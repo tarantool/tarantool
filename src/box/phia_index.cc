@@ -48,94 +48,6 @@
 #include "txn.h"
 #include "phia.h"
 
-enum { PHIA_KEY_MAXLEN = 1024 };
-static char PHIA_STRING_MIN[] = { '\0' };
-static char PHIA_STRING_MAX[PHIA_KEY_MAXLEN]; /* initialized in PhiaIndex() */
-static uint64_t num_parts[BOX_INDEX_PART_MAX];
-
-void
-phia_set_fields(struct key_def *key_def, struct phia_field *fields,
-		const char **data, uint32_t part_count)
-{
-	for (uint32_t i = 0; i < part_count; i++) {
-		struct phia_field *field = &fields[i];
-		switch (key_def->parts[i].type) {
-		case NUM:
-			num_parts[i] = mp_decode_uint(data);
-			field->data = (char *)&num_parts[i];
-			field->size = sizeof(uint64_t);
-			break;
-		case STRING:
-			field->data = mp_decode_str(data, &field->size);
-			if (field->size > PHIA_KEY_MAXLEN)
-				tnt_raise(ClientError, ER_KEY_PART_IS_TOO_LONG,
-					  field->size, PHIA_KEY_MAXLEN);
-			break;
-		default:
-			unreachable();
-			return;
-		}
-	}
-}
-
-struct phia_tuple *
-phia_tuple_from_key_data(struct phia_index *index, struct key_def *key_def,
-			 const char *key, uint32_t part_count, int order)
-{
-	assert(part_count == 0 || key != NULL);
-	assert(part_count <= key_def->part_count);
-	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	phia_set_fields(key_def, fields, &key, part_count);
-	/* Fill remaining parts of key */
-	for (uint32_t i = part_count; i < key_def->part_count; i++) {
-		struct phia_field *field = &fields[i];
-		if ((i > 0 && (order == PHIA_GT || order == PHIA_LE)) ||
-		    (i == 0 && (order == PHIA_LT || order == PHIA_LE))) {
-			switch (key_def->parts[i].type) {
-			case NUM:
-				num_parts[i] = UINT64_MAX;
-				field->data = (char*)&num_parts[i];
-				field->size = sizeof(uint64_t);
-				break;
-			case STRING:
-				field->data = PHIA_STRING_MAX;
-				field->size = sizeof(PHIA_STRING_MAX);
-				break;
-			default:
-				unreachable();
-			}
-		} else if ((i > 0 && (order == PHIA_GE || order == PHIA_LT)) ||
-			   (i == 0 && (order == PHIA_GT || order == PHIA_GE))) {
-			switch (key_def->parts[i].type) {
-			case NUM:
-				num_parts[i] = 0;
-				field->data = (char*)&num_parts[i];
-				field->size = sizeof(uint64_t);
-				break;
-			case STRING:
-				field->data = PHIA_STRING_MIN;
-				field->size = 0;
-				break;
-			default:
-				unreachable();
-			}
-		} else {
-			unreachable();
-		}
-	}
-	/* Add an empty value. Value is stored after key parts. */
-	struct phia_field *value_field = &fields[key_def->part_count];
-	if (order == PHIA_LT || order == PHIA_LE) {
-		value_field->data = PHIA_STRING_MAX;
-		value_field->size = sizeof(PHIA_STRING_MAX);
-	} else {
-		value_field->data = PHIA_STRING_MIN;
-		value_field->size = 0;
-	}
-	/* Create tuple */
-	return phia_tuple_new(index, fields, key_def->part_count + 1);
-}
-
 PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	: Index(key_def_arg)
 {
@@ -158,7 +70,6 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 		phia_raise();
 	format = space->format;
 	tuple_format_ref(format, 1);
-	memset(PHIA_STRING_MAX, 0xff, sizeof(PHIA_STRING_MAX));
 }
 
 PhiaIndex::~PhiaIndex()
@@ -231,7 +142,9 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->opts.is_unique && part_count == key_def->part_count);
 	struct phia_tuple *phia_key =
-		phia_tuple_from_key_data(db, key_def, key, part_count, PHIA_EQ);
+		phia_tuple_from_key_data(db, key, part_count, PHIA_EQ);
+	if (phia_key == NULL)
+		diag_raise();
 	auto key_guard = make_scoped_guard([=] {
 		phia_tuple_unref(db, phia_key);
 	});
@@ -409,7 +322,9 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	}
 
 	struct phia_tuple *phia_key =
-		phia_tuple_from_key_data(db, key_def, key, part_count, order);
+		phia_tuple_from_key_data(db, key, part_count, order);
+	if (phia_key == NULL)
+		diag_raise();
 	it->cursor = phia_cursor_new(db, phia_key, order);
 	phia_tuple_unref(db, phia_key);
 	if (it->cursor == NULL)

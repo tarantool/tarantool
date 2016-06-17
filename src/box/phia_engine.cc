@@ -431,7 +431,9 @@ join_send_space(struct space *sp, void *data)
 
 	/* send database */
 	struct phia_tuple *phia_key =
-		phia_tuple_from_key_data(pk->db, pk->key_def, NULL, 0, PHIA_GE);
+		phia_tuple_from_key_data(pk->db, NULL, 0, PHIA_GE);
+	if (phia_key == NULL)
+		diag_raise();
 	struct phia_cursor *cursor = phia_cursor_new(pk->db, phia_key, PHIA_GE);
 	phia_tuple_unref(pk->db, phia_key);
 	if (cursor == NULL)

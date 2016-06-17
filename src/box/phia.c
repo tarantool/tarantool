@@ -61,7 +61,8 @@
 #include <small/rlist.h>
 #define RB_COMPACT 1
 #define RB_CMP_TREE_ARG 1
-#include "small/rb.h"
+#include <small/rb.h>
+#include <msgpuck/msgpuck.h>
 
 #include "trivia/util.h"
 #include "crc32.h"
@@ -70,11 +71,11 @@
 #include "tt_pthread.h"
 #include "assoc.h"
 #include "cfg.h"
-
-#include "key_def.h"
-
-#include "box/errcode.h"
 #include "diag.h"
+
+#include "errcode.h"
+#include "key_def.h"
+#include "tuple_update.h"
 
 #define ssunused __attribute__((unused))
 
@@ -2639,13 +2640,177 @@ sv_upsertpop(struct svupsert *u)
 	return ss_bufat(&u->stack, sizeof(struct svupsertnode), pos);
 }
 
-/* TODO: move implementation from phia_space.cc */
-extern int
+static inline int
+phia_upsert_prepare(char **src, uint32_t *src_size,
+                      char **mp, uint32_t *mp_size, uint32_t *mp_size_key,
+                      struct key_def *key_def)
+{
+	/* calculate msgpack size */
+	*mp_size_key = 0;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (key_def->parts[i].type == STRING)
+			*mp_size_key += mp_sizeof_str(src_size[i]);
+		else
+			*mp_size_key += mp_sizeof_uint(load_u64(src[i]));
+	}
+
+	/* count msgpack fields */
+	uint32_t count = key_def->part_count;
+	uint32_t value_field = key_def->part_count;
+	uint32_t value_size = src_size[value_field];
+	char *p = src[value_field];
+	char *end = p + value_size;
+	while (p < end) {
+		count++;
+		mp_next((const char **)&p);
+	}
+
+	/* allocate and encode tuple */
+	*mp_size = mp_sizeof_array(count) + *mp_size_key + value_size;
+	*mp = (char *)malloc(*mp_size);
+	if (mp == NULL)
+		return -1;
+	p = *mp;
+	p = mp_encode_array(p, count);
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (key_def->parts[i].type == STRING)
+			p = mp_encode_str(p, src[i], src_size[i]);
+		else
+			p = mp_encode_uint(p, load_u64(src[i]));
+	}
+	memcpy(p, src[value_field], src_size[value_field]);
+	return 0;
+}
+
+struct phia_mempool {
+	void *chunks[128];
+	int count;
+};
+
+static inline void
+phia_mempool_init(struct phia_mempool *p)
+{
+	p->count = 0;
+}
+
+static inline void
+phia_mempool_free(struct phia_mempool *p)
+{
+	int i = 0;
+	while (i < p->count) {
+		free(p->chunks[i]);
+		i++;
+	}
+}
+
+static void *
+phia_update_alloc(void *arg, size_t size)
+{
+	/* simulate region allocator for use with
+	 * tuple_upsert_execute() */
+	struct phia_mempool *p = (struct phia_mempool*)arg;
+	assert(p->count < 128);
+	void *ptr = malloc(size);
+	p->chunks[p->count++] = ptr;
+	return ptr;
+}
+
+static inline int
+phia_upsert_do(char **result, uint32_t *result_size,
+              char *tuple, uint32_t tuple_size, uint32_t tuple_size_key,
+              char *upsert, int upsert_size)
+{
+	char *p = upsert;
+	uint8_t index_base = *(uint8_t *)p;
+	p += sizeof(uint8_t);
+	uint32_t default_tuple_size = *(uint32_t *)p;
+	p += sizeof(uint32_t);
+	p += default_tuple_size;
+	char *expr = p;
+	char *expr_end = upsert + upsert_size;
+	const char *up;
+	uint32_t up_size;
+
+	/* emit upsert */
+	struct phia_mempool alloc;
+	phia_mempool_init(&alloc);
+	up = tuple_upsert_execute(phia_update_alloc, &alloc,
+				  expr, expr_end,
+		                  tuple, tuple + tuple_size,
+		                  &up_size, index_base);
+	if (up == NULL)
+		goto error;
+
+	/* skip array size and key */
+	const char *ptr = up;
+	mp_decode_array(&ptr);
+	ptr += tuple_size_key;
+
+	/* get new value */
+	*result_size = (uint32_t)((up + up_size) -  ptr);
+	*result = (char *)malloc(*result_size);
+	if (*result == NULL)
+		goto error;
+	memcpy(*result, ptr, *result_size);
+	phia_mempool_free(&alloc);
+	return 0;
+error:
+	phia_mempool_free(&alloc);
+	return -1;
+}
+
+static int
 phia_upsert_cb(int count,
 	       char **src,    uint32_t *src_size,
 	       char **upsert, uint32_t *upsert_size,
 	       char **result, uint32_t *result_size,
-	       struct key_def *key_def);
+	       struct key_def *key_def)
+{
+	uint32_t value_field;
+	value_field = key_def->part_count;
+
+	/* use default tuple value */
+	if (src == NULL)
+	{
+		/* result key fields are initialized to upsert
+		 * fields by default */
+		char *p = upsert[value_field];
+		p += sizeof(uint8_t); /* index base */
+		uint32_t value_size = *(uint32_t *)p;
+		p += sizeof(uint32_t);
+		void *value = (char *)malloc(value_size);
+		if (value == NULL)
+			return -1;
+		memcpy(value, p, value_size);
+		result[value_field] = (char*)value;
+		result_size[value_field] = value_size;
+		return 0;
+	}
+
+	/* convert src to msgpack */
+	char *tuple;
+	uint32_t tuple_size_key;
+	uint32_t tuple_size;
+	int rc;
+	rc = phia_upsert_prepare(src, src_size,
+	                           &tuple, &tuple_size, &tuple_size_key,
+	                           key_def);
+	if (rc == -1)
+		return -1;
+
+	/* execute upsert */
+	rc = phia_upsert_do(&result[value_field],
+	                   &result_size[value_field],
+	                   tuple, tuple_size, tuple_size_key,
+	                   upsert[value_field],
+	                   upsert_size[value_field]);
+	free(tuple);
+
+	(void)count;
+	(void)upsert_size;
+	return rc;
+}
+
 
 static inline int
 sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *key_def,
@@ -12167,7 +12332,7 @@ static int phia_index_recoverend(struct phia_index *db)
 	return 0;
 }
 
-struct phia_tuple *
+static struct phia_tuple *
 phia_tuple_new(struct phia_index *db, struct phia_field *fields,
 	       uint32_t fields_count)
 {
@@ -12214,6 +12379,123 @@ phia_tuple_from_sv(struct runtime *r, struct sv *sv)
 	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
 	tt_pthread_mutex_unlock(&r->stat->lock);
 	return v;
+}
+
+enum { PHIA_KEY_MAXLEN = 1024 };
+static char PHIA_STRING_MIN[] = { '\0' };
+static char PHIA_STRING_MAX[PHIA_KEY_MAXLEN];
+static uint64_t num_parts[BOX_INDEX_PART_MAX];
+
+static inline int
+phia_set_fields(struct key_def *key_def, struct phia_field *fields,
+		const char **data, uint32_t part_count)
+{
+	for (uint32_t i = 0; i < part_count; i++) {
+		struct phia_field *field = &fields[i];
+		switch (key_def->parts[i].type) {
+		case NUM:
+			num_parts[i] = mp_decode_uint(data);
+			field->data = (char *)&num_parts[i];
+			field->size = sizeof(uint64_t);
+			break;
+		case STRING:
+			field->data = mp_decode_str(data, &field->size);
+			if (field->size > PHIA_KEY_MAXLEN) {
+				diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
+					  field->size, PHIA_KEY_MAXLEN);
+				return -1;
+			}
+			break;
+		default:
+			unreachable();
+			return -1;
+		}
+	}
+	return 0;
+}
+
+struct phia_tuple *
+phia_tuple_from_key_data(struct phia_index *index, const char *key,
+			 uint32_t part_count, int order)
+{
+	struct key_def *key_def = index->index->key_def;
+	assert(part_count == 0 || key != NULL);
+	assert(part_count <= key_def->part_count);
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	if (phia_set_fields(key_def, fields, &key, part_count) != 0)
+		return NULL;
+	/* Fill remaining parts of key */
+	for (uint32_t i = part_count; i < key_def->part_count; i++) {
+		struct phia_field *field = &fields[i];
+		if ((i > 0 && (order == PHIA_GT || order == PHIA_LE)) ||
+		    (i == 0 && (order == PHIA_LT || order == PHIA_LE))) {
+			switch (key_def->parts[i].type) {
+			case NUM:
+				num_parts[i] = UINT64_MAX;
+				field->data = (char*)&num_parts[i];
+				field->size = sizeof(uint64_t);
+				break;
+			case STRING:
+				field->data = PHIA_STRING_MAX;
+				field->size = sizeof(PHIA_STRING_MAX);
+				break;
+			default:
+				unreachable();
+			}
+		} else if ((i > 0 && (order == PHIA_GE || order == PHIA_LT)) ||
+			   (i == 0 && (order == PHIA_GT || order == PHIA_GE))) {
+			switch (key_def->parts[i].type) {
+			case NUM:
+				num_parts[i] = 0;
+				field->data = (char*)&num_parts[i];
+				field->size = sizeof(uint64_t);
+				break;
+			case STRING:
+				field->data = PHIA_STRING_MIN;
+				field->size = 0;
+				break;
+			default:
+				unreachable();
+			}
+		} else {
+			unreachable();
+		}
+	}
+	/* Add an empty value. Value is stored after key parts. */
+	struct phia_field *value_field = &fields[key_def->part_count];
+	if (order == PHIA_LT || order == PHIA_LE) {
+		value_field->data = PHIA_STRING_MAX;
+		value_field->size = sizeof(PHIA_STRING_MAX);
+	} else {
+		value_field->data = PHIA_STRING_MIN;
+		value_field->size = 0;
+	}
+	/* Create tuple */
+	return phia_tuple_new(index, fields, key_def->part_count + 1);
+}
+
+/*
+ * Create phia_tuple from raw MsgPack data.
+ */
+struct phia_tuple *
+phia_tuple_from_data(struct phia_index *index, const char *data,
+		     const char *data_end)
+{
+	struct key_def *key_def = index->index->key_def;
+
+	uint32_t count = mp_decode_array(&data);
+	assert(count >= key_def->part_count);
+	(void) count;
+
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	if (phia_set_fields(key_def, fields, &data, key_def->part_count) != 0)
+		return NULL;
+
+	/* Value is stored after key parts */
+	struct phia_field *value = &fields[key_def->part_count];
+	value->data = data;
+	value->size = data_end - data;
+	return phia_tuple_new(index, fields, key_def->part_count + 1);
 }
 
 void
@@ -12343,9 +12625,63 @@ phia_replace(struct phia_tx *tx, struct phia_index *index,
 
 int
 phia_upsert(struct phia_tx *tx, struct phia_index *index,
-	    struct phia_tuple *tuple)
+	    const char *tuple, const char *tuple_end,
+	    const char *expr, const char *expr_end, int index_base)
 {
-	return phia_tx_write(tx, index, tuple, SVUPSERT);
+	struct key_def *key_def = index->index->key_def;
+
+	/* upsert */
+	mp_decode_array(&tuple);
+
+	/* Set key fields */
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	const char *tuple_value = tuple;
+	if (phia_set_fields(key_def, fields, &tuple_value,
+				key_def->part_count) != 0)
+		return -1;
+
+	/*
+	 * Set value field:
+	 *  - index_base: uint8_t
+	 *  - tuple_tail_size: uint32_t
+	 *  - tuple_tail: char
+	 *  - expr: char
+	 */
+	uint32_t expr_size  = expr_end - expr;
+	uint32_t tuple_value_size = tuple_end - tuple_value;
+	uint32_t value_size = sizeof(uint8_t) + sizeof(uint32_t) +
+		tuple_value_size + expr_size;
+	char *value = (char *)malloc(value_size);
+	if (value == NULL) {
+		diag_set(OutOfMemory, sizeof(value_size), "phia",
+		          "upsert");
+		return -1;
+	}
+	char *p = value;
+	memcpy(p, &index_base, sizeof(uint8_t));
+	p += sizeof(uint8_t);
+	memcpy(p, &tuple_value_size, sizeof(uint32_t));
+	p += sizeof(uint32_t);
+	memcpy(p, tuple_value, tuple_value_size);
+	p += tuple_value_size;
+	memcpy(p, expr, expr_size);
+	p += expr_size;
+	assert(p == value + value_size);
+
+	/* Value is stored after key parts */
+	struct phia_field *value_field = &fields[key_def->part_count];
+	value_field->data = value;
+	value_field->size = value_size;
+
+	struct phia_tuple *phia_tuple =
+		phia_tuple_new(index, fields, key_def->part_count + 1);
+	free(value);
+	if (phia_tuple == NULL)
+		return -1;
+
+	int rc = phia_tx_write(tx, index, phia_tuple, SVUPSERT);
+	phia_tuple_unref(index, phia_tuple);
+	return rc;
 }
 
 int
@@ -12531,6 +12867,7 @@ phia_env_new(void)
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
+	memset(PHIA_STRING_MAX, 0xff, sizeof(PHIA_STRING_MAX));
 	return e;
 error:
 	phia_env_delete(e);

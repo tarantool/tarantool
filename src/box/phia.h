@@ -120,7 +120,8 @@ phia_replace(struct phia_tx *tx, struct phia_index *index,
 
 int
 phia_upsert(struct phia_tx *tx, struct phia_index *index,
-	    struct phia_tuple *tuple);
+	    const char *tuple, const char *tuple_end,
+	    const char *ops, const char *ops_end, int index_base);
 
 int
 phia_delete(struct phia_tx *tx, struct phia_index *index,
@@ -202,8 +203,12 @@ struct phia_field {
 };
 
 struct phia_tuple *
-phia_tuple_new(struct phia_index *index, struct phia_field *fields,
-	       uint32_t fields_count);
+phia_tuple_from_data(struct phia_index *index, const char *data,
+		     const char *data_end);
+
+struct phia_tuple *
+phia_tuple_from_key_data(struct phia_index *index, const char *key,
+			 uint32_t part_count, int order);
 
 char *
 phia_tuple_field(struct phia_index *index, struct phia_tuple *tuple,

@@ -151,7 +151,7 @@ i = s:create_index('primary',{parts={1, 'STR'}})
 ...
 box.space.t:insert{1,'A'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected STR'
 ...
 s:drop()
 ---

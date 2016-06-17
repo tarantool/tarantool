@@ -7,11 +7,11 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
 ...
 space:insert{1}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected STR'
 ...
 space:replace{1}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected STR'
 ...
 space:delete{1}
 ---
@@ -45,11 +45,11 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 ...
 space:insert{'A'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 space:replace{'A'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 space:delete{'A'}
 ---

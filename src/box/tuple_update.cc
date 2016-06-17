@@ -983,14 +983,18 @@ tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base)
 {
-	struct tuple_update update;
-	update_init(&update, alloc, alloc_ctx, old_data, old_data_end,
-		    index_base);
+	try {
+		struct tuple_update update;
+		update_init(&update, alloc, alloc_ctx, old_data, old_data_end,
+			    index_base);
 
-	update_read_ops(&update, expr, expr_end);
-	update_do_ops(&update);
+		update_read_ops(&update, expr, expr_end);
+		update_do_ops(&update);
 
-	return update_finish(&update, p_tuple_len);
+		return update_finish(&update, p_tuple_len);
+	} catch (Exception *e) {
+		 return NULL;
+	}
 }
 
 const char *
@@ -999,13 +1003,16 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base)
 {
-	struct tuple_update update;
-	update_init(&update, alloc, alloc_ctx, old_data, old_data_end,
-		    index_base);
+	try {
+		struct tuple_update update;
+		update_init(&update, alloc, alloc_ctx, old_data, old_data_end,
+			    index_base);
 
-	update_read_ops(&update, expr, expr_end);
-	upsert_do_ops(&update);
+		update_read_ops(&update, expr, expr_end);
+		upsert_do_ops(&update);
 
-	return update_finish(&update, p_tuple_len);
+		return update_finish(&update, p_tuple_len);
+	} catch (Exception *e) {
+		 return NULL;
+	}
 }
-

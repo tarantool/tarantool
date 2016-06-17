@@ -67,12 +67,4 @@ private:
 	struct tuple_format *format;
 };
 
-void
-phia_set_fields(struct key_def *key_def, struct phia_field *fields,
-		const char **data, uint32_t part_count);
-
-struct phia_tuple *
-phia_tuple_from_key_data(struct phia_index *index, struct key_def *key_def,
-			 const char *key, uint32_t part_count, int order);
-
 #endif /* TARANTOOL_BOX_PHIA_INDEX_H_INCLUDED */

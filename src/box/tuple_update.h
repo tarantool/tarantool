@@ -34,14 +34,16 @@
 #include <stddef.h>
 #include "trivia/util.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum {
 	/** A limit on how many operations a single UPDATE can have. */
 	BOX_UPDATE_OP_CNT_MAX = 4000,
 };
 
-extern "C" {
 typedef void *(*tuple_update_alloc_func)(void *, size_t);
-}
 
 const char *
 tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
@@ -55,5 +57,8 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_new_size, int index_base);
 
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED */

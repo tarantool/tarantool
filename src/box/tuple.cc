@@ -367,6 +367,8 @@ tuple_update(struct tuple_format *format,
 				     expr, expr_end, old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
 				     &new_size, field_base);
+	if (new_data == NULL)
+		diag_raise();
 
 	return tuple_new(format, new_data, new_data + new_size);
 }
@@ -383,6 +385,8 @@ tuple_upsert(struct tuple_format *format,
 				     old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
 				     &new_size, field_base);
+	if (new_data == NULL)
+		diag_raise();
 
 	return tuple_new(format, new_data, new_data + new_size);
 }
