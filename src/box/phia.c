@@ -4646,7 +4646,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 	tt_pthread_mutex_lock(&index->mutex);
 	struct sxv *head = sxv_tree_search_key(&index->tree,
 					       key->data, key->size);
-	if (head != NULL)
+	if (head == NULL)
 		goto add;
 	struct sxv *v = sx_vmatch(head, x->id);
 	if (v == NULL)
@@ -4669,10 +4669,10 @@ add:
 	if (x->log_read == -1)
 		x->log_read = sv_logcount(x->log);
 	tt_pthread_mutex_unlock(&index->mutex);
+	phia_tuple_ref(key);
 	int rc = sx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
-	phia_tuple_ref(key);
 	return 0;
 }
 
