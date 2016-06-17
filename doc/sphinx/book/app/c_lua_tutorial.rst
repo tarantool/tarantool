@@ -629,7 +629,7 @@ Read the following Lua code to see how it works.
 The comments that begin with "SEE NOTE ..." refer to long
 explanations that follow the code.
 
-.. code-block:: tarantoolsession
+.. code-block:: lua
 
    function indexed_pattern_search(space_name, field_no, pattern)
      -- SEE NOTE #1 "FIND AN APPROPRIATE INDEX"

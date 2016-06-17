@@ -328,12 +328,13 @@ csv_next(struct csv_iterator *it)
 		return CSV_IT_ERROR;
 
 	it->buf_begin = tail;
-	/* bufp == NULL means end of line */
-	if (it->csv->bufp == NULL)
-		return CSV_IT_EOL;
 
 	if (tail == it->buf_end) /* buffer is empty */
 		return CSV_IT_NEEDMORE;
+
+	/* bufp == NULL means end of line */
+	if (it->csv->bufp == NULL)
+		return CSV_IT_EOL;
 
 	/* return field via iterator structure */
 	it->field = it->csv->buf;
