@@ -620,204 +620,228 @@ ok 7 - subtests
     ok 78 - mp_encode(0xffffffffU) == "\xc6\xff\xff\xff\xff"
     # *** test_binls: done ***
 ok 8 - subtests
-    1..84
+    1..96
     # *** test_strs ***
     # str len=0x01
     ok 1 - len(mp_decode_str(x, 1))
-    ok 2 - mp_check_str(mp_encode_str(x, 0x01))
-    ok 3 - len(mp_decode_str(x, 0x01)
-    ok 4 - len(mp_next_str(x, 0x01)
-    ok 5 - len(mp_check_str(x, 0x01)
-    ok 6 - mp_sizeof_str(0x01)
-    ok 7 - mp_encode_str(x, 0x01) == x
+    ok 2 - len(mp_decode_strbin(x, 1))
+    ok 3 - mp_check_str(mp_encode_str(x, 0x01))
+    ok 4 - len(mp_decode_str(x, 0x01)
+    ok 5 - len(mp_next_str(x, 0x01)
+    ok 6 - len(mp_check_str(x, 0x01)
+    ok 7 - mp_sizeof_str(0x01)
+    ok 8 - mp_encode_str(x, 0x01) == x
     # str len=0x1e
-    ok 8 - len(mp_decode_str(x, 30))
-    ok 9 - mp_check_str(mp_encode_str(x, 0x1e))
-    ok 10 - len(mp_decode_str(x, 0x1e)
-    ok 11 - len(mp_next_str(x, 0x1e)
-    ok 12 - len(mp_check_str(x, 0x1e)
-    ok 13 - mp_sizeof_str(0x1e)
-    ok 14 - mp_encode_str(x, 0x1e) == x
+    ok 9 - len(mp_decode_str(x, 30))
+    ok 10 - len(mp_decode_strbin(x, 30))
+    ok 11 - mp_check_str(mp_encode_str(x, 0x1e))
+    ok 12 - len(mp_decode_str(x, 0x1e)
+    ok 13 - len(mp_next_str(x, 0x1e)
+    ok 14 - len(mp_check_str(x, 0x1e)
+    ok 15 - mp_sizeof_str(0x1e)
+    ok 16 - mp_encode_str(x, 0x1e) == x
     # str len=0x1f
-    ok 15 - len(mp_decode_str(x, 31))
-    ok 16 - mp_check_str(mp_encode_str(x, 0x1f))
-    ok 17 - len(mp_decode_str(x, 0x1f)
-    ok 18 - len(mp_next_str(x, 0x1f)
-    ok 19 - len(mp_check_str(x, 0x1f)
-    ok 20 - mp_sizeof_str(0x1f)
-    ok 21 - mp_encode_str(x, 0x1f) == x
+    ok 17 - len(mp_decode_str(x, 31))
+    ok 18 - len(mp_decode_strbin(x, 31))
+    ok 19 - mp_check_str(mp_encode_str(x, 0x1f))
+    ok 20 - len(mp_decode_str(x, 0x1f)
+    ok 21 - len(mp_next_str(x, 0x1f)
+    ok 22 - len(mp_check_str(x, 0x1f)
+    ok 23 - mp_sizeof_str(0x1f)
+    ok 24 - mp_encode_str(x, 0x1f) == x
     # str len=0x20
-    ok 22 - len(mp_decode_str(x, 32))
-    ok 23 - mp_check_str(mp_encode_str(x, 0x20))
-    ok 24 - len(mp_decode_str(x, 0x20)
-    ok 25 - len(mp_next_str(x, 0x20)
-    ok 26 - len(mp_check_str(x, 0x20)
-    ok 27 - mp_sizeof_str(0x20)
-    ok 28 - mp_encode_str(x, 0x20) == x
+    ok 25 - len(mp_decode_str(x, 32))
+    ok 26 - len(mp_decode_strbin(x, 32))
+    ok 27 - mp_check_str(mp_encode_str(x, 0x20))
+    ok 28 - len(mp_decode_str(x, 0x20)
+    ok 29 - len(mp_next_str(x, 0x20)
+    ok 30 - len(mp_check_str(x, 0x20)
+    ok 31 - mp_sizeof_str(0x20)
+    ok 32 - mp_encode_str(x, 0x20) == x
     # str len=0xfe
-    ok 29 - len(mp_decode_str(x, 254))
-    ok 30 - mp_check_str(mp_encode_str(x, 0xfe))
-    ok 31 - len(mp_decode_str(x, 0xfe)
-    ok 32 - len(mp_next_str(x, 0xfe)
-    ok 33 - len(mp_check_str(x, 0xfe)
-    ok 34 - mp_sizeof_str(0xfe)
-    ok 35 - mp_encode_str(x, 0xfe) == x
+    ok 33 - len(mp_decode_str(x, 254))
+    ok 34 - len(mp_decode_strbin(x, 254))
+    ok 35 - mp_check_str(mp_encode_str(x, 0xfe))
+    ok 36 - len(mp_decode_str(x, 0xfe)
+    ok 37 - len(mp_next_str(x, 0xfe)
+    ok 38 - len(mp_check_str(x, 0xfe)
+    ok 39 - mp_sizeof_str(0xfe)
+    ok 40 - mp_encode_str(x, 0xfe) == x
     # str len=0xff
-    ok 36 - len(mp_decode_str(x, 255))
-    ok 37 - mp_check_str(mp_encode_str(x, 0xff))
-    ok 38 - len(mp_decode_str(x, 0xff)
-    ok 39 - len(mp_next_str(x, 0xff)
-    ok 40 - len(mp_check_str(x, 0xff)
-    ok 41 - mp_sizeof_str(0xff)
-    ok 42 - mp_encode_str(x, 0xff) == x
+    ok 41 - len(mp_decode_str(x, 255))
+    ok 42 - len(mp_decode_strbin(x, 255))
+    ok 43 - mp_check_str(mp_encode_str(x, 0xff))
+    ok 44 - len(mp_decode_str(x, 0xff)
+    ok 45 - len(mp_next_str(x, 0xff)
+    ok 46 - len(mp_check_str(x, 0xff)
+    ok 47 - mp_sizeof_str(0xff)
+    ok 48 - mp_encode_str(x, 0xff) == x
     # str len=0x100
-    ok 43 - len(mp_decode_str(x, 256))
-    ok 44 - mp_check_str(mp_encode_str(x, 0x100))
-    ok 45 - len(mp_decode_str(x, 0x100)
-    ok 46 - len(mp_next_str(x, 0x100)
-    ok 47 - len(mp_check_str(x, 0x100)
-    ok 48 - mp_sizeof_str(0x100)
-    ok 49 - mp_encode_str(x, 0x100) == x
+    ok 49 - len(mp_decode_str(x, 256))
+    ok 50 - len(mp_decode_strbin(x, 256))
+    ok 51 - mp_check_str(mp_encode_str(x, 0x100))
+    ok 52 - len(mp_decode_str(x, 0x100)
+    ok 53 - len(mp_next_str(x, 0x100)
+    ok 54 - len(mp_check_str(x, 0x100)
+    ok 55 - mp_sizeof_str(0x100)
+    ok 56 - mp_encode_str(x, 0x100) == x
     # str len=0x101
-    ok 50 - len(mp_decode_str(x, 257))
-    ok 51 - mp_check_str(mp_encode_str(x, 0x101))
-    ok 52 - len(mp_decode_str(x, 0x101)
-    ok 53 - len(mp_next_str(x, 0x101)
-    ok 54 - len(mp_check_str(x, 0x101)
-    ok 55 - mp_sizeof_str(0x101)
-    ok 56 - mp_encode_str(x, 0x101) == x
+    ok 57 - len(mp_decode_str(x, 257))
+    ok 58 - len(mp_decode_strbin(x, 257))
+    ok 59 - mp_check_str(mp_encode_str(x, 0x101))
+    ok 60 - len(mp_decode_str(x, 0x101)
+    ok 61 - len(mp_next_str(x, 0x101)
+    ok 62 - len(mp_check_str(x, 0x101)
+    ok 63 - mp_sizeof_str(0x101)
+    ok 64 - mp_encode_str(x, 0x101) == x
     # str len=0xfffe
-    ok 57 - len(mp_decode_str(x, 65534))
-    ok 58 - mp_check_str(mp_encode_str(x, 0xfffe))
-    ok 59 - len(mp_decode_str(x, 0xfffe)
-    ok 60 - len(mp_next_str(x, 0xfffe)
-    ok 61 - len(mp_check_str(x, 0xfffe)
-    ok 62 - mp_sizeof_str(0xfffe)
-    ok 63 - mp_encode_str(x, 0xfffe) == x
+    ok 65 - len(mp_decode_str(x, 65534))
+    ok 66 - len(mp_decode_strbin(x, 65534))
+    ok 67 - mp_check_str(mp_encode_str(x, 0xfffe))
+    ok 68 - len(mp_decode_str(x, 0xfffe)
+    ok 69 - len(mp_next_str(x, 0xfffe)
+    ok 70 - len(mp_check_str(x, 0xfffe)
+    ok 71 - mp_sizeof_str(0xfffe)
+    ok 72 - mp_encode_str(x, 0xfffe) == x
     # str len=0xffff
-    ok 64 - len(mp_decode_str(x, 65535))
-    ok 65 - mp_check_str(mp_encode_str(x, 0xffff))
-    ok 66 - len(mp_decode_str(x, 0xffff)
-    ok 67 - len(mp_next_str(x, 0xffff)
-    ok 68 - len(mp_check_str(x, 0xffff)
-    ok 69 - mp_sizeof_str(0xffff)
-    ok 70 - mp_encode_str(x, 0xffff) == x
+    ok 73 - len(mp_decode_str(x, 65535))
+    ok 74 - len(mp_decode_strbin(x, 65535))
+    ok 75 - mp_check_str(mp_encode_str(x, 0xffff))
+    ok 76 - len(mp_decode_str(x, 0xffff)
+    ok 77 - len(mp_next_str(x, 0xffff)
+    ok 78 - len(mp_check_str(x, 0xffff)
+    ok 79 - mp_sizeof_str(0xffff)
+    ok 80 - mp_encode_str(x, 0xffff) == x
     # str len=0x10000
-    ok 71 - len(mp_decode_str(x, 65536))
-    ok 72 - mp_check_str(mp_encode_str(x, 0x10000))
-    ok 73 - len(mp_decode_str(x, 0x10000)
-    ok 74 - len(mp_next_str(x, 0x10000)
-    ok 75 - len(mp_check_str(x, 0x10000)
-    ok 76 - mp_sizeof_str(0x10000)
-    ok 77 - mp_encode_str(x, 0x10000) == x
+    ok 81 - len(mp_decode_str(x, 65536))
+    ok 82 - len(mp_decode_strbin(x, 65536))
+    ok 83 - mp_check_str(mp_encode_str(x, 0x10000))
+    ok 84 - len(mp_decode_str(x, 0x10000)
+    ok 85 - len(mp_next_str(x, 0x10000)
+    ok 86 - len(mp_check_str(x, 0x10000)
+    ok 87 - mp_sizeof_str(0x10000)
+    ok 88 - mp_encode_str(x, 0x10000) == x
     # str len=0x10001
-    ok 78 - len(mp_decode_str(x, 65537))
-    ok 79 - mp_check_str(mp_encode_str(x, 0x10001))
-    ok 80 - len(mp_decode_str(x, 0x10001)
-    ok 81 - len(mp_next_str(x, 0x10001)
-    ok 82 - len(mp_check_str(x, 0x10001)
-    ok 83 - mp_sizeof_str(0x10001)
-    ok 84 - mp_encode_str(x, 0x10001) == x
+    ok 89 - len(mp_decode_str(x, 65537))
+    ok 90 - len(mp_decode_strbin(x, 65537))
+    ok 91 - mp_check_str(mp_encode_str(x, 0x10001))
+    ok 92 - len(mp_decode_str(x, 0x10001)
+    ok 93 - len(mp_next_str(x, 0x10001)
+    ok 94 - len(mp_check_str(x, 0x10001)
+    ok 95 - mp_sizeof_str(0x10001)
+    ok 96 - mp_encode_str(x, 0x10001) == x
     # *** test_strs: done ***
 ok 9 - subtests
-    1..84
+    1..96
     # *** test_bins ***
     # bin len=0x01
     ok 1 - len(mp_decode_bin(x, 1))
-    ok 2 - mp_check_bin(mp_encode_bin(x, 0x01))
-    ok 3 - len(mp_decode_bin(x, 0x01)
-    ok 4 - len(mp_next_bin(x, 0x01)
-    ok 5 - len(mp_check_bin(x, 0x01)
-    ok 6 - mp_sizeof_bin(0x01)
-    ok 7 - mp_encode_bin(x, 0x01) == x
+    ok 2 - len(mp_decode_strbin(x, 1))
+    ok 3 - mp_check_bin(mp_encode_bin(x, 0x01))
+    ok 4 - len(mp_decode_bin(x, 0x01)
+    ok 5 - len(mp_next_bin(x, 0x01)
+    ok 6 - len(mp_check_bin(x, 0x01)
+    ok 7 - mp_sizeof_bin(0x01)
+    ok 8 - mp_encode_bin(x, 0x01) == x
     # bin len=0x1e
-    ok 8 - len(mp_decode_bin(x, 30))
-    ok 9 - mp_check_bin(mp_encode_bin(x, 0x1e))
-    ok 10 - len(mp_decode_bin(x, 0x1e)
-    ok 11 - len(mp_next_bin(x, 0x1e)
-    ok 12 - len(mp_check_bin(x, 0x1e)
-    ok 13 - mp_sizeof_bin(0x1e)
-    ok 14 - mp_encode_bin(x, 0x1e) == x
+    ok 9 - len(mp_decode_bin(x, 30))
+    ok 10 - len(mp_decode_strbin(x, 30))
+    ok 11 - mp_check_bin(mp_encode_bin(x, 0x1e))
+    ok 12 - len(mp_decode_bin(x, 0x1e)
+    ok 13 - len(mp_next_bin(x, 0x1e)
+    ok 14 - len(mp_check_bin(x, 0x1e)
+    ok 15 - mp_sizeof_bin(0x1e)
+    ok 16 - mp_encode_bin(x, 0x1e) == x
     # bin len=0x1f
-    ok 15 - len(mp_decode_bin(x, 31))
-    ok 16 - mp_check_bin(mp_encode_bin(x, 0x1f))
-    ok 17 - len(mp_decode_bin(x, 0x1f)
-    ok 18 - len(mp_next_bin(x, 0x1f)
-    ok 19 - len(mp_check_bin(x, 0x1f)
-    ok 20 - mp_sizeof_bin(0x1f)
-    ok 21 - mp_encode_bin(x, 0x1f) == x
+    ok 17 - len(mp_decode_bin(x, 31))
+    ok 18 - len(mp_decode_strbin(x, 31))
+    ok 19 - mp_check_bin(mp_encode_bin(x, 0x1f))
+    ok 20 - len(mp_decode_bin(x, 0x1f)
+    ok 21 - len(mp_next_bin(x, 0x1f)
+    ok 22 - len(mp_check_bin(x, 0x1f)
+    ok 23 - mp_sizeof_bin(0x1f)
+    ok 24 - mp_encode_bin(x, 0x1f) == x
     # bin len=0x20
-    ok 22 - len(mp_decode_bin(x, 32))
-    ok 23 - mp_check_bin(mp_encode_bin(x, 0x20))
-    ok 24 - len(mp_decode_bin(x, 0x20)
-    ok 25 - len(mp_next_bin(x, 0x20)
-    ok 26 - len(mp_check_bin(x, 0x20)
-    ok 27 - mp_sizeof_bin(0x20)
-    ok 28 - mp_encode_bin(x, 0x20) == x
+    ok 25 - len(mp_decode_bin(x, 32))
+    ok 26 - len(mp_decode_strbin(x, 32))
+    ok 27 - mp_check_bin(mp_encode_bin(x, 0x20))
+    ok 28 - len(mp_decode_bin(x, 0x20)
+    ok 29 - len(mp_next_bin(x, 0x20)
+    ok 30 - len(mp_check_bin(x, 0x20)
+    ok 31 - mp_sizeof_bin(0x20)
+    ok 32 - mp_encode_bin(x, 0x20) == x
     # bin len=0xfe
-    ok 29 - len(mp_decode_bin(x, 254))
-    ok 30 - mp_check_bin(mp_encode_bin(x, 0xfe))
-    ok 31 - len(mp_decode_bin(x, 0xfe)
-    ok 32 - len(mp_next_bin(x, 0xfe)
-    ok 33 - len(mp_check_bin(x, 0xfe)
-    ok 34 - mp_sizeof_bin(0xfe)
-    ok 35 - mp_encode_bin(x, 0xfe) == x
+    ok 33 - len(mp_decode_bin(x, 254))
+    ok 34 - len(mp_decode_strbin(x, 254))
+    ok 35 - mp_check_bin(mp_encode_bin(x, 0xfe))
+    ok 36 - len(mp_decode_bin(x, 0xfe)
+    ok 37 - len(mp_next_bin(x, 0xfe)
+    ok 38 - len(mp_check_bin(x, 0xfe)
+    ok 39 - mp_sizeof_bin(0xfe)
+    ok 40 - mp_encode_bin(x, 0xfe) == x
     # bin len=0xff
-    ok 36 - len(mp_decode_bin(x, 255))
-    ok 37 - mp_check_bin(mp_encode_bin(x, 0xff))
-    ok 38 - len(mp_decode_bin(x, 0xff)
-    ok 39 - len(mp_next_bin(x, 0xff)
-    ok 40 - len(mp_check_bin(x, 0xff)
-    ok 41 - mp_sizeof_bin(0xff)
-    ok 42 - mp_encode_bin(x, 0xff) == x
+    ok 41 - len(mp_decode_bin(x, 255))
+    ok 42 - len(mp_decode_strbin(x, 255))
+    ok 43 - mp_check_bin(mp_encode_bin(x, 0xff))
+    ok 44 - len(mp_decode_bin(x, 0xff)
+    ok 45 - len(mp_next_bin(x, 0xff)
+    ok 46 - len(mp_check_bin(x, 0xff)
+    ok 47 - mp_sizeof_bin(0xff)
+    ok 48 - mp_encode_bin(x, 0xff) == x
     # bin len=0x100
-    ok 43 - len(mp_decode_bin(x, 256))
-    ok 44 - mp_check_bin(mp_encode_bin(x, 0x100))
-    ok 45 - len(mp_decode_bin(x, 0x100)
-    ok 46 - len(mp_next_bin(x, 0x100)
-    ok 47 - len(mp_check_bin(x, 0x100)
-    ok 48 - mp_sizeof_bin(0x100)
-    ok 49 - mp_encode_bin(x, 0x100) == x
+    ok 49 - len(mp_decode_bin(x, 256))
+    ok 50 - len(mp_decode_strbin(x, 256))
+    ok 51 - mp_check_bin(mp_encode_bin(x, 0x100))
+    ok 52 - len(mp_decode_bin(x, 0x100)
+    ok 53 - len(mp_next_bin(x, 0x100)
+    ok 54 - len(mp_check_bin(x, 0x100)
+    ok 55 - mp_sizeof_bin(0x100)
+    ok 56 - mp_encode_bin(x, 0x100) == x
     # bin len=0x101
-    ok 50 - len(mp_decode_bin(x, 257))
-    ok 51 - mp_check_bin(mp_encode_bin(x, 0x101))
-    ok 52 - len(mp_decode_bin(x, 0x101)
-    ok 53 - len(mp_next_bin(x, 0x101)
-    ok 54 - len(mp_check_bin(x, 0x101)
-    ok 55 - mp_sizeof_bin(0x101)
-    ok 56 - mp_encode_bin(x, 0x101) == x
+    ok 57 - len(mp_decode_bin(x, 257))
+    ok 58 - len(mp_decode_strbin(x, 257))
+    ok 59 - mp_check_bin(mp_encode_bin(x, 0x101))
+    ok 60 - len(mp_decode_bin(x, 0x101)
+    ok 61 - len(mp_next_bin(x, 0x101)
+    ok 62 - len(mp_check_bin(x, 0x101)
+    ok 63 - mp_sizeof_bin(0x101)
+    ok 64 - mp_encode_bin(x, 0x101) == x
     # bin len=0xfffe
-    ok 57 - len(mp_decode_bin(x, 65534))
-    ok 58 - mp_check_bin(mp_encode_bin(x, 0xfffe))
-    ok 59 - len(mp_decode_bin(x, 0xfffe)
-    ok 60 - len(mp_next_bin(x, 0xfffe)
-    ok 61 - len(mp_check_bin(x, 0xfffe)
-    ok 62 - mp_sizeof_bin(0xfffe)
-    ok 63 - mp_encode_bin(x, 0xfffe) == x
+    ok 65 - len(mp_decode_bin(x, 65534))
+    ok 66 - len(mp_decode_strbin(x, 65534))
+    ok 67 - mp_check_bin(mp_encode_bin(x, 0xfffe))
+    ok 68 - len(mp_decode_bin(x, 0xfffe)
+    ok 69 - len(mp_next_bin(x, 0xfffe)
+    ok 70 - len(mp_check_bin(x, 0xfffe)
+    ok 71 - mp_sizeof_bin(0xfffe)
+    ok 72 - mp_encode_bin(x, 0xfffe) == x
     # bin len=0xffff
-    ok 64 - len(mp_decode_bin(x, 65535))
-    ok 65 - mp_check_bin(mp_encode_bin(x, 0xffff))
-    ok 66 - len(mp_decode_bin(x, 0xffff)
-    ok 67 - len(mp_next_bin(x, 0xffff)
-    ok 68 - len(mp_check_bin(x, 0xffff)
-    ok 69 - mp_sizeof_bin(0xffff)
-    ok 70 - mp_encode_bin(x, 0xffff) == x
+    ok 73 - len(mp_decode_bin(x, 65535))
+    ok 74 - len(mp_decode_strbin(x, 65535))
+    ok 75 - mp_check_bin(mp_encode_bin(x, 0xffff))
+    ok 76 - len(mp_decode_bin(x, 0xffff)
+    ok 77 - len(mp_next_bin(x, 0xffff)
+    ok 78 - len(mp_check_bin(x, 0xffff)
+    ok 79 - mp_sizeof_bin(0xffff)
+    ok 80 - mp_encode_bin(x, 0xffff) == x
     # bin len=0x10000
-    ok 71 - len(mp_decode_bin(x, 65536))
-    ok 72 - mp_check_bin(mp_encode_bin(x, 0x10000))
-    ok 73 - len(mp_decode_bin(x, 0x10000)
-    ok 74 - len(mp_next_bin(x, 0x10000)
-    ok 75 - len(mp_check_bin(x, 0x10000)
-    ok 76 - mp_sizeof_bin(0x10000)
-    ok 77 - mp_encode_bin(x, 0x10000) == x
+    ok 81 - len(mp_decode_bin(x, 65536))
+    ok 82 - len(mp_decode_strbin(x, 65536))
+    ok 83 - mp_check_bin(mp_encode_bin(x, 0x10000))
+    ok 84 - len(mp_decode_bin(x, 0x10000)
+    ok 85 - len(mp_next_bin(x, 0x10000)
+    ok 86 - len(mp_check_bin(x, 0x10000)
+    ok 87 - mp_sizeof_bin(0x10000)
+    ok 88 - mp_encode_bin(x, 0x10000) == x
     # bin len=0x10001
-    ok 78 - len(mp_decode_bin(x, 65537))
-    ok 79 - mp_check_bin(mp_encode_bin(x, 0x10001))
-    ok 80 - len(mp_decode_bin(x, 0x10001)
-    ok 81 - len(mp_next_bin(x, 0x10001)
-    ok 82 - len(mp_check_bin(x, 0x10001)
-    ok 83 - mp_sizeof_bin(0x10001)
-    ok 84 - mp_encode_bin(x, 0x10001) == x
+    ok 89 - len(mp_decode_bin(x, 65537))
+    ok 90 - len(mp_decode_strbin(x, 65537))
+    ok 91 - mp_check_bin(mp_encode_bin(x, 0x10001))
+    ok 92 - len(mp_decode_bin(x, 0x10001)
+    ok 93 - len(mp_next_bin(x, 0x10001)
+    ok 94 - len(mp_check_bin(x, 0x10001)
+    ok 95 - mp_sizeof_bin(0x10001)
+    ok 96 - mp_encode_bin(x, 0x10001) == x
     # *** test_bins: done ***
 ok 10 - subtests
     1..54
