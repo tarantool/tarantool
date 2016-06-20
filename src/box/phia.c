@@ -4617,7 +4617,7 @@ static enum sxstate sx_rollback(struct sx *x)
 
 
 static int
-phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
+phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *index,
 		struct sicache *cache);
 
 static inline int
@@ -7421,7 +7421,7 @@ si_unlock(struct phia_index *i) {
 }
 
 static inline int
-phia_index_delete(struct phia_index *db);
+phia_index_delete(struct phia_index *index);
 static int si_recover(struct phia_index*);
 static int si_insert(struct phia_index*, struct sinode*);
 static int si_remove(struct phia_index*, struct sinode*);
@@ -7434,16 +7434,16 @@ static int
 si_execute(struct phia_index*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
 static inline void
-si_lru_add(struct phia_index *i, struct svref *ref)
+si_lru_add(struct phia_index *index, struct svref *ref)
 {
-	i->lru_intr_sum += ref->v->size;
-	if (unlikely(i->lru_intr_sum >= i->conf.lru_step))
+	index->lru_intr_sum += ref->v->size;
+	if (unlikely(index->lru_intr_sum >= index->conf.lru_step))
 	{
-		uint64_t lsn = sr_seq(i->r->seq, SR_LSN);
-		i->lru_v += (lsn - i->lru_intr_lsn);
-		i->lru_steps++;
-		i->lru_intr_lsn = lsn;
-		i->lru_intr_sum = 0;
+		uint64_t lsn = sr_seq(index->r->seq, SR_LSN);
+		index->lru_v += (lsn - index->lru_intr_lsn);
+		index->lru_steps++;
+		index->lru_intr_lsn = lsn;
+		index->lru_intr_sum = 0;
 	}
 }
 
@@ -7956,24 +7956,24 @@ static int si_profilerbegin(struct siprofiler*, struct phia_index*);
 static int si_profilerend(struct siprofiler*);
 static int si_profiler(struct siprofiler*);
 
-static int si_insert(struct phia_index *i, struct sinode *n)
+static int si_insert(struct phia_index *index, struct sinode *n)
 {
-	sinode_tree_insert(&i->tree, n);
-	i->n++;
+	sinode_tree_insert(&index->tree, n);
+	index->n++;
 	return 0;
 }
 
-static int si_remove(struct phia_index *i, struct sinode *n)
+static int si_remove(struct phia_index *index, struct sinode *n)
 {
-	sinode_tree_remove(&i->tree, n);
-	i->n--;
+	sinode_tree_remove(&index->tree, n);
+	index->n--;
 	return 0;
 }
 
-static int si_replace(struct phia_index *i, struct sinode *o, struct sinode *n)
+static int si_replace(struct phia_index *index, struct sinode *o, struct sinode *n)
 {
-	sinode_tree_remove(&i->tree, o);
-	sinode_tree_insert(&i->tree, n);
+	sinode_tree_remove(&index->tree, o);
+	sinode_tree_insert(&index->tree, n);
 	return 0;
 }
 
@@ -7985,75 +7985,75 @@ static int si_refs(struct phia_index *i)
 	return v;
 }
 
-static int si_ref(struct phia_index *i, enum siref ref)
+static int si_ref(struct phia_index *index, enum siref ref)
 {
-	tt_pthread_mutex_lock(&i->ref_lock);
+	tt_pthread_mutex_lock(&index->ref_lock);
 	if (ref == SI_REFBE)
-		i->ref_be++;
+		index->ref_be++;
 	else
-		i->ref_fe++;
-	tt_pthread_mutex_unlock(&i->ref_lock);
+		index->ref_fe++;
+	tt_pthread_mutex_unlock(&index->ref_lock);
 	return 0;
 }
 
-static int si_unref(struct phia_index *i, enum siref ref)
+static int si_unref(struct phia_index *index, enum siref ref)
 {
 	int prev_ref = 0;
-	tt_pthread_mutex_lock(&i->ref_lock);
+	tt_pthread_mutex_lock(&index->ref_lock);
 	if (ref == SI_REFBE) {
-		prev_ref = i->ref_be;
-		if (i->ref_be > 0)
-			i->ref_be--;
+		prev_ref = index->ref_be;
+		if (index->ref_be > 0)
+			index->ref_be--;
 	} else {
-		prev_ref = i->ref_fe;
-		if (i->ref_fe > 0)
-			i->ref_fe--;
+		prev_ref = index->ref_fe;
+		if (index->ref_fe > 0)
+			index->ref_fe--;
 	}
-	tt_pthread_mutex_unlock(&i->ref_lock);
+	tt_pthread_mutex_unlock(&index->ref_lock);
 	return prev_ref;
 }
 
-static int si_plan(struct phia_index *i, struct siplan *plan)
+static int si_plan(struct phia_index *index, struct siplan *plan)
 {
-	si_lock(i);
-	int rc = si_planner(&i->p, plan);
-	si_unlock(i);
+	si_lock(index);
+	int rc = si_planner(&index->p, plan);
+	si_unlock(index);
 	return rc;
 }
 
 static int
-si_execute(struct phia_index *i, struct sdc *c, struct siplan *plan,
+si_execute(struct phia_index *index, struct sdc *c, struct siplan *plan,
 	   uint64_t vlsn, uint64_t vlsn_lru)
 {
 	int rc = -1;
 	switch (plan->plan) {
 	case SI_NODEGC:
-		rc = si_nodefree(plan->node, i->r, 1);
+		rc = si_nodefree(plan->node, index->r, 1);
 		break;
 	case SI_CHECKPOINT:
 	case SI_BRANCH:
 	case SI_AGE:
-		rc = si_branch(i, c, plan, vlsn);
+		rc = si_branch(index, c, plan, vlsn);
 		break;
 	case SI_LRU:
 	case SI_GC:
 	case SI_COMPACT:
-		rc = si_compact(i, c, plan, vlsn, vlsn_lru, NULL, 0);
+		rc = si_compact(index, c, plan, vlsn, vlsn_lru, NULL, 0);
 		break;
 	case SI_COMPACT_INDEX:
-		rc = si_compact_index(i, c, plan, vlsn, vlsn_lru);
+		rc = si_compact_index(index, c, plan, vlsn, vlsn_lru);
 		break;
 	case SI_SHUTDOWN:
-		rc = phia_index_delete(i);
+		rc = phia_index_delete(index);
 		break;
 	case SI_DROP:
-		rc = si_drop(i);
+		rc = si_drop(index);
 		break;
 	}
 	/* garbage collect buffers */
 	if (plan->plan != SI_SHUTDOWN &&
 	    plan->plan != SI_DROP) {
-		sd_cgc(c, i->r->a, i->conf.buf_gc_wm);
+		sd_cgc(c, index->r->a, index->conf.buf_gc_wm);
 	}
 	return rc;
 }
@@ -9570,18 +9570,18 @@ si_readdup(struct siread *q, struct sv *result)
 static inline void
 si_readstat(struct siread *q, int cache, struct sinode *n, uint32_t reads)
 {
-	struct phia_index *i = q->index;
+	struct phia_index *index = q->index;
 	if (cache) {
-		i->read_cache += reads;
+		index->read_cache += reads;
 		q->read_cache += reads;
 	} else {
-		i->read_disk += reads;
+		index->read_disk += reads;
 		q->read_disk += reads;
 	}
 	/* update temperature */
-	if (i->conf.temperature) {
+	if (index->conf.temperature) {
 		n->temperature_reads += reads;
-		uint64_t total = i->read_disk + i->read_cache;
+		uint64_t total = index->read_disk + index->read_cache;
 		if (unlikely(total == 0))
 			return;
 		n->temperature = (n->temperature_reads * 100ULL) / total;
@@ -9972,11 +9972,11 @@ si_readcommited(struct phia_index *index, struct sv *v)
 */
 
 static struct sinode *
-si_bootstrap(struct phia_index *i, uint64_t parent)
+si_bootstrap(struct phia_index *index, uint64_t parent)
 {
-	struct runtime *r = i->r;
+	struct runtime *r = index->r;
 	/* create node */
-	struct sinode *n = si_nodenew(i->key_def, r);
+	struct sinode *n = si_nodenew(index->key_def, r);
 	if (unlikely(n == NULL))
 		return NULL;
 	struct sdid id = {
@@ -9985,16 +9985,16 @@ si_bootstrap(struct phia_index *i, uint64_t parent)
 		.id     = sr_seq(r->seq, SR_NSNNEXT)
 	};
 	int rc;
-	rc = si_nodecreate(n, &i->conf, &id);
+	rc = si_nodecreate(n, &index->conf, &id);
 	if (unlikely(rc == -1))
 		goto e0;
 	n->branch = &n->self;
 	n->branch_count++;
 
 	/* create index with one empty page */
-	struct sdindex index;
-	sd_indexinit(&index);
-	rc = sd_indexbegin(&index, r->a);
+	struct sdindex sdindex;
+	sd_indexinit(&sdindex);
+	rc = sd_indexbegin(&sdindex, r->a);
 	if (unlikely(rc == -1))
 		goto e0;
 
@@ -10003,15 +10003,15 @@ si_bootstrap(struct phia_index *i, uint64_t parent)
 
 	struct sdbuild build;
 	sd_buildinit(&build);
-	rc = sd_buildbegin(&build, r->a, i->key_def,
-	                   i->conf.node_page_checksum,
-	                   i->conf.compression_key,
-	                   i->conf.compression,
-	                   i->conf.compression_if);
+	rc = sd_buildbegin(&build, r->a, index->key_def,
+	                   index->conf.node_page_checksum,
+	                   index->conf.compression_key,
+	                   index->conf.compression,
+	                   index->conf.compression_if);
 	if (unlikely(rc == -1))
 		goto e1;
 	sd_buildend(&build);
-	rc = sd_indexadd(&index, &build, sizeof(struct sdseal));
+	rc = sd_indexadd(&sdindex, &build, sizeof(struct sdseal));
 	if (unlikely(rc == -1))
 		goto e1;
 
@@ -10025,32 +10025,32 @@ si_bootstrap(struct phia_index *i, uint64_t parent)
 	if (unlikely(rc == -1))
 		goto e1;
 	/* amqf */
-	if (i->conf.amqf) {
+	if (index->conf.amqf) {
 		rc = ss_qfensure(&f, r->a, 0);
 		if (unlikely(rc == -1))
 			goto e1;
 		qf = &f;
 	}
-	rc = sd_indexcommit(&index, r->a, &id, qf, n->file.size);
+	rc = sd_indexcommit(&sdindex, r->a, &id, qf, n->file.size);
 	if (unlikely(rc == -1))
 		goto e1;
 	ss_qffree(&f, r->a);
 	/* write index */
-	rc = sd_writeindex(&n->file, &index);
+	rc = sd_writeindex(&n->file, &sdindex);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* close seal */
-	rc = sd_seal(&n->file, &index, seal);
+	rc = sd_seal(&n->file, &sdindex, seal);
 	if (unlikely(rc == -1))
 		goto e1;
-	si_branchset(&n->self, &index);
+	si_branchset(&n->self, &sdindex);
 
 	sd_buildcommit(&build);
 	sd_buildfree(&build);
 	return n;
 e1:
 	ss_qffree(&f, r->a);
-	sd_indexfree(&index, r->a);
+	sd_indexfree(&sdindex, r->a);
 	sd_buildfree(&build);
 e0:
 	si_nodefree(n, r, 0);
@@ -10058,34 +10058,34 @@ e0:
 }
 
 static inline int
-si_deploy(struct phia_index *i, struct runtime *r, int create_directory)
+si_deploy(struct phia_index *index, struct runtime *r, int create_directory)
 {
 	/* create directory */
 	int rc;
 	if (likely(create_directory)) {
-		rc = mkdir(i->conf.path, 0755);
+		rc = mkdir(index->conf.path, 0755);
 		if (unlikely(rc == -1)) {
 			sr_malfunction("directory '%s' create error: %s",
-			               i->conf.path, strerror(errno));
+			               index->conf.path, strerror(errno));
 			return -1;
 		}
 	}
 	/* create initial node */
-	struct sinode *n = si_bootstrap(i, 0);
+	struct sinode *n = si_bootstrap(index, 0);
 	if (unlikely(n == NULL))
 		return -1;
 	SS_INJECTION(r->i, SS_INJECTION_SI_RECOVER_0,
 	             si_nodefree(n, r, 0);
 	             sr_malfunction("%s", "error injection");
 	             return -1);
-	rc = si_nodecomplete(n, &i->conf);
+	rc = si_nodecomplete(n, &index->conf);
 	if (unlikely(rc == -1)) {
 		si_nodefree(n, r, 1);
 		return -1;
 	}
-	si_insert(i, n);
-	si_plannerupdate(&i->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
-	i->size = si_nodesize(n);
+	si_insert(index, n);
+	si_plannerupdate(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
+	index->size = si_nodesize(n);
 	return 1;
 }
 
@@ -10348,22 +10348,22 @@ si_recoversize(struct phia_index *i)
 }
 
 static inline int
-si_recoverindex(struct phia_index *i, struct runtime *r)
+si_recoverindex(struct phia_index *index, struct runtime *r)
 {
 	struct sitrack track;
 	si_trackinit(&track);
 	struct ssbuf buf;
 	ss_bufinit(&buf);
 	int rc;
-	rc = si_trackdir(&track, r, i);
+	rc = si_trackdir(&track, r, index);
 	if (unlikely(rc == -1))
 		goto error;
 	if (unlikely(track.count == 0))
 		return 1;
-	rc = si_trackvalidate(&track, &buf, i);
+	rc = si_trackvalidate(&track, &buf, index);
 	if (unlikely(rc == -1))
 		goto error;
-	rc = si_recovercomplete(&track, r, i, &buf);
+	rc = si_recovercomplete(&track, r, index, &buf);
 	if (unlikely(rc == -1))
 		goto error;
 	/* set actual metrics */
@@ -10371,7 +10371,7 @@ si_recoverindex(struct phia_index *i, struct runtime *r)
 		r->seq->nsn = track.nsn;
 	if (track.lsn > r->seq->lsn)
 		r->seq->lsn = track.lsn;
-	si_recoversize(i);
+	si_recoversize(index);
 	ss_buffree(&buf, r->a);
 	return 0;
 error:
@@ -11213,7 +11213,7 @@ struct phia_confcursor {
 struct phia_env {
 	enum phia_status status;
 	/** List of open spaces. */
-	struct rlist db;
+	struct rlist indexes;
 	struct srseq       seq;
 	struct seconf      conf;
 	struct ssquota     quota;
@@ -11256,7 +11256,7 @@ struct phia_tx {
 };
 
 struct phia_cursor {
-	struct phia_index *db;
+	struct phia_index *index;
 	struct phia_tuple *key;
 	enum phia_order order;
 	struct svlog log;
@@ -11309,9 +11309,9 @@ phia_env_delete(struct phia_env *e)
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
 	int rc;
-	struct phia_index *db, *next;
-	rlist_foreach_entry_safe(db, &e->scheduler.shutdown, link, next) {
-		rc = phia_index_delete(db);
+	struct phia_index *index, *next;
+	rlist_foreach_entry_safe(index, &e->scheduler.shutdown, link, next) {
+		rc = phia_index_delete(index);
 		if (unlikely(rc == -1))
 			rcret = -1;
 	}
@@ -11458,7 +11458,7 @@ se_confdb(struct phia_env *e, struct srconf **pc)
 	struct srconf *prev = NULL;
 	struct srconf *p;
 	struct phia_index *o;
-	rlist_foreach_entry(o, &e->db, link)
+	rlist_foreach_entry(o, &e->indexes, link)
 	{
 		si_profilerbegin(&o->rtp, o);
 		si_profiler(&o->rtp);
@@ -11716,15 +11716,15 @@ phia_confcursor_new(struct phia_env *e)
 void
 phia_cursor_delete(struct phia_cursor *c)
 {
-	struct phia_env *e = c->db->env;
+	struct phia_env *e = c->index->env;
 	uint64_t id = c->t.id;
 	if (! c->read_commited)
 		sx_rollback(&c->t);
 	if (c->cache)
 		si_cachepool_push(c->cache);
 	if (c->key)
-		phia_tuple_unref(c->db, c->key);
-	phia_index_unbind(c->db, id);
+		phia_tuple_unref(c->index, c->key);
+	phia_index_unbind(c->index, id);
 	sr_statcursor(&e->stat, c->start,
 	              c->read_disk,
 	              c->read_cache,
@@ -11736,14 +11736,14 @@ int
 phia_cursor_next(struct phia_cursor *c, struct phia_tuple **result,
 		 bool cache_only)
 {
-	struct phia_index *db = c->db;
+	struct phia_index *index = c->index;
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
 
 	struct phia_statget statget;
 	assert(c->key != NULL);
-	if (phia_index_read(db, c->key, c->order, result, x, 0, c->cache,
+	if (phia_index_read(index, c->key, c->order, result, x, 0, c->cache,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}
@@ -11751,7 +11751,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_tuple **result,
 	c->ops++;
 	if (*result == NULL) {
 		if (!cache_only) {
-			 phia_tuple_unref(c->db, c->key);
+			 phia_tuple_unref(c->index, c->key);
 			 c->key = NULL;
 		}
 		 return 0;
@@ -11765,7 +11765,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_tuple **result,
 	c->read_disk += statget.read_disk;
 	c->read_cache += statget.read_cache;
 
-	phia_tuple_unref(c->db, c->key);
+	phia_tuple_unref(c->index, c->key);
 	c->key = *result;
 	phia_tuple_ref(c->key);
 
@@ -11780,10 +11780,10 @@ phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 }
 
 struct phia_cursor *
-phia_cursor_new(struct phia_index *db, struct phia_tuple *key,
+phia_cursor_new(struct phia_index *index, struct phia_tuple *key,
 		enum phia_order order)
 {
-	struct phia_env *e = db->env;
+	struct phia_env *e = index->env;
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
 	if (unlikely(c == NULL)) {
@@ -11791,7 +11791,7 @@ phia_cursor_new(struct phia_index *db, struct phia_tuple *key,
 		return NULL;
 	}
 	sv_loginit(&c->log);
-	c->db = db;
+	c->index = index;
 	c->start = clock_monotonic64();
 	c->ops = 0;
 	c->read_disk = 0;
@@ -11804,7 +11804,7 @@ phia_cursor_new(struct phia_index *db, struct phia_tuple *key,
 	}
 	c->read_commited = 0;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log);
-	phia_index_bind(db);
+	phia_index_bind(index);
 
 	c->key = key;
 	phia_tuple_ref(key);
@@ -11897,38 +11897,38 @@ error:
 }
 
 int
-phia_index_open(struct phia_index *db)
+phia_index_open(struct phia_index *index)
 {
-	struct phia_env *e = db->env;
-	int status = sr_status(&db->status);
+	struct phia_env *e = index->env;
+	int status = sr_status(&index->status);
 	if (status == SR_FINAL_RECOVERY ||
 	    status == SR_DROP_PENDING)
 		goto online;
 	if (status != SR_OFFLINE)
 		return -1;
-	sx_indexset(&db->coindex, db->conf.id);
-	int rc = phia_index_recoverbegin(db);
+	sx_indexset(&index->coindex, index->conf.id);
+	int rc = phia_index_recoverbegin(index);
 	if (unlikely(rc == -1))
 		return -1;
 
 online:
-	phia_index_recoverend(db);
-	rc = sc_add(&e->scheduler, db);
+	phia_index_recoverend(index);
+	rc = sc_add(&e->scheduler, index);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
 
 static inline void
-phia_index_unref(struct phia_index *db)
+phia_index_unref(struct phia_index *index)
 {
-	struct phia_env *e = db->env;
+	struct phia_env *e = index->env;
 	/* do nothing during env shutdown */
 	if (e->status == SR_SHUTDOWN)
 		return;
 	/* reduce reference counter */
 	int ref;
-	ref = si_unref(db, SI_REFFE);
+	ref = si_unref(index, SI_REFFE);
 	if (ref > 1)
 		return;
 	/* drop/shutdown pending:
@@ -11936,7 +11936,7 @@ phia_index_unref(struct phia_index *db)
 	 * switch state and transfer job to
 	 * the scheduler.
 	*/
-	enum phia_status status = sr_status(&db->status);
+	enum phia_status status = sr_status(&index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 		status = SR_SHUTDOWN;
@@ -11947,54 +11947,54 @@ phia_index_unref(struct phia_index *db)
 	default:
 		return;
 	}
-	rlist_del(&db->link);
+	rlist_del(&index->link);
 
 	/* schedule index shutdown or drop */
-	sr_statusset(&db->status, status);
-	sc_ctl_shutdown(&e->scheduler, db);
+	sr_statusset(&index->status, status);
+	sc_ctl_shutdown(&e->scheduler, index);
 }
 
 int
-phia_index_close(struct phia_index *db)
+phia_index_close(struct phia_index *index)
 {
-	struct phia_env *e = db->env;
-	int status = sr_status(&db->status);
+	struct phia_env *e = index->env;
+	int status = sr_status(&index->status);
 	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
 	/* set last visible transaction id */
-	db->txn_max = sx_max(&e->xm);
-	sr_statusset(&db->status, SR_SHUTDOWN_PENDING);
-	phia_index_unref(db);
+	index->txn_max = sx_max(&e->xm);
+	sr_statusset(&index->status, SR_SHUTDOWN_PENDING);
+	phia_index_unref(index);
 	return 0;
 }
 
 int
-phia_index_drop(struct phia_index *db)
+phia_index_drop(struct phia_index *index)
 {
-	struct phia_env *e = db->env;
-	int status = sr_status(&db->status);
+	struct phia_env *e = index->env;
+	int status = sr_status(&index->status);
 	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
-	int rc = si_dropmark(db);
+	int rc = si_dropmark(index);
 	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
-	db->txn_max = sx_max(&e->xm);
-	sr_statusset(&db->status, SR_DROP_PENDING);
-	phia_index_unref(db);
+	index->txn_max = sx_max(&e->xm);
+	sr_statusset(&index->status, SR_DROP_PENDING);
+	phia_index_unref(index);
 	return 0;
 }
 
 int
-phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order order,
+phia_index_read(struct phia_index *index, struct phia_tuple *key, enum phia_order order,
 		struct phia_tuple **result, struct sx *x, int x_search,
 		struct sicache *cache, bool cache_only,
 		struct phia_statget *statget)
 {
-	struct phia_env *e = db->env;
+	struct phia_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
 
-	if (unlikely(! sr_online(&db->status))) {
+	if (unlikely(! sr_online(&index->status))) {
 		sr_error("%s", "index is not online");
 		return -1;
 	}
@@ -12004,7 +12004,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 
 	/* concurrent */
 	if (x_search && order == PHIA_EQ) {
-		int rc = sx_get(x, &db->coindex, key, &vup);
+		int rc = sx_get(x, &index->coindex, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
 		if (rc == 2) { /* delete */
@@ -12016,7 +12016,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 			return 0;
 		}
 	} else {
-		sx_get_autocommit(&e->xm, &db->coindex);
+		sx_get_autocommit(&e->xm, &index->coindex);
 	}
 
 	/* prepare read cache */
@@ -12026,7 +12026,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 		cache = si_cachepool_pop(&e->cachepool);
 		if (unlikely(cache == NULL)) {
 			if (vup != NULL)
-				phia_tuple_unref(db, vup);
+				phia_tuple_unref(index, vup);
 			sr_oom();
 			return -1;
 		}
@@ -12047,7 +12047,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 
 	/* read index */
 	struct siread q;
-	si_readopen(&q, db, cache,
+	si_readopen(&q, index, cache,
 	            order,
 	            vlsn,
 		    key->data, key->size);
@@ -12062,7 +12062,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 	si_readclose(&q);
 
 	if (vup != NULL) {
-		phia_tuple_unref(db, vup);
+		phia_tuple_unref(index, vup);
 	}
 	/* free read cache */
 	if (likely(cachegc))
@@ -12097,11 +12097,11 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 }
 
 int
-phia_index_get(struct phia_index *db, struct phia_tuple *key,
+phia_index_get(struct phia_index *index, struct phia_tuple *key,
 	       struct phia_tuple **result, bool cache_only)
 {
 	struct phia_statget statget;
-	if (phia_index_read(db, key, PHIA_EQ, result, NULL, 0, NULL,
+	if (phia_index_read(index, key, PHIA_EQ, result, NULL, 0, NULL,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}
@@ -12109,7 +12109,7 @@ phia_index_get(struct phia_index *db, struct phia_tuple *key,
 	if (*result == NULL)
 		 return 0;
 
-	sr_statget(&db->env->stat, &statget);
+	sr_statget(&index->env->stat, &statget);
 	return 0;
 }
 
@@ -12167,7 +12167,7 @@ phia_index_new(struct phia_env *e, struct key_def *key_def)
 	sx_indexinit(&index->coindex, &e->xm, index, index->key_def);
 	index->txn_min = sx_min(&e->xm);
 	index->txn_max = UINT32_MAX;
-	rlist_add(&e->db, &index->link);
+	rlist_add(&e->indexes, &index->link);
 	return index;
 
 error_3:
@@ -12212,83 +12212,83 @@ phia_index_delete(struct phia_index *index)
 struct phia_index *
 phia_index_by_name(struct phia_env *e, const char *name)
 {
-	struct phia_index *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		if (strcmp(db->conf.name, name) == 0)
-			return db;
+	struct phia_index *index;
+	rlist_foreach_entry(index, &e->indexes, link) {
+		if (strcmp(index->conf.name, name) == 0)
+			return index;
 	}
 	return NULL;
 }
 
-static int phia_index_visible(struct phia_index *db, uint64_t txn)
+static int phia_index_visible(struct phia_index *index, uint64_t txn)
 {
-	return txn > db->txn_min && txn <= db->txn_max;
+	return txn > index->txn_min && txn <= index->txn_max;
 }
 
 static void
-phia_index_bind(struct phia_index *db)
+phia_index_bind(struct phia_index *index)
 {
-	int status = sr_status(&db->status);
+	int status = sr_status(&index->status);
 	if (sr_statusactive_is(status))
-		si_ref(db, SI_REFFE);
+		si_ref(index, SI_REFFE);
 }
 
 static void
-phia_index_unbind(struct phia_index *db, uint64_t txn)
+phia_index_unbind(struct phia_index *index, uint64_t txn)
 {
-	if (phia_index_visible(db, txn))
-		phia_index_unref(db);
+	if (phia_index_visible(index, txn))
+		phia_index_unref(index);
 }
 
 size_t
-phia_index_bsize(struct phia_index *db)
+phia_index_bsize(struct phia_index *index)
 {
-	si_profilerbegin(&db->rtp, db);
-	si_profiler(&db->rtp);
-	si_profilerend(&db->rtp);
-	return db->rtp.memory_used;
+	si_profilerbegin(&index->rtp, index);
+	si_profiler(&index->rtp);
+	si_profilerend(&index->rtp);
+	return index->rtp.memory_used;
 }
 
 uint64_t
-phia_index_size(struct phia_index *db)
+phia_index_size(struct phia_index *index)
 {
-	si_profilerbegin(&db->rtp, db);
-	si_profiler(&db->rtp);
-	si_profilerend(&db->rtp);
-	return db->rtp.count;
+	si_profilerbegin(&index->rtp, index);
+	si_profiler(&index->rtp);
+	si_profilerend(&index->rtp);
+	return index->rtp.count;
 }
 
-static int phia_index_recoverbegin(struct phia_index *db)
+static int phia_index_recoverbegin(struct phia_index *index)
 {
 	/* open and recover repository */
-	sr_statusset(&db->status, SR_FINAL_RECOVERY);
+	sr_statusset(&index->status, SR_FINAL_RECOVERY);
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
-	int rc = si_recover(db);
+	int rc = si_recover(index);
 	if (unlikely(rc == -1))
 		goto error;
 	return 0;
 error:
-	sr_statusset(&db->status, SR_MALFUNCTION);
+	sr_statusset(&index->status, SR_MALFUNCTION);
 	return -1;
 }
 
-static int phia_index_recoverend(struct phia_index *db)
+static int phia_index_recoverend(struct phia_index *index)
 {
-	int status = sr_status(&db->status);
+	int status = sr_status(&index->status);
 	if (unlikely(status == SR_DROP_PENDING))
 		return 0;
-	sr_statusset(&db->status, SR_ONLINE);
+	sr_statusset(&index->status, SR_ONLINE);
 	return 0;
 }
 
 static struct phia_tuple *
-phia_tuple_new(struct phia_index *db, struct phia_field *fields,
+phia_tuple_new(struct phia_index *index, struct phia_field *fields,
 	       uint32_t fields_count)
 {
-	struct key_def *key_def = db->key_def;
-	struct runtime *r = db->r;
+	struct key_def *key_def = index->key_def;
+	struct runtime *r = index->r;
 	assert(fields_count == key_def->part_count + 1);
 	(void) fields_count;
 	int size = sf_writesize(key_def, fields);
@@ -12475,17 +12475,17 @@ phia_tuple_unref_rt(struct runtime *r, struct phia_tuple *v)
 }
 
 void
-phia_tuple_unref(struct phia_index *db, struct phia_tuple *tuple)
+phia_tuple_unref(struct phia_index *index, struct phia_tuple *tuple)
 {
-	struct runtime *r = db->r;
+	struct runtime *r = index->r;
 	phia_tuple_unref_rt(r, tuple);
 }
 
 char *
-phia_tuple_field(struct phia_index *db, struct phia_tuple *tuple,
+phia_tuple_field(struct phia_index *index, struct phia_tuple *tuple,
 		 uint32_t field_id, uint32_t *size)
 {
-	struct key_def *key_def = db->key_def;
+	struct key_def *key_def = index->key_def;
 	assert(field_id <= key_def->part_count);
 	return sf_field(key_def, field_id, tuple->data, size);
 }
@@ -12509,9 +12509,10 @@ phia_tuple_lsn(struct phia_tuple *tuple)
 }
 
 static inline int
-phia_tuple_validate(struct phia_tuple *o, struct phia_index *db, uint8_t flags)
+phia_tuple_validate(struct phia_tuple *o, struct phia_index *index,
+		    uint8_t flags)
 {
-	struct phia_env *e = db->env;
+	struct phia_env *e = index->env;
 	o->flags = flags;
 	if (o->lsn != 0) {
 		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
@@ -12522,8 +12523,8 @@ phia_tuple_validate(struct phia_tuple *o, struct phia_index *db, uint8_t flags)
 }
 
 static inline int
-phia_tx_write(struct phia_tx *t, struct phia_index *db, struct phia_tuple *o,
-	      uint8_t flags)
+phia_tx_write(struct phia_tx *t, struct phia_index *index,
+	      struct phia_tuple *o, uint8_t flags)
 {
 	struct phia_env *e = t->env;
 
@@ -12534,11 +12535,11 @@ phia_tx_write(struct phia_tx *t, struct phia_index *db, struct phia_tuple *o,
 	}
 
 	/* validate index status */
-	int status = sr_status(&db->status);
+	int status = sr_status(&index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (unlikely(! phia_index_visible(db, t->t.id))) {
+		if (unlikely(! phia_index_visible(index, t->t.id))) {
 			sr_error("%s", "index is invisible for the transaction");
 			return -1;
 		}
@@ -12550,14 +12551,14 @@ phia_tx_write(struct phia_tx *t, struct phia_index *db, struct phia_tuple *o,
 		return sr_malfunction("%s", "index in malfunction state");
 	}
 
-	int rc = phia_tuple_validate(o, db, flags);
+	int rc = phia_tuple_validate(o, index, flags);
 	if (unlikely(rc == -1))
 		return -1;
 
 	phia_tuple_ref(o);
 
 	/* concurrent index only */
-	rc = sx_set(&t->t, &db->coindex, o);
+	rc = sx_set(&t->t, &index->coindex, o);
 	if (unlikely(rc != 0))
 		return -1;
 
@@ -12642,15 +12643,15 @@ phia_delete(struct phia_tx *tx, struct phia_index *index,
 }
 
 int
-phia_get(struct phia_tx *t, struct phia_index *db, struct phia_tuple *key,
+phia_get(struct phia_tx *t, struct phia_index *index, struct phia_tuple *key,
 	 struct phia_tuple **result, bool cache_only)
 {
 	/* validate index */
-	int status = sr_status(&db->status);
+	int status = sr_status(&index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (unlikely(! phia_index_visible(db, t->t.id))) {
+		if (unlikely(! phia_index_visible(index, t->t.id))) {
 			sr_error("%s", "index is invisible to the transaction");
 			return -1;
 		}
@@ -12665,7 +12666,7 @@ phia_get(struct phia_tx *t, struct phia_index *db, struct phia_tuple *key,
 	}
 
 	struct phia_statget statget;
-	if (phia_index_read(db, key, PHIA_EQ, result, &t->t, 1, NULL,
+	if (phia_index_read(index, key, PHIA_EQ, result, &t->t, 1, NULL,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}
@@ -12673,7 +12674,7 @@ phia_get(struct phia_tx *t, struct phia_index *db, struct phia_tuple *key,
 	if (*result == NULL)
 		return 0;
 
-	sr_statget(&db->env->stat, &statget);
+	sr_statget(&index->env->stat, &statget);
 	return 0;
 }
 
@@ -12685,9 +12686,9 @@ phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 	sx_gc(&t->t);
 	sv_logreset(&t->log);
 	sr_stattx(&e->stat, t->start, count, rlb, conflict);
-	struct phia_index *db, *tmp;
-	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
-		phia_index_unbind(db, t->t.id);
+	struct phia_index *index, *tmp;
+	rlist_foreach_entry_safe(index, &e->indexes, link, tmp) {
+		phia_index_unbind(index, t->t.id);
 	}
 	sv_logfree(&t->log, &e->a);
 	ss_free(&e->a, t);
@@ -12702,13 +12703,13 @@ phia_rollback(struct phia_tx *tx)
 }
 
 static int
-phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
+phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *index,
 		struct sicache *cache)
 {
 	assert(v->i == &sx_vif); /* sv holds sxv */
 
 	struct siread q;
-	si_readopen(&q, db, cache,
+	si_readopen(&q, index, cache,
 	            PHIA_EQ,
 	            x->vlsn,
 	            sv_pointer(v),
@@ -12718,7 +12719,7 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	si_readclose(&q);
 
 	if (unlikely(q.result))
-		phia_tuple_unref(db, q.result);
+		phia_tuple_unref(index, q.result);
 	return rc;
 }
 
@@ -12788,9 +12789,9 @@ phia_begin(struct phia_env *e)
 	sv_loginit(&t->log);
 	t->start = clock_monotonic64();
 	sx_begin(&e->xm, &t->t, SXRW, &t->log);
-	struct phia_index *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		phia_index_bind(db);
+	struct phia_index *index;
+	rlist_foreach_entry(index, &e->indexes, link) {
+		phia_index_bind(index);
 	}
 	return t;
 }
@@ -12802,7 +12803,7 @@ phia_env_new(void)
 	if (unlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	rlist_create(&e->db);
+	rlist_create(&e->indexes);
 	e->status = SR_OFFLINE;
 
 	ss_aopen(&e->a, &ss_stda);
