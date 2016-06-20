@@ -12821,7 +12821,8 @@ phia_env_new(void)
 	memset(PHIA_STRING_MAX, 0xff, sizeof(PHIA_STRING_MAX));
 	return e;
 error:
-	phia_env_delete(e);
+	se_conffree(&e->conf);
+	free(e);
 	return NULL;
 }
 
