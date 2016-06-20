@@ -230,7 +230,7 @@ static inline int
 ss_fileadvise(struct ssfile *f, int hint, uint64_t off, uint64_t len) {
 	(void)hint;
 #if !defined(HAVE_POSIX_FADVISE)
-	(void)fd;
+	(void)f;
 	(void)off;
 	(void)len;
 	return 0;
