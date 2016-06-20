@@ -500,10 +500,6 @@ PhiaEngine::dropIndex(Index *index)
 	int rc = phia_index_drop(i->db);
 	if (rc == -1)
 		phia_raise();
-	/* unref db object */
-	rc = phia_index_delete(i->db);
-	if (rc == -1)
-		phia_raise();
 	i->db  = NULL;
 	i->env = NULL;
 }

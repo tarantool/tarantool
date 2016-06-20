@@ -2924,13 +2924,13 @@ done:
 	return 0;
 }
 
-struct si;
+struct phia_index;
 
 struct PACKED svlogindex {
 	uint32_t id;
 	uint32_t head, tail;
 	uint32_t count;
-	struct si *index;
+	struct phia_index *index;
 };
 
 struct PACKED svlogv {
@@ -2998,7 +2998,7 @@ sv_logat(struct svlog *l, int pos) {
 
 static inline int
 sv_logadd(struct svlog *l, struct ssa *a, struct svlogv *v,
-	  struct si *index)
+	  struct phia_index *index)
 {
 	uint32_t n = sv_logcount(l);
 	int rc = ss_bufadd(&l->buf, a, v, sizeof(struct svlogv));
@@ -4241,8 +4241,7 @@ sxv_tree_search_key(sxv_tree_t *rbtree, char *data, int size)
 struct sxindex {
 	sxv_tree_t tree;
 	uint32_t  dsn;
-	struct phia_index *db;
-	struct si *index;
+	struct phia_index *index;
 	struct key_def *key_def;
 	struct rlist    link;
 	pthread_mutex_t mutex;
@@ -4318,7 +4317,7 @@ struct sxmanager {
 static int sx_managerinit(struct sxmanager*, struct runtime*);
 static int sx_managerfree(struct sxmanager*);
 static int sx_indexinit(struct sxindex *, struct sxmanager *,
-			struct phia_index *, struct si *, struct key_def *key_def);
+			struct phia_index *, struct key_def *key_def);
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
 static struct sx *sx_find(struct sxmanager*, uint64_t);
@@ -4364,13 +4363,11 @@ static int sx_managerfree(struct sxmanager *m)
 }
 
 static int sx_indexinit(struct sxindex *i, struct sxmanager *m,
-			struct phia_index *db,
-			struct si *index, struct key_def *key_def)
+			struct phia_index *index, struct key_def *key_def)
 {
 	sxv_tree_new(&i->tree);
 	rlist_create(&i->link);
 	i->dsn = 0;
-	i->db = db;
 	i->index = index;
 	i->key_def = key_def;
 	(void) tt_pthread_mutex_init(&i->mutex, NULL);
@@ -4631,7 +4628,7 @@ sx_preparev(struct sx *x, struct svlogv *v, uint64_t lsn,
 		return 0;
 
 	struct sxindex *i = ((struct sxv*)v->v.v)->index;
-	if (phia_tx_prepare(x, &v->v, i->db, cache))
+	if (phia_tx_prepare(x, &v->v, i->index, cache))
 		return 1;
 	return 0;
 }
@@ -7329,7 +7326,40 @@ sinode_tree_free_cb(sinode_tree_t *t, struct sinode * n, void *arg)
 	return NULL;
 }
 
-struct si {
+struct siprofiler {
+	uint32_t  total_node_count;
+	uint64_t  total_node_size;
+	uint64_t  total_node_origin_size;
+	uint32_t  total_branch_count;
+	uint32_t  total_branch_avg;
+	uint32_t  total_branch_max;
+	uint32_t  total_page_count;
+	uint64_t  total_snapshot_size;
+	uint64_t  total_amqf_size;
+	uint32_t  temperature_avg;
+	uint32_t  temperature_min;
+	uint32_t  temperature_max;
+	uint64_t  memory_used;
+	uint64_t  count;
+	uint64_t  count_dup;
+	uint64_t  read_disk;
+	uint64_t  read_cache;
+	int       histogram_branch[20];
+	int       histogram_branch_20plus;
+	char      histogram_branch_sz[256];
+	char     *histogram_branch_ptr;
+	char      histogram_temperature_sz[256];
+	char     *histogram_temperature_ptr;
+	struct phia_index  *i;
+};
+
+struct phia_index {
+	struct phia_env *env;
+	struct siprofiler rtp;
+	struct sxindex    coindex;
+	uint64_t   txn_min;
+	uint64_t   txn_max;
+
 	sinode_tree_t tree;
 	struct srstatus   status;
 	pthread_mutex_t    lock;
@@ -7353,8 +7383,8 @@ struct si {
 	struct svupsert   u;
 	struct siconf   conf;
 	struct key_def *key_def;
-	struct phia_index *db;
 	struct runtime *r;
+	/** Member of env->db or scheduler->shutdown. */
 	struct rlist     link;
 };
 
@@ -7362,7 +7392,7 @@ static int
 sinode_tree_cmp(sinode_tree_t *rbtree, struct sinode *a, struct sinode *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct si, tree)->key_def;
+		container_of(rbtree, struct phia_index, tree)->key_def;
 	return si_nodecmpnode(a, b, key_def);
 }
 
@@ -7371,40 +7401,40 @@ sinode_tree_key_cmp(sinode_tree_t *rbtree,
 		    struct sinode_tree_key *a, struct sinode *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct si, tree)->key_def;
+		container_of(rbtree, struct phia_index, tree)->key_def;
 	return (-si_nodecmp(b, a->data, key_def));
 }
 
 static inline bool
-si_active(struct si *i) {
+si_active(struct phia_index *i) {
 	return sr_statusactive(&i->status);
 }
 
 static inline void
-si_lock(struct si *i) {
+si_lock(struct phia_index *i) {
 	tt_pthread_mutex_lock(&i->lock);
 }
 
 static inline void
-si_unlock(struct si *i) {
+si_unlock(struct phia_index *i) {
 	tt_pthread_mutex_unlock(&i->lock);
 }
 
-static struct si *si_init(struct runtime*, struct phia_index*);
-static int si_recover(struct si*);
-static int si_close(struct si*);
-static int si_insert(struct si*, struct sinode*);
-static int si_remove(struct si*, struct sinode*);
-static int si_replace(struct si*, struct sinode*, struct sinode*);
-static int si_refs(struct si*);
-static int si_ref(struct si*, enum siref);
-static int si_unref(struct si*, enum siref);
-static int si_plan(struct si*, struct siplan*);
+static inline int
+phia_index_delete(struct phia_index *db);
+static int si_recover(struct phia_index*);
+static int si_insert(struct phia_index*, struct sinode*);
+static int si_remove(struct phia_index*, struct sinode*);
+static int si_replace(struct phia_index*, struct sinode*, struct sinode*);
+static int si_refs(struct phia_index*);
+static int si_ref(struct phia_index*, enum siref);
+static int si_unref(struct phia_index*, enum siref);
+static int si_plan(struct phia_index*, struct siplan*);
 static int
-si_execute(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
+si_execute(struct phia_index*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
 static inline void
-si_lru_add(struct si *i, struct svref *ref)
+si_lru_add(struct phia_index *i, struct svref *ref)
 {
 	i->lru_intr_sum += ref->v->size;
 	if (unlikely(i->lru_intr_sum >= i->conf.lru_step))
@@ -7418,7 +7448,7 @@ si_lru_add(struct si *i, struct svref *ref)
 }
 
 static inline uint64_t
-si_lru_vlsn_of(struct si *i)
+si_lru_vlsn_of(struct phia_index *i)
 {
 	assert(i->conf.lru_step != 0);
 	uint64_t size = i->size;
@@ -7434,7 +7464,7 @@ si_lru_vlsn_of(struct si *i)
 }
 
 static inline uint64_t
-si_lru_vlsn(struct si *i)
+si_lru_vlsn(struct phia_index *i)
 {
 	if (likely(i->conf.lru == 0))
 		return 0;
@@ -7697,10 +7727,10 @@ si_cachepool_push(struct sicache *c)
 struct sitx {
 	int ro;
 	struct rlist nodelist;
-	struct si *index;
+	struct phia_index *index;
 };
 
-static void si_begin(struct sitx*, struct si*);
+static void si_begin(struct sitx*, struct phia_index*);
 static void si_commit(struct sitx*);
 
 static inline void
@@ -7728,11 +7758,11 @@ struct siread {
 	int       upsert_eq;
 	struct phia_tuple *result;
 	struct sicache  *cache;
-	struct si       *index;
+	struct phia_index       *index;
 };
 
 struct PACKED siiter {
-	struct si *index;
+	struct phia_index *index;
 	struct sinode *node;
 	enum phia_order order;
 	void *key;
@@ -7740,7 +7770,7 @@ struct PACKED siiter {
 };
 
 static inline int
-si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
+si_iter_open(struct siiter *ii, struct phia_index *index, enum phia_order o,
 	     void *key, int keysize)
 {
 	ii->index   = index;
@@ -7806,20 +7836,20 @@ si_iter_next(struct siiter *ii)
 	}
 }
 
-static int si_drop(struct si*);
-static int si_dropmark(struct si*);
+static int si_drop(struct phia_index*);
+static int si_dropmark(struct phia_index*);
 static int si_droprepository(char*, int);
 
 static int
-si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
+si_merge(struct phia_index*, struct sdc*, struct sinode*, uint64_t,
 	 uint64_t, struct svmergeiter*, uint64_t, uint32_t);
 
-static int si_branch(struct si*, struct sdc*, struct siplan*, uint64_t);
+static int si_branch(struct phia_index*, struct sdc*, struct siplan*, uint64_t);
 static int
-si_compact(struct si*, struct sdc*, struct siplan*, uint64_t,
+si_compact(struct phia_index*, struct sdc*, struct siplan*, uint64_t,
 	   uint64_t, struct ssiter*, uint64_t);
 static int
-si_compact_index(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
+si_compact_index(struct phia_index*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
 typedef rb_tree(struct sinode) sinode_id_tree_t;
 
@@ -7919,128 +7949,35 @@ si_trackreplace(struct sitrack *t, struct sinode *o, struct sinode *n)
 	sinode_id_tree_remove(&t->tree, o);
 	sinode_id_tree_insert(&t->tree, n);
 }
-static struct sinode *si_bootstrap(struct si*, uint64_t);
-static int si_recover(struct si*);
+static struct sinode *si_bootstrap(struct phia_index*, uint64_t);
+static int si_recover(struct phia_index*);
 
-struct PACKED siprofiler {
-	uint32_t  total_node_count;
-	uint64_t  total_node_size;
-	uint64_t  total_node_origin_size;
-	uint32_t  total_branch_count;
-	uint32_t  total_branch_avg;
-	uint32_t  total_branch_max;
-	uint32_t  total_page_count;
-	uint64_t  total_snapshot_size;
-	uint64_t  total_amqf_size;
-	uint32_t  temperature_avg;
-	uint32_t  temperature_min;
-	uint32_t  temperature_max;
-	uint64_t  memory_used;
-	uint64_t  count;
-	uint64_t  count_dup;
-	uint64_t  read_disk;
-	uint64_t  read_cache;
-	int       histogram_branch[20];
-	int       histogram_branch_20plus;
-	char      histogram_branch_sz[256];
-	char     *histogram_branch_ptr;
-	char      histogram_temperature_sz[256];
-	char     *histogram_temperature_ptr;
-	struct si       *i;
-};
-
-static int si_profilerbegin(struct siprofiler*, struct si*);
+static int si_profilerbegin(struct siprofiler*, struct phia_index*);
 static int si_profilerend(struct siprofiler*);
 static int si_profiler(struct siprofiler*);
 
-static struct si *si_init(struct runtime *r, struct phia_index *db)
-{
-	struct si *i = ss_malloc(r->a, sizeof(struct si));
-	if (unlikely(i == NULL))
-		return NULL;
-	i->r = r;
-	sr_statusinit(&i->status);
-	int rc = si_plannerinit(&i->p, r->a, i);
-	if (unlikely(rc == -1)) {
-		ss_free(r->a, i);
-		return NULL;
-	}
-	ss_bufinit(&i->readbuf);
-	sv_upsertinit(&i->u);
-	si_confinit(&i->conf);
-	sinode_tree_new(&i->tree);
-	tt_pthread_mutex_init(&i->lock, NULL);
-	rlist_create(&i->link);
-	rlist_create(&i->gc);
-	i->gc_count     = 0;
-	i->update_time  = 0;
-	i->lru_run_lsn  = 0;
-	i->lru_v        = 0;
-	i->lru_steps    = 1;
-	i->lru_intr_lsn = 0;
-	i->lru_intr_sum = 0;
-	i->size         = 0;
-	i->read_disk    = 0;
-	i->read_cache   = 0;
-	i->n            = 0;
-	tt_pthread_mutex_init(&i->ref_lock, NULL);
-	i->ref_fe       = 0;
-	i->ref_be       = 0;
-	i->db           = db;
-	return i;
-}
-
-static int si_close(struct si *i)
-{
-	int rc_ret = 0;
-	int rc = 0;
-	struct sinode *node, *n;
-	rlist_foreach_entry_safe(node, &i->gc, gc, n) {
-		rc = si_nodefree(node, i->r, 1);
-		if (unlikely(rc == -1))
-			rc_ret = -1;
-	}
-	rlist_create(&i->gc);
-	i->gc_count = 0;
-
-	sinode_tree_iter(&i->tree, NULL, sinode_tree_free_cb, i->r);
-#ifndef NDEBUG
-	i->tree.rbt_root = (struct sinode *)(intptr_t)0xDEADBEEF;
-#endif
-	sv_upsertfree(&i->u, i->r->a);
-	ss_buffree(&i->readbuf, i->r->a);
-	si_plannerfree(&i->p, i->r->a);
-	tt_pthread_mutex_destroy(&i->lock);
-	tt_pthread_mutex_destroy(&i->ref_lock);
-	sr_statusfree(&i->status);
-	si_conffree(&i->conf, i->r->a);
-	key_def_delete(i->key_def);
-	ss_free(i->r->a, i);
-	return rc_ret;
-}
-
-static int si_insert(struct si *i, struct sinode *n)
+static int si_insert(struct phia_index *i, struct sinode *n)
 {
 	sinode_tree_insert(&i->tree, n);
 	i->n++;
 	return 0;
 }
 
-static int si_remove(struct si *i, struct sinode *n)
+static int si_remove(struct phia_index *i, struct sinode *n)
 {
 	sinode_tree_remove(&i->tree, n);
 	i->n--;
 	return 0;
 }
 
-static int si_replace(struct si *i, struct sinode *o, struct sinode *n)
+static int si_replace(struct phia_index *i, struct sinode *o, struct sinode *n)
 {
 	sinode_tree_remove(&i->tree, o);
 	sinode_tree_insert(&i->tree, n);
 	return 0;
 }
 
-static int si_refs(struct si *i)
+static int si_refs(struct phia_index *i)
 {
 	tt_pthread_mutex_lock(&i->ref_lock);
 	int v = i->ref_be + i->ref_fe;
@@ -8048,7 +7985,7 @@ static int si_refs(struct si *i)
 	return v;
 }
 
-static int si_ref(struct si *i, enum siref ref)
+static int si_ref(struct phia_index *i, enum siref ref)
 {
 	tt_pthread_mutex_lock(&i->ref_lock);
 	if (ref == SI_REFBE)
@@ -8059,7 +7996,7 @@ static int si_ref(struct si *i, enum siref ref)
 	return 0;
 }
 
-static int si_unref(struct si *i, enum siref ref)
+static int si_unref(struct phia_index *i, enum siref ref)
 {
 	int prev_ref = 0;
 	tt_pthread_mutex_lock(&i->ref_lock);
@@ -8076,7 +8013,7 @@ static int si_unref(struct si *i, enum siref ref)
 	return prev_ref;
 }
 
-static int si_plan(struct si *i, struct siplan *plan)
+static int si_plan(struct phia_index *i, struct siplan *plan)
 {
 	si_lock(i);
 	int rc = si_planner(&i->p, plan);
@@ -8085,7 +8022,7 @@ static int si_plan(struct si *i, struct siplan *plan)
 }
 
 static int
-si_execute(struct si *i, struct sdc *c, struct siplan *plan,
+si_execute(struct phia_index *i, struct sdc *c, struct siplan *plan,
 	   uint64_t vlsn, uint64_t vlsn_lru)
 {
 	int rc = -1;
@@ -8107,7 +8044,7 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 		rc = si_compact_index(i, c, plan, vlsn, vlsn_lru);
 		break;
 	case SI_SHUTDOWN:
-		rc = si_close(i);
+		rc = phia_index_delete(i);
 		break;
 	case SI_DROP:
 		rc = si_drop(i);
@@ -8122,7 +8059,7 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 }
 
 static inline int
-si_branchcreate(struct si *index, struct sdc *c,
+si_branchcreate(struct phia_index *index, struct sdc *c,
 		struct sinode *parent, struct svindex *vindex,
 		uint64_t vlsn, struct sibranch **result)
 {
@@ -8253,7 +8190,7 @@ e0:
 }
 
 static int
-si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
+si_branch(struct phia_index *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 {
 	struct runtime *r = index->r;
 	struct sinode *n = plan->node;
@@ -8312,7 +8249,7 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 }
 
 static int
-si_compact(struct si *index, struct sdc *c, struct siplan *plan,
+si_compact(struct phia_index *index, struct sdc *c, struct siplan *plan,
 	   uint64_t vlsn,
 	   uint64_t vlsn_lru,
 	   struct ssiter *vindex,
@@ -8388,7 +8325,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 }
 
 static int
-si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
+si_compact_index(struct phia_index *index, struct sdc *c, struct siplan *plan,
 		 uint64_t vlsn,
 		 uint64_t vlsn_lru)
 {
@@ -8456,7 +8393,7 @@ static int si_droprepository(char *repo, int drop_directory)
 	return 0;
 }
 
-static int si_dropmark(struct si *i)
+static int si_dropmark(struct phia_index *i)
 {
 	/* create drop file */
 	char path[1024];
@@ -8473,14 +8410,14 @@ static int si_dropmark(struct si *i)
 	return 0;
 }
 
-static int si_drop(struct si *i)
+static int si_drop(struct phia_index *i)
 {
 	struct sspath path;
 	ss_pathinit(&path);
 	ss_pathset(&path, "%s", i->conf.path);
 	/* drop file must exists at this point */
 	/* shutdown */
-	int rc = si_close(i);
+	int rc = phia_index_delete(i);
 	if (unlikely(rc == -1))
 		return -1;
 	/* remove directory */
@@ -8489,7 +8426,7 @@ static int si_drop(struct si *i)
 }
 
 static int
-si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
+si_redistribute(struct phia_index *index, struct ssa *a, struct sdc *c,
 		struct sinode *node, struct ssbuf *result)
 {
 	(void)index;
@@ -8544,7 +8481,7 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 }
 
 static inline void
-si_redistribute_set(struct si *index, uint64_t now, struct svref *v)
+si_redistribute_set(struct phia_index *index, uint64_t now, struct svref *v)
 {
 	index->update_time = now;
 	/* match node */
@@ -8562,7 +8499,7 @@ si_redistribute_set(struct si *index, uint64_t now, struct svref *v)
 }
 
 static int
-si_redistribute_index(struct si *index, struct ssa *a, struct sdc *c, struct sinode *node)
+si_redistribute_index(struct phia_index *index, struct ssa *a, struct sdc *c, struct sinode *node)
 {
 	struct svindex *vindex = si_nodeindex(node);
 	struct ssiter i;
@@ -8601,7 +8538,7 @@ si_splitfree(struct ssbuf *result, struct runtime *r)
 }
 
 static inline int
-si_split(struct si *index, struct sdc *c, struct ssbuf *result,
+si_split(struct phia_index *index, struct sdc *c, struct ssbuf *result,
          struct sinode   *parent,
          struct svmergeiter *i,
          uint64_t  size_node,
@@ -8702,7 +8639,7 @@ error:
 }
 
 static int
-si_merge(struct si *index, struct sdc *c, struct sinode *node,
+si_merge(struct phia_index *index, struct sdc *c, struct sinode *node,
 	 uint64_t vlsn,
 	 uint64_t vlsn_lru,
 	 struct svmergeiter *stream,
@@ -9340,7 +9277,7 @@ match:
 static inline int
 si_plannerpeek_lru(struct siplanner *p, struct siplan *plan)
 {
-	struct si *index = p->i;
+	struct phia_index *index = p->i;
 	if (likely(! index->conf.lru))
 		return 0;
 	if (! index->lru_run_lsn) {
@@ -9377,7 +9314,7 @@ match:
 static inline int
 si_plannerpeek_shutdown(struct siplanner *p, struct siplan *plan)
 {
-	struct si *index = p->i;
+	struct phia_index *index = p->i;
 	int status = sr_status(&index->status);
 	switch (status) {
 	case SR_DROP:
@@ -9397,7 +9334,7 @@ si_plannerpeek_shutdown(struct siplanner *p, struct siplan *plan)
 static inline int
 si_plannerpeek_nodegc(struct siplanner *p, struct siplan *plan)
 {
-	struct si *index = p->i;
+	struct phia_index *index = p->i;
 	if (likely(index->gc_count == 0))
 		return 0;
 	int rc_inprogress = 0;
@@ -9443,7 +9380,7 @@ static int si_planner(struct siplanner *p, struct siplan *plan)
 	return -1;
 }
 
-static int si_profilerbegin(struct siprofiler *p, struct si *i)
+static int si_profilerbegin(struct siprofiler *p, struct phia_index *i)
 {
 	memset(p, 0, sizeof(*p));
 	p->i = i;
@@ -9585,7 +9522,7 @@ static int si_profiler(struct siprofiler *p)
 }
 
 static int
-si_readopen(struct siread *q, struct si *index, struct sicache *c,
+si_readopen(struct siread *q, struct phia_index *index, struct sicache *c,
 	    enum phia_order o, uint64_t vlsn, void *key, uint32_t keysize)
 {
 	q->order       = o;
@@ -9633,7 +9570,7 @@ si_readdup(struct siread *q, struct sv *result)
 static inline void
 si_readstat(struct siread *q, int cache, struct sinode *n, uint32_t reads)
 {
-	struct si *i = q->index;
+	struct phia_index *i = q->index;
 	if (cache) {
 		i->read_cache += reads;
 		q->read_cache += reads;
@@ -9970,7 +9907,7 @@ static int si_read(struct siread *q)
 }
 
 static int
-si_readcommited(struct si *index, struct sv *v)
+si_readcommited(struct phia_index *index, struct sv *v)
 {
 	/* search node index */
 	struct siiter ii;
@@ -10035,7 +9972,7 @@ si_readcommited(struct si *index, struct sv *v)
 */
 
 static struct sinode *
-si_bootstrap(struct si *i, uint64_t parent)
+si_bootstrap(struct phia_index *i, uint64_t parent)
 {
 	struct runtime *r = i->r;
 	/* create node */
@@ -10121,7 +10058,7 @@ e0:
 }
 
 static inline int
-si_deploy(struct si *i, struct runtime *r, int create_directory)
+si_deploy(struct phia_index *i, struct runtime *r, int create_directory)
 {
 	/* create directory */
 	int rc;
@@ -10201,7 +10138,7 @@ si_process(char *name, uint64_t *nsn, uint64_t *parent)
 }
 
 static inline int
-si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
+si_trackdir(struct sitrack *track, struct runtime *r, struct phia_index *i)
 {
 	DIR *dir = opendir(i->conf.path);
 	if (unlikely(dir == NULL)) {
@@ -10318,7 +10255,7 @@ error:
 }
 
 static inline int
-si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct si *i)
+si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct phia_index *i)
 {
 	ss_bufreset(buf);
 	struct sinode *n = sinode_id_tree_last(&track->tree);
@@ -10369,7 +10306,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct si *i)
 }
 
 static inline int
-si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, struct ssbuf *buf)
+si_recovercomplete(struct sitrack *track, struct runtime *r, struct phia_index *index, struct ssbuf *buf)
 {
 	/* prepare and build primary index */
 	ss_bufreset(buf);
@@ -10401,7 +10338,7 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 }
 
 static inline void
-si_recoversize(struct si *i)
+si_recoversize(struct phia_index *i)
 {
 	struct sinode *n = sinode_tree_first(&i->tree);
 	while (n) {
@@ -10411,7 +10348,7 @@ si_recoversize(struct si *i)
 }
 
 static inline int
-si_recoverindex(struct si *i, struct runtime *r)
+si_recoverindex(struct phia_index *i, struct runtime *r)
 {
 	struct sitrack track;
 	si_trackinit(&track);
@@ -10444,7 +10381,7 @@ error:
 }
 
 static inline int
-si_recoverdrop(struct si *i)
+si_recoverdrop(struct phia_index *i)
 {
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
@@ -10457,7 +10394,7 @@ si_recoverdrop(struct si *i)
 	return 1;
 }
 
-static int si_recover(struct si *i)
+static int si_recover(struct phia_index *i)
 {
 	struct runtime *r = i->r;
 	int exist = path_exists(i->conf.path);
@@ -10504,7 +10441,7 @@ static void si_conffree(struct siconf *s, struct ssa *a)
 	}
 }
 
-static void si_begin(struct sitx *x, struct si *index)
+static void si_begin(struct sitx *x, struct phia_index *index)
 {
 	x->index = index;
 	rlist_create(&x->nodelist);
@@ -10524,7 +10461,7 @@ static void si_commit(struct sitx *x)
 
 static inline int si_set(struct sitx *x, struct phia_tuple *v, uint64_t time)
 {
-	struct si *index = x->index;
+	struct phia_index *index = x->index;
 	index->update_time = time;
 	/* match node */
 	struct siiter ii;
@@ -10598,14 +10535,14 @@ enum {
 
 struct scdb {
 	uint32_t workers[SC_QMAX];
-	struct si *index;
+	struct phia_index *index;
 	uint32_t active;
 };
 
 struct sctask {
 	struct siplan plan;
 	struct scdb  *db;
-	struct si    *shutdown;
+	struct phia_index    *shutdown;
 };
 
 struct scheduler {
@@ -10628,8 +10565,8 @@ struct scheduler {
 };
 
 static int sc_init(struct scheduler*, struct runtime*);
-static int sc_add(struct scheduler*, struct si*);
-static int sc_del(struct scheduler*, struct si*, int);
+static int sc_add(struct scheduler*, struct phia_index*);
+static int sc_del(struct scheduler*, struct phia_index*, int);
 
 static inline void
 sc_start(struct scheduler *s, int task)
@@ -10717,7 +10654,7 @@ sc_task_age_done(struct scheduler *s, uint64_t now)
 static int sc_step(struct phia_service*, uint64_t);
 
 static int sc_ctl_checkpoint(struct scheduler*);
-static int sc_ctl_shutdown(struct scheduler*, struct si*);
+static int sc_ctl_shutdown(struct scheduler*, struct phia_index*);
 
 
 static int
@@ -10743,7 +10680,7 @@ sc_init(struct scheduler *s, struct runtime *r)
 	return 0;
 }
 
-static int sc_add(struct scheduler *s, struct si *index)
+static int sc_add(struct scheduler *s, struct phia_index *index)
 {
 	struct scdb *db = ss_malloc(s->r->a, sizeof(struct scdb));
 	if (unlikely(db == NULL))
@@ -10771,7 +10708,7 @@ static int sc_add(struct scheduler *s, struct si *index)
 	return 0;
 }
 
-static int sc_del(struct scheduler *s, struct si *index, int lock)
+static int sc_del(struct scheduler *s, struct phia_index *index, int lock)
 {
 	if (unlikely(s->i == NULL))
 		return 0;
@@ -10829,7 +10766,7 @@ static int sc_ctl_checkpoint(struct scheduler *s)
 	return 0;
 }
 
-static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
+static int sc_ctl_shutdown(struct scheduler *s, struct phia_index *i)
 {
 	tt_pthread_mutex_lock(&s->lock);
 	s->shutdown_pending++;
@@ -10841,7 +10778,7 @@ static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
 static inline int
 sc_execute(struct sctask *t, struct sdc *c, uint64_t vlsn)
 {
-	struct si *index;
+	struct phia_index *index;
 	if (unlikely(t->shutdown))
 		index = t->shutdown;
 	else
@@ -10907,13 +10844,14 @@ sc_do_shutdown(struct scheduler *s, struct sctask *task)
 {
 	if (likely(s->shutdown_pending == 0))
 		return 0;
-	struct si *index, *n;
+	struct phia_index *index, *n;
 	rlist_foreach_entry_safe(index, &s->shutdown, link, n) {
 		task->plan.plan = SI_SHUTDOWN;
 		int rc;
 		rc = si_plan(index, &task->plan);
 		if (rc == 1) {
 			s->shutdown_pending--;
+			/* delete from scheduler->shutdown list */
 			rlist_del(&index->link);
 			sc_del(s, index, 0);
 			task->shutdown = index;
@@ -11217,7 +11155,7 @@ static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn,
 	struct svlogindex *i   = (struct svlogindex*)log->index.s;
 	struct svlogindex *end = (struct svlogindex*)log->index.p;
 	while (i < end) {
-		struct si *index = i->index;
+		struct phia_index *index = i->index;
 		struct sitx x;
 		si_begin(&x, index);
 		si_write(&x, log, i, now, status);
@@ -11286,17 +11224,6 @@ struct phia_env {
 	struct scheduler          scheduler;
 	struct srstat      stat;
 	struct runtime          r;
-};
-
-struct phia_index {
-	struct phia_env *env;
-	struct siprofiler rtp;
-	struct si        *index;
-	struct sxindex    coindex;
-	uint64_t   txn_min;
-	uint64_t   txn_max;
-	/** Member of env->db list. */
-	struct rlist link;
 };
 
 struct scheduler *
@@ -11378,15 +11305,15 @@ int
 phia_env_delete(struct phia_env *e)
 {
 	int rcret = 0;
-	int rc;
 	e->status = SR_SHUTDOWN;
-	{
-		struct phia_index *db, *next;
-		rlist_foreach_entry_safe(db, &e->db, link, next) {
-			rc = phia_index_delete(db);
-			if (unlikely(rc == -1))
-				rcret = -1;
-		}
+	/* TODO: tarantool doesn't delete indexes during shutdown */
+	//assert(rlist_empty(&e->db));
+	int rc;
+	struct phia_index *db, *next;
+	rlist_foreach_entry_safe(db, &e->scheduler.shutdown, link, next) {
+		rc = phia_index_delete(db);
+		if (unlikely(rc == -1))
+			rcret = -1;
 	}
 	sx_managerfree(&e->xm);
 	si_cachepool_free(&e->cachepool);
@@ -11533,7 +11460,7 @@ se_confdb(struct phia_env *e, struct srconf **pc)
 	struct phia_index *o;
 	rlist_foreach_entry(o, &e->db, link)
 	{
-		si_profilerbegin(&o->rtp, o->index);
+		si_profilerbegin(&o->rtp, o);
 		si_profiler(&o->rtp);
 		si_profilerend(&o->rtp);
 		/* database index */
@@ -11557,7 +11484,7 @@ se_confdb(struct phia_env *e, struct srconf **pc)
 		sr_C(&p, pc, "branch_max", SS_U32, &o->rtp.total_branch_max);
 		sr_C(&p, pc, "branch_histogram", SS_STRINGPTR, &o->rtp.histogram_branch_ptr);
 		sr_C(&p, pc, "page_count", SS_U32, &o->rtp.total_page_count);
-		sr_C(&prev, pc, o->index->conf.name, SS_UNDEF, database);
+		sr_C(&prev, pc, o->conf.name, SS_UNDEF, database);
 		if (db == NULL)
 			db = prev;
 	}
@@ -11973,39 +11900,23 @@ int
 phia_index_open(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	if (status == SR_FINAL_RECOVERY ||
 	    status == SR_DROP_PENDING)
 		goto online;
 	if (status != SR_OFFLINE)
 		return -1;
-	sx_indexset(&db->coindex, db->index->conf.id);
+	sx_indexset(&db->coindex, db->conf.id);
 	int rc = phia_index_recoverbegin(db);
 	if (unlikely(rc == -1))
 		return -1;
 
 online:
 	phia_index_recoverend(db);
-	rc = sc_add(&e->scheduler, db->index);
+	rc = sc_add(&e->scheduler, db);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
-}
-
-static inline int
-phia_index_free(struct phia_index *db, int close)
-{
-	struct phia_env *e = db->env;
-	int rcret = 0;
-	int rc;
-	sx_indexfree(&db->coindex, &e->xm);
-	if (close) {
-		rc = si_close(db->index);
-		if (unlikely(rc == -1))
-			rcret = -1;
-	}
-	ss_free(&e->a, db);
-	return rcret;
 }
 
 static inline void
@@ -12017,7 +11928,7 @@ phia_index_unref(struct phia_index *db)
 		return;
 	/* reduce reference counter */
 	int ref;
-	ref = si_unref(db->index, SI_REFFE);
+	ref = si_unref(db, SI_REFFE);
 	if (ref > 1)
 		return;
 	/* drop/shutdown pending:
@@ -12025,7 +11936,7 @@ phia_index_unref(struct phia_index *db)
 	 * switch state and transfer job to
 	 * the scheduler.
 	*/
-	enum phia_status status = sr_status(&db->index->status);
+	enum phia_status status = sr_status(&db->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 		status = SR_SHUTDOWN;
@@ -12036,37 +11947,24 @@ phia_index_unref(struct phia_index *db)
 	default:
 		return;
 	}
-	/* destroy index object */
-	struct si *index = db->index;
 	rlist_del(&db->link);
-	phia_index_free(db, 0);
 
 	/* schedule index shutdown or drop */
-	sr_statusset(&index->status, status);
-	sc_ctl_shutdown(&e->scheduler, index);
-}
-
-int
-phia_index_delete(struct phia_index *db)
-{
-	struct phia_env *e = db->env;
-	if (e->status == SR_SHUTDOWN || e->status == SR_OFFLINE) {
-		return phia_index_free(db, 1);
-	}
-	phia_index_unref(db);
-	return 0;
+	sr_statusset(&db->status, status);
+	sc_ctl_shutdown(&e->scheduler, db);
 }
 
 int
 phia_index_close(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
 	/* set last visible transaction id */
 	db->txn_max = sx_max(&e->xm);
-	sr_statusset(&db->index->status, SR_SHUTDOWN_PENDING);
+	sr_statusset(&db->status, SR_SHUTDOWN_PENDING);
+	phia_index_unref(db);
 	return 0;
 }
 
@@ -12074,15 +11972,16 @@ int
 phia_index_drop(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
-	int rc = si_dropmark(db->index);
+	int rc = si_dropmark(db);
 	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
 	db->txn_max = sx_max(&e->xm);
-	sr_statusset(&db->index->status, SR_DROP_PENDING);
+	sr_statusset(&db->status, SR_DROP_PENDING);
+	phia_index_unref(db);
 	return 0;
 }
 
@@ -12095,7 +11994,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
 
-	if (unlikely(! sr_online(&db->index->status))) {
+	if (unlikely(! sr_online(&db->status))) {
 		sr_error("%s", "index is not online");
 		return -1;
 	}
@@ -12148,7 +12047,7 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 
 	/* read index */
 	struct siread q;
-	si_readopen(&q, db->index, cache,
+	si_readopen(&q, db, cache,
 	            order,
 	            vlsn,
 		    key->data, key->size);
@@ -12226,36 +12125,88 @@ phia_index_new(struct phia_env *e, struct key_def *key_def)
 		sr_error("index '%s' already exists", name);
 		return NULL;
 	}
-	struct phia_index *db = ss_malloc(&e->a, sizeof(struct phia_index));
-	if (unlikely(db == NULL)) {
+	struct phia_index *index = ss_malloc(&e->a, sizeof(struct phia_index));
+	if (unlikely(index == NULL)) {
 		sr_oom();
 		return NULL;
 	}
-	memset(db, 0, sizeof(*db));
-	db->env = e;
-	db->index = si_init(&e->r, db);
-	if (unlikely(db->index == NULL)) {
-		ss_free(&e->a, db);
-		return NULL;
+	memset(index, 0, sizeof(*index));
+	index->env = e;
+	index->r = &e->r;
+	sr_statusinit(&index->status);
+	int rc = si_plannerinit(&index->p, e->r.a, index);
+	if (unlikely(rc == -1))
+		goto error_1;
+	si_confinit(&index->conf);
+	if (si_confcreate(&index->conf, e->r.a, key_def))
+		goto error_2;
+	index->key_def = key_def_dup(key_def);
+	if (index->key_def == NULL)
+		goto error_3;
+	ss_bufinit(&index->readbuf);
+	sv_upsertinit(&index->u);
+	sinode_tree_new(&index->tree);
+	tt_pthread_mutex_init(&index->lock, NULL);
+	rlist_create(&index->link);
+	rlist_create(&index->gc);
+	index->gc_count     = 0;
+	index->update_time  = 0;
+	index->lru_run_lsn  = 0;
+	index->lru_v        = 0;
+	index->lru_steps    = 1;
+	index->lru_intr_lsn = 0;
+	index->lru_intr_sum = 0;
+	index->size         = 0;
+	index->read_disk    = 0;
+	index->read_cache   = 0;
+	index->n            = 0;
+	tt_pthread_mutex_init(&index->ref_lock, NULL);
+	index->ref_fe       = 0;
+	index->ref_be       = 0;
+	sr_statusset(&index->status, SR_OFFLINE);
+	sx_indexinit(&index->coindex, &e->xm, index, index->key_def);
+	index->txn_min = sx_min(&e->xm);
+	index->txn_max = UINT32_MAX;
+	rlist_add(&e->db, &index->link);
+	return index;
+
+error_3:
+	si_conffree(&index->conf, index->r->a);
+error_2:
+	si_plannerfree(&index->p, index->r->a);
+error_1:
+	ss_free(&e->a, index);
+	return NULL;
+}
+
+static inline int
+phia_index_delete(struct phia_index *index)
+{
+	struct phia_env *e = index->env;
+	sx_indexfree(&index->coindex, &e->xm);
+	int rc_ret = 0;
+	int rc = 0;
+	struct sinode *node, *n;
+	rlist_foreach_entry_safe(node, &index->gc, gc, n) {
+		rc = si_nodefree(node, index->r, 1);
+		if (unlikely(rc == -1))
+			rc_ret = -1;
 	}
-	if (si_confcreate(&db->index->conf, e->r.a, key_def)) {
-		si_close(db->index);
-		ss_free(&e->a, db);
-		return NULL;
-	}
-	db->index->key_def = key_def_dup(key_def);
-	if (db->index->key_def == NULL) {
-		si_close(db->index);
-		ss_free(&e->a, db);
-		return NULL;
-	}
-	sr_statusset(&db->index->status, SR_OFFLINE);
-	sx_indexinit(&db->coindex, &e->xm, db, db->index,
-		     db->index->key_def);
-	db->txn_min = sx_min(&e->xm);
-	db->txn_max = UINT32_MAX;
-	rlist_add(&e->db, &db->link);
-	return db;
+	rlist_create(&index->gc);
+	index->gc_count = 0;
+
+	sinode_tree_iter(&index->tree, NULL, sinode_tree_free_cb, index->r);
+	sv_upsertfree(&index->u, index->r->a);
+	ss_buffree(&index->readbuf, index->r->a);
+	si_plannerfree(&index->p, index->r->a);
+	tt_pthread_mutex_destroy(&index->lock);
+	tt_pthread_mutex_destroy(&index->ref_lock);
+	sr_statusfree(&index->status);
+	si_conffree(&index->conf, index->r->a);
+	key_def_delete(index->key_def);
+	TRASH(index);
+	ss_free(e->r.a, index);
+	return rc_ret;
 }
 
 struct phia_index *
@@ -12263,7 +12214,7 @@ phia_index_by_name(struct phia_env *e, const char *name)
 {
 	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {
-		if (strcmp(db->index->conf.name, name) == 0)
+		if (strcmp(db->conf.name, name) == 0)
 			return db;
 	}
 	return NULL;
@@ -12277,9 +12228,9 @@ static int phia_index_visible(struct phia_index *db, uint64_t txn)
 static void
 phia_index_bind(struct phia_index *db)
 {
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	if (sr_statusactive_is(status))
-		si_ref(db->index, SI_REFFE);
+		si_ref(db, SI_REFFE);
 }
 
 static void
@@ -12292,7 +12243,7 @@ phia_index_unbind(struct phia_index *db, uint64_t txn)
 size_t
 phia_index_bsize(struct phia_index *db)
 {
-	si_profilerbegin(&db->rtp, db->index);
+	si_profilerbegin(&db->rtp, db);
 	si_profiler(&db->rtp);
 	si_profilerend(&db->rtp);
 	return db->rtp.memory_used;
@@ -12301,7 +12252,7 @@ phia_index_bsize(struct phia_index *db)
 uint64_t
 phia_index_size(struct phia_index *db)
 {
-	si_profilerbegin(&db->rtp, db->index);
+	si_profilerbegin(&db->rtp, db);
 	si_profiler(&db->rtp);
 	si_profilerend(&db->rtp);
 	return db->rtp.count;
@@ -12310,25 +12261,25 @@ phia_index_size(struct phia_index *db)
 static int phia_index_recoverbegin(struct phia_index *db)
 {
 	/* open and recover repository */
-	sr_statusset(&db->index->status, SR_FINAL_RECOVERY);
+	sr_statusset(&db->status, SR_FINAL_RECOVERY);
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
-	int rc = si_recover(db->index);
+	int rc = si_recover(db);
 	if (unlikely(rc == -1))
 		goto error;
 	return 0;
 error:
-	sr_statusset(&db->index->status, SR_MALFUNCTION);
+	sr_statusset(&db->status, SR_MALFUNCTION);
 	return -1;
 }
 
 static int phia_index_recoverend(struct phia_index *db)
 {
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	if (unlikely(status == SR_DROP_PENDING))
 		return 0;
-	sr_statusset(&db->index->status, SR_ONLINE);
+	sr_statusset(&db->status, SR_ONLINE);
 	return 0;
 }
 
@@ -12336,8 +12287,8 @@ static struct phia_tuple *
 phia_tuple_new(struct phia_index *db, struct phia_field *fields,
 	       uint32_t fields_count)
 {
-	struct key_def *key_def = db->index->key_def;
-	struct runtime *r = db->index->r;
+	struct key_def *key_def = db->key_def;
+	struct runtime *r = db->r;
 	assert(fields_count == key_def->part_count + 1);
 	(void) fields_count;
 	int size = sf_writesize(key_def, fields);
@@ -12418,7 +12369,7 @@ struct phia_tuple *
 phia_tuple_from_key_data(struct phia_index *index, const char *key,
 			 uint32_t part_count, int order)
 {
-	struct key_def *key_def = index->index->key_def;
+	struct key_def *key_def = index->key_def;
 	assert(part_count == 0 || key != NULL);
 	assert(part_count <= key_def->part_count);
 	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
@@ -12481,7 +12432,7 @@ struct phia_tuple *
 phia_tuple_from_data(struct phia_index *index, const char *data,
 		     const char *data_end)
 {
-	struct key_def *key_def = index->index->key_def;
+	struct key_def *key_def = index->key_def;
 
 	uint32_t count = mp_decode_array(&data);
 	assert(count >= key_def->part_count);
@@ -12526,7 +12477,7 @@ phia_tuple_unref_rt(struct runtime *r, struct phia_tuple *v)
 void
 phia_tuple_unref(struct phia_index *db, struct phia_tuple *tuple)
 {
-	struct runtime *r = db->index->r;
+	struct runtime *r = db->r;
 	phia_tuple_unref_rt(r, tuple);
 }
 
@@ -12534,16 +12485,15 @@ char *
 phia_tuple_field(struct phia_index *db, struct phia_tuple *tuple,
 		 uint32_t field_id, uint32_t *size)
 {
-	struct key_def *key_def = db->index->key_def;
+	struct key_def *key_def = db->key_def;
 	assert(field_id <= key_def->part_count);
 	return sf_field(key_def, field_id, tuple->data, size);
 }
 
 void
-phia_tuple_fields(struct phia_index *db, struct phia_tuple *tuple,
+phia_tuple_fields(struct phia_index *index, struct phia_tuple *tuple,
 		  struct phia_field *fields, uint32_t fields_count)
 {
-	struct si *index = db->index;
 	assert(fields_count <= index->key_def->part_count + 1);
 	for (uint32_t i = 0; i < fields_count; i++) {
 		struct phia_field *field = &fields[i];
@@ -12584,7 +12534,7 @@ phia_tx_write(struct phia_tx *t, struct phia_index *db, struct phia_tuple *o,
 	}
 
 	/* validate index status */
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
@@ -12628,7 +12578,7 @@ phia_upsert(struct phia_tx *tx, struct phia_index *index,
 	    const char *tuple, const char *tuple_end,
 	    const char *expr, const char *expr_end, int index_base)
 {
-	struct key_def *key_def = index->index->key_def;
+	struct key_def *key_def = index->key_def;
 
 	/* upsert */
 	mp_decode_array(&tuple);
@@ -12696,7 +12646,7 @@ phia_get(struct phia_tx *t, struct phia_index *db, struct phia_tuple *key,
 	 struct phia_tuple **result, bool cache_only)
 {
 	/* validate index */
-	int status = sr_status(&db->index->status);
+	int status = sr_status(&db->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
@@ -12758,7 +12708,7 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	assert(v->i == &sx_vif); /* sv holds sxv */
 
 	struct siread q;
-	si_readopen(&q, db->index, cache,
+	si_readopen(&q, db, cache,
 	            PHIA_EQ,
 	            x->vlsn,
 	            sv_pointer(v),

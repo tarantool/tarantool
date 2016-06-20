@@ -149,14 +149,17 @@ phia_index_new(struct phia_env *e, struct key_def *);
 int
 phia_index_open(struct phia_index *index);
 
+/**
+ * Close index during database shutdown
+ */
 int
 phia_index_close(struct phia_index *index);
 
+/**
+ * Close index and drop all data
+ */
 int
 phia_index_drop(struct phia_index *index);
-
-int
-phia_index_delete(struct phia_index *index);
 
 int
 phia_index_get(struct phia_index *index, struct phia_tuple *key,

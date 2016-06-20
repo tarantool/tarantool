@@ -80,10 +80,6 @@ PhiaIndex::~PhiaIndex()
 	int rc = phia_index_close(db);
 	if (rc == -1)
 		goto error;
-	/* unref database object */
-	rc = phia_index_delete(db);
-	if (rc == -1)
-		goto error;
 	return;
 error:;
 	say_info("phia space %" PRIu32 " close error: %s",
