@@ -130,6 +130,9 @@ PhiaIndex::findByKey(struct phia_tuple *phia_key) const
 	if (result == NULL) /* not found */
 		return NULL;
 
+	auto tuple_guard = make_scoped_guard([=] {
+		phia_tuple_unref(db, result);
+	});
 	return phia_convert_tuple(db, result, key_def, format);
 }
 
