@@ -1878,6 +1878,7 @@ bps_tree_reserve_blocks(struct bps_tree *tree, bps_tree_block_id_t count)
 			matras_alloc(&tree->matras, &id);
 		if (!block)
 			return false;
+		block->type = BPS_TREE_BT_GARBAGE;
 		bps_tree_garbage_push(tree, block, id);
 	}
 	return true;
