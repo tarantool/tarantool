@@ -52,6 +52,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <errno.h>
+#include <pmatomic.h>
 
 #include <lz4.h>
 #include <lz4frame.h>
@@ -2499,10 +2500,10 @@ sv_hash(struct sv *v, struct key_def *key_def) {
 	return sf_hash(key_def, sv_pointer(v));
 }
 
-struct PACKED phia_tuple {
+struct phia_tuple {
 	uint64_t lsn;
 	uint32_t size;
-	uint16_t refs;
+	uint16_t refs; /* atomic */
 	uint8_t  flags;
 	char data[0];
 };
@@ -12452,14 +12453,16 @@ phia_tuple_from_data(struct phia_index *index, const char *data,
 void
 phia_tuple_ref(struct phia_tuple *v)
 {
-	v->refs++;
+	pm_atomic_fetch_add_explicit(&v->refs, 1, pm_memory_order_relaxed);
 }
 
 static int
 phia_tuple_unref_rt(struct runtime *r, struct phia_tuple *v)
 {
-	assert(v->refs > 0);
-	if (likely(--v->refs == 0)) {
+	uint16_t old_refs = pm_atomic_fetch_sub_explicit(&v->refs, 1,
+		pm_memory_order_relaxed);
+	assert(old_refs > 0);
+	if (likely(old_refs == 1)) {
 		uint32_t size = phia_tuple_size(v);
 		/* update runtime statistics */
 		tt_pthread_mutex_lock(&r->stat->lock);
