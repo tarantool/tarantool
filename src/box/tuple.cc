@@ -473,14 +473,6 @@ mp_decode_number(const char **data)
 }
 
 static int
-mp_compare_nil(const char *field_a, const char *field_b)
-{
-	(void)field_a;
-	(void)field_b;
-	return 0;
-}
-
-static int
 mp_compare_bool(const char *field_a, const char *field_b)
 {
 	int a_val = mp_decode_bool(&field_a);
@@ -560,7 +552,7 @@ mp_compare_bin(const char *field_a, const char *field_b)
 
 typedef int (*mp_compare_f)(const char *, const char *);
 static mp_compare_f mp_class_comparators[] = {
-	/* .MP_CLASS_NIL    = */ mp_compare_nil,
+	/* .MP_CLASS_NIL    = */ NULL,
 	/* .MP_CLASS_BOOL   = */ mp_compare_bool,
 	/* .MP_CLASS_NUMBER = */ mp_compare_number,
 	/* .MP_CLASS_STR    = */ mp_compare_str,
