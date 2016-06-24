@@ -42,7 +42,7 @@ some of the box calls, including the data-change requests
 however, :func:`box.space...select <space_object.select>` will not.
 A fuller description will appear in section :ref:`The Implicit Yield Rules <the-implicit-yield-rules>`.
 
-Note re storage engine: phia has different rules: insert or update or delete
+Note re storage engine: vinyl has different rules: insert or update or delete
 will very rarely cause a yield, but select can cause a yield.
 
 In the absence of transactions, any function that contains yield points may see
@@ -89,7 +89,7 @@ To ensure they are sent as a single block: put them in a function, or put them a
 on one line, or use a delimiter so that multi-line requests are handled together.
 
 **All database operations in a transaction should use the same storage engine**.
-It is not safe to access tuple sets that are defined with ``{engine='phia'}``
+It is not safe to access tuple sets that are defined with ``{engine='vinyl'}``
 and also access tuple sets that are defined with ``{engine='memtx'}``,
 in the same transaction.
 
@@ -136,7 +136,7 @@ functions in package
 :ref:`net_box <package_net_box>`,
 :ref:`console <package-console>`, or
 :ref:`socket <package-socket>` (the "os" and "network" requests).
-Note re storage engine: with sophia :ref:`select <space-select>` is
+Note re storage engine: with sovinyl :ref:`select <space-select>` is
 an implicit yield request, but data-change requests may not be.
 
 The yield occurs just before a blocking syscall, such as a write to the Write-Ahead Log (WAL)

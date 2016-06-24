@@ -285,7 +285,7 @@ admin("space2:drop()")
 #
 # gh-1280 Segmentation fault on space.select(tuple()) or space.select([2])
 #
-admin("space = box.schema.create_space('gh1280', { engine = 'phia' })")
+admin("space = box.schema.create_space('gh1280', { engine = 'vinyl' })")
 admin("index = space:create_index('primary')")
 admin("space:insert({1})")
 admin("space:insert({2, 'Music'})")

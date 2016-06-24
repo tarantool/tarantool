@@ -160,7 +160,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * If there are triggers, and they are not disabled, and
 	 * the statement found any rows, run triggers.
 	 * XXX:
-	 * - phia doesn't set old/new tuple, so triggers don't
+	 * - vinyl doesn't set old/new tuple, so triggers don't
 	 *   work for it
 	 * - perhaps we should run triggers even for deletes which
 	 *   doesn't find any rows

@@ -202,23 +202,23 @@ lbox_info_cluster(struct lua_State *L)
 	return 1;
 }
 
-typedef void (*phia_info_f)(const char*, const char*, void *);
+typedef void (*vinyl_info_f)(const char*, const char*, void *);
 
-extern int phia_info(const char *name, phia_info_f, void *);
+extern int vinyl_info(const char *name, vinyl_info_f, void *);
 
 static void
-lbox_phia_cb(const char *key, const char *value, void *arg)
+lbox_vinyl_cb(const char *key, const char *value, void *arg)
 {
 	struct lua_State *L;
 	L = (struct lua_State*)arg;
 	if (value == NULL || key[0] == '\0')
 		return;
 
-	/* stack: box.info.phia */
-	lua_pushvalue(L, -1); /* current = box.info.phia */
+	/* stack: box.info.vinyl */
+	lua_pushvalue(L, -1); /* current = box.info.vinyl */
 	const char *part = key;
 	while(1) {
-		/* stack: box.info.phia, current */
+		/* stack: box.info.vinyl, current */
 #ifndef TARGET_OS_DARWIN
 		const char *part_end = strchrnul(part, '.');
 #else
@@ -229,49 +229,49 @@ lbox_phia_cb(const char *key, const char *value, void *arg)
 		if (*part_end == '\0') {
 			lua_pushlstring(L, part, part_end - part);
 			lua_pushstring(L, value);
-			/* stack: box.info.phia, current, part, value */
+			/* stack: box.info.vinyl, current, part, value */
 			lua_settable(L, -3); /* current[part] = value */
-			/* stack: box.info.phia, current */
+			/* stack: box.info.vinyl, current */
 			lua_pop(L, 1);
-			/* stack: box.info.phia */
+			/* stack: box.info.vinyl */
 			break;
 		}
 
 		lua_pushlstring(L, part, part_end - part);
 		lua_gettable(L, -2);
-		/* stack: box.info.phia, current, current[part] */
+		/* stack: box.info.vinyl, current, current[part] */
 		if (!lua_istable(L, -1)) {
 			lua_pop(L, 1); /* pop current[part] */
 			lua_newtable(L);
 			lua_pushlstring(L, part, part_end - part);
 			lua_pushvalue(L, -2);
-			/* stack: box.info.phia, current, new, part, new */
+			/* stack: box.info.vinyl, current, new, part, new */
 			lua_settable(L, -4); /* current[part] = new */
 		}
-		/* stack: box.info.phia, current, current[part] */
+		/* stack: box.info.vinyl, current, current[part] */
 		lua_replace(L, -2);
-		/* stack: box.info.phia, current */
+		/* stack: box.info.vinyl, current */
 		part = part_end + 1;
 	}
 }
 
 static int
-lbox_info_phia_call(struct lua_State *L)
+lbox_info_vinyl_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	phia_info(NULL, lbox_phia_cb, (void*)L);
+	vinyl_info(NULL, lbox_vinyl_cb, (void*)L);
 	return 1;
 }
 
 static int
-lbox_info_phia(struct lua_State *L)
+lbox_info_vinyl(struct lua_State *L)
 {
 	lua_newtable(L);
 
 	lua_newtable(L); /* metatable */
 
 	lua_pushstring(L, "__call");
-	lua_pushcfunction(L, lbox_info_phia_call);
+	lua_pushcfunction(L, lbox_info_vinyl_call);
 	lua_settable(L, -3);
 
 	lua_setmetatable(L, -2);
@@ -289,7 +289,7 @@ lbox_info_dynamic_meta [] =
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},
 	{"cluster", lbox_info_cluster},
-	{"phia", lbox_info_phia},
+	{"vinyl", lbox_info_vinyl},
 	{NULL, NULL}
 };
 

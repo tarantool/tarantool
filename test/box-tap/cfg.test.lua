@@ -45,15 +45,15 @@ local status, result = pcall(testfun)
 test:ok(not status and result:match('Please call box.cfg{}'),
     'exception on unconfigured box')
 
-os.execute("rm -rf phia")
+os.execute("rm -rf vinyl")
 box.cfg{
     logger="tarantool.log",
     slab_alloc_arena=0.1,
     wal_mode = "", -- "" means default value
 }
 
--- gh-678: phia engine creates phia dir with empty 'snapshot' file
-test:isnil(io.open("phia", 'r'), 'phia_dir is not auto-created')
+-- gh-678: vinyl engine creates vinyl dir with empty 'snapshot' file
+test:isnil(io.open("vinyl", 'r'), 'vinyl_dir is not auto-created')
 
 status, result = pcall(testfun)
 test:ok(status and result == 'table', 'configured box')
@@ -139,8 +139,8 @@ local code;
 code = [[ box.cfg{ work_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'work_dir is invalid')
 
-code = [[ box.cfg{ phia_dir='invalid' } ]]
-test:is(run_script(code), PANIC, 'phia_dir is invalid')
+code = [[ box.cfg{ vinyl_dir='invalid' } ]]
+test:is(run_script(code), PANIC, 'vinyl_dir is invalid')
 
 code = [[ box.cfg{ snap_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'snap_dir is invalid')

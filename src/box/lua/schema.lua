@@ -468,8 +468,8 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
-    if box.space[space_id].engine == 'phia' then
-        box.error(box.error.PHIA, 'alter is not supported for a Phia index')
+    if box.space[space_id].engine == 'vinyl' then
+        box.error(box.error.VINYL, 'alter is not supported for a Phia index')
     end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
@@ -873,7 +873,7 @@ function box.schema.space.bless(space)
     end
 
     -- true if reading operations may yield
-    local read_yields = space.engine == 'phia'
+    local read_yields = space.engine == 'vinyl'
     local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
     for _, op in ipairs(read_ops) do
         if read_yields then

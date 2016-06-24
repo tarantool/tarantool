@@ -40,14 +40,14 @@
     Default: 16 |br|
     Dynamic: no |br|
 
-.. confval:: phia
+.. confval:: vinyl
 
-    The default phia configuration can be changed with
+    The default vinyl configuration can be changed with
 
     .. cssclass:: highlight
     .. parsed-literal::
 
-        phia = {
+        vinyl = {
           page_size = *number*,
           memory_limit = *number*,
           compression_key = *number*,
@@ -71,7 +71,7 @@
         .. cssclass:: highlight
         .. parsed-literal::
 
-            phia = {
+            vinyl = {
                 page_size = 131072,
                 memory_limit = 0,
                 compression_key = 0,

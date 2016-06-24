@@ -5,7 +5,7 @@ local json = require('json')
 local private = require('box.internal')
 
 -- see default_cfg below
-local default_phia_cfg = {
+local default_vinyl_cfg = {
     memory_limit      = 1.0, -- 1G
     threads           = 5,
     compact_wm        = 2,
@@ -25,8 +25,8 @@ local default_cfg = {
     work_dir            = nil,
     snap_dir            = ".",
     wal_dir             = ".",
-    phia_dir          = '.',
-    phia              = default_phia_cfg,
+    vinyl_dir          = '.',
+    vinyl              = default_vinyl_cfg,
     logger              = nil,
     logger_nonblock     = true,
     log_level           = 5,
@@ -53,7 +53,7 @@ local default_cfg = {
 }
 
 -- see template_cfg below
-local phia_template_cfg = {
+local vinyl_template_cfg = {
     memory_limit      = 'number',
     threads           = 'number',
     compact_wm        = 'number',
@@ -74,8 +74,8 @@ local template_cfg = {
     work_dir            = 'string',
     snap_dir            = 'string',
     wal_dir             = 'string',
-    phia_dir          = 'string',
-    phia              = phia_template_cfg,
+    vinyl_dir          = 'string',
+    vinyl              = vinyl_template_cfg,
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',

@@ -36,7 +36,7 @@
 #include <box/tuple.h>
 #include <box/index.h>
 #include <box/func.h>
-#include <box/phia_engine.h>
+#include <box/vinyl_engine.h>
 #include <box/request.h>
 #include <box/port.h>
 #include <box/xrow.h>

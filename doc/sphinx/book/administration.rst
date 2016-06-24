@@ -274,7 +274,7 @@ would look like this:
         pid_file   = "/var/run/tarantool",
         wal_dir    = "/var/lib/tarantool",
         snap_dir   = "/var/lib/tarantool",
-        phia_dir = "/var/lib/tarantool",
+        vinyl_dir = "/var/lib/tarantool",
         logger     = "/var/log/tarantool",
         username   = "tarantool",
     }
@@ -294,9 +294,9 @@ The settings in the above script are:
     The directory for the snapshot :file:`*.snap` files. The script
     will add ":samp:`/{instance-name}`" to the directory-name.
 
-``phia_dir``
-    The directory for the phia-storage-engine files. The script
-    will add ":samp:`/phia/{instance-name}`" to the directory-name.
+``vinyl_dir``
+    The directory for the vinyl-storage-engine files. The script
+    will add ":samp:`/vinyl/{instance-name}`" to the directory-name.
 
 ``logger``
     The place where the application log will go. The script will
@@ -409,7 +409,7 @@ say :codenormal:`sudo mkdir /usr/local/etc/default` first. Let the new file cont
         pid_file = "/tarantool_test/my_app.pid",
         wal_dir = "/tarantool_test",
         snap_dir = "/tarantool_test",
-        phia_dir = "/tarantool_test",
+        vinyl_dir = "/tarantool_test",
         logger = "/tarantool_test/log",
         username = "tarantool",
     }
@@ -1188,16 +1188,8 @@ Alternatively, one needs an ordinary file copy utility,
 but there should be frequent production of new snapshot files or
 new WAL files as
 changes occur, so that only the new files need to be copied.
-One such utility is
-`tarantar <https://github.com/tarantool/tarantool/wiki/Tarantar>`_
-but it will require some modifications to work with the latest
-Tarantool version. Setting the :ref:`rows_per_wal <box-cfg-rows-per-wal>` configuration
-parameter is another option.
 
-Note re storage engines:
-sophia databases require additional steps, see the
-explanation in
-`the sophia manual <http://sophia.systems/v2.1/sophia_v21_manual.pdf>`_.
+Note re storage engines: vinyl databases require additional steps.
 
 =====================================================================
        Upgrades

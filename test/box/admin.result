@@ -34,23 +34,6 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - phia
-    - - - branch_age
-        - 0
-      - - branch_age_period
-        - 0
-      - - branch_age_wm
-        - 0
-      - - branch_prio
-        - 2
-      - - compact_wm
-        - 2
-      - - memory_limit
-        - 1
-      - - threads
-        - 5
-  - - phia_dir
-    - <hidden>
   - - pid_file
     - <hidden>
   - - read_only
@@ -75,6 +58,23 @@ cfg_filter(box.cfg)
     - 0
   - - too_long_threshold
     - 0.5
+  - - vinyl
+    - - - branch_age
+        - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
+      - - memory_limit
+        - 1
+      - - threads
+        - 5
+  - - vinyl_dir
+    - <hidden>
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay

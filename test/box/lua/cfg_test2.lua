@@ -4,7 +4,7 @@ os = require('os')
 box.cfg{
     listen              = os.getenv("LISTEN"),
     slab_alloc_arena = 0.2,
-    phia = {},
+    vinyl = {},
 }
 
 require('console').listen(os.getenv('ADMIN'))

@@ -93,9 +93,9 @@
     Default: "." |br|
     Dynamic: no |br|
 
-.. confval:: phia_dir
+.. confval:: vinyl_dir
 
-    A directory where phia files or sub-directories will be stored. Can be relative to
+    A directory where vinyl files or sub-directories will be stored. Can be relative to
     :ref:`work_dir <box-cfg-work-dir>`. If not specified, defaults to work_dir.
 
     Type: string |br|

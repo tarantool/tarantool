@@ -612,7 +612,7 @@ contain a "yield" instruction if the count of tuples is huge.
 Here is a generic function which takes a field identifier
 and a search pattern, and returns all tuples that match. |br|
 * The field must be the first field of a TREE index.
-If the engine is sophia, the field must be the only field of the index. |br|
+If the engine is vinyl, the field must be the only field of the index. |br|
 * The function will use `Lua pattern matching <http://www.lua.org/manual/5.2/manual.html#6.4.1>`_,
 which allows "magic characters" in regular expressions. |br|
 * The initial characters in the pattern, as far as the
@@ -730,7 +730,7 @@ will not return strings in order by string value; |br|
 (c) the field must contain strings, because for the other data type
 ("NUM") pattern searches are not possible; |br|
 (d) if the index has more than one part then the space's engine
-must be "memtx", because for the other engine ("sophia")
+must be "memtx", because for the other engine ("vinyl")
 a search on only one part will cause an error
 "Index ... does not support partial keys". |br|
 If these requirements are not met by any index, then

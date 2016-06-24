@@ -152,7 +152,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: too many parts. Index '...' already exists. Primary key must be unique.
 
-        Note re storage engine: phia supports only the TREE index type,
+        Note re storage engine: vinyl supports only the TREE index type,
         and supports only one index per space,
         and supports only the unique = true option,
         and requires that field numbers be in order starting with 1.
@@ -181,7 +181,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Possible errors: If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
 
-        Note re storage engine: phia will return nil, rather than the inserted tuple.
+        Note re storage engine: vinyl will return nil, rather than the inserted tuple.
 
         **Example:**
 
@@ -363,7 +363,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        Note re storage engine: phia will return nil, rather than the inserted tuple.
+        Note re storage engine: vinyl will return nil, rather than the inserted tuple.
 
         **Example:**
 
@@ -421,7 +421,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
 
-        Note re storage engine: phia will return nil, rather than the updated tuple.
+        Note re storage engine: vinyl will return nil, rather than the updated tuple.
 
         Thus, in the instruction:
 
@@ -591,7 +591,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Complexity Factors:** Index size, Index type
 
-        Note re storage engine: phia will return nil, rather than the deleted tuple.
+        Note re storage engine: vinyl will return nil, rather than the deleted tuple.
 
         **Example:**
 
@@ -704,7 +704,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 1
             ...
 
-    Note re storage engine: phia does not support :codenormal:`count(...)`.
+    Note re storage engine: vinyl does not support :codenormal:`count(...)`.
     One possible workaround is to say :codenormal:`#select(...)`.
 
 
@@ -735,7 +735,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        Note re storage engine: phia does not support ``truncate``.
+        Note re storage engine: vinyl does not support ``truncate``.
 
         **Example:**
 
@@ -837,7 +837,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Insert a new tuple using an auto-increment primary key. The space specified
         by space_object must have a ``NUM`` primary key index of type ``TREE``. The
         primary-key field will be incremented before the insert.
-        Note re storage engine: phia does not support auto_increment.
+        Note re storage engine: vinyl does not support auto_increment.
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
         :codeitalic:`field-value(s)` (type = Lua table or scalar) = tuple's fields, other than the primary-key field.
@@ -984,7 +984,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
           - '313 1 _vpriv sysview 0  '
           - '320 1 _cluster memtx 0  '
           - '512 1 tester memtx 0  '
-          - '513 1 origin phia 0  '
+          - '513 1 origin vinyl 0  '
           - '514 1 archive memtx 0  '
         ...
 

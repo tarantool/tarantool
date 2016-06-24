@@ -148,7 +148,7 @@ s.index.spatial:alter({type = 'tree'})
 - error: 'Can''t create or modify index ''spatial'' in space ''spatial'': ARRAY field
     type is not supported'
 ...
-box.space[box.schema.SPACE_ID]:update({s.id}, {{"=", 4, 'phia'}})
+box.space[box.schema.SPACE_ID]:update({s.id}, {{"=", 4, 'vinyl'}})
 ---
 - error: 'Can''t modify space ''spatial'': can not change space engine'
 ...
@@ -211,13 +211,13 @@ s.index.spatial:select({})
 s:drop()
 ---
 ...
-s = box.schema.space.create('phia', {engine = 'phia'})
+s = box.schema.space.create('vinyl', {engine = 'vinyl'})
 ---
 ...
--- rtree indexes are not enabled in phia
+-- rtree indexes are not enabled in vinyl
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 ---
-- error: Unsupported index type supplied for index 'spatial' in space 'phia'
+- error: Unsupported index type supplied for index 'spatial' in space 'vinyl'
 ...
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 ---
@@ -225,7 +225,7 @@ i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 -- ... even secondary
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 ---
-- error: Unsupported index type supplied for index 'spatial' in space 'phia'
+- error: Unsupported index type supplied for index 'spatial' in space 'vinyl'
 ...
 s:drop()
 ---

@@ -48,7 +48,7 @@
 #include "memtx_engine.h"
 #include "memtx_index.h"
 #include "sysview_engine.h"
-#include "phia_engine.h"
+#include "vinyl_engine.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -999,7 +999,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * <= INSERT
 	 *    ...
 	 *    Initial data: a stream of engine-specifc rows, e.g. snapshot
-	 *    rows for memtx or dirty cursor data for Phia. Engine can
+	 *    rows for memtx or dirty cursor data for Vinyl. Engine can
 	 *    use SERVER_ID, LSN and other fields for internal purposes.
 	 *    ...
 	 * <= INSERT
@@ -1222,9 +1222,9 @@ engine_init()
 	SysviewEngine *sysview = new SysviewEngine();
 	engine_register(sysview);
 
-	PhiaEngine *phia = new PhiaEngine();
-	phia->init();
-	engine_register(phia);
+	VinylEngine *vinyl = new VinylEngine();
+	vinyl->init();
+	engine_register(vinyl);
 }
 
 /**

@@ -43,10 +43,10 @@ add_library(box STATIC
     memtx_engine.cc
     sysview_engine.cc
     sysview_index.cc
-    phia_engine.cc
-    phia_space.cc
-    phia_index.cc
-    phia.c
+    vinyl_engine.cc
+    vinyl_space.cc
+    vinyl_index.cc
+    vinyl.c
     space.cc
     func.cc
     alter.cc

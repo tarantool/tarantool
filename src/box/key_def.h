@@ -163,7 +163,7 @@ struct key_opts {
 	char distancebuf[16];
 	enum rtree_index_distance_type distance;
 	/**
-	 * Phia index options.
+	 * Vinyl index options.
 	 */
 	char path[PATH_MAX];
 	char compression[16];

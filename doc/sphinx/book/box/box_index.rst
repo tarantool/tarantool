@@ -121,7 +121,7 @@ API is a direct binding to corresponding methods of index objects of type
             the comparison-result for equality is always true when a search-value-part is ``nil``
             or is missing. This behavior of searches with nil is subject to change.
 
-            Note re storage engine: phia does not allow search-value-parts to be ``nil`` or missing.
+            Note re storage engine: vinyl does not allow search-value-parts to be ``nil`` or missing.
 
             .. rst-class:: left-align-column-1
             .. rst-class:: left-align-column-2
@@ -140,7 +140,7 @@ API is a direct binding to corresponding methods of index objects of type
             | or 'REQ'      | value     | ``box.index.EQ``.                           |
             |               |           | Tuples are returned in descending order by  |
             |               |           | index key.                                  |
-            |               |           | Note re storage engine: phia does not     |
+            |               |           | Note re storage engine: vinyl does not      |
             |               |           | REQ.                                        |
             +---------------+-----------+---------------------------------------------+
             | box.index.GT  | search    | The comparison operator is '>' (greater     |
@@ -534,7 +534,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: phia does not support ``min()``.
+        Note re storage engine: vinyl does not support ``min()``.
 
         **Example:**
 
@@ -565,7 +565,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: phia does not support ``max()``.
+        Note re storage engine: vinyl does not support ``max()``.
 
         **Example:**
 
@@ -594,7 +594,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: phia does not support ``random()``.
+        Note re storage engine: vinyl does not support ``random()``.
 
         **Example:**
 
@@ -623,7 +623,7 @@ API is a direct binding to corresponding methods of index objects of type
         :return: the number of matching index keys.
         :rtype:  number
 
-        Note re storage engine: phia does not support :codenormal:`count(...)`.
+        Note re storage engine: vinyl does not support :codenormal:`count(...)`.
         One possible workaround is to say :codenormal:`#select(...)`.
 
 
@@ -694,7 +694,7 @@ API is a direct binding to corresponding methods of index objects of type
         the first index cannot be changed to {unique = false}, or
         the alter function is only applicable for the memtx storage engine.
 
-        Note re storage engine: phia does not support ``alter()``.
+        Note re storage engine: vinyl does not support ``alter()``.
 
         **Example:**
 

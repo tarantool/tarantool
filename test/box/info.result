@@ -56,7 +56,6 @@ table.sort(t)
 t
 ---
 - - cluster
-  - phia
   - pid
   - replication
   - server
@@ -64,4 +63,5 @@ t
   - uptime
   - vclock
   - version
+  - vinyl
 ...

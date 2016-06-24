@@ -44,7 +44,7 @@ for spaces, users, roles, and function tuples.
         |               | duplicate name                 |         |                     |
         +---------------+--------------------------------+---------+---------------------+
         | engine        | storage engine =               | string  | 'memtx'             |
-        |               | :ref:`'memtx' or 'phia'      |         |                     |
+        |               | :ref:`'memtx' or 'vinyl'       |         |                     |
         |               | <two-storage-engines>`         |         |                     |
         +---------------+--------------------------------+---------+---------------------+
         | user          | user name                      | string  | current user's name |
@@ -60,7 +60,7 @@ for spaces, users, roles, and function tuples.
     attached to the space objects, for example
     :func:`space_object:drop() <space_object.drop>`.
 
-    Note re storage engine: phia does not support temporary spaces.
+    Note re storage engine: vinyl does not support temporary spaces.
 
 =================================================
                     Example

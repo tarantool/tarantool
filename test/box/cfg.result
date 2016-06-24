@@ -30,23 +30,6 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - phia
-    - - - branch_age
-        - 0
-      - - branch_age_period
-        - 0
-      - - branch_age_wm
-        - 0
-      - - branch_prio
-        - 2
-      - - compact_wm
-        - 2
-      - - memory_limit
-        - 1
-      - - threads
-        - 5
-  - - phia_dir
-    - <hidden>
   - - pid_file
     - <hidden>
   - - read_only
@@ -71,6 +54,23 @@ cfg_filter(box.cfg)
     - 0
   - - too_long_threshold
     - 0.5
+  - - vinyl
+    - - - branch_age
+        - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
+      - - memory_limit
+        - 1
+      - - threads
+        - 5
+  - - vinyl_dir
+    - <hidden>
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -102,23 +102,6 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - phia
-    - - - branch_age
-        - 0
-      - - branch_age_period
-        - 0
-      - - branch_age_wm
-        - 0
-      - - branch_prio
-        - 2
-      - - compact_wm
-        - 2
-      - - memory_limit
-        - 1
-      - - threads
-        - 5
-  - - phia_dir
-    - <hidden>
   - - pid_file
     - <hidden>
   - - read_only
@@ -143,6 +126,23 @@ cfg_filter(box.cfg)
     - 0
   - - too_long_threshold
     - 0.5
+  - - vinyl
+    - - - branch_age
+        - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
+      - - memory_limit
+        - 1
+      - - threads
+        - 5
+  - - vinyl_dir
+    - <hidden>
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -175,13 +175,13 @@ box.cfg{slab_alloc_arena = "100500"}
 ---
 - error: 'Incorrect value for option ''slab_alloc_arena'': should be of type number'
 ...
-box.cfg{phia = "phia"}
+box.cfg{vinyl = "vinyl"}
 ---
-- error: 'Incorrect value for option ''phia'': should be a table'
+- error: 'Incorrect value for option ''vinyl'': should be a table'
 ...
-box.cfg{phia = {threads = "threads"}}
+box.cfg{vinyl = {threads = "threads"}}
 ---
-- error: 'Incorrect value for option ''phia.threads'': should be of type number'
+- error: 'Incorrect value for option ''vinyl.threads'': should be of type number'
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options
@@ -198,7 +198,7 @@ test_run:cmd('switch cfg_tester1')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 1
 - 1.1
@@ -228,7 +228,7 @@ test_run:cmd('switch cfg_tester2')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 0.2
 - 1.1
@@ -258,7 +258,7 @@ test_run:cmd('switch cfg_tester3')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 0.2
 - 1.1
@@ -288,7 +288,7 @@ test_run:cmd('switch cfg_tester4')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 1
 - 3.14
