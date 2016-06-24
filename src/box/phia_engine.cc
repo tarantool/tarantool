@@ -276,6 +276,8 @@ phia_read_task_free_cb(struct coio_task *ptr)
 		(struct phia_read_task *) ptr;
 	if (task->result != NULL)
 		phia_tuple_unref(task->index, task->result);
+	if (task->index != NULL)
+		phia_index_unref(task->index);
 	mempool_free(&phia_read_pool, task);
 	return 0;
 }
@@ -289,6 +291,8 @@ phia_read_task(struct phia_index *index, struct phia_tx *tx,
 	struct phia_read_task *task =
 		(struct phia_read_task *) mempool_alloc_xc(&phia_read_pool);
 	task->index = index;
+	if (index != NULL)
+		phia_index_ref(index);
 	task->tx = tx;
 	task->cursor = cursor;
 	task->key = key;
@@ -297,6 +301,8 @@ phia_read_task(struct phia_index *index, struct phia_tx *tx,
 	              TIMEOUT_INFINITY) == -1) {
 		return -1;
 	}
+	if (index != NULL)
+		phia_index_unref(index);
 	*result = task->result;
 	int rc = task->base.base.result; /* save original error code */
 	mempool_free(&phia_read_pool, task);

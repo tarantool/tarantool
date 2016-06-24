@@ -126,6 +126,8 @@ PhiaIndex::findByKey(struct phia_tuple *phia_key) const
 		}
 		if (rc != 0)
 			diag_raise();
+		if (db == NULL) /* a workaround for concurrent dropIndex() */
+			tnt_raise(ClientError, ER_PHIA, "Index has been dropped");
 	}
 	if (result == NULL) /* not found */
 		return NULL;
@@ -198,6 +200,8 @@ phia_iterator_next(struct iterator *ptr)
 	assert(it->cursor != NULL);
 	struct phia_tuple *result;
 
+	uint32_t it_sc_version = ::sc_version;
+
 	/* read from cache */
 	if (phia_cursor_next(it->cursor, &result, true) != 0)
 		diag_raise();
@@ -205,6 +209,7 @@ phia_iterator_next(struct iterator *ptr)
 		/* switch to asynchronous mode (read from disk) */
 		if (phia_cursor_conext(it->cursor, &result) != 0)
 			diag_raise();
+
 	}
 	if (result == NULL) { /* not found */
 		/* immediately close the cursor */
@@ -218,6 +223,8 @@ phia_iterator_next(struct iterator *ptr)
 	auto result_guard = make_scoped_guard([=]{
 		phia_tuple_unref(it->db, result);
 	});
+	if (it_sc_version != ::sc_version)
+		return NULL;
 	return phia_convert_tuple(it->db, result, it->key_def, it->space->format);
 }
 
@@ -275,7 +282,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	it->space = space_cache_find(key_def->space_id);
 	it->key_def = key_def;
 	it->env = env;
-	it->db  = db;
+	it->db  = db; /* refcounted by phia_cursor_new() */
 	it->key = key;
 	it->part_count = part_count;
 

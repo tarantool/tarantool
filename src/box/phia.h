@@ -146,6 +146,12 @@ phia_index_by_name(struct phia_env *env, const char *name);
 struct phia_index *
 phia_index_new(struct phia_env *e, struct key_def *);
 
+void
+phia_index_ref(struct phia_index *index);
+
+void
+phia_index_unref(struct phia_index *index);
+
 int
 phia_index_open(struct phia_index *index);
 
