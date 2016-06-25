@@ -136,7 +136,7 @@ functions in package
 :ref:`net_box <package_net_box>`,
 :ref:`console <package-console>`, or
 :ref:`socket <package-socket>` (the "os" and "network" requests).
-Note re storage engine: with sovinyl :ref:`select <space-select>` is
+Note re storage engine: with vinyl :ref:`select <space-select>` is
 an implicit yield request, but data-change requests may not be.
 
 The yield occurs just before a blocking syscall, such as a write to the Write-Ahead Log (WAL)
