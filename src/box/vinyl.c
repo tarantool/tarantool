@@ -3075,12 +3075,6 @@ sv_mergeprepare(struct svmerge *m, int count)
 	return 0;
 }
 
-static inline struct svmergesrc*
-sv_mergenextof(struct svmergesrc *src)
-{
-	return src + 1;
-}
-
 static inline void
 sv_mergefree(struct svmerge *m)
 {
@@ -3126,11 +3120,8 @@ struct PACKED svmergeiter {
 static inline void
 sv_mergeiter_dupreset(struct svmergeiter *i, struct svmergesrc *pos)
 {
-	struct svmergesrc *v = i->src;
-	while (v != pos) {
-		v->dup = 0;
-		v = sv_mergenextof(v);
-	}
+	for (struct svmergesrc *src = i->src; src != pos; src++)
+		src->dup = 0;
 }
 
 static inline void
@@ -3141,12 +3132,9 @@ sv_mergeiter_gt(struct svmergeiter *i)
 		ss_iteratornext(i->v->i);
 	}
 	i->v = NULL;
-	struct svmergesrc *min, *src;
-	struct sv *minv;
-	minv = NULL;
-	min  = NULL;
-	src  = i->src;
-	for (; src < i->end; src = sv_mergenextof(src))
+	struct svmergesrc *min = NULL;
+	struct sv *minv = NULL;
+	for (struct svmergesrc *src = i->src; src < i->end; src++)
 	{
 		struct sv *v = ss_iteratorof(src->i);
 		if (v == NULL)
@@ -3186,12 +3174,9 @@ sv_mergeiter_lt(struct svmergeiter *i)
 		ss_iteratornext(i->v->i);
 	}
 	i->v = NULL;
-	struct svmergesrc *max, *src;
-	struct sv *maxv;
-	maxv = NULL;
-	max  = NULL;
-	src  = i->src;
-	for (; src < i->end; src = sv_mergenextof(src))
+	struct svmergesrc *max = NULL;
+	struct sv *maxv = NULL;
+	for (struct svmergesrc *src = i->src; src < i->end; src++)
 	{
 		struct sv *v = ss_iteratorof(src->i);
 		if (v == NULL)
@@ -9494,7 +9479,8 @@ si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
 	return 0;
 }
 
-static int si_readclose(struct siread *q)
+static int
+si_readclose(struct siread *q)
 {
 	si_unlock(q->index);
 	sv_mergefree(&q->merge);
@@ -11210,7 +11196,6 @@ struct vinyl_env {
 	struct srseq       seq;
 	struct seconf      conf;
 	struct ssquota     quota;
-	struct ssa         a_oom;
 	struct ssa         a;
 	struct sicachepool cachepool;
 	struct sxmanager   xm;
@@ -12054,10 +12039,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key, enum vinyl_
 
 	/* read index */
 	struct siread q;
-	si_readopen(&q, index, cache,
-	            order,
-	            vlsn,
-		    key->data, key->size);
+	si_readopen(&q, index, cache, order, vlsn, key->data, key->size);
 	struct sv sv_vup;
 	if (vup != NULL) {
 		sv_init(&sv_vup, &sv_vif, vup, NULL);
