@@ -2459,11 +2459,6 @@ sv_size(struct sv *v) {
 	return v->i->size(v);
 }
 
-static inline char*
-sv_field(struct sv *v, struct key_def *key_def, int pos, uint32_t *size) {
-	return sf_field(key_def, pos, v->i->pointer(v), size);
-}
-
 static inline uint64_t
 sv_hash(struct sv *v, struct key_def *key_def) {
 	return sf_hash(key_def, sv_pointer(v));
@@ -4932,7 +4927,6 @@ struct PACKED sdv {
 };
 
 static struct svif sd_vif;
-static struct svif sd_vrawif;
 
 struct PACKED sdpageheader {
 	uint32_t crc;
@@ -4970,38 +4964,6 @@ sd_pagepointer(struct sdpage *p, struct sdv *v) {
 	         sizeof(struct sdv) * p->h->count) + v->offset;
 }
 
-static inline char*
-sd_pagesparse_keyread(struct sdpage *p, uint32_t offset, uint32_t *size)
-{
-	char *ptr = (char*)p->h + sizeof(struct sdpageheader) +
-	            (p->h->sizeorigin - p->h->sizekeys) + offset;
-	*size = *(uint32_t*)ptr;
-	return ptr + sizeof(uint32_t);
-}
-
-static inline char*
-sd_pagesparse_field(struct sdpage *p, struct sdv *v, uint32_t part_id, uint32_t *size)
-{
-	uint32_t *offsets = (uint32_t*)sd_pagepointer(p, v);
-	return sd_pagesparse_keyread(p, offsets[part_id], size);
-}
-
-static inline void
-sd_pagesparse_convert(struct sdpage *p, struct key_def *key_def,
-		      struct sdv *v, char *dest)
-{
-	char *ptr = dest;
-	memcpy(ptr, v, sizeof(struct sdv));
-	ptr += sizeof(struct sdv);
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1];
-	/* for each key parts + value */
-	for (uint32_t i = 0; i <= key_def->part_count; i++) {
-		struct vinyl_field *k = &fields[i];
-		k->data = sd_pagesparse_field(p, v, i, &k->size);
-	}
-	sf_write(key_def, fields, ptr);
-}
-
 struct PACKED sdpageiter {
 	struct sdpage *page;
 	struct ssbuf *xfbuf;
@@ -5019,12 +4981,7 @@ sd_pageiter_result(struct sdpageiter *i)
 {
 	if (unlikely(i->v == NULL))
 		return;
-	if (likely(!i->key_def->opts.compression_key)) {
-		sv_init(&i->current, &sd_vif, i->v, i->page->h);
-	} else {
-		sd_pagesparse_convert(i->page, i->key_def, i->v, i->xfbuf->s);
-		sv_init(&i->current, &sd_vrawif, i->xfbuf->s, NULL);
-	}
+	sv_init(&i->current, &sd_vif, i->v, i->page->h);
 }
 
 static inline void
@@ -5037,23 +4994,7 @@ sd_pageiter_end(struct sdpageiter *i)
 static inline int
 sd_pageiter_cmp(struct sdpageiter *i, struct key_def *key_def, struct sdv *v)
 {
-	if (likely(!key_def->opts.compression_key)) {
-		return sf_compare(key_def, sd_pagepointer(i->page, v),
-		                  i->key);
-	}
-
-	int rc;
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		struct key_part *part = &key_def->parts[part_id];
-		uint32_t a_fieldsize;
-		char *a_field = sd_pagesparse_field(i->page, v, part_id, &a_fieldsize);
-		uint32_t b_fieldsize;
-		char *b_field = sf_field(key_def, part_id, i->key, &b_fieldsize);
-		rc = tuple_compare_field(a_field, b_field, part->type);
-		if (rc != 0)
-			return rc;
-	}
-	return 0;
+	return sf_compare(key_def, sd_pagepointer(i->page, v), i->key);
 }
 
 static inline int
@@ -5254,14 +5195,12 @@ sd_pageiter_next(struct sdpageiter *pi)
 struct PACKED sdbuildref {
 	uint32_t m, msize;
 	uint32_t v, vsize;
-	uint32_t k, ksize;
 	uint32_t c, csize;
 };
 
 struct sdbuild {
-	struct ssbuf list, m, v, k, c;
+	struct ssbuf list, m, v, c;
 	struct ssfilterif *compress_if;
-	int compress_dup;
 	int compress;
 	int crc;
 	uint32_t vmax;
@@ -5310,7 +5249,7 @@ sd_buildmaxkey(struct sdbuild *b) {
 }
 
 static int sd_buildbegin(struct sdbuild*, struct ssa *a, struct key_def *key_def,
-			 int, int, int, struct ssfilterif*);
+			 int, int, struct ssfilterif*);
 static int sd_buildend(struct sdbuild*);
 static int sd_buildcommit(struct sdbuild*);
 static int sd_buildadd(struct sdbuild*, struct sv*, uint32_t);
@@ -5716,7 +5655,6 @@ struct sdmergeconf {
 	uint64_t    size_node;
 	uint32_t    size_page;
 	uint32_t    checksum;
-	uint32_t    compression_key;
 	uint32_t    compression;
 	struct ssfilterif *compression_if;
 	uint32_t    amqf;
@@ -5957,10 +5895,8 @@ static void sd_buildinit(struct sdbuild *b)
 	ss_bufinit(&b->m);
 	ss_bufinit(&b->v);
 	ss_bufinit(&b->c);
-	ss_bufinit(&b->k);
 	b->n = 0;
 	b->compress = 0;
-	b->compress_dup = 0;
 	b->compress_if = NULL;
 	b->crc = 0;
 	b->vmax = 0;
@@ -5989,7 +5925,6 @@ static void sd_buildfree(struct sdbuild *b)
 	ss_buffree(&b->m, b->a);
 	ss_buffree(&b->v, b->a);
 	ss_buffree(&b->c, b->a);
-	ss_buffree(&b->k, b->a);
 }
 
 static void sd_buildreset(struct sdbuild *b)
@@ -5999,7 +5934,6 @@ static void sd_buildreset(struct sdbuild *b)
 	ss_bufreset(&b->m);
 	ss_bufreset(&b->v);
 	ss_bufreset(&b->c);
-	ss_bufreset(&b->k);
 	b->n = 0;
 	b->vmax = 0;
 }
@@ -6011,20 +5945,17 @@ static void sd_buildgc(struct sdbuild *b, int wm)
 	ss_bufgc(&b->m, b->a, wm);
 	ss_bufgc(&b->v, b->a, wm);
 	ss_bufgc(&b->c, b->a, wm);
-	ss_bufgc(&b->k, b->a, wm);
 	b->n = 0;
 	b->vmax = 0;
 }
 
 static int
 sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
-	      int crc, int compress_dup,
-	      int compress, struct ssfilterif *compress_if)
+	      int crc, int compress, struct ssfilterif *compress_if)
 {
 	b->a = a;
 	b->key_def = key_def;
 	b->crc = crc;
-	b->compress_dup = compress_dup;
 	b->compress = compress;
 	b->compress_if = compress_if;
 	if (!b->tracker) {
@@ -6033,10 +5964,6 @@ sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
 			return sr_oom();
 	}
 	int rc;
-	if (compress_dup && mh_size(b->tracker) == 0) {
-		if (mh_strnptr_reserve(b->tracker, 32768, NULL) == -1)
-			return sr_oom();
-	}
 	rc = ss_bufensure(&b->list, b->a, sizeof(struct sdbuildref));
 	if (unlikely(rc == -1))
 		return sr_oom();
@@ -6046,8 +5973,6 @@ sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
 	ref->msize = 0;
 	ref->v     = ss_bufused(&b->v);
 	ref->vsize = 0;
-	ref->k     = ss_bufused(&b->k);
-	ref->ksize = 0;
 	ref->c     = ss_bufused(&b->c);
 	ref->csize = 0;
 	rc = ss_bufensure(&b->m, b->a, sizeof(struct sdpageheader));
@@ -6068,71 +5993,6 @@ struct sdbuildkey {
 	uint32_t offsetstart;
 	uint32_t size;
 };
-
-static inline int
-sd_buildadd_sparse(struct sdbuild *b, struct sv *v)
-{
-	/* for each key part and value */
-	for (uint32_t i = 0; i <= b->key_def->part_count; i++)
-	{
-		uint32_t fieldsize;
-		char *field = sv_field(v, b->key_def, i, &fieldsize);
-
-		int offsetstart = ss_bufused(&b->k);
-		int offset = (offsetstart - sd_buildref(b)->k);
-
-		/* match a field copy */
-		int is_duplicate = 0;
-		if (b->compress_dup) {
-			mh_int_t pos = mh_strnptr_find_inp(b->tracker, field, fieldsize);
-			if (pos != mh_end(b->tracker)) {
-				is_duplicate = 1;
-				struct sdbuildkey *ref = (struct sdbuildkey *)
-					mh_strnptr_node(b->tracker, pos)->val;
-				offset = ref->offset;
-			}
-		}
-
-		/* offset */
-		int rc;
-		rc = ss_bufensure(&b->v, b->a, sizeof(uint32_t));
-		if (unlikely(rc == -1))
-			return sr_oom();
-		*(uint32_t*)b->v.p = offset;
-		ss_bufadvance(&b->v, sizeof(uint32_t));
-		if (is_duplicate)
-			continue;
-
-		/* copy field */
-		rc = ss_bufensure(&b->k, b->a, sizeof(uint32_t) + fieldsize);
-		if (unlikely(rc == -1))
-			return sr_oom();
-		*(uint32_t*)b->k.p = fieldsize;
-		ss_bufadvance(&b->k, sizeof(uint32_t));
-		memcpy(b->k.p, field, fieldsize);
-		ss_bufadvance(&b->k, fieldsize);
-
-		/* add field reference */
-		if (b->compress_dup) {
-			struct sdbuildkey *ref = ss_malloc(b->a, sizeof(struct sdbuildkey));
-			if (unlikely(ref == NULL))
-				return sr_oom();
-			ref->offset = offset;
-			ref->offsetstart = offsetstart + sizeof(uint32_t);
-			ref->size = fieldsize;
-			uint32_t hash = mh_strn_hash(field, fieldsize);
-			const struct mh_strnptr_node_t strnode = {
-				field, fieldsize, hash, ref};
-			mh_int_t ins_pos = mh_strnptr_put(b->tracker, &strnode,
-							  NULL, NULL);
-			if (unlikely(ins_pos == mh_end(b->tracker)))
-				return sr_error("%s",
-						"Can't insert assoc array item");
-		}
-	}
-
-	return 0;
-}
 
 static inline int
 sd_buildadd_raw(struct sdbuild *b, struct sv *v, uint32_t size)
@@ -6161,11 +6021,7 @@ int sd_buildadd(struct sdbuild *b, struct sv *v, uint32_t flags)
 	sv->lsn = lsn;
 	ss_bufadvance(&b->m, sizeof(struct sdv));
 	/* copy document */
-	if (!b->key_def->opts.compression_key) {
-		rc = sd_buildadd_raw(b, v, size);
-	} else {
-		rc = sd_buildadd_sparse(b, v);
-	}
+	rc = sd_buildadd_raw(b, v, size);
 	if (unlikely(rc == -1))
 		return -1;
 	/* update page header */
@@ -6210,9 +6066,6 @@ sd_buildcompress(struct sdbuild *b)
 	rc = ss_filternext(&f, &b->c, b->v.s + ref->v, ref->vsize);
 	if (unlikely(rc == -1))
 		goto error;
-	rc = ss_filternext(&f, &b->c, b->k.s + ref->k, ref->ksize);
-	if (unlikely(rc == -1))
-		goto error;
 	rc = ss_filtercomplete(&f, &b->c);
 	if (unlikely(rc == -1))
 		goto error;
@@ -6229,7 +6082,6 @@ static int sd_buildend(struct sdbuild *b)
 	struct sdbuildref *ref = sd_buildref(b);
 	ref->msize = ss_bufused(&b->m) - ref->m;
 	ref->vsize = ss_bufused(&b->v) - ref->v;
-	ref->ksize = ss_bufused(&b->k) - ref->k;
 	ref->csize = 0;
 	/* calculate data crc (non-compressed) */
 	struct sdpageheader *h = sd_buildheader(b);
@@ -6237,7 +6089,6 @@ static int sd_buildend(struct sdbuild *b)
 	if (likely(b->crc)) {
 		crc = ss_crcp(b->m.s + ref->m, ref->msize, 0);
 		crc = ss_crcp(b->v.s + ref->v, ref->vsize, crc);
-		crc = ss_crcp(b->k.s + ref->k, ref->ksize, crc);
 	}
 	h->crcdata = crc;
 	/* compression */
@@ -6248,8 +6099,8 @@ static int sd_buildend(struct sdbuild *b)
 		ref->csize = ss_bufused(&b->c) - ref->c;
 	}
 	/* update page header */
-	int total = ref->msize + ref->vsize + ref->ksize;
-	h->sizekeys = ref->ksize;
+	int total = ref->msize + ref->vsize;
+	h->sizekeys = 0;
 	h->sizeorigin = total - sizeof(struct sdpageheader);
 	h->size = h->sizeorigin;
 	if (b->compress)
@@ -6264,12 +6115,9 @@ static int sd_buildend(struct sdbuild *b)
 
 static int sd_buildcommit(struct sdbuild *b)
 {
-	if (b->compress_dup)
-		sd_buildfree_tracker(b);
 	if (b->compress) {
 		ss_bufreset(&b->m);
 		ss_bufreset(&b->v);
-		ss_bufreset(&b->k);
 	}
 	b->n++;
 	return 0;
@@ -6357,67 +6205,6 @@ sd_indexadd_raw(struct sdindex *i, struct sdbuild *build,
 	return 0;
 }
 
-static inline int
-sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
-		   struct sdindexpage *p, char *min, char *max)
-{
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1];
-
-	/* min - for each key part + value */
-	for (uint32_t part = 0; part <= build->key_def->part_count; part++) {
-		/* read field offset */
-		uint32_t offset = *(uint32_t*)min;
-		min += sizeof(uint32_t);
-		/* read field */
-		char *field = build->k.s + sd_buildref(build)->k + offset;
-		int fieldsize = *(uint32_t*)field;
-		field += sizeof(uint32_t);
-		/* copy only key fields, others are set to zero */
-		struct vinyl_field *k = &fields[part];
-		if (part < build->key_def->part_count) {
-			k->data = field;
-			k->size = fieldsize;
-		} else {
-			k->data = NULL;
-			k->size = 0;
-		}
-	}
-	p->sizemin = sf_writesize(build->key_def, fields);
-	int rc = ss_bufensure(&i->v, build->a, p->sizemin);
-	if (unlikely(rc == -1))
-		return sr_oom();
-	sf_write(build->key_def, fields, i->v.p);
-	ss_bufadvance(&i->v, p->sizemin);
-
-	/* max - for each key part + value */
-	for (uint32_t part = 0; part <= build->key_def->part_count; part++) {
-		/* read field offset */
-		uint32_t offset = *(uint32_t*)max;
-		max += sizeof(uint32_t);
-
-		/* read field */
-		char *field = build->k.s + sd_buildref(build)->k + offset;
-		int fieldsize = *(uint32_t*)field;
-		field += sizeof(uint32_t);
-
-		struct vinyl_field *k = &fields[part];
-		if (part < build->key_def->part_count) {
-			k->data = field;
-			k->size = fieldsize;
-		} else {
-			k->data = NULL;
-			k->size = 0;
-		}
-	}
-	p->sizemax = sf_writesize(build->key_def, fields);
-	rc = ss_bufensure(&i->v, build->a, p->sizemax);
-	if (unlikely(rc == -1))
-		return sr_oom();
-	sf_write(build->key_def, fields, i->v.p);
-	ss_bufadvance(&i->v, p->sizemax);
-	return 0;
-}
-
 static int
 sd_indexadd(struct sdindex *i, struct sdbuild *build, uint64_t offset)
 {
@@ -6445,11 +6232,7 @@ sd_indexadd(struct sdindex *i, struct sdbuild *build, uint64_t offset)
 	{
 		char *min = sd_buildminkey(build);
 		char *max = sd_buildmaxkey(build);
-		if (!build->key_def->opts.compression_key) {
-			rc = sd_indexadd_raw(i, build, p, min, max);
-		} else {
-			rc = sd_indexadd_sparse(i, build, p, min, max);
-		}
+		rc = sd_indexadd_raw(i, build, p, min, max);
 		if (unlikely(rc == -1))
 			return -1;
 	}
@@ -6569,8 +6352,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		return 0;
 	int rc;
 	rc = sd_buildbegin(m->build, m->merge->merge->a, m->merge->merge->key_def,
-			   conf->checksum, conf->compression_key,
-	                   conf->compression, conf->compression_if);
+			   conf->checksum, conf->compression, conf->compression_if);
 	if (unlikely(rc == -1))
 		return -1;
 	while (sv_writeiter_has(&m->i))
@@ -6809,21 +6591,6 @@ static struct svif sd_vif =
 	.size      = sd_vifsize
 };
 
-static char*
-sd_vrawifpointer(struct sv *v)
-{
-	return (char*)v->v + sizeof(struct sdv);
-}
-
-static struct svif sd_vrawif =
-{
-	.flags     = sd_vifflags,
-	.lsn       = sd_viflsn,
-	.lsnset    = NULL,
-	.pointer   = sd_vrawifpointer,
-	.size      = sd_vifsize
-};
-
 static int
 sd_writeseal(struct ssfile *file)
 {
@@ -6859,7 +6626,6 @@ sd_writepage(struct ssfile *file, struct sdbuild *b)
 		/* uncompressed */
 		ss_iovadd(&iov, b->m.s + ref->m, ref->msize);
 		ss_iovadd(&iov, b->v.s + ref->v, ref->vsize);
-		ss_iovadd(&iov, b->k.s + ref->k, ref->ksize);
 	}
 	int rc;
 	rc = ss_filewritev(file, &iov);
@@ -6917,7 +6683,6 @@ struct siconf {
 	uint32_t    compression_branch;
 	char       *compression_branch_sz;
 	struct ssfilterif *compression_branch_if;
-	uint32_t    compression_key;
 	uint32_t    temperature;
 	uint32_t    amqf;
 	uint64_t    lru;
@@ -7984,7 +7749,6 @@ si_branchcreate(struct vinyl_index *index, struct sdc *c,
 		.size_node       = UINT64_MAX,
 		.size_page       = index->conf.node_page_size,
 		.checksum        = index->conf.node_page_checksum,
-		.compression_key = index->conf.compression_key,
 		.compression     = index->conf.compression_branch,
 		.compression_if  = index->conf.compression_branch_if,
 		.amqf            = index->conf.amqf,
@@ -8454,7 +8218,6 @@ si_split(struct vinyl_index *index, struct sdc *c, struct ssbuf *result,
 		.size_node       = size_node,
 		.size_page       = index->conf.node_page_size,
 		.checksum        = index->conf.node_page_checksum,
-		.compression_key = index->conf.compression_key,
 		.compression     = index->conf.compression,
 		.compression_if  = index->conf.compression_if,
 		.amqf            = index->conf.amqf,
@@ -9905,7 +9668,6 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	sd_buildinit(&build);
 	rc = sd_buildbegin(&build, r->a, index->key_def,
 	                   index->conf.node_page_checksum,
-	                   index->conf.compression_key,
 	                   index->conf.compression,
 	                   index->conf.compression_if);
 	if (unlikely(rc == -1))
@@ -11771,7 +11533,6 @@ si_confcreate(struct siconf *conf, struct ssa *a,
 	conf->node_size             = key_def->opts.node_size;
 	conf->node_page_size        = key_def->opts.page_size;
 	conf->node_page_checksum    = 1;
-	conf->compression_key       = key_def->opts.compression_key;
 
 	/* compression */
 	if (key_def->opts.compression[0] != '\0') {
