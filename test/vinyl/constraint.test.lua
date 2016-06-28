@@ -42,9 +42,9 @@ space:drop()
 space = box.schema.space.create('single_part', { engine = 'vinyl' })
 _ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
 
-space:insert({string.rep('x', 1023)})
-space:insert({string.rep('x', 1024)})
-space:insert({string.rep('x', 1025)})
+space:insert({string.rep('x', 1020)})
+space:insert({string.rep('x', 1021)})
+space:insert({string.rep('x', 1022)})
 
 space:drop()
 space = nil

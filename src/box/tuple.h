@@ -252,6 +252,19 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 
 /** \endcond public */
 
+/**
+ * @brief Compare two tuple fields using using field type definition
+ * @param field_a field
+ * @param field_b field
+ * @param field_type field type definition
+ * @retval 0  if field_a == field_b
+ * @retval <0 if field_a < field_b
+ * @retval >0 if field_a > field_b
+ */
+int
+tuple_compare_field(const char *field_a, const char *field_b,
+		    enum field_type type);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -648,18 +661,6 @@ tuple_upsert(struct tuple_format *new_format,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base);
 
-/**
- * @brief Compare two tuple fields using using field type definition
- * @param field_a field
- * @param field_b field
- * @param field_type field type definition
- * @retval 0  if field_a == field_b
- * @retval <0 if field_a < field_b
- * @retval >0 if field_a > field_b
- */
-int
-tuple_compare_field(const char *field_a, const char *field_b,
-		    enum field_type type);
 
 /**
  * @brief Compare two tuples using field by field using key definition

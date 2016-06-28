@@ -1831,45 +1831,6 @@ sf_comparable_write(struct key_def *key_def, char *src, char *dest)
 	current->size = 0;
 }
 
-static inline int
-sf_cmpstring(char *a, int asz, char *b, int bsz)
-{
-	int size = (asz < bsz) ? asz : bsz;
-	int rc = memcmp(a, b, size);
-	if (unlikely(rc == 0)) {
-		if (likely(asz == bsz))
-			return 0;
-		return (asz < bsz) ? -1 : 1;
-	}
-	return rc > 0 ? 1 : -1;
-}
-
-static inline int
-sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused)
-{
-	uint64_t av = load_u64(a);
-	uint64_t bv = load_u64(b);
-	if (av == bv)
-		return 0;
-	return (av > bv) ? 1 : -1;
-}
-
-static inline int
-sf_compare_field(enum field_type type, char *a, int asz, char *b, int bsz)
-{
-	switch (type) {
-	case NUM:
-		return sf_cmpu64(a, asz, b, bsz);
-		break;
-	case STRING:
-		return sf_cmpstring(a, asz, b, bsz);
-		break;
-	default:
-		unreachable();
-		return 0;
-	}
-}
-
 static int
 sf_compare(struct key_def *key_def, char *a, char *b)
 {
@@ -1880,8 +1841,7 @@ sf_compare(struct key_def *key_def, char *a, char *b)
 		char *a_field = sf_field(key_def, part_id, a, &a_fieldsize);
 		uint32_t b_fieldsize;
 		char *b_field = sf_field(key_def, part_id, b, &b_fieldsize);
-		rc = sf_compare_field(part->type, a_field, a_fieldsize,
-				      b_field, b_fieldsize);
+		rc = tuple_compare_field(a_field, b_field, part->type);
 		if (rc != 0)
 			return rc;
 		part++;
@@ -3153,18 +3113,15 @@ sv_mergeiter_gt(struct svmergeiter *i)
 		int rc;
 		rc = sf_compare(i->merge->key_def, sv_pointer(minv),
 				sv_pointer(v));
-		switch (rc) {
-		case 0:
+		if (rc == 0) {
 			/*
 			assert(sv_lsn(v) < sv_lsn(minv));
 			*/
 			src->dup = 1;
-			break;
-		case 1:
+		} else if (rc > 0) {
 			sv_mergeiter_dupreset(i, src);
 			minv = v;
 			min = src;
-			break;
 		}
 	}
 	if (unlikely(min == NULL))
@@ -3195,14 +3152,13 @@ sv_mergeiter_lt(struct svmergeiter *i)
 		int rc;
 		rc = sf_compare(i->merge->key_def,
 				sv_pointer(maxv), sv_pointer(v));
-		switch (rc) {
-		case  0:
+		if (rc == 0) {
 			/*
 			assert(sv_lsn(v) < sv_lsn(maxv));
 			*/
 			src->dup = 1;
 			break;
-		case -1:
+		} else if (rc < 0) {
 			sv_mergeiter_dupreset(i, src);
 			maxv = v;
 			max = src;
@@ -5090,8 +5046,7 @@ sd_pageiter_cmp(struct sdpageiter *i, struct key_def *key_def, struct sdv *v)
 		char *a_field = sd_pagesparse_field(i->page, v, part_id, &a_fieldsize);
 		uint32_t b_fieldsize;
 		char *b_field = sf_field(key_def, part_id, i->key, &b_fieldsize);
-		rc = sf_compare_field(part->type, a_field, a_fieldsize,
-				      b_field, b_fieldsize);
+		rc = tuple_compare_field(a_field, b_field, part->type);
 		if (rc != 0)
 			return rc;
 	}
@@ -5108,12 +5063,12 @@ sd_pageiter_search(struct sdpageiter *i)
 	{
 		mid = min + (max - min) / 2;
 		int rc = sd_pageiter_cmp(i, i->key_def, sd_pagev(i->page, mid));
-		switch (rc) {
-		case -1: min = mid + 1;
-			continue;
-		case  1: max = mid - 1;
-			continue;
-		default: return mid;
+		if (rc < 0) {
+			min = mid + 1;
+		} else if (rc > 0) {
+			max = mid - 1;
+		} else {
+			return mid;
 		}
 	}
 	return min;
@@ -5153,7 +5108,7 @@ sd_pageiter_chain_next(struct sdpageiter *i)
 }
 
 static inline int
-sd_pageiter_gt(struct sdpageiter *i, int e)
+sd_pageiter_gt(struct sdpageiter *i, bool eq)
 {
 	if (i->key == NULL) {
 		i->pos = 0;
@@ -5167,21 +5122,21 @@ sd_pageiter_gt(struct sdpageiter *i, int e)
 	if (i->v == NULL)
 		return 0;
 	int rc = sd_pageiter_cmp(i, i->key_def, i->v);
-	int match = rc == 0;
-	switch (rc) {
-		case  0:
-			if (e) {
-				break;
-			}
-		case -1:
+	if (rc < 0) {
+		sd_pageiter_chain_next(i);
+		return 0;
+	} else if (rc > 0) {
+		return 0;
+	} else {
+		assert(rc == 0);
+		if (!eq)
 			sd_pageiter_chain_next(i);
-			break;
+		return 1;
 	}
-	return match;
 }
 
 static inline int
-sd_pageiter_lt(struct sdpageiter *i, int e)
+sd_pageiter_lt(struct sdpageiter *i, bool eq)
 {
 	if (i->key == NULL) {
 		sd_pageiter_chain_head(i, i->page->h->count - 1);
@@ -5194,17 +5149,17 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 	if (i->v == NULL)
 		return 0;
 	int rc = sd_pageiter_cmp(i, i->key_def, i->v);
-	int match = rc == 0;
-	switch (rc) {
-		case 0:
-			if (e) {
-				break;
-			}
-		case 1:
+	if (rc < 0) {
+		return 0;
+	} else if (rc > 0) {
+		sd_pageiter_chain_head(i, i->pos - 1);
+		return 1;
+	} else {
+		assert(rc == 0);
+		if (!eq)
 			sd_pageiter_chain_head(i, i->pos - 1);
-			break;
+		return 1;
 	}
-	return match;
 }
 
 static inline int
@@ -5226,13 +5181,13 @@ sd_pageiter_open(struct sdpageiter *pi, struct key_def *key_def,
 	}
 	int rc = 0;
 	switch (pi->order) {
-	case VINYL_GT:  rc = sd_pageiter_gt(pi, 0);
+	case VINYL_GT:  rc = sd_pageiter_gt(pi, false);
 		break;
-	case VINYL_GE: rc = sd_pageiter_gt(pi, 1);
+	case VINYL_GE: rc = sd_pageiter_gt(pi, true);
 		break;
-	case VINYL_LT:  rc = sd_pageiter_lt(pi, 0);
+	case VINYL_LT:  rc = sd_pageiter_lt(pi, false);
 		break;
-	case VINYL_LE: rc = sd_pageiter_lt(pi, 1);
+	case VINYL_LE: rc = sd_pageiter_lt(pi, true);
 		break;
 	default: unreachable();
 	}
@@ -5559,14 +5514,14 @@ sd_indexiter_open(struct sdindexiter *ii, struct key_def *key_def,
 	case VINYL_LT:
 		rc = sf_compare(ii->key_def, sd_indexpage_min(ii->index, p),
 		                ii->key);
-		if (rc ==  1 || (rc == 0 && ii->cmp == VINYL_LT))
+		if (rc > 0 || (rc == 0 && ii->cmp == VINYL_LT))
 			ii->pos--;
 		break;
 	case VINYL_GE:
 	case VINYL_GT:
 		rc = sf_compare(ii->key_def, sd_indexpage_max(ii->index, p),
 				ii->key);
-		if (rc == -1 || (rc == 0 && ii->cmp == VINYL_GT))
+		if (rc < 0 || (rc == 0 && ii->cmp == VINYL_GT))
 			ii->pos++;
 		break;
 	default: unreachable();
@@ -7154,10 +7109,10 @@ si_nodecmp(struct sinode *n, void *key, struct key_def *key_def)
 	if (l <= 0 && r >= 0)
 		return 0;
 	/* key > range */
-	if (l == -1)
+	if (l < 0)
 		return -1;
 	/* key < range */
-	assert(r == 1);
+	assert(r > 0);
 	return 1;
 }
 
@@ -12312,32 +12267,23 @@ vinyl_tuple_from_sv(struct runtime *r, struct sv *sv)
 }
 
 enum { VINYL_KEY_MAXLEN = 1024 };
-static char VINYL_STRING_MIN[] = { '\0' };
-static char VINYL_STRING_MAX[VINYL_KEY_MAXLEN];
-static uint64_t num_parts[BOX_INDEX_PART_MAX];
+static char VINYL_MP_STRING_MIN[1];
+static char VINYL_MP_STRING_MAX[VINYL_KEY_MAXLEN];
+static char VINYL_MP_UINT_MIN[1];
+static char VINYL_MP_UINT_MAX[9];
 
 static inline int
-vinyl_set_fields(struct key_def *key_def, struct vinyl_field *fields,
-		const char **data, uint32_t part_count)
+vinyl_set_fields(struct vinyl_field *fields,
+		 const char **data, uint32_t part_count)
 {
 	for (uint32_t i = 0; i < part_count; i++) {
 		struct vinyl_field *field = &fields[i];
-		switch (key_def->parts[i].type) {
-		case NUM:
-			num_parts[i] = mp_decode_uint(data);
-			field->data = (char *)&num_parts[i];
-			field->size = sizeof(uint64_t);
-			break;
-		case STRING:
-			field->data = mp_decode_str(data, &field->size);
-			if (field->size > VINYL_KEY_MAXLEN) {
-				diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
-					  field->size, VINYL_KEY_MAXLEN);
-				return -1;
-			}
-			break;
-		default:
-			unreachable();
+		field->data = *data;
+		mp_next(data);
+		field->size = *data - field->data;
+		if (field->size > VINYL_KEY_MAXLEN) {
+			diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
+				  field->size, VINYL_KEY_MAXLEN);
 			return -1;
 		}
 	}
@@ -12352,7 +12298,7 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	assert(part_count == 0 || key != NULL);
 	assert(part_count <= key_def->part_count);
 	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	if (vinyl_set_fields(key_def, fields, &key, part_count) != 0)
+	if (vinyl_set_fields(fields, &key, part_count) != 0)
 		return NULL;
 	/* Fill remaining parts of key */
 	for (uint32_t i = part_count; i < key_def->part_count; i++) {
@@ -12361,13 +12307,12 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 		    (i == 0 && (order == VINYL_LT || order == VINYL_LE))) {
 			switch (key_def->parts[i].type) {
 			case NUM:
-				num_parts[i] = UINT64_MAX;
-				field->data = (char*)&num_parts[i];
-				field->size = sizeof(uint64_t);
+				field->data = VINYL_MP_UINT_MAX;
+				field->size = sizeof(VINYL_MP_UINT_MAX);
 				break;
 			case STRING:
-				field->data = VINYL_STRING_MAX;
-				field->size = sizeof(VINYL_STRING_MAX);
+				field->data = VINYL_MP_STRING_MAX;
+				field->size = sizeof(VINYL_MP_STRING_MAX);
 				break;
 			default:
 				unreachable();
@@ -12376,13 +12321,12 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 			   (i == 0 && (order == VINYL_GT || order == VINYL_GE))) {
 			switch (key_def->parts[i].type) {
 			case NUM:
-				num_parts[i] = 0;
-				field->data = (char*)&num_parts[i];
-				field->size = sizeof(uint64_t);
+				field->data = VINYL_MP_UINT_MIN;
+				field->size = sizeof(VINYL_MP_UINT_MIN);
 				break;
 			case STRING:
-				field->data = VINYL_STRING_MIN;
-				field->size = 0;
+				field->data = VINYL_MP_STRING_MIN;
+				field->size = sizeof(VINYL_MP_STRING_MAX);
 				break;
 			default:
 				unreachable();
@@ -12394,11 +12338,11 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	/* Add an empty value. Value is stored after key parts. */
 	struct vinyl_field *value_field = &fields[key_def->part_count];
 	if (order == VINYL_LT || order == VINYL_LE) {
-		value_field->data = VINYL_STRING_MAX;
-		value_field->size = sizeof(VINYL_STRING_MAX);
+		value_field->data = VINYL_MP_STRING_MAX;
+		value_field->size = sizeof(VINYL_MP_STRING_MAX);
 	} else {
-		value_field->data = VINYL_STRING_MIN;
-		value_field->size = 0;
+		value_field->data = VINYL_MP_STRING_MIN;
+		value_field->size = sizeof(VINYL_MP_STRING_MIN);
 	}
 	/* Create tuple */
 	return vinyl_tuple_new(index, fields, key_def->part_count + 1);
@@ -12418,7 +12362,7 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 	(void) count;
 
 	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	if (vinyl_set_fields(key_def, fields, &data, key_def->part_count) != 0)
+	if (vinyl_set_fields(fields, &data, key_def->part_count) != 0)
 		return NULL;
 
 	/* Value is stored after key parts */
@@ -12437,16 +12381,7 @@ vinyl_calc_fieldslen(struct key_def *key_def, struct vinyl_field *fields,
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		struct vinyl_field *field = &fields[i];
 		assert(field->data != NULL);
-		switch (key_def->parts[i].type) {
-		case STRING:
-			size += mp_sizeof_str(field->size);
-			break;
-		case NUM:
-			size += mp_sizeof_uint(load_u64(field->data));
-			break;
-		default:
-			unreachable();
-		}
+		size += field->size;
 	}
 
 	uint32_t count = key_def->part_count;
@@ -12462,28 +12397,6 @@ vinyl_calc_fieldslen(struct key_def *key_def, struct vinyl_field *fields,
 
 	*field_count = count;
 	return size;
-}
-
-static inline char *
-vinyl_write_fields(struct key_def *key_def, struct vinyl_field *fields,
-		   char *p)
-{
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		switch (key_def->parts[i].type) {
-		case STRING:
-			p = mp_encode_str(p, field->data, field->size);
-			break;
-		case NUM:
-			p = mp_encode_uint(p, load_u64(field->data));
-			break;
-		default:
-			unreachable();
-		}
-	}
-	struct vinyl_field *value_field = &fields[key_def->part_count];
-	memcpy(p, value_field->data, value_field->size);
-	return p + value_field->size;
 }
 
 char *
@@ -12507,7 +12420,12 @@ vinyl_convert_tuple_data(struct vinyl_index *index,
 	}
 	char *d = tuple_data;
 	d = mp_encode_array(d, field_count);
-	d = vinyl_write_fields(key_def, fields, d);
+	/* For each key part + value */
+	for (uint32_t i = 0; i <= key_def->part_count; i++) {
+		struct vinyl_field *field = &fields[i];
+		memcpy(d, field->data, field->size);
+		d += field->size;
+	}
 	assert(tuple_data + size == d);
 	*bsize = size;
 	return tuple_data;
@@ -12650,8 +12568,7 @@ vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
 	/* Set key fields */
 	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
 	const char *tuple_value = tuple;
-	if (vinyl_set_fields(key_def, fields, &tuple_value,
-				key_def->part_count) != 0)
+	if (vinyl_set_fields(fields, &tuple_value, key_def->part_count) != 0)
 		return -1;
 
 	/*
@@ -12873,7 +12790,27 @@ vinyl_env_new(void)
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
-	memset(VINYL_STRING_MAX, 0xff, sizeof(VINYL_STRING_MAX));
+
+	/*
+	 * Initialize limits
+	 */
+
+	char *d;
+
+	d = mp_encode_uint(VINYL_MP_UINT_MIN, 0);
+	assert(d - VINYL_MP_UINT_MIN == sizeof(VINYL_MP_UINT_MIN));
+
+	d = mp_encode_uint(VINYL_MP_UINT_MAX, UINT64_MAX);
+	assert(d - VINYL_MP_UINT_MAX == sizeof(VINYL_MP_UINT_MAX));
+
+	d = mp_encode_strl(VINYL_MP_STRING_MIN, 0);
+	assert(d - VINYL_MP_STRING_MIN == sizeof(VINYL_MP_STRING_MIN));
+
+	uint32_t len = VINYL_KEY_MAXLEN - mp_sizeof_strl(VINYL_KEY_MAXLEN);
+	d = mp_encode_strl(VINYL_MP_STRING_MAX, len);
+	assert(d + len - VINYL_MP_STRING_MAX == sizeof(VINYL_MP_STRING_MAX));
+	memset(d, 0xff, len);
+
 	return e;
 error:
 	se_conffree(&e->conf);
