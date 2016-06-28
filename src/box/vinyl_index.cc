@@ -109,21 +109,12 @@ VinylIndex::findByKey(struct vinyl_tuple *vinyl_key) const
 		transaction = (struct vinyl_tx *) in_txn()->engine_tx;
 	/* try to read from cache first, if nothing is found
 	 * retry using disk */
-	int rc;
 	struct vinyl_tuple *result = NULL;
-	if (transaction == NULL) {
-		rc = vinyl_index_get(db, vinyl_key, &result, true);
-	} else {
-		rc = vinyl_get(transaction, db, vinyl_key, &result, true);
-	}
+	int rc = vinyl_get(transaction, db, vinyl_key, &result, true);
 	if (rc != 0)
 		diag_raise();
 	if (result == NULL) { /* cache miss or not found */
-		if (transaction == NULL) {
-			rc = vinyl_index_coget(db, vinyl_key, &result);
-		} else {
-			rc = vinyl_coget(transaction, db, vinyl_key, &result);
-		}
+		rc = vinyl_coget(transaction, db, vinyl_key, &result);
 		if (rc != 0)
 			diag_raise();
 		if (db == NULL) /* a workaround for concurrent dropIndex() */

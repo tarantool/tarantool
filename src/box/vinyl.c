@@ -11179,7 +11179,7 @@ vinyl_raise()
 
 int
 vinyl_index_read(struct vinyl_index*, struct vinyl_tuple*, enum vinyl_order order,
-		struct vinyl_tuple **, struct sx*, int, struct sicache*,
+		struct vinyl_tuple **, struct sx*, struct sicache*,
 		bool cache_only, struct vinyl_statget *);
 static int vinyl_index_visible(struct vinyl_index*, uint64_t);
 static int vinyl_index_recoverbegin(struct vinyl_index*);
@@ -11680,7 +11680,7 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 
 	struct vinyl_statget statget;
 	assert(c->key != NULL);
-	if (vinyl_index_read(index, c->key, c->order, result, x, 0, c->cache,
+	if (vinyl_index_read(index, c->key, c->order, result, x, c->cache,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}
@@ -11939,7 +11939,7 @@ vinyl_index_drop(struct vinyl_index *index)
 
 int
 vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key, enum vinyl_order order,
-		struct vinyl_tuple **result, struct sx *x, int x_search,
+		struct vinyl_tuple **result, struct sx *x,
 		struct sicache *cache, bool cache_only,
 		struct vinyl_statget *statget)
 {
@@ -11955,7 +11955,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key, enum vinyl_
 	struct vinyl_tuple *vup = NULL;
 
 	/* concurrent */
-	if (x_search && order == VINYL_EQ) {
+	if (x != NULL && order == VINYL_EQ) {
 		int rc = sx_get(x, &index->coindex, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
@@ -12043,23 +12043,6 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key, enum vinyl_
 	statget->read_latency = clock_monotonic64() - start;
 
 	*result = q.result;
-	return 0;
-}
-
-int
-vinyl_index_get(struct vinyl_index *index, struct vinyl_tuple *key,
-	       struct vinyl_tuple **result, bool cache_only)
-{
-	struct vinyl_statget statget;
-	if (vinyl_index_read(index, key, VINYL_EQ, result, NULL, 0, NULL,
-			    cache_only, &statget) != 0) {
-		return -1;
-	}
-
-	if (*result == NULL)
-		 return 0;
-
-	sr_statget(&index->env->stat, &statget);
 	return 0;
 }
 
@@ -12623,30 +12606,14 @@ vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
 }
 
 int
-vinyl_get(struct vinyl_tx *t, struct vinyl_index *index, struct vinyl_tuple *key,
+vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
-	/* validate index */
-	int status = sr_status(&index->status);
-	switch (status) {
-	case SR_SHUTDOWN_PENDING:
-	case SR_DROP_PENDING:
-		if (unlikely(! vinyl_index_visible(index, t->t.id))) {
-			sr_error("%s", "index is invisible to the transaction");
-			return -1;
-		}
-		break;
-	case SR_ONLINE:
-	case SR_INITIAL_RECOVERY:
-	case SR_FINAL_RECOVERY:
-		break;
-	default:
-		sr_malfunction("%s", "index is in malfunction state");
-		return -1;
-	}
+	/* Optimization: allow NULL tx */
+	struct sx *sx = tx != NULL ? &tx->t : NULL;
 
 	struct vinyl_statget statget;
-	if (vinyl_index_read(index, key, VINYL_EQ, result, &t->t, 1, NULL,
+	if (vinyl_index_read(index, key, VINYL_EQ, result, sx, NULL,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}

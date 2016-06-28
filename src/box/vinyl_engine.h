@@ -73,9 +73,6 @@ int
 vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
 	   struct vinyl_tuple *key, struct vinyl_tuple **result);
 int
-vinyl_index_coget(struct vinyl_index *index, struct vinyl_tuple *key,
-		 struct vinyl_tuple **result);
-int
 vinyl_cursor_conext(struct vinyl_cursor *tx, struct vinyl_tuple **result);
 
 struct tuple *

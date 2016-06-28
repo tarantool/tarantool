@@ -170,10 +170,6 @@ vinyl_index_close(struct vinyl_index *index);
 int
 vinyl_index_drop(struct vinyl_index *index);
 
-int
-vinyl_index_get(struct vinyl_index *index, struct vinyl_tuple *key,
-	        struct vinyl_tuple **result, bool cache_only);
-
 size_t
 vinyl_index_bsize(struct vinyl_index *db);
 

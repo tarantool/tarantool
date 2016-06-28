@@ -150,14 +150,6 @@ vinyl_get_cb(struct coio_task *ptr)
 }
 
 static ssize_t
-vinyl_index_get_cb(struct coio_task *ptr)
-{
-	struct vinyl_read_task *task =
-		(struct vinyl_read_task *) ptr;
-	return vinyl_index_get(task->index, task->key, &task->result, false);
-}
-
-static ssize_t
 vinyl_cursor_next_cb(struct coio_task *ptr)
 {
 	struct vinyl_read_task *task =
@@ -204,13 +196,6 @@ vinyl_read_task(struct vinyl_index *index, struct vinyl_tx *tx,
 	mempool_free(&vinyl_read_pool, task);
 	assert(rc == 0 || !diag_is_empty(&fiber()->diag));
 	return rc;
-}
-
-int
-vinyl_index_coget(struct vinyl_index *index, struct vinyl_tuple *key,
-		 struct vinyl_tuple **result)
-{
-	return vinyl_read_task(index, NULL, NULL, key, result, vinyl_index_get_cb);
 }
 
 int
