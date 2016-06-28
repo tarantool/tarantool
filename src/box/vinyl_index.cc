@@ -110,16 +110,9 @@ VinylIndex::findByKey(struct vinyl_tuple *vinyl_key) const
 	/* try to read from cache first, if nothing is found
 	 * retry using disk */
 	struct vinyl_tuple *result = NULL;
-	int rc = vinyl_get(transaction, db, vinyl_key, &result, true);
+	int rc = vinyl_coget(transaction, db, vinyl_key, &result);
 	if (rc != 0)
 		diag_raise();
-	if (result == NULL) { /* cache miss or not found */
-		rc = vinyl_coget(transaction, db, vinyl_key, &result);
-		if (rc != 0)
-			diag_raise();
-		if (db == NULL) /* a workaround for concurrent dropIndex() */
-			tnt_raise(ClientError, ER_VINYL, "Index has been dropped");
-	}
 	if (result == NULL) /* not found */
 		return NULL;
 
@@ -194,15 +187,8 @@ vinyl_iterator_next(struct iterator *ptr)
 
 	uint32_t it_sc_version = ::sc_version;
 
-	/* read from cache */
-	if (vinyl_cursor_next(it->cursor, &result, true) != 0)
+	if (vinyl_cursor_conext(it->cursor, &result) != 0)
 		diag_raise();
-	if (result == NULL) { /* cache miss or not found */
-		/* switch to asynchronous mode (read from disk) */
-		if (vinyl_cursor_conext(it->cursor, &result) != 0)
-			diag_raise();
-
-	}
 	if (result == NULL) { /* not found */
 		/* immediately close the cursor */
 		vinyl_cursor_delete(it->cursor);

@@ -36,8 +36,6 @@
 #include <small/pmatomic.h>
 
 #include "trivia/util.h"
-#include "coeio.h"
-#include "coio.h"
 #include "cfg.h"
 #include "scoped_guard.h"
 
@@ -130,88 +128,6 @@ int vinyl_info(const char *name, vinyl_info_f cb, void *arg)
 	return 0;
 }
 
-static struct mempool vinyl_read_pool;
-
-struct vinyl_read_task {
-	struct coio_task base;
-	struct vinyl_index *index;
-	struct vinyl_cursor *cursor;
-	struct vinyl_tx *tx;
-	struct vinyl_tuple *key;
-	struct vinyl_tuple *result;
-};
-
-static ssize_t
-vinyl_get_cb(struct coio_task *ptr)
-{
-	struct vinyl_read_task *task =
-		(struct vinyl_read_task *) ptr;
-	return vinyl_get(task->tx, task->index, task->key, &task->result, false);
-}
-
-static ssize_t
-vinyl_cursor_next_cb(struct coio_task *ptr)
-{
-	struct vinyl_read_task *task =
-		(struct vinyl_read_task *) ptr;
-	return vinyl_cursor_next(task->cursor, &task->result, false);
-}
-
-static ssize_t
-vinyl_read_task_free_cb(struct coio_task *ptr)
-{
-	struct vinyl_read_task *task =
-		(struct vinyl_read_task *) ptr;
-	if (task->result != NULL)
-		vinyl_tuple_unref(task->index, task->result);
-	if (task->index != NULL)
-		vinyl_index_unref(task->index);
-	mempool_free(&vinyl_read_pool, task);
-	return 0;
-}
-
-static inline int
-vinyl_read_task(struct vinyl_index *index, struct vinyl_tx *tx,
-	       struct vinyl_cursor *cursor, struct vinyl_tuple *key,
-	       struct vinyl_tuple **result,
-	       coio_task_cb func)
-{
-	struct vinyl_read_task *task =
-		(struct vinyl_read_task *) mempool_alloc_xc(&vinyl_read_pool);
-	task->index = index;
-	if (index != NULL)
-		vinyl_index_ref(index);
-	task->tx = tx;
-	task->cursor = cursor;
-	task->key = key;
-	task->result = NULL;
-	if (coio_task(&task->base, func, vinyl_read_task_free_cb,
-	              TIMEOUT_INFINITY) == -1) {
-		return -1;
-	}
-	if (index != NULL)
-		vinyl_index_unref(index);
-	*result = task->result;
-	int rc = task->base.base.result; /* save original error code */
-	mempool_free(&vinyl_read_pool, task);
-	assert(rc == 0 || !diag_is_empty(&fiber()->diag));
-	return rc;
-}
-
-int
-vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
-	   struct vinyl_tuple *key, struct vinyl_tuple **result)
-{
-	return vinyl_read_task(index, tx, NULL, key, result, vinyl_get_cb);
-}
-
-int
-vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result)
-{
-	return vinyl_read_task(NULL, NULL, cursor, NULL, result,
-			      vinyl_cursor_next_cb);
-}
-
 VinylEngine::VinylEngine()
 	:Engine("vinyl")
 	 ,recovery_complete(0)
@@ -233,9 +149,6 @@ VinylEngine::init()
 	worker_pool_run = 0;
 	worker_pool_size = 0;
 	worker_pool = NULL;
-	/* destroyed with cord() */
-	mempool_create(&vinyl_read_pool, &cord()->slabc,
-	               sizeof(struct vinyl_read_task));
 	/* prepare worker pool */
 	env = vinyl_env_new();
 	if (env == NULL)

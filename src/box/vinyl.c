@@ -63,6 +63,7 @@
 #define RB_COMPACT 1
 #define RB_CMP_TREE_ARG 1
 #include <small/rb.h>
+#include <small/mempool.h>
 #include <msgpuck/msgpuck.h>
 
 #include "trivia/util.h"
@@ -73,6 +74,8 @@
 #include "assoc.h"
 #include "cfg.h"
 #include "diag.h"
+#include "fiber.h" /* cord_slab_cache() */
+#include "coeio.h"
 
 #include "errcode.h"
 #include "key_def.h"
@@ -11163,6 +11166,7 @@ struct vinyl_env {
 	struct scheduler          scheduler;
 	struct srstat      stat;
 	struct runtime          r;
+	struct mempool read_pool;
 };
 
 struct scheduler *
@@ -11258,6 +11262,7 @@ vinyl_env_delete(struct vinyl_env *e)
 	ss_quotafree(&e->quota);
 	sr_statfree(&e->stat);
 	sr_seqfree(&e->seq);
+	mempool_destroy(&e->read_pool);
 	free(e);
 	return rcret;
 }
@@ -12605,7 +12610,7 @@ vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
 	return vinyl_tx_write(tx, index, tuple, SVDELETE);
 }
 
-int
+static inline int
 vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
@@ -12735,6 +12740,113 @@ vinyl_begin(struct vinyl_env *e)
 	return t;
 }
 
+/** {{ vinyl_read_task - Asynchronous I/O using eio pool */
+
+struct vinyl_read_task {
+	struct coio_task base;
+	struct vinyl_index *index;
+	struct vinyl_cursor *cursor;
+	struct vinyl_tx *tx;
+	struct vinyl_tuple *key;
+	struct vinyl_tuple *result;
+};
+
+static ssize_t
+vinyl_get_cb(struct coio_task *ptr)
+{
+	struct vinyl_read_task *task =
+		(struct vinyl_read_task *) ptr;
+	return vinyl_get(task->tx, task->index, task->key, &task->result, false);
+}
+
+static ssize_t
+vinyl_cursor_next_cb(struct coio_task *ptr)
+{
+	struct vinyl_read_task *task =
+		(struct vinyl_read_task *) ptr;
+	return vinyl_cursor_next(task->cursor, &task->result, false);
+}
+
+static ssize_t
+vinyl_read_task_free_cb(struct coio_task *ptr)
+{
+	struct vinyl_read_task *task =
+		(struct vinyl_read_task *) ptr;
+	struct vinyl_env *env = task->index->env;
+	assert(env != NULL);
+	if (task->result != NULL)
+		vinyl_tuple_unref(task->index, task->result);
+	vinyl_index_unref(task->index);
+	mempool_free(&env->read_pool, task);
+	return 0;
+}
+
+static inline int
+vinyl_read_task(struct vinyl_index *index, struct vinyl_tx *tx,
+	       struct vinyl_cursor *cursor, struct vinyl_tuple *key,
+	       struct vinyl_tuple **result,
+	       coio_task_cb func)
+{
+	assert(index != NULL);
+	struct vinyl_env *env = index->env;
+	assert(env != NULL);
+	struct vinyl_read_task *task = (struct vinyl_read_task *)
+		mempool_alloc(&env->read_pool);
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "mempool",
+			 "vinyl_read_task");
+		return -1;
+	}
+	task->index = index;
+	vinyl_index_ref(index);
+	task->tx = tx;
+	task->cursor = cursor;
+	task->key = key;
+	task->result = NULL;
+	if (coio_task(&task->base, func, vinyl_read_task_free_cb,
+	              TIMEOUT_INFINITY) == -1) {
+		return -1;
+	}
+	vinyl_index_unref(index);
+	*result = task->result;
+	int rc = task->base.base.result; /* save original error code */
+	mempool_free(&env->read_pool, task);
+	assert(rc == 0 || !diag_is_empty(&fiber()->diag));
+	return rc;
+}
+
+int
+vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
+	    struct vinyl_tuple *key, struct vinyl_tuple **result)
+{
+	*result = NULL;
+	int rc = vinyl_get(tx, index, key, result, true);
+	if (rc != 0)
+		return rc;
+	if (*result != NULL) /* found */
+		return 0;
+
+	 /* cache miss or not found */
+	return vinyl_read_task(index, tx, NULL, key, result,
+				     vinyl_get_cb);
+}
+
+int
+vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result)
+{
+	*result = NULL;
+	int rc = vinyl_cursor_next(cursor, result, true);
+	if (rc != 0)
+		return rc;
+	if (*result != NULL)
+		return 0; /* found */
+
+	return vinyl_read_task(cursor->index, NULL, cursor, NULL, result,
+			      vinyl_cursor_next_cb);
+}
+
+/** }} vinyl_read_task */
+
 struct vinyl_env *
 vinyl_env_new(void)
 {
@@ -12778,6 +12890,8 @@ vinyl_env_new(void)
 	assert(d + len - VINYL_MP_STRING_MAX == sizeof(VINYL_MP_STRING_MAX));
 	memset(d, 0xff, len);
 
+	mempool_create(&e->read_pool, cord_slab_cache(),
+	               sizeof(struct vinyl_read_task));
 	return e;
 error:
 	se_conffree(&e->conf);

@@ -114,8 +114,8 @@ struct vinyl_tx *
 vinyl_begin(struct vinyl_env *e);
 
 int
-vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index,
-	 struct vinyl_tuple *key, struct vinyl_tuple **result, bool cache_only);
+vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
+	    struct vinyl_tuple *key, struct vinyl_tuple **result);
 
 int
 vinyl_replace(struct vinyl_tx *tx, struct vinyl_index *index,
@@ -199,8 +199,10 @@ void
 vinyl_cursor_set_read_commited(struct vinyl_cursor *cursor, bool read_commited);
 
 int
-vinyl_cursor_next(struct vinyl_cursor *cursor, struct vinyl_tuple **result,
-		 bool cache_only);
+vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
+		 bool cache_only); /* used from relay cord */
+int
+vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result);
 
 /*
  * Tuple

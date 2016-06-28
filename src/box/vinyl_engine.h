@@ -66,14 +66,6 @@ int vinyl_info(const char*, vinyl_info_f, void*);
 void vinyl_workers_start(struct vinyl_env *);
 
 struct vinyl_tuple;
-struct vinyl_tx;
-struct vinyl_cursor;
-
-int
-vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
-	   struct vinyl_tuple *key, struct vinyl_tuple **result);
-int
-vinyl_cursor_conext(struct vinyl_cursor *tx, struct vinyl_tuple **result);
 
 struct tuple *
 vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
