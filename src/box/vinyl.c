@@ -76,6 +76,7 @@
 
 #include "errcode.h"
 #include "key_def.h"
+#include "tuple.h"
 #include "tuple_update.h"
 
 #define ssunused __attribute__((unused))
@@ -1728,6 +1729,11 @@ static struct ssfilterif ss_zstdfilter =
 };
 
 static int  sf_compare(struct key_def*, char *, char *b);
+
+struct vinyl_field {
+	const char *data;
+	uint32_t size;
+};
 
 struct PACKED vinyl_field_meta {
 	uint32_t offset;
@@ -12422,6 +12428,106 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 	return vinyl_tuple_new(index, fields, key_def->part_count + 1);
 }
 
+static inline uint32_t
+vinyl_calc_fieldslen(struct key_def *key_def, struct vinyl_field *fields,
+		     uint32_t *field_count)
+{
+	/* prepare keys */
+	uint32_t size = 0;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct vinyl_field *field = &fields[i];
+		assert(field->data != NULL);
+		switch (key_def->parts[i].type) {
+		case STRING:
+			size += mp_sizeof_str(field->size);
+			break;
+		case NUM:
+			size += mp_sizeof_uint(load_u64(field->data));
+			break;
+		default:
+			unreachable();
+		}
+	}
+
+	uint32_t count = key_def->part_count;
+	struct vinyl_field *value_field = &fields[key_def->part_count];
+	const char *value = value_field->data;
+	const char *valueend = value + value_field->size;
+	while (value < valueend) {
+		count++;
+		mp_next(&value);
+	}
+	size += mp_sizeof_array(count);
+	size += value_field->size;
+
+	*field_count = count;
+	return size;
+}
+
+static inline char *
+vinyl_write_fields(struct key_def *key_def, struct vinyl_field *fields,
+		   char *p)
+{
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct vinyl_field *field = &fields[i];
+		switch (key_def->parts[i].type) {
+		case STRING:
+			p = mp_encode_str(p, field->data, field->size);
+			break;
+		case NUM:
+			p = mp_encode_uint(p, load_u64(field->data));
+			break;
+		default:
+			unreachable();
+		}
+	}
+	struct vinyl_field *value_field = &fields[key_def->part_count];
+	memcpy(p, value_field->data, value_field->size);
+	return p + value_field->size;
+}
+
+char *
+vinyl_convert_tuple_data(struct vinyl_index *index,
+			 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize)
+{
+	struct key_def *key_def = index->key_def;
+	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
+	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	for (uint32_t i = 0; i <= key_def->part_count; i++) {
+		struct vinyl_field *field = &fields[i];
+		field->data = sf_field(index->key_def, i, vinyl_tuple->data,
+				       &field->size);
+	}
+	uint32_t field_count = 0;
+	size_t size = vinyl_calc_fieldslen(key_def, fields, &field_count);
+	char *tuple_data = (char *) malloc(size);
+	if (tuple_data == NULL) {
+		diag_set(OutOfMemory, size, "malloc", "tuple");
+		return NULL;
+	}
+	char *d = tuple_data;
+	d = mp_encode_array(d, field_count);
+	d = vinyl_write_fields(key_def, fields, d);
+	assert(tuple_data + size == d);
+	*bsize = size;
+	return tuple_data;
+}
+
+struct tuple *
+vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
+		    struct tuple_format *format)
+{
+	assert(format);
+	uint32_t bsize;
+	char *data = vinyl_convert_tuple_data(index, vinyl_tuple, &bsize);
+	if (data == NULL)
+		return NULL;
+
+	struct tuple *tuple = box_tuple_new(format, data, data + bsize);
+	free(data);
+	return tuple;
+}
+
 void
 vinyl_tuple_ref(struct vinyl_tuple *v)
 {
@@ -12457,27 +12563,6 @@ vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple)
 {
 	struct runtime *r = index->r;
 	vinyl_tuple_unref_rt(r, tuple);
-}
-
-char *
-vinyl_tuple_field(struct vinyl_index *index, struct vinyl_tuple *tuple,
-		 uint32_t field_id, uint32_t *size)
-{
-	struct key_def *key_def = index->key_def;
-	assert(field_id <= key_def->part_count);
-	return sf_field(key_def, field_id, tuple->data, size);
-}
-
-void
-vinyl_tuple_fields(struct vinyl_index *index, struct vinyl_tuple *tuple,
-		  struct vinyl_field *fields, uint32_t fields_count)
-{
-	assert(fields_count <= index->key_def->part_count + 1);
-	for (uint32_t i = 0; i < fields_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		field->data = sf_field(index->key_def, i, tuple->data,
-				       &field->size);
-	}
 }
 
 int64_t

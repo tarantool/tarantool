@@ -132,10 +132,11 @@ VinylIndex::findByKey(struct vinyl_tuple *vinyl_key) const
 	if (result == NULL) /* not found */
 		return NULL;
 
-	auto tuple_guard = make_scoped_guard([=] {
-		vinyl_tuple_unref(db, result);
-	});
-	return vinyl_convert_tuple(db, result, key_def, format);
+	struct tuple *tuple = vinyl_convert_tuple(db, result, format);
+	vinyl_tuple_unref(db, result);
+	if (tuple == NULL)
+		diag_raise();
+	return tuple;
 }
 
 struct tuple *
@@ -220,12 +221,16 @@ vinyl_iterator_next(struct iterator *ptr)
 	}
 
 	/* found */
-	auto result_guard = make_scoped_guard([=]{
+	if (it_sc_version != ::sc_version) {
 		vinyl_tuple_unref(it->db, result);
-	});
-	if (it_sc_version != ::sc_version)
 		return NULL;
-	return vinyl_convert_tuple(it->db, result, it->key_def, it->space->format);
+	}
+	struct tuple *tuple = vinyl_convert_tuple(it->db, result,
+		it->space->format);
+	vinyl_tuple_unref(it->db, result);
+	if (tuple == NULL)
+		diag_raise();
+	return tuple;
 }
 
 static struct tuple *
@@ -239,7 +244,11 @@ vinyl_iterator_eq(struct iterator *ptr)
 	/* check equality */
 	if (tuple_compare_with_key(tuple, it->key, it->part_count,
 				it->key_def) != 0) {
-		tuple_delete(tuple);
+		/*
+		 * tuple is destroyed on the next call to
+		 * box_tuple_XXX() API. See box_tuple_ref()
+		 * comments.
+		 */
 		vinyl_cursor_delete(it->cursor);
 		it->cursor = NULL;
 		ptr->next = NULL;

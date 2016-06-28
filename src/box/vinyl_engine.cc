@@ -59,110 +59,6 @@ struct cord *worker_pool;
 static int worker_pool_size;
 static volatile int worker_pool_run;
 
-static inline uint32_t
-vinyl_calc_fields(struct key_def *key_def, struct vinyl_field *fields,
-		uint32_t *field_count)
-{
-	/* prepare keys */
-	uint32_t size = 0;
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		assert(field->data != NULL);
-		switch (key_def->parts[i].type) {
-		case STRING:
-			size += mp_sizeof_str(field->size);
-			break;
-		case NUM:
-			size += mp_sizeof_uint(load_u64(field->data));
-			break;
-		default:
-			unreachable();
-		}
-	}
-
-	uint32_t count = key_def->part_count;
-	struct vinyl_field *value_field = &fields[key_def->part_count];
-	const char *value = value_field->data;
-	const char *valueend = value + value_field->size;
-	while (value < valueend) {
-		count++;
-		mp_next(&value);
-	}
-	size += mp_sizeof_array(count);
-	size += value_field->size;
-
-	*field_count = count;
-	return size;
-}
-
-static inline char *
-vinyl_write_fields(struct key_def *key_def, struct vinyl_field *fields,
-		  char *p)
-{
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		switch (key_def->parts[i].type) {
-		case STRING:
-			p = mp_encode_str(p, field->data, field->size);
-			break;
-		case NUM:
-			p = mp_encode_uint(p, load_u64(field->data));
-			break;
-		default:
-			unreachable();
-		}
-	}
-	struct vinyl_field *value_field = &fields[key_def->part_count];
-	memcpy(p, value_field->data, value_field->size);
-	return p + value_field->size;
-}
-
-struct tuple *
-vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-		   struct key_def *key_def, struct tuple_format *format)
-{
-	assert(format);
-	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	vinyl_tuple_fields(index, vinyl_tuple, fields, key_def->part_count + 1);
-	uint32_t field_count = 0;
-	size_t size = vinyl_calc_fields(key_def, fields, &field_count);
-
-	struct tuple *tuple = tuple_alloc(format, size);
-	char *d = tuple->data;
-	d = mp_encode_array(d, field_count);
-	d = vinyl_write_fields(key_def, fields, d);
-	assert(tuple->data + size == d);
-	try {
-		tuple_init_field_map(format, tuple);
-	} catch (Exception *e) {
-		tuple_delete(tuple);
-		throw;
-	}
-	return tuple;
-}
-
-static char *
-vinyl_convert_tuple_data(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-			struct key_def *key_def,
-			uint32_t *bsize)
-{
-	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	vinyl_tuple_fields(index, vinyl_tuple, fields, key_def->part_count + 1);
-	uint32_t field_count = 0;
-	size_t size = vinyl_calc_fields(key_def, fields, &field_count);
-	char *tuple_data = (char *) malloc(size);
-	if (tuple_data == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "tuple");
-	char *d = tuple_data;
-	d = mp_encode_array(d, field_count);
-	d = vinyl_write_fields(key_def, fields, d);
-	assert(tuple_data + size == d);
-	*bsize = size;
-	return tuple_data;
-}
-
 static void*
 vinyl_worker(void *arg)
 {
@@ -463,7 +359,9 @@ join_send_space(struct space *sp, void *data)
 		int64_t lsn = vinyl_tuple_lsn(vinyl_tuple);
 		uint32_t tuple_size;
 		char *tuple = vinyl_convert_tuple_data(pk->db, vinyl_tuple,
-			pk->key_def, &tuple_size);
+			&tuple_size);
+		if (tuple == NULL)
+			diag_raise();
 		vinyl_tuple_unref(pk->db, vinyl_tuple);
 		try {
 			vinyl_send_row(stream, pk->key_def->space_id,

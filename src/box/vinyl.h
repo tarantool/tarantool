@@ -42,12 +42,15 @@ extern "C" {
 struct vinyl_env;
 struct vinyl_service;
 struct vinyl_tx;
+struct vinyl_field;
 struct vinyl_tuple;
 struct vinyl_cursor;
 struct vinyl_index;
 struct vinyl_confcursor;
 struct vinyl_confkv;
 struct key_def;
+struct tuple;
+struct tuple_format;
 
 /*
  * Environment
@@ -206,10 +209,6 @@ vinyl_cursor_next(struct vinyl_cursor *cursor, struct vinyl_tuple **result,
 /*
  * Tuple
  */
-struct vinyl_field {
-	const char *data;
-	uint32_t size;
-};
 
 struct vinyl_tuple *
 vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
@@ -219,13 +218,13 @@ struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 			 uint32_t part_count, int order);
 
-char *
-vinyl_tuple_field(struct vinyl_index *index, struct vinyl_tuple *tuple,
-		 uint32_t field_id, uint32_t *size);
+struct tuple *
+vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
+		    struct tuple_format *format);
 
-void
-vinyl_tuple_fields(struct vinyl_index *index, struct vinyl_tuple *tuple,
-		  struct vinyl_field *fields, uint32_t fields_count);
+char *
+vinyl_convert_tuple_data(struct vinyl_index *index,
+			 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize);
 
 void
 vinyl_tuple_ref(struct vinyl_tuple *tuple);

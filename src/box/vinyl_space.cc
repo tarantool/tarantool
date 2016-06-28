@@ -132,7 +132,11 @@ VinylSpace::executeReplace(struct txn*,
 		if (mode == DUP_INSERT) {
 			struct tuple *found = index->findByKey(tuple);
 			if (found) {
-				tuple_delete(found);
+				/*
+				 * tuple is destroyed on the next call to
+				 * box_tuple_XXX() API. See box_tuple_ref()
+				 * comments.
+				 */
 				tnt_raise(ClientError, ER_TUPLE_FOUND,
 						  index_name(index), space_name(space));
 			}
