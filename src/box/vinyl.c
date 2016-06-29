@@ -71,7 +71,6 @@
 #include "clock.h"
 #include "trivia/config.h"
 #include "tt_pthread.h"
-#include "assoc.h"
 #include "cfg.h"
 #include "diag.h"
 #include "fiber.h" /* cord_slab_cache() */
@@ -5205,7 +5204,6 @@ struct sdbuild {
 	int crc;
 	uint32_t vmax;
 	uint32_t n;
-	struct mh_strnptr_t *tracker;
 	struct ssa *a;
 	struct key_def *key_def;
 };
@@ -5890,7 +5888,6 @@ static int sd_seal(struct ssfile*, struct sdindex*, uint64_t);
 
 static void sd_buildinit(struct sdbuild *b)
 {
-	b->tracker = NULL;
 	ss_bufinit(&b->list);
 	ss_bufinit(&b->m);
 	ss_bufinit(&b->v);
@@ -5902,25 +5899,8 @@ static void sd_buildinit(struct sdbuild *b)
 	b->vmax = 0;
 }
 
-static inline void
-sd_buildfree_tracker(struct sdbuild *b)
-{
-	if (!b->tracker)
-		return;
-	mh_int_t i;
-	mh_foreach(b->tracker, i) {
-		ss_free(b->a, mh_strnptr_node(b->tracker, i)->val);
-	}
-	mh_strnptr_clear(b->tracker);
-}
-
 static void sd_buildfree(struct sdbuild *b)
 {
-	if (b->tracker) {
-		sd_buildfree_tracker(b);
-		mh_strnptr_delete(b->tracker);
-		b->tracker = NULL;
-	}
 	ss_buffree(&b->list, b->a);
 	ss_buffree(&b->m, b->a);
 	ss_buffree(&b->v, b->a);
@@ -5929,7 +5909,6 @@ static void sd_buildfree(struct sdbuild *b)
 
 static void sd_buildreset(struct sdbuild *b)
 {
-	sd_buildfree_tracker(b);
 	ss_bufreset(&b->list);
 	ss_bufreset(&b->m);
 	ss_bufreset(&b->v);
@@ -5940,7 +5919,6 @@ static void sd_buildreset(struct sdbuild *b)
 
 static void sd_buildgc(struct sdbuild *b, int wm)
 {
-	sd_buildfree_tracker(b);
 	ss_bufgc(&b->list, b->a, wm);
 	ss_bufgc(&b->m, b->a, wm);
 	ss_bufgc(&b->v, b->a, wm);
@@ -5958,11 +5936,6 @@ sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
 	b->crc = crc;
 	b->compress = compress;
 	b->compress_if = compress_if;
-	if (!b->tracker) {
-		b->tracker = mh_strnptr_new();
-		if (!b->tracker)
-			return sr_oom();
-	}
 	int rc;
 	rc = ss_bufensure(&b->list, b->a, sizeof(struct sdbuildref));
 	if (unlikely(rc == -1))
@@ -5987,12 +5960,6 @@ sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
 	ss_bufadvance(&b->m, sizeof(struct sdpageheader));
 	return 0;
 }
-
-struct sdbuildkey {
-	uint32_t offset;
-	uint32_t offsetstart;
-	uint32_t size;
-};
 
 static inline int
 sd_buildadd_raw(struct sdbuild *b, struct sv *v, uint32_t size)
