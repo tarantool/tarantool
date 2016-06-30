@@ -1964,16 +1964,71 @@ struct svif {
 	uint32_t  (*size)(struct sv*);
 };
 
+static struct svif sv_tupleif;
+static struct svif sv_upsertvif;
+static struct svif sv_refif;
+static struct svif sv_upsertvif;
+static struct svif sx_vif;
+static struct svif sd_vif;
+struct vinyl_tuple;
+struct sdv;
+struct sxv;
+struct svupsert;
+struct sdpageheader;
+
 struct PACKED sv {
 	struct svif *i;
 	void *v, *arg;
 };
 
+static inline struct vinyl_tuple *
+sv_to_tuple(struct sv *v)
+{
+	assert(v->i == &sv_tupleif);
+	struct vinyl_tuple *tuple = (struct vinyl_tuple *)v->v;
+	assert(tuple != NULL);
+	return tuple;
+}
+
 static inline void
-sv_init(struct sv *v, struct svif *i, void *vptr, void *arg) {
-	v->i   = i;
-	v->v   = vptr;
-	v->arg = arg;
+sv_from_tuple(struct sv *v, struct vinyl_tuple *tuple)
+{
+	v->i   = &sv_tupleif;
+	v->v   = tuple;
+	v->arg = NULL;
+}
+
+static inline struct sxv *
+sv_to_sxv(struct sv *v)
+{
+	assert(v->i == &sx_vif);
+	struct sxv *sxv = (struct sxv *)v->v;
+	assert(sxv != NULL);
+	return sxv;
+}
+
+static inline void
+sv_from_sxv(struct sv *v, struct sxv *sxv)
+{
+	v->i   = &sx_vif;
+	v->v   = sxv;
+	v->arg = NULL;
+}
+
+static inline void
+sv_from_svupsert(struct sv *v, char *s)
+{
+	v->i   = &sv_upsertvif;
+	v->v   = s;
+	v->arg = NULL;
+}
+
+static inline void
+sv_from_sdv(struct sv *v, struct sdv *sdv, struct sdpageheader *h)
+{
+	v->i   = &sd_vif;
+	v->v   = sdv;
+	v->arg = h;
 }
 
 static inline uint8_t
@@ -2029,8 +2084,6 @@ vinyl_tuple_from_sv(struct runtime *r, struct sv *src);
 
 static int
 vinyl_tuple_unref_rt(struct runtime *r, struct vinyl_tuple *v);
-
-static struct svif sv_upsertvif;
 
 struct svupsertnode {
 	uint64_t lsn;
@@ -2432,7 +2485,7 @@ sv_upsert(struct svupsert *u, struct key_def *key_def)
 			return -1;
 	}
 done:
-	sv_init(&u->result, &sv_upsertvif, u->stack.s, NULL);
+	sv_from_svupsert(&u->result, u->stack.s);
 	return 0;
 }
 
@@ -3472,45 +3525,45 @@ static struct svif sv_upsertvif =
 };
 
 static uint8_t
-sv_vifflags(struct sv *v) {
-	return ((struct vinyl_tuple*)v->v)->flags;
+sv_tupleflags(struct sv *v) {
+	return sv_to_tuple(v)->flags;
 }
 
 static uint64_t
-sv_viflsn(struct sv *v) {
-	return ((struct vinyl_tuple*)v->v)->lsn;
+sv_tuplelsn(struct sv *v) {
+	return sv_to_tuple(v)->lsn;
 }
 
 static void
-sv_viflsnset(struct sv *v, int64_t lsn) {
-	((struct vinyl_tuple*)v->v)->lsn = lsn;
+sv_tuplelsnset(struct sv *v, int64_t lsn) {
+	sv_to_tuple(v)->lsn = lsn;
 }
 
 static char*
-sv_vifpointer(struct sv *v) {
-	return ((struct vinyl_tuple*)v->v)->data;
+sv_tuplepointer(struct sv *v) {
+	return sv_to_tuple(v)->data;
 }
 
 static uint32_t
-sv_vifsize(struct sv *v) {
-	return ((struct vinyl_tuple*)v->v)->size;
+sv_tuplesize(struct sv *v) {
+	return sv_to_tuple(v)->size;
 }
 
-static struct svif sv_vif =
+static struct svif sv_tupleif =
 {
-	.flags     = sv_vifflags,
-	.lsn       = sv_viflsn,
-	.lsnset    = sv_viflsnset,
-	.pointer   = sv_vifpointer,
-	.size      = sv_vifsize
+	.flags     = sv_tupleflags,
+	.lsn       = sv_tuplelsn,
+	.lsnset    = sv_tuplelsnset,
+	.pointer   = sv_tuplepointer,
+	.size      = sv_tuplesize
 };
 
-struct PACKED sxv {
+struct sxv {
 	uint64_t id;
 	uint32_t lo;
 	uint64_t csn;
 	struct sxindex *index;
-	struct vinyl_tuple *v;
+	struct vinyl_tuple *tuple;
 	struct sxv *next;
 	struct sxv *prev;
 	struct sxv *gc;
@@ -3564,7 +3617,7 @@ static inline void
 sx_vpool_push(struct sxvpool *p, struct sxv *v)
 {
 	pthread_mutex_lock(&p->stack_lock);
-	v->v    = NULL;
+	v->tuple = NULL;
 	v->next = NULL;
 	v->prev = NULL;
 	v->next = p->head;
@@ -3586,7 +3639,7 @@ sx_valloc(struct sxvpool *p, struct vinyl_tuple *ref)
 	v->id    = 0;
 	v->lo    = 0;
 	v->csn   = 0;
-	v->v     = ref;
+	v->tuple = ref;
 	v->next  = NULL;
 	v->prev  = NULL;
 	v->gc    = NULL;
@@ -3596,7 +3649,7 @@ sx_valloc(struct sxvpool *p, struct vinyl_tuple *ref)
 static inline void
 sx_vfree(struct sxvpool *p, struct sxv *v)
 {
-	vinyl_tuple_unref_rt(p->r, v->v);
+	vinyl_tuple_unref_rt(p->r, v->tuple);
 	sx_vpool_push(p, v);
 }
 
@@ -3672,7 +3725,7 @@ sx_vcommitted(struct sxv *v)
 static inline void
 sx_vabort(struct sxv *v)
 {
-	v->v->flags |= SVCONFLICT;
+	v->tuple->flags |= SVCONFLICT;
 }
 
 static inline void
@@ -3687,7 +3740,7 @@ sx_vabort_all(struct sxv *v)
 static inline int
 sx_vaborted(struct sxv *v)
 {
-	return v->v->flags & SVCONFLICT;
+	return v->tuple->flags & SVCONFLICT;
 }
 
 static struct svif sx_vif;
@@ -3745,7 +3798,7 @@ sxv_tree_cmp(sxv_tree_t *rbtree, struct sxv *a, struct sxv *b)
 {
 	struct key_def *key_def =
 		container_of(rbtree, struct sxindex, tree)->key_def;
-	return sf_compare(key_def, a->v->data, b->v->data);
+	return sf_compare(key_def, a->tuple->data, b->tuple->data);
 }
 
 static int
@@ -3753,7 +3806,7 @@ sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
 {
 	struct key_def *key_def =
 		container_of(rbtree, struct sxindex, tree)->key_def;
-	return sf_compare(key_def, a->data, b->v->data);
+	return sf_compare(key_def, a->data, b->tuple->data);
 }
 
 struct sx;
@@ -4020,7 +4073,7 @@ sx_garbage_collect(struct sxmanager *m)
 	for (; v; v = next)
 	{
 		next = v->gc;
-		assert(v->v->flags & SVGET);
+		assert(v->tuple->flags & SVGET);
 		assert(sx_vcommitted(v));
 		if (v->csn > min_csn) {
 			v->gc = gc;
@@ -4071,10 +4124,10 @@ sx_rollback_svp(struct sx *x, struct ssbufiter *i, int free)
 		 * a first waiter */
 		sx_untrack(v);
 		/* translate log version from struct sxv to struct vinyl_tuple */
-		sv_init(&lv->v, &sv_vif, v->v, NULL);
+		sv_from_tuple(&lv->v, v->tuple);
 		if (free) {
-			int size = vinyl_tuple_size((struct vinyl_tuple*)v->v);
-			if (vinyl_tuple_unref_rt(m->r, v->v))
+			int size = vinyl_tuple_size(v->tuple);
+			if (vinyl_tuple_unref_rt(m->r, v->tuple))
 				gc += size;
 		}
 		sx_vpool_push(&m->pool, v);
@@ -4109,22 +4162,9 @@ static enum sxstate sx_rollback(struct sx *x)
 }
 
 
-static int
-vinyl_tx_prepare(struct sx *x, struct sv *v, struct vinyl_index *index,
-		struct sicache *cache);
-
 static inline int
 sx_preparev(struct sx *x, struct svlogv *v, uint64_t lsn,
-	    struct sicache *cache, enum vinyl_status status)
-{
-	if (lsn == x->vlsn || status == SR_FINAL_RECOVERY)
-		return 0;
-
-	struct sxindex *i = ((struct sxv*)v->v.v)->index;
-	if (vinyl_tx_prepare(x, &v->v, i->index, cache))
-		return 1;
-	return 0;
-}
+	    struct sicache *cache, enum vinyl_status status);
 
 static enum sxstate
 sx_prepare(struct sx *x, struct sicache *cache, enum vinyl_status status)
@@ -4156,7 +4196,7 @@ sx_prepare(struct sx *x, struct sicache *cache, enum vinyl_status status)
 			continue;
 		}
 		/* force commit for read-only conflicts */
-		if (v->prev->v->flags & SVGET) {
+		if (v->prev->tuple->flags & SVGET) {
 			rc = sx_preparev(x, lv, lsn, cache, status);
 			if (unlikely(rc != 0))
 				return sx_promote(x, SXROLLBACK);
@@ -4183,7 +4223,7 @@ static enum sxstate sx_commit(struct sx *x)
 			break;
 		/* abort conflict reader */
 		if (v->prev && !sx_vcommitted(v->prev)) {
-			assert(v->prev->v->flags & SVGET);
+			assert(v->prev->tuple->flags & SVGET);
 			sx_vabort(v->prev);
 		}
 		/* abort waiters */
@@ -4191,10 +4231,10 @@ static enum sxstate sx_commit(struct sx *x)
 		/* mark stmt as commited */
 		sx_vcommit(v, csn);
 		/* translate log version from struct sxv to struct vinyl_tuple */
-		sv_init(&lv->v, &sv_vif, v->v, NULL);
+		sv_from_tuple(&lv->v, v->tuple);
 		/* schedule read stmt for gc */
-		if (v->v->flags & SVGET) {
-			vinyl_tuple_ref(v->v);
+		if (v->tuple->flags & SVGET) {
+			vinyl_tuple_ref(v->tuple);
 			v->gc = m->gc;
 			m->gc = v;
 			m->count_gc++;
@@ -4231,11 +4271,11 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 	struct svlogv lv;
 	lv.id   = index->dsn;
 	lv.next = UINT32_MAX;
-	sv_init(&lv.v, &sx_vif, v, NULL);
+	sv_from_sxv(&lv.v, v);
 	/* update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
 	struct sxv *head = sxv_tree_search_key(&index->tree,
-					       v->v->data, v->v->size);
+					       v->tuple->data, v->tuple->size);
 	if (unlikely(head == NULL)) {
 		/* unique */
 		v->lo = sv_logcount(x->log);
@@ -4271,7 +4311,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 		/* update log */
 		sv_logreplace(x->log, v->lo, &lv);
 
-		ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(own->v));
+		ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(own->tuple));
 		sx_vfree(&m->pool, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
@@ -4289,7 +4329,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 	return 0;
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
-	ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(v->v));
+	ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(v->tuple));
 	sx_vfree(&m->pool, v);
 	return -1;
 }
@@ -4297,7 +4337,6 @@ error:
 static int sx_get(struct sx *x, struct sxindex *index, struct vinyl_tuple *key,
 		  struct vinyl_tuple **result)
 {
-	struct sxmanager *m = x->manager;
 	tt_pthread_mutex_lock(&index->mutex);
 	struct sxv *head = sxv_tree_search_key(&index->tree,
 					       key->data, key->size);
@@ -4307,15 +4346,13 @@ static int sx_get(struct sx *x, struct sxindex *index, struct vinyl_tuple *key,
 	if (v == NULL)
 		goto add;
 	tt_pthread_mutex_unlock(&index->mutex);
-	if (unlikely((v->v->flags & SVGET) > 0))
+	struct vinyl_tuple *tuple = v->tuple;
+	if (unlikely((tuple->flags & SVGET) > 0))
 		return 0;
-	if (unlikely((v->v->flags & SVDELETE) > 0))
+	if (unlikely((tuple->flags & SVDELETE) > 0))
 		return 2;
-	struct sv vv;
-	sv_init(&vv, &sv_vif, v->v, NULL);
-	*result = vinyl_tuple_from_sv(m->r, &vv);
-	if (unlikely(*result == NULL))
-		return -1;
+	*result = tuple;
+	vinyl_tuple_ref(tuple);
 	return 1;
 
 add:
@@ -4405,27 +4442,27 @@ static int ssunused sx_deadlock(struct sx *t)
 
 static uint8_t
 sx_vifflags(struct sv *v) {
-	return ((struct sxv*)v->v)->v->flags;
+	return sv_to_sxv(v)->tuple->flags;
 }
 
 static uint64_t
 sx_viflsn(struct sv *v) {
-	return ((struct sxv*)v->v)->v->lsn;
+	return sv_to_sxv(v)->tuple->lsn;
 }
 
 static void
 sx_viflsnset(struct sv *v, int64_t lsn) {
-	((struct sxv*)v->v)->v->lsn = lsn;
+	sv_to_sxv(v)->tuple->lsn = lsn;
 }
 
 static char*
 sx_vifpointer(struct sv *v) {
-	return (((struct sxv*)v->v)->v)->data;
+	return sv_to_sxv(v)->tuple->data;
 }
 
 static uint32_t
 sx_vifsize(struct sv *v) {
-	return ((struct sxv*)v->v)->v->size;
+	return sv_to_sxv(v)->tuple->size;
 }
 
 static struct svif sx_vif =
@@ -4471,8 +4508,6 @@ struct PACKED sdv {
 	uint64_t lsn;
 	uint32_t size;
 };
-
-static struct svif sd_vif;
 
 struct PACKED sdpageheader {
 	uint32_t crc;
@@ -4527,7 +4562,7 @@ sd_pageiter_result(struct sdpageiter *i)
 {
 	if (unlikely(i->v == NULL))
 		return;
-	sv_init(&i->current, &sd_vif, i->v, i->page->h);
+	sv_from_sdv(&i->current, i->v, i->page->h);
 }
 
 static inline void
@@ -8649,7 +8684,7 @@ static inline int
 si_readdup(struct siread *q, struct sv *result)
 {
 	struct vinyl_tuple *v;
-	if (likely(result->i == &sv_vif)) {
+	if (likely(result->i == &sv_tupleif)) {
 		v = result->v;
 		vinyl_tuple_ref(v);
 	} else {
@@ -8717,7 +8752,7 @@ si_getindex(struct siread *q, struct sinode *n)
 
 	si_readstat(q, 1, n, 1);
 	struct sv vret;
-	sv_init(&vret, &sv_vif, ref->v, NULL);
+	sv_from_tuple(&vret, ref->v);
 	return si_getresult(q, &vret, 0);
 }
 
@@ -9554,7 +9589,8 @@ si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
-		struct vinyl_tuple *v = cv->v.v;
+		struct sv *sv = &cv->v;
+		struct vinyl_tuple *v = sv_to_tuple(sv);
 		if (status == SR_FINAL_RECOVERY) {
 			if (si_readcommited(x->index, &cv->v)) {
 				size_t gc = vinyl_tuple_size(v);
@@ -11143,7 +11179,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key, enum vinyl_
 	si_readopen(&q, index, cache, order, vlsn, key->data, key->size);
 	struct sv sv_vup;
 	if (vup != NULL) {
-		sv_init(&sv_vup, &sv_vif, vup, NULL);
+		sv_from_tuple(&sv_vup, vup);
 		q.upsert_v = &sv_vup;
 	}
 	q.upsert_eq = upsert_eq;
@@ -11785,25 +11821,35 @@ vinyl_rollback(struct vinyl_tx *tx)
 	return 0;
 }
 
-static int
-vinyl_tx_prepare(struct sx *x, struct sv *v, struct vinyl_index *index,
-		struct sicache *cache)
+static inline int
+sx_preparev(struct sx *x, struct svlogv *v, uint64_t lsn,
+	    struct sicache *cache, enum vinyl_status status)
 {
-	assert(v->i == &sx_vif); /* sv holds sxv */
+	if (lsn == x->vlsn || status == SR_FINAL_RECOVERY)
+		return 0;
+
+	struct sv *sv = &v->v;
+	struct sxv *sxv = sv_to_sxv(sv);
+	struct vinyl_tuple *key = sxv->tuple;
+	struct sxindex *sxindex = sxv->index;
+	struct vinyl_index *index = sxindex->index;
 
 	struct siread q;
 	si_readopen(&q, index, cache,
 	            VINYL_EQ,
 	            x->vlsn,
-	            sv_pointer(v),
-	            sv_size(v));
+	            key->data,
+	            key->size);
 	q.has = 1;
 	int rc = si_read(&q);
 	si_readclose(&q);
 
 	if (unlikely(q.result))
 		vinyl_tuple_unref(index, q.result);
-	return rc;
+	if (rc)
+		return 1;
+
+	return 0;
 }
 
 int
