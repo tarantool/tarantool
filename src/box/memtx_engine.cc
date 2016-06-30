@@ -363,15 +363,17 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	/* Check tuple fields */
 	tuple_validate_raw(space->format, request->tuple);
 
+	struct key_def *key_def = pk->key_def;
 	uint32_t part_count = pk->key_def->part_count;
 	/*
 	 * Extract the primary key from tuple.
 	 * Allocate enough memory to store the key.
 	 */
-	uint32_t key_len = request->tuple_end - request->tuple;
-	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
-	key_len = key_parts_create_from_tuple(pk->key_def, request->tuple,
-					      key, key_len);
+	const char *key = tuple_extract_key_raw(request->tuple,
+						request->tuple_end,
+						key_def, NULL);
+	/* Cut array header */
+	mp_decode_array(&key);
 
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple = pk->findByKey(key, part_count);

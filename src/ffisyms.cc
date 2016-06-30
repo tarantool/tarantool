@@ -78,6 +78,7 @@ void *ffi_symbols[] = {
 	(void *) box_tuple_rewind,
 	(void *) box_tuple_seek,
 	(void *) box_tuple_next,
+	(void *) box_tuple_extract_key,
 	(void *) box_tuple_ref,
 	(void *) box_tuple_unref,
 	(void *) box_tuple_to_buf,

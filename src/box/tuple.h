@@ -250,6 +250,10 @@ box_tuple_t *
 box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 		 char *expr_end);
 
+char *
+box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
+	uint32_t index_id, uint32_t *key_size);
+
 /** \endcond public */
 
 /**
@@ -630,24 +634,27 @@ const char *
 tuple_next_cstr(struct tuple_iterator *it);
 
 /**
- * Extract msgpacked key parts from tuple data.
- * Write the key to the provided buffer ('key_buf' argument), if the
- * buffer size is big enough ('key_buf_size' argument)
- * Return length of the key (required buffer size for storing it)
+ * Extract key from tuple by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * @param tuple - tuple from which need to extract key
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
  */
-uint32_t
-key_parts_create_from_tuple(struct key_def *key_def, const char *tuple,
-			    char *key_buf, uint32_t key_buf_size);
+char *
+tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
+		  uint32_t *key_size);
 
 /**
- * Extract msgpacked array with key parts from tuple data/
- * Write the key to the provided buffer ('key_buf' argument), if the
- * buffer size is big enough ('key_buf_size' argument)
- * Return length of the key (required buffer size for storing it)
+ * Extract key from raw msgpuck by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * @param data - msgpuck data from which need to extract key
+ * @param data_end - pointer at the end of data
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
  */
-uint32_t
-key_create_from_tuple(struct key_def *key_def, const char *tuple,
-			   char *key_buf, uint32_t key_buf_size);
+char *
+tuple_extract_key_raw(const char *data, const char *data_end,
+		      struct key_def *key_def, uint32_t *key_size);
 
 struct tuple *
 tuple_update(struct tuple_format *new_format,

@@ -155,6 +155,19 @@ primary_key_validate(struct key_def *key_def, const char *key,
 	key_validate_parts(key_def, key, part_count);
 }
 
+char *
+box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
+	uint32_t index_id, uint32_t *key_size)
+{
+	try {
+		struct space *space = space_by_id(space_id);
+		Index *index = index_find(space, index_id);
+		return tuple_extract_key(tuple, index->key_def, key_size);
+	} catch (ClientError *e) {
+		return NULL;
+	}
+}
+
 /* }}} */
 
 /* {{{ Index -- base class for all indexes. ********************/

@@ -195,12 +195,8 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple)
 {
 	Index *primary = index_find(space, 0);
-	uint32_t key_len = found_tuple->bsize;
-	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
-	const char *data = found_tuple->data;
-	key_len = key_create_from_tuple(primary->key_def, data,
-					key, key_len);
-	assert(key_len <= found_tuple->bsize);
+	uint32_t key_len;
+	char *key = tuple_extract_key(found_tuple, primary->key_def, &key_len);
 	request->key = key;
 	request->key_end = key + key_len;
 	request->index_id = 0;
