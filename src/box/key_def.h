@@ -172,7 +172,6 @@ struct key_opts {
 	uint32_t node_size;
 	uint32_t page_size;
 	uint32_t sync;
-	uint32_t amqf;
 };
 
 extern const struct key_opts key_opts_default;

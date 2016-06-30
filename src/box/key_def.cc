@@ -84,7 +84,6 @@ const struct key_opts key_opts_default = {
 	/* .node_size           = */ 67108864,
 	/* .page_size           = */ 131072,
 	/* .sync                = */ 2,
-	/* .amqf                = */ 0,
 };
 
 const struct opt_def key_opts_reg[] = {
@@ -98,7 +97,6 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("node_size", MP_UINT, struct key_opts, node_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
 	OPT_DEF("sync", MP_UINT, struct key_opts, sync),
-	OPT_DEF("amqf", MP_UINT, struct key_opts, amqf),
 	{ NULL, MP_NIL, 0, 0 }
 };
 

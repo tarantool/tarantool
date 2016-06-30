@@ -95,7 +95,6 @@ box_info_sort(box.info.vinyl())
       - read_cache: '0'
       - read_disk: '0'
       - size: '232'
-      - size_amqf: '0'
       - size_uncompressed: '232'
       - temperature_avg: '0'
       - temperature_histogram: '[0]:1-1 '

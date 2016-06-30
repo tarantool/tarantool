@@ -536,42 +536,6 @@ ss_quotaused_percent(struct ssquota *q)
 	return percent;
 }
 
-struct ssqf {
-	uint8_t   qf_qbits;
-	uint8_t   qf_rbits;
-	uint8_t   qf_elem_bits;
-	uint32_t  qf_entries;
-	uint64_t  qf_index_mask;
-	uint64_t  qf_rmask;
-	uint64_t  qf_elem_mask;
-	uint64_t  qf_max_size;
-	uint32_t  qf_table_size;
-	uint64_t *qf_table;
-	struct ssbuf     qf_buf;
-};
-
-static int  ss_qfinit(struct ssqf*);
-static int  ss_qfensure(struct ssqf*, uint32_t);
-static void ss_qffree(struct ssqf*);
-static void ss_qfgc(struct ssqf*, size_t);
-static void ss_qfreset(struct ssqf*);
-static void ss_qfrecover(struct ssqf*, int, int, uint32_t, uint64_t*);
-static void ss_qfadd(struct ssqf*, uint64_t);
-static int  ss_qfhas(struct ssqf*, uint64_t);
-
-static inline unsigned int
-ss_fnv(char *key, int len)
-{
-	unsigned char *p = (unsigned char*)key;
-	unsigned char *end = p + len;
-	unsigned h = 2166136261;
-	while (p < end) {
-		h = (h * 16777619) ^ *p;
-		p++;
-	}
-	return h;
-}
-
 /* range queue */
 
 struct ssrqnode {
@@ -1123,312 +1087,6 @@ static struct ssfilterif ss_nonefilter =
 	.complete = ss_nonefilter_complete
 };
 
-/*
- * Quotient Filter.
- *
- * Based on implementation made by Vedant Kumar <vsk@berkeley.edu>
-*/
-
-#define ss_qflmask(n) ((1ULL << (n)) - 1ULL)
-
-static void
-ss_qfrecover(struct ssqf *f, int q, int r, uint32_t size, uint64_t *table)
-{
-	f->qf_qbits      = q;
-	f->qf_rbits      = r;
-	f->qf_elem_bits  = f->qf_rbits + 3;
-	f->qf_index_mask = ss_qflmask(q);
-	f->qf_rmask      = ss_qflmask(r);
-	f->qf_elem_mask  = ss_qflmask(f->qf_elem_bits);
-	f->qf_entries    = 0;
-	f->qf_max_size   = 1 << q;
-	f->qf_table_size = size;
-	f->qf_table      = table;
-}
-
-static int
-ss_qfinit(struct ssqf *f)
-{
-	memset(f, 0, sizeof(*f));
-	ss_bufinit(&f->qf_buf);
-	return 0;
-}
-
-static int
-ss_qfensure(struct ssqf *f, uint32_t count)
-{
-	int q = 6;
-	int r = 1;
-	while (q < 32) {
-		if (count < (1UL << q))
-			break;
-		q++;
-	}
-	f->qf_qbits      = q;
-	f->qf_rbits      = r;
-	f->qf_elem_bits  = f->qf_rbits + 3;
-	f->qf_index_mask = ss_qflmask(q);
-	f->qf_rmask      = ss_qflmask(r);
-	f->qf_elem_mask  = ss_qflmask(f->qf_elem_bits);
-	f->qf_entries    = 0;
-	f->qf_max_size   = 1 << q;
-	f->qf_table_size = ((1 << q) * (r + 3)) / 8;
-	if (f->qf_table_size % 8)
-		f->qf_table_size++;
-	int rc = ss_bufensure(&f->qf_buf, f->qf_table_size);
-	if (unlikely(rc == -1))
-		return -1;
-	ss_bufadvance(&f->qf_buf, f->qf_table_size);
-	f->qf_table = (uint64_t*)f->qf_buf.s;
-	memset(f->qf_table, 0, f->qf_table_size);
-	return 0;
-}
-
-static void
-ss_qffree(struct ssqf *f)
-{
-	if (f->qf_table) {
-		ss_buffree(&f->qf_buf);
-		f->qf_table = NULL;
-	}
-}
-
-static void
-ss_qfgc(struct ssqf *f, size_t wm)
-{
-	if (unlikely(ss_bufsize(&f->qf_buf) >= wm)) {
-		ss_buffree(&f->qf_buf);
-		ss_bufinit(&f->qf_buf);
-		return;
-	}
-	ss_bufreset(&f->qf_buf);
-}
-
-static void
-ss_qfreset(struct ssqf *f)
-{
-	memset(f->qf_table, 0, f->qf_table_size);
-	ss_bufreset(&f->qf_buf);
-	f->qf_entries = 0;
-}
-
-static inline uint64_t
-ss_qfincr(struct ssqf *f, uint64_t idx) {
-	return (idx + 1) & f->qf_index_mask;
-}
-
-static inline uint64_t
-ss_qfdecr(struct ssqf *f, uint64_t idx) {
-	return (idx - 1) & f->qf_index_mask;
-}
-
-static inline int
-ss_qfoccupied_is(uint64_t elt) {
-	return elt & 1;
-}
-
-static inline uint64_t
-ss_qfoccupied_set(uint64_t elt) {
-	return elt | 1;
-}
-
-static inline uint64_t
-ss_qfoccupied_clr(uint64_t elt) {
-	return elt & ~1;
-}
-
-static inline int
-ss_qfcontinuation_is(uint64_t elt) {
-	return elt & 2;
-}
-
-static inline uint64_t
-ss_qfcontinuation_set(uint64_t elt) {
-	return elt | 2;
-}
-
-static inline int
-ss_qfshifted_is(uint64_t elt) {
-	return elt & 4;
-}
-
-static inline uint64_t
-ss_qfshifted_set(uint64_t elt) {
-	return elt | 4;
-}
-
-static inline int
-ss_qfremainder_of(uint64_t elt) {
-	return elt >> 3;
-}
-
-static inline int
-ss_qfis_empty(uint64_t elt) {
-	return (elt & 7) == 0;
-}
-
-static inline uint64_t
-ss_qfhash_to_q(struct ssqf *f, uint64_t h) {
-	return (h >> f->qf_rbits) & f->qf_index_mask;
-}
-
-static inline uint64_t
-ss_qfhash_to_r(struct ssqf *f, uint64_t h) {
-	return h & f->qf_rmask;
-}
-
-static inline uint64_t
-ss_qfget(struct ssqf *f, uint64_t idx)
-{
-	size_t bitpos  = f->qf_elem_bits * idx;
-	size_t tabpos  = bitpos / 64;
-	size_t slotpos = bitpos % 64;
-	int spillbits  = (slotpos + f->qf_elem_bits) - 64;
-	uint64_t elt;
-	elt = (f->qf_table[tabpos] >> slotpos) & f->qf_elem_mask;
-	if (spillbits > 0) {
-		tabpos++;
-		uint64_t x = f->qf_table[tabpos] & ss_qflmask(spillbits);
-		elt |= x << (f->qf_elem_bits - spillbits);
-	}
-	return elt;
-}
-
-static inline void
-ss_qfset(struct ssqf *f, uint64_t idx, uint64_t elt)
-{
-	size_t bitpos = f->qf_elem_bits * idx;
-	size_t tabpos = bitpos / 64;
-	size_t slotpos = bitpos % 64;
-	int spillbits = (slotpos + f->qf_elem_bits) - 64;
-	elt &= f->qf_elem_mask;
-	f->qf_table[tabpos] &= ~(f->qf_elem_mask << slotpos);
-	f->qf_table[tabpos] |= elt << slotpos;
-	if (spillbits > 0) {
-		tabpos++;
-		f->qf_table[tabpos] &= ~ss_qflmask(spillbits);
-		f->qf_table[tabpos] |= elt >> (f->qf_elem_bits - spillbits);
-	}
-}
-
-static inline uint64_t
-ss_qffind(struct ssqf *f, uint64_t fq)
-{
-	uint64_t b = fq;
-	while (ss_qfshifted_is( ss_qfget(f, b)))
-		b = ss_qfdecr(f, b);
-	uint64_t s = b;
-	while (b != fq) {
-		do {
-			s = ss_qfincr(f, s);
-		} while (ss_qfcontinuation_is(ss_qfget(f, s)));
-		do {
-			b = ss_qfincr(f, b);
-		} while (! ss_qfoccupied_is(ss_qfget(f, b)));
-	}
-	return s;
-}
-
-static inline void
-ss_qfinsert(struct ssqf *f, uint64_t s, uint64_t elt)
-{
-	uint64_t prev;
-	uint64_t curr = elt;
-	int empty;
-	do {
-		prev = ss_qfget(f, s);
-		empty = ss_qfis_empty(prev);
-		if (! empty) {
-			prev = ss_qfshifted_set(prev);
-			if (ss_qfoccupied_is(prev)) {
-				curr = ss_qfoccupied_set(curr);
-				prev = ss_qfoccupied_clr(prev);
-			}
-		}
-		ss_qfset(f, s, curr);
-		curr = prev;
-		s = ss_qfincr(f, s);
-	} while (! empty);
-}
-
-static inline int
-ss_qffull(struct ssqf *f) {
-	return f->qf_entries >= f->qf_max_size;
-}
-
-static void
-ss_qfadd(struct ssqf *f, uint64_t h)
-{
-	if (unlikely(ss_qffull(f)))
-		return;
-
-	uint64_t fq    = ss_qfhash_to_q(f, h);
-	uint64_t fr    = ss_qfhash_to_r(f, h);
-	uint64_t T_fq  = ss_qfget(f, fq);
-	uint64_t entry = (fr << 3) & ~7;
-
-	if (likely(ss_qfis_empty(T_fq))) {
-		ss_qfset(f, fq, ss_qfoccupied_set(entry));
-		f->qf_entries++;
-		return;
-	}
-
-	if (! ss_qfoccupied_is(T_fq))
-		ss_qfset(f, fq, ss_qfoccupied_set(T_fq));
-
-	uint64_t start = ss_qffind(f, fq);
-	uint64_t s = start;
-
-	if (ss_qfoccupied_is(T_fq)) {
-		do {
-			uint64_t rem = ss_qfremainder_of(ss_qfget(f, s));
-			if (rem == fr) {
-				return;
-			} else if (rem > fr) {
-				break;
-			}
-			s = ss_qfincr(f, s);
-		} while (ss_qfcontinuation_is(ss_qfget(f, s)));
-
-		if (s == start) {
-			uint64_t old_head = ss_qfget(f, start);
-			ss_qfset(f, start, ss_qfcontinuation_set(old_head));
-		} else {
-			entry = ss_qfcontinuation_set(entry);
-		}
-	}
-
-	if (s != fq)
-		entry = ss_qfshifted_set(entry);
-
-	ss_qfinsert(f, s, entry);
-	f->qf_entries++;
-}
-
-static int
-ss_qfhas(struct ssqf *f, uint64_t h)
-{
-	uint64_t fq   = ss_qfhash_to_q(f, h);
-	uint64_t fr   = ss_qfhash_to_r(f, h);
-	uint64_t T_fq = ss_qfget(f, fq);
-
-	if (! ss_qfoccupied_is(T_fq))
-		return 0;
-
-	uint64_t s = ss_qffind(f, fq);
-	do {
-		uint64_t rem = ss_qfremainder_of(ss_qfget(f, s));
-		if (rem == fr)
-			return 1;
-		else
-		if (rem > fr)
-			return 0;
-		s = ss_qfincr(f, s);
-	} while (ss_qfcontinuation_is(ss_qfget(f, s)));
-
-	return 0;
-}
-
 static void
 ss_quotainit(struct ssquota *q, int64_t limit)
 {
@@ -1693,18 +1351,6 @@ sf_write(struct key_def *key_def, struct vinyl_field *fields, char *dest)
 		memcpy(dest + var_value_offset, field->data, field->size);
 		var_value_offset += current->size;
 	}
-}
-
-static inline uint64_t
-sf_hash(struct key_def *key_def, char *data)
-{
-	uint64_t hash = 0;
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		uint32_t size;
-		char *field = sf_field(key_def, part_id, data, &size);
-		hash ^= ss_fnv(field, size);
-	}
-	return hash;
 }
 
 static inline int
@@ -2363,11 +2009,6 @@ sv_pointer(struct sv *v) {
 static inline uint32_t
 sv_size(struct sv *v) {
 	return v->i->size(v);
-}
-
-static inline uint64_t
-sv_hash(struct sv *v, struct key_def *key_def) {
-	return sf_hash(key_def, sv_pointer(v));
 }
 
 struct vinyl_tuple {
@@ -5158,8 +4799,6 @@ static int sd_buildend(struct sdbuild*);
 static int sd_buildcommit(struct sdbuild*);
 static int sd_buildadd(struct sdbuild*, struct sv*, uint32_t);
 
-#define SD_INDEXEXT_AMQF 1
-
 struct PACKED sdindexheader {
 	uint32_t  crc;
 	struct srversion version;
@@ -5178,13 +4817,6 @@ struct PACKED sdindexheader {
 	uint32_t  extension;
 	uint8_t   extensions;
 	char      reserve[31];
-};
-
-struct PACKED sdindexamqf {
-	uint8_t  q, r;
-	uint32_t entries;
-	uint32_t size;
-	uint64_t table[];
 };
 
 struct PACKED sdindexpage {
@@ -5273,15 +4905,8 @@ sd_indexsize_ext(struct sdindexheader *h)
 	return sizeof(struct sdindexheader) + h->size + h->extension;
 }
 
-static inline struct sdindexamqf*
-sd_indexamqf(struct sdindex *i) {
-	struct sdindexheader *h = sd_indexheader(i);
-	assert(h->extensions & SD_INDEXEXT_AMQF);
-	return (struct sdindexamqf*)(i->i.s + sizeof(struct sdindexheader) + h->size);
-}
-
 static int sd_indexbegin(struct sdindex*);
-static int sd_indexcommit(struct sdindex*, struct sdid*, struct ssqf*, uint64_t);
+static int sd_indexcommit(struct sdindex*, struct sdid*, uint64_t);
 static int sd_indexadd(struct sdindex*, struct sdbuild*, uint64_t);
 static int sd_indexcopy(struct sdindex*, struct sdindexheader*);
 
@@ -5465,7 +5090,6 @@ struct sdcbuf {
 
 struct sdc {
 	struct sdbuild build;
-	struct ssqf qf;
 	struct svupsert upsert;
 	struct ssbuf a;        /* result */
 	struct ssbuf b;        /* redistribute buffer */
@@ -5485,7 +5109,6 @@ sd_cinit(struct sdc *sc)
 {
 	sv_upsertinit(&sc->upsert);
 	sd_buildinit(&sc->build);
-	ss_qfinit(&sc->qf);
 	ss_bufinit(&sc->a);
 	ss_bufinit(&sc->b);
 	ss_bufinit(&sc->c);
@@ -5498,7 +5121,6 @@ static inline void
 sd_cfree(struct sdc *sc)
 {
 	sd_buildfree(&sc->build);
-	ss_qffree(&sc->qf);
 	sv_upsertfree(&sc->upsert);
 	ss_buffree(&sc->a);
 	ss_buffree(&sc->b);
@@ -5519,7 +5141,6 @@ static inline void
 sd_cgc(struct sdc *sc, int wm)
 {
 	sd_buildgc(&sc->build, wm);
-	ss_qfgc(&sc->qf, wm);
 	sv_upsertgc(&sc->upsert, 600, 512);
 	ss_bufgc(&sc->a, wm);
 	ss_bufgc(&sc->b, wm);
@@ -5561,7 +5182,6 @@ struct sdmergeconf {
 	uint32_t    checksum;
 	uint32_t    compression;
 	struct ssfilterif *compression_if;
-	uint32_t    amqf;
 	uint64_t    vlsn;
 	uint64_t    vlsn_lru;
 	uint32_t    save_delete;
@@ -5574,7 +5194,6 @@ struct sdmerge {
 	struct svwriteiter i;
 	struct sdmergeconf *conf;
 	struct sdbuild     *build;
-	struct ssqf        *qf;
 	uint64_t    processed;
 	uint64_t    current;
 	uint64_t    limit;
@@ -5583,7 +5202,7 @@ struct sdmerge {
 
 static int
 sd_mergeinit(struct sdmerge*, struct svmergeiter*, struct sdbuild*,
-	     struct ssqf*, struct svupsert*, struct sdmergeconf*);
+	     struct svupsert*, struct sdmergeconf*);
 static int sd_mergefree(struct sdmerge*);
 static int sd_merge(struct sdmerge*);
 static int sd_mergepage(struct sdmerge*, uint64_t);
@@ -6025,31 +5644,16 @@ static int sd_indexbegin(struct sdindex *i)
 
 static int
 sd_indexcommit(struct sdindex *i, struct sdid *id,
-	       struct ssqf *qf, uint64_t offset)
+	       uint64_t offset)
 {
 	int size = ss_bufused(&i->v);
 	int size_extension = 0;
 	int extensions = 0;
-	if (qf) {
-		extensions = SD_INDEXEXT_AMQF;
-		size_extension += sizeof(struct sdindexamqf);
-		size_extension += qf->qf_table_size;
-	}
 	int rc = ss_bufensure(&i->i, size + size_extension);
 	if (unlikely(rc == -1))
 		return sr_oom();
 	memcpy(i->i.p, i->v.s, size);
 	ss_bufadvance(&i->i, size);
-	if (qf) {
-		struct sdindexamqf *qh = (struct sdindexamqf*)(i->i.p);
-		qh->q       = qf->qf_qbits;
-		qh->r       = qf->qf_rbits;
-		qh->entries = qf->qf_entries;
-		qh->size    = qf->qf_table_size;
-		ss_bufadvance(&i->i, sizeof(struct sdindexamqf));
-		memcpy(i->i.p, qf->qf_table, qf->qf_table_size);
-		ss_bufadvance(&i->i, qf->qf_table_size);
-	}
 	ss_buffree(&i->v);
 	i->h = sd_indexheader(i);
 	i->h->offset     = offset;
@@ -6143,22 +5747,16 @@ static int sd_indexcopy(struct sdindex *i, struct sdindexheader *h)
 
 static int
 sd_mergeinit(struct sdmerge *m, struct svmergeiter *im,
-	     struct sdbuild *build, struct ssqf *qf,
+	     struct sdbuild *build,
 	     struct svupsert *upsert, struct sdmergeconf *conf)
 {
 	m->conf      = conf;
 	m->build     = build;
-	m->qf        = qf;
 	m->merge     = im;
 	m->processed = 0;
 	m->current   = 0;
 	m->limit     = 0;
 	m->resume    = 0;
-	if (conf->amqf) {
-		int rc = ss_qfensure(qf, conf->stream);
-		if (unlikely(rc == -1))
-			return sr_oom();
-	}
 	sd_indexinit(&m->index);
 	sv_writeiter_open(&m->i, im, upsert,
 			  (uint64_t)conf->size_page, sizeof(struct sdv),
@@ -6194,8 +5792,6 @@ static int sd_merge(struct sdmerge *m)
 	int rc = sd_indexbegin(&m->index);
 	if (unlikely(rc == -1))
 		return -1;
-	if (conf->amqf)
-		ss_qfreset(m->qf);
 	m->current = 0;
 	m->limit   = 0;
 	uint64_t processed = m->processed;
@@ -6236,9 +5832,6 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		rc = sd_buildadd(m->build, v, flags);
 		if (unlikely(rc == -1))
 			return -1;
-		if (conf->amqf) {
-			ss_qfadd(m->qf, sv_hash(v, m->merge->merge->key_def));
-		}
 		sv_writeiter_next(&m->i);
 	}
 	rc = sd_buildend(m->build);
@@ -6255,10 +5848,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 static int sd_mergecommit(struct sdmerge *m, struct sdid *id, uint64_t offset)
 {
 	m->processed += sd_indextotal(&m->index);
-	struct ssqf *qf = NULL;
-	if (m->conf->amqf)
-		qf = m->qf;
-	return sd_indexcommit(&m->index, id, qf, offset);
+	return sd_indexcommit(&m->index, id, offset);
 }
 
 static struct ssiterif sd_readif =
@@ -6556,7 +6146,6 @@ struct siconf {
 	char       *compression_branch_sz;
 	struct ssfilterif *compression_branch_if;
 	uint32_t    temperature;
-	uint32_t    amqf;
 	uint64_t    lru;
 	uint32_t    lru_step;
 	uint32_t    buf_gc_wm;
@@ -6873,15 +6462,6 @@ static int si_plannerupdate(struct siplanner*, int, struct sinode*);
 static int si_plannerremove(struct siplanner*, int, struct sinode*);
 static int si_planner(struct siplanner*, struct siplan*);
 
-static inline int
-si_amqfhas_branch(struct key_def *key_def, struct sibranch *b, char *key)
-{
-	struct sdindexamqf *qh = sd_indexamqf(&b->index);
-	struct ssqf qf;
-	ss_qfrecover(&qf, qh->q, qh->r, qh->size, qh->table);
-	return ss_qfhas(&qf, sf_hash(key_def, key));
-}
-
 typedef rb_tree(struct sinode) sinode_tree_t;
 
 struct sinode_tree_key {
@@ -6918,7 +6498,6 @@ struct siprofiler {
 	uint32_t  total_branch_max;
 	uint32_t  total_page_count;
 	uint64_t  total_snapshot_size;
-	uint64_t  total_amqf_size;
 	uint32_t  temperature_avg;
 	uint32_t  temperature_min;
 	uint32_t  temperature_max;
@@ -7622,14 +7201,13 @@ si_branchcreate(struct vinyl_index *index, struct sdc *c,
 		.checksum        = index->conf.node_page_checksum,
 		.compression     = index->conf.compression_branch,
 		.compression_if  = index->conf.compression_branch_if,
-		.amqf            = index->conf.amqf,
 		.vlsn            = vlsn,
 		.vlsn_lru        = 0,
 		.save_delete     = 1,
 		.save_upsert     = 1
 	};
 	struct sdmerge merge;
-	rc = sd_mergeinit(&merge, &im, &c->build, &c->qf,
+	rc = sd_mergeinit(&merge, &im, &c->build,
 	                  &c->upsert, &mergeconf);
 	if (unlikely(rc == -1))
 		return -1;
@@ -8091,7 +7669,6 @@ si_split(struct vinyl_index *index, struct sdc *c, struct ssbuf *result,
 		.checksum        = index->conf.node_page_checksum,
 		.compression     = index->conf.compression,
 		.compression_if  = index->conf.compression_if,
-		.amqf            = index->conf.amqf,
 		.vlsn            = vlsn,
 		.vlsn_lru        = vlsn_lru,
 		.save_delete     = 0,
@@ -8099,7 +7676,7 @@ si_split(struct vinyl_index *index, struct sdc *c, struct ssbuf *result,
 	};
 	struct sinode *n = NULL;
 	struct sdmerge merge;
-	rc = sd_mergeinit(&merge, i, &c->build, &c->qf, &c->upsert,
+	rc = sd_mergeinit(&merge, i, &c->build, &c->upsert,
 			  &mergeconf);
 	if (unlikely(rc == -1))
 		return -1;
@@ -9031,10 +8608,6 @@ static int si_profiler(struct siprofiler *p)
 			p->total_node_size += indexsize + b->index.h->total;
 			p->total_node_origin_size += indexsize + b->index.h->totalorigin;
 			p->total_page_count += b->index.h->count;
-			if (b->index.h->extensions & SD_INDEXEXT_AMQF) {
-				p->total_amqf_size +=
-					sizeof(struct sdindexamqf) + sd_indexamqf(&b->index)->size;
-			}
 			b = b->next;
 		}
 		n = sinode_tree_next(&p->i->tree, n);
@@ -9165,14 +8738,8 @@ static inline int
 si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 {
 	struct sibranch *b = c->branch;
-	/* amqf */
 	struct siconf *conf= &q->index->conf;
 	int rc;
-	if (conf->amqf) {
-		rc = si_amqfhas_branch(q->merge.key_def, b, q->key);
-		if (likely(! rc))
-			return 0;
-	}
 	/* choose compression type */
 	int compression;
 	struct ssfilterif *compression_if;
@@ -9532,9 +9099,6 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	if (unlikely(rc == -1))
 		goto e0;
 
-	struct ssqf f, *qf = NULL;
-	ss_qfinit(&f);
-
 	struct sdbuild build;
 	sd_buildinit(&build);
 	rc = sd_buildbegin(&build, index->key_def,
@@ -9557,17 +9121,9 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	rc = sd_writepage(&n->file, &build);
 	if (unlikely(rc == -1))
 		goto e1;
-	/* amqf */
-	if (index->conf.amqf) {
-		rc = ss_qfensure(&f, 0);
-		if (unlikely(rc == -1))
-			goto e1;
-		qf = &f;
-	}
-	rc = sd_indexcommit(&sdindex, &id, qf, n->file.size);
+	rc = sd_indexcommit(&sdindex, &id, n->file.size);
 	if (unlikely(rc == -1))
 		goto e1;
-	ss_qffree(&f);
 	/* write index */
 	rc = sd_writeindex(&n->file, &sdindex);
 	if (unlikely(rc == -1))
@@ -9582,7 +9138,6 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	sd_buildfree(&build);
 	return n;
 e1:
-	ss_qffree(&f);
 	sd_indexfree(&sdindex);
 	sd_buildfree(&build);
 e0:
@@ -11043,7 +10598,6 @@ se_confdb(struct vinyl_env *e, struct srconf **pc)
 		sr_C(&p, pc, "memory_used", SS_U64, &o->rtp.memory_used);
 		sr_C(&p, pc, "size", SS_U64, &o->rtp.total_node_size);
 		sr_C(&p, pc, "size_uncompressed", SS_U64, &o->rtp.total_node_origin_size);
-		sr_C(&p, pc, "size_amqf", SS_U64, &o->rtp.total_amqf_size);
 		sr_C(&p, pc, "count", SS_U64, &o->rtp.count);
 		sr_C(&p, pc, "count_dup", SS_U64, &o->rtp.count_dup);
 		sr_C(&p, pc, "read_disk", SS_U64, &o->rtp.read_disk);
@@ -11442,7 +10996,6 @@ si_confcreate(struct siconf *conf, struct key_def *key_def)
 		goto error;
 	}
 	conf->temperature           = 1;
-	conf->amqf                  = key_def->opts.amqf;
 	/* path */
 	if (key_def->opts.path[0] == '\0') {
 		char path[1024];
