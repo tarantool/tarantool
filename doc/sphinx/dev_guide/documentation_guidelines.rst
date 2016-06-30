@@ -27,6 +27,41 @@ narrow most of the time, leaving more space for other applications in a
 wide-screen environment.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              Formatting code snippets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For code snippets, we mainly use the ``code-block`` directive with an
+appropriate highlighting language. The most commonly used highlighting languages
+are:
+
+  * ``.. code-block:: tarantoolsession``
+  * ``.. code-block:: console``
+  * ``.. code-block:: lua``
+
+For example (a code snippet in Lua):
+
+.. code-block:: lua
+
+    for page in paged_iter("X", 10) do
+      print("New Page. Number Of Tuples = " .. #page)
+      for i=1,#page,1 do print(page[i]) end
+    end
+
+In rare cases, when we need custom highlight for specific parts of a code
+snippet and the ``code-block`` directive is not enough, we use the per-line
+``codenormal`` directive together with explicit output formatting (defined in 
+:file:`doc/sphinx/_static/sphinx_design.css`).
+
+For example (a tdb session with custom formatting in bold, blue and green):
+
+:codenormal:`$` :codebold:`tarantool example.lua` |br|
+:codeblue:`(TDB)` |nbsp| :codegreen:`Tarantool debugger v.0.0.3. Type h for help` |br|
+:codenormal:`example.lua` |br|
+:codeblue:`(TDB)` |nbsp| :codegreen:`[example.lua]` |br|
+:codeblue:`(TDB)` |nbsp| :codenormal:`3: i = 1` |br|
+:codeblue:`(TDB)>` |br|
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
               Making comments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
