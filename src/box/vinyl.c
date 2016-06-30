@@ -80,6 +80,7 @@
 #include "key_def.h"
 #include "tuple.h"
 #include "tuple_update.h"
+#include "txn.h" /* box_txn_alloc() */
 
 #define ssunused __attribute__((unused))
 
@@ -2247,37 +2248,15 @@ vinyl_upsert_prepare(char **src, uint32_t *src_size,
 	return 0;
 }
 
-struct vinyl_mempool {
-	void *chunks[128];
-	int count;
-};
-
-static inline void
-vinyl_mempool_init(struct vinyl_mempool *p)
-{
-	p->count = 0;
-}
-
-static inline void
-vinyl_mempool_free(struct vinyl_mempool *p)
-{
-	int i = 0;
-	while (i < p->count) {
-		free(p->chunks[i]);
-		i++;
-	}
-}
-
 static void *
 vinyl_update_alloc(void *arg, size_t size)
 {
-	/* simulate region allocator for use with
-	 * tuple_upsert_execute() */
-	struct vinyl_mempool *p = (struct vinyl_mempool*)arg;
-	assert(p->count < 128);
-	void *ptr = malloc(size);
-	p->chunks[p->count++] = ptr;
-	return ptr;
+	(void) arg;
+	/* TODO: rewrite tuple_upsert_execute() without exceptions */
+	void *data = box_txn_alloc(size);
+	if (data != NULL)
+		diag_raise();
+	return data;
 }
 
 static inline int
@@ -2297,9 +2276,7 @@ vinyl_upsert_do(char **result, uint32_t *result_size,
 	uint32_t up_size;
 
 	/* emit upsert */
-	struct vinyl_mempool alloc;
-	vinyl_mempool_init(&alloc);
-	up = tuple_upsert_execute(vinyl_update_alloc, &alloc,
+	up = tuple_upsert_execute(vinyl_update_alloc, NULL,
 				  expr, expr_end,
 		                  tuple, tuple + tuple_size,
 		                  &up_size, index_base);
@@ -2317,10 +2294,10 @@ vinyl_upsert_do(char **result, uint32_t *result_size,
 	if (*result == NULL)
 		goto error;
 	memcpy(*result, ptr, *result_size);
-	vinyl_mempool_free(&alloc);
+	fiber_gc();
 	return 0;
 error:
-	vinyl_mempool_free(&alloc);
+	fiber_gc();
 	return -1;
 }
 
