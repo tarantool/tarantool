@@ -842,7 +842,7 @@ Lua functions `os.date()`_ and `string.sub()`_.
 =================================================================
 
 Here is an example that shows how to build one's own iterator.
-The :func:`paged_iter` function is an "iterator function", which will only be
+The ``paged_iter`` function is an "iterator function", which will only be
 understood by programmers who have read the Lua
 manual section
 `Iterators and Closures <https://www.lua.org/pil/7.1.html>`_.
@@ -865,7 +865,7 @@ primary key was defined with
       end
     end
     
-Programmers who use :func:`paged_iter` do not need to know
+Programmers who use ``paged_iter`` do not need to know
 why it works, they only need to know that, if they
 call it within a loop, they will get 10 tuples
 at a time until there are no more tuples. In this
