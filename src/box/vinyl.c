@@ -6142,9 +6142,6 @@ struct siconf {
 	uint32_t    compression;
 	char       *compression_sz;
 	struct ssfilterif *compression_if;
-	uint32_t    compression_branch;
-	char       *compression_branch_sz;
-	struct ssfilterif *compression_branch_if;
 	uint32_t    temperature;
 	uint64_t    lru;
 	uint32_t    lru_step;
@@ -6196,11 +6193,6 @@ si_branchfree(struct sibranch *b)
 {
 	sd_indexfree(&b->index);
 	free(b);
-}
-
-static inline int
-si_branchis_root(struct sibranch *b) {
-	return b->next == NULL;
 }
 
 #define SI_NONE       0
@@ -7199,8 +7191,8 @@ si_branchcreate(struct vinyl_index *index, struct sdc *c,
 		.size_node       = UINT64_MAX,
 		.size_page       = index->conf.node_page_size,
 		.checksum        = index->conf.node_page_checksum,
-		.compression     = index->conf.compression_branch,
-		.compression_if  = index->conf.compression_branch_if,
+		.compression     = index->conf.compression,
+		.compression_if  = index->conf.compression_if,
 		.vlsn            = vlsn,
 		.vlsn_lru        = 0,
 		.save_delete     = 1,
@@ -7398,13 +7390,8 @@ si_compact(struct vinyl_index *index, struct sdc *c, struct siplan *plan,
 		/* choose compression type */
 		int compression;
 		struct ssfilterif *compression_if;
-		if (! si_branchis_root(b)) {
-			compression    = index->conf.compression_branch;
-			compression_if = index->conf.compression_branch_if;
-		} else {
-			compression    = index->conf.compression;
-			compression_if = index->conf.compression_if;
-		}
+		compression    = index->conf.compression;
+		compression_if = index->conf.compression_if;
 		struct sdreadarg arg = {
 			.index           = &b->index,
 			.buf             = &cbuf->a,
@@ -8743,13 +8730,8 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	/* choose compression type */
 	int compression;
 	struct ssfilterif *compression_if;
-	if (! si_branchis_root(b)) {
-		compression    = conf->compression_branch;
-		compression_if = conf->compression_branch_if;
-	} else {
-		compression    = conf->compression;
-		compression_if = conf->compression_if;
-	}
+	compression    = conf->compression;
+	compression_if = conf->compression_if;
 	struct sdreadarg arg = {
 		.index           = &b->index,
 		.buf             = &c->buf_a,
@@ -8861,13 +8843,8 @@ si_rangebranch(struct siread *q, struct sinode *n,
 	struct siconf *conf = &q->index->conf;
 	int compression;
 	struct ssfilterif *compression_if;
-	if (! si_branchis_root(b)) {
-		compression    = conf->compression_branch;
-		compression_if = conf->compression_branch_if;
-	} else {
-		compression    = conf->compression;
-		compression_if = conf->compression_if;
-	}
+	compression    = conf->compression;
+	compression_if = conf->compression_if;
 	struct sdreadarg arg = {
 		.index           = &b->index,
 		.buf             = &c->buf_a,
@@ -9522,10 +9499,6 @@ static void si_conffree(struct siconf *s)
 	if (s->compression_sz) {
 		free(s->compression_sz);
 		s->compression_sz = NULL;
-	}
-	if (s->compression_branch_sz) {
-		free(s->compression_branch_sz);
-		s->compression_branch_sz = NULL;
 	}
 }
 
@@ -10975,26 +10948,6 @@ si_confcreate(struct siconf *conf, struct key_def *key_def)
 		goto error;
 	}
 
-	/* compression_branch */
-	if (key_def->opts.compression_branch[0] != '\0') {
-		conf->compression_branch_if =
-			ss_filterof(key_def->opts.compression_branch);
-		if (unlikely(conf->compression_branch_if == NULL)) {
-			sr_error("unknown compression type '%s'",
-				 key_def->opts.compression_branch);
-			goto error;
-		}
-		if (conf->compression_branch_if != &ss_nonefilter)
-			conf->compression_branch = 1;
-	} else {
-		conf->compression_branch = 0;
-		conf->compression_branch_if = &ss_nonefilter;
-	}
-	conf->compression_branch_sz = strdup(conf->compression_branch_if->name);
-	if (conf->compression_branch_sz == NULL) {
-		sr_oom();
-		goto error;
-	}
 	conf->temperature           = 1;
 	/* path */
 	if (key_def->opts.path[0] == '\0') {
