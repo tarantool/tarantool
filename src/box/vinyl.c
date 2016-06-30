@@ -3547,71 +3547,12 @@ struct sxv {
 	rb_node(struct sxv) tree_node;
 };
 
-struct sxvpool {
-	struct sxv *head;
-	int n;
-	struct runtime *r;
-	pthread_mutex_t stack_lock;
-};
-
-static inline void
-sx_vpool_init(struct sxvpool *p, struct runtime *r)
-{
-	p->head = NULL;
-	p->n = 0;
-	p->r = r;
-	pthread_mutex_init(&p->stack_lock, NULL);
-}
-
-static inline void
-sx_vpool_free(struct sxvpool *p)
-{
-	struct sxv *n, *c = p->head;
-	while (c) {
-		n = c->next;
-		free(c);
-		c = n;
-	}
-}
-
 static inline struct sxv*
-sx_vpool_pop(struct sxvpool *p)
+sx_valloc(struct vinyl_tuple *ref)
 {
-	pthread_mutex_lock(&p->stack_lock);
-	if (unlikely(p->n == 0)) {
-		pthread_mutex_unlock(&p->stack_lock);
+	struct sxv *v = malloc(sizeof(struct sxv));
+	if (unlikely(v == NULL))
 		return NULL;
-	}
-	assert(p->head);
-	struct sxv *v = p->head;
-	p->head = v->next;
-	p->n--;
-	pthread_mutex_unlock(&p->stack_lock);
-	return v;
-}
-
-static inline void
-sx_vpool_push(struct sxvpool *p, struct sxv *v)
-{
-	pthread_mutex_lock(&p->stack_lock);
-	v->tuple = NULL;
-	v->next = NULL;
-	v->prev = NULL;
-	v->next = p->head;
-	p->head = v;
-	p->n++;
-	pthread_mutex_unlock(&p->stack_lock);
-}
-
-static inline struct sxv*
-sx_valloc(struct sxvpool *p, struct vinyl_tuple *ref)
-{
-	struct sxv *v = sx_vpool_pop(p);
-	if (unlikely(v == NULL)) {
-		v = malloc(sizeof(struct sxv));
-		if (unlikely(v == NULL))
-			return NULL;
-	}
 	v->index = NULL;
 	v->id    = 0;
 	v->lo    = 0;
@@ -3624,18 +3565,18 @@ sx_valloc(struct sxvpool *p, struct vinyl_tuple *ref)
 }
 
 static inline void
-sx_vfree(struct sxvpool *p, struct sxv *v)
+sx_vfree(struct runtime *r, struct sxv *v)
 {
-	vinyl_tuple_unref_rt(p->r, v->tuple);
-	sx_vpool_push(p, v);
+	vinyl_tuple_unref_rt(r, v->tuple);
+	free(v);
 }
 
 static inline void
-sx_vfreeall(struct sxvpool *p, struct sxv *v)
+sx_vfreeall(struct runtime *r, struct sxv *v)
 {
 	while (v) {
 		struct sxv *next = v->next;
-		sx_vfree(p, v);
+		sx_vfree(r, v);
 		v = next;
 	}
 }
@@ -3833,7 +3774,6 @@ struct sxmanager {
 	uint32_t    count_gc;
 	uint64_t    csn;
 	struct sxv        *gc;
-	struct sxvpool     pool;
 	struct runtime         *r;
 };
 
@@ -3872,7 +3812,6 @@ static int sx_managerinit(struct sxmanager *m, struct runtime *r)
 	m->gc  = NULL;
 	tt_pthread_mutex_init(&m->lock, NULL);
 	rlist_create(&m->indexes);
-	sx_vpool_init(&m->pool, r);
 	m->r = r;
 	return 0;
 }
@@ -3880,7 +3819,6 @@ static int sx_managerinit(struct sxmanager *m, struct runtime *r)
 static int sx_managerfree(struct sxmanager *m)
 {
 	assert(sx_count(m) == 0);
-	sx_vpool_free(&m->pool);
 	tt_pthread_mutex_destroy(&m->lock);
 	return 0;
 }
@@ -3904,13 +3842,11 @@ static int sx_indexset(struct sxindex *i, uint32_t dsn)
 	return 0;
 }
 
-
 static struct sxv *
 sxv_tree_free_cb(sxv_tree_t *t, struct sxv *v, void *arg)
 {
 	(void)t;
-	struct sxvpool *p = (struct sxvpool *)arg;
-	sx_vfreeall(p, v);
+	sx_vfreeall((struct runtime *)arg, v);
 	return NULL;
 }
 
@@ -3918,7 +3854,7 @@ static inline void
 sx_indextruncate(struct sxindex *i, struct sxmanager *m)
 {
 	tt_pthread_mutex_lock(&i->mutex);
-	sxv_tree_iter(&i->tree, NULL, sxv_tree_free_cb, &m->pool);
+	sxv_tree_iter(&i->tree, NULL, sxv_tree_free_cb, m->r);
 	sxv_tree_new(&i->tree);
 	tt_pthread_mutex_unlock(&i->mutex);
 }
@@ -4059,7 +3995,7 @@ sx_garbage_collect(struct sxmanager *m)
 			continue;
 		}
 		sx_untrack(v);
-		sx_vfree(&m->pool, v);
+		sx_vfree(m->r, v);
 	}
 	m->count_gc = count;
 	m->gc = gc;
@@ -4089,7 +4025,7 @@ sx_end(struct sx *x)
 }
 
 static inline void
-sx_rollback_svp(struct sx *x, struct ssbufiter *i, int free)
+sx_rollback_svp(struct sx *x, struct ssbufiter *i, int tuple_free)
 {
 	struct sxmanager *m = x->manager;
 	int gc = 0;
@@ -4102,12 +4038,12 @@ sx_rollback_svp(struct sx *x, struct ssbufiter *i, int free)
 		sx_untrack(v);
 		/* translate log version from struct sxv to struct vinyl_tuple */
 		sv_from_tuple(&lv->v, v->tuple);
-		if (free) {
+		if (tuple_free) {
 			int size = vinyl_tuple_size(v->tuple);
 			if (vinyl_tuple_unref_rt(m->r, v->tuple))
 				gc += size;
 		}
-		sx_vpool_push(&m->pool, v);
+		free(v);
 	}
 	ss_quota(m->r->quota, SS_QREMOVE, gc);
 }
@@ -4217,7 +4153,7 @@ static enum sxstate sx_commit(struct sx *x)
 			m->count_gc++;
 		} else {
 			sx_untrack(v);
-			sx_vpool_push(&m->pool, v);
+			free(v);
 		}
 	}
 
@@ -4237,7 +4173,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 		x->log_read = -1;
 	}
 	/* allocate mvcc container */
-	struct sxv *v = sx_valloc(&m->pool, version);
+	struct sxv *v = sx_valloc(version);
 	if (unlikely(v == NULL)) {
 		ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(version));
 		vinyl_tuple_unref_rt(r, version);
@@ -4289,7 +4225,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 		sv_logreplace(x->log, v->lo, &lv);
 
 		ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(own->tuple));
-		sx_vfree(&m->pool, own);
+		sx_vfree(r, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
@@ -4307,7 +4243,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
 	ss_quota(r->quota, SS_QREMOVE, vinyl_tuple_size(v->tuple));
-	sx_vfree(&m->pool, v);
+	sx_vfree(r, v);
 	return -1;
 }
 
