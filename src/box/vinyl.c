@@ -8944,7 +8944,7 @@ next_node:
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, m, q->order);
 	struct svreaditer ri;
-	sv_readiter_open(&ri, &im, &q->index->u, q->vlsn, 0);
+	sv_readiter_open(&ri, &im, &q->index->u, q->vlsn, q->upsert_eq);
 	struct sv *v = sv_readiter_get(&ri);
 	if (unlikely(v == NULL)) {
 		sv_mergereset(&q->merge);
@@ -8955,8 +8955,10 @@ next_node:
 	rc = 1;
 	/* convert upsert search to VINYL_EQ */
 	if (q->upsert_eq) {
-		rc = sf_compare(q->merge.key_def, sv_pointer(v), q->key);
-		rc = rc == 0;
+		int res = sf_compare(q->merge.key_def, sv_pointer(v), q->key);
+		rc = res == 0;
+		if (res == 0 && sv_is(v, SVDELETE))
+			rc = 0; /* that is not what we wanted to find */
 	}
 	if (likely(rc == 1)) {
 		if (unlikely(si_readdup(q, v) == -1))
