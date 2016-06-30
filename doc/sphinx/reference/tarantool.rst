@@ -11,7 +11,7 @@ version of the compiler".
 .. _tarantool-build:
 
 Additionally one can see the uptime and the server version and the process id.
-Those information items can also be accessed with :func:`box.info` but use of
+Those information items can also be accessed with :ref:`box.info <box_introspection-box_info>` but use of
 the tarantool package is recommended.
 
 **Example:**

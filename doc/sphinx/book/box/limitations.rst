@@ -27,14 +27,14 @@
 
     The theoretical maximum is 2147483647 (``box.schema.FIELD_MAX``). The
     practical maximum is whatever is specified by the space's
-    :ref:`field_count <space-object-field-count>`
+    :ref:`field_count <box_space-field_count>`
     member, or the maximum tuple length.
 
 .. _lim_bytes_in_tuple:
 
 **Number of bytes in a tuple**
 
-    By default the value of :confval:`slab_alloc_maximal`
+    By default the value of :ref:`slab_alloc_maximal <cfg_storage-slab_alloc_maximal>`
     is 1048576, and the maximum tuple length is approximately one quarter of that:
     approximately 262,000 bytes. To increase it, when starting the server,
     specify a larger value. For example
@@ -58,7 +58,7 @@
 **Space size**
 
     The total maximum size for all spaces is in effect set by
-    :confval:`slab_alloc_arena`, which in turn
+    :ref:`slab_alloc_arena <cfg_storage-slab_alloc_arena>`, which in turn
     is limited by the total available memory.
 
 .. _lim_update_ops:

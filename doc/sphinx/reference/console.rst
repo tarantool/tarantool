@@ -10,6 +10,8 @@ host/port.
 
 .. module:: console
 
+.. _console-connect:
+
 .. function:: connect(uri)
 
     Connect to the server at :ref:`URI`, change the prompt from ':samp:`tarantool>`' to
@@ -54,6 +56,8 @@ host/port.
         ...
         198.18.44.44:3301> -- prompt is telling us that server is remote
 
+.. _console-listen:
+
 .. function:: listen(uri)
 
     Listen on :ref:`URI`. The primary way of listening for incoming requests
@@ -92,6 +96,8 @@ host/port.
             protocol: 0
             port: /tmp/X.sock
         ...
+
+.. _console-start:
 
 .. function:: start()
 

@@ -30,57 +30,57 @@ are ``errno``, ``error``.
     +================+===============================================================+
     |    setup       | :ref:`socket() <socket-socket>`                               |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket.tcp_connect() <socket.tcp_connect>`             |
+    |    ""          | :ref:`socket.tcp_connect() <socket-tcp_connect>`              |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket.tcp_server() <socket.tcp_server>`               |
+    |    ""          | :ref:`socket.tcp_server() <socket-tcp_server>`                |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:sysconnect() <socket_object.sysconnect>` |
+    |    ""          | :ref:`socket_object:sysconnect() <socket-sysconnect>`         |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:send() <socket_object.send>`             |
+    |    ""          | :ref:`socket_object:send() <socket-send>`                     |
     +----------------+---------------------------------------------------------------+
-    |   sending      | :func:`socket_object:sendto() <socket_object.sendto>`         |
+    |   sending      | :ref:`socket_object:sendto() <socket-sendto>`                 |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:write() <socket_object.write>`           |
+    |    ""          | :ref:`socket_object:write() <socket-send>`                    |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:syswrite() <socket_object.syswrite>`     |
+    |    ""          | :ref:`socket_object:syswrite() <socket-syswrite>`             |
     +----------------+---------------------------------------------------------------+
-    |   receiving    | :func:`socket_object:recv() <socket_object.recv>`             |
+    |   receiving    | :ref:`socket_object:recv() <socket-recv>`                     |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:recvfrom() <socket_object.recvfrom>`     |
+    |    ""          | :ref:`socket_object:recvfrom() <socket-recvfrom>`             |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:read() <socket_object.read>`             |
+    |   ""           | :ref:`socket_object:read() <socket-read>`                     |
     +----------------+---------------------------------------------------------------+
-    |  flag setting  | :func:`socket_object:nonblock() <socket_object.nonblock>`     |
+    |  flag setting  | :ref:`socket_object:nonblock() <socket-nonblock>`             |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:setsockopt() <socket_object.setsockopt>` |
+    |   ""           | :ref:`socket_object:setsockopt() <socket-setsockopt>`         |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:linger() <socket_object.linger>`         |
+    |   ""           | :ref:`socket_object:linger() <socket-linger>`                 |
     +----------------+---------------------------------------------------------------+
-    | client/server  | :func:`socket_object:listen() <socket_object.listen>`         |
+    | client/server  | :ref:`socket_object:listen() <socket-listen>`                 |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:accept() <socket_object.accept>`         |
+    |    ""          | :ref:`socket_object:accept() <socket-accept>`                 |
     +----------------+---------------------------------------------------------------+
-    |    teardown    | :func:`socket_object:shutdown() <socket_object.shutdown>`     |
+    |    teardown    | :ref:`socket_object:shutdown() <socket-shutdown>`             |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:close() <socket_object.close>`           |
+    |   ""           | :ref:`socket_object:close() <socket-close>`                   |
     +----------------+---------------------------------------------------------------+
-    | error checking | :func:`socket_object:error() <socket_object.error>`           |
+    | error checking | :ref:`socket_object:error() <socket-error>`                   |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:errno() <socket_object.errno>`           |
+    |   ""           | :ref:`socket_object:errno() <socket-error>`                   |
     +----------------+---------------------------------------------------------------+
-    |  information   | :func:`socket.getaddrinfo() <socket.getaddrinfo>`             |
+    |  information   | :ref:`socket.getaddrinfo() <socket-getaddrinfo>`              |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:getsockopt() <socket_object.getsockopt>` |
+    |   ""           | :ref:`socket_object:getsockopt() <socket-getsockopt>`         |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:peer() <socket_object.peer>`             |
+    |   ""           | :ref:`socket_object:peer() <socket-peer>`                     |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:name() <socket_object.name>`             |
+    |   ""           | :ref:`socket_object:name() <socket-name>`                     |
     +----------------+---------------------------------------------------------------+
-    | state checking | :func:`socket_object:readable() <socket_object.readable>`     |
+    | state checking | :ref:`socket_object:readable() <socket-readable>`             |
     +----------------+---------------------------------------------------------------+
-    |   ""           | :func:`socket_object:writable() <socket_object.writable>`     |
+    |   ""           | :ref:`socket_object:writable() <socket-writable>`             |
     +----------------+---------------------------------------------------------------+
-    |    ""          | :func:`socket_object:wait() <socket_object.wait>`             |
+    |    ""          | :ref:`socket_object:wait() <socket-wait>`                     |
     +----------------+---------------------------------------------------------------+
 
 Typically a socket session will begin with the setup functions, will set one
@@ -110,6 +110,8 @@ the function invocations will look like ``sock:function_name(...)``.
     Example: |br|
     :codenormal:`socket('AF_INET', 'SOCK_STREAM', 'tcp')`
 
+.. _socket-tcp_connect:
+
 .. function:: tcp_connect(host[, port])
 
     Connect a socket to a remote host.
@@ -122,6 +124,7 @@ the function invocations will look like ``sock:function_name(...)``.
     Example: |br|
     :codenormal:`tcp_connect('127.0.0.1', 3301)`
 
+.. _socket-getaddrinfo:
 
 .. function:: getaddrinfo(host, type, [, {option-list}])
 
@@ -151,6 +154,8 @@ the function invocations will look like ``sock:function_name(...)``.
             port: 80
         ...
 
+.. _socket-tcp_server:
+
 .. function:: tcp_server(host, port, handler-function)
 
     The ``socket.tcp_server()`` function makes Tarantool act as a server that
@@ -161,6 +166,8 @@ the function invocations will look like ``sock:function_name(...)``.
     :codenormal:`socket.tcp_server('localhost', 3302, function () end)`
 
 .. class:: socket_object
+
+    .. _socket-sysconnect:
 
     .. method:: sysconnect(host, port)
 
@@ -191,6 +198,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :codenormal:`sock = socket('AF_INET', 'SOCK_STREAM', 'tcp')` |br|
         :codenormal:`sock:sysconnect(0, 3301)`
 
+    .. _socket-send:
+
     .. method:: send(data)
                 write(data)
 
@@ -202,10 +211,14 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Possible errors: nil on error.
 
+    .. _socket-syswrite:
+
     .. method:: syswrite(size)
 
         Write as much as possible data to the socket buffer if non-blocking.
         Rarely used. For details see `this description`_.
+
+    .. _socket-recv:
 
     .. method:: recv(size)
 
@@ -220,6 +233,8 @@ the function invocations will look like ``sock:function_name(...)``.
         errno, errstr. In case the writing side has closed its
         end, returns the remainder read from the socket (possibly
         an empty string), followed by "eof" status.
+
+    .. _socket-read:
 
     .. method:: read(limit [, timeout])
                 read(delimiter [, timeout])
@@ -245,15 +260,19 @@ the function invocations will look like ``sock:function_name(...)``.
                  expression.
         :rtype: string
 
+    .. _socket-sysread:
+
     .. method:: sysread(size)
 
         Return all available data from the socket buffer if non-blocking.
         Rarely used. For details see `this description`_.
 
+    .. _socket-bind:
+
     .. method:: bind(host [, port])
 
         Bind a socket to the given host/port. A UDP socket after binding
-        can be used to receive data (see :func:`socket_object.recvfrom`).
+        can be used to receive data (see :ref:`socket_object.recvfrom <socket-recvfrom>`).
         A TCP socket can be used to accept new connections, after it has
         been put in listen mode.
 
@@ -265,6 +284,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Possible errors: Returns nil, status, errno, errstr on error.
 
+    .. _socket-listen:
 
     .. method:: listen(backlog)
 
@@ -277,6 +297,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: true for success, false for error.
         :rtype: boolean.
 
+    .. _socket-accept:
+
     .. method:: accept()
 
         Accept a new client connection and create a new connected socket.
@@ -287,6 +309,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :rtype: userdata
 
         Possible errors: nil.
+
+    .. _socket-sendto:
 
     .. method:: sendto(host, port, data)
 
@@ -300,6 +324,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :rtype:  number
 
         Possible errors: on error, returns status, errno, errstr.
+
+    .. _socket-recvfrom:
 
     .. method:: recvfrom(limit)
 
@@ -320,6 +346,8 @@ the function invocations will look like ``sock:function_name(...)``.
         ``message_sender.family = 'AF_INET'``,
         ``message_sender.port = 43065``.
 
+    .. _socket-shutdown:
+
     .. method:: shutdown(how)
 
         Shutdown a reading end, a writing end, or both ends of a socket.
@@ -328,6 +356,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: true or false.
         :rtype:  boolean
+
+    .. _socket-close:
 
     .. method:: close()
 
@@ -338,6 +368,8 @@ the function invocations will look like ``sock:function_name(...)``.
                  sock is already closed, sock:close() returns false.
         :rtype:  boolean
 
+    .. _socket-error:
+
     .. method:: error()
                 errno()
 
@@ -347,6 +379,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: result for ``sock:errno()``, result for ``sock:error()``.
                  If there is no error, then ``sock:errno()`` will return 0 and ``sock:error()``.
         :rtype:  number, string
+
+    .. _socket-setsockopt:
 
     .. method:: setsockopt(level, name, value)
 
@@ -382,9 +416,13 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Setting SO_LINGER is done with ``sock:linger(active)``.
 
+    .. _socket-getsockopt:
+
     .. method:: getsockopt(level, name)
 
         Get socket flags. For a list of possible flags see ``sock:setsockopt()``.
+
+    .. _socket-linger:
 
     .. method:: linger([active])
 
@@ -395,6 +433,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: new active and timeout values.
 
+    .. _socket-nonblock:
+
     .. method:: nonblock([flag])
 
         ``sock:nonblock()`` returns the current flag value. |br|
@@ -403,11 +443,15 @@ the function invocations will look like ``sock:function_name(...)``.
         This function may be useful before invoking a function which might
         otherwise block indefinitely.
 
+    .. _socket-readable:
+
     .. method:: readable([timeout])
 
         Wait until something is readable, or until a timeout value expires.
 
         :return: true if the socket is now readable, false if timeout expired;
+
+    .. _socket-writable:
 
     .. method:: writable([timeout])
 
@@ -415,11 +459,15 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: true if the socket is now writable, false if timeout expired;
 
+    .. _socket-wait:
+
     .. method:: wait([timeout])
 
         Wait until something is either readable or writable, or until a timeout value expires.
 
         :return: 'R' if the socket is now readable, 'W' if the socket is now writable, 'RW' if the socket is now both readable and writable, '' (empty string) if timeout expired;
+
+    .. _socket-name:
 
     .. method:: name()
 
@@ -430,6 +478,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: A table containing these fields: "host", "family", "type", "protocol", "port".
         :rtype:  table
+
+    .. _socket-peer:
 
     .. method:: peer()
 

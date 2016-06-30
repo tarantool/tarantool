@@ -1,4 +1,4 @@
-.. _box-tuple:
+.. _box_tuple:
 
 -------------------------------------------------------------------------------
                             Package `box.tuple`
@@ -14,9 +14,9 @@ and conversion to a Lua table.
 .. function:: new(value)
 
     Construct a new tuple from either a scalar or a Lua table. Alternatively,
-    one can get new tuples from tarantool's :func:`select <space_object.select>`
-    or :func:`insert <space_object.insert>` or :func:`replace <space_object.replace>`
-    or :func:`update <space_object.update>` requests,
+    one can get new tuples from tarantool's :ref:`select <box_space-select>`
+    or :ref:`insert <box_space-insert>` or :ref:`replace <box_space-replace>`
+    or :ref:`update <box_space-update>` requests,
     which can be regarded as statements that do
     ``new()`` implicitly.
 
@@ -256,7 +256,7 @@ and conversion to a Lua table.
         as 'B' for a new assignable value = 'B'.
 
         For details: see the description for ``format``, ``field_number``, and ``value`` in
-        the section :func:`box.space.space-name:update{key, format, {field_number, value}...) <space_object.update>`.
+        the section :ref:`box.space.space-name:update{key, format, {field_number, value}...) <box_space-update>`.
 
         :return: new tuple
         :rtype:  tuple

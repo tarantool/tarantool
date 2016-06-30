@@ -44,7 +44,7 @@ All triggers have the following characteristics:
 .. function:: box.session.on_connect(trigger-function [, old-trigger-function-name])
 
     Define a trigger for execution when a new session is created due to an event
-    such as :func:`console.connect`. The trigger function will be the first thing
+    such as :ref:`console.connect <console-connect>`. The trigger function will be the first thing
     executed after a new session is created. If the trigger fails by raising an
     error, the error is sent to the client and the connection is closed.
 
@@ -95,7 +95,7 @@ All triggers have the following characteristics:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After the following series of requests, the server will write a message
-using the :mod:`log` package whenever any user connects or disconnects.
+using the :ref:`log <log>` package whenever any user connects or disconnects.
 
 .. code-block:: lua_tarantool
 
@@ -130,7 +130,7 @@ Here is what might appear in the log file in a typical installation:
     Define a trigger for execution during authentication.
 
     The on_auth trigger function is invoked in these circumstances:
-    (1) The :func:`console.connect` function includes an authentication check for all users except 'guest';
+    (1) The :ref:`console.connect <console-connect>` function includes an authentication check for all users except 'guest';
     for this case the on_auth trigger function is invoked after the on_connect trigger function,
     if and only if the connection has succeeded so far.
     (2) The binary protocol has a separate :ref:`authentication packet <iproto-authentication>` --

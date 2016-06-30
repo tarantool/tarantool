@@ -167,7 +167,7 @@ Tarantool will try to store a number as floating-point if
 the value contains a decimal point or is very large (greater than 100 quadrillion = 1e14),
 otherwise Tarantool will store it as an integer.
 To ensure that even very large numbers will be treated as
-integers, use the :func:`tonumber64 <tonumber64>`
+integers, use the :ref:`tonumber64 <other-tonumber64>`
 function, or the LL (Long Long) suffix, or the ULL
 (Unsigned Long Long) suffix. Here are examples of numbers
 using regular notation, exponential notation, the ULL suffix,
@@ -188,15 +188,15 @@ A *boolean* is either ``true`` or ``false``.
 A *nil* type has only one possible value, also called *nil*, but often displayed
 as *null*. Nils may be compared to values of any types with == (is-equal) or
 ~= (is-not-equal), but other operations will not work. Nils may not be used in
-Lua tables; the workaround is to use :data:`yaml.NULL` or :data:`json.NULL` or
-:data:`msgpack.NULL`.
+Lua tables; the workaround is to use :ref:`yaml.NULL <yaml-null>` or :ref:`json.NULL <json-null>` or
+:ref:`msgpack.NULL <msgpack-null>`.
 
 A *tuple* is returned in YAML format like ``- [120, 'a', 'b', 'c']``.
 A few functions may return tables with multiple tuples.
 A scalar may be converted to a tuple with only one field.
 A Lua table may contain all of a tuple's fields, but not nil.
 
-For more tuple examples see :ref:`box.tuple <box-tuple>`.
+For more tuple examples see :ref:`box.tuple <box_tuple>`.
 
 ----------
 Operations
@@ -360,7 +360,7 @@ is lost when the power goes off, Tarantool recovers it automatically
 when it starts up again, by reading the WAL files and redoing the requests
 (this is called the "recovery process").
 Users can change the timing of the WAL writer,
-or turn it off, by setting :ref:`wal_mode <confval-wal-mode>`.
+or turn it off, by setting :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>`.
 
 Tarantool also maintains a set of snapshot files.
 A snapshot file is an on-disk copy of the entire data set for a given moment.
@@ -369,7 +369,7 @@ the recovery process can load the latest snapshot and then read only
 the WAL files that were produced after the snapshot was made.
 A snapshot can be made even if there is no WAL file.
 Some snapshots are automatic, or users can make them at any time
-with the :func:`box.snapshot() <box.snapshot()>` request.
+with the :ref:`box.snapshot() <admin-snapshot>` request.
 
 Details about the WAL writer and the recovery process
 are in the :ref:`Internals <box-internals>` section.
@@ -603,35 +603,35 @@ introspection (inspecting contents of spaces, accessing server configuration).
     .. rst-class:: left-align-column-1
     .. rst-class:: left-align-column-2
 
-    +-------------------+-----------------------------------------------------+
-    | Index size        | The number of index keys is the same as the number  |
-    |                   | of tuples in the data set. For a TREE index, if     |
-    |                   | there are more keys then the lookup time will be    |
-    |                   | greater, although of course the effect is not       |
-    |                   | linear. For a HASH index, if there are more keys    |
-    |                   | then there is more RAM use, but the number of       |
-    |                   | low-level steps tends to remain constant.           |
-    +-------------------+-----------------------------------------------------+
-    | Index type        | Typically a HASH index is faster than a TREE index  |
-    |                   | if the number of tuples in the tuple set is greater |
-    |                   | than one.                                           |
-    +-------------------+-----------------------------------------------------+
-    | Number of indexes | Ordinarily only one index is accessed to retrieve   |
-    | accessed          | one tuple. But to update the tuple, there must be N |
-    |                   | accesses if the tuple set has N different indexes.  |
-    +-------------------+-----------------------------------------------------+
-    | Number of tuples  | A few requests, for example select, can retrieve    |
-    | accessed          | multiple tuples. This factor is usually less        |
-    |                   | important than the others.                          |
-    +-------------------+-----------------------------------------------------+
-    | WAL settings      | The important setting for the write-ahead log is    |
-    |                   | :ref:`wal_mode <confval-wal-mode>`. If the setting  |
-    |                   | causes no writing or                                |
-    |                   | delayed writing, this factor is unimportant. If the |
-    |                   | setting causes every data-change request to wait    |
-    |                   | for writing to finish on a slow device, this factor |
-    |                   | is more important than all the others.              |
-    +-------------------+-----------------------------------------------------+
+    +-------------------+----------------------------------------------------------+
+    | Index size        | The number of index keys is the same as the number       |
+    |                   | of tuples in the data set. For a TREE index, if          |
+    |                   | there are more keys then the lookup time will be         |
+    |                   | greater, although of course the effect is not            |
+    |                   | linear. For a HASH index, if there are more keys         |
+    |                   | then there is more RAM use, but the number of            |
+    |                   | low-level steps tends to remain constant.                |
+    +-------------------+----------------------------------------------------------+
+    | Index type        | Typically a HASH index is faster than a TREE index       |
+    |                   | if the number of tuples in the tuple set is greater      |
+    |                   | than one.                                                |
+    +-------------------+----------------------------------------------------------+
+    | Number of indexes | Ordinarily only one index is accessed to retrieve        |
+    | accessed          | one tuple. But to update the tuple, there must be N      |
+    |                   | accesses if the tuple set has N different indexes.       |
+    +-------------------+----------------------------------------------------------+
+    | Number of tuples  | A few requests, for example select, can retrieve         |
+    | accessed          | multiple tuples. This factor is usually less             |
+    |                   | important than the others.                               |
+    +-------------------+----------------------------------------------------------+
+    | WAL settings      | The important setting for the write-ahead log is         |
+    |                   | :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>`. |
+    |                   | If the setting causes no writing or                      |
+    |                   | delayed writing, this factor is unimportant. If the      |
+    |                   | setting causes every data-change request to wait         |
+    |                   | for writing to finish on a slow device, this factor      |
+    |                   | is more important than all the others.                   |
+    +-------------------+----------------------------------------------------------+
 
 In the discussion of each data-manipulation function there will be a note about
 which Complexity Factors might affect the function's resource usage.

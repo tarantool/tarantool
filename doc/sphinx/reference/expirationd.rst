@@ -54,7 +54,7 @@ Remembering that :codenormal:`index[0]` is always the space's primary key,
 and :codenormal:`index[0].parts[`:codeitalic:`N`:codenormal:`].fieldno`
 is always the field number for key part :codeitalic:`N`,
 fun.map() is creating a table from the primary-key values of the tuple.
-The result of fun.map() is passed to :func:`space_object:delete() <space_object.delete>`.
+The result of fun.map() is passed to :ref:`space_object:delete() <box_space-delete>`.
 
 .. code-block:: lua
 
@@ -103,8 +103,8 @@ expirationd through the test.
      os.exit()
 
 The database-specific requests (``cfg``,
-:ref:`space.create <schema-space-create>`,
-:func:`create_index <space_object.create_index>`)
+:ref:`space.create <box_schema-space_create>`,
+:ref:`create_index <box_space-create_index>`)
 should already be familiar.
 
 The function which will be supplied to expirationd is

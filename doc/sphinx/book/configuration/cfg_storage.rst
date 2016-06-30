@@ -1,3 +1,5 @@
+.. _cfg_storage-slab_alloc_arena:
+
 .. confval:: slab_alloc_arena
 
     How much memory Tarantool allocates to actually store tuples, in gigabytes.
@@ -11,6 +13,8 @@
     Default: 1.0 |br|
     Dynamic: no |br|
 
+.. _cfg_storage-slab_alloc_factor:
+
 .. confval:: slab_alloc_factor
 
     Use slab_alloc_factor as the multiplier for computing the sizes of memory
@@ -22,6 +26,8 @@
     Default: 1.1 |br|
     Dynamic: no |br|
 
+.. _cfg_storage-slab_alloc_maximal:
+
 .. confval:: slab_alloc_maximal
 
     Size of the largest allocation unit. It can be increased if it
@@ -31,6 +37,8 @@
     Default: 1048576 |br|
     Dynamic: no |br|
 
+.. _cfg_storage-slab_alloc_minimal:
+
 .. confval:: slab_alloc_minimal
 
     Size of the smallest allocation unit. It can be decreased if most
@@ -39,6 +47,8 @@
     Type: integer |br|
     Default: 16 |br|
     Dynamic: no |br|
+
+.. _cfg_storage-sophia:
 
 .. confval:: sophia
 

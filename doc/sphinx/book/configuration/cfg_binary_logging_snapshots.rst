@@ -1,9 +1,11 @@
-    :confval:`panic_on_snap_error`, |br|
-    :confval:`panic_on_wal_error`, |br|
-    :confval:`rows_per_wal`, |br|
-    :confval:`snap_io_rate_limit`, |br|
-    :confval:`wal_mode`, |br|
-    :confval:`wal_dir_rescan_delay` |br|
+    :ref:`panic_on_snap_error <cfg_binary_logging_snapshots-panic_on_snap_error>`, |br|
+    :ref:`panic_on_wal_error <cfg_binary_logging_snapshots-panic_on_wal_error>`, |br|
+    :ref:`rows_per_wal <cfg_binary_logging_snapshots-rows_per_wal>`, |br|
+    :ref:`snap_io_rate_limit <cfg_binary_logging_snapshots-snap_io_rate_limit>`, |br|
+    :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>`, |br|
+    :ref:`wal_dir_rescan_delay <cfg_binary_logging_snapshots-wal_dir_rescan_delay>` |br|
+
+.. _cfg_binary_logging_snapshots-panic_on_snap_error:
 
 .. confval:: panic_on_snap_error
 
@@ -14,6 +16,8 @@
     Default: true |br|
     Dynamic: no |br|
 
+.. _cfg_binary_logging_snapshots-panic_on_wal_error:
+
 .. confval:: panic_on_wal_error
 
     If there is an error while reading a write-ahead log
@@ -23,7 +27,7 @@
     Default: true |br|
     Dynamic: yes |br|
 
-.. _box-cfg-rows-per-wal:
+.. _cfg_binary_logging_snapshots-rows_per_wal:
 
 .. confval:: rows_per_wal
 
@@ -36,19 +40,21 @@
     Default: 500000 |br|
     Dynamic: no |br|
 
+.. _cfg_binary_logging_snapshots-snap_io_rate_limit:
+
 .. confval:: snap_io_rate_limit
 
-    Reduce the throttling effect of :func:`box.snapshot` on
+    Reduce the throttling effect of :ref:`box.snapshot <admin-snapshot>` on
     INSERT/UPDATE/DELETE performance by setting a limit on how many
     megabytes per second it can write to disk. The same can be
-    achieved by splitting :confval:`wal_dir` and :confval:`snap_dir`
+    achieved by splitting :ref:`wal_dir <cfg_basic-wal_dir>` and :ref:`snap_dir <cfg_basic-snap_dir>`
     locations and moving snapshots to a separate disk.
 
     Type: float |br|
     Default: null |br|
     Dynamic: **yes** |br|
 
-.. _confval-wal-mode:
+.. _cfg_binary_logging_snapshots-wal_mode:
 
 .. confval:: wal_mode
 
@@ -63,6 +69,8 @@
     Type: string |br|
     Default: "write" |br|
     Dynamic: **yes** |br|
+
+.. _cfg_binary_logging_snapshots-wal_dir_rescan_delay:
 
 .. confval:: wal_dir_rescan_delay
 

@@ -36,10 +36,10 @@ scheduling, when a single client throttles the rest of the system, or to
 apparent stalls in request processing. Avoiding this situation is the
 responsibility of the function's author. For the default memtx storage engine
 some of the box calls, including the data-change requests
-:func:`box.space...insert <space_object.insert>` or
-:func:`box.space...update <space_object.update>` or
-:func:`box.space...delete <space_object.delete>`, will usually cause yielding;
-however, :func:`box.space...select <space_object.select>` will not.
+:ref:`box.space...insert <box_space-insert>` or
+:ref:`box.space...update <box_space-update>` or
+:ref:`box.space...delete <box_space-delete>`, will usually cause yielding;
+however, :ref:`box.space...select <box_space-select>` will not.
 A fuller description will appear in section :ref:`The Implicit Yield Rules <the-implicit-yield-rules>`.
 
 Note re storage engine: sophia has different rules: insert or update or delete
@@ -128,15 +128,15 @@ but many other requests "imply" yields because Tarantool is designed to avoid
 blocking.
 
 The implicit yield requests are:
-:ref:`insert <space_insert>` :ref:`replace <space_replace>`
-:ref:`update <space_update>` :ref:`upsert <space_update>` :ref:`delete <space_delete>` (the "data-change" requests),
+:ref:`insert <box_space-insert>` :ref:`replace <box_space-replace>`
+:ref:`update <box_space-update>` :ref:`upsert <box_space-upsert>` :ref:`delete <box_space-delete>` (the "data-change" requests),
 and
 functions in package
 :ref:`fio <fio-section>`,
 :ref:`net_box <package_net_box>`,
 :ref:`console <package-console>`, or
 :ref:`socket <package-socket>` (the "os" and "network" requests).
-Note re storage engine: with sophia :ref:`select <space-select>` is
+Note re storage engine: with sophia :ref:`select <box_space-select>` is
 an implicit yield request, but data-change requests may not be.
 
 The yield occurs just before a blocking syscall, such as a write to the Write-Ahead Log (WAL)
@@ -156,13 +156,13 @@ The commit request is not itself an implicit yield request,
 it only enables yields caused by earlier implicit yield requests.
 
 Despite their resemblance to implicit yield requests,
-:ref:`truncate <space_truncate>` and :ref:`drop <space_drop>` do not cause implicit yield.
+:ref:`truncate <box_space-truncate>` and :ref:`drop <box_space-drop>` do not cause implicit yield.
 Despite their resemblance to functions of the fio package,
 functions of the :ref:`os <package-os>` package do not cause implicit yield.
 Despite its resemblance to commit, :ref:`rollback <box-rollback>` does not
 enable yields.
 
-If :ref:`wal_mode <confval-wal-mode>` = 'none', then implicit yielding is disabled,
+If :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` = 'none', then implicit yielding is disabled,
 because there are no writes to the WAL.
 
 If a task is interactive -- sending requests to the server

@@ -8,27 +8,27 @@ A fiber is a set of instructions which are executed with cooperative
 multitasking. Fibers managed by the fiber package are associated with
 a user-supplied function called the *fiber function*.
 A fiber has three possible states: **running**, **suspended** or **dead**.
-When a fiber is created with :func:`fiber.create()`, it is running.
-When a fiber yields control with :func:`fiber.sleep()`, it is suspended.
+When a fiber is created with :ref:`fiber.create() <fiber-create>`, it is running.
+When a fiber yields control with :ref:`fiber.sleep() <fiber-sleep>`, it is suspended.
 When a fiber ends (because the fiber function ends), it is dead.
 
 All fibers are part of the fiber registry. This registry can be searched
-with :func:`fiber.find()` - via fiber id (fid), which is a numeric identifier.
+with :ref:`fiber.find() <fiber-find>` - via fiber id (fid), which is a numeric identifier.
 
-A runaway fiber can be stopped with :func:`fiber_object.cancel`. However,
-:func:`fiber_object.cancel` is advisory — it works only if the runaway fiber
-calls :func:`fiber.testcancel()` occasionally. Most ``box.*`` functions, such
-as :func:`box.space...delete() <space_object.delete>` or
-:func:`box.space...update() <space_object.update>`, do call
-:func:`fiber.testcancel()` but :func:`box.space...select{} <space_object.select>`
+A runaway fiber can be stopped with :ref:`fiber_object.cancel <fiber-cancel>`. However,
+:ref:`fiber_object.cancel <fiber-cancel>` is advisory — it works only if the runaway fiber
+calls :ref:`fiber.testcancel() <fiber-testcancel>` occasionally. Most ``box.*`` functions, such
+as :ref:`box.space...delete() <box_space-delete>` or
+:ref:`box.space...update() <box_space-update>`, do call
+:ref:`fiber.testcancel() <fiber-testcancel>` but :ref:`box.space...select{} <box_space-select>`
 does not. In practice, a runaway fiber can only become unresponsive if it does
 many computations and does not check whether it has been cancelled.
 
 The other potential problem comes from fibers which never get scheduled,
 because they are not subscribed to any events, or because no relevant
-events occur. Such morphing fibers can be killed with :func:`fiber.kill()`
-at any time, since :func:`fiber.kill()` sends an asynchronous wakeup event
-to the fiber, and :func:`fiber.testcancel()` is checked whenever such a
+events occur. Such morphing fibers can be killed with :ref:`fiber.kill() <fiber-kill>`
+at any time, since :ref:`fiber.kill() <fiber-kill>` sends an asynchronous wakeup event
+to the fiber, and :ref:`fiber.testcancel() <fiber-testcancel>` is checked whenever such a
 wakeup event occurs.
 
 Like all Lua objects, dead fibers are garbage collected. The garbage collector
@@ -44,6 +44,8 @@ recommended.
 
 
 .. module:: fiber
+
+.. _fiber-create:
 
 .. function:: create(function [, function-arguments])
 
@@ -72,6 +74,8 @@ recommended.
         ...
 
 
+.. _fiber-self:
+
 .. function:: self()
 
     :Return: fiber object for the currently scheduled fiber.
@@ -87,6 +91,8 @@ recommended.
           name: interactive
           id: 101
         ...
+
+.. _fiber-find:
 
 .. function:: find(id)
 
@@ -127,7 +133,7 @@ recommended.
 
 .. function:: yield()
 
-    Yield control to the scheduler. Equivalent to :func:`fiber.sleep(0) <fiber.sleep>`.
+    Yield control to the scheduler. Equivalent to :ref:`fiber.sleep(0) <fiber-sleep>`.
 
     Example:
 
@@ -136,6 +142,8 @@ recommended.
         tarantool> fiber.yield()
         ---
         ...
+
+.. _fiber-status:
 
 .. function:: status()
 
@@ -152,6 +160,8 @@ recommended.
         ---
         - running
         ...
+
+.. _fiber-info:
 
 .. function:: info()
 
@@ -177,11 +187,13 @@ recommended.
             name: interactive
         ...
 
+.. _fiber-kill:
+
 .. function:: kill(id)
 
     Locate a fiber by its numeric id and cancel it. In other words,
-    :func:`fiber.kill()` combines :func:`fiber.find()` and
-    :func:`fiber_object:cancel() <fiber_object.cancel>`.
+    :ref:`fiber.kill() <fiber-kill>` combines :ref:`fiber.find() <fiber-find>` and
+    :ref:`fiber_object:cancel() <fiber-cancel>`.
 
     :param id: the id of the fiber to be cancelled.
     :Exception: the specified fiber does not exist or cancel is not permitted.
@@ -213,10 +225,12 @@ recommended.
 
 .. class:: fiber_object
 
+    .. _fiber-id:
+
     .. method:: id()
 
         :param self: fiber object, for example the fiber object returned
-                     by :func:`fiber.create`
+                     by :ref:`fiber.create <fiber-create>`
         :Return: id of the fiber.
         :Rtype: number
 
@@ -235,7 +249,7 @@ recommended.
     .. method:: name()
 
         :param self: fiber object, for example the fiber object returned
-                     by :func:`fiber.create`
+                     by :ref:`fiber.create <fiber-create>`
         :Return: name of the fiber.
         :Rtype: string
 
@@ -252,12 +266,12 @@ recommended.
 
         Change the fiber name. By default the Tarantool server's
         interactive-mode fiber is named 'interactive' and new
-        fibers created due to :func:`fiber.create` are named 'lua'.
+        fibers created due to :ref:`fiber.create <fiber-create>` are named 'lua'.
         Giving fibers distinct names makes it easier to
-        distinguish them when using :func:`fiber.info`.
+        distinguish them when using :ref:`fiber.info <fiber-info>`.
 
         :param self: fiber object, for example the fiber
-                     object returned by :func:`fiber.create`
+                     object returned by :ref:`fiber.create <fiber-create>`
         :param string name: the new name of the fiber.
 
         :Return: nil
@@ -270,12 +284,14 @@ recommended.
             ---
             ...
 
+    .. _fiber-status:
+
     .. method:: status()
 
         Return the status of the specified fiber.
 
         :param self: fiber object, for example the fiber object returned by
-                     :func:`fiber.create`
+                     :ref:`fiber.create <fiber-create>`
 
         :Return: the status of fiber. One of: “dead”, “suspended”, or “running”.
         :Rtype: string
@@ -289,15 +305,17 @@ recommended.
             - running
             ...
 
+    .. _fiber-cancel:
+
     .. method:: cancel()
 
         Cancel a fiber. Running and suspended fibers can be cancelled.
         After a fiber has been cancelled, attempts to operate on it will
-        cause errors, for example :func:`fiber_object:id() <fiber_object.id>`
+        cause errors, for example :ref:`fiber_object:id() <fiber-id>`
         will cause ``error: the fiber is dead``.
 
         :param self: fiber object, for example the fiber
-                     object returned by :func:`fiber.create`
+                     object returned by :ref:`fiber.create <fiber-create>`
 
         :Return: nil
 
@@ -312,6 +330,8 @@ recommended.
             - error: fiber is cancelled
             ...
 
+    .. _fiber-storage:
+
     .. data:: storage
 
         Local storage within the fiber. The storage can contain any number of
@@ -320,7 +340,7 @@ recommended.
         or with a number :samp:`{fiber_object}.storage[{number}]`.
         Values may be either numbers or strings. The storage is garbage-collected
         when :samp:`{fiber_object}:cancel()` happens. |br|
-        See also :data:`box.session.storage <box.session.storage>`.
+        See also :ref:`box.session.storage <box_session-storage>`.
 
         **Example:**
 
@@ -375,6 +395,8 @@ recommended.
             - 1448466279.2415
             ...
 
+.. _fiber-time64:
+
 .. function:: time64()
 
     :Return: current system time (in microseconds since the epoch)
@@ -392,10 +414,6 @@ recommended.
             - 1448466351270762
             ...
 
-.. function:: info()
-
-    Show all running fibers, with their stack. Mainly useful for debugging.
-
 =================================================
              Example Of Fiber Use
 =================================================
@@ -403,7 +421,7 @@ recommended.
 Make the function which will be associated with the fiber. This function
 contains an infinite loop (``while 0 == 0`` is always true). Each iteration
 of the loop adds 1 to a global variable named gvar, then goes to sleep for
-2 seconds. The sleep causes an implicit :func:`fiber.yield()`.
+2 seconds. The sleep causes an implicit :ref:`fiber.yield() <fiber-yield>`.
 
 .. code-block:: tarantoolsession
 

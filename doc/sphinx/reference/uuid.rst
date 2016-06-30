@@ -10,20 +10,20 @@ applications, UUIDs are better.
 
 The functions that can return a UUID are:
 
-    * :func:`uuid() <uuid.__call>`
-    * :func:`uuid.bin()`
-    * :func:`uuid.str()`
+    * :ref:`uuid() <uuid-__call>`
+    * :ref:`uuid.bin() <uuid-bin>`
+    * :ref:`uuid.str() <uuid-str>`
 
 The functions that can convert between different types of UUID are:
 
-    * :func:`uuid_object:bin() <uuid_object.bin>`
-    * :func:`uuid_object:str() <uuid_object.str>`
-    * :func:`uuid.fromstr()`
-    * :func:`uuid.frombin()`
+    * :ref:`uuid_object:bin() <uuid-object_bin>`
+    * :ref:`uuid_object:str() <uuid-object_str>`
+    * :ref:`uuid.fromstr() <uuid-fromstr>`
+    * :ref:`uuid.frombin() <uuid-frombin>`
 
 The function that can determine whether a UUID is an all-zero value is:
 
-    * :func:`uuid_object:isnil() <uuid_object.isnil>`
+    * :ref:`uuid_object:isnil() <uuid-isnil>`
 
 .. module:: uuid
 
@@ -31,26 +31,36 @@ The function that can determine whether a UUID is an all-zero value is:
 
     A nil object
 
+.. _uuid-__call:
+
 .. function:: __call()
 
     :return: a UUID
     :rtype: cdata
+
+.. _uuid-bin:
 
 .. function:: bin()
 
     :return: a UUID
     :rtype: 16-byte string
 
+.. _uuid-str:
+
 .. function:: str()
 
     :return: a UUID
     :rtype: 36-byte binary string
+
+.. _uuid-fromstr:
 
 .. function:: fromstr(uuid_str)
 
     :param uuid_str: UUID in 36-byte hexadecimal string
     :return: converted UUID
     :rtype: cdata
+
+.. _uuid-frombin:
 
 .. function:: frombin(uuid_bin)
 
@@ -59,6 +69,8 @@ The function that can determine whether a UUID is an all-zero value is:
     :rtype: cdata
 
 .. class:: uuid_object
+
+    .. _uuid-object_bin:
 
     .. method:: bin([byte-order])
 
@@ -70,10 +82,14 @@ The function that can determine whether a UUID is an all-zero value is:
         :return: UUID converted from cdata input value.
         :rtype: 16-byte binary string
 
+    .. _uuid-object_str:
+
     .. method:: str()
 
         :return: UUID converted from cdata input value.
         :rtype: 36-byte hexadecimal string
+
+    .. _uuid-isnil:
 
     .. method:: isnil()
 

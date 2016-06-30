@@ -79,7 +79,7 @@ API is a direct binding to corresponding methods of index objects of type
         there is a "context switch": which may happen due to
         :ref:`the-implicit-yield-rules <the-implicit-yield-rules>`,
         or by an
-        explicit call to :func:`fiber.yield`. When the execution flow returns
+        explicit call to :ref:`fiber.yield <fiber-yield>`. When the execution flow returns
         to the yielded procedure, the data set could have changed significantly.
         Iteration, resumed after a yield point, does not preserve the read view,
         but continues with the new content of the database.
@@ -388,7 +388,7 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. method:: select(key, options)
 
-        This is an alternative to :func:`box.space...select() <space_object.select>`
+        This is an alternative to :ref:`box.space...select() <box_space-select>`
         which goes via a particular index and can make use of additional
         parameters that specify the iterator type, and the limit (that is, the
         maximum number of tuples to return) and the offset (that is, which
@@ -652,7 +652,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Update a tuple.
 
-        Same as :func:`box.space...update() <space_object.update>`,
+        Same as :ref:`box.space...update() <box_space-update>`,
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
@@ -662,7 +662,7 @@ API is a direct binding to corresponding methods of index objects of type
         * :samp:`{key}` (type = Lua table or scalar) = key to be matched against
           the index key;
         * :samp:`{operator, field_no, value}` (type = Lua table) = update
-          operations (see: :func:`box.space...update() <space_object.update>`).
+          operations (see: :ref:`box.space...update() <box_space-update>`).
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -671,7 +671,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Delete a tuple identified by a key.
 
-        Same as :func:`box.space...delete() <space_object.delete>`, but key is
+        Same as :ref:`box.space...delete() <box_space-delete>`, but key is
         searched in this index instead of in the primary-key index. This index
         ought to be unique.
 
@@ -694,7 +694,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
         * :samp:`{options}` = options list, same as the options list for
-          :func:`create_index <space_object.create_index>`.
+          :ref:`create_index <box_space-create_index>`.
 
         :return: nil
 
@@ -787,9 +787,9 @@ function will:
 * Return the formatted value.
 
 The function uses Tarantool box functions
-:func:`box.space...select <space_object.select>`,
-:func:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
-:func:`uuid.str`. The function uses
+:ref:`box.space...select <box_space-select>`,
+:ref:`box.space...replace <box_space-replace>`, :ref:`fiber.time <fiber-time>`,
+:ref:`uuid.str <uuid-str>`. The function uses
 Lua functions `os.date()`_ and `string.sub()`_.
 
 .. _os.date(): http://www.lua.org/pil/22.1.html
@@ -888,7 +888,7 @@ additional criteria.
              Package `box.index` with index type = RTREE for spatial searches
 =============================================================================
 
-The :mod:`box.index` package may be used for spatial searches if the index type
+The :ref:`box.index <box_index>` package may be used for spatial searches if the index type
 is RTREE. There are operations for searching *rectangles* (geometric objects
 with 4 corners and 4 sides) and *boxes* (geometric objects with more than 4
 corners and more than 4 sides, sometimes called hyperrectangles). This manual

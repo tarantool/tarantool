@@ -1,4 +1,4 @@
-.. _box-cfg-replication-source:
+.. _cfg_replication-replication_source:
 
 .. confval:: replication_source
 
@@ -17,7 +17,7 @@
     specification on multiple servers.
 
     The default user name is ‘guest’.
-    A replica server does not accept data-change requests on the :confval:`listen` port.
+    A replica server does not accept data-change requests on the :ref:`listen <cfg_basic-listen>` port.
     The replication_source parameter is
     dynamic, that is, to enter master mode, simply set replication_source
     to an empty string and issue :code:`box.cfg{replication_source=`:samp:`{new-value}`:code:`}`.

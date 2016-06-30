@@ -19,7 +19,7 @@ The server processes these signals during the main thread event loop:
 
     SIGUSR1
         may cause saving of a snapshot, see the description of
-        :func:`box.snapshot`.
+        :ref:`box.snapshot <admin-snapshot>`.
 
     SIGTERM
         may cause graceful shutdown (information will be saved first).
@@ -60,7 +60,7 @@ A Tarantool server's process title has these components:
   - "orphan" (not in a cluster),
   - "hot_standby" (see section :ref:`local hot standby <book_cfg_local_hot_standby>`), or
   - "dumper" + process-id (saving a snapshot).
-* **custom_proc_title** is taken from the :confval:`custom_proc_title` configuration parameter, if one was specified.
+* **custom_proc_title** is taken from the :ref:`custom_proc_title <cfg_basic-custom_proc_title>` configuration parameter, if one was specified.
 
 For example:
 
@@ -79,7 +79,7 @@ For example:
 .. program:: tarantool
 
 If ``tarantool`` is started without an :ref:`initialization file <init-label>`,
-or if the initialization file contains :func:`console.start()`, then ``tarantool``
+or if the initialization file contains :ref:`console.start() <console-start>`, then ``tarantool``
 enters interactive mode. There will be a prompt ("``tarantool>``") and it will
 be possible to enter requests. When used this way, ``tarantool`` can be
 a client for a remote server.
@@ -1155,7 +1155,7 @@ writes are complete (fsync can be used for this purpose). |br|
 (2) If this is a backup of the whole database, say
 :codenormal:`box.snapshot()`. |br|
 (3) Use tar to make a (possibly compressed) copy of the
-latest .snap and .xlog files on the :ref:`snap_dir <box-cfg-snap-dir>` and :ref:`wal_dir <box-cfg-wal-dir>`
+latest .snap and .xlog files on the :ref:`snap_dir <cfg_basic-snap_dir>` and :ref:`wal_dir <cfg_basic-wal_dir>`
 directories. |br|
 (4) If there is a security policy, encrypt the tar file. |br|
 (5) Copy the tar file to a safe place. |br|
@@ -1191,7 +1191,7 @@ changes occur, so that only the new files need to be copied.
 One such utility is
 `tarantar <https://github.com/tarantool/tarantool/wiki/Tarantar>`_
 but it will require some modifications to work with the latest
-Tarantool version. Setting the :ref:`rows_per_wal <box-cfg-rows-per-wal>` configuration
+Tarantool version. Setting the :ref:`rows_per_wal <cfg_binary_logging_snapshots-rows_per_wal>` configuration
 parameter is another option.
 
 Note re storage engines:

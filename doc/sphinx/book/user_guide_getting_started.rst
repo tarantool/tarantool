@@ -67,7 +67,7 @@ Start the server. The server name is tarantool.
     $ ~/tarantool/src/tarantool
 
 The server starts in interactive mode and outputs a command prompt.
-To turn on the database, :mod:`configure <box.cfg>` it. This minimal example is sufficient:
+To turn on the database, :ref:`configure <box_introspection-box_cfg>` it. This minimal example is sufficient:
 
 .. code-block:: tarantoolsession
 

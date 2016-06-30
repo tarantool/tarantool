@@ -28,6 +28,8 @@ The possible options which can be passed to csv functions are:
 * :samp:`chunk-size = {number}` -- number of characters to read at once (usually for file-IO efficiency), default = 4096
 * :samp:`skip_head_lines = {number}` -- number of lines to skip at the start (usually for a header), default 0
 
+.. _csv-load:
+
 .. function:: load(readable[, {options}])
 
     Get CSV-formatted input from ``readable`` and return a table as output.
@@ -103,13 +105,15 @@ The possible options which can be passed to csv functions are:
         - true
         ...
 
+.. _csv-dump:
+
 .. function:: dump(csv-table[, options, writable])
 
     Get table input from ``csv-table`` and return a CSV-formatted string as output.
     Or, get table input from ``csv-table`` and put the output in ``writable``.
     Usually :samp:`{options}` is not specified.
     Usually ``writable``, if specified, is a file opened for writing.
-    :func:`csv.dump()` is the reverse of :func:`csv.load()`.
+    :ref:`csv.dump() <csv-dump>` is the reverse of :ref:`csv.load() <csv-load>`.
 
     :param table csv-table: a table which can be formatted according to the CSV rules.
     :param table options: optional. see :ref:`above <csv-options>`
@@ -147,6 +151,7 @@ The possible options which can be passed to csv functions are:
         '
         ...
 
+.. _csv-iterate:
 
 .. function:: iterate(input, {options})
 
@@ -160,8 +165,8 @@ The possible options which can be passed to csv functions are:
 
     **Example:**
 
-    func:`csv.iterate()` is the low level of func:`csv.load()` and :func:`csv.dump()`.
-    To illustrate that, here is a function which is the same as the :func:`csv.load()`
+    :ref:`csv.iterate() <csv-iterate>` is the low level of :ref:`csv.load() <csv-load>` and :ref:`csv.dump() <csv-dump>`.
+    To illustrate that, here is a function which is the same as the :ref:`csv.load() <csv-load>`
     function, as seen in `the Tarantool source code`_.
 
     .. code-block:: tarantoolsession

@@ -14,7 +14,7 @@ Call ``require('net.box')`` to get a ``net.box`` object, which will be called
 ``net_box`` for examples in this section. Call ``net_box.new()`` to connect and
 get a connection object, which will be called ``conn`` for examples in this section.
 Call the other ``net.box()`` routines, passing ``conn:``, to execute requests on
-the remote box. Call :func:`conn:close <socket_object.close>` to disconnect.
+the remote box. Call :ref:`conn:close <socket-close>` to disconnect.
 
 All ``net.box`` methods are fiber-safe, that is, it is safe to share and use the
 same connection object across multiple concurrent fibers. In fact, it's perhaps
