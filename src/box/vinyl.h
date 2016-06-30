@@ -152,7 +152,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *);
 void
 vinyl_index_ref(struct vinyl_index *index);
 
-void
+int
 vinyl_index_unref(struct vinyl_index *index);
 
 int

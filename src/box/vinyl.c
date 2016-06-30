@@ -10107,8 +10107,8 @@ sc_complete(struct scheduler *s, struct sctask *t)
 		unreachable();
 	}
 	if (db && db->index != NULL) {
-		vinyl_index_unref(db->index);
-		db->index = NULL;
+		if (!(vinyl_index_unref(db->index)))
+			db->index = NULL;
 	}
 	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
@@ -10911,20 +10911,20 @@ vinyl_index_ref(struct vinyl_index *index)
 	tt_pthread_mutex_unlock(&index->ref_lock);
 }
 
-void
+int
 vinyl_index_unref(struct vinyl_index *index)
 {
 	struct vinyl_env *e = index->env;
 	/* do nothing during env shutdown */
 	if (e->status == SR_SHUTDOWN)
-		return;
+		return -1;
 	/* reduce reference counter */
 	tt_pthread_mutex_lock(&index->ref_lock);
 	int ref = --index->refs;
 	tt_pthread_mutex_unlock(&index->ref_lock);
 	assert(ref >= 0);
 	if (ref > 0)
-		return;
+		return ref;
 	/* drop/shutdown pending:
 	 *
 	 * switch state and transfer job to
@@ -10939,13 +10939,14 @@ vinyl_index_unref(struct vinyl_index *index)
 		status = SR_DROP;
 		break;
 	default:
-		return;
+		return ref;
 	}
 	rlist_del(&index->link);
 
 	/* schedule index shutdown or drop */
 	sr_statusset(&index->status, status);
 	sc_ctl_shutdown(&e->scheduler, index);
+	return ref;
 }
 
 int
