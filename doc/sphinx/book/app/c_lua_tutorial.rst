@@ -275,7 +275,7 @@ The first field is numeric: 1. The second field is a random string. Once again
 the ``string_function()`` can be invoked from ``main_function()`` which can be
 invoked with  ``main_function()``.
 
-For more about Tarantool tuples see Tarantool manual section :mod:`Package box.tuple <box.tuple>`.
+For more about Tarantool tuples see Tarantool manual section :ref:`Package box.tuple <box_tuple>`.
 
 The screen now looks like this:
 
@@ -333,7 +333,7 @@ a SELECT request.
     box.space.tester:select{1}
 
 For more about Tarantool insert and replace calls, see Tarantool manual section
-:mod:`Package box.space <box.space>`.
+:ref:`Package box.space <box_space>`.
 
 The screen now looks like this:
 
@@ -473,7 +473,7 @@ procedures in some SQL DBMSs), and that it's straightforward to combine
 Lua-library functions and Tarantool-library functions.
 
 What has also been shown is that inserting a million tuples took 37 seconds. The
-host computer was a Linux laptop. By changing :confval:`wal_mode <wal_mode>` to 'none' before
+host computer was a Linux laptop. By changing :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` to 'none' before
 running the test, one can reduce the elapsed time to 4 seconds.
 
 .. _tutorial-sum-a-json-field:
@@ -513,7 +513,7 @@ undeclared variable is "global". That's not desirable for any of the variables
 that are declared in line 1, because all of them are for use only within the function.
 
 **LINE 5: WHY "PAIRS()".** Our job is to go through all the rows and there are two
-ways to do it: with :func:`box.space.space_object:pairs() <space_object.pairs>` or with
+ways to do it: with :ref:`box.space.space_object:pairs() <box_space-pairs>` or with
 ``variable = select(...)`` followed by :samp:`for i, {n}, 1 do {some-function}(variable[i]) end`.
 We preferred ``pairs()`` for this example.
 
@@ -528,7 +528,7 @@ JSON string - a missing colon, for example. By putting the function inside "``pc
 there's a problem just set ``is_valid_json = false`` and we will know what to do
 about it later.
 
-**LINE 6: MEANING.** The function is :func:`json.decode` which means decode a JSON
+**LINE 6: MEANING.** The function is :ref:`json.decode <json-decode>` which means decode a JSON
 string, and the parameter is t[2] which is a reference to a JSON string. There's
 a bit of hard coding here, we're assuming that the second field in the tuple is
 where the JSON string was inserted. For example, we're assuming a tuple looks like

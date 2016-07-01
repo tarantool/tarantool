@@ -1,5 +1,7 @@
-    :confval:`io_collect_interval`, |br|
-    :confval:`readahead`  |br|
+    :ref:`io_collect_interval <cfg_networking-io_collect_interval>`, |br|
+    :ref:`readahead <cfg_networking-readahead>`  |br|
+
+.. _cfg_networking-io_collect_interval:
 
 .. confval:: io_collect_interval
 
@@ -11,6 +13,8 @@
     Type: float |br|
     Default: null |br|
     Dynamic: **yes** |br|
+
+.. _cfg_networking-readahead:
 
 .. confval:: readahead
 

@@ -9,16 +9,18 @@
     snapshot file and contain information that is present in
     the snapshot file.
 
-    The :confval:`snapshot_period` and :confval:`snapshot_count`
+    The :ref:`snapshot_period <cfg_snapshot_daemon-snapshot_period>` and :ref:`snapshot_count <cfg_snapshot_daemon-snapshot_count>`
     configuration settings determine how long the intervals are,
     and how many snapshots should exist before removals occur.
+
+.. _cfg_snapshot_daemon-snapshot_period:
 
 .. confval:: snapshot_period
 
     The interval between actions by the snapshot daemon, in seconds.
     If ``snapshot_period`` is set to a value greater than zero,
     and there is activity which causes change to a database,
-    then the snapshot daemon will call :func:`box.snapshot` every
+    then the snapshot daemon will call :ref:`box.snapshot <admin-snapshot>` every
     ``snapshot_period`` seconds, creating a new snapshot file each time.
 
     For example: ``box.cfg{snapshot_period=3600}``
@@ -28,6 +30,8 @@
     Type: integer |br|
     Default: 0 |br|
     Dynamic: yes |br|
+
+.. _cfg_snapshot_daemon-snapshot_count:
 
 .. confval:: snapshot_count
 

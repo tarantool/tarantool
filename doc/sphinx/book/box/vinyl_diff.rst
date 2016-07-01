@@ -42,8 +42,8 @@
 
     With memtx, the :ref:`alter() <index_alter>` and :ref:`count() <index_count>`
     and :ref:`min() <index_min>` and :ref:`max() <index_max>` and
-    :ref:`random() <index_random>` and :ref:`auto_increment() <space_auto_increment>`
-    and :ref:`truncate() <space_truncate>` functions are supported. |br|
+    :ref:`random() <index_random>` and :ref:`auto_increment() <box_space-auto_increment>`
+    and :ref:`truncate() <box_space-truncate>` functions are supported. |br|
     With vinyl, they are not.
 
     With memtx, insert and replace and update will return a tuple, if successful. |br|

@@ -97,6 +97,8 @@ script:
 
 .. include:: __go.rst
 
+.. include:: __r.rst
+
 .. include:: __perl.rst
 
 .. include:: __php.rst

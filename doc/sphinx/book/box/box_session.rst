@@ -45,6 +45,8 @@ client connection.
 
     :rtype:  number
 
+.. _box_session-storage:
+
 .. data:: storage
 
     A Lua table that can hold arbitrary unordered session-specific

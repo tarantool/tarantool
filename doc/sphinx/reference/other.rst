@@ -2,6 +2,8 @@
                                Miscellaneous
 -------------------------------------------------------------------------------
 
+.. _other-tonumber64:
+
 .. function:: tonumber64(value)
 
     Convert a string or a Lua number to a 64-bit integer. The result can be

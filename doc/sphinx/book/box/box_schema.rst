@@ -9,7 +9,7 @@
 The ``box.schema`` package has data-definition functions
 for spaces, users, roles, and function tuples.
 
-.. _schema-space-create:
+.. _box_schema-space_create:
 
 .. function:: box.schema.space.create(space-name [, {options} ])
 
@@ -58,7 +58,7 @@ for spaces, users, roles, and function tuples.
     space objects, for example :samp:`box.schema.space.drop({space-id})`
     will drop a space. However, the common approach is to use functions
     attached to the space objects, for example
-    :func:`space_object:drop() <space_object.drop>`.
+    :ref:`space_object:drop() <box_space-drop>`.
 
     Note re storage engine: vinyl does not support temporary spaces.
 
@@ -83,11 +83,11 @@ for spaces, users, roles, and function tuples.
              > })
 
 For an illustration with the :code:`format` clause, see
-:data:`box.space._space <box.space._space>` example.
+:ref:`box.space._space <box_space-space>` example.
 
 After a space is created, usually the next step is to
-:func:`create an index <space_object.create_index>` for it, and then it is
-available for insert, select, and all the other :mod:`box.space` functions.
+:ref:`create an index <box_space-create_index>` for it, and then it is
+available for insert, select, and all the other :ref:`box.space <box_space>` functions.
 
 
 .. function:: box.schema.user.create(user-name [, {options} ])

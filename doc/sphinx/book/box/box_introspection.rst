@@ -2,6 +2,8 @@
    Server introspection
 -------------------------------------------------------------------------------
 
+.. _box_introspection-box_cfg:
+
 =====================================================================
                          Package `box.cfg`
 =====================================================================
@@ -37,12 +39,14 @@ The ``box.info`` package provides access to information about server variables.
 Some important ones:
 
 * **server.uuid** holds the unique identifier of the server. This value is also
-  in the :data:`box.space._cluster` system space.
+  in the :ref:`box.space._cluster <box_space-cluster>` system space.
 * **pid** is the process ID of the server. This value is also shown by the
   :ref:`tarantool <tarantool-build>` package.
 * **version** is the Tarantool version. This value is also shown by
   :ref:`tarantool --version <tarantool-version>`.
 * **uptime** is the number of seconds since the server started.
+
+.. _box_introspection-box_info:
 
 .. function:: box.info()
 
@@ -109,7 +113,7 @@ so bytes_used = 1024); there is 1 item stored in the 136-byte slab
 the bytes_used values (1024+136 = 1160); the arena_size value is the arena_used
 value plus the total of all the bytes_free values (1160+4193200+4194088 = 8388448).
 The arena_size and arena_used values are the amount of the % of
-:confval:`slab_alloc_arena` that is already distributed to the slab allocator.
+:ref:`slab_alloc_arena <cfg_storage-slab_alloc_arena>` that is already distributed to the slab allocator.
 
 **Example:**
 

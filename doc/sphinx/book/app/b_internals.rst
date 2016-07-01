@@ -15,8 +15,8 @@ Data persistence and the WAL file format
 
 To maintain data persistence, Tarantool writes each data change request (INSERT,
 UPDATE, DELETE, REPLACE) into a write-ahead log (WAL) file in the
-:confval:`wal_dir <wal_dir>` directory. A new WAL file is created for every
-:confval:`rows_per_wal <rows_per_wal>` records. Each data change request gets
+:ref:`wal_dir <cfg_basic-wal_dir>` directory. A new WAL file is created for every
+:ref:`rows_per_wal <cfg_binary_logging_snapshots-rows_per_wal>` records. Each data change request gets
 assigned a continuously growing 64-bit log sequence number. The name of the WAL
 file is based on the log sequence number of the first record in the file, plus
 an extension ``.xlog``.
@@ -94,10 +94,10 @@ particular, SELECT performance, even for SELECTs running on a connection packed
 with UPDATEs and DELETEs, remains unaffected by disk load.
 
 The WAL writer employs a number of durability modes, as defined in configuration
-variable :confval:`wal_mode <wal_mode>`. It is possible to turn the write-ahead
-log completely off, by setting :confval:`wal_mode <wal_mode>` to *none*. Even
+variable :ref:`wal_mode <wal_mode>`. It is possible to turn the write-ahead
+log completely off, by setting :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` to *none*. Even
 without the write-ahead log it's still possible to take a persistent copy of the
-entire data set with the :func:`box.snapshot() <box.snapshot()>` request.
+entire data set with the :ref:`box.snapshot() <admin-snapshot>` request.
 
 An .xlog file always contains changes based on the primary key.
 Even if the client requested an update or delete using
@@ -142,9 +142,10 @@ as the snapshot file.)
 
 Step 1
     Read the configuration parameters in the ``box.cfg{}`` request.
-    Parameters which affect recovery may include :confval:`work_dir`,
-    :confval:`wal_dir`, :confval:`snap_dir`, :confval:`vinyl_dir`,
-    :confval:`panic_on_snap_error`, and :confval:`panic_on_wal_error`.
+    Parameters which affect recovery may include :ref:`work_dir <cfg_basic-work_dir>`,
+    :ref:`wal_dir <cfg_basic-wal_dir>`, :ref:`snap_dir <cfg_basic-snap_dir>`, :ref:`vinyl_dir <cfg_basic-vinyl_dir>`,
+    :ref:`panic_on_snap_error <cfg_binary_logging_snapshots-panic_on_snap_error>`,
+    and :ref:`panic_on_wal_error <cfg_binary_logging_snapshots-panic_on_wal_error>`.
 
 Step 2
     Find the latest snapshot file. Use its data to reconstruct the in-memory
@@ -190,7 +191,7 @@ additional steps and precautions if :ref:`replication <box-replication>` is
 enabled.
 
 Once again the startup procedure is initiated by the ``box.cfg{}`` request.
-One of the box.cfg parameters may be :confval:`replication_source`. We will
+One of the box.cfg parameters may be :ref:`replication_source <cfg_replication-replication_source>`. We will
 refer to this server, which is starting up due to box.cfg, as the "local" server
 to distinguish it from the other servers in a cluster, which we will refer to as
 "distant" servers.

@@ -150,7 +150,7 @@ Then the screen might look like this:
     ... main C> entering the event loop
 
 If one wishes to start an interactive session on the same terminal after
-initialization is complete, one can use :func:`console.start()`.
+initialization is complete, one can use :ref:`console.start() <console-start>`.
 
 .. _local_hot_standby:
 .. _replication_port:
@@ -241,7 +241,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
 
 Local hot standby is a feature which provides a simple form of failover without
 replication. To initiate it, start a second instance of the Tarantool server on
-the same computer with the same :func:`box.cfg` configuration settings -
+the same computer with the same :ref:`box.cfg <box_introspection-box_cfg>` configuration settings -
 including the same directories and same non-null URIs. A warning should appear with a
 message like
 

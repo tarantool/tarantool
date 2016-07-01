@@ -547,9 +547,14 @@ local function enter()
 end
 
 local function connect()
-    local cmd = string.format("require('console').connect('%s')", arg[0])
-
-    console.on_start(function(self) self:eval(cmd) end)
+    console.on_start(function(self)
+        local status, reason
+        status, reason = pcall(function() require('console').connect(arg[0]) end)
+        if not status then
+            self:print(reason)
+            self.running = false
+        end
+    end)
     console.on_client_disconnect(function(self) self.running = false end)
     console.start()
     return 0

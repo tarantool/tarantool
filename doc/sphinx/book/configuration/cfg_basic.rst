@@ -1,8 +1,8 @@
 
 .. confval:: background
 
-    Run the server as a background task. The :ref:`logger <log-label>` and
-    :ref:`pid_file <box-cfg-pid-file>` parameters must be non-null for this to work.
+    Run the server as a background task. The :ref:`logger <cfg_logging-logger>` and
+    :ref:`pid_file <cfg_basic-pid_file>` parameters must be non-null for this to work.
 
     Type: boolean |br|
     Default: false |br|
@@ -15,6 +15,8 @@
     Type: boolean |br|
     Default: false |br|
     Dynamic: no |br|
+
+..  _cfg_basic-custom_proc_title:
 
 .. confval:: custom_proc_title
 
@@ -40,7 +42,7 @@
     Default: null |br|
     Dynamic: yes |br|
 
-.. _box-cfg-listen:
+.. _cfg_basic-listen:
 
 .. confval:: listen
 
@@ -59,18 +61,18 @@
     Default: null |br|
     Dynamic: yes |br|
 
-.. _box-cfg-pid-file:
+.. _cfg_basic-pid_file:
 
 .. confval:: pid_file
 
-    Store the process id in this file. Can be relative to :ref:`work_dir <box-cfg-work-dir>`.
+    Store the process id in this file. Can be relative to :ref:`work_dir <cfg_basic-work_dir>`.
     A typical value is “:file:`tarantool.pid`”.
 
     Type: string |br|
     Default: null |br|
     Dynamic: no |br|
 
-.. _box-cfg-read-only:
+.. _cfg_basic-read_only:
 
 .. confval:: read_only
 
@@ -81,22 +83,24 @@
     Default: false |br|
     Dynamic: yes |br|
 
-.. _box-cfg-snap-dir:
+.. _cfg_basic-snap_dir:
 
 .. confval:: snap_dir
 
     A directory where snapshot (.snap) files will be stored. Can be relative to
-    :ref:`work_dir <box-cfg-work-dir>`. If not specified, defaults to work_dir.
-    See also :ref:`wal_dir <box-cfg-wal-dir>`.
+    :ref:`work_dir <cfg_basic-work_dir>`. If not specified, defaults to work_dir.
+    See also :ref:`wal_dir <cfg_basic-wal_dir>`.
 
     Type: string |br|
     Default: "." |br|
     Dynamic: no |br|
 
+.. _cfg_basic-vinyl_dir:
+
 .. confval:: vinyl_dir
 
-    A directory where vinyl files or sub-directories will be stored. Can be relative to
-    :ref:`work_dir <box-cfg-work-dir>`. If not specified, defaults to work_dir.
+    A directory where sophia files or sub-directories will be stored. Can be relative to
+    :ref:`work_dir <cfg_basic-work_dir>`. If not specified, defaults to work_dir.
 
     Type: string |br|
     Default: "." |br|
@@ -110,13 +114,13 @@
     Default: null |br|
     Dynamic: no |br|
 
-.. _box-cfg-wal-dir:
+.. _cfg_basic-wal_dir:
 
 .. confval:: wal_dir
 
     A directory where write-ahead log (.xlog) files are stored. Can be
-    relative to :ref:`work_dir <box-cfg-work-dir>`. Sometimes wal_dir
-    and :ref:`snap_dir <box-cfg-snap-dir>` are specified with different values, so that
+    relative to :ref:`work_dir <cfg_basic-work_dir>`. Sometimes wal_dir
+    and :ref:`snap_dir <cfg_basic-snap_dir>` are specified with different values, so that
     write-ahead log files and snapshot files can be stored on different disks. If not
     specified, defaults to work_dir.
 
@@ -124,7 +128,7 @@
     Default: "." |br|
     Dynamic: no |br|
 
-.. _box-cfg-work-dir:
+.. _cfg_basic-work_dir:
 
 .. confval:: work_dir
 

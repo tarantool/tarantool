@@ -5,9 +5,11 @@
 To learn which functions are considered to be administrative, type ``help()``.
 A reference description also follows below:
 
+.. _admin-snapshot:
+
 .. function:: box.snapshot()
 
-    Take a snapshot of all data and store it in :confval:`snap_dir`:samp:`/{<latest-lsn>}.snap`.
+    Take a snapshot of all data and store it in :ref:`snap_dir <cfg_basic-snap_dir>`:samp:`/{<latest-lsn>}.snap`.
     To take a snapshot, Tarantool first enters the delayed garbage collection
     mode for all data. In this mode, tuples which were allocated before the
     snapshot has started are not freed until the snapshot has finished. To
@@ -24,7 +26,7 @@ A reference description also follows below:
     saved in a matter of minutes. Note: as long as there are any changes to
     the parent index memory through concurrent updates, there are going to be
     page splits, and therefore one needs to have some extra free memory to run
-    this command. 10% of :confval:`slab_alloc_arena` is, on average, sufficient.
+    this command. 10% of :ref:`slab_alloc_arena <cfg_storage-slab_alloc_arena>` is, on average, sufficient.
     This statement waits until a snapshot is taken and returns operation result.
 
     Change Notice: prior to Tarantool version 1.6.6, the snapshot process caused

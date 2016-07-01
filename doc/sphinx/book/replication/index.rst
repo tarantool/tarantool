@@ -36,7 +36,7 @@ not cause replication to go out of sync.
 =====================================================================
 
 To prepare the master for connections from the replica, it's only necessary
-to include ":ref:`listen <box-cfg-listen>`" in the initial ``box.cfg`` request, for example
+to include ":ref:`listen <cfg_basic-listen>`" in the initial ``box.cfg`` request, for example
 ``box.cfg{listen=3301}``. A master with enabled "listen" URI can accept
 connections from as many replicas as necessary on that URI. Each replica
 has its own replication state.
@@ -52,7 +52,7 @@ server is a master and starts its own new cluster with a new unique UUID.
 If this first ``box.cfg`` request occurs with a "replication source" clause,
 then the server is a replica and its snapshot file, along with the cluster
 information, is constructed from the write-ahead logs of the master.
-Therefore, to start replication, specify :confval:`replication_source`
+Therefore, to start replication, specify :ref:`replication_source <cfg_replication-replication_source>`
 in a ``box.cfg`` request. When a replica contacts a master for the first time,
 it becomes part of a cluster. On subsequent occasions, it should always contact
 a master in the same cluster.
@@ -67,7 +67,7 @@ Again, this procedure works only if the master's WAL files are present.
 
 NOTE:
 Replication parameters are "dynamic", which allows the replica to become
-a master and vice versa with the help of the :func:`box.cfg` statement.
+a master and vice versa with the help of the :ref:`box.cfg <box_introspection-box_cfg>` statement.
 
 NOTE:
 The replica does not inherit the master's configuration parameters, such
@@ -114,7 +114,7 @@ Step 1. Start the first server thus:
 ... Now a new cluster exists.
 
 Step 2. Check where the second server's files will go by looking at its
-directories (:confval:`snap_dir` for snapshot files, :confval:`wal_dir` for .xlog files).
+directories (:ref:`snap_dir <cfg_basic-snap_dir>` for snapshot files, :ref:`wal_dir <cfg_basic-wal_dir>` for .xlog files).
 They must be empty - when the second server joins for the first time, it
 has to be working with a clean slate so that the initial copy of the first
 server's databases can happen without conflicts.
@@ -140,19 +140,19 @@ computer and the replica on a different computer is very common and provides
 two benefits: FAILOVER (because if the master goes down then the replica can
 take over), or LOAD BALANCING (because clients can connect to either the master
 or the replica for select requests). Sometimes the replica may be configured with
-the additional parameter :ref:`read_only = true <box-cfg-read-only>`.
+the additional parameter :ref:`read_only = true <cfg_basic-read_only>`.
 
 =====================================================================
                     Monitoring a Replica's Actions
 =====================================================================
 
-In :func:`box.info` there is a :code:`box.info.replication.status` field:
+In :ref:`box.info <box_introspection-box_info>` there is a :code:`box.info.replication.status` field:
 "off", "stopped", "connecting", "auth", "follow", or "disconnected". |br|
 If a replica's status is "follow", then there will be two more fields: |br|
 :code:`box.info.replication.idle` = the number of seconds the replica has been idle, |br|
 :code:`box.info.replication.lag` = the number of seconds the replica is behind the master.
 
-In the :mod:`log` there is a record of replication activity.
+In the :ref:`log <log>` there is a record of replication activity.
 If a primary server is started with:
 
 .. cssclass:: highlight
@@ -212,7 +212,7 @@ Starting with the simple configuration, the first server has to say:
     box.cfg{ replication_source = *uri#2* }
 
 This request can be performed at any time --
-:ref:`replication_source <box-cfg-replication-source>` is a dynamic parameter.
+:ref:`replication_source <cfg_replication-replication_source>` is a dynamic parameter.
 
 In this configuration, both servers are "masters" and both servers are
 "replicas". Henceforth every change that happens on either server will
@@ -231,7 +231,7 @@ servers will end up with different contents.
 =====================================================================
 
 Q: What if there are more than two servers with master-master? |br|
-A: On each server, specify the :confval:`replication_source` for all the
+A: On each server, specify the :ref:`replication_source <cfg_replication-replication_source>` for all the
 others. For example, server #3 would have a request: |br|
 :codenormal:`box.cfg{` |br|
 |nbsp| |nbsp| |nbsp| :codenormal:`replication_source = {`:codeitalic:`uri#1, uri#2`:codenormal:`}` |br|
@@ -264,7 +264,7 @@ saying ``box.cfg{replication_source=''}``.
 Q: What if it's necessary to know what cluster a server is in? |br|
 A: The identification of the cluster is a UUID which is generated when the
 first master starts for the first time. This UUID is stored in a tuple
-of the :data:`box.space._schema` system space. So to see it, say:
+of the :ref:`box.space._schema <box_space-schema>` system space. So to see it, say:
 ``box.space._schema:select{'cluster'}``
 
 Q: What if it's necessary to know what other servers belong in the cluster? |br|
@@ -285,7 +285,7 @@ Q: What if replication causes security concerns? |br|
 A: Prevent unauthorized replication sources by associating a password with
 every user that has access privileges for the relevant spaces, and every
 user that has a replication :ref:`role <rep-role>`. That way,
-the :ref:`URI` for the :confval:`replication_source` parameter will
+the :ref:`URI` for the ref:`replication_source <cfg_replication-replication_source>` parameter will
 always have to have the long form |br|
 ``replication_source='username:password@host:port'``
 

@@ -1,3 +1,5 @@
+.. _cfg_logging-log_level:
+
 .. confval:: log_level
 
     How verbose the logging is. There are six log verbosity classes:
@@ -11,14 +13,14 @@
 
     By setting log_level, one can enable logging of all classes below
     or equal to the given level. Tarantool prints its logs to the standard
-    error stream by default, but this can be changed with the :ref:`logger <log-label>`
+    error stream by default, but this can be changed with the :ref:`logger <cfg_logging-logger>`
     configuration parameter.
 
     Type: integer |br|
     Default: 5 |br|
     Dynamic: **yes** |br|
 
-.. _log-label:
+.. _cfg_logging-logger:
 
 .. confval:: logger
 
@@ -77,18 +79,20 @@
     The ``facility`` setting is currently ignored but will be used in the future.
 
     When logging to a file, tarantool reopens the log on SIGHUP. When log is
-    a program, its pid is saved in the :func:`log.logger_pid` variable. You need
+    a program, its pid is saved in the :ref:`log.logger_pid <log-logger_pid>` variable. You need
     to send it a signal to rotate logs.
 
     Type: string |br|
     Default: null |br|
     Dynamic: no |br|
 
+.. _cfg_logging-logger_nonblock:
+
 .. confval:: logger_nonblock
 
     If ``logger_nonblock`` equals true, Tarantool does not block on the log
     file descriptor when it’s not ready for write, and drops the message
-    instead. If :confval:`log_level` is high, and a lot of messages go to the
+    instead. If :ref:`log_level <cfg_logging-log_level>` is high, and a lot of messages go to the
     log file, setting ``logger_nonblock`` to true may improve logging
     performance at the cost of some log messages getting lost.
 
@@ -96,10 +100,12 @@
     Default: true |br|
     Dynamic: no |br|
 
+.. _cfg_logging-too_long_threshold:
+
 .. confval:: too_long_threshold
 
     If processing a request takes longer than the given value (in seconds),
-    warn about it in the log. Has effect only if :confval:`log_level` is
+    warn about it in the log. Has effect only if :ref:`log_level <cfg_logging-log_level>` is
     more than or equal to 4 (WARNING).
 
     Type: float |br|

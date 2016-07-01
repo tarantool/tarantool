@@ -10,6 +10,8 @@ The json package provides JSON manipulation routines. It is based on the
 
 .. module:: json
 
+.. _json-encode:
+
 .. function:: encode(lua-value)
 
     Convert a Lua object to a JSON string.
@@ -46,6 +48,8 @@ The json package provides JSON manipulation routines. It is based on the
         - '{"hello":["world"]}'
         ...
 
+.. _json-decode:
+
 .. function:: decode(string)
 
     Convert a JSON string to a Lua object.
@@ -73,6 +77,8 @@ The json package provides JSON manipulation routines. It is based on the
         ---
         - world
         ...
+
+.. _json-null:
 
 .. data:: NULL
 
