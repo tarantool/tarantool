@@ -2,6 +2,8 @@
 -- Test for unique indices
 
 -- Tests for TREE index type
+env = require('test_run')
+test_run = env.new()
 
 s0 = box.schema.space.create('my_space1')
 i0 = s0:create_index('my_space1_idx1', {type='TREE', parts={1, 'NUMBER'}, unique=true})
@@ -180,6 +182,22 @@ s5 = box.schema.space.create('my_space6')
 i5_1 = s5:create_index('my_space6_idx1', {type='TREE', parts={1, 'NUM'}, unique=true})
 i5_2 = s5:create_index('my_space6_idx2', {type='TREE', parts={2, 'SCALAR'}, unique=false})
 
+test_run:cmd("setopt delimiter ';'");
+function less(a, b)
+    if type(a[2]) ~= type(b[2]) then
+        return type(a[2]) < type(b[2])
+    end
+    if type(a[2]) == 'boolean' then
+        return a[2] == false and b[2] == true
+    end
+    if a[2] == b[2] then
+        return a[1] < b[1]
+    end
+    return a[2] < b[2]
+end;
+test_run:cmd("setopt delimiter ''");
+function sort(t) table.sort(t, less) return t end
+
 s5:insert({1, "123"})
 s5:insert({2, "123"})
 s5:insert({3, "123"})
@@ -193,14 +211,14 @@ s5:insert({10, -39.5})
 s5:insert({11, -38.5})
 s5:insert({12, 100.5})
 s5:select{}
-i5_2:select({123})
-i5_2:select({"123"})
-i5_2:select({true})
-i5_2:select({false})
-i5_2:select({true})
-i5_2:select({-38.5})
+sort(i5_2:select({123}))
+sort(i5_2:select({"123"}))
+sort(i5_2:select({true}))
+sort(i5_2:select({false}))
+sort(i5_2:select({true}))
+sort(i5_2:select({-38.5}))
 
-i5_2:select({-40}, {iterator = 'GE'})
+sort(i5_2:select({-40}, {iterator = 'GE'}))
 
 s5:drop()
 
