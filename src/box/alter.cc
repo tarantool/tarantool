@@ -79,6 +79,12 @@
 /** _func columns */
 #define FUNC_LANGUAGE    4
 
+/**
+ * chap-sha1 of empty string, i.e.
+ * base64_encode(sha1(sha1(""))
+ */
+#define CHAP_SHA1_EMPTY_PASSWORD "vhvewKp0tNyweZQ+cFKAlsyphfg="
+
 /* {{{ Auxiliary functions and methods. */
 
 void
@@ -1509,6 +1515,12 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 			tnt_raise(ClientError, ER_CREATE_USER,
 				  user->name, "invalid user password");
 		}
+                if (user->uid == GUEST) {
+                    /** Guest user is permitted to have empty password */
+                    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
+                        tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
+                }
+
 		base64_decode(hash2_base64, len, user->hash2,
 			      sizeof(user->hash2));
 		break;
@@ -1549,8 +1561,6 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 				tnt_raise(ClientError, ER_CREATE_ROLE,
 					  user->name, "authentication "
 					  "data can not be set for a role");
-			if (user->uid == GUEST)
-				tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
 		}
 		user_def_fill_auth_data(user, auth_data);
 	}

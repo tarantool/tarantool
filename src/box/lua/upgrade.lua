@@ -469,6 +469,21 @@ local function upgrade_to_1_6_8()
     box.space._schema:replace({'version', 1, 6, 8})
 end
 
+local function upgrade_users_to_1_7_0()
+    box.schema.user.passwd('guest', '')
+end
+
+local function upgrade_to_1_7_0()
+    if VERSION_ID >= version_id(1, 7, 0) then
+        return
+    end
+
+    upgrade_users_to_1_7_0()
+
+    log.info("set schema version to 1.7.0")
+    box.space._schema:replace({'version', 1, 7, 0})
+end
+
 --------------------------------------------------------------------------------
 
 local function upgrade()
@@ -483,6 +498,7 @@ local function upgrade()
     VERSION_ID = version_id(major, minor, patch)
 
     upgrade_to_1_6_8()
+    upgrade_to_1_7_0()
 end
 
 local function bootstrap()

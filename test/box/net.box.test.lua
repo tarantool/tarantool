@@ -287,9 +287,13 @@ cnc:console('return 1, 2, 3, "string", nil')
 cnc:console('error("test")')
 cnc:console('a = {1, 2, 3, 4}; return a[3]')
 
--- #545 user or password is not defined
-remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
-remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+-- #1545 empty password
+cn = remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+cn ~= nil
+cn:close()
+cn = remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+cn ~= nil
+cn:close()
 
 -- #544 usage for remote[point]method
 cn = remote:new(LISTEN.host, LISTEN.service)
@@ -313,7 +317,9 @@ cn:ping()
 cn:close()
 
 uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
-remote.new(uri)
+cn = remote.new(uri)
+cn ~= nil
+cn:close()
 cn = remote.new(uri, { password = 'test' })
 cn:ping()
 cn:close()

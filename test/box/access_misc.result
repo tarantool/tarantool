@@ -573,7 +573,7 @@ s:drop()
 ...
 box.space._user:select()
 ---
-- - [0, 1, 'guest', 'user']
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
   - [1, 1, 'admin', 'user']
   - [2, 1, 'public', 'role']
   - [3, 1, 'replication', 'role']

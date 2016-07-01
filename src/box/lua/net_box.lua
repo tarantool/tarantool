@@ -335,8 +335,7 @@ local remote_methods = {
         end
 
         if self.opts.user ~= nil and self.opts.password == nil then
-            box.error(box.error.PROC_LUA,
-                "net.box: password is not defined")
+            self.opts.password = ""
         end
         if self.opts.user == nil and self.opts.password ~= nil then
             box.error(box.error.PROC_LUA,
