@@ -2665,99 +2665,57 @@ sv_mergeiter_dupreset(struct svmergeiter *i, struct svmergesrc *pos)
 }
 
 static inline void
-sv_mergeiter_gt(struct svmergeiter *i)
+sv_mergeiter_next(struct svmergeiter *im)
 {
-	if (i->v) {
-		i->v->dup = 0;
-		ss_iteratornext(i->v->i);
+	int direction = 0;
+	switch (im->order) {
+	case VINYL_GT:
+	case VINYL_GE:
+		direction = 1;
+		break;
+	case VINYL_LT:
+	case VINYL_LE:
+		direction = -1;
+		break;
+	default: unreachable();
 	}
-	i->v = NULL;
-	struct svmergesrc *min = NULL;
-	struct sv *minv = NULL;
-	for (struct svmergesrc *src = i->src; src < i->end; src++)
-	{
-		struct sv *v = ss_iteratorof(src->i);
-		if (v == NULL)
-			continue;
-		if (min == NULL) {
-			minv = v;
-			min = src;
-			continue;
-		}
-		int rc;
-		rc = sf_compare(i->merge->key_def, sv_pointer(minv),
-				sv_pointer(v));
-		if (rc == 0) {
-			/*
-			assert(sv_lsn(v) < sv_lsn(minv));
-			*/
-			src->dup = 1;
-		} else if (rc > 0) {
-			sv_mergeiter_dupreset(i, src);
-			minv = v;
-			min = src;
-		}
-	}
-	if (unlikely(min == NULL))
-		return;
-	i->v = min;
-}
 
-static inline void
-sv_mergeiter_lt(struct svmergeiter *i)
-{
-	if (i->v) {
-		i->v->dup = 0;
-		ss_iteratornext(i->v->i);
+	if (im->v) {
+		im->v->dup = 0;
+		ss_iteratornext(im->v->i);
 	}
-	i->v = NULL;
-	struct svmergesrc *max = NULL;
-	struct sv *maxv = NULL;
-	for (struct svmergesrc *src = i->src; src < i->end; src++)
+	im->v = NULL;
+	struct svmergesrc *found_src = NULL;
+	struct sv *found_val = NULL;
+	for (struct svmergesrc *src = im->src; src < im->end; src++)
 	{
 		struct sv *v = ss_iteratorof(src->i);
 		if (v == NULL)
 			continue;
-		if (max == NULL) {
-			maxv = v;
-			max = src;
+		if (found_src == NULL) {
+			found_val = v;
+			found_src = src;
 			continue;
 		}
 		int rc;
-		rc = sf_compare(i->merge->key_def,
-				sv_pointer(maxv), sv_pointer(v));
+		rc = sf_compare(im->merge->key_def,
+				sv_pointer(found_val), sv_pointer(v));
 		if (rc == 0) {
 			/*
 			assert(sv_lsn(v) < sv_lsn(maxv));
 			*/
 			src->dup = 1;
 			break;
-		} else if (rc < 0) {
-			sv_mergeiter_dupreset(i, src);
-			maxv = v;
-			max = src;
+		} else if (direction * rc > 0) {
+			sv_mergeiter_dupreset(im, src);
+			found_val = v;
+			found_src = src;
 			break;
 		}
 	}
-	if (unlikely(max == NULL))
+	if (unlikely(found_src == NULL))
 		return;
-	i->v = max;
-}
-
-static inline void
-sv_mergeiter_next(struct svmergeiter *im)
-{
-	switch (im->order) {
-	case VINYL_GT:
-	case VINYL_GE:
-		sv_mergeiter_gt(im);
-		break;
-	case VINYL_LT:
-	case VINYL_LE:
-		sv_mergeiter_lt(im);
-		break;
-	default: unreachable();
-	}
+	im->v = found_src;
 }
 
 static inline int
