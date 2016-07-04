@@ -12,7 +12,7 @@
 
 The ``box.cfg`` package is for administrators to specify all the server
 configuration parameters; the full description of the parameters is in
-section :ref:`book-cfg`. Use ``box.cfg`` without braces to get read-only
+section :ref:`book-cfg <index-book_cfg>`. Use ``box.cfg`` without braces to get read-only
 access to those parameters.
 
 **Example:**
@@ -43,7 +43,7 @@ Some important ones:
 * **pid** is the process ID of the server. This value is also shown by the
   :ref:`tarantool <tarantool-build>` package.
 * **version** is the Tarantool version. This value is also shown by
-  :ref:`tarantool --version <tarantool-version>`.
+  :ref:`tarantool --version <index-tarantool_version>`.
 * **uptime** is the number of seconds since the server started.
 
 .. _box_introspection-box_info:
@@ -153,7 +153,7 @@ The arena_size and arena_used values are the amount of the % of
       slab_size: 16384
     ...
 
-.. _box_stat:
+.. _box_introspection-box_stat:
 
 =====================================================================
                          Package `box.stat`

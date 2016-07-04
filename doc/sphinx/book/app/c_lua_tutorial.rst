@@ -3,11 +3,11 @@
 -------------------------------------------------------------------------------
 
 There are three tutorials:
-:ref:`Insert one million tuples with a Lua stored procedure <tutorial-insert-one-million-tuples>`,
-:ref:`Sum a JSON field for all tuples <tutorial-sum-a-json-field>`,
-:ref:`Indexed pattern search <tutorial-indexed-pattern-search>`.
+:ref:`Insert one million tuples with a Lua stored procedure <c_lua_tutorial-insert_one_million_tuples>`,
+:ref:`Sum a JSON field for all tuples <c_lua_tutorial-sum_a_json_field>`,
+:ref:`Indexed pattern search <c_lua_tutorial-indexed_pattern_search>`.
 
-.. _tutorial-insert-one-million-tuples:
+.. _c_lua_tutorial-insert_one_million_tuples:
 
 =====================================================================
        Insert one million tuples with a Lua stored procedure
@@ -32,7 +32,7 @@ learning, type the statements in with the tarantool client while reading along.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We are going to use the "tarantool_sandbox" that was created in section
-:ref:`first database`. So there is a single space, and a numeric primary key,
+:ref:`first database <user_guide_getting_started-first_database>`. So there is a single space, and a numeric primary key,
 and a running tarantool server which also serves as a client.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -44,7 +44,7 @@ enclosed within "delimiters". They are no longer necessary, and
 so they will not be used in this tutorial. However, they are still
 supported. Users who wish to use delimiters, or users of
 older versions of Tarantool, should check the syntax description for
-:ref:`declaring a delimiter <setting delimiter>` before proceeding.
+:ref:`declaring a delimiter <administration-setting_delimiter>` before proceeding.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            Create a function that returns a string
@@ -476,7 +476,7 @@ What has also been shown is that inserting a million tuples took 37 seconds. The
 host computer was a Linux laptop. By changing :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` to 'none' before
 running the test, one can reduce the elapsed time to 4 seconds.
 
-.. _tutorial-sum-a-json-field:
+.. _c_lua_tutorial-sum_a_json_field:
 
 =====================================================================
                   Sum a JSON field for all tuples
@@ -565,7 +565,7 @@ the database is in perfect shape can skip this kind of thing.
 
 And the function is complete. Time to test it. Starting with an empty database,
 defined the same way as the sandbox database that was introduced in
-:ref:`first database`,
+:ref:`first database <user_guide_getting_started-first_database>`,
 
 .. code-block:: lua
 
@@ -603,7 +603,7 @@ that the "hard coding" assumptions could be removed, that there might have to be
 an overflow check if some field values are huge, and that the function should
 contain a "yield" instruction if the count of tuples is huge.
 
-.. _tutorial-indexed-pattern-search:
+.. _c_lua_tutorial-indexed_pattern_search:
 
 =====================================================================
        Indexed Pattern Search
@@ -619,7 +619,7 @@ which allows "magic characters" in regular expressions. |br|
 first magic character, will be used as an index search key.
 For each tuple that is found via the index, there will be
 a match of the whole pattern. |br|
-* To be :ref:`cooperative <cooperative_multitasking>`, the function should yield after every
+* To be :ref:`cooperative <atomic-cooperative_multitasking>`, the function should yield after every
 10 tuples, unless there is a reason to delay yielding. |br|
 With this function, we can take advantage of Tarantool's indexes
 for speed, and take advantage of Lua's pattern matching for flexibility.
@@ -764,7 +764,7 @@ them in the result set if they match the pattern.
 
 NOTE #4 "INNER LOOP: ITERATOR" |br|
 The for loop here is using pairs(), see the
-:ref:`explanation of what index iterators are <index-pairs>`. 
+:ref:`explanation of what index iterators are <box_index-index_pairs>`. 
 Within the inner loop,
 there will be a local variable named "tuple" which contains
 the latest tuple found via the index search key.

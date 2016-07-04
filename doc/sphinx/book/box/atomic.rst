@@ -1,4 +1,4 @@
-.. _atomic_execution:
+.. _atomic-atomic_execution:
 
 -------------------------------------------------------------------------------
                             Atomic execution
@@ -9,7 +9,7 @@ fibers on a single thread. That is why there can be a guarantee of execution
 atomicity. That requires emphasis.
 
 
-.. _cooperative_multitasking:
+.. _atomic-cooperative_multitasking:
 
 ===========================================================
             Cooperative multitasking environment
@@ -40,7 +40,7 @@ some of the box calls, including the data-change requests
 :ref:`box.space...update <box_space-update>` or
 :ref:`box.space...delete <box_space-delete>`, will usually cause yielding;
 however, :ref:`box.space...select <box_space-select>` will not.
-A fuller description will appear in section :ref:`The Implicit Yield Rules <the-implicit-yield-rules>`.
+A fuller description will appear in section :ref:`The Implicit Yield Rules <atomic-the_implicit_yield_rules>`.
 
 Note re storage engine: vinyl has different rules: insert or update or delete
 will very rarely cause a yield, but select can cause a yield.
@@ -59,7 +59,7 @@ account #2. If something interrupted after the withdrawal, then the institution
 would be out of balance. For such cases, the ``begin ... commit|rollback``
 block was designed.
 
-.. _box-begin:
+.. _atomic-box_begin:
 
 .. function:: box.begin()
 
@@ -68,14 +68,14 @@ block was designed.
     In effect the fiber which executes ``box.begin()`` is starting an "active
     multi-request transaction", blocking all other fibers.
 
-.. _box-commit:
+.. _atomic-box_commit:
 
 .. function:: box.commit()
 
     End the transaction, and make all its data-change
     operations permanent.
 
-.. _box-rollback:
+.. _atomic-box_rollback:
 
 .. function:: box.rollback()
 
@@ -117,7 +117,7 @@ tuple#1, deposit in tuple#2, and end the transaction, making its effects permane
     - "ok"
     ...
 
-.. _the-implicit-yield-rules:
+.. _atomic-the_implicit_yield_rules:
 
 ===========================================================
             The Implicit Yield Rules
@@ -133,17 +133,17 @@ The implicit yield requests are:
 and
 functions in package
 :ref:`fio <fio-section>`,
-:ref:`net_box <package_net_box>`,
-:ref:`console <package-console>`, or
-:ref:`socket <package-socket>` (the "os" and "network" requests).
+:ref:`net_box <net_box-package>`,
+:ref:`console <console-package>`, or
+:ref:`socket <socket-package>` (the "os" and "network" requests).
 Note re storage engine: with Vinyl :ref:`select <box_space-select>` is
 an implicit yield request, but data-change requests may not be.
 
 The yield occurs just before a blocking syscall, such as a write to the Write-Ahead Log (WAL)
 or a network message reception.
 
-Implicit yield requests are disabled by :ref:`begin <box-begin>`,
-and enabled again by :ref:`commit <box-commit>`.
+Implicit yield requests are disabled by :ref:`box.begin <atomic-box_begin>`,
+and enabled again by :ref:`commit <atomic-box_commit>`.
 Therefore the sequence` |br|
 :codenormal:`begin` |br|
 :codenormal:`implicit yield request #1` |br|
@@ -158,8 +158,8 @@ it only enables yields caused by earlier implicit yield requests.
 Despite their resemblance to implicit yield requests,
 :ref:`truncate <box_space-truncate>` and :ref:`drop <box_space-drop>` do not cause implicit yield.
 Despite their resemblance to functions of the fio package,
-functions of the :ref:`os <package-os>` package do not cause implicit yield.
-Despite its resemblance to commit, :ref:`rollback <box-rollback>` does not
+functions of the :ref:`os <os-package>` package do not cause implicit yield.
+Despite its resemblance to commit, :ref:`rollback <atomic-box_rollback>` does not
 enable yields.
 
 If :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` = 'none', then implicit yielding is disabled,
@@ -178,7 +178,7 @@ being executed on the server, but causes yielding if it
 is done as a series of transmissions from a client, including
 a client which operates via telnet, via one of the connectors,
 or via the MySQL and PostgreSQL rocks,
-or via the interactive mode when :ref:`"Using tarantool as a client" <using-tarantool-as-a-client>`.
+or via the interactive mode when :ref:`"Using tarantool as a client" <administration-using_tarantool_as_a_client>`.
 
 After a fiber has yielded and then has regained control,
 it immediately issues :ref:`testcancel <fiber-testcancel>`.

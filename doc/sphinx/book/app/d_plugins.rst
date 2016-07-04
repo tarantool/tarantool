@@ -1,4 +1,4 @@
-.. _dbms-plugins:
+.. _d_plugins-dbms_plugins:
 
 -------------------------------------------------------------------------------
                         Appendix D. Modules
@@ -34,7 +34,7 @@ also is useful for any operations, such as database copying and accelerating,
 which work best when the application can work on both SQL and Tarantool inside
 the same Lua routine.
 The methods for connect/select/insert/etc. are similar to the ones in the
-:ref:`net.box <package_net_box>` package.
+:ref:`net.box <net_box-package>` package.
 
 From a user's point of view the MySQL and PostgreSQL rocks are
 very similar, so the following sections -- "MySQL Example" and
@@ -62,7 +62,7 @@ statement to the server and receive results, including multiple result sets.
          Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check the instructions for :ref:`Downloading and installing a binary package <downloading-and-installing-a-binary-package>`
+Check the instructions for :ref:`Downloading and installing a binary package <user_guide_getting_started-downloading_and_installing_a_binary_package>`
 that apply for the environment where tarantool was installed. In addition to
 installing :code:`tarantool`, install :code:`tarantool-dev`. For example, on
 Ubuntu, add the line
@@ -94,7 +94,7 @@ For example:
 
     luarocks install mysql MYSQL_LIBDIR=/usr/local/mysql/lib
 
-See also :ref:`Modules, LuaRocks, and requiring packages <modules-luarocks-and-requiring-packages>`.
+See also :ref:`Modules, LuaRocks, and requiring packages <administration-modules_luarocks_and_requiring_packages>`.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
        With GitHub
@@ -418,7 +418,7 @@ any PostgreSQL statement to the server and receive results.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Check the instructions for
-:ref:`Downloading and installing a binary package <downloading-and-installing-a-binary-package>`
+:ref:`Downloading and installing a binary package <user_guide_getting_started-downloading_and_installing_a_binary_package>`
 that apply for the environment where tarantool was installed. In addition to
 installing :code:`tarantool`, install :code:`tarantool-dev`. For example, on
 Ubuntu, add the line:
@@ -450,7 +450,7 @@ For example:
 
     luarocks install pg POSTGRESQL_LIBDIR=/usr/local/postgresql/lib
 
-See also :ref:`Modules, LuaRocks, and requiring packages <modules-luarocks-and-requiring-packages>`.
+See also :ref:`Modules, LuaRocks, and requiring packages <administration-modules_luarocks_and_requiring_packages>`.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
        With GitHub

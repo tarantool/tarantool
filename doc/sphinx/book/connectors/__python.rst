@@ -18,7 +18,7 @@ To prepare, paste the code into a file named example.py and install
 tarantool-python with either :code:`pip install tarantool\>0.4` to install
 in :code:`/usr` (requires **root** privilege) or :code:`pip install tarantool\>0.4 --user`
 to install in :code:`~` i.e. user's default directory. Before trying to run,
-check that the server is listening and that examples exists, as :ref:`described earlier <connector-setting>`.
+check that the server is listening and that examples exists, as :ref:`described earlier <index-connector_setting>`.
 To run the program, say :code:`python example.py`. The program will connect
 to the server, will send the request, and will not throw an exception if
 all went well. If the tuple already exists, the program will throw

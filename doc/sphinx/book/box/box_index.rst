@@ -20,7 +20,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`.
 
         :rtype: boolean
 
@@ -30,7 +30,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`.
 
     .. data:: parts
 
@@ -38,7 +38,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`.
 
         :rtype: table
 
@@ -58,7 +58,7 @@ API is a direct binding to corresponding methods of index objects of type
               type: TREE
             ...
 
-.. _index-pairs:
+.. _box_index-index_pairs:
 
     .. method:: pairs(bitset-value | search-value, iterator-type)
 
@@ -77,18 +77,18 @@ API is a direct binding to corresponding methods of index objects of type
         iterator in Tarantool does not own a consistent read view. Instead, each
         procedure is granted exclusive access to all tuples and spaces until
         there is a "context switch": which may happen due to
-        :ref:`the-implicit-yield-rules <the-implicit-yield-rules>`,
+        :ref:`the-implicit-yield-rules <atomic-the_implicit_yield_rules>`,
         or by an
         explicit call to :ref:`fiber.yield <fiber-yield>`. When the execution flow returns
         to the yielded procedure, the data set could have changed significantly.
         Iteration, resumed after a yield point, does not preserve the read view,
         but continues with the new content of the database.
-        The tutorial :ref:`Indexed pattern search <tutorial-indexed-pattern-search>`
+        The tutorial :ref:`Indexed pattern search <c_lua_tutorial-indexed_pattern_search>`
         shows one way that iterators and yields can be used together.
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`{bitset-value} | {search-value...}` = what to search for
         * :samp:`{iterator-type}` = as defined in tables below.
 
@@ -384,7 +384,7 @@ API is a direct binding to corresponding methods of index objects of type
               print(tuple)
             end
 
-    .. _index_object_select:
+    .. _box_index-select:
 
     .. method:: select(key, options)
 
@@ -396,7 +396,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`field-value(s)` = values to be matched against the index key;
         * :samp:`option(s)` any or all of
             * :samp:`iterator = {iterator-type}`,
@@ -522,7 +522,7 @@ API is a direct binding to corresponding methods of index objects of type
             - - ['Tuple with bit value = 01', 1]
             ...
 
-    .. _index_min:
+    .. _box_index-min:
 
     .. method:: min([key-value])
 
@@ -530,7 +530,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`key-value`.
 
         :return: the tuple for the first key in the index. If optional
@@ -553,7 +553,7 @@ API is a direct binding to corresponding methods of index objects of type
             - ['Alpha!', 55, 'This is the first tuple!']
             ...
 
-    .. _index_max:
+    .. _box_index-max:
 
     .. method:: max([key-value])
 
@@ -561,7 +561,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`key-value`.
 
         :return: the tuple for the last key in the index. If optional ``key-value``
@@ -584,7 +584,7 @@ API is a direct binding to corresponding methods of index objects of type
             - ['Gamma!', 55, 'This is the third tuple!']
             ...
 
-    .. _index_random:
+    .. _box_index-random:
 
     .. method:: random(random-value)
 
@@ -594,7 +594,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`random-value` (type = number) = an arbitrary non-negative integer.
 
         :return: the tuple for the random key in the index.
@@ -613,7 +613,7 @@ API is a direct binding to corresponding methods of index objects of type
             - ['Beta!', 66, 'This is the second tuple!']
             ...
 
-    .. _index_count:
+    .. _box_index-count:
 
     .. method:: count([key], [iterator])
 
@@ -622,7 +622,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`{key-value}` (type = Lua table or scalar) =
           the value which must match the key(s) in the specified index. The type
           may be a list of field-values, or a tuple containing only the
@@ -658,7 +658,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`{key}` (type = Lua table or scalar) = key to be matched against
           the index key;
         * :samp:`{operator, field_no, value}` (type = Lua table) = update
@@ -677,14 +677,14 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`key` (type = Lua table or scalar) = key to be matched against
           the index key.
 
         :return: the deleted tuple.
         :rtype:  tuple
 
-    .. _index_alter:
+    .. _box_index-alter:
 
     .. method:: alter({options})
 
@@ -692,7 +692,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`{options}` = options list, same as the options list for
           :ref:`create_index <box_space-create_index>`.
 
@@ -719,7 +719,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`.
 
         :return: nil.
 
@@ -740,7 +740,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`;
         * :samp:`{index-name}` (type = string) = new name for index.
 
         :return: nil
@@ -763,7 +763,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+        * :samp:`{index_object}` = an :ref:`object reference <index-object_reference>`.
 
         :return: number of bytes
         :rtype: number
@@ -882,7 +882,7 @@ additional criteria.
       for i=1,#page,1 do print(page[i]) end
     end
 
-.. _RTREE:
+.. _box_index-rtree:
 
 =============================================================================
              Package `box.index` with index type = RTREE for spatial searches

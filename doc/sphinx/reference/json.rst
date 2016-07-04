@@ -1,4 +1,4 @@
-.. _package-json:
+.. _json-package:
 
 -------------------------------------------------------------------------------
                           Package `json`
@@ -135,7 +135,7 @@ Serializing 'A' and 'B' with different ``__serialize`` values causes different r
     ...
 
 
-.. _package-json-cfg:
+.. _json-package_cfg:
 
 A NOTE ABOUT CONFIGURATION SETTINGS:
 There are configuration settings which affect the way that Tarantool
@@ -157,8 +157,8 @@ The result of the json.encode request will look like this: |br|
 :codenormal:`---` |br|
 :codenormal:`- '[1,nan,inf,2]` |br|
 :codenormal:`...` |br|
-The same configuration settings exist for json, for :ref:`MsgPack <package-msgpack>`, and
-for :ref:`yaml <package-yaml>`.
+The same configuration settings exist for json, for :ref:`MsgPack <msgpack-package>`, and
+for :ref:`yaml <yaml-package>`.
 
 .. _Lua-CJSON package by Mark Pulford: http://www.kyne.com.au/~mark/software/lua-cjson.php
 .. _the official documentation: http://www.kyne.com.au/~mark/software/lua-cjson-manual.html

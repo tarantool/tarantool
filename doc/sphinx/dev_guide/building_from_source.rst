@@ -1,4 +1,4 @@
-.. _building-from-source:
+.. _building_from_source:
 
 -------------------------------------------------------------------------------
                              Building from source

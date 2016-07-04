@@ -79,22 +79,34 @@ Returns array of random bytes with length = integer.
 Returns 32-bit checksum made with CRC32.
 
     The crc32 and crc32_update functions use the `CRC-32C (Castagnoli)`_ polynomial
-    value: 0x11EDC6F41 / 4812730177. If it is necessary to be
+    value: 0x1EDC6F41 / 4812730177. If it is necessary to be
     compatible with other checksum functions in other
     programming languages, ensure that the other functions use
-    the same polynomial value. |br| For example, in Python,
-    install the crcmod package and say:
+    the same polynomial value.
+    
+    For example, in Python, install the ``crcmod`` package and say:
 
       >>> import crcmod
       >>> fun = crcmod.mkCrcFun('4812730177')
       >>> fun('string')
       3304160206L
+      
+    In Perl, install the ``Digest::CRC`` module and run the following code:
+    
+    .. code-block:: perl
+    
+      use Digest::CRC;
+      $d = Digest::CRC->new(width => 32, poly => 0x1EDC6F41, init => 0xFFFFFFFF, refin => 1, refout => 1);
+      $d->add('string');
+      print $d->digest;
+      
+    (the expected output is 3304160206).  
 
 .. _CRC-32C (Castagnoli): https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use
 
 :codebold:`digest.crc32.new()` |br|
 Initiates incremental crc32.
-See :ref:`incremental methods <incremental-digests>` notes.
+See :ref:`incremental methods <digest-incremental_digests>` notes.
 
 .. _digest-guava:
 
@@ -117,9 +129,9 @@ Returns 32-bit binary string = digest made with MurmurHash.
 
 :codebold:`digest.murmur.new([`:codeitalic:`seed`]) |br|
 Initiates incremental MurmurHash.
-See :ref:`incremental methods <incremental-digests>` notes.
+See :ref:`incremental methods <digest-incremental_digests>` notes.
 
-.. _incremental-digests:
+.. _digest-incremental_digests:
 
 =========================================
 Incremental methods in the digest package

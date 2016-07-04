@@ -20,7 +20,7 @@
 
 .. confval:: custom_proc_title
 
-    Add the given string to the server's :ref:`Process title <book-proctitle>`
+    Add the given string to the server's :ref:`Process title <administration-proctitle>`
     (what’s shown in the COMMAND column for :samp:`ps -ef` and :samp:`top -c` commands).
 
     For example, ordinarily :samp:`ps -ef` shows the Tarantool server process thus:
@@ -46,7 +46,7 @@
 
 .. confval:: listen
 
-    The read/write data port number or :ref:`URI` (Universal Resource Identifier)
+    The read/write data port number or :ref:`URI <index-uri>` (Universal Resource Identifier)
     string. Has no default value, so **must be specified** if connections will
     occur from remote clients that do not use “admin address” (the
     administrative host and port).

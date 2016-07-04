@@ -1,4 +1,4 @@
-.. _package-msgpack:
+.. _msgpack-package:
 
 -------------------------------------------------------------------------------
                                     Package `msgpack`
@@ -113,7 +113,7 @@ Here are examples for all the common types,
 with the Lua-table representation on the left,
 with the MsgPack format name and encoding on the right.
 
-.. _common-types-and-msgpack-encodings:
+.. _msgpack-common_types_and_msgpack_encodings:
 
     .. container:: table
 
@@ -152,7 +152,7 @@ with the MsgPack format name and encoding on the right.
         +--------------+-------------------------------------------------+
 
 Also, some MsgPack configuration settings for encoding can be changed, in the
-same way that they can be changed for :ref:`JSON <package-json-cfg>`.
+same way that they can be changed for :ref:`JSON <json-package_cfg>`.
 
 .. _MsgPack: http://msgpack.org/
 .. _Specification: http://github.com/msgpack/msgpack/blob/master/spec.md

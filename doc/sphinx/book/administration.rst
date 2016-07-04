@@ -34,7 +34,7 @@ Other signals will result in behavior defined by the operating system. Signals
 other than SIGKILL may be ignored, especially if the server is executing a
 long-running procedure which prevents return to the main thread event loop.
 
-.. _book-proctitle:
+.. _administration-proctitle:
 
 =====================================================================
                         Process title
@@ -53,7 +53,7 @@ A Tarantool server's process title has these components:
     **program_name** [**initialization_file_name**] **<role_name>** [**custom_proc_title**]
 
 * **program_name** is typically "tarantool".
-* **initialization_file_name** is the name of an :ref:`initialization file <init-label>` if one was specified.
+* **initialization_file_name** is the name of an :ref:`initialization file <index-init_label>` if one was specified.
 * **role_name** is:
   - "running" (ordinary node "ready to accept requests"),
   - "loading" (ordinary node recovering from old snap and wal files),
@@ -70,7 +70,7 @@ For example:
     1000     17337 16716  1 91362  6916   0 11:07 pts/5    00:00:13 tarantool script.lua <running>
 
 
-.. _using-tarantool-as-a-client:
+.. _administration-using_tarantool_as_a_client:
 
 =====================================================================
                         Using ``tarantool`` as a client
@@ -78,7 +78,7 @@ For example:
 
 .. program:: tarantool
 
-If ``tarantool`` is started without an :ref:`initialization file <init-label>`,
+If ``tarantool`` is started without an :ref:`initialization file <index-init_label>`,
 or if the initialization file contains :ref:`console.start() <console-start>`, then ``tarantool``
 enters interactive mode. There will be a prompt ("``tarantool>``") and it will
 be possible to enter requests. When used this way, ``tarantool`` can be
@@ -87,7 +87,7 @@ a client for a remote server.
 This section shows all legal syntax for the tarantool program, with short notes
 and examples. Other client programs may have similar options and request
 syntaxes. Some of the information in this section is duplicated in the
-:ref:`book-cfg` chapter.
+:ref:`book-cfg <index-book_cfg>` chapter.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Conventions used in this section
@@ -162,7 +162,7 @@ Single-byte tokens are: , or ( or ) or arithmetic operators. Examples: * , ( ).
 Tokens must be separated from each other by one or more spaces, except that
 spaces are not necessary around single-byte tokens or string literals.
 
-.. _setting delimiter:
+.. _administration-setting_delimiter:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         Requests
@@ -953,7 +953,7 @@ Finally, clients make a CALL to ``myapp.api_for_call`` and other API functions.
 
 In the case of ``tarantool-http``, there is no need to start the binary protocol at all.
 
-.. _modules-luarocks-and-requiring-packages:
+.. _administration-modules_luarocks_and_requiring_packages:
 
 =====================================================================
        Modules, LuaRocks, and requiring packages
@@ -969,10 +969,10 @@ before reading this section.
 
 The modules that come from Tarantool developers and community contributors are
 on rocks.tarantool.org_. Some of them
--- :ref:`expirationd <package-expirationd>`,
+-- :ref:`expirationd <expirationd-package>`,
 :ref:`mysql <d_plugins-mysql-example>`,
 :ref:`postgresql <d_plugins-postgresql-example>`,
-:ref:`shard <package-shard>` --
+:ref:`shard <shard-package>` --
 are discussed elsewhere in this manual.
 
 Step 1: Install LuaRocks.
@@ -1165,7 +1165,7 @@ directories.
 
 **Continuous remote backup**
 
-In essence: :ref:`replication <box-replication>`
+In essence: :ref:`replication <index-box_replication>`
 is useful for backup as well as for load balancing.
 Therefore taking a backup is a matter of ensuring that any given
 replica is up to date, and doing a cold backup on it.

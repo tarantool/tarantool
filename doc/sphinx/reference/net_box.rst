@@ -1,4 +1,4 @@
-.. _package_net_box:
+.. _net_box-package:
 
 --------------------------------------------------------------------------------
                                 Package `net.box`
@@ -6,7 +6,7 @@
 
 The ``net.box`` package contains connectors to remote database systems. One
 variant, to be discussed later, is for connecting to MySQL or MariaDB or PostgreSQL —
-that variant is the subject of the :ref:`SQL DBMS plugins <dbms-plugins>` appendix.
+that variant is the subject of the :ref:`SQL DBMS plugins <d_plugins-dbms_plugins>` appendix.
 In this section the subject is the built-in variant, ``net.box``. This is for
 connecting to tarantool servers via a network.
 
@@ -40,11 +40,11 @@ necessary to prioritize requests or to use different authentication ids.
     can be replaced by :samp:`conn = {net_box}.self`. However, there is an important
     difference between the embedded connection and a remote one. With the
     embedded connection, requests which do not modify data do not yield.
-    When using a remote connection, due to :ref:`the implicit rules <the-implicit-yield-rules>`
+    When using a remote connection, due to :ref:`the implicit rules <atomic-the_implicit_yield_rules>`
     any request can yield, and database
     state may have changed by the time it regains control.
 
-    :param string URI: the :ref:`URI` of the target for the connection
+    :param string URI: the :ref:`URI <index-uri>` of the target for the connection
     :param options: a possible option is `wait_connect`
     :return: conn object
     :rtype:  userdata
@@ -114,7 +114,7 @@ necessary to prioritize requests or to use different authentication ids.
 
         :samp:`conn.space.{space-name}:select`:code:`{...}` is the remote-call equivalent
         of the local call :samp:`box.space.{space-name}:select`:code:`{...}`. Please note
-        this difference: due to :ref:`the implicit yield rules <the-implicit-yield-rules>`
+        this difference: due to :ref:`the implicit yield rules <atomic-the_implicit_yield_rules>`
         a local :samp:`box.space.{space-name}:select`:code:`{...}` does
         not yield, but a remote :samp:`conn.space.{space-name}:select`:code:`{...}` call
         does yield, so global variables or database tuples data may change when a remote
@@ -152,7 +152,7 @@ necessary to prioritize requests or to use different authentication ids.
 
         :samp:`conn:eval({Lua-string})` evaluates and executes the expression
         in Lua-string, which may be any statement or series of statements.
-        An :ref:`execute privilege <privileges>` is required; if the user does not have it,
+        An :ref:`execute privilege <authentication-privileges>` is required; if the user does not have it,
         an administrator may grant it with
         :samp:`box.schema.user.grant({username}, 'execute', 'universe')`.
 
