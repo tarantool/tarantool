@@ -1,0 +1,203 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C)
+# This file is distributed under the same license as the Tarantool package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Tarantool 1.7\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-06-17 13:08+0300\n"
+"PO-Revision-Date: 2016-06-20 12:52+0300\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.2.0\n"
+"Language: ru\n"
+"X-Generator: Poedit 1.8.8\n"
+
+#: ../faq.rst:33
+msgid "FAQ"
+msgstr "Вопросы и ответы"
+
+#: ../faq.rst:36
+msgid "Why Tarantool?"
+msgstr "Почему Tarantool?"
+
+#: ../faq.rst:37
+msgid ""
+"Tarantool is a result of a long trial and error process within Mail.Ru. "
+"It's the Nth generation of a family of custom in-memory data servers, "
+"developed for various web applications. Besides, when Tarantool "
+"development started (2008) there were no stable and sufficiently "
+"functional open source alternative."
+msgstr ""
+"Tarantool появился в ходе многолетней разработки и отладки в стенах Mail."
+"Ru. Tarantool -- это специализированный in-memory сервер баз данных N-го "
+"поколения, предназначенный для работы с веб-приложениями. В 2008 году, "
+"когда разработка Tarantool'а только начиналась, не существовало open-"
+"source решений, сравнимых с ним по надежности и функционалу."
+
+#: ../faq.rst:43
+msgid "Why Lua?"
+msgstr "Почему Lua?"
+
+#: ../faq.rst:44
+msgid ""
+"Lua is a lightweight, fast, extensible multi-paradigm language. Lua also "
+"happens to be very easy to embed. Lua coroutines relate very closely to "
+"Tarantool fibers, and Lua architecture works well with Tarantool "
+"internals. Lua is the first, but hopefully not the last, stored program "
+"language for Tarantool."
+msgstr ""
+"Lua -- это легкий, быстрый и расширяемый язык, позволяющий использовать "
+"различные парадигмы программирования. Lua также очень легко встраивается "
+"в разные приложения. Ко-рутины (coroutines) в Lua близко соотносятся с "
+"файберами (fibers) в Tarantool, а вся Lua-архитектура гладко ложится на "
+"внутреннюю реализацию Tarantool'а. Lua -- это первый язык, на котором "
+"можно писать хранимые процедуры для Tarantool'а. В будущем список "
+"поддерживаемых языков планируется расширить."
+
+#: ../faq.rst:50
+msgid "What's the key advantage of Tarantool?"
+msgstr "В чем главное преимущество Tarantool?"
+
+#: ../faq.rst:51
+msgid ""
+"Tarantool provides a rich database feature set (HASH, TREE, RTREE, "
+"BITSET indexes, secondary indexes, composite indexes, transactions, "
+"triggers, asynchronous replication) in a flexible environment of a Lua "
+"interpreter."
+msgstr ""
+"Tarantool предоставляет богатый набор функций по работе с базами данных "
+"(HASH, TREE, RTREE, BitSet-индексы, вторичные индексы, составные "
+"индексы, транзакции, триггеры, асинхронная репликация), и всё это -- в "
+"гибкой среде Lua-интерпретатора."
+
+#: ../faq.rst:55
+msgid ""
+"These two properties make it possible to code fast, atomic and reliable "
+"in-memory data servers which handle non-trivial application-specific "
+"logic. The win over traditional SQL servers is in performance: low-"
+"overhead, lock-free architecture means Tarantool can serve an order of "
+"magnitude more requests per second, on comparable hardware. The win over "
+"NoSQL alternatives is in flexibility: Lua allows flexible processing of "
+"data stored in a compact, denormalized format."
+msgstr ""
+"Эти два обстоятельства делают Tarantool быстрым и надежным in-memory "
+"сервером баз данных с атомарными операциями и сложной логикой на стороне "
+"сервера. Преимуществом Tarantool'а по сравнению с традиционными SQL СУБД "
+"является его высокая производительность: низкие накладные расходы и "
+"безблокировочная архитектура позволяют Tarantool'у обрабатывать на "
+"порядок больше запросов в секунду на аналогичном оборудовании. "
+"Преимущество же перед другими NoSQL СУБД заключается в большей гибкости "
+"Tarantool'а: язык Lua позволяет гибко обрабатывать данные, хранящиеся в "
+"компактном, ненормализованном формате."
+
+#: ../faq.rst:63
+msgid "What are your development plans?"
+msgstr "Каковы ваши планы по развитию?"
+
+#: ../faq.rst:64
+msgid ""
+"We continuously improve server performance. On the feature front, "
+"automatic sharding and bsync (bidirectional file synchronization) and a "
+"subset of SQL are the major goals of 2016."
+msgstr ""
+"Мы постоянно улучшаем производительность серверной части. Наши главные "
+"цели на 2016 год -- это автоматический шардинг и bsync (двунаправленная "
+"синхронизация файлов), а также частичная поддержка SQL."
+
+#: ../faq.rst:69
+msgid "Who is developing Tarantool?"
+msgstr "Кто разрабатывает Tarantool?"
+
+#: ../faq.rst:70
+msgid ""
+"There is a small engineering team employed by Mail.Ru -- check out our "
+"commit logs on github. The development is fully open, and most of the "
+"connectors authors and maintainers for different distributions are from "
+"the community."
+msgstr ""
+
+#: ../faq.rst:75
+msgid "How serious is Mail.Ru about Tarantool?"
+msgstr "Насколько серьезны планы Mail.Ru в отношении Tarantool'а?"
+
+#: ../faq.rst:76
+msgid ""
+"Tarantool is an open source project, distributed under a BSD license, "
+"and as such does not depend on any one sponsor. However, it is currently "
+"an integral part of Mail.Ru backbone, so it gets a lot of support from "
+"Mail.Ru."
+msgstr ""
+"Tarantool -- это проект с открытым кодом, распространяемый под лицензией "
+"BSD, поэтому он не зависит от спонсоров. В то же время, Tarantool -- это "
+"часть технологического \"костяка\" Mail.Ru, и поэтому он пользуется "
+"сильной поддержкой со стороны Mail.Ru."
+
+#: ../faq.rst:81
+msgid "What happens when Tarantool runs out of memory?"
+msgstr "Что происходит, когда Tarantool'у не хватает памяти?"
+
+#: ../faq.rst:82
+msgid ""
+"The server stops accepting updates until more memory is available. Read "
+"and delete requests continue to be served without difficulty."
+msgstr ""
+"В этой ситуации Tarantool-сервер не принимает запросы на обновление "
+"данных до тех пор, пока снова не появится свободная память. Но запросы "
+"на чтение и удаление продолжают обрабатываться без проблем."
+
+#~ msgid ""
+#~ "Tarantool is the latest generation of a family of in-memory data "
+#~ "servers developed for web applications. It is the result of practical "
+#~ "experience and trials within Mail.Ru since development began in 2008."
+#~ msgstr ""
+#~ "Tarantool -- это in-memory сервер баз данных последнего поколения, "
+#~ "предназначенный для работы с веб-приложениями. Разработка и "
+#~ "практические испытания Tarantool'а ведутся в стенах компании Mail.Ru, "
+#~ "начиная с 2008 года."
+
+#~ msgid ""
+#~ "There is an engineering team employed by Mail.Ru -- check out our "
+#~ "commit logs on github.com/tarantool. The development is fully open. "
+#~ "Most of the connectors' authors, and the maintainers for different "
+#~ "distributions, come from the wider community."
+#~ msgstr ""
+#~ "Во-первых, это команда разработчиков в Mail.Ru. Разработка ведется "
+#~ "совершенно открыто: все коммиты можно увидеть на github.com/"
+#~ "tarantool. Во-вторых, активную роль играют пользователи из "
+#~ "сообщества. Они добавили большинство коннекторов и осуществляют "
+#~ "поддержку Tarantool'а в разных дистрибутивах."
+
+#~ msgid "Are there problems associated with being an in-memory server?"
+#~ msgstr ""
+#~ "Есть у Tarantool'а ли проблемы из-за того, что он in-memory сервер "
+#~ "баз данных?"
+
+#~ msgid ""
+#~ "The principal storage engine is designed for RAM plus persistent "
+#~ "storage. It is immune to data loss because there is a write-ahead "
+#~ "log. Its memory-allocation and compression techniques ensure there is "
+#~ "no waste. And if Tarantool runs out of memory, then it will stop "
+#~ "accepting updates until more memory is available, but will continue "
+#~ "to handle read and delete requests without difficulty. However, for "
+#~ "databases which are much larger than the available RAM space, "
+#~ "Tarantool has a second storage engine that is only limited by the "
+#~ "available disk space."
+#~ msgstr ""
+#~ "Основной движок баз данных в Tarantool'е работает с оперативной "
+#~ "памятью, но при этом он гарантирует сохранность данных благодаря "
+#~ "механизму WAL (write head log), т.е. журналу упреждающей записи. "
+#~ "Также в Tarantool'е используются технологии сжатия и распределения "
+#~ "данных, которые позволяют использовать все виды памяти наиболее "
+#~ "эффективно. Если Tarantool сталкивается с нехваткой оперативной "
+#~ "памяти, то он приостанавливает прием запросов на изменение данных до "
+#~ "тех пор, пока не появится свободная память, но при этом с успехом "
+#~ "продолжает обработку запросов на чтение и удаление данных. А для "
+#~ "больших баз, где объем данных значительно превосходит имеющийся объем "
+#~ "оперативной памяти, у Tarantool'а есть второй движок, чьи возможности "
+#~ "ограничены лишь размером жесткого диска."

@@ -5,26 +5,29 @@ find_package(Doxygen REQUIRED)
 configure_file("${PROJECT_SOURCE_DIR}/Doxyfile.API.in"
     "${PROJECT_BINARY_DIR}/Doxyfile.API")
 
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/conf.py.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/conf.py")
+
 add_custom_target(api-doc
     COMMAND ${DOXYGEN_EXECUTABLE} "${PROJECT_BINARY_DIR}/Doxyfile.API"
     WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
     DEPENDS api
     COMMENT "Generating API documentation" VERBATIM)
 
-set(SPHINX_BUILD_SINGLE_DIR "${PROJECT_BINARY_DIR}/doc/sphinx/_single_build/")
+set(SPHINX_BUILD_SINGLEHTML_DIR "${PROJECT_BINARY_DIR}/doc/sphinx/_single_build/")
 set(SPHINX_BUILD_HTML_DIR   "${PROJECT_BINARY_DIR}/doc/sphinx/_html_build/")
+set(SPHINX_BUILD_LOCALE_DIR "${PROJECT_BINARY_DIR}/doc/sphinx/_locale_build/")
 set(SPHINX_HTML_DIR  "${PROJECT_BINARY_DIR}/doc/www/output/doc/")
+set(SPHINX_RU_HTML_DIR  "${PROJECT_BINARY_DIR}/doc/www/output/doc/ru/")
 
-#add_custom_command(OUTPUT
-#    ${MKDIR} -p ${SPHINX_BUILD_DIR})
-#add_custom_command(OUTPUT
-#    ${MKDIR} -p ${SPHINX_HTML_DIR})
+#add_custom_command(OUTPUT ${MKDIR} -p ${SPHINX_BUILD_DIR})
+#add_custom_command(OUTPUT ${MKDIR} -p ${SPHINX_HTML_DIR})
 
 add_custom_target(sphinx-html ALL
 #    DEPENDS ${SPHINX_BUILD_DIR} ${SPHINX_HTML_DIR}
     COMMAND "${SPHINX_EXECUTABLE}"
         -b html
-        -d "${SPHINX_BUILD_SINGLE_DIR}"
+        -d "${SPHINX_BUILD_SINGLEHTML_DIR}"
         -c html/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_HTML_DIR}"
@@ -42,4 +45,50 @@ add_custom_target(sphinx-singlehtml ALL
         singlehtml.rst
     COMMENT "Building HTML documentation with Sphinx"
     DEPENDS api-doc
+)
+
+add_custom_target(sphinx-html-ru ALL
+#    DEPENDS ${SPHINX_BUILD_DIR} ${SPHINX_HTML_DIR}
+    COMMAND "${SPHINX_EXECUTABLE}"
+        -b html
+        -d "${SPHINX_BUILD_HTML_DIR}"
+        -c html/
+        "${PROJECT_SOURCE_DIR}/doc/sphinx"
+        "${SPHINX_RU_HTML_DIR}"
+        -Dlanguage=ru
+    COMMENT "Building HTML documentation with Sphinx"
+    DEPENDS api-doc
+)
+
+add_custom_target(sphinx-singlehtml-ru ALL
+    COMMAND "${SPHINX_EXECUTABLE}"
+        -b singlehtml
+        -d "${SPHINX_BUILD_SINGLEHTML_DIR}"
+        -c singlehtml/
+        "${PROJECT_SOURCE_DIR}/doc/sphinx"
+        "${SPHINX_RU_HTML_DIR}"
+        singlehtml.rst
+        -Dlanguage=ru
+    COMMENT "Building HTML documentation with Sphinx"
+    DEPENDS api-doc
+)
+
+add_custom_target(sphinx-update-pot
+    COMMAND "${SPHINX_EXECUTABLE}"
+        -b gettext
+        -d "${SPHINX_BUILD_LOCALE_DIR}"
+        -c locale/
+        "${PROJECT_SOURCE_DIR}/doc/sphinx"
+        "${PROJECT_SOURCE_DIR}/doc/sphinx/locale"
+    COMMENT "Generate localization templates"
+    DEPENDS api-doc
+)
+
+add_custom_target(sphinx-update-po
+    COMMAND "${SPHINX_INTL_EXECUTABLE}"
+        update
+        -p ${PROJECT_SOURCE_DIR}/doc/sphinx/locale
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx
+    COMMENT "Regenerate localization files from templates"
+    DEPENDS sphinx-update-pot
 )

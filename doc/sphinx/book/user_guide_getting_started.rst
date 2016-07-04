@@ -15,15 +15,14 @@ different parameters when building from source. The section about binaries is
 For development, you will want to download a source package and make the binary
 by yourself using a C/C++ compiler and common tools. Although this is a bit harder,
 it gives more control. And the source packages include additional files, for example
-the Tarantool test suite. The section about source is “:ref:`building-from-source <building_from_source>`”.
+the Tarantool test suite. The section about source is “:ref:`building-from-source`”.
 
 If the installation has already been done, then you should try it out. So we've
 provided some instructions that you can use to make a temporary “sandbox”. In a
 few minutes you can start the server and type in some database-manipulation
-statements. The section about the sandbox is
-“`Starting Tarantool and making your first database <user_guide_getting_started-first_database>`”.
+statements. The section about the sandbox is “`Starting Tarantool and making your first database`_”.
 
-.. _user_guide_getting_started-downloading_and_installing_a_binary_package:
+.. _downloading-and-installing-a-binary-package:
 
 =====================================================================
             Downloading and installing a binary package
@@ -38,7 +37,7 @@ start a shell (terminal) and enter the command-line instructions provided
 for your OS at http://tarantool.org/download.html.
 
 
-.. _user_guide_getting_started-first_database:
+.. _first database:
 
 =====================================================================
         Starting Tarantool and making your first database
@@ -104,7 +103,7 @@ interactive mode is just for administrators, but because it's
 convenient for learning it will be used for most examples in
 this manual. Tarantool is waiting for the user to type instructions.
 
-To create the first space and the first :ref:`index <index-box_index>`, try this:
+To create the first space and the first :ref:`index <box.index>`, try this:
 
 .. code-block:: tarantoolsession
 
@@ -172,7 +171,7 @@ In the previous section the first request was with :code:`box.cfg{listen = 3301}
 The :code:`listen` value can be any form of URI (uniform resource identifier);
 in this case it's just a local port: port 3301.
 It's possible to send requests to the listen URI via (a) telnet,
-(b) a connector (which will be the subject of the :ref:`Connectors <index-box_connectors>` chapter),
+(b) a connector (which will be the subject of the :ref:`Connectors <box-connectors>` chapter),
 or (c) another instance of Tarantool. Let's try (c).
 
 Switch to another terminal.
@@ -199,7 +198,7 @@ Try these requests:
     tarantool> console.connect('localhost:3301')
     tarantool> box.space.tester:select{2}
 
-The requests are saying "use the :ref:`console package <console-package>`
+The requests are saying "use the :ref:`console package <package-console>`
 to connect to the Tarantool server that's listening
 on ``localhost:3301``, send a request to that server,
 and display the result." The result in this case is
