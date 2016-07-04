@@ -1,4 +1,4 @@
-.. _box-connectors:
+.. _index-box_connectors:
 
 -------------------------------------------------------------------------------
                             Connectors
@@ -23,7 +23,7 @@ Unless implementing a client driver, one needn't concern oneself with the
 complications of the binary protocol. Language-specific drivers provide a
 friendly way to store domain language data structures in Tarantool. A complete
 description of the binary protocol is maintained in annotated Backus-Naur form
-in the source tree: please see :ref:`iproto protocol`.
+in the source tree: please see :ref:`iproto protocol <box_protocol-iproto_protocol>`.
 
 ====================================================================
                           Packet example
@@ -32,7 +32,7 @@ in the source tree: please see :ref:`iproto protocol`.
 The Tarantool API exists so that a client program can send a request packet to
 the server, and receive a response. Here is an example of a what the client
 would send for :code:`box.space[513]:insert{'A', 'BB'}`. The BNF description of the
-components is in file :ref:`iproto protocol`.
+components is in file :ref:`iproto protocol <box_protocol-iproto_protocol>`.
 
 .. _Language-specific drivers: `Connectors`_
 
@@ -62,13 +62,13 @@ components is in file :ref:`iproto protocol`.
         +---------------------------------+---------+---------+---------+---------+
 
 Now, one could send that packet to the tarantool server, and interpret the response
-(:ref:`iproto protocol` has a description of the packet format for responses as
+(:ref:`iproto protocol <box_protocol-iproto_protocol>` has a description of the packet format for responses as
 well as requests). But it would be easier, and less error-prone, if one could invoke
 a routine that formats the packet according to typed parameters. Something like
 :code:`response=tarantool_routine("insert",513,"A","B");`. And that is why APIs exist for
 drivers for Perl, Python, PHP, and so on.
 
-.. _connector-setting:
+.. _index-connector_setting:
 
 ====================================================================
           Setting up the server for connector examples

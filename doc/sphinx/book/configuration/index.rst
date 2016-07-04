@@ -1,4 +1,4 @@
-.. _book-cfg:
+.. _index-book_cfg:
 
 -------------------------------------------------------------------------------
                         Configuration reference
@@ -29,7 +29,7 @@ Tarantool is started by entering the command:
 
     Print an annotated list of all available options and exit.
 
-.. _tarantool-version:
+.. _index-tarantool_version:
 
 .. option:: -V, --version
 
@@ -67,7 +67,7 @@ Tarantool is started by entering the command:
 .. _git describe: http://www.kernel.org/pub/software/scm/git/docs/git-describe.html
 .. _git repository: http://github.com/tarantool/tarantool.git
 
-.. _URI:
+.. _index-uri:
 
 =====================================================================
                                 URI
@@ -106,7 +106,7 @@ In certain circumstances a Unix domain socket may be used
 where a URI is expected, for example "unix/:/tmp/unix_domain_socket.sock" or
 simply "/tmp/unix_domain_socket.sock".
 
-.. _init-label:
+.. _index-init_label:
 
 =====================================================================
                        Initialization file
@@ -152,15 +152,15 @@ Then the screen might look like this:
 If one wishes to start an interactive session on the same terminal after
 initialization is complete, one can use :ref:`console.start() <console-start>`.
 
-.. _local_hot_standby:
-.. _replication_port:
-.. _slab_alloc_arena:
-.. _replication_source:
-.. _admin_port:
-.. _snap_dir:
-.. _wal_dir:
-.. _wal_mode:
-.. _snapshot daemon:
+.. _index-local_hot_standby:
+.. _index-replication_port:
+.. _index-slab_alloc_arena:
+.. _index-replication_source:
+.. _index-admin_port:
+.. _index-snap_dir:
+.. _index-wal_dir:
+.. _index-wal_mode:
+.. _index-snapshot daemon:
 
 =====================================================================
                 Configuration parameters

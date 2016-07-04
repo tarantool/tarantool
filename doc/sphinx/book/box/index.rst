@@ -12,7 +12,7 @@ Document data model
 ===================
 
 If you tried out the
-:ref:`Starting Tarantool and making your first database <first database>`
+:ref:`Starting Tarantool and making your first database <user_guide_getting_started-first_database>`
 exercise from the last chapter, then your database looks like this:
 
 .. code-block:: none
@@ -85,7 +85,7 @@ strings with single quotes, separates fields with commas,
 and encloses the tuple inside square brackets.
 For example: ``[ 3, 'length', 93 ]``.
 
-.. _box.index:
+.. _index-box_index:
 
 -----
 Index
@@ -116,7 +116,7 @@ An index definition may include identifiers of tuple fields
 and their expected types. The allowed types for indexed fields are NUM
 (unsigned integer between 0 and
 18,446,744,073,709,551,615), or STR (string, any sequence of octets), or ARRAY
-(a series of numbers for use with :ref:`RTREE indexes <RTREE>`.
+(a series of numbers for use with :ref:`RTREE indexes <box_index-rtree>`.
 Take our example, which has the request:
 
 .. code-block:: tarantoolsession
@@ -130,7 +130,7 @@ Space definitions and index definitions are stored permanently
 in system spaces. It is possible to add, drop, or alter the
 definitions at runtime, with some restrictions.
 The syntax details for defining spaces and indexes
-are in section :ref:`The box library <box-library>`.
+are in section :ref:`The box library <index-box_library>`.
 
 ----------
 Data types
@@ -206,7 +206,7 @@ The basic operations are: the five data-change operations
 (insert, update, upsert, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like
 “ping” which can only be used with the binary protocol.
-Also, there are :ref:`index iterator <index-pairs>` operations, which can only
+Also, there are :ref:`index iterator <box_index-index_pairs>` operations, which can only
 be used with Lua code. (Index iterators are for traversing
 indexes one key at a time, taking advantage of features
 that are specific to an index type, for example evaluating
@@ -296,11 +296,11 @@ all computer instructions until a yield, then switch to execute
 the instructions of a different fiber. Thus (say) the thread reads
 row#x for the sake of fiber#1, then writes row#y for the sake of fiber#2.
 
-.. _yields_must_happen:
+.. _index-yields_must_happen:
 
 **FACT #3**: yields must happen, otherwise the transaction processor
 thread would stick permanently on the same fiber.
-There are :ref:`implicit yields <the-implicit-yield-rules>`: every data-change operation
+There are :ref:`implicit yields <atomic-the_implicit_yield_rules>`: every data-change operation
 or network-access causes an implicit yield, and every
 statement that goes through the tarantool client causes
 an implicit yield. And there are explicit yields:
@@ -326,7 +326,7 @@ to another fiber, and delete the tuple that was just updated.
 Note re storage engine: sophia handles yields differently, see
 :ref:`differences between memtx and sophia <sophia_diff>`.
 Note re multi-request transactions: there is a way to delay yields,
-see :ref:`Atomic execution <atomic_execution>`.
+see :ref:`Atomic execution <atomic-atomic_execution>`.
 
 Since locks don't exist, and disk writes only involve the write-ahead log,
 transactions are usually fast. Also the Tarantool server may not be using
@@ -340,7 +340,7 @@ A complete grammar of supported data-manipulation functions will come later in t
 
 Since not all Tarantool operations can be expressed with the data-manipulation
 functions, or with Lua, to gain complete access to data manipulation
-functionality one must use a :ref:`Perl, PHP, Python or other programming language connector <box-connectors>`.
+functionality one must use a :ref:`Perl, PHP, Python or other programming language connector <index-box_connectors>`.
 The client/server protocol is open and documented: an annotated BNF can be found
 in the source tree, file `doc/dev_guide/box-protocol.html`_.
 
@@ -372,7 +372,7 @@ Some snapshots are automatic, or users can make them at any time
 with the :ref:`box.snapshot() <admin-snapshot>` request.
 
 Details about the WAL writer and the recovery process
-are in the :ref:`Internals <box-internals>` section.
+are in the :ref:`Internals <b_internals>` section.
 
 -----------------
 Data manipulation
@@ -389,7 +389,7 @@ select a tuple set from a space named tester where the primary-key field value
 equals 1. For the examples there is an assumption that the numeric id of 'tester' is 512,
 which happens to be the case in our sandbox example only.
 
-.. _object-reference:
+.. _index-object_reference:
 
 First, there are five *object reference variations*:
 
@@ -572,7 +572,7 @@ because a rectangle whose corners are at coordinates
 are at coordinates 3,5,9,10. Searches on RTREE indexes
 can be for GT, GE, LT, LE, OVERLAPS, or NEIGHBOR.
 
-.. _box-library:
+.. _index-box_library:
 
 ---------------
 The box library
@@ -636,7 +636,7 @@ introspection (inspecting contents of spaces, accessing server configuration).
 In the discussion of each data-manipulation function there will be a note about
 which Complexity Factors might affect the function's resource usage.
 
-.. _two-storage-engines:
+.. _index-two_storage_engines:
 
 =====================================================================
             The two storage engines: memtx and sophia
@@ -650,7 +650,7 @@ The manual concentrates on memtx because it is the default and has been around
 longer. But sophia is a working key-value engine and will especially appeal to
 users who like to see data go directly to disk, so that recovery time might be
 shorter and database size might be larger. For architectural explanations and
-benchmarks, see `sphia.org`_ and Appendix E: :ref:`sophia <sophia>`.
+benchmarks, see `sphia.org`_ and Appendix E: :ref:`sophia <index-sophia>`.
 On the other hand, sophia lacks some functions and
 options that are available with memtx. Where that is the case, the relevant
 description will contain a note beginning with the words

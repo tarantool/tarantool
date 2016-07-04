@@ -23,7 +23,7 @@ a :codenormal:`grant` of an execute privilege will be necessary.
 The function returns an empty array, a scalar string,
 two booleans, and a short integer. The values are
 the ones described in the msgpack section in the table
-:ref:`Common Types and MsgPack Encodings <common-types-and-msgpack-encodings>`.
+:ref:`Common Types and MsgPack Encodings <msgpack-common_types_and_msgpack_encodings>`.
 
 :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}` |br|
 :codenormal:`2016-03-03 18:45:52.802 [27381] main/101/interactive I> ready to accept requests` |br|

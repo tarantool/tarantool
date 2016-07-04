@@ -28,7 +28,7 @@ line like :code:`extension=./tarantool.so`, or if PHP is started with the option
 
 Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples'
 via the PHP API. Before trying to run, check that the server is listening and that
-:code:`examples` exists, as :ref:`described earlier <connector-setting>`. To run, paste the code into a file named
+:code:`examples` exists, as :ref:`described earlier <index-connector_setting>`. To run, paste the code into a file named
 example.php and say :code:`php -d extension=~/tarantool-php/modules/tarantool.so example.php`. The program will open a socket connection with
 the tarantool server at localhost:3301, then send an INSERT request, then — if all is
 well — print "Insert succeeded". If the tuple already exists, the program will print

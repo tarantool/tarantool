@@ -106,7 +106,7 @@ Returns 32-bit checksum made with CRC32.
 
 :codebold:`digest.crc32.new()` |br|
 Initiates incremental crc32.
-See :ref:`incremental methods <incremental-digests>` notes.
+See :ref:`incremental methods <digest-incremental_digests>` notes.
 
 .. _digest-guava:
 
@@ -129,9 +129,9 @@ Returns 32-bit binary string = digest made with MurmurHash.
 
 :codebold:`digest.murmur.new([`:codeitalic:`seed`]) |br|
 Initiates incremental MurmurHash.
-See :ref:`incremental methods <incremental-digests>` notes.
+See :ref:`incremental methods <digest-incremental_digests>` notes.
 
-.. _incremental-digests:
+.. _digest-incremental_digests:
 
 =========================================
 Incremental methods in the digest package

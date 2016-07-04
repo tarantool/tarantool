@@ -1,4 +1,4 @@
-.. _package-expirationd: 
+.. _expirationd-package: 
 
 -------------------------------------------------------------------------------
                                    Package `expirationd`
@@ -48,7 +48,7 @@ process the tuple as an expired tuple.
 
 Ultimately the tuple-expiry process leads to ``default_tuple_drop()``
 which does a "delete" of a tuple from its original space.
-First the fun :ref:`fun <package-fun>` package is used,
+First the fun :ref:`fun <fun-package>` package is used,
 specifically fun.map_.
 Remembering that :codenormal:`index[0]` is always the space's primary key,
 and :codenormal:`index[0].parts[`:codeitalic:`N`:codenormal:`].fieldno`

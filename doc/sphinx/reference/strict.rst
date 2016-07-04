@@ -11,7 +11,7 @@ had a value assigned to it. Often this is an indication of a programming error.
 
 By default strict mode is off, unless tarantool was built with the
 ``-DCMAKE_BUILD_TYPE=Debug`` option -- see the description of build options
-in section :ref:`building-from-source`.
+in section :ref:`building-from-source <building_from_source>`.
 
 **Example:**
 

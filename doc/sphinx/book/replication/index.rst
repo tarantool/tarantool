@@ -1,4 +1,4 @@
-.. _box-replication:
+.. _index-box_replication:
 
 -------------------------------------------------------------------------------
                     Replication
@@ -78,7 +78,7 @@ so that they are the same on both master and replica.
 NOTE:
 Replication requires privileges. Privileges for accessing spaces could be granted directly
 to the user who will start the replica. However, it is more usual to
-grant privileges for accessing spaces to a :ref:`role <rep-role>`, and then grant the
+grant privileges for accessing spaces to a :ref:`role <authentication-rep_role>`, and then grant the
 role to the user who will start the replica.
 
 =====================================================================
@@ -93,7 +93,7 @@ degraded state requires a human inspection.
 
 However, once a master failure is detected, the recovery is simple: declare
 that the replica is now the new master, by saying
-:codenormal:`box.cfg{... listen=`:codeitalic:`URI`:codenormal:`}`.
+:codenormal:`box.cfg{... listen=`:codeitalic:`URI <index-uri>`:codenormal:`}`.
 Then, if there are updates on the old master that were not propagated before
 the old master went down, they would have to be re-applied manually.
 
@@ -129,7 +129,7 @@ Step 3. Start the second server thus:
       replication_source = *uri#1*
     }
 
-... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
+... where ``uri#1`` = the :ref:`URI <index-uri>` that the first server is listening on.
 
 That's all.
 
@@ -167,7 +167,7 @@ If a primary server is started with:
 then there will be lines in the log file, containing the word "relay",
 when a replica connects or disconnects.
 
-.. _preventing-duplicate-actions:
+.. _index-preventing_duplicate_actions:
 
 =====================================================================
                     Preventing Duplicate Actions
@@ -284,14 +284,14 @@ with the master by contacting it again (just say
 Q: What if replication causes security concerns? |br|
 A: Prevent unauthorized replication sources by associating a password with
 every user that has access privileges for the relevant spaces, and every
-user that has a replication :ref:`role <rep-role>`. That way,
-the :ref:`URI` for the ref:`replication_source <cfg_replication-replication_source>` parameter will
+user that has a replication :ref:`role <authentication-rep_role>`. That way,
+the :ref:`URI <index-uri>` for the ref:`replication_source <cfg_replication-replication_source>` parameter will
 always have to have the long form |br|
 ``replication_source='username:password@host:port'``
 
 Q: What if advanced users want to understand better how it all works? |br|
 A: See the description of server startup with replication in the
-:ref:`Internals <internals-replication>` appendix.
+:ref:`Internals <b_internals-replication>` appendix.
 
 .. _vector clock: https://en.wikipedia.org/wiki/Vector_clock
 

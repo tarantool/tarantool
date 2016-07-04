@@ -21,7 +21,7 @@ example, on Ubuntu, the installation could look like this:
 
 Here is a complete Perl program that inserts [99999,'BB'] into space[999] via
 the Perl API. Before trying to run, check that the server is listening and
-that :code:`examples` exists, as :ref:`described earlier <connector-setting>`. To run, paste the code into
+that :code:`examples` exists, as :ref:`described earlier <index-connector_setting>`. To run, paste the code into
 a file named example.pl and say :code:`perl example.pl`. The program will connect
 using an application-specific definition of the space. The program will open a
 socket connection with the tarantool server at localhost:3301, then send an

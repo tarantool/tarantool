@@ -66,7 +66,7 @@ To compile and link the program, say:
 
 Before trying to run,
 check that the server is listening and that the space :code:`examples` exists, as 
-:ref:`described earlier <connector-setting>`.
+:ref:`described earlier <index-connector_setting>`.
 To run the program, say :code:`./example`. The program will connect
 to the server, and will send the request.
 If Tarantool is not running on localhost with listen address = 3301, the program

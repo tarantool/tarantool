@@ -45,7 +45,7 @@ for spaces, users, roles, and function tuples.
         +---------------+--------------------------------+---------+---------------------+
         | engine        | storage engine =               | string  | 'memtx'             |
         |               | :ref:`'memtx' or 'sophia'      |         |                     |
-        |               | <two-storage-engines>`         |         |                     |
+        |               | <index-two_storage_engines>`   |         |                     |
         +---------------+--------------------------------+---------+---------------------+
         | user          | user name                      | string  | current user's name |
         +---------------+--------------------------------+---------+---------------------+
@@ -141,7 +141,7 @@ available for insert, select, and all the other :ref:`box.space <box_space>` fun
 
 .. function:: box.schema.user.grant(user-name, privileges)
 
-    Grant :ref:`privileges <privileges>` to a user.
+    Grant :ref:`privileges <authentication-privileges>` to a user.
 
     :param string user-name: the name of the user
     :param string privileges: either privilege,object-type,object-name
@@ -159,7 +159,7 @@ available for insert, select, and all the other :ref:`box.space <box_space>` fun
 
 .. function:: box.schema.user.revoke(user-name, privileges)
 
-    Revoke :ref:`privileges <privileges>` from a user.
+    Revoke :ref:`privileges <authentication-privileges>` from a user.
 
     :param string user-name: the name of the user
     :param string privileges: either privilege,object-type,object-name
@@ -260,7 +260,7 @@ available for insert, select, and all the other :ref:`box.space <box_space>` fun
 
 .. function:: box.schema.role.grant(role-name, privileges)
 
-    Grant :ref:`privileges <privileges>` to a role.
+    Grant :ref:`privileges <authentication-privileges>` to a role.
 
     :param string role-name: the name of the role
     :param string privileges: either privilege,object-type,object-name
@@ -278,7 +278,7 @@ available for insert, select, and all the other :ref:`box.space <box_space>` fun
 
 .. function:: box.schema.role.revoke(role-name, privileges)
 
-    Revoke :ref:`privileges <privileges>` to a role.
+    Revoke :ref:`privileges <authentication-privileges>` to a role.
 
     :param string role-name: the name of the role
     :param string privileges: either privilege,object-type,object-name

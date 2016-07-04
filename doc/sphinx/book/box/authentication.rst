@@ -1,4 +1,4 @@
-.. _box-authentication:
+.. _authentication:
 
 -------------------------------------------------------------------------------
                               Access control
@@ -111,7 +111,7 @@ To create a new user, say:
     box.schema.user.create(*user-name*, {if_not_exists = true})
     box.schema.user.create(*user-name*, {password = *password*}).
 
-The :samp:`password={password}` specification is good because in a :ref:`URI` (Uniform Resource Identifier) it is
+The :samp:`password={password}` specification is good because in a :ref:`URI <index-uri>` (Uniform Resource Identifier) it is
 usually illegal to include a user-name without a password.
 
 To change the user's password, say:
@@ -172,7 +172,7 @@ tuple in the _user space, and then drops the user.
 
     The maximum number of users is 32.
 
-.. _privileges:
+.. _authentication-privileges:
 
 ===========================================================
                Privileges and the _priv space
@@ -347,9 +347,9 @@ purposes are:
     box.session.su(*user-name*) -- allows changing current user to 'user-name'
 
 If a user types requests directly on the Tarantool server in its interactive
-mode, or if a user connects via telnet to the administrative port (using :ref:`admin <admin_port>`
+mode, or if a user connects via telnet to the administrative port (using :ref:`admin <index-admin_port>`
 instead of listen), then the user by default is 'admin' and has many privileges.
-If a user connects from an application program via one of the :ref:`connectors <box-connectors>`, then
+If a user connects from an application program via one of the :ref:`connectors <index-box_connectors>`, then
 the user by default is 'guest' and has few privileges. Typically an admin user
 will set up and configure objects, then grant privileges to appropriate non-admin
 users. Typically a guest user will use ``box.session.su()`` to change into a non-generic
@@ -383,7 +383,7 @@ privileges in a role and then grant or revoke the role. Role information is
 in the _user space but the third field - the type field - is 'role' rather
 than 'user'.
 
-.. _rep-role:
+.. _authentication-rep_role:
 
 If a role R1 is granted a privilege X, and user U1 is granted a privilege
 "role R1", then user U1 in effect has privilege X. Then if a role R2 is
