@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Tarantool 1.6\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-06-01 12:02+0300\n"
+"POT-Creation-Date: 2016-06-23 13:32+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -8048,7 +8048,7 @@ msgstr ""
 #: ../book/connectors/index.rst:76
 #: ../book/connectors/index.rst:76
 #: ../book/connectors/index.rst:76
-#: ../book/user_guide_getting_started.rst:202
+#: ../book/user_guide_getting_started.rst:233
 msgid "..."
 msgstr ""
 
@@ -9394,32 +9394,57 @@ msgstr ""
 msgid "Getting started"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:31
-msgid "If the installation has already been done, then you should try it out. So we've provided some instructions that you can use to make a temporary “sandbox”. In a few minutes you can start the server and type in some database-manipulation statements. The section about sandbox is “`Starting Tarantool and making your first database`_”."
+#: ../book/user_guide_getting_started.rst:30
+msgid "UGGS - This chapter shows how to download, how to install, and how to start Tarantool for the first time."
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:33
+msgid "For production, if possible, you should download a binary (executable) package. This will ensure that you have the same build of the same version that the developers have. That makes analysis easier if later you need to report a problem, and avoids subtle problems that might happen if you used different tools or different parameters when building from source. The section about binaries is “`Downloading and installing a binary package`_”."
 msgstr ""
 
 #: ../book/user_guide_getting_started.rst:40
+msgid "For development, you will want to download a source package and make the binary by yourself using a C/C++ compiler and common tools. Although this is a bit harder, it gives more control. And the source packages include additional files, for example the Tarantool test suite. The section about source is “:ref:`building-from-source`”."
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:45
+msgid "If the installation has already been done, then you should try it out. So we've provided some instructions that you can use to make a temporary “sandbox”. In a few minutes you can start the server and type in some database-manipulation statements. The section about the sandbox is “`Starting Tarantool and making your first database`_”."
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:54
+msgid "Downloading and installing a binary package"
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:56
+msgid "Binary packages for the stable 1.6.x release are provided at http://tarantool.org/download.html. An automatic build system creates, tests and publishes packages for every push into the 1.6 branch."
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:60
+msgid "To download and install the package that's appropriate for your OS, start a shell (terminal) and enter the command-line instructions provided for your OS at http://tarantool.org/download.html."
+msgstr ""
+
+#: ../book/user_guide_getting_started.rst:69
 msgid "Starting Tarantool and making your first database"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:42
+#: ../book/user_guide_getting_started.rst:71
+#: ../book/user_guide_getting_started.rst:80
 msgid "Here is how to create a simple test database after installing."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:44
+#: ../book/user_guide_getting_started.rst:73
 msgid "Create a new directory. It's just for tests, you can delete it when the tests are over."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:46
+#: ../book/user_guide_getting_started.rst:75
 msgid "$ mkdir ~/tarantool_sandbox\n"
 "$ cd ~/tarantool_sandbox"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:51
+#: ../book/user_guide_getting_started.rst:82
 msgid "Start the server. The server name is tarantool."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:53
+#: ../book/user_guide_getting_started.rst:84
 msgid "$ # if you downloaded a binary with apt-get or yum, say this:\n"
 "$ /usr/bin/tarantool\n"
 "$ # if you downloaded and untarred a binary\n"
@@ -9429,19 +9454,19 @@ msgid "$ # if you downloaded a binary with apt-get or yum, say this:\n"
 "$ ~/tarantool/src/tarantool"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:63
+#: ../book/user_guide_getting_started.rst:94
 msgid "The server starts in interactive mode and outputs a command prompt. To turn on the database, :mod:`configure <box.cfg>` it. This minimal example is sufficient:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:66
+#: ../book/user_guide_getting_started.rst:97
 msgid "tarantool> box.cfg{listen = 3301}"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:70
+#: ../book/user_guide_getting_started.rst:101
 msgid "If all goes well, you will see the server displaying progress as it initializes, something like this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:73
+#: ../book/user_guide_getting_started.rst:104
 msgid "tarantool> box.cfg{listen = 3301}\n"
 "2015-08-07 09:41:41.077 ... version 1.6.7-439-g7e1011b\n"
 "2015-08-07 09:41:41.077 ... log level 5\n"
@@ -9455,23 +9480,23 @@ msgid "tarantool> box.cfg{listen = 3301}\n"
 "2015-08-07 09:41:41.128 ... ready to accept requests"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:87
+#: ../book/user_guide_getting_started.rst:118
 msgid "Now that the server is up, you could start up a different shell and connect to its primary port with:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:90
+#: ../book/user_guide_getting_started.rst:121
 msgid "$ telnet 0 3301"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:94
+#: ../book/user_guide_getting_started.rst:125
 msgid "but for example purposes it is simpler to just leave the server running in \"interactive mode\". On production machines the interactive mode is just for administrators, but because it's convenient for learning it will be used for most examples in this manual. Tarantool is waiting for the user to type instructions."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:100
+#: ../book/user_guide_getting_started.rst:131
 msgid "To create the first space and the first :ref:`index <box.index>`, try this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:102
+#: ../book/user_guide_getting_started.rst:133
 msgid "tarantool> s = box.schema.space.create('tester')\n"
 "tarantool> s:create_index('primary', {\n"
 "         >   type = 'hash',\n"
@@ -9479,29 +9504,29 @@ msgid "tarantool> s = box.schema.space.create('tester')\n"
 "         > })"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:110
+#: ../book/user_guide_getting_started.rst:141
 msgid "To insert three “tuples” (our name for “records”) into the first “space” of the database try this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:112
+#: ../book/user_guide_getting_started.rst:143
 msgid "tarantool> t = s:insert({1})\n"
 "tarantool> t = s:insert({2, 'Music'})\n"
 "tarantool> t = s:insert({3, 'Length', 93})"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:118
+#: ../book/user_guide_getting_started.rst:149
 msgid "To select a tuple from the first space of the database, using the first defined key, try this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:120
+#: ../book/user_guide_getting_started.rst:151
 msgid "tarantool> s:select{3}"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:124
+#: ../book/user_guide_getting_started.rst:155
 msgid "Your terminal screen should now look like this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:126
+#: ../book/user_guide_getting_started.rst:157
 msgid "tarantool> s = box.schema.space.create('tester')\n"
 "2015-06-10 12:04:18.158 ... creating './00000000000000000000.xlog.inprogress'\n"
 "---\n"
@@ -9525,31 +9550,31 @@ msgid "tarantool> s = box.schema.space.create('tester')\n"
 "tarantool>"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:150
+#: ../book/user_guide_getting_started.rst:181
 msgid "Now, to prepare for the example in the next section, try this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:152
+#: ../book/user_guide_getting_started.rst:183
 msgid "tarantool> box.schema.user.grant('guest', 'read,write,execute', 'universe')"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:162
+#: ../book/user_guide_getting_started.rst:193
 msgid "Starting another Tarantool instance and connecting remotely"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:164
-msgid "In the previous section the first request was with :code:`box.cfg{listen = 3301}`. The :code:`listen` value can be any form of URI (uniform resource identifier); in this case it's just a local port: port 3301. It's possible to send requests to the listen URI via (a) telnet, (b) a connector (which will be the subject of Chapter 8), or (c) another instance of Tarantool. Let's try (c)."
+#: ../book/user_guide_getting_started.rst:195
+msgid "In the previous section the first request was with :code:`box.cfg{listen = 3301}`. The :code:`listen` value can be any form of URI (uniform resource identifier); in this case it's just a local port: port 3301. It's possible to send requests to the listen URI via (a) telnet, (b) a connector (which will be the subject of the :ref:`Connectors <box-connectors>` chapter), or (c) another instance of Tarantool. Let's try (c)."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:171
+#: ../book/user_guide_getting_started.rst:202
 msgid "Switch to another terminal. On Linux, for example, this means starting another instance of a Bash shell. There is no need to use cd to switch to the :code:`~/tarantool_sandbox` directory."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:175
+#: ../book/user_guide_getting_started.rst:206
 msgid "Start the second instance of Tarantool. The server name is tarantool."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:177
+#: ../book/user_guide_getting_started.rst:208
 msgid "$ # if you downloaded a binary with apt-get or yum, say this:\n"
 "$ /usr/bin/tarantool\n"
 "$ # if you downloaded and untarred a\n"
@@ -9559,21 +9584,21 @@ msgid "$ # if you downloaded a binary with apt-get or yum, say this:\n"
 "$ ~/tarantool/src/tarantool"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:187
+#: ../book/user_guide_getting_started.rst:218
 msgid "Try these requests:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:189
+#: ../book/user_guide_getting_started.rst:220
 msgid "tarantool> console = require('console')\n"
 "tarantool> console.connect('localhost:3301')\n"
 "tarantool> box.space.tester:select{2}"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:195
+#: ../book/user_guide_getting_started.rst:226
 msgid "The requests are saying \"use the :ref:`console package <package-console>` to connect to the Tarantool server that's listening on ``localhost:3301``, send a request to that server, and display the result.\" The result in this case is one of the tuples that was inserted earlier. Your terminal screen should now look like this:"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:204
+#: ../book/user_guide_getting_started.rst:235
 msgid "tarantool> console = require('console')\n"
 "---\n"
 "...\n"
@@ -9589,11 +9614,11 @@ msgid "tarantool> console = require('console')\n"
 "localhost:3301>"
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:220
-msgid "You can repeat :code:`box.space...:insert{}` and :code:`box.space...:select{}` indefinitely, on either Tarantool instance. When the testing is over: To drop the space: :code:`s:drop()`. To stop tarantool: Ctrl+C. To stop tarantool (an alternative): :code:`os.exit()`. To stop tarantool (from another terminal): :code:`sudo pkill -f tarantool`. To destroy the test: :code:`rm -r ~/tarantool_sandbox`."
+#: ../book/user_guide_getting_started.rst:251
+msgid "You can repeat :code:`box.space...:insert{}` and :code:`box.space...:select{}` indefinitely, on either Tarantool instance. When the testing is over: To drop the space: :code:`s:drop()`. To stop tarantool: Ctrl+C. To stop tarantool (an alternative): :ref:`os.exit() <os-exit>`. To stop tarantool (from another terminal): :code:`sudo pkill -f tarantool`. To destroy the test: :code:`rm -r ~/tarantool_sandbox`."
 msgstr ""
 
-#: ../book/user_guide_getting_started.rst:228
+#: ../book/user_guide_getting_started.rst:259
 msgid "To review ... If you followed all the instructions in this chapter, then so far you have: installed Tarantool from either a binary or a source repository, started up the Tarantool server, inserted and selected tuples."
 msgstr ""
 
