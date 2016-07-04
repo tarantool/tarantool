@@ -3,6 +3,10 @@
 	url = https://github.com/tarantool/luajit.git
 	ignore = dirty
 	branch = tarantool-1.7
+[submodule "third_party/libyaml"]
+	path = third_party/libyaml
+	url = https://github.com/tarantool/libyaml.git
+	ignore = dirty
 [submodule "src/lib/msgpuck"]
 	path = src/lib/msgpuck
 	url = https://github.com/tarantool/msgpuck.git
