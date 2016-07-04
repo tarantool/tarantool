@@ -1,4 +1,4 @@
-.. _package-yaml:
+.. _yaml-package:
 
 -------------------------------------------------------------------------------
                             Package `yaml`
@@ -106,7 +106,7 @@ different results:
     ...
 
 Also, some YAML configuration settings for encoding can be changed, in the
-same way that they can be changed for :ref:`JSON <package-json-cfg>`.
+same way that they can be changed for :ref:`JSON <json-package_cfg>`.
 
 
 .. _YAML: http://yaml.org/

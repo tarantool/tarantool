@@ -1,4 +1,4 @@
-.. _package-console:
+.. _console-package:
 
 -------------------------------------------------------------------------------
                                    Package `console`
@@ -14,7 +14,7 @@ host/port.
 
 .. function:: connect(uri)
 
-    Connect to the server at :ref:`URI`, change the prompt from ':samp:`tarantool>`' to
+    Connect to the server at :ref:`URI <index-uri>`, change the prompt from ':samp:`tarantool>`' to
     ':samp:`{uri}>`', and act henceforth as a client until the user ends the
     session or types :code:`control-D`.
 
@@ -60,7 +60,7 @@ host/port.
 
 .. function:: listen(uri)
 
-    Listen on :ref:`URI`. The primary way of listening for incoming requests
+    Listen on :ref:`URI <index-uri>`. The primary way of listening for incoming requests
     is via the connection-information string, or URI, specified in :code:`box.cfg{listen=...}`.
     The alternative way of listening is via the URI
     specified in :code:`console.listen(...)`. This alternative way is called
@@ -106,7 +106,7 @@ host/port.
     **Example:**
 
     A special use of ``console.start()`` is with
-    :ref:`initialization files <init-label>`.
+    :ref:`initialization files <index-init_label>`.
     Normally, if one starts the tarantool server with
     :samp:`tarantool {initialization file}`
     there is no console. This can be remedied by adding

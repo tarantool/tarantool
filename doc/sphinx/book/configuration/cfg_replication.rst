@@ -3,8 +3,8 @@
 .. confval:: replication_source
 
     If replication_source is not an empty string, the server is considered
-    to be a Tarantool :ref:`replica <box-replication>`. The replica server will try to connect to the
-    master which replication_source specifies with a :ref:`URI` (Universal
+    to be a Tarantool :ref:`replica <index-box_replication>`. The replica server will try to connect to the
+    master which replication_source specifies with a :ref:`URI <index-uri>` (Universal
     Resource Identifier), for example :samp:`{konstantin}:{secret_password}@{tarantool.org}:{3301}`.
 
     If there is more than one replication source in a cluster, specify an

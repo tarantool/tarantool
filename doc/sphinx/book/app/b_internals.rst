@@ -1,4 +1,4 @@
-.. _box-internals:
+.. _b_internals:
 
 -------------------------------------------------------------------------------
                             Appendix B. Internals
@@ -26,7 +26,7 @@ same as in the binary protocol and is described in `doc/dev_guide/box-protocol.h
 each WAL record contains a header, some metadata, and then the data formatted
 according to `msgpack`_ rules. For example this is what the WAL file looks like
 after the first INSERT request ("s:insert({1})") for the introductory sandbox
-exercise ":ref:`Starting Tarantool and making your first database <first database>` “.
+exercise ":ref:`Starting Tarantool and making your first database <user_guide_getting_started-first_database>` “.
 On the left are the hexadecimal bytes that one would see with:
 
 .. code-block:: console
@@ -94,7 +94,7 @@ particular, SELECT performance, even for SELECTs running on a connection packed
 with UPDATEs and DELETEs, remains unaffected by disk load.
 
 The WAL writer employs a number of durability modes, as defined in configuration
-variable :ref:`wal_mode <wal_mode>`. It is possible to turn the write-ahead
+variable :ref:`wal_mode <index-wal_mode>`. It is possible to turn the write-ahead
 log completely off, by setting :ref:`wal_mode <cfg_binary_logging_snapshots-wal_mode>` to *none*. Even
 without the write-ahead log it's still possible to take a persistent copy of the
 entire data set with the :ref:`box.snapshot() <admin-snapshot>` request.
@@ -180,14 +180,14 @@ Step 3
 Step 4
     For the memtx engine, re-create all secondary indexes.
 
-.. _internals-replication:
+.. _b_internals-replication:
 
 ===============================
 Server Startup With Replication
 ===============================
 
 In addition to the recovery process described above, the server must take
-additional steps and precautions if :ref:`replication <box-replication>` is
+additional steps and precautions if :ref:`replication <index-box_replication>` is
 enabled.
 
 Once again the startup procedure is initiated by the ``box.cfg{}`` request.

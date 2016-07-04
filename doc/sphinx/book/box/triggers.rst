@@ -1,4 +1,4 @@
-.. _box-triggers:
+.. _triggers-box_triggers:
 
 -------------------------------------------------------------------------------
                             Triggers
@@ -133,7 +133,7 @@ Here is what might appear in the log file in a typical installation:
     (1) The :ref:`console.connect <console-connect>` function includes an authentication check for all users except 'guest';
     for this case the on_auth trigger function is invoked after the on_connect trigger function,
     if and only if the connection has succeeded so far.
-    (2) The binary protocol has a separate :ref:`authentication packet <iproto-authentication>` --
+    (2) The binary protocol has a separate :ref:`authentication packet <box_protocol-authentication>` --
     for this case, connection and authentication are considered to be separate steps.
 
     Unlike other trigger types, on_auth trigger functions are invoked `before`

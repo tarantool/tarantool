@@ -123,7 +123,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         first created index, which will be used as the primary-key index, must be
         unique.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`index_name` (type = string) = name of index, which should not be a number
         and should not contain special characters;
         :codeitalic:`options`.
@@ -183,7 +183,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Insert a tuple into a space.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`tuple` (type = Lua table or tuple) = tuple to be inserted.
 
         :return: the inserted tuple
@@ -209,7 +209,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Search for a tuple or a set of tuples in the given space.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index key,
         which may be multi-part.
 
@@ -274,7 +274,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         For examples of complex ``select`` requests, where one can specify which
         index to search and what condition to use (for example "greater than"
         instead of "equal to") and how many tuples to return, see the later section
-        :ref:`index_object:select <index_object_select>`.
+        :ref:`index_object:select <box_index-select>`.
 
     .. _box_space-get:
 
@@ -282,7 +282,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Search for a tuple in the given space.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
         key, which may be multi-part.
 
@@ -314,7 +314,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Drop a space.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         :return: nil
 
@@ -335,7 +335,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Rename a space.
 
-        Parameters::samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters::samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`space-name` (type = string) = new name for space.
 
         :return: nil
@@ -364,7 +364,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``box.space...:put()`` have the same effect; the latter is sometimes used
         to show that the effect is the converse of ``box.space...:get()``.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`tuple` (type = Lua table or tuple) = tuple to be inserted.
 
         :return: the inserted tuple.
@@ -419,7 +419,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         For ``!`` and ``=`` operations the field number can be ``-1``, meaning the last field in the tuple.
 
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`key` (type = Lua table or scalar) = primary-key field values, must be passed as a Lua
         table if key is multi-part;
         :codeitalic:`{operator, field_no, value}` (type = table): a group of arguments for each
@@ -568,7 +568,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         error checks before returning -- this is a design feature which
         enhances throughput but requires more caution on the part of the user.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :samp:`{tuple_value}` (type = Lua table or scalar) =
         field values, must be passed as a Lua table;
         :codeitalic:`{operator, field_no, value}` (type = Lua table) = a group of arguments for each
@@ -597,7 +597,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Delete a tuple identified by a primary key.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`
         :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
         key, which may be multi-part.
 
@@ -634,7 +634,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``box.space.tester:insert{0}`` and ``box.space[800]:insert{0}``
         are equivalent requests.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         **Example:**
 
@@ -652,7 +652,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Whether or not this space is enabled.
         The value is ``false`` if the space has no index.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
     .. _box_space-field_count:
 
@@ -672,7 +672,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         The default value is ``0``, which means there is no required field count.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         **Example:**
 
@@ -689,7 +689,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :ref:`box.index <box_index>` with methods to search tuples and iterate over them in
         predefined order.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         :rtype: table
 
@@ -710,7 +710,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. method:: count([key], [iterator])
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the primary index
         key, which may be multi-part; :codeitalic:`iterator` = comparison method.
 
@@ -732,7 +732,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. method:: len()
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         :return: Number of tuples in the space.
 
@@ -751,7 +751,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Deletes all tuples.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         **Complexity Factors:** Index size, Index type, Number of tuples accessed.
 
@@ -782,7 +782,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         value set to ``1``.
 
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`field-value(s)` (type = Lua table or scalar) = values which must match the primary key.
 
         :return: the new counter value
@@ -822,7 +822,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``field-value(s)``, a new one is not inserted. If the counter value drops
         to zero, the tuple is deleted.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`field-value(s)` (type = Lua table or scalar) = values which must match the primary key.
 
         :return: the new counter value
@@ -865,7 +865,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         primary-key field will be incremented before the insert.
         Note re storage engine: sophia does not support auto_increment.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`;
         :codeitalic:`field-value(s)` (type = Lua table or scalar) = tuple's fields, other than the primary-key field.
 
         :return: the inserted tuple.
@@ -895,7 +895,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         A helper function to prepare for iterating over all tuples in a space.
 
-        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <index-object_reference>`.
 
         :return: function which can be used in a for/end loop. Within the loop, a value is returned for each iteration.
         :rtype:  function, tuple
@@ -1115,21 +1115,21 @@ A list of all ``box.space`` functions follows, then comes a list of all
 .. data:: _user
 
     ``_user`` is a system tuple set for
-    support of the :ref:`authorization feature <box-authentication>`.
+    support of the :ref:`authorization feature <authentication>`.
 
 .. _box_space-priv:
 
 .. data:: _priv
 
     ``_priv`` is a system tuple set for
-    support of the :ref:`authorization feature <box-authentication>`.
+    support of the :ref:`authorization feature <authentication>`.
 
 .. _box_space-cluster:
 
 .. data:: _cluster
 
     ``_cluster`` is a system tuple set
-    for support of the :ref:`replication feature <box-replication>`.
+    for support of the :ref:`replication feature <index-box_replication>`.
 
 =============================================================================
           Example: use box.space functions to read _space tuples
