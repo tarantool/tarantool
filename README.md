@@ -67,10 +67,6 @@ To use a different release type, say, RelWithDebInfo, use:
 
     tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
-Additional build options can be set similarly:
-
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_DOC=true # builds the docs
-
 'make' creates 'tarantool' executable in directory src/.
 
 There is 'make install' goal. One can also run Tarantool executable without

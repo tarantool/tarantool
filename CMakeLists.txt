@@ -19,10 +19,6 @@ include(FindOptionalPackage)
 include(FindPackageMessage)
 
 find_program(ECHO echo)
-find_program(XSLTPROC xsltproc)
-find_program(XMLLINT xmllint)
-find_program(JING jing)
-find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
@@ -53,7 +49,6 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
-include(cmake/FindSphinx.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 
@@ -252,13 +247,6 @@ find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
     "${MODULE_LUAPATH}")
 find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
     "${MODULE_LIBPATH}")
-
-#
-# Now handle all configuration options.
-#
-if (IS_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx)
-    option(ENABLE_DOC "Enable building of documentation" OFF)
-endif ()
 
 
 ##
