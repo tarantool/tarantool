@@ -3209,7 +3209,8 @@ sv_indexset(struct svindex *i, struct svref ref)
 	i->hint_key_is_equal = false;
 	if (bps_tree_svindex_insert(&i->tree, ref, NULL) != 0)
 		return -1;
-	i->used += ref.v->size;
+	/* sic: sync this value with vy_range->used */
+	i->used += vinyl_tuple_size(ref.v);
 	if (i->lsnmin > ref.v->lsn)
 		i->lsnmin = ref.v->lsn;
 	if (!i->hint_key_is_equal) {
@@ -3278,12 +3279,6 @@ sv_indexfind(struct svindex *i, char *key, int size, uint64_t lsn)
 	if (ref != NULL && tree_svindex_compare_key(*ref, &tree_key, i) != 0)
 		ref = NULL;
 	return ref;
-}
-
-static inline uint32_t
-sv_indexused(struct svindex *i) {
-	return i->tree.size * sizeof(struct vinyl_tuple) + i->used +
-		bps_tree_svindex_mem_used(&i->tree);
 }
 
 static uint8_t
@@ -6114,7 +6109,7 @@ struct PACKED vy_range {
 	uint32_t   recover;
 	uint16_t   flags;
 	uint64_t   update_time;
-	uint32_t   used;
+	uint32_t   used; /* sum of i0->used + i1->used */
 	uint64_t   lru;
 	uint64_t   ac;
 	struct vy_run   self;
@@ -7209,9 +7204,9 @@ vy_run(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan, uint64_t 
 		return -1;
 	if (unlikely(branch == NULL)) {
 		vy_index_lock(index);
-		uint32_t used = sv_indexused(i);
-		n->used -= used;
-		vy_quota_op(r->quota, VINYL_QREMOVE, used);
+		assert(n->used >= i->used);
+		n->used -= i->used;
+		vy_quota_op(r->quota, VINYL_QREMOVE, i->used);
 		struct svindex swap = *i;
 		swap.tree.arg = &swap;
 		vy_range_unrotate(n);
@@ -7228,9 +7223,9 @@ vy_run(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan, uint64_t 
 	n->branch->link = branch;
 	n->branch = branch;
 	n->branch_count++;
-	uint32_t used = sv_indexused(i);
-	n->used -= used;
-	vy_quota_op(r->quota, VINYL_QREMOVE, used);
+	assert(n->used >= i->used);
+	n->used -= i->used;
+	vy_quota_op(r->quota, VINYL_QREMOVE, i->used);
 	index->size +=
 		sd_indexsize_ext(branch->index.h) +
 		sd_indextotal(&branch->index);
@@ -7331,7 +7326,7 @@ vy_index_compact(struct vinyl_index *index, struct sdc *c,
 	vindex = vy_range_rotate(node);
 	vy_index_unlock(index);
 
-	uint64_t size_stream = sv_indexused(vindex);
+	uint64_t size_stream = vindex->used;
 	struct vy_iter i;
 	sv_indexiter_open(&i, vindex, VINYL_GE, NULL, 0);
 	return si_compact(index, c, plan, vlsn, vlsn_lru, &i, size_stream);
@@ -7480,7 +7475,9 @@ si_redistribute_set(struct vinyl_index *index, uint64_t now, struct svref *v)
 	assert(node != NULL);
 	/* update node */
 	struct svindex *vindex = vy_range_index(node);
-	sv_indexset(vindex, *v);
+	int rc = sv_indexset(vindex, *v);
+	assert(rc == 0); /* TODO: handle BPS tree errors properly */
+	(void) rc;
 	node->update_time = index->update_time;
 	node->used += vinyl_tuple_size(v->v);
 	/* schedule node */
@@ -7690,7 +7687,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		n->i0.tree.arg = &n->i0;
 		n->temperature = range->temperature;
 		n->temperature_reads = range->temperature_reads;
-		n->used = sv_indexused(j);
+		n->used = j->used;
 		index->size += vy_range_size(n);
 		vy_range_lock(n);
 		si_replace(index, range, n);
@@ -7705,7 +7702,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		}
 		vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
 		n = vy_bufiterref_get(&i);
-		n->used = sv_indexused(&n->i0);
+		n->used = n->i0.used;
 		n->temperature = range->temperature;
 		n->temperature_reads = range->temperature_reads;
 		index->size += vy_range_size(n);
@@ -7715,7 +7712,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		for (vy_bufiterref_next(&i); vy_bufiterref_has(&i);
 		     vy_bufiterref_next(&i)) {
 			n = vy_bufiterref_get(&i);
-			n->used = sv_indexused(&n->i0);
+			n->used = n->i0.used;
 			n->temperature = range->temperature;
 			n->temperature_reads = range->temperature_reads;
 			index->size += vy_range_size(n);
@@ -8465,8 +8462,8 @@ static int vy_profiler_(struct vy_profiler *p)
 			p->histogram_branch[n->branch_count]++;
 		else
 			p->histogram_branch_20plus++;
-		memory_used += sv_indexused(&n->i0);
-		memory_used += sv_indexused(&n->i1);
+		memory_used += n->i0.used;
+		memory_used += n->i1.used;
 		struct vy_run *b = n->branch;
 		while (b) {
 			p->count += b->index.h->keys;
@@ -9416,7 +9413,9 @@ static inline int si_set(struct sitx *x, struct vinyl_tuple *v, uint64_t time)
 	ref.flags = 0;
 	/* insert into node index */
 	struct svindex *vindex = vy_range_index(node);
-	sv_indexset(vindex, ref);
+	int rc = sv_indexset(vindex, ref);
+	assert(rc == 0); /* TODO: handle BPS tree errors properly */
+	(void) rc;
 	/* update node */
 	node->update_time = index->update_time;
 	node->used += vinyl_tuple_size(v);
