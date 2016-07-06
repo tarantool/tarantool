@@ -1794,19 +1794,17 @@ struct runtime {
 };
 
 static inline void
-sr_init(struct runtime *r,
-        struct vy_quota *quota,
-        struct srzonemap *zonemap,
-        struct vy_sequence *seq,
-        struct vy_stat *stat)
+sr_init(struct runtime *r, struct vy_quota *quota, struct srzonemap *zonemap,
+        struct vy_sequence *seq, struct vy_stat *stat)
 {
-	r->quota       = quota;
-	r->zonemap     = zonemap;
-	r->seq         = seq;
-	r->stat        = stat;
+	r->quota = quota;
+	r->zonemap = zonemap;
+	r->seq = seq;
+	r->stat = stat;
 }
 
-static inline struct srzone *sr_zoneof(struct runtime *r)
+static inline struct srzone *
+sr_zoneof(struct runtime *r)
 {
 	int p = vy_quota_used_percent(r->quota);
 	return sr_zonemap(r->zonemap, p);
@@ -1814,8 +1812,6 @@ static inline struct srzone *sr_zoneof(struct runtime *r)
 
 struct srconfstmt;
 struct srconf;
-
-typedef int (*srconff)(struct srconf*, struct srconfstmt*);
 
 struct srconf {
 	char *key;
@@ -1825,15 +1821,15 @@ struct srconf {
 };
 
 struct PACKED srconfdump {
-	uint8_t  type;
+	uint8_t type;
 	uint16_t keysize;
 	uint32_t valuesize;
 };
 
 struct srconfstmt {
 	const char *path;
-	struct vy_buf      *serialize;
-	struct runtime         *r;
+	struct vy_buf *serialize;
+	struct runtime *r;
 };
 
 static inline struct srconf *
@@ -4206,8 +4202,9 @@ error:
 	return -1;
 }
 
-static int sx_get(struct sx *x, struct sxindex *index, struct vinyl_tuple *key,
-		  struct vinyl_tuple **result)
+static int
+sx_get(struct sx *x, struct sxindex *index, struct vinyl_tuple *key,
+       struct vinyl_tuple **result)
 {
 	tt_pthread_mutex_lock(&index->mutex);
 	struct sxv *head = sxv_tree_search_key(&index->tree,
@@ -6416,35 +6413,35 @@ struct vy_profiler {
 struct vinyl_index {
 	struct vinyl_env *env;
 	struct vy_profiler rtp;
-	struct sxindex    coindex;
-	uint64_t   txn_min;
-	uint64_t   txn_max;
+	struct sxindex coindex;
+	uint64_t txn_min;
+	uint64_t txn_max;
 
 	vy_range_tree_t tree;
 	struct vy_status status;
 	pthread_mutex_t lock;
-	struct vy_planner  p;
-	int        n;
-	uint64_t   update_time;
-	uint64_t   lru_run_lsn;
-	uint64_t   lru_v;
-	uint64_t   lru_steps;
-	uint64_t   lru_intr_lsn;
-	uint64_t   lru_intr_sum;
-	uint64_t   read_disk;
-	uint64_t   read_cache;
-	uint64_t   size;
+	struct vy_planner p;
+	int range_count;
+	uint64_t update_time;
+	uint64_t lru_run_lsn;
+	uint64_t lru_v;
+	uint64_t lru_steps;
+	uint64_t lru_intr_lsn;
+	uint64_t lru_intr_sum;
+	uint64_t read_disk;
+	uint64_t read_cache;
+	uint64_t size;
 	pthread_mutex_t ref_lock;
-	uint32_t   refs;
-	uint32_t   gc_count;
-	struct rlist     gc;
-	struct vy_buf      readbuf;
-	struct svupsert   u;
-	struct vy_index_conf   conf;
+	uint32_t refs;
+	uint32_t gc_count;
+	struct rlist gc;
+	struct vy_buf readbuf;
+	struct svupsert u;
+	struct vy_index_conf conf;
 	struct key_def *key_def;
 	struct runtime *r;
 	/** Member of env->db or scheduler->shutdown. */
-	struct rlist     link;
+	struct rlist link;
 };
 
 static int
@@ -6476,10 +6473,8 @@ vy_index_unlock(struct vinyl_index *i) {
 
 static inline int
 vinyl_index_delete(struct vinyl_index *index);
-static int si_recover(struct vinyl_index*);
-static int si_insert(struct vinyl_index*, struct vy_range*);
-static int si_remove(struct vinyl_index*, struct vy_range*);
-static int si_replace(struct vinyl_index*, struct vy_range*, struct vy_range*);
+
+static struct vy_range *si_bootstrap(struct vinyl_index*, uint64_t);
 static int vy_plan(struct vinyl_index*, struct vy_plan*);
 static int
 si_execute(struct vinyl_index*, struct sdc*, struct vy_plan*, uint64_t, uint64_t);
@@ -6794,24 +6789,24 @@ si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t,
 	 enum vinyl_status status);
 
 struct siread {
-	enum vinyl_order   order;
-	void     *key;
-	uint32_t  keysize;
-	int       has;
-	uint64_t  vlsn;
-	struct svmerge   merge;
-	int       cache_only;
-	int       oldest_only;
-	int       read_disk;
-	int       read_cache;
-	struct sv       *upsert_v;
-	int       upsert_eq;
+	enum vinyl_order order;
+	void *key;
+	uint32_t keysize;
+	int has;
+	uint64_t vlsn;
+	struct svmerge merge;
+	int cache_only;
+	int oldest_only;
+	int read_disk;
+	int read_cache;
+	struct sv *upsert_v;
+	int upsert_eq;
 	struct vinyl_tuple *result;
-	struct sicache  *cache;
-	struct vinyl_index       *index;
+	struct sicache *cache;
+	struct vinyl_index *index;
 };
 
-struct PACKED vy_rangeiter {
+struct vy_rangeiter {
 	struct vinyl_index *index;
 	struct vy_range *node;
 	enum vinyl_order order;
@@ -6820,28 +6815,28 @@ struct PACKED vy_rangeiter {
 };
 
 static inline int
-vy_rangeiter_open(struct vy_rangeiter *ii, struct vinyl_index *index, enum vinyl_order o,
-	     void *key, int keysize)
+vy_rangeiter_open(struct vy_rangeiter *itr, struct vinyl_index *index,
+		  enum vinyl_order order, void *key, int keysize)
 {
-	ii->index   = index;
-	ii->order   = o;
-	ii->key     = key;
-	ii->keysize = keysize;
-	ii->node = NULL;
+	itr->index = index;
+	itr->order = order;
+	itr->key = key;
+	itr->keysize = keysize;
+	itr->node = NULL;
 	int eq = 0;
-	if (unlikely(index->n == 1)) {
-		ii->node = vy_range_tree_first(&index->tree);
+	if (unlikely(index->range_count == 1)) {
+		itr->node = vy_range_tree_first(&index->tree);
 		return 1;
 	}
-	if (unlikely(ii->key == NULL)) {
-		switch (ii->order) {
+	if (unlikely(itr->key == NULL)) {
+		switch (itr->order) {
 		case VINYL_LT:
 		case VINYL_LE:
-			ii->node = vy_range_tree_last(&index->tree);;
+			itr->node = vy_range_tree_last(&index->tree);;
 			break;
 		case VINYL_GT:
 		case VINYL_GE:
-			ii->node = vy_range_tree_first(&index->tree);
+			itr->node = vy_range_tree_first(&index->tree);
 			break;
 		default:
 			unreachable();
@@ -6850,17 +6845,17 @@ vy_rangeiter_open(struct vy_rangeiter *ii, struct vinyl_index *index, enum vinyl
 		return 0;
 	}
 	/* route */
-	assert(ii->key != NULL);
+	assert(itr->key != NULL);
 	struct vy_range_tree_key tree_key;
-	tree_key.data = ii->key;
-	tree_key.size = ii->keysize;
-	ii->node = vy_range_tree_search(&index->tree, &tree_key);
-	if (ii->node != NULL) {
+	tree_key.data = itr->key;
+	tree_key.size = itr->keysize;
+	itr->node = vy_range_tree_search(&index->tree, &tree_key);
+	if (itr->node != NULL) {
 		eq = 1;
 	} else {
-		ii->node = vy_range_tree_psearch(&index->tree, &tree_key);
+		itr->node = vy_range_tree_psearch(&index->tree, &tree_key);
 	}
-	assert(ii->node != NULL);
+	assert(itr->node != NULL);
 	return eq;
 }
 
@@ -6999,35 +6994,33 @@ si_trackreplace(struct sitrack *t, struct vy_range *o, struct vy_range *n)
 	vy_range_id_tree_remove(&t->tree, o);
 	vy_range_id_tree_insert(&t->tree, n);
 }
-static struct vy_range *si_bootstrap(struct vinyl_index*, uint64_t);
-static int si_recover(struct vinyl_index*);
 
-static int vy_profiler_begin(struct vy_profiler*, struct vinyl_index*);
-static int vy_profiler_end(struct vy_profiler*);
-static int vy_profiler_(struct vy_profiler*);
-
-static int si_insert(struct vinyl_index *index, struct vy_range *n)
+static int
+si_insert(struct vinyl_index *index, struct vy_range *range)
 {
-	vy_range_tree_insert(&index->tree, n);
-	index->n++;
+	vy_range_tree_insert(&index->tree, range);
+	index->range_count++;
 	return 0;
 }
 
-static int si_remove(struct vinyl_index *index, struct vy_range *n)
+static int
+si_remove(struct vinyl_index *index, struct vy_range *range)
 {
-	vy_range_tree_remove(&index->tree, n);
-	index->n--;
+	vy_range_tree_remove(&index->tree, range);
+	index->range_count--;
 	return 0;
 }
 
-static int si_replace(struct vinyl_index *index, struct vy_range *o, struct vy_range *n)
+static int
+si_replace(struct vinyl_index *index, struct vy_range *o, struct vy_range *n)
 {
 	vy_range_tree_remove(&index->tree, o);
 	vy_range_tree_insert(&index->tree, n);
 	return 0;
 }
 
-static int vy_plan(struct vinyl_index *index, struct vy_plan *plan)
+static int
+vy_plan(struct vinyl_index *index, struct vy_plan *plan)
 {
 	vy_index_lock(index);
 	int rc = vy_planner(&index->p, plan);
@@ -7100,8 +7093,7 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 		.save_upsert     = 1
 	};
 	struct sdmerge merge;
-	rc = sd_mergeinit(&merge, &im, &c->build,
-	                  &c->upsert, &mergeconf);
+	rc = sd_mergeinit(&merge, &im, &c->build, &c->upsert, &mergeconf);
 	if (unlikely(rc == -1))
 		return -1;
 
@@ -7634,12 +7626,9 @@ error:
 }
 
 static int
-si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *node,
-	 uint64_t vlsn,
-	 uint64_t vlsn_lru,
-	 struct svmergeiter *stream,
-	 uint64_t size_stream,
-	 uint32_t n_stream)
+si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
+	 uint64_t vlsn, uint64_t vlsn_lru,
+	 struct svmergeiter *stream, uint64_t size_stream, uint32_t n_stream)
 {
 	struct runtime *r = index->r;
 	struct vy_buf *result = &c->a;
@@ -7651,34 +7640,28 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *node,
 	 * a new nodes.
 	 */
 	int rc;
-	rc = si_split(index, c, result,
-	              node, stream,
-	              index->conf.node_size,
-	              size_stream,
-	              n_stream,
-	              vlsn,
-	              vlsn_lru);
+	rc = si_split(index, c, result, range, stream, index->conf.node_size,
+		      size_stream, n_stream, vlsn, vlsn_lru);
 	if (unlikely(rc == -1))
 		return -1;
 
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_0,
-	             si_splitfree(result, r);
-	             vy_error("%s", "error injection");
-	             return -1);
+			si_splitfree(result, r);
+			vy_error("%s", "error injection");
+			return -1);
 
-	/* mask removal of a single node as a
-	 * single node update */
+	/* mask removal of a single range as a
+	 * single range update */
 	int count = vy_buf_used(result) / sizeof(struct vy_range*);
-	int count_index;
 
 	vy_index_lock(index);
-	count_index = index->n;
+	int range_count = index->range_count;
 	vy_index_unlock(index);
 
 	struct vy_range *n;
-	if (unlikely(count == 0 && count_index == 1))
+	if (unlikely(count == 0 && range_count == 1))
 	{
-		n = si_bootstrap(index, node->self.id.id);
+		n = si_bootstrap(index, range->self.id.id);
 		if (unlikely(n == NULL))
 			return -1;
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
@@ -7692,29 +7675,29 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *node,
 
 	/* commit compaction changes */
 	vy_index_lock(index);
-	struct svindex *j = vy_range_index(node);
-	vy_planner_remove(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, node);
-	vy_range_split(node);
-	index->size -= vy_range_size(node);
+	struct svindex *j = vy_range_index(range);
+	vy_planner_remove(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, range);
+	vy_range_split(range);
+	index->size -= vy_range_size(range);
 	switch (count) {
 	case 0: /* delete */
-		si_remove(index, node);
-		si_redistribute_index(index, c, node);
+		si_remove(index, range);
+		si_redistribute_index(index, c, range);
 		break;
 	case 1: /* self update */
 		n = *(struct vy_range**)result->s;
 		n->i0 = *j;
 		n->i0.tree.arg = &n->i0;
-		n->temperature = node->temperature;
-		n->temperature_reads = node->temperature_reads;
+		n->temperature = range->temperature;
+		n->temperature_reads = range->temperature_reads;
 		n->used = sv_indexused(j);
 		index->size += vy_range_size(n);
 		vy_range_lock(n);
-		si_replace(index, node, n);
+		si_replace(index, range, n);
 		vy_planner_update(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
 		break;
 	default: /* split */
-		rc = si_redistribute(index, c, node, result);
+		rc = si_redistribute(index, c, range, result);
 		if (unlikely(rc == -1)) {
 			vy_index_unlock(index);
 			si_splitfree(result, r);
@@ -7723,18 +7706,18 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *node,
 		vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
 		n = vy_bufiterref_get(&i);
 		n->used = sv_indexused(&n->i0);
-		n->temperature = node->temperature;
-		n->temperature_reads = node->temperature_reads;
+		n->temperature = range->temperature;
+		n->temperature_reads = range->temperature_reads;
 		index->size += vy_range_size(n);
 		vy_range_lock(n);
-		si_replace(index, node, n);
+		si_replace(index, range, n);
 		vy_planner_update(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
 		for (vy_bufiterref_next(&i); vy_bufiterref_has(&i);
 		     vy_bufiterref_next(&i)) {
 			n = vy_bufiterref_get(&i);
 			n->used = sv_indexused(&n->i0);
-			n->temperature = node->temperature;
-			n->temperature_reads = node->temperature_reads;
+			n->temperature = range->temperature;
+			n->temperature_reads = range->temperature_reads;
 			index->size += vy_range_size(n);
 			vy_range_lock(n);
 			si_insert(index, n);
@@ -7754,33 +7737,33 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *node,
 		n  = vy_bufiterref_get(&i);
 		rc = vy_range_seal(n, &index->conf);
 		if (unlikely(rc == -1)) {
-			vy_range_free(node, r, 0);
+			vy_range_free(range, r, 0);
 			return -1;
 		}
 		VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_3,
-		             vy_range_free(node, r, 0);
+		             vy_range_free(range, r, 0);
 		             vy_error("%s", "error injection");
 		             return -1);
 		vy_bufiterref_next(&i);
 	}
 
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
-	             vy_range_free(node, r, 0);
+	             vy_range_free(range, r, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
 
-	/* gc node */
-	uint16_t refs = vy_range_refof(node);
+	/* gc range */
+	uint16_t refs = vy_range_refof(range);
 	if (likely(refs == 0)) {
-		rc = vy_range_free(node, r, 1);
+		rc = vy_range_free(range, r, 1);
 		if (unlikely(rc == -1))
 			return -1;
 	} else {
-		/* node concurrently being read, schedule for
+		/* range concurrently being read, schedule for
 		 * delayed removal */
-		vy_range_gc(node, &index->conf);
+		vy_range_gc(range, &index->conf);
 		vy_index_lock(index);
-		rlist_add(&index->gc, &node->gc);
+		rlist_add(&index->gc, &range->gc);
 		index->gc_count++;
 		vy_index_unlock(index);
 	}
@@ -8514,22 +8497,22 @@ static int vy_profiler_(struct vy_profiler *p)
 
 static int
 si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
-	    enum vinyl_order o, uint64_t vlsn, void *key, uint32_t keysize)
+	    enum vinyl_order order, uint64_t vlsn, void *key, uint32_t keysize)
 {
-	q->order       = o;
-	q->key         = key;
-	q->keysize     = keysize;
-	q->vlsn        = vlsn;
-	q->index       = index;
-	q->cache       = c;
-	q->has         = 0;
-	q->upsert_v    = NULL;
-	q->upsert_eq   = 0;
-	q->cache_only  = 0;
+	q->order = order;
+	q->key = key;
+	q->keysize = keysize;
+	q->vlsn = vlsn;
+	q->index = index;
+	q->cache = c;
+	q->has = 0;
+	q->upsert_v = NULL;
+	q->upsert_eq = 0;
+	q->cache_only = 0;
 	q->oldest_only = 0;
-	q->read_disk   = 0;
-	q->read_cache  = 0;
-	q->result      = NULL;
+	q->read_disk = 0;
+	q->read_cache = 0;
+	q->result = NULL;
 	sv_mergeinit(&q->merge, index->key_def);
 	vy_index_lock(index);
 	return 0;
@@ -8886,16 +8869,15 @@ static int
 si_readcommited(struct vinyl_index *index, struct sv *v)
 {
 	/* search node index */
-	struct vy_rangeiter ii;
-	vy_rangeiter_open(&ii, index, VINYL_GE, sv_pointer(v), sv_size(v));
-	struct vy_range *node;
-	node = vy_rangeiter_get(&ii);
-	assert(node != NULL);
+	struct vy_rangeiter ri;
+	vy_rangeiter_open(&ri, index, VINYL_GE, sv_pointer(v), sv_size(v));
+	struct vy_range *range = vy_rangeiter_get(&ri);
+	assert(range != NULL);
 
 	uint64_t lsn = sv_lsn(v);
 	/* search in-memory */
 	struct svindex *second;
-	struct svindex *first = vy_range_index_priority(node, &second);
+	struct svindex *first = vy_range_index_priority(range, &second);
 	struct svref *ref = sv_indexfind(first, sv_pointer(v),
 					 sv_size(v), UINT64_MAX);
 	if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
@@ -8904,12 +8886,11 @@ si_readcommited(struct vinyl_index *index, struct sv *v)
 	if (ref != NULL && ref->v->lsn >= lsn)
 		return 1;
 
-	/* search branches */
-	struct vy_run *b;
-	for (b = node->branch; b; b = b->next)
+	/* search runs */
+	for (struct vy_run *run = range->branch; run != NULL; run = run->next)
 	{
 		struct sdindexiter ii;
-		sd_indexiter_open(&ii, index->key_def, &b->index, VINYL_GE,
+		sd_indexiter_open(&ii, index->key_def, &run->index, VINYL_GE,
 				  sv_pointer(v), sv_size(v));
 		struct sdindexpage *page = sd_indexiter_get(&ii);
 		if (page == NULL)
@@ -9357,7 +9338,8 @@ si_recoverdrop(struct vinyl_index *i)
 	return 1;
 }
 
-static int si_recover(struct vinyl_index *i)
+static int
+si_recover(struct vinyl_index *i)
 {
 	struct runtime *r = i->r;
 	int exist = path_exists(i->conf.path);
@@ -9377,14 +9359,16 @@ deploy:
 	return si_deploy(i, r, !exist);
 }
 
-static void vy_index_conf_init(struct vy_index_conf *s)
+static void
+vy_index_conf_init(struct vy_index_conf *s)
 {
 	memset(s, 0, sizeof(*s));
 	sr_version(&s->version);
 	sr_version_storage(&s->version_storage);
 }
 
-static void vy_index_conf_free(struct vy_index_conf *s)
+static void
+vy_index_conf_free(struct vy_index_conf *s)
 {
 	if (s->name) {
 		free(s->name);
@@ -10979,9 +10963,9 @@ vinyl_index_drop(struct vinyl_index *index)
 int
 vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order,
-		struct vinyl_tuple **result, struct sx *x,
-		struct sicache *cache, bool cache_only,
-		struct vy_stat_get *statget)
+		 struct vinyl_tuple **result, struct sx *x,
+		 struct sicache *cache, bool cache_only,
+		 struct vy_stat_get *statget)
 {
 	struct vinyl_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
@@ -11122,17 +11106,17 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	tt_pthread_mutex_init(&index->lock, NULL);
 	rlist_create(&index->link);
 	rlist_create(&index->gc);
-	index->gc_count     = 0;
-	index->update_time  = 0;
-	index->lru_run_lsn  = 0;
-	index->lru_v        = 0;
-	index->lru_steps    = 1;
+	index->gc_count = 0;
+	index->update_time = 0;
+	index->lru_run_lsn = 0;
+	index->lru_v = 0;
+	index->lru_steps = 1;
 	index->lru_intr_lsn = 0;
 	index->lru_intr_sum = 0;
-	index->size         = 0;
-	index->read_disk    = 0;
-	index->read_cache   = 0;
-	index->n            = 0;
+	index->size = 0;
+	index->read_disk = 0;
+	index->read_cache = 0;
+	index->range_count = 0;
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs         = 1;
 	vy_status_set(&index->status, VINYL_OFFLINE);
@@ -11852,8 +11836,7 @@ vy_read_task(struct vinyl_index *index, struct vinyl_tx *tx,
 	assert(env != NULL);
 	struct vy_read_task *task = mempool_alloc(&env->read_task_pool);
 	if (task == NULL) {
-		diag_set(OutOfMemory, sizeof(*task), "mempool",
-			 "vy_read_task");
+		diag_set(OutOfMemory, sizeof(*task), "mempool", "vy_read_task");
 		return -1;
 	}
 	task->index = index;
