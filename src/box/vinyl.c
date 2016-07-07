@@ -3540,13 +3540,15 @@ sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
 	return vy_compare(key_def, a->data, b->tuple->data);
 }
 
-struct sx;
+struct vinyl_tx;
 struct sicache;
 
-typedef int (*sxpreparef)(struct sx*, struct sv*, struct vinyl_index*,
+typedef int (*sxpreparef)(struct vinyl_tx*, struct sv*, struct vinyl_index*,
 			  struct sicache *);
 
-struct sx {
+struct vinyl_tx {
+	struct vinyl_env *env;
+	struct svlog log;
 	uint64_t start;
 	enum sxtype     type;
 	enum sxstate    state;
@@ -3554,29 +3556,28 @@ struct sx {
 	uint64_t   vlsn;
 	uint64_t   csn;
 	int        log_read;
-	struct svlog     *log;
 	struct rlist     deadlock;
-	rb_node(struct sx) tree_node;
+	rb_node(struct vinyl_tx) tree_node;
 	struct sxmanager *manager;
 };
 
-typedef rb_tree(struct sx) sx_tree_t;
+typedef rb_tree(struct vinyl_tx) sx_tree_t;
 
 static int
-sx_tree_cmp(sx_tree_t *rbtree, struct sx *a, struct sx *b)
+sx_tree_cmp(sx_tree_t *rbtree, struct vinyl_tx *a, struct vinyl_tx *b)
 {
 	(void)rbtree;
 	return vy_cmp(a->id, b->id);
 }
 
 static int
-sx_tree_key_cmp(sx_tree_t *rbtree, const char *a, struct sx *b)
+sx_tree_key_cmp(sx_tree_t *rbtree, const char *a, struct vinyl_tx *b)
 {
 	(void)rbtree;
 	return vy_cmp(load_u64(a), b->id);
 }
 
-rb_gen_ext_key(, sx_tree_, sx_tree_t, struct sx, tree_node,
+rb_gen_ext_key(, sx_tree_, sx_tree_t, struct vinyl_tx, tree_node,
 		 sx_tree_cmp, const char *, sx_tree_key_cmp);
 
 struct sxmanager {
@@ -3597,19 +3598,19 @@ static int sx_indexinit(struct sxindex *, struct sxmanager *,
 			struct vinyl_index *, struct key_def *key_def);
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
-static struct sx *sx_find(struct sxmanager*, uint64_t);
-static void sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*);
-static void sx_gc(struct sx*);
-static enum sxstate sx_commit(struct sx*);
-static enum sxstate sx_rollback(struct sx*);
-static int sx_set(struct sx*, struct sxindex*, struct vinyl_tuple*);
-static int sx_get(struct sx*, struct sxindex*, struct vinyl_tuple*, struct vinyl_tuple**);
+static struct vinyl_tx *sx_find(struct sxmanager*, uint64_t);
+static void sx_begin(struct sxmanager*, struct vinyl_tx*, enum sxtype);
+static void sx_gc(struct vinyl_tx*);
+static enum sxstate sx_commit(struct vinyl_tx*);
+static enum sxstate sx_rollback(struct vinyl_tx*);
+static int sx_set(struct vinyl_tx*, struct sxindex*, struct vinyl_tuple*);
+static int sx_get(struct vinyl_tx*, struct sxindex*, struct vinyl_tuple*, struct vinyl_tuple**);
 static uint64_t sx_min(struct sxmanager*);
 static uint64_t sx_max(struct sxmanager*);
 static uint64_t sx_vlsn(struct sxmanager*);
 static enum sxstate sx_get_autocommit(struct sxmanager*, struct sxindex*);
 
-static int sx_deadlock(struct sx*);
+static int sx_deadlock(struct vinyl_tx*);
 
 static inline int
 sx_count(struct sxmanager *m) {
@@ -3687,7 +3688,7 @@ static uint64_t sx_min(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
-		struct sx *min = sx_tree_first(&m->tree);
+		struct vinyl_tx *min = sx_tree_first(&m->tree);
 		id = min->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -3699,7 +3700,7 @@ static uint64_t sx_max(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
-		struct sx *max = sx_tree_last(&m->tree);
+		struct vinyl_tx *max = sx_tree_last(&m->tree);
 		id = max->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -3711,7 +3712,7 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t vlsn;
 	if (sx_count(m) > 0) {
-		struct sx *min = sx_tree_first(&m->tree);
+		struct vinyl_tx *min = sx_tree_first(&m->tree);
 		vlsn = min->vlsn;
 	} else {
 		vlsn = vy_sequence(m->r->seq, VINYL_LSN);
@@ -3720,25 +3721,24 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	return vlsn;
 }
 
-static struct sx *sx_find(struct sxmanager *m, uint64_t id)
+static struct vinyl_tx *sx_find(struct sxmanager *m, uint64_t id)
 {
 	return sx_tree_search(&m->tree, (char*)&id);
 }
 
 static inline enum sxstate
-sx_promote(struct sx *x, enum sxstate state)
+sx_promote(struct vinyl_tx *x, enum sxstate state)
 {
 	x->state = state;
 	return state;
 }
 
 static void
-sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
-	 struct svlog *log)
+sx_begin(struct sxmanager *m, struct vinyl_tx *x, enum sxtype type)
 {
+	sv_loginit(&x->log);
 	x->start = clock_monotonic64();
 	x->manager = m;
-	x->log = log;
 	x->state = SXREADY;
 	x->type = type;
 	x->log_read = -1;
@@ -3779,7 +3779,7 @@ sx_csn(struct sxmanager *m)
 	uint64_t csn = UINT64_MAX;
 	if (m->count_rw == 0)
 		return csn;
-	struct sx *min = sx_tree_first(&m->tree);
+	struct vinyl_tx *min = sx_tree_first(&m->tree);
 	while (min) {
 		if (min->type != SXRO) {
 			break;
@@ -3816,18 +3816,18 @@ sx_garbage_collect(struct sxmanager *m)
 	m->gc = gc;
 }
 
-static void sx_gc(struct sx *x)
+static void sx_gc(struct vinyl_tx *x)
 {
 	struct sxmanager *m = x->manager;
 	sx_promote(x, SXUNDEF);
-	x->log = NULL;
+	sv_logfree(&x->log);
 	if (m->count_gc == 0)
 		return;
 	sx_garbage_collect(m);
 }
 
 static inline void
-sx_end(struct sx *x)
+sx_end(struct vinyl_tx *x)
 {
 	struct sxmanager *m = x->manager;
 	tt_pthread_mutex_lock(&m->lock);
@@ -3840,7 +3840,7 @@ sx_end(struct sx *x)
 }
 
 static inline void
-sx_rollback_svp(struct sx *x, struct vy_bufiter *i, int tuple_free)
+sx_rollback_svp(struct vinyl_tx *x, struct vy_bufiter *i, int tuple_free)
 {
 	struct sxmanager *m = x->manager;
 	int gc = 0;
@@ -3863,11 +3863,11 @@ sx_rollback_svp(struct sx *x, struct vy_bufiter *i, int tuple_free)
 	vy_quota_op(m->r->quota, VINYL_QREMOVE, gc);
 }
 
-static enum sxstate sx_rollback(struct sx *x)
+static enum sxstate sx_rollback(struct vinyl_tx *x)
 {
 	struct sxmanager *m = x->manager;
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
 	/* support log free after commit and half-commit mode */
 	if (x->state == SXCOMMIT) {
 		int gc = 0;
@@ -3891,18 +3891,18 @@ static enum sxstate sx_rollback(struct sx *x)
 
 
 static inline int
-vy_txprepare_cb(struct sx *x, struct svlogv *v, uint64_t lsn,
+vy_txprepare_cb(struct vinyl_tx *x, struct svlogv *v, uint64_t lsn,
 	    struct sicache *cache, enum vinyl_status status);
 
 static enum sxstate
-sx_prepare(struct sx *x, struct sicache *cache, enum vinyl_status status)
+sx_prepare(struct vinyl_tx *x, struct sicache *cache, enum vinyl_status status)
 {
 	uint64_t lsn = vy_sequence(x->manager->r->seq, VINYL_LSN);
 	/* proceed read-only transactions */
-	if (x->type == SXRO || sv_logcount_write(x->log) == 0)
+	if (x->type == SXRO || sv_logcount_write(&x->log) == 0)
 		return sx_promote(x, SXPREPARE);
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
 	enum sxstate rc;
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
@@ -3935,13 +3935,13 @@ sx_prepare(struct sx *x, struct sicache *cache, enum vinyl_status status)
 	return sx_promote(x, SXPREPARE);
 }
 
-static enum sxstate sx_commit(struct sx *x)
+static enum sxstate sx_commit(struct vinyl_tx *x)
 {
 	assert(x->state == SXPREPARE);
 
 	struct sxmanager *m = x->manager;
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
 	uint64_t csn = ++m->csn;
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
@@ -3980,7 +3980,7 @@ static enum sxstate sx_commit(struct sx *x)
 	return SXCOMMIT;
 }
 
-static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *version)
+static int sx_set(struct vinyl_tx *x, struct sxindex *index, struct vinyl_tuple *version)
 {
 	struct sxmanager *m = x->manager;
 	struct runtime *r = m->r;
@@ -4006,8 +4006,8 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 					       v->tuple->data, v->tuple->size);
 	if (unlikely(head == NULL)) {
 		/* unique */
-		v->lo = sv_logcount(x->log);
-		int rc = sv_logadd(x->log, &lv, index->index);
+		v->lo = sv_logcount(&x->log);
+		int rc = sv_logadd(&x->log, &lv, index->index);
 		if (unlikely(rc == -1)) {
 			vy_oom();
 			goto error;
@@ -4027,7 +4027,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 			goto error;
 		}
 		/* replace old document with the new one */
-		lv.next = sv_logat(x->log, own->lo)->next;
+		lv.next = sv_logat(&x->log, own->lo)->next;
 		v->lo = own->lo;
 		if (unlikely(sx_vaborted(own)))
 			sx_vabort(v);
@@ -4037,7 +4037,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 			sxv_tree_insert(&index->tree, v);
 		}
 		/* update log */
-		sv_logreplace(x->log, v->lo, &lv);
+		sv_logreplace(&x->log, v->lo, &lv);
 
 		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(own->tuple));
 		sx_vfree(r, own);
@@ -4045,8 +4045,8 @@ static int sx_set(struct sx *x, struct sxindex *index, struct vinyl_tuple *versi
 		return 0;
 	}
 	/* update log */
-	v->lo = sv_logcount(x->log);
-	int rc = sv_logadd(x->log, &lv, index->index);
+	v->lo = sv_logcount(&x->log);
+	int rc = sv_logadd(&x->log, &lv, index->index);
 	if (unlikely(rc == -1)) {
 		vy_oom();
 		goto error;
@@ -4063,7 +4063,7 @@ error:
 }
 
 static int
-sx_get(struct sx *x, struct sxindex *index, struct vinyl_tuple *key,
+sx_get(struct vinyl_tx *x, struct sxindex *index, struct vinyl_tuple *key,
        struct vinyl_tuple **result)
 {
 	tt_pthread_mutex_lock(&index->mutex);
@@ -4088,7 +4088,7 @@ add:
 	/* track a start of the latest read sequence in the
 	 * transactional log */
 	if (x->log_read == -1)
-		x->log_read = sv_logcount(x->log);
+		x->log_read = sv_logcount(&x->log);
 	tt_pthread_mutex_unlock(&index->mutex);
 	vinyl_tuple_ref(key);
 	int rc = sx_set(x, index, key);
@@ -4106,13 +4106,13 @@ sx_get_autocommit(struct sxmanager *m, struct sxindex *index)
 }
 
 static inline int
-sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct sx *t, struct sx *p)
+sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct vinyl_tx *t, struct vinyl_tx *p)
 {
 	if (p->deadlock.next != &p->deadlock)
 		return 0;
 	rlist_add(mark, &p->deadlock);
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &p->log->buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &p->log.buf, sizeof(struct svlogv));
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct svlogv *lv = vy_bufiter_get(&i);
@@ -4120,7 +4120,7 @@ sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct sx *t, struct sx 
 		if (v->prev == NULL)
 			continue;
 		do {
-			struct sx *n = sx_find(m, v->id);
+			struct vinyl_tx *n = sx_find(m, v->id);
 			assert(n != NULL);
 			if (unlikely(n == t))
 				return 1;
@@ -4136,19 +4136,19 @@ sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct sx *t, struct sx 
 static inline void
 sx_deadlock_unmark(struct rlist *mark)
 {
-	struct sx *t, *n;
+	struct vinyl_tx *t, *n;
 	rlist_foreach_entry_safe(t, mark, deadlock, n) {
 		rlist_create(&t->deadlock);
 	}
 }
 
-static int __attribute__((unused)) sx_deadlock(struct sx *t)
+static int __attribute__((unused)) sx_deadlock(struct vinyl_tx *t)
 {
 	struct sxmanager *m = t->manager;
 	struct rlist mark;
 	rlist_create(&mark);
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &t->log->buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &t->log.buf, sizeof(struct svlogv));
 	while (vy_bufiter_has(&i))
 	{
 		struct svlogv *lv = vy_bufiter_get(&i);
@@ -4157,7 +4157,7 @@ static int __attribute__((unused)) sx_deadlock(struct sx *t)
 			vy_bufiter_next(&i);
 			continue;
 		}
-		struct sx *p = sx_find(m, v->prev->id);
+		struct vinyl_tx *p = sx_find(m, v->prev->id);
 		assert(p != NULL);
 		int rc = sx_deadlock_in(m, &mark, t, p);
 		if (unlikely(rc)) {
@@ -10134,24 +10134,17 @@ vinyl_raise()
 
 int
 vinyl_index_read(struct vinyl_index*, struct vinyl_tuple*, enum vinyl_order order,
-		struct vinyl_tuple **, struct sx*, struct sicache*,
+		struct vinyl_tuple **, struct vinyl_tx*, struct sicache*,
 		bool cache_only, struct vy_stat_get *);
 static int vinyl_index_visible(struct vinyl_index*, uint64_t);
 static int vinyl_index_recoverbegin(struct vinyl_index*);
 static int vinyl_index_recoverend(struct vinyl_index*);
 
-struct vinyl_tx {
-	struct vinyl_env *env;
-	struct svlog log;
-	struct sx t;
-};
-
 struct vinyl_cursor {
 	struct vinyl_index *index;
 	struct vinyl_tuple *key;
 	enum vinyl_order order;
-	struct svlog log;
-	struct sx t;
+	struct vinyl_tx t;
 	int ops;
 	int read_disk;
 	int read_cache;
@@ -10698,7 +10691,7 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 		  bool cache_only)
 {
 	struct vinyl_index *index = c->index;
-	struct sx *x = &c->t;
+	struct vinyl_tx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
 
@@ -10751,7 +10744,6 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		vy_oom();
 		return NULL;
 	}
-	sv_loginit(&c->log);
 	vinyl_index_ref(index);
 	c->index = index;
 	c->ops = 0;
@@ -10764,7 +10756,7 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		return NULL;
 	}
 	c->read_commited = 0;
-	sx_begin(&e->xm, &c->t, SXRO, &c->log);
+	sx_begin(&e->xm, &c->t, SXRO);
 
 	c->key = key;
 	vinyl_tuple_ref(key);
@@ -10940,7 +10932,7 @@ vinyl_index_drop(struct vinyl_index *index)
 int
 vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order,
-		 struct vinyl_tuple **result, struct sx *x,
+		 struct vinyl_tuple **result, struct vinyl_tx *x,
 		 struct sicache *cache, bool cache_only,
 		 struct vy_stat_get *statget)
 {
@@ -11495,10 +11487,10 @@ static inline int
 vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	    struct vinyl_tuple *o, uint8_t flags)
 {
-	struct vinyl_env *e = t->env;
+	struct vinyl_env *e = index->env;
 
 	/* validate req */
-	if (unlikely(t->t.state == SXPREPARE)) {
+	if (unlikely(t->state == SXPREPARE)) {
 		vy_error("%s", "transaction is in 'prepare' state (read-only)");
 		return -1;
 	}
@@ -11508,7 +11500,7 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	switch (status) {
 	case VINYL_SHUTDOWN_PENDING:
 	case VINYL_DROP_PENDING:
-		if (unlikely(! vinyl_index_visible(index, t->t.id))) {
+		if (unlikely(! vinyl_index_visible(index, t->id))) {
 			vy_error("%s", "index is invisible for the transaction");
 			return -1;
 		}
@@ -11527,7 +11519,7 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	vinyl_tuple_ref(o);
 
 	/* concurrent index only */
-	rc = sx_set(&t->t, &index->coindex, o);
+	rc = sx_set(t, &index->coindex, o);
 	if (unlikely(rc != 0))
 		return -1;
 
@@ -11541,14 +11533,13 @@ vy_tx_end(struct vinyl_tx *t, int rlb, int conflict)
 {
 	struct vinyl_env *e = t->env;
 	uint32_t count = sv_logcount(&t->log);
-	sx_gc(&t->t);
-	vy_stat_tx(&e->stat, t->t.start, count, rlb, conflict);
-	sv_logfree(&t->log);
+	sx_gc(t);
+	vy_stat_tx(&e->stat, t->start, count, rlb, conflict);
 	free(t);
 }
 
 static inline int
-vy_txprepare_cb(struct sx *x, struct svlogv *v, uint64_t lsn,
+vy_txprepare_cb(struct vinyl_tx *x, struct svlogv *v, uint64_t lsn,
 		struct sicache *cache, enum vinyl_status status)
 {
 	if (lsn == x->vlsn || status == VINYL_FINAL_RECOVERY)
@@ -11660,11 +11651,8 @@ static inline int
 vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
-	/* Optimization: allow NULL tx */
-	struct sx *sx = tx != NULL ? &tx->t : NULL;
-
 	struct vy_stat_get statget;
-	if (vinyl_index_read(index, key, VINYL_EQ, result, sx, NULL,
+	if (vinyl_index_read(index, key, VINYL_EQ, result, tx, NULL,
 			    cache_only, &statget) != 0) {
 		return -1;
 	}
@@ -11680,24 +11668,24 @@ vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *ke
 int
 vinyl_rollback(struct vinyl_tx *tx)
 {
-	sx_rollback(&tx->t);
+	sx_rollback(tx);
 	vy_tx_end(tx, 1, 0);
 	return 0;
 }
 
 int
-vinyl_prepare(struct vinyl_tx *t)
+vinyl_prepare(struct vinyl_tx *tx)
 {
-	struct vinyl_env *e = t->env;
+	struct vinyl_env *e = tx->env;
 	if (unlikely(! vy_status_is_active(e->status)))
 		return -1;
 
 	/* prepare transaction */
-	assert(t->t.state == SXREADY);
+	assert(tx->state == SXREADY);
 	struct sicache *cache = vy_cachepool_pop(&e->cachepool);
 	if (unlikely(cache == NULL))
 		return vy_oom();
-	enum sxstate s = sx_prepare(&t->t, cache, e->status);
+	enum sxstate s = sx_prepare(tx, cache, e->status);
 
 	vy_cachepool_push(cache);
 	if (s == SXLOCK) {
@@ -11709,7 +11697,7 @@ vinyl_prepare(struct vinyl_tx *t)
 	}
 	assert(s == SXPREPARE);
 
-	sx_commit(&t->t);
+	sx_commit(tx);
 
 	/*
 	 * A half committed transaction is no longer
@@ -11722,35 +11710,34 @@ vinyl_prepare(struct vinyl_tx *t)
 }
 
 int
-vinyl_commit(struct vinyl_tx *t, int64_t lsn)
+vinyl_commit(struct vinyl_tx *tx, int64_t lsn)
 {
-	struct vinyl_env *e = t->env;
+	struct vinyl_env *e = tx->env;
 	if (unlikely(! vy_status_is_active(e->status)))
 		return -1;
-	assert(t->t.state == SXCOMMIT);
+	assert(tx->state == SXCOMMIT);
 
 	/* do wal write and backend commit */
-	int rc = sc_write(&e->scheduler, &t->log, lsn, e->status);
+	int rc = sc_write(&e->scheduler, &tx->log, lsn, e->status);
 	if (unlikely(rc == -1))
-		sx_rollback(&t->t);
+		sx_rollback(tx);
 
-	vy_tx_end(t, 0, 0);
+	vy_tx_end(tx, 0, 0);
 	return rc;
 }
 
 struct vinyl_tx *
 vinyl_begin(struct vinyl_env *e)
 {
-	struct vinyl_tx *t;
-	t = malloc(sizeof(struct vinyl_tx));
-	if (unlikely(t == NULL)) {
+	struct vinyl_tx *tx;
+	tx = malloc(sizeof(struct vinyl_tx));
+	if (unlikely(tx == NULL)) {
 		vy_oom();
 		return NULL;
 	}
-	t->env = e;
-	sv_loginit(&t->log);
-	sx_begin(&e->xm, &t->t, SXRW, &t->log);
-	return t;
+	tx->env = e;
+	sx_begin(&e->xm, tx, SXRW);
+	return tx;
 }
 
 /* }}} Public API of transaction control */
