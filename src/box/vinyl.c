@@ -3547,6 +3547,7 @@ typedef int (*sxpreparef)(struct sx*, struct sv*, struct vinyl_index*,
 			  struct sicache *);
 
 struct sx {
+	uint64_t start;
 	enum sxtype     type;
 	enum sxstate    state;
 	uint64_t   id;
@@ -3735,6 +3736,7 @@ static void
 sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	 struct svlog *log)
 {
+	x->start = clock_monotonic64();
 	x->manager = m;
 	x->log = log;
 	x->state = SXREADY;
@@ -10140,7 +10142,6 @@ static int vinyl_index_recoverend(struct vinyl_index*);
 
 struct vinyl_tx {
 	struct vinyl_env *env;
-	uint64_t start;
 	struct svlog log;
 	struct sx t;
 };
@@ -10151,7 +10152,6 @@ struct vinyl_cursor {
 	enum vinyl_order order;
 	struct svlog log;
 	struct sx t;
-	uint64_t start;
 	int ops;
 	int read_disk;
 	int read_cache;
@@ -10685,7 +10685,7 @@ vinyl_cursor_delete(struct vinyl_cursor *c)
 	if (c->key)
 		vinyl_tuple_unref(c->index, c->key);
 	vinyl_index_unref(c->index);
-	vy_stat_cursor(&e->stat, c->start,
+	vy_stat_cursor(&e->stat, c->t.start,
 	              c->read_disk,
 	              c->read_cache,
 	              c->ops);
@@ -10754,13 +10754,12 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 	sv_loginit(&c->log);
 	vinyl_index_ref(index);
 	c->index = index;
-	c->start = clock_monotonic64();
 	c->ops = 0;
 	c->read_disk = 0;
 	c->read_cache = 0;
-	c->t.state = SXUNDEF;
 	c->cache = vy_cachepool_pop(&e->cachepool);
 	if (unlikely(c->cache == NULL)) {
+		free(c);
 		vy_oom();
 		return NULL;
 	}
@@ -11242,7 +11241,7 @@ vinyl_tuple_from_sv(struct runtime *r, struct sv *sv)
 	v->lsn       = 0;
 	v->flags     = sv_flags(sv);
 	v->lsn       = sv_lsn(sv);
-		memcpy(v->data, src, size);
+	memcpy(v->data, src, size);
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
@@ -11543,7 +11542,7 @@ vy_tx_end(struct vinyl_tx *t, int rlb, int conflict)
 	struct vinyl_env *e = t->env;
 	uint32_t count = sv_logcount(&t->log);
 	sx_gc(&t->t);
-	vy_stat_tx(&e->stat, t->start, count, rlb, conflict);
+	vy_stat_tx(&e->stat, t->t.start, count, rlb, conflict);
 	sv_logfree(&t->log);
 	free(t);
 }
@@ -11750,7 +11749,6 @@ vinyl_begin(struct vinyl_env *e)
 	}
 	t->env = e;
 	sv_loginit(&t->log);
-	t->start = clock_monotonic64();
 	sx_begin(&e->xm, &t->t, SXRW, &t->log);
 	return t;
 }
