@@ -56,6 +56,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	assert(request->type == IPROTO_INSERT);
 	assert(request->header != NULL);
 	VinylIndex *index = (VinylIndex *)index_find(space, 0);
+	struct vinyl_env *env = index->env;
 
 	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
@@ -71,7 +72,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 		vinyl_tuple_unref(index->db, tuple);
 	});
 
-	struct vinyl_tx *tx = vinyl_begin(index->env);
+	struct vinyl_tx *tx = vinyl_begin(env);
 	if (tx == NULL)
 		vinyl_raise();
 
@@ -80,20 +81,20 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	if (vinyl_replace(tx, index->db, tuple) != 0)
 		vinyl_raise();
 
-	int rc = vinyl_prepare(tx);
+	int rc = vinyl_prepare(env, tx);
 	switch (rc) {
 	case 0:
-		if (vinyl_commit(tx, signature))
+		if (vinyl_commit(env, tx, signature))
 			panic("failed to commit vinyl transaction");
 		return;
 	case 1: /* rollback */
 	case 2: /* lock */
-		vinyl_rollback(tx);
+		vinyl_rollback(env, tx);
 		/* must never happen during JOIN */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		return;
 	case -1:
-		vinyl_rollback(tx);
+		vinyl_rollback(env, tx);
 		vinyl_raise();
 		return;
 	default:

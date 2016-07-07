@@ -131,13 +131,13 @@ vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
 	    struct vinyl_tuple *tuple);
 
 int
-vinyl_prepare(struct vinyl_tx *tx);
+vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx);
 
 int
-vinyl_commit(struct vinyl_tx *tx, int64_t lsn);
+vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn);
 
 int
-vinyl_rollback(struct vinyl_tx *tx);
+vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx);
 
 /*
  * Index

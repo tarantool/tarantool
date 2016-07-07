@@ -359,7 +359,7 @@ VinylEngine::prepare(struct txn *txn)
 {
 	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
 
-	int rc = vinyl_prepare(tx);
+	int rc = vinyl_prepare(env, tx);
 	switch (rc) {
 	case 1: /* rollback */
 	case 2: /* lock */
@@ -376,7 +376,7 @@ VinylEngine::commit(struct txn *txn, int64_t lsn)
 {
 	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
 	if (tx) {
-		int rc = vinyl_commit(tx, txn->n_rows ? lsn : 0);
+		int rc = vinyl_commit(env, tx, txn->n_rows ? lsn : 0);
 		if (rc == -1) {
 			panic("vinyl commit failed: txn->signature = %"
 			      PRIu64, lsn);
@@ -392,7 +392,7 @@ VinylEngine::rollback(struct txn *txn)
 		return;
 
 	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
-	vinyl_rollback(tx);
+	vinyl_rollback(env, tx);
 	txn->engine_tx = NULL;
 }
 

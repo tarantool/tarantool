@@ -1821,18 +1821,17 @@ struct sv;
 
 struct svif {
 	uint8_t   (*flags)(struct sv*);
-	void      (*lsnset)(struct sv*, int64_t);
+	void      (*set_lsn)(struct sv*, int64_t);
 	uint64_t  (*lsn)(struct sv*);
 	char     *(*pointer)(struct sv*);
 	uint32_t  (*size)(struct sv*);
 };
 
-static struct svif sv_tupleif;
-static struct svif sv_upsertvif;
-static struct svif sv_refif;
-static struct svif sv_upsertvif;
-static struct svif sx_vif;
-static struct svif sd_vif;
+static struct svif svtuple_if;
+static struct svif svref_if;
+static struct svif svupsert_if;
+static struct svif sxv_if;
+static struct svif sdv_if;
 struct vinyl_tuple;
 struct sdv;
 struct sxv;
@@ -1847,7 +1846,7 @@ struct PACKED sv {
 static inline struct vinyl_tuple *
 sv_to_tuple(struct sv *v)
 {
-	assert(v->i == &sv_tupleif);
+	assert(v->i == &svtuple_if);
 	struct vinyl_tuple *tuple = (struct vinyl_tuple *)v->v;
 	assert(tuple != NULL);
 	return tuple;
@@ -1856,7 +1855,7 @@ sv_to_tuple(struct sv *v)
 static inline void
 sv_from_tuple(struct sv *v, struct vinyl_tuple *tuple)
 {
-	v->i   = &sv_tupleif;
+	v->i   = &svtuple_if;
 	v->v   = tuple;
 	v->arg = NULL;
 }
@@ -1864,7 +1863,7 @@ sv_from_tuple(struct sv *v, struct vinyl_tuple *tuple)
 static inline struct sxv *
 sv_to_sxv(struct sv *v)
 {
-	assert(v->i == &sx_vif);
+	assert(v->i == &sxv_if);
 	struct sxv *sxv = (struct sxv *)v->v;
 	assert(sxv != NULL);
 	return sxv;
@@ -1873,7 +1872,7 @@ sv_to_sxv(struct sv *v)
 static inline void
 sv_from_sxv(struct sv *v, struct sxv *sxv)
 {
-	v->i   = &sx_vif;
+	v->i   = &sxv_if;
 	v->v   = sxv;
 	v->arg = NULL;
 }
@@ -1881,7 +1880,7 @@ sv_from_sxv(struct sv *v, struct sxv *sxv)
 static inline void
 sv_from_svupsert(struct sv *v, char *s)
 {
-	v->i   = &sv_upsertvif;
+	v->i   = &svupsert_if;
 	v->v   = s;
 	v->arg = NULL;
 }
@@ -1889,7 +1888,7 @@ sv_from_svupsert(struct sv *v, char *s)
 static inline void
 sv_from_sdv(struct sv *v, struct sdv *sdv, struct sdpageheader *h)
 {
-	v->i   = &sd_vif;
+	v->i   = &sdv_if;
 	v->v   = sdv;
 	v->arg = h;
 }
@@ -1915,8 +1914,8 @@ sv_lsn(struct sv *v) {
 }
 
 static inline void
-sv_lsnset(struct sv *v, int64_t lsn) {
-	v->i->lsnset(v, lsn);
+sv_set_lsn(struct sv *v, int64_t lsn) {
+	v->i->set_lsn(v, lsn);
 }
 
 static inline char*
@@ -1963,7 +1962,7 @@ struct svupsert {
 };
 
 static inline void
-sv_upsertinit(struct svupsert *u)
+svupsert_init(struct svupsert *u)
 {
 	u->max = 0;
 	u->count = 0;
@@ -1973,7 +1972,7 @@ sv_upsertinit(struct svupsert *u)
 }
 
 static inline void
-sv_upsertfree(struct svupsert *u)
+svupsert_free(struct svupsert *u)
 {
 	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
 	int i = 0;
@@ -1986,7 +1985,7 @@ sv_upsertfree(struct svupsert *u)
 }
 
 static inline void
-sv_upsertreset(struct svupsert *u)
+svupsert_reset(struct svupsert *u)
 {
 	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
 	int i = 0;
@@ -2001,12 +2000,12 @@ sv_upsertreset(struct svupsert *u)
 }
 
 static inline void
-sv_upsertgc(struct svupsert *u, int wm_stack, int wm_buf)
+svupsert_gc(struct svupsert *u, int wm_stack, int wm_buf)
 {
 	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
 	if (u->max >= wm_stack) {
-		sv_upsertfree(u);
-		sv_upsertinit(u);
+		svupsert_free(u);
+		svupsert_init(u);
 		return;
 	}
 	vy_buf_gc(&u->tmp, wm_buf);
@@ -2020,7 +2019,7 @@ sv_upsertgc(struct svupsert *u, int wm_stack, int wm_buf)
 }
 
 static inline int
-sv_upsertpush_raw(struct svupsert *u,
+svupsert_push_raw(struct svupsert *u,
 		  char *pointer, int size,
                   uint8_t flags, uint64_t lsn)
 {
@@ -2050,15 +2049,15 @@ sv_upsertpush_raw(struct svupsert *u,
 }
 
 static inline int
-sv_upsertpush(struct svupsert *u, struct sv *v)
+svupsert_push(struct svupsert *u, struct sv *v)
 {
-	return sv_upsertpush_raw(u, sv_pointer(v),
+	return svupsert_push_raw(u, sv_pointer(v),
 	                         sv_size(v),
 	                         sv_flags(v), sv_lsn(v));
 }
 
 static inline struct svupsertnode*
-sv_upsertpop(struct svupsert *u)
+svupsert_pop(struct svupsert *u)
 {
 	if (u->count == 0)
 		return NULL;
@@ -2217,7 +2216,7 @@ vinyl_upsert_cb(int count,
 
 
 static inline int
-sv_upsertdo(struct svupsert *u, struct key_def *key_def,
+svupsert_do(struct svupsert *u, struct key_def *key_def,
 	    struct svupsertnode *n1, struct svupsertnode *n2)
 {
 	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
@@ -2281,7 +2280,7 @@ sv_upsertdo(struct svupsert *u, struct key_def *key_def,
 	vy_buf_advance(&u->tmp, size);
 
 	/* save result */
-	rc = sv_upsertpush_raw(u, u->tmp.s, vy_buf_used(&u->tmp),
+	rc = svupsert_push_raw(u, u->tmp.s, vy_buf_used(&u->tmp),
 	                       n2->flags & ~SVUPSERT,
 	                       n2->lsn);
 cleanup:
@@ -2299,7 +2298,7 @@ cleanup:
 }
 
 static inline int
-sv_upsert(struct svupsert *u, struct key_def *key_def)
+svupsert_(struct svupsert *u, struct key_def *key_def)
 {
 	assert(u->count >= 1 );
 	struct svupsertnode *f = vy_buf_at(&u->stack,
@@ -2307,19 +2306,19 @@ sv_upsert(struct svupsert *u, struct key_def *key_def)
 					  u->count - 1);
 	int rc;
 	if (f->flags & SVUPSERT) {
-		f = sv_upsertpop(u);
-		rc = sv_upsertdo(u, key_def, NULL, f);
+		f = svupsert_pop(u);
+		rc = svupsert_do(u, key_def, NULL, f);
 		if (unlikely(rc == -1))
 			return -1;
 	}
 	if (u->count == 1)
 		goto done;
 	while (u->count > 1) {
-		struct svupsertnode *f = sv_upsertpop(u);
-		struct svupsertnode *s = sv_upsertpop(u);
+		struct svupsertnode *f = svupsert_pop(u);
+		struct svupsertnode *s = svupsert_pop(u);
 		assert(f != NULL);
 		assert(s != NULL);
-		rc = sv_upsertdo(u, key_def, f, s);
+		rc = svupsert_do(u, key_def, f, s);
 		if (unlikely(rc == -1))
 			return -1;
 	}
@@ -2627,12 +2626,12 @@ struct PACKED svreaditer {
 static inline int
 sv_readiter_upsert(struct svreaditer *i)
 {
-	sv_upsertreset(i->u);
+	svupsert_reset(i->u);
 	/* upsert begin */
 	struct sv *v = sv_mergeiter_get(i->merge);
 	assert(v != NULL);
 	assert(sv_flags(v) & SVUPSERT);
-	int rc = sv_upsertpush(i->u, v);
+	int rc = svupsert_push(i->u, v);
 	if (unlikely(rc == -1))
 		return -1;
 	sv_mergeiter_next(i->merge);
@@ -2646,14 +2645,14 @@ sv_readiter_upsert(struct svreaditer *i)
 			break;
 		if (skip)
 			continue;
-		int rc = sv_upsertpush(i->u, v);
+		int rc = svupsert_push(i->u, v);
 		if (unlikely(rc == -1))
 			return -1;
 		if (! (sv_flags(v) & SVUPSERT))
 			skip = 1;
 	}
 	/* upsert */
-	rc = sv_upsert(i->u, i->merge->merge->key_def);
+	rc = svupsert_(i->u, i->merge->merge->key_def);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
@@ -2763,14 +2762,14 @@ sv_writeiter_upsert(struct svwriteiter *i)
 {
 	/* apply upsert only on statements which are the latest or
 	 * ready to be garbage-collected */
-	sv_upsertreset(i->u);
+	svupsert_reset(i->u);
 
 	/* upsert begin */
 	struct sv *v = sv_mergeiter_get(i->merge);
 	assert(v != NULL);
 	assert(sv_flags(v) & SVUPSERT);
 	assert(sv_lsn(v) <= i->vlsn);
-	int rc = sv_upsertpush(i->u, v);
+	int rc = svupsert_push(i->u, v);
 	if (unlikely(rc == -1))
 		return -1;
 	sv_mergeiter_next(i->merge);
@@ -2789,13 +2788,13 @@ sv_writeiter_upsert(struct svwriteiter *i)
 		if (last_non_upd)
 			continue;
 		last_non_upd = ! sv_isflags(flags, SVUPSERT);
-		int rc = sv_upsertpush(i->u, v);
+		int rc = svupsert_push(i->u, v);
 		if (unlikely(rc == -1))
 			return -1;
 	}
 
 	/* upsert */
-	rc = sv_upsert(i->u, i->merge->merge->key_def);
+	rc = svupsert_(i->u, i->merge->merge->key_def);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
@@ -3145,42 +3144,47 @@ sv_indexfind(struct svindex *i, char *key, int size, uint64_t lsn)
 }
 
 static uint8_t
-sv_refifflags(struct sv *v) {
+svref_flags(struct sv *v)
+{
 	struct svref *ref = (struct svref *)v->v;
 	return (ref->v)->flags | ref->flags;
 }
 
 static uint64_t
-sv_refiflsn(struct sv *v) {
+svref_lsn(struct sv *v)
+{
 	struct svref *ref = (struct svref *)v->v;
 	return ref->v->lsn;
 }
 
 static void
-sv_refiflsnset(struct sv *v, int64_t lsn) {
+svref_set_lsn(struct sv *v, int64_t lsn)
+{
 	struct svref *ref = (struct svref *)v->v;
 	ref->v->lsn = lsn;
 }
 
 static char*
-sv_refifpointer(struct sv *v) {
+svref_pointer(struct sv *v)
+{
 	struct svref *ref = (struct svref *)v->v;
 	return ref->v->data;
 }
 
 static uint32_t
-sv_refifsize(struct sv *v) {
+svref_size(struct sv *v)
+{
 	struct svref *ref = (struct svref *)v->v;
 	return ref->v->size;
 }
 
-static struct svif sv_refif =
+static struct svif svref_if =
 {
-       .flags     = sv_refifflags,
-       .lsn       = sv_refiflsn,
-       .lsnset    = sv_refiflsnset,
-       .pointer   = sv_refifpointer,
-       .size      = sv_refifsize
+       .flags     = svref_flags,
+       .lsn       = svref_lsn,
+       .set_lsn   = svref_set_lsn,
+       .pointer   = svref_pointer,
+       .size      = svref_size
 };
 
 struct svindexiter {
@@ -3203,7 +3207,7 @@ sv_indexiter_open(struct vy_iter *i, struct svindex *index,
 	struct bps_tree_svindex *tree = &index->tree;
 	ii->index = index;
 	ii->order = o;
-	ii->current.i = &sv_refif;
+	ii->current.i = &svref_if;
 	if (key == NULL) {
 		if (o == VINYL_GT || o == VINYL_GE) {
 			ii->itr = bps_tree_svindex_itr_first(tree);
@@ -3274,19 +3278,19 @@ static struct vy_iterif sv_indexiterif =
 };
 
 static uint8_t
-sv_upsertvifflags(struct sv *v) {
+svupsert_flags(struct sv *v) {
 	struct svupsertnode *n = v->v;
 	return n->flags;
 }
 
 static uint64_t
-sv_upsertviflsn(struct sv *v) {
+svupsert_lsn(struct sv *v) {
 	struct svupsertnode *n = v->v;
 	return n->lsn;
 }
 
 static void
-sv_upsertviflsnset(struct sv *v, int64_t lsn)
+svupsert_set_lsn(struct sv *v, int64_t lsn)
 {
 	(void) v;
 	(void) lsn;
@@ -3294,58 +3298,60 @@ sv_upsertviflsnset(struct sv *v, int64_t lsn)
 }
 
 static char*
-sv_upsertvifpointer(struct sv *v) {
+svupsert_pointer(struct sv *v)
+{
 	struct svupsertnode *n = v->v;
 	return n->buf.s;
 }
 
 static uint32_t
-sv_upsertvifsize(struct sv *v) {
+svupsert_size(struct sv *v)
+{
 	struct svupsertnode *n = v->v;
 	return vy_buf_used(&n->buf);
 }
 
-static struct svif sv_upsertvif =
+static struct svif svupsert_if =
 {
-	.flags     = sv_upsertvifflags,
-	.lsn       = sv_upsertviflsn,
-	.lsnset    = sv_upsertviflsnset,
-	.pointer   = sv_upsertvifpointer,
-	.size      = sv_upsertvifsize
+	.flags     = svupsert_flags,
+	.lsn       = svupsert_lsn,
+	.set_lsn   = svupsert_set_lsn,
+	.pointer   = svupsert_pointer,
+	.size      = svupsert_size
 };
 
 static uint8_t
-sv_tupleflags(struct sv *v) {
+svtuple_flags(struct sv *v) {
 	return sv_to_tuple(v)->flags;
 }
 
 static uint64_t
-sv_tuplelsn(struct sv *v) {
+svtuple_lsn(struct sv *v) {
 	return sv_to_tuple(v)->lsn;
 }
 
 static void
-sv_tuplelsnset(struct sv *v, int64_t lsn) {
+svtuple_set_lsn(struct sv *v, int64_t lsn) {
 	sv_to_tuple(v)->lsn = lsn;
 }
 
 static char*
-sv_tuplepointer(struct sv *v) {
+svtuple_pointer(struct sv *v) {
 	return sv_to_tuple(v)->data;
 }
 
 static uint32_t
-sv_tuplesize(struct sv *v) {
+svtuple_size(struct sv *v) {
 	return sv_to_tuple(v)->size;
 }
 
-static struct svif sv_tupleif =
+static struct svif svtuple_if =
 {
-	.flags     = sv_tupleflags,
-	.lsn       = sv_tuplelsn,
-	.lsnset    = sv_tuplelsnset,
-	.pointer   = sv_tuplepointer,
-	.size      = sv_tuplesize
+	.flags     = svtuple_flags,
+	.lsn       = svtuple_lsn,
+	.set_lsn   = svtuple_set_lsn,
+	.pointer   = svtuple_pointer,
+	.size      = svtuple_size
 };
 
 struct sxv {
@@ -3361,7 +3367,7 @@ struct sxv {
 };
 
 static inline struct sxv*
-sx_valloc(struct vinyl_tuple *ref)
+sxv_alloc(struct vinyl_tuple *ref)
 {
 	struct sxv *v = malloc(sizeof(struct sxv));
 	if (unlikely(v == NULL))
@@ -3378,24 +3384,24 @@ sx_valloc(struct vinyl_tuple *ref)
 }
 
 static inline void
-sx_vfree(struct runtime *r, struct sxv *v)
+sxv_free(struct runtime *r, struct sxv *v)
 {
 	vinyl_tuple_unref_rt(r, v->tuple);
 	free(v);
 }
 
 static inline void
-sx_vfreeall(struct runtime *r, struct sxv *v)
+sxv_freeall(struct runtime *r, struct sxv *v)
 {
 	while (v) {
 		struct sxv *next = v->next;
-		sx_vfree(r, v);
+		sxv_free(r, v);
 		v = next;
 	}
 }
 
 static inline struct sxv*
-sx_vmatch(struct sxv *head, uint64_t id)
+sxv_match(struct sxv *head, uint64_t id)
 {
 	struct sxv *c = head;
 	while (c) {
@@ -3407,7 +3413,7 @@ sx_vmatch(struct sxv *head, uint64_t id)
 }
 
 static inline void
-sx_vreplace(struct sxv *v, struct sxv *n)
+sxv_replace(struct sxv *v, struct sxv *n)
 {
 	if (v->prev)
 		v->prev->next = n;
@@ -3418,7 +3424,7 @@ sx_vreplace(struct sxv *v, struct sxv *n)
 }
 
 static inline void
-sx_vlink(struct sxv *head, struct sxv *v)
+sxv_link(struct sxv *head, struct sxv *v)
 {
 	struct sxv *c = head;
 	while (c->next)
@@ -3429,7 +3435,7 @@ sx_vlink(struct sxv *head, struct sxv *v)
 }
 
 static inline void
-sx_vunlink(struct sxv *v)
+sxv_unlink(struct sxv *v)
 {
 	if (v->prev)
 		v->prev->next = v->next;
@@ -3440,7 +3446,7 @@ sx_vunlink(struct sxv *v)
 }
 
 static inline void
-sx_vcommit(struct sxv *v, uint32_t csn)
+sxv_commit(struct sxv *v, uint32_t csn)
 {
 	v->id  = UINT64_MAX;
 	v->lo  = UINT32_MAX;
@@ -3448,35 +3454,35 @@ sx_vcommit(struct sxv *v, uint32_t csn)
 }
 
 static inline int
-sx_vcommitted(struct sxv *v)
+sxv_committed(struct sxv *v)
 {
 	return v->id == UINT64_MAX && v->lo == UINT32_MAX;
 }
 
 static inline void
-sx_vabort(struct sxv *v)
+sxv_abort(struct sxv *v)
 {
 	v->tuple->flags |= SVCONFLICT;
 }
 
 static inline void
-sx_vabort_all(struct sxv *v)
+sxv_abort_all(struct sxv *v)
 {
 	while (v) {
-		sx_vabort(v);
+		sxv_abort(v);
 		v = v->next;
 	}
 }
 
 static inline int
-sx_vaborted(struct sxv *v)
+sxv_aborted(struct sxv *v)
 {
 	return v->tuple->flags & SVCONFLICT;
 }
 
-static struct svif sx_vif;
+static struct svif sxv_if;
 
-enum sxstate {
+enum tx_state {
 	VINYL_TX_UNDEF,
 	VINYL_TX_READY,
 	VINYL_TX_COMMIT,
@@ -3485,7 +3491,7 @@ enum sxstate {
 	VINYL_TX_LOCK
 };
 
-enum sxtype {
+enum tx_type {
 	VINYL_TX_RO,
 	VINYL_TX_RW
 };
@@ -3547,11 +3553,10 @@ typedef int (*sxpreparef)(struct vinyl_tx*, struct sv*, struct vinyl_index*,
 			  struct sicache *);
 
 struct vinyl_tx {
-	struct vinyl_env *env;
 	struct svlog log;
 	uint64_t start;
-	enum sxtype     type;
-	enum sxstate    state;
+	enum tx_type     type;
+	enum tx_state    state;
 	uint64_t   id;
 	uint64_t   vlsn;
 	uint64_t   csn;
@@ -3561,28 +3566,28 @@ struct vinyl_tx {
 	struct tx_manager *manager;
 };
 
-typedef rb_tree(struct vinyl_tx) sx_tree_t;
+typedef rb_tree(struct vinyl_tx) tx_tree_t;
 
 static int
-sx_tree_cmp(sx_tree_t *rbtree, struct vinyl_tx *a, struct vinyl_tx *b)
+tx_tree_cmp(tx_tree_t *rbtree, struct vinyl_tx *a, struct vinyl_tx *b)
 {
 	(void)rbtree;
 	return vy_cmp(a->id, b->id);
 }
 
 static int
-sx_tree_key_cmp(sx_tree_t *rbtree, const char *a, struct vinyl_tx *b)
+tx_tree_key_cmp(tx_tree_t *rbtree, const char *a, struct vinyl_tx *b)
 {
 	(void)rbtree;
 	return vy_cmp(load_u64(a), b->id);
 }
 
-rb_gen_ext_key(, sx_tree_, sx_tree_t, struct vinyl_tx, tree_node,
-		 sx_tree_cmp, const char *, sx_tree_key_cmp);
+rb_gen_ext_key(, tx_tree_, tx_tree_t, struct vinyl_tx, tree_node,
+		 tx_tree_cmp, const char *, tx_tree_key_cmp);
 
 struct tx_manager {
 	pthread_mutex_t  lock;
-	sx_tree_t tree;
+	tx_tree_t tree;
 	struct rlist      indexes;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
@@ -3598,28 +3603,26 @@ static int tx_index_init(struct tx_index *, struct tx_manager *,
 			struct vinyl_index *, struct key_def *key_def);
 static int tx_index_set(struct tx_index*, uint32_t);
 static int tx_index_free(struct tx_index*, struct tx_manager*);
-static struct vinyl_tx *sx_find(struct tx_manager*, uint64_t);
-static void sx_begin(struct tx_manager*, struct vinyl_tx*, enum sxtype);
-static void sx_gc(struct vinyl_tx*);
-static enum sxstate sx_commit(struct vinyl_tx*);
-static enum sxstate sx_rollback(struct vinyl_tx*);
-static int sx_set(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*);
-static int sx_get(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*, struct vinyl_tuple**);
-static uint64_t sx_min(struct tx_manager*);
-static uint64_t sx_max(struct tx_manager*);
+static struct vinyl_tx *tx_manager_find(struct tx_manager*, uint64_t);
+static void tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
+static void tx_gc(struct vinyl_tx*);
+static enum tx_state tx_rollback(struct vinyl_tx*);
+static int tx_set(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*);
+static int tx_get(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*, struct vinyl_tuple**);
+static uint64_t tx_manager_min(struct tx_manager*);
+static uint64_t tx_manager_max(struct tx_manager*);
 static uint64_t tx_manager_lsn(struct tx_manager*);
-static enum sxstate sx_get_autocommit(struct tx_manager*, struct tx_index*);
 
-static int sx_deadlock(struct vinyl_tx*);
+static int tx_deadlock(struct vinyl_tx*);
 
 static inline int
-sx_count(struct tx_manager *m) {
+tx_manager_count(struct tx_manager *m) {
 	return m->count_rd + m->count_rw;
 }
 
 static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 {
-	sx_tree_new(&m->tree);
+	tx_tree_new(&m->tree);
 	m->count_rd = 0;
 	m->count_rw = 0;
 	m->count_gc = 0;
@@ -3633,7 +3636,7 @@ static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 
 static int tx_managerfree(struct tx_manager *m)
 {
-	assert(sx_count(m) == 0);
+	assert(tx_manager_count(m) == 0);
 	tt_pthread_mutex_destroy(&m->lock);
 	return 0;
 }
@@ -3661,7 +3664,7 @@ static struct sxv *
 sxv_tree_free_cb(sxv_tree_t *t, struct sxv *v, void *arg)
 {
 	(void)t;
-	sx_vfreeall((struct runtime *)arg, v);
+	sxv_freeall((struct runtime *)arg, v);
 	return NULL;
 }
 
@@ -3683,24 +3686,24 @@ tx_index_free(struct tx_index *i, struct tx_manager *m)
 	return 0;
 }
 
-static uint64_t sx_min(struct tx_manager *m)
+static uint64_t tx_manager_min(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
-	if (sx_count(m) > 0) {
-		struct vinyl_tx *min = sx_tree_first(&m->tree);
+	if (tx_manager_count(m) > 0) {
+		struct vinyl_tx *min = tx_tree_first(&m->tree);
 		id = min->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
 	return id;
 }
 
-static uint64_t sx_max(struct tx_manager *m)
+static uint64_t tx_manager_max(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
-	if (sx_count(m) > 0) {
-		struct vinyl_tx *max = sx_tree_last(&m->tree);
+	if (tx_manager_count(m) > 0) {
+		struct vinyl_tx *max = tx_tree_last(&m->tree);
 		id = max->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -3711,8 +3714,8 @@ static uint64_t tx_manager_lsn(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t vlsn;
-	if (sx_count(m) > 0) {
-		struct vinyl_tx *min = sx_tree_first(&m->tree);
+	if (tx_manager_count(m) > 0) {
+		struct vinyl_tx *min = tx_tree_first(&m->tree);
 		vlsn = min->vlsn;
 	} else {
 		vlsn = vy_sequence(m->r->seq, VINYL_LSN);
@@ -3721,37 +3724,37 @@ static uint64_t tx_manager_lsn(struct tx_manager *m)
 	return vlsn;
 }
 
-static struct vinyl_tx *sx_find(struct tx_manager *m, uint64_t id)
+static struct vinyl_tx *tx_manager_find(struct tx_manager *m, uint64_t id)
 {
-	return sx_tree_search(&m->tree, (char*)&id);
+	return tx_tree_search(&m->tree, (char*)&id);
 }
 
-static inline enum sxstate
-sx_promote(struct vinyl_tx *x, enum sxstate state)
+static inline enum tx_state
+tx_promote(struct vinyl_tx *tx, enum tx_state state)
 {
-	x->state = state;
+	tx->state = state;
 	return state;
 }
 
 static void
-sx_begin(struct tx_manager *m, struct vinyl_tx *x, enum sxtype type)
+tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 {
-	sv_loginit(&x->log);
-	x->start = clock_monotonic64();
-	x->manager = m;
-	x->state = VINYL_TX_READY;
-	x->type = type;
-	x->log_read = -1;
-	rlist_create(&x->deadlock);
+	sv_loginit(&tx->log);
+	tx->start = clock_monotonic64();
+	tx->manager = m;
+	tx->state = VINYL_TX_READY;
+	tx->type = type;
+	tx->log_read = -1;
+	rlist_create(&tx->deadlock);
 
 	vy_sequence_lock(m->r->seq);
-	x->csn = m->csn;
-	x->id = vy_sequence_do(m->r->seq, VINYL_TSN_NEXT);
-	x->vlsn = vy_sequence_do(m->r->seq, VINYL_LSN);
+	tx->csn = m->csn;
+	tx->id = vy_sequence_do(m->r->seq, VINYL_TSN_NEXT);
+	tx->vlsn = vy_sequence_do(m->r->seq, VINYL_LSN);
 	vy_sequence_unlock(m->r->seq);
 
 	tt_pthread_mutex_lock(&m->lock);
-	sx_tree_insert(&m->tree, x);
+	tx_tree_insert(&m->tree, tx);
 	if (type == VINYL_TX_RO)
 		m->count_rd++;
 	else
@@ -3760,7 +3763,7 @@ sx_begin(struct tx_manager *m, struct vinyl_tx *x, enum sxtype type)
 }
 
 static inline void
-sx_untrack(struct sxv *v)
+sxv_untrack(struct sxv *v)
 {
 	if (v->prev == NULL) {
 		struct tx_index *i = v->index;
@@ -3770,30 +3773,30 @@ sx_untrack(struct sxv *v)
 			sxv_tree_insert(&i->tree, v->next);
 		tt_pthread_mutex_unlock(&i->mutex);
 	}
-	sx_vunlink(v);
+	sxv_unlink(v);
 }
 
 static inline uint64_t
-sx_csn(struct tx_manager *m)
+tx_manager_csn(struct tx_manager *m)
 {
 	uint64_t csn = UINT64_MAX;
 	if (m->count_rw == 0)
 		return csn;
-	struct vinyl_tx *min = sx_tree_first(&m->tree);
+	struct vinyl_tx *min = tx_tree_first(&m->tree);
 	while (min) {
 		if (min->type != VINYL_TX_RO) {
 			break;
 		}
-		min = sx_tree_next(&m->tree, min);
+		min = tx_tree_next(&m->tree, min);
 	}
 	assert(min != NULL);
 	return min->csn;
 }
 
 static inline void
-sx_garbage_collect(struct tx_manager *m)
+tx_manager_gc(struct tx_manager *m)
 {
-	uint64_t min_csn = sx_csn(m);
+	uint64_t min_csn = tx_manager_csn(m);
 	struct sxv *gc = NULL;
 	uint32_t count = 0;
 	struct sxv *next;
@@ -3802,37 +3805,38 @@ sx_garbage_collect(struct tx_manager *m)
 	{
 		next = v->gc;
 		assert(v->tuple->flags & SVGET);
-		assert(sx_vcommitted(v));
+		assert(sxv_committed(v));
 		if (v->csn > min_csn) {
 			v->gc = gc;
 			gc = v;
 			count++;
 			continue;
 		}
-		sx_untrack(v);
-		sx_vfree(m->r, v);
+		sxv_untrack(v);
+		sxv_free(m->r, v);
 	}
 	m->count_gc = count;
 	m->gc = gc;
 }
 
-static void sx_gc(struct vinyl_tx *x)
+static void
+tx_gc(struct vinyl_tx *tx)
 {
-	struct tx_manager *m = x->manager;
-	sx_promote(x, VINYL_TX_UNDEF);
-	sv_logfree(&x->log);
+	struct tx_manager *m = tx->manager;
+	tx_promote(tx, VINYL_TX_UNDEF);
+	sv_logfree(&tx->log);
 	if (m->count_gc == 0)
 		return;
-	sx_garbage_collect(m);
+	tx_manager_gc(m);
 }
 
 static inline void
-sx_end(struct vinyl_tx *x)
+tx_end(struct vinyl_tx *tx)
 {
-	struct tx_manager *m = x->manager;
+	struct tx_manager *m = tx->manager;
 	tt_pthread_mutex_lock(&m->lock);
-	sx_tree_remove(&m->tree, x);
-	if (x->type == VINYL_TX_RO)
+	tx_tree_remove(&m->tree, tx);
+	if (tx->type == VINYL_TX_RO)
 		m->count_rd--;
 	else
 		m->count_rw--;
@@ -3840,9 +3844,9 @@ sx_end(struct vinyl_tx *x)
 }
 
 static inline void
-sx_rollback_svp(struct vinyl_tx *x, struct vy_bufiter *i, int tuple_free)
+tx_rollback_svp(struct vinyl_tx *tx, struct vy_bufiter *i, int tuple_free)
 {
-	struct tx_manager *m = x->manager;
+	struct tx_manager *m = tx->manager;
 	int gc = 0;
 	for (; vy_bufiter_has(i); vy_bufiter_next(i))
 	{
@@ -3850,7 +3854,7 @@ sx_rollback_svp(struct vinyl_tx *x, struct vy_bufiter *i, int tuple_free)
 		struct sxv *v = lv->v.v;
 		/* remove from index and replace head with
 		 * a first waiter */
-		sx_untrack(v);
+		sxv_untrack(v);
 		/* translate log version from struct sxv to struct vinyl_tuple */
 		sv_from_tuple(&lv->v, v->tuple);
 		if (tuple_free) {
@@ -3863,13 +3867,14 @@ sx_rollback_svp(struct vinyl_tx *x, struct vy_bufiter *i, int tuple_free)
 	vy_quota_op(m->r->quota, VINYL_QREMOVE, gc);
 }
 
-static enum sxstate sx_rollback(struct vinyl_tx *x)
+static enum tx_state
+tx_rollback(struct vinyl_tx *tx)
 {
-	struct tx_manager *m = x->manager;
+	struct tx_manager *m = tx->manager;
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
+	vy_bufiter_open(&i, &tx->log.buf, sizeof(struct svlogv));
 	/* support log free after commit and half-commit mode */
-	if (x->state == VINYL_TX_COMMIT) {
+	if (tx->state == VINYL_TX_COMMIT) {
 		int gc = 0;
 		for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 		{
@@ -3880,107 +3885,58 @@ static enum sxstate sx_rollback(struct vinyl_tx *x)
 				gc += size;
 		}
 		vy_quota_op(m->r->quota, VINYL_QREMOVE, gc);
-		sx_promote(x, VINYL_TX_ROLLBACK);
-		return VINYL_TX_ROLLBACK;
+		return tx_promote(tx, VINYL_TX_ROLLBACK);
 	}
-	sx_rollback_svp(x, &i, 1);
-	sx_promote(x, VINYL_TX_ROLLBACK);
-	sx_end(x);
+	tx_rollback_svp(tx, &i, 1);
+	tx_promote(tx, VINYL_TX_ROLLBACK);
+	tx_end(tx);
 	return VINYL_TX_ROLLBACK;
 }
 
 
 static inline int
-vy_txprepare_cb(struct vinyl_tx *x, struct svlogv *v, uint64_t lsn,
+vy_txprepare_cb(struct vinyl_tx *tx, struct svlogv *v, uint64_t lsn,
 	    struct sicache *cache, enum vinyl_status status);
 
-static enum sxstate
-sx_prepare(struct vinyl_tx *x, struct sicache *cache, enum vinyl_status status)
+static enum tx_state
+tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 {
-	uint64_t lsn = vy_sequence(x->manager->r->seq, VINYL_LSN);
+	uint64_t lsn = vy_sequence(tx->manager->r->seq, VINYL_LSN);
 	/* proceed read-only transactions */
-	if (x->type == VINYL_TX_RO || sv_logcount_write(&x->log) == 0)
-		return sx_promote(x, VINYL_TX_PREPARE);
+	if (tx->type == VINYL_TX_RO || sv_logcount_write(&tx->log) == 0)
+		return tx_promote(tx, VINYL_TX_PREPARE);
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
-	enum sxstate rc;
+	vy_bufiter_open(&i, &tx->log.buf, sizeof(struct svlogv));
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct svlogv *lv = vy_bufiter_get(&i);
 		struct sxv *v = lv->v.v;
-		if ((int)v->lo == x->log_read)
+		if ((int)v->lo == tx->log_read)
 			break;
-		if (sx_vaborted(v))
-			return sx_promote(x, VINYL_TX_ROLLBACK);
-		if (likely(v->prev == NULL)) {
-			rc = vy_txprepare_cb(x, lv, lsn, cache, status);
-			if (unlikely(rc != 0))
-				return sx_promote(x, VINYL_TX_ROLLBACK);
+		if (sxv_aborted(v))
+			return tx_promote(tx, VINYL_TX_ROLLBACK);
+		if (v->prev == NULL) {
+			if (vy_txprepare_cb(tx, lv, lsn, cache, status))
+				return tx_promote(tx, VINYL_TX_ROLLBACK);
 			continue;
 		}
-		if (sx_vcommitted(v->prev)) {
-			if (v->prev->csn > x->csn)
-				return sx_promote(x, VINYL_TX_ROLLBACK);
+		if (sxv_committed(v->prev)) {
+			if (v->prev->csn > tx->csn)
+				return tx_promote(tx, VINYL_TX_ROLLBACK);
 			continue;
 		}
 		/* force commit for read-only conflicts */
 		if (v->prev->tuple->flags & SVGET) {
-			rc = vy_txprepare_cb(x, lv, lsn, cache, status);
-			if (unlikely(rc != 0))
-				return sx_promote(x, VINYL_TX_ROLLBACK);
+			if (vy_txprepare_cb(tx, lv, lsn, cache, status))
+				return tx_promote(tx, VINYL_TX_ROLLBACK);
 			continue;
 		}
-		return sx_promote(x, VINYL_TX_LOCK);
+		return tx_promote(tx, VINYL_TX_LOCK);
 	}
-	return sx_promote(x, VINYL_TX_PREPARE);
+	return tx_promote(tx, VINYL_TX_PREPARE);
 }
 
-static enum sxstate sx_commit(struct vinyl_tx *x)
-{
-	assert(x->state == VINYL_TX_PREPARE);
-
-	struct tx_manager *m = x->manager;
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, &x->log.buf, sizeof(struct svlogv));
-	uint64_t csn = ++m->csn;
-	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
-	{
-		struct svlogv *lv = vy_bufiter_get(&i);
-		struct sxv *v = lv->v.v;
-		if ((int)v->lo == x->log_read)
-			break;
-		/* abort conflict reader */
-		if (v->prev && !sx_vcommitted(v->prev)) {
-			assert(v->prev->tuple->flags & SVGET);
-			sx_vabort(v->prev);
-		}
-		/* abort waiters */
-		sx_vabort_all(v->next);
-		/* mark stmt as commited */
-		sx_vcommit(v, csn);
-		/* translate log version from struct sxv to struct vinyl_tuple */
-		sv_from_tuple(&lv->v, v->tuple);
-		/* schedule read stmt for gc */
-		if (v->tuple->flags & SVGET) {
-			vinyl_tuple_ref(v->tuple);
-			v->gc = m->gc;
-			m->gc = v;
-			m->count_gc++;
-		} else {
-			sx_untrack(v);
-			free(v);
-		}
-	}
-
-	/* rollback latest reads */
-	sx_rollback_svp(x, &i, 0);
-
-	sx_promote(x, VINYL_TX_COMMIT);
-	sx_end(x);
-	return VINYL_TX_COMMIT;
-}
-
-static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *version)
+static int tx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *version)
 {
 	struct tx_manager *m = x->manager;
 	struct runtime *r = m->r;
@@ -3988,7 +3944,7 @@ static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple
 		x->log_read = -1;
 	}
 	/* allocate mvcc container */
-	struct sxv *v = sx_valloc(version);
+	struct sxv *v = sxv_alloc(version);
 	if (unlikely(v == NULL)) {
 		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(version));
 		vinyl_tuple_unref_rt(r, version);
@@ -4018,7 +3974,7 @@ static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple
 	}
 	/* exists */
 	/* match previous update made by current transaction */
-	struct sxv *own = sx_vmatch(head, x->id);
+	struct sxv *own = sxv_match(head, x->id);
 	if (unlikely(own))
 	{
 		if (unlikely(version->flags & SVUPSERT)) {
@@ -4029,9 +3985,9 @@ static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple
 		/* replace old document with the new one */
 		lv.next = sv_logat(&x->log, own->lo)->next;
 		v->lo = own->lo;
-		if (unlikely(sx_vaborted(own)))
-			sx_vabort(v);
-		sx_vreplace(own, v);
+		if (unlikely(sxv_aborted(own)))
+			sxv_abort(v);
+		sxv_replace(own, v);
 		if (likely(head == own)) {
 			sxv_tree_remove(&index->tree, own);
 			sxv_tree_insert(&index->tree, v);
@@ -4040,7 +3996,7 @@ static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple
 		sv_logreplace(&x->log, v->lo, &lv);
 
 		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(own->tuple));
-		sx_vfree(r, own);
+		sxv_free(r, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
@@ -4052,18 +4008,18 @@ static int sx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple
 		goto error;
 	}
 	/* add version */
-	sx_vlink(head, v);
+	sxv_link(head, v);
 	tt_pthread_mutex_unlock(&index->mutex);
 	return 0;
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
 	vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(v->tuple));
-	sx_vfree(r, v);
+	sxv_free(r, v);
 	return -1;
 }
 
 static int
-sx_get(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *key,
+tx_get(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *key,
        struct vinyl_tuple **result)
 {
 	tt_pthread_mutex_lock(&index->mutex);
@@ -4071,7 +4027,7 @@ sx_get(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *key,
 					       key->data, key->size);
 	if (head == NULL)
 		goto add;
-	struct sxv *v = sx_vmatch(head, x->id);
+	struct sxv *v = sxv_match(head, x->id);
 	if (v == NULL)
 		goto add;
 	tt_pthread_mutex_unlock(&index->mutex);
@@ -4091,22 +4047,15 @@ add:
 		x->log_read = sv_logcount(&x->log);
 	tt_pthread_mutex_unlock(&index->mutex);
 	vinyl_tuple_ref(key);
-	int rc = sx_set(x, index, key);
+	int rc = tx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
 
-static enum sxstate
-sx_get_autocommit(struct tx_manager *m, struct tx_index *index)
-{
-	(void) index;
-	vy_sequence(m->r->seq, VINYL_TSN_NEXT);
-	return VINYL_TX_COMMIT;
-}
-
 static inline int
-sx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t, struct vinyl_tx *p)
+tx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t,
+	       struct vinyl_tx *p)
 {
 	if (p->deadlock.next != &p->deadlock)
 		return 0;
@@ -4120,11 +4069,11 @@ sx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t, str
 		if (v->prev == NULL)
 			continue;
 		do {
-			struct vinyl_tx *n = sx_find(m, v->id);
+			struct vinyl_tx *n = tx_manager_find(m, v->id);
 			assert(n != NULL);
 			if (unlikely(n == t))
 				return 1;
-			int rc = sx_deadlock_in(m, mark, t, n);
+			int rc = tx_deadlock_in(m, mark, t, n);
 			if (unlikely(rc == 1))
 				return 1;
 			v = v->prev;
@@ -4134,7 +4083,7 @@ sx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t, str
 }
 
 static inline void
-sx_deadlock_unmark(struct rlist *mark)
+tx_deadlock_unmark(struct rlist *mark)
 {
 	struct vinyl_tx *t, *n;
 	rlist_foreach_entry_safe(t, mark, deadlock, n) {
@@ -4142,7 +4091,7 @@ sx_deadlock_unmark(struct rlist *mark)
 	}
 }
 
-static int __attribute__((unused)) sx_deadlock(struct vinyl_tx *t)
+static int __attribute__((unused)) tx_deadlock(struct vinyl_tx *t)
 {
 	struct tx_manager *m = t->manager;
 	struct rlist mark;
@@ -4157,51 +4106,56 @@ static int __attribute__((unused)) sx_deadlock(struct vinyl_tx *t)
 			vy_bufiter_next(&i);
 			continue;
 		}
-		struct vinyl_tx *p = sx_find(m, v->prev->id);
+		struct vinyl_tx *p = tx_manager_find(m, v->prev->id);
 		assert(p != NULL);
-		int rc = sx_deadlock_in(m, &mark, t, p);
+		int rc = tx_deadlock_in(m, &mark, t, p);
 		if (unlikely(rc)) {
-			sx_deadlock_unmark(&mark);
+			tx_deadlock_unmark(&mark);
 			return 1;
 		}
 		vy_bufiter_next(&i);
 	}
-	sx_deadlock_unmark(&mark);
+	tx_deadlock_unmark(&mark);
 	return 0;
 }
 
 static uint8_t
-sx_vifflags(struct sv *v) {
+sxv_flags(struct sv *v)
+{
 	return sv_to_sxv(v)->tuple->flags;
 }
 
 static uint64_t
-sx_viflsn(struct sv *v) {
+sxv_lsn(struct sv *v)
+{
 	return sv_to_sxv(v)->tuple->lsn;
 }
 
 static void
-sx_viflsnset(struct sv *v, int64_t lsn) {
+sxv_set_lsn(struct sv *v, int64_t lsn)
+{
 	sv_to_sxv(v)->tuple->lsn = lsn;
 }
 
 static char*
-sx_vifpointer(struct sv *v) {
+sxv_pointer(struct sv *v)
+{
 	return sv_to_sxv(v)->tuple->data;
 }
 
 static uint32_t
-sx_vifsize(struct sv *v) {
+sxv_size(struct sv *v)
+{
 	return sv_to_sxv(v)->tuple->size;
 }
 
-static struct svif sx_vif =
+static struct svif sxv_if =
 {
-	.flags     = sx_vifflags,
-	.lsn       = sx_viflsn,
-	.lsnset    = sx_viflsnset,
-	.pointer   = sx_vifpointer,
-	.size      = sx_vifsize
+	.flags     = sxv_flags,
+	.lsn       = sxv_lsn,
+	.set_lsn    = sxv_set_lsn,
+	.pointer   = sxv_pointer,
+	.size      = sxv_size
 };
 
 static void
@@ -4212,7 +4166,7 @@ sl_write(struct svlog *vlog, int64_t lsn)
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct svlogv *v = vy_bufiter_get(&i);
-		sv_lsnset(&v->v, lsn);
+		sv_set_lsn(&v->v, lsn);
 	}
 }
 
@@ -4871,7 +4825,7 @@ struct vinyl_service {
 static inline void
 sd_cinit(struct sdc *sc)
 {
-	sv_upsertinit(&sc->upsert);
+	svupsert_init(&sc->upsert);
 	sd_buildinit(&sc->build);
 	vy_buf_init(&sc->a);
 	vy_buf_init(&sc->b);
@@ -4885,7 +4839,7 @@ static inline void
 sd_cfree(struct sdc *sc)
 {
 	sd_buildfree(&sc->build);
-	sv_upsertfree(&sc->upsert);
+	svupsert_free(&sc->upsert);
 	vy_buf_free(&sc->a);
 	vy_buf_free(&sc->b);
 	vy_buf_free(&sc->c);
@@ -4905,7 +4859,7 @@ static inline void
 sd_cgc(struct sdc *sc, int wm)
 {
 	sd_buildgc(&sc->build, wm);
-	sv_upsertgc(&sc->upsert, 600, 512);
+	svupsert_gc(&sc->upsert, 600, 512);
 	vy_buf_gc(&sc->a, wm);
 	vy_buf_gc(&sc->b, wm);
 	vy_buf_gc(&sc->c, wm);
@@ -5781,19 +5735,19 @@ static int sd_recover_complete(struct sdrecover *ri)
 }
 
 static uint8_t
-sd_vifflags(struct sv *v)
+sdv_flags(struct sv *v)
 {
 	return ((struct sdv*)v->v)->flags;
 }
 
 static uint64_t
-sd_viflsn(struct sv *v)
+sdv_lsn(struct sv *v)
 {
 	return ((struct sdv*)v->v)->lsn;
 }
 
 static char*
-sd_vifpointer(struct sv *v)
+sdv_pointer(struct sv *v)
 {
 	struct sdpage p = {
 		.h = (struct sdpageheader*)v->arg
@@ -5802,18 +5756,18 @@ sd_vifpointer(struct sv *v)
 }
 
 static uint32_t
-sd_vifsize(struct sv *v)
+sdv_size(struct sv *v)
 {
 	return ((struct sdv*)v->v)->size;
 }
 
-static struct svif sd_vif =
+static struct svif sdv_if =
 {
-	.flags     = sd_vifflags,
-	.lsn       = sd_viflsn,
-	.lsnset    = NULL,
-	.pointer   = sd_vifpointer,
-	.size      = sd_vifsize
+	.flags     = sdv_flags,
+	.lsn       = sdv_lsn,
+	.set_lsn    = NULL,
+	.pointer   = sdv_pointer,
+	.size      = sdv_size
 };
 
 static int
@@ -8392,7 +8346,7 @@ static inline int
 si_readdup(struct siread *q, struct sv *result)
 {
 	struct vinyl_tuple *v;
-	if (likely(result->i == &sv_tupleif)) {
+	if (likely(result->i == &svtuple_if)) {
 		v = result->v;
 		vinyl_tuple_ref(v);
 	} else {
@@ -10672,7 +10626,7 @@ vinyl_cursor_delete(struct vinyl_cursor *c)
 {
 	struct vinyl_env *e = c->index->env;
 	if (! c->read_commited)
-		sx_rollback(&c->tx);
+		tx_rollback(&c->tx);
 	if (c->cache)
 		vy_cachepool_push(c->cache);
 	if (c->key)
@@ -10729,7 +10683,7 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 void
 vinyl_cursor_set_read_commited(struct vinyl_cursor *c, bool read_commited)
 {
-	sx_rollback(&c->tx);
+	tx_rollback(&c->tx);
 	c->read_commited = read_commited;
 }
 
@@ -10756,7 +10710,7 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		return NULL;
 	}
 	c->read_commited = 0;
-	sx_begin(&e->xm, &c->tx, VINYL_TX_RO);
+	tx_begin(&e->xm, &c->tx, VINYL_TX_RO);
 
 	c->key = key;
 	vinyl_tuple_ref(key);
@@ -10901,7 +10855,7 @@ vinyl_index_close(struct vinyl_index *index)
 	if (unlikely(! vy_status_is_active(status)))
 		return -1;
 	/* set last visible transaction id */
-	index->txn_max = sx_max(&e->xm);
+	index->txn_max = tx_manager_max(&e->xm);
 	vy_status_set(&index->status, VINYL_SHUTDOWN_PENDING);
 	if (e->status == VINYL_SHUTDOWN || e->status == VINYL_OFFLINE) {
 		return vinyl_index_delete(index);
@@ -10921,7 +10875,7 @@ vinyl_index_drop(struct vinyl_index *index)
 	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
-	index->txn_max = sx_max(&e->xm);
+	index->txn_max = tx_manager_max(&e->xm);
 	vy_status_set(&index->status, VINYL_DROP_PENDING);
 	if (e->status == VINYL_SHUTDOWN || e->status == VINYL_OFFLINE)
 		return vinyl_index_delete(index);
@@ -10932,7 +10886,7 @@ vinyl_index_drop(struct vinyl_index *index)
 int
 vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order,
-		 struct vinyl_tuple **result, struct vinyl_tx *x,
+		 struct vinyl_tuple **result, struct vinyl_tx *tx,
 		 struct sicache *cache, bool cache_only,
 		 struct vy_stat_get *statget)
 {
@@ -10948,8 +10902,8 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	struct vinyl_tuple *vup = NULL;
 
 	/* concurrent */
-	if (x != NULL && order == VINYL_EQ) {
-		int rc = sx_get(x, &index->coindex, key, &vup);
+	if (tx != NULL && order == VINYL_EQ) {
+		int rc = tx_get(tx, &index->coindex, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
 		if (rc == 2) { /* delete */
@@ -10961,7 +10915,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 			return 0;
 		}
 	} else {
-		sx_get_autocommit(&e->xm, &index->coindex);
+		vy_sequence(e->r.seq, VINYL_TSN_NEXT);
 	}
 
 	/* prepare read cache */
@@ -10979,8 +10933,8 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	}
 
 	int64_t vlsn;
-	if (x) {
-		vlsn = x->vlsn;
+	if (tx) {
+		vlsn = tx->vlsn;
 	} else {
 		vlsn = vy_sequence(e->scheduler.r->seq, VINYL_LSN);
 	}
@@ -11070,7 +11024,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	if (index->key_def == NULL)
 		goto error_3;
 	vy_buf_init(&index->readbuf);
-	sv_upsertinit(&index->u);
+	svupsert_init(&index->u);
 	vy_range_tree_new(&index->tree);
 	tt_pthread_mutex_init(&index->lock, NULL);
 	rlist_create(&index->link);
@@ -11090,7 +11044,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	index->refs         = 1;
 	vy_status_set(&index->status, VINYL_OFFLINE);
 	tx_index_init(&index->coindex, &e->xm, index, index->key_def);
-	index->txn_min = sx_min(&e->xm);
+	index->txn_min = tx_manager_min(&e->xm);
 	index->txn_max = UINT32_MAX;
 	rlist_add(&e->indexes, &index->link);
 	return index;
@@ -11121,7 +11075,7 @@ vinyl_index_delete(struct vinyl_index *index)
 	index->gc_count = 0;
 
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->r);
-	sv_upsertfree(&index->u);
+	svupsert_free(&index->u);
 	vy_buf_free(&index->readbuf);
 	vy_planner_free(&index->p);
 	tt_pthread_mutex_destroy(&index->lock);
@@ -11519,7 +11473,7 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	vinyl_tuple_ref(o);
 
 	/* concurrent index only */
-	rc = sx_set(t, &index->coindex, o);
+	rc = tx_set(t, &index->coindex, o);
 	if (unlikely(rc != 0))
 		return -1;
 
@@ -11529,13 +11483,12 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 }
 
 static inline void
-vy_tx_end(struct vinyl_tx *t, int rlb, int conflict)
+vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 {
-	struct vinyl_env *e = t->env;
-	uint32_t count = sv_logcount(&t->log);
-	sx_gc(t);
-	vy_stat_tx(&e->stat, t->start, count, rlb, conflict);
-	free(t);
+	uint32_t count = sv_logcount(&tx->log);
+	tx_gc(tx);
+	vy_stat_tx(stat, tx->start, count, rlb, conflict);
+	free(tx);
 }
 
 static inline int
@@ -11666,17 +11619,16 @@ vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *ke
 
 
 int
-vinyl_rollback(struct vinyl_tx *tx)
+vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx)
 {
-	sx_rollback(tx);
-	vy_tx_end(tx, 1, 0);
+	tx_rollback(tx);
+	vy_tx_end(&e->stat, tx, 1, 0);
 	return 0;
 }
 
 int
-vinyl_prepare(struct vinyl_tx *tx)
+vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 {
-	struct vinyl_env *e = tx->env;
 	if (unlikely(! vy_status_is_active(e->status)))
 		return -1;
 
@@ -11685,7 +11637,7 @@ vinyl_prepare(struct vinyl_tx *tx)
 	struct sicache *cache = vy_cachepool_pop(&e->cachepool);
 	if (unlikely(cache == NULL))
 		return vy_oom();
-	enum sxstate s = sx_prepare(tx, cache, e->status);
+	enum tx_state s = tx_prepare(tx, cache, e->status);
 
 	vy_cachepool_push(cache);
 	if (s == VINYL_TX_LOCK) {
@@ -11695,10 +11647,45 @@ vinyl_prepare(struct vinyl_tx *tx)
 	if (s == VINYL_TX_ROLLBACK) {
 		return 1;
 	}
-	assert(s == VINYL_TX_PREPARE);
 
-	sx_commit(tx);
+	struct tx_manager *m = tx->manager;
+	struct vy_bufiter i;
+	vy_bufiter_open(&i, &tx->log.buf, sizeof(struct svlogv));
+	uint64_t csn = ++m->csn;
+	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
+	{
+		struct svlogv *lv = vy_bufiter_get(&i);
+		struct sxv *v = lv->v.v;
+		if ((int)v->lo == tx->log_read)
+			break;
+		/* abort conflict reader */
+		if (v->prev && !sxv_committed(v->prev)) {
+			assert(v->prev->tuple->flags & SVGET);
+			sxv_abort(v->prev);
+		}
+		/* abort waiters */
+		sxv_abort_all(v->next);
+		/* mark stmt as commited */
+		sxv_commit(v, csn);
+		/* translate log version from struct sxv to struct vinyl_tuple */
+		sv_from_tuple(&lv->v, v->tuple);
+		/* schedule read stmt for gc */
+		if (v->tuple->flags & SVGET) {
+			vinyl_tuple_ref(v->tuple);
+			v->gc = m->gc;
+			m->gc = v;
+			m->count_gc++;
+		} else {
+			sxv_untrack(v);
+			free(v);
+		}
+	}
 
+	/* rollback latest reads */
+	tx_rollback_svp(tx, &i, 0);
+
+	tx_promote(tx, VINYL_TX_COMMIT);
+	tx_end(tx);
 	/*
 	 * A half committed transaction is no longer
 	 * being part of concurrent index, but still can be
@@ -11710,9 +11697,8 @@ vinyl_prepare(struct vinyl_tx *tx)
 }
 
 int
-vinyl_commit(struct vinyl_tx *tx, int64_t lsn)
+vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn)
 {
-	struct vinyl_env *e = tx->env;
 	if (unlikely(! vy_status_is_active(e->status)))
 		return -1;
 	assert(tx->state == VINYL_TX_COMMIT);
@@ -11720,9 +11706,9 @@ vinyl_commit(struct vinyl_tx *tx, int64_t lsn)
 	/* do wal write and backend commit */
 	int rc = sc_write(&e->scheduler, &tx->log, lsn, e->status);
 	if (unlikely(rc == -1))
-		sx_rollback(tx);
+		tx_rollback(tx);
 
-	vy_tx_end(tx, 0, 0);
+	vy_tx_end(&e->stat, tx, 0, 0);
 	return rc;
 }
 
@@ -11735,8 +11721,7 @@ vinyl_begin(struct vinyl_env *e)
 		vy_oom();
 		return NULL;
 	}
-	tx->env = e;
-	sx_begin(&e->xm, tx, VINYL_TX_RW);
+	tx_begin(&e->xm, tx, VINYL_TX_RW);
 	return tx;
 }
 
