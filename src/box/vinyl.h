@@ -46,7 +46,7 @@ struct vinyl_field;
 struct vinyl_tuple;
 struct vinyl_cursor;
 struct vinyl_index;
-struct vinyl_confcursor;
+struct vinyl_info_cursor;
 struct vinyl_confkv;
 struct key_def;
 struct tuple;
@@ -65,14 +65,14 @@ vinyl_env_delete(struct vinyl_env *e);
 void
 vinyl_raise();
 
-struct vinyl_confcursor *
-vinyl_confcursor_new(struct vinyl_env *env);
+struct vinyl_info_cursor *
+vinyl_info_cursor_new(struct vinyl_env *env);
 
 void
-vinyl_confcursor_delete(struct vinyl_confcursor *confcursor);
+vinyl_info_cursor_delete(struct vinyl_info_cursor *cursor);
 
 int
-vinyl_confcursor_next(struct vinyl_confcursor *confcursor, const char **key,
+vinyl_info_cursor_next(struct vinyl_info_cursor *cursor, const char **key,
 		     const char **value);
 
 void

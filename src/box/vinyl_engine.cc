@@ -108,23 +108,23 @@ vinyl_workers_stop(void)
 int vinyl_info(const char *name, vinyl_info_f cb, void *arg)
 {
 	VinylEngine *e = (VinylEngine *)engine_find("vinyl");
-	struct vinyl_confcursor *cursor = vinyl_confcursor_new(e->env);
+	struct vinyl_info_cursor *cursor = vinyl_info_cursor_new(e->env);
 	const char *key;
 	const char *value;
 	if (name) {
-		while (vinyl_confcursor_next(cursor, &key, &value) == 0) {
+		while (vinyl_info_cursor_next(cursor, &key, &value) == 0) {
 			if (name && strcmp(key, name) != 0)
 				continue;
 			cb(key, value, arg);
 			return 1;
 		}
-		vinyl_confcursor_delete(cursor);
+		vinyl_info_cursor_delete(cursor);
 		return 0;
 	}
-	while (vinyl_confcursor_next(cursor, &key, &value) == 0) {
+	while (vinyl_info_cursor_next(cursor, &key, &value) == 0) {
 		cb(key, value, arg);
 	}
-	vinyl_confcursor_delete(cursor);
+	vinyl_info_cursor_delete(cursor);
 	return 0;
 }
 
