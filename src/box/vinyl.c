@@ -4158,18 +4158,6 @@ static struct svif sxv_if =
 	.size      = sxv_size
 };
 
-static void
-sl_write(struct svlog *vlog, int64_t lsn)
-{
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, &vlog->buf, sizeof(struct svlogv));
-	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
-	{
-		struct svlogv *v = vy_bufiter_get(&i);
-		sv_set_lsn(&v->v, lsn);
-	}
-}
-
 #define SD_IDBRANCH 1
 
 struct PACKED sdid {
@@ -9946,15 +9934,16 @@ sc_step(struct vinyl_service *srv, uint64_t vlsn)
 	return rc_job;
 }
 
-static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn,
-		    enum vinyl_status status)
+static int
+svlog_flush(struct svlog *log, uint64_t lsn, enum vinyl_status status)
 {
-	/* write-ahead log */
-	vy_sequence_lock(s->r->seq);
-	if (lsn > s->r->seq->lsn)
-		s->r->seq->lsn = lsn;
-	vy_sequence_unlock(s->r->seq);
-	sl_write(log, lsn);
+	struct vy_bufiter iter;
+	vy_bufiter_open(&iter, &log->buf, sizeof(struct svlogv));
+	for (; vy_bufiter_has(&iter); vy_bufiter_next(&iter))
+	{
+		struct svlogv *v = vy_bufiter_get(&iter);
+		sv_set_lsn(&v->v, lsn);
+	}
 
 	/* index */
 	uint64_t now = clock_monotonic64();
@@ -11703,8 +11692,13 @@ vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn)
 		return -1;
 	assert(tx->state == VINYL_TX_COMMIT);
 
+	/* write-ahead log */
+	vy_sequence_lock(&e->seq);
+	if (lsn > (int64_t) e->seq.lsn)
+		e->seq.lsn = lsn;
+	vy_sequence_unlock(&e->seq);
 	/* do wal write and backend commit */
-	int rc = sc_write(&e->scheduler, &tx->log, lsn, e->status);
+	int rc = svlog_flush(&tx->log, lsn, e->status);
 	if (unlikely(rc == -1))
 		tx_rollback(tx);
 
