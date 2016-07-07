@@ -11494,7 +11494,7 @@ vinyl_tuple_validate(struct vinyl_tuple *o, struct vinyl_index *index,
 
 static inline int
 vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
-	      struct vinyl_tuple *o, uint8_t flags)
+	    struct vinyl_tuple *o, uint8_t flags)
 {
 	struct vinyl_env *e = t->env;
 
@@ -11543,7 +11543,6 @@ vy_tx_end(struct vinyl_tx *t, int rlb, int conflict)
 	struct vinyl_env *e = t->env;
 	uint32_t count = sv_logcount(&t->log);
 	sx_gc(&t->t);
-	sv_logreset(&t->log);
 	vy_stat_tx(&e->stat, t->start, count, rlb, conflict);
 	sv_logfree(&t->log);
 	free(t);
