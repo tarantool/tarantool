@@ -2376,14 +2376,6 @@ sv_logfree(struct svlog *l)
 	l->count_write = 0;
 }
 
-static inline void
-sv_logreset(struct svlog *l)
-{
-	vy_buf_reset(&l->buf);
-	vy_buf_reset(&l->index);
-	l->count_write = 0;
-}
-
 static inline int
 sv_logcount(struct svlog *l) {
 	return vy_buf_used(&l->buf) / sizeof(struct svlogv);
