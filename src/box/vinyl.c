@@ -1838,7 +1838,7 @@ struct sxv;
 struct svupsert;
 struct sdpageheader;
 
-struct PACKED sv {
+struct sv {
 	struct svif *i;
 	void *v, *arg;
 };
@@ -2051,8 +2051,7 @@ svupsert_push_raw(struct svupsert *u,
 static inline int
 svupsert_push(struct svupsert *u, struct sv *v)
 {
-	return svupsert_push_raw(u, sv_pointer(v),
-	                         sv_size(v),
+	return svupsert_push_raw(u, sv_pointer(v), sv_size(v),
 	                         sv_flags(v), sv_lsn(v));
 }
 
@@ -2605,7 +2604,7 @@ sv_mergeisdup(struct svmergeiter *im)
 	return 0;
 }
 
-struct PACKED svreaditer {
+struct svreaditer {
 	struct svmergeiter *merge;
 	uint64_t vlsn;
 	int next;
@@ -3358,20 +3357,20 @@ struct sxv {
 	rb_node(struct sxv) tree_node;
 };
 
-static inline struct sxv*
-sxv_alloc(struct vinyl_tuple *ref)
+static inline struct sxv *
+sxv_alloc(struct vinyl_tuple *tuple)
 {
 	struct sxv *v = malloc(sizeof(struct sxv));
 	if (unlikely(v == NULL))
 		return NULL;
 	v->index = NULL;
-	v->id    = 0;
-	v->lo    = 0;
-	v->csn   = 0;
-	v->tuple = ref;
-	v->next  = NULL;
-	v->prev  = NULL;
-	v->gc    = NULL;
+	v->id = 0;
+	v->lo = 0;
+	v->csn = 0;
+	v->tuple = tuple;
+	v->next = NULL;
+	v->prev = NULL;
+	v->gc = NULL;
 	return v;
 }
 
@@ -3392,16 +3391,13 @@ sxv_freeall(struct runtime *r, struct sxv *v)
 	}
 }
 
-static inline struct sxv*
+static inline struct sxv *
 sxv_match(struct sxv *head, uint64_t id)
 {
-	struct sxv *c = head;
-	while (c) {
+	for (struct sxv *c = head; c != NULL; c = c->next)
 		if (c->id == id)
-			break;
-		c = c->next;
-	}
-	return c;
+			return c;
+	return NULL;
 }
 
 static inline void
@@ -3472,8 +3468,6 @@ sxv_aborted(struct sxv *v)
 	return v->tuple->flags & SVCONFLICT;
 }
 
-static struct svif sxv_if;
-
 enum tx_state {
 	VINYL_TX_UNDEF,
 	VINYL_TX_READY,
@@ -3538,11 +3532,7 @@ sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
 	return vy_compare(key_def, a->data, b->tuple->data);
 }
 
-struct vinyl_tx;
 struct sicache;
-
-typedef int (*sxpreparef)(struct vinyl_tx*, struct sv*, struct vinyl_index*,
-			  struct sicache *);
 
 struct vinyl_tx {
 	struct svlog log;
@@ -3626,15 +3616,17 @@ static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 	return 0;
 }
 
-static int tx_managerfree(struct tx_manager *m)
+static int
+tx_managerfree(struct tx_manager *m)
 {
 	assert(tx_manager_count(m) == 0);
 	tt_pthread_mutex_destroy(&m->lock);
 	return 0;
 }
 
-static int tx_index_init(struct tx_index *i, struct tx_manager *m,
-			struct vinyl_index *index, struct key_def *key_def)
+static int
+tx_index_init(struct tx_index *i, struct tx_manager *m,
+	      struct vinyl_index *index, struct key_def *key_def)
 {
 	sxv_tree_new(&i->tree);
 	rlist_create(&i->link);
@@ -3646,7 +3638,8 @@ static int tx_index_init(struct tx_index *i, struct tx_manager *m,
 	return 0;
 }
 
-static int tx_index_set(struct tx_index *i, uint32_t dsn)
+static int
+tx_index_set(struct tx_index *i, uint32_t dsn)
 {
 	i->dsn = dsn;
 	return 0;
@@ -3678,7 +3671,8 @@ tx_index_free(struct tx_index *i, struct tx_manager *m)
 	return 0;
 }
 
-static uint64_t tx_manager_min(struct tx_manager *m)
+static uint64_t
+tx_manager_min(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
@@ -3690,7 +3684,8 @@ static uint64_t tx_manager_min(struct tx_manager *m)
 	return id;
 }
 
-static uint64_t tx_manager_max(struct tx_manager *m)
+static uint64_t
+tx_manager_max(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
@@ -3702,7 +3697,8 @@ static uint64_t tx_manager_max(struct tx_manager *m)
 	return id;
 }
 
-static uint64_t tx_manager_lsn(struct tx_manager *m)
+static uint64_t
+tx_manager_lsn(struct tx_manager *m)
 {
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t vlsn;
@@ -3716,7 +3712,8 @@ static uint64_t tx_manager_lsn(struct tx_manager *m)
 	return vlsn;
 }
 
-static struct vinyl_tx *tx_manager_find(struct tx_manager *m, uint64_t id)
+static struct vinyl_tx *
+tx_manager_find(struct tx_manager *m, uint64_t id)
 {
 	return tx_tree_search(&m->tree, (char*)&id);
 }
@@ -3928,7 +3925,8 @@ tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 	return tx_promote(tx, VINYL_TX_PREPARE);
 }
 
-static int tx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *version)
+static int
+tx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *version)
 {
 	struct tx_manager *m = x->manager;
 	struct runtime *r = m->r;
@@ -11486,11 +11484,7 @@ vy_txprepare_cb(struct vinyl_tx *tx, struct svlogv *v, uint64_t lsn,
 	struct vinyl_index *index = tx_index->index;
 
 	struct siread q;
-	si_readopen(&q, index, cache,
-	            VINYL_EQ,
-	            tx->vlsn,
-	            key->data,
-	            key->size);
+	si_readopen(&q, index, cache, VINYL_EQ, tx->vlsn, key->data, key->size);
 	q.has = 1;
 	int rc = si_read(&q);
 	si_readclose(&q);
