@@ -778,8 +778,6 @@ struct vy_iter {
 #define vy_iter_get(i) (i)->vif->get(i)
 #define vy_iter_next(i) (i)->vif->next(i)
 
-static struct vy_iterif vy_bufiterrefif;
-
 struct vy_bufiter {
 	struct vy_buf *buf;
 	int vsize;
@@ -808,6 +806,14 @@ vy_bufiter_get(struct vy_bufiter *bi)
 	return bi->v;
 }
 
+static inline void*
+vy_bufiterref_get(struct vy_bufiter *bi)
+{
+	if (unlikely(bi->v == NULL))
+		return NULL;
+	return *(void**)bi->v;
+}
+
 static inline void
 vy_bufiter_next(struct vy_bufiter *bi)
 {
@@ -816,43 +822,6 @@ vy_bufiter_next(struct vy_bufiter *bi)
 	bi->v = (char*)bi->v + bi->vsize;
 	if (unlikely(! vy_buf_in(bi->buf, bi->v)))
 		bi->v = NULL;
-}
-
-static inline void
-vy_bufiterref_open(struct vy_iter *i, struct vy_buf *buf, int vsize)
-{
-	i->vif = &vy_bufiterrefif;
-	struct vy_bufiter *bi = (struct vy_bufiter*)i->priv;
-	vy_bufiter_open(bi, buf, vsize);
-}
-
-static inline void
-vy_bufiterref_close(struct vy_iter *i)
-{
-	(void) i;
-}
-
-static inline int
-vy_bufiterref_has(struct vy_iter *i)
-{
-	struct vy_bufiter *bi = (struct vy_bufiter*)i->priv;
-	return vy_bufiter_has(bi);
-}
-
-static inline void*
-vy_bufiterref_get(struct vy_iter *i)
-{
-	struct vy_bufiter *bi = (struct vy_bufiter*)i->priv;
-	if (unlikely(bi->v == NULL))
-		return NULL;
-	return *(void**)bi->v;
-}
-
-static inline void
-vy_bufiterref_next(struct vy_iter *i)
-{
-	struct vy_bufiter *bi = (struct vy_bufiter*)i->priv;
-	vy_bufiter_next(bi);
 }
 
 struct vy_avg {
@@ -881,14 +850,6 @@ vy_avg_prepare(struct vy_avg *a)
 	snprintf(a->sz, sizeof(a->sz), "%"PRIu32" %"PRIu32" %.1f",
 	         a->min, a->max, a->avg);
 }
-
-static struct vy_iterif vy_bufiterrefif =
-{
-	.close   = vy_bufiterref_close,
-	.has     = vy_bufiterref_has,
-	.get     = vy_bufiterref_get,
-	.next    = vy_bufiterref_next
-};
 
 struct vy_filter_lz4 {
 	LZ4F_compressionContext_t compress;
@@ -1312,7 +1273,7 @@ sf_comparable_size(struct key_def *key_def, char *data)
 	int sum = 0;
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		uint32_t field_size;
-		(void) sf_field(key_def, part_id, data, &field_size);
+		sf_field(key_def, part_id, data, &field_size);
 		sum += field_size;
 		sum += sizeof(struct vinyl_field_meta);
 	}
@@ -3129,24 +3090,27 @@ struct svindexiter {
 	struct bps_tree_svindex_iterator itr;
 	struct sv current;
 	enum vinyl_order order;
+	void *key;
+	int key_size;
 };
 
 static struct vy_iterif sv_indexiterif;
 
 static inline int
 sv_indexiter_open(struct vy_iter *i, struct svindex *index,
-		  enum vinyl_order o, void *key, int keysize)
+		  enum vinyl_order o, void *key, int key_size)
 {
 	assert(index == index->tree.arg);
-	assert(o == VINYL_GT || o == VINYL_GE || o == VINYL_LT || o == VINYL_LE);
 	i->vif = &sv_indexiterif;
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
 	struct bps_tree_svindex *tree = &index->tree;
 	ii->index = index;
 	ii->order = o;
+	ii->key = key;
+	ii->key_size = key_size;
 	ii->current.i = &svref_if;
 	if (key == NULL) {
-		if (o == VINYL_GT || o == VINYL_GE) {
+		if (o == VINYL_GT || o == VINYL_GE || o == VINYL_EQ) {
 			ii->itr = bps_tree_svindex_itr_first(tree);
 		} else {
 			assert(o == VINYL_LT || o == VINYL_LE);
@@ -3157,13 +3121,17 @@ sv_indexiter_open(struct vy_iter *i, struct svindex *index,
 
 	struct tree_svindex_key tree_key;
 	tree_key.data = key;
-	tree_key.size = keysize;
-	tree_key.lsn = (o == VINYL_GE || o == VINYL_LT) ? UINT64_MAX : 0;
+	tree_key.size = key_size;
+	tree_key.lsn = (o == VINYL_GE || o == VINYL_EQ || o == VINYL_LT) ?
+		       UINT64_MAX : 0;
 	bool exact;
 	ii->index->hint_key_is_equal = false;
 	ii->itr = bps_tree_svindex_lower_bound(tree, &tree_key, &exact);
 	if (o == VINYL_LE || o == VINYL_LT)
 		bps_tree_svindex_itr_prev(tree, &ii->itr);
+	else if(o == VINYL_EQ)
+		if (!ii->index->hint_key_is_equal)
+			ii->itr = bps_tree_svindex_invalid_iterator();
 	return (int)ii->index->hint_key_is_equal;
 }
 
@@ -3198,7 +3166,16 @@ sv_indexiter_next(struct vy_iter *i)
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
 	assert(!bps_tree_svindex_itr_is_invalid(&ii->itr));
 
-	if (ii->order == VINYL_GT || ii->order == VINYL_GE) {
+	if (ii->order == VINYL_EQ) {
+		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
+		if (bps_tree_svindex_itr_is_invalid(&ii->itr))
+			return;
+		struct svref *ref =
+			bps_tree_svindex_itr_get_elem(&ii->index->tree,
+						      &ii->itr);
+		if (vy_compare(ii->index->key_def, ref->v->data, ii->key) != 0)
+			ii->itr = bps_tree_svindex_invalid_iterator();
+	} else if (ii->order == VINYL_GT || ii->order == VINYL_GE) {
 		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
 	} else {
 		assert(ii->order == VINYL_LT || ii->order == VINYL_LE);
@@ -5961,61 +5938,56 @@ struct siread {
 
 struct vy_rangeiter {
 	struct vinyl_index *index;
-	struct vy_range *node;
+	struct vy_range *cur_range;
 	enum vinyl_order order;
-	void *key;
-	int keysize;
+	char *key;
+	int key_size;
 };
 
-static inline int
+static inline void
 vy_rangeiter_open(struct vy_rangeiter *itr, struct vinyl_index *index,
-		  enum vinyl_order order, void *key, int keysize)
+		  enum vinyl_order order, char *key, int key_size)
 {
 	itr->index = index;
 	itr->order = order;
 	itr->key = key;
-	itr->keysize = keysize;
-	itr->node = NULL;
-	int eq = 0;
+	itr->key_size = key_size;
+	itr->cur_range = NULL;
 	if (unlikely(index->range_count == 1)) {
-		itr->node = vy_range_tree_first(&index->tree);
-		return 1;
+		itr->cur_range = vy_range_tree_first(&index->tree);
+		return;
 	}
 	if (unlikely(itr->key == NULL)) {
 		switch (itr->order) {
 		case VINYL_LT:
 		case VINYL_LE:
-			itr->node = vy_range_tree_last(&index->tree);;
+			itr->cur_range = vy_range_tree_last(&index->tree);;
 			break;
 		case VINYL_GT:
 		case VINYL_GE:
-			itr->node = vy_range_tree_first(&index->tree);
+			itr->cur_range = vy_range_tree_first(&index->tree);
 			break;
 		default:
 			unreachable();
 			break;
 		}
-		return 0;
+		return;
 	}
 	/* route */
 	assert(itr->key != NULL);
 	struct vy_range_tree_key tree_key;
 	tree_key.data = itr->key;
-	tree_key.size = itr->keysize;
-	itr->node = vy_range_tree_search(&index->tree, &tree_key);
-	if (itr->node != NULL) {
-		eq = 1;
-	} else {
-		itr->node = vy_range_tree_psearch(&index->tree, &tree_key);
-	}
-	assert(itr->node != NULL);
-	return eq;
+	tree_key.size = itr->key_size;
+	itr->cur_range = vy_range_tree_search(&index->tree, &tree_key);
+	if (itr->cur_range == NULL)
+		itr->cur_range = vy_range_tree_psearch(&index->tree, &tree_key);
+	assert(itr->cur_range != NULL);
 }
 
 static inline struct vy_range *
 vy_rangeiter_get(struct vy_rangeiter *ii)
 {
-	return ii->node;
+	return ii->cur_range;
 }
 
 static inline void
@@ -6024,11 +5996,13 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 	switch (ii->order) {
 	case VINYL_LT:
 	case VINYL_LE:
-		ii->node = vy_range_tree_prev(&ii->index->tree, ii->node);
+		ii->cur_range = vy_range_tree_prev(&ii->index->tree,
+						   ii->cur_range);
 		break;
 	case VINYL_GT:
 	case VINYL_GE:
-		ii->node = vy_range_tree_next(&ii->index->tree, ii->node);
+		ii->cur_range = vy_range_tree_next(&ii->index->tree,
+						   ii->cur_range);
 		break;
 	default: unreachable();
 	}
@@ -6732,36 +6706,36 @@ si_redistribute(struct vinyl_index *index, struct sdc *c,
 {
 	(void)index;
 	struct svindex *vindex = vy_range_index(node);
-	struct vy_iter i;
-	sv_indexiter_open(&i, vindex, VINYL_GE, NULL, 0);
-	while (sv_indexiter_has(&i))
+	struct vy_iter ii;
+	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
+	while (sv_indexiter_has(&ii))
 	{
-		struct sv *v = sv_indexiter_get(&i);
-		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref**));
+		struct sv *v = sv_indexiter_get(&ii);
+		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref **));
 		if (unlikely(rc == -1))
 			return vy_oom();
-		sv_indexiter_next(&i);
+		sv_indexiter_next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
 		return 0;
-	vy_bufiterref_open(&i, &c->b, sizeof(struct svref*));
-	struct vy_iter j;
-	vy_bufiterref_open(&j, result, sizeof(struct vy_range*));
+	struct vy_bufiter i, j;
+	vy_bufiter_open(&i, &c->b, sizeof(struct svref*));
+	vy_bufiter_open(&j, result, sizeof(struct vy_range*));
 	struct vy_range *prev = vy_bufiterref_get(&j);
-	vy_bufiterref_next(&j);
+	vy_bufiter_next(&j);
 	while (1)
 	{
 		struct vy_range *p = vy_bufiterref_get(&j);
 		if (p == NULL) {
 			assert(prev != NULL);
-			while (vy_bufiterref_has(&i)) {
+			while (vy_bufiter_has(&i)) {
 				struct svref *v = vy_bufiterref_get(&i);
 				sv_indexset(&prev->i0, *v);
-				vy_bufiterref_next(&i);
+				vy_bufiter_next(&i);
 			}
 			break;
 		}
-		while (vy_bufiterref_has(&i))
+		while (vy_bufiter_has(&i))
 		{
 			struct svref *v = vy_bufiterref_get(&i);
 			struct sdindexpage *page = sd_indexmin(&p->self.index);
@@ -6770,12 +6744,12 @@ si_redistribute(struct vinyl_index *index, struct sdc *c,
 			if (unlikely(rc >= 0))
 				break;
 			sv_indexset(&prev->i0, *v);
-			vy_bufiterref_next(&i);
+			vy_bufiter_next(&i);
 		}
-		if (unlikely(! vy_bufiterref_has(&i)))
+		if (unlikely(! vy_bufiter_has(&i)))
 			break;
 		prev = p;
-		vy_bufiterref_next(&j);
+		vy_bufiter_next(&j);
 	}
 	assert(vy_bufiterref_get(&i) == NULL);
 	return 0;
@@ -6805,23 +6779,24 @@ static int
 si_redistribute_index(struct vinyl_index *index, struct sdc *c, struct vy_range *node)
 {
 	struct svindex *vindex = vy_range_index(node);
-	struct vy_iter i;
-	sv_indexiter_open(&i, vindex, VINYL_GE, NULL, 0);
-	while (sv_indexiter_has(&i)) {
-		struct sv *v = sv_indexiter_get(&i);
+	struct vy_iter ii;
+	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
+	while (sv_indexiter_has(&ii)) {
+		struct sv *v = sv_indexiter_get(&ii);
 		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref**));
 		if (unlikely(rc == -1))
 			return vy_oom();
-		sv_indexiter_next(&i);
+		sv_indexiter_next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
 		return 0;
 	uint64_t now = clock_monotonic64();
-	vy_bufiterref_open(&i, &c->b, sizeof(struct svref*));
-	while (vy_bufiterref_has(&i)) {
+	struct vy_bufiter i;
+	vy_bufiter_open(&i, &c->b, sizeof(struct svref*));
+	while (vy_bufiter_has(&i)) {
 		struct svref *v = vy_bufiterref_get(&i);
 		si_redistribute_set(index, now, v);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 	return 0;
 }
@@ -6829,13 +6804,13 @@ si_redistribute_index(struct vinyl_index *index, struct sdc *c, struct vy_range 
 static int
 si_splitfree(struct vy_buf *result, struct runtime *r)
 {
-	struct vy_iter i;
-	vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiterref_has(&i))
+	struct vy_bufiter i;
+	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
+	while (vy_bufiter_has(&i))
 	{
 		struct vy_range *p = vy_bufiterref_get(&i);
 		vy_range_free(p, r, 0);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 	return 0;
 }
@@ -6909,7 +6884,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 {
 	struct runtime *r = index->r;
 	struct vy_buf *result = &c->a;
-	struct vy_iter i;
+	struct vy_bufiter i;
 
 	/* begin compaction.
 	 *
@@ -6980,7 +6955,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 			si_splitfree(result, r);
 			return -1;
 		}
-		vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
+		vy_bufiter_open(&i, result, sizeof(struct vy_range*));
 		n = vy_bufiterref_get(&i);
 		n->used = n->i0.used;
 		n->temperature = range->temperature;
@@ -6989,8 +6964,8 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		vy_range_lock(n);
 		si_replace(index, range, n);
 		vy_planner_update(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
-		for (vy_bufiterref_next(&i); vy_bufiterref_has(&i);
-		     vy_bufiterref_next(&i)) {
+		for (vy_bufiter_next(&i); vy_bufiter_has(&i);
+		     vy_bufiter_next(&i)) {
 			n = vy_bufiterref_get(&i);
 			n->used = n->i0.used;
 			n->temperature = range->temperature;
@@ -7008,8 +6983,8 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 	/* compaction completion */
 
 	/* seal nodes */
-	vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiterref_has(&i))
+	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
+	while (vy_bufiter_has(&i))
 	{
 		n  = vy_bufiterref_get(&i);
 		rc = vy_range_seal(n, &index->conf);
@@ -7021,7 +6996,7 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		             vy_range_free(range, r, 0);
 		             vy_error("%s", "error injection");
 		             return -1);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
@@ -7050,8 +7025,8 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 	             return -1);
 
 	/* complete new nodes */
-	vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiterref_has(&i))
+	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
+	while (vy_bufiter_has(&i))
 	{
 		n = vy_bufiterref_get(&i);
 		rc = vy_range_complete(n, &index->conf);
@@ -7060,17 +7035,17 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 		VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_4,
 		             vy_error("%s", "error injection");
 		             return -1);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 
 	/* unlock */
 	vy_index_lock(index);
-	vy_bufiterref_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiterref_has(&i))
+	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
+	while (vy_bufiter_has(&i))
 	{
 		n = vy_bufiterref_get(&i);
 		vy_range_unlock(n);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 	vy_index_unlock(index);
 	return 0;
@@ -8028,6 +8003,47 @@ si_rangebranch(struct siread *q, struct vy_range *n,
 	return 1;
 }
 
+static void
+vy_upsert_iterator_close(struct vy_iter *itr)
+{
+	assert(itr->vif->close == vy_upsert_iterator_close);
+	(void)itr;
+}
+
+static int
+vy_upsert_iterator_has(struct vy_iter *itr)
+{
+	assert(itr->vif->has == vy_upsert_iterator_has);
+	return *((struct sv **)itr->priv) != NULL;
+}
+
+static void *
+vy_upsert_iterator_get(struct vy_iter *itr)
+{
+	assert(itr->vif->get == vy_upsert_iterator_get);
+	return *((struct sv **)itr->priv);
+}
+
+static void
+vy_upsert_iterator_next(struct vy_iter *itr)
+{
+	assert(itr->vif->next == vy_upsert_iterator_next);
+	*((struct sv **)itr->priv) = NULL;
+}
+
+static void
+vy_upsert_iterator_open(struct vy_iter *itr, struct sv *value)
+{
+	static struct vy_iterif vif = {
+		.close = vy_upsert_iterator_close,
+		.has = vy_upsert_iterator_has,
+		.get = vy_upsert_iterator_get,
+		.next = vy_upsert_iterator_next
+	};
+	itr->vif = &vif;
+	*((struct sv **)itr->priv) = value;
+}
+
 static inline int
 si_range(struct siread *q)
 {
@@ -8051,25 +8067,21 @@ next_node:
 	}
 
 	/* external source (upsert) */
-	struct svmergesrc *s;
-	struct vy_buf upbuf;
 	if (unlikely(q->upsert_v && q->upsert_v->v)) {
-		vy_buf_init(&upbuf);
-		vy_buf_add(&upbuf, (void*)&q->upsert_v, sizeof(struct sv*));
-		s = sv_mergeadd(m, NULL);
-		vy_bufiterref_open(&s->src, &upbuf, sizeof(struct sv*));
+		struct svmergesrc *s = sv_mergeadd(m, NULL);
+		vy_upsert_iterator_open(&s->src, q->upsert_v);
 	}
 
 	/* in-memory indexes */
 	struct svindex *second;
 	struct svindex *first = vy_range_index_priority(node, &second);
 	if (first->tree.size) {
-		s = sv_mergeadd(m, NULL);
+		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		sv_indexiter_open(&s->src, first, q->order,
 				  q->key, q->keysize);
 	}
 	if (unlikely(second && second->tree.size)) {
-		s = sv_mergeadd(m, NULL);
+		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		sv_indexiter_open(&s->src, second, q->order,
 				  q->key, q->keysize);
 	}
@@ -8501,22 +8513,22 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct vinyl_index 
 			return vy_oom();
 		n = vy_range_id_tree_next(&track->tree, n);
 	}
-	struct vy_iter i;
-	vy_bufiterref_open(&i, buf, sizeof(struct vy_range*));
-	while (vy_bufiterref_has(&i))
+	struct vy_bufiter i;
+	vy_bufiter_open(&i, buf, sizeof(struct vy_range*));
+	while (vy_bufiter_has(&i))
 	{
 		struct vy_range *n = vy_bufiterref_get(&i);
 		if (n->recover & SI_RDB_REMOVE) {
 			int rc = vy_range_free(n, r, 1);
 			if (unlikely(rc == -1))
 				return -1;
-			vy_bufiterref_next(&i);
+			vy_bufiter_next(&i);
 			continue;
 		}
 		n->recover = SI_RDB;
 		si_insert(index, n);
 		vy_planner_update(&index->p, SI_COMPACT|SI_BRANCH|SI_TEMP, n);
-		vy_bufiterref_next(&i);
+		vy_bufiter_next(&i);
 	}
 	return 0;
 }
