@@ -214,7 +214,7 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 
 struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
-			 uint32_t part_count, int order);
+			 uint32_t part_count);
 
 struct tuple *
 vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,

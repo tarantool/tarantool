@@ -128,7 +128,7 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->opts.is_unique && part_count == key_def->part_count);
 	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(db, key, part_count, VINYL_EQ);
+		vinyl_tuple_from_key_data(db, key, part_count);
 	if (vinyl_key == NULL)
 		diag_raise();
 	auto key_guard = make_scoped_guard([=] {
@@ -280,7 +280,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_GT:
-		order = VINYL_GT;
+		order = part_count > 0 ? VINYL_GT : VINYL_GE;
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LE:
@@ -288,7 +288,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LT:
-		order = VINYL_LT;
+		order = part_count > 0 ? VINYL_LT : VINYL_LE;
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_EQ:
@@ -314,7 +314,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	}
 
 	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(db, key, part_count, order);
+		vinyl_tuple_from_key_data(db, key, part_count);
 	if (vinyl_key == NULL)
 		diag_raise();
 	it->cursor = vinyl_cursor_new(db, vinyl_key, order);

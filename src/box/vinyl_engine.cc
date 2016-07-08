@@ -231,7 +231,7 @@ join_send_space(struct space *sp, void *data)
 
 	/* send database */
 	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(pk->db, NULL, 0, VINYL_GE);
+		vinyl_tuple_from_key_data(pk->db, NULL, 0);
 	if (vinyl_key == NULL)
 		diag_raise();
 	struct vinyl_cursor *cursor = vinyl_cursor_new(pk->db, vinyl_key, VINYL_GE);

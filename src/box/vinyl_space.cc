@@ -164,7 +164,7 @@ VinylSpace::executeDelete(struct txn*, struct space *space,
 	primary_key_validate(index->key_def, key, part_count);
 
 	struct vinyl_tuple *vinyl_key = vinyl_tuple_from_key_data(index->db,
-		key, part_count, VINYL_EQ);
+		key, part_count);
 	if (vinyl_key == NULL)
 		diag_raise();
 	auto tuple_guard = make_scoped_guard([=]{
