@@ -43,6 +43,7 @@
 #include "small/mempool.h"
 #include "small/region.h"
 #include "small/rlist.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -283,6 +284,54 @@ struct fiber {
 
 enum { FIBER_CALL_STACK = 16 };
 
+#define CACHELINE_SIZE 64
+/**
+ * A pool of worker fibers to handle messages,
+ * so that each message is handled in its own fiber.
+ */
+struct fiber_pool {
+	struct {
+		/** Cache of fibers which work on incoming messages. */
+		struct rlist idle;
+		/** The number of fibers in the pool. */
+		int size;
+		/** The limit on the number of fibers working on tasks. */
+		int max_size;
+		/**
+		 * Fibers in leave the pool if they have nothing to do
+		 * for longer than this.
+		 */
+		float idle_timeout;
+		/** Staged messages (for fibers to work on) */
+		struct stailq output;
+		struct ev_timer idle_timer;
+	} __attribute__((aligned(CACHELINE_SIZE)));
+	struct {
+
+		/** The consumer thread loop. */
+		struct ev_loop *consumer;
+		/**
+		 * Used to trigger task processing when
+		 * the pipe becomes non-empty.
+		 */
+		struct ev_async fetch_output;
+		/** The lock around the pipe. */
+		pthread_mutex_t mutex;
+		/** The pipe with incoming messages. */
+		struct stailq pipe;
+	} __attribute__((aligned(CACHELINE_SIZE)));
+	fiber_func f;
+};
+#undef CACHELINE_SIZE
+
+/**
+ * Initialize a fiber pool and connect it to a pipe. Currently
+ * must be done before the pipe is actively used by a bus.
+ */
+void
+fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
+		  float idle_timeout, fiber_func f);
+
 struct cord_on_exit;
 
 /**
@@ -325,11 +374,12 @@ struct cord {
 	 */
 	ev_idle idle_event;
 	/** A memory cache for (struct fiber) */
-	struct mempool fiber_pool;
+	struct mempool fiber_mempool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
+	struct fiber_pool fiber_pool;
 	char name[FIBER_NAME_MAX];
 };
 

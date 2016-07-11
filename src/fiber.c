@@ -564,7 +564,7 @@ fiber_new(const char *name, fiber_func f)
 		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
 		fiber = (struct fiber *)
-			mempool_alloc(&cord->fiber_pool);
+			mempool_alloc(&cord->fiber_mempool);
 		if (fiber == NULL) {
 			diag_set(OutOfMemory, sizeof(struct fiber),
 				 "fiber pool", "fiber");
@@ -574,7 +574,7 @@ fiber_new(const char *name, fiber_func f)
 
 		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
 					  fiber_loop, NULL)) {
-			mempool_free(&cord->fiber_pool, fiber);
+			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}
 
@@ -633,16 +633,115 @@ fiber_destroy_all(struct cord *cord)
 		fiber_destroy(cord, f);
 }
 
+/* {{{ fiber_pool */
+
+static void
+fiber_pool_fetch_output(struct fiber_pool *pool)
+{
+	tt_pthread_mutex_lock(&pool->mutex);
+	stailq_concat(&pool->output, &pool->pipe);
+	tt_pthread_mutex_unlock(&pool->mutex);
+}
+
+
+static void
+fiber_pool_idle_cb(ev_loop *loop, struct ev_timer *watcher, int events)
+{
+	(void) events;
+	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
+	if (! rlist_empty(&pool->idle)) {
+		struct fiber *f;
+		/*
+		 * Schedule the fiber at the tail of the list,
+		 * it's the one most likely to have not been
+		 * scheduled lately.
+		 */
+		f = rlist_shift_tail_entry(&pool->idle, struct fiber, state);
+		fiber_call(f);
+	}
+	ev_timer_again(loop, watcher);
+}
+
+/** Create fibers to handle all outstanding tasks. */
+static void
+fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
+{
+	(void) loop;
+	(void) events;
+	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
+	fiber_pool_fetch_output(pool);
+
+	struct stailq *output = &pool->output;
+	while (! stailq_empty(output)) {
+		struct fiber *f;
+		if (! rlist_empty(&pool->idle)) {
+			f = rlist_shift_entry(&pool->idle, struct fiber, state);
+			fiber_call(f);
+		} else if (pool->size < pool->max_size) {
+			f = fiber_new(cord_name(cord()), pool->f);
+			if (f == NULL) {
+				error_log(diag_last_error(&fiber()->diag));
+				break;
+			}
+			fiber_start(f, pool);
+		} else {
+			/**
+			 * No worries that this watcher may not
+			 * get scheduled again - there are enough
+			 * worker fibers already, so just leave.
+			 */
+			break;
+		}
+	}
+}
+void
+fiber_pool_destroy(struct fiber_pool *pool)
+{
+	/*
+	 * Do not destroy async or idle timers, or fibers:
+	 * events are destroyed along with the event loop,
+	 * and fibers are freed at once when thread runtime
+	 * pool is destroyed.
+         */
+	(void) tt_pthread_mutex_destroy(&pool->mutex);
+}
+
+void
+fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
+		  float idle_timeout, fiber_func f)
+{
+	pool->consumer = loop();
+	pool->f = f;
+	pool->idle_timeout = idle_timeout;
+	rlist_create(&pool->idle);
+	ev_timer_init(&pool->idle_timer, fiber_pool_idle_cb, 0,
+		      pool->idle_timeout);
+	pool->idle_timer.data = pool;
+	ev_timer_again(loop(), &pool->idle_timer);
+	pool->size = 0;
+	pool->max_size = max_pool_size;
+	stailq_create(&pool->output);
+	stailq_create(&pool->pipe);
+	ev_async_init(&pool->fetch_output, fiber_pool_cb);
+	pool->fetch_output.data = pool;
+	ev_async_start(pool->consumer, &pool->fetch_output);
+
+	(void) tt_pthread_mutex_init(&pool->mutex, NULL);
+}
+
+/* }}} */
+
 void
 cord_create(struct cord *cord, const char *name)
 {
 	cord() = cord;
+	memset(&cord->fiber_pool, 0, sizeof(cord->fiber_pool));
 	slab_cache_set_thread(&cord()->slabc);
 
 	cord->id = pthread_self();
 	cord->on_exit = NULL;
 	slab_cache_create(&cord->slabc, &runtime);
-	mempool_create(&cord->fiber_pool, &cord->slabc,
+	mempool_create(&cord->fiber_mempool, &cord->slabc,
 		       sizeof(struct fiber));
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
@@ -683,6 +782,8 @@ cord_destroy(struct cord *cord)
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);
 	slab_cache_destroy(&cord->slabc);
+	if (cord->fiber_pool.f)
+		fiber_pool_destroy(&cord->fiber_pool);
 }
 
 struct cord_thread_arg

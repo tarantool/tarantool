@@ -38,19 +38,9 @@ const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 static inline void
 cmsg_deliver(struct cmsg *msg);
 
-static __thread struct fiber_pool fiber_pool;
-
 /* {{{ fiber_pool */
 
 enum { FIBER_POOL_SIZE = 4096, FIBER_POOL_IDLE_TIMEOUT = 1 };
-
-static void
-fiber_pool_fetch_output(struct fiber_pool *pool)
-{
-	tt_pthread_mutex_lock(&pool->mutex);
-	stailq_concat(&pool->output, &pool->pipe);
-	tt_pthread_mutex_unlock(&pool->mutex);
-}
 
 /**
  * Main function of the fiber invoked to handle all outstanding
@@ -97,93 +87,8 @@ restart:
 		fiber_yield();
 		goto restart;
 	}
-
 	pool->size--;
 	return 0;
-}
-
-static void
-fiber_pool_idle_cb(ev_loop *loop, struct ev_timer *watcher, int events)
-{
-	(void) events;
-	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
-	if (! rlist_empty(&pool->idle)) {
-		struct fiber *f;
-		/*
-		 * Schedule the fiber at the tail of the list,
-		 * it's the one most likely to have not been
-		 * scheduled lately.
-		 */
-		f = rlist_shift_tail_entry(&pool->idle, struct fiber, state);
-		fiber_call(f);
-	}
-	ev_timer_again(loop, watcher);
-}
-
-/** Create fibers to handle all outstanding tasks. */
-static void
-fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
-{
-	(void) loop;
-	(void) events;
-	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
-	fiber_pool_fetch_output(pool);
-
-	struct stailq *output = &pool->output;
-	while (! stailq_empty(output)) {
-		struct fiber *f;
-		if (! rlist_empty(&pool->idle)) {
-			f = rlist_shift_entry(&pool->idle, struct fiber, state);
-			fiber_call(f);
-		} else if (pool->size < pool->max_size) {
-			f = fiber_new(cord_name(cord()), fiber_pool_f);
-			if (f == NULL) {
-				error_log(diag_last_error(&fiber()->diag));
-				break;
-			}
-			fiber_start(f, pool);
-		} else {
-			/**
-			 * No worries that this watcher may not
-			 * get scheduled again - there are enough
-			 * worker fibers already, so just leave.
-			 */
-			break;
-		}
-	}
-}
-void
-fiber_pool_destroy(struct fiber_pool *pool)
-{
-	/*
-	 * Do not destroy async or idle timers, or fibers:
-	 * events are destroyed along with the event loop,
-	 * and fibers are freed at once when thread runtime
-	 * pool is destroyed.
-         */
-	(void) tt_pthread_mutex_destroy(&pool->mutex);
-}
-
-void
-fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
-		  float idle_timeout)
-{
-	pool->consumer = loop();
-	rlist_create(&pool->idle);
-	ev_timer_init(&pool->idle_timer, fiber_pool_idle_cb, 0,
-		      FIBER_POOL_IDLE_TIMEOUT);
-	pool->idle_timer.data = pool;
-	ev_timer_again(loop(), &pool->idle_timer);
-	pool->size = 0;
-	pool->max_size = max_pool_size;
-	pool->idle_timeout = idle_timeout;
-	stailq_create(&pool->output);
-	stailq_create(&pool->pipe);
-	ev_async_init(&pool->fetch_output, fiber_pool_cb);
-	pool->fetch_output.data = pool;
-	ev_async_start(pool->consumer, &pool->fetch_output);
-
-	(void) tt_pthread_mutex_init(&pool->mutex, NULL);
 }
 
 /** }}} fiber_pool */
@@ -240,10 +145,10 @@ cbus_destroy(struct cbus *bus)
 struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe)
 {
-	pipe->pool = &fiber_pool;
+	pipe->pool = &cord()->fiber_pool;
 	if (pipe->pool->max_size == 0) {
 		fiber_pool_create(pipe->pool, FIBER_POOL_SIZE,
-				  FIBER_POOL_IDLE_TIMEOUT);
+				  FIBER_POOL_IDLE_TIMEOUT, fiber_pool_f);
 	}
 	/*
 	 * We can't let one or the other thread go off and
