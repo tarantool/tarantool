@@ -1848,8 +1848,8 @@ vinyl_tuple_size(struct vinyl_tuple *v) {
 	return sizeof(struct vinyl_tuple) + v->size;
 }
 
-static inline struct vinyl_tuple*
-vinyl_tuple_from_sv(struct runtime *r, struct sv *src);
+static struct vinyl_tuple *
+vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size);
 
 static int
 vinyl_tuple_unref_rt(struct runtime *r, struct vinyl_tuple *v);
@@ -7766,9 +7766,14 @@ si_readdup(struct siread *q, struct sv *result)
 		v = result->v;
 		vinyl_tuple_ref(v);
 	} else {
-		v = vinyl_tuple_from_sv(q->index->r, result);
+		/* Allocate new tuple and copy data */
+		uint32_t size = sv_size(result);
+		v = vinyl_tuple_alloc(q->index, size);
 		if (unlikely(v == NULL))
 			return vy_oom();
+		memcpy(v->data, sv_pointer(result), size);
+		v->flags = sv_flags(result);
+		v->lsn = sv_lsn(result);
 	}
 	q->result = v;
 	return 1;
@@ -10550,47 +10555,17 @@ static int vinyl_index_recoverend(struct vinyl_index *index)
 }
 
 static struct vinyl_tuple *
-vinyl_tuple_new(struct vinyl_index *index, struct vinyl_field *fields,
-	       uint32_t fields_count)
+vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size)
 {
-	struct key_def *key_def = index->key_def;
+	struct vinyl_tuple *v = malloc(sizeof(struct vinyl_tuple) + size);
+	if (unlikely(v == NULL))
+		return NULL;
+	v->size      = size;
+	v->lsn       = 0;
+	v->flags     = 0;
+	v->refs      = 1;
+	/* update runtime statistics */
 	struct runtime *r = index->r;
-	assert(fields_count == key_def->part_count + 1);
-	(void) fields_count;
-	int size = sf_writesize(key_def, fields);
-	struct vinyl_tuple *v = malloc(sizeof(struct vinyl_tuple) + size);
-	if (unlikely(v == NULL))
-		return NULL;
-	v->size      = size;
-	v->lsn       = 0;
-	v->flags     = 0;
-	v->refs      = 1;
-	char *ptr = v->data;
-	sf_write(key_def, fields, ptr);
-	/* update runtime statistics */
-	tt_pthread_mutex_lock(&r->stat->lock);
-	r->stat->v_count++;
-	r->stat->v_allocated += sizeof(struct vinyl_tuple) + size;
-	tt_pthread_mutex_unlock(&r->stat->lock);
-	return v;
-}
-
-static inline struct vinyl_tuple*
-vinyl_tuple_from_sv(struct runtime *r, struct sv *sv)
-{
-	char *src = sv_pointer(sv);
-	size_t size = sv_size(sv);
-	struct vinyl_tuple *v = malloc(sizeof(struct vinyl_tuple) + size);
-	if (unlikely(v == NULL))
-		return NULL;
-	v->size      = size;
-	v->flags     = 0;
-	v->refs      = 1;
-	v->lsn       = 0;
-	v->flags     = sv_flags(sv);
-	v->lsn       = sv_lsn(sv);
-	memcpy(v->data, src, size);
-	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
 	r->stat->v_allocated += sizeof(struct vinyl_tuple) + size;
@@ -10622,30 +10597,46 @@ struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 			 uint32_t part_count)
 {
-
 	struct key_def *key_def = index->key_def;
 	assert(part_count == 0 || key != NULL);
 	assert(part_count <= key_def->part_count);
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	if (vinyl_set_fields(fields, &key, part_count) != 0)
+
+	/* Calculate key length */
+	const char *key_end = key;
+	for (uint32_t i = 0; i < part_count; i++)
+		mp_next(&key_end);
+
+	/* Allocate tuple */
+	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
+		(key_def->part_count + 1);
+	uint32_t key_size = key_end - key;
+	uint32_t size = meta_size + key_size;
+	struct vinyl_tuple *tuple = vinyl_tuple_alloc(index, size);
+	if (tuple == NULL)
 		return NULL;
-	/* Fill remaining parts of key */
-	for (uint32_t i = part_count; i < key_def->part_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		/*
-		 * Length of MsgPack field is always > 0.
-		 * Use size = 0 to indicate that this key doesn't have
-		 * more parts.
-		 */
-		field->data = NULL;
-		field->size = 0;
+
+	/* Calculate offsets for key parts */
+	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)tuple->data;
+	const char *key_pos = key;
+	for (uint32_t i = 0; i < part_count; i++) {
+		const char *part_start = key_pos;
+		meta[i].offset = meta_size + (key_pos - key);
+		mp_next(&key_pos);
+		meta[i].size = (key_pos - part_start);
 	}
-	/* Add an empty value. Value is stored after key parts. */
-	struct vinyl_field *value_field = &fields[key_def->part_count];
-	value_field->data = NULL;
-	value_field->size = 0;
-	/* Create tuple */
-	return vinyl_tuple_new(index, fields, key_def->part_count + 1);
+	/* Fill offsets for missing key parts + value */
+	for (uint32_t i = part_count; i <= key_def->part_count; i++) {
+		meta[i].offset = 0;
+		meta[i].size = 0;
+	}
+
+	/* Copy MsgPack data */
+	char *data = tuple->data + meta_size;
+	memcpy(data, key, key_size);
+	data += key_size;
+	assert(data == tuple->data + size);
+
+	return tuple;
 }
 
 /*
@@ -10669,7 +10660,13 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 	struct vinyl_field *value = &fields[key_def->part_count];
 	value->data = data;
 	value->size = data_end - data;
-	return vinyl_tuple_new(index, fields, key_def->part_count + 1);
+
+	uint32_t size = sf_writesize(key_def, fields);
+	struct vinyl_tuple *v = vinyl_tuple_alloc(index, size);
+	if (unlikely(v == NULL))
+		return NULL;
+	sf_write(key_def, fields, v->data);
+	return v;
 }
 
 static inline uint32_t
@@ -10948,11 +10945,14 @@ vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
 	value_field->data = value;
 	value_field->size = value_size;
 
-	struct vinyl_tuple *vinyl_tuple =
-		vinyl_tuple_new(index, fields, key_def->part_count + 1);
-	free(value);
-	if (vinyl_tuple == NULL)
+	uint32_t size = sf_writesize(key_def, fields);
+	struct vinyl_tuple *vinyl_tuple = vinyl_tuple_alloc(index, size);
+	if (vinyl_tuple == NULL) {
+		free(value);
 		return -1;
+	}
+	sf_write(key_def, fields, vinyl_tuple->data);
+	free(value);
 
 	int rc = vy_tx_write(tx, index, vinyl_tuple, SVUPSERT);
 	vinyl_tuple_unref(index, vinyl_tuple);
