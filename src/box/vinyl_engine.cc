@@ -237,7 +237,7 @@ join_send_space(struct space *sp, void *data)
 	struct vinyl_cursor *cursor = vinyl_cursor_new(pk->db, vinyl_key, VINYL_GE);
 	vinyl_tuple_unref(pk->db, vinyl_key);
 	if (cursor == NULL)
-		vinyl_raise();
+		diag_raise();
 	auto cursor_guard = make_scoped_guard([=]{
 		vinyl_cursor_delete(cursor);
 	});
@@ -301,7 +301,7 @@ VinylEngine::dropIndex(Index *index)
 	/* schedule asynchronous drop */
 	int rc = vinyl_index_drop(i->db);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 	i->db  = NULL;
 	i->env = NULL;
 }
@@ -351,7 +351,7 @@ VinylEngine::begin(struct txn *txn)
 	assert(txn->engine_tx == NULL);
 	txn->engine_tx = vinyl_begin(env);
 	if (txn->engine_tx == NULL)
-		vinyl_raise();
+		diag_raise();
 }
 
 void
@@ -366,7 +366,7 @@ VinylEngine::prepare(struct txn *txn)
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;
 	case -1:
-		vinyl_raise();
+		diag_raise();
 		break;
 	}
 }
@@ -406,7 +406,7 @@ VinylEngine::beginCheckpoint()
 
 	int rc = vinyl_checkpoint(env);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 	return 0;
 }
 

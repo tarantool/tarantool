@@ -60,14 +60,14 @@ VinylIndex::VinylIndex(struct key_def *key_def_arg)
 	/* create database */
 	db = vinyl_index_new(env, key_def);
 	if (db == NULL)
-		vinyl_raise();
+		diag_raise();
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	rc = vinyl_index_open(db);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 	format = space->format;
 	tuple_format_ref(format, 1);
 }

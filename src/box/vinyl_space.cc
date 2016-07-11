@@ -74,12 +74,12 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 
 	struct vinyl_tx *tx = vinyl_begin(env);
 	if (tx == NULL)
-		vinyl_raise();
+		diag_raise();
 
 	int64_t signature = request->header->lsn;
 
 	if (vinyl_replace(tx, index->db, tuple) != 0)
-		vinyl_raise();
+		diag_raise();
 
 	int rc = vinyl_prepare(env, tx);
 	switch (rc) {
@@ -95,7 +95,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 		return;
 	case -1:
 		vinyl_rollback(env, tx);
-		vinyl_raise();
+		diag_raise();
 		return;
 	default:
 		unreachable();
@@ -148,7 +148,7 @@ VinylSpace::executeReplace(struct txn*,
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
 	int rc = vinyl_replace(tx, index->db, tuple);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 
 	return NULL;
 }
@@ -175,7 +175,7 @@ VinylSpace::executeDelete(struct txn*, struct space *space,
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
 	int rc = vinyl_delete(tx, index->db, vinyl_key);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 	return NULL;
 }
 
@@ -222,7 +222,7 @@ VinylSpace::executeUpdate(struct txn*, struct space *space,
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
 	int rc = vinyl_replace(tx, index->db, tuple);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 	return NULL;
 }
 
@@ -243,5 +243,5 @@ VinylSpace::executeUpsert(struct txn*, struct space *space,
 			     request->ops, request->ops_end,
 			     request->index_base);
 	if (rc == -1)
-		vinyl_raise();
+		diag_raise();
 }

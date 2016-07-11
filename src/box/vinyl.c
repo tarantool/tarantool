@@ -5899,25 +5899,6 @@ vy_cachepool_push(struct sicache *c)
 	tt_pthread_mutex_unlock(&p->mutex);
 }
 
-struct sitx {
-	int ro;
-	struct rlist nodelist;
-	struct vinyl_index *index;
-};
-
-static void si_begin(struct sitx*, struct vinyl_index*);
-static void si_commit(struct sitx*);
-
-static inline void
-si_txtrack(struct sitx *x, struct vy_range *n) {
-	if (rlist_empty(&n->commit))
-		rlist_add(&x->nodelist, &n->commit);
-}
-
-static void
-si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t,
-	 enum vinyl_status status);
-
 struct siread {
 	enum vinyl_order order;
 	void *key;
@@ -8636,62 +8617,24 @@ vy_index_conf_free(struct vy_index_conf *s)
 	}
 }
 
-static void si_begin(struct sitx *x, struct vinyl_index *index)
-{
-	x->index = index;
-	rlist_create(&x->nodelist);
-	vy_index_lock(index);
-}
-
-static void si_commit(struct sitx *x)
-{
-	/* reschedule nodes */
-	struct vy_range *node, *n;
-	rlist_foreach_entry_safe(node, &x->nodelist, commit, n) {
-		rlist_create(&node->commit);
-		vy_planner_update(&x->index->p, SI_BRANCH, node);
-	}
-	vy_index_unlock(x->index);
-}
-
-static inline int si_set(struct sitx *x, struct vinyl_tuple *v, uint64_t time)
-{
-	struct vinyl_index *index = x->index;
-	index->update_time = time;
-	/* match node */
-	struct vy_rangeiter ii;
-	vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
-	struct vy_range *node = vy_rangeiter_get(&ii);
-	assert(node != NULL);
-	struct svref ref;
-	ref.v = v;
-	ref.flags = 0;
-	/* insert into node index */
-	struct svindex *vindex = vy_range_index(node);
-	int rc = sv_indexset(vindex, ref);
-	assert(rc == 0); /* TODO: handle BPS tree errors properly */
-	(void) rc;
-	/* update node */
-	node->update_time = index->update_time;
-	node->used += vinyl_tuple_size(v);
-	if (index->conf.lru)
-		si_lru_add(index, &ref);
-	si_txtrack(x, node);
-	return 0;
-}
-
 static void
-si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
+si_write(struct svlog *l, struct svlogindex *li, uint64_t time,
 	 enum vinyl_status status)
 {
-	struct runtime *r = x->index->r;
+	struct vinyl_index *index = li->index;
+	struct runtime *r = index->r;
+	struct rlist rangelist;
+	rlist_create(&rangelist);
+
+	vy_index_lock(index);
+	index->update_time = time;
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
 		struct sv *sv = &cv->v;
 		struct vinyl_tuple *v = sv_to_tuple(sv);
 		if (status == VINYL_FINAL_RECOVERY) {
-			if (si_readcommited(x->index, &cv->v)) {
+			if (si_readcommited(index, &cv->v)) {
 				size_t gc = vinyl_tuple_size(v);
 				if (vinyl_tuple_unref_rt(r, v))
 					vy_quota_op(r->quota, VINYL_QREMOVE, gc);
@@ -8702,11 +8645,37 @@ si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
 			vinyl_tuple_unref_rt(r, v);
 			goto next;
 		}
-		si_set(x, v, time);
+		/* match node */
+		struct vy_rangeiter ii;
+		vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
+		struct vy_range *range = vy_rangeiter_get(&ii);
+		assert(range != NULL);
+		struct svref ref;
+		ref.v = v;
+		ref.flags = 0;
+		/* insert into node index */
+		struct svindex *vindex = vy_range_index(range);
+		int rc = sv_indexset(vindex, ref);
+		assert(rc == 0); /* TODO: handle BPS tree errors properly */
+		(void) rc;
+		/* update node */
+		range->used += vinyl_tuple_size(v);
+		if (index->conf.lru)
+			si_lru_add(index, &ref);
+		if (rlist_empty(&range->commit))
+			rlist_add(&rangelist, &range->commit);
 next:
 		cv = sv_logat(l, cv->next);
 		c--;
 	}
+	/* reschedule nodes */
+	struct vy_range *range, *tmp;
+	rlist_foreach_entry_safe(range, &rangelist, commit, tmp) {
+		range->update_time = index->update_time;
+		rlist_create(&range->commit);
+		vy_planner_update(&index->p, SI_BRANCH, range);
+	}
+	vy_index_unlock(index);
 	return;
 }
 
@@ -9398,11 +9367,7 @@ svlog_flush(struct svlog *log, uint64_t lsn, enum vinyl_status status)
 	struct svlogindex *i   = (struct svlogindex*)log->index.s;
 	struct svlogindex *end = (struct svlogindex*)log->index.p;
 	while (i < end) {
-		struct vinyl_index *index = i->index;
-		struct sitx x;
-		si_begin(&x, index);
-		si_write(&x, log, i, now, status);
-		si_commit(&x);
+		si_write(log, i, now, status);
 		i++;
 	}
 	return 0;
@@ -9515,12 +9480,6 @@ struct scheduler *
 vinyl_env_get_scheduler(struct vinyl_env *env)
 {
 	return &env->scheduler;
-}
-
-void
-vinyl_raise()
-{
-	diag_raise();
 }
 
 int

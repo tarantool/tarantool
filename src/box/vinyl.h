@@ -62,9 +62,6 @@ vinyl_env_new(void);
 int
 vinyl_env_delete(struct vinyl_env *e);
 
-void
-vinyl_raise();
-
 struct vinyl_info_cursor *
 vinyl_info_cursor_new(struct vinyl_env *env);
 
