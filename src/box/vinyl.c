@@ -3395,11 +3395,17 @@ sxv_tree_search_key(sxv_tree_t *rbtree, char *data, int size)
 	return sxv_tree_search(rbtree, &key);
 }
 
+/**
+ * Transaction operation index. Contains all changes
+ * made by this transaction before it commits. Is used
+ * to implement read committed isolation level, i.e.
+ * the changes made by a transaction are only present
+ * in its tx_index, and thus not seen by other transactions.
+ */
 struct tx_index {
 	sxv_tree_t tree;
 	struct vinyl_index *index;
 	struct key_def *key_def;
-	struct rlist    link;
 	pthread_mutex_t mutex;
 };
 
@@ -3427,6 +3433,11 @@ struct vinyl_tx {
 	enum tx_type     type;
 	enum tx_state    state;
 	uint64_t   id;
+	/**
+	 * Consistent read view LSN: the LSN recorded
+	 * at start of transaction and used to implement
+	 * transactional read view.
+	 */
 	uint64_t   vlsn;
 	uint64_t   csn;
 	int        log_read;
@@ -3457,7 +3468,6 @@ rb_gen_ext_key(, tx_tree_, tx_tree_t, struct vinyl_tx, tree_node,
 struct tx_manager {
 	pthread_mutex_t  lock;
 	tx_tree_t tree;
-	struct rlist      indexes;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
 	uint32_t    count_gc;
@@ -3468,8 +3478,8 @@ struct tx_manager {
 
 static int tx_managerinit(struct tx_manager*, struct runtime*);
 static int tx_managerfree(struct tx_manager*);
-static int tx_index_init(struct tx_index *, struct tx_manager *,
-			struct vinyl_index *, struct key_def *key_def);
+static int tx_index_init(struct tx_index *, struct vinyl_index *,
+			 struct key_def *key_def);
 static int tx_index_free(struct tx_index*, struct tx_manager*);
 static struct vinyl_tx *tx_manager_find(struct tx_manager*, uint64_t);
 static void tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
@@ -3497,7 +3507,6 @@ static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 	m->csn = 0;
 	m->gc  = NULL;
 	tt_pthread_mutex_init(&m->lock, NULL);
-	rlist_create(&m->indexes);
 	m->r = r;
 	return 0;
 }
@@ -3511,15 +3520,13 @@ tx_managerfree(struct tx_manager *m)
 }
 
 static int
-tx_index_init(struct tx_index *i, struct tx_manager *m,
-	      struct vinyl_index *index, struct key_def *key_def)
+tx_index_init(struct tx_index *i, struct vinyl_index *index,
+	      struct key_def *key_def)
 {
 	sxv_tree_new(&i->tree);
-	rlist_create(&i->link);
 	i->index = index;
 	i->key_def = key_def;
 	(void) tt_pthread_mutex_init(&i->mutex, NULL);
-	rlist_add(&m->indexes, &i->link);
 	return 0;
 }
 
@@ -3544,7 +3551,6 @@ static int
 tx_index_free(struct tx_index *i, struct tx_manager *m)
 {
 	tx_index_truncate(i, m);
-	rlist_del(&i->link);
 	(void) tt_pthread_mutex_destroy(&i->mutex);
 	return 0;
 }
@@ -10391,7 +10397,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs         = 1;
 	vy_status_set(&index->status, VINYL_OFFLINE);
-	tx_index_init(&index->coindex, &e->xm, index, index->key_def);
+	tx_index_init(&index->coindex, index, index->key_def);
 	index->txn_min = tx_manager_min(&e->xm);
 	index->txn_max = UINT32_MAX;
 	rlist_add(&e->indexes, &index->link);
@@ -10799,6 +10805,16 @@ vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 	free(tx);
 }
 
+/**
+ * Abort the transaction if there is a transaction with a newer
+ * consistent read view which has already committed and modified
+ * the data seen by this transaction. Despite multi-version
+ * concurrency control, vinyl doesn't allow Thomas rule writes
+ * or blind writes, because the binary log in Tarantool
+ * stores entire transactions in their actual commit order, and thus
+ * allowing such writes would break consistency after recovery or on
+ * a replica.
+ */
 static inline int
 vy_txprepare_cb(struct vinyl_tx *tx, struct svlogv *v, uint64_t lsn,
 		struct sicache *cache, enum vinyl_status status)
