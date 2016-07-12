@@ -5779,18 +5779,6 @@ si_cachevalidate(struct sicache *c, struct vy_range *n)
 }
 
 static inline struct sicachebranch*
-si_cacheseek(struct sicache *c, struct vy_run *seek)
-{
-	while (c->branch) {
-		struct sicachebranch *cb = c->branch;
-		c->branch = c->branch->next;
-		if (likely(cb->branch == seek))
-			return cb;
-	}
-	return NULL;
-}
-
-static inline struct sicachebranch*
 si_cachefollow(struct sicache *c, struct vy_run *seek)
 {
 	while (c->branch) {
