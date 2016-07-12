@@ -143,3 +143,13 @@ good
 s1:drop()
 s2:drop()
 
+--
+-- gh-1608: tuple disappears after invalid upsert
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+_ = s:create_index('test', {type = 'tree', parts = {1, 'num', 2, 'str'}})
+s:put({1, 'test', 3, 4})
+s:select()
+s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})
+s:select()
+s:drop()

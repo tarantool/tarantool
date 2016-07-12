@@ -218,8 +218,8 @@ vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
 		    struct tuple_format *format);
 
 char *
-vinyl_convert_tuple_data(struct vinyl_index *index,
-			 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize);
+vinyl_tuple_data(struct vinyl_index *index,
+		 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize);
 
 void
 vinyl_tuple_ref(struct vinyl_tuple *tuple);

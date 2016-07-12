@@ -256,8 +256,8 @@ join_send_space(struct space *sp, void *data)
 			break; /* eof */
 		int64_t lsn = vinyl_tuple_lsn(vinyl_tuple);
 		uint32_t tuple_size;
-		char *tuple = vinyl_convert_tuple_data(pk->db, vinyl_tuple,
-			&tuple_size);
+		char *tuple = vinyl_tuple_data(pk->db, vinyl_tuple,
+					       &tuple_size);
 		try {
 			vinyl_send_row(stream, pk->key_def->space_id,
 				      tuple, tuple_size, lsn);

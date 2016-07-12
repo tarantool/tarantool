@@ -1246,32 +1246,6 @@ sf_field(struct key_def *key_def, uint32_t part_id, char *data, uint32_t *size)
 	return data + v->offset;
 }
 
-static inline int
-sf_writesize(struct key_def *key_def, struct vinyl_field *v)
-{
-	int sum = 0;
-	/* for each key_part + value */
-	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
-		sum += sizeof(struct vinyl_field_meta)+ v[part_id].size;
-	}
-	return sum;
-}
-
-static inline void
-sf_write(struct key_def *key_def, struct vinyl_field *fields, char *dest)
-{
-	int var_value_offset = sizeof(struct vinyl_field_meta) * (key_def->part_count + 1);
-	/* for each key_part + value */
-	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
-		struct vinyl_field *field = &fields[part_id];
-		struct vinyl_field_meta *current = sf_fieldmeta(key_def, part_id, dest);
-		current->offset = var_value_offset;
-		current->size   = field->size;
-		memcpy(dest + var_value_offset, field->data, field->size);
-		var_value_offset += current->size;
-	}
-}
-
 static int
 vy_compare(struct key_def *key_def, char *a, char *b)
 {
@@ -1706,13 +1680,11 @@ struct svif {
 
 static struct svif svtuple_if;
 static struct svif svref_if;
-static struct svif svupsert_if;
 static struct svif sxv_if;
 static struct svif sdv_if;
 struct vinyl_tuple;
 struct sdv;
 struct sxv;
-struct svupsert;
 struct sdpageheader;
 
 struct sv {
@@ -1751,14 +1723,6 @@ sv_from_sxv(struct sv *v, struct sxv *sxv)
 {
 	v->i   = &sxv_if;
 	v->v   = sxv;
-	v->arg = NULL;
-}
-
-static inline void
-sv_from_svupsert(struct sv *v, char *s)
-{
-	v->i   = &svupsert_if;
-	v->v   = s;
 	v->arg = NULL;
 }
 
@@ -1824,167 +1788,6 @@ vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size);
 static int
 vinyl_tuple_unref_rt(struct runtime *r, struct vinyl_tuple *v);
 
-struct svupsertnode {
-	uint64_t lsn;
-	uint8_t  flags;
-	struct vy_buf    buf;
-};
-
-struct svupsert {
-	struct vy_buf stack;
-	struct vy_buf tmp;
-	int max;
-	int count;
-	struct sv result;
-};
-
-static inline void
-svupsert_init(struct svupsert *u)
-{
-	u->max = 0;
-	u->count = 0;
-	memset(&u->result, 0, sizeof(u->result));
-	vy_buf_init(&u->stack);
-	vy_buf_init(&u->tmp);
-}
-
-static inline void
-svupsert_free(struct svupsert *u)
-{
-	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
-	int i = 0;
-	while (i < u->max) {
-		vy_buf_free(&n[i].buf);
-		i++;
-	}
-	vy_buf_free(&u->stack);
-	vy_buf_free(&u->tmp);
-}
-
-static inline void
-svupsert_reset(struct svupsert *u)
-{
-	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
-	int i = 0;
-	while (i < u->count) {
-		vy_buf_reset(&n[i].buf);
-		i++;
-	}
-	u->count = 0;
-	vy_buf_reset(&u->stack);
-	vy_buf_reset(&u->tmp);
-	memset(&u->result, 0, sizeof(u->result));
-}
-
-static inline void
-svupsert_gc(struct svupsert *u, int wm_stack, int wm_buf)
-{
-	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
-	if (u->max >= wm_stack) {
-		svupsert_free(u);
-		svupsert_init(u);
-		return;
-	}
-	vy_buf_gc(&u->tmp, wm_buf);
-	int i = 0;
-	while (i < u->count) {
-		vy_buf_gc(&n[i].buf, wm_buf);
-		i++;
-	}
-	u->count = 0;
-	memset(&u->result, 0, sizeof(u->result));
-}
-
-static inline int
-svupsert_push_raw(struct svupsert *u,
-		  char *pointer, int size,
-                  uint8_t flags, uint64_t lsn)
-{
-	struct svupsertnode *n;
-	int rc;
-	if (likely(u->max > u->count)) {
-		n = (struct svupsertnode*)u->stack.p;
-		vy_buf_reset(&n->buf);
-	} else {
-		rc = vy_buf_ensure(&u->stack, sizeof(struct svupsertnode));
-		if (unlikely(rc == -1))
-			return -1;
-		n = (struct svupsertnode*)u->stack.p;
-		vy_buf_init(&n->buf);
-		u->max++;
-	}
-	rc = vy_buf_ensure(&n->buf, size);
-	if (unlikely(rc == -1))
-		return -1;
-	memcpy(n->buf.p, pointer, size);
-	n->flags = flags;
-	n->lsn = lsn;
-	vy_buf_advance(&n->buf, size);
-	vy_buf_advance(&u->stack, sizeof(struct svupsertnode));
-	u->count++;
-	return 0;
-}
-
-static inline int
-svupsert_push(struct svupsert *u, struct sv *v)
-{
-	return svupsert_push_raw(u, sv_pointer(v), sv_size(v),
-	                         sv_flags(v), sv_lsn(v));
-}
-
-static inline struct svupsertnode*
-svupsert_pop(struct svupsert *u)
-{
-	if (u->count == 0)
-		return NULL;
-	int pos = u->count - 1;
-	u->count--;
-	u->stack.p -= sizeof(struct svupsertnode);
-	return vy_buf_at(&u->stack, sizeof(struct svupsertnode), pos);
-}
-
-static inline int
-vinyl_upsert_prepare(char **src, uint32_t *src_size,
-                      char **mp, uint32_t *mp_size, uint32_t *mp_size_key,
-                      struct key_def *key_def)
-{
-	/* calculate msgpack size */
-	*mp_size_key = 0;
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == STRING)
-			*mp_size_key += mp_sizeof_str(src_size[i]);
-		else
-			*mp_size_key += mp_sizeof_uint(load_u64(src[i]));
-	}
-
-	/* count msgpack fields */
-	uint32_t count = key_def->part_count;
-	uint32_t value_field = key_def->part_count;
-	uint32_t value_size = src_size[value_field];
-	char *p = src[value_field];
-	char *end = p + value_size;
-	while (p < end) {
-		count++;
-		mp_next((const char **)&p);
-	}
-
-	/* allocate and encode tuple */
-	*mp_size = mp_sizeof_array(count) + *mp_size_key + value_size;
-	*mp = (char *)malloc(*mp_size);
-	if (mp == NULL)
-		return -1;
-	p = *mp;
-	p = mp_encode_array(p, count);
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == STRING)
-			p = mp_encode_str(p, src[i], src_size[i]);
-		else
-			p = mp_encode_uint(p, load_u64(src[i]));
-	}
-	memcpy(p, src[value_field], src_size[value_field]);
-	return 0;
-}
-
 static void *
 vinyl_update_alloc(void *arg, size_t size)
 {
@@ -1994,213 +1797,6 @@ vinyl_update_alloc(void *arg, size_t size)
 	if (data != NULL)
 		diag_raise();
 	return data;
-}
-
-static inline int
-vinyl_upsert_do(char **result, uint32_t *result_size,
-              char *tuple, uint32_t tuple_size, uint32_t tuple_size_key,
-              char *upsert, int upsert_size)
-{
-	char *p = upsert;
-	uint8_t index_base = *(uint8_t *)p;
-	p += sizeof(uint8_t);
-	uint32_t default_tuple_size = *(uint32_t *)p;
-	p += sizeof(uint32_t);
-	p += default_tuple_size;
-	char *expr = p;
-	char *expr_end = upsert + upsert_size;
-	const char *up;
-	uint32_t up_size;
-
-	/* emit upsert */
-	up = tuple_upsert_execute(vinyl_update_alloc, NULL,
-				  expr, expr_end,
-		                  tuple, tuple + tuple_size,
-		                  &up_size, index_base);
-	if (up == NULL)
-		goto error;
-
-	/* skip array size and key */
-	const char *ptr = up;
-	mp_decode_array(&ptr);
-	ptr += tuple_size_key;
-
-	/* get new value */
-	*result_size = (uint32_t)((up + up_size) -  ptr);
-	*result = (char *)malloc(*result_size);
-	if (*result == NULL)
-		goto error;
-	memcpy(*result, ptr, *result_size);
-	fiber_gc();
-	return 0;
-error:
-	fiber_gc();
-	return -1;
-}
-
-static int
-vinyl_upsert_cb(int count,
-	       char **src,    uint32_t *src_size,
-	       char **upsert, uint32_t *upsert_size,
-	       char **result, uint32_t *result_size,
-	       struct key_def *key_def)
-{
-	uint32_t value_field;
-	value_field = key_def->part_count;
-
-	/* use default tuple value */
-	if (src == NULL)
-	{
-		/* result key fields are initialized to upsert
-		 * fields by default */
-		char *p = upsert[value_field];
-		p += sizeof(uint8_t); /* index base */
-		uint32_t value_size = *(uint32_t *)p;
-		p += sizeof(uint32_t);
-		void *value = (char *)malloc(value_size);
-		if (value == NULL)
-			return -1;
-		memcpy(value, p, value_size);
-		result[value_field] = (char*)value;
-		result_size[value_field] = value_size;
-		return 0;
-	}
-
-	/* convert src to msgpack */
-	char *tuple;
-	uint32_t tuple_size_key;
-	uint32_t tuple_size;
-	int rc;
-	rc = vinyl_upsert_prepare(src, src_size,
-	                           &tuple, &tuple_size, &tuple_size_key,
-	                           key_def);
-	if (rc == -1)
-		return -1;
-
-	/* execute upsert */
-	rc = vinyl_upsert_do(&result[value_field],
-	                   &result_size[value_field],
-	                   tuple, tuple_size, tuple_size_key,
-	                   upsert[value_field],
-	                   upsert_size[value_field]);
-	free(tuple);
-
-	(void)count;
-	(void)upsert_size;
-	return rc;
-}
-
-
-static inline int
-svupsert_do(struct svupsert *u, struct key_def *key_def,
-	    struct svupsertnode *n1, struct svupsertnode *n2)
-{
-	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
-	assert(n2->flags & SVUPSERT);
-
-	uint32_t  src_size[BOX_INDEX_PART_MAX + 1];
-	char     *src[BOX_INDEX_PART_MAX + 1];
-	void     *src_ptr;
-	uint32_t *src_size_ptr;
-
-	uint32_t  upsert_size[BOX_INDEX_PART_MAX + 1];
-	char     *upsert[BOX_INDEX_PART_MAX + 1];
-
-	char     *result[BOX_INDEX_PART_MAX + 1];
-	uint32_t  result_size[BOX_INDEX_PART_MAX + 1];
-
-	if (n1 && !(n1->flags & SVDELETE))
-	{
-		src_ptr = src;
-		src_size_ptr = src_size;
-		/* for each key part + value */
-		for (uint32_t i = 0; i <= key_def->part_count; i++) {
-			src[i]    = sf_field(key_def, i, n1->buf.s, &src_size[i]);
-			upsert[i] = sf_field(key_def, i, n2->buf.s, &upsert_size[i]);
-			result[i] = src[i];
-			result_size[i] = src_size[i];
-		}
-	} else {
-		src_ptr = NULL;
-		src_size_ptr = NULL;
-		/* for each key part + value */
-		for (uint32_t i = 0; i <= key_def->part_count; i++) {
-			upsert[i] = sf_field(key_def, i, n2->buf.s, &upsert_size[i]);
-			result[i] = upsert[i];
-			result_size[i] = upsert_size[i];
-		}
-	}
-
-	/* execute */
-	int rc = vinyl_upsert_cb(key_def->part_count + 1,
-				src_ptr, src_size_ptr,
-				upsert, upsert_size,
-				result, result_size,
-				key_def);
-	if (unlikely(rc == -1))
-		return -1;
-
-	/* validate and create new record */
-	struct vinyl_field v[BOX_INDEX_PART_MAX + 1];
-	/* for each key part + value */
-	for (uint32_t i = 0; i <= key_def->part_count; i++) {
-		v[i].data = result[i];
-		v[i].size = result_size[i];
-	}
-	int size = sf_writesize(key_def, v);
-	vy_buf_reset(&u->tmp);
-	rc = vy_buf_ensure(&u->tmp, size);
-	if (unlikely(rc == -1))
-		goto cleanup;
-	sf_write(key_def, v, u->tmp.s);
-	vy_buf_advance(&u->tmp, size);
-
-	/* save result */
-	rc = svupsert_push_raw(u, u->tmp.s, vy_buf_used(&u->tmp),
-	                       n2->flags & ~SVUPSERT,
-	                       n2->lsn);
-cleanup:
-	/* free key parts + value */
-	for (uint32_t i = 0 ; i <= key_def->part_count; i++) {
-		if (src_ptr == NULL) {
-			if (v[i].data != upsert[i])
-				free((char *)v[i].data);
-		} else {
-			if (v[i].data != src[i])
-				free((char *)v[i].data);
-		}
-	}
-	return rc;
-}
-
-static inline int
-svupsert_(struct svupsert *u, struct key_def *key_def)
-{
-	assert(u->count >= 1 );
-	struct svupsertnode *f = vy_buf_at(&u->stack,
-					  sizeof(struct svupsertnode),
-					  u->count - 1);
-	int rc;
-	if (f->flags & SVUPSERT) {
-		f = svupsert_pop(u);
-		rc = svupsert_do(u, key_def, NULL, f);
-		if (unlikely(rc == -1))
-			return -1;
-	}
-	if (u->count == 1)
-		goto done;
-	while (u->count > 1) {
-		struct svupsertnode *f = svupsert_pop(u);
-		struct svupsertnode *s = svupsert_pop(u);
-		assert(f != NULL);
-		assert(s != NULL);
-		rc = svupsert_do(u, key_def, f, s);
-		if (unlikely(rc == -1))
-			return -1;
-	}
-done:
-	sv_from_svupsert(&u->result, u->stack.s);
-	return 0;
 }
 
 struct vinyl_index;
@@ -2323,14 +1919,17 @@ struct PACKED svmergesrc {
 };
 
 struct svmerge {
-	struct key_def *key_def;
+	struct vinyl_index *index;
+	struct key_def *key_def; /* TODO: use index->key_def when possible */
 	struct vy_buf buf;
 };
 
 static inline void
-sv_mergeinit(struct svmerge *m, struct key_def *key_def)
+sv_mergeinit(struct svmerge *m, struct vinyl_index *index,
+	     struct key_def *key_def)
 {
 	vy_buf_init(&m->buf);
+	m->index = index;
 	m->key_def = key_def;
 }
 
@@ -2487,48 +2086,70 @@ struct svreaditer {
 	int next;
 	int nextdup;
 	int save_delete;
-	struct svupsert *u;
 	struct sv *v;
+	struct sv upsert_sv;
+	struct vinyl_tuple *upsert_tuple;
 };
+
+static struct vinyl_tuple *
+vy_apply_upsert(struct sv *upsert, struct sv *object,
+		struct vinyl_index *index);
 
 static inline int
 sv_readiter_upsert(struct svreaditer *i)
 {
-	svupsert_reset(i->u);
+	assert(i->upsert_tuple == NULL);
+	struct vinyl_index *index = i->merge->merge->index;
 	/* upsert begin */
 	struct sv *v = sv_mergeiter_get(i->merge);
 	assert(v != NULL);
 	assert(sv_flags(v) & SVUPSERT);
-	int rc = svupsert_push(i->u, v);
-	if (unlikely(rc == -1))
-		return -1;
+	i->upsert_tuple = vinyl_tuple_alloc(index, sv_size(v));
+	i->upsert_tuple->flags = SVUPSERT;
+	memcpy(i->upsert_tuple->data, sv_pointer(v), sv_size(v));
+	sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+	v = &i->upsert_sv;
+
 	sv_mergeiter_next(i->merge);
 	/* iterate over upsert statements */
 	int skip = 0;
 	for (; sv_mergeiter_has(i->merge); sv_mergeiter_next(i->merge))
 	{
-		v = sv_mergeiter_get(i->merge);
-		int dup = sv_is(v, SVDUP) || sv_mergeisdup(i->merge);
+		struct sv *next_v = sv_mergeiter_get(i->merge);
+		int dup = sv_is(next_v, SVDUP) || sv_mergeisdup(i->merge);
 		if (! dup)
 			break;
 		if (skip)
 			continue;
-		int rc = svupsert_push(i->u, v);
-		if (unlikely(rc == -1))
-			return -1;
-		if (! (sv_flags(v) & SVUPSERT))
+		struct vinyl_tuple *up = vy_apply_upsert(v, next_v, index);
+		if (up == NULL)
+			return -1; /* memory error */
+		vinyl_tuple_unref(index, i->upsert_tuple);
+		i->upsert_tuple = up;
+		sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+		v = &i->upsert_sv;
+		if (! (sv_flags(next_v) & SVUPSERT))
 			skip = 1;
 	}
-	/* upsert */
-	rc = svupsert_(i->u, i->merge->merge->key_def);
-	if (unlikely(rc == -1))
-		return -1;
+	if (sv_flags(v) & SVUPSERT) {
+		struct vinyl_tuple *up = vy_apply_upsert(v, NULL, index);
+		if (up == NULL)
+			return -1; /* memory error */
+		vinyl_tuple_unref(index, i->upsert_tuple);
+		i->upsert_tuple = up;
+		sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+		v = &i->upsert_sv;
+	}
 	return 0;
 }
 
 static inline void
 sv_readiter_next(struct svreaditer *im)
 {
+	if (im->upsert_tuple != NULL) {
+		vinyl_tuple_unref(im->merge->merge->index, im->upsert_tuple);
+		im->upsert_tuple = NULL;
+	}
 	if (im->next)
 		sv_mergeiter_next(im->merge);
 	im->next = 0;
@@ -2554,7 +2175,7 @@ sv_readiter_next(struct svreaditer *im)
 			int rc = sv_readiter_upsert(im);
 			if (unlikely(rc == -1))
 				return;
-			im->v = &im->u->result;
+			im->v = &im->upsert_sv;
 			im->next = 0;
 		} else {
 			im->v = v;
@@ -2585,18 +2206,27 @@ sv_readiter_forward(struct svreaditer *im)
 
 static inline int
 sv_readiter_open(struct svreaditer *im, struct svmergeiter *merge,
-		 struct svupsert *u, uint64_t vlsn, int save_delete)
+		 uint64_t vlsn, int save_delete)
 {
-	im->u     = u;
 	im->merge = merge;
 	im->vlsn  = vlsn;
 	im->v = NULL;
 	im->next = 0;
 	im->nextdup = 0;
 	im->save_delete = save_delete;
+	im->upsert_tuple = NULL;
 	/* iteration can start from duplicate */
 	sv_readiter_next(im);
 	return 0;
+}
+
+static inline void
+sv_readiter_close(struct svreaditer *im)
+{
+	if (im->upsert_tuple != NULL) {
+		vinyl_tuple_unref(im->merge->merge->index, im->upsert_tuple);
+		im->upsert_tuple = NULL;
+	}
 }
 
 static inline void*
@@ -2607,7 +2237,7 @@ sv_readiter_get(struct svreaditer *im)
 	return im->v;
 }
 
-struct PACKED svwriteiter {
+struct svwriteiter {
 	uint64_t  vlsn;
 	uint64_t  vlsn_lru;
 	uint64_t  limit;
@@ -2621,33 +2251,34 @@ struct PACKED svwriteiter {
 	uint64_t  prevlsn;
 	int       vdup;
 	struct sv       *v;
-	struct svupsert *u;
 	struct svmergeiter   *merge;
+	struct sv upsert_sv;
+	struct vinyl_tuple *upsert_tuple;
 };
 
 static inline int
 sv_writeiter_upsert(struct svwriteiter *i)
 {
-	/* apply upsert only on statements which are the latest or
-	 * ready to be garbage-collected */
-	svupsert_reset(i->u);
-
+	assert(i->upsert_tuple == NULL);
 	/* upsert begin */
+	struct vinyl_index *index = i->merge->merge->index;
 	struct sv *v = sv_mergeiter_get(i->merge);
 	assert(v != NULL);
 	assert(sv_flags(v) & SVUPSERT);
 	assert(sv_lsn(v) <= i->vlsn);
-	int rc = svupsert_push(i->u, v);
-	if (unlikely(rc == -1))
-		return -1;
+	i->upsert_tuple = vinyl_tuple_alloc(index, sv_size(v));
+	i->upsert_tuple->flags = SVUPSERT;
+	memcpy(i->upsert_tuple->data, sv_pointer(v), sv_size(v));
+	sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+	v = &i->upsert_sv;
 	sv_mergeiter_next(i->merge);
 
 	/* iterate over upsert statements */
 	int last_non_upd = 0;
 	for (; sv_mergeiter_has(i->merge); sv_mergeiter_next(i->merge))
 	{
-		v = sv_mergeiter_get(i->merge);
-		int flags = sv_flags(v);
+		struct sv *next_v = sv_mergeiter_get(i->merge);
+		int flags = sv_flags(next_v);
 		int dup = sv_isflags(flags, SVDUP) || sv_mergeisdup(i->merge);
 		if (! dup)
 			break;
@@ -2656,21 +2287,34 @@ sv_writeiter_upsert(struct svwriteiter *i)
 		if (last_non_upd)
 			continue;
 		last_non_upd = ! sv_isflags(flags, SVUPSERT);
-		int rc = svupsert_push(i->u, v);
-		if (unlikely(rc == -1))
-			return -1;
-	}
 
-	/* upsert */
-	rc = svupsert_(i->u, i->merge->merge->key_def);
-	if (unlikely(rc == -1))
-		return -1;
+		struct vinyl_tuple *up = vy_apply_upsert(v, next_v, index);
+		if (up == NULL)
+			return -1; /* memory error */
+		vinyl_tuple_unref(index, i->upsert_tuple);
+		i->upsert_tuple = up;
+		sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+		v = &i->upsert_sv;
+	}
+	if (sv_flags(v) & SVUPSERT) {
+		struct vinyl_tuple *up = vy_apply_upsert(v, NULL, index);
+		if (up == NULL)
+			return -1; /* memory error */
+		vinyl_tuple_unref(index, i->upsert_tuple);
+		i->upsert_tuple = up;
+		sv_from_tuple(&i->upsert_sv, i->upsert_tuple);
+		v = &i->upsert_sv;
+	}
 	return 0;
 }
 
 static inline void
 sv_writeiter_next(struct svwriteiter *im)
 {
+	if (im->upsert_tuple != NULL) {
+		vinyl_tuple_unref(im->merge->merge->index, im->upsert_tuple);
+		im->upsert_tuple = NULL;
+	}
 	if (im->next)
 		sv_mergeiter_next(im->merge);
 	im->next = 0;
@@ -2725,7 +2369,7 @@ sv_writeiter_next(struct svwriteiter *im)
 						return;
 					im->upsert = 0;
 					im->prevlsn = lsn;
-					im->v = &im->u->result;
+					im->v = &im->upsert_sv;
 					im->vdup = dup;
 					im->next = 0;
 					break;
@@ -2743,11 +2387,11 @@ sv_writeiter_next(struct svwriteiter *im)
 
 static inline int
 sv_writeiter_open(struct svwriteiter *im, struct svmergeiter *merge,
-		  struct svupsert *u, uint64_t limit,
+		  uint64_t limit,
                   uint32_t sizev, uint64_t vlsn, uint64_t vlsn_lru,
                   int save_delete, int save_upsert)
 {
-	im->u           = u;
+	im->upsert_tuple = NULL;
 	im->merge       = merge;
 	im->limit       = limit;
 	im->size        = 0;
@@ -2763,6 +2407,15 @@ sv_writeiter_open(struct svwriteiter *im, struct svmergeiter *merge,
 	im->upsert = 0;
 	sv_writeiter_next(im);
 	return 0;
+}
+
+static inline void
+sv_writeiter_close(struct svwriteiter *im)
+{
+	if (im->upsert_tuple != NULL) {
+		vinyl_tuple_unref(im->merge->merge->index, im->upsert_tuple);
+		im->upsert_tuple = NULL;
+	}
 }
 
 static inline int
@@ -3159,49 +2812,6 @@ static struct vy_iterif sv_indexiterif =
 	.has     = sv_indexiter_has,
 	.get     = sv_indexiter_get,
 	.next    = sv_indexiter_next
-};
-
-static uint8_t
-svupsert_flags(struct sv *v) {
-	struct svupsertnode *n = v->v;
-	return n->flags;
-}
-
-static uint64_t
-svupsert_lsn(struct sv *v) {
-	struct svupsertnode *n = v->v;
-	return n->lsn;
-}
-
-static void
-svupsert_set_lsn(struct sv *v, int64_t lsn)
-{
-	(void) v;
-	(void) lsn;
-	unreachable();
-}
-
-static char*
-svupsert_pointer(struct sv *v)
-{
-	struct svupsertnode *n = v->v;
-	return n->buf.s;
-}
-
-static uint32_t
-svupsert_size(struct sv *v)
-{
-	struct svupsertnode *n = v->v;
-	return vy_buf_used(&n->buf);
-}
-
-static struct svif svupsert_if =
-{
-	.flags     = svupsert_flags,
-	.lsn       = svupsert_lsn,
-	.set_lsn   = svupsert_set_lsn,
-	.pointer   = svupsert_pointer,
-	.size      = svupsert_size
 };
 
 static uint8_t
@@ -4605,7 +4215,6 @@ struct sdcbuf {
 };
 
 struct sdc {
-	struct svupsert upsert;
 	struct vy_buf a;        /* result */
 	struct vy_buf b;        /* redistribute buffer */
 	struct vy_buf c;        /* file buffer */
@@ -4622,7 +4231,6 @@ struct vinyl_service {
 static inline void
 sd_cinit(struct sdc *sc)
 {
-	svupsert_init(&sc->upsert);
 	vy_buf_init(&sc->a);
 	vy_buf_init(&sc->b);
 	vy_buf_init(&sc->c);
@@ -4634,7 +4242,6 @@ sd_cinit(struct sdc *sc)
 static inline void
 sd_cfree(struct sdc *sc)
 {
-	svupsert_free(&sc->upsert);
 	vy_buf_free(&sc->a);
 	vy_buf_free(&sc->b);
 	vy_buf_free(&sc->c);
@@ -4653,7 +4260,6 @@ sd_cfree(struct sdc *sc)
 static inline void
 sd_cgc(struct sdc *sc, int wm)
 {
-	svupsert_gc(&sc->upsert, 600, 512);
 	vy_buf_gc(&sc->a, wm);
 	vy_buf_gc(&sc->b, wm);
 	vy_buf_gc(&sc->c, wm);
@@ -5530,7 +5136,6 @@ struct vinyl_index {
 	uint32_t gc_count;
 	struct rlist gc;
 	struct vy_buf readbuf;
-	struct svupsert u;
 	struct vy_index_conf conf;
 	struct key_def *key_def;
 	struct runtime *r;
@@ -6351,12 +5956,13 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 		struct vy_range *parent, struct svindex *vindex,
 		uint64_t vlsn, struct vy_run **result)
 {
+	(void)c;
 	struct runtime *r = index->r;
 
 	/* in-memory mode blob */
 	int rc;
 	struct svmerge vmerge;
-	sv_mergeinit(&vmerge, index->key_def);
+	sv_mergeinit(&vmerge, index, index->key_def);
 	rc = sv_mergeprepare(&vmerge, 1);
 	if (unlikely(rc == -1))
 		return -1;
@@ -6367,7 +5973,7 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
 
 	struct svwriteiter iwrite;
-	sv_writeiter_open(&iwrite, &imerge, &c->upsert,
+	sv_writeiter_open(&iwrite, &imerge,
 			  index->key_def->opts.page_size,
 			  sizeof(struct sdv),
 			  vlsn, 0, 1, 1);
@@ -6388,10 +5994,11 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 	(*result)->id = id;
 	(*result)->index = sdindex;
 
+	sv_writeiter_close(&iwrite);
 	sv_mergefree(&vmerge);
-
 	return 0;
 err:
+	sv_writeiter_close(&iwrite);
 	sv_mergefree(&vmerge);
 	return -1;
 }
@@ -6471,7 +6078,7 @@ si_compact(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan,
 	if (unlikely(rc == -1))
 		return vy_oom();
 	struct svmerge merge;
-	sv_mergeinit(&merge, index->key_def);
+	sv_mergeinit(&merge, index, index->key_def);
 	rc = sv_mergeprepare(&merge, node->branch_count + 1);
 	if (unlikely(rc == -1))
 		return -1;
@@ -6751,12 +6358,13 @@ si_split(struct vinyl_index *index, struct sdc *c, struct vy_buf *result,
 {
 	(void) stream;
 	(void) size_node;
+	(void) c;
 	struct runtime *r = index->r;
 	int rc;
 	struct vy_range *n = NULL;
 
 	struct svwriteiter iwrite;
-	sv_writeiter_open(&iwrite, merge_iter, &c->upsert,
+	sv_writeiter_open(&iwrite, merge_iter,
 			  index->key_def->opts.page_size, sizeof(struct sdv),
 			  vlsn, vlsn_lru, 0, 0);
 
@@ -6792,8 +6400,10 @@ si_split(struct vinyl_index *index, struct sdc *c, struct vy_buf *result,
 		n->self.id = id;
 		n->self.index = sdindex;
 	}
+	sv_writeiter_close(&iwrite);
 	return 0;
 error:
+	sv_writeiter_close(&iwrite);
 	if (n)
 		vy_range_free(n, r, 0);
 	si_splitfree(result, r);
@@ -7687,7 +7297,7 @@ si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
 	q->read_disk = 0;
 	q->read_cache = 0;
 	q->result = NULL;
-	sv_mergeinit(&q->merge, index->key_def);
+	sv_mergeinit(&q->merge, index, index->key_def);
 	vy_index_lock(index);
 	return 0;
 }
@@ -7821,11 +7431,15 @@ si_getbranch(struct siread *q, struct vy_range *n, struct sicachebranch *c)
 	if (unlikely(q->has))
 		vlsn = UINT64_MAX;
 	struct svreaditer ri;
-	sv_readiter_open(&ri, &im, &q->index->u, vlsn, 1);
+	sv_readiter_open(&ri, &im, vlsn, 1);
 	struct sv *v = sv_readiter_get(&ri);
-	if (unlikely(v == NULL))
+	if (unlikely(v == NULL)) {
+		sv_readiter_close(&ri);
 		return 0;
-	return si_getresult(q, v, 1);
+	}
+	rc = si_getresult(q, v, 1);
+	sv_readiter_close(&ri);
+	return rc;
 }
 
 static inline int
@@ -8028,11 +7642,12 @@ next_node:
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, m, q->order);
 	struct svreaditer ri;
-	sv_readiter_open(&ri, &im, &q->index->u, q->vlsn, q->upsert_eq);
+	sv_readiter_open(&ri, &im, q->vlsn, q->upsert_eq);
 	struct sv *v = sv_readiter_get(&ri);
 	if (unlikely(v == NULL)) {
 		sv_mergereset(&q->merge);
 		vy_rangeiter_next(&ii);
+		sv_readiter_close(&ri);
 		goto next_node;
 	}
 
@@ -8048,12 +7663,15 @@ next_node:
 			rc = 0; /* that is not what we wanted to find */
 	}
 	if (likely(rc == 1)) {
-		if (unlikely(si_readdup(q, v) == -1))
+		if (unlikely(si_readdup(q, v) == -1)) {
+			sv_readiter_close(&ri);
 			return -1;
+		}
 	}
 
 	/* skip a possible duplicates from data sources */
 	sv_readiter_forward(&ri);
+	sv_readiter_close(&ri);
 	return rc;
 }
 
@@ -10345,7 +9963,6 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	if (index->key_def == NULL)
 		goto error_3;
 	vy_buf_init(&index->readbuf);
-	svupsert_init(&index->u);
 	vy_range_tree_new(&index->tree);
 	tt_pthread_mutex_init(&index->lock, NULL);
 	rlist_create(&index->link);
@@ -10396,7 +10013,6 @@ vinyl_index_delete(struct vinyl_index *index)
 	index->gc_count = 0;
 
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->r);
-	svupsert_free(&index->u);
 	vy_buf_free(&index->readbuf);
 	vy_planner_free(&index->p);
 	tt_pthread_mutex_destroy(&index->lock);
@@ -10489,24 +10105,6 @@ vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size)
 
 enum { VINYL_KEY_MAXLEN = 1024  };
 
-static inline int
-vinyl_set_fields(struct vinyl_field *fields,
-		 const char **data, uint32_t part_count)
-{
-	for (uint32_t i = 0; i < part_count; i++) {
-		struct vinyl_field *field = &fields[i];
-		field->data = *data;
-		mp_next(data);
-		field->size = *data - field->data;
-		if (field->size > VINYL_KEY_MAXLEN) {
-			diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
-				 field->size, VINYL_KEY_MAXLEN);
-			return -1;
-		}
-	}
-	return 0;
-}
-
 struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 			 uint32_t part_count)
@@ -10557,13 +10155,16 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	return tuple;
 }
 
-/*
- * Create vinyl_tuple from raw MsgPack data.
- */
 struct vinyl_tuple *
-vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
-		     const char *data_end)
+vinyl_tuple_from_data_ex(struct vinyl_index *index,
+			 const char *data, const char *data_end,
+			 uint32_t extra_size, char **extra)
 {
+#ifndef NDEBUG
+	const char *data_end_must_be = data;
+	mp_next(&data_end_must_be);
+	assert(data_end == data_end_must_be);
+#endif
 	struct key_def *key_def = index->key_def;
 
 	uint32_t field_count = mp_decode_array(&data);
@@ -10573,7 +10174,8 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
 		(key_def->part_count + 1);
 	uint32_t data_size = data_end - data;
-	uint32_t size = meta_size + mp_sizeof_array(field_count) + data_size;
+	uint32_t size = meta_size + mp_sizeof_array(field_count) +
+		data_size + extra_size;
 	struct vinyl_tuple *tuple = vinyl_tuple_alloc(index, size);
 	if (tuple == NULL)
 		return NULL;
@@ -10595,28 +10197,53 @@ vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
 		}
 		part_offset += meta[i].size;
 	}
-	/* TODO: offset for value is unused */
-	meta[key_def->part_count].offset = 0;
-	meta[key_def->part_count].size = 0;
+	meta[key_def->part_count].offset = size - extra_size;
+	meta[key_def->part_count].size = extra_size;
 
 	/* Copy MsgPack data */
 	char *wpos = tuple->data + meta_size;
 	wpos = mp_encode_array(wpos, field_count);
 	memcpy(wpos, data, data_size);
 	wpos += data_size;
-	assert(wpos == tuple->data + size);
+	assert(wpos == tuple->data + size - extra_size);
+	*extra = wpos;
 	return tuple;
 }
 
-char *
-vinyl_convert_tuple_data(struct vinyl_index *index,
-			 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize)
+/*
+ * Create vinyl_tuple from raw MsgPack data.
+ */
+struct vinyl_tuple *
+vinyl_tuple_from_data(struct vinyl_index *index,
+		      const char *data, const char *data_end)
 {
+	char *unused;
+	return vinyl_tuple_from_data_ex(index, data, data_end, 0, &unused);
+}
+
+char *
+vinyl_tuple_data(struct vinyl_index *index,
+		 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize)
+{
+	assert((vinyl_tuple->flags & (SVUPSERT | SVDELETE)) == 0);
 	struct key_def *key_def = index->key_def;
 	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
-		(key_def->part_count + 1);
+			     (key_def->part_count + 1);
 	*bsize = vinyl_tuple->size - meta_size;
-	return vinyl_tuple->data + meta_size;
+	return  vinyl_tuple->data + meta_size;
+}
+
+static void
+vinyl_tuple_data_ex(const char *data, struct key_def *key_def,
+		    const char **tuple_data, const char **tuple_data_end,
+		    const char **extra_data, const char **extra_data_end)
+{
+	uint32_t part_count = key_def->part_count;
+	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)data;
+	*tuple_data = data + (part_count + 1) * sizeof(struct vinyl_field_meta);
+	*tuple_data_end = data + meta[part_count].offset;
+	*extra_data = *tuple_data_end;
+	*extra_data_end = *extra_data + meta[part_count].size;
 }
 
 struct tuple *
@@ -10624,7 +10251,7 @@ vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
 		    struct tuple_format *format)
 {
 	uint32_t bsize;
-	char *data = vinyl_convert_tuple_data(index, vinyl_tuple, &bsize);
+	char *data = vinyl_tuple_data(index, vinyl_tuple, &bsize);
 	return box_tuple_new(format, data, data + bsize);
 }
 
@@ -10673,6 +10300,102 @@ int64_t
 vinyl_tuple_lsn(struct vinyl_tuple *tuple)
 {
 	return tuple->lsn;
+}
+
+/**
+ * vinyl wrapper of tuple_upsert_execute.
+ * vibyl upsert opts are slightly different from tarantool ops,
+ *  so they need some preparation before tuple_upsert_execute call.
+ *  The function does this preparation.
+ * On successfull upsert the result is placed into tuple and tuple_end args.
+ * On fail the tuple and tuple_end args are not changed.
+ * Possibly allocates new tuple via fiber region alloc,
+ * so call fiber_gc() after usage
+ */
+static void
+vy_apply_upsert_ops(const char **tuple, const char **tuple_end,
+		    const char *ops, const char *ops_end)
+{
+	uint64_t series_count = mp_decode_uint(&ops);
+	assert(series_count > 0);
+	(void)ops_end;
+	for (uint64_t i = 0; i < series_count; i++) {
+		int index_base = mp_decode_uint(&ops);
+		const char *serie_end;
+		if (i == series_count - 1) {
+			serie_end = ops_end;
+		} else {
+			serie_end = ops;
+			mp_next(&serie_end);
+		}
+#ifndef NDEBUG
+		if (i == series_count - 1) {
+			const char *serie_end_must_be = ops;
+			mp_next(&serie_end_must_be);
+			assert(serie_end == serie_end_must_be);
+		}
+#endif
+		const char *result;
+		uint32_t size;
+		result = tuple_upsert_execute(vinyl_update_alloc, NULL,
+					      ops, serie_end,
+					      *tuple, *tuple_end,
+					      &size, index_base);
+		if (result != NULL) {
+			/* if failed, just skip it and leave tuple the same */
+			*tuple = result;
+			*tuple_end = result + size;
+		}
+		ops = serie_end;
+	}
+}
+
+/*
+ * Get the upserted tuple by upsert tuple and original tuple
+ */
+static struct vinyl_tuple *
+vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
+{
+	assert(upsert != object);
+	struct key_def *key_def = index->key_def;
+	const char *u_tuple, *u_tuple_end, *u_ops, *u_ops_end;
+	vinyl_tuple_data_ex(sv_pointer(upsert), key_def,
+			    &u_tuple, &u_tuple_end, &u_ops, &u_ops_end);
+	if (object == NULL || (sv_flags(object) & SVDELETE)) {
+		/* replace version */
+		struct vinyl_tuple *result =
+			vinyl_tuple_from_data(index, u_tuple, u_tuple_end);
+		return result;
+	}
+	const char *o_tuple, *o_tuple_end, *o_ops, *o_ops_end;
+	vinyl_tuple_data_ex(sv_pointer(object), key_def,
+			    &o_tuple, &o_tuple_end, &o_ops, &o_ops_end);
+	vy_apply_upsert_ops(&o_tuple, &o_tuple_end, u_ops, u_ops_end);
+	if (!(sv_flags(object) & SVUPSERT)) {
+		/* update version */
+		assert(o_ops_end - o_ops == 0);
+		struct vinyl_tuple *result =
+			vinyl_tuple_from_data(index, o_tuple, o_tuple_end);
+		fiber_gc();
+		return result;
+	}
+	/* upsert of upsert .. */
+	assert(o_ops_end - o_ops > 0);
+	uint64_t ops_series_count = mp_decode_uint(&u_ops) +
+				    mp_decode_uint(&o_ops);
+	uint32_t total_ops_size = mp_sizeof_uint(ops_series_count) +
+				  (u_ops_end - u_ops) + (o_ops_end - o_ops);
+	char *extra;
+	struct vinyl_tuple *result =
+		vinyl_tuple_from_data_ex(index, o_tuple, o_tuple_end,
+					 total_ops_size, &extra);
+	extra = mp_encode_uint(extra, ops_series_count);
+	memcpy(extra, o_ops, o_ops_end - o_ops);
+	extra += o_ops_end - o_ops;
+	memcpy(extra, u_ops, u_ops_end - u_ops);
+	result->flags = SVUPSERT;
+	fiber_gc();
+	return result;
 }
 
 static inline int
@@ -10776,59 +10499,19 @@ vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
 	    const char *tuple, const char *tuple_end,
 	    const char *expr, const char *expr_end, int index_base)
 {
-	struct key_def *key_def = index->key_def;
-
-	/* upsert */
-	mp_decode_array(&tuple);
-
-	/* Set key fields */
-	struct vinyl_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
-	const char *tuple_value = tuple;
-	if (vinyl_set_fields(fields, &tuple_value, key_def->part_count) != 0)
-		return -1;
-
-	/*
-	 * Set value field:
-	 *  - index_base: uint8_t
-	 *  - tuple_tail_size: uint32_t
-	 *  - tuple_tail: char
-	 *  - expr: char
-	 */
-	uint32_t expr_size  = expr_end - expr;
-	uint32_t tuple_value_size = tuple_end - tuple_value;
-	uint32_t value_size = sizeof(uint8_t) + sizeof(uint32_t) +
-		tuple_value_size + expr_size;
-	char *value = (char *)malloc(value_size);
-	if (value == NULL) {
-		diag_set(OutOfMemory, sizeof(value_size), "vinyl",
-		          "upsert");
-		return -1;
-	}
-	char *p = value;
-	memcpy(p, &index_base, sizeof(uint8_t));
-	p += sizeof(uint8_t);
-	memcpy(p, &tuple_value_size, sizeof(uint32_t));
-	p += sizeof(uint32_t);
-	memcpy(p, tuple_value, tuple_value_size);
-	p += tuple_value_size;
-	memcpy(p, expr, expr_size);
-	p += expr_size;
-	assert(p == value + value_size);
-
-	/* Value is stored after key parts */
-	struct vinyl_field *value_field = &fields[key_def->part_count];
-	value_field->data = value;
-	value_field->size = value_size;
-
-	uint32_t size = sf_writesize(key_def, fields);
-	struct vinyl_tuple *vinyl_tuple = vinyl_tuple_alloc(index, size);
+	assert(index_base == 0 || index_base == 1);
+	uint32_t extra_size = (expr_end - expr) +
+			      mp_sizeof_uint(1) + mp_sizeof_uint(index_base);
+	char *extra;
+	struct vinyl_tuple *vinyl_tuple =
+		vinyl_tuple_from_data_ex(index, tuple, tuple_end,
+					 extra_size, &extra);
 	if (vinyl_tuple == NULL) {
-		free(value);
 		return -1;
 	}
-	sf_write(key_def, fields, vinyl_tuple->data);
-	free(value);
-
+	extra = mp_encode_uint(extra, 1); /* 1 upsert ops record */
+	extra = mp_encode_uint(extra, index_base);
+	memcpy(extra, expr, expr_end - expr);
 	int rc = vy_tx_write(tx, index, vinyl_tuple, SVUPSERT);
 	vinyl_tuple_unref(index, vinyl_tuple);
 	return rc;
