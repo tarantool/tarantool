@@ -10524,7 +10524,7 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
 		(key_def->part_count + 1);
 	uint32_t key_size = key_end - key;
-	uint32_t size = meta_size + key_size;
+	uint32_t size = meta_size + mp_sizeof_array(part_count) + key_size;
 	struct vinyl_tuple *tuple = vinyl_tuple_alloc(index, size);
 	if (tuple == NULL)
 		return NULL;
@@ -10532,12 +10532,15 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	/* Calculate offsets for key parts */
 	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)tuple->data;
 	const char *key_pos = key;
+	uint32_t part_offset = meta_size + mp_sizeof_array(part_count);
 	for (uint32_t i = 0; i < part_count; i++) {
 		const char *part_start = key_pos;
-		meta[i].offset = meta_size + (key_pos - key);
+		meta[i].offset = part_offset;
 		mp_next(&key_pos);
 		meta[i].size = (key_pos - part_start);
+		part_offset += meta[i].size;
 	}
+	assert(part_offset == size);
 	/* Fill offsets for missing key parts + value */
 	for (uint32_t i = part_count; i <= key_def->part_count; i++) {
 		meta[i].offset = 0;
@@ -10546,6 +10549,7 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 
 	/* Copy MsgPack data */
 	char *data = tuple->data + meta_size;
+	data = mp_encode_array(data, part_count);
 	memcpy(data, key, key_size);
 	data += key_size;
 	assert(data == tuple->data + size);
