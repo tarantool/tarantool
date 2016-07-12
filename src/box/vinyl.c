@@ -1267,41 +1267,6 @@ sf_write(struct key_def *key_def, struct vinyl_field *fields, char *dest)
 	}
 }
 
-static inline int
-sf_comparable_size(struct key_def *key_def, char *data)
-{
-	int sum = 0;
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		uint32_t field_size;
-		sf_field(key_def, part_id, data, &field_size);
-		sum += field_size;
-		sum += sizeof(struct vinyl_field_meta);
-	}
-	/* fields: [key_part, key_part, ..., value] */
-	sum += sizeof(struct vinyl_field_meta);
-	return sum;
-}
-
-static inline void
-sf_comparable_write(struct key_def *key_def, char *src, char *dest)
-{
-	int var_value_offset = sizeof(struct vinyl_field_meta) *
-		(key_def->part_count + 1);
-	/* for each key_part + value */
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		struct vinyl_field_meta *current = sf_fieldmeta(key_def, part_id, dest);
-		current->offset = var_value_offset;
-		char *ptr = sf_field(key_def, part_id, src, &current->size);
-		memcpy(dest + var_value_offset, ptr, current->size);
-		var_value_offset += current->size;
-	}
-	/* fields: [key_part, key_part, ..., value] */
-	struct vinyl_field_meta *current =
-		sf_fieldmeta(key_def, key_def->part_count, dest);
-	current->offset = var_value_offset;
-	current->size = 0;
-}
-
 static int
 vy_compare(struct key_def *key_def, char *a, char *b)
 {
@@ -6153,48 +6118,8 @@ si_execute(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan,
 	return rc;
 }
 
-/* update statistic in page header and page index header */
-static int
-vy_branch_update_stat(struct sdpageheader *page_header, char *first_value,
-		      char *last_value, struct sdindexpage *page_index,
-		      struct sdindexheader *index_header,
-		      struct vy_buf *minmax_buf,
-		      struct key_def *key_def)
-{
-	page_index->lsnmin = page_header->lsnmin;
-	page_index->lsnmax = page_header->lsnmax;
-	page_index->size = page_header->size + sizeof(struct sdpageheader);
-	page_index->sizeorigin = page_header->sizeorigin + sizeof(struct sdpageheader);
-
-	if (first_value && last_value) {
-		page_index->offsetindex = vy_buf_used(minmax_buf);
-		page_index->sizemin = sf_comparable_size(key_def, first_value);
-		page_index->sizemax = sf_comparable_size(key_def, last_value);
-		if (vy_buf_ensure(minmax_buf, page_index->sizemin + page_index->sizemax))
-			return -1;
-		sf_comparable_write(key_def, first_value, minmax_buf->p);
-		vy_buf_advance(minmax_buf, page_index->sizemin);
-		sf_comparable_write(key_def, last_value, minmax_buf->p);
-		vy_buf_advance(minmax_buf, page_index->sizemax);
-	}
-
-	++index_header->count;
-	if (page_index->lsnmin < index_header->lsnmin)
-		index_header->lsnmin = page_index->lsnmin;
-	if (page_index->lsnmax > index_header->lsnmax)
-		index_header->lsnmax = page_index->lsnmax;
-	index_header->total += page_index->size;
-	index_header->totalorigin += page_index->sizeorigin;
-
-	if (index_header->dupmin > page_header->lsnmindup)
-		index_header->dupmin = page_header->lsnmindup;
-	index_header->keys += page_header->count;
-	index_header->dupkeys += page_header->countdup;
-	return 0;
-}
-
 /* dump tuple to branch page buffers (tuple header and data) */
-static void *
+static int
 vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 		     struct vy_buf *data_buf, struct sdpageheader *header)
 {
@@ -6205,7 +6130,7 @@ vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 	if (sv_writeiter_is_duplicate(iwrite))
 		flags |= SVDUP;
 	if (vy_buf_ensure(info_buf, sizeof(struct sdv)))
-		return NULL;
+		return -1;
 	struct sdv *tupleinfo = (struct sdv *)info_buf->p;
 	tupleinfo->flags = flags;
 	tupleinfo->offset = vy_buf_used(data_buf);
@@ -6214,7 +6139,7 @@ vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 	vy_buf_advance(info_buf, sizeof(struct sdv));
 
 	if (vy_buf_ensure(data_buf, sv_size(value)))
-		return NULL;
+		return -1;
 	value_ptr = data_buf->p;
 	memcpy(data_buf->p, sv_pointer(value), sv_size(value));
 	vy_buf_advance(data_buf, sv_size(value));
@@ -6229,7 +6154,7 @@ vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 		if (lsn < header->lsnmindup)
 			header->lsnmindup = lsn;
 	}
-	return value_ptr;
+	return 0;
 }
 
 /* write tuples from iterator to new page in branch,
@@ -6239,8 +6164,7 @@ vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 		     struct vy_filterif *compression,
 		     struct sdindexheader *index_header,
 		     struct sdindexpage *page_index,
-		     struct vy_buf *minmax_buf,
-		     struct key_def *key_def)
+		     struct vy_buf *minmax_buf)
 {
 	struct vy_buf tuplesinfo, values;
 	vy_buf_init(&tuplesinfo);
@@ -6251,17 +6175,13 @@ vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 	header.lsnmin = UINT64_MAX;
 	header.lsnmindup = UINT64_MAX;
 
-	char *first_value = NULL, *last_value = NULL;
-
 	while (iwrite && sv_writeiter_has(iwrite)) {
-		char *value_ptr = vy_branch_dump_tuple(iwrite, &tuplesinfo,
-						       &values, &header);
-		if (!value_ptr) {
+		int rc = vy_branch_dump_tuple(iwrite, &tuplesinfo, &values,
+					      &header);
+		if (rc != 0) {
 			vy_oom();
 			goto err;
 		}
-		first_value = values.s;
-		last_value = value_ptr;
 		sv_writeiter_next(iwrite);
 	}
 	struct vy_buf compressed;
@@ -6306,14 +6226,52 @@ vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 		goto err;
 	}
 
-	vy_branch_update_stat(&header, first_value, last_value, page_index,
-			      index_header, minmax_buf, key_def);
+	/*
+	 * Update statistic in page header and page index header.
+	 */
+	page_index->lsnmin = header.lsnmin;
+	page_index->lsnmax = header.lsnmax;
+	page_index->size = header.size + sizeof(struct sdpageheader);
+	page_index->sizeorigin = header.sizeorigin + sizeof(struct sdpageheader);
+
+	if (header.count > 0) {
+		struct sdv *tuplesinfoarr = (struct sdv *) tuplesinfo.s;
+		struct sdv *mininfo = &tuplesinfoarr[0];
+		struct sdv *maxinfo = &tuplesinfoarr[header.count - 1];
+		page_index->offsetindex = vy_buf_used(minmax_buf);
+		page_index->sizemin = mininfo->size;
+		page_index->sizemax = maxinfo->size;
+		if (vy_buf_ensure(minmax_buf, page_index->sizemin + page_index->sizemax))
+			goto err;
+
+		char *minvalue = values.s + mininfo->offset;
+		memcpy(minmax_buf->p, minvalue, page_index->sizemin);
+		vy_buf_advance(minmax_buf, page_index->sizemin);
+
+		char *maxvalue = values.s + maxinfo->offset;
+		memcpy(minmax_buf->p, maxvalue, page_index->sizemax);
+		vy_buf_advance(minmax_buf, page_index->sizemax);
+	}
+
+	++index_header->count;
+	if (page_index->lsnmin < index_header->lsnmin)
+		index_header->lsnmin = page_index->lsnmin;
+	if (page_index->lsnmax > index_header->lsnmax)
+		index_header->lsnmax = page_index->lsnmax;
+	index_header->total += page_index->size;
+	index_header->totalorigin += page_index->sizeorigin;
+
+	if (index_header->dupmin > header.lsnmindup)
+		index_header->dupmin = header.lsnmindup;
+	index_header->keys += header.count;
+	index_header->dupkeys += header.countdup;
 
 	vy_buf_free(&compressed);
 	vy_buf_free(&tuplesinfo);
 	vy_buf_free(&values);
 	return 0;
 err:
+	vy_buf_free(&compressed);
 	vy_buf_free(&tuplesinfo);
 	vy_buf_free(&values);
 	return -1;
@@ -6324,7 +6282,7 @@ err:
 static int
 vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 	        struct vy_filterif *compression, uint64_t limit, struct sdid *id,
-	        struct key_def *key_def, struct sdindex *sdindex)
+	        struct sdindex *sdindex)
 {
 	uint64_t seal_offset = file->size;
 	struct sdseal seal;
@@ -6353,7 +6311,7 @@ vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 		struct sdindexpage *index_page = (struct sdindexpage *)sdindex->pages.p;
 		vy_buf_advance(&sdindex->pages, sizeof(struct sdindexpage));
 		if (vy_branch_write_page(file, iwrite, compression, index_header,
-				         index_page, &sdindex->minmax, key_def))
+				         index_page, &sdindex->minmax))
 			goto err;
 
 		index_page->offset = page_offset;
@@ -6424,7 +6382,7 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 	sd_indexinit(&sdindex);
 	if ((rc = vy_branch_write(&parent->file, &iwrite,
 			          index->conf.compression_if, UINT64_MAX,
-			          &id, index->key_def, &sdindex)))
+			          &id, &sdindex)))
 		goto err;
 
 	*result = vy_run_new();
@@ -6825,8 +6783,7 @@ si_split(struct vinyl_index *index, struct sdc *c, struct vy_buf *result,
 
 		if ((rc = vy_branch_write(&n->file, &iwrite,
 				          index->conf.compression_if,
-				          size_stream, &id,
-				          index->key_def, &sdindex)))
+				          size_stream, &id, &sdindex)))
 			goto error;
 
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
@@ -8217,8 +8174,8 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	/* create index with one empty page */
 	struct sdindex sdindex;
 	sd_indexinit(&sdindex);
-	vy_branch_write(&n->file, NULL, index->conf.compression_if,
-		        0, &id, index->key_def, &sdindex);
+	vy_branch_write(&n->file, NULL, index->conf.compression_if, 0, &id,
+			&sdindex);
 
 	vy_run_set(&n->self, &sdindex);
 
