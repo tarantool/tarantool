@@ -6128,7 +6128,6 @@ static int
 vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 		     struct vy_buf *data_buf, struct sdpageheader *header)
 {
-	void *value_ptr = NULL;
 	struct sv *value = sv_writeiter_get(iwrite);
 	uint64_t lsn = sv_lsn(value);
 	uint8_t flags = sv_flags(value);
@@ -6145,7 +6144,6 @@ vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 
 	if (vy_buf_ensure(data_buf, sv_size(value)))
 		return -1;
-	value_ptr = data_buf->p;
 	memcpy(data_buf->p, sv_pointer(value), sv_size(value));
 	vy_buf_advance(data_buf, sv_size(value));
 
@@ -10713,30 +10711,12 @@ vinyl_tuple_lsn(struct vinyl_tuple *tuple)
 }
 
 static inline int
-vinyl_tuple_validate(struct vinyl_tuple *o, struct vinyl_index *index,
-		    uint8_t flags)
-{
-	struct vinyl_env *e = index->env;
-	o->flags = flags;
-	if (o->lsn != 0) {
-		uint64_t lsn = vy_sequence(&e->seq, VINYL_LSN);
-		if (o->lsn <= lsn)
-			return vy_error("%s", "incompatible document lsn");
-	}
-	return 0;
-}
-
-static inline int
 vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	    struct vinyl_tuple *o, uint8_t flags)
 {
 	struct vinyl_env *e = index->env;
 
-	/* validate req */
-	if (unlikely(t->state == VINYL_TX_PREPARE)) {
-		vy_error("%s", "transaction is in 'prepare' state (read-only)");
-		return -1;
-	}
+	assert(t->state == VINYL_TX_READY);
 
 	/* validate index status */
 	int status = vy_status(&index->status);
@@ -10755,14 +10735,12 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 		return vy_error("%s", "index in malfunction state");
 	}
 
-	int rc = vinyl_tuple_validate(o, index, flags);
-	if (unlikely(rc == -1))
-		return -1;
+	o->flags = flags;
 
 	vinyl_tuple_ref(o);
 
 	/* concurrent index only */
-	rc = tx_set(t, &index->coindex, o);
+	int rc = tx_set(t, &index->coindex, o);
 	if (unlikely(rc != 0))
 		return -1;
 
