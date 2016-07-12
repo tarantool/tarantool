@@ -2236,7 +2236,7 @@ done:
 struct vinyl_index;
 
 struct PACKED svlogindex {
-	uint32_t id;
+	uint32_t space_id;
 	uint32_t head, tail;
 	uint32_t count;
 	struct vinyl_index *index;
@@ -2244,7 +2244,7 @@ struct PACKED svlogindex {
 
 struct PACKED svlogv {
 	struct sv v;
-	uint32_t id;
+	uint32_t space_id;
 	uint32_t next;
 };
 
@@ -2307,7 +2307,7 @@ sv_logadd(struct svlog *l, struct svlogv *v,
 		return -1;
 	struct svlogindex *i = (struct svlogindex*)l->index.s;
 	while ((char*)i < l->index.p) {
-		if (likely(i->id == v->id)) {
+		if (i->space_id == v->space_id) {
 			struct svlogv *tail = sv_logat(l, i->tail);
 			tail->next = n;
 			i->tail = n;
@@ -2322,7 +2322,7 @@ sv_logadd(struct svlog *l, struct svlogv *v,
 		return -1;
 	}
 	i = (struct svlogindex*)l->index.p;
-	i->id    = v->id;
+	i->space_id = v->space_id;
 	i->head  = n;
 	i->tail  = n;
 	i->index = index;
@@ -3432,7 +3432,6 @@ sxv_tree_search_key(sxv_tree_t *rbtree, char *data, int size)
 
 struct tx_index {
 	sxv_tree_t tree;
-	uint32_t  dsn;
 	struct vinyl_index *index;
 	struct key_def *key_def;
 	struct rlist    link;
@@ -3506,7 +3505,6 @@ static int tx_managerinit(struct tx_manager*, struct runtime*);
 static int tx_managerfree(struct tx_manager*);
 static int tx_index_init(struct tx_index *, struct tx_manager *,
 			struct vinyl_index *, struct key_def *key_def);
-static int tx_index_set(struct tx_index*, uint32_t);
 static int tx_index_free(struct tx_index*, struct tx_manager*);
 static struct vinyl_tx *tx_manager_find(struct tx_manager*, uint64_t);
 static void tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
@@ -3553,18 +3551,10 @@ tx_index_init(struct tx_index *i, struct tx_manager *m,
 {
 	sxv_tree_new(&i->tree);
 	rlist_create(&i->link);
-	i->dsn = 0;
 	i->index = index;
 	i->key_def = key_def;
 	(void) tt_pthread_mutex_init(&i->mutex, NULL);
 	rlist_add(&m->indexes, &i->link);
-	return 0;
-}
-
-static int
-tx_index_set(struct tx_index *i, uint32_t dsn)
-{
-	i->dsn = dsn;
 	return 0;
 }
 
@@ -3866,7 +3856,7 @@ tx_set(struct vinyl_tx *x, struct tx_index *index, struct vinyl_tuple *version)
 	v->id = x->id;
 	v->index = index;
 	struct svlogv lv;
-	lv.id   = index->dsn;
+	lv.space_id   = index->key_def->space_id;
 	lv.next = UINT32_MAX;
 	sv_from_sxv(&lv.v, v);
 	/* update concurrent index */
@@ -5169,9 +5159,6 @@ struct vy_index_conf {
 	char       *name;
 	char       *path;
 	uint32_t    sync;
-	uint64_t    node_size;
-	uint32_t    node_page_size;
-	uint32_t    node_page_checksum;
 	uint32_t    compression;
 	char       *compression_sz;
 	struct vy_filterif *compression_if;
@@ -6426,7 +6413,8 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, &imerge, &c->upsert,
-			  index->conf.node_page_size, sizeof(struct sdv),
+			  index->key_def->opts.page_size,
+			  sizeof(struct sdv),
 			  vlsn, 0, 1, 1);
 	struct sdid id;
 	id.flags = SD_IDBRANCH;
@@ -6814,7 +6802,7 @@ si_split(struct vinyl_index *index, struct sdc *c, struct vy_buf *result,
 
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, merge_iter, &c->upsert,
-			  index->conf.node_page_size, sizeof(struct sdv),
+			  index->key_def->opts.page_size, sizeof(struct sdv),
 			  vlsn, vlsn_lru, 0, 0);
 
 	while (sv_writeiter_has(&iwrite)) {
@@ -6873,7 +6861,8 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 	 * a new nodes.
 	 */
 	int rc;
-	rc = si_split(index, c, result, range, stream, index->conf.node_size,
+	rc = si_split(index, c, result, range, stream,
+		      index->key_def->opts.node_size,
 		      size_stream, n_stream, vlsn, vlsn_lru);
 	if (unlikely(rc == -1))
 		return -1;
@@ -10130,11 +10119,7 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		vy_oom();
 		goto error;
 	}
-	conf->id                    = key_def->space_id;
 	conf->sync                  = cfg_geti("vinyl.sync");
-	conf->node_size             = key_def->opts.node_size;
-	conf->node_page_size        = key_def->opts.page_size;
-	conf->node_page_checksum    = 1;
 
 	/* compression */
 	if (key_def->opts.compression[0] != '\0' &&
@@ -10190,7 +10175,6 @@ vinyl_index_open(struct vinyl_index *index)
 		goto online;
 	if (status != VINYL_OFFLINE)
 		return -1;
-	tx_index_set(&index->coindex, index->conf.id);
 	int rc = vinyl_index_recoverbegin(index);
 	if (unlikely(rc == -1))
 		return -1;
@@ -10983,7 +10967,6 @@ vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *ke
 	return 0;
 }
 
-
 int
 vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx)
 {
@@ -11031,7 +11014,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 		}
 		/* abort waiters */
 		sxv_abort_all(v->next);
-		/* mark stmt as commited */
+		/* mark statement as committed */
 		sxv_commit(v, csn);
 		/* translate log version from struct sxv to struct vinyl_tuple */
 		sv_from_tuple(&lv->v, v->tuple);
@@ -11069,12 +11052,11 @@ vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn)
 		return -1;
 	assert(tx->state == VINYL_TX_COMMIT);
 
-	/* write-ahead log */
 	vy_sequence_lock(&e->seq);
 	if (lsn > (int64_t) e->seq.lsn)
 		e->seq.lsn = lsn;
 	vy_sequence_unlock(&e->seq);
-	/* do wal write and backend commit */
+	/* do log write and backend commit */
 	int rc = svlog_flush(&tx->log, lsn, e->status);
 	if (unlikely(rc == -1))
 		tx_rollback(tx);
