@@ -89,7 +89,7 @@ box_info_sort(box.info.vinyl())
       - branch_max: '1'
       - count: '2'
       - count_dup: '0'
-      - memory_used: '72'
+      - memory_used: '74'
       - node_count: '1'
       - page_count: '1'
       - read_cache: '0'
@@ -102,7 +102,7 @@ box_info_sort(box.info.vinyl())
       - temperature_min: '0'
   - memory:
     - limit: '53687091'
-    - used: '72'
+    - used: '74'
   - metric:
     - lsn: '5'
     - nsn: '1'
@@ -116,7 +116,7 @@ box_info_sort(box.info.vinyl())
     - delete: '0'
     - delete_latency: 0 0 0.0
     - documents: '2'
-    - documents_used: '72'
+    - documents_used: '74'
     - get: '1'
     - get_latency: <get_latency>
     - get_read_cache: 0 0 0.0

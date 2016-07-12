@@ -258,17 +258,14 @@ join_send_space(struct space *sp, void *data)
 		uint32_t tuple_size;
 		char *tuple = vinyl_convert_tuple_data(pk->db, vinyl_tuple,
 			&tuple_size);
-		if (tuple == NULL)
-			diag_raise();
-		vinyl_tuple_unref(pk->db, vinyl_tuple);
 		try {
 			vinyl_send_row(stream, pk->key_def->space_id,
 				      tuple, tuple_size, lsn);
 		} catch (Exception *e) {
-			free(tuple);
+			vinyl_tuple_unref(pk->db, vinyl_tuple);
 			throw;
 		}
-		free(tuple);
+		vinyl_tuple_unref(pk->db, vinyl_tuple);
 	}
 }
 
