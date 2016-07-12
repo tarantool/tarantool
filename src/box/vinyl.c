@@ -5865,7 +5865,6 @@ struct siread {
 	uint64_t vlsn;
 	struct svmerge merge;
 	int cache_only;
-	int oldest_only;
 	int read_disk;
 	int read_cache;
 	struct sv *upsert_v;
@@ -7693,7 +7692,6 @@ si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
 	q->upsert_v = NULL;
 	q->upsert_eq = 0;
 	q->cache_only = 0;
-	q->oldest_only = 0;
 	q->read_disk = 0;
 	q->read_cache = 0;
 	q->result = NULL;
@@ -7869,18 +7867,13 @@ si_get(struct siread *q)
 	rc = sv_mergeprepare(m, 1);
 	assert(rc == 0);
 	struct sicachebranch *b;
-	if (q->oldest_only) {
-		b = si_cacheseek(q->cache, &node->self);
-		assert(b != NULL);
+
+	b = q->cache->branch;
+	while (b && b->branch) {
 		rc = si_getbranch(q, node, b);
-	} else {
-		b = q->cache->branch;
-		while (b && b->branch) {
-			rc = si_getbranch(q, node, b);
-			if (rc != 0)
-				break;
-			b = b->next;
-		}
+		if (rc != 0)
+			break;
+		b = b->next;
 	}
 
 	vy_index_lock(q->index);
@@ -8031,18 +8024,12 @@ next_node:
 		return -1;
 	}
 
-	if (q->oldest_only) {
-		rc = si_rangebranch(q, node, &node->self, m);
+	struct vy_run *b = node->branch;
+	while (b) {
+		rc = si_rangebranch(q, node, b, m);
 		if (unlikely(rc == -1 || rc == 2))
 			return rc;
-	} else {
-		struct vy_run *b = node->branch;
-		while (b) {
-			rc = si_rangebranch(q, node, b, m);
-			if (unlikely(rc == -1 || rc == 2))
-				return rc;
-			b = b->next;
-		}
+		b = b->next;
 	}
 
 	/* merge and filter data stream */
@@ -8076,22 +8063,6 @@ next_node:
 	/* skip a possible duplicates from data sources */
 	sv_readiter_forward(&ri);
 	return rc;
-}
-
-static int si_read(struct siread *q)
-{
-	switch (q->order) {
-	case VINYL_EQ:
-		return si_get(q);
-	case VINYL_LT:
-	case VINYL_LE:
-	case VINYL_GT:
-	case VINYL_GE:
-		return si_range(q);
-	default:
-		break;
-	}
-	return -1;
 }
 
 static int
@@ -10309,7 +10280,11 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	}
 	q.upsert_eq = upsert_eq;
 	q.cache_only = cache_only;
-	int rc = si_read(&q);
+	int rc;
+	if (q.order == VINYL_EQ)
+		rc = si_get(&q);
+	else
+		rc = si_range(&q);
 	si_readclose(&q);
 
 	if (vup != NULL) {
@@ -10831,7 +10806,7 @@ vy_txprepare_cb(struct vinyl_tx *tx, struct svlogv *v, uint64_t lsn,
 	struct siread q;
 	si_readopen(&q, index, cache, VINYL_EQ, tx->vlsn, key->data, key->size);
 	q.has = 1;
-	int rc = si_read(&q);
+	int rc = si_get(&q);
 	si_readclose(&q);
 
 	if (unlikely(q.result))
