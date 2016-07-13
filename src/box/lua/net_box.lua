@@ -896,7 +896,7 @@ local remote_methods = {
 
     _request = function(self, reqtype, raise, ...)
         if self.console then
-            box.error(box.error.UNSUPPORTED, "console", reqtype)
+            box.error(box.error.UNSUPPORTED, "console", "this request type")
         end
         local fid = fiber.id()
         if self.timeouts[fid] == nil then

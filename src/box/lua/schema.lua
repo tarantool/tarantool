@@ -283,7 +283,7 @@ box.schema.space.create = function(name, options)
         uid = session.uid()
     end
     local format = options.format and options.format or {}
-    local extra_options = setmetatable({}, { __serialize = 'mapping' })
+    local extra_options = setmetatable({}, { __serialize = 'map' })
     for k, v in pairs(options) do
         if options_template[k] == nil then
             extra_options[k] = v

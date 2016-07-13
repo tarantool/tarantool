@@ -3127,7 +3127,6 @@ static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 static int
 tx_managerfree(struct tx_manager *m)
 {
-	assert(tx_manager_count(m) == 0);
 	tt_pthread_mutex_destroy(&m->lock);
 	return 0;
 }
@@ -3151,19 +3150,10 @@ sxv_tree_free_cb(sxv_tree_t *t, struct sxv *v, void *arg)
 	return NULL;
 }
 
-static inline void
-tx_index_truncate(struct tx_index *i, struct tx_manager *m)
-{
-	tt_pthread_mutex_lock(&i->mutex);
-	sxv_tree_iter(&i->tree, NULL, sxv_tree_free_cb, m->r);
-	sxv_tree_new(&i->tree);
-	tt_pthread_mutex_unlock(&i->mutex);
-}
-
 static int
 tx_index_free(struct tx_index *i, struct tx_manager *m)
 {
-	tx_index_truncate(i, m);
+	sxv_tree_iter(&i->tree, NULL, sxv_tree_free_cb, m->r);
 	(void) tt_pthread_mutex_destroy(&i->mutex);
 	return 0;
 }
@@ -3266,13 +3256,11 @@ tx_manager_csn(struct tx_manager *m)
 	uint64_t csn = UINT64_MAX;
 	if (m->count_rw == 0)
 		return csn;
+
 	struct vinyl_tx *min = tx_tree_first(&m->tree);
-	while (min) {
-		if (min->type != VINYL_TX_RO) {
-			break;
-		}
+	while (min && min->type == VINYL_TX_RO)
 		min = tx_tree_next(&m->tree, min);
-	}
+
 	assert(min != NULL);
 	return min->csn;
 }
@@ -3280,6 +3268,8 @@ tx_manager_csn(struct tx_manager *m)
 static inline void
 tx_manager_gc(struct tx_manager *m)
 {
+	if (m->count_gc == 0)
+		return;
 	uint64_t min_csn = tx_manager_csn(m);
 	struct sxv *gc = NULL;
 	uint32_t count = 0;
@@ -3309,8 +3299,6 @@ tx_gc(struct vinyl_tx *tx)
 	struct tx_manager *m = tx->manager;
 	tx_promote(tx, VINYL_TX_UNDEF);
 	sv_logfree(&tx->log);
-	if (m->count_gc == 0)
-		return;
 	tx_manager_gc(m);
 }
 
@@ -3426,9 +3414,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 {
 	struct tx_manager *m = tx->manager;
 	struct runtime *r = m->r;
-	if (! (version->flags & SVGET)) {
-		tx->log_read = -1;
-	}
 	/* allocate mvcc container */
 	struct sxv *v = sxv_alloc(version);
 	if (unlikely(v == NULL)) {
@@ -10392,19 +10377,19 @@ vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
 }
 
 static inline int
-vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
+vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	    struct vinyl_tuple *o, uint8_t flags)
 {
 	struct vinyl_env *e = index->env;
 
-	assert(t->state == VINYL_TX_READY);
+	assert(tx->state == VINYL_TX_READY);
 
 	/* validate index status */
 	int status = vy_status(&index->status);
 	switch (status) {
 	case VINYL_SHUTDOWN_PENDING:
 	case VINYL_DROP_PENDING:
-		if (unlikely(! vinyl_index_visible(index, t->tsn))) {
+		if (unlikely(! vinyl_index_visible(index, tx->tsn))) {
 			vy_error("%s", "index is invisible for the transaction");
 			return -1;
 		}
@@ -10417,11 +10402,13 @@ vy_tx_write(struct vinyl_tx *t, struct vinyl_index *index,
 	}
 
 	o->flags = flags;
+	if (! (o->flags & SVGET))
+		tx->log_read = -1;
 
 	vinyl_tuple_ref(o);
 
 	/* concurrent index only */
-	int rc = tx_set(t, &index->coindex, o);
+	int rc = tx_set(tx, &index->coindex, o);
 	if (unlikely(rc != 0))
 		return -1;
 
