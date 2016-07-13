@@ -1523,15 +1523,12 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int read_disk, int read_cache,
 enum vy_sequence_op {
 	VINYL_LSN,
 	VINYL_NSN_NEXT,
-	VINYL_TSN_NEXT
 };
 
 struct vy_sequence {
 	pthread_mutex_t lock;
 	/** Log sequence number. */
 	uint64_t lsn;
-	/** Transaction sequence number. */
-	uint64_t tsn;
 	/** Node sequence number. */
 	uint64_t nsn;
 };
@@ -1563,8 +1560,6 @@ vy_sequence_do(struct vy_sequence *n, enum vy_sequence_op op)
 	uint64_t v = 0;
 	switch (op) {
 	case VINYL_LSN:       v = n->lsn;
-		break;
-	case VINYL_TSN_NEXT:   v = ++n->tsn;
 		break;
 	case VINYL_NSN_NEXT:   v = ++n->nsn;
 		break;
@@ -3087,6 +3082,8 @@ struct tx_manager {
 	uint32_t    count_rw;
 	uint32_t    count_gc;
 	uint64_t    csn;
+	/** Transaction sequence number. */
+	uint64_t tsn;
 	struct sxv        *gc;
 	struct runtime         *r;
 };
@@ -3120,6 +3117,7 @@ static int tx_managerinit(struct tx_manager *m, struct runtime *r)
 	m->count_rw = 0;
 	m->count_gc = 0;
 	m->csn = 0;
+	m->tsn = 0;
 	m->gc  = NULL;
 	tt_pthread_mutex_init(&m->lock, NULL);
 	m->r = r;
@@ -3235,11 +3233,9 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 	tx->log_read = -1;
 	rlist_create(&tx->deadlock);
 
-	vy_sequence_lock(m->r->seq);
 	tx->csn = m->csn;
-	tx->tsn = vy_sequence_do(m->r->seq, VINYL_TSN_NEXT);
-	tx->vlsn = vy_sequence_do(m->r->seq, VINYL_LSN);
-	vy_sequence_unlock(m->r->seq);
+	tx->tsn = ++m->tsn;
+	tx->vlsn = vy_sequence(m->r->seq, VINYL_LSN);
 
 	tt_pthread_mutex_lock(&m->lock);
 	tx_tree_insert(&m->tree, tx);
@@ -9366,7 +9362,6 @@ vy_info_link_metric(struct vy_info *rt, struct vy_info_link **pc)
 	struct vy_info_link *metric = *pc;
 	struct vy_info_link *p = NULL;
 	sr_C(&p, pc, "lsn", VINYL_U64, &rt->seq.lsn);
-	sr_C(&p, pc, "tsn", VINYL_U64, &rt->seq.tsn);
 	sr_C(&p, pc, "nsn", VINYL_U64, &rt->seq.nsn);
 	return sr_C(NULL, pc, "metric", VINYL_UNDEF, metric);
 }
@@ -9844,8 +9839,6 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 			*result = vup;
 			return 0;
 		}
-	} else {
-		vy_sequence(e->r.seq, VINYL_TSN_NEXT);
 	}
 
 	/* prepare read cache */
@@ -10525,7 +10518,7 @@ vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
 }
 
 static inline int
-vinyl_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
+vy_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
 	struct vy_stat_get statget;
@@ -10673,7 +10666,7 @@ static ssize_t
 vy_get_cb(struct coio_task *ptr)
 {
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	return vinyl_get(task->tx, task->index, task->key, &task->result, false);
+	return vy_get(task->tx, task->index, task->key, &task->result, false);
 }
 
 static ssize_t
@@ -10740,7 +10733,7 @@ vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
 	    struct vinyl_tuple *key, struct vinyl_tuple **result)
 {
 	*result = NULL;
-	int rc = vinyl_get(tx, index, key, result, true);
+	int rc = vy_get(tx, index, key, result, true);
 	if (rc != 0)
 		return rc;
 	if (*result != NULL) /* found */

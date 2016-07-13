@@ -106,7 +106,6 @@ box_info_sort(box.info.vinyl())
   - metric:
     - lsn: '5'
     - nsn: '1'
-    - tsn: '9'
   - performance:
     - cursor: '1'
     - cursor_latency: <cursor_latency>
