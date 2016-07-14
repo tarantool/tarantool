@@ -1796,6 +1796,130 @@ vinyl_update_alloc(void *arg, size_t size)
 
 struct vinyl_index;
 
+struct txv {
+	uint64_t tsn;
+	int log_read;
+	uint64_t csn;
+	struct tx_index *index;
+	struct vinyl_tuple *tuple;
+	struct txv *next;
+	struct txv *prev;
+	struct txv *gc;
+	rb_node(struct txv) tree_node;
+};
+
+static inline struct txv *
+txv_alloc(struct vinyl_tuple *tuple)
+{
+	struct txv *v = malloc(sizeof(struct txv));
+	if (unlikely(v == NULL))
+		return NULL;
+	v->index = NULL;
+	v->tsn = 0;
+	v->log_read = 0;
+	v->csn = 0;
+	v->tuple = tuple;
+	v->next = NULL;
+	v->prev = NULL;
+	v->gc = NULL;
+	return v;
+}
+
+static inline void
+txv_free(struct runtime *r, struct txv *v)
+{
+	vinyl_tuple_unref_rt(r, v->tuple);
+	free(v);
+}
+
+static inline void
+txv_freeall(struct runtime *r, struct txv *v)
+{
+	while (v) {
+		struct txv *next = v->next;
+		txv_free(r, v);
+		v = next;
+	}
+}
+
+static inline struct txv *
+txv_match(struct txv *head, uint64_t tsn)
+{
+	for (struct txv *c = head; c != NULL; c = c->next)
+		if (c->tsn == tsn)
+			return c;
+	return NULL;
+}
+
+static inline void
+txv_replace(struct txv *v, struct txv *n)
+{
+	if (v->prev)
+		v->prev->next = n;
+	if (v->next)
+		v->next->prev = n;
+	n->next = v->next;
+	n->prev = v->prev;
+}
+
+static inline void
+txv_link(struct txv *head, struct txv *v)
+{
+	struct txv *c = head;
+	while (c->next)
+		c = c->next;
+	c->next = v;
+	v->prev = c;
+	v->next = NULL;
+}
+
+static inline void
+txv_unlink(struct txv *v)
+{
+	if (v->prev)
+		v->prev->next = v->next;
+	if (v->next)
+		v->next->prev = v->prev;
+	v->prev = NULL;
+	v->next = NULL;
+}
+
+static inline void
+txv_commit(struct txv *v, uint32_t csn)
+{
+	v->tsn = UINT64_MAX;
+	v->log_read  = INT_MAX;
+	v->csn = csn;
+}
+
+static inline int
+txv_committed(struct txv *v)
+{
+	return v->tsn == UINT64_MAX && v->log_read == INT_MAX;
+}
+
+static inline void
+txv_abort(struct txv *v)
+{
+	v->tuple->flags |= SVCONFLICT;
+}
+
+static inline void
+txv_abort_all(struct txv *v)
+{
+	while (v) {
+		txv_abort(v);
+		v = v->next;
+	}
+}
+
+static inline int
+txv_aborted(struct txv *v)
+{
+	return v->tuple->flags & SVCONFLICT;
+}
+
+
 struct PACKED txlogindex {
 	uint32_t space_id;
 	uint32_t head, tail;
@@ -2842,129 +2966,6 @@ static struct svif svtuple_if =
 	.pointer   = svtuple_pointer,
 	.size      = svtuple_size
 };
-
-struct txv {
-	uint64_t tsn;
-	int log_read;
-	uint64_t csn;
-	struct tx_index *index;
-	struct vinyl_tuple *tuple;
-	struct txv *next;
-	struct txv *prev;
-	struct txv *gc;
-	rb_node(struct txv) tree_node;
-};
-
-static inline struct txv *
-txv_alloc(struct vinyl_tuple *tuple)
-{
-	struct txv *v = malloc(sizeof(struct txv));
-	if (unlikely(v == NULL))
-		return NULL;
-	v->index = NULL;
-	v->tsn = 0;
-	v->log_read = 0;
-	v->csn = 0;
-	v->tuple = tuple;
-	v->next = NULL;
-	v->prev = NULL;
-	v->gc = NULL;
-	return v;
-}
-
-static inline void
-txv_free(struct runtime *r, struct txv *v)
-{
-	vinyl_tuple_unref_rt(r, v->tuple);
-	free(v);
-}
-
-static inline void
-txv_freeall(struct runtime *r, struct txv *v)
-{
-	while (v) {
-		struct txv *next = v->next;
-		txv_free(r, v);
-		v = next;
-	}
-}
-
-static inline struct txv *
-txv_match(struct txv *head, uint64_t tsn)
-{
-	for (struct txv *c = head; c != NULL; c = c->next)
-		if (c->tsn == tsn)
-			return c;
-	return NULL;
-}
-
-static inline void
-txv_replace(struct txv *v, struct txv *n)
-{
-	if (v->prev)
-		v->prev->next = n;
-	if (v->next)
-		v->next->prev = n;
-	n->next = v->next;
-	n->prev = v->prev;
-}
-
-static inline void
-txv_link(struct txv *head, struct txv *v)
-{
-	struct txv *c = head;
-	while (c->next)
-		c = c->next;
-	c->next = v;
-	v->prev = c;
-	v->next = NULL;
-}
-
-static inline void
-txv_unlink(struct txv *v)
-{
-	if (v->prev)
-		v->prev->next = v->next;
-	if (v->next)
-		v->next->prev = v->prev;
-	v->prev = NULL;
-	v->next = NULL;
-}
-
-static inline void
-txv_commit(struct txv *v, uint32_t csn)
-{
-	v->tsn = UINT64_MAX;
-	v->log_read  = INT_MAX;
-	v->csn = csn;
-}
-
-static inline int
-txv_committed(struct txv *v)
-{
-	return v->tsn == UINT64_MAX && v->log_read == INT_MAX;
-}
-
-static inline void
-txv_abort(struct txv *v)
-{
-	v->tuple->flags |= SVCONFLICT;
-}
-
-static inline void
-txv_abort_all(struct txv *v)
-{
-	while (v) {
-		txv_abort(v);
-		v = v->next;
-	}
-}
-
-static inline int
-txv_aborted(struct txv *v)
-{
-	return v->tuple->flags & SVCONFLICT;
-}
 
 enum tx_state {
 	VINYL_TX_UNDEF,
