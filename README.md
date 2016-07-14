@@ -10,7 +10,7 @@ Tarantool is an in-memory database and application server.
 
 Key features of the application server:
  * 100% compatible drop-in replacement for Lua 5.1,
-   based on LuaJIT 2.0.
+   based on LuaJIT 2.1.
    Simply use #!/usr/bin/tarantool instead of
    #!/usr/bin/lua in your script.
  * full support for Lua modules and a rich set of
@@ -23,7 +23,7 @@ Key features of the database:
  * two data engines: 100% in-memory with
    optional persistence and a 2-level disk-based
    B-tree, to use with large data sets
- * multiple index types: HASH, TREE, BITSET
+ * multiple index types: HASH, TREE, RTREE, BITSET
  * asynchronous master-master replication
  * authentication and access control
  * the database is just a C extension to the
