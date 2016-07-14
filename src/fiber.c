@@ -781,9 +781,9 @@ cord_destroy(struct cord *cord)
 	}
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);
-	slab_cache_destroy(&cord->slabc);
 	if (cord->fiber_pool.f)
 		fiber_pool_destroy(&cord->fiber_pool);
+	slab_cache_destroy(&cord->slabc);
 }
 
 struct cord_thread_arg
