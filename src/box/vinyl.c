@@ -1794,7 +1794,7 @@ vinyl_update_alloc(void *arg, size_t size)
 	(void) arg;
 	/* TODO: rewrite tuple_upsert_execute() without exceptions */
 	void *data = box_txn_alloc(size);
-	if (data != NULL)
+	if (data == NULL)
 		diag_raise();
 	return data;
 }
