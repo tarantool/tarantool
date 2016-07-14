@@ -235,6 +235,10 @@ if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
     # LuaRocks on Gentoo
     list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
 endif()
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/alpine-release")
+    # LuaRocks on Alpine
+    list(APPEND _libdirs "/usr/local/lib")
+endif()
 list(APPEND _libdirs "/usr/${MULTILIB}") # System packages
 list(REMOVE_DUPLICATES _libdirs)
 set(MODULE_LIBPATH)
