@@ -731,7 +731,7 @@ xlog_write_meta(struct xlog *l)
 		free(vstr);
 		return -1;
 	}
-
+	free(vstr);
 	return 0;
 }
 
