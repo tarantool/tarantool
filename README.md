@@ -35,63 +35,11 @@ Tarantool is ideal for data-enriched components of
 scalable Web architecture: queue servers, caches,
 stateful Web applications.
 
-## Compilation and install
+To download and install Tarantool as a binary package for your OS, please visit
+http://tarantool.org/download.
 
-Tarantool is written in C and C++.
-To build, you will need GCC or Apple CLang compiler.
-
-CMake is used for configuration management.
-3 standard CMake build types are supported:
- * Debug -- used by project maintainers
- * RelWithDebInfo -- the most common release configuration,
- also provides debugging capabilities
- * Release -- use only if the highest performance is required
-
-The build depends on the following external libraries:
-
-- Readline development files (libreadline-dev/readline-devel package).
-- OpenSSL development files (libssl-dev/openssl-devel package).
-- libyaml (libyaml-dev/libyaml-devel package).
-- liblz4 (liblz4-dev/lz4-devel package).
-- GNU bfd which is the part of GNU binutils (binutils-dev/binutils-devel package).
-
-Please follow these steps to compile Tarantool:
-
-    # If compiling from git
-    tarantool $ git submodule update --init --recursive
-
-    tarantool $ cmake .
-    tarantool $ make
-
-To use a different release type, say, RelWithDebInfo, use:
-
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
-
-'make' creates 'tarantool' executable in directory src/.
-
-There is 'make install' goal. One can also run Tarantool executable without
-installation.
-
-To start the server, try:
-
-    tarantool $ ./src/tarantool
-
-This will start Tarantool in interactive mode.
-
-To run Tarantool regression tests (test/test-run.py),
-a few additional Python modules are necessary:
- * PyYAML==3.10
- * argparse==1.1
- * msgpack-python==0.4.6
- * gevent==1.1b5
- * six>=1.8.0
-
-Or run:
-```
-pip install -r test-run/requirements.txt
-```
-
-Simply type 'make test' to fire off the test coverage.
+To build Tarantool from source, see detailed instructions in the Tarantool
+documentation at https://tarantool.org/doc/dev_guide/building_from_source.html.
 
 Please report bugs at http://github.com/tarantool/tarantool/issues
 We also warmly welcome your feedback in the discussion mailing
