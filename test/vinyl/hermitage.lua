@@ -2,7 +2,6 @@
 --
 -- hermitage: Testing transaction isolation levels.
 -- github.com/ept/hermitage
--- github.com/pmwkaa/vinyl/blob/master/test/functional/hermitage.test.c
 --
 -- Testing Vinyl transactional isolation in Tarantool.
 --  
