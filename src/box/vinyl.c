@@ -1809,16 +1809,17 @@ struct txv {
 };
 
 static inline struct txv *
-txv_alloc(struct vinyl_tuple *tuple)
+txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
 {
 	struct txv *v = malloc(sizeof(struct txv));
 	if (unlikely(v == NULL))
 		return NULL;
-	v->index = NULL;
-	v->tsn = 0;
+	v->index = index;
+	v->tsn = tsn;
 	v->log_read = 0;
 	v->csn = 0;
 	v->tuple = tuple;
+	vinyl_tuple_ref(tuple);
 	v->next = NULL;
 	v->prev = NULL;
 	v->gc = NULL;
@@ -1826,18 +1827,18 @@ txv_alloc(struct vinyl_tuple *tuple)
 }
 
 static inline void
-txv_free(struct runtime *r, struct txv *v)
+txv_delete(struct runtime *r, struct txv *v)
 {
 	vinyl_tuple_unref_rt(r, v->tuple);
 	free(v);
 }
 
 static inline void
-txv_freeall(struct runtime *r, struct txv *v)
+txv_delete_all(struct runtime *r, struct txv *v)
 {
 	while (v) {
 		struct txv *next = v->next;
-		txv_free(r, v);
+		txv_delete(r, v);
 		v = next;
 	}
 }
@@ -3144,17 +3145,17 @@ tx_index_init(struct tx_index *i, struct vinyl_index *index,
 }
 
 static struct txv *
-txv_tree_free_cb(txv_tree_t *t, struct txv *v, void *arg)
+txv_tree_delete_cb(txv_tree_t *t, struct txv *v, void *arg)
 {
 	(void)t;
-	txv_freeall((struct runtime *)arg, v);
+	txv_delete_all((struct runtime *)arg, v);
 	return NULL;
 }
 
 static int
 tx_index_free(struct tx_index *i, struct tx_manager *m)
 {
-	txv_tree_iter(&i->tree, NULL, txv_tree_free_cb, m->r);
+	txv_tree_iter(&i->tree, NULL, txv_tree_delete_cb, m->r);
 	(void) tt_pthread_mutex_destroy(&i->mutex);
 	return 0;
 }
@@ -3288,7 +3289,7 @@ tx_manager_gc(struct tx_manager *m)
 			continue;
 		}
 		txv_untrack(v);
-		txv_free(m->r, v);
+		txv_delete(m->r, v);
 	}
 	m->count_gc = count;
 	m->gc = gc;
@@ -3411,19 +3412,16 @@ tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 
 static int
 tx_set(struct vinyl_tx *tx, struct tx_index *index,
-       struct vinyl_tuple *version)
+       struct vinyl_tuple *tuple)
 {
 	struct tx_manager *m = tx->manager;
 	struct runtime *r = m->r;
 	/* allocate mvcc container */
-	struct txv *v = txv_alloc(version);
+	struct txv *v = txv_new(tuple, tx->tsn, index);
 	if (unlikely(v == NULL)) {
-		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(version));
-		vinyl_tuple_unref_rt(r, version);
+		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(tuple));
 		return -1;
 	}
-	v->tsn = tx->tsn;
-	v->index = index;
 	struct txlogv lv;
 	lv.space_id   = index->key_def->space_id;
 	lv.next = UINT32_MAX;
@@ -3449,7 +3447,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	struct txv *own = txv_match(head, tx->tsn);
 	if (unlikely(own))
 	{
-		if (unlikely(version->flags & SVUPSERT)) {
+		if (unlikely(tuple->flags & SVUPSERT)) {
 			vy_error("%s", "only one upsert statement is "
 			         "allowed per a transaction key");
 			goto error;
@@ -3468,7 +3466,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		txlog_replace(&tx->log, v->log_read, &lv);
 
 		vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(own->tuple));
-		txv_free(r, own);
+		txv_delete(r, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
@@ -3486,7 +3484,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
 	vy_quota_op(r->quota, VINYL_QREMOVE, vinyl_tuple_size(v->tuple));
-	txv_free(r, v);
+	txv_delete(r, v);
 	return -1;
 }
 
@@ -3518,7 +3516,6 @@ add:
 	if (tx->log_read == -1)
 		tx->log_read = txlog_count(&tx->log);
 	tt_pthread_mutex_unlock(&index->mutex);
-	vinyl_tuple_ref(key);
 	int rc = tx_set(tx, index, key);
 	if (unlikely(rc == -1))
 		return -1;
@@ -10405,8 +10402,6 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	o->flags = flags;
 	if (! (o->flags & SVGET))
 		tx->log_read = -1;
-
-	vinyl_tuple_ref(o);
 
 	/* concurrent index only */
 	int rc = tx_set(tx, &index->coindex, o);
