@@ -1,3 +1,31 @@
+tarantool (1.6.8.740.g45fc77f-1) unstable; urgency=medium
+
+  * Don't link libbfd-*-system.so dynamically. Closes: #831361.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 15 Jul 2016 14:39:40 +0300
+
+tarantool (1.6.8.525.ga571ac0-1) unstable; urgency=medium
+
+  * Full support for armhf and arm64 (aarch64) architectures
+  * Tuple comparator functions were optimized, providing up to 30% performance
+    boost when an index key consists of 2, 3 or more parts
+  * Tuple allocator changes give another 15% performance improvement
+  * Replication relay performance was improved by reducing the amount of data
+    directory re-scans
+  * A random delay was introduced into snapshot daemon, reducing the chance
+    that multiple instances take a snapshot at the same time
+  * Allow to remove servers with non-zero LSN from _cluster space
+  * net.box now automatically reloads space and index definitions
+  * The maximal number of indexes in space was increased to 128
+  * box.info.cluster.uuid can be used to retrieve cluster UUID
+  * box.once() now waits before the server enters RW mode
+  * Support for GCC 6.0
+  * Fix require() failed to find libraries with multiarch
+  * Bugs fixed:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.8+is%3Aclosed
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 25 Feb 2016 08:57:40 +0300
+
 tarantool (1.6.7.588.g76bbd9c-1) unstable; urgency=medium
 
   * Fix `libiberty | bintuils-dev, binutils-dev` B-D
