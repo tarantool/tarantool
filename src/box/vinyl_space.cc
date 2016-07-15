@@ -115,6 +115,11 @@ VinylSpace::executeReplace(struct txn*,
 	/* Check tuple fields */
 	tuple_validate_raw(space->format, request->tuple);
 
+	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
+		request->tuple_end);
+	/* GC the new tuple if there is an exception below. */
+	TupleRef ref(new_tuple);
+
 	struct vinyl_tuple *tuple = vinyl_tuple_from_data(index->db,
 		request->tuple, request->tuple_end);
 	if (tuple == NULL)
@@ -150,7 +155,7 @@ VinylSpace::executeReplace(struct txn*,
 	if (rc == -1)
 		diag_raise();
 
-	return NULL;
+	return tuple_bless(new_tuple);
 }
 
 struct tuple *
@@ -223,7 +228,8 @@ VinylSpace::executeUpdate(struct txn*, struct space *space,
 	int rc = vinyl_replace(tx, index->db, tuple);
 	if (rc == -1)
 		diag_raise();
-	return NULL;
+
+	return tuple_bless(new_tuple);
 }
 
 void

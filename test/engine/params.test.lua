@@ -8,7 +8,7 @@ s = box.schema.create_space('engine', {engine=engine})
 i = s:create_index('primary')
 
 --test example for memtx and vinyl
-_ = box.space.engine:insert{1,2,3}
+box.space.engine:insert{1,2,3}
 box.space.engine:select{}
 
 

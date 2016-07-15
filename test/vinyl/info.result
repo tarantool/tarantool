@@ -24,6 +24,7 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
 ...
 space:replace({'xxx'})
 ---
+- ['xxx']
 ...
 space:get({'xxx'})
 ---

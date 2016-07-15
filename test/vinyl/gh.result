@@ -13,6 +13,7 @@ i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 ...
 s:insert{'a', 'b', 'c'}
 ---
+- ['a', 'b', 'c']
 ...
 s:drop()
 ---
@@ -25,6 +26,7 @@ i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 ...
 s:insert{'a', 'b', 'c'}
 ---
+- ['a', 'b', 'c']
 ...
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 ---
@@ -44,6 +46,7 @@ i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 ...
 s:insert{'a', 'b', 'c'}
 ---
+- ['a', 'b', 'c']
 ...
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 ---
@@ -134,6 +137,7 @@ i = s:create_index('primary',{})
 ...
 s:insert{5}
 ---
+- [5]
 ...
 s.index.primary:alter({parts={1,'NUM'}})
 ---
@@ -165,6 +169,7 @@ i = s:create_index('primary',{parts={1, 'STR'}})
 ...
 s:insert{''}
 ---
+- ['']
 ...
 #i:select{''}
 ---
@@ -353,6 +358,7 @@ _ = s:create_index('test', {type = 'tree', parts = {1, 'num', 2, 'str'}})
 ...
 s:put({1, 'test', 3, 4})
 ---
+- [1, 'test', 3, 4]
 ...
 s:select()
 ---

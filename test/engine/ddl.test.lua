@@ -24,21 +24,21 @@ space:drop()
 -- space index create/drop tree string
 space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
-_ = space:insert({'test'})
+space:insert({'test'})
 space:drop()
 
 
 -- space index create/drop tree num
 space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
-_ = space:insert({13})
+space:insert({13})
 space:drop()
 
 
 -- space index create/drop tree multi-part num
 space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 2, 'num'}})
-_ = space:insert({13})
+space:insert({13})
 space:drop()
 
 
@@ -47,9 +47,9 @@ space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary')
 primary = space.index[0]
 primary:len()
-_ = space:insert({13})
-_ = space:insert({14})
-_ = space:insert({15})
+space:insert({13})
+space:insert({14})
+space:insert({15})
 primary:len()
 space:drop()
 
@@ -61,7 +61,7 @@ _ = space:create_index('primary', { type = 'tree', parts = parts })
 
 tuple = {}
 for i=1,box.schema.INDEX_PART_MAX,1 do tuple[i] = i; end
-_ = space:replace(tuple)
+space:replace(tuple)
 space:upsert(tuple, {{'=', box.schema.INDEX_PART_MAX + 1, 100500}})
 space:get(tuple)
 space:select(tuple)

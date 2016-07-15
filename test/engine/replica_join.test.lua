@@ -19,7 +19,7 @@ test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 
 -- new data
-_ = box.space.test:insert{1, 1}
+box.space.test:insert{1, 1}
 
 -- replica join
 test_run:cmd("deploy server replica")
@@ -62,4 +62,3 @@ space:drop()
 box.snapshot()
 box.schema.user.revoke('guest', 'replication')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
-

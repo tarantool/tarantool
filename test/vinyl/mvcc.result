@@ -62,7 +62,9 @@ c1:begin()
 ...
 c1("box.space.test:insert{1,2,3}")
 ---
-- 
+- - 1
+  - 2
+  - 3
 ...
 c1("box.space.test:select{}")
 ---

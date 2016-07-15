@@ -151,12 +151,15 @@ index = space:create_index('primary')
 ...
 space:insert({1})
 ---
+- [1]
 ...
 space:insert({2, 'Music'})
 ---
+- [2, 'Music']
 ...
 space:insert({3, 'Length', 93})
 ---
+- [3, 'Length', 93]
 ...
 space:drop()
 ---

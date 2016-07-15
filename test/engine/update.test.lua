@@ -10,7 +10,7 @@ for key = 1, 100 do space:update({tostring(key)}, {{'=', 2, key}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
 t
-_ = space:update({tostring(101)}, {{'=', 2, 101}})
+space:update({tostring(101)}, {{'=', 2, 101}})
 space:get({tostring(101)})
 space:drop()
 
@@ -23,7 +23,7 @@ for key = 1, 100 do space:update({key}, {{'=', 2, key}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key})) end
 t
-_ = space:update({101}, {{'=', 2, 101}})
+space:update({101}, {{'=', 2, 101}})
 space:get({101})
 space:drop()
 
@@ -36,7 +36,7 @@ for key = 1, 100 do space:update({key, key}, {{'=', 3, key}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key, key})) end
 t
-_ = space:update({101, 101}, {{'=', 3, 101}})
+space:update({101, 101}, {{'=', 3, 101}})
 space:get({101, 101})
 space:drop()
 
@@ -48,6 +48,6 @@ for key = 1, 100 do space:update(box.tuple.new{key, key}, box.tuple.new{{'=', 3,
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key, key})) end
 t
-_ = space:update({101, 101}, {{'=', 3, 101}})
+space:update({101, 101}, {{'=', 3, 101}})
 space:get({101, 101})
 space:drop()
