@@ -84,6 +84,63 @@ space = nil
 pk = nil
 
 -------------------------------------------------------------------------------
+-- single-part sparse (unsigned)
+-------------------------------------------------------------------------------
+
+space = box.schema.space.create('sparse_uint', { engine = engine })
+pk = space:create_index('primary', { type = 'tree', parts = {3, 'num'}})
+
+for i=1,9 do space:replace{'', 0, i} end
+space:insert{'', 0, 1} -- conflict
+
+pk:select({}, { iterator = 'ALL' })
+pk:select({}, { iterator = 'EQ' })
+pk:select({}, { iterator = 'REQ' })
+pk:select({}, { iterator = 'GE' })
+pk:select({}, { iterator = 'GT' })
+pk:select({}, { iterator = 'LE' })
+pk:select({}, { iterator = 'LT' })
+
+pk:select({0}, { iterator = 'EQ' })
+pk:select({0}, { iterator = 'REQ' })
+pk:select({0}, { iterator = 'LE' })
+pk:select({0}, { iterator = 'LT' })
+
+pk:select({1}, { iterator = 'EQ' })
+pk:select({1}, { iterator = 'REQ' })
+pk:select({1}, { iterator = 'LE' })
+pk:select({1}, { iterator = 'LT' })
+
+pk:select({5}, { iterator = 'EQ' })
+pk:select({5}, { iterator = 'REQ' })
+pk:select({5}, { iterator = 'GE' })
+pk:select({5}, { iterator = 'GT' })
+pk:select({5}, { iterator = 'LE' })
+pk:select({5}, { iterator = 'LT' })
+
+pk:select({9}, { iterator = 'EQ' })
+pk:select({9}, { iterator = 'REQ' })
+pk:select({9}, { iterator = 'GE' })
+pk:select({9}, { iterator = 'GT' })
+
+pk:select({10}, { iterator = 'EQ' })
+pk:select({10}, { iterator = 'REQ' })
+pk:select({10}, { iterator = 'GE' })
+pk:select({10}, { iterator = 'GT' })
+
+pk:get({})
+
+pk:get({0})
+pk:get({5})
+pk:get({10})
+
+pk:get({10, 15})
+
+space:drop()
+space = nil
+pk = nil
+
+-------------------------------------------------------------------------------
 -- single-part (string)
 -------------------------------------------------------------------------------
 
@@ -232,6 +289,96 @@ space = box.schema.space.create('str_uint', { engine = engine })
 pk = space:create_index('primary', { type = 'tree', parts = {1, 'str', 2, 'num'}})
 
 for i=1,9 do for j=1,3 do space:replace({'0'..i, j}) end end
+
+--
+-- one part
+--
+
+pk:select({}, { iterator = 'ALL' })
+pk:select({}, { iterator = 'EQ' })
+pk:select({}, { iterator = 'REQ' })
+pk:select({}, { iterator = 'GE' })
+pk:select({}, { iterator = 'GT' })
+pk:select({}, { iterator = 'LE' })
+pk:select({}, { iterator = 'LT' })
+
+pk:select({'00'}, { iterator = 'EQ' })
+pk:select({'00'}, { iterator = 'REQ' })
+pk:select({'00'}, { iterator = 'LE' })
+pk:select({'00'}, { iterator = 'LT' })
+
+pk:select({'01'}, { iterator = 'EQ' })
+pk:select({'01'}, { iterator = 'REQ' })
+pk:select({'01'}, { iterator = 'LE' })
+pk:select({'01'}, { iterator = 'LT' })
+
+pk:select({'09'}, { iterator = 'EQ' })
+pk:select({'09'}, { iterator = 'REQ' })
+pk:select({'09'}, { iterator = 'GE' })
+pk:select({'09'}, { iterator = 'GT' })
+
+pk:select({'10'}, { iterator = 'EQ' })
+pk:select({'10'}, { iterator = 'REQ' })
+pk:select({'10'}, { iterator = 'GE' })
+pk:select({'10'}, { iterator = 'GT' })
+
+pk:get({})
+pk:get({'00'})
+pk:get({'05'})
+pk:get({'10'})
+
+--
+-- two parts
+--
+
+pk:select({'05', 0}, { iterator = 'EQ' })
+pk:select({'05', 0}, { iterator = 'REQ' })
+pk:select({'05', 0}, { iterator = 'GE' })
+pk:select({'05', 0}, { iterator = 'GT' })
+pk:select({'05', 0}, { iterator = 'LE' })
+pk:select({'05', 0}, { iterator = 'LT' })
+
+pk:select({'05', 1}, { iterator = 'EQ' })
+pk:select({'05', 1}, { iterator = 'REQ' })
+pk:select({'05', 1}, { iterator = 'GE' })
+pk:select({'05', 1}, { iterator = 'GT' })
+pk:select({'05', 1}, { iterator = 'LE' })
+pk:select({'05', 1}, { iterator = 'LT' })
+
+pk:select({'05', 3}, { iterator = 'EQ' })
+pk:select({'05', 3}, { iterator = 'REQ' })
+pk:select({'05', 3}, { iterator = 'GE' })
+pk:select({'05', 3}, { iterator = 'GT' })
+pk:select({'05', 3}, { iterator = 'LE' })
+pk:select({'05', 3}, { iterator = 'LT' })
+
+pk:select({'05', 4}, { iterator = 'EQ' })
+pk:select({'05', 4}, { iterator = 'REQ' })
+pk:select({'05', 4}, { iterator = 'GE' })
+pk:select({'05', 4}, { iterator = 'GT' })
+pk:select({'05', 4}, { iterator = 'LE' })
+pk:select({'05', 4}, { iterator = 'LT' })
+
+pk:get({'04', 5})
+pk:get({'04', 3})
+
+pk:get({'04', 3, 100})
+
+space:drop()
+space = nil
+pk = nil
+
+-------------------------------------------------------------------------------
+-- multi-part sparse (string + unsigned)
+-------------------------------------------------------------------------------
+
+space = box.schema.space.create('sparse_str_uint', { engine = engine })
+pk = space:create_index('primary', { type = 'tree', parts = {3, 'str', 1, 'num'}})
+
+for i=1,9 do for j=1,3 do space:replace({i, '', '0'..j}) end end
+
+-- conflicts
+space:insert({9, '', '01'})
 
 --
 -- one part

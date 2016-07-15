@@ -115,6 +115,26 @@ VinylSpace::executeReplace(struct txn*,
 	/* Check tuple fields */
 	tuple_validate_raw(space->format, request->tuple);
 
+	/* unique constraint */
+	VinylEngine *engine = (VinylEngine *)space->handler->engine;
+	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
+		uint32_t key_len;
+		const char *key = tuple_extract_key_raw(request->tuple,
+			request->tuple_end, index->key_def, &key_len);
+		mp_decode_array(&key); /* skip array header */
+		struct tuple *found = index->findByKey(key,
+			index->key_def->part_count);
+		if (found) {
+			/*
+			 * tuple is destroyed on the next call to
+			 * box_tuple_XXX() API. See box_tuple_ref()
+			 * comments.
+			 */
+			tnt_raise(ClientError, ER_TUPLE_FOUND,
+					  index_name(index), space_name(space));
+		}
+	}
+
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 		request->tuple_end);
 	/* GC the new tuple if there is an exception below. */
@@ -127,27 +147,6 @@ VinylSpace::executeReplace(struct txn*,
 	auto tuple_guard = make_scoped_guard([=]{
 		vinyl_tuple_unref(index->db, tuple);
 	});
-
-	/* unique constraint */
-	if (request->type == IPROTO_INSERT) {
-		enum dup_replace_mode mode = DUP_REPLACE_OR_INSERT;
-		VinylEngine *engine =
-			(VinylEngine *)space->handler->engine;
-		if (engine->recovery_complete)
-			mode = DUP_INSERT;
-		if (mode == DUP_INSERT) {
-			struct tuple *found = index->findByKey(tuple);
-			if (found) {
-				/*
-				 * tuple is destroyed on the next call to
-				 * box_tuple_XXX() API. See box_tuple_ref()
-				 * comments.
-				 */
-				tnt_raise(ClientError, ER_TUPLE_FOUND,
-						  index_name(index), space_name(space));
-			}
-		}
-	}
 
 	/* replace */
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);

@@ -323,17 +323,6 @@ VinylEngine::keydefCheck(struct space *space, struct key_def *key_def)
 			  space_name(space),
 			  "Vinyl secondary indexes are not supported");
 	}
-	unsigned i = 0;
-	while (i < key_def->part_count) {
-		struct key_part *part = &key_def->parts[i];
-		if (part->fieldno != i) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  key_def->name,
-					  space_name(space),
-					  "Vinyl key parts must follow first and cannot be sparse");
-		}
-		i++;
-	}
 }
 
 void

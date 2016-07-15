@@ -5117,6 +5117,8 @@ struct vinyl_index {
 	struct vy_buf readbuf;
 	struct vy_index_conf conf;
 	struct key_def *key_def;
+	uint32_t key_map_size; /* size of key_map map */
+	uint32_t *key_map; /* field_id -> part_id map */
 	struct runtime *r;
 	/** Member of env->db or scheduler->shutdown. */
 	struct rlist link;
@@ -9938,6 +9940,29 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	index->key_def = key_def_dup(key_def);
 	if (index->key_def == NULL)
 		goto error_3;
+
+	/*
+	 * Create field_id -> part_id mapping used by vinyl_tuple_from_data().
+	 * This code partially duplicates tuple_format_new() logic.
+	 */
+	uint32_t key_map_size = 0;
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		uint32_t field_id = key_def->parts[part_id].fieldno;
+		key_map_size = MAX(key_map_size, field_id + 1);
+	}
+	index->key_map = calloc(key_map_size, sizeof(*index->key_map));
+	if (index->key_map == NULL)
+		goto error_4;
+	index->key_map_size = key_map_size;
+	for (uint32_t field_id = 0; field_id < key_map_size; field_id++) {
+		index->key_map[field_id] = UINT32_MAX;
+	}
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		uint32_t field_id = key_def->parts[part_id].fieldno;
+		assert(index->key_map[field_id] == UINT32_MAX);
+		index->key_map[field_id] = part_id;
+	}
+
 	vy_buf_init(&index->readbuf);
 	vy_range_tree_new(&index->tree);
 	tt_pthread_mutex_init(&index->lock, NULL);
@@ -9963,6 +9988,8 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	rlist_add(&e->indexes, &index->link);
 	return index;
 
+error_4:
+	key_def_delete(index->key_def);
 error_3:
 	vy_index_conf_free(&index->conf);
 error_2:
@@ -10158,20 +10185,25 @@ vinyl_tuple_from_data_ex(struct vinyl_index *index,
 
 	/* Calculate offsets for key parts */
 	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)tuple->data;
+	uint32_t start_offset = meta_size + mp_sizeof_array(field_count);
 	const char *data_pos = data;
-	uint32_t part_offset = meta_size + mp_sizeof_array(field_count);
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		const char *part_start = data_pos;
-		meta[i].offset = part_offset;
+	for (uint32_t field_id = 0; field_id < field_count; field_id++) {
+		const char *field = data_pos;
 		mp_next(&data_pos);
-		meta[i].size = (data_pos - part_start);
-		if (meta[i].size > VINYL_KEY_MAXLEN) {
+		if (field_id >= index->key_map_size ||
+		    index->key_map[field_id] == UINT32_MAX)
+			continue; /* field is not indexed */
+		/* Update offsets for indexed field */
+		uint32_t part_id = index->key_map[field_id];
+		assert(part_id < key_def->part_count);
+		meta[part_id].offset = start_offset + (field - data);
+		meta[part_id].size = data_pos - field;
+		if (meta[part_id].size > VINYL_KEY_MAXLEN) {
 			diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
-				 meta[i].size, VINYL_KEY_MAXLEN);
+					meta[part_id].size, VINYL_KEY_MAXLEN);
 			vinyl_tuple_unref(index, tuple);
 			return NULL;
 		}
-		part_offset += meta[i].size;
 	}
 	meta[key_def->part_count].offset = size - extra_size;
 	meta[key_def->part_count].size = extra_size;

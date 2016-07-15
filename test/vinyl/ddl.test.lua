@@ -1,13 +1,3 @@
--- space index create/drop tree incorrect key pos
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', {type = 'tree', parts = {3, 'num'}})
-space:drop()
-
--- space index create/drop tree sparse
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 3, 'num'}})
-space:drop()
-
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index1 = space:create_index('primary')
