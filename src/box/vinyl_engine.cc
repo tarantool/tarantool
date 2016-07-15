@@ -326,12 +326,6 @@ VinylEngine::keydefCheck(struct space *space, struct key_def *key_def)
 	unsigned i = 0;
 	while (i < key_def->part_count) {
 		struct key_part *part = &key_def->parts[i];
-		if (part->type != NUM && part->type != STRING) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  key_def->name,
-					  space_name(space),
-					  "Vinyl index field type must be STR or NUM");
-		}
 		if (part->fieldno != i) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  key_def->name,
