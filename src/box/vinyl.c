@@ -3908,7 +3908,7 @@ sd_pageiter_next(struct sdpageiter *pi)
 	sd_pageiter_result(pi);
 }
 
-struct PACKED sdindexheader {
+struct PACKED vy_page_index_header {
 	uint32_t  crc;
 	struct srversion version;
 	struct sdid      id;
@@ -3928,7 +3928,7 @@ struct PACKED sdindexheader {
 	char      reserve[31];
 };
 
-struct PACKED sdindexpage {
+struct PACKED vy_page {
 	uint64_t offset;
 	uint32_t offsetindex;
 	uint32_t size;
@@ -3939,203 +3939,192 @@ struct PACKED sdindexpage {
 	uint64_t lsnmax;
 };
 
-struct sdindex {
+struct vy_page_index {
+	struct vy_page_index_header header;
 	struct vy_buf pages, minmax;
-	struct sdindexheader h;
 };
 
-static inline char*
-sd_indexpage_min(struct sdindex *i, struct sdindexpage *p) {
-	return (char*)i->minmax.s + p->offsetindex;
+static inline char *
+vy_page_index_min_key(struct vy_page_index *i, struct vy_page *p) {
+	return i->minmax.s + p->offsetindex;
 }
 
-static inline char*
-sd_indexpage_max(struct sdindex *i, struct sdindexpage *p) {
-	return sd_indexpage_min(i, p) + p->sizemin;
+static inline char *
+vy_page_index_max_key(struct vy_page_index *i, struct vy_page *p) {
+	return vy_page_index_min_key(i, p) + p->sizemin;
 }
 
 static inline void
-sd_indexinit(struct sdindex *i) {
+vy_page_index_init(struct vy_page_index *i) {
 	vy_buf_init(&i->pages);
 	vy_buf_init(&i->minmax);
-	memset(&i->h, 0, sizeof(struct sdindexheader));
+	memset(&i->header, 0, sizeof(i->header));
 }
 
 static inline void
-sd_indexfree(struct sdindex *i) {
+vy_page_index_free(struct vy_page_index *i) {
 	vy_buf_free(&i->pages);
 	vy_buf_free(&i->minmax);
 }
 
-static inline struct sdindexheader*
-sd_indexheader(struct sdindex *i) {
-	return &i->h;
-}
-
-static inline struct sdindexpage*
-sd_indexpage(struct sdindex *i, uint32_t pos)
+static inline struct vy_page *
+vy_page_index_get_page(struct vy_page_index *i, int pos)
 {
-	assert(pos < i->h.count);
-	char *p = (char*)vy_buf_at(&i->pages, sizeof(struct sdindexpage), pos);
-	return (struct sdindexpage*)p;
+	assert(pos >= 0);
+	assert((uint32_t)pos < i->header.count);
+	return (struct vy_page *)
+		vy_buf_at(&i->pages, sizeof(struct vy_page), pos);
 }
 
-static inline struct sdindexpage*
-sd_indexmin(struct sdindex *i) {
-	return sd_indexpage(i, 0);
+static inline struct vy_page *
+vy_page_index_first_page(struct vy_page_index *i) {
+	return vy_page_index_get_page(i, 0);
 }
 
-static inline struct sdindexpage*
-sd_indexmax(struct sdindex *i) {
-	return sd_indexpage(i, i->h.count - 1);
+static inline struct vy_page *
+vy_page_index_last_page(struct vy_page_index *i) {
+	return vy_page_index_get_page(i, i->header.count - 1);
 }
 
 static inline uint32_t
-sd_indexkeys(struct sdindex *i)
+vy_page_index_count(struct vy_page_index *i)
 {
 	if (unlikely(i->pages.s == NULL))
 		return 0;
-	return sd_indexheader(i)->keys;
+	return i->header.keys;
 }
 
 static inline uint32_t
-sd_indextotal(struct sdindex *i)
+vy_page_index_total(struct vy_page_index *i)
 {
 	if (unlikely(i->pages.s == NULL))
 		return 0;
-	return sd_indexheader(i)->total;
+	return i->header.total;
 }
 
 static inline uint32_t
-sd_indexsize_ext(struct sdindexheader *h)
+vy_page_index_size(struct vy_page_index *i)
 {
-	return sizeof(struct sdindexheader) + h->size + h->extension;
+	return sizeof(i->header) + i->header.size + i->header.extension;
 }
 
-static int sd_indexload(struct sdindex*, void *);
+static int vy_page_index_load(struct vy_page_index *, void *);
 
-struct PACKED sdindexiter {
-	struct sdindex *index;
-	struct sdindexpage *v;
-	int pos;
-	enum vinyl_order cmp;
-	void *key;
-	int keysize;
+struct vy_page_iter {
+	struct vy_page_index *index;
 	struct key_def *key_def;
+	int cur_pos;
+	struct vy_page *cur_page;
+	void *key;
+	enum vinyl_order order;
 };
 
 static inline int
-sd_indexiter_route(struct sdindexiter *i)
+sd_indexiter_route(struct vy_page_iter *i)
 {
 	int begin = 0;
-	int end = i->index->h.count - 1;
+	int end = i->index->header.count - 1;
 	while (begin != end) {
 		int mid = begin + (end - begin) / 2;
-		struct sdindexpage *page = sd_indexpage(i->index, mid);
+		struct vy_page *page = vy_page_index_get_page(i->index, mid);
 		int rc = vy_compare(i->key_def,
-		                    sd_indexpage_max(i->index, page),
-		                    i->key);
-		if (rc < 0) {
+		                    vy_page_index_max_key(i->index, page), i->key);
+		if (rc < 0)
 			begin = mid + 1;
-		} else {
-			/* rc >= 0 */
+		else
 			end = mid;
-		}
 	}
-	if (unlikely(end >= (int)i->index->h.count))
-		end = i->index->h.count - 1;
+	if (unlikely(end >= (int)i->index->header.count))
+		end = i->index->header.count - 1;
 	return end;
 }
 
 static inline int
-sd_indexiter_open(struct sdindexiter *ii, struct key_def *key_def,
-		  struct sdindex *index, enum vinyl_order o, void *key,
-		  int keysize)
+sd_indexiter_open(struct vy_page_iter *itr, struct key_def *key_def,
+		  struct vy_page_index *index, enum vinyl_order order, void *key)
 {
-	ii->key_def = key_def;
-	ii->index   = index;
-	ii->cmp     = o;
-	ii->key     = key;
-	ii->keysize = keysize;
-	ii->v       = NULL;
-	ii->pos     = 0;
-	if (unlikely(ii->index->h.count == 1)) {
+	itr->key_def = key_def;
+	itr->index = index;
+	itr->order = order;
+	itr->key = key;
+	itr->cur_pos = 0;
+	itr->cur_page = NULL;
+	if (unlikely(itr->index->header.count == 1)) {
 		/* skip bootstrap node  */
-		if (ii->index->h.lsnmin == UINT64_MAX &&
-		    ii->index->h.lsnmax == 0)
+		if (itr->index->header.lsnmin == UINT64_MAX &&
+		    itr->index->header.lsnmax == 0)
 			return 0;
 	}
-	if (ii->key == NULL) {
-		/* ii->key is [] */
-		switch (ii->cmp) {
+	if (itr->key == NULL) {
+		/* itr->key is [] */
+		switch (itr->order) {
 		case VINYL_LT:
-		case VINYL_LE: ii->pos = ii->index->h.count - 1;
+		case VINYL_LE: itr->cur_pos = itr->index->header.count - 1;
 			break;
 		case VINYL_GT:
-		case VINYL_GE: ii->pos = 0;
+		case VINYL_GE: itr->cur_pos = 0;
 			break;
 		default:
 			unreachable();
 		}
-		ii->v = sd_indexpage(ii->index, ii->pos);
+		itr->cur_page = vy_page_index_get_page(itr->index, itr->cur_pos);
 		return 0;
 	}
-	if (likely(ii->index->h.count > 1))
-		ii->pos = sd_indexiter_route(ii);
+	if (likely(itr->index->header.count > 1))
+		itr->cur_pos = sd_indexiter_route(itr);
 
-	struct sdindexpage *p = sd_indexpage(ii->index, ii->pos);
+	struct vy_page *p = vy_page_index_get_page(itr->index, itr->cur_pos);
 	int rc;
-	switch (ii->cmp) {
+	switch (itr->order) {
 	case VINYL_LE:
 	case VINYL_LT:
-		rc = vy_compare(ii->key_def, sd_indexpage_min(ii->index, p),
-		                ii->key);
-		if (rc ==  1 || (rc == 0 && ii->cmp == VINYL_LT))
-			ii->pos--;
+		rc = vy_compare(itr->key_def, vy_page_index_min_key(itr->index, p),
+		                itr->key);
+		if (rc ==  1 || (rc == 0 && itr->order == VINYL_LT))
+			itr->cur_pos--;
 		break;
 	case VINYL_GE:
 	case VINYL_GT:
-		rc = vy_compare(ii->key_def, sd_indexpage_max(ii->index, p),
-				ii->key);
-		if (rc == -1 || (rc == 0 && ii->cmp == VINYL_GT))
-			ii->pos++;
+		rc = vy_compare(itr->key_def, vy_page_index_max_key(itr->index, p),
+				itr->key);
+		if (rc == -1 || (rc == 0 && itr->order == VINYL_GT))
+			itr->cur_pos++;
 		break;
 	default: unreachable();
 	}
-	if (unlikely(ii->pos == -1 ||
-	               ii->pos >= (int)ii->index->h.count))
+	if (unlikely(itr->cur_pos == -1 ||
+	               itr->cur_pos >= (int)itr->index->header.count))
 		return 0;
-	ii->v = sd_indexpage(ii->index, ii->pos);
+	itr->cur_page = vy_page_index_get_page(itr->index, itr->cur_pos);
 	return 0;
 }
 
-static inline void*
-sd_indexiter_get(struct sdindexiter *ii)
+static inline struct vy_page *
+sd_indexiter_get(struct vy_page_iter *ii)
 {
-	return ii->v;
+	return ii->cur_page;
 }
 
 static inline void
-sd_indexiter_next(struct sdindexiter *ii)
+sd_indexiter_next(struct vy_page_iter *ii)
 {
-	switch (ii->cmp) {
+	switch (ii->order) {
 	case VINYL_LT:
-	case VINYL_LE: ii->pos--;
+	case VINYL_LE: ii->cur_pos--;
 		break;
 	case VINYL_GT:
-	case VINYL_GE: ii->pos++;
+	case VINYL_GE: ii->cur_pos++;
 		break;
 	default:
 		unreachable();
 		break;
 	}
-	if (unlikely(ii->pos < 0))
-		ii->v = NULL;
+	if (unlikely(ii->cur_pos < 0))
+		ii->cur_page = NULL;
+	else if (unlikely(ii->cur_pos >= (int)ii->index->header.count))
+		ii->cur_page = NULL;
 	else
-	if (unlikely(ii->pos >= (int)ii->index->h.count))
-		ii->v = NULL;
-	else
-		ii->v = sd_indexpage(ii->index, ii->pos);
+		ii->cur_page = vy_page_index_get_page(ii->index, ii->cur_pos);
 }
 
 #define SD_SEALED 1
@@ -4159,7 +4148,7 @@ sd_sealset_open(struct sdseal *s)
 }
 
 static inline void
-sd_sealset_close(struct sdseal *s, struct sdindexheader *h)
+sd_sealset_close(struct sdseal *s, struct vy_page_index_header *h)
 {
 	sr_version_storage(&s->version);
 	s->flags = SD_SEALED;
@@ -4169,7 +4158,7 @@ sd_sealset_close(struct sdseal *s, struct sdindexheader *h)
 }
 
 static inline int
-sd_sealvalidate(struct sdseal *s, struct sdindexheader *h)
+sd_sealvalidate(struct sdseal *s, struct vy_page_index_header *h)
 {
 	uint32_t crc = vy_crcs(s, sizeof(struct sdseal), 0);
 	if (unlikely(s->crc != crc))
@@ -4188,7 +4177,7 @@ sd_sealvalidate(struct sdseal *s, struct sdindexheader *h)
 struct sdcbuf {
 	struct vy_buf a; /* decompression */
 	struct vy_buf b; /* transformation */
-	struct sdindexiter index_iter;
+	struct vy_page_iter index_iter;
 	struct sdpageiter page_iter;
 	struct sdcbuf *next;
 };
@@ -4286,7 +4275,7 @@ struct sdmergeconf {
 };
 
 struct sdmerge {
-	struct sdindex     index;
+	struct vy_page_index     index;
 	struct svmergeiter *merge;
 	struct svwriteiter i;
 	struct sdmergeconf *conf;
@@ -4298,11 +4287,11 @@ struct sdmerge {
 };
 
 struct sdreadarg {
-	struct sdindex    *index;
+	struct vy_page_index    *index;
 	struct vy_buf      *buf;
 	struct vy_buf      *buf_xf;
 	struct vy_buf      *buf_read;
-	struct sdindexiter *index_iter;
+	struct vy_page_iter *index_iter;
 	struct sdpageiter *page_iter;
 	struct vy_file     *file;
 	enum vinyl_order     o;
@@ -4315,13 +4304,13 @@ struct sdreadarg {
 
 struct PACKED sdread {
 	struct sdreadarg ra;
-	struct sdindexpage *ref;
+	struct vy_page *ref;
 	struct sdpage page;
 	int reads;
 };
 
 static inline int
-sd_read_page(struct sdread *i, struct sdindexpage *ref)
+sd_read_page(struct sdread *i, struct vy_page *ref)
 {
 	struct sdreadarg *arg = &i->ra;
 
@@ -4330,7 +4319,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 	if (unlikely(rc == -1))
 		return vy_oom();
 	vy_buf_reset(arg->buf_xf);
-	rc = vy_buf_ensure(arg->buf_xf, arg->index->h.sizevmax);
+	rc = vy_buf_ensure(arg->buf_xf, arg->index->header.sizevmax);
 	if (unlikely(rc == -1))
 		return vy_oom();
 
@@ -4417,7 +4406,7 @@ sd_read_open(struct vy_iter *iptr, struct sdreadarg *arg, void *key, int keysize
 	i->reads = 0;
 	i->ra = *arg;
 	sd_indexiter_open(arg->index_iter, arg->key_def, arg->index,
-			  arg->o, key, keysize);
+			  arg->o, key);
 	i->ref = sd_indexiter_get(arg->index_iter);
 	if (i->ref == NULL)
 		return 0;
@@ -4494,23 +4483,26 @@ sd_read_stat(struct vy_iter *iptr)
 	return i->reads;
 }
 
-static int sd_indexload(struct sdindex *i, void *ptr)
+static int
+vy_page_index_load(struct vy_page_index *i, void *ptr)
 {
-	struct sdindexheader *h = (struct sdindexheader *)ptr;
-	uint32_t index_size = h->count * sizeof(struct sdindexpage);
+	struct vy_page_index_header *h = (struct vy_page_index_header *)ptr;
+	uint32_t index_size = h->count * sizeof(struct vy_page);
 	int rc = vy_buf_ensure(&i->pages, index_size);
 	if (unlikely(rc == -1))
 		return vy_oom();
-	memcpy(i->pages.s, (char*)ptr + sizeof(struct sdindexheader), index_size);
+	memcpy(i->pages.s, (char *)ptr + sizeof(struct vy_page_index_header),
+	       index_size);
 	vy_buf_advance(&i->pages, index_size);
 	uint32_t minmax_size = h->size - index_size;
 	rc = vy_buf_ensure(&i->minmax, minmax_size);
 	if (unlikely(rc == -1))
 		return vy_oom();
 	memcpy(i->minmax.s,
-	       (char*)ptr + sizeof(struct sdindexheader) + index_size, minmax_size);
+	       (char *)ptr + sizeof(struct vy_page_index_header) + index_size,
+	       minmax_size);
 	vy_buf_advance(&i->minmax, minmax_size);
-	i->h = *h;
+	i->header = *h;
 	return 0;
 }
 
@@ -4525,8 +4517,8 @@ static struct vy_iterif sd_readif =
 struct PACKED sdrecover {
 	struct vy_file *file;
 	int corrupt;
-	struct sdindexheader *v;
-	struct sdindexheader *actual;
+	struct vy_page_index_header *v;
+	struct vy_page_index_header *actual;
 	struct sdseal *seal;
 	struct vy_mmap map;
 	struct runtime *r;
@@ -4558,17 +4550,17 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	pointer = i->map.p + next->index_offset;
 
 	/* validate index pointer */
-	if (unlikely(((pointer + sizeof(struct sdindexheader)) > eof))) {
+	if (unlikely(((pointer + sizeof(struct vy_page_index_header)) > eof))) {
 		vy_error("corrupted index file '%s': bad index size",
 		               vy_path_of(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
 	}
-	struct sdindexheader *index = (struct sdindexheader*)(pointer);
+	struct vy_page_index_header *index = (struct vy_page_index_header*)(pointer);
 
 	/* validate index crc */
-	uint32_t crc = vy_crcs(index, sizeof(struct sdindexheader), 0);
+	uint32_t crc = vy_crcs(index, sizeof(struct vy_page_index_header), 0);
 	if (index->crc != crc) {
 		vy_error("corrupted index file '%s': bad index crc",
 		               vy_path_of(&i->file->path));
@@ -4578,8 +4570,8 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	}
 
 	/* validate index size */
-	char *end = pointer + sizeof(struct sdindexheader) + index->size +
-	            index->extension;
+	char *end = pointer + sizeof(struct vy_page_index_header)
+		    + index->size + index->extension;
 	if (unlikely(end > eof)) {
 		vy_error("corrupted index file '%s': bad index size",
 		               vy_path_of(&i->file->path));
@@ -4603,13 +4595,14 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	return 1;
 }
 
-static int sd_recover_open(struct sdrecover *ri, struct runtime *r,
+static int
+sd_recover_open(struct sdrecover *ri, struct runtime *r,
 			   struct vy_file *file)
 {
 	memset(ri, 0, sizeof(*ri));
 	ri->r = r;
 	ri->file = file;
-	if (unlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct sdindexheader)))) {
+	if (unlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct vy_page_index_header)))) {
 		vy_error("corrupted index file '%s': bad size",
 		               vy_path_of(&ri->file->path));
 		ri->corrupt = 1;
@@ -4652,10 +4645,9 @@ sd_recover_next(struct sdrecover *ri)
 {
 	if (unlikely(ri->v == NULL))
 		return;
-	struct sdseal *next =
-		(struct sdseal*)((char*)ri->v +
-		    (sizeof(struct sdindexheader) + ri->v->size) +
-		     ri->v->extension);
+	struct sdseal *next = (struct sdseal *)
+		((char *) ri->v + sizeof(struct vy_page_index_header) +
+		 ri->v->size + ri->v->extension);
 	sd_recover_next_of(ri, next);
 }
 
@@ -4667,11 +4659,9 @@ static int sd_recover_complete(struct sdrecover *ri)
 		return  0;
 	/* truncate file to the end of a latest actual
 	 * index */
-	char *eof =
-		(char*)ri->map.p +
-		       ri->actual->offset + sizeof(struct sdindexheader) +
-		       ri->actual->size +
-		       ri->actual->extension;
+	char *eof = ri->map.p +
+		    ri->actual->offset + sizeof(struct vy_page_index_header) +
+		    ri->actual->size - ri->actual->extension;
 	uint64_t file_size = eof - ri->map.p;
 	int rc = vy_file_resize(ri->file, file_size);
 	if (unlikely(rc == -1))
@@ -4737,7 +4727,7 @@ static void vy_index_conf_free(struct vy_index_conf*);
 
 struct PACKED vy_run {
 	struct sdid id;
-	struct sdindex index;
+	struct vy_page_index index;
 	struct vy_run *link;
 	struct vy_run *next;
 };
@@ -4746,7 +4736,7 @@ static inline void
 vy_run_init(struct vy_run *b)
 {
 	memset(&b->id, 0, sizeof(b->id));
-	sd_indexinit(&b->index);
+	vy_page_index_init(&b->index);
 	b->link = NULL;
 	b->next = NULL;
 }
@@ -4764,16 +4754,16 @@ vy_run_new()
 }
 
 static inline void
-vy_run_set(struct vy_run *b, struct sdindex *i)
+vy_run_set(struct vy_run *b, struct vy_page_index *i)
 {
-	b->id = i->h.id;
+	b->id = i->header.id;
 	b->index = *i;
 }
 
 static inline void
 vy_run_free(struct vy_run *b)
 {
-	sd_indexfree(&b->index);
+	vy_page_index_free(&b->index);
 	free(b);
 }
 
@@ -4904,10 +4894,10 @@ vy_range_index_priority(struct vy_range *node, struct svindex **second)
 static inline int
 vy_range_cmp(struct vy_range *n, void *key, struct key_def *key_def)
 {
-	struct sdindexpage *min = sd_indexmin(&n->self.index);
-	struct sdindexpage *max = sd_indexmax(&n->self.index);
-	int l = vy_compare(key_def, sd_indexpage_min(&n->self.index, min), key);
-	int r = vy_compare(key_def, sd_indexpage_max(&n->self.index, max), key);
+	struct vy_page *min = vy_page_index_first_page(&n->self.index);
+	struct vy_page *max = vy_page_index_last_page(&n->self.index);
+	int l = vy_compare(key_def, vy_page_index_min_key(&n->self.index, min), key);
+	int r = vy_compare(key_def, vy_page_index_max_key(&n->self.index, max), key);
 	/* inside range */
 	if (l <= 0 && r >= 0)
 		return 0;
@@ -4924,11 +4914,11 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 {
 	if (n1 == n2)
 		return 0;
-	struct sdindexpage *min1 = sd_indexmin(&n1->self.index);
-	struct sdindexpage *min2 = sd_indexmin(&n2->self.index);
+	struct vy_page *min1 = vy_page_index_first_page(&n1->self.index);
+	struct vy_page *min2 = vy_page_index_first_page(&n2->self.index);
 	return vy_compare(key_def,
-			  sd_indexpage_min(&n1->self.index, min1),
-			  sd_indexpage_min(&n2->self.index, min2));
+			  vy_page_index_min_key(&n1->self.index, min1),
+			  vy_page_index_min_key(&n2->self.index, min2));
 }
 
 static inline uint64_t
@@ -4937,8 +4927,8 @@ vy_range_size(struct vy_range *n)
 	uint64_t size = 0;
 	struct vy_run *b = n->branch;
 	while (b) {
-		size += sd_indexsize_ext(&b->index.h) +
-		        sd_indextotal(&b->index);
+		size += vy_page_index_size(&b->index) +
+		        vy_page_index_total(&b->index);
 		b = b->next;
 	}
 	return size;
@@ -5202,11 +5192,11 @@ si_lru_vlsn(struct vinyl_index *i)
 
 struct PACKED sicachebranch {
 	struct vy_run *branch;
-	struct sdindexpage *ref;
+	struct vy_page *ref;
 	struct sdpage page;
 	struct vy_iter i;
 	struct sdpageiter page_iter;
-	struct sdindexiter index_iter;
+	struct vy_page_iter index_iter;
 	struct vy_buf buf_a;
 	struct vy_buf buf_b;
 	int open;
@@ -5600,7 +5590,7 @@ si_trackmetrics(struct sitrack *t, struct vy_range *n)
 {
 	struct vy_run *b = n->branch;
 	while (b) {
-		struct sdindexheader *h = &b->index.h;
+		struct vy_page_index_header *h = &b->index.header;
 		if (b->id.parent > t->nsn)
 			t->nsn = b->id.parent;
 		if (b->id.id > t->nsn)
@@ -5745,8 +5735,8 @@ vy_branch_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 static int
 vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 		     struct vy_filterif *compression,
-		     struct sdindexheader *index_header,
-		     struct sdindexpage *page_index,
+		     struct vy_page_index_header *index_header,
+		     struct vy_page *page_index,
 		     struct vy_buf *minmax_buf)
 {
 	struct vy_buf tuplesinfo, values;
@@ -5865,7 +5855,7 @@ err:
 static int
 vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 	        struct vy_filterif *compression, uint64_t limit, struct sdid *id,
-	        struct sdindex *sdindex)
+	        struct vy_page_index *sdindex)
 {
 	uint64_t seal_offset = file->size;
 	struct sdseal seal;
@@ -5877,8 +5867,8 @@ vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 		goto err;
 	}
 
-	struct sdindexheader *index_header = &sdindex->h;
-	memset(index_header, 0, sizeof(struct sdindexheader));
+	struct vy_page_index_header *index_header = &sdindex->header;
+	memset(index_header, 0, sizeof(struct vy_page_index_header));
 	sr_version_storage(&index_header->version);
 	index_header->lsnmin = UINT64_MAX;
 	index_header->dupmin = UINT64_MAX;
@@ -5887,31 +5877,31 @@ vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 	do {
 		uint64_t page_offset = file->size;
 
-		if (vy_buf_ensure(&sdindex->pages, sizeof(struct sdindexpage))) {
+		if (vy_buf_ensure(&sdindex->pages, sizeof(struct vy_page))) {
 			vy_oom();
 			goto err;
 		}
-		struct sdindexpage *index_page = (struct sdindexpage *)sdindex->pages.p;
-		vy_buf_advance(&sdindex->pages, sizeof(struct sdindexpage));
+		struct vy_page *page = (struct vy_page *)sdindex->pages.p;
+		vy_buf_advance(&sdindex->pages, sizeof(struct vy_page));
 		if (vy_branch_write_page(file, iwrite, compression, index_header,
-				         index_page, &sdindex->minmax))
+					 page, &sdindex->minmax))
 			goto err;
 
-		index_page->offset = page_offset;
+		page->offset = page_offset;
 
 	} while (index_header->total < limit && iwrite && sv_writeiter_resume(iwrite));
 
 	index_header->size = vy_buf_used(&sdindex->pages) +
 				vy_buf_used(&sdindex->minmax);
 	index_header->offset = file->size;
-	index_header->crc = vy_crcs(index_header, sizeof(struct sdindexheader), 0);
+	index_header->crc = vy_crcs(index_header, sizeof(struct vy_page_index_header), 0);
 
 	sd_sealset_close(&seal, index_header);
 
 	struct iovec iovv[3];
 	struct vy_iov iov;
 	vy_iov_init(&iov, iovv, 3);
-	vy_iov_add(&iov, index_header, sizeof(struct sdindexheader));
+	vy_iov_add(&iov, index_header, sizeof(struct vy_page_index_header));
 	vy_iov_add(&iov, sdindex->pages.s, vy_buf_used(&sdindex->pages));
 	vy_iov_add(&iov, sdindex->minmax.s, vy_buf_used(&sdindex->minmax));
 	if (vy_file_writev(file, &iov) < 0 ||
@@ -5962,8 +5952,8 @@ vy_run_create(struct vinyl_index *index, struct sdc *c,
 	id.flags = SD_IDBRANCH;
 	id.id = vy_sequence(r->seq, VINYL_NSN_NEXT);
 	id.parent = parent->self.id.id;
-	struct sdindex sdindex;
-	sd_indexinit(&sdindex);
+	struct vy_page_index sdindex;
+	vy_page_index_init(&sdindex);
 	if ((rc = vy_branch_write(&parent->file, &iwrite,
 			          index->conf.compression_if, UINT64_MAX,
 			          &id, &sdindex)))
@@ -6029,9 +6019,8 @@ vy_run(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan, uint64_t 
 	assert(n->used >= i->used);
 	n->used -= i->used;
 	vy_quota_op(r->quota, VINYL_QREMOVE, i->used);
-	index->size +=
-		sd_indexsize_ext(&branch->index.h) +
-		sd_indextotal(&branch->index);
+	index->size += vy_page_index_size(&branch->index) +
+		       vy_page_index_total(&branch->index);
 	struct svindex swap = *i;
 	swap.tree.arg = &swap;
 	vy_range_unrotate(n);
@@ -6100,8 +6089,8 @@ si_compact(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan,
 		int rc = sd_read_open(&s->src, &arg, NULL, 0);
 		if (unlikely(rc == -1))
 			return vy_oom();
-		size_stream += sd_indextotal(&b->index);
-		count += sd_indexkeys(&b->index);
+		size_stream += vy_page_index_total(&b->index);
+		count += vy_page_index_count(&b->index);
 		cbuf = cbuf->next;
 		b = b->next;
 	}
@@ -6250,9 +6239,9 @@ si_redistribute(struct vinyl_index *index, struct sdc *c,
 		while (vy_bufiter_has(&i))
 		{
 			struct svref *v = vy_bufiterref_get(&i);
-			struct sdindexpage *page = sd_indexmin(&p->self.index);
+			struct vy_page *page = vy_page_index_first_page(&p->self.index);
 			int rc = vy_compare(index->key_def, v->v->data,
-			                    sd_indexpage_min(&p->self.index, page));
+			                    vy_page_index_min_key(&p->self.index, page));
 			if (unlikely(rc >= 0))
 				break;
 			sv_indexset(&prev->i0, *v);
@@ -6350,8 +6339,8 @@ si_split(struct vinyl_index *index, struct sdc *c, struct vy_buf *result,
 			  vlsn, vlsn_lru, 0, 0);
 
 	while (sv_writeiter_has(&iwrite)) {
-		struct sdindex sdindex;
-		sd_indexinit(&sdindex);
+		struct vy_page_index sdindex;
+		vy_page_index_init(&sdindex);
 		/* create new node */
 		n = vy_range_new(index->key_def);
 		if (unlikely(n == NULL))
@@ -6639,7 +6628,7 @@ vy_range_recover(struct vy_range *n, struct runtime *r)
 	int rc;
 	while (sd_recover_has(&ri))
 	{
-		struct sdindexheader *h = sd_recover_get(&ri);
+		struct vy_page_index_header *h = sd_recover_get(&ri);
 		if (first) {
 			b = &n->self;
 		} else {
@@ -6647,9 +6636,9 @@ vy_range_recover(struct vy_range *n, struct runtime *r)
 			if (unlikely(b == NULL))
 				goto e0;
 		}
-		struct sdindex index;
-		sd_indexinit(&index);
-		rc = sd_indexload(&index, h);
+		struct vy_page_index index;
+		vy_page_index_init(&index);
+		rc = vy_page_index_load(&index, h);
 		if (unlikely(rc == -1))
 			goto e0;
 		vy_run_set(b, &index);
@@ -6724,7 +6713,7 @@ vy_range_free_branches(struct vy_range *n)
 		vy_run_free(p);
 		p = next;
 	}
-	sd_indexfree(&n->self.index);
+	vy_page_index_free(&n->self.index);
 }
 
 static int vy_range_free(struct vy_range *n, struct runtime *r, int gc)
@@ -6996,7 +6985,7 @@ vy_planner_peek_gc(struct vy_planner *p, struct vy_plan *plan)
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->compact, pn))) {
 		n = container_of(pn, struct vy_range, nodecompact);
-		struct sdindexheader *h = &n->self.index.h;
+		struct vy_page_index_header *h = &n->self.index.header;
 		if (likely(h->dupkeys == 0) || (h->dupmin >= plan->a))
 			continue;
 		uint32_t used = (h->dupkeys * 100) / h->keys;
@@ -7034,7 +7023,7 @@ vy_planner_peek_lru(struct vy_planner *p, struct vy_plan *plan)
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->compact, pn))) {
 		n = container_of(pn, struct vy_range, nodecompact);
-		struct sdindexheader *h = &n->self.index.h;
+		struct vy_page_index_header *h = &n->self.index.header;
 		if (h->lsnmin < index->lru_run_lsn) {
 			if (n->flags & SI_LOCK) {
 				rc_inprogress = 2;
@@ -7235,13 +7224,13 @@ static int vy_profiler_(struct vy_profiler *p)
 		memory_used += n->i1.used;
 		struct vy_run *b = n->branch;
 		while (b) {
-			p->count += b->index.h.keys;
-			p->count_dup += b->index.h.dupkeys;
-			int indexsize = sd_indexsize_ext(&b->index.h);
+			p->count += b->index.header.keys;
+			p->count_dup += b->index.header.dupkeys;
+			int indexsize = vy_page_index_size(&b->index);
 			p->total_snapshot_size += indexsize;
-			p->total_node_size += indexsize + b->index.h.total;
-			p->total_node_origin_size += indexsize + b->index.h.totalorigin;
-			p->total_page_count += b->index.h.count;
+			p->total_node_size += indexsize + b->index.header.total;
+			p->total_node_origin_size += indexsize + b->index.header.totalorigin;
+			p->total_page_count += b->index.header.count;
 			b = b->next;
 		}
 		n = vy_range_tree_next(&p->i->tree, n);
@@ -7680,10 +7669,10 @@ si_readcommited(struct vinyl_index *index, struct sv *v)
 	/* search runs */
 	for (struct vy_run *run = range->branch; run != NULL; run = run->next)
 	{
-		struct sdindexiter ii;
+		struct vy_page_iter ii;
 		sd_indexiter_open(&ii, index->key_def, &run->index, VINYL_GE,
-				  sv_pointer(v), sv_size(v));
-		struct sdindexpage *page = sd_indexiter_get(&ii);
+				  sv_pointer(v));
+		struct vy_page *page = sd_indexiter_get(&ii);
 		if (page == NULL)
 			continue;
 		if (page->lsnmax >= lsn)
@@ -7740,8 +7729,8 @@ si_bootstrap(struct vinyl_index *index, uint64_t parent)
 	n->branch_count++;
 
 	/* create index with one empty page */
-	struct sdindex sdindex;
-	sd_indexinit(&sdindex);
+	struct vy_page_index sdindex;
+	vy_page_index_init(&sdindex);
 	vy_branch_write(&n->file, NULL, index->conf.compression_if, 0, &id,
 			&sdindex);
 
