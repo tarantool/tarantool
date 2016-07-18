@@ -1216,49 +1216,35 @@ static struct vy_filterif vy_filterif_zstd =
 	.complete = vy_filter_zstd_complete
 };
 
-static int vy_compare(struct key_def*, char *, char *b);
+enum { VY_TUPLE_KEY_MISSING = UINT32_MAX };
 
-struct vinyl_field {
-	const char *data;
-	uint32_t size;
-};
-
-struct PACKED vinyl_field_meta {
-	uint32_t offset;
-	uint32_t size;
-};
-
-static inline struct vinyl_field_meta *
-sf_fieldmeta(struct key_def *key_def, uint32_t part_id, char *data)
+/**
+ * Extract key from tuple by part_id
+ */
+static inline const char *
+vy_tuple_key_part(const char *tuple_data, uint32_t part_id)
 {
-	assert(part_id <= key_def->part_count);
-	(void)key_def;
-	uint32_t offset_slot = part_id;
-	return &((struct vinyl_field_meta*)(data))[offset_slot];
+	uint32_t *offsets = (uint32_t *) tuple_data;
+	uint32_t offset = offsets[part_id];
+	if (offset == VY_TUPLE_KEY_MISSING)
+		return NULL;
+	return tuple_data + offset;
 }
 
-static inline char*
-sf_field(struct key_def *key_def, uint32_t part_id, char *data, uint32_t *size)
+/**
+ * Compare two tuples
+ */
+static inline int
+vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
+		 const struct key_def *key_def)
 {
-	struct vinyl_field_meta *v = sf_fieldmeta(key_def, part_id, data);
-	if (likely(size))
-		*size = v->size;
-	return data + v->offset;
-}
-
-static int
-vy_compare(struct key_def *key_def, char *a, char *b)
-{
-	int rc;
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		struct key_part *part = &key_def->parts[part_id];
-		uint32_t a_fieldsize;
-		char *a_field = sf_field(key_def, part_id, a, &a_fieldsize);
-		uint32_t b_fieldsize;
-		char *b_field = sf_field(key_def, part_id, b, &b_fieldsize);
-		if (a_fieldsize == 0 || b_fieldsize == 0)
+		const struct key_part *part = &key_def->parts[part_id];
+		const char *field_a = vy_tuple_key_part(tuple_data_a, part_id);
+		const char *field_b = vy_tuple_key_part(tuple_data_b, part_id);
+		if (field_a == NULL || field_b == NULL)
 			break; /* no more parts in the key */
-		rc = tuple_compare_field(a_field, b_field, part->type);
+		int rc = tuple_compare_field(field_a, field_b, part->type);
 		if (rc != 0)
 			return rc;
 	}
@@ -2145,8 +2131,8 @@ sv_mergeiter_next(struct svmergeiter *im)
 			continue;
 		}
 		int rc;
-		rc = vy_compare(im->merge->key_def,
-				sv_pointer(found_val), sv_pointer(v));
+		rc = vy_tuple_compare(sv_pointer(found_val), sv_pointer(v),
+				      im->merge->key_def);
 		if (rc == 0) {
 			/*
 			assert(sv_lsn(v) < sv_lsn(maxv));
@@ -2645,7 +2631,7 @@ struct svindex {
 int
 tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
 {
-	int res = vy_compare(index->key_def, a.v->data, b.v->data);
+	int res = vy_tuple_compare(a.v->data, b.v->data, index->key_def);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
@@ -2657,7 +2643,7 @@ int
 tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 			 struct svindex *index)
 {
-	int res = vy_compare(index->key_def, a.v->data, key->data);
+	int res = vy_tuple_compare(a.v->data, key->data, index->key_def);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
@@ -2743,7 +2729,8 @@ sv_indexset(struct svindex *i, struct svref ref)
 	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
 		struct svref *prev =
 			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
-		if (vy_compare(i->key_def, curr->v->data, prev->v->data) == 0) {
+		if (vy_tuple_compare(curr->v->data, prev->v->data,
+				     i->key_def) == 0) {
 			/*
 			 * Previous position exists and holds same key,
 			 * it's case (2)
@@ -2916,8 +2903,10 @@ sv_indexiter_next(struct vy_iter *i)
 		struct svref *ref =
 			bps_tree_svindex_itr_get_elem(&ii->index->tree,
 						      &ii->itr);
-		if (vy_compare(ii->index->key_def, ref->v->data, ii->key) != 0)
+		if (vy_tuple_compare(ref->v->data, ii->key,
+				     ii->index->key_def) != 0) {
 			ii->itr = bps_tree_svindex_invalid_iterator();
+		}
 	} else if (ii->order == VINYL_GT || ii->order == VINYL_GE) {
 		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
 	} else {
@@ -3026,7 +3015,7 @@ txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b)
 {
 	struct key_def *key_def =
 		container_of(rbtree, struct tx_index, tree)->key_def;
-	return vy_compare(key_def, a->tuple->data, b->tuple->data);
+	return vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
 }
 
 static int
@@ -3034,7 +3023,7 @@ txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b)
 {
 	struct key_def *key_def =
 		container_of(rbtree, struct tx_index, tree)->key_def;
-	return vy_compare(key_def, a->data, b->tuple->data);
+	return vy_tuple_compare(a->data, b->tuple->data, key_def);
 }
 
 struct sicache;
@@ -3708,7 +3697,7 @@ sd_pageiter_end(struct sdpageiter *i)
 static inline int
 sd_pageiter_cmp(struct sdpageiter *i, struct key_def *key_def, struct sdv *v)
 {
-	return vy_compare(key_def, sd_pagepointer(i->page, v), i->key);
+	return vy_tuple_compare(sd_pagepointer(i->page, v), i->key, key_def);
 }
 
 static inline int
@@ -4027,8 +4016,8 @@ sd_indexiter_route(struct vy_page_iter *i)
 	while (begin != end) {
 		int mid = begin + (end - begin) / 2;
 		struct vy_page *page = vy_page_index_get_page(i->index, mid);
-		int rc = vy_compare(i->key_def,
-		                    vy_page_index_max_key(i->index, page), i->key);
+		int rc = vy_tuple_compare(vy_page_index_max_key(i->index, page),
+					  i->key, i->key_def);
 		if (rc < 0)
 			begin = mid + 1;
 		else
@@ -4078,15 +4067,15 @@ sd_indexiter_open(struct vy_page_iter *itr, struct key_def *key_def,
 	switch (itr->order) {
 	case VINYL_LE:
 	case VINYL_LT:
-		rc = vy_compare(itr->key_def, vy_page_index_min_key(itr->index, p),
-		                itr->key);
+		rc = vy_tuple_compare(vy_page_index_min_key(itr->index, p),
+				      itr->key, itr->key_def);
 		if (rc ==  1 || (rc == 0 && itr->order == VINYL_LT))
 			itr->cur_pos--;
 		break;
 	case VINYL_GE:
 	case VINYL_GT:
-		rc = vy_compare(itr->key_def, vy_page_index_max_key(itr->index, p),
-				itr->key);
+		rc = vy_tuple_compare(vy_page_index_max_key(itr->index, p),
+				      itr->key, itr->key_def);
 		if (rc == -1 || (rc == 0 && itr->order == VINYL_GT))
 			itr->cur_pos++;
 		break;
@@ -4896,8 +4885,10 @@ vy_range_cmp(struct vy_range *n, void *key, struct key_def *key_def)
 {
 	struct vy_page *min = vy_page_index_first_page(&n->self.index);
 	struct vy_page *max = vy_page_index_last_page(&n->self.index);
-	int l = vy_compare(key_def, vy_page_index_min_key(&n->self.index, min), key);
-	int r = vy_compare(key_def, vy_page_index_max_key(&n->self.index, max), key);
+	int l = vy_tuple_compare(vy_page_index_min_key(&n->self.index, min),
+				 key, key_def);
+	int r = vy_tuple_compare(vy_page_index_max_key(&n->self.index, max),
+				 key, key_def);
 	/* inside range */
 	if (l <= 0 && r >= 0)
 		return 0;
@@ -4916,9 +4907,9 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 		return 0;
 	struct vy_page *min1 = vy_page_index_first_page(&n1->self.index);
 	struct vy_page *min2 = vy_page_index_first_page(&n2->self.index);
-	return vy_compare(key_def,
-			  vy_page_index_min_key(&n1->self.index, min1),
-			  vy_page_index_min_key(&n2->self.index, min2));
+	return vy_tuple_compare(vy_page_index_min_key(&n1->self.index, min1),
+				vy_page_index_min_key(&n2->self.index, min2),
+				key_def);
 }
 
 static inline uint64_t
@@ -6240,8 +6231,9 @@ si_redistribute(struct vinyl_index *index, struct sdc *c,
 		{
 			struct svref *v = vy_bufiterref_get(&i);
 			struct vy_page *page = vy_page_index_first_page(&p->self.index);
-			int rc = vy_compare(index->key_def, v->v->data,
-			                    vy_page_index_min_key(&p->self.index, page));
+			int rc = vy_tuple_compare(v->v->data,
+				vy_page_index_min_key(&p->self.index, page),
+				index->key_def);
 			if (unlikely(rc >= 0))
 				break;
 			sv_indexset(&prev->i0, *v);
@@ -7328,7 +7320,7 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 {
 	int rc;
 	if (compare) {
-		rc = vy_compare(q->merge.key_def, sv_pointer(v), q->key);
+		rc = vy_tuple_compare(sv_pointer(v), q->key, q->merge.key_def);
 		if (unlikely(rc != 0))
 			return 0;
 	}
@@ -7627,7 +7619,8 @@ next_node:
 		/* key is [] */
 		rc = !sv_is(v, SVDELETE);
 	} else if (q->upsert_eq) {
-		int res = vy_compare(q->merge.key_def, sv_pointer(v), q->key);
+		int res = vy_tuple_compare(sv_pointer(v), q->key,
+					   q->merge.key_def);
 		rc = res == 0;
 		if (res == 0 && sv_is(v, SVDELETE))
 			rc = 0; /* that is not what we wanted to find */
@@ -9810,6 +9803,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 			return 0;
 		}
 		if (rc == 1 && ((vup->flags & SVUPSERT) == 0)) {
+			assert((vup->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
 			*result = vup;
 			return 0;
 		}
@@ -9844,7 +9838,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 
 	/* read index */
 	struct siread q;
-	if (sf_fieldmeta(index->key_def, 0, key->data)->size == 0) {
+	if (vy_tuple_key_part(key->data, 0) == NULL) {
 		/* key is [] */
 		si_readopen(&q, index, cache, order, vlsn, NULL, 0);
 	} else {
@@ -9891,6 +9885,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	assert(rc == 1);
 
 	assert(q.result != NULL);
+	assert((q.result->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
 	statget->read_disk = q.read_disk;
 	statget->read_cache = q.read_cache;
 	statget->read_latency = clock_monotonic64() - start;
@@ -10111,34 +10106,30 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 		mp_next(&key_end);
 
 	/* Allocate tuple */
-	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
-		(key_def->part_count + 1);
+	uint32_t offsets_size = sizeof(uint32_t) * (key_def->part_count + 1);
 	uint32_t key_size = key_end - key;
-	uint32_t size = meta_size + mp_sizeof_array(part_count) + key_size;
+	uint32_t size = offsets_size + mp_sizeof_array(part_count) + key_size;
 	struct vinyl_tuple *tuple = vinyl_tuple_alloc(index, size);
 	if (tuple == NULL)
 		return NULL;
 
 	/* Calculate offsets for key parts */
-	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)tuple->data;
+	uint32_t *offsets = (uint32_t *) tuple->data;
 	const char *key_pos = key;
-	uint32_t part_offset = meta_size + mp_sizeof_array(part_count);
+	uint32_t part_offset = offsets_size + mp_sizeof_array(part_count);
 	for (uint32_t i = 0; i < part_count; i++) {
 		const char *part_start = key_pos;
-		meta[i].offset = part_offset;
+		offsets[i] = part_offset;
 		mp_next(&key_pos);
-		meta[i].size = (key_pos - part_start);
-		part_offset += meta[i].size;
+		part_offset += (key_pos - part_start);
 	}
 	assert(part_offset == size);
 	/* Fill offsets for missing key parts + value */
-	for (uint32_t i = part_count; i <= key_def->part_count; i++) {
-		meta[i].offset = 0;
-		meta[i].size = 0;
-	}
+	for (uint32_t i = part_count; i <= key_def->part_count; i++)
+		offsets[i] = VY_TUPLE_KEY_MISSING; /* part is missing */
 
 	/* Copy MsgPack data */
-	char *data = tuple->data + meta_size;
+	char *data = tuple->data + offsets_size;
 	data = mp_encode_array(data, part_count);
 	memcpy(data, key, key_size);
 	data += key_size;
@@ -10163,18 +10154,17 @@ vinyl_tuple_from_data_ex(struct vinyl_index *index,
 	assert(field_count >= key_def->part_count);
 
 	/* Allocate tuple */
-	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
-		(key_def->part_count + 1);
+	uint32_t offsets_size = sizeof(uint32_t) * (key_def->part_count + 1);
 	uint32_t data_size = data_end - data;
-	uint32_t size = meta_size + mp_sizeof_array(field_count) +
+	uint32_t size = offsets_size + mp_sizeof_array(field_count) +
 		data_size + extra_size;
 	struct vinyl_tuple *tuple = vinyl_tuple_alloc(index, size);
 	if (tuple == NULL)
 		return NULL;
 
 	/* Calculate offsets for key parts */
-	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)tuple->data;
-	uint32_t start_offset = meta_size + mp_sizeof_array(field_count);
+	uint32_t *offsets = (uint32_t *) tuple->data;
+	uint32_t start_offset = offsets_size + mp_sizeof_array(field_count);
 	const char *data_pos = data;
 	for (uint32_t field_id = 0; field_id < field_count; field_id++) {
 		const char *field = data_pos;
@@ -10182,23 +10172,24 @@ vinyl_tuple_from_data_ex(struct vinyl_index *index,
 		if (field_id >= index->key_map_size ||
 		    index->key_map[field_id] == UINT32_MAX)
 			continue; /* field is not indexed */
-		/* Update offsets for indexed field */
-		uint32_t part_id = index->key_map[field_id];
-		assert(part_id < key_def->part_count);
-		meta[part_id].offset = start_offset + (field - data);
-		meta[part_id].size = data_pos - field;
-		if (meta[part_id].size > VINYL_KEY_MAXLEN) {
+		/* Check limits */
+		uint32_t field_size = data_pos - field;
+		if (field_size > VINYL_KEY_MAXLEN) {
 			diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
-					meta[part_id].size, VINYL_KEY_MAXLEN);
+				 field_size, VINYL_KEY_MAXLEN);
 			vinyl_tuple_unref(index, tuple);
 			return NULL;
 		}
+		/* Update offsets for indexed field */
+		uint32_t part_id = index->key_map[field_id];
+		assert(part_id < key_def->part_count);
+		offsets[part_id] = start_offset + (field - data);
 	}
-	meta[key_def->part_count].offset = size - extra_size;
-	meta[key_def->part_count].size = extra_size;
+	offsets[key_def->part_count] = start_offset + (data_pos - data);
+	assert(offsets[key_def->part_count] + extra_size == size);
 
 	/* Copy MsgPack data */
-	char *wpos = tuple->data + meta_size;
+	char *wpos = tuple->data + offsets_size;
 	wpos = mp_encode_array(wpos, field_count);
 	memcpy(wpos, data, data_size);
 	wpos += data_size;
@@ -10218,29 +10209,33 @@ vinyl_tuple_from_data(struct vinyl_index *index,
 	return vinyl_tuple_from_data_ex(index, data, data_end, 0, &unused);
 }
 
-char *
-vinyl_tuple_data(struct vinyl_index *index,
-		 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize)
+const char *
+vinyl_tuple_data(struct vinyl_index *index, struct vinyl_tuple *tuple,
+		 uint32_t *mp_size)
 {
-	assert((vinyl_tuple->flags & (SVUPSERT | SVDELETE)) == 0);
-	struct key_def *key_def = index->key_def;
-	uint32_t meta_size = sizeof(struct vinyl_field_meta) *
-			     (key_def->part_count + 1);
-	*bsize = vinyl_tuple->size - meta_size;
-	return  vinyl_tuple->data + meta_size;
+	uint32_t part_count = index->key_def->part_count;
+	uint32_t *offsets = (uint32_t *) tuple->data;
+	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
+	const char *mp = tuple->data + offsets_size;
+	const char *mp_end = tuple->data + offsets[part_count];
+	assert(mp < mp_end);
+	*mp_size = mp_end - mp;
+	return mp;
 }
 
 static void
-vinyl_tuple_data_ex(const char *data, struct key_def *key_def,
-		    const char **tuple_data, const char **tuple_data_end,
-		    const char **extra_data, const char **extra_data_end)
+vinyl_tuple_data_ex(const struct key_def *key_def,
+		    const char *data, const char *data_end,
+		    const char **msgpack, const char **msgpack_end,
+		    const char **extra, const char **extra_end)
 {
 	uint32_t part_count = key_def->part_count;
-	struct vinyl_field_meta *meta = (struct vinyl_field_meta *)data;
-	*tuple_data = data + (part_count + 1) * sizeof(struct vinyl_field_meta);
-	*tuple_data_end = data + meta[part_count].offset;
-	*extra_data = *tuple_data_end;
-	*extra_data_end = *extra_data + meta[part_count].size;
+	uint32_t *offsets = (uint32_t *) data;
+	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
+	*msgpack = data + offsets_size;
+	*msgpack_end = data + offsets[part_count];
+	*extra = *msgpack_end;
+	*extra_end = data_end;
 }
 
 struct tuple *
@@ -10248,7 +10243,7 @@ vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
 		    struct tuple_format *format)
 {
 	uint32_t bsize;
-	char *data = vinyl_tuple_data(index, vinyl_tuple, &bsize);
+	const char *data = vinyl_tuple_data(index, vinyl_tuple, &bsize);
 	return box_tuple_new(format, data, data + bsize);
 }
 
@@ -10355,18 +10350,22 @@ vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
 {
 	assert(upsert != object);
 	struct key_def *key_def = index->key_def;
+	const char *u_data = sv_pointer(upsert);
+	const char *u_data_end = u_data + sv_size(upsert);
 	const char *u_tuple, *u_tuple_end, *u_ops, *u_ops_end;
-	vinyl_tuple_data_ex(sv_pointer(upsert), key_def,
-			    &u_tuple, &u_tuple_end, &u_ops, &u_ops_end);
+	vinyl_tuple_data_ex(key_def, u_data, u_data_end, &u_tuple, &u_tuple_end,
+			    &u_ops, &u_ops_end);
 	if (object == NULL || (sv_flags(object) & SVDELETE)) {
 		/* replace version */
 		struct vinyl_tuple *result =
 			vinyl_tuple_from_data(index, u_tuple, u_tuple_end);
 		return result;
 	}
+	const char *o_data = sv_pointer(object);
+	const char *o_data_end = o_data + sv_size(object);
 	const char *o_tuple, *o_tuple_end, *o_ops, *o_ops_end;
-	vinyl_tuple_data_ex(sv_pointer(object), key_def,
-			    &o_tuple, &o_tuple_end, &o_ops, &o_ops_end);
+	vinyl_tuple_data_ex(key_def, o_data, o_data_end, &o_tuple, &o_tuple_end,
+			    &o_ops, &o_ops_end);
 	vy_apply_upsert_ops(&o_tuple, &o_tuple_end, u_ops, u_ops_end);
 	if (!(sv_flags(object) & SVUPSERT)) {
 		/* update version */

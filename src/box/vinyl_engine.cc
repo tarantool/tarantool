@@ -191,7 +191,7 @@ VinylEngine::open()
 }
 
 static inline void
-vinyl_send_row(struct xstream *stream, uint32_t space_id, char *tuple,
+vinyl_send_row(struct xstream *stream, uint32_t space_id, const char *tuple,
                 uint32_t tuple_size, int64_t lsn)
 {
 	struct request_replace_body body;
@@ -207,7 +207,7 @@ vinyl_send_row(struct xstream *stream, uint32_t space_id, char *tuple,
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
-	row.body[1].iov_base = tuple;
+	row.body[1].iov_base = (char *) tuple;
 	row.body[1].iov_len = tuple_size;
 	xstream_write(stream, &row);
 }
@@ -256,8 +256,8 @@ join_send_space(struct space *sp, void *data)
 			break; /* eof */
 		int64_t lsn = vinyl_tuple_lsn(vinyl_tuple);
 		uint32_t tuple_size;
-		char *tuple = vinyl_tuple_data(pk->db, vinyl_tuple,
-					       &tuple_size);
+		const char *tuple = vinyl_tuple_data(pk->db, vinyl_tuple,
+						     &tuple_size);
 		try {
 			vinyl_send_row(stream, pk->key_def->space_id,
 				      tuple, tuple_size, lsn);

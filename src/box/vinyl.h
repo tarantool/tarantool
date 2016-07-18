@@ -217,9 +217,9 @@ struct tuple *
 vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
 		    struct tuple_format *format);
 
-char *
-vinyl_tuple_data(struct vinyl_index *index,
-		 struct vinyl_tuple *vinyl_tuple, uint32_t *bsize);
+const char *
+vinyl_tuple_data(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
+		 uint32_t *mp_size);
 
 void
 vinyl_tuple_ref(struct vinyl_tuple *tuple);

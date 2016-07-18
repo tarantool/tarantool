@@ -65,10 +65,4 @@ int vinyl_info(const char*, vinyl_info_f, void*);
 }
 void vinyl_workers_start(struct vinyl_env *);
 
-struct vinyl_tuple;
-
-struct tuple *
-vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-		   struct key_def *key_def, struct tuple_format *format);
-
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */
