@@ -1124,6 +1124,9 @@ box_atfork()
 int
 box_snapshot()
 {
+	/* Signal arrived before box.cfg{} */
+	if (! box_init_done)
+		return 0;
 	/* create snapshot file */
 	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 	return engine_checkpoint(checkpoint_id);
