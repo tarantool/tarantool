@@ -1456,6 +1456,9 @@ box_atfork()
 int
 box_snapshot()
 {
+	/* Signal arrived before box.cfg{} */
+	if (! box_init_done)
+		return 0;
 	int rc = 0;
 	if (box_snapshot_is_in_progress)
 		return EINPROGRESS;
