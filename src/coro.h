@@ -42,6 +42,8 @@ struct tarantool_coro {
 	coro_context ctx;
 	void *stack;
 	size_t stack_size;
+	/** Valgrind stack id. */
+	unsigned int stack_id;
 };
 
 struct slab_cache;

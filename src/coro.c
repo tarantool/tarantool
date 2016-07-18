@@ -58,8 +58,9 @@ tarantool_coro_create(struct tarantool_coro *coro,
 		return -1;
 	}
 
-	(void) VALGRIND_STACK_REGISTER(coro->stack, (char *)
-				       coro->stack + coro->stack_size);
+	coro->stack_id = VALGRIND_STACK_REGISTER(coro->stack,
+						 (char *) coro->stack +
+						 coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
 	return 0;
@@ -69,6 +70,7 @@ void
 tarantool_coro_destroy(struct tarantool_coro *coro, struct slab_cache *slabc)
 {
 	if (coro->stack != NULL) {
+		VALGRIND_STACK_DEREGISTER(coro->stack_id);
 		slab_put(slabc, (struct slab *)
 			 ((char *) coro->stack - slab_sizeof()));
 	}
