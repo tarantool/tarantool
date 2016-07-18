@@ -425,7 +425,7 @@ run_script_f(va_list ap)
 	 */
 	fiber_sleep(0.0);
 
-	if (access(path, F_OK) == 0) {
+	if (path && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			panic("%s", lua_tostring(L, -1));

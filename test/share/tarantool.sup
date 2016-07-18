@@ -14,3 +14,116 @@
    fun:lj_str_new
    ...
 }
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:ERR_load_crypto_strings
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:OpenSSL_add_all_*
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:EVP_add_digest
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations - Lua FFI bindings>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:OBJ_NAME_add
+   ...
+   fun:main
+}
+{
+   <fiber hash of the main cord>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:mh_i32ptr_new
+   fun:cord_create
+   fun:fiber_init
+   fun:main
+}
+{
+   <title.c>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:realloc
+   fun:title_set_interpretor_name
+   fun:title_init
+   fun:main
+}
+{
+   <say.c>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strdup
+   fun:say_init
+   fun:main
+}
+{
+   <libreadline one-time allocation>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:rl_initialize
+   ...
+}
+{
+   <libreadline I don't know what>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:rl_redisplay
+   ...
+}
+{
+   <libev global array of all fds>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*alloc
+   ...
+   fun:array_realloc
+   ...
+   fun:ev_*
+   ...
+}
+{
+   <libev default loop>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*alloc
+   ...
+   fun:ev_default_loop
+   ...
+}
