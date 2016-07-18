@@ -49,6 +49,8 @@
 #include "lua/utils.h"
 #include "fiber.h"
 
+#include "box/vinyl.h"
+
 static void
 lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
 {
@@ -202,64 +204,51 @@ lbox_info_cluster(struct lua_State *L)
 	return 1;
 }
 
-typedef void (*vinyl_info_f)(const char*, const char*, void *);
-
-extern int vinyl_info(const char *name, vinyl_info_f, void *);
-
 static void
-lbox_vinyl_cb(const char *key, const char *value, void *arg)
+lbox_vinyl_info_table(struct lua_State *L, struct vy_info_node *node)
 {
-	struct lua_State *L;
-	L = (struct lua_State*)arg;
-	if (value == NULL || key[0] == '\0')
+	if (node == NULL)
 		return;
-
-	/* stack: box.info.vinyl */
-	lua_pushvalue(L, -1); /* current = box.info.vinyl */
-	const char *part = key;
-	while(1) {
-		/* stack: box.info.vinyl, current */
-#ifndef TARGET_OS_DARWIN
-		const char *part_end = strchrnul(part, '.');
-#else
-		const char *part_end = strchr(part, '.');
-		if (!part_end)
-			part_end = part + strlen(part);
-#endif
-		if (*part_end == '\0') {
-			lua_pushlstring(L, part, part_end - part);
-			lua_pushstring(L, value);
-			/* stack: box.info.vinyl, current, part, value */
-			lua_settable(L, -3); /* current[part] = value */
-			/* stack: box.info.vinyl, current */
-			lua_pop(L, 1);
-			/* stack: box.info.vinyl */
-			break;
+	if (node->key != NULL)
+		lua_pushstring(L, node->key);
+	if (node->val_type == VINYL_NODE) {
+		lua_newtable(L);
+		/* iterate over childs */
+		for (int i = 0; i < node->childs_n; ++i) {
+			lbox_vinyl_info_table(L, node->childs[i]);
 		}
-
-		lua_pushlstring(L, part, part_end - part);
-		lua_gettable(L, -2);
-		/* stack: box.info.vinyl, current, current[part] */
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1); /* pop current[part] */
-			lua_newtable(L);
-			lua_pushlstring(L, part, part_end - part);
-			lua_pushvalue(L, -2);
-			/* stack: box.info.vinyl, current, new, part, new */
-			lua_settable(L, -4); /* current[part] = new */
+		if (node->key != NULL)
+			lua_settable(L, -3);
+	} else {
+		switch(node->val_type) {
+			case VINYL_U64:
+				lua_pushnumber(L, node->value.u64);
+				break;
+			case VINYL_U32:
+				lua_pushnumber(L, node->value.u32);
+				break;
+			case VINYL_STRING:
+				lua_pushstring(L, node->value.str);
+				break;
+			default:
+				unreachable();
 		}
-		/* stack: box.info.vinyl, current, current[part] */
-		lua_replace(L, -2);
-		/* stack: box.info.vinyl, current */
-		part = part_end + 1;
+		lua_settable(L, -3);
 	}
 }
+
+/* Declared in vinyl_engine.cc */
+extern struct vinyl_env *
+vinyl_engine_get_env();
 
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
-	lua_newtable(L);
-	vinyl_info(NULL, lbox_vinyl_cb, (void*)L);
+	struct vy_info info;
+	if (vy_info_create(&info, vinyl_engine_get_env()))
+		return 0;
+	lbox_vinyl_info_table(L, info.root);
+	vy_info_destroy(&info);
 	return 1;
 }
 

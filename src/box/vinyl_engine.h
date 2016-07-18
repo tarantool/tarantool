@@ -60,8 +60,11 @@ public:
 };
 
 extern "C" {
-typedef void (*vinyl_info_f)(const char*, const char*, void*);
-int vinyl_info(const char*, vinyl_info_f, void*);
+typedef int (*vy_info_callback_t)(const char *key,
+				  int value_tp,
+				  const void *value,
+				  void *arg);
+int vinyl_info(const char*, vy_info_callback_t, void*);
 }
 void vinyl_workers_start(struct vinyl_env *);
 

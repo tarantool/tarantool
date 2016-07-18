@@ -53,6 +53,14 @@
 #include "iproto_constants.h"
 #include "vinyl.h"
 
+/* Used by lua/info.c */
+extern "C" struct vinyl_env *
+vinyl_engine_get_env()
+{
+	VinylEngine *e = (VinylEngine *)engine_find("vinyl");
+	return e->env;
+}
+
 struct cord *worker_pool;
 static int worker_pool_size;
 static volatile int worker_pool_run;
@@ -103,29 +111,6 @@ vinyl_workers_stop(void)
 	for (int i = 0; i < worker_pool_size; i++)
 		cord_join(&worker_pool[i]);
 	free(worker_pool);
-}
-
-int vinyl_info(const char *name, vinyl_info_f cb, void *arg)
-{
-	VinylEngine *e = (VinylEngine *)engine_find("vinyl");
-	struct vinyl_info_cursor *cursor = vinyl_info_cursor_new(e->env);
-	const char *key;
-	const char *value;
-	if (name) {
-		while (vinyl_info_cursor_next(cursor, &key, &value) == 0) {
-			if (name && strcmp(key, name) != 0)
-				continue;
-			cb(key, value, arg);
-			return 1;
-		}
-		vinyl_info_cursor_delete(cursor);
-		return 0;
-	}
-	while (vinyl_info_cursor_next(cursor, &key, &value) == 0) {
-		cb(key, value, arg);
-	}
-	vinyl_info_cursor_delete(cursor);
-	return 0;
 }
 
 VinylEngine::VinylEngine()

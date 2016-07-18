@@ -46,11 +46,41 @@ struct vinyl_field;
 struct vinyl_tuple;
 struct vinyl_cursor;
 struct vinyl_index;
-struct vinyl_info_cursor;
-struct vinyl_confkv;
 struct key_def;
 struct tuple;
 struct tuple_format;
+struct region;
+
+enum vy_type {
+	VINYL_NODE = 0,
+	VINYL_STRING,
+	VINYL_U32,
+	VINYL_U64,
+};
+
+struct vy_info_node {
+	const char *key;
+	enum vy_type val_type;
+	union {
+		uint64_t u64;
+		uint32_t u32;
+		const char *str;
+	} value;
+	struct vy_info_node **childs;
+	int childs_n;
+};
+
+struct vy_info {
+	struct vy_info_node *root;
+	struct region *allocator;
+	struct vinyl_env *env;
+};
+
+int
+vy_info_create(struct vy_info *info, struct vinyl_env *e);
+
+void
+vy_info_destroy(struct vy_info *creator);
 
 /*
  * Environment
@@ -61,16 +91,6 @@ vinyl_env_new(void);
 
 int
 vinyl_env_delete(struct vinyl_env *e);
-
-struct vinyl_info_cursor *
-vinyl_info_cursor_new(struct vinyl_env *env);
-
-void
-vinyl_info_cursor_delete(struct vinyl_info_cursor *cursor);
-
-int
-vinyl_info_cursor_next(struct vinyl_info_cursor *cursor, const char **key,
-		     const char **value);
 
 void
 vinyl_bootstrap(struct vinyl_env *e);
@@ -89,6 +109,7 @@ vinyl_checkpoint(struct vinyl_env *env);
 
 bool
 vinyl_checkpoint_is_active(struct vinyl_env *env);
+
 
 /*
  * Workers

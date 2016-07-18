@@ -26,3 +26,14 @@ space:drop()
 test_run:cmd('switch default')
 test_run:cmd("stop server vinyl_info")
 test_run:cmd("start server vinyl_info")
+
+test_run:cmd("setopt delimiter ';'")
+for i = 1, 16 do
+	c = box.schema.space.create('i'..i, { engine='vinyl' })
+	c:create_index('pk')
+end;
+box.info.vinyl().db;
+for i = 1, 16 do
+	box.space['i'..i]:drop()
+end;
+test_run:cmd("setopt delimiter ''");
