@@ -97,7 +97,6 @@ enum vinyl_status {
 	VINYL_MALFUNCTION
 };
 
-//predefinitions
 struct vy_sequence;
 struct vy_conf;
 struct vy_quota;
@@ -138,17 +137,21 @@ struct vy_sequence {
 };
 
 static inline struct vy_sequence *
-vy_sequence_new() {
-	struct vy_sequence *res = malloc(sizeof(struct vy_sequence));
-	if (res == NULL)
+vy_sequence_new()
+{
+	struct vy_sequence *seq = calloc(1, sizeof(*seq));
+	if (seq == NULL) {
+		diag_set(OutOfMemory, sizeof(*seq), "sequence",
+			 "struct sequence");
 		return NULL;
-	memset(res, 0, sizeof(struct vy_sequence));
-	tt_pthread_mutex_init(&res->lock, NULL);
-	return res;
+	}
+	tt_pthread_mutex_init(&seq->lock, NULL);
+	return seq;
 }
 
 static inline void
-vy_sequence_delete(struct vy_sequence *n) {
+vy_sequence_delete(struct vy_sequence *n)
+{
 	tt_pthread_mutex_destroy(&n->lock);
 	free(n);
 }
@@ -637,11 +640,11 @@ struct vy_quota {
 static struct vy_quota *
 vy_quota_new(int64_t);
 
-static void
-vy_quota_enable(struct vy_quota*);
-
 static int
 vy_quota_delete(struct vy_quota*);
+
+static void
+vy_quota_enable(struct vy_quota*);
 
 static int
 vy_quota_op(struct vy_quota*, enum vy_quotaop, int64_t);
@@ -1140,9 +1143,11 @@ static struct vy_filterif vy_filterif_lz4 =
 static struct vy_quota *
 vy_quota_new(int64_t limit)
 {
-	struct vy_quota *q = malloc(sizeof(struct vy_quota));
-	if (q == NULL)
+	struct vy_quota *q = malloc(sizeof(*q));
+	if (q == NULL) {
+		diag_set(OutOfMemory, sizeof(*q), "quota", "struct");
 		return NULL;
+	}
 	q->enable = false;
 	q->wait   = 0;
 	q->limit  = limit;
@@ -1152,21 +1157,19 @@ vy_quota_new(int64_t limit)
 	return q;
 }
 
-static void
-vy_quota_enable(struct vy_quota *q)
-{
-	q->enable = true;
-}
-
 static int
 vy_quota_delete(struct vy_quota *q)
 {
-	if (q == NULL)
-		return 0;
 	tt_pthread_mutex_destroy(&q->lock);
 	tt_pthread_cond_destroy(&q->cond);
 	free(q);
 	return 0;
+}
+
+static void
+vy_quota_enable(struct vy_quota *q)
+{
+	q->enable = true;
 }
 
 static int
@@ -1530,18 +1533,18 @@ struct vy_stat {
 static inline struct vy_stat *
 vy_stat_new()
 {
-	struct vy_stat *s = malloc(sizeof(struct vy_stat));
-	if (s == NULL)
+	struct vy_stat *s = calloc(1, sizeof(*s));
+	if (s == NULL) {
+		diag_set(OutOfMemory, sizeof(*s), "stat", "struct");
 		return NULL;
-	memset(s, 0, sizeof(struct vy_stat));
+	}
 	tt_pthread_mutex_init(&s->lock, NULL);
 	return s;
 }
 
 static inline void
-vy_stat_delete(struct vy_stat *s) {
-	if (s == NULL)
-		return;
+vy_stat_delete(struct vy_stat *s)
+{
 	tt_pthread_mutex_destroy(&s->lock);
 	free(s);
 }
@@ -3160,9 +3163,11 @@ tx_manager_count(struct tx_manager *m) {
 static struct tx_manager *
 tx_manager_new(struct vinyl_env *env)
 {
-	struct tx_manager *m = malloc(sizeof(struct tx_manager));
-	if (m == NULL)
+	struct tx_manager *m = malloc(sizeof(*m));
+	if (m == NULL) {
+		diag_set(OutOfMemory, sizeof(*m), "tx_manager", "struct");
 		return NULL;
+	}
 	tx_tree_new(&m->tree);
 	m->count_rd = 0;
 	m->count_rw = 0;
@@ -3178,8 +3183,6 @@ tx_manager_new(struct vinyl_env *env)
 static int
 tx_manager_delete(struct tx_manager *m)
 {
-	if (m == NULL)
-		return 0;
 	tt_pthread_mutex_destroy(&m->lock);
 	free(m);
 	return 0;
@@ -5428,9 +5431,12 @@ si_cachefollow(struct sicache *c, struct vy_run *seek)
 static inline struct vy_cachepool *
 vy_cachepool_new(struct vinyl_env *env)
 {
-	struct vy_cachepool *cachepool = malloc(sizeof(struct vy_cachepool));
-	if (cachepool == NULL)
+	struct vy_cachepool *cachepool = malloc(sizeof(*cachepool));
+	if (cachepool == NULL) {
+		diag_set(OutOfMemory, sizeof(*cachepool), "cachepool",
+			 "struct");
 		return NULL;
+	}
 	cachepool->head = NULL;
 	cachepool->n = 0;
 	cachepool->env = env;
@@ -5441,8 +5447,6 @@ vy_cachepool_new(struct vinyl_env *env)
 static inline void
 vy_cachepool_delete(struct vy_cachepool *p)
 {
-	if (p == NULL)
-		return;
 	struct sicache *next;
 	struct sicache *c = p->head;
 	while (c) {
@@ -8249,20 +8253,6 @@ next:
 	return;
 }
 
-/**
- * Create vinyl_dir if it doesn't exist.
- */
-static int
-sr_checkdir(const char *path)
-{
-	int exists = path_exists(path);
-	if (exists == 0) {
-		vy_error("directory '%s' does not exist", path);
-		return -1;
-	}
-	return 0;
-}
-
 enum {
 	SC_QBRANCH  = 0,
 	SC_QGC      = 1,
@@ -8402,9 +8392,11 @@ static int sc_ctl_shutdown(struct scheduler*, struct vinyl_index*);
 static struct scheduler *
 scheduler_new(struct vinyl_env *env)
 {
-	struct scheduler *s = malloc(sizeof(struct scheduler));
-	if (s == NULL)
+	struct scheduler *s = calloc(1, sizeof(*s));
+	if (s == NULL) {
+		diag_set(OutOfMemory, sizeof(*s), "scheduler", "struct");
 		return NULL;
+	}
 	uint64_t now = clock_monotonic64();
 	tt_pthread_mutex_init(&s->lock, NULL);
 	s->checkpoint_lsn           = 0;
@@ -8970,17 +8962,21 @@ struct vy_conf {
 static struct vy_conf *
 vy_conf_new()
 {
-	struct vy_conf *conf = malloc(sizeof(struct vy_conf));
-	if (conf == NULL)
-		return NULL;
-	conf->path = strdup(cfg_gets("vinyl_dir"));
-	if (conf->path == NULL) {
-		vy_oom();
+	struct vy_conf *conf = calloc(1, sizeof(*conf));
+	if (conf == NULL) {
+		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
+	conf->path = strdup(cfg_gets("vinyl_dir"));
+	if (conf->path == NULL) {
+		diag_set(OutOfMemory, sizeof(*conf), "conf", "path");
+		goto error_1;
+	}
 	/* Ensure vinyl data directory exists. */
-	if (sr_checkdir(conf->path))
-		return NULL;
+	if (!path_exists(conf->path)) {
+		vy_error("directory '%s' does not exist", conf->path);
+		goto error_2;
+	}
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
@@ -9022,7 +9018,7 @@ vy_conf_new()
 	z->compact_wm = cfg_geti("vinyl.compact_wm");
 	if (z->compact_wm <= 1) {
 		vy_error("bad %d.compact_wm value", 0);
-		return NULL;
+		goto error_2;
 	}
 	z->branch_prio = cfg_geti("vinyl.branch_prio");
 	z->branch_age = cfg_geti("vinyl.branch_age");
@@ -9037,16 +9033,17 @@ vy_conf_new()
 		z->lru_period_us        = z->lru_period * 1000000;
 	}
 	return conf;
+
+error_2:
+	free(conf->path);
+error_1:
+	free(conf);
+	return NULL;
 }
 
 static void vy_conf_delete(struct vy_conf *c)
 {
-	if (c == NULL)
-		return;
-	if (c->path) {
-		free(c->path);
-		c->path = NULL;
-	}
+	free(c->path);
 	free(c);
 }
 
