@@ -41,6 +41,7 @@
 #include "fiber.h"
 #include "cbus.h"
 #include "say.h"
+#include "sio.h"
 #include "evio.h"
 #include "coio.h"
 #include "scoped_guard.h"
@@ -865,6 +866,8 @@ tx_process_join_subscribe(struct cmsg *m)
 		default:
 			unreachable();
 		}
+	} catch (SocketError *e) {
+		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
 		iproto_write_error(con->input.fd, e);
 	}
