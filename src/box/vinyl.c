@@ -10006,6 +10006,7 @@ vinyl_index_delete(struct vinyl_index *index)
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	vy_status_free(&index->status);
 	vy_index_conf_free(&index->conf);
+	free(index->key_map);
 	key_def_delete(index->key_def);
 	TRASH(index);
 	free(index);
