@@ -98,6 +98,10 @@ class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, int fd,
 		    const char *format, ...);
+	virtual void raise()
+	{
+		throw this;
+	}
 };
 
 /** Close a file descriptor on exception or end of scope. */

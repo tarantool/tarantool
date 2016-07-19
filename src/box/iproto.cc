@@ -41,6 +41,7 @@
 #include "fiber.h"
 #include "cbus.h"
 #include "say.h"
+#include "sio.h"
 #include "evio.h"
 #include "coio.h"
 #include "scoped_guard.h"
@@ -752,6 +753,8 @@ tx_process_msg(struct cmsg *m)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				   (uint32_t) msg->header.type);
 		}
+	} catch (SocketError *e) {
+		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
 		iproto_reply_error(out, e, msg->header.sync);
 	}
