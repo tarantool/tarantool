@@ -57,8 +57,18 @@ public:
 	             enum iterator_type type,
 	             const char *key, uint32_t part_count) const override;
 
-	virtual size_t  size() const override;
 	virtual size_t bsize() const override;
+
+	virtual struct tuple *min(const char *key,
+					uint32_t part_count) const override;
+
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
+
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const override;
+
+
 
 public:
 	struct vinyl_env *env;

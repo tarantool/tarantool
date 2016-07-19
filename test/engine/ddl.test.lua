@@ -46,11 +46,11 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary')
 primary = space.index[0]
-primary:len()
+primary:count()
 space:insert({13})
 space:insert({14})
 space:insert({15})
-primary:len()
+primary:count()
 space:drop()
 
 -- Key part max

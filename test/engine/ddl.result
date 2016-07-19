@@ -92,7 +92,7 @@ index = space:create_index('primary')
 primary = space.index[0]
 ---
 ...
-primary:len()
+primary:count()
 ---
 - 0
 ...
@@ -108,7 +108,7 @@ space:insert({15})
 ---
 - [15]
 ...
-primary:len()
+primary:count()
 ---
 - 3
 ...

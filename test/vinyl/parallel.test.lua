@@ -32,5 +32,5 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 cnt == m
-i:len() == m * n
+i:count() == m * n
 

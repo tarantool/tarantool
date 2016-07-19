@@ -68,7 +68,7 @@ cnt == m
 ---
 - true
 ...
-i:len() == m * n
+i:count() == m * n
 ---
 - true
 ...

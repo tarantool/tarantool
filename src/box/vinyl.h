@@ -170,9 +170,6 @@ vinyl_index_drop(struct vinyl_index *index);
 size_t
 vinyl_index_bsize(struct vinyl_index *db);
 
-uint64_t
-vinyl_index_size(struct vinyl_index *db);
-
 /*
  * Index Cursor
  */

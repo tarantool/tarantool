@@ -87,15 +87,41 @@ error:;
 }
 
 size_t
-VinylIndex::size() const
-{
-	return vinyl_index_size(db);
-}
-
-size_t
 VinylIndex::bsize() const
 {
 	return vinyl_index_bsize(db);
+}
+
+struct tuple *
+VinylIndex::min(const char *key, uint32_t part_count) const
+{
+	struct iterator *it = allocIterator();
+	auto guard = make_scoped_guard([=]{it->free(it);});
+	initIterator(it, ITER_GE, key, part_count);
+	return it->next(it);
+}
+
+struct tuple *
+VinylIndex::max(const char *key, uint32_t part_count) const
+{
+	struct iterator *it = allocIterator();
+	auto guard = make_scoped_guard([=]{it->free(it);});
+	initIterator(it, ITER_LE, key, part_count);
+	return it->next(it);
+}
+
+size_t
+VinylIndex::count(enum iterator_type type, const char *key,
+		  uint32_t part_count) const
+{
+	struct iterator *it = allocIterator();
+	auto guard = make_scoped_guard([=]{it->free(it);});
+	initIterator(it, type, key, part_count);
+	size_t count = 0;
+	struct tuple *tuple = NULL;
+	while ((tuple = it->next(it)) != NULL)
+		++count;
+	return count;
 }
 
 struct tuple *

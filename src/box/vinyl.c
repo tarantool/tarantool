@@ -10057,15 +10057,6 @@ vinyl_index_bsize(struct vinyl_index *index)
 	return index->rtp.memory_used;
 }
 
-uint64_t
-vinyl_index_size(struct vinyl_index *index)
-{
-	vy_profiler_begin(&index->rtp, index);
-	vy_profiler_(&index->rtp);
-	vy_profiler_end(&index->rtp);
-	return index->rtp.count;
-}
-
 static int vinyl_index_recoverbegin(struct vinyl_index *index)
 {
 	/* open and recover repository */

@@ -49,3 +49,12 @@ space:insert({string.rep('x', 1022)})
 space:drop()
 space = nil
 pk = nil
+
+-------------------------------------------------------------------------------
+-- space:len() is unsupported
+-------------------------------------------------------------------------------
+
+space = box.schema.space.create('test_len', { engine = 'vinyl' })
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
+space:len()
+space:drop()
