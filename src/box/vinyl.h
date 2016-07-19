@@ -192,12 +192,6 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 void
 vinyl_cursor_delete(struct vinyl_cursor *cursor);
 
-void
-vinyl_cursor_set_read_commited(struct vinyl_cursor *cursor, bool read_commited);
-
-int
-vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
-		 bool cache_only); /* used from relay cord */
 int
 vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result);
 
@@ -227,8 +221,14 @@ vinyl_tuple_ref(struct vinyl_tuple *tuple);
 void
 vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple);
 
-int64_t
-vinyl_tuple_lsn(struct vinyl_tuple *doc);
+/*
+ * Replication
+ */
+
+typedef int
+(*vy_send_row_f)(void *, const char *tuple, uint32_t tuple_size, int64_t lsn);
+int
+vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx);
 
 #ifdef __cplusplus
 }

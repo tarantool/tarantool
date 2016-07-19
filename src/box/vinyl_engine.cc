@@ -190,10 +190,17 @@ VinylEngine::open()
 	return new VinylSpace(this);
 }
 
-static inline void
-vinyl_send_row(struct xstream *stream, uint32_t space_id, const char *tuple,
-                uint32_t tuple_size, int64_t lsn)
+struct vinyl_send_row_arg {
+	struct xstream *stream;
+	uint32_t space_id;
+};
+
+static int
+vinyl_send_row(void *arg, const char *tuple, uint32_t tuple_size, int64_t lsn)
 {
+	struct xstream *stream = ((struct vinyl_send_row_arg *) arg)->stream;
+	uint32_t space_id = ((struct vinyl_send_row_arg *) arg)->space_id;
+
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
@@ -209,7 +216,12 @@ vinyl_send_row(struct xstream *stream, uint32_t space_id, const char *tuple,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = (char *) tuple;
 	row.body[1].iov_len = tuple_size;
-	xstream_write(stream, &row);
+	try {
+		xstream_write(stream, &row);
+	} catch (Exception *e) {
+		 return -1;
+	}
+	return 0;
 }
 
 struct join_send_space_arg {
@@ -230,43 +242,9 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(pk->db, NULL, 0);
-	if (vinyl_key == NULL)
+	struct vinyl_send_row_arg arg = { stream, sp->def.id };
+	if (vy_index_send(pk->db, vinyl_send_row, &arg) != 0)
 		diag_raise();
-	struct vinyl_cursor *cursor = vinyl_cursor_new(pk->db, vinyl_key, VINYL_GE);
-	vinyl_tuple_unref(pk->db, vinyl_key);
-	if (cursor == NULL)
-		diag_raise();
-	auto cursor_guard = make_scoped_guard([=]{
-		vinyl_cursor_delete(cursor);
-	});
-
-	/* tell cursor not to hold a transaction, which
-	 * in result enables compaction process
-	 * for duplicates */
-	vinyl_cursor_set_read_commited(cursor, true);
-
-	while (1) {
-		struct vinyl_tuple *vinyl_tuple;
-		int rc = vinyl_cursor_next(cursor, &vinyl_tuple, false);
-		if (rc != 0)
-			diag_raise();
-		if (vinyl_tuple == NULL)
-			break; /* eof */
-		int64_t lsn = vinyl_tuple_lsn(vinyl_tuple);
-		uint32_t tuple_size;
-		const char *tuple = vinyl_tuple_data(pk->db, vinyl_tuple,
-						     &tuple_size);
-		try {
-			vinyl_send_row(stream, pk->key_def->space_id,
-				      tuple, tuple_size, lsn);
-		} catch (Exception *e) {
-			vinyl_tuple_unref(pk->db, vinyl_tuple);
-			throw;
-		}
-		vinyl_tuple_unref(pk->db, vinyl_tuple);
-	}
 }
 
 /**

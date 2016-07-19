@@ -7315,7 +7315,7 @@ static int vy_profiler_(struct vy_profiler *p)
 	return 0;
 }
 
-static int
+static void
 si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
 	    enum vinyl_order order, uint64_t vlsn, void *key, uint32_t keysize)
 {
@@ -7334,7 +7334,6 @@ si_readopen(struct siread *q, struct vinyl_index *index, struct sicache *c,
 	q->result = NULL;
 	sv_mergeinit(&q->merge, index, index->key_def);
 	vy_index_lock(index);
-	return 0;
 }
 
 static int
@@ -7362,6 +7361,7 @@ si_readdup(struct siread *q, struct sv *result)
 		v->flags = sv_flags(result);
 		v->lsn = sv_lsn(result);
 	}
+	assert((v->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
 	q->result = v;
 	return 1;
 }
@@ -9070,7 +9070,6 @@ struct vinyl_cursor {
 	int ops;
 	int read_disk;
 	int read_cache;
-	int read_commited;
 	struct sicache *cache;
 };
 
@@ -9593,8 +9592,7 @@ void
 vinyl_cursor_delete(struct vinyl_cursor *c)
 {
 	struct vinyl_env *e = c->index->env;
-	if (! c->read_commited)
-		tx_rollback(&c->tx);
+	tx_rollback(&c->tx);
 	if (c->cache)
 		vy_cachepool_push(c->cache);
 	if (c->key)
@@ -9608,14 +9606,12 @@ vinyl_cursor_delete(struct vinyl_cursor *c)
 	free(c);
 }
 
-int
+static int
 vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 		  bool cache_only)
 {
 	struct vinyl_index *index = c->index;
 	struct vinyl_tx *tx = &c->tx;
-	if (c->read_commited)
-		tx = NULL;
 
 	struct vy_stat_get statget;
 	assert(c->key != NULL);
@@ -9648,13 +9644,6 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 	return 0;
 }
 
-void
-vinyl_cursor_set_read_commited(struct vinyl_cursor *c, bool read_commited)
-{
-	tx_rollback(&c->tx);
-	c->read_commited = read_commited;
-}
-
 struct vinyl_cursor *
 vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order)
@@ -9677,7 +9666,6 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		vy_oom();
 		return NULL;
 	}
-	c->read_commited = 0;
 	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
 
 	c->key = key;
@@ -9875,7 +9863,6 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 			return 0;
 		}
 		if (rc == 1 && ((vup->flags & SVUPSERT) == 0)) {
-			assert((vup->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
 			*result = vup;
 			return 0;
 		}
@@ -9923,11 +9910,8 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	}
 	q.upsert_eq = upsert_eq;
 	q.cache_only = cache_only;
-	int rc;
-	if (q.order == VINYL_EQ)
-		rc = si_get(&q);
-	else
-		rc = si_range(&q);
+	assert(q.order != VINYL_EQ);
+	int rc = si_range(&q);
 	si_readclose(&q);
 
 	if (vup != NULL) {
@@ -9957,7 +9941,6 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	assert(rc == 1);
 
 	assert(q.result != NULL);
-	assert((q.result->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
 	statget->read_disk = q.read_disk;
 	statget->read_cache = q.read_cache;
 	statget->read_latency = clock_monotonic64() - start;
@@ -10358,12 +10341,6 @@ vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple)
 {
 	struct vinyl_env *env = index->env;
 	vinyl_tuple_unref_rt(env, tuple);
-}
-
-int64_t
-vinyl_tuple_lsn(struct vinyl_tuple *tuple)
-{
-	return tuple->lsn;
 }
 
 /**
@@ -10887,6 +10864,65 @@ error_1:
 	free(e);
 	return NULL;
 }
+
+/** {{{ replication */
+
+int
+vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx)
+{
+	double start_time = ev_now(loop());
+	int read_disk = 0;
+	int read_cache = 0;
+	int ops = 0;
+	int64_t vlsn = UINT64_MAX;
+
+	struct sicache *cache = vy_cachepool_pop(index->env->cachepool);
+	if (cache == NULL)
+		return -1;
+
+	vinyl_index_ref(index);
+
+	/* First iteration */
+	struct siread q;
+	si_readopen(&q, index, cache, VINYL_GT, vlsn, NULL, 0);
+	assert(!q.cache_only);
+	int rc = si_range(&q);
+	si_readclose(&q);
+
+	while (rc == 1) { /* while found */
+		/* Update statistics */
+		ops++;
+		read_disk += q.read_disk;
+		read_cache += q.read_cache;
+
+		/* Execute callback */
+		struct vinyl_tuple *tuple = q.result;
+		assert(tuple != NULL); /* found */
+		uint32_t mp_size;
+		const char *mp = vinyl_tuple_data(index, tuple, &mp_size);
+		int64_t lsn = tuple->lsn;
+		rc = sendrow(ctx, mp, mp_size, lsn);
+		if (rc != 0) {
+			vinyl_tuple_unref(index, tuple);
+			break;
+		}
+
+		/* Next iteration */
+		si_readopen(&q, index, cache, VINYL_GT, vlsn, tuple->data,
+			    tuple->size);
+		assert(!q.cache_only);
+		rc = si_range(&q);
+		si_readclose(&q);
+		vinyl_tuple_unref(index, tuple);
+	}
+
+	vy_cachepool_push(cache);
+	vy_stat_cursor(index->env->stat, start_time, read_disk, read_cache, ops);
+	vinyl_index_unref(index);
+	return rc;
+}
+
+/* }}} replication */
 
 /** {{{ vinyl_service - context of a vinyl background thread */
 
