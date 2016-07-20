@@ -942,45 +942,6 @@ function box.schema.space.bless(space)
         return space:insert(tuple)
     end
 
-    --
-    -- Increment counter identified by primary key.
-    -- Create counter if not exists.
-    -- Returns updated value of the counter.
-    --
-    space_mt.inc = function(space, key)
-        local key = keify(key)
-        local cnt_index = #key + 1
-        local tuple
-        while true do
-            tuple = space:update(key, {{'+', cnt_index, 1}})
-            if tuple ~= nil then break end
-            local data = key
-            table.insert(data, 1)
-            tuple = space:insert(data)
-            if tuple ~= nil then break end
-        end
-        return tuple[cnt_index]
-    end
-
-    --
-    -- Decrement counter identified by primary key.
-    -- Delete counter if it decreased to zero.
-    -- Returns updated value of the counter.
-    --
-    space_mt.dec = function(space, key)
-        local key = keify(key)
-        local cnt_index = #key + 1
-        local tuple = space:get(key)
-        if tuple == nil then return 0 end
-        if tuple[cnt_index] == 1 then
-            space:delete(key)
-            return 0
-        else
-            tuple = space:update(key, {{'-', cnt_index, 1}})
-            return tuple[cnt_index]
-        end
-    end
-
     space_mt.pairs = function(space, key)
         if space.index[0] == nil then
             -- empty space without indexes, return empty iterator
