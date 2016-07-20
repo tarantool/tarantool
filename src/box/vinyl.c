@@ -119,6 +119,7 @@ struct vinyl_env {
 	struct scheduler    *scheduler;
 	struct vy_stat      *stat;
 	struct mempool      read_task_pool;
+	struct mempool      cursor_pool;
 };
 
 static inline struct srzone *
@@ -9102,6 +9103,7 @@ vinyl_env_delete(struct vinyl_env *e)
 	vy_sequence_delete(e->seq);
 	scheduler_delete(e->scheduler);
 	mempool_destroy(&e->read_task_pool);
+	mempool_destroy(&e->cursor_pool);
 	free(e);
 	return rcret;
 }
@@ -9399,7 +9401,7 @@ vinyl_cursor_delete(struct vinyl_cursor *c)
 	              c->read_cache,
 	              c->ops);
 	TRASH(c);
-	free(c);
+	mempool_free(&e->cursor_pool, c);
 }
 
 static int
@@ -9445,10 +9447,9 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order)
 {
 	struct vinyl_env *e = index->env;
-	struct vinyl_cursor *c;
-	c = malloc(sizeof(struct vinyl_cursor));
+	struct vinyl_cursor *c = mempool_alloc(&e->cursor_pool);
 	if (unlikely(c == NULL)) {
-		vy_oom();
+		diag_set(OutOfMemory, sizeof(*c), "cursor", "struct");
 		return NULL;
 	}
 	vinyl_index_ref(index);
@@ -10635,6 +10636,8 @@ vinyl_env_new(void)
 
 	mempool_create(&e->read_task_pool, cord_slab_cache(),
 	               sizeof(struct vy_read_task));
+	mempool_create(&e->cursor_pool, cord_slab_cache(),
+	               sizeof(struct vinyl_cursor));
 	return e;
 error_7:
 	scheduler_delete(e->scheduler);
