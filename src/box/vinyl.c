@@ -1767,7 +1767,7 @@ static inline int
 vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
 		 const struct key_def *key_def);
 
-struct vinyl_index;
+struct tx_index;
 
 struct txv {
 	uint64_t tsn;
@@ -1776,6 +1776,8 @@ struct txv {
 	struct tx_index *index;
 	struct vinyl_tuple *tuple;
 	struct txv *gc;
+	/** Next tuple in the same index. */
+	struct rlist next_in_index;
 	rb_node(struct txv) tree_node;
 };
 
@@ -1792,12 +1794,14 @@ txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
 	v->tuple = tuple;
 	vinyl_tuple_ref(tuple);
 	v->gc = NULL;
+	rlist_create(&v->next_in_index);
 	return v;
 }
 
 static inline void
 txv_delete(struct vinyl_env *env, struct txv *v)
 {
+	rlist_del(&v->next_in_index);
 	vinyl_tuple_unref_rt(env, v->tuple);
 	free(v);
 }
@@ -1844,16 +1848,15 @@ txv_aborted(struct txv *v)
 
 
 struct PACKED txlogindex {
+	struct rlist log;
 	uint32_t space_id;
-	uint32_t head, tail;
-	uint32_t count;
-	struct vinyl_index *index;
+	struct tx_index *index;
+	struct rlist next;
 };
 
 struct PACKED txlogv {
 	struct sv v;
 	uint32_t space_id;
-	uint32_t next;
 };
 
 /**
@@ -1870,7 +1873,7 @@ struct txlog {
 	 * the transaction.
 	 */
 	int write_count;
-	struct vy_buf index;
+	struct rlist index;
 	struct vy_buf buf;
 };
 
@@ -1878,16 +1881,19 @@ static inline void
 txlog_init(struct txlog *l)
 {
 	vy_buf_init(&l->buf);
-	vy_buf_init(&l->index);
 	l->write_count = 0;
+	rlist_create(&l->index);
 }
 
 static inline void
 txlog_free(struct txlog *l)
 {
 	vy_buf_free(&l->buf);
-	vy_buf_free(&l->index);
 	l->write_count = 0;
+	struct txlogindex *i, *tmp;
+	rlist_foreach_entry_safe(i, &l->index, next, tmp)
+		free(i);
+	rlist_create(&l->index);
 }
 
 static inline int
@@ -1905,38 +1911,48 @@ txlog_at(struct txlog *l, int pos) {
 	return vy_buf_at(&l->buf, sizeof(struct txlogv), pos);
 }
 
-static inline int
-txlog_add(struct txlog *l, struct txlogv *v,
-	  struct vinyl_index *index)
+void
+txlogindex_del(struct txlog *l, struct txlogv *lv)
 {
-	uint32_t n = txlog_count(l);
-	int rc = vy_buf_add(&l->buf, v, sizeof(struct txlogv));
-	if (unlikely(rc == -1))
-		return -1;
-	struct txlogindex *i = (struct txlogindex*)l->index.s;
-	while ((char*)i < l->index.p) {
-		if (i->space_id == v->space_id) {
-			struct txlogv *tail = txlog_at(l, i->tail);
-			tail->next = n;
-			i->tail = n;
-			i->count++;
-			goto done;
+	(void) l;
+	struct txv *v = sv_to_txv(&lv->v);
+	rlist_del(&v->next_in_index);
+}
+
+int
+txlogindex_add(struct txlog *l, struct txlogv *lv)
+{
+
+	struct txv *v = sv_to_txv(&lv->v);
+	struct txlogindex *i;
+	rlist_foreach_entry(i, &l->index, next) {
+		if (i->space_id == lv->space_id) {
+			rlist_add_tail(&i->log, &v->next_in_index);
+			return 0;
 		}
-		i++;
 	}
-	rc = vy_buf_ensure(&l->index, sizeof(struct txlogindex));
-	if (unlikely(rc == -1)) {
+	i = malloc(sizeof(struct txlogindex));
+	if (i == NULL)
+		return -1;
+	i->space_id = lv->space_id;
+	i->index = v->index;
+	rlist_create(&i->log);
+	rlist_create(&i->next);
+	rlist_add_tail(&i->log, &v->next_in_index);
+	rlist_add(&l->index, &i->next);
+	return 0;
+}
+
+static inline int
+txlog_add(struct txlog *l, struct txlogv *v)
+{
+	if (vy_buf_add(&l->buf, v, sizeof(struct txlogv)))
+		return -1;
+
+	if (txlogindex_add(l, v)) {
 		l->buf.p -= sizeof(struct txlogv);
 		return -1;
 	}
-	i = (struct txlogindex*)l->index.p;
-	i->space_id = v->space_id;
-	i->head  = n;
-	i->tail  = n;
-	i->index = index;
-	i->count = 1;
-	vy_buf_advance(&l->index, sizeof(struct txlogindex));
-done:
 	if (! (sv_flags(&v->v) & SVGET))
 		l->write_count++;
 	return 0;
@@ -1946,8 +1962,10 @@ static inline void
 txlog_replace(struct txlog *l, int n, struct txlogv *v)
 {
 	struct txlogv *ov = txlog_at(l, n);
+	txlogindex_del(l, ov);
 	if (! (sv_flags(&ov->v) & SVGET))
 		l->write_count--;
+	txlogindex_add(l, v);
 	if (! (sv_flags(&v->v) & SVGET))
 		l->write_count++;
 	vy_buf_set(&l->buf, sizeof(struct txlogv), n, (char*)v, sizeof(struct txlogv));
@@ -3313,49 +3331,28 @@ tx_end(struct vinyl_tx *tx)
 }
 
 static inline void
-tx_rollback_svp(struct vinyl_tx *tx, struct vy_bufiter *i, int tuple_free)
+tx_rollback_svp(struct vinyl_tx *tx, struct vy_bufiter *i)
 {
+	void *new_p = i->v ? i->v : i->buf->p;
 	struct tx_manager *m = tx->manager;
-	int gc = 0;
 	for (; vy_bufiter_has(i); vy_bufiter_next(i))
 	{
 		struct txlogv *lv = vy_bufiter_get(i);
 		struct txv *v = lv->v.v;
 		/* remove from index */
 		txv_untrack(v);
-		/* translate log version from struct txv to struct vinyl_tuple */
-		sv_from_tuple(&lv->v, v->tuple);
-		if (tuple_free) {
-			int size = vinyl_tuple_size(v->tuple);
-			if (vinyl_tuple_unref_rt(m->env, v->tuple))
-				gc += size;
-		}
-		free(v);
+		txv_delete(m->env, v);
 	}
-	vy_quota_op(m->env->quota, VINYL_QREMOVE, gc);
+	i->buf->p = new_p;
 }
 
 static enum tx_state
 tx_rollback(struct vinyl_tx *tx)
 {
-	struct tx_manager *m = tx->manager;
 	struct vy_bufiter i;
 	vy_bufiter_open(&i, &tx->log.buf, sizeof(struct txlogv));
 	/* support log free after commit and half-commit mode */
-	if (tx->state == VINYL_TX_COMMIT) {
-		int gc = 0;
-		for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
-		{
-			struct txlogv *lv = vy_bufiter_get(&i);
-			struct vinyl_tuple *v = lv->v.v;
-			int size = vinyl_tuple_size(v);
-			if (vinyl_tuple_unref_rt(m->env, v))
-				gc += size;
-		}
-		vy_quota_op(m->env->quota, VINYL_QREMOVE, gc);
-		return tx_promote(tx, VINYL_TX_ROLLBACK);
-	}
-	tx_rollback_svp(tx, &i, 1);
+	tx_rollback_svp(tx, &i);
 	tx_promote(tx, VINYL_TX_ROLLBACK);
 	tx_end(tx);
 	return VINYL_TX_ROLLBACK;
@@ -3413,13 +3410,11 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	struct vinyl_env *env = m->env;
 	/* allocate mvcc container */
 	struct txv *v = txv_new(tuple, tx->tsn, index);
-	if (unlikely(v == NULL)) {
-		vy_quota_op(env->quota, VINYL_QREMOVE, vinyl_tuple_size(tuple));
+	if (v == NULL)
 		return -1;
-	}
+
 	struct txlogv lv;
 	lv.space_id   = index->key_def->space_id;
-	lv.next = UINT32_MAX;
 	sv_from_txv(&lv.v, v);
 	/* update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
@@ -3434,7 +3429,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 			goto error;
 		}
 		/* replace old document with the new one */
-		lv.next = txlog_at(&tx->log, own->log_read)->next;
 		v->log_read = own->log_read;
 		if (unlikely(txv_aborted(own)))
 			txv_abort(v);
@@ -3443,13 +3437,12 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		/* update log */
 		txlog_replace(&tx->log, v->log_read, &lv);
 
-		vy_quota_op(env->quota, VINYL_QREMOVE, vinyl_tuple_size(own->tuple));
 		txv_delete(env, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
 	v->log_read = txlog_count(&tx->log);
-	int rc = txlog_add(&tx->log, &lv, index->index);
+	int rc = txlog_add(&tx->log, &lv);
 	if (unlikely(rc == -1)) {
 		vy_oom();
 		goto error;
@@ -3460,7 +3453,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	return 0;
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
-	vy_quota_op(env->quota, VINYL_QREMOVE, vinyl_tuple_size(v->tuple));
 	txv_delete(env, v);
 	return -1;
 }
@@ -7649,23 +7641,23 @@ next_node:
 }
 
 static int
-si_readcommited(struct vinyl_index *index, struct sv *v)
+si_readcommited(struct vinyl_index *index, struct vinyl_tuple *tuple)
 {
 	/* search node index */
 	struct vy_rangeiter ri;
-	vy_rangeiter_open(&ri, index, VINYL_GE, sv_pointer(v), sv_size(v));
+	vy_rangeiter_open(&ri, index, VINYL_GE, tuple->data, tuple->size);
 	struct vy_range *range = vy_rangeiter_get(&ri);
 	assert(range != NULL);
 
-	uint64_t lsn = sv_lsn(v);
+	uint64_t lsn = tuple->lsn;
 	/* search in-memory */
 	struct svindex *second;
 	struct svindex *first = vy_range_index_priority(range, &second);
-	struct svref *ref = sv_indexfind(first, sv_pointer(v),
-					 sv_size(v), UINT64_MAX);
+	struct svref *ref = sv_indexfind(first, tuple->data,
+					 tuple->size, UINT64_MAX);
 	if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
-		ref = sv_indexfind(second, sv_pointer(v),
-				   sv_size(v), UINT64_MAX);
+		ref = sv_indexfind(second, tuple->data,
+				   tuple->size, UINT64_MAX);
 	if (ref != NULL && ref->v->lsn >= lsn)
 		return 1;
 
@@ -7674,7 +7666,7 @@ si_readcommited(struct vinyl_index *index, struct sv *v)
 	{
 		struct vy_page_iter ii;
 		sd_indexiter_open(&ii, index->key_def, &run->index, VINYL_GE,
-				  sv_pointer(v));
+				  tuple->data);
 		struct vy_page_info *page = sd_indexiter_get(&ii);
 		if (page == NULL)
 			continue;
@@ -8129,40 +8121,34 @@ vy_index_conf_free(struct vy_index_conf *s)
 }
 
 static void
-si_write(struct txlog *l, struct txlogindex *li, uint64_t time,
+si_write(struct txlogindex *li, uint64_t time,
 	 enum vinyl_status status)
 {
-	struct vinyl_index *index = li->index;
+	struct vinyl_index *index = li->index->index;
 	struct vinyl_env *env = index->env;
 	struct rlist rangelist;
+	size_t quota = 0;
 	rlist_create(&rangelist);
 
 	vy_index_lock(index);
 	index->update_time = time;
-	struct txlogv *cv = txlog_at(l, li->head);
-	int c = li->count;
-	while (c) {
-		struct sv *sv = &cv->v;
-		struct vinyl_tuple *v = sv_to_tuple(sv);
-		if (status == VINYL_FINAL_RECOVERY) {
-			if (si_readcommited(index, &cv->v)) {
-				size_t gc = vinyl_tuple_size(v);
-				if (vinyl_tuple_unref_rt(env, v))
-					vy_quota_op(env->quota, VINYL_QREMOVE, gc);
-				goto next;
-			}
-		}
-		if (v->flags & SVGET) {
-			vinyl_tuple_unref_rt(env, v);
-			goto next;
+	struct txv *v;
+	rlist_foreach_entry(v, &li->log, next_in_index) {
+		struct vinyl_tuple *tuple = v->tuple;
+		if (tuple->flags & SVGET ||
+		    (status == VINYL_FINAL_RECOVERY &&
+		     si_readcommited(index, tuple))) {
+
+			continue;
 		}
 		/* match node */
 		struct vy_rangeiter ii;
-		vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
+		vy_rangeiter_open(&ii, index, VINYL_GE, tuple->data, tuple->size);
 		struct vy_range *range = vy_rangeiter_get(&ii);
 		assert(range != NULL);
 		struct svref ref;
-		ref.v = v;
+		vinyl_tuple_ref(tuple);
+		ref.v = tuple;
 		ref.flags = 0;
 		/* insert into node index */
 		struct svindex *vindex = vy_range_index(range);
@@ -8170,14 +8156,12 @@ si_write(struct txlog *l, struct txlogindex *li, uint64_t time,
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 		/* update node */
-		range->used += vinyl_tuple_size(v);
+		range->used += vinyl_tuple_size(tuple);
+		quota += vinyl_tuple_size(tuple);
 		if (index->conf.lru)
 			si_lru_add(index, &ref);
 		if (rlist_empty(&range->commit))
 			rlist_add(&rangelist, &range->commit);
-next:
-		cv = txlog_at(l, cv->next);
-		c--;
 	}
 	/* reschedule nodes */
 	struct vy_range *range, *tmp;
@@ -8187,6 +8171,8 @@ next:
 		vy_planner_update(&index->p, SI_BRANCH, range);
 	}
 	vy_index_unlock(index);
+	/* Take quota after having unlocked the index mutex. */
+	vy_quota_op(env->quota, VINYL_QADD, quota);
 	return;
 }
 
@@ -8875,12 +8861,9 @@ txlog_flush(struct txlog *log, uint64_t lsn, enum vinyl_status status)
 
 	/* index */
 	uint64_t now = clock_monotonic64();
-	struct txlogindex *i   = (struct txlogindex*)log->index.s;
-	struct txlogindex *end = (struct txlogindex*)log->index.p;
-	while (i < end) {
-		si_write(log, i, now, status);
-		i++;
-	}
+	struct txlogindex *i;
+	rlist_foreach_entry(i, &log->index, next)
+		si_write(i, now, status);
 	return 0;
 }
 
@@ -10179,8 +10162,6 @@ static inline int
 vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	    struct vinyl_tuple *o, uint8_t flags)
 {
-	struct vinyl_env *e = index->env;
-
 	assert(tx->state == VINYL_TX_READY);
 
 	/* validate index status */
@@ -10201,23 +10182,39 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	}
 
 	o->flags = flags;
-	if (! (o->flags & SVGET))
-		tx->log_read = -1;
+	/** Drop log_read counter */
+	tx->log_read = -1;
 
 	/* concurrent index only */
-	int rc = tx_set(tx, &index->coindex, o);
-	if (unlikely(rc != 0))
-		return -1;
-
-	int size = vinyl_tuple_size(o);
-	vy_quota_op(e->quota, VINYL_QADD, size);
-	return 0;
+	return tx_set(tx, &index->coindex, o);
 }
 
 static inline void
 vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 {
 	uint32_t count = txlog_count(&tx->log);
+	struct tx_manager *m = tx->manager;
+	struct vy_bufiter iter;
+	vy_bufiter_open(&iter, &tx->log.buf, sizeof(struct txlogv));
+	for (; vy_bufiter_has(&iter); vy_bufiter_next(&iter))
+	{
+		struct txlogv *lv = vy_bufiter_get(&iter);
+		struct txv *v = lv->v.v;
+		/** Gets are collected by gc */
+		if (v->tuple->flags & SVGET) {
+			v->gc = m->gc;
+			/*
+			 * We will destroy tx, ensure the txv
+			 * doesn't refer to it.
+			 */
+			rlist_del(&v->next_in_index);
+			m->gc = v;
+			m->count_gc++;
+		} else {
+			txv_untrack(v);
+			txv_delete(m->env, v);
+		}
+	}
 	tx_gc(tx);
 	vy_stat_tx(stat, tx->start, count, rlb, conflict);
 	free(tx);
@@ -10369,22 +10366,10 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 		txv_abort_all(txv_next(v));
 		/* mark statement as committed */
 		txv_commit(v, csn);
-		/* translate log version from struct txv to struct vinyl_tuple */
-		sv_from_tuple(&lv->v, v->tuple);
-		/* schedule read stmt for gc */
-		if (v->tuple->flags & SVGET) {
-			vinyl_tuple_ref(v->tuple);
-			v->gc = m->gc;
-			m->gc = v;
-			m->count_gc++;
-		} else {
-			txv_untrack(v);
-			free(v);
-		}
 	}
 
 	/* rollback latest reads */
-	tx_rollback_svp(tx, &i, 0);
+	tx_rollback_svp(tx, &i);
 
 	tx_promote(tx, VINYL_TX_COMMIT);
 	tx_end(tx);
