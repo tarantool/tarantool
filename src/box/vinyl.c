@@ -1327,41 +1327,6 @@ static struct vy_filterif vy_filterif_zstd =
 	.complete = vy_filter_zstd_complete
 };
 
-enum { VY_TUPLE_KEY_MISSING = UINT32_MAX };
-
-/**
- * Extract key from tuple by part_id
- */
-static inline const char *
-vy_tuple_key_part(const char *tuple_data, uint32_t part_id)
-{
-	uint32_t *offsets = (uint32_t *) tuple_data;
-	uint32_t offset = offsets[part_id];
-	if (offset == VY_TUPLE_KEY_MISSING)
-		return NULL;
-	return tuple_data + offset;
-}
-
-/**
- * Compare two tuples
- */
-static inline int
-vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
-		 const struct key_def *key_def)
-{
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		const struct key_part *part = &key_def->parts[part_id];
-		const char *field_a = vy_tuple_key_part(tuple_data_a, part_id);
-		const char *field_b = vy_tuple_key_part(tuple_data_b, part_id);
-		if (field_a == NULL || field_b == NULL)
-			break; /* no more parts in the key */
-		int rc = tuple_compare_field(field_a, field_b, part->type);
-		if (rc != 0)
-			return rc;
-	}
-	return 0;
-}
-
 #define VINYL_VERSION_MAGIC      8529643324614668147ULL
 
 #define VINYL_VERSION_A         '2'
@@ -1787,9 +1752,7 @@ struct vinyl_tuple {
 };
 
 static inline uint32_t
-vinyl_tuple_size(struct vinyl_tuple *v) {
-	return sizeof(struct vinyl_tuple) + v->size;
-}
+vinyl_tuple_size(struct vinyl_tuple *v);
 
 static struct vinyl_tuple *
 vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size);
@@ -1797,16 +1760,12 @@ vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size);
 static int
 vinyl_tuple_unref_rt(struct vinyl_env *env, struct vinyl_tuple *v);
 
-static void *
-vinyl_update_alloc(void *arg, size_t size)
-{
-	(void) arg;
-	/* TODO: rewrite tuple_upsert_execute() without exceptions */
-	void *data = box_txn_alloc(size);
-	if (data == NULL)
-		diag_raise();
-	return data;
-}
+static inline const char *
+vy_tuple_key_part(const char *tuple_data, uint32_t part_id);
+
+static inline int
+vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
+		 const struct key_def *key_def);
 
 struct vinyl_index;
 
@@ -9038,92 +8997,7 @@ static int vinyl_index_visible(struct vinyl_index*, uint64_t);
 static int vinyl_index_recoverbegin(struct vinyl_index*);
 static int vinyl_index_recoverend(struct vinyl_index*);
 
-struct vinyl_cursor {
-	struct vinyl_index *index;
-	struct vinyl_tuple *key;
-	enum vinyl_order order;
-	struct vinyl_tx tx;
-	int ops;
-	int read_disk;
-	int read_cache;
-	struct sicache *cache;
-};
-
-void
-vinyl_bootstrap(struct vinyl_env *e)
-{
-	assert(e->status == VINYL_OFFLINE);
-	e->status = VINYL_ONLINE;
-	/* enable quota */
-	vy_quota_enable(e->quota);
-}
-
-void
-vinyl_begin_initial_recovery(struct vinyl_env *e)
-{
-	assert(e->status == VINYL_OFFLINE);
-	e->status = VINYL_INITIAL_RECOVERY;
-}
-
-void
-vinyl_begin_final_recovery(struct vinyl_env *e)
-{
-	assert(e->status == VINYL_INITIAL_RECOVERY);
-	e->status = VINYL_FINAL_RECOVERY;
-}
-
-void
-vinyl_end_recovery(struct vinyl_env *e)
-{
-	assert(e->status == VINYL_FINAL_RECOVERY);
-	e->status = VINYL_ONLINE;
-	/* enable quota */
-	vy_quota_enable(e->quota);
-}
-
-int
-vinyl_env_delete(struct vinyl_env *e)
-{
-	int rcret = 0;
-	e->status = VINYL_SHUTDOWN;
-	/* TODO: tarantool doesn't delete indexes during shutdown */
-	//assert(rlist_empty(&e->db));
-	int rc;
-	struct vinyl_index *index, *next;
-	rlist_foreach_entry_safe(index, &e->scheduler->shutdown, link, next) {
-		rc = vinyl_index_delete(index);
-		if (unlikely(rc == -1))
-			rcret = -1;
-	}
-	tx_manager_delete(e->xm);
-	vy_cachepool_delete(e->cachepool);
-	vy_conf_delete(e->conf);
-	vy_quota_delete(e->quota);
-	vy_stat_delete(e->stat);
-	vy_sequence_delete(e->seq);
-	scheduler_delete(e->scheduler);
-	mempool_destroy(&e->read_task_pool);
-	mempool_destroy(&e->cursor_pool);
-	free(e);
-	return rcret;
-}
-
-int
-vinyl_checkpoint(struct vinyl_env *env)
-{
-	return sc_ctl_checkpoint(env->scheduler);
-}
-
-bool
-vinyl_checkpoint_is_active(struct vinyl_env *env)
-{
-	tt_pthread_mutex_lock(&env->scheduler->lock);
-	bool is_active = env->scheduler->checkpoint;
-	tt_pthread_mutex_unlock(&env->scheduler->lock);
-	return is_active;
-}
-
-/** {{{ vy_info*/
+/** {{{ Introspection */
 
 static inline struct vy_info_node *
 vy_info_append(struct vy_info_node *root, const char *key)
@@ -9384,7 +9258,49 @@ vy_info_destroy(struct vy_info *info)
 	TRASH(info);
 }
 
-/** }}} vy_info */
+/** }}} Introspection */
+
+/* {{{ Cursor */
+
+struct vinyl_cursor {
+	struct vinyl_index *index;
+	struct vinyl_tuple *key;
+	enum vinyl_order order;
+	struct vinyl_tx tx;
+	int ops;
+	int read_disk;
+	int read_cache;
+	struct sicache *cache;
+};
+
+struct vinyl_cursor *
+vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
+		 enum vinyl_order order)
+{
+	struct vinyl_env *e = index->env;
+	struct vinyl_cursor *c = mempool_alloc(&e->cursor_pool);
+	if (unlikely(c == NULL)) {
+		diag_set(OutOfMemory, sizeof(*c), "cursor", "struct");
+		return NULL;
+	}
+	vinyl_index_ref(index);
+	c->index = index;
+	c->ops = 0;
+	c->read_disk = 0;
+	c->read_cache = 0;
+	c->cache = vy_cachepool_pop(e->cachepool);
+	if (unlikely(c->cache == NULL)) {
+		mempool_free(&e->cursor_pool, c);
+		vy_oom();
+		return NULL;
+	}
+	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
+
+	c->key = key;
+	vinyl_tuple_ref(key);
+	c->order = order;
+	return c;
+}
 
 void
 vinyl_cursor_delete(struct vinyl_cursor *c)
@@ -9442,34 +9358,7 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 	return 0;
 }
 
-struct vinyl_cursor *
-vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
-		 enum vinyl_order order)
-{
-	struct vinyl_env *e = index->env;
-	struct vinyl_cursor *c = mempool_alloc(&e->cursor_pool);
-	if (unlikely(c == NULL)) {
-		diag_set(OutOfMemory, sizeof(*c), "cursor", "struct");
-		return NULL;
-	}
-	vinyl_index_ref(index);
-	c->index = index;
-	c->ops = 0;
-	c->read_disk = 0;
-	c->read_cache = 0;
-	c->cache = vy_cachepool_pop(e->cachepool);
-	if (unlikely(c->cache == NULL)) {
-		free(c);
-		vy_oom();
-		return NULL;
-	}
-	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
-
-	c->key = key;
-	vinyl_tuple_ref(key);
-	c->order = order;
-	return c;
-}
+/*** }}} Cursor */
 
 static int
 vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
@@ -9914,6 +9803,19 @@ static int vinyl_index_recoverend(struct vinyl_index *index)
 	return 0;
 }
 
+/* {{{ Tuple */
+
+enum {
+	VY_TUPLE_KEY_MISSING = UINT32_MAX,
+	VINYL_KEY_MAXLEN = 1024
+};
+
+static inline uint32_t
+vinyl_tuple_size(struct vinyl_tuple *v)
+{
+	return sizeof(struct vinyl_tuple) + v->size;
+}
+
 static struct vinyl_tuple *
 vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size)
 {
@@ -9932,8 +9834,6 @@ vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size)
 	tt_pthread_mutex_unlock(&env->stat->lock);
 	return v;
 }
-
-enum { VINYL_KEY_MAXLEN = 1024  };
 
 struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
@@ -10132,6 +10032,55 @@ vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple)
 }
 
 /**
+ * Extract key from tuple by part_id
+ */
+static inline const char *
+vy_tuple_key_part(const char *tuple_data, uint32_t part_id)
+{
+	uint32_t *offsets = (uint32_t *) tuple_data;
+	uint32_t offset = offsets[part_id];
+	if (offset == VY_TUPLE_KEY_MISSING)
+		return NULL;
+	return tuple_data + offset;
+}
+
+/**
+ * Compare two tuples
+ */
+static inline int
+vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
+		 const struct key_def *key_def)
+{
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		const struct key_part *part = &key_def->parts[part_id];
+		const char *field_a = vy_tuple_key_part(tuple_data_a, part_id);
+		const char *field_b = vy_tuple_key_part(tuple_data_b, part_id);
+		if (field_a == NULL || field_b == NULL)
+			break; /* no more parts in the key */
+		int rc = tuple_compare_field(field_a, field_b, part->type);
+		if (rc != 0)
+			return rc;
+	}
+	return 0;
+}
+
+
+/* }}} Tuple */
+
+/** {{{ Upsert */
+
+static void *
+vinyl_update_alloc(void *arg, size_t size)
+{
+	(void) arg;
+	/* TODO: rewrite tuple_upsert_execute() without exceptions */
+	void *data = box_txn_alloc(size);
+	if (data == NULL)
+		diag_raise();
+	return data;
+}
+
+/**
  * vinyl wrapper of tuple_upsert_execute.
  * vibyl upsert opts are slightly different from tarantool ops,
  *  so they need some preparation before tuple_upsert_execute call.
@@ -10230,6 +10179,8 @@ vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
 	fiber_gc();
 	return result;
 }
+
+/* }}} Upsert */
 
 static inline int
 vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
@@ -10603,6 +10554,8 @@ vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result)
 
 /** }}} vy_read_task */
 
+/** {{{ Environment */
+
 struct vinyl_env *
 vinyl_env_new(void)
 {
@@ -10656,7 +10609,87 @@ error_1:
 	return NULL;
 }
 
-/** {{{ replication */
+int
+vinyl_env_delete(struct vinyl_env *e)
+{
+	int rcret = 0;
+	e->status = VINYL_SHUTDOWN;
+	/* TODO: tarantool doesn't delete indexes during shutdown */
+	//assert(rlist_empty(&e->db));
+	int rc;
+	struct vinyl_index *index, *next;
+	rlist_foreach_entry_safe(index, &e->scheduler->shutdown, link, next) {
+		rc = vinyl_index_delete(index);
+		if (unlikely(rc == -1))
+			rcret = -1;
+	}
+	tx_manager_delete(e->xm);
+	vy_cachepool_delete(e->cachepool);
+	vy_conf_delete(e->conf);
+	vy_quota_delete(e->quota);
+	vy_stat_delete(e->stat);
+	vy_sequence_delete(e->seq);
+	scheduler_delete(e->scheduler);
+	mempool_destroy(&e->read_task_pool);
+	mempool_destroy(&e->cursor_pool);
+	free(e);
+	return rcret;
+}
+
+/** }}} Environment */
+
+/** {{{ Recovery */
+
+void
+vinyl_bootstrap(struct vinyl_env *e)
+{
+	assert(e->status == VINYL_OFFLINE);
+	e->status = VINYL_ONLINE;
+	/* enable quota */
+	vy_quota_enable(e->quota);
+}
+
+void
+vinyl_begin_initial_recovery(struct vinyl_env *e)
+{
+	assert(e->status == VINYL_OFFLINE);
+	e->status = VINYL_INITIAL_RECOVERY;
+}
+
+void
+vinyl_begin_final_recovery(struct vinyl_env *e)
+{
+	assert(e->status == VINYL_INITIAL_RECOVERY);
+	e->status = VINYL_FINAL_RECOVERY;
+}
+
+void
+vinyl_end_recovery(struct vinyl_env *e)
+{
+	assert(e->status == VINYL_FINAL_RECOVERY);
+	e->status = VINYL_ONLINE;
+	/* enable quota */
+	vy_quota_enable(e->quota);
+}
+
+int
+vinyl_checkpoint(struct vinyl_env *env)
+{
+	return sc_ctl_checkpoint(env->scheduler);
+}
+
+bool
+vinyl_checkpoint_is_active(struct vinyl_env *env)
+{
+	tt_pthread_mutex_lock(&env->scheduler->lock);
+	bool is_active = env->scheduler->checkpoint;
+	tt_pthread_mutex_unlock(&env->scheduler->lock);
+	return is_active;
+}
+
+/** }}} Recovery */
+
+/** {{{ Replication */
 
 int
 vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx)

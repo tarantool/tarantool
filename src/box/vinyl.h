@@ -53,6 +53,42 @@ struct tuple;
 struct tuple_format;
 struct region;
 
+/*
+ * Environment
+ */
+
+struct vinyl_env *
+vinyl_env_new(void);
+
+int
+vinyl_env_delete(struct vinyl_env *e);
+
+/*
+ * Recovery
+ */
+
+void
+vinyl_bootstrap(struct vinyl_env *e);
+
+void
+vinyl_begin_initial_recovery(struct vinyl_env *e);
+
+void
+vinyl_begin_final_recovery(struct vinyl_env *e);
+
+void
+vinyl_end_recovery(struct vinyl_env *e);
+
+int
+vinyl_checkpoint(struct vinyl_env *env);
+
+bool
+vinyl_checkpoint_is_active(struct vinyl_env *env);
+
+/*
+ * Introspection
+ */
+
 enum vy_type {
 	VINYL_NODE = 0,
 	VINYL_STRING,
@@ -84,35 +120,6 @@ vy_info_create(struct vy_info *info, struct vinyl_env *e);
 
 void
 vy_info_destroy(struct vy_info *creator);
-
-/*
- * Environment
- */
-
-struct vinyl_env *
-vinyl_env_new(void);
-
-int
-vinyl_env_delete(struct vinyl_env *e);
-
-void
-vinyl_bootstrap(struct vinyl_env *e);
-
-void
-vinyl_begin_initial_recovery(struct vinyl_env *e);
-
-void
-vinyl_begin_final_recovery(struct vinyl_env *e);
-
-void
-vinyl_end_recovery(struct vinyl_env *e);
-
-int
-vinyl_checkpoint(struct vinyl_env *env);
-
-bool
-vinyl_checkpoint_is_active(struct vinyl_env *env);
-
 
 /*
  * Workers
