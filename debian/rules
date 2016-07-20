@@ -4,6 +4,12 @@
 VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
+ifneq ($(wildcard /usr/bin/dh_systemd_start),)
+WITH_SYSTEMD:=ON
+else
+WITH_SYSTEMD:=OFF
+endif
+
 DEB_CMAKE_EXTRA_FLAGS := \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
@@ -12,9 +18,11 @@ DEB_CMAKE_EXTRA_FLAGS := \
 	-DENABLE_BUNDLED_LIBYAML=OFF \
 	-DENABLE_DIST=ON \
 	-DWITH_SYSVINIT=ON \
-	-DWITH_SYSTEMD=OFF
+	-DWITH_SYSTEMD=$(WITH_SYSTEMD)
 
-DEB_DH_INSTALLINIT_ARGS := --name=tarantool
+DEB_DH_INSTALLINIT_ARGS    := --name=tarantool
+DEB_DH_SYSTEMD_ENABLE_ARGS := --name=tarantool tarantool.service
+DEB_DH_SYSTEMD_START_ARGS  := --no-restart-on-upgrade tarantool.service
 
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
@@ -28,7 +36,15 @@ include /usr/share/cdbs/1/class/cmake.mk
 debian/%.manpages: debian/%.manpages.in
 	sed 's/@DEB_BUILDDIR@/$(DEB_BUILDDIR)/g' $< > $@
 
-build-indep: debian/tarantool.manpages debian/tarantool-common.manpages
+debian/tarantool-common.install:
+ifneq ($(wildcard /usr/bin/dh_systemd_start),)
+	cp -p debian/tarantool-common.install.systemd.in $@
+else
+	cp -p debian/tarantool-common.install.sysvinit.in $@
+endif
+
+build-indep: debian/tarantool.manpages debian/tarantool-common.manpages \
+             debian/tarantool-common.install
 
 tarball: clean
 	git describe --long --always > VERSION

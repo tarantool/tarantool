@@ -1,0 +1,15 @@
+# systemd service for managing all Tarantool instances on the system. This
+# service is actually a systemd target, but we are using a service since
+# targets cannot be reloaded.
+
+[Unit]
+Description=Tarantool Database Server
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+ExecReload=/bin/true
+RemainAfterExit=on
+
+[Install]
+WantedBy=multi-user.target

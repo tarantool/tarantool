@@ -20,7 +20,7 @@ AssertPathIsReadWrite=@TARANTOOL_LOGDIR@
 # Created by systemd-tmpfiles
 AssertPathIsReadWrite=@TARANTOOL_RUNDIR@
 # Instance file
-ConditionPathExists=@TARANTOOL_AVAILABLEDIR@/%I.lua
+ConditionPathExists=@TARANTOOL_INSTANCEDIR@/%I.lua
 
 [Service]
 Type=forking

@@ -1,6 +1,12 @@
+tarantool (1.7.1.142.g27d7c6c-1) unstable; urgency=medium
+
+  * Enable systemd integration, fix sysvinit + systemd interoperability.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Wed, 03 Aug 2016 17:20:26 +0300
+
 tarantool (1.7.1.140.g6d1a4be-1) unstable; urgency=medium
 
-  * Start 'example.lua' instance by default on 'localhost:3301'
+  * Start 'example.lua' instance by default on 'localhost:3301'.
 
  -- Roman Tsisyk <roman@tarantool.org>  Wed, 03 Aug 2016 16:28:58 +0300
 

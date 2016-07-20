@@ -121,6 +121,26 @@ if (WITH_SYSTEMD)
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
+
+    if(WITH_SYSVINIT)
+        # Install generator and tarantool.service file to allow
+        # sysvinit alongside systemd (Debian/Ubuntu)
+        #
+        configure_file("tarantool-generator.in" "tarantool-generator" @ONLY)
+        install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool-generator
+            DESTINATION ${SYSTEMD_GENERATOR_DIR}
+            PERMISSIONS
+            OWNER_READ OWNER_WRITE OWNER_EXECUTE
+            GROUP_READ GROUP_READ GROUP_EXECUTE
+            WORLD_READ WORLD_READ WORLD_EXECUTE)
+        install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/tarantool.service
+            DESTINATION ${SYSTEMD_UNIT_DIR}
+            PERMISSIONS
+            OWNER_READ OWNER_WRITE
+            GROUP_READ GROUP_READ
+            WORLD_READ WORLD_READ)
+    endif()
+
     configure_file(tarantool.tmpfiles.conf.in tarantool.tmpfiles.conf @ONLY)
     install (FILES "${CMAKE_CURRENT_BINARY_DIR}/tarantool.tmpfiles.conf"
         DESTINATION "${SYSTEMD_TMPFILES_DIR}"
