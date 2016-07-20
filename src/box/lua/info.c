@@ -215,7 +215,7 @@ lbox_vinyl_info_table(struct lua_State *L, struct vy_info_node *node)
 		lua_newtable(L);
 		/* iterate over childs */
 		for (int i = 0; i < node->childs_n; ++i) {
-			lbox_vinyl_info_table(L, node->childs[i]);
+			lbox_vinyl_info_table(L, &node->childs[i]);
 		}
 		if (node->key != NULL)
 			lua_settable(L, -3);
@@ -247,7 +247,7 @@ lbox_info_vinyl_call(struct lua_State *L)
 	struct vy_info info;
 	if (vy_info_create(&info, vinyl_engine_get_env()))
 		return 0;
-	lbox_vinyl_info_table(L, info.root);
+	lbox_vinyl_info_table(L, &info.root);
 	vy_info_destroy(&info);
 	return 1;
 }

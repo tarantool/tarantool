@@ -35,6 +35,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <small/region.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,13 +68,14 @@ struct vy_info_node {
 		uint32_t u32;
 		const char *str;
 	} value;
-	struct vy_info_node **childs;
+	int childs_cap;
 	int childs_n;
+	struct vy_info_node *childs;
 };
 
 struct vy_info {
-	struct vy_info_node *root;
-	struct region *allocator;
+	struct vy_info_node root;
+	struct region allocator;
 	struct vinyl_env *env;
 };
 

@@ -9108,396 +9108,263 @@ vinyl_checkpoint_is_active(struct vinyl_env *env)
 
 /** {{{ vy_info*/
 
-static inline struct vy_info
-vy_get_info(struct vinyl_env *env)
-{
-	struct vy_info info;
-	info.root = NULL;
-	info.allocator = NULL;
-	info.env = env;
-	return info;
-}
-
-static inline struct vy_info
-vy_get_info_from(struct vy_info *parent)
-{
-	struct vy_info info = vy_get_info(parent->env);
-	info.allocator = parent->allocator;
-	return info;
-}
-
 static inline struct vy_info_node *
-vy_info_node_alloc(struct region *region)
+vy_info_append(struct vy_info_node *root, const char *key)
 {
-	struct vy_info_node *node = region_alloc(region, sizeof(struct vy_info_node));
-	if (node == NULL) {
-		diag_set(OutOfMemory, sizeof(*node), "region_alloc", "vy_info_node_alloc");
-		return NULL;
-	}
-	memset(node, 0, sizeof(*node));
+	assert(root->childs_n < root->childs_cap);
+	struct vy_info_node *node = &root->childs[root->childs_n];
+	root->childs_n++;
+	node->key = key;
+	node->val_type = VINYL_NODE;
 	return node;
 }
 
-static inline int
-vy_info_append_u32(struct vy_info *info, const char *key,
-		   uint32_t value)
+static inline void
+vy_info_append_u32(struct vy_info_node *root, const char *key, uint32_t value)
 {
-	struct vy_info_node *node = vy_info_node_alloc(info->allocator);
-	if (node == NULL)
-		return 1;
-	node->key = key;
+	struct vy_info_node *node = vy_info_append(root, key);
 	node->value.u32 = value;
 	node->val_type = VINYL_U32;
-	node->childs = NULL;
-	node->childs_n = 0;
-	struct vy_info_node *root = info->root;
-	root->childs[root->childs_n++] = node;
-	return 0;
 }
 
-static inline int
-vy_info_append_u64(struct vy_info *info, const char *key,
-		   uint64_t value)
+static inline void
+vy_info_append_u64(struct vy_info_node *root, const char *key, uint64_t value)
 {
-	struct vy_info_node *node = vy_info_node_alloc(info->allocator);
-	if (node == NULL)
-		return 1;
-	node->key = key;
+	struct vy_info_node *node = vy_info_append(root, key);
 	node->value.u64 = value;
 	node->val_type = VINYL_U64;
-	node->childs = NULL;
-	node->childs_n = 0;
-	struct vy_info_node *root = info->root;
-	root->childs[root->childs_n++] = node;
-	return 0;
 }
 
-static inline int
-vy_info_append_node(struct vy_info *info, const char *key,
-		    struct vy_info_node *child)
-{
-	struct vy_info_node *root = info->root;
-	child->key = key;
-	root->childs[root->childs_n++] = child;
-	return 0;
-}
-
-static inline int
-vy_info_append_str(struct vy_info *info, const char *key,
+static inline void
+vy_info_append_str(struct vy_info_node *root, const char *key,
 		   const char *value)
 {
-	struct vy_info_node *node = vy_info_node_alloc(info->allocator);
-	if (node == NULL)
-		return 1;
-	node->key = key;
+	struct vy_info_node *node = vy_info_append(root, key);
 	node->value.str = value;
 	node->val_type = VINYL_STRING;
-	node->childs = NULL;
-	node->childs_n = 0;
-	struct vy_info_node *root = info->root;
-	root->childs[root->childs_n++] = node;
+}
+
+static inline int
+vy_info_reserve(struct vy_info *info, struct vy_info_node *node, int size)
+{
+	node->childs = region_alloc(&info->allocator,
+				    size * sizeof(*node->childs));
+	if (node->childs == NULL) {
+		diag_set(OutOfMemory, sizeof(*node), "vy_info_node",
+			"node->childs");
+		return -1;
+	}
+	memset(node->childs, 0, size * sizeof(*node->childs));
+	node->childs_cap = size;
 	return 0;
 }
 
 static inline int
-vy_info_reserve(struct vy_info *info, int size)
+vy_info_append_global(struct vy_info *info, struct vy_info_node *root)
 {
-	info->root = vy_info_node_alloc(info->allocator);
-	if (info->root == NULL)
+	struct vy_info_node *node = vy_info_append(root, "vinyl");
+	if (vy_info_reserve(info, node, 4) != 0)
 		return 1;
-	struct vy_info_node *root = info->root;
-	root->key = NULL;
-	root->val_type = VINYL_NODE;
-	root->childs = region_alloc(info->allocator, sizeof(struct vy_info_node *) * size);
-	if (root->childs == NULL) {
-		diag_set(OutOfMemory, sizeof(struct vy_info_node *) * size,
-			 "region_alloc", "vy_reserve_tree_creator");
-		return 1;
-	}
+	vy_info_append_str(node, "path", info->env->conf->path);
+	vy_info_append_str(node, "build", PACKAGE_VERSION);
+	vy_info_append_str(node, "version", VINYL_VERSION);
+	vy_info_append_str(node, "version_storage", VINYL_VERSION_STORAGE);
 	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_global(struct vy_info *parent)
+static inline int
+vy_info_append_memory(struct vy_info *info, struct vy_info_node *root)
 {
-	struct vy_info info = vy_get_info_from(parent);
-	if (vy_info_reserve(&info, 4))
-		return NULL;
-	if (vy_info_append_str(&info, "path", info.env->conf->path))
-		return NULL;
-	if (vy_info_append_str(&info, "build", PACKAGE_VERSION))
-		return NULL;
-	if (vy_info_append_str(&info, "version", VINYL_VERSION))
-		return NULL;
-	if (vy_info_append_str(&info, "version_storage", VINYL_VERSION_STORAGE))
-		return NULL;
-	return info.root;
+	struct vy_info_node *node = vy_info_append(root, "memory");
+	if (vy_info_reserve(info, node, 2) != 0)
+		return 1;
+	struct vinyl_env *env = info->env;
+	vy_info_append_u64(node, "used", vy_quota_used(env->quota));
+	vy_info_append_u64(node, "limit", env->conf->memory_limit);
+	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_memory(struct vy_info *parent)
+static inline int
+vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 {
-	struct vy_info info = vy_get_info_from(parent);
-	struct vinyl_env *env = info.env;
-	if (vy_info_reserve(&info, 2))
-		return NULL;
-	if (vy_info_append_u64(&info, "used", vy_quota_used(env->quota)))
-		return NULL;
-	if (vy_info_append_u64(&info, "limit", env->conf->memory_limit))
-		return NULL;
-	return info.root;
-}
-
-static inline struct vy_info_node *
-vy_info_append_compaction(struct vy_info *parent)
-{
-	struct vy_info info = vy_get_info_from(parent);
 	int childs_cnt = 0;
-	struct vinyl_env *env = info.env;
+	struct vinyl_env *env = info->env;
 	for (int i = 0; i < 11; ++i) {
 		struct srzone *z = &env->conf->zones.zones[i];
 		if (!z->enable)
 			continue;
 		++childs_cnt;
 	}
-	if (vy_info_reserve(&info, childs_cnt))
-		return NULL;
+	struct vy_info_node *node = vy_info_append(root, "compaction");
+	if (vy_info_reserve(info, node, childs_cnt) != 0)
+		return 1;
 	for (int i = 0; i < 11; ++i) {
 		struct srzone *z = &env->conf->zones.zones[i];
 		if (!z->enable)
 			continue;
-		struct vy_info local_info = vy_get_info_from(&info);
-		if (vy_info_reserve(&local_info, 13))
-			return NULL;
 
-		if (vy_info_append_u32(&local_info, "mode", z->mode))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "gc_wm", z->gc_wm))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "gc_prio", z->gc_prio))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "lru_prio", z->lru_prio))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_wm", z->branch_wm))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "gc_period", z->gc_period))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "lru_period", z->lru_period))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_age", z->branch_age))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "compact_wm", z->compact_wm))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_prio", z->branch_prio))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "compact_mode", z->compact_mode))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_age_wm", z->branch_age_wm))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_age_period", z->branch_age_period))
-			return NULL;
-
-		vy_info_append_node(&info, z->name, local_info.root);
+		struct vy_info_node *local_node = vy_info_append(node, z->name);
+		if (vy_info_reserve(info, local_node, 13) != 0)
+			return 1;
+		vy_info_append_u32(local_node, "mode", z->mode);
+		vy_info_append_u32(local_node, "gc_wm", z->gc_wm);
+		vy_info_append_u32(local_node, "gc_prio", z->gc_prio);
+		vy_info_append_u32(local_node, "lru_prio", z->lru_prio);
+		vy_info_append_u32(local_node, "branch_wm", z->branch_wm);
+		vy_info_append_u32(local_node, "gc_period", z->gc_period);
+		vy_info_append_u32(local_node, "lru_period", z->lru_period);
+		vy_info_append_u32(local_node, "branch_age", z->branch_age);
+		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
+		vy_info_append_u32(local_node, "branch_prio", z->branch_prio);
+		vy_info_append_u32(local_node, "compact_mode", z->compact_mode);
+		vy_info_append_u32(local_node, "branch_age_wm", z->branch_age_wm);
+		vy_info_append_u32(local_node, "branch_age_period", z->branch_age_period);
 	}
-	return info.root;
+	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_scheduler(struct vy_info *parent)
+static inline int
+vy_info_append_scheduler(struct vy_info *info, struct vy_info_node *root)
 {
-	struct vy_info info = vy_get_info_from(parent);
-	if (vy_info_reserve(&info, 3))
-		return NULL;
-	struct vinyl_env *env = info.env;
+	struct vy_info_node *node = vy_info_append(root, "scheduler");
+	if (vy_info_reserve(info, node, 3) != 0)
+		return 1;
+
+	struct vinyl_env *env = info->env;
 	int v = vy_quota_used_percent(env->quota);
 	struct srzone *z = sr_zonemap(&env->conf->zones, v);
-	if (vy_info_append_str(&info, "zone", z->name))
-		return NULL;
+	vy_info_append_str(node, "zone", z->name);
 
 	struct scheduler *scheduler = env->scheduler;
 	tt_pthread_mutex_lock(&scheduler->lock);
-	if (vy_info_append_u32(&info, "gc_active", scheduler->gc))
-		return NULL;
-	if (vy_info_append_u32(&info, "lru_active", scheduler->lru))
-		return NULL;
+	vy_info_append_u32(node, "gc_active", scheduler->gc);
+	vy_info_append_u32(node, "lru_active", scheduler->lru);
 	tt_pthread_mutex_unlock(&scheduler->lock);
-	return info.root;
+	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_performance(struct vy_info *parent)
+static inline int
+vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 {
-	struct vy_info info = vy_get_info_from(parent);
-	if (vy_info_reserve(&info, 26))
-		return NULL;
-	struct vinyl_env *env = info.env;
+	struct vy_info_node *node = vy_info_append(root, "performance");
+	if (vy_info_reserve(info, node, 26) != 0)
+		return 1;
+
+	struct vinyl_env *env = info->env;
 	struct vy_stat *stat = env->stat;
 	vy_stat_prepare(stat);
 	tt_pthread_mutex_lock(&stat->lock);
-	if (vy_info_append_u64(&info, "tx", stat->tx))
-		return NULL;
-	if (vy_info_append_u64(&info, "set", stat->set))
-		return NULL;
-	if (vy_info_append_u64(&info, "get", stat->get))
-		return NULL;
-	if (vy_info_append_u64(&info, "delete", stat->del))
-		return NULL;
-	if (vy_info_append_u64(&info, "upsert", stat->upsert))
-		return NULL;
-	if (vy_info_append_u64(&info, "cursor", stat->cursor))
-		return NULL;
-	if (vy_info_append_str(&info, "tx_ops", stat->tx_stmts.sz))
-		return NULL;
-	if (vy_info_append_u64(&info, "tx_lock", stat->tx_lock))
-		return NULL;
-	if (vy_info_append_u64(&info, "documents", stat->v_count))
-		return NULL;
-	if (vy_info_append_str(&info, "tx_latency", stat->tx_latency.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "cursor_ops", stat->cursor_ops.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "get_latency", stat->get_latency.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "set_latency", stat->set_latency.sz))
-		return NULL;
-	if (vy_info_append_u64(&info, "tx_rollback", stat->tx_rlb))
-		return NULL;
-	if (vy_info_append_u64(&info, "tx_conflict", stat->tx_conflict))
-		return NULL;
-	if (vy_info_append_u32(&info, "tx_gc_queue", env->xm->count_gc))
-		return NULL;
-	if (vy_info_append_u32(&info, "tx_active_rw", env->xm->count_rw))
-		return NULL;
-	if (vy_info_append_u32(&info, "tx_active_ro", env->xm->count_rd))
-		return NULL;
-	if (vy_info_append_str(&info, "get_read_disk", stat->get_read_disk.sz))
-		return NULL;
-	if (vy_info_append_u64(&info, "documents_used", stat->v_allocated))
-		return NULL;
-	if (vy_info_append_str(&info, "delete_latency", stat->del_latency.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "upsert_latency", stat->upsert_latency.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "get_read_cache", stat->get_read_cache.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "cursor_latency", stat->cursor_latency.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "cursor_read_disk", stat->cursor_read_disk.sz))
-		return NULL;
-	if (vy_info_append_str(&info, "cursor_read_cache", stat->cursor_read_cache.sz))
-		return NULL;
+	vy_info_append_u64(node, "tx", stat->tx);
+	vy_info_append_u64(node, "set", stat->set);
+	vy_info_append_u64(node, "get", stat->get);
+	vy_info_append_u64(node, "delete", stat->del);
+	vy_info_append_u64(node, "upsert", stat->upsert);
+	vy_info_append_u64(node, "cursor", stat->cursor);
+	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
+	vy_info_append_u64(node, "tx_lock", stat->tx_lock);
+	vy_info_append_u64(node, "documents", stat->v_count);
+	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
+	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
+	vy_info_append_str(node, "get_latency", stat->get_latency.sz);
+	vy_info_append_str(node, "set_latency", stat->set_latency.sz);
+	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
+	vy_info_append_u64(node, "tx_conflict", stat->tx_conflict);
+	vy_info_append_u32(node, "tx_gc_queue", env->xm->count_gc);
+	vy_info_append_u32(node, "tx_active_rw", env->xm->count_rw);
+	vy_info_append_u32(node, "tx_active_ro", env->xm->count_rd);
+	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
+	vy_info_append_u64(node, "documents_used", stat->v_allocated);
+	vy_info_append_str(node, "delete_latency", stat->del_latency.sz);
+	vy_info_append_str(node, "upsert_latency", stat->upsert_latency.sz);
+	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
+	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
+	vy_info_append_str(node, "cursor_read_disk", stat->cursor_read_disk.sz);
+	vy_info_append_str(node, "cursor_read_cache", stat->cursor_read_cache.sz);
 	tt_pthread_mutex_unlock(&stat->lock);
-	return info.root;
+	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_metric(struct vy_info *parent)
+static inline int
+vy_info_append_metric(struct vy_info *info, struct vy_info_node *root)
 {
-	struct vy_info info = vy_get_info_from(parent);
-	if (vy_info_reserve(&info, 3))
-		return NULL;
-	struct vy_sequence *seq = info.env->seq;
+	struct vy_info_node *node = vy_info_append(root, "metric");
+	if (vy_info_reserve(info, node, 2) != 0)
+		return 1;
+
+	struct vy_sequence *seq = info->env->seq;
 	vy_sequence_lock(seq);
-	if (vy_info_append_u64(&info, "lsn", seq->lsn))
-		return NULL;
-	if (vy_info_append_u64(&info, "nsn", seq->nsn))
-		return NULL;
+	vy_info_append_u64(node, "lsn", seq->lsn);
+	vy_info_append_u64(node, "nsn", seq->nsn);
 	vy_sequence_unlock(seq);
-	return info.root;
+	return 0;
 }
 
-static inline struct vy_info_node *
-vy_info_append_indices(struct vy_info *parent)
+static inline int
+vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 {
 	struct vinyl_index *o;
-	struct vy_info info = vy_get_info_from(parent);
 	int indices_cnt = 0;
-	rlist_foreach_entry(o, &info.env->indexes, link)
-	{
+	rlist_foreach_entry(o, &info->env->indexes, link) {
 		++indices_cnt;
 	}
-	if (vy_info_reserve(&info, indices_cnt))
-		return NULL;
-	rlist_foreach_entry(o, &info.env->indexes, link)
-	{
+	struct vy_info_node *node = vy_info_append(root, "db");
+	if (vy_info_reserve(info, node, indices_cnt) != 0)
+		return 1;
+	rlist_foreach_entry(o, &info->env->indexes, link) {
 		vy_profiler_begin(&o->rtp, o);
 		vy_profiler_(&o->rtp);
 		vy_profiler_end(&o->rtp);
-		struct vy_info local_info = vy_get_info_from(&info);
-		if (vy_info_reserve(&local_info, 17))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "size", o->rtp.total_node_size))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "count", o->rtp.count))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "count_dup", o->rtp.count_dup))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "read_disk", o->rtp.read_disk))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "page_count", o->rtp.total_page_count))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "read_cache", o->rtp.read_cache))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "node_count", o->rtp.total_node_count))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_avg", o->rtp.total_branch_avg))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_max", o->rtp.total_branch_max))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "memory_used", o->rtp.memory_used))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "branch_count", o->rtp.total_branch_count))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "temperature_avg", o->rtp.temperature_avg))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "temperature_min", o->rtp.temperature_min))
-			return NULL;
-		if (vy_info_append_u32(&local_info, "temperature_max", o->rtp.temperature_max))
-			return NULL;
-		if (vy_info_append_str(&local_info, "branch_histogram", o->rtp.histogram_branch_ptr))
-			return NULL;
-		if (vy_info_append_u64(&local_info, "size_uncompressed", o->rtp.total_node_origin_size))
-			return NULL;
-		if (vy_info_append_str(&local_info, "temperature_histogram", o->rtp.histogram_temperature_ptr))
-			return NULL;
-
-		vy_info_append_node(&info, o->conf.name, local_info.root);
+		struct vy_info_node *local_node =
+			vy_info_append(node, o->conf.name);
+		if (vy_info_reserve(info, local_node, 17) != 0)
+			return 1;
+		vy_info_append_u64(local_node, "size", o->rtp.total_node_size);
+		vy_info_append_u64(local_node, "count", o->rtp.count);
+		vy_info_append_u64(local_node, "count_dup", o->rtp.count_dup);
+		vy_info_append_u64(local_node, "read_disk", o->rtp.read_disk);
+		vy_info_append_u32(local_node, "page_count", o->rtp.total_page_count);
+		vy_info_append_u64(local_node, "read_cache", o->rtp.read_cache);
+		vy_info_append_u32(local_node, "node_count", o->rtp.total_node_count);
+		vy_info_append_u32(local_node, "branch_avg", o->rtp.total_branch_avg);
+		vy_info_append_u32(local_node, "branch_max", o->rtp.total_branch_max);
+		vy_info_append_u64(local_node, "memory_used", o->rtp.memory_used);
+		vy_info_append_u32(local_node, "branch_count", o->rtp.total_branch_count);
+		vy_info_append_u32(local_node, "temperature_avg", o->rtp.temperature_avg);
+		vy_info_append_u32(local_node, "temperature_min", o->rtp.temperature_min);
+		vy_info_append_u32(local_node, "temperature_max", o->rtp.temperature_max);
+		vy_info_append_str(local_node, "branch_histogram", o->rtp.histogram_branch_ptr);
+		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_node_origin_size);
+		vy_info_append_str(local_node, "temperature_histogram", o->rtp.histogram_temperature_ptr);
 	}
-	return info.root;
+	return 0;
 }
 
 int
 vy_info_create(struct vy_info *info, struct vinyl_env *e)
 {
+	memset(info, 0, sizeof(*info));
 	info->env = e;
-	info->allocator = malloc(sizeof(struct region));
-	if (info->allocator == NULL) {
-		diag_set(OutOfMemory, sizeof(struct region),
-			 "malloc", "vy_info_tree_create");
+	region_create(&info->allocator, cord_slab_cache());
+	struct vy_info_node *root = &info->root;
+	if (vy_info_reserve(info, root, 7) != 0 ||
+	    vy_info_append_indices(info, root) != 0 ||
+	    vy_info_append_global(info, root) != 0 ||
+	    vy_info_append_memory(info, root) != 0 ||
+	    vy_info_append_metric(info, root) != 0 ||
+	    vy_info_append_scheduler(info, root) != 0 ||
+	    vy_info_append_compaction(info, root) != 0 ||
+	    vy_info_append_performance(info, root) != 0) {
+		region_destroy(&info->allocator);
 		return 1;
 	}
-	region_create(info->allocator, cord_slab_cache());
-	if (vy_info_reserve(info, 7)) {
-		region_destroy(info->allocator);
-		free(info->allocator);
-		return 1;
-	}
-	vy_info_append_node(info, "db", vy_info_append_indices(info));
-	vy_info_append_node(info, "vinyl", vy_info_append_global(info));
-	vy_info_append_node(info, "memory", vy_info_append_memory(info));
-	vy_info_append_node(info, "metric", vy_info_append_metric(info));
-	vy_info_append_node(info, "scheduler", vy_info_append_scheduler(info));
-	vy_info_append_node(info, "compaction", vy_info_append_compaction(info));
-	vy_info_append_node(info, "performance", vy_info_append_performance(info));
 	return 0;
 }
 
 void
 vy_info_destroy(struct vy_info *info)
 {
-	struct region *allocator = info->allocator;
-	region_destroy(info->allocator);
-	free(allocator);
+	region_destroy(&info->allocator);
+	TRASH(info);
 }
 
 /** }}} vy_info */
