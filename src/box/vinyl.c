@@ -5737,6 +5737,8 @@ vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 		     struct vy_page_info *page_info,
 		     struct vy_buf *minmax_buf)
 {
+	memset(page_info, 0, sizeof(*page_info));
+
 	struct vy_buf tuplesinfo, values;
 	vy_buf_init(&tuplesinfo);
 	vy_buf_init(&values);
