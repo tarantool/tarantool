@@ -1654,11 +1654,9 @@ struct svif {
 
 static struct svif svtuple_if;
 static struct svif svref_if;
-static struct svif txv_if;
 static struct svif sdv_if;
 struct vinyl_tuple;
 struct sdv;
-struct txv;
 struct sdpageheader;
 
 struct sv {
@@ -1680,23 +1678,6 @@ sv_from_tuple(struct sv *v, struct vinyl_tuple *tuple)
 {
 	v->i   = &svtuple_if;
 	v->v   = tuple;
-	v->arg = NULL;
-}
-
-static inline struct txv *
-sv_to_txv(struct sv *v)
-{
-	assert(v->i == &txv_if);
-	struct txv *txv = (struct txv *)v->v;
-	assert(txv != NULL);
-	return txv;
-}
-
-static inline void
-sv_from_txv(struct sv *v, struct txv *txv)
-{
-	v->i   = &txv_if;
-	v->v   = txv;
 	v->arg = NULL;
 }
 
@@ -3358,7 +3339,6 @@ tx_rollback(struct vinyl_tx *tx)
 	return VINYL_TX_ROLLBACK;
 }
 
-
 static inline int
 vy_txprepare_cb(struct vinyl_tx *tx, struct txv *v, uint64_t lsn,
 	    struct sicache *cache, enum vinyl_status status);
@@ -3548,45 +3528,6 @@ static int __attribute__((unused)) tx_deadlock(struct vinyl_tx *t)
 	tx_deadlock_unmark(&mark);
 	return 0;
 }
-
-static uint8_t
-txv_flags(struct sv *v)
-{
-	return sv_to_txv(v)->tuple->flags;
-}
-
-static uint64_t
-txv_lsn(struct sv *v)
-{
-	return sv_to_txv(v)->tuple->lsn;
-}
-
-static void
-txv_set_lsn(struct sv *v, int64_t lsn)
-{
-	sv_to_txv(v)->tuple->lsn = lsn;
-}
-
-static char*
-txv_pointer(struct sv *v)
-{
-	return sv_to_txv(v)->tuple->data;
-}
-
-static uint32_t
-txv_size(struct sv *v)
-{
-	return sv_to_txv(v)->tuple->size;
-}
-
-static struct svif txv_if =
-{
-	.flags     = txv_flags,
-	.lsn       = txv_lsn,
-	.set_lsn    = txv_set_lsn,
-	.pointer   = txv_pointer,
-	.size      = txv_size
-};
 
 #define SD_IDBRANCH 1
 
