@@ -193,45 +193,16 @@ vy_sequence(struct vy_sequence *n, enum vy_sequence_op op)
 	return v;
 }
 
-struct vy_path {
-	char path[PATH_MAX];
-};
-
-static inline void
-vy_path_reset(struct vy_path *p)
+static void
+vy_path_init(char *p, char *dir, uint64_t id, char *ext)
 {
-	p->path[0] = 0;
+	snprintf(p, PATH_MAX, "%s/%020"PRIu64"%s", dir, id, ext);
 }
 
-static inline void
-vy_path_format(struct vy_path *p, char *fmt, ...)
+static void
+vy_path_compound(char *p, char *dir, uint64_t a, uint64_t b, char *ext)
 {
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(p->path, sizeof(p->path), fmt, args);
-	va_end(args);
-}
-
-static inline void
-vy_path_init(struct vy_path *p, char *dir, uint64_t id, char *ext)
-{
-	vy_path_format(p, "%s/%020"PRIu64"%s", dir, id, ext);
-}
-
-static inline void
-vy_path_compound(struct vy_path *p, char *dir, uint64_t a, uint64_t b, char *ext)
-{
-	vy_path_format(p, "%s/%020"PRIu64".%020"PRIu64"%s", dir, a, b, ext);
-}
-
-static inline char*
-vy_path_of(struct vy_path *p) {
-	return p->path;
-}
-
-static inline int
-vy_path_is_set(struct vy_path *p) {
-	return p->path[0] != 0;
+	snprintf(p, PATH_MAX, "%s/%020"PRIu64".%020"PRIu64"%s", dir, a, b, ext);
 }
 
 struct vy_iov {
@@ -291,13 +262,13 @@ struct vy_file {
 	int fd;
 	uint64_t size;
 	int creat;
-	struct vy_path path;
+	char path[PATH_MAX];
 };
 
 static inline void
 vy_file_init(struct vy_file *f)
 {
-	vy_path_reset(&f->path);
+	f->path[0] = '\0';
 	f->fd    = -1;
 	f->size  = 0;
 	f->creat = 0;
@@ -310,7 +281,7 @@ vy_file_open_as(struct vy_file *f, char *path, int flags)
 	f->fd = open(path, flags, 0644);
 	if (unlikely(f->fd == -1))
 		return -1;
-	vy_path_format(&f->path, "%s", path);
+	snprintf(f->path, PATH_MAX, "%s", path);
 	f->size = 0;
 	if (f->creat)
 		return 0;
@@ -350,10 +321,10 @@ vy_file_close(struct vy_file *f)
 static inline int
 vy_file_rename(struct vy_file *f, char *path)
 {
-	int rc = rename(vy_path_of(&f->path), path);
+	int rc = rename(f->path, path);
 	if (unlikely(rc == -1))
 		return -1;
-	vy_path_format(&f->path, "%s", path);
+	snprintf(f->path, PATH_MAX, "%s", path);
 	return 0;
 }
 
@@ -4247,7 +4218,7 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 				   arg->buf_read->s, info->size);
 		if (unlikely(rc == -1)) {
 			vy_error("index file '%s' read error: %s",
-				 vy_path_of(&arg->file->path),
+				 arg->file->path,
 				 strerror(errno));
 			return -1;
 		}
@@ -4263,7 +4234,7 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 		rc = vy_filter_init(&f, arg->compression_if, VINYL_FOUTPUT);
 		if (unlikely(rc == -1)) {
 			vy_error("index file '%s' decompression error",
-			         vy_path_of(&arg->file->path));
+			         arg->file->path);
 			return -1;
 		}
 		int size = info->size - sizeof(struct sdpageheader);
@@ -4272,7 +4243,7 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 				    size);
 		if (unlikely(rc == -1)) {
 			vy_error("index file '%s' decompression error",
-			         vy_path_of(&arg->file->path));
+			         arg->file->path);
 			return -1;
 		}
 		vy_filter_free(&f);
@@ -4285,7 +4256,7 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 	rc = vy_file_pread(arg->file, info->offset, arg->buf->s, info->size);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' read error: %s",
-		         vy_path_of(&arg->file->path),
+		         arg->file->path,
 		         strerror(errno));
 		return -1;
 	}
@@ -4456,7 +4427,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	/* validate seal pointer */
 	if (unlikely(((pointer + sizeof(struct sdseal)) > eof))) {
 		vy_error("corrupted index file '%s': bad seal size",
-		               vy_path_of(&i->file->path));
+		               i->file->path);
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
@@ -4466,7 +4437,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	/* validate index pointer */
 	if (unlikely(((pointer + sizeof(struct vy_page_index_header)) > eof))) {
 		vy_error("corrupted index file '%s': bad index size",
-		               vy_path_of(&i->file->path));
+		               i->file->path);
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
@@ -4477,7 +4448,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	uint32_t crc = vy_crcs(index, sizeof(struct vy_page_index_header), 0);
 	if (index->crc != crc) {
 		vy_error("corrupted index file '%s': bad index crc",
-		               vy_path_of(&i->file->path));
+		               i->file->path);
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
@@ -4488,7 +4459,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 		    + index->size + index->extension;
 	if (unlikely(end > eof)) {
 		vy_error("corrupted index file '%s': bad index size",
-		               vy_path_of(&i->file->path));
+		               i->file->path);
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
@@ -4498,7 +4469,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	int rc = sd_sealvalidate(next, index);
 	if (unlikely(rc == -1)) {
 		vy_error("corrupted index file '%s': bad seal",
-		               vy_path_of(&i->file->path));
+		               i->file->path);
 		i->corrupt = 1;
 		i->v = NULL;
 		return -1;
@@ -4518,14 +4489,14 @@ sd_recover_open(struct sdrecover *ri, struct vinyl_env *env,
 	ri->file = file;
 	if (unlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct vy_page_index_header)))) {
 		vy_error("corrupted index file '%s': bad size",
-		               vy_path_of(&ri->file->path));
+		               ri->file->path);
 		ri->corrupt = 1;
 		return -1;
 	}
 	int rc = vy_mmap_map(&ri->map, ri->file->fd, ri->file->size, 1);
 	if (unlikely(rc == -1)) {
 		vy_error("failed to mmap index file '%s': %s",
-		               vy_path_of(&ri->file->path),
+		               ri->file->path,
 		               strerror(errno));
 		return -1;
 	}
@@ -4719,7 +4690,7 @@ struct PACKED vy_range {
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
-vy_range_open(struct vy_range*, struct vinyl_env*, struct vy_path*);
+vy_range_open(struct vy_range*, struct vinyl_env*, char *);
 static int
 vy_range_create(struct vy_range*, struct vy_index_conf*, struct sdid*);
 static int vy_range_free(struct vy_range*, struct vinyl_env*, int);
@@ -5723,7 +5694,7 @@ vy_branch_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 	}
 	if (vy_file_writev(file, &iov) < 0) {
 		vy_error("file '%s' write error: %s",
-		               vy_path_of(&file->path),
+		               file->path,
 		               strerror(errno));
 		goto err;
 	}
@@ -5792,7 +5763,7 @@ vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 	sd_sealset_open(&seal);
 	if (vy_file_write(file, &seal, sizeof(struct sdseal)) < 0) {
 		vy_error("file '%s' write error: %s",
-		               vy_path_of(&file->path),
+		               file->path,
 		               strerror(errno));
 		goto err;
 	}
@@ -5837,13 +5808,13 @@ vy_branch_write(struct vy_file *file, struct svwriteiter *iwrite,
 	if (vy_file_writev(file, &iov) < 0 ||
 		vy_file_pwrite(file, seal_offset, &seal, sizeof(struct sdseal)) < 0) {
 		vy_error("file '%s' write error: %s",
-		               vy_path_of(&file->path),
+		               file->path,
 		               strerror(errno));
 		goto err;
 	}
 	if (vy_file_sync(file) == -1) {
 		vy_error("index file '%s' sync error: %s",
-		               vy_path_of(&file->path), strerror(errno));
+		               file->path, strerror(errno));
 		return -1;
 	}
 
@@ -6119,15 +6090,15 @@ static int vy_index_dropmark(struct vinyl_index *i)
 
 static int vy_index_drop(struct vinyl_index *i)
 {
-	struct vy_path path;
-	vy_path_format(&path, "%s", i->conf.path);
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%s", i->conf.path);
 	/* drop file must exists at this point */
 	/* shutdown */
 	int rc = vinyl_index_delete(i);
 	if (unlikely(rc == -1))
 		return -1;
 	/* remove directory */
-	rc = vy_index_droprepository(path.path, 1);
+	rc = vy_index_droprepository(path, 1);
 	return rc;
 }
 
@@ -6533,7 +6504,7 @@ vy_range_close(struct vy_range *n, struct vinyl_env *env, int gc)
 	int rc = vy_file_close(&n->file);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' close error: %s",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 		rcret = -1;
 	}
@@ -6595,20 +6566,20 @@ e1:
 }
 
 static int
-vy_range_open(struct vy_range *n, struct vinyl_env *env, struct vy_path *path)
+vy_range_open(struct vy_range *n, struct vinyl_env *env, char *path)
 {
-	int rc = vy_file_open(&n->file, path->path);
+	int rc = vy_file_open(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' open error: %s "
 		               "(please ensure storage version compatibility)",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 		return -1;
 	}
 	rc = vy_file_seek(&n->file, n->file.size);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' seek error: %s",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 		return -1;
 	}
@@ -6622,13 +6593,13 @@ static int
 vy_range_create(struct vy_range *n, struct vy_index_conf *scheme,
 	      struct sdid *id)
 {
-	struct vy_path path;
-	vy_path_compound(&path, scheme->path, id->parent, id->id,
+	char path[PATH_MAX];
+	vy_path_compound(path, scheme->path, id->parent, id->id,
 	                ".index.incomplete");
-	int rc = vy_file_new(&n->file, path.path);
+	int rc = vy_file_new(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' create error: %s",
-		               path.path, strerror(errno));
+		               path, strerror(errno));
 		return -1;
 	}
 	return 0;
@@ -6651,12 +6622,12 @@ static int vy_range_free(struct vy_range *n, struct vinyl_env *env, int gc)
 {
 	int rcret = 0;
 	int rc;
-	if (gc && vy_path_is_set(&n->file.path)) {
+	if (gc && n->file.path[0]) {
 		vy_file_advise(&n->file, 0, 0, n->file.size);
-		rc = unlink(vy_path_of(&n->file.path));
+		rc = unlink(n->file.path);
 		if (unlikely(rc == -1)) {
 			vy_error("index file '%s' unlink error: %s",
-			               vy_path_of(&n->file.path),
+			               n->file.path,
 			               strerror(errno));
 			rcret = -1;
 		}
@@ -6676,19 +6647,19 @@ static int vy_range_seal(struct vy_range *n, struct vy_index_conf *scheme)
 		rc = vy_file_sync(&n->file);
 		if (unlikely(rc == -1)) {
 			vy_error("index file '%s' sync error: %s",
-			               vy_path_of(&n->file.path),
+			               n->file.path,
 			               strerror(errno));
 			return -1;
 		}
 	}
-	struct vy_path path;
-	vy_path_compound(&path, scheme->path,
+	char path[PATH_MAX];
+	vy_path_compound(path, scheme->path,
 	                n->self.id.parent, n->self.id.id,
 	                ".index.seal");
-	rc = vy_file_rename(&n->file, path.path);
+	rc = vy_file_rename(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 		return -1;
 	}
@@ -6698,12 +6669,12 @@ static int vy_range_seal(struct vy_range *n, struct vy_index_conf *scheme)
 static int
 vy_range_complete(struct vy_range *n, struct vy_index_conf *scheme)
 {
-	struct vy_path path;
-	vy_path_init(&path, scheme->path, n->self.id.id, ".index");
-	int rc = vy_file_rename(&n->file, path.path);
+	char path[PATH_MAX];
+	vy_path_init(path, scheme->path, n->self.id.id, ".index");
+	int rc = vy_file_rename(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 	}
 	return rc;
@@ -6711,12 +6682,12 @@ vy_range_complete(struct vy_range *n, struct vy_index_conf *scheme)
 
 static int vy_range_gc(struct vy_range *n, struct vy_index_conf *scheme)
 {
-	struct vy_path path;
-	vy_path_init(&path, scheme->path, n->self.id.id, ".index.gc");
-	int rc = vy_file_rename(&n->file, path.path);
+	char path[PATH_MAX];
+	vy_path_init(path, scheme->path, n->self.id.id, ".index.gc");
+	int rc = vy_file_rename(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
-		               vy_path_of(&n->file.path),
+		               n->file.path,
 		               strerror(errno));
 	}
 	return rc;
@@ -7776,7 +7747,7 @@ si_trackdir(struct sitrack *track, struct vinyl_env *env, struct vinyl_index *i)
 		si_tracknsn(track, id);
 
 		struct vy_range *head, *node;
-		struct vy_path path;
+		char path[PATH_MAX];
 		switch (rc) {
 		case SI_RDB_DBI:
 		case SI_RDB_DBSEAL: {
@@ -7794,12 +7765,12 @@ si_trackdir(struct sitrack *track, struct vinyl_env *env, struct vinyl_index *i)
 			head->recover |= rc;
 			/* remove any incomplete file made during compaction */
 			if (rc == SI_RDB_DBI) {
-				vy_path_compound(&path, i->conf.path, id_parent, id,
+				vy_path_compound(path, i->conf.path, id_parent, id,
 				                ".index.incomplete");
-				rc = unlink(path.path);
+				rc = unlink(path);
 				if (unlikely(rc == -1)) {
 					vy_error("index file '%s' unlink error: %s",
-						 path.path, strerror(errno));
+						 path, strerror(errno));
 					goto error;
 				}
 				continue;
@@ -7810,9 +7781,9 @@ si_trackdir(struct sitrack *track, struct vinyl_env *env, struct vinyl_index *i)
 			if (unlikely(node == NULL))
 				goto error;
 			node->recover = SI_RDB_DBSEAL;
-			vy_path_compound(&path, i->conf.path, id_parent, id,
+			vy_path_compound(path, i->conf.path, id_parent, id,
 			                ".index.seal");
-			rc = vy_range_open(node, env, &path);
+			rc = vy_range_open(node, env, path);
 			if (unlikely(rc == -1)) {
 				vy_range_free(node, env, 0);
 				goto error;
@@ -7822,11 +7793,11 @@ si_trackdir(struct sitrack *track, struct vinyl_env *env, struct vinyl_index *i)
 			continue;
 		}
 		case SI_RDB_REMOVE:
-			vy_path_init(&path, i->conf.path, id, ".index.gc");
-			rc = unlink(vy_path_of(&path));
+			vy_path_init(path, i->conf.path, id, ".index.gc");
+			rc = unlink(path);
 			if (unlikely(rc == -1)) {
 				vy_error("index file '%s' unlink error: %s",
-					 vy_path_of(&path), strerror(errno));
+					 path, strerror(errno));
 				goto error;
 			}
 			continue;
@@ -7844,8 +7815,8 @@ si_trackdir(struct sitrack *track, struct vinyl_env *env, struct vinyl_index *i)
 		if (unlikely(node == NULL))
 			goto error;
 		node->recover = SI_RDB;
-		vy_path_init(&path, i->conf.path, id, ".index");
-		rc = vy_range_open(node, env, &path);
+		vy_path_init(path, i->conf.path, id, ".index");
+		rc = vy_range_open(node, env, path);
 		if (unlikely(rc == -1)) {
 			vy_range_free(node, env, 0);
 			goto error;
