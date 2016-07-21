@@ -120,6 +120,9 @@ struct vinyl_env {
 	struct vy_stat      *stat;
 	struct mempool      read_task_pool;
 	struct mempool      cursor_pool;
+	struct cord *worker_pool;
+	int worker_pool_size;
+	volatile int worker_pool_run;
 };
 
 static inline struct srzone *
@@ -8156,6 +8159,10 @@ static int
 sc_add(struct scheduler*, struct vinyl_index*);
 static int
 sc_del(struct scheduler*, struct vinyl_index*, int);
+static void
+vy_workers_start(struct vinyl_env *env);
+static void
+vy_workers_stop(struct vinyl_env *env);
 
 static inline void
 sc_start(struct scheduler *s, int task)
@@ -8240,11 +8247,8 @@ sc_task_age_done(struct scheduler *s, uint64_t now)
 	s->age_time = now;
 }
 
-static int sc_step(struct vinyl_service*, uint64_t);
-
 static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct vinyl_index*);
-
 
 static struct scheduler *
 scheduler_new(struct vinyl_env *env)
@@ -8675,11 +8679,10 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 }
 
 static int
-sc_schedule(struct sctask *task, struct vinyl_service *srv, uint64_t vlsn)
+sc_schedule(struct vinyl_env *env, struct sctask *task, int64_t vlsn)
 {
 	uint64_t now = clock_monotonic64();
-	struct scheduler *sc = srv->env->scheduler;
-	struct vinyl_env *env = sc->env;
+	struct scheduler *sc = env->scheduler;
 	struct srzone *zone = sr_zoneof(env);
 	int rc;
 	tt_pthread_mutex_lock(&sc->lock);
@@ -8752,12 +8755,12 @@ sc_taskinit(struct sctask *task)
 }
 
 static int
-sc_step(struct vinyl_service *srv, uint64_t vlsn)
+sc_step(struct vinyl_env *env, struct sdc *sdc, uint64_t vlsn)
 {
-	struct scheduler *sc = srv->env->scheduler;
+	struct scheduler *sc = env->scheduler;
 	struct sctask task;
 	sc_taskinit(&task);
-	int rc = sc_schedule(&task, srv, vlsn);
+	int rc = sc_schedule(env, &task, vlsn);
 	if (task.plan.plan == 0) {
 		/*
 		 * TODO: no-op task.
@@ -8769,7 +8772,7 @@ sc_step(struct vinyl_service *srv, uint64_t vlsn)
 	}
 	int rc_job = rc;
 	if (rc_job > 0) {
-		rc = sc_execute(&task, &srv->sdc, vlsn);
+		rc = sc_execute(&task, sdc, vlsn);
 		if (unlikely(rc == -1)) {
 			if (task.db != NULL) {
 				vy_status_set(&task.db->index->status,
@@ -9637,6 +9640,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def,
 	index->tsn_min = tx_manager_min(e->xm);
 	index->tsn_max = UINT64_MAX;
 	rlist_add(&e->indexes, &index->link);
+	vy_workers_start(e);
 	return index;
 
 error_4:
@@ -10567,6 +10571,7 @@ vinyl_env_delete(struct vinyl_env *e)
 {
 	int rcret = 0;
 	e->status = VINYL_SHUTDOWN;
+	vy_workers_stop(e);
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
 	int rc;
@@ -10628,6 +10633,10 @@ vinyl_end_recovery(struct vinyl_env *e)
 int
 vinyl_checkpoint(struct vinyl_env *env)
 {
+	/* do not initiate checkpoint during bootstrap,
+	 * thread pool is not up yet */
+	if (! env->worker_pool_run)
+		return 0;
 	return sc_ctl_checkpoint(env->scheduler);
 }
 
@@ -10703,33 +10712,58 @@ vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx)
 
 /** {{{ vinyl_service - context of a vinyl background thread */
 
-struct vinyl_service *
-vinyl_service_new(struct vinyl_env *env)
+static void*
+vinyl_worker(void *arg)
 {
-	struct vinyl_service *srv = malloc(sizeof(struct vinyl_service));
-	if (srv == NULL) {
-		vy_oom();
-		return NULL;
+	struct vinyl_env *env = (struct vinyl_env *) arg;
+	struct sdc sdc;
+	sd_cinit(&sdc);
+	while (pm_atomic_load_explicit(&env->worker_pool_run,
+				       pm_memory_order_relaxed)) {
+		int rc = 0;
+		if (vy_status_is_active(env->status)) {
+			rc = sc_step(env, &sdc, tx_manager_lsn(env->xm));
+		}
+		if (rc == -1)
+			break;
+		if (rc == 0)
+			usleep(10000); /* 10ms */
 	}
-	srv->env = env;
-	sd_cinit(&srv->sdc);
-	return srv;
+	sd_cfree(&sdc);
+	return NULL;
 }
 
-int
-vinyl_service_do(struct vinyl_service *srv)
+static void
+vy_workers_start(struct vinyl_env *env)
 {
-	if (! vy_status_is_active(srv->env->status))
-		return 0;
-
-	return sc_step(srv, tx_manager_lsn(srv->env->xm));
+	if (env->worker_pool_run)
+		return;
+	/* prepare worker pool */
+	env->worker_pool = NULL;
+	env->worker_pool_size = cfg_geti("vinyl.threads");
+	if (env->worker_pool_size < 0)
+		env->worker_pool_size = 1;
+	env->worker_pool = (struct cord *)calloc(env->worker_pool_size,
+		sizeof(struct cord));
+	if (env->worker_pool == NULL)
+		panic("failed to allocate vinyl worker pool");
+	env->worker_pool_run = 1;
+	for (int i = 0; i < env->worker_pool_size; i++)
+		cord_start(&env->worker_pool[i], "vinyl", vinyl_worker, env);
 }
 
-void
-vinyl_service_delete(struct vinyl_service *srv)
+static void
+vy_workers_stop(struct vinyl_env *env)
 {
-	sd_cfree(&srv->sdc);
-	free(srv);
+	if (!env->worker_pool_run)
+		return;
+	pm_atomic_store_explicit(&env->worker_pool_run, 0,
+				 pm_memory_order_relaxed);
+	for (int i = 0; i < env->worker_pool_size; i++)
+		cord_join(&env->worker_pool[i]);
+	free(env->worker_pool);
+	env->worker_pool = NULL;
+	env->worker_pool_size = 0;
 }
 
 /* }}} vinyl service */

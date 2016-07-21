@@ -42,7 +42,6 @@ extern "C" {
 #endif
 
 struct vinyl_env;
-struct vinyl_service;
 struct vinyl_tx;
 struct vinyl_cursor;
 struct vinyl_index;
@@ -118,19 +117,6 @@ vy_info_create(struct vy_info *info, struct vinyl_env *e);
 
 void
 vy_info_destroy(struct vy_info *creator);
-
-/*
- * Workers
- */
-
-struct vinyl_service *
-vinyl_service_new(struct vinyl_env *env);
-
-int
-vinyl_service_do(struct vinyl_service *srv);
-
-void
-vinyl_service_delete(struct vinyl_service *srv);
 
 /*
  * Transaction

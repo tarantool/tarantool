@@ -59,13 +59,4 @@ public:
 	int recovery_complete;
 };
 
-extern "C" {
-typedef int (*vy_info_callback_t)(const char *key,
-				  int value_tp,
-				  const void *value,
-				  void *arg);
-int vinyl_info(const char*, vy_info_callback_t, void*);
-}
-void vinyl_workers_start(struct vinyl_env *);
-
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */

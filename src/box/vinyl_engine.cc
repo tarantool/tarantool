@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <small/pmatomic.h>
 
 #include "trivia/util.h"
 #include "cfg.h"
@@ -61,58 +60,6 @@ vinyl_engine_get_env()
 	return e->env;
 }
 
-struct cord *worker_pool;
-static int worker_pool_size;
-static volatile int worker_pool_run;
-
-static void*
-vinyl_worker(void *arg)
-{
-	struct vinyl_env *env = (struct vinyl_env *) arg;
-	struct vinyl_service *srv = vinyl_service_new(env);
-	if (srv == NULL)
-		tnt_raise(OutOfMemory, sizeof(srv), "vinyl", "service");
-	while (pm_atomic_load_explicit(&worker_pool_run,
-				       pm_memory_order_relaxed)) {
-		int rc = vinyl_service_do(srv);
-		if (rc == -1)
-			break;
-		if (rc == 0)
-			usleep(10000); /* 10ms */
-	}
-	vinyl_service_delete(srv);
-	return NULL;
-}
-
-void
-vinyl_workers_start(struct vinyl_env *env)
-{
-	if (worker_pool_run)
-		return;
-	/* prepare worker pool */
-	worker_pool = NULL;
-	worker_pool_size = cfg_geti("vinyl.threads");
-	if (worker_pool_size > 0) {
-		worker_pool = (struct cord *)calloc(worker_pool_size, sizeof(struct cord));
-		if (worker_pool == NULL)
-			panic("failed to allocate vinyl worker pool");
-	}
-	worker_pool_run = 1;
-	for (int i = 0; i < worker_pool_size; i++)
-		cord_start(&worker_pool[i], "vinyl", vinyl_worker, env);
-}
-
-static void
-vinyl_workers_stop(void)
-{
-	if (! worker_pool_run)
-		return;
-	pm_atomic_store_explicit(&worker_pool_run, 0, pm_memory_order_relaxed);
-	for (int i = 0; i < worker_pool_size; i++)
-		cord_join(&worker_pool[i]);
-	free(worker_pool);
-}
-
 VinylEngine::VinylEngine()
 	:Engine("vinyl")
 	 ,recovery_complete(0)
@@ -123,7 +70,6 @@ VinylEngine::VinylEngine()
 
 VinylEngine::~VinylEngine()
 {
-	vinyl_workers_stop();
 	if (env)
 		vinyl_env_delete(env);
 }
@@ -131,14 +77,9 @@ VinylEngine::~VinylEngine()
 void
 VinylEngine::init()
 {
-	worker_pool_run = 0;
-	worker_pool_size = 0;
-	worker_pool = NULL;
-	/* prepare worker pool */
 	env = vinyl_env_new();
 	if (env == NULL)
 		panic("failed to create vinyl environment");
-	worker_pool_size = cfg_geti("vinyl.threads");
 }
 
 void
@@ -342,11 +283,6 @@ VinylEngine::rollback(struct txn *txn)
 int
 VinylEngine::beginCheckpoint()
 {
-	/* do not initiate checkpoint during bootstrap,
-	 * thread pool is not up yet */
-	if (! worker_pool_run)
-		return 0;
-
 	int rc = vinyl_checkpoint(env);
 	if (rc == -1)
 		diag_raise();
@@ -356,8 +292,6 @@ VinylEngine::beginCheckpoint()
 int
 VinylEngine::waitCheckpoint(struct vclock*)
 {
-	if (! worker_pool_run)
-		return 0;
 	for (;;) {
 		if (!vinyl_checkpoint_is_active(env))
 			break;
