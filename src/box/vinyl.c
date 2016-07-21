@@ -1855,7 +1855,7 @@ struct PACKED txlogindex {
 };
 
 struct PACKED txlogv {
-	struct sv v;
+	struct txv *v;
 	uint32_t space_id;
 };
 
@@ -1915,15 +1915,14 @@ void
 txlogindex_del(struct txlog *l, struct txlogv *lv)
 {
 	(void) l;
-	struct txv *v = sv_to_txv(&lv->v);
-	rlist_del(&v->next_in_index);
+	rlist_del(&lv->v->next_in_index);
 }
 
 int
 txlogindex_add(struct txlog *l, struct txlogv *lv)
 {
 
-	struct txv *v = sv_to_txv(&lv->v);
+	struct txv *v = lv->v;
 	struct txlogindex *i;
 	rlist_foreach_entry(i, &l->index, next) {
 		if (i->space_id == lv->space_id) {
@@ -1953,7 +1952,7 @@ txlog_add(struct txlog *l, struct txlogv *v)
 		l->buf.p -= sizeof(struct txlogv);
 		return -1;
 	}
-	if (! (sv_flags(&v->v) & SVGET))
+	if (! (v->v->tuple->flags & SVGET))
 		l->write_count++;
 	return 0;
 }
@@ -1963,10 +1962,10 @@ txlog_replace(struct txlog *l, int n, struct txlogv *v)
 {
 	struct txlogv *ov = txlog_at(l, n);
 	txlogindex_del(l, ov);
-	if (! (sv_flags(&ov->v) & SVGET))
+	if (! (ov->v->tuple->flags & SVGET))
 		l->write_count--;
 	txlogindex_add(l, v);
-	if (! (sv_flags(&v->v) & SVGET))
+	if (! (v->v->tuple->flags & SVGET))
 		l->write_count++;
 	vy_buf_set(&l->buf, sizeof(struct txlogv), n, (char*)v, sizeof(struct txlogv));
 }
@@ -3338,7 +3337,7 @@ tx_rollback_svp(struct vinyl_tx *tx, struct vy_bufiter *i)
 	for (; vy_bufiter_has(i); vy_bufiter_next(i))
 	{
 		struct txlogv *lv = vy_bufiter_get(i);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		/* remove from index */
 		txv_untrack(v);
 		txv_delete(m->env, v);
@@ -3375,7 +3374,7 @@ tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txlogv *lv = vy_bufiter_get(&i);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		if (v->log_read == tx->log_read)
 			break;
 		if (txv_aborted(v))
@@ -3415,7 +3414,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 
 	struct txlogv lv;
 	lv.space_id   = index->key_def->space_id;
-	sv_from_txv(&lv.v, v);
+	lv.v = v;
 	/* update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
 	struct txv *own = txv_tree_search_key(&index->tree, v->tuple->data,
@@ -3500,7 +3499,7 @@ tx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t,
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txlogv *lv = vy_bufiter_get(&i);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		if (txv_prev(v) == NULL)
 			continue;
 		do {
@@ -3536,7 +3535,7 @@ static int __attribute__((unused)) tx_deadlock(struct vinyl_tx *t)
 	while (vy_bufiter_has(&i))
 	{
 		struct txlogv *lv = vy_bufiter_get(&i);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		struct txv *prev = txv_prev(v);
 		if (prev == NULL) {
 			vy_bufiter_next(&i);
@@ -8856,7 +8855,7 @@ txlog_flush(struct txlog *log, uint64_t lsn, enum vinyl_status status)
 	for (; vy_bufiter_has(&iter); vy_bufiter_next(&iter))
 	{
 		struct txlogv *v = vy_bufiter_get(&iter);
-		sv_set_lsn(&v->v, lsn);
+		v->v->tuple->lsn = lsn;
 	}
 
 	/* index */
@@ -10199,7 +10198,7 @@ vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 	for (; vy_bufiter_has(&iter); vy_bufiter_next(&iter))
 	{
 		struct txlogv *lv = vy_bufiter_get(&iter);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		/** Gets are collected by gc */
 		if (v->tuple->flags & SVGET) {
 			v->gc = m->gc;
@@ -10237,8 +10236,7 @@ vy_txprepare_cb(struct vinyl_tx *tx, struct txlogv *v, uint64_t lsn,
 	if (lsn == tx->vlsn || status == VINYL_FINAL_RECOVERY)
 		return 0;
 
-	struct sv *sv = &v->v;
-	struct txv *txv = sv_to_txv(sv);
+	struct txv *txv = v->v;
 	struct vinyl_tuple *key = txv->tuple;
 	struct tx_index *tx_index = txv->index;
 	struct vinyl_index *index = tx_index->index;
@@ -10353,7 +10351,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txlogv *lv = vy_bufiter_get(&i);
-		struct txv *v = lv->v.v;
+		struct txv *v = lv->v;
 		if (v->log_read == tx->log_read)
 			break;
 		struct txv *prev = txv_prev(v);
