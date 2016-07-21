@@ -33,6 +33,10 @@
 
 #include "key_def.h" /* for enum field_type */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX};
 
@@ -117,16 +121,6 @@ tuple_format_by_id(uint32_t tuple_format_id)
 	return tuple_formats[tuple_format_id];
 }
 
-/**
- * @brief Allocate, construct and register a new in-memory tuple
- *	 format.
- * @param space description
- *
- * @return tuple format or raise an exception on error
- */
-struct tuple_format *
-tuple_format_new(struct rlist *key_list);
-
 /** Delete a format with zero ref count. */
 void
 tuple_format_delete(struct tuple_format *format);
@@ -142,6 +136,20 @@ tuple_format_ref(struct tuple_format *format, int count)
 		tuple_format_delete(format);
 
 };
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+/**
+ * @brief Allocate, construct and register a new in-memory tuple
+ *	 format.
+ * @param space description
+ *
+ * @return tuple format or raise an exception on error
+ */
+struct tuple_format *
+tuple_format_new(struct rlist *key_list);
 
 void
 tuple_format_init();

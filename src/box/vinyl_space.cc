@@ -64,21 +64,13 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	/* Check tuple fields */
 	tuple_validate_raw(space->format, request->tuple);
 
-	struct vinyl_tuple *tuple = vinyl_tuple_from_data(index->db,
-		request->tuple, request->tuple_end);
-	if (tuple == NULL)
-		diag_raise();
-	auto tuple_guard = make_scoped_guard([=]{
-		vinyl_tuple_unref(index->db, tuple);
-	});
-
 	struct vinyl_tx *tx = vinyl_begin(env);
 	if (tx == NULL)
 		diag_raise();
 
 	int64_t signature = request->header->lsn;
 
-	if (vinyl_replace(tx, index->db, tuple) != 0)
+	if (vinyl_replace(tx, index->db, request->tuple, request->tuple_end) != 0)
 		diag_raise();
 
 	int rc = vinyl_prepare(env, tx);
@@ -140,17 +132,10 @@ VinylSpace::executeReplace(struct txn*,
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
 
-	struct vinyl_tuple *tuple = vinyl_tuple_from_data(index->db,
-		request->tuple, request->tuple_end);
-	if (tuple == NULL)
-		diag_raise();
-	auto tuple_guard = make_scoped_guard([=]{
-		vinyl_tuple_unref(index->db, tuple);
-	});
-
 	/* replace */
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_replace(tx, index->db, tuple);
+	int rc = vinyl_replace(tx, index->db, request->tuple,
+			        request->tuple_end);
 	if (rc == -1)
 		diag_raise();
 
@@ -167,17 +152,9 @@ VinylSpace::executeDelete(struct txn*, struct space *space,
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
 
-	struct vinyl_tuple *vinyl_key = vinyl_tuple_from_key_data(index->db,
-		key, part_count);
-	if (vinyl_key == NULL)
-		diag_raise();
-	auto tuple_guard = make_scoped_guard([=]{
-		vinyl_tuple_unref(index->db, vinyl_key);
-	});
-
 	/* remove */
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_delete(tx, index->db, vinyl_key);
+	int rc = vinyl_delete(tx, index->db, key, part_count);
 	if (rc == -1)
 		diag_raise();
 	return NULL;
@@ -214,17 +191,10 @@ VinylSpace::executeUpdate(struct txn*, struct space *space,
 	space_validate_tuple(space, new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
 
-	struct vinyl_tuple *tuple = vinyl_tuple_from_data(index->db,
-		new_tuple->data, new_tuple->data + new_tuple->bsize);
-	if (tuple == NULL)
-		diag_raise();
-	auto tuple_guard = make_scoped_guard([=]{
-		vinyl_tuple_unref(index->db, tuple);
-	});
-
 	/* replace */
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_replace(tx, index->db, tuple);
+	int rc = vinyl_replace(tx, index->db, new_tuple->data,
+				new_tuple->data + new_tuple->bsize);
 	if (rc == -1)
 		diag_raise();
 

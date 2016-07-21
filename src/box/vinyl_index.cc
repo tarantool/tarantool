@@ -58,7 +58,7 @@ VinylIndex::VinylIndex(struct key_def *key_def_arg)
 	int rc;
 	vinyl_workers_start(env);
 	/* create database */
-	db = vinyl_index_new(env, key_def);
+	db = vinyl_index_new(env, key_def, space->format);
 	if (db == NULL)
 		diag_raise();
 	/* start two-phase recovery for a space:
@@ -125,42 +125,19 @@ VinylIndex::count(enum iterator_type type, const char *key,
 }
 
 struct tuple *
-VinylIndex::findByKey(struct vinyl_tuple *vinyl_key) const
-{
-	struct vinyl_tx *transaction = NULL;
-	/* engine_tx might be empty, even if we are in txn context.
-	 *
-	 * This can happen on a first-read statement. */
-	if (in_txn())
-		transaction = (struct vinyl_tx *) in_txn()->engine_tx;
-	/* try to read from cache first, if nothing is found
-	 * retry using disk */
-	struct vinyl_tuple *result = NULL;
-	int rc = vinyl_coget(transaction, db, vinyl_key, &result);
-	if (rc != 0)
-		diag_raise();
-	if (result == NULL) /* not found */
-		return NULL;
-
-	struct tuple *tuple = vinyl_convert_tuple(db, result, format);
-	vinyl_tuple_unref(db, result);
-	if (tuple == NULL)
-		diag_raise();
-	return tuple;
-}
-
-struct tuple *
 VinylIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->opts.is_unique && part_count == key_def->part_count);
-	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(db, key, part_count);
-	if (vinyl_key == NULL)
+	/*
+	 * engine_tx might be empty, even if we are in txn context.
+	 * This can happen on a first-read statement.
+	 */
+	struct vinyl_tx *transaction = in_txn() ?
+		(struct vinyl_tx *) in_txn()->engine_tx : NULL;
+	struct tuple *tuple = NULL;
+	if (vinyl_coget(transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
-	auto key_guard = make_scoped_guard([=] {
-		vinyl_tuple_unref(db, vinyl_key);
-	});
-	return findByKey(vinyl_key);
+	return tuple;
 }
 
 struct tuple *
@@ -209,13 +186,13 @@ vinyl_iterator_next(struct iterator *ptr)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	assert(it->cursor != NULL);
-	struct vinyl_tuple *result;
 
 	uint32_t it_sc_version = ::sc_version;
 
-	if (vinyl_cursor_conext(it->cursor, &result) != 0)
+	struct tuple *tuple;
+	if (vinyl_cursor_conext(it->cursor, &tuple) != 0)
 		diag_raise();
-	if (result == NULL) { /* not found */
+	if (tuple == NULL) { /* not found */
 		/* immediately close the cursor */
 		vinyl_cursor_delete(it->cursor);
 		it->cursor = NULL;
@@ -224,15 +201,8 @@ vinyl_iterator_next(struct iterator *ptr)
 	}
 
 	/* found */
-	if (it_sc_version != ::sc_version) {
-		vinyl_tuple_unref(it->db, result);
+	if (it_sc_version != ::sc_version)
 		return NULL;
-	}
-	struct tuple *tuple = vinyl_convert_tuple(it->db, result,
-		it->space->format);
-	vinyl_tuple_unref(it->db, result);
-	if (tuple == NULL)
-		diag_raise();
 	return tuple;
 }
 
@@ -338,13 +308,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	default:
 		return Index::initIterator(ptr, type, key, part_count);
 	}
-
-	struct vinyl_tuple *vinyl_key =
-		vinyl_tuple_from_key_data(db, key, part_count);
-	if (vinyl_key == NULL)
-		diag_raise();
-	it->cursor = vinyl_cursor_new(db, vinyl_key, order);
-	vinyl_tuple_unref(db, vinyl_key);
+	it->cursor = vinyl_cursor_new(db, key, part_count, order);
 	if (it->cursor == NULL)
 		diag_raise();
 }

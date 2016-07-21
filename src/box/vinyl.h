@@ -44,8 +44,6 @@ extern "C" {
 struct vinyl_env;
 struct vinyl_service;
 struct vinyl_tx;
-struct vinyl_field;
-struct vinyl_tuple;
 struct vinyl_cursor;
 struct vinyl_index;
 struct key_def;
@@ -143,11 +141,11 @@ vinyl_begin(struct vinyl_env *e);
 
 int
 vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
-	    struct vinyl_tuple *key, struct vinyl_tuple **result);
+	    const char *key, uint32_t part_count, struct tuple **result);
 
 int
 vinyl_replace(struct vinyl_tx *tx, struct vinyl_index *index,
-	     struct vinyl_tuple *tuple);
+	      const char *tuple, const char *tuple_end);
 
 int
 vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
@@ -156,7 +154,7 @@ vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
 
 int
 vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
-	    struct vinyl_tuple *tuple);
+	     const char *key, uint32_t part_count);
 
 int
 vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx);
@@ -175,7 +173,8 @@ struct vinyl_index *
 vinyl_index_by_name(struct vinyl_env *env, const char *name);
 
 struct vinyl_index *
-vinyl_index_new(struct vinyl_env *e, struct key_def *);
+vinyl_index_new(struct vinyl_env *env, struct key_def *key_def,
+		struct tuple_format *tuple_format);
 
 void
 vinyl_index_ref(struct vinyl_index *index);
@@ -214,40 +213,14 @@ enum vinyl_order {
 };
 
 struct vinyl_cursor *
-vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
-		enum vinyl_order order);
+vinyl_cursor_new(struct vinyl_index *index, const char *key,
+		 uint32_t part_count, enum vinyl_order order);
 
 void
 vinyl_cursor_delete(struct vinyl_cursor *cursor);
 
 int
-vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result);
-
-/*
- * Tuple
- */
-
-struct vinyl_tuple *
-vinyl_tuple_from_data(struct vinyl_index *index, const char *data,
-		     const char *data_end);
-
-struct vinyl_tuple *
-vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
-			 uint32_t part_count);
-
-struct tuple *
-vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-		    struct tuple_format *format);
-
-const char *
-vinyl_tuple_data(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-		 uint32_t *mp_size);
-
-void
-vinyl_tuple_ref(struct vinyl_tuple *tuple);
-
-void
-vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple);
+vinyl_cursor_conext(struct vinyl_cursor *cursor, struct tuple **result);
 
 /*
  * Replication

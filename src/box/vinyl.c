@@ -1757,9 +1757,6 @@ vinyl_tuple_size(struct vinyl_tuple *v);
 static struct vinyl_tuple *
 vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size);
 
-static int
-vinyl_tuple_unref_rt(struct vinyl_env *env, struct vinyl_tuple *v);
-
 static inline const char *
 vy_tuple_key_part(const char *tuple_data, uint32_t part_id);
 
@@ -1767,7 +1764,20 @@ static inline int
 vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
 		 const struct key_def *key_def);
 
+static struct vinyl_tuple *
+vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
+			  uint32_t part_count);
+static void
+vinyl_tuple_ref(struct vinyl_tuple *tuple);
+
+static void
+vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple);
+
+static int
+vinyl_tuple_unref_rt(struct vinyl_env *env, struct vinyl_tuple *v);
+
 struct tx_index;
+struct vinyl_index;
 
 struct txv {
 	uint64_t tsn;
@@ -5089,6 +5099,7 @@ struct vinyl_index {
 	struct vy_buf readbuf;
 	struct vy_index_conf conf;
 	struct key_def *key_def;
+	struct tuple_format *tuple_format;
 	uint32_t key_map_size; /* size of key_map map */
 	uint32_t *key_map; /* field_id -> part_id map */
 	/** Member of env->db or scheduler->shutdown. */
@@ -5397,8 +5408,11 @@ vy_cachepool_pop(struct vy_cachepool *p)
 		c->pool = p;
 	} else {
 		c = malloc(sizeof(struct sicache));
-		if (unlikely(c == NULL))
+		if (unlikely(c == NULL)) {
+			diag_set(OutOfMemory, sizeof(*c), "sicache",
+				 "struct");
 			return NULL;
+		}
 		si_cacheinit(c, p);
 	}
 	tt_pthread_mutex_unlock(&p->mutex);
@@ -9258,8 +9272,8 @@ struct vinyl_cursor {
 };
 
 struct vinyl_cursor *
-vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
-		 enum vinyl_order order)
+vinyl_cursor_new(struct vinyl_index *index, const char *key,
+		 uint32_t part_count, enum vinyl_order order)
 {
 	struct vinyl_env *e = index->env;
 	struct vinyl_cursor *c = mempool_alloc(&e->cursor_pool);
@@ -9272,18 +9286,23 @@ vinyl_cursor_new(struct vinyl_index *index, struct vinyl_tuple *key,
 	c->ops = 0;
 	c->read_disk = 0;
 	c->read_cache = 0;
-	c->cache = vy_cachepool_pop(e->cachepool);
-	if (unlikely(c->cache == NULL)) {
-		mempool_free(&e->cursor_pool, c);
-		vy_oom();
-		return NULL;
-	}
-	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
-
-	c->key = key;
-	vinyl_tuple_ref(key);
+	c->key = vinyl_tuple_from_key_data(index, key, part_count);
+	if (c->key == NULL)
+		goto error_1;
 	c->order = order;
+	c->cache = vy_cachepool_pop(e->cachepool);
+	if (unlikely(c->cache == NULL))
+		goto error_2;
+
+	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
 	return c;
+
+error_2:
+	vinyl_tuple_unref(index, c->key);
+error_1:
+	vinyl_index_unref(index);
+	mempool_free(&e->cursor_pool, c);
+	return NULL;
 }
 
 void
@@ -9620,7 +9639,8 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 }
 
 struct vinyl_index *
-vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
+vinyl_index_new(struct vinyl_env *e, struct key_def *key_def,
+		struct tuple_format *tuple_format)
 {
 	assert(key_def->part_count > 0);
 	char name[128];
@@ -9648,6 +9668,8 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	index->key_def = key_def_dup(key_def);
 	if (index->key_def == NULL)
 		goto error_3;
+	index->tuple_format = tuple_format;
+	tuple_format_ref(index->tuple_format, 1);
 
 	/*
 	 * Create field_id -> part_id mapping used by vinyl_tuple_from_data().
@@ -9697,6 +9719,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def)
 	return index;
 
 error_4:
+	tuple_format_ref(index->tuple_format, -1);
 	key_def_delete(index->key_def);
 error_3:
 	vy_index_conf_free(&index->conf);
@@ -9732,6 +9755,7 @@ vinyl_index_delete(struct vinyl_index *index)
 	vy_index_conf_free(&index->conf);
 	free(index->key_map);
 	key_def_delete(index->key_def);
+	tuple_format_ref(index->tuple_format, -1);
 	TRASH(index);
 	free(index);
 	return rc_ret;
@@ -9818,7 +9842,7 @@ vinyl_tuple_alloc(struct vinyl_index *index, uint32_t size)
 	return v;
 }
 
-struct vinyl_tuple *
+static struct vinyl_tuple *
 vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 			 uint32_t part_count)
 {
@@ -9864,7 +9888,7 @@ vinyl_tuple_from_key_data(struct vinyl_index *index, const char *key,
 	return tuple;
 }
 
-struct vinyl_tuple *
+static struct vinyl_tuple *
 vinyl_tuple_from_data_ex(struct vinyl_index *index,
 			 const char *data, const char *data_end,
 			 uint32_t extra_size, char **extra)
@@ -9919,7 +9943,7 @@ vinyl_tuple_from_data_ex(struct vinyl_index *index,
 /*
  * Create vinyl_tuple from raw MsgPack data.
  */
-struct vinyl_tuple *
+static struct vinyl_tuple *
 vinyl_tuple_from_data(struct vinyl_index *index,
 		      const char *data, const char *data_end)
 {
@@ -9927,7 +9951,7 @@ vinyl_tuple_from_data(struct vinyl_index *index,
 	return vinyl_tuple_from_data_ex(index, data, data_end, 0, &unused);
 }
 
-const char *
+static const char *
 vinyl_tuple_data(struct vinyl_index *index, struct vinyl_tuple *tuple,
 		 uint32_t *mp_size)
 {
@@ -9956,16 +9980,15 @@ vinyl_tuple_data_ex(const struct key_def *key_def,
 	*extra_end = data_end;
 }
 
-struct tuple *
-vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple,
-		    struct tuple_format *format)
+static struct tuple *
+vinyl_convert_tuple(struct vinyl_index *index, struct vinyl_tuple *vinyl_tuple)
 {
 	uint32_t bsize;
 	const char *data = vinyl_tuple_data(index, vinyl_tuple, &bsize);
-	return box_tuple_new(format, data, data + bsize);
+	return box_tuple_new(index->tuple_format, data, data + bsize);
 }
 
-void
+static void
 vinyl_tuple_ref(struct vinyl_tuple *v)
 {
 	uint16_t old_refs =
@@ -9999,7 +10022,7 @@ vinyl_tuple_unref_rt(struct vinyl_env *env, struct vinyl_tuple *v)
 	return 0;
 }
 
-void
+static void
 vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple)
 {
 	struct vinyl_env *env = index->env;
@@ -10261,9 +10284,15 @@ vy_txprepare_cb(struct vinyl_tx *tx, struct txlogv *v, uint64_t lsn,
 
 int
 vinyl_replace(struct vinyl_tx *tx, struct vinyl_index *index,
-	     struct vinyl_tuple *tuple)
+	      const char *tuple, const char *tuple_end)
 {
-	return vy_tx_write(tx, index, tuple, 0);
+	struct vinyl_tuple *vytuple = vinyl_tuple_from_data(index,
+		tuple, tuple_end);
+	if (vytuple == NULL)
+		return -1;
+	int rc = vy_tx_write(tx, index, vytuple, 0);
+	vinyl_tuple_unref(index, vytuple);
+	return rc;
 }
 
 int
@@ -10291,9 +10320,13 @@ vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
 
 int
 vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
-	    struct vinyl_tuple *tuple)
+	     const char *key, uint32_t part_count)
 {
-	return vy_tx_write(tx, index, tuple, SVDELETE);
+	struct vinyl_tuple *vykey =
+		vinyl_tuple_from_key_data(index, key, part_count);
+	int rc = vy_tx_write(tx, index, vykey, SVDELETE);
+	vinyl_tuple_unref(index, vykey);
+	return rc;
 }
 
 static inline int
@@ -10497,35 +10530,62 @@ vy_read_task(struct vinyl_index *index, struct vinyl_tx *tx,
  * Find a tuple by key using a thread pool thread.
  */
 int
-vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
-	    struct vinyl_tuple *key, struct vinyl_tuple **result)
+vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index, const char *key,
+	    uint32_t part_count, struct tuple **result)
 {
-	*result = NULL;
-	int rc = vy_get(tx, index, key, result, true);
-	if (rc != 0)
-		return rc;
-	if (*result != NULL) /* found */
-		return 0;
+	struct vinyl_tuple *vykey =
+		vinyl_tuple_from_key_data(index, key, part_count);
+	if (vykey == NULL)
+		return -1;
 
-	 /* cache miss or not found */
-	return vy_read_task(index, tx, NULL, key, result, vy_get_cb);
+	struct vinyl_tuple *vyresult = NULL;
+	int rc = vy_get(tx, index, vykey, &vyresult, true);
+	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
+		rc = vy_read_task(index, tx, NULL, vykey, &vyresult, vy_get_cb);
+	}
+	vinyl_tuple_unref(index, vykey);
+	if (rc != 0)
+		return -1;
+
+	if (vyresult == NULL) { /* not found */
+		*result = NULL;
+		return 0;
+	}
+
+	/* found */
+	*result = vinyl_convert_tuple(index, vyresult);
+	vinyl_tuple_unref(index, vyresult);
+	if (*result == NULL)
+		return -1;
+	return 0;
 }
 
 /**
  * Read the next value from a cursor in a thread pool thread.
  */
 int
-vinyl_cursor_conext(struct vinyl_cursor *cursor, struct vinyl_tuple **result)
+vinyl_cursor_conext(struct vinyl_cursor *cursor, struct tuple **result)
 {
-	*result = NULL;
-	int rc = vinyl_cursor_next(cursor, result, true);
+	struct vinyl_tuple *vyresult;
+	int rc = vinyl_cursor_next(cursor, &vyresult, true);
+	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
+		rc = vy_read_task(cursor->index, NULL, cursor, NULL, &vyresult,
+				  vy_cursor_next_cb);
+	}
 	if (rc != 0)
-		return rc;
-	if (*result != NULL)
-		return 0; /* found */
+		return -1;
 
-	return vy_read_task(cursor->index, NULL, cursor, NULL, result,
-			    vy_cursor_next_cb);
+	if (vyresult == NULL) { /* not found */
+		*result = NULL;
+		return 0;
+	}
+
+	/* found */
+	*result = vinyl_convert_tuple(cursor->index, vyresult);
+	vinyl_tuple_unref(cursor->index, vyresult);
+	if (*result == NULL)
+		return -1;
+	return 0;
 }
 
 /** }}} vy_read_task */
