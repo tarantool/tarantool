@@ -10,9 +10,9 @@ function test_conflict()
     local commits = 0
     local function conflict()
         box.begin()
-	s:replace({'test'})
-	box.commit()
-	commits = commits + 1
+        s:replace({'test'})
+        box.commit()
+        commits = commits + 1
     end;
 
     local fiber = require('fiber');
