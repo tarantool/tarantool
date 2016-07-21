@@ -1859,14 +1859,12 @@ txv_aborted(struct txv *v)
 
 struct PACKED txlogindex {
 	struct rlist log;
-	uint32_t space_id;
 	struct tx_index *index;
 	struct rlist next;
 };
 
 struct PACKED txlogv {
 	struct txv *v;
-	uint32_t space_id;
 };
 
 /**
@@ -1935,7 +1933,7 @@ txlogindex_add(struct txlog *l, struct txlogv *lv)
 	struct txv *v = lv->v;
 	struct txlogindex *i;
 	rlist_foreach_entry(i, &l->index, next) {
-		if (i->space_id == lv->space_id) {
+		if (i->index == v->index) {
 			rlist_add_tail(&i->log, &v->next_in_index);
 			return 0;
 		}
@@ -1943,7 +1941,6 @@ txlogindex_add(struct txlog *l, struct txlogv *lv)
 	i = malloc(sizeof(struct txlogindex));
 	if (i == NULL)
 		return -1;
-	i->space_id = lv->space_id;
 	i->index = v->index;
 	rlist_create(&i->log);
 	rlist_create(&i->next);
@@ -3423,7 +3420,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		return -1;
 
 	struct txlogv lv;
-	lv.space_id   = index->key_def->space_id;
 	lv.v = v;
 	/* update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
