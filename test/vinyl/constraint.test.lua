@@ -36,15 +36,15 @@ index:select({1}, {iterator = box.index.GT})
 space:drop()
 
 -------------------------------------------------------------------------------
--- Key part length limit
+-- Key part length without limit
 -------------------------------------------------------------------------------
 
 space = box.schema.space.create('single_part', { engine = 'vinyl' })
 _ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
 
-space:insert({string.rep('x', 1020)})
-space:insert({string.rep('x', 1021)})
-space:insert({string.rep('x', 1022)})
+t1 = space:insert({string.rep('x', 1020)})
+t1 = space:insert({string.rep('x', 10210)})
+t3 = space:insert({string.rep('x', 102200)})
 
 space:drop()
 space = nil

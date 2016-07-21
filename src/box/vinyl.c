@@ -9809,7 +9809,6 @@ static int vinyl_index_recoverend(struct vinyl_index *index)
 
 enum {
 	VY_TUPLE_KEY_MISSING = UINT32_MAX,
-	VINYL_KEY_MAXLEN = 1024
 };
 
 static inline uint32_t
@@ -9917,14 +9916,6 @@ vinyl_tuple_from_data_ex(struct vinyl_index *index,
 		if (field_id >= index->key_map_size ||
 		    index->key_map[field_id] == UINT32_MAX)
 			continue; /* field is not indexed */
-		/* Check limits */
-		uint32_t field_size = data_pos - field;
-		if (field_size > VINYL_KEY_MAXLEN) {
-			diag_set(ClientError, ER_KEY_PART_IS_TOO_LONG,
-				 field_size, VINYL_KEY_MAXLEN);
-			vinyl_tuple_unref(index, tuple);
-			return NULL;
-		}
 		/* Update offsets for indexed field */
 		uint32_t part_id = index->key_map[field_id];
 		assert(part_id < key_def->part_count);
