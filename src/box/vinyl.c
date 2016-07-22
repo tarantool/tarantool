@@ -1709,11 +1709,6 @@ sv_lsn(struct sv *v) {
 	return v->i->lsn(v);
 }
 
-static inline void
-sv_set_lsn(struct sv *v, int64_t lsn) {
-	v->i->set_lsn(v, lsn);
-}
-
 static inline char*
 sv_pointer(struct sv *v) {
 	return v->i->pointer(v);
