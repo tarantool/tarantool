@@ -10,13 +10,17 @@ _ = box.space.test:create_index('pk')
 
 c1 = net:new(address)
 c2 = net.new(address)
+c3 = net.new(address)
+c4 = net.new(address)
+c5 = net.new(address)
+c6 = net.new(address)
+c7 = net.new(address)
 
 
 test_run:cmd("setopt delimiter ';'")
 getmetatable(c1).__call = function(c, command)
     local f = yaml.decode(c:console(command))
     if type(f) == 'table' then
-        f = f[1]
         setmetatable(f, {__serialize='array'})
     end
     return f
@@ -26,16 +30,1359 @@ methods = getmetatable(c1)['__index']
 methods.begin = function(c) return c("box.begin()") end
 methods.commit = function(c) return c("box.commit()") end
 methods.rollback = function(c) return c("box.rollback()") end
+t = box.space.test
 
--- basic effects
-
+--
+-- empty transaction commit
+--
 c1:begin()
-c1("box.space.test:insert{1,2,3}")
-c1("box.space.test:select{}")
+c1:commit()
+
+--
+-- empty transaction rollback
+--
+c1:begin()
 c1:rollback()
-c1("box.space.test:select{}")
+
+--
+-- single-statement transaction commit
+--
+c1:begin()
+c1("t:replace{1}")
+c1:commit()
+c1("t:get{1}")
 
 -- cleanup
+c1("t:delete{1}")
+
+--
+-- single-statement transaction rollback
+--
+c1:begin()
+c1("t:replace{1}")
+c1:rollback()
+c1("t:get{1}")
+
+--
+-- basic effects: if a transaction is rolled back, it has no effect
+--
+c1:begin()
+c1("t:insert{1}")
+c1("t:get{1}")
+c1:rollback()
+c1("t:get{1}")
+c2("t:get{1}")
+
+--
+-- multi-statement transaction
+--
+test_run:cmd("setopt delimiter ';'")
+c1:begin();
+for i = 1,100 do
+    c1(string.format("t:insert{%d}", i))
+    assert(c1(string.format("t:get{%d}", i))[1][1] == i)
+end;
+c1:commit();
+for i = 1,100 do
+    c1(string.format("t:delete{%d}", i))
+end;
+for i = 1,100 do
+    assert(#c1(string.format("t:get{%d}", i)) == 0)
+end;
+test_run:cmd("setopt delimiter ''");
+
+--
+-- multi-statement transaction rollback
+--
+test_run:cmd("setopt delimiter ';'")
+c1:begin();
+for i = 1,100 do
+    c1(string.format("t:insert{%d}", i))
+    assert(c1(string.format("t:get{%d}", i))[1][1] == i)
+end;
+c1:rollback();
+for i = 1,100 do
+    assert(#c1(string.format("t:get{%d}", i)) == 0)
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- transaction_set_set_get_commit(void)
+
+c1:begin()
+
+c1("t:replace{1, 1}")
+c1("t:replace{1, 2}")
+c1("t:get{1}")
+c1:commit()
+c1("t:get{1}")
+c1("t:delete{1}")
+
+-- transaction_set_set_commit_get(void)
+
+c1:begin()
+c1("t:replace{1}")
+c1("t:replace{1, 2}")
+c1:commit()
+
+c2:begin()
+c2("t:get{1}")
+c2:rollback()
+
+c1("t:delete{1}")
+
+-- transaction_set_set_rollback_get(void)
+
+c1:begin()
+
+c1("t:replace{1}")
+c1("t:replace{1, 2}")
+c1:rollback()
+
+c2:begin()
+c2("t:get{1}")
+c2:rollback()
+
+-- transaction_set_delete_get_commit(void)
+
+c1:begin()
+c1("t:insert{1}")
+c1("t:delete{1}")
+c1("t:get{1}")
+c1:commit()
+
+-- transaction_set_delete_get_commit_get(void)
+
+c1:begin()
+
+c1("t:insert{1}")
+c1("t:delete{1}")
+c1("t:get{1}")
+c1:commit()
+
+c1("t:get{1}")
+
+--
+-- transaction_set_delete_set_commit_get(void)
+--
+c1:begin()
+
+c1("t:insert{1, 1}")
+c1("t:delete{1}")
+c1("t:insert{1, 2}")
+c1("t:get{1}")
+c1:commit()
+c2("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+
+--
+-- transaction_set_delete_commit_get_set(void)
+--
+c1:begin()
+
+c1("t:insert{1}")
+c1("t:delete{1}")
+c1:commit()
+
+c1("t:get{1}")
+c1("t:insert{1}")
+c1("t:get{1}")
+c1("t:delete{1}")
+c1("t:get{1}")
+
+--
+-- transaction_p_set_commit(void)
+--
+c1:begin()
+c2:begin()
+
+c1("t:replace{1, 10}")
+c1:commit()
+
+c2("t:replace{2, 15}");
+c2:commit()
+
+c1("t:get{1}")
+c1("t:get{2}")
+c1("t:delete{1}")
+c1("t:delete{2}")
+
+--
+-- no dirty reads: if a transaction is not committed, its effects are not
+-- visible
+--
+
+c1:begin()
+c1("t:insert{1}")
+c1("t:get{1}")
+--
+-- not visible in c2
+--
+c2("t:get{1}")
+c1:commit()
+--
+-- become visible in c2 after c1 commits (c2 runs in autocommit)
+--
+c2("t:get{1}")
+
+--
+-- repeatable read: if c1 has read X, and there was
+-- another transaction, which modified X after c1 started,
+-- and c1 reads X again, it gets the same result
+--
+c1:begin()
+c1("t:get{1}")
+--
+-- not visible in c1
+--
+c2("t:replace{1, 'c2'}")
+
+c1("t:get{1}")
+c2:commit()
+--
+-- still not visible, even though c2 has committed
+--
+c1("t:get{1}")
+-- commits ok since is a read only transaction
+c1:commit()
+--
+-- now visible
+--
+c1("t:get{1}")
+c1("t:delete{1}")
+
+-- *******************************
+-- tx manager tests  from sophia *
+-- *******************************
+-- --------------------------------------------------------------------------
+-- transaction_p_set_get_commit(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+
+c1("t:replace{1, 10}")
+c1("t:get{1}") -- {1, 10}
+--
+c1:commit()
+--
+--
+c2("t:replace{2, 15}")
+--
+c2("t:get{2}") -- {2, 15}
+--
+c2:commit()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+c1("t:delete{2}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_p_set_commit_get0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c1:commit()
+--
+c2("t:replace{2, 15}")
+c2:commit()
+--
+c1:begin()
+c1("t:get{1}") -- {1, 10}
+--
+c1("t:get{2}") -- {2, 15}
+c1:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+c1("t:delete{2}")
+
+-- --------------------------------------------------------------------------
+-- transaction_p_set_commit_get1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}")
+c2("t:get{200}")
+--
+c2("t:replace{1, 10}")
+c2:commit()
+--
+-- try writing an unrelated key
+--
+c1("t:replace{2, 15}")
+c1:commit()
+--
+c2:begin()
+c2("t:get{1}") -- {1, 10}
+c2:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+c1("t:delete{2}")
+-- --
+--  now try the same key
+-- --
+c1:begin()
+c2:begin()
+c1("t:get{100}")
+c2("t:get{200}")
+--
+c2("t:replace{1, 10}")
+c2:commit()
+--
+c1("t:replace{1, 15}")
+c1:commit()
+--
+c2:begin()
+c2("t:get{1}") -- {1, 15}
+c2:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+-- --------------------------------------------------------------------------
+-- transaction_p_set_commit_get2(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}")
+c2("t:get{200}")
+--
+--
+c1("t:replace{2, 15}")
+c1:commit()
+--
+--
+c2("t:replace{1, 10}")
+c2:commit() -- commits successfully
+--
+c1:begin()
+c1("t:get{1}") -- {1, 10}
+--
+c1("t:get{2}") -- {2, 15}
+c1:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+c1("t:delete{2}")
+
+-- --------------------------------------------------------------------------
+-- transaction_p_set_rollback_get0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}")
+c2("t:get{200}")
+--
+--
+c1("t:replace{1, 10}")
+c1:rollback()
+--
+c2("t:replace{2, 15}")
+c2:rollback()
+--
+c3:begin()
+c3("t:get{1}") -- finds nothing
+c3("t:get{2}") -- finds nothing
+c3:rollback()
+
+-- --------------------------------------------------------------------------
+-- transaction_p_set_rollback_get1(void)
+-- --------------------------------------------------------------------------
+--
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+c2:rollback()
+--
+c1("t:replace{2, 15}")
+c1:rollback()
+--
+c3:begin()
+c3("t:get{1}") -- finds nothing
+c3("t:get{2}") -- finds nothing
+c3:rollback()
+--
+-- --------------------------------------------------------------------------
+-- transaction_p_set_rollback_get2(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+--
+c2("t:replace{1, 10}")
+c2:rollback()
+--
+c1("t:replace{1, 15}")
+c1:rollback()
+--
+c3("t:get{1}") -- finds nothing
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+--
+c2("t:replace{1, 10}")
+c2:rollback()
+--
+c1("t:replace{1, 15}")
+c1:commit()
+--
+c3("t:get{1}") -- {1, 15}
+--
+-- cleanup
+--
+c3("t:delete{1}")
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c1("t:replace{1, 10}")
+c1:commit()
+--
+c2("t:replace{1, 15}")
+c2:commit()
+--
+c2("t:get{1}")  -- {1,15}
+-- cleanup
+--
+c1("t:delete{1}")
+
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+c2:commit()
+--
+c1("t:replace{1, 15}")
+c1:commit()
+--
+c3("t:get{1}") -- {1, 15}
+--
+-- cleanup
+--
+c3("t:delete{1}")
+
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit2(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 15}")
+--
+c2("t:replace{1, 10}")
+--
+c2:commit()
+c1:commit()
+--
+c3("t:get{1}") -- {1, 15}
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 15}")
+--
+c2("t:replace{1, 10}")
+--
+-- sic: commit order
+c1:commit()
+c2:commit() -- aborted by conflict @fixme it shouldn't be the case
+--
+c3("t:get{1}") -- {1, 15}
+--
+-- cleanup
+--
+c1("t:delete{1}")
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_a0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+--
+c2:rollback()
+--
+c1("t:replace{1, 15}")
+--
+c1:commit()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+-- 
+--
+-- statement order is irrelevant, rollback order is important
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+c2("t:replace{1, 15}")
+--
+c2:rollback()
+c1:commit()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_a1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+c1("t:replace{1, 15}")
+--
+c2:rollback()
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- statements in different order now
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+c2("t:replace{1, 15}")
+--
+c2:rollback()
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_b0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+c2:commit() -- success
+--
+c1("t:replace{1, 15}")
+c1:rollback() -- success
+--
+c3("t:get{1}")
+-- cleanup
+--
+c1("t:delete{1}")
+
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_b1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 15}")
+c1("t:replace{1, 10}")
+--
+c2:commit() -- fixme: aborted by conflict
+c1:rollback()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- now commit the second transaction
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 15}")
+c1("t:replace{1, 10}")
+--
+c2:commit() -- fixme: aborted by conflict
+c1:commit()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_ab0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 15}")
+c2:rollback()
+--
+c1("t:replace{1, 10}")
+c1:rollback()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- now commit the second transaction
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 15}")
+c2:rollback()
+--
+c1("t:replace{1, 10}")
+c1:commit()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_rollback_ab1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 10}")
+c1("t:replace{1, 15}")
+--
+c2:rollback()
+c1:rollback()
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c2("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_a0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c2("t:replace{1, 15}")
+--
+c1("t:replace{1, 10}")
+--
+c1:commit() -- success
+c2:commit() -- @fixme: rollback
+--
+c2("t:get{1}") -- {1, 10}
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_a1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c1:commit() -- success
+--
+-- cleanup
+--
+c2("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_b0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c1:commit() -- succcess
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_b1(void)
+-- --------------------------------------------------------------------------
+--
+c2:begin()
+c1:begin()
+c2("t:get{100}") -- start transaction in the engine
+c1("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_a0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c1:rollback()
+-- c2:commit() -- success - not in tarantool
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_a1(void)
+-- --------------------------------------------------------------------------
+--
+c2:begin()
+c1:begin()
+c2("t:get{100}") -- start transaction in the engine
+c1("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c1:rollback() -- success
+-- c2:commit()  -- success - not in tarantool
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_b0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c2:rollback() -- not in transaction
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_b1(void)
+-- --------------------------------------------------------------------------
+--
+c2:begin()
+c1:begin()
+c2("t:get{100}") -- start transaction in the engine
+c1("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c2:commit() -- rollback
+c2:rollback() -- not in transaction
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+c1("t:delete{2}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_n0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3:begin()
+c3("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c2:commit() -- rollback
+c3:commit() -- rollback
+c1:commit() -- success
+c2:commit() -- not in transaction
+c3:commit() -- not in transaction
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_n1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c3:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c3("t:get{200}") -- start transaction in the engine
+c2("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 10}")
+--
+c3("t:replace{1, 10}")
+--
+c2:commit() -- rollback
+c3:commit() -- rollback
+c3:commit() -- rollback
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_n0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c3:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c2:commit() -- rollback
+c3:commit() -- rollback
+c1:rollback() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_n1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c3:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c2:commit()  -- rollback
+c3:commit() -- rollback
+c2:rollback() -- success, not in transaction in tarantool
+c3:commit() -- success, not in transaction in tarantool
+c1:commit() -- success
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_n2(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c3:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c3:rollback()
+c2:commit()
+c1:commit()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_n3(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c3:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3("t:get{300}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c2:commit()
+c3:rollback()
+c1:commit()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_commit_wait_rollback_n4(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c3:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+c3("t:get{300}") -- start transaction in the engine
+--
+--
+c1("t:replace{1, 10}")
+--
+c2("t:replace{1, 15}")
+--
+c3("t:replace{1, 20}")
+--
+c2:commit()
+c3:rollback()
+c1:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_get0(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+c1:commit()
+--
+c2("t:get{1}") -- finds nothing
+--
+c2("t:replace{1, 15}")
+c2:commit() -- rollback
+--
+c3:begin()
+c3("t:get{1}") -- {1, 10}
+c3:commit()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_get1(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+--
+c1("t:replace{1, 10}")
+--
+c1:rollback()
+--
+c2("t:get{1}") -- finds nothing
+--
+c2("t:replace{1, 15}")
+c2:commit()
+--
+c3:begin()
+c3("t:get{1}") -- {1, 15}
+c3:commit()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_get2(void)
+-- --------------------------------------------------------------------------
+--
+c7:begin()
+c7("t:get{100}") -- start transaction in the engine
+c1:begin()
+--
+c1("t:replace{1, 1}")
+--
+c2:begin()
+--
+c2("t:replace{1, 2}")
+--
+c4:begin()
+c4("t:replace{1, 4}")
+--
+c5:begin()
+c5("t:replace{1, 5}")
+--
+c6:begin()
+c6("t:get{100}") -- start transaction in the engine
+--
+c1("t:get{1}") -- {1, 1}
+--
+c2("t:get{1}") --  {1, 2}
+--
+c4("t:get{1}") -- {1, 4}
+--
+c5("t:get{1}") -- {1, 5}
+--
+c6("t:get{1}") --  nothing
+--
+c7("t:get{1}") --  nothing
+--
+c3:begin()
+--
+c3("t:get{1}") -- nothing
+c3:rollback()
+--
+c1:rollback()
+c2:rollback()
+c3:rollback()
+c4:rollback()
+c5:rollback()
+c6:rollback()
+c7:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_get3(void)
+-- --------------------------------------------------------------------------
+--
+c7:begin()
+c1:begin()
+c7("t:get{100}") -- start transaction in the engine
+c1("t:get{200}") -- start transaction in the engine
+--
+c3:begin()
+c3("t:replace{1, 3}")
+c3:commit()
+--
+c2:begin()
+c3:begin()
+c2("t:get{500}") -- start transaction in the engine
+c3("t:get{600}") -- start transaction in the engine
+--
+c3("t:replace{1, 6}")
+c3:commit()
+--
+c4:begin()
+c3:begin()
+--
+c3("t:replace{1, 9}")
+c3:commit()
+--
+c5:begin()
+c3:begin()
+c5("t:get{800}") -- start transaction in the engine
+c3("t:get{900}") -- start transaction in the engine
+--
+c3("t:replace{1, 12}")
+c3:commit()
+--
+c6:begin()
+c6("t:get{1000}") -- start transaction in the engine
+--
+c2("t:get{1}") -- {1, 3}
+--
+c4("t:get{1}") -- {1, 12}
+--
+c5("t:get{1}") -- {1, 9}
+--
+c6("t:get{1}") -- {1, 12}
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+c1("t:get{1}") -- nothing
+--
+c7("t:get{1}") -- nothing
+--
+c2:rollback()
+--
+c4("t:get{1}") -- {1, 12}
+--
+c5("t:get{1}") -- {1, 9}
+--
+c6("t:get{1}") -- {1, 12}
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+c1("t:get{1}") -- nothing
+--
+c7("t:get{1}") -- nothing
+--
+c4:rollback()
+--
+c5("t:get{1}") -- {1, 9}
+--
+c6("t:get{1}") -- {1, 12}
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+c1("t:get{1}") -- nothing
+--
+c7("t:get{1}") -- nothing
+--
+c5:rollback()
+--
+c6("t:get{1}") -- {1, 12}
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+c1("t:get{1}") -- nothing
+--
+c7("t:get{1}") -- nothing
+--
+c6:rollback()
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+c1("t:get{1}") -- finds nothing
+--
+c7("t:get{1}") -- finds nothing
+--
+c1:rollback()
+c7:rollback()
+--
+c3:begin()
+c3("t:get{1}") -- {1, 12}
+c3:rollback()
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_c_set_conflict_derive(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+c2:begin()
+c1("t:get{100}") -- start transaction in the engine
+c2("t:get{200}") -- start transaction in the engine
+
+c1("t:replace{1, 10}")
+c2("t:replace{1, 15}")
+--
+c1:commit()
+--
+c2("t:replace{1, 20}") -- should not reset conflict flag
+--
+c2:commit() --  rollback
+--
+c3("t:get{1}")
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- --------------------------------------------------------------------------
+-- transaction_sc_set_wait(void)
+-- --------------------------------------------------------------------------
+--
+c1:begin()
+--
+c1("t:replace{1, 10}")
+--
+-- sic: runs in autocommit mode
+--
+c2("t:replace{1, 15}") -- fixme: aborted
+--
+c1:commit()
+--
+c2("t:get{1}") -- {1, 10}
+--
+c1("t:delete{1}")
+
+-- --------------------------------------------------------------------------
+-- transaction_sc_get(void)
+-- --------------------------------------------------------------------------
+--
+c1("t:replace{1, 7}")
+--
+c2:begin()
+--
+c2("t:replace{1, 8}")
+--
+c1("t:get{1}") -- {1, 7}
+--
+c2:commit()
+--
+c1("t:get{1}") -- {1, 8}
+--
+c3("t:get{1}") -- {1, 8}
+--
+-- cleanup
+--
+c1("t:delete{1}")
+--
+-- *************************************************************************
+-- 1.7 cleanup marker: end of tests cleanup cleanup
+-- *************************************************************************
+--
 box.space.test:drop()
 c1 = nil
 c2 = nil
+c3 = nil
+c4 = nil
+c5 = nil
+c6 = nil
+c7 = nil
