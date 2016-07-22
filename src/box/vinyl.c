@@ -1620,7 +1620,6 @@ struct sv;
 
 struct svif {
 	uint8_t   (*flags)(struct sv*);
-	void      (*set_lsn)(struct sv*, int64_t);
 	uint64_t  (*lsn)(struct sv*);
 	char     *(*pointer)(struct sv*);
 	uint32_t  (*size)(struct sv*);
@@ -2690,13 +2689,6 @@ svref_lsn(struct sv *v)
 	return ref->v->lsn;
 }
 
-static void
-svref_set_lsn(struct sv *v, int64_t lsn)
-{
-	struct svref *ref = (struct svref *)v->v;
-	ref->v->lsn = lsn;
-}
-
 static char*
 svref_pointer(struct sv *v)
 {
@@ -2715,7 +2707,6 @@ static struct svif svref_if =
 {
        .flags     = svref_flags,
        .lsn       = svref_lsn,
-       .set_lsn   = svref_set_lsn,
        .pointer   = svref_pointer,
        .size      = svref_size
 };
@@ -2838,11 +2829,6 @@ svtuple_lsn(struct sv *v) {
 	return sv_to_tuple(v)->lsn;
 }
 
-static void
-svtuple_set_lsn(struct sv *v, int64_t lsn) {
-	sv_to_tuple(v)->lsn = lsn;
-}
-
 static char*
 svtuple_pointer(struct sv *v) {
 	return sv_to_tuple(v)->data;
@@ -2857,7 +2843,6 @@ static struct svif svtuple_if =
 {
 	.flags     = svtuple_flags,
 	.lsn       = svtuple_lsn,
-	.set_lsn   = svtuple_set_lsn,
 	.pointer   = svtuple_pointer,
 	.size      = svtuple_size
 };
@@ -4586,7 +4571,6 @@ static struct svif sdv_if =
 {
 	.flags     = sdv_flags,
 	.lsn       = sdv_lsn,
-	.set_lsn    = NULL,
 	.pointer   = sdv_pointer,
 	.size      = sdv_size
 };
