@@ -67,7 +67,7 @@ box_info_sort(box.info.vinyl())
       - gc_wm: 30
       - lru_period: 0
       - lru_prio: 0
-      - mode: 3
+      - periodic_checkpoint: 0
     - '80':
       - branch_age: 0
       - branch_age_period: 0
@@ -81,7 +81,7 @@ box_info_sort(box.info.vinyl())
       - gc_wm: 0
       - lru_period: 0
       - lru_prio: 0
-      - mode: 2
+      - periodic_checkpoint: 1
   - db:
     - 512:0:
       - branch_avg: 1

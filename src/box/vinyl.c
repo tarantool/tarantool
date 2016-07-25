@@ -1556,7 +1556,7 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int read_disk, int read_cache,
 struct srzone {
 	uint32_t enable;
 	char     name[4];
-	uint32_t mode;
+	bool periodic_checkpoint;
 	uint32_t compact_wm;
 	uint32_t compact_mode;
 	uint32_t branch_prio;
@@ -4844,7 +4844,6 @@ struct vy_planner {
 #define SI_BRANCH        1
 #define SI_AGE           2
 #define SI_COMPACT       4
-#define SI_COMPACT_INDEX 8
 #define SI_CHECKPOINT    16
 #define SI_GC            32
 #define SI_TEMP          64
@@ -4871,8 +4870,6 @@ struct vy_plan {
 	 * compact:
 	 *   a: branches
 	 *   b: mode
-	 * compact_index:
-	 *   a: index_size
 	 * checkpoint:
 	 *   a: lsn
 	 * nodegc:
@@ -5410,8 +5407,6 @@ static int vy_run(struct vinyl_index*, struct sdc*, struct vy_plan*, uint64_t);
 static int
 si_compact(struct vinyl_index*, struct sdc*, struct vy_plan*, uint64_t,
 	   uint64_t, struct vy_iter*, uint64_t);
-static int
-vy_index_compact(struct vinyl_index*, struct sdc*, struct vy_plan*, uint64_t, uint64_t);
 
 typedef rb_tree(struct vy_range) vy_range_id_tree_t;
 
@@ -5563,9 +5558,6 @@ si_execute(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan,
 	case SI_GC:
 	case SI_COMPACT:
 		rc = si_compact(index, c, plan, vlsn, vlsn_lru, NULL, 0);
-		break;
-	case SI_COMPACT_INDEX:
-		rc = vy_index_compact(index, c, plan, vlsn, vlsn_lru);
 		break;
 	default:
 		unreachable();
@@ -5984,29 +5976,6 @@ si_compact(struct vinyl_index *index, struct sdc *c, struct vy_plan *plan,
 	rc = si_merge(index, c, node, vlsn, vlsn_lru, &im, size_stream, count);
 	sv_mergefree(&merge);
 	return rc;
-}
-
-static int
-vy_index_compact(struct vinyl_index *index, struct sdc *c,
-		 struct vy_plan *plan, uint64_t vlsn,
-		 uint64_t vlsn_lru)
-{
-	struct vy_range *node = plan->node;
-
-	vy_index_lock(index);
-	if (unlikely(node->used == 0)) {
-		vy_range_unlock(node);
-		vy_index_unlock(index);
-		return 0;
-	}
-	struct svindex *vindex;
-	vindex = vy_range_rotate(node);
-	vy_index_unlock(index);
-
-	uint64_t size_stream = vindex->used;
-	struct vy_iter i;
-	sv_indexiter_open(&i, vindex, VINYL_GE, NULL, 0);
-	return si_compact(index, c, plan, vlsn, vlsn_lru, &i, size_stream);
 }
 
 static int vy_index_droprepository(char *repo, int drop_directory)
@@ -6976,7 +6945,6 @@ static int vy_planner(struct vy_planner *p, struct vy_plan *plan)
 {
 	switch (plan->plan) {
 	case SI_BRANCH:
-	case SI_COMPACT_INDEX:
 		return vy_planner_peek_branch(p, plan);
 	case SI_COMPACT:
 		if (plan->b == 1)
@@ -8479,8 +8447,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 		rc = sc_planquota(s, &task->plan, SC_QGC, zone->gc_prio);
 		switch (rc) {
 		case 1:
-			if (zone->mode == 0)
-				task->plan.plan = SI_COMPACT_INDEX;
 			assert(db->index != NULL && db->index->refs > 0);
 			vinyl_index_ref(db->index);
 			db->workers[SC_QGC]++;
@@ -8499,8 +8465,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 		rc = sc_planquota(s, &task->plan, SC_QLRU, zone->lru_prio);
 		switch (rc) {
 		case 1:
-			if (zone->mode == 0)
-				task->plan.plan = SI_COMPACT_INDEX;
 			assert(db->index != NULL && db->index->refs > 0);
 			vinyl_index_ref(db->index);
 			db->workers[SC_QLRU]++;
@@ -8521,8 +8485,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 		rc = sc_planquota(s, &task->plan, SC_QBRANCH, zone->branch_prio);
 		switch (rc) {
 		case 1:
-			if (zone->mode == 0)
-				task->plan.plan = SI_COMPACT_INDEX;
 			assert(db->index != NULL && db->index->refs > 0);
 			vinyl_index_ref(db->index);
 			db->workers[SC_QBRANCH]++;
@@ -8533,20 +8495,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 				sc_task_age_done(s, now);
 			break;
 		}
-	}
-
-	/* compact_index (compaction with in-memory index) */
-	if (zone->mode == 0) {
-		task->plan.plan = SI_COMPACT_INDEX;
-		task->plan.a = zone->branch_wm;
-		rc = sc_plan(s, &task->plan);
-		if (rc == 1) {
-			assert(db->index != NULL && db->index->refs > 0);
-			vinyl_index_ref(db->index);
-			task->db = db;
-			return 1;
-		}
-		goto no_job;
 	}
 
 	/* branching */
@@ -8573,7 +8521,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 		return 1;
 	}
 
-no_job:
 	vy_plan_init(&task->plan);
 	return 0;
 }
@@ -8601,21 +8548,10 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 	if (unlikely(s->count == 0))
 		return;
 	/* checkpoint */
-	switch (zone->mode) {
-	case 0:  /* compact_index */
-		break;
-	case 1:  /* compact_index + branch_count prio */
-		unreachable();
-		break;
-	case 2:  /* checkpoint */
-	{
-		if (!s->checkpoint)
-			sc_task_checkpoint(s);
-		break;
+	if (zone->periodic_checkpoint && !s->checkpoint) {
+		sc_task_checkpoint(s);
 	}
-	default: /* branch + compact */
-		assert(zone->mode == 3);
-	}
+
 	/* gc */
 	if (s->gc == 0 && zone->gc_prio && zone->gc_period) {
 		if ((now - s->gc_time) >= zone->gc_period_us)
@@ -8676,8 +8612,6 @@ sc_complete(struct scheduler *s, struct sctask *t)
 	case SI_AGE:
 	case SI_CHECKPOINT:
 		db->workers[SC_QBRANCH]--;
-		break;
-	case SI_COMPACT_INDEX:
 		break;
 	case SI_GC:
 		db->workers[SC_QGC]--;
@@ -8792,7 +8726,7 @@ vy_conf_new()
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
-		.mode              = 3, /* branch + compact */
+		.periodic_checkpoint = false, /* branch + compact */
 		.compact_wm        = 2,
 		.compact_mode      = 0, /* branch priority */
 		.branch_prio       = 1,
@@ -8808,7 +8742,7 @@ vy_conf_new()
 	};
 	struct srzone redzone = {
 		.enable            = 1,
-		.mode              = 2, /* checkpoint */
+		.periodic_checkpoint = true, /* checkpoint */
 		.compact_wm        = 4,
 		.compact_mode      = 0,
 		.branch_prio       = 0,
@@ -8974,7 +8908,8 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		struct vy_info_node *local_node = vy_info_append(node, z->name);
 		if (vy_info_reserve(info, local_node, 13) != 0)
 			return 1;
-		vy_info_append_u32(local_node, "mode", z->mode);
+		vy_info_append_u32(local_node, "periodic_checkpoint",
+				   z->periodic_checkpoint);
 		vy_info_append_u32(local_node, "gc_wm", z->gc_wm);
 		vy_info_append_u32(local_node, "gc_prio", z->gc_prio);
 		vy_info_append_u32(local_node, "lru_prio", z->lru_prio);
