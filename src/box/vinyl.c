@@ -3293,14 +3293,9 @@ tx_rollback(struct vinyl_tx *tx)
 	return VINYL_TX_ROLLBACK;
 }
 
-static inline int
-vy_txprepare_cb(struct vinyl_tx *tx, struct txv *v, uint64_t lsn,
-	    struct sicache *cache, enum vinyl_status status);
-
 static enum tx_state
-tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
+tx_prepare(struct vinyl_tx *tx)
 {
-	uint64_t lsn = vy_sequence(tx->manager->env->seq, VINYL_LSN);
 	/* proceed read-only transactions */
 	if (tx->type == VINYL_TX_RO || txlog_write_count(&tx->log) == 0)
 		return tx_promote(tx, VINYL_TX_PREPARE);
@@ -3314,22 +3309,13 @@ tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 		if (txv_aborted(v))
 			return tx_promote(tx, VINYL_TX_ROLLBACK);
 		struct txv *prev = txv_prev(v);
-		if (prev == NULL) {
-			if (vy_txprepare_cb(tx, v, lsn, cache, status))
-				return tx_promote(tx, VINYL_TX_ROLLBACK);
+		if (prev == NULL)
 			continue;
-		}
-		if (txv_committed(prev)) {
-			if (prev->csn > tx->csn)
-				return tx_promote(tx, VINYL_TX_ROLLBACK);
+		if (txv_committed(prev))
 			continue;
-		}
 		/* force commit for read-only conflicts */
-		if (prev->tuple->flags & SVGET) {
-			if (vy_txprepare_cb(tx, v, lsn, cache, status))
-				return tx_promote(tx, VINYL_TX_ROLLBACK);
+		if (prev->tuple->flags & SVGET)
 			continue;
-		}
 		return tx_promote(tx, VINYL_TX_ROLLBACK);
 	}
 	return tx_promote(tx, VINYL_TX_PREPARE);
@@ -7084,51 +7070,6 @@ si_getbranch(struct siread *q, struct vy_range *n, struct sicachebranch *c)
 }
 
 static inline int
-si_get(struct siread *q)
-{
-	assert(q->key != NULL);
-	struct vy_rangeiter ii;
-	vy_rangeiter_open(&ii, q->index, VINYL_GE, q->key, q->keysize);
-	struct vy_range *node;
-	node = vy_rangeiter_get(&ii);
-	assert(node != NULL);
-
-	/* search in memory */
-	int rc;
-	rc = si_getindex(q, node);
-	if (rc != 0)
-		return rc;
-	if (q->cache_only)
-		return 2;
-	struct vy_rangeview view;
-	vy_range_view_open(&view, node);
-	rc = si_cachevalidate(q->cache, node);
-	if (unlikely(rc == -1)) {
-		vy_oom();
-		return -1;
-	}
-	vy_index_unlock(q->index);
-
-	/* search on disk */
-	struct svmerge *m = &q->merge;
-	rc = sv_mergeprepare(m, 1);
-	assert(rc == 0);
-	struct sicachebranch *b;
-
-	b = q->cache->branch;
-	while (b && b->branch) {
-		rc = si_getbranch(q, node, b);
-		if (rc != 0)
-			break;
-		b = b->next;
-	}
-
-	vy_index_lock(q->index);
-	vy_range_view_close(&view);
-	return rc;
-}
-
-static inline int
 si_rangebranch(struct siread *q, struct vy_range *n,
 	       struct vy_run *b, struct svmerge *m)
 {
@@ -9800,40 +9741,6 @@ vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 	tx_delete(tx);
 }
 
-/**
- * Abort the transaction if there is a transaction with a newer
- * consistent read view which has already committed and modified
- * the data seen by this transaction. Despite multi-version
- * concurrency control, vinyl doesn't allow Thomas rule writes
- * or blind writes, because the binary log in Tarantool
- * stores entire transactions in their actual commit order, and thus
- * allowing such writes would break consistency after recovery or on
- * a replica.
- */
-static inline int
-vy_txprepare_cb(struct vinyl_tx *tx, struct txv *v, uint64_t lsn,
-		struct sicache *cache, enum vinyl_status status)
-{
-	if (lsn == tx->vlsn || status == VINYL_FINAL_RECOVERY)
-		return 0;
-
-	struct vinyl_tuple *key = v->tuple;
-	struct vinyl_index *index = v->index->index;
-
-	struct siread q;
-	si_readopen(&q, index, cache, VINYL_EQ, tx->vlsn, key->data, key->size);
-	q.has = 1;
-	int rc = si_get(&q);
-	si_readclose(&q);
-
-	if (unlikely(q.result))
-		vinyl_tuple_unref(index, q.result);
-	if (rc)
-		return 1;
-
-	return 0;
-}
-
 /* {{{ Public API of transaction control: start/end transaction,
  * read, write data in the context of a transaction.
  */
@@ -9919,12 +9826,8 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
 
-	struct sicache *cache = vy_cachepool_pop(e->cachepool);
-	if (unlikely(cache == NULL))
-		return vy_oom();
-	enum tx_state s = tx_prepare(tx, cache, e->status);
+	enum tx_state s = tx_prepare(tx);
 
-	vy_cachepool_push(cache);
 	if (s == VINYL_TX_ROLLBACK) {
 		return 1;
 	}
