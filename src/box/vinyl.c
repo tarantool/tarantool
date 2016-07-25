@@ -1558,7 +1558,6 @@ struct srzone {
 	char     name[4];
 	bool periodic_checkpoint;
 	uint32_t compact_wm;
-	uint32_t compact_mode;
 	uint32_t branch_prio;
 	uint32_t branch_wm;
 	uint32_t branch_age;
@@ -4847,27 +4846,26 @@ struct vy_planner {
 struct vy_plan {
 	int explain;
 	int plan;
-	/* branch:
-	 *   a: index_size
-	 * age:
-	 *   a: ttl
-	 *   b: ttl_wm
-	 * compact:
-	 *   a: branches
-	 *   b: mode
-	 * checkpoint:
-	 *   a: lsn
-	 * nodegc:
-	 * gc:
-	 *   a: lsn
-	 *   b: percent
-	 * snapshot:
-	 *   a: ssn
-	 * shutdown:
-	 * drop:
-	 */
-	uint64_t a, b, c;
 	struct vy_range *node;
+	union {
+		struct {
+			uint32_t index_size;
+		} branch;
+		struct {
+			uint32_t ttl;
+			uint32_t ttl_wm;
+		} age;
+		struct {
+			uint32_t branches;
+		} compact;
+		struct {
+			uint64_t lsn;
+			uint32_t percent;
+		} gc;
+		struct {
+			uint64_t lsn;
+		} checkpoint;
+	};
 };
 
 static int vy_plan_init(struct vy_plan*);
@@ -6576,12 +6574,7 @@ static int vy_range_gc(struct vy_range *n, struct vy_index_conf *scheme)
 
 static int vy_plan_init(struct vy_plan *p)
 {
-	p->plan    = SI_NONE;
-	p->explain = SI_ENONE;
-	p->a       = 0;
-	p->b       = 0;
-	p->c       = 0;
-	p->node    = NULL;
+	memset(p, 0, sizeof(*p));
 	return 0;
 }
 
@@ -6643,7 +6636,7 @@ vy_planner_peek_checkpoint(struct vy_planner *p, struct vy_plan *plan)
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
 		n = container_of(pn, struct vy_range, nodebranch);
-		if (n->i0.lsnmin <= plan->a) {
+		if (n->i0.lsnmin <= plan->checkpoint.lsn) {
 			if (n->flags & SI_LOCK) {
 				rc_inprogress = 2;
 				continue;
@@ -6671,7 +6664,7 @@ vy_planner_peek_branch(struct vy_planner *p, struct vy_plan *plan)
 		n = container_of(pn, struct vy_range, nodebranch);
 		if (n->flags & SI_LOCK)
 			continue;
-		if (n->used >= plan->a)
+		if (n->used >= plan->branch.index_size)
 			goto match;
 		return 0;
 	}
@@ -6697,7 +6690,8 @@ vy_planner_peek_age(struct vy_planner *p, struct vy_plan *plan)
 		n = container_of(pn, struct vy_range, nodebranch);
 		if (n->flags & SI_LOCK)
 			continue;
-		if (n->used >= plan->b && ((now - n->update_time) >= plan->a))
+		if (n->used >= plan->age.ttl_wm &&
+		    ((now - n->update_time) >= plan->age.ttl))
 			goto match;
 	}
 	return 0;
@@ -6719,7 +6713,7 @@ vy_planner_peek_compact(struct vy_planner *p, struct vy_plan *plan)
 		n = container_of(pn, struct vy_range, nodecompact);
 		if (n->flags & SI_LOCK)
 			continue;
-		if (n->branch_count >= plan->a)
+		if (n->branch_count >= plan->compact.branches)
 			goto match;
 		return 0;
 	}
@@ -6742,10 +6736,10 @@ vy_planner_peek_gc(struct vy_planner *p, struct vy_plan *plan)
 	while ((pn = ss_rqprev(&p->compact, pn))) {
 		n = container_of(pn, struct vy_range, nodecompact);
 		struct vy_page_index_header *h = &n->self.index.header;
-		if (likely(h->dupkeys == 0) || (h->dupmin >= plan->a))
+		if (likely(h->dupkeys == 0) || (h->dupmin >= plan->gc.lsn))
 			continue;
 		uint32_t used = (h->dupkeys * 100) / h->keys;
-		if (used >= plan->b) {
+		if (used >= plan->gc.percent) {
 			if (n->flags & SI_LOCK) {
 				rc_inprogress = 2;
 				continue;
@@ -8216,7 +8210,7 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 	/* checkpoint */
 	if (s->checkpoint) {
 		task->plan.plan = SI_CHECKPOINT;
-		task->plan.a = s->checkpoint_lsn;
+		task->plan.checkpoint.lsn = s->checkpoint_lsn;
 		rc = sc_plan(s, &task->plan);
 		switch (rc) {
 		case 1:
@@ -8235,8 +8229,8 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 	/* garbage-collection */
 	if (s->gc) {
 		task->plan.plan = SI_GC;
-		task->plan.a = vlsn;
-		task->plan.b = zone->gc_wm;
+		task->plan.gc.lsn = vlsn;
+		task->plan.gc.percent = zone->gc_wm;
 		rc = sc_planquota(s, &task->plan, SC_QGC, zone->gc_prio);
 		switch (rc) {
 		case 1:
@@ -8255,8 +8249,8 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 	/* index aging */
 	if (s->age) {
 		task->plan.plan = SI_AGE;
-		task->plan.a = zone->branch_age * 1000000; /* ms */
-		task->plan.b = zone->branch_age_wm;
+		task->plan.age.ttl = zone->branch_age * 1000000; /* ms */
+		task->plan.age.ttl_wm = zone->branch_age_wm;
 		rc = sc_planquota(s, &task->plan, SC_QBRANCH, zone->branch_prio);
 		switch (rc) {
 		case 1:
@@ -8274,7 +8268,7 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 
 	/* branching */
 	task->plan.plan = SI_BRANCH;
-	task->plan.a = zone->branch_wm;
+	task->plan.branch.index_size = zone->branch_wm;
 	rc = sc_planquota(s, &task->plan, SC_QBRANCH, zone->branch_prio);
 	if (rc == 1) {
 		db->workers[SC_QBRANCH]++;
@@ -8286,8 +8280,7 @@ sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
 
 	/* compaction */
 	task->plan.plan = SI_COMPACT;
-	task->plan.a = zone->compact_wm;
-	task->plan.b = zone->compact_mode;
+	task->plan.compact.branches = zone->compact_wm;
 	rc = sc_plan(s, &task->plan);
 	if (rc == 1) {
 		assert(db->index != NULL && db->index->refs > 0);
@@ -8492,7 +8485,6 @@ vy_conf_new()
 		.enable            = 1,
 		.periodic_checkpoint = false, /* branch + compact */
 		.compact_wm        = 2,
-		.compact_mode      = 0, /* branch priority */
 		.branch_prio       = 1,
 		.branch_wm         = 10 * 1024 * 1024,
 		.branch_age        = 40,
@@ -8506,7 +8498,6 @@ vy_conf_new()
 		.enable            = 1,
 		.periodic_checkpoint = true, /* checkpoint */
 		.compact_wm        = 4,
-		.compact_mode      = 0,
 		.branch_prio       = 0,
 		.branch_wm         = 0,
 		.branch_age        = 0,
@@ -8676,7 +8667,6 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		vy_info_append_u32(local_node, "branch_age", z->branch_age);
 		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
 		vy_info_append_u32(local_node, "branch_prio", z->branch_prio);
-		vy_info_append_u32(local_node, "compact_mode", z->compact_mode);
 		vy_info_append_u32(local_node, "branch_age_wm", z->branch_age_wm);
 		vy_info_append_u32(local_node, "branch_age_period", z->branch_age_period);
 	}
