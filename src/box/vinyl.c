@@ -2973,7 +2973,6 @@ struct vinyl_tx {
 	uint64_t   vlsn;
 	uint64_t   csn;
 	int log_read;
-	struct rlist     deadlock;
 	rb_node(struct vinyl_tx) tree_node;
 	struct tx_manager *manager;
 };
@@ -3023,9 +3022,6 @@ tx_index_init(struct tx_index *, struct vinyl_index *,
 static int
 tx_index_free(struct tx_index*, struct tx_manager*);
 
-static struct vinyl_tx *
-tx_manager_find(struct tx_manager*, uint64_t);
-
 static void
 tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
 
@@ -3049,10 +3045,6 @@ tx_manager_max(struct tx_manager*);
 
 static uint64_t
 tx_manager_lsn(struct tx_manager*);
-
-
-static int
-tx_deadlock(struct vinyl_tx*);
 
 static inline int
 tx_manager_count(struct tx_manager *m) {
@@ -3155,12 +3147,6 @@ tx_manager_lsn(struct tx_manager *m)
 	return vlsn;
 }
 
-static struct vinyl_tx *
-tx_manager_find(struct tx_manager *m, uint64_t id)
-{
-	return tx_tree_search(&m->tree, (char*)&id);
-}
-
 static inline enum tx_state
 tx_promote(struct vinyl_tx *tx, enum tx_state state)
 {
@@ -3177,7 +3163,6 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
 	tx->log_read = -1;
-	rlist_create(&tx->deadlock);
 
 	tx->csn = m->csn;
 	tx->tsn = ++m->tsn;
@@ -3401,71 +3386,6 @@ add:
 	int rc = tx_set(tx, index, key);
 	if (unlikely(rc == -1))
 		return -1;
-	return 0;
-}
-
-static inline int
-tx_deadlock_in(struct tx_manager *m, struct rlist *mark, struct vinyl_tx *t,
-	       struct vinyl_tx *p)
-{
-	if (p->deadlock.next != &p->deadlock)
-		return 0;
-	rlist_add(mark, &p->deadlock);
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, &p->log.buf, sizeof(struct txv *));
-	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
-	{
-		struct txv *v = * (struct txv **) vy_bufiter_get(&i);
-		if (txv_prev(v) == NULL)
-			continue;
-		do {
-			struct vinyl_tx *n = tx_manager_find(m, v->tsn);
-			assert(n != NULL);
-			if (unlikely(n == t))
-				return 1;
-			int rc = tx_deadlock_in(m, mark, t, n);
-			if (unlikely(rc == 1))
-				return 1;
-			v = txv_prev(v);
-		} while (v);
-	}
-	return 0;
-}
-
-static inline void
-tx_deadlock_unmark(struct rlist *mark)
-{
-	struct vinyl_tx *t, *n;
-	rlist_foreach_entry_safe(t, mark, deadlock, n) {
-		rlist_create(&t->deadlock);
-	}
-}
-
-static int __attribute__((unused)) tx_deadlock(struct vinyl_tx *t)
-{
-	struct tx_manager *m = t->manager;
-	struct rlist mark;
-	rlist_create(&mark);
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, &t->log.buf, sizeof(struct txv *));
-	while (vy_bufiter_has(&i))
-	{
-		struct txv *v = *(struct txv **) vy_bufiter_get(&i);
-		struct txv *prev = txv_prev(v);
-		if (prev == NULL) {
-			vy_bufiter_next(&i);
-			continue;
-		}
-		struct vinyl_tx *p = tx_manager_find(m, prev->tsn);
-		assert(p != NULL);
-		int rc = tx_deadlock_in(m, &mark, t, p);
-		if (unlikely(rc)) {
-			tx_deadlock_unmark(&mark);
-			return 1;
-		}
-		vy_bufiter_next(&i);
-	}
-	tx_deadlock_unmark(&mark);
 	return 0;
 }
 
