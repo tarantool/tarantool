@@ -129,7 +129,16 @@ static inline struct srzone *
 sr_zoneof(struct vinyl_env *r);
 
 enum vy_sequence_op {
+	/**
+	 * The latest LSN of the write ahead log known to the
+	 * engine.
+	 */
 	VINYL_LSN,
+	/**
+	 * The oldest LSN used in one of the read views in
+	 * a transaction in the engine.
+	 */
+	VINYL_VIEW_LSN,
 	VINYL_NSN_NEXT,
 };
 
@@ -137,6 +146,11 @@ struct vy_sequence {
 	pthread_mutex_t lock;
 	/** Log sequence number. */
 	uint64_t lsn;
+	/**
+	 * View sequence number: the oldest read view maintained
+	 * by the front end.
+	 */
+	uint64_t vlsn;
 	/** Node sequence number. */
 	uint64_t nsn;
 };
@@ -176,9 +190,14 @@ vy_sequence_do(struct vy_sequence *n, enum vy_sequence_op op)
 {
 	uint64_t v = 0;
 	switch (op) {
-	case VINYL_LSN:       v = n->lsn;
+	case VINYL_LSN:
+		v = n->lsn;
 		break;
-	case VINYL_NSN_NEXT:   v = ++n->nsn;
+	case VINYL_VIEW_LSN:
+		v = n->vlsn;
+		break;
+	case VINYL_NSN_NEXT:
+		v = ++n->nsn;
 		break;
 	}
 	return v;
@@ -2997,7 +3016,6 @@ rb_gen_ext_key(, tx_tree_, tx_tree_t, struct vinyl_tx, tree_node,
 		 tx_tree_cmp, const char *, tx_tree_key_cmp);
 
 struct tx_manager {
-	pthread_mutex_t  lock;
 	tx_tree_t tree;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
@@ -3037,15 +3055,6 @@ tx_set(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*);
 static int
 tx_get(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*, struct vinyl_tuple**);
 
-static uint64_t
-tx_manager_min(struct tx_manager*);
-
-static uint64_t
-tx_manager_max(struct tx_manager*);
-
-static uint64_t
-tx_manager_lsn(struct tx_manager*);
-
 static inline int
 tx_manager_count(struct tx_manager *m) {
 	return m->count_rd + m->count_rw;
@@ -3066,7 +3075,6 @@ tx_manager_new(struct vinyl_env *env)
 	m->csn = 0;
 	m->tsn = 0;
 	m->gc  = NULL;
-	tt_pthread_mutex_init(&m->lock, NULL);
 	m->env = env;
 	return m;
 }
@@ -3074,7 +3082,6 @@ tx_manager_new(struct vinyl_env *env)
 static int
 tx_manager_delete(struct tx_manager *m)
 {
-	tt_pthread_mutex_destroy(&m->lock);
 	free(m);
 	return 0;
 }
@@ -3109,42 +3116,15 @@ tx_index_free(struct tx_index *i, struct tx_manager *m)
 static uint64_t
 tx_manager_min(struct tx_manager *m)
 {
-	tt_pthread_mutex_lock(&m->lock);
-	uint64_t min_tsn = 0;
-	if (tx_manager_count(m) > 0) {
-		struct vinyl_tx *min = tx_tree_first(&m->tree);
-		min_tsn = min->tsn;
-	}
-	tt_pthread_mutex_unlock(&m->lock);
-	return min_tsn;
+	struct vinyl_tx *min = tx_tree_first(&m->tree);
+	return min ? min->tsn : 0;
 }
 
 static uint64_t
 tx_manager_max(struct tx_manager *m)
 {
-	tt_pthread_mutex_lock(&m->lock);
-	uint64_t max_tsn = 0;
-	if (tx_manager_count(m) > 0) {
-		struct vinyl_tx *max = tx_tree_last(&m->tree);
-		max_tsn = max->tsn;
-	}
-	tt_pthread_mutex_unlock(&m->lock);
-	return max_tsn;
-}
-
-static uint64_t
-tx_manager_lsn(struct tx_manager *m)
-{
-	tt_pthread_mutex_lock(&m->lock);
-	uint64_t vlsn;
-	if (tx_manager_count(m) > 0) {
-		struct vinyl_tx *min = tx_tree_first(&m->tree);
-		vlsn = min->vlsn;
-	} else {
-		vlsn = vy_sequence(m->env->seq, VINYL_LSN);
-	}
-	tt_pthread_mutex_unlock(&m->lock);
-	return vlsn;
+	struct vinyl_tx *max = tx_tree_last(&m->tree);
+	return max ? max->tsn : 0;
 }
 
 static inline enum tx_state
@@ -3168,13 +3148,11 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 	tx->tsn = ++m->tsn;
 	tx->vlsn = vy_sequence(m->env->seq, VINYL_LSN);
 
-	tt_pthread_mutex_lock(&m->lock);
 	tx_tree_insert(&m->tree, tx);
 	if (type == VINYL_TX_RO)
 		m->count_rd++;
 	else
 		m->count_rw++;
-	tt_pthread_mutex_unlock(&m->lock);
 }
 
 static inline void
@@ -3242,13 +3220,19 @@ static inline void
 tx_end(struct vinyl_tx *tx)
 {
 	struct tx_manager *m = tx->manager;
-	tt_pthread_mutex_lock(&m->lock);
+	bool was_oldest = tx == tx_tree_first(&m->tree);
 	tx_tree_remove(&m->tree, tx);
 	if (tx->type == VINYL_TX_RO)
 		m->count_rd--;
 	else
 		m->count_rw--;
-	tt_pthread_mutex_unlock(&m->lock);
+	if (was_oldest) {
+		struct vinyl_tx *oldest = tx_tree_first(&m->tree);
+		vy_sequence_lock(m->env->seq);
+		m->env->seq->vlsn = oldest ? oldest->vlsn :
+			m->env->seq->lsn;
+		vy_sequence_unlock(m->env->seq);
+	}
 }
 
 static inline void
@@ -10175,7 +10159,8 @@ vinyl_worker(void *arg)
 				       pm_memory_order_relaxed)) {
 		int rc = 0;
 		if (vy_status_is_active(env->status)) {
-			rc = sc_step(env, &sdc, tx_manager_lsn(env->xm));
+			rc = sc_step(env, &sdc,
+				     vy_sequence(env->seq, VINYL_VIEW_LSN));
 		}
 		if (rc == -1)
 			break;
