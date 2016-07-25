@@ -80,7 +80,6 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 			panic("failed to commit vinyl transaction");
 		return;
 	case 1: /* rollback */
-	case 2: /* lock */
 		vinyl_rollback(env, tx);
 		/* must never happen during JOIN */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);

@@ -2839,15 +2839,23 @@ static struct svif svtuple_if =
 	.size      = svtuple_size
 };
 
+/** Transaction state. */
 enum tx_state {
-	VINYL_TX_UNDEF,
+	/** Initial state. */
 	VINYL_TX_READY,
-	VINYL_TX_COMMIT,
+	/**
+	 * A transaction is finished and validated in the engine.
+	 * It may still be rolled back if there is an error
+	 * writing the WAL.
+	 */
 	VINYL_TX_PREPARE,
-	VINYL_TX_ROLLBACK,
-	VINYL_TX_LOCK
+	/** A transaction is committed. */
+	VINYL_TX_COMMIT,
+	/** A transaction is aborted or rolled back. */
+	VINYL_TX_ROLLBACK
 };
 
+/** Transaction type. */
 enum tx_type {
 	VINYL_TX_RO,
 	VINYL_TX_RW
@@ -3022,7 +3030,7 @@ static void
 tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
 
 static void
-tx_gc(struct vinyl_tx*);
+tx_delete(struct vinyl_tx*);
 
 static enum tx_state
 tx_rollback(struct vinyl_tx*);
@@ -3237,12 +3245,12 @@ tx_manager_gc(struct tx_manager *m)
 }
 
 static void
-tx_gc(struct vinyl_tx *tx)
+tx_delete(struct vinyl_tx *tx)
 {
 	struct tx_manager *m = tx->manager;
-	tx_promote(tx, VINYL_TX_UNDEF);
 	txlog_free(&tx->log);
 	tx_manager_gc(m);
+	free(tx);
 }
 
 static inline void
@@ -3322,7 +3330,7 @@ tx_prepare(struct vinyl_tx *tx, struct sicache *cache, enum vinyl_status status)
 				return tx_promote(tx, VINYL_TX_ROLLBACK);
 			continue;
 		}
-		return tx_promote(tx, VINYL_TX_LOCK);
+		return tx_promote(tx, VINYL_TX_ROLLBACK);
 	}
 	return tx_promote(tx, VINYL_TX_PREPARE);
 }
@@ -9788,9 +9796,8 @@ vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 			txv_delete(m->env, v);
 		}
 	}
-	tx_gc(tx);
 	vy_stat_tx(stat, tx->start, count, rlb, conflict);
-	free(tx);
+	tx_delete(tx);
 }
 
 /**
@@ -9918,10 +9925,6 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	enum tx_state s = tx_prepare(tx, cache, e->status);
 
 	vy_cachepool_push(cache);
-	if (s == VINYL_TX_LOCK) {
-		vy_stat_tx_lock(e->stat);
-		return 2;
-	}
 	if (s == VINYL_TX_ROLLBACK) {
 		return 1;
 	}
