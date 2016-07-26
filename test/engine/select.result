@@ -3243,3 +3243,189 @@ index:select(box.tuple.new(tostring(77)), {iterator = box.index.LT})
 space:drop()
 ---
 ...
+-- select multiple indices
+-- two indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'number'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'str'} })
+---
+...
+space:insert({1, 'a'})
+---
+- [1, 'a']
+...
+space:insert({2, 'd'})
+---
+- [2, 'd']
+...
+space:insert({3, 'c'})
+---
+- [3, 'c']
+...
+space:insert({4, 'b'})
+---
+- [4, 'b']
+...
+space:insert({5, 'bbbb'})
+---
+- [5, 'bbbb']
+...
+space:insert({5, 'cbcb'})
+---
+- error: Duplicate key exists in unique index 'primary' in space 'test'
+...
+space:insert({6, 'bbbb'})
+---
+- error: Duplicate key exists in unique index 'secondary' in space 'test'
+...
+space:insert({-45.2, 'waerwe'})
+---
+- [-45.2, 'waerwe']
+...
+index1:select{}
+---
+- - [-45.2, 'waerwe']
+  - [1, 'a']
+  - [2, 'd']
+  - [3, 'c']
+  - [4, 'b']
+  - [5, 'bbbb']
+...
+index2:select{}
+---
+- - [1, 'a']
+  - [4, 'b']
+  - [5, 'bbbb']
+  - [3, 'c']
+  - [2, 'd']
+  - [-45.2, 'waerwe']
+...
+space:get{5}
+---
+- [5, 'bbbb']
+...
+index1:get{5}
+---
+- [5, 'bbbb']
+...
+space:select{5}
+---
+- - [5, 'bbbb']
+...
+index1:get{5}
+---
+- [5, 'bbbb']
+...
+index2:get{'a'}
+---
+- [1, 'a']
+...
+index2:select{'a'}
+---
+- - [1, 'a']
+...
+space:drop()
+---
+...
+-- three indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'int'} })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'int'} })
+---
+...
+space:insert({1, -30, 9})
+---
+- [1, -30, 9]
+...
+space:insert({5, 234, 9789})
+---
+- [5, 234, 9789]
+...
+space:insert({10, -56, 212})
+---
+- [10, -56, 212]
+...
+space:insert({2, 762, 1235})
+---
+- [2, 762, 1235]
+...
+space:insert({4, 7873, 67545})
+---
+- [4, 7873, 67545]
+...
+space:insert({9, 103, 1232})
+---
+- [9, 103, 1232]
+...
+index1:select{}
+---
+- - [1, -30, 9]
+  - [2, 762, 1235]
+  - [4, 7873, 67545]
+  - [5, 234, 9789]
+  - [9, 103, 1232]
+  - [10, -56, 212]
+...
+index2:select{}
+---
+- - [10, -56, 212]
+  - [1, -30, 9]
+  - [9, 103, 1232]
+  - [5, 234, 9789]
+  - [2, 762, 1235]
+  - [4, 7873, 67545]
+...
+index3:select{}
+---
+- - [1, -30, 9]
+  - [10, -56, 212]
+  - [9, 103, 1232]
+  - [2, 762, 1235]
+  - [5, 234, 9789]
+  - [4, 7873, 67545]
+...
+index1:select{10}
+---
+- - [10, -56, 212]
+...
+index1:get{9}
+---
+- [9, 103, 1232]
+...
+index2:select{-56}
+---
+- - [10, -56, 212]
+...
+index2:select{-57}
+---
+- []
+...
+index2:get{103}
+---
+- [9, 103, 1232]
+...
+index2:get{104}
+---
+...
+index3:get{9}
+---
+- [1, -30, 9]
+...
+index3:select{1235}
+---
+- - [2, 762, 1235]
+...
+space:drop()
+---
+...

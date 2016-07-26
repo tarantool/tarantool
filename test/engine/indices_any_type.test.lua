@@ -151,3 +151,49 @@ s4:insert({3, 3, mp.NULL, 3})
 s4:insert({4, 4, 4, mp.NULL})
 
 s4:drop()
+
+-- Test for nonunique indices
+
+s5 = box.schema.space.create('my_space6', { engine = engine })
+i5_1 = s5:create_index('my_space6_idx1', {type='TREE', parts={1, 'NUM'}, unique=true})
+i5_2 = s5:create_index('my_space6_idx2', {type='TREE', parts={2, 'SCALAR'}, unique=false})
+
+test_run:cmd("setopt delimiter ';'");
+function less(a, b)
+    if type(a[2]) ~= type(b[2]) then
+        return type(a[2]) < type(b[2])
+    end
+    if type(a[2]) == 'boolean' then
+        return a[2] == false and b[2] == true
+    end
+    if a[2] == b[2] then
+        return a[1] < b[1]
+    end
+    return a[2] < b[2]
+end;
+test_run:cmd("setopt delimiter ''");
+function sort(t) table.sort(t, less) return t end
+
+s5:insert({1, "123"})
+s5:insert({2, "123"})
+s5:insert({3, "123"})
+s5:insert({4, 123})
+s5:insert({5, 123})
+s5:insert({6, true})
+s5:insert({7, true})
+s5:insert({8, mp.NULL}) -- must fail
+s5:insert({9, -40.5})
+s5:insert({10, -39.5})
+s5:insert({11, -38.5})
+s5:insert({12, 100.5})
+s5:select{}
+sort(i5_2:select({123}))
+sort(i5_2:select({"123"}))
+sort(i5_2:select({true}))
+sort(i5_2:select({false}))
+sort(i5_2:select({true}))
+sort(i5_2:select({-38.5}))
+
+sort(i5_2:select({-40}, {iterator = 'GE'}))
+
+s5:drop()

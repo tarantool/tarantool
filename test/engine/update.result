@@ -531,3 +531,117 @@ space:get({101, 101})
 space:drop()
 ---
 ...
+-- update multiple indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'str'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'str'}, unique = false })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'scalar', 2, 'str', 1, 'num'}, unique = false })
+---
+...
+space:insert({1, 'fwoen', 324})
+---
+- [1, 'fwoen', 324]
+...
+space:insert({2, 'fwoen', 123})
+---
+- [2, 'fwoen', 123]
+...
+space:insert({3, 'fwoen', 324})
+---
+- [3, 'fwoen', 324]
+...
+space:insert({4, '21qn2', 213})
+---
+- [4, '21qn2', 213]
+...
+space:insert({5, 'fgb', '231293'})
+---
+- [5, 'fgb', '231293']
+...
+space:insert({6, 'nrhjrt', -1231.234})
+---
+- [6, 'nrhjrt', -1231.234]
+...
+index1:update({1}, {{'+', 3, 10}})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+index1:update({1, 'fwoen'}, {{'+', 3, 10}})
+---
+- [1, 'fwoen', 334]
+...
+index1:update({0, 'fwoen'}, {{'=', 3, 5}})
+---
+...
+index2:update({'fwoen'}, {'=', 3, 1000})
+---
+- error: More than one tuple found by get()
+...
+index3:update({324, 'fwoen', 3}, {{'-', 3, 100}})
+---
+- error: More than one tuple found by get()
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'} })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'num'}, unique = false })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:update({1}, {{'=', 2, 2}, {'=', 3, 3}})
+---
+- error: Duplicate key exists in unique index 'secondary' in space 'test'
+...
+index1:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index2:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index3:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:drop()
+---
+...

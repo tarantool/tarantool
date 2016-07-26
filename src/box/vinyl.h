@@ -155,6 +155,9 @@ vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx);
  * Index
  */
 
+struct key_def *
+vy_index_key_def(struct vinyl_index *index);
+
 struct vinyl_index *
 vinyl_index_by_name(struct vinyl_env *env, const char *name);
 

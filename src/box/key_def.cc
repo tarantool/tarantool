@@ -317,6 +317,17 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		key_def_set_cmp(def);
 }
 
+bool
+key_def_contains_fieldno(const struct key_def *key_def,
+			uint32_t fieldno)
+{
+	for (const struct key_part *iter = key_def->parts,
+	     *end = key_def->parts + key_def->part_count; iter != end; ++iter)
+		if (iter->fieldno == fieldno)
+			return true;
+	return false;
+}
+
 const struct space_opts space_opts_default = {
 	/* .temporary = */ false,
 };

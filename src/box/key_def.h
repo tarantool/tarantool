@@ -380,6 +380,14 @@ void
 key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type);
 
+/**
+ * Returns true if key_def->parts contains key_part
+ * with specified fieldno.
+ */
+bool
+key_def_contains_fieldno(const struct key_def *key_def,
+			uint32_t fieldno);
+
 /** Compare two key part arrays.
  *
  * This function is used to find out whether alteration

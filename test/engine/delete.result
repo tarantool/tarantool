@@ -531,3 +531,94 @@ space:delete(box.tuple.new{tostring(7)})
 space:drop()
 ---
 ...
+-- delete with multiple indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'str', 3, 'scalar'}})
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {1, 'num', 3, 'scalar'}})
+---
+...
+space:insert({1, 'abc', 100})
+---
+- [1, 'abc', 100]
+...
+space:insert({3, 'weif', 345})
+---
+- [3, 'weif', 345]
+...
+space:insert({2, 'gbot', '023'})
+---
+- [2, 'gbot', '023']
+...
+space:insert({10, 'dflgner', 532.123})
+---
+- [10, 'dflgner', 532.123]
+...
+space:insert({0, 'igkkm', 4902})
+---
+- [0, 'igkkm', 4902]
+...
+index1:select{}
+---
+- - [0, 'igkkm', 4902]
+  - [1, 'abc', 100]
+  - [2, 'gbot', '023']
+  - [3, 'weif', 345]
+  - [10, 'dflgner', 532.123]
+...
+index2:select{}
+---
+- - [1, 'abc', 100]
+  - [10, 'dflgner', 532.123]
+  - [2, 'gbot', '023']
+  - [0, 'igkkm', 4902]
+  - [3, 'weif', 345]
+...
+index3:select{}
+---
+- - [0, 'igkkm', 4902]
+  - [1, 'abc', 100]
+  - [2, 'gbot', '023']
+  - [3, 'weif', 345]
+  - [10, 'dflgner', 532.123]
+...
+tmp = index1:delete({1})
+---
+...
+tmp = index2:delete({'weif'}) -- must fail
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+tmp = index2:delete({'weif', 345})
+---
+...
+tmp = index2:delete({'weif', 345})
+---
+...
+tmp = index3:delete({2, '023'})
+---
+...
+index1:select{}
+---
+- - [0, 'igkkm', 4902]
+  - [10, 'dflgner', 532.123]
+...
+index2:select{}
+---
+- - [10, 'dflgner', 532.123]
+  - [0, 'igkkm', 4902]
+...
+index3:select{}
+---
+- - [0, 'igkkm', 4902]
+  - [10, 'dflgner', 532.123]
+...
+space:drop()
+---
+...

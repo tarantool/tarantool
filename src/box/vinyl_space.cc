@@ -55,13 +55,13 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 {
 	assert(request->type == IPROTO_INSERT);
 	assert(request->header != NULL);
-	VinylIndex *index = (VinylIndex *)index_find(space, 0);
-	struct vinyl_env *env = index->env;
+	struct vinyl_env *env = ((VinylEngine *)space->handler->engine)->env;
+	VinylIndex *index;
 
-	/* Check field count in tuple */
+	/* Check field count in the tuple. */
 	space_validate_tuple_raw(space, request->tuple);
 
-	/* Check tuple fields */
+	/* Check the tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);
 
 	struct vinyl_tx *tx = vinyl_begin(env);
@@ -69,9 +69,13 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 		diag_raise();
 
 	int64_t signature = request->header->lsn;
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		index = (VinylIndex *)space->index[i];
+		if (vinyl_replace(tx, index->db, request->tuple,
+				  request->tuple_end))
+			diag_raise();
+	}
 
-	if (vinyl_replace(tx, index->db, request->tuple, request->tuple_end) != 0)
-		diag_raise();
 
 	int rc = vinyl_prepare(env, tx);
 	switch (rc) {
@@ -93,110 +97,269 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	}
 }
 
-struct tuple *
-VinylSpace::executeReplace(struct txn*,
-			  struct space *space,
-			  struct request *request)
+static int
+vinyl_delete_from_all_indexes(struct space *space, struct tuple *tuple,
+			      struct request *request, struct vinyl_tx *tx)
 {
+	uint32_t key_size;
+	VinylIndex *index;
+	uint32_t part_count;
+	const char *key;
+	for (uint32_t iid = 0; iid < space->index_count; ++iid) {
+		index = (VinylIndex *)space->index[iid];
+		if ((request->index_id == iid) && (request->key != NULL)) {
+			key = request->key;
+		} else {
+			key = tuple_extract_key(tuple,
+						vy_index_key_def(index->db),
+						&key_size);
+		}
+		part_count = mp_decode_array(&key);
+		if (vinyl_delete(tx, index->db, key, part_count) < 0)
+			return 1;
+	}
+	return 0;
+}
+
+static void
+vinyl_insert_in_one_idx_impl(VinylIndex *index, const char *tuple,
+			     const char *tuple_end, uint32_t space_id,
+			     struct vinyl_tx *tx)
+{
+	/*
+	 * If the index is unique then the new tuple must not conflict with
+	 * existing tuples. If the index is not unique conflict is impossible.
+	 */
+	if (index->key_def->opts.is_unique) {
+		uint32_t key_len;
+		struct key_def *vinyl_key_def = vy_index_key_def(index->db);
+		const char *key;
+		key = tuple_extract_key_raw(tuple, tuple_end,
+					    vinyl_key_def, &key_len);
+		mp_decode_array(&key); /* Skip array header. */
+		struct tuple *found;
+		vinyl_coget(tx, index->db, key,
+			    vinyl_key_def->part_count,
+			    &found);
+		if (found) {
+			struct space *space = space_by_id(space_id);
+			tnt_raise(ClientError, ER_TUPLE_FOUND,
+				  index_name(index), space_name(space));
+		}
+	}
+
+	/* Tuple doesn't exists so it can be inserted. */
+	if (vinyl_replace(tx, index->db, tuple,
+			  tuple_end)) {
+		diag_raise();
+	}
+}
+
+static void
+vinyl_insert_in_one_idx(struct space *space, struct request *request,
+			struct vinyl_tx *tx)
+{
+	assert(request->type == IPROTO_INSERT);
+	assert(space->index_count == 1);
 	VinylIndex *index = (VinylIndex *)index_find(space, 0);
 
-	/* Check field count in tuple */
+	vinyl_insert_in_one_idx_impl(index, request->tuple, request->tuple_end,
+				     request->space_id, tx);
+}
+
+static void
+vinyl_insert_in_all_indexes(struct space *space, struct request *request,
+			    struct vinyl_tx *tx)
+{
+	assert(request->type == IPROTO_INSERT);
+	/* Check if there are at least one index. */
+	index_find(space, 0);
+	for (uint32_t iid = 0; iid < space->index_count; ++iid) {
+		vinyl_insert_in_one_idx_impl((VinylIndex *)space->index[iid],
+					     request->tuple,
+					     request->tuple_end,
+					     request->space_id, tx);
+	}
+}
+
+static void
+vinyl_replace_in_one_idx(struct space *space, struct request *request,
+			 struct vinyl_tx *tx)
+{
+	VinylEngine *engine = (VinylEngine *)space->handler->engine;
+	assert((request->type == IPROTO_REPLACE) ||
+	       (!engine->recovery_complete));
+	assert(space->index_count == 1);
+	VinylIndex *index = (VinylIndex *)index_find(space, 0);
+	if (vinyl_replace(tx, index->db, request->tuple,
+			  request->tuple_end) < 0) {
+		diag_raise();
+	}
+}
+
+static void
+vinyl_replace_in_all_indexes(struct space *space, struct request *request,
+			     struct vinyl_tx *tx)
+{
+	VinylEngine *engine = (VinylEngine *)space->handler->engine;
+	assert((request->type == IPROTO_REPLACE) ||
+	       (!engine->recovery_complete));
+	struct tuple *full_tuple;
+	VinylIndex *index = (VinylIndex *)index_find(space, 0);
+	uint32_t key_size;
+	const char *key = tuple_extract_key_raw(request->tuple,
+						request->tuple_end,
+						index->key_def,
+						&key_size);
+	uint32_t part_count = mp_decode_array(&key);
+	/* If the request type is replace then delete the old tuple. */
+	vinyl_coget(tx, index->db, key, part_count, &full_tuple);
+	if (full_tuple &&
+	    vinyl_delete_from_all_indexes(space, full_tuple, request, tx)) {
+		diag_raise();
+	}
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		index = (VinylIndex *)space->index[i];
+		vinyl_insert_in_one_idx_impl(index, request->tuple,
+					     request->tuple_end,
+					     request->space_id, tx);
+	}
+}
+
+/*
+ * Four cases:
+ *  - insert in one index
+ *  - insert in multiple indexes
+ *  - replace in one index
+ *  - replace in multiple indexes.
+ */
+struct tuple *
+VinylSpace::executeReplace(struct txn*,
+			   struct space *space,
+			   struct request *request)
+{
+	assert(request->index_id == 0);
+	/* Check field count in the tuple. */
 	space_validate_tuple_raw(space, request->tuple);
 
-	/* Check tuple fields */
+	/* Check the tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);
-
-	/* unique constraint */
+	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
-	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		uint32_t key_len;
-		const char *key = tuple_extract_key_raw(request->tuple,
-			request->tuple_end, index->key_def, &key_len);
-		mp_decode_array(&key); /* skip array header */
-		struct tuple *found = index->findByKey(key,
-			index->key_def->part_count);
-		if (found) {
+
+	if ((request->type == IPROTO_INSERT) && engine->recovery_complete) {
+		if (space->index_count == 1) {
 			/*
-			 * tuple is destroyed on the next call to
-			 * box_tuple_XXX() API. See box_tuple_ref()
-			 * comments.
+			 * Get function for insert in space with
+			 * single index.
 			 */
-			tnt_raise(ClientError, ER_TUPLE_FOUND,
-					  index_name(index), space_name(space));
+			vinyl_insert_in_one_idx(space, request, tx);
+		} else {
+			/*
+			 * Get function for insert in space with
+			 * multiple indexes.
+			 */
+			 vinyl_insert_in_all_indexes(space, request, tx);
+		}
+	} else {
+		if (space->index_count == 1) {
+			/*
+			 * Get function for replace in space with
+			 * single index.
+			 */
+			vinyl_replace_in_one_idx(space, request, tx);
+		} else {
+			/*
+			 * Get function for replace in space with
+			 * multiple indexes.
+			 */
+			 vinyl_replace_in_all_indexes(space, request, tx);
 		}
 	}
 
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
-		request->tuple_end);
+					    request->tuple_end);
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
-
-	/* replace */
-	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_replace(tx, index->db, request->tuple,
-			        request->tuple_end);
-	if (rc == -1)
-		diag_raise();
 
 	return tuple_bless(new_tuple);
 }
 
 struct tuple *
 VinylSpace::executeDelete(struct txn*, struct space *space,
-                           struct request *request)
+                          struct request *request)
 {
-	VinylIndex *index = (VinylIndex *)
-		index_find_unique(space, request->index_id);
+	VinylIndex *index = (VinylIndex *)index_find_unique(space,
+							    request->index_id);
+
+	/* Find full tuple in the index. */
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
 
-	/* remove */
+	struct tuple *full_tuple = NULL;
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_delete(tx, index->db, key, part_count);
-	if (rc == -1)
-		diag_raise();
+	if (space->index_count > 1) {
+		if (vinyl_coget(tx, index->db, key,
+				part_count, &full_tuple) != 0) {
+			diag_raise();
+			return NULL;
+		}
+		if (full_tuple &&
+		    vinyl_delete_from_all_indexes(space, full_tuple,
+						  request, tx))
+			diag_raise();
+	} else {
+		if (vinyl_delete(tx, index->db, key, part_count) < 0)
+			diag_raise();
+	}
 	return NULL;
 }
 
 struct tuple *
 VinylSpace::executeUpdate(struct txn*, struct space *space,
-                           struct request *request)
+                          struct request *request)
 {
-	/* Try to find the tuple by unique key */
-	VinylIndex *index = (VinylIndex *)
-		index_find_unique(space, request->index_id);
+	uint32_t index_id = request->index_id;
+	/* Find full tuple in the index. */
+	struct tuple *old_full_tuple = NULL;
+	VinylIndex *index = (VinylIndex *)index_find_unique(space, index_id);
+	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
-	struct tuple *old_tuple = index->findByKey(key, part_count);
 
-	if (old_tuple == NULL)
+	vinyl_coget(tx, index->db, key, part_count, &old_full_tuple);
+	if (old_full_tuple == NULL) {
 		return NULL;
-
-	/* Vinyl always yields a zero-ref tuple, GC it here. */
-	TupleRef old_ref(old_tuple);
-
-	/* Do tuple update */
-	struct tuple *new_tuple =
-		tuple_update(space->format,
-		             region_aligned_alloc_xc_cb,
-		             &fiber()->gc,
-		             old_tuple, request->tuple,
-		             request->tuple_end,
-		             request->index_base);
-	TupleRef ref(new_tuple);
-
+	}
+	TupleRef old_ref(old_full_tuple);
+	struct tuple *new_tuple;
+	new_tuple = tuple_update(space->format, region_aligned_alloc_xc_cb,
+				 &fiber()->gc, old_full_tuple, request->tuple,
+				 request->tuple_end, request->index_base);
+	TupleRef result_ref(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	space_check_update(space, old_tuple, new_tuple);
+	space_check_update(space, old_full_tuple, new_tuple);
 
-	/* replace */
-	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_replace(tx, index->db, new_tuple->data,
-				new_tuple->data + new_tuple->bsize);
-	if (rc == -1)
-		diag_raise();
-
+	uint32_t key_size;
+	for (uint32_t iid = 0; iid < space->index_count; ++iid) {
+		index = (VinylIndex *)space->index[iid];
+		if (iid != index_id) {
+			key = tuple_extract_key(old_full_tuple, index->key_def,
+						&key_size);
+		} else {
+			key = request->key;
+		}
+		part_count = mp_decode_array(&key);
+		if (vinyl_delete(tx, index->db, key, part_count) < 0) {
+			diag_raise();
+			return NULL;
+		}
+		vinyl_insert_in_one_idx_impl(index, new_tuple->data,
+					     new_tuple->data + new_tuple->bsize,
+					     request->space_id, tx);
+	}
 	return tuple_bless(new_tuple);
 }
 
@@ -204,6 +367,7 @@ void
 VinylSpace::executeUpsert(struct txn*, struct space *space,
                            struct request *request)
 {
+	assert(request->index_id == 0);
 	VinylIndex *index = (VinylIndex *)index_find(space, request->index_id);
 
 	/* Check field count in tuple */
@@ -213,9 +377,12 @@ VinylSpace::executeUpsert(struct txn*, struct space *space,
 	tuple_validate_raw(space->format, request->tuple);
 
 	struct vinyl_tx *tx = (struct vinyl_tx *)(in_txn()->engine_tx);
-	int rc = vinyl_upsert(tx, index->db, request->tuple, request->tuple_end,
-			     request->ops, request->ops_end,
-			     request->index_base);
-	if (rc == -1)
-		diag_raise();
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		index = (VinylIndex *)space->index[i];
+		if (vinyl_upsert(tx, index->db, request->tuple,
+				 request->tuple_end, request->ops,
+				 request->ops_end, request->index_base) < 0) {
+			diag_raise();
+		}
+	}
 }

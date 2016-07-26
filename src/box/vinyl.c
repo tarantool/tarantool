@@ -4764,6 +4764,12 @@ vinyl_index_ref(struct vinyl_index *index);
 static void
 vinyl_index_unref(struct vinyl_index *index);
 
+struct key_def *
+vy_index_key_def(struct vinyl_index *index)
+{
+	return index->key_def;
+}
+
 static int
 vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *b)
 {

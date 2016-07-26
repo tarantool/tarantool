@@ -7,8 +7,6 @@ index1 = space:create_index('primary')
 ...
 index2 = space:create_index('secondary')
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': Vinyl secondary
-    indexes are not supported'
 ...
 space:drop()
 ---

@@ -715,3 +715,143 @@ s4:insert({4, 4, 4, mp.NULL})
 s4:drop()
 ---
 ...
+-- Test for nonunique indices
+s5 = box.schema.space.create('my_space6', { engine = engine })
+---
+...
+i5_1 = s5:create_index('my_space6_idx1', {type='TREE', parts={1, 'NUM'}, unique=true})
+---
+...
+i5_2 = s5:create_index('my_space6_idx2', {type='TREE', parts={2, 'SCALAR'}, unique=false})
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+function less(a, b)
+    if type(a[2]) ~= type(b[2]) then
+        return type(a[2]) < type(b[2])
+    end
+    if type(a[2]) == 'boolean' then
+        return a[2] == false and b[2] == true
+    end
+    if a[2] == b[2] then
+        return a[1] < b[1]
+    end
+    return a[2] < b[2]
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+function sort(t) table.sort(t, less) return t end
+---
+...
+s5:insert({1, "123"})
+---
+- [1, '123']
+...
+s5:insert({2, "123"})
+---
+- [2, '123']
+...
+s5:insert({3, "123"})
+---
+- [3, '123']
+...
+s5:insert({4, 123})
+---
+- [4, 123]
+...
+s5:insert({5, 123})
+---
+- [5, 123]
+...
+s5:insert({6, true})
+---
+- [6, true]
+...
+s5:insert({7, true})
+---
+- [7, true]
+...
+s5:insert({8, mp.NULL}) -- must fail
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected SCALAR'
+...
+s5:insert({9, -40.5})
+---
+- [9, -40.5]
+...
+s5:insert({10, -39.5})
+---
+- [10, -39.5]
+...
+s5:insert({11, -38.5})
+---
+- [11, -38.5]
+...
+s5:insert({12, 100.5})
+---
+- [12, 100.5]
+...
+s5:select{}
+---
+- - [1, '123']
+  - [2, '123']
+  - [3, '123']
+  - [4, 123]
+  - [5, 123]
+  - [6, true]
+  - [7, true]
+  - [9, -40.5]
+  - [10, -39.5]
+  - [11, -38.5]
+  - [12, 100.5]
+...
+sort(i5_2:select({123}))
+---
+- - [4, 123]
+  - [5, 123]
+...
+sort(i5_2:select({"123"}))
+---
+- - [1, '123']
+  - [2, '123']
+  - [3, '123']
+...
+sort(i5_2:select({true}))
+---
+- - [6, true]
+  - [7, true]
+...
+sort(i5_2:select({false}))
+---
+- []
+...
+sort(i5_2:select({true}))
+---
+- - [6, true]
+  - [7, true]
+...
+sort(i5_2:select({-38.5}))
+---
+- - [11, -38.5]
+...
+sort(i5_2:select({-40}, {iterator = 'GE'}))
+---
+- - [10, -39.5]
+  - [11, -38.5]
+  - [12, 100.5]
+  - [4, 123]
+  - [5, 123]
+  - [1, '123']
+  - [2, '123']
+  - [3, '123']
+...
+s5:drop()
+---
+...
