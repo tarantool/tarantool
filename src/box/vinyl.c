@@ -1473,7 +1473,6 @@ struct vy_stat {
 	uint64_t tx;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	uint64_t tx_lock;
 	struct vy_avg    tx_latency;
 	struct vy_avg    tx_stmts;
 	/* cursor */
@@ -1548,14 +1547,6 @@ vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
 	s->tx_conflict += conflict;
 	vy_avg_update(&s->tx_stmts, count);
 	vy_avg_update(&s->tx_latency, diff);
-	tt_pthread_mutex_unlock(&s->lock);
-}
-
-static inline void
-vy_stat_tx_lock(struct vy_stat *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	s->tx_lock++;
 	tt_pthread_mutex_unlock(&s->lock);
 }
 
@@ -3054,11 +3045,6 @@ tx_set(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*);
 
 static int
 tx_get(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*, struct vinyl_tuple**);
-
-static inline int
-tx_manager_count(struct tx_manager *m) {
-	return m->count_rd + m->count_rw;
-}
 
 static struct tx_manager *
 tx_manager_new(struct vinyl_env *env)
@@ -4563,7 +4549,6 @@ static int
 vy_range_create(struct vy_range*, struct vy_index_conf*, struct sdid*);
 static int vy_range_free(struct vy_range*, struct vinyl_env*, int);
 static int vy_range_gc_index(struct vinyl_env*, struct svindex*);
-static int vy_range_gc(struct vy_range*, struct vy_index_conf*);
 static int vy_range_seal(struct vy_range*, struct vy_index_conf*);
 static int vy_range_complete(struct vy_range*, struct vy_index_conf*);
 
@@ -4582,33 +4567,6 @@ vy_range_unlock(struct vy_range *node) {
 static inline void
 vy_range_split(struct vy_range *node) {
 	node->flags |= SI_SPLIT;
-}
-
-static inline void
-vy_range_ref(struct vy_range *node)
-{
-	tt_pthread_mutex_lock(&node->reflock);
-	node->refs++;
-	tt_pthread_mutex_unlock(&node->reflock);
-}
-
-static inline uint16_t
-vy_range_unref(struct vy_range *node)
-{
-	tt_pthread_mutex_lock(&node->reflock);
-	assert(node->refs > 0);
-	uint16_t v = node->refs--;
-	tt_pthread_mutex_unlock(&node->reflock);
-	return v;
-}
-
-static inline uint16_t
-vy_range_refof(struct vy_range *node)
-{
-	tt_pthread_mutex_lock(&node->reflock);
-	uint16_t v = node->refs;
-	tt_pthread_mutex_unlock(&node->reflock);
-	return v;
 }
 
 static inline struct svindex*
@@ -4687,34 +4645,6 @@ vy_range_size(struct vy_range *n)
 		b = b->next;
 	}
 	return size;
-}
-
-struct vy_rangeview {
-	struct vy_range   *node;
-	uint16_t  flags;
-	uint32_t  branch_count;
-};
-
-static inline void
-vy_range_view_init(struct vy_rangeview *v, struct vy_range *node)
-{
-	v->node         = node;
-	v->branch_count = node->branch_count;
-	v->flags        = node->flags;
-}
-
-static inline void
-vy_range_view_open(struct vy_rangeview *v, struct vy_range *node)
-{
-	vy_range_ref(node);
-	vy_range_view_init(v, node);
-}
-
-static inline void
-vy_range_view_close(struct vy_rangeview *v)
-{
-	vy_range_unref(v->node);
-	v->node = NULL;
 }
 
 struct vy_planner {
@@ -6190,21 +6120,9 @@ si_merge(struct vinyl_index *index, struct sdc *c, struct vy_range *range,
 	             return -1);
 
 	/* gc range */
-	uint16_t refs = vy_range_refof(range);
-	if (likely(refs == 0)) {
-		rc = vy_range_free(range, env, 1);
-		if (unlikely(rc == -1))
-			return -1;
-	} else {
-		/* range concurrently being read, schedule for
-		 * delayed removal */
-		vy_range_gc(range, &index->conf);
-		vy_index_lock(index);
-		rlist_add(&index->gc, &range->gc);
-		index->gc_count++;
-		vy_index_unlock(index);
-	}
-
+	rc = vy_range_free(range, env, 1);
+	if (unlikely(rc == -1))
+		return -1;
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_2,
 	             vy_error("%s", "error injection");
 	             return -1);
@@ -6457,19 +6375,6 @@ vy_range_complete(struct vy_range *n, struct vy_index_conf *scheme)
 	return rc;
 }
 
-static int vy_range_gc(struct vy_range *n, struct vy_index_conf *scheme)
-{
-	char path[PATH_MAX];
-	vy_path_init(path, scheme->path, n->self.id.id, ".index.gc");
-	int rc = vy_file_rename(&n->file, path);
-	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' rename error: %s",
-		               n->file.path,
-		               strerror(errno));
-	}
-	return rc;
-}
-
 static int vy_plan_init(struct vy_plan *p)
 {
 	memset(p, 0, sizeof(*p));
@@ -6681,20 +6586,15 @@ vy_planner_peek_nodegc(struct vy_planner *p, struct vy_plan *plan)
 	struct vinyl_index *index = p->i;
 	if (likely(index->gc_count == 0))
 		return 0;
-	int rc_inprogress = 0;
 	struct vy_range *n;
 	rlist_foreach_entry(n, &index->gc, gc) {
-		if (likely(vy_range_refof(n) == 0)) {
-			rlist_del(&n->gc);
-			index->gc_count--;
-			plan->explain = SI_ENONE;
-			plan->node = n;
-			return 1;
-		} else {
-			rc_inprogress = 2;
-		}
+		rlist_del(&n->gc);
+		index->gc_count--;
+		plan->explain = SI_ENONE;
+		plan->node = n;
+		return 1;
 	}
-	return rc_inprogress;
+	return 0;
 }
 
 static int vy_planner(struct vy_planner *p, struct vy_plan *plan)
@@ -6882,95 +6782,6 @@ si_readstat(struct siread *q, int cache, struct vy_range *n, uint32_t reads)
 	if (unlikely(total == 0))
 		return;
 	n->temperature = (n->temperature_reads * 100ULL) / total;
-}
-
-static inline int
-si_getresult(struct siread *q, struct sv *v, int compare)
-{
-	int rc;
-	if (compare) {
-		rc = vy_tuple_compare(sv_pointer(v), q->key, q->merge.key_def);
-		if (unlikely(rc != 0))
-			return 0;
-	}
-	if (unlikely(q->has))
-		return sv_lsn(v) > q->vlsn;
-	if (unlikely(sv_is(v, SVDELETE)))
-		return 2;
-	rc = si_readdup(q, v);
-	if (unlikely(rc == -1))
-		return -1;
-	return 1;
-}
-
-static inline int
-si_getindex(struct siread *q, struct vy_range *n)
-{
-	struct svindex *second;
-	struct svindex *first = vy_range_index_priority(n, &second);
-
-	uint64_t lsn = q->has ? UINT64_MAX : q->vlsn;
-	struct svref *ref = sv_indexfind(first, q->key, q->keysize, lsn);
-	if (ref == NULL && second != NULL)
-		ref = sv_indexfind(second, q->key, q->keysize, lsn);
-	if (ref == NULL)
-		return 0;
-
-	si_readstat(q, 1, n, 1);
-	struct sv vret;
-	sv_from_tuple(&vret, ref->v);
-	return si_getresult(q, &vret, 0);
-}
-
-static inline int
-si_getbranch(struct siread *q, struct vy_range *n, struct sicachebranch *c)
-{
-	struct vy_run *b = c->branch;
-	struct vy_index_conf *conf= &q->index->conf;
-	int rc;
-	/* choose compression type */
-	int compression;
-	struct vy_filterif *compression_if;
-	compression    = conf->compression;
-	compression_if = conf->compression_if;
-	struct sdreadarg arg = {
-		.index           = &b->index,
-		.buf             = &c->buf_a,
-		.buf_xf          = &c->buf_b,
-		.buf_read        = &q->index->readbuf,
-		.index_iter      = &c->index_iter,
-		.page_iter       = &c->page_iter,
-		.use_compression = compression,
-		.compression_if  = compression_if,
-		.has             = q->has,
-		.has_vlsn        = q->vlsn,
-		.o               = VINYL_GE,
-		.file            = &n->file,
-		.key_def          = q->merge.key_def
-	};
-	rc = sd_read_open(&c->i, &arg, q->key, q->keysize);
-	int reads = sd_read_stat(&c->i);
-	si_readstat(q, 0, n, reads);
-	if (unlikely(rc <= 0))
-		return rc;
-	/* prepare sources */
-	sv_mergereset(&q->merge);
-	sv_mergeadd(&q->merge, &c->i);
-	struct svmergeiter im;
-	sv_mergeiter_open(&im, &q->merge, VINYL_GE);
-	uint64_t vlsn = q->vlsn;
-	if (unlikely(q->has))
-		vlsn = UINT64_MAX;
-	struct svreaditer ri;
-	sv_readiter_open(&ri, &im, vlsn, 1);
-	struct sv *v = sv_readiter_get(&ri);
-	if (unlikely(v == NULL)) {
-		sv_readiter_close(&ri);
-		return 0;
-	}
-	rc = si_getresult(q, v, 1);
-	sv_readiter_close(&ri);
-	return rc;
 }
 
 static inline int
@@ -8563,7 +8374,6 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_u64(node, "upsert", stat->upsert);
 	vy_info_append_u64(node, "cursor", stat->cursor);
 	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
-	vy_info_append_u64(node, "tx_lock", stat->tx_lock);
 	vy_info_append_u64(node, "documents", stat->v_count);
 	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
 	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
