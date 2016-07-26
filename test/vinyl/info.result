@@ -64,7 +64,6 @@ box_info_sort(box.info.vinyl())
       - gc_period: 60
       - gc_prio: 1
       - gc_wm: 30
-      - periodic_checkpoint: 0
     - '80':
       - branch_age: 0
       - branch_age_period: 0
@@ -75,7 +74,6 @@ box_info_sort(box.info.vinyl())
       - gc_period: 0
       - gc_prio: 0
       - gc_wm: 0
-      - periodic_checkpoint: 1
   - db:
     - 512:0:
       - branch_avg: 1

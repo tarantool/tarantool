@@ -1566,7 +1566,6 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int read_disk, int read_cache,
 struct srzone {
 	uint32_t enable;
 	char     name[4];
-	bool periodic_checkpoint;
 	uint32_t compact_wm;
 	uint32_t branch_prio;
 	uint32_t branch_wm;
@@ -7976,11 +7975,6 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 {
 	if (unlikely(s->count == 0))
 		return;
-	/* checkpoint */
-	if (zone->periodic_checkpoint && !s->checkpoint) {
-		sc_task_checkpoint(s);
-	}
-
 	/* gc */
 	if (s->gc == 0 && zone->gc_prio && zone->gc_period) {
 		if ((now - s->gc_time) >= zone->gc_period_us)
@@ -8147,7 +8141,6 @@ vy_conf_new()
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
-		.periodic_checkpoint = false, /* branch + compact */
 		.compact_wm        = 2,
 		.branch_prio       = 1,
 		.branch_wm         = 10 * 1024 * 1024,
@@ -8160,7 +8153,6 @@ vy_conf_new()
 	};
 	struct srzone redzone = {
 		.enable            = 1,
-		.periodic_checkpoint = true, /* checkpoint */
 		.compact_wm        = 4,
 		.branch_prio       = 0,
 		.branch_wm         = 0,
@@ -8322,8 +8314,6 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		struct vy_info_node *local_node = vy_info_append(node, z->name);
 		if (vy_info_reserve(info, local_node, 13) != 0)
 			return 1;
-		vy_info_append_u32(local_node, "periodic_checkpoint",
-				   z->periodic_checkpoint);
 		vy_info_append_u32(local_node, "gc_wm", z->gc_wm);
 		vy_info_append_u32(local_node, "gc_prio", z->gc_prio);
 		vy_info_append_u32(local_node, "branch_wm", z->branch_wm);
