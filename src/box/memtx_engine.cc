@@ -854,6 +854,13 @@ MemtxEngine::createIndex(struct key_def *key_def)
 void
 MemtxEngine::dropIndex(Index *index)
 {
+	if (index->key_def->iid != 0)
+		return; /* nothing to do for secondary keys */
+
+	/*
+	 * Delete all tuples in the old space if dropping the
+	 * primary key.
+	 */
 	struct iterator *it = ((MemtxIndex*) index)->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;

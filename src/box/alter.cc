@@ -909,16 +909,10 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter)
 {
-	/*
-	 * Delete all tuples in the old space if dropping the
-	 * primary key.
-	 */
-	if (space_index(alter->new_space, 0) != NULL)
+	if (space_index(alter->new_space, old_key_def->iid) != NULL)
 		return;
-	Index *pk = index_find(alter->old_space, 0);
-	if (pk == NULL)
-		return;
-	alter->old_space->handler->engine->dropIndex(pk);
+	Index *index = index_find(alter->old_space, old_key_def->iid);
+	alter->old_space->handler->engine->dropIndex(index);
 }
 
 /** Change non-essential (no data change) properties of an index. */
