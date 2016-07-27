@@ -820,11 +820,11 @@ function less(a, b)
     if type(a[2]) ~= type(b[2]) then
         return type(a[2]) < type(b[2])
     end
-    if type(a[2]) == 'boolean' then
-        return a[2] == false and b[2] == true
-    end
     if a[2] == b[2] then
         return a[1] < b[1]
+    end
+    if type(a[2]) == 'boolean' then
+        return a[2] == false and b[2] == true
     end
     return a[2] < b[2]
 end;
