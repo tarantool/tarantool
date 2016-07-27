@@ -442,8 +442,21 @@ iproto_session_input_iobuf(struct iproto_session *session)
 	if (ibuf_unused(&oldbuf->in) >= to_read)
 		return oldbuf;
 
-	/** All requests are processed, reuse the buffer. */
-	if (ibuf_size(&oldbuf->in) == session->parse_size) {
+	/**
+	 * Reuse the buffer if:
+	 * - all requests are processed (in only has unparsed
+	 *   content, and out is empty, so we will not bloat
+	 *   output by reusing input
+	 * - we received a large packet, so we need to
+	 *   extend input buffer size to store a single large
+	 *   packet. In this case we need to realloc the input
+	 *   buffer, simply falling through to the subsequent
+	 *   branches will not make the buffer larger.
+	 */
+	if (ibuf_size(&oldbuf->in) == session->parse_size &&
+	    (ibuf_pos(&oldbuf->in) == session->parse_size ||
+	     obuf_size(&oldbuf->out) == 0)) {
+
 		ibuf_reserve(&oldbuf->in, to_read);
 		return oldbuf;
 	}
