@@ -3193,9 +3193,7 @@ tx_manager_gc(struct tx_manager *m)
 static void
 tx_delete(struct vinyl_tx *tx)
 {
-	struct tx_manager *m = tx->manager;
 	txlog_free(&tx->log);
-	tx_manager_gc(m);
 	free(tx);
 }
 
@@ -3215,6 +3213,7 @@ tx_end(struct vinyl_tx *tx)
 		m->env->seq->vlsn = oldest ? oldest->vlsn :
 			m->env->seq->lsn;
 		vy_sequence_unlock(m->env->seq);
+		tx_manager_gc(m);
 	}
 }
 
