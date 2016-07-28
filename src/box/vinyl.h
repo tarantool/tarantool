@@ -162,12 +162,6 @@ struct vinyl_index *
 vinyl_index_new(struct vinyl_env *env, struct key_def *key_def,
 		struct tuple_format *tuple_format);
 
-void
-vinyl_index_ref(struct vinyl_index *index);
-
-int
-vinyl_index_unref(struct vinyl_index *index);
-
 int
 vinyl_index_open(struct vinyl_index *index);
 
