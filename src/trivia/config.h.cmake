@@ -232,6 +232,8 @@
 #define MODULE_LUAPATH "@MODULE_LUAPATH@"
 /** A constant added to package.cpath in Lua to find *.so module files */
 #define MODULE_LIBPATH "@MODULE_LIBPATH@"
+/** Shared library suffix - ".so" on Linux, ".dylib" on Mac */
+#define MODULE_LIBSUFFIX "@MODULE_LIBSUFFIX@"
 
 /** \endcond public */
 
