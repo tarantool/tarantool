@@ -49,10 +49,12 @@
 #include "vinyl.h"
 
 /**
- * Allocate new key_def with same fields as in first key_def
- * except parts. Parts of new key_def consists of
- * first key_def's parts and those parts of second key_def that
- * was not found in first parts.
+ * Allocate a new key_def with a set union of key parts from
+ * first and second key defs. Parts of the new key_def consist
+ * of first key_def's parts and those parts of the second key_def
+ * that were not among the first parts.
+ *
+ * @throws OutOfMemory
  */
 static struct key_def *
 merge_key_defs(struct key_def *first, struct key_def *second)
@@ -60,8 +62,8 @@ merge_key_defs(struct key_def *first, struct key_def *second)
 	int new_part_count = first->part_count + second->part_count;
 	struct key_part *sec_parts = second->parts;
 	/*
-	 * Find and remove part doubles that occured both in
-	 * first and second indexes.
+	 * Find and remove part duplicates, i.e. parts counted
+	 * twice since they are present in both key defs.
 	 */
 	for (struct key_part *iter = sec_parts,
 	     *end = sec_parts + second->part_count; iter != end; ++iter)
@@ -73,18 +75,22 @@ merge_key_defs(struct key_def *first, struct key_def *second)
 	new_def =  key_def_new(first->space_id, first->iid, first->name,
 			      first->type, &first->opts, new_part_count);
 
-	uint32_t offset = 0;
-	/* Append first parts to new key_def. */
+	/* Write position in the new key def. */
+	uint32_t pos = 0;
+	/* Append first key def's parts to the new key_def. */
 	for (struct key_part *iter = first->parts,
 	     *end = first->parts + first->part_count; iter != end; ++iter) {
-		key_def_set_part(new_def, offset++, iter->fieldno, iter->type);
+
+		key_def_set_part(new_def, pos++, iter->fieldno, iter->type);
 	}
+	/* Set-append second key def's part to the new key def. */
 	for (struct key_part *iter = sec_parts,
 	     *end = sec_parts + second->part_count; iter != end; ++iter) {
+
 		if (key_def_contains_fieldno(first, iter->fieldno)) {
 			continue;
 		}
-		key_def_set_part(new_def, offset++, iter->fieldno, iter->type);
+		key_def_set_part(new_def, pos++, iter->fieldno, iter->type);
 	}
 	return new_def;
 }
@@ -98,16 +104,20 @@ VinylIndex::VinylIndex(struct key_def *key_def_arg)
 	env = engine->env;
 	int rc;
 	struct key_def *vinyl_key_def = key_def;
-
+	auto guard = make_scoped_guard([&]{
+		if (vinyl_key_def != key_def) {
+			key_def_delete(vinyl_key_def);
+		}
+        });
 	/*
 	 * If the index is not unique, add primary key
 	 * to the end of parts.
 	 */
 	if (!key_def->opts.is_unique) {
 		Index *primary = index_find(space, 0);
+		/* Allocates a new (temporary) key_def */
 		vinyl_key_def = merge_key_defs(key_def, primary->key_def);
 	}
-
 	char name[128];
 	snprintf(name, sizeof(name), "%d:%d", key_def->space_id, key_def->iid);
 	db = vinyl_index_by_name(env, name);
@@ -119,15 +129,9 @@ VinylIndex::VinylIndex(struct key_def *key_def_arg)
 	}
 	/* Create database. */
 	db = vinyl_index_new(env, vinyl_key_def, space->format);
-	if (!key_def->opts.is_unique)
-		/* vinyl_key_def was duplicated in vinyl_index_new. */
-		key_def_delete(vinyl_key_def);
 	if (db == NULL)
 		diag_raise();
-	/* start two-phase recovery for a space:
-	 * a. created after snapshot recovery
-	 * b. created during log recovery
-	*/
+	/* Start two-phase recovery if the index exists. */
 	rc = vinyl_index_open(db);
 	if (rc == -1)
 		diag_raise();
