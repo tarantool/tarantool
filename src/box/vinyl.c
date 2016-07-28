@@ -1734,9 +1734,11 @@ struct tx_index;
 struct vinyl_index;
 
 struct txv {
+	/** Transaction start logical time - used by conflict manager. */
 	uint64_t tsn;
-	int log_read;
+	/** Transaction end logical time - used by conflict manager. */
 	uint64_t csn;
+	int log_read;
 	struct tx_index *index;
 	struct vinyl_tuple *tuple;
 	struct txv *gc;
@@ -1754,7 +1756,7 @@ txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
 	v->index = index;
 	v->tsn = tsn;
 	v->log_read = 0;
-	v->csn = 0;
+	v->csn = UINT64_MAX;
 	v->tuple = tuple;
 	vinyl_tuple_ref(tuple);
 	v->gc = NULL;
@@ -1771,7 +1773,7 @@ txv_delete(struct vinyl_env *env, struct txv *v)
 }
 
 static inline void
-txv_commit(struct txv *v, uint32_t csn)
+txv_commit(struct txv *v, uint64_t csn)
 {
 	v->log_read  = INT_MAX;
 	v->csn = csn;
@@ -1780,7 +1782,7 @@ txv_commit(struct txv *v, uint32_t csn)
 static inline int
 txv_committed(struct txv *v)
 {
-	return v->log_read == INT_MAX;
+	return v->csn != UINT64_MAX;
 }
 
 static inline void
@@ -2973,14 +2975,16 @@ struct vinyl_tx {
 	uint64_t start;
 	enum tx_type     type;
 	enum tx_state    state;
+	/** Transaction logical start time. */
 	uint64_t tsn;
+	/** Transaction logical end time. */
+	uint64_t   csn;
 	/**
 	 * Consistent read view LSN: the LSN recorded
 	 * at start of transaction and used to implement
 	 * transactional read view.
 	 */
 	uint64_t   vlsn;
-	uint64_t   csn;
 	int log_read;
 	rb_node(struct vinyl_tx) tree_node;
 	struct tx_manager *manager;
@@ -3010,8 +3014,7 @@ struct tx_manager {
 	uint32_t    count_rd;
 	uint32_t    count_rw;
 	uint32_t    count_gc;
-	uint64_t    csn;
-	/** Transaction sequence number. */
+	/** Transaction logical time. */
 	uint64_t tsn;
 	struct txv       *gc;
 	struct vinyl_env *env;
@@ -3057,7 +3060,6 @@ tx_manager_new(struct vinyl_env *env)
 	m->count_rd = 0;
 	m->count_rw = 0;
 	m->count_gc = 0;
-	m->csn = 0;
 	m->tsn = 0;
 	m->gc  = NULL;
 	m->env = env;
@@ -3129,7 +3131,7 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 	tx->type = type;
 	tx->log_read = -1;
 
-	tx->csn = m->csn;
+	tx->csn = UINT64_MAX;
 	tx->tsn = ++m->tsn;
 	tx->vlsn = vy_sequence(m->env->seq, VINYL_LSN);
 
@@ -3150,18 +3152,18 @@ txv_untrack(struct txv *v)
 }
 
 static inline uint64_t
-tx_manager_csn(struct tx_manager *m)
+tx_manager_tsn(struct tx_manager *m)
 {
-	uint64_t csn = UINT64_MAX;
+	uint64_t tsn = UINT64_MAX;
 	if (m->count_rw == 0)
-		return csn;
+		return tsn;
 
 	struct vinyl_tx *min = tx_tree_first(&m->tree);
 	while (min && min->type == VINYL_TX_RO)
 		min = tx_tree_next(&m->tree, min);
 
 	assert(min != NULL);
-	return min->csn;
+	return min->tsn;
 }
 
 static inline void
@@ -3169,7 +3171,7 @@ tx_manager_gc(struct tx_manager *m)
 {
 	if (m->count_gc == 0)
 		return;
-	uint64_t min_csn = tx_manager_csn(m);
+	uint64_t min_tsn = tx_manager_tsn(m);
 	struct txv *gc = NULL;
 	uint32_t count = 0;
 	struct txv *next;
@@ -3179,14 +3181,14 @@ tx_manager_gc(struct tx_manager *m)
 		next = v->gc;
 		assert(v->tuple->flags & SVGET);
 		assert(txv_committed(v));
-		if (v->csn > min_csn) {
+		if (v->csn < min_tsn) {
+			txv_untrack(v);
+			txv_delete(m->env, v);
+		} else {
 			v->gc = gc;
 			gc = v;
 			count++;
-			continue;
 		}
-		txv_untrack(v);
-		txv_delete(m->env, v);
 	}
 	m->count_gc = count;
 	m->gc = gc;
@@ -9539,7 +9541,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	struct tx_manager *m = tx->manager;
 	struct vy_bufiter i;
 	vy_bufiter_open(&i, &tx->log.buf, sizeof(struct txv *));
-	uint64_t csn = ++m->csn;
+	uint64_t csn = m->tsn;
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txv *v = *(struct txv **) vy_bufiter_get(&i);
