@@ -243,12 +243,12 @@ tarantool_lua_setpaths(struct lua_State *L)
 	tarantool_lua_pushpath_env(L, "LUA_PATH");
 	lua_setfield(L, top, "path");
 
-	lua_pushliteral(L, "./?." TARANTOOL_LIBEXT ";");
+	lua_pushliteral(L, "./?" MODULE_LIBSUFFIX ";");
 	if (home != NULL) {
 		lua_pushstring(L, home);
-		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?." TARANTOOL_LIBEXT ";");
+		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
 		lua_pushstring(L, home);
-		lua_pushliteral(L, "/.luarocks/lib/lua/?." TARANTOOL_LIBEXT ";");
+		lua_pushliteral(L, "/.luarocks/lib/lua/?" MODULE_LIBSUFFIX ";");
 	}
 	lua_pushliteral(L, MODULE_LIBPATH ";");
 	/* overwrite standard paths */
