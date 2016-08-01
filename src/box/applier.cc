@@ -169,13 +169,19 @@ applier_join(struct applier *applier)
 	xrow_encode_join(&row, &SERVER_UUID);
 	coio_write_xrow(coio, &row);
 
-	/* Decode JOIN response */
-	coio_read_xrow(coio, &iobuf->in, &row);
-	if (iproto_type_is_error(row.type)) {
-		return xrow_decode_error(&row); /* re-throw error */
-	} else if (row.type != IPROTO_OK) {
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) row.type);
+	/**
+	 * Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
+	 * response, but a stream of rows from snapshot.
+	 */
+	if (applier->version_id >= version_id(1, 7, 0)) {
+		/* Decode JOIN response */
+		coio_read_xrow(coio, &iobuf->in, &row);
+		if (iproto_type_is_error(row.type)) {
+			return xrow_decode_error(&row); /* re-throw error */
+		} else if (row.type != IPROTO_OK) {
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				  (uint32_t) row.type);
+		}
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -203,6 +209,12 @@ applier_join(struct applier *applier)
 	applier_set_state(applier, APPLIER_FINAL_JOIN);
 
 	/*
+	 * Tarantool < 1.7.0: there is no "final join" stage.
+	 */
+	if (applier->version_id < version_id(1, 7, 0))
+		goto finish;
+
+	/*
 	 * Receive final data.
 	 */
 	assert(applier->final_join_stream != NULL);
@@ -220,6 +232,7 @@ applier_join(struct applier *applier)
 				  (uint32_t) row.type);
 		}
 	}
+finish:
 	/* Decode end of stream packet */
 	vclock_create(&applier->vclock);
 	assert(row.type == IPROTO_OK);
