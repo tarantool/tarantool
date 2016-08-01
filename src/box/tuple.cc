@@ -365,7 +365,7 @@ tuple_upsert(struct tuple_format *format,
 		tuple_upsert_execute(region_alloc, alloc_ctx, expr, expr_end,
 				     old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
-				     &new_size, field_base);
+				     &new_size, field_base, false);
 	if (new_data == NULL)
 		diag_raise();
 

@@ -153,3 +153,19 @@ s:select()
 s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})
 s:select()
 s:drop()
+
+
+--
+-- gh-1571: vinyl upsert with bad update should not log
+--
+s = box.schema.space.create('t',{engine='vinyl'})
+_ = s:create_index('primary',{})
+s:insert{1}
+s:replace{1,2}
+s:upsert({1},{{'=',4,5}})
+s:select{}
+s:select{}
+test_run:grep_log('default', 'UPSERT operation failed') == nil
+box:snapshot()
+test_run:grep_log('default', 'UPSERT operation failed') ~= nil
+s:drop()

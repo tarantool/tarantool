@@ -59,7 +59,7 @@ const char *
 tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr, const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_new_size, int index_base);
+		     uint32_t *p_new_size, int index_base, bool suppress_error);
 
 #if defined(__cplusplus)
 } /* extern "C" */
