@@ -1734,7 +1734,6 @@ struct txv {
 	uint64_t tsn;
 	/** Transaction end logical time - used by conflict manager. */
 	uint64_t csn;
-	int log_read;
 	struct tx_index *index;
 	struct vinyl_tuple *tuple;
 	struct txv *gc;
@@ -1751,7 +1750,6 @@ txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
 		return NULL;
 	v->index = index;
 	v->tsn = tsn;
-	v->log_read = 0;
 	v->csn = UINT64_MAX;
 	v->tuple = tuple;
 	vinyl_tuple_ref(tuple);
@@ -1771,7 +1769,6 @@ txv_delete(struct vinyl_env *env, struct txv *v)
 static inline void
 txv_commit(struct txv *v, uint64_t csn)
 {
-	v->log_read  = INT_MAX;
 	v->csn = csn;
 }
 
@@ -1912,16 +1909,21 @@ txlog_add(struct txlog *l, struct txv *v)
 }
 
 static inline void
-txlog_replace(struct txlog *l, int n, struct txv *v)
+txlog_replace(struct vinyl_env *env, struct txlog *l,
+	      struct txv *old_v, struct txv *v)
 {
-	struct txv *ov = txlog_at(l, n);
-	txlogindex_del(l, ov);
-	if (! (ov->tuple->flags & SVGET))
+	txlogindex_del(l, old_v);
+	if (! (old_v->tuple->flags & SVGET))
 		l->write_count--;
-	txlogindex_add(l, v);
+	txlogindex_add(l, old_v);
 	if (! (v->tuple->flags & SVGET))
 		l->write_count++;
-	vy_buf_set(&l->buf, sizeof(struct txv *), n, (char*) &v, sizeof(struct txv *));
+	vinyl_tuple_unref_rt(env, old_v->tuple);
+	old_v->tuple = v->tuple;
+	old_v->tsn = v->tsn;
+	old_v->csn = v->csn;
+	old_v->gc = v->gc;
+	free(v);
 }
 
 struct PACKED svmergesrc {
@@ -2981,7 +2983,7 @@ struct vinyl_tx {
 	 * transactional read view.
 	 */
 	uint64_t   vlsn;
-	int log_read;
+	struct txv *readonly_tail;
 	rb_node(struct vinyl_tx) tree_node;
 	struct tx_manager *manager;
 };
@@ -3125,7 +3127,7 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
-	tx->log_read = -1;
+	tx->readonly_tail = NULL;
 
 	tx->csn = UINT64_MAX;
 	tx->tsn = ++m->tsn;
@@ -3255,7 +3257,7 @@ tx_prepare(struct vinyl_tx *tx)
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txv *v = *(struct txv ** )vy_bufiter_get(&i);
-		if (v->log_read == tx->log_read)
+		if (v == tx->readonly_tail)
 			break;
 		if (txv_aborted(v))
 			return tx_promote(tx, VINYL_TX_ROLLBACK);
@@ -3295,20 +3297,14 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 			         "allowed per a transaction key");
 			goto error;
 		}
-		/* replace old document with the new one */
-		v->log_read = own->log_read;
 		if (unlikely(txv_aborted(own)))
 			txv_abort(v);
-		txv_tree_remove(&index->tree, own);
-		txv_tree_insert(&index->tree, v);
 		/* update log */
-		txlog_replace(&tx->log, v->log_read, v);
+		txlog_replace(env, &tx->log, own, v);
 
-		txv_delete(env, own);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
-	v->log_read = txlog_count(&tx->log);
 	int rc = txlog_add(&tx->log, v);
 	if (unlikely(rc == -1)) {
 		vy_oom();
@@ -3344,14 +3340,14 @@ tx_get(struct vinyl_tx *tx, struct tx_index *index, struct vinyl_tuple *key,
 	return 1;
 
 add:
-	/* track a start of the latest read sequence in the
-	 * transactional log */
-	if (tx->log_read == -1)
-		tx->log_read = txlog_count(&tx->log);
 	tt_pthread_mutex_unlock(&index->mutex);
 	int rc = tx_set(tx, index, key);
 	if (unlikely(rc == -1))
 		return -1;
+	/* track a start of the latest read sequence in the
+	 * transactional log */
+	if (tx->readonly_tail == NULL)
+		 tx->readonly_tail = txlog_at(&tx->log, txlog_count(&tx->log) - 1);
 	return 0;
 }
 
@@ -9069,7 +9065,7 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 
 	o->flags = flags;
 	/** Drop log_read counter */
-	tx->log_read = -1;
+	tx->readonly_tail = NULL;
 
 	/* concurrent index only */
 	return tx_set(tx, &index->coindex, o);
@@ -9202,7 +9198,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	for (; vy_bufiter_has(&i); vy_bufiter_next(&i))
 	{
 		struct txv *v = *(struct txv **) vy_bufiter_get(&i);
-		if (v->log_read == tx->log_read)
+		if (v == tx->readonly_tail)
 			break;
 		struct txv *prev = txv_prev(v);
 		/* abort conflict reader */
