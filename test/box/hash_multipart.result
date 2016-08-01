@@ -4,10 +4,10 @@ utils = dofile('utils.lua')
 hash = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num', 2, 'str', 3, 'num'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned', 2, 'string', 3, 'unsigned'}, unique = true })
 ---
 ...
-tmp = hash:create_index('unique', { type = 'hash', parts = {3, 'num', 5, 'num'}, unique = true })
+tmp = hash:create_index('unique', { type = 'hash', parts = {3, 'unsigned', 5, 'unsigned'}, unique = true })
 ---
 ...
 -- insert rows
@@ -109,7 +109,7 @@ hash.index['primary']:get{1, 'foo', 0, 0}
 -- primary index select with wrong type
 hash.index['primary']:get{1, 'foo', 'baz'}
 ---
-- error: 'Supplied key type of part 2 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 2 does not match index part type: expected unsigned'
 ...
 -- secondary index select
 hash.index['unique']:get{1, 4}
@@ -128,7 +128,7 @@ hash.index['unique']:get{1}
 -- secondary index select with wrong type
 hash.index['unique']:select{1, 'baz'}
 ---
-- error: 'Supplied key type of part 1 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 1 does not match index part type: expected unsigned'
 ...
 -- cleanup
 hash:truncate()

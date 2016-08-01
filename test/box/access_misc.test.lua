@@ -16,7 +16,7 @@ box.schema.user.create('testus')
 box.schema.user.create('testus')
 
 s = box.schema.space.create('admin_space')
-index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+index = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
 s:insert({1})
 s:insert({2})
 --
@@ -164,7 +164,7 @@ session.su('admin')
 box.schema.user.grant('testuser', 'read', 'space', '_index')
 session.su('testuser')
 box.space._index:select(272)
-box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
+box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'unsigned'}
 
 
 
@@ -175,7 +175,7 @@ box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 --
 s = box.schema.space.create('glade') 
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
-index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {1, 'unsigned', 2, 'string'}})
 s:insert({1, 'A'})
 s:insert({2, 'B'})
 s:insert({3, 'C'})

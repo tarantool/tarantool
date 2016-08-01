@@ -112,7 +112,8 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 				  d  * 2, part_count);
 		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
-			key_mp_type_validate(ARRAY, mp_type, ER_KEY_PART_TYPE, 0);
+			key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
+					     ER_KEY_PART_TYPE, 0);
 			uint32_t array_size = mp_decode_array(&key);
 			if (array_size != d && array_size != d * 2)
 				tnt_raise(ClientError, ER_RTREE_RECT,
@@ -120,13 +121,15 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 			for (uint32_t part = 0; part < array_size; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, 0);
+				key_mp_type_validate(FIELD_TYPE_NUMBER, mp_type,
+						     ER_KEY_PART_TYPE, 0);
 			}
 		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, part);
+				key_mp_type_validate(FIELD_TYPE_NUMBER, mp_type,
+						     ER_KEY_PART_TYPE, part);
 			}
 		}
 	} else {

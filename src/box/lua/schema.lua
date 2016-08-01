@@ -4,6 +4,7 @@ local ffi = require('ffi')
 local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
+local log = require('log')
 local session = box.session
 local internal = require('box.internal')
 
@@ -398,8 +399,8 @@ box.schema.index.create = function(space_id, name, options)
     options = update_param_table(options, options_defaults)
     local type_dependent_defaults = {
         rtree = {parts = { 2, 'array' }, unique = false},
-        bitset = {parts = { 2, 'num' }, unique = false},
-        other = {parts = { 1, 'num' }, unique = true},
+        bitset = {parts = { 2, 'unsigned' }, unique = false},
+        other = {parts = { 1, 'unsigned' }, unique = true},
     }
     options_defaults = type_dependent_defaults[options.type]
             and type_dependent_defaults[options.type]
@@ -441,6 +442,20 @@ box.schema.index.create = function(space_id, name, options)
     for k, v in pairs(options) do
         if options_template[k] == nil then
             key_opts[k] = v
+        end
+    end
+    local field_type_aliases = {
+        num = 'unsigned'; -- Deprecated since 1.7.2
+        uint = 'unsigned';
+        str = 'string';
+        int = 'integer';
+    };
+    for _, part in pairs(parts) do
+        local field_type = part[2]:lower()
+        part[2] = field_type_aliases[field_type] or field_type
+        if field_type == 'num' then
+            log.warn("field type '%s' is deprecated since Tarantool 1.7, "..
+                     "please use '%s' instead", field_type, part[2])
         end
     end
     _index:insert{space_id, iid, name, options.type, key_opts, parts}

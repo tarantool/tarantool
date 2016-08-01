@@ -2,7 +2,7 @@
 env = require('test_run')
 test_run = env.new()
 s = box.schema.create_space('test')
-i = s:create_index('primary', { type = 'TREE', parts = {1, 'num', 2, 'num'} })
+i = s:create_index('primary', { type = 'TREE', parts = {1, 'unsigned', 2, 'unsigned'} })
 s:insert{0, 0} s:insert{2, 0}
 for i=1,10000 do s:insert{1, i} end
 test_itrs = {'EQ', 'REQ', 'GT', 'LT', 'GE', 'LE'}

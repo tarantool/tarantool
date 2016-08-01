@@ -266,7 +266,7 @@ tuple_next_cstr(struct tuple_iterator *it)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
 	if (mp_typeof(*field) != MP_STR)
 		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
-			  field_type_strs[STRING]);
+			  field_type_strs[FIELD_TYPE_STRING]);
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
@@ -286,7 +286,7 @@ tuple_field_cstr(struct tuple *tuple, uint32_t i)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, i);
 	if (mp_typeof(*field) != MP_STR)
 		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
-			  field_type_strs[STRING]);
+			  field_type_strs[FIELD_TYPE_STRING]);
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
@@ -561,15 +561,15 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type)
 {
 	switch (type) {
-	case NUM:
+	case FIELD_TYPE_UNSIGNED:
 		return mp_compare_uint(field_a, field_b);
-	case STRING:
+	case FIELD_TYPE_STRING:
 		return mp_compare_str(field_a, field_b);
-	case INT:
+	case FIELD_TYPE_INTEGER:
 		return mp_compare_integer(field_a, field_b);
-	case NUMBER:
+	case FIELD_TYPE_NUMBER:
 		return mp_compare_number(field_a, field_b);
-	case SCALAR:
+	case FIELD_TYPE_SCALAR:
 		return mp_compare_scalar(field_a, field_b);
 	default:
 		unreachable();

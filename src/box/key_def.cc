@@ -39,12 +39,34 @@
 #include "space.h"
 #include "schema.h"
 
-const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", "INT", "SCALAR", ""};
+const char *field_type_strs[] = {
+	/* [FIELD_TYPE_ANY]      = */ "any",
+	/* [FIELD_TYPE_UNSIGNED] = */ "unsigned",
+	/* [FIELD_TYPE_STRING]   = */ "string",
+	/* [FIELD_TYPE_ARRAY]    = */ "array",
+	/* [FIELD_TYPE_NUMBER]   = */ "number",
+	/* [FIELD_TYPE_INTEGER]  = */ "integer",
+	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+};
+
+enum field_type
+field_type_by_name(const char *name)
+{
+	enum field_type field_type = STR2ENUM(field_type, name);
+	if (field_type != field_type_MAX)
+		return field_type;
+	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
+	if (strcasecmp(name, "num") == 0)
+		return FIELD_TYPE_UNSIGNED;
+	else if (strcasecmp(name, "str") == 0)
+		return FIELD_TYPE_STRING;
+	return field_type_MAX;
+}
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
-	/* .MP_UINT   = */ "unsigned int",
-	/* .MP_INT    = */ "int",
+	/* .MP_UINT   = */ "unsigned",
+	/* .MP_INT    = */ "integer",
 	/* .MP_STR    = */ "string",
 	/* .MP_BIN    = */ "blob",
 	/* .MP_ARRAY  = */ "array",
@@ -62,14 +84,16 @@ const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 const char *func_language_strs[] = {"LUA", "C"};
 
 const uint32_t key_mp_type[] = {
-	/* [UNKNOWN] = */ UINT32_MAX,
-	/* [NUM]     = */  1U << MP_UINT,
-	/* [STR]     =  */  1U << MP_STR,
-	/* [ARRAY]   =  */  1U << MP_ARRAY,
-	/* [NUMBER]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE),
-	/* [INT]     =  */  (1U << MP_UINT) | (1U << MP_INT),
-	/* [SCALAR]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE) |
-		(1U << MP_STR) | (1U << MP_BIN) | (1U << MP_BOOL),
+	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
+	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
+	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
+	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
+		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
+	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
+		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
+		(1U << MP_BIN) | (1U << MP_BOOL),
 };
 
 const struct key_opts key_opts_default = {
@@ -310,7 +334,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
 	for (uint32_t i = 0; i < def->part_count; i++) {
-		if (def->parts[i].type == UNKNOWN)
+		if (def->parts[i].type == FIELD_TYPE_ANY)
 			all_parts_set = false;
 	}
 	if (all_parts_set)

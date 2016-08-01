@@ -14,7 +14,7 @@ engine = inspector:get_cfg('engine')
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 ---
 ...
 for key = 1, 100 do space:upsert({tostring(key), 0}, {{'+', 2, 1}}) end
@@ -363,7 +363,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:upsert({key, 0}, {{'+', 2, 1}}) end
@@ -712,7 +712,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:upsert({key, key, 0}, {{'+', 3, 1}}) end
@@ -1086,12 +1086,12 @@ function sort(t) table.sort(t, less) return t end
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 ---
 ...
 space:upsert({0, 'key', 0}, {{'+', 3, 1}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
 ...
 space:drop()
 ---
@@ -1100,7 +1100,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 ---
 ...
 space:upsert({0, 0}, {{'+', 1, 1}, {'+', 2, 1}})
@@ -1117,7 +1117,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:upsert(box.tuple.new{key, key, 0}, box.tuple.new{{'+', 3, 1}}) end
@@ -1465,10 +1465,10 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 ---
 ...
-index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
 ---
 ...
 space:insert({1, 1})
@@ -1746,7 +1746,7 @@ s = box.schema.space.create('s', { engine = engine })
 index1 = s:create_index('i1')
 ---
 ...
-index2 = s:create_index('i2', { parts = {2, 'str'}, unique = false })
+index2 = s:create_index('i2', { parts = {2, 'string'}, unique = false })
 ---
 ...
 t = {1, '1', 1, 'qwerty'}

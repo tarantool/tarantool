@@ -79,10 +79,10 @@ test:ok(true, 'gh-695: avoid overwriting tuple data necessary for smfree()')
 -------------------------------------------------------------------------------
 
 local s1 = box.schema.create_space('test1', { engine = 'memtx'})
-local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'num'} })
+local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 local s2 = box.schema.create_space('test2', { engine = 'memtx'})
-local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'num'} })
+local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 for i = 1,1000 do s1:insert{i, i, i} end
 

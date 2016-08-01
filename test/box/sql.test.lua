@@ -12,7 +12,7 @@ space = conn.space.test
 
 index = box.space.test:create_index('primary', { type = 'hash' })
 _ = box.space.test1:create_index('primary', { type = 'hash' })
-_ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'str'}})
+_ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'string'}})
 conn:ping()
 
 -- xxx: bug  currently selects no rows
@@ -95,8 +95,8 @@ net_box = require('net.box')
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 s = box.schema.space.create('tweedledum', { id = 0 })
-index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
-index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
+index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
+index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'string'}})
 function compare(a,b) return a[1] < b[1] end
 conn = net_box:new('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum
@@ -145,7 +145,7 @@ s:truncate()
 
 -- Test composite keys with trees
 -- Redefine the second key to be composite
-s.index.secondary:alter{unique = true, parts = { 2, 'str', 3, 'str'}}
+s.index.secondary:alter{unique = true, parts = { 2, 'string', 3, 'string'}}
 
 space:insert{'key1', 'part1', 'part2'}
 -- Test a duplicate insert on unique index that once resulted in a crash (bug 926080)
@@ -172,7 +172,7 @@ space:delete('key3')
 s:truncate()
 
 -- check non-unique multipart keys
-s.index.primary:alter{type = 'tree', parts = { 1, 'num'}}
+s.index.primary:alter{type = 'tree', parts = { 1, 'unsigned'}}
 s.index.secondary:alter{unique = false}
 
 space:insert{1234567, 'part1', 'part2'}
@@ -207,7 +207,7 @@ space:delete(41234567)
 s:select{}
 s:truncate()
 s.index.primary:alter{type = 'hash'}
-s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'str' }}
+s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'string' }}
 
 space:insert{1, 'hello'}
 space:insert{2, 'brave'}
@@ -235,7 +235,7 @@ s:truncate()
 -- A test case for: http://bugs.launchpad.net/bugs/735140
 -- Partial REPLACE corrupts index.
 -- clean data and restart with appropriate config
-s.index.primary:alter{parts = {1, 'str'}}
+s.index.primary:alter{parts = {1, 'string'}}
 s.index.secondary:alter{type = 'tree', unique = false}
 
 space:insert{'Spears', 'Britney'}
@@ -249,7 +249,7 @@ space:select{'Spears'}
 space:delete('Spears')
 
 -- Test retrieval of duplicates via a secondary key
-s.index.primary:alter{parts = { 1, 'num'}}
+s.index.primary:alter{parts = { 1, 'unsigned'}}
 
 space:insert{1, 'duplicate one'}
 space:insert{2, 'duplicate one'}

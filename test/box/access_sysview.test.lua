@@ -243,13 +243,13 @@ box.session.su('guest')
 --
 
 session.su('admin')
-box.space._vspace.index[1]:alter({parts = { 2, 'str' }})
+box.space._vspace.index[1]:alter({parts = { 2, 'string' }})
 box.space._vspace.index[1]:select('xxx')
 box.space._vspace.index[1]:select(1)
-box.space._vspace.index[1]:alter({parts = { 2, 'num' }})
+box.space._vspace.index[1]:alter({parts = { 2, 'unsigned' }})
 box.space._space.index[1]:drop()
 box.space._vspace.index[1]:select(1)
-s = box.space._space:create_index('owner', {parts = { 2, 'num' }, id = 1, unique = false})
+s = box.space._space:create_index('owner', {parts = { 2, 'unsigned' }, id = 1, unique = false})
 #box.space._vspace.index[1]:select(1) > 0
 
 session = nil

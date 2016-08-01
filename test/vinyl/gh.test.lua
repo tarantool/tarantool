@@ -3,19 +3,19 @@ test_run = env.new()
 
 -- gh-283: hang after three creates and drops
 s = box.schema.space.create('space0', {engine='vinyl'})
-i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
+i = s:create_index('space0', {type = 'tree', parts = {1, 'string'}})
 s:insert{'a', 'b', 'c'}
 s:drop()
 
 s = box.schema.space.create('space0', {engine='vinyl'})
-i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
+i = s:create_index('space0', {type = 'tree', parts = {1, 'string'}})
 s:insert{'a', 'b', 'c'}
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
 s:drop()
 
 s = box.schema.space.create('space0', {engine='vinyl'})
-i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
+i = s:create_index('space0', {type = 'tree', parts = {1, 'string'}})
 s:insert{'a', 'b', 'c'}
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
@@ -43,7 +43,7 @@ t
 s:drop()
 
 s = box.schema.space.create('tester', {engine='vinyl'})
-i = s:create_index('vinyl_index', {type = 'tree', parts = {1, 'STR'}})
+i = s:create_index('vinyl_index', {type = 'tree', parts = {1, 'string'}})
 for v=1, 100 do s:insert({tostring(v)}) end
 t = s:select({''},{iterator='GT', limit =1})
 t
@@ -56,20 +56,20 @@ s:drop()
 s = box.schema.space.create('M', {engine='vinyl'})
 i = s:create_index('primary',{})
 s:insert{5}
-s.index.primary:alter({parts={1,'NUM'}})
+s.index.primary:alter({parts={1,'unsigned'}})
 s:drop()
 
 
 -- gh-1008: assertion if insert of wrong type
 s = box.schema.space.create('t', {engine='vinyl'})
-i = s:create_index('primary',{parts={1, 'STR'}})
+i = s:create_index('primary',{parts={1, 'string'}})
 box.space.t:insert{1,'A'}
 s:drop()
 
 
 -- gh-1009: search for empty string fails
 s = box.schema.space.create('t', {engine='vinyl'})
-i = s:create_index('primary',{parts={1, 'STR'}})
+i = s:create_index('primary',{parts={1, 'string'}})
 s:insert{''}
 #i:select{''}
 i:get{''}
@@ -79,7 +79,7 @@ s:drop()
 -- gh-1407: upsert generate garbage data
 email_space_id = 'email'
 email_space = box.schema.space.create(email_space_id, { engine = 'vinyl', if_not_exists = true })
-i = email_space:create_index('primary', { parts = {1, 'STR'} })
+i = email_space:create_index('primary', { parts = {1, 'string'} })
 
 time = 1234
 email = "test@domain.com"
@@ -105,15 +105,15 @@ box.space.email:drop()
 
 --gh-1540: vinyl: invalid results from LE/LT iterators
 s = box.schema.space.create('test', { engine = 'vinyl' })
-i = box.space.test:create_index('primary', { parts = { 1, 'NUM', 2, 'NUM' } })
+i = box.space.test:create_index('primary', { parts = { 1, 'unsigned', 2, 'unsigned' } })
 for i =1,2 do for j=1,9 do box.space.test:replace({i, j}) end end
 box.space.test:select({1, 999999}, {iterator = 'LE'})
 box.space.test:drop()
 
 s1 = box.schema.create_space('s1',{engine='vinyl'})
-i1 = s1:create_index('primary',{parts={1,'num',2,'num'}})
+i1 = s1:create_index('primary',{parts={1,'unsigned',2,'unsigned'}})
 s2 = box.schema.create_space('s2',{engine='memtx'})
-i2 = s2:create_index('primary',{parts={1,'num',2,'num'}})
+i2 = s2:create_index('primary',{parts={1,'unsigned',2,'unsigned'}})
 for i = 1,3 do for j = 1,5 do s1:insert{i, j} s2:insert{i, j} end end
 itrs = {'GE', 'GT', 'LE', 'LT'}
 good = true
@@ -147,7 +147,7 @@ s2:drop()
 -- gh-1608: tuple disappears after invalid upsert
 --
 s = box.schema.create_space('test', {engine = 'vinyl'})
-_ = s:create_index('test', {type = 'tree', parts = {1, 'num', 2, 'str'}})
+_ = s:create_index('test', {type = 'tree', parts = {1, 'unsigned', 2, 'string'}})
 s:put({1, 'test', 3, 4})
 s:select()
 s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})

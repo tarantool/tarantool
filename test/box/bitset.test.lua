@@ -101,15 +101,15 @@ drop_space()
 
 -- gh-1467: invalid iterator type
 space = box.schema.space.create('test')
-_ = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
-_ = space:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+_ = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
+_ = space:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
 space.index.bitset:select({1}, { iterator = 'OVERLAPS'})
 space:drop()
 space = nil
 
 -- gh-1549: BITSET index with inappropriate types crashes in debug build
 space = box.schema.space.create('test')
-_ = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 _ = space:create_index('bitset', { type = 'bitset', parts = {2, 'number'}, unique = false })
 space:drop()
 space = nil

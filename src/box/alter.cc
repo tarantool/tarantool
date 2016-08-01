@@ -364,7 +364,7 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 		for (uint32_t j = 2; j < item_count; j++)
 			mp_next(&parts);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
+		enum field_type field_type = field_type_by_name(buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }
@@ -388,7 +388,7 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		uint32_t len;
 		const char *str = mp_decode_str(&parts, &len);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
+		enum field_type field_type = field_type_by_name(buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }

@@ -5,7 +5,7 @@ inspector:cmd("push filter '"..engine.."' to 'engine'")
 
 -- iterator (str)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 for key = 1, 100 do space:replace({tostring(key)}) end
 t = {} for state, v in index:pairs({}, {iterator = 'ALL'}) do table.insert(t, v) end
 t
@@ -28,7 +28,7 @@ space:drop()
 
 -- iterator (num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 for key = 1, 100 do space:replace({key}) end
 t = {} for state, v in index:pairs({}, {iterator = 'ALL'}) do table.insert(t, v) end
 t
@@ -51,7 +51,7 @@ space:drop()
 
 -- iterator multi-part (num, num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 for key = 1, 100 do space:replace({key, key}) end
 t = {} for state, v in index:pairs({}, {iterator = 'ALL'}) do table.insert(t, v) end
 t
@@ -73,7 +73,7 @@ space:drop()
 
 -- iterator with tuple.new
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 for key = 1, 100 do space:replace({tostring(key)}) end
 t = {} for state, v in index:pairs(box.tuple.new{}, {iterator = 'ALL'}) do table.insert(t, v) end
 t
@@ -99,13 +99,13 @@ inspector:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 # Tree single-part unique
 
 space = box.schema.space.create('tweedledum', { engine = engine })
-idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true})
+idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true})
 -- Tree single-part non-unique
-idx2 = space:create_index('i1', { type = 'tree', parts = {2, 'str'}, unique = false})
+idx2 = space:create_index('i1', { type = 'tree', parts = {2, 'string'}, unique = false})
 -- Tree multi-part unique
-idx3 = space:create_index('i2', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true})
+idx3 = space:create_index('i2', { type = 'tree', parts = {2, 'string', 3, 'string'}, unique = true})
 -- Tree multi-part non-unique
-idx4 = space:create_index('i3', { type = 'tree', parts = {3, 'str', 4, 'str'}, unique = false })
+idx4 = space:create_index('i3', { type = 'tree', parts = {3, 'string', 4, 'string'}, unique = false })
 
 space:insert{'pid_001', 'sid_001', 'tid_998', 'a'}
 space:insert{'pid_002', 'sid_001', 'tid_997', 'a'}

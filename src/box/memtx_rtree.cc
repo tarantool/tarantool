@@ -61,7 +61,7 @@ mp_decode_num(const char **data, uint32_t field_no)
 		break;
 	default:
 		tnt_raise(ClientError, ER_FIELD_TYPE, field_no + INDEX_OFFSET,
-			  field_type_strs[NUM]);
+			  field_type_strs[FIELD_TYPE_NUMBER]);
 	}
 	return val;
 }
@@ -178,7 +178,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	: MemtxIndex(key_def)
 {
 	assert(key_def->part_count == 1);
-	assert(key_def->parts[0].type = ARRAY);
+	assert(key_def->parts[0].type = FIELD_TYPE_ARRAY);
 	assert(key_def->opts.is_unique == false);
 
 	m_dimension = key_def->opts.dimension;

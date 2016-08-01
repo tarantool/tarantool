@@ -5,7 +5,7 @@
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------
 hash = box.schema.space.create('tweedledum')
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 
 bsize = tmp:bsize()
 
@@ -162,7 +162,7 @@ hash:truncate()
 -- String hash inset fields tests
 -------------------------------------------------------------------------------
 hash.index['primary']:drop()
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'string'}, unique = true })
 
 -- Insert valid fields
 hash:insert{'key 0', 'value1 v1.0', 'value2 v1.0'}
@@ -214,10 +214,10 @@ hash:truncate()
 -- hash::replace tests
 ------------------------
 hash.index['primary']:drop()
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
-tmp = hash:create_index('field1', { type = 'hash', parts = {2, 'num'}, unique = true })
-tmp = hash:create_index('field2', { type = 'hash', parts = {3, 'num'}, unique = true })
-tmp = hash:create_index('field3', { type = 'hash', parts = {4, 'num'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
+tmp = hash:create_index('field1', { type = 'hash', parts = {2, 'unsigned'}, unique = true })
+tmp = hash:create_index('field2', { type = 'hash', parts = {3, 'unsigned'}, unique = true })
+tmp = hash:create_index('field3', { type = 'hash', parts = {4, 'unsigned'}, unique = true })
 
 hash:insert{0, 0, 0, 0}
 hash:insert{1, 1, 1, 1}
@@ -292,7 +292,7 @@ hash.index['field3']:get{0}
 hash:drop()
 
 hash = box.schema.space.create('tweedledum')
-hi = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+hi = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 hash:insert{0}
 hash:insert{16}
 for _, tuple in hi:pairs(nil, {iterator = box.index.ALL}) do hash:delete{tuple[1]} end
@@ -302,7 +302,7 @@ hash:drop()
 -- gh-616 "1-based indexing and 0-based error message
 --
 _ = box.schema.create_space('test')
-_ = box.space.test:create_index('i',{parts={1,'STR'}})
+_ = box.space.test:create_index('i',{parts={1,'string'}})
 box.space.test:insert{1}
 box.space.test:drop()
 

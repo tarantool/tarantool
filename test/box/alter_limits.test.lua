@@ -143,7 +143,7 @@ index = s:create_index('test', { type = 'hash', unique = false })
 -- bitset index is unique
 index = s:create_index('test', { type = 'bitset', unique = true })
 -- bitset index is multipart
-index = s:create_index('test', { type = 'bitset', parts = {1, 'num', 2, 'num'}})
+index = s:create_index('test', { type = 'bitset', parts = {1, 'unsigned', 2, 'unsigned'}})
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
 -- part count must be positive
@@ -153,30 +153,30 @@ index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 -- big field no
-index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'num' }})
-index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX - 1, 'num' }})
-index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX + 90, 'num' }})
-index = s:create_index('test', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX + 1, 'num' }})
-index = s:create_index('t1', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX, 'num' }})
-index = s:create_index('t2', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX - 1, 'num' }})
+index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'unsigned' }})
+index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX - 1, 'unsigned' }})
+index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX + 90, 'unsigned' }})
+index = s:create_index('test', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX + 1, 'unsigned' }})
+index = s:create_index('t1', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX, 'unsigned' }})
+index = s:create_index('t2', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX - 1, 'unsigned' }})
 -- cleanup
 s:drop()
 s = box.schema.space.create('test')
 -- same part can't be indexed twice
-index = s:create_index('t1', { type = 'hash', parts = { 1, 'num', 1, 'str' }})
+index = s:create_index('t1', { type = 'hash', parts = { 1, 'unsigned', 1, 'string' }})
 -- a lot of key parts
 parts = {}
 test_run:cmd("setopt delimiter ';'")
 for k=1, box.schema.INDEX_PART_MAX + 1, 1 do
     table.insert(parts, k)
-    table.insert(parts, 'num')
+    table.insert(parts, 'unsigned')
 end;
 #parts;
 index = s:create_index('t1', { type = 'hash', parts = parts});
 parts = {};
 for k=1, box.schema.INDEX_PART_MAX, 1 do
     table.insert(parts, k + 1)
-    table.insert(parts, 'num')
+    table.insert(parts, 'unsigned')
 end;
 #parts;
 index = s:create_index('t1', { type = 'hash', parts = parts});
@@ -190,9 +190,9 @@ s:drop()
 s = box.schema.space.create('test')
 index = s:create_index('t1', { type = 'hash' })
 -- field type contradicts field type of another index
-index = s:create_index('t2', { type = 'hash', parts = { 1, 'str' }})
+index = s:create_index('t2', { type = 'hash', parts = { 1, 'string' }})
 -- ok
-index = s:create_index('t2', { type = 'hash', parts = { 2, 'str' }})
+index = s:create_index('t2', { type = 'hash', parts = { 2, 'string' }})
 -- don't allow drop of the primary key in presence of other keys
 s.index[0]:drop()
 -- cleanup
@@ -240,9 +240,9 @@ s.index.primary.id
 s.index.pk.type
 s.index.pk.unique
 s.index.pk:rename('primary')
-index = s:create_index('second', { type = 'tree', parts = {  2, 'str' } })
+index = s:create_index('second', { type = 'tree', parts = {  2, 'string' } })
 s.index.second.id
-index = s:create_index('third', { type = 'hash', parts = {  3, 'num' } })
+index = s:create_index('third', { type = 'hash', parts = {  3, 'unsigned' } })
 s.index.third:rename('second')
 s.index.third.id
 s.index.second:drop()
@@ -255,7 +255,7 @@ s:drop()
 -- BUILD INDEX: changes of a non-empty index
 -- ----------------------------------------------------------------
 s = box.schema.space.create('full')
-index = s:create_index('primary', { type = 'tree', parts =  { 1, 'str' }})
+index = s:create_index('primary', { type = 'tree', parts =  { 1, 'string' }})
 s:insert{'No such movie', 999}
 s:insert{'Barbara', 2012}
 s:insert{'Cloud Atlas', 2012}
@@ -264,24 +264,24 @@ s:insert{'Halt auf freier Strecke', 2011}
 s:insert{'Homevideo', 2011}
 s:insert{'Die Fremde', 2010}
 -- create index with data
-index = s:create_index('year', { type = 'tree', unique=false, parts = { 2, 'num'} })
+index = s:create_index('year', { type = 'tree', unique=false, parts = { 2, 'unsigned'} })
 s.index.primary:select{}
 -- a duplicate in the created index
-index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'num'} })
+index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'unsigned'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select{}
 -- ambiguous field type
-index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
+index = s:create_index('string', { type = 'tree', unique =  false, parts = { 2, 'string'}})
 -- create index on a non-existing field
-index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'str'}})
+index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'string'}})
 s.index.year:drop()
 s:insert{'Der Baader Meinhof Komplex', '2009 '}
 -- create an index on a field with a wrong type
-index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'num'}})
+index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'unsigned'}})
 -- a field is missing
 s:replace{'Der Baader Meinhof Komplex'}
-index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'num'}})
+index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'unsigned'}})
 s:drop()
 -- unique -> non-unique transition
 s = box.schema.space.create('test')
@@ -290,7 +290,7 @@ index = s:create_index('primary', { unique = false })
 -- create primary key
 index = s:create_index('primary', { type = 'hash' })
 s:insert{1, 1}
-index = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'num'}})
+index = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'unsigned'}})
 s:insert{2, 1}
 s.index.secondary:alter{ unique = true }
 s:delete{2}
@@ -322,11 +322,11 @@ s:drop()
 -- primary, secondary keys in a snapshot
 s_empty = box.schema.space.create('s_empty')
 indexe1 = s_empty:create_index('primary')
-indexe2 = s_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
+indexe2 = s_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'unsigned'}})
 
 s_full = box.schema.space.create('s_full')
 indexf1 = s_full:create_index('primary')
-indexf2 = s_full:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
+indexf2 = s_full:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'unsigned'}})
 
 s_full:insert{1, 1, 'a'}
 s_full:insert{2, 2, 'b'}
@@ -345,16 +345,16 @@ s_drop:drop()
 indexn1 = s_nil:create_index('primary', { type = 'hash'})
 s_nil:insert{1,2,3,4,5,6}
 s_nil:insert{7, 8, 9, 10, 11,12}
-indexn2 = s_nil:create_index('secondary', { type = 'tree', unique=false, parts = {2, 'num', 3, 'num', 4, 'num'}})
+indexn2 = s_nil:create_index('secondary', { type = 'tree', unique=false, parts = {2, 'unsigned', 3, 'unsigned', 4, 'unsigned'}})
 s_nil:insert{13, 14, 15, 16, 17}
 
 r_empty = box.schema.space.create('r_empty')
 indexe1 = r_empty:create_index('primary')
-indexe2 = r_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
+indexe2 = r_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'unsigned'}})
 
 r_full = box.schema.space.create('r_full')
-indexf1 = r_full:create_index('primary', { type = 'tree', unique = true, parts = {1, 'num'}})
-indexf2 = r_full:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
+indexf1 = r_full:create_index('primary', { type = 'tree', unique = true, parts = {1, 'unsigned'}})
+indexf2 = r_full:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'unsigned'}})
 
 r_full:insert{1, 1, 'a'}
 r_full:insert{2, 2, 'b'}
@@ -362,7 +362,7 @@ r_full:insert{3, 3, 'c'}
 r_full:insert{4, 4, 'd'}
 r_full:insert{5, 5, 'e'}
 
-indexf1 = s_full:create_index('multikey', { type = 'tree', unique = true, parts = { 2, 'num', 3, 'str'}})
+indexf1 = s_full:create_index('multikey', { type = 'tree', unique = true, parts = { 2, 'unsigned', 3, 'string'}})
 s_full:insert{6, 6, 'f'}
 s_full:insert{7, 7, 'g'}
 s_full:insert{8, 8, 'h'}

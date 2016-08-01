@@ -22,7 +22,7 @@ if jit.os ~= 'Linux' then PERIOD = 1.5 end
 space = box.schema.space.create('snapshot_daemon')
 ---
 ...
-index = space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
+index = space:create_index('pk', { type = 'tree', parts = { 1, 'unsigned' }})
 ---
 ...
 box.cfg{snapshot_period = PERIOD, snapshot_count = 2 }

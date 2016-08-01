@@ -469,19 +469,68 @@ local function upgrade_to_1_6_8()
     box.space._schema:replace({'version', 1, 6, 8})
 end
 
-local function upgrade_users_to_1_7_0()
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.1
+--------------------------------------------------------------------------------
+
+local function upgrade_users_to_1_7_1()
     box.schema.user.passwd('guest', '')
 end
 
-local function upgrade_to_1_7_0()
+local function upgrade_to_1_7_1()
     if VERSION_ID >= version_id(1, 7, 0) then
         return
     end
 
-    upgrade_users_to_1_7_0()
+    upgrade_users_to_1_7_1()
 
-    log.info("set schema version to 1.7.0")
-    box.space._schema:replace({'version', 1, 7, 0})
+    log.info("set schema version to 1.7.1")
+    box.space._schema:replace({'version', 1, 7, 1})
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.2
+--------------------------------------------------------------------------------
+
+local function upgrade_field_types_to_1_7_2()
+    local field_types_v16 = {
+        num = 'unsigned';
+        int = 'integer';
+        str = 'string';
+    };
+    local indexes = {}
+    for _, deftuple in box.space._index:pairs() do
+        local def = deftuple:totable()
+        local changed = false
+        local parts = def[6]
+        for _, part in pairs(parts) do
+            local field_type = part[2]:lower()
+            part[2] = field_types_v16[field_type] or field_type
+            if field_type ~= part[2] then
+                changed = true
+            end
+        end
+        if changed then
+            table.insert(indexes, def)
+        end
+    end
+    for _, new_def in ipairs(indexes) do
+        log.info("alter index %s on %s set parts to %s",
+                 new_def[3], box.space[new_def[1]].name,
+                 json.encode(new_def[6]))
+        box.space._index:replace(new_def)
+    end
+end
+
+local function upgrade_to_1_7_2()
+    if VERSION_ID >= version_id(1, 7, 2) then
+        return
+    end
+
+    upgrade_field_types_to_1_7_2()
+
+    log.info("set schema version to 1.7.2")
+    box.space._schema:replace({'version', 1, 7, 2})
 end
 
 --------------------------------------------------------------------------------
@@ -498,7 +547,8 @@ local function upgrade()
     VERSION_ID = version_id(major, minor, patch)
 
     upgrade_to_1_6_8()
-    upgrade_to_1_7_0()
+    upgrade_to_1_7_1()
+    upgrade_to_1_7_2()
 end
 
 local function bootstrap()

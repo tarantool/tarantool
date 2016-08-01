@@ -4,7 +4,7 @@ engine = inspector:get_cfg('engine')
 
 -- basic transaction tests
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 
 -- begin/rollback
 inspector:cmd("setopt delimiter ';'")
@@ -43,9 +43,9 @@ space:drop()
 
 -- multi-space transactions
 a = box.schema.space.create('test', { engine = engine })
-index = a:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = a:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 b = box.schema.space.create('test_tmp', { engine = engine })
-index = b:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = b:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 
 -- begin/rollback
 inspector:cmd("setopt delimiter ';'")
@@ -94,7 +94,7 @@ b:drop()
 
 -- ensure findByKey works in empty transaction context
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 
 inspector:cmd("setopt delimiter ';'")
 box.begin()

@@ -2,36 +2,36 @@
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 ---
 ...
 space:insert{1}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected string'
 ...
 space:replace{1}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected string'
 ...
 space:delete{1}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
 ...
 space:update({1}, {{'=', 1, 101}})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
 ...
 space:upsert({1}, {{'+', 1, 10}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected string'
 ...
 space:get{1}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
 ...
 index:pairs(1, {iterator = 'GE'})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
 ...
 space:drop()
 ---
@@ -40,36 +40,36 @@ space:drop()
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 ---
 ...
 space:insert{'A'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 space:replace{'A'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 space:delete{'A'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 space:update({'A'}, {{'=', 1, 101}})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 space:upsert({'A'}, {{'+', 1, 10}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 space:get{'A'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 index:pairs('A', {iterator = 'GE'})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 space:drop()
 ---
@@ -78,7 +78,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1,'unsigned',2,'unsigned'} })
 ---
 ...
 space:insert{1}
@@ -118,7 +118,7 @@ space:drop()
 space = box.schema.space.create('single_part', { engine = 'vinyl' })
 ---
 ...
-_ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
 ---
 ...
 t1 = space:insert({string.rep('x', 1020)})
@@ -145,7 +145,7 @@ pk = nil
 space = box.schema.space.create('test_len', { engine = 'vinyl' })
 ---
 ...
-_ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
 ---
 ...
 space:len()

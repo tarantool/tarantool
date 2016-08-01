@@ -154,7 +154,7 @@ admin("space:drop()")
 # gh-522: Broken compatibility with msgpack-python for strings of size 33..255
 #
 admin("space = box.schema.space.create('test')")
-admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'str'}})")
+admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'string'}})")
 
 class RawInsert(Request):
     request_type = REQUEST_TYPE_INSERT

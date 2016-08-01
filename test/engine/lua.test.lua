@@ -8,8 +8,8 @@ engine = inspector:get_cfg('engine')
 -- lua select_reverse_range() testing
 -- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
 space = box.schema.space.create('tweedledum', { engine = engine })
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
-tmp = space:create_index('range', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
+tmp = space:create_index('range', { type = 'tree', parts = {2, 'unsigned', 1, 'unsigned'}, unique = true })
 
 space:insert{0, 0}
 space:insert{1, 0}
@@ -30,8 +30,8 @@ space:drop()
 -- Tests for box.index iterators
 --
 space = box.schema.space.create('tweedledum', { engine = engine })
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
-tmp = space:create_index('i1', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
+tmp = space:create_index('i1', { type = 'tree', parts = {2, 'string', 3, 'string'}, unique = true })
 
 pid = 1
 tid = 999
