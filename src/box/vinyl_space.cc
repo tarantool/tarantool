@@ -180,6 +180,7 @@ vinyl_replace_one(struct space *space, struct request *request,
 		  struct vinyl_tx *tx)
 {
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
+	(void) engine;
 	assert((request->type == IPROTO_REPLACE) ||
 	       (!engine->recovery_complete));
 	assert(space->index_count == 1);
@@ -193,6 +194,7 @@ vinyl_replace_all(struct space *space, struct request *request,
 		  struct vinyl_tx *tx)
 {
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
+	(void) engine;
 	assert((request->type == IPROTO_REPLACE) ||
 	       (!engine->recovery_complete));
 	struct tuple *old_tuple;
