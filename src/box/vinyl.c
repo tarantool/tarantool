@@ -1850,11 +1850,6 @@ txlog_free(struct txlog *l)
 }
 
 static inline int
-txlog_count(struct txlog *l) {
-	return vy_buf_used(&l->buf) / sizeof(struct txv *);
-}
-
-static inline int
 txlog_write_count(struct txlog *l) {
 	return l->write_count;
 }
@@ -3290,8 +3285,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	struct txv *own = txv_tree_search_key(&index->tree, v->tuple->data,
 					      v->tuple->size, tx->tsn);
 	/* match previous update made by current transaction */
-	if (own != NULL)
-	{
+	if (own != NULL) {
 		if (unlikely(tuple->flags & SVUPSERT)) {
 			vy_error("%s", "only one upsert statement is "
 			         "allowed per a transaction key");
@@ -3301,17 +3295,20 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 			txv_abort(v);
 		/* update log */
 		txlog_replace(env, &tx->log, own, v);
-
-		tt_pthread_mutex_unlock(&index->mutex);
-		return 0;
+	} else {
+		if (txlog_add(&tx->log, v)) {
+			vy_oom();
+			goto error;
+		}
+		/* add version */
+		txv_tree_insert(&index->tree, v);
+		/*
+		 * Track the start of the latest read sequence in
+		 * the transactional log.
+		*/
+		if (tx->readonly_tail == NULL && (v->tuple->flags & SVGET))
+			tx->readonly_tail = v;
 	}
-	int rc = txlog_add(&tx->log, v);
-	if (unlikely(rc == -1)) {
-		vy_oom();
-		goto error;
-	}
-	/* add version */
-	txv_tree_insert(&index->tree, v);
 	tt_pthread_mutex_unlock(&index->mutex);
 	return 0;
 error:
@@ -3344,10 +3341,6 @@ add:
 	int rc = tx_set(tx, index, key);
 	if (unlikely(rc == -1))
 		return -1;
-	/* track a start of the latest read sequence in the
-	 * transactional log */
-	if (tx->readonly_tail == NULL)
-		 tx->readonly_tail = txlog_at(&tx->log, txlog_count(&tx->log) - 1);
 	return 0;
 }
 
@@ -9074,12 +9067,13 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 static inline void
 vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 {
-	uint32_t count = txlog_count(&tx->log);
+	uint32_t count = 0;
 	struct tx_manager *m = tx->manager;
 	struct vy_bufiter iter;
 	vy_bufiter_open(&iter, &tx->log.buf, sizeof(struct txv *));
 	for (; vy_bufiter_has(&iter); vy_bufiter_next(&iter))
 	{
+		count++;
 		struct txv *v = * (struct txv **) vy_bufiter_get(&iter);
 		/** Gets are collected by gc */
 		if (v->tuple->flags & SVGET) {
