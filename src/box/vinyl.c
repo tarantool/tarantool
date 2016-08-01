@@ -1615,7 +1615,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 #define SVUPSERT     2
 #define SVGET        4
 #define SVDUP        8
-#define SVCONFLICT  32
 
 struct sv;
 
@@ -1740,6 +1739,8 @@ struct txv {
 	/** Next tuple in the same index. */
 	struct rlist next_in_index;
 	rb_node(struct txv) tree_node;
+	/** True if this transaction was aborted by a conflict. */
+	bool is_aborted;
 };
 
 static inline struct txv *
@@ -1754,6 +1755,7 @@ txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
 	v->tuple = tuple;
 	vinyl_tuple_ref(tuple);
 	v->gc = NULL;
+	v->is_aborted = false;
 	rlist_create(&v->next_in_index);
 	return v;
 }
@@ -1781,7 +1783,7 @@ txv_committed(struct txv *v)
 static inline void
 txv_abort(struct txv *v)
 {
-	v->tuple->flags |= SVCONFLICT;
+	v->is_aborted = true;
 }
 
 static struct txv *
@@ -1799,14 +1801,14 @@ txv_abort_all(struct txv *v)
 	}
 }
 
-static inline int
+static inline bool
 txv_aborted(struct txv *v)
 {
-	return v->tuple->flags & SVCONFLICT;
+	return v->is_aborted;
 }
 
 
-struct PACKED txlogindex {
+struct txlogindex {
 	struct rlist log;
 	struct tx_index *index;
 	struct rlist next;
@@ -1854,18 +1856,6 @@ txlog_write_count(struct txlog *l) {
 	return l->write_count;
 }
 
-static inline struct txv *
-txlog_at(struct txlog *l, int pos) {
-	return *(struct txv **)vy_buf_at(&l->buf, sizeof(struct txv *), pos);
-}
-
-void
-txlogindex_del(struct txlog *l, struct txv *v)
-{
-	(void) l;
-	rlist_del(&v->next_in_index);
-}
-
 int
 txlogindex_add(struct txlog *l, struct txv *v)
 {
@@ -1901,24 +1891,6 @@ txlog_add(struct txlog *l, struct txv *v)
 	if (! (v->tuple->flags & SVGET))
 		l->write_count++;
 	return 0;
-}
-
-static inline void
-txlog_replace(struct vinyl_env *env, struct txlog *l,
-	      struct txv *old_v, struct txv *v)
-{
-	txlogindex_del(l, old_v);
-	if (! (old_v->tuple->flags & SVGET))
-		l->write_count--;
-	txlogindex_add(l, old_v);
-	if (! (v->tuple->flags & SVGET))
-		l->write_count++;
-	vinyl_tuple_unref_rt(env, old_v->tuple);
-	old_v->tuple = v->tuple;
-	old_v->tsn = v->tsn;
-	old_v->csn = v->csn;
-	old_v->gc = v->gc;
-	free(v);
 }
 
 struct PACKED svmergesrc {
@@ -3275,29 +3247,34 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 {
 	struct tx_manager *m = tx->manager;
 	struct vinyl_env *env = m->env;
-	/* allocate mvcc container */
-	struct txv *v = txv_new(tuple, tx->tsn, index);
-	if (v == NULL)
-		return -1;
-
-	/* update concurrent index */
+	/* Update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
-	struct txv *own = txv_tree_search_key(&index->tree, v->tuple->data,
-					      v->tuple->size, tx->tsn);
-	/* match previous update made by current transaction */
+	struct txv *own = txv_tree_search_key(&index->tree, tuple->data,
+					      tuple->size, tx->tsn);
+	/* Found a match of the previous action of this transaction */
 	if (own != NULL) {
 		if (unlikely(tuple->flags & SVUPSERT)) {
 			vy_error("%s", "only one upsert statement is "
 			         "allowed per a transaction key");
 			goto error;
 		}
-		if (unlikely(txv_aborted(own)))
-			txv_abort(v);
-		/* update log */
-		txlog_replace(env, &tx->log, own, v);
+		/* Update log */
+		if (! (own->tuple->flags & SVGET))
+			tx->log.write_count--;
+		if (! (tuple->flags & SVGET))
+			tx->log.write_count++;
+		vinyl_tuple_unref_rt(env, own->tuple);
+		vinyl_tuple_ref(tuple);
+		own->tuple = tuple;
 	} else {
+		/* Allocate mvcc container */
+		struct txv *v = txv_new(tuple, tx->tsn, index);
+		if (v == NULL)
+			goto error;
+
 		if (txlog_add(&tx->log, v)) {
 			vy_oom();
+			txv_delete(env, v);
 			goto error;
 		}
 		/* add version */
@@ -3313,7 +3290,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	return 0;
 error:
 	tt_pthread_mutex_unlock(&index->mutex);
-	txv_delete(env, v);
 	return -1;
 }
 
