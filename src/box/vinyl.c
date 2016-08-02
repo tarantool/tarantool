@@ -3215,34 +3215,37 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 			         "allowed per a transaction key");
 			goto error;
 		}
-		/* Update log */
-		if (! (own->tuple->flags & SVGET))
-			tx->write_count--;
-		if (! (tuple->flags & SVGET))
-			tx->write_count++;
-		vinyl_tuple_unref_rt(env, own->tuple);
-		vinyl_tuple_ref(tuple);
-		own->tuple = tuple;
+		if (!(tuple->flags & SVGET)) {
+			if (own->tuple->flags & SVGET) {
+				/* Write after read */
+				if (txlogindex_add(&tx->logindex, own))
+					goto error;
+				tx->write_count++;
+			}
+			vinyl_tuple_unref_rt(env, own->tuple);
+			vinyl_tuple_ref(tuple);
+			own->tuple = tuple;
+		}
 	} else {
-		/* Allocate mvcc container */
+		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(tuple, tx->tsn, index);
-		if (txlogindex_add(&tx->logindex, v)) {
-			txv_delete(env, v);
-			goto error;
+		if (v->tuple->flags & SVGET) {
+			/*
+			 * Track the start of the latest read
+			 * sequence in the transactional log.
+			*/
+			if (tx->readonly_tail == NULL)
+				tx->readonly_tail = v;
+		} else {
+			if (txlogindex_add(&tx->logindex, v)) {
+				txv_delete(env, v);
+				goto error;
+			}
+			tx->write_count++;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
 		txv_tree_insert(&index->tree, v);
-		/*
-		 * Track the start of the latest read sequence in
-		 * the transactional log.
-		*/
-		if (v->tuple->flags & SVGET) {
-			if (tx->readonly_tail == NULL)
-				tx->readonly_tail = v;
-		} else {
-			tx->write_count++;
-		}
 	}
 	tt_pthread_mutex_unlock(&index->mutex);
 	return 0;
@@ -7355,7 +7358,7 @@ vy_index_conf_free(struct vy_index_conf *s)
 
 static void
 si_write(struct txlogindex *li, uint64_t time,
-	 enum vinyl_status status)
+	 enum vinyl_status status, uint64_t lsn)
 {
 	struct vinyl_index *index = li->index->index;
 	struct vinyl_env *env = index->env;
@@ -7368,8 +7371,10 @@ si_write(struct txlogindex *li, uint64_t time,
 	struct txv *v;
 	rlist_foreach_entry(v, &li->log, next_in_index) {
 		struct vinyl_tuple *tuple = v->tuple;
-		if (tuple->flags & SVGET ||
-		    (status == VINYL_FINAL_RECOVERY &&
+		assert(!(tuple->flags & SVGET));
+		tuple->lsn = lsn;
+
+		if ((status == VINYL_FINAL_RECOVERY &&
 		     si_readcommited(index, tuple))) {
 
 			continue;
@@ -9145,15 +9150,11 @@ vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn)
 
 	/* do log write and backend commit */
 
-	struct txv *v;
-	stailq_foreach_entry(v, &tx->log, next_in_log)
-		v->tuple->lsn = lsn;
-
 	/* index */
 	uint64_t now = clock_monotonic64();
 	struct txlogindex *i;
 	rlist_foreach_entry(i, &tx->logindex, next)
-		si_write(i, now, e->status);
+		si_write(i, now, e->status, lsn);
 
 	vy_tx_end(e->stat, tx, 0, 0);
 	return 0;
