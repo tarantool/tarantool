@@ -2880,11 +2880,6 @@ struct sicache;
 
 struct vinyl_tx {
 	/**
-	 * Number of writes (inserts,updates, deletes) done by
-	 * the transaction.
-	 */
-	int write_count;
-	/**
 	 * In memory transaction log. Contains both reads
 	 * and writes.
 	 */
@@ -2911,6 +2906,12 @@ struct vinyl_tx {
 	rb_node(struct vinyl_tx) tree_node;
 	struct tx_manager *manager;
 };
+
+bool
+vy_tx_is_ro(struct vinyl_tx *tx)
+{
+	return tx->type == VINYL_TX_RO || rlist_empty(&tx->logindex);
+}
 
 typedef rb_tree(struct vinyl_tx) tx_tree_t;
 
@@ -3047,7 +3048,6 @@ static void
 tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 {
 	stailq_create(&tx->log);
-	tx->write_count = 0;
 	rlist_create(&tx->logindex);
 	tx->start = clock_monotonic64();
 	tx->manager = m;
@@ -3177,7 +3177,7 @@ static enum tx_state
 tx_prepare(struct vinyl_tx *tx)
 {
 	/* proceed read-only transactions */
-	if (tx->type == VINYL_TX_RO || tx->write_count == 0)
+	if (vy_tx_is_ro(tx))
 		return tx_promote(tx, VINYL_TX_PREPARE);
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
@@ -3220,7 +3220,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 				/* Write after read */
 				if (txlogindex_add(&tx->logindex, own))
 					goto error;
-				tx->write_count++;
 			}
 			vinyl_tuple_unref_rt(env, own->tuple);
 			vinyl_tuple_ref(tuple);
@@ -3241,7 +3240,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 				txv_delete(env, v);
 				goto error;
 			}
-			tx->write_count++;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
