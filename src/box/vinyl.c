@@ -2818,7 +2818,6 @@ struct tx_index {
 	txv_tree_t tree;
 	struct vinyl_index *index;
 	struct key_def *key_def;
-	pthread_mutex_t mutex;
 };
 
 static int
@@ -3003,7 +3002,6 @@ tx_index_init(struct tx_index *i, struct vinyl_index *index,
 	txv_tree_new(&i->tree);
 	i->index = index;
 	i->key_def = key_def;
-	(void) tt_pthread_mutex_init(&i->mutex, NULL);
 	return 0;
 }
 
@@ -3019,7 +3017,6 @@ static int
 tx_index_free(struct tx_index *i, struct tx_manager *m)
 {
 	txv_tree_iter(&i->tree, NULL, txv_tree_delete_cb, m->env);
-	(void) tt_pthread_mutex_destroy(&i->mutex);
 	return 0;
 }
 
@@ -3070,9 +3067,7 @@ static inline void
 txv_untrack(struct txv *v)
 {
 	struct tx_index *i = v->index;
-	tt_pthread_mutex_lock(&i->mutex);
 	txv_tree_remove(&i->tree, v);
-	tt_pthread_mutex_unlock(&i->mutex);
 }
 
 static inline uint64_t
@@ -3205,7 +3200,6 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 	struct tx_manager *m = tx->manager;
 	struct vinyl_env *env = m->env;
 	/* Update concurrent index */
-	tt_pthread_mutex_lock(&index->mutex);
 	struct txv *own = txv_tree_search_key(&index->tree, tuple->data,
 					      tuple->size, tx->tsn);
 	/* Found a match of the previous action of this transaction */
@@ -3245,10 +3239,8 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		/* Add version */
 		txv_tree_insert(&index->tree, v);
 	}
-	tt_pthread_mutex_unlock(&index->mutex);
 	return 0;
 error:
-	tt_pthread_mutex_unlock(&index->mutex);
 	return -1;
 }
 
@@ -3256,12 +3248,10 @@ static int
 tx_get(struct vinyl_tx *tx, struct tx_index *index, struct vinyl_tuple *key,
        struct vinyl_tuple **result)
 {
-	tt_pthread_mutex_lock(&index->mutex);
 	struct txv *v = txv_tree_search_key(&index->tree,
 					    key->data, key->size, tx->tsn);
 	if (v == NULL)
 		goto add;
-	tt_pthread_mutex_unlock(&index->mutex);
 	struct vinyl_tuple *tuple = v->tuple;
 	if (unlikely((tuple->flags & SVGET) > 0))
 		return 0;
@@ -3272,11 +3262,7 @@ tx_get(struct vinyl_tx *tx, struct tx_index *index, struct vinyl_tuple *key,
 	return 1;
 
 add:
-	tt_pthread_mutex_unlock(&index->mutex);
-	int rc = tx_set(tx, index, key);
-	if (unlikely(rc == -1))
-		return -1;
-	return 0;
+	return tx_set(tx, index, key);
 }
 
 #define SD_IDBRANCH 1
