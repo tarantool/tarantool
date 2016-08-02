@@ -90,7 +90,7 @@ iobuf_reset_mt(struct iobuf *iobuf);
 static inline bool
 iobuf_is_idle(struct iobuf *iobuf)
 {
-	return ibuf_used(&iobuf->in) == 0 && obuf_size(&iobuf->out) == 0;
+	return ibuf_used(&iobuf->in) == 0 && obuf_used(&iobuf->out) == 0;
 }
 
 /**

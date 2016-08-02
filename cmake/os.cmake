@@ -44,6 +44,15 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     find_package_message(PLATFORM "Building for OS X" "${CMAKE_SYSTEM_NAME}")
     find_package_message(DARWIN_BUILD_TYPE
         "DARWIN_BUILD_TYPE: ${DARWIN_BUILD_TYPE}" "${DARWIN_BUILD_TYPE}")
+
+    # In Mac OS, the dynamic linker recognizes
+    # @loader_path, @executable_path and @rpath tokens, ex:
+    #   '@loder_path/lit.dylib'
+    # means load lit from the same dir the requesting binary lives in.
+    # Since our dynamic libraries aren't intended for static linking,
+    # this is pretty much irrelevant. Disable CMake rpath features
+    # altogether. Suppresses a few warnings.
+    set(CMAKE_SKIP_RPATH true)
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
