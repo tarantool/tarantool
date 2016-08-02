@@ -5666,6 +5666,18 @@ static int vy_index_droprepository(char *repo, int drop_directory)
 			               repo, strerror(errno));
 			return -1;
 		}
+		char space_path[PATH_MAX];
+		char *last_path_sep = strrchr(repo, '/');
+		if (last_path_sep) {
+			int len = last_path_sep - repo + 1;
+			snprintf(space_path, len, "%s", repo);
+			rc = rmdir(space_path);
+			if (unlikely(rc == -1)) {
+				vy_error("directory '%s' unlink error: %s",
+				         space_path, strerror(errno));
+				return -1;
+			}
+		}
 	}
 	return 0;
 }
@@ -6958,6 +6970,18 @@ si_deploy(struct vinyl_index *index, struct vinyl_env *env, int create_directory
 	/* create directory */
 	int rc;
 	if (likely(create_directory)) {
+		char space_path[PATH_MAX];
+		char *last_path_sep = strrchr(index->conf.path, '/');
+		if (last_path_sep) {
+			int len = last_path_sep - index->conf.path + 1;
+			snprintf(space_path, len, "%s", index->conf.path);
+			rc = mkdir(space_path, 0755);
+			if (unlikely(rc == -1) && errno != EEXIST) {
+				vy_error("directory '%s' create error: %s",
+				               space_path, strerror(errno));
+				return -1;
+			}
+		}
 		rc = mkdir(index->conf.path, 0755);
 		if (unlikely(rc == -1)) {
 			vy_error("directory '%s' create error: %s",
@@ -8151,7 +8175,7 @@ static int
 vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 {
 	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 ":%" PRIu32,
+	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
 	         key_def->space_id, key_def->iid);
 	conf->name = strdup(name);
 	if (conf->name == NULL) {
@@ -8400,7 +8424,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def,
 {
 	assert(key_def->part_count > 0);
 	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 ":%" PRIu32,
+	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
 	         key_def->space_id, key_def->iid);
 	struct vinyl_index *dup = vinyl_index_by_name(e, name);
 	if (unlikely(dup)) {

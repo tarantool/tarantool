@@ -119,7 +119,7 @@ VinylIndex::VinylIndex(struct key_def *key_def_arg)
 		vinyl_key_def = merge_key_defs(key_def, primary->key_def);
 	}
 	char name[128];
-	snprintf(name, sizeof(name), "%d:%d", key_def->space_id, key_def->iid);
+	snprintf(name, sizeof(name), "%d/%d", key_def->space_id, key_def->iid);
 	db = vinyl_index_by_name(env, name);
 	if (db != NULL) {
 		if (key_def_cmp(vinyl_key_def, vy_index_key_def(db)))

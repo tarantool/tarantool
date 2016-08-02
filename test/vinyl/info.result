@@ -75,7 +75,7 @@ box_info_sort(box.info.vinyl())
       - gc_prio: 0
       - gc_wm: 0
   - db:
-    - 512:0:
+    - 512/0:
       - branch_avg: 1
       - branch_count: 1
       - branch_histogram: '[1]:1 '
@@ -152,7 +152,7 @@ end;
 ...
 box_info_sort(box.info.vinyl().db);
 ---
-- - 513:0:
+- - 513/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -169,7 +169,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 514:0:
+  - 514/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -186,7 +186,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 515:0:
+  - 515/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -203,7 +203,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 516:0:
+  - 516/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -220,7 +220,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 517:0:
+  - 517/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -237,7 +237,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 518:0:
+  - 518/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -254,7 +254,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 519:0:
+  - 519/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -271,7 +271,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 520:0:
+  - 520/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -288,7 +288,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 521:0:
+  - 521/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -305,7 +305,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 522:0:
+  - 522/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -322,7 +322,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 523:0:
+  - 523/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -339,7 +339,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 524:0:
+  - 524/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -356,7 +356,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 525:0:
+  - 525/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -373,7 +373,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 526:0:
+  - 526/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -390,7 +390,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 527:0:
+  - 527/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
@@ -407,7 +407,7 @@ box_info_sort(box.info.vinyl().db);
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
-  - 528:0:
+  - 528/0:
     - branch_avg: 1
     - branch_count: 1
     - branch_histogram: '[1]:1 '
