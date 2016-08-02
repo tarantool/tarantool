@@ -1,4 +1,8 @@
-space = box.schema.space.create('tweedledum')
+env = require('test_run')
+test_run = env.new()
+engine = test_run:get_cfg('engine')
+
+space = box.schema.space.create('tweedledum', { engine = engine })
 i0 = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 i1 = space:create_index('i1', { type = 'tree', parts = {2, 'num'}, unique = false })
 i2 = space:create_index('i2', { type = 'tree', parts = {3, 'num'}, unique = false })
@@ -33,10 +37,10 @@ sort(space.index[2]:select({300}))
 sort(space.index['i5']:select{2007})
 sort(space.index[6]:select{'Miller Genuine Draft', 'Drinks'})
 
-space:delete{6}
-space:delete{7}
-space:delete{8}
-space:delete{9}
+tmp = space:delete{6}
+tmp = space:delete{7}
+tmp = space:delete{8}
+tmp = space:delete{9}
 
 space:insert{6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006}
 space:insert{7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007}

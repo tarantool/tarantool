@@ -1,4 +1,13 @@
-space = box.schema.space.create('tweedledum')
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+space = box.schema.space.create('tweedledum', { engine = engine })
 ---
 ...
 i0 = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
@@ -108,21 +117,17 @@ sort(space.index[6]:select{'Miller Genuine Draft', 'Drinks'})
 ---
 - - [5, 5, 300, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
 ...
-space:delete{6}
+tmp = space:delete{6}
 ---
-- [6, 6, 400, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006]
 ...
-space:delete{7}
+tmp = space:delete{7}
 ---
-- [7, 7, 400, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007]
 ...
-space:delete{8}
+tmp = space:delete{8}
 ---
-- [8, 8, 400, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
 ...
-space:delete{9}
+tmp = space:delete{9}
 ---
-- [9, 9, 400, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
 ...
 space:insert{6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006}
 ---

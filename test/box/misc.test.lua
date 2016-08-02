@@ -181,19 +181,6 @@ space:delete{1}
 space:drop()
 test_run:cmd("clear filter")
 
--- https://github.com/tarantool/tarantool/issues/1109
--- Update via a secondary key breaks recovery
-s = box.schema.create_space('test')
-i1 = s:create_index('test1', {parts = {1, 'num'}})
-i2 = s:create_index('test2', {parts = {2, 'num'}})
-s:insert{1, 2, 3}
-s:insert{5, 8, 13}
-i2:update({2}, {{'+', 3, 3}})
-i2:delete{8}
-test_run:cmd("restart server default")
-box.space.test:select{}
-box.space.test:drop()
-
 -- test test_run:grep_log()
 require('log').info('Incorrect password supplied')
 test_run:grep_log("default", "password")
