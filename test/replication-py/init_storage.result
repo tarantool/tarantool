@@ -45,6 +45,7 @@ for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
 ...
 for k = 20, 29 do box.space[42]:upsert({k}, {}) end
 ---
+- error: Illegal parameters, no operations for update
 ...
 space = box.space.test
 ---

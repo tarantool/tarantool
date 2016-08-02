@@ -463,7 +463,7 @@ s:update({1})
 ...
 s:update({1}, {'=', 1, 1})
 ---
-- error: Illegal parameters, update operations must be an array {{op,..}, {op,..}}
+- error: Illegal parameters, update operation must be an array {op,..}
 ...
 s:drop()
 ---
@@ -776,7 +776,7 @@ s:update({0}, {})
 ...
 s:update({0}, {'+', 2, 2})
 ---
-- error: Illegal parameters, update operations must be an array {{op,..}, {op,..}}
+- error: Illegal parameters, update operation must be an array {op,..}
 ...
 s:update({0}, {{}})
 ---

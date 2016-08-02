@@ -1437,11 +1437,6 @@ vy_status_is_active(enum vinyl_status status)
 }
 
 static inline bool
-vy_status_active(struct vy_status *s) {
-	return vy_status_is_active(vy_status(s));
-}
-
-static inline bool
 vy_status_online(struct vy_status *s) {
 	return vy_status(s) == VINYL_ONLINE;
 }
@@ -8884,36 +8879,58 @@ vy_apply_upsert_ops(const char **tuple, const char **tuple_end,
 	}
 }
 
+extern const char *
+space_name_by_id(uint32_t id);
+
 /*
  * Get the upserted tuple by upsert tuple and original tuple
  */
 static struct vinyl_tuple *
-vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
+vy_apply_upsert(struct sv *upsert, struct sv *object,
+		struct vinyl_index *index)
 {
 	assert(upsert != object);
 	struct key_def *key_def = index->key_def;
 	const char *u_data = sv_pointer(upsert);
 	const char *u_data_end = u_data + sv_size(upsert);
-	const char *u_tuple, *u_tuple_end, *u_ops, *u_ops_end;
-	vinyl_tuple_data_ex(key_def, u_data, u_data_end, &u_tuple, &u_tuple_end,
-			    &u_ops, &u_ops_end);
+	const char *new_tpl, *new_tpl_end, *u_ops, *u_ops_end;
+	vinyl_tuple_data_ex(key_def, u_data, u_data_end, &new_tpl,
+			    &new_tpl_end, &u_ops, &u_ops_end);
 	if (object == NULL || (sv_flags(object) & SVDELETE)) {
 		/* replace version */
 		struct vinyl_tuple *result =
-			vinyl_tuple_from_data(index, u_tuple, u_tuple_end);
+			vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
 		return result;
 	}
 	const char *o_data = sv_pointer(object);
 	const char *o_data_end = o_data + sv_size(object);
 	const char *o_tuple, *o_tuple_end, *o_ops, *o_ops_end;
-	vinyl_tuple_data_ex(key_def, o_data, o_data_end, &o_tuple, &o_tuple_end,
-			    &o_ops, &o_ops_end);
-	vy_apply_upsert_ops(&o_tuple, &o_tuple_end, u_ops, u_ops_end);
+	vinyl_tuple_data_ex(key_def, o_data, o_data_end, &o_tuple,
+			    &o_tuple_end, &o_ops, &o_ops_end);
+	new_tpl = o_tuple;
+	new_tpl_end = o_tuple_end;
+	vy_apply_upsert_ops(&new_tpl, &new_tpl_end, u_ops, u_ops_end);
+	if (index->key_def->iid == 0) {
+		struct vinyl_tuple *old_tuple;
+		old_tuple = vinyl_tuple_from_data(index,o_tuple, o_tuple_end);
+		struct vinyl_tuple *new_tuple;
+		new_tuple = vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
+		if ((old_tuple == NULL) || (new_tuple == NULL)) {
+			return NULL;
+		}
+		if (vy_tuple_compare(old_tuple->data, new_tuple->data, index->key_def)) {
+			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+				 index->key_def->name,
+				 space_name_by_id(index->key_def->space_id));
+			error_log(diag_last_error(diag_get()));
+			return old_tuple;
+		}
+	}
 	if (!(sv_flags(object) & SVUPSERT)) {
 		/* update version */
 		assert(o_ops_end - o_ops == 0);
 		struct vinyl_tuple *result =
-			vinyl_tuple_from_data(index, o_tuple, o_tuple_end);
+			vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
 		fiber_gc();
 		return result;
 	}
@@ -8925,7 +8942,7 @@ vy_apply_upsert(struct sv *upsert, struct sv *object, struct vinyl_index *index)
 				  (u_ops_end - u_ops) + (o_ops_end - o_ops);
 	char *extra;
 	struct vinyl_tuple *result =
-		vinyl_tuple_from_data_ex(index, o_tuple, o_tuple_end,
+		vinyl_tuple_from_data_ex(index, new_tpl, new_tpl_end,
 					 total_ops_size, &extra);
 	extra = mp_encode_uint(extra, ops_series_count);
 	memcpy(extra, o_ops, o_ops_end - o_ops);

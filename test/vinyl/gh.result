@@ -366,6 +366,7 @@ s:select()
 ...
 s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})
 ---
+- error: Unknown UPDATE operation
 ...
 s:select()
 ---
