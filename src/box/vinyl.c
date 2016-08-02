@@ -9099,6 +9099,7 @@ vy_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
 	struct vy_stat_get statget;
+	memset(&statget, 0, sizeof(statget));
 	if (vinyl_index_read(index, key, VINYL_EQ, result, tx, NULL,
 			    cache_only, &statget) != 0) {
 		return -1;
