@@ -1815,50 +1815,11 @@ struct txlogindex {
 	struct rlist next;
 };
 
-/**
- * In-memory transaction log.
- * Transaction changes are made in multi-version
- * in-memory index (tx_index) and recorded in this log.
- * When the transaction is committed, the changes are written to the
- * in-memory single-version index (struct svindex) in a
- * specific vy_range object of an index.
- */
-struct txlog {
-	/**
-	 * Number of writes (inserts,updates, deletes) done by
-	 * the transaction.
-	 */
-	int write_count;
-	struct rlist index;
-	struct stailq log;
-};
-
-static inline void
-txlog_init(struct txlog *l)
-{
-	stailq_create(&l->log);
-	l->write_count = 0;
-	rlist_create(&l->index);
-}
-
-static inline void
-txlog_free(struct txlog *l)
-{
-	struct txlogindex *i, *tmp;
-	rlist_foreach_entry_safe(i, &l->index, next, tmp)
-		free(i);
-}
-
-static inline int
-txlog_write_count(struct txlog *l) {
-	return l->write_count;
-}
-
 int
-txlogindex_add(struct txlog *l, struct txv *v)
+txlogindex_add(struct rlist *logindex, struct txv *v)
 {
 	struct txlogindex *i;
-	rlist_foreach_entry(i, &l->index, next) {
+	rlist_foreach_entry(i, logindex, next) {
 		if (i->index == v->index) {
 			rlist_add_tail(&i->log, &v->next_in_index);
 			return 0;
@@ -1871,7 +1832,7 @@ txlogindex_add(struct txlog *l, struct txv *v)
 	rlist_create(&i->log);
 	rlist_create(&i->next);
 	rlist_add_tail(&i->log, &v->next_in_index);
-	rlist_add(&l->index, &i->next);
+	rlist_add(logindex, &i->next);
 	return 0;
 }
 
@@ -2918,7 +2879,21 @@ txv_next(struct txv *v)
 struct sicache;
 
 struct vinyl_tx {
-	struct txlog log;
+	/**
+	 * Number of writes (inserts,updates, deletes) done by
+	 * the transaction.
+	 */
+	int write_count;
+	/**
+	 * In memory transaction log. Contains both reads
+	 * and writes.
+	 */
+	struct stailq log;
+	/**
+	 * Writes of the transaction segregated by the changed
+	 * vinyl_index object.
+	 */
+	struct rlist logindex;
 	uint64_t start;
 	enum tx_type     type;
 	enum tx_state    state;
@@ -3071,7 +3046,9 @@ tx_promote(struct vinyl_tx *tx, enum tx_state state)
 static void
 tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 {
-	txlog_init(&tx->log);
+	stailq_create(&tx->log);
+	tx->write_count = 0;
+	rlist_create(&tx->logindex);
 	tx->start = clock_monotonic64();
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
@@ -3144,7 +3121,9 @@ tx_manager_gc(struct tx_manager *m)
 static void
 tx_delete(struct vinyl_tx *tx)
 {
-	txlog_free(&tx->log);
+	struct txlogindex *i, *tmp;
+	rlist_foreach_entry_safe(i, &tx->logindex, next, tmp)
+		free(i);
 	free(tx);
 }
 
@@ -3173,7 +3152,7 @@ tx_rollback_svp(struct vinyl_tx *tx, struct txv *v)
 {
 	struct stailq tail;
 	stailq_create(&tail);
-	stailq_splice(&tx->log.log, &v->next_in_log, &tail);
+	stailq_splice(&tx->log, &v->next_in_log, &tail);
 	struct vinyl_env *env = tx->manager->env;
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
@@ -3187,7 +3166,7 @@ static enum tx_state
 tx_rollback(struct vinyl_tx *tx)
 {
 	/* support log free after commit and half-commit mode */
-	tx_rollback_svp(tx, stailq_first_entry(&tx->log.log, struct txv,
+	tx_rollback_svp(tx, stailq_first_entry(&tx->log, struct txv,
 					       next_in_log));
 	tx_promote(tx, VINYL_TX_ROLLBACK);
 	tx_end(tx);
@@ -3198,10 +3177,10 @@ static enum tx_state
 tx_prepare(struct vinyl_tx *tx)
 {
 	/* proceed read-only transactions */
-	if (tx->type == VINYL_TX_RO || txlog_write_count(&tx->log) == 0)
+	if (tx->type == VINYL_TX_RO || tx->write_count == 0)
 		return tx_promote(tx, VINYL_TX_PREPARE);
 	struct txv *v;
-	stailq_foreach_entry(v, &tx->log.log, next_in_log) {
+	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v == tx->readonly_tail)
 			break;
 		if (txv_aborted(v))
@@ -3238,20 +3217,20 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		}
 		/* Update log */
 		if (! (own->tuple->flags & SVGET))
-			tx->log.write_count--;
+			tx->write_count--;
 		if (! (tuple->flags & SVGET))
-			tx->log.write_count++;
+			tx->write_count++;
 		vinyl_tuple_unref_rt(env, own->tuple);
 		vinyl_tuple_ref(tuple);
 		own->tuple = tuple;
 	} else {
 		/* Allocate mvcc container */
 		struct txv *v = txv_new(tuple, tx->tsn, index);
-		if (txlogindex_add(&tx->log, v)) {
+		if (txlogindex_add(&tx->logindex, v)) {
 			txv_delete(env, v);
 			goto error;
 		}
-		stailq_add_tail_entry(&tx->log.log, v, next_in_log);
+		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
 		txv_tree_insert(&index->tree, v);
 		/*
@@ -3262,7 +3241,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 			if (tx->readonly_tail == NULL)
 				tx->readonly_tail = v;
 		} else {
-			tx->log.write_count++;
+			tx->write_count++;
 		}
 	}
 	tt_pthread_mutex_unlock(&index->mutex);
@@ -7717,21 +7696,6 @@ sc_schedule(struct vinyl_env *env, struct sdc *sdc, int64_t vlsn)
 	return 1; /* success */
 }
 
-static int
-txlog_flush(struct txlog *log, uint64_t lsn, enum vinyl_status status)
-{
-	struct txv *v;
-	stailq_foreach_entry(v, &log->log, next_in_log)
-		v->tuple->lsn = lsn;
-
-	/* index */
-	uint64_t now = clock_monotonic64();
-	struct txlogindex *i;
-	rlist_foreach_entry(i, &log->index, next)
-		si_write(i, now, status);
-	return 0;
-}
-
 /**
  * Global configuration of an entire vinyl instance (env object).
  */
@@ -9021,7 +8985,7 @@ vy_tx_end(struct vy_stat *stat, struct vinyl_tx *tx, int rlb, int conflict)
 	uint32_t count = 0;
 	struct tx_manager *m = tx->manager;
 	struct txv *v, *tmp;
-	stailq_foreach_entry_safe(v, tmp, &tx->log.log, next_in_log) {
+	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 
 		count++;
 		/** Gets are collected by gc */
@@ -9138,7 +9102,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx)
 	struct tx_manager *m = tx->manager;
 	uint64_t csn = m->tsn;
 	struct txv *v;
-	stailq_foreach_entry(v, &tx->log.log, next_in_log) {
+	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v == tx->readonly_tail)
 			break;
 		struct txv *prev = txv_prev(v);
@@ -9178,13 +9142,21 @@ vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn)
 	if (lsn > (int64_t) e->seq->lsn)
 		e->seq->lsn = lsn;
 	vy_sequence_unlock(e->seq);
+
 	/* do log write and backend commit */
-	int rc = txlog_flush(&tx->log, lsn, e->status);
-	if (unlikely(rc == -1))
-		tx_rollback(tx);
+
+	struct txv *v;
+	stailq_foreach_entry(v, &tx->log, next_in_log)
+		v->tuple->lsn = lsn;
+
+	/* index */
+	uint64_t now = clock_monotonic64();
+	struct txlogindex *i;
+	rlist_foreach_entry(i, &tx->logindex, next)
+		si_write(i, now, e->status);
 
 	vy_tx_end(e->stat, tx, 0, 0);
-	return rc;
+	return 0;
 }
 
 struct vinyl_tx *
