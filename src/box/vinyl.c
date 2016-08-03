@@ -9219,6 +9219,22 @@ vinyl_begin(struct vinyl_env *e)
 	return tx;
 }
 
+void *
+vy_savepoint(struct vinyl_tx *tx)
+{
+	return stailq_last(&tx->log);
+}
+
+void
+vy_rollback_to_savepoint(struct vinyl_tx *tx, void *svp)
+{
+	struct txv *v = svp;
+	if (v) {
+		v = stailq_next_entry(v, next_in_log);
+		return tx_rollback_svp(tx, v);
+	}
+}
+
 /* }}} Public API of transaction control */
 
 /** {{{ vy_read_task - Asynchronous get/cursor I/O using eio pool */

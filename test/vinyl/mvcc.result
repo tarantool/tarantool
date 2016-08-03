@@ -2367,7 +2367,7 @@ c3("t:replace{1, 20}")
 --
 c2:commit() -- rollback
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c3:commit() -- rollback
 ---

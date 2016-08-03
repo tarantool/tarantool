@@ -151,6 +151,12 @@ vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn);
 void
 vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx);
 
+void *
+vy_savepoint(struct vinyl_tx *tx);
+
+void
+vy_rollback_to_savepoint(struct vinyl_tx *tx, void *svp);
+
 /*
  * Index
  */

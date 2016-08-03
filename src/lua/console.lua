@@ -48,13 +48,6 @@ local function format(status, ...)
     return formatter.encode({{error = err }})
 end
 
-local function local_format(status, ...)
-    if not status and type(box.cfg) == 'table' then
-        box.rollback()
-    end
-    return format(status, ...)
-end
-
 --
 -- Evaluate command on local server
 --
@@ -75,7 +68,7 @@ local function local_eval(self, line)
     if not fun then
         return format(false, errmsg)
     end
-    return local_format(pcall(fun))
+    return format(pcall(fun))
 end
 
 local function eval(line)
