@@ -5170,38 +5170,38 @@ si_replace(struct vinyl_index *index, struct vy_range *o, struct vy_range *n)
 static int
 vy_task_execute(struct vy_task *task, struct sdc *c, uint64_t vlsn)
 {
-	struct vinyl_index *index = task->index;
-	assert(index != NULL);
+	assert(task->index != NULL);
 	int rc = -1;
 	switch (task->type) {
 	case VY_TASK_NODEGC:
-		rc = vy_range_free(task->node, index->env, 1);
-		break;
+		rc = vy_range_free(task->node, task->index->env, 1);
+		sd_cgc(c, task->index->conf.buf_gc_wm);
+		return rc;
 	case VY_TASK_CHECKPOINT:
 	case VY_TASK_BRANCH:
 	case VY_TASK_AGE:
-		rc = vy_run(index, c, task->node, vlsn);
-		break;
+		rc = vy_run(task->index, c, task->node, vlsn);
+		sd_cgc(c, task->index->conf.buf_gc_wm);
+		return rc;
 	case VY_TASK_GC:
 	case VY_TASK_COMPACT:
-		rc = si_compact(index, c, task->node, vlsn, NULL, 0);
-		break;
+		rc = si_compact(task->index, c, task->node, vlsn, NULL, 0);
+		sd_cgc(c, task->index->conf.buf_gc_wm);
+		return rc;
 	case VY_TASK_SHUTDOWN:
-		assert(index->refs == 1); /* referenced by this task */
-		rc = vinyl_index_delete(index);
+		assert(task->index->refs == 1); /* referenced by this task */
+		rc = vinyl_index_delete(task->index);
 		task->index = NULL;
-		break;
+		return rc;
 	case VY_TASK_DROP:
-		assert(index->refs == 1); /* referenced by this task */
-		rc = vy_index_drop(index);
+		assert(task->index->refs == 1); /* referenced by this task */
+		rc = vy_index_drop(task->index);
 		task->index = NULL;
-		break;
+		return rc;
 	default:
 		unreachable();
+		return -1;
 	}
-	/* garbage collect buffers */
-	sd_cgc(c, index->conf.buf_gc_wm);
-	return rc;
 }
 
 /* dump tuple to branch page buffers (tuple header and data) */
@@ -7457,8 +7457,7 @@ scheduler_new(struct vinyl_env *env)
 static void
 scheduler_delete(struct scheduler *s)
 {
-	if (s->count > 0)
-		free(s->indexes);
+	free(s->indexes);
 	free(s);
 }
 
