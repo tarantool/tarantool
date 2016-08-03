@@ -6975,14 +6975,14 @@ si_deploy(struct vinyl_index *index, struct vinyl_env *env, int create_directory
 		if (last_path_sep) {
 			int len = last_path_sep - index->conf.path + 1;
 			snprintf(space_path, len, "%s", index->conf.path);
-			rc = mkdir(space_path, 0755);
+			rc = mkdir(space_path, 0777);
 			if (unlikely(rc == -1) && errno != EEXIST) {
 				vy_error("directory '%s' create error: %s",
 				               space_path, strerror(errno));
 				return -1;
 			}
 		}
-		rc = mkdir(index->conf.path, 0755);
+		rc = mkdir(index->conf.path, 0777);
 		if (unlikely(rc == -1)) {
 			vy_error("directory '%s' create error: %s",
 			               index->conf.path, strerror(errno));
