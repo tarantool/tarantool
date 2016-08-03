@@ -2852,8 +2852,6 @@ struct txv_tree_key {
 	uint64_t tsn;
 };
 
-struct vinyl_index;
-
 static inline struct txv *
 txv_new(struct vinyl_index *index, struct vinyl_tuple *tuple, uint64_t tsn)
 {
@@ -3334,6 +3332,7 @@ tx_set(struct vinyl_tx *tx, struct vinyl_index *index,
 				/* Write after read */
 				if (txlogindex_add(&tx->logindex, own))
 					goto error;
+				tx->readonly_tail = NULL;
 			}
 			vinyl_tuple_unref_rt(env, own->tuple);
 			vinyl_tuple_ref(tuple);
@@ -3354,6 +3353,7 @@ tx_set(struct vinyl_tx *tx, struct vinyl_index *index,
 				txv_delete(env, v);
 				goto error;
 			}
+			tx->readonly_tail = NULL;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
@@ -8999,10 +8999,8 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	}
 
 	o->flags = flags;
-	/** Drop log_read counter */
-	tx->readonly_tail = NULL;
 
-	/* concurrent index only */
+	/* Update the concurrent index only */
 	return tx_set(tx, index, o);
 }
 
