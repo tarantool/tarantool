@@ -1,0 +1,1 @@
+/etc/tarantool/instances.available/example.lua /etc/tarantool/instances.enabled/example.lua

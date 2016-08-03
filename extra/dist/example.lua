@@ -38,7 +38,8 @@ box.cfg {
     -- Has no default value, so must be specified if
     -- connections will occur from remote clients 
     -- that do not use “admin address”
-    listen = 3301;
+    listen = 'localhost:3301';
+    -- listen = '*:3301';
 
     -- Inject the given string into server process title
     -- custom_proc_title = 'example';

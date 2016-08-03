@@ -118,4 +118,5 @@ debian/tarantool.substvars
 debian/tarantool.manpages
 debian/tarantool/*
 debian/tmp/*
+obj-*/
 *.cdbs-config_list
