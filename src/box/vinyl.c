@@ -8886,71 +8886,102 @@ space_name_by_id(uint32_t id);
  * Get the upserted tuple by upsert tuple and original tuple
  */
 static struct vinyl_tuple *
-vy_apply_upsert(struct sv *upsert, struct sv *object,
+vy_apply_upsert(struct sv *new_tuple, struct sv *old_tuple,
 		struct vinyl_index *index)
 {
-	assert(upsert != object);
+	/*
+	 * old_tuple - previous (old) version of tuple
+	 * new_tuple - next (new) version of tuple
+	 * result_tuple - the result of merging new and old
+	 */
+	assert(new_tuple != NULL);
+	assert(new_tuple != old_tuple);
 	struct key_def *key_def = index->key_def;
-	const char *u_data = sv_pointer(upsert);
-	const char *u_data_end = u_data + sv_size(upsert);
-	const char *new_tpl, *new_tpl_end, *u_ops, *u_ops_end;
-	vinyl_tuple_data_ex(key_def, u_data, u_data_end, &new_tpl,
-			    &new_tpl_end, &u_ops, &u_ops_end);
-	if (object == NULL || (sv_flags(object) & SVDELETE)) {
-		/* replace version */
-		struct vinyl_tuple *result =
-			vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
-		return result;
+
+	/*
+	 * Unpack UPSERT operation from the new tuple
+	 */
+	const char *new_data = sv_pointer(new_tuple);
+	const char *new_data_end = new_data + sv_size(new_tuple);
+	const char *new_mp, *new_mp_end, *new_ops, *new_ops_end;
+	vinyl_tuple_data_ex(key_def, new_data, new_data_end,
+			    &new_mp, &new_mp_end,
+			    &new_ops, &new_ops_end);
+	if (old_tuple == NULL || (sv_flags(old_tuple) & SVDELETE)) {
+		/*
+		 * INSERT case: return new tuple.
+		 */
+		return vinyl_tuple_from_data(index, new_mp, new_mp_end);
 	}
-	const char *o_data = sv_pointer(object);
-	const char *o_data_end = o_data + sv_size(object);
-	const char *o_tuple, *o_tuple_end, *o_ops, *o_ops_end;
-	vinyl_tuple_data_ex(key_def, o_data, o_data_end, &o_tuple,
-			    &o_tuple_end, &o_ops, &o_ops_end);
-	new_tpl = o_tuple;
-	new_tpl_end = o_tuple_end;
-	vy_apply_upsert_ops(&new_tpl, &new_tpl_end, u_ops, u_ops_end);
-	if (index->key_def->iid == 0) {
-		struct vinyl_tuple *old_tuple;
-		old_tuple = vinyl_tuple_from_data(index,o_tuple, o_tuple_end);
-		struct vinyl_tuple *new_tuple;
-		new_tuple = vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
-		if ((old_tuple == NULL) || (new_tuple == NULL)) {
-			return NULL;
-		}
-		if (vy_tuple_compare(old_tuple->data, new_tuple->data, index->key_def)) {
-			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 index->key_def->name,
-				 space_name_by_id(index->key_def->space_id));
-			error_log(diag_last_error(diag_get()));
-			return old_tuple;
-		}
+
+	/*
+	 * Unpack UPSERT operation from the old tuple
+	 */
+	assert(old_tuple != NULL);
+	const char *old_data = sv_pointer(old_tuple);
+	const char *old_data_end = old_data + sv_size(old_tuple);
+	const char *old_mp, *old_mp_end, *old_ops, *old_ops_end;
+	vinyl_tuple_data_ex(key_def, old_data, old_data_end,
+			    &old_mp, &old_mp_end, &old_ops, &old_ops_end);
+
+	/*
+	 * Apply new operations to the old tuple
+	 */
+	const char *result_mp = old_mp;
+	const char *result_mp_end = old_mp_end;
+	struct vinyl_tuple *result_tuple;
+	vy_apply_upsert_ops(&result_mp, &result_mp_end, new_ops, new_ops_end);
+	if (!(sv_flags(old_tuple) & SVUPSERT)) {
+		/*
+		 * UPDATE case: return the updated old tuple.
+		 */
+		assert(old_ops_end - old_ops == 0);
+		result_tuple = vinyl_tuple_from_data(index, result_mp,
+						     result_mp_end);
+		fiber_gc(); /* free memory allocated by tuple_upsert_execute */
+		if (result_tuple == NULL)
+			return NULL; /* OOM */
+		goto check_key;
 	}
-	if (!(sv_flags(object) & SVUPSERT)) {
-		/* update version */
-		assert(o_ops_end - o_ops == 0);
-		struct vinyl_tuple *result =
-			vinyl_tuple_from_data(index, new_tpl, new_tpl_end);
-		fiber_gc();
-		return result;
-	}
-	/* upsert of upsert .. */
-	assert(o_ops_end - o_ops > 0);
-	uint64_t ops_series_count = mp_decode_uint(&u_ops) +
-				    mp_decode_uint(&o_ops);
+
+	/*
+	 * UPSERT + UPSERT case: combine operations
+	 */
+	assert(old_ops_end - old_ops > 0);
+	uint64_t ops_series_count = mp_decode_uint(&new_ops) +
+				    mp_decode_uint(&old_ops);
 	uint32_t total_ops_size = mp_sizeof_uint(ops_series_count) +
-				  (u_ops_end - u_ops) + (o_ops_end - o_ops);
+				  (new_ops_end - new_ops) +
+				  (old_ops_end - old_ops);
 	char *extra;
-	struct vinyl_tuple *result =
-		vinyl_tuple_from_data_ex(index, new_tpl, new_tpl_end,
-					 total_ops_size, &extra);
+	result_tuple = vinyl_tuple_from_data_ex(index, result_mp,
+		result_mp_end, total_ops_size, &extra);
+	fiber_gc(); /* free memory allocated by tuple_upsert_execute */
+	if (result_tuple == NULL)
+		return NULL; /* OOM */
 	extra = mp_encode_uint(extra, ops_series_count);
-	memcpy(extra, o_ops, o_ops_end - o_ops);
-	extra += o_ops_end - o_ops;
-	memcpy(extra, u_ops, u_ops_end - u_ops);
-	result->flags = SVUPSERT;
-	fiber_gc();
-	return result;
+	memcpy(extra, old_ops, old_ops_end - old_ops);
+	extra += old_ops_end - old_ops;
+	memcpy(extra, new_ops, new_ops_end - new_ops);
+	result_tuple->flags = SVUPSERT;
+
+check_key:
+	/*
+	 * Check that key hasn't been changed after applying operations.
+	 */
+	if (key_def->iid == 0 &&
+	    vy_tuple_compare(old_data, result_tuple->data, key_def) != 0) {
+		/*
+		 * Key has been changed: ignore this UPSERT and
+		 * return the old tuple.
+		 */
+		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+			 key_def->name, space_name_by_id(key_def->space_id));
+		error_log(diag_last_error(diag_get()));
+		vinyl_tuple_unref(index, result_tuple);
+		return vinyl_tuple_from_data(index, old_mp, old_mp_end);
+	}
+	return result_tuple;
 }
 
 /* }}} Upsert */
