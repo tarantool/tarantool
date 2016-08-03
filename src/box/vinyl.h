@@ -148,7 +148,7 @@ vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx);
 int
 vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn);
 
-int
+void
 vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx);
 
 /*

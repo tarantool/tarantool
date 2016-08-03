@@ -2859,6 +2859,169 @@ txv_next(struct txv *v)
 
 struct sicache;
 
+struct PACKED sdid {
+	uint64_t parent;
+	uint64_t id;
+	uint8_t  flags;
+};
+
+struct PACKED vy_page_index_header {
+	uint32_t  crc;
+	struct srversion version;
+	struct sdid      id;
+	uint64_t  offset;
+	uint32_t  size;
+	uint32_t  sizevmax;
+	uint32_t  count;
+	uint32_t  keys;
+	uint64_t  total;
+	uint64_t  totalorigin;
+	uint64_t  lsnmin;
+	uint64_t  lsnmax;
+	uint32_t  dupkeys;
+	uint64_t  dupmin;
+	uint32_t  extension;
+	uint8_t   extensions;
+	char      reserve[31];
+};
+
+struct PACKED vy_page_info {
+	/* offset of page data in file (0 for first page) */
+	uint64_t offset;
+	/* size of page data in file */
+	uint32_t size;
+	/* size of page data in memory, i.e. unpacked */
+	uint32_t unpacked_size;
+	/* offset of page's min key in page index key storage (0 for first) */
+	uint32_t min_key_offset;
+	/* offset of page's max key in page index key storage */
+	uint32_t max_key_offset;
+	/* lsn of min key in page */
+	uint64_t min_key_lsn;
+	/* lsn of max key in page */
+	uint64_t max_key_lsn;
+	/* minimal lsn of all records in page */
+	uint64_t min_lsn;
+	/* maximal lsn of all records in page */
+	uint64_t max_lsn;
+};
+
+
+struct vy_page_index {
+	struct vy_page_index_header header;
+	struct vy_buf pages, minmax;
+};
+
+struct PACKED vy_run {
+	struct sdid id;
+	struct vy_page_index index;
+	struct vy_run *link;
+	struct vy_run *next;
+};
+
+struct PACKED vy_range {
+	uint32_t   recover;
+	uint16_t   flags;
+	uint64_t   update_time;
+	uint32_t   used; /* sum of i0->used + i1->used */
+	uint64_t   ac;
+	struct vy_run   self;
+	struct vy_run  *branch;
+	uint32_t   branch_count;
+	uint32_t   temperature;
+	uint64_t   temperature_reads;
+	uint16_t   refs;
+	pthread_mutex_t reflock;
+	struct svindex    i0, i1;
+	struct vy_file     file;
+	rb_node(struct vy_range) tree_node;
+	struct ssrqnode   nodecompact;
+	struct ssrqnode   nodebranch;
+	struct rlist     gc;
+	struct rlist     commit;
+};
+
+
+typedef rb_tree(struct vy_range) vy_range_tree_t;
+
+struct vy_index_conf {
+	uint32_t    id;
+	char       *name;
+	char       *path;
+	uint32_t    sync;
+	uint32_t    compression;
+	char       *compression_sz;
+	struct vy_filterif *compression_if;
+	uint32_t    buf_gc_wm;
+	struct srversion   version;
+	struct srversion   version_storage;
+};
+
+struct vy_profiler {
+	uint32_t  total_node_count;
+	uint64_t  total_node_size;
+	uint64_t  total_node_origin_size;
+	uint32_t  total_branch_count;
+	uint32_t  total_branch_avg;
+	uint32_t  total_branch_max;
+	uint32_t  total_page_count;
+	uint64_t  total_snapshot_size;
+	uint32_t  temperature_avg;
+	uint32_t  temperature_min;
+	uint32_t  temperature_max;
+	uint64_t  memory_used;
+	uint64_t  count;
+	uint64_t  count_dup;
+	uint64_t  read_disk;
+	uint64_t  read_cache;
+	int       histogram_branch[20];
+	int       histogram_branch_20plus;
+	char      histogram_branch_sz[256];
+	char     *histogram_branch_ptr;
+	struct vinyl_index  *i;
+};
+
+struct vy_planner {
+	struct ssrq branch;
+	struct ssrq compact;
+};
+
+struct vinyl_index {
+	struct vinyl_env *env;
+	struct vy_profiler rtp;
+	struct tx_index coindex;
+	uint64_t tsn_min;
+	uint64_t tsn_max;
+
+	vy_range_tree_t tree;
+	struct vy_status status;
+	pthread_mutex_t lock;
+	int range_count;
+	uint64_t update_time;
+	uint64_t read_disk;
+	uint64_t read_cache;
+	uint64_t size;
+	pthread_mutex_t ref_lock;
+	uint32_t refs;
+	struct vy_buf readbuf;
+	struct vy_index_conf conf;
+	struct key_def *key_def;
+	struct tuple_format *tuple_format;
+	uint32_t key_map_size; /* size of key_map map */
+	uint32_t *key_map; /* field_id -> part_id map */
+	/** Member of env->db or scheduler->shutdown. */
+	struct rlist link;
+
+	/* {{{ Scheduler members */
+	struct rlist gc;
+	struct vy_planner p;
+	bool checkpoint_in_progress;
+	bool age_in_progress;
+	bool gc_in_progress;
+	/* Scheduler members }}} */
+};
+
+
 struct vinyl_tx {
 	/**
 	 * In memory transaction log. Contains both reads
@@ -3249,12 +3412,6 @@ add:
 
 #define SD_IDBRANCH 1
 
-struct PACKED sdid {
-	uint64_t parent;
-	uint64_t id;
-	uint8_t  flags;
-};
-
 struct PACKED sdv {
 	uint32_t offset;
 	uint8_t  flags;
@@ -3527,52 +3684,6 @@ sd_pageiter_next(struct sdpageiter *pi)
 	}
 	sd_pageiter_result(pi);
 }
-
-struct PACKED vy_page_index_header {
-	uint32_t  crc;
-	struct srversion version;
-	struct sdid      id;
-	uint64_t  offset;
-	uint32_t  size;
-	uint32_t  sizevmax;
-	uint32_t  count;
-	uint32_t  keys;
-	uint64_t  total;
-	uint64_t  totalorigin;
-	uint64_t  lsnmin;
-	uint64_t  lsnmax;
-	uint32_t  dupkeys;
-	uint64_t  dupmin;
-	uint32_t  extension;
-	uint8_t   extensions;
-	char      reserve[31];
-};
-
-struct PACKED vy_page_info {
-	/* offset of page data in file (0 for first page) */
-	uint64_t offset;
-	/* size of page data in file */
-	uint32_t size;
-	/* size of page data in memory, i.e. unpacked */
-	uint32_t unpacked_size;
-	/* offset of page's min key in page index key storage (0 for first) */
-	uint32_t min_key_offset;
-	/* offset of page's max key in page index key storage */
-	uint32_t max_key_offset;
-	/* lsn of min key in page */
-	uint64_t min_key_lsn;
-	/* lsn of max key in page */
-	uint64_t max_key_lsn;
-	/* minimal lsn of all records in page */
-	uint64_t min_lsn;
-	/* maximal lsn of all records in page */
-	uint64_t max_lsn;
-};
-
-struct vy_page_index {
-	struct vy_page_index_header header;
-	struct vy_buf pages, minmax;
-};
 
 static inline char *
 vy_page_index_min_key(struct vy_page_index *i, struct vy_page_info *p) {
@@ -4338,28 +4449,8 @@ static struct svif sdv_if =
 	.size      = sdv_size
 };
 
-struct vy_index_conf {
-	uint32_t    id;
-	char       *name;
-	char       *path;
-	uint32_t    sync;
-	uint32_t    compression;
-	char       *compression_sz;
-	struct vy_filterif *compression_if;
-	uint32_t    buf_gc_wm;
-	struct srversion   version;
-	struct srversion   version_storage;
-};
-
 static void vy_index_conf_init(struct vy_index_conf*);
 static void vy_index_conf_free(struct vy_index_conf*);
-
-struct PACKED vy_run {
-	struct sdid id;
-	struct vy_page_index index;
-	struct vy_run *link;
-	struct vy_run *next;
-};
 
 static inline void
 vy_run_init(struct vy_run *b)
@@ -4407,28 +4498,6 @@ vy_run_free(struct vy_run *b)
 #define SI_RDB_DBSEAL 128
 #define SI_RDB_UNDEF  256
 #define SI_RDB_REMOVE 512
-
-struct PACKED vy_range {
-	uint32_t   recover;
-	uint16_t   flags;
-	uint64_t   update_time;
-	uint32_t   used; /* sum of i0->used + i1->used */
-	uint64_t   ac;
-	struct vy_run   self;
-	struct vy_run  *branch;
-	uint32_t   branch_count;
-	uint32_t   temperature;
-	uint64_t   temperature_reads;
-	uint16_t   refs;
-	pthread_mutex_t reflock;
-	struct svindex    i0, i1;
-	struct vy_file     file;
-	rb_node(struct vy_range) tree_node;
-	struct ssrqnode   nodecompact;
-	struct ssrqnode   nodebranch;
-	struct rlist     gc;
-	struct rlist     commit;
-};
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
@@ -4535,11 +4604,6 @@ vy_range_size(struct vy_range *n)
 	return size;
 }
 
-struct vy_planner {
-	struct ssrq branch;
-	struct ssrq compact;
-};
-
 enum vy_task_type {
 	VY_TASK_UNKNOWN = 0,
 	VY_TASK_BRANCH,
@@ -4563,8 +4627,6 @@ static int vy_planner_free(struct vy_planner*);
 static int vy_planner_update(struct vy_planner*, struct vy_range*);
 static int vy_planner_update_range(struct vy_planner *p, struct vy_range *n);
 static int vy_planner_remove(struct vy_planner*, struct vy_range*);
-
-typedef rb_tree(struct vy_range) vy_range_tree_t;
 
 struct vy_range_tree_key {
 	char *data;
@@ -4590,65 +4652,6 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range * n, void *arg)
 	vy_range_free(n, env, 0);
 	return NULL;
 }
-
-struct vy_profiler {
-	uint32_t  total_node_count;
-	uint64_t  total_node_size;
-	uint64_t  total_node_origin_size;
-	uint32_t  total_branch_count;
-	uint32_t  total_branch_avg;
-	uint32_t  total_branch_max;
-	uint32_t  total_page_count;
-	uint64_t  total_snapshot_size;
-	uint32_t  temperature_avg;
-	uint32_t  temperature_min;
-	uint32_t  temperature_max;
-	uint64_t  memory_used;
-	uint64_t  count;
-	uint64_t  count_dup;
-	uint64_t  read_disk;
-	uint64_t  read_cache;
-	int       histogram_branch[20];
-	int       histogram_branch_20plus;
-	char      histogram_branch_sz[256];
-	char     *histogram_branch_ptr;
-	struct vinyl_index  *i;
-};
-
-struct vinyl_index {
-	struct vinyl_env *env;
-	struct vy_profiler rtp;
-	struct tx_index coindex;
-	uint64_t tsn_min;
-	uint64_t tsn_max;
-
-	vy_range_tree_t tree;
-	struct vy_status status;
-	pthread_mutex_t lock;
-	int range_count;
-	uint64_t update_time;
-	uint64_t read_disk;
-	uint64_t read_cache;
-	uint64_t size;
-	pthread_mutex_t ref_lock;
-	uint32_t refs;
-	struct vy_buf readbuf;
-	struct vy_index_conf conf;
-	struct key_def *key_def;
-	struct tuple_format *tuple_format;
-	uint32_t key_map_size; /* size of key_map map */
-	uint32_t *key_map; /* field_id -> part_id map */
-	/** Member of env->db or scheduler->shutdown. */
-	struct rlist link;
-
-	/* {{{ Scheduler members */
-	struct rlist gc;
-	struct vy_planner p;
-	bool checkpoint_in_progress;
-	bool age_in_progress;
-	bool gc_in_progress;
-	/* Scheduler members }}} */
-};
 
 static void
 vinyl_index_ref(struct vinyl_index *index);
@@ -9125,12 +9128,11 @@ vy_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	return 0;
 }
 
-int
+void
 vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx)
 {
 	tx_rollback(tx);
 	vy_tx_end(e->stat, tx, 1, 0);
-	return 0;
 }
 
 int
