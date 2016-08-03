@@ -1707,117 +1707,6 @@ vinyl_tuple_unref(struct vinyl_index *index, struct vinyl_tuple *tuple);
 static int
 vinyl_tuple_unref_rt(struct vinyl_env *env, struct vinyl_tuple *v);
 
-struct tx_index;
-struct vinyl_index;
-
-struct txv {
-	/** Transaction start logical time - used by conflict manager. */
-	uint64_t tsn;
-	/** Transaction end logical time - used by conflict manager. */
-	uint64_t csn;
-	struct tx_index *index;
-	struct vinyl_tuple *tuple;
-	struct txv *gc;
-	/** Next tuple in the same index. */
-	struct rlist next_in_index;
-	/** Next in the transaction log. */
-	struct stailq_entry next_in_log;
-	rb_node(struct txv) tree_node;
-	/** True if this transaction was aborted by a conflict. */
-	bool is_aborted;
-};
-
-static inline struct txv *
-txv_new(struct vinyl_tuple *tuple, uint64_t tsn, struct tx_index *index)
-{
-	struct txv *v = malloc(sizeof(struct txv));
-	if (unlikely(v == NULL))
-		return NULL;
-	v->index = index;
-	v->tsn = tsn;
-	v->csn = UINT64_MAX;
-	v->tuple = tuple;
-	vinyl_tuple_ref(tuple);
-	v->gc = NULL;
-	v->is_aborted = false;
-	rlist_create(&v->next_in_index);
-	return v;
-}
-
-static inline void
-txv_delete(struct vinyl_env *env, struct txv *v)
-{
-	rlist_del(&v->next_in_index);
-	vinyl_tuple_unref_rt(env, v->tuple);
-	free(v);
-}
-
-static inline void
-txv_commit(struct txv *v, uint64_t csn)
-{
-	v->csn = csn;
-}
-
-static inline int
-txv_committed(struct txv *v)
-{
-	return v->csn != UINT64_MAX;
-}
-
-static inline void
-txv_abort(struct txv *v)
-{
-	v->is_aborted = true;
-}
-
-static struct txv *
-txv_prev(struct txv *v);
-
-static struct txv *
-txv_next(struct txv *v);
-
-static inline void
-txv_abort_all(struct txv *v)
-{
-	while (v) {
-		txv_abort(v);
-		v = txv_next(v);
-	}
-}
-
-static inline bool
-txv_aborted(struct txv *v)
-{
-	return v->is_aborted;
-}
-
-struct txlogindex {
-	struct rlist log;
-	struct tx_index *index;
-	struct rlist next;
-};
-
-int
-txlogindex_add(struct rlist *logindex, struct txv *v)
-{
-	struct txlogindex *i;
-	rlist_foreach_entry(i, logindex, next) {
-		if (i->index == v->index) {
-			rlist_add_tail(&i->log, &v->next_in_index);
-			return 0;
-		}
-	}
-	i = malloc(sizeof(struct txlogindex));
-	if (i == NULL)
-		return -1;
-	i->index = v->index;
-	rlist_create(&i->log);
-	rlist_create(&i->next);
-	rlist_add_tail(&i->log, &v->next_in_index);
-	rlist_add(logindex, &i->next);
-	return 0;
-}
-
 struct PACKED svmergesrc {
 	struct vy_iter *i;
 	struct vy_iter src;
@@ -2740,123 +2629,6 @@ static struct svif svtuple_if =
 	.size      = svtuple_size
 };
 
-/** Transaction state. */
-enum tx_state {
-	/** Initial state. */
-	VINYL_TX_READY,
-	/**
-	 * A transaction is finished and validated in the engine.
-	 * It may still be rolled back if there is an error
-	 * writing the WAL.
-	 */
-	VINYL_TX_PREPARE,
-	/** A transaction is committed. */
-	VINYL_TX_COMMIT,
-	/** A transaction is aborted or rolled back. */
-	VINYL_TX_ROLLBACK
-};
-
-/** Transaction type. */
-enum tx_type {
-	VINYL_TX_RO,
-	VINYL_TX_RW
-};
-
-typedef rb_tree(struct txv) txv_tree_t;
-
-struct txv_tree_key {
-	char *data;
-	int size;
-	uint64_t tsn;
-};
-
-static int
-txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b);
-
-static int
-txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b);
-
-rb_gen_ext_key(, txv_tree_, txv_tree_t, struct txv, tree_node, txv_tree_cmp,
-		 struct txv_tree_key *, txv_tree_key_cmp);
-
-static struct txv *
-txv_tree_search_key(txv_tree_t *rbtree, char *data, int size, uint64_t tsn)
-{
-	struct txv_tree_key key;
-	key.data = data;
-	key.size = size;
-	key.tsn = tsn;
-	return txv_tree_search(rbtree, &key);
-}
-
-/**
- * Transaction operation index. Contains all changes
- * made by this transaction before it commits. Is used
- * to implement read committed isolation level, i.e.
- * the changes made by a transaction are only present
- * in its tx_index, and thus not seen by other transactions.
- */
-struct tx_index {
-	txv_tree_t tree;
-	struct vinyl_index *index;
-	struct key_def *key_def;
-};
-
-static int
-txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b)
-{
-	struct key_def *key_def =
-		container_of(rbtree, struct tx_index, tree)->key_def;
-	int rc = vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
-	/**
-	 * While in svindex older value are "bigger" than newer
-	 * ones, i.e. the newest value comes first, in
-	 * transactional index (tx_index), we want to look
-	 * at data in chronological order.
-	 * @sa tree_svindex_compare
-	 */
-	if (rc == 0)
-		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
-	return rc;
-}
-
-static int
-txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b)
-{
-	struct key_def *key_def =
-		container_of(rbtree, struct tx_index, tree)->key_def;
-	int rc = vy_tuple_compare(a->data, b->tuple->data, key_def);
-	if (rc == 0)
-		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
-	return rc;
-}
-
-static struct txv *
-txv_prev(struct txv *v)
-{
-	txv_tree_t *tree = &v->index->tree;
-	struct key_def *key_def;
-	key_def = container_of(tree, struct tx_index, tree)->key_def;
-	struct txv *prev = txv_tree_prev(tree, v);
-	if (prev && vy_tuple_compare(v->tuple->data,
-				     prev->tuple->data, key_def) == 0)
-		return prev;
-	return NULL;
-}
-
-static struct txv *
-txv_next(struct txv *v)
-{
-	txv_tree_t *tree = &v->index->tree;
-	struct key_def *key_def;
-	key_def = container_of(tree, struct tx_index, tree)->key_def;
-	struct txv *next = txv_tree_next(tree, v);
-	if (next && vy_tuple_compare(v->tuple->data,
-				     next->tuple->data, key_def) == 0)
-		return next;
-	return NULL;
-}
-
 struct sicache;
 
 struct PACKED sdid {
@@ -2986,11 +2758,40 @@ struct vy_planner {
 	struct ssrq compact;
 };
 
+
+struct txv {
+	/** Transaction start logical time - used by conflict manager. */
+	uint64_t tsn;
+	/** Transaction end logical time - used by conflict manager. */
+	uint64_t csn;
+	struct vinyl_index *index;
+	struct vinyl_tuple *tuple;
+	struct txv *gc;
+	/** Next tuple in the same index. */
+	struct rlist next_in_index;
+	/** Next in the transaction log. */
+	struct stailq_entry next_in_log;
+	rb_node(struct txv) tree_node;
+	/** True if this transaction was aborted by a conflict. */
+	bool is_aborted;
+};
+
+typedef rb_tree(struct txv) txv_tree_t;
+
 struct vinyl_index {
 	struct vinyl_env *env;
 	struct vy_profiler rtp;
-	struct tx_index coindex;
+	/**
+	 * Conflict manager index. Contains all changes
+	 * made by transaction before they commit. Is used
+	 * to implement read committed isolation level, i.e.
+	 * the changes made by a transaction are only present
+	 * in this tree, and thus not seen by other transactions.
+	 */
+	txv_tree_t coindex;
+	/** Transaction logical time of index creation */
 	uint64_t tsn_min;
+	/** Transaction logical time of index deletion. */
 	uint64_t tsn_max;
 
 	vy_range_tree_t tree;
@@ -3020,6 +2821,203 @@ struct vinyl_index {
 	bool gc_in_progress;
 	/* Scheduler members }}} */
 };
+
+
+/** Transaction state. */
+enum tx_state {
+	/** Initial state. */
+	VINYL_TX_READY,
+	/**
+	 * A transaction is finished and validated in the engine.
+	 * It may still be rolled back if there is an error
+	 * writing the WAL.
+	 */
+	VINYL_TX_PREPARE,
+	/** A transaction is committed. */
+	VINYL_TX_COMMIT,
+	/** A transaction is aborted or rolled back. */
+	VINYL_TX_ROLLBACK
+};
+
+/** Transaction type. */
+enum tx_type {
+	VINYL_TX_RO,
+	VINYL_TX_RW
+};
+
+
+struct txv_tree_key {
+	char *data;
+	int size;
+	uint64_t tsn;
+};
+
+struct vinyl_index;
+
+static inline struct txv *
+txv_new(struct vinyl_index *index, struct vinyl_tuple *tuple, uint64_t tsn)
+{
+	struct txv *v = malloc(sizeof(struct txv));
+	if (unlikely(v == NULL))
+		return NULL;
+	v->index = index;
+	v->tsn = tsn;
+	v->csn = UINT64_MAX;
+	v->tuple = tuple;
+	vinyl_tuple_ref(tuple);
+	v->gc = NULL;
+	v->is_aborted = false;
+	rlist_create(&v->next_in_index);
+	return v;
+}
+
+static inline void
+txv_delete(struct vinyl_env *env, struct txv *v)
+{
+	rlist_del(&v->next_in_index);
+	vinyl_tuple_unref_rt(env, v->tuple);
+	free(v);
+}
+
+static inline void
+txv_commit(struct txv *v, uint64_t csn)
+{
+	v->csn = csn;
+}
+
+static inline int
+txv_committed(struct txv *v)
+{
+	return v->csn != UINT64_MAX;
+}
+
+static inline void
+txv_abort(struct txv *v)
+{
+	v->is_aborted = true;
+}
+
+static struct txv *
+txv_prev(struct txv *v);
+
+static struct txv *
+txv_next(struct txv *v);
+
+static inline void
+txv_abort_all(struct txv *v)
+{
+	while (v) {
+		txv_abort(v);
+		v = txv_next(v);
+	}
+}
+
+static inline bool
+txv_aborted(struct txv *v)
+{
+	return v->is_aborted;
+}
+
+struct txlogindex {
+	struct rlist log;
+	struct vinyl_index *index;
+	struct rlist next;
+};
+
+int
+txlogindex_add(struct rlist *logindex, struct txv *v)
+{
+	struct txlogindex *i;
+	rlist_foreach_entry(i, logindex, next) {
+		if (i->index == v->index) {
+			rlist_add_tail(&i->log, &v->next_in_index);
+			return 0;
+		}
+	}
+	i = malloc(sizeof(struct txlogindex));
+	if (i == NULL)
+		return -1;
+	i->index = v->index;
+	rlist_create(&i->log);
+	rlist_create(&i->next);
+	rlist_add_tail(&i->log, &v->next_in_index);
+	rlist_add(logindex, &i->next);
+	return 0;
+}
+
+static int
+txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b);
+
+static int
+txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b);
+
+rb_gen_ext_key(, txv_tree_, txv_tree_t, struct txv, tree_node, txv_tree_cmp,
+		 struct txv_tree_key *, txv_tree_key_cmp);
+
+static struct txv *
+txv_tree_search_key(txv_tree_t *rbtree, char *data, int size, uint64_t tsn)
+{
+	struct txv_tree_key key;
+	key.data = data;
+	key.size = size;
+	key.tsn = tsn;
+	return txv_tree_search(rbtree, &key);
+}
+
+static int
+txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b)
+{
+	struct key_def *key_def =
+		container_of(rbtree, struct vinyl_index, coindex)->key_def;
+	int rc = vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
+	/**
+	 * While in svindex older value are "bigger" than newer
+	 * ones, i.e. the newest value comes first, in
+	 * transactional index (coindex), we want to look
+	 * at data in chronological order.
+	 * @sa tree_svindex_compare
+	 */
+	if (rc == 0)
+		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
+	return rc;
+}
+
+static int
+txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b)
+{
+	struct key_def *key_def =
+		container_of(rbtree, struct vinyl_index, coindex)->key_def;
+	int rc = vy_tuple_compare(a->data, b->tuple->data, key_def);
+	if (rc == 0)
+		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
+	return rc;
+}
+
+static struct txv *
+txv_prev(struct txv *v)
+{
+	txv_tree_t *tree = &v->index->coindex;
+	struct key_def *key_def;
+	key_def = container_of(tree, struct vinyl_index, coindex)->key_def;
+	struct txv *prev = txv_tree_prev(tree, v);
+	if (prev && vy_tuple_compare(v->tuple->data,
+				     prev->tuple->data, key_def) == 0)
+		return prev;
+	return NULL;
+}
+
+static struct txv *
+txv_next(struct txv *v)
+{
+	txv_tree_t *tree = &v->index->coindex;
+	struct key_def *key_def;
+	key_def = container_of(tree, struct vinyl_index, coindex)->key_def;
+	struct txv *next = txv_tree_next(tree, v);
+	if (next && vy_tuple_compare(v->tuple->data,
+				     next->tuple->data, key_def) == 0)
+		return next;
+	return NULL;
+}
 
 
 struct vinyl_tx {
@@ -3093,13 +3091,6 @@ tx_manager_new(struct vinyl_env*);
 static int
 tx_manager_delete(struct tx_manager*);
 
-static int
-tx_index_init(struct tx_index *, struct vinyl_index *,
-
-			 struct key_def *key_def);
-static int
-tx_index_free(struct tx_index*, struct tx_manager*);
-
 static void
 tx_begin(struct tx_manager*, struct vinyl_tx*, enum tx_type);
 
@@ -3110,10 +3101,11 @@ static enum tx_state
 tx_rollback(struct vinyl_tx*);
 
 static int
-tx_set(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*);
+tx_set(struct vinyl_tx*, struct vinyl_index *, struct vinyl_tuple*);
 
 static int
-tx_get(struct vinyl_tx*, struct tx_index*, struct vinyl_tuple*, struct vinyl_tuple**);
+tx_get(struct vinyl_tx*, struct vinyl_index *, struct vinyl_tuple*,
+       struct vinyl_tuple**);
 
 static struct tx_manager *
 tx_manager_new(struct vinyl_env *env)
@@ -3140,29 +3132,12 @@ tx_manager_delete(struct tx_manager *m)
 	return 0;
 }
 
-static int
-tx_index_init(struct tx_index *i, struct vinyl_index *index,
-	      struct key_def *key_def)
-{
-	txv_tree_new(&i->tree);
-	i->index = index;
-	i->key_def = key_def;
-	return 0;
-}
-
 static struct txv *
 txv_tree_delete_cb(txv_tree_t *t, struct txv *v, void *arg)
 {
 	(void) t;
 	txv_delete(arg, v);
 	return NULL;
-}
-
-static int
-tx_index_free(struct tx_index *i, struct tx_manager *m)
-{
-	txv_tree_iter(&i->tree, NULL, txv_tree_delete_cb, m->env);
-	return 0;
 }
 
 static uint64_t
@@ -3211,8 +3186,8 @@ tx_begin(struct tx_manager *m, struct vinyl_tx *tx, enum tx_type type)
 static inline void
 txv_untrack(struct txv *v)
 {
-	struct tx_index *i = v->index;
-	txv_tree_remove(&i->tree, v);
+	txv_tree_t *tree = &v->index->coindex;
+	txv_tree_remove(tree, v);
 }
 
 static inline uint64_t
@@ -3339,13 +3314,13 @@ tx_prepare(struct vinyl_tx *tx)
 }
 
 static int
-tx_set(struct vinyl_tx *tx, struct tx_index *index,
+tx_set(struct vinyl_tx *tx, struct vinyl_index *index,
        struct vinyl_tuple *tuple)
 {
 	struct tx_manager *m = tx->manager;
 	struct vinyl_env *env = m->env;
 	/* Update concurrent index */
-	struct txv *own = txv_tree_search_key(&index->tree, tuple->data,
+	struct txv *own = txv_tree_search_key(&index->coindex, tuple->data,
 					      tuple->size, tx->tsn);
 	/* Found a match of the previous action of this transaction */
 	if (own != NULL) {
@@ -3366,7 +3341,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		}
 	} else {
 		/* Allocate a MVCC container. */
-		struct txv *v = txv_new(tuple, tx->tsn, index);
+		struct txv *v = txv_new(index, tuple, tx->tsn);
 		if (v->tuple->flags & SVGET) {
 			/*
 			 * Track the start of the latest read
@@ -3382,7 +3357,7 @@ tx_set(struct vinyl_tx *tx, struct tx_index *index,
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
-		txv_tree_insert(&index->tree, v);
+		txv_tree_insert(&index->coindex, v);
 	}
 	return 0;
 error:
@@ -3390,10 +3365,10 @@ error:
 }
 
 static int
-tx_get(struct vinyl_tx *tx, struct tx_index *index, struct vinyl_tuple *key,
-       struct vinyl_tuple **result)
+tx_get(struct vinyl_tx *tx, struct vinyl_index *index,
+       struct vinyl_tuple *key, struct vinyl_tuple **result)
 {
-	struct txv *v = txv_tree_search_key(&index->tree,
+	struct txv *v = txv_tree_search_key(&index->coindex,
 					    key->data, key->size, tx->tsn);
 	if (v == NULL)
 		goto add;
@@ -7353,7 +7328,7 @@ static void
 si_write(struct txlogindex *li, uint64_t time,
 	 enum vinyl_status status, uint64_t lsn)
 {
-	struct vinyl_index *index = li->index->index;
+	struct vinyl_index *index = li->index;
 	struct vinyl_env *env = index->env;
 	struct rlist rangelist;
 	size_t quota = 0;
@@ -8313,7 +8288,7 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 
 	/* concurrent */
 	if (tx != NULL && order == VINYL_EQ) {
-		int rc = tx_get(tx, &index->coindex, key, &vup);
+		int rc = tx_get(tx, index, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
 		if (rc == 2) { /* delete */
@@ -8478,7 +8453,7 @@ vinyl_index_new(struct vinyl_env *e, struct key_def *key_def,
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs = 0; /* referenced by scheduler */
 	vy_status_set(&index->status, VINYL_OFFLINE);
-	tx_index_init(&index->coindex, index, index->key_def);
+	txv_tree_new(&index->coindex);
 	index->tsn_min = tx_manager_min(e->xm);
 	index->tsn_max = UINT64_MAX;
 	rlist_add(&e->indexes, &index->link);
@@ -8501,7 +8476,7 @@ static inline int
 vinyl_index_delete(struct vinyl_index *index)
 {
 	struct vinyl_env *e = index->env;
-	tx_index_free(&index->coindex, e->xm);
+	txv_tree_iter(&index->coindex, NULL, txv_tree_delete_cb, e);
 	int rc_ret = 0;
 	int rc = 0;
 	struct vy_range *node, *n;
@@ -9028,7 +9003,7 @@ vy_tx_write(struct vinyl_tx *tx, struct vinyl_index *index,
 	tx->readonly_tail = NULL;
 
 	/* concurrent index only */
-	return tx_set(tx, &index->coindex, o);
+	return tx_set(tx, index, o);
 }
 
 static inline void
