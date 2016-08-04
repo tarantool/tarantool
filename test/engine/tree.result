@@ -2923,6 +2923,65 @@ space = nil
 pk = nil
 ---
 ...
+-- Create and drop several indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+pk = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'str'} })
+---
+...
+index3 = space:create_index('third', { parts = {3, 'str'}, unique = false })
+---
+...
+index2:drop()
+---
+...
+#box.space._index:select{space.id}
+---
+- 2
+...
+index4 = space:create_index('fourth', { parts = {2, 'str', 3, 'str'} })
+---
+...
+index2 = space:create_index('secondary', { parts = {4, 'str'} })
+---
+...
+#box.space._index:select{space.id}
+---
+- 4
+...
+index3:drop()
+---
+...
+index2:drop()
+---
+...
+index4:drop()
+---
+...
+#box.space._index:select{space.id}
+---
+- 1
+...
+index2 = space:create_index('secondary', { parts = {2, 'str'} })
+---
+...
+index3 = space:create_index('third', { parts = {3, 'str'}, unique = false })
+---
+...
+index4 = space:create_index('fourth', { parts = {2, 'str', 3, 'str'} })
+---
+...
+#box.space._index:select{space.id}
+---
+- 4
+...
+space:drop()
+---
+...
 -------------------------------------------------------------------------------
 -- Cleanup
 -------------------------------------------------------------------------------

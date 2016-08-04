@@ -59,6 +59,8 @@ public:
 
 	virtual size_t bsize() const override;
 
+	virtual void open() override;
+
 	virtual struct tuple *min(const char *key,
 					uint32_t part_count) const override;
 
