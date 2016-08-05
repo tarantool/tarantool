@@ -5,8 +5,8 @@
 static void
 uuid_test(struct tt_uuid a, struct tt_uuid b, int expected_result)
 {
-        char a_str[UUID_STR_LEN];
-        char b_str[UUID_STR_LEN];
+        char a_str[UUID_STR_LEN + 1];
+        char b_str[UUID_STR_LEN + 1];
 
         tt_uuid_to_string(&a, a_str);
         tt_uuid_to_string(&b, b_str);
