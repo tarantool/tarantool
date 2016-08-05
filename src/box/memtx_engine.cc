@@ -982,7 +982,7 @@ MemtxEngine::begin(struct txn *txn)
 }
 
 void
-MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
+MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 {
 	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
 		return;
@@ -1015,7 +1015,7 @@ MemtxEngine::rollback(struct txn *txn)
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
-		rollbackStatement(stmt);
+		rollbackStatement(txn, stmt);
 }
 
 void

@@ -9131,10 +9131,18 @@ vy_savepoint(struct vy_tx *tx)
 void
 vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 {
-	struct txv *v = svp;
-	if (v) {
-		v = stailq_next_entry(v, next_in_log);
-		return tx_rollback_svp(tx, v);
+	struct stailq_entry *last = svp;
+	if (last == NULL) {
+		last = stailq_first(&tx->log);
+	} else {
+		last = stailq_next(last);
+	}
+	if (last) {
+		struct txv *v = NULL;
+		if (last != NULL) {
+			v = stailq_entry(last, struct txv, next_in_log);
+			tx_rollback_svp(tx, v);
+		}
 	}
 }
 

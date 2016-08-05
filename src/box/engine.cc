@@ -55,6 +55,9 @@ void Engine::init()
 void Engine::begin(struct txn *)
 {}
 
+void Engine::beginStatement(struct txn *)
+{}
+
 void Engine::prepare(struct txn *)
 {}
 
@@ -64,7 +67,7 @@ void Engine::commit(struct txn *, int64_t)
 void Engine::rollback(struct txn *)
 {}
 
-void Engine::rollbackStatement(struct txn_stmt *)
+void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
 {}
 
 void Engine::initSystemSpace(struct space * /* space */)

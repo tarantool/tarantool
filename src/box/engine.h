@@ -103,6 +103,10 @@ public:
 	 */
 	virtual void begin(struct txn *);
 	/**
+	 * Begine one statement in existing transaction.
+	 */
+	virtual void beginStatement(struct txn *);
+	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
 	 */
@@ -118,7 +122,7 @@ public:
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.
 	 */
-	virtual void rollbackStatement(struct txn_stmt *);
+	virtual void rollbackStatement(struct txn *, struct txn_stmt *);
 	/*
 	 * Roll back and end the transaction in the engine.
 	 */

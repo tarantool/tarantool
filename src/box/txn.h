@@ -56,6 +56,8 @@ struct txn_stmt {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
+	/** Engine savepoint for the start of this statement. */
+	void *engine_savepoint;
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 };
@@ -149,7 +151,7 @@ struct txn *
 txn_begin_stmt(struct space *space);
 
 void
-txn_begin_in_engine(struct txn *txn, struct space *space);
+txn_begin_in_engine(Engine *engine, struct txn *txn);
 
 /**
  * This is an optimization, which exists to speed up selects
@@ -162,8 +164,10 @@ static inline struct txn *
 txn_begin_ro_stmt(struct space *space)
 {
 	struct txn *txn = in_txn();
-	if (txn)
-		txn_begin_in_engine(txn, space);
+	if (txn) {
+		Engine *engine = space->handler->engine;
+		txn_begin_in_engine(engine, txn);
+	}
 	return txn;
 }
 

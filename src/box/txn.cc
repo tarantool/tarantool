@@ -79,6 +79,7 @@ txn_stmt_new(struct txn *txn)
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 
 	stailq_add_tail_entry(&txn->stmts, stmt, next);
@@ -106,9 +107,8 @@ txn_begin(bool is_autocommit)
 }
 
 void
-txn_begin_in_engine(struct txn *txn, struct space *space)
+txn_begin_in_engine(Engine *engine, struct txn *txn)
 {
-	Engine *engine = space->handler->engine;
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
@@ -128,11 +128,12 @@ txn_begin_stmt(struct space *space)
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
-
-	txn_begin_in_engine(txn, space);
-
+	Engine *engine = space->handler->engine;
+	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;
+
+	engine->beginStatement(txn);
 	return txn;
 }
 
@@ -167,9 +168,9 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-
 		trigger_run(&stmt->space->on_replace, txn);
 	}
+	stmt->engine_savepoint = NULL;
 	txn->in_stmt = false;
 	if (txn->is_autocommit)
 		txn_commit(txn);
@@ -275,7 +276,7 @@ txn_rollback_stmt()
 		return;
 	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
 						  next);
-	txn->engine->rollbackStatement(stmt);
+	txn->engine->rollbackStatement(txn, stmt);
 	if (stmt->row != NULL) {
 		stmt->row = NULL;
 		--txn->n_rows;

@@ -55,7 +55,8 @@ struct MemtxEngine: public Engine {
 	virtual bool needToBuildSecondaryKey(struct space *space) override;
 	virtual void keydefCheck(struct space *space, struct key_def *key_def) override;
 	virtual void begin(struct txn *txn) override;
-	virtual void rollbackStatement(struct txn_stmt *stmt) override;
+	virtual void rollbackStatement(struct txn *,
+				       struct txn_stmt *stmt) override;
 	virtual void rollback(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;
 	virtual void commit(struct txn *txn, int64_t signature) override;

@@ -227,6 +227,15 @@ VinylEngine::begin(struct txn *txn)
 }
 
 void
+VinylEngine::beginStatement(struct txn *txn)
+{
+	assert(txn != NULL);
+	struct vy_tx *tx = (struct vy_tx *)(txn->engine_tx);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	stmt->engine_savepoint = vy_savepoint(tx);
+}
+
+void
 VinylEngine::prepare(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
@@ -266,6 +275,14 @@ VinylEngine::rollback(struct txn *txn)
 	vy_rollback(env, tx);
 	txn->engine_tx = NULL;
 }
+
+void
+VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
+{
+	vy_rollback_to_savepoint((struct vy_tx *)txn->engine_tx,
+				 stmt->engine_savepoint);
+}
+
 
 int
 VinylEngine::beginCheckpoint()
