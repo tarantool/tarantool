@@ -8218,9 +8218,9 @@ vy_index_drop(struct vy_index *index)
 
 int
 vy_index_read(struct vy_index *index, struct vy_tuple *key,
-		 enum vy_order order,
-		 struct vy_tuple **result, struct vy_tx *tx,
-		 struct sicache *cache, bool cache_only)
+	      enum vy_order order,
+	      struct vy_tuple **result, struct vy_tx *tx,
+	      struct sicache *cache, bool cache_only)
 {
 	struct vy_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
@@ -9028,21 +9028,6 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 	return rc;
 }
 
-static inline int
-vy_get(struct vy_tx *tx, struct vy_index *index, struct vy_tuple *key,
-	 struct vy_tuple **result, bool cache_only)
-{
-	if (vy_index_read(index, key, VINYL_EQ, result, tx, NULL,
-			    cache_only) != 0) {
-		return -1;
-	}
-
-	if (*result == NULL)
-		return 0;
-
-	return 0;
-}
-
 void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
@@ -9170,7 +9155,9 @@ static ssize_t
 vy_get_cb(struct coio_task *ptr)
 {
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	return vy_get(task->tx, task->index, task->key, &task->result, false);
+	return vy_index_read(task->index, task->key, VINYL_EQ,
+			     &task->result, task->tx, NULL,
+			     false);
 }
 
 static ssize_t
@@ -9242,7 +9229,8 @@ vy_coget(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return -1;
 
 	struct vy_tuple *vyresult = NULL;
-	int rc = vy_get(tx, index, vykey, &vyresult, true);
+	int rc = vy_index_read(index, vykey, VINYL_EQ, &vyresult,
+			       tx, NULL, true);
 	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
 		rc = vy_read_task(index, tx, NULL, vykey, &vyresult, vy_get_cb);
 	}
