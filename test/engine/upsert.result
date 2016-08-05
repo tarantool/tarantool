@@ -1669,7 +1669,7 @@ space:select{}
 ...
 space:upsert({2, 2}, {{'+', 2, 1}})
 ---
-- error: Tuple field count 2 does not match format field count 1
+- error: Tuple field count 2 does not match space field count 1
 ...
 -- TODO: https://github.com/tarantool/tarantool/issues/1622
 -- space:upsert({1}, {{'=', 2, 10}})
@@ -1696,7 +1696,7 @@ space:select{}
 ...
 space:upsert({2, 2, 2}, {{'+', 3, 1}})
 ---
-- error: Tuple field count 3 does not match format field count 2
+- error: Tuple field count 3 does not match space field count 2
 ...
 space:upsert({3, 3}, {{'+', 2, 1}})
 ---

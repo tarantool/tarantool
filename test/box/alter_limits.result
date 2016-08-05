@@ -248,7 +248,7 @@ index = s:create_index('primary')
 -- field_count actually works
 s:insert{1}
 ---
-- error: Tuple field count 1 does not match format field count 2
+- error: Tuple field count 1 does not match space field count 2
 ...
 s:insert{1, 2}
 ---
@@ -256,7 +256,7 @@ s:insert{1, 2}
 ...
 s:insert{1, 2, 3}
 ---
-- error: Tuple field count 3 does not match format field count 2
+- error: Tuple field count 3 does not match space field count 2
 ...
 s:select{}
 ---
@@ -313,7 +313,7 @@ s:select{}
 -- field_count actually works
 s:insert{3, 4}
 ---
-- error: Tuple field count 2 does not match format field count 3
+- error: Tuple field count 2 does not match space field count 3
 ...
 s:insert{3, 4, 5}
 ---
@@ -321,7 +321,7 @@ s:insert{3, 4, 5}
 ...
 s:insert{3, 4, 5, 6}
 ---
-- error: Tuple field count 4 does not match format field count 3
+- error: Tuple field count 4 does not match space field count 3
 ...
 s:insert{7, 8, 9}
 ---
