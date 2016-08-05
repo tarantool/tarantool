@@ -2751,6 +2751,10 @@ struct vy_planner {
 };
 
 
+/**
+ * A single operation made by a transaction:
+ * a single read or write in a vy_index.
+ */
 struct txv {
 	/** Transaction start logical time - used by conflict manager. */
 	uint64_t tsn;
@@ -2763,12 +2767,12 @@ struct txv {
 	struct rlist next_in_index;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
-	rb_node(struct txv) tree_node;
+	rb_node(struct txv) in_txvindex;
 	/** True if this transaction was aborted by a conflict. */
 	bool is_aborted;
 };
 
-typedef rb_tree(struct txv) txv_tree_t;
+typedef rb_tree(struct txv) txvindex_t;
 
 struct vy_index {
 	struct vy_env *env;
@@ -2780,7 +2784,7 @@ struct vy_index {
 	 * the changes made by a transaction are only present
 	 * in this tree, and thus not seen by other transactions.
 	 */
-	txv_tree_t coindex;
+	txvindex_t txvindex;
 	/** Transaction logical time of index creation */
 	uint64_t tsn_min;
 	/** Transaction logical time of index deletion. */
@@ -2838,7 +2842,7 @@ enum tx_type {
 };
 
 
-struct txv_tree_key {
+struct txvindex_key {
 	char *data;
 	int size;
 	uint64_t tsn;
@@ -2936,34 +2940,34 @@ txlogindex_add(struct rlist *logindex, struct txv *v)
 }
 
 static int
-txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b);
+txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b);
 
 static int
-txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b);
+txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b);
 
-rb_gen_ext_key(, txv_tree_, txv_tree_t, struct txv, tree_node, txv_tree_cmp,
-		 struct txv_tree_key *, txv_tree_key_cmp);
+rb_gen_ext_key(, txvindex_, txvindex_t, struct txv, in_txvindex, txvindex_cmp,
+		 struct txvindex_key *, txvindex_key_cmp);
 
 static struct txv *
-txv_tree_search_key(txv_tree_t *rbtree, char *data, int size, uint64_t tsn)
+txvindex_search_key(txvindex_t *rbtree, char *data, int size, uint64_t tsn)
 {
-	struct txv_tree_key key;
+	struct txvindex_key key;
 	key.data = data;
 	key.size = size;
 	key.tsn = tsn;
-	return txv_tree_search(rbtree, &key);
+	return txvindex_search(rbtree, &key);
 }
 
 static int
-txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b)
+txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, coindex)->key_def;
+		container_of(rbtree, struct vy_index, txvindex)->key_def;
 	int rc = vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
 	/**
 	 * While in svindex older value are "bigger" than newer
 	 * ones, i.e. the newest value comes first, in
-	 * transactional index (coindex), we want to look
+	 * transactional index (txvindex), we want to look
 	 * at data in chronological order.
 	 * @sa tree_svindex_compare
 	 */
@@ -2973,10 +2977,10 @@ txv_tree_cmp(txv_tree_t *rbtree, struct txv *a, struct txv *b)
 }
 
 static int
-txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b)
+txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, coindex)->key_def;
+		container_of(rbtree, struct vy_index, txvindex)->key_def;
 	int rc = vy_tuple_compare(a->data, b->tuple->data, key_def);
 	if (rc == 0)
 		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
@@ -2986,10 +2990,10 @@ txv_tree_key_cmp(txv_tree_t *rbtree, struct txv_tree_key *a, struct txv *b)
 static struct txv *
 txv_prev(struct txv *v)
 {
-	txv_tree_t *tree = &v->index->coindex;
+	txvindex_t *tree = &v->index->txvindex;
 	struct key_def *key_def;
-	key_def = container_of(tree, struct vy_index, coindex)->key_def;
-	struct txv *prev = txv_tree_prev(tree, v);
+	key_def = container_of(tree, struct vy_index, txvindex)->key_def;
+	struct txv *prev = txvindex_prev(tree, v);
 	if (prev && vy_tuple_compare(v->tuple->data,
 				     prev->tuple->data, key_def) == 0)
 		return prev;
@@ -2999,10 +3003,10 @@ txv_prev(struct txv *v)
 static struct txv *
 txv_next(struct txv *v)
 {
-	txv_tree_t *tree = &v->index->coindex;
+	txvindex_t *tree = &v->index->txvindex;
 	struct key_def *key_def;
-	key_def = container_of(tree, struct vy_index, coindex)->key_def;
-	struct txv *next = txv_tree_next(tree, v);
+	key_def = container_of(tree, struct vy_index, txvindex)->key_def;
+	struct txv *next = txvindex_next(tree, v);
 	if (next && vy_tuple_compare(v->tuple->data,
 				     next->tuple->data, key_def) == 0)
 		return next;
@@ -3123,7 +3127,7 @@ tx_manager_delete(struct tx_manager *m)
 }
 
 static struct txv *
-txv_tree_delete_cb(txv_tree_t *t, struct txv *v, void *arg)
+txvindex_delete_cb(txvindex_t *t, struct txv *v, void *arg)
 {
 	(void) t;
 	txv_delete(arg, v);
@@ -3176,8 +3180,8 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 static inline void
 txv_untrack(struct txv *v)
 {
-	txv_tree_t *tree = &v->index->coindex;
-	txv_tree_remove(tree, v);
+	txvindex_t *tree = &v->index->txvindex;
+	txvindex_remove(tree, v);
 }
 
 static inline uint64_t
@@ -3310,7 +3314,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 	struct tx_manager *m = tx->manager;
 	struct vy_env *env = m->env;
 	/* Update concurrent index */
-	struct txv *own = txv_tree_search_key(&index->coindex, tuple->data,
+	struct txv *own = txvindex_search_key(&index->txvindex, tuple->data,
 					      tuple->size, tx->tsn);
 	/* Found a match of the previous action of this transaction */
 	if (own != NULL) {
@@ -3349,7 +3353,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add version */
-		txv_tree_insert(&index->coindex, v);
+		txvindex_insert(&index->txvindex, v);
 	}
 	return 0;
 error:
@@ -3360,7 +3364,7 @@ static int
 tx_get(struct vy_tx *tx, struct vy_index *index,
        struct vy_tuple *key, struct vy_tuple **result)
 {
-	struct txv *v = txv_tree_search_key(&index->coindex,
+	struct txv *v = txvindex_search_key(&index->txvindex,
 					    key->data, key->size, tx->tsn);
 	if (v == NULL)
 		goto add;
@@ -8362,7 +8366,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs = 0; /* referenced by scheduler */
 	vy_status_set(&index->status, VINYL_OFFLINE);
-	txv_tree_new(&index->coindex);
+	txvindex_new(&index->txvindex);
 	index->tsn_min = tx_manager_min(e->xm);
 	index->tsn_max = UINT64_MAX;
 	rlist_add(&e->indexes, &index->link);
@@ -8385,7 +8389,7 @@ static inline int
 vy_index_delete(struct vy_index *index)
 {
 	struct vy_env *e = index->env;
-	txv_tree_iter(&index->coindex, NULL, txv_tree_delete_cb, e);
+	txvindex_iter(&index->txvindex, NULL, txvindex_delete_cb, e);
 	int rc_ret = 0;
 	int rc = 0;
 	struct vy_range *node, *n;
