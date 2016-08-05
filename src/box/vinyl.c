@@ -1454,8 +1454,6 @@ struct vy_stat {
 	/* cursor */
 	uint64_t cursor;
 	struct vy_avg    cursor_latency;
-	struct vy_avg    cursor_read_disk;
-	struct vy_avg    cursor_read_cache;
 	struct vy_avg    cursor_ops;
 };
 
@@ -1490,8 +1488,6 @@ vy_stat_prepare(struct vy_stat *s)
 	vy_avg_prepare(&s->tx_latency);
 	vy_avg_prepare(&s->tx_stmts);
 	vy_avg_prepare(&s->cursor_latency);
-	vy_avg_prepare(&s->cursor_read_disk);
-	vy_avg_prepare(&s->cursor_read_cache);
 	vy_avg_prepare(&s->cursor_ops);
 }
 
@@ -1527,13 +1523,11 @@ vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
 }
 
 static inline void
-vy_stat_cursor(struct vy_stat *s, uint64_t start, int read_disk, int read_cache, int ops)
+vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 {
 	uint64_t diff = clock_monotonic64() - start;
 	tt_pthread_mutex_lock(&s->lock);
 	s->cursor++;
-	vy_avg_update(&s->cursor_read_disk, read_disk);
-	vy_avg_update(&s->cursor_read_cache, read_cache);
 	vy_avg_update(&s->cursor_latency, diff);
 	vy_avg_update(&s->cursor_ops, ops);
 	tt_pthread_mutex_unlock(&s->lock);
@@ -7754,7 +7748,7 @@ sr_zoneof(struct vinyl_env *env)
 int
 vinyl_index_read(struct vinyl_index*, struct vinyl_tuple*, enum vinyl_order order,
 		struct vinyl_tuple **, struct vinyl_tx*, struct sicache*,
-		bool cache_only, struct vy_stat_get *);
+		bool cache_only);
 static int vinyl_index_visible(struct vinyl_index*, uint64_t);
 static int vinyl_index_recoverbegin(struct vinyl_index*);
 static int vinyl_index_recoverend(struct vinyl_index*);
@@ -7925,8 +7919,6 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "upsert_latency", stat->upsert_latency.sz);
 	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
 	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
-	vy_info_append_str(node, "cursor_read_disk", stat->cursor_read_disk.sz);
-	vy_info_append_str(node, "cursor_read_cache", stat->cursor_read_cache.sz);
 	tt_pthread_mutex_unlock(&stat->lock);
 	return 0;
 }
@@ -8023,8 +8015,6 @@ struct vinyl_cursor {
 	enum vinyl_order order;
 	struct vinyl_tx tx;
 	int ops;
-	int read_disk;
-	int read_cache;
 	struct sicache *cache;
 };
 
@@ -8041,8 +8031,6 @@ vinyl_cursor_new(struct vinyl_index *index, const char *key,
 	vinyl_index_ref(index);
 	c->index = index;
 	c->ops = 0;
-	c->read_disk = 0;
-	c->read_cache = 0;
 	c->key = vinyl_tuple_from_key_data(index, key, part_count);
 	if (c->key == NULL)
 		goto error_1;
@@ -8072,10 +8060,7 @@ vinyl_cursor_delete(struct vinyl_cursor *c)
 	if (c->key)
 		vinyl_tuple_unref(c->index, c->key);
 	vinyl_index_unref(c->index);
-	vy_stat_cursor(e->stat, c->tx.start,
-	              c->read_disk,
-	              c->read_cache,
-	              c->ops);
+	vy_stat_cursor(e->stat, c->tx.start, c->ops);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
 }
@@ -8087,10 +8072,9 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 	struct vinyl_index *index = c->index;
 	struct vinyl_tx *tx = &c->tx;
 
-	struct vy_stat_get statget;
 	assert(c->key != NULL);
 	if (vinyl_index_read(index, c->key, c->order, result, tx, c->cache,
-			    cache_only, &statget) != 0) {
+			    cache_only) != 0) {
 		return -1;
 	}
 
@@ -8107,9 +8091,6 @@ vinyl_cursor_next(struct vinyl_cursor *c, struct vinyl_tuple **result,
 		c->order = VINYL_GT;
 	else if (c->order == VINYL_LE)
 		c->order = VINYL_LT;
-
-	c->read_disk += statget.read_disk;
-	c->read_cache += statget.read_cache;
 
 	vinyl_tuple_unref(c->index, c->key);
 	c->key = *result;
@@ -8239,8 +8220,7 @@ int
 vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 		 enum vinyl_order order,
 		 struct vinyl_tuple **result, struct vinyl_tx *tx,
-		 struct sicache *cache, bool cache_only,
-		 struct vy_stat_get *statget)
+		 struct sicache *cache, bool cache_only)
 {
 	struct vinyl_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
@@ -8341,9 +8321,11 @@ vinyl_index_read(struct vinyl_index *index, struct vinyl_tuple *key,
 	assert(rc == 1);
 
 	assert(q.result != NULL);
-	statget->read_disk = q.read_disk;
-	statget->read_cache = q.read_cache;
-	statget->read_latency = clock_monotonic64() - start;
+	struct vy_stat_get statget;
+	statget.read_disk = q.read_disk;
+	statget.read_cache = q.read_cache;
+	statget.read_latency = clock_monotonic64() - start;
+	vy_stat_get(e->stat, &statget);
 
 	*result = q.result;
 	return 0;
@@ -9050,17 +9032,14 @@ static inline int
 vy_get(struct vinyl_tx *tx, struct vinyl_index *index, struct vinyl_tuple *key,
 	 struct vinyl_tuple **result, bool cache_only)
 {
-	struct vy_stat_get statget;
-	memset(&statget, 0, sizeof(statget));
 	if (vinyl_index_read(index, key, VINYL_EQ, result, tx, NULL,
-			    cache_only, &statget) != 0) {
+			    cache_only) != 0) {
 		return -1;
 	}
 
 	if (*result == NULL)
 		return 0;
 
-	vy_stat_get(index->env->stat, &statget);
 	return 0;
 }
 
@@ -9458,7 +9437,6 @@ vinyl_checkpoint_is_active(struct vinyl_env *env)
 int
 vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx)
 {
-	double start_time = ev_now(loop());
 	int read_disk = 0;
 	int read_cache = 0;
 	int ops = 0;
@@ -9505,7 +9483,6 @@ vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx)
 	}
 
 	vy_cachepool_push(cache);
-	vy_stat_cursor(index->env->stat, start_time, read_disk, read_cache, ops);
 	vinyl_index_unref(index);
 	return rc;
 }
