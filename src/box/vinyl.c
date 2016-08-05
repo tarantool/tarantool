@@ -3365,10 +3365,8 @@ tx_get(struct vy_tx *tx, struct vy_index *index,
 	if (v == NULL)
 		goto add;
 	struct vy_tuple *tuple = v->tuple;
-	if (unlikely((tuple->flags & SVGET) > 0))
+	if (tuple->flags & SVGET)
 		return 0;
-	if (unlikely((tuple->flags & SVDELETE) > 0))
-		return 2;
 	*result = tuple;
 	vy_tuple_ref(tuple);
 	return 1;
@@ -7747,8 +7745,8 @@ sr_zoneof(struct vy_env *env)
 
 int
 vy_index_read(struct vy_index*, struct vy_tuple*, enum vy_order order,
-		struct vy_tuple **, struct vy_tx*, struct sicache*,
-		bool cache_only);
+		struct vy_tuple **, struct vy_tuple *,
+		struct vy_tx*, struct sicache*, bool cache_only);
 static int vy_index_visible(struct vy_index*, uint64_t);
 static int vy_index_recoverbegin(struct vy_index*);
 static int vy_index_recoverend(struct vy_index*);
@@ -8184,8 +8182,8 @@ vy_index_drop(struct vy_index *index)
 
 int
 vy_index_read(struct vy_index *index, struct vy_tuple *key,
-	      enum vy_order order,
-	      struct vy_tuple **result, struct vy_tx *tx,
+	      enum vy_order order, struct vy_tuple **result,
+	      struct vy_tuple *upsert, struct vy_tx *tx,
 	      struct sicache *cache, bool cache_only)
 {
 	struct vy_env *e = index->env;
@@ -8197,21 +8195,16 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	}
 
 	key->flags = SVGET;
-	struct vy_tuple *vup = NULL;
 
 	/* concurrent */
-	if (tx != NULL && order == VINYL_EQ) {
-		int rc = tx_get(tx, index, key, &vup);
-		if (unlikely(rc == -1))
+	if (cache_only && tx != NULL && order == VINYL_EQ) {
+		assert(upsert == NULL);
+		int rc = tx_get(tx, index, key, result);
+		if (rc == -1)
 			return -1;
-		if (rc == 2) { /* delete */
-			*result = NULL;
+		if (rc == 1)
 			return 0;
-		}
-		if (rc == 1 && ((vup->flags & SVUPSERT) == 0)) {
-			*result = vup;
-			return 0;
-		}
+		/* rc == 0: tuple not found. */
 	}
 
 	/* prepare read cache */
@@ -8220,9 +8213,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 		cachegc = 1;
 		cache = vy_cachepool_pop(e->cachepool);
 		if (unlikely(cache == NULL)) {
-			if (vup != NULL) {
-				vy_tuple_unref(index, vup);
-			}
 			vy_oom();
 			return -1;
 		}
@@ -8250,8 +8240,8 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 		si_readopen(&q, index, cache, order, vlsn, key->data, key->size);
 	}
 	struct sv sv_vup;
-	if (vup != NULL) {
-		sv_from_tuple(&sv_vup, vup);
+	if (upsert != NULL) {
+		sv_from_tuple(&sv_vup, upsert);
 		q.upsert_v = &sv_vup;
 	}
 	q.upsert_eq = upsert_eq;
@@ -8260,9 +8250,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	int rc = si_range(&q);
 	si_readclose(&q);
 
-	if (vup != NULL) {
-		vy_tuple_unref(index, vup);
-	}
 	/* free read cache */
 	if (likely(cachegc))
 		vy_cachepool_push(cache);
@@ -9115,6 +9102,7 @@ struct vy_read_task {
 	struct vy_tx *tx;
 	struct vy_tuple *key;
 	struct vy_tuple *result;
+	struct vy_tuple *upsert;
 };
 
 static ssize_t
@@ -9122,7 +9110,7 @@ vy_get_cb(struct coio_task *ptr)
 {
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
 	return vy_index_read(task->index, task->key, VINYL_EQ,
-			     &task->result, task->tx, NULL,
+			     &task->result, task->upsert, task->tx, NULL,
 			     false);
 }
 
@@ -9132,7 +9120,8 @@ vy_cursor_next_cb(struct coio_task *ptr)
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
 	struct vy_cursor *c = task->cursor;
 	return vy_index_read(c->index, c->key, c->order,
-			     &task->result, &c->tx, c->cache, false);
+			     &task->result, task->upsert, &c->tx,
+			     c->cache, false);
 }
 
 static ssize_t
@@ -9143,6 +9132,8 @@ vy_read_task_free_cb(struct coio_task *ptr)
 	assert(env != NULL);
 	if (task->result != NULL)
 		vy_tuple_unref(task->index, task->result);
+	if (task->upsert != NULL)
+		vy_tuple_unref(task->index, task->upsert);
 	vy_index_unref(task->index);
 	mempool_free(&env->read_task_pool, task);
 	return 0;
@@ -9155,7 +9146,7 @@ vy_read_task_free_cb(struct coio_task *ptr)
 static inline int
 vy_read_task(struct vy_index *index, struct vy_tx *tx,
 	     struct vy_cursor *cursor, struct vy_tuple *key,
-	     struct vy_tuple **result,
+	     struct vy_tuple **result, struct vy_tuple *upsert,
 	     coio_task_cb func)
 {
 	assert(index != NULL);
@@ -9172,6 +9163,7 @@ vy_read_task(struct vy_index *index, struct vy_tx *tx,
 	task->cursor = cursor;
 	task->key = key;
 	task->result = NULL;
+	task->upsert = upsert;
 	if (coio_task(&task->base, func, vy_read_task_free_cb,
 	              TIMEOUT_INFINITY) == -1) {
 		return -1;
@@ -9198,10 +9190,20 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 
 	struct vy_tuple *vyresult = NULL;
 	int rc = vy_index_read(index, vykey, VINYL_EQ, &vyresult,
-			       tx, NULL, true);
-	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
-		rc = vy_read_task(index, tx, NULL, vykey,
-				  &vyresult, vy_get_cb);
+			       NULL, tx, NULL, true);
+	if (rc == 0) {
+		if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
+			/* cache miss or not found */
+			rc = vy_read_task(index, tx, NULL, vykey,
+					  &vyresult, vyresult, vy_get_cb);
+		} else if (vyresult->flags & SVDELETE) {
+			/*
+			 * We deleted this tuple in this
+			 * transaction. No need for a disk lookup.
+			 */
+			vy_tuple_unref(index, vyresult);
+			vyresult = NULL;
+		}
 	}
 	vy_tuple_unref(index, vykey);
 	if (rc != 0)
@@ -9231,15 +9233,22 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	struct vy_tx *tx = &c->tx;
 
 	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult, tx,
-			  c->cache, true))
+	if (vy_index_read(index, c->key, c->order, &vyresult, NULL,
+			  tx, c->cache, true))
 		return -1;
 	c->ops++;
-	if (vyresult == NULL) {
+	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
 		/* Cache miss. */
 		if (vy_read_task(index, NULL, c, NULL, &vyresult,
-				 vy_cursor_next_cb))
+				 vyresult, vy_cursor_next_cb))
 			return -1;
+	} else if (vyresult->flags & SVDELETE) {
+		/*
+		 * We deleted this tuple in this
+		 * transaction. No need for a disk lookup.
+		 */
+		vy_tuple_unref(index, vyresult);
+		vyresult = NULL;
 	}
 	if (vyresult != NULL) {
 		/* Found. */
