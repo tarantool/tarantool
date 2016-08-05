@@ -8065,40 +8065,6 @@ vy_cursor_delete(struct vy_cursor *c)
 	mempool_free(&e->cursor_pool, c);
 }
 
-static int
-vy_cursor_next(struct vy_cursor *c, struct vy_tuple **result,
-		  bool cache_only)
-{
-	struct vy_index *index = c->index;
-	struct vy_tx *tx = &c->tx;
-
-	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, result, tx, c->cache,
-			    cache_only) != 0) {
-		return -1;
-	}
-
-	c->ops++;
-	if (*result == NULL) {
-		if (!cache_only) {
-			 vy_tuple_unref(c->index, c->key);
-			 c->key = NULL;
-		}
-		 return 0;
-	}
-
-	if (c->order == VINYL_GE)
-		c->order = VINYL_GT;
-	else if (c->order == VINYL_LE)
-		c->order = VINYL_LT;
-
-	vy_tuple_unref(c->index, c->key);
-	c->key = *result;
-	vy_tuple_ref(c->key);
-
-	return 0;
-}
-
 /*** }}} Cursor */
 
 static int
@@ -9164,7 +9130,9 @@ static ssize_t
 vy_cursor_next_cb(struct coio_task *ptr)
 {
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	return vy_cursor_next(task->cursor, &task->result, false);
+	struct vy_cursor *c = task->cursor;
+	return vy_index_read(c->index, c->key, c->order,
+			     &task->result, &c->tx, c->cache, false);
 }
 
 static ssize_t
@@ -9220,8 +9188,8 @@ vy_read_task(struct vy_index *index, struct vy_tx *tx,
  * Find a tuple by key using a thread pool thread.
  */
 int
-vy_coget(struct vy_tx *tx, struct vy_index *index, const char *key,
-	 uint32_t part_count, struct tuple **result)
+vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
+       uint32_t part_count, struct tuple **result)
 {
 	struct vy_tuple *vykey =
 		vy_tuple_from_key_data(index, key, part_count);
@@ -9232,7 +9200,8 @@ vy_coget(struct vy_tx *tx, struct vy_index *index, const char *key,
 	int rc = vy_index_read(index, vykey, VINYL_EQ, &vyresult,
 			       tx, NULL, true);
 	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
-		rc = vy_read_task(index, tx, NULL, vykey, &vyresult, vy_get_cb);
+		rc = vy_read_task(index, tx, NULL, vykey,
+				  &vyresult, vy_get_cb);
 	}
 	vy_tuple_unref(index, vykey);
 	if (rc != 0)
@@ -9255,27 +9224,44 @@ vy_coget(struct vy_tx *tx, struct vy_index *index, const char *key,
  * Read the next value from a cursor in a thread pool thread.
  */
 int
-vy_cursor_conext(struct vy_cursor *cursor, struct tuple **result)
+vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
-	struct vy_tuple *vyresult;
-	int rc = vy_cursor_next(cursor, &vyresult, true);
-	if (rc == 0 && vyresult == NULL) { /* cache miss or not found */
-		rc = vy_read_task(cursor->index, NULL, cursor, NULL, &vyresult,
-				  vy_cursor_next_cb);
-	}
-	if (rc != 0)
-		return -1;
+	struct vy_tuple *vyresult = NULL;
+	struct vy_index *index = c->index;
+	struct vy_tx *tx = &c->tx;
 
-	if (vyresult == NULL) { /* not found */
+	assert(c->key != NULL);
+	if (vy_index_read(index, c->key, c->order, &vyresult, tx,
+			  c->cache, true))
+		return -1;
+	c->ops++;
+	if (vyresult == NULL) {
+		/* Cache miss. */
+		if (vy_read_task(index, NULL, c, NULL, &vyresult,
+				 vy_cursor_next_cb))
+			return -1;
+	}
+	if (vyresult != NULL) {
+		/* Found. */
+		if (c->order == VINYL_GE)
+			c->order = VINYL_GT;
+		else if (c->order == VINYL_LE)
+			c->order = VINYL_LT;
+
+		vy_tuple_unref(index, c->key);
+		c->key = vyresult;
+		vy_tuple_ref(c->key);
+
+		*result = vinyl_convert_tuple(index, vyresult);
+		vy_tuple_unref(index, vyresult);
+		if (*result == NULL)
+			return -1;
+	} else {
+		/* Not found. */
+		vy_tuple_unref(c->index, c->key);
+		c->key = NULL;
 		*result = NULL;
-		return 0;
 	}
-
-	/* found */
-	*result = vinyl_convert_tuple(cursor->index, vyresult);
-	vy_tuple_unref(cursor->index, vyresult);
-	if (*result == NULL)
-		return -1;
 	return 0;
 }
 

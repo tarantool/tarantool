@@ -184,7 +184,7 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	struct vy_tx *transaction = in_txn() ?
 		(struct vy_tx *) in_txn()->engine_tx : NULL;
 	struct tuple *tuple = NULL;
-	if (vy_coget(transaction, db, key, part_count, &tuple) != 0)
+	if (vy_get(transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
 	return tuple;
 }
@@ -238,7 +238,7 @@ vinyl_iterator_next(struct iterator *ptr)
 	uint32_t it_sc_version = ::sc_version;
 
 	struct tuple *tuple;
-	if (vy_cursor_conext(it->cursor, &tuple) != 0)
+	if (vy_cursor_next(it->cursor, &tuple) != 0)
 		diag_raise();
 	if (tuple == NULL) { /* not found */
 		/* immediately close the cursor */

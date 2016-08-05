@@ -140,7 +140,7 @@ vinyl_insert_one(VinylIndex *index, const char *tuple,
 		key = tuple_extract_key_raw(tuple, tuple_end, def, &key_len);
 		mp_decode_array(&key); /* Skip array header. */
 		struct tuple *found;
-		if (vy_coget(tx, index->db, key, def->part_count, &found))
+		if (vy_get(tx, index->db, key, def->part_count, &found))
 			diag_raise();
 
 		if (found) {
@@ -202,7 +202,7 @@ vinyl_replace_all(struct space *space, struct request *request,
 	uint32_t part_count = mp_decode_array(&key);
 
 	/* If the request type is replace then delete the old tuple. */
-	if (vy_coget(tx, pk->db, key, part_count, &old_tuple))
+	if (vy_get(tx, pk->db, key, part_count, &old_tuple))
 		diag_raise();
 
 	/* Tuple doesn't exist so it can be inserted. */
@@ -287,7 +287,7 @@ VinylSpace::executeDelete(struct txn*, struct space *space,
 	struct tuple *old_tuple = NULL;
 	struct vy_tx *tx = (struct vy_tx *)(in_txn()->engine_tx);
 	if (space->index_count > 1) {
-		if (vy_coget(tx, index->db, key, part_count, &old_tuple))
+		if (vy_get(tx, index->db, key, part_count, &old_tuple))
 			diag_raise();
 		if (old_tuple)
 			vinyl_delete_all(space, old_tuple, request, tx);
@@ -311,7 +311,7 @@ VinylSpace::executeUpdate(struct txn*, struct space *space,
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
 
-	if (vy_coget(tx, index->db, key, part_count, &old_tuple))
+	if (vy_get(tx, index->db, key, part_count, &old_tuple))
 		diag_raise();
 	if (old_tuple == NULL)
 		return NULL;

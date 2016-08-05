@@ -126,8 +126,8 @@ struct vy_tx *
 vy_begin(struct vy_env *e);
 
 int
-vy_coget(struct vy_tx *tx, struct vy_index *index,
-	 const char *key, uint32_t part_count, struct tuple **result);
+vy_get(struct vy_tx *tx, struct vy_index *index,
+       const char *key, uint32_t part_count, struct tuple **result);
 
 int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
@@ -200,7 +200,7 @@ void
 vy_cursor_delete(struct vy_cursor *cursor);
 
 int
-vy_cursor_conext(struct vy_cursor *cursor, struct tuple **result);
+vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
 
 /*
  * Replication
