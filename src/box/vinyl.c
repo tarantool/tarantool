@@ -3095,7 +3095,7 @@ static enum tx_state
 tx_rollback(struct vy_tx*);
 
 static int
-tx_set(struct vy_tx*, struct vy_index *, struct vy_tuple*);
+tx_set(struct vy_tx*, struct vy_index *, struct vy_tuple*, struct txv *);
 
 static int
 tx_get(struct vy_tx*, struct vy_index *, struct vy_tuple*,
@@ -3309,30 +3309,27 @@ tx_prepare(struct vy_tx *tx)
 
 static int
 tx_set(struct vy_tx *tx, struct vy_index *index,
-       struct vy_tuple *tuple)
+       struct vy_tuple *tuple, struct txv *old)
 {
 	struct tx_manager *m = tx->manager;
 	struct vy_env *env = m->env;
-	/* Update concurrent index */
-	struct txv *own = txvindex_search_key(&index->txvindex, tuple->data,
-					      tuple->size, tx->tsn);
 	/* Found a match of the previous action of this transaction */
-	if (own != NULL) {
+	if (old != NULL) {
 		if (unlikely(tuple->flags & SVUPSERT)) {
 			vy_error("%s", "only one upsert statement is "
 			         "allowed per a transaction key");
 			goto error;
 		}
 		if (!(tuple->flags & SVGET)) {
-			if (own->tuple->flags & SVGET) {
+			if (old->tuple->flags & SVGET) {
 				/* Write after read */
-				if (txlogindex_add(&tx->logindex, own))
+				if (txlogindex_add(&tx->logindex, old))
 					goto error;
 				tx->readonly_tail = NULL;
 			}
-			vy_tuple_unref_rt(env, own->tuple);
+			vy_tuple_unref_rt(env, old->tuple);
 			vy_tuple_ref(tuple);
-			own->tuple = tuple;
+			old->tuple = tuple;
 		}
 	} else {
 		/* Allocate a MVCC container. */
@@ -3376,7 +3373,7 @@ tx_get(struct vy_tx *tx, struct vy_index *index,
 	return 1;
 
 add:
-	return tx_set(tx, index, key);
+	return tx_set(tx, index, key, NULL);
 }
 
 struct PACKED sdv {
@@ -8880,7 +8877,7 @@ check_key:
 
 static inline int
 vy_tx_write(struct vy_tx *tx, struct vy_index *index,
-	    struct vy_tuple *o, uint8_t flags)
+	    struct vy_tuple *tuple, uint8_t flags)
 {
 	assert(tx->state == VINYL_TX_READY);
 
@@ -8900,10 +8897,13 @@ vy_tx_write(struct vy_tx *tx, struct vy_index *index,
 		return vy_error("%s", "index in malfunction state");
 	}
 
-	o->flags = flags;
+	tuple->flags = flags;
 
+	/* Update concurrent index */
+	struct txv *old = txvindex_search_key(&index->txvindex, tuple->data,
+					      tuple->size, tx->tsn);
 	/* Update the concurrent index only */
-	return tx_set(tx, index, o);
+	return tx_set(tx, index, tuple, old);
 }
 
 static inline void
