@@ -12,5 +12,5 @@ space:drop()
 -- ensure alter is not supported
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
-index:alter({parts={1,'NUM'}})
+index:alter({parts={1,'unsigned'}})
 space:drop()

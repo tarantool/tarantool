@@ -2,10 +2,10 @@
 s3 = box.schema.space.create('my_space4')
 ---
 ...
-i3_1 = s3:create_index('my_space4_idx1', {type='HASH', parts={1, 'SCALAR', 2, 'INT', 3, 'NUMBER'}, unique=true})
+i3_1 = s3:create_index('my_space4_idx1', {type='HASH', parts={1, 'scalar', 2, 'integer', 3, 'number'}, unique=true})
 ---
 ...
-i3_2 = s3:create_index('my_space4_idx2', {type='HASH', parts={4, 'STR', 5, 'SCALAR'}, unique=true})
+i3_2 = s3:create_index('my_space4_idx2', {type='HASH', parts={4, 'string', 5, 'scalar'}, unique=true})
 ---
 ...
 s3:insert({100.5, 30, 95, "str1", 5})

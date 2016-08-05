@@ -12,10 +12,10 @@ engine = inspector:get_cfg('engine')
 s = box.schema.create_space('test', { engine = engine })
 ---
 ...
-i1 = s:create_index('test1', {parts = {1, 'num'}})
+i1 = s:create_index('test1', {parts = {1, 'unsigned'}})
 ---
 ...
-i2 = s:create_index('test2', {parts = {2, 'num'}})
+i2 = s:create_index('test2', {parts = {2, 'unsigned'}})
 ---
 ...
 s:insert{1, 2, 3}

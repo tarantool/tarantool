@@ -217,7 +217,7 @@ end;
 ...
 t;
 ---
-- - 'type : NUM'
+- - 'type : unsigned'
   - 'fieldno : 1'
 ...
 ----------------

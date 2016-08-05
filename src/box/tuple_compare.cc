@@ -39,14 +39,14 @@ field_compare(const char **field_a, const char **field_b);
 
 template <>
 inline int
-field_compare<NUM>(const char **field_a, const char **field_b)
+field_compare<FIELD_TYPE_UNSIGNED>(const char **field_a, const char **field_b)
 {
 	return mp_compare_uint(*field_a, *field_b);
 }
 
 template <>
 inline int
-field_compare<STRING>(const char **field_a, const char **field_b)
+field_compare<FIELD_TYPE_STRING>(const char **field_a, const char **field_b)
 {
 	uint32_t size_a, size_b;
 	size_a = mp_decode_strl(field_a);
@@ -63,7 +63,8 @@ field_compare_and_next(const char **field_a, const char **field_b);
 
 template <>
 inline int
-field_compare_and_next<NUM>(const char **field_a, const char **field_b)
+field_compare_and_next<FIELD_TYPE_UNSIGNED>(const char **field_a,
+					    const char **field_b)
 {
 	int r = mp_compare_uint(*field_a, *field_b);
 	mp_next(field_a);
@@ -73,7 +74,8 @@ field_compare_and_next<NUM>(const char **field_a, const char **field_b)
 
 template <>
 inline int
-field_compare_and_next<STRING>(const char **field_a, const char **field_b)
+field_compare_and_next<FIELD_TYPE_STRING>(const char **field_a,
+					  const char **field_b)
 {
 	uint32_t size_a, size_b;
 	size_a = mp_decode_strl(field_a);
@@ -185,20 +187,20 @@ struct comparator_signature {
  * field1 no, field1 type, field2 no, field2 type, ...
  */
 static const comparator_signature cmp_arr[] = {
-	COMPARATOR(0, NUM   )
-	COMPARATOR(0, STRING)
-	COMPARATOR(0, NUM   , 1, NUM   )
-	COMPARATOR(0, STRING, 1, NUM   )
-	COMPARATOR(0, NUM   , 1, STRING)
-	COMPARATOR(0, STRING, 1, STRING)
-	COMPARATOR(0, NUM   , 1, NUM   , 2, NUM   )
-	COMPARATOR(0, STRING, 1, NUM   , 2, NUM   )
-	COMPARATOR(0, NUM   , 1, STRING, 2, NUM   )
-	COMPARATOR(0, STRING, 1, STRING, 2, NUM   )
-	COMPARATOR(0, NUM   , 1, NUM   , 2, STRING)
-	COMPARATOR(0, STRING, 1, NUM   , 2, STRING)
-	COMPARATOR(0, NUM   , 1, STRING, 2, STRING)
-	COMPARATOR(0, STRING, 1, STRING, 2, STRING)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_UNSIGNED)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_STRING)
+	COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_STRING)
 };
 
 #undef COMPARATOR
@@ -226,14 +228,14 @@ static inline int field_compare_with_key(const char **field, const char **key);
 
 template <>
 inline int
-field_compare_with_key<NUM>(const char **field, const char **key)
+field_compare_with_key<FIELD_TYPE_UNSIGNED>(const char **field, const char **key)
 {
 	return mp_compare_uint(*field, *key);
 }
 
 template <>
 inline int
-field_compare_with_key<STRING>(const char **field, const char **key)
+field_compare_with_key<FIELD_TYPE_STRING>(const char **field, const char **key)
 {
 	uint32_t size_a, size_b;
 	size_a = mp_decode_strl(field);
@@ -250,7 +252,8 @@ field_compare_with_key_and_next(const char **field_a, const char **field_b);
 
 template <>
 inline int
-field_compare_with_key_and_next<NUM>(const char **field_a, const char **field_b)
+field_compare_with_key_and_next<FIELD_TYPE_UNSIGNED>(const char **field_a,
+						     const char **field_b)
 {
 	int r = mp_compare_uint(*field_a, *field_b);
 	mp_next(field_a);
@@ -260,7 +263,7 @@ field_compare_with_key_and_next<NUM>(const char **field_a, const char **field_b)
 
 template <>
 inline int
-field_compare_with_key_and_next<STRING>(const char **field_a,
+field_compare_with_key_and_next<FIELD_TYPE_STRING>(const char **field_a,
 					const char **field_b)
 {
 	uint32_t size_a, size_b;
@@ -375,19 +378,19 @@ struct comparator_with_key_signature
 	{ TupleCompareWithKey<0, __VA_ARGS__>::compare, { __VA_ARGS__ } },
 
 static const comparator_with_key_signature cmp_wk_arr[] = {
-	KEY_COMPARATOR(0, NUM   , 1, NUM   , 2, NUM   )
-	KEY_COMPARATOR(0, STRING, 1, NUM   , 2, NUM   )
-	KEY_COMPARATOR(0, NUM   , 1, STRING, 2, NUM   )
-	KEY_COMPARATOR(0, STRING, 1, STRING, 2, NUM   )
-	KEY_COMPARATOR(0, NUM   , 1, NUM   , 2, STRING)
-	KEY_COMPARATOR(0, STRING, 1, NUM   , 2, STRING)
-	KEY_COMPARATOR(0, NUM   , 1, STRING, 2, STRING)
-	KEY_COMPARATOR(0, STRING, 1, STRING, 2, STRING)
+	KEY_COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_STRING)
+	KEY_COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_STRING)
+	KEY_COMPARATOR(0, FIELD_TYPE_UNSIGNED, 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_STRING)
+	KEY_COMPARATOR(0, FIELD_TYPE_STRING  , 1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_STRING)
 
-	KEY_COMPARATOR(1, NUM   , 2, NUM   )
-	KEY_COMPARATOR(1, STRING, 2, NUM   )
-	KEY_COMPARATOR(1, NUM   , 2, STRING)
-	KEY_COMPARATOR(1, STRING, 2, STRING)
+	KEY_COMPARATOR(1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_UNSIGNED)
+	KEY_COMPARATOR(1, FIELD_TYPE_UNSIGNED, 2, FIELD_TYPE_STRING)
+	KEY_COMPARATOR(1, FIELD_TYPE_STRING  , 2, FIELD_TYPE_STRING)
 };
 
 #undef KEY_COMPARATOR

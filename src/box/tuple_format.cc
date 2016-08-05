@@ -43,7 +43,7 @@ field_type_create(struct tuple_format *format, struct rlist *key_list)
 {
 	/* There may be fields between indexed fields (gaps). */
 	for (uint32_t i = 0; i < format->field_count; i++)
-		format->fields[i].type = UNKNOWN;
+		format->fields[i].type = FIELD_TYPE_ANY;
 
 	struct key_def *key_def;
 	/* extract field type info */
@@ -53,7 +53,8 @@ field_type_create(struct tuple_format *format, struct rlist *key_list)
 			enum field_type set_type = key_def->parts[i].type;
 			enum field_type *fmt_type =
 				&format->fields[key_def->parts[i].fieldno].type;
-			if (*fmt_type != UNKNOWN && *fmt_type != set_type) {
+			if (*fmt_type != FIELD_TYPE_ANY &&
+			    *fmt_type != set_type) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE_MISMATCH,
 					  key_def->name,
@@ -178,7 +179,7 @@ tuple_format_new(struct rlist *key_list)
 		 * In the tuple, store only offsets necessary to
 		 * quickly access indexed fields.
 		 */
-		if (format->fields[i].type == UNKNOWN)
+		if (format->fields[i].type == FIELD_TYPE_ANY)
 			format->fields[i].offset_slot = INT32_MAX;
 		else
 			format->fields[i].offset_slot = --current_slot;

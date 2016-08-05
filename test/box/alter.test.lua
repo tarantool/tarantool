@@ -58,15 +58,15 @@ t = _space:delete{space.id}
 space_deleted = box.space[t[1]]
 space_deleted
 space:replace{0}
-_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
-_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
-_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
-_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
+_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
+_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
 _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
-_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 box.space[1000]:insert{0, 'hello, world'}
 box.space[1000]:drop()
 box.space[1000]
@@ -135,7 +135,7 @@ auto:drop()
 -- gh-281 Crash after rename + replace + delete with multi-part index
 -- ------------------------------------------------------------------
 s = box.schema.space.create('space')
-index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {1, 'unsigned', 2, 'string'}})
 s:insert{1, 'a'}
 box.space.space.index.primary:rename('secondary')
 box.space.space:replace{1,'The rain in Spain'}
@@ -150,10 +150,10 @@ s = box.schema.space.create(42)
 s = box.schema.space.create("test", "bug")
 s = box.schema.space.create("test", {unknown = 'param'})
 s = box.schema.space.create("test")
-index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
-index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+index = s:create_index('primary', {unique = true, parts = {0, 'unsigned', 1, 'string'}})
+index = s:create_index('primary', {unique = true, parts = {'unsigned', 1, 'string', 2}})
 index = s:create_index('primary', {unique = true, parts = 'bug'})
-index = s:create_index('test', {unique = true, parts = {1, 'NUM'}, mmap = true})
+index = s:create_index('test', {unique = true, parts = {1, 'unsigned'}, mmap = true})
 s:drop()
 
 
@@ -181,3 +181,39 @@ for i=1,W do
     ch:get()
 end
 test_run:cmd("setopt delimiter ''");
+
+-- ------------------------------------------------------------------
+-- Lower and upper cases
+-- ------------------------------------------------------------------
+
+space = box.schema.space.create("test")
+_ = space:create_index('primary', { parts = {1, 'nUmBeR', 2, 'StRinG'}})
+space.index.primary.parts[1].type == 'number'
+space.index.primary.parts[2].type == 'string'
+box.space._index:get({space.id, 0})[6]
+space:drop()
+
+-- ------------------------------------------------------------------
+-- Aliases
+-- ------------------------------------------------------------------
+
+space = box.schema.space.create("test")
+_ = space:create_index('primary', { parts = {1, 'uint', 2, 'int', 3, 'str'}})
+space.index.primary.parts[1].type == 'unsigned'
+space.index.primary.parts[2].type == 'integer'
+space.index.primary.parts[3].type == 'string'
+box.space._index:get({space.id, 0})[6]
+space:drop()
+
+-- ------------------------------------------------------------------
+-- Tarantool 1.6 compatibility
+-- ------------------------------------------------------------------
+
+-- gh-1534: deprecate 'num' data type for unsigned integers
+space = box.schema.space.create("test")
+_ = space:create_index('primary', { parts = {1, 'num'}})
+space.index.primary.parts[1].type == 'unsigned'
+box.space._index:get({space.id, 0})[6]
+space:drop()
+
+-- data dictionary compatibility is checked by upgrade.test.lua

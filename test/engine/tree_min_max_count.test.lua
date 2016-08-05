@@ -6,7 +6,7 @@ engine = test_run:get_cfg('engine')
 -- int type
 
 space0 = box.schema.space.create('space0', { engine = engine })
-index0 = space0:create_index('primary', { type = 'tree', parts = {1, 'int'} })
+index0 = space0:create_index('primary', { type = 'tree', parts = {1, 'INTEGER'} })
 
 space0:insert({1, "AAAA"})
 space0:insert({2, "AAAA"})
@@ -107,7 +107,7 @@ space1:drop()
 -- str type
 
 space2 = box.schema.space.create('space2', { engine = engine })
-index2 = space2:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index2 = space2:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 space2:insert({'1', "AAAA"})
 space2:insert({'2', "AAAA"})
 space2:insert({'3', "AAAA"})
@@ -150,7 +150,7 @@ space2:drop()
 -- num type
 
 space3 = box.schema.space.create('space3', { engine = engine })
-index3 = space3:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index3 = space3:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 space3:insert({1, "AAAA"})
 space3:insert({2, "AAAA"})
 space3:insert({3, "AAAA"})
@@ -261,7 +261,7 @@ space4:drop()
 
 -- scalar int
 space5 = box.schema.space.create('space5', { engine = engine })
-index5 = space5:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'int'} })
+index5 = space5:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'INTEGER'} })
 
 space5:insert({1, 1})
 space5:insert({1, 2})
@@ -299,7 +299,7 @@ space5:drop()
 
 -- scalar str
 space6 = box.schema.space.create('space6', { engine = engine })
-index6 = space6:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'str'} })
+index6 = space6:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'string'} })
 
 space6:insert({1, '1'})
 space6:insert({1, '2'})
@@ -357,7 +357,7 @@ index7:count()
 space7:drop()
 
 space8 = box.schema.space.create('space8', { engine = engine })
-index8 = space8:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'int'} })
+index8 = space8:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'INTEGER'} })
 
 for i = 1, 1000 do space8:insert({i % 10, i, long_string}) end
 

@@ -7,7 +7,7 @@
 hash = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 bsize = tmp:bsize()
@@ -37,7 +37,7 @@ tmp:bsize() > bsize
 -- Insert invalid fields
 hash:insert{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash replace fields tests
@@ -58,7 +58,7 @@ hash:replace{2, 'value1 v1.43', 'value2 1.92'}
 -- Replace invalid fields
 hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash select fields test
@@ -89,7 +89,7 @@ hash.index['primary']:get{5}
 -- select by invalid keys
 hash.index['primary']:get{'invalid key'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 hash.index['primary']:get{1, 2}
 ---
@@ -124,7 +124,7 @@ hash:delete{5}
 -- delete by invalid keys
 hash:delete{'invalid key'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 hash:delete{1, 2}
 ---
@@ -175,7 +175,7 @@ hash:insert{103, 'value1 v1.0', 'value2 v1.0'}
 ...
 hash:insert{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash replace fields tests
@@ -208,7 +208,7 @@ hash:replace{2, 'value1 v1.43', 'value2 1.92'}
 ...
 hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash select fields test
@@ -262,7 +262,7 @@ hash.index['primary']:get{5}
 -- select by invalid keys
 hash.index['primary']:get{'invalid key'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 hash.index['primary']:get{'00000001', '00000002'}
 ---
@@ -336,7 +336,7 @@ hash:delete{5}
 -- delete by invalid keys
 hash:delete{'invalid key'}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 hash:delete{'00000001', '00000002'}
 ---
@@ -354,7 +354,7 @@ hash:truncate()
 hash.index['primary']:drop()
 ---
 ...
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'string'}, unique = true })
 ---
 ...
 -- Insert valid fields
@@ -461,16 +461,16 @@ hash:truncate()
 hash.index['primary']:drop()
 ---
 ...
-tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-tmp = hash:create_index('field1', { type = 'hash', parts = {2, 'num'}, unique = true })
+tmp = hash:create_index('field1', { type = 'hash', parts = {2, 'unsigned'}, unique = true })
 ---
 ...
-tmp = hash:create_index('field2', { type = 'hash', parts = {3, 'num'}, unique = true })
+tmp = hash:create_index('field2', { type = 'hash', parts = {3, 'unsigned'}, unique = true })
 ---
 ...
-tmp = hash:create_index('field3', { type = 'hash', parts = {4, 'num'}, unique = true })
+tmp = hash:create_index('field3', { type = 'hash', parts = {4, 'unsigned'}, unique = true })
 ---
 ...
 hash:insert{0, 0, 0, 0}
@@ -681,7 +681,7 @@ hash:drop()
 hash = box.schema.space.create('tweedledum')
 ---
 ...
-hi = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+hi = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 hash:insert{0}
@@ -704,12 +704,12 @@ hash:drop()
 _ = box.schema.create_space('test')
 ---
 ...
-_ = box.space.test:create_index('i',{parts={1,'STR'}})
+_ = box.space.test:create_index('i',{parts={1,'string'}})
 ---
 ...
 box.space.test:insert{1}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected string'
 ...
 box.space.test:drop()
 ---

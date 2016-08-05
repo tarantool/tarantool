@@ -899,7 +899,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "RTREE index can not be unique");
 		}
-		if (key_def->parts[0].type != ARRAY) {
+		if (key_def->parts[0].type != FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),
@@ -920,8 +920,8 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "BITSET can not be unique");
 		}
-		if (key_def->parts[0].type != NUM &&
-		    key_def->parts[0].type != STRING) {
+		if (key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
+		    key_def->parts[0].type != FIELD_TYPE_STRING) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),
@@ -938,7 +938,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 	/* Only HASH and TREE indexes checks parts there */
 	/* Just check that there are no ARRAY parts */
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == ARRAY) {
+		if (key_def->parts[i].type == FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),

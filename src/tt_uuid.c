@@ -67,6 +67,9 @@ tt_uuid_create(struct tt_uuid *uu)
 extern inline int
 tt_uuid_from_string(const char *in, struct tt_uuid *uu);
 
+extern inline int
+tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b);
+
 extern inline void
 tt_uuid_to_string(const struct tt_uuid *uu, char *out);
 

@@ -525,12 +525,12 @@ tuple_field_u32(struct tuple *tuple, uint32_t i)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, i);
 	if (mp_typeof(*field) != MP_UINT)
 		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
-			  field_type_strs[NUM]);
+			  field_type_strs[FIELD_TYPE_UNSIGNED]);
 
 	uint64_t val = mp_decode_uint(&field);
 	if (val > UINT32_MAX)
 		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
-			  field_type_strs[NUM]);
+			  field_type_strs[FIELD_TYPE_UNSIGNED]);
 	return (uint32_t) val;
 }
 
@@ -616,12 +616,12 @@ tuple_next_u32(struct tuple_iterator *it)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
 	if (mp_typeof(*field) != MP_UINT)
 		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
-			  field_type_strs[NUM]);
+			  field_type_strs[FIELD_TYPE_UNSIGNED]);
 
 	uint32_t val = mp_decode_uint(&field);
 	if (val > UINT32_MAX)
 		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
-			  field_type_strs[NUM]);
+			  field_type_strs[FIELD_TYPE_UNSIGNED]);
 	return (uint32_t) val;
 }
 

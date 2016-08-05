@@ -3,7 +3,7 @@ fiber = require('fiber')
 env = require('test_run')
 test_run = env.new()
 s0 = box.schema.space.create('tweedledum')
-i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 s0:insert{20000}
 test_run:cmd("setopt delimiter ';'")
 for i = 1, 10000 do

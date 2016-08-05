@@ -52,11 +52,11 @@ if box.space.operations then box.space.operations:drop() end
 if box.space.deleting then box.space.deleting:drop() end
 
 s1 = box.schema.create_space("accounts")
-i1 = s1:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
+i1 = s1:create_index('primary', { type = 'HASH', parts = {1, 'unsigned'} })
 s2 = box.schema.create_space("operations")
-i2 = s2:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
+i2 = s2:create_index('primary', { type = 'HASH', parts = {1, 'unsigned'} })
 s3 = box.schema.create_space("deleting")
-i3 = s3:create_index('primary', { type = 'TREE', parts = {1, 'num'} })
+i3 = s3:create_index('primary', { type = 'TREE', parts = {1, 'unsigned'} })
 
 n_accs = 0
 n_ops = 0

@@ -1,7 +1,7 @@
 
 -- key type validations (str, num)
 space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 space:insert{1}
 space:replace{1}
 space:delete{1}
@@ -13,7 +13,7 @@ space:drop()
 
 -- key type validations (num, str)
 space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 space:insert{'A'}
 space:replace{'A'}
 space:delete{'A'}
@@ -25,7 +25,7 @@ space:drop()
 
 -- ensure all key-parts are passed
 space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1,'unsigned',2,'unsigned'} })
 space:insert{1}
 space:replace{1}
 space:delete{1}
@@ -40,7 +40,7 @@ space:drop()
 -------------------------------------------------------------------------------
 
 space = box.schema.space.create('single_part', { engine = 'vinyl' })
-_ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
 
 t1 = space:insert({string.rep('x', 1020)})
 t1 = space:insert({string.rep('x', 10210)})
@@ -55,6 +55,6 @@ pk = nil
 -------------------------------------------------------------------------------
 
 space = box.schema.space.create('test_len', { engine = 'vinyl' })
-_ = space:create_index('primary', { type = 'tree', parts = {1, 'str'}})
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
 space:len()
 space:drop()

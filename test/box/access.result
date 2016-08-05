@@ -258,7 +258,7 @@ box.schema.user.create('testus')
 s = box.schema.space.create('admin_space')
 ---
 ...
-index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+index = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
 ---
 ...
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
@@ -586,7 +586,7 @@ box.schema.user.exists('nosuchuser')
 ...
 box.schema.user.exists{}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 -- gh-671: box.schema.func.exists()
 box.schema.func.exists('nosuchfunc')

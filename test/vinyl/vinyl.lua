@@ -15,7 +15,7 @@ box.cfg {
     vinyl_dir        = "./vinyl/vinyl_test",
     vinyl = {
         threads = 3;
-        memory_limit = 0.05;
+        memory_limit = 0.5;
     }
 }
 

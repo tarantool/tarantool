@@ -5,7 +5,7 @@ function test_conflict()
     local engine = inspector:get_cfg('engine')
 
     local s = box.schema.space.create('tester', {engine=engine});
-    local i = s:create_index('test_index', {type = 'tree', parts = {1, 'STR'}});
+    local i = s:create_index('test_index', {type = 'tree', parts = {1, 'string'}});
 
     local commits = 0
     local function conflict()

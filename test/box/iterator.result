@@ -14,15 +14,15 @@ test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 space = box.schema.space.create('tweedledum')
 ---
 ...
-idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true})
+idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true})
 ---
 ...
 -- Hash single-part unique
-idx5 = space:create_index('i4', { type = 'hash', parts = {1, 'str'}, unique = true})
+idx5 = space:create_index('i4', { type = 'hash', parts = {1, 'string'}, unique = true})
 ---
 ...
 -- Hash multi-part unique
-idx6 = space:create_index('i5', { type = 'hash', parts = {2, 'str', 3, 'str'}, unique = true})
+idx6 = space:create_index('i5', { type = 'hash', parts = {2, 'string', 3, 'string'}, unique = true})
 ---
 ...
 space:insert{'pid_001', 'sid_001', 'tid_998', 'a'}

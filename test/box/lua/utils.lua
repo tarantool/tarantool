@@ -16,7 +16,7 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 	local types = space_field_types(space_no);
 	local function get_field(tuple, field_no)
 		local f = tuple[field_no]
-		if (types[field_no] == 'NUM') then
+		if (types[field_no] == 'unsigned') then
 			return string.format('%8d', f);
 		else
 			return f

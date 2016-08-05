@@ -59,7 +59,7 @@ rb_proto(, serverset_, serverset_t, struct server)
 static int
 server_compare_by_uuid(const struct server *a, const struct server *b)
 {
-	return memcmp(&a->uuid, &b->uuid, sizeof(a->uuid));
+	return tt_uuid_compare(&a->uuid, &b->uuid);
 }
 
 rb_gen(, serverset_, serverset_t, struct server, link,

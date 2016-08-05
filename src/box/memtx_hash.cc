@@ -65,7 +65,7 @@ mh_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	uint32_t size;
 
 	switch (type) {
-	case STRING:
+	case FIELD_TYPE_STRING:
 		/*
 		 * (!) MP_STR fields hashed **excluding** MsgPack format
 		 * indentifier. We have to do that to keep compatibility
@@ -100,7 +100,7 @@ tuple_hash(struct tuple *tuple, const struct key_def *key_def)
 	 * Speed up the simplest case when we have a
 	 * single-part hash_table over an integer field.
 	 */
-	if (key_def->part_count == 1 && part->type == NUM) {
+	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
 		const char *field = tuple_field(tuple, part->fieldno);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
@@ -125,7 +125,7 @@ key_hash(const char *key, const struct key_def *key_def)
 {
 	const struct key_part *part = key_def->parts;
 
-	if (key_def->part_count == 1 && part->type == NUM) {
+	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
 		uint64_t val = mp_decode_uint(&key);
 		if (likely(val <= UINT32_MAX))
 			return val;

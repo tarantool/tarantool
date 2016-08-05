@@ -87,6 +87,36 @@ tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 }
 
 /**
+ * \brief Compare UUIDs lexicographically.
+ * \param a UUID
+ * \param b UUID
+ * \retval comparison result, as in strcmp()
+ */
+inline int
+tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
+{
+#define cmp_tt_uuid_field(field)                \
+        if (a->field > b->field) return 1;      \
+        if (a->field < b->field) return -1;
+
+        cmp_tt_uuid_field(time_low);
+        cmp_tt_uuid_field(time_mid);
+        cmp_tt_uuid_field(time_hi_and_version);
+        cmp_tt_uuid_field(clock_seq_hi_and_reserved);
+        cmp_tt_uuid_field(clock_seq_low);
+        cmp_tt_uuid_field(node[0]);
+        cmp_tt_uuid_field(node[1]);
+        cmp_tt_uuid_field(node[2]);
+        cmp_tt_uuid_field(node[3]);
+        cmp_tt_uuid_field(node[4]);
+        cmp_tt_uuid_field(node[5]);
+
+#undef cmp_tt_uuid_field
+
+        return 0;
+}
+
+/**
  * \brief Format UUID to RFC 4122 string.
  * \param uu uuid
  * \param[out] out buffer, must be at least UUID_STR_LEN + 1 length

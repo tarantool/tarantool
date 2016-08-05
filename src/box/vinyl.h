@@ -165,20 +165,11 @@ struct key_def *
 vy_index_key_def(struct vinyl_index *index);
 
 struct vinyl_index *
-vinyl_index_by_name(struct vinyl_env *env, const char *name);
-
-struct vinyl_index *
 vinyl_index_new(struct vinyl_env *env, struct key_def *key_def,
 		struct tuple_format *tuple_format);
 
 int
 vinyl_index_open(struct vinyl_index *index);
-
-/**
- * Close index during database shutdown
- */
-int
-vinyl_index_close(struct vinyl_index *index);
 
 /**
  * Close index and drop all data

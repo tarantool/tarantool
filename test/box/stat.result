@@ -64,7 +64,7 @@ box.stat.SELECT.total
 -- check exceptions
 space:get('Impossible value')
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 box.stat.ERROR.total
 ---

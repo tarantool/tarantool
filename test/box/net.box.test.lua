@@ -380,7 +380,7 @@ test_run:grep_log("default", "ER_NO_SUCH_PROC")
 
 -- gh-983 test case: iproto connection selecting a lot of data
 _ = box.schema.space.create('test', { temporary = true })
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 
 data1k = "aaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhh"
 
@@ -393,7 +393,7 @@ box.space.test:drop()
 
 -- gh-970 gh-971 UPSERT over network
 _ = box.schema.space.create('test')
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 _ = box.space.test:insert{1, 2, "string"}
 c = net:new(box.cfg.listen)
 c.space.test:select{}

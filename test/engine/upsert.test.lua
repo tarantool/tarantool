@@ -6,7 +6,7 @@ engine = inspector:get_cfg('engine')
 
 -- upsert (str)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 for key = 1, 100 do space:upsert({tostring(key), 0}, {{'+', 2, 1}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
@@ -25,7 +25,7 @@ space:drop()
 
 -- upsert (num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 for key = 1, 100 do space:upsert({key, 0}, {{'+', 2, 1}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key})) end
@@ -44,7 +44,7 @@ space:drop()
 
 -- upsert multi-part (num, num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 for key = 1, 100 do space:upsert({key, key, 0}, {{'+', 3, 1}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key, key})) end
@@ -79,21 +79,21 @@ function sort(t) table.sort(t, less) return t end
 
 -- upsert default tuple constraint
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 space:upsert({0, 'key', 0}, {{'+', 3, 1}})
 space:drop()
 
 
 -- upsert primary key modify (skipped)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 space:upsert({0, 0}, {{'+', 1, 1}, {'+', 2, 1}})
 space:get({0})
 space:drop()
 
 -- upsert with box.tuple.new
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 for key = 1, 100 do space:upsert(box.tuple.new{key, key, 0}, box.tuple.new{{'+', 3, 1}}) end
 t = {}
 for key = 1, 100 do table.insert(t, space:get({key, key})) end
@@ -110,8 +110,8 @@ t
 space:drop()
 
 space = box.schema.space.create('test', { engine = engine })
-index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
-index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
 space:insert({1, 1})
 space:insert({2, 2})
 index1:select{}
@@ -243,7 +243,7 @@ test_run:cmd("setopt delimiter ''");
 
 s = box.schema.space.create('s', { engine = engine })
 index1 = s:create_index('i1')
-index2 = s:create_index('i2', { parts = {2, 'str'}, unique = false })
+index2 = s:create_index('i2', { parts = {2, 'string'}, unique = false })
 
 t = {1, '1', 1, 'qwerty'}
 s:insert(t)

@@ -187,7 +187,7 @@ s_withdata:insert{4, 5, 6, 7, 8}
 ---
 - [4, 5, 6, 7, 8]
 ...
-index3 = s_withdata:create_index('secondary', { type = 'hash', parts = {2, 'num', 3, 'num' }})
+index3 = s_withdata:create_index('secondary', { type = 'hash', parts = {2, 'unsigned', 3, 'unsigned' }})
 ---
 ...
 errinj.set("ERRINJ_WAL_IO", true)
@@ -210,7 +210,7 @@ s_disabled:insert{0}
 ---
 - error: 'No index #0 is defined in space ''disabled'''
 ...
-s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'num'} })
+s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'unsigned'} })
 ---
 - error: Failed to write to disk
 ...
@@ -234,7 +234,7 @@ box.space['withdata'].enabled
 ---
 - true
 ...
-index4 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
+index4 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'unsigned' }, unique = false})
 ---
 - error: Failed to write to disk
 ...
@@ -260,7 +260,7 @@ s_disabled:insert{0}
 ---
 - [0]
 ...
-index6 = s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'num'} })
+index6 = s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'unsigned'} })
 ---
 ...
 s_withindex.index.secondary.unique
@@ -281,7 +281,7 @@ box.space['withdata']
 ---
 - null
 ...
-index7 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
+index7 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'unsigned' }, unique = false})
 ---
 - error: Space 'withdata' does not exist
 ...
@@ -420,7 +420,7 @@ s:drop()
 s = box.schema.space.create('test')
 ---
 ...
-_ = s:create_index('test', {parts = {1, 'NUM', 3, 'NUM', 5, 'NUM'}})
+_ = s:create_index('test', {parts = {1, 'unsigned', 3, 'unsigned', 5, 'unsigned'}})
 ---
 ...
 s:insert{1, 2, 3, 4, 5, 6}
@@ -452,7 +452,7 @@ s:drop()
 s = box.schema.space.create('test')
 ---
 ...
-_ = s:create_index('test', {parts = {2, 'NUM', 4, 'NUM', 6, 'NUM'}})
+_ = s:create_index('test', {parts = {2, 'unsigned', 4, 'unsigned', 6, 'unsigned'}})
 ---
 ...
 s:insert{1, 2, 3, 4, 5, 6}

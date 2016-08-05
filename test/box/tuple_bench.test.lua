@@ -7,7 +7,7 @@ c = net:new(os.getenv("LISTEN"))
 box.schema.func.create('tuple_bench', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'tuple_bench')
 space = box.schema.space.create('tester')
-key_parts = {1, 'NUM', 2, 'STR'}
+key_parts = {1, 'unsigned', 2, 'string'}
 _ = space:create_index('primary', {type = 'TREE', parts =  key_parts})
 box.schema.user.grant('guest', 'read,write', 'space', 'tester')
 

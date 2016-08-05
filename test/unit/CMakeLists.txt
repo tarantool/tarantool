@@ -30,6 +30,11 @@ add_executable(bitset_index.test bitset_index.c)
 target_link_libraries(bitset_index.test bitset)
 add_executable(base64.test base64.c ${CMAKE_SOURCE_DIR}/third_party/base64.c)
 
+add_executable(uuid.test uuid.c unit.c
+        ${CMAKE_SOURCE_DIR}/src/tt_uuid.c
+        ${CMAKE_SOURCE_DIR}/src/random.c)
+target_link_libraries(uuid.test bit)
+
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)
 add_executable(bps_tree_itr.test bps_tree_itr.cc)

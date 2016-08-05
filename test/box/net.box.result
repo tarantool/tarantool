@@ -971,7 +971,7 @@ test_run:grep_log("default", "ER_NO_SUCH_PROC")
 _ = box.schema.space.create('test', { temporary = true })
 ---
 ...
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 ---
 ...
 data1k = "aaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhh"
@@ -996,7 +996,7 @@ box.space.test:drop()
 _ = box.schema.space.create('test')
 ---
 ...
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 ---
 ...
 _ = box.space.test:insert{1, 2, "string"}

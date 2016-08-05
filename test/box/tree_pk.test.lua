@@ -1,7 +1,7 @@
 utils = dofile('utils.lua')
 
 s0 = box.schema.space.create('tweedledum')
-i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 
 bsize = i0:bsize()
 
@@ -30,10 +30,10 @@ s0:insert{''}
 s0:insert{'12'}
 
 s1 = box.schema.space.create('tweedledee')
-i1 = s1:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
+i1 = s1:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
 
 s2 = box.schema.space.create('alice')
-i2 = s2:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
+i2 = s2:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
 
 -- string keys
 s1:insert{'identifier', 'tuple'}
@@ -102,9 +102,9 @@ s2 = nil
 --
 s0:truncate()
 
-i1 = s0:create_index('i1', { type = 'tree', parts = {2, 'num'}, unique = true })
-i2 = s0:create_index('i2', { type = 'tree', parts = {3, 'num'}, unique = false })
-i3 = s0:create_index('i3', { type = 'tree', parts = {4, 'num'}, unique = true })
+i1 = s0:create_index('i1', { type = 'tree', parts = {2, 'unsigned'}, unique = true })
+i2 = s0:create_index('i2', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+i3 = s0:create_index('i3', { type = 'tree', parts = {4, 'unsigned'}, unique = true })
 
 s0:insert{0, 0, 0, 0}
 s0:insert{1, 1, 1, 1}

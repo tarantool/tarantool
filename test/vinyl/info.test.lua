@@ -6,7 +6,7 @@ test_run:cmd("start server vinyl_info")
 test_run:cmd('switch vinyl_info')
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 space:replace({'xxx'})
 space:get({'xxx'})
 space:select()

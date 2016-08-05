@@ -7,8 +7,8 @@ s = box.schema.space.create('spatial')
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {1, 'array'}})
 
 -- any non-unique index as primary key must be forbidden
-i = s:create_index('spatial', { type = 'hash', unique = false, parts = {1, 'num'}})
-i = s:create_index('spatial', { type = 'tree', unique = false, parts = {1, 'num'}})
+i = s:create_index('spatial', { type = 'hash', unique = false, parts = {1, 'unsigned'}})
+i = s:create_index('spatial', { type = 'tree', unique = false, parts = {1, 'unsigned'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'array'}})
 
 -- tree and hash indexes over array field is not possible
@@ -16,8 +16,8 @@ i = s:create_index('primary', { type = 'tree', parts = {1, 'array'}})
 i = s:create_index('primary', { type = 'hash', parts = {1, 'array'}})
 
 -- normal indexes
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
-i = s:create_index('secondary', { type = 'hash', parts = {2, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
+i = s:create_index('secondary', { type = 'hash', parts = {2, 'unsigned'}})
 
 -- adding a tuple with array instead of num will fail
 i = s:insert{{1, 2, 3}, 4}
@@ -30,10 +30,10 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'arr
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 
 -- num rtree index is not possible
-i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'num'}})
+i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'unsigned'}})
 
 -- str rtree index is not possible
-i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'str'}})
+i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'string'}})
 
 
 -- normal rtree index
@@ -87,14 +87,14 @@ s:drop()
 s = box.schema.space.create('vinyl', {engine = 'vinyl'})
 -- rtree indexes are not enabled in vinyl
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 -- ... even secondary
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 s:drop()
 
 -- rtree in temp space must work fine
 s = box.schema.space.create('spatial', {temporary = true})
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
 s:insert{1, 2, {3, 4, 5, 6}}
 s.index.spatial:select({0, 0, 10, 10}, {iterator = 'le'})
@@ -102,7 +102,7 @@ s:drop()
 
 -- snapshot test
 s = box.schema.space.create('spatial')
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
 for i = 1,10 do s:insert{i, i, {i, i, i + 1, i + 1}} end
 box.snapshot()
@@ -116,7 +116,7 @@ i:select({0, 0}, {iterator = 'neighbor'})
 s:drop()
 
 s = box.schema.space.create('spatial')
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}, dimension = 4})
 for i = 1,10 do s:insert{i, i, {i, i, i, i, i + 1, i + 1, i + 1, i + 1}} end
 box.snapshot()
@@ -133,7 +133,7 @@ s:drop()
 iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
 iopts['distance'] = 'euclid'
 s = box.schema.space.create('spatial')
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 i = s:create_index('spatial', iopts)
 s:insert{1, {0, 5}}
 s:insert{2, {5, 0}}
@@ -146,7 +146,7 @@ s:drop()
 iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
 iopts['distance'] = 'manhattan'
 s = box.schema.space.create('spatial')
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
 i = s:create_index('spatial', iopts)
 s:insert{1, {0, 5}}
 s:insert{2, {5, 0}}
@@ -184,7 +184,7 @@ i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 0})
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, unique = true})
 
 -- wrong parts
-i = s:create_index('s', {type = 'rtree', parts = {2, 'num'}})
+i = s:create_index('s', {type = 'rtree', parts = {2, 'unsigned'}})
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array', 3, 'array'}})
 
 -- defaults test
@@ -210,7 +210,7 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'num'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'time'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}

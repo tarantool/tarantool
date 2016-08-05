@@ -336,6 +336,7 @@ public:
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
 	virtual size_t bsize() const;
+	virtual void open() { };
 
 	/**
 	 * Create a structure to represent an iterator. Must be

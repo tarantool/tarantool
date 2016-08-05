@@ -3,13 +3,13 @@ test_run = env.new()
 engine = test_run:get_cfg('engine')
 
 space = box.schema.space.create('tweedledum', { engine = engine })
-i0 = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
-i1 = space:create_index('i1', { type = 'tree', parts = {2, 'num'}, unique = false })
-i2 = space:create_index('i2', { type = 'tree', parts = {3, 'num'}, unique = false })
-i3 = space:create_index('i3', { type = 'tree', parts = {4, 'str', 5, 'str'}, unique = false })
-i4 = space:create_index('i4', { type = 'tree', parts = {7, 'str', 6, 'str'}, unique = false })
-i5 = space:create_index('i5', { type = 'tree', parts = {9, 'num'}, unique = false })
-i6 = space:create_index('i6', { type = 'tree', parts = {7, 'str', 6, 'str', 4, 'str', 5, 'str', 9, 'num'}, unique = true })
+i0 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
+i1 = space:create_index('i1', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+i2 = space:create_index('i2', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+i3 = space:create_index('i3', { type = 'tree', parts = {4, 'string', 5, 'string'}, unique = false })
+i4 = space:create_index('i4', { type = 'tree', parts = {7, 'string', 6, 'string'}, unique = false })
+i5 = space:create_index('i5', { type = 'tree', parts = {9, 'unsigned'}, unique = false })
+i6 = space:create_index('i6', { type = 'tree', parts = {7, 'string', 6, 'string', 4, 'string', 5, 'string', 9, 'unsigned'}, unique = true })
 
 space:insert{0, 0, 100, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
 space:insert{1, 1, 200, 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001}

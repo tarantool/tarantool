@@ -364,7 +364,7 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 		for (uint32_t j = 2; j < item_count; j++)
 			mp_next(&parts);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
+		enum field_type field_type = field_type_by_name(buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }
@@ -388,7 +388,7 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		uint32_t len;
 		const char *str = mp_decode_str(&parts, &len);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
+		enum field_type field_type = field_type_by_name(buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }
@@ -1103,6 +1103,9 @@ void
 AddIndex::alter(struct alter_space *alter)
 {
 	Engine *engine = alter->new_space->handler->engine;
+	/* Open the new index. */
+	Index *new_index = index_find(alter->new_space, new_key_def->iid);
+	new_index->open();
 	if (space_index(alter->old_space, 0) == NULL) {
 		if (new_key_def->iid == 0) {
 			/*
@@ -1134,7 +1137,6 @@ AddIndex::alter(struct alter_space *alter)
 		return;
 
 	Index *pk = index_find(alter->old_space, 0);
-	Index *new_index = index_find(alter->new_space, new_key_def->iid);
 
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->allocIterator();

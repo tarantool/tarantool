@@ -4,7 +4,7 @@ engine = inspector:get_cfg('engine')
 
 -- update (str)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 for key = 1, 100 do space:replace({tostring(key)}) end
 for key = 1, 100 do space:update({tostring(key)}, {{'=', 2, key}}) end
 t = {}
@@ -17,7 +17,7 @@ space:drop()
 
 -- update (num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 for key = 1, 100 do space:replace({key}) end
 for key = 1, 100 do space:update({key}, {{'=', 2, key}}) end
 t = {}
@@ -30,7 +30,7 @@ space:drop()
 
 -- update multi-part (num, num)
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 for key = 1, 100 do space:replace({key, key}) end
 for key = 1, 100 do space:update({key, key}, {{'=', 3, key}}) end
 t = {}
@@ -42,7 +42,7 @@ space:drop()
 
 -- update with box.tuple.new
 space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 for key = 1, 100 do space:replace({key, key}) end
 for key = 1, 100 do space:update(box.tuple.new{key, key}, box.tuple.new{{'=', 3, key}}) end
 t = {}
@@ -54,9 +54,9 @@ space:drop()
 
 -- update multiple indices
 space = box.schema.space.create('test', { engine = engine })
-index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'str'} })
-index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'str'}, unique = false })
-index3 = space:create_index('third', { type = 'tree', parts = {3, 'scalar', 2, 'str', 1, 'num'}, unique = false })
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'string'} })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'string'}, unique = false })
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'scalar', 2, 'string', 1, 'unsigned'}, unique = false })
 space:insert({1, 'fwoen', 324})
 space:insert({2, 'fwoen', 123})
 space:insert({3, 'fwoen', 324})
@@ -71,9 +71,9 @@ index3:update({324, 'fwoen', 3}, {{'-', 3, 100}})
 space:drop()
 
 space = box.schema.space.create('test', { engine = engine })
-index1 = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
-index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'} })
-index3 = space:create_index('third', { type = 'tree', parts = {3, 'num'}, unique = false })
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'} })
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
 space:insert({1, 1, 1})
 space:insert({2, 2, 2})
 space:insert({3, 3, 3})
