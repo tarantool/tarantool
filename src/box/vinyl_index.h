@@ -44,7 +44,7 @@ public:
 
 	/* Used by INSERT */
 	struct tuple *
-	findByKey(struct vinyl_tuple *tuple) const;
+	findByKey(struct vy_tuple *tuple) const;
 
 	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
@@ -73,8 +73,8 @@ public:
 
 
 public:
-	struct vinyl_env *env;
-	struct vinyl_index *db;
+	struct vy_env *env;
+	struct vy_index *db;
 private:
 	struct tuple_format *format;
 };

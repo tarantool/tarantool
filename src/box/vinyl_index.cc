@@ -128,8 +128,8 @@ VinylIndex::open()
 		vinyl_key_def = merge_key_defs(key_def, primary->key_def);
 	}
 	/* Create vinyl database. */
-	db = vinyl_index_new(env, vinyl_key_def, space->format);
-	if ((db == NULL) || vinyl_index_open(db))
+	db = vy_index_new(env, vinyl_key_def, space->format);
+	if ((db == NULL) || vy_index_open(db))
 		diag_raise();
 }
 
@@ -138,7 +138,7 @@ VinylIndex::~VinylIndex() { }
 size_t
 VinylIndex::bsize() const
 {
-	return vinyl_index_bsize(db);
+	return vy_index_bsize(db);
 }
 
 struct tuple *
@@ -181,10 +181,10 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	 * engine_tx might be empty, even if we are in txn context.
 	 * This can happen on a first-read statement.
 	 */
-	struct vinyl_tx *transaction = in_txn() ?
-		(struct vinyl_tx *) in_txn()->engine_tx : NULL;
+	struct vy_tx *transaction = in_txn() ?
+		(struct vy_tx *) in_txn()->engine_tx : NULL;
 	struct tuple *tuple = NULL;
-	if (vinyl_coget(transaction, db, key, part_count, &tuple) != 0)
+	if (vy_coget(transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
 	return tuple;
 }
@@ -207,8 +207,8 @@ struct vinyl_iterator {
 	int part_count;
 	const VinylIndex *index;
 	struct key_def *key_def;
-	struct vinyl_env *env;
-	struct vinyl_cursor *cursor;
+	struct vy_env *env;
+	struct vy_cursor *cursor;
 };
 
 void
@@ -217,7 +217,7 @@ vinyl_iterator_free(struct iterator *ptr)
 	assert(ptr->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	if (it->cursor) {
-		vinyl_cursor_delete(it->cursor);
+		vy_cursor_delete(it->cursor);
 		it->cursor = NULL;
 	}
 	free(ptr);
@@ -238,11 +238,11 @@ vinyl_iterator_next(struct iterator *ptr)
 	uint32_t it_sc_version = ::sc_version;
 
 	struct tuple *tuple;
-	if (vinyl_cursor_conext(it->cursor, &tuple) != 0)
+	if (vy_cursor_conext(it->cursor, &tuple) != 0)
 		diag_raise();
 	if (tuple == NULL) { /* not found */
 		/* immediately close the cursor */
-		vinyl_cursor_delete(it->cursor);
+		vy_cursor_delete(it->cursor);
 		it->cursor = NULL;
 		ptr->next = NULL;
 		return NULL;
@@ -270,7 +270,7 @@ vinyl_iterator_eq(struct iterator *ptr)
 		 * box_tuple_XXX() API. See box_tuple_ref()
 		 * comments.
 		 */
-		vinyl_cursor_delete(it->cursor);
+		vy_cursor_delete(it->cursor);
 		it->cursor = NULL;
 		ptr->next = NULL;
 		return NULL;
@@ -315,7 +315,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	it->key = key;
 	it->part_count = part_count;
 
-	enum vinyl_order order;
+	enum vy_order order;
 	switch (type) {
 	case ITER_ALL:
 	case ITER_GE:
@@ -357,7 +357,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	default:
 		return Index::initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = vinyl_cursor_new(db, key, part_count, order);
+	it->cursor = vy_cursor_new(db, key, part_count, order);
 	if (it->cursor == NULL)
 		diag_raise();
 }

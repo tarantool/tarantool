@@ -53,7 +53,7 @@
 #include "vinyl.h"
 
 /* Used by lua/info.c */
-extern "C" struct vinyl_env *
+extern "C" struct vy_env *
 vinyl_engine_get_env()
 {
 	VinylEngine *e = (VinylEngine *)engine_find("vinyl");
@@ -71,13 +71,13 @@ VinylEngine::VinylEngine()
 VinylEngine::~VinylEngine()
 {
 	if (env)
-		vinyl_env_delete(env);
+		vy_env_delete(env);
 }
 
 void
 VinylEngine::init()
 {
-	env = vinyl_env_new();
+	env = vy_env_new();
 	if (env == NULL)
 		panic("failed to create vinyl environment");
 }
@@ -85,20 +85,20 @@ VinylEngine::init()
 void
 VinylEngine::bootstrap()
 {
-	vinyl_bootstrap(env);
+	vy_bootstrap(env);
 	recovery_complete = 1;
 }
 
 void
 VinylEngine::beginInitialRecovery()
 {
-	vinyl_begin_initial_recovery(env);
+	vy_begin_initial_recovery(env);
 }
 
 void
 VinylEngine::beginFinalRecovery()
 {
-	vinyl_begin_final_recovery(env);
+	vy_begin_final_recovery(env);
 }
 
 void
@@ -106,7 +106,7 @@ VinylEngine::endRecovery()
 {
 	assert(!recovery_complete);
 	/* complete two-phase recovery */
-	vinyl_end_recovery(env);
+	vy_end_recovery(env);
 	recovery_complete = 1;
 }
 
@@ -151,7 +151,7 @@ vinyl_send_row(void *arg, const char *tuple, uint32_t tuple_size, int64_t lsn)
 }
 
 struct join_send_space_arg {
-	struct vinyl_env *env;
+	struct vy_env *env;
 	struct xstream *stream;
 };
 
@@ -200,7 +200,7 @@ VinylEngine::dropIndex(Index *index)
 {
 	VinylIndex *i = (VinylIndex *)index;
 	/* schedule asynchronous drop */
-	int rc = vinyl_index_drop(i->db);
+	int rc = vy_index_drop(i->db);
 	if (rc == -1)
 		diag_raise();
 	i->db  = NULL;
@@ -221,7 +221,7 @@ void
 VinylEngine::begin(struct txn *txn)
 {
 	assert(txn->engine_tx == NULL);
-	txn->engine_tx = vinyl_begin(env);
+	txn->engine_tx = vy_begin(env);
 	if (txn->engine_tx == NULL)
 		diag_raise();
 }
@@ -229,9 +229,9 @@ VinylEngine::begin(struct txn *txn)
 void
 VinylEngine::prepare(struct txn *txn)
 {
-	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
+	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
-	int rc = vinyl_prepare(env, tx);
+	int rc = vy_prepare(env, tx);
 	switch (rc) {
 	case 1: /* rollback, will be done by all-engines transaction manager */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
@@ -245,9 +245,9 @@ VinylEngine::prepare(struct txn *txn)
 void
 VinylEngine::commit(struct txn *txn, int64_t lsn)
 {
-	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
+	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	if (tx) {
-		int rc = vinyl_commit(env, tx, txn->n_rows ? lsn : 0);
+		int rc = vy_commit(env, tx, txn->n_rows ? lsn : 0);
 		if (rc == -1) {
 			panic("vinyl commit failed: txn->signature = %"
 			      PRIu64, lsn);
@@ -262,15 +262,15 @@ VinylEngine::rollback(struct txn *txn)
 	if (txn->engine_tx == NULL)
 		return;
 
-	struct vinyl_tx *tx = (struct vinyl_tx *) txn->engine_tx;
-	vinyl_rollback(env, tx);
+	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
+	vy_rollback(env, tx);
 	txn->engine_tx = NULL;
 }
 
 int
 VinylEngine::beginCheckpoint()
 {
-	int rc = vinyl_checkpoint(env);
+	int rc = vy_checkpoint(env);
 	if (rc == -1)
 		diag_raise();
 	return 0;
@@ -280,7 +280,7 @@ int
 VinylEngine::waitCheckpoint(struct vclock*)
 {
 	for (;;) {
-		if (!vinyl_checkpoint_is_active(env))
+		if (!vy_checkpoint_is_active(env))
 			break;
 		fiber_yield_timeout(.020);
 	}

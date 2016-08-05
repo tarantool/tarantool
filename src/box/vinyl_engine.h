@@ -55,7 +55,7 @@ struct VinylEngine: public Engine {
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 public:
-	struct vinyl_env *env;
+	struct vy_env *env;
 	int recovery_complete;
 };
 

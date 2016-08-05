@@ -41,10 +41,10 @@
 extern "C" {
 #endif
 
-struct vinyl_env;
-struct vinyl_tx;
-struct vinyl_cursor;
-struct vinyl_index;
+struct vy_env;
+struct vy_tx;
+struct vy_cursor;
+struct vy_index;
 struct key_def;
 struct tuple;
 struct tuple_format;
@@ -54,33 +54,33 @@ struct region;
  * Environment
  */
 
-struct vinyl_env *
-vinyl_env_new(void);
+struct vy_env *
+vy_env_new(void);
 
 int
-vinyl_env_delete(struct vinyl_env *e);
+vy_env_delete(struct vy_env *e);
 
 /*
  * Recovery
  */
 
 void
-vinyl_bootstrap(struct vinyl_env *e);
+vy_bootstrap(struct vy_env *e);
 
 void
-vinyl_begin_initial_recovery(struct vinyl_env *e);
+vy_begin_initial_recovery(struct vy_env *e);
 
 void
-vinyl_begin_final_recovery(struct vinyl_env *e);
+vy_begin_final_recovery(struct vy_env *e);
 
 void
-vinyl_end_recovery(struct vinyl_env *e);
+vy_end_recovery(struct vy_env *e);
 
 int
-vinyl_checkpoint(struct vinyl_env *env);
+vy_checkpoint(struct vy_env *env);
 
 bool
-vinyl_checkpoint_is_active(struct vinyl_env *env);
+vy_checkpoint_is_active(struct vy_env *env);
 
 /*
  * Introspection
@@ -109,11 +109,11 @@ struct vy_info_node {
 struct vy_info {
 	struct vy_info_node root;
 	struct region allocator;
-	struct vinyl_env *env;
+	struct vy_env *env;
 };
 
 int
-vy_info_create(struct vy_info *info, struct vinyl_env *e);
+vy_info_create(struct vy_info *info, struct vy_env *e);
 
 void
 vy_info_destroy(struct vy_info *creator);
@@ -122,69 +122,69 @@ vy_info_destroy(struct vy_info *creator);
  * Transaction
  */
 
-struct vinyl_tx *
-vinyl_begin(struct vinyl_env *e);
+struct vy_tx *
+vy_begin(struct vy_env *e);
 
 int
-vinyl_coget(struct vinyl_tx *tx, struct vinyl_index *index,
-	    const char *key, uint32_t part_count, struct tuple **result);
+vy_coget(struct vy_tx *tx, struct vy_index *index,
+	 const char *key, uint32_t part_count, struct tuple **result);
 
 int
-vinyl_replace(struct vinyl_tx *tx, struct vinyl_index *index,
-	      const char *tuple, const char *tuple_end);
+vy_replace(struct vy_tx *tx, struct vy_index *index,
+	   const char *tuple, const char *tuple_end);
 
 int
-vinyl_upsert(struct vinyl_tx *tx, struct vinyl_index *index,
-	    const char *tuple, const char *tuple_end,
-	    const char *ops, const char *ops_end, int index_base);
+vy_upsert(struct vy_tx *tx, struct vy_index *index,
+	  const char *tuple, const char *tuple_end,
+	  const char *ops, const char *ops_end, int index_base);
 
 int
-vinyl_delete(struct vinyl_tx *tx, struct vinyl_index *index,
-	     const char *key, uint32_t part_count);
+vy_delete(struct vy_tx *tx, struct vy_index *index,
+	  const char *key, uint32_t part_count);
 
 int
-vinyl_prepare(struct vinyl_env *e, struct vinyl_tx *tx);
+vy_prepare(struct vy_env *e, struct vy_tx *tx);
 
 int
-vinyl_commit(struct vinyl_env *e, struct vinyl_tx *tx, int64_t lsn);
+vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn);
 
 void
-vinyl_rollback(struct vinyl_env *e, struct vinyl_tx *tx);
+vy_rollback(struct vy_env *e, struct vy_tx *tx);
 
 void *
-vy_savepoint(struct vinyl_tx *tx);
+vy_savepoint(struct vy_tx *tx);
 
 void
-vy_rollback_to_savepoint(struct vinyl_tx *tx, void *svp);
+vy_rollback_to_savepoint(struct vy_tx *tx, void *svp);
 
 /*
  * Index
  */
 
 struct key_def *
-vy_index_key_def(struct vinyl_index *index);
+vy_index_key_def(struct vy_index *index);
 
-struct vinyl_index *
-vinyl_index_new(struct vinyl_env *env, struct key_def *key_def,
+struct vy_index *
+vy_index_new(struct vy_env *env, struct key_def *key_def,
 		struct tuple_format *tuple_format);
 
 int
-vinyl_index_open(struct vinyl_index *index);
+vy_index_open(struct vy_index *index);
 
 /**
  * Close index and drop all data
  */
 int
-vinyl_index_drop(struct vinyl_index *index);
+vy_index_drop(struct vy_index *index);
 
 size_t
-vinyl_index_bsize(struct vinyl_index *db);
+vy_index_bsize(struct vy_index *db);
 
 /*
  * Index Cursor
  */
 
-enum vinyl_order {
+enum vy_order {
 	VINYL_LT,
 	VINYL_LE,
 	VINYL_GT,
@@ -192,15 +192,15 @@ enum vinyl_order {
 	VINYL_EQ
 };
 
-struct vinyl_cursor *
-vinyl_cursor_new(struct vinyl_index *index, const char *key,
-		 uint32_t part_count, enum vinyl_order order);
+struct vy_cursor *
+vy_cursor_new(struct vy_index *index, const char *key,
+		 uint32_t part_count, enum vy_order order);
 
 void
-vinyl_cursor_delete(struct vinyl_cursor *cursor);
+vy_cursor_delete(struct vy_cursor *cursor);
 
 int
-vinyl_cursor_conext(struct vinyl_cursor *cursor, struct tuple **result);
+vy_cursor_conext(struct vy_cursor *cursor, struct tuple **result);
 
 /*
  * Replication
@@ -209,7 +209,7 @@ vinyl_cursor_conext(struct vinyl_cursor *cursor, struct tuple **result);
 typedef int
 (*vy_send_row_f)(void *, const char *tuple, uint32_t tuple_size, int64_t lsn);
 int
-vy_index_send(struct vinyl_index *index, vy_send_row_f sendrow, void *ctx);
+vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx);
 
 #ifdef __cplusplus
 }

@@ -238,7 +238,7 @@ lbox_vinyl_info_table(struct lua_State *L, struct vy_info_node *node)
 }
 
 /* Declared in vinyl_engine.cc */
-extern struct vinyl_env *
+extern struct vy_env *
 vinyl_engine_get_env();
 
 static int
