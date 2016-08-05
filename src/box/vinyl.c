@@ -2763,11 +2763,12 @@ struct txv {
 	struct vy_index *index;
 	struct vy_tuple *tuple;
 	struct txv *gc;
-	/** Next tuple in the same index. */
-	struct rlist next_in_index;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
+	/** Member of the transaction manager index. */
 	rb_node(struct txv) in_txvindex;
+	/** Member of the transaction log index. */
+	rb_node(struct txv) in_logindex;
 	/** True if this transaction was aborted by a conflict. */
 	bool is_aborted;
 };
@@ -2861,14 +2862,12 @@ txv_new(struct vy_index *index, struct vy_tuple *tuple, uint64_t tsn)
 	vy_tuple_ref(tuple);
 	v->gc = NULL;
 	v->is_aborted = false;
-	rlist_create(&v->next_in_index);
 	return v;
 }
 
 static inline void
 txv_delete(struct vy_env *env, struct txv *v)
 {
-	rlist_del(&v->next_in_index);
 	vy_tuple_unref_rt(env, v->tuple);
 	free(v);
 }
@@ -2912,32 +2911,6 @@ txv_aborted(struct txv *v)
 	return v->is_aborted;
 }
 
-struct txlogindex {
-	struct rlist log;
-	struct vy_index *index;
-	struct rlist next;
-};
-
-int
-txlogindex_add(struct rlist *logindex, struct txv *v)
-{
-	struct txlogindex *i;
-	rlist_foreach_entry(i, logindex, next) {
-		if (i->index == v->index) {
-			rlist_add_tail(&i->log, &v->next_in_index);
-			return 0;
-		}
-	}
-	i = malloc(sizeof(struct txlogindex));
-	if (i == NULL)
-		return -1;
-	i->index = v->index;
-	rlist_create(&i->log);
-	rlist_create(&i->next);
-	rlist_add_tail(&i->log, &v->next_in_index);
-	rlist_add(logindex, &i->next);
-	return 0;
-}
 
 static int
 txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b);
@@ -3013,6 +2986,22 @@ txv_next(struct txv *v)
 	return NULL;
 }
 
+typedef rb_tree(struct txv) logindex_t;
+
+static int
+logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
+{
+	(void) index;
+	/* Order by index first, by key in the index second. */
+	int rc = a->index < b->index ? -1 : a->index > b->index;
+	if (rc == 0) {
+		struct key_def *key_def = a->index->key_def;
+		rc = vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
+	}
+	return rc;
+}
+
+rb_gen(, logindex_, logindex_t, struct txv, in_logindex, logindex_cmp);
 
 struct vy_tx {
 	/**
@@ -3024,7 +3013,7 @@ struct vy_tx {
 	 * Writes of the transaction segregated by the changed
 	 * vy_index object.
 	 */
-	struct rlist logindex;
+	logindex_t logindex;
 	uint64_t start;
 	enum tx_type     type;
 	enum tx_state    state;
@@ -3046,7 +3035,8 @@ struct vy_tx {
 bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
-	return tx->type == VINYL_TX_RO || rlist_empty(&tx->logindex);
+	return tx->type == VINYL_TX_RO ||
+		tx->logindex.rbt_root == &tx->logindex.rbt_nil;
 }
 
 typedef rb_tree(struct vy_tx) tx_tree_t;
@@ -3159,7 +3149,7 @@ static void
 tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 {
 	stailq_create(&tx->log);
-	rlist_create(&tx->logindex);
+	logindex_new(&tx->logindex);
 	tx->start = clock_monotonic64();
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
@@ -3230,9 +3220,6 @@ tx_manager_gc(struct tx_manager *m)
 static void
 tx_delete(struct vy_tx *tx)
 {
-	struct txlogindex *i, *tmp;
-	rlist_foreach_entry_safe(i, &tx->logindex, next, tmp)
-		free(i);
 	free(tx);
 }
 
@@ -3267,6 +3254,8 @@ tx_rollback_svp(struct vy_tx *tx, struct txv *v)
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* remove from index */
 		txv_untrack(v);
+		if (!(v->tuple->flags & SVGET))
+			logindex_remove(&tx->logindex, v);
 		txv_delete(env, v);
 	}
 }
@@ -3323,8 +3312,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 		if (!(tuple->flags & SVGET)) {
 			if (old->tuple->flags & SVGET) {
 				/* Write after read */
-				if (txlogindex_add(&tx->logindex, old))
-					goto error;
+				logindex_insert(&tx->logindex, old);
 				tx->readonly_tail = NULL;
 			}
 			vy_tuple_unref_rt(env, old->tuple);
@@ -3342,10 +3330,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 			if (tx->readonly_tail == NULL)
 				tx->readonly_tail = v;
 		} else {
-			if (txlogindex_add(&tx->logindex, v)) {
-				txv_delete(env, v);
-				goto error;
-			}
+			logindex_insert(&tx->logindex, v);
 			tx->readonly_tail = NULL;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
@@ -7302,11 +7287,11 @@ vy_index_conf_free(struct vy_index_conf *s)
 	}
 }
 
-static void
-si_write(struct txlogindex *li, uint64_t time,
+static struct txv *
+si_write(logindex_t *logindex, struct txv *v, uint64_t time,
 	 enum vinyl_status status, uint64_t lsn)
 {
-	struct vy_index *index = li->index;
+	struct vy_index *index = v->index;
 	struct vy_env *env = index->env;
 	struct rlist rangelist;
 	size_t quota = 0;
@@ -7314,8 +7299,9 @@ si_write(struct txlogindex *li, uint64_t time,
 
 	vy_index_lock(index);
 	index->update_time = time;
-	struct txv *v;
-	rlist_foreach_entry(v, &li->log, next_in_index) {
+	for (; v != NULL && v->index == index;
+	     v = logindex_next(logindex, v)) {
+
 		struct vy_tuple *tuple = v->tuple;
 		assert(!(tuple->flags & SVGET));
 		tuple->lsn = lsn;
@@ -7355,7 +7341,7 @@ si_write(struct txlogindex *li, uint64_t time,
 	vy_index_unlock(index);
 	/* Take quota after having unlocked the index mutex. */
 	vy_quota_op(env->quota, VINYL_QADD, quota);
-	return;
+	return v;
 }
 
 struct scheduler {
@@ -8918,11 +8904,6 @@ vy_tx_end(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
 		/** Gets are collected by gc */
 		if (v->tuple->flags & SVGET) {
 			v->gc = m->gc;
-			/*
-			 * We will destroy tx, ensure the txv
-			 * doesn't refer to it.
-			 */
-			rlist_del(&v->next_in_index);
 			m->gc = v;
 			m->count_gc++;
 		} else {
@@ -9055,9 +9036,9 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 
 	/* index */
 	uint64_t now = clock_monotonic64();
-	struct txlogindex *i;
-	rlist_foreach_entry(i, &tx->logindex, next)
-		si_write(i, now, e->status, lsn);
+	struct txv *v = logindex_first(&tx->logindex);
+	while (v != NULL)
+		v = si_write(&tx->logindex, v, now, e->status, lsn);
 
 	vy_tx_end(e->stat, tx, 0, 0);
 	return 0;
