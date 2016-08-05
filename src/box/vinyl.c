@@ -2257,30 +2257,29 @@ struct svref {
 	uint8_t flags;
 };
 
-struct tree_svindex_key {
+struct tree_mem_key {
 	char *data;
-	int size;
 	uint64_t lsn;
 };
 
-struct svindex;
+struct vy_mem;
 
 int
-tree_svindex_compare(struct svref a, struct svref b, struct svindex *index);
+vy_mem_tree_cmp(struct svref a, struct svref b, struct vy_mem *index);
 
 int
-tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
-			 struct svindex *index);
+vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
+			 struct vy_mem *index);
 
-#define BPS_TREE_VINDEX_PAGE_SIZE (16 * 1024)
-#define BPS_TREE_NAME _svindex
+#define BPS_TREE_MEM_INDEX_PAGE_SIZE (16 * 1024)
+#define BPS_TREE_NAME _mem
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE BPS_TREE_VINDEX_PAGE_SIZE
-#define BPS_TREE_COMPARE(a, b, index) tree_svindex_compare(a, b, index)
-#define BPS_TREE_COMPARE_KEY(a, b, index) tree_svindex_compare_key(a, b, index)
+#define BPS_TREE_EXTENT_SIZE BPS_TREE_MEM_INDEX_PAGE_SIZE
+#define BPS_TREE_COMPARE(a, b, index) vy_mem_tree_cmp(a, b, index)
+#define BPS_TREE_COMPARE_KEY(a, b, index) vy_mem_tree_cmp_key(a, b, index)
 #define bps_tree_elem_t struct svref
-#define bps_tree_key_t struct tree_svindex_key *
-#define bps_tree_arg_t struct svindex *
+#define bps_tree_key_t struct tree_mem_key *
+#define bps_tree_arg_t struct vy_mem *
 #define BPS_TREE_NO_DEBUG
 
 #include "salad/bps_tree.h"
@@ -2308,10 +2307,10 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
  * During insertion, reference counter of vy_tuple is incremented,
  * during destruction all vy_tuple' reference counters are decremented.
  */
-struct svindex {
-	struct bps_tree_svindex tree;
+struct vy_mem {
+	struct bps_tree_mem tree;
 	uint32_t used;
-	uint64_t lsnmin;
+	uint64_t min_lsn;
 	struct key_def *key_def;
 	/*
 	 * This is a search state flag, which is set
@@ -2324,7 +2323,7 @@ struct svindex {
 };
 
 int
-tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
+vy_mem_tree_cmp(struct svref a, struct svref b, struct vy_mem *index)
 {
 	int res = vy_tuple_compare(a.v->data, b.v->data, index->key_def);
 	if (res == 0) {
@@ -2335,8 +2334,8 @@ tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
 }
 
 int
-tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
-			 struct svindex *index)
+vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
+			 struct vy_mem *index)
 {
 	int res = vy_tuple_compare(a.v->data, key->data, index->key_def);
 	if (res == 0) {
@@ -2347,11 +2346,11 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 }
 
 void *
-sv_index_alloc_matras_page()
+vy_index_alloc_matras_page()
 {
-	void *res = malloc(BPS_TREE_VINDEX_PAGE_SIZE);
+	void *res = malloc(BPS_TREE_MEM_INDEX_PAGE_SIZE);
 	if (res == NULL) {
-		diag_set(OutOfMemory, BPS_TREE_VINDEX_PAGE_SIZE,
+		diag_set(OutOfMemory, BPS_TREE_MEM_INDEX_PAGE_SIZE,
 			 "malloc", "raw bytes");
 	}
 	return res;
@@ -2364,45 +2363,46 @@ sv_index_free_matras_page(void *p)
 }
 
 static int
-sv_indexinit(struct svindex *i, struct key_def *key_def)
+vy_mem_init(struct vy_mem *index, struct key_def *key_def)
 {
-	i->lsnmin = UINT64_MAX;
-	i->used   = 0;
-	i->key_def = key_def;
-	bps_tree_svindex_create(&i->tree, i,
-				sv_index_alloc_matras_page,
+	index->min_lsn = UINT64_MAX;
+	index->used = 0;
+	index->key_def = key_def;
+	bps_tree_mem_create(&index->tree, index,
+				vy_index_alloc_matras_page,
 				sv_index_free_matras_page);
 	return 0;
 }
 
 static int
-sv_indexfree(struct svindex *i)
+vy_mem_free(struct vy_mem *index)
 {
-	assert(i == i->tree.arg);
-	struct bps_tree_svindex_iterator itr =
-		bps_tree_svindex_itr_first(&i->tree);
-	while (!bps_tree_svindex_itr_is_invalid(&itr)) {
-		struct vy_tuple *v = bps_tree_svindex_itr_get_elem(&i->tree, &itr)->v;
+	assert(index == index->tree.arg);
+	struct bps_tree_mem_iterator itr =
+		bps_tree_mem_itr_first(&index->tree);
+	while (!bps_tree_mem_itr_is_invalid(&itr)) {
+		struct vy_tuple *v =
+			bps_tree_mem_itr_get_elem(&index->tree, &itr)->v;
 		vy_tuple_unref(v);
-		bps_tree_svindex_itr_next(&i->tree, &itr);
+		bps_tree_mem_itr_next(&index->tree, &itr);
 	}
-	bps_tree_svindex_destroy(&i->tree);
+	bps_tree_mem_destroy(&index->tree);
 	return 0;
 }
 
 static inline int
-sv_indexset(struct svindex *i, struct svref ref)
+vy_mem_set(struct vy_mem *index, struct svref ref)
 {
-	/* see struct svindex comments */
-	assert(i == i->tree.arg);
-	i->hint_key_is_equal = false;
-	if (bps_tree_svindex_insert(&i->tree, ref, NULL) != 0)
+	/* see struct vy_mem comments */
+	assert(index == index->tree.arg);
+	index->hint_key_is_equal = false;
+	if (bps_tree_mem_insert(&index->tree, ref, NULL) != 0)
 		return -1;
 	/* sic: sync this value with vy_range->used */
-	i->used += vy_tuple_size(ref.v);
-	if (i->lsnmin > ref.v->lsn)
-		i->lsnmin = ref.v->lsn;
-	if (!i->hint_key_is_equal) {
+	index->used += vy_tuple_size(ref.v);
+	if (index->min_lsn > ref.v->lsn)
+		index->min_lsn = ref.v->lsn;
+	if (!index->hint_key_is_equal) {
 		/* there no duplicates, no need to change and flags */
 		return 0;
 	}
@@ -2413,24 +2413,23 @@ sv_indexset(struct svindex *i, struct svref ref)
 	 * Otherwise, the new inserted ref's flags must be set to SVDUP. (2)
 	 * First of all, let's find the just inserted svref.
 	 */
-	struct tree_svindex_key tree_key;
+	struct tree_mem_key tree_key;
 	tree_key.data = ref.v->data;
-	tree_key.size = ref.v->size;
 	tree_key.lsn = ref.v->lsn;
 	bool exact;
-	struct bps_tree_svindex_iterator itr =
-		bps_tree_svindex_lower_bound(&i->tree, &tree_key, &exact);
-	assert(!bps_tree_svindex_itr_is_invalid(&itr));
+	struct bps_tree_mem_iterator itr =
+		bps_tree_mem_lower_bound(&index->tree, &tree_key, &exact);
+	assert(!bps_tree_mem_itr_is_invalid(&itr));
 	struct svref *curr =
-		bps_tree_svindex_itr_get_elem(&i->tree, &itr);
+		bps_tree_mem_itr_get_elem(&index->tree, &itr);
 	/* Find previous position */
-	struct bps_tree_svindex_iterator itr_prev = itr;
-	bps_tree_svindex_itr_prev(&i->tree, &itr_prev);
-	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
+	struct bps_tree_mem_iterator itr_prev = itr;
+	bps_tree_mem_itr_prev(&index->tree, &itr_prev);
+	if (!bps_tree_mem_itr_is_invalid(&itr_prev)) {
 		struct svref *prev =
-			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
+			bps_tree_mem_itr_get_elem(&index->tree, &itr_prev);
 		if (vy_tuple_compare(curr->v->data, prev->v->data,
-				     i->key_def) == 0) {
+				     index->key_def) == 0) {
 			/*
 			 * Previous position exists and holds same key,
 			 * it's case (2)
@@ -2443,11 +2442,11 @@ sv_indexset(struct svindex *i, struct svref ref)
 	 * Previous position does not exist or holds another key,
 	 * it's case (1). Next position holds previous head of chain.
 	 */
-	struct bps_tree_svindex_iterator itr_next = itr;
-	bps_tree_svindex_itr_next(&i->tree, &itr_next);
-	assert(!bps_tree_svindex_itr_is_invalid(&itr_next));
+	struct bps_tree_mem_iterator itr_next = itr;
+	bps_tree_mem_itr_next(&index->tree, &itr_next);
+	assert(!bps_tree_mem_itr_is_invalid(&itr_next));
 	struct svref *next =
-		bps_tree_svindex_itr_get_elem(&i->tree, &itr_next);
+		bps_tree_mem_itr_get_elem(&index->tree, &itr_next);
 	next->flags |= SVDUP;
 	return 0;
 }
@@ -2455,18 +2454,17 @@ sv_indexset(struct svindex *i, struct svref ref)
  * Find a value in index with given key and biggest lsn <= given lsn
  */
 static struct svref *
-sv_indexfind(struct svindex *i, char *key, int size, uint64_t lsn)
+vy_mem_find(struct vy_mem *i, char *key, uint64_t lsn)
 {
 	assert(i == i->tree.arg);
-	struct tree_svindex_key tree_key;
+	struct tree_mem_key tree_key;
 	tree_key.data = key;
-	tree_key.size = size;
 	tree_key.lsn = lsn;
 	bool exact;
-	struct bps_tree_svindex_iterator itr =
-		bps_tree_svindex_lower_bound(&i->tree, &tree_key, &exact);
-	struct svref *ref = bps_tree_svindex_itr_get_elem(&i->tree, &itr);
-	if (ref != NULL && tree_svindex_compare_key(*ref, &tree_key, i) != 0)
+	struct bps_tree_mem_iterator itr =
+		bps_tree_mem_lower_bound(&i->tree, &tree_key, &exact);
+	struct svref *ref = bps_tree_mem_itr_get_elem(&i->tree, &itr);
+	if (ref != NULL && vy_mem_tree_cmp_key(*ref, &tree_key, i) != 0)
 		ref = NULL;
 	return ref;
 }
@@ -2508,8 +2506,8 @@ static struct svif svref_if =
 };
 
 struct svindexiter {
-	struct svindex *index;
-	struct bps_tree_svindex_iterator itr;
+	struct vy_mem *index;
+	struct bps_tree_mem_iterator itr;
 	struct sv current;
 	enum vy_order order;
 	void *key;
@@ -2519,13 +2517,13 @@ struct svindexiter {
 static struct vy_iterif sv_indexiterif;
 
 static inline int
-sv_indexiter_open(struct vy_iter *i, struct svindex *index,
+sv_indexiter_open(struct vy_iter *i, struct vy_mem *index,
 		  enum vy_order o, void *key, int key_size)
 {
 	assert(index == index->tree.arg);
 	i->vif = &sv_indexiterif;
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	struct bps_tree_svindex *tree = &index->tree;
+	struct bps_tree_mem *tree = &index->tree;
 	ii->index = index;
 	ii->order = o;
 	ii->key = key;
@@ -2533,27 +2531,26 @@ sv_indexiter_open(struct vy_iter *i, struct svindex *index,
 	ii->current.i = &svref_if;
 	if (key == NULL) {
 		if (o == VINYL_GT || o == VINYL_GE || o == VINYL_EQ) {
-			ii->itr = bps_tree_svindex_itr_first(tree);
+			ii->itr = bps_tree_mem_itr_first(tree);
 		} else {
 			assert(o == VINYL_LT || o == VINYL_LE);
-			ii->itr = bps_tree_svindex_itr_last(tree);
+			ii->itr = bps_tree_mem_itr_last(tree);
 		}
 		return 0;
 	}
 
-	struct tree_svindex_key tree_key;
+	struct tree_mem_key tree_key;
 	tree_key.data = key;
-	tree_key.size = key_size;
 	tree_key.lsn = (o == VINYL_GE || o == VINYL_EQ || o == VINYL_LT) ?
 		       UINT64_MAX : 0;
 	bool exact;
 	ii->index->hint_key_is_equal = false;
-	ii->itr = bps_tree_svindex_lower_bound(tree, &tree_key, &exact);
+	ii->itr = bps_tree_mem_lower_bound(tree, &tree_key, &exact);
 	if (o == VINYL_LE || o == VINYL_LT)
-		bps_tree_svindex_itr_prev(tree, &ii->itr);
+		bps_tree_mem_itr_prev(tree, &ii->itr);
 	else if(o == VINYL_EQ)
 		if (!ii->index->hint_key_is_equal)
-			ii->itr = bps_tree_svindex_invalid_iterator();
+			ii->itr = bps_tree_mem_invalid_iterator();
 	return (int)ii->index->hint_key_is_equal;
 }
 
@@ -2567,17 +2564,17 @@ static inline int
 sv_indexiter_has(struct vy_iter *i)
 {
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	return !bps_tree_svindex_itr_is_invalid(&ii->itr);
+	return !bps_tree_mem_itr_is_invalid(&ii->itr);
 }
 
 static inline void *
 sv_indexiter_get(struct vy_iter *i)
 {
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	if (bps_tree_svindex_itr_is_invalid(&ii->itr))
+	if (bps_tree_mem_itr_is_invalid(&ii->itr))
 		return NULL;
 	ii->current.v = (void *)
-		bps_tree_svindex_itr_get_elem(&ii->index->tree, &ii->itr);
+		bps_tree_mem_itr_get_elem(&ii->index->tree, &ii->itr);
 	assert(ii->current.v != NULL);
 	return (void *)&ii->current;
 }
@@ -2586,24 +2583,24 @@ static inline void
 sv_indexiter_next(struct vy_iter *i)
 {
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	assert(!bps_tree_svindex_itr_is_invalid(&ii->itr));
+	assert(!bps_tree_mem_itr_is_invalid(&ii->itr));
 
 	if (ii->order == VINYL_EQ) {
-		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
-		if (bps_tree_svindex_itr_is_invalid(&ii->itr))
+		bps_tree_mem_itr_next(&ii->index->tree, &ii->itr);
+		if (bps_tree_mem_itr_is_invalid(&ii->itr))
 			return;
 		struct svref *ref =
-			bps_tree_svindex_itr_get_elem(&ii->index->tree,
+			bps_tree_mem_itr_get_elem(&ii->index->tree,
 						      &ii->itr);
 		if (vy_tuple_compare(ref->v->data, ii->key,
 				     ii->index->key_def) != 0) {
-			ii->itr = bps_tree_svindex_invalid_iterator();
+			ii->itr = bps_tree_mem_invalid_iterator();
 		}
 	} else if (ii->order == VINYL_GT || ii->order == VINYL_GE) {
-		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
+		bps_tree_mem_itr_next(&ii->index->tree, &ii->itr);
 	} else {
 		assert(ii->order == VINYL_LT || ii->order == VINYL_LE);
-		bps_tree_svindex_itr_prev(&ii->index->tree, &ii->itr);
+		bps_tree_mem_itr_prev(&ii->index->tree, &ii->itr);
 	}
 }
 
@@ -2720,7 +2717,7 @@ struct PACKED vy_range {
 	uint64_t   temperature_reads;
 	uint16_t   refs;
 	pthread_mutex_t reflock;
-	struct svindex    i0, i1;
+	struct vy_mem    i0, i1;
 	struct vy_file     file;
 	rb_node(struct vy_range) tree_node;
 	struct ssrqnode   nodecompact;
@@ -2951,7 +2948,7 @@ txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b)
 	 * ones, i.e. the newest value comes first, in
 	 * transactional index (txvindex), we want to look
 	 * at data in chronological order.
-	 * @sa tree_svindex_compare
+	 * @sa vy_mem_tree_cmp
 	 */
 	if (rc == 0)
 		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
@@ -3965,7 +3962,7 @@ vy_range_open(struct vy_range*, struct vy_env*, char *);
 static int
 vy_range_create(struct vy_range*, struct vy_index_conf*, struct sdid*);
 static int vy_range_free(struct vy_range*, int);
-static int vy_range_gc_index(struct svindex*);
+static int vy_range_gc_index(struct vy_mem *);
 static int vy_range_seal(struct vy_range*, struct vy_index_conf*);
 static int vy_range_complete(struct vy_range*, struct vy_index_conf*);
 
@@ -3986,7 +3983,7 @@ vy_range_split(struct vy_range *node) {
 	node->flags |= SI_SPLIT;
 }
 
-static inline struct svindex*
+static inline struct vy_mem *
 vy_range_rotate(struct vy_range *node) {
 	node->flags |= SI_ROTATE;
 	return &node->i0;
@@ -3998,18 +3995,18 @@ vy_range_unrotate(struct vy_range *node) {
 	node->flags &= ~SI_ROTATE;
 	node->i0 = node->i1;
 	node->i0.tree.arg = &node->i0;
-	sv_indexinit(&node->i1, node->i0.key_def);
+	vy_mem_init(&node->i1, node->i0.key_def);
 }
 
-static inline struct svindex*
+static inline struct vy_mem *
 vy_range_index(struct vy_range *node) {
 	if (node->flags & SI_ROTATE)
 		return &node->i1;
 	return &node->i0;
 }
 
-static inline struct svindex*
-vy_range_index_priority(struct vy_range *node, struct svindex **second)
+static inline struct vy_mem *
+vy_range_index_priority(struct vy_range *node, struct vy_mem **second)
 {
 	if (unlikely(node->flags & SI_ROTATE)) {
 		*second = &node->i0;
@@ -4880,8 +4877,8 @@ err:
 
 static inline int
 vy_run_create(struct vy_index *index, struct sdc *c,
-		struct vy_range *parent, struct svindex *vindex,
-		uint64_t vlsn, struct vy_run **result)
+	      struct vy_range *parent, struct vy_mem *vindex,
+	      uint64_t vlsn, struct vy_run **result)
 {
 	(void)c;
 	struct vy_env *env = index->env;
@@ -4943,7 +4940,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 		vy_index_unlock(index);
 		return 0;
 	}
-	struct svindex *i;
+	struct vy_mem *i;
 	i = vy_range_rotate(n);
 	vy_index_unlock(index);
 
@@ -4956,7 +4953,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 		assert(n->used >= i->used);
 		n->used -= i->used;
 		vy_quota_op(env->quota, VINYL_QREMOVE, i->used);
-		struct svindex swap = *i;
+		struct vy_mem swap = *i;
 		swap.tree.arg = &swap;
 		vy_range_unrotate(n);
 		vy_range_unlock(n);
@@ -4977,7 +4974,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 	vy_quota_op(env->quota, VINYL_QREMOVE, i->used);
 	index->size += vy_page_index_size(&run->index) +
 		       vy_page_index_total(&run->index);
-	struct svindex swap = *i;
+	struct vy_mem swap = *i;
 	swap.tree.arg = &swap;
 	vy_range_unrotate(n);
 	vy_range_unlock(n);
@@ -5134,7 +5131,7 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 		struct vy_range *node, struct vy_buf *result)
 {
 	(void)index;
-	struct svindex *vindex = vy_range_index(node);
+	struct vy_mem *vindex = vy_range_index(node);
 	struct vy_iter ii;
 	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
 	while (sv_indexiter_has(&ii))
@@ -5159,7 +5156,7 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 			assert(prev != NULL);
 			while (vy_bufiter_has(&i)) {
 				struct svref *v = vy_bufiterref_get(&i);
-				sv_indexset(&prev->i0, *v);
+				vy_mem_set(&prev->i0, *v);
 				vy_bufiter_next(&i);
 			}
 			break;
@@ -5173,7 +5170,7 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 				index->key_def);
 			if (unlikely(rc >= 0))
 				break;
-			sv_indexset(&prev->i0, *v);
+			vy_mem_set(&prev->i0, *v);
 			vy_bufiter_next(&i);
 		}
 		if (unlikely(! vy_bufiter_has(&i)))
@@ -5195,8 +5192,8 @@ si_redistribute_set(struct vy_index *index, uint64_t now, struct svref *v)
 	struct vy_range *node = vy_rangeiter_get(&ii);
 	assert(node != NULL);
 	/* update node */
-	struct svindex *vindex = vy_range_index(node);
-	int rc = sv_indexset(vindex, *v);
+	struct vy_mem *vindex = vy_range_index(node);
+	int rc = vy_mem_set(vindex, *v);
 	assert(rc == 0); /* TODO: handle BPS tree errors properly */
 	(void) rc;
 	node->update_time = index->update_time;
@@ -5208,7 +5205,7 @@ si_redistribute_set(struct vy_index *index, uint64_t now, struct svref *v)
 static int
 si_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *node)
 {
-	struct svindex *vindex = vy_range_index(node);
+	struct vy_mem *vindex = vy_range_index(node);
 	struct vy_iter ii;
 	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
 	while (sv_indexiter_has(&ii)) {
@@ -5354,7 +5351,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	/* commit compaction changes */
 	vy_index_lock(index);
-	struct svindex *j = vy_range_index(range);
+	struct vy_mem *j = vy_range_index(range);
 	vy_planner_remove(&index->p, range);
 	vy_range_split(range);
 	index->size -= vy_range_size(range);
@@ -5404,7 +5401,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		}
 		break;
 	}
-	sv_indexinit(j, index->key_def);
+	vy_mem_init(j, index->key_def);
 	vy_index_unlock(index);
 
 	/* compaction completion */
@@ -5488,8 +5485,8 @@ vy_range_new(struct key_def *key_def)
 	n->refs = 0;
 	tt_pthread_mutex_init(&n->reflock, NULL);
 	vy_file_init(&n->file);
-	sv_indexinit(&n->i0, key_def);
-	sv_indexinit(&n->i1, key_def);
+	vy_mem_init(&n->i0, key_def);
+	vy_mem_init(&n->i1, key_def);
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodedump);
 	rlist_create(&n->gc);
@@ -5497,10 +5494,10 @@ vy_range_new(struct key_def *key_def)
 	return n;
 }
 
-static int vy_range_gc_index(struct svindex *i)
+static int vy_range_gc_index(struct vy_mem *i)
 {
-	sv_indexfree(i);
-	sv_indexinit(i, i->key_def);
+	vy_mem_free(i);
+	vy_mem_init(i, i->key_def);
 	return 0;
 }
 
@@ -5520,8 +5517,8 @@ vy_range_close(struct vy_range *n, int gc)
 		vy_range_gc_index(&n->i0);
 		vy_range_gc_index(&n->i1);
 	} else {
-		sv_indexfree(&n->i0);
-		sv_indexfree(&n->i1);
+		vy_mem_free(&n->i0);
+		vy_mem_free(&n->i1);
 		tt_pthread_mutex_destroy(&n->reflock);
 	}
 	return rcret;
@@ -5764,7 +5761,7 @@ vy_planner_peek_checkpoint(struct vy_index *index, uint64_t checkpoint_lsn,
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
 		n = container_of(pn, struct vy_range, nodedump);
-		if (n->i0.lsnmin > checkpoint_lsn)
+		if (n->i0.min_lsn > checkpoint_lsn)
 			continue;
 		if (n->flags & SI_LOCK) {
 			in_progress = true;
@@ -6155,8 +6152,8 @@ next_node:
 	}
 
 	/* in-memory indexes */
-	struct svindex *second;
-	struct svindex *first = vy_range_index_priority(node, &second);
+	struct vy_mem *second;
+	struct vy_mem *first = vy_range_index_priority(node, &second);
 	if (first->tree.size) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		sv_indexiter_open(&s->src, first, q->order,
@@ -6238,13 +6235,11 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 
 	uint64_t lsn = tuple->lsn;
 	/* search in-memory */
-	struct svindex *second;
-	struct svindex *first = vy_range_index_priority(range, &second);
-	struct svref *ref = sv_indexfind(first, tuple->data,
-					 tuple->size, UINT64_MAX);
+	struct vy_mem *second;
+	struct vy_mem *first = vy_range_index_priority(range, &second);
+	struct svref *ref = vy_mem_find(first, tuple->data, UINT64_MAX);
 	if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
-		ref = sv_indexfind(second, tuple->data,
-				   tuple->size, UINT64_MAX);
+		ref = vy_mem_find(second, tuple->data, UINT64_MAX);
 	if (ref != NULL && ref->v->lsn >= lsn)
 		return 1;
 
@@ -6752,8 +6747,8 @@ si_write(logindex_t *logindex, struct txv *v, uint64_t time,
 		ref.v = tuple;
 		ref.flags = 0;
 		/* insert into node index */
-		struct svindex *vindex = vy_range_index(range);
-		int rc = sv_indexset(vindex, ref);
+		struct vy_mem *vindex = vy_range_index(range);
+		int rc = vy_mem_set(vindex, ref);
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 		/* update node */
