@@ -59,18 +59,18 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - branch_age
-        - 0
-      - - branch_age_period
-        - 0
-      - - branch_age_wm
-        - 0
-      - - branch_prio
-        - 2
-      - - compact_wm
+    - - - compact_wm
         - 2
       - - memory_limit
         - 1
+      - - run_age
+        - 0
+      - - run_age_period
+        - 0
+      - - run_age_wm
+        - 0
+      - - run_prio
+        - 2
       - - threads
         - 5
   - - vinyl_dir

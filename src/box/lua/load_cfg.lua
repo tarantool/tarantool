@@ -9,10 +9,10 @@ local default_vinyl_cfg = {
     memory_limit      = 1.0, -- 1G
     threads           = 5,
     compact_wm        = 2,
-    branch_prio       = 2,
-    branch_age        = 0,
-    branch_age_period = 0,
-    branch_age_wm     = 0,
+    run_prio          = 2,
+    run_age           = 0,
+    run_age_period    = 0,
+    run_age_wm        = 0,
 }
 
 -- all available options
@@ -57,10 +57,10 @@ local vinyl_template_cfg = {
     memory_limit      = 'number',
     threads           = 'number',
     compact_wm        = 'number',
-    branch_prio       = 'number',
-    branch_age        = 'number',
-    branch_age_period = 'number',
-    branch_age_wm     = 'number',
+    run_prio          = 'number',
+    run_age           = 'number',
+    run_age_period    = 'number',
+    run_age_wm        = 'number',
 }
 
 -- types of available options
