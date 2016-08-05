@@ -491,7 +491,7 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 {
 	def->id = tuple_field_u32(tuple, ID);
 	def->uid = tuple_field_u32(tuple, UID);
-	def->field_count = tuple_field_u32(tuple, FIELD_COUNT);
+	def->exact_field_count = tuple_field_u32(tuple, FIELD_COUNT);
 	int namelen = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
@@ -812,8 +812,8 @@ ModifySpace::prepare(struct alter_space *alter)
 			  space_name(alter->old_space),
 			  "can not change space engine");
 
-	if (def.field_count != 0 &&
-	    def.field_count != alter->old_space->def.field_count &&
+	if (def.exact_field_count != 0 &&
+	    def.exact_field_count != alter->old_space->def.exact_field_count &&
 	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 

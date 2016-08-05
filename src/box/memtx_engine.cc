@@ -266,7 +266,6 @@ MemtxSpace::applySnapshotRow(struct space *space, struct request *request)
 					    request->tuple_end);
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
-	space_validate_tuple(space, new_tuple);
 	if (!rlist_empty(&space->on_replace)) {
 		/*
 		 * Emulate transactions for system spaces with triggers
@@ -298,7 +297,6 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 					    request->tuple_end);
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
-	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 	struct tuple *old_tuple = this->replace(space, NULL, new_tuple, mode);
 	memtx_txn_add_undo(txn, old_tuple, new_tuple);
@@ -346,7 +344,6 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					       request->tuple_end,
 					       request->index_base);
 	TupleRef ref(new_tuple);
-	space_validate_tuple(space, new_tuple);
 	this->replace(space, old_tuple, new_tuple, DUP_REPLACE);
 	memtx_txn_add_undo(txn, old_tuple, new_tuple);
 	return new_tuple;
@@ -358,8 +355,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 {
 	Index *pk = index_find_unique(space, request->index_id);
 
-	/* Check field count in tuple */
-	space_validate_tuple_raw(space, request->tuple);
 	/* Check tuple fields */
 	tuple_validate_raw(space->format, request->tuple);
 
@@ -413,11 +408,12 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		 * tuple_upsert throws on totally wrong tuple ops,
 		 * but ignores ops that not suitable for the tuple
 		 */
-		struct tuple *new_tuple =
-			tuple_upsert(space->format, region_aligned_alloc_xc_cb,
-				     &fiber()->gc, old_tuple,
-				     request->ops, request->ops_end,
-				     request->index_base);
+		struct tuple *new_tuple;
+		new_tuple = tuple_upsert(space->format,
+					 region_aligned_alloc_xc_cb,
+					 &fiber()->gc, old_tuple,
+					 request->ops, request->ops_end,
+					 request->index_base);
 		TupleRef ref(new_tuple);
 
 		/**
@@ -425,7 +421,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		 * note that OutOfMemory is not catched.
 		 */
 		try {
-			space_validate_tuple(space, new_tuple);
 			replace(space, old_tuple, new_tuple, DUP_REPLACE);
 			memtx_txn_add_undo(txn, old_tuple, new_tuple);
 		} catch (ClientError *e) {

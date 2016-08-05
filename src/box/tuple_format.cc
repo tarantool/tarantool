@@ -138,6 +138,7 @@ tuple_format_alloc(struct rlist *key_list)
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
 	format->field_count = field_count;
+	format->exact_field_count = 0;
 	return format;
 }
 

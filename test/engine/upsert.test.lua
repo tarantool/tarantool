@@ -164,6 +164,29 @@ s:upsert({0}, {{':', 2, -100, 2, 'every'}})
 s:select{0}
 s:drop()
 
+
+space = box.schema.space.create('test', { engine = engine, field_count = 1 })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+space:insert({1})
+space:select{}
+space:upsert({2, 2}, {{'+', 2, 1}})
+-- TODO: https://github.com/tarantool/tarantool/issues/1622
+-- space:upsert({1}, {{'=', 2, 10}})
+space:select{}
+space:drop()
+
+space = box.schema.space.create('test', { engine = engine, field_count = 2 })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+space:insert({1, 1})
+space:select{}
+space:upsert({2, 2, 2}, {{'+', 3, 1}})
+space:upsert({3, 3}, {{'+', 2, 1}})
+-- TODO: https://github.com/tarantool/tarantool/issues/1622
+--space:upsert({4}, {{'=', 2, 10}})
+--space:upsert({1}, {{'#', 2}})
+space:select{}
+space:drop()
+
 --UPSERT https://github.com/tarantool/tarantool/issues/966
 test_run:cmd("setopt delimiter ';'")
 function anything_to_string(tab)

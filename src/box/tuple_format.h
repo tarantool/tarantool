@@ -88,6 +88,11 @@ struct tuple_format {
 	uint16_t id;
 	/* Format objects are reference counted. */
 	int refs;
+	/**
+	 * If not set (== 0), any tuple in the space can have any number of
+	 * fields. If set, each tuple must have exactly this number of fields.
+	 */
+	uint32_t exact_field_count;
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/**

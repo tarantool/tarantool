@@ -120,16 +120,6 @@ uint32_t
 space_size(struct space *space);
 
 /**
- * Check that the tuple has correct field count and correct field
- * types (a pre-requisite for an INSERT).
- */
-void
-space_validate_tuple(struct space *sp, struct tuple *new_tuple);
-
-void
-space_validate_tuple_raw(struct space *sp, const char *data);
-
-/**
  * Allocate and initialize a space. The space
  * needs to be loaded before it can be used
  * (see space->handler->recover()).

@@ -64,7 +64,6 @@ access_check_space(struct space *space, uint8_t access)
 	}
 }
 
-
 void
 space_fill_index_map(struct space *space)
 {
@@ -119,6 +118,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->format = tuple_format_new(key_list);
 	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
+	space->format->exact_field_count = def->exact_field_count;
 	space->index_id_max = index_id_max;
 	/* init space engine instance */
 	Engine *engine = engine_find(def->engine_name);
@@ -157,31 +157,6 @@ uint32_t
 space_size(struct space *space)
 {
 	return space_index(space, 0)->size();
-}
-
-static inline void
-space_validate_field_count(struct space *sp, uint32_t field_count)
-{
-	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
-		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
-		          field_count, space_name(sp), sp->def.field_count);
-	if (field_count < sp->format->field_count)
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  field_count, sp->format->field_count);
-}
-
-void
-space_validate_tuple_raw(struct space *sp, const char *data)
-{
-	uint32_t field_count = mp_decode_array(&data);
-	space_validate_field_count(sp, field_count);
-}
-
-void
-space_validate_tuple(struct space *sp, struct tuple *new_tuple)
-{
-	uint32_t field_count = tuple_field_count(new_tuple);
-	space_validate_field_count(sp, field_count);
 }
 
 void

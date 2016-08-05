@@ -76,6 +76,11 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple)
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&pos);
+	if (format->exact_field_count > 0 &&
+	    format->exact_field_count != field_count)
+		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->exact_field_count);
 	if (unlikely(field_count < format->field_count))
 		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
 			  (unsigned) field_count,
@@ -113,6 +118,11 @@ tuple_validate_raw(struct tuple_format *format, const char *data)
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&data);
+	if (format->exact_field_count > 0 &&
+	    format->exact_field_count != field_count)
+		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->exact_field_count);
 	if (unlikely(field_count < format->field_count))
 		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
 			  (unsigned) field_count,

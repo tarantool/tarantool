@@ -336,7 +336,7 @@ struct space_def {
 	 * If set, each tuple
 	 * must have exactly this many fields.
 	 */
-	uint32_t field_count;
+	uint32_t exact_field_count;
 	char name[BOX_NAME_MAX + 1];
 	char engine_name[BOX_NAME_MAX + 1];
 	struct space_opts opts;

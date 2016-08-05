@@ -1653,6 +1653,65 @@ s:select{0}
 s:drop()
 ---
 ...
+space = box.schema.space.create('test', { engine = engine, field_count = 1 })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space:insert({1})
+---
+- [1]
+...
+space:select{}
+---
+- - [1]
+...
+space:upsert({2, 2}, {{'+', 2, 1}})
+---
+- error: Tuple field count 2 does not match format field count 1
+...
+-- TODO: https://github.com/tarantool/tarantool/issues/1622
+-- space:upsert({1}, {{'=', 2, 10}})
+space:select{}
+---
+- - [1]
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = engine, field_count = 2 })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space:insert({1, 1})
+---
+- [1, 1]
+...
+space:select{}
+---
+- - [1, 1]
+...
+space:upsert({2, 2, 2}, {{'+', 3, 1}})
+---
+- error: Tuple field count 3 does not match format field count 2
+...
+space:upsert({3, 3}, {{'+', 2, 1}})
+---
+...
+-- TODO: https://github.com/tarantool/tarantool/issues/1622
+--space:upsert({4}, {{'=', 2, 10}})
+--space:upsert({1}, {{'#', 2}})
+space:select{}
+---
+- - [1, 1]
+  - [3, 3]
+...
+space:drop()
+---
+...
 --UPSERT https://github.com/tarantool/tarantool/issues/966
 test_run:cmd("setopt delimiter ';'")
 ---

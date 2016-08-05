@@ -58,9 +58,6 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	struct vy_env *env = ((VinylEngine *)space->handler->engine)->env;
 	VinylIndex *index;
 
-	/* Check field count in the tuple. */
-	space_validate_tuple_raw(space, request->tuple);
-
 	/* Check the tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);
 
@@ -249,8 +246,6 @@ VinylSpace::executeReplace(struct txn*, struct space *space,
 			   struct request *request)
 {
 	assert(request->index_id == 0);
-	/* Check field count in the tuple. */
-	space_validate_tuple_raw(space, request->tuple);
 
 	/* Check the tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);
@@ -327,7 +322,6 @@ VinylSpace::executeUpdate(struct txn*, struct space *space,
 				 &fiber()->gc, old_tuple, request->tuple,
 				 request->tuple_end, request->index_base);
 	TupleRef new_ref(new_tuple);
-	space_validate_tuple(space, new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
 
 	/* Tuple doesn't exist so it can be inserted. */
@@ -370,9 +364,6 @@ VinylSpace::executeUpsert(struct txn*, struct space *space,
 {
 	assert(request->index_id == 0);
 	VinylIndex *index = (VinylIndex *)index_find_unique(space, request->index_id);
-
-	/* Check field count in tuple. */
-	space_validate_tuple_raw(space, request->tuple);
 
 	/* Check tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);

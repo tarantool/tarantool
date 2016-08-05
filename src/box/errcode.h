@@ -90,7 +90,7 @@ struct errcode_record {
 	/* 35 */_(ER_NO_SUCH_INDEX,		"No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \
-	/* 38 */_(ER_SPACE_FIELD_COUNT,		"Tuple field count %u does not match space '%s' field count %u") \
+	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match format field count %u") \
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		"Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"More than one tuple found by get()") \
