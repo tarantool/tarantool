@@ -34,3 +34,4 @@ test_run:cmd("setopt delimiter ''");
 cnt == m
 i:count() == m * n
 
+s:drop()
