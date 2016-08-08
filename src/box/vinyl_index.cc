@@ -118,6 +118,16 @@ VinylIndex::open()
 		}
         });
 	space = space_cache_find(key_def->space_id);
+	if (space->index_count) {
+		Index *pk = index_find(space, 0);
+		if (pk->min(NULL, 0)) {
+			/**
+			 * If space is not empty then forbid new indexes creating
+			 */
+			tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
+				  "altering not empty space");
+		}
+	}
 	/*
 	 * If the index is not unique, add primary key
 	 * to the end of parts.
