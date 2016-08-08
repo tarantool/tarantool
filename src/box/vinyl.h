@@ -79,8 +79,8 @@ vy_end_recovery(struct vy_env *e);
 int
 vy_checkpoint(struct vy_env *env);
 
-bool
-vy_checkpoint_is_active(struct vy_env *env);
+void
+vy_wait_checkpoint(struct vy_env *env);
 
 /*
  * Introspection

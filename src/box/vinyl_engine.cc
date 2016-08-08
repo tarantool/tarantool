@@ -279,10 +279,6 @@ VinylEngine::beginCheckpoint()
 int
 VinylEngine::waitCheckpoint(struct vclock*)
 {
-	for (;;) {
-		if (!vy_checkpoint_is_active(env))
-			break;
-		fiber_yield_timeout(.020);
-	}
+	vy_wait_checkpoint(env);
 	return 0;
 }

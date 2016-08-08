@@ -100,7 +100,7 @@ struct vy_conf;
 struct vy_quota;
 struct vy_cachepool;
 struct tx_manager;
-struct scheduler;
+struct vy_scheduler;
 struct vy_stat;
 struct srzone;
 
@@ -113,7 +113,7 @@ struct vy_env {
 	struct vy_quota     *quota;
 	struct vy_cachepool *cachepool;
 	struct tx_manager   *xm;
-	struct scheduler    *scheduler;
+	struct vy_scheduler *scheduler;
 	struct vy_stat      *stat;
 	struct mempool      read_task_pool;
 	struct mempool      cursor_pool;
@@ -2747,7 +2747,6 @@ struct vy_planner {
 	struct ssrq compact;
 };
 
-
 /**
  * A single operation made by a transaction:
  * a single read or write in a vy_index.
@@ -3876,11 +3875,6 @@ struct sdc {
 	struct vy_buf d;        /* page read buffer */
 	struct sdcbuf *head;   /* compression buffer list */
 	int count;
-};
-
-struct vinyl_service {
-	struct vy_env *env;
-	struct sdc sdc;
 };
 
 static inline void
@@ -7343,7 +7337,9 @@ si_write(logindex_t *logindex, struct txv *v, uint64_t time,
 	return v;
 }
 
-struct scheduler {
+/* {{{ Scheduler */
+
+struct vy_scheduler {
 	pthread_mutex_t        lock;
 	uint64_t       checkpoint_lsn_last;
 	uint64_t       checkpoint_lsn;
@@ -7362,44 +7358,39 @@ struct scheduler {
 	volatile int worker_pool_run;
 };
 
-static struct scheduler *
-scheduler_new(struct vy_env*);
 static void
-scheduler_delete(struct scheduler *);
+vy_workers_start(struct vy_scheduler *scheduler);
 static void
-vy_workers_start(struct scheduler *scheduler);
-static void
-vy_workers_stop(struct scheduler *scheduler);
+vy_workers_stop(struct vy_scheduler *scheduler);
 
-static int sc_ctl_checkpoint(struct scheduler*);
-
-static struct scheduler *
-scheduler_new(struct vy_env *env)
+static struct vy_scheduler *
+vy_scheduler_new(struct vy_env *env)
 {
-	struct scheduler *s = calloc(1, sizeof(*s));
-	if (s == NULL) {
-		diag_set(OutOfMemory, sizeof(*s), "scheduler", "struct");
+	struct vy_scheduler *scheduler = calloc(1, sizeof(*scheduler));
+	if (scheduler == NULL) {
+		diag_set(OutOfMemory, sizeof(*scheduler), "scheduler",
+			 "struct");
 		return NULL;
 	}
-	uint64_t now = clock_monotonic64();
-	tt_pthread_mutex_init(&s->lock, NULL);
-	s->checkpoint_lsn           = 0;
-	s->checkpoint_lsn_last      = 0;
-	s->checkpoint_in_progress   = false;
-	s->age_in_progress          = false;
-	s->age_time                 = now;
-	s->gc_in_progress           = false;
-	s->gc_time                  = now;
-	s->indexes                  = NULL;
-	s->count                    = 0;
-	s->rr                       = 0;
-	s->env                      = env;
-	rlist_create(&s->shutdown);
-	return s;
+	uint64_t now = ev_now(loop());
+	tt_pthread_mutex_init(&scheduler->lock, NULL);
+	scheduler->checkpoint_lsn = 0;
+	scheduler->checkpoint_lsn_last = 0;
+	scheduler->checkpoint_in_progress = false;
+	scheduler->age_in_progress = false;
+	scheduler->age_time = now;
+	scheduler->gc_in_progress = false;
+	scheduler->gc_time = now;
+	scheduler->indexes = NULL;
+	scheduler->count = 0;
+	scheduler->rr = 0;
+	scheduler->env = env;
+	rlist_create(&scheduler->shutdown);
+	return scheduler;
 }
 
 static void
-scheduler_delete(struct scheduler *scheduler)
+vy_scheduler_delete(struct vy_scheduler *scheduler)
 {
 	if (scheduler->worker_pool_run)
 		vy_workers_stop(scheduler);
@@ -7412,74 +7403,61 @@ scheduler_delete(struct scheduler *scheduler)
 }
 
 static int
-vy_scheduler_add_index(struct scheduler *s, struct vy_index *index)
+vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	tt_pthread_mutex_lock(&s->lock);
-	struct vy_index **indexes = realloc(s->indexes,
-		(s->count + 1) * sizeof(*indexes));
+	tt_pthread_mutex_lock(&scheduler->lock);
+	struct vy_index **indexes = realloc(scheduler->indexes,
+		(scheduler->count + 1) * sizeof(*indexes));
 	if (unlikely(indexes == NULL)) {
-		diag_set(OutOfMemory, sizeof((s->count + 1) * sizeof(*indexes)),
-			 "scheduler", "indexes");
-		tt_pthread_mutex_unlock(&s->lock);
+		diag_set(OutOfMemory, sizeof((scheduler->count + 1) *
+			 sizeof(*indexes)), "scheduler", "indexes");
+		tt_pthread_mutex_unlock(&scheduler->lock);
 		return -1;
 	}
-	s->indexes = indexes;
-	s->indexes[s->count++] = index;
+	scheduler->indexes = indexes;
+	scheduler->indexes[scheduler->count++] = index;
 	vy_index_ref(index);
-	tt_pthread_mutex_unlock(&s->lock);
+	tt_pthread_mutex_unlock(&scheduler->lock);
 	/* Start scheduler threads on demand */
-	if (!s->worker_pool_run)
-		vy_workers_start(s);
+	if (!scheduler->worker_pool_run)
+		vy_workers_start(scheduler);
 	return 0;
 }
 
 static int
-vy_scheduler_del_index(struct scheduler *s, struct vy_index *index)
+vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	tt_pthread_mutex_lock(&s->lock);
+	tt_pthread_mutex_lock(&scheduler->lock);
 	int found = 0;
-	while (found < s->count && s->indexes[found] != index)
+	while (found < scheduler->count && scheduler->indexes[found] != index)
 		found++;
-	assert(found < s->count);
-	for (int i = found + 1; i < s->count; i++)
-		s->indexes[i - 1] = s->indexes[i];
-	s->count--;
-	if (unlikely(s->rr >= s->count))
-		s->rr = 0;
+	assert(found < scheduler->count);
+	for (int i = found + 1; i < scheduler->count; i++)
+		scheduler->indexes[i - 1] = scheduler->indexes[i];
+	scheduler->count--;
+	if (unlikely(scheduler->rr >= scheduler->count))
+		scheduler->rr = 0;
 	vy_index_unref(index);
 	/* add index to `shutdown` list */
-	rlist_add(&s->shutdown, &index->link);
-	tt_pthread_mutex_unlock(&s->lock);
+	rlist_add(&scheduler->shutdown, &index->link);
+	tt_pthread_mutex_unlock(&scheduler->lock);
 	return 0;
 }
 
 static struct vy_index *
-vy_scheduler_peek_index(struct scheduler *s)
+vy_scheduler_peek_index(struct vy_scheduler *scheduler)
 {
-	if (s->count == 0)
+	if (scheduler->count == 0)
 		return NULL;
-	assert(s->rr < s->count);
-	struct vy_index *index = s->indexes[s->rr];
-	s->rr = (s->rr + 1) % s->count;
+	assert(scheduler->rr < scheduler->count);
+	struct vy_index *index = scheduler->indexes[scheduler->rr];
+	scheduler->rr = (scheduler->rr + 1) % scheduler->count;
 	return index;
 }
 
-static int sc_ctl_checkpoint(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	uint64_t lsn = vy_sequence(s->env->seq, VINYL_LSN);
-	s->checkpoint_lsn = lsn;
-	s->checkpoint_in_progress = true;
-	for (int i = 0; i < s->count; i++) {
-		s->indexes[i]->checkpoint_in_progress = true;
-	}
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
 static int
-vy_plan_index(struct scheduler *s, struct srzone *zone, uint64_t vlsn,
-	      struct vy_index *index, struct vy_task *task)
+vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
+	      uint64_t vlsn, struct vy_index *index, struct vy_task *task)
 {
 	int rc;
 
@@ -7489,21 +7467,22 @@ vy_plan_index(struct scheduler *s, struct srzone *zone, uint64_t vlsn,
 		return rc; /* found or error */
 
 	/* checkpoint */
-	if (s->checkpoint_in_progress) {
-		rc = vy_planner_peek_checkpoint(index, s->checkpoint_lsn, task);
+	if (scheduler->checkpoint_in_progress) {
+		rc = vy_planner_peek_checkpoint(index,
+			scheduler->checkpoint_lsn, task);
 		if (rc != 0)
 			return rc; /* found or error */
 	}
 
 	/* garbage-collection */
-	if (s->gc_in_progress) {
+	if (scheduler->gc_in_progress) {
 		rc = vy_planner_peek_gc(index, vlsn, zone->gc_wm, task);
 		if (rc != 0)
 			return rc; /* found or error */
 	}
 
 	/* index aging */
-	if (s->age_in_progress) {
+	if (scheduler->age_in_progress) {
 		uint32_t ttl = zone->dump_age * 1000000; /* ms */
 		uint32_t ttl_wm = zone->dump_age_wm;
 		rc = vy_planner_peek_age(index, ttl, ttl_wm, task);
@@ -7525,12 +7504,12 @@ vy_plan_index(struct scheduler *s, struct srzone *zone, uint64_t vlsn,
 }
 
 static int
-vy_plan(struct scheduler *s, struct srzone *zone, uint64_t vlsn,
+vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, uint64_t vlsn,
 	struct vy_task *task)
 {
 	/* pending shutdowns */
 	struct vy_index *index, *n;
-	rlist_foreach_entry_safe(index, &s->shutdown, link, n) {
+	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
 		vy_index_lock(index);
 		int rc = vy_planner_peek_shutdown(index, task);
 		vy_index_unlock(index);
@@ -7542,91 +7521,92 @@ vy_plan(struct scheduler *s, struct srzone *zone, uint64_t vlsn,
 	}
 
 	/* peek an index */
-	index = vy_scheduler_peek_index(s);
+	index = vy_scheduler_peek_index(scheduler);
 	if (index == NULL)
 		return 0; /* nothing to do */
 
 	vy_index_lock(index);
-	int rc = vy_plan_index(s, zone, vlsn, index, task);
+	int rc = vy_plan_index(scheduler, zone, vlsn, index, task);
 	vy_index_unlock(index);
 	return rc;
 }
 
 static int
-vy_schedule(struct scheduler *sc, struct sdc *sdc)
+vy_schedule(struct vy_scheduler *scheduler, struct sdc *sdc)
 {
-	struct vy_env *env = sc->env;
+	struct vy_env *env = scheduler->env;
 	int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
 	uint64_t now = clock_monotonic64();
 	struct srzone *zone = sr_zoneof(env);
 	int rc;
-	tt_pthread_mutex_lock(&sc->lock);
+	tt_pthread_mutex_lock(&scheduler->lock);
 
-	if (sc->age_in_progress) {
+	if (scheduler->age_in_progress) {
 		/* Stop periodic aging */
 		bool age_in_progress = false;
-		for (int i = 0; i < sc->count; i++) {
-			if (sc->indexes[i]->age_in_progress) {
+		for (int i = 0; i < scheduler->count; i++) {
+			if (scheduler->indexes[i]->age_in_progress) {
 				age_in_progress = true;
 				break;
 			}
 		}
 		if (!age_in_progress) {
-			sc->age_in_progress = false;
-			sc->age_time = now;
+			scheduler->age_in_progress = false;
+			scheduler->age_time = now;
 		}
 	} else if (zone->dump_prio && zone->dump_age_period &&
-		   (now - sc->age_time) >= zone->dump_age_period_us &&
-		   sc->count > 0) {
+		   (now - scheduler->age_time) >= zone->dump_age_period_us &&
+		   scheduler->count > 0) {
 		/* Start periodic aging */
-		sc->age_in_progress = true;
-		for (int i = 0; i < sc->count; i++) {
-			sc->indexes[i]->age_in_progress = true;
+		scheduler->age_in_progress = true;
+		for (int i = 0; i < scheduler->count; i++) {
+			scheduler->indexes[i]->age_in_progress = true;
 		}
 	}
 
-	if (sc->gc_in_progress) {
+	if (scheduler->gc_in_progress) {
 		/* Stop periodic GC */
 		bool gc_in_progress = false;
-		for (int i = 0; i < sc->count; i++) {
-			if (sc->indexes[i]->gc_in_progress) {
+		for (int i = 0; i < scheduler->count; i++) {
+			if (scheduler->indexes[i]->gc_in_progress) {
 				gc_in_progress = true;
 				break;
 			}
 		}
 		if (!gc_in_progress) {
-			sc->gc_in_progress = false;
-			sc->gc_time = now;
+			scheduler->gc_in_progress = false;
+			scheduler->gc_time = now;
 		}
 	} else if (zone->gc_prio && zone->gc_period &&
-		   ((now - sc->gc_time) >= zone->gc_period_us) &&
-		   sc->count > 0) {
+		   ((now - scheduler->gc_time) >= zone->gc_period_us) &&
+		   scheduler->count > 0) {
 		/* Start periodic GC */
-		sc->gc_in_progress = true;
-		for (int i = 0; i < sc->count; i++) {
-			sc->indexes[i]->gc_in_progress = true;
+		scheduler->gc_in_progress = true;
+		for (int i = 0; i < scheduler->count; i++) {
+			scheduler->indexes[i]->gc_in_progress = true;
 		}
 	}
 
-	if (sc->checkpoint_in_progress) {
+	if (scheduler->checkpoint_in_progress) {
 		bool checkpoint_in_progress = false;
-		for (int i = 0; i < sc->count; i++) {
-			if (sc->indexes[i]->checkpoint_in_progress) {
+		for (int i = 0; i < scheduler->count; i++) {
+			if (scheduler->indexes[i]->checkpoint_in_progress) {
 				checkpoint_in_progress = true;
 				break;
 			}
 		}
 		if (!checkpoint_in_progress) {
-			sc->checkpoint_in_progress = false;
-			sc->checkpoint_lsn_last = sc->checkpoint_lsn;
-			sc->checkpoint_lsn = 0;
+			scheduler->checkpoint_in_progress = false;
+			scheduler->checkpoint_lsn_last =
+				scheduler->checkpoint_lsn;
+			scheduler->checkpoint_lsn = 0;
 		}
 	}
 
 	/* Get task */
 	struct vy_task task;
-	rc = vy_plan(sc, zone, vlsn, &task);
-	tt_pthread_mutex_unlock(&sc->lock);
+	rc = vy_plan(scheduler, zone, vlsn, &task);
+	tt_pthread_mutex_unlock(&scheduler->lock);
 	if (rc < 0) {
 		return -1; /* error */
 	} else if (rc == 0) {
@@ -7643,6 +7623,92 @@ vy_schedule(struct scheduler *sc, struct sdc *sdc)
 		return -1; /* error */
 	return 1; /* success */
 }
+
+static void*
+vy_worker(void *arg)
+{
+	struct vy_scheduler *scheduler = (struct vy_scheduler *) arg;
+	struct sdc sdc;
+	sd_cinit(&sdc);
+	while (pm_atomic_load_explicit(&scheduler->worker_pool_run,
+				       pm_memory_order_relaxed)) {
+		int rc = vy_schedule(scheduler, &sdc);
+		if (rc == -1)
+			break;
+		if (rc == 0)
+			usleep(10000); /* 10ms */
+	}
+	sd_cfree(&sdc);
+	return NULL;
+}
+
+static void
+vy_workers_start(struct vy_scheduler *scheduler)
+{
+	assert(!scheduler->worker_pool_run);
+	/* prepare worker pool */
+	scheduler->worker_pool = NULL;
+	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
+	if (scheduler->worker_pool_size < 0)
+		scheduler->worker_pool_size = 1;
+	scheduler->worker_pool = (struct cord *)
+		calloc(scheduler->worker_pool_size, sizeof(struct cord));
+	if (scheduler->worker_pool == NULL)
+		panic("failed to allocate vinyl worker pool");
+	scheduler->worker_pool_run = 1;
+	for (int i = 0; i < scheduler->worker_pool_size; i++) {
+		cord_start(&scheduler->worker_pool[i], "vinyl", vy_worker,
+			   scheduler);
+	}
+}
+
+static void
+vy_workers_stop(struct vy_scheduler *scheduler)
+{
+	assert(scheduler->worker_pool_run);
+	pm_atomic_store_explicit(&scheduler->worker_pool_run, 0,
+				 pm_memory_order_relaxed);
+	for (int i = 0; i < scheduler->worker_pool_size; i++)
+		cord_join(&scheduler->worker_pool[i]);
+	free(scheduler->worker_pool);
+	scheduler->worker_pool = NULL;
+	scheduler->worker_pool_size = 0;
+}
+
+int
+vy_checkpoint(struct vy_env *env)
+{
+	struct vy_scheduler *scheduler = env->scheduler;
+	/* do not initiate checkpoint during bootstrap,
+	 * thread pool is not up yet */
+	if (!scheduler->worker_pool_run)
+		return 0;
+	tt_pthread_mutex_lock(&scheduler->lock);
+	uint64_t lsn = vy_sequence(env->seq, VINYL_LSN);
+	scheduler->checkpoint_lsn = lsn;
+	scheduler->checkpoint_in_progress = true;
+	for (int i = 0; i < scheduler->count; i++) {
+		scheduler->indexes[i]->checkpoint_in_progress = true;
+	}
+	tt_pthread_mutex_unlock(&scheduler->lock);
+	return 0;
+}
+
+void
+vy_wait_checkpoint(struct vy_env *env)
+{
+	struct vy_scheduler *scheduler = env->scheduler;
+	for (;;) {
+		tt_pthread_mutex_lock(&scheduler->lock);
+		bool is_active = scheduler->checkpoint_in_progress;
+		tt_pthread_mutex_unlock(&scheduler->lock);
+		if (!is_active)
+			break;
+		fiber_sleep(.020);
+	}
+}
+
+/* Scheduler }}} */
 
 /**
  * Global configuration of an entire vinyl instance (env object).
@@ -7875,7 +7941,7 @@ vy_info_append_scheduler(struct vy_info *info, struct vy_info_node *root)
 	struct srzone *z = sr_zonemap(&env->conf->zones, v);
 	vy_info_append_str(node, "zone", z->name);
 
-	struct scheduler *scheduler = env->scheduler;
+	struct vy_scheduler *scheduler = env->scheduler;
 	tt_pthread_mutex_lock(&scheduler->lock);
 	vy_info_append_u32(node, "gc_active", scheduler->gc_in_progress);
 	tt_pthread_mutex_unlock(&scheduler->lock);
@@ -9289,7 +9355,7 @@ vy_env_new(void)
 	e->stat = vy_stat_new();
 	if (e->stat == NULL)
 		goto error_6;
-	e->scheduler = scheduler_new(e);
+	e->scheduler = vy_scheduler_new(e);
 	if (e->scheduler == NULL)
 		goto error_7;
 
@@ -9318,7 +9384,7 @@ error_1:
 void
 vy_env_delete(struct vy_env *e)
 {
-	scheduler_delete(e->scheduler);
+	vy_scheduler_delete(e->scheduler);
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
 	tx_manager_delete(e->xm);
@@ -9366,25 +9432,6 @@ vy_end_recovery(struct vy_env *e)
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
-}
-
-int
-vy_checkpoint(struct vy_env *env)
-{
-	/* do not initiate checkpoint during bootstrap,
-	 * thread pool is not up yet */
-	if (! env->scheduler->worker_pool_run)
-		return 0;
-	return sc_ctl_checkpoint(env->scheduler);
-}
-
-bool
-vy_checkpoint_is_active(struct vy_env *env)
-{
-	tt_pthread_mutex_lock(&env->scheduler->lock);
-	bool is_active = env->scheduler->checkpoint_in_progress;
-	tt_pthread_mutex_unlock(&env->scheduler->lock);
-	return is_active;
 }
 
 /** }}} Recovery */
@@ -9447,56 +9494,5 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 /* }}} replication */
 
 /** {{{ vinyl_service - context of a vinyl background thread */
-
-static void*
-vy_worker(void *arg)
-{
-	struct scheduler *scheduler = (struct scheduler *) arg;
-	struct sdc sdc;
-	sd_cinit(&sdc);
-	while (pm_atomic_load_explicit(&scheduler->worker_pool_run,
-				       pm_memory_order_relaxed)) {
-		int rc = vy_schedule(scheduler, &sdc);
-		if (rc == -1)
-			break;
-		if (rc == 0)
-			usleep(10000); /* 10ms */
-	}
-	sd_cfree(&sdc);
-	return NULL;
-}
-
-static void
-vy_workers_start(struct scheduler *scheduler)
-{
-	assert(!scheduler->worker_pool_run);
-	/* prepare worker pool */
-	scheduler->worker_pool = NULL;
-	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
-	if (scheduler->worker_pool_size < 0)
-		scheduler->worker_pool_size = 1;
-	scheduler->worker_pool = (struct cord *)
-		calloc(scheduler->worker_pool_size, sizeof(struct cord));
-	if (scheduler->worker_pool == NULL)
-		panic("failed to allocate vinyl worker pool");
-	scheduler->worker_pool_run = 1;
-	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		cord_start(&scheduler->worker_pool[i], "vinyl", vy_worker,
-			   scheduler);
-	}
-}
-
-static void
-vy_workers_stop(struct scheduler *scheduler)
-{
-	assert(scheduler->worker_pool_run);
-	pm_atomic_store_explicit(&scheduler->worker_pool_run, 0,
-				 pm_memory_order_relaxed);
-	for (int i = 0; i < scheduler->worker_pool_size; i++)
-		cord_join(&scheduler->worker_pool[i]);
-	free(scheduler->worker_pool);
-	scheduler->worker_pool = NULL;
-	scheduler->worker_pool_size = 0;
-}
 
 /* }}} vinyl service */
