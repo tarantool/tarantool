@@ -57,7 +57,7 @@ struct region;
 struct vy_env *
 vy_env_new(void);
 
-int
+void
 vy_env_delete(struct vy_env *e);
 
 /*
