@@ -1581,11 +1581,11 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 	return z;
 }
 
-#define SVNONE       0
-#define SVDELETE     1
-#define SVUPSERT     2
-#define SVGET        4
-#define SVDUP        8
+#define SVGET        1
+#define SVREPLACE    2
+#define SVDELETE     4
+#define SVUPSERT     8
+#define SVDUP        16
 
 struct sv;
 
@@ -3209,8 +3209,10 @@ tx_get(struct vy_tx *tx, struct vy_index *index,
 	if (v == NULL)
 		goto add;
 	struct vy_tuple *tuple = v->tuple;
-	if (tuple->flags & SVGET)
+	if (tuple->flags & SVGET) {
+		/* The tuple does not exist. */
 		return 0;
+	}
 	*result = tuple;
 	vy_tuple_ref(tuple);
 	return 1;
@@ -8844,7 +8846,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 		tuple, tuple_end);
 	if (vytuple == NULL)
 		return -1;
-	int rc = vy_tx_write(tx, index, vytuple, 0);
+	int rc = vy_tx_write(tx, index, vytuple, SVREPLACE);
 	vy_tuple_unref(index, vytuple);
 	return rc;
 }
