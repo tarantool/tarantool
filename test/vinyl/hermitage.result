@@ -331,9 +331,9 @@ c1:commit() -- ok
 ---
 - 
 ...
-c2:commit() -- ok
+c2:commit() -- rollback (@fixme: not necessary)
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
 t:delete{1}

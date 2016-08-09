@@ -135,7 +135,7 @@ c2("t:replace{2, 22}")
 c1("t:get{2}") -- {2, 20}
 c2("t:get{1}") -- {1, 10}
 c1:commit() -- ok
-c2:commit() -- ok
+c2:commit() -- rollback (@fixme: not necessary)
 
 -- teardown
 t:delete{1}

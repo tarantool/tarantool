@@ -2756,14 +2756,13 @@ struct txv {
 	uint64_t tsn;
 	struct vy_index *index;
 	struct vy_tuple *tuple;
+	struct vy_tx *tx;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
 	/** Member of the transaction manager index. */
 	rb_node(struct txv) in_txvindex;
 	/** Member of the transaction log index. */
 	rb_node(struct txv) in_logindex;
-	/** True if this transaction was aborted by a conflict. */
-	struct vy_tx *tx;
 };
 
 typedef rb_tree(struct txv) txvindex_t;
@@ -2842,7 +2841,6 @@ struct txvindex_key {
 
 typedef rb_tree(struct txv) logindex_t;
 
-
 struct vy_tx {
 	/**
 	 * In memory transaction log. Contains both reads
@@ -2866,7 +2864,6 @@ struct vy_tx {
 	 * transactional read view.
 	 */
 	uint64_t   vlsn;
-	struct txv *readonly_tail;
 	rb_node(struct vy_tx) tree_node;
 	struct tx_manager *manager;
 };
@@ -3112,7 +3109,6 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
-	tx->readonly_tail = NULL;
 	tx->is_aborted = false;
 
 	tx->tsn = ++m->tsn;
@@ -3128,8 +3124,7 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 static inline void
 txv_untrack(struct txv *v)
 {
-	txvindex_t *tree = &v->index->txvindex;
-	txvindex_remove(tree, v);
+	txvindex_remove(&v->index->txvindex, v);
 }
 
 static inline uint64_t
@@ -3217,7 +3212,6 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 			if (old->tuple->flags & SVGET) {
 				/* Write after read */
 				logindex_insert(&tx->logindex, old);
-				tx->readonly_tail = NULL;
 			}
 			vy_tuple_unref_rt(env, old->tuple);
 			vy_tuple_ref(tuple);
@@ -3227,15 +3221,8 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, tuple, tx);
 		if (v->tuple->flags & SVGET) {
-			/*
-			 * Track the start of the latest read
-			 * sequence in the transactional log.
-			*/
-			if (tx->readonly_tail == NULL)
-				tx->readonly_tail = v;
 		} else {
 			logindex_insert(&tx->logindex, v);
-			tx->readonly_tail = NULL;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		/* Add a version */
