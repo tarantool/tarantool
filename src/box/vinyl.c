@@ -1694,7 +1694,7 @@ static void
 vy_tuple_unref(struct vy_index *index, struct vy_tuple *tuple);
 
 static int
-vy_tuple_unref_rt(struct vy_env *env, struct vy_tuple *v);
+vy_tuple_unref_rt(struct vy_stat *stat, struct vy_tuple *v);
 
 struct PACKED svmergesrc {
 	struct vy_iter *i;
@@ -2358,7 +2358,7 @@ sv_indexfree(struct svindex *i, struct vy_env *env)
 		bps_tree_svindex_itr_first(&i->tree);
 	while (!bps_tree_svindex_itr_is_invalid(&itr)) {
 		struct vy_tuple *v = bps_tree_svindex_itr_get_elem(&i->tree, &itr)->v;
-		vy_tuple_unref_rt(env, v);
+		vy_tuple_unref_rt(env->stat, v);
 		bps_tree_svindex_itr_next(&i->tree, &itr);
 	}
 	bps_tree_svindex_destroy(&i->tree);
@@ -2884,9 +2884,9 @@ txv_new(struct vy_index *index, struct vy_tuple *tuple, struct vy_tx *tx)
 }
 
 static inline void
-txv_delete(struct vy_env *env, struct txv *v)
+txv_delete(struct vy_stat *stat, struct txv *v)
 {
-	vy_tuple_unref_rt(env, v->tuple);
+	vy_tuple_unref_rt(stat, v->tuple);
 	free(v);
 }
 
@@ -3035,9 +3035,6 @@ tx_manager_delete(struct tx_manager*);
 static void
 tx_begin(struct tx_manager*, struct vy_tx*, enum tx_type);
 
-static void
-tx_delete(struct vy_tx*);
-
 static enum tx_state
 tx_rollback(struct vy_tx*);
 
@@ -3122,36 +3119,8 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 }
 
 static inline void
-txv_untrack(struct txv *v)
+tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 {
-	txvindex_remove(&v->index->txvindex, v);
-}
-
-static inline uint64_t
-tx_manager_tsn(struct tx_manager *m)
-{
-	uint64_t tsn = UINT64_MAX;
-	if (m->count_rw == 0)
-		return tsn;
-
-	struct vy_tx *min = tx_tree_first(&m->tree);
-	while (min && min->type == VINYL_TX_RO)
-		min = tx_tree_next(&m->tree, min);
-
-	assert(min != NULL);
-	return min->tsn;
-}
-
-static void
-tx_delete(struct vy_tx *tx)
-{
-	free(tx);
-}
-
-static inline void
-tx_end(struct vy_tx *tx)
-{
-	struct tx_manager *m = tx->manager;
 	bool was_oldest = tx == tx_tree_first(&m->tree);
 	tx_tree_remove(&m->tree, tx);
 	if (tx->type == VINYL_TX_RO)
@@ -3173,14 +3142,14 @@ tx_rollback_svp(struct vy_tx *tx, struct txv *v)
 	struct stailq tail;
 	stailq_create(&tail);
 	stailq_splice(&tx->log, &v->next_in_log, &tail);
-	struct vy_env *env = tx->manager->env;
+	struct vy_stat *stat = tx->manager->env->stat;
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* remove from index */
-		txv_untrack(v);
+		txvindex_remove(&v->index->txvindex, v);
 		if (!(v->tuple->flags & SVGET))
 			logindex_remove(&tx->logindex, v);
-		txv_delete(env, v);
+		txv_delete(stat, v);
 	}
 }
 
@@ -3191,7 +3160,7 @@ tx_rollback(struct vy_tx *tx)
 	tx_rollback_svp(tx, stailq_first_entry(&tx->log, struct txv,
 					       next_in_log));
 	tx_promote(tx, VINYL_TX_ROLLBACK);
-	tx_end(tx);
+	tx_manager_end(tx->manager, tx);
 	return VINYL_TX_ROLLBACK;
 }
 
@@ -3199,8 +3168,6 @@ static int
 tx_set(struct vy_tx *tx, struct vy_index *index,
        struct vy_tuple *tuple, struct txv *old)
 {
-	struct tx_manager *m = tx->manager;
-	struct vy_env *env = m->env;
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
 		if (unlikely(tuple->flags & SVUPSERT)) {
@@ -3213,7 +3180,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 				/* Write after read */
 				logindex_insert(&tx->logindex, old);
 			}
-			vy_tuple_unref_rt(env, old->tuple);
+			vy_tuple_unref_rt(tx->manager->env->stat, old->tuple);
 			vy_tuple_ref(tuple);
 			old->tuple = tuple;
 		}
@@ -8584,7 +8551,7 @@ vy_tuple_ref(struct vy_tuple *v)
 }
 
 static int
-vy_tuple_unref_rt(struct vy_env *env, struct vy_tuple *v)
+vy_tuple_unref_rt(struct vy_stat *stat, struct vy_tuple *v)
 {
 	uint16_t old_refs = pm_atomic_fetch_sub_explicit(&v->refs, 1,
 		pm_memory_order_relaxed);
@@ -8592,12 +8559,12 @@ vy_tuple_unref_rt(struct vy_env *env, struct vy_tuple *v)
 	if (likely(old_refs == 1)) {
 		uint32_t size = vy_tuple_size(v);
 		/* update runtime statistics */
-		tt_pthread_mutex_lock(&env->stat->lock);
-		assert(env->stat->v_count > 0);
-		assert(env->stat->v_allocated >= size);
-		env->stat->v_count--;
-		env->stat->v_allocated -= size;
-		tt_pthread_mutex_unlock(&env->stat->lock);
+		tt_pthread_mutex_lock(&stat->lock);
+		assert(stat->v_count > 0);
+		assert(stat->v_allocated >= size);
+		stat->v_count--;
+		stat->v_allocated -= size;
+		tt_pthread_mutex_unlock(&stat->lock);
 #ifndef NDEBUG
 		memset(v, '#', vy_tuple_size(v)); /* fail early */
 #endif
@@ -8610,8 +8577,8 @@ vy_tuple_unref_rt(struct vy_env *env, struct vy_tuple *v)
 static void
 vy_tuple_unref(struct vy_index *index, struct vy_tuple *tuple)
 {
-	struct vy_env *env = index->env;
-	vy_tuple_unref_rt(env, tuple);
+	struct vy_stat *stat = index->env->stat;
+	vy_tuple_unref_rt(stat, tuple);
 }
 
 /**
@@ -8851,19 +8818,18 @@ vy_tx_write(struct vy_tx *tx, struct vy_index *index,
 	return tx_set(tx, index, tuple, old);
 }
 
-static inline void
-vy_tx_end(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
+static void
+vy_tx_delete(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
 {
 	uint32_t count = 0;
-	struct tx_manager *m = tx->manager;
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
-		txv_untrack(v);
-		txv_delete(m->env, v);
+		txvindex_remove(&v->index->txvindex, v);
+		txv_delete(stat, v);
 	}
 	vy_stat_tx(stat, tx->start, count, rlb, conflict);
-	tx_delete(tx);
+	free(tx);
 }
 
 /* {{{ Public API of transaction control: start/end transaction,
@@ -8921,7 +8887,7 @@ void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
 	tx_rollback(tx);
-	vy_tx_end(e->stat, tx, 1, 0);
+	vy_tx_delete(e->stat, tx, 1, 0);
 }
 
 int
@@ -8955,7 +8921,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 			abort = txv_next(abort);
 		}
 	}
-	tx_end(tx);
+	tx_manager_end(tx->manager, tx);
 	/*
 	 * A half committed transaction is no longer
 	 * being part of concurrent index, but still can be
@@ -8978,15 +8944,13 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		e->seq->lsn = lsn;
 	vy_sequence_unlock(e->seq);
 
-	/* do log write and backend commit */
-
-	/* index */
+	/* Flush transactional changes to the index. */
 	uint64_t now = clock_monotonic64();
 	struct txv *v = logindex_first(&tx->logindex);
 	while (v != NULL)
 		v = si_write(&tx->logindex, v, now, e->status, lsn);
 
-	vy_tx_end(e->stat, tx, 0, 0);
+	vy_tx_delete(e->stat, tx, 0, 0);
 	return 0;
 }
 
