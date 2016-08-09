@@ -74,24 +74,12 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	}
 
 
-	int rc = vy_prepare(env, tx);
-	switch (rc) {
-	case 0:
-		if (vy_commit(env, tx, signature))
-			panic("failed to commit vinyl transaction");
-		return;
-	case 1: /* rollback */
-		vy_rollback(env, tx);
-		/* must never happen during JOIN */
-		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
-		return;
-	case -1:
+	if (vy_prepare(env, tx)) {
 		vy_rollback(env, tx);
 		diag_raise();
-		return;
-	default:
-		unreachable();
 	}
+	if (vy_commit(env, tx, signature))
+		panic("failed to commit vinyl transaction");
 }
 
 /**

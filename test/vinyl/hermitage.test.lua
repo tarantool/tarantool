@@ -306,6 +306,7 @@ c1("t:get{1}") -- {1, 10}
 c1("t:get{2}") -- {2, 20}
 c2("t:get{1}") -- {1, 10}
 c2("t:get{2}") -- {2, 20}
+c2("t:get{3}") -- {3, 30} to be inserted
 c1("t:replace{3, 30}")
 c2("t:replace{4, 42}")
 c1:commit() -- ok

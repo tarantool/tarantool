@@ -1229,16 +1229,16 @@ c2("t:replace{1, 10}")
 --
 c2:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c1:commit()
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 c3("t:get{1}") -- {1, 15}
 ---
-- - [1, 15]
+- - [1, 10]
 ...
 --
 -- cleanup
@@ -1566,9 +1566,9 @@ c1("t:replace{1, 10}")
 - - [1, 10]
 ...
 --
-c2:commit() -- fixme: aborted by conflict
+c2:commit() 
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c1:rollback()
 ---
@@ -1577,7 +1577,7 @@ c1:rollback()
 --
 c3("t:get{1}")
 ---
-- 
+- - [1, 15]
 ...
 --
 -- cleanup
@@ -1615,18 +1615,18 @@ c1("t:replace{1, 10}")
 - - [1, 10]
 ...
 --
-c2:commit() -- fixme: aborted by conflict
+c2:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c1:commit()
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 c3("t:get{1}")
 ---
-- - [1, 10]
+- - [1, 15]
 ...
 --
 -- cleanup
@@ -1870,13 +1870,13 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
----
-- - {'error': 'Transaction has been aborted by conflict'}
-...
-c1:commit() -- success
+c2:commit() -- success
 ---
 - 
+...
+c1:commit() -- rollback
+---
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -1917,13 +1917,13 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
----
-- - {'error': 'Transaction has been aborted by conflict'}
-...
-c1:commit() -- succcess
+c2:commit() -- succcess
 ---
 - 
+...
+c1:commit() -- rollback
+---
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -1964,11 +1964,11 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- success
+c1:commit() -- rollback
 ---
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
@@ -2011,15 +2011,14 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
----
-- - {'error': 'Transaction has been aborted by conflict'}
-...
-c1:rollback()
+c2:commit() -- success
 ---
 - 
 ...
--- c2:commit() -- success - not in tarantool
+c1:commit() -- rollback
+---
+- - {'error': 'Transaction has been aborted by conflict'}
+...
 --
 -- cleanup
 --
@@ -2059,7 +2058,7 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
 - 
 ...
@@ -2067,7 +2066,6 @@ c1:rollback() -- success
 ---
 - 
 ...
--- c2:commit()  -- success - not in tarantool
 --
 -- cleanup
 --
@@ -2107,9 +2105,9 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c2:rollback() -- not in transaction
 ---
@@ -2117,7 +2115,7 @@ c2:rollback() -- not in transaction
 ...
 c1:commit() -- success
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -2158,7 +2156,7 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
 - 
 ...
@@ -2227,17 +2225,17 @@ c3("t:replace{1, 20}")
 - - [1, 20]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:commit() -- rollback
 ---
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
-c1:commit() -- success
+c1:commit() -- rollback
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c2:commit() -- not in transaction
 ---
@@ -2300,15 +2298,15 @@ c3("t:replace{1, 10}")
 - - [1, 10]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:commit() -- rollback
 ---
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
-c3:commit() -- commit
+c3:commit() -- rollback
 ---
 - 
 ...
@@ -2365,9 +2363,9 @@ c3("t:replace{1, 20}")
 - - [1, 20]
 ...
 --
-c2:commit() -- rollback
+c2:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:commit() -- rollback
 ---
@@ -2430,9 +2428,9 @@ c3("t:replace{1, 20}")
 - - [1, 20]
 ...
 --
-c2:commit()  -- rollback
+c2:commit()  -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:commit() -- rollback
 ---
@@ -2446,9 +2444,9 @@ c3:commit() -- success, not in transaction in tarantool
 ---
 - 
 ...
-c1:commit() -- success
+c1:commit() -- rollback
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -2509,11 +2507,11 @@ c3:rollback()
 ...
 c2:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c1:commit()
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -2569,7 +2567,7 @@ c3("t:replace{1, 20}")
 --
 c2:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:rollback()
 ---
@@ -2577,7 +2575,7 @@ c3:rollback()
 ...
 c1:commit()
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 -- cleanup
@@ -2634,7 +2632,7 @@ c3("t:replace{1, 20}")
 --
 c2:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c3:rollback()
 ---
@@ -3319,19 +3317,19 @@ c1("t:replace{1, 10}")
 --
 -- sic: runs in autocommit mode
 --
-c2("t:replace{1, 15}") -- fixme: aborted
+c2("t:replace{1, 15}")
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- - [1, 15]
 ...
 --
 c1:commit()
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 c2("t:get{1}") -- {1, 10}
 ---
-- - [1, 10]
+- - [1, 15]
 ...
 --
 c1("t:delete{1}")
@@ -3446,18 +3444,18 @@ c2("t:insert{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- rollback
----
-- - {'error': 'Transaction has been aborted by conflict'}
-...
-c1:commit() -- success
+c2:commit() -- success
 ---
 - 
+...
+c1:commit() -- rollback
+---
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
 c3("t:get{1}") -- {1, 10}
 ---
-- - [1, 10]
+- - [1, 15]
 ...
 --
 --

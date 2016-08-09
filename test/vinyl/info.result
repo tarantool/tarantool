@@ -116,7 +116,6 @@ box_info_sort(box.info.vinyl())
     - tx_active_ro: 0
     - tx_active_rw: 0
     - tx_conflict: 0
-    - tx_gc_queue: 0
     - tx_latency: <tx_latency>
     - tx_ops: 0 1 1.0
     - tx_rollback: 0

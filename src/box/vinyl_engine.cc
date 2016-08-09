@@ -240,15 +240,8 @@ VinylEngine::prepare(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
-	int rc = vy_prepare(env, tx);
-	switch (rc) {
-	case 1: /* rollback, will be done by all-engines transaction manager */
-		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
-		break;
-	case -1:
+	if (vy_prepare(env, tx))
 		diag_raise();
-		break;
-	}
 }
 
 static inline void

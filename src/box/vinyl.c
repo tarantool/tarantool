@@ -2754,11 +2754,8 @@ struct vy_planner {
 struct txv {
 	/** Transaction start logical time - used by conflict manager. */
 	uint64_t tsn;
-	/** Transaction end logical time - used by conflict manager. */
-	uint64_t csn;
 	struct vy_index *index;
 	struct vy_tuple *tuple;
-	struct txv *gc;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
 	/** Member of the transaction manager index. */
@@ -2766,7 +2763,7 @@ struct txv {
 	/** Member of the transaction log index. */
 	rb_node(struct txv) in_logindex;
 	/** True if this transaction was aborted by a conflict. */
-	bool is_aborted;
+	struct vy_tx *tx;
 };
 
 typedef rb_tree(struct txv) txvindex_t;
@@ -2825,8 +2822,6 @@ enum tx_state {
 	 * It may still be rolled back if there is an error
 	 * writing the WAL.
 	 */
-	VINYL_TX_PREPARE,
-	/** A transaction is committed. */
 	VINYL_TX_COMMIT,
 	/** A transaction is aborted or rolled back. */
 	VINYL_TX_ROLLBACK
@@ -2845,19 +2840,49 @@ struct txvindex_key {
 	uint64_t tsn;
 };
 
+typedef rb_tree(struct txv) logindex_t;
+
+
+struct vy_tx {
+	/**
+	 * In memory transaction log. Contains both reads
+	 * and writes.
+	 */
+	struct stailq log;
+	/**
+	 * Writes of the transaction segregated by the changed
+	 * vy_index object.
+	 */
+	logindex_t logindex;
+	uint64_t start;
+	enum tx_type     type;
+	enum tx_state    state;
+	bool is_aborted;
+	/** Transaction logical start time. */
+	uint64_t tsn;
+	/**
+	 * Consistent read view LSN: the LSN recorded
+	 * at start of transaction and used to implement
+	 * transactional read view.
+	 */
+	uint64_t   vlsn;
+	struct txv *readonly_tail;
+	rb_node(struct vy_tx) tree_node;
+	struct tx_manager *manager;
+};
+
+
 static inline struct txv *
-txv_new(struct vy_index *index, struct vy_tuple *tuple, uint64_t tsn)
+txv_new(struct vy_index *index, struct vy_tuple *tuple, struct vy_tx *tx)
 {
 	struct txv *v = malloc(sizeof(struct txv));
 	if (unlikely(v == NULL))
 		return NULL;
 	v->index = index;
-	v->tsn = tsn;
-	v->csn = UINT64_MAX;
+	v->tsn = tx->tsn;
 	v->tuple = tuple;
 	vy_tuple_ref(tuple);
-	v->gc = NULL;
-	v->is_aborted = false;
+	v->tx = tx;
 	return v;
 }
 
@@ -2869,21 +2894,9 @@ txv_delete(struct vy_env *env, struct txv *v)
 }
 
 static inline void
-txv_commit(struct txv *v, uint64_t csn)
-{
-	v->csn = csn;
-}
-
-static inline int
-txv_committed(struct txv *v)
-{
-	return v->csn != UINT64_MAX;
-}
-
-static inline void
 txv_abort(struct txv *v)
 {
-	v->is_aborted = true;
+	v->tx->is_aborted = true;
 }
 
 static struct txv *
@@ -2891,22 +2904,6 @@ txv_prev(struct txv *v);
 
 static struct txv *
 txv_next(struct txv *v);
-
-static inline void
-txv_abort_all(struct txv *v)
-{
-	while (v) {
-		txv_abort(v);
-		v = txv_next(v);
-	}
-}
-
-static inline bool
-txv_aborted(struct txv *v)
-{
-	return v->is_aborted;
-}
-
 
 static int
 txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b);
@@ -2982,8 +2979,6 @@ txv_next(struct txv *v)
 	return NULL;
 }
 
-typedef rb_tree(struct txv) logindex_t;
-
 static int
 logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
 {
@@ -2998,35 +2993,6 @@ logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
 }
 
 rb_gen(, logindex_, logindex_t, struct txv, in_logindex, logindex_cmp);
-
-struct vy_tx {
-	/**
-	 * In memory transaction log. Contains both reads
-	 * and writes.
-	 */
-	struct stailq log;
-	/**
-	 * Writes of the transaction segregated by the changed
-	 * vy_index object.
-	 */
-	logindex_t logindex;
-	uint64_t start;
-	enum tx_type     type;
-	enum tx_state    state;
-	/** Transaction logical start time. */
-	uint64_t tsn;
-	/** Transaction logical end time. */
-	uint64_t   csn;
-	/**
-	 * Consistent read view LSN: the LSN recorded
-	 * at start of transaction and used to implement
-	 * transactional read view.
-	 */
-	uint64_t   vlsn;
-	struct txv *readonly_tail;
-	rb_node(struct vy_tx) tree_node;
-	struct tx_manager *manager;
-};
 
 bool
 vy_tx_is_ro(struct vy_tx *tx)
@@ -3058,10 +3024,8 @@ struct tx_manager {
 	tx_tree_t tree;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
-	uint32_t    count_gc;
 	/** Transaction logical time. */
 	uint64_t tsn;
-	struct txv       *gc;
 	struct vy_env *env;
 };
 
@@ -3098,9 +3062,7 @@ tx_manager_new(struct vy_env *env)
 	tx_tree_new(&m->tree);
 	m->count_rd = 0;
 	m->count_rw = 0;
-	m->count_gc = 0;
 	m->tsn = 0;
-	m->gc  = NULL;
 	m->env = env;
 	return m;
 }
@@ -3151,8 +3113,8 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
 	tx->readonly_tail = NULL;
+	tx->is_aborted = false;
 
-	tx->csn = UINT64_MAX;
 	tx->tsn = ++m->tsn;
 	tx->vlsn = vy_sequence(m->env->seq, VINYL_LSN);
 
@@ -3185,34 +3147,6 @@ tx_manager_tsn(struct tx_manager *m)
 	return min->tsn;
 }
 
-static inline void
-tx_manager_gc(struct tx_manager *m)
-{
-	if (m->count_gc == 0)
-		return;
-	uint64_t min_tsn = tx_manager_tsn(m);
-	struct txv *gc = NULL;
-	uint32_t count = 0;
-	struct txv *next;
-	struct txv *v = m->gc;
-	for (; v; v = next)
-	{
-		next = v->gc;
-		assert(v->tuple->flags & SVGET);
-		assert(txv_committed(v));
-		if (v->csn < min_tsn) {
-			txv_untrack(v);
-			txv_delete(m->env, v);
-		} else {
-			v->gc = gc;
-			gc = v;
-			count++;
-		}
-	}
-	m->count_gc = count;
-	m->gc = gc;
-}
-
 static void
 tx_delete(struct vy_tx *tx)
 {
@@ -3235,7 +3169,6 @@ tx_end(struct vy_tx *tx)
 		m->env->seq->vlsn = oldest ? oldest->vlsn :
 			m->env->seq->lsn;
 		vy_sequence_unlock(m->env->seq);
-		tx_manager_gc(m);
 	}
 }
 
@@ -3267,31 +3200,6 @@ tx_rollback(struct vy_tx *tx)
 	return VINYL_TX_ROLLBACK;
 }
 
-static enum tx_state
-tx_prepare(struct vy_tx *tx)
-{
-	/* proceed read-only transactions */
-	if (vy_tx_is_ro(tx))
-		return tx_promote(tx, VINYL_TX_PREPARE);
-	struct txv *v;
-	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		if (v == tx->readonly_tail)
-			break;
-		if (txv_aborted(v))
-			return tx_promote(tx, VINYL_TX_ROLLBACK);
-		struct txv *prev = txv_prev(v);
-		if (prev == NULL)
-			continue;
-		if (txv_committed(prev))
-			continue;
-		/* force commit for read-only conflicts */
-		if (prev->tuple->flags & SVGET)
-			continue;
-		return tx_promote(tx, VINYL_TX_ROLLBACK);
-	}
-	return tx_promote(tx, VINYL_TX_PREPARE);
-}
-
 static int
 tx_set(struct vy_tx *tx, struct vy_index *index,
        struct vy_tuple *tuple, struct txv *old)
@@ -3317,7 +3225,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 		}
 	} else {
 		/* Allocate a MVCC container. */
-		struct txv *v = txv_new(index, tuple, tx->tsn);
+		struct txv *v = txv_new(index, tuple, tx);
 		if (v->tuple->flags & SVGET) {
 			/*
 			 * Track the start of the latest read
@@ -3330,7 +3238,7 @@ tx_set(struct vy_tx *tx, struct vy_index *index,
 			tx->readonly_tail = NULL;
 		}
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		/* Add version */
+		/* Add a version */
 		txvindex_insert(&index->txvindex, v);
 	}
 	return 0;
@@ -7973,7 +7881,6 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "set_latency", stat->set_latency.sz);
 	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
 	vy_info_append_u64(node, "tx_conflict", stat->tx_conflict);
-	vy_info_append_u32(node, "tx_gc_queue", env->xm->count_gc);
 	vy_info_append_u32(node, "tx_active_rw", env->xm->count_rw);
 	vy_info_append_u32(node, "tx_active_ro", env->xm->count_rd);
 	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
@@ -8964,17 +8871,9 @@ vy_tx_end(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
 	struct tx_manager *m = tx->manager;
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
-
 		count++;
-		/** Gets are collected by gc */
-		if (v->tuple->flags & SVGET) {
-			v->gc = m->gc;
-			m->gc = v;
-			m->count_gc++;
-		} else {
-			txv_untrack(v);
-			txv_delete(m->env, v);
-		}
+		txv_untrack(v);
+		txv_delete(m->env, v);
 	}
 	vy_stat_tx(stat, tx->start, count, rlb, conflict);
 	tx_delete(tx);
@@ -9047,33 +8946,28 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
 
-	enum tx_state s = tx_prepare(tx);
-
-	if (s == VINYL_TX_ROLLBACK) {
-		return 1;
+	/* proceed read-only transactions */
+	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
+		tx_promote(tx, VINYL_TX_ROLLBACK);
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
 	}
-
-	struct tx_manager *m = tx->manager;
-	uint64_t csn = m->tsn;
-	struct txv *v;
-	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		if (v == tx->readonly_tail)
-			break;
-		struct txv *prev = txv_prev(v);
-		/* abort conflict reader */
-		if (prev && !txv_committed(prev)) {
-			assert(prev->tuple->flags & SVGET);
-			txv_abort(prev);
-		}
-		/* abort waiters */
-		txv_abort_all(txv_next(v));
-		/* mark statement as committed */
-		txv_commit(v, csn);
-	}
-	/* rollback latest reads */
-	tx_rollback_svp(tx, v);
-
 	tx_promote(tx, VINYL_TX_COMMIT);
+
+	struct txv *v = logindex_first(&tx->logindex);
+	for (; v != NULL; v = logindex_next(&tx->logindex, v)) {
+		struct txv *abort = txv_prev(v);
+		/* abort conflict reader */
+		while (abort) {
+			txv_abort(abort);
+			abort = txv_prev(abort);
+		}
+		abort = txv_next(v);
+		while (abort) {
+			txv_abort(abort);
+			abort = txv_next(abort);
+		}
+	}
 	tx_end(tx);
 	/*
 	 * A half committed transaction is no longer

@@ -649,7 +649,7 @@ c2("t:get{200}") -- start transaction in the engine
 c2("t:replace{1, 15}")
 c1("t:replace{1, 10}")
 --
-c2:commit() -- fixme: aborted by conflict
+c2:commit() 
 c1:rollback()
 --
 c3("t:get{1}")
@@ -668,7 +668,7 @@ c2("t:get{200}") -- start transaction in the engine
 c2("t:replace{1, 15}")
 c1("t:replace{1, 10}")
 --
-c2:commit() -- fixme: aborted by conflict
+c2:commit()
 c1:commit()
 --
 c3("t:get{1}")
@@ -773,8 +773,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
-c1:commit() -- success
+c2:commit() -- success
+c1:commit() -- rollback
 --
 -- cleanup
 --
@@ -793,8 +793,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
-c1:commit() -- succcess
+c2:commit() -- succcess
+c1:commit() -- rollback
 --
 -- cleanup
 --
@@ -813,8 +813,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
-c1:commit() -- success
+c2:commit() -- success
+c1:commit() -- rollback
 --
 -- cleanup
 --
@@ -833,9 +833,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
-c1:rollback()
--- c2:commit() -- success - not in tarantool
+c2:commit() -- success
+c1:commit() -- rollback
 --
 -- cleanup
 --
@@ -854,9 +853,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c1:rollback() -- success
--- c2:commit()  -- success - not in tarantool
 --
 -- cleanup
 --
@@ -875,7 +873,7 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c2:rollback() -- not in transaction
 c1:commit() -- success
 --
@@ -896,7 +894,7 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c2:rollback() -- not in transaction
 c1:commit() -- success
 --
@@ -923,9 +921,9 @@ c2("t:replace{1, 15}")
 --
 c3("t:replace{1, 20}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c3:commit() -- rollback
-c1:commit() -- success
+c1:commit() -- rollback
 c2:commit() -- not in transaction
 c3:commit() -- not in transaction
 --
@@ -951,9 +949,9 @@ c2("t:replace{1, 10}")
 --
 c3("t:replace{1, 10}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c3:commit() -- rollback
-c3:commit() -- commit
+c3:commit() -- rollback
 --
 -- cleanup
 --
@@ -977,7 +975,7 @@ c2("t:replace{1, 15}")
 --
 c3("t:replace{1, 20}")
 --
-c2:commit() -- rollback
+c2:commit() -- success
 c3:commit() -- rollback
 c1:rollback() -- success
 --
@@ -1003,11 +1001,11 @@ c2("t:replace{1, 15}")
 --
 c3("t:replace{1, 20}")
 --
-c2:commit()  -- rollback
+c2:commit()  -- success
 c3:commit() -- rollback
 c2:rollback() -- success, not in transaction in tarantool
 c3:commit() -- success, not in transaction in tarantool
-c1:commit() -- success
+c1:commit() -- rollback
 --
 -- cleanup
 --
@@ -1344,7 +1342,7 @@ c1("t:replace{1, 10}")
 --
 -- sic: runs in autocommit mode
 --
-c2("t:replace{1, 15}") -- fixme: aborted
+c2("t:replace{1, 15}")
 --
 c1:commit()
 --
@@ -1400,8 +1398,8 @@ c1("t:insert{1, 10}")
 --
 c2("t:insert{1, 15}")
 --
-c2:commit() -- rollback
-c1:commit() -- success
+c2:commit() -- success
+c1:commit() -- rollback
 --
 c3("t:get{1}") -- {1, 10}
 --
