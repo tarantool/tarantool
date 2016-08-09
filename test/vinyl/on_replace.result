@@ -1,0 +1,676 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+fail = false
+---
+...
+old_tuple = nil
+---
+...
+new_tuple = nil
+---
+...
+function on_replace(old_tuple_, new_tuple_) if fail then old_tuple = nil new_tuple = nil error('fail') else old_tuple = old_tuple_ new_tuple = new_tuple_ end end
+---
+...
+-- on insert one index
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:insert({6, 'f'})
+---
+- [6, 'f']
+...
+old_tuple, new_tuple
+---
+- null
+- [6, 'f']
+...
+index:select{}
+---
+- - [6, 'f']
+...
+fail = true
+---
+...
+space:insert({7, 'g'})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [6, 'f']
+...
+space:drop()
+---
+...
+fail = false
+---
+...
+-- on insert in multiple indexes
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'scalar'} })
+---
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:insert({1, 2})
+---
+- [1, 2]
+...
+old_tuple, new_tuple
+---
+- null
+- [1, 2]
+...
+index:select{}
+---
+- - [1, 2]
+...
+index2:select{}
+---
+- - [1, 2]
+...
+fail = true
+---
+...
+space:insert({2, 3})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [1, 2]
+...
+index2:select{}
+---
+- - [1, 2]
+...
+space:drop()
+---
+...
+fail = false
+---
+...
+-- on replace in one index
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:replace({1})
+---
+- [1]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:replace({2})
+---
+- [2]
+...
+old_tuple, new_tuple
+---
+- null
+- [2]
+...
+space:replace({2})
+---
+- [2]
+...
+old_tuple, new_tuple
+---
+- [2]
+- [2]
+...
+space:replace({1, 43})
+---
+- [1, 43]
+...
+old_tuple, new_tuple
+---
+- [1]
+- [1, 43]
+...
+fail = true
+---
+...
+space:replace({2, 100})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+space:select{}
+---
+- - [1, 43]
+  - [2]
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- ensure trigger error causes rollback of only one statement
+fail = true
+---
+...
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'string'} })
+---
+...
+box.begin()
+---
+...
+space:insert({1, 'a'})
+---
+- [1, 'a']
+...
+space:insert({2, 'a'})
+---
+- error: Duplicate key exists in unique index 'secondary' in space 'test_space'
+...
+space:insert({1, 'b'})
+---
+- error: Duplicate key exists in unique index 'primary' in space 'test_space'
+...
+space:insert({2, 'b'})
+---
+- [2, 'b']
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:insert({3, 'c'})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+box.commit()
+---
+...
+index:select{}
+---
+- - [1, 'a']
+  - [2, 'b']
+...
+index2:select{}
+---
+- - [1, 'a']
+  - [2, 'b']
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- on replace in multiple indexes
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'scalar'} })
+---
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:replace({1, 'a'})
+---
+- [1, 'a']
+...
+space:replace({2, true})
+---
+- [2, true]
+...
+space:replace({3, 36.6})
+---
+- [3, 36.6]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+space:replace({4, 4})
+---
+- [4, 4]
+...
+old_tuple, new_tuple
+---
+- null
+- [4, 4]
+...
+space:replace({5, 5})
+---
+- [5, 5]
+...
+old_tuple, new_tuple
+---
+- null
+- [5, 5]
+...
+space:replace({4, 5})
+---
+- error: Duplicate key exists in unique index 'secondary' in space 'test_space'
+...
+old_tuple, new_tuple
+---
+- null
+- [5, 5]
+...
+space:replace({5, 6, 60})
+---
+- [5, 6, 60]
+...
+old_tuple, new_tuple
+---
+- [5, 5]
+- [5, 6, 60]
+...
+fail = true
+---
+...
+space:replace({10, 10})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [1, 'a']
+  - [2, true]
+  - [3, 36.6]
+  - [4, 4]
+  - [5, 6, 60]
+...
+index2:select{}
+---
+- - [2, true]
+  - [4, 4]
+  - [5, 6, 60]
+  - [3, 36.6]
+  - [1, 'a']
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- on delete from one index
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:insert({1, 2})
+---
+- [1, 2]
+...
+space:insert({2, 3, 4})
+---
+- [2, 3, 4]
+...
+space:insert({3, 4, 5})
+---
+- [3, 4, 5]
+...
+space:insert({4})
+---
+- [4]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+index:delete({3})
+---
+...
+old_tuple, new_tuple
+---
+- [3, 4, 5]
+- null
+...
+index:delete({4})
+---
+...
+old_tuple, new_tuple
+---
+- [4]
+- null
+...
+fail = true
+---
+...
+index:delete({1})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [1, 2]
+  - [2, 3, 4]
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- on delete from multiple indexes
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'scalar'} })
+---
+...
+space:insert({1, 'a'})
+---
+- [1, 'a']
+...
+space:insert({2, 2, 'b'})
+---
+- [2, 2, 'b']
+...
+space:insert({3, 30.3})
+---
+- [3, 30.3]
+...
+space:insert({4, false})
+---
+- [4, false]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+index:delete({1})
+---
+...
+old_tuple, new_tuple
+---
+- [1, 'a']
+- null
+...
+index2:delete({30.3})
+---
+...
+old_tuple, new_tuple
+---
+- [3, 30.3]
+- null
+...
+fail = true
+---
+...
+index2:delete({false})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [2, 2, 'b']
+  - [4, false]
+...
+index2:select{}
+---
+- - [4, false]
+  - [2, 2, 'b']
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- on update one index
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:insert({1, 2})
+---
+- [1, 2]
+...
+space:insert({2, 3, 4})
+---
+- [2, 3, 4]
+...
+space:insert({3, 4, 5})
+---
+- [3, 4, 5]
+...
+space:insert({4})
+---
+- [4]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+index:update({1}, {{'#', 2, 1}})
+---
+- [1]
+...
+old_tuple, new_tuple
+---
+- [1, 2]
+- [1]
+...
+index:update({2}, {{'#', 1, 1}}) -- must fail
+---
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    'test_space'
+...
+old_tuple, new_tuple
+---
+- [1, 2]
+- [1]
+...
+index:update({3}, {{'=', 4, '300'}})
+---
+- [3, 4, 5, '300']
+...
+old_tuple, new_tuple
+---
+- [3, 4, 5]
+- [3, 4, 5, '300']
+...
+index:update({20}, {{'+', 2, 5}})
+---
+...
+old_tuple, new_tuple
+---
+- [3, 4, 5]
+- [3, 4, 5, '300']
+...
+fail = true
+---
+...
+index:update({1}, {{'=', 2, 'one'}})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [1]
+  - [2, 3, 4]
+  - [3, 4, 5, '300']
+  - [4]
+...
+fail = false
+---
+...
+space:drop()
+---
+...
+-- on update multiple indexes
+space = box.schema.space.create('test_space', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'scalar'} })
+---
+...
+space:insert({1, 'a'})
+---
+- [1, 'a']
+...
+space:insert({2, 2, 'b'})
+---
+- [2, 2, 'b']
+...
+space:insert({3, 30.3})
+---
+- [3, 30.3]
+...
+space:insert({4, false})
+---
+- [4, false]
+...
+tmp = space:on_replace(on_replace)
+---
+...
+index:update({1}, {{'=', 2, 'z'}})
+---
+- [1, 'z']
+...
+old_tuple, new_tuple
+---
+- [1, 'a']
+- [1, 'z']
+...
+index:update({2}, {{'+', 1, 1}})
+---
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    'test_space'
+...
+old_tuple, new_tuple
+---
+- [1, 'a']
+- [1, 'z']
+...
+index2:update({30.3}, {{'+', 2, 10}})
+---
+- [3, 40.3]
+...
+old_tuple, new_tuple
+---
+- [3, 30.3]
+- [3, 40.3]
+...
+index2:update({false}, {{'=', 3, 'equal false'}})
+---
+- [4, false, 'equal false']
+...
+old_tuple, new_tuple
+---
+- [4, false]
+- [4, false, 'equal false']
+...
+fail = true
+---
+...
+index:update({1}, {{'=', 2, 'a'}})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index2:update({2}, {{'-', 2, 10}})
+---
+- error: '[string "function on_replace(old_tuple_, new_tuple_) i..."]:1: fail'
+...
+old_tuple, new_tuple
+---
+- null
+- null
+...
+index:select{}
+---
+- - [1, 'z']
+  - [2, 2, 'b']
+  - [3, 40.3]
+  - [4, false, 'equal false']
+...
+index2:select{}
+---
+- - [4, false, 'equal false']
+  - [2, 2, 'b']
+  - [3, 40.3]
+  - [1, 'z']
+...
+fail = false
+---
+...
+space:drop()
+---
+...
