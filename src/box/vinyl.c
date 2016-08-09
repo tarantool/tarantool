@@ -3145,7 +3145,7 @@ tx_rollback_svp(struct vy_tx *tx, struct txv *v)
 	struct vy_stat *stat = tx->manager->env->stat;
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
-		/* remove from index */
+		/* Remove from the conflict manager index */
 		txvindex_remove(&v->index->txvindex, v);
 		if (!(v->tuple->flags & SVGET))
 			logindex_remove(&tx->logindex, v);
@@ -3218,6 +3218,7 @@ tx_get(struct vy_tx *tx, struct vy_index *index,
 	return 1;
 
 add:
+	key->flags = SVGET;
 	return tx_set(tx, index, key, NULL);
 }
 
@@ -7160,7 +7161,6 @@ si_write(logindex_t *logindex, struct txv *v, uint64_t time,
 	     v = logindex_next(logindex, v)) {
 
 		struct vy_tuple *tuple = v->tuple;
-		assert(!(tuple->flags & SVGET));
 		tuple->lsn = lsn;
 
 		if ((status == VINYL_FINAL_RECOVERY &&
@@ -8119,8 +8119,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 		vy_error("%s", "index is not online");
 		return -1;
 	}
-
-	key->flags = SVGET;
 
 	/* concurrent */
 	if (cache_only && tx != NULL && order == VINYL_EQ) {
