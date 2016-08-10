@@ -1585,9 +1585,22 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 	return z;
 }
 
+/** There was a backend read. This flag is additive. */
 #define SVGET        1
+/**
+ * The last write operation on the tuple was REPLACE.
+ * This flag resets other write flags.
+ */
 #define SVREPLACE    2
+/**
+ * The last write operation on the tuple was DELETE.
+ * This flag resets other write flags.
+ */
 #define SVDELETE     4
+/**
+ * The last write operation on the tuple was UPSERT.
+ * This flag resets other write flags.
+ */
 #define SVUPSERT     8
 #define SVDUP        16
 
@@ -1699,6 +1712,27 @@ vy_tuple_unref(struct vy_index *index, struct vy_tuple *tuple);
 
 static int
 vy_tuple_unref_rt(struct vy_stat *stat, struct vy_tuple *v);
+
+/** This tuple was created for a read request. */
+static bool
+vy_tuple_is_r(struct vy_tuple *tuple)
+{
+	return tuple->flags & SVGET;
+}
+
+/** This tuple was created for a write request. */
+static bool
+vy_tuple_is_w(struct vy_tuple *tuple)
+{
+	return tuple->flags & (SVUPSERT|SVREPLACE|SVDELETE);
+}
+
+/** The tuple, while present in the transaction log, doesn't exist. */
+static bool
+vy_tuple_is_not_found(struct vy_tuple *tuple)
+{
+	return tuple->flags & SVDELETE;
+}
 
 struct PACKED svmergesrc {
 	struct vy_iter *i;
@@ -2784,11 +2818,6 @@ struct vy_index {
 	 * in this tree, and thus not seen by other transactions.
 	 */
 	txvindex_t txvindex;
-	/** Transaction logical time of index creation */
-	uint64_t tsn_min;
-	/** Transaction logical time of index deletion. */
-	uint64_t tsn_max;
-
 	vy_range_tree_t tree;
 	struct vy_status status;
 	pthread_mutex_t lock;
@@ -3016,15 +3045,8 @@ tx_tree_cmp(tx_tree_t *rbtree, struct vy_tx *a, struct vy_tx *b)
 	return vy_cmp(a->tsn, b->tsn);
 }
 
-static int
-tx_tree_key_cmp(tx_tree_t *rbtree, const char *a, struct vy_tx *b)
-{
-	(void)rbtree;
-	return vy_cmp(load_u64(a), b->tsn);
-}
-
-rb_gen_ext_key(, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
-		 tx_tree_cmp, const char *, tx_tree_key_cmp);
+rb_gen(, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
+       tx_tree_cmp);
 
 struct tx_manager {
 	tx_tree_t tree;
@@ -3046,13 +3068,6 @@ tx_begin(struct tx_manager*, struct vy_tx*, enum tx_type);
 
 static enum tx_state
 tx_rollback(struct vy_tx*);
-
-static int
-tx_set(struct vy_tx*, struct vy_index *, struct vy_tuple*, struct txv *);
-
-static int
-tx_get(struct vy_tx*, struct vy_index *, struct vy_tuple*,
-       struct vy_tuple**);
 
 static struct tx_manager *
 tx_manager_new(struct vy_env *env)
@@ -3083,20 +3098,6 @@ txvindex_delete_cb(txvindex_t *t, struct txv *v, void *arg)
 	(void) t;
 	txv_delete(arg, v);
 	return NULL;
-}
-
-static uint64_t
-tx_manager_min(struct tx_manager *m)
-{
-	struct vy_tx *min = tx_tree_first(&m->tree);
-	return min ? min->tsn : 0;
-}
-
-static uint64_t
-tx_manager_max(struct tx_manager *m)
-{
-	struct vy_tx *max = tx_tree_last(&m->tree);
-	return max ? max->tsn : 0;
 }
 
 static inline enum tx_state
@@ -3156,7 +3157,7 @@ tx_rollback_svp(struct vy_tx *tx, struct txv *v)
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
 		txvindex_remove(&v->index->txvindex, v);
-		if (!(v->tuple->flags & SVGET))
+		if (vy_tuple_is_w(v->tuple))
 			logindex_remove(&tx->logindex, v);
 		txv_delete(stat, v);
 	}
@@ -3173,45 +3174,9 @@ tx_rollback(struct vy_tx *tx)
 	return VINYL_TX_ROLLBACK;
 }
 
-static int
-tx_set(struct vy_tx *tx, struct vy_index *index,
-       struct vy_tuple *tuple, struct txv *old)
-{
-	/* Found a match of the previous action of this transaction */
-	if (old != NULL) {
-		if (unlikely(tuple->flags & SVUPSERT)) {
-			vy_error("%s", "only one upsert statement is "
-			         "allowed per a transaction key");
-			goto error;
-		}
-		if (!(tuple->flags & SVGET)) {
-			if (old->tuple->flags & SVGET) {
-				/* Write after read */
-				logindex_insert(&tx->logindex, old);
-			}
-			vy_tuple_unref_rt(tx->manager->env->stat, old->tuple);
-			vy_tuple_ref(tuple);
-			old->tuple = tuple;
-		}
-	} else {
-		/* Allocate a MVCC container. */
-		struct txv *v = txv_new(index, tuple, tx);
-		if (v->tuple->flags & SVGET) {
-		} else {
-			logindex_insert(&tx->logindex, v);
-		}
-		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		/* Add a version */
-		txvindex_insert(&index->txvindex, v);
-	}
-	return 0;
-error:
-	return -1;
-}
-
-static int
-tx_get(struct vy_tx *tx, struct vy_index *index,
-       struct vy_tuple *key, struct vy_tuple **result)
+static struct vy_tuple *
+vy_tx_get(struct vy_tx *tx, struct vy_index *index,
+       struct vy_tuple *key)
 {
 	struct txv *v = txvindex_search_key(&index->txvindex,
 					    key->data, key->size, tx->tsn);
@@ -3222,13 +3187,17 @@ tx_get(struct vy_tx *tx, struct vy_index *index,
 		/* The tuple does not exist. */
 		return 0;
 	}
-	*result = tuple;
 	vy_tuple_ref(tuple);
-	return 1;
+	return tuple;
 
 add:
 	key->flags = SVGET;
-	return tx_set(tx, index, key, NULL);
+	/* Allocate a MVCC container. */
+	v = txv_new(index, key, tx);
+	stailq_add_tail_entry(&tx->log, v, next_in_log);
+	/* Add a version */
+	txvindex_insert(&index->txvindex, v);
+	return 0;
 }
 
 struct PACKED sdv {
@@ -7684,7 +7653,6 @@ int
 vy_index_read(struct vy_index*, struct vy_tuple*, enum vy_order order,
 		struct vy_tuple **, struct vy_tuple *,
 		struct vy_tx*, struct sicache*, bool cache_only);
-static int vy_index_visible(struct vy_index*, uint64_t);
 static int vy_index_recoverbegin(struct vy_index*);
 static int vy_index_recoverend(struct vy_index*);
 
@@ -8120,7 +8088,6 @@ vy_index_drop(struct vy_index *index)
 	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
-	index->tsn_max = tx_manager_max(e->xm);
 	vy_status_set(&index->status, VINYL_DROP);
 	rlist_del(&index->link);
 	/* schedule index shutdown or drop */
@@ -8145,12 +8112,9 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	/* concurrent */
 	if (cache_only && tx != NULL && order == VINYL_EQ) {
 		assert(upsert == NULL);
-		int rc = tx_get(tx, index, key, result);
-		if (rc == -1)
-			return -1;
-		if (rc == 1)
+		if ((*result = vy_tx_get(tx, index, key)))
 			return 0;
-		/* rc == 0: tuple not found. */
+		/* Tuple not found. */
 	}
 
 	/* prepare read cache */
@@ -8311,8 +8275,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->refs = 0; /* referenced by scheduler */
 	vy_status_set(&index->status, VINYL_OFFLINE);
 	txvindex_new(&index->txvindex);
-	index->tsn_min = tx_manager_min(e->xm);
-	index->tsn_max = UINT64_MAX;
 	rlist_add(&e->indexes, &index->link);
 	return index;
 
@@ -8346,11 +8308,6 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_ref(index->tuple_format, -1);
 	TRASH(index);
 	free(index);
-}
-
-static int vy_index_visible(struct vy_index *index, uint64_t tsn)
-{
-	return tsn > index->tsn_min && tsn <= index->tsn_max;
 }
 
 size_t
@@ -8814,35 +8771,36 @@ check_key:
 
 /* }}} Upsert */
 
-static inline int
-vy_tx_write(struct vy_tx *tx, struct vy_index *index,
+static inline void
+vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	    struct vy_tuple *tuple, uint8_t flags)
 {
-	assert(tx->state == VINYL_TX_READY);
-
-	/* validate index status */
-	int status = vy_status(&index->status);
-	switch (status) {
-	case VINYL_DROP:
-		if (unlikely(! vy_index_visible(index, tx->tsn))) {
-			vy_error("%s", "index is invisible for the transaction");
-			return -1;
-		}
-		break;
-	case VINYL_INITIAL_RECOVERY:
-	case VINYL_FINAL_RECOVERY:
-	case VINYL_ONLINE: break;
-	default:
-		return vy_error("%s", "index in malfunction state");
-	}
-
 	tuple->flags = flags;
 
 	/* Update concurrent index */
 	struct txv *old = txvindex_search_key(&index->txvindex, tuple->data,
 					      tuple->size, tx->tsn);
-	/* Update the concurrent index only */
-	return tx_set(tx, index, tuple, old);
+	/* Found a match of the previous action of this transaction */
+	if (old != NULL) {
+		if (vy_tuple_is_w(tuple)) {
+			if (vy_tuple_is_r(old->tuple)) {
+				/* Write after read */
+				logindex_insert(&tx->logindex, old);
+			}
+			vy_tuple_unref_rt(tx->manager->env->stat, old->tuple);
+			vy_tuple_ref(tuple);
+			old->tuple = tuple;
+		}
+	} else {
+		/* Allocate a MVCC container. */
+		struct txv *v = txv_new(index, tuple, tx);
+		if (vy_tuple_is_w(v->tuple)) {
+			logindex_insert(&tx->logindex, v);
+		}
+		stailq_add_tail_entry(&tx->log, v, next_in_log);
+		/* Add a version */
+		txvindex_insert(&index->txvindex, v);
+	}
 }
 
 static void
@@ -8871,9 +8829,9 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 		tuple, tuple_end);
 	if (vytuple == NULL)
 		return -1;
-	int rc = vy_tx_write(tx, index, vytuple, SVREPLACE);
+	vy_tx_set(tx, index, vytuple, SVREPLACE);
 	vy_tuple_unref(index, vytuple);
-	return rc;
+	return 0;
 }
 
 int
@@ -8894,9 +8852,9 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	extra = mp_encode_uint(extra, 1); /* 1 upsert ops record */
 	extra = mp_encode_uint(extra, index_base);
 	memcpy(extra, expr, expr_end - expr);
-	int rc = vy_tx_write(tx, index, vy_tuple, SVUPSERT);
+	vy_tx_set(tx, index, vy_tuple, SVUPSERT);
 	vy_tuple_unref(index, vy_tuple);
-	return rc;
+	return 0;
 }
 
 int
@@ -8905,9 +8863,11 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 {
 	struct vy_tuple *vykey =
 		vy_tuple_from_key_data(index, key, part_count);
-	int rc = vy_tx_write(tx, index, vykey, SVDELETE);
+	if (vykey == NULL)
+		return -1;
+	vy_tx_set(tx, index, vykey, SVDELETE);
 	vy_tuple_unref(index, vykey);
-	return rc;
+	return 0;
 }
 
 void
@@ -9127,7 +9087,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 			/* cache miss or not found */
 			rc = vy_read_task(index, tx, NULL, vykey,
 					  &vyresult, vyresult, vy_get_cb);
-		} else if (vyresult->flags & SVDELETE) {
+		} else if (vy_tuple_is_not_found(vyresult)) {
 			/*
 			 * We deleted this tuple in this
 			 * transaction. No need for a disk lookup.
@@ -9173,7 +9133,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 		if (vy_read_task(index, NULL, c, NULL, &vyresult,
 				 vyresult, vy_cursor_next_cb))
 			return -1;
-	} else if (vyresult->flags & SVDELETE) {
+	} else if (vy_tuple_is_not_found(vyresult)) {
 		/*
 		 * We deleted this tuple in this
 		 * transaction. No need for a disk lookup.
