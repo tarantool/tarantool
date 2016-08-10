@@ -34,19 +34,26 @@
 struct VinylSpace: public Handler {
 	VinylSpace(Engine*);
 	virtual void
-	applySnapshotRow(struct space *space, struct request *request);
+	applySnapshotRow(struct space *space, struct request *request) override;
 	virtual struct tuple *
 	executeReplace(struct txn*, struct space *space,
-	               struct request *request);
+	               struct request *request) override;
 	virtual struct tuple *
 	executeDelete(struct txn*, struct space *space,
-	              struct request *request);
+	              struct request *request) override;
 	virtual struct tuple *
 	executeUpdate(struct txn*, struct space *space,
-	              struct request *request);
+	              struct request *request) override;
 	virtual void
 	executeUpsert(struct txn*, struct space *space,
-	              struct request *request);
+	              struct request *request) override;
+	/**
+	 * If space was altered then this method updates space pointer in all
+	 * indexes.
+	 */
+	virtual void
+	commitAlterSpace(struct space *old_space, struct space *new_space)
+		override;
 };
 
 struct key_def;

@@ -144,7 +144,8 @@ struct MemtxSpace: public Handler {
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char * /* key_end */,
 		      struct port *port);
-	virtual void onAlter(Handler *old);
+	virtual void doAlterSpace(struct space *old_space,
+				  struct space *new_space);
 public:
 	/**
 	 * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -432,9 +433,10 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 }
 
 void
-MemtxSpace::onAlter(Handler *old)
+MemtxSpace::doAlterSpace(struct space *old_space, struct space *new_space)
 {
-	MemtxSpace *handler = (MemtxSpace *) old;
+	(void)new_space;
+	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
 	replace = handler->replace;
 }
 

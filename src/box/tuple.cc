@@ -303,7 +303,7 @@ tuple_field_cstr(struct tuple *tuple, uint32_t i)
 }
 
 char *
-tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
 	return tuple_extract_key_raw(tuple->data, tuple->data + tuple->bsize,
@@ -312,7 +312,7 @@ tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
 
 char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      struct key_def *key_def, uint32_t *key_size)
+		      const struct key_def *key_def, uint32_t *key_size)
 {
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc_xc(&fiber()->gc, data_end - data);

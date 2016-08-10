@@ -62,7 +62,8 @@ _ = space:create_index('primary', { type = 'tree', parts = parts })
 tuple = {}
 for i=1,box.schema.INDEX_PART_MAX,1 do tuple[i] = i; end
 space:replace(tuple)
-space:upsert(tuple, {{'=', box.schema.INDEX_PART_MAX + 1, 100500}})
+-- https://github.com/tarantool/tarantool/issues/1651 and https://github.com/tarantool/tarantool/issues/1671
+-- space:upsert(tuple, {{'=', box.schema.INDEX_PART_MAX + 1, 100500}})
 space:get(tuple)
 space:select(tuple)
 _ = space:delete(tuple)

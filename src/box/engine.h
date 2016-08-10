@@ -208,7 +208,15 @@ public:
 		      const char *key, const char *key_end,
 		      struct port *);
 
-	virtual void onAlter(Handler *old);
+	virtual void doAlterSpace(struct space *old_space,
+				  struct space *new_space);
+
+	/**
+	 * This method is called after altering space and
+	 * replacing old_space with new_space in space cache.
+	 */
+	virtual void commitAlterSpace(struct space *old_space,
+				      struct space *new_space);
 	Engine *engine;
 };
 

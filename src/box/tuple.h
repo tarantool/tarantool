@@ -252,7 +252,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 
 char *
 box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
-	uint32_t index_id, uint32_t *key_size);
+		      uint32_t index_id, uint32_t *key_size);
 
 /** \endcond public */
 
@@ -641,7 +641,7 @@ tuple_next_cstr(struct tuple_iterator *it);
  * @param key_size - here will be size of extracted key
  */
 char *
-tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size);
 
 /**
@@ -654,7 +654,7 @@ tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
  */
 char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      struct key_def *key_def, uint32_t *key_size);
+		      const struct key_def *key_def, uint32_t *key_size);
 
 struct tuple *
 tuple_update(struct tuple_format *new_format,

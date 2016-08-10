@@ -190,7 +190,13 @@ Index*
 VinylEngine::createIndex(struct key_def *key_def)
 {
 	switch (key_def->type) {
-	case TREE: return new VinylIndex(key_def);
+	case TREE: {
+		if (key_def->iid == 0) {
+			return new VinylPrimaryIndex(key_def);
+		} else {
+			return new VinylSecondaryIndex(key_def);
+		}
+	}
 	default:
 		unreachable();
 		return NULL;
