@@ -56,9 +56,9 @@ c2("t:replace{1, 12}")
 c1("t:replace{2, 21}")
 c1:commit()
 c2("t:replace{2, 22}")
-c2:commit() -- rollback
-t:get{1} -- {1, 11}
-t:get{2} -- {2, 21}
+c2:commit() -- success, the last writer wins
+t:get{1} -- {1, 12}
+t:get{2} -- {2, 22}
 
 -- teardown
 t:delete{1}
@@ -157,7 +157,7 @@ c1:commit() -- ok
 c3("t:get{1}") -- {1, 11}
 c2("t:replace{2, 18}")
 c3("t:get{2}") -- {2, 19}
-c2:commit() -- rollback -- conflict
+c2:commit() -- fixme: must be rollback due to conflict
 c3("t:get{2}") -- {2, 19}
 c3("t:get{1}") -- {1, 11}
 c3:commit()

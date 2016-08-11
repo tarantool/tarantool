@@ -2934,12 +2934,6 @@ txv_abort(struct txv *v)
 	v->tx->is_aborted = true;
 }
 
-static struct txv *
-txv_prev(struct txv *v);
-
-static struct txv *
-txv_next(struct txv *v);
-
 static int
 txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b);
 
@@ -2988,30 +2982,31 @@ txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b)
 	return rc;
 }
 
-static struct txv *
-txv_prev(struct txv *v)
+/**
+ * Abort all transaction which are reading the tuple v written by
+ * tx.
+ */
+static void
+txv_abort_all(struct vy_tx *tx, struct txv *v)
 {
 	txvindex_t *tree = &v->index->txvindex;
-	struct key_def *key_def;
-	key_def = container_of(tree, struct vy_index, txvindex)->key_def;
-	struct txv *prev = txvindex_prev(tree, v);
-	if (prev && vy_tuple_compare(v->tuple->data,
-				     prev->tuple->data, key_def) == 0)
-		return prev;
-	return NULL;
-}
-
-static struct txv *
-txv_next(struct txv *v)
-{
-	txvindex_t *tree = &v->index->txvindex;
-	struct key_def *key_def;
-	key_def = container_of(tree, struct vy_index, txvindex)->key_def;
-	struct txv *next = txvindex_next(tree, v);
-	if (next && vy_tuple_compare(v->tuple->data,
-				     next->tuple->data, key_def) == 0)
-		return next;
-	return NULL;
+	struct key_def *key_def = v->index->key_def;
+	struct txvindex_key key;
+	key.data = v->tuple->data;
+	key.size = v->tuple->size;
+	key.tsn = 0;
+	/** Find the first value equal to or greater than key */
+	struct txv *abort = txvindex_nsearch(tree, &key);
+	while (abort) {
+		/* Check if we're still looking at the matching key. */
+		if (vy_tuple_compare(key.data, abort->tuple->data,
+				     key_def))
+			break;
+		/* Don't abort self. */
+		if (abort->tx != tx)
+			txv_abort(abort);
+		abort = txvindex_next(tree, abort);
+	}
 }
 
 static int
@@ -3027,7 +3022,33 @@ logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
 	return rc;
 }
 
-rb_gen(, logindex_, logindex_t, struct txv, in_logindex, logindex_cmp);
+struct logindex_key {
+	struct vy_index *index;
+	char *data;
+};
+
+static int
+logindex_key_cmp(logindex_t *index, struct logindex_key *a, struct txv *b)
+{
+	(void) index;
+	/* Order by index first, by key in the index second. */
+	int rc = a->index < b->index ? -1 : a->index > b->index;
+	if (rc == 0) {
+		struct key_def *key_def = a->index->key_def;
+		rc = vy_tuple_compare(a->data, b->tuple->data, key_def);
+	}
+	return rc;
+}
+
+rb_gen_ext_key(, logindex_, logindex_t, struct txv, in_logindex, logindex_cmp,
+	       struct logindex_key *, logindex_key_cmp);
+
+static struct txv *
+logindex_search_key(logindex_t *tree, struct vy_index *index, char *data)
+{
+	struct logindex_key key = { .index = index, .data = data};
+	return logindex_search(tree, &key);
+}
 
 bool
 vy_tx_is_ro(struct vy_tx *tx)
@@ -3156,7 +3177,8 @@ tx_rollback_svp(struct vy_tx *tx, struct txv *v)
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
-		txvindex_remove(&v->index->txvindex, v);
+		if (vy_tuple_is_r(v->tuple))
+			txvindex_remove(&v->index->txvindex, v);
 		if (vy_tuple_is_w(v->tuple))
 			logindex_remove(&tx->logindex, v);
 		txv_delete(stat, v);
@@ -3175,28 +3197,23 @@ tx_rollback(struct vy_tx *tx)
 }
 
 static struct vy_tuple *
-vy_tx_get(struct vy_tx *tx, struct vy_index *index,
-       struct vy_tuple *key)
+vy_tx_get(struct vy_tx *tx, struct vy_index *index, struct vy_tuple *key)
 {
-	struct txv *v = txvindex_search_key(&index->txvindex,
-					    key->data, key->size, tx->tsn);
-	if (v == NULL)
-		goto add;
-	struct vy_tuple *tuple = v->tuple;
-	if (tuple->flags & SVGET) {
-		/* The tuple does not exist. */
-		return 0;
+	struct txv *v = logindex_search_key(&tx->logindex, index, key->data);
+	if (v) {
+		/* Do not track separately our own reads after writes. */
+		vy_tuple_ref(v->tuple);
+		return v->tuple;
 	}
-	vy_tuple_ref(tuple);
-	return tuple;
-
-add:
-	key->flags = SVGET;
-	/* Allocate a MVCC container. */
-	v = txv_new(index, key, tx);
-	stailq_add_tail_entry(&tx->log, v, next_in_log);
-	/* Add a version */
-	txvindex_insert(&index->txvindex, v);
+	v = txvindex_search_key(&index->txvindex, key->data,
+				key->size, tx->tsn);
+	if (v == NULL) {
+		key->flags = SVGET;
+		/* Allocate a MVCC container. */
+		v = txv_new(index, key, tx);
+		stailq_add_tail_entry(&tx->log, v, next_in_log);
+		txvindex_insert(&index->txvindex, v);
+	}
 	return 0;
 }
 
@@ -8776,30 +8793,19 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	    struct vy_tuple *tuple, uint8_t flags)
 {
 	tuple->flags = flags;
-
 	/* Update concurrent index */
-	struct txv *old = txvindex_search_key(&index->txvindex, tuple->data,
-					      tuple->size, tx->tsn);
+	struct txv *old = logindex_search_key(&tx->logindex, index,
+					      tuple->data);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
-		if (vy_tuple_is_w(tuple)) {
-			if (vy_tuple_is_r(old->tuple)) {
-				/* Write after read */
-				logindex_insert(&tx->logindex, old);
-			}
-			vy_tuple_unref_rt(tx->manager->env->stat, old->tuple);
-			vy_tuple_ref(tuple);
-			old->tuple = tuple;
-		}
+		vy_tuple_unref_rt(tx->manager->env->stat, old->tuple);
+		vy_tuple_ref(tuple);
+		old->tuple = tuple;
 	} else {
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, tuple, tx);
-		if (vy_tuple_is_w(v->tuple)) {
-			logindex_insert(&tx->logindex, v);
-		}
+		logindex_insert(&tx->logindex, v);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		/* Add a version */
-		txvindex_insert(&index->txvindex, v);
 	}
 }
 
@@ -8810,7 +8816,9 @@ vy_tx_delete(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
-		txvindex_remove(&v->index->txvindex, v);
+		if (vy_tuple_is_r(v->tuple))
+			txvindex_remove(&v->index->txvindex, v);
+		/* Don't touch logindex, we're deleting all keys. */
 		txv_delete(stat, v);
 	}
 	vy_stat_tx(stat, tx->start, count, rlb, conflict);
@@ -8895,19 +8903,9 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 	tx_promote(tx, VINYL_TX_COMMIT);
 
 	struct txv *v = logindex_first(&tx->logindex);
-	for (; v != NULL; v = logindex_next(&tx->logindex, v)) {
-		struct txv *abort = txv_prev(v);
-		/* abort conflict reader */
-		while (abort) {
-			txv_abort(abort);
-			abort = txv_prev(abort);
-		}
-		abort = txv_next(v);
-		while (abort) {
-			txv_abort(abort);
-			abort = txv_next(abort);
-		}
-	}
+	for (; v != NULL; v = logindex_next(&tx->logindex, v))
+		txv_abort_all(tx, v);
+
 	tx_manager_end(tx->manager, tx);
 	/*
 	 * A half committed transaction is no longer

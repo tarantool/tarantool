@@ -1233,12 +1233,12 @@ c2:commit()
 ...
 c1:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 c3("t:get{1}") -- {1, 15}
 ---
-- - [1, 10]
+- - [1, 15]
 ...
 --
 -- cleanup
@@ -1280,14 +1280,14 @@ c1:commit()
 ---
 - 
 ...
-c2:commit() -- aborted by conflict @fixme it shouldn't be the case
+c2:commit() -- write after write is ok, the last writer to commit wins
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
-c3("t:get{1}") -- {1, 15}
+c3("t:get{1}") -- {1, 10}
 ---
-- - [1, 15]
+- - [1, 10]
 ...
 --
 -- cleanup
@@ -1619,14 +1619,14 @@ c2:commit()
 ---
 - 
 ...
-c1:commit()
+c1:commit() -- ok, the last committer wins
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
-c3("t:get{1}")
+c3("t:get{1}") -- {1, 10}
 ---
-- - [1, 15]
+- - [1, 10]
 ...
 --
 -- cleanup
@@ -1822,14 +1822,14 @@ c1:commit() -- success
 ---
 - 
 ...
-c2:commit() -- @fixme: rollback
+c2:commit() -- success, the last writer wins
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
-c2("t:get{1}") -- {1, 10}
+c2("t:get{1}") -- {1, 15}
 ---
-- - [1, 10]
+- - [1, 15]
 ...
 --
 -- cleanup
@@ -1874,9 +1874,9 @@ c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- rollback
+c1:commit() -- success, the last writer wins
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -1917,13 +1917,13 @@ c2("t:replace{1, 15}")
 - - [1, 15]
 ...
 --
-c2:commit() -- succcess
+c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- rollback
+c1:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -1968,9 +1968,9 @@ c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- rollback
+c1:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2015,9 +2015,9 @@ c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- rollback
+c1:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2115,7 +2115,7 @@ c2:rollback() -- not in transaction
 ...
 c1:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2166,7 +2166,7 @@ c2:rollback() -- not in transaction
 ...
 c1:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2229,13 +2229,13 @@ c2:commit() -- success
 ---
 - 
 ...
-c3:commit() -- rollback
+c3:commit() -- success
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
-c1:commit() -- rollback
+c1:commit() -- success, the last committer wins
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c2:commit() -- not in transaction
 ---
@@ -2246,6 +2246,11 @@ c3:commit() -- not in transaction
 - 
 ...
 --
+c3:get{1} -- {1, 20}
+---
+- error: '[string "return c3:get{1} -- {1, 20} "]:1: attempt to call method ''get''
+    (a nil value)'
+...
 -- cleanup
 --
 c1("t:delete{1}")
@@ -2288,29 +2293,33 @@ c1("t:replace{1, 10}")
 - - [1, 10]
 ...
 --
-c2("t:replace{1, 10}")
+c2("t:replace{1, 20}")
 ---
-- - [1, 10]
+- - [1, 20]
 ...
 --
-c3("t:replace{1, 10}")
+c3("t:replace{1, 30}")
 ---
-- - [1, 10]
+- - [1, 30]
 ...
 --
+c1:commit() -- success
+---
+- 
+...
 c2:commit() -- success
 ---
 - 
 ...
-c3:commit() -- rollback
----
-- - {'error': 'Transaction has been aborted by conflict'}
-...
-c3:commit() -- rollback
+c3:commit() -- success
 ---
 - 
 ...
 --
+c3("t:get{1}") -- {1, 30}
+---
+- - [1, 30]
+...
 -- cleanup
 --
 c1("t:delete{1}")
@@ -2324,7 +2333,7 @@ c1("t:delete{1}")
 --
 c1:begin()
 ---
-- - {'error': 'Operation is not permitted when there is an active transaction '}
+- 
 ...
 c2:begin()
 ---
@@ -2369,7 +2378,7 @@ c2:commit() -- success
 ...
 c3:commit() -- rollback
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c1:rollback() -- success
 ---
@@ -2434,7 +2443,7 @@ c2:commit()  -- success
 ...
 c3:commit() -- rollback
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 c2:rollback() -- success, not in transaction in tarantool
 ---
@@ -2446,7 +2455,7 @@ c3:commit() -- success, not in transaction in tarantool
 ...
 c1:commit() -- rollback
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2511,7 +2520,7 @@ c2:commit()
 ...
 c1:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -2575,7 +2584,7 @@ c3:rollback()
 ...
 c1:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 -- cleanup
@@ -3286,12 +3295,12 @@ c2("t:replace{1, 20}") -- should not reset conflict flag
 --
 c2:commit() --  rollback
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 c3("t:get{1}")
 ---
-- - [1, 10]
+- - [1, 20]
 ...
 --
 -- cleanup
@@ -3324,12 +3333,12 @@ c2("t:replace{1, 15}")
 --
 c1:commit()
 ---
-- - {'error': 'Transaction has been aborted by conflict'}
+- 
 ...
 --
 c2("t:get{1}") -- {1, 10}
 ---
-- - [1, 15]
+- - [1, 10]
 ...
 --
 c1("t:delete{1}")

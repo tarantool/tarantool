@@ -533,9 +533,9 @@ c2("t:replace{1, 10}")
 --
 -- sic: commit order
 c1:commit()
-c2:commit() -- aborted by conflict @fixme it shouldn't be the case
+c2:commit() -- write after write is ok, the last writer to commit wins
 --
-c3("t:get{1}") -- {1, 15}
+c3("t:get{1}") -- {1, 10}
 --
 -- cleanup
 --
@@ -669,9 +669,9 @@ c2("t:replace{1, 15}")
 c1("t:replace{1, 10}")
 --
 c2:commit()
-c1:commit()
+c1:commit() -- ok, the last committer wins
 --
-c3("t:get{1}")
+c3("t:get{1}") -- {1, 10}
 --
 -- cleanup
 --
@@ -752,9 +752,9 @@ c2("t:replace{1, 15}")
 c1("t:replace{1, 10}")
 --
 c1:commit() -- success
-c2:commit() -- @fixme: rollback
+c2:commit() -- success, the last writer wins
 --
-c2("t:get{1}") -- {1, 10}
+c2("t:get{1}") -- {1, 15}
 --
 -- cleanup
 --
@@ -774,7 +774,7 @@ c1("t:replace{1, 10}")
 c2("t:replace{1, 15}")
 --
 c2:commit() -- success
-c1:commit() -- rollback
+c1:commit() -- success, the last writer wins
 --
 -- cleanup
 --
@@ -793,8 +793,8 @@ c1("t:replace{1, 10}")
 --
 c2("t:replace{1, 15}")
 --
-c2:commit() -- succcess
-c1:commit() -- rollback
+c2:commit() -- success
+c1:commit() -- success
 --
 -- cleanup
 --
@@ -814,7 +814,7 @@ c1("t:replace{1, 10}")
 c2("t:replace{1, 15}")
 --
 c2:commit() -- success
-c1:commit() -- rollback
+c1:commit() -- success
 --
 -- cleanup
 --
@@ -834,7 +834,7 @@ c1("t:replace{1, 10}")
 c2("t:replace{1, 15}")
 --
 c2:commit() -- success
-c1:commit() -- rollback
+c1:commit() -- success
 --
 -- cleanup
 --
@@ -922,11 +922,12 @@ c2("t:replace{1, 15}")
 c3("t:replace{1, 20}")
 --
 c2:commit() -- success
-c3:commit() -- rollback
-c1:commit() -- rollback
+c3:commit() -- success
+c1:commit() -- success, the last committer wins
 c2:commit() -- not in transaction
 c3:commit() -- not in transaction
 --
+c3:get{1} -- {1, 20}
 -- cleanup
 --
 c1("t:delete{1}")
@@ -945,14 +946,15 @@ c2("t:get{300}") -- start transaction in the engine
 --
 c1("t:replace{1, 10}")
 --
-c2("t:replace{1, 10}")
+c2("t:replace{1, 20}")
 --
-c3("t:replace{1, 10}")
+c3("t:replace{1, 30}")
 --
+c1:commit() -- success
 c2:commit() -- success
-c3:commit() -- rollback
-c3:commit() -- rollback
+c3:commit() -- success
 --
+c3("t:get{1}") -- {1, 30}
 -- cleanup
 --
 c1("t:delete{1}")
