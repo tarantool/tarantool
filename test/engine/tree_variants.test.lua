@@ -64,3 +64,32 @@ space:insert{1, 'xxxxxxxxxxx', 2, '', '', '', '', '', 0}
 space:drop()
 sort = nil
 sort_cmp = nil
+
+-- test index bsize
+
+space = box.schema.space.create('test', { engine = engine })
+pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'string', 3, 'scalar'} })
+pk:bsize() == 0
+index2:bsize() == 0
+space:insert({1, 'a', 3})
+pk:bsize() > 0
+index2:bsize() > 0
+
+space:insert({2, 'b', 4})
+old_pk_size = pk:bsize()
+old_index2_size = index2:bsize()
+
+space:insert({2, 'b', 4})
+old_pk_size == pk:bsize()
+old_index2_size == index2:bsize()
+
+tmp = pk:delete({1})
+pk:bsize() > 0
+index2:bsize() > 0
+
+tmp = index2:delete({'b', 4})
+pk:bsize() > 0
+index2:bsize() > 0
+
+space:drop()
