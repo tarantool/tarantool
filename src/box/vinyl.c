@@ -533,12 +533,16 @@ vy_buf_ensure(struct vy_buf *b, size_t size)
 	char *p;
 	if (b->s == NULL) {
 		p = malloc(sz);
-		if (unlikely(p == NULL))
+		if (unlikely(p == NULL)) {
+			diag_set(OutOfMemory, sz, "malloc", "vy_buf->p");
 			return -1;
+		}
 	} else {
 		p = realloc(b->s, sz);
-		if (unlikely(p == NULL))
+		if (unlikely(p == NULL)) {
+			diag_set(OutOfMemory, sz, "realloc", "vy_buf->p");
 			return -1;
+		}
 	}
 	b->p = p + (b->p - b->s);
 	b->e = p + sz;
@@ -679,8 +683,11 @@ ss_rqinit(struct ssrq *q, uint32_t range, uint32_t count)
 	q->range_count = count + 1 /* zero */;
 	q->range = range;
 	q->q = malloc(sizeof(struct ssrqq) * q->range_count);
-	if (unlikely(q->q == NULL))
+	if (unlikely(q->q == NULL)) {
+		diag_set(OutOfMemory, sizeof(struct ssrqq) * q->range_count,
+			 "ssrqq", "struct");
 		return -1;
+	}
 	uint32_t i = 0;
 	while (i < q->range_count) {
 		struct ssrqq *p = &q->q[i];
@@ -1361,9 +1368,6 @@ sr_versionstorage_check(struct srversion *v)
 #define vy_error(fmt, ...) \
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
-#define vy_oom() \
-	vy_e(ER_VINYL, "%s", "memory allocation failed")
-
 struct vy_status {
 	enum vinyl_status status;
 	pthread_mutex_t lock;
@@ -1721,10 +1725,7 @@ sv_mergeinit(struct svmerge *m, struct vy_index *index,
 static inline int
 sv_mergeprepare(struct svmerge *m, int count)
 {
-	int rc = vy_buf_ensure(&m->buf, sizeof(struct svmergesrc) * count);
-	if (unlikely(rc == -1))
-		return vy_oom();
-	return 0;
+	return vy_buf_ensure(&m->buf, sizeof(struct svmergesrc) * count);
 }
 
 static inline void
@@ -2329,7 +2330,12 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 void *
 sv_index_alloc_matras_page()
 {
-	return malloc(BPS_TREE_VINDEX_PAGE_SIZE);
+	void *res = malloc(BPS_TREE_VINDEX_PAGE_SIZE);
+	if (res == NULL) {
+		diag_set(OutOfMemory, BPS_TREE_VINDEX_PAGE_SIZE,
+			 "sv_index_alloc_matras_page", "res");
+	}
+	return res;
 }
 
 void
@@ -2873,8 +2879,10 @@ static inline struct txv *
 txv_new(struct vy_index *index, struct vy_tuple *tuple, struct vy_tx *tx)
 {
 	struct txv *v = malloc(sizeof(struct txv));
-	if (unlikely(v == NULL))
+	if (unlikely(v == NULL)) {
+		diag_set(OutOfMemory, sizeof(struct txv), "txv", "struct");
 		return NULL;
+	}
 	v->index = index;
 	v->tsn = tx->tsn;
 	v->tuple = tuple;
@@ -3793,8 +3801,11 @@ sd_censure(struct sdc *c, int count)
 		while (count-- >= 0) {
 			struct sdcbuf *buf =
 				malloc(sizeof(struct sdcbuf));
-			if (buf == NULL)
+			if (buf == NULL) {
+				diag_set(OutOfMemory, sizeof(struct sdcbuf),
+					 "sdcbuf", "struct");
 				return -1;
+			}
 			vy_buf_init(&buf->a);
 			vy_buf_init(&buf->b);
 			buf->next = c->head;
@@ -3862,11 +3873,11 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 	vy_buf_reset(arg->buf);
 	int rc = vy_buf_ensure(arg->buf, info->unpacked_size);
 	if (unlikely(rc == -1))
-		return vy_oom();
+		return -1;
 	vy_buf_reset(arg->buf_xf);
 	rc = vy_buf_ensure(arg->buf_xf, arg->index->header.sizevmax);
 	if (unlikely(rc == -1))
-		return vy_oom();
+		return -1;
 
 	i->reads++;
 
@@ -3877,7 +3888,7 @@ sd_read_page(struct sdread *i, struct vy_page_info *info)
 		vy_buf_reset(arg->buf_read);
 		rc = vy_buf_ensure(arg->buf_read, info->size);
 		if (unlikely(rc == -1))
-			return vy_oom();
+			return -1;
 		rc = vy_file_pread(arg->file, info->offset,
 				   arg->buf_read->s, info->size);
 		if (unlikely(rc == -1)) {
@@ -4039,14 +4050,14 @@ vy_page_index_load(struct vy_page_index *i, void *ptr)
 	uint32_t index_size = h->count * sizeof(struct vy_page_info);
 	int rc = vy_buf_ensure(&i->pages, index_size);
 	if (unlikely(rc == -1))
-		return vy_oom();
+		return -1;
 	memcpy(i->pages.s, (char *)ptr + sizeof(struct vy_page_index_header),
 	       index_size);
 	vy_buf_advance(&i->pages, index_size);
 	uint32_t minmax_size = h->size - index_size;
 	rc = vy_buf_ensure(&i->minmax, minmax_size);
 	if (unlikely(rc == -1))
-		return vy_oom();
+		return -1;
 	memcpy(i->minmax.s,
 	       (char *)ptr + sizeof(struct vy_page_index_header) + index_size,
 	       minmax_size);
@@ -4271,7 +4282,8 @@ vy_run_new()
 {
 	struct vy_run *b = (struct vy_run*)malloc(sizeof(struct vy_run));
 	if (unlikely(b == NULL)) {
-		vy_oom();
+		diag_set(OutOfMemory, sizeof(struct vy_run), "vy_run",
+			 "struct");
 		return NULL;
 	}
 	vy_run_init(b);
@@ -4581,8 +4593,11 @@ si_cacheadd(struct vy_run *run)
 {
 	struct sicacherun *nb =
 		malloc(sizeof(struct sicacherun));
-	if (unlikely(nb == NULL))
+	if (unlikely(nb == NULL)) {
+		diag_set(OutOfMemory, sizeof(struct sicacherun),
+			 "sicacherun", "struct");
 		return NULL;
+	}
 	nb->run = run;
 	nb->ref = NULL;
 	memset(&nb->i, 0, sizeof(nb->i));
@@ -5067,10 +5082,8 @@ vy_run_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 	while (iwrite && sv_writeiter_has(iwrite)) {
 		int rc = vy_run_dump_tuple(iwrite, &tuplesinfo, &values,
 					   &header);
-		if (rc != 0) {
-			vy_oom();
+		if (rc != 0)
 			goto err;
-		}
 		sv_writeiter_next(iwrite);
 	}
 	struct vy_buf compressed;
@@ -5194,10 +5207,8 @@ vy_run_write(struct vy_file *file, struct svwriteiter *iwrite,
 	do {
 		uint64_t page_offset = file->size;
 
-		if (vy_buf_ensure(&sdindex->pages, sizeof(struct vy_page_info))) {
-			vy_oom();
+		if (vy_buf_ensure(&sdindex->pages, sizeof(struct vy_page_info)))
 			goto err;
-		}
 		struct vy_page_info *page = (struct vy_page_info *)sdindex->pages.p;
 		vy_buf_advance(&sdindex->pages, sizeof(struct vy_page_info));
 		if (vy_run_write_page(file, iwrite, compression, index_header,
@@ -5359,7 +5370,7 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	int rc;
 	rc = sd_censure(c, node->run_count);
 	if (unlikely(rc == -1))
-		return vy_oom();
+		return -1;
 	struct svmerge merge;
 	sv_mergeinit(&merge, index, index->key_def);
 	rc = sv_mergeprepare(&merge, node->run_count + 1);
@@ -5401,7 +5412,7 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 		};
 		int rc = sd_read_open(&s->src, &arg, NULL, 0);
 		if (unlikely(rc == -1))
-			return vy_oom();
+			return -1;
 		size_stream += vy_page_index_total(&run->index);
 		count += vy_page_index_count(&run->index);
 		cbuf = cbuf->next;
@@ -5517,7 +5528,7 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 		struct sv *v = sv_indexiter_get(&ii);
 		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref **));
 		if (unlikely(rc == -1))
-			return vy_oom();
+			return -1;
 		sv_indexiter_next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
@@ -5590,7 +5601,7 @@ si_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *no
 		struct sv *v = sv_indexiter_get(&ii);
 		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref**));
 		if (unlikely(rc == -1))
-			return vy_oom();
+			return -1;
 		sv_indexiter_next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
@@ -5665,10 +5676,8 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 			goto error;
 
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
-		if (unlikely(rc == -1)) {
-			vy_oom();
+		if (unlikely(rc == -1))
 			goto error;
-		}
 
 		n->self.id = id;
 		n->self.index = sdindex;
@@ -5725,7 +5734,6 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 			return -1;
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
 		if (unlikely(rc == -1)) {
-			vy_oom();
 			vy_range_free(n, env, 1);
 			return -1;
 		}
@@ -5851,7 +5859,8 @@ vy_range_new(struct key_def *key_def)
 {
 	struct vy_range *n = (struct vy_range*)malloc(sizeof(struct vy_range));
 	if (unlikely(n == NULL)) {
-		vy_oom();
+		diag_set(OutOfMemory, sizeof(struct vy_range), "vy_range",
+			 "struct");
 		return NULL;
 	}
 	n->recover = 0;
@@ -6435,7 +6444,7 @@ si_readdup(struct siread *q, struct sv *result)
 		uint32_t size = sv_size(result);
 		v = vy_tuple_alloc(q->index, size);
 		if (unlikely(v == NULL))
-			return vy_oom();
+			return -1;
 		memcpy(v->data, sv_pointer(result), size);
 		v->flags = sv_flags(result);
 		v->lsn = sv_lsn(result);
@@ -6602,10 +6611,8 @@ next_node:
 
 	/* cache and runs */
 	rc = si_cachevalidate(q->cache, node);
-	if (unlikely(rc == -1)) {
-		vy_oom();
+	if (unlikely(rc == -1))
 		return -1;
-	}
 
 	struct vy_run *run = node->run;
 	while (run != NULL) {
@@ -7019,7 +7026,7 @@ si_recovercomplete(struct sitrack *track, struct vy_env *env, struct vy_index *i
 	while (n) {
 		int rc = vy_buf_add(buf, &n, sizeof(struct vy_range*));
 		if (unlikely(rc == -1))
-			return vy_oom();
+			return -1;
 		n = vy_range_id_tree_next(&track->tree, n);
 	}
 	struct vy_bufiter i;
@@ -8001,10 +8008,11 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 	         key_def->space_id, key_def->iid);
 	conf->name = strdup(name);
 	if (conf->name == NULL) {
-		vy_oom();
+		diag_set(OutOfMemory, strlen(name),
+			 "conf->name", "char *");
 		goto error;
 	}
-	conf->sync                  = cfg_geti("vinyl.sync");
+	conf->sync = cfg_geti("vinyl.sync");
 
 	/* compression */
 	if (key_def->opts.compression[0] != '\0' &&
@@ -8016,15 +8024,22 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 			goto error;
 		}
 		conf->compression_sz = strdup(conf->compression_if->name);
+		if (conf->compression_sz == NULL) {
+			diag_set(OutOfMemory,
+				 strlen(conf->compression_if->name),
+				 "conf->compression_sz", "char *");
+			goto error;
+		}
 		conf->compression = 1;
 	} else {
 		conf->compression = 0;
 		conf->compression_if = NULL;
 		conf->compression_sz = strdup("none");
-	}
-	if (conf->compression_sz == NULL) {
-		vy_oom();
-		goto error;
+		if (conf->compression_sz == NULL) {
+			diag_set(OutOfMemory, strlen("none"),
+				 "conf->compression_sz", "char *");
+			goto error;
+		}
 	}
 
 	/* path */
@@ -8033,12 +8048,18 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		snprintf(path, sizeof(path), "%s/%s", cfg_gets("vinyl_dir"),
 			 conf->name);
 		conf->path = strdup(path);
+		if (conf->path == NULL) {
+			diag_set(OutOfMemory, strlen(path), "conf->path",
+				 "char *");
+			goto error;
+		}
 	} else {
 		conf->path = strdup(key_def->opts.path);
-	}
-	if (conf->path == NULL) {
-		vy_oom();
-		goto error;
+		if (conf->path == NULL) {
+			diag_set(OutOfMemory, strlen(key_def->opts.path),
+				"conf->path", "char *");
+			goto error;
+		}
 	}
 	conf->buf_gc_wm             = 1024 * 1024;
 
@@ -8136,10 +8157,8 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	if (cache == NULL) {
 		cachegc = 1;
 		cache = vy_cachepool_pop(e->cachepool);
-		if (unlikely(cache == NULL)) {
-			vy_oom();
+		if (unlikely(cache == NULL))
 			return -1;
-		}
 	}
 
 	int64_t vlsn;
@@ -8230,7 +8249,8 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 	index = malloc(sizeof(struct vy_index));
 	if (unlikely(index == NULL)) {
-		vy_oom();
+		diag_set(OutOfMemory, sizeof(struct vy_index),
+			 "vy_index", "struct");
 		return NULL;
 	}
 	memset(index, 0, sizeof(*index));
@@ -8261,8 +8281,11 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 		key_map_size = MAX(key_map_size, field_id + 1);
 	}
 	index->key_map = calloc(key_map_size, sizeof(*index->key_map));
-	if (index->key_map == NULL)
+	if (index->key_map == NULL) {
+		diag_set(OutOfMemory, sizeof(*index->key_map),
+			 "index->key_map", "uint32_t");
 		goto error_4;
+	}
 	index->key_map_size = key_map_size;
 	for (uint32_t field_id = 0; field_id < key_map_size; field_id++) {
 		index->key_map[field_id] = UINT32_MAX;
@@ -8379,8 +8402,11 @@ static struct vy_tuple *
 vy_tuple_alloc(struct vy_index *index, uint32_t size)
 {
 	struct vy_tuple *v = malloc(sizeof(struct vy_tuple) + size);
-	if (unlikely(v == NULL))
+	if (unlikely(v == NULL)) {
+		diag_set(OutOfMemory, sizeof(struct vy_tuple) + size,
+			 "vy_tuple", "struct");
 		return NULL;
+	}
 	v->size      = size;
 	v->lsn       = 0;
 	v->flags     = 0;
@@ -8960,7 +8986,7 @@ vy_begin(struct vy_env *e)
 	struct vy_tx *tx;
 	tx = malloc(sizeof(struct vy_tx));
 	if (unlikely(tx == NULL)) {
-		vy_oom();
+		diag_set(OutOfMemory, sizeof(struct vy_tx), "vy_tx", "struct");
 		return NULL;
 	}
 	tx_begin(e->xm, tx, VINYL_TX_RW);
@@ -9185,8 +9211,10 @@ struct vy_env *
 vy_env_new(void)
 {
 	struct vy_env *e = malloc(sizeof(*e));
-	if (unlikely(e == NULL))
+	if (unlikely(e == NULL)) {
+		diag_set(OutOfMemory, sizeof(*e), "vy_env", "struct");
 		return NULL;
+	}
 	memset(e, 0, sizeof(*e));
 	rlist_create(&e->indexes);
 	e->status = VINYL_OFFLINE;
