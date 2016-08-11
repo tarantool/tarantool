@@ -685,7 +685,7 @@ ss_rqinit(struct ssrq *q, uint32_t range, uint32_t count)
 	q->q = malloc(sizeof(struct ssrqq) * q->range_count);
 	if (unlikely(q->q == NULL)) {
 		diag_set(OutOfMemory, sizeof(struct ssrqq) * q->range_count,
-			 "ssrqq", "struct");
+			 "malloc", "struct ssrq");
 		return -1;
 	}
 	uint32_t i = 0;
@@ -2333,7 +2333,7 @@ sv_index_alloc_matras_page()
 	void *res = malloc(BPS_TREE_VINDEX_PAGE_SIZE);
 	if (res == NULL) {
 		diag_set(OutOfMemory, BPS_TREE_VINDEX_PAGE_SIZE,
-			 "sv_index_alloc_matras_page", "res");
+			 "malloc", "raw bytes");
 	}
 	return res;
 }
@@ -2880,7 +2880,8 @@ txv_new(struct vy_index *index, struct vy_tuple *tuple, struct vy_tx *tx)
 {
 	struct txv *v = malloc(sizeof(struct txv));
 	if (unlikely(v == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct txv), "txv", "struct");
+		diag_set(OutOfMemory, sizeof(struct txv), "malloc",
+			 "struct txv");
 		return NULL;
 	}
 	v->index = index;
@@ -3803,7 +3804,7 @@ sd_censure(struct sdc *c, int count)
 				malloc(sizeof(struct sdcbuf));
 			if (buf == NULL) {
 				diag_set(OutOfMemory, sizeof(struct sdcbuf),
-					 "sdcbuf", "struct");
+					 "malloc", "struct sdcbuf");
 				return -1;
 			}
 			vy_buf_init(&buf->a);
@@ -4282,8 +4283,8 @@ vy_run_new()
 {
 	struct vy_run *b = (struct vy_run*)malloc(sizeof(struct vy_run));
 	if (unlikely(b == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct vy_run), "vy_run",
-			 "struct");
+		diag_set(OutOfMemory, sizeof(struct vy_run), "malloc",
+			 "struct vy_run");
 		return NULL;
 	}
 	vy_run_init(b);
@@ -4595,7 +4596,7 @@ si_cacheadd(struct vy_run *run)
 		malloc(sizeof(struct sicacherun));
 	if (unlikely(nb == NULL)) {
 		diag_set(OutOfMemory, sizeof(struct sicacherun),
-			 "sicacherun", "struct");
+			 "malloc", "struct sicacherun");
 		return NULL;
 	}
 	nb->run = run;
@@ -5859,8 +5860,8 @@ vy_range_new(struct key_def *key_def)
 {
 	struct vy_range *n = (struct vy_range*)malloc(sizeof(struct vy_range));
 	if (unlikely(n == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct vy_range), "vy_range",
-			 "struct");
+		diag_set(OutOfMemory, sizeof(struct vy_range), "malloc",
+			 "struct vy_range");
 		return NULL;
 	}
 	n->recover = 0;
@@ -8009,7 +8010,7 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 	conf->name = strdup(name);
 	if (conf->name == NULL) {
 		diag_set(OutOfMemory, strlen(name),
-			 "conf->name", "char *");
+			 "strdup", "char *");
 		goto error;
 	}
 	conf->sync = cfg_geti("vinyl.sync");
@@ -8026,8 +8027,8 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		conf->compression_sz = strdup(conf->compression_if->name);
 		if (conf->compression_sz == NULL) {
 			diag_set(OutOfMemory,
-				 strlen(conf->compression_if->name),
-				 "conf->compression_sz", "char *");
+				 strlen(conf->compression_if->name), "strdup",
+				 "char *");
 			goto error;
 		}
 		conf->compression = 1;
@@ -8036,8 +8037,8 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		conf->compression_if = NULL;
 		conf->compression_sz = strdup("none");
 		if (conf->compression_sz == NULL) {
-			diag_set(OutOfMemory, strlen("none"),
-				 "conf->compression_sz", "char *");
+			diag_set(OutOfMemory, strlen("none"), "strdup",
+				 "char *");
 			goto error;
 		}
 	}
@@ -8049,7 +8050,7 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 			 conf->name);
 		conf->path = strdup(path);
 		if (conf->path == NULL) {
-			diag_set(OutOfMemory, strlen(path), "conf->path",
+			diag_set(OutOfMemory, strlen(path), "strdup",
 				 "char *");
 			goto error;
 		}
@@ -8057,11 +8058,11 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		conf->path = strdup(key_def->opts.path);
 		if (conf->path == NULL) {
 			diag_set(OutOfMemory, strlen(key_def->opts.path),
-				"conf->path", "char *");
+				"strdup", "char *");
 			goto error;
 		}
 	}
-	conf->buf_gc_wm             = 1024 * 1024;
+	conf->buf_gc_wm = 1024 * 1024;
 
 	return 0;
 error:
@@ -8250,7 +8251,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index = malloc(sizeof(struct vy_index));
 	if (unlikely(index == NULL)) {
 		diag_set(OutOfMemory, sizeof(struct vy_index),
-			 "vy_index", "struct");
+			 "malloc", "struct vy_index");
 		return NULL;
 	}
 	memset(index, 0, sizeof(*index));
@@ -8283,7 +8284,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->key_map = calloc(key_map_size, sizeof(*index->key_map));
 	if (index->key_map == NULL) {
 		diag_set(OutOfMemory, sizeof(*index->key_map),
-			 "index->key_map", "uint32_t");
+			 "calloc", "uint32_t *");
 		goto error_4;
 	}
 	index->key_map_size = key_map_size;
@@ -8404,7 +8405,7 @@ vy_tuple_alloc(struct vy_index *index, uint32_t size)
 	struct vy_tuple *v = malloc(sizeof(struct vy_tuple) + size);
 	if (unlikely(v == NULL)) {
 		diag_set(OutOfMemory, sizeof(struct vy_tuple) + size,
-			 "vy_tuple", "struct");
+			 "malloc", "struct vy_tuple");
 		return NULL;
 	}
 	v->size      = size;
@@ -8986,7 +8987,8 @@ vy_begin(struct vy_env *e)
 	struct vy_tx *tx;
 	tx = malloc(sizeof(struct vy_tx));
 	if (unlikely(tx == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct vy_tx), "vy_tx", "struct");
+		diag_set(OutOfMemory, sizeof(struct vy_tx), "malloc",
+			 "struct vy_tx");
 		return NULL;
 	}
 	tx_begin(e->xm, tx, VINYL_TX_RW);
@@ -9212,7 +9214,7 @@ vy_env_new(void)
 {
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
-		diag_set(OutOfMemory, sizeof(*e), "vy_env", "struct");
+		diag_set(OutOfMemory, sizeof(*e), "malloc", "struct vy_env");
 		return NULL;
 	}
 	memset(e, 0, sizeof(*e));
