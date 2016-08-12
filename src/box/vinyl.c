@@ -1603,7 +1603,6 @@ struct svif {
 };
 
 static struct svif svtuple_if;
-static struct svif svref_if;
 struct vy_tuple;
 struct sdv;
 struct sdpageheader;
@@ -2299,23 +2298,16 @@ struct vy_mem {
 	uint64_t min_lsn;
 	struct key_def *key_def;
 	/*
-	 * This is a search state flag, which is set
-	 * to true to true when the tree comparator finds
-	 * a duplicate key in a chain (same key, different LSN).
-	 * Used in insert and range search operations with the
-	 * index.
+	 * version is initially 0 and is incremented on every index change
 	 */
-	bool hint_key_is_equal;
+	uint32_t version;
 };
 
 int
 vy_mem_tree_cmp(struct svref a, struct svref b, struct vy_mem *index)
 {
 	int res = vy_tuple_compare(a.v->data, b.v->data, index->key_def);
-	if (res == 0) {
-		index->hint_key_is_equal = true;
-		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
-	}
+	res = res ? res : a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
 	return res;
 }
 
@@ -2325,7 +2317,8 @@ vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
 {
 	int res = vy_tuple_compare(a.v->data, key->data, index->key_def);
 	if (res == 0) {
-		index->hint_key_is_equal = true;
+		if (key->lsn == UINT64_MAX - 1)
+			return 0;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
 	}
 	return res;
@@ -2355,6 +2348,7 @@ vy_mem_init(struct vy_mem *index, struct key_def *key_def)
 	index->min_lsn = UINT64_MAX;
 	index->used = 0;
 	index->key_def = key_def;
+	index->version = 0;
 	bps_tree_mem_create(&index->tree, index,
 				vy_mem_alloc_matras_page,
 				vy_mem_free_matras_page);
@@ -2382,59 +2376,13 @@ vy_mem_set(struct vy_mem *index, struct svref ref)
 {
 	/* see struct vy_mem comments */
 	assert(index == index->tree.arg);
-	index->hint_key_is_equal = false;
 	if (bps_tree_mem_insert(&index->tree, ref, NULL) != 0)
 		return -1;
+	index->version++;
 	/* sic: sync this value with vy_range->used */
 	index->used += vy_tuple_size(ref.v);
 	if (index->min_lsn > ref.v->lsn)
 		index->min_lsn = ref.v->lsn;
-	if (!index->hint_key_is_equal) {
-		/* there no duplicates, no need to change and flags */
-		return 0;
-	}
-	/*
-	 * There is definitely a duplicate.
-	 * If current ref was inserted into the head of the chain,
-	 * the previous head's flags must be set to SVDUP. (1)
-	 * Otherwise, the new inserted ref's flags must be set to SVDUP. (2)
-	 * First of all, let's find the just inserted svref.
-	 */
-	struct tree_mem_key tree_key;
-	tree_key.data = ref.v->data;
-	tree_key.lsn = ref.v->lsn;
-	bool exact;
-	struct bps_tree_mem_iterator itr =
-		bps_tree_mem_lower_bound(&index->tree, &tree_key, &exact);
-	assert(!bps_tree_mem_itr_is_invalid(&itr));
-	struct svref *curr =
-		bps_tree_mem_itr_get_elem(&index->tree, &itr);
-	/* Find previous position */
-	struct bps_tree_mem_iterator itr_prev = itr;
-	bps_tree_mem_itr_prev(&index->tree, &itr_prev);
-	if (!bps_tree_mem_itr_is_invalid(&itr_prev)) {
-		struct svref *prev =
-			bps_tree_mem_itr_get_elem(&index->tree, &itr_prev);
-		if (vy_tuple_compare(curr->v->data, prev->v->data,
-				     index->key_def) == 0) {
-			/*
-			 * Previous position exists and holds same key,
-			 * it's case (2)
-			 */
-			curr->flags |= SVDUP;
-			return 0;
-		}
-	}
-	/*
-	 * Previous position does not exist or holds another key,
-	 * it's case (1). Next position holds previous head of chain.
-	 */
-	struct bps_tree_mem_iterator itr_next = itr;
-	bps_tree_mem_itr_next(&index->tree, &itr_next);
-	assert(!bps_tree_mem_itr_is_invalid(&itr_next));
-	struct svref *next =
-		bps_tree_mem_itr_get_elem(&index->tree, &itr_next);
-	next->flags |= SVDUP;
 	return 0;
 }
 /*
@@ -2455,149 +2403,6 @@ vy_mem_find(struct vy_mem *i, char *key, uint64_t lsn)
 		ref = NULL;
 	return ref;
 }
-
-static uint8_t
-svref_flags(struct sv *v)
-{
-	struct svref *ref = (struct svref *)v->v;
-	return (ref->v)->flags | ref->flags;
-}
-
-static uint64_t
-svref_lsn(struct sv *v)
-{
-	struct svref *ref = (struct svref *)v->v;
-	return ref->v->lsn;
-}
-
-static char*
-svref_pointer(struct sv *v)
-{
-	struct svref *ref = (struct svref *)v->v;
-	return ref->v->data;
-}
-
-static uint32_t
-svref_size(struct sv *v)
-{
-	struct svref *ref = (struct svref *)v->v;
-	return ref->v->size;
-}
-
-static struct svif svref_if =
-{
-       .flags     = svref_flags,
-       .lsn       = svref_lsn,
-       .pointer   = svref_pointer,
-       .size      = svref_size
-};
-
-struct svindexiter {
-	struct vy_mem *index;
-	struct bps_tree_mem_iterator itr;
-	struct sv current;
-	enum vy_order order;
-	void *key;
-	int key_size;
-};
-
-static struct vy_iterif sv_indexiterif;
-
-static inline int
-sv_indexiter_open(struct vy_iter *i, struct vy_mem *index,
-		  enum vy_order o, void *key, int key_size)
-{
-	assert(index == index->tree.arg);
-	i->vif = &sv_indexiterif;
-	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	struct bps_tree_mem *tree = &index->tree;
-	ii->index = index;
-	ii->order = o;
-	ii->key = key;
-	ii->key_size = key_size;
-	ii->current.i = &svref_if;
-	if (key == NULL) {
-		if (o == VINYL_GT || o == VINYL_GE || o == VINYL_EQ) {
-			ii->itr = bps_tree_mem_itr_first(tree);
-		} else {
-			assert(o == VINYL_LT || o == VINYL_LE);
-			ii->itr = bps_tree_mem_itr_last(tree);
-		}
-		return 0;
-	}
-
-	struct tree_mem_key tree_key;
-	tree_key.data = key;
-	tree_key.lsn = (o == VINYL_GE || o == VINYL_EQ || o == VINYL_LT) ?
-		       UINT64_MAX : 0;
-	bool exact;
-	ii->index->hint_key_is_equal = false;
-	ii->itr = bps_tree_mem_lower_bound(tree, &tree_key, &exact);
-	if (o == VINYL_LE || o == VINYL_LT)
-		bps_tree_mem_itr_prev(tree, &ii->itr);
-	else if(o == VINYL_EQ)
-		if (!ii->index->hint_key_is_equal)
-			ii->itr = bps_tree_mem_invalid_iterator();
-	return (int)ii->index->hint_key_is_equal;
-}
-
-static inline void
-sv_indexiter_close(struct vy_iter *i)
-{
-	(void)i;
-}
-
-static inline int
-sv_indexiter_has(struct vy_iter *i)
-{
-	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	return !bps_tree_mem_itr_is_invalid(&ii->itr);
-}
-
-static inline void *
-sv_indexiter_get(struct vy_iter *i)
-{
-	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	if (bps_tree_mem_itr_is_invalid(&ii->itr))
-		return NULL;
-	ii->current.v = (void *)
-		bps_tree_mem_itr_get_elem(&ii->index->tree, &ii->itr);
-	assert(ii->current.v != NULL);
-	return (void *)&ii->current;
-}
-
-static inline void
-sv_indexiter_next(struct vy_iter *i)
-{
-	struct svindexiter *ii = (struct svindexiter *)i->priv;
-	assert(!bps_tree_mem_itr_is_invalid(&ii->itr));
-
-	if (ii->order == VINYL_EQ) {
-		bps_tree_mem_itr_next(&ii->index->tree, &ii->itr);
-		if (bps_tree_mem_itr_is_invalid(&ii->itr))
-			return;
-		struct svref *ref =
-			bps_tree_mem_itr_get_elem(&ii->index->tree,
-						      &ii->itr);
-		if (vy_tuple_compare(ref->v->data, ii->key,
-				     ii->index->key_def) != 0) {
-			ii->itr = bps_tree_mem_invalid_iterator();
-		}
-	} else if (ii->order == VINYL_GT || ii->order == VINYL_GE) {
-		bps_tree_mem_itr_next(&ii->index->tree, &ii->itr);
-	} else {
-		assert(ii->order == VINYL_LT || ii->order == VINYL_LE);
-		bps_tree_mem_itr_prev(&ii->index->tree, &ii->itr);
-	}
-}
-
-static struct vy_iterif sv_indexiterif =
-{
-	.close   = sv_indexiter_close,
-	.has     = sv_indexiter_has,
-	.get     = sv_indexiter_get,
-	.next    = sv_indexiter_next
-};
 
 static uint8_t
 svtuple_flags(struct sv *v) {
@@ -4533,9 +4338,13 @@ err:
 	return -1;
 }
 
+void
+vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
+			 enum vy_order order, char *key);
+
 static inline int
 vy_run_create(struct vy_index *index, struct sdc *c,
-	      struct vy_range *parent, struct vy_mem *vindex,
+	      struct vy_range *parent, struct vy_mem *mem,
 	      uint64_t vlsn, struct vy_run **result)
 {
 	(void)c;
@@ -4549,7 +4358,7 @@ vy_run_create(struct vy_index *index, struct sdc *c,
 	if (unlikely(rc == -1))
 		return -1;
 	struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
-	sv_indexiter_open(&s->src, vindex, VINYL_GE, NULL, 0);
+	vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
 
 	struct svmergeiter imerge;
 	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
@@ -4644,11 +4453,11 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 }
 
 void
-vy_tmp_iterator_open(struct vy_iter *virt_itr, struct vy_index *index,
-		     struct vy_run *run, struct vy_file *file,
-		     struct vy_filterif *compression,
-		     enum vy_order order, char *key);
-
+vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
+			 struct vy_index *index,
+			 struct vy_run *run, struct vy_file *file,
+			 struct vy_filterif *compression,
+			 enum vy_order order, char *key);
 
 static int
 si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
@@ -4681,8 +4490,8 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 		struct vy_filterif *compression = NULL;
 		if (index->conf.compression)
 			compression = index->conf.compression_if;
-		vy_tmp_iterator_open(&s->src, index, run, &node->file,
-				     compression, VINYL_GE, NULL);
+		vy_tmp_run_iterator_open(&s->src, index, run, &node->file,
+					 compression, VINYL_GE, NULL);
 		size_stream += vy_page_index_total(&run->index);
 		count += vy_page_index_count(&run->index);
 		run = run->next;
@@ -4789,16 +4598,16 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 		struct vy_range *node, struct vy_buf *result)
 {
 	(void)index;
-	struct vy_mem *vindex = vy_range_index(node);
+	struct vy_mem *mem = vy_range_index(node);
 	struct vy_iter ii;
-	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
-	while (sv_indexiter_has(&ii))
+	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
+	while (ii.vif->has(&ii))
 	{
-		struct sv *v = sv_indexiter_get(&ii);
+		struct sv *v = ii.vif->get(&ii);
 		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref **));
 		if (unlikely(rc == -1))
 			return -1;
-		sv_indexiter_next(&ii);
+		ii.vif->next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
 		return 0;
@@ -4863,15 +4672,15 @@ si_redistribute_set(struct vy_index *index, uint64_t now, struct svref *v)
 static int
 si_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *node)
 {
-	struct vy_mem *vindex = vy_range_index(node);
+	struct vy_mem *mem = vy_range_index(node);
 	struct vy_iter ii;
-	sv_indexiter_open(&ii, vindex, VINYL_GE, NULL, 0);
-	while (sv_indexiter_has(&ii)) {
-		struct sv *v = sv_indexiter_get(&ii);
+	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
+	while (ii.vif->has(&ii)) {
+		struct sv *v = ii.vif->get(&ii);
 		int rc = vy_buf_add(&c->b, &v->v, sizeof(struct svref**));
 		if (unlikely(rc == -1))
 			return -1;
-		sv_indexiter_next(&ii);
+		ii.vif->next(&ii);
 	}
 	if (unlikely(vy_buf_used(&c->b) == 0))
 		return 0;
@@ -5915,13 +5724,11 @@ next_node:
 	struct vy_mem *first = vy_range_index_priority(node, &second);
 	if (first->tree.size) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
-		sv_indexiter_open(&s->src, first, q->order,
-				  q->key, q->keysize);
+		vy_tmp_mem_iterator_open(&s->src, first, q->order, q->key);
 	}
 	if (unlikely(second && second->tree.size)) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
-		sv_indexiter_open(&s->src, second, q->order,
-				  q->key, q->keysize);
+		vy_tmp_mem_iterator_open(&s->src, second, q->order, q->key);
 	}
 
 	if (q->cache_only) {
@@ -5935,8 +5742,8 @@ next_node:
 		struct vy_filterif *compression = NULL;
 		if (q->index->conf.compression)
 			compression = q->index->conf.compression_if;
-		vy_tmp_iterator_open(&s->src, q->index, run, &node->file,
-				     compression, q->order, q->key);
+		vy_tmp_run_iterator_open(&s->src, q->index, run, &node->file,
+					 compression, q->order, q->key);
 		run = run->next;
 	}
 
@@ -8624,8 +8431,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 			struct vy_filterif *compression = NULL;
 			if (index->conf.compression)
 				compression = index->conf.compression_if;
-			vy_tmp_iterator_open(&s->src, index, run, &node->file,
-					     compression, VINYL_GT, NULL);
+			vy_tmp_run_iterator_open(&s->src, index, run,
+				&node->file, compression, VINYL_GT, NULL);
 			run = run->next;
 		}
 		struct svmergeiter im;
@@ -9285,20 +9092,20 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 /* }}} vy_run_iterator API implementation */
 
 
-/* {{{ Temporary wrap of new iterator to old API */
+/* {{{ Temporary wrap of new run iterator to old API */
 
 static void
-vy_tmp_iterator_close(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_close(struct vy_iter *virt_iterator)
 {
-	assert(virt_iterator->vif->close == vy_tmp_iterator_close);
+	assert(virt_iterator->vif->close == vy_tmp_run_iterator_close);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
 	vy_run_iterator_close(itr);
 }
 
 static int
-vy_tmp_iterator_has(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_has(struct vy_iter *virt_iterator)
 {
-	assert(virt_iterator->vif->has == vy_tmp_iterator_has);
+	assert(virt_iterator->vif->has == vy_tmp_run_iterator_has);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
 	struct vy_tuple *t;
 	int rc = vy_run_iterator_get(itr, &t);
@@ -9306,47 +9113,477 @@ vy_tmp_iterator_has(struct vy_iter *virt_iterator)
 }
 
 static void *
-vy_tmp_iterator_get(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_get(struct vy_iter *virt_iterator)
 {
-	assert(virt_iterator->vif->get == vy_tmp_iterator_get);
+	assert(virt_iterator->vif->get == vy_tmp_run_iterator_get);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
 	struct vy_tuple *t;
 	int rc = vy_run_iterator_get(itr, &t);
 	if (rc != 0)
 		return NULL;
+	t->flags &= ~SVDUP;
+	t->flags |= *is_dup ? SVDUP : 0;
 	struct sv *sv = (struct sv *)(virt_iterator->priv + sizeof(*itr));
 	sv_from_tuple(sv, t);
 	return sv;
 }
 
 static void
-vy_tmp_iterator_next(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_next(struct vy_iter *virt_iterator)
 {
-	assert(virt_iterator->vif->next == vy_tmp_iterator_next);
+	assert(virt_iterator->vif->next == vy_tmp_run_iterator_next);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
+	*is_dup = true;
 	int rc = vy_run_iterator_next_lsn(itr);
-	if (rc == 1)
+	if (rc == 1) {
+		*is_dup = false;
 		vy_run_iterator_next_key(itr);
+	}
 }
 
 void
-vy_tmp_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
+vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
 		     struct vy_run *run, struct vy_file *file,
 		     struct vy_filterif *compression,
 		     enum vy_order order, char *key)
 {
 	static struct vy_iterif vif = {
-		.close = vy_tmp_iterator_close,
-		.has = vy_tmp_iterator_has,
-		.get = vy_tmp_iterator_get,
-		.next = vy_tmp_iterator_next
+		.close = vy_tmp_run_iterator_close,
+		.has = vy_tmp_run_iterator_has,
+		.get = vy_tmp_run_iterator_get,
+		.next = vy_tmp_run_iterator_next
 	};
 	virt_iterator->vif = &vif;
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct sv));
+	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct sv) + sizeof(bool));
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
+	*is_dup = false;
 	vy_run_iterator_open(itr, index, run, file, compression, order, key,
 			UINT64_MAX);
 
 }
 
-/* }}} Temporary wrap of new iterator to old API */
+/* }}} Temporary wrap of new run iterator to old API */
+
+/* {{{ vy_mem_iterator API forward declaration */
+/* TODO: move to header and remove static keyword */
+
+/**
+ * Iterator over vy_mem
+ */
+struct vy_mem_iterator {
+	/* mem */
+	struct vy_mem *mem;
+
+	/* Search options */
+	/**
+	 * Order, that specifies direction, start position and stop criteria
+	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 */
+	enum vy_order order;
+	/* Search key data in terms of vinyl, vy_tuple_compare argument */
+	char *key;
+	/* LSN visibility, iterator shows values with lsn <= than that */
+	uint64_t vlsn;
+
+	/* State of iterator */
+	/* Current position in tree */
+	struct bps_tree_mem_iterator curr_pos;
+	/* Tuple in current position in tree */
+	struct vy_tuple *curr_tuple;
+	/* data version from vy_mem */
+	uint32_t version;
+
+	/* Is false until first .._get ot .._next_.. method is called */
+	bool search_started;
+	/* Search is finished, you will not get more values from iterator */
+	bool search_ended;
+};
+
+/**
+ * vy_mem_iterator API forward declaration
+ */
+
+/**
+ * Open the iterator
+ */
+static void
+vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
+			     enum vy_order order, char *key, uint64_t vlsn);
+
+/**
+ * Get a tuple from a record, that iterator currently positioned on
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_get(struct vy_mem_iterator *itr, struct vy_tuple **result);
+
+/**
+ * Find the next record with different key as current and visible lsn
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_next_key(struct vy_mem_iterator *itr);
+
+/**
+ * Find next (lower, older) record with the same key as current
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr);
+
+/**
+ * Close an iterator and free all resources
+ */
+static void
+vy_mem_iterator_close(struct vy_mem_iterator *itr);
+
+/* }}} vy_mem_iterator API forward declaration */
+
+/* {{{ vy_mem_iterator support functions */
+
+/**
+ * Get a tuple by current position
+ */
+static struct vy_tuple *
+vy_mem_iterator_curr_tuple(struct vy_mem_iterator *itr)
+{
+	return bps_tree_mem_itr_get_elem(&itr->mem->tree,
+					       &itr->curr_pos)->v;
+}
+
+/**
+ * Make a step in directions defined by itr->order
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_step(struct vy_mem_iterator *itr)
+{
+	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+		bps_tree_mem_itr_prev(&itr->mem->tree, &itr->curr_pos);
+	else
+		bps_tree_mem_itr_next(&itr->mem->tree, &itr->curr_pos);
+	if (bps_tree_mem_itr_is_invalid(&itr->curr_pos))
+		return 1;
+	itr->curr_tuple = vy_mem_iterator_curr_tuple(itr);
+	return 0;
+}
+
+/**
+ * Find next record with lsn <= itr->lsn record.
+ * Current position must be at the beginning of serie of records with the
+ * same key it terms of direction of iterator (i.e. left for GE, right for LE)
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
+{
+	assert(!bps_tree_mem_itr_is_invalid(&itr->curr_pos));
+	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
+	while (itr->curr_tuple->lsn > itr->vlsn) {
+		if (vy_mem_iterator_step(itr) != 0 ||
+		    (itr->order == VINYL_EQ &&
+		     vy_tuple_compare(itr->curr_tuple->data, itr->key,
+				      itr->mem->key_def))) {
+			vy_mem_iterator_close(itr);
+			return 1;
+		}
+	}
+	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+		struct bps_tree_mem_iterator prev_pos = itr->curr_pos;
+		bps_tree_mem_itr_prev(&itr->mem->tree, &prev_pos);
+
+		while (!bps_tree_mem_itr_is_invalid(&prev_pos)) {
+			struct vy_tuple *prev_tuple =
+				bps_tree_mem_itr_get_elem(&itr->mem->tree,
+								&prev_pos)->v;
+			struct key_def *key_def = itr->mem->key_def;
+			if (prev_tuple->lsn > itr->vlsn ||
+			    vy_tuple_compare(itr->curr_tuple->data,
+					     prev_tuple->data, key_def) != 0)
+				break;
+			itr->curr_pos = prev_pos;
+			itr->curr_tuple = prev_tuple;
+			bps_tree_mem_itr_prev(&itr->mem->tree, &prev_pos);
+		}
+	}
+	return 0;
+}
+
+/**
+ * Find next (lower, older) record with the same key as current
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_start(struct vy_mem_iterator *itr)
+{
+	assert(!itr->search_started);
+	itr->search_started = true;
+	itr->version = itr->mem->version;
+
+	struct tree_mem_key tree_key;
+	tree_key.data = itr->key;
+	/* (lsn == UINT64_MAX - 1) means that lsn is ignored in comparison */
+	tree_key.lsn = UINT64_MAX - 1;
+	if (itr->key != NULL) {
+		if (itr->order == VINYL_EQ) {
+			bool exact;
+			itr->curr_pos =
+				bps_tree_mem_lower_bound(&itr->mem->tree,
+							       &tree_key,
+							       &exact);
+			if (!exact) {
+				vy_mem_iterator_close(itr);
+				return 1;
+			}
+		} else if (itr->order == VINYL_LE || itr->order == VINYL_GT) {
+			itr->curr_pos =
+				bps_tree_mem_upper_bound(&itr->mem->tree,
+							       &tree_key, NULL);
+		} else {
+			assert(itr->order == VINYL_GE || itr->order == VINYL_LT);
+			itr->curr_pos =
+				bps_tree_mem_lower_bound(&itr->mem->tree,
+							       &tree_key, NULL);
+		}
+	} else if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+		itr->order = VINYL_LE;
+		itr->curr_pos = bps_tree_mem_invalid_iterator();
+	} else {
+		itr->order = VINYL_GE;
+		itr->curr_pos = bps_tree_mem_itr_first(&itr->mem->tree);
+	}
+
+	if (itr->order == VINYL_LT || itr->order == VINYL_LE)
+		bps_tree_mem_itr_prev(&itr->mem->tree, &itr->curr_pos);
+	if (bps_tree_mem_itr_is_invalid(&itr->curr_pos)) {
+		vy_mem_iterator_close(itr);
+		return 1;
+	}
+	itr->curr_tuple = vy_mem_iterator_curr_tuple(itr);
+
+	return vy_mem_iterator_find_lsn(itr);
+}
+
+/**
+ * Restores bps_tree_iterator if the mem have been changed
+ */
+static void
+vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
+{
+	assert(itr->curr_tuple != NULL);
+	if (itr->version == itr->mem->version)
+		return;
+	itr->version = itr->mem->version;
+	struct svref *record =
+		bps_tree_mem_itr_get_elem(&itr->mem->tree, &itr->curr_pos);
+	if (record != NULL && record->v == itr->curr_tuple)
+		return;
+	struct tree_mem_key tree_key;
+	tree_key.data = itr->curr_tuple->data;
+	tree_key.lsn = itr->curr_tuple->lsn;
+	bool exact;
+	itr->curr_pos = bps_tree_mem_lower_bound(&itr->mem->tree,
+						       &tree_key, &exact);
+	assert(exact);
+	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
+}
+
+/* }}} vy_mem_iterator support functions */
+
+
+/* {{{ vy_mem_iterator API implementation */
+/* TODO: move to c file and remove static keyword */
+
+/**
+ * Open the iterator
+ */
+static void
+vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
+		     enum vy_order order, char *key, uint64_t vlsn)
+{
+	itr->mem = mem;
+
+	itr->order = order;
+	itr->key = key;
+	itr->vlsn = vlsn;
+
+	itr->curr_pos = bps_tree_mem_invalid_iterator();
+	itr->curr_tuple = NULL;
+
+	itr->search_started = false;
+	itr->search_ended = false;
+}
+
+/**
+ * Get a tuple from a record, that iterator currently positioned on
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_get(struct vy_mem_iterator *itr, struct vy_tuple **result)
+{
+	if (itr->search_ended ||
+	    (!itr->search_started && vy_mem_iterator_start(itr) != 0))
+		return 1;
+	*result = itr->curr_tuple;
+	return 0;
+}
+
+/**
+ * Find the next record with different key as current and visible lsn
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
+{
+	if (itr->search_ended ||
+	    (!itr->search_started && vy_mem_iterator_start(itr) != 0))
+		return 1;
+	assert(!bps_tree_mem_itr_is_invalid(&itr->curr_pos));
+	vy_mem_iterator_check_version(itr);
+	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
+	struct key_def *key_def = itr->mem->key_def;
+
+	struct vy_tuple *prev_tuple = itr->curr_tuple;
+	do {
+		if (vy_mem_iterator_step(itr) != 0) {
+			vy_mem_iterator_close(itr);
+			return 1;
+		}
+	} while (vy_tuple_compare(prev_tuple->data, itr->curr_tuple->data,
+				  key_def) == 0);
+
+	if (itr->order == VINYL_EQ &&
+	    vy_tuple_compare(itr->curr_tuple->data, itr->key, key_def) != 0) {
+		vy_mem_iterator_close(itr);
+		return 1;
+	}
+
+	return vy_mem_iterator_find_lsn(itr);
+}
+
+/**
+ * Find next (lower, older) record with the same key as current
+ * return 0 on sucess
+ * return 1 on EOF
+ */
+static int
+vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
+{
+	if (itr->search_ended ||
+	    (!itr->search_started && vy_mem_iterator_start(itr) != 0))
+		return 1;
+	assert(!bps_tree_mem_itr_is_invalid(&itr->curr_pos));
+	vy_mem_iterator_check_version(itr);
+	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
+	struct key_def *key_def = itr->mem->key_def;
+
+	struct bps_tree_mem_iterator next_pos = itr->curr_pos;
+	bps_tree_mem_itr_next(&itr->mem->tree, &next_pos);
+	if (bps_tree_mem_itr_is_invalid(&next_pos))
+		return 1; /* EOF */
+
+	struct vy_tuple *next_tuple =
+		bps_tree_mem_itr_get_elem(&itr->mem->tree, &next_pos)->v;
+	if (vy_tuple_compare(itr->curr_tuple->data,
+			     next_tuple->data, key_def) == 0) {
+		itr->curr_pos = next_pos;
+		itr->curr_tuple = next_tuple;
+		return 0;
+	}
+	return 1;
+}
+
+/**
+ * Close an iterator and free all resources
+ */
+static void
+vy_mem_iterator_close(struct vy_mem_iterator *itr)
+{
+	itr->search_ended = true;
+}
+
+/* }}} vy_mem_iterator API implementation */
+
+/* {{{ Temporary wrap of new mem iterator to old API */
+
+static void
+vy_tmp_mem_iterator_close(struct vy_iter *virt_iterator)
+{
+	assert(virt_iterator->vif->close == vy_tmp_mem_iterator_close);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	vy_mem_iterator_close(itr);
+}
+
+static int
+vy_tmp_mem_iterator_has(struct vy_iter *virt_iterator)
+{
+	assert(virt_iterator->vif->has == vy_tmp_mem_iterator_has);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	struct vy_tuple *t;
+	int rc = vy_mem_iterator_get(itr, &t);
+	return rc == 0;
+}
+
+static void *
+vy_tmp_mem_iterator_get(struct vy_iter *virt_iterator)
+{
+	assert(virt_iterator->vif->get == vy_tmp_mem_iterator_get);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
+	struct vy_tuple *t;
+	int rc = vy_mem_iterator_get(itr, &t);
+	if (rc != 0)
+		return NULL;
+
+	t->flags &= ~SVDUP;
+	t->flags |= *is_dup ? SVDUP : 0;
+	struct sv *sv = (struct sv *)(virt_iterator->priv + sizeof(*itr));
+	sv_from_tuple(sv, t);
+	return sv;
+}
+
+static void
+vy_tmp_mem_iterator_next(struct vy_iter *virt_iterator)
+{
+	assert(virt_iterator->vif->next == vy_tmp_mem_iterator_next);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
+	*is_dup = true;
+	int rc = vy_mem_iterator_next_lsn(itr);
+	if (rc == 1) {
+		*is_dup = false;
+		vy_mem_iterator_next_key(itr);
+	}
+};
+
+void
+vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
+			 enum vy_order order, char *key)
+{
+	static struct vy_iterif vif = {
+		.close = vy_tmp_mem_iterator_close,
+		.has = vy_tmp_mem_iterator_has,
+		.get = vy_tmp_mem_iterator_get,
+		.next = vy_tmp_mem_iterator_next
+	};
+	virt_iterator->vif = &vif;
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct sv) + sizeof(bool));
+	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
+	*is_dup = false;
+	vy_mem_iterator_open(itr, mem, order, key, UINT64_MAX);
+}
+
+/* }}} Temporary wrap of new mem iterator to old API */
+
