@@ -102,7 +102,7 @@ ts_shutdown(void)
 void
 ts_oomcheck(void)
 {
-#ifdef __linux__
+#if defined(__linux__) && defined(__GLIBC__)
 	struct mallinfo mi = mallinfo();
 	if (tss.opts.limit > 0 && mi.uordblks > tss.opts.limit) {
 		printf("\nmemory limit reached (%"PRIu64")\n", tss.opts.limit);

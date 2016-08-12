@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+
 typedef ssize_t (*tnt_reply_t)(void *ptr, char *dst, ssize_t size);
 
 struct tnt_reply {
