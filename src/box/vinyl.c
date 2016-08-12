@@ -1682,7 +1682,7 @@ vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
 		 const struct key_def *key_def);
 
 static struct vy_tuple *
-vy_tuple_from_key_data(struct vy_index *index, const char *key,
+vy_tuple_from_key(struct vy_index *index, const char *key,
 			  uint32_t part_count);
 static void
 vy_tuple_ref(struct vy_tuple *tuple);
@@ -7269,7 +7269,7 @@ vy_cursor_new(struct vy_index *index, const char *key,
 	vy_index_ref(index);
 	c->index = index;
 	c->ops = 0;
-	c->key = vy_tuple_from_key_data(index, key, part_count);
+	c->key = vy_tuple_from_key(index, key, part_count);
 	if (c->key == NULL)
 		goto error_1;
 	c->order = order;
@@ -7698,8 +7698,7 @@ vy_tuple_free(struct vy_tuple *tuple)
 }
 
 static struct vy_tuple *
-vy_tuple_from_key_data(struct vy_index *index, const char *key,
-			 uint32_t part_count)
+vy_tuple_from_key(struct vy_index *index, const char *key, uint32_t part_count)
 {
 	struct key_def *key_def = index->key_def;
 	assert(part_count == 0 || key != NULL);
@@ -8152,8 +8151,7 @@ int
 vy_delete(struct vy_tx *tx, struct vy_index *index,
 	  const char *key, uint32_t part_count)
 {
-	struct vy_tuple *vykey =
-		vy_tuple_from_key_data(index, key, part_count);
+	struct vy_tuple *vykey = vy_tuple_from_key(index, key, part_count);
 	if (vykey == NULL)
 		return -1;
 	vy_tx_set(tx, index, vykey, SVDELETE);
@@ -8353,43 +8351,45 @@ int
 vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
        uint32_t part_count, struct tuple **result)
 {
-	struct vy_tuple *vykey =
-		vy_tuple_from_key_data(index, key, part_count);
+	int rc = -1;
+	struct vy_tuple *vyresult = NULL;
+	struct vy_tuple *vykey = vy_tuple_from_key(index, key, part_count);
 	if (vykey == NULL)
 		return -1;
 
-	struct vy_tuple *vyresult = NULL;
-	int rc = vy_index_read(index, vykey, VINYL_EQ, &vyresult,
-			       NULL, tx, true);
-	if (rc == 0) {
-		if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
-			/* cache miss or not found */
-			rc = vy_read_task(index, tx, NULL, vykey,
-					  &vyresult, vyresult, vy_get_cb);
-		} else if (vy_tuple_is_not_found(vyresult)) {
-			/*
-			 * We deleted this tuple in this
-			 * transaction. No need for a disk lookup.
-			 */
-			vy_tuple_unref(vyresult);
-			vyresult = NULL;
-		}
-	}
-	vy_tuple_unref(vykey);
-	if (rc != 0)
-		return -1;
+	/* Try to look up the tuple in the cache */
+	if (vy_index_read(index, vykey, VINYL_EQ, &vyresult,
+			  NULL, tx, true))
+		goto end;
 
+	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
+		/* Cache miss or not found. */
+		if (vy_read_task(index, tx, NULL, vykey, &vyresult,
+				 vyresult, vy_get_cb))
+			goto end;
+	} else if (vy_tuple_is_not_found(vyresult)) {
+		/*
+		 * We deleted this tuple in this
+		 * transaction. No need for a disk lookup.
+		 */
+		vy_tuple_unref(vyresult);
+		vyresult = NULL;
+	} else {
+		/* Tuple found in the cache. */
+	}
 	if (vyresult == NULL) { /* not found */
 		*result = NULL;
-		return 0;
+		rc = 0;
+	} else {
+		*result = vinyl_convert_tuple(index, vyresult);
+		if (*result != NULL)
+			rc = 0;
 	}
-
-	/* found */
-	*result = vinyl_convert_tuple(index, vyresult);
-	vy_tuple_unref(vyresult);
-	if (*result == NULL)
-		return -1;
-	return 0;
+end:
+	vy_tuple_unref(vykey);
+	if (vyresult)
+		vy_tuple_unref(vyresult);
+	return rc;
 }
 
 /**
