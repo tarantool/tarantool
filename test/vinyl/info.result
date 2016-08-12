@@ -104,8 +104,6 @@ box_info_sort(box.info.vinyl())
     - cursor_ops: 0 2 2.0
     - delete: 0
     - delete_latency: 0 0 0.0
-    - documents: 2
-    - documents_used: 58
     - get: 2
     - get_latency: <get_latency>
     - get_read_cache: 0 0 0.0
