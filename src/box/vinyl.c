@@ -2640,8 +2640,6 @@ static struct svif svtuple_if =
 	.size      = svtuple_size
 };
 
-struct sicache;
-
 struct PACKED sdid {
 	uint64_t parent;
 	uint64_t id;
@@ -3247,18 +3245,6 @@ sd_pagepointer(struct sdpage *p, struct sdv *v) {
 	         sizeof(struct sdv) * p->h->count) + v->offset;
 }
 
-struct sdpageiter {
-	struct sdpage *page;
-	struct vy_buf *xfbuf;
-	int64_t pos;
-	struct sdv *v;
-	struct sv current;
-	enum vy_order order;
-	void *key;
-	int keysize;
-	struct key_def *key_def;
-};
-
 static inline char *
 vy_page_index_min_key(struct vy_page_index *i, struct vy_page_info *p) {
 	return i->minmax.s + p->min_key_offset;
@@ -3325,101 +3311,6 @@ vy_page_index_size(struct vy_page_index *i)
 
 static int vy_page_index_load(struct vy_page_index *, void *);
 
-struct vy_page_iter {
-	struct vy_page_index *index;
-	struct key_def *key_def;
-	int cur_pos;
-	struct vy_page_info *cur_page;
-	void *key;
-	enum vy_order order;
-};
-
-static inline int
-sd_indexiter_route(struct vy_page_iter *i)
-{
-	int begin = 0;
-	int end = i->index->header.count - 1;
-	while (begin != end) {
-		int mid = begin + (end - begin) / 2;
-		struct vy_page_info *page = vy_page_index_get_page(i->index, mid);
-		int rc = vy_tuple_compare(vy_page_index_max_key(i->index, page),
-					  i->key, i->key_def);
-		if (rc < 0)
-			begin = mid + 1;
-		else
-			end = mid;
-	}
-	if (unlikely(end >= (int)i->index->header.count))
-		end = i->index->header.count - 1;
-	return end;
-}
-
-static inline int
-sd_indexiter_open(struct vy_page_iter *itr, struct key_def *key_def,
-		  struct vy_page_index *index, enum vy_order order, void *key)
-{
-	itr->key_def = key_def;
-	itr->index = index;
-	itr->order = order;
-	itr->key = key;
-	itr->cur_pos = 0;
-	itr->cur_page = NULL;
-	if (unlikely(itr->index->header.count == 1)) {
-		/* skip bootstrap node  */
-		if (itr->index->header.lsnmin == UINT64_MAX &&
-		    itr->index->header.lsnmax == 0)
-			return 0;
-	}
-	if (itr->key == NULL) {
-		/* itr->key is [] */
-		switch (itr->order) {
-		case VINYL_LT:
-		case VINYL_LE: itr->cur_pos = itr->index->header.count - 1;
-			break;
-		case VINYL_GT:
-		case VINYL_GE: itr->cur_pos = 0;
-			break;
-		default:
-			unreachable();
-		}
-		itr->cur_page = vy_page_index_get_page(itr->index, itr->cur_pos);
-		return 0;
-	}
-	if (likely(itr->index->header.count > 1))
-		itr->cur_pos = sd_indexiter_route(itr);
-
-	struct vy_page_info *p = vy_page_index_get_page(itr->index, itr->cur_pos);
-	int rc;
-	switch (itr->order) {
-	case VINYL_LE:
-	case VINYL_LT:
-		rc = vy_tuple_compare(vy_page_index_min_key(itr->index, p),
-				      itr->key, itr->key_def);
-		if (rc ==  1 || (rc == 0 && itr->order == VINYL_LT))
-			itr->cur_pos--;
-		break;
-	case VINYL_GE:
-	case VINYL_GT:
-		rc = vy_tuple_compare(vy_page_index_max_key(itr->index, p),
-				      itr->key, itr->key_def);
-		if (rc == -1 || (rc == 0 && itr->order == VINYL_GT))
-			itr->cur_pos++;
-		break;
-	default: unreachable();
-	}
-	if (unlikely(itr->cur_pos == -1 ||
-	               itr->cur_pos >= (int)itr->index->header.count))
-		return 0;
-	itr->cur_page = vy_page_index_get_page(itr->index, itr->cur_pos);
-	return 0;
-}
-
-static inline struct vy_page_info *
-sd_indexiter_get(struct vy_page_iter *ii)
-{
-	return ii->cur_page;
-}
-
 #define SD_SEALED 1
 
 struct PACKED sdseal {
@@ -3470,8 +3361,6 @@ sd_sealvalidate(struct sdseal *s, struct vy_page_index_header *h)
 struct sdcbuf {
 	struct vy_buf a; /* decompression */
 	struct vy_buf b; /* transformation */
-	struct vy_page_iter index_iter;
-	struct sdpageiter page_iter;
 	struct sdcbuf *next;
 };
 
@@ -3581,8 +3470,6 @@ struct sdreadarg {
 	struct vy_buf      *buf;
 	struct vy_buf      *buf_xf;
 	struct vy_buf      *buf_read;
-	struct vy_page_iter *index_iter;
-	struct sdpageiter *page_iter;
 	struct vy_file     *file;
 	enum vy_order     o;
 	int         has;
@@ -4153,242 +4040,6 @@ vy_index_delete(struct vy_index *index);
 
 static struct vy_range *si_bootstrap(struct vy_index*, uint64_t);
 
-struct sicacherun {
-	struct vy_run *run;
-	struct vy_page_info *ref;
-	struct sdpage page;
-	struct vy_iter i;
-	struct sdpageiter page_iter;
-	struct vy_page_iter index_iter;
-	struct vy_buf buf_a;
-	struct vy_buf buf_b;
-	int open;
-	struct sicacherun *next;
-};
-
-struct sicache {
-	struct sicacherun *path;
-	struct sicacherun *run;
-	uint32_t count;
-	uint64_t nsn;
-	struct vy_range *node;
-	struct sicache *next;
-	struct vy_cachepool *pool;
-};
-
-struct vy_cachepool {
-	struct sicache *head;
-	int n;
-	struct vy_env *env;
-	pthread_mutex_t mutex;
-};
-
-static inline void
-si_cacheinit(struct sicache *c, struct vy_cachepool *pool)
-{
-	c->path   = NULL;
-	c->run = NULL;
-	c->count  = 0;
-	c->node   = NULL;
-	c->nsn    = 0;
-	c->next   = NULL;
-	c->pool   = pool;
-}
-
-static inline void
-si_cachefree(struct sicache *c)
-{
-	struct sicacherun *next;
-	struct sicacherun *cb = c->path;
-	while (cb) {
-		next = cb->next;
-		vy_buf_free(&cb->buf_a);
-		vy_buf_free(&cb->buf_b);
-		free(cb);
-		cb = next;
-	}
-}
-
-static inline void
-si_cachereset(struct sicache *c)
-{
-	struct sicacherun *cb = c->path;
-	while (cb) {
-		vy_buf_reset(&cb->buf_a);
-		vy_buf_reset(&cb->buf_b);
-		cb->run = NULL;
-		cb->ref = NULL;
-		cb->open = 0;
-		cb = cb->next;
-	}
-	c->run = NULL;
-	c->node   = NULL;
-	c->nsn    = 0;
-	c->count  = 0;
-}
-
-static inline struct sicacherun*
-si_cacheadd(struct vy_run *run)
-{
-	struct sicacherun *nb =
-		malloc(sizeof(struct sicacherun));
-	if (unlikely(nb == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct sicacherun),
-			 "malloc", "struct sicacherun");
-		return NULL;
-	}
-	nb->run = run;
-	nb->ref = NULL;
-	memset(&nb->i, 0, sizeof(nb->i));
-	nb->open = 0;
-	nb->next = NULL;
-	vy_buf_init(&nb->buf_a);
-	vy_buf_init(&nb->buf_b);
-	return nb;
-}
-
-static inline int
-si_cachevalidate(struct sicache *c, struct vy_range *n)
-{
-	if (likely(c->node == n && c->nsn == n->self.id.id))
-	{
-		if (likely(n->run_count == c->count)) {
-			c->run = c->path;
-			return 0;
-		}
-		assert(n->run_count > c->count);
-		/* c b a */
-		/* e d c b a */
-		struct sicacherun *head = NULL;
-		struct sicacherun *last = NULL;
-		struct sicacherun *cb = c->path;
-		struct vy_run *run = n->run;
-		while (run != NULL) {
-			if (cb->run == run) {
-				assert(last != NULL);
-				last->next = cb;
-				break;
-			}
-			struct sicacherun *nb = si_cacheadd(run);
-			if (unlikely(nb == NULL))
-				return -1;
-			if (! head)
-				head = nb;
-			if (last)
-				last->next = nb;
-			last = nb;
-			run = run->next;
-		}
-		c->path = head;
-		c->count = n->run_count;
-		c->run = c->path;
-		return 0;
-	}
-	struct sicacherun *last = c->path;
-	struct sicacherun *cb = last;
-	struct vy_run *run = n->run;
-	while (cb != NULL && run != NULL) {
-		cb->run = run;
-		cb->ref = NULL;
-		cb->open = 0;
-		vy_buf_reset(&cb->buf_a);
-		vy_buf_reset(&cb->buf_b);
-		last = cb;
-		cb = cb->next;
-		run = run->next;
-	}
-	while (cb != NULL) {
-		cb->run = NULL;
-		cb->ref = NULL;
-		cb->open = 0;
-		vy_buf_reset(&cb->buf_a);
-		vy_buf_reset(&cb->buf_b);
-		cb = cb->next;
-	}
-	while (run != NULL) {
-		cb = si_cacheadd(run);
-		if (unlikely(cb == NULL))
-			return -1;
-		if (last)
-			last->next = cb;
-		last = cb;
-		if (c->path == NULL)
-			c->path = cb;
-		run = run->next;
-	}
-	c->count  = n->run_count;
-	c->node   = n;
-	c->nsn    = n->self.id.id;
-	c->run = c->path;
-	return 0;
-}
-
-static inline struct vy_cachepool *
-vy_cachepool_new(struct vy_env *env)
-{
-	struct vy_cachepool *cachepool = malloc(sizeof(*cachepool));
-	if (cachepool == NULL) {
-		diag_set(OutOfMemory, sizeof(*cachepool), "cachepool",
-			 "struct");
-		return NULL;
-	}
-	cachepool->head = NULL;
-	cachepool->n = 0;
-	cachepool->env = env;
-	tt_pthread_mutex_init(&cachepool->mutex, NULL);
-	return cachepool;
-}
-
-static inline void
-vy_cachepool_delete(struct vy_cachepool *p)
-{
-	struct sicache *next;
-	struct sicache *c = p->head;
-	while (c) {
-		next = c->next;
-		si_cachefree(c);
-		free(c);
-		c = next;
-	}
-	tt_pthread_mutex_destroy(&p->mutex);
-	free(p);
-}
-
-static inline struct sicache*
-vy_cachepool_pop(struct vy_cachepool *p)
-{
-	tt_pthread_mutex_lock(&p->mutex);
-	struct sicache *c;
-	if (likely(p->n > 0)) {
-		c = p->head;
-		p->head = c->next;
-		p->n--;
-		si_cachereset(c);
-		c->pool = p;
-	} else {
-		c = malloc(sizeof(struct sicache));
-		if (unlikely(c == NULL)) {
-			diag_set(OutOfMemory, sizeof(*c), "sicache",
-				 "struct");
-			return NULL;
-		}
-		si_cacheinit(c, p);
-	}
-	tt_pthread_mutex_unlock(&p->mutex);
-	return c;
-}
-
-static inline void
-vy_cachepool_push(struct sicache *c)
-{
-	struct vy_cachepool *p = c->pool;
-	tt_pthread_mutex_lock(&p->mutex);
-	c->next = p->head;
-	p->head = c;
-	p->n++;
-	tt_pthread_mutex_unlock(&p->mutex);
-}
-
 struct siread {
 	enum vy_order order;
 	void *key;
@@ -4402,7 +4053,6 @@ struct siread {
 	struct sv *upsert_v;
 	int upsert_eq;
 	struct vy_tuple *result;
-	struct sicache *cache;
 	struct vy_index *index;
 };
 
@@ -6012,16 +5662,113 @@ static int vy_profiler_(struct vy_profiler *p)
 	return 0;
 }
 
+/* {{{ vy_run_itr API forward declaration */
+/* TODO: move to header (with struct vy_run_itr) and remove static keyword */
+
+/**
+ * Position of particular tuple in vy_run
+ */
+struct vy_run_iterator_pos {
+	uint32_t page_no;
+	uint32_t pos_in_page;
+};
+
+/**
+ * Iterator over vy_run
+ */
+struct vy_run_iterator {
+	/* Members needed for memory allocation and disk accesss */
+	/* index */
+	struct vy_index *index;
+	/* run */
+	struct vy_run *run;
+	/* file of run */
+	struct vy_file *file;
+	/* compression in file */
+	struct vy_filterif *compression;
+
+	/* Search options */
+	/**
+	 * Order, that specifies direction, start position and stop criteria
+	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 */
+	enum vy_order order;
+	/* Search key data in terms of vinyl, vy_tuple_compare argument */
+	char *key;
+	/* LSN visibility, iterator shows values with lsn <= vlsn */
+	uint64_t vlsn;
+
+	/* State of iterator */
+	/* Position of curent record */
+	struct vy_run_iterator_pos curr_pos;
+	/* last tuple returned by vy_run_iterator_get, iterator hold this tuple
+	 *  until next call to vy_run_iterator_get, in which it's unreffed */
+	struct vy_tuple *curr_tuple;
+	/* Position of record that spawned curr_tuple */
+	struct vy_run_iterator_pos curr_tuple_pos;
+	/* Page number of currenly loaded into memory page
+	 * (UINT32_MAX if no page is loaded */
+	uint32_t curr_loaded_page;
+	/* Is false until first .._get ot .._next_.. method is called */
+	bool search_started;
+	/* Search is finished, you will not get more values from iterator */
+	bool search_ended;
+};
+
+/**
+ * Open the iterator
+ */
 static void
-si_readopen(struct siread *q, struct vy_index *index, struct sicache *c,
-	    enum vy_order order, uint64_t vlsn, void *key, uint32_t keysize)
+vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
+		     struct vy_run *run, struct vy_file *file,
+		     struct vy_filterif *compression, enum vy_order order,
+		     char *key, uint64_t vlsn);
+
+/**
+ * Get a tuple from a record, that iterator currently positioned on
+ * return 0 on sucess
+ * return 1 on EOF
+ * return -1 on memory or read error
+ */
+static int
+vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result);
+
+/**
+ * Find the next record with different key as current and visible lsn
+ * return 0 on sucess
+ * return 1 on EOF
+ * return -1 on memory or read error
+ */
+static int
+vy_run_iterator_next_key(struct vy_run_iterator *itr);
+
+/**
+ * Find next (lower, older) record with the same key as current
+ * return 0 on sucess
+ * return 1 on EOF
+ * return -1 on memory or read error
+ */
+static int
+vy_run_iterator_next_lsn(struct vy_run_iterator *itr);
+
+/**
+ * Close an iterator and free all resources
+ */
+static void
+vy_run_iterator_close(struct vy_run_iterator *itr);
+
+/* }}} vy_run_iterator API forward declaration */
+
+
+static void
+si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
+	    uint64_t vlsn, void *key, uint32_t keysize)
 {
 	q->order = order;
 	q->key = key;
 	q->keysize = keysize;
 	q->vlsn = vlsn;
 	q->index = index;
-	q->cache = c;
 	q->has = 0;
 	q->upsert_v = NULL;
 	q->upsert_eq = 0;
@@ -6165,11 +5912,6 @@ next_node:
 				  q->key, q->keysize);
 	}
 
-	/* cache and runs */
-	rc = si_cachevalidate(q->cache, node);
-	if (unlikely(rc == -1))
-		return -1;
-
 	if (q->cache_only) {
 		return 2;
 	}
@@ -6246,13 +5988,20 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 	/* search runs */
 	for (struct vy_run *run = range->run; run != NULL; run = run->next)
 	{
-		struct vy_page_iter ii;
-		sd_indexiter_open(&ii, index->key_def, &run->index, VINYL_GE,
-				  tuple->data);
-		struct vy_page_info *page = sd_indexiter_get(&ii);
-		if (page == NULL)
-			continue;
-		if (page->max_lsn >= lsn)
+		struct vy_run_iterator iterator;
+		struct vy_filterif *compression = NULL;
+		if (index->conf.compression)
+			compression = index->conf.compression_if;
+		vy_run_iterator_open(&iterator, index, run, &range->file,
+				     compression, VINYL_EQ, tuple->data,
+				     INT64_MAX);
+		struct vy_tuple *tuple;
+		int rc = vy_run_iterator_get(&iterator, &tuple);
+		uint64_t tuple_lsn = (rc == 0) ? tuple->lsn : 0;
+		vy_run_iterator_close(&iterator);
+		if (rc == -1)
+			return -1;
+		if (tuple_lsn >= lsn)
 			return 1;
 	}
 	return 0;
@@ -7244,7 +6993,7 @@ sr_zoneof(struct vy_env *env)
 int
 vy_index_read(struct vy_index*, struct vy_tuple*, enum vy_order order,
 		struct vy_tuple **, struct vy_tuple *,
-		struct vy_tx*, struct sicache*, bool cache_only);
+		struct vy_tx*, bool cache_only);
 static int vy_index_recoverbegin(struct vy_index*);
 static int vy_index_recoverend(struct vy_index*);
 
@@ -7505,7 +7254,6 @@ struct vy_cursor {
 	enum vy_order order;
 	struct vy_tx tx;
 	int ops;
-	struct sicache *cache;
 };
 
 struct vy_cursor *
@@ -7525,15 +7273,10 @@ vy_cursor_new(struct vy_index *index, const char *key,
 	if (c->key == NULL)
 		goto error_1;
 	c->order = order;
-	c->cache = vy_cachepool_pop(e->cachepool);
-	if (unlikely(c->cache == NULL))
-		goto error_2;
 
 	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
 	return c;
 
-error_2:
-	vy_tuple_unref(c->key);
 error_1:
 	vy_index_unref(index);
 	mempool_free(&e->cursor_pool, c);
@@ -7545,8 +7288,6 @@ vy_cursor_delete(struct vy_cursor *c)
 {
 	struct vy_env *e = c->index->env;
 	tx_rollback(&c->tx);
-	if (c->cache)
-		vy_cachepool_push(c->cache);
 	if (c->key)
 		vy_tuple_unref(c->key);
 	vy_index_unref(c->index);
@@ -7687,7 +7428,7 @@ int
 vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	      enum vy_order order, struct vy_tuple **result,
 	      struct vy_tuple *upsert, struct vy_tx *tx,
-	      struct sicache *cache, bool cache_only)
+	      bool cache_only)
 {
 	struct vy_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
@@ -7703,15 +7444,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 		if ((*result = vy_tx_get(tx, index, key)))
 			return 0;
 		/* Tuple not found. */
-	}
-
-	/* prepare read cache */
-	int cachegc = 0;
-	if (cache == NULL) {
-		cachegc = 1;
-		cache = vy_cachepool_pop(e->cachepool);
-		if (unlikely(cache == NULL))
-			return -1;
 	}
 
 	int64_t vlsn;
@@ -7731,9 +7463,9 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	struct siread q;
 	if (vy_tuple_key_part(key->data, 0) == NULL) {
 		/* key is [] */
-		si_readopen(&q, index, cache, order, vlsn, NULL, 0);
+		si_readopen(&q, index, order, vlsn, NULL, 0);
 	} else {
-		si_readopen(&q, index, cache, order, vlsn, key->data, key->size);
+		si_readopen(&q, index, order, vlsn, key->data, key->size);
 	}
 	struct sv sv_vup;
 	if (upsert != NULL) {
@@ -7746,9 +7478,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	int rc = si_range(&q);
 	si_readclose(&q);
 
-	/* free read cache */
-	if (likely(cachegc))
-		vy_cachepool_push(cache);
 	if (rc < 0) {
 		/* error */
 		assert(q.result == NULL);
@@ -8553,8 +8282,7 @@ vy_get_cb(struct coio_task *ptr)
 {
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
 	return vy_index_read(task->index, task->key, VINYL_EQ,
-			     &task->result, task->upsert, task->tx, NULL,
-			     false);
+			     &task->result, task->upsert, task->tx, false);
 }
 
 static ssize_t
@@ -8563,8 +8291,7 @@ vy_cursor_next_cb(struct coio_task *ptr)
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
 	struct vy_cursor *c = task->cursor;
 	return vy_index_read(c->index, c->key, c->order,
-			     &task->result, task->upsert, &c->tx,
-			     c->cache, false);
+			     &task->result, task->upsert, &c->tx, false);
 }
 
 static ssize_t
@@ -8633,7 +8360,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 
 	struct vy_tuple *vyresult = NULL;
 	int rc = vy_index_read(index, vykey, VINYL_EQ, &vyresult,
-			       NULL, tx, NULL, true);
+			       NULL, tx, true);
 	if (rc == 0) {
 		if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
 			/* cache miss or not found */
@@ -8676,8 +8403,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	struct vy_tx *tx = &c->tx;
 
 	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult, NULL,
-			  tx, c->cache, true))
+	if (vy_index_read(index, c->key, c->order, &vyresult, NULL, tx, true))
 		return -1;
 	c->ops++;
 	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
@@ -8741,30 +8467,25 @@ vy_env_new(void)
 	e->quota = vy_quota_new(e->conf->memory_limit);
 	if (e->quota == NULL)
 		goto error_3;
-	e->cachepool = vy_cachepool_new(e);
-	if (e->cachepool == NULL)
-		goto error_4;
 	e->xm = tx_manager_new(e);
 	if (e->xm == NULL)
-		goto error_5;
+		goto error_4;
 	e->stat = vy_stat_new();
 	if (e->stat == NULL)
-		goto error_6;
+		goto error_5;
 	e->scheduler = vy_scheduler_new(e);
 	if (e->scheduler == NULL)
-		goto error_7;
+		goto error_6;
 
 	mempool_create(&e->read_task_pool, cord_slab_cache(),
 	               sizeof(struct vy_read_task));
 	mempool_create(&e->cursor_pool, cord_slab_cache(),
 	               sizeof(struct vy_cursor));
 	return e;
-error_7:
-	vy_stat_delete(e->stat);
 error_6:
-	tx_manager_delete(e->xm);
+	vy_stat_delete(e->stat);
 error_5:
-	vy_cachepool_delete(e->cachepool);
+	tx_manager_delete(e->xm);
 error_4:
 	vy_quota_delete(e->quota);
 error_3:
@@ -8783,7 +8504,6 @@ vy_env_delete(struct vy_env *e)
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
 	tx_manager_delete(e->xm);
-	vy_cachepool_delete(e->cachepool);
 	vy_conf_delete(e->conf);
 	vy_quota_delete(e->quota);
 	vy_stat_delete(e->stat);
@@ -8841,15 +8561,11 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	int ops = 0;
 	int64_t vlsn = UINT64_MAX;
 
-	struct sicache *cache = vy_cachepool_pop(index->env->cachepool);
-	if (cache == NULL)
-		return -1;
-
 	vy_index_ref(index);
 
 	/* First iteration */
 	struct siread q;
-	si_readopen(&q, index, cache, VINYL_GT, vlsn, NULL, 0);
+	si_readopen(&q, index, VINYL_GT, vlsn, NULL, 0);
 	assert(!q.cache_only);
 	int rc = si_range(&q);
 	si_readclose(&q);
@@ -8873,15 +8589,13 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		}
 
 		/* Next iteration */
-		si_readopen(&q, index, cache, VINYL_GT, vlsn, tuple->data,
-			    tuple->size);
+		si_readopen(&q, index, VINYL_GT, vlsn, tuple->data, tuple->size);
 		assert(!q.cache_only);
 		rc = si_range(&q);
 		si_readclose(&q);
 		vy_tuple_unref(tuple);
 	}
 
-	vy_cachepool_push(cache);
 	vy_index_unref(index);
 	return rc;
 }
@@ -8891,103 +8605,6 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 /** {{{ vinyl_service - context of a vinyl background thread */
 
 /* }}} vinyl service */
-
-/* {{{ vy_run_itr API forward declaration */
-/* TODO: move to header (with struct vy_run_itr) and remove static keyword */
-
-/**
- * Position of particular tuple in vy_run
- */
-struct vy_run_iterator_pos {
-	uint32_t page_no;
-	uint32_t pos_in_page;
-};
-
-/**
- * Iterator over vy_run
- */
-struct vy_run_iterator {
-	/* Members needed for memory allocation and disk accesss */
-	/* index */
-	struct vy_index *index;
-	/* run */
-	struct vy_run *run;
-	/* file of run */
-	struct vy_file *file;
-	/* compression in file */
-	struct vy_filterif *compression;
-
-	/* Search options */
-	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
-	 */
-	enum vy_order order;
-	/* Search key data in terms of vinyl, vy_tuple_compare argument */
-	char *key;
-	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	uint64_t vlsn;
-
-	/* State of iterator */
-	/* Position of curent record */
-	struct vy_run_iterator_pos curr_pos;
-	/* last tuple returned by vy_run_iterator_get, iterator hold this tuple
-	 *  until next call to vy_run_iterator_get, in which it's unreffed */
-	struct vy_tuple *curr_tuple;
-	/* Position of record that spawned curr_tuple */
-	struct vy_run_iterator_pos curr_tuple_pos;
-	/* Page number of currenly loaded into memory page
-	 * (UINT32_MAX if no page is loaded */
-	uint32_t curr_loaded_page;
-	/* Is false until first .._get ot .._next_.. method is called */
-	bool search_started;
-	/* Search is finished, you will not get more values from iterator */
-	bool search_ended;
-};
-
-/**
- * Open the iterator
- */
-static void
-vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
-		     struct vy_run *run, struct vy_file *file,
-		     struct vy_filterif *compression, enum vy_order order,
-		     char *key, uint64_t vlsn);
-
-/**
- * Get a tuple from a record, that iterator currently positioned on
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
-static int
-vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result);
-
-/**
- * Find the next record with different key as current and visible lsn
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
-static int
-vy_run_iterator_next_key(struct vy_run_iterator *itr);
-
-/**
- * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
-static int
-vy_run_iterator_next_lsn(struct vy_run_iterator *itr);
-
-/**
- * Close an iterator and free all resources
- */
-static void
-vy_run_iterator_close(struct vy_run_iterator *itr);
-
-/* }}} vy_run_iterator API forward declaration */
 
 /* {{{ vy_run_iterator vy_run_iterator support functions */
 /* TODO: move to appropriate c file and remove */
