@@ -3132,6 +3132,25 @@ tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 		m->count_rw++;
 }
 
+/**
+ * Remember the read in the conflict manager index.
+ */
+int
+vy_tx_track(struct vy_tx *tx, struct vy_index *index,
+	    struct vy_tuple *key)
+{
+	struct txv *v = txvindex_search_key(&index->txvindex, key->data,
+					    key->size, tx->tsn);
+	if (v == NULL) {
+		key->flags = SVGET;
+		if ((v = txv_new(index, key, tx)) == NULL)
+			return -1;
+		stailq_add_tail_entry(&tx->log, v, next_in_log);
+		txvindex_insert(&index->txvindex, v);
+	}
+	return 0;
+}
+
 static inline void
 tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 {
@@ -3186,15 +3205,6 @@ vy_tx_get(struct vy_tx *tx, struct vy_index *index, struct vy_tuple *key)
 		/* Do not track separately our own reads after writes. */
 		vy_tuple_ref(v->tuple);
 		return v->tuple;
-	}
-	v = txvindex_search_key(&index->txvindex, key->data,
-				key->size, tx->tsn);
-	if (v == NULL) {
-		key->flags = SVGET;
-		/* Allocate a MVCC container. */
-		v = txv_new(index, key, tx);
-		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		txvindex_insert(&index->txvindex, v);
 	}
 	return 0;
 }
@@ -8377,6 +8387,8 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	} else {
 		/* Tuple found in the cache. */
 	}
+	if (tx != NULL && vy_tx_track(tx, index, vykey))
+		goto end;
 	if (vyresult == NULL) { /* not found */
 		*result = NULL;
 		rc = 0;
