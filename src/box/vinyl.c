@@ -2883,7 +2883,34 @@ struct vy_tx {
 	 */
 	uint64_t   vlsn;
 	rb_node(struct vy_tx) tree_node;
+	/*
+	 * For non-autocommit transactions, the list of open
+	 * cursors. When a transaction ends, all open cursors are
+	 * forcibly closed.
+	 */
+	struct rlist cursors;
 	struct tx_manager *manager;
+};
+
+/** Cursor. */
+struct vy_cursor {
+	/**
+	 * A built-in transaction created when a cursor is open
+	 * in autocommit mode.
+	 */
+	struct vy_tx tx_autocommit;
+	struct vy_index *index;
+	struct vy_tuple *key;
+	struct vy_tx *tx;
+	enum vy_order order;
+	/** The number of vy_cursor_next() invocations. */
+	int n_reads;
+	/**
+	 * All open cursors are registered in a transaction
+	 * they belong to. When the transaction ends, the cursor
+	 * is closed.
+	 */
+	struct rlist next_in_tx;
 };
 
 
@@ -3109,6 +3136,7 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
 	tx->is_aborted = false;
+	rlist_create(&tx->cursors);
 
 	tx->tsn = ++m->tsn;
 	tx->vlsn = vy_sequence(m->env->seq, VINYL_LSN);
@@ -3170,6 +3198,11 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		txv_delete(v);
 		count++;
 	}
+	/** Abort all open cursors. */
+	struct vy_cursor *c;
+	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
+		c->tx = NULL;
+
 	tx_manager_end(tx->manager, tx);
 	vy_stat_tx(e->stat, tx->start, count, 1, 0);
 }
@@ -7235,22 +7268,14 @@ vy_info_destroy(struct vy_info *info)
 
 /* {{{ Cursor */
 
-struct vy_cursor {
-	struct vy_index *index;
-	struct vy_tuple *key;
-	enum vy_order order;
-	struct vy_tx tx;
-	int ops;
-};
-
 struct vy_cursor *
 vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	      uint32_t part_count, enum vy_order order)
 {
-	(void) tx;
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
 	if (c == NULL) {
+
 		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
 		return NULL;
 	}
@@ -7260,10 +7285,16 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return NULL;
 	}
 	c->index = index;
-	c->ops = 0;
+	c->n_reads = 0;
 	c->order = order;
 	vy_index_ref(index);
-	vy_tx_begin(e->xm, &c->tx, VINYL_TX_RO);
+	if (tx == NULL) {
+		tx = &c->tx_autocommit;
+		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
+	} else {
+		rlist_add(&tx->cursors, &c->next_in_tx);
+	}
+	c->tx = tx;
 	return c;
 }
 
@@ -7271,11 +7302,22 @@ void
 vy_cursor_delete(struct vy_cursor *c)
 {
 	struct vy_env *e = c->index->env;
-	vy_tx_rollback(c->index->env, &c->tx);
+	if (c->tx != NULL) {
+		if (c->tx == &c->tx_autocommit) {
+			/* Rollback the automatic transaction. */
+			vy_tx_rollback(c->index->env, c->tx);
+		} else {
+			/*
+			 * Delete itself from the list of open cursors
+			 * in the transaction
+			 */
+			rlist_del(&c->next_in_tx);
+		}
+	}
 	if (c->key)
 		vy_tuple_unref(c->key);
 	vy_index_unref(c->index);
-	vy_stat_cursor(e->stat, c->tx.start, c->ops);
+	vy_stat_cursor(e->stat, c->tx->start, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
 }
@@ -8192,6 +8234,10 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		/* Don't touch logindex, we're deleting all keys. */
 		txv_delete(v);
 	}
+	/** Abort all open cursors. */
+	struct vy_cursor *c;
+	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
+		c->tx = NULL;
 	vy_stat_tx(e->stat, tx->start, count, 0, 0);
 	free(tx);
 	return 0;
@@ -8273,7 +8319,7 @@ vy_cursor_next_cb(struct coio_task *ptr)
 	struct vy_read_task *task = (struct vy_read_task *) ptr;
 	struct vy_cursor *c = task->cursor;
 	return vy_index_read(c->index, c->key, c->order,
-			     &task->result, task->upsert, &c->tx, false);
+			     &task->result, task->upsert, c->tx, false);
 }
 
 static ssize_t
@@ -8386,12 +8432,17 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
 	struct vy_tuple *vyresult = NULL;
 	struct vy_index *index = c->index;
-	struct vy_tx *tx = &c->tx;
+
+	if (c->tx == NULL) {
+		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		return -1;
+	}
 
 	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult, NULL, tx, true))
+	if (vy_index_read(index, c->key, c->order, &vyresult,
+			  NULL, c->tx, true))
 		return -1;
-	c->ops++;
+	c->n_reads++;
 	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
 		/* Cache miss. */
 		if (vy_read_task(index, NULL, c, NULL, &vyresult,
@@ -8404,6 +8455,11 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 		 */
 		vy_tuple_unref(vyresult);
 		vyresult = NULL;
+	}
+	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key)) {
+		if (vyresult)
+			vy_tuple_unref(vyresult);
+		return -1;
 	}
 	if (vyresult != NULL) {
 		/* Found. */

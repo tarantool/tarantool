@@ -3416,7 +3416,7 @@ c1:commit() -- success
 ---
 - 
 ...
-c2:commit() -- rollback
+c2:commit() -- rollback, c2 reads {1} before writing it
 ---
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
@@ -3457,12 +3457,12 @@ c2:commit() -- success
 ---
 - 
 ...
-c1:commit() -- rollback
+c1:commit() -- rollback, c1 reads {1} before writing it
 ---
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 --
-c3("t:get{1}") -- {1, 10}
+c3("t:get{1}") -- {1, 15}
 ---
 - - [1, 15]
 ...
@@ -3576,6 +3576,50 @@ t:delete{4}
 t:delete{5}
 ---
 ...
+-- --------------------------------------------------------------------------
+-- Conflict manager works for iterators
+-- --------------------------------------------------------------------------
+t:insert{1, 10}
+---
+- [1, 10]
+...
+t:insert{2, 20}
+---
+- [2, 20]
+...
+c1:begin()
+---
+- 
+...
+c2:begin()
+---
+- 
+...
+c1("t:select{}")
+---
+- - [[1, 10], [2, 20]]
+...
+c2("t:select{}")
+---
+- - [[1, 10], [2, 20]]
+...
+c1("t:replace{1, 'new'}")
+---
+- - [1, 'new']
+...
+c2("t:replace{2, 'new'}")
+---
+- - [2, 'new']
+...
+c1:commit()
+---
+- 
+...
+c2:commit() -- rollback
+---
+- - {'error': 'Transaction has been aborted by conflict'}
+...
+--
 --
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup

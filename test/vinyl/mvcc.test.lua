@@ -1384,7 +1384,7 @@ c1("t:insert{1, 10}")
 c2("t:insert{1, 15}")
 --
 c1:commit() -- success
-c2:commit() -- rollback
+c2:commit() -- rollback, c2 reads {1} before writing it
 --
 c3("t:get{1}") -- {1, 10}
 --
@@ -1401,9 +1401,9 @@ c1("t:insert{1, 10}")
 c2("t:insert{1, 15}")
 --
 c2:commit() -- success
-c1:commit() -- rollback
+c1:commit() -- rollback, c1 reads {1} before writing it
 --
-c3("t:get{1}") -- {1, 10}
+c3("t:get{1}") -- {1, 15}
 --
 --
 -- cleanup
@@ -1448,6 +1448,21 @@ t:delete{2}
 t:delete{3}
 t:delete{4}
 t:delete{5}
+-- --------------------------------------------------------------------------
+-- Conflict manager works for iterators
+-- --------------------------------------------------------------------------
+t:insert{1, 10}
+t:insert{2, 20}
+
+c1:begin()
+c2:begin()
+c1("t:select{}")
+c2("t:select{}")
+c1("t:replace{1, 'new'}")
+c2("t:replace{2, 'new'}")
+c1:commit()
+c2:commit() -- rollback
+--
 --
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
