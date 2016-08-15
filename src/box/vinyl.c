@@ -3069,8 +3069,8 @@ tx_manager_delete(struct tx_manager*);
 static void
 tx_begin(struct tx_manager*, struct vy_tx*, enum tx_type);
 
-static enum tx_state
-tx_rollback(struct vy_tx*);
+static void
+tx_rollback(struct vy_env *, struct vy_tx *);
 
 static struct tx_manager *
 tx_manager_new(struct vy_env *env)
@@ -3169,32 +3169,21 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 	}
 }
 
-static inline void
-tx_rollback_svp(struct vy_tx *tx, struct txv *v)
+static void
+tx_rollback(struct vy_env *e, struct vy_tx *tx)
 {
-	struct stailq tail;
-	stailq_create(&tail);
-	stailq_splice(&tx->log, &v->next_in_log, &tail);
-	struct txv *tmp;
-	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
+	struct txv *v, *tmp;
+	uint32_t count = 0;
+	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		/* Remove from the conflict manager index */
 		if (vy_tuple_is_r(v->tuple))
 			txvindex_remove(&v->index->txvindex, v);
-		if (vy_tuple_is_w(v->tuple))
-			logindex_remove(&tx->logindex, v);
+		/* Don't touch logindex, we're deleting all keys. */
 		txv_delete(v);
+		count++;
 	}
-}
-
-static enum tx_state
-tx_rollback(struct vy_tx *tx)
-{
-	/* support log free after commit and half-commit mode */
-	tx_rollback_svp(tx, stailq_first_entry(&tx->log, struct txv,
-					       next_in_log));
-	tx_promote(tx, VINYL_TX_ROLLBACK);
 	tx_manager_end(tx->manager, tx);
-	return VINYL_TX_ROLLBACK;
+	vy_stat_tx(e->stat, tx->start, count, 1, 0);
 }
 
 static struct vy_tuple *
@@ -7268,7 +7257,7 @@ struct vy_cursor {
 
 struct vy_cursor *
 vy_cursor_new(struct vy_index *index, const char *key,
-		 uint32_t part_count, enum vy_order order)
+	      uint32_t part_count, enum vy_order order)
 {
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
@@ -7297,7 +7286,7 @@ void
 vy_cursor_delete(struct vy_cursor *c)
 {
 	struct vy_env *e = c->index->env;
-	tx_rollback(&c->tx);
+	tx_rollback(c->index->env, &c->tx);
 	if (c->key)
 		vy_tuple_unref(c->key);
 	vy_index_unref(c->index);
@@ -8101,22 +8090,6 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	}
 }
 
-static void
-vy_tx_delete(struct vy_stat *stat, struct vy_tx *tx, int rlb, int conflict)
-{
-	uint32_t count = 0;
-	struct txv *v, *tmp;
-	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
-		count++;
-		if (vy_tuple_is_r(v->tuple))
-			txvindex_remove(&v->index->txvindex, v);
-		/* Don't touch logindex, we're deleting all keys. */
-		txv_delete(v);
-	}
-	vy_stat_tx(stat, tx->start, count, rlb, conflict);
-	free(tx);
-}
-
 /* {{{ Public API of transaction control: start/end transaction,
  * read, write data in the context of a transaction.
  */
@@ -8172,8 +8145,8 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
-	tx_rollback(tx);
-	vy_tx_delete(e->stat, tx, 1, 0);
+	tx_rollback(e, tx);
+	free(tx);
 }
 
 int
@@ -8211,10 +8184,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 int
 vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 {
-	if (unlikely(! vy_status_is_active(e->status)))
-		return -1;
 	assert(tx->state == VINYL_TX_COMMIT);
-
 	vy_sequence_lock(e->seq);
 	if (lsn > (int64_t) e->seq->lsn)
 		e->seq->lsn = lsn;
@@ -8223,10 +8193,22 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	/* Flush transactional changes to the index. */
 	uint64_t now = clock_monotonic64();
 	struct txv *v = logindex_first(&tx->logindex);
+
+	/** @todo: check return value of si_write(). */
 	while (v != NULL)
 		v = si_write(&tx->logindex, v, now, e->status, lsn);
 
-	vy_tx_delete(e->stat, tx, 0, 0);
+	uint32_t count = 0;
+	struct txv *tmp;
+	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
+		count++;
+		if (vy_tuple_is_r(v->tuple))
+			txvindex_remove(&v->index->txvindex, v);
+		/* Don't touch logindex, we're deleting all keys. */
+		txv_delete(v);
+	}
+	vy_stat_tx(e->stat, tx->start, count, 0, 0);
+	free(tx);
 	return 0;
 }
 
@@ -8254,17 +8236,24 @@ void
 vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 {
 	struct stailq_entry *last = svp;
+	/* Start from the first statement after the savepoint. */
+	last = last == NULL ? stailq_first(&tx->log) : stailq_next(last);
 	if (last == NULL) {
-		last = stailq_first(&tx->log);
-	} else {
-		last = stailq_next(last);
+		/* Empty transaction or no changes after the savepoint. */
+		return;
 	}
-	if (last) {
-		struct txv *v = NULL;
-		if (last != NULL) {
-			v = stailq_entry(last, struct txv, next_in_log);
-			tx_rollback_svp(tx, v);
-		}
+	struct stailq tail;
+	stailq_create(&tail);
+	stailq_splice(&tx->log, last, &tail);
+	struct txv *v, *tmp;
+	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
+		/* Remove from the conflict manager index */
+		if (vy_tuple_is_r(v->tuple))
+			txvindex_remove(&v->index->txvindex, v);
+		/* Remove from the transaction write log. */
+		if (vy_tuple_is_w(v->tuple))
+			logindex_remove(&tx->logindex, v);
+		txv_delete(v);
 	}
 }
 
