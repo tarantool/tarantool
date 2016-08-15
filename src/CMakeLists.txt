@@ -129,6 +129,9 @@ set (common_sources
      lua/bsdsocket.cc
      fiob.c
      ${lua_sources}
+     ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
+     ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/strbuf.c
+     ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/fpconv.c
 )
 
 if (CC_HAS_WNO_UNUSED_CONST_VARIABLE)
@@ -151,7 +154,6 @@ list(APPEND common_libraries
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
-    ${LIBCJSON_LIBRARIES}
     ${LUAJIT_LIB}
     misc
 )

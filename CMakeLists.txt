@@ -299,14 +299,6 @@ libgopt_build()
 add_dependencies(build_bundled_libs gopt)
 
 #
-# LibCJSON
-#
-
-include(BuildLibCJSON)
-libcjson_build()
-add_dependencies(build_bundled_libs cjson)
-
-#
 # Third-Party
 #
 
