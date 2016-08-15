@@ -3066,12 +3066,6 @@ tx_manager_new(struct vy_env*);
 static int
 tx_manager_delete(struct tx_manager*);
 
-static void
-tx_begin(struct tx_manager*, struct vy_tx*, enum tx_type);
-
-static void
-tx_rollback(struct vy_env *, struct vy_tx *);
-
 static struct tx_manager *
 tx_manager_new(struct vy_env *env)
 {
@@ -3104,15 +3098,8 @@ txvindex_delete_cb(txvindex_t *t, struct txv *v, void *arg)
 	return NULL;
 }
 
-static inline enum tx_state
-tx_promote(struct vy_tx *tx, enum tx_state state)
-{
-	tx->state = state;
-	return state;
-}
-
 static void
-tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
+vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 {
 	stailq_create(&tx->log);
 	logindex_new(&tx->logindex);
@@ -3170,7 +3157,7 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 }
 
 static void
-tx_rollback(struct vy_env *e, struct vy_tx *tx)
+vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 {
 	struct txv *v, *tmp;
 	uint32_t count = 0;
@@ -7256,37 +7243,34 @@ struct vy_cursor {
 };
 
 struct vy_cursor *
-vy_cursor_new(struct vy_index *index, const char *key,
+vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	      uint32_t part_count, enum vy_order order)
 {
+	(void) tx;
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
-	if (unlikely(c == NULL)) {
-		diag_set(OutOfMemory, sizeof(*c), "cursor", "struct");
+	if (c == NULL) {
+		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
 		return NULL;
 	}
-	vy_index_ref(index);
+	c->key = vy_tuple_from_key(index, key, part_count);
+	if (c->key == NULL) {
+		mempool_free(&e->cursor_pool, c);
+		return NULL;
+	}
 	c->index = index;
 	c->ops = 0;
-	c->key = vy_tuple_from_key(index, key, part_count);
-	if (c->key == NULL)
-		goto error_1;
 	c->order = order;
-
-	tx_begin(e->xm, &c->tx, VINYL_TX_RO);
+	vy_index_ref(index);
+	vy_tx_begin(e->xm, &c->tx, VINYL_TX_RO);
 	return c;
-
-error_1:
-	vy_index_unref(index);
-	mempool_free(&e->cursor_pool, c);
-	return NULL;
 }
 
 void
 vy_cursor_delete(struct vy_cursor *c)
 {
 	struct vy_env *e = c->index->env;
-	tx_rollback(c->index->env, &c->tx);
+	vy_tx_rollback(c->index->env, &c->tx);
 	if (c->key)
 		vy_tuple_unref(c->key);
 	vy_index_unref(c->index);
@@ -8099,7 +8083,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 	   const char *tuple, const char *tuple_end)
 {
 	struct vy_tuple *vytuple = vy_tuple_from_data(index,
-		tuple, tuple_end);
+						      tuple, tuple_end);
 	if (vytuple == NULL)
 		return -1;
 	vy_tx_set(tx, index, vytuple, SVREPLACE);
@@ -8113,20 +8097,20 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *expr, const char *expr_end, int index_base)
 {
 	assert(index_base == 0 || index_base == 1);
-	uint32_t extra_size = (expr_end - expr) +
-			      mp_sizeof_uint(1) + mp_sizeof_uint(index_base);
+	uint32_t extra_size = ((expr_end - expr) +
+			       mp_sizeof_uint(1) + mp_sizeof_uint(index_base));
 	char *extra;
-	struct vy_tuple *vy_tuple =
+	struct vy_tuple *vytuple =
 		vy_tuple_from_data_ex(index, tuple, tuple_end,
-					 extra_size, &extra);
-	if (vy_tuple == NULL) {
+				      extra_size, &extra);
+	if (vytuple == NULL) {
 		return -1;
 	}
 	extra = mp_encode_uint(extra, 1); /* 1 upsert ops record */
 	extra = mp_encode_uint(extra, index_base);
 	memcpy(extra, expr, expr_end - expr);
-	vy_tx_set(tx, index, vy_tuple, SVUPSERT);
-	vy_tuple_unref(vy_tuple);
+	vy_tx_set(tx, index, vytuple, SVUPSERT);
+	vy_tuple_unref(vytuple);
 	return 0;
 }
 
@@ -8145,7 +8129,7 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
-	tx_rollback(e, tx);
+	vy_tx_rollback(e, tx);
 	free(tx);
 }
 
@@ -8160,11 +8144,11 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 
 	/* proceed read-only transactions */
 	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
-		tx_promote(tx, VINYL_TX_ROLLBACK);
+		tx->state = VINYL_TX_ROLLBACK;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
-	tx_promote(tx, VINYL_TX_COMMIT);
+	tx->state = VINYL_TX_COMMIT;
 
 	struct txv *v = logindex_first(&tx->logindex);
 	for (; v != NULL; v = logindex_next(&tx->logindex, v))
@@ -8222,7 +8206,7 @@ vy_begin(struct vy_env *e)
 			 "struct vy_tx");
 		return NULL;
 	}
-	tx_begin(e->xm, tx, VINYL_TX_RW);
+	vy_tx_begin(e->xm, tx, VINYL_TX_RW);
 	return tx;
 }
 

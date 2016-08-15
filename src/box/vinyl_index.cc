@@ -313,11 +313,13 @@ VinylIndex::allocIterator() const
 
 void
 VinylIndex::initIterator(struct iterator *ptr,
-                          enum iterator_type type,
-                          const char *key, uint32_t part_count) const
+			 enum iterator_type type,
+			 const char *key, uint32_t part_count) const
 {
 	assert(part_count == 0 || key != NULL);
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
+	struct vy_tx *tx =
+		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
 	it->index = this;
 	it->key_def = vy_index_key_def(db);
@@ -367,7 +369,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	default:
 		return Index::initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = vy_cursor_new(db, key, part_count, order);
+	it->cursor = vy_cursor_new(tx, db, key, part_count, order);
 	if (it->cursor == NULL)
 		diag_raise();
 }

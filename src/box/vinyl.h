@@ -192,9 +192,14 @@ enum vy_order {
 	VINYL_EQ
 };
 
+/**
+ * Create a cursor. If tx is not NULL, the cursor life time is
+ * bound by the transaction life time. Otherwise, the cursor
+ * allocates its own transaction.
+ */
 struct vy_cursor *
-vy_cursor_new(struct vy_index *index, const char *key,
-		 uint32_t part_count, enum vy_order order);
+vy_cursor_new(struct vy_tx *tx, struct vy_index *index,
+	      const char *key, uint32_t part_count, enum vy_order order);
 
 void
 vy_cursor_delete(struct vy_cursor *cursor);
