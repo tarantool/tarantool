@@ -2346,20 +2346,21 @@ vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
 }
 
 void *
-vy_index_alloc_matras_page()
+vy_mem_alloc_matras_page()
 {
-	void *res = malloc(BPS_TREE_MEM_INDEX_PAGE_SIZE);
-	if (res == NULL) {
+	void *res = mmap(0, BPS_TREE_MEM_INDEX_PAGE_SIZE, PROT_READ|PROT_WRITE,
+			 MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (res == MAP_FAILED) {
 		diag_set(OutOfMemory, BPS_TREE_MEM_INDEX_PAGE_SIZE,
-			 "malloc", "raw bytes");
+			 "mmap", "vinyl matras page");
 	}
 	return res;
 }
 
 void
-sv_index_free_matras_page(void *p)
+vy_mem_free_matras_page(void *p)
 {
-	return free(p);
+	munmap(p, BPS_TREE_MEM_INDEX_PAGE_SIZE);
 }
 
 static int
@@ -2369,8 +2370,8 @@ vy_mem_init(struct vy_mem *index, struct key_def *key_def)
 	index->used = 0;
 	index->key_def = key_def;
 	bps_tree_mem_create(&index->tree, index,
-				vy_index_alloc_matras_page,
-				sv_index_free_matras_page);
+				vy_mem_alloc_matras_page,
+				vy_mem_free_matras_page);
 	return 0;
 }
 
