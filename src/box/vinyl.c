@@ -5905,6 +5905,10 @@ next_node:
 
 	/* prepare sources */
 	struct svmerge *m = &q->merge;
+	/*
+	 * (+2) - for two in-memory indexes below.
+	 * (+1) - for q->upsert below.
+	 */
 	int count = node->run_count + 2 + 1;
 	int rc = sv_mergeprepare(m, count);
 	if (unlikely(rc == -1)) {
@@ -8598,46 +8602,69 @@ vy_end_recovery(struct vy_env *e)
 int
 vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 {
-	int read_disk = 0;
-	int read_cache = 0;
-	int ops = 0;
 	int64_t vlsn = UINT64_MAX;
+	int rc;
 
 	vy_index_ref(index);
 
-	/* First iteration */
-	struct siread q;
-	si_readopen(&q, index, VINYL_GT, vlsn, NULL, 0);
-	assert(!q.cache_only);
-	int rc = si_range(&q);
-	si_readclose(&q);
+	struct svmerge merge;
+	sv_mergeinit(&merge, index, index->key_def);
+	struct vy_rangeiter range_iter;
+	vy_rangeiter_open(&range_iter, index, VINYL_GT, NULL, 0);
+	/*
+	 * It is nested loop over all ranges in index, all runs on every range
+	 * and all tuples in every run.
+	 *
+	 * First, iterate over all ranges.
+	 */
+	for (struct vy_range *node = vy_rangeiter_get(&range_iter); node;
+	     vy_rangeiter_next(&range_iter),
+	     node = vy_rangeiter_get(&range_iter)) {
 
-	while (rc == 1) { /* while found */
-		/* Update statistics */
-		ops++;
-		read_disk += q.read_disk;
-		read_cache += q.read_cache;
-
-		/* Execute callback */
-		struct vy_tuple *tuple = q.result;
-		assert(tuple != NULL); /* found */
-		uint32_t mp_size;
-		const char *mp = vy_tuple_data(index, tuple, &mp_size);
-		int64_t lsn = tuple->lsn;
-		rc = sendrow(ctx, mp, mp_size, lsn);
-		if (rc != 0) {
-			vy_tuple_unref(tuple);
-			break;
+		struct svmerge *m = &merge;
+		rc = sv_mergeprepare(m, node->run_count);
+		if (unlikely(rc == -1)) {
+			diag_clear(diag_get());
+			goto finish_send;
 		}
+		struct vy_run *run = node->run;
 
-		/* Next iteration */
-		si_readopen(&q, index, VINYL_GT, vlsn, tuple->data, tuple->size);
-		assert(!q.cache_only);
-		rc = si_range(&q);
-		si_readclose(&q);
-		vy_tuple_unref(tuple);
+		/* Merge all runs. */
+		while (run) {
+			struct svmergesrc *s = sv_mergeadd(m, NULL);
+			struct vy_filterif *compression = NULL;
+			if (index->conf.compression)
+				compression = index->conf.compression_if;
+			vy_tmp_iterator_open(&s->src, index, run, &node->file,
+					     compression, VINYL_GT, NULL);
+			run = run->next;
+		}
+		struct svmergeiter im;
+		sv_mergeiter_open(&im, m, VINYL_GT);
+		struct svreaditer ri;
+		sv_readiter_open(&ri, &im, vlsn, 0);
+		/*
+		 * Iterate over the merger with getting and sending
+		 * every tuple.
+		 */
+		for (struct sv *v = sv_readiter_get(&ri); v;
+		     sv_readiter_next(&ri), v = sv_readiter_get(&ri)) {
+
+			struct vy_tuple *tuple = sv_to_tuple(v);
+			assert(tuple != NULL);
+			uint32_t mp_size;
+			const char *mp_data = vy_tuple_data(index, tuple,
+							    &mp_size);
+			int64_t lsn = tuple->lsn;
+			if ((rc = sendrow(ctx, mp_data, mp_size, lsn)))
+				goto finish_send;
+		}
+		sv_readiter_forward(&ri);
+		sv_readiter_close(&ri);
+		sv_mergereset(&merge);
 	}
-
+finish_send:
+	sv_mergefree(&merge);
 	vy_index_unref(index);
 	return rc;
 }
@@ -9275,7 +9302,8 @@ static void
 vy_tmp_iterator_close(struct vy_iter *virt_iterator)
 {
 	assert(virt_iterator->vif->close == vy_tmp_iterator_close);
-	(void)virt_iterator;
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
+	vy_run_iterator_close(itr);
 }
 
 static int

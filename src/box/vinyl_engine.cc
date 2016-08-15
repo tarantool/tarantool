@@ -128,12 +128,14 @@ vinyl_send_row(void *arg, const char *tuple, uint32_t tuple_size, int64_t lsn)
 	uint32_t space_id = ((struct vinyl_send_row_arg *) arg)->space_id;
 
 	struct request_replace_body body;
+	memset(&body, 0, sizeof(body));
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
 	body.m_space_id = 0xce; /* uint32 */
 	body.v_space_id = mp_bswap_u32(space_id);
 	body.k_tuple = IPROTO_TUPLE;
 	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
 	row.type = IPROTO_INSERT;
 	row.server_id = 0;
 	row.lsn = lsn;
