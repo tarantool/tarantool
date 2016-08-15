@@ -143,7 +143,6 @@ endif()
 set_source_files_properties(sio.cc evio.cc replica.cc PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers)
 
 set (common_libraries cfg core)
 
@@ -220,7 +219,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
         "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-    add_dependencies(lt${mod} generate_headers generate_admin_cc generate_memcached_grammar_cc build_bundled_libs)
+    add_dependencies(lt${mod} generate_admin_cc generate_memcached_grammar_cc build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries} -rdynamic)
 
