@@ -43,6 +43,15 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "lua/utils.h"
+#include <lj_cdata.h>
+#include <lj_obj.h>
+#include <lj_ctype.h>
+#include <lj_state.h>
+#include <lj_cconv.h>
+
+#include <ctype.h>
+
 #include "strbuf.h"
 #include "fpconv.h"
 
@@ -80,6 +89,8 @@ typedef enum {
     T_ARR_BEGIN,
     T_ARR_END,
     T_STRING,
+    T_UINT,
+    T_INT,
     T_NUMBER,
     T_BOOLEAN,
     T_NULL,
@@ -97,6 +108,8 @@ static const char *json_token_type_name[] = {
     "T_ARR_BEGIN",
     "T_ARR_END",
     "T_STRING",
+    "T_UINT",
+    "T_INT",
     "T_NUMBER",
     "T_BOOLEAN",
     "T_NULL",
@@ -144,6 +157,7 @@ typedef struct {
         const char *string;
         double number;
         int boolean;
+        long long ival;
     } value;
     int string_len;
 } json_token_t;
@@ -613,6 +627,38 @@ static void json_append_number(lua_State *l, json_config_t *cfg,
     strbuf_extend_length(json, len);
 }
 
+static void json_append_cdata(lua_State *l, json_config_t *cfg,
+                               strbuf_t *json, int lindex)
+{
+    int len = 0;
+
+    /* Calculate absolute value in the stack. */
+    if (lindex < 0)
+            lindex = lua_gettop(l) + lindex + 1;
+    GCcdata *cd = cdataV(l->base + lindex - 1);
+    switch(cd->ctypeid) {
+        case CTID_INT64:
+            {
+                int64_t num = *(int64_t*) cdataptr(cd);
+                strbuf_ensure_empty_length(json, FPCONV_G_FMT_BUFSIZE_64);
+                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%ld",num);
+                strbuf_extend_length(json, len);
+            }
+            break;
+        case CTID_UINT64:
+            {
+                uint64_t unum = *(uint64_t*) cdataptr(cd);
+                strbuf_ensure_empty_length(json,FPCONV_G_FMT_BUFSIZE_64);
+                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%lu",unum);
+                strbuf_extend_length(json, len);
+            }
+            break;
+        default:
+            json_encode_exception(l, cfg, json, lindex,
+                                  "cdata must be int64 or uint64 number");
+    }
+}
+
 static void json_append_object(lua_State *l, json_config_t *cfg,
                                int current_depth, strbuf_t *json)
 {
@@ -663,6 +709,9 @@ static void json_append_data(lua_State *l, json_config_t *cfg,
     switch (lua_type(l, -1)) {
     case LUA_TSTRING:
         json_append_string(l, json, -1);
+        break;
+    case LUA_TCDATA:
+        json_append_cdata(l, cfg, json, -1);
         break;
     case LUA_TNUMBER:
         json_append_number(l, cfg, json, -1);
@@ -995,8 +1044,17 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
 {
     char *endptr;
 
-    token->type = T_NUMBER;
-    token->value.number = fpconv_strtod(json->ptr, &endptr);
+    token->type = T_INT;
+    token->value.ival = strtoll(json->ptr, &endptr, 10);
+
+    if (token->value.ival == LLONG_MAX) {
+        token->type = T_UINT;
+        token->value.ival = strtoull(json->ptr, &endptr, 10);
+    }
+    if (*endptr == '.' || *endptr == 'e' || isdigit(*endptr)) {
+        token->type = T_NUMBER;
+        token->value.number = fpconv_strtod(json->ptr, &endptr);
+    }
     if (json->ptr == endptr)
         json_set_token_error(token, json, "invalid number");
     else
@@ -1225,6 +1283,12 @@ static void json_process_value(lua_State *l, json_parse_t *json,
     switch (token->type) {
     case T_STRING:
         lua_pushlstring(l, token->value.string, token->string_len);
+        break;;
+    case T_INT:
+        luaL_pushint64(l, token->value.ival);
+        break;;
+    case T_UINT:
+        luaL_pushuint64(l, token->value.ival);
         break;;
     case T_NUMBER:
         lua_pushnumber(l, token->value.number);
