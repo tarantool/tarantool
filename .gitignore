@@ -125,3 +125,7 @@ debian/tarantool/*
 debian/tmp/*
 obj-*/
 *.cdbs-config_list
+parts/
+prime/
+stage/
+*.snap
