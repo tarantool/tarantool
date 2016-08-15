@@ -56,8 +56,6 @@ ffi.cdef[[
     /** \cond public */
     int
     box_txn_begin();
-    void
-    box_txn_rollback();
     /** \endcond public */
 
     struct port_entry {
@@ -234,8 +232,7 @@ box.begin = function()
     end
 end
 -- box.commit yields, so it's defined as Lua/C binding
-
-box.rollback = builtin.box_txn_rollback;
+-- box.rollback yields as well
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
