@@ -414,3 +414,14 @@ box.space.test:len()
 box.space.test:drop()
 ---
 ...
+--
+-- gh-1638: box.rollback on a JIT-ed code path crashes LuaJIT
+-- (ffi call + yield don't mix well, rollback started to yield recently)
+-- Note: don't remove gh_1638(), it's necessary to trigger JIT-compilation.
+--
+function gh_1638() box.begin(); box.rollback() end
+---
+...
+for i = 1, 1000 do fiber.create(function() gh_1638() end) end
+---
+...

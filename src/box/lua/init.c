@@ -82,6 +82,14 @@ lbox_commit(lua_State *L)
 }
 
 static int
+lbox_rollback(lua_State *L)
+{
+	(void)L;
+	box_txn_rollback();
+	return 0;
+}
+
+static int
 lbox_snapshot(struct lua_State *L)
 {
 	int ret = box_snapshot();
@@ -95,8 +103,9 @@ lbox_snapshot(struct lua_State *L)
 }
 
 static const struct luaL_reg boxlib[] = {
-	{"snapshot", lbox_snapshot},
 	{"commit", lbox_commit},
+	{"rollback", lbox_rollback},
+	{"snapshot", lbox_snapshot},
 	{NULL, NULL}
 };
 
