@@ -39,6 +39,7 @@
 #include "vclock.h"
 #include "xrow.h"
 #include "coio.h"
+#include "coeio.h"
 #include "cfg.h"
 #include "trigger.h"
 #include "errinj.h"
@@ -83,6 +84,7 @@ int
 relay_initial_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
+	coeio_enable();
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send snapshot */
@@ -110,6 +112,7 @@ int
 relay_final_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
+	coeio_enable();
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send all WALs until stop_vclock */
@@ -156,7 +159,7 @@ relay_subscribe_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
 	struct recovery *r = relay->r;
-
+	coeio_enable();
 	relay->stream.write = relay_send_subscribe_row;
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),

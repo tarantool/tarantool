@@ -116,7 +116,6 @@ struct vy_env {
 	struct tx_manager   *xm;
 	struct vy_scheduler *scheduler;
 	struct vy_stat      *stat;
-	struct mempool      read_task_pool;
 	struct mempool      cursor_pool;
 };
 
@@ -368,26 +367,6 @@ vy_file_resize(struct vy_file *f, uint64_t size)
 		return -1;
 	f->size = size;
 	return 0;
-}
-
-static inline int
-vy_file_pread(struct vy_file *f, uint64_t off, void *buf, int size)
-{
-	int64_t n = 0;
-	do {
-		int r;
-		do {
-			r = pread(f->fd, (char*)buf + n, size - n, off + n);
-		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
-			return -1;
-		n += r;
-	} while (n != size);
-
-	if (unlikely(n == -1))
-		return -1;
-	assert(n == size);
-	return n;
 }
 
 static inline int
@@ -3562,7 +3541,7 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 		return NULL;
 	}
 
-#if 0
+#if 1
 	int rc = coeio_pread(file->fd, data, page_info->size, page_info->offset);
 #else
 	int rc = vy_file_pread(file, page_info->offset, data, page_info->size);
@@ -3860,7 +3839,6 @@ struct siread {
 	int has;
 	uint64_t vlsn;
 	struct svmerge merge;
-	int cache_only;
 	int read_disk;
 	int read_cache;
 	struct sv *upsert_v;
@@ -5589,7 +5567,6 @@ si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
 	q->has = 0;
 	q->upsert_v = NULL;
 	q->upsert_eq = 0;
-	q->cache_only = 0;
 	q->read_disk = 0;
 	q->read_cache = 0;
 	q->result = NULL;
@@ -5731,9 +5708,6 @@ next_node:
 		vy_tmp_mem_iterator_open(&s->src, second, q->order, q->key);
 	}
 
-	if (q->cache_only) {
-		return 2;
-	}
 	si_readstat(q, 0, node, 0);
 
 	struct vy_run *run = node->run;
@@ -6625,12 +6599,13 @@ vy_schedule(struct vy_scheduler *scheduler, struct sdc *sdc)
 	return 1; /* success */
 }
 
-static void*
-vy_worker(void *arg)
+static int
+vy_worker(va_list va)
 {
-	struct vy_scheduler *scheduler = (struct vy_scheduler *) arg;
+	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct sdc sdc;
 	sd_cinit(&sdc);
+	coeio_enable();
 	while (pm_atomic_load_explicit(&scheduler->worker_pool_run,
 				       pm_memory_order_relaxed)) {
 		int rc = vy_schedule(scheduler, &sdc);
@@ -6640,7 +6615,7 @@ vy_worker(void *arg)
 			usleep(10000); /* 10ms */
 	}
 	sd_cfree(&sdc);
-	return NULL;
+	return 0;
 }
 
 static void
@@ -6658,8 +6633,8 @@ vy_workers_start(struct vy_scheduler *scheduler)
 		panic("failed to allocate vinyl worker pool");
 	scheduler->worker_pool_run = 1;
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		cord_start(&scheduler->worker_pool[i], "vinyl", vy_worker,
-			   scheduler);
+		cord_costart(&scheduler->worker_pool[i], "vinyl", vy_worker,
+			     scheduler);
 	}
 }
 
@@ -6812,7 +6787,7 @@ sr_zoneof(struct vy_env *env)
 int
 vy_index_read(struct vy_index*, struct vy_tuple*, enum vy_order order,
 		struct vy_tuple **, struct vy_tuple *,
-		struct vy_tx*, bool cache_only);
+		struct vy_tx*);
 static int vy_index_recoverbegin(struct vy_index*);
 static int vy_index_recoverend(struct vy_index*);
 
@@ -7252,8 +7227,7 @@ vy_index_drop(struct vy_index *index)
 int
 vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	      enum vy_order order, struct vy_tuple **result,
-	      struct vy_tuple *upsert, struct vy_tx *tx,
-	      bool cache_only)
+	      struct vy_tuple *upsert, struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
@@ -7264,7 +7238,7 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	}
 
 	/* concurrent */
-	if (cache_only && tx != NULL && order == VINYL_EQ) {
+	if (tx != NULL && order == VINYL_EQ) {
 		assert(upsert == NULL);
 		if ((*result = vy_tx_get(tx, index, key)))
 			return 0;
@@ -7298,7 +7272,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 		q.upsert_v = &sv_vup;
 	}
 	q.upsert_eq = upsert_eq;
-	q.cache_only = cache_only;
 	assert(q.order != VINYL_EQ);
 	int rc = si_range(&q);
 	si_readclose(&q);
@@ -7315,7 +7288,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	} else if (rc == 2) {
 		/* cache miss */
 		assert(q.result == NULL);
-		assert(cache_only);
 		*result = NULL;
 		return 0;
 	}
@@ -7847,7 +7819,7 @@ vy_apply_upsert(struct sv *new_tuple, struct sv *old_tuple,
 		assert(old_ops_end - old_ops == 0);
 		result_tuple = vy_tuple_from_data(index, result_mp,
 						     result_mp_end);
-		fiber_gc(); /* free memory allocated by tuple_upsert_execute */
+		//fiber_gc(); /* free memory allocated by tuple_upsert_execute */
 		if (result_tuple == NULL)
 			return NULL; /* OOM */
 		goto check_key;
@@ -7865,7 +7837,7 @@ vy_apply_upsert(struct sv *new_tuple, struct sv *old_tuple,
 	char *extra;
 	result_tuple = vy_tuple_from_data_ex(index, result_mp,
 		result_mp_end, total_ops_size, &extra);
-	fiber_gc(); /* free memory allocated by tuple_upsert_execute */
+	//fiber_gc(); /* free memory allocated by tuple_upsert_execute */
 	if (result_tuple == NULL)
 		return NULL; /* OOM */
 	extra = mp_encode_uint(extra, ops_series_count);
@@ -8090,90 +8062,6 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 
 /* }}} Public API of transaction control */
 
-/** {{{ vy_read_task - Asynchronous get/cursor I/O using eio pool */
-
-/**
- * A context of asynchronous index get or cursor read.
- */
-struct vy_read_task {
-	struct coio_task base;
-	struct vy_index *index;
-	struct vy_cursor *cursor;
-	struct vy_tx *tx;
-	struct vy_tuple *key;
-	struct vy_tuple *result;
-	struct vy_tuple *upsert;
-};
-
-static ssize_t
-vy_get_cb(struct coio_task *ptr)
-{
-	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	return vy_index_read(task->index, task->key, VINYL_EQ,
-			     &task->result, task->upsert, task->tx, false);
-}
-
-static ssize_t
-vy_cursor_next_cb(struct coio_task *ptr)
-{
-	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	struct vy_cursor *c = task->cursor;
-	return vy_index_read(c->index, c->key, c->order,
-			     &task->result, task->upsert, c->tx, false);
-}
-
-static ssize_t
-vy_read_task_free_cb(struct coio_task *ptr)
-{
-	struct vy_read_task *task = (struct vy_read_task *) ptr;
-	struct vy_env *env = task->index->env;
-	assert(env != NULL);
-	if (task->result != NULL)
-		vy_tuple_unref(task->result);
-	if (task->upsert != NULL)
-		vy_tuple_unref(task->upsert);
-	vy_index_unref(task->index);
-	mempool_free(&env->read_task_pool, task);
-	return 0;
-}
-
-/**
- * Create a thread pool task to run a callback,
- * execute the task, and return the result (tuple) back.
- */
-static inline int
-vy_read_task(struct vy_index *index, struct vy_tx *tx,
-	     struct vy_cursor *cursor, struct vy_tuple *key,
-	     struct vy_tuple **result, struct vy_tuple *upsert,
-	     coio_task_cb func)
-{
-	assert(index != NULL);
-	struct vy_env *env = index->env;
-	assert(env != NULL);
-	struct vy_read_task *task = mempool_alloc(&env->read_task_pool);
-	if (task == NULL) {
-		diag_set(OutOfMemory, sizeof(*task), "mempool", "vy_read_task");
-		return -1;
-	}
-	task->index = index;
-	vy_index_ref(index);
-	task->tx = tx;
-	task->cursor = cursor;
-	task->key = key;
-	task->result = NULL;
-	task->upsert = upsert;
-	if (coio_task(&task->base, func, vy_read_task_free_cb,
-	              TIMEOUT_INFINITY) == -1) {
-		return -1;
-	}
-	vy_index_unref(index);
-	*result = task->result;
-	int rc = task->base.base.result; /* save original error code */
-	mempool_free(&env->read_task_pool, task);
-	assert(rc == 0 || !diag_is_empty(&fiber()->diag));
-	return rc;
-}
-
 /**
  * Find a tuple by key using a thread pool thread.
  */
@@ -8189,15 +8077,10 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 
 	/* Try to look up the tuple in the cache */
 	if (vy_index_read(index, vykey, VINYL_EQ, &vyresult,
-			  NULL, tx, true))
+			  NULL, tx))
 		goto end;
 
-	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
-		/* Cache miss or not found. */
-		if (vy_read_task(index, tx, NULL, vykey, &vyresult,
-				 vyresult, vy_get_cb))
-			goto end;
-	} else if (vy_tuple_is_not_found(vyresult)) {
+	if (vyresult && vy_tuple_is_not_found(vyresult)) {
 		/*
 		 * We deleted this tuple in this
 		 * transaction. No need for a disk lookup.
@@ -8240,15 +8123,10 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 
 	assert(c->key != NULL);
 	if (vy_index_read(index, c->key, c->order, &vyresult,
-			  NULL, c->tx, true))
+			  NULL, c->tx))
 		return -1;
 	c->n_reads++;
-	if (vyresult == NULL || (vyresult->flags & SVUPSERT)) {
-		/* Cache miss. */
-		if (vy_read_task(index, NULL, c, NULL, &vyresult,
-				 vyresult, vy_cursor_next_cb))
-			return -1;
-	} else if (vy_tuple_is_not_found(vyresult)) {
+	if (vyresult && vy_tuple_is_not_found(vyresult)) {
 		/*
 		 * We deleted this tuple in this
 		 * transaction. No need for a disk lookup.
@@ -8285,8 +8163,6 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	return 0;
 }
 
-/** }}} vy_read_task */
-
 /** {{{ Environment */
 
 struct vy_env *
@@ -8319,8 +8195,6 @@ vy_env_new(void)
 	if (e->scheduler == NULL)
 		goto error_6;
 
-	mempool_create(&e->read_task_pool, cord_slab_cache(),
-	               sizeof(struct vy_read_task));
 	mempool_create(&e->cursor_pool, cord_slab_cache(),
 	               sizeof(struct vy_cursor));
 	return e;
@@ -8350,7 +8224,6 @@ vy_env_delete(struct vy_env *e)
 	vy_quota_delete(e->quota);
 	vy_stat_delete(e->stat);
 	vy_sequence_delete(e->seq);
-	mempool_destroy(&e->read_task_pool);
 	mempool_destroy(&e->cursor_pool);
 	free(e);
 }
