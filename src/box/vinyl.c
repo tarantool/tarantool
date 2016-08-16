@@ -1690,20 +1690,6 @@ vy_tuple_ref(struct vy_tuple *tuple);
 static void
 vy_tuple_unref(struct vy_tuple *tuple);
 
-/** This tuple was created for a read request. */
-static bool
-vy_tuple_is_r(struct vy_tuple *tuple)
-{
-	return tuple->flags & SVGET;
-}
-
-/** This tuple was created for a write request. */
-static bool
-vy_tuple_is_w(struct vy_tuple *tuple)
-{
-	return tuple->flags & (SVUPSERT|SVREPLACE|SVDELETE);
-}
-
 /** The tuple, while present in the transaction log, doesn't exist. */
 static bool
 vy_tuple_is_not_found(struct vy_tuple *tuple)
@@ -2786,6 +2772,8 @@ struct txv {
 	rb_node(struct txv) in_read_set;
 	/** Member of the transaction log index. */
 	rb_node(struct txv) in_write_set;
+	/** true for read tx, false for write tx */
+	bool is_read;
 };
 
 typedef rb_tree(struct txv) read_set_t;
@@ -3158,9 +3146,9 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	struct txv *v = read_set_search_key(&index->read_set, key->data,
 					    key->size, tx->tsn);
 	if (v == NULL) {
-		key->flags = SVGET;
 		if ((v = txv_new(index, key, tx)) == NULL)
 			return -1;
+		v->is_read = true;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		read_set_insert(&index->read_set, v);
 	}
@@ -3192,7 +3180,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 	uint32_t count = 0;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		/* Remove from the conflict manager index */
-		if (vy_tuple_is_r(v->tuple))
+		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
@@ -8116,6 +8104,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	} else {
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, tuple, tx);
+		v->is_read = false;
 		write_set_insert(&tx->write_set, v);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
@@ -8233,7 +8222,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
-		if (vy_tuple_is_r(v->tuple))
+		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
@@ -8283,10 +8272,10 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
-		if (vy_tuple_is_r(v->tuple))
+		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
 		/* Remove from the transaction write log. */
-		if (vy_tuple_is_w(v->tuple))
+		if (!v->is_read)
 			write_set_remove(&tx->write_set, v);
 		txv_delete(v);
 	}
