@@ -2783,12 +2783,12 @@ struct txv {
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
 	/** Member of the transaction manager index. */
-	rb_node(struct txv) in_txvindex;
+	rb_node(struct txv) in_read_set;
 	/** Member of the transaction log index. */
-	rb_node(struct txv) in_logindex;
+	rb_node(struct txv) in_write_set;
 };
 
-typedef rb_tree(struct txv) txvindex_t;
+typedef rb_tree(struct txv) read_set_t;
 
 struct vy_index {
 	struct vy_env *env;
@@ -2800,7 +2800,7 @@ struct vy_index {
 	 * the changes made by a transaction are only present
 	 * in this tree, and thus not seen by other transactions.
 	 */
-	txvindex_t txvindex;
+	read_set_t read_set;
 	vy_range_tree_t tree;
 	struct vy_status status;
 	pthread_mutex_t lock;
@@ -2851,13 +2851,13 @@ enum tx_type {
 };
 
 
-struct txvindex_key {
+struct read_set_key {
 	char *data;
 	int size;
 	uint64_t tsn;
 };
 
-typedef rb_tree(struct txv) logindex_t;
+typedef rb_tree(struct txv) write_set_t;
 
 struct vy_tx {
 	/**
@@ -2869,7 +2869,7 @@ struct vy_tx {
 	 * Writes of the transaction segregated by the changed
 	 * vy_index object.
 	 */
-	logindex_t logindex;
+	write_set_t write_set;
 	uint64_t start;
 	enum tx_type     type;
 	enum tx_state    state;
@@ -2945,34 +2945,34 @@ txv_abort(struct txv *v)
 }
 
 static int
-txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b);
+read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b);
 
 static int
-txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b);
+read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b);
 
-rb_gen_ext_key(, txvindex_, txvindex_t, struct txv, in_txvindex, txvindex_cmp,
-		 struct txvindex_key *, txvindex_key_cmp);
+rb_gen_ext_key(, read_set_, read_set_t, struct txv, in_read_set, read_set_cmp,
+		 struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
-txvindex_search_key(txvindex_t *rbtree, char *data, int size, uint64_t tsn)
+read_set_search_key(read_set_t *rbtree, char *data, int size, uint64_t tsn)
 {
-	struct txvindex_key key;
+	struct read_set_key key;
 	key.data = data;
 	key.size = size;
 	key.tsn = tsn;
-	return txvindex_search(rbtree, &key);
+	return read_set_search(rbtree, &key);
 }
 
 static int
-txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b)
+read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, txvindex)->key_def;
+		container_of(rbtree, struct vy_index, read_set)->key_def;
 	int rc = vy_tuple_compare(a->tuple->data, b->tuple->data, key_def);
 	/**
 	 * While in svindex older value are "bigger" than newer
 	 * ones, i.e. the newest value comes first, in
-	 * transactional index (txvindex), we want to look
+	 * transactional index (read_set), we want to look
 	 * at data in chronological order.
 	 * @sa vy_mem_tree_cmp
 	 */
@@ -2982,10 +2982,10 @@ txvindex_cmp(txvindex_t *rbtree, struct txv *a, struct txv *b)
 }
 
 static int
-txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b)
+read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b)
 {
 	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, txvindex)->key_def;
+		container_of(rbtree, struct vy_index, read_set)->key_def;
 	int rc = vy_tuple_compare(a->data, b->tuple->data, key_def);
 	if (rc == 0)
 		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
@@ -2999,14 +2999,14 @@ txvindex_key_cmp(txvindex_t *rbtree, struct txvindex_key *a, struct txv *b)
 static void
 txv_abort_all(struct vy_tx *tx, struct txv *v)
 {
-	txvindex_t *tree = &v->index->txvindex;
+	read_set_t *tree = &v->index->read_set;
 	struct key_def *key_def = v->index->key_def;
-	struct txvindex_key key;
+	struct read_set_key key;
 	key.data = v->tuple->data;
 	key.size = v->tuple->size;
 	key.tsn = 0;
 	/** Find the first value equal to or greater than key */
-	struct txv *abort = txvindex_nsearch(tree, &key);
+	struct txv *abort = read_set_nsearch(tree, &key);
 	while (abort) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_tuple_compare(key.data, abort->tuple->data,
@@ -3015,12 +3015,12 @@ txv_abort_all(struct vy_tx *tx, struct txv *v)
 		/* Don't abort self. */
 		if (abort->tx != tx)
 			txv_abort(abort);
-		abort = txvindex_next(tree, abort);
+		abort = read_set_next(tree, abort);
 	}
 }
 
 static int
-logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
+write_set_cmp(write_set_t *index, struct txv *a, struct txv *b)
 {
 	(void) index;
 	/* Order by index first, by key in the index second. */
@@ -3032,13 +3032,13 @@ logindex_cmp(logindex_t *index, struct txv *a, struct txv *b)
 	return rc;
 }
 
-struct logindex_key {
+struct write_set_key {
 	struct vy_index *index;
 	char *data;
 };
 
 static int
-logindex_key_cmp(logindex_t *index, struct logindex_key *a, struct txv *b)
+write_set_key_cmp(write_set_t *index, struct write_set_key *a, struct txv *b)
 {
 	(void) index;
 	/* Order by index first, by key in the index second. */
@@ -3050,21 +3050,21 @@ logindex_key_cmp(logindex_t *index, struct logindex_key *a, struct txv *b)
 	return rc;
 }
 
-rb_gen_ext_key(, logindex_, logindex_t, struct txv, in_logindex, logindex_cmp,
-	       struct logindex_key *, logindex_key_cmp);
+rb_gen_ext_key(, write_set_, write_set_t, struct txv, in_write_set, write_set_cmp,
+	       struct write_set_key *, write_set_key_cmp);
 
 static struct txv *
-logindex_search_key(logindex_t *tree, struct vy_index *index, char *data)
+write_set_search_key(write_set_t *tree, struct vy_index *index, char *data)
 {
-	struct logindex_key key = { .index = index, .data = data};
-	return logindex_search(tree, &key);
+	struct write_set_key key = { .index = index, .data = data};
+	return write_set_search(tree, &key);
 }
 
 bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
 	return tx->type == VINYL_TX_RO ||
-		tx->logindex.rbt_root == &tx->logindex.rbt_nil;
+		tx->write_set.rbt_root == &tx->write_set.rbt_nil;
 }
 
 typedef rb_tree(struct vy_tx) tx_tree_t;
@@ -3118,7 +3118,7 @@ tx_manager_delete(struct tx_manager *m)
 }
 
 static struct txv *
-txvindex_delete_cb(txvindex_t *t, struct txv *v, void *arg)
+read_set_delete_cb(read_set_t *t, struct txv *v, void *arg)
 {
 	(void) t;
 	(void) arg;
@@ -3130,7 +3130,7 @@ static void
 vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 {
 	stailq_create(&tx->log);
-	logindex_new(&tx->logindex);
+	write_set_new(&tx->write_set);
 	tx->start = clock_monotonic64();
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
@@ -3155,14 +3155,14 @@ int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct vy_tuple *key)
 {
-	struct txv *v = txvindex_search_key(&index->txvindex, key->data,
+	struct txv *v = read_set_search_key(&index->read_set, key->data,
 					    key->size, tx->tsn);
 	if (v == NULL) {
 		key->flags = SVGET;
 		if ((v = txv_new(index, key, tx)) == NULL)
 			return -1;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		txvindex_insert(&index->txvindex, v);
+		read_set_insert(&index->read_set, v);
 	}
 	return 0;
 }
@@ -3193,8 +3193,8 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		/* Remove from the conflict manager index */
 		if (vy_tuple_is_r(v->tuple))
-			txvindex_remove(&v->index->txvindex, v);
-		/* Don't touch logindex, we're deleting all keys. */
+			read_set_remove(&v->index->read_set, v);
+		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 		count++;
 	}
@@ -3210,7 +3210,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 static struct vy_tuple *
 vy_tx_get(struct vy_tx *tx, struct vy_index *index, struct vy_tuple *key)
 {
-	struct txv *v = logindex_search_key(&tx->logindex, index, key->data);
+	struct txv *v = write_set_search_key(&tx->write_set, index, key->data);
 	if (v) {
 		/* Do not track separately our own reads after writes. */
 		vy_tuple_ref(v->tuple);
@@ -6484,7 +6484,7 @@ vy_index_conf_free(struct vy_index_conf *s)
 }
 
 static struct txv *
-si_write(logindex_t *logindex, struct txv *v, uint64_t time,
+si_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	 enum vinyl_status status, uint64_t lsn)
 {
 	struct vy_index *index = v->index;
@@ -6496,7 +6496,7 @@ si_write(logindex_t *logindex, struct txv *v, uint64_t time,
 	vy_index_lock(index);
 	index->update_time = time;
 	for (; v != NULL && v->index == index;
-	     v = logindex_next(logindex, v)) {
+	     v = write_set_next(write_set, v)) {
 
 		struct vy_tuple *tuple = v->tuple;
 		tuple->lsn = lsn;
@@ -7617,7 +7617,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs = 0; /* referenced by scheduler */
 	vy_status_set(&index->status, VINYL_OFFLINE);
-	txvindex_new(&index->txvindex);
+	read_set_new(&index->read_set);
 	rlist_add(&e->indexes, &index->link);
 	return index;
 
@@ -7636,7 +7636,7 @@ error_1:
 static inline void
 vy_index_delete(struct vy_index *index)
 {
-	txvindex_iter(&index->txvindex, NULL, txvindex_delete_cb, NULL);
+	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	rlist_create(&index->gc);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
 	vy_buf_free(&index->readbuf);
@@ -8102,7 +8102,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 {
 	tuple->flags = flags;
 	/* Update concurrent index */
-	struct txv *old = logindex_search_key(&tx->logindex, index,
+	struct txv *old = write_set_search_key(&tx->write_set, index,
 					      tuple->data);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
@@ -8112,7 +8112,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	} else {
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, tuple, tx);
-		logindex_insert(&tx->logindex, v);
+		write_set_insert(&tx->write_set, v);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
 }
@@ -8193,8 +8193,8 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 	}
 	tx->state = VINYL_TX_COMMIT;
 
-	struct txv *v = logindex_first(&tx->logindex);
-	for (; v != NULL; v = logindex_next(&tx->logindex, v))
+	struct txv *v = write_set_first(&tx->write_set);
+	for (; v != NULL; v = write_set_next(&tx->write_set, v))
 		txv_abort_all(tx, v);
 
 	tx_manager_end(tx->manager, tx);
@@ -8219,19 +8219,19 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 
 	/* Flush transactional changes to the index. */
 	uint64_t now = clock_monotonic64();
-	struct txv *v = logindex_first(&tx->logindex);
+	struct txv *v = write_set_first(&tx->write_set);
 
 	/** @todo: check return value of si_write(). */
 	while (v != NULL)
-		v = si_write(&tx->logindex, v, now, e->status, lsn);
+		v = si_write(&tx->write_set, v, now, e->status, lsn);
 
 	uint32_t count = 0;
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
 		if (vy_tuple_is_r(v->tuple))
-			txvindex_remove(&v->index->txvindex, v);
-		/* Don't touch logindex, we're deleting all keys. */
+			read_set_remove(&v->index->read_set, v);
+		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
 	/** Abort all open cursors. */
@@ -8280,10 +8280,10 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
 		if (vy_tuple_is_r(v->tuple))
-			txvindex_remove(&v->index->txvindex, v);
+			read_set_remove(&v->index->read_set, v);
 		/* Remove from the transaction write log. */
 		if (vy_tuple_is_w(v->tuple))
-			logindex_remove(&tx->logindex, v);
+			write_set_remove(&tx->write_set, v);
 		txv_delete(v);
 	}
 }
