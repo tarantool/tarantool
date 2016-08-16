@@ -48,12 +48,13 @@ struct VinylEngine: public Engine {
 	virtual void rollbackStatement(struct txn *txn,
 				       struct txn_stmt *stmt) override;
 	virtual void bootstrap() override;
-	virtual void beginInitialRecovery() override;
+	virtual void beginInitialRecovery(int64_t lsn) override;
 	virtual void beginFinalRecovery() override;
 	virtual void endRecovery() override;
 	virtual void join(struct xstream *stream) override;
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
+	virtual void commitCheckpoint() override;
 public:
 	struct vy_env *env;
 	bool recovery_complete;

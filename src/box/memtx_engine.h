@@ -59,7 +59,7 @@ struct MemtxEngine: public Engine {
 	virtual void prepare(struct txn *txn) override;
 	virtual void commit(struct txn *txn, int64_t signature) override;
 	virtual void bootstrap() override;
-	virtual void beginInitialRecovery() override;
+	virtual void beginInitialRecovery(int64_t lsn) override;
 	virtual void beginFinalRecovery() override;
 	virtual void endRecovery() override;
 	virtual void join(struct xstream *stream) override;
@@ -80,6 +80,7 @@ struct MemtxEngine: public Engine {
 	 * no snapshot.
 	 */
 	int64_t lastCheckpoint(struct vclock *vclock);
+	void recoverSnapshot();
 private:
 	void
 	recoverSnapshotRow(struct xrow_header *row);

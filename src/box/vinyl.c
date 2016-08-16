@@ -84,6 +84,9 @@
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
 
+#include "vclock.h"
+#include "assoc.h"
+
 #define vy_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
@@ -206,18 +209,6 @@ vy_sequence(struct vy_sequence *n, enum vy_sequence_op op)
 	return v;
 }
 
-static void
-vy_path_init(char *p, char *dir, uint64_t id, char *ext)
-{
-	snprintf(p, PATH_MAX, "%s/%020"PRIu64"%s", dir, id, ext);
-}
-
-static void
-vy_path_compound(char *p, char *dir, uint64_t a, uint64_t b, char *ext)
-{
-	snprintf(p, PATH_MAX, "%s/%020"PRIu64".%020"PRIu64"%s", dir, a, b, ext);
-}
-
 struct vy_iov {
 	struct iovec *v;
 	int iovmax;
@@ -316,7 +307,7 @@ vy_file_open(struct vy_file *f, char *path) {
 
 static inline int
 vy_file_new(struct vy_file *f, char *path) {
-	return vy_file_open_as(f, path, O_RDWR|O_CREAT);
+	return vy_file_open_as(f, path, O_RDWR|O_CREAT|O_TRUNC);
 }
 
 static inline int
@@ -2498,7 +2489,6 @@ struct PACKED vy_range {
 	struct rlist     commit;
 };
 
-
 typedef rb_tree(struct vy_range) vy_range_tree_t;
 
 struct vy_index_conf {
@@ -2602,6 +2592,9 @@ struct vy_index {
 	bool age_in_progress;
 	bool gc_in_progress;
 	/* Scheduler members }}} */
+
+	int64_t first_dump_lsn;
+	int64_t last_dump_range_id;
 };
 
 
@@ -3464,6 +3457,11 @@ static int sd_recover_complete(struct sdrecover *ri)
 static void vy_index_conf_init(struct vy_index_conf*);
 static void vy_index_conf_free(struct vy_index_conf*);
 
+static int
+vy_index_dump_range_index(struct vy_index *index);
+static int
+vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn);
+
 static inline void
 vy_run_init(struct vy_run *run)
 {
@@ -3638,13 +3636,12 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
-vy_range_open(struct vy_range*, struct vy_env*, char *);
+vy_range_open(struct vy_index*, struct vy_range*, char *);
 static int
-vy_range_create(struct vy_range*, struct vy_index_conf*, struct sdid*);
+vy_range_create(struct vy_range*, struct vy_index*, struct sdid*);
 static int vy_range_free(struct vy_range*, int);
 static int vy_range_gc_index(struct vy_mem *);
-static int vy_range_seal(struct vy_range*, struct vy_index_conf*);
-static int vy_range_complete(struct vy_range*, struct vy_index_conf*);
+static int vy_range_complete(struct vy_range*, struct vy_index*);
 
 static inline void
 vy_range_lock(struct vy_range *node) {
@@ -3926,8 +3923,6 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 }
 
 static int vy_task_index_drop(struct vy_index*);
-static int vy_index_dropmark(struct vy_index*);
-static int vy_index_droprepository(char*, int);
 
 static int
 si_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
@@ -3937,105 +3932,6 @@ static int vy_dump(struct vy_index*, struct sdc*, struct vy_range*, int64_t);
 static int
 si_compact(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
 	   struct vy_iter*, uint64_t);
-
-typedef rb_tree(struct vy_range) vy_range_id_tree_t;
-
-static int
-vy_range_id_tree_cmp(vy_range_id_tree_t *rbtree, struct vy_range *a, struct vy_range *b)
-{
-	(void)rbtree;
-	return vy_cmp(a->self.id.id, b->self.id.id);
-}
-
-static int
-vy_range_id_tree_key_cmp(vy_range_id_tree_t *rbtree, const char *a, struct vy_range *b)
-{
-	(void)rbtree;
-	return vy_cmp((int64_t)load_u64(a), b->self.id.id);
-}
-
-rb_gen_ext_key(, vy_range_id_tree_, vy_range_id_tree_t, struct vy_range,
-		 tree_node, vy_range_id_tree_cmp, const char *,
-		 vy_range_id_tree_key_cmp);
-
-struct vy_range *
-vy_range_id_tree_free_cb(vy_range_id_tree_t *t, struct vy_range * n, void *arg)
-{
-	(void)t;
-	(void)arg;
-	vy_range_free(n, 0);
-	return NULL;
-}
-
-struct sitrack {
-	vy_range_id_tree_t tree;
-	int count;
-	int64_t nsn;
-	int64_t lsn;
-};
-
-static inline void
-si_trackinit(struct sitrack *t)
-{
-	vy_range_id_tree_new(&t->tree);
-	t->count = 0;
-	t->nsn = 0;
-	t->lsn = 0;
-}
-
-static inline void
-si_trackfree(struct sitrack *t)
-{
-	vy_range_id_tree_iter(&t->tree, NULL, vy_range_id_tree_free_cb, NULL);
-#ifndef NDEBUG
-	t->tree.rbt_root = (struct vy_range *)(intptr_t)0xDEADBEEF;
-#endif
-}
-
-static inline void
-si_trackmetrics(struct sitrack *t, struct vy_range *n)
-{
-	struct vy_run *run = n->run;
-	while (run != NULL) {
-		struct vy_page_index_header *h = &run->index.header;
-		if (run->id.parent > t->nsn)
-			t->nsn = run->id.parent;
-		if (run->id.id > t->nsn)
-			t->nsn = run->id.id;
-		if (h->lsnmin != INT64_MAX && h->lsnmin > t->lsn)
-			t->lsn = h->lsnmin;
-		if (h->lsnmax > t->lsn)
-			t->lsn = h->lsnmax;
-		run = run->next;
-	}
-}
-
-static inline void
-si_tracknsn(struct sitrack *t, int64_t nsn)
-{
-	if (t->nsn < nsn)
-		t->nsn = nsn;
-}
-
-static inline void
-si_trackset(struct sitrack *t, struct vy_range *n)
-{
-	vy_range_id_tree_insert(&t->tree, n);
-	t->count++;
-}
-
-static inline struct vy_range*
-si_trackget(struct sitrack *t, uint64_t id)
-{
-	return vy_range_id_tree_search(&t->tree, (const char *)&id);
-}
-
-static inline void
-si_trackreplace(struct sitrack *t, struct vy_range *o, struct vy_range *n)
-{
-	vy_range_id_tree_remove(&t->tree, o);
-	vy_range_id_tree_insert(&t->tree, n);
-}
 
 static int
 si_insert(struct vy_index *index, struct vy_range *range)
@@ -4487,81 +4383,6 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	return rc;
 }
 
-static int vy_index_droprepository(char *repo, int drop_directory)
-{
-	DIR *dir = opendir(repo);
-	if (dir == NULL) {
-		vy_error("directory '%s' open error: %s",
-		               repo, strerror(errno));
-		return -1;
-	}
-	char path[1024];
-	int rc;
-	struct dirent *de;
-	while ((de = readdir(dir))) {
-		if (de->d_name[0] == '.')
-			continue;
-		/* skip drop file */
-		if (unlikely(strcmp(de->d_name, "drop") == 0))
-			continue;
-		snprintf(path, sizeof(path), "%s/%s", repo, de->d_name);
-		rc = unlink(path);
-		if (unlikely(rc == -1)) {
-			vy_error("index file '%s' unlink error: %s",
-			               path, strerror(errno));
-			closedir(dir);
-			return -1;
-		}
-	}
-	closedir(dir);
-
-	snprintf(path, sizeof(path), "%s/drop", repo);
-	rc = unlink(path);
-	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' unlink error: %s",
-		               path, strerror(errno));
-		return -1;
-	}
-	if (drop_directory) {
-		rc = rmdir(repo);
-		if (unlikely(rc == -1)) {
-			vy_error("directory '%s' unlink error: %s",
-			               repo, strerror(errno));
-			return -1;
-		}
-		char space_path[PATH_MAX];
-		char *last_path_sep = strrchr(repo, '/');
-		if (last_path_sep) {
-			int len = last_path_sep - repo + 1;
-			snprintf(space_path, len, "%s", repo);
-			rc = rmdir(space_path);
-			if (unlikely(rc == -1)) {
-				vy_error("directory '%s' unlink error: %s",
-				         space_path, strerror(errno));
-				return -1;
-			}
-		}
-	}
-	return 0;
-}
-
-static int vy_index_dropmark(struct vy_index *i)
-{
-	/* create drop file */
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
-	struct vy_file drop;
-	vy_file_init(&drop);
-	int rc = vy_file_new(&drop, path);
-	if (unlikely(rc == -1)) {
-		vy_error("drop file '%s' create error: %s",
-		               path, strerror(errno));
-		return -1;
-	}
-	vy_file_close(&drop);
-	return 0;
-}
-
 static int vy_task_index_drop(struct vy_index *index)
 {
 	struct vy_range *node, *n;
@@ -4569,9 +4390,6 @@ static int vy_task_index_drop(struct vy_index *index)
 		if (vy_range_free(node, 1) != 0)
 			return -1;
 	}
-	/* remove directory */
-	if (vy_index_droprepository(index->conf.path, 1) != 0)
-		return -1;
 	/* free memory */
 	vy_index_delete(index);
 	return 0;
@@ -4725,7 +4543,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 			.flags  = 0,
 			.id     = vy_sequence(index->env->seq, VINYL_NSN_NEXT)
 		};
-		rc = vy_range_create(n, &index->conf, &id);
+		rc = vy_range_create(n, index, &id);
 		if (unlikely(rc == -1))
 			goto error;
 		n->run = &n->self;
@@ -4857,23 +4675,6 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	/* compaction completion */
 
-	/* seal nodes */
-	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiter_has(&i))
-	{
-		n  = vy_bufiterref_get(&i);
-		rc = vy_range_seal(n, &index->conf);
-		if (unlikely(rc == -1)) {
-			vy_range_free(range, 0);
-			return -1;
-		}
-		VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_3,
-		             vy_range_free(range, 0);
-		             vy_error("%s", "error injection");
-		             return -1);
-		vy_bufiter_next(&i);
-	}
-
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
 	             vy_range_free(range, 0);
 	             vy_error("%s", "error injection");
@@ -4892,7 +4693,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	while (vy_bufiter_has(&i))
 	{
 		n = vy_bufiterref_get(&i);
-		rc = vy_range_complete(n, &index->conf);
+		rc = vy_range_complete(n, index);
 		if (unlikely(rc == -1))
 			return -1;
 		VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_4,
@@ -4911,6 +4712,16 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		vy_bufiter_next(&i);
 	}
 	vy_index_unlock(index);
+
+	if (vy_index_dump_range_index(index)) {
+		/*
+		 * @todo: we should roll back the failed dump
+		 * first, but it requires a redesign of the index
+		 * change function.
+		 */
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -5021,37 +4832,61 @@ e1:
 	return -1;
 }
 
-static int
-vy_range_open(struct vy_range *n, struct vy_env *env, char *path)
+int
+vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 {
-	int rc = vy_file_open(&n->file, path);
+	int rc = vy_file_open(&range->file, path);
 	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' open error: %s "
-		               "(please ensure storage version compatibility)",
-		               n->file.path,
-		               strerror(errno));
+		vy_error("index file '%s' open error: %s ",
+		         path, strerror(errno));
 		return -1;
 	}
-	rc = vy_file_seek(&n->file, n->file.size);
+	rc = vy_file_seek(&range->file, range->file.size);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' seek error: %s",
-		               n->file.path,
+		               range->file.path,
 		               strerror(errno));
 		return -1;
 	}
-	rc = vy_range_recover(n, env);
+	rc = vy_range_recover(range, index->env);
 	if (unlikely(rc == -1))
 		return -1;
+
+	/* Attach range to the index and update statistics. */
+	si_insert(index, range);
+	index->size += vy_range_size(range);
+	/*
+	 * Update the global view LSN from the state of this
+	 * range. It is assumed that the global LSN is
+	 * max(run lsnmax) over all runs.
+	 * @todo: this code is buggy if we restart after
+	 * a failed join, and is overall very fragile.
+	 * @todo remove global NSN.
+	 */
+	struct vy_run *run = range->run;
+	while (run) {
+		if (index->env->seq->lsn < run->index.header.lsnmax)
+			index->env->seq->lsn = run->index.header.lsnmax;
+		if (index->env->seq->nsn < run->id.id)
+			index->env->seq->nsn = run->id.id;
+		run = run->next;
+	}
+	vy_planner_update(&index->p, range);
+
 	return 0;
 }
 
 static int
-vy_range_create(struct vy_range *n, struct vy_index_conf *scheme,
-	      struct sdid *id)
+vy_range_create(struct vy_range *n, struct vy_index *index,
+		struct sdid *id)
 {
+	/*
+	 * TODO: don't create any range file until range
+	 * have at least one record
+	 */
 	char path[PATH_MAX];
-	vy_path_compound(path, scheme->path, id->parent, id->id,
-	                ".index.incomplete");
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".range",
+		 index->conf.path, id->parent, id->id);
 	int rc = vy_file_new(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' create error: %s",
@@ -5078,16 +4913,6 @@ static int vy_range_free(struct vy_range *n, int gc)
 {
 	int rcret = 0;
 	int rc;
-	if (gc && n->file.path[0]) {
-		vy_file_advise(&n->file, 0, 0, n->file.size);
-		rc = unlink(n->file.path);
-		if (unlikely(rc == -1)) {
-			vy_error("index file '%s' unlink error: %s",
-			               n->file.path,
-			               strerror(errno));
-			rcret = -1;
-		}
-	}
 	vy_range_free_runs(n);
 	rc = vy_range_close(n,gc);
 	if (unlikely(rc == -1))
@@ -5096,37 +4921,12 @@ static int vy_range_free(struct vy_range *n, int gc)
 	return rcret;
 }
 
-static int vy_range_seal(struct vy_range *n, struct vy_index_conf *scheme)
-{
-	int rc;
-	if (scheme->sync) {
-		rc = vy_file_sync(&n->file);
-		if (unlikely(rc == -1)) {
-			vy_error("index file '%s' sync error: %s",
-			               n->file.path,
-			               strerror(errno));
-			return -1;
-		}
-	}
-	char path[PATH_MAX];
-	vy_path_compound(path, scheme->path,
-	                n->self.id.parent, n->self.id.id,
-	                ".index.seal");
-	rc = vy_file_rename(&n->file, path);
-	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' rename error: %s",
-		               n->file.path,
-		               strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
 static int
-vy_range_complete(struct vy_range *n, struct vy_index_conf *scheme)
+vy_range_complete(struct vy_range *n, struct vy_index *index)
 {
 	char path[PATH_MAX];
-	vy_path_init(path, scheme->path, n->self.id.id, ".index");
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
+		 index->conf.path, n->self.id.id);
 	int rc = vy_file_rename(&n->file, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
@@ -5806,33 +5606,6 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 	return 0;
 }
 
-/*
-	repository recover states
-	-------------------------
-
-	compaction
-
-	000000001.000000002.index.incomplete  (1)
-	000000001.000000002.index.seal        (2)
-	000000002.index                       (3)
-	000000001.000000003.index.incomplete
-	000000001.000000003.index.seal
-	000000003.index
-	(4)
-
-	1. remove incomplete, mark parent as having incomplete
-	2. find parent, mark as having seal
-	3. add
-	4. recover:
-		a. if parent has incomplete and seal - remove both
-		b. if parent has incomplete - remove incomplete
-		c. if parent has seal - remove parent, complete seal
-
-	see: snapshot recover
-	see: key_def recover
-	see: test/crash/durability.test.c
-*/
-
 static struct vy_range *
 si_bootstrap(struct vy_index *index, uint64_t parent)
 {
@@ -5847,7 +5620,7 @@ si_bootstrap(struct vy_index *index, uint64_t parent)
 		.id     = vy_sequence(env->seq, VINYL_NSN_NEXT)
 	};
 	int rc;
-	rc = vy_range_create(n, &index->conf, &id);
+	rc = vy_range_create(n, index, &id);
 	if (unlikely(rc == -1))
 		goto e0;
 	n->run = &n->self;
@@ -5867,31 +5640,43 @@ e0:
 	return NULL;
 }
 
-static inline int
-si_deploy(struct vy_index *index, int create_directory)
+/**
+ * Create an index directory for a new index.
+ * TODO: create index files only after the WAL
+ * record is committed.
+ */
+static int
+vy_index_create(struct vy_index *index)
 {
 	/* create directory */
 	int rc;
-	if (likely(create_directory)) {
-		char space_path[PATH_MAX];
-		char *last_path_sep = strrchr(index->conf.path, '/');
-		if (last_path_sep) {
-			int len = last_path_sep - index->conf.path + 1;
-			snprintf(space_path, len, "%s", index->conf.path);
-			rc = mkdir(space_path, 0777);
-			if (unlikely(rc == -1) && errno != EEXIST) {
-				vy_error("directory '%s' create error: %s",
-				               space_path, strerror(errno));
-				return -1;
-			}
-		}
+	char *path_sep = index->conf.path;
+	while (*path_sep == '/') {
+		/* Don't create root */
+		++path_sep;
+	}
+	while ((path_sep = strchr(path_sep, '/'))) {
+		/* Recursively create path hierarchy */
+		*path_sep = '\0';
 		rc = mkdir(index->conf.path, 0777);
-		if (unlikely(rc == -1)) {
+		if (rc == -1 && errno != EEXIST) {
 			vy_error("directory '%s' create error: %s",
-			               index->conf.path, strerror(errno));
+		                 index->conf.path, strerror(errno));
+			*path_sep = '/';
 			return -1;
 		}
+		*path_sep = '/';
+		++path_sep;
 	}
+	rc = mkdir(index->conf.path, 0777);
+	if (rc == -1 && errno != EEXIST) {
+		vy_error("directory '%s' create error: %s",
+	                 index->conf.path, strerror(errno));
+		return -1;
+	}
+
+	index->first_dump_lsn = 0;
+	index->last_dump_range_id = 0;
 	/* create initial node */
 	struct vy_range *n = si_bootstrap(index, 0);
 	if (unlikely(n == NULL))
@@ -5900,7 +5685,7 @@ si_deploy(struct vy_index *index, int create_directory)
 	             vy_range_free(n, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
-	rc = vy_range_complete(n, &index->conf);
+	rc = vy_range_complete(n, index);
 	if (unlikely(rc == -1)) {
 		vy_range_free(n, 1);
 		return -1;
@@ -5911,330 +5696,129 @@ si_deploy(struct vy_index *index, int create_directory)
 	return 1;
 }
 
-static inline int64_t
-si_processid(char **str)
-{
-	char *s = *str;
-	size_t v = 0;
-	while (*s && *s != '.') {
-		if (unlikely(! isdigit(*s)))
-			return -1;
-		v = (v * 10) + *s - '0';
-		s++;
-	}
-	*str = s;
-	return v;
-}
-
-static inline int
-si_process(char *name, int64_t *nsn, int64_t *parent)
-{
-	/* id.index */
-	/* id.id.index.incomplete */
-	/* id.id.index.seal */
-	/* id.id.index.gc */
-	char *token = name;
-	int64_t id = si_processid(&token);
-	if (unlikely(id == -1))
-		return -1;
-	*parent = id;
-	*nsn = id;
-	if (strcmp(token, ".index") == 0)
-		return SI_RDB;
-	else
-	if (strcmp(token, ".index.gc") == 0)
-		return SI_RDB_REMOVE;
-	if (unlikely(*token != '.'))
-		return -1;
-	token++;
-	id = si_processid(&token);
-	if (unlikely(id == -1))
-		return -1;
-	*nsn = id;
-	if (strcmp(token, ".index.incomplete") == 0)
-		return SI_RDB_DBI;
-	else
-	if (strcmp(token, ".index.seal") == 0)
-		return SI_RDB_DBSEAL;
-	return -1;
-}
-
-static inline int
-si_trackdir(struct sitrack *track, struct vy_env *env, struct vy_index *i)
-{
-	DIR *dir = opendir(i->conf.path);
-	if (unlikely(dir == NULL)) {
-		vy_error("directory '%s' open error: %s",
-			 i->conf.path, strerror(errno));
-		return -1;
-	}
-	struct dirent *de;
-	while ((de = readdir(dir))) {
-		if (unlikely(de->d_name[0] == '.'))
-			continue;
-		int64_t id_parent = 0;
-		int64_t id = 0;
-		int rc = si_process(de->d_name, &id, &id_parent);
-		if (unlikely(rc == -1))
-			continue; /* skip unknown file */
-		si_tracknsn(track, id_parent);
-		si_tracknsn(track, id);
-
-		struct vy_range *head, *node;
-		char path[PATH_MAX];
-		switch (rc) {
-		case SI_RDB_DBI:
-		case SI_RDB_DBSEAL: {
-			/* find parent node and mark it as having
-			 * incomplete compaction process */
-			head = si_trackget(track, id_parent);
-			if (likely(head == NULL)) {
-				head = vy_range_new(i->key_def);
-				if (unlikely(head == NULL))
-					goto error;
-				head->self.id.id = id_parent;
-				head->recover = SI_RDB_UNDEF;
-				si_trackset(track, head);
-			}
-			head->recover |= rc;
-			/* remove any incomplete file made during compaction */
-			if (rc == SI_RDB_DBI) {
-				vy_path_compound(path, i->conf.path, id_parent, id,
-				                ".index.incomplete");
-				rc = unlink(path);
-				if (unlikely(rc == -1)) {
-					vy_error("index file '%s' unlink error: %s",
-						 path, strerror(errno));
-					goto error;
-				}
-				continue;
-			}
-			assert(rc == SI_RDB_DBSEAL);
-			/* recover 'sealed' node */
-			node = vy_range_new(i->key_def);
-			if (unlikely(node == NULL))
-				goto error;
-			node->recover = SI_RDB_DBSEAL;
-			vy_path_compound(path, i->conf.path, id_parent, id,
-			                ".index.seal");
-			rc = vy_range_open(node, env, path);
-			if (unlikely(rc == -1)) {
-				vy_range_free(node, 0);
-				goto error;
-			}
-			si_trackset(track, node);
-			si_trackmetrics(track, node);
-			continue;
-		}
-		case SI_RDB_REMOVE:
-			vy_path_init(path, i->conf.path, id, ".index.gc");
-			rc = unlink(path);
-			if (unlikely(rc == -1)) {
-				vy_error("index file '%s' unlink error: %s",
-					 path, strerror(errno));
-				goto error;
-			}
-			continue;
-		}
-		assert(rc == SI_RDB);
-
-		head = si_trackget(track, id);
-		if (head != NULL && (head->recover & SI_RDB)) {
-			/* loaded by snapshot */
-			continue;
-		}
-
-		/* recover node */
-		node = vy_range_new(i->key_def);
-		if (unlikely(node == NULL))
-			goto error;
-		node->recover = SI_RDB;
-		vy_path_init(path, i->conf.path, id, ".index");
-		rc = vy_range_open(node, env, path);
-		if (unlikely(rc == -1)) {
-			vy_range_free(node, 0);
-			goto error;
-		}
-		si_trackmetrics(track, node);
-
-		/* track node */
-		if (likely(head == NULL)) {
-			si_trackset(track, node);
-		} else {
-			/* replace a node previously created by a
-			 * incomplete compaction */
-			si_trackreplace(track, head, node);
-			head->recover &= ~SI_RDB_UNDEF;
-			node->recover |= head->recover;
-			vy_range_free(head, 0);
-		}
-	}
-	closedir(dir);
-	return 0;
-error:
-	closedir(dir);
-	return -1;
-}
-
-static inline int
-si_trackvalidate(struct sitrack *track, struct vy_buf *buf, struct vy_index *i)
-{
-	vy_buf_reset(buf);
-	struct vy_range *n = vy_range_id_tree_last(&track->tree);
-	while (n) {
-		switch (n->recover) {
-		case SI_RDB|SI_RDB_DBI|SI_RDB_DBSEAL|SI_RDB_REMOVE:
-		case SI_RDB|SI_RDB_DBSEAL|SI_RDB_REMOVE:
-		case SI_RDB|SI_RDB_REMOVE:
-		case SI_RDB_UNDEF|SI_RDB_DBSEAL|SI_RDB_REMOVE:
-		case SI_RDB|SI_RDB_DBI|SI_RDB_DBSEAL:
-		case SI_RDB|SI_RDB_DBI:
-		case SI_RDB:
-		case SI_RDB|SI_RDB_DBSEAL:
-		case SI_RDB_UNDEF|SI_RDB_DBSEAL: {
-			/* match and remove any leftover ancestor */
-			struct vy_range *ancestor = si_trackget(track, n->self.id.parent);
-			if (ancestor && (ancestor != n))
-				ancestor->recover |= SI_RDB_REMOVE;
-			break;
-		}
-		case SI_RDB_DBSEAL: {
-			/* find parent */
-			struct vy_range *parent = si_trackget(track, n->self.id.parent);
-			if (parent) {
-				/* schedule node for removal, if has incomplete merges */
-				if (parent->recover & SI_RDB_DBI)
-					n->recover |= SI_RDB_REMOVE;
-				else
-					parent->recover |= SI_RDB_REMOVE;
-			}
-			if (! (n->recover & SI_RDB_REMOVE)) {
-				/* complete node */
-				int rc = vy_range_complete(n, &i->conf);
-				if (unlikely(rc == -1))
-					return -1;
-				n->recover = SI_RDB;
-			}
-			break;
-		}
-		default:
-			/* corrupted states */
-			return vy_error("corrupted index repository: %s",
-					i->conf.path);
-		}
-		n = vy_range_id_tree_prev(&track->tree, n);
-	}
-	return 0;
-}
-
-static inline int
-si_recovercomplete(struct sitrack *track, struct vy_index *index, struct vy_buf *buf)
-{
-	/* prepare and build primary index */
-	vy_buf_reset(buf);
-	struct vy_range *n = vy_range_id_tree_first(&track->tree);
-	while (n) {
-		int rc = vy_buf_add(buf, &n, sizeof(struct vy_range*));
-		if (unlikely(rc == -1))
-			return -1;
-		n = vy_range_id_tree_next(&track->tree, n);
-	}
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, buf, sizeof(struct vy_range*));
-	while (vy_bufiter_has(&i))
-	{
-		struct vy_range *n = vy_bufiterref_get(&i);
-		if (n->recover & SI_RDB_REMOVE) {
-			int rc = vy_range_free(n, 1);
-			if (unlikely(rc == -1))
-				return -1;
-			vy_bufiter_next(&i);
-			continue;
-		}
-		n->recover = SI_RDB;
-		si_insert(index, n);
-		vy_planner_update(&index->p, n);
-		vy_bufiter_next(&i);
-	}
-	return 0;
-}
-
-static inline void
-si_recoversize(struct vy_index *i)
-{
-	struct vy_range *n = vy_range_tree_first(&i->tree);
-	while (n) {
-		i->size += vy_range_size(n);
-		n = vy_range_tree_next(&i->tree, n);
-	}
-}
-
-static inline int
-si_recoverindex(struct vy_index *index, struct vy_env *env)
-{
-	struct sitrack track;
-	si_trackinit(&track);
-	struct vy_buf buf;
-	vy_buf_init(&buf);
-	int rc;
-	rc = si_trackdir(&track, env, index);
-	if (unlikely(rc == -1))
-		goto error;
-	if (unlikely(track.count == 0))
-		return 1;
-	rc = si_trackvalidate(&track, &buf, index);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = si_recovercomplete(&track, index, &buf);
-	if (unlikely(rc == -1))
-		goto error;
-	/* set actual metrics */
-	if (track.nsn > env->seq->nsn)
-		env->seq->nsn = track.nsn;
-	if (track.lsn > env->seq->lsn)
-		env->seq->lsn = track.lsn;
-	si_recoversize(index);
-	vy_buf_free(&buf);
-	return 0;
-error:
-	vy_buf_free(&buf);
-	si_trackfree(&track);
-	return -1;
-}
-
-static inline int
-si_recoverdrop(struct vy_index *i)
-{
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
-	int rc = path_exists(path);
-	if (likely(! rc))
-		return 0;
-	rc = vy_index_droprepository(i->conf.path, 0);
-	if (unlikely(rc == -1))
-		return -1;
-	return 1;
-}
-
+/**
+ * A quick intro into Vinyl cosmology and file format
+ * --------------------------------------------------
+ * A single vinyl index on disk consists of a set of "range"
+ * objects. A range contains a sorted set of index keys;
+ * keys in different ranges do not overlap, for example:
+ * [0..100],[103..252],[304..360]
+ *
+ * The sorted set of keys in a range is called a run. A single
+ * range may contain multiple runs, each run contains changes of
+ * keys in the range over a certain period of time. The periods do
+ * not overlap, while, of course, two runs of the same range may
+ * contain changes of the same key.
+ * All keys in a run are sorted and split between pages of
+ * approximately equal size. The purpose of putting keys into
+ * pages is a quicker key lookup, since (min,max) key of every
+ * page is put into the page index, stored at the beginning of each
+ * run. The page index of an active run is fully cached in RAM.
+ *
+ * All files of an index have the following name pattern:
+ * <lsn>.<range_id>.index
+ * and are stored together in the index directory.
+ *
+ * The <lsn> component represents LSN of index creation: it is used
+ * to distinguish between different "incarnations" of the same index,
+ * e.g. on create/drop events. In a most common case LSN is the
+ * same for all files in an index.
+ *
+ * <range_id> component represents the id of the range in an
+ * index. The id is a monotonically growing integer, and is
+ * assigned to a range when it's created.  The header file of each
+ * range contains a full list of range ids of all ranges known to
+ * the index when this last range file was created. Thus by
+ * navigating to the latest range and reading its range directory,
+ * we can find out ids of all remaining ranges of the index and
+ * open them.
+ */
 static int
-si_recover(struct vy_index *i)
+vy_index_open_ex(struct vy_index *index)
 {
-	struct vy_env *env = i->env;
-	int exist = path_exists(i->conf.path);
-	if (exist == 0)
-		goto deploy;
-	int rc = si_recoverdrop(i);
-	switch (rc) {
-	case -1: return -1;
-	case  1: goto deploy;
-	}
-	if (unlikely(rc == -1))
+	/*
+	 * The main index file name has format <lsn>.<range_id>.index.
+	 * Load the index with the greatest LSN (but at least
+	 * as new as the current view LSN, to skip dropped
+	 * indexes) and choose the maximal range_id among
+	 * ranges within the same LSN.
+	 */
+	int64_t first_dump_lsn = INT64_MAX;
+	int64_t last_dump_range_id = 0;
+	DIR *index_dir;
+	index_dir = opendir(index->conf.path);
+	if (!index_dir) {
+		vy_error("Can't open dir %s", index->conf.path);
 		return -1;
-	rc = si_recoverindex(i, env);
-	if (likely(rc <= 0))
-		return rc;
-deploy:
-	return si_deploy(i, !exist);
+	}
+	struct dirent *dirent;
+	while ((dirent = readdir(index_dir))) {
+		if (!strstr(dirent->d_name, ".index"))
+			continue;
+		int64_t index_lsn;
+		int64_t range_id;
+		if (sscanf(dirent->d_name, "%"SCNx64".%"SCNx64,
+			   &index_lsn, &range_id) != 2)
+			continue;
+		/*
+		 * Find the newest range in the last incarnation
+		 * of this index.
+		 */
+		if (index_lsn < index->env->seq->lsn)
+			continue;
+		if (index_lsn < first_dump_lsn) {
+			first_dump_lsn = index_lsn;
+			last_dump_range_id = range_id;
+		} else if (index_lsn == first_dump_lsn &&
+			   last_dump_range_id < range_id) {
+			last_dump_range_id = range_id;
+		}
+	}
+	closedir(index_dir);
+
+	if (first_dump_lsn == INT64_MAX) {
+		vy_error("No matching index files found for the current LSN"
+			 " in path %s", index->conf.path);
+		return -1;
+	}
+
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+		 index->conf.path, first_dump_lsn, last_dump_range_id);
+	int fd = open(path, O_RDWR);
+	if (fd == -1) {
+		vy_error("Can't open index file %s: %s",
+			 path, strerror(errno));
+		return -1;
+	}
+
+	int64_t range_id;
+	int size;
+	while ((size = read(fd, &range_id, sizeof(range_id)) ==
+		sizeof(range_id))) {
+		struct vy_range *range = vy_range_new(index->key_def);
+		if (!range) {
+			vy_error("%s", "Can't alloc range");
+			break;
+		}
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
+			 index->conf.path, range_id);
+		if (vy_range_open(index, range, path)) {
+			vy_error("Can't open range %s path", path);
+			vy_range_free(range, 0);
+			break;
+		}
+	}
+
+	close(fd);
+	if (size != 0) {
+		vy_error("Corrupted index file %s", path);
+		return -1;
+	}
+	index->first_dump_lsn = first_dump_lsn;
+	index->last_dump_range_id = last_dump_range_id;
+
+	return 0;
 }
 
 static void
@@ -6315,6 +5899,14 @@ si_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	vy_index_unlock(index);
 	/* Take quota after having unlocked the index mutex. */
 	vy_quota_op(env->quota, VINYL_QADD, quota);
+	if (!index->first_dump_lsn) {
+		/*
+		 * It's the first time we write anything out for
+		 * this index.  Adjust index creation LSN.
+		 */
+		index->first_dump_lsn = lsn;
+		vy_index_dump_range_index(index);
+	}
 	return v;
 }
 
@@ -6337,6 +5929,7 @@ struct vy_scheduler {
 	struct cord *worker_pool;
 	int worker_pool_size;
 	volatile int worker_pool_run;
+	struct vclock checkpoint_vclock;
 };
 
 static void
@@ -6452,7 +6045,7 @@ vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
 		rc = vy_planner_peek_checkpoint(index,
 			scheduler->checkpoint_lsn, task);
 		if (rc != 0)
-			return rc; /* found or error */
+			return rc;
 	}
 
 	/* garbage-collection */
@@ -6677,16 +6270,116 @@ vy_checkpoint(struct vy_env *env)
 }
 
 void
-vy_wait_checkpoint(struct vy_env *env)
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
+	scheduler->checkpoint_vclock = *vclock;
 	for (;;) {
 		tt_pthread_mutex_lock(&scheduler->lock);
-		bool is_active = scheduler->checkpoint_in_progress;
+		bool is_active = false;
+		for (int i = 0; i < scheduler->count; i++) {
+			struct vy_index *index = scheduler->indexes[i];
+			is_active |= index->checkpoint_in_progress;
+		}
 		tt_pthread_mutex_unlock(&scheduler->lock);
 		if (!is_active)
 			break;
 		fiber_sleep(.020);
+	}
+}
+
+/**
+ * Unlink old ranges - i.e. ranges which are not relevant
+ * any more because of a passed range split, or create/drop
+ * index.
+ */
+static void
+vy_index_gc(struct vy_index *index)
+{
+	struct mh_i32ptr_t *ranges = NULL;
+	DIR *dir = NULL;
+	ranges = mh_i32ptr_new();
+
+	if (ranges == NULL)
+		goto error;
+	/*
+	 * Construct a hash map of existing ranges, to quickly
+	 * find a valid range by range id.
+	 */
+	struct vy_range *range = vy_range_tree_first(&index->tree);
+	while (range) {
+		const struct mh_i32ptr_node_t node = {range->self.id.id, range};
+		struct mh_i32ptr_node_t old, *p_old = &old;
+		mh_int_t k = mh_i32ptr_put(ranges, &node, &p_old, NULL);
+		if (k == mh_end(ranges))
+			goto error;
+		range = vy_range_tree_next(&index->tree, range);
+	}
+	/*
+	 * Scan the index directory and unlink files not
+	 * referenced from any valid range.
+	 */
+	dir = opendir(index->conf.path);
+	if (dir == NULL)
+		goto error;
+	struct dirent *dirent;
+	/**
+	 * @todo: only remove files matching the pattern *and*
+	 * identified as old, not all files.
+	 */
+	while ((dirent = readdir(dir))) {
+		if (!(strcmp(".", dirent->d_name)))
+			continue;
+		if (!(strcmp("..", dirent->d_name)))
+			continue;
+		if (strstr(dirent->d_name, ".index")) {
+			int64_t lsn = 0;
+			sscanf(dirent->d_name, "%"SCNx64, &lsn);
+			if (lsn >= index->first_dump_lsn)
+				continue;
+		}
+		if (strstr(dirent->d_name, ".range")) {
+			uint64_t range_id = 0;
+			sscanf(dirent->d_name, "%"SCNx64, &range_id);
+			mh_int_t range = mh_i32ptr_find(ranges, range_id, NULL);
+			if (range != mh_end(ranges))
+				continue;
+		}
+		char path[PATH_MAX];
+		snprintf(path, PATH_MAX, "%s/%s",
+			 index->conf.path, dirent->d_name);
+		unlink(path);
+	}
+	goto end;
+error:
+	say_syserror("failed to cleanup index directory %s", index->conf.path);
+end:
+	closedir(dir);
+	mh_i32ptr_delete(ranges);
+}
+
+void
+vy_commit_checkpoint(struct vy_env *env)
+{
+	struct vy_scheduler *scheduler = env->scheduler;
+	int64_t checkpoint_lsn = vclock_sum(&scheduler->checkpoint_vclock);
+	for (int i = 0; i < scheduler->count; i++) {
+		struct vy_index *index;
+		index = scheduler->indexes[i];
+		if (index->first_dump_lsn == checkpoint_lsn) {
+			/*
+			 * Nothing changed, skip index
+			 */
+			continue;
+		}
+		if (index->first_dump_lsn &&
+		    vy_index_checkpoint_range_index(index, checkpoint_lsn)) {
+			panic("Can't commit index at %s", index->conf.path);
+			scheduler->checkpoint_in_progress = false;
+			return;
+		}
+		vy_index_gc(index);
+		scheduler->checkpoint_in_progress = false;
 	}
 }
 
@@ -6794,8 +6487,6 @@ int
 vy_index_read(struct vy_index*, struct vy_tuple*, enum vy_order order,
 		struct vy_tuple **, struct vy_tuple *,
 		struct vy_tx*);
-static int vy_index_recoverbegin(struct vy_index*);
-static int vy_index_recoverend(struct vy_index*);
 
 /** {{{ Introspection */
 
@@ -7173,21 +6864,233 @@ error:
 	return -1;
 }
 
+static int
+vy_index_dump_range_index(struct vy_index *index)
+{
+	vy_index_wrlock(index);
+	ssize_t ranges_size = index->range_count * sizeof(uint64_t);
+	int64_t *ranges = (int64_t *)malloc(ranges_size);
+	if (!ranges) {
+		vy_error("Can't alloc %li bytes", (long int) ranges_size);
+		vy_index_unlock(index);
+		return -1;
+	}
+	int range_no = 0;
+	int64_t last_dump_range_id = 0;
+	struct vy_range *range = vy_range_tree_first(&index->tree);
+	do {
+		if (!range->run_count) {
+			continue;               /* Skip empty ranges */
+		}
+		ranges[range_no] = range->self.id.id;
+		if (range->self.id.id > last_dump_range_id)
+			last_dump_range_id = range->self.id.id;
+		++range_no;
+	} while ((range = vy_range_tree_next(&index->tree, range)));
+
+	if (!range_no) {
+		/*
+		 * This index is entirely empty, we won't create
+		 * any files on disk.
+		 */
+		free(ranges);
+		vy_index_unlock(index);
+		return 0;
+	}
+	if (last_dump_range_id == index->last_dump_range_id) {
+		free(ranges);
+		vy_index_unlock(index);
+		return 0;
+	}
+
+	index->last_dump_range_id = last_dump_range_id;
+
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->conf.path);
+	int fd = mkstemp(path);
+	if (fd == -1) {
+		vy_error("Can't create temporary file in %s: %s",
+			 index->conf.path, strerror(errno));
+		free(ranges);
+		return -1;
+	}
+	int write_size = sizeof(uint64_t) * range_no;
+	if (write(fd, ranges, write_size) != write_size) {
+		free(ranges);
+		close(fd);
+		unlink(path);
+		vy_error("Can't write index file: %s", strerror(errno));
+		vy_index_unlock(index);
+		return -1;
+	}
+	free(ranges);
+	fsync(fd);
+	close(fd);
+
+	char new_path[PATH_MAX];
+	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+		 index->conf.path, index->first_dump_lsn, last_dump_range_id);
+	if (link(path, new_path)) {
+		vy_error("Can't dump index range dict %s: %s",
+			 new_path, strerror(errno));
+		unlink(path);
+		vy_index_unlock(index);
+		return -1;
+	}
+	unlink(path);
+	vy_index_unlock(index);
+	return 0;
+}
+
+/**
+ * Link the range index file to the latest checkpoint LSN.
+ */
+static int
+vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn)
+{
+	vy_index_wrlock(index);
+	char old_path[PATH_MAX];
+	snprintf(old_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+		 index->conf.path, index->first_dump_lsn,
+		 index->last_dump_range_id);
+	char new_path[PATH_MAX];
+	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+		 index->conf.path, lsn,
+		 index->last_dump_range_id);
+	if (link(old_path, new_path)) {
+		vy_index_unlock(index);
+		return -1;
+	}
+	index->first_dump_lsn = lsn;
+	vy_index_unlock(index);
+	return 0;
+}
+
+
+/**
+ * Check whether or not an index was created after the
+ * given LSN.
+ * @note: the index may have been dropped afterwards, and
+ * we don't track this fact anywhere except the write
+ * ahead log.
+ *
+ * @note: this function simply reports that the index
+ * does not exist if it encounters a read error. It's
+ * assumed that the error will be taken care of when
+ * someone tries to create the index.
+ */
+static bool
+vy_index_exists(struct vy_index *index, int64_t lsn)
+{
+	if (!path_exists(index->conf.path))
+		return false;
+	DIR *dir = opendir(index->conf.path);
+	if (!dir) {
+		return false;
+	}
+	/*
+	 * Try to find an index file with a number in name
+	 * greater or equal than the passed LSN.
+	 */
+	char target_name[PATH_MAX];
+	snprintf(target_name, PATH_MAX, "%016"PRIx64, lsn);
+	struct dirent *dirent;
+	while ((dirent = readdir(dir))) {
+		if (strstr(dirent->d_name, ".index") &&
+			strcmp(dirent->d_name, target_name) > 0) {
+			break;
+		}
+	}
+	closedir(dir);
+	return dirent != NULL;
+}
+
+/**
+ * Detect whether we already have non-garbage index files,
+ * and open an existing index if that's the case. Otherwise,
+ * create a new index. Take the current recovery status into
+ * account.
+ */
+static int
+vy_index_open_or_create(struct vy_index *index)
+{
+	/*
+	 * TODO: don't drop/recreate index in local wal
+	 * recovery mode if all operations already done.
+	 */
+	if (index->env->status == VINYL_ONLINE) {
+		/*
+		 * The recovery is complete, simply
+		 * create a new index.
+		 */
+		return vy_index_create(index);
+	}
+	if (index->env->status == VINYL_INITIAL_RECOVERY) {
+		/*
+		 * A local or remote snapshot recovery. For
+		 * a local snapshot recovery, local checkpoint LSN
+		 * is non-zero, while for a remote one (new
+		 * replica bootstrap) it is zero. In either case
+		 * the engine is being fed rows from  system spaces.
+		 *
+		 * If this is a recovery from a non-empty local
+		 * snapshot (lsn != 0), we should have index files
+		 * nicely put on disk.
+		 *
+		 * Otherwise, the index files do not exist
+		 * locally, and we should create the index
+		 * directory from scratch.
+		 */
+		return index->env->seq->lsn ?
+			vy_index_open_ex(index) : vy_index_create(index);
+	}
+	/*
+	 * Case of a WAL replay from either a local or remote
+	 * master.
+	 * If it is a remote WAL replay, there should be no
+	 * local files for this index yet - it's just being
+	 * created.
+	 *
+	 * For a local recovery, however, the index may or may not
+	 * have any files on disk, depending on whether we dumped
+	 * any rows of this index after it had been created and
+	 * before shutdown.
+	 * Moreover, even when the index directory is not empty,
+	 * we need to be careful to not open files from the
+	 * previous incarnation of this index. Imagine the case
+	 * when the index was created, dropped, and created again
+	 * - all without a checkpoint. In this case the index
+	 * directory may contain files from the dropped index
+	 * and we need to be careful to not use them. Fortunately,
+	 * we can rely on the current LSN to check whether
+	 * the files we're looking at belong to this incarnation
+	 * of the index or not, since file names always contain
+	 * this LSN.
+	 */
+	if (vy_index_exists(index, index->env->seq->lsn)) {
+		/*
+		 * We found a file with LSN greater or equal
+		 * that the "index recovery" lsn.
+		 */
+		return vy_index_open_ex(index);
+	}
+	return vy_index_create(index);
+}
+
 int
 vy_index_open(struct vy_index *index)
 {
 	struct vy_env *e = index->env;
 	int status = vy_status(&index->status);
-	if (status == VINYL_FINAL_RECOVERY)
-		goto online;
 	if (status != VINYL_OFFLINE)
 		return -1;
-	int rc = vy_index_recoverbegin(index);
-	if (unlikely(rc == -1))
+	int rc;
+	rc = vy_index_open_or_create(index);
+	if (unlikely(rc == -1)) {
+		vy_status_set(&index->status, VINYL_MALFUNCTION);
 		return -1;
-
-online:
-	vy_index_recoverend(index);
+	}
+	vy_status_set(&index->status, VINYL_ONLINE);
 	rc = vy_scheduler_add_index(e->scheduler, index);
 	if (unlikely(rc == -1))
 		return -1;
@@ -7216,12 +7119,13 @@ vy_index_unref(struct vy_index *index)
 int
 vy_index_drop(struct vy_index *index)
 {
+	/* TODO:
+	 * don't drop/recreate index in local wal recovery mode if all
+	 * operations alreadey done
+	 */
 	struct vy_env *e = index->env;
 	int status = vy_status(&index->status);
 	if (unlikely(! vy_status_is_active(status)))
-		return -1;
-	int rc = vy_index_dropmark(index);
-	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
 	vy_status_set(&index->status, VINYL_DROP);
@@ -7397,6 +7301,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	vy_status_set(&index->status, VINYL_OFFLINE);
 	read_set_new(&index->read_set);
 	rlist_add(&e->indexes, &index->link);
+
 	return index;
 
 error_4:
@@ -7437,31 +7342,6 @@ vy_index_bsize(struct vy_index *index)
 	vy_profiler_(&index->rtp);
 	vy_profiler_end(&index->rtp);
 	return index->rtp.memory_used;
-}
-
-static int vy_index_recoverbegin(struct vy_index *index)
-{
-	/* open and recover repository */
-	vy_status_set(&index->status, VINYL_FINAL_RECOVERY);
-	/* do not allow to recover existing indexes
-	 * during online (only create), since logpool
-	 * reply is required. */
-	int rc = si_recover(index);
-	if (unlikely(rc == -1))
-		goto error;
-	return 0;
-error:
-	vy_status_set(&index->status, VINYL_MALFUNCTION);
-	return -1;
-}
-
-static int vy_index_recoverend(struct vy_index *index)
-{
-	int status = vy_status(&index->status);
-	if (unlikely(status == VINYL_DROP))
-		return 0;
-	vy_status_set(&index->status, VINYL_ONLINE);
-	return 0;
 }
 
 /* {{{ Tuple */
@@ -7639,7 +7519,7 @@ vy_tuple_data_ex(const struct key_def *key_def,
 }
 
 static struct tuple *
-vinyl_convert_tuple(struct vy_index *index, struct vy_tuple *vy_tuple)
+vy_convert_tuple(struct vy_index *index, struct vy_tuple *vy_tuple)
 {
 	uint32_t bsize;
 	const char *data = vy_tuple_data(index, vy_tuple, &bsize);
@@ -7707,7 +7587,7 @@ vy_tuple_compare(const char *tuple_data_a, const char *tuple_data_b,
 /** {{{ Upsert */
 
 static void *
-vinyl_update_alloc(void *arg, size_t size)
+vy_update_alloc(void *arg, size_t size)
 {
 	(void) arg;
 	/* TODO: rewrite tuple_upsert_execute() without exceptions */
@@ -7753,7 +7633,7 @@ vy_apply_upsert_ops(const char **tuple, const char **tuple_end,
 #endif
 		const char *result;
 		uint32_t size;
-		result = tuple_upsert_execute(vinyl_update_alloc, NULL,
+		result = tuple_upsert_execute(vy_update_alloc, NULL,
 					      ops, serie_end,
 					      *tuple, *tuple_end,
 					      &size, index_base, suppress_error);
@@ -8104,7 +7984,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		*result = NULL;
 		rc = 0;
 	} else {
-		*result = vinyl_convert_tuple(index, vyresult);
+		*result = vy_convert_tuple(index, vyresult);
 		if (*result != NULL)
 			rc = 0;
 	}
@@ -8158,7 +8038,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 		c->key = vyresult;
 		vy_tuple_ref(c->key);
 
-		*result = vinyl_convert_tuple(index, vyresult);
+		*result = vy_convert_tuple(index, vyresult);
 		vy_tuple_unref(vyresult);
 		if (*result == NULL)
 			return -1;
@@ -8250,10 +8130,11 @@ vy_bootstrap(struct vy_env *e)
 }
 
 void
-vy_begin_initial_recovery(struct vy_env *e)
+vy_begin_initial_recovery(struct vy_env *e, int64_t lsn)
 {
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_INITIAL_RECOVERY;
+	e->seq->lsn = lsn;
 }
 
 void

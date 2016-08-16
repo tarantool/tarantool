@@ -1287,7 +1287,7 @@ bootstrap_from_master(struct server *master)
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
-	engine_begin_initial_recovery();
+	engine_begin_initial_recovery(0);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 
@@ -1368,7 +1368,16 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
-		engine_begin_initial_recovery();
+		engine_begin_initial_recovery(lsn);
+		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+		/**
+		 * We explicitly request memtx to recover its
+		 * snapshot as a separate phase since it contains
+		 * data for system spaces, and triggers on
+		 * recovery of system spaces issue DDL events in
+		 * other engines.
+		 */
+		memtx->recoverSnapshot();
 
 		/* Replace server vclock using the data from snapshot */
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);

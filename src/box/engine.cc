@@ -71,6 +71,20 @@ void Engine::rollback(struct txn *)
 void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
 {}
 
+void Engine::bootstrap()
+{}
+
+void Engine::beginInitialRecovery(int64_t lsn)
+{
+	(void) lsn;
+}
+
+void Engine::beginFinalRecovery()
+{}
+
+void Engine::endRecovery()
+{}
+
 void Engine::initSystemSpace(struct space * /* space */)
 {
 	panic("not implemented");
@@ -256,12 +270,12 @@ engine_bootstrap()
 }
 
 void
-engine_begin_initial_recovery()
+engine_begin_initial_recovery(int64_t lsn)
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginInitialRecovery();
+		engine->beginInitialRecovery(lsn);
 	}
 }
 

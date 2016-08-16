@@ -121,23 +121,22 @@ public:
 	/**
 	 * Bootstrap an empty data directory
 	 */
-	virtual void bootstrap() {};
+	virtual void bootstrap();
 	/**
 	 * Begin initial recovery from snapshot or dirty disk data.
 	 */
-	virtual void beginInitialRecovery() {};
+	virtual void beginInitialRecovery(int64_t lsn);
 	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
 	 * of WAL catch up durin join on slave side
 	 */
-	virtual void beginFinalRecovery() {};
+	virtual void beginFinalRecovery();
 	/**
 	 * Inform the engine about the end of recovery from the
 	 * binary log.
 	 */
-	virtual void endRecovery() {};
-
+	virtual void endRecovery();
 	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
@@ -260,7 +259,7 @@ engine_bootstrap();
  * Called at the start of recovery.
  */
 void
-engine_begin_initial_recovery();
+engine_begin_initial_recovery(int64_t lsn);
 
 /**
  * Called in the middle of JOIN stage,

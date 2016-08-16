@@ -687,49 +687,8 @@ MemtxEngine::lastCheckpoint(struct vclock *vclock)
 }
 
 void
-MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
+MemtxEngine::recoverSnapshot()
 {
-	assert(row->bodycnt == 1); /* always 1 for read */
-	if (row->type != IPROTO_INSERT) {
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) row->type);
-	}
-
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, row->type);
-	request_decode(request, (const char *) row->body[0].iov_base,
-		row->body[0].iov_len);
-	request->header = row;
-
-	struct space *space = space_cache_find(request->space_id);
-	/* memtx snapshot must contain only memtx spaces */
-	if (space->handler->engine != this)
-		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-	/* no access checks here - applier always works with admin privs */
-	space->handler->applySnapshotRow(space, request);
-}
-
-/** Called at start to tell memtx to recover to a given LSN. */
-void
-MemtxEngine::beginInitialRecovery()
-{
-	assert(m_state == MEMTX_INITIALIZED);
-	/*
-	 * By default, enable fast start: bulk read of tuples
-	 * from the snapshot, in which they are stored in key
-	 * order, and bulk build of the primary key.
-	 *
-	 * If panic_on_snap_error = false, it's a disaster
-	 * recovery mode. Enable all keys on start, to detect and
-	 * discard duplicates in the snapshot.
-	 */
-	m_state = (m_snap_dir.panic_if_error ?
-		   MEMTX_INITIAL_RECOVERY : MEMTX_OK);
-
-	/*
-	 * JOIN from remote master - empty data directory.
-	 */
 	if (!m_has_checkpoint)
 		return;
 
@@ -768,6 +727,50 @@ MemtxEngine::beginInitialRecovery()
 	 */
 	if (!cursor.eof_read)
 		panic("snapshot `%s' has no EOF marker", snap->filename);
+
+}
+
+void
+MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
+{
+	assert(row->bodycnt == 1); /* always 1 for read */
+	if (row->type != IPROTO_INSERT) {
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) row->type);
+	}
+
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, row->type);
+	request_decode(request, (const char *) row->body[0].iov_base,
+		row->body[0].iov_len);
+	request->header = row;
+
+	struct space *space = space_cache_find(request->space_id);
+	/* memtx snapshot must contain only memtx spaces */
+	if (space->handler->engine != this)
+		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	/* no access checks here - applier always works with admin privs */
+	space->handler->applySnapshotRow(space, request);
+}
+
+/** Called at start to tell memtx to recover to a given LSN. */
+void
+MemtxEngine::beginInitialRecovery(int64_t lsn)
+{
+	(void) lsn;
+	assert(m_state == MEMTX_INITIALIZED);
+	/*
+	 * By default, enable fast start: bulk read of tuples
+	 * from the snapshot, in which they are stored in key
+	 * order, and bulk build of the primary key.
+	 *
+	 * If panic_on_snap_error = false, it's a disaster
+	 * recovery mode. Enable all keys on start, to detect and
+	 * discard duplicates in the snapshot.
+	 */
+	m_state = (m_snap_dir.panic_if_error ?
+		   MEMTX_INITIAL_RECOVERY : MEMTX_OK);
 }
 
 void

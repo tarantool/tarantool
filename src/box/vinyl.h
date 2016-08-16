@@ -49,6 +49,7 @@ struct key_def;
 struct tuple;
 struct tuple_format;
 struct region;
+struct vclock;
 
 /*
  * Environment
@@ -68,7 +69,7 @@ void
 vy_bootstrap(struct vy_env *e);
 
 void
-vy_begin_initial_recovery(struct vy_env *e);
+vy_begin_initial_recovery(struct vy_env *e, int64_t lsn);
 
 void
 vy_begin_final_recovery(struct vy_env *e);
@@ -80,7 +81,10 @@ int
 vy_checkpoint(struct vy_env *env);
 
 void
-vy_wait_checkpoint(struct vy_env *env);
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);
+
+void
+vy_commit_checkpoint(struct vy_env *env);
 
 /*
  * Introspection
