@@ -119,6 +119,7 @@ box_info_sort(box.info.vinyl())
     - tx_rollback: 1
     - upsert: 0
     - upsert_latency: 0 0 0.0
+    - write_count: 2
   - scheduler:
     - gc_active: 0
     - zone: '0'
@@ -428,6 +429,41 @@ end;
 test_run:cmd("setopt delimiter ''");
 ---
 - true
+...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+---
+...
+old_count = box.info.vinyl().performance.write_count
+---
+...
+space:insert({1, 1})
+---
+- [1, 1]
+...
+space:insert({2, 2})
+---
+- [2, 2]
+...
+space:insert({3, 3})
+---
+- [3, 3]
+...
+space:insert({4, 4})
+---
+- [4, 4]
+...
+box.info.vinyl().performance.write_count - old_count == 8
+---
+- true
+...
+space:drop()
+---
 ...
 test_run:cmd('switch default')
 ---

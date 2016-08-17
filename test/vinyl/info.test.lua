@@ -34,6 +34,17 @@ for i = 1, 16 do
 end;
 test_run:cmd("setopt delimiter ''");
 
+space = box.schema.space.create('test', { engine = 'vinyl' })
+index = space:create_index('primary')
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+old_count = box.info.vinyl().performance.write_count
+space:insert({1, 1})
+space:insert({2, 2})
+space:insert({3, 3})
+space:insert({4, 4})
+box.info.vinyl().performance.write_count - old_count == 8
+space:drop()
+
 test_run:cmd('switch default')
 test_run:cmd("stop server vinyl_info")
 test_run:cmd("start server vinyl_info")

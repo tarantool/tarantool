@@ -1422,6 +1422,8 @@ struct vy_stat {
 	struct vy_avg    get_read_disk;
 	struct vy_avg    get_read_cache;
 	struct vy_avg    get_latency;
+	/* write */
+	uint64_t write_count;
 	/* transaction */
 	uint64_t tx;
 	uint64_t tx_rlb;
@@ -1483,12 +1485,13 @@ vy_stat_get(struct vy_stat *s, const struct vy_stat_get *statget)
 
 static inline void
 vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
-          int rlb, int conflict)
+          int rlb, int conflict, uint64_t write_count)
 {
 	uint64_t diff = clock_monotonic64() - start;
 	s->tx++;
 	s->tx_rlb += rlb;
 	s->tx_conflict += conflict;
+	s->write_count += write_count;
 	vy_avg_update(&s->tx_stmts, count);
 	vy_avg_update(&s->tx_latency, diff);
 }
@@ -2976,7 +2979,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		c->tx = NULL;
 
 	tx_manager_end(tx->manager, tx);
-	vy_stat_tx(e->stat, tx->start, count, 1, 0);
+	vy_stat_tx(e->stat, tx->start, count, 1, 0, 0);
 }
 
 static struct vy_tuple *
@@ -6945,6 +6948,7 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
 	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
 	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
+	vy_info_append_u64(node, "write_count", stat->write_count);
 	vy_info_append_str(node, "get_latency", stat->get_latency.sz);
 	vy_info_append_str(node, "set_latency", stat->set_latency.sz);
 	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
@@ -7994,9 +7998,12 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	uint64_t now = clock_monotonic64();
 	struct txv *v = write_set_first(&tx->write_set);
 
+	uint64_t write_count = 0;
 	/** @todo: check return value of si_write(). */
-	while (v != NULL)
+	while (v != NULL) {
+		++write_count;
 		v = si_write(&tx->write_set, v, now, e->status, lsn);
+	}
 
 	uint32_t count = 0;
 	struct txv *tmp;
@@ -8011,7 +8018,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	struct vy_cursor *c;
 	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
 		c->tx = NULL;
-	vy_stat_tx(e->stat, tx->start, count, 0, 0);
+	vy_stat_tx(e->stat, tx->start, count, 0, 0, write_count);
 	free(tx);
 	return 0;
 }
