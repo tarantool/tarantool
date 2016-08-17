@@ -3740,6 +3740,7 @@ struct vy_task {
 	enum vy_task_type type;
 	struct vy_index *index;
 	struct vy_range *node;
+	struct stailq_entry link;
 };
 
 static int vy_planner_init(struct vy_planner*);
@@ -4316,7 +4317,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 	vy_index_unlock(index);
 
 	vy_range_gc_index(&swap);
-	return 1;
+	return 0;
 }
 
 void
@@ -4965,29 +4966,34 @@ vy_planner_remove(struct vy_planner *p, struct vy_range *n)
 	return 0;
 }
 
-static inline void
-vy_task_create(struct vy_task *task, struct vy_index *index,
-	       enum vy_task_type type)
+static inline struct vy_task *
+vy_task_new(struct vy_index *index, enum vy_task_type type)
 {
-	memset(task, 0, sizeof(*task));
+	struct vy_task *task = (struct vy_task *) calloc(1, sizeof(*task));
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "scheduler", "task");
+		return NULL;
+	}
 	task->type = type;
 	task->index = index;
 	vy_index_ref(index);
+	return task;
 }
 
 static inline void
-vy_task_destroy(struct vy_task *task)
+vy_task_delete(struct vy_task *task)
 {
 	if (task->type != VY_TASK_DROP) {
 		vy_index_unref(task->index);
 		task->index = NULL;
 	}
 	TRASH(task);
+	free(task);
 }
 
 static inline int
 vy_planner_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
-			   struct vy_task *task)
+			   struct vy_task **ptask)
 {
 	/* try to peek a node which has min
 	 * lsn <= required value
@@ -5003,21 +5009,25 @@ vy_planner_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
 			in_progress = true;
 			continue;
 		}
-		vy_task_create(task, index, VY_TASK_CHECKPOINT);
+		struct vy_task *task = vy_task_new(index, VY_TASK_CHECKPOINT);
+		if (task == NULL)
+			return -1; /* OOM */
 		vy_range_lock(n);
 		task->node = n;
+		*ptask = task;
 		return 1; /* new task */
 	}
 	if (!in_progress) {
 		/* no more ranges to dump */
 		index->checkpoint_in_progress = false;
 	}
+	*ptask = NULL;
 	return 0; /* nothing to do */
 }
 
 static inline int
 vy_planner_peek_dump(struct vy_index *index, uint32_t dump_wm,
-		     struct vy_task *task)
+		     struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest in-memory index */
 	struct vy_range *n;
@@ -5028,17 +5038,21 @@ vy_planner_peek_dump(struct vy_index *index, uint32_t dump_wm,
 			continue;
 		if (n->used < dump_wm)
 			return 0; /* nothing to do */
-		vy_task_create(task, index, VY_TASK_DUMP);
+		struct vy_task *task = vy_task_new(index, VY_TASK_DUMP);
+		if (task == NULL)
+			return -1; /* oom */
 		vy_range_lock(n);
 		task->node = n;
+		*ptask = task;
 		return 1; /* new task */
 	}
+	*ptask = NULL;
 	return 0; /* nothing to do */
 }
 
 static inline int
 vy_planner_peek_age(struct vy_index *index, uint32_t ttl, uint32_t ttl_wm,
-		    struct vy_task *task)
+		    struct vy_task **ptask)
 {
 	/* try to peek a node with update >= a and in-memory
 	 * index size >= b */
@@ -5056,21 +5070,25 @@ vy_planner_peek_age(struct vy_index *index, uint32_t ttl, uint32_t ttl_wm,
 		}
 		if (n->used < ttl_wm && (now - n->update_time) < ttl)
 			continue;
-		vy_task_create(task, index, VY_TASK_AGE);
+		struct vy_task *task = vy_task_new(index, VY_TASK_AGE);
+		if (task == NULL)
+			return -1; /* oom */
 		vy_range_lock(n);
 		task->node = n;
+		*ptask = task;
 		return 1; /* new task */
 	}
 	if (!in_progress) {
 		/* no more ranges */
 		index->age_in_progress = false;
 	}
+	*ptask = NULL;
 	return 0; /* nothing to do */
 }
 
 static inline int
 vy_planner_peek_compact(struct vy_index *index, uint32_t run_count,
-			struct vy_task *task)
+			struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest number
 	 * of runs */
@@ -5080,20 +5098,23 @@ vy_planner_peek_compact(struct vy_index *index, uint32_t run_count,
 		n = container_of(pn, struct vy_range, nodecompact);
 		if (n->flags & SI_LOCK)
 			continue;
-		if (n->run_count >= run_count) {
-			vy_task_create(task, index, VY_TASK_COMPACT);
-			vy_range_lock(n);
-			task->node = n;
-			return 1; /* new task */
-		}
-		break; /* TODO: why? */
+		if (n->run_count < run_count)
+			break; /* TODO: why ? */
+		struct vy_task *task = vy_task_new(index, VY_TASK_COMPACT);
+		if (task == NULL)
+			return -1; /* OOM */
+		vy_range_lock(n);
+		task->node = n;
+		*ptask = task;
+		return 1; /* new task */
 	}
+	*ptask = NULL;
 	return 0; /* nothing to do */
 }
 
 static inline int
 vy_planner_peek_gc(struct vy_index *index, int64_t gc_lsn,
-		   uint32_t gc_percent, struct vy_task *task)
+		   uint32_t gc_percent, struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest number
 	 * of runs which is ready for gc */
@@ -5106,33 +5127,42 @@ vy_planner_peek_gc(struct vy_index *index, int64_t gc_lsn,
 		if (likely(h->dupkeys == 0) || (h->dupmin >= gc_lsn))
 			continue;
 		uint32_t used = (h->dupkeys * 100) / h->keys;
-		if (used >= gc_percent) {
-			if (n->flags & SI_LOCK) {
-				in_progress = true;
-				continue;
-			}
-			vy_task_create(task, index, VY_TASK_GC);
-			vy_range_lock(n);
-			task->node = n;
-			return 1; /* new task */
+		if (used < gc_percent)
+			continue;
+		if (n->flags & SI_LOCK) {
+			in_progress = true;
+			continue;
 		}
+		struct vy_task *task = vy_task_new(index, VY_TASK_GC);
+		if (task == NULL)
+			return -1; /* OOM */
+		vy_range_lock(n);
+		task->node = n;
+		*ptask = task;
+		return 1; /* new task */
 	}
 	if (!in_progress) {
 		/* no more ranges to gc */
 		index->gc_in_progress = false;
 	}
+	*ptask = NULL;
 	return 0; /* nothing to do */
 }
 
 static inline int
-vy_planner_peek_shutdown(struct vy_index *index, struct vy_task *task)
+vy_planner_peek_shutdown(struct vy_index *index, struct vy_task **ptask)
 {
 	int status = vy_status(&index->status);
 	switch (status) {
 	case VINYL_DROP:
-		if (index->refs > 0)
+		if (index->refs > 0) {
+			*ptask = NULL;
 			return 0; /* index still has tasks */
-		vy_task_create(task, index, VY_TASK_DROP);
+		}
+		struct vy_task *task = vy_task_new(index, VY_TASK_DROP);
+		if (task == NULL)
+			return -1;
+		*ptask = task;
 		return 1; /* new task */
 	default:
 		unreachable();
@@ -5141,16 +5171,21 @@ vy_planner_peek_shutdown(struct vy_index *index, struct vy_task *task)
 }
 
 static inline int
-vy_planner_peek_nodegc(struct vy_index *index, struct vy_task *task)
+vy_planner_peek_nodegc(struct vy_index *index, struct vy_task **ptask)
 {
-	struct vy_range *n;
-	rlist_foreach_entry(n, &index->gc, gc) {
-		vy_task_create(task, index, VY_TASK_NODEGC);
-		rlist_del(&n->gc);
-		task->node = n;
-		return 1; /* new task */
+	if (rlist_empty(&index->gc)) {
+		*ptask = NULL;
+		return 0; /* nothing to do */
 	}
-	return 0; /* nothing to do */
+
+	struct vy_range *n = rlist_first_entry(&index->gc, struct vy_range, gc);
+	struct vy_task *task= vy_task_new(index, VY_TASK_NODEGC);
+	if (task == NULL)
+		return -1;
+	rlist_del(&n->gc);
+	task->node = n;
+	*ptask = task;
+	return 1; /* new task */
 }
 
 static int vy_profiler_begin(struct vy_profiler *p, struct vy_index *i)
@@ -5911,9 +5946,16 @@ struct vy_scheduler {
 	struct vy_index **indexes;
 	struct rlist   shutdown;
 	struct vy_env    *env;
+
 	struct cord *worker_pool;
+	struct cord scheduler;
 	int worker_pool_size;
-	volatile int worker_pool_run;
+	bool worker_pool_run;
+
+	pthread_mutex_t queue_lock;
+	pthread_cond_t pending_cond;
+	pthread_cond_t wakeup_cond;
+	struct stailq pending;
 	struct vclock checkpoint_vclock;
 };
 
@@ -5944,6 +5986,9 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->count = 0;
 	scheduler->rr = 0;
 	scheduler->env = env;
+	tt_pthread_mutex_init(&scheduler->queue_lock, NULL);
+	tt_pthread_cond_init(&scheduler->pending_cond, NULL);
+	tt_pthread_cond_init(&scheduler->wakeup_cond, NULL);
 	rlist_create(&scheduler->shutdown);
 	return scheduler;
 }
@@ -5953,6 +5998,11 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 {
 	if (scheduler->worker_pool_run)
 		vy_workers_stop(scheduler);
+
+	tt_pthread_mutex_destroy(&scheduler->queue_lock);
+	tt_pthread_cond_destroy(&scheduler->pending_cond);
+	tt_pthread_cond_destroy(&scheduler->wakeup_cond);
+
 	struct vy_index *index, *next;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, next) {
 		vy_index_delete(index);
@@ -6016,7 +6066,7 @@ vy_scheduler_peek_index(struct vy_scheduler *scheduler)
 
 static int
 vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
-	      int64_t vlsn, struct vy_index *index, struct vy_task *task)
+	      int64_t vlsn, struct vy_index *index, struct vy_task **task)
 {
 	int rc;
 
@@ -6064,7 +6114,7 @@ vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
 
 static int
 vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
-	struct vy_task *task)
+	struct vy_task **task)
 {
 	/* pending shutdowns */
 	struct vy_index *index, *n;
@@ -6090,15 +6140,11 @@ vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	return rc;
 }
 
-static int
-vy_schedule(struct vy_scheduler *scheduler, struct sdc *sdc)
+
+static void
+vy_schedule_periodic(struct vy_scheduler *scheduler, struct srzone *zone)
 {
-	struct vy_env *env = scheduler->env;
-	int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
 	uint64_t now = clock_monotonic64();
-	struct srzone *zone = sr_zoneof(env);
-	int rc;
-	tt_pthread_mutex_lock(&scheduler->lock);
 
 	if (scheduler->age_in_progress) {
 		/* Stop periodic aging */
@@ -6161,42 +6207,116 @@ vy_schedule(struct vy_scheduler *scheduler, struct sdc *sdc)
 			scheduler->checkpoint_lsn = 0;
 		}
 	}
-
-	/* Get task */
-	struct vy_task task;
-	rc = vy_plan(scheduler, zone, vlsn, &task);
-	tt_pthread_mutex_unlock(&scheduler->lock);
-	if (rc < 0) {
-		return -1; /* error */
-	} else if (rc == 0) {
-		 return 0; /* nothing to do */
-	}
-
-	/* Execute task */
-	rc = vy_task_execute(&task, sdc, vlsn);
-
-	/* Delete task */
-	vy_task_destroy(&task);
-
-	if (unlikely(rc == -1))
-		return -1; /* error */
-	return 1; /* success */
 }
 
 static int
-vy_worker(va_list va)
+vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
+	struct vy_env *env = scheduler->env;
+
+	bool warning_said = false;
+	while (true) {
+		/* Run periodic tasks */
+		struct srzone *zone = sr_zoneof(env);
+		vy_schedule_periodic(scheduler, zone);
+
+		/*
+		 * pthread_cond_timedwait() is used to schedule periodic tasks,
+		 * 5 seconds is enough for periodic.
+		 */
+		struct timespec deadline;
+		clock_gettime(CLOCK_REALTIME, &deadline);
+		deadline.tv_sec = deadline.tv_sec + 5;
+		tt_pthread_mutex_lock(&scheduler->queue_lock);
+		/* Spurious wakeups are ignored to simplicity */
+		tt_pthread_cond_timedwait(&scheduler->wakeup_cond,
+					  &scheduler->queue_lock,
+					  &deadline);
+		tt_pthread_mutex_unlock(&scheduler->queue_lock);
+		if (!scheduler->worker_pool_run)
+			break; /* shutdown */
+
+		/* Get task */
+		int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
+		struct vy_task *task = NULL;
+		int rc = vy_plan(scheduler, zone, vlsn, &task);
+		if (rc < 0) {
+			/* Log error message once */
+			if (!warning_said) {
+				error_log(diag_last_error(diag_get()));
+			}
+			warning_said = true;
+			continue;
+		} else if (rc == 0) {
+			continue; /* nothing to do */
+		}
+		assert(rc == 1 && task != NULL);
+
+		/* Queue task */
+		tt_pthread_mutex_lock(&scheduler->queue_lock);
+		bool was_empty = stailq_empty(&scheduler->pending);
+		stailq_add_tail_entry(&scheduler->pending, task, link);
+		if (was_empty) /* Notify workers */
+			tt_pthread_cond_signal(&scheduler->pending_cond);
+		tt_pthread_mutex_unlock(&scheduler->queue_lock);
+		warning_said = false;
+	}
+	return 0;
+}
+
+static int
+vy_worker_f(va_list va)
+{
+	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
+	struct vy_env *env = scheduler->env;
 	struct sdc sdc;
 	sd_cinit(&sdc);
 	coeio_enable();
-	while (pm_atomic_load_explicit(&scheduler->worker_pool_run,
-				       pm_memory_order_relaxed)) {
-		int rc = vy_schedule(scheduler, &sdc);
-		if (rc == -1)
-			break;
-		if (rc == 0)
-			usleep(10000); /* 10ms */
+	bool warning_said = false;
+	while (true) {
+		tt_pthread_mutex_lock(&scheduler->queue_lock);
+		/* Wake scheduler up if there are no more tasks */
+		if (stailq_empty(&scheduler->pending))
+			tt_pthread_cond_signal(&scheduler->wakeup_cond);
+		/* Wait for a task */
+		while (stailq_empty(&scheduler->pending) &&
+		       scheduler->worker_pool_run) {
+			tt_pthread_cond_wait(&scheduler->pending_cond,
+					     &scheduler->queue_lock);
+		}
+		if (!scheduler->worker_pool_run) {
+			tt_pthread_mutex_unlock(&scheduler->queue_lock);
+			break; /* shutdown worker */
+		}
+
+		struct vy_task *task = stailq_shift_entry(&scheduler->pending,
+			struct vy_task, link);
+		assert(task != NULL);
+		/* Wake scheduler up if there are no more tasks */
+		if (stailq_empty(&scheduler->pending))
+			tt_pthread_cond_signal(&scheduler->wakeup_cond);
+		tt_pthread_mutex_unlock(&scheduler->queue_lock);
+
+		/* Execute task */
+		int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
+		int rc = vy_task_execute(task, &sdc, vlsn);
+
+		/* Delete task */
+		vy_task_delete(task);
+
+		if (rc != 0) {
+			/* Log error message once */
+			if (!warning_said) {
+				error_log(diag_last_error(diag_get()));
+				warning_said = true;
+			}
+			warning_said = true;
+			continue;
+		}
+
+		assert(rc == 0);
+		warning_said = false;
 	}
 	sd_cfree(&sdc);
 	return 0;
@@ -6211,28 +6331,49 @@ vy_workers_start(struct vy_scheduler *scheduler)
 	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
 	if (scheduler->worker_pool_size < 0)
 		scheduler->worker_pool_size = 1;
+	stailq_create(&scheduler->pending);
 	scheduler->worker_pool = (struct cord *)
 		calloc(scheduler->worker_pool_size, sizeof(struct cord));
 	if (scheduler->worker_pool == NULL)
 		panic("failed to allocate vinyl worker pool");
+	/* Start worker cords */
 	scheduler->worker_pool_run = 1;
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		cord_costart(&scheduler->worker_pool[i], "vinyl", vy_worker,
-			     scheduler);
+		cord_costart(&scheduler->worker_pool[i], "vinyl.worker",
+			     vy_worker_f, scheduler);
 	}
+	/* Start scheduler cord */
+	cord_costart(&scheduler->scheduler, "vinyl.scheduler", vy_scheduler_f,
+		     scheduler);
 }
 
 static void
 vy_workers_stop(struct vy_scheduler *scheduler)
 {
 	assert(scheduler->worker_pool_run);
-	pm_atomic_store_explicit(&scheduler->worker_pool_run, 0,
-				 pm_memory_order_relaxed);
+
+	/* Stop workers */
+	pthread_mutex_lock(&scheduler->queue_lock);
+	scheduler->worker_pool_run = false;
+	pthread_cond_broadcast(&scheduler->pending_cond);
+	pthread_cond_signal(&scheduler->wakeup_cond);
+	pthread_mutex_unlock(&scheduler->queue_lock);
+
+	/* Delete workers */
 	for (int i = 0; i < scheduler->worker_pool_size; i++)
 		cord_join(&scheduler->worker_pool[i]);
 	free(scheduler->worker_pool);
 	scheduler->worker_pool = NULL;
 	scheduler->worker_pool_size = 0;
+
+	/* Delete scheduler */
+	cord_join(&scheduler->scheduler);
+
+	/* Delete all pending tasks */
+	struct vy_task *task, *next;
+	stailq_foreach_entry_safe(task, next, &scheduler->pending, link)
+		vy_task_delete(task);
+	stailq_create(&scheduler->pending);
 }
 
 int
@@ -6251,6 +6392,12 @@ vy_checkpoint(struct vy_env *env)
 		scheduler->indexes[i]->checkpoint_in_progress = true;
 	}
 	tt_pthread_mutex_unlock(&scheduler->lock);
+
+	/* Wake scheduler up */
+	tt_pthread_mutex_lock(&scheduler->queue_lock);
+	tt_pthread_cond_signal(&scheduler->wakeup_cond);
+	tt_pthread_mutex_unlock(&scheduler->queue_lock);
+
 	return 0;
 }
 

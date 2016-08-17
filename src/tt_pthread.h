@@ -235,7 +235,7 @@
 
 #define tt_pthread_cond_timedwait(cond, mutex, timeout)	\
 ({	int e__ = pthread_cond_timedwait(cond, mutex, timeout);\
-	if (ETIMEDOUT != e__)			\
+	if (ETIMEDOUT != e__ && e__ != 0)		\
 		say_error("%s error %d", __func__, e__);\
 	assert(e__ == 0 || e__ == ETIMEDOUT);	\
 	e__;					\

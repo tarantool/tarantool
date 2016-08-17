@@ -14,7 +14,7 @@ space:delete({'xxx'})
 
 test_run:cmd("setopt delimiter ';'")
 for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
-                     'get_latency'}) do
+                     'get_latency', 'gc_active'}) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 test_run:cmd("setopt delimiter ''");

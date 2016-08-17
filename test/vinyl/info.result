@@ -42,7 +42,7 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
-                     'get_latency'}) do
+                     'get_latency', 'gc_active'}) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 ---
@@ -121,7 +121,7 @@ box_info_sort(box.info.vinyl())
     - upsert_latency: 0 0 0.0
     - write_count: 2
   - scheduler:
-    - gc_active: 0
+    - gc_active: <gc_active>
     - zone: '0'
   - vinyl:
     - build: <build>
