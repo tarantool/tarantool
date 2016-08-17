@@ -2575,7 +2575,7 @@ struct vy_index {
 	read_set_t read_set;
 	vy_range_tree_t tree;
 	struct vy_status status;
-	pthread_mutex_t lock;
+	pthread_rwlock_t lock;
 	int range_count;
 	uint64_t update_time;
 	uint64_t read_disk;
@@ -3197,6 +3197,7 @@ sd_cfree(struct sdc *sc)
 static inline void
 sd_cgc(struct sdc *sc, int wm)
 {
+	fiber_gc();
 	vy_buf_gc(&sc->a, wm);
 	vy_buf_gc(&sc->b, wm);
 	vy_buf_gc(&sc->c, wm);
@@ -3541,12 +3542,8 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 		return NULL;
 	}
 
-#if 1
-	int rc = coeio_pread(file->fd, data, page_info->size, page_info->offset);
-#else
-	int rc = vy_file_pread(file, page_info->offset, data, page_info->size);
-#endif
-
+	ssize_t rc = coeio_preadn(file->fd, data, page_info->size,
+				  page_info->offset);
 	if (rc < 0) {
 		free(data);
 		vy_error("index file '%s' read error: %s",
@@ -3554,6 +3551,7 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 		return NULL;
 	}
 
+	assert(rc == page_info->size);
 	if (compression != NULL) {
 		/* decompression */
 		struct vy_filter f;
@@ -3818,13 +3816,18 @@ vy_range_tree_key_cmp(vy_range_tree_t *rbtree,
 }
 
 static inline void
-vy_index_lock(struct vy_index *i) {
-	tt_pthread_mutex_lock(&i->lock);
+vy_index_rdlock(struct vy_index *index) {
+	tt_pthread_rwlock_rdlock(&index->lock);
 }
 
 static inline void
-vy_index_unlock(struct vy_index *i) {
-	tt_pthread_mutex_unlock(&i->lock);
+vy_index_wrlock(struct vy_index *index) {
+	tt_pthread_rwlock_wrlock(&index->lock);
+}
+
+static inline void
+vy_index_unlock(struct vy_index *index) {
+	tt_pthread_rwlock_unlock(&index->lock);
 }
 
 static inline void
@@ -4379,7 +4382,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 	struct vy_env *env = index->env;
 	assert(n->flags & SI_LOCK);
 
-	vy_index_lock(index);
+	vy_index_wrlock(index);
 	if (unlikely(n->used == 0)) {
 		vy_range_unlock(n);
 		vy_index_unlock(index);
@@ -4394,7 +4397,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 	if (unlikely(rc == -1))
 		return -1;
 	if (unlikely(run == NULL)) {
-		vy_index_lock(index);
+		vy_index_wrlock(index);
 		assert(n->used >= i->used);
 		n->used -= i->used;
 		vy_quota_op(env->quota, VINYL_QREMOVE, i->used);
@@ -4409,7 +4412,7 @@ vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
 	}
 
 	/* commit */
-	vy_index_lock(index);
+	vy_index_wrlock(index);
 	run->next = n->run;
 	n->run->link = run;
 	n->run = run;
@@ -4776,7 +4779,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 * single range update */
 	int count = vy_buf_used(result) / sizeof(struct vy_range*);
 
-	vy_index_lock(index);
+	vy_index_rdlock(index);
 	int range_count = index->range_count;
 	vy_index_unlock(index);
 
@@ -4795,7 +4798,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	}
 
 	/* commit compaction changes */
-	vy_index_lock(index);
+	vy_index_wrlock(index);
 	struct vy_mem *j = vy_range_index(range);
 	vy_planner_remove(&index->p, range);
 	vy_range_split(range);
@@ -4896,7 +4899,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	}
 
 	/* unlock */
-	vy_index_lock(index);
+	vy_index_rdlock(index);
 	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
 	while (vy_bufiter_has(&i))
 	{
@@ -5367,7 +5370,7 @@ static int vy_profiler_begin(struct vy_profiler *p, struct vy_index *i)
 	memset(p, 0, sizeof(*p));
 	p->i = i;
 	p->temperature_min = 100;
-	vy_index_lock(i);
+	vy_index_rdlock(i);
 	return 0;
 }
 
@@ -5571,7 +5574,7 @@ si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
 	q->read_cache = 0;
 	q->result = NULL;
 	sv_mergeinit(&q->merge, index, index->key_def);
-	vy_index_lock(index);
+	vy_index_rdlock(index);
 }
 
 static int
@@ -6266,7 +6269,7 @@ si_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	size_t quota = 0;
 	rlist_create(&rangelist);
 
-	vy_index_lock(index);
+	vy_index_rdlock(index);
 	index->update_time = time;
 	for (; v != NULL && v->index == index;
 	     v = write_set_next(write_set, v)) {
@@ -6485,7 +6488,7 @@ vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, uint64_t vlsn,
 	/* pending shutdowns */
 	struct vy_index *index, *n;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
-		vy_index_lock(index);
+		vy_index_rdlock(index);
 		int rc = vy_planner_peek_shutdown(index, task);
 		vy_index_unlock(index);
 		if (rc == 0)
@@ -6500,7 +6503,7 @@ vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, uint64_t vlsn,
 	if (index == NULL)
 		return 0; /* nothing to do */
 
-	vy_index_lock(index);
+	vy_index_rdlock(index);
 	int rc = vy_plan_index(scheduler, zone, vlsn, index, task);
 	vy_index_unlock(index);
 	return rc;
@@ -7377,7 +7380,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 
 	vy_buf_init(&index->readbuf);
 	vy_range_tree_new(&index->tree);
-	tt_pthread_mutex_init(&index->lock, NULL);
+	tt_pthread_rwlock_init(&index->lock, NULL);
 	rlist_create(&index->link);
 	rlist_create(&index->gc);
 	index->update_time = 0;
@@ -7412,7 +7415,7 @@ vy_index_delete(struct vy_index *index)
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
 	vy_buf_free(&index->readbuf);
 	vy_planner_free(&index->p);
-	tt_pthread_mutex_destroy(&index->lock);
+	tt_pthread_rwlock_destroy(&index->lock);
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	vy_status_free(&index->status);
 	vy_index_conf_free(&index->conf);
@@ -7819,7 +7822,6 @@ vy_apply_upsert(struct sv *new_tuple, struct sv *old_tuple,
 		assert(old_ops_end - old_ops == 0);
 		result_tuple = vy_tuple_from_data(index, result_mp,
 						     result_mp_end);
-		//fiber_gc(); /* free memory allocated by tuple_upsert_execute */
 		if (result_tuple == NULL)
 			return NULL; /* OOM */
 		goto check_key;
@@ -7837,7 +7839,6 @@ vy_apply_upsert(struct sv *new_tuple, struct sv *old_tuple,
 	char *extra;
 	result_tuple = vy_tuple_from_data_ex(index, result_mp,
 		result_mp_end, total_ops_size, &extra);
-	//fiber_gc(); /* free memory allocated by tuple_upsert_execute */
 	if (result_tuple == NULL)
 		return NULL; /* OOM */
 	extra = mp_encode_uint(extra, ops_series_count);

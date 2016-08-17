@@ -168,6 +168,24 @@ coeio_pread(int fd, void *buf, size_t count, off_t offset)
 	return coeio_wait_done(req, &eio);
 }
 
+ssize_t
+coeio_preadn(int fd, void *buf, size_t count, off_t offset)
+{
+	size_t n = 0;
+	do {
+		ssize_t r;
+		do {
+			r = coeio_pread(fd, buf + n, count - n, offset + n);
+		} while (r == -1 && errno == EINTR);
+		if (r <= 0)
+			return -1;
+		n += r;
+	} while (n < count);
+
+	assert(n == count);
+	return n;
+}
+
 static void
 coeio_do_write(eio_req *req)
 {

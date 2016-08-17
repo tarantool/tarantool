@@ -52,6 +52,7 @@ int     coeio_close(int fd);
 
 ssize_t coeio_pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t coeio_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t coeio_preadn(int fd, void *buf, size_t count, off_t offset);
 ssize_t coeio_read(int fd, void *buf, size_t count);
 ssize_t coeio_write(int fd, const void *buf, size_t count);
 off_t   coeio_lseek(int fd, off_t offset, int whence);
