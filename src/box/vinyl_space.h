@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "vinyl_engine.h"
 
 struct VinylSpace: public Handler {
 	VinylSpace(Engine*);
@@ -47,22 +48,15 @@ struct VinylSpace: public Handler {
 	virtual void
 	executeUpsert(struct txn*, struct space *space,
 	              struct request *request) override;
+	virtual void dropIndex(Index*) override;
+	virtual Index *createIndex(struct space *, struct key_def *) override;
 	/**
-	 * If space was altered then this method updates space pointer in all
-	 * indexes.
+	 * If space was altered then this method updates
+	 * pointers to the primary index in all secondary ones.
 	 */
 	virtual void
 	commitAlterSpace(struct space *old_space, struct space *new_space)
 		override;
 };
-
-struct key_def;
-/* TODO: move to vinyl.c */
-extern "C" int
-vinyl_upsert_cb(int count,
-	       char **src,    uint32_t *src_size,
-	       char **upsert, uint32_t *upsert_size,
-	       char **result, uint32_t *result_size,
-	       struct key_def *key_def);
 
 #endif /* TARANTOOL_BOX_VINYL_SPACE_H_INCLUDED */

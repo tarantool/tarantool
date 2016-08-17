@@ -341,38 +341,95 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		key_def_set_cmp(def);
 }
 
-bool
-key_def_contains_fieldno(const struct key_def *key_def,
-			uint32_t fieldno)
+struct key_part *
+key_def_find(struct key_def *key_def, uint32_t fieldno)
 {
-	for (const struct key_part *iter = key_def->parts,
-	     *end = key_def->parts + key_def->part_count; iter != end; ++iter)
-		if (iter->fieldno == fieldno)
-			return true;
-	return false;
+	struct key_part *part = key_def->parts;
+	struct key_part *end = part + key_def->part_count;
+	for (; part != end; part++) {
+		if (part->fieldno == fieldno)
+			return part;
+	}
+	return NULL;
+}
+
+struct key_def *
+key_def_merge(struct key_def *first, struct key_def *second)
+{
+	uint32_t new_part_count = first->part_count + second->part_count;
+	/*
+	 * Find and remove part duplicates, i.e. parts counted
+	 * twice since they are present in both key defs.
+	 */
+	struct key_part *part = second->parts;
+	struct key_part *end = part + second->part_count;
+	for (; part != end; part++) {
+		if (key_def_find(first, part->fieldno))
+			--new_part_count;
+	}
+
+	struct key_def *new_def;
+	new_def =  key_def_new(first->space_id, first->iid, first->name,
+			      first->type, &first->opts, new_part_count);
+
+	/* Write position in the new key def. */
+	uint32_t pos = 0;
+	/* Append first key def's parts to the new key_def. */
+	part = first->parts;
+	end = part + first->part_count;
+	for (; part != end; part++)
+	     key_def_set_part(new_def, pos++, part->fieldno, part->type);
+
+	/* Set-append second key def's part to the new key def. */
+	part = second->parts;
+	end = part + second->part_count;
+	for (; part != end; part++) {
+		if (key_def_find(first, part->fieldno))
+			continue;
+		key_def_set_part(new_def, pos++, part->fieldno, part->type);
+	}
+	return new_def;
 }
 
 struct key_def *
 key_def_build_secondary_to_primary(struct key_def *primary,
 				   struct key_def *secondary)
 {
+	/*
+	 * Find the order in which keys parts from primary and
+	 * secondary key_defs are present in the secondary
+	 * index tuple.
+	 */
+	struct key_def *merge = key_def_merge(secondary, primary);
+	auto scoped_guard = make_scoped_guard([=] { key_def_delete(merge); });
+
 	struct key_def *def;
 	def = key_def_new(secondary->space_id, secondary->iid,
 			  secondary->name, secondary->type,
 			  &secondary->opts, primary->part_count);
-
+	/** Use the order to set parts in the result. */
 	for (uint32_t i = 0; i < primary->part_count; ++i) {
-		for (uint32_t j = 0; j < secondary->part_count; ++j) {
-			if (secondary->parts[j].fieldno ==
-			    primary->parts[i].fieldno) {
-
-				key_def_set_part(def, i, j,
-						 secondary->parts[j].type);
-				break;
-			}
-		}
+		struct key_part *part;
+		part = key_def_find(merge, primary->parts[i].fieldno);
+		assert(part);
+		key_def_set_part(def, i, part - merge->parts, part->type);
 	}
 	return def;
+}
+
+struct key_def *
+key_def_build_secondary(struct key_def *primary, struct key_def *secondary)
+{
+	struct key_def *merge = key_def_merge(secondary, primary);
+	/*
+	 * Renumber key parts, since they are stored consequently
+	 * in the secondary index.
+	 */
+	struct key_part *part = merge->parts;
+	struct key_part *end = part + merge->part_count;
+	for (; part != end; part++)
+		part->fieldno = part - merge->parts;
+	return merge;
 }
 
 const struct space_opts space_opts_default = {

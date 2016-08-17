@@ -48,9 +48,7 @@ struct MemtxEngine: public Engine {
 					      bool panic_on_wal_error);
 	~MemtxEngine();
 	virtual Handler *open() override;
-	virtual Index *createIndex(struct key_def *key_def) override;
 	virtual void addPrimaryKey(struct space *space) override;
-	virtual void dropIndex(Index *index) override;
 	virtual void dropPrimaryKey(struct space *space) override;
 	virtual bool needToBuildSecondaryKey(struct space *space) override;
 	virtual void keydefCheck(struct space *space, struct key_def *key_def) override;

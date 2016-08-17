@@ -393,33 +393,64 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type);
 
 /**
- * Returns true if key_def->parts contains key_part
- * with specified fieldno.
+ * Returns the part in key_def->parts for the specified fieldno.
+ * If fieldno is not in key_def->parts returns NULL.
  */
-bool
-key_def_contains_fieldno(const struct key_def *key_def,
-			uint32_t fieldno);
+struct key_part *
+key_def_find(struct key_def *key_def, uint32_t fieldno);
 
 /**
- * Create key_def which maps secondary key_parts on primary key_parts.
- * That is the following equality must be true:
- *     secondary key_parts[res->key_parts[i].fieldno] = primary key_parts[i]
- *     (res - result of this function)
+ * Allocate a new key_def with a set union of key parts from
+ * first and second key defs. Parts of the new key_def consist
+ * of the first key_def's parts and those parts of the second
+ * key_def that were not among the first parts.
  *
- * Also key_parts in new key_def will keep original types.
+ * @throws OutOfMemory
+ */
+struct key_def *
+key_def_merge(struct key_def *first, struct key_def *second);
+
+/**
+ * Create a key_def to fetch primary key parts from the tuple
+ * stored in a non-covering secondary index.
  *
- * For instance:
- * - secondary key_parts: 0 (str),    5 (uint), 2 (int),   4 (scalar), 1 (number)
- * - primary key_parts:   1 (number), 5 (uint), 4 (scalar)
+ * A non-covering secondary index stores a tuple with a union
+ * of fields from the primary and secondary key. If a field is
+ * present in both indexes, it's only stored once.
  *
- * Result will be:
- * - res->key_parts:      4 (number), 1 (uint), 3 (scalar)
+ * For example, if there's a primary key defined over fields
+ * (1, 5) and a secondary key defined over fields (7, 5), then
+ * the tuple, stored in the secondary key will contain fields (7,
+ * 5, 1) from the original tuple, in this order.
+ *
+ * The key def returned by this function for the above example
+ * will contain fields (3, 2), since it's built to operate on
+ * the secondary index tuple, and extract key parts for a look
+ * up in the primary key.
+ *
+ * All key parts in the new key_def will keep their original
+ * types.
+ *
+ * @param primary the definition of the primary key
+ * @param secondary the definition of the secondary key
  *
  * @sa usage in vinyl_index.cc
+ *
+ * @throws OutOfMemory
  */
 struct key_def *
 key_def_build_secondary_to_primary(struct key_def *primary,
 				   struct key_def *secondary);
+
+/**
+ * Create a key def with a set union of primary and secondary
+ * keys, used to compare such keys between each other. This
+ * key_def describes how the index is stored in the engine.
+ *
+ * @throws OutOfMemory
+ */
+struct key_def *
+key_def_build_secondary(struct key_def *primary, struct key_def *secondary);
 
 /** Compare two key part arrays.
  *

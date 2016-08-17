@@ -58,11 +58,6 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *open() = 0;
-	/**
-	 * Create an instance of space index. Used in alter
-	 * space.
-	 */
-	virtual Index *createIndex(struct key_def*) = 0;
 	virtual void initSystemSpace(struct space *space);
 	/**
 	 * Check a key definition for violation of
@@ -75,10 +70,6 @@ public:
 	 * key.
 	 */
 	virtual void addPrimaryKey(struct space *space);
-	/**
-	 * Delete all tuples in the index on drop.
-	 */
-	virtual void dropIndex(Index *);
 	/**
 	 * Called by alter when the primary key is dropped.
 	 * Do whatever is necessary with space/handler object,
@@ -207,13 +198,28 @@ public:
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char *key_end,
 		      struct port *);
-
+	/**
+	 * Create an instance of space index. Used in alter
+	 * space.
+	 */
+	virtual Index *createIndex(struct space *space, struct key_def*) = 0;
+	/**
+	 * Delete all tuples in the index on drop.
+	 */
+	virtual void dropIndex(Index *) = 0;
+	/**
+	 * Notify the engine about the changed space,
+	 * before it's done, to prepare 'new_space'
+	 * object.
+	 */
 	virtual void doAlterSpace(struct space *old_space,
 				  struct space *new_space);
 
 	/**
-	 * This method is called after altering space and
-	 * replacing old_space with new_space in space cache.
+	 * Notify the engine engine after altering a space and
+	 * replacing old_space with new_space in the space cache,
+	 * to, e.g., update all referenced to struct space
+	 * and replace old_space with new_space.
 	 */
 	virtual void commitAlterSpace(struct space *old_space,
 				      struct space *new_space);

@@ -28,11 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "engine.h"
+
 #include "tuple.h"
 #include "txn.h"
 #include "port.h"
 #include "request.h"
-#include "engine.h"
 #include "space.h"
 #include "exception.h"
 #include "schema.h"
@@ -117,12 +118,6 @@ void
 Engine::join(struct xstream *stream)
 {
 	(void) stream;
-}
-
-void
-Engine::dropIndex(Index *index)
-{
-	(void) index;
 }
 
 void

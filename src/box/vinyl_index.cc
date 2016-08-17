@@ -48,53 +48,6 @@
 #include "txn.h"
 #include "vinyl.h"
 
-/**
- * Allocate a new key_def with a set union of key parts from
- * first and second key defs. Parts of the new key_def consist
- * of first key_def's parts and those parts of the second key_def
- * that were not among the first parts.
- *
- * @throws OutOfMemory
- */
-static struct key_def *
-key_defs_merge(struct key_def *first, struct key_def *second)
-{
-	int new_part_count = first->part_count + second->part_count;
-	struct key_part *sec_parts = second->parts;
-	/*
-	 * Find and remove part duplicates, i.e. parts counted
-	 * twice since they are present in both key defs.
-	 */
-	for (struct key_part *iter = sec_parts,
-	     *end = sec_parts + second->part_count; iter != end; ++iter)
-		if (key_def_contains_fieldno(first, iter->fieldno)) {
-			--new_part_count;
-		}
-
-	struct key_def *new_def;
-	new_def =  key_def_new(first->space_id, first->iid, first->name,
-			      first->type, &first->opts, new_part_count);
-
-	/* Write position in the new key def. */
-	uint32_t pos = 0;
-	/* Append first key def's parts to the new key_def. */
-	for (struct key_part *iter = first->parts,
-	     *end = first->parts + first->part_count; iter != end; ++iter) {
-
-		key_def_set_part(new_def, pos++, iter->fieldno, iter->type);
-	}
-	/* Set-append second key def's part to the new key def. */
-	for (struct key_part *iter = sec_parts,
-	     *end = sec_parts + second->part_count; iter != end; ++iter) {
-
-		if (key_def_contains_fieldno(first, iter->fieldno)) {
-			continue;
-		}
-		key_def_set_part(new_def, pos++, iter->fieldno, iter->type);
-	}
-	return new_def;
-}
-
 struct vinyl_iterator {
 	struct iterator base;
 	const char *key;
@@ -104,13 +57,11 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct key_def *key_def_arg)
-	: Index(key_def_arg), db(NULL)
-{
-	struct space *space = space_by_id(key_def->space_id);
-	VinylEngine *engine = (VinylEngine *)space->handler->engine;
-	env = engine->env;
-}
+VinylIndex::VinylIndex(struct vy_env *env_arg, struct key_def *key_def_arg)
+	:Index(key_def_arg)
+	 ,env(env_arg)
+	 ,db(NULL)
+{}
 
 struct tuple*
 VinylIndex::findByKey(const char *key, uint32_t part_count) const
@@ -178,8 +129,10 @@ VinylIndex::count(enum iterator_type type, const char *key,
 	return count;
 }
 
-VinylPrimaryIndex::VinylPrimaryIndex(struct key_def *key_def)
-	: VinylIndex(key_def) { }
+VinylPrimaryIndex::VinylPrimaryIndex(struct vy_env *env_arg,
+				     struct key_def *key_def_arg)
+	:VinylIndex(env_arg, key_def_arg)
+{}
 
 void
 VinylPrimaryIndex::open()
@@ -187,14 +140,18 @@ VinylPrimaryIndex::open()
 	assert(db == NULL);
 	/* Create vinyl database. */
 	db = vy_index_new(env, key_def, tuple_format_default);
-	if ((db == NULL) || vy_index_open(db))
+	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
 
-VinylSecondaryIndex::VinylSecondaryIndex(struct key_def *key_def_arg)
-	: VinylIndex(key_def_arg), key_def_secondary(NULL),
-	  key_def_secondary_to_primary(NULL), primary_index(NULL)
-{ }
+VinylSecondaryIndex::VinylSecondaryIndex(struct vy_env *env_arg,
+					 VinylPrimaryIndex *pk_arg,
+					 struct key_def *key_def_arg)
+	:VinylIndex(env_arg, key_def_arg)
+	 ,key_def_tuple_to_key(NULL)
+	 ,key_def_secondary_to_primary(NULL)
+	 ,primary_index(pk_arg)
+{}
 
 /**
  * Get tuple from the primary index by the partial tuple from secondary index.
@@ -234,21 +191,12 @@ void
 VinylSecondaryIndex::open()
 {
 	assert(db == NULL);
-	/**
-	 * key_def_vinyl is merged key_def of this index and key_def of
-	 * primary index, in which parts field numbers are condensed.
-	 * For instance:
-	 * - merged primary and secondary: 3 (str), 6 (uint), 4 (scalar)
-	 * - key_def_vinyl:                0 (str), 1 (uint), 2 (scalar)
-	 *
-	 * Condensing is neccessary because partial tuple consists only
-	 * from primary key and this secondary key fields in a row.
+	/*
+	 * @fixme: we must refetch the primary key becaus it's
+	 * irrelevant here.
+	 * Move the check to alter.cc, ::prepare() phase, and 
+	 * use pass in the primary key key def explicitly.
 	 */
-	struct key_def *key_def_vinyl = NULL;
-	auto guard = make_scoped_guard([&]{
-		if (key_def_vinyl)
-			key_def_delete(key_def_vinyl);
-        });
 	struct space *space = space_by_id(key_def->space_id);
 	primary_index = (VinylPrimaryIndex *) index_find(space, 0);
 	if (space->index_count) {
@@ -260,50 +208,37 @@ VinylSecondaryIndex::open()
 				  "altering not empty space");
 		}
 	}
-	/**
-	 * Allocate a new key_def for vinyl.
-	 * This new key_def is temprorary because its deep copy will
-	 * be created inside the vinyl.c and the original key_def
-	 * we will delete at the end of this function.
-	 * If an exception will be throwed then this key_def will be deleted
-	 * by the guard, declared above.
-	 */
-	key_def_vinyl = key_defs_merge(key_def, primary_index->key_def);
-	/**
-	 * Remember this merged key_def.
-	 * What is key_def_secondary: @sa vinyl_index.h
-	 * Here deep copy must be created because further key_def_vinyl
-	 * will be condensed.
-	 */
-	key_def_secondary = key_def_dup(key_def_vinyl);
-
-	/**
-	 * Create key_def_secondary_to_primary key_def.
-	 * What is this key_def: @sa vinyl_index.h
-	 */
-	struct key_part *iter = key_def_vinyl->parts;
-	for (uint32_t i = 0; i < key_def_vinyl->part_count; ++i, ++iter) {
-		key_def_set_part(key_def_vinyl, i, i, iter->type);
-	}
+	key_def_tuple_to_key = key_def_merge(key_def, primary_index->key_def);
 
 	key_def_secondary_to_primary =
-		key_def_build_secondary_to_primary(primary_index->key_def,
-						   key_def_secondary);
+		key_def_build_secondary_to_primary(primary_index->key_def, key_def);
 
-	/* Create vinyl database. */
+	/**
+	 * key_def_vinyl is a merged key_def of this index and key_def
+	 * of the primary index, in which parts field number are
+	 * renumbered.
+	 *
+	 * For instance:
+	 * - merged primary and secondary: 3 (str), 6 (uint), 4 (scalar)
+	 * - key_def_vinyl:                0 (str), 1 (uint), 2 (scalar)
+	 *
+	 * Condensing is necessary since partial tuple consists only
+	 * from primary secondary key fields, coalesced.
+	 */
+	struct key_def *key_def_vinyl;
+	key_def_vinyl = key_def_build_secondary(primary_index->key_def, key_def);
+	/* The engine makes a copy of the key. */
+	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
+	/* Create a vinyl index. */
 	db = vy_index_new(env, key_def_vinyl, tuple_format_default);
-	if ((db == NULL) || vy_index_open(db)) {
-		key_def_delete(key_def_secondary);
-		key_def_delete(key_def_secondary_to_primary);
-		key_def_secondary = NULL;
-		key_def_secondary_to_primary = NULL;
+	if (db == NULL || vy_index_open(db))
 		diag_raise();
-	}
 }
 
-VinylSecondaryIndex::~VinylSecondaryIndex() {
-	if (key_def_secondary)
-		key_def_delete(key_def_secondary);
+VinylSecondaryIndex::~VinylSecondaryIndex()
+{
+	if (key_def_tuple_to_key)
+		key_def_delete(key_def_tuple_to_key);
 	if (key_def_secondary_to_primary)
 		key_def_delete(key_def_secondary_to_primary);
 }

@@ -28,9 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "vinyl_space.h"
 #include "vinyl_engine.h"
 #include "vinyl_index.h"
-#include "vinyl_space.h"
 #include "xrow.h"
 #include "tuple.h"
 #include "scoped_guard.h"
@@ -48,7 +48,7 @@
 
 VinylSpace::VinylSpace(Engine *e)
 	:Handler(e)
-{ }
+{}
 
 /* Insert a tuple only into the primary index. */
 static void
@@ -78,7 +78,7 @@ vinyl_insert_primary(VinylPrimaryIndex *index, const char *tuple,
 }
 
 /**
- * Insert a tuple only into one secondary index.
+ * Insert a tuple into one secondary index.
  */
 static void
 vinyl_insert_secondary(VinylSecondaryIndex *index, const char *tuple,
@@ -88,7 +88,7 @@ vinyl_insert_secondary(VinylSecondaryIndex *index, const char *tuple,
 	uint32_t key_len;
 	struct key_def *def = index->key_def;
 	key = tuple_extract_key_raw(tuple, tuple_end,
-				    index->key_def_secondary, &key_len);
+				    index->key_def_tuple_to_key, &key_len);
 	key_end = key + key_len;
 	/*
 	 * If the index is unique then the new tuple must not
@@ -149,7 +149,7 @@ vinyl_replace_all(struct space *space, struct request *request,
 		 */
 		if (old_tuple) {
 			key = tuple_extract_key(old_tuple,
-						index->key_def_secondary,
+						index->key_def_tuple_to_key,
 						NULL);
 			part_count = mp_decode_array(&key);
 			if (vy_delete(tx, index->db, key, part_count))
@@ -158,6 +158,7 @@ vinyl_replace_all(struct space *space, struct request *request,
 		vinyl_insert_secondary(index, request->tuple,
 				       request->tuple_end, tx);
 	}
+	/** The old tuple is used if there is an on_replace trigger. */
 	if (stmt) {
 		if (old_tuple)
 			tuple_ref(old_tuple);
@@ -217,7 +218,7 @@ vinyl_delete_all(struct space *space, struct tuple *tuple,
 			key = request->key;
 		} else {
 			key = tuple_extract_key(tuple,
-						index->key_def_secondary,
+						index->key_def_tuple_to_key,
 						NULL);
 		}
 		part_count = mp_decode_array(&key);
@@ -393,7 +394,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 	VinylSecondaryIndex *sec_idx;
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		sec_idx = (VinylSecondaryIndex *) space->index[iid];
-		key = tuple_extract_key(old_tuple, sec_idx->key_def_secondary,
+		key = tuple_extract_key(old_tuple, sec_idx->key_def_tuple_to_key,
 					NULL);
 		part_count = mp_decode_array(&key);
 		/**
@@ -442,6 +443,32 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 			diag_raise();
 		}
 	}
+}
+
+Index *
+VinylSpace::createIndex(struct space *space, struct key_def *key_def)
+{
+	VinylEngine *engine = (VinylEngine *) this->engine;
+	if (key_def->type != TREE) {
+		unreachable();
+		return NULL;
+	}
+	if (key_def->iid == 0)
+		return new VinylPrimaryIndex(engine->env, key_def);
+	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) space->index[0];
+	return new VinylSecondaryIndex(engine->env, pk, key_def);
+}
+
+void
+VinylSpace::dropIndex(Index *index)
+{
+	VinylIndex *i = (VinylIndex *)index;
+	/* schedule asynchronous drop */
+	int rc = vy_index_drop(i->db);
+	if (rc == -1)
+		diag_raise();
+	i->db  = NULL;
+	i->env = NULL;
 }
 
 void

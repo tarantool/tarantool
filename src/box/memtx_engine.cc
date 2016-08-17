@@ -125,27 +125,32 @@ struct MemtxSpace: public Handler {
 		/* engine->close(this); */
 	}
 	virtual void
-	applySnapshotRow(struct space *space, struct request *request);
+	applySnapshotRow(struct space *space,
+			 struct request *request) override;
 	virtual struct tuple *
 	executeReplace(struct txn *txn, struct space *space,
-		       struct request *request);
+		       struct request *request) override;
 	virtual struct tuple *
 	executeDelete(struct txn *txn, struct space *space,
-		      struct request *request);
+		      struct request *request) override;
 	virtual struct tuple *
 	executeUpdate(struct txn *txn, struct space *space,
-		      struct request *request);
+		      struct request *request) override;
 	virtual void
 	executeUpsert(struct txn *txn, struct space *space,
-		      struct request *request);
+		      struct request *request) override;
 	virtual void
 	executeSelect(struct txn *, struct space *space,
 		      uint32_t index_id, uint32_t iterator,
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char * /* key_end */,
-		      struct port *port);
+		      struct port *port) override;
+
+	virtual Index *createIndex(struct space *space,
+				   struct key_def *key_def) override;
+	virtual void dropIndex(Index *index) override;
 	virtual void doAlterSpace(struct space *old_space,
-				  struct space *new_space);
+				  struct space *new_space) override;
 public:
 	/**
 	 * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -430,6 +435,41 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		}
 	}
 	/* Return nothing: UPSERT does not return data. */
+}
+
+Index *
+MemtxSpace::createIndex(struct space *space, struct key_def *key_def)
+{
+	(void) space;
+	switch (key_def->type) {
+	case HASH:
+		return new MemtxHash(key_def);
+	case TREE:
+		return new MemtxTree(key_def);
+	case RTREE:
+		return new MemtxRTree(key_def);
+	case BITSET:
+		return new MemtxBitset(key_def);
+	default:
+		unreachable();
+		return NULL;
+	}
+}
+
+void
+MemtxSpace::dropIndex(Index *index)
+{
+	if (index->key_def->iid != 0)
+		return; /* nothing to do for secondary keys */
+	/*
+	 * Delete all tuples in the old space if dropping the
+	 * primary key.
+	 */
+	struct iterator *it = ((MemtxIndex*) index)->position();
+	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
+	while ((tuple = it->next(it)))
+		tuple_unref(tuple);
 }
 
 void
@@ -831,41 +871,6 @@ MemtxEngine::needToBuildSecondaryKey(struct space *space)
 {
 	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
 	return handler->replace == memtx_replace_all_keys;
-}
-
-Index *
-MemtxEngine::createIndex(struct key_def *key_def)
-{
-	switch (key_def->type) {
-	case HASH:
-		return new MemtxHash(key_def);
-	case TREE:
-		return new MemtxTree(key_def);
-	case RTREE:
-		return new MemtxRTree(key_def);
-	case BITSET:
-		return new MemtxBitset(key_def);
-	default:
-		unreachable();
-		return NULL;
-	}
-}
-
-void
-MemtxEngine::dropIndex(Index *index)
-{
-	if (index->key_def->iid != 0)
-		return; /* nothing to do for secondary keys */
-
-	/*
-	 * Delete all tuples in the old space if dropping the
-	 * primary key.
-	 */
-	struct iterator *it = ((MemtxIndex*) index)->position();
-	index->initIterator(it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = it->next(it)))
-		tuple_unref(tuple);
 }
 
 void

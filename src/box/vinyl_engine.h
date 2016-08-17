@@ -31,17 +31,14 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
-#include "third_party/tarantool_ev.h"
-#include "small/mempool.h"
-#include "small/region.h"
+
+struct vy_env;
 
 struct VinylEngine: public Engine {
 	VinylEngine();
 	~VinylEngine();
 	virtual void init() override;
 	virtual Handler *open() override;
-	virtual Index *createIndex(struct key_def *) override;
-	virtual void dropIndex(Index*) override;
 	virtual void keydefCheck(struct space *space, struct key_def *f) override;
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;
@@ -59,7 +56,7 @@ struct VinylEngine: public Engine {
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 public:
 	struct vy_env *env;
-	int recovery_complete;
+	bool recovery_complete;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */

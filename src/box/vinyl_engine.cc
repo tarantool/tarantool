@@ -43,11 +43,9 @@
 #include "xrow.h"
 #include "tuple.h"
 #include "txn.h"
-#include "index.h"
 #include "relay.h"
 #include "space.h"
 #include "schema.h"
-#include "port.h"
 #include "request.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
@@ -62,7 +60,7 @@ vinyl_engine_get_env()
 
 VinylEngine::VinylEngine()
 	:Engine("vinyl")
-	 ,recovery_complete(0)
+	,recovery_complete(false)
 {
 	flags = 0;
 	env = NULL;
@@ -86,7 +84,7 @@ void
 VinylEngine::bootstrap()
 {
 	vy_bootstrap(env);
-	recovery_complete = 1;
+	recovery_complete = true;
 }
 
 void
@@ -107,7 +105,7 @@ VinylEngine::endRecovery()
 	assert(!recovery_complete);
 	/* complete two-phase recovery */
 	vy_end_recovery(env);
-	recovery_complete = 1;
+	recovery_complete = true;
 }
 
 Handler *
@@ -184,35 +182,6 @@ VinylEngine::join(struct xstream *stream)
 {
 	struct join_send_space_arg arg = { env, stream };
 	space_foreach(join_send_space, &arg);
-}
-
-Index*
-VinylEngine::createIndex(struct key_def *key_def)
-{
-	switch (key_def->type) {
-	case TREE: {
-		if (key_def->iid == 0) {
-			return new VinylPrimaryIndex(key_def);
-		} else {
-			return new VinylSecondaryIndex(key_def);
-		}
-	}
-	default:
-		unreachable();
-		return NULL;
-	}
-}
-
-void
-VinylEngine::dropIndex(Index *index)
-{
-	VinylIndex *i = (VinylIndex *)index;
-	/* schedule asynchronous drop */
-	int rc = vy_index_drop(i->db);
-	if (rc == -1)
-		diag_raise();
-	i->db  = NULL;
-	i->env = NULL;
 }
 
 void
