@@ -133,6 +133,76 @@
 	tt_pthread_error(e__);			\
 })
 
+#define tt_pthread_rwlock_init(rwlock, attr)	\
+({						\
+	int e__ = pthread_rwlock_init(rwlock, attr);\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlock_destroy(rwlock)		\
+({	int e__ = pthread_rwlock_destroy(rwlock);	\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlock_rdlock(rwlock)		\
+({	int e__ = pthread_rwlock_rdlock(rwlock);	\
+	say_debug("%s: locking %s", __func__, #rwlock);\
+	tt_pthread_error(e__);\
+})
+
+#define tt_pthread_rwlock_tryrdlock(rwlock)		\
+({	int e__ = pthread_rwlock_tryrdlock(rwlock);	\
+	if (e__ != 0 && e__ != EBUSY)		\
+		say_error("%s error %d at %s:%d", __func__, e__, __FILE__, __LINE__);\
+	assert(e__ == 0 || e__ == EBUSY);	\
+	e__;					\
+})
+
+#define tt_pthread_rwlock_wrlock(rwlock)		\
+({	int e__ = pthread_rwlock_wrlock(rwlock);	\
+	say_debug("%s: locking %s", __func__, #rwlock);\
+	tt_pthread_error(e__);\
+})
+
+#define tt_pthread_rwlock_trywrlock(rwlock)		\
+({	int e__ = pthread_rwlock_trywrlock(rwlock);	\
+	if (e__ != 0 && e__ != EBUSY)		\
+		say_error("%s error %d at %s:%d", __func__, e__, __FILE__, __LINE__);\
+	assert(e__ == 0 || e__ == EBUSY);	\
+	e__;					\
+})
+
+#define tt_pthread_rwlock_unlock(rwlock)		\
+({	int e__ = pthread_rwlock_unlock(rwlock);	\
+	say_debug("%s: unlocking %s", __func__, #rwlock);\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlock_destroy(rwlock)		\
+({	int e__ = pthread_rwlock_destroy(rwlock);	\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlockattr_init(attr)		\
+({	int e__ = pthread_rwlockattr_init(attr);	\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlockattr_destroy(attr)	\
+({	int e__ = pthread_rwlockattr_destroy(attr);\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlockattr_gettype(attr, type)\
+({	int e__ = pthread_rwlockattr_gettype(attr, type);\
+	tt_pthread_error(e__);			\
+})
+
+#define tt_pthread_rwlockattr_settype(attr, type)\
+({	int e__ = pthread_rwlockattr_settype(attr, type);\
+	tt_pthread_error(e__);			\
+})
+
 #define tt_pthread_condattr_init(attr)		\
 ({	int e__ = pthread_condattr_init(attr);	\
 	tt_pthread_error(e__);			\
