@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/init.h"
+#include "lua/utils.h"
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
@@ -165,26 +166,10 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
-static GCcdata*
-luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
-{
-	CTState *cts = ctype_cts(L);
-	CType *ct = ctype_raw(cts, id);
-	CTSize sz;
-	lj_ctype_info(cts, id, &sz);
-	GCcdata *cd = lj_cdata_new(cts, id, bits);
-	TValue *o = L->top;
-	setcdataV(L, o, cd);
-	lj_cconv_ct_init(cts, ct, sz, (uint8_t *) cdataptr(cd), o, 0);
-	incr_top(L);
-	return cd;
-}
-
 int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
-	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-	*(uint64_t*)cdataptr(cd) = val;
+	*(uint64_t *) luaL_pushcdata(L, CTID_UINT64) = val;
 	return 1;
 }
 

@@ -7,6 +7,7 @@ if (NOT TARGET_OS_DARWIN)
     add_subdirectory(module)
 endif()
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
@@ -80,6 +81,7 @@ set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/tarantool.cc
      ${CMAKE_SOURCE_DIR}/src/opts.c
      ${CMAKE_SOURCE_DIR}/src/lua/init.cc
+     ${CMAKE_SOURCE_DIR}/src/lua/utils.c
      ${CMAKE_SOURCE_DIR}/src/say.cc
      ${CMAKE_SOURCE_DIR}/src/assoc.cc
      ${CMAKE_SOURCE_DIR}/src/replication.cc
@@ -127,6 +129,7 @@ set (common_sources
      lua/cjson.cc
      lua/errno.c
      lua/bsdsocket.cc
+     lua/utils.c
      fiob.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
