@@ -11,3 +11,38 @@ exec admin "lua box.cjson.encode({Метапеременная = { 'Метазн
 exec admin "lua box.cjson.decode('123')"
 exec admin "lua box.cjson.decode('[123, \"Кудыкины горы\"]')[2]"
 exec admin "lua box.cjson.decode('{\"test\": \"Результат\"}').test"
+
+exec admin "lua box.cjson.encode(0)"
+exec admin "lua box.cjson.encode(0LL)"
+exec admin "lua box.cjson.encode(0ULL)"
+exec admin "lua box.cjson.encode(-1)"
+exec admin "lua box.cjson.encode(-1LL)"
+exec admin "lua box.cjson.encode(-1ULL)"
+
+exec admin "lua box.cjson.encode(99999999999999)"
+exec admin "lua box.cjson.encode(99999999999999LL)"
+exec admin "lua box.cjson.encode(99999999999999ULL)"
+exec admin "lua box.cjson.encode(100000000000000)"
+exec admin "lua box.cjson.encode(100000000000000ULL)"
+
+exec admin "lua box.cjson.encode(9223372036854775808ULL)"
+exec admin "lua box.cjson.encode(9223372036854775809ULL)"
+exec admin "lua box.cjson.encode(18446744073709551614ULL)"
+exec admin "lua box.cjson.encode(18446744073709551615ULL)"
+
+exec admin "lua box.cjson.encode(-99999999999999)"
+exec admin "lua box.cjson.encode(-99999999999999LL)"
+exec admin "lua box.cjson.encode(-100000000000000)"
+exec admin "lua box.cjson.encode(-100000000000000LL)"
+exec admin "lua box.cjson.encode(-9223372036854775806LL)"
+exec admin "lua box.cjson.encode(-9223372036854775808LL)"
+
+
+exec admin "lua box.cjson.decode('9223372036854775808') == 9223372036854775808LL"
+exec admin "lua box.cjson.decode('-9223372036854775808') == -9223372036854775808LL"
+
+exec admin "lua box.cjson.decode('100000000000000') == 100000000000000LL"
+exec admin "lua box.cjson.decode('-100000000000000') == -100000000000000LL"
+
+exec admin "lua box.cjson.decode('99999999999999') == 99999999999999LL"
+exec admin "lua box.cjson.decode('-99999999999999') == -99999999999999LL"

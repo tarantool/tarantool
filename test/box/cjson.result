@@ -35,3 +35,111 @@ lua box.cjson.decode('{"test": "Результат"}').test
 ---
  - Результат
 ...
+lua box.cjson.encode(0)
+---
+ - 0
+...
+lua box.cjson.encode(0LL)
+---
+ - 0
+...
+lua box.cjson.encode(0ULL)
+---
+ - 0
+...
+lua box.cjson.encode(-1)
+---
+ - -1
+...
+lua box.cjson.encode(-1LL)
+---
+ - -1
+...
+lua box.cjson.encode(-1ULL)
+---
+ - 18446744073709551615
+...
+lua box.cjson.encode(99999999999999)
+---
+ - 99999999999999
+...
+lua box.cjson.encode(99999999999999LL)
+---
+ - 99999999999999
+...
+lua box.cjson.encode(99999999999999ULL)
+---
+ - 99999999999999
+...
+lua box.cjson.encode(100000000000000)
+---
+ - 1e+14
+...
+lua box.cjson.encode(100000000000000ULL)
+---
+ - 100000000000000
+...
+lua box.cjson.encode(9223372036854775808ULL)
+---
+ - 9223372036854775808
+...
+lua box.cjson.encode(9223372036854775809ULL)
+---
+ - 9223372036854775809
+...
+lua box.cjson.encode(18446744073709551614ULL)
+---
+ - 18446744073709551614
+...
+lua box.cjson.encode(18446744073709551615ULL)
+---
+ - 18446744073709551615
+...
+lua box.cjson.encode(-99999999999999)
+---
+ - -99999999999999
+...
+lua box.cjson.encode(-99999999999999LL)
+---
+ - -99999999999999
+...
+lua box.cjson.encode(-100000000000000)
+---
+ - -1e+14
+...
+lua box.cjson.encode(-100000000000000LL)
+---
+ - -100000000000000
+...
+lua box.cjson.encode(-9223372036854775806LL)
+---
+ - -9223372036854775806
+...
+lua box.cjson.encode(-9223372036854775808LL)
+---
+ - -9223372036854775808
+...
+lua box.cjson.decode('9223372036854775808') == 9223372036854775808LL
+---
+ - true
+...
+lua box.cjson.decode('-9223372036854775808') == -9223372036854775808LL
+---
+ - true
+...
+lua box.cjson.decode('100000000000000') == 100000000000000LL
+---
+ - true
+...
+lua box.cjson.decode('-100000000000000') == -100000000000000LL
+---
+ - true
+...
+lua box.cjson.decode('99999999999999') == 99999999999999LL
+---
+ - true
+...
+lua box.cjson.decode('-99999999999999') == -99999999999999LL
+---
+ - true
+...
