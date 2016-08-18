@@ -139,14 +139,14 @@ enum vy_sequence_op {
 struct vy_sequence {
 	pthread_mutex_t lock;
 	/** Log sequence number. */
-	uint64_t lsn;
+	int64_t lsn;
 	/**
 	 * View sequence number: the oldest read view maintained
 	 * by the front end.
 	 */
-	uint64_t vlsn;
+	int64_t vlsn;
 	/** Node sequence number. */
-	uint64_t nsn;
+	int64_t nsn;
 };
 
 static inline struct vy_sequence *
@@ -179,10 +179,10 @@ vy_sequence_unlock(struct vy_sequence *n) {
 	tt_pthread_mutex_unlock(&n->lock);
 }
 
-static inline uint64_t
+static inline int64_t
 vy_sequence_do(struct vy_sequence *n, enum vy_sequence_op op)
 {
-	uint64_t v = 0;
+	int64_t v = 0;
 	switch (op) {
 	case VINYL_LSN:
 		v = n->lsn;
@@ -197,11 +197,11 @@ vy_sequence_do(struct vy_sequence *n, enum vy_sequence_op op)
 	return v;
 }
 
-static inline uint64_t
+static inline int64_t
 vy_sequence(struct vy_sequence *n, enum vy_sequence_op op)
 {
 	vy_sequence_lock(n);
-	uint64_t v = vy_sequence_do(n, op);
+	int64_t v = vy_sequence_do(n, op);
 	vy_sequence_unlock(n);
 	return v;
 }
@@ -607,11 +607,11 @@ vy_quota_enable(struct vy_quota*);
 static int
 vy_quota_op(struct vy_quota*, enum vy_quotaop, int64_t);
 
-static inline uint64_t
+static inline int64_t
 vy_quota_used(struct vy_quota *q)
 {
 	tt_pthread_mutex_lock(&q->lock);
-	uint64_t used = q->used;
+	int64_t used = q->used;
 	tt_pthread_mutex_unlock(&q->lock);
 	return used;
 }
@@ -1579,7 +1579,7 @@ struct sv;
 
 struct svif {
 	uint8_t   (*flags)(struct sv*);
-	uint64_t  (*lsn)(struct sv*);
+	int64_t   (*lsn)(struct sv*);
 	char     *(*pointer)(struct sv*);
 	uint32_t  (*size)(struct sv*);
 };
@@ -1626,7 +1626,7 @@ sv_is(struct sv *v, int flags) {
 	return sv_isflags(sv_flags(v), flags) > 0;
 }
 
-static inline uint64_t
+static inline int64_t
 sv_lsn(struct sv *v) {
 	return v->i->lsn(v);
 }
@@ -1642,7 +1642,7 @@ sv_size(struct sv *v) {
 }
 
 struct vy_tuple {
-	uint64_t lsn;
+	int64_t  lsn;
 	uint32_t size;
 	uint16_t refs; /* atomic */
 	uint8_t  flags;
@@ -1854,7 +1854,7 @@ sv_mergeisdup(struct svmergeiter *im)
 
 struct svreaditer {
 	struct svmergeiter *merge;
-	uint64_t vlsn;
+	int64_t vlsn;
 	int next;
 	int nextdup;
 	int save_delete;
@@ -1978,7 +1978,7 @@ sv_readiter_forward(struct svreaditer *im)
 
 static inline int
 sv_readiter_open(struct svreaditer *im, struct svmergeiter *merge,
-		 uint64_t vlsn, int save_delete)
+		 int64_t vlsn, int save_delete)
 {
 	im->merge = merge;
 	im->vlsn  = vlsn;
@@ -2010,7 +2010,7 @@ sv_readiter_get(struct svreaditer *im)
 }
 
 struct svwriteiter {
-	uint64_t  vlsn;
+	int64_t   vlsn;
 	uint64_t  limit;
 	uint64_t  size;
 	uint32_t  sizev;
@@ -2019,7 +2019,7 @@ struct svwriteiter {
 	int       save_upsert;
 	int       next;
 	int       upsert;
-	uint64_t  prevlsn;
+	int64_t   prevlsn;
 	int       vdup;
 	struct sv       *v;
 	struct svmergeiter   *merge;
@@ -2095,7 +2095,7 @@ sv_writeiter_next(struct svwriteiter *im)
 	for (; sv_mergeiter_has(im->merge); sv_mergeiter_next(im->merge))
 	{
 		struct sv *v = sv_mergeiter_get(im->merge);
-		uint64_t lsn = sv_lsn(v);
+		int64_t lsn = sv_lsn(v);
 		int flags = sv_flags(v);
 		int dup = sv_isflags(flags, SVDUP) || sv_mergeisdup(im->merge);
 		if (im->size >= im->limit) {
@@ -2157,7 +2157,7 @@ sv_writeiter_next(struct svwriteiter *im)
 static inline int
 sv_writeiter_open(struct svwriteiter *im, struct svmergeiter *merge,
 		  uint64_t limit,
-		  uint32_t sizev, uint64_t vlsn, int save_delete,
+		  uint32_t sizev, int64_t vlsn, int save_delete,
 		  int save_upsert)
 {
 	im->upsert_tuple = NULL;
@@ -2226,7 +2226,7 @@ struct svref {
 
 struct tree_mem_key {
 	char *data;
-	uint64_t lsn;
+	int64_t lsn;
 };
 
 struct vy_mem;
@@ -2277,7 +2277,7 @@ vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
 struct vy_mem {
 	struct bps_tree_mem tree;
 	uint32_t used;
-	uint64_t min_lsn;
+	int64_t min_lsn;
 	struct key_def *key_def;
 	/*
 	 * version is initially 0 and is incremented on every index change
@@ -2299,7 +2299,7 @@ vy_mem_tree_cmp_key(struct svref a, struct tree_mem_key *key,
 {
 	int res = vy_tuple_compare(a.v->data, key->data, index->key_def);
 	if (res == 0) {
-		if (key->lsn == UINT64_MAX - 1)
+		if (key->lsn == INT64_MAX - 1)
 			return 0;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
 	}
@@ -2327,7 +2327,7 @@ vy_mem_free_matras_page(void *p)
 static int
 vy_mem_init(struct vy_mem *index, struct key_def *key_def)
 {
-	index->min_lsn = UINT64_MAX;
+	index->min_lsn = INT64_MAX;
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
@@ -2371,7 +2371,7 @@ vy_mem_set(struct vy_mem *index, struct svref ref)
  * Find a value in index with given key and biggest lsn <= given lsn
  */
 static struct svref *
-vy_mem_find(struct vy_mem *i, char *key, uint64_t lsn)
+vy_mem_find(struct vy_mem *i, char *key, int64_t lsn)
 {
 	assert(i == i->tree.arg);
 	struct tree_mem_key tree_key;
@@ -2391,7 +2391,7 @@ svtuple_flags(struct sv *v) {
 	return sv_to_tuple(v)->flags;
 }
 
-static uint64_t
+static int64_t
 svtuple_lsn(struct sv *v) {
 	return sv_to_tuple(v)->lsn;
 }
@@ -2415,8 +2415,8 @@ static struct svif svtuple_if =
 };
 
 struct PACKED sdid {
-	uint64_t parent;
-	uint64_t id;
+	int64_t parent;
+	int64_t id;
 	uint8_t  flags;
 };
 
@@ -2431,10 +2431,10 @@ struct PACKED vy_page_index_header {
 	uint32_t  keys;
 	uint64_t  total;
 	uint64_t  totalorigin;
-	uint64_t  lsnmin;
-	uint64_t  lsnmax;
+	int64_t   lsnmin;
+	int64_t   lsnmax;
 	uint32_t  dupkeys;
-	uint64_t  dupmin;
+	int64_t   dupmin;
 	uint32_t  extension;
 	uint8_t   extensions;
 	char      reserve[31];
@@ -2452,13 +2452,13 @@ struct PACKED vy_page_info {
 	/* offset of page's max key in page index key storage */
 	uint32_t max_key_offset;
 	/* lsn of min key in page */
-	uint64_t min_key_lsn;
+	int64_t  min_key_lsn;
 	/* lsn of max key in page */
-	uint64_t max_key_lsn;
+	int64_t  max_key_lsn;
 	/* minimal lsn of all records in page */
-	uint64_t min_lsn;
+	int64_t  min_lsn;
 	/* maximal lsn of all records in page */
-	uint64_t max_lsn;
+	int64_t  max_lsn;
 };
 
 
@@ -2549,7 +2549,7 @@ struct vy_planner {
  */
 struct txv {
 	/** Transaction start logical time - used by conflict manager. */
-	uint64_t tsn;
+	int64_t tsn;
 	struct vy_index *index;
 	struct vy_tuple *tuple;
 	struct vy_tx *tx;
@@ -2629,7 +2629,7 @@ enum tx_type {
 struct read_set_key {
 	char *data;
 	int size;
-	uint64_t tsn;
+	int64_t tsn;
 };
 
 typedef rb_tree(struct txv) write_set_t;
@@ -2650,13 +2650,13 @@ struct vy_tx {
 	enum tx_state    state;
 	bool is_aborted;
 	/** Transaction logical start time. */
-	uint64_t tsn;
+	int64_t tsn;
 	/**
 	 * Consistent read view LSN: the LSN recorded
 	 * at start of transaction and used to implement
 	 * transactional read view.
 	 */
-	uint64_t   vlsn;
+	int64_t   vlsn;
 	rb_node(struct vy_tx) tree_node;
 	/*
 	 * For non-autocommit transactions, the list of open
@@ -2729,7 +2729,7 @@ rb_gen_ext_key(, read_set_, read_set_t, struct txv, in_read_set, read_set_cmp,
 		 struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
-read_set_search_key(read_set_t *rbtree, char *data, int size, uint64_t tsn)
+read_set_search_key(read_set_t *rbtree, char *data, int size, int64_t tsn)
 {
 	struct read_set_key key;
 	key.data = data;
@@ -2859,7 +2859,7 @@ struct tx_manager {
 	uint32_t    count_rd;
 	uint32_t    count_rw;
 	/** Transaction logical time. */
-	uint64_t tsn;
+	int64_t tsn;
 	struct vy_env *env;
 };
 
@@ -2998,7 +2998,7 @@ struct PACKED sdv {
 	/* TODO: reorder: uint64_t, uint32_t, uint32_t, uint8_t */
 	uint32_t offset;
 	uint8_t  flags;
-	uint64_t lsn;
+	int64_t lsn;
 	uint32_t size;
 };
 
@@ -3010,9 +3010,9 @@ struct PACKED sdpageheader {
 	uint32_t sizeorigin;
 	uint32_t sizekeys;
 	uint32_t size;
-	uint64_t lsnmin;
-	uint64_t lsnmindup;
-	uint64_t lsnmax;
+	int64_t  lsnmin;
+	int64_t  lsnmindup;
+	int64_t  lsnmax;
 	uint32_t reserve;
 };
 
@@ -3244,7 +3244,7 @@ struct sdmergeconf {
 	uint32_t    checksum;
 	uint32_t    compression;
 	struct vy_filterif *compression_if;
-	uint64_t    vlsn;
+	int64_t     vlsn;
 	uint32_t    save_delete;
 	uint32_t    save_upsert;
 };
@@ -3269,7 +3269,7 @@ struct sdreadarg {
 	struct vy_file     *file;
 	enum vy_order     o;
 	int         has;
-	uint64_t    has_vlsn;
+	int64_t     has_vlsn;
 	int         use_compression;
 	struct vy_filterif *compression_if;
 	struct key_def *key_def;
@@ -3843,7 +3843,7 @@ struct siread {
 	void *key;
 	uint32_t keysize;
 	int has;
-	uint64_t vlsn;
+	int64_t vlsn;
 	struct svmerge merge;
 	int read_disk;
 	int read_cache;
@@ -3930,12 +3930,12 @@ static int vy_index_dropmark(struct vy_index*);
 static int vy_index_droprepository(char*, int);
 
 static int
-si_merge(struct vy_index*, struct sdc*, struct vy_range*, uint64_t,
+si_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
 	 struct svmergeiter*, uint64_t, uint32_t);
 
-static int vy_dump(struct vy_index*, struct sdc*, struct vy_range*, uint64_t);
+static int vy_dump(struct vy_index*, struct sdc*, struct vy_range*, int64_t);
 static int
-si_compact(struct vy_index*, struct sdc*, struct vy_range*, uint64_t,
+si_compact(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
 	   struct vy_iter*, uint64_t);
 
 typedef rb_tree(struct vy_range) vy_range_id_tree_t;
@@ -3951,7 +3951,7 @@ static int
 vy_range_id_tree_key_cmp(vy_range_id_tree_t *rbtree, const char *a, struct vy_range *b)
 {
 	(void)rbtree;
-	return vy_cmp(load_u64(a), b->self.id.id);
+	return vy_cmp((int64_t)load_u64(a), b->self.id.id);
 }
 
 rb_gen_ext_key(, vy_range_id_tree_, vy_range_id_tree_t, struct vy_range,
@@ -3970,8 +3970,8 @@ vy_range_id_tree_free_cb(vy_range_id_tree_t *t, struct vy_range * n, void *arg)
 struct sitrack {
 	vy_range_id_tree_t tree;
 	int count;
-	uint64_t nsn;
-	uint64_t lsn;
+	int64_t nsn;
+	int64_t lsn;
 };
 
 static inline void
@@ -4002,7 +4002,7 @@ si_trackmetrics(struct sitrack *t, struct vy_range *n)
 			t->nsn = run->id.parent;
 		if (run->id.id > t->nsn)
 			t->nsn = run->id.id;
-		if (h->lsnmin != UINT64_MAX && h->lsnmin > t->lsn)
+		if (h->lsnmin != INT64_MAX && h->lsnmin > t->lsn)
 			t->lsn = h->lsnmin;
 		if (h->lsnmax > t->lsn)
 			t->lsn = h->lsnmax;
@@ -4011,7 +4011,7 @@ si_trackmetrics(struct sitrack *t, struct vy_range *n)
 }
 
 static inline void
-si_tracknsn(struct sitrack *t, uint64_t nsn)
+si_tracknsn(struct sitrack *t, int64_t nsn)
 {
 	if (t->nsn < nsn)
 		t->nsn = nsn;
@@ -4062,7 +4062,7 @@ si_replace(struct vy_index *index, struct vy_range *o, struct vy_range *n)
 }
 
 static int
-vy_task_execute(struct vy_task *task, struct sdc *c, uint64_t vlsn)
+vy_task_execute(struct vy_task *task, struct sdc *c, int64_t vlsn)
 {
 	assert(task->index != NULL);
 	int rc = -1;
@@ -4100,7 +4100,7 @@ vy_run_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
 		  struct vy_buf *data_buf, struct sdpageheader *header)
 {
 	struct sv *value = sv_writeiter_get(iwrite);
-	uint64_t lsn = sv_lsn(value);
+	int64_t lsn = sv_lsn(value);
 	uint8_t flags = sv_flags(value);
 	if (sv_writeiter_is_duplicate(iwrite))
 		flags |= SVDUP;
@@ -4148,8 +4148,8 @@ vy_run_write_page(struct vy_file *file, struct svwriteiter *iwrite,
 
 	struct sdpageheader header;
 	memset(&header, 0, sizeof(struct sdpageheader));
-	header.lsnmin = UINT64_MAX;
-	header.lsnmindup = UINT64_MAX;
+	header.lsnmin = INT64_MAX;
+	header.lsnmindup = INT64_MAX;
 
 	while (iwrite && sv_writeiter_has(iwrite)) {
 		int rc = vy_run_dump_tuple(iwrite, &tuplesinfo, &values,
@@ -4272,8 +4272,8 @@ vy_run_write(struct vy_file *file, struct svwriteiter *iwrite,
 	struct vy_page_index_header *index_header = &sdindex->header;
 	memset(index_header, 0, sizeof(struct vy_page_index_header));
 	sr_version_storage(&index_header->version);
-	index_header->lsnmin = UINT64_MAX;
-	index_header->dupmin = UINT64_MAX;
+	index_header->lsnmin = INT64_MAX;
+	index_header->dupmin = INT64_MAX;
 	index_header->id = *id;
 
 	do {
@@ -4329,7 +4329,7 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
 static inline int
 vy_run_create(struct vy_index *index, struct sdc *c,
 	      struct vy_range *parent, struct vy_mem *mem,
-	      uint64_t vlsn, struct vy_run **result)
+	      int64_t vlsn, struct vy_run **result)
 {
 	(void)c;
 	struct vy_env *env = index->env;
@@ -4380,7 +4380,7 @@ err:
 
 static int
 vy_dump(struct vy_index *index, struct sdc *c, struct vy_range *n,
-        uint64_t vlsn)
+        int64_t vlsn)
 {
 	struct vy_env *env = index->env;
 	assert(n->flags & SI_LOCK);
@@ -4445,7 +4445,7 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 
 static int
 si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
-	   uint64_t vlsn, struct vy_iter *vindex, uint64_t vindex_used)
+	   int64_t vlsn, struct vy_iter *vindex, uint64_t vindex_used)
 {
 	assert(node->flags & SI_LOCK);
 
@@ -4700,7 +4700,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
          uint64_t  size_node,
          uint64_t  size_stream,
          uint32_t  stream,
-         uint64_t  vlsn)
+         int64_t   vlsn)
 {
 	(void) stream;
 	(void) size_node;
@@ -4755,7 +4755,7 @@ error:
 
 static int
 si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
-	 uint64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
+	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
 	 uint32_t n_stream)
 {
 	struct vy_buf *result = &c->a;
@@ -5201,7 +5201,7 @@ vy_task_destroy(struct vy_task *task)
 }
 
 static inline int
-vy_planner_peek_checkpoint(struct vy_index *index, uint64_t checkpoint_lsn,
+vy_planner_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
 			   struct vy_task *task)
 {
 	/* try to peek a node which has min
@@ -5307,7 +5307,7 @@ vy_planner_peek_compact(struct vy_index *index, uint32_t run_count,
 }
 
 static inline int
-vy_planner_peek_gc(struct vy_index *index, uint64_t gc_lsn,
+vy_planner_peek_gc(struct vy_index *index, int64_t gc_lsn,
 		   uint32_t gc_percent, struct vy_task *task)
 {
 	/* try to peek a node with a biggest number
@@ -5497,7 +5497,7 @@ struct vy_run_iterator {
 	/* Search key data in terms of vinyl, vy_tuple_compare argument */
 	char *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	uint64_t vlsn;
+	int64_t vlsn;
 
 	/* State of iterator */
 	/* Position of curent record */
@@ -5523,7 +5523,7 @@ static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 		     struct vy_run *run, struct vy_file *file,
 		     struct vy_filterif *compression, enum vy_order order,
-		     char *key, uint64_t vlsn);
+		     char *key, int64_t vlsn);
 
 /**
  * Get a tuple from a record, that iterator currently positioned on
@@ -5563,7 +5563,7 @@ vy_run_iterator_close(struct vy_run_iterator *itr);
 
 static void
 si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
-	    uint64_t vlsn, void *key, uint32_t keysize)
+	    int64_t vlsn, void *key, uint32_t keysize)
 {
 	q->order = order;
 	q->key = key;
@@ -5774,13 +5774,13 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 	struct vy_range *range = vy_rangeiter_get(&ri);
 	assert(range != NULL);
 
-	uint64_t lsn = tuple->lsn;
+	int64_t lsn = tuple->lsn;
 	/* search in-memory */
 	struct vy_mem *second;
 	struct vy_mem *first = vy_range_index_priority(range, &second);
-	struct svref *ref = vy_mem_find(first, tuple->data, UINT64_MAX);
+	struct svref *ref = vy_mem_find(first, tuple->data, INT64_MAX);
 	if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
-		ref = vy_mem_find(second, tuple->data, UINT64_MAX);
+		ref = vy_mem_find(second, tuple->data, INT64_MAX);
 	if (ref != NULL && ref->v->lsn >= lsn)
 		return 1;
 
@@ -5796,7 +5796,7 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 				     INT64_MAX);
 		struct vy_tuple *tuple;
 		int rc = vy_run_iterator_get(&iterator, &tuple);
-		uint64_t tuple_lsn = (rc == 0) ? tuple->lsn : 0;
+		int64_t tuple_lsn = (rc == 0) ? tuple->lsn : 0;
 		vy_run_iterator_close(&iterator);
 		if (rc == -1)
 			return -1;
@@ -5927,7 +5927,7 @@ si_processid(char **str)
 }
 
 static inline int
-si_process(char *name, uint64_t *nsn, uint64_t *parent)
+si_process(char *name, int64_t *nsn, int64_t *parent)
 {
 	/* id.index */
 	/* id.id.index.incomplete */
@@ -5972,8 +5972,8 @@ si_trackdir(struct sitrack *track, struct vy_env *env, struct vy_index *i)
 	while ((de = readdir(dir))) {
 		if (unlikely(de->d_name[0] == '.'))
 			continue;
-		uint64_t id_parent = 0;
-		uint64_t id = 0;
+		int64_t id_parent = 0;
+		int64_t id = 0;
 		int rc = si_process(de->d_name, &id, &id_parent);
 		if (unlikely(rc == -1))
 			continue; /* skip unknown file */
@@ -6264,7 +6264,7 @@ vy_index_conf_free(struct vy_index_conf *s)
 
 static struct txv *
 si_write(write_set_t *write_set, struct txv *v, uint64_t time,
-	 enum vinyl_status status, uint64_t lsn)
+	 enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
 	struct vy_env *env = index->env;
@@ -6322,8 +6322,8 @@ si_write(write_set_t *write_set, struct txv *v, uint64_t time,
 
 struct vy_scheduler {
 	pthread_mutex_t        lock;
-	uint64_t       checkpoint_lsn_last;
-	uint64_t       checkpoint_lsn;
+	int64_t       checkpoint_lsn_last;
+	int64_t       checkpoint_lsn;
 	bool checkpoint_in_progress;
 	bool age_in_progress;
 	uint64_t       age_time;
@@ -6438,7 +6438,7 @@ vy_scheduler_peek_index(struct vy_scheduler *scheduler)
 
 static int
 vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
-	      uint64_t vlsn, struct vy_index *index, struct vy_task *task)
+	      int64_t vlsn, struct vy_index *index, struct vy_task *task)
 {
 	int rc;
 
@@ -6485,7 +6485,7 @@ vy_plan_index(struct vy_scheduler *scheduler, struct srzone *zone,
 }
 
 static int
-vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, uint64_t vlsn,
+vy_plan(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	struct vy_task *task)
 {
 	/* pending shutdowns */
@@ -6666,7 +6666,7 @@ vy_checkpoint(struct vy_env *env)
 	if (!scheduler->worker_pool_run)
 		return 0;
 	tt_pthread_mutex_lock(&scheduler->lock);
-	uint64_t lsn = vy_sequence(env->seq, VINYL_LSN);
+	int64_t lsn = vy_sequence(env->seq, VINYL_LSN);
 	scheduler->checkpoint_lsn = lsn;
 	scheduler->checkpoint_in_progress = true;
 	for (int i = 0; i < scheduler->count; i++) {
@@ -8279,7 +8279,7 @@ vy_end_recovery(struct vy_env *e)
 int
 vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 {
-	int64_t vlsn = UINT64_MAX;
+	int64_t vlsn = INT64_MAX;
 	int rc;
 
 	vy_index_ref(index);
@@ -8461,7 +8461,7 @@ vy_iterator_pos_mid_next(struct vy_run_iterator *itr,
  */
 static char *
 vy_run_iterator_read(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_pos pos, uint64_t *lsn)
+		     struct vy_run_iterator_pos pos, int64_t *lsn)
 {
 	if (pos.pos_in_page == 0) {
 		struct vy_page_info *page_info =
@@ -8493,11 +8493,11 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  * return -1 on read or memory error
  * Beware of:
  * 1)VINYL_GT/VINYL_LE special case
- * 2)search with partial key and lsn != UINT64_MAX is meaningless and dangerous
+ * 2)search with partial key and lsn != INT64_MAX is meaningless and dangerous
  * 3)if return false, the position was set to maximal lsn of the next key
  */
 static int
-vy_run_iterator_search(struct vy_run_iterator *itr, char *key, uint64_t vlsn,
+vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
 	struct vy_run_iterator_pos beg = {0, 0};
@@ -8508,7 +8508,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, uint64_t vlsn,
 		int rc = vy_iterator_pos_mid(itr, beg, end, &mid);
 		if (rc != 0)
 			return rc;
-		uint64_t fnd_lsn;
+		int64_t fnd_lsn;
 		char *fnd_key = vy_run_iterator_read(itr, mid, &fnd_lsn);
 		if (fnd_key == NULL)
 			return -1;
@@ -8614,7 +8614,7 @@ static int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 {
 	assert(itr->curr_pos.page_no < itr->run->index.header.count);
-	uint64_t cur_lsn;
+	int64_t cur_lsn;
 	int rc = 0;
 	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
 	if (cur_key == NULL)
@@ -8643,7 +8643,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 		struct vy_run_iterator_pos test_pos;
 		rc = vy_run_iterator_next_pos(itr, itr->order, &test_pos);
 		while (rc == 0) {
-			uint64_t test_lsn;
+			int64_t test_lsn;
 			char *test_key =
 				vy_run_iterator_read(itr, test_pos, &test_lsn);
 			if (test_key == NULL) {
@@ -8699,7 +8699,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 	bool equal_found = false;
 	int rc;
 	if (itr->key != NULL) {
-		rc = vy_run_iterator_search(itr, itr->key, UINT64_MAX,
+		rc = vy_run_iterator_search(itr, itr->key, INT64_MAX,
 					    &itr->curr_pos, &equal_found);
 		if (rc < 0)
 			return rc;
@@ -8757,7 +8757,7 @@ static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 		     struct vy_run *run, struct vy_file *file,
 		     struct vy_filterif *compression, enum vy_order order,
-		     char *key, uint64_t vlsn)
+		     char *key, int64_t vlsn)
 {
 	itr->index = index;
 	itr->run = run;
@@ -8865,7 +8865,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 	}
 	assert(itr->curr_pos.page_no < end_page);
 
-	uint64_t cur_lsn;
+	int64_t cur_lsn;
 	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
 	if (cur_key == NULL)
 		return -1;
@@ -8874,7 +8874,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 	uint32_t lock_page =
 		vy_run_iterator_lock_page(itr, itr->curr_pos.page_no);
 
-	uint64_t next_lsn;
+	int64_t next_lsn;
 	char *next_key;
 	do {
 		int rc = vy_run_iterator_next_pos(itr, itr->order, &itr->curr_pos);
@@ -8924,12 +8924,12 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr)
 	if (rc != 0)
 		return rc;
 
-	uint64_t cur_lsn;
+	int64_t cur_lsn;
 	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
 	if (cur_key == NULL)
 		return -1; /* read error */
 
-	uint64_t next_lsn;
+	int64_t next_lsn;
 	char *next_key = vy_run_iterator_read(itr, next_pos, &next_lsn);
 	if (next_key == NULL)
 		return -1; /* read error */
@@ -9042,7 +9042,7 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
 	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
 	*is_dup = false;
 	vy_run_iterator_open(itr, index, run, file, compression, order, key,
-			UINT64_MAX);
+			     INT64_MAX);
 
 }
 
@@ -9067,7 +9067,7 @@ struct vy_mem_iterator {
 	/* Search key data in terms of vinyl, vy_tuple_compare argument */
 	char *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
-	uint64_t vlsn;
+	int64_t vlsn;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -9092,7 +9092,7 @@ struct vy_mem_iterator {
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-			     enum vy_order order, char *key, uint64_t vlsn);
+			     enum vy_order order, char *key, int64_t vlsn);
 
 /**
  * Get a tuple from a record, that iterator currently positioned on
@@ -9212,8 +9212,8 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 
 	struct tree_mem_key tree_key;
 	tree_key.data = itr->key;
-	/* (lsn == UINT64_MAX - 1) means that lsn is ignored in comparison */
-	tree_key.lsn = UINT64_MAX - 1;
+	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
+	tree_key.lsn = INT64_MAX - 1;
 	if (itr->key != NULL) {
 		if (itr->order == VINYL_EQ) {
 			bool exact;
@@ -9289,7 +9289,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, char *key, uint64_t vlsn)
+		     enum vy_order order, char *key, int64_t vlsn)
 {
 	itr->mem = mem;
 
@@ -9463,7 +9463,7 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
 	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct sv) + sizeof(bool));
 	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct sv));
 	*is_dup = false;
-	vy_mem_iterator_open(itr, mem, order, key, UINT64_MAX);
+	vy_mem_iterator_open(itr, mem, order, key, INT64_MAX);
 }
 
 /* }}} Temporary wrap of new mem iterator to old API */
