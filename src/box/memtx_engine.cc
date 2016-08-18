@@ -348,7 +348,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
-					       request->index_base);
+					       request->index_base, NULL);
 	TupleRef ref(new_tuple);
 	this->replace(space, old_tuple, new_tuple, DUP_REPLACE);
 	memtx_txn_add_undo(txn, old_tuple, new_tuple);

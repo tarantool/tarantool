@@ -50,6 +50,22 @@ VinylSpace::VinylSpace(Engine *e)
 	:Handler(e)
 {}
 
+/* Raise exception if in the index was found a tuple by the passed key. */
+static inline void
+check_dup_key(VinylIndex *idx, const char *key, struct vy_tx *tx)
+{
+	struct tuple *found;
+	mp_decode_array(&key); /* Skip array header. */
+	if (vy_get(tx, idx->db, key, idx->key_def->part_count, &found))
+		diag_raise();
+
+	if (found) {
+		struct space *space = space_by_id(idx->key_def->space_id);
+		tnt_raise(ClientError, ER_TUPLE_FOUND,
+			  index_name(idx), space_name(space));
+	}
+}
+
 /* Insert a tuple only into the primary index. */
 static void
 vinyl_insert_primary(VinylPrimaryIndex *index, const char *tuple,
@@ -63,16 +79,8 @@ vinyl_insert_primary(VinylPrimaryIndex *index, const char *tuple,
 	 * A primary index always is unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	struct tuple *found;
-	mp_decode_array(&key); /* Skip array header. */
-	if (vy_get(tx, index->db, key, def->part_count, &found))
-		diag_raise();
+	check_dup_key(index, key, tx);
 
-	if (found) {
-		struct space *space = space_by_id(def->space_id);
-		tnt_raise(ClientError, ER_TUPLE_FOUND,
-			  index_name(index), space_name(space));
-	}
 	if (vy_replace(tx, index->db, tuple, tuple_end))
 		diag_raise();
 }
@@ -95,19 +103,9 @@ vinyl_insert_secondary(VinylSecondaryIndex *index, const char *tuple,
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
-	if (def->opts.is_unique) {
-		struct tuple *found;
-		const char *key_iter = key;
-		mp_decode_array(&key_iter); /* Skip array header. */
-		if (vy_get(tx, index->db, key_iter, def->part_count, &found))
-			diag_raise();
+	if (def->opts.is_unique)
+		check_dup_key(index, key, tx);
 
-		if (found) {
-			struct space *space = space_by_id(def->space_id);
-			tnt_raise(ClientError, ER_TUPLE_FOUND,
-				  index_name(index), space_name(space));
-		}
-	}
 	if (vy_replace(tx, index->db, key, key_end))
 		diag_raise();
 }
@@ -355,6 +353,22 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 	return NULL;
 }
 
+/**
+ * Update optimization allows to don't do deletion and insertion in an index
+ * if the update operation doesn't change indexed fields.
+ *
+ * If in the columns mask (@sa update_read_ops in tuple_update.cc) is set
+ * at least one bit that corresponds to one of the columns from key_def->parts
+ * then an update operation changes at least one indexed field and the
+ * optimization is inapplicable.
+ */
+static bool
+can_optimize_update(const VinylSecondaryIndex *idx, uint64_t cols_mask)
+{
+	return !(idx->cols_mask == UINT64_MAX) &&
+	       !(cols_mask & idx->cols_mask);
+}
+
 struct tuple *
 VinylSpace::executeUpdate(struct txn *txn, struct space *space,
                           struct request *request)
@@ -375,9 +389,11 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	TupleRef old_ref(old_tuple);
 	struct tuple *new_tuple;
+	uint64_t cols_mask = 0;
 	new_tuple = tuple_update(space->format, region_aligned_alloc_xc_cb,
 				 &fiber()->gc, old_tuple, request->tuple,
-				 request->tuple_end, request->index_base);
+				 request->tuple_end, request->index_base,
+				 &cols_mask);
 	TupleRef new_ref(new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
 
@@ -396,6 +412,9 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 		sec_idx = (VinylSecondaryIndex *) space->index[iid];
 		key = tuple_extract_key(old_tuple, sec_idx->key_def_tuple_to_key,
 					NULL);
+		if (can_optimize_update(sec_idx, cols_mask)) {
+			continue;
+		}
 		part_count = mp_decode_array(&key);
 		/**
 		 * Delete goes first, so if old and new keys

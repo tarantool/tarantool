@@ -100,6 +100,11 @@ struct tuple_update
 	struct update_op *ops;
 	uint32_t op_count;
 	int index_base; /* 0 for C and 1 for Lua */
+	/**
+	 * cols_mask - bitmask in that if bit 'n' is set then tuple
+	 * field with number 'n' will be changed by update operations.
+	 */
+	uint64_t cols_mask;
 };
 
 /** Argument of SET (and INSERT) operation. */
@@ -873,7 +878,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		tnt_raise(IllegalParams,
 			  "update operations must be an "
 			  "array {{op,..}, {op,..}}");
-
+	uint64_t cols_mask = 0;
 	/* number of operations */
 	update->op_count = mp_decode_array(&expr);
 
@@ -917,12 +922,55 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		} else {
 			tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
 		}
+		/*
+		 * UINT64_MAX - in a binary representation it is only ones.
+		 * If in cols_mask all bits are ones then need not to continue
+		 * the mask calculating.
+		 */
+		if (cols_mask != UINT64_MAX) {
+			/*
+			 * If the field number is bigger than 64 then
+			 * optimization disabled.
+			 */
+			if (field_no > 64) {
+				cols_mask = UINT64_MAX;
+			} else {
+				/*
+				 * If the operation is insertion or deletion
+				 * then it potentially changes a range of
+				 * columns by moving them, so need to set a
+				 * range of bits.
+				 */
+				if (op->opcode == '!' || op->opcode == '#') {
+					/* Set all bits. */
+					uint64_t range = UINT64_MAX;
+					/*
+					 * Unset bits that are placed before
+					 * the operation field number. Fields
+					 * corresponding to this bits
+					 * definitely will not be changed.
+					 */
+					range = range >> (field_no - 1);
+					cols_mask |= range;
+				} else {
+					/*
+					 * If the operation changes only one
+					 * column then set
+					 * the corresponding bit.
+					 */
+					uint64_t one_col = 1;
+					one_col = one_col << (64 - field_no);
+					cols_mask |= one_col;
+				}
+			}
+		}
 		op->meta->read_arg(update->index_base, op, &expr);
 	}
 
 	/* Check the remainder length, the request must be fully read. */
 	if (expr != expr_end)
 		tnt_raise(IllegalParams, "can't unpack update operations");
+	update->cols_mask = cols_mask;
 }
 
 static void
@@ -993,7 +1041,8 @@ const char *
 tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_tuple_len, int index_base)
+		     uint32_t *p_tuple_len, int index_base,
+		     uint64_t *cols_mask)
 {
 	try {
 		struct tuple_update update;
@@ -1001,6 +1050,8 @@ tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 
 		update_read_ops(&update, expr, expr_end);
 		update_do_ops(&update, old_data, old_data_end);
+		if (cols_mask)
+			*cols_mask = update.cols_mask;
 
 		return update_finish(&update, p_tuple_len);
 	} catch (Exception *e) {
