@@ -34,6 +34,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <lj_obj.h> /* internals: lua in box.runtime.info() */
 
 #include "small/small.h"
 #include "small/quota.h"
@@ -206,6 +207,13 @@ lbox_runtime_info(struct lua_State *L)
 
 	lua_pushstring(L, "maxalloc");
 	luaL_pushuint64(L, quota_total(runtime.quota));
+	lua_settable(L, -3);
+
+	/*
+	 * Lua GC heap size
+	 */
+	lua_pushstring(L, "lua");
+	lua_pushinteger(L, G(L)->gc.total);
 	lua_settable(L, -3);
 
 	return 1;
