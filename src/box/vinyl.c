@@ -338,19 +338,6 @@ vy_file_sync(struct vy_file *f) {
 }
 
 static inline int
-vy_file_advise(struct vy_file *f, int hint, uint64_t off, uint64_t len) {
-	(void)hint;
-#if !defined(HAVE_POSIX_FADVISE)
-	(void)f;
-	(void)off;
-	(void)len;
-	return 0;
-#else
-	return posix_fadvise(f->fd, off, len, POSIX_FADV_DONTNEED);
-#endif
-}
-
-static inline int
 vy_file_resize(struct vy_file *f, uint64_t size)
 {
 	int rc = ftruncate(f->fd, size);
@@ -8159,7 +8146,7 @@ int
 vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 {
 	int64_t vlsn = INT64_MAX;
-	int rc;
+	int rc = 0;
 
 	vy_index_ref(index);
 
