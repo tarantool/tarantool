@@ -36,7 +36,7 @@ class MemtxIndex: public Index {
 public:
 	MemtxIndex(struct key_def *key_def)
 		:Index(key_def), m_position(NULL)
-	{ }
+	{}
 	virtual ~MemtxIndex() override {
 		if (m_position != NULL)
 			m_position->free(m_position);

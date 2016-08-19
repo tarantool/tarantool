@@ -50,7 +50,9 @@ struct MemtxEngine: public Engine {
 	virtual Handler *open() override;
 	virtual void addPrimaryKey(struct space *space) override;
 	virtual void dropPrimaryKey(struct space *space) override;
-	virtual bool needToBuildSecondaryKey(struct space *space) override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
 	virtual void keydefCheck(struct space *space, struct key_def *key_def) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *,

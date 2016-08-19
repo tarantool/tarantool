@@ -36,7 +36,9 @@ struct SysviewEngine: public Engine {
 public:
 	SysviewEngine();
 	virtual Handler *open() override;
-	virtual bool needToBuildSecondaryKey(struct space *space) override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

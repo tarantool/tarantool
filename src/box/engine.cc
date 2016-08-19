@@ -100,9 +100,41 @@ Engine::dropPrimaryKey(struct space * /* space */)
 {
 }
 
-bool Engine::needToBuildSecondaryKey(struct space * /* space */)
+void
+Engine::buildSecondaryKey(struct space *old_space, struct space *new_space,
+			  Index *new_index)
 {
-	return true;
+	Index *pk = index_find(old_space, 0);
+
+	/* Now deal with any kind of add index during normal operation. */
+	struct iterator *it = pk->allocIterator();
+	IteratorGuard guard(it);
+	pk->initIterator(it, ITER_ALL, NULL, 0);
+
+	/*
+	 * The index has to be built tuple by tuple, since
+	 * there is no guarantee that all tuples satisfy
+	 * new index' constraints. If any tuple can not be
+	 * added to the index (insufficient number of fields,
+	 * etc., the build is aborted.
+	 */
+	/* Build the new index. */
+	struct tuple *tuple;
+	struct tuple_format *format = new_space->format;
+	while ((tuple = it->next(it))) {
+		/*
+		 * Check that the tuple is OK according to the
+		 * new format.
+		 */
+		tuple_validate(format, tuple);
+		/*
+		 * @todo: better message if there is a duplicate.
+		 */
+		struct tuple *old_tuple =
+			new_index->replace(NULL, tuple, DUP_INSERT);
+		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
+		(void) old_tuple;
+	}
 }
 
 int
@@ -183,7 +215,7 @@ Handler::executeUpsert(struct txn *, struct space *, struct request *)
 }
 
 void
-Handler::doAlterSpace(struct space *, struct space *)
+Handler::prepareAlterSpace(struct space *, struct space *)
 {
 }
 

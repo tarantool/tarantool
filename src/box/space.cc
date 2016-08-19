@@ -123,7 +123,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	/* init space engine instance */
 	Engine *engine = engine_find(def->engine_name);
 	space->handler = engine->open();
-	/* fill space indexes */
+	/* Fill the space indexes. */
 	rlist_foreach_entry(key_def, key_list, link) {
 		space->index_map[key_def->iid] =
 			space->handler->createIndex(space, key_def);

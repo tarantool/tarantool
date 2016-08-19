@@ -77,12 +77,14 @@ public:
 	 * necessary.
 	 */
 	virtual void dropPrimaryKey(struct space *space);
+
 	/**
-	 * An optimization for MemTX engine, which
-	 * builds all secondary keys after recovery from
-	 * a snapshot.
+	 * Called with the new empty secondary index. Fill the new index
+	 * with data from the primary key of the space.
 	 */
-	virtual bool needToBuildSecondaryKey(struct space *space);
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index);
 
 	virtual void join(struct xstream *);
 	/**
@@ -211,8 +213,8 @@ public:
 	 * before it's done, to prepare 'new_space'
 	 * object.
 	 */
-	virtual void doAlterSpace(struct space *old_space,
-				  struct space *new_space);
+	virtual void prepareAlterSpace(struct space *old_space,
+				       struct space *new_space);
 
 	/**
 	 * Notify the engine engine after altering a space and

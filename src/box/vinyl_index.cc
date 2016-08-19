@@ -191,23 +191,6 @@ void
 VinylSecondaryIndex::open()
 {
 	assert(db == NULL);
-	/*
-	 * @fixme: we must refetch the primary key becaus it's
-	 * irrelevant here.
-	 * Move the check to alter.cc, ::prepare() phase, and 
-	 * use pass in the primary key key def explicitly.
-	 */
-	struct space *space = space_by_id(key_def->space_id);
-	primary_index = (VinylPrimaryIndex *) index_find(space, 0);
-	if (space->index_count) {
-		if (primary_index->min(NULL, 0)) {
-			/**
-			 * If space is not empty then forbid new indexes creating
-			 */
-			tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
-				  "altering not empty space");
-		}
-	}
 	key_def_tuple_to_key = key_def_merge(key_def, primary_index->key_def);
 
 	key_def_secondary_to_primary =

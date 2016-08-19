@@ -149,8 +149,8 @@ struct MemtxSpace: public Handler {
 	virtual Index *createIndex(struct space *space,
 				   struct key_def *key_def) override;
 	virtual void dropIndex(Index *index) override;
-	virtual void doAlterSpace(struct space *old_space,
-				  struct space *new_space) override;
+	virtual void prepareAlterSpace(struct space *old_space,
+				       struct space *new_space) override;
 public:
 	/**
 	 * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -473,7 +473,7 @@ MemtxSpace::dropIndex(Index *index)
 }
 
 void
-MemtxSpace::doAlterSpace(struct space *old_space, struct space *new_space)
+MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
 	(void)new_space;
 	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
@@ -869,11 +869,22 @@ MemtxEngine::initSystemSpace(struct space *space)
 	memtx_add_primary_key(space, MEMTX_OK);
 }
 
-bool
-MemtxEngine::needToBuildSecondaryKey(struct space *space)
+void
+MemtxEngine::buildSecondaryKey(struct space *old_space,
+				    struct space *new_space, Index *new_index)
 {
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
-	return handler->replace == memtx_replace_all_keys;
+	struct key_def *new_key_def = new_index->key_def;
+	/**
+	 * If it's a secondary key, and we're not building them
+	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
+	 */
+	if (new_key_def->iid != 0) {
+		struct MemtxSpace *handler;
+		handler = (struct MemtxSpace *) new_space->handler;
+		if (!(handler->replace == memtx_replace_all_keys))
+			return;
+	}
+	Engine::buildSecondaryKey(old_space, new_space, new_index);
 }
 
 void

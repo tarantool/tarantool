@@ -114,6 +114,23 @@ VinylEngine::open()
 	return new VinylSpace(this);
 }
 
+void
+VinylEngine::addPrimaryKey(struct space *space)
+{
+	VinylIndex *pk = (VinylIndex *)index_find(space, 0);
+	pk->open();
+}
+
+void
+VinylEngine::buildSecondaryKey(struct space *old_space,
+			       struct space *new_space,
+			       Index *new_index_arg)
+{
+	VinylIndex *new_index = (VinylIndex *) new_index_arg;
+	new_index->open();
+	Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
+}
+
 struct vinyl_send_row_arg {
 	struct xstream *stream;
 	uint32_t space_id;

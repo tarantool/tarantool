@@ -60,6 +60,9 @@ class VinylIndex: public Index
 public:
 	VinylIndex(struct vy_env *env, struct key_def *key_def);
 
+	virtual void
+	open() = 0;
+
 	virtual struct tuple*
 	replace(struct tuple*,
 	        struct tuple*, enum dup_replace_mode) override;

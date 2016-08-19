@@ -455,7 +455,11 @@ VinylSpace::createIndex(struct space *space, struct key_def *key_def)
 	}
 	if (key_def->iid == 0)
 		return new VinylPrimaryIndex(engine->env, key_def);
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) space->index[0];
+	/**
+	 * Get pointer to the primary key from space->index_map, because
+	 * the array space->index can be empty.
+	 */
+	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) space_index(space, 0);
 	return new VinylSecondaryIndex(engine->env, pk, key_def);
 }
 
@@ -469,6 +473,23 @@ VinylSpace::dropIndex(Index *index)
 		diag_raise();
 	i->db  = NULL;
 	i->env = NULL;
+}
+
+void
+VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
+{
+	if (old_space->index_count &&
+	    old_space->index_count <= new_space->index_count) {
+
+		Index *primary_index = index_find(old_space, 0);
+		if (primary_index->min(NULL, 0)) {
+			/**
+			 * If space is not empty then forbid new indexes creating
+			 */
+			tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
+				  "altering not empty space");
+		}
+	}
 }
 
 void

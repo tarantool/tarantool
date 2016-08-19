@@ -118,8 +118,6 @@ Handler *SysviewEngine::open()
 	return new SysviewSpace(this);
 }
 
-bool
-SysviewEngine::needToBuildSecondaryKey(struct space * /* space */)
-{
-	return false;
-}
+void
+SysviewEngine::buildSecondaryKey(struct space *, struct space *, Index *)
+{}

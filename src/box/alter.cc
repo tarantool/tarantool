@@ -763,8 +763,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * snapshot/xlog, but needs to continue staying "fully
 	 * built".
 	 */
-	alter->new_space->handler->doAlterSpace(alter->old_space,
-						alter->new_space);
+	alter->new_space->handler->prepareAlterSpace(alter->old_space,
+						     alter->new_space);
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
@@ -1106,9 +1106,7 @@ void
 AddIndex::alter(struct alter_space *alter)
 {
 	Engine *engine = alter->new_space->handler->engine;
-	/* Open the new index. */
-	Index *new_index = index_find(alter->new_space, new_key_def->iid);
-	new_index->open();
+
 	if (space_index(alter->old_space, 0) == NULL) {
 		if (new_key_def->iid == 0) {
 			/*
@@ -1133,43 +1131,10 @@ AddIndex::alter(struct alter_space *alter)
 		return;
 	}
 	/**
-	 * If it's a secondary key, and we're not building them
-	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
+	 * Get the new index and build it.
 	 */
-	if (new_key_def->iid != 0 && !engine->needToBuildSecondaryKey(alter->new_space))
-		return;
-
-	Index *pk = index_find(alter->old_space, 0);
-
-	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = pk->allocIterator();
-	IteratorGuard guard(it);
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	/*
-	 * The index has to be built tuple by tuple, since
-	 * there is no guarantee that all tuples satisfy
-	 * new index' constraints. If any tuple can not be
-	 * added to the index (insufficient number of fields,
-	 * etc., the build is aborted.
-	 */
-	/* Build the new index. */
-	struct tuple *tuple;
-	struct tuple_format *format = alter->new_space->format;
-	while ((tuple = it->next(it))) {
-		/*
-		 * Check that the tuple is OK according to the
-		 * new format.
-		 */
-		tuple_validate(format, tuple);
-		/*
-		 * @todo: better message if there is a duplicate.
-		 */
-		struct tuple *old_tuple =
-			new_index->replace(NULL, tuple, DUP_INSERT);
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
-	}
+	Index *new_index = index_find(alter->new_space, new_key_def->iid);
+	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
 	trigger_add(&alter->old_space->on_replace, on_replace);
