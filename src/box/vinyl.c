@@ -4865,8 +4865,6 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 	 */
 	struct vy_run *run = range->run;
 	while (run) {
-		if (index->env->seq->lsn < run->index.header.lsnmax)
-			index->env->seq->lsn = run->index.header.lsnmax;
 		if (index->env->seq->nsn < run->id.id)
 			index->env->seq->nsn = run->id.id;
 		run = run->next;
