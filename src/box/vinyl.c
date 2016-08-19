@@ -7892,9 +7892,22 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	tuple->flags = flags;
 	/* Update concurrent index */
 	struct txv *old = write_set_search_key(&tx->write_set, index,
-					      tuple->data);
+					       tuple->data);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
+		if (tuple->flags & SVUPSERT) {
+			if (old->tuple->flags & (SVUPSERT | SVREPLACE
+			    | SVDELETE)) {
+
+				struct sv old_tuple, new_tuple;
+				sv_from_tuple(&old_tuple, old->tuple);
+				sv_from_tuple(&new_tuple, tuple);
+				tuple = vy_apply_upsert(&new_tuple, &old_tuple,
+							index, true);
+				if (!tuple->flags)
+					tuple->flags = SVREPLACE;
+			}
+		}
 		vy_tuple_unref(old->tuple);
 		vy_tuple_ref(tuple);
 		old->tuple = tuple;
