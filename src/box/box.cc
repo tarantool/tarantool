@@ -148,11 +148,6 @@ process_rw(struct request *request, struct tuple **result)
 			}
 			break;
 		case IPROTO_UPSERT:
-			if (space->has_unique_secondary_key) {
-				tnt_raise(ClientError,
-					  ER_UPSERT_UNIQUE_SECONDARY_KEY,
-					  space_name(space));
-			}
 			space->handler->executeUpsert(txn, space, request);
 			tuple = NULL;
 			break;

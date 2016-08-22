@@ -7669,9 +7669,9 @@ vy_apply_upsert_ops(const char **tuple, const char **tuple_end,
 		    const char *ops, const char *ops_end,
 		    bool suppress_error)
 {
+	if (ops == ops_end)
+		return;
 	uint64_t series_count = mp_decode_uint(&ops);
-	assert(series_count > 0);
-	(void)ops_end;
 	for (uint64_t i = 0; i < series_count; i++) {
 		int index_base = mp_decode_uint(&ops);
 		const char *serie_end;

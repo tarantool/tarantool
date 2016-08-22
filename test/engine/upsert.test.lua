@@ -111,17 +111,17 @@ space:drop()
 
 -- https://github.com/tarantool/tarantool/issues/1671
 
--- space = box.schema.space.create('test', { engine = engine })
--- index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
--- index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
--- space:insert({1, 1})
--- space:insert({2, 2})
--- index1:select{}
--- index2:select{}
--- space:upsert({1, 1}, {{'=', 2, 2}})
--- sort(index1:select{})
--- sort(index2:select{})
--- space:drop()
+space = box.schema.space.create('test', { engine = engine })
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+space:insert({1, 1})
+space:insert({2, 2})
+index1:select{}
+index2:select{}
+space:upsert({1, 1}, {{'=', 2, 2}})
+sort(index1:select{})
+sort(index2:select{})
+space:drop()
 
 s = box.schema.space.create('tweedledum', { engine = engine })
 index = s:create_index('pk')
@@ -267,120 +267,152 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 -- https://github.com/tarantool/tarantool/issues/1671
+-- test upserts without triggers
 
--- s = box.schema.space.create('s', { engine = engine })
--- index1 = s:create_index('i1')
--- index2 = s:create_index('i2', { parts = {2, 'string'}, unique = false })
+-- test case with one index
 
--- t = {1, '1', 1, 'qwerty'}
--- s:insert(t)
+space = box.schema.space.create('test', { engine = engine })
+index1 = space:create_index('primary', { parts = {1, 'string'} })
+space:upsert({1}, {{'!', 2, 100}}) -- must fail on checking tuple
+space:upsert({'a'}, {{'a', 2, 100}}) -- must fail on checking ops
+space:upsert({'a'}, {{'!', 2, 'ups1'}}) -- 'fast' upsert via insert in one index
+space:upsert({'a', 'b'}, {{'!', 2, 'ups2'}}) -- 'fast' upsert via update in one index
+space:select{}
+space:drop()
 
--- -- all good operations, one op, equivalent to update
--- test(t, {{'+', 3, 5}}, {{1, '1', 6, 'qwerty'}})
--- test(t, {{'-', 3, 3}}, {{1, '1', 3, 'qwerty'}})
--- test(t, {{'&', 3, 5}}, {{1, '1', 1, 'qwerty'}})
--- test(t, {{'|', 3, 8}}, {{1, '1', 9, 'qwerty'}})
--- test(t, {{'^', 3, 12}}, {{1, '1', 5, 'qwerty'}})
--- test(t, {{':', 4, 2, 4, "uer"}}, {{1, '1', 5, 'query'}})
--- test(t, {{'!', 4, 'answer'}}, {{1, '1', 5, 'answer', 'query'}})
--- test(t, {{'#', 5, 1}}, {{1, '1', 5, 'answer'}})
--- test(t, {{'!', -1, 1}}, {{1, '1', 5, 'answer', 1}})
--- test(t, {{'!', -1, 2}}, {{1, '1', 5, 'answer', 1, 2}})
--- test(t, {{'!', -1, 3}}, {{1, '1', 5, 'answer', 1, 2 ,3}})
--- test(t, {{'#', 5, 100500}}, {{1, '1', 5, 'answer'}})
--- test(t, {{'=', 4, 'qwerty'}}, {{1, '1', 5, 'qwerty'}})
+-- tests on multiple indexes
 
--- -- same check for negative posistion
--- test(t, {{'+', -2, 5}}, {{1, '1', 10, 'qwerty'}})
--- test(t, {{'-', -2, 3}}, {{1, '1', 7, 'qwerty'}})
--- test(t, {{'&', -2, 5}}, {{1, '1', 5, 'qwerty'}})
--- test(t, {{'|', -2, 8}}, {{1, '1', 13, 'qwerty'}})
--- test(t, {{'^', -2, 12}}, {{1, '1', 1, 'qwerty'}})
--- test(t, {{':', -1, 2, 4, "uer"}}, {{1, '1', 1, 'query'}})
--- test(t, {{'!', -2, 'answer'}}, {{1, '1', 1, 'answer', 'query'}})
--- test(t, {{'#', -1, 1}}, {{1, '1', 1, 'answer'}})
--- test(t, {{'=', -1, 'answer!'}}, {{1, '1', 1, 'answer!'}})
+space = box.schema.space.create('test', { engine = engine })
+index1 = space:create_index('primary', { parts = {1, 'string'} })
+index2 = space:create_index('secondary', { parts = {2, 'scalar', 3, 'unsigned'} })
+-- test upsert that executes as insert in all indexes
+space:upsert({'a', 100, 100}, {{'!', 4, 200}})
+space:upsert({'b', 100, 200}, {{'!', 4, 300}})
+space:upsert({'c', 100, 300}, {{'!', 4, 400}})
+index1:select{}
+index2:select{}
 
--- -- selective test for good multiple ops
--- test(t, {{'+', 3, 2}, {'!', 4, 42}}, {{1, '1', 3, 42, 'answer!'}})
--- test(t, {{'!', 1, 666}, {'#', 1, 1}, {'+', 3, 2}}, {{1, '1', 5, 42, 'answer!'}})
--- test(t, {{'!', 3, 43}, {'+', 4, 2}}, {{1, '1', 43, 7, 42, 'answer!'}})
--- test(t, {{'#', 3, 2}, {'=', 3, 1}, {'=', 4, '1'}}, {{1, '1', 1, '1'}})
+-- test upsert that executes as update
+space:upsert({'a', 100, 100}, {{'=', 3, -200}}) -- must fail on cheking new tuple in secondary index
+space:upsert({'b', 100, 200}, {{'=', 1, 'd'}}) -- must fail with attempt to modify primary index
+index1:select{}
+index2:select{}
 
--- -- all bad operations, one op, equivalent to update but error is supressed
--- test(t, {{'+', 4, 3}}, {{1, '1', 1, '1'}})
--- test(t, {{'-', 4, 3}}, {{1, '1', 1, '1'}})
--- test(t, {{'&', 4, 1}}, {{1, '1', 1, '1'}})
--- test(t, {{'|', 4, 1}}, {{1, '1', 1, '1'}})
--- test(t, {{'^', 4, 1}}, {{1, '1', 1, '1'}})
--- test(t, {{':', 3, 2, 4, "uer"}}, {{1, '1', 1, '1'}})
--- test(t, {{'!', 18, 'answer'}}, {{1, '1', 1, '1'}})
--- test(t, {{'#', 18, 1}}, {{1, '1', 1, '1'}})
--- test(t, {{'=', 18, 'qwerty'}}, {{1, '1', 1, '1'}})
+space:drop()
 
--- -- selective test for good/bad multiple ops mix
--- test(t, {{'+', 3, 1}, {'+', 4, 1}}, {{1, '1', 2, '1'}})
--- test(t, {{'-', 4, 1}, {'-', 3, 1}}, {{1, '1', 1, '1'}})
--- test(t, {{'#', 18, 1}, {'|', 3, 14}, {'!', 18, '!'}}, {{1, '1', 15, '1'}})
--- test(t, {{'^', 42, 42}, {':', 1, 1, 1, ''}, {'^', 3, 8}}, {{1, '1', 7, '1'}})
--- test(t, {{'&', 3, 1}, {'&', 2, 1}, {'&', 4, 1}}, {{1, '1', 1, '1'}})
+s = box.schema.space.create('s', { engine = engine })
+index1 = s:create_index('i1')
+index2 = s:create_index('i2', { parts = {2, 'string'}, unique = false })
 
--- -- broken ops must raise an exception and discarded
--- 'dump ' .. anything_to_string(box.space.s:select{})
--- test(t, {{'&', 'a', 3}, {'+', 3, 3}}, {{1, '1', 1, '1'}})
--- test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
--- test(t, {{'+', 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
--- test(t, {{':', 3, 3}}, {{1, '1', 1, '1'}})
--- test(t, {{':', 3, 3, 3}}, {{1, '1', 1, '1'}})
--- test(t, {{'?', 3, 3}}, {{1, '1', 1, '1'}})
--- 'dump ' .. anything_to_string(box.space.s:select{})
+t = {1, '1', 1, 'qwerty'}
+s:insert(t)
 
--- -- ignoring ops for insert upsert
--- test({2, '2', 2, '2'}, {{}}, {{1, '1', 1, '1'}, {2, '2', 2, '2'}})
--- test({3, '3', 3, '3'}, {{'+', 3, 3}}, {{1, '1', 1, '1'}, {2, '2', 2, '2'}, {3, '3', 3, '3'}})
+-- all good operations, one op, equivalent to update
+test(t, {{'+', 3, 5}}, {{1, '1', 6, 'qwerty'}})
+test(t, {{'-', 3, 3}}, {{1, '1', 3, 'qwerty'}})
+test(t, {{'&', 3, 5}}, {{1, '1', 1, 'qwerty'}})
+test(t, {{'|', 3, 8}}, {{1, '1', 9, 'qwerty'}})
+test(t, {{'^', 3, 12}}, {{1, '1', 5, 'qwerty'}})
+test(t, {{':', 4, 2, 4, "uer"}}, {{1, '1', 5, 'query'}})
+test(t, {{'!', 4, 'answer'}}, {{1, '1', 5, 'answer', 'query'}})
+test(t, {{'#', 5, 1}}, {{1, '1', 5, 'answer'}})
+test(t, {{'!', -1, 1}}, {{1, '1', 5, 'answer', 1}})
+test(t, {{'!', -1, 2}}, {{1, '1', 5, 'answer', 1, 2}})
+test(t, {{'!', -1, 3}}, {{1, '1', 5, 'answer', 1, 2 ,3}})
+test(t, {{'#', 5, 100500}}, {{1, '1', 5, 'answer'}})
+test(t, {{'=', 4, 'qwerty'}}, {{1, '1', 5, 'qwerty'}})
 
--- -- adding random ops
--- t[1] = 1
--- test(t, {{'+', 3, 3}, {'+', 4, 3}}, {{1, '1', 4, '1'}, {2, '2', 2, '2'}, {3, '3', 3, '3'}})
--- t[1] = 2
--- test(t, {{'-', 4, 1}}, {{1, '1', 4, '1'}, {2, '2', 2, '2'}, {3, '3', 3, '3'}})
--- t[1] = 3
--- test(t, {{':', 3, 3, 3, ''}, {'|', 3, 4}}, {{1, '1', 4, '1'}, {2, '2', 2, '2'}, {3, '3', 7, '3'}})
+-- same check for negative posistion
+test(t, {{'+', -2, 5}}, {{1, '1', 10, 'qwerty'}})
+test(t, {{'-', -2, 3}}, {{1, '1', 7, 'qwerty'}})
+test(t, {{'&', -2, 5}}, {{1, '1', 5, 'qwerty'}})
+test(t, {{'|', -2, 8}}, {{1, '1', 13, 'qwerty'}})
+test(t, {{'^', -2, 12}}, {{1, '1', 1, 'qwerty'}})
+test(t, {{':', -1, 2, 4, "uer"}}, {{1, '1', 1, 'query'}})
+test(t, {{'!', -2, 'answer'}}, {{1, '1', 1, 'answer', 'query'}})
+test(t, {{'#', -1, 1}}, {{1, '1', 1, 'answer'}})
+test(t, {{'=', -1, 'answer!'}}, {{1, '1', 1, 'answer!'}})
 
--- 'dump ' .. anything_to_string(box.space.s:select{}) -- (1)
--- test_run:cmd("restart server default")
+-- selective test for good multiple ops
+test(t, {{'+', 3, 2}, {'!', 4, 42}}, {{1, '1', 3, 42, 'answer!'}})
+test(t, {{'!', 1, 666}, {'#', 1, 1}, {'+', 3, 2}}, {{1, '1', 5, 42, 'answer!'}})
+test(t, {{'!', 3, 43}, {'+', 4, 2}}, {{1, '1', 43, 7, 42, 'answer!'}})
+test(t, {{'#', 3, 2}, {'=', 3, 1}, {'=', 4, '1'}}, {{1, '1', 1, '1'}})
 
--- test_run:cmd("setopt delimiter ';'")
--- function anything_to_string(tab)
---     if tab == nil then
---         return 'nil'
---     end
---     local str = '['
---     local first_route = true
---     local t = 0
---     for k,f in pairs(tab) do
---         if not first_route then str = str .. ',' end
---         first_route = false
---         t = t + 1
---         if k ~= t then
---             str = str .. k .. '='
---         end
---         if type(f) == 'string' then
---             str = str .. "'" .. f .. "'"
---         elseif type (f) == 'number' then
---             str = str .. tostring(f)
---         elseif type (f) == 'table' or type (f) == 'cdata' then
---             str = str .. anything_to_string(f)
---         else
---             str = str .. '?'
---         end
---     end
---     str = str .. ']'
---     return str
--- end;
--- test_run:cmd("setopt delimiter ''");
+-- all bad operations, one op, equivalent to update but error is supressed
+test(t, {{'+', 4, 3}}, {{1, '1', 1, '1'}})
+test(t, {{'-', 4, 3}}, {{1, '1', 1, '1'}})
+test(t, {{'&', 4, 1}}, {{1, '1', 1, '1'}})
+test(t, {{'|', 4, 1}}, {{1, '1', 1, '1'}})
+test(t, {{'^', 4, 1}}, {{1, '1', 1, '1'}})
+test(t, {{':', 3, 2, 4, "uer"}}, {{1, '1', 1, '1'}})
+test(t, {{'!', 18, 'answer'}}, {{1, '1', 1, '1'}})
+test(t, {{'#', 18, 1}}, {{1, '1', 1, '1'}})
+test(t, {{'=', 18, 'qwerty'}}, {{1, '1', 1, '1'}})
 
--- s = box.space.s
--- 'dump ' .. anything_to_string(box.space.s:select{})-- compare with (1) visually!
+-- selective test for good/bad multiple ops mix
+test(t, {{'+', 3, 1}, {'+', 4, 1}}, {{1, '1', 2, '1'}})
+test(t, {{'-', 4, 1}, {'-', 3, 1}}, {{1, '1', 1, '1'}})
+test(t, {{'#', 18, 1}, {'|', 3, 14}, {'!', 18, '!'}}, {{1, '1', 15, '1'}})
+test(t, {{'^', 42, 42}, {':', 1, 1, 1, ''}, {'^', 3, 8}}, {{1, '1', 7, '1'}})
+test(t, {{'&', 3, 1}, {'&', 2, 1}, {'&', 4, 1}}, {{1, '1', 1, '1'}})
 
--- box.space.s:drop()
+-- broken ops must raise an exception and discarded
+'dump ' .. anything_to_string(box.space.s:select{})
+test(t, {{'&', 'a', 3}, {'+', 3, 3}}, {{1, '1', 1, '1'}})
+test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
+test(t, {{'+', 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
+test(t, {{':', 3, 3}}, {{1, '1', 1, '1'}})
+test(t, {{':', 3, 3, 3}}, {{1, '1', 1, '1'}})
+test(t, {{'?', 3, 3}}, {{1, '1', 1, '1'}})
+'dump ' .. anything_to_string(box.space.s:select{})
+
+-- ignoring ops for insert upsert
+test({2, '2', 2, '2'}, {{}}, {{1, '1', 1, '1'}})
+test({3, '3', 3, '3'}, {{'+', 3, 3}}, {{1, '1', 1, '1'}, {3, '3', 3, '3'}})
+
+-- adding random ops
+t[1] = 1
+test(t, {{'+', 3, 3}, {'+', 4, 3}}, {{1, '1', 4, '1'}, {3, '3', 3, '3'}})
+t[1] = 2
+test(t, {{'-', 4, 1}}, {{1, '1', 4, '1'}, {2, '1', 1, 'qwerty'}, {3, '3', 3, '3'}})
+t[1] = 3
+test(t, {{':', 3, 3, 3, ''}, {'|', 3, 4}}, {{1, '1', 4, '1'}, {2, '1', 1, 'qwerty'}, {3, '3', 7, '3'}})
+
+'dump ' .. anything_to_string(box.space.s:select{}) -- (1)
+test_run:cmd("restart server default")
+
+test_run:cmd("setopt delimiter ';'")
+function anything_to_string(tab)
+    if tab == nil then
+        return 'nil'
+    end
+    local str = '['
+    local first_route = true
+    local t = 0
+    for k,f in pairs(tab) do
+        if not first_route then str = str .. ',' end
+        first_route = false
+        t = t + 1
+        if k ~= t then
+            str = str .. k .. '='
+        end
+        if type(f) == 'string' then
+            str = str .. "'" .. f .. "'"
+        elseif type (f) == 'number' then
+            str = str .. tostring(f)
+        elseif type (f) == 'table' or type (f) == 'cdata' then
+            str = str .. anything_to_string(f)
+        else
+            str = str .. '?'
+        end
+    end
+    str = str .. ']'
+    return str
+end;
+test_run:cmd("setopt delimiter ''");
+
+s = box.space.s
+'dump ' .. anything_to_string(box.space.s:select{})-- compare with (1) visually!
+
+box.space.s:drop()

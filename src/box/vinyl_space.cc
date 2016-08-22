@@ -116,8 +116,6 @@ vinyl_replace_all(struct space *space, struct request *request,
 {
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
 	(void) engine;
-	assert((request->type == IPROTO_REPLACE) ||
-	       (!engine->recovery_complete));
 	struct tuple *old_tuple;
 	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
 	const char *key;
@@ -128,7 +126,6 @@ vinyl_replace_all(struct space *space, struct request *request,
 	/* Get full tuple from the primary index. */
 	if (vy_get(tx, pk->db, key, part_count, &old_tuple))
 		diag_raise();
-
 	/*
 	 * Replace in the primary index without explicit deletion of
 	 * the old tuple.
@@ -232,11 +229,25 @@ static void
 vinyl_insert_all(struct space *space, struct request *request,
 		 struct vy_tx *tx)
 {
-	assert(request->type == IPROTO_INSERT);
 	/* First insert into the primary index. */
 	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
 	vinyl_insert_primary(pk, request->tuple, request->tuple_end, tx);
 
+	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
+		VinylSecondaryIndex *index;
+		index = (VinylSecondaryIndex *) space->index[iid];
+		vinyl_insert_secondary(index, request->tuple,
+				       request->tuple_end, tx);
+	}
+}
+
+static void
+vinyl_insert_without_lookup(struct space *space, struct request *request,
+			    struct vy_tx *tx)
+{
+	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
+	if (vy_replace(tx, pk->db, request->tuple, request->tuple_end))
+		diag_raise();
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		VinylSecondaryIndex *index;
 		index = (VinylSecondaryIndex *) space->index[iid];
@@ -251,16 +262,13 @@ vinyl_replace_one(struct space *space, struct request *request,
 {
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
 	(void) engine;
-	assert((request->type == IPROTO_REPLACE) ||
-	       (!engine->recovery_complete));
 	assert(space->index_count == 1);
-	VinylIndex *index = (VinylIndex *) index_find(space, 0);
+	VinylIndex *pk = (VinylIndex *) index_find(space, 0);
 	/**
 	 * If the space has triggers, then we need to fetch the old tuple to
 	 * pass it to the trigger. Use vy_get to fetch it.
 	 */
 	if (!rlist_empty(&space->on_replace)) {
-		VinylIndex *pk = (VinylIndex *)index_find(space, 0);
 		const char *key;
 		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 					    pk->key_def, NULL);
@@ -270,7 +278,7 @@ vinyl_replace_one(struct space *space, struct request *request,
 		if (stmt->old_tuple)
 			tuple_ref(stmt->old_tuple);
 	}
-	if (vy_replace(tx, index->db, request->tuple, request->tuple_end))
+	if (vy_replace(tx, pk->db, request->tuple, request->tuple_end))
 		diag_raise();
 }
 
@@ -438,30 +446,107 @@ void
 VinylSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
-	if (space->index_count > 1) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
-			  "upserts in spaces with more"\
-			  " than one index");
-	}
 	assert(request->index_id == 0);
-	VinylIndex *index;
-	index = (VinylIndex *)index_find_unique(space, request->index_id);
+	VinylIndex *pk;
+	pk = (VinylIndex *)index_find_unique(space, 0);
 
 	/* Check tuple fields. */
 	tuple_validate_raw(space->format, request->tuple);
 
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
+	/* Check update operations. */
 	tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
 			       request->ops, request->ops_end,
 			       request->index_base);
-	for (uint32_t i = 0; i < space->index_count; ++i) {
-		index = (VinylIndex *)space->index[i];
-		if (vy_upsert(tx, index->db, request->tuple,
-			      request->tuple_end, request->ops,
-			      request->ops_end, request->index_base) < 0) {
-			diag_raise();
+	const char *key;
+	uint32_t part_count;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = NULL;
+	struct tuple *new_tuple = NULL;
+	/**
+	 * Need to look up the old tuple in two cases:
+	 *   - if there is at least one on_replace trigger, then
+	 *     old_tuple has to be passed into the trigger
+	 *
+	 *   - if the space has secondary indexes, then the old tuple
+	 *     is necessary to apply update operations to it
+	 *     and fetch the secondary key
+	 */
+	if (space->index_count > 1 || !rlist_empty(&space->on_replace)) {
+		/* Find the old tuple using the primary key. */
+		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
+					    pk->key_def, NULL);
+		part_count = mp_decode_array(&key);
+		old_tuple = pk->findByKey(key, part_count);
+		if (old_tuple == NULL) {
+			/**
+			 * If the old tuple was not found then upsert
+			 * becomes an insert.
+			 */
+			vinyl_insert_without_lookup(space, request, tx);
+			new_tuple = tuple_new(space->format, request->tuple,
+					      request->tuple_end);
+			tuple_ref(new_tuple);
+			stmt->new_tuple = new_tuple;
+			return;
 		}
 	}
+	/**
+	 * This is a case of a simple and fast vy_upsert in the primary
+	 * index: this index is covering and we don't need to
+	 * fetch the old tuple to find out the key.
+	 */
+	if (vy_upsert(tx, pk->db, request->tuple,
+		      request->tuple_end, request->ops,
+		      request->ops_end, request->index_base) < 0) {
+		diag_raise();
+	}
+	/**
+	 * We have secondary keys or triggers, and there is an old
+	 * tuple found in this space. Construct a new tuple to
+	 * use in triggers and/or secondary keys.
+	 */
+	if (space->index_count > 1 || !rlist_empty(&space->on_replace)) {
+		new_tuple = tuple_upsert(space->format,
+					 region_aligned_alloc_xc_cb,
+					 &fiber()->gc, old_tuple,
+					 request->ops, request->ops_end,
+					 request->index_base);
+		TupleRef new_ref(new_tuple);
+		/**
+		 * Ignore errors since upsert doesn't raise not
+		 * critical errors.
+		 */
+		try {
+			space_check_update(space, old_tuple, new_tuple);
+		} catch (ClientError *e) {
+			e->log();
+			return;
+		}
+		VinylSecondaryIndex *sec_idx;
+		for (uint32_t i = 1; i < space->index_count; ++i) {
+			/* Update secondary keys with the new tuple. */
+			sec_idx = (VinylSecondaryIndex *) space->index[i];
+			key = tuple_extract_key(old_tuple,
+						sec_idx->key_def_tuple_to_key,
+						NULL);
+			part_count = mp_decode_array(&key);
+			/*
+			 * Delete the old tuple from the secondary key and
+			 * insert the new tuple.
+			 */
+			if (vy_delete(tx, sec_idx->db, key, part_count))
+				diag_raise();
+			vinyl_insert_secondary(sec_idx, new_tuple->data,
+					       new_tuple->data +
+					       new_tuple->bsize, tx);
+		}
+		tuple_ref(new_tuple);
+		stmt->new_tuple = new_tuple;
+	}
+	if (old_tuple)
+		tuple_ref(old_tuple);
+	stmt->old_tuple = old_tuple;
 }
 
 Index *

@@ -622,7 +622,7 @@ space:insert({4, 2, 'b'})
 ...
 space:upsert({2}, {{'=', 4, 1000}})
 ---
-- error: Space test has a unique secondary index and does not support UPSERT
+- error: Tuple field count 1 is less than required by a defined index (expected 3)
 ...
 index3:delete({3, 'a'})
 ---
