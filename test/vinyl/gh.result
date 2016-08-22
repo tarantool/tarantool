@@ -418,3 +418,56 @@ test_run:grep_log('default', 'UPSERT operation failed') ~= nil
 s:drop()
 ---
 ...
+--
+-- gh-1684: vinyl: infinite cycle on box.snapshot()
+--
+-- Create and drop several indices
+space = box.schema.space.create('test', { engine = 'vinyl'  })
+---
+...
+pk = space:create_index('primary')
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'string'}  })
+---
+...
+index3 = space:create_index('third', { parts = {3, 'string'}, unique = false  })
+---
+...
+index2:drop()
+---
+...
+index2 = space:create_index('secondary', { parts = {4, 'string'}  })
+---
+...
+index3:drop()
+---
+...
+index2:drop()
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'string'}  })
+---
+...
+index3 = space:create_index('third', { parts = {3, 'string'}, unique = false  })
+---
+...
+index4 = space:create_index('fourth', { parts = {2, 'string', 3, 'string'}  })
+---
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}  })
+---
+...
+box.snapshot()
+---
+- ok
+...
+space:drop()
+---
+...

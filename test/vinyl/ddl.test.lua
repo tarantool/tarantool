@@ -43,3 +43,17 @@ space:insert({1, 2})
 index:select{}
 index2:select{}
 space:drop()
+
+--
+-- gh-1632: index:bsize()
+--
+space = box.schema.space.create('test', { engine = 'vinyl' })
+pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}  })
+for i=1,10 do box.space.test:replace({i}) end
+box.space.test.index.primary:bsize() > 0
+
+box.snapshot()
+
+box.space.test.index.primary:bsize() == 0
+
+space:drop()
