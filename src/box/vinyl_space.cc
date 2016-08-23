@@ -50,7 +50,7 @@ VinylSpace::VinylSpace(Engine *e)
 	:Handler(e)
 {}
 
-/* Raise exception if in the index was found a tuple by the passed key. */
+/* Raise an exception if the index contains a duplicate. */
 static inline void
 check_dup_key(VinylIndex *idx, const char *key, struct vy_tx *tx)
 {
@@ -354,19 +354,19 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 }
 
 /**
- * Update optimization allows to don't do deletion and insertion in an index
- * if the update operation doesn't change indexed fields.
+ * Don't modify indexes whose fields were not changed by update.
  *
- * If in the columns mask (@sa update_read_ops in tuple_update.cc) is set
- * at least one bit that corresponds to one of the columns from key_def->parts
- * then an update operation changes at least one indexed field and the
- * optimization is inapplicable.
+ * If there is at least one bit in the columns mask (@sa update_read_ops in
+ * tuple_update.cc) set that corresponds to one of the columns from
+ * key_def->parts, then the update operation changes at least one
+ * indexed field and the optimization is inapplicable.
+ *
+ * Otherwise, we can skip the update.
  */
 static bool
-can_optimize_update(const VinylSecondaryIndex *idx, uint64_t cols_mask)
+can_optimize_update(const VinylSecondaryIndex *idx, uint64_t column_mask)
 {
-	return !(idx->cols_mask == UINT64_MAX) &&
-	       !(cols_mask & idx->cols_mask);
+	return (column_mask & idx->column_mask) == 0;
 }
 
 struct tuple *
@@ -389,11 +389,11 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	TupleRef old_ref(old_tuple);
 	struct tuple *new_tuple;
-	uint64_t cols_mask = 0;
+	uint64_t column_mask = 0;
 	new_tuple = tuple_update(space->format, region_aligned_alloc_xc_cb,
 				 &fiber()->gc, old_tuple, request->tuple,
 				 request->tuple_end, request->index_base,
-				 &cols_mask);
+				 &column_mask);
 	TupleRef new_ref(new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
 
@@ -412,7 +412,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 		sec_idx = (VinylSecondaryIndex *) space->index[iid];
 		key = tuple_extract_key(old_tuple, sec_idx->key_def_tuple_to_key,
 					NULL);
-		if (can_optimize_update(sec_idx, cols_mask)) {
+		if (can_optimize_update(sec_idx, column_mask)) {
 			continue;
 		}
 		part_count = mp_decode_array(&key);

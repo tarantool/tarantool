@@ -350,14 +350,14 @@ struct tuple *
 tuple_update(struct tuple_format *format,
 	     tuple_update_alloc_func f, void *alloc_ctx,
 	     const struct tuple *old_tuple, const char *expr,
-	     const char *expr_end, int field_base, uint64_t *cols_mask)
+	     const char *expr_end, int field_base, uint64_t *column_mask)
 {
 	uint32_t new_size = 0;
 	const char *new_data =
 		tuple_update_execute(f, alloc_ctx,
 				     expr, expr_end, old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
-				     &new_size, field_base, cols_mask);
+				     &new_size, field_base, column_mask);
 	if (new_data == NULL)
 		diag_raise();
 

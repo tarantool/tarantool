@@ -661,7 +661,7 @@ tuple_update(struct tuple_format *new_format,
 	     tuple_update_alloc_func f, void *alloc_ctx,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base,
-	     uint64_t *cols_mask);
+	     uint64_t *column_mask);
 
 struct tuple *
 tuple_upsert(struct tuple_format *new_format,
