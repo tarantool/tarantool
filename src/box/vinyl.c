@@ -127,11 +127,6 @@ sr_zoneof(struct vy_env *r);
 
 enum vy_sequence_op {
 	/**
-	 * The latest LSN of the write ahead log known to the
-	 * engine.
-	 */
-	VINYL_LSN,
-	/**
 	 * The oldest LSN used in one of the read views in
 	 * a transaction in the engine.
 	 */
@@ -141,8 +136,6 @@ enum vy_sequence_op {
 
 struct vy_sequence {
 	pthread_mutex_t lock;
-	/** Log sequence number. */
-	int64_t lsn;
 	/**
 	 * View sequence number: the oldest read view maintained
 	 * by the front end.
@@ -187,15 +180,14 @@ vy_sequence_do(struct vy_sequence *n, enum vy_sequence_op op)
 {
 	int64_t v = 0;
 	switch (op) {
-	case VINYL_LSN:
-		v = n->lsn;
-		break;
 	case VINYL_VIEW_LSN:
 		v = n->vlsn;
 		break;
 	case VINYL_NSN_NEXT:
 		v = ++n->nsn;
 		break;
+	default:
+		assert(0);
 	}
 	return v;
 }
@@ -2840,6 +2832,11 @@ struct tx_manager {
 	uint32_t    count_rw;
 	/** Transaction logical time. */
 	int64_t tsn;
+	/**
+	 * The last committed log sequence number known to
+	 * vinyl. Updated in vy_commit().
+	 */
+	int64_t lsn;
 	struct vy_env *env;
 };
 
@@ -2861,6 +2858,7 @@ tx_manager_new(struct vy_env *env)
 	m->count_rd = 0;
 	m->count_rw = 0;
 	m->tsn = 0;
+	m->lsn = 0;
 	m->env = env;
 	return m;
 }
@@ -2894,7 +2892,7 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	rlist_create(&tx->cursors);
 
 	tx->tsn = ++m->tsn;
-	tx->vlsn = vy_sequence(m->env->seq, VINYL_LSN);
+	tx->vlsn = m->lsn;
 
 	tx_tree_insert(&m->tree, tx);
 	if (type == VINYL_TX_RO)
@@ -2934,8 +2932,7 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 	if (was_oldest) {
 		struct vy_tx *oldest = tx_tree_first(&m->tree);
 		vy_sequence_lock(m->env->seq);
-		m->env->seq->vlsn = oldest ? oldest->vlsn :
-			m->env->seq->lsn;
+		m->env->seq->vlsn = oldest ? oldest->vlsn : m->lsn;
 		vy_sequence_unlock(m->env->seq);
 	}
 }
@@ -5511,7 +5508,7 @@ vy_index_open_ex(struct vy_index *index)
 		 * Find the newest range in the last incarnation
 		 * of this index.
 		 */
-		if (index_lsn < index->env->seq->lsn)
+		if (index_lsn < index->env->xm->lsn)
 			continue;
 		if (index_lsn < first_dump_lsn) {
 			first_dump_lsn = index_lsn;
@@ -6392,13 +6389,13 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 int
 vy_checkpoint(struct vy_env *env)
 {
+	int64_t lsn = env->xm->lsn;
 	struct vy_scheduler *scheduler = env->scheduler;
 	/* do not initiate checkpoint during bootstrap,
 	 * thread pool is not up yet */
 	if (!scheduler->is_worker_pool_running)
 		return 0;
 	tt_pthread_mutex_lock(&scheduler->mutex);
-	int64_t lsn = vy_sequence(env->seq, VINYL_LSN);
 	scheduler->checkpoint_lsn = lsn;
 	scheduler->checkpoint_in_progress = true;
 	for (int i = 0; i < scheduler->count; i++) {
@@ -6807,9 +6804,9 @@ vy_info_append_metric(struct vy_info *info, struct vy_info_node *root)
 	if (vy_info_reserve(info, node, 2) != 0)
 		return 1;
 
+	vy_info_append_u64(node, "lsn", info->env->xm->lsn);
 	struct vy_sequence *seq = info->env->seq;
 	vy_sequence_lock(seq);
-	vy_info_append_u64(node, "lsn", seq->lsn);
 	vy_info_append_u64(node, "nsn", seq->nsn);
 	vy_sequence_unlock(seq);
 	return 0;
@@ -7187,7 +7184,7 @@ vy_index_open_or_create(struct vy_index *index)
 		 * locally, and we should create the index
 		 * directory from scratch.
 		 */
-		return index->env->seq->lsn ?
+		return index->env->xm->lsn ?
 			vy_index_open_ex(index) : vy_index_create(index);
 	}
 	/*
@@ -7213,7 +7210,7 @@ vy_index_open_or_create(struct vy_index *index)
 	 * of the index or not, since file names always contain
 	 * this LSN.
 	 */
-	if (vy_index_exists(index, index->env->seq->lsn)) {
+	if (vy_index_exists(index, index->env->xm->lsn)) {
 		/*
 		 * We found a file with LSN greater or equal
 		 * that the "index recovery" lsn.
@@ -7306,7 +7303,7 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	if (tx) {
 		vlsn = tx->vlsn;
 	} else {
-		vlsn = vy_sequence(e->scheduler->env->seq, VINYL_LSN);
+		vlsn = e->xm->lsn;
 	}
 
 	int upsert_eq = 0;
@@ -8028,10 +8025,8 @@ int
 vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 {
 	assert(tx->state == VINYL_TX_COMMIT);
-	vy_sequence_lock(e->seq);
-	if (lsn > (int64_t) e->seq->lsn)
-		e->seq->lsn = lsn;
-	vy_sequence_unlock(e->seq);
+	if (lsn > e->xm->lsn)
+		e->xm->lsn = lsn;
 
 	/* Flush transactional changes to the index. */
 	uint64_t now = clock_monotonic64();
@@ -8293,7 +8288,7 @@ vy_begin_initial_recovery(struct vy_env *e, int64_t lsn)
 {
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_INITIAL_RECOVERY;
-	e->seq->lsn = lsn;
+	e->xm->lsn = lsn;
 }
 
 void
