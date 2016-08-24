@@ -5550,9 +5550,10 @@ struct vy_task {
 };
 
 static inline struct vy_task *
-vy_task_new(struct vy_index *index, enum vy_task_type type)
+vy_task_new(struct mempool *pool, struct vy_index *index,
+	    enum vy_task_type type)
 {
-	struct vy_task *task = (struct vy_task *) calloc(1, sizeof(*task));
+	struct vy_task *task = mempool_alloc(pool);
 	if (task == NULL) {
 		diag_set(OutOfMemory, sizeof(*task), "scheduler", "task");
 		return NULL;
@@ -5564,14 +5565,14 @@ vy_task_new(struct vy_index *index, enum vy_task_type type)
 }
 
 static inline void
-vy_task_delete(struct vy_task *task)
+vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
 	if (task->type != VY_TASK_DROP) {
 		vy_index_unref(task->index);
 		task->index = NULL;
 	}
 	TRASH(task);
-	free(task);
+	mempool_free(pool, task);
 }
 
 static int
@@ -5646,7 +5647,16 @@ struct vy_scheduler {
 	 * A queue with all vy_task objects created by the
 	 * scheduler and not yet taken by a worker.
 	 */
-	struct stailq queue;
+	struct stailq input_queue;
+	/**
+	 * A queue of processed vy_tasks objects.
+	 */
+	struct stailq output_queue;
+	/**
+	 * A memory pool for vy_tasks.
+	 */
+	struct mempool task_pool;
+
 	struct vclock checkpoint_vclock;
 };
 
@@ -5744,8 +5754,9 @@ vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 }
 
 static inline int
-vy_scheduler_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
-			   struct vy_task **ptask)
+vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
+			     struct vy_index *index, int64_t checkpoint_lsn,
+			     struct vy_task **ptask)
 {
 	/* try to peek a node which has min
 	 * lsn <= required value
@@ -5761,7 +5772,8 @@ vy_scheduler_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
 			in_progress = true;
 			continue;
 		}
-		struct vy_task *task = vy_task_new(index, VY_TASK_CHECKPOINT);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_CHECKPOINT);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(n);
@@ -5778,8 +5790,8 @@ vy_scheduler_peek_checkpoint(struct vy_index *index, int64_t checkpoint_lsn,
 }
 
 static inline int
-vy_scheduler_peek_dump(struct vy_index *index, uint32_t dump_wm,
-		     struct vy_task **ptask)
+vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
+		       uint32_t dump_wm, struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest in-memory index */
 	struct vy_range *n;
@@ -5790,7 +5802,8 @@ vy_scheduler_peek_dump(struct vy_index *index, uint32_t dump_wm,
 			continue;
 		if (n->used < dump_wm)
 			return 0; /* nothing to do */
-		struct vy_task *task = vy_task_new(index, VY_TASK_DUMP);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_DUMP);
 		if (task == NULL)
 			return -1; /* oom */
 		vy_range_lock(n);
@@ -5803,8 +5816,8 @@ vy_scheduler_peek_dump(struct vy_index *index, uint32_t dump_wm,
 }
 
 static inline int
-vy_scheduler_peek_age(struct vy_index *index, uint32_t ttl, uint32_t ttl_wm,
-		    struct vy_task **ptask)
+vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
+		      uint32_t ttl, uint32_t ttl_wm, struct vy_task **ptask)
 {
 	/* try to peek a node with update >= a and in-memory
 	 * index size >= b */
@@ -5822,7 +5835,8 @@ vy_scheduler_peek_age(struct vy_index *index, uint32_t ttl, uint32_t ttl_wm,
 		}
 		if (n->used < ttl_wm && (now - n->update_time) < ttl)
 			continue;
-		struct vy_task *task = vy_task_new(index, VY_TASK_AGE);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_AGE);
 		if (task == NULL)
 			return -1; /* oom */
 		vy_range_lock(n);
@@ -5839,8 +5853,9 @@ vy_scheduler_peek_age(struct vy_index *index, uint32_t ttl, uint32_t ttl_wm,
 }
 
 static inline int
-vy_scheduler_peek_compact(struct vy_index *index, uint32_t run_count,
-			struct vy_task **ptask)
+vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
+			  struct vy_index *index, uint32_t run_count,
+			  struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest number
 	 * of runs */
@@ -5852,7 +5867,8 @@ vy_scheduler_peek_compact(struct vy_index *index, uint32_t run_count,
 			continue;
 		if (n->run_count < run_count)
 			break; /* TODO: why ? */
-		struct vy_task *task = vy_task_new(index, VY_TASK_COMPACT);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_COMPACT);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(n);
@@ -5865,8 +5881,9 @@ vy_scheduler_peek_compact(struct vy_index *index, uint32_t run_count,
 }
 
 static inline int
-vy_scheduler_peek_gc(struct vy_index *index, int64_t gc_lsn,
-		   uint32_t gc_percent, struct vy_task **ptask)
+vy_scheduler_peek_gc(struct vy_scheduler *scheduler, struct vy_index *index,
+		     int64_t gc_lsn, uint32_t gc_percent,
+		     struct vy_task **ptask)
 {
 	/* try to peek a node with a biggest number
 	 * of runs which is ready for gc */
@@ -5885,7 +5902,8 @@ vy_scheduler_peek_gc(struct vy_index *index, int64_t gc_lsn,
 			in_progress = true;
 			continue;
 		}
-		struct vy_task *task = vy_task_new(index, VY_TASK_GC);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_GC);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(n);
@@ -5902,7 +5920,8 @@ vy_scheduler_peek_gc(struct vy_index *index, int64_t gc_lsn,
 }
 
 static inline int
-vy_scheduler_peek_shutdown(struct vy_index *index, struct vy_task **ptask)
+vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
+			   struct vy_index *index, struct vy_task **ptask)
 {
 	int status = vy_status(&index->status);
 	switch (status) {
@@ -5911,7 +5930,8 @@ vy_scheduler_peek_shutdown(struct vy_index *index, struct vy_task **ptask)
 			*ptask = NULL;
 			return 0; /* index still has tasks */
 		}
-		struct vy_task *task = vy_task_new(index, VY_TASK_DROP);
+		struct vy_task *task = vy_task_new(&scheduler->task_pool,
+						   index, VY_TASK_DROP);
 		if (task == NULL)
 			return -1;
 		*ptask = task;
@@ -5923,7 +5943,8 @@ vy_scheduler_peek_shutdown(struct vy_index *index, struct vy_task **ptask)
 }
 
 static inline int
-vy_scheduler_peek_nodegc(struct vy_index *index, struct vy_task **ptask)
+vy_scheduler_peek_nodegc(struct vy_scheduler *scheduler,
+			 struct vy_index *index, struct vy_task **ptask)
 {
 	if (rlist_empty(&index->gc)) {
 		*ptask = NULL;
@@ -5931,7 +5952,8 @@ vy_scheduler_peek_nodegc(struct vy_index *index, struct vy_task **ptask)
 	}
 
 	struct vy_range *n = rlist_first_entry(&index->gc, struct vy_range, gc);
-	struct vy_task *task= vy_task_new(index, VY_TASK_NODEGC);
+	struct vy_task *task= vy_task_new(&scheduler->task_pool, index,
+					  VY_TASK_NODEGC);
 	if (task == NULL)
 		return -1;
 	rlist_del(&n->gc);
@@ -5948,7 +5970,7 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	*ptask = NULL;
 
 	/* node gc */
-	rc = vy_scheduler_peek_nodegc(index, ptask);
+	rc = vy_scheduler_peek_nodegc(scheduler, index, ptask);
 	if (rc != 0)
 		return rc; /* error */
 	if (*ptask != NULL)
@@ -5956,7 +5978,7 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 
 	/* checkpoint */
 	if (scheduler->checkpoint_in_progress) {
-		rc = vy_scheduler_peek_checkpoint(index,
+		rc = vy_scheduler_peek_checkpoint(scheduler, index,
 			scheduler->checkpoint_lsn, ptask);
 		if (rc != 0)
 			return rc; /* error */
@@ -5966,7 +5988,8 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 
 	/* garbage-collection */
 	if (scheduler->gc_in_progress) {
-		rc = vy_scheduler_peek_gc(index, vlsn, zone->gc_wm, ptask);
+		rc = vy_scheduler_peek_gc(scheduler, index, vlsn, zone->gc_wm,
+					  ptask);
 		if (rc != 0)
 			return rc; /* error */
 		if (*ptask != NULL)
@@ -5977,7 +6000,8 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	if (scheduler->age_in_progress) {
 		uint32_t ttl = zone->dump_age * 1000000; /* ms */
 		uint32_t ttl_wm = zone->dump_age_wm;
-		rc = vy_scheduler_peek_age(index, ttl, ttl_wm, ptask);
+		rc = vy_scheduler_peek_age(scheduler, index, ttl, ttl_wm,
+					   ptask);
 		if (rc != 0)
 			return rc; /* error */
 		if (*ptask != NULL)
@@ -5985,7 +6009,7 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	}
 
 	/* dumping */
-	rc = vy_scheduler_peek_dump(index, zone->dump_wm, ptask);
+	rc = vy_scheduler_peek_dump(scheduler, index, zone->dump_wm, ptask);
 	if (rc != 0) {
 		if (rc != 0)
 			return rc; /* error */
@@ -5994,7 +6018,8 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	}
 
 	/* compaction */
-	rc = vy_scheduler_peek_compact(index, zone->compact_wm, ptask);
+	rc = vy_scheduler_peek_compact(scheduler, index, zone->compact_wm,
+				       ptask);
 	if (rc != 0)
 		return rc; /* error */
 
@@ -6010,7 +6035,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
 		*ptask = NULL;
 		vy_index_rdlock(index);
-		int rc = vy_scheduler_peek_shutdown(index, ptask);
+		int rc = vy_scheduler_peek_shutdown(scheduler, index, ptask);
 		vy_index_unlock(index);
 		if (rc < 0)
 			return rc;
@@ -6096,9 +6121,13 @@ vy_scheduler_f(va_list va)
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct vy_env *env = scheduler->env;
 
+	mempool_create(&scheduler->task_pool, cord_slab_cache(),
+			sizeof(struct vy_task));
+
 	/* Start worker threads */
 	scheduler->worker_pool = NULL;
-	stailq_create(&scheduler->queue);
+	stailq_create(&scheduler->input_queue);
+	stailq_create(&scheduler->output_queue);
 	assert(scheduler->worker_pool_size > 0);
 	scheduler->worker_pool = (struct cord *)
 		calloc(scheduler->worker_pool_size, sizeof(struct cord));
@@ -6112,7 +6141,18 @@ vy_scheduler_f(va_list va)
 	bool warning_said = false;
 	tt_pthread_mutex_lock(&scheduler->mutex);
 	while (scheduler->is_worker_pool_running) {
+		/* Swap output queue */
+		struct stailq output_queue;
+		stailq_create(&output_queue);
+		stailq_splice(&scheduler->output_queue,
+			      stailq_first(&scheduler->output_queue),
+			      &output_queue);
 		tt_pthread_mutex_unlock(&scheduler->mutex);
+
+		/* Delete all processed tasks */
+		struct vy_task *task, *next;
+		stailq_foreach_entry_safe(task, next, &output_queue, link)
+			vy_task_delete(&scheduler->task_pool, task);
 
 		/* Run periodic tasks */
 		struct srzone *zone = sr_zoneof(env);
@@ -6120,7 +6160,7 @@ vy_scheduler_f(va_list va)
 
 		/* Get task */
 		int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
-		struct vy_task *task = NULL;
+		task = NULL;
 		int rc = vy_schedule(scheduler, zone, vlsn, &task);
 		if (rc != 0){
 			/* Log error message once */
@@ -6135,8 +6175,9 @@ vy_scheduler_f(va_list va)
 
 		if (task != NULL) {
 			/* Queue task */
-			bool was_empty = stailq_empty(&scheduler->queue);
-			stailq_add_tail_entry(&scheduler->queue, task, link);
+			bool was_empty = stailq_empty(&scheduler->input_queue);
+			stailq_add_tail_entry(&scheduler->input_queue, task,
+					      link);
 			if (was_empty)                  /* Notify workers */
 				tt_pthread_cond_signal(&scheduler->worker_cond);
 			warning_said = false;
@@ -6159,12 +6200,12 @@ vy_scheduler_f(va_list va)
 	tt_pthread_mutex_lock(&scheduler->mutex);
 	/* Delete all pending tasks */
 	struct vy_task *task, *next;
-	stailq_foreach_entry_safe(task, next, &scheduler->queue, link)
-		vy_task_delete(task);
+	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link)
+		vy_task_delete(&scheduler->task_pool, task);
 	/* Wake up worker threads */
 	pthread_cond_broadcast(&scheduler->worker_cond);
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	assert(stailq_empty(&scheduler->queue));
+	assert(stailq_empty(&scheduler->input_queue));
 
 	/* Join worker threads */
 	for (int i = 0; i < scheduler->worker_pool_size; i++)
@@ -6172,7 +6213,14 @@ vy_scheduler_f(va_list va)
 	free(scheduler->worker_pool);
 	scheduler->worker_pool = NULL;
 	scheduler->worker_pool_size = 0;
-	stailq_create(&scheduler->queue);
+	stailq_create(&scheduler->input_queue);
+	stailq_create(&scheduler->output_queue);
+
+	/* Delete all processed tasks */
+	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link)
+		vy_task_delete(&scheduler->task_pool, task);
+
+	mempool_destroy(&scheduler->task_pool);
 
 	return 0;
 }
@@ -6191,15 +6239,15 @@ vy_worker_f(va_list va)
 	tt_pthread_mutex_lock(&scheduler->mutex);
 	while (scheduler->is_worker_pool_running) {
 		/* Wait for a task */
-		if (stailq_empty(&scheduler->queue)) {
+		if (stailq_empty(&scheduler->input_queue)) {
 			/* Wake scheduler up if there are no more tasks */
 			tt_pthread_cond_signal(&scheduler->scheduler_cond);
 			tt_pthread_cond_wait(&scheduler->worker_cond,
 					     &scheduler->mutex);
 			continue;
 		}
-		task = stailq_shift_entry(&scheduler->queue, struct vy_task,
-					  link);
+		task = stailq_shift_entry(&scheduler->input_queue,
+					  struct vy_task, link);
 		tt_pthread_mutex_unlock(&scheduler->mutex);
 		assert(task != NULL);
 
@@ -6214,11 +6262,9 @@ vy_worker_f(va_list va)
 			warning_said = false;
 		}
 
-		/* Delete task */
-		vy_task_delete(task);
-		task = NULL;
-
+		/* Return processed task to scheduler */
 		tt_pthread_mutex_lock(&scheduler->mutex);
+		stailq_add_tail_entry(&scheduler->output_queue, task, link);
 	}
 	tt_pthread_mutex_unlock(&scheduler->mutex);
 	sd_cfree(&sdc);
