@@ -3698,7 +3698,7 @@ struct siread {
 	struct svmerge merge;
 	int read_disk;
 	int read_cache;
-	struct vy_tuple **upsert_v;
+	struct vy_tuple *upsert_v;
 	int upsert_eq;
 	struct vy_tuple *result;
 	struct vy_index *index;
@@ -5058,25 +5058,25 @@ static int
 vy_upsert_iterator_has(struct vy_iter *itr)
 {
 	assert(itr->vif->has == vy_upsert_iterator_has);
-	return *((struct vy_tuple ***)itr->priv) != NULL;
+	return *((struct vy_tuple **)itr->priv) != NULL;
 }
 
 static struct vy_tuple *
 vy_upsert_iterator_get(struct vy_iter *itr)
 {
 	assert(itr->vif->get == vy_upsert_iterator_get);
-	return **((struct vy_tuple ***)itr->priv);
+	return *((struct vy_tuple **)itr->priv);
 }
 
 static void
 vy_upsert_iterator_next(struct vy_iter *itr)
 {
 	assert(itr->vif->next == vy_upsert_iterator_next);
-	*((struct vy_tuple ***)itr->priv) = NULL;
+	*((struct vy_tuple **)itr->priv) = NULL;
 }
 
 static void
-vy_upsert_iterator_open(struct vy_iter *itr, struct vy_tuple **value)
+vy_upsert_iterator_open(struct vy_iter *itr, struct vy_tuple *value)
 {
 	static struct vy_iterif vif = {
 		.close = vy_upsert_iterator_close,
@@ -5085,7 +5085,7 @@ vy_upsert_iterator_open(struct vy_iter *itr, struct vy_tuple **value)
 		.next = vy_upsert_iterator_next
 	};
 	itr->vif = &vif;
-	*((struct vy_tuple ***)itr->priv) = value;
+	*((struct vy_tuple **)itr->priv) = value;
 }
 
 static inline int
@@ -5115,7 +5115,7 @@ next_node:
 	}
 
 	/* external source (upsert) */
-	if (unlikely(q->upsert_v && *q->upsert_v)) {
+	if (q->upsert_v) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		vy_upsert_iterator_open(&s->src, q->upsert_v);
 	}
@@ -7237,12 +7237,9 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	} else {
 		si_readopen(&q, index, order, vlsn, key->data, key->size);
 	}
-	struct vy_tuple *sv_vup;
-	if (upsert != NULL) {
-		sv_vup = upsert;
-		q.upsert_v = &sv_vup;
-	}
+	q.upsert_v = upsert;
 	q.upsert_eq = upsert_eq;
+
 	assert(q.order != VINYL_EQ);
 	int rc = si_range(&q);
 	si_readclose(&q);
