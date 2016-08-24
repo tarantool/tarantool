@@ -339,55 +339,58 @@ vy_file_resize(struct vy_file *f, uint64_t size)
 	return 0;
 }
 
-static inline int
-vy_file_pwrite(struct vy_file *f, uint64_t off, void *buf, int size)
+static inline ssize_t
+vy_file_pwrite(struct vy_file *f, uint64_t off, void *buf, size_t size)
 {
-	int n = 0;
+	ssize_t n = 0;
 	do {
-		int r;
+		ssize_t r;
 		do {
 			r = pwrite(f->fd, (char*)buf + n, size - n, off + n);
 		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
+		if (r <= 0) {
 			return -1;
+		}
 		n += r;
-	} while (n != size);
-	assert(n == size);
+	} while ((size_t)n != size);
+	assert((size_t)n == size);
 	return n;
 }
 
-static inline int
-vy_file_write(struct vy_file *f, void *buf, int size)
+static inline ssize_t
+vy_file_write(struct vy_file *f, void *buf, size_t size)
 {
-	int n = 0;
+	ssize_t n = 0;
 	do {
-		int r;
+		ssize_t r;
 		do {
 			r = write(f->fd, (char*)buf + n, size - n);
 		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
+		if (r <= 0) {
 			return -1;
+		}
 		n += r;
-	} while (n != size);
-	assert(n == size);
+	} while ((size_t)n != size);
+	assert((size_t)n == size);
 	//FIXME: this may be incorrect
 	f->size += n;
 	return n;
 }
 
-static inline int
+static inline ssize_t
 vy_file_writev(struct vy_file *f, struct vy_iov *iov)
 {
 	struct iovec *v = iov->v;
 	int n = iov->iovc;
-	int size = 0;
+	ssize_t size = 0;
 	do {
-		int r;
+		ssize_t r;
 		do {
 			r = writev(f->fd, v, n);
 		} while (r == -1 && errno == EINTR);
-		if (r < 0)
+		if (r < 0) {
 			return -1;
+		}
 		size += r;
 		while (n > 0) {
 			if (v->iov_len > (size_t)r) {
