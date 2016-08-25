@@ -69,7 +69,7 @@ void
 vy_bootstrap(struct vy_env *e);
 
 void
-vy_begin_initial_recovery(struct vy_env *e, int64_t lsn);
+vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock);
 
 void
 vy_begin_final_recovery(struct vy_env *e);
@@ -84,7 +84,7 @@ void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);
 
 void
-vy_commit_checkpoint(struct vy_env *env);
+vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 /*
  * Introspection

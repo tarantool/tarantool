@@ -88,9 +88,9 @@ VinylEngine::bootstrap()
 }
 
 void
-VinylEngine::beginInitialRecovery(int64_t lsn)
+VinylEngine::beginInitialRecovery(struct vclock *vclock)
 {
-	vy_begin_initial_recovery(env, lsn);
+	vy_begin_initial_recovery(env, vclock);
 }
 
 void
@@ -308,7 +308,7 @@ VinylEngine::waitCheckpoint(struct vclock* vclock)
 }
 
 void
-VinylEngine::commitCheckpoint()
+VinylEngine::commitCheckpoint(struct vclock* vclock)
 {
-	vy_commit_checkpoint(env);
+	vy_commit_checkpoint(env, vclock);
 }

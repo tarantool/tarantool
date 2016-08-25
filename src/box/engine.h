@@ -127,7 +127,7 @@ public:
 	/**
 	 * Begin initial recovery from snapshot or dirty disk data.
 	 */
-	virtual void beginInitialRecovery(int64_t lsn);
+	virtual void beginInitialRecovery(struct vclock *vclock);
 	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
@@ -152,7 +152,7 @@ public:
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	virtual void commitCheckpoint();
+	virtual void commitCheckpoint(struct vclock *vclock);
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
@@ -261,7 +261,7 @@ engine_bootstrap();
  * Called at the start of recovery.
  */
 void
-engine_begin_initial_recovery(int64_t lsn);
+engine_begin_initial_recovery(struct vclock *vclock);
 
 /**
  * Called in the middle of JOIN stage,

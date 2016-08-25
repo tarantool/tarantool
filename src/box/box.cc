@@ -1282,7 +1282,7 @@ bootstrap_from_master(struct server *master)
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
-	engine_begin_initial_recovery(0);
+	engine_begin_initial_recovery(NULL);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 
@@ -1363,7 +1363,7 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
-		engine_begin_initial_recovery(lsn);
+		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
 		 * We explicitly request memtx to recover its

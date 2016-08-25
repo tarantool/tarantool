@@ -74,9 +74,9 @@ void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
 void Engine::bootstrap()
 {}
 
-void Engine::beginInitialRecovery(int64_t lsn)
+void Engine::beginInitialRecovery(struct vclock *vclock)
 {
-	(void) lsn;
+	(void) vclock;
 }
 
 void Engine::beginFinalRecovery()
@@ -151,8 +151,9 @@ Engine::waitCheckpoint(struct vclock *vclock)
 }
 
 void
-Engine::commitCheckpoint()
+Engine::commitCheckpoint(struct vclock *vclock)
 {
+	(void) vclock;
 }
 
 void
@@ -302,12 +303,12 @@ engine_bootstrap()
 }
 
 void
-engine_begin_initial_recovery(int64_t lsn)
+engine_begin_initial_recovery(struct vclock *vclock)
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginInitialRecovery(lsn);
+		engine->beginInitialRecovery(vclock);
 	}
 }
 
@@ -354,7 +355,7 @@ engine_commit_checkpoint(struct vclock *vclock)
 	}
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
-		engine->commitCheckpoint();
+		engine->commitCheckpoint(vclock);
 	}
 	return 0;
 }

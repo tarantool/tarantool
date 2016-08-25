@@ -756,9 +756,9 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::beginInitialRecovery(int64_t lsn)
+MemtxEngine::beginInitialRecovery(struct vclock *vclock)
 {
-	(void) lsn;
+	(void) vclock;
 	assert(m_state == MEMTX_INITIALIZED);
 	/*
 	 * By default, enable fast start: bulk read of tuples
@@ -1315,8 +1315,9 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 }
 
 void
-MemtxEngine::commitCheckpoint()
+MemtxEngine::commitCheckpoint(struct vclock *vclock)
 {
+	(void) vclock;
 	/* beginCheckpoint() must have been done */
 	assert(m_checkpoint);
 	/* waitCheckpoint() must have been done. */
