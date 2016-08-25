@@ -4201,6 +4201,8 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	sv_mergeiter_open(&im, &merge, VINYL_GE);
 	rc = si_merge(index, c, node, vlsn, &im, size_stream, count);
 	sv_mergefree(&merge);
+	if (!rc)
+		rc = vy_range_free(node, 1);
 	return rc;
 }
 
@@ -4342,8 +4344,8 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
          int64_t   vlsn)
 {
 	(void) stream;
-	(void) size_node;
 	(void) c;
+	(void) size_stream;
 	int rc;
 	struct vy_range *n = NULL;
 
@@ -4372,7 +4374,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 
 		if ((rc = vy_run_write(&n->file, &iwrite,
 				       index->conf.compression_if,
-				       size_stream, &id, &sdindex)))
+				       size_node, &id, &sdindex)))
 			goto error;
 
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
@@ -4498,14 +4500,6 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
 	             vy_range_free(range, 0);
-	             vy_error("%s", "error injection");
-	             return -1);
-
-	/* gc range */
-	rc = vy_range_free(range, 1);
-	if (unlikely(rc == -1))
-		return -1;
-	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_2,
 	             vy_error("%s", "error injection");
 	             return -1);
 
@@ -6009,13 +6003,12 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	}
 
 	/* dumping */
-	rc = vy_scheduler_peek_dump(scheduler, index, zone->dump_wm, ptask);
-	if (rc != 0) {
-		if (rc != 0)
-			return rc; /* error */
-		if (*ptask != NULL)
-			return 0; /* found */
-	}
+	rc = vy_scheduler_peek_dump(scheduler, index, zone->dump_wm,
+				    ptask);
+	if (rc != 0)
+		return rc; /* error */
+	if (*ptask != NULL)
+		return 0; /* found */
 
 	/* compaction */
 	rc = vy_scheduler_peek_compact(scheduler, index, zone->compact_wm,
