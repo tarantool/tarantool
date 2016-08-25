@@ -80,15 +80,15 @@ box_info_sort(box.info.vinyl())
       - count_dup: 0
       - memory_used: 58
       - node_count: 1
-      - page_count: 1
+      - page_count: 0
       - read_cache: 0
       - read_disk: 0
-      - run_avg: 1
-      - run_count: 1
-      - run_histogram: '[1]:1 '
-      - run_max: 1
-      - size: 248
-      - size_uncompressed: 248
+      - run_avg: 0
+      - run_count: 0
+      - run_histogram: '[0]:1 '
+      - run_max: 0
+      - size: 0
+      - size_uncompressed: 0
       - temperature_avg: 0
       - temperature_max: 0
       - temperature_min: 0
@@ -97,7 +97,6 @@ box_info_sort(box.info.vinyl())
     - used: 58
   - metric:
     - lsn: 5
-    - nsn: 1
   - performance:
     - cursor: 1
     - cursor_latency: <cursor_latency>
@@ -153,15 +152,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -170,15 +169,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -187,15 +186,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -204,15 +203,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -221,15 +220,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -238,15 +237,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -255,15 +254,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -272,15 +271,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -289,15 +288,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -306,15 +305,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -323,15 +322,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -340,15 +339,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -357,15 +356,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -374,15 +373,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -391,15 +390,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0
@@ -408,15 +407,15 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - node_count: 1
-    - page_count: 1
+    - page_count: 0
     - read_cache: 0
     - read_disk: 0
-    - run_avg: 1
-    - run_count: 1
-    - run_histogram: '[1]:1 '
-    - run_max: 1
-    - size: 248
-    - size_uncompressed: 248
+    - run_avg: 0
+    - run_count: 0
+    - run_histogram: '[0]:1 '
+    - run_max: 0
+    - size: 0
+    - size_uncompressed: 0
     - temperature_avg: 0
     - temperature_max: 0
     - temperature_min: 0

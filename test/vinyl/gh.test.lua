@@ -166,6 +166,9 @@ s:upsert({1},{{'=',4,5}})
 s:select{}
 s:select{}
 test_run:grep_log('default', 'UPSERT operation failed') == nil
+box.snapshot()
+s:replace{2,2}
+s:upsert({2},{{'=',4,5}})
 box:snapshot()
 test_run:grep_log('default', 'UPSERT operation failed') ~= nil
 s:drop()

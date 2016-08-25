@@ -407,6 +407,17 @@ test_run:grep_log('default', 'UPSERT operation failed') == nil
 ---
 - true
 ...
+box.snapshot()
+---
+- ok
+...
+s:replace{2,2}
+---
+- [2, 2]
+...
+s:upsert({2},{{'=',4,5}})
+---
+...
 box:snapshot()
 ---
 - ok
