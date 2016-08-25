@@ -6385,19 +6385,27 @@ vy_index_gc(struct vy_index *index)
 			continue;
 		if (!(strcmp("..", dirent->d_name)))
 			continue;
+		bool is_vinyl_file = false;
+		if (strstr(dirent->d_name, ".tmp") == dirent->d_name) {
+			is_vinyl_file = true;
+		}
 		if (strstr(dirent->d_name, ".index")) {
+			is_vinyl_file = true;
 			int64_t lsn = 0;
 			sscanf(dirent->d_name, "%"SCNx64, &lsn);
 			if (lsn >= index->first_dump_lsn)
 				continue;
 		}
 		if (strstr(dirent->d_name, ".range")) {
+			is_vinyl_file = true;
 			uint64_t range_id = 0;
 			sscanf(dirent->d_name, "%"SCNx64, &range_id);
 			mh_int_t range = mh_i32ptr_find(ranges, range_id, NULL);
 			if (range != mh_end(ranges))
 				continue;
 		}
+		if (!is_vinyl_file)
+			continue;
 		char path[PATH_MAX];
 		snprintf(path, PATH_MAX, "%s/%s",
 			 index->conf.path, dirent->d_name);
