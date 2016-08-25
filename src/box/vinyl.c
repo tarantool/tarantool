@@ -5650,8 +5650,6 @@ struct vy_scheduler {
 	 * A memory pool for vy_tasks.
 	 */
 	struct mempool task_pool;
-
-	struct vclock checkpoint_vclock;
 };
 
 static void
@@ -6321,8 +6319,8 @@ vy_checkpoint(struct vy_env *env)
 void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
+	(void) vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
-	scheduler->checkpoint_vclock = *vclock;
 	for (;;) {
 		tt_pthread_mutex_lock(&scheduler->mutex);
 		bool is_active = false;
@@ -6414,10 +6412,10 @@ end:
 }
 
 void
-vy_commit_checkpoint(struct vy_env *env)
+vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
-	int64_t checkpoint_lsn = vclock_sum(&scheduler->checkpoint_vclock);
+	int64_t checkpoint_lsn = vclock_sum(vclock);
 	for (int i = 0; i < scheduler->count; i++) {
 		struct vy_index *index;
 		index = scheduler->indexes[i];
@@ -8190,11 +8188,15 @@ vy_bootstrap(struct vy_env *e)
 }
 
 void
-vy_begin_initial_recovery(struct vy_env *e, int64_t lsn)
+vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 {
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_INITIAL_RECOVERY;
-	e->xm->lsn = lsn;
+	if (vclock) {
+		e->xm->lsn = vclock_sum(vclock);
+	} else {
+		e->xm->lsn = 0;
+	}
 }
 
 void
