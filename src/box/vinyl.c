@@ -4357,7 +4357,8 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 			  index->key_def->opts.page_size, sizeof(struct sdv),
 			  vlsn, 0, 0);
 
-	while (sv_writeiter_has(&iwrite)) {
+	while (sv_writeiter_has(&iwrite) ||
+	       sv_writeiter_resume(&iwrite)) {
 		struct vy_page_index sdindex;
 		vy_page_index_init(&sdindex);
 		/* create new node */
