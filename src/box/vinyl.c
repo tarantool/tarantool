@@ -203,7 +203,7 @@ struct vy_buf {
 };
 
 static inline void
-vy_buf_init(struct vy_buf *b)
+vy_buf_create(struct vy_buf *b)
 {
 	b->s = NULL;
 	b->p = NULL;
@@ -211,7 +211,7 @@ vy_buf_init(struct vy_buf *b)
 }
 
 static inline void
-vy_buf_free(struct vy_buf *b)
+vy_buf_destroy(struct vy_buf *b)
 {
 	if (unlikely(b->s == NULL))
 		return;
@@ -245,8 +245,8 @@ static inline void
 vy_buf_gc(struct vy_buf *b, size_t wm)
 {
 	if (unlikely(vy_buf_size(b) >= wm)) {
-		vy_buf_free(b);
-		vy_buf_init(b);
+		vy_buf_destroy(b);
+		vy_buf_create(b);
 		return;
 	}
 	vy_buf_reset(b);
@@ -524,8 +524,8 @@ struct vy_filter;
 
 struct vy_filterif {
 	char *name;
-	int (*init)(struct vy_filter*, va_list);
-	int (*free)(struct vy_filter*);
+	int (*create)(struct vy_filter*, va_list);
+	int (*destroy)(struct vy_filter*);
 	int (*start)(struct vy_filter*, struct vy_buf*);
 	int (*next)(struct vy_filter*, struct vy_buf*, char*, int);
 	int (*complete)(struct vy_filter*, struct vy_buf*);
@@ -538,22 +538,22 @@ struct vy_filter {
 };
 
 static inline int
-vy_filter_init(struct vy_filter *c, struct vy_filterif *ci,
-	      enum vy_filter_op op, ...)
+vy_filter_create(struct vy_filter *c, struct vy_filterif *ci,
+	       enum vy_filter_op op, ...)
 {
 	c->op = op;
 	c->i  = ci;
 	va_list args;
 	va_start(args, op);
-	int rc = c->i->init(c, args);
+	int rc = c->i->create(c, args);
 	va_end(args);
 	return rc;
 }
 
 static inline int
-vy_filter_free(struct vy_filter *c)
+vy_filter_destroy(struct vy_filter *c)
 {
-	return c->i->free(c);
+	return c->i->destroy(c);
 }
 
 static inline int
@@ -679,7 +679,7 @@ struct vy_filter_lz4 {
 };
 
 static int
-vy_filter_lz4_init(struct vy_filter *f, va_list args)
+vy_filter_lz4_create(struct vy_filter *f, va_list args)
 {
 	(void) args;
 	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
@@ -700,7 +700,7 @@ vy_filter_lz4_init(struct vy_filter *f, va_list args)
 }
 
 static int
-vy_filter_lz4_free(struct vy_filter *f)
+vy_filter_lz4_destroy(struct vy_filter *f)
 {
 	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
 	(void)z;
@@ -839,8 +839,8 @@ vy_filter_lz4_complete(struct vy_filter *f, struct vy_buf *dest)
 static struct vy_filterif vy_filterif_lz4 =
 {
 	.name     = "lz4",
-	.init     = vy_filter_lz4_init,
-	.free     = vy_filter_lz4_free,
+	.create   = vy_filter_lz4_create,
+	.destroy  = vy_filter_lz4_destroy,
 	.start    = vy_filter_lz4_start,
 	.next     = vy_filter_lz4_next,
 	.complete = vy_filter_lz4_complete
@@ -923,7 +923,7 @@ struct vy_filter_zstd {
 };
 
 static int
-vy_filter_zstd_init(struct vy_filter *f, va_list args)
+vy_filter_zstd_create(struct vy_filter *f, va_list args)
 {
 	(void) args;
 	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
@@ -941,7 +941,7 @@ vy_filter_zstd_init(struct vy_filter *f, va_list args)
 }
 
 static int
-vy_filter_zstd_free(struct vy_filter *f)
+vy_filter_zstd_destroy(struct vy_filter *f)
 {
 	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
 	switch (f->op) {
@@ -1032,8 +1032,8 @@ vy_filter_zstd_complete(struct vy_filter *f, struct vy_buf *dest)
 static struct vy_filterif vy_filterif_zstd =
 {
 	.name     = "zstd",
-	.init     = vy_filter_zstd_init,
-	.free     = vy_filter_zstd_free,
+	.create   = vy_filter_zstd_create,
+	.destroy  = vy_filter_zstd_destroy,
 	.start    = vy_filter_zstd_start,
 	.next     = vy_filter_zstd_next,
 	.complete = vy_filter_zstd_complete
@@ -1318,7 +1318,7 @@ static inline void
 sv_mergeinit(struct svmerge *m, struct vy_index *index,
 	     struct key_def *key_def)
 {
-	vy_buf_init(&m->buf);
+	vy_buf_create(&m->buf);
 	m->index = index;
 	m->key_def = key_def;
 }
@@ -1336,7 +1336,7 @@ sv_mergefree(struct svmerge *m)
 	struct svmergesrc *end = (struct svmergesrc *)m->buf.p;
 	for (struct svmergesrc *src = beg; src != end; ++src)
 		src->i->vif->close(src->i);
-	vy_buf_free(&m->buf);
+	vy_buf_destroy(&m->buf);
 }
 
 static inline void
@@ -1927,7 +1927,7 @@ vy_mem_free_matras_page(void *p)
 }
 
 static int
-vy_mem_init(struct vy_mem *index, struct key_def *key_def)
+vy_mem_create(struct vy_mem *index, struct key_def *key_def)
 {
 	index->min_lsn = INT64_MAX;
 	index->used = 0;
@@ -1940,7 +1940,7 @@ vy_mem_init(struct vy_mem *index, struct key_def *key_def)
 }
 
 static int
-vy_mem_free(struct vy_mem *index)
+vy_mem_destroy(struct vy_mem *index)
 {
 	assert(index == index->tree.arg);
 	struct bps_tree_mem_iterator itr =
@@ -1969,6 +1969,15 @@ vy_mem_set(struct vy_mem *index, struct vy_tuple *v)
 		index->min_lsn = v->lsn;
 	return 0;
 }
+
+static int
+vy_mem_gc(struct vy_mem *i)
+{
+	vy_mem_destroy(i);
+	vy_mem_create(i, i->key_def);
+	return 0;
+}
+
 /*
  * Find a value in index with given key and biggest lsn <= given lsn
  */
@@ -2098,7 +2107,6 @@ struct PACKED vy_run {
 
 struct PACKED vy_range {
 	int64_t   id;
-	uint32_t   recover;
 	uint16_t   flags;
 	uint64_t   update_time;
 	uint32_t   used; /* sum of i0->used + i1->used */
@@ -2109,10 +2117,7 @@ struct PACKED vy_range {
 	uint16_t   refs;
 	pthread_mutex_t reflock;
 	struct vy_mem    i0, i1;
-	/*
-	 * File descriptor in which range is stored
-	 * or -1 if range was not dumped yet
-	 */
+	/** The file where the run is stored or -1 if it's not dumped yet. */
 	int fd;
 	char path[PATH_MAX];
 	rb_node(struct vy_range) tree_node;
@@ -2123,17 +2128,6 @@ struct PACKED vy_range {
 };
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
-
-struct vy_index_conf {
-	uint32_t    id;
-	char       *name;
-	char       *path;
-	uint32_t    sync;
-	uint32_t    compression;
-	char       *compression_sz;
-	struct vy_filterif *compression_if;
-	uint32_t    buf_gc_wm;
-};
 
 struct vy_profiler {
 	uint32_t  total_range_count;
@@ -2207,7 +2201,12 @@ struct vy_index {
 	uint64_t size;
 	pthread_mutex_t ref_lock;
 	uint32_t refs;
-	struct vy_index_conf conf;
+	/** A schematic name for profiler output. */
+	char       *name;
+	/** The path with index files. */
+	char       *path;
+	/** Compression filter. */
+	struct vy_filterif *compression_if;
 	struct key_def *key_def;
 	struct tuple_format *tuple_format;
 	uint32_t key_map_size; /* size of key_map map */
@@ -2235,9 +2234,9 @@ struct vy_index {
 	 * we will update this stamp. For new nodes we will
 	 * use this stamp as an identifier.
 	 */
-	int64_t range_stamp;
+	int64_t range_id_max;
 	/* Last range stamp that was dumped to disk */
-	int64_t last_dumped_range_stamp;
+	int64_t last_dump_range_id;
 };
 
 
@@ -2260,7 +2259,6 @@ enum tx_type {
 	VINYL_TX_RO,
 	VINYL_TX_RW
 };
-
 
 struct read_set_key {
 	char *data;
@@ -2642,20 +2640,23 @@ struct vy_page {
 };
 
 static inline void
-vy_page_init(struct vy_page *p, struct vy_page_info *info, char *data) {
+vy_page_init(struct vy_page *p, struct vy_page_info *info, char *data)
+{
 	p->info = info;
 	p->data = data;
 	p->refs = 1;
 }
 
 static inline struct vy_tuple_info*
-sd_pagev(struct vy_page *p, uint32_t pos) {
+sd_pagev(struct vy_page *p, uint32_t pos)
+{
 	assert(pos < p->info->count);
 	return (struct vy_tuple_info*)(p->data + sizeof(struct vy_tuple_info) * pos);
 }
 
 static inline void*
-sd_pagepointer(struct vy_page *p, struct vy_tuple_info *v) {
+sd_pagepointer(struct vy_page *p, struct vy_tuple_info *v)
+{
 	assert((sizeof(struct vy_tuple_info) * p->info->count) + v->offset <=
 	       p->info->unpacked_size);
 	return (p->data + sizeof(struct vy_tuple_info) * p->info->count)
@@ -2663,26 +2664,30 @@ sd_pagepointer(struct vy_page *p, struct vy_tuple_info *v) {
 }
 
 static inline char *
-vy_run_index_min_key(struct vy_run_index *i, struct vy_page_info *p) {
+vy_run_index_min_key(struct vy_run_index *i, struct vy_page_info *p)
+{
 	return i->minmax.s + p->min_key_offset;
 }
 
 static inline char *
-vy_run_index_max_key(struct vy_run_index *i, struct vy_page_info *p) {
+vy_run_index_max_key(struct vy_run_index *i, struct vy_page_info *p)
+{
 	return i->minmax.s + p->max_key_offset;
 }
 
 static inline void
-vy_run_index_init(struct vy_run_index *i) {
-	vy_buf_init(&i->pages);
-	vy_buf_init(&i->minmax);
+vy_run_index_init(struct vy_run_index *i)
+{
+	vy_buf_create(&i->pages);
+	vy_buf_create(&i->minmax);
 	memset(&i->info, 0, sizeof(i->info));
 }
 
 static inline void
-vy_run_index_free(struct vy_run_index *i) {
-	vy_buf_free(&i->pages);
-	vy_buf_free(&i->minmax);
+vy_run_index_destroy(struct vy_run_index *i)
+{
+	vy_buf_destroy(&i->pages);
+	vy_buf_destroy(&i->minmax);
 }
 
 static inline struct vy_page_info *
@@ -2695,12 +2700,14 @@ vy_run_index_get_page(struct vy_run_index *i, int pos)
 }
 
 static inline struct vy_page_info *
-vy_run_index_first_page(struct vy_run_index *i) {
+vy_run_index_first_page(struct vy_run_index *i)
+{
 	return vy_run_index_get_page(i, 0);
 }
 
 static inline struct vy_page_info *
-vy_run_index_last_page(struct vy_run_index *i) {
+vy_run_index_last_page(struct vy_run_index *i)
+{
 	return vy_run_index_get_page(i, i->info.count - 1);
 }
 
@@ -2728,8 +2735,6 @@ vy_run_index_size(struct vy_run_index *i)
 	       i->info.minmax_size;
 }
 
-int vy_run_index_load(struct vy_run_index *, void *);
-
 struct sdcbuf {
 	struct vy_buf a; /* decompression */
 	struct vy_buf b; /* transformation */
@@ -2748,10 +2753,10 @@ struct sdc {
 static inline void
 sd_cinit(struct sdc *sc)
 {
-	vy_buf_init(&sc->a);
-	vy_buf_init(&sc->b);
-	vy_buf_init(&sc->c);
-	vy_buf_init(&sc->d);
+	vy_buf_create(&sc->a);
+	vy_buf_create(&sc->b);
+	vy_buf_create(&sc->c);
+	vy_buf_create(&sc->d);
 	sc->count = 0;
 	sc->head = NULL;
 }
@@ -2759,24 +2764,25 @@ sd_cinit(struct sdc *sc)
 static inline void
 sd_cfree(struct sdc *sc)
 {
-	vy_buf_free(&sc->a);
-	vy_buf_free(&sc->b);
-	vy_buf_free(&sc->c);
-	vy_buf_free(&sc->d);
+	vy_buf_destroy(&sc->a);
+	vy_buf_destroy(&sc->b);
+	vy_buf_destroy(&sc->c);
+	vy_buf_destroy(&sc->d);
 	struct sdcbuf *b = sc->head;
 	struct sdcbuf *next;
 	while (b) {
 		next = b->next;
-		vy_buf_free(&b->a);
-		vy_buf_free(&b->b);
+		vy_buf_destroy(&b->a);
+		vy_buf_destroy(&b->b);
 		free(b);
 		b = next;
 	}
 }
 
 static inline void
-sd_cgc(struct sdc *sc, int wm)
+sd_cgc(struct sdc *sc)
 {
+	int wm = 1024 * 1024;
 	fiber_gc();
 	vy_buf_gc(&sc->a, wm);
 	vy_buf_gc(&sc->b, wm);
@@ -2802,8 +2808,8 @@ sd_censure(struct sdc *c, int count)
 					 "malloc", "struct sdcbuf");
 				return -1;
 			}
-			vy_buf_init(&buf->a);
-			vy_buf_init(&buf->b);
+			vy_buf_create(&buf->a);
+			vy_buf_create(&buf->b);
 			buf->next = c->head;
 			c->head = buf;
 			c->count++;
@@ -2873,30 +2879,16 @@ vy_run_index_load(struct vy_run_index *i, void *ptr)
 	rc = vy_buf_ensure(&i->minmax, h->minmax_size);
 	if (unlikely(rc == -1))
 		return -1;
-	memcpy(i->minmax.s,
-	       (char *)ptr + h->minmax_offset,
-	       h->minmax_size);
+	memcpy(i->minmax.s, (char *)ptr + h->minmax_offset, h->minmax_size);
 	vy_buf_advance(&i->minmax, h->minmax_size);
 	i->info = *h;
 	return 0;
 }
 
-static void vy_index_conf_init(struct vy_index_conf*);
-static void vy_index_conf_free(struct vy_index_conf*);
-
 static int
 vy_index_dump_range_index(struct vy_index *index);
 static int
 vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn);
-
-static inline void
-vy_run_init(struct vy_run *run)
-{
-	vy_run_index_init(&run->index);
-	run->next = NULL;
-	run->page_cache = NULL;
-	pthread_mutex_init(&run->cache_lock, NULL);
-}
 
 static inline struct vy_run *
 vy_run_new()
@@ -2907,7 +2899,10 @@ vy_run_new()
 			 "struct vy_run");
 		return NULL;
 	}
-	vy_run_init(run);
+	vy_run_index_init(&run->index);
+	run->next = NULL;
+	run->page_cache = NULL;
+	pthread_mutex_init(&run->cache_lock, NULL);
 	return run;
 }
 
@@ -2918,9 +2913,9 @@ vy_run_set(struct vy_run *run, struct vy_run_index *i)
 }
 
 static inline void
-vy_run_free(struct vy_run *run)
+vy_run_delete(struct vy_run *run)
 {
-	vy_run_index_free(&run->index);
+	vy_run_index_destroy(&run->index);
 	if (run->page_cache != NULL) {
 		free(run->page_cache);
 		run->page_cache = NULL;
@@ -3071,27 +3066,27 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 	if (compression != NULL) {
 		/* decompression */
 		struct vy_filter f;
-		rc = vy_filter_init(&f, compression, VINYL_FOUTPUT);
+		rc = vy_filter_create(&f, compression, VINYL_FOUTPUT);
 		if (unlikely(rc == -1)) {
 			vy_error("%s", "index file decompression error");
 			free(data);
 			return NULL;
 		}
 		struct vy_buf buf;
-		vy_buf_init(&buf);
+		vy_buf_create(&buf);
 		rc = vy_filter_next(&f, &buf, data,
 				    page_info->size);
-		vy_filter_free(&f);
+		vy_filter_destroy(&f);
 		if (unlikely(rc == -1)) {
 			vy_error("%s", "index file decompression error");
-			vy_buf_free(&buf);
+			vy_buf_destroy(&buf);
 			free(data);
 			return NULL;
 		}
 		assert(vy_buf_size(&buf) == page_info->unpacked_size);
 		memcpy(data, buf.s,
 		       page_info->unpacked_size);
-		vy_buf_free(&buf);
+		vy_buf_destroy(&buf);
 	}
 
 	pthread_mutex_lock(&run->cache_lock);
@@ -3134,25 +3129,16 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 	pthread_mutex_unlock(&run->cache_lock);
 }
 
-#define SI_NONE       0
 #define SI_LOCK       1
 #define SI_ROTATE     2
 #define SI_SPLIT      4
-#define SI_PROMOTE    8
-#define SI_REVOKE     16
-#define SI_RDB        32
-#define SI_RDB_DBI    64
-#define SI_RDB_DBSEAL 128
-#define SI_RDB_UNDEF  256
-#define SI_RDB_REMOVE 512
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
 vy_range_open(struct vy_index*, struct vy_range*, char *);
 static int
 vy_range_create(struct vy_range*, struct vy_index*);
-static int vy_range_free(struct vy_range*, int);
-static int vy_range_gc_index(struct vy_mem *);
+static int vy_range_delete(struct vy_range*, int);
 static int vy_range_complete(struct vy_range*, struct vy_index*);
 
 static inline void
@@ -3184,7 +3170,7 @@ vy_range_unrotate(struct vy_range *node) {
 	node->flags &= ~SI_ROTATE;
 	node->i0 = node->i1;
 	node->i0.tree.arg = &node->i0;
-	vy_mem_init(&node->i1, node->i0.key_def);
+	vy_mem_create(&node->i1, node->i0.key_def);
 }
 
 static inline struct vy_mem *
@@ -3250,11 +3236,11 @@ vy_range_size(struct vy_range *n)
 	return size;
 }
 
-static int vy_planner_init(struct vy_planner*);
-static int vy_planner_free(struct vy_planner*);
-static int vy_planner_update(struct vy_planner*, struct vy_range*);
-static int vy_planner_update_range(struct vy_planner *p, struct vy_range *n);
-static int vy_planner_remove(struct vy_planner*, struct vy_range*);
+static int vy_planner_create(struct vy_planner*);
+static void vy_planner_destroy(struct vy_planner*);
+static void vy_planner_update(struct vy_planner*, struct vy_range*);
+static void vy_planner_update_range(struct vy_planner *p, struct vy_range *n);
+static void vy_planner_remove(struct vy_planner*, struct vy_range*);
 
 struct vy_range_tree_key {
 	char *data;
@@ -3277,7 +3263,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range * n, void *arg)
 {
 	(void)t;
 	(void)arg;
-	vy_range_free(n, 0);
+	vy_range_delete(n, 0);
 	return NULL;
 }
 
@@ -3414,7 +3400,7 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 	}
 }
 
-static int vy_task_index_drop(struct vy_index*);
+static int vy_task_drop(struct vy_index*);
 
 static int
 si_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
@@ -3560,23 +3546,23 @@ vy_pwrite_aligned(int fd, void *buf, uint32_t *size, uint64_t pos)
 	return written;
 }
 
-/* write tuples from iterator to new page in run,
- * update page and the run statistics */
+/**
+ * Write tuples from the iterator to a new page in the run,
+ * update page and run statistics.
+ */
 static int
-vy_run_write_page(int fd,
-		  struct svwriteiter *iwrite,
+vy_run_write_page(int fd, struct svwriteiter *iwrite,
 		  struct vy_filterif *compression,
 		  struct vy_run_index *run_index)
 {
 	struct vy_run_info *run_info = &run_index->info;
 
 	struct vy_buf tuplesinfo, values, compressed;
-	vy_buf_init(&tuplesinfo);
-	vy_buf_init(&values);
-	vy_buf_init(&compressed);
+	vy_buf_create(&tuplesinfo);
+	vy_buf_create(&values);
+	vy_buf_create(&compressed);
 
-	if (vy_buf_ensure(&run_index->pages,
-			  sizeof(struct vy_page_info)))
+	if (vy_buf_ensure(&run_index->pages, sizeof(struct vy_page_info)))
 		goto err;
 
 	struct vy_page_info *page =
@@ -3592,13 +3578,12 @@ vy_run_write_page(int fd,
 			goto err;
 		sv_writeiter_next(iwrite);
 	}
-	page->unpacked_size = vy_buf_used(&tuplesinfo)+
-				   vy_buf_used(&values);
+	page->unpacked_size = vy_buf_used(&tuplesinfo) + vy_buf_used(&values);
 	page->unpacked_size = ALIGN_POS(page->unpacked_size);
 
 	if (compression) {
 		struct vy_filter f;
-		if (vy_filter_init(&f, compression, VINYL_FINPUT))
+		if (vy_filter_create(&f, compression, VINYL_FINPUT))
 			goto err;
 		if (vy_filter_start(&f, &compressed) ||
 		    vy_filter_next(&f, &compressed, tuplesinfo.s,
@@ -3606,10 +3591,10 @@ vy_run_write_page(int fd,
 		    vy_filter_next(&f, &compressed, values.s,
 				   vy_buf_used(&values)) ||
 		    vy_filter_complete(&f, &compressed)) {
-			vy_filter_free(&f);
+			vy_filter_destroy(&f);
 			goto err;
 		}
-		vy_filter_free(&f);
+		vy_filter_destroy(&f);
 	} else {
 		vy_buf_ensure(&compressed, page->unpacked_size);
 		memcpy(compressed.p, tuplesinfo.s,
@@ -3620,8 +3605,7 @@ vy_run_write_page(int fd,
 	}
 	page->size = vy_buf_used(&compressed);
 	vy_write_aligned(fd, compressed.s, &page->size);
-	page->crc = crc32_calc(0, compressed.s,
-			       vy_buf_used(&compressed));
+	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
 	if (page->count > 0) {
 		struct vy_buf *minmax_buf = &run_index->minmax;
@@ -3643,8 +3627,7 @@ vy_run_write_page(int fd,
 		memcpy(minmax_buf->p, maxvalue, maxinfo->size);
 		vy_buf_advance(minmax_buf, maxinfo->size);
 	}
-	vy_buf_advance(&run_index->pages,
-			  sizeof(struct vy_page_info));
+	vy_buf_advance(&run_index->pages, sizeof(struct vy_page_info));
 
 	run_info->size += page->size;
 	++run_info->count;
@@ -3657,22 +3640,21 @@ vy_run_write_page(int fd,
 
 	run_info->keys += page->count;
 
-	vy_buf_free(&compressed);
-	vy_buf_free(&tuplesinfo);
-	vy_buf_free(&values);
+	vy_buf_destroy(&compressed);
+	vy_buf_destroy(&tuplesinfo);
+	vy_buf_destroy(&values);
 	return 0;
 err:
-	vy_buf_free(&compressed);
-	vy_buf_free(&tuplesinfo);
-	vy_buf_free(&values);
+	vy_buf_destroy(&compressed);
+	vy_buf_destroy(&tuplesinfo);
+	vy_buf_destroy(&values);
 	return -1;
 }
 
-/*
- * write tuples for iterator to new run
- * and setup corresponding run_index structure
+/**
+ * Write tuples from the iterator to a new run
+ * and set up the corresponding run index structures.
  */
-
 static int
 vy_run_write(int fd, struct svwriteiter *iwrite,
 	     struct vy_filterif *compression, uint64_t limit,
@@ -3705,17 +3687,17 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	header->size += header_size;
 
 	/*
-	 * Read write iter until it has any data or
-	 * range size limit reached
-	 * Current write iterator has virtual eofs
-	 * emited by page size limit param and can be restored
-	 * for next page writing with sv_writeiter_resume execution*/
+	 * Read from the iterator until it's exhausted or range
+	 * size limit is reached.
+	 * The current write iterator emits "virtual" eofs
+	 * at page size boundary and can be resumed
+	 * with sv_writeiter_resume()
+	 */
 	do {
 		if (vy_run_write_page(fd, iwrite,
 				      compression, run_index) == -1)
 			goto err;
-	} while (header->total < limit &&
-		 sv_writeiter_resume(iwrite));
+	} while (header->total < limit && sv_writeiter_resume(iwrite));
 
 	/* Write pages index */
 	int rc;
@@ -3732,8 +3714,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	header->minmax_offset = header->offset +
 				      header->size;
 	header->minmax_size = vy_buf_used(&run_index->minmax);
-	rc = vy_write_aligned(fd, run_index->minmax.s,
-			      &header->minmax_size);
+	rc = vy_write_aligned(fd, run_index->minmax.s, &header->minmax_size);
 	if (rc == -1)
 		goto err;
 	header->size += header->minmax_size;
@@ -3750,8 +3731,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	 * Eval run_info header crc and rewrite it
 	 * to finalize the run on disk
 	 * */
-	header->crc = vy_crcs(header,
-				    sizeof(struct vy_run_info), 0);
+	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
 	header_size = sizeof(*header);
 	if (vy_pwrite_aligned(fd, header, &header_size,
@@ -3763,8 +3743,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	return 0;
 
 err_file:
-	vy_error("index file error: %s",
-                 strerror(errno));
+	vy_error("index file error: %s", strerror(errno));
 err:
 	/*
 	 * Reposition to end of file and trucate it
@@ -3804,7 +3783,7 @@ vy_run_create(struct vy_index *index,
 	struct vy_run_index sdindex;
 	vy_run_index_init(&sdindex);
 	if ((rc = vy_run_write(parent->fd, &iwrite,
-			        index->conf.compression_if, UINT64_MAX,
+			        index->compression_if, UINT64_MAX,
 			        &sdindex)))
 		goto err;
 
@@ -3823,7 +3802,7 @@ err:
 }
 
 static int64_t
-vy_index_range_stamp_next(struct vy_index *index);
+vy_index_range_id_next(struct vy_index *index);
 
 static int
 vy_dump(struct vy_index *index, struct vy_range *n,
@@ -3848,11 +3827,11 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 		 * Empty range, we will create a temp file for it
 		 */
 		snprintf(tmp_path, PATH_MAX, "%s/.rngXXXXXX",
-			 index->conf.path);
+			 index->path);
 		n->fd = mkstemp(tmp_path);
 		if (n->fd == -1) {
 			vy_error("Can't create temporary file in %s: %s",
-				 index->conf.path, strerror(errno));
+				 index->path, strerror(errno));
 			return -1;
 		}
 	}
@@ -3873,7 +3852,7 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 		vy_range_unlock(n);
 		vy_planner_update(&index->p, n);
 		vy_index_unlock(index);
-		vy_range_gc_index(&swap);
+		vy_mem_gc(&swap);
 		return 0;
 	}
 
@@ -3898,14 +3877,14 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 		/*
 		 * First not-empty run for range, we will deploy range
 		 */
-		n->id = vy_index_range_stamp_next(index);
+		n->id = vy_index_range_id_next(index);
 
 		char path[PATH_MAX];
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->conf.path, n->id);
+			 index->path, n->id);
 		if (rename(tmp_path, path)) {
 			vy_error("Can't rename temporary file in %s: %s",
-				 index->conf.path, strerror(errno));
+				 index->path, strerror(errno));
 			return -1;
 		}
 		/*
@@ -3917,7 +3896,7 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 		vy_index_dump_range_index(index);
 	}
 
-	vy_range_gc_index(&swap);
+	vy_mem_gc(&swap);
 	return 0;
 }
 
@@ -3956,9 +3935,7 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	struct vy_run *run = node->run;
 	while (run) {
 		struct svmergesrc *s = sv_mergeadd(&merge, NULL);
-		struct vy_filterif *compression = NULL;
-		if (index->conf.compression)
-			compression = index->conf.compression_if;
+		struct vy_filterif *compression = index->compression_if;
 		vy_tmp_run_iterator_open(&s->src, index, run, node->fd,
 				     compression, VINYL_GE, NULL);
 		size_stream += vy_run_index_total(&run->index);
@@ -3970,15 +3947,15 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	rc = si_merge(index, c, node, vlsn, &im, size_stream, count);
 	sv_mergefree(&merge);
 	if (!rc)
-		rc = vy_range_free(node, 1);
+		rc = vy_range_delete(node, 1);
 	return rc;
 }
 
-static int vy_task_index_drop(struct vy_index *index)
+static int vy_task_drop(struct vy_index *index)
 {
 	struct vy_range *node, *n;
 	rlist_foreach_entry_safe(node, &index->gc, gc, n) {
-		if (vy_range_free(node, 1) != 0)
+		if (vy_range_delete(node, 1) != 0)
 			return -1;
 	}
 	/* free memory */
@@ -4096,7 +4073,7 @@ si_splitfree(struct vy_buf *result)
 	while (vy_bufiter_has(&i))
 	{
 		struct vy_range *p = vy_bufiterref_get(&i);
-		vy_range_free(p, 0);
+		vy_range_delete(p, 0);
 		vy_bufiter_next(&i);
 	}
 	return 0;
@@ -4135,7 +4112,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 			goto error;
 
 		if ((rc = vy_run_write(n->fd, &iwrite,
-				       index->conf.compression_if,
+				       index->compression_if,
 				       size_node, &sdindex)))
 			goto error;
 		n->run = vy_run_new();
@@ -4153,7 +4130,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 error:
 	sv_writeiter_close(&iwrite);
 	if (n)
-		vy_range_free(n, 0);
+		vy_range_delete(n, 0);
 	si_splitfree(result);
 	return -1;
 }
@@ -4199,7 +4176,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 			return -1;
 		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
 		if (unlikely(rc == -1)) {
-			vy_range_free(n, 1);
+			vy_range_delete(n, 1);
 			return -1;
 		}
 		count++;
@@ -4257,13 +4234,13 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		}
 		break;
 	}
-	vy_mem_init(j, index->key_def);
+	vy_mem_create(j, index->key_def);
 	vy_index_unlock(index);
 
 	/* compaction completion */
 
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
-	             vy_range_free(range, 0);
+	             vy_range_delete(range, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
 
@@ -4313,7 +4290,6 @@ vy_range_new(struct key_def *key_def)
 			 "struct vy_range");
 		return NULL;
 	}
-	n->recover = 0;
 	n->flags = 0;
 	n->update_time = 0;
 	n->used = 0;
@@ -4325,20 +4301,13 @@ vy_range_new(struct key_def *key_def)
 	tt_pthread_mutex_init(&n->reflock, NULL);
 	n->fd = -1;
 	n->path[0] = '\0';
-	vy_mem_init(&n->i0, key_def);
-	vy_mem_init(&n->i1, key_def);
+	vy_mem_create(&n->i0, key_def);
+	vy_mem_create(&n->i1, key_def);
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodedump);
 	rlist_create(&n->gc);
 	rlist_create(&n->commit);
 	return n;
-}
-
-static int vy_range_gc_index(struct vy_mem *i)
-{
-	vy_mem_free(i);
-	vy_mem_init(i, i->key_def);
-	return 0;
 }
 
 static inline int
@@ -4353,11 +4322,11 @@ vy_range_close(struct vy_range *n, int gc)
 		rcret = -1;
 	}
 	if (gc) {
-		vy_range_gc_index(&n->i0);
-		vy_range_gc_index(&n->i1);
+		vy_mem_gc(&n->i0);
+		vy_mem_gc(&n->i1);
 	} else {
-		vy_mem_free(&n->i0);
-		vy_mem_free(&n->i1);
+		vy_mem_destroy(&n->i0);
+		vy_mem_destroy(&n->i1);
 		tt_pthread_mutex_destroy(&n->reflock);
 	}
 	return rcret;
@@ -4432,8 +4401,7 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 static int
 vy_range_create(struct vy_range *n, struct vy_index *index)
 {
-	snprintf(n->path, PATH_MAX, "%s/.tmpXXXXXX",
-		 index->conf.path);
+	snprintf(n->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 	int rc = n->fd = mkstemp(n->path);
 	if (unlikely(rc == -1)) {
 		vy_error("temp file '%s' create error: %s",
@@ -4444,22 +4412,23 @@ vy_range_create(struct vy_range *n, struct vy_index *index)
 }
 
 static inline void
-vy_range_free_runs(struct vy_range *n)
+vy_range_delete_runs(struct vy_range *n)
 {
 	struct vy_run *p = n->run;
 	struct vy_run *next = NULL;
 	while (p) {
 		next = p->next;
-		vy_run_free(p);
+		vy_run_delete(p);
 		p = next;
 	}
 }
 
-static int vy_range_free(struct vy_range *n, int gc)
+static int
+vy_range_delete(struct vy_range *n, int gc)
 {
 	int rcret = 0;
 	int rc;
-	vy_range_free_runs(n);
+	vy_range_delete_runs(n);
 	rc = vy_range_close(n,gc);
 	if (unlikely(rc == -1))
 		rcret = -1;
@@ -4474,10 +4443,10 @@ static int vy_range_free(struct vy_range *n, int gc)
 static int
 vy_range_complete(struct vy_range *n, struct vy_index *index)
 {
-	n->id = vy_index_range_stamp_next(index);
+	n->id = vy_index_range_id_next(index);
 	char path[PATH_MAX];
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
-		 index->conf.path, n->id);
+		 index->path, n->id);
 	int rc = rename(n->path, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
@@ -4490,63 +4459,58 @@ vy_range_complete(struct vy_range *n, struct vy_index *index)
 	return rc;
 }
 
-static int vy_planner_init(struct vy_planner *p)
+static int vy_planner_create(struct vy_planner *p)
 {
-	int rc = ss_rqinit(&p->compact, 1, 20);
-	if (unlikely(rc == -1))
+	if (ss_rqinit(&p->compact, 1, 20) < 0)
 		return -1;
 	/* 1Mb step up to 4Gb */
-	rc = ss_rqinit(&p->dump, 1024 * 1024, 4000);
-	if (unlikely(rc == -1)) {
+	if (ss_rqinit(&p->dump, 1024 * 1024, 4000)) {
 		ss_rqfree(&p->compact);
 		return -1;
 	}
 	return 0;
 }
 
-static int vy_planner_free(struct vy_planner *p)
+static void
+vy_planner_destroy(struct vy_planner *p)
 {
 	ss_rqfree(&p->compact);
 	ss_rqfree(&p->dump);
-	return 0;
 }
 
-static int
+static void
 vy_planner_update(struct vy_planner *p, struct vy_range *n)
 {
 	ss_rqupdate(&p->dump, &n->nodedump, n->used);
 	ss_rqupdate(&p->compact, &n->nodecompact, n->run_count);
-	return 0;
 }
 
-static int
+static void
 vy_planner_update_range(struct vy_planner *p, struct vy_range *n)
 {
 	ss_rqupdate(&p->dump, &n->nodedump, n->used);
-	return 0;
 }
 
-static int
+static void
 vy_planner_remove(struct vy_planner *p, struct vy_range *n)
 {
 	ss_rqdelete(&p->dump, &n->nodedump);
 	ss_rqdelete(&p->compact, &n->nodecompact);
-	return 0;
 }
 
-static int vy_profiler_begin(struct vy_profiler *p, struct vy_index *i)
+static void
+vy_profiler_begin(struct vy_profiler *p, struct vy_index *i)
 {
 	memset(p, 0, sizeof(*p));
 	p->i = i;
 	p->temperature_min = 100;
 	vy_index_rdlock(i);
-	return 0;
 }
 
-static int vy_profiler_end(struct vy_profiler *p)
+static void
+vy_profiler_end(struct vy_profiler *p)
 {
 	vy_index_unlock(p->i);
-	return 0;
 }
 
 static void
@@ -4632,9 +4596,7 @@ static int vy_profiler_(struct vy_profiler *p)
 /* {{{ vy_run_itr API forward declaration */
 /* TODO: move to header (with struct vy_run_itr) and remove static keyword */
 
-/**
- * Position of particular tuple in vy_run
- */
+/** Position of a particular tuple in vy_run. */
 struct vy_run_iterator_pos {
 	uint32_t page_no;
 	uint32_t pos_in_page;
@@ -4644,7 +4606,7 @@ struct vy_run_iterator_pos {
  * Iterator over vy_run
  */
 struct vy_run_iterator {
-	/* Members needed for memory allocation and disk accesss */
+	/* Members needed for memory allocation and disk access */
 	/* index */
 	struct vy_index *index;
 	/* run */
@@ -4869,9 +4831,7 @@ next_node:
 	struct vy_run *run = node->run;
 	while (run) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
-		struct vy_filterif *compression = NULL;
-		if (q->index->conf.compression)
-			compression = q->index->conf.compression_if;
+		struct vy_filterif *compression = q->index->compression_if;
 		vy_tmp_run_iterator_open(&s->src, q->index, run, node->fd,
 					 compression, q->order, q->key);
 		run = run->next;
@@ -4938,9 +4898,7 @@ si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 	for (struct vy_run *run = range->run; run != NULL; run = run->next)
 	{
 		struct vy_run_iterator iterator;
-		struct vy_filterif *compression = NULL;
-		if (index->conf.compression)
-			compression = index->conf.compression_if;
+		struct vy_filterif *compression = index->compression_if;
 		vy_run_iterator_open(&iterator, index, run, range->fd,
 				     compression, VINYL_EQ, tuple->data,
 				     INT64_MAX);
@@ -4966,7 +4924,7 @@ vy_index_create(struct vy_index *index)
 {
 	/* create directory */
 	int rc;
-	char *path_sep = index->conf.path;
+	char *path_sep = index->path;
 	while (*path_sep == '/') {
 		/* Don't create root */
 		++path_sep;
@@ -4974,32 +4932,32 @@ vy_index_create(struct vy_index *index)
 	while ((path_sep = strchr(path_sep, '/'))) {
 		/* Recursively create path hierarchy */
 		*path_sep = '\0';
-		rc = mkdir(index->conf.path, 0777);
+		rc = mkdir(index->path, 0777);
 		if (rc == -1 && errno != EEXIST) {
 			vy_error("directory '%s' create error: %s",
-		                 index->conf.path, strerror(errno));
+		                 index->path, strerror(errno));
 			*path_sep = '/';
 			return -1;
 		}
 		*path_sep = '/';
 		++path_sep;
 	}
-	rc = mkdir(index->conf.path, 0777);
+	rc = mkdir(index->path, 0777);
 	if (rc == -1 && errno != EEXIST) {
 		vy_error("directory '%s' create error: %s",
-	                 index->conf.path, strerror(errno));
+	                 index->path, strerror(errno));
 		return -1;
 	}
 
-	index->range_stamp = 0;
+	index->range_id_max = 0;
 	index->first_dump_lsn = 0;
-	index->last_dumped_range_stamp = 0;
+	index->last_dump_range_id = 0;
 	/* create initial node */
 	struct vy_range *n = vy_range_new(index->key_def);
 	if (unlikely(n == NULL))
 		return -1;
 	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_RECOVER_0,
-	             vy_range_free(n, 0);
+	             vy_range_delete(n, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
 	si_insert(index, n);
@@ -5009,12 +4967,11 @@ vy_index_create(struct vy_index *index)
 }
 
 static int64_t
-vy_index_range_stamp_next(struct vy_index *index)
+vy_index_range_id_next(struct vy_index *index)
 {
-	int stamp = pm_atomic_fetch_add_explicit(&index->range_stamp,
-						 1,
-						 pm_memory_order_relaxed);
-	return stamp + 1;
+	int64_t id = pm_atomic_fetch_add_explicit(&index->range_id_max,
+						  1, pm_memory_order_relaxed);
+	return id + 1;
 }
 
 /**
@@ -5065,11 +5022,11 @@ vy_index_open_ex(struct vy_index *index)
 	 * ranges within the same LSN.
 	 */
 	int64_t first_dump_lsn = INT64_MAX;
-	int64_t last_dumped_range_stamp = 0;
+	int64_t last_dump_range_id = 0;
 	DIR *index_dir;
-	index_dir = opendir(index->conf.path);
+	index_dir = opendir(index->path);
 	if (!index_dir) {
-		vy_error("Can't open dir %s", index->conf.path);
+		vy_error("Can't open dir %s", index->path);
 		return -1;
 	}
 	struct dirent *dirent;
@@ -5089,23 +5046,23 @@ vy_index_open_ex(struct vy_index *index)
 			continue;
 		if (index_lsn < first_dump_lsn) {
 			first_dump_lsn = index_lsn;
-			last_dumped_range_stamp = range_id;
+			last_dump_range_id = range_id;
 		} else if (index_lsn == first_dump_lsn &&
-			   last_dumped_range_stamp < range_id) {
-			last_dumped_range_stamp = range_id;
+			   last_dump_range_id < range_id) {
+			last_dump_range_id = range_id;
 		}
 	}
 	closedir(index_dir);
 
 	if (first_dump_lsn == INT64_MAX) {
 		vy_error("No matching index files found for the current LSN"
-			 " in path %s", index->conf.path);
+			 " in path %s", index->path);
 		return -1;
 	}
 
 	char path[PATH_MAX];
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
-		 index->conf.path, first_dump_lsn, last_dumped_range_stamp);
+		 index->path, first_dump_lsn, last_dump_range_id);
 	int fd = open(path, O_RDWR);
 	if (fd == -1) {
 		vy_error("Can't open index file %s: %s",
@@ -5120,15 +5077,15 @@ vy_index_open_ex(struct vy_index *index)
 		struct vy_range *range = vy_range_new(index->key_def);
 		if (!range) {
 			vy_error("%s", "Can't alloc range");
-			vy_range_free(range, 0);
+			vy_range_delete(range, 0);
 			return -1;
 		}
 		char range_path[PATH_MAX];
 		snprintf(range_path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->conf.path, range_id);
+			 index->path, range_id);
 		range->id = range_id;
 		if (vy_range_open(index, range, range_path)) {
-			vy_range_free(range, 0);
+			vy_range_delete(range, 0);
 			return -1;
 		}
 	}
@@ -5142,32 +5099,9 @@ vy_index_open_ex(struct vy_index *index)
 		return -1;
 	}
 	index->first_dump_lsn = first_dump_lsn;
-	index->last_dumped_range_stamp = last_dumped_range_stamp;
+	index->last_dump_range_id = last_dump_range_id;
 
 	return 0;
-}
-
-static void
-vy_index_conf_init(struct vy_index_conf *s)
-{
-	memset(s, 0, sizeof(*s));
-}
-
-static void
-vy_index_conf_free(struct vy_index_conf *s)
-{
-	if (s->name) {
-		free(s->name);
-		s->name = NULL;
-	}
-	if (s->path) {
-		free(s->path);
-		s->path = NULL;
-	}
-	if (s->compression_sz) {
-		free(s->compression_sz);
-		s->compression_sz = NULL;
-	}
 }
 
 static struct txv *
@@ -5280,23 +5214,23 @@ vy_task_execute(struct vy_task *task, struct sdc *c, int64_t vlsn)
 	int rc = -1;
 	switch (task->type) {
 	case VY_TASK_NODEGC:
-		rc = vy_range_free(task->node, 1);
-		sd_cgc(c, task->index->conf.buf_gc_wm);
+		rc = vy_range_delete(task->node, 1);
+		sd_cgc(c);
 		return rc;
 	case VY_TASK_CHECKPOINT:
 	case VY_TASK_DUMP:
 	case VY_TASK_AGE:
 		rc = vy_dump(task->index, task->node, vlsn);
-		sd_cgc(c, task->index->conf.buf_gc_wm);
+		sd_cgc(c);
 		return rc;
 	case VY_TASK_GC:
 	case VY_TASK_COMPACT:
 		rc = si_compact(task->index, c, task->node, vlsn, NULL, 0);
-		sd_cgc(c, task->index->conf.buf_gc_wm);
+		sd_cgc(c);
 		return rc;
 	case VY_TASK_DROP:
 		assert(task->index->refs == 1); /* referenced by this task */
-		rc = vy_task_index_drop(task->index);
+		rc = vy_task_drop(task->index);
 		/* TODO: return index to shutdown list in case of error */
 		task->index = NULL;
 		return rc;
@@ -6054,7 +5988,7 @@ vy_index_gc(struct vy_index *index)
 	 * Scan the index directory and unlink files not
 	 * referenced from any valid range.
 	 */
-	dir = opendir(index->conf.path);
+	dir = opendir(index->path);
 	if (dir == NULL)
 		goto error;
 	struct dirent *dirent;
@@ -6093,12 +6027,12 @@ vy_index_gc(struct vy_index *index)
 			continue;
 		char path[PATH_MAX];
 		snprintf(path, PATH_MAX, "%s/%s",
-			 index->conf.path, dirent->d_name);
+			 index->path, dirent->d_name);
 		unlink(path);
 	}
 	goto end;
 error:
-	say_syserror("failed to cleanup index directory %s", index->conf.path);
+	say_syserror("failed to cleanup index directory %s", index->path);
 end:
 	closedir(dir);
 	mh_i32ptr_delete(ranges);
@@ -6120,7 +6054,7 @@ vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 		}
 		if (index->first_dump_lsn &&
 		    vy_index_checkpoint_range_index(index, checkpoint_lsn)) {
-			panic("Can't commit index at %s", index->conf.path);
+			panic("Can't commit index at %s", index->path);
 			return;
 		}
 		vy_index_gc(index);
@@ -6419,8 +6353,7 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 		vy_profiler_begin(&o->rtp, o);
 		vy_profiler_(&o->rtp);
 		vy_profiler_end(&o->rtp);
-		struct vy_info_node *local_node =
-			vy_info_append(node, o->conf.name);
+		struct vy_info_node *local_node = vy_info_append(node, o->name);
 		if (vy_info_reserve(info, local_node, 17) != 0)
 			return 1;
 		vy_info_append_u64(local_node, "size", o->rtp.total_range_size);
@@ -6532,19 +6465,8 @@ vy_cursor_delete(struct vy_cursor *c)
 /*** }}} Cursor */
 
 static int
-vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
+vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 {
-	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
-	         key_def->space_id, key_def->iid);
-	conf->name = strdup(name);
-	if (conf->name == NULL) {
-		diag_set(OutOfMemory, strlen(name),
-			 "strdup", "char *");
-		goto error;
-	}
-	conf->sync = cfg_geti("vinyl.sync");
-
 	/* compression */
 	if (key_def->opts.compression[0] != '\0' &&
 	    strcmp(key_def->opts.compression, "none")) {
@@ -6552,57 +6474,41 @@ vy_index_conf_create(struct vy_index_conf *conf, struct key_def *key_def)
 		if (conf->compression_if == NULL) {
 			vy_error("unknown compression type '%s'",
 				 key_def->opts.compression);
-			goto error;
-		}
-		conf->compression_sz = strdup(conf->compression_if->name);
-		if (conf->compression_sz == NULL) {
-			diag_set(OutOfMemory,
-				 strlen(conf->compression_if->name), "strdup",
-				 "char *");
-			goto error;
-		}
-		conf->compression = 1;
-	} else {
-		conf->compression = 0;
-		conf->compression_if = NULL;
-		conf->compression_sz = strdup("none");
-		if (conf->compression_sz == NULL) {
-			diag_set(OutOfMemory, strlen("none"), "strdup",
-				 "char *");
-			goto error;
+			return -1;
 		}
 	}
-
+	char name[128];
+	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
+	         key_def->space_id, key_def->iid);
+	conf->name = strdup(name);
 	/* path */
 	if (key_def->opts.path[0] == '\0') {
-		char path[1024];
-		snprintf(path, sizeof(path), "%s/%s", cfg_gets("vinyl_dir"),
-			 conf->name);
+		char path[PATH_MAX];
+		snprintf(path, sizeof(path), "%s/%" PRIu32 "/%" PRIu32,
+			 cfg_gets("vinyl_dir"), key_def->space_id,
+			 key_def->iid);
 		conf->path = strdup(path);
-		if (conf->path == NULL) {
-			diag_set(OutOfMemory, strlen(path), "strdup",
-				 "char *");
-			goto error;
-		}
 	} else {
 		conf->path = strdup(key_def->opts.path);
-		if (conf->path == NULL) {
-			diag_set(OutOfMemory, strlen(key_def->opts.path),
-				"strdup", "char *");
-			goto error;
-		}
 	}
-	conf->buf_gc_wm = 1024 * 1024;
-
+	if (conf->name == NULL || conf->path == NULL) {
+		if (conf->name)
+			free(conf->name);
+		if (conf->path)
+			free(conf->path);
+		conf->name = NULL;
+		conf->path = NULL;
+		diag_set(OutOfMemory, strlen(key_def->opts.path),
+			 "strdup", "char *");
+		return -1;
+	}
 	return 0;
-error:
-	return -1;
 }
 
 static int
 vy_index_dump_range_index(struct vy_index *index)
 {
-	if (index->range_stamp == index->last_dumped_range_stamp)
+	if (index->range_id_max == index->last_dump_range_id)
 		return 0;
 	vy_index_wrlock(index);
 	long int ranges_size = index->range_count * sizeof(int64_t);
@@ -6633,11 +6539,11 @@ vy_index_dump_range_index(struct vy_index *index)
 	}
 
 	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->conf.path);
+	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 	int fd = mkstemp(path);
 	if (fd == -1) {
 		vy_error("Can't create temporary file in %s: %s",
-			 index->conf.path, strerror(errno));
+			 index->path, strerror(errno));
 		free(ranges);
 		return -1;
 	}
@@ -6656,8 +6562,8 @@ vy_index_dump_range_index(struct vy_index *index)
 
 	char new_path[PATH_MAX];
 	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
-		 index->conf.path, index->first_dump_lsn,
-		 index->range_stamp);
+		 index->path, index->first_dump_lsn,
+		 index->range_id_max);
 	if (link(path, new_path)) {
 		vy_error("Can't dump index range dict %s: %s",
 			 new_path, strerror(errno));
@@ -6665,7 +6571,7 @@ vy_index_dump_range_index(struct vy_index *index)
 		vy_index_unlock(index);
 		return -1;
 	}
-	index->last_dumped_range_stamp = index->range_stamp;
+	index->last_dump_range_id = index->range_id_max;
 	unlink(path);
 	vy_index_unlock(index);
 	return 0;
@@ -6681,12 +6587,12 @@ vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn)
 	vy_index_wrlock(index);
 	char old_path[PATH_MAX];
 	snprintf(old_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
-		 index->conf.path, index->first_dump_lsn,
-		 index->last_dumped_range_stamp);
+		 index->path, index->first_dump_lsn,
+		 index->last_dump_range_id);
 	char new_path[PATH_MAX];
 	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
-		 index->conf.path, lsn,
-		 index->last_dumped_range_stamp);
+		 index->path, lsn,
+		 index->last_dump_range_id);
 	if (link(old_path, new_path)) {
 		vy_index_unlock(index);
 		return -1;
@@ -6712,9 +6618,9 @@ vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn)
 static bool
 vy_index_exists(struct vy_index *index, int64_t lsn)
 {
-	if (!path_exists(index->conf.path))
+	if (!path_exists(index->path))
 		return false;
-	DIR *dir = opendir(index->conf.path);
+	DIR *dir = opendir(index->path);
 	if (!dir) {
 		return false;
 	}
@@ -6949,23 +6855,8 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 		struct tuple_format *tuple_format)
 {
 	assert(key_def->part_count > 0);
-	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
-	         key_def->space_id, key_def->iid);
-	struct vy_index *dup = NULL;
-	struct vy_index *index;
-	rlist_foreach_entry(index, &e->indexes, link) {
-		if (strcmp(index->conf.name, name) == 0) {
-			dup = index;
-			break;
-		}
-	}
-	if (unlikely(dup)) {
-		vy_error("index '%s' already exists", name);
-		return NULL;
-	}
-	index = malloc(sizeof(struct vy_index));
-	if (unlikely(index == NULL)) {
+	struct vy_index *index = malloc(sizeof(struct vy_index));
+	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_index),
 			 "malloc", "struct vy_index");
 		return NULL;
@@ -6973,14 +6864,13 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	memset(index, 0, sizeof(*index));
 	index->env = e;
 	vy_status_init(&index->status);
-	int rc = vy_planner_init(&index->p);
+	int rc = vy_planner_create(&index->p);
 	if (unlikely(rc == -1))
 		goto error_1;
 	index->checkpoint_in_progress = false;
 	index->gc_in_progress = false;
 	index->age_in_progress = false;
-	vy_index_conf_init(&index->conf);
-	if (vy_index_conf_create(&index->conf, key_def))
+	if (vy_index_conf_create(index, key_def))
 		goto error_2;
 	index->key_def = key_def_dup(key_def);
 	if (index->key_def == NULL)
@@ -7034,9 +6924,10 @@ error_4:
 	tuple_format_ref(index->tuple_format, -1);
 	key_def_delete(index->key_def);
 error_3:
-	vy_index_conf_free(&index->conf);
+	free(index->name);
+	free(index->path);
 error_2:
-	vy_planner_free(&index->p);
+	vy_planner_destroy(&index->p);
 error_1:
 	free(index);
 	return NULL;
@@ -7048,11 +6939,12 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	rlist_create(&index->gc);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
-	vy_planner_free(&index->p);
+	vy_planner_destroy(&index->p);
 	tt_pthread_rwlock_destroy(&index->lock);
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	vy_status_free(&index->status);
-	vy_index_conf_free(&index->conf);
+	free(index->name);
+	free(index->path);
 	free(index->key_map);
 	key_def_delete(index->key_def);
 	tuple_format_ref(index->tuple_format, -1);
@@ -7098,7 +6990,7 @@ vy_tuple_alloc(uint32_t size)
 }
 
 void
-vy_tuple_free(struct vy_tuple *tuple)
+vy_tuple_delete(struct vy_tuple *tuple)
 {
 #ifndef NDEBUG
 	memset(tuple, '#', vy_tuple_size(tuple)); /* fail early */
@@ -7270,7 +7162,7 @@ vy_tuple_unref(struct vy_tuple *tuple)
 	if (likely(old_refs > 1))
 		return;
 
-	vy_tuple_free(tuple);
+	vy_tuple_delete(tuple);
 }
 
 /**
@@ -7929,9 +7821,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		/* Merge all runs. */
 		while (run) {
 			struct svmergesrc *s = sv_mergeadd(m, NULL);
-			struct vy_filterif *compression = NULL;
-			if (index->conf.compression)
-				compression = index->conf.compression_if;
+			struct vy_filterif *compression = index->compression_if;
 			vy_tmp_run_iterator_open(&s->src, index, run,
 				range->fd, compression, VINYL_GT, NULL);
 			run = run->next;
