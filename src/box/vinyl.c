@@ -102,7 +102,6 @@ enum vinyl_status {
 struct vy_sequence;
 struct vy_conf;
 struct vy_quota;
-struct vy_cachepool;
 struct tx_manager;
 struct vy_scheduler;
 struct vy_stat;
@@ -115,7 +114,6 @@ struct vy_env {
 	struct vy_sequence  *seq;
 	struct vy_conf      *conf;
 	struct vy_quota     *quota;
-	struct vy_cachepool *cachepool;
 	struct tx_manager   *xm;
 	struct vy_scheduler *scheduler;
 	struct vy_stat      *stat;
@@ -1041,56 +1039,6 @@ static struct vy_filterif vy_filterif_zstd =
 	.complete = vy_filter_zstd_complete
 };
 
-#define VINYL_VERSION_MAGIC      8529643324614668147ULL
-
-#define VINYL_VERSION_A         '2'
-#define VINYL_VERSION_B         '1'
-#define VINYL_VERSION_C         '1'
-#define VINYL_VERSION "2.1.1"
-
-#define VINYL_VERSION_STORAGE_A '2'
-#define VINYL_VERSION_STORAGE_B '1'
-#define VINYL_VERSION_STORAGE_C '1'
-#define VINYL_VERSION_STORAGE "2.1.1"
-
-struct PACKED srversion {
-	uint64_t magic;
-	uint8_t  a, b, c;
-};
-
-static inline void
-sr_version(struct srversion *v)
-{
-	v->magic = VINYL_VERSION_MAGIC;
-	v->a = VINYL_VERSION_A;
-	v->b = VINYL_VERSION_B;
-	v->c = VINYL_VERSION_C;
-}
-
-static inline void
-sr_version_storage(struct srversion *v)
-{
-	v->magic = VINYL_VERSION_MAGIC;
-	v->a = VINYL_VERSION_STORAGE_A;
-	v->b = VINYL_VERSION_STORAGE_B;
-	v->c = VINYL_VERSION_STORAGE_C;
-}
-
-static inline int
-sr_versionstorage_check(struct srversion *v)
-{
-	if (v->magic != VINYL_VERSION_MAGIC)
-		return 0;
-	if (v->a != VINYL_VERSION_STORAGE_A)
-		return 0;
-	if (v->b != VINYL_VERSION_STORAGE_B)
-		return 0;
-	if (v->c != VINYL_VERSION_STORAGE_C)
-		return 0;
-	return 1;
-}
-
-
 #define vy_e(type, fmt, ...) \
 	({int res = -1;\
 	  char errmsg[256];\
@@ -1161,15 +1109,6 @@ vy_status_online(struct vy_status *s) {
 }
 
 struct vy_stat {
-	/* set */
-	uint64_t set;
-	struct vy_avg    set_latency;
-	/* delete */
-	uint64_t del;
-	struct vy_avg    del_latency;
-	/* upsert */
-	uint64_t upsert;
-	struct vy_avg    upsert_latency;
 	/* get */
 	uint64_t get;
 	struct vy_avg    get_read_disk;
@@ -1209,9 +1148,6 @@ vy_stat_delete(struct vy_stat *s)
 static inline void
 vy_stat_prepare(struct vy_stat *s)
 {
-	vy_avg_prepare(&s->set_latency);
-	vy_avg_prepare(&s->del_latency);
-	vy_avg_prepare(&s->upsert_latency);
 	vy_avg_prepare(&s->get_read_disk);
 	vy_avg_prepare(&s->get_read_cache);
 	vy_avg_prepare(&s->get_latency);
@@ -1947,9 +1883,7 @@ struct vy_mem {
 	uint32_t used;
 	int64_t min_lsn;
 	struct key_def *key_def;
-	/*
-	 * version is initially 0 and is incremented on every index change
-	 */
+	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 };
 
@@ -2168,7 +2102,6 @@ struct PACKED vy_range {
 	uint16_t   flags;
 	uint64_t   update_time;
 	uint32_t   used; /* sum of i0->used + i1->used */
-	uint64_t   ac;
 	struct vy_run  *run;
 	uint32_t   run_count;
 	uint32_t   temperature;
@@ -2200,14 +2133,12 @@ struct vy_index_conf {
 	char       *compression_sz;
 	struct vy_filterif *compression_if;
 	uint32_t    buf_gc_wm;
-	struct srversion   version;
-	struct srversion   version_storage;
 };
 
 struct vy_profiler {
-	uint32_t  total_node_count;
-	uint64_t  total_node_size;
-	uint64_t  total_node_origin_size;
+	uint32_t  total_range_count;
+	uint64_t  total_range_size;
+	uint64_t  total_range_origin_size;
 	uint32_t  total_run_count;
 	uint32_t  total_run_avg;
 	uint32_t  total_run_max;
@@ -2276,7 +2207,6 @@ struct vy_index {
 	uint64_t size;
 	pthread_mutex_t ref_lock;
 	uint32_t refs;
-	struct vy_buf readbuf;
 	struct vy_index_conf conf;
 	struct key_def *key_def;
 	struct tuple_format *tuple_format;
@@ -3402,7 +3332,6 @@ struct siread {
 	enum vy_order order;
 	void *key;
 	uint32_t keysize;
-	int has;
 	int64_t vlsn;
 	struct svmerge merge;
 	int read_disk;
@@ -4244,7 +4173,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 */
 	int rc;
 	rc = si_split(index, c, result, stream,
-		      index->key_def->opts.node_size,
+		      index->key_def->opts.range_size,
 		      size_stream, n_stream, vlsn);
 	if (unlikely(rc == -1))
 		return -1;
@@ -4385,7 +4314,6 @@ vy_range_new(struct key_def *key_def)
 		return NULL;
 	}
 	n->recover = 0;
-	n->ac = 0;
 	n->flags = 0;
 	n->update_time = 0;
 	n->used = 0;
@@ -4662,7 +4590,7 @@ static int vy_profiler_(struct vy_profiler *p)
 		if (p->temperature_min > n->temperature)
 			p->temperature_min = n->temperature;
 		temperature_total += n->temperature;
-		p->total_node_count++;
+		p->total_range_count++;
 		p->count += n->i0.tree.size;
 		p->count += n->i1.tree.size;
 		p->total_run_count += n->run_count;
@@ -4680,18 +4608,18 @@ static int vy_profiler_(struct vy_profiler *p)
 //			p->count_dup += run->index.header.dupkeys;
 			int indexsize = vy_run_index_size(&run->index);
 			p->total_snapshot_size += indexsize;
-			p->total_node_size += indexsize + run->index.info.total;
-			p->total_node_origin_size += indexsize + run->index.info.totalorigin;
+			p->total_range_size += indexsize + run->index.info.total;
+			p->total_range_origin_size += indexsize + run->index.info.totalorigin;
 			p->total_page_count += run->index.info.count;
 			run = run->next;
 		}
 		n = vy_range_tree_next(&p->i->tree, n);
 	}
-	if (p->total_node_count > 0) {
+	if (p->total_range_count > 0) {
 		p->total_run_avg =
-			p->total_run_count / p->total_node_count;
+			p->total_run_count / p->total_range_count;
 		p->temperature_avg =
-			temperature_total / p->total_node_count;
+			temperature_total / p->total_range_count;
 	}
 	p->memory_used = memory_used;
 	p->read_disk  = p->i->read_disk;
@@ -4808,7 +4736,6 @@ si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
 	q->keysize = keysize;
 	q->vlsn = vlsn;
 	q->index = index;
-	q->has = 0;
 	q->upsert_v = NULL;
 	q->upsert_eq = 0;
 	q->read_disk = 0;
@@ -4898,8 +4825,6 @@ vy_upsert_iterator_open(struct vy_iter *itr, struct vy_tuple *value)
 static inline int
 si_range(struct siread *q)
 {
-	assert(q->has == 0);
-
 	struct vy_rangeiter ii;
 	vy_rangeiter_open(&ii, q->index, q->order, q->key, q->keysize);
 	struct vy_range *node;
@@ -5226,8 +5151,6 @@ static void
 vy_index_conf_init(struct vy_index_conf *s)
 {
 	memset(s, 0, sizeof(*s));
-	sr_version(&s->version);
-	sr_version_storage(&s->version_storage);
 }
 
 static void
@@ -6370,8 +6293,6 @@ vy_info_append_global(struct vy_info *info, struct vy_info_node *root)
 		return 1;
 	vy_info_append_str(node, "path", info->env->conf->path);
 	vy_info_append_str(node, "build", PACKAGE_VERSION);
-	vy_info_append_str(node, "version", VINYL_VERSION);
-	vy_info_append_str(node, "version_storage", VINYL_VERSION_STORAGE);
 	return 0;
 }
 
@@ -6452,24 +6373,18 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	struct vy_stat *stat = env->stat;
 	vy_stat_prepare(stat);
 	vy_info_append_u64(node, "tx", stat->tx);
-	vy_info_append_u64(node, "set", stat->set);
 	vy_info_append_u64(node, "get", stat->get);
-	vy_info_append_u64(node, "delete", stat->del);
-	vy_info_append_u64(node, "upsert", stat->upsert);
 	vy_info_append_u64(node, "cursor", stat->cursor);
 	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
 	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
 	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
 	vy_info_append_u64(node, "write_count", stat->write_count);
 	vy_info_append_str(node, "get_latency", stat->get_latency.sz);
-	vy_info_append_str(node, "set_latency", stat->set_latency.sz);
 	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
 	vy_info_append_u64(node, "tx_conflict", stat->tx_conflict);
 	vy_info_append_u32(node, "tx_active_rw", env->xm->count_rw);
 	vy_info_append_u32(node, "tx_active_ro", env->xm->count_rd);
 	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
-	vy_info_append_str(node, "delete_latency", stat->del_latency.sz);
-	vy_info_append_str(node, "upsert_latency", stat->upsert_latency.sz);
 	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
 	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
 	return 0;
@@ -6508,13 +6423,13 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 			vy_info_append(node, o->conf.name);
 		if (vy_info_reserve(info, local_node, 17) != 0)
 			return 1;
-		vy_info_append_u64(local_node, "size", o->rtp.total_node_size);
+		vy_info_append_u64(local_node, "size", o->rtp.total_range_size);
 		vy_info_append_u64(local_node, "count", o->rtp.count);
 		vy_info_append_u64(local_node, "count_dup", o->rtp.count_dup);
 		vy_info_append_u64(local_node, "read_disk", o->rtp.read_disk);
 		vy_info_append_u32(local_node, "page_count", o->rtp.total_page_count);
 		vy_info_append_u64(local_node, "read_cache", o->rtp.read_cache);
-		vy_info_append_u32(local_node, "node_count", o->rtp.total_node_count);
+		vy_info_append_u32(local_node, "range_count", o->rtp.total_range_count);
 		vy_info_append_u32(local_node, "run_avg", o->rtp.total_run_avg);
 		vy_info_append_u32(local_node, "run_max", o->rtp.total_run_max);
 		vy_info_append_u64(local_node, "memory_used", o->rtp.memory_used);
@@ -6523,7 +6438,7 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 		vy_info_append_u32(local_node, "temperature_min", o->rtp.temperature_min);
 		vy_info_append_u32(local_node, "temperature_max", o->rtp.temperature_max);
 		vy_info_append_str(local_node, "run_histogram", o->rtp.histogram_run_ptr);
-		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_node_origin_size);
+		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
 	}
 	return 0;
 }
@@ -7098,7 +7013,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 		index->key_map[field_id] = part_id;
 	}
 
-	vy_buf_init(&index->readbuf);
 	vy_range_tree_new(&index->tree);
 	tt_pthread_rwlock_init(&index->lock, NULL);
 	rlist_create(&index->link);
@@ -7134,7 +7048,6 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	rlist_create(&index->gc);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
-	vy_buf_free(&index->readbuf);
 	vy_planner_free(&index->p);
 	tt_pthread_rwlock_destroy(&index->lock);
 	tt_pthread_mutex_destroy(&index->ref_lock);
@@ -8001,17 +7914,17 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	 *
 	 * First, iterate over all ranges.
 	 */
-	for (struct vy_range *node = vy_rangeiter_get(&range_iter); node;
+	for (struct vy_range *range = vy_rangeiter_get(&range_iter); range;
 	     vy_rangeiter_next(&range_iter),
-	     node = vy_rangeiter_get(&range_iter)) {
+	     range = vy_rangeiter_get(&range_iter)) {
 
 		struct svmerge *m = &merge;
-		rc = sv_mergeprepare(m, node->run_count);
+		rc = sv_mergeprepare(m, range->run_count);
 		if (unlikely(rc == -1)) {
 			diag_clear(diag_get());
 			goto finish_send;
 		}
-		struct vy_run *run = node->run;
+		struct vy_run *run = range->run;
 
 		/* Merge all runs. */
 		while (run) {
@@ -8020,7 +7933,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 			if (index->conf.compression)
 				compression = index->conf.compression_if;
 			vy_tmp_run_iterator_open(&s->src, index, run,
-				node->fd, compression, VINYL_GT, NULL);
+				range->fd, compression, VINYL_GT, NULL);
 			run = run->next;
 		}
 		struct svmergeiter im;

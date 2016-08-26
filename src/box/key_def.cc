@@ -104,7 +104,7 @@ const struct key_opts key_opts_default = {
 	/* .path                = */ { 0 },
 	/* .compression         = */ { 0 },
 	/* .compression_key     = */ 0,
-	/* .node_size           = */ 67108864,
+	/* .range_size           = */ 67108864,
 	/* .page_size           = */ 131072,
 	/* .sync                = */ 2,
 };
@@ -116,7 +116,7 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("path", MP_STR, struct key_opts, path),
 	OPT_DEF("compression", MP_STR, struct key_opts, compression),
 	OPT_DEF("compression_key", MP_UINT, struct key_opts, compression_key),
-	OPT_DEF("node_size", MP_UINT, struct key_opts, node_size),
+	OPT_DEF("range_size", MP_UINT, struct key_opts, range_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
 	OPT_DEF("sync", MP_UINT, struct key_opts, sync),
 	{ NULL, MP_NIL, 0, 0 }
