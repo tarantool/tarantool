@@ -98,7 +98,7 @@ box.schema.user.drop('Петя_Иванов')
 -- gh-300: misleading error message if a function does not exist
 LISTEN = require('uri').parse(box.cfg.listen)
 LISTEN ~= nil
-c = (require 'net.box'):new(LISTEN.host, LISTEN.service)
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 
 c:call('nosuchfunction')
 function nosuchfunction() end

@@ -12,7 +12,7 @@ index = space:create_index('primary', { type = 'hash' })
 remote = require 'net.box'
 
 LISTEN = require('uri').parse(box.cfg.listen)
-cn = remote:new(LISTEN.host, LISTEN.service)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 
 cn.space.tweedledum:select() --small request
 

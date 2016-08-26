@@ -1,6 +1,6 @@
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
-conn = require('net.box').new(box.cfg.listen)
+conn = require('net.box').connect(box.cfg.listen)
 conn:ping()
 
 --

@@ -134,7 +134,7 @@ test:select{1}
 function test() box.begin() end
 box.schema.func.create('test')
 box.schema.user.grant('guest', 'execute', 'function', 'test')
-cn = require('net.box').new(box.cfg.listen)
+cn = require('net.box').connect(box.cfg.listen)
 cn:call('test') -- first CALL starts transaction
 cn:call('test') -- iproto reuses fiber on the second call
 cn = nil

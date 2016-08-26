@@ -30,7 +30,7 @@ test = box.schema.create_space('test')
 _ = test:create_index('primary')
 
 for i=1, box.cfg.rows_per_wal do test:insert{i, 'test'} end
-c = require('net.box'):new(box.cfg.listen)
+c = require('net.box').connect(box.cfg.listen)
 
 -- try to write xlog without permission to write to disk
 errinj.set('ERRINJ_WAL_WRITE', true)

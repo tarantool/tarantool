@@ -53,10 +53,10 @@ type(session.on_connect(inc))
 type(session.on_disconnect(dec))
 active_connections = 0
 LISTEN = require('uri').parse(box.cfg.listen)
-c = net.box:new(LISTEN.host, LISTEN.service)
+c = net.box.connect(LISTEN.host, LISTEN.service)
 while active_connections < 1 do fiber.sleep(0.001) end
 active_connections
-c1 = net.box:new(LISTEN.host, LISTEN.service)
+c1 = net.box.connect(LISTEN.host, LISTEN.service)
 while active_connections < 2 do fiber.sleep(0.001) end
 active_connections
 c:close()
@@ -74,7 +74,7 @@ type(session.on_connect(audit_connect))
 type(session.on_disconnect(audit_disconnect))
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-a = net.box:new(LISTEN.host, LISTEN.service)
+a = net.box.connect(LISTEN.host, LISTEN.service)
 a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
 a:eval('return session.sync() ~= 0')
 a:close()

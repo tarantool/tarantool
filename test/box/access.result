@@ -226,7 +226,7 @@ LISTEN ~= nil
 ---
 - true
 ...
-c = (require 'net.box'):new(LISTEN.host, LISTEN.service)
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 ---
 ...
 c:call('nosuchfunction')

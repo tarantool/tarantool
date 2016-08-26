@@ -47,7 +47,7 @@ box.space.test:get(1) ~= nil
 
 test_run:cmd("switch default")
 test_run:cmd("set variable r_uri to 'replica.listen'")
-c = net_box:new(r_uri)
+c = net_box.connect(r_uri)
 d = c.space.test:delete{1}
 c.space.test:get(1) ~= nil
 

@@ -19,7 +19,7 @@ box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -65,7 +65,7 @@ test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -87,7 +87,7 @@ test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -246,7 +246,7 @@ index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2
 function compare(a,b) return a[1] < b[1] end
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.tweedledum
@@ -583,7 +583,7 @@ test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.tweedledum

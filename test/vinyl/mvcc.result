@@ -19,25 +19,25 @@ _ = box.schema.space.create('test', {engine = 'vinyl'})
 _ = box.space.test:create_index('pk')
 ---
 ...
-c1 = net:new(address)
+c1 = net.connect(address)
 ---
 ...
-c2 = net.new(address)
+c2 = net.connect(address)
 ---
 ...
-c3 = net.new(address)
+c3 = net.connect(address)
 ---
 ...
-c4 = net.new(address)
+c4 = net.connect(address)
 ---
 ...
-c5 = net.new(address)
+c5 = net.connect(address)
 ---
 ...
-c6 = net.new(address)
+c6 = net.connect(address)
 ---
 ...
-c7 = net.new(address)
+c7 = net.connect(address)
 ---
 ...
 test_run:cmd("setopt delimiter ';'")

@@ -16,9 +16,9 @@ test_run = require('test_run').new()
 _ = box.schema.space.create('test', {engine = 'vinyl'})
 _ = box.space.test:create_index('pk')
 
-c1 = net:new(address)
-c2 = net.new(address)
-c3 = net.new(address)
+c1 = net.connect(address)
+c2 = net.connect(address)
+c3 = net.connect(address)
 
 
 test_run:cmd("setopt delimiter ';'")

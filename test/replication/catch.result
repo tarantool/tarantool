@@ -103,7 +103,7 @@ test_run:cmd("set variable r_uri to 'replica.listen'")
 ---
 - true
 ...
-c = net_box:new(r_uri)
+c = net_box.connect(r_uri)
 ---
 ...
 d = c.space.test:delete{1}

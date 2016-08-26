@@ -303,7 +303,7 @@ local function connect(uri)
     end
 
     -- connect to remote host
-    local remote = require('net.box'):new(u.host, u.service,
+    local remote = require('net.box').connect(u.host, u.service,
         { user = u.login, password = u.password })
 
     -- run disconnect trigger

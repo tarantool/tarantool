@@ -12,7 +12,7 @@ index = space:create_index('primary', { type = 'tree' })
 
 -- low level connection
 log.info("create connection")
-cn = remote:new(LISTEN.host, LISTEN.service)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 cn:_wait_state({active = true, error = true}, 1)
 log.info("state is %s", cn.state)
 
@@ -33,7 +33,7 @@ cn:eval('return 2+2')
 
 box.schema.user.grant('guest','execute','universe')
 cn:close()
-cn = remote:new(box.cfg.listen)
+cn = remote.connect(box.cfg.listen)
 
 cn:call('unexists_procedure')
 cn:call('test_foo', 'a', 'b', 'c')
@@ -97,7 +97,7 @@ box.space.gh822:drop()
 box.schema.user.revoke('guest','execute','universe')
 box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()
-cn = remote:new(box.cfg.listen)
+cn = remote.connect(box.cfg.listen)
 
 cn:_select(space.id, space.index.primary.id, 123)
 space:insert{123, 345}
@@ -182,7 +182,7 @@ cn:ping()
 cn:call('test_foo')
 
 -- -- 2 reconnect
-cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
+cn = remote.connect(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
 cn:_wait_state({active = true}, 1)
 cn.space ~= nil
 
@@ -242,7 +242,7 @@ cn:call('X.X.X.X:fn', u)
 
 -- auth
 
-cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()
 cn.error
 cn.state
@@ -250,7 +250,7 @@ cn.state
 box.schema.user.create('netbox', { password  = 'test' })
 box.schema.user.grant('netbox', 'read, write, execute', 'universe');
 
-cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
 cn:ping()
@@ -263,8 +263,8 @@ cn:call('ret_after', .01)
 cn:timeout(1):call('ret_after', .01)
 cn:timeout(.01):call('ret_after', 1)
 
-cn = remote:timeout(0.0000000001):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 
 
 
@@ -281,22 +281,22 @@ space:drop()
 
 
 -- admin console tests
-cnc = remote:new(os.getenv('ADMIN'))
+cnc = remote.connect(os.getenv('ADMIN'))
 cnc.console ~= nil
 cnc:console('return 1, 2, 3, "string", nil')
 cnc:console('error("test")')
 cnc:console('a = {1, 2, 3, 4}; return a[3]')
 
 -- #1545 empty password
-cn = remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'test' })
 cn ~= nil
 cn:close()
-cn = remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+cn = remote.connect(LISTEN.host, LISTEN.service, { password = 'test' })
 cn ~= nil
 cn:close()
 
 -- #544 usage for remote[point]method
-cn = remote:new(LISTEN.host, LISTEN.service)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 
 cn:eval('return true')
 cn.eval('return true')
@@ -330,7 +330,7 @@ box.schema.user.drop('netbox')
 -- #594: bad argument #1 to 'setmetatable' (table expected, got number)
 test_run:cmd("setopt delimiter ';'")
 function gh594()
-    local cn = remote:new(box.cfg.listen)
+    local cn = remote.connect(box.cfg.listen)
     local ping = fiber.create(function() cn:ping() end)
     cn:call('dostring', 'return 2 + 2')
     cn:close()
@@ -387,7 +387,7 @@ data1k = "aaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabb
 for i = 0,10000 do box.space.test:insert{i, data1k} end
 
 net = require('net.box')
-c = net:new(box.cfg.listen)
+c = net:connect(box.cfg.listen)
 r = c.space.test:select(nil, {limit=5000})
 box.space.test:drop()
 
@@ -395,7 +395,7 @@ box.space.test:drop()
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 _ = box.space.test:insert{1, 2, "string"}
-c = net:new(box.cfg.listen)
+c = net:connect(box.cfg.listen)
 c.space.test:select{}
 c.space.test:upsert({1, 2, 'nothing'}, {{'+', 2, 1}}) -- common update
 c.space.test:select{}
@@ -406,4 +406,10 @@ c.space.test:select{}
 box.space.test:drop()
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+-- Tarantool < 1.7.1 compatibility (gh-1533)
+c = net.new(box.cfg.listen)
+c:ping()
+c:close()
+
 test_run:cmd("clear filter")

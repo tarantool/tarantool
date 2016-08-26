@@ -17,7 +17,7 @@ session = box.session
 remote = require('net.box')
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("dostring", "session.su('admin')")
@@ -51,7 +51,7 @@ box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("setuid_func")
@@ -111,7 +111,7 @@ session = box.session
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("setuid_func")
@@ -163,7 +163,7 @@ box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:insert{1}
@@ -240,7 +240,7 @@ box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:select{}
@@ -257,7 +257,7 @@ c.space.test:select{}
 c:close()
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:select{}
@@ -309,7 +309,7 @@ box.schema.func.create('f1')
 box.schema.func.create('f2',{setuid=true})
 ---
 ...
-c = net.new(box.cfg.listen)
+c = net.connect(box.cfg.listen)
 ---
 ...
 -- should return access denied

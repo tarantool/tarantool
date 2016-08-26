@@ -3,7 +3,7 @@ package.cpath = '../box/?.so;../box/?.dylib;'..package.cpath
 log = require('log')
 net = require('net.box')
 
-c = net:new(os.getenv("LISTEN"))
+c = net.connect(os.getenv("LISTEN"))
 
 box.schema.func.create('function1', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'function1')

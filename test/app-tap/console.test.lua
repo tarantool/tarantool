@@ -137,7 +137,7 @@ client:write("2 + 2\n")
 test:ok(yaml.decode(client:read(EOL))[1] == 4, "admin eval")
 
 -- gh-1177: Error message for display of a net.box result
-client:write("require('net.box').new('unix/', '"..IPROTO_SOCKET.."')\n")
+client:write("require('net.box').connect('unix/', '"..IPROTO_SOCKET.."')\n")
 test:isnil(yaml.decode(client:read(EOL))[1].error, "gh-1177 __serialize")
 -- there is no way to disconnect here
 

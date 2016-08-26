@@ -289,7 +289,7 @@ local errno_is_transient = {
 local remote = {}
 
 local remote_methods = {
-    new = function(cls, host, port, opts)
+    connect = function(cls, host, port, opts)
         local self = { _sync = -1 }
 
         if type(cls) == 'table' then
@@ -453,23 +453,22 @@ local remote_methods = {
             return self
         end
 
-        return {
-            new = function(cls, host, port, opts)
-                if opts == nil then
-                    opts = {}
-                end
-
-                opts.wait_connected = false
-
-                local cn = self:new(host, port, opts)
-
-                if not cn:wait_connected(timeout) then
-                    cn:close()
-                    box.error(box.error.TIMEOUT)
-                end
-                return cn
+        local connect = function(cls, host, port, opts)
+            if opts == nil then
+                opts = {}
             end
-        }
+
+            opts.wait_connected = false
+
+            local cn = self:new(host, port, opts)
+
+            if not cn:wait_connected(timeout) then
+                cn:close()
+                box.error(box.error.TIMEOUT)
+            end
+            return cn
+        end
+        return { connect = connect, new = connect }
     end,
 
 
@@ -1037,6 +1036,8 @@ local remote_methods = {
     end,
 }
 
+-- Tarantool < 1.7.1 compatibility
+remote_methods.new = remote_methods.connect
 setmetatable(remote, { __index = remote_methods })
 
 local function rollback()

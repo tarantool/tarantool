@@ -30,49 +30,49 @@ LISTEN = require('uri').parse(box.cfg.listen)
 
 -- check connection with authentication(counter must be incremented)
 counter = 0
-c = net.box:new('test:pass@' .. LISTEN.host .. ':' .. LISTEN.service)
+c = net.box.connect('test:pass@' .. LISTEN.host .. ':' .. LISTEN.service)
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c = net.box:new('test2:@' .. LISTEN.host .. ':' .. LISTEN.service)
+c = net.box.connect('test2:@' .. LISTEN.host .. ':' .. LISTEN.service)
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c = net.box:new('test2@' .. LISTEN.host .. ':' .. LISTEN.service)
+c = net.box.connect('test2@' .. LISTEN.host .. ':' .. LISTEN.service)
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c1 = net.box:new(LISTEN.host, LISTEN.service, {user='test2'})
+c1 = net.box.connect(LISTEN.host, LISTEN.service, {user='test2'})
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c1 = net.box:new('guest@' .. LISTEN.host .. ':' .. LISTEN.service)
+c1 = net.box.connect('guest@' .. LISTEN.host .. ':' .. LISTEN.service)
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c1 = net.box:new('guest:@' .. LISTEN.host .. ':' .. LISTEN.service)
+c1 = net.box.connect('guest:@' .. LISTEN.host .. ':' .. LISTEN.service)
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c1 = net.box:new(LISTEN.host, LISTEN.service, {user='guest', password=''})
+c1 = net.box.connect(LISTEN.host, LISTEN.service, {user='guest', password=''})
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
 
 counter = 0
-c1 = net.box:new(LISTEN.host, LISTEN.service, {user='guest'})
+c1 = net.box.connect(LISTEN.host, LISTEN.service, {user='guest'})
 while counter < 1 do fiber.sleep(0.001) end
 counter
 msg
@@ -80,7 +80,7 @@ msg
 
 -- check guest connection without authentication(no increment)
 counter = 0
-c1 = net.box:new(LISTEN.host, LISTEN.service)
+c1 = net.box.connect(LISTEN.host, LISTEN.service)
 c1:ping()
 counter
 

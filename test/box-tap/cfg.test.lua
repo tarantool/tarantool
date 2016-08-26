@@ -190,7 +190,7 @@ box.cfg{wal_mode = 'none', listen='unix/:./tarantool.sock' }
 box.once("bootstrap", function()
     box.schema.user.create("test", { password = '123'  })
 end)
-local conn = require('net.box').new('unix/:./tarantool.sock',
+local conn = require('net.box').connect('unix/:./tarantool.sock',
     { user = 'test', password = '123' })
 if not conn:ping() then os.exit(1) end
 os.exit(0)

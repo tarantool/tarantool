@@ -7,7 +7,7 @@ test_run = env.new()
 box.schema.user.grant('guest','read,write,execute','universe')
 session = box.session
 remote = require('net.box')
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 c:call("dostring", "session.su('admin')")
 c:call("dostring", "return session.user()")
 c:close()
@@ -20,7 +20,7 @@ index = setuid_space:create_index('primary')
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
 box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 c:call("setuid_func")
 session.su('guest')
 setuid_func()
@@ -41,7 +41,7 @@ test_run:cmd('restart server default')
 remote = require('net.box')
 session = box.session
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 c:call("setuid_func")
 session.su('guest')
 setuid_func()
@@ -61,7 +61,7 @@ box.schema.user.grant('test', 'read,write', 'space','test')
 box.schema.user.grant('test', 'read', 'space', '_space')
 box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 c.space.test:insert{1}
 box.schema.user.drop('test')
 c.space.test:insert{1}
@@ -92,12 +92,12 @@ box.schema.user.create('test', {password='test'})
 box.schema.user.grant('test', 'read', 'space', '_space')
 box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 c.space.test:select{}
 box.schema.role.grant('public', 'read', 'universe')
 c.space.test:select{}
 c:close()
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 c.space.test:select{}
 box.schema.role.revoke('public', 'read', 'universe')
 c.space.test:select{}
@@ -116,7 +116,7 @@ function f1() return box.space._func:get(1)[4] end
 function f2() return box.space._func:get(2)[4] end
 box.schema.func.create('f1')
 box.schema.func.create('f2',{setuid=true})
-c = net.new(box.cfg.listen)
+c = net.connect(box.cfg.listen)
 -- should return access denied
 c:call('f1')
 -- should work (used to return access denied, because was not setuid

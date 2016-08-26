@@ -7,7 +7,7 @@ _ = box.schema.space.create('test1', { id = 555 })
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.test
 
 index = box.space.test:create_index('primary', { type = 'hash' })
@@ -28,7 +28,7 @@ space:select{2}
 test_run:cmd('restart server default')
 
 net_box = require('net.box')
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.test
 
 space:select{1}
@@ -38,7 +38,7 @@ space:select{1}
 test_run:cmd('restart server default')
 
 net_box = require('net.box')
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.test
 
 space:select{1}
@@ -98,7 +98,7 @@ s = box.schema.space.create('tweedledum', { id = 0 })
 index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
 index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'string'}})
 function compare(a,b) return a[1] < b[1] end
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum
 -- A test case for Bug#729758
 -- "SELECT fails with a disjunct and small LIMIT"
@@ -220,7 +220,7 @@ test_run = env.new()
 -- Check how build_indexes() works
 test_run:cmd('restart server default')
 net_box = require('net.box')
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum
 
 s = box.space[0]

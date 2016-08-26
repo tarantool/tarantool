@@ -6,7 +6,7 @@ LISTEN = require('uri').parse(box.cfg.listen)
 -- create first space
 s = box.schema.create_space('test')
 i = s:create_index('primary')
-cn = net_box:new(LISTEN.host, LISTEN.service)
+cn = net_box.connect(LISTEN.host, LISTEN.service)
 
 -- check that schema is correct
 cn.space.test ~= nil
