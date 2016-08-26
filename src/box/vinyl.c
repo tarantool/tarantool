@@ -2230,9 +2230,9 @@ struct vy_index {
 	 */
 	int64_t first_dump_lsn;
 	/*
-	 * For each index range list modification
-	 * we will update this stamp. For new nodes we will
-	 * use this stamp as an identifier.
+	 * For each index range list modification,
+	 * get a new range id and increment this variable.
+	 * For new ranges, use this id as a sequence.
 	 */
 	int64_t range_id_max;
 	/* Last range stamp that was dumped to disk */
@@ -3665,12 +3665,12 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	struct vy_run_info *header = &run_index->info;
 	memset(header, 0, sizeof(struct vy_run_info));
 	/*
-	 * Store start run offset in file.
-	 * In case of run write failure we will
-	 * truncate file to this position.
-	 * Start offset can be used in future for integrity checking,
-	 * data restoration or if we will use relative offsets for
-	 * run items
+	 * Store start run offset in file. In case of run write
+	 * failure the file is truncated to this position.
+	 *
+	 * Start offset can be used in future for integrity
+	 * checks, data restoration or if we decide to use
+	 * relative offsets for run objects.
 	 */
 	header->offset = lseek(fd, 0, SEEK_CUR);
 	header->footprint = (struct vy_run_footprint) {
@@ -3823,9 +3823,7 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 
 	char tmp_path[PATH_MAX];
 	if (!n->run) {
-		/*
-		 * Empty range, we will create a temp file for it
-		 */
+		/* An empty range, create a temp file for it. */
 		snprintf(tmp_path, PATH_MAX, "%s/.rngXXXXXX",
 			 index->path);
 		n->fd = mkstemp(tmp_path);
@@ -3874,9 +3872,7 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 	vy_index_unlock(index);
 
 	if (n->run_count == 1) {
-		/*
-		 * First not-empty run for range, we will deploy range
-		 */
+		/* First non-empty run for this range, deploy the range. */
 		n->id = vy_index_range_id_next(index);
 
 		char path[PATH_MAX];
@@ -3888,10 +3884,10 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 			return -1;
 		}
 		/*
-		 * range file was created,
-		 * we will update index ranges index
+		 * The range file was created successfully,
+		 * update the range index on disk.
 		 */
-		if (!index->first_dump_lsn)
+		if (index->first_dump_lsn == 0)
 			index->first_dump_lsn = run->index.info.min_lsn;
 		vy_index_dump_range_index(index);
 	}
