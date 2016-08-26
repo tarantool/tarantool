@@ -2054,43 +2054,57 @@ vy_mem_find(struct vy_mem *i, char *key, int64_t lsn)
 	return *v;
 }
 
-/*
- * Struct stored sizes of writers data structures stored in run
- * We will only add new items and size_ifo can be used for
- * compability checking and version control
+/**
+ * The footprint of run metadata on disk.
+ * Run metadata is a set of packed data structures which are
+ * written to disk in host byte order. They describe the
+ * format of the run itself, which is a collection of
+ * equi-sized, aligned pages with tuples.
+ *
+ * This footprint is the first thing written to disk
+ * when a run is dumped. It is a way to achieve
+ * backward compatibility when restoring runs written
+ * by previous versions of tarantool: it is assumed that
+ * the data structures will get new members, which will
+ * be stored at their end, and we'll be able to check
+ * for absent members by looking at this footprint record.
  */
-struct PACKED vy_run_size_info {
-	/* size of run_info struct */
+struct PACKED vy_run_footprint {
+	/** Size of struct vy_run_info */
 	uint16_t run_info_size;
-	/* size of page info struct */
+	/* Size of struct vy_page_info */
 	uint16_t page_info_size;
-	/* size of tuple info struct */
+	/* Size struct vy_tuple_info */
 	uint16_t tuple_info_size;
-	/* data aligment */
-	uint16_t aligment;
+	/* Data alignment */
+	uint16_t alignment;
 };
 
+/**
+ * Run metadata. A run is a written to a file as a single
+ * chunk.
+ */
 struct PACKED vy_run_info {
 	/* sizes of containig structures */
-	struct vy_run_size_info size_info;
+	struct vy_run_footprint footprint;
 	uint32_t  crc;
-	/* size of run in file */
+	/** Total run size when stored in a file. */
 	uint64_t size;
-	/* offset of run in file */
+	/** Offset of the run in the file */
 	uint64_t offset;
-	/* pages count */
+	/** Run page count. */
 	uint32_t  count;
-	/* size of pages info data block */
+	/** Size of the page index. */
 	uint32_t pages_size;
-	/* start of pages info array (global) */
+	/** Offset of this run's page index in the file. */
 	uint64_t  pages_offset;
-	/* size of min-max data block */
+	/** size of min-max data block */
 	uint32_t  minmax_size;
-	/* start of min-max keys array (global) */
+	/** start of min-max keys array (global) */
 	uint64_t  minmax_offset;
-	/* keys count*/
+	/** Number of keys in the min-max key array. */
 	uint32_t  keys;
-	/* min and max lsn in run */
+	/* Min and max lsn over all tuples in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;
 
@@ -2131,7 +2145,7 @@ struct PACKED vy_tuple_info {
 	uint32_t size;
 	/* flags */
 	uint8_t  flags;
-	/* for 4-byte aligment */
+	/* for 4-byte alignment */
 	uint8_t reserved[3];
 };
 
@@ -3737,8 +3751,8 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 {
 	vy_run_index_init(run_index);
 
-	struct vy_run_info *index_header = &run_index->info;
-	memset(index_header, 0, sizeof(struct vy_run_info));
+	struct vy_run_info *header = &run_index->info;
+	memset(header, 0, sizeof(struct vy_run_info));
 	/*
 	 * Store start run offset in file.
 	 * In case of run write failure we will
@@ -3747,19 +3761,19 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	 * data restoration or if we will use relative offsets for
 	 * run items
 	 */
-	index_header->offset = lseek(fd, 0, SEEK_CUR);
-	index_header->size_info = (struct vy_run_size_info) {
+	header->offset = lseek(fd, 0, SEEK_CUR);
+	header->footprint = (struct vy_run_footprint) {
 		sizeof(struct vy_run_info),
 		sizeof(struct vy_page_info),
 		sizeof(struct vy_tuple_info),
 		FILE_ALIGN
 	};
-	index_header->min_lsn = INT64_MAX;
+	header->min_lsn = INT64_MAX;
 
 	/* write run info header and adjust size */
-	uint32_t header_size = sizeof(*index_header);
-	vy_write_aligned(fd, index_header, &header_size);
-	index_header->size += header_size;
+	uint32_t header_size = sizeof(*header);
+	vy_write_aligned(fd, header, &header_size);
+	header->size += header_size;
 
 	/*
 	 * Read write iter until it has any data or
@@ -3771,29 +3785,29 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 		if (vy_run_write_page(fd, iwrite,
 				      compression, run_index) == -1)
 			goto err;
-	} while (index_header->total < limit &&
+	} while (header->total < limit &&
 		 sv_writeiter_resume(iwrite));
 
 	/* Write pages index */
 	int rc;
-	index_header->pages_offset = index_header->offset +
-				     index_header->size;
-	index_header->pages_size = vy_buf_used(&run_index->pages);
+	header->pages_offset = header->offset +
+				     header->size;
+	header->pages_size = vy_buf_used(&run_index->pages);
 	rc = vy_write_aligned(fd, run_index->pages.s,
-			      &index_header->pages_size);
+			      &header->pages_size);
 	if (rc == -1)
 		goto err;
-	index_header->size += index_header->pages_size;
+	header->size += header->pages_size;
 
 	/* Write min-max keys for pages */
-	index_header->minmax_offset = index_header->offset +
-				      index_header->size;
-	index_header->minmax_size = vy_buf_used(&run_index->minmax);
+	header->minmax_offset = header->offset +
+				      header->size;
+	header->minmax_size = vy_buf_used(&run_index->minmax);
 	rc = vy_write_aligned(fd, run_index->minmax.s,
-			      &index_header->minmax_size);
+			      &header->minmax_size);
 	if (rc == -1)
 		goto err;
-	index_header->size += index_header->minmax_size;
+	header->size += header->minmax_size;
 
 	/*
 	 * Sync written data
@@ -3805,14 +3819,14 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 
 	/*
 	 * Eval run_info header crc and rewrite it
-	 * to finalyze run on disk
+	 * to finalize the run on disk
 	 * */
-	index_header->crc = vy_crcs(index_header,
+	header->crc = vy_crcs(header,
 				    sizeof(struct vy_run_info), 0);
 
-	header_size = sizeof(*index_header);
-	if (vy_pwrite_aligned(fd, index_header, &header_size,
-			      index_header->offset) == -1)
+	header_size = sizeof(*header);
+	if (vy_pwrite_aligned(fd, header, &header_size,
+			      header->offset) == -1)
 		goto err;
 	if (fdatasync(fd) == -1)
 		goto err_file;
@@ -3826,8 +3840,8 @@ err:
 	/*
 	 * Reposition to end of file and trucate it
 	 */
-	lseek(fd, index_header->offset, SEEK_SET);
-	ftruncate(fd, index_header->offset);
+	lseek(fd, header->offset, SEEK_SET);
+	ftruncate(fd, header->offset);
 	return -1;
 }
 
