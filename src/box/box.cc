@@ -863,14 +863,32 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 	if (iproto_prepare_select(out, &svp) != 0)
 		goto error;
 
-	for (struct port_entry *entry = port.first;
-	     entry != NULL; entry = entry->next) {
-		if (tuple_to_obuf(entry->tuple, out) != 0) {
-			obuf_rollback_to_svp(out, &svp);
-			goto error;
+	if (request->type == IPROTO_CALL_16) {
+		/* Tarantool < 1.7.1 compatibility */
+		for (struct port_entry *entry = port.first;
+		     entry != NULL; entry = entry->next) {
+			if (tuple_to_obuf(entry->tuple, out) != 0) {
+				obuf_rollback_to_svp(out, &svp);
+				goto error;
+			}
 		}
+		iproto_reply_select(out, &svp, request->header->sync, port.size);
+	} else {
+		assert(request->type == IPROTO_CALL);
+		char *size_buf = (char *)
+			obuf_alloc(out, mp_sizeof_array(port.size));
+		if (size_buf == NULL)
+			goto error;
+		mp_encode_array(size_buf, port.size);
+		for (struct port_entry *entry = port.first;
+		     entry != NULL; entry = entry->next) {
+			if (tuple_to_obuf(entry->tuple, out) != 0) {
+				obuf_rollback_to_svp(out, &svp);
+				goto error;
+			}
+		}
+		iproto_reply_select(out, &svp, request->header->sync, 1);
 	}
-	iproto_reply_select(out, &svp, request->header->sync, port.size);
 
 	port_destroy(&port);
 

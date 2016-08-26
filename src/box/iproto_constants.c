@@ -97,24 +97,26 @@ const char *iproto_type_strs[] =
 	"REPLACE",
 	"UPDATE",
 	"DELETE",
-	"CALL",
+	NULL, /* CALL_16 */
 	"AUTH",
 	"EVAL",
 	"UPSERT",
+	"CALL"
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_UPSERT + 1] = {
+const uint64_t iproto_body_key_map[IPROTO_CALL + 1] = {
 	0,                                                     /* unused */
 	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
 	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
 	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
-	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL_16 */
 	bit(USER_NAME)| bit(TUPLE),                            /* AUTH */
 	bit(EXPR)     | bit(TUPLE),                            /* EVAL */
 	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
 };
 #undef bit
 

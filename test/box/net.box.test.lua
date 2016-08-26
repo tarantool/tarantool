@@ -223,13 +223,13 @@ cn:call('test_foo', 'a', 'b', 'c')
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
 res = cn:call('long_rep')
-res[1][1] == 1
-res[1][2] == string.rep('a', 5000)
+res[1] == 1
+res[2] == string.rep('a', 5000)
 
 function long_rep() return { 1,  string.rep('a', 50000) } end
 res = cn:call('long_rep')
-res[1][1] == 1
-res[1][2] == string.rep('a', 50000)
+res[1] == 1
+res[2] == string.rep('a', 50000)
 
 -- a.b.c.d
 u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'

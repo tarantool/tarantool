@@ -563,9 +563,7 @@ cn:call('pause')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- [[{'a': 1}], [{'b': 2}], 'c']
 ...
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
@@ -576,9 +574,7 @@ remote.self:call('test_foo', 'a', 'b', 'c')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- [[{'a': 1}], [{'b': 2}], 'c']
 ...
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
@@ -587,11 +583,11 @@ function long_rep() return { 1,  string.rep('a', 5000) } end
 res = cn:call('long_rep')
 ---
 ...
-res[1][1] == 1
+res[1] == 1
 ---
 - true
 ...
-res[1][2] == string.rep('a', 5000)
+res[2] == string.rep('a', 5000)
 ---
 - true
 ...
@@ -601,11 +597,11 @@ function long_rep() return { 1,  string.rep('a', 50000) } end
 res = cn:call('long_rep')
 ---
 ...
-res[1][1] == 1
+res[1] == 1
 ---
 - true
 ...
-res[1][2] == string.rep('a', 50000)
+res[2] == string.rep('a', 50000)
 ---
 - true
 ...
@@ -624,15 +620,15 @@ function X.fn(x,y) return y or x end
 ...
 cn:call('X.fn', u)
 ---
-- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
+- 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
 cn:call('X.X.X.X.X.X.X.fn', u)
 ---
-- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
+- 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
 cn:call('X.X.X.X:fn', u)
 ---
-- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
+- 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
 -- auth
 cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
@@ -681,11 +677,11 @@ cn:timeout(1).space.net_box_test_space.index.primary:select{234}
 ...
 cn:call('ret_after', .01)
 ---
-- - [0.01]
+- [[0.01]]
 ...
 cn:timeout(1):call('ret_after', .01)
 ---
-- - [0.01]
+- [[0.01]]
 ...
 cn:timeout(.01):call('ret_after', 1)
 ---

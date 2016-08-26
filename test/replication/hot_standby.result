@@ -144,7 +144,6 @@ a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
 ...
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 ---
-- []
 ...
 a:close()
 ---
@@ -228,7 +227,6 @@ a = (require 'net.box').connect(HOT_STANDBY.host, HOT_STANDBY.service)
 ...
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 ---
-- []
 ...
 a:close()
 ---

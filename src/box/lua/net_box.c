@@ -152,14 +152,14 @@ netbox_encode_auth(lua_State *L)
 }
 
 static int
-netbox_encode_call(lua_State *L)
+netbox_encode_call_impl(lua_State *L, enum iproto_type type)
 {
 	if (lua_gettop(L) < 5)
 		return luaL_error(L, "Usage: netbox.encode_call(ibuf, sync, "
 		       "schema_id, function_name, args)");
 
 	struct mpstream stream;
-	size_t svp = netbox_prepare_request(L, &stream, IPROTO_CALL);
+	size_t svp = netbox_prepare_request(L, &stream, type);
 
 	luamp_encode_map(cfg, &stream, 2);
 
@@ -175,6 +175,18 @@ netbox_encode_call(lua_State *L)
 
 	netbox_encode_request(&stream, svp);
 	return 0;
+}
+
+static int
+netbox_encode_call_16(lua_State *L)
+{
+	return netbox_encode_call_impl(L, IPROTO_CALL_16);
+}
+
+static int
+netbox_encode_call(lua_State *L)
+{
+	return netbox_encode_call_impl(L, IPROTO_CALL);
 }
 
 static int
@@ -403,6 +415,7 @@ luaopen_net_box(struct lua_State *L)
 {
 	const luaL_reg net_box_lib[] = {
 		{ "encode_ping",    netbox_encode_ping },
+		{ "encode_call_16", netbox_encode_call_16 },
 		{ "encode_call",    netbox_encode_call },
 		{ "encode_eval",    netbox_encode_eval },
 		{ "encode_select",  netbox_encode_select },

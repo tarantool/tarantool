@@ -18,10 +18,11 @@ local INSERT            = 2
 local REPLACE           = 3
 local UPDATE            = 4
 local DELETE            = 5
-local CALL              = 6
+local CALL_16           = 6
 local AUTH              = 7
 local EVAL              = 8
 local UPSERT            = 9
+local CALL              = 10
 local PING              = 64
 local ERROR_TYPE        = 65536
 
@@ -98,6 +99,10 @@ local function free_channel(ch)
     ch_buf_size = ch_buf_size + 1
 end
 
+local function version_id(major, minor, patch)
+    return bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8), patch)
+end
+
 local function one_tuple(tbl)
     if tbl == nil then
         return
@@ -111,6 +116,7 @@ end
 local requests = {
     [PING]    = internal.encode_ping;
     [AUTH]    = internal.encode_auth;
+    [CALL_16] = internal.encode_call_16;
     [CALL]    = internal.encode_call;
     [EVAL]    = internal.encode_eval;
     [INSERT]  = internal.encode_insert;
@@ -255,7 +261,7 @@ local function index_metatable(self)
                 check_if_index(idx)
                 local proc = string.format('box.space.%s.index.%s:count',
                     idx.space.name, idx.name)
-                local res = self:call(proc, key)
+                local res = self:call_16(proc, key)
                 if #res > 0 then
                     return res[1][1]
                 end
@@ -407,16 +413,34 @@ local remote_methods = {
         return res.body[DATA]
     end,
 
-    call    = function(self, proc_name, ...)
+    call_16  = function(self, proc_name, ...)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call_16(proc_name, ...)")
+        end
+
+        proc_name = tostring(proc_name)
+
+        local res = self:_request(CALL_16, true, proc_name, {...})
+        return res.body[DATA]
+
+    end,
+
+    call_17  = function(self, proc_name, ...)
         if type(self) ~= 'table' then
             box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
         end
 
         proc_name = tostring(proc_name)
 
-        local res = self:_request(CALL, true, proc_name, {...})
-        return res.body[DATA]
-
+        local data = self:_request(CALL, true, proc_name, {...}).body[DATA]
+        local data_len = #data
+        if data_len == 1 then
+            return data[1]
+        elseif data_len == 0 then
+            return
+        else
+            return unpack(data)
+        end
     end,
 
     eval    = function(self, expr, ...)
@@ -681,6 +705,12 @@ local remote_methods = {
                         self.salt = ffi.string(greeting.salt, greeting.salt_len)
                         self.console = nil
                         self._check_response = self._check_binary_response
+                        if self.version_id < version_id(1, 7, 1) then
+                            -- Tarantool < 1.7.1 compatibility
+                            self.call = self.call_16
+                        else
+                            self.call = self.call_17
+                        end
                         local s, e = pcall(function()
                             self:_auth()
                         end)
@@ -957,7 +987,8 @@ local remote_methods = {
         end
 
 
-        if response.body[DATA] ~= nil and reqtype ~= EVAL then
+        if response.body[DATA] ~= nil and reqtype ~= EVAL and
+           reqtype ~= CALL then
             if rawget(box, 'tuple') ~= nil then
                 for i, v in pairs(response.body[DATA]) do
                     response.body[DATA][i] =

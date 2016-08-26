@@ -303,11 +303,9 @@ cn = require('net.box').connect(box.cfg.listen)
 ...
 cn:call('test') -- first CALL starts transaction
 ---
-- []
 ...
 cn:call('test') -- iproto reuses fiber on the second call
 ---
-- []
 ...
 cn = nil
 ---

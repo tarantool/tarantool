@@ -75,7 +75,7 @@ type(session.on_disconnect(audit_disconnect))
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 a = net.box.connect(LISTEN.host, LISTEN.service)
-a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
+a:eval('return space:get{session.id()}[1] == session.id()')
 a:eval('return session.sync() ~= 0')
 a:close()
 

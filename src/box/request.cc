@@ -58,7 +58,7 @@ request_decode(struct request *request, const char *data, uint32_t len)
 {
 	const char *end = data + len;
 	/** Advanced requests don't have a defined key map. */
-	assert(request->type <= IPROTO_UPSERT);
+	assert(request->type <= IPROTO_CALL);
 	uint64_t key_map = iproto_body_key_map[request->type];
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {

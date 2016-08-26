@@ -22,11 +22,10 @@ c = remote.connect(box.cfg.listen)
 ...
 c:call("dostring", "session.su('admin')")
 ---
-- []
 ...
 c:call("dostring", "return session.user()")
 ---
-- - ['admin']
+- admin
 ...
 c:close()
 ---
@@ -79,7 +78,7 @@ box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ...
 c:call("setuid_func")
 ---
-- - [1]
+- [1]
 ...
 session.su('guest')
 ---
@@ -116,7 +115,7 @@ c = remote.connect(box.cfg.listen)
 ...
 c:call("setuid_func")
 ---
-- - [2]
+- [2]
 ...
 session.su('guest')
 ---
@@ -204,7 +203,7 @@ c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
 ...
 c:call('dostring', 'return 2 + 2')
 ---
-- - [4]
+- 4
 ...
 c:close()
 ---
@@ -320,7 +319,7 @@ c:call('f1')
 -- should work (used to return access denied, because was not setuid
 c:call('f2')
 ---
-- - [0]
+- 0
 ...
 c:close()
 ---

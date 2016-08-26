@@ -319,10 +319,11 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	process1_route,                         /* IPROTO_REPLACE */
 	process1_route,                         /* IPROTO_UPDATE */
 	process1_route,                         /* IPROTO_DELETE */
-	misc_route,                             /* IPROTO_CALL */
+	misc_route,                             /* IPROTO_CALL_16 */
 	misc_route,                             /* IPROTO_AUTH */
 	misc_route,                             /* IPROTO_EVAL */
-	process1_route                          /* IPROTO_UPSERT */
+	process1_route,                         /* IPROTO_UPSERT */
+	misc_route                              /* IPROTO_CALL */
 };
 
 static const struct cmsg_hop sync_route[] = {
@@ -523,6 +524,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		case IPROTO_REPLACE:
 		case IPROTO_UPDATE:
 		case IPROTO_DELETE:
+		case IPROTO_CALL_16:
 		case IPROTO_CALL:
 		case IPROTO_AUTH:
 		case IPROTO_EVAL:
@@ -821,8 +823,9 @@ tx_process_misc(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_CALL:
+		case IPROTO_CALL_16:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
+			rmean_collect(rmean_box, IPROTO_CALL, 1);
 			box_process_call(&msg->request, out);
 			break;
 		case IPROTO_EVAL:
