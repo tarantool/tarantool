@@ -568,9 +568,9 @@ cn:call('test_foo', 'a', 'b', 'c')
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- - - a: 1
+  - - b: 2
+  - c
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---

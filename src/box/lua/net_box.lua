@@ -108,9 +108,23 @@ local function one_tuple(tbl)
         return
     end
     if #tbl > 0 then
-        return tbl[1]
+        if rawget(box, 'tuple') ~= nil then
+            return tbl[1]
+        else
+            return box.tuple.new(tbl[1])
+        end
     end
     return
+end
+
+local function multiple_tuples(data)
+    if rawget(box, 'tuple') ~= nil then
+        for i, v in pairs(data) do
+            data[i] = box.tuple.new(data[i])
+        end
+    end
+    -- disable YAML flow output (useful for admin console)
+    return setmetatable(data, sequence_mt)
 end
 
 local requests = {
@@ -421,8 +435,8 @@ local remote_methods = {
         proc_name = tostring(proc_name)
 
         local res = self:_request(CALL_16, true, proc_name, {...})
-        return res.body[DATA]
-
+        -- disable YAML flow output (useful for admin console)
+        return setmetatable(res.body[DATA], sequence_mt)
     end,
 
     call_17  = function(self, proc_name, ...)
@@ -986,19 +1000,6 @@ local remote_methods = {
             end
         end
 
-
-        if response.body[DATA] ~= nil and reqtype ~= EVAL and
-           reqtype ~= CALL then
-            if rawget(box, 'tuple') ~= nil then
-                for i, v in pairs(response.body[DATA]) do
-                    response.body[DATA][i] =
-                        box.tuple.new(response.body[DATA][i])
-                end
-            end
-            -- disable YAML flow output (useful for admin console)
-            setmetatable(response.body[DATA], sequence_mt)
-        end
-
         return response
     end,
 
@@ -1037,7 +1038,7 @@ local remote_methods = {
     -- private (low level) methods
     _select = function(self, spaceno, indexno, key, opts)
         local res = self:_request(SELECT, true, spaceno, indexno, key, opts)
-        return res.body[DATA]
+        return multiple_tuples(res.body[DATA])
     end,
 
     _insert = function(self, spaceno, tuple)
@@ -1078,26 +1079,6 @@ local function rollback()
     end
 end
 
-local function handle_call_result(status, ...)
-    if not status then
-        rollback()
-        return box.error(box.error.PROC_LUA, (...))
-    end
-    if select('#', ...) == 1 and type((...)) == 'table' then
-        local result = (...)
-        for i, v in pairs(result) do
-            result[i] = box.tuple.new(v)
-        end
-        return result
-    else
-        local result = {}
-        for i=1,select('#', ...), 1 do
-            result[i] = box.tuple.new((select(i, ...)))
-        end
-        return result
-    end
-end
-
 local function handle_eval_result(status, ...)
     if not status then
         rollback()
@@ -1126,9 +1107,9 @@ remote.self = {
         end
         local result
         if obj ~= nil then
-            return handle_call_result(pcall(proc, obj, ...))
+            return handle_eval_result(pcall(proc, obj, ...))
         else
-            return handle_call_result(pcall(proc, ...))
+            return handle_eval_result(pcall(proc, ...))
         end
     end,
     eval = function(_box, expr, ...)
