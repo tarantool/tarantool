@@ -1628,10 +1628,6 @@ sv_readiter_get(struct svreaditer *im)
 
 struct svwriteiter {
 	int64_t   vlsn;
-	uint64_t  limit;
-	uint64_t  size;
-	uint32_t  sizev;
-	uint32_t  now;
 	int       save_delete;
 	int       save_upsert;
 	int       next;
@@ -1711,10 +1707,6 @@ sv_writeiter_next(struct svwriteiter *im)
 		int64_t lsn = v->lsn;
 		int flags = v->flags;
 		int dup = flags & SVDUP || sv_mergeisdup(im->merge);
-		if (im->size >= im->limit) {
-			if (! dup)
-				break;
-		}
 
 		if (unlikely(dup)) {
 			/* keep atleast one visible version for <= vlsn */
@@ -1735,7 +1727,6 @@ sv_writeiter_next(struct svwriteiter *im)
 					continue;
 				}
 			}
-			im->size += im->sizev + v->size;
 			/* upsert (track first statement start) */
 			if (flags & SVUPSERT)
 				im->upsert = 1;
@@ -1769,15 +1760,11 @@ sv_writeiter_next(struct svwriteiter *im)
 
 static inline int
 sv_writeiter_open(struct svwriteiter *im, struct svmergeiter *merge,
-		  uint64_t limit,
-		  uint32_t sizev, int64_t vlsn, int save_delete,
+		  int64_t vlsn, int save_delete,
 		  int save_upsert)
 {
 	im->upsert_tuple = NULL;
 	im->merge       = merge;
-	im->limit       = limit;
-	im->size        = 0;
-	im->sizev       = sizev;
 	im->vlsn        = vlsn;
 	im->save_delete = save_delete;
 	im->save_upsert = save_upsert;
@@ -1809,20 +1796,6 @@ static inline struct vy_tuple *
 sv_writeiter_get(struct svwriteiter *im)
 {
 	return im->v;
-}
-
-static inline int
-sv_writeiter_resume(struct svwriteiter *im)
-{
-	im->v       = sv_mergeiter_get(im->merge);
-	if (unlikely(im->v == NULL))
-		return 0;
-	im->vdup    = im->v->flags & SVDUP || sv_mergeisdup(im->merge);
-	im->prevlsn = im->v->lsn;
-	im->next    = 1;
-	im->upsert  = 0;
-	im->size    = im->sizev + im->v->size;
-	return 1;
 }
 
 static inline int
@@ -3552,6 +3525,7 @@ vy_pwrite_aligned(int fd, void *buf, uint32_t *size, uint64_t pos)
  */
 static int
 vy_run_write_page(int fd, struct svwriteiter *iwrite,
+		  uint32_t page_size,
 		  struct vy_filterif *compression,
 		  struct vy_run_index *run_index)
 {
@@ -3571,7 +3545,8 @@ vy_run_write_page(int fd, struct svwriteiter *iwrite,
 	page->min_lsn = INT64_MAX;
 	page->offset = run_info->offset + run_info->size;
 
-	while (sv_writeiter_has(iwrite)) {
+	while (sv_writeiter_has(iwrite) &&
+	       vy_buf_used(&values) < page_size) {
 		int rc = vy_run_dump_tuple(iwrite, &tuplesinfo, &values,
 					   page);
 		if (rc != 0)
@@ -3657,7 +3632,8 @@ err:
  */
 static int
 vy_run_write(int fd, struct svwriteiter *iwrite,
-	     struct vy_filterif *compression, uint64_t limit,
+	     struct vy_filterif *compression,
+	     uint32_t page_size, uint64_t run_size,
 	     struct vy_run_index *run_index)
 {
 	vy_run_index_init(run_index);
@@ -3694,10 +3670,10 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	 * with sv_writeiter_resume()
 	 */
 	do {
-		if (vy_run_write_page(fd, iwrite,
+		if (vy_run_write_page(fd, iwrite, page_size,
 				      compression, run_index) == -1)
 			goto err;
-	} while (header->total < limit && sv_writeiter_resume(iwrite));
+	} while (sv_writeiter_has(iwrite) && header->total < run_size);
 
 	/* Write pages index */
 	int rc;
@@ -3777,13 +3753,13 @@ vy_run_create(struct vy_index *index,
 
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, &imerge,
-			  index->key_def->opts.page_size,
-			  sizeof(struct vy_tuple_info),
 			  vlsn, 1, 1);
 	struct vy_run_index sdindex;
 	vy_run_index_init(&sdindex);
 	if ((rc = vy_run_write(parent->fd, &iwrite,
-			        index->compression_if, UINT64_MAX,
+			        index->compression_if,
+				index->key_def->opts.page_size,
+				UINT64_MAX,
 			        &sdindex)))
 		goto err;
 
@@ -4091,12 +4067,9 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, merge_iter,
-			  index->key_def->opts.page_size,
-			  sizeof(struct vy_tuple_info),
 			  vlsn, 0, 0);
 
-	while (sv_writeiter_has(&iwrite) ||
-	       sv_writeiter_resume(&iwrite)) {
+	while (sv_writeiter_has(&iwrite)) {
 		struct vy_run_index sdindex;
 		vy_run_index_init(&sdindex);
 		/* create new node */
@@ -4109,7 +4082,9 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 
 		if ((rc = vy_run_write(n->fd, &iwrite,
 				       index->compression_if,
-				       size_node, &sdindex)))
+				       index->key_def->opts.page_size,
+				       size_node,
+				       &sdindex)))
 			goto error;
 		n->run = vy_run_new();
 		if (!n->run)
