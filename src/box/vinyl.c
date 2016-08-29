@@ -76,6 +76,7 @@
 #include "cfg.h"
 #include "diag.h"
 #include "fiber.h" /* cord_slab_cache() */
+#include "ipc.h"
 #include "coeio.h"
 
 #include "errcode.h"
@@ -5167,7 +5168,8 @@ struct vy_scheduler {
 	struct vy_env    *env;
 
 	struct cord *worker_pool;
-	struct cord scheduler;
+	struct fiber *scheduler;
+	struct ev_loop *loop;
 	int worker_pool_size;
 	bool is_worker_pool_running;
 
@@ -5179,9 +5181,11 @@ struct vy_scheduler {
 	/**
 	 * There is no pending tasks for workers, so scheduler
 	 * needs to create one, or we want to shutdown the
-	 * scheduler.
+	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
+	 * are used here instead of pthread_cond_t.
 	 */
-	pthread_cond_t scheduler_cond;
+	struct ev_async scheduler_async;
+	struct ipc_cond scheduler_cond;
 	/**
 	 * A queue with all vy_task objects created by the
 	 * scheduler and not yet taken by a worker.
@@ -5201,6 +5205,16 @@ static void
 vy_scheduler_start(struct vy_scheduler *scheduler);
 static void
 vy_scheduler_stop(struct vy_scheduler *scheduler);
+
+static void
+vy_scheduler_async_cb(ev_loop *loop, struct ev_async *watcher, int events)
+{
+	(void) loop;
+	(void) events;
+	struct vy_scheduler *scheduler =
+		container_of(watcher, struct vy_scheduler, scheduler_async);
+	ipc_cond_signal(&scheduler->scheduler_cond);
+}
 
 static struct vy_scheduler *
 vy_scheduler_new(struct vy_env *env)
@@ -5224,9 +5238,13 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->count = 0;
 	scheduler->rr = 0;
 	scheduler->env = env;
-	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
-	tt_pthread_cond_init(&scheduler->scheduler_cond, NULL);
 	rlist_create(&scheduler->shutdown);
+	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
+	scheduler->loop = loop();
+	ev_async_init(&scheduler->scheduler_async, vy_scheduler_async_cb);
+	ipc_cond_create(&scheduler->scheduler_cond);
+	mempool_create(&scheduler->task_pool, cord_slab_cache(),
+			sizeof(struct vy_task));
 	return scheduler;
 }
 
@@ -5236,13 +5254,16 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	if (scheduler->is_worker_pool_running)
 		vy_scheduler_stop(scheduler);
 
+	mempool_destroy(&scheduler->task_pool);
+
 	struct vy_index *index, *next;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, next) {
 		vy_index_delete(index);
 	}
 	free(scheduler->indexes);
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
-	tt_pthread_cond_destroy(&scheduler->scheduler_cond);
+	TRASH(&scheduler->scheduler_async);
+	ipc_cond_destroy(&scheduler->scheduler_cond);
 	tt_pthread_mutex_destroy(&scheduler->mutex);
 	free(scheduler);
 }
@@ -5250,7 +5271,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 static int
 vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	struct vy_index **indexes =
 		realloc(scheduler->indexes,
 			(scheduler->count + 1) * sizeof(*indexes));
@@ -5263,7 +5283,6 @@ vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
 	scheduler->indexes = indexes;
 	scheduler->indexes[scheduler->count++] = index;
 	vy_index_ref(index);
-	tt_pthread_mutex_unlock(&scheduler->mutex);
 	/* Start scheduler threads on demand */
 	if (!scheduler->is_worker_pool_running)
 		vy_scheduler_start(scheduler);
@@ -5273,7 +5292,6 @@ vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
 static int
 vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	int found = 0;
 	while (found < scheduler->count && scheduler->indexes[found] != index)
 		found++;
@@ -5286,7 +5304,6 @@ vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 	vy_index_unref(index);
 	/* add index to `shutdown` list */
 	rlist_add(&scheduler->shutdown, &index->link);
-	tt_pthread_mutex_unlock(&scheduler->mutex);
 	return 0;
 }
 
@@ -5599,46 +5616,15 @@ vy_scheduler_f(va_list va)
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct vy_env *env = scheduler->env;
 
-	mempool_create(&scheduler->task_pool, cord_slab_cache(),
-			sizeof(struct vy_task));
-
-	/* Start worker threads */
-	scheduler->worker_pool = NULL;
-	stailq_create(&scheduler->input_queue);
-	stailq_create(&scheduler->output_queue);
-	assert(scheduler->worker_pool_size > 0);
-	scheduler->worker_pool = (struct cord *)
-		calloc(scheduler->worker_pool_size, sizeof(struct cord));
-	if (scheduler->worker_pool == NULL)
-		panic("failed to allocate vinyl worker pool");
-	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		cord_costart(&scheduler->worker_pool[i], "vinyl.worker",
-			     vy_worker_f, scheduler);
-	}
-
 	bool warning_said = false;
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	while (scheduler->is_worker_pool_running) {
-		/* Swap output queue */
-		struct stailq output_queue;
-		stailq_create(&output_queue);
-		stailq_splice(&scheduler->output_queue,
-			      stailq_first(&scheduler->output_queue),
-			      &output_queue);
-		tt_pthread_mutex_unlock(&scheduler->mutex);
-
-		/* Delete all processed tasks */
-		struct vy_task *task, *next;
-		stailq_foreach_entry_safe(task, next, &output_queue, link)
-			vy_task_delete(&scheduler->task_pool, task);
-
 		/* Run periodic tasks */
 		struct srzone *zone = sr_zoneof(env);
 		vy_schedule_periodic(scheduler, zone);
 
 		/* Get task */
 		int64_t vlsn = vy_sequence(env->seq, VINYL_VIEW_LSN);
-		task = NULL;
+		struct vy_task *task = NULL;
 		int rc = vy_schedule(scheduler, zone, vlsn, &task);
 		if (rc != 0){
 			/* Log error message once */
@@ -5651,6 +5637,13 @@ vy_scheduler_f(va_list va)
 
 		tt_pthread_mutex_lock(&scheduler->mutex);
 
+		/* Swap output queue */
+		struct stailq output_queue;
+		stailq_create(&output_queue);
+		stailq_splice(&scheduler->output_queue,
+			      stailq_first(&scheduler->output_queue),
+			      &output_queue);
+
 		if (task != NULL) {
 			/* Queue task */
 			bool was_empty = stailq_empty(&scheduler->input_queue);
@@ -5661,44 +5654,20 @@ vy_scheduler_f(va_list va)
 			warning_said = false;
 		}
 
+		tt_pthread_mutex_unlock(&scheduler->mutex);
+
+		/* Delete all processed tasks */
+		struct vy_task *next;
+		stailq_foreach_entry_safe(task, next, &output_queue, link)
+			vy_task_delete(&scheduler->task_pool, task);
+
 		/*
-		 * pthread_cond_timedwait() is used to
+		 * ipc_channel_get_timeout() is used to
 		 * schedule periodic tasks, 5 seconds is
 		 * enough for periodic.
 		 */
-		struct timespec deadline;
-		clock_gettime(CLOCK_REALTIME, &deadline);
-		deadline.tv_sec = deadline.tv_sec + 5; /* 5 seconds */
-		tt_pthread_cond_timedwait(&scheduler->scheduler_cond,
-					  &scheduler->mutex, &deadline);
+		ipc_cond_wait_timeout(&scheduler->scheduler_cond, 5.0);
 	}
-	tt_pthread_mutex_unlock(&scheduler->mutex);
-
-	assert(!scheduler->is_worker_pool_running);
-	tt_pthread_mutex_lock(&scheduler->mutex);
-	/* Delete all pending tasks */
-	struct vy_task *task, *next;
-	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link)
-		vy_task_delete(&scheduler->task_pool, task);
-	/* Wake up worker threads */
-	pthread_cond_broadcast(&scheduler->worker_cond);
-	tt_pthread_mutex_unlock(&scheduler->mutex);
-	assert(stailq_empty(&scheduler->input_queue));
-
-	/* Join worker threads */
-	for (int i = 0; i < scheduler->worker_pool_size; i++)
-		cord_join(&scheduler->worker_pool[i]);
-	free(scheduler->worker_pool);
-	scheduler->worker_pool = NULL;
-	scheduler->worker_pool_size = 0;
-	stailq_create(&scheduler->input_queue);
-	stailq_create(&scheduler->output_queue);
-
-	/* Delete all processed tasks */
-	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link)
-		vy_task_delete(&scheduler->task_pool, task);
-
-	mempool_destroy(&scheduler->task_pool);
 
 	return 0;
 }
@@ -5719,7 +5688,8 @@ vy_worker_f(va_list va)
 		/* Wait for a task */
 		if (stailq_empty(&scheduler->input_queue)) {
 			/* Wake scheduler up if there are no more tasks */
-			tt_pthread_cond_signal(&scheduler->scheduler_cond);
+			ev_async_send(scheduler->loop,
+				      &scheduler->scheduler_async);
 			tt_pthread_cond_wait(&scheduler->worker_cond,
 					     &scheduler->mutex);
 			continue;
@@ -5753,14 +5723,31 @@ static void
 vy_scheduler_start(struct vy_scheduler *scheduler)
 {
 	assert(!scheduler->is_worker_pool_running);
+
+	/* Start worker threads */
+	scheduler->is_worker_pool_running = true;
 	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
 	if (scheduler->worker_pool_size < 0)
 		scheduler->worker_pool_size = 1;
+	scheduler->worker_pool = NULL;
+	stailq_create(&scheduler->input_queue);
+	stailq_create(&scheduler->output_queue);
+	scheduler->worker_pool = (struct cord *)
+		calloc(scheduler->worker_pool_size, sizeof(struct cord));
+	if (scheduler->worker_pool == NULL)
+		panic("failed to allocate vinyl worker pool");
+	for (int i = 0; i < scheduler->worker_pool_size; i++) {
+		cord_costart(&scheduler->worker_pool[i], "vinyl.worker",
+			     vy_worker_f, scheduler);
+	}
 
-	/* Start scheduler cord */
-	scheduler->is_worker_pool_running = true;
-	cord_costart(&scheduler->scheduler, "vinyl.scheduler", vy_scheduler_f,
-		     scheduler);
+	/* Start scheduler fiber */
+	ev_async_start(scheduler->loop, &scheduler->scheduler_async);
+	scheduler->scheduler = fiber_new("vinyl.scheduler", vy_scheduler_f);
+	if (scheduler->scheduler == NULL)
+		panic("failed to start vinyl scheduler fiber");
+	fiber_set_joinable(scheduler->scheduler, false);
+	fiber_start(scheduler->scheduler, scheduler);
 }
 
 static void
@@ -5768,14 +5755,33 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 {
 	assert(scheduler->is_worker_pool_running);
 
-	/* Stop scheduler */
-	pthread_mutex_lock(&scheduler->mutex);
+	/* Stop scheduler fiber */
 	scheduler->is_worker_pool_running = false;
-	pthread_cond_signal(&scheduler->scheduler_cond);
-	pthread_mutex_unlock(&scheduler->mutex);
+	ev_async_stop(scheduler->loop, &scheduler->scheduler_async);
+	/* Sic: fiber_cancel() can't be used here */
+	ipc_cond_signal(&scheduler->scheduler_cond);
+	scheduler->scheduler = NULL;
 
-	/* Join scheduler thread */
-	cord_join(&scheduler->scheduler);
+	/* Delete all pending tasks and wake up worker threads */
+	tt_pthread_mutex_lock(&scheduler->mutex);
+	struct vy_task *task, *next;
+	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link)
+		vy_task_delete(&scheduler->task_pool, task);
+	pthread_cond_broadcast(&scheduler->worker_cond);
+	tt_pthread_mutex_unlock(&scheduler->mutex);
+	assert(stailq_empty(&scheduler->input_queue));
+
+	/* Join worker threads */
+	for (int i = 0; i < scheduler->worker_pool_size; i++)
+		cord_join(&scheduler->worker_pool[i]);
+	free(scheduler->worker_pool);
+	scheduler->worker_pool = NULL;
+	scheduler->worker_pool_size = 0;
+
+	/* Delete all processed tasks */
+	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link)
+		vy_task_delete(&scheduler->task_pool, task);
+	assert(stailq_empty(&scheduler->output_queue));
 }
 
 /*
@@ -5790,15 +5796,13 @@ vy_checkpoint(struct vy_env *env)
 	 * thread pool is not up yet */
 	if (!scheduler->is_worker_pool_running)
 		return 0;
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	scheduler->checkpoint_lsn = lsn;
 	scheduler->checkpoint_in_progress = true;
 	for (int i = 0; i < scheduler->count; i++) {
 		scheduler->indexes[i]->checkpoint_in_progress = true;
 	}
 	/* Wake scheduler up */
-	tt_pthread_cond_signal(&scheduler->scheduler_cond);
-	tt_pthread_mutex_unlock(&scheduler->mutex);
+	ipc_cond_signal(&scheduler->scheduler_cond);
 
 	return 0;
 }
@@ -5809,23 +5813,20 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	(void) vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
 	for (;;) {
-		tt_pthread_mutex_lock(&scheduler->mutex);
 		bool is_active = false;
 		for (int i = 0; i < scheduler->count; i++) {
 			struct vy_index *index = scheduler->indexes[i];
 			is_active |= index->checkpoint_in_progress;
 		}
-		tt_pthread_mutex_unlock(&scheduler->mutex);
 		if (!is_active)
 			break;
+		/* TODO: use channel here */
 		fiber_sleep(.020);
 	}
 
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	scheduler->checkpoint_in_progress = false;
 	scheduler->checkpoint_lsn_last = scheduler->checkpoint_lsn;
 	scheduler->checkpoint_lsn = 0;
-	tt_pthread_mutex_unlock(&scheduler->mutex);
 }
 
 /**
@@ -6161,9 +6162,7 @@ vy_info_append_scheduler(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "zone", z->name);
 
 	struct vy_scheduler *scheduler = env->scheduler;
-	tt_pthread_mutex_lock(&scheduler->mutex);
 	vy_info_append_u32(node, "gc_active", scheduler->gc_in_progress);
-	tt_pthread_mutex_unlock(&scheduler->mutex);
 	return 0;
 }
 
