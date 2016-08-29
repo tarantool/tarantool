@@ -1,35 +1,18 @@
-net = require('net.box')
-address  = os.getenv('ADMIN')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
-yaml = require('yaml')
 test_run = require('test_run').new()
-
+txn_proxy = require('txn_proxy')
 
 _ = box.schema.space.create('test', {engine = 'vinyl'})
 _ = box.space.test:create_index('pk')
 
-c1 = net.connect(address)
-c2 = net.connect(address)
-c3 = net.connect(address)
-c4 = net.connect(address)
-c5 = net.connect(address)
-c6 = net.connect(address)
-c7 = net.connect(address)
+c1 = txn_proxy.new()
+c2 = txn_proxy.new()
+c3 = txn_proxy.new()
+c4 = txn_proxy.new()
+c5 = txn_proxy.new()
+c6 = txn_proxy.new()
+c7 = txn_proxy.new()
 
 
-test_run:cmd("setopt delimiter ';'")
-getmetatable(c1).__call = function(c, command)
-    local f = yaml.decode(c:console(command))
-    if type(f) == 'table' then
-        setmetatable(f, {__serialize='array'})
-    end
-    return f
-end;
-test_run:cmd("setopt delimiter ''");
-methods = getmetatable(c1)['__index']
-methods.begin = function(c) return c("box.begin()") end
-methods.commit = function(c) return c("box.commit()") end
-methods.rollback = function(c) return c("box.rollback()") end
 t = box.space.test
 
 --
@@ -1476,4 +1459,3 @@ c4 = nil
 c5 = nil
 c6 = nil
 c7 = nil
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
