@@ -41,3 +41,25 @@ box.space.test:select{}
 box.space.test:drop()
 ---
 ...
+-- https://github.com/tarantool/tarantool/issues/1435
+-- Truncate does not work
+_ = box.schema.space.create('t5',{engine='vinyl'})
+---
+...
+_ = box.space.t5:create_index('primary')
+---
+...
+box.space.t5:insert{44}
+---
+- [44]
+...
+box.space.t5:truncate()
+---
+...
+box.space.t5:insert{55}
+---
+- [55]
+...
+box.space.t5:drop()
+---
+...
