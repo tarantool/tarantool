@@ -43,7 +43,8 @@ int luaL_error(lua_State *L, const char *fmt, ...) __attribute__((__noreturn__))
 #include "lua/utils.h"
 #include <fiber.h>
 
-static const char ipc_lib[]   = "ipc";
+static const char channel_typename[] = "fiber.channel";
+static const char cond_typename[]    = "fiber.cond";
 
 /******************** channel ***************************/
 
@@ -68,7 +69,7 @@ lbox_ipc_channel(struct lua_State *L)
 		luaL_error(L, "fiber.channel: not enough memory");
 	ipc_channel_create(ch, size);
 
-	luaL_getmetatable(L, ipc_lib);
+	luaL_getmetatable(L, channel_typename);
 
 	lua_setmetatable(L, -2);
 	return 1;
@@ -81,14 +82,14 @@ lbox_check_channel(struct lua_State *L, int index, const char *source)
 	if (index > lua_gettop(L))
 		luaL_error(L, "usage: %s", source);
 	/* Note: checkudata errs on mismatch, no point in checking res */
-	return (struct ipc_channel *) luaL_checkudata(L, index, ipc_lib);
+	return (struct ipc_channel *) luaL_checkudata(L, index, channel_typename);
 }
 
 static int
 lbox_ipc_channel_gc(struct lua_State *L)
 {
 	struct ipc_channel *ch = (struct ipc_channel *)
-		luaL_checkudata(L, -1, ipc_lib);
+		luaL_checkudata(L, -1, channel_typename);
 	if (ch)
 		ipc_channel_destroy(ch);
 	return 0;
@@ -256,6 +257,67 @@ lbox_ipc_channel_is_closed(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_ipc_cond(struct lua_State *L)
+{
+	struct ipc_cond *e = lua_newuserdata(L, sizeof(*e));
+	if (e == NULL)
+		luaL_error(L, "fiber.cond: not enough memory");
+	ipc_cond_create(e);
+	luaL_getmetatable(L, cond_typename);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static inline struct ipc_cond *
+lbox_check_cond(struct lua_State *L, int index, const char *source)
+{
+	if (index > lua_gettop(L))
+		luaL_error(L, "usage: %s", source);
+	return (struct ipc_cond *)luaL_checkudata(L, index, cond_typename);
+}
+
+static int
+lbox_ipc_cond_gc(struct lua_State *L)
+{
+	ipc_cond_destroy(lbox_check_cond(L, 1, "cond:destroy()"));
+	return 0;
+}
+
+static int
+lbox_ipc_cond_signal(struct lua_State *L)
+{
+	ipc_cond_signal(lbox_check_cond(L, 1, "cond:signal()"));
+	return 0;
+}
+
+static int
+lbox_ipc_cond_broadcast(struct lua_State *L)
+{
+	ipc_cond_broadcast(lbox_check_cond(L, 1, "cond:broadcast()"));
+	return 0;
+}
+
+static int
+lbox_ipc_cond_wait(struct lua_State *L)
+{
+	static const char usage[] = "cond:wait([timeout])";
+	int rc;
+	struct ipc_cond *e = lbox_check_cond(L, 1, usage);
+	ev_tstamp timeout = TIMEOUT_INFINITY;
+	if (!lua_isnoneornil(L, 2)) {
+		if (!lua_isnumber(L, 2) ||
+		    (timeout = lua_tonumber(L, 2)) < .0) {
+			luaL_error(L, "usage: %s", usage);
+		}
+	}
+	rc = ipc_cond_wait_timeout(e, timeout);
+	if (rc != 0)
+		luaL_testcancel(L);
+	lua_pushboolean(L, rc == 0);
+	return 1;
+}
+
 void
 tarantool_lua_ipc_init(struct lua_State *L)
 {
@@ -273,13 +335,23 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"is_closed",	lbox_ipc_channel_is_closed},
 		{NULL, NULL}
 	};
-	luaL_register_type(L, ipc_lib, channel_meta);
+	luaL_register_type(L, channel_typename, channel_meta);
 
-	static const struct luaL_reg ipc_meta[] = {
+	static const struct luaL_reg cond_meta[] = {
+		{"__gc",	lbox_ipc_cond_gc},
+		{"signal",	lbox_ipc_cond_signal},
+		{"broadcast",	lbox_ipc_cond_broadcast},
+		{"wait",	lbox_ipc_cond_wait},
+		{NULL, NULL}
+	};
+	luaL_register_type(L, cond_typename, cond_meta);
+
+	static const struct luaL_reg ipc_lib[] = {
 		{"channel",	lbox_ipc_channel},
+		{"cond",	lbox_ipc_cond},
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "fiber", ipc_meta);
+	luaL_register_module(L, "fiber", ipc_lib);
 	lua_pop(L, 1);
 }
