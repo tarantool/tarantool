@@ -198,13 +198,15 @@ set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
 # Exports syntax is toolchain-dependent, preprocessing is necessary
-add_custom_target(preprocess_exports DEPENDS ${CMAKE_BINARY_DIR}/exports2)
+set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
+add_custom_target(preprocess_exports
+                  DEPENDS ${exports_file})
 add_custom_command(
-    OUTPUT  ${CMAKE_BINARY_DIR}/exports2
-    DEPENDS ${CMAKE_SOURCE_DIR}/exports
+    OUTPUT  ${exports_file}
+    DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
     COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
-            ${CMAKE_SOURCE_DIR}/exports
-            ${CMAKE_BINARY_DIR}/exports2 ${CMAKE_SYSTEM_NAME})
+            ${CMAKE_SOURCE_DIR}/extra/exports
+            ${exports_file} ${CMAKE_SYSTEM_NAME})
 
 add_executable(
 	tarantool main.cc title.c
@@ -214,8 +216,7 @@ add_executable(
 add_dependencies(tarantool build_bundled_libs preprocess_exports)
 
 # Re-link if exports changed
-set_target_properties(tarantool PROPERTIES
-                      LINK_DEPENDS ${CMAKE_BINARY_DIR}/exports2)
+set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 
 # A note about linkers:
 # [GNU linker] When linking an *executable* visibility is ignored, and
@@ -236,14 +237,14 @@ if (TARGET_OS_DARWIN)
     # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
         LINK_FLAGS "-pagezero_size 10000 -image_base 100000000 \
-        -Wl,-exported_symbols_list,${CMAKE_BINARY_DIR}/exports2")
+        -Wl,-exported_symbols_list,${exports_file}")
 else ()
     target_link_libraries(tarantool
                           -Wl,--whole-archive box ${reexport_libraries}
                           salad -Wl,--no-whole-archive
                           ${common_libraries})
     set_target_properties(tarantool PROPERTIES LINK_FLAGS
-    "-Wl,--gc-sections -Wl,--dynamic-list,${CMAKE_BINARY_DIR}/exports2")
+    "-Wl,--gc-sections -Wl,--dynamic-list,${exports_file}")
     # get rid of -rdynamic
     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
