@@ -146,9 +146,9 @@ void *ffi_symbols[] = {
 	(void *) title_get_custom,
 	(void *) title_set_status,
 	(void *) title_get_status,
-	(void *) OpenSSL_add_all_digests,
-	(void *) OpenSSL_add_all_ciphers,
-	(void *) ERR_load_crypto_strings,
+	(void *) tnt_openssl_init,
 	(void *) tnt_EVP_CIPHER_key_length,
 	(void *) tnt_EVP_CIPHER_iv_length,
+	(void *) tnt_EVP_MD_CTX_new,
+	(void *) tnt_EVP_MD_CTX_free
 };

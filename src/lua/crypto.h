@@ -39,6 +39,9 @@ extern "C" {
 
 int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
 int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
+int tnt_openssl_init();
+EVP_MD_CTX *tnt_EVP_MD_CTX_new(void);
+void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
 
 #if defined(__cplusplus)
 }

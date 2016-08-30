@@ -13,10 +13,6 @@ digest.md5_hex()
 ---
 - d41d8cd98f00b204e9800998ecf8427e
 ...
-digest.sha_hex()
----
-- f96cea198ad1dd5617ac084a3d92c6107708c0ef
-...
 digest.sha1_hex()
 ---
 - da39a3ee5e6b4b0d3255bfef95601890afd80709
@@ -45,10 +41,6 @@ string.len(digest.md5_hex())
 ---
 - 32
 ...
-string.len(digest.sha_hex())
----
-- 40
-...
 string.len(digest.sha1_hex())
 ---
 - 40
@@ -76,10 +68,6 @@ string.len(digest.md4())
 string.len(digest.md5())
 ---
 - 16
-...
-string.len(digest.sha())
----
-- 20
 ...
 string.len(digest.sha1())
 ---
@@ -326,7 +314,7 @@ digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspa
 ...
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 ---
-- error: 'builtin/crypto.lua:286: Can''t finalize cipher:error:06065064:digital envelope
+- error: 'builtin/crypto.lua:281: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
 ...
 digest = nil

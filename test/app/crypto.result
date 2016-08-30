@@ -28,42 +28,42 @@ ciph.decrypt(enc, pass, iv)
 --Failing scenaries
 crypto.cipher.aes128.cbc.encrypt('a')
 ---
-- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+- error: 'builtin/crypto.lua:279: Key length should be equal to cipher key length
     (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+- error: 'builtin/crypto.lua:279: Key length should be equal to cipher key length
     (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321')
 ---
-- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+- error: 'builtin/crypto.lua:279: Initial vector length should be equal to cipher
     iv length (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+- error: 'builtin/crypto.lua:279: Initial vector length should be equal to cipher
     iv length (16 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a')
 ---
-- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+- error: 'builtin/crypto.lua:279: Key length should be equal to cipher key length
     (32 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+- error: 'builtin/crypto.lua:279: Key length should be equal to cipher key length
     (32 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '12345678876543211234567887654321')
 ---
-- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+- error: 'builtin/crypto.lua:279: Initial vector length should be equal to cipher
     iv length (16 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('12', '12345678876543211234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+- error: 'builtin/crypto.lua:279: Initial vector length should be equal to cipher
     iv length (16 bytes)'
 ...
 crypto.cipher.aes192.cbc.encrypt.new()
@@ -89,7 +89,7 @@ crypto.cipher.aes100.efb
 ...
 crypto.cipher.aes256.nomode
 ---
-- error: 'builtin/crypto.lua:269: Cipher mode nomode is not supported'
+- error: 'builtin/crypto.lua:264: Cipher mode nomode is not supported'
 ...
 crypto.digest.nodigest
 ---
@@ -104,11 +104,11 @@ bad_iv = '123456abcdefghij'
 ...
 ciph.decrypt(enc, bad_pass, iv)
 ---
-- error: 'builtin/crypto.lua:286: Can''t finalize cipher:error:06065064:digital envelope
+- error: 'builtin/crypto.lua:281: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
 ...
 ciph.decrypt(enc, pass, bad_iv)
 ---
-- error: 'builtin/crypto.lua:286: Can''t finalize cipher:error:06065064:digital envelope
+- error: 'builtin/crypto.lua:281: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
 ...
