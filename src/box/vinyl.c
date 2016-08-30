@@ -2835,12 +2835,6 @@ vy_run_new()
 }
 
 static inline void
-vy_run_set(struct vy_run *run, struct vy_run_index *i)
-{
-	run->index = *i;
-}
-
-static inline void
 vy_run_delete(struct vy_run *run)
 {
 	vy_run_index_destroy(&run->index);
