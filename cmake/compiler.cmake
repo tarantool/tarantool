@@ -98,6 +98,7 @@ check_c_compiler_flag("-Wno-parentheses-equality" CC_HAS_WNO_PARENTHESES_EQUALIT
 check_c_compiler_flag("-Wno-undefined-inline" CC_HAS_WNO_UNDEFINED_INLINE)
 check_c_compiler_flag("-Wno-dangling-else" CC_HAS_WNO_DANGLING_ELSE)
 check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
+check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
 
 #
 # Perform build type specific configuration.
