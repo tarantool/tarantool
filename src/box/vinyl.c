@@ -1049,43 +1049,6 @@ static struct vy_filterif vy_filterif_zstd =
 #define vy_error(fmt, ...) \
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
-struct vy_status {
-	enum vinyl_status status;
-	pthread_mutex_t lock;
-};
-
-static inline void
-vy_status_init(struct vy_status *s)
-{
-	s->status = VINYL_OFFLINE;
-	tt_pthread_mutex_init(&s->lock, NULL);
-}
-
-static inline void
-vy_status_free(struct vy_status *s)
-{
-	tt_pthread_mutex_destroy(&s->lock);
-}
-
-static inline enum vinyl_status
-vy_status_set(struct vy_status *s, enum vinyl_status status)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	enum vinyl_status old = s->status;
-	s->status = status;
-	tt_pthread_mutex_unlock(&s->lock);
-	return old;
-}
-
-static inline enum vinyl_status
-vy_status(struct vy_status *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	enum vinyl_status status = s->status;
-	tt_pthread_mutex_unlock(&s->lock);
-	return status;
-}
-
 static inline bool
 vy_status_is_active(enum vinyl_status status)
 {
@@ -1101,11 +1064,6 @@ vy_status_is_active(enum vinyl_status status)
 	}
 	unreachable();
 	return 0;
-}
-
-static inline bool
-vy_status_online(struct vy_status *s) {
-	return vy_status(s) == VINYL_ONLINE;
 }
 
 struct vy_stat {
@@ -2165,7 +2123,6 @@ struct vy_index {
 	 */
 	read_set_t read_set;
 	vy_range_tree_t tree;
-	struct vy_status status;
 	pthread_rwlock_t lock;
 	int range_count;
 	uint64_t update_time;
@@ -4925,7 +4882,7 @@ vy_index_create(struct vy_index *index)
 	si_insert(index, n);
 	vy_planner_update(&index->p, n);
 	index->size = vy_range_size(n);
-	return 1;
+	return 0;
 }
 
 static int64_t
@@ -5493,23 +5450,14 @@ static inline int
 vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 			   struct vy_index *index, struct vy_task **ptask)
 {
-	int status = vy_status(&index->status);
-	switch (status) {
-	case VINYL_DROP:
-		if (index->refs > 0) {
-			*ptask = NULL;
-			return 0; /* index still has tasks */
-		}
-		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_DROP);
-		if (task == NULL)
-			return -1;
-		*ptask = task;
-		return 0; /* new task */
-	default:
-		unreachable();
-		return -1;
+	if (index->refs > 0) {
+		*ptask = NULL;
+		return 0; /* index still has tasks */
 	}
+	*ptask = vy_task_new(&scheduler->task_pool, index, VY_TASK_DROP);
+	if (*ptask == NULL)
+		return -1;
+	return 0; /* new task */
 }
 
 static inline int
@@ -5599,7 +5547,7 @@ static int
 vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	    struct vy_task **ptask)
 {
-	/* pending shutdowns */
+	/* Schedule all pending shutdowns. */
 	struct vy_index *index, *n;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
 		*ptask = NULL;
@@ -5610,7 +5558,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 			return rc;
 		if (*ptask == NULL)
 			continue;
-		/* delete from scheduler->shutdown list */
+		/* Remove from scheduler->shutdown list */
 		rlist_del(&index->link);
 		return 0;
 	}
@@ -6681,19 +6629,8 @@ vy_index_open_or_create(struct vy_index *index)
 int
 vy_index_open(struct vy_index *index)
 {
-	struct vy_env *e = index->env;
-	int status = vy_status(&index->status);
-	if (status != VINYL_OFFLINE)
-		return -1;
-	int rc;
-	rc = vy_index_open_or_create(index);
-	if (unlikely(rc == -1)) {
-		vy_status_set(&index->status, VINYL_MALFUNCTION);
-		return -1;
-	}
-	vy_status_set(&index->status, VINYL_ONLINE);
-	rc = vy_scheduler_add_index(e->scheduler, index);
-	if (unlikely(rc == -1))
+	if (vy_index_open_or_create(index) ||
+	    vy_scheduler_add_index(index->env->scheduler, index))
 		return -1;
 	return 0;
 }
@@ -6722,14 +6659,9 @@ vy_index_drop(struct vy_index *index)
 {
 	/* TODO:
 	 * don't drop/recreate index in local wal recovery mode if all
-	 * operations alreadey done
+	 * operations are already done.
 	 */
 	struct vy_env *e = index->env;
-	int status = vy_status(&index->status);
-	if (unlikely(! vy_status_is_active(status)))
-		return -1;
-	/* set last visible transaction id */
-	vy_status_set(&index->status, VINYL_DROP);
 	rlist_del(&index->link);
 	/* schedule index shutdown or drop */
 	vy_scheduler_del_index(e->scheduler, index);
@@ -6743,11 +6675,6 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 {
 	struct vy_env *e = index->env;
 	uint64_t start  = clock_monotonic64();
-
-	if (! vy_status_online(&index->status)) {
-		vy_error("%s", "index is not online");
-		return -1;
-	}
 
 	/* concurrent */
 	if (tx != NULL && order == VINYL_EQ) {
@@ -6828,9 +6755,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 	memset(index, 0, sizeof(*index));
 	index->env = e;
-	vy_status_init(&index->status);
-	int rc = vy_planner_create(&index->p);
-	if (unlikely(rc == -1))
+	if (vy_planner_create(&index->p))
 		goto error_1;
 	index->checkpoint_in_progress = false;
 	index->gc_in_progress = false;
@@ -6879,7 +6804,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->range_count = 0;
 	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs = 0; /* referenced by scheduler */
-	vy_status_set(&index->status, VINYL_OFFLINE);
 	read_set_new(&index->read_set);
 	rlist_add(&e->indexes, &index->link);
 
@@ -6907,7 +6831,6 @@ vy_index_delete(struct vy_index *index)
 	vy_planner_destroy(&index->p);
 	tt_pthread_rwlock_destroy(&index->lock);
 	tt_pthread_mutex_destroy(&index->ref_lock);
-	vy_status_free(&index->status);
 	free(index->name);
 	free(index->path);
 	free(index->key_map);
