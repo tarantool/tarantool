@@ -486,13 +486,6 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
-	/* A hack for cc/ld, see ffisyms.c */
-	if (time(NULL) == 0) {
-		/* never executed */
-		extern void *ffi_symbols[];
-		ssize_t res = write(0, ffi_symbols, 0);
-		(void) res;
-	}
 	if (script)
 		free(script);
 	/* tarantool_lua_free() was formerly reponsible for terminal reset,

@@ -193,20 +193,55 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
+# Exports syntax is toolchain-dependent, preprocessing is necessary
+add_custom_target(preprocess_exports DEPENDS ${CMAKE_BINARY_DIR}/exports2)
+add_custom_command(
+    OUTPUT  ${CMAKE_BINARY_DIR}/exports2
+    DEPENDS ${CMAKE_SOURCE_DIR}/exports
+    COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
+            ${CMAKE_SOURCE_DIR}/exports
+            ${CMAKE_BINARY_DIR}/exports2 ${CMAKE_SYSTEM_NAME})
+
 add_executable(
-	tarantool main.cc ffisyms.cc title.c
+	tarantool main.cc title.c
 	${LIBUTIL_FREEBSD_SRC}/flopen.c
 	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
-add_dependencies(tarantool build_bundled_libs)
-target_link_libraries(tarantool box ${common_libraries} ${OPENSSL_LIBRARIES})
 
+add_dependencies(tarantool build_bundled_libs preprocess_exports)
+
+# Re-link if exports changed
+set_target_properties(tarantool PROPERTIES
+                      LINK_DEPENDS ${CMAKE_BINARY_DIR}/exports2)
+
+# A note about linkers:
+# [GNU linker] When linking an *executable* visibility is ignored, and
+#              either nothing is exported (default), or any non-static
+#              symbol is exported (-rdynamic), or explicitly listed
+#              symbols are exported (--dynamic-list).
+#
+#              However, if a symbol listed lives in a static library it
+#              won't be automatically pulled, hence --whole-archive
+#              option.
+#
+# [Apple linker] One can provide an explicit export list; pulls symbols
+#                from static libraries.
+#
 if (TARGET_OS_DARWIN)
+    target_link_libraries(tarantool box ${common_libraries} ${OPENSSL_LIBRARIES})
     # Necessary to make LuaJIT work on Darwin, see
     # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
-elseif (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
-    # Helps symbol resolution of plug-ins
-    set_target_properties(tarantool PROPERTIES LINK_FLAGS "-rdynamic")
+        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000 \
+        -Wl,-exported_symbols_list,${CMAKE_BINARY_DIR}/exports2")
+else ()
+    target_link_libraries(tarantool
+                          -Wl,--whole-archive box ${common_libraries}
+                          salad -Wl,--no-whole-archive
+                          ${OPENSSL_LIBRARIES})
+    set_target_properties(tarantool PROPERTIES LINK_FLAGS
+    "-Wl,--gc-sections -Wl,--dynamic-list,${CMAKE_BINARY_DIR}/exports2")
+    # get rid of -rdynamic
+    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
+
 install (TARGETS tarantool DESTINATION bin)
