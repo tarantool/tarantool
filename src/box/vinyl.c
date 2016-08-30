@@ -3167,6 +3167,7 @@ vy_range_index_priority(struct vy_range *node, struct vy_mem **second)
 static inline int
 vy_range_cmp(struct vy_range *n, void *key, struct key_def *key_def)
 {
+	assert(n->run != NULL);
 	struct vy_page_info *min = vy_run_index_first_page(&n->run->index);
 	struct vy_page_info *max = vy_run_index_last_page(&n->run->index);
 	int l = vy_tuple_compare(vy_run_index_min_key(&n->run->index, min),
@@ -3189,6 +3190,7 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 {
 	if (n1 == n2)
 		return 0;
+	assert(n1->run != NULL && n2->run != NULL);
 	struct vy_page_info *min1 = vy_run_index_first_page(&n1->run->index);
 	struct vy_page_info *min2 = vy_run_index_first_page(&n2->run->index);
 	return vy_tuple_compare(vy_run_index_min_key(&n1->run->index, min1),
@@ -3343,9 +3345,9 @@ vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
 	struct vy_range_tree_key tree_key;
 	tree_key.data = itr->key;
 	tree_key.size = itr->key_size;
-	itr->cur_range = vy_range_tree_search(&index->tree, &tree_key);
+	itr->cur_range = vy_range_tree_psearch(&index->tree, &tree_key);
 	if (itr->cur_range == NULL)
-		itr->cur_range = vy_range_tree_psearch(&index->tree, &tree_key);
+		itr->cur_range = vy_range_tree_first(&index->tree);
 	assert(itr->cur_range != NULL);
 }
 
@@ -3936,25 +3938,14 @@ static int vy_task_drop(struct vy_index *index)
 }
 
 static int
-si_redistribute(struct vy_index *index, struct sdc *c,
-		struct vy_range *node, struct vy_buf *result)
+si_redistribute(struct vy_index *index, struct vy_range *node,
+		struct vy_buf *result)
 {
 	(void)index;
 	struct vy_mem *mem = vy_range_index(node);
 	struct vy_iter ii;
 	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
-	while (ii.vif->has(&ii))
-	{
-		struct vy_tuple *v = ii.vif->get(&ii);
-		int rc = vy_buf_add(&c->b, v, sizeof(struct vy_tuple * **));
-		if (unlikely(rc == -1))
-			return -1;
-		ii.vif->next(&ii);
-	}
-	if (unlikely(vy_buf_used(&c->b) == 0))
-		return 0;
-	struct vy_bufiter i, j;
-	vy_bufiter_open(&i, &c->b, sizeof(struct vy_tuple **));
+	struct vy_bufiter j;
 	vy_bufiter_open(&j, result, sizeof(struct vy_range*));
 	struct vy_range *prev = vy_bufiterref_get(&j);
 	vy_bufiter_next(&j);
@@ -3963,31 +3954,31 @@ si_redistribute(struct vy_index *index, struct sdc *c,
 		struct vy_range *p = vy_bufiterref_get(&j);
 		if (p == NULL) {
 			assert(prev != NULL);
-			while (vy_bufiter_has(&i)) {
-				struct vy_tuple **v = vy_bufiterref_get(&i);
-				vy_mem_set(&prev->i0, *v);
-				vy_bufiter_next(&i);
+			while (ii.vif->has(&ii)) {
+				struct vy_tuple *v = ii.vif->get(&ii);
+				vy_mem_set(&prev->i0, v);
+				ii.vif->next(&ii);
 			}
 			break;
 		}
-		while (vy_bufiter_has(&i))
+		while (ii.vif->has(&ii))
 		{
-			struct vy_tuple **v = vy_bufiterref_get(&i);
+			struct vy_tuple *v = ii.vif->get(&ii);
 			struct vy_page_info *page = vy_run_index_first_page(&p->run->index);
-			int rc = vy_tuple_compare((*v)->data,
+			int rc = vy_tuple_compare(v->data,
 				vy_run_index_min_key(&p->run->index, page),
 				index->key_def);
 			if (unlikely(rc >= 0))
 				break;
-			vy_mem_set(&prev->i0, *v);
-			vy_bufiter_next(&i);
+			vy_mem_set(&prev->i0, v);
+			ii.vif->next(&ii);
 		}
-		if (unlikely(! vy_bufiter_has(&i)))
+		if (unlikely(! ii.vif->has(&ii)))
 			break;
 		prev = p;
 		vy_bufiter_next(&j);
 	}
-	assert(vy_bufiterref_get(&i) == NULL);
+	assert(ii.vif->get(&ii) == NULL);
 	return 0;
 }
 
@@ -4177,7 +4168,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		vy_planner_update(&index->p, n);
 		break;
 	default: /* split */
-		rc = si_redistribute(index, c, range, result);
+		rc = si_redistribute(index, range, result);
 		if (unlikely(rc == -1)) {
 			vy_index_unlock(index);
 			si_splitfree(result);
@@ -6325,7 +6316,7 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 		vy_profiler_(&o->rtp);
 		vy_profiler_end(&o->rtp);
 		struct vy_info_node *local_node = vy_info_append(node, o->name);
-		if (vy_info_reserve(info, local_node, 17) != 0)
+		if (vy_info_reserve(info, local_node, 19) != 0)
 			return 1;
 		vy_info_append_u64(local_node, "size", o->rtp.total_range_size);
 		vy_info_append_u64(local_node, "count", o->rtp.count);
@@ -6343,6 +6334,9 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 		vy_info_append_u32(local_node, "temperature_max", o->rtp.temperature_max);
 		vy_info_append_str(local_node, "run_histogram", o->rtp.histogram_run_ptr);
 		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(local_node, "range_size", o->key_def->opts.range_size);
+		vy_info_append_u64(local_node, "page_size", o->key_def->opts.range_size);
 	}
 	return 0;
 }
