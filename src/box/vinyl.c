@@ -2054,7 +2054,6 @@ struct PACKED vy_range {
 	rb_node(struct vy_range) tree_node;
 	struct ssrqnode   nodecompact;
 	struct ssrqnode   nodedump;
-	struct rlist     gc;
 	struct rlist     commit;
 };
 
@@ -2145,7 +2144,6 @@ struct vy_index {
 	struct rlist link;
 
 	/* {{{ Scheduler members */
-	struct rlist gc;
 	struct vy_planner p;
 	bool checkpoint_in_progress;
 	bool age_in_progress;
@@ -3884,11 +3882,6 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 
 static int vy_task_drop(struct vy_index *index)
 {
-	struct vy_range *node, *n;
-	rlist_foreach_entry_safe(node, &index->gc, gc, n) {
-		if (vy_range_delete(node, 1) != 0)
-			return -1;
-	}
 	/* free memory */
 	vy_index_delete(index);
 	return 0;
@@ -4224,7 +4217,6 @@ vy_range_new(struct key_def *key_def)
 	vy_mem_create(&n->i1, key_def);
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodedump);
-	rlist_create(&n->gc);
 	rlist_create(&n->commit);
 	return n;
 }
@@ -5460,39 +5452,12 @@ vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 	return 0; /* new task */
 }
 
-static inline int
-vy_scheduler_peek_nodegc(struct vy_scheduler *scheduler,
-			 struct vy_index *index, struct vy_task **ptask)
-{
-	if (rlist_empty(&index->gc)) {
-		*ptask = NULL;
-		return 0; /* nothing to do */
-	}
-
-	struct vy_range *n = rlist_first_entry(&index->gc, struct vy_range, gc);
-	struct vy_task *task= vy_task_new(&scheduler->task_pool, index,
-					  VY_TASK_NODEGC);
-	if (task == NULL)
-		return -1;
-	rlist_del(&n->gc);
-	task->node = n;
-	*ptask = task;
-	return 0; /* new task */
-}
-
 static int
 vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 		  int64_t vlsn, struct vy_index *index, struct vy_task **ptask)
 {
 	int rc;
 	*ptask = NULL;
-
-	/* node gc */
-	rc = vy_scheduler_peek_nodegc(scheduler, index, ptask);
-	if (rc != 0)
-		return rc; /* error */
-	if (*ptask != NULL)
-		return 0; /* found */
 
 	/* checkpoint */
 	if (scheduler->checkpoint_in_progress) {
@@ -6796,7 +6761,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	vy_range_tree_new(&index->tree);
 	tt_pthread_rwlock_init(&index->lock, NULL);
 	rlist_create(&index->link);
-	rlist_create(&index->gc);
 	index->update_time = 0;
 	index->size = 0;
 	index->read_disk = 0;
@@ -6826,7 +6790,6 @@ static inline void
 vy_index_delete(struct vy_index *index)
 {
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
-	rlist_create(&index->gc);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
 	vy_planner_destroy(&index->p);
 	tt_pthread_rwlock_destroy(&index->lock);
