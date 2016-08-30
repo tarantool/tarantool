@@ -243,8 +243,8 @@ else ()
                           -Wl,--whole-archive box ${reexport_libraries}
                           salad -Wl,--no-whole-archive
                           ${common_libraries})
-    set_target_properties(tarantool PROPERTIES LINK_FLAGS
-    "-Wl,--gc-sections -Wl,--dynamic-list,${exports_file}")
+    set_target_properties(tarantool PROPERTIES
+        LINK_FLAGS "-Wl,--dynamic-list,${exports_file}")
     # get rid of -rdynamic
     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
