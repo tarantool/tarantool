@@ -2150,11 +2150,13 @@ struct vy_index {
 	bool gc_in_progress;
 	/* Scheduler members }}} */
 
-	/*
-	 * Lsn with index was created. For newly created
-	 * (not checkpointed) index this should be a minimal
-	 * lsn of stored on disk record.
-	 * For checkpointed index this should be a lsn a checkpoint
+	/**
+	 * LSN from the time when the first index impression on
+	 * disk was created. For a newly created (not
+	 * checkpointed) index this should be the min LSN over
+	 * records from this index stored on disk.  For
+	 * checkpointed index this should be LSN of
+	 * the checkpoint.
 	 */
 	int64_t first_dump_lsn;
 	/*
@@ -2163,7 +2165,7 @@ struct vy_index {
 	 * For new ranges, use this id as a sequence.
 	 */
 	int64_t range_id_max;
-	/* Last range stamp that was dumped to disk */
+	/* The newest range id that was dumped to disk. */
 	int64_t last_dump_range_id;
 };
 
@@ -6374,6 +6376,10 @@ vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 			 "strdup", "char *");
 		return -1;
 	}
+	if (key_def->opts.range_size == 0)
+		key_def->opts.range_size = cfg_geti("vinyl.range_size");
+	if (key_def->opts.page_size == 0)
+		key_def->opts.page_size = cfg_geti("vinyl.page_size");
 	return 0;
 }
 

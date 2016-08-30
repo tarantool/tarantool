@@ -16,6 +16,8 @@ box.cfg {
     vinyl = {
         threads = 3;
         memory_limit = 0.5;
+        range_size = 1024*64;
+        page_size = 1024;
     }
 }
 

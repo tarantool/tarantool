@@ -63,6 +63,10 @@ cfg_filter(box.cfg)
         - 2
       - - memory_limit
         - 1
+      - - page_size
+        - 131072
+      - - range_size
+        - 67108864
       - - run_age
         - 0
       - - run_age_period

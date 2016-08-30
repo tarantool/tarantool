@@ -7,7 +7,9 @@ os.execute("mkdir -p vinyl_test")
 
 local vinyl = {
     memory_limit = 0.1,
-	threads = 5
+	threads = 5,
+    range_size=1024*1024,
+    page_size=4*1024,
 }
 
 box.cfg {

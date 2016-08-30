@@ -1,11 +1,17 @@
 #!/usr/bin/env tarantool
 os = require('os')
 
+local vinyl = {
+    range_size=1024*64,
+    page_size=1024,
+}
+
 box.cfg{
     listen              = os.getenv("LISTEN"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
-    rows_per_wal        = 50
+    rows_per_wal        = 50,
+    vinyl               = vinyl,
 }
 
 require('console').listen(os.getenv('ADMIN'))

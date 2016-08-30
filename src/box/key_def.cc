@@ -104,8 +104,8 @@ const struct key_opts key_opts_default = {
 	/* .path                = */ { 0 },
 	/* .compression         = */ { 0 },
 	/* .compression_key     = */ 0,
-	/* .range_size           = */ 67108864,
-	/* .page_size           = */ 131072,
+	/* .range_size           = */ 0,
+	/* .page_size           = */ 0,
 	/* .sync                = */ 2,
 };
 

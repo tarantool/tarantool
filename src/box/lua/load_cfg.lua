@@ -13,6 +13,8 @@ local default_vinyl_cfg = {
     run_age           = 0,
     run_age_period    = 0,
     run_age_wm        = 0,
+    range_size        = 64 * 1024 * 1024,
+    page_size        = 128 * 1024,
 }
 
 -- all available options
@@ -61,6 +63,8 @@ local vinyl_template_cfg = {
     run_age           = 'number',
     run_age_period    = 'number',
     run_age_wm        = 'number',
+    range_size        = 'number',
+    page_size        = 'number',
 }
 
 -- types of available options

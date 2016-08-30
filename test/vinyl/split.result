@@ -47,7 +47,7 @@ while vyinfo().range_count < 2 do fiber.sleep(0.1) end
 ...
 vyinfo().range_count
 ---
-- 3
+- 4
 ...
 for i=1,100 do box.space.vinyl:replace({i}) end
 ---
