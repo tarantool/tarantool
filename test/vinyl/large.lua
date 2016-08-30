@@ -17,14 +17,22 @@ local function large_test(iter_limit, time_limit)
         local space = box.space.large_s1
         space:replace({i, data})
         i = i + 1
+        if i % 100 == 0 then
+            collectgarbage('collect')
+        end
     end
 end
 
 local function check_test()
+    local i = 0
     for _, tuple in box.space.large_s1:pairs() do
         if 2 * 1024 * 1024 ~= tuple[2]:len() then
             error('Large tuple has incorect length')
         end
+        if i % 100 == 0 then
+            collectgarbage('collect')
+        end
+        i = i + 1
     end
 end
 
