@@ -156,14 +156,18 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 target_link_libraries(server core bit)
 
-set (common_libraries server core misc bitset csv ${MSGPUCK_LIBRARIES})
+# Rule of thumb: if exporting a symbol from a static library, list the
+# library here.
+set (reexport_libraries server core misc bitset csv
+     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES})
 
-list(APPEND common_libraries
+set (common_libraries
+    ${reexport_libraries}
     ${LIBEIO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${LUAJIT_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
@@ -227,7 +231,7 @@ set_target_properties(tarantool PROPERTIES
 #                from static libraries.
 #
 if (TARGET_OS_DARWIN)
-    target_link_libraries(tarantool box ${common_libraries} ${OPENSSL_LIBRARIES})
+    target_link_libraries(tarantool box ${common_libraries})
     # Necessary to make LuaJIT work on Darwin, see
     # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
@@ -235,9 +239,9 @@ if (TARGET_OS_DARWIN)
         -Wl,-exported_symbols_list,${CMAKE_BINARY_DIR}/exports2")
 else ()
     target_link_libraries(tarantool
-                          -Wl,--whole-archive box ${common_libraries}
+                          -Wl,--whole-archive box ${reexport_libraries}
                           salad -Wl,--no-whole-archive
-                          ${OPENSSL_LIBRARIES})
+                          ${common_libraries})
     set_target_properties(tarantool PROPERTIES LINK_FLAGS
     "-Wl,--gc-sections -Wl,--dynamic-list,${CMAKE_BINARY_DIR}/exports2")
     # get rid of -rdynamic
