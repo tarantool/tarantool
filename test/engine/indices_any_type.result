@@ -734,7 +734,9 @@ function less(a, b)
         return type(a[2]) < type(b[2])
     end
     if type(a[2]) == 'boolean' then
-        return a[2] == false and b[2] == true
+        if a[2] == false and b[2] == true then
+            return true
+        end
     end
     if a[2] == b[2] then
         return a[1] < b[1]
