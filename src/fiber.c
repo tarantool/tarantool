@@ -166,16 +166,13 @@ fiber_wakeup(struct fiber *f)
 
 /** Cancel the subject fiber.
 *
- * Note: this is not guaranteed to return immediately, since
- * requires a level of cooperation on behalf of the fiber. A fiber
- * may opt to set FIBER_IS_CANCELLABLE to false, and never test that
- * it was cancelled. Such fiber can not ever be cancelled, and
- * for such fiber this call will lead to an infinite wait.
- * However, as long as most of the cooperative code calls fiber_testcancel(),
- * most of the fibers are cancellable.
+ * Note: cancelation is asynchronous. Use fiber_join() to wait for the
+ * cancelation to complete.
  *
- * Currently cancellation can only be synchronous: this call
- * returns only when the subject fiber has terminated.
+ * A fiber may opt to set FIBER_IS_CANCELLABLE to false, and never test
+ * that it was cancelled.  Such fiber can not ever be cancelled.
+ * However, as long as most of the cooperative code calls
+ * fiber_testcancel(), most of the fibers are cancellable.
  *
  * The fiber which is cancelled, has FiberIsCancelled raised
  * in it. For cancellation to work, this exception type should be
@@ -190,14 +187,11 @@ fiber_cancel(struct fiber *f)
 	f->flags |= FIBER_IS_CANCELLED;
 
 	/**
-	 * Don't wait for self and for fibers which are already
-	 * dead.
+	 * Don't wake self and zombies.
 	 */
 	if (f != self && !fiber_is_dead(f)) {
-		rlist_add_tail_entry(&f->wake, self, state);
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
-		fiber_yield();
 	}
 }
 
