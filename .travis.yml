@@ -12,6 +12,9 @@ compiler:
   - gcc
 
 env:
+    global:
+      - ENCRYPTION_LABEL="8f886150b5ec"
+      - SFTP_UPLOAD_SOURCE="True"
     matrix:
       - OS=el DIST=6 PACK=rpm
       - OS=el DIST=7 PACK=rpm
@@ -27,9 +30,11 @@ env:
       - OS=debian DIST=stretch PACK=deb
       - OS=debian DIST=sid PACK=deb
       - PACK=none
+      - Pack=source
 
 matrix:
     allow_failures:
+      - env: PACK=source
       - env: OS=el DIST=6 PACK=rpm
       - env: OS=el DIST=7 PACK=rpm
       - env: OS=fedora DIST=23 PACK=rpm
@@ -70,6 +75,8 @@ matrix:
       - env: OS=debian DIST=stretch PACK=deb
         compiler: clang
       - env: OS=debian DIST=sid PACK=deb
+        compiler: clang
+      - env: PACK=source
         compiler: clang
       - env: OS=el DIST=6 PACK=rpm
         os: osx
