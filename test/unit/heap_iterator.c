@@ -29,16 +29,15 @@ int test_type_less(const heap_t *heap,
 	return left->val1 < right->val1;
 }
 
-#define HEAP_NAME test_
+#define HEAP_NAME test_heap
 #define HEAP_LESS(h, a, b) test_type_less(h, a, b)
 
 #include "salad/heap.h"
 
-
 void free_all_nodes(heap_t *p_heap)
 {
 	struct test_type *root_value;
-	for (heap_offset_t i = 0; i < p_heap->size; ++i) {
+	for (heap_off_t i = 0; i < p_heap->size; ++i) {
 		root_value = (struct test_type *) ((char *)p_heap->harr[i] -
 				offsetof(struct test_type, node));
 		free(root_value);
@@ -51,7 +50,7 @@ test_iterator_create()
 	header();
 	struct test_type *value, *root_value;
 	heap_t heap;
-	test_heap_init(&heap);
+	test_heap_create(&heap);
 
 	value = (struct test_type *)malloc(sizeof(struct test_type));
 	value->val1 = 0;
@@ -74,7 +73,7 @@ test_iterator_empty()
 	header();
 	struct heap_node *nd;
 	heap_t heap;
-	test_heap_init(&heap);
+	test_heap_create(&heap);
 
 	struct heap_iterator it;
 	test_heap_iterator_init(&heap, &it);
@@ -97,7 +96,7 @@ test_iterator_small()
 	struct test_type *value, *root_value;
 	struct heap_node *test_node;
 	heap_t heap;
-	test_heap_init(&heap);
+	test_heap_create(&heap);
 
 	for (uint32_t i = 4; i > 0; --i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
@@ -153,7 +152,7 @@ test_iterator_large()
 	struct test_type *value, *root_value;
 	struct heap_node *test_node;
 	heap_t heap;
-	test_heap_init(&heap);
+	test_heap_create(&heap);
 
 	for (uint32_t i = TEST_CASE_SIZE; i > 0; --i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));

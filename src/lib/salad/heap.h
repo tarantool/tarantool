@@ -47,7 +47,7 @@
  * Example:
  * #define HEAP_NAME test_
  * ...
- * test_heap_init(&some_heap);
+ * test_heap_create(&some_heap);
  * test_heap_destroy(&some_heap);
  */
 
@@ -97,35 +97,38 @@
 /**
  * Tools for name substitution:
  */
-#ifndef CONCAT4
-#define CONCAT4_R(a, b, c, d) a##b##c##d
-#define CONCAT4(a, b, c, d) CONCAT4_R(a, b, c, d)
+#ifndef CONCAT3
+#define CONCAT3_R(a, b, c) a##b##c
+#define CONCAT3(a, b, c) CONCAT3_R(a, b, c)
 #endif
 
 #ifdef _
 #error '_' must be undefinded!
 #endif
 #ifndef HEAP
-#define HEAP(name) CONCAT4(HEAP_NAME, heap, _, name)
+#define HEAP(name) CONCAT3(HEAP_NAME, _, name)
 #endif
 
 #endif /* HEAP_FORWARD_DECLARATION */
 
 /* Structures. */
 
-#ifndef HEAP_STRUCTURES /* Incude guard for structures */
+#ifndef HEAP_STRUCTURES /* Include guard for structures */
 
 #define HEAP_STRUCTURES
 
-enum {HEAP_INITIAL_CAPACITY = 8};
-typedef uint32_t heap_offset_t;
+enum {
+	HEAP_INITIAL_CAPACITY = 8
+};
+
+typedef uint32_t heap_off_t;
 
 /**
  * Main structure for holding heap.
  */
 struct heap_core_structure {
-	heap_offset_t size;
-	heap_offset_t capacity;
+	heap_off_t size;
+	heap_off_t capacity;
 	struct heap_node **harr; /* array of heap node pointers */
 };
 
@@ -135,7 +138,7 @@ typedef struct heap_core_structure heap_t;
  * Heap entry structure.
  */
 struct heap_node {
-	heap_offset_t pos;
+	heap_off_t pos;
 };
 
 /**
@@ -143,7 +146,7 @@ struct heap_node {
  */
 struct heap_iterator {
 	heap_t *heap;
-	heap_offset_t curr_pos;
+	heap_off_t curr_pos;
 };
 
 #endif /* HEAP_STRUCTURES */
@@ -153,10 +156,10 @@ struct heap_iterator {
 /* Extern API that is the most usefull part. */
 
 /**
- * Init heap.
+ * Initialize the heap.
  */
 static inline void
-HEAP(init)(heap_t *heap);
+HEAP(create)(heap_t *heap);
 
 /**
  * Destroy current heap.
@@ -174,7 +177,7 @@ HEAP(pop)(heap_t *heap);
 /**
  * Insert value.
  */
-static inline void
+static inline int
 HEAP(insert)(heap_t *heap, struct heap_node *nd);
 
 /**
@@ -207,7 +210,7 @@ HEAP(iterator_next) (struct heap_iterator *it);
  * Update backlink in the give heap_node structure.
  */
 static inline void
-HEAP(update_link)(heap_t *heap, heap_offset_t pos);
+HEAP(update_link)(heap_t *heap, heap_off_t pos);
 
 /**
  * Sift up current node.
@@ -227,21 +230,20 @@ HEAP(sift_down)(heap_t *heap, struct heap_node *node);
  * Check that heap inveriants is holded.
  */
 static int
-HEAP(check_invariants)(heap_t *heap);
+HEAP(check)(heap_t *heap);
 
 
-/* Function definitions */
+/* Function definitions. */
 
 /**
  * Init heap.
  */
 static inline void
-HEAP(init)(heap_t *heap)
+HEAP(create)(heap_t *heap)
 {
 	heap->size = 0;
-	heap->capacity = HEAP_INITIAL_CAPACITY;
-	heap->harr = (struct heap_node **)
-		malloc(sizeof(struct heap_node *) * HEAP_INITIAL_CAPACITY);
+	heap->capacity = 0;
+	heap->harr = NULL;
 }
 
 /**
@@ -250,7 +252,6 @@ HEAP(init)(heap_t *heap)
 static inline void
 HEAP(destroy)(heap_t *heap)
 {
-	heap->size = 0;
 	free(heap->harr);
 }
 
@@ -258,7 +259,7 @@ HEAP(destroy)(heap_t *heap)
  * Update backlink in the give heap_node structure.
  */
 static inline void
-HEAP(update_link)(heap_t *heap, heap_offset_t pos)
+HEAP(update_link)(heap_t *heap, heap_off_t pos)
 {
 	heap->harr[pos]->pos = pos;
 }
@@ -269,7 +270,7 @@ HEAP(update_link)(heap_t *heap, heap_offset_t pos)
 static void
 HEAP(sift_up)(heap_t *heap, struct heap_node *node)
 {
-	heap_offset_t curr_pos = node->pos, parent = (curr_pos - 1) / 2;
+	heap_off_t curr_pos = node->pos, parent = (curr_pos - 1) / 2;
 
 	while (curr_pos > 0 && HEAP_LESS(heap, node, heap->harr[parent])) {
 
@@ -291,8 +292,8 @@ HEAP(sift_up)(heap_t *heap, struct heap_node *node)
 void
 HEAP(sift_down)(heap_t *heap, struct heap_node *node)
 {
-	heap_offset_t curr_pos = node->pos, left, right;
-	heap_offset_t min_child;
+	heap_off_t curr_pos = node->pos, left, right;
+	heap_off_t min_child;
 
 	while (true) {
 		left = 2 * curr_pos + 1;
@@ -321,33 +322,38 @@ HEAP(sift_down)(heap_t *heap, struct heap_node *node)
 /**
  * Increase capacity.
  */
-static inline void
-HEAP(increase_capacity)(heap_t *heap)
+static inline int
+HEAP(reserve)(heap_t *heap)
 {
-	heap->capacity <<= 1;
-	struct heap_node **oharr = heap->harr;
-	heap->harr = (struct heap_node **)
-		malloc(sizeof(struct heap_node *) * heap->capacity);
-	for (heap_offset_t curr_pos = 0; curr_pos < heap->size; ++curr_pos)
-		heap->harr[curr_pos] = oharr[curr_pos];
-	free(oharr);
+	heap_off_t capacity = heap->capacity == 0 ? HEAP_INITIAL_CAPACITY :
+		heap->capacity << 1;
+	void *harr = realloc(heap->harr, sizeof(struct heap_node *) * capacity);
+	if (harr == NULL)
+		return -1;
+	heap->harr = harr;
+	heap->capacity = capacity;
+	return 0;
 }
 
 /**
  * Insert value.
  */
-static inline void
+static inline int
 HEAP(insert)(heap_t *heap, struct heap_node *node)
 {
 	(void) heap;
 	assert(heap);
 
-	if (heap->size + 1 > heap->capacity)
-		HEAP(increase_capacity)(heap);
+	if (heap->size + 1 > heap->capacity) {
+		if (HEAP(reserve)(heap))
+			return -1;
+	}
 
 	heap->harr[heap->size] = node;
 	HEAP(update_link)(heap, heap->size++);
 	HEAP(sift_up)(heap, node); /* heapify */
+
+	return 0;
 }
 
 /**
@@ -375,7 +381,7 @@ HEAP(delete)(heap_t *heap, struct heap_node *value_node)
 
 	heap->size--;
 
-	heap_offset_t curr_pos = value_node->pos;
+	heap_off_t curr_pos = value_node->pos;
 
 	if (curr_pos == heap->size)
 		return;
@@ -421,12 +427,13 @@ HEAP(iterator_next)(struct heap_iterator *it)
  * Check that heap inveriants is holded.
  */
 static int
-HEAP(check_invariants)(heap_t *heap)
+HEAP(check)(heap_t *heap)
 {
-	heap_offset_t left, right, min_child;
-	for (heap_offset_t curr_pos = 0;
+	heap_off_t left, right, min_child;
+	for (heap_off_t curr_pos = 0;
 	     2 * curr_pos + 1 < heap->size;
 	     ++curr_pos) {
+
 		left = 2 * curr_pos + 1;
 		right = 2 * curr_pos + 2;
 		min_child = left;
@@ -437,10 +444,10 @@ HEAP(check_invariants)(heap_t *heap)
 		if (HEAP_LESS(heap,
 			      heap->harr[min_child],
 			      heap->harr[curr_pos]))
-			return false;
+			return -1;
 	}
 
-	return true;
+	return 0;
 }
 
 #endif /* HEAP_FORWARD_DECLARATION */
