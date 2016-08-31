@@ -72,7 +72,7 @@ rb_gen(, serverset_, serverset_t, struct server, link,
 
 static struct mempool server_pool;
 static serverset_t serverset;
-static struct ipc_channel wait_for_id;
+static struct ipc_cond wait_for_id;
 
 void
 cluster_init(void)
@@ -80,14 +80,14 @@ cluster_init(void)
 	mempool_create(&server_pool, &cord()->slabc,
 		       sizeof(struct server));
 	serverset_new(&serverset);
-	ipc_channel_create(&wait_for_id, 0);
+	ipc_cond_create(&wait_for_id);
 }
 
 void
 cluster_free(void)
 {
 	mempool_destroy(&server_pool);
-	ipc_channel_destroy(&wait_for_id);
+	ipc_cond_destroy(&wait_for_id);
 }
 
 extern "C" struct vclock *
@@ -128,11 +128,8 @@ server_delete(struct server *server)
 void
 cluster_wait_for_id()
 {
-	void *msg;
-	while (recovery->server_id == 0) {
-		ipc_channel_get(&wait_for_id, &msg);
-		assert(msg == NULL);
-	}
+	while (recovery->server_id == 0)
+		ipc_cond_wait(&wait_for_id);
 }
 
 struct server *
@@ -168,8 +165,8 @@ server_set_id(struct server *server, uint32_t server_id)
 		 * Otherwise, read only is switched
 		 * off after recovery_finalize().
 		 */
-		if (wal && ipc_channel_has_readers(&wait_for_id))
-			ipc_channel_put(&wait_for_id, NULL);
+		if (wal)
+			ipc_cond_signal(&wait_for_id);
 	}
 }
 
