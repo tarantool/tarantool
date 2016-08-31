@@ -166,19 +166,6 @@ lbox_checkfiber(struct lua_State *L, int index)
 	return f;
 }
 
-static struct fiber *
-lbox_isfiber(struct lua_State *L, int narg)
-{
-	if (lua_getmetatable(L, narg) == 0)
-		return NULL;
-	luaL_getmetatable(L, fiberlib_name);
-	struct fiber *f = NULL;
-	if (lua_equal(L, -1, -2))
-		f = fiber_find(* (int *) lua_touserdata(L, narg));
-	lua_pop(L, 2);
-	return f;
-}
-
 static int
 lbox_fiber_id(struct lua_State *L)
 {
@@ -363,7 +350,7 @@ lbox_fiber_name(struct lua_State *L)
 {
 	struct fiber *f = fiber();
 	int name_index = 1;
-	if (lua_gettop(L) >= 1 && lbox_isfiber(L, 1)) {
+	if (lua_type(L, 1) == LUA_TUSERDATA) {
 		f = lbox_checkfiber(L, 1);
 		name_index = 2;
 	}
@@ -473,22 +460,6 @@ lbox_fiber_cancel(struct lua_State *L)
 	return 0;
 }
 
-/** Kill a fiber by id. */
-static int
-lbox_fiber_kill(struct lua_State *L)
-{
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "fiber.kill(): bad arguments");
-	int fid = lua_tointeger(L, -1);
-	struct fiber *f = fiber_find(fid);
-	if (f == NULL)
-		luaL_error(L, "fiber.kill(): fiber not found");
-	fiber_cancel(f);
-	/* Check if we're ourselves cancelled. */
-	luaL_testcancel(L);
-	return 0;
-}
-
 static int
 lbox_fiber_serialize(struct lua_State *L)
 {
@@ -560,7 +531,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"self", lbox_fiber_self},
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
-	{"kill", lbox_fiber_kill},
+	{"kill", lbox_fiber_cancel},
 	{"wakeup", lbox_fiber_wakeup},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},

@@ -884,6 +884,11 @@ test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 ---
 - 'ER_ILLEGAL_PARAMS: Illegal parameters, oh my'
 ...
+-- #1734 fiber.name irt dead fibers
+fiber.create(function()end):name()
+---
+- error: the fiber is dead
+...
 fiber = nil
 ---
 ...
