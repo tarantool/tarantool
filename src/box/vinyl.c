@@ -4943,7 +4943,7 @@ vy_index_open_ex(struct vy_index *index)
 			continue;
 		int64_t index_lsn;
 		int64_t range_id;
-		if (sscanf(dirent->d_name, "%"SCNx64".%"SCNx64,
+		if (sscanf(dirent->d_name, "%"SCNu64".%"SCNx64,
 			   &index_lsn, &range_id) != 2)
 			continue;
 		/*
@@ -4969,7 +4969,7 @@ vy_index_open_ex(struct vy_index *index)
 	}
 
 	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+	snprintf(path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
 		 index->path, first_dump_lsn, last_dump_range_id);
 	int fd = open(path, O_RDWR);
 	if (fd == -1) {
@@ -4998,9 +4998,6 @@ vy_index_open_ex(struct vy_index *index)
 		}
 	}
 
-	struct stat stat;
-	fstat(fd, &stat);
-
 	close(fd);
 	if (size != 0) {
 		vy_error("Corrupted index file %s", path);
@@ -5008,6 +5005,19 @@ vy_index_open_ex(struct vy_index *index)
 	}
 	index->first_dump_lsn = first_dump_lsn;
 	index->last_dump_range_id = last_dump_range_id;
+	if (!index->range_count) {
+		/*
+		 * Special case: index has no ranges
+		 * (merged out or empty index was checkpointed)
+		 */
+		/* create initial node */
+		struct vy_range *n = vy_range_new(index->key_def);
+		if (unlikely(n == NULL))
+			return -1;
+		si_insert(index, n);
+		vy_planner_update(&index->p, n);
+		index->size = vy_range_size(n);
+	}
 
 	return 0;
 }
@@ -5810,7 +5820,7 @@ vy_checkpoint(struct vy_env *env)
 void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
-	(void) vclock;
+	int64_t checkpoint_lsn = vclock_sum(vclock);
 	struct vy_scheduler *scheduler = env->scheduler;
 	for (;;) {
 		bool is_active = false;
@@ -5822,6 +5832,14 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			break;
 		/* TODO: use channel here */
 		fiber_sleep(.020);
+	}
+
+	for (int i = 0; i < scheduler->count; i++) {
+		struct vy_index *index = scheduler->indexes[i];
+		if (index->first_dump_lsn != checkpoint_lsn) {
+			vy_index_checkpoint_range_index(index,
+							checkpoint_lsn);
+		}
 	}
 
 	scheduler->checkpoint_in_progress = false;
@@ -5918,17 +5936,7 @@ vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 	for (int i = 0; i < scheduler->count; i++) {
 		struct vy_index *index;
 		index = scheduler->indexes[i];
-		if (index->first_dump_lsn == checkpoint_lsn) {
-			/*
-			 * Nothing changed, skip index
-			 */
-			continue;
-		}
-		if (index->first_dump_lsn &&
-		    vy_index_checkpoint_range_index(index, checkpoint_lsn)) {
-			panic("Can't commit index at %s", index->path);
-			return;
-		}
+		index->first_dump_lsn = checkpoint_lsn;
 		vy_index_gc(index);
 	}
 }
@@ -6438,7 +6446,7 @@ vy_index_dump_range_index(struct vy_index *index)
 	close(fd);
 
 	char new_path[PATH_MAX];
-	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+	snprintf(new_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
 		 index->path, index->first_dump_lsn,
 		 index->range_id_max);
 	if (link(path, new_path)) {
@@ -6461,21 +6469,29 @@ vy_index_dump_range_index(struct vy_index *index)
 static int
 vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn)
 {
-	vy_index_wrlock(index);
-	char old_path[PATH_MAX];
-	snprintf(old_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
-		 index->path, index->first_dump_lsn,
-		 index->last_dump_range_id);
 	char new_path[PATH_MAX];
-	snprintf(new_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".index",
+	snprintf(new_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
 		 index->path, lsn,
 		 index->last_dump_range_id);
+	if (!index->first_dump_lsn) {
+		/* index is empty, just create an empty file */
+		int fd = open(new_path, O_CREAT | O_RDWR | O_TRUNC,
+			      S_IRUSR | S_IWUSR | S_IWGRP);
+		if (fd < 0) {
+			vy_error("File %s create error: %s",
+				  new_path, strerror(errno));
+			return -1;
+		}
+		close(fd);
+		return 0;
+	}
+	char old_path[PATH_MAX];
+	snprintf(old_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
+		 index->path, index->first_dump_lsn,
+		 index->last_dump_range_id);
 	if (link(old_path, new_path)) {
-		vy_index_unlock(index);
 		return -1;
 	}
-	index->first_dump_lsn = lsn;
-	vy_index_unlock(index);
 	return 0;
 }
 
@@ -6506,7 +6522,7 @@ vy_index_exists(struct vy_index *index, int64_t lsn)
 	 * greater or equal than the passed LSN.
 	 */
 	char target_name[PATH_MAX];
-	snprintf(target_name, PATH_MAX, "%016"PRIx64, lsn);
+	snprintf(target_name, PATH_MAX, "%016"PRIu64, lsn);
 	struct dirent *dirent;
 	while ((dirent = readdir(dir))) {
 		if (strstr(dirent->d_name, ".index") &&
