@@ -5684,9 +5684,9 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	struct vy_task *task, *next;
 	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link)
 		vy_task_delete(&scheduler->task_pool, task);
+	stailq_create(&scheduler->input_queue);
 	pthread_cond_broadcast(&scheduler->worker_cond);
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	assert(stailq_empty(&scheduler->input_queue));
 
 	/* Join worker threads */
 	for (int i = 0; i < scheduler->worker_pool_size; i++)
@@ -5698,7 +5698,7 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	/* Delete all processed tasks */
 	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link)
 		vy_task_delete(&scheduler->task_pool, task);
-	assert(stailq_empty(&scheduler->output_queue));
+	stailq_create(&scheduler->output_queue);
 }
 
 /*
