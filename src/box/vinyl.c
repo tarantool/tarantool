@@ -1027,7 +1027,6 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 }
 
 struct srzone {
-	uint32_t enable;
 	char     name[4];
 	uint32_t compact_wm;
 	uint32_t dump_prio;
@@ -1035,10 +1034,6 @@ struct srzone {
 	uint32_t dump_age;
 	uint32_t dump_age_period;
 	uint64_t dump_age_period_us;
-	uint32_t gc_prio;
-	uint32_t gc_period;
-	uint64_t gc_period_us;
-	uint32_t gc_wm;
 };
 
 struct srzonemap {
@@ -1064,15 +1059,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 	percent = percent - percent % 10;
 	int p = percent / 10;
 	struct srzone *z = &m->zones[p];
-	if (!z->enable) {
-		while (p >= 0) {
-			z = &m->zones[p];
-			if (z->enable)
-				return z;
-			p--;
-		}
-		return NULL;
-	}
 	return z;
 }
 
@@ -2020,7 +2006,6 @@ struct vy_index {
 	struct vy_planner p;
 	bool checkpoint_in_progress;
 	bool age_in_progress;
-	bool gc_in_progress;
 	/* Scheduler members }}} */
 
 	/**
@@ -5056,8 +5041,6 @@ struct vy_scheduler {
 	bool checkpoint_in_progress;
 	bool age_in_progress;
 	uint64_t       age_time;
-	uint64_t       gc_time;
-	bool gc_in_progress;
 	int            rr;
 	int            count;
 	struct vy_index **indexes;
@@ -5129,8 +5112,6 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->checkpoint_in_progress = false;
 	scheduler->age_in_progress = false;
 	scheduler->age_time = now;
-	scheduler->gc_in_progress = false;
-	scheduler->gc_time = now;
 	scheduler->indexes = NULL;
 	scheduler->count = 0;
 	scheduler->rr = 0;
@@ -5334,23 +5315,6 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 }
 
 static inline int
-vy_scheduler_peek_gc(struct vy_scheduler *scheduler, struct vy_index *index,
-		     int64_t gc_lsn, uint32_t gc_percent,
-		     struct vy_task **ptask)
-{
-	/*
-	 * TODO: this should be completely refactored
-	 */
-	(void) scheduler;
-	(void) index;
-	(void) gc_lsn;
-	(void) gc_percent;
-	index->gc_in_progress = false;
-	*ptask = NULL;
-	return 0; /* nothing to do */
-}
-
-static inline int
 vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 			   struct vy_index *index, struct vy_task **ptask)
 {
@@ -5375,16 +5339,6 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	if (scheduler->checkpoint_in_progress) {
 		rc = vy_scheduler_peek_checkpoint(scheduler, index,
 			scheduler->checkpoint_lsn, ptask);
-		if (rc != 0)
-			return rc; /* error */
-		if (*ptask != NULL)
-			goto found;
-	}
-
-	/* garbage-collection */
-	if (scheduler->gc_in_progress) {
-		rc = vy_scheduler_peek_gc(scheduler, index, vlsn, zone->gc_wm,
-					  ptask);
 		if (rc != 0)
 			return rc; /* error */
 		if (*ptask != NULL)
@@ -5483,29 +5437,6 @@ vy_schedule_periodic(struct vy_scheduler *scheduler, struct srzone *zone)
 		scheduler->age_in_progress = true;
 		for (int i = 0; i < scheduler->count; i++) {
 			scheduler->indexes[i]->age_in_progress = true;
-		}
-	}
-
-	if (scheduler->gc_in_progress) {
-		/* Stop periodic GC */
-		bool gc_in_progress = false;
-		for (int i = 0; i < scheduler->count; i++) {
-			if (scheduler->indexes[i]->gc_in_progress) {
-				gc_in_progress = true;
-				break;
-			}
-		}
-		if (!gc_in_progress) {
-			scheduler->gc_in_progress = false;
-			scheduler->gc_time = now;
-		}
-	} else if (zone->gc_prio && zone->gc_period &&
-		   ((now - scheduler->gc_time) >= zone->gc_period_us) &&
-		   scheduler->count > 0) {
-		/* Start periodic GC */
-		scheduler->gc_in_progress = true;
-		for (int i = 0; i < scheduler->count; i++) {
-			scheduler->indexes[i]->gc_in_progress = true;
 		}
 	}
 }
@@ -5865,32 +5796,23 @@ vy_conf_new()
 	}
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
 	struct srzone def = {
-		.enable            = 1,
 		.compact_wm        = 2,
 		.dump_prio       = 1,
 		.dump_wm         = 10 * 1024 * 1024,
 		.dump_age        = 40,
 		.dump_age_period = 40,
-		.gc_prio           = 1,
-		.gc_period         = 60,
-		.gc_wm             = 30,
 	};
 	struct srzone redzone = {
-		.enable            = 1,
 		.compact_wm        = 4,
 		.dump_prio       = 0,
 		.dump_wm         = 0,
 		.dump_age        = 0,
 		.dump_age_period = 0,
-		.gc_prio           = 0,
-		.gc_period         = 0,
-		.gc_wm             = 0,
 	};
 	sr_zonemap_set(&conf->zones, 0, &def);
 	sr_zonemap_set(&conf->zones, 80, &redzone);
 	/* configure zone = 0 */
 	struct srzone *z = &conf->zones.zones[0];
-	assert(z->enable);
 	z->compact_wm = cfg_geti("vinyl.compact_wm");
 	if (z->compact_wm <= 1) {
 		vy_error("bad %d.compact_wm value", 0);
@@ -5904,7 +5826,6 @@ vy_conf_new()
 	for (int i = 0; i < 11; i++) {
 		z = &conf->zones.zones[i];
 		z->dump_age_period_us = z->dump_age_period * 1000000;
-		z->gc_period_us         = z->gc_period * 1000000;
 	}
 	return conf;
 
@@ -6015,9 +5936,6 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 	int childs_cnt = 0;
 	struct vy_env *env = info->env;
 	for (int i = 0; i < 11; ++i) {
-		struct srzone *z = &env->conf->zones.zones[i];
-		if (!z->enable)
-			continue;
 		++childs_cnt;
 	}
 	struct vy_info_node *node = vy_info_append(root, "compaction");
@@ -6025,16 +5943,11 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		return 1;
 	for (int i = 0; i < 11; ++i) {
 		struct srzone *z = &env->conf->zones.zones[i];
-		if (!z->enable)
-			continue;
 
 		struct vy_info_node *local_node = vy_info_append(node, z->name);
 		if (vy_info_reserve(info, local_node, 13) != 0)
 			return 1;
-		vy_info_append_u32(local_node, "gc_wm", z->gc_wm);
-		vy_info_append_u32(local_node, "gc_prio", z->gc_prio);
 		vy_info_append_u32(local_node, "dump_wm", z->dump_wm);
-		vy_info_append_u32(local_node, "gc_period", z->gc_period);
 		vy_info_append_u32(local_node, "dump_age", z->dump_age);
 		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
 		vy_info_append_u32(local_node, "dump_prio", z->dump_prio);
@@ -6054,9 +5967,6 @@ vy_info_append_scheduler(struct vy_info *info, struct vy_info_node *root)
 	int v = vy_quota_used_percent(env->quota);
 	struct srzone *z = sr_zonemap(&env->conf->zones, v);
 	vy_info_append_str(node, "zone", z->name);
-
-	struct vy_scheduler *scheduler = env->scheduler;
-	vy_info_append_u32(node, "gc_active", scheduler->gc_in_progress);
 	return 0;
 }
 
@@ -6621,7 +6531,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	if (vy_planner_create(&index->p))
 		goto error_1;
 	index->checkpoint_in_progress = false;
-	index->gc_in_progress = false;
 	index->age_in_progress = false;
 	if (vy_index_conf_create(index, key_def))
 		goto error_2;
@@ -7349,8 +7258,6 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		 */
 		vy_tuple_unref(vyresult);
 		vyresult = NULL;
-	} else {
-		/* Tuple found in the cache. */
 	}
 	if (tx != NULL && vy_tx_track(tx, index, vykey))
 		goto end;
@@ -7384,8 +7291,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	}
 
 	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult,
-			  NULL, c->tx))
+	if (vy_index_read(index, c->key, c->order, &vyresult, NULL, c->tx))
 		return -1;
 	c->n_reads++;
 	if (vyresult && vy_tuple_is_not_found(vyresult)) {
@@ -7596,10 +7502,6 @@ finish_send:
 }
 
 /* }}} replication */
-
-/** {{{ vinyl_service - context of a vinyl background thread */
-
-/* }}} vinyl service */
 
 /* {{{ vy_run_iterator vy_run_iterator support functions */
 /* TODO: move to appropriate c file and remove */
