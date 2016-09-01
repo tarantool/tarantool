@@ -4,7 +4,7 @@
 PORTNAME=	tarantool
 PORTVERSION=	1.6.8.371
 CATEGORIES=	databases
-MASTER_SITES=	http://tarantool.org/dist/1.6/
+MASTER_SITES=	http://download.tarantool.org/tarantool/1.6/src/
 
 MAINTAINER=	vg@FreeBSD.org
 COMMENT=	NoSQL database running in a Lua application server

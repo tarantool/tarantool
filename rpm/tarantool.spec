@@ -63,7 +63,7 @@ BuildRequires: python-yaml >= 3.0.9
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
-Version: 1.6.8.0
+Version: 1.7.1.0
 Release: 1%{?dist}
 Group: Applications/Databases
 Summary: In-memory database and Lua application server
@@ -73,7 +73,7 @@ Provides: tarantool-debuginfo = %{version}-%{release}
 Provides: tarantool-common = %{version}-%{release}
 Obsoletes: tarantool-common < 1.6.8.434-1
 URL: http://tarantool.org
-Source0: http://tarantool.org/dist/1.6/tarantool-%{version}.tar.gz
+Source0: http://download.tarantool.org/tarantool/1.7/src/tarantool-%{version}.tar.gz
 %description
 Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
