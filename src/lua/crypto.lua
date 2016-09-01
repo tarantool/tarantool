@@ -4,21 +4,18 @@ local ffi = require 'ffi'
 local buffer = require('buffer')
 
 ffi.cdef[[
+    int tnt_openssl_init(void);
     /* from openssl/err.h */
     unsigned long ERR_get_error(void);
     char *ERR_error_string(unsigned long e, char *buf);
-    void ERR_load_ERR_strings(void);
-    void ERR_load_crypto_strings(void);
 
     /* from openssl/evp.h */
-    void OpenSSL_add_all_digests();
-    void OpenSSL_add_all_ciphers();
     typedef void ENGINE;
 
     typedef struct {} EVP_MD_CTX;
     typedef struct {} EVP_MD;
-    EVP_MD_CTX *EVP_MD_CTX_create(void);
-    void EVP_MD_CTX_destroy(EVP_MD_CTX *ctx);
+    EVP_MD_CTX *tnt_EVP_MD_CTX_new(void);
+    void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
     int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);
     int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt);
     int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
@@ -44,9 +41,7 @@ ffi.cdef[[
     const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
 ]]
 
-ffi.C.OpenSSL_add_all_digests()
-ffi.C.OpenSSL_add_all_ciphers()
-ffi.C.ERR_load_crypto_strings()
+ffi.C.tnt_openssl_init();
 
 local function openssl_err_str()
   return ffi.string(ffi.C.ERR_error_string(ffi.C.ERR_get_error(), nil))
@@ -67,11 +62,11 @@ end
 local digest_mt = {}
 
 local function digest_gc(ctx)
-    ffi.C.EVP_MD_CTX_destroy(ctx)
+    ffi.C.tnt_EVP_MD_CTX_free(ctx)
 end
 
 local function digest_new(digest)
-    local ctx = ffi.C.EVP_MD_CTX_create()
+    local ctx = ffi.C.tnt_EVP_MD_CTX_new()
     if ctx == nil then
         return error('Can\'t create digest ctx: ' .. openssl_err_str())
     end
@@ -118,7 +113,7 @@ local function digest_final(self)
 end
 
 local function digest_free(self)
-    ffi.C.EVP_MD_CTX_destroy(self.ctx)
+    ffi.C.tnt_EVP_MD_CTX_free(self.ctx)
     ffi.gc(self.ctx, nil)
     self.ctx = nil
     self.initialized = false

@@ -206,6 +206,9 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Tue Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
+- Add support for OpenSSL 1.1
+
 * Tue Feb 09 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.462-1
 - Enable tests
 

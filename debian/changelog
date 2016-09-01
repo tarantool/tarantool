@@ -1,14 +1,15 @@
-tarantool (1.7.1.142.g27d7c6c-1) unstable; urgency=medium
+tarantool (1.7.1.265.g479962c-1) unstable; urgency=medium
 
   * Enable systemd integration, fix sysvinit + systemd interoperability.
-
- -- Roman Tsisyk <roman@tarantool.org>  Wed, 03 Aug 2016 17:20:26 +0300
-
-tarantool (1.7.1.140.g6d1a4be-1) unstable; urgency=medium
-
   * Start 'example.lua' instance by default on 'localhost:3301'.
 
- -- Roman Tsisyk <roman@tarantool.org>  Wed, 03 Aug 2016 16:28:58 +0300
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 01 Sep 2016 10:00:00 +0300
+
+tarantool (1.6.8.762.g15ed10e-1) unstable; urgency=medium
+
+  * Add support for OpenSSL 1.1 (FTBFS). Closes: #835798.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 01 Sep 2016 09:34:24 +0300
 
 tarantool (1.6.8.740.g45fc77f-1) unstable; urgency=medium
 

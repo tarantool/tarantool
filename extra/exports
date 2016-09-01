@@ -42,8 +42,6 @@ title_set_status
 title_get_status
 exception_get_string
 exception_get_int
-tnt_EVP_CIPHER_key_length
-tnt_EVP_CIPHER_iv_length
 
 tarantool_lua_ibuf
 uuid_nil
@@ -70,6 +68,12 @@ tarantool_uptime
 logger_pid
 space_by_id
 space_run_triggers
+
+tnt_openssl_init
+tnt_EVP_CIPHER_key_length
+tnt_EVP_CIPHER_iv_length
+tnt_EVP_MD_CTX_new
+tnt_EVP_MD_CTX_free
 
 # Module API
 
