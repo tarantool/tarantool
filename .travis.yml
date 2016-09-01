@@ -30,7 +30,7 @@ env:
       - OS=debian DIST=stretch PACK=deb
       - OS=debian DIST=sid PACK=deb
       - PACK=none
-      - Pack=source
+      - PACK=source
 
 matrix:
     allow_failures:
