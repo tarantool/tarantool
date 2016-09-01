@@ -1,3 +1,9 @@
+tarantool (1.6.8.762.g15ed10e-1) unstable; urgency=medium
+
+  * Add support for OpenSSL 1.1 (FTBFS). Closes: #835798.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 01 Sep 2016 09:34:24 +0300
+
 tarantool (1.6.8.740.g45fc77f-1) unstable; urgency=medium
 
   * Don't link libbfd-*-system.so dynamically. Closes: #831361.
