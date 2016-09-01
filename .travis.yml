@@ -12,8 +12,12 @@ compiler:
   - gcc
 
 env:
+    global:
+      - ENCRYPTION_LABEL="8f886150b5ec"
+      - SFTP_UPLOAD_SOURCE="True"
     matrix:
       - PACK=none
+      - Pack=source
       - PACK=coverage
       - OS=el DIST=6 PACK=rpm
       - OS=el DIST=7 PACK=rpm
@@ -31,6 +35,7 @@ env:
 
 matrix:
     allow_failures:
+      - env: PACK=source
       - env: PACK=coverage
       - env: OS=el DIST=6 PACK=rpm
       - env: OS=el DIST=7 PACK=rpm
@@ -77,6 +82,8 @@ matrix:
         compiler: clang
       - env: PACK=coverage
         os: osx
+      - env: PACK=source
+        compiler: clang
       - env: OS=el DIST=6 PACK=rpm
         os: osx
       - env: OS=el DIST=7 PACK=rpm
