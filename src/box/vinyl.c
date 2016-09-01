@@ -1052,7 +1052,6 @@ struct srzone {
 	uint32_t dump_age;
 	uint32_t dump_age_period;
 	uint64_t dump_age_period_us;
-	uint32_t dump_age_wm;
 	uint32_t gc_prio;
 	uint32_t gc_period;
 	uint64_t gc_period_us;
@@ -5286,10 +5285,12 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 
 static inline int
 vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
-		      uint32_t ttl, uint32_t ttl_wm, struct vy_task **ptask)
+		      uint32_t max_age, struct vy_task **ptask)
 {
-	/* try to peek a range with update >= a and in-memory
-	 * index size >= b */
+	/*
+	 * Try to peek a range with no updates within max_age
+	 * seconds and dump it to free memory.
+	 */
 
 	/* full scan */
 	uint64_t now = clock_monotonic64();
@@ -5302,7 +5303,7 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 			in_progress = true;
 			continue;
 		}
-		if (range->used < ttl_wm && (now - range->update_time) < ttl)
+		if (range->update_time + max_age > now)
 			continue;
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
 						   index, VY_TASK_AGE);
@@ -5409,10 +5410,8 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 
 	/* index aging */
 	if (scheduler->age_in_progress) {
-		uint32_t ttl = zone->dump_age * 1000000; /* ms */
-		uint32_t ttl_wm = zone->dump_age_wm;
-		rc = vy_scheduler_peek_age(scheduler, index, ttl, ttl_wm,
-					   ptask);
+		uint32_t max_age = zone->dump_age * 1000000; /* ms */
+		rc = vy_scheduler_peek_age(scheduler, index, max_age, ptask);
 		if (rc != 0)
 			return rc; /* error */
 		if (*ptask != NULL)
@@ -5889,7 +5888,6 @@ vy_conf_new()
 		.dump_wm         = 10 * 1024 * 1024,
 		.dump_age        = 40,
 		.dump_age_period = 40,
-		.dump_age_wm     = 1 * 1024 * 1024,
 		.gc_prio           = 1,
 		.gc_period         = 60,
 		.gc_wm             = 30,
@@ -5901,7 +5899,6 @@ vy_conf_new()
 		.dump_wm         = 0,
 		.dump_age        = 0,
 		.dump_age_period = 0,
-		.dump_age_wm     = 0,
 		.gc_prio           = 0,
 		.gc_period         = 0,
 		.gc_wm             = 0,
@@ -5919,7 +5916,6 @@ vy_conf_new()
 	z->dump_prio = cfg_geti("vinyl.dump_prio");
 	z->dump_age = cfg_geti("vinyl.dump_age");
 	z->dump_age_period = cfg_geti("vinyl.dump_age_period");
-	z->dump_age_wm = cfg_geti("vinyl.dump_age_wm");
 
 	/* convert periodic times from sec to usec */
 	for (int i = 0; i < 11; i++) {
@@ -6059,7 +6055,6 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		vy_info_append_u32(local_node, "dump_age", z->dump_age);
 		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
 		vy_info_append_u32(local_node, "dump_prio", z->dump_prio);
-		vy_info_append_u32(local_node, "dump_age_wm", z->dump_age_wm);
 		vy_info_append_u32(local_node, "dump_age_period", z->dump_age_period);
 	}
 	return 0;
