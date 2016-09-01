@@ -239,15 +239,13 @@ vy_buf_at(struct vy_buf *b, int size, int i) {
 	return b->s + size * i;
 }
 
-#define VINYL_INJECTION_SD_BUILD_0      0
-#define VINYL_INJECTION_SD_BUILD_1      1
-#define VINYL_INJECTION_SI_DUMP_0       2
-#define VINYL_INJECTION_SI_COMPACTION_0 3
-#define VINYL_INJECTION_SI_COMPACTION_1 4
-#define VINYL_INJECTION_SI_COMPACTION_2 5
-#define VINYL_INJECTION_SI_COMPACTION_3 6
-#define VINYL_INJECTION_SI_COMPACTION_4 7
-#define VINYL_INJECTION_SI_RECOVER_0    8
+#define VY_INJECTION_SD_BUILD_0   0
+#define VY_INJECTION_SD_BUILD_1   1
+#define VY_INJECTION_DUMP_0       2
+#define VY_INJECTION_COMPACTION_0 3
+#define VY_INJECTION_COMPACTION_1 4
+#define VY_INJECTION_COMPACTION_4 7
+#define VY_INJECTION_RECOVER_0    8
 
 #ifdef VINYL_INJECTION_ENABLE
 	#define VINYL_INJECTION(E, ID, X) \
@@ -2577,7 +2575,7 @@ struct sdc {
 };
 
 static inline void
-sd_cinit(struct sdc *sc)
+sdc_init(struct sdc *sc)
 {
 	vy_buf_create(&sc->a);
 	vy_buf_create(&sc->b);
@@ -2588,7 +2586,7 @@ sd_cinit(struct sdc *sc)
 }
 
 static inline void
-sd_cfree(struct sdc *sc)
+sdc_free(struct sdc *sc)
 {
 	vy_buf_destroy(&sc->a);
 	vy_buf_destroy(&sc->b);
@@ -2606,7 +2604,7 @@ sd_cfree(struct sdc *sc)
 }
 
 static inline void
-sd_cgc(struct sdc *sc)
+sdc_gc(struct sdc *sc)
 {
 	int wm = 1024 * 1024;
 	fiber_gc();
@@ -2623,7 +2621,7 @@ sd_cgc(struct sdc *sc)
 }
 
 static inline int
-sd_censure(struct sdc *c, int count)
+sdc_ensure(struct sdc *c, int count)
 {
 	if (c->count < count) {
 		while (count-- >= 0) {
@@ -2949,9 +2947,9 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 	pthread_mutex_unlock(&run->cache_lock);
 }
 
-#define SI_LOCK       1
-#define SI_ROTATE     2
-#define SI_SPLIT      4
+#define VY_LOCK       1
+#define VY_ROTATE     2
+#define VY_SPLIT      4
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
@@ -2962,64 +2960,65 @@ static int vy_range_delete(struct vy_range*, int);
 static int vy_range_complete(struct vy_range*, struct vy_index*);
 
 static inline void
-vy_range_lock(struct vy_range *node) {
-	assert(! (node->flags & SI_LOCK));
-	node->flags |= SI_LOCK;
-}
-
-static inline void
-vy_range_unlock(struct vy_range *node) {
-	assert((node->flags & SI_LOCK) > 0);
-	node->flags &= ~SI_LOCK;
-}
-
-static inline void
-vy_range_split(struct vy_range *node) {
-	node->flags |= SI_SPLIT;
-}
-
-static inline struct vy_mem *
-vy_range_rotate(struct vy_range *node) {
-	node->flags |= SI_ROTATE;
-	return &node->i0;
-}
-
-static inline void
-vy_range_unrotate(struct vy_range *node) {
-	assert((node->flags & SI_ROTATE) > 0);
-	node->flags &= ~SI_ROTATE;
-	node->i0 = node->i1;
-	node->i0.tree.arg = &node->i0;
-	vy_mem_create(&node->i1, node->i0.key_def);
-}
-
-static inline struct vy_mem *
-vy_range_index(struct vy_range *node) {
-	if (node->flags & SI_ROTATE)
-		return &node->i1;
-	return &node->i0;
-}
-
-static inline struct vy_mem *
-vy_range_index_priority(struct vy_range *node, struct vy_mem **second)
+vy_range_lock(struct vy_range *range)
 {
-	if (unlikely(node->flags & SI_ROTATE)) {
-		*second = &node->i0;
-		return &node->i1;
+	assert(! (range->flags & VY_LOCK));
+	range->flags |= VY_LOCK;
+}
+
+static inline void
+vy_range_unlock(struct vy_range *range)
+{
+	assert((range->flags & VY_LOCK) > 0);
+	range->flags &= ~VY_LOCK;
+}
+
+static inline struct vy_mem *
+vy_range_rotate(struct vy_range *range)
+{
+	range->flags |= VY_ROTATE;
+	return &range->i0;
+}
+
+static inline void
+vy_range_unrotate(struct vy_range *range)
+{
+	assert((range->flags & VY_ROTATE) > 0);
+	range->flags &= ~VY_ROTATE;
+	range->i0 = range->i1;
+	range->i0.tree.arg = &range->i0;
+	vy_mem_create(&range->i1, range->i0.key_def);
+}
+
+static inline struct vy_mem *
+vy_range_mem(struct vy_range *range)
+{
+	if (range->flags & VY_ROTATE)
+		return &range->i1;
+	return &range->i0;
+}
+
+static inline struct vy_mem *
+vy_range_index_priority(struct vy_range *range, struct vy_mem **second)
+{
+	if (unlikely(range->flags & VY_ROTATE)) {
+		*second = &range->i0;
+		return &range->i1;
 	}
 	*second = NULL;
-	return &node->i0;
+	return &range->i0;
 }
 
 static inline int
-vy_range_cmp(struct vy_range *n, void *key, struct key_def *key_def)
+vy_range_cmp(struct vy_range *range, void *key, struct key_def *key_def)
 {
-	assert(n->run != NULL);
-	struct vy_page_info *min = vy_run_index_first_page(&n->run->index);
-	struct vy_page_info *max = vy_run_index_last_page(&n->run->index);
-	int l = vy_tuple_compare(vy_run_index_min_key(&n->run->index, min),
+	struct vy_run_index *run_index = &range->run->index;
+
+	struct vy_page_info *min = vy_run_index_first_page(run_index);
+	struct vy_page_info *max = vy_run_index_last_page(run_index);
+	int l = vy_tuple_compare(vy_run_index_min_key(run_index, min),
 				 key, key_def);
-	int r = vy_tuple_compare(vy_run_index_max_key(&n->run->index, max),
+	int r = vy_tuple_compare(vy_run_index_max_key(run_index, max),
 				 key, key_def);
 	/* inside range */
 	if (l <= 0 && r >= 0)
@@ -3046,10 +3045,10 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 }
 
 static inline uint64_t
-vy_range_size(struct vy_range *n)
+vy_range_size(struct vy_range *range)
 {
 	uint64_t size = 0;
-	struct vy_run *run = n->run;
+	struct vy_run *run = range->run;
 	while (run) {
 		size += vy_run_index_size(&run->index) +
 		        vy_run_index_total(&run->index);
@@ -3061,7 +3060,8 @@ vy_range_size(struct vy_range *n)
 static int vy_planner_create(struct vy_planner*);
 static void vy_planner_destroy(struct vy_planner*);
 static void vy_planner_update(struct vy_planner*, struct vy_range*);
-static void vy_planner_update_range(struct vy_planner *p, struct vy_range *n);
+static void vy_planner_update_range(struct vy_planner *p,
+				    struct vy_range *range);
 static void vy_planner_remove(struct vy_planner*, struct vy_range*);
 
 struct vy_range_tree_key {
@@ -3081,11 +3081,11 @@ rb_gen_ext_key(, vy_range_tree_, vy_range_tree_t, struct vy_range, tree_node,
 		 vy_range_tree_key_cmp);
 
 struct vy_range *
-vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range * n, void *arg)
+vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
 	(void)arg;
-	vy_range_delete(n, 0);
+	vy_range_delete(range, 0);
 	return NULL;
 }
 
@@ -3225,11 +3225,11 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 static int vy_task_drop(struct vy_index*);
 
 static int
-si_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
+vy_range_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
 	 struct svmergeiter*, uint64_t, uint32_t);
 
 static int
-si_insert(struct vy_index *index, struct vy_range *range)
+vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
 	index->range_count++;
@@ -3237,7 +3237,7 @@ si_insert(struct vy_index *index, struct vy_range *range)
 }
 
 static int
-si_remove(struct vy_index *index, struct vy_range *range)
+vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_remove(&index->tree, range);
 	index->range_count--;
@@ -3245,10 +3245,11 @@ si_remove(struct vy_index *index, struct vy_range *range)
 }
 
 static int
-si_replace(struct vy_index *index, struct vy_range *o, struct vy_range *n)
+vy_index_replace_range(struct vy_index *index, struct vy_range *old,
+	   struct vy_range *range)
 {
-	vy_range_tree_remove(&index->tree, o);
-	vy_range_tree_insert(&index->tree, n);
+	vy_range_tree_remove(&index->tree, old);
+	vy_range_tree_insert(&index->tree, range);
 	return 0;
 }
 
@@ -3625,28 +3626,28 @@ static int64_t
 vy_index_range_id_next(struct vy_index *index);
 
 static int
-vy_dump(struct vy_index *index, struct vy_range *n,
+vy_dump(struct vy_index *index, struct vy_range *range,
         int64_t vlsn, int64_t *p_quota_release)
 {
-	assert(n->flags & SI_LOCK);
+	assert(range->flags & VY_LOCK);
 
 	vy_index_wrlock(index);
-	if (unlikely(n->used == 0)) {
-		vy_range_unlock(n);
+	if (unlikely(range->used == 0)) {
+		vy_range_unlock(range);
 		vy_index_unlock(index);
 		return 0;
 	}
 	struct vy_mem *i;
-	i = vy_range_rotate(n);
+	i = vy_range_rotate(range);
 	vy_index_unlock(index);
 
 	char tmp_path[PATH_MAX];
-	if (!n->run) {
+	if (!range->run) {
 		/* An empty range, create a temp file for it. */
 		snprintf(tmp_path, PATH_MAX, "%s/.rngXXXXXX",
 			 index->path);
-		n->fd = mkstemp(tmp_path);
-		if (n->fd == -1) {
+		range->fd = mkstemp(tmp_path);
+		if (range->fd == -1) {
 			vy_error("Can't create temporary file in %s: %s",
 				 index->path, strerror(errno));
 			return -1;
@@ -3654,20 +3655,20 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 	}
 
 	struct vy_run *run = NULL;
-	int rc = vy_run_create(index, n, i, vlsn, &run);
+	int rc = vy_run_create(index, range, i, vlsn, &run);
 	if (unlikely(rc == -1))
 		return -1;
 
 	if (unlikely(run == NULL)) {
 		vy_index_wrlock(index);
-		assert(n->used >= i->used);
-		n->used -= i->used;
+		assert(range->used >= i->used);
+		range->used -= i->used;
 		*p_quota_release = i->used;
 		struct vy_mem swap = *i;
 		swap.tree.arg = &swap;
-		vy_range_unrotate(n);
-		vy_range_unlock(n);
-		vy_planner_update(&index->p, n);
+		vy_range_unrotate(range);
+		vy_range_unlock(range);
+		vy_planner_update(&index->p, range);
 		vy_index_unlock(index);
 		vy_mem_gc(&swap);
 		return 0;
@@ -3675,28 +3676,28 @@ vy_dump(struct vy_index *index, struct vy_range *n,
 
 	/* commit */
 	vy_index_wrlock(index);
-	run->next = n->run;
-	n->run = run;
-	n->run_count++;
-	assert(n->used >= i->used);
-	n->used -= i->used;
+	run->next = range->run;
+	range->run = run;
+	range->run_count++;
+	assert(range->used >= i->used);
+	range->used -= i->used;
 	*p_quota_release = i->used;
 	index->size += vy_run_index_size(&run->index) +
 		       vy_run_index_total(&run->index);
 	struct vy_mem swap = *i;
 	swap.tree.arg = &swap;
-	vy_range_unrotate(n);
-	vy_range_unlock(n);
-	vy_planner_update(&index->p, n);
+	vy_range_unrotate(range);
+	vy_range_unlock(range);
+	vy_planner_update(&index->p, range);
 	vy_index_unlock(index);
 
-	if (n->run_count == 1) {
+	if (range->run_count == 1) {
 		/* First non-empty run for this range, deploy the range. */
-		n->id = vy_index_range_id_next(index);
+		range->id = vy_index_range_id_next(index);
 
 		char path[PATH_MAX];
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->path, n->id);
+			 index->path, range->id);
 		if (rename(tmp_path, path)) {
 			vy_error("Can't rename temporary file in %s: %s",
 				 index->path, strerror(errno));
@@ -3723,19 +3724,19 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 			 enum vy_order order, char *key);
 
 static int
-si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
+vy_range_compact(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	   int64_t vlsn, struct vy_iter *vindex, uint64_t vindex_used)
 {
-	assert(node->flags & SI_LOCK);
+	assert(range->flags & VY_LOCK);
 
 	/* prepare for compaction */
 	int rc;
-	rc = sd_censure(c, node->run_count);
+	rc = sdc_ensure(c, range->run_count);
 	if (unlikely(rc == -1))
 		return -1;
 	struct svmerge merge;
 	sv_mergeinit(&merge, index, index->key_def);
-	rc = sv_mergeprepare(&merge, node->run_count + 1);
+	rc = sv_mergeprepare(&merge, range->run_count + 1);
 	if (unlikely(rc == -1))
 		return -1;
 
@@ -3747,11 +3748,11 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 		size_stream = vindex_used;
 	}
 
-	struct vy_run *run = node->run;
+	struct vy_run *run = range->run;
 	while (run) {
 		struct svmergesrc *s = sv_mergeadd(&merge, NULL);
 		struct vy_filterif *compression = index->compression_if;
-		vy_tmp_run_iterator_open(&s->src, index, run, node->fd,
+		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
 				     compression, VINYL_GE, NULL);
 		size_stream += vy_run_index_total(&run->index);
 		count += vy_run_index_count(&run->index);
@@ -3759,10 +3760,10 @@ si_compact(struct vy_index *index, struct sdc *c, struct vy_range *node,
 	}
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, &merge, VINYL_GE);
-	rc = si_merge(index, c, node, vlsn, &im, size_stream, count);
+	rc = vy_range_merge(index, c, range, vlsn, &im, size_stream, count);
 	sv_mergefree(&merge);
 	if (!rc)
-		rc = vy_range_delete(node, 1);
+		rc = vy_range_delete(range, 1);
 	return rc;
 }
 
@@ -3774,11 +3775,11 @@ static int vy_task_drop(struct vy_index *index)
 }
 
 static int
-si_redistribute(struct vy_index *index, struct vy_range *node,
+vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 		struct vy_buf *result)
 {
 	(void)index;
-	struct vy_mem *mem = vy_range_index(node);
+	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
 	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
 	struct vy_bufiter j;
@@ -3819,29 +3820,29 @@ si_redistribute(struct vy_index *index, struct vy_range *node,
 }
 
 static inline void
-si_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple *v)
+vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple *v)
 {
 	index->update_time = now;
-	/* match node */
+	/* match range */
 	struct vy_rangeiter ii;
 	vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
-	struct vy_range *node = vy_rangeiter_get(&ii);
-	assert(node != NULL);
-	/* update node */
-	struct vy_mem *vindex = vy_range_index(node);
+	struct vy_range *range = vy_rangeiter_get(&ii);
+	assert(range != NULL);
+	/* update range */
+	struct vy_mem *vindex = vy_range_mem(range);
 	int rc = vy_mem_set(vindex, v);
 	assert(rc == 0); /* TODO: handle BPS tree errors properly */
 	(void) rc;
-	node->update_time = index->update_time;
-	node->used += vy_tuple_size(v);
-	/* schedule node */
-	vy_planner_update_range(&index->p, node);
+	range->update_time = index->update_time;
+	range->used += vy_tuple_size(v);
+	/* schedule range */
+	vy_planner_update_range(&index->p, range);
 }
 
 static int
-si_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *node)
+vy_range_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *range)
 {
-	struct vy_mem *mem = vy_range_index(node);
+	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
 	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
 	while (ii.vif->has(&ii)) {
@@ -3858,14 +3859,14 @@ si_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *no
 	vy_bufiter_open(&i, &c->b, sizeof(struct vy_tuple **));
 	while (vy_bufiter_has(&i)) {
 		struct vy_tuple **v = vy_bufiterref_get(&i);
-		si_redistribute_set(index, now, *v);
+		vy_range_redistribute_set(index, now, *v);
 		vy_bufiter_next(&i);
 	}
 	return 0;
 }
 
 static int
-si_splitfree(struct vy_buf *result)
+vy_range_splitfree(struct vy_buf *result)
 {
 	struct vy_bufiter i;
 	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
@@ -3879,7 +3880,7 @@ si_splitfree(struct vy_buf *result)
 }
 
 static inline int
-si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
+vy_range_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
          struct svmergeiter *merge_iter,
          uint64_t  size_node,
          uint64_t  size_stream,
@@ -3890,7 +3891,7 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 	(void) c;
 	(void) size_stream;
 	int rc;
-	struct vy_range *n = NULL;
+	struct vy_range *range = NULL;
 
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, merge_iter,
@@ -3899,27 +3900,27 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 	while (sv_writeiter_has(&iwrite)) {
 		struct vy_run_index sdindex;
 		vy_run_index_init(&sdindex);
-		/* create new node */
-		n = vy_range_new(index->key_def);
-		if (unlikely(n == NULL))
+		/* create new range */
+		range = vy_range_new(index->key_def);
+		if (unlikely(range == NULL))
 			goto error;
-		rc = vy_range_create(n, index);
+		rc = vy_range_create(range, index);
 		if (unlikely(rc == -1))
 			goto error;
 
-		if ((rc = vy_run_write(n->fd, &iwrite,
+		if ((rc = vy_run_write(range->fd, &iwrite,
 				       index->compression_if,
 				       index->key_def->opts.page_size,
 				       size_node,
 				       &sdindex)))
 			goto error;
-		n->run = vy_run_new();
-		if (!n->run)
+		range->run = vy_run_new();
+		if (!range->run)
 			goto error;
-		++n->run_count;
-		n->run->index = sdindex;
+		++range->run_count;
+		range->run->index = sdindex;
 
-		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
+		rc = vy_buf_add(result, &range, sizeof(struct vy_range*));
 		if (unlikely(rc == -1))
 			goto error;
 	}
@@ -3927,14 +3928,14 @@ si_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 	return 0;
 error:
 	sv_writeiter_close(&iwrite);
-	if (n)
-		vy_range_delete(n, 0);
-	si_splitfree(result);
+	if (range)
+		vy_range_delete(range, 0);
+	vy_range_splitfree(result);
 	return -1;
 }
 
 static int
-si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
+vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
 	 uint32_t n_stream)
 {
@@ -3947,14 +3948,14 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 * a new nodes.
 	 */
 	int rc;
-	rc = si_split(index, c, result, stream,
+	rc = vy_range_split(index, c, result, stream,
 		      index->key_def->opts.range_size,
 		      size_stream, n_stream, vlsn);
 	if (unlikely(rc == -1))
 		return -1;
 
-	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_0,
-			si_splitfree(result, r);
+	VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_0,
+			vy_range_splitfree(result, r);
 			vy_error("%s", "error injection");
 			return -1);
 
@@ -3982,14 +3983,14 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	/* commit compaction changes */
 	vy_index_wrlock(index);
-	struct vy_mem *j = vy_range_index(range);
+	struct vy_mem *j = vy_range_mem(range);
 	vy_planner_remove(&index->p, range);
-	vy_range_split(range);
+	range->flags |= VY_SPLIT;
 	index->size -= vy_range_size(range);
 	switch (count) {
 	case 0: /* delete */
-		si_remove(index, range);
-		si_redistribute_index(index, c, range);
+		vy_index_remove_range(index, range);
+		vy_range_redistribute_index(index, c, range);
 		break;
 	case 1: /* self update */
 		n = *(struct vy_range**)result->s;
@@ -4000,14 +4001,14 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		n->used = j->used;
 		index->size += vy_range_size(n);
 		vy_range_lock(n);
-		si_replace(index, range, n);
+		vy_index_replace_range(index, range, n);
 		vy_planner_update(&index->p, n);
 		break;
 	default: /* split */
-		rc = si_redistribute(index, range, result);
+		rc = vy_range_redistribute(index, range, result);
 		if (unlikely(rc == -1)) {
 			vy_index_unlock(index);
-			si_splitfree(result);
+			vy_range_splitfree(result);
 			return -1;
 		}
 		vy_bufiter_open(&i, result, sizeof(struct vy_range*));
@@ -4017,7 +4018,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		n->temperature_reads = range->temperature_reads;
 		index->size += vy_range_size(n);
 		vy_range_lock(n);
-		si_replace(index, range, n);
+		vy_index_replace_range(index, range, n);
 		vy_planner_update(&index->p, n);
 		for (vy_bufiter_next(&i); vy_bufiter_has(&i);
 		     vy_bufiter_next(&i)) {
@@ -4027,7 +4028,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 			n->temperature_reads = range->temperature_reads;
 			index->size += vy_range_size(n);
 			vy_range_lock(n);
-			si_insert(index, n);
+			vy_index_add_range(index, n);
 			vy_planner_update(&index->p, n);
 		}
 		break;
@@ -4037,7 +4038,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	/* compaction completion */
 
-	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_1,
+	VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_1,
 	             vy_range_delete(range, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
@@ -4050,7 +4051,7 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		rc = vy_range_complete(n, index);
 		if (unlikely(rc == -1))
 			return -1;
-		VINYL_INJECTION(r->i, VINYL_INJECTION_SI_COMPACTION_4,
+		VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_4,
 		             vy_error("%s", "error injection");
 		             return -1);
 		vy_bufiter_next(&i);
@@ -4082,57 +4083,57 @@ si_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 static struct vy_range *
 vy_range_new(struct key_def *key_def)
 {
-	struct vy_range *n = (struct vy_range*)malloc(sizeof(struct vy_range));
-	if (unlikely(n == NULL)) {
+	struct vy_range *range = (struct vy_range*) malloc(sizeof(*range));
+	if (range == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_range), "malloc",
 			 "struct vy_range");
 		return NULL;
 	}
-	n->flags = 0;
-	n->update_time = 0;
-	n->used = 0;
-	n->run = NULL;
-	n->run_count = 0;
-	n->temperature = 0;
-	n->temperature_reads = 0;
-	n->refs = 0;
-	tt_pthread_mutex_init(&n->reflock, NULL);
-	n->fd = -1;
-	n->path[0] = '\0';
-	vy_mem_create(&n->i0, key_def);
-	vy_mem_create(&n->i1, key_def);
-	ss_rqinitnode(&n->nodecompact);
-	ss_rqinitnode(&n->nodedump);
-	rlist_create(&n->commit);
-	return n;
+	range->flags = 0;
+	range->update_time = 0;
+	range->used = 0;
+	range->run = NULL;
+	range->run_count = 0;
+	range->temperature = 0;
+	range->temperature_reads = 0;
+	range->refs = 0;
+	tt_pthread_mutex_init(&range->reflock, NULL);
+	range->fd = -1;
+	range->path[0] = '\0';
+	vy_mem_create(&range->i0, key_def);
+	vy_mem_create(&range->i1, key_def);
+	ss_rqinitnode(&range->nodecompact);
+	ss_rqinitnode(&range->nodedump);
+	rlist_create(&range->commit);
+	return range;
 }
 
 static inline int
-vy_range_close(struct vy_range *n, int gc)
+vy_range_close(struct vy_range *range, int gc)
 {
 	int rcret = 0;
 
-	int rc = close(n->fd);
+	int rc = close(range->fd);
 	if (unlikely(rc == -1)) {
 		vy_error("index file close error: %s",
 		               strerror(errno));
 		rcret = -1;
 	}
 	if (gc) {
-		vy_mem_gc(&n->i0);
-		vy_mem_gc(&n->i1);
+		vy_mem_gc(&range->i0);
+		vy_mem_gc(&range->i1);
 	} else {
-		vy_mem_destroy(&n->i0);
-		vy_mem_destroy(&n->i1);
-		tt_pthread_mutex_destroy(&n->reflock);
+		vy_mem_destroy(&range->i0);
+		vy_mem_destroy(&range->i1);
+		tt_pthread_mutex_destroy(&range->reflock);
 	}
 	return rcret;
 }
 
 static inline int
-vy_range_recover(struct vy_range *n)
+vy_range_recover(struct vy_range *range)
 {
-	int fd = n->fd;
+	int fd = range->fd;
 	int readen;
 	uint32_t read_size = ALIGN_POS(sizeof(struct vy_run_info));
 	void *read_buf;
@@ -4143,7 +4144,7 @@ vy_range_recover(struct vy_range *n)
 			(struct vy_run_info *)read_buf;
 		if (!run_info->size) {
 			 vy_error("run was not finished, range is"
-				  "broken for file %s", n->path);
+				  "broken for file %s", range->path);
 			 return -1;
 		}
 		struct vy_run *vy_run = vy_run_new();
@@ -4163,9 +4164,9 @@ vy_range_recover(struct vy_range *n)
 				     run_info->minmax_offset) == -1)
 			return -1;
 
-		vy_run->next = n->run;
-		n->run = vy_run;
-		++n->run_count;
+		vy_run->next = range->run;
+		range->run = vy_run;
+		++range->run_count;
 		if (lseek(fd, run_info->offset + run_info->size,
 			  SEEK_SET) == -1)
 			return -1;
@@ -4188,7 +4189,7 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 		return -1;
 
 	/* Attach range to the index and update statistics. */
-	si_insert(index, range);
+	vy_index_add_range(index, range);
 	index->size += vy_range_size(range);
 	vy_planner_update(&index->p, range);
 
@@ -4196,22 +4197,22 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 }
 
 static int
-vy_range_create(struct vy_range *n, struct vy_index *index)
+vy_range_create(struct vy_range *range, struct vy_index *index)
 {
-	snprintf(n->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	int rc = n->fd = mkstemp(n->path);
+	snprintf(range->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+	int rc = range->fd = mkstemp(range->path);
 	if (unlikely(rc == -1)) {
 		vy_error("temp file '%s' create error: %s",
-		               n->path, strerror(errno));
+		               range->path, strerror(errno));
 		return -1;
 	}
 	return 0;
 }
 
 static inline void
-vy_range_delete_runs(struct vy_range *n)
+vy_range_delete_runs(struct vy_range *range)
 {
-	struct vy_run *p = n->run;
+	struct vy_run *p = range->run;
 	struct vy_run *next = NULL;
 	while (p) {
 		next = p->next;
@@ -4221,37 +4222,37 @@ vy_range_delete_runs(struct vy_range *n)
 }
 
 static int
-vy_range_delete(struct vy_range *n, int gc)
+vy_range_delete(struct vy_range *range, int gc)
 {
 	int rcret = 0;
 	int rc;
-	vy_range_delete_runs(n);
-	rc = vy_range_close(n,gc);
+	vy_range_delete_runs(range);
+	rc = vy_range_close(range,gc);
 	if (unlikely(rc == -1))
 		rcret = -1;
-	if (!n->id && n->fd > 0) {
+	if (!range->id && range->fd > 0) {
 		/* Range wasn't completed */
-		unlink(n->path);
+		unlink(range->path);
 	}
-	free(n);
+	free(range);
 	return rcret;
 }
 
 static int
-vy_range_complete(struct vy_range *n, struct vy_index *index)
+vy_range_complete(struct vy_range *range, struct vy_index *index)
 {
-	n->id = vy_index_range_id_next(index);
+	range->id = vy_index_range_id_next(index);
 	char path[PATH_MAX];
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
-		 index->path, n->id);
-	int rc = rename(n->path, path);
+		 index->path, range->id);
+	int rc = rename(range->path, path);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' rename error: %s",
-		               n->path,
+		               range->path,
 		               strerror(errno));
-		n->id = 0;
+		range->id = 0;
 	} else {
-		snprintf(n->path, PATH_MAX, "%s", path);
+		snprintf(range->path, PATH_MAX, "%s", path);
 	}
 	return rc;
 }
@@ -4276,23 +4277,23 @@ vy_planner_destroy(struct vy_planner *p)
 }
 
 static void
-vy_planner_update(struct vy_planner *p, struct vy_range *n)
+vy_planner_update(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqupdate(&p->dump, &n->nodedump, n->used);
-	ss_rqupdate(&p->compact, &n->nodecompact, n->run_count);
+	ss_rqupdate(&p->dump, &range->nodedump, range->used);
+	ss_rqupdate(&p->compact, &range->nodecompact, range->run_count);
 }
 
 static void
-vy_planner_update_range(struct vy_planner *p, struct vy_range *n)
+vy_planner_update_range(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqupdate(&p->dump, &n->nodedump, n->used);
+	ss_rqupdate(&p->dump, &range->nodedump, range->used);
 }
 
 static void
-vy_planner_remove(struct vy_planner *p, struct vy_range *n)
+vy_planner_remove(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqdelete(&p->dump, &n->nodedump);
-	ss_rqdelete(&p->compact, &n->nodecompact);
+	ss_rqdelete(&p->dump, &range->nodedump);
+	ss_rqdelete(&p->compact, &range->nodecompact);
 }
 
 static void
@@ -4344,26 +4345,26 @@ static int vy_profiler_(struct vy_profiler *p)
 {
 	uint32_t temperature_total = 0;
 	uint64_t memory_used = 0;
-	struct vy_range *n = vy_range_tree_first(&p->i->tree);
-	while (n) {
-		if (p->temperature_max < n->temperature)
-			p->temperature_max = n->temperature;
-		if (p->temperature_min > n->temperature)
-			p->temperature_min = n->temperature;
-		temperature_total += n->temperature;
+	struct vy_range *range = vy_range_tree_first(&p->i->tree);
+	while (range) {
+		if (p->temperature_max < range->temperature)
+			p->temperature_max = range->temperature;
+		if (p->temperature_min > range->temperature)
+			p->temperature_min = range->temperature;
+		temperature_total += range->temperature;
 		p->total_range_count++;
-		p->count += n->i0.tree.size;
-		p->count += n->i1.tree.size;
-		p->total_run_count += n->run_count;
-		if (p->total_run_max < n->run_count)
-			p->total_run_max = n->run_count;
-		if (n->run_count < 20)
-			p->histogram_run[n->run_count]++;
+		p->count += range->i0.tree.size;
+		p->count += range->i1.tree.size;
+		p->total_run_count += range->run_count;
+		if (p->total_run_max < range->run_count)
+			p->total_run_max = range->run_count;
+		if (range->run_count < 20)
+			p->histogram_run[range->run_count]++;
 		else
 			p->histogram_run_20plus++;
-		memory_used += n->i0.used;
-		memory_used += n->i1.used;
-		struct vy_run *run = n->run;
+		memory_used += range->i0.used;
+		memory_used += range->i1.used;
+		struct vy_run *run = range->run;
 		while (run != NULL) {
 			p->count += run->index.info.keys;
 //			p->count_dup += run->index.header.dupkeys;
@@ -4374,7 +4375,7 @@ static int vy_profiler_(struct vy_profiler *p)
 			p->total_page_count += run->index.info.count;
 			run = run->next;
 		}
-		n = vy_range_tree_next(&p->i->tree, n);
+		range = vy_range_tree_next(&p->i->tree, range);
 	}
 	if (p->total_range_count > 0) {
 		p->total_run_avg =
@@ -4487,7 +4488,7 @@ vy_run_iterator_close(struct vy_run_iterator *itr);
 
 
 static void
-si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
+vy_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
 	    int64_t vlsn, void *key, uint32_t keysize)
 {
 	q->order = order;
@@ -4505,7 +4506,7 @@ si_readopen(struct siread *q, struct vy_index *index, enum vy_order order,
 }
 
 static int
-si_readclose(struct siread *q)
+vy_readclose(struct siread *q)
 {
 	vy_index_unlock(q->index);
 	sv_mergefree(&q->merge);
@@ -4513,7 +4514,7 @@ si_readclose(struct siread *q)
 }
 
 static inline int
-si_readdup(struct siread *q, struct vy_tuple *v)
+vy_readdup(struct siread *q, struct vy_tuple *v)
 {
 	vy_tuple_ref(v);
 	assert((v->flags & (SVUPSERT|SVDELETE|SVGET)) == 0);
@@ -4522,7 +4523,7 @@ si_readdup(struct siread *q, struct vy_tuple *v)
 }
 
 static inline void
-si_readstat(struct siread *q, int cache, struct vy_range *n, uint32_t reads)
+vy_readstat(struct siread *q, int cache, struct vy_range *range, uint32_t reads)
 {
 	struct vy_index *index = q->index;
 	if (cache) {
@@ -4533,11 +4534,11 @@ si_readstat(struct siread *q, int cache, struct vy_range *n, uint32_t reads)
 		q->read_disk += reads;
 	}
 	/* update temperature */
-	n->temperature_reads += reads;
+	range->temperature_reads += reads;
 	uint64_t total = index->read_disk + index->read_cache;
 	if (unlikely(total == 0))
 		return;
-	n->temperature = (n->temperature_reads * 100ULL) / total;
+	range->temperature = (range->temperature_reads * 100ULL) / total;
 }
 
 static void
@@ -4582,14 +4583,14 @@ vy_upsert_iterator_open(struct vy_iter *itr, struct vy_tuple *value)
 }
 
 static inline int
-si_range(struct siread *q)
+vy_read(struct siread *q)
 {
 	struct vy_rangeiter ii;
 	vy_rangeiter_open(&ii, q->index, q->order, q->key, q->keysize);
-	struct vy_range *node;
+	struct vy_range *range;
 next_node:
-	node = vy_rangeiter_get(&ii);
-	if (unlikely(node == NULL))
+	range = vy_rangeiter_get(&ii);
+	if (unlikely(range == NULL))
 		return 0;
 
 	/* prepare sources */
@@ -4598,7 +4599,7 @@ next_node:
 	 * (+2) - for two in-memory indexes below.
 	 * (+1) - for q->upsert below.
 	 */
-	int count = node->run_count + 2 + 1;
+	int count = range->run_count + 2 + 1;
 	int rc = sv_mergeprepare(m, count);
 	if (unlikely(rc == -1)) {
 		diag_clear(diag_get());
@@ -4613,7 +4614,7 @@ next_node:
 
 	/* in-memory indexes */
 	struct vy_mem *second;
-	struct vy_mem *first = vy_range_index_priority(node, &second);
+	struct vy_mem *first = vy_range_index_priority(range, &second);
 	if (first->tree.size) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		vy_tmp_mem_iterator_open(&s->src, first, q->order, q->key);
@@ -4623,13 +4624,13 @@ next_node:
 		vy_tmp_mem_iterator_open(&s->src, second, q->order, q->key);
 	}
 
-	si_readstat(q, 0, node, 0);
+	vy_readstat(q, 0, range, 0);
 
-	struct vy_run *run = node->run;
+	struct vy_run *run = range->run;
 	while (run) {
 		struct svmergesrc *s = sv_mergeadd(m, NULL);
 		struct vy_filterif *compression = q->index->compression_if;
-		vy_tmp_run_iterator_open(&s->src, q->index, run, node->fd,
+		vy_tmp_run_iterator_open(&s->src, q->index, run, range->fd,
 					 compression, q->order, q->key);
 		run = run->next;
 	}
@@ -4660,7 +4661,7 @@ next_node:
 			rc = 0; /* that is not what we wanted to find */
 	}
 	if (likely(rc == 1)) {
-		if (unlikely(si_readdup(q, v) == -1)) {
+		if (unlikely(vy_readdup(q, v) == -1)) {
 			sv_readiter_close(&ri);
 			return -1;
 		}
@@ -4673,9 +4674,9 @@ next_node:
 }
 
 static int
-si_readcommited(struct vy_index *index, struct vy_tuple *tuple)
+vy_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 {
-	/* search node index */
+	/* search range index */
 	struct vy_rangeiter ri;
 	vy_rangeiter_open(&ri, index, VINYL_GE, tuple->data, tuple->size);
 	struct vy_range *range = vy_rangeiter_get(&ri);
@@ -4749,17 +4750,17 @@ vy_index_create(struct vy_index *index)
 	index->range_id_max = 0;
 	index->first_dump_lsn = 0;
 	index->last_dump_range_id = 0;
-	/* create initial node */
-	struct vy_range *n = vy_range_new(index->key_def);
-	if (unlikely(n == NULL))
+	/* create initial range */
+	struct vy_range *range = vy_range_new(index->key_def);
+	if (unlikely(range == NULL))
 		return -1;
-	VINYL_INJECTION(r->i, VINYL_INJECTION_SI_RECOVER_0,
-	             vy_range_delete(n, 0);
+	VINYL_INJECTION(r->i, VY_INJECTION_RECOVER_0,
+	             vy_range_delete(range, 0);
 	             vy_error("%s", "error injection");
 	             return -1);
-	si_insert(index, n);
-	vy_planner_update(&index->p, n);
-	index->size = vy_range_size(n);
+	vy_index_add_range(index, range);
+	vy_planner_update(&index->p, range);
+	index->size = vy_range_size(range);
 	return 0;
 }
 
@@ -4899,20 +4900,20 @@ vy_index_open_ex(struct vy_index *index)
 		 * Special case: index has no ranges
 		 * (merged out or empty index was checkpointed)
 		 */
-		/* create initial node */
-		struct vy_range *n = vy_range_new(index->key_def);
-		if (unlikely(n == NULL))
+		/* create initial range */
+		struct vy_range *range = vy_range_new(index->key_def);
+		if (unlikely(range == NULL))
 			return -1;
-		si_insert(index, n);
-		vy_planner_update(&index->p, n);
-		index->size = vy_range_size(n);
+		vy_index_add_range(index, range);
+		vy_planner_update(&index->p, range);
+		index->size = vy_range_size(range);
 	}
 
 	return 0;
 }
 
 static struct txv *
-si_write(write_set_t *write_set, struct txv *v, uint64_t time,
+vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	 enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
@@ -4930,22 +4931,22 @@ si_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		tuple->lsn = lsn;
 
 		if ((status == VINYL_FINAL_RECOVERY &&
-		     si_readcommited(index, tuple))) {
+		     vy_readcommited(index, tuple))) {
 
 			continue;
 		}
-		/* match node */
+		/* match range */
 		struct vy_rangeiter ii;
 		vy_rangeiter_open(&ii, index, VINYL_GE, tuple->data, tuple->size);
 		struct vy_range *range = vy_rangeiter_get(&ii);
 		assert(range != NULL);
 		vy_tuple_ref(tuple);
-		/* insert into node index */
-		struct vy_mem *vindex = vy_range_index(range);
+		/* insert into range index */
+		struct vy_mem *vindex = vy_range_mem(range);
 		int rc = vy_mem_set(vindex, tuple);
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
-		/* update node */
+		/* update range */
 		range->used += vy_tuple_size(tuple);
 		quota += vy_tuple_size(tuple);
 		if (rlist_empty(&range->commit))
@@ -4980,7 +4981,7 @@ enum vy_task_type {
 struct vy_task {
 	enum vy_task_type type;
 	struct vy_index *index;
-	struct vy_range *node;
+	struct vy_range *range;
 	/*
 	 * View sequence number at the time when the task was scheduled.
 	 */
@@ -5035,20 +5036,20 @@ vy_task_execute(struct vy_task *task, struct sdc *c)
 	int rc = -1;
 	switch (task->type) {
 	case VY_TASK_NODEGC:
-		rc = vy_range_delete(task->node, 1);
-		sd_cgc(c);
+		rc = vy_range_delete(task->range, 1);
+		sdc_gc(c);
 		return rc;
 	case VY_TASK_CHECKPOINT:
 	case VY_TASK_DUMP:
 	case VY_TASK_AGE:
-		rc = vy_dump(task->index, task->node, task->vlsn,
+		rc = vy_dump(task->index, task->range, task->vlsn,
 			     &task->quota_release);
-		sd_cgc(c);
+		sdc_gc(c);
 		return rc;
 	case VY_TASK_GC:
 	case VY_TASK_COMPACT:
-		rc = si_compact(task->index, c, task->node, task->vlsn, NULL, 0);
-		sd_cgc(c);
+		rc = vy_range_compact(task->index, c, task->range, task->vlsn, NULL, 0);
+		sdc_gc(c);
 		return rc;
 	case VY_TASK_DROP:
 		assert(task->index->refs == 1); /* referenced by this task */
@@ -5226,17 +5227,17 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 			     struct vy_index *index, int64_t checkpoint_lsn,
 			     struct vy_task **ptask)
 {
-	/* try to peek a node which has min
+	/* try to peek a range which has min
 	 * lsn <= required value
 	*/
 	bool in_progress = false;
-	struct vy_range *n;
+	struct vy_range *range;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
-		n = container_of(pn, struct vy_range, nodedump);
-		if (n->i0.min_lsn > checkpoint_lsn)
+		range = container_of(pn, struct vy_range, nodedump);
+		if (range->i0.min_lsn > checkpoint_lsn)
 			continue;
-		if (n->flags & SI_LOCK) {
+		if (range->flags & VY_LOCK) {
 			in_progress = true;
 			continue;
 		}
@@ -5244,8 +5245,8 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 						   index, VY_TASK_CHECKPOINT);
 		if (task == NULL)
 			return -1; /* OOM */
-		vy_range_lock(n);
-		task->node = n;
+		vy_range_lock(range);
+		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
 	}
@@ -5261,21 +5262,21 @@ static inline int
 vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 		       uint32_t dump_wm, struct vy_task **ptask)
 {
-	/* try to peek a node with a biggest in-memory index */
-	struct vy_range *n;
+	/* try to peek a range with a biggest in-memory index */
+	struct vy_range *range;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
-		n = container_of(pn, struct vy_range, nodedump);
-		if (n->flags & SI_LOCK)
+		range = container_of(pn, struct vy_range, nodedump);
+		if (range->flags & VY_LOCK)
 			continue;
-		if (n->used < dump_wm)
+		if (range->used < dump_wm)
 			return 0; /* nothing to do */
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
 						   index, VY_TASK_DUMP);
 		if (task == NULL)
 			return -1; /* oom */
-		vy_range_lock(n);
-		task->node = n;
+		vy_range_lock(range);
+		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
 	}
@@ -5287,28 +5288,28 @@ static inline int
 vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 		      uint32_t ttl, uint32_t ttl_wm, struct vy_task **ptask)
 {
-	/* try to peek a node with update >= a and in-memory
+	/* try to peek a range with update >= a and in-memory
 	 * index size >= b */
 
 	/* full scan */
 	uint64_t now = clock_monotonic64();
-	struct vy_range *n = NULL;
+	struct vy_range *range = NULL;
 	struct ssrqnode *pn = NULL;
 	bool in_progress = false;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
-		n = container_of(pn, struct vy_range, nodedump);
-		if (n->flags & SI_LOCK) {
+		range = container_of(pn, struct vy_range, nodedump);
+		if (range->flags & VY_LOCK) {
 			in_progress = true;
 			continue;
 		}
-		if (n->used < ttl_wm && (now - n->update_time) < ttl)
+		if (range->used < ttl_wm && (now - range->update_time) < ttl)
 			continue;
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
 						   index, VY_TASK_AGE);
 		if (task == NULL)
 			return -1; /* oom */
-		vy_range_lock(n);
-		task->node = n;
+		vy_range_lock(range);
+		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
 	}
@@ -5325,22 +5326,22 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_index *index, uint32_t run_count,
 			  struct vy_task **ptask)
 {
-	/* try to peek a node with a biggest number
+	/* try to peek a range with a biggest number
 	 * of runs */
-	struct vy_range *n;
+	struct vy_range *range;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.compact, pn))) {
-		n = container_of(pn, struct vy_range, nodecompact);
-		if (n->flags & SI_LOCK)
+		range = container_of(pn, struct vy_range, nodecompact);
+		if (range->flags & VY_LOCK)
 			continue;
-		if (n->run_count < run_count)
+		if (range->run_count < run_count)
 			break; /* TODO: why ? */
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
 						   index, VY_TASK_COMPACT);
 		if (task == NULL)
 			return -1; /* OOM */
-		vy_range_lock(n);
-		task->node = n;
+		vy_range_lock(range);
+		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
 	}
@@ -5596,7 +5597,7 @@ vy_worker_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct sdc sdc;
-	sd_cinit(&sdc);
+	sdc_init(&sdc);
 	coeio_enable();
 	bool warning_said = false;
 	struct vy_task *task = NULL;
@@ -5632,7 +5633,7 @@ vy_worker_f(va_list va)
 		stailq_add_tail_entry(&scheduler->output_queue, task, link);
 	}
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	sd_cfree(&sdc);
+	sdc_free(&sdc);
 	return 0;
 }
 
@@ -6585,16 +6586,16 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 	struct siread q;
 	if (vy_tuple_key_part(key->data, 0) == NULL) {
 		/* key is [] */
-		si_readopen(&q, index, order, vlsn, NULL, 0);
+		vy_readopen(&q, index, order, vlsn, NULL, 0);
 	} else {
-		si_readopen(&q, index, order, vlsn, key->data, key->size);
+		vy_readopen(&q, index, order, vlsn, key->data, key->size);
 	}
 	q.upsert_v = upsert;
 	q.upsert_eq = upsert_eq;
 
 	assert(q.order != VINYL_EQ);
-	int rc = si_range(&q);
-	si_readclose(&q);
+	int rc = vy_read(&q);
+	vy_readclose(&q);
 
 	if (rc < 0) {
 		/* error */
@@ -7276,10 +7277,10 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	struct txv *v = write_set_first(&tx->write_set);
 
 	uint64_t write_count = 0;
-	/** @todo: check return value of si_write(). */
+	/** @todo: check return value of vy_tx_write(). */
 	while (v != NULL) {
 		++write_count;
-		v = si_write(&tx->write_set, v, now, e->status, lsn);
+		v = vy_tx_write(&tx->write_set, v, now, e->status, lsn);
 	}
 
 	uint32_t count = 0;
