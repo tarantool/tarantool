@@ -940,23 +940,6 @@ static struct vy_filterif vy_filterif_zstd =
 #define vy_error(fmt, ...) \
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
-static inline bool
-vy_status_is_active(enum vinyl_status status)
-{
-	switch (status) {
-	case VINYL_ONLINE:
-	case VINYL_INITIAL_RECOVERY:
-	case VINYL_FINAL_RECOVERY:
-		return true;
-	case VINYL_DROP:
-	case VINYL_OFFLINE:
-	case VINYL_MALFUNCTION:
-		return false;
-	}
-	unreachable();
-	return 0;
-}
-
 struct vy_stat {
 	/* get */
 	uint64_t get;
@@ -7231,9 +7214,7 @@ vy_rollback(struct vy_env *e, struct vy_tx *tx)
 int
 vy_prepare(struct vy_env *e, struct vy_tx *tx)
 {
-	if (unlikely(! vy_status_is_active(e->status)))
-		return -1;
-
+	(void) e;
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
 
