@@ -2003,7 +2003,6 @@ struct vy_index {
 	/* {{{ Scheduler members */
 	struct vy_planner p;
 	bool checkpoint_in_progress;
-	bool age_in_progress;
 	/* Scheduler members }}} */
 
 	/**
@@ -5034,8 +5033,6 @@ struct vy_scheduler {
 	int64_t       checkpoint_lsn_last;
 	int64_t       checkpoint_lsn;
 	bool checkpoint_in_progress;
-	bool age_in_progress;
-	uint64_t       age_time;
 	int            rr;
 	int            count;
 	struct vy_index **indexes;
@@ -5100,13 +5097,10 @@ vy_scheduler_new(struct vy_env *env)
 			 "struct");
 		return NULL;
 	}
-	uint64_t now = ev_now(loop());
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	scheduler->checkpoint_lsn = 0;
 	scheduler->checkpoint_lsn_last = 0;
 	scheduler->checkpoint_in_progress = false;
-	scheduler->age_in_progress = false;
-	scheduler->age_time = now;
 	scheduler->indexes = NULL;
 	scheduler->count = 0;
 	scheduler->rr = 0;
@@ -5255,13 +5249,10 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 	uint64_t now = clock_monotonic64();
 	struct vy_range *range = NULL;
 	struct ssrqnode *pn = NULL;
-	bool in_progress = false;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (range->flags & VY_LOCK) {
-			in_progress = true;
+		if (range->flags & VY_LOCK)
 			continue;
-		}
 		if (range->update_time + max_age > now)
 			continue;
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
@@ -5272,10 +5263,6 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
-	}
-	if (!in_progress) {
-		/* no more ranges */
-		index->age_in_progress = false;
 	}
 	*ptask = NULL;
 	return 0; /* nothing to do */
@@ -5341,7 +5328,7 @@ vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
 	}
 
 	/* index aging */
-	if (scheduler->age_in_progress) {
+	if (zone->dump_prio && zone->dump_age_period) {
 		uint32_t max_age = zone->dump_age * 1000000; /* ms */
 		rc = vy_scheduler_peek_age(scheduler, index, max_age, ptask);
 		if (rc != 0)
@@ -5407,35 +5394,6 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	return rc;
 }
 
-static void
-vy_schedule_periodic(struct vy_scheduler *scheduler, struct srzone *zone)
-{
-	uint64_t now = clock_monotonic64();
-
-	if (scheduler->age_in_progress) {
-		/* Stop periodic aging */
-		bool age_in_progress = false;
-		for (int i = 0; i < scheduler->count; i++) {
-			if (scheduler->indexes[i]->age_in_progress) {
-				age_in_progress = true;
-				break;
-			}
-		}
-		if (!age_in_progress) {
-			scheduler->age_in_progress = false;
-			scheduler->age_time = now;
-		}
-	} else if (zone->dump_prio && zone->dump_age_period &&
-		   (now - scheduler->age_time) >= zone->dump_age_period_us &&
-		   scheduler->count > 0) {
-		/* Start periodic aging */
-		scheduler->age_in_progress = true;
-		for (int i = 0; i < scheduler->count; i++) {
-			scheduler->indexes[i]->age_in_progress = true;
-		}
-	}
-}
-
 static int
 vy_worker_f(va_list va);
 
@@ -5447,12 +5405,9 @@ vy_scheduler_f(va_list va)
 
 	bool warning_said = false;
 	while (scheduler->is_worker_pool_running) {
-		/* Run periodic tasks */
-		struct srzone *zone = sr_zoneof(env);
-		vy_schedule_periodic(scheduler, zone);
-
 		/* Get task */
 		struct vy_task *task = NULL;
+		struct srzone *zone = sr_zoneof(env);
 		int rc = vy_schedule(scheduler, zone, env->xm->vlsn, &task);
 		if (rc != 0){
 			/* Log error message once */
@@ -6526,7 +6481,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	if (vy_planner_create(&index->p))
 		goto error_1;
 	index->checkpoint_in_progress = false;
-	index->age_in_progress = false;
 	if (vy_index_conf_create(index, key_def))
 		goto error_2;
 	index->key_def = key_def_dup(key_def);
