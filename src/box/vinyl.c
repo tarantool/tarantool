@@ -4929,14 +4929,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 /* {{{ Scheduler Task */
 
 enum vy_task_type {
-	VY_TASK_UNKNOWN = 0,
 	VY_TASK_DUMP,
-	VY_TASK_AGE,
 	VY_TASK_COMPACT,
-	VY_TASK_CHECKPOINT,
-	VY_TASK_GC,
 	VY_TASK_DROP,
-	VY_TASK_NODEGC
 };
 
 struct vy_task {
@@ -4996,18 +4991,11 @@ vy_task_execute(struct vy_task *task, struct sdc *c)
 	assert(task->index != NULL);
 	int rc = -1;
 	switch (task->type) {
-	case VY_TASK_NODEGC:
-		rc = vy_range_delete(task->range, 1);
-		sdc_gc(c);
-		return rc;
-	case VY_TASK_CHECKPOINT:
 	case VY_TASK_DUMP:
-	case VY_TASK_AGE:
 		rc = vy_dump(task->index, task->range, task->vlsn,
 			     &task->quota_release);
 		sdc_gc(c);
 		return rc;
-	case VY_TASK_GC:
 	case VY_TASK_COMPACT:
 		rc = vy_range_compact(task->index, c, task->range, task->vlsn, NULL, 0);
 		sdc_gc(c);
@@ -5194,7 +5182,7 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 			continue;
 		}
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_CHECKPOINT);
+						   index, VY_TASK_DUMP);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(range);
@@ -5256,7 +5244,7 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 		if (range->update_time + max_age > now)
 			continue;
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_AGE);
+						   index, VY_TASK_DUMP);
 		if (task == NULL)
 			return -1; /* oom */
 		vy_range_lock(range);
