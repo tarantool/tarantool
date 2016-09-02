@@ -215,13 +215,13 @@ HEAP(update_link)(heap_t *heap, heap_off_t pos);
 /**
  * Sift up current node.
  */
-static void
+static inline void
 HEAP(sift_up)(heap_t *heap, struct heap_node *node);
 
 /**
  * Sift down current node.
  */
-static void
+static inline void
 HEAP(sift_down)(heap_t *heap, struct heap_node *node);
 
 /* Debug functions */
@@ -229,7 +229,7 @@ HEAP(sift_down)(heap_t *heap, struct heap_node *node);
 /**
  * Check that heap inveriants is holded.
  */
-static int
+static inline int /* inline for suppress warning */
 HEAP(check)(heap_t *heap);
 
 
@@ -267,7 +267,7 @@ HEAP(update_link)(heap_t *heap, heap_off_t pos)
 /**
  * Sift up current node.
  */
-static void
+static inline void
 HEAP(sift_up)(heap_t *heap, struct heap_node *node)
 {
 	heap_off_t curr_pos = node->pos, parent = (curr_pos - 1) / 2;
@@ -289,7 +289,7 @@ HEAP(sift_up)(heap_t *heap, struct heap_node *node)
 /**
  * Sift down current node.
  */
-void
+static inline void
 HEAP(sift_down)(heap_t *heap, struct heap_node *node)
 {
 	heap_off_t curr_pos = node->pos, left, right;
@@ -426,7 +426,7 @@ HEAP(iterator_next)(struct heap_iterator *it)
 /**
  * Check that heap inveriants is holded.
  */
-static int
+static inline int
 HEAP(check)(heap_t *heap)
 {
 	heap_off_t left, right, min_child;
