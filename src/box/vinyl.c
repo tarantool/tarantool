@@ -1904,7 +1904,6 @@ struct PACKED vy_range {
 	uint32_t   run_count;
 	uint32_t   temperature;
 	uint64_t   temperature_reads;
-	uint16_t   refs;
 	struct vy_mem    i0, i1;
 	/** The file where the run is stored or -1 if it's not dumped yet. */
 	int fd;
@@ -4062,7 +4061,6 @@ vy_range_new(struct key_def *key_def)
 	range->run_count = 0;
 	range->temperature = 0;
 	range->temperature_reads = 0;
-	range->refs = 0;
 	range->fd = -1;
 	range->path[0] = '\0';
 	vy_mem_create(&range->i0, key_def);
