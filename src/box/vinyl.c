@@ -2002,7 +2002,6 @@ struct vy_index {
 
 	/* {{{ Scheduler members */
 	struct vy_planner p;
-	bool checkpoint_in_progress;
 	/* Scheduler members }}} */
 
 	/**
@@ -5170,7 +5169,6 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 	/* try to peek a range which has min
 	 * lsn <= required value
 	*/
-	bool in_progress = false;
 	struct vy_range *range;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
@@ -5178,7 +5176,6 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 		if (range->i0.min_lsn > checkpoint_lsn)
 			continue;
 		if (range->flags & VY_LOCK) {
-			in_progress = true;
 			continue;
 		}
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
@@ -5189,10 +5186,6 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 		task->range = range;
 		*ptask = task;
 		return 0; /* new task */
-	}
-	if (!in_progress) {
-		/* no more ranges to dump */
-		index->checkpoint_in_progress = false;
 	}
 	*ptask = NULL;
 	return 0; /* nothing to do */
@@ -5567,9 +5560,6 @@ vy_checkpoint(struct vy_env *env)
 		return 0;
 	scheduler->checkpoint_lsn = lsn;
 	scheduler->checkpoint_in_progress = true;
-	for (int i = 0; i < scheduler->count; i++) {
-		scheduler->indexes[i]->checkpoint_in_progress = true;
-	}
 	/* Wake scheduler up */
 	ipc_cond_signal(&scheduler->scheduler_cond);
 
@@ -5583,9 +5573,20 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	struct vy_scheduler *scheduler = env->scheduler;
 	for (;;) {
 		bool is_active = false;
+		/* iterate over all indexes */
 		for (int i = 0; i < scheduler->count; i++) {
+			/*
+			 * check that all ranges of index have lsn
+			 * greater than checkpoint_lsn
+			 */
 			struct vy_index *index = scheduler->indexes[i];
-			is_active |= index->checkpoint_in_progress;
+			struct vy_range *range;
+			range = vy_range_tree_first(&index->tree);
+			while (range) {
+				is_active |= (range->i0.min_lsn <=
+					      scheduler->checkpoint_lsn);
+				range = vy_range_tree_next(&index->tree, range);
+			}
 		}
 		if (!is_active)
 			break;
@@ -5601,7 +5602,6 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 		}
 	}
 
-	scheduler->checkpoint_in_progress = false;
 	scheduler->checkpoint_lsn_last = scheduler->checkpoint_lsn;
 	scheduler->checkpoint_lsn = 0;
 }
@@ -6468,7 +6468,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->env = e;
 	if (vy_planner_create(&index->p))
 		goto error_1;
-	index->checkpoint_in_progress = false;
 	if (vy_index_conf_create(index, key_def))
 		goto error_2;
 	index->key_def = key_def_dup(key_def);
@@ -8557,4 +8556,3 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
 }
 
 /* }}} Temporary wrap of new mem iterator to old API */
-
