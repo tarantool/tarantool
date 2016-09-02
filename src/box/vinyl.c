@@ -1905,7 +1905,6 @@ struct PACKED vy_range {
 	uint32_t   temperature;
 	uint64_t   temperature_reads;
 	uint16_t   refs;
-	pthread_mutex_t reflock;
 	struct vy_mem    i0, i1;
 	/** The file where the run is stored or -1 if it's not dumped yet. */
 	int fd;
@@ -4064,7 +4063,6 @@ vy_range_new(struct key_def *key_def)
 	range->temperature = 0;
 	range->temperature_reads = 0;
 	range->refs = 0;
-	tt_pthread_mutex_init(&range->reflock, NULL);
 	range->fd = -1;
 	range->path[0] = '\0';
 	vy_mem_create(&range->i0, key_def);
@@ -4092,7 +4090,6 @@ vy_range_close(struct vy_range *range, int gc)
 	} else {
 		vy_mem_destroy(&range->i0);
 		vy_mem_destroy(&range->i1);
-		tt_pthread_mutex_destroy(&range->reflock);
 	}
 	return rcret;
 }
