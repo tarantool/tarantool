@@ -88,6 +88,9 @@
 #include "vclock.h"
 #include "assoc.h"
 
+#define HEAP_FORWARD_DECLARATION
+#include "salad/heap.h"
+
 #define vy_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
@@ -255,134 +258,6 @@ vy_quota_used_percent(struct vy_quota *q)
 	if (q->limit == 0)
 		return 0;
 	return (q->used * 100) / q->limit;
-}
-
-/* range queue */
-
-struct ssrqnode {
-	uint32_t q, v;
-	struct rlist link;
-};
-
-struct ssrqq {
-	uint32_t count;
-	uint32_t q;
-	struct rlist list;
-};
-
-struct ssrq {
-	uint32_t range_count;
-	uint32_t range;
-	uint32_t last;
-	struct ssrqq *q;
-};
-
-static inline void
-ss_rqinitnode(struct ssrqnode *n) {
-	rlist_create(&n->link);
-	n->q = UINT32_MAX;
-	n->v = 0;
-}
-
-static inline int
-ss_rqinit(struct ssrq *q, uint32_t range, uint32_t count)
-{
-	q->range_count = count + 1 /* zero */;
-	q->range = range;
-	q->q = malloc(sizeof(struct ssrqq) * q->range_count);
-	if (unlikely(q->q == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct ssrqq) * q->range_count,
-			 "malloc", "struct ssrq");
-		return -1;
-	}
-	uint32_t i = 0;
-	while (i < q->range_count) {
-		struct ssrqq *p = &q->q[i];
-		rlist_create(&p->list);
-		p->count = 0;
-		p->q = i;
-		i++;
-	}
-	q->last = 0;
-	return 0;
-}
-
-static inline void
-ss_rqfree(struct ssrq *q)
-{
-	if (q->q) {
-		free(q->q);
-		q->q = NULL;
-	}
-}
-
-static inline void
-ss_rqadd(struct ssrq *q, struct ssrqnode *n, uint32_t v)
-{
-	uint32_t pos;
-	if (unlikely(v == 0)) {
-		pos = 0;
-	} else {
-		pos = (v / q->range) + 1;
-		if (unlikely(pos >= q->range_count))
-			pos = q->range_count - 1;
-	}
-	struct ssrqq *p = &q->q[pos];
-	rlist_create(&n->link);
-	n->v = v;
-	n->q = pos;
-	rlist_add(&p->list, &n->link);
-	if (unlikely(p->count == 0)) {
-		if (pos > q->last)
-			q->last = pos;
-	}
-	p->count++;
-}
-
-static inline void
-ss_rqdelete(struct ssrq *q, struct ssrqnode *n)
-{
-	struct ssrqq *p = &q->q[n->q];
-	p->count--;
-	rlist_del(&n->link);
-	if (unlikely(p->count == 0 && q->last == n->q))
-	{
-		int i = n->q - 1;
-		while (i >= 0) {
-			struct ssrqq *p = &q->q[i];
-			if (p->count > 0) {
-				q->last = i;
-				n->q = UINT32_MAX;
-				return;
-			}
-			i--;
-		}
-	}
-	n->q = UINT32_MAX;
-}
-
-static inline struct ssrqnode*
-ss_rqprev(struct ssrq *q, struct ssrqnode *n)
-{
-	int pos;
-	struct ssrqq *p;
-	if (likely(n)) {
-		pos = n->q;
-		p = &q->q[pos];
-		if (n->link.next != (&p->list)) {
-			return container_of(n->link.next, struct ssrqnode, link);
-		}
-		pos--;
-	} else {
-		pos = q->last;
-	}
-	for (; pos >= 0; pos--) {
-		p = &q->q[pos];
-		if (unlikely(p->count == 0))
-			continue;
-		return container_of(p->list.next, struct ssrqnode, link);
-	}
-	return NULL;
 }
 
 enum vy_filter_op {
@@ -1853,8 +1728,8 @@ struct vy_range {
 	int fd;
 	char path[PATH_MAX];
 	rb_node(struct vy_range) tree_node;
-	struct ssrqnode   nodecompact;
-	struct ssrqnode   nodedump;
+	struct heap_node   nodecompact;
+	struct heap_node   nodedump;
 	struct rlist     split;
 	uint32_t range_version;
 };
@@ -1885,9 +1760,44 @@ struct vy_profiler {
 	struct vy_index  *i;
 };
 
+#define HEAP_NAME vy_dump_heap
+
+static inline int
+heap_dump_less(struct heap_node *a, struct heap_node *b)
+{
+	const struct vy_range *left =
+		container_of(a, struct vy_range, nodedump);
+	const struct vy_range *right =
+		container_of(b, struct vy_range, nodedump);
+	return left->used > right->used;
+}
+
+#define HEAP_LESS(h, l, r) heap_dump_less(l, r)
+
+#include "salad/heap.h"
+
+#undef HEAP_LESS
+#undef HEAP_NAME
+
+#define HEAP_NAME vy_compact_heap
+
+static inline int
+heap_compact_less(struct heap_node *a, struct heap_node *b)
+{
+	const struct vy_range *left =
+				container_of(a, struct vy_range, nodecompact);
+	const struct vy_range *right =
+				container_of(b, struct vy_range, nodecompact);
+	return left->run_count > right->run_count;
+}
+
+#define HEAP_LESS(h, l, r) heap_compact_less(l, r)
+
+#include "salad/heap.h"
+
 struct vy_planner {
-	struct ssrq dump;
-	struct ssrq compact;
+	heap_t dump_heap;
+	heap_t compact_heap;
 };
 
 /**
@@ -2761,7 +2671,7 @@ vy_range_size(struct vy_range *range)
 	return size;
 }
 
-static int vy_planner_create(struct vy_planner*);
+static void vy_planner_create(struct vy_planner*);
 static void vy_planner_destroy(struct vy_planner*);
 static void
 vy_planner_add_range(struct vy_planner *p, struct vy_range *range);
@@ -3464,8 +3374,8 @@ vy_range_new(struct key_def *key_def)
 	range->fd = -1;
 	vy_mem_create(&range->i0, key_def);
 	vy_mem_create(&range->i1, key_def);
-	ss_rqinitnode(&range->nodecompact);
-	ss_rqinitnode(&range->nodedump);
+	range->nodedump.pos = UINT32_MAX;
+	range->nodecompact.pos = UINT32_MAX;
 	rlist_create(&range->split);
 	return range;
 }
@@ -3585,8 +3495,8 @@ vy_range_delete_runs(struct vy_range *range)
 static int
 vy_range_delete(struct vy_range *range, int gc)
 {
-	assert(range->nodedump.q == UINT32_MAX);
-	assert(range->nodecompact.q == UINT32_MAX);
+	assert(range->nodedump.pos == UINT32_MAX);
+	assert(range->nodecompact.pos == UINT32_MAX);
 
 	int rcret = 0;
 	int rc;
@@ -3622,53 +3532,46 @@ vy_range_complete(struct vy_range *range, struct vy_index *index)
 	return rc;
 }
 
-static int vy_planner_create(struct vy_planner *p)
+static void vy_planner_create(struct vy_planner *p)
 {
-	if (ss_rqinit(&p->compact, 1, 20) < 0)
-		return -1;
-	/* 1Mb step up to 4Gb */
-	if (ss_rqinit(&p->dump, 1024 * 1024, 4000)) {
-		ss_rqfree(&p->compact);
-		return -1;
-	}
-	return 0;
+	vy_compact_heap_create(&p->compact_heap);
+	vy_dump_heap_create(&p->dump_heap);
 }
 
 static void
 vy_planner_destroy(struct vy_planner *p)
 {
-	ss_rqfree(&p->compact);
-	ss_rqfree(&p->dump);
+	vy_compact_heap_destroy(&p->compact_heap);
+	vy_dump_heap_destroy(&p->dump_heap);
 }
 
 static void
 vy_planner_add_range(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqadd(&p->dump, &range->nodedump, range->used);
-	ss_rqadd(&p->compact, &range->nodecompact, range->run_count);
-	assert(range->nodedump.q != UINT32_MAX);
-	assert(range->nodecompact.q != UINT32_MAX);
+	vy_dump_heap_insert(&p->dump_heap, &range->nodedump);
+	vy_compact_heap_insert(&p->compact_heap, &range->nodecompact);
+	assert(range->nodedump.pos != UINT32_MAX);
+	assert(range->nodecompact.pos != UINT32_MAX);
 }
 
 static void
 vy_planner_update_range(struct vy_planner *p, struct vy_range *range)
 {
-	if (likely(range->nodedump.q == UINT32_MAX))
+	if (likely(range->nodedump.pos == UINT32_MAX))
 		return; /* range is being processed by a task */
 
-	ss_rqdelete(&p->dump, &range->nodedump);
-	ss_rqadd(&p->dump, &range->nodedump, range->used);
-	assert(range->nodedump.q != UINT32_MAX);
-	assert(range->nodecompact.q != UINT32_MAX);
+	vy_dump_heap_update(&p->dump_heap, &range->nodedump);
+	assert(range->nodedump.pos != UINT32_MAX);
+	assert(range->nodecompact.pos != UINT32_MAX);
 }
 
 static void
 vy_planner_remove_range(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqdelete(&p->dump, &range->nodedump);
-	ss_rqdelete(&p->compact, &range->nodecompact);
-	assert(range->nodedump.q == UINT32_MAX);
-	assert(range->nodecompact.q == UINT32_MAX);
+	vy_dump_heap_delete(&p->dump_heap, &range->nodedump);
+	vy_compact_heap_delete(&p->compact_heap, &range->nodecompact);
+	range->nodedump.pos = UINT32_MAX;
+	range->nodecompact.pos = UINT32_MAX;
 }
 
 static void
@@ -4221,8 +4124,8 @@ vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->compact.range;
-	assert(range->nodedump.q == UINT32_MAX);
-	assert(range->nodecompact.q == UINT32_MAX);
+	assert(range->nodedump.pos == UINT32_MAX);
+	assert(range->nodecompact.pos == UINT32_MAX);
 
 	struct svmergeiter imerge;
 	struct svmerge vmerge;
@@ -4519,8 +4422,10 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 	 * lsn <= required value
 	*/
 	struct vy_range *range;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&index->p.dump, pn))) {
+	struct heap_node *pn = NULL;
+	struct heap_iterator it;
+	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->i0.min_lsn > checkpoint_lsn)
 			continue;
@@ -4542,8 +4447,10 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 {
 	/* try to peek a range with a biggest in-memory index */
 	struct vy_range *range;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&index->p.dump, pn))) {
+	struct heap_node *pn = NULL;
+	struct heap_iterator it;
+	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->used < 10 * 1024 * 1024 &&
 		    range->used < index->key_def->opts.range_size)
@@ -4569,9 +4476,11 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 
 	/* full scan */
 	uint64_t now = clock_monotonic64();
-	struct vy_range *range = NULL;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&index->p.dump, pn))) {
+	struct vy_range *range;
+	struct heap_node *pn = NULL;
+	struct heap_iterator it;
+	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->used == 0)
 			continue;
@@ -4595,8 +4504,10 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	/* try to peek a range with a biggest number
 	 * of runs */
 	struct vy_range *range;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&index->p.compact, pn))) {
+	struct heap_node *pn = NULL;
+	struct heap_iterator it;
+	vy_compact_heap_iterator_init(&index->p.compact_heap, &it);
+	while ((pn = vy_compact_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodecompact);
 		if (range->run_count < run_count)
 			break; /* TODO: why ? */
@@ -5714,8 +5625,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 	memset(index, 0, sizeof(*index));
 	index->env = e;
-	if (vy_planner_create(&index->p))
-		goto error_1;
+	vy_planner_create(&index->p);
 	if (vy_index_conf_create(index, key_def))
 		goto error_2;
 	index->key_def = key_def_dup(key_def);
@@ -5771,7 +5681,6 @@ error_3:
 	free(index->path);
 error_2:
 	vy_planner_destroy(&index->p);
-error_1:
 	free(index);
 	return NULL;
 }
