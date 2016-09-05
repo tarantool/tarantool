@@ -91,15 +91,21 @@ if (WITH_SYSVINIT)
 endif()
 
 if (NOT TARGET_OS_FREEBSD)
-# logrotate files
-configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool.logrotate
-    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d/
-    RENAME "tarantool"
-    PERMISSIONS
-    OWNER_READ OWNER_WRITE
-    GROUP_READ
-    WORLD_READ)
+    set (WITH_LOGROTATE_DEFAULT ON)
+endif()
+option(WITH_LOGROTATE "Enable logrotate configuration" ${WITH_LOGROTATE_DEFAULT})
+file(APPEND "${_OptionalPackagesFile}" "-- WITH_LOGROTATE=${WITH_LOGROTATE}\n")
+
+if (WITH_LOGROTATE)
+    # logrotate files
+    configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
+    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool.logrotate
+        DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d/
+        RENAME "tarantool"
+        PERMISSIONS
+        OWNER_READ OWNER_WRITE
+        GROUP_READ
+        WORLD_READ)
 endif()
 
 # man page for tarantoolctl
