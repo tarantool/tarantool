@@ -124,42 +124,35 @@ ch:is_closed()
 
 
 -- race conditions
-chs= {}
-count= 0
-res= { }
+chs, res, count = {}, {}, 0
 test_run:cmd("setopt delimiter ';'")
 for i = 1, 10 do table.insert(chs, fiber.channel()) end;
 
-
 for i = 1, 10 do
-    local no = i fiber.create(
-        function()
-            fiber.self():name('pusher')
-            while true do
-                chs[no]:put({no})
-                fiber.sleep(0.001 * math.random())
-            end
+    fiber.create(function(no)
+        fiber.self():name('pusher')
+        while true do
+            chs[no]:put({no})
+            fiber.sleep(0.001 * math.random())
         end
-    )
+    end, i)
 end;
 
 for i = 1, 10 do
-    local no = i fiber.create(
-        function()
-            fiber.self():name('receiver')
-            while true do
-                local r = chs[no]:get(math.random() * .001)
-                if r ~= nil and r[1] == no then
-                    res[no] = true
-                elseif r ~= nil then
-                    break
-                end
-                fiber.sleep(0.001 * math.random())
-                count = count + 1
+    fiber.create(function(no)
+        fiber.self():name('receiver')
+        while true do
+            local r = chs[no]:get(math.random() * .001)
+            if r ~= nil and r[1] == no then
+                res[no] = true
+            elseif r ~= nil then
+                break
             end
-            res[no] = false
+            fiber.sleep(0.001 * math.random())
+            count = count + 1
         end
-    )
+        res[no] = false
+    end, i)
 end;
 
 for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
