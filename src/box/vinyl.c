@@ -165,22 +165,6 @@ vy_buf_unused(struct vy_buf *b) {
 	return b->e - b->p;
 }
 
-static inline void
-vy_buf_reset(struct vy_buf *b) {
-	b->p = b->s;
-}
-
-static inline void
-vy_buf_gc(struct vy_buf *b, size_t wm)
-{
-	if (unlikely(vy_buf_size(b) >= wm)) {
-		vy_buf_destroy(b);
-		vy_buf_create(b);
-		return;
-	}
-	vy_buf_reset(b);
-}
-
 static inline int
 vy_buf_ensure(struct vy_buf *b, size_t size)
 {
@@ -2508,89 +2492,6 @@ vy_run_index_size(struct vy_run_index *i)
 	       i->info.minmax_size;
 }
 
-struct sdcbuf {
-	struct vy_buf a; /* decompression */
-	struct vy_buf b; /* transformation */
-	struct sdcbuf *next;
-};
-
-struct sdc {
-	struct vy_buf a;        /* result */
-	struct vy_buf b;        /* redistribute buffer */
-	struct vy_buf c;        /* file buffer */
-	struct vy_buf d;        /* page read buffer */
-	struct sdcbuf *head;   /* compression buffer list */
-	int count;
-};
-
-static inline void
-sdc_init(struct sdc *sc)
-{
-	vy_buf_create(&sc->a);
-	vy_buf_create(&sc->b);
-	vy_buf_create(&sc->c);
-	vy_buf_create(&sc->d);
-	sc->count = 0;
-	sc->head = NULL;
-}
-
-static inline void
-sdc_free(struct sdc *sc)
-{
-	vy_buf_destroy(&sc->a);
-	vy_buf_destroy(&sc->b);
-	vy_buf_destroy(&sc->c);
-	vy_buf_destroy(&sc->d);
-	struct sdcbuf *b = sc->head;
-	struct sdcbuf *next;
-	while (b) {
-		next = b->next;
-		vy_buf_destroy(&b->a);
-		vy_buf_destroy(&b->b);
-		free(b);
-		b = next;
-	}
-}
-
-static inline void
-sdc_gc(struct sdc *sc)
-{
-	int wm = 1024 * 1024;
-	fiber_gc();
-	vy_buf_gc(&sc->a, wm);
-	vy_buf_gc(&sc->b, wm);
-	vy_buf_gc(&sc->c, wm);
-	vy_buf_gc(&sc->d, wm);
-	struct sdcbuf *it = sc->head;
-	while (it) {
-		vy_buf_gc(&it->a, wm);
-		vy_buf_gc(&it->b, wm);
-		it = it->next;
-	}
-}
-
-static inline int
-sdc_ensure(struct sdc *c, int count)
-{
-	if (c->count < count) {
-		while (count-- >= 0) {
-			struct sdcbuf *buf =
-				malloc(sizeof(struct sdcbuf));
-			if (buf == NULL) {
-				diag_set(OutOfMemory, sizeof(struct sdcbuf),
-					 "malloc", "struct sdcbuf");
-				return -1;
-			}
-			vy_buf_create(&buf->a);
-			vy_buf_create(&buf->b);
-			buf->next = c->head;
-			c->head = buf;
-			c->count++;
-		}
-	}
-	return 0;
-}
-
 static int
 vy_index_dump_range_index(struct vy_index *index);
 static int
@@ -3107,7 +3008,7 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 static int vy_task_drop(struct vy_index*);
 
 static int
-vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
+vy_range_merge(struct vy_index *index, struct vy_range *range,
 	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
 	 uint32_t n_stream, struct rlist *result);
 
@@ -3611,16 +3512,13 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 			 enum vy_order order, char *key);
 
 static int
-vy_range_compact(struct vy_index *index, struct sdc *c, struct vy_range *range,
+vy_range_compact(struct vy_index *index, struct vy_range *range,
 	   int64_t vlsn, struct vy_iter *vindex, uint64_t vindex_used)
 {
 	assert(range->flags & VY_LOCK);
 
 	/* prepare for compaction */
 	int rc;
-	rc = sdc_ensure(c, range->run_count);
-	if (unlikely(rc == -1))
-		return -1;
 	struct svmerge merge;
 	sv_mergeinit(&merge, index, index->key_def);
 	rc = sv_mergeprepare(&merge, range->run_count + 1);
@@ -3649,7 +3547,7 @@ vy_range_compact(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	rlist_create(&result);
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, &merge, VINYL_GE);
-	rc = vy_range_merge(index, c, range, vlsn, &im, size_stream, count,
+	rc = vy_range_merge(index, range, vlsn, &im, size_stream, count,
 			    &result);
 	sv_mergefree(&merge);
 	if (!rc)
@@ -3729,28 +3627,35 @@ vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple 
 }
 
 static int
-vy_range_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_range *range)
+vy_range_redistribute_index(struct vy_index *index, struct vy_range *range)
 {
+	struct vy_buf buf;
+	vy_buf_create(&buf);
 	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
 	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
 	while (ii.vif->has(&ii)) {
 		struct vy_tuple *v = ii.vif->get(&ii);
-		int rc = vy_buf_add(&c->b, v, sizeof(struct vy_tuple ***));
-		if (unlikely(rc == -1))
+		int rc = vy_buf_add(&buf, v, sizeof(struct vy_tuple ***));
+		if (unlikely(rc == -1)) {
+			vy_buf_destroy(&buf);
 			return -1;
+		}
 		ii.vif->next(&ii);
 	}
-	if (unlikely(vy_buf_used(&c->b) == 0))
+	if (unlikely(vy_buf_used(&buf) == 0)) {
+		vy_buf_destroy(&buf);
 		return 0;
+	}
 	uint64_t now = clock_monotonic64();
 	struct vy_bufiter i;
-	vy_bufiter_open(&i, &c->b, sizeof(struct vy_tuple **));
+	vy_bufiter_open(&i, &buf, sizeof(struct vy_tuple **));
 	while (vy_bufiter_has(&i)) {
 		struct vy_tuple **v = vy_bufiterref_get(&i);
 		vy_range_redistribute_set(index, now, *v);
 		vy_bufiter_next(&i);
 	}
+	vy_buf_destroy(&buf);
 	return 0;
 }
 
@@ -3767,7 +3672,7 @@ vy_range_splitfree(struct rlist *result)
 }
 
 static inline int
-vy_range_split(struct vy_index *index, struct sdc *c,
+vy_range_split(struct vy_index *index,
 	       struct svmergeiter *merge_iter,
 	       uint64_t  size_node,
 	       uint64_t  size_stream,
@@ -3776,7 +3681,6 @@ vy_range_split(struct vy_index *index, struct sdc *c,
 	       struct rlist *result)
 {
 	(void) stream;
-	(void) c;
 	(void) size_stream;
 	int rc;
 	struct vy_range *range = NULL;
@@ -3823,7 +3727,7 @@ error:
 }
 
 static int
-vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
+vy_range_merge(struct vy_index *index, struct vy_range *range,
 	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
 	 uint32_t n_stream, struct rlist *result)
 {
@@ -3833,7 +3737,7 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 * a new nodes.
 	 */
 	int rc;
-	rc = vy_range_split(index, c, stream, index->key_def->opts.range_size,
+	rc = vy_range_split(index, stream, index->key_def->opts.range_size,
 			    size_stream, n_stream, vlsn, result);
 	if (unlikely(rc == -1))
 		return -1;
@@ -3873,7 +3777,7 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	switch (count) {
 	case 0: /* delete */
 		vy_index_remove_range(index, range);
-		vy_range_redistribute_index(index, c, range);
+		vy_range_redistribute_index(index, range);
 		break;
 	case 1: /* self update */
 		n = rlist_first_entry(result, struct vy_range, split);
@@ -4659,7 +4563,7 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 }
 
 static int
-vy_task_execute(struct vy_task *task, struct sdc *c)
+vy_task_execute(struct vy_task *task)
 {
 	assert(task->index != NULL);
 	int rc = -1;
@@ -4667,11 +4571,9 @@ vy_task_execute(struct vy_task *task, struct sdc *c)
 	case VY_TASK_DUMP:
 		rc = vy_dump(task->index, task->range, task->vlsn,
 			     &task->quota_release);
-		sdc_gc(c);
 		return rc;
 	case VY_TASK_COMPACT:
-		rc = vy_range_compact(task->index, c, task->range, task->vlsn, NULL, 0);
-		sdc_gc(c);
+		rc = vy_range_compact(task->index, task->range, task->vlsn, NULL, 0);
 		return rc;
 	case VY_TASK_DROP:
 		assert(task->index->refs == 1); /* referenced by this task */
@@ -5114,8 +5016,6 @@ static int
 vy_worker_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-	struct sdc sdc;
-	sdc_init(&sdc);
 	coeio_enable();
 	bool warning_said = false;
 	struct vy_task *task = NULL;
@@ -5137,7 +5037,7 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		if (vy_task_execute(task, &sdc)) {
+		if (vy_task_execute(task)) {
 			if (!warning_said) {
 				error_log(diag_last_error(diag_get()));
 				warning_said = true;
@@ -5151,7 +5051,6 @@ vy_worker_f(va_list va)
 		stailq_add_tail_entry(&scheduler->output_queue, task, link);
 	}
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	sdc_free(&sdc);
 	return 0;
 }
 
