@@ -25,10 +25,8 @@ The file contains common default instances options:
     default_cfg = {
         -- will become pid_file .. instance .. '.pid'
         pid_file    =   "/var/run/tarantool",
-
         -- will become wal_dir/instance/
         wal_dir     =   "/var/lib/tarantool",
-
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
 
@@ -37,7 +35,6 @@ The file contains common default instances options:
 
         -- logger/instance .. '.log'
         logger      =   "/var/log/tarantool",
-
         username    =   "tarantool",
     }
 
@@ -130,45 +127,26 @@ int kill(int pid, int sig);
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
 ]]
---
--- tables with all available commands
---
-local local_commands
-local remote_commands
---
+-- command, that we're executing
+local command_name
 -- true if we're running in HOME directory of a user
---
 local usermode = false
---
+-- true if we're tarantoolctl is symlink and name != tarantoolctl
+local linkmode = false
 -- a file with system-wide settings
---
 local default_file
+-- current instance settings
 local instance_name
 local instance_path
 local console_sock
 local group_name
---
 -- overrides for defaults files
---
 local instance_dir
 local default_cfg
 
---
--- print usage and exit
---
-local function usage()
-    local local_tbl = fun.map(function(name, cmd) return name end,
-                                 local_commands):totable()
-    local remote_tbl = fun.map(function(name, cmd) return name end,
-                               remote_commands):totable()
-    table.sort(local_tbl)
-    table.sort(remote_tbl)
-
-    log.error("Usage: %s {%s} instance_name", arg[0], table.concat(local_tbl, '|'))
-    log.error("       %s {%s} URI", arg[0], table.concat(remote_tbl, '|'))
-
-    log.error("Config file: %s", default_file)
-    os.exit(1)
+-- print usage and exit. overloaded later
+local usage = function()
+    os.exit(-1)
 end
 
 --
@@ -231,7 +209,8 @@ end
 local function check_file(path)
     local rv, err = loadfile(path)
     if rv == nil then
-        log.error("Failed to check %s", err)
+        log.error("%s", debug.traceback())
+        log.error("Failed to check instance file '%s'", err)
         return err
     end
     return nil
@@ -322,9 +301,9 @@ local function find_instance_name(arg0, arg2)
         log.error("Can't stat %s: %s", arg0, errno.strerror())
         os.exit(1)
     end
-    if not istat:is_link() then
-        usage()
-    end
+    if not istat:is_link() then usage() end
+    arg[2] = arg0
+    linkmode = true
     return fio.basename(arg0, '.lua')
 end
 
@@ -632,38 +611,23 @@ local function exit_wrapper(func)
     return function() os.exit(func()) end
 end
 
-local_commands = {
-    start     = start,
-    stop      = exit_wrapper(stop),
-    logrotate = exit_wrapper(logrotate),
-    status    = exit_wrapper(status),
-    enter     = exit_wrapper(enter),
-    restart   = restart,
-    reload    = exit_wrapper(eval),
-    eval      = exit_wrapper(eval),
-    check     = exit_wrapper(check)
-}
-
-remote_commands = {
-    connect   = exit_wrapper(connect)
-}
-
-if #arg <2 then
-    usage()
+local function process_remote(cmd_function)
+    shift_argv(arg, 0, 2)
+    cmd_function()
 end
 
-default_file = find_default_file()
-
-if local_commands[arg[1]] ~= nil then
-    -- Check if the requested action is among supported ones, and return it in this
-    -- case. Otherwise print help and exit.
-    local cmd_function = local_commands[arg[1]]
-
+local function process_local(cmd_function)
     instance_name = find_instance_name(arg[0], arg[2])
+
+    default_file = find_default_file()
     load_default_file(default_file)
 
-    -- Pass the rest of command line arguments to the instance
     shift_argv(arg, 0, 2)
+
+    if #arg < 2 then
+        log.error("Not enough arguments for '%s' command", command_name)
+        usage()
+    end
 
     instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
 
@@ -678,16 +642,56 @@ if local_commands[arg[1]] ~= nil then
     console_sock = 'unix/:' .. console_sock
 
     cmd_function()
-elseif remote_commands[arg[1]] ~= nil then
-    local cmd_function = remote_commands[arg[1]]
+end
 
-    -- Pass the rest of command line arguments to the instance
-    shift_argv(arg, 0, 2)
+local commands = setmetatable({
+    start     = { func = start,                   process = process_local  },
+    stop      = { func = exit_wrapper(stop),      process = process_local  },
+    logrotate = { func = exit_wrapper(logrotate), process = process_local  },
+    status    = { func = exit_wrapper(status),    process = process_local  },
+    enter     = { func = exit_wrapper(enter),     process = process_local  },
+    restart   = { func = restart,                 process = process_local  },
+    reload    = { func = exit_wrapper(eval),      process = process_local  },
+    eval      = { func = exit_wrapper(eval),      process = process_local  },
+    check     = { func = exit_wrapper(check),     process = process_local  },
+    connect   = { func = exit_wrapper(connect),   process = process_remote }
+}, {
+    __index = function()
+        log.error("Unknown command '%s'", command_name)
+        usage()
+    end
+})
 
-    cmd_function()
-else
-    log.error("Unknown command '%s'", arg[1])
+local usage = function()
+    local local_tbl = fun.iter(commands):reduce(function(name, cmd)
+        return cmd.process == process_local
+    end):map(function(name, cmd) return name end):totable()
+    table.sort(local_tbl); local_tbl = table.concat(local_tbl, '|')
+
+    local remote_tbl = fun.iter(commands):reduce(function(name, cmd)
+        return cmd.process == process_remote
+    end):map(function(name, cmd) return name end):totable()
+    table.sort(remote_tbl); remote_tbl = table.concat(remote_tbl, '|')
+
+    if linkmode then
+        log.error("Usage: %s {%s}",               arg[0], local_tbl )
+    else
+        log.error("Usage: %s {%s} instance_name", arg[0], local_tbl )
+        log.error("       %s {%s} URI",           arg[0], remote_tbl)
+    end
+
+    log.error("Config file: %s", default_file)
+    os.exit(1)
+end
+
+if #arg < 2 then
+    log.error("Not enough arguments for '%s' command", command_name)
     usage()
 end
+
+local command_name = arg[1]
+
+local cmd_pair = commands[command_name]
+cmd_pair.process(cmd_pair.func)
 
 -- vim: syntax=lua
