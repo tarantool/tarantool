@@ -2227,7 +2227,10 @@ write_set_key_cmp(write_set_t *index, struct write_set_key *a, struct txv *b)
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
 		if (a->data == NULL) {
-			/* special key for search of begining of index */
+			/*
+			 * A special key to position search at the
+			 * beginning of the index.
+			 */
 			return -1;
 		}
 		struct key_def *key_def = a->index->key_def;
@@ -4304,20 +4307,25 @@ struct vy_run_iterator {
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	int64_t vlsn;
 
-	/* State of iterator */
-	/* Position of curent record */
+	/* State of the iterator */
+	/** Position of the current record */
 	struct vy_run_iterator_pos curr_pos;
-	/* last tuple returned by vy_run_iterator_get, iterator hold this tuple
-	 *  until next call to vy_run_iterator_get, in which it's unreffed */
+	/**
+	 * Last tuple returned by vy_run_iterator_get.
+	 * The iterator holds this tuple until the next call to
+	 * vy_run_iterator_get, when it's dereferenced.
+	 */
 	struct vy_tuple *curr_tuple;
-	/* Position of record that spawned curr_tuple */
+	/** Position of record that spawned curr_tuple */
 	struct vy_run_iterator_pos curr_tuple_pos;
-	/* Page number of currenly loaded into memory page
-	 * (UINT32_MAX if no page is loaded */
+	/**
+	 * Page number of the currently loaded page, UINT32_MAX if
+	 * no page is loaded.
+	 */
 	uint32_t curr_loaded_page;
-	/* Is false until first .._get ot .._next_.. method is called */
+	/** Is false until first .._get ot .._next_.. method is called */
 	bool search_started;
-	/* Search is finished, you will not get more values from iterator */
+	/** Search is finished, you will not get more values from iterator */
 	bool search_ended;
 };
 
@@ -4330,39 +4338,15 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 		     struct vy_filterif *compression, enum vy_order order,
 		     char *key, int64_t vlsn);
 
-/**
- * Get a tuple from a record, that iterator currently positioned on
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
 static int
 vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result);
 
-/**
- * Find the next record with different key as current and visible lsn
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
 static int
 vy_run_iterator_next_key(struct vy_run_iterator *itr);
 
-/**
- * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
- */
 static int
 vy_run_iterator_next_lsn(struct vy_run_iterator *itr);
 
-/**
- * Restore current position (if necessary) after the given tuple
- * Work only for not started iterator
- * return 0 if position did not change (iterator started)
- * return 1 if position changed (iterator not started)
- */
 static int
 vy_run_iterator_restore(struct vy_run_iterator *itr, struct vy_tuple *last_tuple);
 
@@ -6596,7 +6580,7 @@ check_key:
 	    vy_tuple_compare(old_data, result_tuple->data, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
-		 * return the old tuple.
+		 * @retval the old tuple.
 		 */
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 key_def->name, space_name_by_id(key_def->space_id));
@@ -7116,7 +7100,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page)
 }
 
 /**
- * Compare two position
+ * Compare two positions
  */
 static int
 vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
@@ -7133,9 +7117,9 @@ vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
  * Till possible, returns position of first record in page
  * This behaviour allows to read keys from page index instead of disk
  *  untill necessary page was found
- * return 0 on sucess
- * return -1 or memory or read error
- * return 1 on EOF (possible when page has no records, int bootstrap run)
+ * @retval 0 success
+ * @retval -1 or memory or read error
+ * @retval 1 EOF (possible when page has no records, int bootstrap run)
  */
 static int
 vy_iterator_pos_mid(struct vy_run_iterator *itr,
@@ -7166,8 +7150,8 @@ vy_iterator_pos_mid(struct vy_run_iterator *itr,
 /**
  * Specific increment of middle wide position for binary search
  * Actually does not do increment until search in page was started.
- * return 0 on sucess
- * return -1 or memory or read error
+ * @retval 0 success
+ * @retval -1 memory or read error
  */
 static int
 vy_iterator_pos_mid_next(struct vy_run_iterator *itr,
@@ -7188,10 +7172,11 @@ vy_iterator_pos_mid_next(struct vy_run_iterator *itr,
 }
 
 /**
- * Read key and lsn by given wide position.
- * For first record in page reads tuple from page index
- *   instead of loading from disk
- * Return NULL if read error or memory.
+ * Read key and lsn by a given wide position.
+ * For the first record in a page reads the result from the page
+ * index instead of fetching it from disk.
+ *
+ * @retval NULL read error or out of memory.
  * Affects: curr_loaded_page
  */
 static char *
@@ -7213,7 +7198,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 }
 
 /**
- * Binary search in a run of given key and lsn.
+ * Binary search in a run for the given key and lsn.
  * Resulting wide position is stored it *pos argument
  * Note that run is sorted by key ASC and lsn DESC.
  * Normally sets the position to first record that greater than given key or
@@ -7224,8 +7209,8 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  *  (record.key > key),
  * If that value was not found then position is set to end_pos (invalid pos)
  * *equal_key is set to true if found value is equal to key of false otherwise
- * return 0 on success
- * return -1 on read or memory error
+ * @retval 0 success
+ * @retval -1 read or memory error
  * Beware of:
  * 1)VINYL_GT/VINYL_LE special case
  * 2)search with partial key and lsn != INT64_MAX is meaningless and dangerous
@@ -7267,11 +7252,12 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 }
 
 /**
- * Icrement (or decrement, depending on order) current wide position
- * Return new value on success, end_pos on read error or EOF
- * return 0 on success
- * return 1 on EOF
- * return -1 on read or memory error
+ * Increment (or decrement, depending on the order) the current
+ * wide position.
+ * Return a new value on success, end_pos on read error or EOF.
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 read or memory error
  * Affects: curr_loaded_page
  */
 static int
@@ -7314,6 +7300,8 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 /**
  * Temporary prevent unloading of given page if necessary
  * Returns a value that must be passed to vy_run_iterator_unlock_page
+ *
+ * @retval page no of the locked page
  */
 static uint32_t
 vy_run_iterator_lock_page(struct vy_run_iterator *itr, uint32_t page_no)
@@ -7337,12 +7325,13 @@ vy_run_iterator_unlock_page(struct vy_run_iterator *itr, uint32_t lock)
 }
 
 /**
- * Find next record with lsn <= itr->lsn record.
- * Current position must be at the beginning of serie of records with the
- * same key it terms of direction of iterator (i.e. left for GE, right for LE)
- * return 0 on success
- * return 1 on EOF
- * return -1 on read or memory error
+ * Find the next record with lsn <= itr->lsn record.
+ * The current position must be at the beginning of a series of
+ * records with the same key it terms of direction of iterator
+ * (i.e. left for GE, right for LE).
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 read or memory error
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static int
@@ -7371,7 +7360,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 		}
 	}
 	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
-		/* lock page, i.e. prevent from unloading from memory of cur_key */
+		/* Lock the  page, i.e. prevent the cur_key from unloading. */
 		uint32_t lock_page =
 			vy_run_iterator_lock_page(itr, itr->curr_pos.page_no);
 
@@ -7402,9 +7391,9 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
  * Find next (lower, older) record with the same key as current
  * Return true if the record was found
  * Return false if no value was found (or EOF) or there is a read error
- * return 0 on success
- * return 1 on EOF
- * return -1 on read or memory error
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 read or memory error
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static int
@@ -7516,10 +7505,12 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 }
 
 /**
- * Get a tuple from a record, that iterator currently positioned on
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
+ * Create a tuple object from a its impression on a run page.
+ * Uses the current iterator position in the page.
+ *
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 memory or read error
  */
 static int
 vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result)
@@ -7561,10 +7552,13 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result)
 }
 
 /**
- * Find the next record with different key as current and visible lsn
- * return 0 on sucess
- * return 1 on EOF
- * return -1 on memory or read error
+ * Find the next tuple in a page, i.e. a tuple with a different key
+ * and fresh enough LSN (i.e. skipping the keys
+ * too old for the current transaction).
+ *
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 memory or read error
  */
 static int
 vy_run_iterator_next_key(struct vy_run_iterator *itr)
@@ -7586,7 +7580,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 			return 1;
 		}
 		if (itr->curr_pos.page_no == end_page) {
-			/* special case for reverse iterators */
+			/* A special case for reverse iterators */
 			uint32_t page_no = end_page - 1;
 			struct vy_page *page =
 				vy_run_iterator_load_page(itr, page_no);
@@ -7608,14 +7602,18 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 	if (cur_key == NULL)
 		return -1;
 
-	/* lock page, i.e. prevent from unloading from memory of cur_key */
+	/*
+	 * Lock the page, i.e. prevent the memory of cur_key from
+	 * being unloaded.
+	 */
 	uint32_t lock_page =
 		vy_run_iterator_lock_page(itr, itr->curr_pos.page_no);
 
 	int64_t next_lsn;
 	char *next_key;
 	do {
-		int rc = vy_run_iterator_next_pos(itr, itr->order, &itr->curr_pos);
+		int rc = vy_run_iterator_next_pos(itr, itr->order,
+						  &itr->curr_pos);
 		if (rc != 0) {
 			if (rc > 0)
 				vy_run_iterator_close(itr);
@@ -7641,9 +7639,9 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 
 /**
  * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on if no value found, the iterator position was not changed
- * return -1 on memory or read error
+ * @retval 0 success
+ * @retval 1 on if no value found, the iterator position was not changed
+ * @retval -1 memory or read error
  */
 static int
 vy_run_iterator_next_lsn(struct vy_run_iterator *itr)
@@ -7690,14 +7688,21 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr)
 }
 
 /**
- * Restore current position (if necessary) after the given tuple
- * Work only for not started iterator
- * return 0 if position did not change (iterator started)
- * return 1 if position changed
- * return -1 on read or memory error
+ * Restore the current position (if necessary) after
+ * a change in the set of runs or ranges.
+ *
+ * @pre the iterator is not started
+ *
+ * @param last_tuple the last key on which the iterator was
+ *		      positioned
+ *
+ * @retval 0	if position did not change (iterator started)
+ * @retval 1	if position changed
+ * @retval -1	a read or memory error
  */
 static int
-vy_run_iterator_restore(struct vy_run_iterator *itr, struct vy_tuple *last_tuple)
+vy_run_iterator_restore(struct vy_run_iterator *itr,
+			struct vy_tuple *last_tuple)
 {
 	if (itr->search_started || last_tuple == NULL)
 		return 0;
@@ -7712,9 +7717,9 @@ vy_run_iterator_restore(struct vy_run_iterator *itr, struct vy_tuple *last_tuple
 	itr->key = last_tuple->data;
 	itr->vlsn = last_tuple->lsn;
 	int rc = vy_run_iterator_start(itr);
-	itr->order = save_key != NULL ? save_order :
-		save_order == VINYL_LE || save_order == VINYL_LT ?
-		VINYL_LE : VINYL_GE;
+	itr->order = (save_key != NULL ? save_order :
+		      save_order == VINYL_LE || save_order == VINYL_LT ?
+		      VINYL_LE : VINYL_GE);
 	itr->key = save_key;
 	itr->vlsn = save_vlsn;
 	if (rc < 0)
@@ -7870,47 +7875,23 @@ struct vy_mem_iterator {
  * vy_mem_iterator API forward declaration
  */
 
-/**
- * Open the iterator
- */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 		     enum vy_order order, char *key, int64_t vlsn);
 
-/**
- * Get a tuple from a record, that iterator currently positioned on
- * return 0 on sucess
- * return 1 on EOF
- */
 static int
 vy_mem_iterator_get(struct vy_mem_iterator *itr, struct vy_tuple **result);
 
-/**
- * Find the next record with different key as current and visible lsn
- * return 0 on sucess
- * return 1 on EOF
- */
 static int
 vy_mem_iterator_next_key(struct vy_mem_iterator *itr);
 
-/**
- * Restore current position (if necessary) after the given tuple
- */
 static int
 vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 			struct vy_tuple *last_tuple);
 
-/**
- * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on EOF
- */
 static int
 vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr);
 
-/**
- * Close an iterator and free all resources
- */
 static void
 vy_mem_iterator_close(struct vy_mem_iterator *itr);
 
@@ -7929,8 +7910,8 @@ vy_mem_iterator_curr_tuple(struct vy_mem_iterator *itr)
 
 /**
  * Make a step in directions defined by itr->order
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr)
@@ -7949,8 +7930,8 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
  * Find next record with lsn <= itr->lsn record.
  * Current position must be at the beginning of serie of records with the
  * same key it terms of direction of iterator (i.e. left for GE, right for LE)
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
@@ -7989,8 +7970,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 
 /**
  * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_start(struct vy_mem_iterator *itr)
@@ -8096,8 +8077,8 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 
 /**
  * Get a tuple from a record, that iterator currently positioned on
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_get(struct vy_mem_iterator *itr, struct vy_tuple **result)
@@ -8111,8 +8092,8 @@ vy_mem_iterator_get(struct vy_mem_iterator *itr, struct vy_tuple **result)
 
 /**
  * Find the next record with different key as current and visible lsn
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
@@ -8145,8 +8126,8 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 
 /**
  * Find next (lower, older) record with the same key as current
- * return 0 on sucess
- * return 1 on EOF
+ * @retval 0 success
+ * @retval 1 EOF
  */
 static int
 vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
@@ -8176,9 +8157,12 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
 }
 
 /**
- * Restore current position (if necessary) after the given tuple
- * Return 0 if nothing changed
- * Return 1 if iterator changed position
+ * Restore the current position (if necessary).
+ *
+ * @param last_tuple the key the iterator was positioned on
+ *
+ * @retval 0 nothing changed
+ * @retval 1 iterator position was changed
  */
 static int
 vy_mem_iterator_restore(struct vy_mem_iterator *itr,
@@ -8408,10 +8392,12 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr)
 		}
 		if (txv == NULL || txv->index != itr->index)
 			return 1;
-		if (vy_tuple_compare(itr->key, txv->tuple->data, itr->index->key_def) == 0) {
+		if (vy_tuple_compare(itr->key, txv->tuple->data,
+				     itr->index->key_def) == 0) {
 			while (true) {
 				struct txv *next;
-				if (itr->order == VINYL_LE || itr->order == VINYL_GT)
+				if (itr->order == VINYL_LE ||
+				    itr->order == VINYL_GT)
 					next = write_set_next(&itr->tx->write_set, txv);
 				else
 					next = write_set_prev(&itr->tx->write_set, txv);
@@ -8431,7 +8417,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr)
 		key.index = (struct vy_index *)((uintptr_t)key.index + 1);
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	} else {
-		assert(itr->order == VINYL_GE || itr->order == VINYL_GT || itr->order == VINYL_EQ);
+		assert(itr->order == VINYL_GE ||
+		       itr->order == VINYL_GT || itr->order == VINYL_EQ);
 		itr->order = VINYL_GE;
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	}
@@ -8488,10 +8475,14 @@ vy_txw_iterator_next_lsn(struct vy_txw_iterator *itr)
 }
 
 int
-vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct vy_tuple *last_tuple)
+vy_txw_iterator_restore(struct vy_txw_iterator *itr,
+			struct vy_tuple *last_tuple)
 {
-	if (last_tuple == NULL || !itr->search_started || itr->version == itr->tx->write_set_version)
+	if (last_tuple == NULL || !itr->search_started ||
+	    itr->version == itr->tx->write_set_version) {
+
 		return 0;
+	}
 
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
