@@ -15,13 +15,13 @@ box.once("vinyl_stress", function()
     s1:create_index('pk', {if_not_exists = true})
 
     local s2 = box.schema.space.create('s2', { engine = 'vinyl', if_not_exists = true })
-    s2:create_index('pk', {compression = 'zstd', if_not_exists = true})
+    s2:create_index('pk', {if_not_exists = true})
 
     local s3 = box.schema.space.create('s3', { engine = 'vinyl', if_not_exists = true })
-    s3:create_index('pk', {compression = 'zstd', if_not_exists = true})
+    s3:create_index('pk', {if_not_exists = true})
 
     local s4 = box.schema.space.create('s4', { engine = 'vinyl', if_not_exists = true })
-    s4:create_index('pk', {compression = 'lz4', if_not_exists = true})
+    s4:create_index('pk', {if_not_exists = true})
 
     local s5 = box.schema.space.create('s5', { engine = 'vinyl'})
     s5:create_index('pk')
