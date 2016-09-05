@@ -18,7 +18,7 @@ struct elem_t {
 static int compare(const elem_t &a, const elem_t &b);
 static int compare_key(const elem_t &a, long b);
 
-#define BPS_TREE_NAME _test
+#define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 1024 /* value is to low specially for tests */
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -60,17 +60,17 @@ itr_check()
 {
 	header();
 
-	bps_tree_test tree;
-	bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
-	
+	test tree;
+	test_create(&tree, 0, extent_alloc, extent_free);
+
 	/* Stupid tests */
 	{
-		bps_tree_test_iterator tmp1, tmp2;
-		tmp1 = bps_tree_test_invalid_iterator();
-		tmp2 = bps_tree_test_invalid_iterator();
-		if (!bps_tree_test_itr_is_invalid(&tmp1))
+		test_iterator tmp1, tmp2;
+		tmp1 = test_invalid_iterator();
+		tmp2 = test_invalid_iterator();
+		if (!test_itr_is_invalid(&tmp1))
 			fail("invalid iterator is not invalid", "true");
-		if (!bps_tree_test_itr_are_equal(&tree, &tmp1, &tmp2))
+		if (!test_itr_are_equal(&tree, &tmp1, &tmp2))
 			fail("invalid iterators are not equal", "true");
 	}
 
@@ -82,17 +82,17 @@ itr_check()
 		e.first = i * 2; /* note that filled with even numbers */
 		for (long j = 0; j < count2; j++) {
 			e.second = j;
-			bps_tree_test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0);
 		}
 	}
-	printf("Test tree size: %d\n", (int)bps_tree_test_size(&tree));
+	printf("Test tree size: %d\n", (int)test_size(&tree));
 
 	/* Test that tree filled ok */
 	for (long i = 0; i < count1; i++) {
 		for (long j = 0; j < count2; j++) {
-			if (bps_tree_test_find(&tree, i * 2) == 0)
+			if (test_find(&tree, i * 2) == 0)
 				fail("Integrity check failed (1)", "true");
-			if (bps_tree_test_find(&tree, i * 2 + 1) != 0)
+			if (test_find(&tree, i * 2 + 1) != 0)
 				fail("Integrity check failed (2)", "true");
 		}
 	}
@@ -100,93 +100,93 @@ itr_check()
 	/* Print first 7 elems */
 	{
 		printf("--> ");
-		bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
+		test_iterator itr = test_itr_first(&tree);
 		for (int i = 0; i < 7; i++) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_itr_get_elem(&tree, &itr);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			bps_tree_test_itr_next(&tree, &itr);
+			test_itr_next(&tree, &itr);
 		}
 		printf("\n");
 	}
 	/* Print last 7 elems */
 	{
 		printf("<-- ");
-		bps_tree_test_iterator itr = bps_tree_test_itr_last(&tree);
+		test_iterator itr = test_itr_last(&tree);
 		for (int i = 0; i < 7; i++) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_itr_get_elem(&tree, &itr);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			bps_tree_test_itr_prev(&tree, &itr);
+			test_itr_prev(&tree, &itr);
 		}
 		printf("\n");
 	}
-	
+
 	/* Iterate forward all elements 5 times */
 	{
-		bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
+		test_iterator itr = test_itr_first(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_itr_get_elem(&tree, &itr);
 			if (elem->first != ((i % (count1 * count2)) / count2) * 2)
 				fail("iterate all failed (1)", "true");
 			if (elem->second != i % count2)
 				fail("iterate all failed (2)", "true");
-			bool itr_res = bps_tree_test_itr_next(&tree, &itr);
-			if (!!itr_res == !!bps_tree_test_itr_is_invalid(&itr))
+			bool itr_res = test_itr_next(&tree, &itr);
+			if (!!itr_res == !!test_itr_is_invalid(&itr))
 				fail("iterate all failed (3)", "true");
 			if (!itr_res) {
-				itr_res = bps_tree_test_itr_next(&tree, &itr);
-				if (!itr_res || bps_tree_test_itr_is_invalid(&itr))
+				itr_res = test_itr_next(&tree, &itr);
+				if (!itr_res || test_itr_is_invalid(&itr))
 					fail("iterate all failed (4)", "true");
 			}
 		}
 	}
-	
+
 	/* Iterate backward all elements 5 times */
 	{
-		bps_tree_test_iterator itr = bps_tree_test_itr_last(&tree);
+		test_iterator itr = test_itr_last(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &itr);
-			long j = count1 * count2 - 1 - (i % (count1 * count2)); 
+			elem_t *elem = test_itr_get_elem(&tree, &itr);
+			long j = count1 * count2 - 1 - (i % (count1 * count2));
 			if (elem->first != (j / count2) * 2)
 				fail("iterate all failed (5)", "true");
 			if (elem->second != j % count2)
 				fail("iterate all failed (6)", "true");
-			bool itr_res = bps_tree_test_itr_prev(&tree, &itr);
-			if (!!itr_res == !!bps_tree_test_itr_is_invalid(&itr))
+			bool itr_res = test_itr_prev(&tree, &itr);
+			if (!!itr_res == !!test_itr_is_invalid(&itr))
 				fail("iterate all failed (7)", "true");
 			if (!itr_res) {
-				itr_res = bps_tree_test_itr_prev(&tree, &itr);
-				if (!itr_res || bps_tree_test_itr_is_invalid(&itr))
+				itr_res = test_itr_prev(&tree, &itr);
+				if (!itr_res || test_itr_is_invalid(&itr))
 					fail("iterate all failed (8)", "true");
 			}
 		}
 	}
-	
+
 	/* Check iterating in range from lower bound to upper bound */
 	/* Several probes */
 	const long keys[] = {-1, 0, 10, 15, count1*2 - 2, count1 * 2};
 	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
 		const long key = keys[i];
 		bool has_this_key1;
-		bps_tree_test_iterator begin = bps_tree_test_lower_bound(&tree, key, &has_this_key1);
+		test_iterator begin = test_lower_bound(&tree, key, &has_this_key1);
 		bool has_this_key2;
-		bps_tree_test_iterator end = bps_tree_test_upper_bound(&tree, key, &has_this_key2);
+		test_iterator end = test_upper_bound(&tree, key, &has_this_key2);
 		if (has_this_key1 != has_this_key2)
 			fail("Exact flag is broken", "true");
 		printf("Key %ld, %s range [%s, %s): ", key,
 			has_this_key1 ? "not empty" : "empty",
-			bps_tree_test_itr_is_invalid(&begin) ? "eof" : "ptr",
-			bps_tree_test_itr_is_invalid(&end) ? "eof" : "ptr");
-		bps_tree_test_iterator runner = begin;
-		while (!bps_tree_test_itr_are_equal(&tree, &runner, &end)) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &runner);
+			test_itr_is_invalid(&begin) ? "eof" : "ptr",
+			test_itr_is_invalid(&end) ? "eof" : "ptr");
+		test_iterator runner = begin;
+		while (!test_itr_are_equal(&tree, &runner, &end)) {
+			elem_t *elem = test_itr_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			bps_tree_test_itr_next(&tree, &runner);
+			test_itr_next(&tree, &runner);
 		}
 		printf(" <-> ");
 		runner = end;
-		while (!bps_tree_test_itr_are_equal(&tree, &runner, &begin)) {
-			bps_tree_test_itr_prev(&tree, &runner);
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &runner);
+		while (!test_itr_are_equal(&tree, &runner, &begin)) {
+			test_itr_prev(&tree, &runner);
+			elem_t *elem = test_itr_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
 		}
 		printf("\n");
@@ -195,17 +195,17 @@ itr_check()
 	/* Check iterating in range from lower bound to upper bound */
 	/* Automated */
 	for (long i = -1; i <= count1 + 1; i++) {
-		bps_tree_test_iterator begin = bps_tree_test_lower_bound(&tree, i, 0);
-		bps_tree_test_iterator end = bps_tree_test_upper_bound(&tree, i, 0);
+		test_iterator begin = test_lower_bound(&tree, i, 0);
+		test_iterator end = test_upper_bound(&tree, i, 0);
 		long real_count = 0;
-		while (!bps_tree_test_itr_are_equal(&tree, &begin, &end)) {
-			elem_t *elem = bps_tree_test_itr_get_elem(&tree, &begin);
+		while (!test_itr_are_equal(&tree, &begin, &end)) {
+			elem_t *elem = test_itr_get_elem(&tree, &begin);
 			if (elem->first != i)
 				fail("range itr failed (1)", "true");
 			if (elem->second != real_count)
 				fail("range itr failed (2)", "true");
 			real_count++;
-			bps_tree_test_itr_next(&tree, &begin);
+			test_itr_next(&tree, &begin);
 		}
 		long must_be_count = 0;
 		if (i >= 0 && i / 2 <= count1 - 1 && (i & 1) == 0)
@@ -214,7 +214,7 @@ itr_check()
 			fail("range itr failed (3)", "true");
 	}
 
-	bps_tree_test_destroy(&tree);
+	test_destroy(&tree);
 
 	footer();
 }
@@ -228,9 +228,9 @@ itr_invalidate_check()
 	const long max_delete_count = 100;
 	const long max_insert_count = 200;
 	const long attempt_count = 100;
-	struct bps_tree_test_iterator iterators[test_size];
+	struct test_iterator iterators[test_size];
 
-	struct bps_tree_test tree;
+	struct test tree;
 
 	/* invalidation during deletion */
 	srand(0);
@@ -239,31 +239,31 @@ itr_invalidate_check()
 		long del_cnt = rand() % max_delete_count + 1;
 		if (del_pos + del_cnt > test_size)
 			del_cnt = test_size - del_pos;
-		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+		test_create(&tree, 0, extent_alloc, extent_free);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			bps_tree_test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0);
 		}
-		iterators[0] = bps_tree_test_itr_first(&tree);
-		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		iterators[0] = test_itr_first(&tree);
+		assert(test_itr_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
-			bps_tree_test_itr_next(&tree, iterators + i);
-			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+			test_itr_next(&tree, iterators + i);
+			assert(test_itr_get_elem(&tree, iterators + i));
 		}
 		for (long i = del_pos; i < del_pos + del_cnt; i++) {
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = bps_tree_test_delete(&tree, e);
+			int res = test_delete(&tree, e);
 			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_itr_get_elem(&tree, iterators + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (1)", "true");
@@ -273,9 +273,9 @@ itr_invalidate_check()
 					if ( (v < 0 || v >= del_pos) && (v < del_pos + del_cnt || v >= test_size) )
 						fail("unexpected result of getting elem (3)", "true");
 				}
-			} while(bps_tree_test_itr_next(&tree, iterators + i));
+			} while(test_itr_next(&tree, iterators + i));
 		}
-		bps_tree_test_destroy(&tree);
+		test_destroy(&tree);
 	}
 
 	/* invalidation during insertion */
@@ -283,31 +283,31 @@ itr_invalidate_check()
 	for (long attempt = 0; attempt < attempt_count; attempt++) {
 		long ins_pos = rand() % test_size;
 		long ins_cnt = rand() % max_insert_count + 1;
-		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+		test_create(&tree, 0, extent_alloc, extent_free);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			bps_tree_test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0);
 		}
-		iterators[0] = bps_tree_test_itr_first(&tree);
-		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		iterators[0] = test_itr_first(&tree);
+		assert(test_itr_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
-			bps_tree_test_itr_next(&tree, iterators + i);
-			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+			test_itr_next(&tree, iterators + i);
+			assert(test_itr_get_elem(&tree, iterators + i));
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			int res = bps_tree_test_insert(&tree, e, 0);
+			int res = test_insert(&tree, e, 0);
 			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_itr_get_elem(&tree, iterators + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (4)", "true");
@@ -324,9 +324,9 @@ itr_invalidate_check()
 							fail("unexpected result of getting elem (7)", "true");
 					}
 				}
-			} while(bps_tree_test_itr_next(&tree, iterators + i));
+			} while(test_itr_next(&tree, iterators + i));
 		}
-		bps_tree_test_destroy(&tree);
+		test_destroy(&tree);
 	}
 
 	/* invalidation during deletion and insertion */
@@ -338,38 +338,38 @@ itr_invalidate_check()
 		long ins_cnt = rand() % max_insert_count + 1;
 		if (del_pos + del_cnt > test_size)
 			del_cnt = test_size - del_pos;
-		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+		test_create(&tree, 0, extent_alloc, extent_free);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			bps_tree_test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0);
 		}
-		iterators[0] = bps_tree_test_itr_first(&tree);
-		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		iterators[0] = test_itr_first(&tree);
+		assert(test_itr_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
-			bps_tree_test_itr_next(&tree, iterators + i);
-			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+			test_itr_next(&tree, iterators + i);
+			assert(test_itr_get_elem(&tree, iterators + i));
 		}
 		for (long i = del_pos; i < del_pos + del_cnt; i++) {
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = bps_tree_test_delete(&tree, e);
+			int res = test_delete(&tree, e);
 			assert(res == 0);
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			int res = bps_tree_test_insert(&tree, e, 0);
+			int res = test_insert(&tree, e, 0);
 			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_itr_get_elem(&tree, iterators + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (8)", "true");
@@ -386,9 +386,9 @@ itr_invalidate_check()
 							fail("unexpected result of getting elem (b)", "true");
 					}
 				}
-			} while(bps_tree_test_itr_next(&tree, iterators + i));
+			} while(test_itr_next(&tree, iterators + i));
 		}
-		bps_tree_test_destroy(&tree);
+		test_destroy(&tree);
 	}
 
 	footer();
@@ -405,42 +405,42 @@ itr_freeze_check()
 	elem_t comp_buf2[test_data_size];
 	const int test_data_mod = 2000;
 	srand(0);
-	struct bps_tree_test tree;
+	struct test tree;
 
 	for (int i = 0; i < 10; i++) {
-		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+		test_create(&tree, 0, extent_alloc, extent_free);
 		int comp_buf_size1 = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			bps_tree_test_insert(&tree, e, 0);
-			int check = bps_tree_test_debug_check(&tree);
+			test_insert(&tree, e, 0);
+			int check = test_debug_check(&tree);
 			fail_if(check);
 			assert(check == 0);
 		}
-		struct bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
+		struct test_iterator itr = test_itr_first(&tree);
 		elem_t *e;
-		while ((e = bps_tree_test_itr_get_elem(&tree, &itr))) {
+		while ((e = test_itr_get_elem(&tree, &itr))) {
 			comp_buf1[comp_buf_size1++] = *e;
-			bps_tree_test_itr_next(&tree, &itr);
+			test_itr_next(&tree, &itr);
 		}
-		struct bps_tree_test_iterator itr1 = bps_tree_test_itr_first(&tree);
-		bps_tree_test_itr_freeze(&tree, &itr1);
-		struct bps_tree_test_iterator itr2 = bps_tree_test_itr_first(&tree);
-		bps_tree_test_itr_freeze(&tree, &itr2);
+		struct test_iterator itr1 = test_itr_first(&tree);
+		test_itr_freeze(&tree, &itr1);
+		struct test_iterator itr2 = test_itr_first(&tree);
+		test_itr_freeze(&tree, &itr2);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			bps_tree_test_insert(&tree, e, 0);
-			int check = bps_tree_test_debug_check(&tree);
+			test_insert(&tree, e, 0);
+			int check = test_debug_check(&tree);
 			fail_if(check);
 			assert(check == 0);
 		}
 		int tested_count = 0;
-		while ((e = bps_tree_test_itr_get_elem(&tree, &itr1))) {
+		while ((e = test_itr_get_elem(&tree, &itr1))) {
 			if (*e != comp_buf1[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -448,21 +448,21 @@ itr_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			bps_tree_test_itr_next(&tree, &itr1);
+			test_itr_next(&tree, &itr1);
 		}
-		bps_tree_test_itr_destroy(&tree, &itr1);
+		test_itr_destroy(&tree, &itr1);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			bps_tree_test_delete(&tree, e);
-			int check = bps_tree_test_debug_check(&tree);
+			test_delete(&tree, e);
+			int check = test_debug_check(&tree);
 			fail_if(check);
 			assert(check == 0);
 		}
 
 		tested_count = 0;
-		while ((e = bps_tree_test_itr_get_elem(&tree, &itr2))) {
+		while ((e = test_itr_get_elem(&tree, &itr2))) {
 			if (*e != comp_buf1[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -470,10 +470,10 @@ itr_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			bps_tree_test_itr_next(&tree, &itr2);
+			test_itr_next(&tree, &itr2);
 		}
 
-		bps_tree_test_destroy(&tree);
+		test_destroy(&tree);
 	}
 
 	footer();

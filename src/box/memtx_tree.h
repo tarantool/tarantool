@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_MEMTX_TREE_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_TREE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -38,16 +38,16 @@ struct tuple;
 struct key_data;
 
 int
-tree_index_compare(const struct tuple *a, const struct tuple *b, struct key_def *key_def);
+memtx_tree_compare(const struct tuple *a, const struct tuple *b, struct key_def *key_def);
 
 int
-tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_def);
+memtx_tree_compare_key(const tuple *a, const key_data *b, struct key_def *key_def);
 
-#define BPS_TREE_NAME _index
+#define BPS_TREE_NAME memtx_tree
 #define BPS_TREE_BLOCK_SIZE (512)
 #define BPS_TREE_EXTENT_SIZE MEMTX_EXTENT_SIZE
-#define BPS_TREE_COMPARE(a, b, arg) tree_index_compare(a, b, arg)
-#define BPS_TREE_COMPARE_KEY(a, b, arg) tree_index_compare_key(a, b, arg)
+#define BPS_TREE_COMPARE(a, b, arg) memtx_tree_compare(a, b, arg)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) memtx_tree_compare_key(a, b, arg)
 #define bps_tree_elem_t struct tuple *
 #define bps_tree_key_t struct key_data *
 #define bps_tree_arg_t struct key_def *
@@ -90,9 +90,9 @@ public:
 	virtual void destroyReadViewForIterator(struct iterator *iterator) override;
 
 // protected:
-	struct bps_tree_index tree;
+	struct memtx_tree tree;
 	struct tuple **build_array;
 	size_t build_array_size, build_array_alloc_size;
 };
 
-#endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_TREE_H_INCLUDED */

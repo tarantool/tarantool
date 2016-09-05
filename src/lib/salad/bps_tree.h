@@ -298,6 +298,8 @@ typedef uint32_t bps_tree_block_id_t;
 #ifndef CONCAT
 #define CONCAT_R(a, b) a##b
 #define CONCAT(a, b) CONCAT_R(a, b)
+#define CONCAT3_R(a, b, c) a##b##c
+#define CONCAT3(a, b, c) CONCAT3_R(a, b, c)
 #define CONCAT4_R(a, b, c, d) a##b##c##d
 #define CONCAT4(a, b, c, d) CONCAT4_R(a, b, c, d)
 #define CONCAT5_R(a, b, c, d, e) a##b##c##d##e
@@ -322,45 +324,46 @@ typedef uint32_t bps_tree_block_id_t;
 #error '_' must be undefinded!
 #endif
 #define _bps(postfix) CONCAT4(bps, BPS_TREE_NAME, _, postfix)
-#define _bps_tree(postfix) CONCAT5(bps, _tree, BPS_TREE_NAME, _, postfix)
-#define _BPS(postfix) CONCAT4(BPS, BPS_TREE_NAME, _, postfix)
-#define _BPS_TREE(postfix) CONCAT4(BPS_TREE, BPS_TREE_NAME, _, postfix)
-#define _bps_tree_name CONCAT(bps_tree, BPS_TREE_NAME)
+#define _api_name(postfix) CONCAT3(BPS_TREE_NAME, _, postfix)
+#define _bps_tree(postfix) CONCAT5(bps, _tree_, BPS_TREE_NAME, _, postfix)
+#define _BPS(postfix) CONCAT5(BPS, _, BPS_TREE_NAME, _, postfix)
+#define _BPS_TREE(postfix) CONCAT5(BPS_TREE, _, BPS_TREE_NAME, _, postfix)
+#define _bps_tree_name BPS_TREE_NAME
 
-#define bps_tree _bps_tree_name
+#define bps_tree BPS_TREE_NAME
 #define bps_block _bps(block)
 #define bps_leaf _bps(leaf)
 #define bps_inner _bps(inner)
 #define bps_garbage _bps(garbage)
-#define bps_tree_iterator _bps_tree(iterator)
+#define bps_tree_iterator _api_name(iterator)
 #define bps_inner_path_elem _bps(inner_path_elem)
 #define bps_leaf_path_elem _bps(leaf_path_elem)
 
-#define bps_tree_create _bps_tree(create)
-#define bps_tree_build _bps_tree(build)
-#define bps_tree_destroy _bps_tree(destroy)
-#define bps_tree_find _bps_tree(find)
-#define bps_tree_insert _bps_tree(insert)
-#define bps_tree_delete _bps_tree(delete)
-#define bps_tree_size _bps_tree(size)
-#define bps_tree_mem_used _bps_tree(mem_used)
-#define bps_tree_random _bps_tree(random)
-#define bps_tree_invalid_iterator _bps_tree(invalid_iterator)
-#define bps_tree_itr_is_invalid _bps_tree(itr_is_invalid)
-#define bps_tree_itr_are_equal _bps_tree(itr_are_equal)
-#define bps_tree_itr_first _bps_tree(itr_first)
-#define bps_tree_itr_last _bps_tree(itr_last)
-#define bps_tree_lower_bound _bps_tree(lower_bound)
-#define bps_tree_upper_bound _bps_tree(upper_bound)
-#define bps_tree_itr_get_elem _bps_tree(itr_get_elem)
-#define bps_tree_itr_next _bps_tree(itr_next)
-#define bps_tree_itr_prev _bps_tree(itr_prev)
-#define bps_tree_itr_freeze _bps_tree(itr_freeze)
-#define bps_tree_itr_destroy _bps_tree(itr_destroy)
-#define bps_tree_debug_check _bps_tree(debug_check)
-#define bps_tree_print _bps_tree(print)
+#define bps_tree_create _api_name(create)
+#define bps_tree_build _api_name(build)
+#define bps_tree_destroy _api_name(destroy)
+#define bps_tree_find _api_name(find)
+#define bps_tree_insert _api_name(insert)
+#define bps_tree_delete _api_name(delete)
+#define bps_tree_size _api_name(size)
+#define bps_tree_mem_used _api_name(mem_used)
+#define bps_tree_random _api_name(random)
+#define bps_tree_invalid_iterator _api_name(invalid_iterator)
+#define bps_tree_itr_is_invalid _api_name(itr_is_invalid)
+#define bps_tree_itr_are_equal _api_name(itr_are_equal)
+#define bps_tree_itr_first _api_name(itr_first)
+#define bps_tree_itr_last _api_name(itr_last)
+#define bps_tree_lower_bound _api_name(lower_bound)
+#define bps_tree_upper_bound _api_name(upper_bound)
+#define bps_tree_itr_get_elem _api_name(itr_get_elem)
+#define bps_tree_itr_next _api_name(itr_next)
+#define bps_tree_itr_prev _api_name(itr_prev)
+#define bps_tree_itr_freeze _api_name(itr_freeze)
+#define bps_tree_itr_destroy _api_name(itr_destroy)
+#define bps_tree_debug_check _api_name(debug_check)
+#define bps_tree_print _api_name(print)
 #define bps_tree_debug_check_internal_functions \
-	_bps_tree(debug_check_internal_functions)
+	_api_name(debug_check_internal_functions)
 
 #define bps_tree_max_sizes _bps_tree(max_sizes)
 #define BPS_TREE_MAX_COUNT_IN_LEAF _BPS_TREE(MAX_COUNT_IN_LEAF)
@@ -5546,7 +5549,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 {
 	int result = 0;
 
-	bps_tree tree;
+	struct bps_tree tree;
 	tree.root_id = (bps_tree_block_id_t) -1;
 
 	result |= bps_tree_debug_check_insert_into_leaf(&tree, assertme);
