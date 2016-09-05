@@ -11,9 +11,11 @@ local fio = require('fio')
 local log = require('log')
 local buffer = require('buffer')
 
+local format = string.format
+
 ffi.cdef[[
-    struct socket {
-        int fd;
+    struct gc_socket {
+        const int fd;
     };
     typedef uint32_t socklen_t;
     typedef ptrdiff_t ssize_t;
@@ -27,7 +29,7 @@ ffi.cdef[[
     ssize_t read(int fd, void *buf, size_t count);
     int listen(int fd, int backlog);
     int socket(int domain, int type, int protocol);
-    int close(int s);
+    int coio_close(int s);
     int shutdown(int s, int how);
     ssize_t send(int sockfd, const void *buf, size_t len, int flags);
     ssize_t recv(int s, void *buf, size_t len, int flags);
@@ -56,51 +58,52 @@ ffi.cdef[[
         const void *needle, size_t needlelen);
 ]]
 
-local function sprintf(fmt, ...)
-    return string.format(fmt, ...)
-end
-
-local function printf(fmt, ...)
-    print(sprintf(fmt, ...))
-end
-
-local socket_t = ffi.typeof('struct socket');
-
-local function socket_cdata_gc(socket)
-    if socket.fd < 0 then
-        log.error("socket: attempt to double close on gc")
-        return
+local gc_socket_t = ffi.metatype(ffi.typeof('struct gc_socket'), {
+    __gc = function (socket)
+        if socket.fd < 0 then return end
+        if ffi.C.coio_close(socket.fd) ~= 0 then
+            log.error("socket: failed to close fd=%d on gc: %s", socket.fd,
+                boxerrno.strerror())
+        end
     end
-    if ffi.C.close(socket.fd) ~= 0 then
-        log.error("socket: failed to close fd=%d on gc: %s", socket.fd,
-            boxerrno.strerror())
-    end
-end
-
-local function check_socket(self)
-    local socket = type(self) == 'table' and self.socket
-    if not ffi.istype(socket_t, socket) then
-        error('Usage: socket:method()');
-    end
-    if socket.fd < 0 then
-        error("attempt to use closed socket")
-    end
-    return socket.fd
-end
+})
 
 local socket_mt
-local function bless_socket(fd)
-    -- Make socket to be non-blocked by default
-    if ffi.C.lbox_socket_nonblock(fd, 1) < 0 then
-        local errno = boxerrno()
-        ffi.C.close(fd)
-        boxerrno(errno)
-        return nil
-    end
 
-    local socket = ffi.new(socket_t, { fd = fd });
-    ffi.gc(socket, socket_cdata_gc)
-    return setmetatable({ socket = socket }, socket_mt)
+local function check_socket(socket)
+    local gc_socket = type(socket) == 'table' and socket._gc_socket
+    if ffi.istype(gc_socket_t, gc_socket) then
+        local fd = gc_socket.fd
+        if fd >= 0 then
+            return fd
+        else
+            error("attempt to use closed socket")
+        end
+    else
+        local msg = "Usage: socket:method()"
+        if socket ~= nil then msg = msg .. ", called with non-socket" end
+        error(msg)
+    end
+end
+
+local function make_socket(fd)
+    local socket = { _gc_socket = ffi.new(gc_socket_t, { fd = fd }) }
+    return setmetatable(socket, socket_mt)
+end
+
+local gc_socket_sentinel = ffi.new(gc_socket_t, { fd = -1 })
+
+local function close_socket(socket)
+    local fd = check_socket(socket)
+    socket._errno = nil
+    local r = ffi.C.coio_close(fd)
+    -- .fd is const to prevent tampering
+    ffi.copy(socket._gc_socket, gc_socket_sentinel, ffi.sizeof(gc_socket_t))
+    if r ~= 0 then
+        self._errno = boxerrno()
+        return false
+    end
+    return true
 end
 
 local function get_ivalue(table, key)
@@ -254,40 +257,30 @@ socket_methods.nonblock = function(self, nb)
     end
 end
 
-local waiters_mt = { __serialize = 'mapping' }
-local function wait_safely(self, what, timeout)
+local function do_wait(self, what, timeout)
     local fd = check_socket(self)
-    local f = fiber.self()
-    local fid = f:id()
 
     self._errno = nil
     timeout = timeout or TIMEOUT_INFINITY
 
-    if self.waiters == nil then
-        self.waiters = setmetatable({}, waiters_mt)
-    end
-
-    self.waiters[fid] = true
     local res = internal.iowait(fd, what, timeout)
-    self.waiters[fid] = nil
     if res == 0 then
         self._errno = boxerrno.ETIMEDOUT
         return 0
     end
-    fiber.testcancel()
     return res
 end
 
 socket_methods.readable = function(self, timeout)
-    return wait_safely(self, 1, timeout) ~= 0
-end
-
-socket_methods.wait = function(self, timeout)
-    return wait_safely(self, 'RW', timeout)
+    return do_wait(self, 1, timeout) ~= 0
 end
 
 socket_methods.writable = function(self, timeout)
-    return wait_safely(self, 2, timeout) ~= 0
+    return do_wait(self, 2, timeout) ~= 0
+end
+
+socket_methods.wait = function(self, timeout)
+    return do_wait(self, 'RW', timeout)
 end
 
 socket_methods.listen = function(self, backlog)
@@ -324,25 +317,7 @@ socket_methods.bind = function(self, host, port)
     return false
 end
 
-socket_methods.close = function(self)
-    local fd = check_socket(self)
-    if self.waiters ~= nil then
-        for fid in pairs(self.waiters) do
-            internal.abort(fid)
-            self.waiters[fid] = nil
-        end
-    end
-
-    self._errno = nil
-    local r = ffi.C.close(fd)
-    self.socket.fd = -1
-    ffi.gc(self.socket, nil)
-    if r ~= 0 then
-        self._errno = boxerrno()
-        return false
-    end
-    return true
-end
+socket_methods.close = close_socket
 
 socket_methods.shutdown = function(self, how)
     local fd = check_socket(self)
@@ -377,11 +352,11 @@ socket_methods.setsockopt = function(self, level, name, value)
     local info = get_ivalue(internal.SO_OPT, name)
 
     if info == nil then
-        error(sprintf("Unknown socket option name: %s", tostring(name)))
+        error(format("Unknown socket option name: %s", tostring(name)))
     end
 
     if not info.rw then
-        error(sprintf("Socket option %s is read only", name))
+        error(format("Socket option %s is read only", name))
     end
 
     self._errno = nil
@@ -434,7 +409,7 @@ socket_methods.setsockopt = function(self, level, name, value)
     if name == 'SO_LINGER' then
         error("Use s:linger(active[, timeout])")
     end
-    error(sprintf("Unsupported socket option: %s", name))
+    error(format("Unsupported socket option: %s", name))
 end
 
 socket_methods.getsockopt = function(self, level, name)
@@ -443,7 +418,7 @@ socket_methods.getsockopt = function(self, level, name)
     local info = get_ivalue(internal.SO_OPT, name)
 
     if info == nil then
-        error(sprintf("Unknown socket option name: %s", tostring(name)))
+        error(format("Unknown socket option name: %s", tostring(name)))
     end
 
     self._errno = nil
@@ -476,7 +451,7 @@ socket_methods.getsockopt = function(self, level, name)
         end
 
         if len[0] ~= 4 then
-            error(sprintf("Internal error: unexpected optlen: %d", len[0]))
+            error(format("Internal error: unexpected optlen: %d", len[0]))
         end
         return tonumber(value[0])
     end
@@ -495,7 +470,7 @@ socket_methods.getsockopt = function(self, level, name)
     if name == 'SO_LINGER' then
         error("Use s:linger()")
     end
-    error(sprintf("Unsupported socket option: %s", name))
+    error(format("Unsupported socket option: %s", name))
 end
 
 socket_methods.linger = function(self, active, timeout)
@@ -545,20 +520,20 @@ socket_methods.linger = function(self, active, timeout)
 end
 
 socket_methods.accept = function(self)
-    local fd = check_socket(self)
+    local server_fd = check_socket(self)
     self._errno = nil
 
-    local cfd, from = internal.accept(fd)
-    if cfd == nil then
+    local client_fd, from = internal.accept(server_fd)
+    if client_fd == nil then
         self._errno = boxerrno()
         return nil
     end
-    local c = bless_socket(cfd)
-    if c == nil then
-        self._errno = boxerrno()
-        return nil
+    local client = make_socket(client_fd)
+    if not client:nonblock(true) then
+        client:close()
+        return
     end
-    return c, from
+    return client, from
 end
 
 local errno_is_transient = {
@@ -831,10 +806,14 @@ local function create_socket(domain, stype, proto)
     end
 
     local fd = ffi.C.socket(idomain, itype, iproto)
-    if fd < 1 then
-        return nil
+    if fd >= 0 then
+        local socket = make_socket(fd)
+        if not socket:nonblock(true) then
+            socket:close()
+        else
+            return socket
+        end
     end
-    return bless_socket(fd)
 end
 
 local function getaddrinfo(host, port, timeout, opts)
@@ -895,13 +874,13 @@ local soname_mt = {
             return ''
         end
         if si.host == nil then
-            return sprintf('%s:%s', '0', tostring(si.port))
+            return format('%s:%s', '0', tostring(si.port))
         end
 
         if si.port == nil then
-            return sprintf('%s:%', tostring(si.host), 0)
+            return format('%s:%', tostring(si.host), 0)
         end
-        return sprintf('%s:%s', tostring(si.host), tostring(si.port))
+        return format('%s:%s', tostring(si.host), tostring(si.port))
     end
 }
 
@@ -1001,14 +980,14 @@ local function tcp_connect(host, port, timeout)
 end
 
 local function tcp_server_handler(server, sc, from)
-    fiber.name(sprintf("%s/%s:%s", server.name, from.host, from.port))
+    fiber.name(format("%s/%s:%s", server.name, from.host, from.port))
     server.handler(sc, from)
     sc:shutdown()
     sc:close()
 end
 
 local function tcp_server_loop(server, s, addr)
-    fiber.name(sprintf("%s/%s:%s", server.name, addr.host, addr.port))
+    fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port))
     log.info("started")
     while s:readable() do
         local sc, from = s:accept()
@@ -1131,14 +1110,14 @@ socket_mt   = {
         local fd = check_socket(self)
 
         local save_errno = self._errno
-        local name = sprintf("fd %d", fd)
+        local name = format("fd %d", fd)
         local aka = self:name()
         if aka ~= nil then
-            name = sprintf("%s, aka %s:%s", name, aka.host, aka.port)
+            name = format("%s, aka %s:%s", name, aka.host, aka.port)
         end
         local peer = self:peer(self)
         if peer ~= nil then
-            name = sprintf("%s, peer %s:%s", name, peer.host, peer.port)
+            name = format("%s, peer %s:%s", name, peer.host, peer.port)
         end
         self._errno = save_errno
         return name

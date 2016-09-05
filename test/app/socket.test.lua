@@ -11,6 +11,7 @@ ffi = require('ffi')
 type(socket)
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
@@ -309,14 +310,13 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 
--- invalid fd
+-- invalid fd / tampering
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 s:read(9)
 s:close()
-s.socket.fd = 512
+s._gc_socket.fd = 512
+s._gc_socket = nil
 tostring(s)
-s:readable(0)
-s:writable(0)
 s = nil
 
 -- close

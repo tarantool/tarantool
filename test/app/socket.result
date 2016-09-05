@@ -38,6 +38,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
+---
+- true
+...
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 ---
 - null
@@ -343,7 +347,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:384: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -972,7 +976,7 @@ socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 - null
 - true
 ...
--- invalid fd
+-- invalid fd / tampering
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
@@ -984,20 +988,16 @@ s:close()
 ---
 - true
 ...
-s.socket.fd = 512
+s._gc_socket.fd = 512
+---
+- error: '[string "s._gc_socket.fd = 512 "]:1: attempt to write to constant location'
+...
+s._gc_socket = nil
 ---
 ...
 tostring(s)
 ---
-- fd 512
-...
-s:readable(0)
----
-- true
-...
-s:writable(0)
----
-- true
+- error: 'builtin/socket.lua: Usage: socket:method(), called with non-socket'
 ...
 s = nil
 ---
@@ -1058,7 +1058,7 @@ ch:get(1)
 ...
 s:error()
 ---
-- error: 'builtin/socket.lua:86: attempt to use closed socket'
+- error: 'builtin/socket.lua: attempt to use closed socket'
 ...
 -- random port
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')

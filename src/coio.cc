@@ -745,5 +745,11 @@ coio_wait(int fd, int events, double timeout)
 	fiber_yield_timeout(timeout);
 
 	ev_io_stop(loop(), &io);
-	return wdata.revents;
+	return wdata.revents & (EV_READ | EV_WRITE);
+}
+
+int coio_close(int fd)
+{
+	ev_io_closing(loop(), fd, EV_CUSTOM);
+	return close(fd);
 }

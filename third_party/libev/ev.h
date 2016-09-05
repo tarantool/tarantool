@@ -758,6 +758,14 @@ EV_API_DECL int  ev_clear_pending  (EV_P_ void *w) EV_THROW;
 EV_API_DECL void ev_io_start       (EV_P_ ev_io *w) EV_THROW;
 EV_API_DECL void ev_io_stop        (EV_P_ ev_io *w) EV_THROW;
 
+/*
+ * Fd is about to close. Make sure that libev won't do anything funny
+ * with now invalid fd. Needed if some ev_io watchers weren't stopped
+ * prior to close().
+ * Note: if fd was reused and added again it just works.
+ */
+EV_API_DECL void ev_io_closing     (EV_P_ int fd, int revents) EV_THROW;
+
 EV_API_DECL void ev_timer_start    (EV_P_ ev_timer *w) EV_THROW;
 EV_API_DECL void ev_timer_stop     (EV_P_ ev_timer *w) EV_THROW;
 /* stops if active and no repeat, restarts if active and repeating, starts if inactive and repeating */

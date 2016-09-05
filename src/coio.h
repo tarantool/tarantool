@@ -210,6 +210,13 @@ enum {
 API_EXPORT int
 coio_wait(int fd, int event, double timeout);
 
+/**
+ * Close the fd and wake any fiber blocked in
+ * coio_wait() call on this fd.
+ */
+API_EXPORT int
+coio_close(int fd);
+
 /** \endcond public */
 
 #if defined(__cplusplus)
