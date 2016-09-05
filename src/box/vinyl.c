@@ -1893,6 +1893,7 @@ struct PACKED vy_range {
 	struct ssrqnode   nodecompact;
 	struct ssrqnode   nodedump;
 	struct rlist     commit;
+	struct rlist     split;
 	uint32_t range_version;
 };
 
@@ -3106,8 +3107,9 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 static int vy_task_drop(struct vy_index*);
 
 static int
-vy_range_merge(struct vy_index*, struct sdc*, struct vy_range*, int64_t,
-	 struct svmergeiter*, uint64_t, uint32_t);
+vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
+	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
+	 uint32_t n_stream, struct rlist *result);
 
 static int
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
@@ -3643,9 +3645,12 @@ vy_range_compact(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		count += vy_run_index_count(&run->index);
 		run = run->next;
 	}
+	struct rlist result;
+	rlist_create(&result);
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, &merge, VINYL_GE);
-	rc = vy_range_merge(index, c, range, vlsn, &im, size_stream, count);
+	rc = vy_range_merge(index, c, range, vlsn, &im, size_stream, count,
+			    &result);
 	sv_mergefree(&merge);
 	if (!rc)
 		rc = vy_range_delete(range, 1);
@@ -3661,20 +3666,19 @@ static int vy_task_drop(struct vy_index *index)
 
 static int
 vy_range_redistribute(struct vy_index *index, struct vy_range *range,
-		struct vy_buf *result)
+		struct rlist *result)
 {
 	(void)index;
 	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
 	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
-	struct vy_bufiter j;
-	vy_bufiter_open(&j, result, sizeof(struct vy_range*));
-	struct vy_range *prev = vy_bufiterref_get(&j);
-	vy_bufiter_next(&j);
+	assert(!rlist_empty(result));
+	struct vy_range *prev = rlist_first_entry(result, struct vy_range,
+						  split);
 	while (1)
 	{
-		struct vy_range *p = vy_bufiterref_get(&j);
-		if (p == NULL) {
+		if (rlist_next(&prev->split) == result) {
+			/* no more ranges */
 			assert(prev != NULL);
 			while (ii.vif->has(&ii)) {
 				struct vy_tuple *v = ii.vif->get(&ii);
@@ -3683,6 +3687,7 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 			}
 			break;
 		}
+		struct vy_range *p = rlist_next_entry(prev, split);
 		while (ii.vif->has(&ii))
 		{
 			struct vy_tuple *v = ii.vif->get(&ii);
@@ -3698,7 +3703,6 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 		if (unlikely(! ii.vif->has(&ii)))
 			break;
 		prev = p;
-		vy_bufiter_next(&j);
 	}
 	assert(ii.vif->get(&ii) == NULL);
 	return 0;
@@ -3751,26 +3755,25 @@ vy_range_redistribute_index(struct vy_index *index, struct sdc *c, struct vy_ran
 }
 
 static int
-vy_range_splitfree(struct vy_buf *result)
+vy_range_splitfree(struct rlist *result)
 {
-	struct vy_bufiter i;
-	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiter_has(&i))
-	{
-		struct vy_range *p = vy_bufiterref_get(&i);
-		vy_range_delete(p, 0);
-		vy_bufiter_next(&i);
+	struct vy_range *range, *next;
+	rlist_foreach_entry_safe(range, result, split, next) {
+		rlist_del_entry(range, split);
+		vy_range_delete(range, 0);
 	}
+	assert(rlist_empty(result));
 	return 0;
 }
 
 static inline int
-vy_range_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
-         struct svmergeiter *merge_iter,
-         uint64_t  size_node,
-         uint64_t  size_stream,
-         uint32_t  stream,
-         int64_t  vlsn)
+vy_range_split(struct vy_index *index, struct sdc *c,
+	       struct svmergeiter *merge_iter,
+	       uint64_t  size_node,
+	       uint64_t  size_stream,
+	       uint32_t  stream,
+	       int64_t  vlsn,
+	       struct rlist *result)
 {
 	(void) stream;
 	(void) c;
@@ -3805,7 +3808,7 @@ vy_range_split(struct vy_index *index, struct sdc *c, struct vy_buf *result,
 		++range->run_count;
 		range->run->index = sdindex;
 
-		rc = vy_buf_add(result, &range, sizeof(struct vy_range*));
+		rlist_add_entry(result, range, split);
 		if (unlikely(rc == -1))
 			goto error;
 	}
@@ -3822,20 +3825,16 @@ error:
 static int
 vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
-	 uint32_t n_stream)
+	 uint32_t n_stream, struct rlist *result)
 {
-	struct vy_buf *result = &c->a;
-	struct vy_bufiter i;
-
 	/* begin compaction.
 	 *
 	 * Split merge stream into a number of
 	 * a new nodes.
 	 */
 	int rc;
-	rc = vy_range_split(index, c, result, stream,
-		      index->key_def->opts.range_size,
-		      size_stream, n_stream, vlsn);
+	rc = vy_range_split(index, c, stream, index->key_def->opts.range_size,
+			    size_stream, n_stream, vlsn, result);
 	if (unlikely(rc == -1))
 		return -1;
 
@@ -3846,23 +3845,22 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 
 	/* mask removal of a single range as a
 	 * single range update */
-	int count = vy_buf_used(result) / sizeof(struct vy_range*);
+	int count = 0;
+	struct vy_range *n;
+	rlist_foreach_entry(n, result, split) {
+		 count++;
+	}
 
 	vy_index_rdlock(index);
 	int range_count = index->range_count;
 	vy_index_unlock(index);
 
-	struct vy_range *n;
 	if (unlikely(count == 0 && range_count == 1))
 	{
 		n = vy_range_new(index->key_def);
 		if (unlikely(n == NULL))
 			return -1;
-		rc = vy_buf_add(result, &n, sizeof(struct vy_range*));
-		if (unlikely(rc == -1)) {
-			vy_range_delete(n, 1);
-			return -1;
-		}
+		rlist_add_entry(result, n, split);
 		count++;
 	}
 
@@ -3878,7 +3876,7 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 		vy_range_redistribute_index(index, c, range);
 		break;
 	case 1: /* self update */
-		n = *(struct vy_range**)result->s;
+		n = rlist_first_entry(result, struct vy_range, split);
 		n->i0 = *j;
 		n->i0.tree.arg = &n->i0;
 		n->temperature = range->temperature;
@@ -3896,24 +3894,18 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 			vy_range_splitfree(result);
 			return -1;
 		}
-		vy_bufiter_open(&i, result, sizeof(struct vy_range*));
-		n = vy_bufiterref_get(&i);
-		n->used = n->i0.used;
-		n->temperature = range->temperature;
-		n->temperature_reads = range->temperature_reads;
-		index->size += vy_range_size(n);
-		vy_range_lock(n);
-		vy_index_replace_range(index, range, n);
-		vy_planner_update(&index->p, n);
-		for (vy_bufiter_next(&i); vy_bufiter_has(&i);
-		     vy_bufiter_next(&i)) {
-			n = vy_bufiterref_get(&i);
+		rlist_foreach_entry(n, result, split) {
 			n->used = n->i0.used;
 			n->temperature = range->temperature;
 			n->temperature_reads = range->temperature_reads;
 			index->size += vy_range_size(n);
 			vy_range_lock(n);
-			vy_index_add_range(index, n);
+			if (rlist_first_entry(result, struct vy_range,
+					      split) == n) {
+				vy_index_replace_range(index, range, n);
+			} else {
+				vy_index_add_range(index, n);
+			}
 			vy_planner_update(&index->p, n);
 		}
 		break;
@@ -3929,27 +3921,19 @@ vy_range_merge(struct vy_index *index, struct sdc *c, struct vy_range *range,
 	             return -1);
 
 	/* complete new nodes */
-	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiter_has(&i))
-	{
-		n = vy_bufiterref_get(&i);
+	rlist_foreach_entry(n, result, split) {
 		rc = vy_range_complete(n, index);
 		if (unlikely(rc == -1))
 			return -1;
 		VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_4,
 		             vy_error("%s", "error injection");
 		             return -1);
-		vy_bufiter_next(&i);
 	}
 
 	/* unlock */
 	vy_index_rdlock(index);
-	vy_bufiter_open(&i, result, sizeof(struct vy_range*));
-	while (vy_bufiter_has(&i))
-	{
-		n = vy_bufiterref_get(&i);
+	rlist_foreach_entry(n, result, split) {
 		vy_range_unlock(n);
-		vy_bufiter_next(&i);
 	}
 	vy_index_unlock(index);
 
@@ -3989,6 +3973,7 @@ vy_range_new(struct key_def *key_def)
 	ss_rqinitnode(&range->nodecompact);
 	ss_rqinitnode(&range->nodedump);
 	rlist_create(&range->commit);
+	rlist_create(&range->split);
 	return range;
 }
 
