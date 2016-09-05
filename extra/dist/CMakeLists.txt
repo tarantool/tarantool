@@ -83,7 +83,12 @@ install (FILES example.lua DESTINATION
 # Sic: chmod and chown are performed by rpm/deb
 install(DIRECTORY DESTINATION ${TARANTOOL_DATADIR})
 install(DIRECTORY DESTINATION ${TARANTOOL_LOGDIR})
-install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
+
+# /var/run/tarantool is only needed with sysvinit
+# systemd creates this directory automatically using systemd-tmpfiles
+if (WITH_SYSVINIT)
+    install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
+endif()
 
 if (NOT TARGET_OS_FREEBSD)
 # logrotate files
