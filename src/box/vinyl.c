@@ -1873,7 +1873,6 @@ struct PACKED vy_range {
 	rb_node(struct vy_range) tree_node;
 	struct ssrqnode   nodecompact;
 	struct ssrqnode   nodedump;
-	struct rlist     commit;
 	struct rlist     split;
 	uint32_t range_version;
 };
@@ -1945,7 +1944,6 @@ struct vy_index {
 	vy_range_tree_t tree;
 	pthread_rwlock_t lock;
 	int range_count;
-	uint64_t update_time;
 	uint64_t read_disk;
 	uint64_t read_cache;
 	uint64_t size;
@@ -2916,20 +2914,6 @@ vy_index_unlock(struct vy_index *index) {
 static inline void
 vy_index_delete(struct vy_index *index);
 
-struct siread {
-	enum vy_order order;
-	void *key;
-	uint32_t keysize;
-	int64_t vlsn;
-	struct svmerge merge;
-	int read_disk;
-	int read_cache;
-	struct vy_tuple *upsert_v;
-	int upsert_eq;
-	struct vy_tuple *result;
-	struct vy_index *index;
-};
-
 struct vy_rangeiter {
 	struct vy_index *index;
 	struct vy_range *cur_range;
@@ -3606,7 +3590,6 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 static inline void
 vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple *v)
 {
-	index->update_time = now;
 	/* match range */
 	struct vy_rangeiter ii;
 	vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
@@ -3617,7 +3600,7 @@ vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple 
 	int rc = vy_mem_set(vindex, v);
 	assert(rc == 0); /* TODO: handle BPS tree errors properly */
 	(void) rc;
-	range->update_time = index->update_time;
+	range->update_time = now;
 	range->used += vy_tuple_size(v);
 	/* schedule range */
 	vy_planner_update_range(&index->p, range);
@@ -3873,7 +3856,6 @@ vy_range_new(struct key_def *key_def)
 	vy_mem_create(&range->i1, key_def);
 	ss_rqinitnode(&range->nodecompact);
 	ss_rqinitnode(&range->nodedump);
-	rlist_create(&range->commit);
 	rlist_create(&range->split);
 	return range;
 }
@@ -4447,24 +4429,35 @@ vy_index_open_ex(struct vy_index *index)
 	return 0;
 }
 
+/**
+ * Iterate over the write set of a single index
+ * and flush it i0 tree of this index.
+ *
+ * Break when the write set begins pointing at the next index.
+ */
 static struct txv *
 vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	 enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
-	struct vy_env *env = index->env;
-	struct rlist rangelist;
+	struct vy_range *prev_range = NULL;
+	struct vy_range *range = NULL;
 	size_t quota = 0;
-	rlist_create(&rangelist);
 
 	vy_index_rdlock(index);
-	index->update_time = time;
-	for (; v != NULL && v->index == index;
-	     v = write_set_next(write_set, v)) {
+	for (; v && v->index == index; v = write_set_next(write_set, v)) {
 
 		struct vy_tuple *tuple = v->tuple;
 		tuple->lsn = lsn;
 
+		/**
+		 * If we're recovering the WAL, it may happen so
+		 * that this particular run was dumped after the
+		 * checkpoint, and we're replaying records already
+		 * present in the database.
+		 * In this case avoid overwriting a newer version with
+		 * an older one.
+		 */
 		if ((status == VINYL_FINAL_RECOVERY &&
 		     vy_readcommited(index, tuple))) {
 
@@ -4473,8 +4466,18 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		/* match range */
 		struct vy_rangeiter ii;
 		vy_rangeiter_open(&ii, index, VINYL_GE, tuple->data, tuple->size);
-		struct vy_range *range = vy_rangeiter_get(&ii);
+		range = vy_rangeiter_get(&ii);
 		assert(range != NULL);
+		if (prev_range != NULL && range != prev_range) {
+			/*
+			 * The write set is key-ordered, hence
+			 * we can safely assume there won't be new
+			 * keys for this range.
+			 */
+			prev_range->update_time = time;
+			vy_planner_update_range(&index->p, prev_range);
+		}
+		prev_range = range;
 		vy_tuple_ref(tuple);
 		/* insert into range index */
 		struct vy_mem *vindex = vy_range_mem(range);
@@ -4484,19 +4487,14 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		/* update range */
 		range->used += vy_tuple_size(tuple);
 		quota += vy_tuple_size(tuple);
-		if (rlist_empty(&range->commit))
-			rlist_add(&rangelist, &range->commit);
 	}
-	/* reschedule nodes */
-	struct vy_range *range, *tmp;
-	rlist_foreach_entry_safe(range, &rangelist, commit, tmp) {
-		range->update_time = index->update_time;
-		rlist_create(&range->commit);
+	if (range != NULL) {
+		range->update_time = time;
 		vy_planner_update_range(&index->p, range);
 	}
 	vy_index_unlock(index);
 	/* Take quota after having unlocked the index mutex. */
-	vy_quota_use(env->quota, quota);
+	vy_quota_use(index->env->quota, quota);
 	return v;
 }
 
@@ -5983,7 +5981,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->range_index_version = 0;
 	tt_pthread_rwlock_init(&index->lock, NULL);
 	rlist_create(&index->link);
-	index->update_time = 0;
 	index->size = 0;
 	index->read_disk = 0;
 	index->read_cache = 0;
