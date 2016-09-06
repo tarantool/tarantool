@@ -61,20 +61,14 @@ cfg_filter(box.cfg)
   - - vinyl
     - - - compact_wm
         - 2
+      - - dump_age
+        - 40
       - - memory_limit
         - 1
       - - page_size
         - 131072
       - - range_size
         - 67108864
-      - - run_age
-        - 0
-      - - run_age_period
-        - 0
-      - - run_age_wm
-        - 0
-      - - run_prio
-        - 2
       - - threads
         - 5
   - - vinyl_dir

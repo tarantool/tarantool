@@ -8,11 +8,8 @@ local private = require('box.internal')
 local default_vinyl_cfg = {
     memory_limit      = 1.0, -- 1G
     threads           = 5,
-    compact_wm        = 2,
-    run_prio          = 2,
-    run_age           = 0,
-    run_age_period    = 0,
-    run_age_wm        = 0,
+    compact_wm        = 2, -- try to maintain less than 2 runs in a range
+    dump_age          = 40, -- dump idle runs after 40 seconds
     range_size        = 64 * 1024 * 1024,
     page_size        = 128 * 1024,
 }
