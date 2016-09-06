@@ -104,6 +104,7 @@ struct vy_conf;
 struct vy_quota;
 struct tx_manager;
 struct vy_scheduler;
+struct vy_task;
 struct vy_stat;
 struct srzone;
 
@@ -2983,8 +2984,6 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 	}
 }
 
-static int vy_task_drop(struct vy_index*);
-
 static int
 vy_range_merge(struct vy_index *index, struct vy_range *range,
 	 int64_t vlsn, struct svmergeiter *stream, uint64_t size_stream,
@@ -3532,13 +3531,6 @@ vy_range_compact(struct vy_index *index, struct vy_range *range,
 	if (!rc)
 		rc = vy_range_delete(range, 1);
 	return rc;
-}
-
-static int vy_task_drop(struct vy_index *index)
-{
-	/* free memory */
-	vy_index_delete(index);
-	return 0;
 }
 
 static int
@@ -4498,14 +4490,29 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 
 /* {{{ Scheduler Task */
 
-enum vy_task_type {
-	VY_TASK_DUMP,
-	VY_TASK_COMPACT,
-	VY_TASK_DROP,
+struct vy_task_ops {
+	/**
+	 * This function is called from a worker. It is supposed to do work
+	 * which is too heavy for the tx thread (like IO or compression).
+	 * Returns 0 on success.
+	 */
+	int (*execute)(struct vy_task *);
+	/**
+	 * This function is called by the scheduler upon task completion.
+	 * It may be used to finish the task from the tx thread context.
+	 * Returns 0 on success.
+	 */
+	int (*complete)(struct vy_task *);
 };
 
 struct vy_task {
-	enum vy_task_type type;
+	const struct vy_task_ops *ops;
+
+	/*
+	 * Set to ->execute retcode. If non-zero, ->complete won't be called.
+	 */
+	int status;
+
 	struct vy_index *index;
 	struct vy_range *range;
 	/*
@@ -4525,14 +4532,14 @@ struct vy_task {
 
 static inline struct vy_task *
 vy_task_new(struct mempool *pool, struct vy_index *index,
-	    enum vy_task_type type)
+	    const struct vy_task_ops *ops)
 {
 	struct vy_task *task = mempool_alloc(pool);
 	if (task == NULL) {
 		diag_set(OutOfMemory, sizeof(*task), "scheduler", "task");
 		return NULL;
 	}
-	task->type = type;
+	task->ops = ops;
 	task->index = index;
 	task->quota_release = 0;
 	vy_index_ref(index);
@@ -4542,7 +4549,7 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 static inline void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
-	if (task->type != VY_TASK_DROP) {
+	if (task->index) {
 		if (task->quota_release != 0) {
 			struct vy_quota *quota = task->index->env->quota;
 			vy_quota_release(quota, task->quota_release);
@@ -4556,29 +4563,38 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 }
 
 static int
-vy_task_execute(struct vy_task *task)
+vy_task_dump_execute(struct vy_task *task)
 {
-	assert(task->index != NULL);
-	int rc = -1;
-	switch (task->type) {
-	case VY_TASK_DUMP:
-		rc = vy_dump(task->index, task->range, task->vlsn,
-			     &task->quota_release);
-		return rc;
-	case VY_TASK_COMPACT:
-		rc = vy_range_compact(task->index, task->range, task->vlsn, NULL, 0);
-		return rc;
-	case VY_TASK_DROP:
-		assert(task->index->refs == 1); /* referenced by this task */
-		rc = vy_task_drop(task->index);
-		/* TODO: return index to shutdown list in case of error */
-		task->index = NULL;
-		return rc;
-	default:
-		unreachable();
-		return -1;
-	}
+	return vy_dump(task->index, task->range, task->vlsn,
+		       &task->quota_release);
 }
+
+static struct vy_task_ops vy_task_dump_ops = {
+	.execute = vy_task_dump_execute,
+};
+
+static int
+vy_task_compact_execute(struct vy_task *task)
+{
+	return vy_range_compact(task->index, task->range, task->vlsn, NULL, 0);
+}
+
+static struct vy_task_ops vy_task_compact_ops = {
+	.execute = vy_task_compact_execute,
+};
+
+static int
+vy_task_drop_execute(struct vy_task *task)
+{
+	assert(task->index->refs == 1); /* referenced by this task */
+	vy_index_delete(task->index);
+	task->index = NULL;
+	return 0;
+}
+
+static struct vy_task_ops vy_task_drop_ops = {
+	.execute = vy_task_drop_execute,
+};
 
 /* Scheduler Task }}} */
 
@@ -4748,7 +4764,7 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 			continue;
 		}
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_DUMP);
+						   index, &vy_task_dump_ops);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(range);
@@ -4775,7 +4791,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 		    range->used < index->key_def->opts.range_size)
 			return 0; /* nothing to do */
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_DUMP);
+						   index, &vy_task_dump_ops);
 		if (task == NULL)
 			return -1; /* oom */
 		vy_range_lock(range);
@@ -4807,7 +4823,7 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 		if (range->update_time + max_age > now)
 			continue;
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_DUMP);
+						   index, &vy_task_dump_ops);
 		if (task == NULL)
 			return -1; /* oom */
 		vy_range_lock(range);
@@ -4835,7 +4851,7 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 		if (range->run_count < run_count)
 			break; /* TODO: why ? */
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
-						   index, VY_TASK_COMPACT);
+						   index, &vy_task_compact_ops);
 		if (task == NULL)
 			return -1; /* OOM */
 		vy_range_lock(range);
@@ -4855,7 +4871,7 @@ vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 		*ptask = NULL;
 		return 0; /* index still has tasks */
 	}
-	*ptask = vy_task_new(&scheduler->task_pool, index, VY_TASK_DROP);
+	*ptask = vy_task_new(&scheduler->task_pool, index, &vy_task_drop_ops);
 	if (*ptask == NULL)
 		return -1;
 	return 0; /* new task */
@@ -4989,10 +5005,14 @@ vy_scheduler_f(va_list va)
 
 		tt_pthread_mutex_unlock(&scheduler->mutex);
 
-		/* Delete all processed tasks */
+		/* Complete and delete all processed tasks */
 		struct vy_task *next;
-		stailq_foreach_entry_safe(task, next, &output_queue, link)
+		stailq_foreach_entry_safe(task, next, &output_queue, link) {
+			if (task->status == 0 &&
+			    task->ops->complete && task->ops->complete(task))
+				error_log(diag_last_error(diag_get()));
 			vy_task_delete(&scheduler->task_pool, task);
+		}
 
 		/*
 		 * ipc_channel_get_timeout() is used to
@@ -5030,7 +5050,8 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		if (vy_task_execute(task)) {
+		task->status = task->ops->execute(task);
+		if (task->status != 0) {
 			if (!warning_said) {
 				error_log(diag_last_error(diag_get()));
 				warning_said = true;
