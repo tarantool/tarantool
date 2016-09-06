@@ -3448,6 +3448,7 @@ vy_dump(struct vy_index *index, struct vy_range *range,
 	range->run = run;
 	range->run_count++;
 	range->range_version++;
+	index->range_index_version++;
 	assert(range->used >= i->used);
 	range->used -= i->used;
 	*p_quota_release = i->used;
@@ -4773,7 +4774,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->flags & VY_LOCK)
 			continue;
-		if (range->used < 10 * 1024 * 1024)
+		if (range->used < 10 * 1024 * 1024 &&
+		    range->used < index->key_def->opts.range_size)
 			return 0; /* nothing to do */
 		struct vy_task *task = vy_task_new(&scheduler->task_pool,
 						   index, VY_TASK_DUMP);
@@ -8988,11 +8990,13 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
+	vy_index_rdlock(index);
 	vy_rangeiter_open(&itr->range_itr, index, order == VINYL_EQ ? VINYL_GE : order, key, 0);
 	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
 	vy_merge_iterator_open(&itr->merge_itr, index->key_def, order, key, vlsn);
 	vy_read_iterator_use_range(itr);
 	itr->range_index_version = index->range_index_version;
+	vy_index_unlock(index);
 }
 
 int

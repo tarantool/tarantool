@@ -42,7 +42,9 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
-                     'get_latency', 'gc_active'}) do
+                     'get_latency', 'gc_active', 'run_avg', 'run_count',
+                     'page_count', 'memory_used', 'run_max', 'run_histogram',
+                     'size', 'size_uncompressed'}) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 ---
@@ -67,19 +69,19 @@ box_info_sort(box.info.vinyl())
     - 512/0:
       - count: 2
       - count_dup: 0
-      - memory_used: 58
-      - page_count: 0
-      - page_size: 67108864
+      - memory_used: <memory_used>
+      - page_count: <page_count>
+      - page_size: <size>
       - range_count: 1
-      - range_size: 67108864
+      - range_size: <size>
       - read_cache: 0
       - read_disk: 0
-      - run_avg: 0
-      - run_count: 0
-      - run_histogram: '[0]:1 '
-      - run_max: 0
-      - size: 0
-      - size_uncompressed: 0
+      - run_avg: <run_avg>
+      - run_count: <run_count>
+      - run_histogram: <run_histogram>
+      - run_max: <run_max>
+      - size: <size>
+      - size_uncompressed: <size_uncompressed>
       - temperature_avg: 0
       - temperature_max: 0
       - temperature_min: 0
