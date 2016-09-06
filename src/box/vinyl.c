@@ -1940,7 +1940,6 @@ struct vy_index {
 	 */
 	read_set_t read_set;
 	vy_range_tree_t tree;
-	pthread_rwlock_t lock;
 	int range_count;
 	uint64_t read_disk;
 	uint64_t read_cache;
@@ -2895,21 +2894,6 @@ vy_range_tree_key_cmp(vy_range_tree_t *rbtree,
 }
 
 static inline void
-vy_index_rdlock(struct vy_index *index) {
-	tt_pthread_rwlock_rdlock(&index->lock);
-}
-
-static inline void
-vy_index_wrlock(struct vy_index *index) {
-	tt_pthread_rwlock_wrlock(&index->lock);
-}
-
-static inline void
-vy_index_unlock(struct vy_index *index) {
-	tt_pthread_rwlock_unlock(&index->lock);
-}
-
-static inline void
 vy_index_delete(struct vy_index *index);
 
 struct vy_rangeiter {
@@ -3410,7 +3394,6 @@ vy_dump_commit(struct vy_index *index, struct vy_range *range,
 	       struct vy_mem *i, int64_t *p_quota_release, struct vy_run *run)
 {
 	if (unlikely(run == NULL)) {
-		vy_index_wrlock(index);
 		assert(range->used >= i->used);
 		range->used -= i->used;
 		*p_quota_release = i->used;
@@ -3419,13 +3402,11 @@ vy_dump_commit(struct vy_index *index, struct vy_range *range,
 		vy_range_unrotate(range);
 		vy_range_unlock(range);
 		vy_planner_update(&index->p, range);
-		vy_index_unlock(index);
 		vy_mem_gc(&swap);
 		return 0;
 	}
 
 	/* commit */
-	vy_index_wrlock(index);
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
@@ -3441,7 +3422,6 @@ vy_dump_commit(struct vy_index *index, struct vy_range *range,
 	vy_range_unrotate(range);
 	vy_range_unlock(range);
 	vy_planner_update(&index->p, range);
-	vy_index_unlock(index);
 
 	if (range->run_count == 1) {
 		/* First non-empty run for this range, deploy the range. */
@@ -3707,9 +3687,7 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 		 count++;
 	}
 
-	vy_index_rdlock(index);
 	int range_count = index->range_count;
-	vy_index_unlock(index);
 
 	if (unlikely(count == 0 && range_count == 1))
 	{
@@ -3721,7 +3699,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 	}
 
 	/* commit compaction changes */
-	vy_index_wrlock(index);
 	struct vy_mem *j = vy_range_mem(range);
 	vy_planner_remove(&index->p, range);
 	range->flags |= VY_SPLIT;
@@ -3746,7 +3723,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 	default: /* split */
 		rc = vy_range_redistribute(index, range, result);
 		if (unlikely(rc == -1)) {
-			vy_index_unlock(index);
 			vy_range_splitfree(result);
 			return -1;
 		}
@@ -3767,7 +3743,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 		break;
 	}
 	vy_mem_create(j, index->key_def);
-	vy_index_unlock(index);
 
 	/* compaction completion */
 
@@ -3787,11 +3762,9 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 	}
 
 	/* unlock */
-	vy_index_rdlock(index);
 	rlist_foreach_entry(n, result, split) {
 		vy_range_unlock(n);
 	}
-	vy_index_unlock(index);
 
 	if (vy_index_dump_range_index(index)) {
 		/*
@@ -4024,13 +3997,12 @@ vy_profiler_begin(struct vy_profiler *p, struct vy_index *i)
 	memset(p, 0, sizeof(*p));
 	p->i = i;
 	p->temperature_min = 100;
-	vy_index_rdlock(i);
 }
 
 static void
 vy_profiler_end(struct vy_profiler *p)
 {
-	vy_index_unlock(p->i);
+	(void)p;
 }
 
 static void
@@ -4416,7 +4388,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	struct vy_range *range = NULL;
 	size_t quota = 0;
 
-	vy_index_rdlock(index);
 	for (; v && v->index == index; v = write_set_next(write_set, v)) {
 
 		struct vy_tuple *tuple = v->tuple;
@@ -4464,7 +4435,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		range->update_time = time;
 		vy_planner_update_range(&index->p, range);
 	}
-	vy_index_unlock(index);
 	/* Take quota after having unlocked the index mutex. */
 	vy_quota_use(index->env->quota, quota);
 	return v;
@@ -4953,9 +4923,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	struct vy_index *index, *n;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
 		*ptask = NULL;
-		vy_index_rdlock(index);
 		int rc = vy_scheduler_peek_shutdown(scheduler, index, ptask);
-		vy_index_unlock(index);
 		if (rc < 0)
 			return rc;
 		if (*ptask == NULL)
@@ -4973,9 +4941,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	index = scheduler->indexes[scheduler->rr];
 	scheduler->rr = (scheduler->rr + 1) % scheduler->count;
 
-	vy_index_rdlock(index);
 	int rc = vy_schedule_index(scheduler, zone, vlsn, index, ptask);
-	vy_index_unlock(index);
 	return rc;
 }
 
@@ -5715,12 +5681,10 @@ vy_index_dump_range_index(struct vy_index *index)
 {
 	if (index->range_id_max == index->last_dump_range_id)
 		return 0;
-	vy_index_wrlock(index);
 	long int ranges_size = index->range_count * sizeof(int64_t);
 	int64_t *ranges = (int64_t *)malloc(ranges_size);
 	if (!ranges) {
 		vy_error("Can't alloc %li bytes", (long int)ranges_size);
-		vy_index_unlock(index);
 		return -1;
 	}
 	int range_no = 0;
@@ -5739,7 +5703,6 @@ vy_index_dump_range_index(struct vy_index *index)
 		 * any files on disk.
 		 */
 		free(ranges);
-		vy_index_unlock(index);
 		return 0;
 	}
 
@@ -5758,7 +5721,6 @@ vy_index_dump_range_index(struct vy_index *index)
 		close(fd);
 		unlink(path);
 		vy_error("Can't write index file: %s", strerror(errno));
-		vy_index_unlock(index);
 		return -1;
 	}
 	free(ranges);
@@ -5773,12 +5735,10 @@ vy_index_dump_range_index(struct vy_index *index)
 		vy_error("Can't dump index range dict %s: %s",
 			 new_path, strerror(errno));
 		unlink(path);
-		vy_index_unlock(index);
 		return -1;
 	}
 	index->last_dump_range_id = index->range_id_max;
 	unlink(path);
-	vy_index_unlock(index);
 	return 0;
 }
 
@@ -6018,7 +5978,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 
 	vy_range_tree_new(&index->tree);
 	index->range_index_version = 0;
-	tt_pthread_rwlock_init(&index->lock, NULL);
 	rlist_create(&index->link);
 	index->size = 0;
 	index->read_disk = 0;
@@ -6050,7 +6009,6 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
 	vy_planner_destroy(&index->p);
-	tt_pthread_rwlock_destroy(&index->lock);
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	free(index->name);
 	free(index->path);
@@ -9026,13 +8984,11 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
-	vy_index_rdlock(index);
 	vy_rangeiter_open(&itr->range_itr, index, order == VINYL_EQ ? VINYL_GE : order, key, 0);
 	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
 	vy_merge_iterator_open(&itr->merge_itr, index->key_def, order, key, vlsn);
 	vy_read_iterator_use_range(itr);
 	itr->range_index_version = index->range_index_version;
-	vy_index_unlock(index);
 }
 
 int
@@ -9090,12 +9046,10 @@ vy_read_iterator_check_versions(struct vy_read_iterator *itr)
 int
 vy_read_iterator_next(struct vy_read_iterator *itr)
 {
-	vy_index_rdlock(itr->index);
 	vy_read_iterator_check_versions(itr);
 	int rc = vy_merge_iterator_next_key(&itr->merge_itr);
 	if (rc >= 0 && itr->merge_itr.eof_under_control && itr->curr_range != NULL)
 		rc = vy_read_iterator_next_range(itr);
-	vy_index_unlock(itr->index);
 	return rc;
 
 }
@@ -9103,7 +9057,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr)
 int
 vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 {
-	vy_index_rdlock(itr->index);
 	vy_read_iterator_check_versions(itr);
 	int rc;
 	while (true) {
@@ -9115,7 +9068,6 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 				vy_merge_iterator_get(&itr->merge_itr, &t);
 		}
 		if (rc != 0) {
-			vy_index_unlock(itr->index);
 			return rc;
 		}
 		if (itr->curr_tuple != NULL)
@@ -9125,7 +9077,6 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 		while (itr->curr_tuple->flags & SVUPSERT) {
 			int rc = vy_merge_iterator_next_lsn(&itr->merge_itr);
 			if (rc < 0) {
-				vy_index_unlock(itr->index);
 				return rc;
 			}
 			struct vy_tuple *next = NULL;
@@ -9135,7 +9086,6 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 				vy_apply_upsert(itr->curr_tuple, next,
 						itr->index, true);
 			if (applied == NULL) {
-				vy_index_unlock(itr->index);
 				return -1;
 			}
 			vy_tuple_unref(itr->curr_tuple);
@@ -9148,7 +9098,6 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 			break;
 	}
 	*result = itr->curr_tuple;
-	vy_index_unlock(itr->index);
 	return rc;
 }
 
