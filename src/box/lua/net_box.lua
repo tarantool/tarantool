@@ -57,28 +57,6 @@ local CONSOLE_DELIMITER = "$EOF$"
 local VSPACE_ID = 281
 local VINDEX_ID = 289
 
-ffi.cdef [[
-enum {
-    /* Maximal length of protocol name in handshake */
-    GREETING_PROTOCOL_LEN_MAX = 32,
-    /* Maximal length of salt in handshake */
-    GREETING_SALT_LEN_MAX = 44,
-};
-
-struct greeting {
-    uint32_t version_id;
-    uint32_t salt_len;
-    char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
-    struct tt_uuid uuid;
-    char salt[GREETING_SALT_LEN_MAX];
-};
-
-int
-greeting_decode(const char *greetingbuf, struct greeting *greeting);
-int strcmp(const char *s1, const char *s2);
-]]
-local builtin = ffi.C
-
 local ch_buf = {}
 local ch_buf_size = 0
 
@@ -693,10 +671,10 @@ local remote_methods = {
                 elseif #greetingbuf ~= GREETING_SIZE then
                     self:_fatal("Can't read handshake")
                 else
-                    local greeting = ffi.new('struct greeting')
-                    if builtin.greeting_decode(greetingbuf, greeting) ~= 0 then
+                    local greeting = internal.decode_greeting(greetingbuf)
+                    if not greeting then
                         self:_fatal("Can't decode handshake")
-                    elseif builtin.strcmp(greeting.protocol, 'Lua console') == 0 then
+                    elseif greeting.protocol == 'Lua console' then
                         self.version_id = greeting.version_id
                         -- enable self:console() method
                         self.console = self._console
@@ -714,9 +692,9 @@ local remote_methods = {
                             self:_fatal(res.body[ERROR])
                         end
                         self:_switch_state('active')
-                    elseif builtin.strcmp(greeting.protocol, 'Binary') == 0 then
+                    elseif greeting.protocol == 'Binary' then
                         self.version_id = greeting.version_id
-                        self.salt = ffi.string(greeting.salt, greeting.salt_len)
+                        self.salt = greeting.salt
                         self.console = nil
                         self._check_response = self._check_binary_response
                         if self.version_id < version_id(1, 7, 1) then
@@ -735,7 +713,7 @@ local remote_methods = {
                         self:reload_schema()
                     else
                         self:_fatal("Unsupported protocol - "..
-                            ffi.string(greeting.protocol))
+                            greeting.protocol)
                     end
                 end
             end

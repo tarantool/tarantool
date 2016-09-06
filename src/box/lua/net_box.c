@@ -36,6 +36,7 @@
 
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
+#include "box/xrow.h"
 
 #include "lua/msgpack.h"
 #include "third_party/base64.h"
@@ -410,6 +411,40 @@ netbox_encode_upsert(lua_State *L)
 	return 0;
 }
 
+static int
+netbox_decode_greeting(lua_State *L)
+{
+	struct greeting greeting;
+	size_t len;
+	const char *buf = NULL;
+	char uuid_buf[UUID_STR_LEN + 1];
+
+	if (lua_isstring(L, 1))
+		buf = lua_tolstring(L, 1, &len);
+
+	if (buf == NULL || len != IPROTO_GREETING_SIZE ||
+		greeting_decode(buf, &greeting) != 0) {
+
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, "Invalid greeting");
+		return 2;
+	}
+
+	lua_newtable(L);
+	lua_pushinteger(L, greeting.version_id);
+	lua_setfield(L, -2, "version_id");
+	lua_pushstring(L, greeting.protocol);
+	lua_setfield(L, -2, "protocol");
+	lua_pushlstring(L, greeting.salt, greeting.salt_len);
+	lua_setfield(L, -2, "salt");
+
+	tt_uuid_to_string(&greeting.uuid, uuid_buf);
+	lua_pushstring(L, uuid_buf);
+	lua_setfield(L, -2, "uuid");
+
+	return 1;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -425,6 +460,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_update",  netbox_encode_update },
 		{ "encode_upsert",  netbox_encode_upsert },
 		{ "encode_auth",    netbox_encode_auth },
+		{ "decode_greeting",netbox_decode_greeting },
 		{ NULL, NULL}
 	};
 	luaL_register(L, "net.box.lib", net_box_lib);

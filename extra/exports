@@ -29,7 +29,6 @@ csv_iterator_create
 csv_next
 csv_feed
 csv_escape_field
-greeting_decode
 title_update
 title_get
 title_set_interpretor_name
