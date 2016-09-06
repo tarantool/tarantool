@@ -13,12 +13,6 @@ Description=Tarantool Database Server
 After=network.target
 Documentation=man:tarantool(1)
 
-# Created by package
-AssertPathIsDirectory=@TARANTOOL_AVAILABLEDIR@
-AssertPathIsReadWrite=@TARANTOOL_DATADIR@
-AssertPathIsReadWrite=@TARANTOOL_LOGDIR@
-# Created by systemd-tmpfiles
-AssertPathIsReadWrite=@TARANTOOL_RUNDIR@
 # Instance file
 ConditionPathExists=@TARANTOOL_INSTANCEDIR@/%I.lua
 

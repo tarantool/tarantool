@@ -5,3 +5,4 @@
 /lib/systemd/system/tarantool.service
 /lib/systemd/system/tarantool@.service
 /lib/systemd/system-generators/tarantool-generator
+/usr/lib/tmpfiles.d/tarantool.conf
