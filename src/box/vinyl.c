@@ -1225,12 +1225,10 @@ sv_mergeiter_next(struct svmergeiter *im)
 			assert(sv_lsn(v) < sv_lsn(maxv));
 			*/
 			src->dup = 1;
-			break;
 		} else if (direction * rc > 0) {
 			sv_mergeiter_dupreset(im, src);
 			found_val = v;
 			found_src = src;
-			break;
 		}
 	}
 	if (unlikely(found_src == NULL))
