@@ -20,6 +20,7 @@ for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 test_run:cmd("setopt delimiter ''");
+box.snapshot()
 box_info_sort(box.info.vinyl())
 test_run:cmd("clear filter")
 

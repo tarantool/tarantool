@@ -2,11 +2,6 @@
 
 require('suite')
 
-if not file_exists('./vinyl/lock') then
-	vinyl_rmdir()
-	vinyl_mkdir()
-end
-
 box.cfg {
     listen            = os.getenv("LISTEN"),
     slab_alloc_arena  = 0.5,

@@ -53,6 +53,10 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
+box.snapshot()
+---
+- ok
+...
 box_info_sort(box.info.vinyl())
 ---
 - - compaction:
