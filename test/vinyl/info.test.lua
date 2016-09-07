@@ -16,7 +16,7 @@ test_run:cmd("setopt delimiter ';'")
 for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
                      'get_latency', 'gc_active', 'run_avg', 'run_count',
                      'page_count', 'memory_used', 'run_max', 'run_histogram',
-                     'size', 'size_uncompressed'}) do
+                     'size', 'size_uncompressed', 'used'}) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 test_run:cmd("setopt delimiter ''");
