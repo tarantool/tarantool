@@ -50,4 +50,3 @@ space:drop()
 
 test_run:cmd('switch default')
 test_run:cmd("stop server vinyl_info")
-test_run:cmd("start server vinyl_info")

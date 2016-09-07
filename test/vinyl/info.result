@@ -90,7 +90,7 @@ box_info_sort(box.info.vinyl())
       - temperature_max: 0
       - temperature_min: 0
   - memory:
-    - limit: 53687091
+    - limit: 536870912
     - used: <used>
   - metric:
     - lsn: 5
@@ -140,9 +140,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -159,9 +159,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -178,9 +178,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -197,9 +197,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -216,9 +216,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -235,9 +235,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -254,9 +254,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -273,9 +273,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -292,9 +292,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -311,9 +311,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -330,9 +330,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -349,9 +349,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -368,9 +368,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -387,9 +387,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -406,9 +406,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -425,9 +425,9 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 67108864
+    - page_size: 65536
     - range_count: 1
-    - range_size: 67108864
+    - range_size: 65536
     - read_cache: 0
     - read_disk: 0
     - run_avg: 0
@@ -489,10 +489,6 @@ test_run:cmd('switch default')
 - true
 ...
 test_run:cmd("stop server vinyl_info")
----
-- true
-...
-test_run:cmd("start server vinyl_info")
 ---
 - true
 ...
