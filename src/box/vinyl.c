@@ -224,23 +224,6 @@ vy_buf_at(struct vy_buf *b, int size, int i) {
 	return b->s + size * i;
 }
 
-#define VY_INJECTION_SD_BUILD_0   0
-#define VY_INJECTION_SD_BUILD_1   1
-#define VY_INJECTION_DUMP_0       2
-#define VY_INJECTION_COMPACTION_0 3
-#define VY_INJECTION_COMPACTION_1 4
-#define VY_INJECTION_COMPACTION_4 7
-#define VY_INJECTION_RECOVER_0    8
-
-#ifdef VINYL_INJECTION_ENABLE
-	#define VINYL_INJECTION(E, ID, X) \
-	if ((E)->e[(ID)]) { \
-		X; \
-	} else {}
-#else
-	#define VINYL_INJECTION(E, ID, X)
-#endif
-
 #define vy_crcs(p, size, crc) \
 	crc32_calc(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
 
@@ -3505,14 +3488,7 @@ vy_range_compact_begin(struct vy_index *index, struct vy_range *range,
 			    size_stream, count, vlsn, result);
 	sv_mergefree(&merge);
 
-	if (rc)
-		return rc;
-
-	VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_0,
-			vy_range_splitfree(result, r);
-			vy_error("%s", "error injection");
-			return -1);
-	return 0;
+	return rc;
 }
 
 static int
@@ -3750,19 +3726,11 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 
 	/* compaction completion */
 
-	VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_1,
-	             vy_range_delete(range, 0);
-	             vy_error("%s", "error injection");
-	             return -1);
-
 	/* complete new nodes */
 	rlist_foreach_entry(n, result, split) {
 		rc = vy_range_complete(n, index);
 		if (unlikely(rc == -1))
 			return -1;
-		VINYL_INJECTION(r->i, VY_INJECTION_COMPACTION_4,
-		             vy_error("%s", "error injection");
-		             return -1);
 	}
 
 	/* unlock */
@@ -4211,10 +4179,6 @@ vy_index_create(struct vy_index *index)
 	struct vy_range *range = vy_range_new(index->key_def);
 	if (unlikely(range == NULL))
 		return -1;
-	VINYL_INJECTION(r->i, VY_INJECTION_RECOVER_0,
-	             vy_range_delete(range, 0);
-	             vy_error("%s", "error injection");
-	             return -1);
 	vy_index_add_range(index, range);
 	vy_planner_update(&index->p, range);
 	index->size = vy_range_size(range);
