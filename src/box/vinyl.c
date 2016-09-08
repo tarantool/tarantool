@@ -3380,19 +3380,6 @@ static int
 vy_dump_commit(struct vy_index *index, struct vy_range *range,
 	       struct vy_mem *i, int64_t *p_quota_release, struct vy_run *run)
 {
-	if (unlikely(run == NULL)) {
-		assert(range->used >= i->used);
-		range->used -= i->used;
-		*p_quota_release = i->used;
-		struct vy_mem swap = *i;
-		swap.tree.arg = &swap;
-		vy_range_unrotate(range);
-		vy_range_unlock(range);
-		vy_planner_update(&index->p, range);
-		vy_mem_gc(&swap);
-		return 0;
-	}
-
 	/* commit */
 	run->next = range->run;
 	range->run = run;
