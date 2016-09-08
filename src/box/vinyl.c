@@ -3374,7 +3374,7 @@ vy_dump_begin(struct vy_index *index, struct vy_range *range,
 
 static int
 vy_dump_commit(struct vy_index *index, struct vy_range *range,
-	       struct vy_mem *i, int64_t *p_quota_release, struct vy_run *run)
+	       struct vy_mem *i, struct vy_run *run)
 {
 	/* commit */
 	run->next = range->run;
@@ -3384,7 +3384,7 @@ vy_dump_commit(struct vy_index *index, struct vy_range *range,
 	index->range_index_version++;
 	assert(range->used >= i->used);
 	range->used -= i->used;
-	*p_quota_release = i->used;
+	vy_quota_release(index->env->quota, i->used);
 	index->size += vy_run_index_size(&run->index) +
 		       vy_run_index_total(&run->index);
 	struct vy_mem swap = *i;
@@ -4416,10 +4416,6 @@ struct vy_task {
 	 */
 	int64_t vlsn;
 	/*
-	 * Release used quota after finishing task.
-	 */
-	int64_t quota_release;
-	/*
 	 * Result of vy_range_compact_begin() is stored here.
 	 */
 	struct rlist compact_result;
@@ -4445,7 +4441,6 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 	}
 	task->ops = ops;
 	task->index = index;
-	task->quota_release = 0;
 	rlist_create(&task->compact_result);
 	vy_index_ref(index);
 	return task;
@@ -4455,10 +4450,6 @@ static inline void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
 	if (task->index) {
-		if (task->quota_release != 0) {
-			struct vy_quota *quota = task->index->env->quota;
-			vy_quota_release(quota, task->quota_release);
-		}
 		vy_index_unref(task->index);
 		task->index = NULL;
 	}
@@ -4478,7 +4469,7 @@ static int
 vy_task_dump_complete(struct vy_task *task)
 {
 	return vy_dump_commit(task->index, task->range, task->range_mem,
-			      &task->quota_release, task->dump_result);
+			      task->dump_result);
 }
 
 static struct vy_task_ops vy_task_dump_ops = {
