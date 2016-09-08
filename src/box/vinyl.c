@@ -2720,12 +2720,8 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 #define VY_ROTATE     2
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
-static int
-vy_range_open(struct vy_index*, struct vy_range*, char *);
-static int
-vy_range_create(struct vy_range*, struct vy_index*);
+static int vy_range_create(struct vy_range*, struct vy_index*);
 static int vy_range_delete(struct vy_range*, int);
-static int vy_range_complete(struct vy_range*, struct vy_index*);
 
 static inline void
 vy_range_lock(struct vy_range *range)
@@ -3330,103 +3326,8 @@ void
 vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
 			 enum vy_order order, char *key);
 
-static inline int
-vy_run_create(struct vy_index *index,
-	      struct vy_range *parent, struct vy_mem *mem,
-	      int64_t vlsn, struct vy_run **result)
-{
-	/* in-memory mode blob */
-	int rc;
-	struct svmerge vmerge;
-	sv_mergeinit(&vmerge, index, index->key_def);
-	rc = sv_mergeprepare(&vmerge, 1);
-	if (unlikely(rc == -1))
-		return -1;
-	struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
-	vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
-
-	struct svmergeiter imerge;
-	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
-
-	struct svwriteiter iwrite;
-	sv_writeiter_open(&iwrite, &imerge,
-			  vlsn, 1, 1);
-	if ((rc = vy_run_write(parent->fd, &iwrite,
-			        index->compression_if,
-				index->key_def->opts.page_size,
-				UINT64_MAX, result)))
-		goto err;
-
-	sv_writeiter_close(&iwrite);
-	sv_mergefree(&vmerge);
-	return 0;
-err:
-	sv_writeiter_close(&iwrite);
-	sv_mergefree(&vmerge);
-	return -1;
-}
-
 static int64_t
 vy_index_range_id_next(struct vy_index *index);
-
-static int
-vy_range_create(struct vy_range *range, struct vy_index *index);
-
-static int
-vy_range_complete(struct vy_range *range, struct vy_index *index);
-
-static int
-vy_dump_begin(struct vy_index *index, struct vy_range *range,
-	      struct vy_mem *i, int64_t vlsn, struct vy_run **result)
-{
-	assert(range->flags & VY_LOCK);
-
-	if (!range->run) {
-		/* An empty range, create a temp file for it. */
-		if (vy_range_create(range, index) < 0)
-			return -1;
-	}
-
-	return vy_run_create(index, range, i, vlsn, result);
-}
-
-static int
-vy_dump_commit(struct vy_index *index, struct vy_range *range,
-	       struct vy_mem *i, struct vy_run *run)
-{
-	/* commit */
-	run->next = range->run;
-	range->run = run;
-	range->run_count++;
-	range->range_version++;
-	index->range_index_version++;
-	assert(range->used >= i->used);
-	range->used -= i->used;
-	vy_quota_release(index->env->quota, i->used);
-	index->size += vy_run_index_size(&run->index) +
-		       vy_run_index_total(&run->index);
-	struct vy_mem swap = *i;
-	swap.tree.arg = &swap;
-	vy_range_unrotate(range);
-	vy_range_unlock(range);
-	vy_planner_update(&index->p, range);
-
-	if (range->run_count == 1) {
-		/* First non-empty run for this range, deploy the range. */
-		if (vy_range_complete(range, index) < 0)
-			return -1;
-		/*
-		 * The range file was created successfully,
-		 * update the range index on disk.
-		 */
-		if (index->first_dump_lsn == 0)
-			index->first_dump_lsn = run->index.info.min_lsn;
-		vy_index_dump_range_index(index);
-	}
-
-	vy_mem_gc(&swap);
-	return 0;
-}
 
 void
 vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
@@ -3434,50 +3335,6 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 			 struct vy_run *run, int fd,
 			 struct vy_filterif *compression,
 			 enum vy_order order, char *key);
-
-static inline int
-vy_range_split(struct vy_index *index,
-	       struct svmergeiter *merge_iter,
-	       uint64_t  size_node,
-	       int64_t  vlsn,
-	       struct rlist *result);
-
-static int
-vy_range_compact_begin(struct vy_index *index, struct vy_range *range,
-		       int64_t vlsn, struct rlist *result)
-{
-	assert(range->flags & VY_LOCK);
-
-	/* prepare for compaction */
-	int rc;
-	struct svmerge merge;
-	sv_mergeinit(&merge, index, index->key_def);
-	rc = sv_mergeprepare(&merge, range->run_count + 1);
-	if (unlikely(rc == -1))
-		return -1;
-
-	struct vy_run *run = range->run;
-	while (run) {
-		struct svmergesrc *s = sv_mergeadd(&merge, NULL);
-		struct vy_filterif *compression = index->compression_if;
-		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
-				     compression, VINYL_GE, NULL);
-		run = run->next;
-	}
-
-	/* begin compaction.
-	 *
-	 * Split merge stream into a number of
-	 * a new nodes.
-	 */
-	struct svmergeiter im;
-	sv_mergeiter_open(&im, &merge, VINYL_GE);
-	rc = vy_range_split(index, &im, index->key_def->opts.range_size,
-			    vlsn, result);
-	sv_mergefree(&merge);
-
-	return rc;
-}
 
 static int
 vy_range_redistribute(struct vy_index *index, struct vy_range *range,
@@ -3632,80 +3489,6 @@ error:
 		vy_range_delete(range, 0);
 	vy_range_splitfree(result);
 	return -1;
-}
-
-static int
-vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
-		      struct rlist *result)
-{
-	/* mask removal of a single range as a
-	 * single range update */
-	int rc;
-	int count = 0;
-	struct vy_range *n;
-	rlist_foreach_entry(n, result, split) {
-		 count++;
-	}
-
-	if (unlikely(count == 0 && index->range_count == 1))
-	{
-		n = vy_range_new(index->key_def);
-		if (unlikely(n == NULL))
-			return -1;
-		rlist_add_entry(result, n, split);
-		count++;
-	}
-
-	/* commit compaction changes */
-	struct vy_mem *j = vy_range_mem(range);
-	vy_planner_remove(&index->p, range);
-	vy_index_remove_range(index, range);
-	index->size -= vy_range_size(range);
-
-	if (count == 0) {
-		/* delete */
-		vy_range_redistribute_index(index, range);
-	} else if (count == 1) {
-		/* self update */
-		n = rlist_first_entry(result, struct vy_range, split);
-		n->i0 = *j;
-		n->i0.tree.arg = &n->i0;
-	} else {
-		/* split */
-		rc = vy_range_redistribute(index, range, result);
-		if (unlikely(rc == -1)) {
-			vy_range_splitfree(result);
-			return -1;
-		}
-	}
-	vy_mem_create(j, index->key_def);
-
-	rlist_foreach_entry(n, result, split) {
-		n->used = n->i0.used;
-		n->temperature = range->temperature;
-		n->temperature_reads = range->temperature_reads;
-		index->size += vy_range_size(n);
-		vy_index_add_range(index, n);
-		vy_planner_update(&index->p, n);
-	}
-
-	/* complete new nodes */
-	rlist_foreach_entry(n, result, split) {
-		rc = vy_range_complete(n, index);
-		if (unlikely(rc == -1))
-			return -1;
-	}
-
-	if (vy_index_dump_range_index(index)) {
-		/*
-		 * @todo: we should roll back the failed dump
-		 * first, but it requires a redesign of the index
-		 * change function.
-		 */
-		return -1;
-	}
-
-	return vy_range_delete(range, 1);
 }
 
 static struct vy_range *
@@ -4440,16 +4223,92 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 static int
 vy_task_dump_execute(struct vy_task *task)
 {
-	return vy_dump_begin(task->index, task->dump.range,
-			     task->dump.mem, task->vlsn,
-			     &task->dump.new_run);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->dump.range;
+	struct vy_mem *mem = task->dump.mem;
+
+	struct svwriteiter iwrite;
+	struct svmergeiter imerge;
+	struct svmerge vmerge;
+	struct svmergesrc *s;
+	int rc;
+
+	assert(range->flags & VY_LOCK);
+
+	if (!range->run) {
+		/* An empty range, create a temp file for it. */
+		rc = vy_range_create(range, index);
+		if (rc)
+			return rc;
+	}
+
+	sv_mergeinit(&vmerge, index, index->key_def);
+
+	rc = sv_mergeprepare(&vmerge, 1);
+	if (rc)
+		return rc;
+
+	s = sv_mergeadd(&vmerge, NULL);
+	vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
+
+	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
+	sv_writeiter_open(&iwrite, &imerge, task->vlsn, 1, 1);
+
+	rc = vy_run_write(range->fd, &iwrite,
+			  index->compression_if,
+			  index->key_def->opts.page_size,
+			  UINT64_MAX, &task->dump.new_run);
+
+	sv_writeiter_close(&iwrite);
+	sv_mergefree(&vmerge);
+
+	return rc;
 }
 
 static int
 vy_task_dump_complete(struct vy_task *task)
 {
-	return vy_dump_commit(task->index, task->dump.range,
-			      task->dump.mem, task->dump.new_run);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->dump.range;
+	struct vy_mem *mem = task->dump.mem;
+	struct vy_run *run = task->dump.new_run;
+
+	struct vy_mem swap;
+
+	run->next = range->run;
+	range->run = run;
+	range->run_count++;
+
+	range->range_version++;
+	index->range_index_version++;
+
+	assert(range->used >= mem->used);
+	range->used -= mem->used;
+	index->size += vy_run_index_size(&run->index) +
+		       vy_run_index_total(&run->index);
+	vy_quota_release(index->env->quota, mem->used);
+
+	swap = *mem;
+	swap.tree.arg = &swap;
+	vy_range_unrotate(range);
+	vy_range_unlock(range);
+	vy_planner_update(&index->p, range);
+
+	if (range->run_count == 1) {
+		/* First non-empty run for this range, deploy the range. */
+		if (vy_range_complete(range, index) == -1)
+			return -1;
+		/*
+		 * The range file was created successfully,
+		 * update the range index on disk.
+		 */
+		if (index->first_dump_lsn == 0)
+			index->first_dump_lsn = run->index.info.min_lsn;
+		vy_index_dump_range_index(index);
+	}
+
+	vy_mem_gc(&swap);
+	return 0;
 }
 
 static struct vy_task *
@@ -4474,15 +4333,107 @@ vy_task_dump_new(struct mempool *pool,
 static int
 vy_task_compact_execute(struct vy_task *task)
 {
-	return vy_range_compact_begin(task->index, task->compact.range,
-				      task->vlsn, &task->compact.split_list);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->compact.range;
+
+	struct svmergeiter imerge;
+	struct svmerge vmerge;
+	struct vy_run *run;
+	int rc;
+
+	assert(range->flags & VY_LOCK);
+
+	sv_mergeinit(&vmerge, index, index->key_def);
+
+	rc = sv_mergeprepare(&vmerge, range->run_count + 1);
+	if (rc)
+		return rc;
+
+	for (run = range->run; run; run = run->next) {
+		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
+		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
+					 index->compression_if, VINYL_GE, NULL);
+	}
+
+	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
+	rc = vy_range_split(index, &imerge, index->key_def->opts.range_size,
+			    task->vlsn, &task->compact.split_list);
+	sv_mergefree(&vmerge);
+
+	return rc;
 }
 
 static int
 vy_task_compact_complete(struct vy_task *task)
 {
-	return vy_range_compact_commit(task->index, task->compact.range,
-				       &task->compact.split_list);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->compact.range;
+	struct rlist *split_list = &task->compact.split_list;
+
+	struct vy_mem *mem = vy_range_mem(range);
+	struct vy_range *n;
+	int count = 0;
+	int rc;
+
+	rlist_foreach_entry(n, split_list, split)
+		 count++;
+
+	/* Mask removal of a single range as a single range update */
+	if (count == 0 && index->range_count == 1) {
+		n = vy_range_new(index->key_def);
+		if (n == NULL)
+			return -1;
+		rlist_add_entry(split_list, n, split);
+		count++;
+	}
+
+	vy_planner_remove(&index->p, range);
+	vy_index_remove_range(index, range);
+	index->size -= vy_range_size(range);
+
+	if (count == 0) {
+		/* delete */
+		vy_range_redistribute_index(index, range);
+	} else if (count == 1) {
+		/* self update */
+		n = rlist_first_entry(split_list, struct vy_range, split);
+		n->i0 = *mem;
+		n->i0.tree.arg = &n->i0;
+	} else {
+		/* split */
+		rc = vy_range_redistribute(index, range, split_list);
+		if (rc) {
+			vy_range_splitfree(split_list);
+			return rc;
+		}
+	}
+	vy_mem_create(mem, index->key_def);
+
+	rlist_foreach_entry(n, split_list, split) {
+		n->used = n->i0.used;
+		n->temperature = range->temperature;
+		n->temperature_reads = range->temperature_reads;
+		index->size += vy_range_size(n);
+		vy_index_add_range(index, n);
+		vy_planner_update(&index->p, n);
+	}
+
+	/* complete new nodes */
+	rlist_foreach_entry(n, split_list, split) {
+		rc = vy_range_complete(n, index);
+		if (rc)
+			return rc;
+	}
+
+	if (vy_index_dump_range_index(index)) {
+		/*
+		 * TODO: we should roll back the failed dump first, but it
+		 * requires a redesign of the index change function.
+		 */
+		return -1;
+	}
+
+	return vy_range_delete(range, 1);
 }
 
 static struct vy_task *
