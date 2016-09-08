@@ -2718,7 +2718,6 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 
 #define VY_LOCK       1
 #define VY_ROTATE     2
-#define VY_SPLIT      4
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int
@@ -3671,7 +3670,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 	/* commit compaction changes */
 	struct vy_mem *j = vy_range_mem(range);
 	vy_planner_remove(&index->p, range);
-	range->flags |= VY_SPLIT;
 	index->size -= vy_range_size(range);
 	switch (count) {
 	case 0: /* delete */
