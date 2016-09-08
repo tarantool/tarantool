@@ -991,12 +991,12 @@ vy_stat_get(struct vy_stat *s, const struct vy_stat_get *statget)
 
 static inline void
 vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
-          int rlb, int conflict, uint64_t write_count)
+	   uint32_t write_count, bool is_rollback)
 {
 	uint64_t diff = clock_monotonic64() - start;
 	s->tx++;
-	s->tx_rlb += rlb;
-	s->tx_conflict += conflict;
+	if (is_rollback)
+		s->tx_rlb++;
 	s->write_count += write_count;
 	vy_avg_update(&s->tx_stmts, count);
 	vy_avg_update(&s->tx_latency, diff);
@@ -2357,6 +2357,14 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 static void
 vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 {
+	if (tx->state != VINYL_TX_COMMIT) {
+		/** Abort all open cursors. */
+		struct vy_cursor *c;
+		rlist_foreach_entry(c, &tx->cursors, next_in_tx)
+			c->tx = NULL;
+
+		tx_manager_end(tx->manager, tx);
+	}
 	struct txv *v, *tmp;
 	uint32_t count = 0;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
@@ -2367,13 +2375,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		txv_delete(v);
 		count++;
 	}
-	/** Abort all open cursors. */
-	struct vy_cursor *c;
-	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
-		c->tx = NULL;
-
-	tx_manager_end(tx->manager, tx);
-	vy_stat_tx(e->stat, tx->start, count, 1, 0, 0);
+	vy_stat_tx(e->stat, tx->start, count, 0, true);
 }
 
 struct vy_page {
@@ -6569,13 +6571,19 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
-	tx->state = VINYL_TX_COMMIT;
 
 	struct txv *v = write_set_first(&tx->write_set);
 	for (; v != NULL; v = write_set_next(&tx->write_set, v))
 		txv_abort_all(tx, v);
 
+	/** Abort all open cursors. */
+	struct vy_cursor *c;
+	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
+		c->tx = NULL;
+
 	tx_manager_end(tx->manager, tx);
+
+	tx->state = VINYL_TX_COMMIT;
 	/*
 	 * A half committed transaction is no longer
 	 * being part of concurrent index, but still can be
@@ -6613,11 +6621,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
-	/** Abort all open cursors. */
-	struct vy_cursor *c;
-	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
-		c->tx = NULL;
-	vy_stat_tx(e->stat, tx->start, count, 0, 0, write_count);
+	vy_stat_tx(e->stat, tx->start, count, write_count, false);
 	free(tx);
 	return 0;
 }

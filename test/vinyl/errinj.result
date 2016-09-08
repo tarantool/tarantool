@@ -1,0 +1,42 @@
+-- 
+-- gh-1681: vinyl: crash in vy_rollback on ER_WAL_WRITE
+--
+errinj = box.error.injection
+---
+...
+s = box.schema.space.create('test', {engine='vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+function f() box.begin() s:insert{1, 'hi'} s:insert{2, 'bye'} box.commit() end
+---
+...
+errinj.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
+...
+f()
+---
+- error: Failed to write to disk
+...
+s:select{}
+---
+- []
+...
+errinj.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
+f()
+---
+...
+s:select{}
+---
+- - [1, 'hi']
+  - [2, 'bye']
+...
+s:drop()
+---
+...
