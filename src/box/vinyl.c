@@ -3421,15 +3421,12 @@ static inline int
 vy_range_split(struct vy_index *index,
 	       struct svmergeiter *merge_iter,
 	       uint64_t  size_node,
-	       uint64_t  size_stream,
-	       uint32_t  stream,
 	       int64_t  vlsn,
 	       struct rlist *result);
 
 static int
 vy_range_compact_begin(struct vy_index *index, struct vy_range *range,
-		 int64_t vlsn, struct vy_iter *vindex, uint64_t vindex_used,
-		 struct rlist *result)
+		       int64_t vlsn, struct rlist *result)
 {
 	assert(range->flags & VY_LOCK);
 
@@ -3441,22 +3438,12 @@ vy_range_compact_begin(struct vy_index *index, struct vy_range *range,
 	if (unlikely(rc == -1))
 		return -1;
 
-	/* include vindex into merge process */
-	uint32_t count = 0;
-	uint64_t size_stream = 0;
-	if (vindex) {
-		sv_mergeadd(&merge, vindex);
-		size_stream = vindex_used;
-	}
-
 	struct vy_run *run = range->run;
 	while (run) {
 		struct svmergesrc *s = sv_mergeadd(&merge, NULL);
 		struct vy_filterif *compression = index->compression_if;
 		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
 				     compression, VINYL_GE, NULL);
-		size_stream += vy_run_index_total(&run->index);
-		count += vy_run_index_count(&run->index);
 		run = run->next;
 	}
 
@@ -3468,7 +3455,7 @@ vy_range_compact_begin(struct vy_index *index, struct vy_range *range,
 	struct svmergeiter im;
 	sv_mergeiter_open(&im, &merge, VINYL_GE);
 	rc = vy_range_split(index, &im, index->key_def->opts.range_size,
-			    size_stream, count, vlsn, result);
+			    vlsn, result);
 	sv_mergefree(&merge);
 
 	return rc;
@@ -3586,13 +3573,9 @@ static inline int
 vy_range_split(struct vy_index *index,
 	       struct svmergeiter *merge_iter,
 	       uint64_t  size_node,
-	       uint64_t  size_stream,
-	       uint32_t  stream,
 	       int64_t  vlsn,
 	       struct rlist *result)
 {
-	(void) stream;
-	(void) size_stream;
 	int rc;
 	struct vy_range *range = NULL;
 
@@ -4481,7 +4464,7 @@ static int
 vy_task_compact_execute(struct vy_task *task)
 {
 	return vy_range_compact_begin(task->index, task->range, task->vlsn,
-				      NULL, 0, &task->compact_result);
+				      &task->compact_result);
 }
 
 static int
