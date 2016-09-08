@@ -4993,6 +4993,19 @@ vy_scheduler_f(va_list va)
 			vy_task_delete(&scheduler->task_pool, task);
 		}
 
+		if (!stailq_empty(&output_queue)) {
+			/*
+			 * At least one task has been processed and
+			 * initial conditions may have been changed.
+			 * For example, VY_DUMP task increases run_count and
+			 * may be followed by VY_COMPACT task.
+			 * Don't wait for a while and re-run scheduler
+			 * on the next event loop iteration.
+			 */
+			fiber_reschedule();
+			continue;
+		}
+
 		/*
 		 * ipc_channel_get_timeout() is used to
 		 * schedule periodic tasks, 5 seconds is

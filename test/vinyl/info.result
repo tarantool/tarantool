@@ -44,7 +44,7 @@ test_run:cmd("setopt delimiter ';'")
 for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
                      'get_latency', 'gc_active', 'run_avg', 'run_count',
                      'page_count', 'memory_used', 'run_max', 'run_histogram',
-                     'size', 'size_uncompressed', 'used'}) do
+                     'size', 'size_uncompressed', 'used', 'count'}) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 ---
@@ -71,17 +71,17 @@ box_info_sort(box.info.vinyl())
       - dump_age: 0
   - db:
     - 512/0:
-      - count: 2
+      - count: <count>
       - count_dup: 0
       - memory_used: <used>
-      - page_count: <page_count>
+      - page_count: <count>
       - page_size: <size>
-      - range_count: 1
+      - range_count: <count>
       - range_size: <size>
       - read_cache: 0
       - read_disk: 0
       - run_avg: <run_avg>
-      - run_count: <run_count>
+      - run_count: <count>
       - run_histogram: <run_histogram>
       - run_max: <run_max>
       - size: <size>
@@ -109,7 +109,7 @@ box_info_sort(box.info.vinyl())
     - tx_latency: <tx_latency>
     - tx_ops: 0 1 1.0
     - tx_rollback: 1
-    - write_count: 2
+    - write_count: <count>
   - scheduler:
     - zone: '0'
   - vinyl:
