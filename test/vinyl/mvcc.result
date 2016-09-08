@@ -3711,6 +3711,41 @@ c1("t:select{}")
 ...
 --
 --
+-- Check that a cursor is closed automatically when a transaction
+-- is committed or rolled back
+--
+c1:begin()
+---
+- 
+...
+c1("t:select{1}")
+---
+- - [[1, 'new']]
+...
+c1("for k, v in box.space.test:pairs() do box.commit() end")
+---
+- - {'error': 'Operation is not permitted when there is no active transaction '}
+...
+c1:rollback()
+---
+- 
+...
+c1:begin()
+---
+- 
+...
+c1("t:select{1}")
+---
+- - [[1, 'new']]
+...
+c1("for k, v in box.space.test:pairs() do box.rollback() end")
+---
+- - {'error': 'Operation is not permitted when there is no active transaction '}
+...
+c1:rollback()
+---
+- 
+...
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
 -- *************************************************************************

@@ -2051,6 +2051,8 @@ struct vy_cursor {
 	enum vy_order order;
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
+	/** Cursor creation time, used for statistics. */
+	uint64_t start;
 	/**
 	 * All open cursors are registered in a transaction
 	 * they belong to. When the transaction ends, the cursor
@@ -5529,6 +5531,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}
 	c->tx = tx;
+	c->start = tx->start;
 	return c;
 }
 
@@ -5550,7 +5553,7 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		vy_tuple_unref(c->key);
-	vy_stat_cursor(e->stat, c->tx->start, c->n_reads);
+	vy_stat_cursor(e->stat, c->start, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
 }

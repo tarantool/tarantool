@@ -600,7 +600,7 @@ ffi.metatype(iterator_t, {
 
 local iterator_gen = function(param, state)
     --[[
-        index:pairs() mostly confirms to the Lua for-in loop conventions and
+        index:pairs() mostly conforms to the Lua for-in loop conventions and
         tries to follow the best practices of Lua community.
 
         - this generating function is stateless.
@@ -617,8 +617,7 @@ local iterator_gen = function(param, state)
           not properly implemented here. These drawbacks can be fixed in
           future without changing this API.
 
-        Please checkout http://www.lua.org/pil/7.3.html for the further
-        information.
+        Please check out http://www.lua.org/pil/7.3.html for details.
     --]]
     if not ffi.istype(iterator_t, state) then
         error('usage: next(param, state)')

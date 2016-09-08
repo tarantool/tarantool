@@ -1482,6 +1482,18 @@ c1:rollback()
 c1("t:select{}")
 --
 --
+-- Check that a cursor is closed automatically when a transaction
+-- is committed or rolled back
+--
+c1:begin()
+c1("t:select{1}")
+c1("for k, v in box.space.test:pairs() do box.commit() end")
+c1:rollback()
+c1:begin()
+c1("t:select{1}")
+c1("for k, v in box.space.test:pairs() do box.rollback() end")
+c1:rollback()
+
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
 -- *************************************************************************
