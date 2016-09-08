@@ -3583,6 +3583,134 @@ c2:commit() -- rollback
 ...
 --
 --
+-- gh-1606 visibility of changes in transaction in range queries
+--
+c1:begin()
+---
+- 
+...
+c1("t:select{}")
+---
+- - [[1, 'new'], [2, 20]]
+...
+c1("t:replace{3, 30}")
+---
+- - [3, 30]
+...
+c1("t:select{}")
+---
+- - [[1, 'new'], [2, 20], [3, 30]]
+...
+c1("t:select({3}, {iterator='ge'})")
+---
+- - [[3, 30]]
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[2, 20], [1, 'new']]
+...
+c1("t:select({3}, {iterator='gt'})")
+---
+- - []
+...
+c1("t:select({3}, {iterator='eq'})")
+---
+- - [[3, 30]]
+...
+c1("t:replace{3, 'new'}")
+---
+- - [3, 'new']
+...
+c1("t:select({3}, {iterator='ge'})")
+---
+- - [[3, 'new']]
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[2, 20], [1, 'new']]
+...
+c1("t:select({3}, {iterator='gt'})")
+---
+- - []
+...
+c1("t:select({3}, {iterator='eq'})")
+---
+- - [[3, 'new']]
+...
+c1("t:delete{3}")
+---
+- 
+...
+c1("t:select({3}, {iterator='ge'})")
+---
+- - []
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[2, 20], [1, 'new']]
+...
+c1("t:select({3}, {iterator='gt'})")
+---
+- - []
+...
+c1("t:select({3}, {iterator='eq'})")
+---
+- - []
+...
+c1("t:replace{3}")
+---
+- - [3]
+...
+c1("t:delete{2}")
+---
+- 
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[1, 'new']]
+...
+c1("t:select({3}, {iterator='le'})")
+---
+- - [[3], [1, 'new']]
+...
+c1("t:replace{2}")
+---
+- - [2]
+...
+c1("t:delete{1}")
+---
+- 
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[2]]
+...
+c1("t:select({3}, {iterator='le'})")
+---
+- - [[3], [2]]
+...
+c1("t:delete{3}")
+---
+- 
+...
+c1("t:select({3}, {iterator='lt'})")
+---
+- - [[2]]
+...
+c1("t:select({3}, {iterator='le'})")
+---
+- - [[2]]
+...
+c1:rollback()
+---
+- 
+...
+c1("t:select{}")
+---
+- - [[1, 'new'], [2, 20]]
+...
+--
+--
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
 -- *************************************************************************

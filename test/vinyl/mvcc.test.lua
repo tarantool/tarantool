@@ -1447,6 +1447,41 @@ c1:commit()
 c2:commit() -- rollback
 --
 --
+-- gh-1606 visibility of changes in transaction in range queries
+--
+c1:begin()
+c1("t:select{}")
+c1("t:replace{3, 30}")
+c1("t:select{}")
+c1("t:select({3}, {iterator='ge'})")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='gt'})")
+c1("t:select({3}, {iterator='eq'})")
+c1("t:replace{3, 'new'}")
+c1("t:select({3}, {iterator='ge'})")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='gt'})")
+c1("t:select({3}, {iterator='eq'})")
+c1("t:delete{3}")
+c1("t:select({3}, {iterator='ge'})")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='gt'})")
+c1("t:select({3}, {iterator='eq'})")
+c1("t:replace{3}")
+c1("t:delete{2}")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='le'})")
+c1("t:replace{2}")
+c1("t:delete{1}")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='le'})")
+c1("t:delete{3}")
+c1("t:select({3}, {iterator='lt'})")
+c1("t:select({3}, {iterator='le'})")
+c1:rollback()
+c1("t:select{}")
+--
+--
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
 -- *************************************************************************
