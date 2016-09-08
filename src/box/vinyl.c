@@ -3209,12 +3209,14 @@ static int
 vy_run_write(int fd, struct svwriteiter *iwrite,
 	     struct vy_filterif *compression,
 	     uint32_t page_size, uint64_t run_size,
-	     struct vy_run_index *run_index)
+	     struct vy_run **result)
 {
-	vy_run_index_init(run_index);
+	struct vy_run *run = vy_run_new();
+	if (!run)
+		return -1;
 
+	struct vy_run_index *run_index = &run->index;
 	struct vy_run_info *header = &run_index->info;
-	memset(header, 0, sizeof(struct vy_run_info));
 	/*
 	 * Store start run offset in file. In case of run write
 	 * failure the file is truncated to this position.
@@ -3291,6 +3293,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	if (fdatasync(fd) == -1)
 		goto err_file;
 
+	*result = run;
 	return 0;
 
 err_file:
@@ -3301,6 +3304,7 @@ err:
 	 */
 	lseek(fd, header->offset, SEEK_SET);
 	ftruncate(fd, header->offset);
+	free(run);
 	return -1;
 }
 
@@ -3329,19 +3333,11 @@ vy_run_create(struct vy_index *index,
 	struct svwriteiter iwrite;
 	sv_writeiter_open(&iwrite, &imerge,
 			  vlsn, 1, 1);
-	struct vy_run_index sdindex;
-	vy_run_index_init(&sdindex);
 	if ((rc = vy_run_write(parent->fd, &iwrite,
 			        index->compression_if,
 				index->key_def->opts.page_size,
-				UINT64_MAX,
-			        &sdindex)))
+				UINT64_MAX, result)))
 		goto err;
-
-	*result = vy_run_new();
-	if (!(*result))
-		goto err;
-	(*result)->index = sdindex;
 
 	sv_writeiter_close(&iwrite);
 	sv_mergefree(&vmerge);
@@ -3605,8 +3601,6 @@ vy_range_split(struct vy_index *index,
 			  vlsn, 0, 0);
 
 	while (sv_writeiter_has(&iwrite)) {
-		struct vy_run_index sdindex;
-		vy_run_index_init(&sdindex);
 		/* create new range */
 		range = vy_range_new(index->key_def);
 		if (unlikely(range == NULL))
@@ -3615,17 +3609,15 @@ vy_range_split(struct vy_index *index,
 		if (unlikely(rc == -1))
 			goto error;
 
+		struct vy_run *run;
 		if ((rc = vy_run_write(range->fd, &iwrite,
 				       index->compression_if,
 				       index->key_def->opts.page_size,
-				       size_node,
-				       &sdindex)))
+				       size_node, &run)))
 			goto error;
-		range->run = vy_run_new();
-		if (!range->run)
-			goto error;
+
+		range->run = run;
 		++range->run_count;
-		range->run->index = sdindex;
 
 		rlist_add_entry(result, range, split);
 		if (unlikely(rc == -1))
