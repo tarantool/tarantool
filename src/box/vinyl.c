@@ -3135,7 +3135,8 @@ vy_run_write_page(int fd, struct svwriteiter *iwrite,
 	page->offset = run_info->offset + run_info->size;
 
 	while (sv_writeiter_has(iwrite) &&
-	       vy_buf_used(&values) < page_size) {
+	       (vy_buf_used(&values) < page_size ||
+	        sv_writeiter_is_duplicate(iwrite))) {
 		int rc = vy_run_dump_tuple(iwrite, &tuplesinfo, &values,
 					   page);
 		if (rc != 0)
