@@ -3686,7 +3686,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 		n->temperature_reads = range->temperature_reads;
 		n->used = j->used;
 		index->size += vy_range_size(n);
-		vy_range_lock(n);
 		vy_index_replace_range(index, range, n);
 		vy_planner_update(&index->p, n);
 		break;
@@ -3701,7 +3700,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 			n->temperature = range->temperature;
 			n->temperature_reads = range->temperature_reads;
 			index->size += vy_range_size(n);
-			vy_range_lock(n);
 			if (rlist_first_entry(result, struct vy_range,
 					      split) == n) {
 				vy_index_replace_range(index, range, n);
@@ -3721,11 +3719,6 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 		rc = vy_range_complete(n, index);
 		if (unlikely(rc == -1))
 			return -1;
-	}
-
-	/* unlock */
-	rlist_foreach_entry(n, result, split) {
-		vy_range_unlock(n);
 	}
 
 	if (vy_index_dump_range_index(index)) {
