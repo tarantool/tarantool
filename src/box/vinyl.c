@@ -3000,15 +3000,6 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 	return 0;
 }
 
-static int
-vy_index_replace_range(struct vy_index *index, struct vy_range *old,
-	   struct vy_range *range)
-{
-	vy_index_remove_range(index, old);
-	vy_index_add_range(index, range);
-	return 0;
-}
-
 /* dump tuple to the run page buffers (tuple header and data) */
 static int
 vy_run_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
@@ -3656,9 +3647,7 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 		 count++;
 	}
 
-	int range_count = index->range_count;
-
-	if (unlikely(count == 0 && range_count == 1))
+	if (unlikely(count == 0 && index->range_count == 1))
 	{
 		n = vy_range_new(index->key_def);
 		if (unlikely(n == NULL))
@@ -3670,47 +3659,35 @@ vy_range_compact_commit(struct vy_index *index, struct vy_range *range,
 	/* commit compaction changes */
 	struct vy_mem *j = vy_range_mem(range);
 	vy_planner_remove(&index->p, range);
+	vy_index_remove_range(index, range);
 	index->size -= vy_range_size(range);
-	switch (count) {
-	case 0: /* delete */
-		vy_index_remove_range(index, range);
+
+	if (count == 0) {
+		/* delete */
 		vy_range_redistribute_index(index, range);
-		break;
-	case 1: /* self update */
+	} else if (count == 1) {
+		/* self update */
 		n = rlist_first_entry(result, struct vy_range, split);
 		n->i0 = *j;
 		n->i0.tree.arg = &n->i0;
-		n->temperature = range->temperature;
-		n->temperature_reads = range->temperature_reads;
-		n->used = j->used;
-		index->size += vy_range_size(n);
-		vy_index_replace_range(index, range, n);
-		vy_planner_update(&index->p, n);
-		break;
-	default: /* split */
+	} else {
+		/* split */
 		rc = vy_range_redistribute(index, range, result);
 		if (unlikely(rc == -1)) {
 			vy_range_splitfree(result);
 			return -1;
 		}
-		rlist_foreach_entry(n, result, split) {
-			n->used = n->i0.used;
-			n->temperature = range->temperature;
-			n->temperature_reads = range->temperature_reads;
-			index->size += vy_range_size(n);
-			if (rlist_first_entry(result, struct vy_range,
-					      split) == n) {
-				vy_index_replace_range(index, range, n);
-			} else {
-				vy_index_add_range(index, n);
-			}
-			vy_planner_update(&index->p, n);
-		}
-		break;
 	}
 	vy_mem_create(j, index->key_def);
 
-	/* compaction completion */
+	rlist_foreach_entry(n, result, split) {
+		n->used = n->i0.used;
+		n->temperature = range->temperature;
+		n->temperature_reads = range->temperature_reads;
+		index->size += vy_range_size(n);
+		vy_index_add_range(index, n);
+		vy_planner_update(&index->p, n);
+	}
 
 	/* complete new nodes */
 	rlist_foreach_entry(n, result, split) {
