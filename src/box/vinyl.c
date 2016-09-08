@@ -6090,7 +6090,7 @@ vy_tuple_from_key(struct vy_index *index, const char *key, uint32_t part_count)
 	}
 	assert(part_offset == size);
 	/* Fill offsets for missing key parts + value */
-	for (uint32_t i = part_count; i <= key_def->part_count; i++)
+	for (uint32_t i = part_count; i < key_def->part_count; i++)
 		offsets[i] = VY_TUPLE_KEY_MISSING; /* part is missing */
 
 	/* Copy MsgPack data */
@@ -6098,6 +6098,8 @@ vy_tuple_from_key(struct vy_index *index, const char *key, uint32_t part_count)
 	data = mp_encode_array(data, part_count);
 	memcpy(data, key, key_size);
 	data += key_size;
+	/* Store offset of the end of msgpack data in the last entry */
+	offsets[key_def->part_count] = size;
 	assert(data == tuple->data + size);
 
 	return tuple;
@@ -6142,6 +6144,7 @@ vy_tuple_from_data_ex(struct vy_index *index,
 		assert(part_id < key_def->part_count);
 		offsets[part_id] = start_offset + (field - data);
 	}
+	/* Store offset of the end of msgpack data in the last entry */
 	offsets[key_def->part_count] = start_offset + (data_pos - data);
 	assert(offsets[key_def->part_count] + extra_size == size);
 
