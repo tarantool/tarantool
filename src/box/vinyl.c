@@ -2260,6 +2260,11 @@ struct tx_manager {
 	 * vinyl. Updated in vy_commit().
 	 */
 	int64_t lsn;
+	/**
+	 * View sequence number: the oldest read view maintained
+	 * by the front end.
+	 */
+	int64_t vlsn;
 	struct vy_env *env;
 };
 
@@ -2347,11 +2352,16 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 static inline void
 tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 {
+	bool was_oldest = tx == tx_tree_first(&m->tree);
 	tx_tree_remove(&m->tree, tx);
 	if (tx->type == VINYL_TX_RO)
 		m->count_rd--;
 	else
 		m->count_rw--;
+	if (was_oldest) {
+		struct vy_tx *oldest = tx_tree_first(&m->tree);
+		m->vlsn = oldest ? oldest->vlsn : m->lsn;
+	}
 }
 
 static void
@@ -4945,7 +4955,7 @@ vy_scheduler_f(va_list va)
 		/* Get task */
 		struct vy_task *task = NULL;
 		struct srzone *zone = sr_zoneof(env);
-		int rc = vy_schedule(scheduler, zone, env->xm->lsn, &task);
+		int rc = vy_schedule(scheduler, zone, env->xm->vlsn, &task);
 		if (rc != 0){
 			/* Log error message once */
 			if (! warning_said) {
