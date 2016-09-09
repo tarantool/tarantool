@@ -559,350 +559,9 @@ vy_tuple_is_not_found(struct vy_tuple *tuple)
 static struct vy_tuple *
 vy_tuple_extract_key_raw(struct vy_index *index, const char *tuple);
 
-struct svmergesrc {
-	struct vy_iter *i;
-	struct vy_iter src;
-	uint8_t dup;
-	void *ptr;
-};
-
-struct svmerge {
-	struct vy_index *index;
-	struct key_def *key_def; /* TODO: use index->key_def when possible */
-	struct vy_buf buf;
-};
-
-static void
-sv_mergeinit(struct svmerge *m, struct vy_index *index,
-	     struct key_def *key_def)
-{
-	vy_buf_create(&m->buf);
-	m->index = index;
-	m->key_def = key_def;
-}
-
-static int
-sv_mergeprepare(struct svmerge *m, int count)
-{
-	return vy_buf_ensure(&m->buf, sizeof(struct svmergesrc) * count);
-}
-
-static void
-sv_mergefree(struct svmerge *m)
-{
-	struct svmergesrc *beg = (struct svmergesrc *)m->buf.s;
-	struct svmergesrc *end = (struct svmergesrc *)m->buf.p;
-	for (struct svmergesrc *src = beg; src != end; ++src)
-		src->i->vif->close(src->i);
-	vy_buf_destroy(&m->buf);
-}
-
-static inline struct svmergesrc*
-sv_mergeadd(struct svmerge *m, struct vy_iter *i)
-{
-	assert(m->buf.p < m->buf.e);
-	struct svmergesrc *s = (struct svmergesrc*)m->buf.p;
-	s->dup = 0;
-	s->i = i;
-	s->ptr = NULL;
-	if (i == NULL)
-		s->i = &s->src;
-	vy_buf_advance(&m->buf, sizeof(struct svmergesrc));
-	return s;
-}
-
-/*
- * Merge several sorted streams into one.
- * Track duplicates.
- *
- * Merger does not recognize duplicates from
- * a single stream, assumed that they are tracked
- * by the incoming data sources.
-*/
-
-struct svmergeiter {
-	enum vy_order order;
-	struct svmerge *merge;
-	struct svmergesrc *src, *end;
-	struct svmergesrc *v;
-};
-
-static void
-sv_mergeiter_dupreset(struct svmergeiter *i, struct svmergesrc *pos)
-{
-	for (struct svmergesrc *src = i->src; src != pos; src++)
-		src->dup = 0;
-}
-
-static void
-sv_mergeiter_next(struct svmergeiter *im)
-{
-	int direction = 0;
-	switch (im->order) {
-	case VINYL_GT:
-	case VINYL_GE:
-		direction = 1;
-		break;
-	case VINYL_LT:
-	case VINYL_LE:
-		direction = -1;
-		break;
-	default: unreachable();
-	}
-
-	if (im->v) {
-		im->v->dup = 0;
-		vy_iter_next(im->v->i);
-	}
-	im->v = NULL;
-	struct svmergesrc *found_src = NULL;
-	struct vy_tuple *found_val = NULL;
-	for (struct svmergesrc *src = im->src; src < im->end; src++)
-	{
-		struct vy_tuple *v = vy_iter_get(src->i);
-		if (v == NULL)
-			continue;
-		if (found_src == NULL) {
-			found_val = v;
-			found_src = src;
-			continue;
-		}
-		int rc;
-		rc = vy_tuple_compare(found_val->data, v->data,
-				      im->merge->key_def);
-		if (rc == 0) {
-			/*
-			assert(sv_lsn(v) < sv_lsn(maxv));
-			*/
-			src->dup = 1;
-		} else if (direction * rc > 0) {
-			sv_mergeiter_dupreset(im, src);
-			found_val = v;
-			found_src = src;
-		}
-	}
-	if (unlikely(found_src == NULL))
-		return;
-	im->v = found_src;
-}
-
-static int
-sv_mergeiter_open(struct svmergeiter *im, struct svmerge *m, enum vy_order o)
-{
-	im->merge = m;
-	im->order = o;
-	im->src   = (struct svmergesrc*)(im->merge->buf.s);
-	im->end   = (struct svmergesrc*)(im->merge->buf.p);
-	im->v     = NULL;
-	sv_mergeiter_next(im);
-	return 0;
-}
-
-static int
-sv_mergeiter_has(struct svmergeiter *im)
-{
-	return im->v != NULL;
-}
-
-static struct vy_tuple *
-sv_mergeiter_get(struct svmergeiter *im)
-{
-	if (unlikely(im->v == NULL))
-		return NULL;
-	return vy_iter_get(im->v->i);
-}
-
-static uint32_t
-sv_mergeisdup(struct svmergeiter *im)
-{
-	assert(im->v != NULL);
-	if (im->v->dup)
-		return SVDUP;
-	return 0;
-}
-
 static struct vy_tuple *
 vy_apply_upsert(struct vy_tuple *upsert, struct vy_tuple *object,
 		struct vy_index *index, bool suppress_error);
-
-struct svwriteiter {
-	int64_t   vlsn;
-	int       save_delete;
-	int       save_upsert;
-	int       next;
-	int       upsert;
-	int64_t   prevlsn;
-	int       vdup;
-	struct vy_tuple *v;
-	struct svmergeiter   *merge;
-	struct vy_tuple *upsert_tuple;
-};
-
-static int
-sv_writeiter_upsert(struct svwriteiter *i)
-{
-	assert(i->upsert_tuple == NULL);
-	/* upsert begin */
-	struct vy_index *index = i->merge->merge->index;
-	struct vy_tuple *v = sv_mergeiter_get(i->merge);
-	assert(v != NULL);
-	assert(v->flags & SVUPSERT);
-	assert(v->lsn <= i->vlsn);
-	i->upsert_tuple = vy_tuple_alloc(v->size);
-	i->upsert_tuple->flags = SVUPSERT;
-	memcpy(i->upsert_tuple->data, v->data, v->size);
-	v = i->upsert_tuple;
-	sv_mergeiter_next(i->merge);
-
-	/* iterate over upsert statements */
-	int last_non_upd = 0;
-	for (; sv_mergeiter_has(i->merge); sv_mergeiter_next(i->merge))
-	{
-		struct vy_tuple *next_v = sv_mergeiter_get(i->merge);
-		int flags = next_v->flags;
-		int dup = flags & SVDUP || sv_mergeisdup(i->merge);
-		if (! dup)
-			break;
-		/* stop forming upserts on a second non-upsert stmt,
-		 * but continue to iterate stream */
-		if (last_non_upd)
-			continue;
-		last_non_upd = ! (flags & SVUPSERT);
-
-		struct vy_tuple *up = vy_apply_upsert(v, next_v, index, false);
-		if (up == NULL)
-			return -1; /* memory error */
-		vy_tuple_unref(i->upsert_tuple);
-		i->upsert_tuple = up;
-		v = i->upsert_tuple;
-	}
-	if (v->flags & SVUPSERT) {
-		struct vy_tuple *up = vy_apply_upsert(v, NULL, index, false);
-		if (up == NULL)
-			return -1; /* memory error */
-		vy_tuple_unref(i->upsert_tuple);
-		i->upsert_tuple = up;
-		v = i->upsert_tuple;
-	}
-	return 0;
-}
-
-static void
-sv_writeiter_next(struct svwriteiter *im)
-{
-	if (im->upsert_tuple != NULL) {
-		vy_tuple_unref(im->upsert_tuple);
-		im->upsert_tuple = NULL;
-	}
-	if (im->next)
-		sv_mergeiter_next(im->merge);
-	im->next = 0;
-	im->v = NULL;
-	im->vdup = 0;
-
-	for (; sv_mergeiter_has(im->merge); sv_mergeiter_next(im->merge))
-	{
-		struct vy_tuple *v = sv_mergeiter_get(im->merge);
-		int64_t lsn = v->lsn;
-		int flags = v->flags;
-		int dup = flags & SVDUP || sv_mergeisdup(im->merge);
-
-		if (unlikely(dup)) {
-			/* keep atleast one visible version for <= vlsn */
-			if (im->prevlsn <= im->vlsn) {
-				if (im->upsert) {
-					im->upsert = flags & SVUPSERT;
-				} else {
-					continue;
-				}
-			}
-		} else {
-			im->upsert = 0;
-			/* delete (stray or on the run) */
-			if (! im->save_delete) {
-				int del = flags & SVDELETE;
-				if (unlikely(del && (lsn <= im->vlsn))) {
-					im->prevlsn = lsn;
-					continue;
-				}
-			}
-			/* upsert (track first statement start) */
-			if (flags & SVUPSERT)
-				im->upsert = 1;
-		}
-
-		/* upsert */
-		if (flags & SVUPSERT) {
-			if (! im->save_upsert) {
-				if (lsn <= im->vlsn) {
-					int rc;
-					rc = sv_writeiter_upsert(im);
-					if (unlikely(rc == -1))
-						return;
-					im->upsert = 0;
-					im->prevlsn = lsn;
-					im->v = im->upsert_tuple;
-					im->vdup = dup;
-					im->next = 0;
-					break;
-				}
-			}
-		}
-
-		im->prevlsn = lsn;
-		im->v = v;
-		im->vdup = dup;
-		im->next = 1;
-		break;
-	}
-}
-
-static int
-sv_writeiter_open(struct svwriteiter *im, struct svmergeiter *merge,
-		  int64_t vlsn, int save_delete,
-		  int save_upsert)
-{
-	im->upsert_tuple = NULL;
-	im->merge       = merge;
-	im->vlsn        = vlsn;
-	im->save_delete = save_delete;
-	im->save_upsert = save_upsert;
-	im->next  = 0;
-	im->prevlsn  = 0;
-	im->v = NULL;
-	im->vdup = 0;
-	im->upsert = 0;
-	sv_writeiter_next(im);
-	return 0;
-}
-
-static void
-sv_writeiter_close(struct svwriteiter *im)
-{
-	if (im->upsert_tuple != NULL) {
-		vy_tuple_unref(im->upsert_tuple);
-		im->upsert_tuple = NULL;
-	}
-}
-
-static int
-sv_writeiter_has(struct svwriteiter *im)
-{
-	return im->v != NULL;
-}
-
-static struct vy_tuple *
-sv_writeiter_get(struct svwriteiter *im)
-{
-	return im->v;
-}
-
-static int
-sv_writeiter_is_duplicate(struct svwriteiter *im)
-{
-	assert(im->v != NULL);
-	return im->vdup;
-}
 
 struct tree_mem_key {
 	char *data;
@@ -2176,18 +1835,14 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 
 /* dump tuple to the run page buffers (tuple header and data) */
 static int
-vy_run_dump_tuple(struct svwriteiter *iwrite, struct vy_buf *info_buf,
+vy_run_dump_tuple(struct vy_tuple *value, struct vy_buf *info_buf,
 		  struct vy_buf *data_buf, struct vy_page_info *info)
 {
-	struct vy_tuple *value = sv_writeiter_get(iwrite);
 	int64_t lsn = value->lsn;
-	uint8_t flags = value->flags;
-	if (sv_writeiter_is_duplicate(iwrite))
-		flags |= SVDUP;
 	if (vy_buf_ensure(info_buf, sizeof(struct vy_tuple_info)))
 		return -1;
 	struct vy_tuple_info *tupleinfo = (struct vy_tuple_info *)info_buf->p;
-	tupleinfo->flags = flags;
+	tupleinfo->flags = value->flags;
 	tupleinfo->offset = vy_buf_used(data_buf);
 	tupleinfo->size = value->size;
 	tupleinfo->lsn = lsn;
@@ -2233,13 +1888,32 @@ vy_pwrite_file(int fd, void *buf, uint32_t size, off_t offset)
 	return pos;
 }
 
+struct vy_write_iterator;
+
+struct vy_write_iterator *
+vy_write_iterator_new(bool save_delete, struct vy_index *index,
+		      int64_t purge_lsn);
+int
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
+			  int fd, bool is_mutable, bool control_eof);
+int
+vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
+			  bool is_mutable, bool control_eof);
+int
+vy_write_iterator_next(struct vy_write_iterator *wi);
+
+int
+vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result);
+
+void
+vy_write_iterator_delete(struct vy_write_iterator *wi);
+
 /**
  * Write tuples from the iterator to a new page in the run,
  * update page and run statistics.
  */
 static int
-vy_run_write_page(int fd, struct svwriteiter *iwrite,
-		  uint32_t page_size,
+vy_run_write_page(int fd, struct vy_write_iterator *wi, uint32_t page_size,
 		  struct vy_run_index *run_index)
 {
 	struct vy_run_info *run_info = &run_index->info;
@@ -2258,14 +1932,14 @@ vy_run_write_page(int fd, struct svwriteiter *iwrite,
 	page->min_lsn = INT64_MAX;
 	page->offset = run_info->offset + run_info->size;
 
-	while (sv_writeiter_has(iwrite) &&
-	       (vy_buf_used(&values) < page_size ||
-	        sv_writeiter_is_duplicate(iwrite))) {
-		int rc = vy_run_dump_tuple(iwrite, &tuplesinfo, &values,
-					   page);
-		if (rc != 0)
+	struct vy_tuple *tuple;
+	int rc = vy_write_iterator_get(wi, &tuple);
+	while (rc == 0 && (vy_buf_used(&values) < page_size)) {
+		rc = vy_run_dump_tuple(tuple, &tuplesinfo, &values, page);
+		if (rc)
 			goto err;
-		sv_writeiter_next(iwrite);
+		vy_write_iterator_next(wi);
+		rc = vy_write_iterator_get(wi, &tuple);
 	}
 	page->unpacked_size = vy_buf_used(&tuplesinfo) + vy_buf_used(&values);
 	page->unpacked_size = ALIGN_POS(page->unpacked_size);
@@ -2329,10 +2003,11 @@ err:
  * and set up the corresponding run index structures.
  */
 static int
-vy_run_write(int fd, struct svwriteiter *iwrite,
+vy_run_write(int fd, struct vy_write_iterator *wi,
 	     uint32_t page_size, uint64_t run_size,
 	     struct vy_run **result)
 {
+	int rc = 0;
 	struct vy_run *run = vy_run_new();
 	if (!run)
 		return -1;
@@ -2364,18 +2039,15 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	/*
 	 * Read from the iterator until it's exhausted or range
 	 * size limit is reached.
-	 * The current write iterator emits "virtual" eofs
-	 * at page size boundary and can be resumed
-	 * with sv_writeiter_resume()
 	 */
 	do {
-		if (vy_run_write_page(fd, iwrite, page_size,
+		if (vy_run_write_page(fd, wi, page_size,
 				      run_index) == -1)
 			goto err;
-	} while (sv_writeiter_has(iwrite) && header->total < run_size);
+		rc = vy_write_iterator_get(wi, NULL);
+	} while (rc == 0 && header->total < run_size);
 
 	/* Write pages index */
-	int rc;
 	header->pages_offset = header->offset +
 				     header->size;
 	header->pages_size = vy_buf_used(&run_index->pages);
@@ -2442,6 +2114,10 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 			 struct vy_index *index,
 			 struct vy_run *run, int fd,
 			 enum vy_order order, char *key);
+
+static inline int
+vy_range_split(struct vy_index *index, struct vy_write_iterator *wi,
+	       uint64_t size_node, struct rlist *result);
 
 static int
 vy_range_redistribute(struct vy_index *index, struct vy_range *range,
@@ -2546,21 +2222,14 @@ vy_range_splitfree(struct rlist *result)
 	return 0;
 }
 
-static int
-vy_range_split(struct vy_index *index,
-	       struct svmergeiter *merge_iter,
-	       uint64_t  size_node,
-	       int64_t  vlsn,
-	       struct rlist *result)
+static inline int
+vy_range_split(struct vy_index *index, struct vy_write_iterator *wi,
+	       uint64_t  size_node, struct rlist *result)
 {
 	int rc;
 	struct vy_range *range = NULL;
 
-	struct svwriteiter iwrite;
-	sv_writeiter_open(&iwrite, merge_iter,
-			  vlsn, 0, 0);
-
-	while (sv_writeiter_has(&iwrite)) {
+	while (!vy_write_iterator_get(wi, NULL)) {
 		/* create new range */
 		range = vy_range_new(index);
 		if (unlikely(range == NULL))
@@ -2570,7 +2239,7 @@ vy_range_split(struct vy_index *index,
 			goto error;
 
 		struct vy_run *run;
-		if ((rc = vy_run_write(range->fd, &iwrite,
+		if ((rc = vy_run_write(range->fd, wi,
 				       index->key_def->opts.page_size,
 				       size_node, &run)))
 			goto error;
@@ -2582,10 +2251,8 @@ vy_range_split(struct vy_index *index,
 		if (unlikely(rc == -1))
 			goto error;
 	}
-	sv_writeiter_close(&iwrite);
 	return 0;
 error:
-	sv_writeiter_close(&iwrite);
 	if (range)
 		vy_range_delete(range);
 	vy_range_splitfree(result);
@@ -3218,10 +2885,6 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->dump.range;
 	struct vy_mem *mem;
-
-	struct svwriteiter iwrite;
-	struct svmergeiter imerge;
-	struct svmerge vmerge;
 	int rc;
 
 	if (!range->run) {
@@ -3231,30 +2894,18 @@ vy_task_dump_execute(struct vy_task *task)
 			return rc;
 	}
 
-	sv_mergeinit(&vmerge, index, index->key_def);
-
-	assert(range->mem_count > 1);
-	rc = sv_mergeprepare(&vmerge, range->mem_count - 1);
-	if (rc)
-		return rc;
-
+	struct vy_write_iterator *wi;
+	wi = vy_write_iterator_new(1, index, task->vlsn);
 	/* We dump all memory indexes but the newest one -
 	 * see comment in vy_task_dump_new() */
 	for (mem = range->mem->next; mem; mem = mem->next) {
-		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
-		vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
+		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
 	}
-
-	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
-	sv_writeiter_open(&iwrite, &imerge, task->vlsn, 1, 1);
-
-	rc = vy_run_write(range->fd, &iwrite,
-			  index->key_def->opts.page_size,
-			  UINT64_MAX, &task->dump.new_run);
-
-	sv_writeiter_close(&iwrite);
-	sv_mergefree(&vmerge);
-
+	if (!rc)
+		rc = vy_run_write(range->fd, wi,
+				  index->key_def->opts.page_size, UINT64_MAX,
+				  &task->dump.new_run);
+	vy_write_iterator_delete(wi);
 	return rc;
 }
 
@@ -3353,34 +3004,29 @@ vy_task_compact_execute(struct vy_task *task)
 	assert(range->nodedump.pos == UINT32_MAX);
 	assert(range->nodecompact.pos == UINT32_MAX);
 
-	struct svmergeiter imerge;
-	struct svmerge vmerge;
+	struct vy_run *run;
 	int rc;
-
-	sv_mergeinit(&vmerge, index, index->key_def);
-
-	rc = sv_mergeprepare(&vmerge, range->run_count + range->mem_count - 1);
-	if (rc)
-		return rc;
+	struct vy_write_iterator *wi;
+	wi = vy_write_iterator_new(0, index, task->vlsn);
 
 	/* compact on disk runs */
-	for (struct vy_run *run = range->run; run; run = run->next) {
-		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
-		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
-					 VINYL_GE, NULL);
+	for (run = range->run; run; run = run->next) {
+		rc = vy_write_iterator_add_run(wi, run, range->fd, 0, 0);
+		if (rc)
+			goto end;
 	}
 
 	/* compact shadow memory indexes */
 	for (struct vy_mem *mem = range->mem->next; mem; mem = mem->next) {
-		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
-		vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
+		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
+		if (rc)
+			goto end;
 	}
 
-	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
-	rc = vy_range_split(index, &imerge, index->key_def->opts.range_size,
-			    task->vlsn, &task->compact.split_list);
-	sv_mergefree(&vmerge);
-
+	rc = vy_range_split(index, wi, index->key_def->opts.range_size,
+			    &task->compact.split_list);
+end:
+	vy_write_iterator_delete(wi);
 	return rc;
 }
 
@@ -3420,7 +3066,6 @@ vy_task_compact_complete(struct vy_task *task)
 	if (count == 0) {
 		/* delete */
 		vy_range_redistribute_index(index, range);
-		unreachable();
 	} else if (count == 1) {
 		/* self update */
 		struct vy_mem *mem = range->mem;
@@ -8078,6 +7723,269 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 }
 
 /* }}} Merge iterator */
+
+/* {{{ Write iterator */
+
+/**
+ * A write iterator provides API for iteration over tuples from several
+ * sources and for the automated filtering of them.
+ */
+struct vy_write_iterator {
+	struct vy_index *index;
+	/*
+	 * If a current tuple LSN is bigger than purge_lsn then
+	 * this tuple possible is in using in a transaction and
+	 * can't be filtered out. But if current tuple LSN is less
+	 * of equal than purge LSN then it can be filtered.
+	 * @sa vy_write_iterator_next
+	 */
+	int64_t purge_lsn;
+	/*
+	 * User of a write iterator can specify if he needs
+	 * deletions saving. If save_delete is true then
+	 * deletions with LSN less or equal to purge LSN
+	 * will be returned to the user, else deletions will be
+	 * skipped and the iteraion will continue from a next key.
+	 */
+	bool save_delete;
+	bool goto_next_key;
+	struct vy_tuple *curr_tuple;
+	struct vy_tuple *upsert_tuple;
+	struct vy_merge_iterator mi;
+};
+
+/*
+ * Open an empty write iterator. For specifying sources for the iterator
+ * use vy_write_iterator_add_* functions. 
+ */
+void
+vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
+		       struct vy_index *index, int64_t purge_lsn)
+{
+	wi->index = index;
+	wi->purge_lsn = purge_lsn;
+	wi->save_delete = save_delete;
+	wi->curr_tuple = NULL;
+	wi->goto_next_key = false;
+	vy_merge_iterator_open(&wi->mi, index->key_def, VINYL_GE, NULL);
+}
+
+struct vy_write_iterator *
+vy_write_iterator_new(bool save_delete, struct vy_index *index,
+		      int64_t purge_lsn)
+{
+	struct vy_write_iterator *wi = calloc(1, sizeof(*wi));
+	if (wi == NULL) {
+		diag_set(OutOfMemory, sizeof(*wi), "calloc", "wi");
+		return NULL;
+	}
+	vy_write_iterator_open(wi, save_delete, index, purge_lsn);
+	return wi;
+}
+
+int
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
+			  int fd, bool is_mutable, bool control_eof)
+{
+	struct vy_tuple_iterator *ti;
+	ti = vy_merge_iterator_add(&wi->mi, is_mutable, control_eof);
+	if (ti == NULL)
+		return -1;
+	vy_run_iterator_iface_open(ti, wi->index, run, fd,
+				   VINYL_GE, NULL, INT64_MAX);
+	return 0;
+}
+
+int
+vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
+			  bool is_mutable, bool control_eof)
+{
+	struct vy_tuple_iterator *ti;
+	ti = vy_merge_iterator_add(&wi->mi, is_mutable, control_eof);
+	if (ti == NULL)
+		return -1;
+	vy_mem_iterator_iface_open(ti, mem, VINYL_GE, NULL, INT64_MAX);
+	return 0;
+}
+
+int
+vy_write_iterator_next(struct vy_write_iterator *wi)
+{
+	/*
+	 * Nullify the result tuple. If we will not found a next tuple
+	 * then need to 'forget' the old tuple.
+	 */
+	if (wi->curr_tuple)
+		vy_tuple_unref(wi->curr_tuple);
+	wi->curr_tuple = NULL;
+	/*
+	 * The upsert tuple can be not null since previous calling of
+	 * next().
+	 */
+	if (wi->upsert_tuple)
+		vy_tuple_unref(wi->upsert_tuple);
+	wi->upsert_tuple = NULL;
+	struct vy_merge_iterator *mi = &wi->mi;
+	/*
+	 * Further rc means following:
+	 *  - rc < 0 - it is an error.
+	 *  - rc = 0 - all is ok.
+	 *  - rc > 0 - iteration over current key or LSN is finished.
+	 */
+	int rc;
+	struct vy_tuple *tuple;
+	if (!mi->search_started) {
+		/* Start the searching if it's first iteration. */
+		rc = vy_merge_iterator_locate(mi);
+	} else {
+		if (wi->goto_next_key) {
+			rc = vy_merge_iterator_next_key(mi);
+			wi->goto_next_key = false;
+		} else {
+			rc = vy_merge_iterator_next_lsn(mi);
+		}
+	}
+	if (rc < 0)
+		return rc;
+
+	/*
+	 * This cycle works accoring to the following algorithm:
+	 *  - iterate over all tuples with one key. If the current tuple
+	 *    is above purge_lsn then there is a transaction that
+	 *    uses this tuple and we return this tuple as it is.
+	 *    But if the current tuple is below purge_lsn then
+	 *    all older versions of this tuple can be merged.
+	 *  - if tuples with one key are finished then go to the next key.
+	 */
+	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi))
+	{
+		if (wi->goto_next_key) {
+			rc = vy_merge_iterator_next_key(mi);
+			wi->goto_next_key = false;
+		}
+		/**
+		 * If we reached end of the key LSNs then go to the next key.
+		 * If the end of all keys is reached then it's end of
+		 * the iterator.
+		 */
+		if (rc > 0) {
+			if (wi->upsert_tuple) {
+				tuple = wi->upsert_tuple;
+				rc = 0;
+				break;
+			}
+			rc = vy_merge_iterator_next_key(mi);
+			if (rc)
+				break;
+		}
+		rc = vy_merge_iterator_get(mi, &tuple);
+		if (rc)
+			break;
+		if (tuple->lsn > wi->purge_lsn) {
+			/* Save the current tuple as the result. */
+			break;
+		}
+		/*
+		 * If the merge iterator now is below
+		 * the purge LSN then upserts can be merged and
+		 * all operations after replace on same key can
+		 * be skipped. 
+		 */
+		if (tuple->flags & SVDELETE) {
+			if (wi->save_delete) {
+				/*
+				 * If the tuple was deleted and
+				 * user needs to save it then 
+				 * return it.
+				 * There is the case when don't need to save
+				 * deletions. If the deletion is below the
+				 * purge LSN - there are no transactions
+				 * that need this or older versions of the tuple.
+				 */
+				if (wi->upsert_tuple) {
+					/*
+					 * If the previous operation was
+					 * deletion then save upsert as
+					 * replace.
+					 */
+					tuple = vy_apply_upsert(wi->upsert_tuple,
+								tuple, wi->index,
+								false);
+				}
+				break;
+			}
+			/*
+			 * If the tuple was deleted then all
+			 * operations before the deletion can be skipped
+			 * because after the deletion the tuple doesn't exist.
+			 * Go to the next key.
+			 */
+			wi->goto_next_key = true;
+			continue;
+		} else if (tuple->flags & SVUPSERT) {
+			if (wi->upsert_tuple) {
+				/*
+				 * If it isn't first upsert then apply both.
+				 */
+				tuple = vy_apply_upsert(wi->upsert_tuple,
+							tuple, wi->index,
+							false);
+				vy_tuple_unref(wi->upsert_tuple);
+			} else {
+				vy_tuple_ref(tuple);
+			}
+			wi->upsert_tuple = tuple;
+		} else {
+			/* Replace. */
+			if (wi->upsert_tuple) {
+				/*
+				 * If the previous tuple was upserted
+				 * then combine it with the replace and return.
+				 */
+				tuple = vy_apply_upsert(wi->upsert_tuple,
+							tuple, wi->index,
+							false);
+			}
+			wi->goto_next_key = true;
+			break;
+		}
+	}
+	if (rc)
+		return rc;
+	vy_tuple_ref(tuple);
+	wi->curr_tuple = tuple;
+	return 0;
+}
+
+int
+vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result)
+{
+	if (wi->curr_tuple == NULL && vy_write_iterator_next(wi))
+		return 1;
+	if (result)
+		*result = wi->curr_tuple;
+	return 0;
+}
+
+void
+vy_write_iterator_close(struct vy_write_iterator *wi)
+{
+	if (wi->upsert_tuple) {
+		vy_tuple_unref(wi->upsert_tuple);
+	}
+	wi->curr_tuple = NULL;
+	wi->upsert_tuple = NULL;
+	vy_merge_iterator_close(&wi->mi);
+}
+
+void
+vy_write_iterator_delete(struct vy_write_iterator *wi)
+{
+	vy_write_iterator_close(wi);
+	free(wi);
+}
+
+/* Write iterator }}} */
 
 /* {{{ Iterator over index */
 
