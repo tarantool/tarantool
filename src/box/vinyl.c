@@ -352,19 +352,13 @@ ss_rqdelete(struct ssrq *q, struct ssrqnode *n)
 			struct ssrqq *p = &q->q[i];
 			if (p->count > 0) {
 				q->last = i;
+				n->q = UINT32_MAX;
 				return;
 			}
 			i--;
 		}
 	}
-}
-
-static inline void
-ss_rqupdate(struct ssrq *q, struct ssrqnode *n, uint32_t v)
-{
-	if (likely(n->q != UINT32_MAX))
-		ss_rqdelete(q, n);
-	ss_rqadd(q, n, v);
+	n->q = UINT32_MAX;
 }
 
 static inline struct ssrqnode*
@@ -2696,26 +2690,11 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 	pthread_mutex_unlock(&run->cache_lock);
 }
 
-#define VY_LOCK       1
 #define VY_ROTATE     2
 
 static struct vy_range *vy_range_new(struct key_def *key_def);
 static int vy_range_create(struct vy_range*, struct vy_index*);
 static int vy_range_delete(struct vy_range*, int);
-
-static inline void
-vy_range_lock(struct vy_range *range)
-{
-	assert(! (range->flags & VY_LOCK));
-	range->flags |= VY_LOCK;
-}
-
-static inline void
-vy_range_unlock(struct vy_range *range)
-{
-	assert((range->flags & VY_LOCK) > 0);
-	range->flags &= ~VY_LOCK;
-}
 
 static inline struct vy_mem *
 vy_range_rotate(struct vy_range *range)
@@ -2784,10 +2763,12 @@ vy_range_size(struct vy_range *range)
 
 static int vy_planner_create(struct vy_planner*);
 static void vy_planner_destroy(struct vy_planner*);
-static void vy_planner_update(struct vy_planner*, struct vy_range*);
-static void vy_planner_update_range(struct vy_planner *p,
-				    struct vy_range *range);
-static void vy_planner_remove(struct vy_planner*, struct vy_range*);
+static void
+vy_planner_add_range(struct vy_planner *p, struct vy_range *range);
+static void
+vy_planner_update_range(struct vy_planner *p, struct vy_range *range);
+static void
+vy_planner_remove_range(struct vy_planner*, struct vy_range*);
 
 struct vy_range_tree_key {
 	char *data;
@@ -2810,6 +2791,8 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
 	(void)arg;
+	struct vy_index *index = (struct vy_index *) arg;
+	vy_planner_remove_range(&index->p, range);
 	vy_range_delete(range, 0);
 	return NULL;
 }
@@ -3375,8 +3358,6 @@ vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple 
 	(void) rc;
 	range->update_time = now;
 	range->used += vy_tuple_size(v);
-	/* schedule range */
-	vy_planner_update_range(&index->p, range);
 }
 
 static int
@@ -3571,7 +3552,8 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 	/* Attach range to the index and update statistics. */
 	vy_index_add_range(index, range);
 	index->size += vy_range_size(range);
-	vy_planner_update(&index->p, range);
+	/* schedule range */
+	vy_planner_add_range(&index->p, range);
 	return 0;
 }
 
@@ -3603,6 +3585,9 @@ vy_range_delete_runs(struct vy_range *range)
 static int
 vy_range_delete(struct vy_range *range, int gc)
 {
+	assert(range->nodedump.q == UINT32_MAX);
+	assert(range->nodecompact.q == UINT32_MAX);
+
 	int rcret = 0;
 	int rc;
 	vy_range_delete_runs(range);
@@ -3657,23 +3642,33 @@ vy_planner_destroy(struct vy_planner *p)
 }
 
 static void
-vy_planner_update(struct vy_planner *p, struct vy_range *range)
+vy_planner_add_range(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqupdate(&p->dump, &range->nodedump, range->used);
-	ss_rqupdate(&p->compact, &range->nodecompact, range->run_count);
+	ss_rqadd(&p->dump, &range->nodedump, range->used);
+	ss_rqadd(&p->compact, &range->nodecompact, range->run_count);
+	assert(range->nodedump.q != UINT32_MAX);
+	assert(range->nodecompact.q != UINT32_MAX);
 }
 
 static void
 vy_planner_update_range(struct vy_planner *p, struct vy_range *range)
 {
-	ss_rqupdate(&p->dump, &range->nodedump, range->used);
+	if (likely(range->nodedump.q == UINT32_MAX))
+		return; /* range is being processed by a task */
+
+	ss_rqdelete(&p->dump, &range->nodedump);
+	ss_rqadd(&p->dump, &range->nodedump, range->used);
+	assert(range->nodedump.q != UINT32_MAX);
+	assert(range->nodecompact.q != UINT32_MAX);
 }
 
 static void
-vy_planner_remove(struct vy_planner *p, struct vy_range *range)
+vy_planner_remove_range(struct vy_planner *p, struct vy_range *range)
 {
 	ss_rqdelete(&p->dump, &range->nodedump);
 	ss_rqdelete(&p->compact, &range->nodecompact);
+	assert(range->nodedump.q == UINT32_MAX);
+	assert(range->nodecompact.q == UINT32_MAX);
 }
 
 static void
@@ -3816,7 +3811,7 @@ vy_index_create(struct vy_index *index)
 	if (unlikely(range == NULL))
 		return -1;
 	vy_index_add_range(index, range);
-	vy_planner_update(&index->p, range);
+	vy_planner_add_range(&index->p, range);
 	index->size = vy_range_size(range);
 	return 0;
 }
@@ -3962,7 +3957,6 @@ vy_index_open_ex(struct vy_index *index)
 		if (unlikely(range == NULL))
 			return -1;
 		vy_index_add_range(index, range);
-		vy_planner_update(&index->p, range);
 		index->size = vy_range_size(range);
 	}
 
@@ -4128,8 +4122,6 @@ vy_task_dump_execute(struct vy_task *task)
 	struct svmergesrc *s;
 	int rc;
 
-	assert(range->flags & VY_LOCK);
-
 	if (!range->run) {
 		/* An empty range, create a temp file for it. */
 		rc = vy_range_create(range, index);
@@ -4186,8 +4178,6 @@ vy_task_dump_complete(struct vy_task *task)
 	swap = *mem;
 	swap.tree.arg = &swap;
 	vy_range_unrotate(range);
-	vy_range_unlock(range);
-	vy_planner_update(&index->p, range);
 
 	if (range->run_count == 1) {
 		/* First non-empty run for this range, deploy the range. */
@@ -4202,6 +4192,7 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_index_dump_range_index(index);
 	}
 
+	vy_planner_add_range(&index->p, range);
 	vy_mem_gc(&swap);
 	return 0;
 }
@@ -4219,7 +4210,6 @@ vy_task_dump_new(struct mempool *pool,
 	if (!task)
 		return NULL;
 
-	vy_range_lock(range);
 	task->dump.range = range;
 	task->dump.mem = vy_range_rotate(range);
 	return task;
@@ -4230,13 +4220,13 @@ vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->compact.range;
+	assert(range->nodedump.q == UINT32_MAX);
+	assert(range->nodecompact.q == UINT32_MAX);
 
 	struct svmergeiter imerge;
 	struct svmerge vmerge;
 	struct vy_run *run;
 	int rc;
-
-	assert(range->flags & VY_LOCK);
 
 	sv_mergeinit(&vmerge, index, index->key_def);
 
@@ -4282,13 +4272,13 @@ vy_task_compact_complete(struct vy_task *task)
 		count++;
 	}
 
-	vy_planner_remove(&index->p, range);
 	vy_index_remove_range(index, range);
 	index->size -= vy_range_size(range);
 
 	if (count == 0) {
 		/* delete */
 		vy_range_redistribute_index(index, range);
+		unreachable();
 	} else if (count == 1) {
 		/* self update */
 		n = rlist_first_entry(split_list, struct vy_range, split);
@@ -4310,7 +4300,8 @@ vy_task_compact_complete(struct vy_task *task)
 		n->temperature_reads = range->temperature_reads;
 		index->size += vy_range_size(n);
 		vy_index_add_range(index, n);
-		vy_planner_update(&index->p, n);
+		/* Add to scheduler */
+		vy_planner_add_range(&index->p, n);
 	}
 
 	/* complete new nodes */
@@ -4344,7 +4335,6 @@ vy_task_compact_new(struct mempool *pool,
 	if (!task)
 		return NULL;
 
-	vy_range_lock(range);
 	task->compact.range = range;
 	rlist_create(&task->compact.split_list);
 	return task;
@@ -4533,13 +4523,12 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->i0.min_lsn > checkpoint_lsn)
 			continue;
-		if (range->flags & VY_LOCK)
-			continue;
 		if (range->used == 0)
 			continue;
 		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
 		if (*ptask == NULL)
 			return -1; /* OOM */
+		vy_planner_remove_range(&index->p, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4555,14 +4544,13 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (range->flags & VY_LOCK)
-			continue;
 		if (range->used < 10 * 1024 * 1024 &&
 		    range->used < index->key_def->opts.range_size)
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
 		if (*ptask == NULL)
 			return -1; /* oom */
+		vy_planner_remove_range(&index->p, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4584,8 +4572,6 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.dump, pn))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (range->flags & VY_LOCK)
-			continue;
 		if (range->used == 0)
 			continue;
 		if (range->update_time + max_age > now)
@@ -4593,6 +4579,7 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
 		if (*ptask == NULL)
 			return -1; /* oom */
+		vy_planner_remove_range(&index->p, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4610,14 +4597,13 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&index->p.compact, pn))) {
 		range = container_of(pn, struct vy_range, nodecompact);
-		if (range->flags & VY_LOCK)
-			continue;
 		if (range->run_count < run_count)
 			break; /* TODO: why ? */
 		*ptask = vy_task_compact_new(&scheduler->task_pool,
 					     index, range);
 		if (*ptask == NULL)
 			return -1; /* OOM */
+		vy_planner_remove_range(&index->p, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -5793,7 +5779,7 @@ static inline void
 vy_index_delete(struct vy_index *index)
 {
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
-	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index->env);
+	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index);
 	vy_planner_destroy(&index->p);
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	free(index->name);
