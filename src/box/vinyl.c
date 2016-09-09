@@ -3938,6 +3938,7 @@ vy_index_open_ex(struct vy_index *index)
 			vy_range_delete(range, 0);
 			return -1;
 		}
+		index->range_id_max = MAX(index->range_id_max, range_id + 1);
 	}
 
 	close(fd);
