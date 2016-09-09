@@ -3770,91 +3770,6 @@ static int vy_profiler_(struct vy_profiler *p)
 	return 0;
 }
 
-/* {{{ vy_run_itr API forward declaration */
-/* TODO: move to header (with struct vy_run_itr) and remove static keyword */
-
-/** Position of a particular tuple in vy_run. */
-struct vy_run_iterator_pos {
-	uint32_t page_no;
-	uint32_t pos_in_page;
-};
-
-/**
- * Iterator over vy_run
- */
-struct vy_run_iterator {
-	/* Members needed for memory allocation and disk access */
-	/* index */
-	struct vy_index *index;
-	/* run */
-	struct vy_run *run;
-	/* file of run */
-	int fd;
-	/* compression in file */
-	struct vy_filterif *compression;
-
-	/* Search options */
-	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
-	 */
-	enum vy_order order;
-	/* Search key data in terms of vinyl, vy_tuple_compare argument */
-	char *key;
-	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	int64_t vlsn;
-
-	/* State of the iterator */
-	/** Position of the current record */
-	struct vy_run_iterator_pos curr_pos;
-	/**
-	 * Last tuple returned by vy_run_iterator_get.
-	 * The iterator holds this tuple until the next call to
-	 * vy_run_iterator_get, when it's dereferenced.
-	 */
-	struct vy_tuple *curr_tuple;
-	/** Position of record that spawned curr_tuple */
-	struct vy_run_iterator_pos curr_tuple_pos;
-	/**
-	 * Page number of the currently loaded page, UINT32_MAX if
-	 * no page is loaded.
-	 */
-	uint32_t curr_loaded_page;
-	/** Is false until first .._get ot .._next_.. method is called */
-	bool search_started;
-	/** Search is finished, you will not get more values from iterator */
-	bool search_ended;
-};
-
-/**
- * Open the iterator
- */
-static void
-vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
-		     struct vy_run *run, int fd,
-		     struct vy_filterif *compression, enum vy_order order,
-		     char *key, int64_t vlsn);
-
-static int
-vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result);
-
-static int
-vy_run_iterator_next_key(struct vy_run_iterator *itr);
-
-static int
-vy_run_iterator_next_lsn(struct vy_run_iterator *itr);
-
-static int
-vy_run_iterator_restore(struct vy_run_iterator *itr, struct vy_tuple *last_tuple);
-
-/**
- * Close an iterator and free all resources
- */
-static void
-vy_run_iterator_close(struct vy_run_iterator *itr);
-
-/* }}} vy_run_iterator API forward declaration */
-
 static int
 vy_readcommited(struct vy_index *index, struct vy_tuple *tuple);
 
@@ -6813,6 +6728,85 @@ finish_send:
 
 /* }}} replication */
 
+/* {{{ vy_run_itr API forward declaration */
+/* TODO: move to header (with struct vy_run_itr) and remove static keyword */
+
+/** Position of a particular tuple in vy_run. */
+struct vy_run_iterator_pos {
+	uint32_t page_no;
+	uint32_t pos_in_page;
+};
+
+/**
+ * Iterator over vy_run
+ */
+struct vy_run_iterator {
+	/* Members needed for memory allocation and disk access */
+	/* index */
+	struct vy_index *index;
+	/* run */
+	struct vy_run *run;
+	/* file of run */
+	int fd;
+	/* compression in file */
+	struct vy_filterif *compression;
+
+	/* Search options */
+	/**
+	 * Order, that specifies direction, start position and stop criteria
+	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 */
+	enum vy_order order;
+	/* Search key data in terms of vinyl, vy_tuple_compare argument */
+	char *key;
+	/* LSN visibility, iterator shows values with lsn <= vlsn */
+	int64_t vlsn;
+
+	/* State of the iterator */
+	/** Position of the current record */
+	struct vy_run_iterator_pos curr_pos;
+	/**
+	 * Last tuple returned by vy_run_iterator_get.
+	 * The iterator holds this tuple until the next call to
+	 * vy_run_iterator_get, when it's dereferenced.
+	 */
+	struct vy_tuple *curr_tuple;
+	/** Position of record that spawned curr_tuple */
+	struct vy_run_iterator_pos curr_tuple_pos;
+	/**
+	 * Page number of the currently loaded page, UINT32_MAX if
+	 * no page is loaded.
+	 */
+	uint32_t curr_loaded_page;
+	/** Is false until first .._get ot .._next_.. method is called */
+	bool search_started;
+	/** Search is finished, you will not get more values from iterator */
+	bool search_ended;
+};
+
+static void
+vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
+		     struct vy_run *run, int fd,
+		     struct vy_filterif *compression, enum vy_order order,
+		     char *key, int64_t vlsn);
+
+static int
+vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result);
+
+static int
+vy_run_iterator_next_key(struct vy_run_iterator *itr);
+
+static int
+vy_run_iterator_next_lsn(struct vy_run_iterator *itr);
+
+static int
+vy_run_iterator_restore(struct vy_run_iterator *itr, struct vy_tuple *last_tuple);
+
+static void
+vy_run_iterator_close(struct vy_run_iterator *itr);
+
+/* }}} vy_run_iterator API forward declaration */
+
 /* {{{ vy_run_iterator vy_run_iterator support functions */
 /* TODO: move to appropriate c file and remove */
 
@@ -7628,11 +7622,11 @@ static int
 vy_mem_iterator_next_key(struct vy_mem_iterator *itr);
 
 static int
-vy_mem_iterator_restore(struct vy_mem_iterator *itr,
-			struct vy_tuple *last_tuple);
+vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr);
 
 static int
-vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr);
+vy_mem_iterator_restore(struct vy_mem_iterator *itr,
+			struct vy_tuple *last_tuple);
 
 static void
 vy_mem_iterator_close(struct vy_mem_iterator *itr);
@@ -8076,7 +8070,7 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
 
 /* }}} Temporary wrap of new mem iterator to old API */
 
-/* {{{ Iteration over transaction writes */
+/* {{{ Iterator over transaction writes : forward declaration */
 
 struct vy_txw_iterator {
 	struct vy_index *index;
@@ -8099,7 +8093,33 @@ struct vy_txw_iterator {
 	bool search_started;
 };
 
-void
+static void
+vy_txw_iterator_open(struct vy_txw_iterator *itr,
+		     struct vy_index *index, struct vy_tx *tx,
+		     enum vy_order order, char *key);
+
+static int
+vy_txw_iterator_get(struct vy_txw_iterator *itr, struct vy_tuple **result);
+
+static int
+vy_txw_iterator_next_key(struct vy_txw_iterator *itr);
+
+static int
+vy_txw_iterator_next_lsn(struct vy_txw_iterator *itr);
+
+static int
+vy_txw_iterator_restore(struct vy_txw_iterator *itr,
+			struct vy_tuple *last_tuple);
+
+static void
+vy_txw_iterator_close(struct vy_txw_iterator *itr);
+
+/* }}} Iterator over transaction writes : forward declaration */
+
+/* {{{ Iterator over transaction writes : implementation */
+
+/* Open the iterator */
+static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
 		     enum vy_order order, char *key)
@@ -8115,7 +8135,13 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 	itr->search_started = false;
 }
 
-int
+/**
+ * Find position in write set of transaction. Used once in first call of
+ *  get/next
+ * return 0: OK
+ * return 1: not found
+ */
+static int
 vy_txw_iterator_start(struct vy_txw_iterator *itr)
 {
 	itr->search_started = true;
@@ -8124,13 +8150,12 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr)
 	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
 	if (itr->key != NULL) {
-		if (itr->order == VINYL_EQ) {
+		if (itr->order == VINYL_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
-		} else if (itr->order == VINYL_GE || itr->order == VINYL_GT) {
+		else if (itr->order == VINYL_GE || itr->order == VINYL_GT)
 			txv = write_set_nsearch(&itr->tx->write_set, &key);
-		} else {
+		else
 			txv = write_set_psearch(&itr->tx->write_set, &key);
-		}
 		if (txv == NULL || txv->index != itr->index)
 			return 1;
 		if (vy_tuple_compare(itr->key, txv->tuple->data,
@@ -8169,7 +8194,12 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr)
 	return 0;
 }
 
-int
+/**
+ * Gut current tupple
+ * return 0 : OK
+ * return 1 : no more data
+ */
+static int
 vy_txw_iterator_get(struct vy_txw_iterator *itr, struct vy_tuple **result)
 {
 	if (!itr->search_started && vy_txw_iterator_start(itr) != 0)
@@ -8180,7 +8210,12 @@ vy_txw_iterator_get(struct vy_txw_iterator *itr, struct vy_tuple **result)
 	return 0;
 }
 
-int
+/**
+ * Move to next tuple
+ * return 0 : OK
+ * return 1 : no more data
+ */
+static int
 vy_txw_iterator_next_key(struct vy_txw_iterator *itr)
 {
 	if (!itr->search_started && vy_txw_iterator_start(itr) != 0)
@@ -8208,14 +8243,25 @@ vy_txw_iterator_next_key(struct vy_txw_iterator *itr)
 	return itr->curr_txv == NULL ? 1 : 0;
 }
 
-int
+/**
+ * Function for compatibility with run/mem iterators.
+ * return 1 : no more data
+ */
+static int
 vy_txw_iterator_next_lsn(struct vy_txw_iterator *itr)
 {
 	(void)itr;
 	return 1;
 }
 
-int
+/**
+ * Restore iterator position after some changes in write set. Iterator
+ *  position is placed to the next position after last_tuple
+ * Can restore iterator that was out of data previously
+ * return 0 : nothing significant was happend and itr position left the same
+ * return 1 : iterator restored and position changed
+ */
+static int
 vy_txw_iterator_restore(struct vy_txw_iterator *itr,
 			struct vy_tuple *last_tuple)
 {
@@ -8256,13 +8302,16 @@ vy_txw_iterator_restore(struct vy_txw_iterator *itr,
 	return txv->tuple != was_tuple;
 }
 
-void
+/**
+ * Close the iterator
+ */
+static void
 vy_txw_iterator_close(struct vy_txw_iterator *itr)
 {
 	(void)itr;
 }
 
-/* }}} Iteration over transaction writes */
+/* }}} Iterator over transaction writes : implementation */
 
 /* {{{ vy_tuple_iterator: Common interface for iterator over run, mem, etc */
 
@@ -8284,14 +8333,14 @@ struct vy_tuple_iterator_iface {
 
 struct vy_tuple_iterator {
 	struct vy_tuple_iterator_iface *iface;
-	char priv[128];
+	char priv[96];
 };
 
 /* }}} vy_tuple_iterator: Common interface for iterator over run, mem, etc */
 
 /* {{{ Virtual iterator over run */
 
-int
+static int
 vy_run_iterator_iface_get(struct vy_tuple_iterator *vitr,
 			  struct vy_tuple **result)
 {
@@ -8300,7 +8349,7 @@ vy_run_iterator_iface_get(struct vy_tuple_iterator *vitr,
 	return vy_run_iterator_get(itr, result);
 }
 
-int
+static int
 vy_run_iterator_iface_next_key(struct vy_tuple_iterator *vitr)
 {
 	assert(vitr->iface->next_key == vy_run_iterator_iface_next_key);
@@ -8316,7 +8365,7 @@ vy_run_iterator_iface_next_lsn(struct vy_tuple_iterator *vitr)
 	return vy_run_iterator_next_lsn(itr);
 }
 
-int
+static int
 vy_run_iterator_iface_restore(struct vy_tuple_iterator *vitr,
 			      struct vy_tuple *last_tuple)
 {
@@ -8333,7 +8382,7 @@ vy_run_iterator_iface_close(struct vy_tuple_iterator *vitr)
 	vy_run_iterator_close(itr);
 }
 
-void
+static void
 vy_run_iterator_iface_open(struct vy_tuple_iterator *vitr, struct vy_index *index,
 			   struct vy_run *run, int fd,
 			   struct vy_filterif *compression, enum vy_order order,
@@ -8356,7 +8405,7 @@ vy_run_iterator_iface_open(struct vy_tuple_iterator *vitr, struct vy_index *inde
 
 /* {{{ Virtual iterator over mem */
 
-int
+static int
 vy_mem_iterator_iface_get(struct vy_tuple_iterator *vitr,
 			  struct vy_tuple **result)
 {
@@ -8365,7 +8414,7 @@ vy_mem_iterator_iface_get(struct vy_tuple_iterator *vitr,
 	return vy_mem_iterator_get(itr, result);
 }
 
-int
+static int
 vy_mem_iterator_iface_next_key(struct vy_tuple_iterator *vitr)
 {
 	assert(vitr->iface->next_key == vy_mem_iterator_iface_next_key);
@@ -8373,7 +8422,7 @@ vy_mem_iterator_iface_next_key(struct vy_tuple_iterator *vitr)
 	return vy_mem_iterator_next_key(itr);
 }
 
-int
+static int
 vy_mem_iterator_iface_next_lsn(struct vy_tuple_iterator *vitr)
 {
 	assert(vitr->iface->next_lsn == vy_mem_iterator_iface_next_lsn);
@@ -8381,7 +8430,7 @@ vy_mem_iterator_iface_next_lsn(struct vy_tuple_iterator *vitr)
 	return vy_mem_iterator_next_lsn(itr);
 }
 
-int
+static int
 vy_mem_iterator_iface_restore(struct vy_tuple_iterator *vitr,
 			      struct vy_tuple *last_tuple)
 {
@@ -8398,7 +8447,7 @@ vy_mem_iterator_iface_close(struct vy_tuple_iterator *vitr)
 	vy_mem_iterator_close(itr);
 }
 
-void
+static void
 vy_mem_iterator_iface_open(struct vy_tuple_iterator *vitr,
 			   struct vy_mem *mem,
 			   enum vy_order order, char *key, int64_t vlsn)
@@ -8462,7 +8511,7 @@ vy_txw_iterator_iface_close(struct vy_tuple_iterator *vitr)
 	vy_txw_iterator_close(itr);
 }
 
-void
+static void
 vy_txw_iterator_iface_open(struct vy_tuple_iterator *vitr,
 			   struct vy_index *index, struct vy_tx *tx,
 			   enum vy_order order, char *key)
@@ -8484,38 +8533,89 @@ vy_txw_iterator_iface_open(struct vy_tuple_iterator *vitr,
 
 /* {{{ Merge iterator */
 
+/**
+ * Merge source, support structure for vy_merge_iterator
+ * Contains source iterator, additional properties and merge state
+ */
 struct vy_merge_src {
+	/* Source iterator */
 	struct vy_tuple_iterator itr;
+	/* Source can change during merge iteration */ 
 	bool is_mutable;
-	bool control_eof;
+	/* Source belongs to a range (see vy_merge_iterator comments) */
+	bool belong_range;
+	/* All sources with the same front_id as in struct vy_merge_iterator
+	 * are on the same key of current output tuple (optimization) */
 	uint32_t front_id;
 };
 
+/**
+ * Merge iterator takes several iterators as a source and sorts output from
+ * them by given order and LSN DESC. Nothing is skipped, just sorted.
+ * There are several optimizations, that requires:
+ * 1)all sources are given with increasing age.
+ * 2)mutable sources are given before read-blocking sources.
+ * The iterator designed for read iteration over write_set of current
+ * transaction (that does not belong to any range but to entire index)
+ * and mems and runs of some range. For this purpose the iterator hase
+ * specuial flag (range_ended) that signals to read iterator that it must
+ * switch to the next range
+ */
 struct vy_merge_iterator {
+	/* Array of sources */
 	struct vy_merge_src *src;
+	/* Number of elements in the src array */
 	uint32_t src_count;
+	/* Number of elements allocated in the src array */
 	uint32_t src_capacity;
+	/* Current source offset that merge iterator is positioned on */
 	uint32_t curr_src;
-	uint32_t front_id;
+	/* Offset of the first source with is_mutable == true */
 	uint32_t mutable_start;
+	/* Next offset after the last source with is_mutable == true */
 	uint32_t mutable_end;
+	/* key_def for comparators */
 	struct key_def *key_def;
+	/* key to compare with */
 	char *key;
-	int64_t vlsn;
+	/* Order of iteration */
 	enum vy_order order;
+	/* Current tuple that merge iterator is positioned on */
 	struct vy_tuple *curr_tuple;
+	/* All sources with this front_id
+	 * are on the same key of current iteration (optimization) */
+	uint32_t front_id;
+	/* If index is unique and full key is given we can optimize first
+	 * search in order to avoid unnecessary reading from disk.
+	 * That flag is set to true during initialization if index is unique
+	 * and  full key is given. After first _get or _next_key call is set
+	 * to false */
 	bool unique_optimization;
+	/* After first search with unique_optimization we must do some extra
+	 * moves and optimizations for _next_lsn call. So that flag is set to
+	 * true after first search and will set to false after consequent
+	 * _next_key call */
 	bool is_in_uniq_opt;
+	/* This flag is set to false during initialiization and means that we
+	 * must do lazy search for first _get or _next call. After that is
+	 * set to false */
 	bool search_started;
-	bool eof_under_control;
+	/* If all sources marked with belong_range = true comes to the end of
+	 * data this flag is automatically set to true; is false otherwise.
+	 * For read iterator range_ended = true means that it must switch to
+	 * next range */
+	bool range_ended;
 };
 
-void
-vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def, enum vy_order order, char *key, int64_t vlsn)
+/**
+ * Open the iterator
+ */
+static void
+vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def,
+		       enum vy_order order, char *key)
 {
 	itr->key_def = key_def;
 	itr->key = key;
-	itr->vlsn = vlsn;
 	itr->order = order;
 	itr->src = NULL;
 	itr->src_count = 0;
@@ -8531,10 +8631,13 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def, e
 		vy_tuple_key_is_full(key, key_def);
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
-	itr->eof_under_control = false;
+	itr->range_ended = false;
 }
 
-void
+/**
+ * Close the iteator and free resources
+ */
+static void
 vy_merge_iterator_close(struct vy_merge_iterator *itr)
 {
 	if (itr->curr_tuple != NULL) {
@@ -8549,7 +8652,12 @@ vy_merge_iterator_close(struct vy_merge_iterator *itr)
 	itr->src = NULL;
 }
 
-int
+/**
+ * Extend internal source array capacity to fit capacity sources.
+ * Not necessary to call is but calling it allows to optimize internal memory
+ * allocation
+ */
+static int
 vy_merge_iterator_reserve(struct vy_merge_iterator *itr, uint32_t capacity)
 {
 	if (itr->src_capacity >= capacity)
@@ -8566,8 +8674,19 @@ vy_merge_iterator_reserve(struct vy_merge_iterator *itr, uint32_t capacity)
 	return 0;
 }
 
-struct vy_tuple_iterator *
-vy_merge_iterator_add(struct vy_merge_iterator *itr, bool is_mutable, bool control_eof)
+/**
+ * Add another source to merge iterator. Must be called before actual
+ * iteration start and must not be called after.
+ * See necessary order of adding requirements in struct vy_merge_iterator
+ * comments.
+ * The resulting vy_tuple_iterator must be properly initialized before merge
+ * iteration start.
+ * param is_mutable - Source can change during merge iteration
+ * param belong_range - Source belongs to a range (see vy_merge_iterator comments)
+ */
+static struct vy_tuple_iterator *
+vy_merge_iterator_add(struct vy_merge_iterator *itr,
+		      bool is_mutable, bool belong_range)
 {
 	assert(!itr->search_started);
 	if (itr->src_count == itr->src_capacity) {
@@ -8582,11 +8701,17 @@ vy_merge_iterator_add(struct vy_merge_iterator *itr, bool is_mutable, bool contr
 	itr->src[itr->src_count].front_id = 0;
 	struct vy_merge_src *src = &itr->src[itr->src_count++];
 	src->is_mutable = is_mutable;
-	src->control_eof = control_eof;
+	src->belong_range = belong_range;
 	return &src->itr;
 }
 
-int
+/**
+ * Move all source iterating positioned to equal to current tuple (previous
+ * result of get) to the next position
+ * return 0 : OK
+ * return -1 : read error
+ */
+static int
 vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 {
 	for (uint32_t i = 0; i < itr->src_count; i++) {
@@ -8599,11 +8724,16 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 	return 0;
 }
 
-int
+/**
+ * Same as vy_merge_iterator_locate but optimized for first get in unique
+ * index with will key given. See vy_merge_iterator::unique_optimization
+ * member comment
+ */
+static int
 vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr)
 {
 	assert(itr->src_count);
-	itr->eof_under_control = false;
+	itr->range_ended = false;
 	itr->search_started = true;
 	itr->unique_optimization = false;
 	struct vy_tuple *min_tuple;
@@ -8657,7 +8787,15 @@ restart:
 	return 1;
 }
 
-int
+/**
+ * Find minimal tuple from all the sources, mark all sources with tuple equal
+ * to the minimum with specific front_id equal to itr->front_id.
+ * Guaranteed that all other sources will have different front_id.
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
+static int
 vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 {
 	if (itr->src_count == 0)
@@ -8667,7 +8805,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	itr->search_started = true;
 	struct vy_tuple *min_tuple = NULL;
 	itr->curr_src = UINT32_MAX;
-	itr->eof_under_control = true;
+	itr->range_ended = true;
 	for (uint32_t i = itr->src_count; i--;) {
 		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
 		if (itr->src[i].is_mutable)
@@ -8678,7 +8816,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 			return rc;
 		if (rc > 0)
 			continue;
-		itr->eof_under_control = itr->eof_under_control && !itr->src[i].control_eof;
+		itr->range_ended = itr->range_ended && !itr->src[i].belong_range;
 		int cmp = min_tuple == NULL ? -1 :
 			vy_tuple_compare(t->data, min_tuple->data, itr->key_def);
 		if (cmp <= 0) {
@@ -8698,7 +8836,13 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	return 1;
 }
 
-int
+/**
+ * Get current tuple
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
+static int
 vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_tuple **result)
 {
 	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
@@ -8707,7 +8851,13 @@ vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_tuple **result)
 	return itr->curr_tuple != NULL ? 0 : 1;
 }
 
-int
+/**
+ * Iterate to the next key
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
+static int
 vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
 {
 	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
@@ -8722,7 +8872,13 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
 	return vy_merge_iterator_locate(itr);
 }
 
-int
+/**
+ * Iterate to the next (elder) version of the same key
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
+static int
 vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 {
 	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
@@ -8774,7 +8930,10 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 	return 1;
 }
 
-int
+/**
+ * Restore position of merge iterator after given tuple according to order
+ */
+static int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 			  struct vy_tuple *last_tuple)
 {
@@ -8793,43 +8952,84 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 
 /* {{{ Iterator over index */
 
+/**
+ * Complex read iterator over vinyl index and write_set of current tx
+ * Iterates over ranges, creates merge iterator for every range and outputs
+ * the result.
+ * Can also wor without transaction, just set tx = NULL in _open
+ * Applyes upserts and skips deletes, so only one replace tuple for every key
+ * is output
+ */
 struct vy_read_iterator {
+	/* index to iterate over */
 	struct vy_index *index;
+	/* transaction to iterate over */
 	struct vy_tx *tx;
 
+	/* search options */
 	enum vy_order order;
 	char *key;
 	int64_t vlsn;
 
+	/* iterator over ranges */
 	struct vy_rangeiter range_itr;
+	/* current range */
 	struct vy_range *curr_range;
+	/* merge iterator over current range */
 	struct vy_merge_iterator merge_itr;
+
 	struct vy_tuple *curr_tuple;
 
+	/* copy of index->range_index_version to track range tree changes */
 	uint32_t range_index_version;
+	/* copy of curr_range->version to track mem/run lists changes */
 	uint32_t range_version;
 };
 
+/**
+ * Open the iterator
+ */
 void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum vy_order order, char *key, int64_t vlsn);
 
+/**
+ * Get current tuple
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
 int
 vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result);
 
+/**
+ * Goto next tuple
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
 int
 vy_read_iterator_next(struct vy_read_iterator *itr);
 
+/**
+ * Close the iterator and free resources
+ */
 void
 vy_read_iterator_close(struct vy_read_iterator *itr);
 
+
+/**
+ * Set up merge iterator for current range
+ */
 void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
 	if (itr->tx != NULL) {
-		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(&itr->merge_itr, true, false);
-		vy_txw_iterator_iface_open(sub_itr, itr->index, itr->tx, itr->order, itr->key);
+		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
+			&itr->merge_itr, true, false);
+		vy_txw_iterator_iface_open(sub_itr, itr->index, itr->tx,
+					   itr->order, itr->key);
 		sub_itr->iface->restore(sub_itr, itr->curr_tuple);
 	}
 	if (itr->curr_range == NULL)
@@ -8839,12 +9039,15 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	struct vy_mem *second;
 	struct vy_mem *first = vy_range_index_priority(itr->curr_range, &second);
 
-	struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(&itr->merge_itr, true, true);
-	vy_mem_iterator_iface_open(sub_itr, first, itr->order, itr->key, itr->vlsn);
+	struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
+		&itr->merge_itr, true, true);
+	vy_mem_iterator_iface_open(sub_itr, first, itr->order, itr->key,
+				   itr->vlsn);
 
 	if (second != NULL && second->tree.size != 0) {
 		sub_itr = vy_merge_iterator_add(&itr->merge_itr, false, true);
-		vy_mem_iterator_iface_open(sub_itr, second, itr->order, itr->key, itr->vlsn);
+		vy_mem_iterator_iface_open(sub_itr, second, itr->order,
+					   itr->key, itr->vlsn);
 	}
 
 	struct vy_run *run = itr->curr_range->run;
@@ -8859,6 +9062,9 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 
 }
 
+/**
+ * Open the iterator
+ */
 void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
@@ -8871,31 +9077,42 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
-	vy_rangeiter_open(&itr->range_itr, index, order == VINYL_EQ ? VINYL_GE : order, key, 0);
+	vy_rangeiter_open(&itr->range_itr, index,
+			  order == VINYL_EQ ? VINYL_GE : order, key, 0);
 	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
-	vy_merge_iterator_open(&itr->merge_itr, index->key_def, order, key, vlsn);
+	vy_merge_iterator_open(&itr->merge_itr, index->key_def, order, key);
 	vy_read_iterator_use_range(itr);
 	itr->range_index_version = index->range_index_version;
 }
 
+/**
+ * Goto next range according to order
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
 int
 vy_read_iterator_next_range(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
 	vy_merge_iterator_close(&itr->merge_itr);
-	vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def, itr->order, itr->key, itr->vlsn);
+	vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def,
+			       itr->order, itr->key);
 	vy_rangeiter_next(&itr->range_itr);
 	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
 	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
-		struct vy_page_info *min = vy_run_index_first_page(&itr->curr_range->run->index);
-		char *min_key_data = vy_run_index_min_key(&itr->curr_range->run->index, min);
-		if (vy_tuple_compare(min_key_data, itr->key, itr->index->key_def) > 0)
+		struct vy_page_info *min = vy_run_index_first_page(
+			&itr->curr_range->run->index);
+		char *min_key_data = vy_run_index_min_key(
+			&itr->curr_range->run->index, min);
+		if (vy_tuple_compare(min_key_data, itr->key,
+				     itr->index->key_def) > 0)
 			itr->curr_range = NULL;
 	}
 	vy_read_iterator_use_range(itr);
 	struct vy_tuple *t;
 	int rc = vy_merge_iterator_get(&itr->merge_itr, &t);
-	if (rc >= 0 && itr->merge_itr.eof_under_control && itr->curr_range != NULL)
+	if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL)
 		return vy_read_iterator_next_range(itr);
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
@@ -8905,42 +9122,62 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	return rc;
 }
 
+/**
+ * Check versions of index and current range and restores position if
+ * something was changed
+ */
 void
 vy_read_iterator_check_versions(struct vy_read_iterator *itr)
 {
 	if (itr->range_index_version != itr->index->range_index_version) {
 		itr->range_index_version = itr->index->range_index_version;
-		char *key = itr->curr_tuple != 0 ? itr->curr_tuple->data : itr->key;
-		enum vy_order order = itr->order == VINYL_EQ ? VINYL_GE : itr->order;
-		//vy_rangeiter_close(&itr->range_itr);
+		char *key = itr->curr_tuple != 0 ?
+			    itr->curr_tuple->data : itr->key;
+		enum vy_order order =
+			itr->order == VINYL_EQ ? VINYL_GE : itr->order;
 		vy_rangeiter_open(&itr->range_itr, itr->index, order, key, 0);
 		struct vy_range *range = vy_rangeiter_get(&itr->range_itr);
 		if (range != itr->curr_range) {
-			itr->range_version = range == NULL ? 1 : range->range_version + 1;
+			itr->range_version =
+				range == NULL ? 1 : range->range_version + 1;
 			itr->curr_range = range;
 		}
 	}
-	uint32_t range_version = itr->curr_range == NULL ? 0 : itr->curr_range->range_version;
+	uint32_t range_version =
+		itr->curr_range == NULL ? 0 : itr->curr_range->range_version;
 	if (itr->range_version != range_version) {
 		itr->range_version = range_version;
 		vy_merge_iterator_close(&itr->merge_itr);
-		vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def, itr->order, itr->key, itr->vlsn);
+		vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def,
+				       itr->order, itr->key);
 		vy_read_iterator_use_range(itr);
 		vy_merge_iterator_restore(&itr->merge_itr, itr->curr_tuple);
 	}
 }
 
+/**
+ * Goto next tuple
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
 int
 vy_read_iterator_next(struct vy_read_iterator *itr)
 {
 	vy_read_iterator_check_versions(itr);
 	int rc = vy_merge_iterator_next_key(&itr->merge_itr);
-	if (rc >= 0 && itr->merge_itr.eof_under_control && itr->curr_range != NULL)
+	if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL)
 		rc = vy_read_iterator_next_range(itr);
 	return rc;
 
 }
 
+/**
+ * Get current tuple
+ * return 0 : something was found
+ * return 1 : no more data
+ * return -1 : read error
+ */
 int
 vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 {
@@ -8949,7 +9186,7 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 	while (true) {
 		struct vy_tuple *t;
 		rc = vy_merge_iterator_get(&itr->merge_itr, &t);
-		if (rc >= 0 && itr->merge_itr.eof_under_control && itr->curr_range != NULL) {
+		if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr);
 			if (rc == 0)
 				vy_merge_iterator_get(&itr->merge_itr, &t);
@@ -8988,6 +9225,9 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 	return rc;
 }
 
+/**
+ * Close the iterator and free resources
+ */
 void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
