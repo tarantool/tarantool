@@ -3774,7 +3774,7 @@ void noinline
 ev_io_closing (EV_P_ int fd, int revents) EV_THROW
 {
   ev_io *w;
-  if (fd < 0 || fd > anfdmax)
+  if (fd < 0 || fd >= anfdmax)
     return;
 
   while ((w = (ev_io *)anfds [fd].head))
