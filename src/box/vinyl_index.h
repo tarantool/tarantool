@@ -105,7 +105,7 @@ public:
 class VinylPrimaryIndex: public VinylIndex
 {
 public:
-	VinylPrimaryIndex(struct vy_env *env, struct key_def *key_def);
+	VinylPrimaryIndex(struct vy_env *env, struct key_def *key_def_arg);
 
 	virtual void
 	open() override;

@@ -185,8 +185,8 @@ bitset_index_iterator_next(struct iterator *iterator)
 #endif /* #ifndef OLD_GOOD_BITSET */
 }
 
-MemtxBitset::MemtxBitset(struct key_def *key_def)
-	: MemtxIndex(key_def)
+MemtxBitset::MemtxBitset(struct key_def *key_def_arg)
+	: MemtxIndex(key_def_arg)
 {
 	assert(!this->key_def->opts.is_unique);
 

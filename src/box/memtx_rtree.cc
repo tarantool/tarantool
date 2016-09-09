@@ -174,8 +174,8 @@ MemtxRTree::~MemtxRTree()
 	rtree_destroy(&m_tree);
 }
 
-MemtxRTree::MemtxRTree(struct key_def *key_def)
-	: MemtxIndex(key_def)
+MemtxRTree::MemtxRTree(struct key_def *key_def_arg)
+	: MemtxIndex(key_def_arg)
 {
 	assert(key_def->part_count == 1);
 	assert(key_def->parts[0].type = FIELD_TYPE_ARRAY);

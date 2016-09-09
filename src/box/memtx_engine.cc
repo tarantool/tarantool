@@ -438,18 +438,18 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 }
 
 Index *
-MemtxSpace::createIndex(struct space *space, struct key_def *key_def)
+MemtxSpace::createIndex(struct space *space, struct key_def *key_def_arg)
 {
 	(void) space;
-	switch (key_def->type) {
+	switch (key_def_arg->type) {
 	case HASH:
-		return new MemtxHash(key_def);
+		return new MemtxHash(key_def_arg);
 	case TREE:
-		return new MemtxTree(key_def);
+		return new MemtxTree(key_def_arg);
 	case RTREE:
-		return new MemtxRTree(key_def);
+		return new MemtxRTree(key_def_arg);
 	case BITSET:
-		return new MemtxBitset(key_def);
+		return new MemtxBitset(key_def_arg);
 	default:
 		unreachable();
 		return NULL;
