@@ -3457,7 +3457,7 @@ vy_range_split(struct vy_index *index,
 		range->run = run;
 		++range->run_count;
 
-		rlist_add_entry(result, range, split);
+		rlist_add_tail_entry(result, range, split);
 		if (unlikely(rc == -1))
 			goto error;
 	}
