@@ -2412,12 +2412,6 @@ vy_run_index_min_key(struct vy_run_index *i, struct vy_page_info *p)
 	return i->minmax.s + p->min_key_offset;
 }
 
-static inline char *
-vy_run_index_max_key(struct vy_run_index *i, struct vy_page_info *p)
-{
-	return i->minmax.s + p->max_key_offset;
-}
-
 static inline void
 vy_run_index_init(struct vy_run_index *i)
 {
@@ -2446,20 +2440,6 @@ static inline struct vy_page_info *
 vy_run_index_first_page(struct vy_run_index *i)
 {
 	return vy_run_index_get_page(i, 0);
-}
-
-static inline struct vy_page_info *
-vy_run_index_last_page(struct vy_run_index *i)
-{
-	return vy_run_index_get_page(i, i->info.count - 1);
-}
-
-static inline uint32_t
-vy_run_index_count(struct vy_run_index *i)
-{
-	if (unlikely(i->pages.s == NULL))
-		return 0;
-	return i->info.keys;
 }
 
 static inline uint32_t
