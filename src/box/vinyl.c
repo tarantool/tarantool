@@ -1834,15 +1834,18 @@ struct vy_run_index {
 	struct vy_buf pages, minmax;
 };
 
-struct PACKED vy_run {
+struct vy_run {
 	struct vy_run_index index;
 	struct vy_run *next;
 	struct vy_page *page_cache;
 	pthread_mutex_t cache_lock;
 };
 
-struct PACKED vy_range {
+struct vy_range {
 	int64_t   id;
+	/**
+	 * Minimal key of the range
+	 */
 	struct vy_tuple *min_key;
 	uint16_t   flags;
 	uint64_t   update_time;
@@ -2943,19 +2946,42 @@ vy_rangeiter_next(struct vy_rangeiter *ii)
 static int
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	if (range->run == NULL) {
+	/*
+	 * Find minimal key for the range
+	 */
+
+	/* Check disk runs */
+	const char *min_key = NULL;
+	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
+		struct vy_page_info *p = vy_run_index_first_page(&run->index);
+		const char *key = vy_run_index_min_key(&run->index, p);
+		if (min_key == NULL ||
+		    vy_tuple_compare(key, min_key, index->key_def) < 0) {
+			min_key = key;
+		}
+	}
+
+	/* Check in-memory index */
+	struct vy_mem_tree *mem_tree = &range->i0.tree;
+	struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(mem_tree);
+	if (!vy_mem_tree_itr_is_invalid(&itr)) {
+		struct vy_tuple *v = *vy_mem_tree_itr_get_elem(mem_tree, &itr);
+		if (min_key == NULL ||
+		    vy_tuple_compare(v->data, min_key, index->key_def) < 0) {
+			min_key = v->data;
+		}
+	}
+
+	/* Create tuple with the minimal key */
+	if (min_key == NULL) {
 		range->min_key = vy_tuple_from_key(index, NULL, 0);
 	} else {
-		assert(range->run != NULL);
-		struct vy_page_info *min =
-			vy_run_index_first_page(&range->run->index);
-		const char *min_key = vy_run_index_min_key(&range->run->index,
-							   min);
 		range->min_key = vy_tuple_extract_key_raw(index, min_key);
 	}
 	if (range->min_key == NULL)
 		return -1;
 
+	/* Add to range tree */
 	vy_range_tree_insert(&index->tree, range);
 	index->range_index_version++;
 	index->range_count++;
