@@ -159,20 +159,20 @@ bitset_index_iterator(struct iterator *it)
 }
 
 void
-bitset_index_iterator_free(struct iterator *iterator)
+bitset_index_iterator_free(struct iterator *itr)
 {
-	assert(iterator->free == bitset_index_iterator_free);
-	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	assert(itr->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(itr);
 
 	bitset_iterator_destroy(&it->bitset_it);
 	free(it);
 }
 
 struct tuple *
-bitset_index_iterator_next(struct iterator *iterator)
+bitset_index_iterator_next(struct iterator *itr)
 {
-	assert(iterator->free == bitset_index_iterator_free);
-	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	assert(itr->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(itr);
 
 	size_t value = bitset_iterator_next(&it->bitset_it);
 	if (value == SIZE_MAX)
@@ -325,14 +325,14 @@ MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 void
-MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
+MemtxBitset::initIterator(struct iterator *itr, enum iterator_type type,
 			  const char *key, uint32_t part_count) const
 {
-	assert(iterator->free == bitset_index_iterator_free);
+	assert(itr->free == bitset_index_iterator_free);
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
 
-	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	struct bitset_index_iterator *it = bitset_index_iterator(itr);
 #ifndef OLD_GOOD_BITSET
 	assert(it->bitset_index == this);
 #endif /* #ifndef OLD_GOOD_BITSET */
@@ -370,7 +370,7 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 						       bitset_key_size);
 			break;
 		default:
-			return Index::initIterator(iterator, type, key,
+			return Index::initIterator(itr, type, key,
 						   part_count);
 		}
 

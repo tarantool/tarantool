@@ -1693,12 +1693,12 @@ static int
 vy_mem_destroy(struct vy_mem *index)
 {
 	assert(index == index->tree.arg);
-	struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(&index->tree);
-	while (!vy_mem_tree_itr_is_invalid(&itr)) {
+	struct vy_mem_tree_iterator itr = vy_mem_tree_iterator_first(&index->tree);
+	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
 		struct vy_tuple *v =
-			*vy_mem_tree_itr_get_elem(&index->tree, &itr);
+			*vy_mem_tree_iterator_get_elem(&index->tree, &itr);
 		vy_tuple_unref(v);
-		vy_mem_tree_itr_next(&index->tree, &itr);
+		vy_mem_tree_iterator_next(&index->tree, &itr);
 	}
 	vy_mem_tree_destroy(&index->tree);
 	return 0;
@@ -2921,9 +2921,9 @@ vy_index_add_range(struct vy_index *index, struct vy_range *range)
 
 	/* Check in-memory index */
 	struct vy_mem_tree *mem_tree = &range->i0.tree;
-	struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(mem_tree);
-	if (!vy_mem_tree_itr_is_invalid(&itr)) {
-		struct vy_tuple *v = *vy_mem_tree_itr_get_elem(mem_tree, &itr);
+	struct vy_mem_tree_iterator itr = vy_mem_tree_iterator_first(mem_tree);
+	if (!vy_mem_tree_iterator_is_invalid(&itr)) {
+		struct vy_tuple *v = *vy_mem_tree_iterator_get_elem(mem_tree, &itr);
 		if (min_key == NULL ||
 		    vy_tuple_compare(v->data, min_key, index->key_def) < 0) {
 			min_key = v->data;
@@ -7487,46 +7487,46 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 /* {{{ Temporary wrap of new run iterator to old API */
 
 static void
-vy_tmp_run_iterator_close(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_close(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->close == vy_tmp_run_iterator_close);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
+	assert(virt_itr->vif->close == vy_tmp_run_iterator_close);
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_itr->priv;
 	vy_run_iterator_close(itr);
 }
 
 static int
-vy_tmp_run_iterator_has(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_has(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->has == vy_tmp_run_iterator_has);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
+	assert(virt_itr->vif->has == vy_tmp_run_iterator_has);
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_itr->priv;
 	struct vy_tuple *t;
 	int rc = vy_run_iterator_get(itr, &t);
 	return rc == 0;
 }
 
 static struct vy_tuple *
-vy_tmp_run_iterator_get(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_get(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->get == vy_tmp_run_iterator_get);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	assert(virt_itr->vif->get == vy_tmp_run_iterator_get);
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_itr->priv;
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	struct vy_tuple *t;
 	int rc = vy_run_iterator_get(itr, &t);
 	if (rc != 0)
 		return NULL;
 	t->flags &= ~SVDUP;
 	t->flags |= *is_dup ? SVDUP : 0;
-	struct vy_tuple **sv = (struct vy_tuple **)(virt_iterator->priv + sizeof(*itr));
+	struct vy_tuple **sv = (struct vy_tuple **)(virt_itr->priv + sizeof(*itr));
 	*sv = t;
 	return *sv;
 }
 
 static void
-vy_tmp_run_iterator_next(struct vy_iter *virt_iterator)
+vy_tmp_run_iterator_next(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->next == vy_tmp_run_iterator_next);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	assert(virt_itr->vif->next == vy_tmp_run_iterator_next);
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_itr->priv;
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	*is_dup = true;
 	int rc = vy_run_iterator_next_lsn(itr);
 	if (rc == 1) {
@@ -7536,10 +7536,10 @@ vy_tmp_run_iterator_next(struct vy_iter *virt_iterator)
 }
 
 void
-vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
-		     struct vy_run *run, int fd,
-		     struct vy_filterif *compression,
-		     enum vy_order order, char *key)
+vy_tmp_run_iterator_open(struct vy_iter *virt_itr, struct vy_index *index,
+		         struct vy_run *run, int fd,
+		         struct vy_filterif *compression,
+		         enum vy_order order, char *key)
 {
 	static struct vy_iterif vif = {
 		.close = vy_tmp_run_iterator_close,
@@ -7547,10 +7547,10 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
 		.get = vy_tmp_run_iterator_get,
 		.next = vy_tmp_run_iterator_next
 	};
-	virt_iterator->vif = &vif;
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	virt_itr->vif = &vif;
+	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_itr->priv;
+	assert(sizeof(virt_itr->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	*is_dup = false;
 	vy_run_iterator_open(itr, index, run, fd, compression, order, key,
 			     INT64_MAX);
@@ -7628,7 +7628,7 @@ vy_mem_iterator_close(struct vy_mem_iterator *itr);
 static struct vy_tuple *
 vy_mem_iterator_curr_tuple(struct vy_mem_iterator *itr)
 {
-	return *vy_mem_tree_itr_get_elem(&itr->mem->tree, &itr->curr_pos);
+	return *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
 }
 
 /**
@@ -7640,10 +7640,10 @@ static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr)
 {
 	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
-		vy_mem_tree_itr_prev(&itr->mem->tree, &itr->curr_pos);
+		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
-		vy_mem_tree_itr_next(&itr->mem->tree, &itr->curr_pos);
-	if (vy_mem_tree_itr_is_invalid(&itr->curr_pos))
+		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
+	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
 	itr->curr_tuple = vy_mem_iterator_curr_tuple(itr);
 	return 0;
@@ -7659,7 +7659,7 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
 static int
 vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 {
-	assert(!vy_mem_tree_itr_is_invalid(&itr->curr_pos));
+	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
 	while (itr->curr_tuple->lsn > itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
@@ -7672,12 +7672,12 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	}
 	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
 		struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
-		vy_mem_tree_itr_prev(&itr->mem->tree, &prev_pos);
+		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 
-		while (!vy_mem_tree_itr_is_invalid(&prev_pos)) {
+		while (!vy_mem_tree_iterator_is_invalid(&prev_pos)) {
 			struct vy_tuple *prev_tuple =
-				*vy_mem_tree_itr_get_elem(&itr->mem->tree,
-							  &prev_pos);
+				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+							       &prev_pos);
 			struct key_def *key_def = itr->mem->key_def;
 			if (prev_tuple->lsn > itr->vlsn ||
 			    vy_tuple_compare(itr->curr_tuple->data,
@@ -7685,7 +7685,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 				break;
 			itr->curr_pos = prev_pos;
 			itr->curr_tuple = prev_tuple;
-			vy_mem_tree_itr_prev(&itr->mem->tree, &prev_pos);
+			vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 		}
 	}
 	return 0;
@@ -7732,12 +7732,12 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
 		itr->order = VINYL_GE;
-		itr->curr_pos = vy_mem_tree_itr_first(&itr->mem->tree);
+		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
 	}
 
 	if (itr->order == VINYL_LT || itr->order == VINYL_LE)
-		vy_mem_tree_itr_prev(&itr->mem->tree, &itr->curr_pos);
-	if (vy_mem_tree_itr_is_invalid(&itr->curr_pos)) {
+		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
+	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos)) {
 		vy_mem_iterator_close(itr);
 		return 1;
 	}
@@ -7758,7 +7758,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 		return;
 	itr->version = itr->mem->version;
 	struct vy_tuple **record =
-		vy_mem_tree_itr_get_elem(&itr->mem->tree, &itr->curr_pos);
+		vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
 	if (record != NULL && *record == itr->curr_tuple)
 		return;
 	struct tree_mem_key tree_key;
@@ -7823,7 +7823,7 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 	if (itr->search_ended ||
 	    (!itr->search_started && vy_mem_iterator_start(itr) != 0))
 		return 1;
-	assert(!vy_mem_tree_itr_is_invalid(&itr->curr_pos));
+	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
 	struct key_def *key_def = itr->mem->key_def;
@@ -7857,18 +7857,18 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
 	if (itr->search_ended ||
 	    (!itr->search_started && vy_mem_iterator_start(itr) != 0))
 		return 1;
-	assert(!vy_mem_tree_itr_is_invalid(&itr->curr_pos));
+	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_tuple == vy_mem_iterator_curr_tuple(itr));
 	struct key_def *key_def = itr->mem->key_def;
 
 	struct vy_mem_tree_iterator next_pos = itr->curr_pos;
-	vy_mem_tree_itr_next(&itr->mem->tree, &next_pos);
-	if (vy_mem_tree_itr_is_invalid(&next_pos))
+	vy_mem_tree_iterator_next(&itr->mem->tree, &next_pos);
+	if (vy_mem_tree_iterator_is_invalid(&next_pos))
 		return 1; /* EOF */
 
 	struct vy_tuple *next_tuple =
-		*vy_mem_tree_itr_get_elem(&itr->mem->tree, &next_pos);
+		*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
 	if (vy_tuple_compare(itr->curr_tuple->data,
 			     next_tuple->data, key_def) == 0) {
 		itr->curr_pos = next_pos;
@@ -7910,11 +7910,11 @@ vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 	int rc = 0;
 	if (itr->order == VINYL_GE || itr->order == VINYL_GT || itr->order == VINYL_EQ) {
 		while (true) {
-			vy_mem_tree_itr_prev(&itr->mem->tree, &pos);
-			if (vy_mem_tree_itr_is_invalid(&pos))
+			vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
+			if (vy_mem_tree_iterator_is_invalid(&pos))
 				return rc;
 			struct vy_tuple *t =
-				*vy_mem_tree_itr_get_elem(&itr->mem->tree, &pos);
+				*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
 			int cmp = vy_tuple_compare(t->data, last_tuple->data, itr->mem->key_def);
 			if (cmp < 0 || (cmp == 0 && t->lsn >= last_tuple->lsn))
 				return rc;
@@ -7930,11 +7930,11 @@ vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 	int cmp = vy_tuple_compare(itr->curr_tuple->data, last_tuple->data, itr->mem->key_def);
 	int64_t break_lsn = cmp == 0 ? last_tuple->lsn : itr->vlsn + 1;
 	while (true) {
-		vy_mem_tree_itr_prev(&itr->mem->tree, &pos);
-		if (vy_mem_tree_itr_is_invalid(&pos))
+		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
+		if (vy_mem_tree_iterator_is_invalid(&pos))
 			return rc;
 		struct vy_tuple *t =
-			*vy_mem_tree_itr_get_elem(&itr->mem->tree, &pos);
+			*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
 		int cmp = vy_tuple_compare(t->data, itr->curr_tuple->data, itr->mem->key_def);
 		assert(cmp <= 0);
 		if (cmp < 0 || t->lsn >= break_lsn)
@@ -7947,11 +7947,11 @@ vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 		return rc;
 	pos = itr->curr_pos;
 	while (true) {
-		vy_mem_tree_itr_next(&itr->mem->tree, &pos);
-		if (vy_mem_tree_itr_is_invalid(&pos))
+		vy_mem_tree_iterator_next(&itr->mem->tree, &pos);
+		if (vy_mem_tree_iterator_is_invalid(&pos))
 			return rc;
 		struct vy_tuple *t =
-			*vy_mem_tree_itr_get_elem(&itr->mem->tree, &pos);
+			*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
 		int cmp = vy_tuple_compare(t->data, last_tuple->data, itr->mem->key_def);
 		if (cmp > 0)
 			return rc;
@@ -7988,29 +7988,29 @@ vy_mem_iterator_close(struct vy_mem_iterator *itr)
 /* {{{ Temporary wrap of new mem iterator to old API */
 
 static void
-vy_tmp_mem_iterator_close(struct vy_iter *virt_iterator)
+vy_tmp_mem_iterator_close(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->close == vy_tmp_mem_iterator_close);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	assert(virt_itr->vif->close == vy_tmp_mem_iterator_close);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_itr->priv;
 	vy_mem_iterator_close(itr);
 }
 
 static int
-vy_tmp_mem_iterator_has(struct vy_iter *virt_iterator)
+vy_tmp_mem_iterator_has(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->has == vy_tmp_mem_iterator_has);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
+	assert(virt_itr->vif->has == vy_tmp_mem_iterator_has);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_itr->priv;
 	struct vy_tuple *t;
 	int rc = vy_mem_iterator_get(itr, &t);
 	return rc == 0;
 }
 
 static struct vy_tuple *
-vy_tmp_mem_iterator_get(struct vy_iter *virt_iterator)
+vy_tmp_mem_iterator_get(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->get == vy_tmp_mem_iterator_get);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	assert(virt_itr->vif->get == vy_tmp_mem_iterator_get);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_itr->priv;
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	struct vy_tuple *t;
 	int rc = vy_mem_iterator_get(itr, &t);
 	if (rc != 0)
@@ -8018,17 +8018,17 @@ vy_tmp_mem_iterator_get(struct vy_iter *virt_iterator)
 
 	t->flags &= ~SVDUP;
 	t->flags |= *is_dup ? SVDUP : 0;
-	struct vy_tuple **sv = (struct vy_tuple **)(virt_iterator->priv + sizeof(*itr));
+	struct vy_tuple **sv = (struct vy_tuple **)(virt_itr->priv + sizeof(*itr));
 	*sv = t;
 	return *sv;
 }
 
 static void
-vy_tmp_mem_iterator_next(struct vy_iter *virt_iterator)
+vy_tmp_mem_iterator_next(struct vy_iter *virt_itr)
 {
-	assert(virt_iterator->vif->next == vy_tmp_mem_iterator_next);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	assert(virt_itr->vif->next == vy_tmp_mem_iterator_next);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_itr->priv;
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	*is_dup = true;
 	int rc = vy_mem_iterator_next_lsn(itr);
 	if (rc == 1) {
@@ -8038,7 +8038,7 @@ vy_tmp_mem_iterator_next(struct vy_iter *virt_iterator)
 };
 
 void
-vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
+vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
 			 enum vy_order order, char *key)
 {
 	static struct vy_iterif vif = {
@@ -8047,10 +8047,10 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
 		.get = vy_tmp_mem_iterator_get,
 		.next = vy_tmp_mem_iterator_next
 	};
-	virt_iterator->vif = &vif;
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
+	virt_itr->vif = &vif;
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_itr->priv;
+	assert(sizeof(virt_itr->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
+	bool *is_dup = (bool *)(virt_itr->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	*is_dup = false;
 	vy_mem_iterator_open(itr, mem, order, key, INT64_MAX);
 }
@@ -8304,11 +8304,11 @@ vy_txw_iterator_close(struct vy_txw_iterator *itr)
 
 struct vy_tuple_iterator;
 
-typedef int (*vy_iterator_get_f)(struct vy_tuple_iterator *virt_iterator, struct vy_tuple **result);
-typedef int (*vy_iterator_next_key_f)(struct vy_tuple_iterator *virt_iterator);
-typedef int (*vy_iterator_next_lsn_f)(struct vy_tuple_iterator *virt_iterator);
-typedef int (*vy_iterator_restore_f)(struct vy_tuple_iterator *virt_iterator, struct vy_tuple *last_tuple);
-typedef void (*vy_iterator_next_close_f)(struct vy_tuple_iterator *virt_iterator);
+typedef int (*vy_iterator_get_f)(struct vy_tuple_iterator *virt_itr, struct vy_tuple **result);
+typedef int (*vy_iterator_next_key_f)(struct vy_tuple_iterator *virt_itr);
+typedef int (*vy_iterator_next_lsn_f)(struct vy_tuple_iterator *virt_itr);
+typedef int (*vy_iterator_restore_f)(struct vy_tuple_iterator *virt_itr, struct vy_tuple *last_tuple);
+typedef void (*vy_iterator_next_close_f)(struct vy_tuple_iterator *virt_itr);
 
 struct vy_tuple_iterator_iface {
 	vy_iterator_get_f get;
@@ -8526,7 +8526,7 @@ vy_txw_iterator_iface_open(struct vy_tuple_iterator *vitr,
  */
 struct vy_merge_src {
 	/* Source iterator */
-	struct vy_tuple_iterator itr;
+	struct vy_tuple_iterator iterator;
 	/* Source can change during merge iteration */ 
 	bool is_mutable;
 	/* Source belongs to a range (see vy_merge_iterator comments) */
@@ -8632,7 +8632,7 @@ vy_merge_iterator_close(struct vy_merge_iterator *itr)
 		itr->curr_tuple = NULL;
 	}
 	for (size_t i = 0; i < itr->src_count; i++)
-		itr->src[i].itr.iface->close(&itr->src[i].itr);
+		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
 	free(itr->src);
 	itr->src_count = 0;
 	itr->src_capacity = 0;
@@ -8689,7 +8689,7 @@ vy_merge_iterator_add(struct vy_merge_iterator *itr,
 	struct vy_merge_src *src = &itr->src[itr->src_count++];
 	src->is_mutable = is_mutable;
 	src->belong_range = belong_range;
-	return &src->itr;
+	return &src->iterator;
 }
 
 /**
@@ -8704,7 +8704,7 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 	for (uint32_t i = 0; i < itr->src_count; i++) {
 		if (itr->src[i].front_id != itr->front_id)
 			continue;
-		if (itr->src[i].itr.iface->next_key(&itr->src[i].itr) < 0)
+		if (itr->src[i].iterator.iface->next_key(&itr->src[i].iterator) < 0)
 			return -1;
 	}
 	itr->front_id++;
@@ -8729,7 +8729,7 @@ restart:
 	min_tuple = NULL;
 	itr->curr_src = UINT32_MAX;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
-		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
+		struct vy_tuple_iterator *sub_itr = &itr->src[i].iterator;
 		struct vy_tuple *t;
 		int rc = sub_itr->iface->get(sub_itr, &t);
 		if (rc > 0)
@@ -8755,7 +8755,7 @@ restart:
 	}
 	bool must_restart = false;
 	for (uint32_t i = itr->mutable_start; i < itr->mutable_end; i++) {
-		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
+		struct vy_tuple_iterator *sub_itr = &itr->src[i].iterator;
 		int rc = sub_itr->iface->restore(sub_itr, NULL);
 		if (rc < 0)
 			return rc;
@@ -8794,7 +8794,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	itr->curr_src = UINT32_MAX;
 	itr->range_ended = true;
 	for (uint32_t i = itr->src_count; i--;) {
-		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
+		struct vy_tuple_iterator *sub_itr = &itr->src[i].iterator;
 		if (itr->src[i].is_mutable)
 			sub_itr->iface->restore(sub_itr, itr->curr_tuple);
 		struct vy_tuple *t;
@@ -8872,7 +8872,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 		return -1;
 	if (itr->curr_src == UINT32_MAX)
 		return 1;
-	struct vy_tuple_iterator *sub_itr = &itr->src[itr->curr_src].itr;
+	struct vy_tuple_iterator *sub_itr = &itr->src[itr->curr_src].iterator;
 	int rc = sub_itr->iface->next_lsn(sub_itr);
 	if (rc < 0) {
 		return rc;
@@ -8886,7 +8886,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 	}
 	for (uint32_t i = itr->curr_src + 1; i < itr->src_count; i++) {
 		if (itr->is_in_uniq_opt) {
-			sub_itr = &itr->src[i].itr;
+			sub_itr = &itr->src[i].iterator;
 			struct vy_tuple *t;
 			rc = sub_itr->iface->get(sub_itr, &t);
 			if (rc < 0)
@@ -8904,7 +8904,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 			}
 
 		} else if (itr->src[i].front_id == itr->front_id) {
-			sub_itr = &itr->src[i].itr;
+			sub_itr = &itr->src[i].iterator;
 			itr->curr_src = i;
 			if (itr->curr_tuple != NULL)
 				vy_tuple_unref(itr->curr_tuple);
@@ -8926,7 +8926,7 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 {
 	int result = 0;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
-		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
+		struct vy_tuple_iterator *sub_itr = &itr->src[i].iterator;
 		int rc = sub_itr->iface->restore(sub_itr, last_tuple);
 		if (rc < 0)
 			return rc;
@@ -8959,11 +8959,11 @@ struct vy_read_iterator {
 	int64_t vlsn;
 
 	/* iterator over ranges */
-	struct vy_rangeiter range_itr;
+	struct vy_rangeiter range_iterator;
 	/* current range */
 	struct vy_range *curr_range;
 	/* merge iterator over current range */
-	struct vy_merge_iterator merge_itr;
+	struct vy_merge_iterator merge_iterator;
 
 	struct vy_tuple *curr_tuple;
 
@@ -9014,7 +9014,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
 	if (itr->tx != NULL) {
 		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
-			&itr->merge_itr, true, false);
+			&itr->merge_iterator, true, false);
 		vy_txw_iterator_iface_open(sub_itr, itr->index, itr->tx,
 					   itr->order, itr->key);
 		sub_itr->iface->restore(sub_itr, itr->curr_tuple);
@@ -9027,12 +9027,12 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	struct vy_mem *first = vy_range_index_priority(itr->curr_range, &second);
 
 	struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
-		&itr->merge_itr, true, true);
+		&itr->merge_iterator, true, true);
 	vy_mem_iterator_iface_open(sub_itr, first, itr->order, itr->key,
 				   itr->vlsn);
 
 	if (second != NULL && second->tree.size != 0) {
-		sub_itr = vy_merge_iterator_add(&itr->merge_itr, false, true);
+		sub_itr = vy_merge_iterator_add(&itr->merge_iterator, false, true);
 		vy_mem_iterator_iface_open(sub_itr, second, itr->order,
 					   itr->key, itr->vlsn);
 	}
@@ -9040,7 +9040,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	struct vy_run *run = itr->curr_range->run;
 	struct vy_filterif *compression = itr->index->compression_if;
 	while (run != NULL) {
-		sub_itr = vy_merge_iterator_add(&itr->merge_itr, false, true);
+		sub_itr = vy_merge_iterator_add(&itr->merge_iterator, false, true);
 		vy_run_iterator_iface_open(sub_itr, itr->index, run,
 					   itr->curr_range->fd, compression,
 					   itr->order, itr->key, itr->vlsn);
@@ -9064,10 +9064,10 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
-	vy_rangeiter_open(&itr->range_itr, index,
+	vy_rangeiter_open(&itr->range_iterator, index,
 			  order == VINYL_EQ ? VINYL_GE : order, key, 0);
-	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
-	vy_merge_iterator_open(&itr->merge_itr, index->key_def, order, key);
+	itr->curr_range = vy_rangeiter_get(&itr->range_iterator);
+	vy_merge_iterator_open(&itr->merge_iterator, index->key_def, order, key);
 	vy_read_iterator_use_range(itr);
 	itr->range_index_version = index->range_index_version;
 }
@@ -9082,11 +9082,11 @@ int
 vy_read_iterator_next_range(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
-	vy_merge_iterator_close(&itr->merge_itr);
-	vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def,
+	vy_merge_iterator_close(&itr->merge_iterator);
+	vy_merge_iterator_open(&itr->merge_iterator, itr->index->key_def,
 			       itr->order, itr->key);
-	vy_rangeiter_next(&itr->range_itr);
-	itr->curr_range = vy_rangeiter_get(&itr->range_itr);
+	vy_rangeiter_next(&itr->range_iterator);
+	itr->curr_range = vy_rangeiter_get(&itr->range_iterator);
 	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
 		struct vy_page_info *min = vy_run_index_first_page(
 			&itr->curr_range->run->index);
@@ -9098,8 +9098,8 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	}
 	vy_read_iterator_use_range(itr);
 	struct vy_tuple *t;
-	int rc = vy_merge_iterator_get(&itr->merge_itr, &t);
-	if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL)
+	int rc = vy_merge_iterator_get(&itr->merge_iterator, &t);
+	if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL)
 		return vy_read_iterator_next_range(itr);
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
@@ -9122,8 +9122,8 @@ vy_read_iterator_check_versions(struct vy_read_iterator *itr)
 			    itr->curr_tuple->data : itr->key;
 		enum vy_order order =
 			itr->order == VINYL_EQ ? VINYL_GE : itr->order;
-		vy_rangeiter_open(&itr->range_itr, itr->index, order, key, 0);
-		struct vy_range *range = vy_rangeiter_get(&itr->range_itr);
+		vy_rangeiter_open(&itr->range_iterator, itr->index, order, key, 0);
+		struct vy_range *range = vy_rangeiter_get(&itr->range_iterator);
 		if (range != itr->curr_range) {
 			itr->range_version =
 				range == NULL ? 1 : range->range_version + 1;
@@ -9134,11 +9134,11 @@ vy_read_iterator_check_versions(struct vy_read_iterator *itr)
 		itr->curr_range == NULL ? 0 : itr->curr_range->range_version;
 	if (itr->range_version != range_version) {
 		itr->range_version = range_version;
-		vy_merge_iterator_close(&itr->merge_itr);
-		vy_merge_iterator_open(&itr->merge_itr, itr->index->key_def,
+		vy_merge_iterator_close(&itr->merge_iterator);
+		vy_merge_iterator_open(&itr->merge_iterator, itr->index->key_def,
 				       itr->order, itr->key);
 		vy_read_iterator_use_range(itr);
-		vy_merge_iterator_restore(&itr->merge_itr, itr->curr_tuple);
+		vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_tuple);
 	}
 }
 
@@ -9152,8 +9152,8 @@ int
 vy_read_iterator_next(struct vy_read_iterator *itr)
 {
 	vy_read_iterator_check_versions(itr);
-	int rc = vy_merge_iterator_next_key(&itr->merge_itr);
-	if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL)
+	int rc = vy_merge_iterator_next_key(&itr->merge_iterator);
+	if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL)
 		rc = vy_read_iterator_next_range(itr);
 	return rc;
 
@@ -9172,11 +9172,11 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 	int rc;
 	while (true) {
 		struct vy_tuple *t;
-		rc = vy_merge_iterator_get(&itr->merge_itr, &t);
-		if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL) {
+		rc = vy_merge_iterator_get(&itr->merge_iterator, &t);
+		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr);
 			if (rc == 0)
-				vy_merge_iterator_get(&itr->merge_itr, &t);
+				vy_merge_iterator_get(&itr->merge_iterator, &t);
 		}
 		if (rc != 0) {
 			return rc;
@@ -9186,13 +9186,13 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 		itr->curr_tuple = t;
 		vy_tuple_ref(itr->curr_tuple);
 		while (itr->curr_tuple->flags & SVUPSERT) {
-			int rc = vy_merge_iterator_next_lsn(&itr->merge_itr);
+			int rc = vy_merge_iterator_next_lsn(&itr->merge_iterator);
 			if (rc < 0) {
 				return rc;
 			}
 			struct vy_tuple *next = NULL;
 			if (rc == 0)
-				vy_merge_iterator_get(&itr->merge_itr, &next);
+				vy_merge_iterator_get(&itr->merge_iterator, &next);
 			struct vy_tuple *applied =
 				vy_apply_upsert(itr->curr_tuple, next,
 						itr->index, true);
@@ -9221,7 +9221,7 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
 	itr->curr_tuple = NULL;
-	vy_merge_iterator_close(&itr->merge_itr);
+	vy_merge_iterator_close(&itr->merge_iterator);
 }
 
 /* }}} Iterator over index */

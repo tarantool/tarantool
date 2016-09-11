@@ -281,7 +281,7 @@ LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @param itr - iterator to set
  */
 void
-LIGHT(itr_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
+LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /**
  * @brief Set iterator to position determined by key
@@ -291,8 +291,8 @@ LIGHT(itr_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
  * @param data - key to find
  */
 void
-LIGHT(itr_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
-	       uint32_t hash, LIGHT_KEY_TYPE data);
+LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
+	            uint32_t hash, LIGHT_KEY_TYPE data);
 
 /**
  * @brief Get the value that iterator currently points to
@@ -301,18 +301,18 @@ LIGHT(itr_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
  * @return poiner to the value or NULL if iteration is complete
  */
 LIGHT_DATA_TYPE *
-LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
-			struct LIGHT(iterator) *itr);
+LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
+			     struct LIGHT(iterator) *itr);
 
 /**
  * @brief Freezes state for given iterator. All following hash table modification
  * will not apply to that iterator iteration. That iterator should be destroyed
- * with a light_itr_destroy call after usage.
+ * with a light_iterator_destroy call after usage.
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
  */
 void
-LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
+LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /**
  * @brief Destroy an iterator that was frozen before. Useless for not frozen
@@ -321,7 +321,7 @@ LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
  * @param itr - iterator to destroy
  */
 void
-LIGHT(itr_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
+LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /* Functions definition */
 
@@ -972,7 +972,7 @@ LIGHT(pos_valid)(LIGHT(core) *ht, uint32_t slotpos)
  * @param itr - iterator to set
  */
 inline void
-LIGHT(itr_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
+LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	(void)ht;
 	itr->slotpos = 0;
@@ -987,7 +987,7 @@ LIGHT(itr_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * @param data - key to find
  */
 inline void
-LIGHT(itr_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
+LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
 	       uint32_t hash, LIGHT_KEY_TYPE data)
 {
 	itr->slotpos = LIGHT(find_key)(ht, hash, data);
@@ -1001,8 +1001,8 @@ LIGHT(itr_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
  * @return poiner to the value or NULL if iteration is complete
  */
 inline LIGHT_DATA_TYPE *
-LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
-			struct LIGHT(iterator) *itr)
+LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
+			     struct LIGHT(iterator) *itr)
 {
 	const struct matras_view *view;
 	view = matras_is_read_view_created(&itr->view) ?
@@ -1021,12 +1021,12 @@ LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
 /**
  * @brief Freezes state for given iterator. All following hash table modification
  * will not apply to that iterator iteration. That iterator should be destroyed
- * with a light_itr_destroy call after usage.
+ * with a light_iterator_destroy call after usage.
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
  */
 inline void
-LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
+LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	assert(!matras_is_read_view_created(&itr->view));
 	matras_create_read_view(&ht->mtable, &itr->view);
@@ -1039,7 +1039,7 @@ LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * @param itr - iterator to destroy
  */
 inline void
-LIGHT(itr_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
+LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	matras_destroy_read_view(&ht->mtable, &itr->view);
 }

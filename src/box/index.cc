@@ -272,9 +272,9 @@ Index::initIterator(struct iterator *ptr, enum iterator_type type,
  * will not affect the iterator iteration.
  */
 void
-Index::createReadViewForIterator(struct iterator *iterator)
+Index::createReadViewForIterator(struct iterator *itr)
 {
-	(void) iterator;
+	(void) itr;
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 
@@ -283,9 +283,9 @@ Index::createReadViewForIterator(struct iterator *iterator)
  * for which createReadViewForIterator was called.
  */
 void
-Index::destroyReadViewForIterator(struct iterator *iterator)
+Index::destroyReadViewForIterator(struct iterator *itr)
 {
-	(void) iterator;
+	(void) itr;
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 

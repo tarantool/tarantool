@@ -29,8 +29,8 @@ static void
 simple_check()
 {
 	struct rtree_rect rect;
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 	const size_t rounds = 2000;
 
 	header();
@@ -45,7 +45,7 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_EQUALS, &itr)) {
 			fail("element already in tree (1)", "true");
 		}
 		rtree_insert(&tree, &rect, rec);
@@ -58,19 +58,19 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (!rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
+		if (!rtree_search(&tree, &rect, SOP_EQUALS, &itr)) {
 			fail("element in tree (1)", "false");
 		}
-		if (rtree_iterator_next(&iterator) != rec) {
+		if (rtree_iterator_next(&itr) != rec) {
 			fail("right search result (1)", "true");
 		}
-		if (rtree_iterator_next(&iterator)) {
+		if (rtree_iterator_next(&itr)) {
 			fail("single search result (1)", "true");
 		}
 		if (!rtree_remove(&tree, &rect, rec)) {
 			fail("delete element in tree (1)", "false");
 		}
-		if (rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_EQUALS, &itr)) {
 			fail("element still in tree (1)", "true");
 		}
 	}
@@ -84,7 +84,7 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_EQUALS, &itr)) {
 			fail("element already in tree (2)", "true");
 		}
 		rtree_insert(&tree, &rect, rec);
@@ -97,19 +97,19 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (!rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator)) {
+		if (!rtree_search(&tree, &rect, SOP_OVERLAPS, &itr)) {
 			fail("element in tree (2)", "false");
 		}
-		if (rtree_iterator_next(&iterator) != rec) {
+		if (rtree_iterator_next(&itr) != rec) {
 			fail("right search result (2)", "true");
 		}
-		if (rtree_iterator_next(&iterator)) {
+		if (rtree_iterator_next(&itr)) {
 			fail("single search result (2)", "true");
 		}
 		if (!rtree_remove(&tree, &rect, rec)) {
 			fail("delete element in tree (2)", "false");
 		}
-		if (rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_OVERLAPS, &itr)) {
 			fail("element still in tree (2)", "true");
 		}
 	}
@@ -124,7 +124,7 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_BELONGS, &itr)) {
 			fail("element already in tree (3)", "true");
 		}
 		rtree_insert(&tree, &rect, rec);
@@ -137,19 +137,19 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (!rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
+		if (!rtree_search(&tree, &rect, SOP_BELONGS, &itr)) {
 			fail("element in tree (3)", "false");
 		}
-		if (rtree_iterator_next(&iterator) != rec) {
+		if (rtree_iterator_next(&itr) != rec) {
 			fail("right search result (3)", "true");
 		}
-		if (rtree_iterator_next(&iterator)) {
+		if (rtree_iterator_next(&itr)) {
 			fail("single search result (3)", "true");
 		}
 		if (!rtree_remove(&tree, &rect, rec)) {
 			fail("delete element in tree (3)", "false");
 		}
-		if (rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_BELONGS, &itr)) {
 			fail("element still in tree (3)", "true");
 		}
 	}
@@ -164,7 +164,7 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_CONTAINS, &itr)) {
 			fail("element already in tree (4)", "true");
 		}
 		rtree_insert(&tree, &rect, rec);
@@ -177,19 +177,19 @@ simple_check()
 
 		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
-		if (!rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
+		if (!rtree_search(&tree, &rect, SOP_CONTAINS, &itr)) {
 			fail("element in tree (4)", "false");
 		}
-		if (rtree_iterator_next(&iterator) != rec) {
+		if (rtree_iterator_next(&itr) != rec) {
 			fail("right search result (4)", "true");
 		}
-		if (rtree_iterator_next(&iterator)) {
+		if (rtree_iterator_next(&itr)) {
 			fail("single search result (4)", "true");
 		}
 		if (!rtree_remove(&tree, &rect, rec)) {
 			fail("delete element in tree (4)", "false");
 		}
-		if (rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
+		if (rtree_search(&tree, &rect, SOP_CONTAINS, &itr)) {
 			fail("element still in tree (4)", "true");
 		}
 	}
@@ -200,7 +200,7 @@ simple_check()
 	rtree_purge(&tree);
 	rtree_destroy(&tree);
 
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 
 	footer();
 }
@@ -234,19 +234,19 @@ neighbor_test()
 
 		rtree_test_build(&tree, arr, i);
 
-		struct rtree_iterator iterator;
-		rtree_iterator_init(&iterator);
-		if (!rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator) && i != 0) {
+		struct rtree_iterator itr;
+		rtree_iterator_init(&itr);
+		if (!rtree_search(&tree, &basis, SOP_NEIGHBOR, &itr) && i != 0) {
 			fail("search is successful", "true");
 		}
 
 		for (size_t j = 0; j < i; j++) {
-			record_t rec = rtree_iterator_next(&iterator);
+			record_t rec = rtree_iterator_next(&itr);
 			if (rec != record_t(j+1)) {
 				fail("wrong search result", "true");
 			}
 		}
-		rtree_iterator_destroy(&iterator);
+		rtree_iterator_destroy(&itr);
 		rtree_destroy(&tree);
 	}
 

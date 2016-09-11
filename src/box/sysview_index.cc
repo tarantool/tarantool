@@ -58,13 +58,13 @@ sysview_iterator_free(struct iterator *ptr)
 }
 
 static struct tuple *
-sysview_iterator_next(struct iterator *iterator)
+sysview_iterator_next(struct iterator *itr)
 {
-	assert(iterator->free == sysview_iterator_free);
-	struct sysview_iterator *it = sysview_iterator(iterator);
+	assert(itr->free == sysview_iterator_free);
+	struct sysview_iterator *it = sysview_iterator(itr);
 	if (it->source->sc_version != sc_version)
 		return NULL; /* invalidate iterator */
-	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
+	class SysviewIndex *index = (class SysviewIndex *) itr->index;
 	struct tuple *tuple;
 	while ((tuple = it->source->next(it->source)) != NULL) {
 		if (index->filter(it->space, tuple))
@@ -98,12 +98,12 @@ SysviewIndex::allocIterator() const
 }
 
 void
-SysviewIndex::initIterator(struct iterator *iterator,
+SysviewIndex::initIterator(struct iterator *itr,
 			   enum iterator_type type,
 			   const char *key, uint32_t part_count) const
 {
-	assert(iterator->free == sysview_iterator_free);
-	struct sysview_iterator *it = sysview_iterator(iterator);
+	assert(itr->free == sysview_iterator_free);
+	struct sysview_iterator *it = sysview_iterator(itr);
 	struct space *source = space_cache_find(source_space_id);
 	class Index *pk = index_find(source, source_index_id);
 	/*
@@ -122,8 +122,8 @@ SysviewIndex::initIterator(struct iterator *iterator,
 		it->source->sc_version = ::sc_version;
 	}
 	pk->initIterator(it->source, type, key, part_count);
-	iterator->index = (Index *) this;
-	iterator->next = sysview_iterator_next;
+	itr->index = (Index *) this;
+	itr->next = sysview_iterator_next;
 	it->space = source;
 }
 

@@ -207,12 +207,12 @@ check_trees_are_identical(test *tree, sptree_test *spt_test)
 	if (test_size(tree) != spt_test->size)
 		return false;
 	int n = test_size(tree);
-	test_iterator itr = test_itr_first(tree);
+	test_iterator itr = test_iterator_first(tree);
 	sptree_test_iterator *spitr = sptree_test_iterator_init(spt_test);
 	for (int i = 0; i < n; i++) {
-		type_t v1 = *test_itr_get_elem(tree, &itr);
+		type_t v1 = *test_iterator_get_elem(tree, &itr);
 		type_t v2 = *(type_t *)sptree_test_iterator_next(spitr);
-		test_itr_next(tree, &itr);
+		test_iterator_next(tree, &itr);
 		if (v1 != v2) {
 			sptree_test_iterator_free(spitr);
 			return false;
@@ -528,14 +528,14 @@ loading_test()
 			fail("debug check nonzero", "true");
 
 		struct test_iterator itr;
-		itr = test_itr_first(&tree);
+		itr = test_iterator_first(&tree);
 		for (type_t j = 0; j < i; j++) {
-			type_t *v = test_itr_get_elem(&tree, &itr);
+			type_t *v = test_iterator_get_elem(&tree, &itr);
 			if (!v || *v != j)
 				fail("wrong build result", "true");
-			test_itr_next(&tree, &itr);
+			test_iterator_next(&tree, &itr);
 		}
-		if (!test_itr_is_invalid(&itr))
+		if (!test_iterator_is_invalid(&itr))
 			fail("wrong build result", "true");
 
 		test_destroy(&tree);
