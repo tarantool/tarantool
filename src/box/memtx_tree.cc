@@ -105,10 +105,10 @@ static struct tuple *
 tree_iterator_fwd(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	tuple **res = memtx_tree_itr_get_elem(it->tree, &it->tree_iterator);
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
-	memtx_tree_itr_next(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
 	return *res;
 }
 
@@ -116,10 +116,10 @@ static struct tuple *
 tree_iterator_bwd(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	tuple **res = memtx_tree_itr_get_elem(it->tree, &it->tree_iterator);
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
-	memtx_tree_itr_prev(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_prev(it->tree, &it->tree_iterator);
 	return *res;
 }
 
@@ -127,14 +127,14 @@ static struct tuple *
 tree_iterator_fwd_check_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	tuple **res = memtx_tree_itr_get_elem(it->tree, &it->tree_iterator);
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
 	if (memtx_tree_compare_key(*res, &it->key_data, it->key_def) != 0) {
 		it->tree_iterator = memtx_tree_invalid_iterator();
 		return 0;
 	}
-	memtx_tree_itr_next(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
 	return *res;
 }
 
@@ -142,10 +142,10 @@ static struct tuple *
 tree_iterator_fwd_check_next_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	tuple **res = memtx_tree_itr_get_elem(it->tree, &it->tree_iterator);
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
-	memtx_tree_itr_next(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
 	iterator->next = tree_iterator_fwd_check_equality;
 	return *res;
 }
@@ -154,7 +154,7 @@ static struct tuple *
 tree_iterator_bwd_skip_one(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	memtx_tree_itr_prev(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_prev(it->tree, &it->tree_iterator);
 	iterator->next = tree_iterator_bwd;
 	return tree_iterator_bwd(iterator);
 }
@@ -163,14 +163,14 @@ static struct tuple *
 tree_iterator_bwd_check_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	tuple **res = memtx_tree_itr_get_elem(it->tree, &it->tree_iterator);
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
 	if (memtx_tree_compare_key(*res, &it->key_data, it->key_def) != 0) {
 		it->tree_iterator = memtx_tree_invalid_iterator();
 		return 0;
 	}
-	memtx_tree_itr_prev(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_prev(it->tree, &it->tree_iterator);
 	return *res;
 }
 
@@ -178,7 +178,7 @@ static struct tuple *
 tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	memtx_tree_itr_prev(it->tree, &it->tree_iterator);
+	memtx_tree_iterator_prev(it->tree, &it->tree_iterator);
 	iterator->next = tree_iterator_bwd_check_equality;
 	return tree_iterator_bwd_check_equality(iterator);
 }
@@ -313,7 +313,7 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		if (iterator_type_is_reverse(type))
 			it->tree_iterator = memtx_tree_invalid_iterator();
 		else
-			it->tree_iterator = memtx_tree_itr_first(&tree);
+			it->tree_iterator = memtx_tree_iterator_first(&tree);
 	} else {
 		if (type == ITER_ALL || type == ITER_EQ || type == ITER_GE || type == ITER_LT) {
 			it->tree_iterator = memtx_tree_lower_bound(&tree, &it->key_data, &exact);
@@ -412,7 +412,7 @@ MemtxTree::createReadViewForIterator(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	struct memtx_tree *tree = (struct memtx_tree *)it->tree;
-	memtx_tree_itr_freeze(tree, &it->tree_iterator);
+	memtx_tree_iterator_freeze(tree, &it->tree_iterator);
 }
 
 /**
@@ -424,5 +424,5 @@ MemtxTree::destroyReadViewForIterator(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	struct memtx_tree *tree = (struct memtx_tree *)it->tree;
-	memtx_tree_itr_destroy(tree, &it->tree_iterator);
+	memtx_tree_iterator_destroy(tree, &it->tree_iterator);
 }

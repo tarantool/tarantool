@@ -146,17 +146,17 @@
  * int bps_tree_debug_check_internal_functions(assert_on_error);
  * // iterators:
  * struct bps_tree_iterator bps_tree_invalid_iterator();
- * bool bps_tree_itr_is_invalid(itr);
- * bool bps_tree_itr_are_equal(tree, itr1, itr2);
- * struct bps_tree_iterator bps_tree_itr_first(tree);
- * struct bps_tree_iterator bps_tree_itr_last(tree);
+ * bool bps_tree_iterator_is_invalid(itr);
+ * bool bps_tree_iterator_are_equal(tree, itr1, itr2);
+ * struct bps_tree_iterator bps_tree_iterator_first(tree);
+ * struct bps_tree_iterator bps_tree_iterator_last(tree);
  * struct bps_tree_iterator bps_tree_lower_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_upper_bound(tree, key, exact);
- * bps_tree_elem_t *bps_tree_itr_get_elem(tree, itr);
- * bool bps_tree_itr_next(tree, itr);
- * bool bps_tree_itr_prev(tree, itr);
- * void bps_tree_itr_freeze(tree, itr);
- * void bps_tree_itr_destroy(tree, itr);
+ * bps_tree_elem_t *bps_tree_iterator_get_elem(tree, itr);
+ * bool bps_tree_iterator_next(tree, itr);
+ * bool bps_tree_iterator_prev(tree, itr);
+ * void bps_tree_iterator_freeze(tree, itr);
+ * void bps_tree_iterator_destroy(tree, itr);
  */
 /* }}} */
 
@@ -349,17 +349,17 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_mem_used _api_name(mem_used)
 #define bps_tree_random _api_name(random)
 #define bps_tree_invalid_iterator _api_name(invalid_iterator)
-#define bps_tree_itr_is_invalid _api_name(itr_is_invalid)
-#define bps_tree_itr_are_equal _api_name(itr_are_equal)
-#define bps_tree_itr_first _api_name(itr_first)
-#define bps_tree_itr_last _api_name(itr_last)
+#define bps_tree_iterator_is_invalid _api_name(iterator_is_invalid)
+#define bps_tree_iterator_are_equal _api_name(iterator_are_equal)
+#define bps_tree_iterator_first _api_name(iterator_first)
+#define bps_tree_iterator_last _api_name(iterator_last)
 #define bps_tree_lower_bound _api_name(lower_bound)
 #define bps_tree_upper_bound _api_name(upper_bound)
-#define bps_tree_itr_get_elem _api_name(itr_get_elem)
-#define bps_tree_itr_next _api_name(itr_next)
-#define bps_tree_itr_prev _api_name(itr_prev)
-#define bps_tree_itr_freeze _api_name(itr_freeze)
-#define bps_tree_itr_destroy _api_name(itr_destroy)
+#define bps_tree_iterator_get_elem _api_name(iterator_get_elem)
+#define bps_tree_iterator_next _api_name(iterator_next)
+#define bps_tree_iterator_prev _api_name(iterator_prev)
+#define bps_tree_iterator_freeze _api_name(iterator_freeze)
+#define bps_tree_iterator_destroy _api_name(iterator_destroy)
 #define bps_tree_debug_check _api_name(debug_check)
 #define bps_tree_print _api_name(print)
 #define bps_tree_debug_check_internal_functions \
@@ -650,7 +650,7 @@ bps_tree_invalid_iterator();
  * @return - true if iterator is invalid, false otherwise
  */
 bool
-bps_tree_itr_is_invalid(struct bps_tree_iterator *itr);
+bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr);
 
 /**
  * @brief Compare two iterators and return true if trey points to same element.
@@ -662,9 +662,9 @@ bps_tree_itr_is_invalid(struct bps_tree_iterator *itr);
  * @return - true if iterators are equal, false otherwise
  */
 bool
-bps_tree_itr_are_equal(const struct bps_tree *tree,
-		       struct bps_tree_iterator *itr1,
-		       struct bps_tree_iterator *itr2);
+bps_tree_iterator_are_equal(const struct bps_tree *tree,
+		            struct bps_tree_iterator *itr1,
+		            struct bps_tree_iterator *itr2);
 
 /**
  * @brief Get an iterator to the first element of the tree
@@ -672,7 +672,7 @@ bps_tree_itr_are_equal(const struct bps_tree *tree,
  * @return - First iterator. Could be invalid if the tree is empty.
  */
 struct bps_tree_iterator
-bps_tree_itr_first(const struct bps_tree *tree);
+bps_tree_iterator_first(const struct bps_tree *tree);
 
 /**
  * @brief Get an iterator to the last element of the tree
@@ -680,7 +680,7 @@ bps_tree_itr_first(const struct bps_tree *tree);
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
 struct bps_tree_iterator
-bps_tree_itr_last(const struct bps_tree *tree);
+bps_tree_iterator_last(const struct bps_tree *tree);
 
 /**
  * @brief Get an iterator to the first element that is greater or
@@ -718,8 +718,8 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @return - Pointer to the element. Null for invalid iterator
  */
 bps_tree_elem_t *
-bps_tree_itr_get_elem(const struct bps_tree *tree,
-		      struct bps_tree_iterator *itr);
+bps_tree_iterator_get_elem(const struct bps_tree *tree,
+		           struct bps_tree_iterator *itr);
 
 /**
  * @brief Increments an iterator, makes it point to the next element
@@ -731,7 +731,7 @@ bps_tree_itr_get_elem(const struct bps_tree *tree,
  * @return - true on success, false if a resulted iterator is set to invalid
  */
 bool
-bps_tree_itr_next(const struct bps_tree *tree, struct bps_tree_iterator *itr);
+bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
  * @brief Decrements an iterator, makes it point to the previous element
@@ -743,17 +743,17 @@ bps_tree_itr_next(const struct bps_tree *tree, struct bps_tree_iterator *itr);
  * @return - true on success, false if a resulted iterator is set to invalid
  */
 bool
-bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
+bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
  * @brief Freezes tree state for given iterator. All following tree modification
  * will not apply to that iterator iteration. That iterator should be destroyed
- * with a bps_tree_itr_destroy call after usage.
+ * with a bps_tree_iterator_destroy call after usage.
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
 void
-bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
+bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
  * @brief Destroy an iterator that was frozen before. Useless for not frozen
@@ -762,7 +762,7 @@ bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
  * @param itr - pointer to tree iterator
  */
 void
-bps_tree_itr_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr);
+bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
  * @brief Debug self-checking. Returns bitmask of found errors (0
@@ -1400,7 +1400,7 @@ bps_tree_invalid_iterator()
  * @return - true if iterator is invalid, false otherwise
  */
 inline bool
-bps_tree_itr_is_invalid(struct bps_tree_iterator *itr)
+bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr)
 {
 	return itr->block_id == (bps_tree_block_id_t)(-1);
 }
@@ -1468,13 +1468,13 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
  * @return - true if iterators are equal, false otherwise
  */
 inline bool
-bps_tree_itr_are_equal(const struct bps_tree *tree,
-		       struct bps_tree_iterator *itr1,
-		       struct bps_tree_iterator *itr2)
+bps_tree_iterator_are_equal(const struct bps_tree *tree,
+		            struct bps_tree_iterator *itr1,
+		            struct bps_tree_iterator *itr2)
 {
-	if (bps_tree_itr_is_invalid(itr1) && bps_tree_itr_is_invalid(itr2))
+	if (bps_tree_iterator_is_invalid(itr1) && bps_tree_iterator_is_invalid(itr2))
 		return true;
-	if (bps_tree_itr_is_invalid(itr1) || bps_tree_itr_is_invalid(itr2))
+	if (bps_tree_iterator_is_invalid(itr1) || bps_tree_iterator_is_invalid(itr2))
 		return false;
 	if (itr1->block_id == itr2->block_id && itr1->pos == itr2->pos)
 		return true;
@@ -1503,7 +1503,7 @@ bps_tree_itr_are_equal(const struct bps_tree *tree,
  * @return - First iterator. Could be invalid if the tree is empty.
  */
 inline struct bps_tree_iterator
-bps_tree_itr_first(const struct bps_tree *tree)
+bps_tree_iterator_first(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->first_id;
@@ -1518,7 +1518,7 @@ bps_tree_itr_first(const struct bps_tree *tree)
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
 inline struct bps_tree_iterator
-bps_tree_itr_last(const struct bps_tree *tree)
+bps_tree_iterator_last(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->last_id;
@@ -1643,8 +1643,8 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @return - Pointer to the element. Null for invalid iterator
  */
 inline bps_tree_elem_t *
-bps_tree_itr_get_elem(const struct bps_tree *tree,
-		      struct bps_tree_iterator *itr)
+bps_tree_iterator_get_elem(const struct bps_tree *tree,
+		           struct bps_tree_iterator *itr)
 {
 	struct bps_leaf *leaf = bps_tree_get_leaf_safe(tree, itr);
 	if (!leaf)
@@ -1662,7 +1662,7 @@ bps_tree_itr_get_elem(const struct bps_tree *tree,
  * @return - true on success, false if a resulted iterator is set to invalid
  */
 inline bool
-bps_tree_itr_next(const struct bps_tree *tree, struct bps_tree_iterator *itr)
+bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
 		if (matras_is_read_view_created(&itr->view))
@@ -1693,7 +1693,7 @@ bps_tree_itr_next(const struct bps_tree *tree, struct bps_tree_iterator *itr)
  * @return - true on success, false if a resulted iterator is set to invalid
  */
 inline bool
-bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
+bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
 		if (matras_is_read_view_created(&itr->view))
@@ -1718,12 +1718,12 @@ bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 /**
  * @brief Freezes tree state for given iterator. All following tree modification
  * will not apply to that iterator iteration. That iterator should be destroyed
- * with a bps_tree_itr_destroy call after usage.
+ * with a bps_tree_iterator_destroy call after usage.
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
 inline void
-bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
+bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	assert(!matras_is_read_view_created(&itr->view));
 	matras_create_read_view(&tree->matras, &itr->view);
@@ -1736,7 +1736,7 @@ bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
  * @param itr - pointer to tree iterator
  */
 inline void
-bps_tree_itr_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr)
+bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	matras_destroy_read_view(&tree->matras, &itr->view);
 }
@@ -5604,17 +5604,17 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_mem_used
 #undef bps_tree_random
 #undef bps_tree_invalid_iterator
-#undef bps_tree_itr_is_invalid
-#undef bps_tree_itr_are_equal
-#undef bps_tree_itr_first
-#undef bps_tree_itr_last
+#undef bps_tree_iterator_is_invalid
+#undef bps_tree_iterator_are_equal
+#undef bps_tree_iterator_first
+#undef bps_tree_iterator_last
 #undef bps_tree_lower_bound
 #undef bps_tree_upper_bound
-#undef bps_tree_itr_get_elem
-#undef bps_tree_itr_next
-#undef bps_tree_itr_prev
-#undef bps_tree_itr_freeze
-#undef bps_tree_itr_destroy
+#undef bps_tree_iterator_get_elem
+#undef bps_tree_iterator_next
+#undef bps_tree_iterator_prev
+#undef bps_tree_iterator_freeze
+#undef bps_tree_iterator_destroy
 #undef bps_tree_debug_check
 #undef bps_tree_print
 #undef bps_tree_debug_check_internal_functions

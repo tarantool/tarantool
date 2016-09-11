@@ -25,7 +25,7 @@ extent_free(void *page)
 }
 
 static void
-itr_check()
+iterator_check()
 {
 	header();
 
@@ -192,7 +192,7 @@ itr_check()
 }
 
 static void
-itr_invalidate_check()
+iterator_invalidate_check()
 {
 	header();
 
@@ -299,8 +299,8 @@ itr_invalidate_check()
 int
 main(void)
 {
-	itr_check();
-	itr_invalidate_check();
+	iterator_check();
+	iterator_invalidate_check();
 	if (extent_count != 0) {
 		fail("memory leak!", "false");
 	}
