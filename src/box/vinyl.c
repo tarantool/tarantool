@@ -30,28 +30,7 @@
  */
 #include "vinyl.h"
 
-#include <stdlib.h>
-#include <stddef.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <math.h>
-#include <string.h>
-#include <ctype.h>
-#include <assert.h>
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/uio.h>
-#include <sys/mman.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <time.h>
-#include <fcntl.h>
 #include <dirent.h>
-#include <errno.h>
 #include <pmatomic.h>
 
 #include <lz4.h>
@@ -87,6 +66,7 @@
 
 #include "vclock.h"
 #include "assoc.h"
+#include "errinj.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -3145,7 +3125,8 @@ err:
 	 * Reposition to end of file and trucate it
 	 */
 	lseek(fd, header->offset, SEEK_SET);
-	ftruncate(fd, header->offset);
+	rc = ftruncate(fd, header->offset);
+	(void) rc;
 	free(run);
 	return -1;
 }
@@ -3341,10 +3322,8 @@ vy_range_close(struct vy_range *range, int gc)
 {
 	int rcret = 0;
 
-	int rc = close(range->fd);
-	if (unlikely(rc == -1)) {
-		vy_error("index file close error: %s",
-		               strerror(errno));
+	if (range->fd >= 0 && close(range->fd) < 0) {
+		vy_error("index file close error: %s", strerror(errno));
 		rcret = -1;
 	}
 	if (gc) {
@@ -3364,7 +3343,8 @@ vy_range_recover(struct vy_range *range)
 	int readen;
 	uint32_t read_size = ALIGN_POS(sizeof(struct vy_run_info));
 	void *read_buf;
-	posix_memalign(&read_buf, FILE_ALIGN, read_size);
+	if (posix_memalign(&read_buf, FILE_ALIGN, read_size) != 0)
+		return -1;
 	while ((readen = vy_read_aligned(fd, read_buf, &read_size))
 		== (ssize_t)read_size) {
 		struct vy_run_info *run_info =
@@ -3427,13 +3407,16 @@ static int
 vy_range_create(struct vy_range *range, struct vy_index *index)
 {
 	snprintf(range->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	int rc = range->fd = mkstemp(range->path);
-	if (unlikely(rc == -1)) {
-		vy_error("temp file '%s' create error: %s",
-		               range->path, strerror(errno));
-		return -1;
-	}
+
+	ERROR_INJECT(ERRINJ_VY_RANGE_CREATE, errno = EMFILE; goto error);
+
+	if ((range->fd = mkstemp(range->path)) == -1)
+		goto error;
 	return 0;
+error:
+	vy_error("temp file '%s' create error: %s",
+		 range->path, strerror(errno));
+	return -1;
 }
 
 static inline void
@@ -3455,12 +3438,10 @@ vy_range_delete(struct vy_range *range, int gc)
 	assert(range->nodecompact.pos == UINT32_MAX);
 
 	int rcret = 0;
-	int rc;
 	vy_range_delete_runs(range);
-	rc = vy_range_close(range,gc);
-	if (unlikely(rc == -1))
+	if (vy_range_close(range, gc))
 		rcret = -1;
-	if (!range->id && range->fd > 0) {
+	if (!range->id && range->fd >= 0) {
 		/* Range wasn't completed */
 		unlink(range->path);
 	}
@@ -7357,7 +7338,6 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 
 /* }}} vy_run_iterator API implementation */
 
-
 /* {{{ Temporary wrap of new run iterator to old API */
 
 static void
@@ -7646,7 +7626,6 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 }
 
 /* }}} vy_mem_iterator support functions */
-
 
 /* {{{ vy_mem_iterator API implementation */
 /* TODO: move to c file and remove static keyword */
@@ -8971,13 +8950,13 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 			itr->curr_range = NULL;
 	}
 	vy_read_iterator_use_range(itr);
-	struct vy_tuple *t;
-	int rc = vy_merge_iterator_get(&itr->merge_itr, &t);
+	struct vy_tuple *tuple = NULL;
+	int rc = vy_merge_iterator_get(&itr->merge_itr, &tuple);
 	if (rc >= 0 && itr->merge_itr.range_ended && itr->curr_range != NULL)
 		return vy_read_iterator_next_range(itr);
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
-	itr->curr_tuple = t;
+	itr->curr_tuple = tuple;
 	if (itr->curr_tuple != NULL)
 		vy_tuple_ref(itr->curr_tuple);
 	return rc;
