@@ -1716,6 +1716,7 @@ struct vy_range {
 	 * Minimal key of the range
 	 */
 	struct vy_tuple *min_key;
+	struct vy_index *index;
 	uint16_t   flags;
 	uint64_t   update_time;
 	uint32_t   used; /* sum of i0->used + i1->used */
@@ -1758,46 +1759,6 @@ struct vy_profiler {
 	char      histogram_run_sz[256];
 	char     *histogram_run_ptr;
 	struct vy_index  *i;
-};
-
-#define HEAP_NAME vy_dump_heap
-
-static inline int
-heap_dump_less(struct heap_node *a, struct heap_node *b)
-{
-	const struct vy_range *left =
-		container_of(a, struct vy_range, nodedump);
-	const struct vy_range *right =
-		container_of(b, struct vy_range, nodedump);
-	return left->used > right->used;
-}
-
-#define HEAP_LESS(h, l, r) heap_dump_less(l, r)
-
-#include "salad/heap.h"
-
-#undef HEAP_LESS
-#undef HEAP_NAME
-
-#define HEAP_NAME vy_compact_heap
-
-static inline int
-heap_compact_less(struct heap_node *a, struct heap_node *b)
-{
-	const struct vy_range *left =
-				container_of(a, struct vy_range, nodecompact);
-	const struct vy_range *right =
-				container_of(b, struct vy_range, nodecompact);
-	return left->run_count > right->run_count;
-}
-
-#define HEAP_LESS(h, l, r) heap_compact_less(l, r)
-
-#include "salad/heap.h"
-
-struct vy_planner {
-	heap_t dump_heap;
-	heap_t compact_heap;
 };
 
 /**
@@ -1852,10 +1813,6 @@ struct vy_index {
 	uint32_t *key_map; /* field_id -> part_id map */
 	/** Member of env->db or scheduler->shutdown. */
 	struct rlist link;
-
-	/* {{{ Scheduler members */
-	struct vy_planner p;
-	/* Scheduler members }}} */
 
 	/**
 	 * LSN from the time when the first index impression on
@@ -2602,7 +2559,7 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 
 #define VY_ROTATE     2
 
-static struct vy_range *vy_range_new(struct key_def *key_def);
+static struct vy_range *vy_range_new(struct vy_index *index);
 static int vy_range_create(struct vy_range*, struct vy_index*);
 static int vy_range_delete(struct vy_range*, int);
 
@@ -2671,14 +2628,12 @@ vy_range_size(struct vy_range *range)
 	return size;
 }
 
-static void vy_planner_create(struct vy_planner*);
-static void vy_planner_destroy(struct vy_planner*);
 static void
-vy_planner_add_range(struct vy_planner *p, struct vy_range *range);
+vy_scheduler_add_range(struct vy_scheduler *, struct vy_range *range);
 static void
-vy_planner_update_range(struct vy_planner *p, struct vy_range *range);
+vy_scheduler_update_range(struct vy_scheduler *, struct vy_range *range);
 static void
-vy_planner_remove_range(struct vy_planner*, struct vy_range*);
+vy_scheduler_remove_range(struct vy_scheduler *, struct vy_range*);
 
 struct vy_range_tree_key {
 	char *data;
@@ -2702,7 +2657,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	(void)t;
 	(void)arg;
 	struct vy_index *index = (struct vy_index *) arg;
-	vy_planner_remove_range(&index->p, range);
+	vy_scheduler_remove_range(index->env->scheduler, range);
 	vy_range_delete(range, 0);
 	return NULL;
 }
@@ -3331,7 +3286,7 @@ vy_range_split(struct vy_index *index,
 
 	while (sv_writeiter_has(&iwrite)) {
 		/* create new range */
-		range = vy_range_new(index->key_def);
+		range = vy_range_new(index);
 		if (unlikely(range == NULL))
 			goto error;
 		rc = vy_range_create(range, index);
@@ -3363,7 +3318,7 @@ error:
 }
 
 static struct vy_range *
-vy_range_new(struct key_def *key_def)
+vy_range_new(struct vy_index *index)
 {
 	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
 	if (range == NULL) {
@@ -3372,8 +3327,9 @@ vy_range_new(struct key_def *key_def)
 		return NULL;
 	}
 	range->fd = -1;
-	vy_mem_create(&range->i0, key_def);
-	vy_mem_create(&range->i1, key_def);
+	range->index = index;
+	vy_mem_create(&range->i0, index->key_def);
+	vy_mem_create(&range->i1, index->key_def);
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
 	rlist_create(&range->split);
@@ -3463,7 +3419,7 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 	vy_index_add_range(index, range);
 	index->size += vy_range_size(range);
 	/* schedule range */
-	vy_planner_add_range(&index->p, range);
+	vy_scheduler_add_range(index->env->scheduler, range);
 	return 0;
 }
 
@@ -3530,48 +3486,6 @@ vy_range_complete(struct vy_range *range, struct vy_index *index)
 		snprintf(range->path, PATH_MAX, "%s", path);
 	}
 	return rc;
-}
-
-static void vy_planner_create(struct vy_planner *p)
-{
-	vy_compact_heap_create(&p->compact_heap);
-	vy_dump_heap_create(&p->dump_heap);
-}
-
-static void
-vy_planner_destroy(struct vy_planner *p)
-{
-	vy_compact_heap_destroy(&p->compact_heap);
-	vy_dump_heap_destroy(&p->dump_heap);
-}
-
-static void
-vy_planner_add_range(struct vy_planner *p, struct vy_range *range)
-{
-	vy_dump_heap_insert(&p->dump_heap, &range->nodedump);
-	vy_compact_heap_insert(&p->compact_heap, &range->nodecompact);
-	assert(range->nodedump.pos != UINT32_MAX);
-	assert(range->nodecompact.pos != UINT32_MAX);
-}
-
-static void
-vy_planner_update_range(struct vy_planner *p, struct vy_range *range)
-{
-	if (likely(range->nodedump.pos == UINT32_MAX))
-		return; /* range is being processed by a task */
-
-	vy_dump_heap_update(&p->dump_heap, &range->nodedump);
-	assert(range->nodedump.pos != UINT32_MAX);
-	assert(range->nodecompact.pos != UINT32_MAX);
-}
-
-static void
-vy_planner_remove_range(struct vy_planner *p, struct vy_range *range)
-{
-	vy_dump_heap_delete(&p->dump_heap, &range->nodedump);
-	vy_compact_heap_delete(&p->compact_heap, &range->nodecompact);
-	range->nodedump.pos = UINT32_MAX;
-	range->nodecompact.pos = UINT32_MAX;
 }
 
 static void
@@ -3710,11 +3624,11 @@ vy_index_create(struct vy_index *index)
 	index->first_dump_lsn = 0;
 	index->last_dump_range_id = 0;
 	/* create initial range */
-	struct vy_range *range = vy_range_new(index->key_def);
+	struct vy_range *range = vy_range_new(index);
 	if (unlikely(range == NULL))
 		return -1;
 	vy_index_add_range(index, range);
-	vy_planner_add_range(&index->p, range);
+	vy_scheduler_add_range(index->env->scheduler, range);
 	index->size = vy_range_size(range);
 	return 0;
 }
@@ -3827,7 +3741,7 @@ vy_index_open_ex(struct vy_index *index)
 	int size;
 	while ((size = read(fd, &range_id, sizeof(range_id))) ==
 		sizeof(range_id)) {
-		struct vy_range *range = vy_range_new(index->key_def);
+		struct vy_range *range = vy_range_new(index);
 		if (!range) {
 			vy_error("%s", "Can't alloc range");
 			vy_range_delete(range, 0);
@@ -3857,7 +3771,7 @@ vy_index_open_ex(struct vy_index *index)
 		 * (merged out or empty index was checkpointed)
 		 */
 		/* create initial range */
-		struct vy_range *range = vy_range_new(index->key_def);
+		struct vy_range *range = vy_range_new(index);
 		if (unlikely(range == NULL))
 			return -1;
 		vy_index_add_range(index, range);
@@ -3912,7 +3826,8 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 			 * keys for this range.
 			 */
 			prev_range->update_time = time;
-			vy_planner_update_range(&index->p, prev_range);
+			vy_scheduler_update_range(index->env->scheduler,
+						  prev_range);
 		}
 		prev_range = range;
 		vy_tuple_ref(tuple);
@@ -3927,7 +3842,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	}
 	if (range != NULL) {
 		range->update_time = time;
-		vy_planner_update_range(&index->p, range);
+		vy_scheduler_update_range(index->env->scheduler, range);
 	}
 	/* Take quota after having unlocked the index mutex. */
 	vy_quota_use(index->env->quota, quota);
@@ -4096,20 +4011,19 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_index_dump_range_index(index);
 	}
 
-	vy_planner_add_range(&index->p, range);
+	vy_scheduler_add_range(index->env->scheduler, range);
 	vy_mem_gc(&swap);
 	return 0;
 }
 
 static struct vy_task *
-vy_task_dump_new(struct mempool *pool,
-		 struct vy_index *index, struct vy_range *range)
+vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
 		.complete = vy_task_dump_complete,
 	};
-	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
+	struct vy_task *task = vy_task_new(pool, range->index, &dump_ops);
 
 	if (!task)
 		return NULL;
@@ -4169,7 +4083,7 @@ vy_task_compact_complete(struct vy_task *task)
 
 	/* Mask removal of a single range as a single range update */
 	if (count == 0 && index->range_count == 1) {
-		n = vy_range_new(index->key_def);
+		n = vy_range_new(index);
 		if (n == NULL)
 			return -1;
 		rlist_add_entry(split_list, n, split);
@@ -4205,7 +4119,7 @@ vy_task_compact_complete(struct vy_task *task)
 		index->size += vy_range_size(n);
 		vy_index_add_range(index, n);
 		/* Add to scheduler */
-		vy_planner_add_range(&index->p, n);
+		vy_scheduler_add_range(index->env->scheduler, n);
 	}
 
 	/* complete new nodes */
@@ -4227,14 +4141,13 @@ vy_task_compact_complete(struct vy_task *task)
 }
 
 static struct vy_task *
-vy_task_compact_new(struct mempool *pool,
-		    struct vy_index *index, struct vy_range *range)
+vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 {
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
 		.complete = vy_task_compact_complete,
 	};
-	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
+	struct vy_task *task = vy_task_new(pool, range->index, &compact_ops);
 
 	if (!task)
 		return NULL;
@@ -4267,16 +4180,52 @@ vy_task_drop_new(struct mempool *pool, struct vy_index *index)
 
 /* {{{ Scheduler */
 
+#define HEAP_NAME vy_dump_heap
+
+static inline int
+heap_dump_less(struct heap_node *a, struct heap_node *b)
+{
+	const struct vy_range *left =
+		container_of(a, struct vy_range, nodedump);
+	const struct vy_range *right =
+		container_of(b, struct vy_range, nodedump);
+	return left->used > right->used;
+}
+
+#define HEAP_LESS(h, l, r) heap_dump_less(l, r)
+
+#include "salad/heap.h"
+
+#undef HEAP_LESS
+#undef HEAP_NAME
+
+#define HEAP_NAME vy_compact_heap
+
+static inline int
+heap_compact_less(struct heap_node *a, struct heap_node *b)
+{
+	const struct vy_range *left =
+				container_of(a, struct vy_range, nodecompact);
+	const struct vy_range *right =
+				container_of(b, struct vy_range, nodecompact);
+	return left->run_count > right->run_count;
+}
+
+#define HEAP_LESS(h, l, r) heap_compact_less(l, r)
+
+#include "salad/heap.h"
+
 struct vy_scheduler {
 	pthread_mutex_t        mutex;
 	int64_t       checkpoint_lsn_last;
 	int64_t       checkpoint_lsn;
 	bool checkpoint_in_progress;
-	int            rr;
 	int            count;
 	struct vy_index **indexes;
 	struct rlist   shutdown;
 	struct vy_env    *env;
+	heap_t dump_heap;
+	heap_t compact_heap;
 
 	struct cord *worker_pool;
 	struct fiber *scheduler;
@@ -4342,9 +4291,10 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->checkpoint_in_progress = false;
 	scheduler->indexes = NULL;
 	scheduler->count = 0;
-	scheduler->rr = 0;
 	scheduler->env = env;
 	rlist_create(&scheduler->shutdown);
+	vy_compact_heap_create(&scheduler->compact_heap);
+	vy_dump_heap_create(&scheduler->dump_heap);
 	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
 	scheduler->loop = loop();
 	ev_async_init(&scheduler->scheduler_async, vy_scheduler_async_cb);
@@ -4367,6 +4317,8 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 		vy_index_delete(index);
 	}
 	free(scheduler->indexes);
+	vy_compact_heap_destroy(&scheduler->compact_heap);
+	vy_dump_heap_destroy(&scheduler->dump_heap);
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
 	TRASH(&scheduler->scheduler_async);
 	ipc_cond_destroy(&scheduler->scheduler_cond);
@@ -4405,18 +4357,47 @@ vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 	for (int i = found + 1; i < scheduler->count; i++)
 		scheduler->indexes[i - 1] = scheduler->indexes[i];
 	scheduler->count--;
-	if (unlikely(scheduler->rr >= scheduler->count))
-		scheduler->rr = 0;
 	vy_index_unref(index);
 	/* add index to `shutdown` list */
 	rlist_add(&scheduler->shutdown, &index->link);
 	return 0;
 }
 
+static void
+vy_scheduler_add_range(struct vy_scheduler *scheduler,
+		       struct vy_range *range)
+{
+	vy_dump_heap_insert(&scheduler->dump_heap, &range->nodedump);
+	vy_compact_heap_insert(&scheduler->compact_heap, &range->nodecompact);
+	assert(range->nodedump.pos != UINT32_MAX);
+	assert(range->nodecompact.pos != UINT32_MAX);
+}
+
+static void
+vy_scheduler_update_range(struct vy_scheduler *scheduler,
+			  struct vy_range *range)
+{
+	if (likely(range->nodedump.pos == UINT32_MAX))
+		return; /* range is being processed by a task */
+
+	vy_dump_heap_update(&scheduler->dump_heap, &range->nodedump);
+	assert(range->nodedump.pos != UINT32_MAX);
+	assert(range->nodecompact.pos != UINT32_MAX);
+}
+
+static void
+vy_scheduler_remove_range(struct vy_scheduler *scheduler,
+			  struct vy_range *range)
+{
+	vy_dump_heap_delete(&scheduler->dump_heap, &range->nodedump);
+	vy_compact_heap_delete(&scheduler->compact_heap, &range->nodecompact);
+	range->nodedump.pos = UINT32_MAX;
+	range->nodecompact.pos = UINT32_MAX;
+}
+
 static inline int
 vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
-			     struct vy_index *index, int64_t checkpoint_lsn,
-			     struct vy_task **ptask)
+			     int64_t checkpoint_lsn, struct vy_task **ptask)
 {
 	/* try to peek a range which has min
 	 * lsn <= required value
@@ -4424,17 +4405,17 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
-	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->i0.min_lsn > checkpoint_lsn)
 			continue;
 		if (range->used == 0)
 			continue;
-		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
+		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
 			return -1; /* OOM */
-		vy_planner_remove_range(&index->p, range);
+		vy_scheduler_remove_range(scheduler, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4442,23 +4423,22 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 }
 
 static inline int
-vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
-		       struct vy_task **ptask)
+vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 	/* try to peek a range with a biggest in-memory index */
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
-	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->used < 10 * 1024 * 1024 &&
-		    range->used < index->key_def->opts.range_size)
+		    range->used < range->index->key_def->opts.range_size)
 			return 0; /* nothing to do */
-		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
+		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
 			return -1; /* oom */
-		vy_planner_remove_range(&index->p, range);
+		vy_scheduler_remove_range(scheduler, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4466,8 +4446,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_index *index,
 }
 
 static inline int
-vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
-		      uint32_t max_age, struct vy_task **ptask)
+vy_scheduler_peek_age(struct vy_scheduler *scheduler, uint32_t max_age,
+		      struct vy_task **ptask)
 {
 	/*
 	 * Try to peek a range with no updates within max_age
@@ -4479,17 +4459,17 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
-	vy_dump_heap_iterator_init(&index->p.dump_heap, &it);
+	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (range->used == 0)
 			continue;
 		if (range->update_time + max_age > now)
 			continue;
-		*ptask = vy_task_dump_new(&scheduler->task_pool, index, range);
+		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
 			return -1; /* oom */
-		vy_planner_remove_range(&index->p, range);
+		vy_scheduler_remove_range(scheduler, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4497,8 +4477,7 @@ vy_scheduler_peek_age(struct vy_scheduler *scheduler, struct vy_index *index,
 }
 
 static inline int
-vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
-			  struct vy_index *index, uint32_t run_count,
+vy_scheduler_peek_compact(struct vy_scheduler *scheduler, uint32_t run_count,
 			  struct vy_task **ptask)
 {
 	/* try to peek a range with a biggest number
@@ -4506,16 +4485,16 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
-	vy_compact_heap_iterator_init(&index->p.compact_heap, &it);
+	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
 	while ((pn = vy_compact_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodecompact);
 		if (range->run_count < run_count)
 			break; /* TODO: why ? */
 		*ptask = vy_task_compact_new(&scheduler->task_pool,
-					     index, range);
+					     range);
 		if (*ptask == NULL)
 			return -1; /* OOM */
-		vy_planner_remove_range(&index->p, range);
+		vy_scheduler_remove_range(scheduler, range);
 		return 0; /* new task */
 	}
 	*ptask = NULL;
@@ -4534,55 +4513,6 @@ vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 	if (*ptask == NULL)
 		return -1;
 	return 0; /* new task */
-}
-
-static int
-vy_schedule_index(struct vy_scheduler *scheduler, struct srzone *zone,
-		  int64_t vlsn, struct vy_index *index, struct vy_task **ptask)
-{
-	int rc;
-	*ptask = NULL;
-
-	/* checkpoint */
-	if (scheduler->checkpoint_in_progress) {
-		rc = vy_scheduler_peek_checkpoint(scheduler, index,
-			scheduler->checkpoint_lsn, ptask);
-		if (rc != 0)
-			return rc; /* error */
-		if (*ptask != NULL)
-			goto found;
-	}
-
-	/* index aging */
-	if (zone->dump_prio && zone->dump_age) {
-		uint32_t max_age = zone->dump_age * 1000000; /* ms */
-		rc = vy_scheduler_peek_age(scheduler, index, max_age, ptask);
-		if (rc != 0)
-			return rc; /* error */
-		if (*ptask != NULL)
-			goto found;
-	}
-
-	/* dumping */
-	rc = vy_scheduler_peek_dump(scheduler, index, ptask);
-	if (rc != 0)
-		return rc; /* error */
-	if (*ptask != NULL)
-		goto found;
-
-	/* compaction */
-	rc = vy_scheduler_peek_compact(scheduler, index, zone->compact_wm,
-				       ptask);
-	if (rc != 0)
-		return rc; /* error */
-	if (*ptask != NULL)
-		goto found;
-
-	/* no task to run */
-	return 0;
-found:
-	(*ptask)->vlsn = vlsn;
-	return 0;
 }
 
 static int
@@ -4607,12 +4537,50 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	*ptask = NULL;
 	if (scheduler->count == 0)
 		return 0;
-	assert(scheduler->rr < scheduler->count);
-	index = scheduler->indexes[scheduler->rr];
-	scheduler->rr = (scheduler->rr + 1) % scheduler->count;
 
-	int rc = vy_schedule_index(scheduler, zone, vlsn, index, ptask);
-	return rc;
+	int rc;
+	*ptask = NULL;
+
+	/* checkpoint */
+	if (scheduler->checkpoint_in_progress) {
+		rc = vy_scheduler_peek_checkpoint(scheduler,
+			scheduler->checkpoint_lsn, ptask);
+		if (rc != 0)
+			return rc; /* error */
+		if (*ptask != NULL)
+			goto found;
+	}
+
+	/* index aging */
+	if (zone->dump_prio && zone->dump_age) {
+		uint32_t max_age = zone->dump_age * 1000000; /* ms */
+		rc = vy_scheduler_peek_age(scheduler, max_age, ptask);
+		if (rc != 0)
+			return rc; /* error */
+		if (*ptask != NULL)
+			goto found;
+	}
+
+	/* dumping */
+	rc = vy_scheduler_peek_dump(scheduler, ptask);
+	if (rc != 0)
+		return rc; /* error */
+	if (*ptask != NULL)
+		goto found;
+
+	/* compaction */
+	rc = vy_scheduler_peek_compact(scheduler, zone->compact_wm, ptask);
+	if (rc != 0)
+		return rc; /* error */
+	if (*ptask != NULL)
+		goto found;
+
+	/* no task to run */
+	return 0;
+found:
+	(*ptask)->vlsn = vlsn;
+	return 0;
+
 }
 
 static int
@@ -5625,7 +5593,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 	memset(index, 0, sizeof(*index));
 	index->env = e;
-	vy_planner_create(&index->p);
 	if (vy_index_conf_create(index, key_def))
 		goto error_2;
 	index->key_def = key_def_dup(key_def);
@@ -5680,7 +5647,6 @@ error_3:
 	free(index->name);
 	free(index->path);
 error_2:
-	vy_planner_destroy(&index->p);
 	free(index);
 	return NULL;
 }
@@ -5690,7 +5656,6 @@ vy_index_delete(struct vy_index *index)
 {
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index);
-	vy_planner_destroy(&index->p);
 	tt_pthread_mutex_destroy(&index->ref_lock);
 	free(index->name);
 	free(index->path);
