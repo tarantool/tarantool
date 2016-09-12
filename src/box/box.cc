@@ -735,11 +735,15 @@ space_truncate(struct space *space)
 	}
 	assert(index_count <= BOX_INDEX_MAX);
 
+	/* box_delete() invalidates space pointer */
+	uint32_t x_space_id = space_id(space);
+	space = NULL;
+
 	/* drop all selected indexes */
 	for (int i = index_count - 1; i >= 0; --i) {
 		uint32_t index_id = tuple_field_u32(indexes[i], 1);
 		key_buf_end = mp_encode_array(key_buf, 2);
-		key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+		key_buf_end = mp_encode_uint(key_buf_end, x_space_id);
 		key_buf_end = mp_encode_uint(key_buf_end, index_id);
 		assert(key_buf_end <= key_buf + sizeof(key_buf));
 		if (box_delete(BOX_INDEX_ID, 0, key_buf, key_buf_end, NULL))
