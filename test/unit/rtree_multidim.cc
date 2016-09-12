@@ -334,12 +334,12 @@ test_select_neigh(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 
 	struct rtree_rect rt;
 	box.FillRTreeRect(&rt);
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 	vector<CBoxSetEntry<DIMENSION> > res2;
-	if (rtree_search(tree, &rt, SOP_NEIGHBOR, &iterator)) {
+	if (rtree_search(tree, &rt, SOP_NEIGHBOR, &itr)) {
 		void *record;
-		while((record = rtree_iterator_next(&iterator))) {
+		while((record = rtree_iterator_next(&itr))) {
 			CBoxSetEntry<DIMENSION> entry;
 			entry.id = ((unsigned)(uintptr_t)record) - 1;
 			entry.box = set.entries[entry.id].box;
@@ -358,7 +358,7 @@ test_select_neigh(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 			    res2[i].box.Distance2(box))
 				printf("%s result differ!\n", __func__);
 	}
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 
 }
 
@@ -373,13 +373,13 @@ test_select_neigh_man(const CBoxSet<DIMENSION> &set, struct rtree *tree)
 
 	struct rtree_rect rt;
 	box.FillRTreeRect(&rt);
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 	vector<CBoxSetEntry<DIMENSION> > res2;
 	tree->distance_type = RTREE_MANHATTAN; /* dirty hack */
-	if (rtree_search(tree, &rt, SOP_NEIGHBOR, &iterator)) {
+	if (rtree_search(tree, &rt, SOP_NEIGHBOR, &itr)) {
 		void *record;
-		while((record = rtree_iterator_next(&iterator))) {
+		while((record = rtree_iterator_next(&itr))) {
 			CBoxSetEntry<DIMENSION> entry;
 			entry.id = ((unsigned)(uintptr_t)record) - 1;
 			entry.box = set.entries[entry.id].box;
@@ -399,7 +399,7 @@ test_select_neigh_man(const CBoxSet<DIMENSION> &set, struct rtree *tree)
 				printf("%s result differ!\n", __func__);
 	}
 	tree->distance_type = RTREE_EUCLID; /* dirty hack */
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 
 }
 
@@ -414,12 +414,12 @@ test_select_in(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 
 	struct rtree_rect rt;
 	box.FillRTreeRect(&rt);
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 	vector<CBoxSetEntry<DIMENSION> > res2;
-	if (rtree_search(tree, &rt, SOP_BELONGS, &iterator)) {
+	if (rtree_search(tree, &rt, SOP_BELONGS, &itr)) {
 		void *record;
-		while((record = rtree_iterator_next(&iterator))) {
+		while((record = rtree_iterator_next(&itr))) {
 			CBoxSetEntry<DIMENSION> entry;
 			entry.id = ((unsigned)(uintptr_t)record) - 1;
 			entry.box = set.entries[entry.id].box;
@@ -436,7 +436,7 @@ test_select_in(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 			if (res1[i].id != res2[i].id)
 				printf("%s result differ!\n", __func__);
 	}
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 
 }
 
@@ -451,12 +451,12 @@ test_select_strict_in(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 
 	struct rtree_rect rt;
 	box.FillRTreeRect(&rt);
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 	vector<CBoxSetEntry<DIMENSION> > res2;
-	if (rtree_search(tree, &rt, SOP_STRICT_BELONGS, &iterator)) {
+	if (rtree_search(tree, &rt, SOP_STRICT_BELONGS, &itr)) {
 		void *record;
-		while((record = rtree_iterator_next(&iterator))) {
+		while((record = rtree_iterator_next(&itr))) {
 			CBoxSetEntry<DIMENSION> entry;
 			entry.id = ((unsigned)(uintptr_t)record) - 1;
 			entry.box = set.entries[entry.id].box;
@@ -473,7 +473,7 @@ test_select_strict_in(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 			if (res1[i].id != res2[i].id)
 				printf("%s result differ!\n", __func__);
 	}
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 
 }
 

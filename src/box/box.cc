@@ -595,7 +595,7 @@ box_process1(struct request *request, box_tuple_t **result)
 
 int
 box_select(struct port *port, uint32_t space_id, uint32_t index_id,
-	   int iterator, uint32_t offset, uint32_t limit,
+	   int itr, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end)
 {
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
@@ -604,7 +604,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 		struct space *space = space_cache_find(space_id);
 		access_check_space(space, PRIV_R);
 		struct txn *txn = txn_begin_ro_stmt(space);
-		space->handler->executeSelect(txn, space, index_id, iterator,
+		space->handler->executeSelect(txn, space, index_id, itr,
 					      offset, limit, key, key_end, port);
 		txn_commit_ro_stmt(txn);
 		return 0;

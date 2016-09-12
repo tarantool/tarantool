@@ -108,7 +108,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
  * \retval 0 on success. The end of data is not an error.
  */
 int
-box_iterator_next(box_iterator_t *iterator, box_tuple_t **result);
+box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
 
 /**
  * Destroy and deallocate iterator.
@@ -116,7 +116,7 @@ box_iterator_next(box_iterator_t *iterator, box_tuple_t **result);
  * \param iterator an interator returned by box_index_iterator()
  */
 void
-box_iterator_free(box_iterator_t *iterator);
+box_iterator_free(box_iterator_t *itr);
 
 /** \endcond public */
 

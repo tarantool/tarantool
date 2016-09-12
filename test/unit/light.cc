@@ -182,7 +182,7 @@ collision_test()
 }
 
 static void
-itr_test()
+iterator_test()
 {
 	header();
 
@@ -191,11 +191,11 @@ itr_test()
 	const size_t rounds = 1000;
 	const size_t start_limits = 20;
 
-	const size_t iterator_count = 16;
-	struct light_iterator itrs[iterator_count];
-	for (size_t i = 0; i < iterator_count; i++)
-		light_itr_begin(&ht, itrs + i);
-	size_t cur_iterator = 0;
+	const size_t itr_count = 16;
+	struct light_iterator itrs[itr_count];
+	for (size_t i = 0; i < itr_count; i++)
+		light_iterator_begin(&ht, itrs + i);
+	size_t cur_itr = 0;
 	hash_value_t strage_thing = 0;
 
 	for(size_t limits = start_limits; limits <= 2 * rounds; limits *= 10) {
@@ -210,22 +210,22 @@ itr_test()
 				light_delete(&ht, fnd);
 			}
 
-			hash_value_t *pval = light_itr_get_and_next(&ht, itrs + cur_iterator);
+			hash_value_t *pval = light_iterator_get_and_next(&ht, itrs + cur_itr);
 			if (pval)
 				strage_thing ^= *pval;
-			if (!pval || (rand() % iterator_count) == 0) {
-				if (rand() % iterator_count) {
+			if (!pval || (rand() % itr_count) == 0) {
+				if (rand() % itr_count) {
 					hash_value_t val = rand() % limits;
 					hash_t h = hash(val);
-					light_itr_key(&ht, itrs + cur_iterator, h, val);
+					light_iterator_key(&ht, itrs + cur_itr, h, val);
 				} else {
-					light_itr_begin(&ht, itrs + cur_iterator);
+					light_iterator_begin(&ht, itrs + cur_itr);
 				}
 			}
 
-			cur_iterator++;
-			if (cur_iterator >= iterator_count)
-				cur_iterator = 0;
+			cur_itr++;
+			if (cur_itr >= itr_count)
+				cur_itr = 0;
 		}
 	}
 	light_destroy(&ht);
@@ -238,7 +238,7 @@ itr_test()
 }
 
 static void
-itr_freeze_check()
+iterator_freeze_check()
 {
 	header();
 
@@ -258,24 +258,24 @@ itr_freeze_check()
 			light_insert(&ht, h, val);
 		}
 		struct light_iterator itr;
-		light_itr_begin(&ht, &itr);
+		light_iterator_begin(&ht, &itr);
 		hash_value_t *e;
-		while ((e = light_itr_get_and_next(&ht, &itr))) {
+		while ((e = light_iterator_get_and_next(&ht, &itr))) {
 			comp_buf[comp_buf_size++] = *e;
 		}
 		struct light_iterator itr1;
-		light_itr_begin(&ht, &itr1);
-		light_itr_freeze(&ht, &itr1);
+		light_iterator_begin(&ht, &itr1);
+		light_iterator_freeze(&ht, &itr1);
 		struct light_iterator itr2;
-		light_itr_begin(&ht, &itr2);
-		light_itr_freeze(&ht, &itr2);
+		light_iterator_begin(&ht, &itr2);
+		light_iterator_freeze(&ht, &itr2);
 		for (int j = 0; j < test_data_size; j++) {
 			hash_value_t val = rand() % test_data_mod;
 			hash_t h = hash(val);
 			light_insert(&ht, h, val);
 		}
 		int tested_count = 0;
-		while ((e = light_itr_get_and_next(&ht, &itr1))) {
+		while ((e = light_iterator_get_and_next(&ht, &itr1))) {
 			if (*e != comp_buf[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -284,7 +284,7 @@ itr_freeze_check()
 				fail("version restore failed (2)", "true");
 			}
 		}
-		light_itr_destroy(&ht, &itr1);
+		light_iterator_destroy(&ht, &itr1);
 		for (int j = 0; j < test_data_size; j++) {
 			hash_value_t val = rand() % test_data_mod;
 			hash_t h = hash(val);
@@ -294,7 +294,7 @@ itr_freeze_check()
 		}
 
 		tested_count = 0;
-		while ((e = light_itr_get_and_next(&ht, &itr2))) {
+		while ((e = light_iterator_get_and_next(&ht, &itr2))) {
 			if (*e != comp_buf[tested_count]) {
 				fail("version restore failed (3)", "true");
 			}
@@ -316,8 +316,8 @@ main(int, const char**)
 	srand(time(0));
 	simple_test();
 	collision_test();
-	itr_test();
-	itr_freeze_check();
+	iterator_test();
+	iterator_freeze_check();
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 }

@@ -141,7 +141,7 @@ struct MemtxSpace: public Handler {
 		      struct request *request) override;
 	virtual void
 	executeSelect(struct txn *, struct space *space,
-		      uint32_t index_id, uint32_t iterator,
+		      uint32_t index_id, uint32_t itr,
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char * /* key_end */,
 		      struct port *port) override;
@@ -482,7 +482,7 @@ MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 
 void
 MemtxSpace::executeSelect(struct txn *, struct space *space,
-			  uint32_t index_id, uint32_t iterator,
+			  uint32_t index_id, uint32_t itr,
 			  uint32_t offset, uint32_t limit,
 			  const char *key, const char * /* key_end */,
 			  struct port *port)
@@ -492,9 +492,9 @@ MemtxSpace::executeSelect(struct txn *, struct space *space,
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
 	uint32_t found = 0;
-	if (iterator >= iterator_type_MAX)
+	if (itr >= iterator_type_MAX)
 		tnt_raise(IllegalParams, "Invalid iterator type");
-	enum iterator_type type = (enum iterator_type) iterator;
+	enum iterator_type type = (enum iterator_type) itr;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	key_validate(index->key_def, type, key, part_count);

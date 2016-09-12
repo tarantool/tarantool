@@ -214,17 +214,17 @@ MemtxRTree::bsize() const
 struct tuple *
 MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 {
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 
 	rtree_rect rect;
 	if (mp_decode_rect_from_key(&rect, m_dimension, key, part_count))
 		unreachable();
 
 	struct tuple *result = NULL;
-	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &iterator))
-		result = (struct tuple *)rtree_iterator_next(&iterator);
-	rtree_iterator_destroy(&iterator);
+	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &itr))
+		result = (struct tuple *)rtree_iterator_next(&itr);
+	rtree_iterator_destroy(&itr);
 	return result;
 }
 
@@ -261,10 +261,10 @@ MemtxRTree::allocIterator() const
 }
 
 void
-MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
+MemtxRTree::initIterator(struct iterator *itr, enum iterator_type type,
 			 const char *key, uint32_t part_count) const
 {
-	index_rtree_iterator *it = (index_rtree_iterator *)iterator;
+	index_rtree_iterator *it = (index_rtree_iterator *)itr;
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
@@ -305,7 +305,7 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		return Index::initIterator(iterator, type, key, part_count);
+		return Index::initIterator(itr, type, key, part_count);
 	}
 	rtree_search(&m_tree, &rect, op, &it->impl);
 }

@@ -25,7 +25,7 @@ extent_free(void *page)
 }
 
 static void
-itr_check()
+iterator_check()
 {
 	header();
 
@@ -39,8 +39,8 @@ itr_check()
 	struct rtree_rect rect;
 	size_t count = 0;
 	record_t rec;
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
+	struct rtree_iterator itr;
+	rtree_iterator_init(&itr);
 
 	for (size_t i = 0; i < count1; i++) {
 		coord_t coord = i * 2 * count2; /* note that filled with even numbers */
@@ -56,20 +56,20 @@ itr_check()
 		for (size_t j = 0; j < count2; j++) {
 			coord_t coord = i * 2 * count2;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (!rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
+			if (!rtree_search(&tree, &rect, SOP_BELONGS, &itr)) {
 				fail("Integrity check failed (1)", "false");
 			}
 			for (size_t k = 0; k <= j; k++) {
-				if (!rtree_iterator_next(&iterator)) {
+				if (!rtree_iterator_next(&itr)) {
 					fail("Integrity check failed (2)", "false");
 				}
 			}
-			if (rtree_iterator_next(&iterator)) {
+			if (rtree_iterator_next(&itr)) {
 				fail("Integrity check failed (3)", "true");
 			}
 			coord = (i * 2  + 1) * count2;;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
+			if (rtree_search(&tree, &rect, SOP_BELONGS, &itr)) {
 				fail("Integrity check failed (4)", "true");
 			}
 		}
@@ -79,11 +79,11 @@ itr_check()
 	{
 		static struct rtree_rect basis;
 		printf("--> ");
-		if (!rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator)) {
+		if (!rtree_search(&tree, &basis, SOP_NEIGHBOR, &itr)) {
 			fail("Integrity check failed (5)", "false");
 		}
 		for (int i = 0; i < 7; i++) {
-			rec = rtree_iterator_next(&iterator);
+			rec = rtree_iterator_next(&itr);
 			if (rec == 0) {
 				fail("Integrity check failed (6)", "false");
 			}
@@ -96,11 +96,11 @@ itr_check()
 		printf("<-- ");
 		coord_t coord = (count1 - 1) * count2 * 2;
 		rtree_set2d(&rect, coord, coord, coord, coord);
-		if (!rtree_search(&tree, &rect, SOP_NEIGHBOR, &iterator)) {
+		if (!rtree_search(&tree, &rect, SOP_NEIGHBOR, &itr)) {
 			fail("Integrity check failed (5)", "false");
 		}
 		for (int i = 0; i < 7; i++) {
-		        rec = rtree_iterator_next(&iterator);
+		        rec = rtree_iterator_next(&itr);
 			if (rec == 0) {
 				fail("Integrity check failed (6)", "false");
 			}
@@ -114,20 +114,20 @@ itr_check()
 		for (size_t j = 0; j < count2; j++) {
 			coord_t coord = i * 2 * count2;
 			rtree_set2d(&rect, coord - 0.1, coord - 0.1, coord + j, coord + j);
-			if (!rtree_search(&tree, &rect, SOP_STRICT_BELONGS, &iterator) && j != 0) {
+			if (!rtree_search(&tree, &rect, SOP_STRICT_BELONGS, &itr) && j != 0) {
 				fail("Integrity check failed (7)", "false");
 			}
 			for (size_t k = 0; k < j; k++) {
-				if (!rtree_iterator_next(&iterator)) {
+				if (!rtree_iterator_next(&itr)) {
 					fail("Integrity check failed (8)", "false");
 				}
 			}
-			if (rtree_iterator_next(&iterator)) {
+			if (rtree_iterator_next(&itr)) {
 				fail("Integrity check failed (9)", "true");
 			}
 			coord = (i * 2 + 1) * count2;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (rtree_search(&tree, &rect, SOP_STRICT_BELONGS, &iterator)) {
+			if (rtree_search(&tree, &rect, SOP_STRICT_BELONGS, &itr)) {
 				fail("Integrity check failed (10)", "true");
 			}
 		}
@@ -138,20 +138,20 @@ itr_check()
 		for (size_t j = 0; j < count2; j++) {
 			coord_t coord = i * 2 * count2;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (!rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
+			if (!rtree_search(&tree, &rect, SOP_CONTAINS, &itr)) {
 				fail("Integrity check failed (11)", "false");
 			}
 			for (size_t k = j; k < count2; k++) {
-				if (!rtree_iterator_next(&iterator)) {
+				if (!rtree_iterator_next(&itr)) {
 					fail("Integrity check failed (12)", "false");
 				}
 			}
-			if (rtree_iterator_next(&iterator)) {
+			if (rtree_iterator_next(&itr)) {
 				fail("Integrity check failed (13)", "true");
 			}
 			coord = (i * 2 + 1) * count2;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
+			if (rtree_search(&tree, &rect, SOP_CONTAINS, &itr)) {
 				fail("Integrity check failed (14)", "true");
 			}
 		}
@@ -163,36 +163,36 @@ itr_check()
 			coord_t coord = i * 2 * count2;
 			rtree_set2d(&rect, coord + 0.1, coord + 0.1, coord + j, coord + j);
 			rtree_rect_normalize(&rect, 2);
-			if (!rtree_search(&tree, &rect, SOP_STRICT_CONTAINS, &iterator) && j != 0 && j != count2 - 1) {
+			if (!rtree_search(&tree, &rect, SOP_STRICT_CONTAINS, &itr) && j != 0 && j != count2 - 1) {
 				fail("Integrity check failed (11)", "false");
 			}
 			if (j) {
 				for (size_t k = j; k < count2 - 1; k++) {
-					if (!rtree_iterator_next(&iterator)) {
+					if (!rtree_iterator_next(&itr)) {
 						fail("Integrity check failed (12)", "false");
 					}
 				}
 			}
-			if (rtree_iterator_next(&iterator)) {
+			if (rtree_iterator_next(&itr)) {
 				fail("Integrity check failed (13)", "true");
 			}
 			coord = (i * 2 + 1) * count2;
 			rtree_set2d(&rect, coord, coord, coord + j, coord + j);
-			if (rtree_search(&tree, &rect, SOP_STRICT_CONTAINS, &iterator)) {
+			if (rtree_search(&tree, &rect, SOP_STRICT_CONTAINS, &itr)) {
 				fail("Integrity check failed (14)", "true");
 			}
 		}
 	}
 
 	rtree_purge(&tree);
-	rtree_iterator_destroy(&iterator);
+	rtree_iterator_destroy(&itr);
 	rtree_destroy(&tree);
 
 	footer();
 }
 
 static void
-itr_invalidate_check()
+iterator_invalidate_check()
 {
 	header();
 
@@ -214,22 +214,22 @@ itr_invalidate_check()
 		struct rtree tree;
 		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
 			   RTREE_EUCLID);
-		struct rtree_iterator iterators[test_size];
+		struct rtree_iterator itrs[test_size];
 		for (size_t i = 0; i < test_size; i++)
-			rtree_iterator_init(iterators + i);
+			rtree_iterator_init(itrs + i);
 
 		for (size_t i = 0; i < test_size; i++) {
 			rtree_set2d(&rect, i, i, i, i);
 			rtree_insert(&tree, &rect, record_t(i+1));
 		}
 		rtree_set2d(&rect, 0, 0, test_size, test_size);
-		rtree_search(&tree, &rect, SOP_BELONGS, &iterators[0]);
-		if (!rtree_iterator_next(&iterators[0])) {
+		rtree_search(&tree, &rect, SOP_BELONGS, &itrs[0]);
+		if (!rtree_iterator_next(&itrs[0])) {
 			fail("Integrity check failed (15)", "false");
 		}
 		for (size_t i = 1; i < test_size; i++) {
-			iterators[i] = iterators[i - 1];
-			if (!rtree_iterator_next(&iterators[i])) {
+			itrs[i] = itrs[i - 1];
+			if (!rtree_iterator_next(&itrs[i])) {
 				fail("Integrity check failed (16)", "false");
 			}
 		}
@@ -240,13 +240,13 @@ itr_invalidate_check()
 			}
 		}
 		for (size_t i = 0; i < test_size; i++) {
-			if (rtree_iterator_next(&iterators[i])) {
+			if (rtree_iterator_next(&itrs[i])) {
 				fail("Iterator was not invalidated (18)", "true");
 			}
 		}
 
 		for (size_t i = 0; i < test_size; i++)
-			rtree_iterator_destroy(iterators + i);
+			rtree_iterator_destroy(itrs + i);
 		rtree_destroy(&tree);
 	}
 
@@ -259,22 +259,22 @@ itr_invalidate_check()
 		struct rtree tree;
 		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
 			   RTREE_EUCLID);
-		struct rtree_iterator iterators[test_size];
+		struct rtree_iterator itrs[test_size];
 		for (size_t i = 0; i < test_size; i++)
-			rtree_iterator_init(iterators + i);
+			rtree_iterator_init(itrs + i);
 
 		for (size_t i = 0; i < test_size; i++) {
 			rtree_set2d(&rect, i, i, i, i);
 			rtree_insert(&tree, &rect, record_t(i+1));
 		}
 		rtree_set2d(&rect, 0, 0, test_size, test_size);
-		rtree_search(&tree, &rect, SOP_BELONGS, &iterators[0]);
-		if (!rtree_iterator_next(&iterators[0])) {
+		rtree_search(&tree, &rect, SOP_BELONGS, &itrs[0]);
+		if (!rtree_iterator_next(&itrs[0])) {
 			fail("Integrity check failed (19)", "false");
 		}
 		for (size_t i = 1; i < test_size; i++) {
-			iterators[i] = iterators[i - 1];
-			if (!rtree_iterator_next(&iterators[0])) {
+			itrs[i] = itrs[i - 1];
+			if (!rtree_iterator_next(&itrs[0])) {
 				fail("Integrity check failed (20)", "false");
 			}
 		}
@@ -283,13 +283,13 @@ itr_invalidate_check()
 			rtree_insert(&tree, &rect, record_t(test_size + i - ins_pos + 1));
 		}
 		for (size_t i = 0; i < test_size; i++) {
-			if (rtree_iterator_next(&iterators[i])) {
+			if (rtree_iterator_next(&itrs[i])) {
 				fail("Iterator was not invalidated (22)", "true");
 			}
 		}
 
 		for (size_t i = 0; i < test_size; i++)
-			rtree_iterator_destroy(iterators + i);
+			rtree_iterator_destroy(itrs + i);
 		rtree_destroy(&tree);
 	}
 
@@ -299,8 +299,8 @@ itr_invalidate_check()
 int
 main(void)
 {
-	itr_check();
-	itr_invalidate_check();
+	iterator_check();
+	iterator_invalidate_check();
 	if (extent_count != 0) {
 		fail("memory leak!", "false");
 	}

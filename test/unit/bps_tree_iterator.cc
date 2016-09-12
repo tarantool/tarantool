@@ -56,7 +56,7 @@ extent_free(void *extent)
 }
 
 static void
-itr_check()
+iterator_check()
 {
 	header();
 
@@ -68,9 +68,9 @@ itr_check()
 		test_iterator tmp1, tmp2;
 		tmp1 = test_invalid_iterator();
 		tmp2 = test_invalid_iterator();
-		if (!test_itr_is_invalid(&tmp1))
+		if (!test_iterator_is_invalid(&tmp1))
 			fail("invalid iterator is not invalid", "true");
-		if (!test_itr_are_equal(&tree, &tmp1, &tmp2))
+		if (!test_iterator_are_equal(&tree, &tmp1, &tmp2))
 			fail("invalid iterators are not equal", "true");
 	}
 
@@ -100,41 +100,41 @@ itr_check()
 	/* Print first 7 elems */
 	{
 		printf("--> ");
-		test_iterator itr = test_itr_first(&tree);
+		test_iterator itr = test_iterator_first(&tree);
 		for (int i = 0; i < 7; i++) {
-			elem_t *elem = test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_iterator_get_elem(&tree, &itr);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			test_itr_next(&tree, &itr);
+			test_iterator_next(&tree, &itr);
 		}
 		printf("\n");
 	}
 	/* Print last 7 elems */
 	{
 		printf("<-- ");
-		test_iterator itr = test_itr_last(&tree);
+		test_iterator itr = test_iterator_last(&tree);
 		for (int i = 0; i < 7; i++) {
-			elem_t *elem = test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_iterator_get_elem(&tree, &itr);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			test_itr_prev(&tree, &itr);
+			test_iterator_prev(&tree, &itr);
 		}
 		printf("\n");
 	}
 
 	/* Iterate forward all elements 5 times */
 	{
-		test_iterator itr = test_itr_first(&tree);
+		test_iterator itr = test_iterator_first(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
-			elem_t *elem = test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_iterator_get_elem(&tree, &itr);
 			if (elem->first != ((i % (count1 * count2)) / count2) * 2)
 				fail("iterate all failed (1)", "true");
 			if (elem->second != i % count2)
 				fail("iterate all failed (2)", "true");
-			bool itr_res = test_itr_next(&tree, &itr);
-			if (!!itr_res == !!test_itr_is_invalid(&itr))
+			bool itr_res = test_iterator_next(&tree, &itr);
+			if (!!itr_res == !!test_iterator_is_invalid(&itr))
 				fail("iterate all failed (3)", "true");
 			if (!itr_res) {
-				itr_res = test_itr_next(&tree, &itr);
-				if (!itr_res || test_itr_is_invalid(&itr))
+				itr_res = test_iterator_next(&tree, &itr);
+				if (!itr_res || test_iterator_is_invalid(&itr))
 					fail("iterate all failed (4)", "true");
 			}
 		}
@@ -142,20 +142,20 @@ itr_check()
 
 	/* Iterate backward all elements 5 times */
 	{
-		test_iterator itr = test_itr_last(&tree);
+		test_iterator itr = test_iterator_last(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
-			elem_t *elem = test_itr_get_elem(&tree, &itr);
+			elem_t *elem = test_iterator_get_elem(&tree, &itr);
 			long j = count1 * count2 - 1 - (i % (count1 * count2));
 			if (elem->first != (j / count2) * 2)
 				fail("iterate all failed (5)", "true");
 			if (elem->second != j % count2)
 				fail("iterate all failed (6)", "true");
-			bool itr_res = test_itr_prev(&tree, &itr);
-			if (!!itr_res == !!test_itr_is_invalid(&itr))
+			bool itr_res = test_iterator_prev(&tree, &itr);
+			if (!!itr_res == !!test_iterator_is_invalid(&itr))
 				fail("iterate all failed (7)", "true");
 			if (!itr_res) {
-				itr_res = test_itr_prev(&tree, &itr);
-				if (!itr_res || test_itr_is_invalid(&itr))
+				itr_res = test_iterator_prev(&tree, &itr);
+				if (!itr_res || test_iterator_is_invalid(&itr))
 					fail("iterate all failed (8)", "true");
 			}
 		}
@@ -174,19 +174,19 @@ itr_check()
 			fail("Exact flag is broken", "true");
 		printf("Key %ld, %s range [%s, %s): ", key,
 			has_this_key1 ? "not empty" : "empty",
-			test_itr_is_invalid(&begin) ? "eof" : "ptr",
-			test_itr_is_invalid(&end) ? "eof" : "ptr");
+			test_iterator_is_invalid(&begin) ? "eof" : "ptr",
+			test_iterator_is_invalid(&end) ? "eof" : "ptr");
 		test_iterator runner = begin;
-		while (!test_itr_are_equal(&tree, &runner, &end)) {
-			elem_t *elem = test_itr_get_elem(&tree, &runner);
+		while (!test_iterator_are_equal(&tree, &runner, &end)) {
+			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
-			test_itr_next(&tree, &runner);
+			test_iterator_next(&tree, &runner);
 		}
 		printf(" <-> ");
 		runner = end;
-		while (!test_itr_are_equal(&tree, &runner, &begin)) {
-			test_itr_prev(&tree, &runner);
-			elem_t *elem = test_itr_get_elem(&tree, &runner);
+		while (!test_iterator_are_equal(&tree, &runner, &begin)) {
+			test_iterator_prev(&tree, &runner);
+			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
 		}
 		printf("\n");
@@ -198,14 +198,14 @@ itr_check()
 		test_iterator begin = test_lower_bound(&tree, i, 0);
 		test_iterator end = test_upper_bound(&tree, i, 0);
 		long real_count = 0;
-		while (!test_itr_are_equal(&tree, &begin, &end)) {
-			elem_t *elem = test_itr_get_elem(&tree, &begin);
+		while (!test_iterator_are_equal(&tree, &begin, &end)) {
+			elem_t *elem = test_iterator_get_elem(&tree, &begin);
 			if (elem->first != i)
 				fail("range itr failed (1)", "true");
 			if (elem->second != real_count)
 				fail("range itr failed (2)", "true");
 			real_count++;
-			test_itr_next(&tree, &begin);
+			test_iterator_next(&tree, &begin);
 		}
 		long must_be_count = 0;
 		if (i >= 0 && i / 2 <= count1 - 1 && (i & 1) == 0)
@@ -220,7 +220,7 @@ itr_check()
 }
 
 static void
-itr_invalidate_check()
+iterator_invalidate_check()
 {
 	header();
 
@@ -228,7 +228,7 @@ itr_invalidate_check()
 	const long max_delete_count = 100;
 	const long max_insert_count = 200;
 	const long attempt_count = 100;
-	struct test_iterator iterators[test_size];
+	struct test_iterator itrs[test_size];
 
 	struct test tree;
 
@@ -247,12 +247,12 @@ itr_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0);
 		}
-		iterators[0] = test_itr_first(&tree);
-		assert(test_itr_get_elem(&tree, iterators));
+		itrs[0] = test_iterator_first(&tree);
+		assert(test_iterator_get_elem(&tree, itrs));
 		for (long i = 1; i < test_size; i++) {
-			iterators[i] = iterators[i - 1];
-			test_itr_next(&tree, iterators + i);
-			assert(test_itr_get_elem(&tree, iterators + i));
+			itrs[i] = itrs[i - 1];
+			test_iterator_next(&tree, itrs + i);
+			assert(test_iterator_get_elem(&tree, itrs + i));
 		}
 		for (long i = del_pos; i < del_pos + del_cnt; i++) {
 			elem_t e;
@@ -263,7 +263,7 @@ itr_invalidate_check()
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_iterator_get_elem(&tree, itrs + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (1)", "true");
@@ -273,7 +273,7 @@ itr_invalidate_check()
 					if ( (v < 0 || v >= del_pos) && (v < del_pos + del_cnt || v >= test_size) )
 						fail("unexpected result of getting elem (3)", "true");
 				}
-			} while(test_itr_next(&tree, iterators + i));
+			} while(test_iterator_next(&tree, itrs + i));
 		}
 		test_destroy(&tree);
 	}
@@ -291,12 +291,12 @@ itr_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0);
 		}
-		iterators[0] = test_itr_first(&tree);
-		assert(test_itr_get_elem(&tree, iterators));
+		itrs [0] = test_iterator_first(&tree);
+		assert(test_iterator_get_elem(&tree, itrs));
 		for (long i = 1; i < test_size; i++) {
-			iterators[i] = iterators[i - 1];
-			test_itr_next(&tree, iterators + i);
-			assert(test_itr_get_elem(&tree, iterators + i));
+			itrs[i] = itrs[i - 1];
+			test_iterator_next(&tree, itrs + i);
+			assert(test_iterator_get_elem(&tree, itrs + i));
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
@@ -307,7 +307,7 @@ itr_invalidate_check()
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_iterator_get_elem(&tree, itrs + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (4)", "true");
@@ -324,7 +324,7 @@ itr_invalidate_check()
 							fail("unexpected result of getting elem (7)", "true");
 					}
 				}
-			} while(test_itr_next(&tree, iterators + i));
+			} while(test_iterator_next(&tree, itrs + i));
 		}
 		test_destroy(&tree);
 	}
@@ -346,12 +346,12 @@ itr_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0);
 		}
-		iterators[0] = test_itr_first(&tree);
-		assert(test_itr_get_elem(&tree, iterators));
+		itrs[0] = test_iterator_first(&tree);
+		assert(test_iterator_get_elem(&tree, itrs));
 		for (long i = 1; i < test_size; i++) {
-			iterators[i] = iterators[i - 1];
-			test_itr_next(&tree, iterators + i);
-			assert(test_itr_get_elem(&tree, iterators + i));
+			itrs[i] = itrs[i - 1];
+			test_iterator_next(&tree, itrs + i);
+			assert(test_iterator_get_elem(&tree, itrs + i));
 		}
 		for (long i = del_pos; i < del_pos + del_cnt; i++) {
 			elem_t e;
@@ -369,7 +369,7 @@ itr_invalidate_check()
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
-				elem_t *e = test_itr_get_elem(&tree, iterators + i);
+				elem_t *e = test_iterator_get_elem(&tree, itrs + i);
 				if (e) {
 					if (e->first != e->second)
 						fail("unexpected result of getting elem (8)", "true");
@@ -386,7 +386,7 @@ itr_invalidate_check()
 							fail("unexpected result of getting elem (b)", "true");
 					}
 				}
-			} while(test_itr_next(&tree, iterators + i));
+			} while(test_iterator_next(&tree, itrs + i));
 		}
 		test_destroy(&tree);
 	}
@@ -395,7 +395,7 @@ itr_invalidate_check()
 }
 
 static void
-itr_freeze_check()
+iterator_freeze_check()
 {
 	header();
 
@@ -420,16 +420,16 @@ itr_freeze_check()
 			fail_if(check);
 			assert(check == 0);
 		}
-		struct test_iterator itr = test_itr_first(&tree);
+		struct test_iterator itr = test_iterator_first(&tree);
 		elem_t *e;
-		while ((e = test_itr_get_elem(&tree, &itr))) {
+		while ((e = test_iterator_get_elem(&tree, &itr))) {
 			comp_buf1[comp_buf_size1++] = *e;
-			test_itr_next(&tree, &itr);
+			test_iterator_next(&tree, &itr);
 		}
-		struct test_iterator itr1 = test_itr_first(&tree);
-		test_itr_freeze(&tree, &itr1);
-		struct test_iterator itr2 = test_itr_first(&tree);
-		test_itr_freeze(&tree, &itr2);
+		struct test_iterator itr1 = test_iterator_first(&tree);
+		test_iterator_freeze(&tree, &itr1);
+		struct test_iterator itr2 = test_iterator_first(&tree);
+		test_iterator_freeze(&tree, &itr2);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
@@ -440,7 +440,7 @@ itr_freeze_check()
 			assert(check == 0);
 		}
 		int tested_count = 0;
-		while ((e = test_itr_get_elem(&tree, &itr1))) {
+		while ((e = test_iterator_get_elem(&tree, &itr1))) {
 			if (*e != comp_buf1[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -448,9 +448,9 @@ itr_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			test_itr_next(&tree, &itr1);
+			test_iterator_next(&tree, &itr1);
 		}
-		test_itr_destroy(&tree, &itr1);
+		test_iterator_destroy(&tree, &itr1);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
@@ -462,7 +462,7 @@ itr_freeze_check()
 		}
 
 		tested_count = 0;
-		while ((e = test_itr_get_elem(&tree, &itr2))) {
+		while ((e = test_iterator_get_elem(&tree, &itr2))) {
 			if (*e != comp_buf1[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -470,7 +470,7 @@ itr_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			test_itr_next(&tree, &itr2);
+			test_iterator_next(&tree, &itr2);
 		}
 
 		test_destroy(&tree);
@@ -484,9 +484,9 @@ int
 main(void)
 {
 	srand(time(0));
-	itr_check();
-	itr_invalidate_check();
-	itr_freeze_check();
+	iterator_check();
+	iterator_invalidate_check();
+	iterator_freeze_check();
 	if (total_extents_allocated) {
 		fail("memory leak", "true");
 	}
