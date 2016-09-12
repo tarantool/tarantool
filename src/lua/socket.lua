@@ -100,7 +100,7 @@ local function close_socket(socket)
     -- .fd is const to prevent tampering
     ffi.copy(socket._gc_socket, gc_socket_sentinel, ffi.sizeof(gc_socket_t))
     if r ~= 0 then
-        self._errno = boxerrno()
+        socket._errno = boxerrno()
         return false
     end
     return true
