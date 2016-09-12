@@ -165,14 +165,34 @@ macro(luajit_build)
         set (luajit_ccopt -O2)
         set (luajit_ccdbebug "")
     endif()
-    # Pass sysroot settings on OSX
-    if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
-        set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
-        set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
-    endif()
+    if (${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
+        # Pass sysroot - prepended in front of system header/lib dirs,
+        # i.e. <sysroot>/usr/include, <sysroot>/usr/lib.
+        # Needed for XCode users without command line tools installed,
+        # they have headers/libs deep inside /Applications/Xcode.app/...
+        if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
+            set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+            set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+        endif()
+        # Pass deployment target
+        if ("${CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
+            # Default to 10.6 since @rpath support is NOT available in
+            # earlier versions, needed by AddressSanitizer.
+            set (luajit_osx_deployment_target 10.6)
+        else()
+            set (luajit_osx_deployment_target ${CMAKE_OSX_DEPLOYMENT_TARGET})
+        endif()
+        set(luajit_ldflags
+            ${luajit_ldflags} -Wl,-macosx_version_min,${luajit_osx_deployment_target})
+    endif ()
     if (ENABLE_VALGRIND)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
+    endif()
+    # AddressSanitizer - CFLAGS were set globaly
+    if (ENABLE_ASAN)
+        set (luajit_xcflags ${luajit_xcflags} -DLUAJIT_USE_ASAN)
+        set (luajit_ldflags ${luajit_ldflags} -fsanitize=address)
     endif()
     set (luajit_buildoptions
         BUILDMODE=static

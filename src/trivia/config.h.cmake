@@ -200,6 +200,10 @@
 /** pthread_set_name_np(pthread_self(), "") - *BSD */
 #cmakedefine HAVE_PTHREAD_SET_NAME_NP 1
 
+#cmakedefine HAVE_PTHREAD_GETATTR_NP 1
+#cmakedefine HAVE_PTHREAD_GET_STACKSIZE_NP 1
+#cmakedefine HAVE_PTHREAD_GET_STACKADDR_NP 1
+
 #cmakedefine HAVE_SETPROCTITLE 1
 #cmakedefine HAVE_SETPROGNAME 1
 #cmakedefine HAVE_GETPROGNAME 1
@@ -240,6 +244,8 @@
 
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 #define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
+
+#cmakedefine ENABLE_ASAN 1
 
 /*
  * vim: syntax=c

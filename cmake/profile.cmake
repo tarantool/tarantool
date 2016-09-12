@@ -41,3 +41,8 @@ if (ENABLE_VALGRIND)
              "ENABLE_VALGRIND option is set but valgrind/valgrind.h is not found")
         endif()
 endif()
+
+option(ENABLE_ASAN "Enable AddressSanitizer, a fast memory error detector based on compiler instrumentation" OFF)
+if (ENABLE_ASAN)
+    add_compile_flags("C;CXX" -fsanitize=address)
+endif()

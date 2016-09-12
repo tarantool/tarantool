@@ -26,6 +26,24 @@ function (do_pthread_checks)
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_set_name_np(pthread_self(), \"\"); }
         " HAVE_PTHREAD_SET_NAME_NP)
+    # pthread_getattr_np - Linux
+    check_c_source_compiles("
+        #include <pthread.h>
+        ${INCLUDE_MISC_PTHREAD_HEADERS}
+        int main() { pthread_attr_t a; pthread_getattr_np(pthread_self(), &a); }
+        " HAVE_PTHREAD_GETATTR_NP)
+    # pthread_get_stacksize_np - OSX
+    check_c_source_compiles("
+        #include <pthread.h>
+        ${INCLUDE_MISC_PTHREAD_HEADERS}
+        int main() { (void)pthread_get_stacksize_np(pthread_self()); }
+        " HAVE_PTHREAD_GET_STACKSIZE_NP)
+    # pthread_get_stackaddr_np - OSX
+    check_c_source_compiles("
+        #include <pthread.h>
+        ${INCLUDE_MISC_PTHREAD_HEADERS}
+        int main() { (void)pthread_get_stackaddr_np(pthread_self()); }
+        " HAVE_PTHREAD_GET_STACKADDR_NP)
 endfunction (do_pthread_checks)
 do_pthread_checks()
 

@@ -52,8 +52,6 @@ include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 
-option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
-
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)
@@ -456,7 +454,7 @@ message (STATUS "")
 set(PREFIX ${CMAKE_INSTALL_PREFIX})
 set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
     ENABLE_SSE2 ENABLE_AVX
-    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND
+    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN
     ENABLE_BACKTRACE
     HAVE_BFD
     ENABLE_DOC

@@ -37,6 +37,9 @@
 #include "small/slab_cache.h"
 #include "third_party/valgrind/memcheck.h"
 #include "diag.h"
+#if ENABLE_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
 
 int
 tarantool_coro_create(struct tarantool_coro *coro,
@@ -71,6 +74,9 @@ tarantool_coro_destroy(struct tarantool_coro *coro, struct slab_cache *slabc)
 {
 	if (coro->stack != NULL) {
 		VALGRIND_STACK_DEREGISTER(coro->stack_id);
+#if ENABLE_ASAN
+		ASAN_UNPOISON_MEMORY_REGION(coro->stack, coro->stack_size);
+#endif
 		slab_put(slabc, (struct slab *)
 			 ((char *) coro->stack - slab_sizeof()));
 	}
