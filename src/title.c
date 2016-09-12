@@ -129,8 +129,8 @@ void title_update()
 		 * Omit interpretor name when it is the prefix of
 		 * scriptname, ex: tarantool/tarantoolctl
 		 */
-		if (memcmp(script_name_short, interpretor_name_short,
-		           strlen(interpretor_name_short)) == 0) {
+		if (strncmp(script_name_short, interpretor_name_short,
+		            strlen(interpretor_name_short)) == 0) {
 			part1 = script_name_short;
 		} else {
 			part1 = interpretor_name_short;
