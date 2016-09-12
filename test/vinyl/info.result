@@ -140,7 +140,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -159,7 +159,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -178,7 +178,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -197,7 +197,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -216,7 +216,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -235,7 +235,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -254,7 +254,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -273,7 +273,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -292,7 +292,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -311,7 +311,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -330,7 +330,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -349,7 +349,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -368,7 +368,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -387,7 +387,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -406,7 +406,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0
@@ -425,7 +425,7 @@ box_info_sort(box.info.vinyl().db);
     - count_dup: 0
     - memory_used: 0
     - page_count: 0
-    - page_size: 65536
+    - page_size: 1024
     - range_count: 1
     - range_size: 65536
     - read_cache: 0

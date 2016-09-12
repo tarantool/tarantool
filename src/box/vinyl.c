@@ -5223,7 +5223,7 @@ vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
 		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
 		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
 		vy_info_append_u64(local_node, "range_size", o->key_def->opts.range_size);
-		vy_info_append_u64(local_node, "page_size", o->key_def->opts.range_size);
+		vy_info_append_u64(local_node, "page_size", o->key_def->opts.page_size);
 	}
 	return 0;
 }
