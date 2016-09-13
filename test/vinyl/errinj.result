@@ -88,7 +88,7 @@ box.snapshot();
 ---
 - ok
 ...
--- errinj.set("ERRINJ_VY_RANGE_CREATE", true)
+-- errinj.set("ERRINJ_VY_RANGE_CREATE", true);
 num_rows = num_rows + range();
 ---
 ...
@@ -96,7 +96,7 @@ box.snapshot();
 ---
 - ok
 ...
--- errinj:set("ERRINJ_VY_RANGE_CREATE", false)
+-- errinj.set("ERRINJ_VY_RANGE_CREATE", false);
 num_rows = num_rows + range();
 ---
 ...
