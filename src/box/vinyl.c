@@ -2610,9 +2610,16 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
 	(void)arg;
+	vy_range_delete(range);
+	return NULL;
+}
+
+struct vy_range *
+vy_range_tree_unsched_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
+{
+	(void)t;
 	struct vy_index *index = (struct vy_index *) arg;
 	vy_scheduler_remove_range(index->env->scheduler, range);
-	vy_range_delete(range);
 	return NULL;
 }
 
@@ -4499,6 +4506,10 @@ vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 		*ptask = NULL;
 		return 0; /* index still has tasks */
 	}
+
+	/* make sure the index won't get scheduled any more */
+	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_unsched_cb, index);
+
 	*ptask = vy_task_drop_new(&scheduler->task_pool, index);
 	if (*ptask == NULL)
 		return -1;
