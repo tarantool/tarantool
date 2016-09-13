@@ -1484,6 +1484,7 @@ vy_mem_tree_cmp_key(struct vy_tuple *a, struct tree_mem_key *key,
  * counters are decremented.
  */
 struct vy_mem {
+	struct vy_mem *next;
 	struct vy_mem_tree tree;
 	uint32_t used;
 	int64_t min_lsn;
@@ -1531,9 +1532,16 @@ vy_mem_free_matras_page(void *p)
 	munmap(p, BPS_TREE_MEM_INDEX_PAGE_SIZE);
 }
 
-static int
-vy_mem_create(struct vy_mem *index, struct key_def *key_def)
+static struct vy_mem *
+vy_mem_new(struct key_def *key_def)
 {
+	struct vy_mem *index = malloc(sizeof(*index));
+	if (!index) {
+		diag_set(OutOfMemory, sizeof(*index),
+			 "malloc", "struct vy_mem");
+		return NULL;
+	}
+	index->next = NULL;
 	index->min_lsn = INT64_MAX;
 	index->used = 0;
 	index->key_def = key_def;
@@ -1541,11 +1549,11 @@ vy_mem_create(struct vy_mem *index, struct key_def *key_def)
 	vy_mem_tree_create(&index->tree, index,
 			   vy_mem_alloc_matras_page,
 			   vy_mem_free_matras_page);
-	return 0;
+	return index;
 }
 
-static int
-vy_mem_destroy(struct vy_mem *index)
+static void
+vy_mem_delete(struct vy_mem *index)
 {
 	assert(index == index->tree.arg);
 	struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(&index->tree);
@@ -1556,7 +1564,7 @@ vy_mem_destroy(struct vy_mem *index)
 		vy_mem_tree_itr_next(&index->tree, &itr);
 	}
 	vy_mem_tree_destroy(&index->tree);
-	return 0;
+	free(index);
 }
 
 static inline int
@@ -1571,14 +1579,7 @@ vy_mem_set(struct vy_mem *index, struct vy_tuple *v)
 	index->used += vy_tuple_size(v);
 	if (index->min_lsn > v->lsn)
 		index->min_lsn = v->lsn;
-	return 0;
-}
-
-static int
-vy_mem_gc(struct vy_mem *i)
-{
-	vy_mem_destroy(i);
-	vy_mem_create(i, i->key_def);
+	vy_tuple_ref(v);
 	return 0;
 }
 
@@ -1697,14 +1698,14 @@ struct vy_range {
 	 */
 	struct vy_tuple *min_key;
 	struct vy_index *index;
-	uint16_t   flags;
 	uint64_t   update_time;
-	uint32_t   used; /* sum of i0->used + i1->used */
+	uint32_t   used; /* sum of mem->used */
 	struct vy_run  *run;
 	uint32_t   run_count;
+	uint32_t   mem_count;
 	uint32_t   temperature;
 	uint64_t   temperature_reads;
-	struct vy_mem    i0, i1;
+	struct vy_mem *mem;
 	/** The file where the run is stored or -1 if it's not dumped yet. */
 	int fd;
 	char path[PATH_MAX];
@@ -2537,46 +2538,19 @@ vy_run_unload_page(struct vy_run *run, uint32_t pos)
 	pthread_mutex_unlock(&run->cache_lock);
 }
 
-#define VY_ROTATE     2
-
 static struct vy_range *vy_range_new(struct vy_index *index);
 static int vy_range_create(struct vy_range*, struct vy_index*);
-static int vy_range_delete(struct vy_range*, int);
+static int vy_range_delete(struct vy_range*);
 
-static inline struct vy_mem *
-vy_range_rotate(struct vy_range *range)
+static int64_t
+vy_range_mem_min_lsn(struct vy_range *range)
 {
-	range->flags |= VY_ROTATE;
-	return &range->i0;
-}
-
-static inline void
-vy_range_unrotate(struct vy_range *range)
-{
-	assert((range->flags & VY_ROTATE) > 0);
-	range->flags &= ~VY_ROTATE;
-	range->i0 = range->i1;
-	range->i0.tree.arg = &range->i0;
-	vy_mem_create(&range->i1, range->i0.key_def);
-}
-
-static inline struct vy_mem *
-vy_range_mem(struct vy_range *range)
-{
-	if (range->flags & VY_ROTATE)
-		return &range->i1;
-	return &range->i0;
-}
-
-static inline struct vy_mem *
-vy_range_index_priority(struct vy_range *range, struct vy_mem **second)
-{
-	if (unlikely(range->flags & VY_ROTATE)) {
-		*second = &range->i0;
-		return &range->i1;
+	int64_t min_lsn = INT64_MAX;
+	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
+		if (mem->min_lsn < min_lsn)
+			min_lsn = mem->min_lsn;
 	}
-	*second = NULL;
-	return &range->i0;
+	return min_lsn;
 }
 
 static inline int
@@ -2638,7 +2612,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	(void)arg;
 	struct vy_index *index = (struct vy_index *) arg;
 	vy_scheduler_remove_range(index->env->scheduler, range);
-	vy_range_delete(range, 0);
+	vy_range_delete(range);
 	return NULL;
 }
 
@@ -2764,14 +2738,15 @@ vy_index_add_range(struct vy_index *index, struct vy_range *range)
 		}
 	}
 
-	/* Check in-memory index */
-	struct vy_mem_tree *mem_tree = &range->i0.tree;
-	struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(mem_tree);
-	if (!vy_mem_tree_itr_is_invalid(&itr)) {
-		struct vy_tuple *v = *vy_mem_tree_itr_get_elem(mem_tree, &itr);
-		if (min_key == NULL ||
-		    vy_tuple_compare(v->data, min_key, index->key_def) < 0) {
-			min_key = v->data;
+	/* Check in-memory indexes */
+	for (struct vy_mem *mem = range->mem; mem != NULL; mem = mem->next) {
+		struct vy_mem_tree_iterator itr = vy_mem_tree_itr_first(&mem->tree);
+		if (!vy_mem_tree_itr_is_invalid(&itr)) {
+			struct vy_tuple *v = *vy_mem_tree_itr_get_elem(&mem->tree, &itr);
+			if (min_key == NULL ||
+			    vy_tuple_compare(v->data, min_key, index->key_def) < 0) {
+				min_key = v->data;
+			}
 		}
 	}
 
@@ -3150,9 +3125,8 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 		struct rlist *result)
 {
 	(void)index;
-	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
-	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
+	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, NULL);
 	assert(!rlist_empty(result));
 	struct vy_range *prev = rlist_first_entry(result, struct vy_range,
 						  split);
@@ -3163,7 +3137,7 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 			assert(prev != NULL);
 			while (ii.vif->has(&ii)) {
 				struct vy_tuple *v = ii.vif->get(&ii);
-				vy_mem_set(&prev->i0, v);
+				vy_mem_set(prev->mem, v);
 				ii.vif->next(&ii);
 			}
 			break;
@@ -3178,7 +3152,7 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 				index->key_def);
 			if (unlikely(rc >= 0))
 				break;
-			vy_mem_set(&prev->i0, v);
+			vy_mem_set(prev->mem, v);
 			ii.vif->next(&ii);
 		}
 		if (unlikely(! ii.vif->has(&ii)))
@@ -3198,8 +3172,7 @@ vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple 
 	struct vy_range *range = vy_rangeiter_get(&ii);
 	assert(range != NULL);
 	/* update range */
-	struct vy_mem *vindex = vy_range_mem(range);
-	int rc = vy_mem_set(vindex, v);
+	int rc = vy_mem_set(range->mem, v);
 	assert(rc == 0); /* TODO: handle BPS tree errors properly */
 	(void) rc;
 	range->update_time = now;
@@ -3211,9 +3184,8 @@ vy_range_redistribute_index(struct vy_index *index, struct vy_range *range)
 {
 	struct vy_buf buf;
 	vy_buf_create(&buf);
-	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_iter ii;
-	vy_tmp_mem_iterator_open(&ii, mem, VINYL_GE, NULL);
+	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, NULL);
 	while (ii.vif->has(&ii)) {
 		struct vy_tuple *v = ii.vif->get(&ii);
 		int rc = vy_buf_add(&buf, v, sizeof(struct vy_tuple ***));
@@ -3245,7 +3217,7 @@ vy_range_splitfree(struct rlist *result)
 	struct vy_range *range, *next;
 	rlist_foreach_entry_safe(range, result, split, next) {
 		rlist_del_entry(range, split);
-		vy_range_delete(range, 0);
+		vy_range_delete(range);
 	}
 	assert(rlist_empty(result));
 	return 0;
@@ -3293,7 +3265,7 @@ vy_range_split(struct vy_index *index,
 error:
 	sv_writeiter_close(&iwrite);
 	if (range)
-		vy_range_delete(range, 0);
+		vy_range_delete(range);
 	vy_range_splitfree(result);
 	return -1;
 }
@@ -3307,10 +3279,14 @@ vy_range_new(struct vy_index *index)
 			 "struct vy_range");
 		return NULL;
 	}
+	range->mem = vy_mem_new(index->key_def);
+	if (!range->mem) {
+		free(range);
+		return NULL;
+	}
+	range->mem_count = 1;
 	range->fd = -1;
 	range->index = index;
-	vy_mem_create(&range->i0, index->key_def);
-	vy_mem_create(&range->i1, index->key_def);
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
 	rlist_create(&range->split);
@@ -3318,20 +3294,13 @@ vy_range_new(struct vy_index *index)
 }
 
 static inline int
-vy_range_close(struct vy_range *range, int gc)
+vy_range_close(struct vy_range *range)
 {
 	int rcret = 0;
 
 	if (range->fd >= 0 && close(range->fd) < 0) {
 		vy_error("index file close error: %s", strerror(errno));
 		rcret = -1;
-	}
-	if (gc) {
-		vy_mem_gc(&range->i0);
-		vy_mem_gc(&range->i1);
-	} else {
-		vy_mem_destroy(&range->i0);
-		vy_mem_destroy(&range->i1);
 	}
 	return rcret;
 }
@@ -3431,15 +3400,30 @@ vy_range_delete_runs(struct vy_range *range)
 	}
 }
 
+static void
+vy_range_delete_mems(struct vy_range *range)
+{
+	struct vy_mem *p = range->mem;
+	struct vy_mem *next = NULL;
+	while (p) {
+		next = p->next;
+		vy_mem_delete(p);
+		p = next;
+	}
+}
+
 static int
-vy_range_delete(struct vy_range *range, int gc)
+vy_range_delete(struct vy_range *range)
 {
 	assert(range->nodedump.pos == UINT32_MAX);
 	assert(range->nodecompact.pos == UINT32_MAX);
 
 	int rcret = 0;
+
 	vy_range_delete_runs(range);
-	if (vy_range_close(range, gc))
+	vy_range_delete_mems(range);
+
+	if (vy_range_close(range))
 		rcret = -1;
 	if (!range->id && range->fd >= 0) {
 		/* Range wasn't completed */
@@ -3525,8 +3509,6 @@ static int vy_profiler_(struct vy_profiler *p)
 			p->temperature_min = range->temperature;
 		temperature_total += range->temperature;
 		p->total_range_count++;
-		p->count += range->i0.tree.size;
-		p->count += range->i1.tree.size;
 		p->total_run_count += range->run_count;
 		if (p->total_run_max < range->run_count)
 			p->total_run_max = range->run_count;
@@ -3534,8 +3516,10 @@ static int vy_profiler_(struct vy_profiler *p)
 			p->histogram_run[range->run_count]++;
 		else
 			p->histogram_run_20plus++;
-		memory_used += range->i0.used;
-		memory_used += range->i1.used;
+		for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
+			p->count += mem->tree.size;
+			memory_used += mem->used;
+		}
 		struct vy_run *run = range->run;
 		while (run != NULL) {
 			p->count += run->index.info.keys;
@@ -3725,7 +3709,7 @@ vy_index_open_ex(struct vy_index *index)
 		struct vy_range *range = vy_range_new(index);
 		if (!range) {
 			vy_error("%s", "Can't alloc range");
-			vy_range_delete(range, 0);
+			vy_range_delete(range);
 			return -1;
 		}
 		char range_path[PATH_MAX];
@@ -3733,7 +3717,7 @@ vy_index_open_ex(struct vy_index *index)
 			 index->path, range_id);
 		range->id = range_id;
 		if (vy_range_open(index, range, range_path)) {
-			vy_range_delete(range, 0);
+			vy_range_delete(range);
 			return -1;
 		}
 		index->range_id_max = MAX(index->range_id_max, range_id + 1);
@@ -3764,7 +3748,7 @@ vy_index_open_ex(struct vy_index *index)
 
 /**
  * Iterate over the write set of a single index
- * and flush it i0 tree of this index.
+ * and flush it to the active in-memory tree of this index.
  *
  * Break when the write set begins pointing at the next index.
  */
@@ -3811,10 +3795,8 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 						  prev_range);
 		}
 		prev_range = range;
-		vy_tuple_ref(tuple);
 		/* insert into range index */
-		struct vy_mem *vindex = vy_range_mem(range);
-		int rc = vy_mem_set(vindex, tuple);
+		int rc = vy_mem_set(range->mem, tuple);
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 		/* update range */
@@ -3866,7 +3848,6 @@ struct vy_task {
 	union {
 		struct {
 			struct vy_range *range;
-			struct vy_mem *mem;
 			struct vy_run *new_run;
 		} dump;
 		struct {
@@ -3914,12 +3895,11 @@ vy_task_dump_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->dump.range;
-	struct vy_mem *mem = task->dump.mem;
+	struct vy_mem *mem;
 
 	struct svwriteiter iwrite;
 	struct svmergeiter imerge;
 	struct svmerge vmerge;
-	struct svmergesrc *s;
 	int rc;
 
 	if (!range->run) {
@@ -3931,12 +3911,17 @@ vy_task_dump_execute(struct vy_task *task)
 
 	sv_mergeinit(&vmerge, index, index->key_def);
 
-	rc = sv_mergeprepare(&vmerge, 1);
+	assert(range->mem_count > 1);
+	rc = sv_mergeprepare(&vmerge, range->mem_count - 1);
 	if (rc)
 		return rc;
 
-	s = sv_mergeadd(&vmerge, NULL);
-	vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
+	/* We dump all memory indexes but the newest one -
+	 * see comment in vy_task_dump_new() */
+	for (mem = range->mem->next; mem; mem = mem->next) {
+		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
+		vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
+	}
 
 	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
 	sv_writeiter_open(&iwrite, &imerge, task->vlsn, 1, 1);
@@ -3957,27 +3942,31 @@ vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->dump.range;
-	struct vy_mem *mem = task->dump.mem;
 	struct vy_run *run = task->dump.new_run;
-
-	struct vy_mem swap;
+	struct vy_mem *mem;
 
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
 
+	index->size += vy_run_index_size(&run->index) +
+		       vy_run_index_total(&run->index);
+
 	range->range_version++;
 	index->range_index_version++;
 
-	assert(range->used >= mem->used);
-	range->used -= mem->used;
-	index->size += vy_run_index_size(&run->index) +
-		       vy_run_index_total(&run->index);
-	vy_quota_release(index->env->quota, mem->used);
-
-	swap = *mem;
-	swap.tree.arg = &swap;
-	vy_range_unrotate(range);
+	/* Release dumped in-memory indexes */
+	mem = range->mem->next;
+	range->mem->next = NULL;
+	range->mem_count = 1;
+	while (mem) {
+		struct vy_mem *next = mem->next;
+		assert(range->used >= mem->used);
+		range->used -= mem->used;
+		vy_quota_release(index->env->quota, mem->used);
+		vy_mem_delete(mem);
+		mem = next;
+	}
 
 	if (range->run_count == 1) {
 		/* First non-empty run for this range, deploy the range. */
@@ -3993,7 +3982,6 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 
 	vy_scheduler_add_range(index->env->scheduler, range);
-	vy_mem_gc(&swap);
 	return 0;
 }
 
@@ -4004,13 +3992,27 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 		.execute = vy_task_dump_execute,
 		.complete = vy_task_dump_complete,
 	};
-	struct vy_task *task = vy_task_new(pool, range->index, &dump_ops);
 
+	struct vy_task *task = vy_task_new(pool, range->index, &dump_ops);
 	if (!task)
 		return NULL;
 
+	struct vy_mem *mem = vy_mem_new(range->index->key_def);
+	if (!mem) {
+		free(task);
+		return NULL;
+	}
+
+	/*
+	 * New insertions will go to the new in-memory tree, while we will dump
+	 * older trees. This way we don't need to bother about synchronization.
+	 * To be consistent, lookups fall back on older trees.
+	 */
+	mem->next = range->mem;
+	range->mem = mem;
+	range->mem_count++;
+
 	task->dump.range = range;
-	task->dump.mem = vy_range_rotate(range);
 	return task;
 }
 
@@ -4024,19 +4026,25 @@ vy_task_compact_execute(struct vy_task *task)
 
 	struct svmergeiter imerge;
 	struct svmerge vmerge;
-	struct vy_run *run;
 	int rc;
 
 	sv_mergeinit(&vmerge, index, index->key_def);
 
-	rc = sv_mergeprepare(&vmerge, range->run_count + 1);
+	rc = sv_mergeprepare(&vmerge, range->run_count + range->mem_count - 1);
 	if (rc)
 		return rc;
 
-	for (run = range->run; run; run = run->next) {
+	/* compact on disk runs */
+	for (struct vy_run *run = range->run; run; run = run->next) {
 		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
 		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
 					 index->compression_if, VINYL_GE, NULL);
+	}
+
+	/* compact shadow memory indexes */
+	for (struct vy_mem *mem = range->mem->next; mem; mem = mem->next) {
+		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
+		vy_tmp_mem_iterator_open(&s->src, mem, VINYL_GE, NULL);
 	}
 
 	sv_mergeiter_open(&imerge, &vmerge, VINYL_GE);
@@ -4054,7 +4062,6 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_range *range = task->compact.range;
 	struct rlist *split_list = &task->compact.split_list;
 
-	struct vy_mem *mem = vy_range_mem(range);
 	struct vy_range *n;
 	int count = 0;
 	int rc;
@@ -4080,9 +4087,12 @@ vy_task_compact_complete(struct vy_task *task)
 		unreachable();
 	} else if (count == 1) {
 		/* self update */
+		struct vy_mem *mem = range->mem;
 		n = rlist_first_entry(split_list, struct vy_range, split);
-		n->i0 = *mem;
-		n->i0.tree.arg = &n->i0;
+		n->mem->next = mem->next;
+		mem->next = NULL;
+		range->mem = n->mem;
+		n->mem = mem;
 	} else {
 		/* split */
 		rc = vy_range_redistribute(index, range, split_list);
@@ -4091,10 +4101,9 @@ vy_task_compact_complete(struct vy_task *task)
 			return rc;
 		}
 	}
-	vy_mem_create(mem, index->key_def);
 
 	rlist_foreach_entry(n, split_list, split) {
-		n->used = n->i0.used;
+		n->used = n->mem->used;
 		n->temperature = range->temperature;
 		n->temperature_reads = range->temperature_reads;
 		index->size += vy_range_size(n);
@@ -4118,7 +4127,7 @@ vy_task_compact_complete(struct vy_task *task)
 		return -1;
 	}
 
-	return vy_range_delete(range, 1);
+	return vy_range_delete(range);
 }
 
 static struct vy_task *
@@ -4389,7 +4398,7 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (range->i0.min_lsn > checkpoint_lsn)
+		if (vy_range_mem_min_lsn(range) > checkpoint_lsn)
 			continue;
 		if (range->used == 0)
 			continue;
@@ -4787,7 +4796,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			struct vy_range *range;
 			range = vy_range_tree_first(&index->tree);
 			while (range) {
-				is_active |= (range->i0.min_lsn <=
+				is_active |= (vy_range_mem_min_lsn(range) <=
 					      scheduler->checkpoint_lsn);
 				range = vy_range_tree_next(&index->tree, range);
 			}
@@ -8876,24 +8885,20 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 		return;
 	itr->range_version = itr->curr_range->range_version;
 
-	struct vy_mem *second;
-	struct vy_mem *first = vy_range_index_priority(itr->curr_range, &second);
-
-	struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
-		&itr->merge_itr, true, true);
-	vy_mem_iterator_iface_open(sub_itr, first, itr->order, itr->key,
-				   itr->vlsn);
-
-	if (second != NULL && second->tree.size != 0) {
-		sub_itr = vy_merge_iterator_add(&itr->merge_itr, false, true);
-		vy_mem_iterator_iface_open(sub_itr, second, itr->order,
-					   itr->key, itr->vlsn);
+	for (struct vy_mem *mem = itr->curr_range->mem; mem; mem = mem->next) {
+		/* only the newest range is mutable */
+		bool is_mutable = (mem == itr->curr_range->mem);
+		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
+			&itr->merge_itr, is_mutable, true);
+		vy_mem_iterator_iface_open(sub_itr, mem, itr->order, itr->key,
+					   itr->vlsn);
 	}
 
 	struct vy_run *run = itr->curr_range->run;
 	struct vy_filterif *compression = itr->index->compression_if;
 	while (run != NULL) {
-		sub_itr = vy_merge_iterator_add(&itr->merge_itr, false, true);
+		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
+			&itr->merge_itr, false, true);
 		vy_run_iterator_iface_open(sub_itr, itr->index, run,
 					   itr->curr_range->fd, compression,
 					   itr->order, itr->key, itr->vlsn);
