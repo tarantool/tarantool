@@ -4311,6 +4311,9 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 
 	struct vy_index *index, *next;
 	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, next) {
+		/* Remove all ranges from scheduler */
+		vy_range_tree_iter(&index->tree, NULL,
+				   vy_range_tree_unsched_cb, index);
 		vy_index_delete(index);
 	}
 	free(scheduler->indexes);
