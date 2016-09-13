@@ -98,7 +98,7 @@ while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
 -- Check server ids
 test_run:cmd('eval replica1 "return box.info.server.id"')
 ---
-- '{"result": [2]}'
+- [2]
 ...
 box.space._cluster:len() == 2
 ---
