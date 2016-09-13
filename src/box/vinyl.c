@@ -2676,7 +2676,7 @@ vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
 		itr->cur_range = vy_range_tree_first(&index->tree);
 		return;
 	}
-	if (unlikely(itr->key == NULL)) {
+	if (vy_tuple_key_part(itr->key, 0)  == NULL) {
 		switch (itr->order) {
 		case VINYL_LT:
 		case VINYL_LE:
@@ -5892,7 +5892,9 @@ vy_tuple_to_str(struct vy_tuple *tuple)
 {
 	static __thread char buf[23];
 	const char *kk = vy_tuple_key_part(tuple->data, 0);
-	uint64_t k = mp_decode_uint(&kk);
+	uint64_t k = 0;
+	if (kk)
+		k = mp_decode_uint(&kk);
 	snprintf(buf, sizeof(buf), "%llu", (unsigned long long) k);
 	return buf;
 }
@@ -6847,7 +6849,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 		if (fnd_key == NULL)
 			return -1;
 		int cmp = vy_tuple_compare(fnd_key, key, itr->index->key_def);
-		bool cur_equal_key = cmp == 0;
+		bool is_equal_key = cmp == 0;
 		if (cmp == 0 &&
 		    (itr->order == VINYL_GT || itr->order == VINYL_LE)) {
 			cmp = -1;
@@ -6858,7 +6860,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 				return -1;
 		} else {
 			end = mid;
-			*equal_key = cur_equal_key;
+			*equal_key = is_equal_key;
 		}
 	}
 	*pos = end;
@@ -8898,7 +8900,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr);
  */
 void
 vy_read_iterator_close(struct vy_read_iterator *itr);
-
 
 /**
  * Set up merge iterator for current range

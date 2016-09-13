@@ -27,6 +27,7 @@ _ = s:create_index('pk');
 function range()
     local range_size = box.cfg.vinyl.range_size
     local page_size = box.cfg.vinyl.page_size
+    local s = box.space.test
     local num_rows = 0
     for i=1,range_size/page_size do
         local value = string.rep('a', 256)
@@ -46,11 +47,14 @@ box.snapshot();
 -- errinj.set("ERRINJ_VY_RANGE_CREATE", false);
 num_rows = num_rows + range();
 box.snapshot();
+num_rows = num_rows + range();
+box.snapshot();
 num_rows;
 for i=1,num_rows do
     if s:get{i} == nil then
         error("Row "..i.."not found")
     end
 end;
+#s:select{} == num_rows;
 s:drop();
 test_run:cmd("setopt delimiter ''")
