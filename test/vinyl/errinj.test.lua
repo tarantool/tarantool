@@ -16,7 +16,6 @@ s:drop()
 --
 -- Lost data in case of dump error
 --
-
 --
 test_run:cmd("setopt delimiter ';'")
 if  box.cfg.vinyl.page_size > 1024 or box.cfg.vinyl.range_size > 65536 then

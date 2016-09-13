@@ -91,7 +91,6 @@ box.snapshot();
 -- errinj.set("ERRINJ_VY_RANGE_CREATE", true)
 num_rows = num_rows + range();
 ---
-- error: Duplicate key exists in unique index 'pk' in space 'test'
 ...
 box.snapshot();
 ---
@@ -100,15 +99,14 @@ box.snapshot();
 -- errinj:set("ERRINJ_VY_RANGE_CREATE", false)
 num_rows = num_rows + range();
 ---
-- error: Duplicate key exists in unique index 'pk' in space 'test'
 ...
 box.snapshot();
 ---
-- error: can't save snapshot, errno 17 (File exists)
+- ok
 ...
 num_rows;
 ---
-- 256
+- 768
 ...
 for i=1,num_rows do
     if s:get{i} == nil then

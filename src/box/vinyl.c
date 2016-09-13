@@ -5882,6 +5882,19 @@ vy_tuple_ref(struct vy_tuple *v)
 		panic("this is broken by design");
 }
 
+#if 0
+/** Prints tuple first field. */
+static const char *
+vy_tuple_to_str(struct vy_tuple *tuple)
+{
+	static __thread char buf[23];
+	const char *kk = vy_tuple_key_part(tuple->data, 0);
+	uint64_t k = mp_decode_uint(&kk);
+	snprintf(buf, sizeof(buf), "%llu", (unsigned long long) k);
+	return buf;
+}
+#endif
+
 static void
 vy_tuple_unref(struct vy_tuple *tuple)
 {
@@ -8597,6 +8610,8 @@ vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr)
 	itr->search_started = true;
 	itr->unique_optimization = false;
 	struct vy_tuple *min_tuple;
+	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
+		     -1 : 1);
 restart:
 	itr->is_in_uniq_opt = false;
 	min_tuple = NULL;
@@ -8617,7 +8632,8 @@ restart:
 			break;
 		}
 		int cmp = min_tuple == NULL ? -1 :
-			  vy_tuple_compare(t->data, min_tuple->data, itr->key_def);
+			  order * vy_tuple_compare(t->data, min_tuple->data,
+						   itr->key_def);
 		if (cmp == 0) {
 			itr->src[i].front_id = itr->front_id;
 		} else if (cmp < 0) {
@@ -8666,6 +8682,8 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	struct vy_tuple *min_tuple = NULL;
 	itr->curr_src = UINT32_MAX;
 	itr->range_ended = true;
+	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
+		     -1 : 1);
 	for (uint32_t i = itr->src_count; i--;) {
 		struct vy_tuple_iterator *sub_itr = &itr->src[i].itr;
 		if (itr->src[i].is_mutable)
@@ -8678,7 +8696,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 			continue;
 		itr->range_ended = itr->range_ended && !itr->src[i].belong_range;
 		int cmp = min_tuple == NULL ? -1 :
-			vy_tuple_compare(t->data, min_tuple->data, itr->key_def);
+			order * vy_tuple_compare(t->data, min_tuple->data, itr->key_def);
 		if (cmp <= 0) {
 			itr->front_id += cmp < 0;
 			itr->src[i].front_id = itr->front_id;
@@ -8973,8 +8991,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
 	itr->curr_tuple = tuple;
-	if (itr->curr_tuple != NULL)
+	if (itr->curr_tuple != NULL) {
 		vy_tuple_ref(itr->curr_tuple);
+	}
 	return rc;
 }
 
