@@ -3408,7 +3408,7 @@ vy_range_create(struct vy_range *range, struct vy_index *index)
 {
 	snprintf(range->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 
-	ERROR_INJECT(ERRINJ_VY_RANGE_CREATE, errno = EMFILE; goto error);
+	ERROR_INJECT(ERRINJ_VY_RANGE_CREATE, {errno = EMFILE; goto error;});
 
 	if ((range->fd = mkstemp(range->path)) == -1)
 		goto error;
