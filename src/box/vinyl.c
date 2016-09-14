@@ -33,10 +33,6 @@
 #include <dirent.h>
 #include <pmatomic.h>
 
-#include <lz4.h>
-#include <lz4frame.h>
-#include <zstd_static.h>
-
 #include <bit/bit.h>
 #include <small/rlist.h>
 #define RB_COMPACT 1
@@ -240,79 +236,6 @@ vy_quota_used_percent(struct vy_quota *q)
 	return (q->used * 100) / q->limit;
 }
 
-enum vy_filter_op {
-	VINYL_FINPUT,
-	VINYL_FOUTPUT
-};
-
-struct vy_filter;
-
-struct vy_filterif {
-	char *name;
-	int (*create)(struct vy_filter*, va_list);
-	int (*destroy)(struct vy_filter*);
-	int (*start)(struct vy_filter*, struct vy_buf*);
-	int (*next)(struct vy_filter*, struct vy_buf*, char*, int);
-	int (*complete)(struct vy_filter*, struct vy_buf*);
-};
-
-struct vy_filter {
-	struct vy_filterif *i;
-	enum vy_filter_op op;
-	char priv[90];
-};
-
-static inline int
-vy_filter_create(struct vy_filter *c, struct vy_filterif *ci,
-	       enum vy_filter_op op, ...)
-{
-	c->op = op;
-	c->i  = ci;
-	va_list args;
-	va_start(args, op);
-	int rc = c->i->create(c, args);
-	va_end(args);
-	return rc;
-}
-
-static inline int
-vy_filter_destroy(struct vy_filter *c)
-{
-	return c->i->destroy(c);
-}
-
-static inline int
-vy_filter_start(struct vy_filter *c, struct vy_buf *dest)
-{
-	return c->i->start(c, dest);
-}
-
-static inline int
-vy_filter_next(struct vy_filter *c, struct vy_buf *dest, char *buf, int size)
-{
-	return c->i->next(c, dest, buf, size);
-}
-
-static inline int
-vy_filter_complete(struct vy_filter *c, struct vy_buf *dest)
-{
-	return c->i->complete(c, dest);
-}
-
-static struct vy_filterif vy_filterif_lz4;
-
-static struct vy_filterif vy_filterif_zstd;
-
-static inline struct vy_filterif*
-vy_filter_of(char *name)
-{
-	if (strcmp(name, "lz4") == 0)
-		return &vy_filterif_lz4;
-	if (strcmp(name, "zstd") == 0)
-		return &vy_filterif_zstd;
-	return NULL;
-}
-
 struct vy_iter;
 
 struct vy_iterif {
@@ -397,180 +320,6 @@ vy_avg_prepare(struct vy_avg *a)
 	         a->min, a->max, a->avg);
 }
 
-struct vy_filter_lz4 {
-	LZ4F_compressionContext_t compress;
-	LZ4F_decompressionContext_t decompress;
-	size_t total_size;
-};
-
-static int
-vy_filter_lz4_create(struct vy_filter *f, va_list args)
-{
-	(void) args;
-	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
-	LZ4F_errorCode_t rc = -1;
-	switch (f->op) {
-	case VINYL_FINPUT:
-		rc = LZ4F_createCompressionContext(&z->compress, LZ4F_VERSION);
-		z->total_size = 0;
-		break;
-	case VINYL_FOUTPUT:
-		rc = LZ4F_createDecompressionContext(&z->decompress,
-						     LZ4F_VERSION);
-		break;
-	}
-	if (unlikely(rc != 0))
-		return -1;
-	return 0;
-}
-
-static int
-vy_filter_lz4_destroy(struct vy_filter *f)
-{
-	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
-	(void)z;
-	switch (f->op) {
-	case VINYL_FINPUT:
-		LZ4F_freeCompressionContext(z->compress);
-		break;
-	case VINYL_FOUTPUT:
-		LZ4F_freeDecompressionContext(z->decompress);
-		break;
-	}
-	return 0;
-}
-
-#ifndef LZ4F_MAXHEADERFRAME_SIZE
-/* Defined in lz4frame.c file */
-#define LZ4F_MAXHEADERFRAME_SIZE 15
-#endif
-
-static int
-vy_filter_lz4_start(struct vy_filter *f, struct vy_buf *dest)
-{
-	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
-	int rc;
-	size_t block;
-	size_t sz;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		block = LZ4F_MAXHEADERFRAME_SIZE;
-		rc = vy_buf_ensure(dest, block);
-		if (unlikely(rc == -1))
-			return -1;
-		sz = LZ4F_compressBegin(z->compress, dest->p, block, NULL);
-		if (unlikely(LZ4F_isError(sz)))
-			return -1;
-		vy_buf_advance(dest, sz);
-		break;
-	case VINYL_FOUTPUT:
-		/* do nothing */
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_lz4_next(struct vy_filter *f, struct vy_buf *dest, char *buf, int size)
-{
-	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
-	if (unlikely(size == 0))
-		return 0;
-	int rc;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		/* See comments in vy_filter_lz4_complete() */
-		int capacity = LZ4F_compressBound(z->total_size + size, NULL);
-		assert(capacity >= (ptrdiff_t)vy_buf_used(dest));
-		rc = vy_buf_ensure(dest, capacity);
-		if (unlikely(rc == -1))
-			return -1;
-		size_t sz = LZ4F_compressUpdate(z->compress, dest->p,
-						vy_buf_unused(dest),
-						buf, size, NULL);
-		if (unlikely(LZ4F_isError(sz)))
-			return -1;
-		vy_buf_advance(dest, sz);
-		z->total_size += size;
-		break;
-	case VINYL_FOUTPUT:;
-		/* do a single-pass decompression.
-		 *
-		 * Assume that destination buffer is allocated to
-		 * original size.
-		 */
-		size_t pos = 0;
-		while (pos < (size_t)size)
-		{
-			size_t o_size = vy_buf_unused(dest);
-			size_t i_size = size - pos;
-			LZ4F_errorCode_t rc;
-			rc = LZ4F_decompress(z->decompress, dest->p, &o_size,
-					     buf + pos, &i_size, NULL);
-			if (LZ4F_isError(rc))
-				return -1;
-			vy_buf_advance(dest, o_size);
-			pos += i_size;
-		}
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_lz4_complete(struct vy_filter *f, struct vy_buf *dest)
-{
-	struct vy_filter_lz4 *z = (struct vy_filter_lz4*)f->priv;
-	int rc;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		/*
-		 * FIXME: LZ4F_compressXXX API is not designed for dynamically
-		 * growing buffers. LZ4F_compressUpdate() compress data
-		 * incrementally, but target buffer must be of fixed size.
-		 * https://github.com/Cyan4973/lz4/blob/d86dc916771c126afb797637dda9f6421c0cb998/examples/frameCompress.c#L35
-		 *
-		 * z->compress (LZ4F_cctx_internal_t) has a temporary buffer
-		 * cctxPtr->tmpIn which accumulates cctxPrr->tmpInSize bytes
-		 * from the previous LZ4F_compressUpdate() calls. It may
-		 * contain up to bufferSize ( 64KB - 4MB ) + 16 bytes.
-		 * It is not efficient to pre-allocate, say, 4MB every time.
-		 * This filter calculates the total size of input and then
-		 * calls LZ4F_compressBound() to determine the total size
-		 * of output (capacity).
-		 */
-#if 0
-		LZ4F_cctx_internal_t* cctxPtr = z->compress;
-		size_t block = (cctxPtr->tmpInSize + 16);
-#endif
-		int capacity = LZ4F_compressBound(z->total_size, NULL);
-		assert(capacity >= (ptrdiff_t)vy_buf_used(dest));
-		rc = vy_buf_ensure(dest, capacity);
-		if (unlikely(rc == -1))
-			return -1;
-		size_t sz = LZ4F_compressEnd(z->compress, dest->p,
-					     vy_buf_unused(dest), NULL);
-		if (unlikely(LZ4F_isError(sz)))
-			return -1;
-		vy_buf_advance(dest, sz);
-		break;
-	case VINYL_FOUTPUT:
-		/* do nothing */
-		break;
-	}
-	return 0;
-}
-
-static struct vy_filterif vy_filterif_lz4 =
-{
-	.name     = "lz4",
-	.create   = vy_filter_lz4_create,
-	.destroy  = vy_filter_lz4_destroy,
-	.start    = vy_filter_lz4_start,
-	.next     = vy_filter_lz4_next,
-	.complete = vy_filter_lz4_complete
-};
-
 static struct vy_quota *
 vy_quota_new(int64_t limit)
 {
@@ -626,126 +375,6 @@ path_exists(const char *path)
 	int rc = lstat(path, &st);
 	return rc == 0;
 }
-struct vy_filter_zstd {
-	void *ctx;
-};
-
-static int
-vy_filter_zstd_create(struct vy_filter *f, va_list args)
-{
-	(void) args;
-	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
-	switch (f->op) {
-	case VINYL_FINPUT:
-		z->ctx = ZSTD_createCCtx();
-		if (unlikely(z->ctx == NULL))
-			return -1;
-		break;
-	case VINYL_FOUTPUT:
-		z->ctx = NULL;
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_zstd_destroy(struct vy_filter *f)
-{
-	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
-	switch (f->op) {
-	case VINYL_FINPUT:
-		ZSTD_freeCCtx(z->ctx);
-		break;
-	case VINYL_FOUTPUT:
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_zstd_start(struct vy_filter *f, struct vy_buf *dest)
-{
-	(void)dest;
-	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
-	size_t sz;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		int compressionLevel = 3; /* fast */
-		sz = ZSTD_compressBegin(z->ctx, compressionLevel);
-		if (unlikely(ZSTD_isError(sz)))
-			return -1;
-		break;
-	case VINYL_FOUTPUT:
-		/* do nothing */
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_zstd_next(struct vy_filter *f, struct vy_buf *dest, char *buf, int size)
-{
-	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
-	int rc;
-	if (unlikely(size == 0))
-		return 0;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		size_t block = ZSTD_compressBound(size);
-		rc = vy_buf_ensure(dest, block);
-		if (unlikely(rc == -1))
-			return -1;
-		size_t sz = ZSTD_compressContinue(z->ctx, dest->p, block, buf, size);
-		if (unlikely(ZSTD_isError(sz)))
-			return -1;
-		vy_buf_advance(dest, sz);
-		break;
-	case VINYL_FOUTPUT:
-		/* do a single-pass decompression.
-		 *
-		 * Assume that destination buffer is allocated to
-		 * original size.
-		 */
-		sz = ZSTD_decompress(dest->p, vy_buf_unused(dest), buf, size);
-		if (unlikely(ZSTD_isError(sz)))
-			return -1;
-		break;
-	}
-	return 0;
-}
-
-static int
-vy_filter_zstd_complete(struct vy_filter *f, struct vy_buf *dest)
-{
-	struct vy_filter_zstd *z = (struct vy_filter_zstd*)f->priv;
-	int rc;
-	switch (f->op) {
-	case VINYL_FINPUT:;
-		size_t block = ZSTD_compressBound(0);
-		rc = vy_buf_ensure(dest, block);
-		if (unlikely(rc == -1))
-			return -1;
-		size_t sz = ZSTD_compressEnd(z->ctx, dest->p, block);
-		if (unlikely(ZSTD_isError(sz)))
-			return -1;
-		vy_buf_advance(dest, sz);
-		break;
-	case VINYL_FOUTPUT:
-		/* do nothing */
-		break;
-	}
-	return 0;
-}
-
-static struct vy_filterif vy_filterif_zstd =
-{
-	.name     = "zstd",
-	.create   = vy_filter_zstd_create,
-	.destroy  = vy_filter_zstd_destroy,
-	.start    = vy_filter_zstd_start,
-	.next     = vy_filter_zstd_next,
-	.complete = vy_filter_zstd_complete
-};
 
 #define vy_e(type, fmt, ...) \
 	({int res = -1;\
@@ -1786,8 +1415,6 @@ struct vy_index {
 	char       *name;
 	/** The path with index files. */
 	char       *path;
-	/** Compression filter. */
-	struct vy_filterif *compression_if;
 	struct key_def *key_def;
 	struct tuple_format *tuple_format;
 	uint32_t key_map_size; /* size of key_map map */
@@ -2427,7 +2054,7 @@ vy_pread_aligned(int fd, void *buf, uint32_t *size, off_t offset)
  */
 static struct vy_page *
 vy_run_load_page(struct vy_run *run, uint32_t pos,
-		 int fd, struct vy_filterif *compression)
+		 int fd)
 {
 	pthread_mutex_lock(&run->cache_lock);
 	if (run->page_cache == NULL) {
@@ -2470,32 +2097,6 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 		vy_error("index file read error: %s",
 			 strerror(errno));
 		return NULL;
-	}
-
-	if (compression != NULL) {
-		/* decompression */
-		struct vy_filter f;
-		rc = vy_filter_create(&f, compression, VINYL_FOUTPUT);
-		if (unlikely(rc == -1)) {
-			vy_error("%s", "index file decompression error");
-			free(data);
-			return NULL;
-		}
-		struct vy_buf buf;
-		vy_buf_create(&buf);
-		rc = vy_filter_next(&f, &buf, data,
-				    page_info->size);
-		vy_filter_destroy(&f);
-		if (unlikely(rc == -1)) {
-			vy_error("%s", "index file decompression error");
-			vy_buf_destroy(&buf);
-			free(data);
-			return NULL;
-		}
-		assert(vy_buf_size(&buf) == page_info->unpacked_size);
-		memcpy(data, buf.s,
-		       page_info->unpacked_size);
-		vy_buf_destroy(&buf);
 	}
 
 	pthread_mutex_lock(&run->cache_lock);
@@ -2905,7 +2506,6 @@ vy_pwrite_aligned(int fd, void *buf, uint32_t *size, uint64_t pos)
 static int
 vy_run_write_page(int fd, struct svwriteiter *iwrite,
 		  uint32_t page_size,
-		  struct vy_filterif *compression,
 		  struct vy_run_index *run_index)
 {
 	struct vy_run_info *run_info = &run_index->info;
@@ -2936,28 +2536,12 @@ vy_run_write_page(int fd, struct svwriteiter *iwrite,
 	page->unpacked_size = vy_buf_used(&tuplesinfo) + vy_buf_used(&values);
 	page->unpacked_size = ALIGN_POS(page->unpacked_size);
 
-	if (compression) {
-		struct vy_filter f;
-		if (vy_filter_create(&f, compression, VINYL_FINPUT))
-			goto err;
-		if (vy_filter_start(&f, &compressed) ||
-		    vy_filter_next(&f, &compressed, tuplesinfo.s,
-				   vy_buf_used(&tuplesinfo)) ||
-		    vy_filter_next(&f, &compressed, values.s,
-				   vy_buf_used(&values)) ||
-		    vy_filter_complete(&f, &compressed)) {
-			vy_filter_destroy(&f);
-			goto err;
-		}
-		vy_filter_destroy(&f);
-	} else {
-		vy_buf_ensure(&compressed, page->unpacked_size);
-		memcpy(compressed.p, tuplesinfo.s,
-		       vy_buf_used(&tuplesinfo));
-		vy_buf_advance(&compressed, vy_buf_used(&tuplesinfo));
-		memcpy(compressed.p, values.s, vy_buf_used(&values));
-		vy_buf_advance(&compressed, vy_buf_used(&values));
-	}
+	vy_buf_ensure(&compressed, page->unpacked_size);
+	memcpy(compressed.p, tuplesinfo.s, vy_buf_used(&tuplesinfo));
+	vy_buf_advance(&compressed, vy_buf_used(&tuplesinfo));
+	memcpy(compressed.p, values.s, vy_buf_used(&values));
+	vy_buf_advance(&compressed, vy_buf_used(&values));
+
 	page->size = vy_buf_used(&compressed);
 	vy_write_aligned(fd, compressed.s, &page->size);
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
@@ -3012,7 +2596,6 @@ err:
  */
 static int
 vy_run_write(int fd, struct svwriteiter *iwrite,
-	     struct vy_filterif *compression,
 	     uint32_t page_size, uint64_t run_size,
 	     struct vy_run **result)
 {
@@ -3053,7 +2636,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	 */
 	do {
 		if (vy_run_write_page(fd, iwrite, page_size,
-				      compression, run_index) == -1)
+				      run_index) == -1)
 			goto err;
 	} while (sv_writeiter_has(iwrite) && header->total < run_size);
 
@@ -3125,7 +2708,6 @@ void
 vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
 			 struct vy_index *index,
 			 struct vy_run *run, int fd,
-			 struct vy_filterif *compression,
 			 enum vy_order order, char *key);
 
 static int
@@ -3256,7 +2838,6 @@ vy_range_split(struct vy_index *index,
 
 		struct vy_run *run;
 		if ((rc = vy_run_write(range->fd, &iwrite,
-				       index->compression_if,
 				       index->key_def->opts.page_size,
 				       size_node, &run)))
 			goto error;
@@ -3935,7 +3516,6 @@ vy_task_dump_execute(struct vy_task *task)
 	sv_writeiter_open(&iwrite, &imerge, task->vlsn, 1, 1);
 
 	rc = vy_run_write(range->fd, &iwrite,
-			  index->compression_if,
 			  index->key_def->opts.page_size,
 			  UINT64_MAX, &task->dump.new_run);
 
@@ -4054,7 +3634,7 @@ vy_task_compact_execute(struct vy_task *task)
 	for (struct vy_run *run = range->run; run; run = run->next) {
 		struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
 		vy_tmp_run_iterator_open(&s->src, index, run, range->fd,
-					 index->compression_if, VINYL_GE, NULL);
+					 VINYL_GE, NULL);
 	}
 
 	/* compact shadow memory indexes */
@@ -5305,16 +4885,6 @@ vy_cursor_delete(struct vy_cursor *c)
 static int
 vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 {
-	/* compression */
-	if (key_def->opts.compression[0] != '\0' &&
-	    strcmp(key_def->opts.compression, "none")) {
-		conf->compression_if = vy_filter_of(key_def->opts.compression);
-		if (conf->compression_if == NULL) {
-			vy_error("unknown compression type '%s'",
-				 key_def->opts.compression);
-			return -1;
-		}
-	}
 	char name[128];
 	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
 	         key_def->space_id, key_def->iid);
@@ -6589,9 +6159,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		/* Merge all runs. */
 		while (run) {
 			struct svmergesrc *s = sv_mergeadd(m, NULL);
-			struct vy_filterif *compression = index->compression_if;
 			vy_tmp_run_iterator_open(&s->src, index, run,
-				range->fd, compression, VINYL_GT, NULL);
+				range->fd, VINYL_GT, NULL);
 			run = run->next;
 		}
 		struct svmergeiter im;
@@ -6643,8 +6212,6 @@ struct vy_run_iterator {
 	struct vy_run *run;
 	/* file of run */
 	int fd;
-	/* compression in file */
-	struct vy_filterif *compression;
 
 	/* Search options */
 	/**
@@ -6682,7 +6249,7 @@ struct vy_run_iterator {
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 		     struct vy_run *run, int fd,
-		     struct vy_filterif *compression, enum vy_order order,
+		     enum vy_order order,
 		     char *key, int64_t vlsn);
 
 static int
@@ -6719,8 +6286,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page)
 		if (itr->curr_loaded_page != UINT32_MAX)
 			vy_run_unload_page(itr->run, itr->curr_loaded_page);
 		struct vy_page *result = vy_run_load_page(itr->run, page,
-							 itr->fd,
-							 itr->compression);
+							 itr->fd);
 		if (result != NULL)
 			itr->curr_loaded_page = page;
 		else
@@ -6941,7 +6507,7 @@ vy_run_iterator_lock_page(struct vy_run_iterator *itr, uint32_t page_no)
 		return UINT32_MAX;
 	/* just increment reference counter */
 	vy_run_load_page(itr->run, page_no,
-			 itr->fd, itr->compression);
+			 itr->fd);
 	return page_no;
 }
 
@@ -7114,13 +6680,12 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 		     struct vy_run *run, int fd,
-		     struct vy_filterif *compression, enum vy_order order,
+		     enum vy_order order,
 		     char *key, int64_t vlsn)
 {
 	itr->index = index;
 	itr->run = run;
 	itr->fd = fd;
-	itr->compression = compression;
 
 	itr->order = order;
 	itr->key = key;
@@ -7445,7 +7010,6 @@ vy_tmp_run_iterator_next(struct vy_iter *virt_iterator)
 void
 vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
 		         struct vy_run *run, int fd,
-		         struct vy_filterif *compression,
 		         enum vy_order order, char *key)
 {
 	static struct vy_iterif vif = {
@@ -7459,7 +7023,7 @@ vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
 	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
 	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
 	*is_dup = false;
-	vy_run_iterator_open(itr, index, run, fd, compression, order, key,
+	vy_run_iterator_open(itr, index, run, fd, order, key,
 			     INT64_MAX);
 
 }
@@ -8278,7 +7842,7 @@ vy_run_iterator_iface_close(struct vy_tuple_iterator *vitr)
 static void
 vy_run_iterator_iface_open(struct vy_tuple_iterator *vitr, struct vy_index *index,
 			   struct vy_run *run, int fd,
-			   struct vy_filterif *compression, enum vy_order order,
+			   enum vy_order order,
 			   char *key, int64_t vlsn)
 {
 	static struct vy_tuple_iterator_iface iface = {
@@ -8291,7 +7855,7 @@ vy_run_iterator_iface_open(struct vy_tuple_iterator *vitr, struct vy_index *inde
 	vitr->iface = &iface;
 	struct vy_run_iterator *itr = (struct vy_run_iterator *)vitr->priv;
 	assert(sizeof(vitr->priv) >= sizeof(*itr));
-	vy_run_iterator_open(itr, index, run, fd, compression, order, key, vlsn);
+	vy_run_iterator_open(itr, index, run, fd, order, key, vlsn);
 }
 
 /* }}} Virtual iterator over run */
@@ -8943,12 +8507,11 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	}
 
 	struct vy_run *run = itr->curr_range->run;
-	struct vy_filterif *compression = itr->index->compression_if;
 	while (run != NULL) {
 		struct vy_tuple_iterator *sub_itr = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_iface_open(sub_itr, itr->index, run,
-					   itr->curr_range->fd, compression,
+					   itr->curr_range->fd,
 					   itr->order, itr->key, itr->vlsn);
 		run = run->next;
 	}
