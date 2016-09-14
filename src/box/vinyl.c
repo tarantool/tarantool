@@ -7723,25 +7723,26 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 /* {{{ Write iterator */
 
 /**
- * A write iterator provides API for iteration over tuples from several
- * sources and for the automated filtering of them.
+ * The write iterator merges multiple tuple sources into one,
+ * squashing multiple upserts on the same key and filtering out
+ * replaces older than purge lsn.
  */
 struct vy_write_iterator {
 	struct vy_index *index;
 	/*
-	 * If a current tuple LSN is bigger than purge_lsn then
-	 * this tuple possible is in using in a transaction and
-	 * can't be filtered out. But if current tuple LSN is less
-	 * of equal than purge LSN then it can be filtered.
+	 * If the current tuple LSN is bigger than purge_lsn then
+	 * it could be visible to an active transaction and must
+	 * be preserved in the output. Otherwise it is dropped.
 	 * @sa vy_write_iterator_next
 	 */
 	int64_t purge_lsn;
 	/*
-	 * User of a write iterator can specify if he needs
-	 * deletions saving. If save_delete is true then
-	 * deletions with LSN less or equal to purge LSN
-	 * will be returned to the user, else deletions will be
-	 * skipped and the iteraion will continue from a next key.
+	 * Users of a write iterator can specify if they need
+	 * to preserve deletes.. If save_delete is true then
+	 * old deletes, i.e. those which  LSN is less or equal to
+	 * purge LSN are preserved in the output, ohterwise
+	 * such deletes are skipped and iteration continues
+	 * from the next key.
 	 */
 	bool save_delete;
 	bool goto_next_key;
@@ -7751,8 +7752,8 @@ struct vy_write_iterator {
 };
 
 /*
- * Open an empty write iterator. For specifying sources for the iterator
- * use vy_write_iterator_add_* functions. 
+ * Open an empty write iterator. To add sources to the iterator
+ * use vy_write_iterator_add_* functions
  */
 void
 vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
@@ -7808,30 +7809,30 @@ int
 vy_write_iterator_next(struct vy_write_iterator *wi)
 {
 	/*
-	 * Nullify the result tuple. If we will not found a next tuple
-	 * then need to 'forget' the old tuple.
+	 * Nullify the result tuple. If the next tuple is not
+	 * found, make sure we "forget" the current one.
 	 */
 	if (wi->curr_tuple)
 		vy_tuple_unref(wi->curr_tuple);
 	wi->curr_tuple = NULL;
 	/*
-	 * The upsert tuple can be not null since previous calling of
-	 * next().
+	 * The upsert tuple can be hanging around from the previous
+	 * invocation of next().
 	 */
 	if (wi->upsert_tuple)
 		vy_tuple_unref(wi->upsert_tuple);
 	wi->upsert_tuple = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
 	/*
-	 * Further rc means following:
+	 * rc values mean the following:
 	 *  - rc < 0 - it is an error.
 	 *  - rc = 0 - all is ok.
-	 *  - rc > 0 - iteration over current key or LSN is finished.
+	 *  - rc > 0 - iteration over the current key or LSN is finished.
 	 */
 	int rc;
 	struct vy_tuple *tuple;
 	if (!mi->search_started) {
-		/* Start the searching if it's first iteration. */
+		/* Start the search if it's the first iteration. */
 		rc = vy_merge_iterator_locate(mi);
 	} else {
 		if (wi->goto_next_key) {
@@ -7845,13 +7846,15 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 		return rc;
 
 	/*
-	 * This cycle works accoring to the following algorithm:
-	 *  - iterate over all tuples with one key. If the current tuple
-	 *    is above purge_lsn then there is a transaction that
-	 *    uses this tuple and we return this tuple as it is.
-	 *    But if the current tuple is below purge_lsn then
-	 *    all older versions of this tuple can be merged.
-	 *  - if tuples with one key are finished then go to the next key.
+	 * This cycle works as follows:
+	 *  - iterate over all tuples with the same key. If the
+	 *    current tuple is newer than purge_lsn then there is
+	 *    a transaction that may be using it and the tuple
+	 *    is returned as is.
+	 *    Otherwise, all "older" versions of this tuple
+	 *    can be squashed together: upserts merged, replaces
+	 *    negated with deletes and vice versa.
+	 *  - when done with this key, proceed with the next one.
 	 */
 	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi))
 	{
@@ -7860,9 +7863,9 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			wi->goto_next_key = false;
 		}
 		/**
-		 * If we reached end of the key LSNs then go to the next key.
-		 * If the end of all keys is reached then it's end of
-		 * the iterator.
+		 * If we reached the end of the key LSNs then go to
+		 * the next key. If the end of all keys is reached
+		 * then it's the end of the iterator.
 		 */
 		if (rc > 0) {
 			if (wi->upsert_tuple) {
@@ -7882,26 +7885,27 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			break;
 		}
 		/*
-		 * If the merge iterator now is below
-		 * the purge LSN then upserts can be merged and
-		 * all operations after replace on same key can
-		 * be skipped. 
+		 * If the merge iterator now is below the purge
+		 * LSN then upserts can be merged and all
+		 * operations older than replace on the same key can
+		 * be skipped.
 		 */
 		if (tuple->flags & SVDELETE) {
 			if (wi->save_delete) {
 				/*
 				 * If the tuple was deleted and
-				 * user needs to save it then 
+				 * user needs to save it then
 				 * return it.
-				 * There is the case when don't need to save
+				 * There is the case when we need to save
 				 * deletions. If the deletion is below the
 				 * purge LSN - there are no transactions
-				 * that need this or older versions of the tuple.
+				 * that need this or older versions of the
+				 * tuple.
 				 */
 				if (wi->upsert_tuple) {
 					/*
 					 * If the previous operation was
-					 * deletion then save upsert as
+					 * DELETE then save UPSERT as
 					 * replace.
 					 */
 					tuple = vy_apply_upsert(wi->upsert_tuple,
@@ -7912,16 +7916,17 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			}
 			/*
 			 * If the tuple was deleted then all
-			 * operations before the deletion can be skipped
-			 * because after the deletion the tuple doesn't exist.
-			 * Go to the next key.
+			 * operations preceding it can be
+			 * skipped. Go to the next key.
 			 */
 			wi->goto_next_key = true;
 			continue;
 		} else if (tuple->flags & SVUPSERT) {
 			if (wi->upsert_tuple) {
 				/*
-				 * If it isn't first upsert then apply both.
+				 * If it isn't the first upsert
+				 * then squash the two of them
+				 * into one.
 				 */
 				tuple = vy_apply_upsert(wi->upsert_tuple,
 							tuple, wi->index,
