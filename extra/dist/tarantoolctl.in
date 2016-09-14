@@ -357,6 +357,8 @@ end
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
+    shift_argv(arg, 0, 2)
+
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
             cfg[i] = v
@@ -528,7 +530,7 @@ end
 local function connect()
     console.on_start(function(self)
         local status, reason
-        status, reason = pcall(function() require('console').connect(arg[0]) end)
+        status, reason = pcall(function() require('console').connect(arg[2]) end)
         if not status then
             self:print(reason)
             self.running = false
@@ -574,7 +576,7 @@ end
 
 local function eval()
     local console_sock_path = uri.parse(console_sock).service
-    local filename = arg[1]
+    local filename = arg[3]
     if filename == nil then
         log.error("Usage: tarantoolctl eval instance_name file.lua")
         return 1
@@ -598,6 +600,11 @@ local function eval()
     local u = uri.parse(console_sock)
     local remote = require('net.box'):new(u.host, u.service,
         { user = u.login, password = u.password })
+    if remote == nil then
+        log.warn("control socket exists, but tarantool doesn't listen on it")
+        return 2
+    end
+
     local code = string.format(
         'loadstring(require("digest").base64_decode([[%s]]))()',
         content
@@ -620,7 +627,6 @@ local function exit_wrapper(func)
 end
 
 local function process_remote(cmd_function)
-    shift_argv(arg, 0, 2)
     cmd_function()
 end
 
@@ -629,8 +635,6 @@ local function process_local(cmd_function)
 
     default_file = find_default_file()
     load_default_file(default_file)
-
-    shift_argv(arg, 0, 2)
 
     if #arg < 2 then
         log.error("Not enough arguments for '%s' command", command_name)
@@ -692,12 +696,12 @@ local usage = function()
     os.exit(1)
 end
 
+local command_name = arg[1]
+
 if #arg < 2 then
     log.error("Not enough arguments for '%s' command", command_name)
     usage()
 end
-
-local command_name = arg[1]
 
 local cmd_pair = commands[command_name]
 cmd_pair.process(cmd_pair.func)
