@@ -410,7 +410,7 @@ s = box.schema.space.create("test", "bug")
 ...
 s = box.schema.space.create("test", {unknown = 'param'})
 ---
-- error: 'Wrong space options (field 5): unexpected option ''unknown'''
+- error: Illegal parameters, unexpected option 'unknown'
 ...
 s = box.schema.space.create("test")
 ---
@@ -430,7 +430,7 @@ index = s:create_index('primary', {unique = true, parts = 'bug'})
 ...
 index = s:create_index('test', {unique = true, parts = {1, 'unsigned'}, mmap = true})
 ---
-- error: 'Wrong index options (field 4): unexpected option ''mmap'''
+- error: Illegal parameters, unexpected option 'mmap'
 ...
 s:drop()
 ---

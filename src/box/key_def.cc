@@ -102,11 +102,8 @@ const struct key_opts key_opts_default = {
 	/* .distancebuf         = */ { '\0' },
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
 	/* .path                = */ { 0 },
-	/* .compression         = */ { 0 },
-	/* .compression_key     = */ 0,
 	/* .range_size           = */ 0,
 	/* .page_size           = */ 0,
-	/* .sync                = */ 2,
 };
 
 const struct opt_def key_opts_reg[] = {
@@ -114,11 +111,8 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("dimension", MP_UINT, struct key_opts, dimension),
 	OPT_DEF("distance", MP_STR, struct key_opts, distancebuf),
 	OPT_DEF("path", MP_STR, struct key_opts, path),
-	OPT_DEF("compression", MP_STR, struct key_opts, compression),
-	OPT_DEF("compression_key", MP_UINT, struct key_opts, compression_key),
 	OPT_DEF("range_size", MP_UINT, struct key_opts, range_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
-	OPT_DEF("sync", MP_UINT, struct key_opts, sync),
 	{ NULL, MP_NIL, 0, 0 }
 };
 

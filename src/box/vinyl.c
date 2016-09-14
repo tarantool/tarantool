@@ -4288,10 +4288,6 @@ vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 			 "strdup", "char *");
 		return -1;
 	}
-	if (key_def->opts.range_size == 0)
-		key_def->opts.range_size = cfg_geti("vinyl.range_size");
-	if (key_def->opts.page_size == 0)
-		key_def->opts.page_size = cfg_geti("vinyl.page_size");
 	return 0;
 }
 

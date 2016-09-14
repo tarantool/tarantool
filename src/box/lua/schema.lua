@@ -144,10 +144,9 @@ end
  @example
  check_param_table(options, { user = 'string',
                               port = 'string, number',
-                              data = 'any',
-                              allow_unexpected = false } )
+                              data = 'any'} )
 --]]
-local function check_param_table(table, template, allow_unexpected)
+local function check_param_table(table, template)
     if table == nil then
         return
     end
@@ -161,12 +160,8 @@ local function check_param_table(table, template, allow_unexpected)
     end
     for k,v in pairs(table) do
         if template[k] == nil then
-            if not allow_unexpected then
-                box.error(box.error.ILLEGAL_PARAMS,
-                          "unexpected option '" .. k .. "'")
-            else
-                -- option will be checked by C code
-            end
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "unexpected option '" .. k .. "'")
         elseif template[k] == 'any' then
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
@@ -243,13 +238,15 @@ box.schema.space.create = function(name, options)
         id = 'number',
         field_count = 'number',
         user = 'string, number',
-        format = 'table'
+        format = 'table',
+        temporary = 'boolean',
     }
     local options_defaults = {
         engine = 'memtx',
         field_count = 0,
+        temporary = false,
     }
-    check_param_table(options, options_template, true)
+    check_param_table(options, options_template)
     options = update_param_table(options, options_defaults)
 
     local _space = box.space[box.schema.SPACE_ID]
@@ -281,14 +278,12 @@ box.schema.space.create = function(name, options)
         uid = session.uid()
     end
     local format = options.format and options.format or {}
-    local extra_options = setmetatable({}, { __serialize = 'map' })
-    for k, v in pairs(options) do
-        if options_template[k] == nil then
-            extra_options[k] = v
-        end
-    end
+    -- filter out global parameters from the options array
+    local space_options = {
+        temporary = options.temporary,
+    }
     _space:insert{id, uid, name, options.engine, options.field_count,
-        extra_options, format}
+        space_options, format}
     return box.space[id], "created"
 end
 
@@ -387,9 +382,12 @@ box.schema.index.create = function(space_id, name, options)
         id = 'number',
         if_not_exists = 'boolean',
         dimension = 'number',
-        distance = 'string'
+        distance = 'string',
+        path = 'string',
+        page_size = 'number',
+        range_size = 'number',
     }
-    check_param_table(options, options_template, true)
+    check_param_table(options, options_template)
     local options_defaults = {
         type = 'tree',
     }
@@ -402,6 +400,17 @@ box.schema.index.create = function(space_id, name, options)
     options_defaults = type_dependent_defaults[options.type]
             and type_dependent_defaults[options.type]
             or type_dependent_defaults.other
+    options = update_param_table(options, options_defaults)
+    if box.space[space_id] ~= nil and box.space[space_id].engine == 'vinyl' then
+        options_defaults = {
+            -- path has no default, or, rather, it defaults
+            -- to a subdirectory of the server data dir if it is not set
+            page_size = box.cfg.vinyl.page_size,
+            range_size = box.cfg.vinyl.range_size,
+        }
+    else
+        options_defaults = {}
+    end
     options = update_param_table(options, options_defaults)
 
     check_index_parts(options.parts)
@@ -434,13 +443,16 @@ box.schema.index.create = function(space_id, name, options)
     for i = 1, #options.parts, 2 do
         table.insert(parts, {options.parts[i], options.parts[i + 1]})
     end
-    local key_opts = { dimension = options.dimension,
-        unique = options.unique, distance = options.distance }
-    for k, v in pairs(options) do
-        if options_template[k] == nil then
-            key_opts[k] = v
-        end
-    end
+    -- create_index() options contains type, parts, etc,
+    -- stored separately. Remove these members from key_opts
+    local key_opts = {
+            dimension = options.dimension,
+            unique = options.unique,
+            distance = options.distance,
+            path = options.path,
+            page_size = options.page_size,
+            range_size = options.range_size,
+    }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
         uint = 'unsigned';

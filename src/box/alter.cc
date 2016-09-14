@@ -315,14 +315,14 @@ key_opts_decode_distance(const char *str)
  * Support function for key_def_new_from_tuple(..)
  * 1.6.6+
  * Fill key_opts structure from opts field in tuple of space _index
- * Throw an error is smth is wrong
+ * Throw an error is unrecognized option.
  */
 static void
 key_opts_create_from_field(struct key_opts *opts, const char *map)
 {
 	*opts = key_opts_default;
 	opts_create_from_field(opts, key_opts_reg, map,
-			ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+			       ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
 		opts->distance = key_opts_decode_distance(opts->distancebuf);
 }
@@ -479,7 +479,7 @@ space_def_init_opts(struct space_def *def, struct tuple *tuple)
 	}
 
 	opts_create_from_field(&def->opts, space_opts_reg, data,
-			ER_WRONG_SPACE_OPTIONS, OPTS);
+			       ER_WRONG_SPACE_OPTIONS, OPTS);
 }
 
 /**
