@@ -1994,58 +1994,6 @@ vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
 	return pos;
 }
 
-static ssize_t
-vy_read_aligned(int fd, void *buf, uint32_t *size)
-{
-	ssize_t readen;
-	uint32_t old_size = *size;
-	*size = ALIGN_POS(*size);
-	if (old_size != *size || (intptr_t)buf % FILE_ALIGN) {
-		void *ptr = buf;
-		if (posix_memalign(&ptr, FILE_ALIGN, *size)) {
-			diag_set(OutOfMemory, *size,
-				 "posix_memalign", "aligned buf");
-			return -1;
-		}
-		readen = vy_read_file(fd, ptr, *size);
-		memcpy(buf, ptr, old_size);
-		free(ptr);
-	} else {
-		readen = vy_read_file(fd, buf, *size);
-	}
-	if (readen == -1) {
-		diag_set(ClientError, ER_VINYL, "Can't read file");
-	}
-	return readen;
-
-}
-
-static ssize_t
-vy_pread_aligned(int fd, void *buf, uint32_t *size, off_t offset)
-{
-	ssize_t readen;
-	uint32_t old_size = *size;
-	*size = ALIGN_POS(*size);
-	if (old_size != *size || (intptr_t)buf % FILE_ALIGN) {
-		void *ptr = buf;
-		if (posix_memalign(&ptr, FILE_ALIGN, *size)) {
-			diag_set(OutOfMemory, *size,
-				 "posix_memalign", "aligned buf");
-			return -1;
-		}
-		readen = vy_pread_file(fd, ptr, *size, offset);
-		memcpy(buf, ptr, old_size);
-		free(ptr);
-	} else {
-		readen = vy_pread_file(fd, buf, *size, offset);
-	}
-	if (readen == -1) {
-		diag_set(ClientError, ER_VINYL, "Can't read file");
-	}
-	return readen;
-
-}
-
 /**
  * Load from page with given number
  * If the page is loaded by somebody else, it's returned from cache
@@ -2087,7 +2035,7 @@ vy_run_load_page(struct vy_run *run, uint32_t pos,
 #if 0
 	int rc = coeio_pread(file->fd, data, page_info->size, page_info->offset);
 #else
-	int rc = vy_pread_aligned(fd, data, &page_info->size,
+	int rc = vy_pread_file(fd, data, page_info->size,
 				  page_info->offset);
 #endif
 
@@ -2447,58 +2395,6 @@ vy_pwrite_file(int fd, void *buf, uint32_t size, off_t offset)
 	return pos;
 }
 
-static ssize_t
-vy_write_aligned(int fd, void *buf, uint32_t *size)
-{
-	ssize_t written;
-	uint32_t old_size = *size;
-	*size = ALIGN_POS(*size);
-	if (old_size != *size || (intptr_t)buf % FILE_ALIGN) {
-		void *ptr = buf;
-		if (posix_memalign(&ptr, FILE_ALIGN, *size)) {
-			diag_set(OutOfMemory, *size,
-				 "posix_memalign", "aligned buf");
-			return -1;
-		}
-		memcpy(ptr, buf, old_size);
-		memset((char *)ptr + old_size, 0, *size - old_size);
-		written = vy_write_file(fd, ptr, *size);
-		free(ptr);
-	} else {
-		written = vy_write_file(fd, buf, *size);
-	}
-	if (written == -1) {
-		diag_set(ClientError, ER_VINYL, "Can't write file");
-	}
-	return written;
-}
-
-static ssize_t
-vy_pwrite_aligned(int fd, void *buf, uint32_t *size, uint64_t pos)
-{
-	int written;
-	uint32_t old_size = *size;
-	*size = ALIGN_POS(*size);
-	if (old_size != *size || (intptr_t)buf % FILE_ALIGN) {
-		void *ptr = buf;
-		if (posix_memalign(&ptr, FILE_ALIGN, *size)) {
-			diag_set(OutOfMemory, *size,
-				 "posix_memalign", "aligned buf");
-			return -1;
-		}
-		memcpy(ptr, buf, old_size);
-		memset((char *)ptr + old_size, 0, *size - old_size);
-		written = vy_pwrite_file(fd, ptr, *size, pos);
-		free(ptr);
-	} else {
-		written = vy_pwrite_file(fd, buf, *size, pos);
-	}
-	if (written == -1) {
-		diag_set(ClientError, ER_VINYL, "Can't write file");
-	}
-	return written;
-}
-
 /**
  * Write tuples from the iterator to a new page in the run,
  * update page and run statistics.
@@ -2543,7 +2439,7 @@ vy_run_write_page(int fd, struct svwriteiter *iwrite,
 	vy_buf_advance(&compressed, vy_buf_used(&values));
 
 	page->size = vy_buf_used(&compressed);
-	vy_write_aligned(fd, compressed.s, &page->size);
+	vy_write_file(fd, compressed.s, page->size);
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
 	if (page->count > 0) {
@@ -2624,7 +2520,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 
 	/* write run info header and adjust size */
 	uint32_t header_size = sizeof(*header);
-	vy_write_aligned(fd, header, &header_size);
+	vy_write_file(fd, header, header_size);
 	header->size += header_size;
 
 	/*
@@ -2645,8 +2541,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	header->pages_offset = header->offset +
 				     header->size;
 	header->pages_size = vy_buf_used(&run_index->pages);
-	rc = vy_write_aligned(fd, run_index->pages.s,
-			      &header->pages_size);
+	rc = vy_write_file(fd, run_index->pages.s, header->pages_size);
 	if (rc == -1)
 		goto err;
 	header->size += header->pages_size;
@@ -2655,7 +2550,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	header->minmax_offset = header->offset +
 				      header->size;
 	header->minmax_size = vy_buf_used(&run_index->minmax);
-	rc = vy_write_aligned(fd, run_index->minmax.s, &header->minmax_size);
+	rc = vy_write_file(fd, run_index->minmax.s, header->minmax_size);
 	if (rc == -1)
 		goto err;
 	header->size += header->minmax_size;
@@ -2675,7 +2570,7 @@ vy_run_write(int fd, struct svwriteiter *iwrite,
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
 	header_size = sizeof(*header);
-	if (vy_pwrite_aligned(fd, header, &header_size,
+	if (vy_pwrite_file(fd, header, header_size,
 			      header->offset) == -1)
 		goto err;
 	if (fdatasync(fd) == -1)
@@ -2903,7 +2798,7 @@ vy_range_recover(struct vy_range *range)
 	void *read_buf;
 	if (posix_memalign(&read_buf, FILE_ALIGN, read_size) != 0)
 		return -1;
-	while ((readen = vy_read_aligned(fd, read_buf, &read_size))
+	while ((readen = vy_read_file(fd, read_buf, read_size))
 		== (ssize_t)read_size) {
 		struct vy_run_info *run_info =
 			(struct vy_run_info *)read_buf;
@@ -2916,16 +2811,16 @@ vy_range_recover(struct vy_range *range)
 		vy_run->index.info = *run_info;
 
 		vy_buf_ensure(&vy_run->index.pages, run_info->pages_size);
-		if (vy_pread_aligned(fd, vy_run->index.pages.s,
-				     &run_info->pages_size,
+		if (vy_pread_file(fd, vy_run->index.pages.s,
+				     run_info->pages_size,
 				     run_info->pages_offset) == -1)
 			return -1;
 
 		if (vy_buf_ensure(&vy_run->index.minmax,
 				  run_info->minmax_size))
 			return -1;
-		if (vy_pread_aligned(fd, vy_run->index.minmax.s,
-				     &run_info->minmax_size,
+		if (vy_pread_file(fd, vy_run->index.minmax.s,
+				     run_info->minmax_size,
 				     run_info->minmax_offset) == -1)
 			return -1;
 
