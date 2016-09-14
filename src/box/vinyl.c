@@ -3840,7 +3840,7 @@ struct vy_task_ops {
 struct vy_task {
 	const struct vy_task_ops *ops;
 
-	/** ->execute status; ->complete will only be called if it is 0 */
+	/** ->execute ret code */
 	int status;
 
 	/** index this task is for */
@@ -3953,6 +3953,13 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_run *run = task->dump.new_run;
 	struct vy_mem *mem;
 
+	/*
+	 * No need to roll back anything on dump failure - the range will just
+	 * carry on with a new shadow memory tree.
+	 */
+	if (task->status != 0)
+		goto out;
+
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
@@ -3989,6 +3996,7 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_index_dump_range_index(index);
 	}
 
+out:
 	vy_scheduler_add_range(index->env->scheduler, range);
 	return 0;
 }
@@ -4073,6 +4081,13 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_range *n;
 	int count = 0;
 	int rc;
+
+	if (task->status != 0) {
+		/* roll back */
+		vy_range_splitfree(split_list);
+		vy_scheduler_add_range(index->env->scheduler, range);
+		return 0;
+	}
 
 	rlist_foreach_entry(n, split_list, split)
 		 count++;
@@ -4636,8 +4651,7 @@ vy_scheduler_f(va_list va)
 		/* Complete and delete all processed tasks */
 		struct vy_task *next;
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
-			if (task->status == 0 &&
-			    task->ops->complete && task->ops->complete(task))
+			if (task->ops->complete && task->ops->complete(task))
 				error_log(diag_last_error(diag_get()));
 			vy_task_delete(&scheduler->task_pool, task);
 		}
