@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 -- get instance name from filename (autobootstrap1.lua => autobootstrap1)
-local INSTANCE_ID = string.match(arg[2], "%d")
+local INSTANCE_ID = string.match(arg[0], "%d")
 local USER = 'cluster'
 local PASSWORD = 'somepassword'
 local SOCKET_DIR = require('fio').cwd()

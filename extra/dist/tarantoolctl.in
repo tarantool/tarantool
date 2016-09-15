@@ -357,8 +357,6 @@ end
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
-    shift_argv(arg, 0, 2)
-
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
             cfg[i] = v
@@ -411,6 +409,7 @@ local function start()
         script_name = instance_path,
         __defer_update = true
     }
+    shift_argv(arg, 0, 2)
     local success, data = pcall(dofile, instance_path)
     -- if load fails - show last 10 lines of the log file
     if not success then
