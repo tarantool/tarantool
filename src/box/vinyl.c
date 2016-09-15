@@ -740,7 +740,7 @@ struct PACKED vy_run_footprint {
  * chunk.
  */
 struct PACKED vy_run_info {
-	/* sizes of containig structures */
+	/* Sizes of containing structures */
 	struct vy_run_footprint footprint;
 	uint32_t  crc;
 	/** Total run size when stored in a file. */
@@ -5714,12 +5714,15 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  *  (record.key > key),
  * If that value was not found then position is set to end_pos (invalid pos)
  * *equal_key is set to true if found value is equal to key of false otherwise
+ * Beware of:
+ * 1) VINYL_GT/VINYL_LE special case
+ * 2) search with partial key and lsn != INT64_MAX is meaningless
+ *    and dangerous
+ * 3) if return false, the position was set to maximal lsn of the
+ *    next key
+ *
  * @retval 0 success
  * @retval -1 read or memory error
- * Beware of:
- * 1)VINYL_GT/VINYL_LE special case
- * 2)search with partial key and lsn != INT64_MAX is meaningless and dangerous
- * 3)if return false, the position was set to maximal lsn of the next key
  */
 static int
 vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
@@ -7230,72 +7233,86 @@ vy_txw_iterator_iface_open(struct vy_tuple_iterator *vitr,
  * Contains source iterator, additional properties and merge state
  */
 struct vy_merge_src {
-	/* Source iterator */
+	/** Source iterator */
 	struct vy_tuple_iterator iterator;
-	/* Source can change during merge iteration */ 
+	/** Source can change during merge iteration */
 	bool is_mutable;
-	/* Source belongs to a range (see vy_merge_iterator comments) */
+	/** Source belongs to a range (@sa vy_merge_iterator comments). */
 	bool belong_range;
-	/* All sources with the same front_id as in struct vy_merge_iterator
-	 * are on the same key of current output tuple (optimization) */
+	/**
+	 * All sources with the same front_id as in struct
+	 * vy_merge_iterator are on the same key of current output
+	 * tuple (optimization)
+	 */
 	uint32_t front_id;
 };
 
 /**
- * Merge iterator takes several iterators as a source and sorts output from
- * them by given order and LSN DESC. Nothing is skipped, just sorted.
- * There are several optimizations, that requires:
- * 1)all sources are given with increasing age.
- * 2)mutable sources are given before read-blocking sources.
- * The iterator designed for read iteration over write_set of current
- * transaction (that does not belong to any range but to entire index)
- * and mems and runs of some range. For this purpose the iterator hase
- * specuial flag (range_ended) that signals to read iterator that it must
- * switch to the next range
+ * Merge iterator takes several iterators as a source and sorts
+ * output from them by given order and LSN DESC. Nothing is
+ * skipped, just sorted.  There are several optimizations, that
+ * requires:
+ * 1) all sources are given with increasing age.
+ * 2) mutable sources are given before read-blocking sources.
+ * The iterator designed for read iteration over write_set of
+ * current transaction (that does not belong to any range but to
+ * entire index) and mems and runs of some range. For this purpose
+ * the iterator has special flag (range_ended) that signals to
+ * read iterator that it must switch to the next range.
  */
 struct vy_merge_iterator {
-	/* Array of sources */
+	/** Array of sources */
 	struct vy_merge_src *src;
-	/* Number of elements in the src array */
+	/** Number of elements in the src array */
 	uint32_t src_count;
-	/* Number of elements allocated in the src array */
+	/** Number of elements allocated in the src array */
 	uint32_t src_capacity;
-	/* Current source offset that merge iterator is positioned on */
+	/** Current source offset that merge iterator is positioned on */
 	uint32_t curr_src;
-	/* Offset of the first source with is_mutable == true */
+	/** Offset of the first source with is_mutable == true */
 	uint32_t mutable_start;
-	/* Next offset after the last source with is_mutable == true */
+	/** Next offset after the last source with is_mutable == true */
 	uint32_t mutable_end;
-	/* key_def for comparators */
+	/** key_def for comparators */
 	struct key_def *key_def;
-	/* key to compare with */
+	/** key to compare with */
 	char *key;
-	/* Order of iteration */
+	/** Order of iteration */
 	enum vy_order order;
-	/* Current tuple that merge iterator is positioned on */
+	/** Current tuple that merge iterator is positioned on */
 	struct vy_tuple *curr_tuple;
-	/* All sources with this front_id
-	 * are on the same key of current iteration (optimization) */
+	/**
+	 * All sources with this front_id are on the same key of
+	 * current iteration (optimization)
+	 */
 	uint32_t front_id;
-	/* If index is unique and full key is given we can optimize first
-	 * search in order to avoid unnecessary reading from disk.
-	 * That flag is set to true during initialization if index is unique
-	 * and  full key is given. After first _get or _next_key call is set
-	 * to false */
+	/**
+	 * If index is unique and full key is given we can
+	 * optimize first search in order to avoid unnecessary
+	 * reading from disk.  That flag is set to true during
+	 * initialization if index is unique and  full key is
+	 * given. After first _get or _next_key call is set to
+	 * false
+	 */
 	bool unique_optimization;
-	/* After first search with unique_optimization we must do some extra
+	/**
+	 * After first search with unique_optimization we must do some extra
 	 * moves and optimizations for _next_lsn call. So that flag is set to
 	 * true after first search and will set to false after consequent
 	 * _next_key call */
 	bool is_in_uniq_opt;
-	/* This flag is set to false during initialiization and means that we
-	 * must do lazy search for first _get or _next call. After that is
-	 * set to false */
+	/**
+	 * This flag is set to false during initialization and
+	 * means that we must do lazy search for first _get or
+	 * _next call. After that is set to false
+	 */
 	bool search_started;
-	/* If all sources marked with belong_range = true comes to the end of
-	 * data this flag is automatically set to true; is false otherwise.
-	 * For read iterator range_ended = true means that it must switch to
-	 * next range */
+	/**
+	 * If all sources marked with belong_range = true comes to
+	 * the end of data this flag is automatically set to true;
+	 * is false otherwise.  For read iterator range_ended = true
+	 * means that it must switch to next range
+	 */
 	bool range_ended;
 };
 
@@ -7319,7 +7336,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def,
 	itr->mutable_start = 0;
 	itr->mutable_end = 0;
 	itr->curr_tuple = NULL;
-	itr->unique_optimization = vy_tuple_key_part(key, 0) != NULL &&
+	itr->unique_optimization =
 		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
 		vy_tuple_key_is_full(key, key_def);
 	itr->is_in_uniq_opt = false;
