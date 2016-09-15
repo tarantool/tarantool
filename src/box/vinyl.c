@@ -5015,7 +5015,8 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 		/*
 		 * INSERT case: return new tuple.
 		 */
-		struct vy_tuple *res = vy_tuple_from_data(index, new_mp, new_mp_end);
+		struct vy_tuple *res;
+		res = vy_tuple_from_data(index, new_mp, new_mp_end);
 		res->flags |= SVREPLACE;
 		return res;
 	}
@@ -7827,13 +7828,13 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 	 *    if save_delete flag is true.
 	 *  - when done with this key, proceed with the next one.
 	 */
-	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi))
-	{
+	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi)) {
+
 		if (wi->goto_next_key) {
 			rc = vy_merge_iterator_next_key(mi);
 			wi->goto_next_key = false;
 		}
-		/**
+		/*
 		 * If we reached the end of the key LSNs then go to
 		 * the next key. If the end of all keys is reached
 		 * then it's the end of the iterator.
@@ -7856,7 +7857,41 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			break;
 		}
 		/* The merge iterator now is below the purge  LSN. */
-		if (tuple->flags & SVDELETE) {
+		if (tuple->flags & SVREPLACE) {
+			/* Replace. */
+			wi->goto_next_key = true;
+			if (wi->upsert_tuple) {
+				/*
+				 * If the previous tuple was upserted
+				 * then combine it with the replace and return.
+				 */
+				tuple = vy_apply_upsert(wi->upsert_tuple,
+							tuple, wi->index,
+							false);
+			}
+			break;
+		} else if (tuple->flags & SVUPSERT) {
+			/*
+			 * If the merge iterator now is below the
+			 * purge LSN then upserts can be merged
+			 * and all operations older than replace
+			 * on the same key can be skipped.
+			 */
+			if (wi->upsert_tuple) {
+				/*
+				 * If it isn't the first upsert
+				 * then squash the two of them
+				 * into one.
+				 */
+				tuple = vy_apply_upsert(wi->upsert_tuple,
+							tuple, wi->index,
+							false);
+				vy_tuple_unref(wi->upsert_tuple);
+			} else {
+				vy_tuple_ref(tuple);
+			}
+			wi->upsert_tuple = tuple;
+		} else if (tuple->flags & SVDELETE) {
 			/*
 			 * The tuple on top of the stack is
 			 * delete. We can disregard the rest of
@@ -7885,40 +7920,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 				}
 				break;
 			}
-		} else if (tuple->flags & SVUPSERT) {
-			/*
-			 * If the merge iterator now is below the
-			 * purge LSN then upserts can be merged
-			 * and all operations older than replace
-			 * on the same key can be skipped.
-			 */
-			if (wi->upsert_tuple) {
-				/*
-				 * If it isn't the first upsert
-				 * then squash the two of them
-				 * into one.
-				 */
-				tuple = vy_apply_upsert(wi->upsert_tuple,
-							tuple, wi->index,
-							false);
-				vy_tuple_unref(wi->upsert_tuple);
-			} else {
-				vy_tuple_ref(tuple);
-			}
-			wi->upsert_tuple = tuple;
-		} else if (tuple->flags & SVREPLACE) {
-			/* Replace. */
-			wi->goto_next_key = true;
-			if (wi->upsert_tuple) {
-				/*
-				 * If the previous tuple was upserted
-				 * then combine it with the replace and return.
-				 */
-				tuple = vy_apply_upsert(wi->upsert_tuple,
-							tuple, wi->index,
-							false);
-			}
-			break;
 		} else {
 			unreachable();
 		}
