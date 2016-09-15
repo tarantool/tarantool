@@ -1890,22 +1890,22 @@ vy_pwrite_file(int fd, void *buf, uint32_t size, off_t offset)
 
 struct vy_write_iterator;
 
-struct vy_write_iterator *
+static struct vy_write_iterator *
 vy_write_iterator_new(bool save_delete, struct vy_index *index,
 		      int64_t purge_lsn);
-int
+static int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
 			  int fd, bool is_mutable, bool control_eof);
-int
+static int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 			  bool is_mutable, bool control_eof);
-int
+static int
 vy_write_iterator_next(struct vy_write_iterator *wi);
 
-int
+static int
 vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result);
 
-void
+static void
 vy_write_iterator_delete(struct vy_write_iterator *wi);
 
 /**
@@ -7732,17 +7732,21 @@ struct vy_write_iterator {
 	/*
 	 * If the current tuple LSN is bigger than purge_lsn then
 	 * it could be visible to an active transaction and must
-	 * be preserved in the output. Otherwise it is dropped.
+	 * be preserved in the output. Otherwise it can be dropped
+	 * if a newer version of the tuple exists.
 	 * @sa vy_write_iterator_next
 	 */
 	int64_t purge_lsn;
 	/*
 	 * Users of a write iterator can specify if they need
-	 * to preserve deletes.. If save_delete is true then
-	 * old deletes, i.e. those which  LSN is less or equal to
-	 * purge LSN are preserved in the output, ohterwise
-	 * such deletes are skipped and iteration continues
-	 * from the next key.
+	 * to preserve deletes. This is necessary, for example,
+	 * when dumping a run, to ensure that the deleted tuple
+	 * is eventually removed from all LSM layers.
+	 * If save_delete is true then old deletes, i.e. those
+	 * which  LSN is less or equal to purge LSN and for which
+	 * there are no new replaces, are preserved in the output,
+	 * otherwise such deletes are skipped and iteration
+	 * continues from the next key.
 	 */
 	bool save_delete;
 	bool goto_next_key;
@@ -7755,7 +7759,7 @@ struct vy_write_iterator {
  * Open an empty write iterator. To add sources to the iterator
  * use vy_write_iterator_add_* functions
  */
-void
+static void
 vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
 		       struct vy_index *index, int64_t purge_lsn)
 {
@@ -7767,7 +7771,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
 	vy_merge_iterator_open(&wi->mi, index->key_def, VINYL_GE, NULL);
 }
 
-struct vy_write_iterator *
+static struct vy_write_iterator *
 vy_write_iterator_new(bool save_delete, struct vy_index *index,
 		      int64_t purge_lsn)
 {
@@ -7780,7 +7784,7 @@ vy_write_iterator_new(bool save_delete, struct vy_index *index,
 	return wi;
 }
 
-int
+static int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
 			  int fd, bool is_mutable, bool control_eof)
 {
@@ -7793,7 +7797,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
 	return 0;
 }
 
-int
+static int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 			  bool is_mutable, bool control_eof)
 {
@@ -7805,7 +7809,15 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 	return 0;
 }
 
-int
+/**
+ * The write iterator can return multiple LSNs for the same
+ * key, thus next() will automatically switch to the next
+ * key when it's appropriate.
+ *
+ * The user of the write iterator simply expects a stream
+ * of tuples to write to the output.
+ */
+static int
 vy_write_iterator_next(struct vy_write_iterator *wi)
 {
 	/*
@@ -7825,7 +7837,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 	struct vy_merge_iterator *mi = &wi->mi;
 	/*
 	 * rc values mean the following:
-	 *  - rc < 0 - it is an error.
+	 *  - rc < 0 - an error.
 	 *  - rc = 0 - all is ok.
 	 *  - rc > 0 - iteration over the current key or LSN is finished.
 	 */
@@ -7847,13 +7859,18 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 
 	/*
 	 * This cycle works as follows:
-	 *  - iterate over all tuples with the same key. If the
-	 *    current tuple is newer than purge_lsn then there is
-	 *    a transaction that may be using it and the tuple
-	 *    is returned as is.
-	 *    Otherwise, all "older" versions of this tuple
-	 *    can be squashed together: upserts merged, replaces
-	 *    negated with deletes and vice versa.
+	 *  - iterate over all tuples with the same key.
+	 *    The merge iterator returns versions of the same
+	 *    tuple in newest-to-oldest order.
+	 *    If the current tuple is newer than purge_lsn then
+	 *    there is a transaction that may be using it and the
+	 *    tuple is returned as is.
+	 *    Otherwise, we can pick the first tuple from the
+	 *    "top" of the version stack: it will reflect the
+	 *    latest value we need to preserve. Special
+	 *    care needs to be taken about upserts and deletes:
+	 *    upserts squashed together and deletes preserved
+	 *    if save_delete flag is true.
 	 *  - when done with this key, proceed with the next one.
 	 */
 	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi))
@@ -7884,29 +7901,29 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			/* Save the current tuple as the result. */
 			break;
 		}
-		/*
-		 * If the merge iterator now is below the purge
-		 * LSN then upserts can be merged and all
-		 * operations older than replace on the same key can
-		 * be skipped.
-		 */
+		/* The merge iterator now is below the purge  LSN. */
 		if (tuple->flags & SVDELETE) {
+			/*
+			 * The tuple on top of the stack is
+			 * delete. We can disregard the rest of
+			 * the stack.
+			 */
+			wi->goto_next_key = true;
 			if (wi->save_delete) {
 				/*
-				 * If the tuple was deleted and
-				 * user needs to save it then
-				 * return it.
-				 * There is the case when we need to save
-				 * deletions. If the deletion is below the
-				 * purge LSN - there are no transactions
-				 * that need this or older versions of the
-				 * tuple.
+				 * Preserve the delete in output
+				 * if it's a dump of a run, so it
+				 * can annihilate an older version
+				 * of this tuple when multiple
+				 * runs are merged together.
 				 */
 				if (wi->upsert_tuple) {
 					/*
-					 * If the previous operation was
-					 * DELETE then save UPSERT as
-					 * replace.
+					 * If DELETE was followed
+					 * by UPSERT, convert
+					 * UPSERT to REPLACE at
+					 * once, and return it
+					 * instead of DELETE.
 					 */
 					tuple = vy_apply_upsert(wi->upsert_tuple,
 								tuple, wi->index,
@@ -7914,14 +7931,13 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 				}
 				break;
 			}
-			/*
-			 * If the tuple was deleted then all
-			 * operations preceding it can be
-			 * skipped. Go to the next key.
-			 */
-			wi->goto_next_key = true;
-			continue;
 		} else if (tuple->flags & SVUPSERT) {
+			/*
+			 * If the merge iterator now is below the
+			 * purge LSN then upserts can be merged
+			 * and all operations older than replace
+			 * on the same key can be skipped.
+			 */
 			if (wi->upsert_tuple) {
 				/*
 				 * If it isn't the first upsert
@@ -7938,6 +7954,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			wi->upsert_tuple = tuple;
 		} else {
 			/* Replace. */
+			wi->goto_next_key = true;
 			if (wi->upsert_tuple) {
 				/*
 				 * If the previous tuple was upserted
@@ -7947,7 +7964,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 							tuple, wi->index,
 							false);
 			}
-			wi->goto_next_key = true;
 			break;
 		}
 	}
@@ -7958,7 +7974,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 	return 0;
 }
 
-int
+static int
 vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result)
 {
 	if (wi->curr_tuple == NULL && vy_write_iterator_next(wi))
@@ -7968,7 +7984,7 @@ vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result)
 	return 0;
 }
 
-void
+static void
 vy_write_iterator_close(struct vy_write_iterator *wi)
 {
 	if (wi->upsert_tuple) {
@@ -7979,7 +7995,7 @@ vy_write_iterator_close(struct vy_write_iterator *wi)
 	vy_merge_iterator_close(&wi->mi);
 }
 
-void
+static void
 vy_write_iterator_delete(struct vy_write_iterator *wi)
 {
 	vy_write_iterator_close(wi);
