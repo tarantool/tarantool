@@ -5015,7 +5015,9 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 		/*
 		 * INSERT case: return new tuple.
 		 */
-		return vy_tuple_from_data(index, new_mp, new_mp_end);
+		struct vy_tuple *res = vy_tuple_from_data(index, new_mp, new_mp_end);
+		res->flags |= SVREPLACE;
+		return res;
 	}
 
 	/*
@@ -5045,6 +5047,9 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 						     result_mp_end);
 		if (result_tuple == NULL)
 			return NULL; /* OOM */
+		if (old_tuple->flags & (SVDELETE | SVREPLACE)) {
+			result_tuple->flags |= SVREPLACE;
+		}
 		goto check_key;
 	}
 
@@ -7901,7 +7906,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 				vy_tuple_ref(tuple);
 			}
 			wi->upsert_tuple = tuple;
-		} else {
+		} else if (tuple->flags & SVREPLACE) {
 			/* Replace. */
 			wi->goto_next_key = true;
 			if (wi->upsert_tuple) {
@@ -7914,6 +7919,8 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 							false);
 			}
 			break;
+		} else {
+			unreachable();
 		}
 	}
 	if (rc)
