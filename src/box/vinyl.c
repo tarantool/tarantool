@@ -756,8 +756,6 @@ struct vy_run_index {
 struct vy_run {
 	struct vy_run_index index;
 	struct vy_run *next;
-	struct vy_page *page_cache;
-	pthread_mutex_t cache_lock;
 };
 
 struct vy_range {
@@ -1287,32 +1285,28 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 }
 
 struct vy_page {
-	struct vy_page_info *info;
-	void *data;
-	uint32_t refs;
+	/** Page position in the run file */
+	uint32_t page_no;
+	/** The number of tuples */
+	uint32_t count;
+	/** Size of raw page data */
+	uint32_t size;
+	/** Raw page data */
+	char data[0];
 };
-
-static void
-vy_page_init(struct vy_page *p, struct vy_page_info *info, char *data)
-{
-	p->info = info;
-	p->data = data;
-	p->refs = 1;
-}
 
 static struct vy_tuple_info*
 sd_pagev(struct vy_page *p, uint32_t pos)
 {
-	assert(pos < p->info->count);
+	assert(pos < p->count);
 	return (struct vy_tuple_info*)(p->data + sizeof(struct vy_tuple_info) * pos);
 }
 
 static void*
 sd_pagepointer(struct vy_page *p, struct vy_tuple_info *v)
 {
-	assert((sizeof(struct vy_tuple_info) * p->info->count) + v->offset <=
-	       p->info->unpacked_size);
-	return (p->data + sizeof(struct vy_tuple_info) * p->info->count)
+	assert((sizeof(struct vy_tuple_info) * p->count) + v->offset <= p->size);
+	return (p->data + sizeof(struct vy_tuple_info) * p->count)
 	       + v->offset;
 }
 
@@ -1384,8 +1378,6 @@ vy_run_new()
 	}
 	vy_run_index_init(&run->index);
 	run->next = NULL;
-	run->page_cache = NULL;
-	pthread_mutex_init(&run->cache_lock, NULL);
 	return run;
 }
 
@@ -1393,11 +1385,7 @@ static void
 vy_run_delete(struct vy_run *run)
 {
 	vy_run_index_destroy(&run->index);
-	if (run->page_cache != NULL) {
-		free(run->page_cache);
-		run->page_cache = NULL;
-	}
-	pthread_mutex_destroy(&run->cache_lock);
+	TRASH(run);
 	free(run);
 }
 
@@ -1442,90 +1430,42 @@ vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
  * After usage user must call vy_run_unload_page
  */
 static struct vy_page *
-vy_run_load_page(struct vy_run *run, uint32_t pos,
-		 int fd)
+vy_run_read_page(struct vy_run *run, uint32_t page_no, int fd)
 {
-	pthread_mutex_lock(&run->cache_lock);
-	if (run->page_cache == NULL) {
-		run->page_cache = calloc(run->index.info.count,
-					 sizeof(*run->page_cache));
-		if (run->page_cache == NULL) {
-			pthread_mutex_unlock(&run->cache_lock);
-			diag_set(OutOfMemory,
-				 run->index.info.count * sizeof (*run->page_cache),
-				 "load_page", "page cache");
-			return NULL;
-		}
-	}
-	if (run->page_cache[pos].refs) {
-		run->page_cache[pos].refs++;
-		pthread_mutex_unlock(&run->cache_lock);
-		return &run->page_cache[pos];
-	}
-	pthread_mutex_unlock(&run->cache_lock);
-	struct vy_page_info *page_info = vy_run_index_get_page(&run->index, pos);
-	uint32_t alloc_size = page_info->unpacked_size;
-	if (page_info->size > page_info->unpacked_size)
-		alloc_size = page_info->size;
-	char *data = malloc(alloc_size);
-	if (data == NULL) {
-		diag_set(OutOfMemory, alloc_size, "load_page", "page cache");
+	struct vy_page_info *page_info =
+		vy_run_index_get_page(&run->index, page_no);
+	struct vy_page *page = malloc(sizeof(*page) + page_info->size);
+	if (page == NULL) {
+		diag_set(OutOfMemory, sizeof(*page) + page_info->size,
+			"load_page", "page cache");
 		return NULL;
 	}
 
-#if 0
-	int rc = coeio_pread(file->fd, data, page_info->size, page_info->offset);
-#else
-	int rc = vy_pread_file(fd, data, page_info->size,
+	page->page_no = page_no;
+	page->count = page_info->count;
+	page->size = page_info->size;
+
+	int rc = vy_pread_file(fd, page->data, page_info->size,
 				  page_info->offset);
-#endif
 
 	if (rc < 0) {
-		free(data);
+		free(page);
 		/* TODO: get file name from range */
 		vy_error("index file read error: %s",
 			 strerror(errno));
 		return NULL;
 	}
 
-	pthread_mutex_lock(&run->cache_lock);
-	run->page_cache[pos].refs++;
-	if (run->page_cache[pos].refs == 1)
-		vy_page_init(&run->page_cache[pos], page_info, data);
-	else
-		free(data);
-	pthread_mutex_unlock(&run->cache_lock);
-	return &run->page_cache[pos];
+	return page;
 }
 
-/**
- * Get a page from cache
- * Page must be loaded with vy_run_load_page before the call
- */
-static struct vy_page *
-vy_run_get_page(struct vy_run *run, uint32_t pos)
-{
-	assert(run->page_cache != NULL);
-	assert(run->page_cache[pos].refs > 0);
-	return &run->page_cache[pos];
-}
-
-/**
- * Free page data
- * Actually decrements reference counter and frees data only there are no users
- */
 static void
-vy_run_unload_page(struct vy_run *run, uint32_t pos)
+vy_page_delete(struct vy_page *page)
 {
-	assert(run->page_cache != NULL);
-	assert(run->page_cache[pos].refs > 0);
-	pthread_mutex_lock(&run->cache_lock);
-	run->page_cache[pos].refs--;
-	if (run->page_cache[pos].refs == 0) {
-		free(run->page_cache[pos].data);
-		run->page_cache[pos].data = NULL;
-	}
-	pthread_mutex_unlock(&run->cache_lock);
+#if !defined(NDEBUG)
+	memset(page, '#', sizeof(*page) + page->size); /* fail early */
+#endif /* !defined(NDEBUG) */
+	free(page);
 }
 
 static int64_t
@@ -5525,11 +5465,9 @@ struct vy_run_iterator {
 	struct vy_tuple *curr_tuple;
 	/** Position of record that spawned curr_tuple */
 	struct vy_run_iterator_pos curr_tuple_pos;
-	/**
-	 * Page number of the currently loaded page, UINT32_MAX if
-	 * no page is loaded.
-	 */
-	uint32_t curr_loaded_page;
+	/** LRU cache of two active pages (two pages is enough). */
+	struct vy_page *curr_page;
+	struct vy_page *prev_page;
 	/** Is false until first .._get ot .._next_.. method is called */
 	bool search_started;
 	/** Search is finished, you will not get more values from iterator */
@@ -5563,27 +5501,75 @@ vy_run_iterator_close(struct vy_run_iterator *itr);
 /* TODO: move to appropriate c file and remove */
 
 /**
- * Load page by given nubber from disk to memory, unload previosly load page
- * Does nothing if currently loaded page is the same as the querried
- * Return the page on success or NULL on read error
- * Affects: curr_loaded_page
+ * Get page from LRU cache
+ * @retval page if found
+ * @retval NULL otherwise
  */
 static struct vy_page *
-vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page)
+vy_run_iterator_cache_get(struct vy_run_iterator *itr, uint32_t page_no)
 {
-	assert(page < itr->run->index.info.count);
-	if (itr->curr_loaded_page != page) {
-		if (itr->curr_loaded_page != UINT32_MAX)
-			vy_run_unload_page(itr->run, itr->curr_loaded_page);
-		struct vy_page *result = vy_run_load_page(itr->run, page,
-							 itr->fd);
-		if (result != NULL)
-			itr->curr_loaded_page = page;
-		else
-			itr->curr_loaded_page = UINT32_MAX;
-		return result;
+	if (itr->curr_page != NULL) {
+		if (itr->curr_page->page_no == page_no)
+			return itr->curr_page;
+		if (itr->prev_page != NULL &&
+		    itr->prev_page->page_no == page_no) {
+			struct vy_page *result = itr->prev_page;
+			itr->prev_page = itr->curr_page;
+			itr->curr_page = result;
+			return result;
+		}
 	}
-	return vy_run_get_page(itr->run, page);
+	return NULL;
+}
+
+/**
+ * Touch page in LRU cache.
+ * The cache is at least two pages. Ensure that subsequent read keeps
+ * the page_no in the cache by moving it to the start of LRU list.
+ * @pre page must be in the cache
+ */
+static void
+vy_run_iterator_cache_touch(struct vy_run_iterator *itr, uint32_t page_no)
+{
+	struct vy_page *page = vy_run_iterator_cache_get(itr, page_no);
+	assert(page != NULL);
+	(void) page;
+}
+
+/**
+ * Put page to LRU cache
+ */
+static void
+vy_run_iterator_cache_put(struct vy_run_iterator *itr, struct vy_page *page)
+{
+	if (itr->prev_page != NULL)
+		vy_page_delete(itr->prev_page);
+	itr->prev_page = itr->curr_page;
+	itr->curr_page = page;
+}
+
+/**
+ * Get a page by the given number the cache or load it from the disk.
+ */
+static int
+vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
+			  struct vy_page **result)
+{
+	/* Check cache */
+	*result = vy_run_iterator_cache_get(itr, page_no);
+	if (*result != NULL)
+		return 0;
+
+	/* Read from the disk (may yield) */
+	struct vy_page *page = vy_run_read_page(itr->run, page_no, itr->fd);
+	if (page == NULL)
+		return -1; /* read error */
+
+	/* Update cache */
+	vy_run_iterator_cache_put(itr, page);
+
+	*result = page;
+	return 0;
 }
 
 /**
@@ -5622,16 +5608,17 @@ vy_iterator_pos_mid(struct vy_run_iterator *itr,
 		result->pos_in_page = 0;
 		return 0;
 	}
-	struct vy_page *page = vy_run_iterator_load_page(itr, pos1.page_no);
-	if (page == NULL)
-		return -1;
+	struct vy_page *page;
+	int rc = vy_run_iterator_load_page(itr, pos1.page_no, &page);
+	if (rc != 0)
+		return rc;
 	assert(pos1.page_no == pos2.page_no || pos2.pos_in_page == 0);
 	uint32_t diff = pos1.page_no == pos2.page_no ?
 		pos2.pos_in_page - pos1.pos_in_page :
-		page->info->count - pos1.pos_in_page;
+		page->count - pos1.pos_in_page;
 	result->page_no = pos1.page_no;
 	result->pos_in_page = pos1.pos_in_page + diff / 2;
-	return result->pos_in_page == page->info->count ? 1 : 0;
+	return result->pos_in_page == page->count ? 1 : 0;
 }
 
 /**
@@ -5650,11 +5637,12 @@ vy_iterator_pos_mid_next(struct vy_run_iterator *itr,
 		*result = mid;
 		return 0;
 	}
-	struct vy_page *page = vy_run_iterator_load_page(itr, mid.page_no);
-	if (page == NULL)
-		return -1;
+	struct vy_page *page;
+	int rc = vy_run_iterator_load_page(itr, mid.page_no, &page);
+	if (rc != 0)
+		return rc;
 	mid.pos_in_page++;
-	*result =  mid.pos_in_page == page->info->count ? end : mid;
+	*result =  mid.pos_in_page == page->count ? end : mid;
 	return 0;
 }
 
@@ -5663,25 +5651,23 @@ vy_iterator_pos_mid_next(struct vy_run_iterator *itr,
  * For the first record in a page reads the result from the page
  * index instead of fetching it from disk.
  *
- * @retval NULL read error or out of memory.
+ * @retval 0 success
+ * @retval -1 read error or out of memory.
  * Affects: curr_loaded_page
  */
-static char *
+static int
 vy_run_iterator_read(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_pos pos, int64_t *lsn)
+		     struct vy_run_iterator_pos pos,
+		     const char **data, int64_t *lsn)
 {
-	if (pos.pos_in_page == 0) {
-		struct vy_page_info *page_info =
-			vy_run_index_get_page(&itr->run->index, pos.page_no);
-		*lsn = page_info->min_key_lsn;
-		return vy_run_index_min_key(&itr->run->index, page_info);
-	}
-	struct vy_page *page = vy_run_iterator_load_page(itr, pos.page_no);
-	if (page == NULL)
-		return NULL;
+	struct vy_page *page;
+	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
+	if (rc != 0)
+		return rc;
 	struct vy_tuple_info *info = sd_pagev(page, pos.pos_in_page);
+	*data = sd_pagepointer(page, info);
 	*lsn = info->lsn;
-	return sd_pagepointer(page, info);
+	return 0;
 }
 
 /**
@@ -5718,10 +5704,11 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 		int rc = vy_iterator_pos_mid(itr, beg, end, &mid);
 		if (rc != 0)
 			return rc;
+		const char *fnd_key;
 		int64_t fnd_lsn;
-		char *fnd_key = vy_run_iterator_read(itr, mid, &fnd_lsn);
-		if (fnd_key == NULL)
-			return -1;
+		rc = vy_run_iterator_read(itr, mid, &fnd_key, &fnd_lsn);
+		if (rc != 0)
+			return rc;
 		int cmp = vy_tuple_compare(fnd_key, key, itr->index->key_def);
 		bool is_equal_key = cmp == 0;
 		if (cmp == 0 &&
@@ -5763,21 +5750,22 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			pos->pos_in_page--;
 		} else {
 			pos->page_no--;
-			struct vy_page *page =
-				vy_run_iterator_load_page(itr, pos->page_no);
-			if (page == NULL)
-				return -1;
-			pos->pos_in_page = page->info->count - 1;
+			struct vy_page *page;
+			int rc = vy_run_iterator_load_page(itr, pos->page_no,
+							   &page);
+			if (rc != 0)
+				return rc;
+			pos->pos_in_page = page->count - 1;
 		}
 	} else {
 		assert(order == VINYL_GE || order == VINYL_GT ||
 		       order == VINYL_EQ);
-		struct vy_page *page =
-			vy_run_iterator_load_page(itr, pos->page_no);
-		if (page == NULL)
-			return -1;
+		struct vy_page *page;
+		int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
+		if (rc != 0)
+			return rc;
 		pos->pos_in_page++;
-		if (pos->pos_in_page >= page->info->count) {
+		if (pos->pos_in_page >= page->count) {
 			pos->page_no++;
 			pos->pos_in_page = 0;
 			if (pos->page_no == itr->run->index.info.count)
@@ -5785,33 +5773,6 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 		}
 	}
 	return 0;
-}
-
-/**
- * Temporary prevent unloading of given page if necessary
- * Returns a value that must be passed to vy_run_iterator_unlock_page
- *
- * @retval page no of the locked page
- */
-static uint32_t
-vy_run_iterator_lock_page(struct vy_run_iterator *itr, uint32_t page_no)
-{
-	if (itr->curr_loaded_page != page_no)
-		return UINT32_MAX;
-	/* just increment reference counter */
-	vy_run_load_page(itr->run, page_no,
-			 itr->fd);
-	return page_no;
-}
-
-/**
- * Cleanup after vy_run_iterator_lock_page
- */
-static void
-vy_run_iterator_unlock_page(struct vy_run_iterator *itr, uint32_t lock)
-{
-	if (lock != UINT32_MAX)
-		vy_run_unload_page(itr->run, lock);
 }
 
 /**
@@ -5828,11 +5789,11 @@ static int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 {
 	assert(itr->curr_pos.page_no < itr->run->index.info.count);
+	const char *cur_key;
 	int64_t cur_lsn;
-	int rc = 0;
-	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
-	if (cur_key == NULL)
-		return -1;
+	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	if (rc != 0)
+		return rc;
 	while (cur_lsn > itr->vlsn) {
 		rc = vy_run_iterator_next_pos(itr, itr->order, &itr->curr_pos);
 		if (rc != 0) {
@@ -5840,9 +5801,10 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 				vy_run_iterator_close(itr);
 			return rc;
 		}
-		cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
-		if (cur_key == NULL)
-			return -1;
+		rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key,
+					  &cur_lsn);
+		if (rc != 0)
+			return rc;
 		if (itr->order == VINYL_EQ &&
 		    vy_tuple_compare(cur_key, itr->key, itr->index->key_def)) {
 			vy_run_iterator_close(itr);
@@ -5850,28 +5812,37 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 		}
 	}
 	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
-		/* Lock the  page, i.e. prevent the cur_key from unloading. */
-		uint32_t lock_page =
-			vy_run_iterator_lock_page(itr, itr->curr_pos.page_no);
+		/* Remember the page_no of cur_key */
+		uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
 		struct vy_run_iterator_pos test_pos;
 		rc = vy_run_iterator_next_pos(itr, itr->order, &test_pos);
 		while (rc == 0) {
+			/*
+			 * The cache is at least two pages. Ensure that
+			 * subsequent read keeps the cur_key in the cache
+			 * by moving its page to the start of LRU list.
+			 */
+			vy_run_iterator_cache_touch(itr, cur_key_page_no);
+
+			const char *test_key;
 			int64_t test_lsn;
-			char *test_key =
-				vy_run_iterator_read(itr, test_pos, &test_lsn);
-			if (test_key == NULL) {
-				rc = -1;
-				break;
-			}
+			rc = vy_run_iterator_read(itr, test_pos, &test_key,
+						  &test_lsn);
+			if (rc != 0)
+				return rc;
 			struct key_def *key_def = itr->index->key_def;
 			if (test_lsn > itr->vlsn ||
 			    vy_tuple_compare(cur_key, test_key, key_def) != 0)
 				break;
 			itr->curr_pos = test_pos;
+
+			/* See above */
+			vy_run_iterator_cache_touch(itr, cur_key_page_no);
+
 			rc = vy_run_iterator_next_pos(itr, itr->order, &test_pos);
 		}
-		vy_run_iterator_unlock_page(itr, lock_page);
+
 		rc = rc > 0 ? 0 : rc;
 	}
 	return rc;
@@ -5889,7 +5860,6 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 static int
 vy_run_iterator_start(struct vy_run_iterator *itr)
 {
-	assert(itr->curr_loaded_page == UINT32_MAX);
 	assert(!itr->search_started);
 	itr->search_started = true;
 
@@ -5902,10 +5872,10 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 			vy_run_iterator_close(itr);
 			return 1;
 		}
-		struct vy_page *page =
-			vy_run_iterator_load_page(itr, 0);
-		if (page == NULL)
-			return -1;
+		struct vy_page *page;
+		int rc = vy_run_iterator_load_page(itr, 0, &page);
+		if (rc != 0)
+			return rc;
 	} else if (itr->run->index.info.count == 0) {
 		/* never seen that, but it could be possible in future */
 		vy_run_iterator_close(itr);
@@ -5985,9 +5955,10 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
-	itr->curr_loaded_page = UINT32_MAX;
 	itr->curr_pos.page_no = itr->run->index.info.count;
 	itr->curr_tuple_pos.page_no = UINT32_MAX;
+	itr->curr_page = NULL;
+	itr->prev_page = NULL;
 
 	itr->search_started = false;
 	itr->search_ended = false;
@@ -6023,10 +5994,10 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_tuple **result)
 		itr->curr_tuple_pos.page_no = UINT32_MAX;
 	}
 
-	struct vy_page *page =
-		vy_run_iterator_load_page(itr, itr->curr_pos.page_no);
-	if (page == NULL)
-		return -1;
+	struct vy_page *page;
+	int rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
+	if (rc != 0)
+		return rc;
 	struct vy_tuple_info *info = sd_pagev(page, itr->curr_pos.pos_in_page);
 	char *key = sd_pagepointer(page, info);
 	itr->curr_tuple = vy_tuple_alloc(info->size);
@@ -6071,51 +6042,54 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr)
 		if (itr->curr_pos.page_no == end_page) {
 			/* A special case for reverse iterators */
 			uint32_t page_no = end_page - 1;
-			struct vy_page *page =
-				vy_run_iterator_load_page(itr, page_no);
-			if (page == NULL)
-				return -1;
-			if (page->info->count == 0) {
+			struct vy_page *page;
+			int rc = vy_run_iterator_load_page(itr, page_no, &page);
+			if (rc != 0)
+				return rc;
+			if (page->count == 0) {
 				vy_run_iterator_close(itr);
 				return 1;
 			}
 			itr->curr_pos.page_no = page_no;
-			itr->curr_pos.pos_in_page = page->info->count - 1;
+			itr->curr_pos.pos_in_page = page->count - 1;
 			return vy_run_iterator_find_lsn(itr);
 		}
 	}
 	assert(itr->curr_pos.page_no < end_page);
 
+	const char *cur_key;
 	int64_t cur_lsn;
-	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
-	if (cur_key == NULL)
-		return -1;
+	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	if (rc != 0)
+		return rc;
+	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
-	/*
-	 * Lock the page, i.e. prevent the memory of cur_key from
-	 * being unloaded.
-	 */
-	uint32_t lock_page =
-		vy_run_iterator_lock_page(itr, itr->curr_pos.page_no);
-
+	const char *next_key;
 	int64_t next_lsn;
-	char *next_key;
 	do {
 		int rc = vy_run_iterator_next_pos(itr, itr->order,
 						  &itr->curr_pos);
 		if (rc != 0) {
 			if (rc > 0)
 				vy_run_iterator_close(itr);
-			vy_run_iterator_unlock_page(itr, lock_page);
 			return rc;
 		}
-		next_key = vy_run_iterator_read(itr, itr->curr_pos, &next_lsn);
-		if (next_key == NULL)
-			return -1;
 
+		/*
+		 * The cache is at least two pages. Ensure that
+		 * subsequent read keeps the cur_key in the cache
+		 * by moving its page to the start of LRU list.
+		 */
+		vy_run_iterator_cache_touch(itr, cur_key_page_no);
+
+		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key,
+					  &next_lsn);
+		if (rc != 0)
+			return rc;
+
+		/* See above */
+		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 	} while (vy_tuple_compare(cur_key, next_key, key_def) == 0);
-
-	vy_run_iterator_unlock_page(itr, lock_page);
 
 	if (itr->order == VINYL_EQ &&
 	    vy_tuple_compare(next_key, itr->key, key_def) != 0) {
@@ -6144,20 +6118,23 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr)
 	}
 	assert(itr->curr_pos.page_no < itr->run->index.info.count);
 
+	int rc;
 	struct vy_run_iterator_pos next_pos;
-	int rc = vy_run_iterator_next_pos(itr, VINYL_GE, &next_pos);
+	rc = vy_run_iterator_next_pos(itr, VINYL_GE, &next_pos);
 	if (rc != 0)
 		return rc;
 
+	const char *cur_key;
 	int64_t cur_lsn;
-	char *cur_key = vy_run_iterator_read(itr, itr->curr_pos, &cur_lsn);
-	if (cur_key == NULL)
-		return -1; /* read error */
+	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	if (rc != 0)
+		return rc;
 
+	const char *next_key;
 	int64_t next_lsn;
-	char *next_key = vy_run_iterator_read(itr, next_pos, &next_lsn);
-	if (next_key == NULL)
-		return -1; /* read error */
+	rc = vy_run_iterator_read(itr, next_pos, &next_key, &next_lsn);
+	if (rc != 0)
+		return rc;
 
 	/**
 	 * One can think that we had to lock page of itr->curr_pos,
@@ -6239,10 +6216,11 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 		itr->curr_tuple = NULL;
 		itr->curr_tuple_pos.page_no = UINT32_MAX;
 	}
-	if (itr->curr_loaded_page != UINT32_MAX) {
-		assert(itr->curr_loaded_page < itr->run->index.info.count);
-		vy_run_unload_page(itr->run, itr->curr_loaded_page);
-		itr->curr_loaded_page = UINT32_MAX;
+	if (itr->curr_page != NULL) {
+		vy_page_delete(itr->curr_page);
+		if (itr->prev_page != NULL)
+			vy_page_delete(itr->prev_page);
+		itr->curr_page = itr->prev_page = NULL;
 	}
 	itr->search_ended = true;
 }
@@ -7334,11 +7312,13 @@ vy_merge_iterator_add(struct vy_merge_iterator *itr,
 static int
 vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 {
+	int rc;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
 		if (itr->src[i].front_id != itr->front_id)
 			continue;
-		if (itr->src[i].iterator.iface->next_key(&itr->src[i].iterator) < 0)
-			return -1;
+		rc = itr->src[i].iterator.iface->next_key(&itr->src[i].iterator);
+		if (rc < 0)
+			return rc;
 	}
 	itr->front_id++;
 	return 0;
@@ -7518,6 +7498,8 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 		if (itr->curr_tuple != NULL)
 			vy_tuple_unref(itr->curr_tuple);
 		rc = sub_itr->iface->get(sub_itr, &itr->curr_tuple);
+		if (rc < 0)
+			return rc;
 		assert(rc == 0);
 		vy_tuple_ref(itr->curr_tuple);
 		return rc;
@@ -7528,7 +7510,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 			struct vy_tuple *t;
 			rc = sub_itr->iface->get(sub_itr, &t);
 			if (rc < 0)
-				return -1;
+				return rc;
 			if (rc > 0)
 				continue;
 			if (vy_tuple_compare(t->data, itr->key, itr->key_def) == 0) {
@@ -7544,9 +7526,13 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 		} else if (itr->src[i].front_id == itr->front_id) {
 			sub_itr = &itr->src[i].iterator;
 			itr->curr_src = i;
-			if (itr->curr_tuple != NULL)
+			if (itr->curr_tuple != NULL) {
 				vy_tuple_unref(itr->curr_tuple);
-			sub_itr->iface->get(sub_itr, &itr->curr_tuple);
+				itr->curr_tuple = NULL;
+			}
+			rc = sub_itr->iface->get(sub_itr, &itr->curr_tuple);
+			if (rc < 0)
+				return rc;
 			vy_tuple_ref(itr->curr_tuple);
 			return 0;
 		}
