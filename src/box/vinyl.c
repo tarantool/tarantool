@@ -1722,7 +1722,7 @@ vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
 		itr->cur_range = vy_range_tree_first(&index->tree);
 		return;
 	}
-	if (vy_tuple_key_part(itr->key, 0)  == NULL) {
+	if (vy_tuple_key_part(itr->key, 0) == NULL) {
 		switch (itr->order) {
 		case VINYL_LT:
 		case VINYL_LE:
@@ -1739,7 +1739,6 @@ vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
 		return;
 	}
 	/* route */
-	assert(itr->key != NULL);
 	struct vy_range_tree_key tree_key;
 	tree_key.data = itr->key;
 	tree_key.size = itr->key_size;
@@ -2125,7 +2124,8 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 {
 	(void)index;
 	struct vy_iter ii;
-	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, NULL);
+	struct vy_tuple *key = vy_tuple_from_key(index, NULL, 0);
+	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, key->data);
 	assert(!rlist_empty(result));
 	struct vy_range *prev = rlist_first_entry(result, struct vy_range,
 						  split);
@@ -2159,6 +2159,7 @@ vy_range_redistribute(struct vy_index *index, struct vy_range *range,
 		prev = p;
 	}
 	assert(ii.vif->get(&ii) == NULL);
+	vy_tuple_unref(key);
 	return 0;
 }
 
@@ -2182,20 +2183,23 @@ static int
 vy_range_redistribute_index(struct vy_index *index, struct vy_range *range)
 {
 	struct vy_buf buf;
+	struct vy_tuple *key = vy_tuple_from_key(index, NULL, 0);
 	vy_buf_create(&buf);
 	struct vy_iter ii;
-	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, NULL);
+	vy_tmp_mem_iterator_open(&ii, range->mem, VINYL_GE, key->data);
 	while (ii.vif->has(&ii)) {
 		struct vy_tuple *v = ii.vif->get(&ii);
 		int rc = vy_buf_add(&buf, v, sizeof(struct vy_tuple ***));
 		if (unlikely(rc == -1)) {
 			vy_buf_destroy(&buf);
+			vy_tuple_unref(key);
 			return -1;
 		}
 		ii.vif->next(&ii);
 	}
 	if (unlikely(vy_buf_used(&buf) == 0)) {
 		vy_buf_destroy(&buf);
+		vy_tuple_unref(key);
 		return 0;
 	}
 	uint64_t now = clock_monotonic64();
@@ -2207,6 +2211,7 @@ vy_range_redistribute_index(struct vy_index *index, struct vy_range *range)
 		vy_bufiter_next(&i);
 	}
 	vy_buf_destroy(&buf);
+	vy_tuple_unref(key);
 	return 0;
 }
 
@@ -5524,7 +5529,8 @@ struct vy_run_iterator {
 	/* Search options */
 	/**
 	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 * if the key is not specified, GT and EQ are changed to
+	 * GE, LT to LE for beauty.
 	 */
 	enum vy_order order;
 	/* Search key data in terms of vinyl, vy_tuple_compare argument */
@@ -5930,7 +5936,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 	struct vy_run_iterator_pos end_pos = {itr->run->index.info.count, 0};
 	bool equal_found = false;
 	int rc;
-	if (itr->key != NULL) {
+	if (vy_tuple_key_part(itr->key, 0) != NULL) {
 		rc = vy_run_iterator_search(itr, itr->key, INT64_MAX,
 					    &itr->curr_pos, &equal_found);
 		if (rc < 0)
@@ -6221,7 +6227,7 @@ vy_run_iterator_restore(struct vy_run_iterator *itr,
 	itr->key = last_tuple->data;
 	itr->vlsn = last_tuple->lsn;
 	int rc = vy_run_iterator_start(itr);
-	itr->order = (save_key != NULL ? save_order :
+	itr->order = (vy_tuple_key_part(save_key, 0) != NULL ? save_order :
 		      save_order == VINYL_LE || save_order == VINYL_LT ?
 		      VINYL_LE : VINYL_GE);
 	itr->key = save_key;
@@ -6486,7 +6492,7 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	tree_key.data = itr->key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (itr->key != NULL) {
+	if (vy_tuple_key_part(itr->key, 0) != NULL) {
 		if (itr->order == VINYL_EQ) {
 			bool exact;
 			itr->curr_pos =
@@ -6562,6 +6568,7 @@ static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 		     enum vy_order order, char *key, int64_t vlsn)
 {
+	assert(key != NULL);
 	itr->mem = mem;
 
 	itr->order = order;
@@ -6914,7 +6921,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr)
 	itr->curr_txv = NULL;
 	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
-	if (itr->key != NULL) {
+	if (vy_tuple_key_part(itr->key, 0) != NULL) {
 		if (itr->order == VINYL_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->order == VINYL_GE || itr->order == VINYL_GT)
@@ -7379,6 +7386,7 @@ static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def,
 		       enum vy_order order, char *key)
 {
+	assert(key != NULL);
 	itr->key_def = key_def;
 	itr->key = key;
 	itr->order = order;
@@ -7391,7 +7399,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct key_def *key_def,
 	itr->mutable_start = 0;
 	itr->mutable_end = 0;
 	itr->curr_tuple = NULL;
-	itr->unique_optimization = key != NULL &&
+	itr->unique_optimization = vy_tuple_key_part(key, 0) != NULL &&
 		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
 		vy_tuple_key_is_full(key, key_def);
 	itr->is_in_uniq_opt = false;
@@ -7750,6 +7758,7 @@ struct vy_write_iterator {
 	 */
 	bool save_delete;
 	bool goto_next_key;
+	struct vy_tuple *key;
 	struct vy_tuple *curr_tuple;
 	struct vy_tuple *upsert_tuple;
 	struct vy_merge_iterator mi;
@@ -7768,7 +7777,9 @@ vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
 	wi->save_delete = save_delete;
 	wi->curr_tuple = NULL;
 	wi->goto_next_key = false;
-	vy_merge_iterator_open(&wi->mi, index->key_def, VINYL_GE, NULL);
+	wi->key = vy_tuple_from_key(index, NULL, 0);
+	vy_merge_iterator_open(&wi->mi, index->key_def, VINYL_GE,
+			       wi->key->data);
 }
 
 static struct vy_write_iterator *
@@ -7793,7 +7804,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
 	if (ti == NULL)
 		return -1;
 	vy_run_iterator_iface_open(ti, wi->index, run, fd,
-				   VINYL_GE, NULL, INT64_MAX);
+				   VINYL_GE, wi->key->data, INT64_MAX);
 	return 0;
 }
 
@@ -7805,7 +7816,8 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 	ti = vy_merge_iterator_add(&wi->mi, is_mutable, control_eof);
 	if (ti == NULL)
 		return -1;
-	vy_mem_iterator_iface_open(ti, mem, VINYL_GE, NULL, INT64_MAX);
+	vy_mem_iterator_iface_open(ti, mem, VINYL_GE, wi->key->data,
+				   INT64_MAX);
 	return 0;
 }
 
@@ -7999,6 +8011,7 @@ static void
 vy_write_iterator_delete(struct vy_write_iterator *wi)
 {
 	vy_write_iterator_close(wi);
+	vy_tuple_unref(wi->key);
 	free(wi);
 }
 
@@ -8322,7 +8335,11 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 	struct vy_read_iterator ri;
 	struct vy_tuple *tuple;
-	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, NULL, vlsn, true);
+	struct vy_tuple *key = vy_tuple_from_key(index, NULL, 0);
+	if (key == NULL)
+		return -1;
+	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key->data,
+			      vlsn, true);
 	for (; rc == 0; rc = vy_read_iterator_next(&ri)) {
 		rc = vy_read_iterator_get(&ri, &tuple);
 		if (rc)
@@ -8337,6 +8354,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	}
 finish_send:
 	vy_read_iterator_close(&ri);
+	vy_tuple_unref(key);
 	return rc;
 }
 
