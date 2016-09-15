@@ -1701,7 +1701,7 @@ vy_range_tree_key_cmp(vy_range_tree_t *rbtree,
 static void
 vy_index_delete(struct vy_index *index);
 
-struct vy_rangeiter {
+struct vy_range_iterator {
 	struct vy_index *index;
 	struct vy_range *cur_range;
 	enum vy_order order;
@@ -1710,7 +1710,7 @@ struct vy_rangeiter {
 };
 
 static void
-vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
+vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 		  enum vy_order order, char *key, int key_size)
 {
 	itr->index = index;
@@ -1749,13 +1749,13 @@ vy_rangeiter_open(struct vy_rangeiter *itr, struct vy_index *index,
 }
 
 static struct vy_range *
-vy_rangeiter_get(struct vy_rangeiter *ii)
+vy_range_iterator_get(struct vy_range_iterator *ii)
 {
 	return ii->cur_range;
 }
 
 static void
-vy_rangeiter_next(struct vy_rangeiter *ii)
+vy_range_iterator_next(struct vy_range_iterator *ii)
 {
 	switch (ii->order) {
 	case VINYL_LT:
@@ -2108,12 +2108,6 @@ vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
 static int64_t
 vy_index_range_id_next(struct vy_index *index);
 
-void
-vy_tmp_run_iterator_open(struct vy_iter *virt_itr,
-			 struct vy_index *index,
-			 struct vy_run *run, int fd,
-			 enum vy_order order, char *key);
-
 static inline int
 vy_range_split(struct vy_index *index, struct vy_write_iterator *wi,
 	       uint64_t size_node, struct rlist *result);
@@ -2167,9 +2161,9 @@ static void
 vy_range_redistribute_set(struct vy_index *index, uint64_t now, struct vy_tuple *v)
 {
 	/* match range */
-	struct vy_rangeiter ii;
-	vy_rangeiter_open(&ii, index, VINYL_GE, v->data, v->size);
-	struct vy_range *range = vy_rangeiter_get(&ii);
+	struct vy_range_iterator ii;
+	vy_range_iterator_open(&ii, index, VINYL_GE, v->data, v->size);
+	struct vy_range *range = vy_range_iterator_get(&ii);
 	assert(range != NULL);
 	/* update range */
 	int rc = vy_mem_set(range->mem, v);
@@ -2774,9 +2768,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 			continue;
 		}
 		/* match range */
-		struct vy_rangeiter ii;
-		vy_rangeiter_open(&ii, index, VINYL_GE, tuple->data, tuple->size);
-		range = vy_rangeiter_get(&ii);
+		struct vy_range_iterator ii;
+		vy_range_iterator_open(&ii, index, VINYL_GE, tuple->data, tuple->size);
+		range = vy_range_iterator_get(&ii);
 		assert(range != NULL);
 		if (prev_range != NULL && range != prev_range) {
 			/*
@@ -6270,80 +6264,6 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 
 /* }}} vy_run_iterator API implementation */
 
-/* {{{ Temporary wrap of new run iterator to old API */
-
-static void
-vy_tmp_run_iterator_close(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->close == vy_tmp_run_iterator_close);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	vy_run_iterator_close(itr);
-}
-
-static int
-vy_tmp_run_iterator_has(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->has == vy_tmp_run_iterator_has);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	struct vy_tuple *t;
-	int rc = vy_run_iterator_get(itr, &t);
-	return rc == 0;
-}
-
-static struct vy_tuple *
-vy_tmp_run_iterator_get(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->get == vy_tmp_run_iterator_get);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	struct vy_tuple *t;
-	int rc = vy_run_iterator_get(itr, &t);
-	if (rc != 0)
-		return NULL;
-	t->flags &= ~SVDUP;
-	t->flags |= *is_dup ? SVDUP : 0;
-	struct vy_tuple **sv = (struct vy_tuple **)(virt_iterator->priv + sizeof(*itr));
-	*sv = t;
-	return *sv;
-}
-
-static void
-vy_tmp_run_iterator_next(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->next == vy_tmp_run_iterator_next);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	*is_dup = true;
-	int rc = vy_run_iterator_next_lsn(itr);
-	if (rc == 1) {
-		*is_dup = false;
-		vy_run_iterator_next_key(itr);
-	}
-}
-
-void
-vy_tmp_run_iterator_open(struct vy_iter *virt_iterator, struct vy_index *index,
-		         struct vy_run *run, int fd,
-		         enum vy_order order, char *key)
-{
-	static struct vy_iterif vif = {
-		.close = vy_tmp_run_iterator_close,
-		.has = vy_tmp_run_iterator_has,
-		.get = vy_tmp_run_iterator_get,
-		.next = vy_tmp_run_iterator_next
-	};
-	virt_iterator->vif = &vif;
-	struct vy_run_iterator *itr = (struct vy_run_iterator *)virt_iterator->priv;
-	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	*is_dup = false;
-	vy_run_iterator_open(itr, index, run, fd, order, key,
-			     INT64_MAX);
-
-}
-
-/* }}} Temporary wrap of new run iterator to old API */
-
 /* {{{ vy_mem_iterator API forward declaration */
 /* TODO: move to header and remove static keyword */
 
@@ -8040,7 +7960,7 @@ struct vy_read_iterator {
 	int64_t vlsn;
 
 	/* iterator over ranges */
-	struct vy_rangeiter range_iterator;
+	struct vy_range_iterator range_iterator;
 	/* current range */
 	struct vy_range *curr_range;
 	/* merge iterator over current range */
@@ -8162,9 +8082,9 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->only_disk = only_disk;
 
 	itr->curr_tuple = NULL;
-	vy_rangeiter_open(&itr->range_iterator, index,
+	vy_range_iterator_open(&itr->range_iterator, index,
 			  order == VINYL_EQ ? VINYL_GE : order, key, 0);
-	itr->curr_range = vy_rangeiter_get(&itr->range_iterator);
+	itr->curr_range = vy_range_iterator_get(&itr->range_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, index->key_def, order, key);
 	vy_read_iterator_use_range(itr);
 	itr->range_index_version = index->range_index_version;
@@ -8183,8 +8103,8 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index->key_def,
 			       itr->order, itr->key);
-	vy_rangeiter_next(&itr->range_iterator);
-	itr->curr_range = vy_rangeiter_get(&itr->range_iterator);
+	vy_range_iterator_next(&itr->range_iterator);
+	itr->curr_range = vy_range_iterator_get(&itr->range_iterator);
 	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
 		struct vy_page_info *min = vy_run_index_first_page(
 			&itr->curr_range->run->index);
@@ -8221,8 +8141,9 @@ vy_read_iterator_check_versions(struct vy_read_iterator *itr)
 			    itr->curr_tuple->data : itr->key;
 		enum vy_order order =
 			itr->order == VINYL_EQ ? VINYL_GE : itr->order;
-		vy_rangeiter_open(&itr->range_iterator, itr->index, order, key, 0);
-		struct vy_range *range = vy_rangeiter_get(&itr->range_iterator);
+		vy_range_iterator_open(&itr->range_iterator,
+				       itr->index, order, key, 0);
+		struct vy_range *range = vy_range_iterator_get(&itr->range_iterator);
 		if (range != itr->curr_range) {
 			itr->range_version =
 				range == NULL ? 1 : range->range_version + 1;
