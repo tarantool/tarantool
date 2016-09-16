@@ -747,14 +747,9 @@ struct PACKED vy_tuple_info {
 	uint8_t reserved[3];
 };
 
-
-struct vy_run_index {
+struct vy_run {
 	struct vy_run_info info;
 	struct vy_buf pages, minmax;
-};
-
-struct vy_run {
-	struct vy_run_index index;
 	struct vy_run *next;
 };
 
@@ -1317,55 +1312,40 @@ vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
 }
 
 static char *
-vy_run_index_min_key(struct vy_run_index *i, struct vy_page_info *p)
+vy_run_min_key(struct vy_run *run, struct vy_page_info *p)
 {
-	return i->minmax.s + p->min_key_offset;
-}
-
-static void
-vy_run_index_init(struct vy_run_index *i)
-{
-	vy_buf_create(&i->pages);
-	vy_buf_create(&i->minmax);
-	memset(&i->info, 0, sizeof(i->info));
-}
-
-static void
-vy_run_index_destroy(struct vy_run_index *i)
-{
-	vy_buf_destroy(&i->pages);
-	vy_buf_destroy(&i->minmax);
+	return run->minmax.s + p->min_key_offset;
 }
 
 static struct vy_page_info *
-vy_run_index_get_page(struct vy_run_index *i, int pos)
+vy_run_page(struct vy_run *run, int pos)
 {
 	assert(pos >= 0);
-	assert((uint32_t)pos < i->info.count);
+	assert((uint32_t)pos < run->info.count);
 	return (struct vy_page_info *)
-		vy_buf_at(&i->pages, sizeof(struct vy_page_info), pos);
+		vy_buf_at(&run->pages, sizeof(struct vy_page_info), pos);
 }
 
 static struct vy_page_info *
-vy_run_index_first_page(struct vy_run_index *i)
+vy_run_first_page(struct vy_run *run)
 {
-	return vy_run_index_get_page(i, 0);
+	return vy_run_page(run, 0);
 }
 
 static uint32_t
-vy_run_index_total(struct vy_run_index *i)
+vy_run_total(struct vy_run *run)
 {
-	if (unlikely(i->pages.s == NULL))
+	if (unlikely(run->pages.s == NULL))
 		return 0;
-	return i->info.total;
+	return run->info.total;
 }
 
 static uint32_t
-vy_run_index_size(struct vy_run_index *i)
+vy_run_size(struct vy_run *run)
 {
-	return sizeof(i->info) +
-	       i->info.count * sizeof(struct vy_page_info) +
-	       i->info.minmax_size;
+	return sizeof(run->info) +
+	       run->info.count * sizeof(struct vy_page_info) +
+	       run->info.minmax_size;
 }
 
 static int
@@ -1382,7 +1362,9 @@ vy_run_new()
 			 "struct vy_run");
 		return NULL;
 	}
-	vy_run_index_init(&run->index);
+	vy_buf_create(&run->pages);
+	vy_buf_create(&run->minmax);
+	memset(&run->info, 0, sizeof(run->info));
 	run->next = NULL;
 	return run;
 }
@@ -1390,7 +1372,8 @@ vy_run_new()
 static void
 vy_run_delete(struct vy_run *run)
 {
-	vy_run_index_destroy(&run->index);
+	vy_buf_destroy(&run->pages);
+	vy_buf_destroy(&run->minmax);
 	TRASH(run);
 	free(run);
 }
@@ -1438,8 +1421,7 @@ vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
 static struct vy_page *
 vy_run_read_page(struct vy_run *run, uint32_t page_no, int fd)
 {
-	struct vy_page_info *page_info =
-		vy_run_index_get_page(&run->index, page_no);
+	struct vy_page_info *page_info = vy_run_page(run, page_no);
 	struct vy_page *page = malloc(sizeof(*page) + page_info->size);
 	if (page == NULL) {
 		diag_set(OutOfMemory, sizeof(*page) + page_info->size,
@@ -1507,8 +1489,7 @@ vy_range_size(struct vy_range *range)
 	uint64_t size = 0;
 	struct vy_run *run = range->run;
 	while (run) {
-		size += vy_run_index_size(&run->index) +
-		        vy_run_index_total(&run->index);
+		size += vy_run_size(run) + vy_run_total(run);
 		run = run->next;
 	}
 	return size;
@@ -1668,8 +1649,8 @@ vy_range_update_min_key(struct vy_range *range)
 	/* Check disk runs */
 	const char *min_key = NULL;
 	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
-		struct vy_page_info *p = vy_run_index_first_page(&run->index);
-		const char *key = vy_run_index_min_key(&run->index, p);
+		struct vy_page_info *p = vy_run_first_page(run);
+		const char *key = vy_run_min_key(run, p);
 		if (min_key == NULL ||
 		    vy_tuple_compare(key, min_key, index->key_def) < 0) {
 			min_key = key;
@@ -1806,11 +1787,11 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  * run, or 1 if the caller should proceed to the next run.
  */
 static int
-vy_run_write_page(int fd, struct vy_write_iterator *wi,
+vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 		  struct vy_tuple *split_key, struct key_def *key_def,
-		  uint32_t page_size, struct vy_run_index *run_index)
+		  uint32_t page_size)
 {
-	struct vy_run_info *run_info = &run_index->info;
+	struct vy_run_info *run_info = &run->info;
 	bool run_done = false;
 
 	struct vy_buf tuplesinfo, values, compressed;
@@ -1818,11 +1799,10 @@ vy_run_write_page(int fd, struct vy_write_iterator *wi,
 	vy_buf_create(&values);
 	vy_buf_create(&compressed);
 
-	if (vy_buf_ensure(&run_index->pages, sizeof(struct vy_page_info)))
+	if (vy_buf_ensure(&run->pages, sizeof(struct vy_page_info)))
 		goto err;
 
-	struct vy_page_info *page =
-		(struct vy_page_info *)run_index->pages.p;
+	struct vy_page_info *page = (struct vy_page_info *)run->pages.p;
 	memset(page, 0, sizeof(*page));
 	page->min_lsn = INT64_MAX;
 	page->offset = run_info->offset + run_info->size;
@@ -1859,7 +1839,7 @@ vy_run_write_page(int fd, struct vy_write_iterator *wi,
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
 	if (page->count > 0) {
-		struct vy_buf *minmax_buf = &run_index->minmax;
+		struct vy_buf *minmax_buf = &run->minmax;
 		struct vy_tuple_info *tuplesinfoarr = (struct vy_tuple_info *) tuplesinfo.s;
 		struct vy_tuple_info *mininfo = &tuplesinfoarr[0];
 		struct vy_tuple_info *maxinfo = &tuplesinfoarr[page->count - 1];
@@ -1878,7 +1858,7 @@ vy_run_write_page(int fd, struct vy_write_iterator *wi,
 		memcpy(minmax_buf->p, maxvalue, maxinfo->size);
 		vy_buf_advance(minmax_buf, maxinfo->size);
 	}
-	vy_buf_advance(&run_index->pages, sizeof(struct vy_page_info));
+	vy_buf_advance(&run->pages, sizeof(struct vy_page_info));
 
 	run_info->size += page->size;
 	++run_info->count;
@@ -1916,8 +1896,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	if (!run)
 		return -1;
 
-	struct vy_run_index *run_index = &run->index;
-	struct vy_run_info *header = &run_index->info;
+	struct vy_run_info *header = &run->info;
 	/*
 	 * Store start run offset in file. In case of run write
 	 * failure the file is truncated to this position.
@@ -1945,8 +1924,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	 * the split key is reached.
 	 */
 	do {
-		rc = vy_run_write_page(fd, wi, split_key, key_def,
-				       page_size, run_index);
+		rc = vy_run_write_page(run, fd, wi, split_key, key_def,
+				       page_size);
 		if (rc < 0)
 			goto err;
 	} while (rc == 0);
@@ -1954,8 +1933,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	/* Write pages index */
 	header->pages_offset = header->offset +
 				     header->size;
-	header->pages_size = vy_buf_used(&run_index->pages);
-	rc = vy_write_file(fd, run_index->pages.s, header->pages_size);
+	header->pages_size = vy_buf_used(&run->pages);
+	rc = vy_write_file(fd, run->pages.s, header->pages_size);
 	if (rc == -1)
 		goto err;
 	header->size += header->pages_size;
@@ -1963,8 +1942,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	/* Write min-max keys for pages */
 	header->minmax_offset = header->offset +
 				      header->size;
-	header->minmax_size = vy_buf_used(&run_index->minmax);
-	rc = vy_write_file(fd, run_index->minmax.s, header->minmax_size);
+	header->minmax_size = vy_buf_used(&run->minmax);
+	rc = vy_write_file(fd, run->minmax.s, header->minmax_size);
 	if (rc == -1)
 		goto err;
 	header->size += header->minmax_size;
@@ -2062,18 +2041,18 @@ vy_range_recover(struct vy_range *range)
 			 return -1;
 		}
 		struct vy_run *vy_run = vy_run_new();
-		vy_run->index.info = *run_info;
+		vy_run->info = *run_info;
 
-		vy_buf_ensure(&vy_run->index.pages, run_info->pages_size);
-		if (vy_pread_file(fd, vy_run->index.pages.s,
+		vy_buf_ensure(&vy_run->pages, run_info->pages_size);
+		if (vy_pread_file(fd, vy_run->pages.s,
 				     run_info->pages_size,
 				     run_info->pages_offset) == -1)
 			return -1;
 
-		if (vy_buf_ensure(&vy_run->index.minmax,
+		if (vy_buf_ensure(&vy_run->minmax,
 				  run_info->minmax_size))
 			return -1;
-		if (vy_pread_file(fd, vy_run->index.minmax.s,
+		if (vy_pread_file(fd, vy_run->minmax.s,
 				     run_info->minmax_size,
 				     run_info->minmax_offset) == -1)
 			return -1;
@@ -2222,13 +2201,12 @@ vy_range_need_split(struct vy_range *range, const char **split_key)
 	for (run = range->run; run->next; run = run->next) { }
 
 	/* The range is too small to be split. */
-	if (run->index.info.total < key_def->opts.range_size * 4 / 3)
+	if (run->info.total < key_def->opts.range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
-	struct vy_page_info *p = vy_run_index_get_page(&run->index,
-					run->index.info.count / 2);
-	*split_key = vy_run_index_min_key(&run->index, p);
+	struct vy_page_info *p = vy_run_page(run, run->info.count / 2);
+	*split_key = vy_run_min_key(run, p);
 	return true;
 }
 
@@ -2461,13 +2439,13 @@ static int vy_profiler_(struct vy_profiler *p)
 		}
 		struct vy_run *run = range->run;
 		while (run != NULL) {
-			p->count += run->index.info.keys;
-//			p->count_dup += run->index.header.dupkeys;
-			int indexsize = vy_run_index_size(&run->index);
+			p->count += run->info.keys;
+//			p->count_dup += run->header.dupkeys;
+			int indexsize = vy_run_size(run);
 			p->total_snapshot_size += indexsize;
-			p->total_range_size += indexsize + run->index.info.total;
-			p->total_range_origin_size += indexsize + run->index.info.totalorigin;
-			p->total_page_count += run->index.info.count;
+			p->total_range_size += indexsize + run->info.total;
+			p->total_range_origin_size += indexsize + run->info.totalorigin;
+			p->total_page_count += run->info.count;
 			run = run->next;
 		}
 		range = vy_range_tree_next(&p->i->tree, range);
@@ -2883,8 +2861,7 @@ vy_task_dump_complete(struct vy_task *task)
 	range->run = run;
 	range->run_count++;
 
-	index->size += vy_run_index_size(&run->index) +
-		       vy_run_index_total(&run->index);
+	index->size += vy_run_size(run) + vy_run_total(run);
 
 	range->range_version++;
 	index->range_index_version++;
@@ -2911,7 +2888,7 @@ vy_task_dump_complete(struct vy_task *task)
 		 * update the range index on disk.
 		 */
 		if (index->first_dump_lsn == 0)
-			index->first_dump_lsn = run->index.info.min_lsn;
+			index->first_dump_lsn = run->info.min_lsn;
 		vy_index_dump_range_index(index);
 	}
 
@@ -5734,7 +5711,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key, int64_t vlsn,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
 	struct vy_run_iterator_pos beg = {0, 0};
-	struct vy_run_iterator_pos end = {itr->run->index.info.count, 0};
+	struct vy_run_iterator_pos end = {itr->run->info.count, 0};
 	*equal_key = false;
 	while (vy_run_iterator_cmp_pos(beg, end) != 0) {
 		struct vy_run_iterator_pos mid;
@@ -5779,7 +5756,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			 struct vy_run_iterator_pos *pos)
 {
 	*pos = itr->curr_pos;
-	assert(pos->page_no < itr->run->index.info.count);
+	assert(pos->page_no < itr->run->info.count);
 	if (order == VINYL_LE || order == VINYL_LT) {
 		if (pos->page_no == 0 && pos->pos_in_page == 0)
 			return 1;
@@ -5805,7 +5782,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 		if (pos->pos_in_page >= page->count) {
 			pos->page_no++;
 			pos->pos_in_page = 0;
-			if (pos->page_no == itr->run->index.info.count)
+			if (pos->page_no == itr->run->info.count)
 				return 1;
 		}
 	}
@@ -5825,7 +5802,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 static int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr)
 {
-	assert(itr->curr_pos.page_no < itr->run->index.info.count);
+	assert(itr->curr_pos.page_no < itr->run->info.count);
 	const char *cur_key;
 	int64_t cur_lsn;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
@@ -5910,10 +5887,9 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 	assert(!itr->search_started);
 	itr->search_started = true;
 
-	if (itr->run->index.info.count == 1) {
+	if (itr->run->info.count == 1) {
 		/* there can be a stupid bootstrap run in which it's EOF */
-		struct vy_page_info *page_info =
-			vy_run_index_get_page(&itr->run->index, 0);
+		struct vy_page_info *page_info = vy_run_page(itr->run, 0);
 
 		if (!page_info->count) {
 			vy_run_iterator_cache_clean(itr);
@@ -5924,14 +5900,14 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 		int rc = vy_run_iterator_load_page(itr, 0, &page);
 		if (rc != 0)
 			return rc;
-	} else if (itr->run->index.info.count == 0) {
+	} else if (itr->run->info.count == 0) {
 		/* never seen that, but it could be possible in future */
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 1;
 	}
 
-	struct vy_run_iterator_pos end_pos = {itr->run->index.info.count, 0};
+	struct vy_run_iterator_pos end_pos = {itr->run->info.count, 0};
 	bool equal_found = false;
 	int rc;
 	if (vy_tuple_key_part(itr->key, 0) != NULL) {
@@ -6011,7 +5987,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 	itr->vlsn = vlsn;
 
 	itr->curr_tuple = NULL;
-	itr->curr_pos.page_no = itr->run->index.info.count;
+	itr->curr_pos.page_no = itr->run->info.count;
 	itr->curr_tuple_pos.page_no = UINT32_MAX;
 	itr->curr_page = NULL;
 	itr->prev_page = NULL;
@@ -6092,7 +6068,7 @@ vy_run_iterator_next_key(struct vy_tuple_iterator *vitr)
 		if (rc != 0)
 			return rc;
 	}
-	uint32_t end_page = itr->run->index.info.count;
+	uint32_t end_page = itr->run->info.count;
 	assert(itr->curr_pos.page_no <= end_page);
 	struct key_def *key_def = itr->index->key_def;
 	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
@@ -6186,7 +6162,7 @@ vy_run_iterator_next_lsn(struct vy_tuple_iterator *vitr)
 		if (rc != 0)
 			return rc;
 	}
-	assert(itr->curr_pos.page_no < itr->run->index.info.count);
+	assert(itr->curr_pos.page_no < itr->run->info.count);
 
 	int rc;
 	struct vy_run_iterator_pos next_pos;
@@ -7913,10 +7889,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator);
 	itr->curr_range = vy_range_iterator_get(&itr->range_iterator);
 	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
-		struct vy_page_info *min = vy_run_index_first_page(
-			&itr->curr_range->run->index);
-		char *min_key_data = vy_run_index_min_key(
-			&itr->curr_range->run->index, min);
+		struct vy_page_info *min = vy_run_first_page(
+			itr->curr_range->run);
+		char *min_key_data = vy_run_min_key(itr->curr_range->run, min);
 		if (vy_tuple_compare(min_key_data, itr->key,
 				     itr->index->key_def) > 0)
 			itr->curr_range = NULL;
