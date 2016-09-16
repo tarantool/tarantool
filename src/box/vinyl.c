@@ -2060,10 +2060,6 @@ err:
 	return -1;
 }
 
-void
-vy_tmp_mem_iterator_open(struct vy_iter *virt_itr, struct vy_mem *mem,
-			 enum vy_order order, char *key);
-
 static int64_t
 vy_index_range_id_next(struct vy_index *index);
 
@@ -6678,78 +6674,6 @@ vy_mem_iterator_close(struct vy_mem_iterator *itr)
 }
 
 /* }}} vy_mem_iterator API implementation */
-
-/* {{{ Temporary wrap of new mem iterator to old API */
-
-static void
-vy_tmp_mem_iterator_close(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->close == vy_tmp_mem_iterator_close);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	vy_mem_iterator_close(itr);
-}
-
-static int
-vy_tmp_mem_iterator_has(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->has == vy_tmp_mem_iterator_has);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	struct vy_tuple *t;
-	int rc = vy_mem_iterator_get(itr, &t);
-	return rc == 0;
-}
-
-static struct vy_tuple *
-vy_tmp_mem_iterator_get(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->get == vy_tmp_mem_iterator_get);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	struct vy_tuple *t;
-	int rc = vy_mem_iterator_get(itr, &t);
-	if (rc != 0)
-		return NULL;
-
-	t->flags &= ~SVDUP;
-	t->flags |= *is_dup ? SVDUP : 0;
-	struct vy_tuple **sv = (struct vy_tuple **)(virt_iterator->priv + sizeof(*itr));
-	*sv = t;
-	return *sv;
-}
-
-static void
-vy_tmp_mem_iterator_next(struct vy_iter *virt_iterator)
-{
-	assert(virt_iterator->vif->next == vy_tmp_mem_iterator_next);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	*is_dup = true;
-	int rc = vy_mem_iterator_next_lsn(itr);
-	if (rc == 1) {
-		*is_dup = false;
-		vy_mem_iterator_next_key(itr);
-	}
-};
-
-void
-vy_tmp_mem_iterator_open(struct vy_iter *virt_iterator, struct vy_mem *mem,
-			 enum vy_order order, char *key)
-{
-	static struct vy_iterif vif = {
-		.close = vy_tmp_mem_iterator_close,
-		.has = vy_tmp_mem_iterator_has,
-		.get = vy_tmp_mem_iterator_get,
-		.next = vy_tmp_mem_iterator_next
-	};
-	virt_iterator->vif = &vif;
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *)virt_iterator->priv;
-	assert(sizeof(virt_iterator->priv) >= sizeof(*itr) + sizeof(struct vy_tuple *) + sizeof(bool));
-	bool *is_dup = (bool *)(virt_iterator->priv + sizeof(*itr) + sizeof(struct vy_tuple *));
-	*is_dup = false;
-	vy_mem_iterator_open(itr, mem, order, key, INT64_MAX);
-}
-
-/* }}} Temporary wrap of new mem iterator to old API */
 
 /* {{{ Iterator over transaction writes : forward declaration */
 
