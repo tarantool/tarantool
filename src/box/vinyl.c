@@ -1295,19 +1295,25 @@ struct vy_page {
 	char data[0];
 };
 
-static struct vy_tuple_info*
-sd_pagev(struct vy_page *p, uint32_t pos)
+/**
+ * Read raw tuple data from the page
+ * \param page page
+ * \param tuple_no tuple position in the page
+ * \param[out] pinfo tuple metadata
+ * \return tuple data including offsets table
+ */
+static const char *
+vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
+	      struct vy_tuple_info **pinfo)
 {
-	assert(pos < p->count);
-	return (struct vy_tuple_info*)(p->data + sizeof(struct vy_tuple_info) * pos);
-}
-
-static void*
-sd_pagepointer(struct vy_page *p, struct vy_tuple_info *v)
-{
-	assert((sizeof(struct vy_tuple_info) * p->count) + v->offset <= p->size);
-	return (p->data + sizeof(struct vy_tuple_info) * p->count)
-	       + v->offset;
+	assert(tuple_no < page->count);
+	struct vy_tuple_info *info = ((struct vy_tuple_info *) page->data) +
+		tuple_no;
+	const char *tuple_data = page->data +
+		sizeof(struct vy_tuple_info) * page->count + info->offset;
+	assert(tuple_data <= page->data + page->size);
+	*pinfo = info;
+	return tuple_data; /* includes offset table */
 }
 
 static char *
@@ -5695,8 +5701,8 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	struct vy_tuple_info *info = sd_pagev(page, pos.pos_in_page);
-	*data = sd_pagepointer(page, info);
+	struct vy_tuple_info *info;
+	*data = vy_page_tuple(page, pos.pos_in_page, &info);
 	*lsn = info->lsn;
 	return 0;
 }
@@ -6051,8 +6057,8 @@ vy_run_iterator_get(struct vy_tuple_iterator *vitr, struct vy_tuple **result)
 	int rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	struct vy_tuple_info *info = sd_pagev(page, itr->curr_pos.pos_in_page);
-	char *key = sd_pagepointer(page, info);
+	struct vy_tuple_info *info;
+	const char *key = vy_page_tuple(page, itr->curr_pos.pos_in_page, &info);
 	itr->curr_tuple = vy_tuple_alloc(info->size);
 	if (itr->curr_tuple == NULL)
 		diag_set(OutOfMemory, info->size, "run_itr", "tuple");
