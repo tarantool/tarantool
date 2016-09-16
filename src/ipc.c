@@ -491,6 +491,7 @@ ipc_cond_create(struct ipc_cond *c)
 void
 ipc_cond_destroy(struct ipc_cond *c)
 {
+	(void)c;
 	assert(rlist_empty(&c->waiters));
 }
 
