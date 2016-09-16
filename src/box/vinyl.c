@@ -1634,13 +1634,16 @@ vy_range_iterator_next(struct vy_range_iterator *ii)
 	}
 }
 
-static void
-vy_range_update_min_key(struct vy_range *range)
+static int
+vy_range_init_min_key(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-
-	/* Check disk runs */
 	const char *min_key = NULL;
+
+	assert(range->min_key == NULL);
+	assert(range->used == 0);
+
+	/* Find the minimal key if any. */
 	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
 		struct vy_page_info *p = vy_run_page(run, 0);
 		const char *key = vy_run_min_key(run, p);
@@ -1650,36 +1653,23 @@ vy_range_update_min_key(struct vy_range *range)
 		}
 	}
 
-	/* Check in-memory indexes */
-	for (struct vy_mem *mem = range->mem; mem != NULL; mem = mem->next) {
-		struct vy_mem_tree_iterator itr =
-			vy_mem_tree_iterator_first(&mem->tree);
-		if (!vy_mem_tree_iterator_is_invalid(&itr)) {
-			struct vy_tuple *v = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-			if (min_key == NULL ||
-			    vy_tuple_compare(v->data, min_key, index->key_def) < 0) {
-				min_key = v->data;
-			}
-		}
-	}
-
-	/* Create tuple with the minimal key */
+	/* Create a tuple with the minimal key. */
 	if (min_key == NULL) {
 		range->min_key = vy_tuple_from_key(index, NULL, 0);
 	} else {
 		range->min_key = vy_tuple_extract_key_raw(index, min_key);
 	}
+
 	if (range->min_key == NULL)
-		panic("failed to allocate range->min_key");
+		return -1;
+
+	return 0;
 }
 
 static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	if (range->min_key == NULL)
-		vy_range_update_min_key(range);
-
-	/* Add to range tree */
+	assert(range->min_key != NULL);
 	vy_range_tree_insert(&index->tree, range);
 	index->range_index_version++;
 	index->range_count++;
@@ -1691,10 +1681,6 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 	vy_range_tree_remove(&index->tree, range);
 	index->range_index_version++;
 	index->range_count--;
-
-	assert (range->min_key != NULL);
-	vy_tuple_unref(range->min_key);
-	range->min_key = NULL;
 }
 
 /* dump tuple to the run page buffers (tuple header and data) */
@@ -2057,6 +2043,8 @@ vy_range_recover(struct vy_range *range)
 			  SEEK_SET) == -1)
 			return -1;
 	}
+	if (vy_range_init_min_key(range) != 0)
+		return -1;
 	return 0;
 }
 
@@ -2133,6 +2121,9 @@ vy_range_delete(struct vy_range *range)
 
 	int rcret = 0;
 
+	if (range->min_key)
+		vy_tuple_unref(range->min_key);
+
 	vy_range_delete_runs(range);
 	vy_range_delete_mems(range);
 
@@ -2199,7 +2190,13 @@ vy_range_need_split(struct vy_range *range, const char **split_key)
 
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *p = vy_run_page(run, run->info.count / 2);
-	*split_key = vy_run_min_key(run, p);
+	const char *k = vy_run_min_key(run, p);
+
+	/* No point in splitting if a new range is going to be empty. */
+	if (vy_tuple_compare(range->min_key->data, k, key_def) == 0)
+		return false;
+
+	*split_key = k;
 	return true;
 }
 
@@ -2214,18 +2211,12 @@ vy_range_compact_prepare(struct vy_range *range,
 			 struct vy_range_compact_part *parts, int *p_n_parts)
 {
 	struct vy_index *index = range->index;
-	struct vy_tuple *min_key, *split_key = NULL;
+	struct vy_tuple *split_key = NULL;
 	const char *split_key_raw;
 	int n_parts = 1;
 	int i;
 
-	min_key = range->min_key;
-	vy_tuple_ref(min_key);
-	vy_index_remove_range(index, range);
-
-	if (vy_range_need_split(range, &split_key_raw) &&
-	    vy_tuple_compare(min_key->data, split_key_raw,
-			     index->key_def) != 0) {
+	if (vy_range_need_split(range, &split_key_raw)) {
 		split_key = vy_tuple_extract_key_raw(index, split_key_raw);
 		if (split_key == NULL)
 			goto fail;
@@ -2243,10 +2234,13 @@ vy_range_compact_prepare(struct vy_range *range,
 	}
 
 	/* Set min keys for the new ranges. */
-	parts[0].range->min_key = min_key;
+	vy_tuple_ref(range->min_key);
+	parts[0].range->min_key = range->min_key;
 	if (split_key != NULL)
 		parts[1].range->min_key = split_key;
 
+	/* Replace the old range with the new ones. */
+	vy_index_remove_range(index, range);
 	for (i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i].range;
 
@@ -2268,11 +2262,8 @@ fail:
 		if (r != NULL)
 			vy_range_delete(r);
 	}
-	vy_tuple_unref(min_key);
 	if (split_key != NULL)
 		vy_tuple_unref(split_key);
-
-	vy_index_add_range(index, range);
 	return -1;
 }
 
@@ -2502,6 +2493,10 @@ vy_index_create(struct vy_index *index)
 	struct vy_range *range = vy_range_new(index);
 	if (unlikely(range == NULL))
 		return -1;
+	if (vy_range_init_min_key(range) != 0) {
+		vy_range_delete(range);
+		return -1;
+	}
 	vy_index_add_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
 	index->size = vy_range_size(range);
@@ -2649,6 +2644,10 @@ vy_index_open_ex(struct vy_index *index)
 		struct vy_range *range = vy_range_new(index);
 		if (unlikely(range == NULL))
 			return -1;
+		if (vy_range_init_min_key(range) != 0) {
+			vy_range_delete(range);
+			return -1;
+		}
 		vy_index_add_range(index, range);
 		index->size = vy_range_size(range);
 	}
