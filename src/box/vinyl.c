@@ -2341,7 +2341,7 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 		vy_index_remove_range(index, r);
 
 		/* No point in linking an empty mem. */
-		if (r->used == 0) {
+		if (r->used != 0) {
 			r->mem->next = range->mem;
 			range->mem = r->mem;
 			range->mem_count++;
