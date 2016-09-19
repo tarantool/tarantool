@@ -696,10 +696,10 @@ struct PACKED vy_run_info {
 	uint32_t pages_size;
 	/** Offset of this run's page index in the file. */
 	uint64_t  pages_offset;
-	/** size of min-max data block */
-	uint32_t  minmax_size;
-	/** start of min-max keys array (global) */
-	uint64_t  minmax_offset;
+	/** size of min data block */
+	uint32_t  min_size;
+	/** start of min keys array (global) */
+	uint64_t  min_offset;
 	/** Number of keys in the min-max key array. */
 	uint32_t  keys;
 	/* Min and max lsn over all tuples in the run. */
@@ -712,6 +712,8 @@ struct PACKED vy_run_info {
 
 struct PACKED vy_page_info {
 	uint32_t crc;
+	/* count of records */
+	uint32_t count;
 	/* offset of page data in run */
 	uint64_t offset;
 	/* size of page data in file */
@@ -720,18 +722,10 @@ struct PACKED vy_page_info {
 	uint32_t unpacked_size;
 	/* offset of page's min key in page index key storage */
 	uint32_t min_key_offset;
-	/* offset of page's max key in page index key storage */
-	uint32_t max_key_offset;
-	/* lsn of min key in page */
-	int64_t min_key_lsn;
-	/* lsn of max key in page */
-	int64_t max_key_lsn;
 	/* minimal lsn of all records in page */
 	int64_t min_lsn;
 	/* maximal lsn of all records in page */
 	int64_t max_lsn;
-	/* count of records */
-	uint32_t count;
 };
 
 struct PACKED vy_tuple_info {
@@ -742,14 +736,17 @@ struct PACKED vy_tuple_info {
 	/* size of tuple */
 	uint32_t size;
 	/* flags */
-	uint8_t  flags;
+	uint8_t flags;
 	/* for 4-byte alignment */
 	uint8_t reserved[3];
 };
 
 struct vy_run {
 	struct vy_run_info info;
-	struct vy_buf pages, minmax;
+	/* buffer with struct vy_page_info */
+	struct vy_buf pages;
+	/* buffer with min keys of pages */
+	struct vy_buf pages_min;
 	struct vy_run *next;
 };
 
@@ -1314,7 +1311,7 @@ vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
 static const char *
 vy_run_min_key(struct vy_run *run, const struct vy_page_info *p)
 {
-	return run->minmax.s + p->min_key_offset;
+	return run->pages_min.s + p->min_key_offset;
 }
 
 static struct vy_page_info *
@@ -1338,7 +1335,7 @@ vy_run_size(struct vy_run *run)
 {
 	return sizeof(run->info) +
 	       run->info.count * sizeof(struct vy_page_info) +
-	       run->info.minmax_size;
+	       run->info.min_size;
 }
 
 static int
@@ -1356,7 +1353,7 @@ vy_run_new()
 		return NULL;
 	}
 	vy_buf_create(&run->pages);
-	vy_buf_create(&run->minmax);
+	vy_buf_create(&run->pages_min);
 	memset(&run->info, 0, sizeof(run->info));
 	run->next = NULL;
 	return run;
@@ -1366,7 +1363,7 @@ static void
 vy_run_delete(struct vy_run *run)
 {
 	vy_buf_destroy(&run->pages);
-	vy_buf_destroy(&run->minmax);
+	vy_buf_destroy(&run->pages_min);
 	TRASH(run);
 	free(run);
 }
@@ -1818,24 +1815,16 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
 	if (page->count > 0) {
-		struct vy_buf *minmax_buf = &run->minmax;
+		struct vy_buf *min_buf = &run->pages_min;
 		struct vy_tuple_info *tuplesinfoarr = (struct vy_tuple_info *) tuplesinfo.s;
 		struct vy_tuple_info *mininfo = &tuplesinfoarr[0];
-		struct vy_tuple_info *maxinfo = &tuplesinfoarr[page->count - 1];
-		if (vy_buf_ensure(minmax_buf, mininfo->size + maxinfo->size))
+		if (vy_buf_ensure(min_buf, mininfo->size))
 			goto err;
 
-		page->min_key_offset = vy_buf_used(minmax_buf);
-		page->min_key_lsn = mininfo->lsn;
+		page->min_key_offset = vy_buf_used(min_buf);
 		char *minvalue = values.s + mininfo->offset;
-		memcpy(minmax_buf->p, minvalue, mininfo->size);
-		vy_buf_advance(minmax_buf, mininfo->size);
-
-		page->max_key_offset = vy_buf_used(minmax_buf);
-		page->max_key_lsn = maxinfo->lsn;
-		char *maxvalue = values.s + maxinfo->offset;
-		memcpy(minmax_buf->p, maxvalue, maxinfo->size);
-		vy_buf_advance(minmax_buf, maxinfo->size);
+		memcpy(min_buf->p, minvalue, mininfo->size);
+		vy_buf_advance(min_buf, mininfo->size);
 	}
 	vy_buf_advance(&run->pages, sizeof(struct vy_page_info));
 
@@ -1919,13 +1908,12 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	header->size += header->pages_size;
 
 	/* Write min-max keys for pages */
-	header->minmax_offset = header->offset +
-				      header->size;
-	header->minmax_size = vy_buf_used(&run->minmax);
-	rc = vy_write_file(fd, run->minmax.s, header->minmax_size);
+	header->min_offset = header->offset + header->size;
+	header->min_size = vy_buf_used(&run->pages_min);
+	rc = vy_write_file(fd, run->pages_min.s, header->min_size);
 	if (rc == -1)
 		goto err;
-	header->size += header->minmax_size;
+	header->size += header->min_size;
 
 	/*
 	 * Sync written data
@@ -2028,12 +2016,11 @@ vy_range_recover(struct vy_range *range)
 				     run_info->pages_offset) == -1)
 			return -1;
 
-		if (vy_buf_ensure(&vy_run->minmax,
-				  run_info->minmax_size))
+		if (vy_buf_ensure(&vy_run->pages_min, run_info->min_size))
 			return -1;
-		if (vy_pread_file(fd, vy_run->minmax.s,
-				     run_info->minmax_size,
-				     run_info->minmax_offset) == -1)
+		if (vy_pread_file(fd, vy_run->pages_min.s,
+				  run_info->min_size,
+				  run_info->min_offset) == -1)
 			return -1;
 
 		vy_run->next = range->run;
