@@ -413,8 +413,6 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 struct srzone {
 	char     name[4];
 	uint32_t compact_wm;
-	uint32_t dump_prio;
-	uint32_t dump_age;
 };
 
 struct srzonemap {
@@ -3297,37 +3295,6 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 }
 
 static int
-vy_scheduler_peek_age(struct vy_scheduler *scheduler, uint32_t max_age,
-		      struct vy_task **ptask)
-{
-	/*
-	 * Try to peek a range with no updates within max_age
-	 * seconds and dump it to free memory.
-	 */
-
-	/* full scan */
-	uint64_t now = clock_monotonic64();
-	struct vy_range *range;
-	struct heap_node *pn = NULL;
-	struct heap_iterator it;
-	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
-	while ((pn = vy_dump_heap_iterator_next(&it))) {
-		range = container_of(pn, struct vy_range, nodedump);
-		if (range->used == 0)
-			continue;
-		if (range->update_time + max_age > now)
-			continue;
-		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
-		if (*ptask == NULL)
-			return -1; /* oom */
-		vy_scheduler_remove_range(scheduler, range);
-		return 0; /* new task */
-	}
-	*ptask = NULL;
-	return 0; /* nothing to do */
-}
-
-static int
 vy_scheduler_peek_compact(struct vy_scheduler *scheduler, uint32_t run_count,
 			  struct vy_task **ptask)
 {
@@ -3400,16 +3367,6 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 	if (scheduler->checkpoint_in_progress) {
 		rc = vy_scheduler_peek_checkpoint(scheduler,
 			scheduler->checkpoint_lsn, ptask);
-		if (rc != 0)
-			return rc; /* error */
-		if (*ptask != NULL)
-			goto found;
-	}
-
-	/* index aging */
-	if (zone->dump_prio && zone->dump_age) {
-		uint32_t max_age = zone->dump_age * 1000000; /* ms */
-		rc = vy_scheduler_peek_age(scheduler, max_age, ptask);
 		if (rc != 0)
 			return rc; /* error */
 		if (*ptask != NULL)
@@ -3812,13 +3769,9 @@ vy_conf_new()
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.compact_wm        = 2,
-		.dump_prio       = 1,
-		.dump_age        = 40,
 	};
 	struct srzone redzone = {
 		.compact_wm        = 4,
-		.dump_prio       = 0,
-		.dump_age        = 0,
 	};
 	sr_zonemap_set(&conf->zones, 0, &def);
 	sr_zonemap_set(&conf->zones, 80, &redzone);
@@ -3829,7 +3782,6 @@ vy_conf_new()
 		vy_error("bad %d.compact_wm value", 0);
 		goto error_2;
 	}
-	z->dump_age = cfg_geti("vinyl.dump_age");
 
 	return conf;
 
@@ -3951,7 +3903,6 @@ vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
 		if (vy_info_reserve(info, local_node, 13) != 0)
 			return 1;
 		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
-		vy_info_append_u32(local_node, "dump_age", z->dump_age);
 	}
 	return 0;
 }
