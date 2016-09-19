@@ -57,8 +57,6 @@ cfg_filter(box.cfg)
   - - vinyl
     - - - compact_wm
         - 2
-      - - dump_age
-        - 40
       - - memory_limit
         - 1
       - - page_size
@@ -127,8 +125,6 @@ cfg_filter(box.cfg)
   - - vinyl
     - - - compact_wm
         - 2
-      - - dump_age
-        - 40
       - - memory_limit
         - 1
       - - page_size
