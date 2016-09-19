@@ -368,7 +368,7 @@ netbox_encode_upsert(lua_State *L)
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_UPSERT);
 
-	luamp_encode_map(cfg, &stream, 6);
+	luamp_encode_map(cfg, &stream, 5);
 
 	/* encode space_id */
 	uint32_t space_id = lua_tointeger(L, 4);
