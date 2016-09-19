@@ -2006,9 +2006,9 @@ vy_range_recover(struct vy_range *range)
 {
 	int fd = range->fd;
 	int readen;
-	uint32_t read_size = ALIGN_POS(sizeof(struct vy_run_info));
-	void *read_buf;
-	if (posix_memalign(&read_buf, FILE_ALIGN, read_size) != 0)
+	uint32_t read_size = sizeof(struct vy_run_info);
+	void *read_buf = malloc(read_size);
+	if (!read_buf)
 		return -1;
 	while ((readen = vy_read_file(fd, read_buf, read_size))
 		== (ssize_t)read_size) {
