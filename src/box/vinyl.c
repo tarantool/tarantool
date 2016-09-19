@@ -1311,25 +1311,18 @@ vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
 	return tuple_data; /* includes offset table */
 }
 
-static char *
-vy_run_min_key(struct vy_run *run, struct vy_page_info *p)
+static const char *
+vy_run_min_key(struct vy_run *run, const struct vy_page_info *p)
 {
 	return run->minmax.s + p->min_key_offset;
 }
 
 static struct vy_page_info *
-vy_run_page(struct vy_run *run, int pos)
+vy_run_page(struct vy_run *run, uint32_t pos)
 {
-	assert(pos >= 0);
-	assert((uint32_t)pos < run->info.count);
+	assert(pos < run->info.count);
 	return (struct vy_page_info *)
 		vy_buf_at(&run->pages, sizeof(struct vy_page_info), pos);
-}
-
-static struct vy_page_info *
-vy_run_first_page(struct vy_run *run)
-{
-	return vy_run_page(run, 0);
 }
 
 static uint32_t
@@ -1649,7 +1642,7 @@ vy_range_update_min_key(struct vy_range *range)
 	/* Check disk runs */
 	const char *min_key = NULL;
 	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
-		struct vy_page_info *p = vy_run_first_page(run);
+		struct vy_page_info *p = vy_run_page(run, 0);
 		const char *key = vy_run_min_key(run, p);
 		if (min_key == NULL ||
 		    vy_tuple_compare(key, min_key, index->key_def) < 0) {
@@ -5628,10 +5621,11 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
  * equal to given key (untouched otherwise)
+ * @retval page number
  */
-static void
-vy_run_iterator_search_page(struct vy_run_iterator *itr, char *key,
-			    uint32_t *page_no, bool *equal_key)
+static uint32_t
+vy_run_iterator_search_page(struct vy_run_iterator *itr, const char *key,
+			    bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = itr->run->info.count;
@@ -5641,7 +5635,7 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr, char *key,
 		uint32_t mid = beg + (end - beg) / 2;
 		struct vy_page_info *page_info =
 			vy_run_page(itr->run, mid);
-		char *fnd_key = vy_run_min_key(itr->run, page_info);
+		const char *fnd_key = vy_run_min_key(itr->run, page_info);
 		int cmp = vy_tuple_compare(fnd_key, key, itr->index->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
@@ -5650,7 +5644,7 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr, char *key,
 		else
 			end = mid;
 	}
-	*page_no = end;
+	return end;
 }
 
 /**
@@ -5658,11 +5652,11 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr, char *key,
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
  * equal to given key (untouched otherwise)
+ * @retval position in the page
  */
-static void
-vy_run_iterator_search_in_page(struct vy_run_iterator *itr, char *key,
-			       struct vy_page *page, uint32_t *pos_in_page,
-			       bool *equal_key)
+static uint32_t
+vy_run_iterator_search_in_page(struct vy_run_iterator *itr, const char *key,
+			       struct vy_page *page, bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->count;
@@ -5680,7 +5674,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr, char *key,
 		else
 			end = mid;
 	}
-	*pos_in_page = end;
+	return end;
 }
 
 /**
@@ -5694,10 +5688,10 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr, char *key,
  * @retval -1 read or memory error
  */
 static int
-vy_run_iterator_search(struct vy_run_iterator *itr, char *key,
+vy_run_iterator_search(struct vy_run_iterator *itr, const char *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
-	vy_run_iterator_search_page(itr, key, &pos->page_no, equal_key);
+	pos->page_no = vy_run_iterator_search_page(itr, key, equal_key);
 	if (pos->page_no == 0) {
 		pos->pos_in_page = 0;
 		return 0;
@@ -5708,8 +5702,8 @@ vy_run_iterator_search(struct vy_run_iterator *itr, char *key,
 	if (rc != 0)
 		return rc;
 	bool equal_in_page = false;
-	vy_run_iterator_search_in_page(itr, key, page, &pos->pos_in_page,
-				       &equal_in_page);
+	pos->pos_in_page = vy_run_iterator_search_in_page(itr, key, page,
+							  &equal_in_page);
 	if (pos->pos_in_page == page->count) {
 		pos->page_no++;
 		pos->pos_in_page = 0;
@@ -7866,9 +7860,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator);
 	itr->curr_range = vy_range_iterator_get(&itr->range_iterator);
 	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
-		struct vy_page_info *min = vy_run_first_page(
-			itr->curr_range->run);
-		char *min_key_data = vy_run_min_key(itr->curr_range->run, min);
+		struct vy_page_info *min = vy_run_page(itr->curr_range->run, 0);
+		const char *min_key_data = vy_run_min_key(itr->curr_range->run,
+							  min);
 		if (vy_tuple_compare(min_key_data, itr->key,
 				     itr->index->key_def) > 0)
 			itr->curr_range = NULL;
