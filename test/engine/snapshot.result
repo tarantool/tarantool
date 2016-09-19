@@ -1,15 +1,4 @@
 -- write data recover from latest snapshot
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("rm -f " .. name .."/*.snap")
----
-- 0
-...
-os.execute("rm -f " .. name .."/*.xlog")
----
-- 0
-...
 env = require('test_run')
 ---
 ...
@@ -19,13 +8,6 @@ test_run = env.new()
 test_run:cmd('restart server default')
 engine = test_run:get_cfg('engine')
 ---
-...
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("touch " .. name .."/lock")
----
-- 0
 ...
 space = box.schema.space.create('test', { engine = engine })
 ---
@@ -208,13 +190,6 @@ index:select({}, {iterator = box.index.ALL})
   - [89]
   - [90]
   - [91]
-...
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("rm -f " .. name .."/lock")
----
-- 0
 ...
 box.space.test:drop()
 ---
