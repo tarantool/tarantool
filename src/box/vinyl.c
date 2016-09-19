@@ -2937,16 +2937,16 @@ vy_task_compact_execute(struct vy_task *task)
 	if (wi == NULL)
 		return -1;
 
-	/* Compact on disk runs. */
-	for (struct vy_run *run = range->run; run; run = run->next) {
-		rc = vy_write_iterator_add_run(wi, run, range->fd, 0, 0);
+	/* Compact in-memory indexes. First add mems then add runs. */
+	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
+		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
 		if (rc != 0)
 			goto out;
 	}
 
-	/* Compact in-memory indexes. */
-	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
-		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
+	/* Compact on disk runs. */
+	for (struct vy_run *run = range->run; run; run = run->next) {
+		rc = vy_write_iterator_add_run(wi, run, range->fd, 0, 0);
 		if (rc != 0)
 			goto out;
 	}
