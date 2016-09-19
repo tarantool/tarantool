@@ -1339,21 +1339,6 @@ vy_run_delete(struct vy_run *run)
 #define ALIGN_POS(pos)	(pos + (FILE_ALIGN - (pos % FILE_ALIGN)) % FILE_ALIGN)
 
 static ssize_t
-vy_read_file(int fd, void *buf, uint32_t size)
-{
-	ssize_t pos = 0;
-	while (pos < size) {
-		ssize_t readen = read(fd, buf + pos, size - pos);
-		if (readen < 0)
-			return -1;
-		if (!readen)
-			break;
-		pos += readen;
-	}
-	return pos;
-}
-
-static ssize_t
 vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
 {
 	ssize_t pos = 0;
@@ -1919,50 +1904,86 @@ vy_range_close(struct vy_range *range)
 	return rcret;
 }
 
+static ssize_t
+vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
+{
+	ssize_t n = vy_pread_file(range->fd, buf, size, offset);
+	if (n < 0) {
+		vy_error("error reading range file %s: %s",
+			 range->path, strerror(errno));
+		return -1;
+	}
+	if ((size_t)n != size) {
+		vy_error("range file %s corrupted", range->path);
+		return -1;
+	}
+	return n;
+}
+
 static int
 vy_range_recover(struct vy_range *range)
 {
-	int fd = range->fd;
-	int readen;
-	uint32_t read_size = sizeof(struct vy_run_info);
-	void *read_buf = malloc(read_size);
-	if (!read_buf)
-		return -1;
-	while ((readen = vy_read_file(fd, read_buf, read_size))
-		== (ssize_t)read_size) {
-		struct vy_run_info *run_info =
-			(struct vy_run_info *)read_buf;
-		if (!run_info->size) {
+	struct vy_run *run = NULL;
+	off_t offset = 0;
+	int rc = -1;
+
+	while (true) {
+		struct vy_run_info *h;
+		ssize_t n;
+
+		run = vy_run_new();
+		if (run == NULL)
+			goto out;
+
+		/* Read run header. */
+		h = &run->info;
+		n = vy_pread_file(range->fd, h, sizeof(*h), offset);
+		if (n == 0)
+			break; /* eof */
+		if (n < (ssize_t)sizeof(*h) || h->size == 0) {
 			 vy_error("run was not finished, range is"
 				  "broken for file %s", range->path);
-			 return -1;
+			 goto out;
 		}
-		struct vy_run *vy_run = vy_run_new();
-		vy_run->info = *run_info;
 
-		vy_buf_ensure(&vy_run->pages, run_info->pages_size);
-		if (vy_pread_file(fd, vy_run->pages.s,
-				     run_info->pages_size,
-				     run_info->pages_offset) == -1)
-			return -1;
+		/* Allocate buffer for page info. */
+		if (vy_buf_ensure(&run->pages, h->pages_size) == -1 ||
+		    vy_buf_ensure(&run->pages_min, h->min_size) == -1)
+			goto out;
 
-		if (vy_buf_ensure(&vy_run->pages_min, run_info->min_size))
-			return -1;
-		if (vy_pread_file(fd, vy_run->pages_min.s,
-				  run_info->min_size,
-				  run_info->min_offset) == -1)
-			return -1;
+		/* Read page info. */
+		if (vy_range_read(range, run->pages.s,
+				  h->pages_size, h->pages_offset) < 0 ||
+		    vy_range_read(range, run->pages_min.s,
+				  h->min_size, h->min_offset) < 0)
+			goto out;
 
-		vy_run->next = range->run;
-		range->run = vy_run;
+		run->next = range->run;
+		range->run = run;
 		++range->run_count;
-		if (lseek(fd, run_info->offset + run_info->size,
-			  SEEK_SET) == -1)
-			return -1;
+		run = NULL;
+
+		offset = h->offset + h->size;
 	}
-	if (vy_range_init_min_key(range) != 0)
-		return -1;
-	return 0;
+
+	/*
+	 * Set file offset to the end of the last run so that new runs
+	 * will be appended to the range file.
+	 */
+	if (lseek(range->fd, offset, SEEK_SET) == -1) {
+		vy_error("failed to seek range file %s: %s",
+			 range->path, strerror(errno));
+		goto out;
+	}
+
+	if (vy_range_init_min_key(range) == -1)
+		goto out;
+
+	rc = 0; /* success */
+out:
+	if (run)
+		vy_run_delete(run);
+	return rc;
 }
 
 int
