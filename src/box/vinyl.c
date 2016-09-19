@@ -1621,10 +1621,7 @@ static int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 			  bool is_mutable, bool control_eof);
 static int
-vy_write_iterator_next(struct vy_write_iterator *wi);
-
-static int
-vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result);
+vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret);
 
 static void
 vy_write_iterator_delete(struct vy_write_iterator *wi);
@@ -1633,24 +1630,30 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  * Write tuples from the iterator to a new page in the run,
  * update page and run statistics.
  *
- * Returns -1 in case of error, 0 if there's more data for this
- * run, or 1 if the caller should proceed to the next run.
+ * Returns
+ *  rc == -1: error occured
+ *  rc ==  0: all is ok, the iterator isn't finished
+ *  rc ==  1: all is ok, the iterator is finished
  */
 static int
 vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 		  struct vy_tuple *split_key, struct key_def *key_def,
-		  uint32_t page_size)
+		  uint32_t page_size, struct vy_tuple **curr_tuple)
 {
+	assert(curr_tuple);
+	assert(*curr_tuple);
 	struct vy_run_info *run_info = &run->info;
-	bool run_done = false;
+	int rc = 0;
 
 	struct vy_buf tuplesinfo, values, compressed;
 	vy_buf_create(&tuplesinfo);
 	vy_buf_create(&values);
 	vy_buf_create(&compressed);
 
-	if (vy_buf_ensure(&run->pages, sizeof(struct vy_page_info)))
-		goto err;
+	if (vy_buf_ensure(&run->pages, sizeof(struct vy_page_info))) {
+		rc = -1;
+		goto out;
+	}
 
 	struct vy_page_info *page = (struct vy_page_info *)run->pages.p;
 	memset(page, 0, sizeof(*page));
@@ -1658,26 +1661,28 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	page->offset = run_info->offset + run_info->size;
 
 	while (true) {
-		struct vy_tuple *tuple;
-		int rc = vy_write_iterator_get(wi, &tuple);
-		if (rc < 0) {
-			goto err; /* error */
-		} else if (rc == 1) {
-			run_done = true; /* no more data */
-			break;
-		}
-		assert(rc == 0);
+		struct vy_tuple *tuple = *curr_tuple;
 		if (split_key != NULL && vy_tuple_compare(tuple->data,
 					split_key->data, key_def) >= 0) {
 			/* Split key reached, proceed to the next run. */
-			run_done = true;
+			rc = 1;
 			break;
 		}
 		if (vy_buf_used(&values) >= page_size)
 			break;
-		if (vy_run_dump_tuple(tuple, &tuplesinfo, &values, page) != 0)
-			goto err;
-		vy_write_iterator_next(wi);
+		if (vy_run_dump_tuple(tuple, &tuplesinfo, &values, page) != 0) {
+			rc = -1;
+			goto out;
+		}
+		if (vy_write_iterator_next(wi, curr_tuple)) {
+			rc = -1;
+			goto out;
+		}
+		if (*curr_tuple == NULL) {
+			/* No more data. */
+			rc = 1;
+			break;
+		}
 	}
 	page->unpacked_size = vy_buf_used(&tuplesinfo) + vy_buf_used(&values);
 	page->unpacked_size = ALIGN_POS(page->unpacked_size);
@@ -1691,7 +1696,8 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	page->size = vy_buf_used(&compressed);
 	if (vy_write_file(fd, compressed.s, page->size) < 0) {
 		vy_error("index file error: %s", strerror(errno));
-		goto err;
+		rc = -1;
+		goto out;
 	}
 
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
@@ -1700,8 +1706,10 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	struct vy_buf *min_buf = &run->pages_min;
 	struct vy_tuple_info *tuplesinfoarr = (struct vy_tuple_info *) tuplesinfo.s;
 	struct vy_tuple_info *mininfo = &tuplesinfoarr[0];
-	if (vy_buf_ensure(min_buf, mininfo->size))
-		goto err;
+	if (vy_buf_ensure(min_buf, mininfo->size)) {
+		rc = -1;
+		goto out;
+	}
 
 	page->min_key_offset = vy_buf_used(min_buf);
 	char *minvalue = values.s + mininfo->offset;
@@ -1719,27 +1727,29 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	run_info->totalorigin += page->unpacked_size;
 
 	run_info->keys += page->count;
-
+out:
 	vy_buf_destroy(&compressed);
 	vy_buf_destroy(&tuplesinfo);
 	vy_buf_destroy(&values);
-	return run_done ? 1 : 0;
-err:
-	vy_buf_destroy(&compressed);
-	vy_buf_destroy(&tuplesinfo);
-	vy_buf_destroy(&values);
-	return -1;
+	return rc;
 }
 
 /**
  * Write tuples from the iterator to a new run
  * and set up the corresponding run index structures.
+ * Returns:
+ *  rc == 0, curr_tuple != NULL: all is ok, the iterator is not finished
+ *  rc == 0, curr_tuple == NULL: all is ok, the iterator finished
+ *  rc == -1: error occured
  */
 static int
 vy_run_write(int fd, struct vy_write_iterator *wi,
 	     struct vy_tuple *split_key, struct key_def *key_def,
-	     uint32_t page_size, struct vy_run **result)
+	     uint32_t page_size, struct vy_run **result,
+	     struct vy_tuple **curr_tuple)
 {
+	assert(curr_tuple);
+	assert(*curr_tuple);
 	int rc = 0;
 	struct vy_run *run = vy_run_new();
 	if (!run)
@@ -1775,7 +1785,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	 */
 	do {
 		rc = vy_run_write_page(run, fd, wi, split_key, key_def,
-				       page_size);
+				       page_size, curr_tuple);
 		if (rc < 0)
 			goto err;
 	} while (rc == 0);
@@ -1825,7 +1835,6 @@ err:
 	 */
 	lseek(fd, header->offset, SEEK_SET);
 	rc = ftruncate(fd, header->offset);
-	(void) rc;
 	free(run);
 	return -1;
 }
@@ -2028,16 +2037,15 @@ vy_range_delete(struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_tuple *split_key, int *p_fd, struct vy_run **p_run)
+		   struct vy_tuple *split_key, int *p_fd,
+		   struct vy_run **p_run, struct vy_tuple **tuple)
 {
+	assert(tuple);
+	assert(*tuple);
 	struct vy_index *index = range->index;
 	char path[PATH_MAX];
 	int fd = *p_fd;
 	bool created = false;
-
-	/* Do not write empty runs. */
-	if (vy_write_iterator_get(wi, NULL) != 0)
-		return 0;
 
 	if (fd < 0) {
 		/*
@@ -2060,7 +2068,7 @@ create_failed:
 
 	/* Append tuples to the range file. */
 	if (vy_run_write(fd, wi, split_key, index->key_def,
-			 index->key_def->opts.page_size, p_run) != 0)
+			 index->key_def->opts.page_size, p_run, tuple) != 0)
 		goto fail;
 
 	if (created) {
@@ -2731,8 +2739,13 @@ vy_task_dump_execute(struct vy_task *task)
 			goto out;
 	}
 
+	struct vy_tuple *tuple;
+	/* Start iteration. */
+	rc = vy_write_iterator_next(wi, &tuple);
+	if (rc || tuple == NULL)
+		goto out;
 	rc = vy_range_write_run(range, wi, NULL,
-				&range->fd, &task->dump.new_run);
+				&range->fd, &task->dump.new_run, &tuple);
 out:
 	vy_write_iterator_delete(wi);
 	return rc;
@@ -2851,15 +2864,23 @@ vy_task_compact_execute(struct vy_task *task)
 	}
 
 	assert(n_parts > 0);
+	struct vy_tuple *curr_tuple;
+	/* Start iteration. */
+	rc = vy_write_iterator_next(wi, &curr_tuple);
+	if (rc || curr_tuple == NULL)
+		goto out;
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range_compact_part *p = &parts[i];
 		struct vy_tuple *split_key = i < n_parts - 1 ?
 			parts[i + 1].range->min_key : NULL;
-
 		rc = vy_range_write_run(p->range, wi, split_key,
-					&parts[i].fd, &p->run);
+					&parts[i].fd, &p->run, &curr_tuple);
 		if (rc != 0)
 			goto out;
+		if (curr_tuple == NULL) {
+			/* This iteration was last. */
+			goto out;
+		}
 	}
 out:
 	vy_write_iterator_delete(wi);
@@ -7406,8 +7427,8 @@ struct vy_write_iterator {
 	bool save_delete;
 	bool goto_next_key;
 	struct vy_tuple *key;
-	struct vy_tuple *curr_tuple;
-	struct vy_tuple *upsert_tuple;
+	struct vy_tuple *kept_tuple;
+	bool can_purge;
 	struct vy_merge_iterator mi;
 };
 
@@ -7422,8 +7443,8 @@ vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
 	wi->index = index;
 	wi->purge_lsn = purge_lsn;
 	wi->save_delete = save_delete;
-	wi->curr_tuple = NULL;
 	wi->goto_next_key = false;
+	wi->can_purge = false;
 	wi->key = vy_tuple_from_key(index, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
@@ -7476,22 +7497,21 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
  * of tuples to write to the output.
  */
 static int
-vy_write_iterator_next(struct vy_write_iterator *wi)
+vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 {
 	/*
 	 * Nullify the result tuple. If the next tuple is not
 	 * found, make sure we "forget" the current one.
 	 */
-	if (wi->curr_tuple)
-		vy_tuple_unref(wi->curr_tuple);
-	wi->curr_tuple = NULL;
+	*ret = NULL;
 	/*
-	 * The upsert tuple can be hanging around from the previous
+	 * The kept_tuple can be hanging around from the previous
 	 * invocation of next().
 	 */
-	if (wi->upsert_tuple)
-		vy_tuple_unref(wi->upsert_tuple);
-	wi->upsert_tuple = NULL;
+	if (wi->kept_tuple)
+		vy_tuple_unref(wi->kept_tuple);
+	wi->kept_tuple = NULL;
+	struct vy_tuple *upsert_tuple = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
 	/*
 	 * rc values mean the following:
@@ -7534,11 +7554,12 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi)) {
 
 		if (wi->goto_next_key) {
+			wi->can_purge = false;
 			rc = vy_merge_iterator_next_key(mi);
 			if (rc < 0)
 				break; /* error */
 			if (rc > 0)
-				return 1; /* not found */
+				return 0; /* not found */
 			wi->goto_next_key = false;
 		}
 		/*
@@ -7547,38 +7568,55 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 		 * then it's the end of the iterator.
 		 */
 		if (rc > 0) {
-			if (wi->upsert_tuple) {
-				tuple = wi->upsert_tuple;
+			if (upsert_tuple) {
+				tuple = upsert_tuple;
+				wi->kept_tuple = upsert_tuple;
 				rc = 0;
 				break;
 			}
 			rc = vy_merge_iterator_next_key(mi);
-			if (rc < 0)
-				break; /* error */
-			if (rc > 0)
-				return 1; /* not found */
+			wi->can_purge = false;
+			if (rc)
+				break;
 		}
 		rc = vy_merge_iterator_get(mi, &tuple);
 		if (rc < 0)
 			break; /* error */
 		if (rc > 0)
-			return 1; /* not found */
+			return 0; /* not found */
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
+			wi->can_purge = tuple->flags & (SVREPLACE | SVDELETE);
 			break;
+		}
+		if (wi->can_purge) {
+			/*
+			 * The previous tuple wasn't upsert, then
+			 * it was delete or replace and all older tuples
+			 * can be skipped because they aren't used in any
+			 * transaction.
+			 */
+			wi->goto_next_key = true;
+			continue;
 		}
 		/* The merge iterator now is below the purge  LSN. */
 		if (tuple->flags & SVREPLACE) {
 			/* Replace. */
 			wi->goto_next_key = true;
-			if (wi->upsert_tuple) {
+			if (upsert_tuple) {
 				/*
 				 * If the previous tuple was upserted
 				 * then combine it with the replace and return.
 				 */
-				tuple = vy_apply_upsert(wi->upsert_tuple,
+				tuple = vy_apply_upsert(upsert_tuple,
 							tuple, wi->index,
 							false);
+				/*
+				 * The upsert tuple turns in REPLACE so
+				 * it can be freed.
+				 */
+				vy_tuple_unref(upsert_tuple);
+				wi->kept_tuple = tuple;
 			}
 			break;
 		} else if (tuple->flags & SVUPSERT) {
@@ -7588,20 +7626,20 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			 * and all operations older than replace
 			 * on the same key can be skipped.
 			 */
-			if (wi->upsert_tuple) {
+			if (upsert_tuple) {
 				/*
 				 * If it isn't the first upsert
 				 * then squash the two of them
 				 * into one.
 				 */
-				tuple = vy_apply_upsert(wi->upsert_tuple,
+				tuple = vy_apply_upsert(upsert_tuple,
 							tuple, wi->index,
 							false);
-				vy_tuple_unref(wi->upsert_tuple);
+				vy_tuple_unref(upsert_tuple);
 			} else {
 				vy_tuple_ref(tuple);
 			}
-			wi->upsert_tuple = tuple;
+			upsert_tuple = tuple;
 		} else if (tuple->flags & SVDELETE) {
 			/*
 			 * The tuple on top of the stack is
@@ -7609,17 +7647,23 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			 * the stack.
 			 */
 			wi->goto_next_key = true;
-			if (wi->upsert_tuple) {
+			if (upsert_tuple) {
 				/*
-				 * If DELETE was followed by UPSERT, convert
-				 * UPSERT to REPLACE at once, and return it
+				 * If DELETE was followed
+				 * by UPSERT, convert
+				 * UPSERT to REPLACE at
+				 * once, and return it
 				 * instead of DELETE.
 				 */
-				tuple = vy_apply_upsert(wi->upsert_tuple,
+				tuple = vy_apply_upsert(upsert_tuple,
 							tuple, wi->index,
 							false);
-				if (tuple == NULL)
-					return -1;
+				/*
+				 * The upsert tuple turns in REPLACE so
+				 * it can be freed.
+				 */
+				vy_tuple_unref(upsert_tuple);
+				wi->kept_tuple = tuple;
 				break;
 			}
 			if (wi->save_delete) {
@@ -7636,30 +7680,21 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			unreachable();
 		}
 	}
-	assert(rc == 0);
-	vy_tuple_ref(tuple);
-	wi->curr_tuple = tuple;
-	return 0;
-}
-
-static int
-vy_write_iterator_get(struct vy_write_iterator *wi, struct vy_tuple **result)
-{
-	if (wi->curr_tuple == NULL && vy_write_iterator_next(wi))
-		return 1;
-	if (result)
-		*result = wi->curr_tuple;
+	if (rc < 0)
+		return rc;
+	if (rc > 0)
+		return 0;
+	*ret = tuple;
 	return 0;
 }
 
 static void
 vy_write_iterator_close(struct vy_write_iterator *wi)
 {
-	if (wi->upsert_tuple) {
-		vy_tuple_unref(wi->upsert_tuple);
+	if (wi->kept_tuple) {
+		vy_tuple_unref(wi->kept_tuple);
 	}
-	wi->curr_tuple = NULL;
-	wi->upsert_tuple = NULL;
+	wi->kept_tuple = NULL;
 	vy_merge_iterator_close(&wi->mi);
 }
 
