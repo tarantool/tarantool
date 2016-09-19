@@ -1955,11 +1955,8 @@ err:
 	return -1;
 }
 
-static int64_t
-vy_index_range_id_next(struct vy_index *index);
-
 static struct vy_range *
-vy_range_new(struct vy_index *index)
+vy_range_new(struct vy_index *index, int64_t id)
 {
 	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
 	if (range == NULL) {
@@ -1971,6 +1968,12 @@ vy_range_new(struct vy_index *index)
 	if (!range->mem) {
 		free(range);
 		return NULL;
+	}
+	if (id != 0) {
+		range->id = id;
+		index->range_id_max = MAX(index->range_id_max, id + 1);
+	} else {
+		range->id = ++index->range_id_max;
 	}
 	range->mem_count = 1;
 	range->fd = -1;
@@ -2060,25 +2063,6 @@ vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
 	return 0;
 }
 
-static int
-vy_range_create(struct vy_range *range, struct vy_index *index, int *p_fd)
-{
-	snprintf(range->path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-
-	ERROR_INJECT(ERRINJ_VY_RANGE_CREATE, {errno = EMFILE; goto error;});
-
-	int fd = mkstemp(range->path);
-	if (fd < 0)
-		goto error;
-
-	*p_fd = fd;
-	return 0;
-error:
-	vy_error("temp file '%s' create error: %s",
-		 range->path, strerror(errno));
-	return -1;
-}
-
 static void
 vy_range_delete_runs(struct vy_range *range)
 {
@@ -2119,32 +2103,77 @@ vy_range_delete(struct vy_range *range)
 
 	if (vy_range_close(range))
 		rcret = -1;
-	if (!range->id && range->fd >= 0) {
-		/* Range wasn't completed */
-		unlink(range->path);
-	}
 	TRASH(range);
 	free(range);
 	return rcret;
 }
 
+/*
+ * Append tuples returned by a write iterator to a range file until
+ * split_key is encountered. p_fd is supposed to point to the range file
+ * fd. If fd is < 0, a new file will be created for the range and p_fd
+ * initialized appropriately. On success, the function returns 0 and the
+ * new run is returned in p_run.
+ */
 static int
-vy_range_complete(struct vy_range *range, struct vy_index *index)
+vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
+		   struct vy_tuple *split_key, int *p_fd, struct vy_run **p_run)
 {
-	range->id = vy_index_range_id_next(index);
+	struct vy_index *index = range->index;
 	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/%016"PRIx64".range",
-		 index->path, range->id);
-	int rc = rename(range->path, path);
-	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' rename error: %s",
-		               range->path,
-		               strerror(errno));
-		range->id = 0;
-	} else {
-		snprintf(range->path, PATH_MAX, "%s", path);
+	int fd = *p_fd;
+	bool created = false;
+
+	/* Do not write empty runs. */
+	if (vy_write_iterator_get(wi, NULL) != 0)
+		return 0;
+
+	if (fd < 0) {
+		/*
+		 * The range hasn't been written to yet and hence
+		 * doesn't have a file. Create a temporary file for it
+		 * in the index directory to write the run to.
+		 */
+		ERROR_INJECT(ERRINJ_VY_RANGE_CREATE,
+			     {errno = EMFILE; goto create_failed;});
+		snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+		fd = mkstemp(path);
+		if (fd < 0) {
+create_failed:
+			vy_error("Failed to create temp file '%s': %s",
+				 path, strerror(errno));
+			goto fail;
+		}
+		created = true;
 	}
-	return rc;
+
+	/* Append tuples to the range file. */
+	if (vy_run_write(fd, wi, split_key, index->key_def,
+			 index->key_def->opts.page_size, p_run) != 0)
+		goto fail;
+
+	if (created) {
+		/*
+		 * We've successfully written a run to a new range file.
+		 * Commit the range by linking the file to a proper name.
+		 */
+		snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".range",
+			 index->path, range->id);
+		if (rename(path, range->path) != 0) {
+			vy_error("Failed to link range file '%s': %s",
+				 range->path, strerror(errno));
+			goto fail;
+		}
+	}
+
+	*p_fd = fd;
+	return 0;
+fail:
+	if (created) {
+		unlink(path);
+		close(fd);
+	}
+	return -1;
 }
 
 /*
@@ -2215,7 +2244,7 @@ vy_range_compact_prepare(struct vy_range *range,
 
 	/* Allocate new ranges and initialize parts. */
 	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = vy_range_new(index);
+		struct vy_range *r = vy_range_new(index, 0);
 		if (r == NULL)
 			goto fail;
 		parts[i].range = r;
@@ -2481,7 +2510,7 @@ vy_index_create(struct vy_index *index)
 	index->first_dump_lsn = 0;
 	index->last_dump_range_id = 0;
 	/* create initial range */
-	struct vy_range *range = vy_range_new(index);
+	struct vy_range *range = vy_range_new(index, 0);
 	if (unlikely(range == NULL))
 		return -1;
 	if (vy_range_init_min_key(range) != 0) {
@@ -2492,14 +2521,6 @@ vy_index_create(struct vy_index *index)
 	vy_scheduler_add_range(index->env->scheduler, range);
 	index->size = vy_range_size(range);
 	return 0;
-}
-
-static int64_t
-vy_index_range_id_next(struct vy_index *index)
-{
-	int64_t id = pm_atomic_fetch_add_explicit(&index->range_id_max,
-						  1, pm_memory_order_relaxed);
-	return id + 1;
 }
 
 /**
@@ -2602,7 +2623,7 @@ vy_index_open_ex(struct vy_index *index)
 	int size;
 	while ((size = read(fd, &range_id, sizeof(range_id))) ==
 		sizeof(range_id)) {
-		struct vy_range *range = vy_range_new(index);
+		struct vy_range *range = vy_range_new(index, range_id);
 		if (!range) {
 			vy_error("%s", "Can't alloc range");
 			vy_range_delete(range);
@@ -2611,12 +2632,10 @@ vy_index_open_ex(struct vy_index *index)
 		char range_path[PATH_MAX];
 		snprintf(range_path, PATH_MAX, "%s/%016"PRIx64".range",
 			 index->path, range_id);
-		range->id = range_id;
 		if (vy_range_open(index, range, range_path)) {
 			vy_range_delete(range);
 			return -1;
 		}
-		index->range_id_max = MAX(index->range_id_max, range_id + 1);
 	}
 
 	close(fd);
@@ -2632,7 +2651,7 @@ vy_index_open_ex(struct vy_index *index)
 		 * (merged out or empty index was checkpointed)
 		 */
 		/* create initial range */
-		struct vy_range *range = vy_range_new(index);
+		struct vy_range *range = vy_range_new(index, 0);
 		if (unlikely(range == NULL))
 			return -1;
 		if (vy_range_init_min_key(range) != 0) {
@@ -2799,33 +2818,22 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_write_iterator *wi;
 	int rc;
 
-	if (!range->run) {
-		/* An empty range, create a temp file for it. */
-		rc = vy_range_create(range, index, &range->fd);
-		if (rc != 0)
-			return rc;
-	}
-
 	wi = vy_write_iterator_new(1, index, task->vlsn);
 	if (wi == NULL)
 		return -1;
 
-	/* We dump all memory indexes but the newest one -
-	 * see comment in vy_task_dump_new() */
+	/*
+	 * We dump all memory indexes but the newest one - see comment
+	 * in vy_task_dump_new().
+	 */
 	for (struct vy_mem *mem = range->mem->next; mem; mem = mem->next) {
 		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
 		if (rc != 0)
 			goto out;
 	}
 
-	if (vy_write_iterator_get(wi, NULL) != 0) {
-		rc = 0;
-		goto out; /* no more data */
-	}
-
-	rc = vy_run_write(range->fd, wi, NULL, NULL,
-			  index->key_def->opts.page_size,
-			  &task->dump.new_run);
+	rc = vy_range_write_run(range, wi, NULL,
+				&range->fd, &task->dump.new_run);
 out:
 	vy_write_iterator_delete(wi);
 	return rc;
@@ -2869,9 +2877,6 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 
 	if (range->run_count == 1) {
-		/* First non-empty run for this range, deploy the range. */
-		if (vy_range_complete(range, index) == -1)
-			return -1;
 		/*
 		 * The range file was created successfully,
 		 * update the range index on disk.
@@ -2954,19 +2959,8 @@ vy_task_compact_execute(struct vy_task *task)
 		struct vy_tuple *split_key = i < n_parts - 1 ?
 			parts[i + 1].range->min_key : NULL;
 
-		if (vy_write_iterator_get(wi, NULL) != 0)
-			goto out; /* no more data */
-
-		rc = vy_range_create(p->range, index, &parts[i].fd);
-		if (rc != 0)
-			goto out;
-
-		rc = vy_run_write(p->fd, wi, split_key, index->key_def,
-				  index->key_def->opts.page_size, &p->run);
-		if (rc != 0)
-			goto out;
-
-		rc = vy_range_complete(p->range, index);
+		rc = vy_range_write_run(p->range, wi, split_key,
+					&parts[i].fd, &p->run);
 		if (rc != 0)
 			goto out;
 	}
