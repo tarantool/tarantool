@@ -1784,10 +1784,14 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 
 	while (true) {
 		struct vy_tuple *tuple;
-		if (vy_write_iterator_get(wi, &tuple) != 0) {
+		int rc = vy_write_iterator_get(wi, &tuple);
+		if (rc < 0) {
+			goto err; /* error */
+		} else if (rc == 1) {
 			run_done = true; /* no more data */
 			break;
 		}
+		assert(rc == 0);
 		if (split_key != NULL && vy_tuple_compare(tuple->data,
 					split_key->data, key_def) >= 0) {
 			/* Split key reached, proceed to the next run. */
@@ -1810,7 +1814,11 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	vy_buf_advance(&compressed, vy_buf_used(&values));
 
 	page->size = vy_buf_used(&compressed);
-	vy_write_file(fd, compressed.s, page->size);
+	if (vy_write_file(fd, compressed.s, page->size) < 0) {
+		vy_error("index file error: %s", strerror(errno));
+		goto err;
+	}
+
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
 	assert(page->count > 0);
@@ -1882,7 +1890,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 
 	/* write run info header and adjust size */
 	uint32_t header_size = sizeof(*header);
-	vy_write_file(fd, header, header_size);
+	if (vy_write_file(fd, header, header_size) < 0)
+		goto err_file;
 	header->size += header_size;
 
 	/*
@@ -1900,17 +1909,15 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	header->pages_offset = header->offset +
 				     header->size;
 	header->pages_size = vy_buf_used(&run->pages);
-	rc = vy_write_file(fd, run->pages.s, header->pages_size);
-	if (rc == -1)
-		goto err;
+	if (vy_write_file(fd, run->pages.s, header->pages_size) < 0)
+		goto err_file;
 	header->size += header->pages_size;
 
 	/* Write min-max keys for pages */
 	header->min_offset = header->offset + header->size;
 	header->min_size = vy_buf_used(&run->pages_min);
-	rc = vy_write_file(fd, run->pages_min.s, header->min_size);
-	if (rc == -1)
-		goto err;
+	if (vy_write_file(fd, run->pages_min.s, header->min_size) < 0)
+		goto err_file;
 	header->size += header->min_size;
 
 	/*
@@ -1928,10 +1935,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
 	header_size = sizeof(*header);
-	if (vy_pwrite_file(fd, header, header_size,
-			      header->offset) == -1)
-		goto err;
-	if (fdatasync(fd) == -1)
+	if (vy_pwrite_file(fd, header, header_size, header->offset) < 0 ||
+	    fdatasync(fd) != 0)
 		goto err_file;
 
 	*result = run;
@@ -2289,6 +2294,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		/* Make the new range visible to the scheduler. */
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
+	index->range_index_version++;
 	vy_range_delete(range);
 }
 
@@ -7194,11 +7200,15 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
 		     -1 : 1);
 	for (uint32_t i = itr->src_count; i--;) {
+		int rc;
 		struct vy_tuple_iterator *sub_itr = &itr->src[i].iterator;
-		if (itr->src[i].is_mutable)
-			sub_itr->iface->restore(sub_itr, itr->curr_tuple);
+		if (itr->src[i].is_mutable) {
+			rc = sub_itr->iface->restore(sub_itr, itr->curr_tuple);
+			if (rc < 0)
+				return rc;
+		}
 		struct vy_tuple *t;
-		int rc = sub_itr->iface->get(sub_itr, &t);
+		rc = sub_itr->iface->get(sub_itr, &t);
 		if (rc < 0)
 			return rc;
 		if (rc > 0)
@@ -7232,8 +7242,11 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 static int
 vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_tuple **result)
 {
-	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
-		return -1;
+	if (!itr->search_started) {
+		int rc = vy_merge_iterator_locate(itr);
+		if (rc < 0)
+			return rc;
+	}
 	*result = itr->curr_tuple;
 	return itr->curr_tuple != NULL ? 0 : 1;
 }
@@ -7247,15 +7260,21 @@ vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_tuple **result)
 static int
 vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
 {
-	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
-		return -1;
+	int rc;
+	if (!itr->search_started) {
+		rc = vy_merge_iterator_locate(itr);
+		if (rc < 0)
+			return rc;
+	}
 	if (itr->is_in_uniq_opt) {
 		itr->is_in_uniq_opt = false;
-		if (vy_merge_iterator_locate(itr) < 0)
-			return -1;
+		rc = vy_merge_iterator_locate(itr);
+		if (rc < 0)
+			return rc;
 	}
-	if (vy_merge_iterator_propagate(itr) < 0)
-		return -1;
+	rc = vy_merge_iterator_propagate(itr);
+	if (rc < 0)
+		return rc;
 	return vy_merge_iterator_locate(itr);
 }
 
@@ -7268,12 +7287,16 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
 static int
 vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 {
-	if (!itr->search_started && vy_merge_iterator_locate(itr) < 0)
-		return -1;
+	int rc;
+	if (!itr->search_started) {
+		rc = vy_merge_iterator_locate(itr);
+		if (rc < 0)
+			return rc;
+	}
 	if (itr->curr_src == UINT32_MAX)
 		return 1;
 	struct vy_tuple_iterator *sub_itr = &itr->src[itr->curr_src].iterator;
-	int rc = sub_itr->iface->next_lsn(sub_itr);
+	rc = sub_itr->iface->next_lsn(sub_itr);
 	if (rc < 0) {
 		return rc;
 	} else if (rc == 0) {
@@ -7504,6 +7527,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 
 		if (wi->goto_next_key) {
 			rc = vy_merge_iterator_next_key(mi);
+			if (rc < 0)
+				break; /* error */
+			if (rc > 0)
+				return 1; /* not found */
 			wi->goto_next_key = false;
 		}
 		/*
@@ -7518,12 +7545,16 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 				break;
 			}
 			rc = vy_merge_iterator_next_key(mi);
-			if (rc)
-				break;
+			if (rc < 0)
+				break; /* error */
+			if (rc > 0)
+				return 1; /* not found */
 		}
 		rc = vy_merge_iterator_get(mi, &tuple);
-		if (rc)
-			break;
+		if (rc < 0)
+			break; /* error */
+		if (rc > 0)
+			return 1; /* not found */
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
 			break;
@@ -7596,8 +7627,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			unreachable();
 		}
 	}
-	if (rc)
-		return rc;
+	assert(rc == 0);
 	vy_tuple_ref(tuple);
 	wi->curr_tuple = tuple;
 	return 0;
@@ -7813,7 +7843,10 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	vy_read_iterator_use_range(itr);
 	struct vy_tuple *tuple = NULL;
 	int rc = vy_merge_iterator_get(&itr->merge_iterator, &tuple);
-	if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL)
+	if (rc < 0)
+		return rc;
+	assert(rc >= 0);
+	if (itr->merge_iterator.range_ended && itr->curr_range != NULL)
 		return vy_read_iterator_next_range(itr);
 	if (itr->curr_tuple != NULL)
 		vy_tuple_unref(itr->curr_tuple);
@@ -7869,10 +7902,11 @@ vy_read_iterator_next(struct vy_read_iterator *itr)
 {
 	vy_read_iterator_check_versions(itr);
 	int rc = vy_merge_iterator_next_key(&itr->merge_iterator);
-	if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL)
+	if (rc < 0)
+		return rc;
+	if (itr->merge_iterator.range_ended && itr->curr_range != NULL)
 		rc = vy_read_iterator_next_range(itr);
 	return rc;
-
 }
 
 /**
@@ -7885,47 +7919,53 @@ int
 vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 {
 	vy_read_iterator_check_versions(itr);
-	int rc;
 	while (true) {
 		struct vy_tuple *t;
-		rc = vy_merge_iterator_get(&itr->merge_iterator, &t);
+		int rc = vy_merge_iterator_get(&itr->merge_iterator, &t);
 		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr);
-			if (rc == 0)
-				vy_merge_iterator_get(&itr->merge_iterator, &t);
+			if (rc == 0) {
+				rc = vy_merge_iterator_get(&itr->merge_iterator,
+							   &t);
+			}
 		}
-		if (rc != 0) {
-			return rc;
-		}
+		if (rc < 0)
+			return rc; /* error */
+		if (rc == 1)
+			return 1; /* no more data */
+		assert(rc == 0);
 		if (itr->curr_tuple != NULL)
 			vy_tuple_unref(itr->curr_tuple);
 		itr->curr_tuple = t;
 		vy_tuple_ref(itr->curr_tuple);
 		while (itr->curr_tuple->flags & SVUPSERT) {
-			int rc = vy_merge_iterator_next_lsn(&itr->merge_iterator);
-			if (rc < 0) {
-				return rc;
-			}
+			rc = vy_merge_iterator_next_lsn(&itr->merge_iterator);
 			struct vy_tuple *next = NULL;
-			if (rc == 0)
-				vy_merge_iterator_get(&itr->merge_iterator, &next);
+			if (rc == 0) {
+				rc = vy_merge_iterator_get(&itr->merge_iterator,
+							   &next);
+			}
+			if (rc < 0)
+				return rc;
 			struct vy_tuple *applied =
 				vy_apply_upsert(itr->curr_tuple, next,
 						itr->index, true);
-			if (applied == NULL) {
+			if (applied == NULL)
 				return -1;
-			}
 			vy_tuple_unref(itr->curr_tuple);
 			itr->curr_tuple = applied;
 		}
 		if (rc != 0 || (itr->curr_tuple->flags & SVDELETE) == 0)
 			break;
 		rc = vy_read_iterator_next(itr);
-		if (rc != 0)
-			break;
+		if (rc < 0)
+			return rc;
+		if (rc == 1)
+			return 1; /* no more data */
+		assert(rc == 0);
 	}
 	*result = itr->curr_tuple;
-	return rc;
+	return 0;
 }
 
 /**
