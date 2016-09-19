@@ -1309,6 +1309,7 @@ vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
 static const char *
 vy_run_min_key(struct vy_run *run, const struct vy_page_info *p)
 {
+	assert(run->info.count > 0);
 	return run->pages_min.s + p->min_key_offset;
 }
 
@@ -1812,18 +1813,17 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	vy_write_file(fd, compressed.s, page->size);
 	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
 
-	if (page->count > 0) {
-		struct vy_buf *min_buf = &run->pages_min;
-		struct vy_tuple_info *tuplesinfoarr = (struct vy_tuple_info *) tuplesinfo.s;
-		struct vy_tuple_info *mininfo = &tuplesinfoarr[0];
-		if (vy_buf_ensure(min_buf, mininfo->size))
-			goto err;
+	assert(page->count > 0);
+	struct vy_buf *min_buf = &run->pages_min;
+	struct vy_tuple_info *tuplesinfoarr = (struct vy_tuple_info *) tuplesinfo.s;
+	struct vy_tuple_info *mininfo = &tuplesinfoarr[0];
+	if (vy_buf_ensure(min_buf, mininfo->size))
+		goto err;
 
-		page->min_key_offset = vy_buf_used(min_buf);
-		char *minvalue = values.s + mininfo->offset;
-		memcpy(min_buf->p, minvalue, mininfo->size);
-		vy_buf_advance(min_buf, mininfo->size);
-	}
+	page->min_key_offset = vy_buf_used(min_buf);
+	char *minvalue = values.s + mininfo->offset;
+	memcpy(min_buf->p, minvalue, mininfo->size);
+	vy_buf_advance(min_buf, mininfo->size);
 	vy_buf_advance(&run->pages, sizeof(struct vy_page_info));
 
 	run_info->size += page->size;
@@ -2811,6 +2811,12 @@ vy_task_dump_execute(struct vy_task *task)
 		if (rc != 0)
 			goto out;
 	}
+
+	if (vy_write_iterator_get(wi, NULL) != 0) {
+		rc = 0;
+		goto out; /* no more data */
+	}
+
 	rc = vy_run_write(range->fd, wi, NULL, NULL,
 			  index->key_def->opts.page_size,
 			  &task->dump.new_run);
