@@ -102,8 +102,9 @@ const struct key_opts key_opts_default = {
 	/* .distancebuf         = */ { '\0' },
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
 	/* .path                = */ { 0 },
-	/* .range_size           = */ 0,
+	/* .range_size          = */ 0,
 	/* .page_size           = */ 0,
+	/* .lsn                 = */ 0,
 };
 
 const struct opt_def key_opts_reg[] = {
@@ -113,6 +114,7 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("path", MP_STR, struct key_opts, path),
 	OPT_DEF("range_size", MP_UINT, struct key_opts, range_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
+	OPT_DEF("lsn", MP_UINT, struct key_opts, lsn),
 	{ NULL, MP_NIL, 0, 0 }
 };
 

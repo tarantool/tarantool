@@ -13,6 +13,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter ', .lsn.: [0-9]+' to ''")
+---
+- true
+...
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
@@ -537,3 +541,7 @@ space:drop()
 ---
 ...
 -- data dictionary compatibility is checked by upgrade.test.lua
+test_run:cmd("clear filter")
+---
+- true
+...

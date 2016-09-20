@@ -200,6 +200,9 @@ lbox_info_cluster(struct lua_State *L)
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&CLUSTER_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
+	lua_pushliteral(L, "signature");
+	luaL_pushint64(L, vclock_sum(&recovery->vclock));
+	lua_settable(L, -3);
 
 	return 1;
 }

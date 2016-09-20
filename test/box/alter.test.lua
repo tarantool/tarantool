@@ -3,6 +3,7 @@ _index = box.space[box.schema.INDEX_ID]
 ADMIN = 1
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter ', .lsn.: [0-9]+' to ''")
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
@@ -217,3 +218,4 @@ box.space._index:get({space.id, 0})[6]
 space:drop()
 
 -- data dictionary compatibility is checked by upgrade.test.lua
+test_run:cmd("clear filter")

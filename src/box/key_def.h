@@ -180,6 +180,10 @@ struct key_opts {
 	char path[PATH_MAX];
 	uint32_t range_size;
 	uint32_t page_size;
+	/**
+	 * LSN from the time of index creation.
+	 */
+	int64_t lsn;
 };
 
 extern const struct key_opts key_opts_default;
