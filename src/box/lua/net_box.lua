@@ -1,4 +1,475 @@
 -- net_box.lua (internal file)
+local ffi      = require('ffi')
+local buffer   = require('buffer')
+local socket   = require('socket')
+local fiber    = require('fiber')
+local msgpack  = require('msgpack')
+local errno    = require('errno')
+local internal = require('net.box.lib')
+
+local band          = bit.band
+local max           = math.max
+local fiber_time    = fiber.time
+local fiber_self    = fiber.self
+local ibuf_decode   = msgpack.ibuf_decode
+
+local table_new           = require('table.new')
+local check_iterator_type = box.internal.check_iterator_type
+
+local communicate     = internal.communicate
+local encode_auth     = internal.encode_auth
+local encode_select   = internal.encode_select
+local decode_greeting = internal.decode_greeting
+
+local TIMEOUT_INFINITY = 500 * 365 * 86400
+local VSPACE_ID        = 281
+local VINDEX_ID        = 289
+
+local IPROTO_STATUS_KEY    = 0x00
+local IPROTO_ERRNO_MASK    = 0x7FFF
+local IPROTO_SYNC_KEY      = 0x01
+local IPROTO_SCHEMA_ID_KEY = 0x05
+local IPROTO_DATA_KEY      = 0x30
+local IPROTO_ERROR_KEY     = 0x31
+local IPROTO_GREETING_SIZE = 128
+
+-- select errors from box.error
+local E_UNKNOWN              = box.error.UNKNOWN
+local E_NO_CONNECTION        = box.error.NO_CONNECTION
+local E_TIMEOUT              = box.error.TIMEOUT
+local E_WRONG_SCHEMA_VERSION = box.error.WRONG_SCHEMA_VERSION
+local E_PROC_LUA             = box.error.PROC_LUA
+
+-- utility tables
+local is_final_state         = {closed = 1, error = 1}
+local method_codec           = {
+    ping    = internal.encode_ping,
+    call_16 = internal.encode_call_16,
+    call_17 = internal.encode_call,
+    eval    = internal.encode_eval,
+    insert  = internal.encode_insert,
+    replace = internal.encode_replace,
+    delete  = internal.encode_delete,
+    update  = internal.encode_update,
+    upsert  = internal.encode_upsert,
+    select  = function(buf, id, schema_id, spaceno, indexno, key, opts)
+        if type(spaceno) ~= 'number' then
+            box.error(box.error.NO_SUCH_SPACE, '#'..tostring(spaceno))
+        end
+
+        if type(indexno) ~= 'number' then
+            box.error(box.error.NO_SUCH_INDEX, indexno, '#'..tostring(indexno))
+        end
+
+        local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
+        local offset = tonumber(opts and opts.offset) or 0
+ 
+        local key_is_nil = (key == nil or
+                            (type(key) == 'table' and #key == 0))
+        encode_select(buf, id, schema_id, spaceno, indexno,
+                      check_iterator_type(opts, key_is_nil),
+                      offset, limit, key)
+    end,
+    -- inject raw data into connection, used by console and tests
+    inject = function(buf, id, schema_id, bytes)
+        local ptr = buf:reserve(#bytes)
+        ffi.copy(ptr, bytes, #bytes)
+        buf.wpos = ptr + #bytes
+    end
+}
+
+local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
+
+-- function create_transport(host, port, user, password, callback)
+--
+-- Transport methods: connect(), close(), perfrom_request(), wait_state()
+--
+-- Basically, *transport* is a TCP connection speaking one of
+-- Tarantool network protocols. This is a low-level interface.
+-- Primary features:
+--  * implements protocols; concurrent perform_request()-s benefit from
+--    multiplexing support in the protocol;
+--  * schema-aware (optional) - snoops responses and initiates
+--    schema reload when a request fails due to schema version mismatch;
+--  * delivers transport events via the callback.
+--
+-- Transport state machine:
+--
+-- State machine starts in 'initial' state. Connect method changes
+-- the state to 'connecting' and spawns a worker fiber. Close
+-- method sets the state to 'closed' and kills the worker.
+-- If the transport is already in 'error' state close() does nothing.
+--
+-- State chart:
+--
+--  initial -> connecting -> active
+--                        \
+--                          -> auth -> fetch_schema <-> active
+--
+--  (any state, on error) -> error_reconnect -> connecting -> ...
+--                                           \
+--                                             -> [error]
+--  (any_state, but [error]) -> [closed]
+--
+--
+-- Events / queries delivered via a callback:
+--
+--  'state_changed', state, errno, error
+--  'handshake', greeting           -> nil (accept) / errno, error (reject)
+--  'will_fetch_schema'             -> true (approve) / false (skip fetch)
+--  'did_fetch_schema', schema_id, spaces, indices
+--  'will_reconnect', errno, error  -> true (approve) / false (reject)
+--
+-- Suggestion: sleep a few secs before approving reconnect.
+--
+local function create_transport(host, port, user, password, callback)
+    -- check / normalize credentials
+    if user == nil and password ~= nil then
+        box.error(E_PROC_LUA, 'net.box: user is not defined')
+    end
+    if user ~= nil and password == nil then password = '' end
+
+    -- state: current state, only the worker fiber and connect method
+    -- change state
+    local state            = 'initial'
+    local last_errno
+    local last_error
+    local state_cond       = fiber.cond() -- signaled when the state changes
+ 
+    -- requests: requests currently 'in flight', keyed by a request id;
+    -- value refs are weak hence if a client dies unexpectedly,
+    -- GC cleans the mess. Client submits a request and waits on state_cond.
+    -- If the reponse arrives within the timeout, the worker wakes
+    -- client fiber explicitly. Otherwize, wait on state_cond completes and
+    -- the client reports E_TIMEOUT.
+    local requests         = setmetatable({}, { __mode = 'v' })
+    local requests_next_id = 1
+
+    local worker_fiber
+    local connection
+    local send_buf         = buffer.ibuf(buffer.READAHEAD)
+    local recv_buf         = buffer.ibuf(buffer.READAHEAD)
+
+    -- STATE SWITCHING --
+    local function set_state(new_state, new_errno, new_error, schema_id)
+        state = new_state
+        last_errno = new_errno
+        last_error = new_error
+        callback('state_changed', new_state, new_errno, new_error)
+        state_cond:broadcast()
+        if state ~= 'active' then
+            -- cancel all request but the ones bearing the particular
+            -- schema id; if schema id was omitted or we aren't fetching
+            -- schema, cancel everything
+            if not schema_id or state ~= 'fetch_schema' then
+                schema_id = -1
+            end
+            local next_id, next_request = next(requests)
+            while next_id do
+                local id, request = next_id, next_request
+                next_id, next_request = next(requests, id)
+                if request.schema_id ~= schema_id then
+                    requests[id] = nil -- this marks the request as completed
+                    request.errno  = new_errno
+                    request.response = new_error
+                end
+            end
+        end
+    end
+
+    -- FYI: [] on a string is valid
+    local function wait_state(target_state, timeout)
+        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        repeat until state == target_state or target_state[state] or
+                     is_final_state[state] or
+                     not state_cond:wait(max(0, deadline - fiber_time()))
+        return state == target_state or target_state[state] or false
+    end
+
+    -- CONNECT/CLOSE --
+    local protocol_sm
+
+    local function connect()
+        if state ~= 'initial' then return not is_final_state[state] end
+        set_state('connecting')
+        fiber.create(function()
+            worker_fiber = fiber_self()
+            fiber.name(string.format('%s:%s (net.box)', host, port))
+            local ok, err = pcall(protocol_sm)
+            if not (ok or is_final_state[state]) then
+                set_state('error', E_UNKNOWN, err)
+            end
+            if connection then connection:close(); connection = nil end
+            send_buf:recycle()
+            recv_buf:recycle()
+            worker_fiber = nil
+        end)
+        return true
+    end
+
+    local function close()
+        if not is_final_state[state] then
+            set_state('closed', E_NO_CONNECTION, 'Connection closed')
+        end
+        if worker_fiber then worker_fiber:cancel(); worker_fiber = nil end
+    end
+
+    -- REQUEST/RESPONSE --
+    local function perform_request(timeout, method, schema_id, ...)
+        if state ~= 'active' then
+            return last_errno or E_NO_CONNECTION, last_error
+        end
+        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        -- alert worker to notify it of the queued outgoing data;
+        -- if the buffer wasn't empty, assume the worker was already alerted
+        if send_buf:size() == 0 then worker_fiber:wakeup() end
+        local id = requests_next_id
+        method_codec[method](send_buf, id, schema_id, ...)
+        requests_next_id = next_id(id)
+        local request = table_new(0, 5) -- reserve space for 5 keys
+        request.client = fiber_self()
+        request.method = method
+        request.schema_id = schema_id
+        requests[id] = request
+        repeat
+            local timeout = max(0, deadline - fiber_time())
+            if not state_cond:wait(timeout) then
+                requests[id] = nil
+                return E_TIMEOUT, 'Timeout exceeded'
+            end
+        until requests[id] == nil -- i.e. completed (beware spurious wakeups)
+        return request.errno, request.response
+    end
+
+    local function dispatch_response(id, errno, response)
+        local request = requests[id]
+        if request then -- someone is waiting for the response
+            requests[id] = nil
+            request.errno, request.response = errno, response
+            local client = request.client
+            if client:status() ~= 'dead' then client:wakeup() end
+        end
+    end
+
+    local function dispatch_response_iproto(hdr, body)
+        local id = hdr[IPROTO_SYNC_KEY]
+        local status = hdr[IPROTO_STATUS_KEY]
+        if status ~= 0 then
+            return dispatch_response(id, band(status, IPROTO_ERRNO_MASK),
+                                     body[IPROTO_ERROR_KEY])
+        else
+            return dispatch_response(id, nil, body[IPROTO_DATA_KEY])
+        end
+    end
+
+    local function new_request_id()
+        local id = requests_next_id; requests_next_id = next_id(id)
+        return id
+    end
+
+    -- IO (WORKER FIBER) --
+    local function send_and_recv(limit_or_boundary, timeout)
+        return communicate(connection:fd(), send_buf, recv_buf,
+                           limit_or_boundary, timeout)
+    end
+
+    local function send_and_recv_iproto(timeout)
+        local data_len = recv_buf.wpos - recv_buf.rpos
+        local required = 0
+        if data_len < 5 then
+            required = 5
+        else
+            -- PWN! insufficient input validation
+            local rpos, len = ibuf_decode(recv_buf.rpos)
+            required = (rpos - recv_buf.rpos) + len
+            if data_len >= required then
+                local hdr
+                rpos, hdr = ibuf_decode(rpos)
+                local body = {}
+                if rpos - recv_buf.rpos < required then
+                    rpos, body = ibuf_decode(rpos)
+                end
+                recv_buf.rpos = rpos
+                return nil, hdr, body
+            end
+        end
+        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        local err, extra = send_and_recv(required, timeout)
+        if err then
+            return err, extra
+        end
+        return send_and_recv_iproto(max(0, deadline - fiber_time()))
+    end
+
+    -- PROTOCOL STATE MACHINE (WORKER FIBER) --
+    --
+    -- The sm is implemented as a collection of functions performing
+    -- tail-recursive calls to each other. Yep, Lua optimizes
+    -- such calls, and yep, this is the canonical way to implement
+    -- a state machine in Lua.
+    local console_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
+
+    protocol_sm = function ()
+        connection = socket.tcp_connect(host, port)
+        if connection == nil then
+            return error_sm(E_NO_CONNECTION, errno.strerror(errno()))
+        end
+        local size = IPROTO_GREETING_SIZE
+        local err, msg = send_and_recv(size, 0.3)
+        if err then return error_sm(err, msg) end
+        local g = decode_greeting(ffi.string(recv_buf.rpos, size))
+        recv_buf.rpos = recv_buf.rpos + size
+        if not g then
+            return error_sm(E_NO_CONNECTION, 'Can\'t decode handshake')
+        end
+        err, msg = callback('handshake', g)
+        if err then return error_sm(err, msg) end
+        if g.protocol == 'Lua console' then
+            local rid = requests_next_id
+            set_state('active')
+            return console_sm(rid)
+        elseif g.protocol == 'Binary' then
+            return iproto_auth_sm(g.salt)
+        else
+            return error_sm(E_NO_CONNECTION, 'Unknown protocol: ' .. g.protocol)
+        end
+    end
+
+    console_sm = function(rid)
+        local delim = '\n...\n'
+        local err, delim_pos = send_and_recv(delim)
+        if err then
+            return error_sm(err, delim_pos)
+        else
+            local response = ffi.string(recv_buf.rpos, delim_pos + #delim)
+            dispatch_response(rid, nil, response)
+            recv_buf.rpos = recv_buf.rpos + delim_pos + #delim
+            return console_sm(next_id(rid))
+        end
+    end
+
+    iproto_auth_sm = function(salt)
+        set_state('auth')
+        if not user or not password then
+            set_state('fetch_schema')
+            return iproto_schema_sm()
+        end
+        encode_auth(send_buf, new_request_id(), nil, user, password, salt)
+        local err, hdr, body = send_and_recv_iproto()
+        if err then
+            return error_sm(err, hdr)
+        end
+        if hdr[IPROTO_STATUS_KEY] ~= 0 then
+            return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
+        end
+        set_state('fetch_schema')
+        return iproto_schema_sm(hdr[IPROTO_SCHEMA_ID_KEY])
+    end
+
+    iproto_schema_sm = function(schema_id)
+        if not callback('will_fetch_schema') then
+            set_state('active')
+            return iproto_sm(schema_id)
+        end
+        local select1_id = new_request_id()
+        local select2_id = new_request_id()
+        local response = {}
+        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF)
+        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF)
+        schema_id = nil -- any schema_id will do provided that
+                        -- it is consistent across responses
+        repeat
+            local err, hdr, body = send_and_recv_iproto()
+            if err then return error_sm(err, hdr) end
+            dispatch_response_iproto(hdr, body)
+            local id = hdr[IPROTO_SYNC_KEY]
+            if id == select1_id or id == select2_id then
+                -- response to a schema query we've submitted
+                local status = hdr[IPROTO_STATUS_KEY]
+                local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
+                if status ~= 0 then
+                    return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
+                end
+                if schema_id == nil then
+                    schema_id = response_schema_id
+                elseif schema_id ~= response_schema_id then
+                    -- schema changed while fetching schema; restart loader
+                    return iproto_schema_sm()
+                end
+                response[id] = body[IPROTO_DATA_KEY]
+            end
+        until response[select1_id] and response[select2_id]
+        callback('did_fetch_schema', schema_id,
+                 response[select1_id], response[select2_id])
+        set_state('active')
+        return iproto_sm(schema_id)
+    end
+
+    iproto_sm = function(schema_id)
+        local err, hdr, body = send_and_recv_iproto()
+        if err then return error_sm(err, hdr) end
+        dispatch_response_iproto(hdr, body)
+        local status = hdr[IPROTO_STATUS_KEY]
+        local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
+        if status ~= 0 and
+           band(status, IPROTO_ERRNO_MASK) == E_WRONG_SCHEMA_VERSION and
+           response_schema_id ~= schema_id
+        then
+            set_state('fetch_schema',
+                      E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
+                      response_schema_id)
+            return iproto_schema_sm(schema_id)
+        end
+        return iproto_sm(schema_id)
+    end
+
+    error_sm = function(err, msg)
+        if connection then connection:close(); connection = nil end
+        send_buf:recycle()
+        recv_buf:recycle()
+        set_state('error_reconnect', err, msg)
+        if callback('will_reconnect', err, msg) then
+            set_state('connecting')
+            return protocol_sm()
+        else
+            set_state('error', err, msg)
+        end
+    end
+
+    return {
+        close           = close,
+        connect         = connect,
+        wait_state      = wait_state,
+        perform_request = perform_request
+    }
+end
+
+-- Wrap create_transport, adding auto-close-on-GC feature.
+-- All the GC magic is neatly encapsulated!
+-- The tricky part is the callback:
+--  * callback (typically) references the transport (indirectly);
+--  * worker fiber references the callback;
+--  * fibers are GC roots - i.e. transport is never GC-ed!
+-- We solve the issue by making the worker->callback ref weak.
+-- Now it is necessary to have a strong ref to callback somewhere or
+-- it is GC-ed prematurely. We wrap close() method, stashing the
+-- ref in an upvalue (close() performance doesn't matter much.)
+local create_transport = function(host, port, user, password, callback)
+    local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
+    local function weak_callback(...)
+        local callback = weak_refs.callback
+        if callback then return callback(...) end
+    end
+    local transport = create_transport(host, port, user,
+                                       password, weak_callback)
+    local transport_close = transport.close
+    local gc_hook = ffi.gc(ffi.new('char[1]'), transport_close)
+    transport.close = function()
+        -- dummy gc_hook, callback refs prevent premature GC
+        return transport_close(gc_hook, callback)
+    end
+    return transport
+end
 
 local internal = require 'net.box.lib'
 local msgpack = require 'msgpack'
@@ -1115,5 +1586,7 @@ setmetatable(remote.self, {
         return nil
     end
 })
+
+remote.create_transport = create_transport
 
 package.loaded['net.box'] = remote

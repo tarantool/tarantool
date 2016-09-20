@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "net_box.h"
+#include <sys/socket.h>
 
 #include <small/ibuf.h>
 #include <msgpuck.h> /* mp_store_u32() */
@@ -40,6 +41,10 @@
 
 #include "lua/msgpack.h"
 #include "third_party/base64.h"
+
+#include "coio.h"
+#include "box/errcode.h"
+#include "lua/fiber.h"
 
 #define cfg luaL_msgpack_default
 
@@ -445,6 +450,103 @@ netbox_decode_greeting(lua_State *L)
 	return 1;
 }
 
+/*
+ * communicate(fd, send_buf, recv_buf, limit_or_boundary, timeout)
+ *  -> errno, error
+ *  -> nil, limit/boundary_pos
+ */
+static int
+netbox_communicate(lua_State *L)
+{
+	uint32_t fd = lua_tointeger(L, 1);
+	struct ibuf *send_buf = (struct ibuf *) lua_topointer(L, 2);
+	struct ibuf *recv_buf = (struct ibuf *) lua_topointer(L, 3);
+
+	/* limit or boundary */
+	size_t limit = SIZE_MAX;
+	const void *boundary = NULL;
+	size_t boundary_len;
+
+	if (lua_type(L, 4) == LUA_TSTRING)
+		boundary = lua_tolstring(L, 4, &boundary_len);
+	else
+		limit = lua_tointeger(L, 4);
+
+	/* timeout */
+	ev_tstamp timeout = TIMEOUT_INFINITY;
+	if (lua_type(L, 5) == LUA_TNUMBER)
+		timeout = lua_tonumber(L, 5);
+	if (timeout < 0)
+		return luaL_error(L, "timeout < 0");
+
+	int revents = COIO_READ;
+	while (true) {
+		/* reader serviced first */
+check_limit:
+		if (ibuf_used(recv_buf) >= limit) {
+			lua_pushnil(L);
+			lua_pushinteger(L, (lua_Integer)limit);
+			return 2;
+		}
+		const char *p;
+		if (boundary != NULL && (p = memmem(
+					recv_buf->rpos,
+					ibuf_used(recv_buf),
+					boundary, boundary_len)) != NULL) {
+			lua_pushnil(L);
+			lua_pushinteger(L, (lua_Integer)(
+					p - recv_buf->rpos));
+			return 2;
+		}
+
+		while (revents & COIO_READ) {
+			void *p = ibuf_reserve(recv_buf, 65536);
+			if (p == NULL)
+				luaL_error(L, "out of memory");
+			ssize_t rc = recv(
+				fd, recv_buf->wpos, ibuf_unused(recv_buf), 0);
+			if (rc == 0) {
+				lua_pushinteger(L, ER_NO_CONNECTION);
+				lua_pushstring(L, "Peer closed");
+				return 2;
+			} if (rc > 0) {
+				recv_buf->wpos += rc;
+				goto check_limit;
+			} else if (errno == EAGAIN || errno == EWOULDBLOCK)
+				revents &= ~COIO_READ;
+			else if (errno != EINTR)
+				goto handle_error;
+		}
+
+		while ((revents & COIO_WRITE) && ibuf_used(send_buf) != 0) {
+			ssize_t rc = send(
+				fd, send_buf->rpos, ibuf_used(send_buf), 0);
+			if (rc >= 0)
+				send_buf->rpos += rc;
+			else if (errno == EAGAIN || errno == EWOULDBLOCK)
+				revents &= ~COIO_WRITE;
+			else if (errno != EINTR)
+				goto handle_error;
+		}
+
+		ev_tstamp deadline = fiber_time() + timeout;
+		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
+				EV_WRITE : 0), timeout);
+		luaL_testcancel(L);
+		timeout = deadline - fiber_time();
+		timeout = MAX(0.0, timeout);
+		if (revents == 0 && timeout == 0.0) {
+			lua_pushinteger(L, ER_TIMEOUT);
+			lua_pushstring(L, "Timeout exceeded");
+			return 2;
+		}
+	}
+handle_error:
+	lua_pushinteger(L, ER_NO_CONNECTION);
+	lua_pushstring(L, strerror(errno));
+	return 2;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -461,6 +563,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_upsert",  netbox_encode_upsert },
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
+		{ "communicate",    netbox_communicate },
 		{ NULL, NULL}
 	};
 	luaL_register(L, "net.box.lib", net_box_lib);
