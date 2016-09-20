@@ -68,7 +68,7 @@ cfg_filter(box.cfg)
       - - range_size
         - 67108864
       - - threads
-        - 5
+        - 1
   - - vinyl_dir
     - <hidden>
   - - wal_dir

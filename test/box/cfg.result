@@ -64,7 +64,7 @@ cfg_filter(box.cfg)
       - - range_size
         - 67108864
       - - threads
-        - 5
+        - 1
   - - vinyl_dir
     - <hidden>
   - - wal_dir
@@ -132,7 +132,7 @@ cfg_filter(box.cfg)
       - - range_size
         - 67108864
       - - threads
-        - 5
+        - 1
   - - vinyl_dir
     - <hidden>
   - - wal_dir
@@ -194,7 +194,7 @@ box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 1
 - 1.1
-- 5
+- 1
 ...
 test_run:cmd("switch default")
 ---
@@ -224,7 +224,7 @@ box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 0.2
 - 1.1
-- 5
+- 1
 ...
 test_run:cmd("switch default")
 ---
@@ -284,7 +284,7 @@ box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
 - 1
 - 3.14
-- 5
+- 1
 ...
 test_run:cmd("switch default")
 ---
