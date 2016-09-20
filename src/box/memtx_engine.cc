@@ -1370,21 +1370,23 @@ MemtxEngine::abortCheckpoint()
 	m_checkpoint = 0;
 }
 
+/** Used to pass arguments to memtx_initial_join_f */
+struct memtx_join_arg {
+	const char *snap_dirname;
+	int64_t checkpoint_lsn;
+	struct xstream *stream;
+};
+
 /**
- * Invoked from relay thread to feed snapshot rows
- * to the replica, hence should not use engine state.
+ * Invoked from a thread to feed snapshot rows.
  */
-void
-MemtxEngine::join(struct xstream *stream)
+static int
+memtx_initial_join_f(va_list ap)
 {
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such
-	 * case: raise ER_MISSING_SNAPSHOT.
-	 */
-	if (!m_has_checkpoint)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	struct memtx_join_arg *arg = va_arg(ap, struct memtx_join_arg *);
+	const char *snap_dirname = arg->snap_dirname;
+	int64_t checkpoint_lsn = arg->checkpoint_lsn;
+	struct xstream *stream = arg->stream;
 
 	struct xdir dir;
 	struct xlog *snap = NULL;
@@ -1392,14 +1394,14 @@ MemtxEngine::join(struct xstream *stream)
 	 * snap_dirname and SERVER_UUID don't change after start,
 	 * safe to use in another thread.
 	 */
-	xdir_create(&dir, m_snap_dir.dirname, SNAP, &SERVER_UUID);
+	xdir_create(&dir, snap_dirname, SNAP, &SERVER_UUID);
 	auto guard = make_scoped_guard([&]{
 		xdir_destroy(&dir);
 		if (snap)
 			xlog_close(snap);
 	});
-	struct vclock *last = &m_last_checkpoint;
-	snap = xlog_open_xc(&dir, vclock_sum(last));
+
+	snap = xlog_open_xc(&dir, checkpoint_lsn);
 	struct xlog_cursor cursor;
 	xlog_cursor_open(&cursor, snap);
 	auto reader_guard = make_scoped_guard([&]{
@@ -1418,6 +1420,35 @@ MemtxEngine::join(struct xstream *stream)
 	/* TODO: replace panic with tnt_raise() */
 	if (!cursor.eof_read)
 		panic("snapshot `%s' has no EOF marker", snap->filename);
+	return 0;
+}
+
+void
+MemtxEngine::join(struct xstream *stream)
+{
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such
+	 * case: raise ER_MISSING_SNAPSHOT.
+	 */
+	if (!m_has_checkpoint)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+
+	/*
+	 * cord_costart() passes only void * pointer as an argument.
+	 */
+	struct memtx_join_arg arg = {
+		/* .snap_dirname   = */ m_snap_dir.dirname,
+		/* .checkpoint_lsn = */ vclock_sum(&m_last_checkpoint),
+		/* .stream         = */ stream
+	};
+
+	/* Send snapshot using a thread */
+	struct cord cord;
+	cord_costart(&cord, "initial_join", memtx_initial_join_f, &arg);
+	cord_cojoin(&cord);
+	diag_raise();
 }
 
 /**

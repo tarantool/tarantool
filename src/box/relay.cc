@@ -80,20 +80,6 @@ relay_set_cord_name(int fd)
 	cord_set_name(name);
 }
 
-int
-relay_initial_join_f(va_list ap)
-{
-	struct relay *relay = va_arg(ap, struct relay *);
-	coeio_enable();
-	relay_set_cord_name(relay->io.fd);
-
-	/* Send snapshot */
-	assert(relay->stream.write != NULL);
-	engine_join(&relay->stream);
-
-	return 0;
-}
-
 void
 relay_initial_join(int fd, uint64_t sync)
 {
@@ -103,9 +89,8 @@ relay_initial_join(int fd, uint64_t sync)
 		relay_destroy(&relay);
 	});
 
-	cord_costart(&relay.cord, "initial_join", relay_initial_join_f, &relay);
-	cord_cojoin(&relay.cord);
-	diag_raise();
+	assert(relay.stream.write != NULL);
+	engine_join(&relay.stream);
 }
 
 int
