@@ -850,16 +850,6 @@ struct vy_index {
 	uint32_t *key_map; /* field_id -> part_id map */
 	/** Member of env->db or scheduler->shutdown. */
 	struct rlist link;
-
-	/**
-	 * LSN from the time when the first index impression on
-	 * disk was created. For a newly created (not
-	 * checkpointed) index this should be the min LSN over
-	 * records from this index stored on disk.  For
-	 * checkpointed index this should be LSN of
-	 * the checkpoint.
-	 */
-	int64_t first_dump_lsn;
 	/*
 	 * For each index range list modification,
 	 * get a new range id and increment this variable.
@@ -1307,8 +1297,6 @@ vy_run_size(struct vy_run *run)
 
 static int
 vy_index_dump_range_index(struct vy_index *index);
-static int
-vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn);
 
 static struct vy_run *
 vy_run_new()
@@ -2452,7 +2440,6 @@ vy_index_create(struct vy_index *index)
 	}
 
 	index->range_id_max = 0;
-	index->first_dump_lsn = 0;
 	index->last_dump_range_id = 0;
 	/* create initial range */
 	struct vy_range *range = vy_range_new(index, 0);
@@ -2510,12 +2497,9 @@ vy_index_open_ex(struct vy_index *index)
 {
 	/*
 	 * The main index file name has format <lsn>.<range_id>.index.
-	 * Load the index with the greatest LSN (but at least
-	 * as new as the current view LSN, to skip dropped
-	 * indexes) and choose the maximal range_id among
-	 * ranges within the same LSN.
+	 * Load the index given its LSN and choose the maximal range_id
+	 * among ranges within the same LSN.
 	 */
-	int64_t first_dump_lsn = INT64_MAX;
 	int64_t last_dump_range_id = 0;
 	DIR *index_dir;
 	index_dir = opendir(index->path);
@@ -2536,27 +2520,19 @@ vy_index_open_ex(struct vy_index *index)
 		 * Find the newest range in the last incarnation
 		 * of this index.
 		 */
-		if (index_lsn < index->env->xm->lsn)
+		if (index_lsn != index->key_def->opts.lsn)
 			continue;
-		if (index_lsn < first_dump_lsn) {
-			first_dump_lsn = index_lsn;
+		if (last_dump_range_id < range_id)
 			last_dump_range_id = range_id;
-		} else if (index_lsn == first_dump_lsn &&
-			   last_dump_range_id < range_id) {
-			last_dump_range_id = range_id;
-		}
 	}
 	closedir(index_dir);
 
-	if (first_dump_lsn == INT64_MAX) {
-		vy_error("No matching index files found for the current LSN"
-			 " in path %s", index->path);
-		return -1;
-	}
+	if (last_dump_range_id == 0)
+		goto out; /* empty index */
 
 	char path[PATH_MAX];
 	snprintf(path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, first_dump_lsn, last_dump_range_id);
+		 index->path, index->key_def->opts.lsn, last_dump_range_id);
 	int fd = open(path, O_RDWR);
 	if (fd == -1) {
 		vy_error("Can't open index file %s: %s",
@@ -2588,8 +2564,8 @@ vy_index_open_ex(struct vy_index *index)
 		vy_error("Corrupted index file %s", path);
 		return -1;
 	}
-	index->first_dump_lsn = first_dump_lsn;
 	index->last_dump_range_id = last_dump_range_id;
+out:
 	if (!index->range_count) {
 		/*
 		 * Special case: index has no ranges
@@ -2826,8 +2802,6 @@ vy_task_dump_complete(struct vy_task *task)
 		 * The range file was created successfully,
 		 * update the range index on disk.
 		 */
-		if (index->first_dump_lsn == 0)
-			index->first_dump_lsn = run->info.min_lsn;
 		vy_index_dump_range_index(index);
 	}
 
@@ -3563,7 +3537,7 @@ vy_checkpoint(struct vy_env *env)
 void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
-	int64_t checkpoint_lsn = vclock_sum(vclock);
+	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
 	for (;;) {
 		bool is_active = false;
@@ -3586,14 +3560,6 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			break;
 		/* TODO: use channel here */
 		fiber_sleep(.020);
-	}
-
-	for (int i = 0; i < scheduler->count; i++) {
-		struct vy_index *index = scheduler->indexes[i];
-		if (index->first_dump_lsn != checkpoint_lsn) {
-			vy_index_checkpoint_range_index(index,
-							checkpoint_lsn);
-		}
 	}
 
 	scheduler->checkpoint_lsn_last = scheduler->checkpoint_lsn;
@@ -3655,7 +3621,7 @@ vy_index_gc(struct vy_index *index)
 			is_vinyl_file = true;
 			int64_t lsn = 0;
 			sscanf(dirent->d_name, "%"SCNx64, &lsn);
-			if (lsn >= index->first_dump_lsn)
+			if (lsn >= index->key_def->opts.lsn)
 				continue;
 		}
 		if (strstr(dirent->d_name, ".range")) {
@@ -3684,12 +3650,11 @@ end:
 void
 vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
+	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
-	int64_t checkpoint_lsn = vclock_sum(vclock);
 	for (int i = 0; i < scheduler->count; i++) {
 		struct vy_index *index;
 		index = scheduler->indexes[i];
-		index->first_dump_lsn = checkpoint_lsn;
 		vy_index_gc(index);
 	}
 }
@@ -4132,7 +4097,7 @@ vy_index_dump_range_index(struct vy_index *index)
 
 	char new_path[PATH_MAX];
 	snprintf(new_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, index->first_dump_lsn,
+		 index->path, index->key_def->opts.lsn,
 		 index->range_id_max);
 	if (link(path, new_path)) {
 		vy_error("Can't dump index range dict %s: %s",
@@ -4146,41 +4111,7 @@ vy_index_dump_range_index(struct vy_index *index)
 }
 
 /**
- * Link the range index file to the latest checkpoint LSN.
- */
-
-static int
-vy_index_checkpoint_range_index(struct vy_index *index, int64_t lsn)
-{
-	char new_path[PATH_MAX];
-	snprintf(new_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, lsn,
-		 index->last_dump_range_id);
-	if (!index->first_dump_lsn) {
-		/* index is empty, just create an empty file */
-		int fd = open(new_path, O_CREAT | O_RDWR | O_TRUNC,
-			      S_IRUSR | S_IWUSR | S_IWGRP);
-		if (fd < 0) {
-			vy_error("File %s create error: %s",
-				  new_path, strerror(errno));
-			return -1;
-		}
-		close(fd);
-		return 0;
-	}
-	char old_path[PATH_MAX];
-	snprintf(old_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, index->first_dump_lsn,
-		 index->last_dump_range_id);
-	if (link(old_path, new_path)) {
-		return -1;
-	}
-	return 0;
-}
-
-
-/**
- * Check whether or not an index was created after the
+ * Check whether or not an index was created at the
  * given LSN.
  * @note: the index may have been dropped afterwards, and
  * we don't track this fact anywhere except the write
@@ -4202,14 +4133,15 @@ vy_index_exists(struct vy_index *index, int64_t lsn)
 	}
 	/*
 	 * Try to find an index file with a number in name
-	 * greater or equal than the passed LSN.
+	 * equal to the given LSN.
 	 */
 	char target_name[PATH_MAX];
 	snprintf(target_name, PATH_MAX, "%016"PRIu64, lsn);
+	size_t len = strlen(target_name);
 	struct dirent *dirent;
 	while ((dirent = readdir(dir))) {
 		if (strstr(dirent->d_name, ".index") &&
-			strcmp(dirent->d_name, target_name) > 0) {
+		    strncmp(dirent->d_name, target_name, len) == 0) {
 			break;
 		}
 	}
@@ -4274,15 +4206,15 @@ vy_index_open_or_create(struct vy_index *index)
 	 * - all without a checkpoint. In this case the index
 	 * directory may contain files from the dropped index
 	 * and we need to be careful to not use them. Fortunately,
-	 * we can rely on the current LSN to check whether
+	 * we can rely on the index LSN to check whether
 	 * the files we're looking at belong to this incarnation
 	 * of the index or not, since file names always contain
 	 * this LSN.
 	 */
-	if (vy_index_exists(index, index->env->xm->lsn)) {
+	if (vy_index_exists(index, index->key_def->opts.lsn)) {
 		/*
-		 * We found a file with LSN greater or equal
-		 * that the "index recovery" lsn.
+		 * We found a file with LSN equal to
+		 * the index creation lsn.
 		 */
 		return vy_index_open_ex(index);
 	}
