@@ -3197,7 +3197,8 @@ vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
 	scheduler->indexes[scheduler->count++] = index;
 	vy_index_ref(index);
 	/* Start scheduler threads on demand */
-	if (!scheduler->is_worker_pool_running)
+	if (!scheduler->is_worker_pool_running &&
+	     scheduler->env->status == VINYL_ONLINE)
 		vy_scheduler_start(scheduler);
 	return 0;
 }
@@ -3532,6 +3533,7 @@ static void
 vy_scheduler_start(struct vy_scheduler *scheduler)
 {
 	assert(!scheduler->is_worker_pool_running);
+	assert(scheduler->env->status == VINYL_ONLINE);
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
@@ -5343,6 +5345,10 @@ vy_end_recovery(struct vy_env *e)
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
+
+	/* Start scheduler if there is at least one index */
+	if (e->scheduler->count > 0)
+		vy_scheduler_start(e->scheduler);
 }
 
 /** }}} Recovery */
