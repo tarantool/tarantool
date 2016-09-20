@@ -717,6 +717,17 @@ struct PACKED vy_tuple_info {
 	uint8_t reserved[3];
 };
 
+struct PACKED vy_range_info {
+	/** Offset and size of range->begin. */
+	uint32_t begin_key_offset;
+	uint32_t begin_key_size;
+	/** Offset and size of range->end. */
+	uint32_t end_key_offset;
+	uint32_t end_key_size;
+	/** Offset of the first run in the range */
+	uint32_t first_run_offset;
+};
+
 struct vy_run {
 	struct vy_run_info info;
 	/* buffer with struct vy_page_info */
@@ -728,10 +739,10 @@ struct vy_run {
 
 struct vy_range {
 	int64_t   id;
-	/**
-	 * Minimal key of the range
-	 */
-	struct vy_tuple *min_key;
+	/** Range lower bound. NULL if range is leftmost. */
+	struct vy_tuple *begin;
+	/** Range upper bound. NULL if range is rightmost. */
+	struct vy_tuple *end;
 	struct vy_index *index;
 	uint64_t   update_time;
 	uint32_t   used; /* sum of mem->used */
@@ -1333,8 +1344,11 @@ vy_range_mem_min_lsn(struct vy_range *range)
 static int
 vy_range_cmp(struct vy_range *range, void *key, struct key_def *key_def)
 {
-	assert(range->min_key != NULL);
-	return vy_tuple_compare(range->min_key->data, key, key_def);
+	/* Any key > -inf. */
+	if (range->begin == NULL)
+		return -1;
+
+	return vy_tuple_compare(range->begin->data, key, key_def);
 }
 
 static int
@@ -1342,8 +1356,14 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 {
 	if (n1 == n2)
 		return 0;
-	assert(n1->min_key != NULL && n2->min_key != NULL);
-	return vy_tuple_compare(n1->min_key->data, n2->min_key->data, key_def);
+
+	/* Any key > -inf. */
+	if (n1->begin == NULL)
+		return -1;
+	if (n2->begin == NULL)
+		return 1;
+
+	return vy_tuple_compare(n1->begin->data, n2->begin->data, key_def);
 }
 
 static uint64_t
@@ -1504,42 +1524,9 @@ vy_range_iterator_next(struct vy_range_iterator *ii)
 	}
 }
 
-static int
-vy_range_init_min_key(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-	const char *min_key = NULL;
-
-	assert(range->min_key == NULL);
-	assert(range->used == 0);
-
-	/* Find the minimal key if any. */
-	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
-		struct vy_page_info *p = vy_run_page(run, 0);
-		const char *key = vy_run_min_key(run, p);
-		if (min_key == NULL ||
-		    vy_tuple_compare(key, min_key, index->key_def) < 0) {
-			min_key = key;
-		}
-	}
-
-	/* Create a tuple with the minimal key. */
-	if (min_key == NULL) {
-		range->min_key = vy_tuple_from_key(index, NULL, 0);
-	} else {
-		range->min_key = vy_tuple_extract_key_raw(index, min_key);
-	}
-
-	if (range->min_key == NULL)
-		return -1;
-
-	return 0;
-}
-
 static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	assert(range->min_key != NULL);
 	vy_range_tree_insert(&index->tree, range);
 	index->range_index_version++;
 	index->range_count++;
@@ -1889,11 +1876,59 @@ vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
 }
 
 static int
+vy_load_tuple(struct vy_range *range, size_t size, off_t offset,
+	      struct vy_tuple **tuple)
+{
+	int rc = 0;
+	char *buf;
+
+	buf = malloc(size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "malloc", "buf");
+		return -1;
+	}
+
+	if (vy_range_read(range, buf, size, offset) < 0 ||
+	    (*tuple = vy_tuple_extract_key_raw(range->index, buf)) == NULL)
+		rc = -1;
+
+	free(buf);
+	return rc;
+}
+
+static int
+vy_load_range_header(struct vy_range *range, off_t *offset)
+{
+	struct vy_range_info info;
+
+	if (vy_range_read(range, &info, sizeof(info), 0) < 0)
+		return -1;
+
+	assert(range->begin == NULL);
+	if (info.begin_key_size != 0 &&
+	    vy_load_tuple(range, info.begin_key_size,
+			  info.begin_key_offset, &range->begin) == -1)
+		return -1;
+
+	assert(range->end == NULL);
+	if (info.end_key_size != 0 &&
+	    vy_load_tuple(range, info.end_key_size,
+			  info.end_key_offset, &range->end) == -1)
+		return -1;
+
+	*offset = info.first_run_offset;
+	return 0;
+}
+
+static int
 vy_range_recover(struct vy_range *range)
 {
 	struct vy_run *run = NULL;
-	off_t offset = 0;
+	off_t offset;
 	int rc = -1;
+
+	if (vy_load_range_header(range, &offset) == -1)
+		goto out;
 
 	while (true) {
 		struct vy_run_info *h;
@@ -1943,9 +1978,6 @@ vy_range_recover(struct vy_range *range)
 			 range->path, strerror(errno));
 		goto out;
 	}
-
-	if (vy_range_init_min_key(range) == -1)
-		goto out;
 
 	rc = 0; /* success */
 out:
@@ -2007,8 +2039,10 @@ vy_range_delete(struct vy_range *range)
 
 	int rcret = 0;
 
-	if (range->min_key)
-		vy_tuple_unref(range->min_key);
+	if (range->begin)
+		vy_tuple_unref(range->begin);
+	if (range->end)
+		vy_tuple_unref(range->end);
 
 	vy_range_delete_runs(range);
 	vy_range_delete_mems(range);
@@ -2018,6 +2052,42 @@ vy_range_delete(struct vy_range *range)
 	TRASH(range);
 	free(range);
 	return rcret;
+}
+
+static int
+vy_write_range_header(int fd, struct vy_range *range)
+{
+	struct vy_range_info info;
+	off_t offset = sizeof(info);
+
+	memset(&info, 0, sizeof(info));
+
+	if (range->begin) {
+		if (vy_pwrite_file(fd, range->begin->data,
+				   range->begin->size, offset) < 0)
+			return -1;
+		info.begin_key_offset = offset;
+		info.begin_key_size = range->begin->size;
+		offset += range->begin->size;
+	}
+	if (range->end) {
+		if (vy_pwrite_file(fd, range->end->data,
+				   range->end->size, offset) < 0)
+			return -1;
+		info.end_key_offset = offset;
+		info.end_key_size = range->end->size;
+		offset += range->end->size;
+	}
+
+	info.first_run_offset = offset;
+
+	if (vy_pwrite_file(fd, &info, sizeof(info), 0) < 0)
+		return -1;
+
+	if (lseek(fd, offset, SEEK_SET) == -1)
+		return -1;
+
+	return 0;
 }
 
 /*
@@ -2057,6 +2127,9 @@ create_failed:
 			goto fail;
 		}
 		created = true;
+
+		if (vy_write_range_header(fd, range) != 0)
+			goto fail;
 	}
 
 	/* Append tuples to the range file. */
@@ -2100,7 +2173,7 @@ fail:
  *   4/3 * range_size.
  */
 static bool
-vy_range_need_split(struct vy_range *range, const char **split_key)
+vy_range_need_split(struct vy_range *range, const char **p_split_key)
 {
 	struct key_def *key_def = range->index->key_def;
 	struct vy_run *run = NULL;
@@ -2118,14 +2191,17 @@ vy_range_need_split(struct vy_range *range, const char **split_key)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
-	struct vy_page_info *p = vy_run_page(run, run->info.count / 2);
-	const char *k = vy_run_min_key(run, p);
+	struct vy_page_info *mid_page = vy_run_page(run, run->info.count / 2);
+	const char *split_key = vy_run_min_key(run, mid_page);
+
+	struct vy_page_info *first_page = vy_run_page(run, 0);
+	const char *min_key = vy_run_min_key(run, first_page);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_tuple_compare(range->min_key->data, k, key_def) == 0)
+	if (vy_tuple_compare(min_key, split_key, key_def) == 0)
 		return false;
 
-	*split_key = k;
+	*p_split_key = split_key;
 	return true;
 }
 
@@ -2162,11 +2238,19 @@ vy_range_compact_prepare(struct vy_range *range,
 		parts[i].fd = -1;
 	}
 
-	/* Set min keys for the new ranges. */
-	vy_tuple_ref(range->min_key);
-	parts[0].range->min_key = range->min_key;
-	if (split_key != NULL)
-		parts[1].range->min_key = split_key;
+	/* Set begin and end keys for the new ranges. */
+	if (range->begin)
+		vy_tuple_ref(range->begin);
+	if (range->end)
+		vy_tuple_ref(range->end);
+	parts[0].range->begin = range->begin;
+	if (split_key != NULL) {
+		vy_tuple_ref(split_key);
+		parts[0].range->end = split_key;
+		parts[1].range->begin = split_key;
+		parts[1].range->end = range->end;
+	} else
+		parts[0].range->end = range->end;
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
@@ -2423,10 +2507,6 @@ vy_index_create(struct vy_index *index)
 	struct vy_range *range = vy_range_new(index, 0);
 	if (unlikely(range == NULL))
 		return -1;
-	if (vy_range_init_min_key(range) != 0) {
-		vy_range_delete(range);
-		return -1;
-	}
 	vy_index_add_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
 	index->size = vy_range_size(range);
@@ -2550,10 +2630,6 @@ out:
 		struct vy_range *range = vy_range_new(index, 0);
 		if (unlikely(range == NULL))
 			return -1;
-		if (vy_range_init_min_key(range) != 0) {
-			vy_range_delete(range);
-			return -1;
-		}
 		vy_index_add_range(index, range);
 		index->size = vy_range_size(range);
 	}
@@ -2850,8 +2926,7 @@ vy_task_compact_execute(struct vy_task *task)
 	assert(n_parts > 0);
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range_compact_part *p = &parts[i];
-		struct vy_tuple *split_key = i < n_parts - 1 ?
-			parts[i + 1].range->min_key : NULL;
+		struct vy_tuple *split_key = parts[i].range->end;
 
 		rc = vy_range_write_run(p->range, wi, split_key,
 					&parts[i].fd, &p->run);
