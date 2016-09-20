@@ -6,7 +6,6 @@ local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
 local urilib = require('uri')
-local ffi = require('ffi')
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = require('yaml').new()
@@ -79,34 +78,31 @@ end
 -- Evaluate command on remote server
 --
 local function remote_eval(self, line)
-    if not line then
-        if type(self.on_client_disconnect) == 'function' then
-            self:on_client_disconnect()
-        end
-        pcall(self.remote.close, self.remote)
+    if not line or self.remote.state ~= 'active' then
+        local err = self.remote.error
+        self.remote.close()
         self.remote = nil
+        -- restore local REPL mode
         self.eval = nil
         self.prompt = nil
         self.completion = nil
-        return ""
+        pcall(self.on_client_disconnect, self)
+        return (err and format(false, err)) or ''
     end
     --
-    -- console connection: execute line as is
+    -- execute line
     --
-    if self.remote.console then
-        return self.remote:console(line)
+    local err, res
+    if self.remote.protocol == 'Binary' then
+        local loader = 'return require("console").eval(...)'
+        err, res = self.remote.perform_request(nil, 'eval', nil,
+                                               loader, {line})
+    else
+        assert(self.remote.protocol == 'Lua console')
+        err, res = self.remote.perform_request(nil, 'inject', nil,
+                                               line..'$EOF$\n')
     end
-    --
-    -- binary connection: call remote 'console.eval' function
-    --
-    local status, res = pcall(self.remote.eval, self.remote,
-        "return require('console').eval(...)", line)
-    if not status then
-        -- remote request failed
-        return format(status, res)
-    end
-    -- return formatted output from remote
-    return res
+    return err and format(false, res) or res[1] or res
 end
 
 --
@@ -288,7 +284,12 @@ end
 --
 -- Connect to remove server
 --
+local create_transport
 local function connect(uri)
+    if not create_transport then -- workaround the broken loader
+        create_transport = require('net.box').create_transport
+    end
+
     local self = fiber.self().storage.console
     if self == nil then
         error("console.connect() need existing console")
@@ -303,26 +304,41 @@ local function connect(uri)
     end
 
     -- connect to remote host
-    local remote = require('net.box').connect(u.host, u.service,
-        { user = u.login, password = u.password })
-
-    -- run disconnect trigger
-    if remote.state == 'closed' then
-        if type(self.on_client_disconnect) == 'function' then
-            self:on_client_disconnect()
+    local remote
+    remote = create_transport(u.host, u.service, u.login, u.password,
+        function(what, ...)
+            if what == 'state_changed' then
+                remote.state, remote.errno, remote.error = ...
+            elseif what == 'handshake' then
+                local greeting = ...
+                remote.protocol = greeting.protocol
+            end
         end
+    )
+    remote.host, remote.port = u.host or 'localhost', u.service
+
+    -- run disconnect trigger if connection failed
+    if not (remote.connect() and remote.wait_state('active')) then
+        pcall(self.on_client_disconnect, self)
+        error('Connection is not established: '..remote.error)
     end
 
     -- check connection && permissions
-    local status, reason
-    if remote.console then
-        status, reason = pcall(remote.console, remote, 'return true')
+    local err, res
+    if remote.protocol == 'Binary' then
+        err, res = remote.perform_request(nil, 'eval', nil, 'return true', {})
     else
-        status, reason = pcall(remote.eval, remote, 'return true')
+        assert(remote.protocol == 'Lua console')
+        local code = 'require("console").delimiter("$EOF$")\n'
+        err, res = remote.perform_request(nil, 'inject', nil, code)
+        if not (err or res == '---\n...\n') then
+            err, res = true, 'Unexpected response'
+        end
     end
-    if not status then
-        remote:close() -- don't leak net.box connection
-        error(reason) -- re-throw original error (there is no better way)
+    if err then
+        remote.close()
+        pcall(self.on_client_disconnect, self)
+        error(res)
     end
 
     -- override methods
@@ -342,7 +358,7 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
-    local version = ffi.string(_TARANTOOL)
+    local version = _TARANTOOL
     state:print(string.format("%-63s\n%-63s\n",
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
