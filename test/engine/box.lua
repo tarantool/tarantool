@@ -2,6 +2,7 @@
 os = require('os')
 
 local vinyl = {
+    threads = 3,
     range_size=1024*64,
     page_size=1024,
 }
