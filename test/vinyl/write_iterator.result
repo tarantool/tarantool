@@ -691,3 +691,46 @@ space:delete({6})
 space:drop()
 ---
 ...
+-- gh-1725 merge iterator can't merge more than two runs
+space = box.schema.space.create('tweedledum', {engine = 'vinyl'})
+---
+...
+pk = space:create_index('primary')
+---
+...
+-- integer keys
+space:replace{1, 'tuple'}
+---
+- [1, 'tuple']
+...
+box.snapshot()
+---
+- ok
+...
+space:replace{2, 'tuple 2'}
+---
+- [2, 'tuple 2']
+...
+box.snapshot()
+---
+- ok
+...
+space:replace{3, 'tuple 3'}
+---
+- [3, 'tuple 3']
+...
+pk:get{1} or {'none'}
+---
+- [1, 'tuple']
+...
+pk:get{2}
+---
+- [2, 'tuple 2']
+...
+pk:get{3}
+---
+- [3, 'tuple 3']
+...
+space:drop()
+---
+...
