@@ -3218,6 +3218,13 @@ vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
 	return 0;
 }
 
+static bool
+vy_range_need_dump(struct vy_range *range)
+{
+	return (range->used >= 10 * 1024 * 1024 ||
+		range->used >= range->index->key_def->opts.range_size);
+}
+
 static void
 vy_scheduler_add_range(struct vy_scheduler *scheduler,
 		       struct vy_range *range)
@@ -3238,6 +3245,11 @@ vy_scheduler_update_range(struct vy_scheduler *scheduler,
 	vy_dump_heap_update(&scheduler->dump_heap, &range->nodedump);
 	assert(range->nodedump.pos != UINT32_MAX);
 	assert(range->nodecompact.pos != UINT32_MAX);
+
+	if (vy_range_need_dump(range)) {
+		/* Wake up scheduler */
+		ipc_cond_signal(&scheduler->scheduler_cond);
+	}
 }
 
 static void
@@ -3287,8 +3299,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (range->used < 10 * 1024 * 1024 &&
-		    range->used < range->index->key_def->opts.range_size)
+		if (!vy_range_need_dump(range))
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
@@ -3467,12 +3478,8 @@ vy_scheduler_f(va_list va)
 			continue;
 		}
 
-		/*
-		 * ipc_channel_get_timeout() is used to
-		 * schedule periodic tasks, 5 seconds is
-		 * enough for periodic.
-		 */
-		ipc_cond_wait_timeout(&scheduler->scheduler_cond, 5.0);
+		/* Wait for changes */
+		ipc_cond_wait(&scheduler->scheduler_cond);
 	}
 
 	return 0;
