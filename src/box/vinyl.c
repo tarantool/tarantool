@@ -1274,38 +1274,6 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 	vy_stat_tx(e->stat, tx->start, count, 0, true);
 }
 
-struct vy_page {
-	/** Page position in the run file */
-	uint32_t page_no;
-	/** The number of tuples */
-	uint32_t count;
-	/** Size of raw page data */
-	uint32_t size;
-	/** Raw page data */
-	char data[0];
-};
-
-/**
- * Read raw tuple data from the page
- * \param page page
- * \param tuple_no tuple position in the page
- * \param[out] pinfo tuple metadata
- * \return tuple data including offsets table
- */
-static const char *
-vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
-	      struct vy_tuple_info **pinfo)
-{
-	assert(tuple_no < page->count);
-	struct vy_tuple_info *info = ((struct vy_tuple_info *) page->data) +
-		tuple_no;
-	const char *tuple_data = page->data +
-		sizeof(struct vy_tuple_info) * page->count + info->offset;
-	assert(tuple_data <= page->data + page->size);
-	*pinfo = info;
-	return tuple_data; /* includes offset table */
-}
-
 static const char *
 vy_run_min_key(struct vy_run *run, const struct vy_page_info *p)
 {
@@ -1399,50 +1367,6 @@ vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
 		pos += readen;
 	}
 	return pos;
-}
-
-/**
- * Load from page with given number
- * If the page is loaded by somebody else, it's returned from cache
- * In every case increments page's reference counter
- * After usage user must call vy_run_unload_page
- */
-static struct vy_page *
-vy_run_read_page(struct vy_run *run, uint32_t page_no, int fd)
-{
-	struct vy_page_info *page_info = vy_run_page(run, page_no);
-	struct vy_page *page = malloc(sizeof(*page) + page_info->size);
-	if (page == NULL) {
-		diag_set(OutOfMemory, sizeof(*page) + page_info->size,
-			"load_page", "page cache");
-		return NULL;
-	}
-
-	page->page_no = page_no;
-	page->count = page_info->count;
-	page->size = page_info->size;
-
-	int rc = vy_pread_file(fd, page->data, page_info->size,
-				  page_info->offset);
-
-	if (rc < 0) {
-		free(page);
-		/* TODO: get file name from range */
-		vy_error("index file read error: %s",
-			 strerror(errno));
-		return NULL;
-	}
-
-	return page;
-}
-
-static void
-vy_page_delete(struct vy_page *page)
-{
-#if !defined(NDEBUG)
-	memset(page, '#', sizeof(*page) + page->size); /* fail early */
-#endif /* !defined(NDEBUG) */
-	free(page);
 }
 
 static int64_t
@@ -5445,6 +5369,64 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_index *index,
 /* TODO: move to appropriate c file and remove */
 
 /**
+ * Page
+ */
+struct vy_page {
+	/** Page position in the run file (used by run_iterator->page_cache */
+	uint32_t page_no;
+	/** The number of tuples */
+	uint32_t count;
+	/** Size of raw page data */
+	uint32_t size;
+	/** Raw page data */
+	char data[0];
+};
+
+static struct vy_page *
+vy_page_new(struct vy_page_info *page_info)
+{
+	struct vy_page *page = malloc(sizeof(*page) + page_info->size);
+	if (page == NULL) {
+		diag_set(OutOfMemory, sizeof(*page) + page_info->size,
+			"load_page", "page cache");
+		return NULL;
+	}
+	page->count = page_info->count;
+	page->size = page_info->size;
+	return page;
+}
+
+static void
+vy_page_delete(struct vy_page *page)
+{
+#if !defined(NDEBUG)
+	memset(page, '#', sizeof(*page) + page->size); /* fail early */
+#endif /* !defined(NDEBUG) */
+	free(page);
+}
+
+/**
+ * Read raw tuple data from the page
+ * \param page page
+ * \param tuple_no tuple position in the page
+ * \param[out] pinfo tuple metadata
+ * \return tuple data including offsets table
+ */
+static const char *
+vy_page_tuple(struct vy_page *page, uint32_t tuple_no,
+	      struct vy_tuple_info **pinfo)
+{
+	assert(tuple_no < page->count);
+	struct vy_tuple_info *info = ((struct vy_tuple_info *) page->data) +
+		tuple_no;
+	const char *tuple_data = page->data +
+		sizeof(struct vy_tuple_info) * page->count + info->offset;
+	assert(tuple_data <= page->data + page->size);
+	*pinfo = info;
+	return tuple_data; /* includes offset table */
+}
+
+/**
  * Get page from LRU cache
  * @retval page if found
  * @retval NULL otherwise
@@ -5484,12 +5466,14 @@ vy_run_iterator_cache_touch(struct vy_run_iterator *itr, uint32_t page_no)
  * Put page to LRU cache
  */
 static void
-vy_run_iterator_cache_put(struct vy_run_iterator *itr, struct vy_page *page)
+vy_run_iterator_cache_put(struct vy_run_iterator *itr, struct vy_page *page,
+			  uint32_t page_no)
 {
 	if (itr->prev_page != NULL)
 		vy_page_delete(itr->prev_page);
 	itr->prev_page = itr->curr_page;
 	itr->curr_page = page;
+	page->page_no = page_no;
 }
 
 /**
@@ -5523,13 +5507,28 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	if (*result != NULL)
 		return 0;
 
-	/* Read from the disk (may yield) */
-	struct vy_page *page = vy_run_read_page(itr->run, page_no, itr->fd);
+	/* Allocate buffers */
+	struct vy_page_info *page_info = vy_run_page(itr->run, page_no);
+	struct vy_page *page = vy_page_new(page_info);
 	if (page == NULL)
-		return -1; /* read error */
+		return -1;
+
+	/* Read page data from the disk */
+	int rc = vy_pread_file(itr->fd, page->data, page_info->size,
+			       page_info->offset);
+
+	if (rc < 0) {
+		vy_page_delete(page);
+		/* TODO: get file name from range */
+		vy_error("index file read error: %s", strerror(errno));
+		return -1;
+	}
+
+	/* Iterator is never used from multiple fibers */
+	assert(vy_run_iterator_cache_get(itr, page_no) == NULL);
 
 	/* Update cache */
-	vy_run_iterator_cache_put(itr, page);
+	vy_run_iterator_cache_put(itr, page, page_no);
 
 	*result = page;
 	return 0;
