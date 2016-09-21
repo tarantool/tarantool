@@ -7426,7 +7426,7 @@ struct vy_write_iterator {
 	 */
 	bool is_dump;
 	bool goto_next_key;
-	bool can_purge;
+	uint8_t prev_tuple_flags;
 	struct vy_tuple *key;
 	struct vy_tuple *tmp_tuple;
 	struct vy_merge_iterator mi;
@@ -7444,7 +7444,6 @@ vy_write_iterator_open(struct vy_write_iterator *wi, bool is_dump,
 	wi->purge_lsn = purge_lsn;
 	wi->is_dump = is_dump;
 	wi->goto_next_key = false;
-	wi->can_purge = false;
 	wi->key = vy_tuple_from_key(index, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
@@ -7549,7 +7548,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 					rc = 0;
 					break;
 				}
-				wi->can_purge = false;
+				wi->prev_tuple_flags = 0;
 				wi->goto_next_key = false;
 				rc = vy_merge_iterator_next_key(mi);
 				if (rc > 0) {
@@ -7574,17 +7573,16 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 		assert(rc == 0);
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
-			wi->can_purge = tuple->flags & (SVREPLACE | SVDELETE);
+			wi->prev_tuple_flags = tuple->flags;
 			break;
-		}
-		if (wi->can_purge && !wi->is_dump) {
-			wi->goto_next_key = true;
-			continue;
 		}
 		/* The merge iterator now is below the purge  LSN. */
 		if (tuple->flags & SVREPLACE) {
 			/* Replace. */
 			wi->goto_next_key = true;
+			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE)
+				&& wi->is_dump == false)
+				continue;
 			if (upsert_tuple) {
 				/*
 				 * If the previous tuple was upserted
@@ -7629,6 +7627,8 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			 * the stack.
 			 */
 			wi->goto_next_key = true;
+			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE))
+				continue;
 			if (upsert_tuple) {
 				/*
 				 * If DELETE was followed
@@ -7649,9 +7649,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				break;
 			}
 			if (wi->is_dump) {
-				if (wi->can_purge) {
-					continue;
-				}
 				/*
 				 * Preserve the delete in output
 				 * if it's a dump of a run, so it
