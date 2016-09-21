@@ -1611,7 +1611,7 @@ vy_pwrite_file(int fd, void *buf, uint32_t size, off_t offset)
 struct vy_write_iterator;
 
 static struct vy_write_iterator *
-vy_write_iterator_new(bool save_delete, struct vy_index *index,
+vy_write_iterator_new(bool is_dump, struct vy_index *index,
 		      int64_t purge_lsn);
 static int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
@@ -7418,16 +7418,17 @@ struct vy_write_iterator {
 	 * to preserve deletes. This is necessary, for example,
 	 * when dumping a run, to ensure that the deleted tuple
 	 * is eventually removed from all LSM layers.
-	 * If save_delete is true then old deletes, i.e. those
+	 * If is_dump is true then old deletes, i.e. those
 	 * which  LSN is less or equal to purge LSN and for which
 	 * there are no new replaces, are preserved in the output,
 	 * otherwise such deletes are skipped and iteration
 	 * continues from the next key.
 	 */
-	bool save_delete;
+	bool is_dump;
 	bool goto_next_key;
+	bool can_purge;
 	struct vy_tuple *key;
-	struct vy_tuple *kept_tuple;
+	struct vy_tuple *tmp_tuple;
 	struct vy_merge_iterator mi;
 };
 
@@ -7436,19 +7437,20 @@ struct vy_write_iterator {
  * use vy_write_iterator_add_* functions
  */
 static void
-vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
+vy_write_iterator_open(struct vy_write_iterator *wi, bool is_dump,
 		       struct vy_index *index, int64_t purge_lsn)
 {
 	wi->index = index;
 	wi->purge_lsn = purge_lsn;
-	wi->save_delete = save_delete;
+	wi->is_dump = is_dump;
 	wi->goto_next_key = false;
+	wi->can_purge = false;
 	wi->key = vy_tuple_from_key(index, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
 
 static struct vy_write_iterator *
-vy_write_iterator_new(bool save_delete, struct vy_index *index,
+vy_write_iterator_new(bool is_dump, struct vy_index *index,
 		      int64_t purge_lsn)
 {
 	struct vy_write_iterator *wi = calloc(1, sizeof(*wi));
@@ -7456,7 +7458,7 @@ vy_write_iterator_new(bool save_delete, struct vy_index *index,
 		diag_set(OutOfMemory, sizeof(*wi), "calloc", "wi");
 		return NULL;
 	}
-	vy_write_iterator_open(wi, save_delete, index, purge_lsn);
+	vy_write_iterator_open(wi, is_dump, index, purge_lsn);
 	return wi;
 }
 
@@ -7503,12 +7505,12 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	 */
 	*ret = NULL;
 	/*
-	 * The kept_tuple can be hanging around from the previous
+	 * The tmp_tuple can be hanging around from the previous
 	 * invocation of next().
 	 */
-	if (wi->kept_tuple)
-		vy_tuple_unref(wi->kept_tuple);
-	wi->kept_tuple = NULL;
+	if (wi->tmp_tuple)
+		vy_tuple_unref(wi->tmp_tuple);
+	wi->tmp_tuple = NULL;
 	struct vy_tuple *upsert_tuple = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
 	/*
@@ -7532,7 +7534,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	 *    latest value we need to preserve. Special
 	 *    care needs to be taken about upserts and deletes:
 	 *    upserts squashed together and deletes preserved
-	 *    if save_delete flag is true.
+	 *    if is_dump flag is true.
 	 *  - when done with this key, proceed with the next one.
 	 */
 	while(true) {
@@ -7541,8 +7543,18 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			rc = vy_merge_iterator_locate(mi);
 		} else {
 			if (wi->goto_next_key) {
-				rc = vy_merge_iterator_next_key(mi);
+				if (upsert_tuple) {
+					tuple = upsert_tuple;
+					wi->tmp_tuple = upsert_tuple;
+					rc = 0;
+					break;
+				}
+				wi->can_purge = false;
 				wi->goto_next_key = false;
+				rc = vy_merge_iterator_next_key(mi);
+				if (rc > 0) {
+					return 0;
+				}
 			} else {
 				rc = vy_merge_iterator_next_lsn(mi);
 			}
@@ -7555,21 +7567,19 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 		 * then it's the end of the iterator.
 		 */
 		if (rc > 0) {
-			if (upsert_tuple) {
-				tuple = upsert_tuple;
-				wi->kept_tuple = upsert_tuple;
-				rc = 0;
-				break;
-			}
-			rc = vy_merge_iterator_next_key(mi);
-			if (rc)
-				break;
+			wi->goto_next_key = true;
+			continue;
 		}
 		rc = vy_merge_iterator_get(mi, &tuple);
 		assert(rc == 0);
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
+			wi->can_purge = tuple->flags & (SVREPLACE | SVDELETE);
 			break;
+		}
+		if (wi->can_purge && !wi->is_dump) {
+			wi->goto_next_key = true;
+			continue;
 		}
 		/* The merge iterator now is below the purge  LSN. */
 		if (tuple->flags & SVREPLACE) {
@@ -7588,7 +7598,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				 * it can be freed.
 				 */
 				vy_tuple_unref(upsert_tuple);
-				wi->kept_tuple = tuple;
+				wi->tmp_tuple = tuple;
 			}
 			break;
 		} else if (tuple->flags & SVUPSERT) {
@@ -7635,10 +7645,13 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				 * it can be freed.
 				 */
 				vy_tuple_unref(upsert_tuple);
-				wi->kept_tuple = tuple;
+				wi->tmp_tuple = tuple;
 				break;
 			}
-			if (wi->save_delete) {
+			if (wi->is_dump) {
+				if (wi->can_purge) {
+					continue;
+				}
 				/*
 				 * Preserve the delete in output
 				 * if it's a dump of a run, so it
@@ -7652,10 +7665,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			unreachable();
 		}
 	}
-	if (rc < 0)
-		return rc;
-	if (rc > 0)
-		return 0;
+	assert(rc == 0);
 	*ret = tuple;
 	return 0;
 }
@@ -7663,10 +7673,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 static void
 vy_write_iterator_close(struct vy_write_iterator *wi)
 {
-	if (wi->kept_tuple) {
-		vy_tuple_unref(wi->kept_tuple);
+	if (wi->tmp_tuple) {
+		vy_tuple_unref(wi->tmp_tuple);
 	}
-	wi->kept_tuple = NULL;
+	wi->tmp_tuple = NULL;
 	vy_merge_iterator_close(&wi->mi);
 }
 
