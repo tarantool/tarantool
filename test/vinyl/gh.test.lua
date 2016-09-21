@@ -176,3 +176,22 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}  })
 box.snapshot()
 space:drop()
+
+--
+-- gh-1658: auto_increment
+--
+space = box.schema.space.create('tweedledum', { engine = 'vinyl' })
+_ = space:create_index('primary')
+space:auto_increment{'a'}
+space:auto_increment{'b'}
+space:auto_increment{'c'}
+space:select{}
+space:truncate()
+space:auto_increment{'a'}
+space:auto_increment{'b'}
+space:auto_increment{'c'}
+space:select{}
+space:delete{2}
+space:auto_increment{'d'}
+space:select{}
+space:drop()

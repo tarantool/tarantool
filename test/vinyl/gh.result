@@ -428,3 +428,67 @@ box.snapshot()
 space:drop()
 ---
 ...
+--
+-- gh-1658: auto_increment
+--
+space = box.schema.space.create('tweedledum', { engine = 'vinyl' })
+---
+...
+_ = space:create_index('primary')
+---
+...
+space:auto_increment{'a'}
+---
+- [1, 'a']
+...
+space:auto_increment{'b'}
+---
+- [2, 'b']
+...
+space:auto_increment{'c'}
+---
+- [3, 'c']
+...
+space:select{}
+---
+- - [1, 'a']
+  - [2, 'b']
+  - [3, 'c']
+...
+space:truncate()
+---
+...
+space:auto_increment{'a'}
+---
+- [1, 'a']
+...
+space:auto_increment{'b'}
+---
+- [2, 'b']
+...
+space:auto_increment{'c'}
+---
+- [3, 'c']
+...
+space:select{}
+---
+- - [1, 'a']
+  - [2, 'b']
+  - [3, 'c']
+...
+space:delete{2}
+---
+...
+space:auto_increment{'d'}
+---
+- [4, 'd']
+...
+space:select{}
+---
+- - [1, 'a']
+  - [3, 'c']
+  - [4, 'd']
+...
+space:drop()
+---
+...
