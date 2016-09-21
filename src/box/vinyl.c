@@ -7428,7 +7428,6 @@ struct vy_write_iterator {
 	bool goto_next_key;
 	struct vy_tuple *key;
 	struct vy_tuple *kept_tuple;
-	bool can_purge;
 	struct vy_merge_iterator mi;
 };
 
@@ -7444,7 +7443,6 @@ vy_write_iterator_open(struct vy_write_iterator *wi, bool save_delete,
 	wi->purge_lsn = purge_lsn;
 	wi->save_delete = save_delete;
 	wi->goto_next_key = false;
-	wi->can_purge = false;
 	wi->key = vy_tuple_from_key(index, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
@@ -7521,20 +7519,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	 */
 	int rc;
 	struct vy_tuple *tuple;
-	if (!mi->search_started) {
-		/* Start the search if it's the first iteration. */
-		rc = vy_merge_iterator_locate(mi);
-	} else {
-		if (wi->goto_next_key) {
-			rc = vy_merge_iterator_next_key(mi);
-			wi->goto_next_key = false;
-		} else {
-			rc = vy_merge_iterator_next_lsn(mi);
-		}
-	}
-	if (rc < 0)
-		return rc;
-
 	/*
 	 * This cycle works as follows:
 	 *  - iterate over all tuples with the same key.
@@ -7551,17 +7535,20 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	 *    if save_delete flag is true.
 	 *  - when done with this key, proceed with the next one.
 	 */
-	for (; rc >= 0; rc = vy_merge_iterator_next_lsn(&wi->mi)) {
-
-		if (wi->goto_next_key) {
-			wi->can_purge = false;
-			rc = vy_merge_iterator_next_key(mi);
-			if (rc < 0)
-				break; /* error */
-			if (rc > 0)
-				return 0; /* not found */
-			wi->goto_next_key = false;
+	while(true) {
+		if (!mi->search_started) {
+			/* Start the search if it's the first iteration. */
+			rc = vy_merge_iterator_locate(mi);
+		} else {
+			if (wi->goto_next_key) {
+				rc = vy_merge_iterator_next_key(mi);
+				wi->goto_next_key = false;
+			} else {
+				rc = vy_merge_iterator_next_lsn(mi);
+			}
 		}
+		if (rc < 0)
+			return rc;
 		/*
 		 * If we reached the end of the key LSNs then go to
 		 * the next key. If the end of all keys is reached
@@ -7575,29 +7562,14 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				break;
 			}
 			rc = vy_merge_iterator_next_key(mi);
-			wi->can_purge = false;
 			if (rc)
 				break;
 		}
 		rc = vy_merge_iterator_get(mi, &tuple);
-		if (rc < 0)
-			break; /* error */
-		if (rc > 0)
-			return 0; /* not found */
+		assert(rc == 0);
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
-			wi->can_purge = tuple->flags & (SVREPLACE | SVDELETE);
 			break;
-		}
-		if (wi->can_purge) {
-			/*
-			 * The previous tuple wasn't upsert, then
-			 * it was delete or replace and all older tuples
-			 * can be skipped because they aren't used in any
-			 * transaction.
-			 */
-			wi->goto_next_key = true;
-			continue;
 		}
 		/* The merge iterator now is below the purge  LSN. */
 		if (tuple->flags & SVREPLACE) {
