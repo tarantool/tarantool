@@ -7512,12 +7512,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	wi->tmp_tuple = NULL;
 	struct vy_tuple *upsert_tuple = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
-	/*
-	 * rc values mean the following:
-	 *  - rc < 0 - an error.
-	 *  - rc = 0 - all is ok.
-	 *  - rc > 0 - iteration over the current key or LSN is finished.
-	 */
 	int rc;
 	struct vy_tuple *tuple;
 	/*
@@ -7541,9 +7535,23 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			/* Start the search if it's the first iteration. */
 			rc = vy_merge_iterator_locate(mi);
 		} else {
+			/*
+			 * Need to go to the next key if the previous tuple was
+			 * older or equal than purge_lsn and it was DELETE or
+			 * REPLACE.
+			 */
 			if (wi->goto_next_key) {
+				/*
+				 * If there is one or more accumulated upserts
+				 * then need to squash them and return before
+				 * going to the next key.
+				 */
 				if (upsert_tuple) {
 					tuple = upsert_tuple;
+					/*
+					 * Don't forget to plan free
+					 * accumulated UPSERT.
+					 */
 					wi->tmp_tuple = upsert_tuple;
 					rc = 0;
 					break;
@@ -7551,9 +7559,12 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				wi->prev_tuple_flags = 0;
 				wi->goto_next_key = false;
 				rc = vy_merge_iterator_next_key(mi);
-				if (rc > 0) {
+				/*
+				 * If the end of all keys is reached
+				 * then it's the end of the iterator.
+				 */
+				if (rc > 0)
 					return 0;
-				}
 			} else {
 				rc = vy_merge_iterator_next_lsn(mi);
 			}
@@ -7562,8 +7573,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			return rc;
 		/*
 		 * If we reached the end of the key LSNs then go to
-		 * the next key. If the end of all keys is reached
-		 * then it's the end of the iterator.
+		 * the next key.
 		 */
 		if (rc > 0) {
 			wi->goto_next_key = true;
@@ -7576,9 +7586,20 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			wi->prev_tuple_flags = tuple->flags;
 			break;
 		}
-		/* The merge iterator now is below the purge  LSN. */
+		/*
+		 * The merge iterator now is below or equal to the purge LSN.
+		 */
 		if (tuple->flags & SVREPLACE) {
-			/* Replace. */
+			/*
+			 * Replace. In any case after this tuple the iteration
+			 * will continue from the next key.
+			 * If the previous tuple was DELETE or REPLACE then it
+			 * was the oldest tuple from tuples that newer than the
+			 * purge LSN. And if the current write iterator works
+			 * for runs compacting we can skip the current REPLACE
+			 * and all older tuples because there is no
+			 * transactions that need this LSN.
+			 */
 			wi->goto_next_key = true;
 			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE)
 				&& wi->is_dump == false)
@@ -7627,6 +7648,11 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 			 * the stack.
 			 */
 			wi->goto_next_key = true;
+			/*
+			 * If the previous tuple was REPLACE or DELETE
+			 * and was newer than the purge LSN then
+			 * even current DELETE can be skipped.
+			 */
 			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE))
 				continue;
 			if (upsert_tuple) {
