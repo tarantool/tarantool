@@ -89,8 +89,6 @@ struct wal_writer
 	struct vclock vclock;
 	/** Return pipe from 'wal' to tx' */
 	struct cpipe tx_pipe;
-	/** Cached write buffer */
-	struct fio_batch *batch;
 	/** The current WAL file. */
 	struct xlog *current_wal;
 	/**
@@ -232,10 +230,6 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	cpipe_create(&writer->wal_pipe);
 	cpipe_set_max_input(&writer->wal_pipe, IOV_MAX);
 
-	writer->batch = fio_batch_new();
-	if (writer->batch == NULL)
-		panic_syserror("fio_batch_alloc");
-
 	stailq_create(&writer->rollback);
 	cmsg_init(&writer->in_rollback, NULL);
 
@@ -253,7 +247,6 @@ wal_writer_destroy(struct wal_writer *writer)
 {
 	xdir_destroy(&writer->wal_dir);
 	cbus_destroy(&writer->tx_wal_bus);
-	fio_batch_delete(writer->batch);
 	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
@@ -439,17 +432,6 @@ wal_opt_rotate(struct wal_writer *writer)
 	return l ? 0 : -1;
 }
 
-/**
- * fio_batch_write() version with recovery specific
- * error injection.
- */
-static inline ssize_t
-wal_fio_batch_write(struct fio_batch *batch, int fd)
-{
-	ERROR_INJECT(ERRINJ_WAL_WRITE, return 0);
-	return fio_batch_write(batch, fd);
-}
-
 static void
 wal_writer_clear_bus(struct cmsg *msg)
 {
@@ -541,106 +523,44 @@ wal_write_to_disk(struct cmsg *msg)
 	 */
 
 	struct xlog *l = writer->current_wal;
-	/* The size of batched data */
-	off_t batched_bytes = 0;
-	/* The size of written data */
-	off_t written_bytes = 0;
-	/* Start new iov batch */
-	struct fio_batch *batch = writer->batch;
-	fio_batch_reset(batch);
 
 	/*
 	 * Iterate over requests (transactions)
 	 */
-	struct wal_request *req;
+	struct wal_request *req, *last_ok_req = NULL;
 	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
-		/* Save relative offset of request start */
-		req->start_offset = batched_bytes;
-		req->end_offset = -1;
-
 		/*
 		 * Iterate over request rows (tx statements)
 		 */
+		xlog_tx_begin(l);
 		struct xrow_header **row = req->rows;
 		for (; row < req->rows + req->n_rows; row++) {
-			/* Check batch has enough space to fit statement */
-			if (unlikely(fio_batch_unused(batch) < XROW_IOVMAX)) {
+			if (xlog_write_row(l, *row)) {
 				/*
-				 * No space in the batch for this statement,
-				 * flush added statements and rotate batch.
+				 * Rollback all un-written rows
 				 */
-				assert(fio_batch_size(batch) > 0);
-				ssize_t nwr = wal_fio_batch_write(batch,
-					fileno(l->f));
-				if (nwr < 0)
-					goto done; /* to break outer loop */
-
-				/* Update cached file offset */
-				written_bytes += nwr;
+				xlog_tx_rollback(l);
+				goto done;
 			}
-
-			/* Add the statement to iov batch */
-			struct iovec *iov = fio_batch_book(batch, XROW_IOVMAX);
-			assert(iov != NULL); /* checked above */
-			int iovcnt = xlog_encode_row(*row, iov);
-			batched_bytes += fio_batch_add(batch, iovcnt);
 		}
-
-		/* Save relative offset of request end */
-		req->end_offset = batched_bytes;
-	}
-	/* Flush remaining data in batch (if any) */
-	while (fio_batch_size(batch) > 0) {
-		ssize_t nwr = wal_fio_batch_write(batch, fileno(l->f));
-		if (nwr > 0) {
-			/* Update cached file offset */
-			written_bytes += nwr;
-		} else {
-			break;
+		int rc = xlog_tx_commit(l);
+		if (rc < 0) {
+			goto done;
 		}
+		if (rc > 0)
+			last_ok_req = req;
 	}
+	if (xlog_flush(l) < 0) {
+		goto done;
+	}
+	last_ok_req = stailq_last_entry(&wal_msg->commit,
+					struct wal_request, fifo);
 
 done:
-	/*
-	 * Iterate over `input` queue and add all processed requests to
-	 * `commit` queue and all other to `rollback` queue.
-	 */
-	struct wal_request *reqend = req;
+	bool commit_done = !last_ok_req;
 	for (req = stailq_first_entry(&wal_msg->commit, struct wal_request, fifo);
-	     req != reqend;
+	     req && !commit_done;
 	     req = stailq_next_entry(req, fifo)) {
-		/*
-		 * Check if request has been fully written to xlog.
-		 */
-		if (unlikely(req->end_offset == -1 ||
-			     req->end_offset > written_bytes)) {
-			/*
-			 * This and all subsequent requests have failed
-			 * to write. Truncate xlog to the end of last
-			 * successfully written request.
-			 */
-
-			/* Calculate relative position of the good request */
-			off_t garbage_bytes = written_bytes - req->start_offset;
-			assert(garbage_bytes >= 0);
-
-			/* Get absolute position */
-			off_t good_offset = fio_lseek(fileno(l->f),
-				-garbage_bytes, SEEK_CUR);
-			if (good_offset < 0)
-				panic_syserror("failed to get xlog position");
-
-			/* Truncate xlog */
-			if (ftruncate(fileno(l->f), good_offset) != 0)
-				panic_syserror("failed to rollback xlog");
-			written_bytes = req->start_offset;
-
-			/* Move tail to `rollback` queue. */
-			stailq_splice(&wal_msg->commit, &req->fifo, &wal_msg->rollback);
-			wal_writer_begin_rollback(writer);
-			break;
-		}
-
 		/* Update internal vclock */
 		vclock_follow(&writer->vclock,
 			      req->rows[req->n_rows - 1]->server_id,
@@ -649,8 +569,13 @@ done:
 		l->rows += req->n_rows;
 		/* Mark request as successful for tx thread */
 		req->res = vclock_sum(&writer->vclock);
+		commit_done |= req == last_ok_req;
 	}
-
+	if (req) {
+		/* Rollback unprocessed requests */
+		stailq_splice(&wal_msg->commit, &req->fifo, &wal_msg->rollback);
+		wal_writer_begin_rollback(writer);
+	}
 	fiber_gc();
 	wal_notify_watchers(writer);
 }

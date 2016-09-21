@@ -1097,23 +1097,16 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row,
 	row->lsn = ++l->rows;
 	row->sync = 0; /* don't write sync to wal */
 
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xlog_encode_row(row, iov);
-
-	/* TODO: use writev here */
-	for (int i = 0; i < iovcnt; i++) {
-		if (fwrite(iov[i].iov_base, iov[i].iov_len, 1, l->f) != 1) {
-			say_syserror("Can't write row (%zu bytes)",
-				     iov[i].iov_len);
-			tnt_raise(SystemError, "fwrite");
-		}
-		bytes += iov[i].iov_len;
+	ssize_t written = xlog_write_row(l, row);
+	fiber_gc();
+	if (written < 0) {
+		tnt_raise(SystemError, "Can't write snapshot row");
 	}
+	bytes += written;
 
 	if (l->rows % 100000 == 0)
 		say_crit("%.1fM rows written", l->rows / 1000000.);
 
-	fiber_gc();
 
 	if (snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {
@@ -1266,6 +1259,7 @@ checkpoint_f(va_list ap)
 					       tuple, ckpt->snap_io_rate_limit);
 		}
 	}
+	xlog_flush(snap);
 	say_info("done");
 	return 0;
 }
