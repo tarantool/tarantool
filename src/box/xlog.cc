@@ -208,7 +208,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 */
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
-		tnt_error(OutOfMemory, sizeof(*vclock), "vclock", "malloc");
+		tnt_error(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
 		xlog_close(wal);
 		return -1;
 	}
@@ -439,7 +439,7 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 					  ibuf_capacity(&i->data))){
 				tnt_error(OutOfMemory,
 					  2 * ibuf_capacity(&i->data),
-					  "slab",
+					  "runtime arena",
 					  "xlog decompression buffer");
 				return -1;
 			}
@@ -449,6 +449,7 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 			break;
 		}
 		if (ZSTD_isError(rc)) {
+			tnt_error(ClientError, ER_COMPRESSION, rc);
 			return -1;
 		}
 	}
@@ -518,7 +519,8 @@ error:
 	ibuf_reset(rbuf);
 
 	if (!ibuf_reserve(rbuf, len)) {
-		tnt_error(OutOfMemory, len, "slab", "xlog cursor read buffer");
+		tnt_error(OutOfMemory, len, "runtime arena",
+			  "xlog cursor read buffer");
 		return -1;
 	}
 	if (fread(rbuf->wpos, len, 1, f) != 1)
@@ -639,8 +641,11 @@ xlog_tx_write_zstd(struct xlog *log)
 		size_t zmax_size = ZSTD_compressBound(iov->iov_len - offset);
 		/* Allocate a destination buffer. */
 		void *zdst = obuf_reserve(&block->zbuf, zmax_size);
-		if (!zdst)
+		if (!zdst) {
+			tnt_error(OutOfMemory, zmax_size, "runtime arena",
+				  "decompression buffer");
 			goto error;
+		}
 		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
 				    const void *, size_t);
 		/*
@@ -797,7 +802,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	if (obuf_size(&block->obuf) == 0) {
 		if (!obuf_alloc(&block->obuf, XLOG_FIXHEADER_SIZE)) {
 			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
-				  "slab", "xlog tx output buffer");
+				  "runtime arena", "xlog tx output buffer");
 			return -1;
 		}
 	}
@@ -810,7 +815,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 		if (obuf_dup(&block->obuf, iov[i].iov_base, iov[i].iov_len) <
 		    iov[i].iov_len) {
 			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
-				  "slab", "xlog tx output buffer");
+				  "runtime arena", "xlog tx output buffer");
 			obuf_rollback_to_svp(&block->obuf, &svp);
 			return -1;
 		}

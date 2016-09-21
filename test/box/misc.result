@@ -290,9 +290,10 @@ t;
   - 'box.error.CLUSTER_ID_MISMATCH : 63'
   - 'box.error.FIELD_TYPE : 23'
   - 'box.error.KEY_PART_TYPE : 18'
+  - 'box.error.injection : table: <address>
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
-  - 'box.error.injection : table: <address>
+  - 'box.error.COMPRESSION : 119'
   - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.CONNECTION_TO_SELF : 117'
   - 'box.error.NO_SUCH_INDEX : 35'
