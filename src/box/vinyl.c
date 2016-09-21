@@ -75,17 +75,29 @@ enum vinyl_status {
 	VINYL_INITIAL_RECOVERY,
 	VINYL_FINAL_RECOVERY,
 	VINYL_ONLINE,
-	VINYL_DROP,
-	VINYL_MALFUNCTION
 };
 
-struct vy_conf;
 struct vy_quota;
 struct tx_manager;
 struct vy_scheduler;
 struct vy_task;
 struct vy_stat;
-struct srzone;
+
+/**
+ * Global configuration of an entire vinyl instance (env object).
+ */
+struct vy_conf {
+	/* path to vinyl_dir */
+	char *path;
+	/* memory */
+	uint64_t memory_limit;
+	/*
+	 * Begin compaction when there are more than compact_wm
+	 * runs in a range.
+	 */
+	uint32_t compact_wm;
+};
+
 
 struct vy_env {
 	enum vinyl_status status;
@@ -98,9 +110,6 @@ struct vy_env {
 	struct vy_stat      *stat;
 	struct mempool      cursor_pool;
 };
-
-static struct srzone *
-sr_zoneof(struct vy_env *r);
 
 struct vy_buf {
 	/** Start of the allocated buffer */
@@ -408,37 +417,6 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 	s->cursor++;
 	vy_avg_update(&s->cursor_latency, diff);
 	vy_avg_update(&s->cursor_ops, ops);
-}
-
-struct srzone {
-	char     name[4];
-	uint32_t compact_wm;
-};
-
-struct srzonemap {
-	struct srzone zones[11];
-};
-
-static void
-sr_zonemap_set(struct srzonemap *m, uint32_t percent, struct srzone *z)
-{
-	if (unlikely(percent > 100))
-		percent = 100;
-	percent = percent - percent % 10;
-	int p = percent / 10;
-	m->zones[p] = *z;
-	snprintf(m->zones[p].name, sizeof(m->zones[p].name), "%d", percent);
-}
-
-static struct srzone*
-sr_zonemap(struct srzonemap *m, uint32_t percent)
-{
-	if (unlikely(percent > 100))
-		percent = 100;
-	percent = percent - percent % 10;
-	int p = percent / 10;
-	struct srzone *z = &m->zones[p];
-	return z;
 }
 
 /** There was a backend read. This flag is additive. */
@@ -3233,7 +3211,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 }
 
 static int
-vy_scheduler_peek_compact(struct vy_scheduler *scheduler, uint32_t run_count,
+vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_task **ptask)
 {
 	/* try to peek a range with a biggest number
@@ -3241,10 +3219,11 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler, uint32_t run_count,
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
+	uint32_t compact_wm = scheduler->env->conf->compact_wm;
 	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
 	while ((pn = vy_compact_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodecompact);
-		if (range->run_count < run_count)
+		if (range->run_count < compact_wm)
 			break; /* TODO: why ? */
 		*ptask = vy_task_compact_new(&scheduler->task_pool,
 					     range);
@@ -3276,7 +3255,7 @@ vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
 }
 
 static int
-vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
+vy_schedule(struct vy_scheduler *scheduler, int64_t vlsn,
 	    struct vy_task **ptask)
 {
 	/* Schedule all pending shutdowns. */
@@ -3319,7 +3298,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct srzone *zone, int64_t vlsn,
 		goto found;
 
 	/* compaction */
-	rc = vy_scheduler_peek_compact(scheduler, zone->compact_wm, ptask);
+	rc = vy_scheduler_peek_compact(scheduler, ptask);
 	if (rc != 0)
 		return rc; /* error */
 	if (*ptask != NULL)
@@ -3346,8 +3325,7 @@ vy_scheduler_f(va_list va)
 	while (scheduler->is_worker_pool_running) {
 		/* Get task */
 		struct vy_task *task = NULL;
-		struct srzone *zone = sr_zoneof(env);
-		int rc = vy_schedule(scheduler, zone, env->xm->vlsn, &task);
+		int rc = vy_schedule(scheduler, env->xm->vlsn, &task);
 		if (rc != 0){
 			/* Log error message once */
 			if (! warning_said) {
@@ -3663,18 +3641,6 @@ vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 
 /* Scheduler }}} */
 
-/**
- * Global configuration of an entire vinyl instance (env object).
- */
-struct vy_conf {
-	/* path to vinyl_dir */
-	char *path;
-	/* compaction */
-	struct srzonemap zones;
-	/* memory */
-	uint64_t memory_limit;
-};
-
 static struct vy_conf *
 vy_conf_new()
 {
@@ -3683,6 +3649,14 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
+	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
+
+	conf->compact_wm = cfg_geti("vinyl.compact_wm");
+	if (conf->compact_wm <= 1) {
+		vy_error("bad compact_wm value %d", conf->compact_wm);
+		goto error_1;
+	}
+
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "path");
@@ -3693,23 +3667,6 @@ vy_conf_new()
 		vy_error("directory '%s' does not exist", conf->path);
 		goto error_2;
 	}
-	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
-	struct srzone def = {
-		.compact_wm        = 2,
-	};
-	struct srzone redzone = {
-		.compact_wm        = 4,
-	};
-	sr_zonemap_set(&conf->zones, 0, &def);
-	sr_zonemap_set(&conf->zones, 80, &redzone);
-	/* configure zone = 0 */
-	struct srzone *z = &conf->zones.zones[0];
-	z->compact_wm = cfg_geti("vinyl.compact_wm");
-	if (z->compact_wm <= 1) {
-		vy_error("bad %d.compact_wm value", 0);
-		goto error_2;
-	}
-
 	return conf;
 
 error_2:
@@ -3723,13 +3680,6 @@ static void vy_conf_delete(struct vy_conf *c)
 {
 	free(c->path);
 	free(c);
-}
-
-static struct srzone *
-sr_zoneof(struct vy_env *env)
-{
-	int p = vy_quota_used_percent(env->quota);
-	return sr_zonemap(&env->conf->zones, p);
 }
 
 int
@@ -3804,47 +3754,14 @@ static int
 vy_info_append_memory(struct vy_info *info, struct vy_info_node *root)
 {
 	struct vy_info_node *node = vy_info_append(root, "memory");
-	if (vy_info_reserve(info, node, 2) != 0)
+	if (vy_info_reserve(info, node, 3) != 0)
 		return 1;
 	struct vy_env *env = info->env;
 	vy_info_append_u64(node, "used", vy_quota_used(env->quota));
 	vy_info_append_u64(node, "limit", env->conf->memory_limit);
-	return 0;
-}
-
-static int
-vy_info_append_compaction(struct vy_info *info, struct vy_info_node *root)
-{
-	int childs_cnt = 0;
-	struct vy_env *env = info->env;
-	for (int i = 0; i < 11; ++i) {
-		++childs_cnt;
-	}
-	struct vy_info_node *node = vy_info_append(root, "compaction");
-	if (vy_info_reserve(info, node, childs_cnt) != 0)
-		return 1;
-	for (int i = 0; i < 11; ++i) {
-		struct srzone *z = &env->conf->zones.zones[i];
-
-		struct vy_info_node *local_node = vy_info_append(node, z->name);
-		if (vy_info_reserve(info, local_node, 13) != 0)
-			return 1;
-		vy_info_append_u32(local_node, "compact_wm", z->compact_wm);
-	}
-	return 0;
-}
-
-static int
-vy_info_append_scheduler(struct vy_info *info, struct vy_info_node *root)
-{
-	struct vy_info_node *node = vy_info_append(root, "scheduler");
-	if (vy_info_reserve(info, node, 3) != 0)
-		return 1;
-
-	struct vy_env *env = info->env;
-	int v = vy_quota_used_percent(env->quota);
-	struct srzone *z = sr_zonemap(&env->conf->zones, v);
-	vy_info_append_str(node, "zone", z->name);
+	static char buf[4];
+	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
+	vy_info_append_str(node, "ratio", buf);
 	return 0;
 }
 
@@ -3935,13 +3852,11 @@ vy_info_create(struct vy_info *info, struct vy_env *e)
 	info->env = e;
 	region_create(&info->allocator, cord_slab_cache());
 	struct vy_info_node *root = &info->root;
-	if (vy_info_reserve(info, root, 7) != 0 ||
+	if (vy_info_reserve(info, root, 5) != 0 ||
 	    vy_info_append_indices(info, root) != 0 ||
 	    vy_info_append_global(info, root) != 0 ||
 	    vy_info_append_memory(info, root) != 0 ||
 	    vy_info_append_metric(info, root) != 0 ||
-	    vy_info_append_scheduler(info, root) != 0 ||
-	    vy_info_append_compaction(info, root) != 0 ||
 	    vy_info_append_performance(info, root) != 0) {
 		region_destroy(&info->allocator);
 		return 1;
