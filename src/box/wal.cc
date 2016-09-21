@@ -527,7 +527,7 @@ wal_write_to_disk(struct cmsg *msg)
 	/*
 	 * Iterate over requests (transactions)
 	 */
-	struct wal_request *req, *last_ok_req = NULL;
+	struct wal_request *req, *last_commit_req = NULL;
 	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
 		/*
 		 * Iterate over request rows (tx statements)
@@ -548,19 +548,28 @@ wal_write_to_disk(struct cmsg *msg)
 			goto done;
 		}
 		if (rc > 0)
-			last_ok_req = req;
+			last_commit_req = req;
 	}
 	if (xlog_flush(l) < 0) {
 		goto done;
 	}
-	last_ok_req = stailq_last_entry(&wal_msg->commit,
+	last_commit_req = stailq_last_entry(&wal_msg->commit,
 					struct wal_request, fifo);
 
 done:
-	bool commit_done = !last_ok_req;
-	for (req = stailq_first_entry(&wal_msg->commit, struct wal_request, fifo);
-	     req && !commit_done;
-	     req = stailq_next_entry(req, fifo)) {
+	/*
+	 * We need to start rollback from the first request
+	 * following the last committed request. If
+	 * last_commit_req is NULL, it means we have committed
+	 * nothing, and need to start rollback from the first
+	 * request. Otherwise we rollback from the first request.
+	 */
+	req = stailq_first_entry(&wal_msg->commit, struct wal_request, fifo);
+	struct wal_request *rollback_req = last_commit_req ?
+		stailq_next_entry(last_commit_req, fifo) : req;
+	/* Update status of the successfully committed requests. */
+	for (; req != rollback_req; req = stailq_next_entry(req, fifo)) {
+
 		/* Update internal vclock */
 		vclock_follow(&writer->vclock,
 			      req->rows[req->n_rows - 1]->server_id,
@@ -569,9 +578,8 @@ done:
 		l->rows += req->n_rows;
 		/* Mark request as successful for tx thread */
 		req->res = vclock_sum(&writer->vclock);
-		commit_done |= req == last_ok_req;
 	}
-	if (req) {
+	if (rollback_req) {
 		/* Rollback unprocessed requests */
 		stailq_splice(&wal_msg->commit, &req->fifo, &wal_msg->rollback);
 		wal_writer_begin_rollback(writer);

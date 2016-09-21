@@ -65,6 +65,8 @@ enum {
 	 * When the number of rows in xlog_tx write buffer
 	 * gets this big, don't delay flush any longer, and
 	 * issue a write.
+	 * This also acts as a default for slab size in the
+	 * slab cache so must be a power of 2.
 	 */
 	XLOG_TX_AUTOCOMMIT_THRESHOLD = 128 * 1024,
 	/**
@@ -546,6 +548,27 @@ error:
 	return -1;
 }
 
+static int
+xlog_tx_create(struct xlog_tx *block)
+{
+	block->is_autocommit = true;
+	obuf_create(&block->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	block->zctx = ZSTD_createCCtx();
+	if (!block->zctx)
+		return -1;
+	obuf_create(&block->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	return 0;
+}
+
+static void
+xlog_tx_destroy(struct xlog_tx *block)
+{
+	obuf_destroy(&block->obuf);
+	obuf_destroy(&block->zbuf);
+	if (block->zctx)
+		ZSTD_freeCCtx(block->zctx);
+}
+
 /**
  * Write a block of uncompressed xrow objects.
  *
@@ -608,6 +631,7 @@ xlog_tx_write_zstd(struct xlog *log)
 
 	uint32_t crc32c = 0;
 	struct iovec *iov;
+	/* 3 is compression level. */
 	ZSTD_compressBegin(block->zctx, 3);
 	size_t offset = XLOG_FIXHEADER_SIZE;
 	for (iov = block->obuf.iov; iov->iov_len; ++iov) {
@@ -976,7 +1000,6 @@ xlog_close(struct xlog *l)
 	int r;
 
 	if (l->mode == LOG_WRITE) {
-		xlog_tx_write(l);
 		fwrite(&eof_marker, 1, sizeof(log_magic_t), l->f);
 		/*
 		 * Sync the file before closing, since
@@ -991,10 +1014,7 @@ xlog_close(struct xlog *l)
 	r = fclose(l->f);
 	if (r < 0)
 		say_syserror("%s: close() failed", l->filename);
-	obuf_destroy(&l->xlog_tx.obuf);
-	obuf_destroy(&l->xlog_tx.zbuf);
-	if (l->xlog_tx.zctx)
-		ZSTD_freeCCtx(l->xlog_tx.zctx);
+	xlog_tx_destroy(&l->xlog_tx);
 	free(l);
 	return r;
 }
@@ -1290,14 +1310,8 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	vclock_copy(&l->vclock, vclock);
 	setvbuf(l->f, NULL, _IONBF, 0);
 
-	struct xlog_tx *block;
-	block = &l->xlog_tx;
-	block->is_autocommit = true;
-	obuf_create(&block->obuf, &cord()->slabc, 128 * 1024);
-	block->zctx = ZSTD_createCCtx();
-	if (!block->zctx)
+	if (xlog_tx_create(&l->xlog_tx))
 		goto error;
-	obuf_create(&block->zbuf, &cord()->slabc, 128 * 1024);
 
 	if (xlog_write_meta(l) != 0)
 		goto error;
