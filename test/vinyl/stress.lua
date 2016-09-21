@@ -30,13 +30,15 @@ end)
 local spaces = {box.space.s1, box.space.s2, box.space.s3, box.space.s4,
     box.space.s5}
 
+local max_data_size = box.cfg.vinyl.page_size * 1.5
+
 local function t1(ch, time_limit)
     local t1 = fiber.time()
     while fiber.time() - t1 < time_limit do
         local k = math.random(10000)
         local t = math.random(80)
         local data = string.char(math.random(string.byte('Z') - string.byte('A')) + string.byte('A') - 1)
-        data = data:rep(math.random(20480))
+        data = data:rep(math.random(max_data_size))
         local space = spaces[math.mod(t, #spaces) + 1]
         if t < 32 then
             space:replace({k, data})
