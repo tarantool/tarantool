@@ -36,6 +36,12 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
+#define ZSTD_STATIC_LINKING_ONLY
+#include "zstd.h"
+
+#include "small/ibuf.h"
+#include "small/obuf.h"
+
 struct iovec;
 struct xrow_header;
 
@@ -157,6 +163,46 @@ xdir_check(struct xdir *dir);
  */
 enum log_mode { LOG_READ, LOG_WRITE };
 
+
+/**
+ * A serialized WAL buffer with one or more transactions in it.
+ *
+ * Is used to accumulate xlog records up to a given threshold,
+ * and flushes them to the journal either when a batch is big
+ * enough or is complete. Preserves transactional boundaries,
+ * i.e. never flushes parts of a transaction to the file.
+ */
+struct xlog_tx {
+	/*
+	 * If true, we can flush the data in this buffer whenever
+	 * we like, and it's usually when the buffer gets
+	 * sufficiently big to get compressed.
+	 *
+	 * Otherwise, we must observe transactional boundaries
+	 * to avoid writing a partial transaction to WAL: a
+	 * single transaction always goes to WAL in a single 
+	 * "chunk" with 1 fixed header and common checksum
+	 * for all transactional rows. This prevents miscarriage
+	 * or partial delivery of transactional rows to a slave
+	 * during replication.
+	 */
+	bool is_autocommit;
+	/** The current offset in the log file, for writing. */
+	off_t offset;
+	/**
+	 * Output buffer, works as row accumulator for
+	 * compression.
+	 */
+	struct obuf obuf;
+
+	/** The context of zstd compression */
+	ZSTD_CCtx *zctx;
+	/** Compressed output buffer, used only if compression is
+	 * ON.
+	 */
+	struct obuf zbuf;
+};
+
 /**
  * A single log file - a snapshot or a write ahead log.
  */
@@ -196,6 +242,10 @@ struct xlog {
 	 * is vector clock *at the time the snapshot is taken*.
 	 */
 	struct vclock vclock;
+	/**
+	 * Current writing xlog block
+	 */
+	struct xlog_tx xlog_tx;
 };
 
 /**
@@ -274,6 +324,10 @@ struct xlog_cursor
 	int row_count;
 	off_t good_offset;
 	bool eof_read;
+	struct ibuf data;
+
+	ZSTD_DStream* zdctx;
+	struct ibuf zbuf;
 };
 
 void
@@ -297,10 +351,31 @@ char *
 format_filename(struct xdir *dir, int64_t signature, enum log_suffix suffix);
 
 /**
- * Construct a row to write to the log file.
+ * Write a row to xlog, return count of written bytes (0 if buffered)
+ * 01 for error
  */
-int
-xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
+ssize_t
+xlog_write_row(struct xlog *log, const struct xrow_header *packet);
+
+/**
+ * If write row buffer is lock then block can't offloaded.
+ * Used for wal request writing.
+ * Note: lockand unlock can offload current row buffer.
+ */
+void
+xlog_tx_begin(struct xlog *log);
+
+ssize_t
+xlog_tx_commit(struct xlog *log);
+
+void
+xlog_tx_rollback(struct xlog *log);
+
+/**
+ * Flush buffered rows and sync file
+ */
+ssize_t
+xlog_flush(struct xlog *log);
 
 /** }}} */
 

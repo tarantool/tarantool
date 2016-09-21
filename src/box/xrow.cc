@@ -48,8 +48,8 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)
 {
 	memset(header, 0, sizeof(struct xrow_header));
-	const char *pos2 = *pos;
-	if (mp_check(&pos2, end) != 0) {
+	const char *tmp = *pos;
+	if (mp_check(&tmp, end) != 0) {
 error:
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet header");
 	}
@@ -90,10 +90,13 @@ error:
 	}
 	assert(*pos <= end);
 	if (*pos < end) {
+		const char *body = *pos;
+		if (mp_check(pos, end)) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+		}
 		header->bodycnt = 1;
-		header->body[0].iov_base = (void *) *pos;
-		header->body[0].iov_len = (end - *pos);
-		*pos = end;
+		header->body[0].iov_base = (void *) body;
+		header->body[0].iov_len = *pos - body;
 	}
 }
 
@@ -155,7 +158,6 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		d = mp_encode_double(d, header->tm);
 		map_size++;
 	}
-
 	assert(d <= data + HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
 	out->iov_len = d - (char *) out->iov_base;
