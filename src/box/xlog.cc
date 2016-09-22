@@ -58,6 +58,7 @@ static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte ord
 static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
 static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 static const char inprogress_suffix[] = ".inprogress";
+static const char v13[] = "0.13\n";
 static const char v12[] = "0.12\n";
 
 enum {
@@ -1082,7 +1083,7 @@ xlog_write_meta(struct xlog *l)
 {
 	char *vstr = NULL;
 	off_t sz1, sz2, sz3;
-	if ((sz1 = fprintf(l->f, "%s%s", l->dir->filetype, v12)) < 0 ||
+	if ((sz1 = fprintf(l->f, "%s%s", l->dir->filetype, v13)) < 0 ||
 	    (sz2 = fprintf(l->f, SERVER_UUID_KEY ": %s\n",
 			   tt_uuid_str(l->dir->server_uuid))) < 0 ||
 	    (vstr = vclock_to_string(&l->vclock)) == NULL ||
@@ -1122,7 +1123,7 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 		return -1;
 	}
 
-	if (strcmp(v12, version) != 0) {
+	if (strcmp(v13, version) != 0 && strcmp(v12, version)) {
 		tnt_error(XlogError, "%s: unsupported file format version",
 			  l->filename);
 		return -1;
