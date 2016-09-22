@@ -989,7 +989,7 @@ eof:
 			 */
 		} else {
 			say_error("EOF marker is corrupt: %lu %lu",
-				  (unsigned long) magic, i->good_offset);
+				  (unsigned long) magic, (unsigned long) i->good_offset);
 		}
 	}
 	/* No more rows. */
