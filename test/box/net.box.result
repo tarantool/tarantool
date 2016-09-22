@@ -24,8 +24,8 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function x_select(cn, ...) return cn:_select(...) end
-function x_fatal(cn, ...) return cn:_fatal(...) end
+function x_select(cn, ...) return cn:_request('select', ...) end
+function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\2\1\1') end
 test_run:cmd("setopt delimiter ''");
 ---
 ...
@@ -309,7 +309,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/box/net_box.lua..."]:<line>: Use space:method(...) instead space.method(...)'
+- error: Use space:insert(...) instead of space.insert(...)
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -466,15 +466,9 @@ cn.space.net_box_test_space:get(354)
 x_fatal(cn)
 ---
 ...
--- We expect the connection to enter 'closed' state due to 'reconnect_after'
--- option missing, however 'error'->'closed' transition happens in some
--- unrelated fiber, scheduling quirks bite (again) (sigh)
-fiber.sleep(0)
----
-...
 cn.state
 ---
-- closed
+- error
 ...
 cn:ping()
 ---
@@ -482,7 +476,11 @@ cn:ping()
 ...
 cn:call('test_foo')
 ---
-- error: Connection is not established
+- error: Peer closed
+...
+cn:wait_state('active')
+---
+- false
 ...
 -- -- 2 reconnect
 cn = remote.connect(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
@@ -502,7 +500,15 @@ x_fatal(cn)
 ...
 cn:wait_connected()
 ---
-- active
+- true
+...
+cn:wait_state('active')
+---
+- true
+...
+cn:wait_state({active=true})
+---
+- true
 ...
 cn:ping()
 ---
@@ -552,7 +558,7 @@ function pause() fiber.sleep(10) return true end
 ...
 cn:call('pause')
 ---
-- error: 
+- error: Peer closed
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
@@ -637,7 +643,7 @@ cn.error
 ...
 cn.state
 ---
-- closed
+- error
 ...
 box.schema.user.create('netbox', { password  = 'test' })
 ---
@@ -742,11 +748,11 @@ cn:eval('return true')
 ...
 cn.eval('return true')
 ---
-- error: 'usage: remote:eval(expr, ...)'
+- error: 'Use remote:eval(...) instead of remote.eval(...):'
 ...
 cn.ping()
 ---
-- error: 'usage: remote:ping()'
+- error: 'Use remote:ping(...) instead of remote.ping(...):'
 ...
 cn:close()
 ---
@@ -779,14 +785,21 @@ uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
 cn = remote.new(uri)
 ---
 ...
-cn ~= nil
+cn ~= nil, cn.state, cn.error
 ---
 - true
+- error
+- Incorrect password supplied for user 'netbox'
 ...
 cn:close()
 ---
 ...
-cn = remote.new(uri, { password = 'test' })
+-- don't merge creds from uri & opts
+remote.new(uri, { password = 'test' })
+---
+- error: 'net.box: user is not defined'
+...
+cn = remote.new(uri, { user = 'netbox', password = 'test' })
 ---
 ...
 cn:ping()

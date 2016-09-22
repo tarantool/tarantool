@@ -7,8 +7,8 @@ test_run = env.new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
 test_run:cmd("setopt delimiter ';'")
-function x_select(cn, ...) return cn:_select(...) end
-function x_fatal(cn, ...) return cn:_fatal(...) end
+function x_select(cn, ...) return cn:_request('select', ...) end
+function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\2\1\1') end
 test_run:cmd("setopt delimiter ''");
 
 LISTEN = require('uri').parse(box.cfg.listen)
@@ -177,13 +177,10 @@ cn.space.net_box_test_space:get(354)
 
 -- -- 1. no reconnect
 x_fatal(cn)
--- We expect the connection to enter 'closed' state due to 'reconnect_after'
--- option missing, however 'error'->'closed' transition happens in some
--- unrelated fiber, scheduling quirks bite (again) (sigh)
-fiber.sleep(0)
 cn.state
 cn:ping()
 cn:call('test_foo')
+cn:wait_state('active')
 
 -- -- 2 reconnect
 cn = remote.connect(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
@@ -192,6 +189,8 @@ cn.space ~= nil
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 x_fatal(cn)
 cn:wait_connected()
+cn:wait_state('active')
+cn:wait_state({active=true})
 cn:ping()
 cn.state
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
@@ -309,9 +308,11 @@ cn:close()
 
 uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
 cn = remote.new(uri)
-cn ~= nil
+cn ~= nil, cn.state, cn.error
 cn:close()
-cn = remote.new(uri, { password = 'test' })
+-- don't merge creds from uri & opts
+remote.new(uri, { password = 'test' })
+cn = remote.new(uri, { user = 'netbox', password = 'test' })
 cn:ping()
 cn:close()
 
