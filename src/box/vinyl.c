@@ -4735,10 +4735,8 @@ check_key:
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
 		vy_tuple_unref(result_tuple);
-		result_tuple = vy_tuple_from_data(index, old_mp, old_mp_end);
-		result_tuple->flags = SVREPLACE;
-		result_tuple->lsn = new_tuple->lsn;
-		return result_tuple;
+		vy_tuple_ref(old_tuple);
+		result_tuple = old_tuple;
 	}
 	return result_tuple;
 }
