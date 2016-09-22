@@ -1850,6 +1850,8 @@ vy_range_new(struct vy_index *index, int64_t id)
 	} else {
 		range->id = ++index->range_id_max;
 	}
+	snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".range",
+		 index->path, range->id);
 	range->mem_count = 1;
 	range->fd = -1;
 	range->index = index;
@@ -1953,13 +1955,12 @@ out:
 }
 
 int
-vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
+vy_range_open(struct vy_index *index, struct vy_range *range)
 {
-	snprintf(range->path, PATH_MAX, "%s", path);
-	int rc = range->fd = open(path, O_RDWR);
+	int rc = range->fd = open(range->path, O_RDWR);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' open error: %s ",
-		         path, strerror(errno));
+		         range->path, strerror(errno));
 		return -1;
 	}
 	rc = vy_range_recover(range);
@@ -2068,8 +2069,6 @@ create_failed:
 		 * We've successfully written a run to a new range file.
 		 * Commit the range by linking the file to a proper name.
 		 */
-		snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->path, range->id);
 		if (rename(path, range->path) != 0) {
 			vy_error("Failed to link range file '%s': %s",
 				 range->path, strerror(errno));
@@ -2529,10 +2528,7 @@ vy_index_open_ex(struct vy_index *index)
 			vy_range_delete(range);
 			return -1;
 		}
-		char range_path[PATH_MAX];
-		snprintf(range_path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->path, range_id);
-		if (vy_range_open(index, range, range_path)) {
+		if (vy_range_open(index, range)) {
 			vy_range_delete(range);
 			return -1;
 		}
