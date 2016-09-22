@@ -689,6 +689,9 @@ xlog_tx_write_zstd(struct xlog *log)
 
 	iov = block->zbuf.iov;
 	for (iov = block->zbuf.iov; iov->iov_len; ++iov) {
+		ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
+			fwrite(iov->iov_base, iov->iov_len >> 2, 1, log->f);
+			goto error;});
 		if (!fwrite(iov->iov_base, iov->iov_len, 1, log->f))
 			goto error;
 	}
@@ -728,8 +731,8 @@ xlog_tx_write(struct xlog *log)
 	 * position.
 	 */
 	if (written < 0) {
-		fseeko(log->f, block->offset, SEEK_SET);
-		if (ftruncate(fileno(log->f), block->offset) != 0)
+		if (fseeko(log->f, block->offset, SEEK_SET) < 0 ||
+		    ftruncate(fileno(log->f), block->offset) != 0)
 			panic_syserror("failed to truncate xlog after write error");
 	}
 	return written;
@@ -813,6 +816,10 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	int iovcnt = xrow_header_encode(packet, iov, 0);
 	struct obuf_svp svp = obuf_create_svp(&block->obuf);
 	for (int i = 0; i < iovcnt; ++i) {
+		ERROR_INJECT(ERRINJ_WAL_WRITE_PARTIAL,
+			{if (obuf_size(&block->obuf) > (1 << 14)) {
+				obuf_rollback_to_svp(&block->obuf, &svp);
+				return -1;}});
 		if (obuf_dup(&block->obuf, iov[i].iov_base, iov[i].iov_len) <
 		    iov[i].iov_len) {
 			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
