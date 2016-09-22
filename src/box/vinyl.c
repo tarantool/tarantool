@@ -3902,6 +3902,11 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 	c->tx = tx;
 	c->start = tx->start;
+	/*
+	 * Prevent index drop by the backend while the cursor is
+	 * still alive.
+	 */
+	vy_index_ref(c->index);
 	return c;
 }
 
@@ -3923,6 +3928,7 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		vy_tuple_unref(c->key);
+	vy_index_unref(c->index);
 	vy_stat_cursor(e->stat, c->start, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
