@@ -1123,9 +1123,9 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 		return -1;
 	}
 
-	if (strcmp(v13, version) != 0 && strcmp(v12, version)) {
-		tnt_error(XlogError, "%s: unsupported file format version",
-			  l->filename);
+	if (strcmp(v13, version) != 0 && strcmp(v12, version) != 0) {
+		tnt_error(XlogError, "%s: unsupported file format version %s",
+			  l->filename, version);
 		return -1;
 	}
 	for (;;) {
