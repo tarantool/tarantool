@@ -4655,7 +4655,8 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 		 */
 		struct vy_tuple *res;
 		res = vy_tuple_from_data(index, new_mp, new_mp_end);
-		res->flags |= SVREPLACE;
+		res->flags = SVREPLACE;
+		res->lsn = new_tuple->lsn;
 		return res;
 	}
 
@@ -4687,8 +4688,9 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 		if (result_tuple == NULL)
 			return NULL; /* OOM */
 		if (old_tuple->flags & (SVDELETE | SVREPLACE)) {
-			result_tuple->flags |= SVREPLACE;
+			result_tuple->flags = SVREPLACE;
 		}
+		result_tuple->lsn = new_tuple->lsn;
 		goto check_key;
 	}
 
@@ -4711,6 +4713,7 @@ vy_apply_upsert(struct vy_tuple *new_tuple, struct vy_tuple *old_tuple,
 	extra += old_ops_end - old_ops;
 	memcpy(extra, new_ops, new_ops_end - new_ops);
 	result_tuple->flags = SVUPSERT;
+	result_tuple->lsn = new_tuple->lsn;
 
 check_key:
 	/*
@@ -4726,7 +4729,10 @@ check_key:
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
 		vy_tuple_unref(result_tuple);
-		return vy_tuple_from_data(index, old_mp, old_mp_end);
+		result_tuple = vy_tuple_from_data(index, old_mp, old_mp_end);
+		result_tuple->flags = SVREPLACE;
+		result_tuple->lsn = new_tuple->lsn;
+		return result_tuple;
 	}
 	return result_tuple;
 }
