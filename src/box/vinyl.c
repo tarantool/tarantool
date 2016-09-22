@@ -7761,16 +7761,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * return -1 : read error
  */
 int
-vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result);
-
-/**
- * Goto next tuple
- * return 0 : something was found
- * return 1 : no more data
- * return -1 : read error
- */
-int
-vy_read_iterator_next(struct vy_read_iterator *itr);
+vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_tuple **result);
 
 /**
  * Close the iterator and free resources
@@ -7963,34 +7954,25 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 }
 
 /**
- * Goto next tuple
- * return 0 : something was found
- * return 1 : no more data
- * return -1 : read error
- */
-int
-vy_read_iterator_next(struct vy_read_iterator *itr)
-{
-	int rc = vy_read_iterator_merge_next_key(itr);
-	if (rc < 0)
-		return -1; /* read error */
-	if (itr->merge_iterator.range_ended && itr->curr_range != NULL)
-		rc = vy_read_iterator_next_range(itr);
-	return rc;
-}
-
-/**
  * Get current tuple
- * return 0 : something was found
- * return 1 : no more data
+ * return 0 : something was found if *result != NULL
  * return -1 : read error
  */
 int
-vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
+vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_tuple **result)
 {
+	*result = NULL;
+	int rc;
+	if (itr->merge_iterator.search_started) {
+		rc = vy_read_iterator_merge_next_key(itr);
+		if (rc < 0)
+			return -1;
+		if (rc > 0)
+			return 0;
+	}
 	while (true) {
 		struct vy_tuple *t;
-		int rc = vy_read_iterator_merge_get(itr, &t);
+		rc = vy_read_iterator_merge_get(itr, &t);
 		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr);
 			if (rc == 0) {
@@ -7998,9 +7980,9 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 			}
 		}
 		if (rc < 0)
-			return rc; /* error */
-		if (rc == 1)
-			return 1; /* no more data */
+			return -1; /* error */
+		if (rc > 0)
+			return 0; /* no more data */
 		assert(rc == 0);
 		if (itr->curr_tuple != NULL)
 			vy_tuple_unref(itr->curr_tuple);
@@ -8013,7 +7995,7 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 				rc = vy_read_iterator_merge_get(itr, &next);
 			}
 			if (rc < 0)
-				return rc;
+				return -1;
 			struct vy_tuple *applied =
 				vy_apply_upsert(itr->curr_tuple, next,
 						itr->index, true);
@@ -8024,11 +8006,11 @@ vy_read_iterator_get(struct vy_read_iterator *itr, struct vy_tuple **result)
 		}
 		if (rc != 0 || (itr->curr_tuple->flags & SVDELETE) == 0)
 			break;
-		rc = vy_read_iterator_next(itr);
+		rc = vy_read_iterator_merge_next_key(itr);
 		if (rc < 0)
-			return rc;
-		if (rc == 1)
-			return 1; /* no more data */
+			return -1;
+		if (rc > 0)
+			return 0; /* no more data */
 		assert(rc == 0);
 	}
 	*result = itr->curr_tuple;
@@ -8064,19 +8046,18 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		return -1;
 	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key->data,
 			      vlsn, true);
-	for (; rc == 0; rc = vy_read_iterator_next(&ri)) {
-		rc = vy_read_iterator_get(&ri, &tuple);
-		if (rc)
-			goto finish_send;
+	rc = vy_read_iterator_next(&ri, &tuple);
+	for (; rc == 0 && tuple; rc = vy_read_iterator_next(&ri, &tuple)) {
 		uint32_t mp_size;
 		const char *mp_data = vy_tuple_data(index, tuple,
 						    &mp_size);
 		int64_t lsn = tuple->lsn;
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
 		if (rc)
-			goto finish_send;
+			break;
 	}
-finish_send:
+	if (rc == 0 && tuple == NULL)
+		rc = 1;
 	vy_read_iterator_close(&ri);
 	vy_tuple_unref(key);
 	return rc;
@@ -8095,12 +8076,9 @@ vy_index_read(struct vy_index *index, struct vy_tuple *key,
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, index, tx, order, key->data, vlsn, false);
-	int rc = vy_read_iterator_get(&itr, result);
-	if (rc == 0) {
+	int rc = vy_read_iterator_next(&itr, result);
+	if (rc == 0 && *result) {
 		vy_tuple_ref(*result);
-	} else if (rc > 0) {
-		rc = 0;
-		*result = NULL;
 	}
 	vy_read_iterator_close(&itr);
 
@@ -8120,12 +8098,10 @@ vy_readcommited(struct vy_index *index, struct vy_tuple *tuple)
 	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ, tuple->data,
 			      INT64_MAX, false);
 	struct vy_tuple *t;
-	int rc = vy_read_iterator_get(&itr, &t);
-	if (rc == 0) {
+	int rc = vy_read_iterator_next(&itr, &t);
+	if (rc == 0 && t) {
 		if (t->lsn > tuple->lsn)
 			rc = 1;
-	} else if (rc > 0) {
-		rc = 0;
 	}
 	vy_read_iterator_close(&itr);
 	return rc;
