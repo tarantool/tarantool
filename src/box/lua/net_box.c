@@ -450,10 +450,19 @@ netbox_decode_greeting(lua_State *L)
 	return 1;
 }
 
-/*
+/**
  * communicate(fd, send_buf, recv_buf, limit_or_boundary, timeout)
  *  -> errno, error
  *  -> nil, limit/boundary_pos
+ *
+ * The need for this function arises from not wanting to
+ * have more than one watcher for a single fd, and thus issue
+ * redundant epoll_ctl(EPOLLCTL_ADD) for it when doing both
+ * reading and writing.
+ *
+ * Instead, this function takes an fd, input and output buffer,
+ * and does sending and receiving on it in a single event loop
+ * interaction.
  */
 static int
 netbox_communicate(lua_State *L)
