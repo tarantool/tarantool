@@ -468,6 +468,7 @@ static int
 netbox_communicate(lua_State *L)
 {
 	uint32_t fd = lua_tointeger(L, 1);
+	const int NETBOX_READAHEAD = 16320;
 	struct ibuf *send_buf = (struct ibuf *) lua_topointer(L, 2);
 	struct ibuf *recv_buf = (struct ibuf *) lua_topointer(L, 3);
 
@@ -509,7 +510,7 @@ check_limit:
 		}
 
 		while (revents & COIO_READ) {
-			void *p = ibuf_reserve(recv_buf, 65536);
+			void *p = ibuf_reserve(recv_buf, NETBOX_READAHEAD);
 			if (p == NULL)
 				luaL_error(L, "out of memory");
 			ssize_t rc = recv(
