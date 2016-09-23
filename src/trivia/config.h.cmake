@@ -177,6 +177,7 @@
 
 #cmakedefine HAVE_UUIDGEN 1
 #cmakedefine HAVE_CLOCK_GETTIME 1
+#cmakedefine HAVE_CLOCK_GETTIME_DECL 1
 
 /** pthread_np.h - non-portable stuff */
 #cmakedefine HAVE_PTHREAD_NP_H 1
