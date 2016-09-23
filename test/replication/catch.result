@@ -133,3 +133,6 @@ box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

@@ -21,7 +21,7 @@ function wait_repl(cnt)
         if s.index[0]:len() >= cnt then
             return true
         end
-        fiber.sleep(0.05)
+        fiber.sleep(0.01)
     end
     return false
 end;
@@ -74,3 +74,5 @@ wait_repl(50)
 test_run:cmd("switch default")
 box.space.test.index[0]:len()
 
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'replication')
