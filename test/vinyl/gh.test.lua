@@ -195,3 +195,20 @@ space:delete{2}
 space:auto_increment{'d'}
 space:select{}
 space:drop()
+
+--
+-- Truncate basic test
+--
+-- truncate
+
+s = box.schema.space.create('name_of_space', {engine='vinyl'})
+i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'string'}})
+s:insert{'a', 'b', 'c'}
+s:select{'a'}
+s:truncate()
+s:select{}
+s:insert{'b', 'c', 'd'}
+s:select{}
+s:truncate()
+s:select{}
+s:drop()
