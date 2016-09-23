@@ -273,7 +273,7 @@ say_syslog_init(const char *init_str)
 		opts.identity = "tarantool";
 
 	/* TODO: ignoring init->facility, presumably no one needs it */
-	openlog(opts.identity, LOG_PID, LOG_USER);
+	openlog(strdup(opts.identity), LOG_PID, LOG_USER);
 	say_free_syslog_opts(&opts);
 
 	say_info("started logging to syslog, SIGHUP log rotation disabled");

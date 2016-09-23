@@ -42,8 +42,6 @@
 #define EV_USE_SELECT 1
 #define EV_USE_POLL 1
 #define EV_USE_NANOSLEEP 1
-#define EV_USE_REALTIME 1
-#define EV_USE_MONOTONIC 1
 #define EV_PERIODIC_ENABLE 1
 #define EV_IDLE_ENABLE 1
 #define EV_STAT_ENABLE 1

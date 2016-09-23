@@ -83,15 +83,20 @@ check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
 check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
-#
-# clock_gettime() is not defined on Mac OS X,
-# or own (slow) implementation is in third_party/clock_gettime.c
-#
-if (TARGET_OS_LINUX)
-    check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
-else()
-    check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
-endif()
+# ensure clock_gettime() is declared and actually available
+# in runtime (gh-1777)
+check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME_DECL)
+if (${HAVE_CLOCK_GETTIME_DECL})
+    function(check_code_using_clock_gettime_runs) # start new scope
+        if (${TARGET_OS_LINUX})
+            set(CMAKE_REQUIRED_LIBRARIES rt)
+        endif()
+        check_c_source_runs(
+            "#include <time.h>\nint main() {struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return 0;}"
+            HAVE_CLOCK_GETTIME)
+    endfunction()
+    check_code_using_clock_gettime_runs()
+endif ()
 
 # Checks for libev
 include(CheckStructHasMember)

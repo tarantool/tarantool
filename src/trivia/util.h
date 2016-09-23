@@ -159,7 +159,7 @@ fmemopen(void *buf, size_t size, const char *mode);
 
 #include <time.h>
 #include <sys/time.h>
-#ifndef HAVE_CLOCK_GETTIME
+#ifndef HAVE_CLOCK_GETTIME_DECL
 /* Declare clock_gettime(). */
 int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_REALTIME			0
