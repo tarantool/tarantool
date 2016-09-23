@@ -7593,6 +7593,19 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 			 * the stack.
 			 */
 			wi->goto_next_key = true;
+			if (wi->upsert_tuple) {
+				/*
+				 * If DELETE was followed by UPSERT, convert
+				 * UPSERT to REPLACE at once, and return it
+				 * instead of DELETE.
+				 */
+				tuple = vy_apply_upsert(wi->upsert_tuple,
+							tuple, wi->index,
+							false);
+				if (tuple == NULL)
+					return -1;
+				break;
+			}
 			if (wi->save_delete) {
 				/*
 				 * Preserve the delete in output
@@ -7601,18 +7614,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi)
 				 * of this tuple when multiple
 				 * runs are merged together.
 				 */
-				if (wi->upsert_tuple) {
-					/*
-					 * If DELETE was followed
-					 * by UPSERT, convert
-					 * UPSERT to REPLACE at
-					 * once, and return it
-					 * instead of DELETE.
-					 */
-					tuple = vy_apply_upsert(wi->upsert_tuple,
-								tuple, wi->index,
-								false);
-				}
 				break;
 			}
 		} else {
