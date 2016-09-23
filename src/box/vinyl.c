@@ -5753,13 +5753,10 @@ vy_run_iterator_start(struct vy_run_iterator *itr)
 					    &equal_found);
 		if (rc < 0)
 			return rc;
-	} else if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
-		itr->order = VINYL_LE;
+	} else if (itr->order == VINYL_LE) {
 		itr->curr_pos = end_pos;
 	} else {
-		assert(itr->order == VINYL_GE || itr->order == VINYL_GT ||
-		       itr->order == VINYL_EQ);
-		itr->order = VINYL_GE;
+		assert(itr->order == VINYL_GE);
 		itr->curr_pos.page_no = 0;
 		itr->curr_pos.pos_in_page = 0;
 	}
@@ -5822,6 +5819,11 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->order = order;
 	itr->key = key;
 	itr->vlsn = vlsn;
+	if (vy_tuple_key_part(key, 0) == NULL) {
+		/* NULL key. change itr->order for simplification */
+		itr->order = order == VINYL_LT || order == VINYL_LE ?
+			     VINYL_LE : VINYL_GE;
+	}
 
 	itr->curr_tuple = NULL;
 	itr->curr_pos.page_no = itr->run->info.count;
@@ -6061,32 +6063,48 @@ vy_run_iterator_restore(struct vy_tuple_iterator *vitr,
 	/* Restoration is very similar to first search so we'll use that */
 	enum vy_order save_order = itr->order;
 	char *save_key = itr->key;
-	int64_t save_vlsn = itr->vlsn;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
-		itr->order = VINYL_LT;
-	else
-		itr->order = VINYL_GT;
+	if (itr->order == VINYL_GT)
+		itr->order = VINYL_GE;
+	else if (itr->order == VINYL_LT)
+		itr->order = VINYL_LE;
 	itr->key = last_tuple->data;
-	itr->vlsn = last_tuple->lsn;
 	int rc = vy_run_iterator_start(itr);
-	itr->order = (vy_tuple_key_part(save_key, 0) != NULL ? save_order :
-		      save_order == VINYL_LE || save_order == VINYL_LT ?
-		      VINYL_LE : VINYL_GE);
+	itr->order = save_order;
 	itr->key = save_key;
-	itr->vlsn = save_vlsn;
+	if (rc < 0)
+		return -1;
+	else if (rc == 1)
+		return 0;
+	struct vy_page *page;
+	rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
 	if (rc < 0)
 		return rc;
-	if (itr->order == VINYL_EQ && rc == 0) {
-		struct vy_tuple *found_tuple;
-		rc = vy_run_iterator_get(vitr, &found_tuple);
-		if (rc < 0)
-			return rc;
-		assert(rc == 0);
-		if (vy_tuple_compare(found_tuple->data, itr->key,
-				     itr->index->key_def) != 0) {
+	struct vy_tuple_info *info;
+	const char *fnd = vy_page_tuple(page, itr->curr_pos.pos_in_page, &info);
+	if (vy_tuple_compare(fnd, last_tuple->data, itr->index->key_def) == 0) {
+		/* skip the same tuple to next tuple or older version */
+		while (info->lsn >= last_tuple->lsn) {
+			rc = vy_run_iterator_next_lsn(vitr);
+			if (rc < 0) {
+				return -1;
+			} else if (rc == 0) {
+				rc = vy_run_iterator_load_page(itr,
+							       itr->curr_pos.page_no,
+							       &page);
+				if (rc < 0)
+					return -1;
+				fnd = vy_page_tuple(page,
+						    itr->curr_pos.pos_in_page,
+						    &info);
+			} else {
+				rc = vy_run_iterator_next_key(vitr);
+				break;
+			}
+		}
+	} else if (itr->order == VINYL_EQ) {
+		if (vy_tuple_compare(fnd, itr->key, itr->index->key_def) != 0) {
+			itr->search_ended = true;
 			vy_run_iterator_cache_clean(itr);
-			itr->search_ended = false;
-			return 0;
 		}
 	}
 	return rc == 0 ? 1 : 0;
@@ -6274,11 +6292,10 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		}
-	} else if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
-		itr->order = VINYL_LE;
+	} else if (itr->order == VINYL_LE) {
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
-		itr->order = VINYL_GE;
+		assert(itr->order == VINYL_GE);
 		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
 	}
 
@@ -6338,6 +6355,11 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 	itr->order = order;
 	itr->key = key;
 	itr->vlsn = vlsn;
+	if (vy_tuple_key_part(key, 0) == NULL) {
+		/* NULL key. change itr->order for simplification */
+		itr->order = order == VINYL_LT || order == VINYL_LE ?
+			     VINYL_LE : VINYL_GE;
+	}
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
 	itr->curr_tuple = NULL;
@@ -6450,6 +6472,42 @@ vy_mem_iterator_restore(struct vy_tuple_iterator *vitr,
 {
 	assert(vitr->iface->restore == vy_mem_iterator_restore);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
+
+	if (!itr->search_started) {
+		if (last_tuple == NULL)
+			return 0;
+
+		/* Restoration is very similar to first search so we'll use that */
+		enum vy_order save_order = itr->order;
+		char *save_key = itr->key;
+		if (itr->order == VINYL_GT)
+			itr->order = VINYL_GE;
+		else if (itr->order == VINYL_LT)
+			itr->order = VINYL_LE;
+		itr->key = last_tuple->data;
+		int rc = vy_mem_iterator_start(itr);
+		itr->order = save_order;
+		itr->key = save_key;
+		if (rc == 1)
+			return 0;
+		if (vy_tuple_compare(itr->curr_tuple->data, last_tuple->data,
+				     itr->mem->key_def) == 0) {
+			/* skip the same tuple to next tuple or older version */
+			while (itr->curr_tuple->lsn >= last_tuple->lsn) {
+				rc = vy_mem_iterator_next_lsn(vitr);
+				if (rc > 0) {
+					rc = vy_mem_iterator_next_key(vitr);
+					break;
+				}
+			}
+		} else if (itr->order == VINYL_EQ) {
+			if (vy_tuple_compare(itr->curr_tuple->data, itr->key,
+					     itr->mem->key_def) != 0) {
+				itr->search_ended = true;
+			}
+		}
+		return rc == 0 ? 1 : 0;
+	}
 
 	if (!itr->search_started || itr->version == itr->mem->version) {
 		return 0;
