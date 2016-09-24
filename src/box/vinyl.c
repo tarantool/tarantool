@@ -3165,6 +3165,12 @@ vy_task_compact_execute(struct vy_task *task)
 		struct vy_range_compact_part *p = &parts[i];
 		struct vy_tuple *split_key = parts[i].range->end;
 
+		if (i > 0)
+			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
+				     {vy_error("Failed to split range %s",
+					       p->range->path);
+				      rc = -1; goto out;});
+
 		rc = vy_range_write_run(p->range, wi, split_key,
 					&parts[i].fd, &p->run);
 		if (rc != 0)
@@ -3809,8 +3815,10 @@ vy_index_gc(struct vy_index *index)
 {
 	struct mh_i32ptr_t *ranges = NULL;
 	DIR *dir = NULL;
-	ranges = mh_i32ptr_new();
 
+	ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto error;});
+
+	ranges = mh_i32ptr_new();
 	if (ranges == NULL)
 		goto error;
 	/*
@@ -3872,8 +3880,10 @@ vy_index_gc(struct vy_index *index)
 error:
 	say_syserror("failed to cleanup index directory %s", index->path);
 end:
-	closedir(dir);
-	mh_i32ptr_delete(ranges);
+	if (dir != NULL)
+		closedir(dir);
+	if (ranges != NULL)
+		mh_i32ptr_delete(ranges);
 }
 
 void

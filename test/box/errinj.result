@@ -16,6 +16,10 @@ errinj.info()
     state: false
   ERRINJ_RELAY:
     state: false
+  ERRINJ_VY_GC:
+    state: false
+  ERRINJ_VY_RANGE_SPLIT:
+    state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
   ERRINJ_VY_RANGE_CREATE:
