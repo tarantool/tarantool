@@ -717,6 +717,17 @@ struct PACKED vy_tuple_info {
 	uint8_t reserved[3];
 };
 
+struct PACKED vy_range_info {
+	/** Offset and size of range->begin. */
+	uint32_t begin_key_offset;
+	uint32_t begin_key_size;
+	/** Offset and size of range->end. */
+	uint32_t end_key_offset;
+	uint32_t end_key_size;
+	/** Offset of the first run in the range */
+	uint32_t first_run_offset;
+};
+
 struct vy_run {
 	struct vy_run_info info;
 	/* buffer with struct vy_page_info */
@@ -728,10 +739,10 @@ struct vy_run {
 
 struct vy_range {
 	int64_t   id;
-	/**
-	 * Minimal key of the range
-	 */
-	struct vy_tuple *min_key;
+	/** Range lower bound. NULL if range is leftmost. */
+	struct vy_tuple *begin;
+	/** Range upper bound. NULL if range is rightmost. */
+	struct vy_tuple *end;
 	struct vy_index *index;
 	uint64_t   update_time;
 	uint32_t   used; /* sum of mem->used */
@@ -833,8 +844,6 @@ struct vy_index {
 	 * For new ranges, use this id as a sequence.
 	 */
 	int64_t range_id_max;
-	/* The newest range id that was dumped to disk. */
-	int64_t last_dump_range_id;
 
 	uint32_t range_index_version;
 };
@@ -1272,9 +1281,6 @@ vy_run_size(struct vy_run *run)
 	       run->info.min_size;
 }
 
-static int
-vy_index_dump_range_index(struct vy_index *index);
-
 static struct vy_run *
 vy_run_new()
 {
@@ -1333,8 +1339,11 @@ vy_range_mem_min_lsn(struct vy_range *range)
 static int
 vy_range_cmp(struct vy_range *range, void *key, struct key_def *key_def)
 {
-	assert(range->min_key != NULL);
-	return vy_tuple_compare(range->min_key->data, key, key_def);
+	/* Any key > -inf. */
+	if (range->begin == NULL)
+		return -1;
+
+	return vy_tuple_compare(range->begin->data, key, key_def);
 }
 
 static int
@@ -1342,8 +1351,14 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2, struct key_def *key_d
 {
 	if (n1 == n2)
 		return 0;
-	assert(n1->min_key != NULL && n2->min_key != NULL);
-	return vy_tuple_compare(n1->min_key->data, n2->min_key->data, key_def);
+
+	/* Any key > -inf. */
+	if (n1->begin == NULL)
+		return -1;
+	if (n2->begin == NULL)
+		return 1;
+
+	return vy_tuple_compare(n1->begin->data, n2->begin->data, key_def);
 }
 
 static uint64_t
@@ -1504,42 +1519,9 @@ vy_range_iterator_next(struct vy_range_iterator *ii)
 	}
 }
 
-static int
-vy_range_init_min_key(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-	const char *min_key = NULL;
-
-	assert(range->min_key == NULL);
-	assert(range->used == 0);
-
-	/* Find the minimal key if any. */
-	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
-		struct vy_page_info *p = vy_run_page(run, 0);
-		const char *key = vy_run_min_key(run, p);
-		if (min_key == NULL ||
-		    vy_tuple_compare(key, min_key, index->key_def) < 0) {
-			min_key = key;
-		}
-	}
-
-	/* Create a tuple with the minimal key. */
-	if (min_key == NULL) {
-		range->min_key = vy_tuple_from_key(index, NULL, 0);
-	} else {
-		range->min_key = vy_tuple_extract_key_raw(index, min_key);
-	}
-
-	if (range->min_key == NULL)
-		return -1;
-
-	return 0;
-}
-
 static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	assert(range->min_key != NULL);
 	vy_range_tree_insert(&index->tree, range);
 	index->range_index_version++;
 	index->range_count++;
@@ -1551,6 +1533,239 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 	vy_range_tree_remove(&index->tree, range);
 	index->range_index_version++;
 	index->range_count--;
+}
+
+/*
+ * Check if a is left-adjacent to b, i.e. a->end == b->begin.
+ */
+static bool
+vy_range_is_adjacent(struct vy_range *a, struct vy_range *b,
+		     struct key_def *key_def)
+{
+	if (a->end == NULL || b->begin == NULL)
+		return false;
+	return vy_tuple_compare(a->end->data, b->begin->data, key_def) == 0;
+}
+
+/*
+ * Check if a precedes b, i.e. a->end <= b->begin.
+ */
+static bool
+vy_range_precedes(struct vy_range *a, struct vy_range *b,
+		  struct key_def *key_def)
+{
+	if (a->end == NULL || b->begin == NULL)
+		return false;
+	return vy_tuple_compare(a->end->data, b->begin->data, key_def) <= 0;
+}
+
+/*
+ * Check if a ends before b, i.e. a->end < b->end.
+ */
+static bool
+vy_range_ends_before(struct vy_range *a, struct vy_range *b,
+		     struct key_def *key_def)
+{
+	if (b->end == NULL)
+		return a->end != NULL;
+	if (a->end == NULL)
+		return false;
+	return vy_tuple_compare(a->end->data, b->end->data, key_def) < 0;
+}
+
+/*
+ * Check if ranges present in an index span a range w/o holes. If they
+ * do, delete the range, otherwise remove all ranges of the index
+ * intersecting the range (if any) and insert the range instead.
+ */
+static void
+vy_index_recover_range(struct vy_index *index, struct vy_range *range)
+{
+	/*
+	 * The algorithm can be briefly outlined by the following steps:
+	 *
+	 * 1. Find the first range in the index having an intersection
+	 *    with the given one. If there is no such range, go to step
+	 *    4, otherwise check if the found range can be the first
+	 *    spanning range, i.e. if it starts before or at the same
+	 *    point as the given range. If it does, proceed to step 2,
+	 *    otherwise go to step 3.
+	 *
+	 * 2. Check if there are holes in the span. To do it, iterate
+	 *    over all intersecting ranges and check that for each two
+	 *    neighbouring ranges the end of the first one equals the
+	 *    beginning of the second one. If there is a hole, proceed
+	 *    to step 3, otherwise delete the given range and return.
+	 *
+	 * 3. Remove all ranges intersecting the given range from the
+	 *    index.
+	 *
+	 * 4. Insert the given range to the index.
+	 */
+	struct vy_range *first, *prev, *n;
+
+	first = vy_range_tree_first(&index->tree);
+	if (first == NULL) {
+		/* Trivial case - the index tree is empty. */
+		goto insert;
+	}
+
+	/*
+	 * 1. Find the first intersecting range.
+	 */
+	if (range->begin == NULL) {
+		/*
+		 * The given range starts with -inf.
+		 * Check the leftmost.
+		 */
+		if (vy_range_precedes(range, first, index->key_def)) {
+			/*
+			 * The given range precedes the leftmost,
+			 * hence no intersection is possible.
+			 *
+			 *   ----range----|   |----first----|
+			 */
+			goto insert;
+		}
+		if (first->begin != NULL) {
+			/*
+			 * The leftmost range does not span -inf,
+			 * so there cannot be a span, but there is
+			 * an intersection.
+			 *
+			 *   -----range-----|
+			 *              |------first------|
+			 */
+			goto replace;
+		}
+		/*
+		 * Possible span. Check for holes.
+		 *
+		 *   --------range--------|
+		 *   ----first----|
+		 */
+		goto check;
+	}
+	/*
+	 * The given range starts with a finite key (> -inf).
+	 * Check the predecessor.
+	 */
+	struct vy_range_tree_key tree_key = {
+		.data = range->begin->data,
+	};
+	prev = vy_range_tree_psearch(&index->tree, &tree_key);
+	if (prev == NULL) {
+		/*
+		 * There is no predecessor, i.e. no range with
+		 * begin <= range->begin. Check if the first range
+		 * in the index intersects the given range.
+		 */
+		if (vy_range_precedes(range, first, index->key_def)) {
+			/*
+			 * No intersections. The given range is
+			 * going to be leftmost in the index.
+			 *
+			 *   |----range----|   |---first---|
+			 */
+			goto insert;
+		}
+		/*
+		 * Neither strict succession nor strict precedence:
+		 * the first range intersects the given one.
+		 *
+		 *   |------range------|
+		 *                |------first------|
+		 */
+		goto replace;
+	}
+	/*
+	 * There is a predecessor. Check whether it intersects
+	 * the given range.
+	 */
+	if (vy_range_precedes(prev, range, index->key_def)) {
+		/*
+		 * The predecessor does not intersect the given
+		 * range, hence there is no span. Check if there
+		 * is an intersection with the successor (if any).
+		 */
+		n = vy_range_tree_next(&index->tree, prev);
+		if (n == NULL || vy_range_precedes(range, n, index->key_def)) {
+			/*
+			 * No successor or the given range
+			 * precedes it, hence no intersections.
+			 *
+			 *   |--prev--| |--range--| |--next--|
+			 */
+			goto insert;
+		} else {
+			/*
+			 * There is an overlap with the successor.
+			 *
+			 *   |--prev--| |--range--|
+			 *                    |-----next-----|
+			 */
+			first = n;
+			goto replace;
+		}
+	} else {
+		/*
+		 * There is an intersection between the given range
+		 * and the predecessor, so there might be a span.
+		 * Check for holes.
+		 *
+		 *   |-------prev-------|
+		 *                |-------range-------|
+		 */
+		first = prev;
+	}
+check:
+	/*
+	 * 2. Check for holes in the spanning range.
+	 */
+	n = first;
+	prev = NULL;
+	do {
+		if (prev != NULL &&
+		    !vy_range_is_adjacent(prev, n, index->key_def)) {
+			/*
+			 * There is a hole in the spanning range.
+			 *
+			 *   |---prev---|   |---next---|
+			 *        |----------range----------|
+			 */
+			break;
+		}
+		if (!vy_range_ends_before(n, range, index->key_def)) {
+			/*
+			 * Spanned the whole range w/o holes.
+			 *
+			 *                       |---next---|
+			 *   |----------range----------|
+			 */
+			vy_range_delete(range);
+			return;
+		}
+		prev = n;
+		n = vy_range_tree_next(&index->tree, n);
+	} while (n != NULL);
+	/* Fall through. */
+replace:
+	/*
+	 * 3. Remove intersecting ranges.
+	 */
+	n = first;
+	do {
+		struct vy_range *next = vy_range_tree_next(&index->tree, n);
+		vy_index_remove_range(index, n);
+		vy_range_delete(n);
+		n = next;
+	} while (n != NULL && !vy_range_precedes(range, n, index->key_def));
+	/* Fall through. */
+insert:
+	/*
+	 * 4. Insert the given range to the index.
+	 */
+	vy_index_add_range(index, range);
 }
 
 /* dump tuple to the run page buffers (tuple header and data) */
@@ -1839,6 +2054,17 @@ err:
 	return -1;
 }
 
+static int
+vy_parse_range_name(const char *name, int64_t *index_lsn, int64_t *range_id)
+{
+	int n = 0;
+
+	sscanf(name, "%"SCNx64".%"SCNx64".range%n", index_lsn, range_id, &n);
+	if (name[n] != '\0')
+		return -1;
+	return 0;
+}
+
 static struct vy_range *
 vy_range_new(struct vy_index *index, int64_t id)
 {
@@ -1859,6 +2085,8 @@ vy_range_new(struct vy_index *index, int64_t id)
 	} else {
 		range->id = ++index->range_id_max;
 	}
+	snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".range",
+		 index->path, index->key_def->opts.lsn, range->id);
 	range->mem_count = 1;
 	range->fd = -1;
 	range->index = index;
@@ -1896,11 +2124,59 @@ vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
 }
 
 static int
+vy_load_tuple(struct vy_range *range, size_t size, off_t offset,
+	      struct vy_tuple **tuple)
+{
+	int rc = 0;
+	char *buf;
+
+	buf = malloc(size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "malloc", "buf");
+		return -1;
+	}
+
+	if (vy_range_read(range, buf, size, offset) < 0 ||
+	    (*tuple = vy_tuple_extract_key_raw(range->index, buf)) == NULL)
+		rc = -1;
+
+	free(buf);
+	return rc;
+}
+
+static int
+vy_load_range_header(struct vy_range *range, off_t *offset)
+{
+	struct vy_range_info info;
+
+	if (vy_range_read(range, &info, sizeof(info), 0) < 0)
+		return -1;
+
+	assert(range->begin == NULL);
+	if (info.begin_key_size != 0 &&
+	    vy_load_tuple(range, info.begin_key_size,
+			  info.begin_key_offset, &range->begin) == -1)
+		return -1;
+
+	assert(range->end == NULL);
+	if (info.end_key_size != 0 &&
+	    vy_load_tuple(range, info.end_key_size,
+			  info.end_key_offset, &range->end) == -1)
+		return -1;
+
+	*offset = info.first_run_offset;
+	return 0;
+}
+
+static int
 vy_range_recover(struct vy_range *range)
 {
 	struct vy_run *run = NULL;
-	off_t offset = 0;
+	off_t offset;
 	int rc = -1;
+
+	if (vy_load_range_header(range, &offset) == -1)
+		goto out;
 
 	while (true) {
 		struct vy_run_info *h;
@@ -1951,9 +2227,6 @@ vy_range_recover(struct vy_range *range)
 		goto out;
 	}
 
-	if (vy_range_init_min_key(range) == -1)
-		goto out;
-
 	rc = 0; /* success */
 out:
 	if (run)
@@ -1961,25 +2234,18 @@ out:
 	return rc;
 }
 
-int
-vy_range_open(struct vy_index *index, struct vy_range *range, char *path)
+static int
+vy_range_open(struct vy_range *range)
 {
-	snprintf(range->path, PATH_MAX, "%s", path);
-	int rc = range->fd = open(path, O_RDWR);
+	int rc = range->fd = open(range->path, O_RDWR);
 	if (unlikely(rc == -1)) {
 		vy_error("index file '%s' open error: %s ",
-		         path, strerror(errno));
+		         range->path, strerror(errno));
 		return -1;
 	}
 	rc = vy_range_recover(range);
 	if (unlikely(rc == -1))
 		return -1;
-
-	/* Attach range to the index and update statistics. */
-	vy_index_add_range(index, range);
-	index->size += vy_range_size(range);
-	/* schedule range */
-	vy_scheduler_add_range(index->env->scheduler, range);
 	return 0;
 }
 
@@ -2015,8 +2281,10 @@ vy_range_delete(struct vy_range *range)
 
 	int rcret = 0;
 
-	if (range->min_key)
-		vy_tuple_unref(range->min_key);
+	if (range->begin)
+		vy_tuple_unref(range->begin);
+	if (range->end)
+		vy_tuple_unref(range->end);
 
 	vy_range_delete_runs(range);
 	vy_range_delete_mems(range);
@@ -2026,6 +2294,42 @@ vy_range_delete(struct vy_range *range)
 	TRASH(range);
 	free(range);
 	return rcret;
+}
+
+static int
+vy_write_range_header(int fd, struct vy_range *range)
+{
+	struct vy_range_info info;
+	off_t offset = sizeof(info);
+
+	memset(&info, 0, sizeof(info));
+
+	if (range->begin) {
+		if (vy_pwrite_file(fd, range->begin->data,
+				   range->begin->size, offset) < 0)
+			return -1;
+		info.begin_key_offset = offset;
+		info.begin_key_size = range->begin->size;
+		offset += range->begin->size;
+	}
+	if (range->end) {
+		if (vy_pwrite_file(fd, range->end->data,
+				   range->end->size, offset) < 0)
+			return -1;
+		info.end_key_offset = offset;
+		info.end_key_size = range->end->size;
+		offset += range->end->size;
+	}
+
+	info.first_run_offset = offset;
+
+	if (vy_pwrite_file(fd, &info, sizeof(info), 0) < 0)
+		return -1;
+
+	if (lseek(fd, offset, SEEK_SET) == -1)
+		return -1;
+
+	return 0;
 }
 
 /*
@@ -2059,11 +2363,14 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		fd = mkstemp(path);
 		if (fd < 0) {
 create_failed:
-			vy_error("Failed to create temp file '%s': %s",
-				 path, strerror(errno));
+			vy_error("Failed to create temp file: %s",
+				 strerror(errno));
 			goto fail;
 		}
 		created = true;
+
+		if (vy_write_range_header(fd, range) != 0)
+			goto fail;
 	}
 
 	/* Append tuples to the range file. */
@@ -2076,8 +2383,6 @@ create_failed:
 		 * We've successfully written a run to a new range file.
 		 * Commit the range by linking the file to a proper name.
 		 */
-		snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->path, range->id);
 		if (rename(path, range->path) != 0) {
 			vy_error("Failed to link range file '%s': %s",
 				 range->path, strerror(errno));
@@ -2109,7 +2414,7 @@ fail:
  *   4/3 * range_size.
  */
 static bool
-vy_range_need_split(struct vy_range *range, const char **split_key)
+vy_range_need_split(struct vy_range *range, const char **p_split_key)
 {
 	struct key_def *key_def = range->index->key_def;
 	struct vy_run *run = NULL;
@@ -2127,14 +2432,17 @@ vy_range_need_split(struct vy_range *range, const char **split_key)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
-	struct vy_page_info *p = vy_run_page(run, run->info.count / 2);
-	const char *k = vy_run_min_key(run, p);
+	struct vy_page_info *mid_page = vy_run_page(run, run->info.count / 2);
+	const char *split_key = vy_run_min_key(run, mid_page);
+
+	struct vy_page_info *first_page = vy_run_page(run, 0);
+	const char *min_key = vy_run_min_key(run, first_page);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_tuple_compare(range->min_key->data, k, key_def) == 0)
+	if (vy_tuple_compare(min_key, split_key, key_def) == 0)
 		return false;
 
-	*split_key = k;
+	*p_split_key = split_key;
 	return true;
 }
 
@@ -2171,11 +2479,19 @@ vy_range_compact_prepare(struct vy_range *range,
 		parts[i].fd = -1;
 	}
 
-	/* Set min keys for the new ranges. */
-	vy_tuple_ref(range->min_key);
-	parts[0].range->min_key = range->min_key;
-	if (split_key != NULL)
-		parts[1].range->min_key = split_key;
+	/* Set begin and end keys for the new ranges. */
+	if (range->begin)
+		vy_tuple_ref(range->begin);
+	if (range->end)
+		vy_tuple_ref(range->end);
+	parts[0].range->begin = range->begin;
+	if (split_key != NULL) {
+		vy_tuple_ref(split_key);
+		parts[0].range->end = split_key;
+		parts[1].range->begin = split_key;
+		parts[1].range->end = range->end;
+	} else
+		parts[0].range->end = range->end;
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
@@ -2243,6 +2559,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
 	index->range_index_version++;
+	vy_quota_release(index->env->quota, range->used);
 	vy_range_delete(range);
 }
 
@@ -2426,18 +2743,26 @@ vy_index_create(struct vy_index *index)
 	}
 
 	index->range_id_max = 0;
-	index->last_dump_range_id = 0;
 	/* create initial range */
 	struct vy_range *range = vy_range_new(index, 0);
 	if (unlikely(range == NULL))
 		return -1;
-	if (vy_range_init_min_key(range) != 0) {
-		vy_range_delete(range);
-		return -1;
-	}
 	vy_index_add_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
 	index->size = vy_range_size(range);
+	return 0;
+}
+
+static int
+vy_range_id_cmp(const void *p1, const void *p2)
+{
+	struct vy_range *r1 = *(struct vy_range **)p1;
+	struct vy_range *r2 = *(struct vy_range **)p2;
+
+	if (r1->id > r2->id)
+		return 1;
+	if (r1->id < r2->id)
+		return -1;
 	return 0;
 }
 
@@ -2461,7 +2786,7 @@ vy_index_create(struct vy_index *index)
  * run. The page index of an active run is fully cached in RAM.
  *
  * All files of an index have the following name pattern:
- * <lsn>.<range_id>.index
+ * <lsn>.<range_id>.range
  * and are stored together in the index directory.
  *
  * The <lsn> component represents LSN of index creation: it is used
@@ -2471,87 +2796,72 @@ vy_index_create(struct vy_index *index)
  *
  * <range_id> component represents the id of the range in an
  * index. The id is a monotonically growing integer, and is
- * assigned to a range when it's created.  The header file of each
- * range contains a full list of range ids of all ranges known to
- * the index when this last range file was created. Thus by
- * navigating to the latest range and reading its range directory,
- * we can find out ids of all remaining ranges of the index and
- * open them.
+ * assigned to a range when it's created. Thus newer ranges will
+ * have greater ids, and hence by recovering ranges with greater
+ * ids first and ignoring ranges which are already fully spanned,
+ * we can restore the whole index to its latest state.
  */
 static int
 vy_index_open_ex(struct vy_index *index)
 {
-	/*
-	 * The main index file name has format <lsn>.<range_id>.index.
-	 * Load the index given its LSN and choose the maximal range_id
-	 * among ranges within the same LSN.
-	 */
-	int64_t last_dump_range_id = 0;
+	struct vy_range **range_array = NULL;
+	int range_array_capacity = 0, n_ranges = 0;
+	int rc = -1;
+
 	DIR *index_dir;
 	index_dir = opendir(index->path);
 	if (!index_dir) {
 		vy_error("Can't open dir %s", index->path);
-		return -1;
+		goto out;
 	}
 	struct dirent *dirent;
 	while ((dirent = readdir(index_dir))) {
-		if (!strstr(dirent->d_name, ".index"))
-			continue;
 		int64_t index_lsn;
 		int64_t range_id;
-		if (sscanf(dirent->d_name, "%"SCNu64".%"SCNx64,
-			   &index_lsn, &range_id) != 2)
-			continue;
-		/*
-		 * Find the newest range in the last incarnation
-		 * of this index.
-		 */
+
+		if (vy_parse_range_name(dirent->d_name,
+					&index_lsn, &range_id) != 0)
+			continue; /* unknown file */
 		if (index_lsn != index->key_def->opts.lsn)
-			continue;
-		if (last_dump_range_id < range_id)
-			last_dump_range_id = range_id;
+			continue; /* different incarnation */
+
+		struct vy_range *range = vy_range_new(index, range_id);
+		if (!range)
+			goto out;
+		if (vy_range_open(range) != 0) {
+			vy_range_delete(range);
+			goto out;
+		}
+
+		if (n_ranges == range_array_capacity) {
+			int n = range_array_capacity > 0 ?
+				range_array_capacity * 2 : 1;
+			void *p = realloc(range_array, n * sizeof(*range_array));
+			if (p == NULL) {
+				diag_set(OutOfMemory, n * sizeof(*range_array),
+					 "realloc", "range_array");
+				vy_range_delete(range);
+				goto out;
+			}
+			range_array = p;
+			range_array_capacity = n;
+		}
+		range_array[n_ranges++] = range;
 	}
 	closedir(index_dir);
+	index_dir = NULL;
 
-	if (last_dump_range_id == 0)
-		goto out; /* empty index */
+	/*
+	 * Always prefer newer ranges (i.e. those that have greater ids)
+	 * over older ones. Only fall back on an older range, if it has
+	 * not been spanned by the time we get to it. The latter can
+	 * only happen if there was an incomplete range split.
+	 */
+	qsort(range_array, n_ranges, sizeof(*range_array), vy_range_id_cmp);
+	for (int i = n_ranges - 1; i >= 0; i--)
+		vy_index_recover_range(index, range_array[i]);
+	n_ranges = 0;
 
-	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, index->key_def->opts.lsn, last_dump_range_id);
-	int fd = open(path, O_RDWR);
-	if (fd == -1) {
-		vy_error("Can't open index file %s: %s",
-			 path, strerror(errno));
-		return -1;
-	}
-
-	int64_t range_id;
-	int size;
-	while ((size = read(fd, &range_id, sizeof(range_id))) ==
-		sizeof(range_id)) {
-		struct vy_range *range = vy_range_new(index, range_id);
-		if (!range) {
-			vy_error("%s", "Can't alloc range");
-			vy_range_delete(range);
-			return -1;
-		}
-		char range_path[PATH_MAX];
-		snprintf(range_path, PATH_MAX, "%s/%016"PRIx64".range",
-			 index->path, range_id);
-		if (vy_range_open(index, range, range_path)) {
-			vy_range_delete(range);
-			return -1;
-		}
-	}
-
-	close(fd);
-	if (size != 0) {
-		vy_error("Corrupted index file %s", path);
-		return -1;
-	}
-	index->last_dump_range_id = last_dump_range_id;
-out:
 	if (!index->range_count) {
 		/*
 		 * Special case: index has no ranges
@@ -2559,17 +2869,26 @@ out:
 		 */
 		/* create initial range */
 		struct vy_range *range = vy_range_new(index, 0);
-		if (unlikely(range == NULL))
-			return -1;
-		if (vy_range_init_min_key(range) != 0) {
-			vy_range_delete(range);
-			return -1;
-		}
+		if (range == NULL)
+			goto out;
 		vy_index_add_range(index, range);
-		index->size = vy_range_size(range);
 	}
 
-	return 0;
+	/* Update index size and make ranges visible to the scheduler. */
+	for (struct vy_range *range = vy_range_tree_first(&index->tree);
+	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
+		index->size += vy_range_size(range);
+		vy_scheduler_add_range(index->env->scheduler, range);
+	}
+
+	rc = 0; /* success */
+out:
+	if (index_dir)
+		closedir(index_dir);
+	for (int i = 0; i < n_ranges; i++)
+		vy_range_delete(range_array[i]);
+	free(range_array);
+	return rc;
 }
 
 /**
@@ -2787,15 +3106,6 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_mem_delete(mem);
 		mem = next;
 	}
-
-	if (range->run_count == 1) {
-		/*
-		 * The range file was created successfully,
-		 * update the range index on disk.
-		 */
-		vy_index_dump_range_index(index);
-	}
-
 out:
 	vy_scheduler_add_range(index->env->scheduler, range);
 	return 0;
@@ -2871,8 +3181,14 @@ vy_task_compact_execute(struct vy_task *task)
 		goto out;
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range_compact_part *p = &parts[i];
-		struct vy_tuple *split_key = i < n_parts - 1 ?
-			parts[i + 1].range->min_key : NULL;
+		struct vy_tuple *split_key = parts[i].range->end;
+
+		if (i > 0)
+			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
+				     {vy_error("Failed to split range %s",
+					       p->range->path);
+				      rc = -1; goto out;});
+
 		rc = vy_range_write_run(p->range, wi, split_key,
 					&parts[i].fd, &p->run, &curr_tuple);
 		if (rc != 0)
@@ -2890,26 +3206,14 @@ out:
 static int
 vy_task_compact_complete(struct vy_task *task)
 {
-	struct vy_index *index = task->index;
 	struct vy_range *range = task->compact.range;
 	struct vy_range_compact_part *parts = task->compact.parts;
 	int n_parts = task->compact.n_parts;
 
-	if (task->status != 0) {
+	if (task->status != 0)
 		vy_range_compact_abort(range, n_parts, parts);
-		return 0;
-	}
-
-	vy_range_compact_commit(range, n_parts, parts);
-
-	if (vy_index_dump_range_index(index)) {
-		/*
-		 * TODO: we should roll back the failed dump first, but it
-		 * requires a redesign of the index change function.
-		 */
-		return -1;
-	}
-
+	else
+		vy_range_compact_commit(range, n_parts, parts);
 	return 0;
 }
 
@@ -3533,8 +3837,10 @@ vy_index_gc(struct vy_index *index)
 {
 	struct mh_i32ptr_t *ranges = NULL;
 	DIR *dir = NULL;
-	ranges = mh_i32ptr_new();
 
+	ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto error;});
+
+	ranges = mh_i32ptr_new();
 	if (ranges == NULL)
 		goto error;
 	/*
@@ -3563,6 +3869,9 @@ vy_index_gc(struct vy_index *index)
 	 * identified as old, not all files.
 	 */
 	while ((dirent = readdir(dir))) {
+		int64_t index_lsn;
+		int64_t range_id;
+
 		if (!(strcmp(".", dirent->d_name)))
 			continue;
 		if (!(strcmp("..", dirent->d_name)))
@@ -3574,19 +3883,12 @@ vy_index_gc(struct vy_index *index)
 			is_vinyl_file = true;
 		}
 		*/
-		if (strstr(dirent->d_name, ".index")) {
+		if (vy_parse_range_name(dirent->d_name,
+					&index_lsn, &range_id) == 0) {
 			is_vinyl_file = true;
-			int64_t lsn = 0;
-			sscanf(dirent->d_name, "%"SCNx64, &lsn);
-			if (lsn >= index->key_def->opts.lsn)
-				continue;
-		}
-		if (strstr(dirent->d_name, ".range")) {
-			is_vinyl_file = true;
-			uint64_t range_id = 0;
-			sscanf(dirent->d_name, "%"SCNx64, &range_id);
 			mh_int_t range = mh_i32ptr_find(ranges, range_id, NULL);
-			if (range != mh_end(ranges))
+			if (index_lsn == index->key_def->opts.lsn &&
+			    range != mh_end(ranges))
 				continue;
 		}
 		if (!is_vinyl_file)
@@ -3600,8 +3902,10 @@ vy_index_gc(struct vy_index *index)
 error:
 	say_syserror("failed to cleanup index directory %s", index->path);
 end:
-	closedir(dir);
-	mh_i32ptr_delete(ranges);
+	if (dir != NULL)
+		closedir(dir);
+	if (ranges != NULL)
+		mh_i32ptr_delete(ranges);
 }
 
 void
@@ -3942,72 +4246,6 @@ vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 	return 0;
 }
 
-static int
-vy_index_dump_range_index(struct vy_index *index)
-{
-	if (index->range_id_max == index->last_dump_range_id)
-		return 0;
-	long int ranges_size = index->range_count * sizeof(int64_t);
-	int64_t *ranges = (int64_t *)malloc(ranges_size);
-	if (!ranges) {
-		vy_error("Can't alloc %li bytes", (long int)ranges_size);
-		return -1;
-	}
-	int range_no = 0;
-	struct vy_range *range = vy_range_tree_first(&index->tree);
-	do {
-		if (!range->run_count) {
-			continue;		/* Skip empty ranges */
-		}
-		ranges[range_no] = range->id;
-		++range_no;
-	} while ((range = vy_range_tree_next(&index->tree, range)));
-
-	if (!range_no) {
-		/*
-		 * This index is entirely empty, we won't create
-		 * any files on disk.
-		 */
-		free(ranges);
-		return 0;
-	}
-
-	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	int fd = mkstemp(path);
-	if (fd == -1) {
-		vy_error("Can't create temporary file in %s: %s",
-			 index->path, strerror(errno));
-		free(ranges);
-		return -1;
-	}
-	int write_size = sizeof(uint64_t) * range_no;
-	if (write(fd, ranges, write_size) != write_size) {
-		free(ranges);
-		close(fd);
-		unlink(path);
-		vy_error("Can't write index file: %s", strerror(errno));
-		return -1;
-	}
-	free(ranges);
-	fsync(fd);
-	close(fd);
-
-	char new_path[PATH_MAX];
-	snprintf(new_path, PATH_MAX, "%s/%016"PRIu64".%016"PRIx64".index",
-		 index->path, index->key_def->opts.lsn,
-		 index->range_id_max);
-	if (link(path, new_path)) {
-		vy_error("Can't dump index range dict %s: %s",
-			 new_path, strerror(errno));
-		unlink(path);
-		return -1;
-	}
-	index->last_dump_range_id = index->range_id_max;
-	unlink(path);
-	return 0;
-}
-
 /**
  * Check whether or not an index was created at the
  * given LSN.
@@ -4030,18 +4268,17 @@ vy_index_exists(struct vy_index *index, int64_t lsn)
 		return false;
 	}
 	/*
-	 * Try to find an index file with a number in name
+	 * Try to find a range file with a number in name
 	 * equal to the given LSN.
 	 */
-	char target_name[PATH_MAX];
-	snprintf(target_name, PATH_MAX, "%016"PRIu64, lsn);
-	size_t len = strlen(target_name);
 	struct dirent *dirent;
 	while ((dirent = readdir(dir))) {
-		if (strstr(dirent->d_name, ".index") &&
-		    strncmp(dirent->d_name, target_name, len) == 0) {
+		int64_t index_lsn;
+		int64_t range_id;
+		if (vy_parse_range_name(dirent->d_name,
+					&index_lsn, &range_id) == 0 &&
+		    index_lsn == lsn)
 			break;
-		}
 	}
 	closedir(dir);
 	return dirent != NULL;

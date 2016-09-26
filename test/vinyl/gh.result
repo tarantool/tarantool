@@ -535,3 +535,48 @@ s:select{}
 s:drop()
 ---
 ...
+--
+-- gh-1725: vinyl: merge iterator can't merge more than two runs 
+--
+s0 = box.schema.space.create('tweedledum', {engine = 'vinyl'})
+---
+...
+i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
+---
+...
+-- integer keys
+s0:replace{1, 'tuple'}
+---
+- [1, 'tuple']
+...
+box.snapshot()
+---
+- ok
+...
+s0:replace{2, 'tuple 2'}
+---
+- [2, 'tuple 2']
+...
+box.snapshot()
+---
+- ok
+...
+s0:insert{3, 'tuple 3'}
+---
+- [3, 'tuple 3']
+...
+s0.index['primary']:get{1}
+---
+- [1, 'tuple']
+...
+s0.index['primary']:get{2}
+---
+- [2, 'tuple 2']
+...
+s0.index['primary']:get{3}
+---
+- [3, 'tuple 3']
+...
+s0:drop()
+---
+...

@@ -54,6 +54,8 @@ struct errinj {
 	_(ERRINJ_TUPLE_ALLOC, false) \
 	_(ERRINJ_TUPLE_FIELD, false) \
 	_(ERRINJ_VY_RANGE_CREATE, false) \
+	_(ERRINJ_VY_RANGE_SPLIT, false) \
+	_(ERRINJ_VY_GC, false) \
 	_(ERRINJ_RELAY, false)
 
 ENUM0(errinj_enum, ERRINJ_LIST);
