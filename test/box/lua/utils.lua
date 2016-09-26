@@ -111,6 +111,8 @@ function tuple_to_string(tuple, yaml)
 end;
 
 function check_space(space, N)
+    local errors = {}
+
     --
     -- Insert
     --
@@ -130,7 +132,7 @@ function check_space(space, N)
         local key = keys[i]
         local tuple = space:get({key})
         if tuple == nil or tuple[1] ~= key then
-            return nil, 'missing key', key
+            table.insert(errors, {'missing key after insert', key})
         end
     end
 
@@ -159,31 +161,12 @@ function check_space(space, N)
             local key = keys[i]
             local tuple = space:get({key})
             if tuple == nil or tuple[1] ~= key then
-                return nil, 'missing key', key
+                table.insert(errors, {'missing key after upsert', key})
             end
             if tuple[2] ~= k then
-                return nil, 'invalid value after upsert', tuple
+                table.insert(errors, {'invalid value after upsert', key,
+                             'found', tuple[2], 'expected', k})
             end
-        end
-    end
-
-    --
-    -- Update
-    --
-    table_shuffle(keys)
-    for i=1,N do
-        local key = keys[i]
-        space:update(key, {{'+', 2, 10}})
-    end
-    table_shuffle(keys)
-    for i=1,N do
-        local key = keys[i]
-        local tuple = space:get({key})
-        if tuple == nil or tuple[1] ~= key then
-            return nil, 'missing key', key
-        end
-        if tuple[2] ~= 12 then
-            return nil, 'invalid value after update', tuple
         end
     end
 
@@ -196,20 +179,20 @@ function check_space(space, N)
         space:delete({key})
     end
 
-    local count = #space:select()
-    -- :len() doesn't work on vinyl
-    if count ~= 0 then
-        return nil, 'invalid count after delete', count
-    end
-
     for i=1,N do
         local key = keys[i]
         if space:get({key}) ~= nil then
-            return nil, 'found deleted key', key
+            table.insert(errors, {'found deleted key', key})
         end
     end
 
-    return true
+    local count = #space:select()
+    -- :len() doesn't work on vinyl
+    if count ~= 0 then
+        table.insert(errors, {'invalid count after delete', count})
+    end
+
+    return errors
 end
 
 return {

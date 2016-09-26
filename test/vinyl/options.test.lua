@@ -1,7 +1,7 @@
 utils = require('utils')
 test_run = require('test_run').new()
 
-index_options = {}
+index_options = test_run:get_cfg('index_options')
 index_options.type = 'TREE'
 index_options.parts = {1, 'unsigned'}
 
