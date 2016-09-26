@@ -816,7 +816,6 @@ struct vy_index {
 	uint64_t read_disk;
 	uint64_t read_cache;
 	uint64_t size;
-	pthread_mutex_t ref_lock;
 	uint32_t refs;
 	/** A schematic name for profiler output. */
 	char       *name;
@@ -4156,19 +4155,15 @@ vy_index_open(struct vy_index *index)
 static void
 vy_index_ref(struct vy_index *index)
 {
-	tt_pthread_mutex_lock(&index->ref_lock);
 	index->refs++;
-	tt_pthread_mutex_unlock(&index->ref_lock);
 }
 
 static void
 vy_index_unref(struct vy_index *index)
 {
 	/* reduce reference counter */
-	tt_pthread_mutex_lock(&index->ref_lock);
 	assert(index->refs > 0);
 	--index->refs;
-	tt_pthread_mutex_unlock(&index->ref_lock);
 	/* index will be deleted by scheduler if ref == 0 */
 }
 
@@ -4239,7 +4234,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->read_disk = 0;
 	index->read_cache = 0;
 	index->range_count = 0;
-	tt_pthread_mutex_init(&index->ref_lock, NULL);
 	index->refs = 0; /* referenced by scheduler */
 	read_set_new(&index->read_set);
 	rlist_add(&e->indexes, &index->link);
@@ -4262,7 +4256,6 @@ vy_index_delete(struct vy_index *index)
 {
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index);
-	tt_pthread_mutex_destroy(&index->ref_lock);
 	free(index->name);
 	free(index->path);
 	free(index->key_map);
