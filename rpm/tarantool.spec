@@ -60,7 +60,7 @@ BuildRequires: python-yaml >= 3.0.9
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
-Version: 1.6.8.0
+Version: 1.6.9.0
 Release: 1%{?dist}
 Group: Applications/Databases
 Summary: In-memory database and Lua application server
@@ -200,6 +200,14 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
+ - Tab-based autocompletion in the interactive console
+ - LUA_PATH and LUA_CPATH environment variables taken into account
+ - A new box.cfg { read_only = true } option
+ - Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
+ - Bugs fixed:
+   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
+
 * Tue Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
 - Add support for OpenSSL 1.1
 
