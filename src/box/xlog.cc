@@ -435,7 +435,7 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 						  &output,
 						  &input);
 		ibuf_alloc(&i->data, output.pos);
-		if (rc == 1) {
+		if (rc >= 1) {
 			if (!ibuf_reserve(&i->data,
 					  ibuf_capacity(&i->data))){
 				tnt_error(OutOfMemory,
