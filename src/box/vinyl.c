@@ -3200,6 +3200,16 @@ vy_task_compact_execute(struct vy_task *task)
 	}
 out:
 	vy_write_iterator_delete(wi);
+
+	/* Remove old range file on success. */
+	if (rc == 0) {
+		ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto unlink_error;});
+		if (unlink(range->path) != 0) {
+unlink_error:
+			say_syserror("failed to remove range file %s",
+				     range->path);
+		}
+	}
 	return rc;
 }
 
