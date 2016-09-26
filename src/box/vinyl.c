@@ -2235,6 +2235,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
 	index->range_index_version++;
+	vy_quota_release(index->env->quota, range->used);
 	vy_range_delete(range);
 }
 
