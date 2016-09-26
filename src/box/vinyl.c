@@ -2976,8 +2976,6 @@ struct vy_scheduler {
 	int64_t       checkpoint_lsn_last;
 	int64_t       checkpoint_lsn;
 	bool checkpoint_in_progress;
-	int            count;
-	struct vy_index **indexes;
 	struct rlist   shutdown;
 	struct vy_env    *env;
 	heap_t dump_heap;
@@ -3045,8 +3043,6 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->checkpoint_lsn = 0;
 	scheduler->checkpoint_lsn_last = 0;
 	scheduler->checkpoint_in_progress = false;
-	scheduler->indexes = NULL;
-	scheduler->count = 0;
 	scheduler->env = env;
 	rlist_create(&scheduler->shutdown);
 	vy_compact_heap_create(&scheduler->compact_heap);
@@ -3068,7 +3064,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 
 	mempool_destroy(&scheduler->task_pool);
 
-	free(scheduler->indexes);
 	vy_compact_heap_destroy(&scheduler->compact_heap);
 	vy_dump_heap_destroy(&scheduler->dump_heap);
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
@@ -3076,44 +3071,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	ipc_cond_destroy(&scheduler->scheduler_cond);
 	tt_pthread_mutex_destroy(&scheduler->mutex);
 	free(scheduler);
-}
-
-static int
-vy_scheduler_add_index(struct vy_scheduler *scheduler, struct vy_index *index)
-{
-	struct vy_index **indexes =
-		realloc(scheduler->indexes,
-			(scheduler->count + 1) * sizeof(*indexes));
-	if (indexes == NULL) {
-		diag_set(OutOfMemory, sizeof((scheduler->count + 1) *
-			 sizeof(*indexes)), "scheduler", "indexes");
-		tt_pthread_mutex_unlock(&scheduler->mutex);
-		return -1;
-	}
-	scheduler->indexes = indexes;
-	scheduler->indexes[scheduler->count++] = index;
-	vy_index_ref(index);
-	/* Start scheduler threads on demand */
-	if (!scheduler->is_worker_pool_running &&
-	     scheduler->env->status == VINYL_ONLINE)
-		vy_scheduler_start(scheduler);
-	return 0;
-}
-
-static int
-vy_scheduler_del_index(struct vy_scheduler *scheduler, struct vy_index *index)
-{
-	int found = 0;
-	while (found < scheduler->count && scheduler->indexes[found] != index)
-		found++;
-	assert(found < scheduler->count);
-	for (int i = found + 1; i < scheduler->count; i++)
-		scheduler->indexes[i - 1] = scheduler->indexes[i];
-	scheduler->count--;
-	vy_index_unref(index);
-	/* add index to `shutdown` list */
-	rlist_add(&scheduler->shutdown, &index->link);
-	return 0;
 }
 
 static bool
@@ -3273,7 +3230,7 @@ vy_schedule(struct vy_scheduler *scheduler, int64_t vlsn,
 
 	/* peek an index */
 	*ptask = NULL;
-	if (scheduler->count == 0)
+	if (rlist_empty(&scheduler->env->indexes))
 		return 0;
 
 	int rc;
@@ -3520,13 +3477,13 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	struct vy_scheduler *scheduler = env->scheduler;
 	for (;;) {
 		bool is_active = false;
+		struct vy_index *index;
 		/* iterate over all indexes */
-		for (int i = 0; i < scheduler->count; i++) {
+		rlist_foreach_entry(index, &env->indexes, link) {
 			/*
 			 * check that all ranges of index have lsn
 			 * greater than checkpoint_lsn
 			 */
-			struct vy_index *index = scheduler->indexes[i];
 			struct vy_range *range;
 			range = vy_range_tree_first(&index->tree);
 			while (range) {
@@ -3630,12 +3587,10 @@ void
 vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	(void)vclock;
-	struct vy_scheduler *scheduler = env->scheduler;
-	for (int i = 0; i < scheduler->count; i++) {
-		struct vy_index *index;
-		index = scheduler->indexes[i];
+	struct vy_index *index;
+
+	rlist_foreach_entry(index, &env->indexes, link)
 		vy_index_gc(index);
-	}
 }
 
 /* Scheduler }}} */
@@ -4146,9 +4101,19 @@ vy_index_open_or_create(struct vy_index *index)
 int
 vy_index_open(struct vy_index *index)
 {
-	if (vy_index_open_or_create(index) ||
-	    vy_scheduler_add_index(index->env->scheduler, index))
+	struct vy_env *env = index->env;
+	struct vy_scheduler *scheduler = env->scheduler;
+
+	if (vy_index_open_or_create(index) != 0)
 		return -1;
+
+	vy_index_ref(index);
+	rlist_add(&env->indexes, &index->link);
+
+	/* Start scheduler threads on demand */
+	if (!scheduler->is_worker_pool_running && env->status == VINYL_ONLINE)
+		vy_scheduler_start(scheduler);
+
 	return 0;
 }
 
@@ -4175,9 +4140,10 @@ vy_index_drop(struct vy_index *index)
 	 * operations are already done.
 	 */
 	struct vy_env *e = index->env;
-	rlist_del(&index->link);
+
 	/* schedule index shutdown or drop */
-	vy_scheduler_del_index(e->scheduler, index);
+	rlist_move(&e->scheduler->shutdown, &index->link);
+	vy_index_unref(index);
 	return 0;
 }
 
@@ -4236,7 +4202,6 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->range_count = 0;
 	index->refs = 0; /* referenced by scheduler */
 	read_set_new(&index->read_set);
-	rlist_add(&e->indexes, &index->link);
 
 	return index;
 
@@ -5144,7 +5109,7 @@ vy_end_recovery(struct vy_env *e)
 	vy_quota_enable(e->quota);
 
 	/* Start scheduler if there is at least one index */
-	if (e->scheduler->count > 0)
+	if (!rlist_empty(&e->indexes))
 		vy_scheduler_start(e->scheduler);
 }
 
