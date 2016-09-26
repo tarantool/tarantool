@@ -240,7 +240,7 @@ console_completion_helper(struct lua_State *L)
 	lua_createtable(L, 0, 0);
 	for (i = 0; res[i]; i++) {
 		lua_pushstring(L, res[i]);
-		lua_rawseti(L, -2, i + i);
+		lua_rawseti(L, -2, i + 1);
 	}
 	return 1;
 }

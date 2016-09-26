@@ -6,9 +6,10 @@ local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
 local urilib = require('uri')
+local yaml = require('yaml')
 
 -- admin formatter must be able to encode any Lua variable
-local formatter = require('yaml').new()
+local formatter = yaml.new()
 formatter.cfg{
     encode_invalid_numbers = true;
     encode_load_metatables = true;
@@ -319,7 +320,12 @@ local function connect(uri)
     self.remote = remote
     self.eval = remote_eval
     self.prompt = string.format("%s:%s", self.remote.host, self.remote.port)
-    self.completion = function () end -- no completion for remote console
+    self.completion = function (str, pos1, pos2)
+        local c = string.format(
+            'return require("console").completion_handler(%q, %d, %d)',
+            str, pos1, pos2)
+        return yaml.decode(remote:eval(c))[1]
+    end
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
     return true
 end
@@ -374,4 +380,5 @@ return {
     listen = listen;
     on_start = on_start;
     on_client_disconnect = on_client_disconnect;
+    completion_handler = internal.completion_handler;
 }
