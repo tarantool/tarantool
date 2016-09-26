@@ -321,6 +321,18 @@ local function create_transport(host, port, user, password, callback)
         return send_and_recv_iproto(max(0, deadline - fiber_time()))
     end
 
+    local function send_and_recv_console(timeout)
+        local delim = '\n...\n'
+        local err, delim_pos = send_and_recv(delim, timeout)
+        if err then
+            return err, delim_pos
+        else
+            local response = ffi.string(recv_buf.rpos, delim_pos + #delim)
+            recv_buf.rpos = recv_buf.rpos + delim_pos + #delim
+            return nil, response
+        end
+    end
+
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
     --
     -- The sm is implemented as a collection of functions performing
@@ -349,6 +361,14 @@ local function create_transport(host, port, user, password, callback)
             return error_sm(err, msg)
         end
         if g.protocol == 'Lua console' then
+            local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
+            method_codec.inject(send_buf, nil, nil, setup_delimiter)
+            local err, response = send_and_recv_console()
+            if err then
+                return error_sm(err, response)
+            elseif response ~= '---\n...\n' then
+                return error_sm(E_NO_CONNECTION, 'Unexpected response')
+            end
             local rid = next_request_id
             set_state('active')
             return console_sm(rid)
@@ -361,13 +381,11 @@ local function create_transport(host, port, user, password, callback)
 
     console_sm = function(rid)
         local delim = '\n...\n'
-        local err, delim_pos = send_and_recv(delim)
+        local err, response = send_and_recv_console()
         if err then
-            return error_sm(err, delim_pos)
+            return error_sm(err, response)
         else
-            local response = ffi.string(recv_buf.rpos, delim_pos + #delim)
             dispatch_response(rid, nil, response)
-            recv_buf.rpos = recv_buf.rpos + delim_pos + #delim
             return console_sm(next_id(rid))
         end
     end
@@ -528,6 +546,7 @@ local function remote_serialize(self)
         opts = next(self.opts) and self.opts,
         state = self.state,
         error = self.error,
+        protocol = self.protocol,
         peer_uuid = self.peer_uuid,
         peer_version_id = self.peer_version_id
     }
@@ -538,13 +557,19 @@ local remote_mt = {
     __index = remote_methods, __serialize = remote_serialize,
     __metatable = false
 }
+
+local console_methods = {}
+local console_mt = {
+    __index = console_methods, __serialize = remote_serialize,
+    __metatable = false
+}
+
 local space_metatable, index_metatable
 
 local function connect(...)
     local host, port, opts = parse_connect_params(...)
     local user, password = opts.user, opts.password; opts.password = nil
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
-    setmetatable(remote, remote_mt)
     local function callback(what, ...)
         if      what == 'state_changed' then
             local state, errno, err = ...
@@ -554,14 +579,15 @@ local function connect(...)
             end
         elseif what == 'handshake' then
             local greeting = ...
-            if greeting.protocol ~= 'Binary' then
+            if not opts.console and greeting.protocol ~= 'Binary' then
                 return E_NO_CONNECTION,
                        'Unsupported protocol: '..greeting.protocol
             end
+            remote.protocol = greeting.protocol
             remote.peer_uuid = greeting.uuid
             remote.peer_version_id = greeting.version_id
         elseif what == 'will_fetch_schema' then
-            return true
+            return not opts.console
         elseif what == 'did_fetch_schema' then
             remote:_install_schema(...)
         elseif what == 'will_reconnect' then
@@ -570,15 +596,20 @@ local function connect(...)
             end
         end
     end
+    if opts.console then
+        setmetatable(remote, console_mt)
+    else
+        setmetatable(remote, remote_mt)
+        remote._deadlines = setmetatable({}, {__mode = 'k'})
+        remote._space_mt = space_metatable(remote)
+        remote._index_mt = index_metatable(remote)
+        if opts.call_16 then remote.call = remote.call_16 end
+    end
     remote._transport = create_transport(host, port, user, password, callback)
-    remote._deadlines = setmetatable({}, {__mode = 'k'})
-    remote._space_mt = space_metatable(remote)
-    remote._index_mt = index_metatable(remote)
     remote._transport.connect()
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
     end
-    if opts.call_16 then remote.call = remote.call_16 end
     return remote
 end
 
@@ -763,6 +794,34 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
     self.space = sl
 end
 
+-- console methods
+console_methods.close = remote_methods.close
+console_methods.is_connected = remote_methods.is_connected
+console_methods.wait_state = remote_methods.wait_state
+function console_methods:eval(line, timeout)
+    remote_check(self, 'eval')
+    local err, res
+    local transport = self._transport
+    local pr = transport.perform_request
+    if self.state ~= 'active' then
+        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        transport.wait_state('active', timeout)
+        timeout = max(0, deadline - fiber_time())
+    end
+    if self.protocol == 'Binary' then
+        local loader = 'return require("console").eval(...)'
+        err, res = pr(timeout, 'eval', nil, loader, {line})
+    else
+        assert(self.protocol == 'Lua console')
+        err, res = pr(timeout, 'inject', nil, line..'$EOF$\n')
+    end
+    if err then
+        box.error({code = err, reason = res})
+    end
+    return res[1] or res
+end
+
+-- space, index metatable
 local function space_check(space, method)
     if type(space) ~= 'table' or space.id == nil then
         local fmt = 'Use space:%s(...) instead of space.%s(...)'

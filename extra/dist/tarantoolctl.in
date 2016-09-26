@@ -100,7 +100,6 @@ local uri = require 'uri'
 local yaml = require 'yaml'
 local errno = require 'errno'
 local fiber = require 'fiber'
-local digest = require 'digest'
 local netbox = require 'net.box'
 local socket = require 'socket'
 local console = require 'console'
@@ -588,7 +587,7 @@ local function eval()
         log.error("Error, while checking syntax: halting")
         return 1
     end
-    local content = digest.base64_encode(read_file(filename))
+    local code = read_file(filename)
 
     if fio.stat(console_sock_path) == nil then
         log.warn("pid file exists, but the control socket (%s) doesn't",
@@ -597,19 +596,14 @@ local function eval()
     end
 
     local u = uri.parse(console_sock)
-    local remote = require('net.box'):new(u.host, u.service,
-        { user = u.login, password = u.password })
+    local remote = netbox.connect(u.host, u.service,
+        { user = u.login, password = u.password, console = true })
     if remote == nil then
         log.warn("control socket exists, but tarantool doesn't listen on it")
         return 2
     end
 
-    local code = string.format(
-        'loadstring(require("digest").base64_decode([[%s]]))()',
-        content
-    )
-
-    local full_response = remote:console(code)
+    local full_response = remote:eval(code)
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
         log.error("Error, while reloading config:")

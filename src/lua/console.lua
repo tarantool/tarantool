@@ -80,7 +80,7 @@ end
 local function remote_eval(self, line)
     if not line or self.remote.state ~= 'active' then
         local err = self.remote.error
-        self.remote.close()
+        self.remote:close()
         self.remote = nil
         -- restore local REPL mode
         self.eval = nil
@@ -92,17 +92,8 @@ local function remote_eval(self, line)
     --
     -- execute line
     --
-    local err, res
-    if self.remote.protocol == 'Binary' then
-        local loader = 'return require("console").eval(...)'
-        err, res = self.remote.perform_request(nil, 'eval', nil,
-                                               loader, {line})
-    else
-        assert(self.remote.protocol == 'Lua console')
-        err, res = self.remote.perform_request(nil, 'inject', nil,
-                                               line..'$EOF$\n')
-    end
-    return err and format(false, res) or res[1] or res
+    local ok, res = pcall(self.remote.eval, self.remote, line)
+    return ok and res or format(false, res)
 end
 
 --
@@ -284,10 +275,10 @@ end
 --
 -- Connect to remove server
 --
-local create_transport
+local netbox_connect
 local function connect(uri)
-    if not create_transport then -- workaround the broken loader
-        create_transport = require('net.box').create_transport
+    if not netbox_connect then -- workaround the broken loader
+        netbox_connect = require('net.box').connect
     end
 
     local self = fiber.self().storage.console
@@ -305,38 +296,21 @@ local function connect(uri)
 
     -- connect to remote host
     local remote
-    remote = create_transport(u.host, u.service, u.login, u.password,
-        function(what, ...)
-            if what == 'state_changed' then
-                remote.state, remote.errno, remote.error = ...
-            elseif what == 'handshake' then
-                local greeting = ...
-                remote.protocol = greeting.protocol
-            end
-        end
-    )
+    remote = netbox_connect(u.host, u.service, {
+        user = u.login, password = u.password, console = true
+    })
     remote.host, remote.port = u.host or 'localhost', u.service
 
     -- run disconnect trigger if connection failed
-    if not (remote.connect() and remote.wait_state('active')) then
+    if not remote:is_connected() then
         pcall(self.on_client_disconnect, self)
         error('Connection is not established: '..remote.error)
     end
 
     -- check connection && permissions
-    local err, res
-    if remote.protocol == 'Binary' then
-        err, res = remote.perform_request(nil, 'eval', nil, 'return true', {})
-    else
-        assert(remote.protocol == 'Lua console')
-        local code = 'require("console").delimiter("$EOF$")\n'
-        err, res = remote.perform_request(nil, 'inject', nil, code)
-        if not (err or res == '---\n...\n') then
-            err, res = true, 'Unexpected response'
-        end
-    end
-    if err then
-        remote.close()
+    local ok, res = pcall(remote.eval, remote, 'return true')
+    if not ok then
+        remote:close()
         pcall(self.on_client_disconnect, self)
         error(res)
     end
