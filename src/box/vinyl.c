@@ -7419,7 +7419,7 @@ struct vy_write_iterator {
 	 * when dumping a run, to ensure that the deleted tuple
 	 * is eventually removed from all LSM layers.
 	 * If is_dump is true then old deletes, i.e. those
-	 * which  LSN is less or equal to purge LSN and for which
+	 * which LSN is less or equal to purge LSN and for which
 	 * there are no new replaces, are preserved in the output,
 	 * otherwise such deletes are skipped and iteration
 	 * continues from the next key.
@@ -7500,12 +7500,17 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 {
 	/*
 	 * Nullify the result tuple. If the next tuple is not
-	 * found, make sure we "forget" the current one.
+	 * found, this is a marker of the end of the stream.
 	 */
 	*ret = NULL;
 	/*
-	 * The tmp_tuple can be hanging around from the previous
-	 * invocation of next().
+	 * The write iterator guarantees that the returned tuple
+	 * is alive until the next invocation of next(). If the
+	 * returned tuple is obtained from the merge iterator,
+	 * this guarantee is fulfilled by the merge iterator
+	 * itself. If the write iterator creates the returned
+	 * tuple, e.g. by squashing a bunch of upserts, then
+	 * it must dereference the created tuple here.
 	 */
 	if (wi->tmp_tuple)
 		vy_tuple_unref(wi->tmp_tuple);
@@ -7526,19 +7531,21 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	 *    "top" of the version stack: it will reflect the
 	 *    latest value we need to preserve. Special
 	 *    care needs to be taken about upserts and deletes:
-	 *    upserts squashed together and deletes preserved
-	 *    if is_dump flag is true.
-	 *  - when done with this key, proceed with the next one.
+	 *    upserts are squashed together and deletes are
+	 *    preserved if is_dump flag is true.
+	 *  - when done with this key, proceed to the next one.
 	 */
-	while(true) {
+	while (true) {
 		if (!mi->search_started) {
 			/* Start the search if it's the first iteration. */
 			rc = vy_merge_iterator_locate(mi);
+			if (rc > 0)
+				return 0; /* Empty stream. */
 		} else {
 			/*
 			 * Need to go to the next key if the previous tuple was
-			 * older or equal than purge_lsn and it was DELETE or
-			 * REPLACE.
+			 * older than or equal to purge_lsn and it was DELETE
+			 * or REPLACE.
 			 */
 			if (wi->goto_next_key) {
 				/*
@@ -7549,7 +7556,8 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				if (upsert_tuple) {
 					tuple = upsert_tuple;
 					/*
-					 * Don't forget to plan free
+					 * Don't forget to plan
+					 * a deallocation of the
 					 * accumulated UPSERT.
 					 */
 					wi->tmp_tuple = upsert_tuple;
@@ -7567,47 +7575,41 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 					return 0;
 			} else {
 				rc = vy_merge_iterator_next_lsn(mi);
+				/*
+				 * If we reached the end of the
+				 * key LSNs then go to the next
+				 * key.
+			         */
+				if (rc > 0) {
+					wi->goto_next_key = true;
+					continue;
+				}
 			}
 		}
 		if (rc < 0)
 			return rc;
-		/*
-		 * If we reached the end of the key LSNs then go to
-		 * the next key.
-		 */
-		if (rc > 0) {
-			wi->goto_next_key = true;
-			continue;
-		}
 		rc = vy_merge_iterator_get(mi, &tuple);
 		assert(rc == 0);
+		uint8_t prev_tuple_flags = wi->prev_tuple_flags;
+		wi->prev_tuple_flags |= tuple->flags;
+
 		if (tuple->lsn > wi->purge_lsn) {
 			/* Save the current tuple as the result. */
-			wi->prev_tuple_flags = tuple->flags;
 			break;
 		}
 		/*
 		 * The merge iterator now is below or equal to the purge LSN.
 		 */
-		if (tuple->flags & SVREPLACE) {
+		if (tuple->flags & (SVREPLACE|SVDELETE)) {
 			/*
-			 * Replace. In any case after this tuple the iteration
+			 * Replace/Delete. In any case after this tuple the iteration
 			 * will continue from the next key.
-			 * If the previous tuple was DELETE or REPLACE then it
-			 * was the oldest tuple from tuples that newer than the
-			 * purge LSN. And if the current write iterator works
-			 * for runs compacting we can skip the current REPLACE
-			 * and all older tuples because there is no
-			 * transactions that need this LSN.
 			 */
 			wi->goto_next_key = true;
-			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE)
-				&& wi->is_dump == false)
-				continue;
 			if (upsert_tuple) {
 				/*
 				 * If the previous tuple was upserted
-				 * then combine it with the replace and return.
+				 * then combine it with the current and return.
 				 */
 				tuple = vy_apply_upsert(upsert_tuple,
 							tuple, wi->index,
@@ -7618,8 +7620,26 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				 */
 				vy_tuple_unref(upsert_tuple);
 				wi->tmp_tuple = tuple;
+				break;
 			}
-			break;
+			if (tuple->flags & SVDELETE) {
+				/*
+				 * If the previous tuple was REPLACE or DELETE
+				 * and was newer than the purge LSN then
+				 * even current DELETE can be skipped.
+				 *
+				 * Otherwise preserve the delete in output
+				 * if it's a dump of a run, so it can
+				 * annihilate an older version of this
+				 * tuple when multiple runs are merged
+				 * together.
+				 */
+				if (wi->is_dump &&
+				    (prev_tuple_flags & (SVREPLACE|SVDELETE)) == 0)
+					break;
+			} else {
+				break;
+			}
 		} else if (tuple->flags & SVUPSERT) {
 			/*
 			 * If the merge iterator now is below the
@@ -7641,49 +7661,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 				vy_tuple_ref(tuple);
 			}
 			upsert_tuple = tuple;
-		} else if (tuple->flags & SVDELETE) {
-			/*
-			 * The tuple on top of the stack is
-			 * delete. We can disregard the rest of
-			 * the stack.
-			 */
-			wi->goto_next_key = true;
-			/*
-			 * If the previous tuple was REPLACE or DELETE
-			 * and was newer than the purge LSN then
-			 * even current DELETE can be skipped.
-			 */
-			if (wi->prev_tuple_flags & (SVREPLACE | SVDELETE))
-				continue;
-			if (upsert_tuple) {
-				/*
-				 * If DELETE was followed
-				 * by UPSERT, convert
-				 * UPSERT to REPLACE at
-				 * once, and return it
-				 * instead of DELETE.
-				 */
-				tuple = vy_apply_upsert(upsert_tuple,
-							tuple, wi->index,
-							false);
-				/*
-				 * The upsert tuple turns in REPLACE so
-				 * it can be freed.
-				 */
-				vy_tuple_unref(upsert_tuple);
-				wi->tmp_tuple = tuple;
-				break;
-			}
-			if (wi->is_dump) {
-				/*
-				 * Preserve the delete in output
-				 * if it's a dump of a run, so it
-				 * can annihilate an older version
-				 * of this tuple when multiple
-				 * runs are merged together.
-				 */
-				break;
-			}
 		} else {
 			unreachable();
 		}
