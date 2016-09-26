@@ -674,12 +674,12 @@ local commands = setmetatable({
 })
 
 local usage = function()
-    local local_tbl = fun.iter(commands):reduce(function(name, cmd)
+    local local_tbl = fun.iter(commands):filter(function(name, cmd)
         return cmd.process == process_local
     end):map(function(name, cmd) return name end):totable()
     table.sort(local_tbl); local_tbl = table.concat(local_tbl, '|')
 
-    local remote_tbl = fun.iter(commands):reduce(function(name, cmd)
+    local remote_tbl = fun.iter(commands):filter(function(name, cmd)
         return cmd.process == process_remote
     end):map(function(name, cmd) return name end):totable()
     table.sort(remote_tbl); remote_tbl = table.concat(remote_tbl, '|')
