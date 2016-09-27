@@ -2536,16 +2536,6 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		r->run_count = r->run ? 1 : 0;
 		r->fd = parts[i].fd;
 
-		/*
-		 * If a new range is empty, delete it unless
-		 * it's the only one.
-		 */
-		if (r->run == NULL && r->used == 0 && index->range_count > 1) {
-			vy_index_remove_range(index, r);
-			vy_range_delete(r);
-			continue;
-		}
-
 		index->size += vy_range_size(r);
 
 		/* Account merge w/o split. */
