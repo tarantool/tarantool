@@ -507,7 +507,9 @@ local create_transport = function(host, port, user, password, callback)
     local transport = create_transport(host, port, user,
                                        password, weak_callback)
     local transport_close = transport.close
-    local gc_hook = ffi.gc(ffi.new('char[1]'), transport_close)
+    local gc_hook = ffi.gc(ffi.new('char[1]'), function()
+        pcall(transport_close)
+    end)
     transport.close = function()
         -- dummy gc_hook, callback refs prevent premature GC
         return transport_close(gc_hook, callback)
