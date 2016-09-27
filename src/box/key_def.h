@@ -181,6 +181,11 @@ struct key_opts {
 	uint32_t range_size;
 	uint32_t page_size;
 	/**
+	 * Begin compaction when there are more than compact_wm
+	 * runs in a range.
+	 */
+	uint32_t compact_wm;
+	/**
 	 * LSN from the time of index creation.
 	 */
 	int64_t lsn;

@@ -91,11 +91,6 @@ struct vy_conf {
 	char *path;
 	/* memory */
 	uint64_t memory_limit;
-	/*
-	 * Begin compaction when there are more than compact_wm
-	 * runs in a range.
-	 */
-	uint32_t compact_wm;
 };
 
 struct vy_env {
@@ -3487,11 +3482,10 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
-	uint32_t compact_wm = scheduler->env->conf->compact_wm;
 	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
 	while ((pn = vy_compact_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodecompact);
-		if (range->run_count < compact_wm)
+		if (range->run_count < range->index->key_def->opts.compact_wm)
 			break; /* TODO: why ? */
 		*ptask = vy_task_compact_new(&scheduler->task_pool,
 					     range);
@@ -3916,12 +3910,6 @@ vy_conf_new()
 		return NULL;
 	}
 	conf->memory_limit = cfg_getd("vinyl.memory_limit")*1024*1024*1024;
-
-	conf->compact_wm = cfg_geti("vinyl.compact_wm");
-	if (conf->compact_wm <= 1) {
-		vy_error("bad compact_wm value %d", conf->compact_wm);
-		goto error_1;
-	}
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
