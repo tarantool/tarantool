@@ -2359,6 +2359,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 		fd = mkstemp(path);
 		if (fd < 0) {
+			goto create_failed; /* suppress warn if NDEBUG */
 create_failed:
 			vy_error("Failed to create temp file: %s",
 				 strerror(errno));
@@ -3209,11 +3210,12 @@ vy_task_compact_execute(struct vy_task *task)
 		struct vy_range_compact_part *p = &parts[i];
 		struct vy_tuple *split_key = parts[i].range->end;
 
-		if (i > 0)
+		if (i > 0) {
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
 				     {vy_error("Failed to split range %s",
 					       p->range->path);
 				      rc = -1; goto out;});
+		}
 
 		rc = vy_range_write_run(p->range, wi, split_key,
 					&parts[i].fd, &p->run, &curr_tuple);
@@ -3231,6 +3233,7 @@ out:
 	if (rc == 0) {
 		ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto unlink_error;});
 		if (unlink(range->path) != 0) {
+			goto unlink_error; /* suppress warn if NDEBUG */
 unlink_error:
 			say_syserror("failed to remove range file %s",
 				     range->path);
@@ -6831,6 +6834,7 @@ vy_mem_iterator_close(struct vy_tuple_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_mem_iterator_close);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
+	(void)itr; /* suppress warn if NDEBUG */
 	TRASH(itr);
 }
 
@@ -7089,6 +7093,7 @@ vy_txw_iterator_close(struct vy_tuple_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_txw_iterator_close);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
+	(void)itr; /* suppress warn if NDEBUG */
 	TRASH(itr);
 }
 
