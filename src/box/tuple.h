@@ -684,20 +684,6 @@ tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def);
 
 /**
- * @brief Compare two tuples field by field for duplicate using key definition
- * @param tuple_a tuple
- * @param tuple_b tuple
- * @param key_def key definition
- * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b) and
- * tuple_a == tuple_b - tuple_a is the same object as tuple_b
- * @retval <0 if key_fields(tuple_a) <= key_fields(tuple_b)
- * @retval >0 if key_fields(tuple_a > key_fields(tuple_b)
- */
-int
-tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
-		  const struct key_def *key_def);
-
-/**
  * @brief Compare a tuple with a key field by field using key definition
  * @param tuple_a tuple
  * @param key BER-encoded key

@@ -7774,7 +7774,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_tuple **ret)
 	struct vy_tuple *upsert_tuple = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
 	int rc;
-	struct vy_tuple *tuple;
+	struct vy_tuple *tuple = NULL;
 	/*
 	 * This cycle works as follows:
 	 *  - iterate over all tuples with the same key.
