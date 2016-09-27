@@ -2730,6 +2730,72 @@ vy_range_id_cmp(const void *p1, const void *p2)
 	return 0;
 }
 
+/*
+ * For each hole in the index (prev->end != next->begin),
+ * make a new range filling it (new->begin = prev->end,
+ * new->end = next->begin).
+ */
+static int
+vy_index_patch_holes(struct vy_index *index)
+{
+	struct vy_range *prev, *next = NULL;
+
+	do {
+		struct vy_tuple *begin, *end;
+		struct vy_range *new;
+
+		prev = next;
+		next = (next == NULL) ?
+			vy_range_tree_first(&index->tree) :
+			vy_range_tree_next(&index->tree, next);
+
+		if (prev != NULL && next != NULL) {
+			begin = prev->end;
+			assert(begin != NULL);
+			end = next->begin;
+			assert(end != NULL);
+			int cmp = vy_tuple_compare(begin->data, end->data,
+						   index->key_def);
+			if (cmp == 0)
+				continue;
+			assert(cmp < 0);
+			/* Hole between two adjacent ranges. */
+		} else if (next != NULL) {
+			begin = NULL;
+			end = next->begin;
+			if (end == NULL)
+				continue;
+			/* No leftmost range. */
+		} else if (prev != NULL) {
+			begin = prev->end;
+			end = NULL;
+			if (begin == NULL)
+				continue;
+			/* No rightmost range. */
+		} else {
+			/* Empty index. */
+			assert(index->range_count == 0);
+			begin = end = NULL;
+		}
+
+		new = vy_range_new(index, 0);
+		if (new == NULL)
+			return -1;
+
+		new->begin = begin;
+		if (begin)
+			vy_tuple_ref(begin);
+
+		new->end = end;
+		if (end)
+			vy_tuple_ref(end);
+
+		vy_index_add_range(index, new);
+	} while (next != NULL);
+
+	return 0;
+}
+
 /**
  * A quick intro into Vinyl cosmology and file format
  * --------------------------------------------------
@@ -2826,17 +2892,13 @@ vy_index_open_ex(struct vy_index *index)
 		vy_index_recover_range(index, range_array[i]);
 	n_ranges = 0;
 
-	if (!index->range_count) {
-		/*
-		 * Special case: index has no ranges
-		 * (merged out or empty index was checkpointed)
-		 */
-		/* create initial range */
-		struct vy_range *range = vy_range_new(index, 0);
-		if (range == NULL)
-			goto out;
-		vy_index_add_range(index, range);
-	}
+	/*
+	 * Successful compaction may create a range w/o tuples, and we
+	 * do not store such ranges on disk. Hence we silently create a
+	 * new range for each gap found in the index.
+	 */
+	if (vy_index_patch_holes(index) != 0)
+		goto out;
 
 	/* Update index size and make ranges visible to the scheduler. */
 	for (struct vy_range *range = vy_range_tree_first(&index->tree);
