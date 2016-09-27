@@ -1722,6 +1722,7 @@ check:
 			 *                       |---next---|
 			 *   |----------range----------|
 			 */
+			say_warn("found stale range %s", range->path);
 			vy_range_delete(range);
 			return;
 		}
@@ -1736,6 +1737,7 @@ replace:
 	n = first;
 	do {
 		struct vy_range *next = vy_range_tree_next(&index->tree, n);
+		say_warn("found partial range %s", n->path);
 		vy_index_remove_range(index, n);
 		vy_range_delete(n);
 		n = next;
