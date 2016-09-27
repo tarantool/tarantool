@@ -206,7 +206,15 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
-* Tue Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
+* Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
+ - Tab-based autocompletion in the interactive console
+ - LUA_PATH and LUA_CPATH environment variables taken into account
+ - A new box.cfg { read_only = true } option
+ - Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
+ - Bugs fixed:
+   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
+
+* Thu Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
 - Add support for OpenSSL 1.1
 
 * Tue Feb 09 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.462-1
