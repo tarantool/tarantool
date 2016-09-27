@@ -86,20 +86,21 @@ check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
 check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
-# ensure clock_gettime() is declared and actually available
-# in runtime (gh-1777)
-check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME_DECL)
-if (${HAVE_CLOCK_GETTIME_DECL})
-    function(check_code_using_clock_gettime_runs) # start new scope
-        if (${TARGET_OS_LINUX})
-            set(CMAKE_REQUIRED_LIBRARIES rt)
-        endif()
-        check_c_source_runs(
-            "#include <time.h>\nint main() {struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return 0;}"
-            HAVE_CLOCK_GETTIME)
-    endfunction()
-    check_code_using_clock_gettime_runs()
+set(CMAKE_REQUIRED_LIBRARIES "")
+if (TARGET_OS_LINUX)
+    set(CMAKE_REQUIRED_LIBRARIES rt)
 endif ()
+check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME_DECL)
+if (HAVE_CLOCK_GETTIME_DECL AND TARGET_OS_DARWIN)
+    # ensure clock_gettime() is declared and actually available
+    # in runtime (gh-1777)
+    check_c_source_runs(
+        "#include <time.h>\nint main() {struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return 0;}"
+        HAVE_CLOCK_GETTIME)
+else ()
+    set(HAVE_CLOCK_GETTIME ${HAVE_CLOCK_GETTIME_DECL})
+endif ()
+set(CMAKE_REQUIRED_LIBRARIES "")
 
 # Checks for libev
 include(CheckStructHasMember)
