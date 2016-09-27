@@ -8112,19 +8112,6 @@ vy_read_iterator_merge_get(struct vy_read_iterator *itr, struct vy_tuple **t)
 }
 
 /**
- * Conventional wrapper around vy_merge_iterator_next_lsn() to automatically
- * re-create the merge iterator on vy_index/vy_range/vy_run changes.
- */
-static int
-vy_read_iterator_merge_next_lsn(struct vy_read_iterator *itr)
-{
-	int rc;
-	while ((rc = vy_merge_iterator_next_lsn(&itr->merge_iterator)) == -2)
-		vy_read_iterator_restore(itr);
-	return rc;
-}
-
-/**
  * Conventional wrapper around vy_merge_iterator_next_key() to automatically
  * re-create the merge iterator on vy_index/vy_range/vy_run changes.
  */
@@ -8196,6 +8183,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_tuple **result)
 	}
 	while (true) {
 		struct vy_tuple *t;
+restart:
 		rc = vy_read_iterator_merge_get(itr, &t);
 		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr);
@@ -8208,26 +8196,35 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_tuple **result)
 		if (rc > 0)
 			return 0; /* no more data */
 		assert(rc == 0);
+		vy_tuple_ref(t);
+		while (t->flags & SVUPSERT) {
+			rc = vy_merge_iterator_next_lsn(&itr->merge_iterator);
+			if (rc == -2) {
+				vy_read_iterator_restore(itr);
+				vy_tuple_unref(t);
+				goto restart;
+			}
+			if (rc < 0) {
+				vy_tuple_unref(t);
+				return rc;
+			}
+			struct vy_tuple *next = NULL;
+			if (rc == 0)
+				rc = vy_read_iterator_merge_get(itr, &next);
+			if (rc < 0) {
+				vy_tuple_unref(t);
+				return rc;
+			}
+			struct vy_tuple *applied =
+				vy_apply_upsert(t, next, itr->index, true);
+			vy_tuple_unref(t);
+			if (applied == NULL)
+				return -1;
+			t = applied;
+		}
 		if (itr->curr_tuple != NULL)
 			vy_tuple_unref(itr->curr_tuple);
 		itr->curr_tuple = t;
-		vy_tuple_ref(itr->curr_tuple);
-		while (itr->curr_tuple->flags & SVUPSERT) {
-			rc = vy_read_iterator_merge_next_lsn(itr);
-			struct vy_tuple *next = NULL;
-			if (rc == 0) {
-				rc = vy_read_iterator_merge_get(itr, &next);
-			}
-			if (rc < 0)
-				return -1;
-			struct vy_tuple *applied =
-				vy_apply_upsert(itr->curr_tuple, next,
-						itr->index, true);
-			if (applied == NULL)
-				return -1;
-			vy_tuple_unref(itr->curr_tuple);
-			itr->curr_tuple = applied;
-		}
 		if (rc != 0 || (itr->curr_tuple->flags & SVDELETE) == 0)
 			break;
 		rc = vy_read_iterator_merge_next_key(itr);
