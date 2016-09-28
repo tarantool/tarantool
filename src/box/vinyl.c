@@ -432,6 +432,9 @@ vy_stmt_alloc(uint32_t size);
 static const char *
 vy_stmt_key_part(const char *stmt_data, uint32_t part_id);
 
+static bool
+vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def);
+
 static int
 vy_stmt_compare(const char *stmt_data_a, const char *stmt_data_b,
 		 const struct key_def *key_def);
@@ -1466,12 +1469,84 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 		return;
 	}
 	/* route */
+	struct key_def *key_def = index->key_def;
 	struct vy_range_tree_key tree_key;
 	tree_key.data = itr->key;
 	tree_key.size = itr->key_size;
-	itr->cur_range = vy_range_tree_psearch(&index->tree, &tree_key);
-	if (itr->cur_range == NULL)
-		itr->cur_range = vy_range_tree_first(&index->tree);
+	if (itr->order == VINYL_GE || itr->order == VINYL_GT) {
+		/**
+		 * Case 1. part_count == 1, looking for [10]. ranges:
+		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
+		 *                      ^looking for this
+		 * Case 2. part_count == 1, looking for [10]. ranges:
+		 * {1, 2, 4} {5, 6, 7, 8} {50, 100, 200}
+		 *            ^looking for this
+		 * Case 3. part_count == 2, looking for [10]. ranges:
+		 * {[1, 2], [2, 3]} {[9, 1], [10, 1], [10 2], [11 3]} {[12,..}
+		 *                   ^looking for this
+		 * Case 4. part_count == 2, looking for [10]. ranges:
+		 * {[1, 2], [10, 1]} {[10, 2] [10 3] [11 3]} {[12, 1]..}
+		 *  ^looking for this
+		 * Case 5. part_count does not matter, looking for [10]. ranges:
+		 * {100, 200}, {300, 400}
+		 * ^looking for this
+		 */
+		/**
+		 * vy_range_tree_psearch finds least range with begin == key
+		 * or previous if equal was not found
+		 */
+		itr->cur_range = vy_range_tree_psearch(&index->tree, &tree_key);
+		/* switch to previous for case (4) */
+		if (itr->cur_range != NULL &&
+		    itr->cur_range->begin != NULL &&
+		    !vy_stmt_key_is_full(key, index->key_def) &&
+		    vy_stmt_compare(itr->cur_range->begin->data,
+				     key, key_def) == 0)
+			itr->cur_range = vy_range_tree_prev(&index->tree,
+							    itr->cur_range);
+		/* for case 5 or subcase of case 4 */
+		if (itr->cur_range == NULL)
+			itr->cur_range = vy_range_tree_first(&index->tree);
+	} else {
+		assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
+		/**
+		 * Case 1. part_count == 1, looking for [10]. ranges:
+		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
+		 *                      ^looking for this
+		 * Case 2. part_count == 1, looking for [10]. ranges:
+		 * {1, 2, 4} {5, 6, 7, 8} {50, 100, 200}
+		 *            ^looking for this
+		 * Case 3. part_count == 2, looking for [10]. ranges:
+		 * {[1, 2], [2, 3]} {[9, 1], [10, 1], [10 2], [11 3]} {[12,..}
+		 *                   ^looking for this
+		 * Case 4. part_count == 2, looking for [10]. ranges:
+		 * {[1, 2], [10, 1]} {[10, 2] [10 3] [11 3]} {[12, 1]..}
+		 *                    ^looking for this
+		 * Case 5. part_count does not matter, looking for [10]. ranges:
+		 * {1, 2}, {3, 4, ..}
+		 *          ^looking for this
+		 */
+		/**
+		 * vy_range_tree_nsearch finds most range with begin == key
+		 * or next if equal was not found
+		 */
+		itr->cur_range = vy_range_tree_nsearch(&index->tree, &tree_key);
+		if (itr->cur_range != NULL) {
+			/* fix curr_range for cases 2 and 3 */
+			if (itr->cur_range->begin != NULL &&
+			    vy_stmt_compare(itr->cur_range->begin->data,
+					     key, key_def) != 0) {
+				struct vy_range *range;
+				range = vy_range_tree_prev(&index->tree,
+							   itr->cur_range);
+				if (range != NULL)
+					itr->cur_range = range;
+			}
+		} else {
+			/* Case 5 */
+			itr->cur_range = vy_range_tree_last(&index->tree);
+		}
+	}
 	assert(itr->cur_range != NULL);
 }
 
@@ -4772,11 +4847,7 @@ static bool
 vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def)
 {
 	uint32_t *offsets = (uint32_t *) stmt_data;
-	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		if (offsets[part_id] == VY_STMT_KEY_MISSING)
-			return false;
-	}
-	return true;
+	return offsets[key_def->part_count - 1] != VY_STMT_KEY_MISSING;
 }
 
 /**

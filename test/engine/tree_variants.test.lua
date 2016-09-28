@@ -93,3 +93,18 @@ pk:bsize() > 0
 index2:bsize() > 0
 
 space:drop()
+
+--range queries
+space = box.schema.space.create('test', { engine = engine })
+pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+str = require('string').rep('A', 500)
+c1 = 100 c2 = 10
+for i = 1,c1 do for j=1,c2 do space:insert{j, i, str} end end
+good = true
+for i = 1,c2 do if #space:select{i} ~= c1 then good = false end end
+good --true
+total_count = 0
+for i = 1,c2 do total_count = total_count + #space:select{i} end
+total_count --c1 * c2
+space:drop()
+
