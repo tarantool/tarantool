@@ -193,10 +193,9 @@ local function cipher_update(self, input)
     if not self.initialized then
         return error('Cipher not initialized')
     end
-    if input == nil then
-      return ''
+    if type(input) ~= 'string' then
+        error("Usage: cipher:update(string)")
     end
-    input = tostring(input)
     local wpos = self.buf:reserve(input:len() + self.block_size - 1)
     if ffi.C.EVP_CipherUpdate(self.ctx, wpos, self.outl, input, input:len()) ~= 1 then
         return error('Can\'t update cipher:' .. openssl_err_str())
@@ -241,10 +240,8 @@ for class, digest in pairs(digests) do
         new = function () return digest_new(digest) end
     }, {
         __call = function (self, str)
-            if str == nil then
-                str = ''
-            else
-                str = tostring(str)
+            if type(str) ~= 'string' then
+                error("Usage: digest."..class.."(string)")
             end
             local ctx = digest_new(digest)
             ctx:update(str)

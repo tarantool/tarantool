@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+
 crypto = require('crypto')
 type(crypto)
 
@@ -36,3 +39,4 @@ bad_iv = '123456abcdefghij'
 ciph.decrypt(enc, bad_pass, iv)
 ciph.decrypt(enc, pass, bad_iv)
 
+test_run:cmd("clear filter")
