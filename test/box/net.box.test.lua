@@ -403,6 +403,15 @@ c.space.test.index.covering.parts
 
 box.space.test:drop()
 
+-- CALL vs CALL_16 in connect options
+function scalar42() return 42 end
+c = net.connect(box.cfg.listen)
+c:call('scalar42')
+c:close()
+c = net.connect(box.cfg.listen, {call_16 = true})
+c:call('scalar42')
+c:close()
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
 -- Tarantool < 1.7.1 compatibility (gh-1533)
