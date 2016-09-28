@@ -1,13 +1,35 @@
 # Please don't modify this file in-place, because it will be overwrriten
 # during package upgrades. It is recommended to copy this file to
 # /etc/systemd/system and then modify the chosen settings. Alternatively,
-# one can create a directory named unit.d/ within /etc/systemd/system and
+# one can create a directory named service.d/ within /etc/systemd/system and
 # place a drop-in file name.conf there that only changes the specific
 # settings one is interested in.
 #
-# Please see http://tarantool.org/doc/book/administration.html
-# for additional information.
+# For example, if you want to increase the maximum number of open files
+# for example.lua instance, you need to perform the following steps:
 #
+# 1. Create directory /etc/systemd/system/tarantool@example.service.d/ with
+#   file limits.conf containing:
+#
+#     [Service]
+#     LimitNOFILE=10000
+#
+# 2. Reload systemd daemon
+#
+#     systemctl daemon-reload
+#
+# 3. Check new settings
+#
+#     systemctl show tarantool@example|grep LimitNOFILE
+#
+# 4. Restart tarantool@example service
+#
+#     systemctl restart tarantool@example
+#
+# Please see http://tarantool.org/doc/book/administration.html and
+# systemd.service(5) man page for additional information.
+#
+
 [Unit]
 Description=Tarantool Database Server
 After=network.target
