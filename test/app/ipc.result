@@ -58,6 +58,10 @@ ch:get(.1, nil, unpack(ignored_args))
 ---
 - null
 ...
+tostring(ch)
+---
+- 'channel: 0'
+...
 ch:put()
 ---
 - error: 'usage: channel:put(var [, timeout])'
@@ -69,6 +73,10 @@ ch:count()
 ch:put('test')
 ---
 - true
+...
+tostring(ch)
+---
+- 'channel: 1'
 ...
 ch:get()
 ---
@@ -390,6 +398,10 @@ ch:is_closed()
 ---
 - true
 ...
+tostring(ch)
+---
+- 'channel: closed'
+...
 ch = fiber.channel(1)
 ---
 ...
@@ -555,6 +567,10 @@ refs -- must be zero
 -- fiber.cond
 c = fiber.cond()
 ---
+...
+tostring(c)
+---
+- cond
 ...
 -- args validation
 c.wait()

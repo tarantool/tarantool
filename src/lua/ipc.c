@@ -258,6 +258,18 @@ lbox_ipc_channel_is_closed(struct lua_State *L)
 }
 
 static int
+lbox_ipc_channel_to_string(struct lua_State *L)
+{
+	struct ipc_channel *ch = lbox_check_channel(L, 1, "");
+	if (ipc_channel_is_closed(ch)) {
+		lua_pushstring(L, "channel: closed");
+	} else {
+		lua_pushfstring(L, "channel: %d", (int)ipc_channel_count(ch));
+	}
+	return 1;
+}
+
+static int
 lbox_ipc_cond(struct lua_State *L)
 {
 	struct ipc_cond *e = lua_newuserdata(L, sizeof(*e));
@@ -318,11 +330,21 @@ lbox_ipc_cond_wait(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_ipc_cond_to_string(struct lua_State *L)
+{
+	struct ipc_cond *cond = lbox_check_cond(L, 1, "");
+	(void)cond;
+	lua_pushstring(L, "cond");
+	return 1;
+}
+
 void
 tarantool_lua_ipc_init(struct lua_State *L)
 {
 	static const struct luaL_reg channel_meta[] = {
 		{"__gc",	lbox_ipc_channel_gc},
+		{"__tostring",	lbox_ipc_channel_to_string},
 		{"is_full",	lbox_ipc_channel_is_full},
 		{"is_empty",	lbox_ipc_channel_is_empty},
 		{"put",		lbox_ipc_channel_put},
@@ -339,6 +361,7 @@ tarantool_lua_ipc_init(struct lua_State *L)
 
 	static const struct luaL_reg cond_meta[] = {
 		{"__gc",	lbox_ipc_cond_gc},
+		{"__tostring",	lbox_ipc_cond_to_string},
 		{"signal",	lbox_ipc_cond_signal},
 		{"broadcast",	lbox_ipc_cond_broadcast},
 		{"wait",	lbox_ipc_cond_wait},

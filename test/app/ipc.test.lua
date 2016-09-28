@@ -17,9 +17,11 @@ ch:is_empty(unpack(ignored_args))
 ch:get(.1)
 ch:get(.1, nil)
 ch:get(.1, nil, unpack(ignored_args))
+tostring(ch)
 ch:put()
 ch:count()
 ch:put('test')
+tostring(ch)
 ch:get()
 ch:put('test', nil), ch:get()
 ch:put('test', nil, unpack(ignored_args)), ch:get()
@@ -108,6 +110,7 @@ ch:get()
 ch:get()
 ch:put(10)
 ch:is_closed()
+tostring(ch)
 
 ch = fiber.channel(1)
 ch:put(true)
@@ -189,6 +192,7 @@ refs -- must be zero
 
 -- fiber.cond
 c = fiber.cond()
+tostring(c)
 -- args validation
 c.wait()
 c.wait('1')
