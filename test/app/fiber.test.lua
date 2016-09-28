@@ -197,6 +197,7 @@ fiber.status(nil)
 function r() fiber.sleep(1000) end
 f = fiber.create(r)
 fiber.cancel(f)
+while f:status() ~= 'dead' do fiber.sleep(0) end
 f:status()
 --  Test fiber.name()
 old_name = fiber.name()
@@ -220,6 +221,7 @@ f = fiber.create(testfun)
 f:cancel()
 fib_id = fiber.create(testfun):id()
 fiber.find(fib_id):cancel()
+while fiber.find(fib_id) ~= nil do fiber.sleep(0) end
 fiber.find(fib_id)
 
 --
@@ -349,6 +351,7 @@ test_run:grep_log("default", "gh%-1238") ~= nil
 
 -- must NOT show in the log
 _ = fiber.create(function() fiber.self():cancel() end)
+fiber.sleep(0.001)
 test_run:grep_log("default", "FiberIsCancelled") == nil
 
 -- must show in the log
