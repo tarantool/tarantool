@@ -861,6 +861,7 @@ lbox_socket_recvfrom(struct lua_State *L)
 			       (struct sockaddr*)&fa, &len);
 
 	if (res < 0) {
+		free(buf);
 		lua_pushnil(L);
 		return 1;
 	}

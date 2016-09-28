@@ -56,8 +56,8 @@ Description: Tarantool in-memory database - common files
 Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2,
- openssl, tarantool-common (>= 1.7.1.475)
+Depends: ${shlibs:Depends}, ${misc:Depends}, netbase, binutils, libgomp1,
+ libyaml-0-2, openssl, tarantool-common (>= 1.7.1.475)
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
  tarantool-lts,
