@@ -134,6 +134,9 @@ local function local_read(self)
         prompt = string.rep(' ', #self.prompt)
     end
     internal.add_history(buf)
+    if self.history_file then
+        internal.save_history(self.history_file)
+    end
     return buf
 end
 
@@ -269,6 +272,11 @@ local function start()
     end
     started = true
     local self = setmetatable({ running = true }, repl_mt)
+    local home_dir = os.getenv('HOME')
+    if home_dir then
+        self.history_file = home_dir .. '/.tarantool_history'
+        internal.load_history(self.history_file)
+    end
     repl(self)
     started = false
 end

@@ -287,6 +287,26 @@ lbox_console_completion_handler(struct lua_State *L)
 }
 
 static int
+lbox_console_load_history(struct lua_State *L)
+{
+	if (!lua_isstring(L, 1))
+		luaL_error(L, "load_history(filename: string)");
+
+	read_history(lua_tostring(L, 1));
+	return 0;
+}
+
+static int
+lbox_console_save_history(struct lua_State *L)
+{
+	if (!lua_isstring(L, 1))
+		luaL_error(L, "save_history(filename: string)");
+
+	write_history(lua_tostring(L, 1));
+	return 0;
+}
+
+static int
 lbox_console_add_history(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
@@ -300,6 +320,8 @@ void
 tarantool_lua_console_init(struct lua_State *L)
 {
 	static const struct luaL_reg consolelib[] = {
+		{"load_history",       lbox_console_load_history},
+		{"save_history",       lbox_console_save_history},
 		{"add_history",        lbox_console_add_history},
 		{"completion_handler", lbox_console_completion_handler},
 		{NULL, NULL}

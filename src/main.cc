@@ -69,7 +69,6 @@
 #include "cfg.h"
 #include "version.h"
 #include <readline/readline.h>
-#include <readline/history.h>
 #include "title.h"
 #include <libutil.h>
 #include "box/lua/init.h" /* box_lua_init() */
@@ -471,11 +470,6 @@ tarantool_free(void)
 
 	box_free();
 
-	if (history) {
-		write_history(history);
-		clear_history();
-		free(history);
-	}
 	title_free(main_argc, main_argv);
 
 	/* unlink pidfile. */
@@ -598,13 +592,6 @@ main(int argc, char **argv)
 		argc--;
 		script = abspath(argv[0]);
 		title_set_script_name(argv[0]);
-	} else if (isatty(STDIN_FILENO)) {
-		/* load history file */
-		char *home = getenv("HOME");
-		history = (char *) malloc(PATH_MAX);
-		snprintf(history, PATH_MAX, "%s/%s", home,
-			 ".tarantool_history");
-		read_history(history);
 	}
 
 	random_init();
