@@ -386,6 +386,7 @@ box.space.test:drop()
 -- gh-970 gh-971 UPSERT over network
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
+_ = box.space.test:create_index('covering', {type = 'TREE', parts = {1,'unsigned',3,'string',2,'unsigned'}})
 _ = box.space.test:insert{1, 2, "string"}
 c = net:connect(box.cfg.listen)
 c.space.test:select{}
@@ -395,6 +396,11 @@ c.space.test:upsert({2, 4, 'something'}, {{'+', 2, 1}}) -- insert
 c.space.test:select{}
 c.space.test:upsert({2, 4, 'nothing'}, {{'+', 3, 100500}}) -- wrong operation
 c.space.test:select{}
+
+-- gh-1729 net.box index metadata incompatible with local metadata
+c.space.test.index.primary.parts
+c.space.test.index.covering.parts
+
 box.space.test:drop()
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

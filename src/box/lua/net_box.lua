@@ -765,10 +765,10 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
                 local pkfield = index[7 + k * 2]
 
                 local pk = {
-                    type = string.upper(pktype),
-                    fieldno = pkfield
+                    type = pktype,
+                    fieldno = pkfield + 1
                 }
-                idx.parts[k] = pk
+                idx.parts[k + 1] = pk
             end
         else
             for k = 1, #index[PARTS] do
@@ -776,10 +776,10 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
                 local pkfield = index[PARTS][k][1]
 
                 local pk = {
-                    type = string.upper(pktype),
-                    fieldno = pkfield
+                    type = pktype,
+                    fieldno = pkfield + 1
                 }
-                idx.parts[k - 1] = pk
+                idx.parts[k] = pk
             end
             idx.unique = not not index[OPTS].is_unique
         end

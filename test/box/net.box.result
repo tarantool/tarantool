@@ -955,6 +955,9 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 ---
 ...
+_ = box.space.test:create_index('covering', {type = 'TREE', parts = {1,'unsigned',3,'string',2,'unsigned'}})
+---
+...
 _ = box.space.test:insert{1, 2, "string"}
 ---
 ...
@@ -987,6 +990,21 @@ c.space.test:select{}
 ---
 - - [1, 3, 'string']
   - [2, 4, 'something']
+...
+-- gh-1729 net.box index metadata incompatible with local metadata
+c.space.test.index.primary.parts
+---
+- - type: unsigned
+    fieldno: 1
+...
+c.space.test.index.covering.parts
+---
+- - type: unsigned
+    fieldno: 1
+  - type: string
+    fieldno: 3
+  - type: unsigned
+    fieldno: 2
 ...
 box.space.test:drop()
 ---
