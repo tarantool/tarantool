@@ -7500,6 +7500,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->unique_optimization =
 		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
 		vy_stmt_key_is_full(key, index->key_def);
+	itr->unique_optimization = false;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
 	itr->range_ended = false;
@@ -7720,12 +7721,19 @@ restart:
  * return -2 : iterator is not valid anymore
  */
 static int
-vy_merge_iterator_locate(struct vy_merge_iterator *itr)
+vy_merge_iterator_locate(struct vy_merge_iterator *itr,
+			 struct vy_stmt **ret)
 {
+	int rc;
+	*ret = NULL;
 	if (itr->src_count == 0)
 		return 1;
-	if (itr->unique_optimization)
-		return vy_merge_iterator_locate_uniq_opt(itr);
+	if (itr->unique_optimization) {
+		rc = vy_merge_iterator_locate_uniq_opt(itr);
+		if (!rc)
+			*ret = itr->curr_stmt;
+		return rc;
+	}
 	itr->search_started = true;
 	struct vy_stmt *min_stmt = NULL;
 	itr->curr_src = UINT32_MAX;
@@ -7765,30 +7773,12 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr)
 	if (itr->curr_stmt != NULL)
 		vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = min_stmt;
+	*ret = min_stmt;
 	if (min_stmt != NULL) {
 		vy_stmt_ref(itr->curr_stmt);
 		return 0;
 	}
 	return 1;
-}
-
-/**
- * Get current stmt
- * return 0 : something was found
- * return 1 : no more data
- * return -1 : read error
- * return -2 : iterator is not valid anymore
- */
-static int
-vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_stmt **result)
-{
-	if (!itr->search_started) {
-		int rc = vy_merge_iterator_locate(itr);
-		if (rc < 0)
-			return rc;
-	}
-	*result = itr->curr_stmt;
-	return itr->curr_stmt != NULL ? 0 : 1;
 }
 
 /**
@@ -7799,24 +7789,26 @@ vy_merge_iterator_get(struct vy_merge_iterator *itr, struct vy_stmt **result)
  * return -2 : iterator is not valid anymore
  */
 static int
-vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
+vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt **ret)
 {
 	int rc;
+	*ret = NULL;
 	if (!itr->search_started) {
-		rc = vy_merge_iterator_locate(itr);
-		if (rc < 0)
-			return rc;
+		return vy_merge_iterator_locate(itr, ret);
 	}
 	if (itr->is_in_uniq_opt) {
 		itr->is_in_uniq_opt = false;
-		rc = vy_merge_iterator_locate(itr);
+		rc = vy_merge_iterator_locate(itr, ret);
 		if (rc < 0)
 			return rc;
 	}
 	rc = vy_merge_iterator_propagate(itr);
 	if (rc < 0)
 		return rc;
-	return vy_merge_iterator_locate(itr);
+	rc = vy_merge_iterator_locate(itr, ret);
+	if (rc)
+		return rc;
+	return 0;
 }
 
 /**
@@ -7827,13 +7819,12 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr)
  * return -2 : iterator is not valid anymore
  */
 static int
-vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
+vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt **ret)
 {
 	int rc;
+	*ret = NULL;
 	if (!itr->search_started) {
-		rc = vy_merge_iterator_locate(itr);
-		if (rc < 0)
-			return rc;
+		return vy_merge_iterator_locate(itr, ret);
 	}
 	if (itr->curr_src == UINT32_MAX)
 		return 1;
@@ -7850,9 +7841,9 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 		rc = sub_itr->iface->get(sub_itr, &itr->curr_stmt);
 		if (rc < 0)
 			return rc;
-		assert(rc == 0);
 		vy_stmt_ref(itr->curr_stmt);
-		return rc;
+		*ret = itr->curr_stmt;
+		return 0;
 	}
 	for (uint32_t i = itr->curr_src + 1; i < itr->src_count; i++) {
 		rc = vy_merge_iterator_check_version(itr);
@@ -7874,6 +7865,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 					vy_stmt_unref(itr->curr_stmt);
 				itr->curr_stmt = t;
 				vy_stmt_ref(t);
+				*ret = t;
 				return 0;
 			}
 
@@ -7888,6 +7880,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 			if (rc < 0)
 				return rc;
 			vy_stmt_ref(itr->curr_stmt);
+			*ret = itr->curr_stmt;
 			return 0;
 		}
 	}
@@ -7903,6 +7896,8 @@ static int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 			  struct vy_stmt *last_stmt)
 {
+	itr->unique_optimization = false;
+	itr->is_in_uniq_opt = false;
 	int result = 0;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
 		struct vy_stmt_iterator *sub_itr = &itr->src[i].iterator;
@@ -8123,29 +8118,20 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 	struct vy_stmt *stmt = NULL;
 	/* @sa vy_write_iterator declaration for the algorithm description. */
 	while (true) {
-		if (mi->search_started) {
-			/* Do not switch to next on first iteration */
-			if (wi->goto_next_key) {
-				wi->goto_next_key = false;
-				rc = vy_merge_iterator_next_key(mi);
-			} else {
-				rc = vy_merge_iterator_next_lsn(mi);
-				if (rc > 0)
-					rc = vy_merge_iterator_next_key(mi);
-			}
-			if (rc < 0)
-				return rc;
-			if (rc > 0)
-				return 0;
+		if (wi->goto_next_key) {
+			wi->goto_next_key = false;
+			rc = vy_merge_iterator_next_key(mi, &stmt);
+		} else {
+			rc = vy_merge_iterator_next_lsn(mi, &stmt);
+			if (!rc && stmt == NULL)
+				rc = vy_merge_iterator_next_key(mi, &stmt);
 		}
-		rc = vy_merge_iterator_get(mi, &stmt);
-		if (rc < 0)
+		if (rc)
 			return rc;
-		if (rc > 0)
+		if (stmt == NULL)
 			return 0;
 		if (stmt->lsn > wi->oldest_vlsn)
 			break; /* Save the current stmt as the result. */
-
 		wi->goto_next_key = true;
 		if (stmt->flags == SVDELETE && wi->is_last_level)
 			continue; /* Skip unnecessary DELETE */
@@ -8157,12 +8143,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 		vy_stmt_ref(stmt);
 		do {
 			struct vy_stmt *next = NULL;
-			rc = vy_merge_iterator_next_lsn(mi);
-			if (rc < 0)
+			rc = vy_merge_iterator_next_lsn(mi, &next);
+			if (rc)
 				return rc;
-			else if (rc == 0)
-				vy_merge_iterator_get(mi, &next);
-			else if (!wi->is_last_level)
+			if (next == NULL && !wi->is_last_level)
 				break; /* Return the accumulated UPSERT */
 			struct vy_stmt *applied =
 				vy_apply_upsert(stmt, next, wi->index, false);
@@ -8360,27 +8344,15 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 }
 
 /**
- * Conventional wrapper around vy_merge_iterator_get() to automatically
- * re-create the merge iterator on vy_index/vy_range/vy_run changes.
- */
-static int
-vy_read_iterator_merge_get(struct vy_read_iterator *itr, struct vy_stmt **t)
-{
-	int rc;
-	while ((rc = vy_merge_iterator_get(&itr->merge_iterator, t)) == -2)
-		vy_read_iterator_restore(itr);
-	return rc;
-}
-
-/**
  * Conventional wrapper around vy_merge_iterator_next_key() to automatically
  * re-create the merge iterator on vy_index/vy_range/vy_run changes.
  */
 static int
-vy_read_iterator_merge_next_key(struct vy_read_iterator *itr)
+vy_read_iterator_merge_next_key(struct vy_read_iterator *itr, struct vy_stmt **ret)
 {
 	int rc;
-	while ((rc = vy_merge_iterator_next_key(&itr->merge_iterator)) == -2)
+	*ret = NULL;
+	while ((rc = vy_merge_iterator_next_key(&itr->merge_iterator, ret)) == -2)
 		vy_read_iterator_restore(itr);
 	return rc;
 }
@@ -8392,36 +8364,38 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr)
  * return -1 : read error
  */
 int
-vy_read_iterator_next_range(struct vy_read_iterator *itr)
+vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 {
+	*ret = NULL;
 	assert(itr->curr_range != NULL);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->order, itr->key);
 	vy_range_iterator_next(&itr->range_iterator);
 	itr->curr_range = vy_range_iterator_get(&itr->range_iterator);
-	if (itr->curr_range != NULL && itr->order == VINYL_EQ) {
-		struct vy_page_info *min = vy_run_page(itr->curr_range->run, 0);
-		const char *min_key_data = vy_run_min_key(itr->curr_range->run,
-							  min);
+	if (itr->curr_range != NULL && itr->order == VINYL_EQ &&
+	    itr->curr_range->begin) {
+
+		const char *min_key_data = itr->curr_range->begin->data;
 		if (vy_stmt_compare(min_key_data, itr->key,
 				     itr->index->key_def) > 0)
 			itr->curr_range = NULL;
 	}
 	vy_read_iterator_use_range(itr);
 	struct vy_stmt *stmt = NULL;
-	int rc = vy_read_iterator_merge_get(itr, &stmt);
+	int rc = vy_read_iterator_merge_next_key(itr, &stmt);
 	if (rc < 0)
 		return -1;
 	assert(rc >= 0);
-	if (itr->merge_iterator.range_ended && itr->curr_range != NULL)
-		return vy_read_iterator_next_range(itr);
+	if (!stmt && itr->merge_iterator.range_ended && itr->curr_range != NULL)
+		return vy_read_iterator_next_range(itr, ret);
 	if (itr->curr_stmt != NULL)
 		vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = stmt;
 	if (itr->curr_stmt != NULL) {
 		vy_stmt_ref(itr->curr_stmt);
 	}
+	*ret = itr->curr_stmt;
 	return rc;
 }
 
@@ -8435,22 +8409,16 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 {
 	*result = NULL;
 	int rc;
-	if (itr->merge_iterator.search_started) {
-		rc = vy_read_iterator_merge_next_key(itr);
+	struct vy_stmt *t = NULL;
+	while (true) {
+		rc = vy_read_iterator_merge_next_key(itr, &t);
 		if (rc < 0)
 			return -1;
 		if (rc > 0)
 			return 0;
-	}
-	while (true) {
-		struct vy_stmt *t;
 restart:
-		rc = vy_read_iterator_merge_get(itr, &t);
 		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
-			rc = vy_read_iterator_next_range(itr);
-			if (rc == 0) {
-				rc = vy_read_iterator_merge_get(itr, &t);
-			}
+			rc = vy_read_iterator_next_range(itr, &t);
 		}
 		if (rc < 0)
 			return -1; /* error */
@@ -8459,19 +8427,15 @@ restart:
 		assert(rc == 0);
 		vy_stmt_ref(t);
 		while (t->flags & SVUPSERT) {
-			rc = vy_merge_iterator_next_lsn(&itr->merge_iterator);
+			struct vy_stmt *next = NULL;
+			rc = vy_merge_iterator_next_lsn(&itr->merge_iterator, &next);
 			if (rc == -2) {
-				vy_read_iterator_restore(itr);
 				vy_stmt_unref(t);
+				vy_read_iterator_restore(itr);
+				while ((rc = vy_merge_iterator_next_lsn(&itr->merge_iterator, &t)) == -2)
+					vy_read_iterator_restore(itr);
 				goto restart;
 			}
-			if (rc < 0) {
-				vy_stmt_unref(t);
-				return rc;
-			}
-			struct vy_stmt *next = NULL;
-			if (rc == 0)
-				rc = vy_read_iterator_merge_get(itr, &next);
 			if (rc < 0) {
 				vy_stmt_unref(t);
 				return rc;
@@ -8488,12 +8452,6 @@ restart:
 		itr->curr_stmt = t;
 		if (rc != 0 || (itr->curr_stmt->flags & SVDELETE) == 0)
 			break;
-		rc = vy_read_iterator_merge_next_key(itr);
-		if (rc < 0)
-			return -1;
-		if (rc > 0)
-			return 0; /* no more data */
-		assert(rc == 0);
 	}
 	*result = itr->curr_stmt;
 	return 0;
