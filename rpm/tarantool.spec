@@ -69,10 +69,10 @@ License: BSD
 Provides: tarantool-debuginfo = %{version}-%{release}
 Provides: tarantool-common = %{version}-%{release}
 Obsoletes: tarantool-common < 1.6.8.434-1
-# Recommend network configuration files used by `socket` module
+# Add dependency on network configuration files used by `socket` module
 # https://github.com/tarantool/tarantool/issues/1794
-Recommends: /etc/protocols
-Recommends: /etc/services
+Requires: /etc/protocols
+Requires: /etc/services
 URL: http://tarantool.org
 Source0: http://download.tarantool.org/tarantool/1.6/src/tarantool-%{version}.tar.gz
 %description
@@ -205,7 +205,7 @@ chkconfig --del tarantool
 
 %changelog
 * Wed Sep 28 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.6-1
- - Recommend network configuration files used by `socket` module
+ - Add dependency on network configuration files used by `socket` module
 
 * Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
  - Tab-based autocompletion in the interactive console
