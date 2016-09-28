@@ -69,6 +69,10 @@ License: BSD
 Provides: tarantool-debuginfo = %{version}-%{release}
 Provides: tarantool-common = %{version}-%{release}
 Obsoletes: tarantool-common < 1.6.8.434-1
+# Recommend network configuration files used by `socket` module
+# https://github.com/tarantool/tarantool/issues/1794
+Recommends: /etc/protocols
+Recommends: /etc/services
 URL: http://tarantool.org
 Source0: http://download.tarantool.org/tarantool/1.6/src/tarantool-%{version}.tar.gz
 %description
@@ -200,6 +204,9 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Wed Sep 28 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.6-1
+ - Recommend network configuration files used by `socket` module
+
 * Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
  - Tab-based autocompletion in the interactive console
  - LUA_PATH and LUA_CPATH environment variables taken into account
@@ -208,7 +215,7 @@ chkconfig --del tarantool
  - Bugs fixed:
    https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
 
-* Tue Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
+* Thu Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
 - Add support for OpenSSL 1.1
 
 * Tue Feb 09 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.462-1
