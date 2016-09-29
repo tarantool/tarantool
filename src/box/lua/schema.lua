@@ -279,9 +279,9 @@ box.schema.space.create = function(name, options)
     end
     local format = options.format and options.format or {}
     -- filter out global parameters from the options array
-    local space_options = {
-        temporary = options.temporary,
-    }
+    local space_options = setmetatable({
+        temporary = options.temporary and true or nil,
+    }, { __serialize = 'map' })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
     return box.space[id], "created"
