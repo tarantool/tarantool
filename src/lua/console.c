@@ -99,7 +99,8 @@ console_completion_handler(const char *text, int start, int end)
 	 */
 	if (lua_equal(readline_L, -1, lua_upvalueindex(1))) {
 		lua_pop(readline_L, 1);
-		return lua_rl_complete(readline_L, text, start, end);
+		res = lua_rl_complete(readline_L, text, start, end);
+		goto done;
 	}
 
 	/* Slow path - arbitrary completion handler. */
@@ -126,6 +127,10 @@ console_completion_handler(const char *text, int start, int end)
 		lua_pop(readline_L, 1);
 	}
 	lua_pop(readline_L, 1);
+done:
+#if RL_READLINE_VERSION >= 0x0600
+	rl_completion_suppress_append = 1;
+#endif
 	return res;
 }
 
@@ -609,8 +614,5 @@ error:
 	}
 
 	lua_settop(L, savetop);
-#if RL_READLINE_VERSION >= 0x0600
-	rl_completion_suppress_append = 1;
-#endif
 	return ml.list;
 }
