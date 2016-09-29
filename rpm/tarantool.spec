@@ -63,7 +63,7 @@ BuildRequires: python-yaml >= 3.0.9
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
-Version: 1.7.1.0
+Version: 1.7.2.1
 Release: 1%{?dist}
 Group: Applications/Databases
 Summary: In-memory database and Lua application server
@@ -210,6 +210,28 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Thu Sep 29 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.1-1
+ - Vinyl - a new write-optimized storage engine, allowing the amount of
+   data stored to exceed the amount of available RAM 10-100x times.
+ - A new binary protocol command for CALL, which no more restricts a function
+   to returning an array of tuples and allows returning an arbitrary
+   MsgPack/JSON result, including scalars, nil and void (nothing).
+ - Automatic replication cluster bootstrap; it's now much easier to configure
+   a new replication cluster.
+ - New indexable data types: unsigned, integer, number and scalar.
+ - memtx snapshots and xlog files are now compressed on the fly using the
+   fast ZStandard compression algorithm. Compression options are configured
+   automatically to get an optimal trade-off between CPU utilization and disk
+   throughput.
+ - fiber.cond() - a new synchronization mechanism for fibers.
+ - Tab-based autocompletion in the interactive console.
+ - A new implementation of net.box improving performance and solving
+   problems with the garbage collection of dead connections.
+ - Native systemd integration alongside sysvinit.
+ - A ready-to-use 'example.lua' instance enable by default.
+ - Dozens of bugfixes:
+   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
+
 * Wed Sep 28 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.6-1
  - Add dependency on network configuration files used by `socket` module
 

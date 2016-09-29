@@ -1,9 +1,27 @@
-tarantool (1.7.1.493.g499634d-1) unstable; urgency=medium
+tarantool (1.7.2.1.g92ed6c4-1) unstable; urgency=medium
 
-  * Enable systemd integration, fix sysvinit + systemd interoperability.
-  * Start 'example.lua' instance by default on 'localhost:3301'.
+  * Vinyl - a new write-optimized storage engine, allowing the amount of
+    data stored to exceed the amount of available RAM 10-100x times.
+  * A new binary protocol command for CALL, which no more restricts a function
+    to returning an array of tuples and allows returning an arbitrary
+    MsgPack/JSON result, including scalars, nil and void (nothing).
+  * New indexable data types: unsigned, integer, number and scalar.
+  * Automatic replication cluster bootstrap; it's now much easier to configure
+    a new replication cluster.
+  * memtx snapshots and xlog files are now compressed on the fly using the
+    fast ZStandard compression algorithm. Compression options are configured
+    automatically to get an optimal trade-off between CPU utilization and disk
+    throughput.
+  * fiber.cond() - a new synchronization mechanism for fibers.
+  * Tab-based autocompletion in the interactive console.
+  * A new implementation of net.box improving performance and solving
+    problems with the garbage collection of dead connections.
+  * Native systemd support alongside sysvinit.
+  * A ready-to-use 'example.lua' instance enable by default.
+  * Dozens of bugfixes:
+    https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
 
- -- Roman Tsisyk <roman@tarantool.org>  Wed, 28 Sep 2016 19:47:26 +0300
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 29 Sep 2016 12:00:00 +0300
 
 tarantool (1.6.9.6.g660e882-1) unstable; urgency=medium
 
