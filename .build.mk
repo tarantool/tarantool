@@ -28,4 +28,4 @@ travis_deps_osx:
 travis_test_osx: travis_deps_osx
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j8
-	cd test && python test-run.py
+	cd test && python test-run.py unit/ app/ app-tap/ box/ box-tap/
