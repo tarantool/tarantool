@@ -108,12 +108,12 @@ console_completion_handler(const char *text, int start, int end)
 	lua_pushinteger(readline_L, start);
 	lua_pushinteger(readline_L, end);
 	if (lua_pcall(readline_L, 3, 1, 0) != 0 ||
-	    !lua_istable(readline_L, -1)) {
+	    !lua_istable(readline_L, -1) ||
+	    (n = lua_objlen(readline_L, -1)) == 0) {
 
 		lua_pop(readline_L, 1);
 		return NULL;
 	}
-	n = lua_objlen(readline_L, -1);
 	res = malloc(sizeof(res[0]) * (n + 1));
 	if (res == NULL) {
 		lua_pop(readline_L, 1);
