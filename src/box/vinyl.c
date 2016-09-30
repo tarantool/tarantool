@@ -2423,6 +2423,14 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	int fd = *p_fd;
 	bool created = false;
 
+	/*
+	 * All keys before the split_key could have cancelled each other.
+	 * Do not create an empty range file in this case.
+	 */
+	if (split_key != NULL && vy_stmt_compare((*stmt)->data, split_key->data,
+						 index->key_def) >= 0)
+		return 0;
+
 	if (fd < 0) {
 		/*
 		 * The range hasn't been written to yet and hence
