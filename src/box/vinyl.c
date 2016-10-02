@@ -3722,63 +3722,61 @@ vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct vy_env *env = scheduler->env;
-
+	int workers_available = scheduler->worker_pool_size;
 	bool warning_said = false;
+
 	while (scheduler->is_worker_pool_running) {
-		/* Get task */
-		struct vy_task *task = NULL;
-		int rc = vy_schedule(scheduler, env->xm->vlsn, &task);
-		if (rc != 0){
-			/* Log error message once */
-			if (! warning_said) {
-				error_log(diag_last_error(diag_get()));
-				warning_said = true;
-			}
-		}
-		assert(rc == 0);
-
-		tt_pthread_mutex_lock(&scheduler->mutex);
-
-		/* Swap output queue */
 		struct stailq output_queue;
+		struct vy_task *task, *next;
+		bool was_empty;
+
+		/* Get the list of processed tasks. */
 		stailq_create(&output_queue);
-		stailq_splice(&scheduler->output_queue,
-			      stailq_first(&scheduler->output_queue),
-			      &output_queue);
-
-		if (task != NULL) {
-			/* Queue task */
-			bool was_empty = stailq_empty(&scheduler->input_queue);
-			stailq_add_tail_entry(&scheduler->input_queue, task,
-					      link);
-			if (was_empty)                  /* Notify workers */
-				tt_pthread_cond_signal(&scheduler->worker_cond);
-			warning_said = false;
-		}
-
+		tt_pthread_mutex_lock(&scheduler->mutex);
+		stailq_concat(&output_queue, &scheduler->output_queue);
 		tt_pthread_mutex_unlock(&scheduler->mutex);
 
-		/* Complete and delete all processed tasks */
-		struct vy_task *next;
+		/* Complete and delete all processed tasks. */
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
 			if (task->ops->complete && task->ops->complete(task))
 				error_log(diag_last_error(diag_get()));
 			vy_task_delete(&scheduler->task_pool, task);
+			workers_available++;
+			assert(workers_available <= scheduler->worker_pool_size);
 		}
 
-		if (!stailq_empty(&output_queue)) {
-			/*
-			 * At least one task has been processed and
-			 * initial conditions may have been changed.
-			 * For example, VY_DUMP task increases run_count and
-			 * may be followed by VY_COMPACT task.
-			 * Don't wait for a while and re-run scheduler
-			 * on the next event loop iteration.
-			 */
-			fiber_reschedule();
-			continue;
+		/* All worker threads are busy. */
+		if (workers_available == 0)
+			goto wait;
+
+		/* Get a task to schedule. */
+		if (vy_schedule(scheduler, env->xm->vlsn, &task) != 0) {
+			/* Log error message once. */
+			if (!warning_said) {
+				error_log(diag_last_error(diag_get()));
+				warning_said = true;
+			}
+			assert(0);
 		}
 
+		/* Nothing to do. */
+		if (task == NULL)
+			goto wait;
+
+		/* Queue the task and notify workers if necessary. */
+		tt_pthread_mutex_lock(&scheduler->mutex);
+		was_empty = stailq_empty(&scheduler->input_queue);
+		stailq_add_tail_entry(&scheduler->input_queue, task, link);
+		if (was_empty)
+			tt_pthread_cond_signal(&scheduler->worker_cond);
+		tt_pthread_mutex_unlock(&scheduler->mutex);
+
+		workers_available--;
+		warning_said = false;
+
+		fiber_reschedule();
+		continue;
+wait:
 		/* Wait for changes */
 		ipc_cond_wait(&scheduler->scheduler_cond);
 	}
