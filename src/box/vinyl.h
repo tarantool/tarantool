@@ -83,9 +83,6 @@ vy_checkpoint(struct vy_env *env);
 void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);
 
-void
-vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock);
-
 /*
  * Introspection
  */

@@ -3959,8 +3959,6 @@ vy_index_gc(struct vy_index *index)
 	struct mh_i32ptr_t *ranges = NULL;
 	DIR *dir = NULL;
 
-	ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto error;});
-
 	ranges = mh_i32ptr_new();
 	if (ranges == NULL)
 		goto error;
@@ -4027,16 +4025,6 @@ end:
 		closedir(dir);
 	if (ranges != NULL)
 		mh_i32ptr_delete(ranges);
-}
-
-void
-vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
-{
-	(void)vclock;
-	struct vy_index *index;
-
-	rlist_foreach_entry(index, &env->indexes, link)
-		vy_index_gc(index);
 }
 
 /* Scheduler }}} */
@@ -5461,6 +5449,10 @@ vy_end_recovery(struct vy_env *e)
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
+
+	struct vy_index *index;
+	rlist_foreach_entry(index, &e->indexes, link)
+		vy_index_gc(index);
 
 	/* Start scheduler if there is at least one index */
 	if (!rlist_empty(&e->indexes))

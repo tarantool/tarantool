@@ -306,9 +306,3 @@ VinylEngine::waitCheckpoint(struct vclock* vclock)
 	vy_wait_checkpoint(env, vclock);
 	return 0;
 }
-
-void
-VinylEngine::commitCheckpoint(struct vclock* vclock)
-{
-	vy_commit_checkpoint(env, vclock);
-}
