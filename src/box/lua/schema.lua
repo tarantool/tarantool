@@ -969,13 +969,13 @@ function box.schema.space.bless(space)
         return space:insert(tuple)
     end
 
-    space_mt.pairs = function(space, key)
+    space_mt.pairs = function(space, key, opts)
         if space.index[0] == nil then
             -- empty space without indexes, return empty iterator
             return fun.iter({})
         end
         check_index(space, 0)
-        return space.index[0]:pairs(key)
+        return space.index[0]:pairs(key, opts)
     end
     space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility

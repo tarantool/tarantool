@@ -244,5 +244,14 @@ gen(param, state)
 
 space:drop()
 
+-- gh-1801 space:pairs() don't pass arguments to index:pairs()
+space = box.schema.space.create('test')
+pk = space:create_index('primary')
+space:replace({1})
+space:replace({2})
+space:replace({3})
+space:replace({4})
+space:pairs(2, { iterator = 'GE' }):totable()
+space:drop()
 
 inspector:cmd("clear filter")
