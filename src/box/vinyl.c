@@ -7717,6 +7717,69 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
  * The write iterator merges multiple stmt sources into one,
  * squashing multiple upserts on the same key and filtering out
  * replaces older than purge lsn.
+ *
+ * The purge LSN is such number that tuples with bigger LSN still can be used in
+ * some transactions. The bigger tuple LSN the newer this tuple is.
+ * If the tuple LSN is bigger than the purge LSN then there may be an opened
+ * transaction which needs to see this tuple and newer.
+ * If the tuple LSN less or equal to the purge LSN then there aren't opened
+ * transactions that need to see the state before this tuple. The tuple itself
+ * can be neccessary when a transaction needs to see the state newer than this
+ * tuple but older than any tuple with LSN less than the purge. For example, let
+ * the purge LSN = 100 and the tuples LSN stack is 103, 102, 90. If a transaction
+ * needs to see 101 then the tuple with LSN 90 must be visible for it.
+ *
+ * Regardless of compaction or dumping the write iterator must return tuples
+ * with LSNs newer than the purge LSN. It's neccessary for existing transactions
+ * that maybe need to see the state before any of this tuples. After all tuples
+ * with LSNs newer than the purge LSN are returned, it is neccessary either merge in
+ * a single tuple other tuples or return nothing. Consider reasons why the
+ * merge is possible and why sometimes possible to return nothing.
+ *
+ * Merge in the single tuple always is possible because there aren't opened
+ * transactions that need to see the state older or equal to the purge LSN. That is
+ * to opened transactions only the final result of applying tuples older or
+ * equal to the purge LSN is important.
+ *
+ * There are situations when tuples with LSNs older or equal to the purge LSN
+ * can be rejected at all. It is possible when
+ *  - the oldest tuple of those which are newer than the purge LSN makes REPLACE
+ *   and the next following on decrease of LSN makes DELETE. In that case even
+ *   if there is an opened transaction with VLSN between this tuples and bigger
+ *   than the purge LSN, absense of DELETE and older tuples results in the same case
+ *   as presense of DELETE.
+ *   ┃     ...     ┃       ┃     ...     ┃
+ *   ┃   REPLACE   ┃       ┃   REPLACE   ┃
+ *   ┃             ┃       ┃             ┃    ↑
+ *   ┣━ purge lsn ━┫   =   ┣━ purge lsn ━┫    ↑ lsn
+ *   ┃             ┃       ┗━━━━━━━━━━━━━┛    ↑
+ *   ┃   DELETE    ┃
+ *   ┃     ...     ┃
+ *
+ *  - the oldest tuple of those which are newer than the purge LSN makes DELETE
+ *   and the next following on decrease of LSN makes DELETE. This case is the
+ *    same as previous.
+ *
+ * In other cases tuples older or equal to the purge LSN will be merged in the single
+ * tuple and returned. Merge works by following rules:
+ * 1) the top of the tuples stack is REPLACE
+ *   1.1) UPSERTs wasn't met before, then return REPLACE as is and go to the next key.
+ *   1.2) else apply UPSERTs to REPLACE, return the result and go to the next key.
+ * 2) the top of the tuples stack is DELETE
+ *    2.1) at least one UPSERT was met before, then turn the nearest UPSERT to REPLACE
+ *         and continue from 1.
+ *    2.2) else
+ *       2.2.1) if the current write iterator works in run dumping then return DELETE,
+ *              because it can affect on older runs, and go to the next key.
+ *       2.2.2) else write iterator works in compaction then DELETE with older tuples
+ *              can be rejected at all, because compaction works at once with all runs
+ *              and no need to keep DELETE for older runs. Further go to the next key.
+ * 3) the top of the tuples stack is UPSERT
+ *    3.1) UPSERT was met before - merge two UPSERTs in one and go to the next LSN.
+ *    3.2) else go to the next LSN
+ * 4) the stack is empty
+ *    4.1) if UPSERTs wasn't met before then go to the next key.
+ *    4.2) else merge UPSERTs and return them as the single tuple.
  */
 struct vy_write_iterator {
 	struct vy_index *index;
