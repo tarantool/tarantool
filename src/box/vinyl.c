@@ -1379,7 +1379,8 @@ rb_gen_ext_key(, vy_range_tree_, vy_range_tree_t, struct vy_range, tree_node,
 		 vy_range_tree_cmp, struct vy_range_tree_key *,
 		 vy_range_tree_key_cmp);
 
-static int vy_range_delete(struct vy_range *);
+static void
+vy_range_delete(struct vy_range *);
 
 struct vy_range *
 vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
@@ -2166,16 +2167,6 @@ vy_range_new(struct vy_index *index, int64_t id)
 	return range;
 }
 
-static int
-vy_range_close(struct vy_range *range)
-{
-	if (range->fd >= 0 && close(range->fd) < 0) {
-		vy_error("index file close error: %s", strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
 /**
  * Raw read range file
  */
@@ -2345,13 +2336,11 @@ vy_range_delete_mems(struct vy_range *range)
 	}
 }
 
-static int
+static void
 vy_range_delete(struct vy_range *range)
 {
 	assert(range->nodedump.pos == UINT32_MAX);
 	assert(range->nodecompact.pos == UINT32_MAX);
-
-	int rcret = 0;
 
 	if (range->begin)
 		vy_stmt_unref(range->begin);
@@ -2361,11 +2350,11 @@ vy_range_delete(struct vy_range *range)
 	vy_range_delete_runs(range);
 	vy_range_delete_mems(range);
 
-	if (vy_range_close(range))
-		rcret = -1;
+	if (range->fd >= 0 && close(range->fd) != 0)
+		say_syserror("failed to close range file %s", range->path);
+
 	TRASH(range);
 	free(range);
-	return rcret;
 }
 
 static int
