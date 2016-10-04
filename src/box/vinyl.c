@@ -725,7 +725,10 @@ struct vy_range {
 	struct vy_stmt *end;
 	struct vy_index *index;
 	uint64_t   update_time;
-	uint32_t   used; /* sum of mem->used */
+	/** Total amount of memory used by this range (sum of mem->used). */
+	uint32_t used;
+	/** Minimal in-memory lsn (min over mem->min_lsn). */
+	int64_t min_lsn;
 	struct vy_run  *run;
 	uint32_t   run_count;
 	struct vy_mem *mem;
@@ -1306,17 +1309,6 @@ vy_pread_file(int fd, void *buf, size_t size, off_t offset)
 		pos += readen;
 	}
 	return pos;
-}
-
-static int64_t
-vy_range_mem_min_lsn(struct vy_range *range)
-{
-	int64_t min_lsn = INT64_MAX;
-	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
-		if (mem->min_lsn < min_lsn)
-			min_lsn = mem->min_lsn;
-	}
-	return min_lsn;
 }
 
 static int
@@ -2144,6 +2136,7 @@ vy_range_new(struct vy_index *index, int64_t id)
 		free(range);
 		return NULL;
 	}
+	range->min_lsn = range->mem->min_lsn;
 	if (id != 0) {
 		range->id = id;
 		/** Recovering an existing range from disk. Update
@@ -2646,6 +2639,8 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 			range->mem = r->mem;
 			range->mem_count++;
 			range->used += r->used;
+			if (range->min_lsn > r->min_lsn)
+				range->min_lsn = r->min_lsn;
 			r->mem = NULL;
 		}
 
@@ -3044,6 +3039,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 		/* update range */
+		if (range->used == 0)
+			range->min_lsn = stmt->lsn;
+		assert(range->min_lsn <= stmt->lsn);
 		range->used += vy_stmt_size(stmt);
 		quota += vy_stmt_size(stmt);
 	}
@@ -3197,6 +3195,7 @@ vy_task_dump_complete(struct vy_task *task)
 	mem = range->mem->next;
 	range->mem->next = NULL;
 	range->mem_count = 1;
+	range->min_lsn = range->mem->min_lsn;
 	while (mem) {
 		struct vy_mem *next = mem->next;
 		assert(range->used >= mem->used);
@@ -3566,7 +3565,7 @@ vy_scheduler_peek_checkpoint(struct vy_scheduler *scheduler,
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (vy_range_mem_min_lsn(range) > checkpoint_lsn)
+		if (range->min_lsn > checkpoint_lsn)
 			continue;
 		if (range->used == 0)
 			continue;
@@ -3921,7 +3920,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			struct vy_range *range;
 			range = vy_range_tree_first(&index->tree);
 			while (range) {
-				is_active |= (vy_range_mem_min_lsn(range) <=
+				is_active |= (range->min_lsn <=
 					      scheduler->checkpoint_lsn);
 				range = vy_range_tree_next(&index->tree, range);
 			}
