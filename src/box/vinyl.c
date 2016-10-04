@@ -7714,80 +7714,81 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 /* {{{ Write iterator */
 
 /**
- * The write iterator merges multiple stmt sources into one,
- * squashing multiple upserts on the same key and filtering out
- * replaces older than purge lsn.
+ * The write iterator merges multiple operations for the same key,
+ * squashing UPSERTs and filtering out old REPLACEs and DELETEs.
  *
- * The purge LSN is such number that tuples with bigger LSN still can be used in
- * some transactions. The bigger tuple LSN the newer this tuple is.
- * If the tuple LSN is bigger than the purge LSN then there may be an opened
- * transaction which needs to see this tuple and newer.
- * If the tuple LSN less or equal to the purge LSN then there aren't opened
- * transactions that need to see the state before this tuple. The tuple itself
- * can be neccessary when a transaction needs to see the state newer than this
- * tuple but older than any tuple with LSN less than the purge. For example, let
- * the purge LSN = 100 and the tuples LSN stack is 103, 102, 90. If a transaction
- * needs to see 101 then the tuple with LSN 90 must be visible for it.
+ * The merge process works by the following algorithm:
  *
- * Regardless of compaction or dumping the write iterator must return tuples
- * with LSNs newer than the purge LSN. It's neccessary for existing transactions
- * that maybe need to see the state before any of this tuples. After all tuples
- * with LSNs newer than the purge LSN are returned, it is neccessary either merge in
- * a single tuple other tuples or return nothing. Consider reasons why the
- * merge is possible and why sometimes possible to return nothing.
+ * 1) REPLACE is on the top of the merge stack:
  *
- * Merge in the single tuple always is possible because there aren't opened
- * transactions that need to see the state older or equal to the purge LSN. That is
- * to opened transactions only the final result of applying tuples older or
- * equal to the purge LSN is important.
+ *   1.1) If there was an UPSERT for this key then apply it to REPLACE and
+ *        switch to the next key.
  *
- * There are situations when tuples with LSNs older or equal to the purge LSN
- * can be rejected at all. It is possible when
- *  - the oldest tuple of those which are newer than the purge LSN makes REPLACE
- *   and the next following on decrease of LSN makes DELETE. In that case even
- *   if there is an opened transaction with VLSN between this tuples and bigger
- *   than the purge LSN, absense of DELETE and older tuples results in the same case
- *   as presense of DELETE.
- *   ┃     ...     ┃       ┃     ...     ┃
- *   ┃   REPLACE   ┃       ┃   REPLACE   ┃
- *   ┃             ┃       ┃             ┃    ↑
- *   ┣━ purge lsn ━┫   =   ┣━ purge lsn ━┫    ↑ lsn
- *   ┃             ┃       ┗━━━━━━━━━━━━━┛    ↑
- *   ┃   DELETE    ┃
- *   ┃     ...     ┃
+ *   1.2) Otherwise return REPLACE as is and then switch to the next key.
  *
- *  - the oldest tuple of those which are newer than the purge LSN makes DELETE
- *   and the next following on decrease of LSN makes DELETE. This case is the
- *    same as previous.
+ * 2) DELETE is on the top of the merge stack:
  *
- * In other cases tuples older or equal to the purge LSN will be merged in the single
- * tuple and returned. Merge works by following rules:
- * 1) the top of the tuples stack is REPLACE
- *   1.1) UPSERTs wasn't met before, then return REPLACE as is and go to the next key.
- *   1.2) else apply UPSERTs to REPLACE, return the result and go to the next key.
- * 2) the top of the tuples stack is DELETE
- *    2.1) at least one UPSERT was met before, then turn the nearest UPSERT to REPLACE
- *         and continue from 1.
- *    2.2) else
- *       2.2.1) if the current write iterator works in run dumping then return DELETE,
- *              because it can affect on older runs, and go to the next key.
- *       2.2.2) else write iterator works in compaction then DELETE with older tuples
- *              can be rejected at all, because compaction works at once with all runs
- *              and no need to keep DELETE for older runs. Further go to the next key.
- * 3) the top of the tuples stack is UPSERT
- *    3.1) UPSERT was met before - merge two UPSERTs in one and go to the next LSN.
- *    3.2) else go to the next LSN
- * 4) the stack is empty
- *    4.1) if UPSERTs wasn't met before then go to the next key.
- *    4.2) else merge UPSERTs and return them as the single tuple.
+ *    2.1) If there was an UPSERT operation before then convert it
+ *         to REPLACE, push instead of DELETE to the top of the stack and
+ *         continue from the step 1.
+ *
+ *    2.2) Otherwise
+ *
+ *       2.2.1) If the write iterator is used for run dumping then return
+ *              DELETE as is, because it can affect older runs.
+ *              Switch to the next key.
+ *       2.2.2) If the write iterator is used for compation then there is
+ *              no need to keep DELETEs for older runs. Discard DELETE and
+ *              switch to the next key.
+ *
+ * 3) UPSERT is on the top of the merge stack:
+ *
+ *    3.1) If there was an UPSERT before then merge all UPSERTs into the
+ *         single UPSERT statement and then switch to the next LSN.
+ *
+ *    3.2) Otherwise switch to the next LSN.
+ *
+ * 4) The merge stack is empty:
+ *
+ *    4.1) If there was an UPSERT before then go to the next key.
+ *    4.2) Otherwise merge UPSERTs into the single UPSERT statement and
+ *         return it.
  */
 struct vy_write_iterator {
 	struct vy_index *index;
 	/*
-	 * If the current stmt LSN is bigger than purge_lsn then
-	 * it could be visible to an active transaction and must
-	 * be preserved in the output. Otherwise it can be dropped
-	 * if a newer version of the stmt exists.
+	 * The minimal LSN of active transactions, i.e. there are no open
+	 * transactions with lsn <= purge_lsn at the time of iterator creation.
+	 *
+	 * The write iterator must preserve in the output all statements
+	 * with lsn > purge_lsn and the latest statement with lsn <= purge_lsn.
+	 * In other words, it is safe to prune all statements with
+	 * lsn <= purge_lsn **except** the latest one. For example, if
+	 * purge_lsn is 100 and there are 103, 102, 90, 80, 70 statements
+	 * on the stack, then 90, 80 and 70 can be merged into the single
+	 * statement with lsn=90.
+	 *
+	 * There are two cases when it is also possible to prune **all**
+	 * statements with lsn <= purge_lsn:
+	 *
+	 *  - The latest statement with lsn1 <= purge_lsn is DELETE and
+	 *    this DELETE is followed by a REPLACE statement with
+	 *    lsn2 > purge_lsn >= lsn1. In this case the absence of DELETE is
+	 *    equivalent to the presence of DELETE in the point of view of
+	 *    active transactions.
+	 *
+	 *     ┃     ...     ┃       ┃     ...     ┃
+	 *     ┃   REPLACE   ┃       ┃   REPLACE   ┃
+	 *     ┃             ┃       ┃             ┃    ↑
+	 *     ┣━ purge lsn ━┫   =   ┣━ purge lsn ━┫    ↑ lsn
+	 *     ┃             ┃       ┗━━━━━━━━━━━━━┛    ↑
+	 *     ┃   DELETE    ┃
+	 *     ┃     ...     ┃
+	 *
+	 *  - The latest statement with lsn1 <= purge_lsn is DELETE and it is
+	 *    followed by a DELETE statement. In this case the first DELETE
+	 *    statement can be safely replaced by the second one.
+	 *
 	 * @sa vy_write_iterator_next
 	 */
 	int64_t purge_lsn;
