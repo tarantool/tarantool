@@ -592,22 +592,6 @@ vy_mem_delete(struct vy_mem *index)
 	free(index);
 }
 
-static int
-vy_mem_set(struct vy_mem *index, struct vy_stmt *v)
-{
-	/* see struct vy_mem comments */
-	assert(index == index->tree.arg);
-	if (vy_mem_tree_insert(&index->tree, v, NULL) != 0)
-		return -1;
-	index->version++;
-	/* sic: sync this value with vy_range->used */
-	index->used += vy_stmt_size(v);
-	if (index->min_lsn > v->lsn)
-		index->min_lsn = v->lsn;
-	vy_stmt_ref(v);
-	return 0;
-}
-
 /**
  * The footprint of run metadata on disk.
  * Run metadata is a set of packed data structures which are
@@ -1354,6 +1338,10 @@ static void
 vy_scheduler_update_range(struct vy_scheduler *, struct vy_range *range);
 static void
 vy_scheduler_remove_range(struct vy_scheduler *, struct vy_range*);
+static void
+vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem);
+static void
+vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem);
 
 struct vy_range_tree_key {
 	char *data;
@@ -2317,15 +2305,34 @@ vy_range_delete_runs(struct vy_range *range)
 	}
 }
 
+/*
+ * If delete_all is unset, only shadow in-memory indexes are destroyed.
+ */
 static void
-vy_range_delete_mems(struct vy_range *range)
+vy_range_delete_mems(struct vy_range *range, bool delete_all)
 {
-	struct vy_mem *p = range->mem;
-	struct vy_mem *next = NULL;
-	while (p) {
-		next = p->next;
-		vy_mem_delete(p);
-		p = next;
+	struct vy_env *env = range->index->env;
+	struct vy_mem *mem;
+
+	if (delete_all) {
+		mem = range->mem;
+		range->mem = NULL;
+		range->mem_count = 0;
+		range->used = 0;
+		range->min_lsn = INT64_MAX;
+	} else {
+		mem = range->mem->next;
+		range->mem->next = NULL;
+		range->mem_count = 1;
+		range->used = range->mem->used;
+		range->min_lsn = range->mem->min_lsn;
+	}
+	while (mem != NULL) {
+		struct vy_mem *next = mem->next;
+		vy_scheduler_mem_dumped(env->scheduler, mem);
+		vy_quota_release(env->quota, mem->used);
+		vy_mem_delete(mem);
+		mem = next;
 	}
 }
 
@@ -2341,7 +2348,7 @@ vy_range_delete(struct vy_range *range)
 		vy_stmt_unref(range->end);
 
 	vy_range_delete_runs(range);
-	vy_range_delete_mems(range);
+	vy_range_delete_mems(range, true);
 
 	if (range->fd >= 0 && close(range->fd) != 0)
 		say_syserror("failed to close range file %s", range->path);
@@ -2612,7 +2619,6 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
 	index->range_index_version++;
-	vy_quota_release(index->env->quota, range->used);
 	vy_range_delete(range);
 }
 
@@ -2996,6 +3002,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	 enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *prev_range = NULL;
 	struct vy_range *range = NULL;
 	size_t quota = 0;
@@ -3030,24 +3037,40 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 			 * keys for this range.
 			 */
 			prev_range->update_time = time;
-			vy_scheduler_update_range(index->env->scheduler,
-						  prev_range);
+			vy_scheduler_update_range(scheduler, prev_range);
 		}
 		prev_range = range;
-		/* insert into range index */
-		int rc = vy_mem_set(range->mem, stmt);
+
+		/*
+		 * Insert the new statement to the range's
+		 * in-memory index.
+		 */
+		struct vy_mem *mem = range->mem;
+		int rc = vy_mem_tree_insert(&mem->tree, stmt, NULL);
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
-		/* update range */
+		vy_stmt_ref(stmt);
+
+		if (mem->used == 0) {
+			mem->min_lsn = stmt->lsn;
+			vy_scheduler_mem_dirtied(scheduler, mem);
+		}
 		if (range->used == 0)
 			range->min_lsn = stmt->lsn;
+
+		assert(mem->min_lsn <= stmt->lsn);
 		assert(range->min_lsn <= stmt->lsn);
-		range->used += vy_stmt_size(stmt);
-		quota += vy_stmt_size(stmt);
+
+		size_t size = vy_stmt_size(stmt);
+		mem->used += size;
+		range->used += size;
+		quota += size;
+
+		mem->version++;
 	}
 	if (range != NULL) {
 		range->update_time = time;
-		vy_scheduler_update_range(index->env->scheduler, range);
+		vy_scheduler_update_range(scheduler, range);
 	}
 	/* Take quota after having unlocked the index mutex. */
 	vy_quota_use(index->env->quota, quota);
@@ -3173,7 +3196,6 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->dump.range;
 	struct vy_run *run = task->dump.new_run;
-	struct vy_mem *mem;
 
 	/*
 	 * No need to roll back anything on dump failure - the range will just
@@ -3192,18 +3214,7 @@ vy_task_dump_complete(struct vy_task *task)
 	index->range_index_version++;
 
 	/* Release dumped in-memory indexes */
-	mem = range->mem->next;
-	range->mem->next = NULL;
-	range->mem_count = 1;
-	range->min_lsn = range->mem->min_lsn;
-	while (mem) {
-		struct vy_mem *next = mem->next;
-		assert(range->used >= mem->used);
-		range->used -= mem->used;
-		vy_quota_release(index->env->quota, mem->used);
-		vy_mem_delete(mem);
-		mem = next;
-	}
+	vy_range_delete_mems(range, false);
 out:
 	vy_scheduler_add_range(index->env->scheduler, range);
 	return 0;
@@ -3418,7 +3429,6 @@ heap_compact_less(struct heap_node *a, struct heap_node *b)
 
 struct vy_scheduler {
 	pthread_mutex_t        mutex;
-	int64_t       checkpoint_lsn;
 	struct rlist   shutdown;
 	struct vy_env    *env;
 	heap_t dump_heap;
@@ -3456,6 +3466,24 @@ struct vy_scheduler {
 	 * A memory pool for vy_tasks.
 	 */
 	struct mempool task_pool;
+
+	/** Total number of non-empty in-memory indexes. */
+	int dirty_mem_count;
+	/**
+	 * LSN at the time of checkpoint start. All in-memory indexes with
+	 * min_lsn <= checkpoint_lsn should be dumped first.
+	 */
+	int64_t checkpoint_lsn;
+	/**
+	 * Number of in-memory indexes that need to be checkpointed,
+	 * i.e. have min_lsn <= checkpoint_lsn.
+	 */
+	int checkpoint_pending;
+	/**
+	 * Signaled on checkpoint completion, i.e. when
+	 * checkpoint_pending reaches 0.
+	 */
+	struct ipc_cond checkpoint_cond;
 };
 
 static void
@@ -3483,7 +3511,10 @@ vy_scheduler_new(struct vy_env *env)
 		return NULL;
 	}
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
+	scheduler->dirty_mem_count = 0;
 	scheduler->checkpoint_lsn = 0;
+	scheduler->checkpoint_pending = 0;
+	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
 	rlist_create(&scheduler->shutdown);
 	vy_compact_heap_create(&scheduler->compact_heap);
@@ -3859,19 +3890,53 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	stailq_create(&scheduler->output_queue);
 }
 
+static void
+vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
+{
+	(void)mem;
+	scheduler->dirty_mem_count++;
+}
+
+static void
+vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
+{
+	if (mem->used == 0)
+		return;
+
+	assert(scheduler->dirty_mem_count > 0);
+	scheduler->dirty_mem_count--;
+
+	if (mem->min_lsn <= scheduler->checkpoint_lsn) {
+		/*
+		 * The in-memory index was dirtied before checkpoint was
+		 * initiated and hence it contributes to checkpoint_pending.
+		 */
+		assert(scheduler->checkpoint_pending > 0);
+		if (--scheduler->checkpoint_pending == 0)
+			ipc_cond_signal(&scheduler->checkpoint_cond);
+	}
+}
+
 /*
  * Schedule checkpoint. Please call vy_wait_checkpoint() after that.
  */
 int
 vy_checkpoint(struct vy_env *env)
 {
-	int64_t lsn = env->xm->lsn;
 	struct vy_scheduler *scheduler = env->scheduler;
 	/* do not initiate checkpoint during bootstrap,
 	 * thread pool is not up yet */
 	if (!scheduler->is_worker_pool_running)
 		return 0;
-	scheduler->checkpoint_lsn = lsn;
+	scheduler->checkpoint_lsn = env->xm->lsn;
+	/*
+	 * As LSN is increased on each insertion, all in-memory indexes
+	 * that are currently not empty have min_lsn <= checkpoint_lsn
+	 * while indexes that appear after this point will have min_lsn
+	 * greater than checkpoint_lsn. So the number of indexes we need
+	 * to dump equals dirty_mem_count.
+	 */
+	scheduler->checkpoint_pending = scheduler->dirty_mem_count;
 	/*
 	 * Promote ranges that need to be checkpointed to
 	 * the top of the dump heap.
@@ -3888,28 +3953,11 @@ void
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	(void)vclock;
-	for (;;) {
-		bool is_active = false;
-		struct vy_index *index;
-		/* iterate over all indexes */
-		rlist_foreach_entry(index, &env->indexes, link) {
-			/*
-			 * check that all ranges of index have lsn
-			 * greater than checkpoint_lsn
-			 */
-			struct vy_range *range;
-			range = vy_range_tree_first(&index->tree);
-			while (range) {
-				if (vy_range_need_checkpoint(range))
-					is_active = true;
-				range = vy_range_tree_next(&index->tree, range);
-			}
-		}
-		if (!is_active)
-			break;
-		/* TODO: use channel here */
-		fiber_sleep(.020);
-	}
+	struct vy_scheduler *scheduler = env->scheduler;
+
+	/* TODO: handle dump errors. */
+	while (scheduler->checkpoint_pending > 0)
+		ipc_cond_wait(&scheduler->checkpoint_cond);
 }
 
 /**
