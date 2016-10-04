@@ -21,6 +21,9 @@ struct test_type {
 	struct heap_node node;
 };
 
+/* If set, order by test_type->val2, otherwise by test_type->val1. */
+static bool order_by_val2;
+
 int test_type_less(const heap_t *heap,
 		   const struct heap_node *a,
 		   const struct heap_node *b) {
@@ -29,6 +32,8 @@ int test_type_less(const heap_t *heap,
 		(struct test_type *)((char *)a - offsetof(struct test_type, node));
 	const struct test_type *right =
 		(struct test_type *)((char *)b - offsetof(struct test_type, node));
+	if (order_by_val2)
+		return left->val2 < right->val2;
 	return left->val1 < right->val1;
 }
 
@@ -513,6 +518,33 @@ test_delete_last_node()
 	footer();
 }
 
+static void
+test_heapify()
+{
+	header();
+	heap_t heap;
+	test_heap_create(&heap);
+
+	for (uint32_t i = 0; i < TEST_CASE_SIZE; ++i) {
+		struct test_type *value = malloc(sizeof(struct test_type));
+		value->val1 = rand();
+		value->val2 = rand();
+		test_heap_insert(&heap, &value->node);
+	}
+
+	order_by_val2 = true;
+	test_heap_update_all(&heap);
+	if (test_heap_check(&heap)) {
+		fail("check heap invariants failed",
+		     "test_heap_check(&heap)");
+	}
+	order_by_val2 = false;
+
+	free_all_nodes(&heap);
+	test_heap_destroy(&heap);
+	footer();
+}
+
 int
 main(int argc, const char** argv)
 {
@@ -528,4 +560,5 @@ main(int argc, const char** argv)
 	test_insert_update_workload();
 	test_random_delete_workload();
 	test_delete_last_node();
+	test_heapify();
 }

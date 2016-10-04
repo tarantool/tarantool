@@ -20,3 +20,5 @@
 	*** test_random_delete_workload: done ***
 	*** test_delete_last_node ***
 	*** test_delete_last_node: done ***
+	*** test_heapify ***
+	*** test_heapify: done ***

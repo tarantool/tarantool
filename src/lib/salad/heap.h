@@ -193,6 +193,12 @@ static inline void
 HEAP(update)(heap_t *heap, struct heap_node *value_node);
 
 /**
+ * Heapify tree after updating all values.
+ */
+static inline void
+HEAP(update_all)(heap_t *heap);
+
+/**
  * Heap iterator init.
  */
 static inline void
@@ -400,6 +406,23 @@ HEAP(update)(heap_t *heap, struct heap_node *value_node)
 	/* heapify */
 	HEAP(sift_down)(heap, value_node);
 	HEAP(sift_up)(heap, value_node);
+}
+
+/**
+ * Heapify tree after updating all values.
+ */
+static inline void
+HEAP(update_all)(heap_t *heap)
+{
+	if (heap->size <= 1)
+		return;
+
+	/* Find the parent of the last element. */
+	heap_off_t curr_pos = (heap->size - 2) / 2;
+
+	do {
+		HEAP(sift_down)(heap, heap->harr[curr_pos]);
+	} while (curr_pos-- > 0);
 }
 
 /**
