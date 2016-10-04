@@ -3756,7 +3756,8 @@ vy_scheduler_f(va_list va)
 				error_log(diag_last_error(diag_get()));
 				warning_said = true;
 			}
-			assert(0);
+			/* Can't schedule task right now */
+			goto wait;
 		}
 
 		/* Nothing to do. */
