@@ -1293,9 +1293,9 @@ vy_run_delete(struct vy_run *run)
 #define ALIGN_POS(pos)	(pos + (FILE_ALIGN - (pos % FILE_ALIGN)) % FILE_ALIGN)
 
 static ssize_t
-vy_pread_file(int fd, void *buf, uint32_t size, off_t offset)
+vy_pread_file(int fd, void *buf, size_t size, off_t offset)
 {
-	ssize_t pos = 0;
+	size_t pos = 0;
 	while (pos < size) {
 		ssize_t readen = pread(fd, buf + pos,
 				       size - pos, offset + pos);
@@ -1854,9 +1854,9 @@ vy_run_dump_stmt(struct vy_stmt *value, struct vy_buf *info_buf,
 }
 
 static ssize_t
-vy_write_file(int fd, void *buf, uint32_t size)
+vy_write_file(int fd, void *buf, size_t size)
 {
-	ssize_t pos = 0;
+	size_t pos = 0;
 	while (pos < size) {
 		ssize_t written = write(fd, buf + pos, size - pos);
 		if (written <= 0)
@@ -1867,9 +1867,9 @@ vy_write_file(int fd, void *buf, uint32_t size)
 }
 
 static ssize_t
-vy_pwrite_file(int fd, void *buf, uint32_t size, off_t offset)
+vy_pwrite_file(int fd, void *buf, size_t size, off_t offset)
 {
-	ssize_t pos = 0;
+	size_t pos = 0;
 	while (pos < size) {
 		ssize_t written = pwrite(fd, buf + pos,
 					 size - pos, offset + pos);
