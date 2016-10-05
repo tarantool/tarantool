@@ -820,6 +820,9 @@ tx_process_misc(struct cmsg *m)
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
+
 	try {
 		switch (msg->header.type) {
 		case IPROTO_CALL:
@@ -848,6 +851,11 @@ tx_process_misc(struct cmsg *m)
 		iproto_reply_error(out, diag_last_error(&fiber()->diag),
 				   msg->header.sync);
 	}
+	msg->write_end = obuf_create_svp(out);
+	return;
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
 	msg->write_end = obuf_create_svp(out);
 }
 

@@ -674,7 +674,9 @@ function remote_methods:ping()
     remote_check(self, 'ping')
     local deadline = self._deadlines[fiber_self()]
     local timeout = deadline and max(0, deadline-fiber_time())
-    return (self._transport.perform_request(timeout, 'ping') == nil)
+    local err = self._transport.perform_request(timeout, 'ping',
+                                                self._schema_id)
+    return not err or err == E_WRONG_SCHEMA_VERSION
 end
 
 function remote_methods:reload_schema()
