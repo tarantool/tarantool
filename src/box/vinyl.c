@@ -7500,7 +7500,6 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->unique_optimization =
 		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
 		vy_stmt_key_is_full(key, index->key_def);
-	itr->unique_optimization = false;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
 	itr->range_ended = false;
@@ -8123,11 +8122,11 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 			rc = vy_merge_iterator_next_key(mi, &stmt);
 		} else {
 			rc = vy_merge_iterator_next_lsn(mi, &stmt);
-			if (!rc && stmt == NULL)
+			if (rc >= 0 && stmt == NULL)
 				rc = vy_merge_iterator_next_key(mi, &stmt);
 		}
-		if (rc)
-			return rc;
+		if (rc < 0)
+			return -1;
 		if (stmt == NULL)
 			return 0;
 		if (stmt->lsn > wi->oldest_vlsn)
@@ -8144,8 +8143,8 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 		do {
 			struct vy_stmt *next = NULL;
 			rc = vy_merge_iterator_next_lsn(mi, &next);
-			if (rc)
-				return rc;
+			if (rc < 0)
+				return -1;
 			if (next == NULL && !wi->is_last_level)
 				break; /* Return the accumulated UPSERT */
 			struct vy_stmt *applied =
@@ -8414,8 +8413,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 		rc = vy_read_iterator_merge_next_key(itr, &t);
 		if (rc < 0)
 			return -1;
-		if (rc > 0)
-			return 0;
 restart:
 		if (rc >= 0 && itr->merge_iterator.range_ended && itr->curr_range != NULL) {
 			rc = vy_read_iterator_next_range(itr, &t);
@@ -8447,11 +8444,12 @@ restart:
 				return -1;
 			t = applied;
 		}
-		if (itr->curr_stmt != NULL)
-			vy_stmt_unref(itr->curr_stmt);
-		itr->curr_stmt = t;
-		if (rc != 0 || (itr->curr_stmt->flags & SVDELETE) == 0)
+		if (rc != 0 || t->flags != SVDELETE) {
+			if (itr->curr_stmt != NULL)
+				vy_stmt_unref(itr->curr_stmt);
+			itr->curr_stmt = t;
 			break;
+		}
 	}
 	*result = itr->curr_stmt;
 	return 0;
