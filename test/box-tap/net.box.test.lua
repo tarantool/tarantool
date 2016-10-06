@@ -7,7 +7,7 @@ local net_box = require('net.box')
 local test_run = require('test_run')
 local inspector = test_run.new()
 
-test:plan(4)
+test:plan(5)
 
 -- create tarantool instance
 test:is(
@@ -24,6 +24,8 @@ local uri = inspector:eval('second', 'box.cfg.listen')[1]
 local conn = net_box.connect(uri)
 test:is(conn:is_connected(), true, 'connected to instance')
 test:is(conn.space ~= nil, true, 'space exists')
+-- gh-1814: Segfault if using `net.box` before `box.cfg` start
+test:ok(not pcall(function() conn.space._vspace:insert() end), "error handling")
 
 -- cleanup
 conn:close()
