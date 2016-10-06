@@ -6,3 +6,4 @@
 /lib/systemd/system/tarantool@.service
 /lib/systemd/system-generators/tarantool-generator
 /usr/lib/tmpfiles.d/tarantool.conf
+/usr/share/man/man1/tarantoolctl.1

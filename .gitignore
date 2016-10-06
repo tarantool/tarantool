@@ -109,7 +109,6 @@ debian/tarantool-common.postinst.debhelper
 debian/tarantool-common.postrm.debhelper
 debian/tarantool-common.prerm.debhelper
 debian/tarantool-common.substvars
-debian/tarantool-common.manpages
 debian/tarantool-common.install
 debian/tarantool-common/*
 debian/tarantool-dev.debhelper.log
@@ -121,7 +120,6 @@ debian/tarantool.debhelper.log
 debian/tarantool.substvars
 debian/tarantool.postinst.debhelper
 debian/tarantool.postrm.debhelper
-debian/tarantool.manpages
 debian/tarantool/*
 debian/tmp/*
 obj-*/

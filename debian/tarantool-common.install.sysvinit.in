@@ -2,3 +2,4 @@
 /usr/bin/tarantoolctl
 /etc/tarantool/instances.available/example.lua
 /etc/logrotate.d/tarantool
+/usr/share/man/man1/tarantoolctl.1

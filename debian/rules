@@ -33,9 +33,6 @@ include /usr/share/dpkg/buildflags.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
 
-debian/%.manpages: debian/%.manpages.in
-	sed 's/@DEB_BUILDDIR@/$(DEB_BUILDDIR)/g' $< > $@
-
 debian/tarantool-common.install:
 ifneq ($(wildcard /usr/bin/dh_systemd_start),)
 	cp -p debian/tarantool-common.install.systemd.in $@
@@ -43,8 +40,7 @@ else
 	cp -p debian/tarantool-common.install.sysvinit.in $@
 endif
 
-build-indep: debian/tarantool.manpages debian/tarantool-common.manpages \
-             debian/tarantool-common.install
+build-indep: debian/tarantool-common.install
 
 tarball: clean
 	git describe --long --always > VERSION
