@@ -156,7 +156,7 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 }
 
 void
-error_init(void)
+box_error_init(void)
 {
 	error_factory->ClientError = BuildClientError;
 }

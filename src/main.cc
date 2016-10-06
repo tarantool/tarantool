@@ -61,6 +61,7 @@
 #include "tt_pthread.h"
 #include "lua/init.h"
 #include "box/box.h"
+#include "box/error.h"
 #include "scoped_guard.h"
 #include "random.h"
 #include "tt_uuid.h"
@@ -624,6 +625,7 @@ main(int argc, char **argv)
 	main_argv = argv;
 
 	exception_init();
+	box_error_init();
 
 	fiber_init(fiber_cxx_invoke);
 	/* Init iobuf library with default readahead */

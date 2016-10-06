@@ -182,7 +182,7 @@ public:
 };
 
 void
-error_init(void);
+box_error_init(void);
 
 #endif /* defined(__cplusplus) */
 
