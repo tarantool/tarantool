@@ -1,4 +1,4 @@
-tarantool (1.7.2.1.g92ed6c4-1) unstable; urgency=medium
+tarantool (1.7.2.19.g4c8bf56-1) unstable; urgency=medium
 
   * Vinyl - a new write-optimized storage engine, allowing the amount of
     data stored to exceed the amount of available RAM 10-100x times.
@@ -21,7 +21,7 @@ tarantool (1.7.2.1.g92ed6c4-1) unstable; urgency=medium
   * Dozens of bugfixes:
     https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
 
- -- Roman Tsisyk <roman@tarantool.org>  Thu, 29 Sep 2016 12:00:00 +0300
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 15:21:41 +0300
 
 tarantool (1.6.9.6.g660e882-1) unstable; urgency=medium
 
