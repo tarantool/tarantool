@@ -1,3 +1,9 @@
+tarantool (1.7.2.21.g7131b0c-1) unstable; urgency=medium
+
+  * Fix "tarantool.1: No such file or directory" on buildd
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 18:06:35 +0300
+
 tarantool (1.7.2.19.g4c8bf56-1) unstable; urgency=medium
 
   * Vinyl - a new write-optimized storage engine, allowing the amount of
