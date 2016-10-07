@@ -249,11 +249,14 @@ end;
 ...
 t;
 ---
-- - quota_used
-  - arena_used_ratio
+- - items_size
   - items_used_ratio
-  - arena_size
   - quota_size
+  - quota_used_ratio
+  - arena_used_ratio
+  - items_used
+  - quota_used
+  - arena_size
   - arena_used
 ...
 box.runtime.info().used > 0;

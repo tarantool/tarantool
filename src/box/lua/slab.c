@@ -118,7 +118,6 @@ lbox_slab_stats(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 lbox_slab_info(struct lua_State *L)
 {
@@ -142,6 +141,18 @@ lbox_slab_info(struct lua_State *L)
 		/ ((double) totals.total + 0.0001));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
+	/** How much address space has been already touched */
+	lua_pushstring(L, "items_size");
+	luaL_pushuint64(L, totals.total);
+	lua_settable(L, -3);
+	/**
+	 * How much of this formatted address space is used for
+	 * actual data.
+	 */
+	lua_pushstring(L, "items_used");
+	luaL_pushuint64(L, totals.used);
+	lua_settable(L, -3);
+
 	/*
 	 * Fragmentation factor for tuples. Don't account indexes,
 	 * even if they are fragmented, there is nothing people
@@ -151,16 +162,25 @@ lbox_slab_info(struct lua_State *L)
 	lua_pushstring(L, ratio_buf);
 	lua_settable(L, -3);
 
-	/** How much address space has been already touched */
+	/** How much address space has been already touched
+	 * (tuples and indexes) */
 	lua_pushstring(L, "arena_size");
 	luaL_pushuint64(L, totals.total + index_stats.totals.total);
 	lua_settable(L, -3);
 	/**
 	 * How much of this formatted address space is used for
-	 * actual data.
+	 * data (tuples and indexes).
 	 */
 	lua_pushstring(L, "arena_used");
 	luaL_pushuint64(L, totals.used + index_stats.totals.used);
+	lua_settable(L, -3);
+
+	ratio = 100 * ((double) (totals.used + index_stats.totals.used)
+		       / (double) (totals.total + index_stats.totals.total));
+	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
+
+	lua_pushstring(L, "arena_used_ratio");
+	lua_pushstring(L, ratio_buf);
 	lua_settable(L, -3);
 
 	/*
@@ -189,7 +209,7 @@ lbox_slab_info(struct lua_State *L)
 		 ((double) quota_total(memtx_quota) + 0.0001));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
-	lua_pushstring(L, "arena_used_ratio");
+	lua_pushstring(L, "quota_used_ratio");
 	lua_pushstring(L, ratio_buf);
 	lua_settable(L, -3);
 
