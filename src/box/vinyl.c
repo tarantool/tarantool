@@ -903,7 +903,8 @@ struct vy_cursor {
 	struct vy_tx tx_autocommit;
 	struct vy_index *index;
 	struct vy_stmt *key;
-	/** Points either to tx_autocommit for autocommit mode or
+	/**
+	 * Points either to tx_autocommit for autocommit mode or
 	 * to a multi-statement transaction active when the cursor
 	 * was created.
 	 */
@@ -920,7 +921,6 @@ struct vy_cursor {
 	 */
 	struct rlist next_in_tx;
 };
-
 
 static struct txv *
 txv_new(struct vy_index *index, struct vy_stmt *stmt, struct vy_tx *tx)
@@ -4271,6 +4271,17 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 */
 	vy_index_ref(c->index);
 	return c;
+}
+
+int
+vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx)
+{
+	if (cursor->tx == NULL) {
+		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	*tx = cursor->tx;
+	return 0;
 }
 
 void

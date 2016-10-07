@@ -202,6 +202,12 @@ struct vy_cursor *
 vy_cursor_new(struct vy_tx *tx, struct vy_index *index,
 	      const char *key, uint32_t part_count, enum vy_order order);
 
+/**
+ * Fetch the transaction used in the cursor.
+ */
+int
+vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx);
+
 void
 vy_cursor_delete(struct vy_cursor *cursor);
 

@@ -92,10 +92,10 @@ public:
 		const override;
 
 	virtual struct tuple *
-	iterator_next(struct iterator *iter) const;
+	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const;
 
 	virtual struct tuple *
-	iterator_eq(struct iterator *iter) const;
+	iterator_eq(struct vy_tx *tx, struct vinyl_iterator *it) const;
 
 public:
 	struct vy_env *env;
@@ -148,10 +148,10 @@ public:
 	open() override;
 
 	virtual struct tuple *
-	iterator_next(struct iterator *iter) const override;
+	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const override;
 
 	virtual struct tuple *
-	iterator_eq(struct iterator *iter) const override;
+	iterator_eq(struct vy_tx *tx, struct vinyl_iterator *it) const override;
 
 	virtual ~VinylSecondaryIndex() override;
 
