@@ -2294,39 +2294,28 @@ vy_range_open(struct vy_range *range)
 }
 
 static void
-vy_range_delete_runs(struct vy_range *range)
+vy_range_delete(struct vy_range *range)
 {
-	struct vy_run *p = range->run;
-	struct vy_run *next = NULL;
-	while (p) {
-		next = p->next;
-		vy_run_delete(p);
-		p = next;
-	}
-}
-
-/*
- * If delete_all is unset, only shadow in-memory indexes are destroyed.
- */
-static void
-vy_range_delete_mems(struct vy_range *range, bool delete_all)
-{
+	assert(range->nodedump.pos == UINT32_MAX);
+	assert(range->nodecompact.pos == UINT32_MAX);
 	struct vy_env *env = range->index->env;
-	struct vy_mem *mem;
 
-	if (delete_all) {
-		mem = range->mem;
-		range->mem = NULL;
-		range->mem_count = 0;
-		range->used = 0;
-		range->min_lsn = INT64_MAX;
-	} else {
-		mem = range->mem->next;
-		range->mem->next = NULL;
-		range->mem_count = 1;
-		range->used = range->mem->used;
-		range->min_lsn = range->mem->min_lsn;
+	if (range->begin)
+		vy_stmt_unref(range->begin);
+	if (range->end)
+		vy_stmt_unref(range->end);
+
+	/* Delete all runs */
+	struct vy_run *run = range->run;
+	while (run != NULL) {
+		struct vy_run *next = run->next;
+		vy_run_delete(run);
+		run = next;
 	}
+	range->run = NULL;
+
+	/* Release all mems */
+	struct vy_mem *mem = range->mem;
 	while (mem != NULL) {
 		struct vy_mem *next = mem->next;
 		vy_scheduler_mem_dumped(env->scheduler, mem);
@@ -2334,21 +2323,8 @@ vy_range_delete_mems(struct vy_range *range, bool delete_all)
 		vy_mem_delete(mem);
 		mem = next;
 	}
-}
-
-static void
-vy_range_delete(struct vy_range *range)
-{
-	assert(range->nodedump.pos == UINT32_MAX);
-	assert(range->nodecompact.pos == UINT32_MAX);
-
-	if (range->begin)
-		vy_stmt_unref(range->begin);
-	if (range->end)
-		vy_stmt_unref(range->end);
-
-	vy_range_delete_runs(range);
-	vy_range_delete_mems(range, true);
+	range->mem = NULL;
+	range->used = 0;
 
 	if (range->fd >= 0 && close(range->fd) != 0)
 		say_syserror("failed to close range file %s", range->path);
@@ -3194,6 +3170,7 @@ static int
 vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct vy_env *env = index->env;
 	struct vy_range *range = task->dump.range;
 	struct vy_run *run = task->dump.new_run;
 
@@ -3214,9 +3191,20 @@ vy_task_dump_complete(struct vy_task *task)
 	index->range_index_version++;
 
 	/* Release dumped in-memory indexes */
-	vy_range_delete_mems(range, false);
+	struct vy_mem *mem = range->mem->next;
+	range->mem->next = NULL;
+	range->mem_count = 1;
+	range->used = range->mem->used;
+	range->min_lsn = range->mem->min_lsn;
+	while (mem != NULL) {
+		struct vy_mem *next = mem->next;
+		vy_scheduler_mem_dumped(env->scheduler, mem);
+		vy_quota_release(env->quota, mem->used);
+		vy_mem_delete(mem);
+		mem = next;
+	}
 out:
-	vy_scheduler_add_range(index->env->scheduler, range);
+	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
 }
 
