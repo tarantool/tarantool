@@ -8428,8 +8428,11 @@ static int
 vy_readcommited(struct vy_index *index, struct vy_stmt *stmt)
 {
 	struct vy_read_iterator itr;
+	/*
+	 * Optimization: exclude in-memory indexes from lookup
+	 */
 	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ, stmt->data,
-			      INT64_MAX, false);
+			      INT64_MAX, true);
 	struct vy_stmt *t;
 	int rc = vy_read_iterator_next(&itr, &t);
 	if (rc == 0 && t) {
