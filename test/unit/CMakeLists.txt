@@ -53,7 +53,8 @@ add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc
-    ${CMAKE_SOURCE_DIR}/src/rmean.c)
+    ${CMAKE_SOURCE_DIR}/src/rmean.c
+    ${CMAKE_SOURCE_DIR}/src/histogram.c)
 target_link_libraries(vclock.test core salad small)
 add_executable(xrow.test xrow.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/xrow.cc
@@ -123,6 +124,10 @@ add_executable(csv.test csv.c
 add_executable(rmean.test rmean.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/rmean.c)
 target_link_libraries(rmean.test core)
+
+add_executable(histogram.test histogram.c unit.c
+        ${CMAKE_SOURCE_DIR}/src/histogram.c)
+target_link_libraries(histogram.test core)
 
 add_executable(say.test say.c unit.c)
 target_link_libraries(say.test core)
