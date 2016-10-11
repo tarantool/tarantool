@@ -437,10 +437,12 @@ SophiaEngine::join(struct relay *relay)
 	char id[128];
 	snprintf(id, sizeof(id), "view.%" PRIu64, signt);
 	void *snapshot = sp_getobject(env, id);
-	assert(snapshot != NULL);
-
-	/* iterate through a list of databases which took a
-	 * part in the snapshot */
+	if (snapshot == NULL)
+		return;
+	/*
+	 * Iterate through a list of databases which took a
+	 * part in the snapshot.
+	 */
 	void *db;
 	void *db_cursor = sp_getobject(snapshot, "db");
 	if (db_cursor == NULL)
