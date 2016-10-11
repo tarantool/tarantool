@@ -1864,8 +1864,8 @@ vy_pwrite_file(int fd, void *buf, size_t size, off_t offset)
 struct vy_write_iterator;
 
 static struct vy_write_iterator *
-vy_write_iterator_new(bool is_dump, struct vy_index *index,
-		      int64_t purge_lsn);
+vy_write_iterator_new(struct vy_index *index, bool is_last_level,
+		      int64_t oldest_vlsn);
 static int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
 			  struct vy_run *run, bool is_mutable,
@@ -2446,7 +2446,7 @@ fail:
 	return -1;
 }
 
-/*
+/**
  * Return true and set split_key accordingly if the range needs to be
  * split in two.
  *
@@ -2460,7 +2460,7 @@ fail:
  *   4/3 * range_size.
  */
 static bool
-vy_range_need_split(struct vy_range *range, const char **p_split_key)
+vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 {
 	struct key_def *key_def = range->index->key_def;
 	struct vy_run *run = NULL;
@@ -2508,7 +2508,7 @@ vy_range_compact_prepare(struct vy_range *range,
 	int n_parts = 1;
 	int i;
 
-	if (vy_range_need_split(range, &split_key_raw)) {
+	if (vy_range_needs_split(range, &split_key_raw)) {
 		split_key = vy_stmt_extract_key_raw(index, split_key_raw);
 		if (split_key == NULL)
 			goto fail;
@@ -3140,7 +3140,7 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_write_iterator *wi;
 	int rc;
 
-	wi = vy_write_iterator_new(1, index, task->vlsn);
+	wi = vy_write_iterator_new(index, false, task->vlsn);
 	if (wi == NULL)
 		return -1;
 
@@ -3252,7 +3252,7 @@ vy_task_compact_execute(struct vy_task *task)
 	assert(range->nodedump.pos == UINT32_MAX);
 	assert(range->nodecompact.pos == UINT32_MAX);
 
-	wi = vy_write_iterator_new(0, index, task->vlsn);
+	wi = vy_write_iterator_new(index, true, task->vlsn);
 	if (wi == NULL)
 		return -1;
 
@@ -5506,7 +5506,15 @@ struct vy_run_iterator_pos {
 };
 
 /**
- * Iterator over vy_run
+ * Return statements from vy_run based on initial search key,
+ * iteration order and view lsn.
+ *
+ * All statements with lsn > vlsn are skipped.
+ * The API allows to traverse over resulting statements within two
+ * dimensions - key and lsn. next_key() switches to the youngest
+ * statement of the next key, according to the iteration order,
+ * and next_lsn() switches to an older statement for the same
+ * key.
  */
 struct vy_run_iterator {
 	/** Parent class, must be the first member */
@@ -6453,7 +6461,15 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 /* TODO: move to header and remove static keyword */
 
 /**
- * Iterator over vy_mem
+ * Return statements from vy_mem (in-memory index) based on
+ * initial search key, iteration order and view lsn.
+ *
+ * All statements with lsn > vlsn are skipped.
+ * The API allows to traverse over resulting statements within two
+ * dimensions - key and lsn. next_key() switches to the youngest
+ * statement of the next key, according to the iteration order,
+ * and next_lsn() switches to an older statement for the same
+ * key.
  */
 struct vy_mem_iterator {
 	/** Parent class, must be the first member */
@@ -6932,6 +6948,13 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
 
 /* {{{ Iterator over transaction writes : forward declaration */
 
+/**
+ * Return statements from the write set of the current
+ * transactions.
+ *
+ * @sa vy_run_iterator, vy_mem_iterator, with which
+ * this iterator shares the interface.
+ */
 struct vy_txw_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
@@ -7216,16 +7239,26 @@ struct vy_merge_src {
 };
 
 /**
- * Merge iterator takes several iterators as a source and sorts
- * output from them by given order and LSN DESC. Nothing is
- * skipped, just sorted.  There are several optimizations, that
- * requires:
- * 1) all sources are given with increasing age.
- * 2) mutable sources are given before read-blocking sources.
- * The iterator designed for read iteration over write_set of
- * current transaction (that does not belong to any range but to
- * entire index) and mems and runs of some range. For this purpose
- * the iterator has special flag (range_ended) that signals to
+ * Merge iterator takes several iterators as sources and sorts
+ * output from them by the given order and LSN DESC. It has no filter,
+ * it just sorts output from its sources.
+ *
+ * All statements from all sources can be traversed via
+ * next_key()/next_lsn() like in a simple iterator (run, mem etc).
+ * next_key() switches to the youngest statement of
+ * the next key (according to the order), and next_lsn()
+ * switches to an older statement of the same key.
+ *
+ * There are several merge optimizations, which expect that:
+ *
+ * 1) All sources are sorted by age, i.e. the most fresh
+ * sources are added first.
+ * 2) Mutable sources are added before read-blocking sources.
+ *
+ * The iterator can merge the write set of the current
+ * transaction, that does not belong to any range but to entire
+ * index, and mems and runs of some range. For this purpose the
+ * iterator has a special flag (range_ended) that signals to the
  * read iterator that it must switch to the next range.
  */
 struct vy_merge_iterator {
@@ -7715,7 +7748,8 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr)
 }
 
 /**
- * Restore position of merge iterator after given stmt according to order
+ * Restore the position of merge iterator after the given key
+ * and according to the initial retrieval order.
  */
 static int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
@@ -7737,98 +7771,117 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 /* {{{ Write iterator */
 
 /**
- * The write iterator merges multiple operations for the same key,
- * squashing UPSERTs and filtering out old REPLACEs and DELETEs.
+ * Iterate over an in-memory index when writing it to disk (dump)
+ * or over a series of sorted runs on disk to create a new sorted
+ * run (compaction).
  *
- * The merge process works by the following algorithm:
+ * Use merge iterator to order the output and filter out
+ * too old statements (older than the oldest active read view).
  *
- * 1) REPLACE is on the top of the merge stack:
+ * Squash multiple UPSERT statements over the same key into one,
+ * if possible.
  *
- *   1.1) If there was an UPSERT for this key then apply it to REPLACE and
- *        switch to the next key.
+ * Background
+ * ----------
+ * Vinyl provides support for consistent read views. The oldest
+ * active read view is maintained in the transaction manager.
+ * To support it, when dumping or compacting statements on disk,
+ * older versions need to be preserved, and versions outside
+ * any active read view garbage collected. This task is handled
+ * by the write iterator.
  *
- *   1.2) Otherwise return REPLACE as is and then switch to the next key.
+ * Filtering
+ * ---------
+ * Let's call each transaction consistent read view LSN vlsn.
  *
- * 2) DELETE is on the top of the merge stack:
+ *	oldest_vlsn = MIN(vlsn) over all active transactions
  *
- *    2.1) If there was an UPSERT operation before then convert it
- *         to REPLACE, push instead of DELETE to the top of the stack and
- *         continue from the step 1.
+ * Thus to preserve relevant data for every key and purge old
+ * versions, the iterator works as follows:
  *
- *    2.2) Otherwise
+ *      If statement lsn is greater than oldest vlsn, the
+ *      statement is preserved.
  *
- *       2.2.1) If the write iterator is used for run dumping then return
- *              DELETE as is, because it can affect older runs.
- *              Switch to the next key.
- *       2.2.2) If the write iterator is used for compation then there is
- *              no need to keep DELETEs for older runs. Discard DELETE and
- *              switch to the next key.
+ *      Otherwise, if statement type is REPLACE/DELETE, then
+ *      it's returned, and the iterator can proceed to the
+ *      next key: the readers do not need the history.
  *
- * 3) UPSERT is on the top of the merge stack:
+ *      Otherwise, the statement is UPSERT, and in order
+ *      to restore the original tuple from UPSERT the reader
+ *      does need the history: they need to look for an older
+ *      statement to which the UPSERT can be applied to get
+ *      a tuple. This older statement can be UPSERT as well,
+ *      and so on.
+ *	In other words, of statement type is UPSERT, the reader
+ *	needs a range of statements from the youngest statement
+ *	with lsn <= vlsn to the youngest non-UPSERT statement
+ *	with lsn <= vlsn, borders included.
  *
- *    3.1) If there was an UPSERT before then merge all UPSERTs into the
- *         single UPSERT statement and then switch to the next LSN.
+ *	All other versions of this key can be skipped, and hence
+ *	garbage collected.
  *
- *    3.2) Otherwise switch to the next LSN.
+ * Squashing and garbage collection
+ * --------------------------------
+ * Filtering and garbage collection, performed by write iterator,
+ * must have no effect on read views of active transactions:
+ * they should read the same data as before.
  *
- * 4) The merge stack is empty:
+ * On the other hand, old version should be deleted as soon as possible;
+ * multiple UPSERTs could be merged together to take up less
+ * space, or substituted with REPLACE.
  *
- *    4.1) If there was an UPSERT before then go to the next key.
- *    4.2) Otherwise merge UPSERTs into the single UPSERT statement and
- *         return it.
+ * Here's how it's done:
+ *
+ *
+ *	1) Every statement with lsn greater than oldest vlsn is preserved
+ *	in the output, since there could be an active transaction
+ *	that needs it.
+ *
+ *	2) For all statements with lsn <= oldest_vlsn, only a single
+ *	resultant statement is returned. Here's how.
+ *
+ *	2.1) If the youngest statement with lsn <= oldest _vlsn is a
+ *	REPLACE/DELETE, it becomes the resultant statement.
+ *
+ *	2.2) Otherwise, it as an UPSERT. Then we must iterate over
+ *	all older LSNs for this key until we find a REPLACE/DELETE
+ *	or exhaust all input streams for this key.
+ *
+ *	If the older lsn is a yet another UPSERT, two upserts are
+ *	squashed together into one. Otherwise we found an
+ *	REPLACE/DELETE, so apply all preceding UPSERTs to it and
+ *	get the resultant statement.
+ *
+ * There is an extra twist to this algorithm, used when performing
+ * compaction of the last LSM level (i.e. merging all existing
+ * runs into one). The last level does not need to store DELETEs.
+ * Thus we can:
+ * 1) Completely skip the resultant statement from output if it's
+ *    a DELETE.
+ *     ┃      ...      ┃       ┃     ...      ┃
+ *     ┃               ┃       ┃              ┃    ↑
+ *     ┣━ oldest vlsn ━┫   =   ┣━ oldest lsn ━┫    ↑ lsn
+ *     ┃               ┃       ┗━━━━━━━━━━━━━━┛    ↑
+ *     ┃    DELETE     ┃
+ *     ┃      ...      ┃
+ * 2) Replace an accumulated resultant UPSERT with an appropriate
+ *    REPLACE.
+ *     ┃      ...      ┃       ┃     ...      ┃
+ *     ┃     UPSERT    ┃       ┃   REPLACE    ┃    ↑
+ *     ┃               ┃       ┃              ┃    ↑
+ *     ┣━ oldest vlsn ━┫   =   ┣━ oldest lsn ━┫    ↑ lsn
+ *     ┃               ┃       ┗━━━━━━━━━━━━━━┛    ↑
+ *     ┃    DELETE     ┃
+ *     ┃      ...      ┃
  */
 struct vy_write_iterator {
 	struct vy_index *index;
-	/*
-	 * The minimal LSN of active transactions, i.e. there are no open
-	 * transactions with lsn <= purge_lsn at the time of iterator creation.
-	 *
-	 * The write iterator must preserve in the output all statements
-	 * with lsn > purge_lsn and the latest statement with lsn <= purge_lsn.
-	 * In other words, it is safe to prune all statements with
-	 * lsn <= purge_lsn **except** the latest one. For example, if
-	 * purge_lsn is 100 and there are 103, 102, 90, 80, 70 statements
-	 * on the stack, then 90, 80 and 70 can be merged into the single
-	 * statement with lsn=90.
-	 *
-	 * There are two cases when it is also possible to prune **all**
-	 * statements with lsn <= purge_lsn:
-	 *
-	 *  - The latest statement with lsn1 <= purge_lsn is DELETE and
-	 *    this DELETE is followed by a REPLACE statement with
-	 *    lsn2 > purge_lsn >= lsn1. In this case the absence of DELETE is
-	 *    equivalent to the presence of DELETE in the point of view of
-	 *    active transactions.
-	 *
-	 *     ┃     ...     ┃       ┃     ...     ┃
-	 *     ┃   REPLACE   ┃       ┃   REPLACE   ┃
-	 *     ┃             ┃       ┃             ┃    ↑
-	 *     ┣━ purge lsn ━┫   =   ┣━ purge lsn ━┫    ↑ lsn
-	 *     ┃             ┃       ┗━━━━━━━━━━━━━┛    ↑
-	 *     ┃   DELETE    ┃
-	 *     ┃     ...     ┃
-	 *
-	 *  - The latest statement with lsn1 <= purge_lsn is DELETE and it is
-	 *    followed by a DELETE statement. In this case the first DELETE
-	 *    statement can be safely replaced by the second one.
-	 *
-	 * @sa vy_write_iterator_next
-	 */
-	int64_t purge_lsn;
-	/*
-	 * Users of a write iterator can specify if they need
-	 * to preserve deletes. This is necessary, for example,
-	 * when dumping a run, to ensure that the deleted stmt
-	 * is eventually removed from all LSM layers.
-	 * If is_dump is true then old deletes, i.e. those
-	 * which LSN is less or equal to purge LSN and for which
-	 * there are no new replaces, are preserved in the output,
-	 * otherwise such deletes are skipped and iteration
-	 * continues from the next key.
-	 */
-	bool is_dump;
+	/* The minimal VLSN among all active transactions */
+	int64_t oldest_vlsn;
+	/* There are is no level older than the one we're writing to. */
+	bool is_last_level;
+	/* On the next iteration we must move to the next key */
 	bool goto_next_key;
-	uint8_t prev_stmt_flags;
 	struct vy_stmt *key;
 	struct vy_stmt *tmp_stmt;
 	struct vy_merge_iterator mi;
@@ -7839,27 +7892,27 @@ struct vy_write_iterator {
  * use vy_write_iterator_add_* functions
  */
 static void
-vy_write_iterator_open(struct vy_write_iterator *wi, bool is_dump,
-		       struct vy_index *index, int64_t purge_lsn)
+vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
+		       bool is_last_level, int64_t oldest_vlsn)
 {
 	wi->index = index;
-	wi->purge_lsn = purge_lsn;
-	wi->is_dump = is_dump;
+	wi->oldest_vlsn = oldest_vlsn;
+	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
 	wi->key = vy_stmt_from_key(index, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
 
 static struct vy_write_iterator *
-vy_write_iterator_new(bool is_dump, struct vy_index *index,
-		      int64_t purge_lsn)
+vy_write_iterator_new(struct vy_index *index, bool is_last_level,
+		      int64_t oldest_vlsn)
 {
 	struct vy_write_iterator *wi = calloc(1, sizeof(*wi));
 	if (wi == NULL) {
 		diag_set(OutOfMemory, sizeof(*wi), "calloc", "wi");
 		return NULL;
 	}
-	vy_write_iterator_open(wi, is_dump, index, purge_lsn);
+	vy_write_iterator_open(wi, index, is_last_level, oldest_vlsn);
 	return wi;
 }
 
@@ -7917,157 +7970,61 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 	if (wi->tmp_stmt)
 		vy_stmt_unref(wi->tmp_stmt);
 	wi->tmp_stmt = NULL;
-	struct vy_stmt *upsert_stmt = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
-	int rc;
+	int rc = 0;
 	struct vy_stmt *stmt = NULL;
-	/*
-	 * This cycle works as follows:
-	 *  - iterate over all statements with the same key.
-	 *    The merge iterator returns versions of the same
-	 *    stmt in newest-to-oldest order.
-	 *    If the current stmt is newer than purge_lsn then
-	 *    there is a transaction that may be using it and the
-	 *    stmt is returned as is.
-	 *    Otherwise, we can pick the first stmt from the
-	 *    "top" of the version stack: it will reflect the
-	 *    latest value we need to preserve. Special
-	 *    care needs to be taken about upserts and deletes:
-	 *    upserts are squashed together and deletes are
-	 *    preserved if is_dump flag is true.
-	 *  - when done with this key, proceed to the next one.
-	 */
+	/* @sa vy_write_iterator declaration for the algorithm description. */
 	while (true) {
-		if (!mi->search_started) {
-			/* Start the search if it's the first iteration. */
-			rc = vy_merge_iterator_locate(mi);
-			if (rc > 0)
-				return 0; /* Empty stream. */
-		} else {
-			/*
-			 * Need to go to the next key if the previous stmt was
-			 * older than or equal to purge_lsn and it was DELETE
-			 * or REPLACE.
-			 */
+		if (mi->search_started) {
+			/* Do not switch to next on first iteration */
 			if (wi->goto_next_key) {
-				/*
-				 * If there is one or more accumulated upserts
-				 * then need to squash them and return before
-				 * going to the next key.
-				 */
-				if (upsert_stmt) {
-					stmt = upsert_stmt;
-					/*
-					 * Don't forget to plan
-					 * a deallocation of the
-					 * accumulated UPSERT.
-					 */
-					wi->tmp_stmt = upsert_stmt;
-					rc = 0;
-					break;
-				}
-				wi->prev_stmt_flags = 0;
 				wi->goto_next_key = false;
 				rc = vy_merge_iterator_next_key(mi);
-				/*
-				 * If the end of all keys is reached
-				 * then it's the end of the iterator.
-				 */
-				if (rc > 0)
-					return 0;
 			} else {
 				rc = vy_merge_iterator_next_lsn(mi);
-				/*
-				 * If we reached the end of the
-				 * key LSNs then go to the next
-				 * key.
-			         */
-				if (rc > 0) {
-					wi->goto_next_key = true;
-					continue;
-				}
+				if (rc > 0)
+					rc = vy_merge_iterator_next_key(mi);
 			}
+			if (rc < 0)
+				return rc;
+			if (rc > 0)
+				return 0;
 		}
+		rc = vy_merge_iterator_get(mi, &stmt);
 		if (rc < 0)
 			return rc;
-		rc = vy_merge_iterator_get(mi, &stmt);
-		assert(rc == 0);
-		uint8_t prev_stmt_flags = wi->prev_stmt_flags;
-		wi->prev_stmt_flags |= stmt->flags;
+		if (rc > 0)
+			return 0;
+		if (stmt->lsn > wi->oldest_vlsn)
+			break; /* Save the current stmt as the result. */
 
-		if (stmt->lsn > wi->purge_lsn) {
-			/* Save the current stmt as the result. */
-			break;
-		}
-		/*
-		 * The merge iterator now is below or equal to the purge LSN.
-		 */
-		if (stmt->flags & (SVREPLACE|SVDELETE)) {
-			/*
-			 * Replace/Delete. In any case after this stmt the iteration
-			 * will continue from the next key.
-			 */
-			wi->goto_next_key = true;
-			if (upsert_stmt) {
-				/*
-				 * If the previous stmt was upserted
-				 * then combine it with the current and return.
-				 */
-				stmt = vy_apply_upsert(upsert_stmt,
-							stmt, wi->index,
-							false);
-				/*
-				 * The upsert stmt turns in REPLACE so
-				 * it can be freed.
-				 */
-				vy_stmt_unref(upsert_stmt);
-				wi->tmp_stmt = stmt;
-				break;
-			}
-			if (stmt->flags & SVDELETE) {
-				/*
-				 * If the previous stmt was REPLACE or DELETE
-				 * and was newer than the purge LSN then
-				 * even current DELETE can be skipped.
-				 *
-				 * Otherwise preserve the delete in output
-				 * if it's a dump of a run, so it can
-				 * annihilate an older version of this
-				 * stmt when multiple runs are merged
-				 * together.
-				 */
-				if (wi->is_dump &&
-				    (prev_stmt_flags & (SVREPLACE|SVDELETE)) == 0)
-					break;
-			} else {
-				break;
-			}
-		} else if (stmt->flags & SVUPSERT) {
-			/*
-			 * If the merge iterator now is below the
-			 * purge LSN then upserts can be merged
-			 * and all operations older than replace
-			 * on the same key can be skipped.
-			 */
-			if (upsert_stmt) {
-				/*
-				 * If it isn't the first upsert
-				 * then squash the two of them
-				 * into one.
-				 */
-				stmt = vy_apply_upsert(upsert_stmt,
-							stmt, wi->index,
-							false);
-				vy_stmt_unref(upsert_stmt);
-			} else {
-				vy_stmt_ref(stmt);
-			}
-			upsert_stmt = stmt;
-		} else {
-			unreachable();
-		}
+		wi->goto_next_key = true;
+		if (stmt->flags == SVDELETE && wi->is_last_level)
+			continue; /* Skip unnecessary DELETE */
+		if (stmt->flags & (SVREPLACE | SVDELETE))
+			break; /* It's the resulting statement */
+
+		/* Squash upserts */
+		assert(stmt->flags == SVUPSERT);
+		vy_stmt_ref(stmt);
+		do {
+			struct vy_stmt *next = NULL;
+			rc = vy_merge_iterator_next_lsn(mi);
+			if (rc < 0)
+				return rc;
+			if (rc > 0 && !wi->is_last_level)
+				break; /* Return the accumulated UPSERT */
+			vy_merge_iterator_get(mi, &next);
+			struct vy_stmt *applied =
+				vy_apply_upsert(stmt, next, wi->index, false);
+			vy_stmt_unref(stmt);
+			if (applied == NULL)
+				return -1;
+			stmt = applied;
+		} while (stmt->flags == SVUPSERT);
+		wi->tmp_stmt = stmt;
+		break;
 	}
-	assert(rc == 0);
 	*ret = stmt;
 	return 0;
 }
@@ -8143,7 +8100,7 @@ int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
 
 /**
- * Close the iterator and free resources
+ * Close the iterator and free resources.
  */
 void
 vy_read_iterator_close(struct vy_read_iterator *itr);
@@ -8187,7 +8144,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 }
 
 /**
- * Set up merge iterator for current range
+ * Set up merge iterator for the current range.
  */
 void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
@@ -8208,7 +8165,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 }
 
 /**
- * Open the iterator
+ * Open the iterator.
  */
 void
 vy_read_iterator_open(struct vy_read_iterator *itr,
