@@ -414,6 +414,12 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_auth",    netbox_encode_auth },
 		{ NULL, NULL}
 	};
-	luaL_register(L, "net.box.lib", net_box_lib);
+	/* luaL_register_module polutes _G */
+	lua_newtable(L);
+	luaL_openlib(L, NULL, net_box_lib, 0);
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_pushvalue(L, -2);
+	lua_setfield(L, -2, "net.box.lib");
+	lua_remove(L, -1);
 	return 1;
 }
