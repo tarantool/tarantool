@@ -27,13 +27,10 @@ Package: tarantool-common
 Architecture: all
 Priority: optional
 Conflicts: tarantool-common (<< 1.5.3),
- tarantool-lts-common,
- tarantool-lts,
  tarantool-lts-modules,
  tarantool-lts-client,
  tarantool-lts-postgresql-module,
  tarantool-lts-mysql-module,
- tarantool-lts-dev,
  tarantool-dbg (<< 1.5.2),
  tarantool-common (<< 1.6~),
  tarantool-client (<< 1.6~),
@@ -59,11 +56,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, netbase, binutils, libgomp1,
  libyaml-0-2, openssl, tarantool-common (>= 1.7.2.1)
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
- tarantool-lts,
  tarantool-lts-modules,
  tarantool-lts-postgresql-module,
  tarantool-lts-mysql-module,
- tarantool-lts-dev,
  tarantool-lts-client,
  tarantool-dbg (<< 1.5.2),
  tarantool-common (<< 1.6~),
@@ -95,12 +90,10 @@ Priority: optional
 Section: libdevel
 Replaces: tarantool-lts-dev
 Conflicts: tarantool-lts-common,
- tarantool-lts,
  tarantool-lts-modules,
  tarantool-lts-postgresql-module,
  tarantool-lts-mysql-module,
  tarantool-lts-client,
- tarantool-lts-dev,
  tarantool-dbg (<< 1.5.2),
  tarantool-common (<< 1.6~),
  tarantool-client (<< 1.6~),

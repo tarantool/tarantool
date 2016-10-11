@@ -1,3 +1,9 @@
+tarantool (1.7.2.29.g2ad1af9-1) unstable; urgency=medium
+
+  * Drop conflicts with tarantool-lts and tarantool-common-lts.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 11 Oct 2016 16:14:56 +0300
+
 tarantool (1.7.2.21.g7131b0c-1) unstable; urgency=medium
 
   * Fix "tarantool.1: No such file or directory" on buildd
