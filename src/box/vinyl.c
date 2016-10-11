@@ -53,6 +53,7 @@
 #include "fiber.h" /* cord_slab_cache() */
 #include "ipc.h"
 #include "coeio.h"
+#include "histogram.h"
 
 #include "errcode.h"
 #include "key_def.h"
@@ -328,22 +329,62 @@ struct vy_stat {
 	uint64_t cursor;
 	struct vy_avg    cursor_latency;
 	struct vy_avg    cursor_ops;
+	/**
+	 * Dump bandwidth is needed for calculating the quota watermark.
+	 * The higher the bandwidth, the later we can start dumping w/o
+	 * suffering from transaction throttling. So we want to be very
+	 * conservative about estimating the bandwidth.
+	 *
+	 * To make sure we don't overestimate it, we maintain a
+	 * histogram of all observed measurements and assume the
+	 * bandwidth to be equal to the 10th percentile, i.e. the
+	 * best result among 10% worst measurements.
+	 */
+	struct histogram *dump_bw;
+	int64_t dump_total;
 };
 
 static struct vy_stat *
 vy_stat_new()
 {
+	enum { KB = 1000, MB = 1000 * 1000 };
+	static int64_t bandwidth_buckets[] = {
+		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
+		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
+		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
+		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
+		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
+		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
+		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
+		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
+		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
+		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
+		950 * MB, 1000 * MB,
+	};
+
 	struct vy_stat *s = calloc(1, sizeof(*s));
 	if (s == NULL) {
 		diag_set(OutOfMemory, sizeof(*s), "stat", "struct");
 		return NULL;
 	}
+	s->dump_bw = histogram_new(bandwidth_buckets,
+				   lengthof(bandwidth_buckets));
+	if (s->dump_bw == NULL) {
+		free(s);
+		return NULL;
+	}
+	/*
+	 * Until we dump anything, assume bandwidth to be 10 MB/s,
+	 * which should be fine for initial guess.
+	 */
+	histogram_collect(s->dump_bw, 10 * MB);
 	return s;
 }
 
 static void
 vy_stat_delete(struct vy_stat *s)
 {
+	histogram_delete(s->dump_bw);
 	free(s);
 }
 
@@ -394,6 +435,20 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 	s->cursor++;
 	vy_avg_update(&s->cursor_latency, diff);
 	vy_avg_update(&s->cursor_ops, ops);
+}
+
+static void
+vy_stat_dump(struct vy_stat *s, uint64_t time, size_t written)
+{
+	histogram_collect(s->dump_bw, written / (time / 1000000000.0));
+	s->dump_total += written;
+}
+
+static int64_t
+vy_stat_dump_bandwidth(struct vy_stat *s)
+{
+	/* See comment to vy_stat->dump_bw. */
+	return histogram_percentile(s->dump_bw, 10);
 }
 
 /** There was a backend read. This flag is additive. */
@@ -2494,8 +2549,8 @@ vy_write_range_header(int fd, struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_stmt *split_key, int *p_fd,
-		   struct vy_run **p_run, struct vy_stmt **stmt)
+		   struct vy_stmt *split_key, int *p_fd, struct vy_run **p_run,
+		   struct vy_stmt **stmt, size_t *written)
 {
 	assert(stmt);
 	assert(*stmt);
@@ -2539,6 +2594,8 @@ create_failed:
 	if (vy_run_write(fd, wi, split_key, index->key_def,
 			 index->key_def->opts.page_size, p_run, stmt) != 0)
 		goto fail;
+
+	*written += (*p_run)->info.size;
 
 	if (created) {
 		/*
@@ -3206,6 +3263,12 @@ struct vy_task {
 	/** index this task is for */
 	struct vy_index *index;
 
+	/** How long ->execute took, in nanoseconds. */
+	uint64_t exec_time;
+
+	/** Number of bytes written to disk by this task. */
+	size_t dump_size;
+
 	/**
 	 * View sequence number at the time when the task was scheduled.
 	 * TODO: move it to arg as not all tasks need it.
@@ -3286,8 +3349,8 @@ vy_task_dump_execute(struct vy_task *task)
 	rc = vy_write_iterator_next(wi, &stmt);
 	if (rc || stmt == NULL)
 		goto out;
-	rc = vy_range_write_run(range, wi, NULL,
-				&range->fd, &task->dump.new_run, &stmt);
+	rc = vy_range_write_run(range, wi, NULL, &range->fd,
+				&task->dump.new_run, &stmt, &task->dump_size);
 out:
 	vy_write_iterator_delete(wi);
 	return rc;
@@ -3418,8 +3481,8 @@ vy_task_compact_execute(struct vy_task *task)
 				      rc = -1; goto out;});
 		}
 
-		rc = vy_range_write_run(p->range, wi, split_key,
-					&parts[i].fd, &p->run, &curr_stmt);
+		rc = vy_range_write_run(p->range, wi, split_key, &parts[i].fd,
+					&p->run, &curr_stmt, &task->dump_size);
 		if (rc != 0)
 			goto out;
 		if (curr_stmt == NULL) {
@@ -3854,6 +3917,9 @@ vy_scheduler_f(va_list va)
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
 			if (task->ops->complete && task->ops->complete(task))
 				error_log(diag_last_error(diag_get()));
+			if (task->dump_size > 0)
+				vy_stat_dump(env->stat, task->exec_time,
+					     task->dump_size);
 			vy_task_delete(&scheduler->task_pool, task);
 			workers_available++;
 			assert(workers_available <= scheduler->worker_pool_size);
@@ -3924,7 +3990,9 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
+		uint64_t start = clock_monotonic64();
 		task->status = task->ops->execute(task);
+		task->exec_time = clock_monotonic64() - start;
 		if (task->status != 0) {
 			assert(!diag_is_empty(diag_get()));
 			if (!warning_said) {
@@ -4303,6 +4371,8 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
 	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
 	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
+	vy_info_append_u64(node, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	vy_info_append_u64(node, "dump_total", stat->dump_total);
 	return 0;
 }
 
