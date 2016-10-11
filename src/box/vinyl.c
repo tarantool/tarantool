@@ -54,6 +54,7 @@
 #include "ipc.h"
 #include "coeio.h"
 #include "histogram.h"
+#include "rmean.h"
 
 #include "errcode.h"
 #include "key_def.h"
@@ -311,7 +312,17 @@ path_exists(const char *path)
 #define vy_error(fmt, ...) \
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
+enum vy_stat_name {
+	VY_STAT_TX_WRITE,
+	VY_STAT_LAST,
+};
+
+static const char *vy_stat_strings[] = {
+	"tx_write",
+};
+
 struct vy_stat {
+	struct rmean *rmean;
 	/* get */
 	uint64_t get;
 	struct vy_avg    get_read_disk;
@@ -378,6 +389,13 @@ vy_stat_new()
 	 * which should be fine for initial guess.
 	 */
 	histogram_collect(s->dump_bw, 10 * MB);
+
+	s->rmean = rmean_new(vy_stat_strings, VY_STAT_LAST);
+	if (s->rmean == NULL) {
+		histogram_delete(s->dump_bw);
+		free(s);
+		return NULL;
+	}
 	return s;
 }
 
@@ -385,6 +403,7 @@ static void
 vy_stat_delete(struct vy_stat *s)
 {
 	histogram_delete(s->dump_bw);
+	rmean_delete(s->rmean);
 	free(s);
 }
 
@@ -417,7 +436,7 @@ vy_stat_get(struct vy_stat *s, const struct vy_stat_get *statget)
 
 static void
 vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
-	   uint32_t write_count, bool is_rollback)
+	   uint32_t write_count, size_t write_size, bool is_rollback)
 {
 	uint64_t diff = clock_monotonic64() - start;
 	s->tx++;
@@ -426,6 +445,7 @@ vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
 	s->write_count += write_count;
 	vy_avg_update(&s->tx_stmts, count);
 	vy_avg_update(&s->tx_latency, diff);
+	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
 }
 
 static void
@@ -449,6 +469,18 @@ vy_stat_dump_bandwidth(struct vy_stat *s)
 {
 	/* See comment to vy_stat->dump_bw. */
 	return histogram_percentile(s->dump_bw, 10);
+}
+
+static int64_t
+vy_stat_tx_write_rate(struct vy_stat *s)
+{
+	return rmean_mean(s->rmean->stats[VY_STAT_TX_WRITE].value);
+}
+
+static int64_t
+vy_stat_tx_write_total(struct vy_stat *s)
+{
+	return s->rmean->stats[VY_STAT_TX_WRITE].total;
 }
 
 /** There was a backend read. This flag is additive. */
@@ -1358,7 +1390,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		txv_delete(v);
 		count++;
 	}
-	vy_stat_tx(e->stat, tx->start, count, 0, true);
+	vy_stat_tx(e->stat, tx->start, count, 0, 0, true);
 }
 
 static const char *
@@ -3158,7 +3190,7 @@ out:
  */
 static struct txv *
 vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
-	 enum vinyl_status status, int64_t lsn)
+	 enum vinyl_status status, int64_t lsn, size_t *write_size)
 {
 	struct vy_index *index = v->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -3225,6 +3257,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		mem->used += size;
 		range->used += size;
 		quota += size;
+		*write_size += size;
 
 		mem->version++;
 	}
@@ -4373,6 +4406,8 @@ vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
 	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
 	vy_info_append_u64(node, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
 	vy_info_append_u64(node, "dump_total", stat->dump_total);
+	vy_info_append_u64(node, "tx_write_rate", vy_stat_tx_write_rate(stat));
+	vy_info_append_u64(node, "tx_write_total", vy_stat_tx_write_total(stat));
 	return 0;
 }
 
@@ -5425,10 +5460,12 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	struct txv *v = write_set_first(&tx->write_set);
 
 	uint64_t write_count = 0;
+	size_t write_size = 0;
 	/** @todo: check return value of vy_tx_write(). */
 	while (v != NULL) {
 		++write_count;
-		v = vy_tx_write(&tx->write_set, v, now, e->status, lsn);
+		v = vy_tx_write(&tx->write_set, v, now, e->status, lsn,
+				&write_size);
 	}
 
 	uint32_t count = 0;
@@ -5440,7 +5477,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
-	vy_stat_tx(e->stat, tx->start, count, write_count, false);
+	vy_stat_tx(e->stat, tx->start, count, write_count, write_size, false);
 	free(tx);
 	return 0;
 }
