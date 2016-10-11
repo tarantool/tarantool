@@ -1,3 +1,10 @@
+tarantool-lts (1.5.5-33-g38b2398-1) unstable; urgency=medium
+
+  * Move tarantool-lts-common from dependencies to recommends:
+    tarantool-lts (tarantool_box binary) can be installed with tarantool 1.6+.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 11 Oct 2016 15:40:02 +0300
+
 tarantool-lts (1.5.5-18-g2998d20-1) unstable; urgency=medium
 
   * Add conflict with tarantool, closes: #793867.
