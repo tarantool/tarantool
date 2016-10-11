@@ -105,6 +105,8 @@ struct vy_env {
 	struct vy_scheduler *scheduler;
 	struct vy_stat      *stat;
 	struct mempool      cursor_pool;
+	/** Timer for updating quota watermark. */
+	ev_timer            quota_timer;
 };
 
 struct vy_buf {
@@ -192,6 +194,7 @@ vy_buf_at(struct vy_buf *b, int size, int i) {
 struct vy_quota {
 	bool enable;
 	int64_t limit;
+	int64_t watermark;
 	int64_t used;
 	struct ipc_cond cond;
 };
@@ -217,6 +220,12 @@ vy_quota_used_percent(struct vy_quota *q)
 	if (q->limit == 0)
 		return 0;
 	return (q->used * 100) / q->limit;
+}
+
+static bool
+vy_quota_exceeded(struct vy_quota *q)
+{
+	return q->used >= q->watermark;
 }
 
 struct vy_avg {
@@ -256,6 +265,7 @@ vy_quota_new(int64_t limit)
 	}
 	q->enable = false;
 	q->limit  = limit;
+	q->watermark = limit;
 	q->used   = 0;
 	ipc_cond_create(&q->cond);
 	return q;
@@ -277,13 +287,17 @@ vy_quota_enable(struct vy_quota *q)
 }
 
 static void
-vy_quota_use(struct vy_quota *q, int64_t size)
+vy_quota_use(struct vy_quota *q, int64_t size,
+	     struct ipc_cond *no_quota_cond)
 {
-	if (size == 0)
-		return;
-	while (q->enable && q->used + size >= q->limit)
-		ipc_cond_wait(&q->cond);
 	q->used += size;
+	while (q->enable) {
+		if (q->used >= q->watermark)
+			ipc_cond_signal(no_quota_cond);
+		if (q->used < q->limit)
+			break;
+		ipc_cond_wait(&q->cond);
+	}
 }
 
 static void
@@ -292,6 +306,24 @@ vy_quota_release(struct vy_quota *q, int64_t size)
 	q->used -= size;
 	if (q->used < q->limit)
 		ipc_cond_broadcast(&q->cond);
+}
+
+static void
+vy_quota_update_watermark(struct vy_quota *q, size_t max_range_size,
+			  int64_t tx_write_rate, int64_t dump_bandwidth)
+{
+	/*
+	 * In order to avoid throttling transactions due to the hard
+	 * memory limit, we start dumping ranges beforehand, after
+	 * exceeding the memory watermark. The gap between the watermark
+	 * and the hard limit is set to such a value that should allow
+	 * us to dump the biggest range before the hard limit is hit,
+	 * basing on average write rate and disk bandwidth.
+	 */
+	q->watermark = q->limit - (double)max_range_size *
+					tx_write_rate / dump_bandwidth;
+	if (q->watermark < 0)
+		q->watermark = 0;
 }
 
 static int
@@ -3196,7 +3228,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *prev_range = NULL;
 	struct vy_range *range = NULL;
-	size_t quota = 0;
 
 	for (; v && v->index == index; v = write_set_next(write_set, v)) {
 
@@ -3256,7 +3287,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		size_t size = vy_stmt_size(stmt);
 		mem->used += size;
 		range->used += size;
-		quota += size;
 		*write_size += size;
 
 		mem->version++;
@@ -3265,8 +3295,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		range->update_time = time;
 		vy_scheduler_update_range(scheduler, range);
 	}
-	/* Take quota after having unlocked the index mutex. */
-	vy_quota_use(index->env->quota, quota);
 	return v;
 }
 
@@ -3820,7 +3848,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (!vy_range_need_dump(range) &&
+		if (!vy_quota_exceeded(scheduler->env->quota) &&
+		    !vy_range_need_dump(range) &&
 		    !vy_range_need_checkpoint(range))
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
@@ -4368,11 +4397,12 @@ static int
 vy_info_append_memory(struct vy_info *info, struct vy_info_node *root)
 {
 	struct vy_info_node *node = vy_info_append(root, "memory");
-	if (vy_info_reserve(info, node, 3) != 0)
+	if (vy_info_reserve(info, node, 4) != 0)
 		return 1;
 	struct vy_env *env = info->env;
 	vy_info_append_u64(node, "used", vy_quota_used(env->quota));
 	vy_info_append_u64(node, "limit", env->conf->memory_limit);
+	vy_info_append_u64(node, "watermark", env->quota->watermark);
 	static char buf[4];
 	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
 	vy_info_append_str(node, "ratio", buf);
@@ -5479,6 +5509,8 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	}
 	vy_stat_tx(e->stat, tx->start, count, write_count, write_size, false);
 	free(tx);
+
+	vy_quota_use(e->quota, write_size, &e->scheduler->scheduler_cond);
 	return 0;
 }
 
@@ -5630,6 +5662,30 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 
 /** {{{ Environment */
 
+static void
+vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
+{
+	(void)loop;
+	(void)events;
+	struct vy_env *e = timer->data;
+
+	int64_t tx_write_rate = vy_stat_tx_write_rate(e->stat);
+	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
+
+	size_t max_range_size = 0;
+	struct heap_iterator it;
+	vy_dump_heap_iterator_init(&e->scheduler->dump_heap, &it);
+	struct heap_node *pn = vy_dump_heap_iterator_next(&it);
+	if (pn != NULL) {
+		struct vy_range *range = container_of(pn, struct vy_range,
+						      nodedump);
+		max_range_size = range->used;
+	}
+
+	vy_quota_update_watermark(e->quota, max_range_size,
+				  tx_write_rate, dump_bandwidth);
+}
+
 struct vy_env *
 vy_env_new(void)
 {
@@ -5659,6 +5715,10 @@ vy_env_new(void)
 
 	mempool_create(&e->cursor_pool, cord_slab_cache(),
 	               sizeof(struct vy_cursor));
+
+	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
+	e->quota_timer.data = e;
+	ev_timer_start(loop(), &e->quota_timer);
 	return e;
 error_sched:
 	vy_stat_delete(e->stat);
@@ -5676,6 +5736,7 @@ error_conf:
 void
 vy_env_delete(struct vy_env *e)
 {
+	ev_timer_stop(loop(), &e->quota_timer);
 	vy_scheduler_delete(e->scheduler);
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
