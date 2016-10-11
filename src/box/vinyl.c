@@ -4884,11 +4884,14 @@ vy_stmt_compare(const char *stmt_data_a, const char *stmt_data_b,
 static void *
 vy_update_alloc(void *arg, size_t size)
 {
-	(void) arg;
 	/* TODO: rewrite tuple_upsert_execute() without exceptions */
-	void *data = box_txn_alloc(size);
-	if (data == NULL)
+	struct region *region = (struct region *) arg;
+	void *data = region_aligned_alloc(region, size, sizeof(uint64_t));
+	if (data == NULL) {
+		diag_set(OutOfMemory, sizeof(struct vy_tx), "region",
+			 "upsert");
 		diag_raise();
+	}
 	return data;
 }
 
@@ -4903,9 +4906,9 @@ vy_update_alloc(void *arg, size_t size)
  * so call fiber_gc() after usage
  */
 static void
-vy_apply_upsert_ops(const char **stmt, const char **stmt_end,
-		    const char *ops, const char *ops_end,
-		    bool suppress_error)
+vy_apply_upsert_ops(struct region *region, const char **stmt,
+		    const char **stmt_end, const char *ops,
+		    const char *ops_end, bool suppress_error)
 {
 	if (ops == ops_end)
 		return;
@@ -4928,7 +4931,7 @@ vy_apply_upsert_ops(const char **stmt, const char **stmt_end,
 #endif
 		const char *result;
 		uint32_t size;
-		result = tuple_upsert_execute(vy_update_alloc, NULL,
+		result = tuple_upsert_execute(vy_update_alloc, region,
 					      ops, serie_end,
 					      *stmt, *stmt_end,
 					      &size, index_base, suppress_error);
@@ -4996,15 +4999,19 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	const char *result_mp = old_mp;
 	const char *result_mp_end = old_mp_end;
 	struct vy_stmt *result_stmt;
-	vy_apply_upsert_ops(&result_mp, &result_mp_end, new_ops, new_ops_end,
-			    suppress_error);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
+			    new_ops_end, suppress_error);
 	if (!(old_stmt->flags & SVUPSERT)) {
 		/*
 		 * UPDATE case: return the updated old stmt.
 		 */
 		assert(old_ops_end - old_ops == 0);
 		result_stmt = vy_stmt_from_data(index, result_mp,
-						     result_mp_end);
+						result_mp_end);
+		region_truncate(region, region_svp);
+		result_mp = result_mp_end = NULL;
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
 		if (old_stmt->flags & (SVDELETE | SVREPLACE)) {
@@ -5026,6 +5033,8 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	char *extra;
 	result_stmt = vy_stmt_from_data_ex(index, result_mp,
 		result_mp_end, total_ops_size, &extra);
+	region_truncate(region, region_svp);
+	result_mp = result_mp_end = NULL;
 	if (result_stmt == NULL)
 		return NULL; /* OOM */
 	extra = mp_encode_uint(extra, ops_series_count);
