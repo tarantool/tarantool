@@ -1581,8 +1581,17 @@ ok 15 - subtests
     ok 230 - buffer overflow on step 50
     # *** test_format: done ***
 ok 16 - subtests
-    1..1
+    1..10
     # *** test_mp_print ***
-    ok 1 - identical
+    ok 1 - mp_snprint return value
+    ok 2 - mp_snprint result
+    ok 3 - mp_snprint limit = 0
+    ok 4 - mp_snprint limit = 1
+    ok 5 - mp_snprint limit = 2
+    ok 6 - mp_snprint limit = expected
+    ok 7 - mp_snprint limit = expected + 1
+    ok 8 - mp_fprint return value
+    ok 9 - mp_fprint result
+    ok 10 - mp_fprint I/O error
     # *** test_mp_print: done ***
 ok 17 - subtests
