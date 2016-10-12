@@ -123,6 +123,12 @@ say_set_log_level(int new_level)
 	log_level = new_level;
 }
 
+bool
+say_log_level_enabled(int level)
+{
+	return level <= log_level;
+}
+
 /**
  * Initialize the logger pipe: a standalone
  * process which is fed all log messages.

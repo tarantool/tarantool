@@ -462,6 +462,62 @@ static struct vy_stmt *
 vy_apply_upsert(struct vy_stmt *upsert, struct vy_stmt *object,
 		struct vy_index *index, bool suppress_error);
 
+/*
+ * Buffer used for converting stmt to string.
+ *
+ * Usage:
+ *   vy_str_stmt_reset();
+ *   say_debug("stmt1: %s; stmt2: %s",
+ *             vy_str_stmt(stmt1, key_def), vy_str_stmt(stmt2, key_def));
+ */
+#define VY_STR_STMT_SIZE 16384
+static char *vy_str_stmt_buf;
+static int vy_str_stmt_pos;
+
+static void
+vy_str_stmt_reset(void)
+{
+	vy_str_stmt_pos = 0;
+}
+
+static const char *
+vy_str_stmt(const struct vy_stmt *stmt, const struct key_def *key_def)
+{
+	if (stmt == NULL)
+		return "<nil>";
+	int sz = 2; /* '[' and ']' */
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		int len = mp_snprint(NULL, 0, vy_stmt_key_part(stmt->data, i));
+		if (len < 0)
+			return "<MPErr>";
+		sz += len;
+		if (i < key_def->part_count - 1)
+			sz += 2; /* part separator (", ") */
+	}
+	sz++; /* terminating nil */
+	if (vy_str_stmt_buf == NULL)
+		vy_str_stmt_buf = malloc(VY_STR_STMT_SIZE);
+	if (vy_str_stmt_buf == NULL ||
+	    vy_str_stmt_pos + sz > VY_STR_STMT_SIZE)
+		return "<NoMem>";
+	char *s = vy_str_stmt_buf + vy_str_stmt_pos;
+	vy_str_stmt_pos += sz;
+	char *p = s;
+	*p++ = '[';
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		assert((p - s) < sz);
+		p += mp_snprint(p, sz - (p - s),
+				vy_stmt_key_part(stmt->data, i));
+		if (i < key_def->part_count - 1) {
+			*p++ = ',';
+			*p++ = ' ';
+		}
+	}
+	*p++ = ']';
+	*p = '\0';
+	return s;
+}
+
 struct tree_mem_key {
 	char *data;
 	int64_t lsn;
@@ -1556,6 +1612,21 @@ vy_range_iterator_next(struct vy_range_iterator *ii)
 }
 
 static void
+vy_range_log_debug(struct vy_range *range, const char *reason)
+{
+	struct key_def *key_def = range->index->key_def;
+	if (!say_log_level_enabled(S_DEBUG))
+		return;
+	vy_str_stmt_reset();
+	say_debug("range_%s: %"PRIu32"/%"PRIu32
+		  "/0x%"PRIx64".0x%"PRIx64" (%p): %s .. %s",
+		  reason, key_def->space_id, key_def->iid,
+		  key_def->opts.lsn, range->id, range,
+		  vy_str_stmt(range->begin, key_def),
+		  vy_str_stmt(range->end, key_def));
+}
+
+static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
@@ -2539,6 +2610,8 @@ vy_range_compact_prepare(struct vy_range *range,
 	} else
 		parts[0].range->end = range->end;
 
+	vy_range_log_debug(range, "compact");
+
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
 	for (i = 0; i < n_parts; i++) {
@@ -2552,6 +2625,8 @@ vy_range_compact_prepare(struct vy_range *range,
 		r->fd = range->fd;
 
 		vy_index_add_range(index, r);
+
+		vy_range_log_debug(r, "new");
 	}
 
 	*p_n_parts = n_parts;
@@ -2573,6 +2648,8 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 {
 	struct vy_index *index = range->index;
 	int i;
+
+	vy_range_log_debug(range, "compact_done");
 
 	index->size -= vy_range_size(range);
 	for (i = 0; i < n_parts; i++) {
@@ -2605,6 +2682,8 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 	struct vy_index *index = range->index;
 	int i;
 
+	vy_range_log_debug(range, "compact_failed");
+
 	/*
 	 * So, we failed to write runs for the new ranges. Attach their
 	 * in-memory indexes to the original range and delete them.
@@ -2612,6 +2691,8 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 
 	for (i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i].range;
+
+		vy_range_log_debug(r, "delete");
 
 		vy_index_remove_range(index, r);
 
@@ -3174,6 +3255,9 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_range *range = task->dump.range;
 	struct vy_run *run = task->dump.new_run;
 
+	vy_range_log_debug(range, task->status == 0 ?
+			   "dump_done" : "dump_failed");
+
 	/*
 	 * No need to roll back anything on dump failure - the range will just
 	 * carry on with a new shadow memory tree.
@@ -3236,6 +3320,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	range->mem_count++;
 
 	task->dump.range = range;
+	vy_range_log_debug(range, "dump");
 	return task;
 }
 
