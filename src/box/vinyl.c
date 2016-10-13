@@ -668,7 +668,7 @@ vy_stmt_str(const struct vy_stmt *stmt, const struct key_def *key_def)
 }
 
 struct tree_mem_key {
-	char *data;
+	const char *data;
 	int64_t lsn;
 };
 
@@ -795,6 +795,30 @@ vy_mem_delete(struct vy_mem *index)
 	}
 	vy_mem_tree_destroy(&index->tree);
 	free(index);
+}
+
+/*
+ * Return the older statement for the key
+ */
+static struct vy_stmt *
+vy_mem_older_lsn(struct vy_mem *mem, const char *key, int64_t key_lsn,
+		 const struct key_def *key_def)
+{
+	struct tree_mem_key tree_key;
+	tree_key.data = key;
+	tree_key.lsn = key_lsn - 1;
+	bool exact = false;
+	struct vy_mem_tree_iterator itr =
+		vy_mem_tree_lower_bound(&mem->tree, &tree_key, &exact);
+
+	if (vy_mem_tree_iterator_is_invalid(&itr))
+		return NULL;
+
+	struct vy_stmt *result;
+	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
+	if (vy_stmt_compare(result->data, key, key_def) != 0)
+		return NULL;
+	return result;
 }
 
 /**
@@ -3214,6 +3238,98 @@ out:
 	return rc;
 }
 
+/*
+ * Save a statement in the range's in-memory index.
+ */
+static int
+vy_range_set(struct vy_range *range, struct vy_stmt *stmt, size_t *write_size)
+{
+	struct vy_scheduler *scheduler = range->index->env->scheduler;
+
+	struct vy_mem *mem = range->mem;
+	int rc = vy_mem_tree_insert(&mem->tree, stmt, NULL);
+	if (rc != 0)
+		return -1;
+
+	vy_stmt_ref(stmt);
+
+	if (mem->used == 0) {
+		mem->min_lsn = stmt->lsn;
+		vy_scheduler_mem_dirtied(scheduler, mem);
+	}
+	if (range->used == 0)
+		range->min_lsn = stmt->lsn;
+
+	assert(mem->min_lsn <= stmt->lsn);
+	assert(range->min_lsn <= stmt->lsn);
+
+	size_t size = vy_stmt_size(stmt);
+	mem->used += size;
+	range->used += size;
+	*write_size += size;
+
+	mem->version++;
+
+	return 0;
+}
+
+static int
+vy_range_set_delete(struct vy_range *range, struct vy_stmt *stmt,
+		    size_t *write_size)
+{
+	assert(stmt->flags == SVDELETE);
+
+	if (range->mem_count == 1 && range->run_count == 0 &&
+	    vy_mem_older_lsn(range->mem, stmt->data, stmt->lsn,
+			     range->index->key_def) == NULL) {
+		/*
+		 * Optimization: the active mem index doesn't have statements
+		 * for the key and there are no more mems and runs.
+		 *  => discard DELETE statement.
+		 */
+		return 0;
+	}
+
+	return vy_range_set(range, stmt, write_size);
+}
+
+static int
+vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
+		    size_t *write_size)
+{
+	assert(stmt->flags == SVUPSERT);
+
+	struct vy_index *index = range->index;
+	struct vy_stmt *older = vy_mem_older_lsn(range->mem, stmt->data,
+						 stmt->lsn, index->key_def);
+	if ((older != NULL && older->flags != SVUPSERT) ||
+	    (older == NULL && range->mem_count == 1 && range->run_count == 0)) {
+		/*
+		 * Optimization:
+		 *
+		 *  1. An older non-UPSERT statement for the key has been
+		 *     found in the active memory index.
+		 *  2. Active memory index doesn't have statements for the
+		 *     key, but there are no more mems and runs.
+		 *
+		 *  => apply UPSERT to the older statement and save
+		 *     resulted REPLACE instead of original UPSERT.
+		 *
+		 */
+		assert(older == NULL || older->flags != SVUPSERT);
+		stmt = vy_apply_upsert(stmt, older, index, false);
+		if (stmt == NULL)
+			return -1; /* OOM */
+		assert(stmt->flags == SVREPLACE);
+		int rc = vy_range_set(range, stmt, write_size);
+		vy_stmt_unref(stmt);
+		return rc;
+	}
+
+	return vy_range_set(range, stmt, write_size);
+}
+
+
 /**
  * Iterate over the write set of a single index
  * and flush it to the active in-memory tree of this index.
@@ -3229,6 +3345,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 	struct vy_range *prev_range = NULL;
 	struct vy_range *range = NULL;
 
+	/* Sic: the loop below must not yield after recovery */
 	for (; v && v->index == index; v = write_set_next(write_set, v)) {
 
 		struct vy_stmt *stmt = v->stmt;
@@ -3264,32 +3381,20 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		}
 		prev_range = range;
 
-		/*
-		 * Insert the new statement to the range's
-		 * in-memory index.
-		 */
-		struct vy_mem *mem = range->mem;
-		int rc = vy_mem_tree_insert(&mem->tree, stmt, NULL);
+		int rc;
+		switch (stmt->flags) {
+		case SVUPSERT:
+			rc = vy_range_set_upsert(range, stmt, write_size);
+			break;
+		case SVDELETE:
+			rc = vy_range_set_delete(range, stmt, write_size);
+			break;
+		default:
+			rc = vy_range_set(range, stmt, write_size);
+			break;
+		}
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
-		vy_stmt_ref(stmt);
-
-		if (mem->used == 0) {
-			mem->min_lsn = stmt->lsn;
-			vy_scheduler_mem_dirtied(scheduler, mem);
-		}
-		if (range->used == 0)
-			range->min_lsn = stmt->lsn;
-
-		assert(mem->min_lsn <= stmt->lsn);
-		assert(range->min_lsn <= stmt->lsn);
-
-		size_t size = vy_stmt_size(stmt);
-		mem->used += size;
-		range->used += size;
-		*write_size += size;
-
-		mem->version++;
 	}
 	if (range != NULL) {
 		range->update_time = time;
