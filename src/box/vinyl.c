@@ -8040,9 +8040,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 			rc = vy_merge_iterator_next_lsn(mi);
 			if (rc < 0)
 				return rc;
-			if (rc > 0 && !wi->is_last_level)
+			else if (rc == 0)
+				vy_merge_iterator_get(mi, &next);
+			else if (!wi->is_last_level)
 				break; /* Return the accumulated UPSERT */
-			vy_merge_iterator_get(mi, &next);
 			struct vy_stmt *applied =
 				vy_apply_upsert(stmt, next, wi->index, false);
 			vy_stmt_unref(stmt);
