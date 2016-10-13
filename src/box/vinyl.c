@@ -462,60 +462,88 @@ static struct vy_stmt *
 vy_apply_upsert(struct vy_stmt *upsert, struct vy_stmt *object,
 		struct vy_index *index, bool suppress_error);
 
-/*
- * Buffer used for converting stmt to string.
- *
- * Usage:
- *   vy_str_stmt_reset();
- *   say_debug("stmt1: %s; stmt2: %s",
- *             vy_str_stmt(stmt1, key_def), vy_str_stmt(stmt2, key_def));
+/**
+ * Return statement type name by type id.
  */
-#define VY_STR_STMT_SIZE 16384
-static char *vy_str_stmt_buf;
-static int vy_str_stmt_pos;
-
-static void
-vy_str_stmt_reset(void)
+static const char *
+vy_stmt_typename(int type)
 {
-	vy_str_stmt_pos = 0;
+	switch (type) {
+	case SVGET:     return "SELECT";
+	case SVREPLACE: return "REPLACE";
+	case SVDELETE:  return "DELETE";;
+	case SVUPSERT:  return "DELETE";
+	default:        return "UNKNOWN";;
+	}
 }
 
-static const char *
-vy_str_stmt(const struct vy_stmt *stmt, const struct key_def *key_def)
+/**
+ * Format a key into string.
+ * Example: [1, 2, "string"]
+ * \sa mp_snprint()
+ */
+static int
+vy_key_snprint(char *buf, int size, const char *key,
+	       const struct key_def *key_def)
 {
-	if (stmt == NULL)
-		return "<nil>";
-	int sz = 2; /* '[' and ']' */
+	if (key == NULL)
+		return snprintf(buf, size, "[]");
+
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "[");
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		int len = mp_snprint(NULL, 0, vy_stmt_key_part(stmt->data, i));
-		if (len < 0)
-			return "<MPErr>";
-		sz += len;
+		const char *part = vy_stmt_key_part(key, i);
+		SNPRINT(total, mp_snprint, buf, size, part);
 		if (i < key_def->part_count - 1)
-			sz += 2; /* part separator (", ") */
+			SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	sz++; /* terminating nil */
-	if (vy_str_stmt_buf == NULL)
-		vy_str_stmt_buf = malloc(VY_STR_STMT_SIZE);
-	if (vy_str_stmt_buf == NULL ||
-	    vy_str_stmt_pos + sz > VY_STR_STMT_SIZE)
-		return "<NoMem>";
-	char *s = vy_str_stmt_buf + vy_str_stmt_pos;
-	vy_str_stmt_pos += sz;
-	char *p = s;
-	*p++ = '[';
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		assert((p - s) < sz);
-		p += mp_snprint(p, sz - (p - s),
-				vy_stmt_key_part(stmt->data, i));
-		if (i < key_def->part_count - 1) {
-			*p++ = ',';
-			*p++ = ' ';
-		}
-	}
-	*p++ = ']';
-	*p = '\0';
-	return s;
+	SNPRINT(total, snprintf, buf, size, "]");
+	return total;
+}
+
+/**
+ * Format a statement into string.
+ * Example: REPLACE([1, 2, "string"], lsn=48)
+ */
+static int
+vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
+		const struct key_def *key_def)
+{
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "%s",
+		vy_stmt_typename(stmt->flags));
+	SNPRINT(total, vy_key_snprint, buf, size, stmt->data, key_def);
+	SNPRINT(total, snprintf, buf, size, ", lsn=%lld",
+		(long long) stmt->lsn);
+	return total;
+}
+
+/*
+ * Format a key into string using a static buffer.
+ * Useful for gdb and say_debug().
+ * \sa vy_key_snprint()
+ */
+static __attribute__((unused)) const char *
+vy_key_str(const char *key, const struct key_def *key_def)
+{
+	char *buf = tt_static_buf();
+	if (vy_key_snprint(buf, TT_STATIC_BUF_LEN, key, key_def) < 0)
+		return "<failed to format key>";
+	return buf;
+}
+
+/*
+ * Format a statement into string using a static buffer.
+ * Useful for gdb and say_debug().
+ * \sa vy_stmt_snprint()
+ */
+static __attribute__((unused)) const char *
+vy_stmt_str(const struct vy_stmt *stmt, const struct key_def *key_def)
+{
+	char *buf = tt_static_buf();
+	if (vy_stmt_snprint(buf, TT_STATIC_BUF_LEN, stmt, key_def) < 0)
+		return "<failed to format statement>";
+	return buf;
 }
 
 struct tree_mem_key {
@@ -1614,16 +1642,18 @@ vy_range_iterator_next(struct vy_range_iterator *ii)
 static void
 vy_range_log_debug(struct vy_range *range, const char *reason)
 {
-	struct key_def *key_def = range->index->key_def;
-	if (!say_log_level_enabled(S_DEBUG))
+	if (!say_log_level_is_enabled(S_DEBUG))
 		return;
-	vy_str_stmt_reset();
-	say_debug("range_%s: %"PRIu32"/%"PRIu32
-		  "/0x%"PRIx64".0x%"PRIx64" (%p): %s .. %s",
+
+	struct key_def *key_def = range->index->key_def;
+	say_debug("range %s: %"PRIu32"/%"PRIu32
+		"/%016"PRIx64".%016"PRIx64" (%p): %s .. %s",
 		  reason, key_def->space_id, key_def->iid,
 		  key_def->opts.lsn, range->id, range,
-		  vy_str_stmt(range->begin, key_def),
-		  vy_str_stmt(range->end, key_def));
+		  vy_key_str(range->begin != NULL ? range->begin->data : NULL,
+			     key_def),
+		  vy_key_str(range->end != NULL ? range->end->data : NULL,
+			      key_def));
 }
 
 static void
@@ -2610,7 +2640,7 @@ vy_range_compact_prepare(struct vy_range *range,
 	} else
 		parts[0].range->end = range->end;
 
-	vy_range_log_debug(range, "compact");
+	vy_range_log_debug(range, "compact prepare");
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
@@ -2649,7 +2679,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 	struct vy_index *index = range->index;
 	int i;
 
-	vy_range_log_debug(range, "compact_done");
+	vy_range_log_debug(range, "compact complete");
 
 	index->size -= vy_range_size(range);
 	for (i = 0; i < n_parts; i++) {
@@ -2682,7 +2712,7 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 	struct vy_index *index = range->index;
 	int i;
 
-	vy_range_log_debug(range, "compact_failed");
+	vy_range_log_debug(range, "compact failed");
 
 	/*
 	 * So, we failed to write runs for the new ranges. Attach their
@@ -3256,7 +3286,7 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_run *run = task->dump.new_run;
 
 	vy_range_log_debug(range, task->status == 0 ?
-			   "dump_done" : "dump_failed");
+			   "dump complete" : "dump failed");
 
 	/*
 	 * No need to roll back anything on dump failure - the range will just
@@ -3320,7 +3350,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	range->mem_count++;
 
 	task->dump.range = range;
-	vy_range_log_debug(range, "dump");
+	vy_range_log_debug(range, "dump prepare");
 	return task;
 }
 

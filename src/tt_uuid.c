@@ -33,6 +33,7 @@
 #include <msgpuck.h>
 #include <random.h>
 #include <trivia/config.h>
+#include <trivia/util.h>
 
 /* Zeroed by the linker. */
 const struct tt_uuid uuid_nil;
@@ -85,13 +86,8 @@ tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
 char *
 tt_uuid_str(const struct tt_uuid *uu)
 {
-	enum { BUFS = 4 };
-	static __thread char bufs[BUFS][UUID_STR_LEN + 1];
-	static __thread int bufno = BUFS - 1;
-
-	bufno = (bufno + 1) % BUFS;
-	char *buf = bufs[bufno];
-
+	assert(TT_STATIC_BUF_LEN >= UUID_STR_LEN);
+	char *buf = tt_static_buf();
 	tt_uuid_to_string(uu, buf);
 	return buf;
 }

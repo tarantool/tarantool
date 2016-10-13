@@ -117,17 +117,11 @@ say_init(const char *argv0)
 	binary_filename = strdup(argv0);
 }
 
-void
-say_set_log_level(int new_level)
-{
-	log_level = new_level;
-}
+extern inline void
+say_set_log_level(int new_level);
 
-bool
-say_log_level_enabled(int level)
-{
-	return level <= log_level;
-}
+extern inline bool
+say_log_level_is_enabled(int level);
 
 /**
  * Initialize the logger pipe: a standalone
@@ -418,7 +412,7 @@ sayf(int level, const char *filename, int line, const char *error,
      const char *format, ...)
 {
 	int errsv = errno; /* Preserve the errno. */
-	if (log_level < level)
+	if (!say_log_level_is_enabled(level))
 		return;
 	va_list ap;
 	va_start(ap, format);

@@ -168,6 +168,38 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_THREAD_CPUTIME_ID		3
 #endif
 
+#define TT_STATIC_BUF_LEN 1024
+
+/**
+ * Return a thread-local statically allocated temporary buffer of size
+ * \a TT_STATIC_BUF_LEN
+ */
+static inline char *
+tt_static_buf(void)
+{
+	enum { TT_STATIC_BUFS = 4 };
+	static __thread char bufs[TT_STATIC_BUFS][TT_STATIC_BUF_LEN + 1];
+	static __thread int bufno = TT_STATIC_BUFS - 1;
+
+	bufno = (bufno + 1) % TT_STATIC_BUFS;
+	return bufs[bufno];
+}
+
+/**
+ * Helper macro to handle easily snprintf() result
+ */
+#define SNPRINT(_total, _fun, _buf, _size, ...) do {				\
+	int written =_fun(_buf, _size, ##__VA_ARGS__);				\
+	if (written < 0)							\
+		return -1;							\
+	_total += written;							\
+	if (written < _size) {							\
+		_buf += written, _size -= written;				\
+	} else {								\
+		_buf = NULL, _size = 0;						\
+	}									\
+} while(0)
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

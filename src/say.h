@@ -56,15 +56,22 @@ enum say_level {
 /** \endcond public */
 
 extern pid_t logger_pid;
+extern int log_level;
+
+inline void
+say_set_log_level(int new_level)
+{
+	log_level = new_level;
+}
+
+inline bool
+say_log_level_is_enabled(int level)
+{
+       return level <= log_level;
+}
 
 void
 say_logrotate(int /* signo */);
-
-void
-say_set_log_level(int new_level);
-
-bool
-say_log_level_enabled(int level);
 
 /** Basic init. */
 void say_init(const char *argv0);
