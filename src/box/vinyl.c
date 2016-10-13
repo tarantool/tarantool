@@ -4748,6 +4748,28 @@ vy_stmt_from_data(struct vy_index *index,
 	return vy_stmt_from_data_ex(index, data, data_end, 0, &unused);
 }
 
+/*
+ * Create REPLACE statement from UPSERT statement.
+ */
+static struct vy_stmt *
+vy_stmt_replace_from_upsert(struct vy_stmt *upsert,
+			    const struct key_def *key_def)
+{
+	/* Get statement size without UPSERT operations */
+	uint32_t *offsets = (uint32_t *) upsert->data;
+	size_t size = offsets[key_def->part_count];
+	assert(size <= upsert->size);
+
+	/* Copy statement data excluding UPSERT operations */
+	struct vy_stmt *replace = vy_stmt_alloc(size);
+	if (replace == NULL)
+		return NULL;
+	memcpy(replace->data, upsert->data, size);
+	replace->flags = SVREPLACE;
+	replace->lsn = upsert->lsn;
+	return replace;
+}
+
 static struct vy_stmt *
 vy_stmt_extract_key_raw(struct vy_index *index, const char *stmt)
 {
@@ -4963,6 +4985,13 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	assert(new_stmt != old_stmt);
 	struct key_def *key_def = index->key_def;
 
+	if (old_stmt == NULL || old_stmt->flags & SVDELETE) {
+		/*
+		 * INSERT case: return new stmt.
+		 */
+		return vy_stmt_replace_from_upsert(new_stmt, key_def);
+	}
+
 	/*
 	 * Unpack UPSERT operation from the new stmt
 	 */
@@ -4972,16 +5001,6 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	vy_stmt_data_ex(key_def, new_data, new_data_end,
 			    &new_mp, &new_mp_end,
 			    &new_ops, &new_ops_end);
-	if (old_stmt == NULL || old_stmt->flags & SVDELETE) {
-		/*
-		 * INSERT case: return new stmt.
-		 */
-		struct vy_stmt *res;
-		res = vy_stmt_from_data(index, new_mp, new_mp_end);
-		res->flags = SVREPLACE;
-		res->lsn = new_stmt->lsn;
-		return res;
-	}
 
 	/*
 	 * Unpack UPSERT operation from the old stmt
