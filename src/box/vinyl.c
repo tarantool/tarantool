@@ -1503,7 +1503,6 @@ struct vy_range_iterator {
 	enum vy_order order;
 	char *key;
 	int key_size;
-	bool is_search_started;
 };
 
 static void
@@ -1514,15 +1513,12 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 	itr->order = order;
 	itr->key = key;
 	itr->key_size = key_size;
-	itr->is_search_started = false;
 }
 
 static void
 vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
 {
-	assert(!itr->is_search_started);
 	*ret = NULL;
-	itr->is_search_started = true;
 	struct vy_index *index = itr->index;
 	if (unlikely(index->range_count == 1)) {
 		*ret = vy_range_tree_first(&index->tree);
@@ -1636,22 +1632,22 @@ vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
 static void
 vy_range_iterator_next(struct vy_range_iterator *ii, struct vy_range **in_out)
 {
-	if (ii->is_search_started) {
-		switch (ii->order) {
-		case VINYL_LT:
-		case VINYL_LE:
-			*in_out = vy_range_tree_prev(&ii->index->tree,
-						     *in_out);
-			break;
-		case VINYL_GT:
-		case VINYL_GE:
-			*in_out = vy_range_tree_next(&ii->index->tree,
-						     *in_out);
-			break;
-		default: unreachable();
-		}
-	} else {
-		vy_range_iterator_start(ii, in_out);
+	if (*in_out == NULL) {
+		/* First iteration */
+		return vy_range_iterator_start(ii, in_out);
+	}
+
+	switch (ii->order) {
+	case VINYL_LT:
+	case VINYL_LE:
+		*in_out = vy_range_tree_prev(&ii->index->tree, *in_out);
+		break;
+	case VINYL_GT:
+	case VINYL_GE:
+		*in_out = vy_range_tree_next(&ii->index->tree, *in_out);
+		break;
+	default:
+		unreachable();
 	}
 }
 
@@ -3134,6 +3130,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 		/* match range */
 		struct vy_range_iterator ii;
 		vy_range_iterator_open(&ii, index, VINYL_GE, stmt->data, stmt->size);
+		range = NULL;
 		vy_range_iterator_next(&ii, &range);
 		assert(range != NULL);
 		if (prev_range != NULL && range != prev_range) {
@@ -8328,6 +8325,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->curr_stmt = NULL;
 	vy_range_iterator_open(&itr->range_iterator, index,
 			  order == VINYL_EQ ? VINYL_GE : order, key, 0);
+	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
 	vy_merge_iterator_open(&itr->merge_iterator, index, order, key);
@@ -8346,6 +8344,7 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 	enum vy_order order = itr->order == VINYL_EQ ? VINYL_GE : itr->order;
 	vy_range_iterator_open(&itr->range_iterator, itr->index, order,
 			       key, 0);
+	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
 	/* Re-create merge iterator */
