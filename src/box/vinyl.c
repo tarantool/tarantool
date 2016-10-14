@@ -5962,7 +5962,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 {
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	struct vy_stmt_info *info;
 	*data = vy_page_stmt(page, pos.pos_in_page, &info);
@@ -6054,7 +6054,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const char *key,
 	pos->page_no--;
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	bool equal_in_page = false;
 	pos->pos_in_page = vy_run_iterator_search_in_page(itr, key, page,
@@ -6093,7 +6093,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			struct vy_page *page;
 			int rc = vy_run_iterator_load_page(itr, pos->page_no,
 							   &page);
-			if (rc)
+			if (rc != 0)
 				return rc;
 			pos->pos_in_page = page->count - 1;
 		}
@@ -6102,7 +6102,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 		       order == VINYL_EQ);
 		struct vy_page *page;
 		int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
-		if (rc)
+		if (rc != 0)
 			return rc;
 		pos->pos_in_page++;
 		if (pos->pos_in_page >= page->count) {
@@ -6136,21 +6136,21 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	int64_t cur_lsn;
 	*ret = NULL;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	while (cur_lsn > itr->vlsn) {
 		rc = vy_run_iterator_next_pos(itr, itr->order, &itr->curr_pos);
-		if (rc) {
-			if (rc > 0) {
-				vy_run_iterator_cache_clean(itr);
-				itr->search_ended = true;
-				return 0;
-			}
+		if (rc < 0)
 			return rc;
+		if (rc > 0) {
+			vy_run_iterator_cache_clean(itr);
+			itr->search_ended = true;
+			return 0;
 		}
+		assert(rc == 0);
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key,
 					  &cur_lsn);
-		if (rc)
+		if (rc != 0)
 			return rc;
 		if (itr->order == VINYL_EQ &&
 		    vy_stmt_compare(cur_key, itr->key, itr->index->key_def)) {
@@ -6177,7 +6177,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			int64_t test_lsn;
 			rc = vy_run_iterator_read(itr, test_pos, &test_key,
 						  &test_lsn);
-			if (rc)
+			if (rc != 0)
 				return rc;
 			struct key_def *key_def = itr->index->key_def;
 			if (test_lsn > itr->vlsn ||
@@ -6232,7 +6232,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		}
 		struct vy_page *page;
 		int rc = vy_run_iterator_load_page(itr, 0, &page);
-		if (rc)
+		if (rc != 0)
 			return rc;
 	} else if (itr->run->info.count == 0) {
 		/* never seen that, but it could be possible in future */
@@ -6247,7 +6247,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	if (vy_stmt_key_part(itr->key, 0) != NULL) {
 		rc = vy_run_iterator_search(itr, itr->key, &itr->curr_pos,
 					    &equal_found);
-		if (rc)
+		if (rc != 0)
 			return rc;
 	} else if (itr->order == VINYL_LE) {
 		itr->curr_pos = end_pos;
@@ -6359,7 +6359,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	struct vy_stmt_info *info;
 	const char *key = vy_page_stmt(page, itr->curr_pos.pos_in_page, &info);
@@ -6414,7 +6414,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			uint32_t page_no = end_page - 1;
 			struct vy_page *page;
 			int rc = vy_run_iterator_load_page(itr, page_no, &page);
-			if (rc)
+			if (rc != 0)
 				return rc;
 			if (page->count == 0) {
 				vy_run_iterator_cache_clean(itr);
@@ -6431,7 +6431,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	const char *cur_key;
 	int64_t cur_lsn;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
@@ -6440,7 +6440,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	do {
 		int rc = vy_run_iterator_next_pos(itr, itr->order,
 						  &itr->curr_pos);
-		if (rc) {
+		if (rc != 0) {
 			if (rc > 0) {
 				vy_run_iterator_cache_clean(itr);
 				itr->search_ended = true;
@@ -6458,7 +6458,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key,
 					  &next_lsn);
-		if (rc)
+		if (rc != 0)
 			return rc;
 
 		/* See above */
@@ -6498,19 +6498,19 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 	struct vy_run_iterator_pos next_pos;
 	rc = vy_run_iterator_next_pos(itr, VINYL_GE, &next_pos);
-	if (rc)
+	if (rc != 0)
 		return rc > 0 ? 0 : rc;
 
 	const char *cur_key;
 	int64_t cur_lsn;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
-	if (rc)
+	if (rc != 0)
 		return rc;
 
 	const char *next_key;
 	int64_t next_lsn;
 	rc = vy_run_iterator_read(itr, next_pos, &next_key, &next_lsn);
-	if (rc)
+	if (rc != 0)
 		return rc;
 
 	/**
@@ -6528,7 +6528,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	int cmp = vy_stmt_compare(cur_key, next_key, key_def);
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
-	if (rc)
+	if (rc != 0)
 		return 0;
 	return vy_run_iterator_get(itr, ret);
 }
@@ -6576,7 +6576,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	int rc = vy_run_iterator_start(itr, &next_stmt);
 	itr->order = save_order;
 	itr->key = save_key;
-	if (rc)
+	if (rc != 0)
 		return -1;
 	else if (next_stmt == NULL)
 		return 0;
@@ -7643,7 +7643,7 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 		int rc = src->iterator.iface->next_key(&itr->src[i].iterator,
 						       itr->curr_stmt,
 						       &itr->src[i].stmt);
-		if (rc)
+		if (rc != 0)
 			return rc;
 	}
 	itr->front_id++;
@@ -7690,7 +7690,7 @@ restart:
 			int rc;
 			rc = sub_itr->iface->next_key(sub_itr, itr->curr_stmt,
 						      &src->stmt);
-			if (rc)
+			if (rc != 0)
 				return rc;
 		}
 		t = src->stmt;
@@ -7779,7 +7779,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			rc = sub_itr->iface->next_key(sub_itr, itr->curr_stmt,
 						      &src->stmt);
 		}
-		if (rc)
+		if (rc != 0)
 			return rc;
 		t = src->stmt;
 		if (t == NULL)
@@ -7822,11 +7822,11 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt *in,
 	if (itr->is_in_uniq_opt) {
 		itr->is_in_uniq_opt = false;
 		rc = vy_merge_iterator_locate(itr, ret);
-		if (rc)
+		if (rc != 0)
 			return rc;
 	}
 	rc = vy_merge_iterator_propagate(itr);
-	if (rc)
+	if (rc != 0)
 		return rc;
 	return vy_merge_iterator_locate(itr, ret);
 }
@@ -7851,7 +7851,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 	struct vy_stmt_iterator *sub_itr = &itr->src[itr->curr_src].iterator;
 	rc = sub_itr->iface->next_lsn(sub_itr, itr->curr_stmt,
 				      &itr->src[itr->curr_src].stmt);
-	if (rc) {
+	if (rc != 0) {
 		return rc;
 	} else if (itr->src[itr->curr_src].stmt) {
 		if (vy_merge_iterator_check_version(itr))
@@ -7873,7 +7873,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 			if (t == NULL) {
 				rc = sub_itr->iface->next_lsn(sub_itr, itr->curr_stmt,
 							      &itr->src[i].stmt);
-				if (rc)
+				if (rc != 0)
 					return rc;
 				if (itr->src[i].stmt == NULL)
 					continue;
@@ -7930,7 +7930,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 	while (t->flags & SVUPSERT) {
 		struct vy_stmt *next;
 		int rc = vy_merge_iterator_next_lsn(itr, in, &next);
-		if (rc) {
+		if (rc != 0) {
 			vy_stmt_unref(t);
 			return rc;
 		}
@@ -8483,7 +8483,7 @@ restart:
 			return 0; /* No more data. */
 		int rc = vy_merge_iterator_squash_upsert(mi, itr->curr_stmt,
 							 &t, true);
-		if (rc) {
+		if (rc != 0) {
 			if (rc == -1)
 				return -1;
 			do {
@@ -8492,7 +8492,7 @@ restart:
 								itr->curr_stmt,
 								&t);
 			} while (rc == -2);
-			if (rc)
+			if (rc != 0)
 				return -1;
 			goto restart;
 		}
@@ -8553,7 +8553,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 						    &mp_size);
 		int64_t lsn = stmt->lsn;
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
-		if (rc)
+		if (rc != 0)
 			break;
 	}
 	if (rc == 0 && stmt == NULL)
