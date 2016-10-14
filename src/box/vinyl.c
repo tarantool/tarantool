@@ -1879,6 +1879,7 @@ check:
 			 *                       |---next---|
 			 *   |----------range----------|
 			 */
+			vy_range_log_debug(range, "recover discard");
 			say_warn("found stale range %s", range->path);
 			vy_range_delete(range);
 			return;
@@ -1894,6 +1895,7 @@ replace:
 	n = first;
 	do {
 		struct vy_range *next = vy_range_tree_next(&index->tree, n);
+		vy_range_log_debug(range, "recover replace");
 		say_warn("found partial range %s", n->path);
 		vy_index_remove_range(index, n);
 		vy_range_delete(n);
@@ -1905,6 +1907,7 @@ insert:
 	 * 4. Insert the given range to the index.
 	 */
 	vy_index_add_range(index, range);
+	vy_range_log_debug(range, "recover insert");
 }
 
 /* dump statement to the run page buffers (stmt header and data) */
