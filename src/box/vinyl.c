@@ -4430,185 +4430,152 @@ vy_index_read(struct vy_index*, struct vy_stmt*, enum vy_order order,
 
 /** {{{ Introspection */
 
-static struct vy_info_node *
-vy_info_append(struct vy_info_node *root, const char *key)
+static void
+vy_info_append_u32(struct vy_info_handler *h, const char *key, uint32_t value)
 {
-	assert(root->childs_n < root->childs_cap);
-	struct vy_info_node *node = &root->childs[root->childs_n];
-	root->childs_n++;
-	node->key = key;
-	node->val_type = VINYL_NODE;
-	return node;
+	struct vy_info_node node = {
+		.type = VY_INFO_U32,
+		.key = key,
+		.value.u32 = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
 static void
-vy_info_append_u32(struct vy_info_node *root, const char *key, uint32_t value)
+vy_info_append_u64(struct vy_info_handler *h, const char *key, uint64_t value)
 {
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.u32 = value;
-	node->val_type = VINYL_U32;
+	struct vy_info_node node = {
+		.type = VY_INFO_U64,
+		.key = key,
+		.value.u64 = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
 static void
-vy_info_append_u64(struct vy_info_node *root, const char *key, uint64_t value)
-{
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.u64 = value;
-	node->val_type = VINYL_U64;
-}
-
-static void
-vy_info_append_str(struct vy_info_node *root, const char *key,
+vy_info_append_str(struct vy_info_handler *h, const char *key,
 		   const char *value)
 {
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.str = value;
-	node->val_type = VINYL_STRING;
+	struct vy_info_node node = {
+		.type = VY_INFO_STRING,
+		.key = key,
+		.value.str = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_reserve(struct vy_info *info, struct vy_info_node *node, int size)
+static void
+vy_info_table_begin(struct vy_info_handler *h, const char *key)
 {
-	node->childs = region_alloc(&info->allocator,
-				    size * sizeof(*node->childs));
-	if (node->childs == NULL) {
-		diag_set(OutOfMemory, sizeof(*node), "vy_info_node",
-			"node->childs");
-		return -1;
-	}
-	memset(node->childs, 0, size * sizeof(*node->childs));
-	node->childs_cap = size;
-	return 0;
+	struct vy_info_node node = {
+		.type = VY_INFO_TABLE_BEGIN,
+		.key = key,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_append_global(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_table_end(struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "vinyl");
-	if (vy_info_reserve(info, node, 4) != 0)
-		return 1;
-	vy_info_append_str(node, "path", info->env->conf->path);
-	vy_info_append_str(node, "build", PACKAGE_VERSION);
-	return 0;
+	struct vy_info_node node = {
+		.type = VY_INFO_TABLE_END,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_append_memory(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_global(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "memory");
-	if (vy_info_reserve(info, node, 4) != 0)
-		return 1;
-	struct vy_env *env = info->env;
-	vy_info_append_u64(node, "used", vy_quota_used(env->quota));
-	vy_info_append_u64(node, "limit", env->conf->memory_limit);
-	vy_info_append_u64(node, "watermark", env->quota->watermark);
-	static char buf[4];
+	vy_info_table_begin(h, "vinyl");
+	vy_info_append_str(h, "path", env->conf->path);
+	vy_info_append_str(h, "build", PACKAGE_VERSION);
+	vy_info_table_end(h);
+}
+
+static void
+vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
+{
+	char buf[16];
+	vy_info_table_begin(h, "memory");
+	vy_info_append_u64(h, "used", vy_quota_used(env->quota));
+	vy_info_append_u64(h, "limit", env->conf->memory_limit);
+	vy_info_append_u64(h, "watermark", env->quota->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
-	vy_info_append_str(node, "ratio", buf);
-	return 0;
+	vy_info_append_str(h, "ratio", buf);
+	vy_info_table_end(h);
 }
 
-static int
-vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "performance");
-	if (vy_info_reserve(info, node, 26) != 0)
-		return 1;
-
-	struct vy_env *env = info->env;
 	struct vy_stat *stat = env->stat;
 	vy_stat_prepare(stat);
-	vy_info_append_u64(node, "tx", stat->tx);
-	vy_info_append_u64(node, "get", stat->get);
-	vy_info_append_u64(node, "cursor", stat->cursor);
-	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
-	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
-	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
-	vy_info_append_u64(node, "write_count", stat->write_count);
-	vy_info_append_str(node, "get_latency", stat->get_latency.sz);
-	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
-	vy_info_append_u64(node, "tx_conflict", stat->tx_conflict);
-	vy_info_append_u32(node, "tx_active_rw", env->xm->count_rw);
-	vy_info_append_u32(node, "tx_active_ro", env->xm->count_rd);
-	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
-	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
-	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
-	vy_info_append_u64(node, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	vy_info_append_u64(node, "dump_total", stat->dump_total);
-	vy_info_append_u64(node, "tx_write_rate", vy_stat_tx_write_rate(stat));
-	vy_info_append_u64(node, "tx_write_total", vy_stat_tx_write_total(stat));
-	return 0;
+	vy_info_table_begin(h, "performance");
+	vy_info_append_u64(h, "tx", stat->tx);
+	vy_info_append_u64(h, "get", stat->get);
+	vy_info_append_u64(h, "cursor", stat->cursor);
+	vy_info_append_str(h, "tx_ops", stat->tx_stmts.sz);
+	vy_info_append_str(h, "tx_latency", stat->tx_latency.sz);
+	vy_info_append_str(h, "cursor_ops", stat->cursor_ops.sz);
+	vy_info_append_u64(h, "write_count", stat->write_count);
+	vy_info_append_str(h, "get_latency", stat->get_latency.sz);
+	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
+	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
+	vy_info_append_u32(h, "tx_active_rw", env->xm->count_rw);
+	vy_info_append_u32(h, "tx_active_ro", env->xm->count_rd);
+	vy_info_append_str(h, "get_read_disk", stat->get_read_disk.sz);
+	vy_info_append_str(h, "get_read_cache", stat->get_read_cache.sz);
+	vy_info_append_str(h, "cursor_latency", stat->cursor_latency.sz);
+	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	vy_info_append_u64(h, "dump_total", stat->dump_total);
+	vy_info_append_u64(h, "tx_write_rate", vy_stat_tx_write_rate(stat));
+	vy_info_append_u64(h, "tx_write_total", vy_stat_tx_write_total(stat));
+	vy_info_table_end(h);
 }
 
-static int
-vy_info_append_metric(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_metric(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "metric");
-	if (vy_info_reserve(info, node, 2) != 0)
-		return 1;
-
-	vy_info_append_u64(node, "lsn", info->env->xm->lsn);
-	return 0;
+	vy_info_table_begin(h, "metric");
+	vy_info_append_u64(h, "lsn", env->xm->lsn);
+	vy_info_table_end(h);
 }
 
-static int
-vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_indices(struct vy_env *env, struct vy_info_handler *h)
 {
 	struct vy_index *o;
-	int indices_cnt = 0;
-	rlist_foreach_entry(o, &info->env->indexes, link) {
-		++indices_cnt;
-	}
-	struct vy_info_node *node = vy_info_append(root, "db");
-	if (vy_info_reserve(info, node, indices_cnt) != 0)
-		return 1;
-	rlist_foreach_entry(o, &info->env->indexes, link) {
+	vy_info_table_begin(h, "db");
+	rlist_foreach_entry(o, &env->indexes, link) {
 		vy_profiler(&o->rtp, o);
-		struct vy_info_node *local_node = vy_info_append(node, o->name);
-		if (vy_info_reserve(info, local_node, 19) != 0)
-			return 1;
-		vy_info_append_u64(local_node, "size", o->rtp.total_range_size);
-		vy_info_append_u64(local_node, "count", o->rtp.count);
-		vy_info_append_u64(local_node, "count_dup", o->rtp.count_dup);
-		vy_info_append_u32(local_node, "page_count", o->rtp.total_page_count);
-		vy_info_append_u32(local_node, "range_count", o->rtp.total_range_count);
-		vy_info_append_u32(local_node, "run_avg", o->rtp.total_run_avg);
-		vy_info_append_u32(local_node, "run_max", o->rtp.total_run_max);
-		vy_info_append_u64(local_node, "memory_used", o->rtp.memory_used);
-		vy_info_append_u32(local_node, "run_count", o->rtp.total_run_count);
-		vy_info_append_str(local_node, "run_histogram", o->rtp.histogram_run_ptr);
-		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(local_node, "range_size", o->key_def->opts.range_size);
-		vy_info_append_u64(local_node, "page_size", o->key_def->opts.page_size);
+		vy_info_table_begin(h, o->name);
+		vy_info_append_u64(h, "size", o->rtp.total_range_size);
+		vy_info_append_u64(h, "count", o->rtp.count);
+		vy_info_append_u64(h, "count_dup", o->rtp.count_dup);
+		vy_info_append_u32(h, "page_count", o->rtp.total_page_count);
+		vy_info_append_u32(h, "range_count", o->rtp.total_range_count);
+		vy_info_append_u32(h, "run_avg", o->rtp.total_run_avg);
+		vy_info_append_u32(h, "run_max", o->rtp.total_run_max);
+		vy_info_append_u64(h, "memory_used", o->rtp.memory_used);
+		vy_info_append_u32(h, "run_count", o->rtp.total_run_count);
+		vy_info_append_str(h, "run_histogram", o->rtp.histogram_run_ptr);
+		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(h, "range_size", o->key_def->opts.range_size);
+		vy_info_append_u64(h, "page_size", o->key_def->opts.page_size);
+		vy_info_table_end(h);
 	}
-	return 0;
-}
-
-int
-vy_info_create(struct vy_info *info, struct vy_env *e)
-{
-	memset(info, 0, sizeof(*info));
-	info->env = e;
-	region_create(&info->allocator, cord_slab_cache());
-	struct vy_info_node *root = &info->root;
-	if (vy_info_reserve(info, root, 5) != 0 ||
-	    vy_info_append_indices(info, root) != 0 ||
-	    vy_info_append_global(info, root) != 0 ||
-	    vy_info_append_memory(info, root) != 0 ||
-	    vy_info_append_metric(info, root) != 0 ||
-	    vy_info_append_performance(info, root) != 0) {
-		region_destroy(&info->allocator);
-		return 1;
-	}
-	return 0;
+	vy_info_table_end(h);
 }
 
 void
-vy_info_destroy(struct vy_info *info)
+vy_info_gather(struct vy_env *env, struct vy_info_handler *h)
 {
-	region_destroy(&info->allocator);
-	TRASH(info);
+	vy_info_append_indices(env, h);
+	vy_info_append_global(env, h);
+	vy_info_append_memory(env, h);
+	vy_info_append_metric(env, h);
+	vy_info_append_performance(env, h);
 }
 
 /** }}} Introspection */
