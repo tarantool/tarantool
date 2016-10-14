@@ -493,9 +493,11 @@ vy_key_snprint(char *buf, int size, const char *key,
 	SNPRINT(total, snprintf, buf, size, "[");
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		const char *part = vy_stmt_key_part(key, i);
-		SNPRINT(total, mp_snprint, buf, size, part);
-		if (i < key_def->part_count - 1)
+		if (part == NULL)
+			break;
+		if (i > 0)
 			SNPRINT(total, snprintf, buf, size, ", ");
+		SNPRINT(total, mp_snprint, buf, size, part);
 	}
 	SNPRINT(total, snprintf, buf, size, "]");
 	return total;
