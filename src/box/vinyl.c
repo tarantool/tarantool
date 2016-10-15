@@ -345,33 +345,32 @@ path_exists(const char *path)
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
 enum vy_stat_name {
+	VY_STAT_GET,
+	VY_STAT_TX,
+	VY_STAT_TX_OPS,
 	VY_STAT_TX_WRITE,
+	VY_STAT_CURSOR,
+	VY_STAT_CURSOR_OPS,
 	VY_STAT_LAST,
 };
 
 static const char *vy_stat_strings[] = {
+	"get",
+	"tx",
+	"tx_ops",
 	"tx_write",
+	"cursor",
+	"cursor_ops",
 };
 
 struct vy_stat {
 	struct rmean *rmean;
-	/* get */
-	uint64_t get;
-	struct vy_avg    get_read_disk;
-	struct vy_avg    get_read_cache;
-	struct vy_avg    get_latency;
-	/* write */
 	uint64_t write_count;
-	/* transaction */
-	uint64_t tx;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	struct vy_avg    tx_latency;
-	struct vy_avg    tx_stmts;
-	/* cursor */
-	uint64_t cursor;
-	struct vy_avg    cursor_latency;
-	struct vy_avg    cursor_ops;
+	struct vy_avg get_latency;
+	struct vy_avg tx_latency;
+	struct vy_avg cursor_latency;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -442,51 +441,38 @@ vy_stat_delete(struct vy_stat *s)
 static void
 vy_stat_prepare(struct vy_stat *s)
 {
-	vy_avg_prepare(&s->get_read_disk);
-	vy_avg_prepare(&s->get_read_cache);
 	vy_avg_prepare(&s->get_latency);
 	vy_avg_prepare(&s->tx_latency);
-	vy_avg_prepare(&s->tx_stmts);
 	vy_avg_prepare(&s->cursor_latency);
-	vy_avg_prepare(&s->cursor_ops);
-}
-
-struct vy_stat_get {
-	int read_disk;
-	int read_cache;
-	uint64_t read_latency;
-};
-
-static void
-vy_stat_get(struct vy_stat *s, const struct vy_stat_get *statget)
-{
-	s->get++;
-	vy_avg_update(&s->get_read_disk, statget->read_disk);
-	vy_avg_update(&s->get_read_cache, statget->read_cache);
-	vy_avg_update(&s->get_latency, statget->read_latency);
 }
 
 static void
-vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
-	   uint32_t write_count, size_t write_size, bool is_rollback)
+vy_stat_get(struct vy_stat *s, uint64_t start)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	s->tx++;
-	if (is_rollback)
-		s->tx_rlb++;
-	s->write_count += write_count;
-	vy_avg_update(&s->tx_stmts, count);
-	vy_avg_update(&s->tx_latency, diff);
+	rmean_collect(s->rmean, VY_STAT_GET, 1);
+	vy_avg_update(&s->get_latency, diff);
+}
+
+static void
+vy_stat_tx(struct vy_stat *s, uint64_t start,
+	   int ops, int write_count, size_t write_size)
+{
+	uint64_t diff = clock_monotonic64() - start;
+	rmean_collect(s->rmean, VY_STAT_TX, 1);
+	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
 	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
+	s->write_count += write_count;
+	vy_avg_update(&s->tx_latency, diff);
 }
 
 static void
 vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	s->cursor++;
+	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
+	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
 	vy_avg_update(&s->cursor_latency, diff);
-	vy_avg_update(&s->cursor_ops, ops);
 }
 
 static void
@@ -507,12 +493,6 @@ static int64_t
 vy_stat_tx_write_rate(struct vy_stat *s)
 {
 	return rmean_mean(s->rmean->stats[VY_STAT_TX_WRITE].value);
-}
-
-static int64_t
-vy_stat_tx_write_total(struct vy_stat *s)
-{
-	return s->rmean->stats[VY_STAT_TX_WRITE].total;
 }
 
 /** There was a backend read. This flag is additive. */
@@ -1446,7 +1426,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		txv_delete(v);
 		count++;
 	}
-	vy_stat_tx(e->stat, tx->start, count, 0, 0, true);
+	e->stat->tx_rlb++;
 }
 
 static const char *
@@ -4505,31 +4485,41 @@ vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
 	vy_info_table_end(h);
 }
 
+static int
+vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
+{
+	struct vy_info_handler *h = ctx;
+	vy_info_table_begin(h, name);
+	vy_info_append_u32(h, "rps", rps);
+	vy_info_append_u64(h, "total", total);
+	vy_info_table_end(h);
+	return 0;
+}
+
 static void
 vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
 	vy_stat_prepare(stat);
+
 	vy_info_table_begin(h, "performance");
-	vy_info_append_u64(h, "tx", stat->tx);
-	vy_info_append_u64(h, "get", stat->get);
-	vy_info_append_u64(h, "cursor", stat->cursor);
-	vy_info_append_str(h, "tx_ops", stat->tx_stmts.sz);
-	vy_info_append_str(h, "tx_latency", stat->tx_latency.sz);
-	vy_info_append_str(h, "cursor_ops", stat->cursor_ops.sz);
+
+	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
+
 	vy_info_append_u64(h, "write_count", stat->write_count);
+
+	vy_info_append_str(h, "tx_latency", stat->tx_latency.sz);
 	vy_info_append_str(h, "get_latency", stat->get_latency.sz);
+	vy_info_append_str(h, "cursor_latency", stat->cursor_latency.sz);
+
 	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
 	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
 	vy_info_append_u32(h, "tx_active_rw", env->xm->count_rw);
 	vy_info_append_u32(h, "tx_active_ro", env->xm->count_rd);
-	vy_info_append_str(h, "get_read_disk", stat->get_read_disk.sz);
-	vy_info_append_str(h, "get_read_cache", stat->get_read_cache.sz);
-	vy_info_append_str(h, "cursor_latency", stat->cursor_latency.sz);
+
 	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
 	vy_info_append_u64(h, "dump_total", stat->dump_total);
-	vy_info_append_u64(h, "tx_write_rate", vy_stat_tx_write_rate(stat));
-	vy_info_append_u64(h, "tx_write_total", vy_stat_tx_write_total(stat));
+
 	vy_info_table_end(h);
 }
 
@@ -5519,6 +5509,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 
 	/* proceed read-only transactions */
 	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
+		e->stat->tx_conflict++;
 		tx->state = VINYL_TX_ROLLBACK;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
@@ -5575,7 +5566,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
-	vy_stat_tx(e->stat, tx->start, count, write_count, write_size, false);
+	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
 	free(tx);
 
 	vy_quota_use(e->quota, write_size, &e->scheduler->scheduler_cond);
@@ -8849,12 +8840,7 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	}
 	vy_read_iterator_close(&itr);
 
-	struct vy_stat_get statget;
-	statget.read_disk = 0; // q.read_disk;
-	statget.read_cache = 0; // q.read_cache;
-	statget.read_latency = clock_monotonic64() - start;
-	vy_stat_get(e->stat, &statget);
-
+	vy_stat_get(e->stat, start);
 	return rc;
 }
 
