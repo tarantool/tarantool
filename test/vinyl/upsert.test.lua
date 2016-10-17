@@ -163,4 +163,9 @@ space:replace({0, 0})
 for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
 space:count() -- exploded before #1826
 
+-- Mem has only UPSERTS
+box.snapshot()
+for i=1,10000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+space:count() -- exploded before #1829
+
 space:drop()
