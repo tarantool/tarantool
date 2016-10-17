@@ -136,4 +136,31 @@ space:upsert({4}, {{'!', 2, 105}})
 box.commit()
 space:select{}
 
+
+space:drop()
+
+--
+-- gh-1828: Automatically convert UPSERT into REPLACE
+-- gh-1826: vinyl: memory explosion on UPSERT
+--
+
+space = box.schema.space.create('test', { engine = 'vinyl' })
+_ = space:create_index('primary', { type = 'tree', range_size = 250 * 1024 * 1024 } )
+
+-- No runs
+for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+space:count() -- exploded before #1826
+
+-- Mem has DELETE
+box.snapshot()
+space:delete({0})
+for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+space:count() -- exploded before #1826
+
+-- Mem has REPLACE
+box.snapshot()
+space:replace({0, 0})
+for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+space:count() -- exploded before #1826
+
 space:drop()
