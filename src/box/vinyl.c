@@ -230,12 +230,12 @@ vy_quota_exceeded(struct vy_quota *q)
 
 struct vy_latency {
 	uint64_t count;
-	uint64_t total;
-	uint64_t max;
+	double total;
+	double max;
 };
 
 static void
-vy_latency_update(struct vy_latency *lat, uint64_t v)
+vy_latency_update(struct vy_latency *lat, double v)
 {
 	lat->count++;
 	lat->total += v;
@@ -427,18 +427,18 @@ vy_stat_delete(struct vy_stat *s)
 }
 
 static void
-vy_stat_get(struct vy_stat *s, uint64_t start)
+vy_stat_get(struct vy_stat *s, ev_tstamp start)
 {
-	uint64_t diff = clock_monotonic64() - start;
+	ev_tstamp diff = ev_now(loop()) - start;
 	rmean_collect(s->rmean, VY_STAT_GET, 1);
 	vy_latency_update(&s->get_latency, diff);
 }
 
 static void
-vy_stat_tx(struct vy_stat *s, uint64_t start,
+vy_stat_tx(struct vy_stat *s, ev_tstamp start,
 	   int ops, int write_count, size_t write_size)
 {
-	uint64_t diff = clock_monotonic64() - start;
+	ev_tstamp diff = ev_now(loop()) - start;
 	rmean_collect(s->rmean, VY_STAT_TX, 1);
 	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
 	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
@@ -447,18 +447,18 @@ vy_stat_tx(struct vy_stat *s, uint64_t start,
 }
 
 static void
-vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
+vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
 {
-	uint64_t diff = clock_monotonic64() - start;
+	ev_tstamp diff = ev_now(loop()) - start;
 	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
 	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
 	vy_latency_update(&s->cursor_latency, diff);
 }
 
 static void
-vy_stat_dump(struct vy_stat *s, uint64_t time, size_t written)
+vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written)
 {
-	histogram_collect(s->dump_bw, written / (time / 1000000000.0));
+	histogram_collect(s->dump_bw, written / time);
 	s->dump_total += written;
 }
 
@@ -897,7 +897,7 @@ struct vy_range {
 	/** Range upper bound. NULL if range is rightmost. */
 	struct vy_stmt *end;
 	struct vy_index *index;
-	uint64_t   update_time;
+	ev_tstamp update_time;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	uint32_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
@@ -1048,7 +1048,7 @@ struct vy_tx {
 	 * the version increments.
 	 */
 	uint32_t write_set_version;
-	uint64_t start;
+	ev_tstamp start;
 	enum tx_type     type;
 	enum tx_state    state;
 	bool is_aborted;
@@ -1089,7 +1089,7 @@ struct vy_cursor {
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
-	uint64_t start;
+	ev_tstamp start;
 	/**
 	 * All open cursors are registered in a transaction
 	 * they belong to. When the transaction ends, the cursor
@@ -1334,7 +1334,7 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
-	tx->start = clock_monotonic64();
+	tx->start = ev_now(loop());
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
@@ -3292,7 +3292,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
  * Break when the write set begins pointing at the next index.
  */
 static struct txv *
-vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
+vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 	 enum vinyl_status status, int64_t lsn, size_t *write_size)
 {
 	struct vy_index *index = v->index;
@@ -3384,7 +3384,7 @@ struct vy_task {
 	struct vy_index *index;
 
 	/** How long ->execute took, in nanoseconds. */
-	uint64_t exec_time;
+	ev_tstamp exec_time;
 
 	/** Number of bytes written to disk by this task. */
 	size_t dump_size;
@@ -4111,9 +4111,9 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		uint64_t start = clock_monotonic64();
+		uint64_t start = ev_now(loop());
 		task->status = task->ops->execute(task);
-		task->exec_time = clock_monotonic64() - start;
+		task->exec_time = ev_now(loop()) - start;
 		if (task->status != 0) {
 			assert(!diag_is_empty(diag_get()));
 			if (!warning_said) {
@@ -4481,9 +4481,9 @@ vy_info_append_stat_latency(struct vy_info_handler *h,
 			    const char *name, struct vy_latency *lat)
 {
 	vy_info_table_begin(h, name);
-	vy_info_append_u64(h, "max", lat->max);
+	vy_info_append_u64(h, "max", lat->max * 1000000000);
 	vy_info_append_u64(h, "avg", lat->count == 0 ? 0 :
-			   lat->total / lat->count);
+			   lat->total / lat->count * 1000000000);
 	vy_info_table_end(h);
 }
 
@@ -5535,7 +5535,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		e->xm->lsn = lsn;
 
 	/* Flush transactional changes to the index. */
-	uint64_t now = clock_monotonic64();
+	ev_tstamp now = ev_now(loop());
 	struct txv *v = write_set_first(&tx->write_set);
 
 	uint64_t write_count = 0;
@@ -8818,7 +8818,7 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
-	uint64_t start  = clock_monotonic64();
+	ev_tstamp start  = ev_now(loop());
 
 	int64_t vlsn = tx != NULL ? tx->vlsn : e->xm->lsn;
 
