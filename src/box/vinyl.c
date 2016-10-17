@@ -591,7 +591,7 @@ vy_stmt_typename(int type)
 	case SVGET:     return "SELECT";
 	case SVREPLACE: return "REPLACE";
 	case SVDELETE:  return "DELETE";;
-	case SVUPSERT:  return "DELETE";
+	case SVUPSERT:  return "UPSERT";
 	default:        return "UNKNOWN";;
 	}
 }
