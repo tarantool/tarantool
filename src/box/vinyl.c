@@ -5190,10 +5190,11 @@ vy_convert_stmt(struct vy_index *index, struct vy_stmt *vy_stmt)
 }
 
 static void
-vy_stmt_ref(struct vy_stmt *v)
+vy_stmt_ref(struct vy_stmt *stmt)
 {
+	assert(stmt != NULL);
 	uint16_t old_refs =
-		pm_atomic_fetch_add_explicit(&v->refs, 1,
+		pm_atomic_fetch_add_explicit(&stmt->refs, 1,
 					     pm_memory_order_relaxed);
 	if (old_refs == 0)
 		panic("this is broken by design");
@@ -5217,6 +5218,7 @@ vy_stmt_to_str(struct vy_stmt *stmt)
 static void
 vy_stmt_unref(struct vy_stmt *stmt)
 {
+	assert(stmt != NULL);
 	uint16_t old_refs = pm_atomic_fetch_sub_explicit(&stmt->refs, 1,
 		pm_memory_order_relaxed);
 	assert(old_refs > 0);
@@ -6994,7 +6996,9 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
+	vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = vy_mem_iterator_curr_stmt(itr);
+	vy_stmt_ref(itr->curr_stmt);
 	return 0;
 }
 
@@ -7016,6 +7020,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 		    (itr->order == VINYL_EQ &&
 		     vy_stmt_compare(itr->curr_stmt->data, itr->key,
 				      itr->mem->key_def))) {
+			vy_stmt_unref(itr->curr_stmt);
 			itr->curr_stmt = NULL;
 			return;
 		}
@@ -7034,7 +7039,9 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 					     prev_stmt->data, key_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
+			vy_stmt_unref(itr->curr_stmt);
 			itr->curr_stmt = prev_stmt;
+			vy_stmt_ref(itr->curr_stmt);
 			vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 		}
 	}
@@ -7088,6 +7095,7 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return;
 	itr->curr_stmt = vy_mem_iterator_curr_stmt(itr);
+	vy_stmt_ref(itr->curr_stmt);
 	vy_mem_iterator_find_lsn(itr, ret);
 }
 
@@ -7112,7 +7120,6 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 	itr->curr_pos = vy_mem_tree_lower_bound(&itr->mem->tree,
 						&tree_key, &exact);
 	assert(exact);
-	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 }
 
 /* }}} vy_mem_iterator support functions */
@@ -7174,6 +7181,7 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	struct vy_stmt *prev_stmt = itr->curr_stmt;
 	do {
 		if (vy_mem_iterator_step(itr) != 0) {
+			vy_stmt_unref(itr->curr_stmt);
 			itr->curr_stmt = NULL;
 			return 0;
 		}
@@ -7182,6 +7190,7 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 	if (itr->order == VINYL_EQ &&
 	    vy_stmt_compare(itr->curr_stmt->data, itr->key, key_def) != 0) {
+		vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		return 0;
 	}
@@ -7223,7 +7232,9 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (vy_stmt_compare(itr->curr_stmt->data,
 			     next_stmt->data, key_def) == 0) {
 		itr->curr_pos = next_pos;
+		vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = next_stmt;
+		vy_stmt_ref(itr->curr_stmt);
 		*ret = itr->curr_stmt;
 		return 0;
 	}
@@ -7295,6 +7306,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		} else if (itr->order == VINYL_EQ) {
 			if (vy_stmt_compare(itr->curr_stmt->data, itr->key,
 					     itr->mem->key_def) != 0) {
+				vy_stmt_unref(itr->curr_stmt);
 				itr->curr_stmt = NULL;
 			}
 		}
@@ -7310,6 +7322,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		itr->version = itr->mem->version;
 		struct vy_stmt *was_stmt = itr->curr_stmt;
 		itr->search_started = false;
+		if (itr->curr_stmt != NULL)
+			vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		vy_mem_iterator_start(itr, ret);
 		return was_stmt != *ret;
@@ -7333,7 +7347,9 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 				break;
 			if (t->lsn <= itr->vlsn) {
 				itr->curr_pos = pos;
+				vy_stmt_unref(itr->curr_stmt);
 				itr->curr_stmt = t;
+				vy_stmt_ref(itr->curr_stmt);
 				rc = 1;
 			}
 		}
@@ -7356,7 +7372,9 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (cmp < 0 || t->lsn >= break_lsn)
 			break;
 		itr->curr_pos = pos;
+		vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = t;
+		vy_stmt_ref(itr->curr_stmt);
 		rc = 1;
 	}
 	*ret = itr->curr_stmt;
@@ -7371,7 +7389,8 @@ vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_mem_iterator_close);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-	(void)itr; /* suppress warn if NDEBUG */
+	if (itr->curr_stmt != NULL)
+		vy_stmt_unref(itr->curr_stmt);
 	TRASH(itr);
 }
 
