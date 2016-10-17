@@ -45,7 +45,7 @@ for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
                      'get_latency', 'gc_active', 'run_avg', 'run_count',
                      'page_count', 'memory_used', 'run_max', 'run_histogram',
                      'size', 'size_uncompressed', 'used', 'count',
-                     'rps', 'total', 'bandwidth', 'watermark' }) do
+                     'rps', 'total', 'bandwidth', 'avg', 'max', 'watermark' }) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 ---
@@ -69,10 +69,10 @@ box_info_sort(box.info.vinyl())
       - page_size: <size>
       - range_count: <count>
       - range_size: <size>
-      - run_avg: <run_avg>
+      - run_avg: <avg>
       - run_count: <count>
       - run_histogram: <run_histogram>
-      - run_max: <run_max>
+      - run_max: <max>
       - size: <size>
       - size_uncompressed: <size_uncompressed>
   - memory:
@@ -86,7 +86,9 @@ box_info_sort(box.info.vinyl())
     - cursor:
       - rps: <rps>
       - total: <total>
-    - cursor_latency: <cursor_latency>
+    - cursor_latency:
+      - avg: <avg>
+      - max: <max>
     - cursor_ops:
       - rps: <rps>
       - total: <total>
@@ -95,14 +97,18 @@ box_info_sort(box.info.vinyl())
     - get:
       - rps: <rps>
       - total: <total>
-    - get_latency: <get_latency>
+    - get_latency:
+      - avg: <avg>
+      - max: <max>
     - tx:
       - rps: <rps>
       - total: <total>
     - tx_active_ro: 0
     - tx_active_rw: 0
     - tx_conflict: 0
-    - tx_latency: <tx_latency>
+    - tx_latency:
+      - avg: <avg>
+      - max: <max>
     - tx_ops:
       - rps: <rps>
       - total: <total>

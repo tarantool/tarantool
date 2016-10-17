@@ -228,31 +228,19 @@ vy_quota_exceeded(struct vy_quota *q)
 	return q->used >= q->watermark;
 }
 
-struct vy_avg {
+struct vy_latency {
 	uint64_t count;
 	uint64_t total;
-	uint32_t min, max;
-	double   avg;
-	char sz[32];
+	uint64_t max;
 };
 
 static void
-vy_avg_update(struct vy_avg *a, uint32_t v)
+vy_latency_update(struct vy_latency *lat, uint64_t v)
 {
-	a->count++;
-	a->total += v;
-	a->avg = (double)a->total / (double)a->count;
-	if (v < a->min)
-		a->min = v;
-	if (v > a->max)
-		a->max = v;
-}
-
-static void
-vy_avg_prepare(struct vy_avg *a)
-{
-	snprintf(a->sz, sizeof(a->sz), "%"PRIu32" %"PRIu32" %.1f",
-	         a->min, a->max, a->avg);
+	lat->count++;
+	lat->total += v;
+	if (v > lat->max)
+		lat->max = v;
 }
 
 static struct vy_quota *
@@ -368,9 +356,9 @@ struct vy_stat {
 	uint64_t write_count;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	struct vy_avg get_latency;
-	struct vy_avg tx_latency;
-	struct vy_avg cursor_latency;
+	struct vy_latency get_latency;
+	struct vy_latency tx_latency;
+	struct vy_latency cursor_latency;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -439,19 +427,11 @@ vy_stat_delete(struct vy_stat *s)
 }
 
 static void
-vy_stat_prepare(struct vy_stat *s)
-{
-	vy_avg_prepare(&s->get_latency);
-	vy_avg_prepare(&s->tx_latency);
-	vy_avg_prepare(&s->cursor_latency);
-}
-
-static void
 vy_stat_get(struct vy_stat *s, uint64_t start)
 {
 	uint64_t diff = clock_monotonic64() - start;
 	rmean_collect(s->rmean, VY_STAT_GET, 1);
-	vy_avg_update(&s->get_latency, diff);
+	vy_latency_update(&s->get_latency, diff);
 }
 
 static void
@@ -463,7 +443,7 @@ vy_stat_tx(struct vy_stat *s, uint64_t start,
 	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
 	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
 	s->write_count += write_count;
-	vy_avg_update(&s->tx_latency, diff);
+	vy_latency_update(&s->tx_latency, diff);
 }
 
 static void
@@ -472,7 +452,7 @@ vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
 	uint64_t diff = clock_monotonic64() - start;
 	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
 	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
-	vy_avg_update(&s->cursor_latency, diff);
+	vy_latency_update(&s->cursor_latency, diff);
 }
 
 static void
@@ -4497,10 +4477,20 @@ vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 }
 
 static void
+vy_info_append_stat_latency(struct vy_info_handler *h,
+			    const char *name, struct vy_latency *lat)
+{
+	vy_info_table_begin(h, name);
+	vy_info_append_u64(h, "max", lat->max);
+	vy_info_append_u64(h, "avg", lat->count == 0 ? 0 :
+			   lat->total / lat->count);
+	vy_info_table_end(h);
+}
+
+static void
 vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
-	vy_stat_prepare(stat);
 
 	vy_info_table_begin(h, "performance");
 
@@ -4508,9 +4498,9 @@ vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 
 	vy_info_append_u64(h, "write_count", stat->write_count);
 
-	vy_info_append_str(h, "tx_latency", stat->tx_latency.sz);
-	vy_info_append_str(h, "get_latency", stat->get_latency.sz);
-	vy_info_append_str(h, "cursor_latency", stat->cursor_latency.sz);
+	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
+	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
+	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
 	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
 	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
