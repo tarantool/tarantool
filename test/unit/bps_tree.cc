@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include "unit.h"
 #include "sptree.h"
@@ -49,6 +50,25 @@ compare(type_t a, type_t b);
 #define bps_tree_key_t type_t
 #define bps_tree_arg_t int
 #define BPS_TREE_DEBUG_BRANCH_VISIT
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
+/* tree for approximate_count test */
+#define BPS_TREE_NAME approx
+#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
+#define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) (((a) >> 32) < (b) ? -1 : ((a) >> 32) > (b) ? 1 : 0)
+#define bps_tree_elem_t uint64_t
+#define bps_tree_key_t uint32_t
+#define bps_tree_arg_t int
 #include "salad/bps_tree.h"
 
 static int
@@ -504,8 +524,6 @@ bps_tree_debug_self_check()
 	footer();
 }
 
-#include <signal.h>
-
 static void
 loading_test()
 {
@@ -629,6 +647,108 @@ white_box_test()
 	footer();
 }
 
+static void
+approximate_count()
+{
+	header();
+	srand(0);
+
+	approx tree;
+	approx_create(&tree, 0, extent_alloc, extent_free);
+
+	uint32_t in_leaf_max_count = BPS_TREE_approx_MAX_COUNT_IN_LEAF;
+	uint32_t in_leaf_min_count = in_leaf_max_count * 2 / 3;
+	uint32_t in_leaf_ave_count = in_leaf_max_count * 5 / 6;
+	uint32_t in_inner_max_count = BPS_TREE_approx_MAX_COUNT_IN_INNER;
+	uint32_t in_inner_min_count = in_inner_max_count * 2 / 3;
+	uint32_t in_inner_ave_count = in_inner_max_count * 5 / 6;
+	double X = in_leaf_ave_count;
+	double Y = in_inner_ave_count;
+	double low_border_leaf = double(in_leaf_min_count) / in_leaf_ave_count;
+	double upper_border_leaf = double(in_leaf_max_count) / in_leaf_ave_count;
+	double low_border_inner = double(in_inner_min_count) / in_inner_ave_count;
+	double upper_border_inner = double(in_inner_max_count) / in_inner_ave_count;
+
+	const uint32_t short_sequence_count = 50;
+	const uint32_t long_sequence_count = 30;
+	const uint32_t long_sequence_multiplier = 20;
+	const uint32_t arr_size = short_sequence_count *
+				   (short_sequence_count + 1) / 2 +
+				   long_sequence_count *
+				   (long_sequence_count + 1) * long_sequence_multiplier / 2;
+	uint64_t arr[arr_size];
+	uint64_t count = 0;
+	for (uint64_t i = 1; i <= short_sequence_count; i++)
+		for (uint64_t j = 0; j < i; j++)
+			arr[count++] = ((i * 100) << 32) | j;
+	for (uint64_t i = 1; i <= long_sequence_count; i++)
+		for (uint64_t j = 0; j < i * long_sequence_multiplier; j++)
+			arr[count++] = ((i * 100 + 50) << 32) | j;
+	printf("Count: %lu %u\n", count, arr_size);
+	assert(count == arr_size);
+
+	for (uint64_t i = 0; i < count * 10; i++) {
+		uint64_t j = rand() % count;
+		uint64_t k = rand() % count;
+		uint64_t tmp = arr[j];
+		arr[j] = arr[k];
+		arr[k] = tmp;
+	}
+
+	for (uint64_t i = 0; i < count; i++)
+		approx_insert(&tree, arr[i], NULL);
+
+	printf("Count: %lu\n", tree.size);
+
+	count = 0;
+	int err_count = 0;
+	const uint32_t over_possible =
+		(short_sequence_count + long_sequence_count + 1) * 100;
+	for (uint32_t i = 50; i < over_possible; i += 25) {
+		uint64_t true_count = 0;
+		if (i % 100 == 0) {
+			uint64_t j = i / 100;
+			if (j >= 1 && j <= short_sequence_count)
+				true_count = j;
+		} else if (i % 50 == 0) {
+			uint64_t j = i / 100;
+			if (j >= 1 && j <= long_sequence_count)
+				true_count = j * long_sequence_multiplier;
+		}
+		count += true_count;
+
+		uint64_t approx_count = approx_approximate_count(&tree, i);
+
+		if (approx_count <= X) {
+			if (approx_count != true_count) {
+				err_count++;
+				if (err_count <= 10)
+					printf("searching %u found %lu expected %lu\n",
+					       i, approx_count, true_count);
+			}
+			continue;
+		}
+		double H = ceil(log(approx_count / X) / log(Y));
+		double low = approx_count * low_border_leaf *
+			pow(low_border_inner, H - 1);
+		double up = approx_count * upper_border_leaf *
+			pow(upper_border_inner, H - 1);
+		if (true_count < low || true_count > up) {
+			err_count++;
+			if (err_count <= 10)
+				printf("searching %u found %lu expected %lu\n",
+				       i, approx_count, true_count);
+		}
+	};
+
+	printf("Error count: %d\n", err_count);
+	printf("Count: %lu\n", count);
+
+	approx_destroy(&tree);
+
+	footer();
+}
+
 int
 main(void)
 {
@@ -639,6 +759,7 @@ main(void)
 	loading_test();
 	printing_test();
 	white_box_test();
+	approximate_count();
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 }

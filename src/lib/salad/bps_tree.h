@@ -152,6 +152,7 @@
  * struct bps_tree_iterator bps_tree_iterator_last(tree);
  * struct bps_tree_iterator bps_tree_lower_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_upper_bound(tree, key, exact);
+ * size_t bps_tree_approxiamte_count(tree, key);
  * bps_tree_elem_t *bps_tree_iterator_get_elem(tree, itr);
  * bool bps_tree_iterator_next(tree, itr);
  * bool bps_tree_iterator_prev(tree, itr);
@@ -355,6 +356,7 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_iterator_last _api_name(iterator_last)
 #define bps_tree_lower_bound _api_name(lower_bound)
 #define bps_tree_upper_bound _api_name(upper_bound)
+#define bps_tree_approximate_count _api_name(approximate_count)
 #define bps_tree_iterator_get_elem _api_name(iterator_get_elem)
 #define bps_tree_iterator_next _api_name(iterator_next)
 #define bps_tree_iterator_prev _api_name(iterator_prev)
@@ -709,6 +711,24 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 struct bps_tree_iterator
 bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact);
+
+/**
+ * @brief Get approximate number of entries that are equal to given key.
+ * Accuracy limits:
+ * If the result is less than BPS_TREE_name_MAX_COUNT_IN_LEAF * 5 / 6, the
+ * result is precise. If not, let's define:
+ * X = BPS_TREE_name_MAX_COUNT_IN_LEAF * 5 / 6
+ * Y = BPS_TREE_name_MAX_COUNT_IN_INNER * 5 / 6
+ * H = ceil(log(Result / X) / log(Y))
+ * Then the true count is between:
+ * [ Result * pow(0.8 - z, H), Result * pow(1.2 + z, H) ]
+ * where z parameter is a small number due to rounding errors
+ * @param tree - pointer to a tree
+ * @param key - key that will be compared with elements
+ * @return - approximate number of entries that are equal to given key.
+ */
+size_t
+bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key);
 
 /**
  * @brief Get a pointer to the element pointed by iterator.
@@ -1634,6 +1654,90 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 	}
 	return res;
 }
+
+/**
+ * @brief Get approximate number of entries that are equal to given key.
+ * Accuracy limits:
+ * If the result is less than BPS_TREE_name_MAX_COUNT_IN_LEAF * 5 / 6, the
+ * result is precise. If not, let's define:
+ * X = BPS_TREE_name_MAX_COUNT_IN_LEAF * 5 / 6
+ * Y = BPS_TREE_name_MAX_COUNT_IN_INNER * 5 / 6
+ * H = ceil(log(Result / X) / log(Y))
+ * Then the true count is between:
+ * [ Result * pow(0.8 - z, H), Result * pow(1.2 + z, H) ]
+ * where z parameter is a small number due to rounding errors
+ * @param tree - pointer to a tree
+ * @param key - key that will be compared with elements
+ * @return - approximate number of entries that are equal to given key.
+ */
+inline size_t
+bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key)
+{
+	if (tree->root_id == (bps_tree_block_id_t)(-1))
+		return 0;
+
+	size_t result = 0;
+	bool exact;
+	struct bps_block *lower_block = bps_tree_root(tree);
+	struct bps_block *upper_block = bps_tree_root(tree);
+	for (bps_tree_block_id_t i = 1; i < tree->depth; i++) {
+		/* average occupancy in B+* block is 5/6 */
+		result *= BPS_TREE_MAX_COUNT_IN_INNER * 5 / 6;
+
+		struct bps_inner *lower_inner = (struct bps_inner *)lower_block;
+		bps_tree_pos_t lower_pos =
+			bps_tree_find_ins_point_key(tree, lower_inner->elems,
+						    lower_inner->header.size - 1,
+						    key, &exact);
+		struct bps_inner *upper_inner = (struct bps_inner *)upper_block;
+		bps_tree_pos_t upper_pos =
+			bps_tree_find_after_ins_point_key(tree,
+							  upper_inner->elems,
+							  upper_inner->header.size - 1,
+							  key, &exact);
+
+		if (lower_inner == upper_inner) {
+			if (upper_pos > lower_pos)
+				result += upper_pos - lower_pos - 1;
+		} else {
+			result += lower_inner->header.size - 1 - lower_pos;
+			result += upper_pos;
+		}
+
+		bps_tree_block_id_t lower_block_id =
+			lower_inner->child_ids[lower_pos];
+		lower_block = bps_tree_restore_block(tree, lower_block_id);
+		bps_tree_block_id_t upper_block_id =
+			upper_inner->child_ids[upper_pos];
+		upper_block = bps_tree_restore_block(tree, upper_block_id);
+	}
+
+	/* average occupancy in B+* block is 5/6 */
+	result *= BPS_TREE_MAX_COUNT_IN_LEAF * 5 / 6;
+	struct bps_leaf *lower_leaf = (struct bps_leaf *)lower_block;
+	bps_tree_pos_t lower_pos =
+		bps_tree_find_ins_point_key(tree, lower_leaf->elems,
+					    lower_leaf->header.size,
+					    key, &exact);
+
+	struct bps_leaf *upper_leaf = (struct bps_leaf *)upper_block;
+	bps_tree_pos_t upper_pos =
+		bps_tree_find_after_ins_point_key(tree, upper_leaf->elems,
+						  upper_leaf->header.size,
+						  key, &exact);
+
+	if (lower_leaf == upper_leaf) {
+		result += upper_pos - lower_pos;
+	} else {
+		result += lower_leaf->header.size - 1 - lower_pos;
+		result += upper_pos;
+		result++;
+	}
+
+	return result;
+}
+
+
 
 /**
  * @brief Get a pointer to the element pointed by iterator.
@@ -5610,6 +5714,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_iterator_last
 #undef bps_tree_lower_bound
 #undef bps_tree_upper_bound
+#undef bps_tree_approximate_count
 #undef bps_tree_iterator_get_elem
 #undef bps_tree_iterator_next
 #undef bps_tree_iterator_prev
