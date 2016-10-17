@@ -237,7 +237,7 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 				continue;
 			xstream_write(stream, &row);
 		} catch (ClientError *e) {
-			if (l->dir->panic_if_error)
+			if (l->panic_if_error)
 				throw;
 			say_error("can't apply row: ");
 			e->log();
@@ -320,7 +320,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		}
 		recovery_close_log(r);
 
-		r->current_wal = xlog_open_xc(&r->wal_dir, vclock_sum(clock));
+		r->current_wal = xdir_open_xlog_xc(&r->wal_dir, vclock_sum(clock));
 
 		say_info("recover from `%s'", r->current_wal->filename);
 

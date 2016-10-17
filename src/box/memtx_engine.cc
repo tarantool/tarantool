@@ -696,7 +696,7 @@ MemtxEngine::recoverSnapshot()
 	say_info("recovery start");
 	assert(m_has_checkpoint);
 	int64_t signature = m_last_checkpoint.signature;
-	struct xlog *snap = xlog_open_xc(&m_snap_dir, signature);
+	struct xlog *snap = xdir_open_xlog_xc(&m_snap_dir, signature);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	SERVER_UUID = snap->server_uuid;
@@ -1062,7 +1062,8 @@ MemtxEngine::bootstrap()
 	xdir_create(&dir, "", SNAP, &uuid_nil);
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream_xc(&dir, 0, f, "bootstrap.snap");
+	struct xlog *snap = xlog_open_stream_xc(f, "bootstrap.snap",
+						dir.panic_if_error, false);
 	struct xlog_cursor cursor;
 	xlog_cursor_open(&cursor, snap);
 	auto guard = make_scoped_guard([&]{
@@ -1395,7 +1396,7 @@ memtx_initial_join_f(va_list ap)
 			xlog_close(snap);
 	});
 
-	snap = xlog_open_xc(&dir, checkpoint_lsn);
+	snap = xdir_open_xlog_xc(&dir, checkpoint_lsn);
 	struct xlog_cursor cursor;
 	xlog_cursor_open(&cursor, snap);
 	auto reader_guard = make_scoped_guard([&]{

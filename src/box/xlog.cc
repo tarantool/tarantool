@@ -184,7 +184,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct xlog *wal = xlog_open(dir, signature);
+	struct xlog *wal = xdir_open_xlog(dir, signature);
 	if (wal == NULL)
 		return -1;
 
@@ -218,6 +218,44 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	xlog_close(wal);
 	vclockset_insert(&dir->index, vclock);
 	return 0;
+}
+
+struct xlog *
+xdir_open_xlog(struct xdir *dir, int64_t signature)
+{
+	const char *filename = format_filename(dir, signature, NONE);
+	FILE *f = fopen(filename, "r");
+	struct xlog *wal = xlog_open_stream(f, filename,
+					    dir->panic_if_error,
+					    dir->sync_is_async);
+	if (wal == NULL) {
+		return wal;
+	}
+	if (strcmp(wal->filetype, dir->filetype) != 0) {
+		xlog_close(wal);
+		tnt_error(XlogError, "%s: unknown filetype", filename);
+		return NULL;
+	}
+	if (!tt_uuid_is_nil(dir->server_uuid) &&
+	    !tt_uuid_is_equal(dir->server_uuid, &wal->server_uuid)) {
+		xlog_close(wal);
+		tnt_error(XlogError, "%s: invalid server UUID",
+			  filename);
+		return NULL;
+	}
+	/*
+	 * Check the match between log file name and contents:
+	 * the sum of vector clock coordinates must be the same
+	 * as the name of the file.
+	 */
+	int64_t signature_check = vclock_sum(&wal->vclock);
+	if (signature_check != signature) {
+		xlog_close(wal);
+		tnt_error(XlogError, "%s: signature check failed",
+			  filename);
+		return NULL;
+	}
+	return wal;
 }
 
 static int
@@ -900,7 +938,7 @@ read_row:
 					   (const char **)&i->data.rpos,
 					   (const char *)i->data.wpos);
 		} catch (ClientError *e) {
-			if (i->log->dir->panic_if_error)
+			if (i->log->panic_if_error)
 				throw;
 			say_warn("failed to read row");
 			goto restart;
@@ -950,7 +988,7 @@ restart:
 		if (xlog_cursor_read_tx(i, magic) != 0)
 			goto eof;
 	} catch (ClientError *e) {
-		if (l->dir->panic_if_error)
+		if (l->panic_if_error)
 			throw;
 		/*
 		 * say_warn() is used and exception is not
@@ -1018,10 +1056,9 @@ xlog_close(struct xlog *l)
 		 * Sync the file before closing, since
 		 * otherwise we can end up with a partially
 		 * written file in case of a crash.
-		 * Do not sync if the file is opened with O_SYNC.
+		 * We sync even if file open O_SYNC, simplify code for low cost
 		 */
-		if (! strchr(l->dir->open_wflags, 's'))
-			xlog_sync(l);
+		xlog_sync(l);
 	}
 
 	r = fclose(l->f);
@@ -1068,7 +1105,7 @@ sync_cb(eio_req *req)
 int
 xlog_sync(struct xlog *l)
 {
-	if (l->dir->sync_is_async) {
+	if (l->sync_is_async) {
 		int fd = dup(fileno(l->f));
 		if (fd == -1) {
 			say_syserror("%s: dup() failed", l->filename);
@@ -1090,9 +1127,9 @@ xlog_write_meta(struct xlog *l)
 {
 	char *vstr = NULL;
 	off_t sz1, sz2, sz3;
-	if ((sz1 = fprintf(l->f, "%s%s", l->dir->filetype, v13)) < 0 ||
+	if ((sz1 = fprintf(l->f, "%s%s", l->filetype, v13)) < 0 ||
 	    (sz2 = fprintf(l->f, SERVER_UUID_KEY ": %s\n",
-			   tt_uuid_str(l->dir->server_uuid))) < 0 ||
+			   tt_uuid_str(&l->server_uuid))) < 0 ||
 	    (vstr = vclock_to_string(&l->vclock)) == NULL ||
 	    (sz3 = fprintf(l->f, VCLOCK_KEY ": %s\n\n", vstr)) < 0) {
 		free(vstr);
@@ -1113,20 +1150,15 @@ xlog_write_meta(struct xlog *l)
  * @return 0 if success, -1 on error.
  */
 static int
-xlog_read_meta(struct xlog *l, int64_t signature)
+xlog_read_meta(struct xlog *l)
 {
-	char filetype[32], version[32], buf[256];
-	struct xdir *dir = l->dir;
+	char version[32], buf[256];
 	FILE *stream = l->f;
 
-	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
+	if (fgets(l->filetype, sizeof(l->filetype), stream) == NULL ||
 	    fgets(version, sizeof(version), stream) == NULL) {
 		tnt_error(XlogError, "%s: failed to read log file header",
 			  l->filename);
-		return -1;
-	}
-	if (strcmp(dir->filetype, filetype) != 0) {
-		tnt_error(XlogError, "%s: unknown filetype", l->filename);
 		return -1;
 	}
 
@@ -1178,29 +1210,12 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 		}
 	}
 
-	if (!tt_uuid_is_nil(dir->server_uuid) &&
-	    !tt_uuid_is_equal(dir->server_uuid, &l->server_uuid)) {
-		tnt_error(XlogError, "%s: invalid server UUID",
-			  l->filename);
-		return -1;
-	}
-	/*
-	 * Check the match between log file name and contents:
-	 * the sum of vector clock coordinates must be the same
-	 * as the name of the file.
-	 */
-	int64_t signature_check = vclock_sum(&l->vclock);
-	if (signature_check != signature) {
-		tnt_error(XlogError, "%s: signature check failed",
-			  l->filename);
-		return -1;
-	}
 	return 0;
 }
 
 struct xlog *
-xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file,
-		 const char *filename)
+xlog_open_stream(FILE *file, const char *filename,
+		 bool panic_if_error, bool sync_is_async)
 {
 	/*
 	 * Check fopen() result the caller first thing, to
@@ -1213,37 +1228,31 @@ xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file,
 
 	struct xlog *l = (struct xlog *) calloc(1, sizeof(*l));
 
-	auto log_guard = make_scoped_guard([=]{
-		fclose(file);
-		free(l);
-	});
-
 	if (l == NULL) {
+		fclose(file);
 		tnt_error(OutOfMemory, sizeof(*l), "malloc", "struct xlog");
 		return NULL;
 	}
 
+	auto log_guard = make_scoped_guard([=]{
+		fclose(file);
+		free(l);
+	});
+	l->panic_if_error = panic_if_error;
+	l->sync_is_async = sync_is_async;
+
 	l->f = file;
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_READ;
-	l->dir = dir;
 	l->is_inprogress = false;
 	l->eof_read = false;
 	vclock_create(&l->vclock);
 
-	if (xlog_read_meta(l, signature) != 0)
+	if (xlog_read_meta(l) != 0)
 		return NULL;
 
 	log_guard.is_active = false;
 	return l;
-}
-
-struct xlog *
-xlog_open(struct xdir *dir, int64_t signature)
-{
-	const char *filename = format_filename(dir, signature, NONE);
-	FILE *f = fopen(filename, "r");
-	return xlog_open_stream(dir, signature, f, filename);
 }
 
 int
@@ -1315,8 +1324,13 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 		goto error;
 	l->f = f;
 	snprintf(l->filename, PATH_MAX, "%s", filename);
+	/* Setup inherited values */
+	snprintf(l->filetype, sizeof(l->filetype), "%s", dir->filetype);
+	l->panic_if_error = dir->panic_if_error;
+	l->server_uuid = *dir->server_uuid;
+	l->sync_is_async = dir->sync_is_async;
+
 	l->mode = LOG_WRITE;
-	l->dir = dir;
 	l->is_inprogress = true;
 	/*  Makes no sense, but well. */
 	l->eof_read = false;

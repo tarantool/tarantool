@@ -207,8 +207,10 @@ struct xlog_tx {
  * A single log file - a snapshot or a write ahead log.
  */
 struct xlog {
-	/** The directory this file is in. */
-	struct xdir *dir;
+	/* Inherited from xdir struct */
+	bool panic_if_error;
+	bool sync_is_async;
+	char filetype[10];
 	/** File handle. */
 	FILE *f;
 	/** Mode in which this file has been opened: read or write. */
@@ -249,19 +251,6 @@ struct xlog {
 };
 
 /**
- * Open an existing log file or snapshot for reading.
- *
- * @param  dir           the log directory to look for a file
- * @param  signature     file name
- *
- * The caller must free the returned structure with
- * xlog_close().
- * Raises an exception in case of error.
- */
-struct xlog *
-xlog_open(struct xdir *dir, int64_t signature);
-
-/**
  * Open an xlog from a pre-created stdio stream.
  * The log is open for reading.
  * The file is closed on error, even if open fails.
@@ -273,8 +262,8 @@ xlog_open(struct xdir *dir, int64_t signature);
  */
 
 struct xlog *
-xlog_open_stream(struct xdir *dir, int64_t signature,
-		 FILE *file, const char *filename);
+xlog_open_stream(FILE *file, const char *filename,
+		 bool panic_if_error, bool sync_is_async);
 
 /**
  * Create a new file and open it in write (append) mode.
@@ -342,6 +331,9 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *packet);
 /* }}} */
 
 /** {{{ miscellaneous log io functions. */
+
+struct xlog *
+xdir_open_xlog(struct xdir *dir, int64_t signature);
 
 /**
  * Return a file name based on directory type, vector clock
@@ -431,20 +423,22 @@ xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
 	return rv;
 }
 
-static inline struct xlog *
-xlog_open_stream_xc(struct xdir *dir, int64_t signature, FILE *file,
-		    const char *filename)
+static inline struct xlog*
+xdir_open_xlog_xc(struct xdir *dir, int64_t signature)
 {
-	struct xlog *rv = xlog_open_stream(dir, signature, file, filename);
-	if (rv == NULL)
-		diag_raise();
-	return rv;
+	struct xlog *log = xdir_open_xlog(dir, signature);
+	if (log)
+		return log;
+	diag_raise();
+	return NULL;
 }
 
 static inline struct xlog *
-xlog_open_xc(struct xdir *dir, int64_t signature)
+xlog_open_stream_xc(FILE *file, const char *filename,
+		    bool panic_if_error, bool sync_is_async)
 {
-	struct xlog *rv = xlog_open(dir, signature);
+	struct xlog *rv = xlog_open_stream(file, filename,
+					   panic_if_error, sync_is_async);
 	if (rv == NULL)
 		diag_raise();
 	return rv;
