@@ -6827,11 +6827,13 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(vitr->iface->restore == vy_run_iterator_restore);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	*ret = NULL;
+	int rc;
 
 	if (itr->search_started || last_stmt == NULL) {
 		if (!itr->search_started) {
-			if (vy_run_iterator_start(itr, ret) < 0)
-				return -1;
+			rc = vy_run_iterator_start(itr, ret);
+			if (rc != 0)
+				return rc;
 		} else {
 			vy_run_iterator_get(itr, ret);
 		}
@@ -6846,11 +6848,11 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		itr->order = VINYL_LE;
 	itr->key = last_stmt->data;
 	struct vy_stmt *next_stmt;
-	int rc = vy_run_iterator_start(itr, &next_stmt);
+	rc = vy_run_iterator_start(itr, &next_stmt);
 	itr->order = save_order;
 	itr->key = save_key;
 	if (rc != 0)
-		return -1;
+		return rc;
 	else if (next_stmt == NULL)
 		return 0;
 	const char *fnd = next_stmt->data;
@@ -6860,13 +6862,16 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (next_stmt->lsn >= last_stmt->lsn) {
 			/* skip the same stmt to next stmt or older version */
 			do {
-				if (vy_run_iterator_next_lsn(vitr, next_stmt,
-							     &next_stmt))
-					return -1;
+				rc = vy_run_iterator_next_lsn(vitr, next_stmt,
+							      &next_stmt);
+				if (rc != 0)
+					return rc;
 				if (next_stmt == NULL) {
-					vy_run_iterator_next_key(vitr,
-								 next_stmt,
-								 &next_stmt);
+					rc = vy_run_iterator_next_key(vitr,
+								      next_stmt,
+								      &next_stmt);
+					if (rc != 0)
+						return rc;
 					break;
 				}
 			} while (next_stmt->lsn >= last_stmt->lsn);
@@ -8046,6 +8051,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 						     &src->stmt);
 			if (rc < 0)
 				return rc;
+			rc = 0;
 			if (vy_merge_iterator_check_version(itr))
 				return -2;
 		} else if (src->stmt == NULL) {
@@ -8658,12 +8664,15 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * Check versions of index and current range and restores position if
  * something was changed
  */
-static void
+static int
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
-	char *key = itr->curr_stmt != 0 ?
-		    itr->curr_stmt->data : itr->key;
-	enum vy_order order = itr->order == VINYL_EQ ? VINYL_GE : itr->order;
+	char *key;
+	enum vy_order order;
+	int rc;
+restart:
+	key = itr->curr_stmt != 0 ? itr->curr_stmt->data : itr->key;
+	order = itr->order == VINYL_EQ ? VINYL_GE : itr->order;
 	vy_range_iterator_open(&itr->range_iterator, itr->index, order,
 			       key, 0);
 	itr->curr_range = NULL;
@@ -8674,7 +8683,12 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->order, itr->key);
 	vy_read_iterator_use_range(itr);
-	vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
+	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
+	if (rc == -1)
+		return -1;
+	if (rc == -2)
+		goto restart;
+	return rc;
 }
 
 /**
