@@ -513,7 +513,7 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 			return 1;
 error:
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s: failed to read or parse row "
+		snprintf(buf, sizeof(buf), "%s: failed to parse row "
 			 "header at offset %" PRIu64, fio_filename(fileno(f)),
 			 (uint64_t) ftello(f));
 		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
@@ -909,6 +909,29 @@ xlog_cursor_close(struct xlog_cursor *i)
 	region_free(&fiber()->gc);
 }
 
+static int
+xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
+{
+	/* Return row from xlog tx buffer */
+	try {
+		xrow_header_decode(row,
+				   (const char **)&i->data.rpos,
+				   (const char *)i->data.wpos);
+	} catch (ClientError *e) {
+		if (i->log->panic_if_error)
+			throw;
+		say_warn("failed to read row");
+		return -1;
+	}
+	/* This should be moved to upper level */
+	i->row_count++;
+
+	if (i->row_count % 100000 == 0)
+		say_info("%.1fM rows processed",
+			 i->row_count / 1000000.);
+	return 0;
+}
+
 /**
  * Read logfile contents using designated format, panic if
  * the log is corrupted/unreadable.
@@ -922,33 +945,17 @@ int
 xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 {
 	struct xlog *l = i->log;
-	log_magic_t magic;
+	log_magic_t magic = 0;
 	off_t marker_offset = 0;
 
 	assert(i->eof_read == false);
 
-read_row:
 	if (ibuf_used(&i->data)) {
 		/*
 		 * Still more xrows in this batch, unpack the next
 		 * row.
 		 */
-		try {
-			xrow_header_decode(row,
-					   (const char **)&i->data.rpos,
-					   (const char *)i->data.wpos);
-		} catch (ClientError *e) {
-			if (i->log->panic_if_error)
-				throw;
-			say_warn("failed to read row");
-			goto restart;
-		}
-		i->row_count++;
-
-		if (i->row_count % 100000 == 0)
-			say_info("%.1fM rows processed",
-				 i->row_count / 1000000.);
-		return 0;
+		return xlog_cursor_next_row(i, row);
 	}
 
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
@@ -962,9 +969,6 @@ read_row:
 	region_free_after(&fiber()->gc, 128 * 1024);
 
 restart:
-	if (marker_offset > 0)
-		fseeko(l->f, marker_offset + 1, SEEK_SET);
-
 	if (fread(&magic, sizeof(magic), 1, l->f) != 1)
 		goto eof;
 
@@ -983,27 +987,24 @@ restart:
 			(intmax_t)(marker_offset - i->good_offset),
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
-
-	try {
-		if (xlog_cursor_read_tx(i, magic) != 0)
-			goto eof;
-	} catch (ClientError *e) {
-		if (l->panic_if_error)
-			throw;
-		/*
-		 * say_warn() is used and exception is not
-		 * logged since an error may happen in local
-		 * hot standby or replication mode, when it's
-		 * caused by an attempt to read a partially
-		 * written WAL.
-		 */
-		say_warn("failed to read row block");
+	int rc;
+	rc = xlog_cursor_read_tx(i, magic);
+	if (rc > 0) {
+		goto eof;
+	}
+	if (rc < 0) {
+		if (l->panic_if_error) {
+			diag_raise();
+		}
+		say_warn("xlog: failed to read row at %li",
+			 marker_offset);
+		fseeko(l->f, marker_offset + 1, SEEK_SET);
 		goto restart;
 	}
-
 	i->good_offset = ftello(l->f);
-	goto read_row;
-
+	if (xlog_cursor_next_row(i, row) == 0)
+		return 0;
+	goto restart;
 eof:
 	/*
 	 * According to POSIX, if a partial element is read, value
