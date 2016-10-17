@@ -1756,39 +1756,33 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 	return range;
 }
 
-static void
-vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
-{
-	*ret = NULL;
-	struct vy_index *index = itr->index;
-	if (unlikely(index->range_count == 1)) {
-		*ret = vy_range_tree_first(&index->tree);
-		return;
-	}
-	*ret = vy_range_tree_find_by_key(&index->tree, itr->order,
-					 index->key_def, itr->key,
-					 itr->key_size);
-}
-
 /**
  * Get the range that follows the one passed in @arg in_out and assign the
  * result to @arg in_out.
  */
 static void
-vy_range_iterator_next(struct vy_range_iterator *ii, struct vy_range **in_out)
+vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **in_out)
 {
 	if (*in_out == NULL) {
 		/* First iteration */
-		return vy_range_iterator_start(ii, in_out);
+		struct vy_index *index = itr->index;
+		if (unlikely(index->range_count == 1)) {
+			*in_out = vy_range_tree_first(&index->tree);
+			return;
+		}
+		*in_out = vy_range_tree_find_by_key(&index->tree, itr->order,
+						    index->key_def, itr->key,
+						    itr->key_size);
+		return;
 	}
-	switch (ii->order) {
+	switch (itr->order) {
 	case VINYL_LT:
 	case VINYL_LE:
-		*in_out = vy_range_tree_prev(&ii->index->tree, *in_out);
+		*in_out = vy_range_tree_prev(&itr->index->tree, *in_out);
 		break;
 	case VINYL_GT:
 	case VINYL_GE:
-		*in_out = vy_range_tree_next(&ii->index->tree, *in_out);
+		*in_out = vy_range_tree_next(&itr->index->tree, *in_out);
 		break;
 	default:
 		unreachable();
