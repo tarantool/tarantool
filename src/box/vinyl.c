@@ -1658,38 +1658,29 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 	itr->key_size = key_size;
 }
 
-static void
-vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
+static struct vy_range *
+vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
+			  struct key_def *key_def, char *key, int key_size)
 {
-	*ret = NULL;
-	struct vy_index *index = itr->index;
-	if (unlikely(index->range_count == 1)) {
-		*ret = vy_range_tree_first(&index->tree);
-		return;
-	}
-	if (vy_stmt_key_part(itr->key, 0) == NULL) {
-		switch (itr->order) {
+	if (vy_stmt_key_part(key, 0) == NULL) {
+		switch (order) {
 		case VINYL_LT:
 		case VINYL_LE:
-			*ret = vy_range_tree_last(&index->tree);
-			break;
+			return vy_range_tree_last(tree);
 		case VINYL_GT:
 		case VINYL_GE:
-			*ret = vy_range_tree_first(&index->tree);
-			break;
+			return vy_range_tree_first(tree);
 		default:
 			unreachable();
-			break;
+			return NULL;
 		}
-		return;
 	}
 	/* route */
-	struct key_def *key_def = index->key_def;
 	struct vy_range_tree_key tree_key;
-	tree_key.data = itr->key;
-	tree_key.size = itr->key_size;
+	tree_key.data = key;
+	tree_key.size = key_size;
 	struct vy_range *range;
-	if (itr->order == VINYL_GE || itr->order == VINYL_GT) {
+	if (order == VINYL_GE || order == VINYL_GT) {
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -1712,19 +1703,17 @@ vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
 		 * vy_range_tree_psearch finds least range with begin == key
 		 * or previous if equal was not found
 		 */
-		range = vy_range_tree_psearch(&index->tree, &tree_key);
+		range = vy_range_tree_psearch(tree, &tree_key);
 		/* switch to previous for case (4) */
-		if (range != NULL &&
-		    range->begin != NULL &&
-		    !vy_stmt_key_is_full(itr->key, index->key_def) &&
-		    vy_stmt_compare(range->begin->data,
-				    itr->key, key_def) == 0)
-			range = vy_range_tree_prev(&index->tree, range);
+		if (range != NULL && range->begin != NULL &&
+		    !vy_stmt_key_is_full(key, key_def) &&
+		    vy_stmt_compare(range->begin->data, key, key_def) == 0)
+			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
-			range = vy_range_tree_first(&index->tree);
+			range = vy_range_tree_first(tree);
 	} else {
-		assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
+		assert(order == VINYL_LE || order == VINYL_LT);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -1747,25 +1736,38 @@ vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
 		 * vy_range_tree_nsearch finds most range with begin == key
 		 * or next if equal was not found
 		 */
-		range = vy_range_tree_nsearch(&index->tree, &tree_key);
+		range = vy_range_tree_nsearch(tree, &tree_key);
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
 			    vy_stmt_compare(range->begin->data,
-					    itr->key, key_def) != 0) {
+					    key, key_def) != 0) {
 				struct vy_range *prev;
-				prev = vy_range_tree_prev(&index->tree,
+				prev = vy_range_tree_prev(tree,
 							  range);
 				if (prev != NULL)
 					range = prev;
 			}
 		} else {
 			/* Case 5 */
-			range = vy_range_tree_last(&index->tree);
+			range = vy_range_tree_last(tree);
 		}
 	}
-	assert(range != NULL);
-	*ret = range;
+	return range;
+}
+
+static void
+vy_range_iterator_start(struct vy_range_iterator *itr, struct vy_range **ret)
+{
+	*ret = NULL;
+	struct vy_index *index = itr->index;
+	if (unlikely(index->range_count == 1)) {
+		*ret = vy_range_tree_first(&index->tree);
+		return;
+	}
+	*ret = vy_range_tree_find_by_key(&index->tree, itr->order,
+					 index->key_def, itr->key,
+					 itr->key_size);
 }
 
 /**
@@ -1779,7 +1781,6 @@ vy_range_iterator_next(struct vy_range_iterator *ii, struct vy_range **in_out)
 		/* First iteration */
 		return vy_range_iterator_start(ii, in_out);
 	}
-
 	switch (ii->order) {
 	case VINYL_LT:
 	case VINYL_LE:
@@ -3365,10 +3366,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
 			continue;
 		}
 		/* match range */
-		struct vy_range_iterator ii;
-		vy_range_iterator_open(&ii, index, VINYL_GE, stmt->data, stmt->size);
-		range = NULL;
-		vy_range_iterator_next(&ii, &range);
+		range = vy_range_tree_find_by_key(&index->tree, VINYL_GE,
+						  index->key_def, stmt->data,
+						  stmt->size);
 		assert(range != NULL);
 		if (prev_range != NULL && range != prev_range) {
 			/*
