@@ -405,8 +405,13 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	if (slab_size < SLAB_SIZE_MIN)
 		slab_size = SLAB_SIZE_MIN;
 
+	/*
+	 * Ensure that quota is a multiple of slab_size, to
+	 * have accurate value of quota_used_ratio
+	 */
+	size_t prealloc = small_align(tuple_arena_max_size * 1024
+				      * 1024 * 1024, slab_size);
 	/** Preallocate entire quota. */
-	size_t prealloc = tuple_arena_max_size * 1024 * 1024 * 1024;
 	quota_init(&memtx_quota, prealloc);
 
 	say_info("mapping %zu bytes for tuple arena...", prealloc);
