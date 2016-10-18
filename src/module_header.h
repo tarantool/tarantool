@@ -45,13 +45,6 @@
 #include <stdio.h> /* ssize_t for Apple */
 #include <sys/types.h> /* ssize_t */
 
-/** Extern modifier for all public functions */
-#if defined(__cplusplus)
-#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
-#else
-#define API_EXPORT extern __attribute__ ((visibility ("default")))
-#endif
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */

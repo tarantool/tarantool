@@ -194,7 +194,7 @@ hash_iterator_gt(struct iterator *ptr)
 }
 
 static struct tuple *
-hash_iterator_eq_next(struct iterator *it __attribute__((unused)))
+hash_iterator_eq_next(MAYBE_UNUSED struct iterator *it)
 {
 	return NULL;
 }

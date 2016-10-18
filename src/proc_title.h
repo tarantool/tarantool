@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -36,8 +38,7 @@ extern "C" {
 
 char **proc_title_init(int argc, char **argv);
 void proc_title_free(int argc, char **argv);
-void proc_title_set(const char *format, ...)
-    __attribute__((__format__(__printf__, 1, 2)));
+CFORMAT(printf, 1, 2) void proc_title_set(const char *format, ...);
 size_t proc_title_max_length();
 
 #ifdef __cplusplus

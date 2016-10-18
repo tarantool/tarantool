@@ -35,7 +35,7 @@
  * @file
  * @brief Bit manipulation library
  */
-#include "trivia/config.h"
+#include "trivia/util.h"
 
 #include <stddef.h>
 #include <stdint.h>

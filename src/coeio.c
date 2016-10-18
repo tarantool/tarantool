@@ -85,8 +85,8 @@ coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
 }
 
 static void
-coeio_async_cb(ev_loop *loop, struct ev_async *w __attribute__((unused)),
-	       int events __attribute__((unused)))
+coeio_async_cb(ev_loop *loop, MAYBE_UNUSED struct ev_async *w,
+	       MAYBE_UNUSED int events)
 {
 	if (eio_poll() == -1) {
 		/* not all tasks are complete. */

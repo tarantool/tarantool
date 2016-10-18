@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "trivia/config.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {

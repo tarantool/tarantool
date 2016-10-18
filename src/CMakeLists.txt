@@ -128,6 +128,7 @@ set (server_sources
 
 set(api_headers
     ${CMAKE_BINARY_DIR}/src/trivia/config.h
+    ${CMAKE_BINARY_DIR}/src/trivia/util.h
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/fiber.h
     ${CMAKE_SOURCE_DIR}/src/coio.h

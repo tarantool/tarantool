@@ -576,7 +576,7 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
  * Useful for gdb and say_debug().
  * \sa vy_key_snprint()
  */
-static __attribute__((unused)) const char *
+MAYBE_UNUSED static const char *
 vy_key_str(const char *key, const struct key_def *key_def)
 {
 	char *buf = tt_static_buf();
@@ -590,7 +590,7 @@ vy_key_str(const char *key, const struct key_def *key_def)
  * Useful for gdb and say_debug().
  * \sa vy_stmt_snprint()
  */
-static __attribute__((unused)) const char *
+MAYBE_UNUSED static const char *
 vy_stmt_str(const struct vy_stmt *stmt, const struct key_def *key_def)
 {
 	char *buf = tt_static_buf();

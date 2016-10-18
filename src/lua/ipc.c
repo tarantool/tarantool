@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
+
 #include "lua/ipc.h"
 #include "lua/fiber.h"
 
@@ -37,7 +39,8 @@
 
 /* Help CC understand control flow better, prevent warnings about
  * uninitialized variables. */
-int luaL_error(lua_State *L, const char *fmt, ...) __attribute__((__noreturn__));
+NORETURN int
+luaL_error(lua_State *L, const char *fmt, ...);
 
 #include <ipc.h>
 #include "lua/utils.h"

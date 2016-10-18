@@ -291,6 +291,8 @@ enum { FIBER_CALL_STACK = 16 };
  */
 struct fiber_pool {
 	struct {
+		alignas(CACHELINE_SIZE)
+
 		/** Cache of fibers which work on incoming messages. */
 		struct rlist idle;
 		/** The number of fibers in the pool. */
@@ -305,8 +307,9 @@ struct fiber_pool {
 		/** Staged messages (for fibers to work on) */
 		struct stailq output;
 		struct ev_timer idle_timer;
-	} __attribute__((aligned(CACHELINE_SIZE)));
+	};
 	struct {
+		alignas(CACHELINE_SIZE)
 
 		/** The consumer thread loop. */
 		struct ev_loop *consumer;
@@ -319,7 +322,7 @@ struct fiber_pool {
 		pthread_mutex_t mutex;
 		/** The pipe with incoming messages. */
 		struct stailq pipe;
-	} __attribute__((aligned(CACHELINE_SIZE)));
+	};
 	fiber_func f;
 };
 #undef CACHELINE_SIZE

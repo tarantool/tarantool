@@ -324,7 +324,7 @@ vinyl_iterator_free(struct iterator *ptr)
 }
 
 struct tuple *
-vinyl_iterator_last(struct iterator *ptr __attribute__((unused)))
+vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr)
 {
 	return NULL;
 }

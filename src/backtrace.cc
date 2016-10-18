@@ -349,7 +349,7 @@ print_backtrace()
 #endif /* ENABLE_BACKTRACE */
 
 
-void __attribute__ ((noreturn))
+NORETURN void
 assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);

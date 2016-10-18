@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -80,16 +81,16 @@ void say_init(const char *argv0);
 void say_logger_init(const char *init_str,
                      int log_level, int nonblock, int background);
 
-void vsay(int level, const char *filename, int line, const char *error,
-          const char *format, va_list ap)
-          __attribute__ ((format(printf, 5, 0)));
+CFORMAT(printf, 5, 0) void
+vsay(int level, const char *filename, int line, const char *error,
+     const char *format, va_list ap);
 
 /** \cond public */
 typedef void (*sayfunc_t)(int, const char *, int, const char *,
 		    const char *, ...);
 
 /** Internal function used to implement say() macros */
-extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
+CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 
 /**
  * Format and print a message to Tarantool log file.

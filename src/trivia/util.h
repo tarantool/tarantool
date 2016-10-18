@@ -84,29 +84,236 @@ uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
 
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
-#define likely(x)    __builtin_expect(!! (x),1)
-#define unlikely(x)  __builtin_expect(!! (x),0)
 #define field_sizeof(compound_type, field) sizeof(((compound_type *)NULL)->field)
+#ifndef lengthof
+#define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
+#endif
 
+/** \cond public */
+
+/**
+ * Feature test macroses for -std=c11 / -std=c++11
+ *
+ * Sic: clang aims to be gcc-compatible and thus defines __GNUC__
+ */
+#ifndef __has_feature
+#  define __has_feature(x) 0
+#endif
+#ifndef __has_builtin
+#  define __has_builtin(x) 0
+#endif
+#ifndef __has_attribute
+#  define __has_attribute(x) 0
+#endif
+#ifndef __has_cpp_attribute
+#  define __has_cpp_attribute(x) 0
+#endif
+
+/**
+ * Compiler-independent built-ins.
+ *
+ * \see https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+ *
+ * {{{ Built-ins
+ */
+
+/**
+ * You may use likely()/unlikely() to provide the compiler with branch
+ * prediction information.
+ */
+#if __has_builtin(__builtin_expect) || defined(__GNUC__)
+#  define likely(x)    __builtin_expect(!! (x),1)
+#  define unlikely(x)  __builtin_expect(!! (x),0)
+#else
+#  define likely(x)    (x)
+#  define unlikely(x)  (x)
+#endif
+
+/**
+ * If control flow reaches the point of the unreachable(), the program is
+ * undefined. It is useful in situations where the compiler cannot deduce
+ * the unreachability of the code.
+ */
+#if __has_builtin(__builtin_unreachable) || defined(__GNUC__)
+#  define unreachable() (assert(0), __builtin_unreachable())
+#else
+#  define unreachable() (assert(0))
+#endif
+
+/**
+ * The macro offsetof expands to an integral constant expression of
+ * type size_t, the value of which is the offset, in bytes, from
+ * the beginning of an object of specified type to its specified member,
+ * including padding if any.
+ */
 #ifndef offsetof
 #define offsetof(type, member) ((size_t) &((type *)0)->member)
 #endif
 
-#ifndef __offsetof
-#define __offsetof offsetof
-#endif
-
+/**
+ * This macro is used to retrieve an enclosing structure from a pointer to
+ * a nested element.
+ */
 #ifndef container_of
 #define container_of(ptr, type, member) ({ \
 	const typeof( ((type *)0)->member  ) *__mptr = (ptr); \
 	(type *)( (char *)__mptr - offsetof(type,member)  );})
 #endif
 
-#ifndef lengthof
-#define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
+/**
+ * C11/C++11 keyword. Appears in the declaration syntax as one of the type
+ * specifiers to modify the alignment requirement of the object being
+ * declared.
+ *
+ * Sic: alignas() doesn't work on anonymous strucrs on gcc < 4.9
+ *
+ * \example struct obuf { int a; int b; alignas(16) int c; };
+ */
+#if !defined(alignas) && !defined(__alignas_is_defined)
+#  if __has_feature(c_alignas) || (defined(__GNUC__) && __GNUC__ >= 5)
+#    include <stdalign.h>
+#  elif __has_attribute(aligned) || defined(__GNUC__)
+#    define alignas(_n) __attribute__((aligned(_n)))
+#    define __alignas_is_defined 1
+#  else
+#    define alignas(_n)
+#  endif
 #endif
 
-#define unreachable() (assert(0), __builtin_unreachable())
+/**
+ * C11/C++11 operator. Returns the alignment, in bytes, required for any
+ * instance of the type indicated by type-id, which is either complete type,
+ * an array type, or a reference type.
+ */
+#if !defined(alignof) && !defined(__alignof_is_defined)
+#  if __has_feature(c_alignof) || (defined(__GNUC__) && __GNUC__ >= 5)
+#    include <stdalign.h>
+#  elif defined(__GNUC__)
+#    define alignof(_T) __alignof(_T)
+#    define __alignof_is_defined 1
+#  else
+#    define alignof(_T) offsetof(struct { char c; _T member; }, member)
+#    define __alignof_is_defined 1
+#  endif
+#endif
+
+/** Built-ins }}} */
+
+/**
+ * Compiler-indepedent function attributes.
+ *
+ * \see https://gcc.gnu.org/onlinedocs/gcc/Type-Attributes.html
+ * \see http://clang.llvm.org/docs/AttributeReference.html#function-attributes
+ * \see http://en.cppreference.com/w/cpp/language/attributes
+ *
+ * {{{ Function Attributes
+ */
+
+/**
+ * The MAYBE_UNUSED function attribute can be used to silence -Wunused
+ * diagnostics when the entity cannot be removed. For instance, a local
+ * variable may exist solely for use in an assert() statement, which makes
+ * the local variable unused when NDEBUG is defined.
+ *
+ * \example int fun(MAYBE_UNUSED int unused_arg);
+ */
+#if defined(__cplusplus) && __has_cpp_attribute(maybe_unused)
+#  define MAYBE_UNUSED [[maybe_unused]]
+#elif __has_attribute(unused) || defined(__GNUC__)
+#  define MAYBE_UNUSED __attribute__((unused))
+#else
+#  define MAYBE_UNUSED
+#endif
+
+/**
+ * A diagnostic is generated when a function is marked with NODISCARD and
+ * the function call appears as a potentially-evaluated discarded-value
+ * expression that is not explicitly cast to void.
+ *
+ * \example NODISCARD int function() { return -1 };
+ */
+#if defined(__cplusplus) && __has_cpp_attribute(nodiscard)
+#  define NODISCARD [[nodiscard]]
+#elif __has_attribute(warn_unused_result) || defined(__GNUC__)
+#  define NODISCARD __attribute__((warn_unused_result))
+#else
+#  define NODISCARD
+#endif
+
+/**
+ * A function declared as NORETURN shall not return to its caller.
+ * The compiler will generate a diagnostic for a function declared as
+ * NORETURN that appears to be capable of returning to its caller.
+ *
+ * \example NORETURN void abort();
+ */
+#if defined(__cplusplus) && __has_cpp_attribute(noreturn)
+#  define NORETURN [[noreturn]]
+#elif __has_attribute(noreturn) || defined(__GNUC__)
+#  define NORETURN  __attribute__((noreturn))
+#else
+#  define NORETURN
+#endif
+
+/**
+ * The DEPRECATED attribute can be applied to a function, a variable, or
+ * a type. This is useful when identifying functions, variables, or types
+ * that are expected to be removed in a future version of a program.
+ */
+#if defined(__cplusplus) && __has_cpp_attribute(deprecated)
+#  define DEPRECATED(_msg) [[deprecated(_msg)]]
+#elif __has_attribute(deprecated) || defined(__GNUC__)
+#  define DEPREACTED  __attribute__((deprecated(_msg)))
+#else
+#  define DEPRECATED(_msg)
+#endif
+
+/**
+ * The API_EXPORT attribute declares public C API function.
+ */
+#if defined(__cplusplus) && defined(__GNUC__)
+#  define API_EXPORT extern "C" __attribute__ ((nothrow, visibility ("default")))
+#elif defined(__cplusplus)
+#  define API_EXPORT extern "C"
+#elif defined(__GNUC__)
+#  define API_EXPORT extern __attribute__ ((nothrow, visibility ("default")))
+#else
+#  define API_EXPORT extern
+#endif
+
+/**
+ * The CFORMAT attribute specifies that a function takes printf, scanf,
+ * strftime or strfmon style arguments that should be type-checked against
+ * a format string.
+ *
+ * \see https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html
+ */
+#if __has_attribute(format) || defined(__GNUC__)
+#  define CFORMAT(_archetype, _stringindex, _firsttocheck) \
+	__attribute__((format(_archetype, _stringindex, _firsttocheck)))
+#else
+#  define CFORMAT(archetype, stringindex, firsttocheck)
+#endif
+
+/**
+ * The PACKED qualifier is useful to map a structure to an external data
+ * structure, or for accessing unaligned data, but it is generally not
+ * useful to save data size because of the relatively high cost of
+ * unaligned access on some architectures.
+ *
+ * \example struct PACKED name { char a; int b; };
+ */
+#if __has_attribute(packed) || defined(__GNUC__)
+#  define PACKED  __attribute__((packed))
+#elif defined(__CC_ARM)
+#  define PACKED __packed
+#else
+#  define PACKED
+#endif
+
+/** Function Attributes }}} */
+
+/** \endcond public */
 
 void close_all_xcpt(int fdc, ...);
 void coredump(int dump_interval);
@@ -202,12 +409,6 @@ tt_static_buf(void)
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#if defined(__cplusplus)
-#define API_EXPORT extern "C" __attribute__ ((nothrow, visibility ("default")))
-#else /* defined(__cplusplus) */
-#define API_EXPORT extern __attribute__ ((nothrow, visibility ("default")))
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

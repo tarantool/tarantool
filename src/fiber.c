@@ -492,7 +492,7 @@ fiber_recycle(struct fiber *fiber)
 }
 
 static void
-fiber_loop(void *data __attribute__((unused)))
+fiber_loop(MAYBE_UNUSED void *data)
 {
 	ASAN_FINISH_SWITCH_FIBER(NULL);
 	for (;;) {

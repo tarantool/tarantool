@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "trivia/util.h"
+
 #include "box/lua/slab.h"
 #include "lua/utils.h"
 
@@ -240,7 +242,7 @@ lbox_runtime_info(struct lua_State *L)
 }
 
 static int
-lbox_slab_check(struct lua_State *L __attribute__((unused)))
+lbox_slab_check(MAYBE_UNUSED struct lua_State *L)
 {
 	slab_cache_check(memtx_alloc.cache);
 	return 0;
