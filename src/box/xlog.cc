@@ -996,8 +996,8 @@ restart:
 		if (l->panic_if_error) {
 			diag_raise();
 		}
-		say_warn("xlog: failed to read row at %li",
-			 marker_offset);
+		say_warn("xlog: failed to read row at %lld",
+			 (long long)marker_offset);
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 		goto restart;
 	}

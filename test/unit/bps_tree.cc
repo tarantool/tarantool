@@ -684,7 +684,7 @@ approximate_count()
 	for (uint64_t i = 1; i <= long_sequence_count; i++)
 		for (uint64_t j = 0; j < i * long_sequence_multiplier; j++)
 			arr[count++] = ((i * 100 + 50) << 32) | j;
-	printf("Count: %lu %u\n", count, arr_size);
+	printf("Count: %llu %u\n", (unsigned long long)count, arr_size);
 	assert(count == arr_size);
 
 	for (uint64_t i = 0; i < count * 10; i++) {
@@ -723,8 +723,9 @@ approximate_count()
 			if (approx_count != true_count) {
 				err_count++;
 				if (err_count <= 10)
-					printf("searching %u found %lu expected %lu\n",
-					       i, approx_count, true_count);
+					printf("searching %u found %llu expected %llu\n",
+					       i, (unsigned long long)approx_count,
+					       (unsigned long long)true_count);
 			}
 			continue;
 		}
@@ -736,13 +737,14 @@ approximate_count()
 		if (true_count < low || true_count > up) {
 			err_count++;
 			if (err_count <= 10)
-				printf("searching %u found %lu expected %lu\n",
-				       i, approx_count, true_count);
+				printf("searching %u found %llu expected %llu\n",
+				       i, (unsigned long long)approx_count,
+				       (unsigned long long)true_count);
 		}
 	};
 
 	printf("Error count: %d\n", err_count);
-	printf("Count: %lu\n", count);
+	printf("Count: %llu\n", (unsigned long long)count);
 
 	approx_destroy(&tree);
 
