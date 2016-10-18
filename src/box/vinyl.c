@@ -3521,7 +3521,7 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_write_iterator *wi;
 	int rc;
 
-	wi = vy_write_iterator_new(index, false, task->vlsn);
+	wi = vy_write_iterator_new(index, range->run_count == 0, task->vlsn);
 	if (wi == NULL)
 		return -1;
 
