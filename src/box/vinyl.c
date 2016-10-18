@@ -597,10 +597,10 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 		const struct key_def *key_def)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buf, size, "%s",
+	SNPRINT(total, snprintf, buf, size, "%s(",
 		vy_stmt_typename(stmt->flags));
 	SNPRINT(total, vy_key_snprint, buf, size, stmt->data, key_def);
-	SNPRINT(total, snprintf, buf, size, ", lsn=%lld",
+	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
 	return total;
 }
