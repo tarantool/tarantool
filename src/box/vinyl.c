@@ -914,7 +914,12 @@ struct vy_range {
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   nodecompact;
 	struct heap_node   nodedump;
-	uint32_t range_version;
+	/**
+	 * Incremented whenever an in-memory index (->mem) or on disk
+	 * run (->run) is added to or deleted from this range. Used to
+	 * invalidate iterators.
+	 */
+	uint32_t version;
 };
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
@@ -1000,7 +1005,7 @@ struct vy_index {
 	 * Incremented for each change of the range list,
 	 * to invalidate iterators.
 	 */
-	uint32_t range_index_version;
+	uint32_t version;
 };
 
 
@@ -1770,7 +1775,7 @@ static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
-	index->range_index_version++;
+	index->version++;
 	index->range_count++;
 }
 
@@ -1778,7 +1783,7 @@ static void
 vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_remove(&index->tree, range);
-	index->range_index_version++;
+	index->version++;
 	index->range_count--;
 }
 
@@ -2806,6 +2811,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		r->run = parts[i].run;
 		r->run_count = r->run ? 1 : 0;
 		r->fd = parts[i].fd;
+		r->version++;
 
 		index->size += vy_range_size(r);
 
@@ -2816,7 +2822,6 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		/* Make the new range visible to the scheduler. */
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
-	index->range_index_version++;
 	vy_range_delete(range);
 }
 
@@ -3497,11 +3502,7 @@ vy_task_dump_complete(struct vy_task *task)
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
-
 	index->size += vy_run_size(run) + vy_run_total(run);
-
-	range->range_version++;
-	index->range_index_version++;
 
 	/* Release dumped in-memory indexes */
 	struct vy_mem *mem = range->mem->next;
@@ -3516,6 +3517,8 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_mem_delete(mem);
 		mem = next;
 	}
+
+	range->version++;
 out:
 	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
@@ -3547,6 +3550,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	mem->next = range->mem;
 	range->mem = mem;
 	range->mem_count++;
+	range->version++;
 
 	task->dump.range = range;
 	vy_range_log_debug(range, "dump prepare");
@@ -4871,7 +4875,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 
 	vy_range_tree_new(&index->tree);
-	index->range_index_version = 0;
+	index->version = 0;
 	rlist_create(&index->link);
 	index->size = 0;
 	index->range_count = 0;
@@ -6105,8 +6109,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * rc = -2 is returned to the caller.
 		 */
 
-		uint32_t range_index_version = itr->index->range_index_version;
-		uint32_t range_version = itr->range->range_version;
+		uint32_t index_version = itr->index->version;
+		uint32_t range_version = itr->range->version;
 
 		rc = coeio_preadn(itr->range->fd, page->data, page_info->size,
 				  page_info->offset);
@@ -6115,8 +6119,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Check that vy_index/vy_range/vy_run haven't changed
 		 * during coeio_pread().
 		 */
-		if (range_index_version != itr->index->range_index_version ||
-		    range_version != itr->range->range_version) {
+		if (index_version != itr->index->version ||
+		    range_version != itr->range->version) {
 			vy_page_delete(page);
 			itr->index = NULL;
 			itr->range = NULL;
@@ -7675,8 +7679,8 @@ struct vy_merge_iterator {
 	struct vy_index *index;
 
 	/* {{{ Range version checking */
-	/* copy of index->range_index_version to track range tree changes */
-	uint32_t range_index_version;
+	/* copy of index->version to track range tree changes */
+	uint32_t index_version;
 	/* current range */
 	struct vy_range *curr_range;
 	/* copy of curr_range->version to track mem/run lists changes */
@@ -7732,7 +7736,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 {
 	assert(key != NULL);
 	itr->index = index;
-	itr->range_index_version = 0;
+	itr->index_version = 0;
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->key = key;
@@ -7773,7 +7777,7 @@ vy_merge_iterator_close(struct vy_merge_iterator *itr)
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->index = NULL;
-	itr->range_index_version = 0;
+	itr->index_version = 0;
 }
 
 /**
@@ -7840,8 +7844,8 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
 			      struct vy_range *range)
 {
 	itr->curr_range = range;
-	itr->range_version = range != NULL ? range->range_version : 0;
-	itr->range_index_version = itr->index->range_index_version;
+	itr->range_version = range != NULL ? range->version : 0;
+	itr->index_version = itr->index->version;
 }
 
 /*
@@ -7852,12 +7856,12 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
 static int
 vy_merge_iterator_check_version(struct vy_merge_iterator *itr)
 {
-	if (!itr->range_index_version)
+	if (!itr->index_version)
 		return 0; /* version checking is off */
 
 	assert(itr->curr_range != NULL);
-	if (itr->range_index_version == itr->index->range_index_version &&
-	    itr->curr_range->range_version == itr->range_version)
+	if (itr->index_version == itr->index->version &&
+	    itr->curr_range->version == itr->range_version)
 		return 0;
 
 	return -2; /* iterator is not valid anymore */
