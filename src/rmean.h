@@ -59,11 +59,17 @@ struct rmean {
 	struct stats stats[0];
 };
 
+static inline int64_t
+rmean_total(struct rmean *rmean, size_t name)
+{
+	return rmean->stats[name].total;
+}
+
 void
 rmean_roll(int64_t *value, double dt);
 
 int64_t
-rmean_mean(int64_t *value);
+rmean_mean(struct rmean *rmean, size_t name);
 
 struct rmean *
 rmean_new(const char **name, size_t n);

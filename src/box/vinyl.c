@@ -465,7 +465,7 @@ vy_stat_dump_bandwidth(struct vy_stat *s)
 static int64_t
 vy_stat_tx_write_rate(struct vy_stat *s)
 {
-	return rmean_mean(s->rmean->stats[VY_STAT_TX_WRITE].value);
+	return rmean_mean(s->rmean, VY_STAT_TX_WRITE);
 }
 
 struct vy_stmt {

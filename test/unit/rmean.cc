@@ -21,11 +21,11 @@ void test_100rps(rmean *st)
 		rmean_roll(st->stats[1].value, 1);
 		if (i == 2 || i == 9) { /* two checks */
 			print_stat(st->stats[0].name,
-				   rmean_mean(st->stats[0].value),
-				   st->stats[0].total, NULL);
+				   rmean_mean(st, 0),
+				   rmean_total(st, 0), NULL);
 			print_stat(st->stats[1].name,
-				   rmean_mean(st->stats[1].value),
-				   st->stats[1].total, NULL);
+				   rmean_mean(st, 1),
+				   rmean_total(st, 1), NULL);
 		}
 	}
 	/* 10 seconds, 1000 in EV1, 100 rps */
@@ -47,11 +47,11 @@ void test_mean15rps(rmean *st)
 		rmean_collect(st, 1, 3);
 	}
 	print_stat(st->stats[0].name,
-		   rmean_mean(st->stats[0].value),
-		   st->stats[0].total, NULL);
+		   rmean_mean(st, 0),
+		   rmean_total(st, 0), NULL);
 	print_stat(st->stats[1].name,
-		   rmean_mean(st->stats[1].value),
-		   st->stats[1].total, NULL);
+		   rmean_mean(st, 1),
+		   rmean_total(st, 1), NULL);
 	/* 10 seconds, 1000 + 150 in EV1, 15 rps. 30 in EV2, 3 rps*/
 	footer();
 }
