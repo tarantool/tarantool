@@ -440,6 +440,18 @@ space:count() -- exploded before #1826
 ---
 - 1
 ...
+-- Mem has only UPSERTS
+box.snapshot()
+---
+- ok
+...
+for i=1,10000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+---
+...
+space:count() -- exploded before #1829
+---
+- 1
+...
 space:drop()
 ---
 ...

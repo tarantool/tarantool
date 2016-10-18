@@ -45,8 +45,7 @@ for _, v in ipairs({ 'path', 'build', 'tx_latency', 'cursor_latency',
                      'get_latency', 'gc_active', 'run_avg', 'run_count',
                      'page_count', 'memory_used', 'run_max', 'run_histogram',
                      'size', 'size_uncompressed', 'used', 'count',
-                     'watermark', 'dump_bandwidth', 'dump_total',
-                     'tx_write_rate', 'tx_write_total'}) do
+                     'rps', 'total', 'bandwidth', 'avg', 'max', 'watermark' }) do
     test_run:cmd("push filter '"..v..": .*' to '"..v..": <"..v..">'")
 end;
 ---
@@ -70,10 +69,10 @@ box_info_sort(box.info.vinyl())
       - page_size: <size>
       - range_count: <count>
       - range_size: <size>
-      - run_avg: <run_avg>
+      - run_avg: <avg>
       - run_count: <count>
       - run_histogram: <run_histogram>
-      - run_max: <run_max>
+      - run_max: <max>
       - size: <size>
       - size_uncompressed: <size_uncompressed>
   - memory:
@@ -84,24 +83,39 @@ box_info_sort(box.info.vinyl())
   - metric:
     - lsn: 5
   - performance:
-    - cursor: 1
-    - cursor_latency: <cursor_latency>
-    - cursor_ops: 0 2 2.0
-    - dump_bandwidth: <dump_bandwidth>
-    - dump_total: <dump_total>
-    - get: 3
-    - get_latency: <get_latency>
-    - get_read_cache: 0 0 0.0
-    - get_read_disk: 0 0 0.0
-    - tx: 3
+    - cursor:
+      - rps: <rps>
+      - total: <total>
+    - cursor_latency:
+      - avg: <avg>
+      - max: <max>
+    - cursor_ops:
+      - rps: <rps>
+      - total: <total>
+    - dump_bandwidth: <bandwidth>
+    - dump_total: <total>
+    - get:
+      - rps: <rps>
+      - total: <total>
+    - get_latency:
+      - avg: <avg>
+      - max: <max>
+    - tx:
+      - rps: <rps>
+      - total: <total>
     - tx_active_ro: 0
     - tx_active_rw: 0
     - tx_conflict: 0
-    - tx_latency: <tx_latency>
-    - tx_ops: 0 1 1.0
+    - tx_latency:
+      - avg: <avg>
+      - max: <max>
+    - tx_ops:
+      - rps: <rps>
+      - total: <total>
     - tx_rollback: 1
-    - tx_write_rate: <tx_write_rate>
-    - tx_write_total: <tx_write_total>
+    - tx_write:
+      - rps: <rps>
+      - total: <total>
     - write_count: <count>
   - vinyl:
     - build: <build>

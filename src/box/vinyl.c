@@ -228,31 +228,19 @@ vy_quota_exceeded(struct vy_quota *q)
 	return q->used >= q->watermark;
 }
 
-struct vy_avg {
+struct vy_latency {
 	uint64_t count;
-	uint64_t total;
-	uint32_t min, max;
-	double   avg;
-	char sz[32];
+	double total;
+	double max;
 };
 
 static void
-vy_avg_update(struct vy_avg *a, uint32_t v)
+vy_latency_update(struct vy_latency *lat, double v)
 {
-	a->count++;
-	a->total += v;
-	a->avg = (double)a->total / (double)a->count;
-	if (v < a->min)
-		a->min = v;
-	if (v > a->max)
-		a->max = v;
-}
-
-static void
-vy_avg_prepare(struct vy_avg *a)
-{
-	snprintf(a->sz, sizeof(a->sz), "%"PRIu32" %"PRIu32" %.1f",
-	         a->min, a->max, a->avg);
+	lat->count++;
+	lat->total += v;
+	if (v > lat->max)
+		lat->max = v;
 }
 
 static struct vy_quota *
@@ -301,6 +289,12 @@ vy_quota_use(struct vy_quota *q, int64_t size,
 }
 
 static void
+vy_quota_force_use(struct vy_quota *q, int64_t size)
+{
+	q->used += size;
+}
+
+static void
 vy_quota_release(struct vy_quota *q, int64_t size)
 {
 	q->used -= size;
@@ -345,33 +339,32 @@ path_exists(const char *path)
 	vy_e(ER_VINYL, fmt, __VA_ARGS__)
 
 enum vy_stat_name {
+	VY_STAT_GET,
+	VY_STAT_TX,
+	VY_STAT_TX_OPS,
 	VY_STAT_TX_WRITE,
+	VY_STAT_CURSOR,
+	VY_STAT_CURSOR_OPS,
 	VY_STAT_LAST,
 };
 
 static const char *vy_stat_strings[] = {
+	"get",
+	"tx",
+	"tx_ops",
 	"tx_write",
+	"cursor",
+	"cursor_ops",
 };
 
 struct vy_stat {
 	struct rmean *rmean;
-	/* get */
-	uint64_t get;
-	struct vy_avg    get_read_disk;
-	struct vy_avg    get_read_cache;
-	struct vy_avg    get_latency;
-	/* write */
 	uint64_t write_count;
-	/* transaction */
-	uint64_t tx;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	struct vy_avg    tx_latency;
-	struct vy_avg    tx_stmts;
-	/* cursor */
-	uint64_t cursor;
-	struct vy_avg    cursor_latency;
-	struct vy_avg    cursor_ops;
+	struct vy_latency get_latency;
+	struct vy_latency tx_latency;
+	struct vy_latency cursor_latency;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -440,59 +433,38 @@ vy_stat_delete(struct vy_stat *s)
 }
 
 static void
-vy_stat_prepare(struct vy_stat *s)
+vy_stat_get(struct vy_stat *s, ev_tstamp start)
 {
-	vy_avg_prepare(&s->get_read_disk);
-	vy_avg_prepare(&s->get_read_cache);
-	vy_avg_prepare(&s->get_latency);
-	vy_avg_prepare(&s->tx_latency);
-	vy_avg_prepare(&s->tx_stmts);
-	vy_avg_prepare(&s->cursor_latency);
-	vy_avg_prepare(&s->cursor_ops);
-}
-
-struct vy_stat_get {
-	int read_disk;
-	int read_cache;
-	uint64_t read_latency;
-};
-
-static void
-vy_stat_get(struct vy_stat *s, const struct vy_stat_get *statget)
-{
-	s->get++;
-	vy_avg_update(&s->get_read_disk, statget->read_disk);
-	vy_avg_update(&s->get_read_cache, statget->read_cache);
-	vy_avg_update(&s->get_latency, statget->read_latency);
+	ev_tstamp diff = ev_now(loop()) - start;
+	rmean_collect(s->rmean, VY_STAT_GET, 1);
+	vy_latency_update(&s->get_latency, diff);
 }
 
 static void
-vy_stat_tx(struct vy_stat *s, uint64_t start, uint32_t count,
-	   uint32_t write_count, size_t write_size, bool is_rollback)
+vy_stat_tx(struct vy_stat *s, ev_tstamp start,
+	   int ops, int write_count, size_t write_size)
 {
-	uint64_t diff = clock_monotonic64() - start;
-	s->tx++;
-	if (is_rollback)
-		s->tx_rlb++;
-	s->write_count += write_count;
-	vy_avg_update(&s->tx_stmts, count);
-	vy_avg_update(&s->tx_latency, diff);
+	ev_tstamp diff = ev_now(loop()) - start;
+	rmean_collect(s->rmean, VY_STAT_TX, 1);
+	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
 	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
+	s->write_count += write_count;
+	vy_latency_update(&s->tx_latency, diff);
 }
 
 static void
-vy_stat_cursor(struct vy_stat *s, uint64_t start, int ops)
+vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
 {
-	uint64_t diff = clock_monotonic64() - start;
-	s->cursor++;
-	vy_avg_update(&s->cursor_latency, diff);
-	vy_avg_update(&s->cursor_ops, ops);
+	ev_tstamp diff = ev_now(loop()) - start;
+	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
+	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
+	vy_latency_update(&s->cursor_latency, diff);
 }
 
 static void
-vy_stat_dump(struct vy_stat *s, uint64_t time, size_t written)
+vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written)
 {
-	histogram_collect(s->dump_bw, written / (time / 1000000000.0));
+	histogram_collect(s->dump_bw, written / time);
 	s->dump_total += written;
 }
 
@@ -507,12 +479,6 @@ static int64_t
 vy_stat_tx_write_rate(struct vy_stat *s)
 {
 	return rmean_mean(s->rmean->stats[VY_STAT_TX_WRITE].value);
-}
-
-static int64_t
-vy_stat_tx_write_total(struct vy_stat *s)
-{
-	return s->rmean->stats[VY_STAT_TX_WRITE].total;
 }
 
 /** There was a backend read. This flag is additive. */
@@ -631,10 +597,10 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 		const struct key_def *key_def)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buf, size, "%s",
+	SNPRINT(total, snprintf, buf, size, "%s(",
 		vy_stmt_typename(stmt->flags));
 	SNPRINT(total, vy_key_snprint, buf, size, stmt->data, key_def);
-	SNPRINT(total, snprintf, buf, size, ", lsn=%lld",
+	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
 	return total;
 }
@@ -821,6 +787,37 @@ vy_mem_older_lsn(struct vy_mem *mem, const char *key, int64_t key_lsn,
 	return result;
 }
 
+/*
+ * Number of successive upserts for the same key after which we should
+ * consider inserting a replace statement to optimize future selects
+ * (see vy_range_optimize_upserts()).
+ */
+#define VY_UPSERT_THRESHOLD	10
+
+static bool
+vy_mem_too_many_upserts(struct vy_mem *mem, const char *key,
+			int64_t key_lsn, const struct key_def *key_def)
+{
+	struct tree_mem_key tree_key = {
+		.data = key,
+		.lsn = key_lsn - 1,
+	};
+	int count = 0;
+	struct vy_mem_tree_iterator itr =
+		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
+	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
+		struct vy_stmt *v =
+			*vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
+		if (v->flags != SVUPSERT ||
+		    vy_stmt_compare(v->data, key, key_def) != 0)
+			break;
+		if (++count > VY_UPSERT_THRESHOLD)
+			return true;
+		vy_mem_tree_iterator_next(&mem->tree, &itr);
+	}
+	return false;
+}
+
 /**
  * The footprint of run metadata on disk.
  * Run metadata is a set of packed data structures which are
@@ -937,7 +934,7 @@ struct vy_range {
 	/** Range upper bound. NULL if range is rightmost. */
 	struct vy_stmt *end;
 	struct vy_index *index;
-	uint64_t   update_time;
+	ev_tstamp update_time;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	uint32_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
@@ -954,7 +951,12 @@ struct vy_range {
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   nodecompact;
 	struct heap_node   nodedump;
-	uint32_t range_version;
+	/**
+	 * Incremented whenever an in-memory index (->mem) or on disk
+	 * run (->run) is added to or deleted from this range. Used to
+	 * invalidate iterators.
+	 */
+	uint32_t version;
 };
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
@@ -1040,7 +1042,7 @@ struct vy_index {
 	 * Incremented for each change of the range list,
 	 * to invalidate iterators.
 	 */
-	uint32_t range_index_version;
+	uint32_t version;
 };
 
 
@@ -1088,7 +1090,7 @@ struct vy_tx {
 	 * the version increments.
 	 */
 	uint32_t write_set_version;
-	uint64_t start;
+	ev_tstamp start;
 	enum tx_type     type;
 	enum tx_state    state;
 	bool is_aborted;
@@ -1129,7 +1131,7 @@ struct vy_cursor {
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
-	uint64_t start;
+	ev_tstamp start;
 	/**
 	 * All open cursors are registered in a transaction
 	 * they belong to. When the transaction ends, the cursor
@@ -1374,7 +1376,7 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
-	tx->start = clock_monotonic64();
+	tx->start = ev_now(loop());
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
 	tx->type = type;
@@ -1446,7 +1448,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 		txv_delete(v);
 		count++;
 	}
-	vy_stat_tx(e->stat, tx->start, count, 0, 0, true);
+	e->stat->tx_rlb++;
 }
 
 static const char *
@@ -1522,6 +1524,18 @@ vy_pread_file(int fd, void *buf, size_t size, off_t offset)
 		pos += readen;
 	}
 	return pos;
+}
+
+static const char *
+vy_range_str(struct vy_range *range)
+{
+	struct key_def *key_def = range->index->key_def;
+	char *buf = tt_static_buf();
+	snprintf(buf, TT_STATIC_BUF_LEN,
+		 "%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64" (%p)",
+		 key_def->space_id, key_def->iid,
+		 key_def->opts.lsn, range->id, range);
+	return buf;
 }
 
 static int
@@ -1796,10 +1810,7 @@ vy_range_log_debug(struct vy_range *range, const char *reason)
 		return;
 
 	struct key_def *key_def = range->index->key_def;
-	say_debug("range %s: %"PRIu32"/%"PRIu32
-		"/%016"PRIx64".%016"PRIx64" (%p): %s .. %s",
-		  reason, key_def->space_id, key_def->iid,
-		  key_def->opts.lsn, range->id, range,
+	say_debug("range %s: %s: %s .. %s", reason, vy_range_str(range),
 		  vy_key_str(range->begin != NULL ? range->begin->data : NULL,
 			     key_def),
 		  vy_key_str(range->end != NULL ? range->end->data : NULL,
@@ -1810,7 +1821,7 @@ static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
-	index->range_index_version++;
+	index->version++;
 	index->range_count++;
 }
 
@@ -1818,7 +1829,7 @@ static void
 vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_remove(&index->tree, range);
-	index->range_index_version++;
+	index->version++;
 	index->range_count--;
 }
 
@@ -2846,6 +2857,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		r->run = parts[i].run;
 		r->run_count = r->run ? 1 : 0;
 		r->fd = parts[i].fd;
+		r->version++;
 
 		index->size += vy_range_size(r);
 
@@ -2856,7 +2868,6 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		/* Make the new range visible to the scheduler. */
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
-	index->range_index_version++;
 	vy_range_delete(range);
 }
 
@@ -3241,10 +3252,13 @@ vy_range_set(struct vy_range *range, struct vy_stmt *stmt, size_t *write_size)
 {
 	struct vy_scheduler *scheduler = range->index->env->scheduler;
 
+	struct vy_stmt *replaced_stmt = NULL;
 	struct vy_mem *mem = range->mem;
-	int rc = vy_mem_tree_insert(&mem->tree, stmt, NULL);
+	int rc = vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt);
 	if (rc != 0)
 		return -1;
+	if (replaced_stmt != NULL)
+		vy_stmt_unref(replaced_stmt);
 
 	vy_stmt_ref(stmt);
 
@@ -3288,6 +3302,9 @@ vy_range_set_delete(struct vy_range *range, struct vy_stmt *stmt,
 	return vy_range_set(range, stmt, write_size);
 }
 
+static void
+vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt);
+
 static int
 vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		    size_t *write_size)
@@ -3321,7 +3338,21 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		return rc;
 	}
 
-	return vy_range_set(range, stmt, write_size);
+	if (vy_range_set(range, stmt, write_size) != 0)
+		return -1;
+
+	/*
+	 * If there are a lot of successive upserts for the same key,
+	 * select might take too long to squash them all. So once the
+	 * number of upserts exceeds a certain threshold, we schedule
+	 * a fiber to merge them and substitute the latest upsert with
+	 * the resulting replace statement.
+	 */
+	if (vy_mem_too_many_upserts(range->mem, stmt->data,
+				    stmt->lsn, index->key_def))
+		vy_range_optimize_upserts(range, stmt);
+
+	return 0;
 }
 
 
@@ -3332,7 +3363,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
  * Break when the write set begins pointing at the next index.
  */
 static struct txv *
-vy_tx_write(write_set_t *write_set, struct txv *v, uint64_t time,
+vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 	 enum vinyl_status status, int64_t lsn, size_t *write_size)
 {
 	struct vy_index *index = v->index;
@@ -3424,7 +3455,7 @@ struct vy_task {
 	struct vy_index *index;
 
 	/** How long ->execute took, in nanoseconds. */
-	uint64_t exec_time;
+	ev_tstamp exec_time;
 
 	/** Number of bytes written to disk by this task. */
 	size_t dump_size;
@@ -3537,11 +3568,7 @@ vy_task_dump_complete(struct vy_task *task)
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
-
 	index->size += vy_run_size(run) + vy_run_total(run);
-
-	range->range_version++;
-	index->range_index_version++;
 
 	/* Release dumped in-memory indexes */
 	struct vy_mem *mem = range->mem->next;
@@ -3556,6 +3583,8 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_mem_delete(mem);
 		mem = next;
 	}
+
+	range->version++;
 out:
 	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
@@ -3587,6 +3616,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	mem->next = range->mem;
 	range->mem = mem;
 	range->mem_count++;
+	range->version++;
 
 	task->dump.range = range;
 	vy_range_log_debug(range, "dump prepare");
@@ -4151,9 +4181,9 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		uint64_t start = clock_monotonic64();
+		uint64_t start = ev_now(loop());
 		task->status = task->ops->execute(task);
-		task->exec_time = clock_monotonic64() - start;
+		task->exec_time = ev_now(loop()) - start;
 		if (task->status != 0) {
 			assert(!diag_is_empty(diag_get()));
 			if (!warning_said) {
@@ -4430,185 +4460,172 @@ vy_index_read(struct vy_index*, struct vy_stmt*, enum vy_order order,
 
 /** {{{ Introspection */
 
-static struct vy_info_node *
-vy_info_append(struct vy_info_node *root, const char *key)
+static void
+vy_info_append_u32(struct vy_info_handler *h, const char *key, uint32_t value)
 {
-	assert(root->childs_n < root->childs_cap);
-	struct vy_info_node *node = &root->childs[root->childs_n];
-	root->childs_n++;
-	node->key = key;
-	node->val_type = VINYL_NODE;
-	return node;
+	struct vy_info_node node = {
+		.type = VY_INFO_U32,
+		.key = key,
+		.value.u32 = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
 static void
-vy_info_append_u32(struct vy_info_node *root, const char *key, uint32_t value)
+vy_info_append_u64(struct vy_info_handler *h, const char *key, uint64_t value)
 {
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.u32 = value;
-	node->val_type = VINYL_U32;
+	struct vy_info_node node = {
+		.type = VY_INFO_U64,
+		.key = key,
+		.value.u64 = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
 static void
-vy_info_append_u64(struct vy_info_node *root, const char *key, uint64_t value)
-{
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.u64 = value;
-	node->val_type = VINYL_U64;
-}
-
-static void
-vy_info_append_str(struct vy_info_node *root, const char *key,
+vy_info_append_str(struct vy_info_handler *h, const char *key,
 		   const char *value)
 {
-	struct vy_info_node *node = vy_info_append(root, key);
-	node->value.str = value;
-	node->val_type = VINYL_STRING;
+	struct vy_info_node node = {
+		.type = VY_INFO_STRING,
+		.key = key,
+		.value.str = value,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_reserve(struct vy_info *info, struct vy_info_node *node, int size)
+static void
+vy_info_table_begin(struct vy_info_handler *h, const char *key)
 {
-	node->childs = region_alloc(&info->allocator,
-				    size * sizeof(*node->childs));
-	if (node->childs == NULL) {
-		diag_set(OutOfMemory, sizeof(*node), "vy_info_node",
-			"node->childs");
-		return -1;
-	}
-	memset(node->childs, 0, size * sizeof(*node->childs));
-	node->childs_cap = size;
-	return 0;
+	struct vy_info_node node = {
+		.type = VY_INFO_TABLE_BEGIN,
+		.key = key,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_append_global(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_table_end(struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "vinyl");
-	if (vy_info_reserve(info, node, 4) != 0)
-		return 1;
-	vy_info_append_str(node, "path", info->env->conf->path);
-	vy_info_append_str(node, "build", PACKAGE_VERSION);
-	return 0;
+	struct vy_info_node node = {
+		.type = VY_INFO_TABLE_END,
+	};
+	h->fn(&node, h->ctx);
 }
 
-static int
-vy_info_append_memory(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_global(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "memory");
-	if (vy_info_reserve(info, node, 4) != 0)
-		return 1;
-	struct vy_env *env = info->env;
-	vy_info_append_u64(node, "used", vy_quota_used(env->quota));
-	vy_info_append_u64(node, "limit", env->conf->memory_limit);
-	vy_info_append_u64(node, "watermark", env->quota->watermark);
-	static char buf[4];
+	vy_info_table_begin(h, "vinyl");
+	vy_info_append_str(h, "path", env->conf->path);
+	vy_info_append_str(h, "build", PACKAGE_VERSION);
+	vy_info_table_end(h);
+}
+
+static void
+vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
+{
+	char buf[16];
+	vy_info_table_begin(h, "memory");
+	vy_info_append_u64(h, "used", vy_quota_used(env->quota));
+	vy_info_append_u64(h, "limit", env->conf->memory_limit);
+	vy_info_append_u64(h, "watermark", env->quota->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
-	vy_info_append_str(node, "ratio", buf);
-	return 0;
+	vy_info_append_str(h, "ratio", buf);
+	vy_info_table_end(h);
 }
 
 static int
-vy_info_append_performance(struct vy_info *info, struct vy_info_node *root)
+vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 {
-	struct vy_info_node *node = vy_info_append(root, "performance");
-	if (vy_info_reserve(info, node, 26) != 0)
-		return 1;
+	struct vy_info_handler *h = ctx;
+	vy_info_table_begin(h, name);
+	vy_info_append_u32(h, "rps", rps);
+	vy_info_append_u64(h, "total", total);
+	vy_info_table_end(h);
+	return 0;
+}
 
-	struct vy_env *env = info->env;
+static void
+vy_info_append_stat_latency(struct vy_info_handler *h,
+			    const char *name, struct vy_latency *lat)
+{
+	vy_info_table_begin(h, name);
+	vy_info_append_u64(h, "max", lat->max * 1000000000);
+	vy_info_append_u64(h, "avg", lat->count == 0 ? 0 :
+			   lat->total / lat->count * 1000000000);
+	vy_info_table_end(h);
+}
+
+static void
+vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
+{
 	struct vy_stat *stat = env->stat;
-	vy_stat_prepare(stat);
-	vy_info_append_u64(node, "tx", stat->tx);
-	vy_info_append_u64(node, "get", stat->get);
-	vy_info_append_u64(node, "cursor", stat->cursor);
-	vy_info_append_str(node, "tx_ops", stat->tx_stmts.sz);
-	vy_info_append_str(node, "tx_latency", stat->tx_latency.sz);
-	vy_info_append_str(node, "cursor_ops", stat->cursor_ops.sz);
-	vy_info_append_u64(node, "write_count", stat->write_count);
-	vy_info_append_str(node, "get_latency", stat->get_latency.sz);
-	vy_info_append_u64(node, "tx_rollback", stat->tx_rlb);
-	vy_info_append_u64(node, "tx_conflict", stat->tx_conflict);
-	vy_info_append_u32(node, "tx_active_rw", env->xm->count_rw);
-	vy_info_append_u32(node, "tx_active_ro", env->xm->count_rd);
-	vy_info_append_str(node, "get_read_disk", stat->get_read_disk.sz);
-	vy_info_append_str(node, "get_read_cache", stat->get_read_cache.sz);
-	vy_info_append_str(node, "cursor_latency", stat->cursor_latency.sz);
-	vy_info_append_u64(node, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	vy_info_append_u64(node, "dump_total", stat->dump_total);
-	vy_info_append_u64(node, "tx_write_rate", vy_stat_tx_write_rate(stat));
-	vy_info_append_u64(node, "tx_write_total", vy_stat_tx_write_total(stat));
-	return 0;
+
+	vy_info_table_begin(h, "performance");
+
+	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
+
+	vy_info_append_u64(h, "write_count", stat->write_count);
+
+	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
+	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
+	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
+
+	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
+	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
+	vy_info_append_u32(h, "tx_active_rw", env->xm->count_rw);
+	vy_info_append_u32(h, "tx_active_ro", env->xm->count_rd);
+
+	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	vy_info_append_u64(h, "dump_total", stat->dump_total);
+
+	vy_info_table_end(h);
 }
 
-static int
-vy_info_append_metric(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_metric(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_info_node *node = vy_info_append(root, "metric");
-	if (vy_info_reserve(info, node, 2) != 0)
-		return 1;
-
-	vy_info_append_u64(node, "lsn", info->env->xm->lsn);
-	return 0;
+	vy_info_table_begin(h, "metric");
+	vy_info_append_u64(h, "lsn", env->xm->lsn);
+	vy_info_table_end(h);
 }
 
-static int
-vy_info_append_indices(struct vy_info *info, struct vy_info_node *root)
+static void
+vy_info_append_indices(struct vy_env *env, struct vy_info_handler *h)
 {
 	struct vy_index *o;
-	int indices_cnt = 0;
-	rlist_foreach_entry(o, &info->env->indexes, link) {
-		++indices_cnt;
-	}
-	struct vy_info_node *node = vy_info_append(root, "db");
-	if (vy_info_reserve(info, node, indices_cnt) != 0)
-		return 1;
-	rlist_foreach_entry(o, &info->env->indexes, link) {
+	vy_info_table_begin(h, "db");
+	rlist_foreach_entry(o, &env->indexes, link) {
 		vy_profiler(&o->rtp, o);
-		struct vy_info_node *local_node = vy_info_append(node, o->name);
-		if (vy_info_reserve(info, local_node, 19) != 0)
-			return 1;
-		vy_info_append_u64(local_node, "size", o->rtp.total_range_size);
-		vy_info_append_u64(local_node, "count", o->rtp.count);
-		vy_info_append_u64(local_node, "count_dup", o->rtp.count_dup);
-		vy_info_append_u32(local_node, "page_count", o->rtp.total_page_count);
-		vy_info_append_u32(local_node, "range_count", o->rtp.total_range_count);
-		vy_info_append_u32(local_node, "run_avg", o->rtp.total_run_avg);
-		vy_info_append_u32(local_node, "run_max", o->rtp.total_run_max);
-		vy_info_append_u64(local_node, "memory_used", o->rtp.memory_used);
-		vy_info_append_u32(local_node, "run_count", o->rtp.total_run_count);
-		vy_info_append_str(local_node, "run_histogram", o->rtp.histogram_run_ptr);
-		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(local_node, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(local_node, "range_size", o->key_def->opts.range_size);
-		vy_info_append_u64(local_node, "page_size", o->key_def->opts.page_size);
+		vy_info_table_begin(h, o->name);
+		vy_info_append_u64(h, "size", o->rtp.total_range_size);
+		vy_info_append_u64(h, "count", o->rtp.count);
+		vy_info_append_u64(h, "count_dup", o->rtp.count_dup);
+		vy_info_append_u32(h, "page_count", o->rtp.total_page_count);
+		vy_info_append_u32(h, "range_count", o->rtp.total_range_count);
+		vy_info_append_u32(h, "run_avg", o->rtp.total_run_avg);
+		vy_info_append_u32(h, "run_max", o->rtp.total_run_max);
+		vy_info_append_u64(h, "memory_used", o->rtp.memory_used);
+		vy_info_append_u32(h, "run_count", o->rtp.total_run_count);
+		vy_info_append_str(h, "run_histogram", o->rtp.histogram_run_ptr);
+		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
+		vy_info_append_u64(h, "range_size", o->key_def->opts.range_size);
+		vy_info_append_u64(h, "page_size", o->key_def->opts.page_size);
+		vy_info_table_end(h);
 	}
-	return 0;
-}
-
-int
-vy_info_create(struct vy_info *info, struct vy_env *e)
-{
-	memset(info, 0, sizeof(*info));
-	info->env = e;
-	region_create(&info->allocator, cord_slab_cache());
-	struct vy_info_node *root = &info->root;
-	if (vy_info_reserve(info, root, 5) != 0 ||
-	    vy_info_append_indices(info, root) != 0 ||
-	    vy_info_append_global(info, root) != 0 ||
-	    vy_info_append_memory(info, root) != 0 ||
-	    vy_info_append_metric(info, root) != 0 ||
-	    vy_info_append_performance(info, root) != 0) {
-		region_destroy(&info->allocator);
-		return 1;
-	}
-	return 0;
+	vy_info_table_end(h);
 }
 
 void
-vy_info_destroy(struct vy_info *info)
+vy_info_gather(struct vy_env *env, struct vy_info_handler *h)
 {
-	region_destroy(&info->allocator);
-	TRASH(info);
+	vy_info_append_indices(env, h);
+	vy_info_append_global(env, h);
+	vy_info_append_memory(env, h);
+	vy_info_append_metric(env, h);
+	vy_info_append_performance(env, h);
 }
 
 /** }}} Introspection */
@@ -4924,7 +4941,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 
 	vy_range_tree_new(&index->tree);
-	index->range_index_version = 0;
+	index->version = 0;
 	rlist_create(&index->link);
 	index->size = 0;
 	index->range_count = 0;
@@ -5552,6 +5569,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 
 	/* proceed read-only transactions */
 	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
+		e->stat->tx_conflict++;
 		tx->state = VINYL_TX_ROLLBACK;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
@@ -5587,7 +5605,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		e->xm->lsn = lsn;
 
 	/* Flush transactional changes to the index. */
-	uint64_t now = clock_monotonic64();
+	ev_tstamp now = ev_now(loop());
 	struct txv *v = write_set_first(&tx->write_set);
 
 	uint64_t write_count = 0;
@@ -5608,7 +5626,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
-	vy_stat_tx(e->stat, tx->start, count, write_count, write_size, false);
+	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
 	free(tx);
 
 	vy_quota_use(e->quota, write_size, &e->scheduler->scheduler_cond);
@@ -6157,8 +6175,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * rc = -2 is returned to the caller.
 		 */
 
-		uint32_t range_index_version = itr->index->range_index_version;
-		uint32_t range_version = itr->range->range_version;
+		uint32_t index_version = itr->index->version;
+		uint32_t range_version = itr->range->version;
 
 		rc = coeio_preadn(itr->range->fd, page->data, page_info->size,
 				  page_info->offset);
@@ -6167,8 +6185,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Check that vy_index/vy_range/vy_run haven't changed
 		 * during coeio_pread().
 		 */
-		if (range_index_version != itr->index->range_index_version ||
-		    range_version != itr->range->range_version) {
+		if (index_version != itr->index->version ||
+		    range_version != itr->range->version) {
 			vy_page_delete(page);
 			itr->index = NULL;
 			itr->range = NULL;
@@ -7727,8 +7745,8 @@ struct vy_merge_iterator {
 	struct vy_index *index;
 
 	/* {{{ Range version checking */
-	/* copy of index->range_index_version to track range tree changes */
-	uint32_t range_index_version;
+	/* copy of index->version to track range tree changes */
+	uint32_t index_version;
 	/* current range */
 	struct vy_range *curr_range;
 	/* copy of curr_range->version to track mem/run lists changes */
@@ -7784,7 +7802,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 {
 	assert(key != NULL);
 	itr->index = index;
-	itr->range_index_version = 0;
+	itr->index_version = 0;
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->key = key;
@@ -7825,7 +7843,7 @@ vy_merge_iterator_close(struct vy_merge_iterator *itr)
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->index = NULL;
-	itr->range_index_version = 0;
+	itr->index_version = 0;
 }
 
 /**
@@ -7892,8 +7910,8 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
 			      struct vy_range *range)
 {
 	itr->curr_range = range;
-	itr->range_version = range != NULL ? range->range_version : 0;
-	itr->range_index_version = itr->index->range_index_version;
+	itr->range_version = range != NULL ? range->version : 0;
+	itr->index_version = itr->index->version;
 }
 
 /*
@@ -7904,12 +7922,12 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
 static int
 vy_merge_iterator_check_version(struct vy_merge_iterator *itr)
 {
-	if (!itr->range_index_version)
+	if (!itr->index_version)
 		return 0; /* version checking is off */
 
 	assert(itr->curr_range != NULL);
-	if (itr->range_index_version == itr->index->range_index_version &&
-	    itr->curr_range->range_version == itr->range_version)
+	if (itr->index_version == itr->index->version &&
+	    itr->curr_range->version == itr->range_version)
 		return 0;
 
 	return -2; /* iterator is not valid anymore */
@@ -8870,7 +8888,7 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
-	uint64_t start  = clock_monotonic64();
+	ev_tstamp start  = ev_now(loop());
 
 	int64_t vlsn = tx != NULL ? tx->vlsn : e->xm->lsn;
 
@@ -8882,12 +8900,7 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	}
 	vy_read_iterator_close(&itr);
 
-	struct vy_stat_get statget;
-	statget.read_disk = 0; // q.read_disk;
-	statget.read_cache = 0; // q.read_cache;
-	statget.read_latency = clock_monotonic64() - start;
-	vy_stat_get(e->stat, &statget);
-
+	vy_stat_get(e->stat, start);
 	return rc;
 }
 
@@ -8908,4 +8921,56 @@ vy_readcommited(struct vy_index *index, struct vy_stmt *stmt)
 	}
 	vy_read_iterator_close(&itr);
 	return rc;
+}
+
+static int
+vy_range_optimize_upserts_f(va_list va)
+{
+	struct vy_range *range = va_arg(va, struct vy_range *);
+	struct vy_stmt *stmt = va_arg(va, struct vy_stmt *);
+	uint32_t index_version = va_arg(va, uint32_t);
+	uint32_t range_version = va_arg(va, uint32_t);
+	struct vy_index *index = range->index;
+
+	/* Make sure we don't stall ongoing transactions. */
+	fiber_reschedule();
+
+	struct vy_read_iterator itr;
+	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ,
+			      stmt->data, stmt->lsn, false);
+	struct vy_stmt *v;
+	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
+		assert(v->flags == SVREPLACE);
+		assert(v->lsn == stmt->lsn);
+		assert(vy_stmt_compare(stmt->data, v->data,
+				       index->key_def) == 0);
+		size_t write_size = 0;
+		if (index->version == index_version &&
+		    range->version == range_version &&
+		    vy_range_set(range, v, &write_size) == 0)
+			vy_quota_force_use(index->env->quota, write_size);
+	}
+	vy_read_iterator_close(&itr);
+	vy_index_unref(index);
+	vy_stmt_unref(stmt);
+	return 0;
+}
+
+static void
+vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
+{
+	struct vy_index *index = range->index;
+	say_debug("optimize upsert slow: %s: %s", vy_range_str(range),
+		  vy_stmt_str(stmt, index->key_def));
+
+	struct fiber *f = fiber_new("vinyl.optimize_upserts",
+				    vy_range_optimize_upserts_f);
+	if (f == NULL) {
+		error_log(diag_last_error(diag_get()));
+		diag_clear(diag_get());
+		return;
+	}
+	vy_stmt_ref(stmt);
+	vy_index_ref(index);
+	fiber_start(f, range, stmt, index->version, range->version);
 }

@@ -87,37 +87,31 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);
  * Introspection
  */
 
-enum vy_type {
-	VINYL_NODE = 0,
-	VINYL_STRING,
-	VINYL_U32,
-	VINYL_U64,
+enum vy_info_type {
+	VY_INFO_TABLE_BEGIN,
+	VY_INFO_TABLE_END,
+	VY_INFO_STRING,
+	VY_INFO_U32,
+	VY_INFO_U64,
 };
 
 struct vy_info_node {
+	enum vy_info_type type;
 	const char *key;
-	enum vy_type val_type;
 	union {
-		uint64_t u64;
-		uint32_t u32;
 		const char *str;
+		uint32_t u32;
+		uint64_t u64;
 	} value;
-	int childs_cap;
-	int childs_n;
-	struct vy_info_node *childs;
 };
 
-struct vy_info {
-	struct vy_info_node root;
-	struct region allocator;
-	struct vy_env *env;
+struct vy_info_handler {
+	void (*fn)(struct vy_info_node *node, void *ctx);
+	void *ctx;
 };
-
-int
-vy_info_create(struct vy_info *info, struct vy_env *e);
 
 void
-vy_info_destroy(struct vy_info *creator);
+vy_info_gather(struct vy_env *env, struct vy_info_handler *h);
 
 /*
  * Transaction
