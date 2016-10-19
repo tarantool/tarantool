@@ -939,6 +939,10 @@ struct vy_range {
 	uint32_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
 	int64_t min_lsn;
+	/**
+	 * List of all on-disk runs, linked by vy_run->next.
+	 * The newer a run, the closer it to the list head.
+	 */
 	struct vy_run  *run;
 	uint32_t   run_count;
 	struct vy_mem *mem;
@@ -2525,6 +2529,11 @@ vy_range_recover(struct vy_range *range)
 				  h->min_size, h->min_offset) < 0)
 			goto out;
 
+		/*
+		 * Order is important - see comment to vy_range->run.
+		 * Newer runs are written at higher offsets and so end
+		 * up closer to the head of the run list.
+		 */
 		run->next = range->run;
 		range->run = run;
 		++range->run_count;
@@ -3002,9 +3011,6 @@ static int vy_profiler(struct vy_profiler *p, struct vy_index *i)
 	return 0;
 }
 
-static int
-vy_readcommited(struct vy_index *index, struct vy_stmt *stmt);
-
 /**
  * Create an index directory for a new index.
  * TODO: create index files only after the WAL
@@ -3362,6 +3368,27 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 	return 0;
 }
 
+/*
+ * Check if a statement was dumped to disk before the last shutdown and
+ * therefore can be skipped on WAL replay.
+ *
+ * Since the minimal unit that can be dumped to disk is a range, a
+ * statement is on disk iff its LSN is less than or equal to the max LSN
+ * over all statements written to disk in the same range.
+ */
+static bool
+vy_stmt_committed(struct vy_index *index, struct vy_stmt *stmt)
+{
+	struct vy_range *range;
+
+	range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
+			index->key_def, stmt->data, stmt->size);
+	/*
+	 * The newest run, i.e. the run containing a statement with max
+	 * LSN, is at the head of the list.
+	 */
+	return range->run != NULL && stmt->lsn <= range->run->info.max_lsn;
+}
 
 /**
  * Iterate over the write set of a single index
@@ -3392,11 +3419,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		 * In this case avoid overwriting a newer version with
 		 * an older one.
 		 */
-		if ((status == VINYL_FINAL_RECOVERY &&
-		     vy_readcommited(index, stmt))) {
-
+		if (status == VINYL_FINAL_RECOVERY &&
+		    vy_stmt_committed(index, stmt))
 			continue;
-		}
 		/* match range */
 		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
 						  index->key_def, stmt->data,
@@ -8904,25 +8929,6 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	vy_read_iterator_close(&itr);
 
 	vy_stat_get(e->stat, start);
-	return rc;
-}
-
-static int
-vy_readcommited(struct vy_index *index, struct vy_stmt *stmt)
-{
-	struct vy_read_iterator itr;
-	/*
-	 * Optimization: exclude in-memory indexes from lookup
-	 */
-	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ, stmt->data,
-			      INT64_MAX, true);
-	struct vy_stmt *t;
-	int rc = vy_read_iterator_next(&itr, &t);
-	if (rc == 0 && t) {
-		if (t->lsn > stmt->lsn)
-			rc = 1;
-	}
-	vy_read_iterator_close(&itr);
 	return rc;
 }
 
