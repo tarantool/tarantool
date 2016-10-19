@@ -2091,14 +2091,14 @@ struct vy_write_iterator;
 static struct vy_write_iterator *
 vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 		      int64_t oldest_vlsn);
-static int
+static NODISCARD int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
 			  struct vy_run *run, bool is_mutable,
 			  bool control_eof);
-static int
+static NODISCARD int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 			  bool is_mutable, bool control_eof);
-static int
+static NODISCARD int
 vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret);
 
 static void
@@ -5993,12 +5993,14 @@ vy_end_recovery(struct vy_env *e)
 
 struct vy_stmt_iterator;
 
-typedef int (*vy_iterator_next_f)(struct vy_stmt_iterator *virt_iterator,
-				  struct vy_stmt *in, struct vy_stmt **ret);
-typedef int (*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
-				     struct vy_stmt *last_stmt,
-				     struct vy_stmt **ret);
-typedef void (*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
+typedef NODISCARD int
+(*vy_iterator_next_f)(struct vy_stmt_iterator *virt_iterator,
+		      struct vy_stmt *in, struct vy_stmt **ret);
+typedef NODISCARD int
+(*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
+			struct vy_stmt *last_stmt, struct vy_stmt **ret);
+typedef void
+(*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
 
 struct vy_stmt_iterator_iface {
 	vy_iterator_next_f next_key;
@@ -6221,7 +6223,7 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  * @retval -1 critical error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
@@ -6311,9 +6313,8 @@ vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
  * @retval 0 success
  * @retval -1 read error or out of memory.
  * @retval -2 invalid iterator
- * Affects: curr_loaded_page
  */
-static int
+static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_pos pos,
 		     const char **data, int64_t *lsn)
@@ -6400,7 +6401,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr, const char *key,
  * @retval -1 read or memory error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_run_iterator_search(struct vy_run_iterator *itr, const char *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
@@ -6435,7 +6436,7 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const char *key,
  * @retval -2 invalid iterator
  * Affects: curr_loaded_page
  */
-static int
+static NODISCARD int
 vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			 struct vy_run_iterator_pos *pos)
 {
@@ -6473,7 +6474,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 	return 0;
 }
 
-static int
+static NODISCARD int
 vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result);
 
 /**
@@ -6486,7 +6487,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result);
  * @retval -2 invalid iterator
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
-static int
+static NODISCARD int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
@@ -6560,7 +6561,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
  * FIXME: vy_run_iterator_next_key() calls vy_run_iterator_start() which
  * recursivly calls vy_run_iterator_next_key().
  */
-static int
+static NODISCARD int
 vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret);
 /**
@@ -6572,7 +6573,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval -2 invalid iterator
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
-static int
+static NODISCARD int
 vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 {
 	assert(!itr->search_started);
@@ -6697,7 +6698,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
  * @retval -1 memory or read error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 {
 	assert(itr->search_started);
@@ -6743,7 +6744,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
  * @retval -1 memory or read error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -6838,7 +6839,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval -1 memory or read error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -6905,7 +6906,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval 1	if position changed
  * @retval -1	a read or memory error
  */
-static int
+static NODISCARD int
 vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 			struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
@@ -6917,11 +6918,11 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	if (itr->search_started || last_stmt == NULL) {
 		if (!itr->search_started) {
 			rc = vy_run_iterator_start(itr, ret);
-			if (rc != 0)
-				return rc;
 		} else {
-			vy_run_iterator_get(itr, ret);
+			rc = vy_run_iterator_get(itr, ret);
 		}
+		if (rc < 0)
+			return rc;
 		return 0;
 	}
 	/* Restoration is very similar to first search so we'll use that */
@@ -7241,7 +7242,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
  * Find the next record with different key as current and visible lsn
  * @retval 0 success or EOF (*ret == NULL)
  */
-static int
+static NODISCARD int
 vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -7285,7 +7286,7 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * Find next (lower, older) record with the same key as current
  * @retval 0 success or EOF (*ret == NULL)
  */
-static int
+static NODISCARD int
 vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -7333,7 +7334,7 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval 0 nothing changed
  * @retval 1 iterator position was changed
  */
-static int
+static NODISCARD int
 vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
@@ -7373,13 +7374,17 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 				 * version.
 				 */
 				do {
-					vy_mem_iterator_next_lsn(vitr,
+					int rc = vy_mem_iterator_next_lsn(vitr,
 								 next_stmt,
 								 &next_stmt);
+					if (rc < 0)
+						return -1;
 					if (next_stmt == NULL) {
-						vy_mem_iterator_next_key(vitr,
+						rc = vy_mem_iterator_next_key(vitr,
 									 next_stmt,
 									 &next_stmt);
+						if (rc < 0)
+							return -1;
 						break;
 					}
 				} while (next_stmt->lsn >= last_stmt->lsn);
@@ -7616,7 +7621,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
  * Move to next stmt
  * @retval 0 success or EOF (*ret == NULL)
  */
-static int
+static NODISCARD int
 vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -7658,7 +7663,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * Function for compatibility with run/mem iterators.
  * @retval 0 EOF always
  */
-static int
+static NODISCARD int
 vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			 struct vy_stmt **ret)
 {
@@ -7678,7 +7683,7 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval 0 nothing significant was happend and itr position left the same
  * @retval 1 iterator restored and position changed
  */
-static int
+static NODISCARD int
 vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 			struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
@@ -7922,7 +7927,7 @@ vy_merge_iterator_close(struct vy_merge_iterator *itr)
  * Not necessary to call is but calling it allows to optimize internal memory
  * allocation
  */
-static int
+static NODISCARD int
 vy_merge_iterator_reserve(struct vy_merge_iterator *itr, uint32_t capacity)
 {
 	if (itr->src_capacity >= capacity)
@@ -7990,7 +7995,7 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
  * @retval 0	if position did not change (iterator started)
  * @retval -2	iterator is no more valid
  */
-static int
+static NODISCARD int
 vy_merge_iterator_check_version(struct vy_merge_iterator *itr)
 {
 	if (!itr->index_version)
@@ -8011,7 +8016,7 @@ vy_merge_iterator_check_version(struct vy_merge_iterator *itr)
  * return -1 : read error
  * return -2 : iterator is not valid anymore
  */
-static int
+static NODISCARD int
 vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 {
 	for (uint32_t i = 0; i < itr->src_count; i++) {
@@ -8039,7 +8044,7 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
  * @retval -1 error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr,
 				  struct vy_stmt **ret)
 {
@@ -8126,7 +8131,7 @@ restart:
  * @retval -1 : read error
  * @retval -2 : iterator is not valid anymore
  */
-static int
+static NODISCARD int
 vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			 struct vy_stmt **ret)
 {
@@ -8191,7 +8196,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
  * @retval -1 read error
  * @retval -2 iterator is not valid anymore
  */
-static int
+static NODISCARD int
 vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt *in,
 			   struct vy_stmt **ret)
 {
@@ -8218,7 +8223,7 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt *in,
  * @retval -1 read error
  * @retval -2 iterator is not valid anymore
  */
-static int
+static NODISCARD int
 vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 			   struct vy_stmt **ret)
 {
@@ -8297,7 +8302,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
  * @retval -1 error
  * @retval -2 invalid iterator
  */
-static int
+static NODISCARD int
 vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 				struct vy_stmt *in,
 				struct vy_stmt **ret,
@@ -8333,7 +8338,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
  * Restore the position of merge iterator after the given key
  * and according to the initial retrieval order.
  */
-static int
+static NODISCARD int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 			  struct vy_stmt *last_stmt)
 {
@@ -8501,7 +8506,7 @@ vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 	return wi;
 }
 
-static int
+static NODISCARD int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
 			  struct vy_run *run, bool is_mutable, bool control_eof)
 {
@@ -8514,7 +8519,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
 	return 0;
 }
 
-static int
+static NODISCARD int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
 			  bool is_mutable, bool control_eof)
 {
@@ -8535,7 +8540,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
  * The user of the write iterator simply expects a stream
  * of statements to write to the output.
  */
-static int
+static NODISCARD int
 vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 {
 	/*
@@ -8670,7 +8675,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * return 1 : no more data
  * return -1 : read error
  */
-static int
+static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
 
 /**
@@ -8766,7 +8771,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * Check versions of index and current range and restores position if
  * something was changed
  */
-static int
+static NODISCARD int
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
 	char *key;
@@ -8795,15 +8800,17 @@ restart:
  * Conventional wrapper around vy_merge_iterator_next_key() to automatically
  * re-create the merge iterator on vy_index/vy_range/vy_run changes.
  */
-static int
+static NODISCARD int
 vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 				struct vy_stmt **ret)
 {
 	int rc;
 	*ret = NULL;
 	while ((rc = vy_merge_iterator_next_key(&itr->merge_iterator,
-						itr->curr_stmt, ret)) == -2)
-		vy_read_iterator_restore(itr);
+						itr->curr_stmt, ret)) == -2) {
+		if (vy_read_iterator_restore(itr) < 0)
+			return -1;
+	}
 	return rc;
 }
 
@@ -8813,7 +8820,7 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
  * return 1 : no more data
  * return -1 : read error
  */
-static int
+static NODISCARD int
 vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 {
 	*ret = NULL;
@@ -8847,7 +8854,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
  * return 0 : something was found if *result != NULL
  * return -1 : read error
  */
-static int
+static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 {
 	*result = NULL;
@@ -8868,7 +8875,8 @@ restart:
 			if (rc == -1)
 				return -1;
 			do {
-				vy_read_iterator_restore(itr);
+				if (vy_read_iterator_restore(itr) < 0)
+					return -1;
 				rc = vy_merge_iterator_next_lsn(mi,
 								itr->curr_stmt,
 								&t);

@@ -291,10 +291,8 @@ enum { FIBER_CALL_STACK = 16 };
  */
 struct fiber_pool {
 	struct {
-		alignas(CACHELINE_SIZE)
-
 		/** Cache of fibers which work on incoming messages. */
-		struct rlist idle;
+		alignas(CACHELINE_SIZE) struct rlist idle;
 		/** The number of fibers in the pool. */
 		int size;
 		/** The limit on the number of fibers working on tasks. */
@@ -309,10 +307,8 @@ struct fiber_pool {
 		struct ev_timer idle_timer;
 	};
 	struct {
-		alignas(CACHELINE_SIZE)
-
 		/** The consumer thread loop. */
-		struct ev_loop *consumer;
+		alignas(CACHELINE_SIZE) struct ev_loop *consumer;
 		/**
 		 * Used to trigger task processing when
 		 * the pipe becomes non-empty.
