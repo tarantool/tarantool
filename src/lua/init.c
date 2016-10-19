@@ -90,6 +90,7 @@ extern char strict_lua[],
 	help_en_US_lua[],
 	tap_lua[],
 	fio_lua[],
+	argparse_lua[],
 	/* jit.* library */
 	vmdef_lua[],
 	bc_lua[],
@@ -127,6 +128,7 @@ static const char *lua_modules[] = {
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
+	"internal.argparse", argparse_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,

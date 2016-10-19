@@ -91,18 +91,23 @@ please see AUTHORS file.
 
 ]]
 
-local os = require 'os'
-local ffi = require 'ffi'
-local fio = require 'fio'
-local fun = require 'fun'
-local log = require 'log'
-local uri = require 'uri'
-local yaml = require 'yaml'
-local errno = require 'errno'
-local fiber = require 'fiber'
-local netbox = require 'net.box'
-local socket = require 'socket'
-local console = require 'console'
+
+local io = require('io')
+local os = require('os')
+local ffi = require('ffi')
+local fio = require('fio')
+local fun = require('fun')
+local log = require('log')
+local uri = require('uri')
+local json = require('json')
+local xlog = require('xlog')
+local yaml  = require('yaml')
+local errno = require('errno')
+local fiber = require('fiber')
+local netbox = require('net.box')
+local socket = require('socket')
+local console = require('console')
+local argparse = require('internal.argparse').parse
 
 ffi.cdef[[
 struct passwd {
@@ -127,7 +132,7 @@ struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
 ]]
 -- command, that we're executing
-local command_name
+local command_name = arg[1]
 -- true if we're running in HOME directory of a user
 local usermode = false
 -- true if we're tarantoolctl is symlink and name != tarantoolctl
@@ -142,15 +147,13 @@ local group_name
 -- overrides for defaults files
 local instance_dir
 local default_cfg
+local positional_arguments
+local keyword_arguments
 
--- print usage and exit. overloaded later
-local usage = function()
-    os.exit(-1)
-end
+-- usage printer function
+local usage
 
---
 -- shift argv to remove 'tarantoolctl' from arg[0]
---
 local function shift_argv(arg, argno, argcount)
     for i = argno, 128 do
         arg[i] = arg[i + argcount]
@@ -239,17 +242,17 @@ local function load_default_file(default_file)
     end
     local d = default_cfg or {}
 
-    d.pid_file   = d.pid_file    or "/var/run/tarantool"
-    d.wal_dir    = d.wal_dir     or "/var/lib/tarantool"
-    d.snap_dir   = d.snap_dir    or "/var/lib/tarantool"
-    d.logger     = d.logger      or "/var/log/tarantool"
-    d.vinyl_dir = d.vinyl_dir  or "/var/lib/tarantool"
+    d.pid_file  = d.pid_file  or "/var/run/tarantool"
+    d.wal_dir   = d.wal_dir   or "/var/lib/tarantool"
+    d.snap_dir  = d.snap_dir  or "/var/lib/tarantool"
+    d.logger    = d.logger    or "/var/log/tarantool"
+    d.vinyl_dir = d.vinyl_dir or "/var/lib/tarantool"
 
-    d.pid_file   = fio.pathjoin(d.pid_file,   instance_name .. '.pid')
-    d.wal_dir    = fio.pathjoin(d.wal_dir,    instance_name)
-    d.snap_dir   = fio.pathjoin(d.snap_dir,   instance_name)
+    d.pid_file  = fio.pathjoin(d.pid_file,  instance_name .. '.pid')
+    d.wal_dir   = fio.pathjoin(d.wal_dir,   instance_name)
+    d.snap_dir  = fio.pathjoin(d.snap_dir,  instance_name)
     d.vinyl_dir = fio.pathjoin(d.vinyl_dir, instance_name)
-    d.logger     = fio.pathjoin(d.logger,     instance_name .. '.log')
+    d.logger    = fio.pathjoin(d.logger,    instance_name .. '.log')
 
     default_cfg = d
 
@@ -353,6 +356,110 @@ local function mk_default_dirs(cfg)
     end
 end
 
+-- -------------------------------------------------------------------------- --
+--                            CAT command helpers                             --
+-- -------------------------------------------------------------------------- --
+
+local function find_space(sid, spaces)
+    if type(spaces) == 'number' then
+        return sid == spaces
+    end
+    local shown = false
+    for _, v in ipairs(spaces) do
+        if v == sid then
+            shown = true
+            break
+        end
+    end
+    return shown
+end
+
+local write_lua_table = nil
+
+-- escaped string will be written
+local function write_lua_string(string)
+    io.stdout:write("'")
+    local pos, byte = 1, string:byte(1)
+    while byte ~= nil do
+        io.stdout:write(("\\x%x"):format(byte))
+        pos = pos + 1
+        byte = string:byte(pos)
+    end
+    io.stdout:write("'")
+end
+
+local function write_lua_value(value)
+    if type(value) == 'string' then
+        write_lua_string(value)
+    elseif type(value) == 'table' then
+        write_lua_table(value)
+    else
+        io.stdout:write(tostring(value))
+    end
+end
+
+local function write_lua_fieldpair(key, val)
+    io.stdout:write("[")
+    write_lua_value(key)
+    io.stdout:write("] = ")
+    write_lua_value(val)
+end
+
+write_lua_table = function(tuple)
+    io.stdout:write('{')
+    local is_begin = true
+    for key, val in pairs(tuple) do
+        if is_begin == false then
+            io.stdout:write(', ')
+        else
+            is_begin = false
+        end
+        write_lua_fieldpair(key, val)
+    end
+    io.stdout:write('}')
+end
+
+local function cat_lua_cb(record)
+    io.stdout:write(('box.space[%d]'):format(record.BODY.space_id))
+    local op = record.HEADER.type:lower()
+    io.stdout:write((':%s('):format(op))
+    if op == 'insert' or op == 'replace' then
+        write_lua_table(record.BODY.tuple)
+    elseif op == 'delete' then
+        write_lua_table(record.BODY.key)
+    elseif op == 'update' then
+        write_lua_table(record.BODY.key)
+        io.stdout:write(', ')
+        write_lua_table(record.BODY.tuple)
+    elseif op == 'upsert' then
+        write_lua_table(record.BODY.tuple)
+        io.stdout:write(', ')
+        write_lua_table(record.BODY.operations)
+    end
+    io.stdout:write(')\n')
+end
+
+local function cat_yaml_cb(record)
+    print(yaml.encode(record):sub(1, -6))
+end
+
+local function cat_json_cb(record)
+    print(json.encode(record))
+end
+
+local cat_formats = setmetatable({
+    yaml = cat_yaml_cb,
+    json = cat_json_cb,
+    lua  = cat_lua_cb,
+}, {
+    __index = function(self, cmd)
+        error(("Unknown formatter '%s'"):format(cmd))
+    end
+})
+
+-- -------------------------------------------------------------------------- --
+--                               Commands                                     --
+-- -------------------------------------------------------------------------- --
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
@@ -615,6 +722,79 @@ local function eval()
     return 0
 end
 
+local function cat()
+    local options = keyword_arguments
+    local from, to, spaces = options.from, options.to, options.spaces
+    local show_system, cat_format = options['show-system'], options.format
+
+    local format_cb   = cat_formats[cat_format]
+    local is_printed  = false
+    for id, file in ipairs(positional_arguments) do
+        log.info(("Processing file '%s'"):format(file))
+        for lsn, record in xlog.pairs(file) do
+            local sid = record.BODY.space_id
+            if (lsn < from) or
+               (sid < 512 and show_system == false) or
+               (spaces ~= nil and find_space(sid, spaces)) then
+                -- pass this tuple
+            elseif lsn >= to then
+                -- stop, as we've had finished reading tuple with lsn == to
+                -- and next lsn's will be bigger
+                break
+            else
+                is_printed = true
+                format_cb(record)
+                io.stdout:flush()
+            end
+        end
+        if options.format == 'yaml' and is_printed then
+            is_printed = false
+            print('...\n')
+        end
+    end
+end
+
+local function play()
+    local options = keyword_arguments
+    local from, to, spaces = options.from, options.to, options.spaces
+    local show_system = options['show-system']
+    local uri = table.remove(positional_arguments, 1)
+
+    if uri == nil then
+        error("Empty URI is provided")
+    end
+    local remote = netbox.new(uri)
+    if not remote:wait_connected() then
+        error(("Error, while connecting to host '%s'"):format(uri))
+    end
+    for id, file in ipairs(positional_arguments) do
+        log.info(("Processing file '%s'"):format(file))
+        for lsn, record in xlog.pairs(file) do
+            local sid = record.BODY.space_id
+            if (lsn < from) or
+               (sid < 512 and show_system == false) or
+               (spaces ~= nil and find_space(sid, spaces)) then
+                -- pass this tuple
+            elseif lsn >= to then
+                -- stop, as we've had finished reading tuple with lsn == to
+                -- and next lsn's will be bigger
+                break
+            else
+                local args, so = {}, remote.space[sid]
+                if so == nil then
+                    error(("No space #%s, stopping"):format(sid))
+                end
+                table.insert(args, so)
+                table.insert(args, record.BODY.key)
+                table.insert(args, record.BODY.tuple)
+                table.insert(args, record.BODY.operations)
+                so[record.HEADER.type:lower()](unpack(args))
+            end
+        end
+    end
+    remote:close()
+end
+
 local function exit_wrapper(func)
     return function() os.exit(func()) end
 end
@@ -659,7 +839,9 @@ local commands = setmetatable({
     reload    = { func = exit_wrapper(eval),      process = process_local  },
     eval      = { func = exit_wrapper(eval),      process = process_local  },
     check     = { func = exit_wrapper(check),     process = process_local  },
-    connect   = { func = exit_wrapper(connect),   process = process_remote }
+    connect   = { func = exit_wrapper(connect),   process = process_remote },
+    cat       = { func = exit_wrapper(cat),       process = process_remote },
+    play      = { func = exit_wrapper(play),      process = process_remote }
 }, {
     __index = function()
         log.error("Unknown command '%s'", command_name)
@@ -667,29 +849,74 @@ local commands = setmetatable({
     end
 })
 
-local usage = function()
+usage = function()
     local local_tbl = fun.iter(commands):filter(function(name, cmd)
         return cmd.process == process_local
     end):map(function(name, cmd) return name end):totable()
     table.sort(local_tbl); local_tbl = table.concat(local_tbl, '|')
 
-    local remote_tbl = fun.iter(commands):filter(function(name, cmd)
-        return cmd.process == process_remote
-    end):map(function(name, cmd) return name end):totable()
-    table.sort(remote_tbl); remote_tbl = table.concat(remote_tbl, '|')
-
     if linkmode then
-        log.error("Usage: %s {%s}",               arg[0], local_tbl )
+        log.error("Usage: %s {%s}",                arg[0], local_tbl )
     else
-        log.error("Usage: %s {%s} instance_name", arg[0], local_tbl )
-        log.error("       %s {%s} URI",           arg[0], remote_tbl)
+        log.error("Usage: %s {%s} instance_name",  arg[0], local_tbl )
+        log.error("       %s connect URI",         arg[0])
+        log.error("       %s cat [file ...]",      arg[0])
+        log.error("       %s play URI [file ...]", arg[0])
+        log.error("       %s help",                arg[0])
+        log.error("")
+        log.error("Options for cat/play:")
+        log.error("    --space=<number>   filter by space number (may present more than once)")
+        log.error("    --show-system      show tuples from system space")
+        log.error("    --from=<number>    start xlog file from the specified lsn")
+        log.error("    --to=<number>      stop on specified xlog lsn")
+        log.error("    --format=<string>  cat output format ('yaml' [default], 'json', 'lua')")
+        log.error("")
     end
 
-    log.error("Config file: %s", default_file)
+    if default_file ~= nil then
+        log.error("Config file: %s", default_file)
+    end
     os.exit(1)
 end
+-- parse parameters and put result into positional/keyword_arguments
+do
+    local function keyword_arguments_populate(ka)
+        ka                = ka                or {}
+        ka.from           = ka.from           or 0
+        ka.to             = ka.to             or -1ULL
+        ka['show-system'] = ka['show-system'] or false
+        ka.format         = ka.format         or 'yaml'
+        return ka
+    end
 
-local command_name = arg[1]
+    -- returns command name, file list and named parameters
+    local function parameters_parse(parameters)
+        local command_name = table.remove(parameters, 1)
+        local positional_arguments, keyword_arguments = {}, {}
+        for k, v in pairs(parameters) do
+            if type(k) == 'number' then
+                positional_arguments[k] = v
+            else
+                keyword_arguments[k] = v
+            end
+        end
+        return command_name, positional_arguments, keyword_arguments
+    end
+
+    local parameters = argparse(arg, {
+        { 'space',       'number+' },
+        { 'show-system', 'boolean' },
+        { 'from',        'number'  },
+        { 'to',          'number'  },
+        { 'help',        'boolean' },
+        { 'format',      'string'  }
+    })
+
+    local cmd_name
+    cmd_name, positional_arguments, keyword_arguments = parameters_parse(parameters)
+    if cmd_name == 'help' or parameters.help == true or #arg < 1 then usage() end
+    keyword_arguments = keyword_arguments_populate(parameters)
+end
 
 if #arg < 2 then
     log.error("Not enough arguments for '%s' command", command_name)
