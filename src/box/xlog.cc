@@ -572,8 +572,10 @@ error:
 			 " mismatch (expected %u) at offset %" PRIu64,
 			 fio_filename(fileno(f)), (unsigned) crc32c,
 			 (uint64_t) ftello(f));
-		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
-		return -1;
+		if (i->ignore_crc == false) {
+			tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+			return -1;
+		}
 	}
 	rbuf->wpos += len;
 
@@ -880,7 +882,8 @@ xlog_cursor_open(struct xlog_cursor *i, struct xlog *l)
 {
 	i->log = l;
 	i->good_offset = ftello(l->f);
-	i->eof_read  = false;
+	i->eof_read = false;
+	i->ignore_crc = false;
 	ibuf_create(&i->data, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 
@@ -1174,8 +1177,9 @@ xlog_read_meta(struct xlog *l)
 	}
 
 	if (strcmp(v13, version) != 0 && strcmp(v12, version) != 0) {
-		tnt_error(XlogError, "%s: unsupported file format version %s",
-			  l->filename, version);
+		size_t len = strlen(l->filetype) - 1;
+		tnt_error(XlogError, "%s: unsupported file format version %.*s",
+			  l->filename, len, version);
 		return -1;
 	}
 	for (;;) {

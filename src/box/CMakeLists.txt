@@ -79,6 +79,7 @@ add_library(box STATIC
     lua/error.cc
     lua/session.c
     lua/net_box.c
+    lua/xlog.c
     ${bin_sources})
 
 target_link_libraries(box ${ZSTD_LIBRARIES})

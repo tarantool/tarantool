@@ -311,6 +311,7 @@ struct xlog_cursor
 	off_t good_offset;
 	bool eof_read;
 	struct ibuf data;
+	bool ignore_crc;
 
 	ZSTD_DStream* zdctx;
 	struct ibuf zbuf;
