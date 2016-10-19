@@ -8799,13 +8799,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 	assert(rc >= 0);
 	if (!stmt && itr->merge_iterator.range_ended && itr->curr_range != NULL)
 		return vy_read_iterator_next_range(itr, ret);
-	if (itr->curr_stmt != NULL)
-		vy_stmt_unref(itr->curr_stmt);
-	itr->curr_stmt = stmt;
-	if (itr->curr_stmt != NULL) {
-		vy_stmt_ref(itr->curr_stmt);
-	}
-	*ret = itr->curr_stmt;
+	*ret = stmt;
 	return rc;
 }
 
