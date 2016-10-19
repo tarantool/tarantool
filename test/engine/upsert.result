@@ -2078,7 +2078,7 @@ test(t, {{'&', 'a', 3}, {'+', 3, 3}}, {{1, '1', 1, '1'}})
 test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ---
 - error: 'Argument type in operation ''&'' on field 3 does not match field type: expected
-    a UINT'
+    a positive integer'
 ...
 test(t, {{'+', 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ---

@@ -4,6 +4,7 @@ index = s:create_index('pk')
 -- test delete field
 s:insert{1000001, 1000002, 1000003, 1000004, 1000005}
 s:update({1000001}, {{'#', 1, 1}})
+s:update({1000001}, {{'#', 1, "only one record please"}})
 s:truncate()
 
 -- test arithmetic

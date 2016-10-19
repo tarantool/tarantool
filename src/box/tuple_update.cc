@@ -244,28 +244,28 @@ static inline int64_t
 mp_read_int(int index_base, struct update_op *op,
 	    const char **expr)
 {
-	int64_t field_no;
+	int64_t result;
 	if (mp_typeof(**expr) == MP_UINT)
-		field_no = mp_decode_uint(expr);
+		result = mp_decode_uint(expr);
 	else if (mp_typeof(**expr) == MP_INT)
-		field_no = mp_decode_int(expr);
+		result = mp_decode_int(expr);
 	else
-		tnt_raise(ClientError, ER_ARG_TYPE, (char ) op->opcode,
-			  index_base + op->field_no, "UINT");
-	return field_no;
+		tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+			  index_base + op->field_no, "an integer");
+	return result;
 }
 
 static inline uint64_t
 mp_read_uint(int index_base, struct update_op *op,
 	     const char **expr)
 {
-	int64_t field_no;
+	int64_t result;
 	if (mp_typeof(**expr) == MP_UINT)
-		field_no = mp_decode_uint(expr);
+		result = mp_decode_uint(expr);
 	else
-		tnt_raise(ClientError, ER_ARG_TYPE, (char ) op->opcode,
-			  index_base + op->field_no, "UINT");
-	return field_no;
+		tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+			  index_base + op->field_no, "a positive integer");
+	return result;
 }
 
 /**
@@ -290,8 +290,8 @@ mp_read_arith_arg(int index_base, struct update_op *op,
 		result.type = AT_FLOAT;
 		result.flt = mp_decode_float(expr);
 	} else {
-		tnt_raise(ClientError, ER_ARG_TYPE, (char ) op->opcode,
-			  index_base + op->field_no, "NUMBER");
+		tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+			  index_base + op->field_no, "a number");
 	}
 	return result;
 }
@@ -301,8 +301,8 @@ mp_read_str(int index_base, struct update_op *op,
 	    const char **expr, uint32_t *len)
 {
 	if (mp_typeof(**expr) != MP_STR) {
-		tnt_raise(ClientError, ER_ARG_TYPE, (char) op->opcode,
-			  index_base + op->field_no, "STR");
+		tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char) op->opcode,
+			  index_base + op->field_no, "a string");
 	}
 	return mp_decode_str(expr, len); /* value */
 }
@@ -332,7 +332,12 @@ static void
 read_arg_delete(int index_base, struct update_op *op,
 		const char **expr)
 {
-	op->arg.del.count = (uint32_t) mp_read_int(index_base, op, expr);
+	if (mp_typeof(**expr) == MP_UINT)
+		op->arg.del.count = (uint32_t) mp_decode_uint(expr);
+	else
+		tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+			  index_base + op->field_no,
+			  "a number of fields to delete");
 }
 
 static void
@@ -460,8 +465,8 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		case '+': c = a + b; break;
 		case '-': c = a - b; break;
 		default:
-			tnt_raise(ClientError, ER_ARG_TYPE, (char ) opcode,
-				  err_fieldno, "positive integer");
+			tnt_raise(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
+				  err_fieldno, "a positive integer");
 			break;
 		}
 		if (lowest_type == AT_DOUBLE) {

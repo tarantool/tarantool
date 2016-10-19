@@ -78,7 +78,7 @@ struct errcode_record {
 	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %u type does not match one required by operation: expected %s") \
 	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	"Ambiguous field type in index '%s', key part %u. Requested type is %s but the field has previously been defined as %s") \
 	/* 25 */_(ER_SPLICE,			"SPLICE error on field %u: %s") \
-	/* 26 */_(ER_ARG_TYPE,			"Argument type in operation '%c' on field %u does not match field type: expected a %s") \
+	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %u does not match field type: expected %s") \
 	/* 27 */_(ER_TUPLE_IS_TOO_LONG,		"Tuple is too long %u") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
 	/* 29 */_(ER_UPDATE_FIELD,		"Field %u UPDATE error: %s") \
