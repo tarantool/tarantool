@@ -196,7 +196,7 @@ MemtxBitset::MemtxBitset(struct key_def *key_def_arg)
 	if (!m_id_to_tuple)
 		panic_syserror("bitset_index_create");
 	matras_create(m_id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free);
+		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
 
 	m_tuple_to_id = mh_bitset_index_new();
 	if (!m_tuple_to_id)

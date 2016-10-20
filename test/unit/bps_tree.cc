@@ -86,16 +86,20 @@ compare(type_t a, type_t b)
 static int extents_count = 0;
 
 static void *
-extent_alloc()
+extent_alloc(void *ctx)
 {
-	extents_count++;
+	int *p_extents_count = (int *)ctx;
+	assert(p_extents_count == &extents_count);
+	++*p_extents_count;
 	return malloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *extent)
+extent_free(void *ctx, void *extent)
 {
-	extents_count--;
+	int *p_extents_count = (int *)ctx;
+	assert(p_extents_count == &extents_count);
+	--*p_extents_count;
 	free(extent);
 }
 
@@ -106,7 +110,7 @@ simple_check()
 
 	const unsigned int rounds = 2000;
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (unsigned int i = 0; i < rounds; i++) {
@@ -251,7 +255,7 @@ compare_with_sptree_check()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	const int rounds = 16 * 1024;
 	const int elem_limit = 	1024;
@@ -293,7 +297,7 @@ compare_with_sptree_check_branches()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	const int elem_limit = 1024;
 
@@ -537,7 +541,8 @@ loading_test()
 		arr[i] = i;
 
 	for (type_t i = 0; i <= test_count; i++) {
-		test_create(&tree, 0, extent_alloc, extent_free);
+		test_create(&tree, 0, extent_alloc, extent_free,
+			    &extents_count);
 
 		if (test_build(&tree, arr, i))
 			fail("building failed", "true");
@@ -568,7 +573,7 @@ printing_test()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	const type_t rounds = 22;
 
@@ -594,7 +599,7 @@ white_box_test()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	assert(BPS_TREE_test_MAX_COUNT_IN_LEAF == 14);
 	assert(BPS_TREE_test_MAX_COUNT_IN_INNER == 10);
@@ -630,7 +635,7 @@ white_box_test()
 	test_print(&tree, TYPE_F);
 
 	test_destroy(&tree);
-	test_create(&tree, 0, extent_alloc, extent_free);
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 	type_t arr[140];
 	for (type_t i = 0; i < 140; i++)
 		arr[i] = i;
@@ -654,7 +659,7 @@ approximate_count()
 	srand(0);
 
 	approx tree;
-	approx_create(&tree, 0, extent_alloc, extent_free);
+	approx_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 
 	uint32_t in_leaf_max_count = BPS_TREE_approx_MAX_COUNT_IN_LEAF;
 	uint32_t in_leaf_min_count = in_leaf_max_count * 2 / 3;

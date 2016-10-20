@@ -132,7 +132,8 @@
  * typedef void *(*bps_tree_extent_alloc_f)();
  * typedef void (*bps_tree_extent_free_f)(void *);
  * // base:
- * void bps_tree_create(tree, arg, extent_alloc_func, extent_free_func);
+ * void bps_tree_create(tree, arg, extent_alloc_func, extent_free_func,
+ *                      alloc_ctx);
  * void bps_tree_destroy(tree);
  * int bps_tree_build(tree, sorted_array, array_size);
  * bps_tree_elem_t *bps_tree_find(tree, key);
@@ -539,12 +540,12 @@ struct bps_tree_iterator {
  * BPS-tree properly handles with NULL result but could leak memory
  *  in case of exception.
  */
-typedef void *(*bps_tree_extent_alloc_f)();
+typedef void *(*bps_tree_extent_alloc_f)(void *ctx);
 
 /**
  * Pointer to function frees extent (of size BPS_TREE_EXTENT_SIZE)
  */
-typedef void (*bps_tree_extent_free_f)(void *);
+typedef void (*bps_tree_extent_free_f)(void *ctx, void *extent);
 
 /**
  * @brief Tree construction. Fills struct bps_tree members.
@@ -553,12 +554,14 @@ typedef void (*bps_tree_extent_free_f)(void *);
  * @param extent_alloc_func - pointer to function that allocates extents,
  *  see bps_tree_extent_alloc_f description for details
  * @param extent_free_func - pointer to function that allocates extents,
+ * @param alloc_ctx - argument passed to extent allocator
  *  see bps_tree_extent_free_f description for details
  */
 void
 bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 		bps_tree_extent_alloc_f extent_alloc_func,
-		bps_tree_extent_free_f extent_free_func);
+		bps_tree_extent_free_f extent_free_func,
+		void *alloc_ctx);
 
 /**
  * @brief Fills a new (asserted) tree with values from sorted array.
@@ -988,12 +991,14 @@ struct bps_leaf_path_elem {
  * @param extent_alloc_func - pointer to function that allocates extents,
  *  see bps_tree_extent_alloc_f description for details
  * @param extent_free_func - pointer to function that allocates extents,
+ * @param alloc_ctx - argument passed to extent allocator
  *  see bps_tree_extent_free_f description for details
  */
 inline void
 bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 		bps_tree_extent_alloc_f extent_alloc_func,
-		bps_tree_extent_free_f extent_free_func)
+		bps_tree_extent_free_f extent_free_func,
+		void *alloc_ctx)
 {
 	tree->root_id = (bps_tree_block_id_t)(-1);
 	tree->first_id = (bps_tree_block_id_t)(-1);
@@ -1008,7 +1013,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 
 	matras_create(&tree->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
-		      extent_alloc_func, extent_free_func);
+		      extent_alloc_func, extent_free_func, alloc_ctx);
 
 #ifdef BPS_TREE_DEBUG_BRANCH_VISIT
 	/* Bit masks of different branches visits */

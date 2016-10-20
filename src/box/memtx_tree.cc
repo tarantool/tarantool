@@ -193,7 +193,7 @@ MemtxTree::MemtxTree(struct key_def *key_def_arg)
 	memtx_index_arena_init();
 	memtx_tree_create(&tree, key_def,
 			      memtx_index_extent_alloc,
-			      memtx_index_extent_free);
+			      memtx_index_extent_free, NULL);
 }
 
 MemtxTree::~MemtxTree()

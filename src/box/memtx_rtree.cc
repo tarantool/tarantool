@@ -195,7 +195,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def_arg)
 	enum rtree_distance_type distance_type =
 		(enum rtree_distance_type)(int)key_def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
-		   memtx_index_extent_alloc, memtx_index_extent_free,
+		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
 		   distance_type);
 }
 

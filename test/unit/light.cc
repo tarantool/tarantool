@@ -41,16 +41,20 @@ equal_key(hash_value_t v1, hash_value_t v2)
 #include "salad/light.h"
 
 inline void *
-my_light_alloc()
+my_light_alloc(void *ctx)
 {
-	extents_count++;
+	size_t *p_extents_count = (size_t *)ctx;
+	assert(p_extents_count == &extents_count);
+	++*p_extents_count;
 	return malloc(light_extent_size);
 }
 
 inline void
-my_light_free(void *p)
+my_light_free(void *ctx, void *p)
 {
-	extents_count--;
+	size_t *p_extents_count = (size_t *)ctx;
+	assert(p_extents_count == &extents_count);
+	--*p_extents_count;
 	free(p);
 }
 
@@ -61,7 +65,8 @@ simple_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+	light_create(&ht, light_extent_size,
+		     my_light_alloc, my_light_free, &extents_count, 0);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 1000;
@@ -124,7 +129,8 @@ collision_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+	light_create(&ht, light_extent_size,
+		     my_light_alloc, my_light_free, &extents_count, 0);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 100;
@@ -187,7 +193,8 @@ iterator_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+	light_create(&ht, light_extent_size,
+		     my_light_alloc, my_light_free, &extents_count, 0);
 	const size_t rounds = 1000;
 	const size_t start_limits = 20;
 
@@ -249,7 +256,8 @@ iterator_freeze_check()
 	struct light_core ht;
 
 	for (int i = 0; i < 10; i++) {
-		light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+		light_create(&ht, light_extent_size,
+			     my_light_alloc, my_light_free, &extents_count, 0);
 		int comp_buf_size = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {

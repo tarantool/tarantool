@@ -710,9 +710,10 @@ vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 	return res;
 }
 
-void *
-vy_mem_alloc_matras_page()
+static void *
+vy_mem_alloc_matras_page(void *ctx)
 {
+	(void)ctx;
 	void *res = mmap(0, BPS_TREE_MEM_INDEX_PAGE_SIZE, PROT_READ|PROT_WRITE,
 			 MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	if (res == MAP_FAILED) {
@@ -722,9 +723,10 @@ vy_mem_alloc_matras_page()
 	return res;
 }
 
-void
-vy_mem_free_matras_page(void *p)
+static void
+vy_mem_free_matras_page(void *ctx, void *p)
 {
+	(void)ctx;
 	munmap(p, BPS_TREE_MEM_INDEX_PAGE_SIZE);
 }
 
@@ -744,7 +746,7 @@ vy_mem_new(struct key_def *key_def)
 	index->version = 0;
 	vy_mem_tree_create(&index->tree, index,
 			   vy_mem_alloc_matras_page,
-			   vy_mem_free_matras_page);
+			   vy_mem_free_matras_page, NULL);
 	return index;
 }
 
