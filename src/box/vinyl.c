@@ -1726,8 +1726,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
-	} else {
-		assert(order == VINYL_LE || order == VINYL_LT);
+	} else if (order == VINYL_LE || order == VINYL_LT) {
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -1766,7 +1765,12 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 			/* Case 5 */
 			range = vy_range_tree_last(tree);
 		}
+	} else {
+		assert(order == VINYL_EQ);
+		range = vy_range_tree_psearch(tree, &tree_key);
 	}
+	/* Range tree must span all possible keys. */
+	assert(range != NULL);
 	return range;
 }
 
@@ -1797,6 +1801,9 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **in_out)
 	case VINYL_GT:
 	case VINYL_GE:
 		*in_out = vy_range_tree_next(&itr->index->tree, *in_out);
+		break;
+	case VINYL_EQ:
+		*in_out = NULL;
 		break;
 	default:
 		unreachable();
@@ -3391,10 +3398,9 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 			continue;
 		}
 		/* match range */
-		range = vy_range_tree_find_by_key(&index->tree, VINYL_GE,
+		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
 						  index->key_def, stmt->data,
 						  stmt->size);
-		assert(range != NULL);
 		if (prev_range != NULL && range != prev_range) {
 			/*
 			 * The write set is key-ordered, hence
@@ -8682,8 +8688,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->only_disk = only_disk;
 
 	itr->curr_stmt = NULL;
-	vy_range_iterator_open(&itr->range_iterator, index,
-			  order == VINYL_EQ ? VINYL_GE : order, key, 0);
+	vy_range_iterator_open(&itr->range_iterator, index, order, key, 0);
 	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
@@ -8699,12 +8704,10 @@ static int
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
 	char *key;
-	enum vy_order order;
 	int rc;
 restart:
 	key = itr->curr_stmt != 0 ? itr->curr_stmt->data : itr->key;
-	order = itr->order == VINYL_EQ ? VINYL_GE : itr->order;
-	vy_range_iterator_open(&itr->range_iterator, itr->index, order,
+	vy_range_iterator_open(&itr->range_iterator, itr->index, itr->order,
 			       key, 0);
 	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
