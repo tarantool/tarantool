@@ -323,16 +323,6 @@ path_exists(const char *path)
 	return rc == 0;
 }
 
-#define vy_e(type, fmt, ...) \
-	({int res = -1;\
-	  char errmsg[256];\
-	  snprintf(errmsg, sizeof(errmsg), fmt, __VA_ARGS__);\
-	  diag_set(ClientError, type, errmsg);\
-	  res;})
-
-#define vy_error(fmt, ...) \
-	vy_e(ER_VINYL, fmt, __VA_ARGS__)
-
 enum vy_stat_name {
 	VY_STAT_GET,
 	VY_STAT_TX,
@@ -2213,7 +2203,8 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 
 	page->size = vy_buf_used(&compressed);
 	if (vy_write_file(fd, compressed.s, page->size) < 0) {
-		vy_error("index file error: %s", strerror(errno));
+		/* TODO: report file name */
+		diag_set(SystemError, "error writing file");
 		rc = -1;
 		goto out;
 	}
@@ -2356,7 +2347,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	return 0;
 
 err_file:
-	vy_error("index file error: %s", strerror(errno));
+	/* TODO: report file name */
+	diag_set(SystemError, "error writing file");
 err:
 	/*
 	 * Reposition to end of file and trucate it
@@ -2431,12 +2423,12 @@ vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
 {
 	ssize_t n = vy_pread_file(range->fd, buf, size, offset);
 	if (n < 0) {
-		vy_error("error reading range file %s: %s",
-			 range->path, strerror(errno));
+		diag_set(SystemError, "error reading file '%s'",
+			 range->path);
 		return -1;
 	}
 	if ((size_t)n != size) {
-		vy_error("range file %s corrupted", range->path);
+		diag_set(ClientError, ER_VINYL, "range file corrupted");
 		return -1;
 	}
 	return n;
@@ -2510,10 +2502,14 @@ vy_range_recover(struct vy_range *range)
 		n = vy_pread_file(range->fd, h, sizeof(*h), offset);
 		if (n == 0)
 			break; /* eof */
+		if (n == -1) {
+			diag_set(SystemError, "error reading file '%s'",
+				 range->path);
+			goto out;
+		}
 		if (n < (ssize_t)sizeof(*h) || h->size == 0) {
-			 vy_error("run was not finished, range is"
-				  "broken for file %s", range->path);
-			 goto out;
+			diag_set(ClientError, ER_VINYL, "range file corrupted");
+			goto out;
 		}
 
 		/* Allocate buffer for page info. */
@@ -2552,8 +2548,8 @@ vy_range_recover(struct vy_range *range)
 	 * will be appended to the range file.
 	 */
 	if (lseek(range->fd, offset, SEEK_SET) == -1) {
-		vy_error("failed to seek range file %s: %s",
-			 range->path, strerror(errno));
+		diag_set(SystemError, "failed to seek file '%s'",
+			 range->path);
 		goto out;
 	}
 
@@ -2569,8 +2565,8 @@ vy_range_open(struct vy_range *range)
 {
 	int rc = range->fd = open(range->path, O_RDWR);
 	if (unlikely(rc == -1)) {
-		vy_error("index file '%s' open error: %s ",
-		         range->path, strerror(errno));
+		diag_set(SystemError, "failed to open file '%s'",
+		         range->path);
 		return -1;
 	}
 	rc = vy_range_recover(range);
@@ -2689,14 +2685,12 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		 * in the index directory to write the run to.
 		 */
 		ERROR_INJECT(ERRINJ_VY_RANGE_CREATE,
-			     {errno = EMFILE; goto create_failed;});
+			     {diag_set(ClientError, ER_INJECTION,
+				       "vinyl range create"); goto fail;});
 		snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 		fd = mkstemp(path);
 		if (fd < 0) {
-			goto create_failed; /* suppress warn if NDEBUG */
-create_failed:
-			vy_error("Failed to create temp file: %s",
-				 strerror(errno));
+			diag_set(SystemError, "failed to create temp file");
 			goto fail;
 		}
 		created = true;
@@ -2718,8 +2712,9 @@ create_failed:
 		 * Commit the range by linking the file to a proper name.
 		 */
 		if (rename(path, range->path) != 0) {
-			vy_error("Failed to link range file '%s': %s",
-				 range->path, strerror(errno));
+			diag_set(SystemError,
+				 "failed to rename file '%s' to '%s'",
+				 path, range->path);
 			goto fail;
 		}
 	}
@@ -3037,8 +3032,8 @@ vy_index_create(struct vy_index *index)
 		*path_sep = '\0';
 		rc = mkdir(index->path, 0777);
 		if (rc == -1 && errno != EEXIST) {
-			vy_error("directory '%s' create error: %s",
-		                 index->path, strerror(errno));
+			diag_set(SystemError, "failed to create directory '%s'",
+		                 index->path);
 			*path_sep = '/';
 			return -1;
 		}
@@ -3047,8 +3042,8 @@ vy_index_create(struct vy_index *index)
 	}
 	rc = mkdir(index->path, 0777);
 	if (rc == -1 && errno != EEXIST) {
-		vy_error("directory '%s' create error: %s",
-	                 index->path, strerror(errno));
+		diag_set(SystemError, "failed to create directory '%s'",
+			 index->path);
 		return -1;
 	}
 
@@ -3187,7 +3182,8 @@ vy_index_open_ex(struct vy_index *index)
 	DIR *index_dir;
 	index_dir = opendir(index->path);
 	if (!index_dir) {
-		vy_error("Can't open dir %s", index->path);
+		diag_set(SystemError, "failed to open directory '%s'",
+			 index->path);
 		goto out;
 	}
 	struct dirent *dirent;
@@ -3702,8 +3698,8 @@ vy_task_compact_execute(struct vy_task *task)
 
 		if (i > 0) {
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
-				     {vy_error("Failed to split range %s",
-					       p->range->path);
+				     {diag_set(ClientError, ER_INJECTION,
+					       "vinyl range split");
 				      rc = -1; goto out;});
 		}
 
@@ -4472,7 +4468,8 @@ vy_conf_new()
 	}
 	/* Ensure vinyl data directory exists. */
 	if (!path_exists(conf->path)) {
-		vy_error("directory '%s' does not exist", conf->path);
+		diag_set(ClientError, ER_CFG, "vinyl_dir",
+			 "directory does not exist");
 		goto error_2;
 	}
 	return conf;
@@ -6240,8 +6237,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 	if (rc < 0) {
 		vy_page_delete(page);
-		vy_error("index file %s read error: %s", itr->range->path,
-			 strerror(errno));
+		diag_set(SystemError, "error reading file '%s'",
+			 itr->range->path);
 		return -1;
 	}
 
