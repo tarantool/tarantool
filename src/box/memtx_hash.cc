@@ -221,7 +221,7 @@ MemtxHash::MemtxHash(struct key_def *key_def)
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   this->key_def);
+			   NULL, this->key_def);
 }
 
 MemtxHash::~MemtxHash()

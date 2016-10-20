@@ -99,8 +99,8 @@ enum spatial_search_op
 };
 
 /* pointers to page allocation and deallocations functions */
-typedef void *(*rtree_extent_alloc_t)();
-typedef void (*rtree_extent_free_t)(void *);
+typedef void *(*rtree_extent_alloc_t)(void *ctx);
+typedef void (*rtree_extent_free_t)(void *ctx, void *extent);
 
 /* A box in RTREE_DIMENSION space */
 struct rtree_rect
@@ -231,12 +231,13 @@ rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y);
  * @param extent_size - size of extents allocated by extent_alloc (see next)
  * @param extent_alloc - extent allocation function
  * @param extent_free - extent deallocation function
+ * @param alloc_ctx - argument passed to extent allocator
  * @return 0 on success, -1 on error
  */
 int
 rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
 	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free,
-	   enum rtree_distance_type distance_type);
+	   void *alloc_ctx, enum rtree_distance_type distance_type);
 
 /**
  * @brief Destroy a tree

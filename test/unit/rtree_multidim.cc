@@ -27,16 +27,20 @@ const unsigned TEST_ROUNDS = 1000;
 static int page_count = 0;
 
 static void *
-extent_alloc()
+extent_alloc(void *ctx)
 {
-	page_count++;
+	int *p_page_count = (int *)ctx;
+	assert(p_page_count == &page_count);
+	++*p_page_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *page)
+extent_free(void *ctx, void *page)
 {
-	page_count--;
+	int *p_page_count = (int *)ctx;
+	assert(p_page_count == &page_count);
+	--*p_page_count;
 	free(page);
 }
 
@@ -486,7 +490,8 @@ rand_test()
 	CBoxSet<DIMENSION> set;
 
 	struct rtree tree;
-	rtree_init(&tree, DIMENSION, extent_size, extent_alloc, extent_free,
+	rtree_init(&tree, DIMENSION, extent_size,
+		   extent_alloc, extent_free, &page_count,
 		   RTREE_EUCLID);
 
 	printf("\tDIMENSION: %u, page size: %u, max fill good: %d\n",

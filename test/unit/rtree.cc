@@ -12,16 +12,20 @@ static int page_count = 0;
 const uint32_t extent_size = 1024 * 8;
 
 static void *
-extent_alloc()
+extent_alloc(void *ctx)
 {
-	page_count++;
+	int *p_page_count = (int *)ctx;
+	assert(p_page_count == &page_count);
+	++*p_page_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *page)
+extent_free(void *ctx, void *page)
 {
-	page_count--;
+	int *p_page_count = (int *)ctx;
+	assert(p_page_count == &page_count);
+	--*p_page_count;
 	free(page);
 }
 
@@ -36,7 +40,8 @@ simple_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+	rtree_init(&tree, 2, extent_size,
+		   extent_alloc, extent_free, &page_count,
 		   RTREE_EUCLID);
 
 	printf("Insert 1..X, remove 1..X\n");
@@ -229,7 +234,8 @@ neighbor_test()
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+		rtree_init(&tree, 2, extent_size,
+			   extent_alloc, extent_free, &page_count,
 			   RTREE_EUCLID);
 
 		rtree_test_build(&tree, arr, i);

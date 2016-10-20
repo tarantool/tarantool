@@ -11,16 +11,20 @@ static int extent_count = 0;
 const uint32_t extent_size = 1024 * 8;
 
 static void *
-extent_alloc()
+extent_alloc(void *ctx)
 {
-	extent_count++;
+	int *p_extent_count = (int *)ctx;
+	assert(p_extent_count == &extent_count);
+	++*p_extent_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *page)
+extent_free(void *ctx, void *page)
 {
-	extent_count--;
+	int *p_extent_count = (int *)ctx;
+	assert(p_extent_count == &extent_count);
+	--*p_extent_count;
 	free(page);
 }
 
@@ -30,7 +34,8 @@ itr_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+	rtree_init(&tree, 2, extent_size,
+		   extent_alloc, extent_free, &extent_count,
 		   RTREE_EUCLID);
 
 	/* Filling tree */
@@ -212,7 +217,8 @@ itr_invalidate_check()
 			del_cnt = test_size - del_pos;
 		}
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+		rtree_init(&tree, 2, extent_size,
+			   extent_alloc, extent_free, &extent_count,
 			   RTREE_EUCLID);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
@@ -257,7 +263,8 @@ itr_invalidate_check()
 		size_t ins_cnt = rand() % max_insert_count + 1;
 
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+		rtree_init(&tree, 2, extent_size,
+			   extent_alloc, extent_free, &extent_count,
 			   RTREE_EUCLID);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)

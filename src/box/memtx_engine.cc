@@ -1252,8 +1252,9 @@ memtx_index_arena_init()
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
  */
 void *
-memtx_index_extent_alloc()
+memtx_index_extent_alloc(void *ctx)
 {
+	(void)ctx;
 	if (memtx_index_reserved_extents) {
 		assert(memtx_index_num_reserved_extents > 0);
 		memtx_index_num_reserved_extents--;
@@ -1274,8 +1275,9 @@ memtx_index_extent_alloc()
  * Free a block previously allocated by memtx_index_extent_alloc
  */
 void
-memtx_index_extent_free(void *extent)
+memtx_index_extent_free(void *ctx, void *extent)
 {
+	(void)ctx;
 	return mempool_free(&memtx_index_extent_pool, extent);
 }
 

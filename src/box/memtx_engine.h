@@ -89,13 +89,13 @@ memtx_index_arena_init();
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
  */
 void *
-memtx_index_extent_alloc();
+memtx_index_extent_alloc(void *ctx);
 
 /**
  * Free a block previously allocated by memtx_index_extent_alloc
  */
 void
-memtx_index_extent_free(void *extent);
+memtx_index_extent_free(void *ctx, void *extent);
 
 /**
  * Reserve num extents in pool.

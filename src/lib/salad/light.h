@@ -163,8 +163,8 @@ struct LIGHT(iterator) {
 /**
  * Type of functions for memory allocation and deallocation
  */
-typedef void *(*LIGHT(extent_alloc_t))();
-typedef void (*LIGHT(extent_free_t))(void *);
+typedef void *(*LIGHT(extent_alloc_t))(void *ctx);
+typedef void (*LIGHT(extent_free_t))(void *ctx, void *extent);
 
 /**
  * Special result of light_find that means that nothing was found
@@ -180,6 +180,7 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
  * @param extent_size - size of allocating memory blocks
  * @param extent_alloc_func - memory blocks allocation function
  * @param extent_free_func - memory blocks allocation function
+ * @param alloc_ctx - argument passed to memory block allocator
  * @param arg - optional parameter to save for comparing function
  */
 void
@@ -331,13 +332,14 @@ LIGHT(itr_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
  * @param extent_size - size of allocating memory blocks
  * @param extent_alloc_func - memory blocks allocation function
  * @param extent_free_func - memory blocks allocation function
+ * @param alloc_ctx - argument passed to memory block allocator
  * @param arg - optional parameter to save for comparing function
  */
 inline void
 LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
 	      LIGHT(extent_alloc_t) extent_alloc_func,
 	      LIGHT(extent_free_t) extent_free_func,
-	      LIGHT_CMP_ARG_TYPE arg)
+	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg)
 {
 	assert((ht->GROW_INCREMENT & (ht->GROW_INCREMENT - 1)) == 0);
 	assert(sizeof(LIGHT_DATA_TYPE) >= sizeof(uint32_t));
@@ -347,7 +349,7 @@ LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
 	ht->arg = arg;
 	matras_create(&ht->mtable,
 		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func);
+		      extent_alloc_func, extent_free_func, alloc_ctx);
 }
 
 /**
