@@ -61,6 +61,7 @@
 #include "tuple.h"
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
+#include "iproto_constants.h"
 
 #include "vclock.h"
 #include "assoc.h"
@@ -466,30 +467,11 @@ vy_stat_tx_write_rate(struct vy_stat *s)
 	return rmean_mean(s->rmean->stats[VY_STAT_TX_WRITE].value);
 }
 
-/** There was a backend read. This flag is additive. */
-#define SVGET        1
-/**
- * The last write operation on the statement was REPLACE.
- * This flag resets other write flags.
- */
-#define SVREPLACE    2
-/**
- * The last write operation on the statement was DELETE.
- * This flag resets other write flags.
- */
-#define SVDELETE     4
-/**
- * The last write operation on the statement was UPSERT.
- * This flag resets other write flags.
- */
-#define SVUPSERT     8
-#define SVDUP        16
-
 struct vy_stmt {
 	int64_t  lsn;
 	uint32_t size;
 	uint16_t refs; /* atomic */
-	uint8_t  flags;
+	uint8_t  type;
 	char data[0];
 };
 
@@ -522,7 +504,7 @@ vy_stmt_unref(struct vy_stmt *stmt);
 static bool
 vy_stmt_is_not_found(struct vy_stmt *stmt)
 {
-	return stmt->flags & SVDELETE;
+	return stmt->type == IPROTO_DELETE;
 }
 
 static struct vy_stmt *
@@ -539,10 +521,9 @@ static const char *
 vy_stmt_typename(int type)
 {
 	switch (type) {
-	case SVGET:     return "SELECT";
-	case SVREPLACE: return "REPLACE";
-	case SVDELETE:  return "DELETE";;
-	case SVUPSERT:  return "UPSERT";
+	case IPROTO_REPLACE: return "REPLACE";
+	case IPROTO_DELETE:  return "DELETE";;
+	case IPROTO_UPSERT:  return "UPSERT";
 	default:        return "UNKNOWN";;
 	}
 }
@@ -583,7 +564,7 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 {
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "%s(",
-		vy_stmt_typename(stmt->flags));
+		vy_stmt_typename(stmt->type));
 	SNPRINT(total, vy_key_snprint, buf, size, stmt->data, key_def);
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
@@ -795,7 +776,7 @@ vy_mem_too_many_upserts(struct vy_mem *mem, const char *key,
 	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
 		struct vy_stmt *v =
 			*vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-		if (v->flags != SVUPSERT ||
+		if (v->type != IPROTO_UPSERT ||
 		    vy_stmt_compare(v->data, key, key_def) != 0)
 			break;
 		if (++count > VY_UPSERT_THRESHOLD)
@@ -888,8 +869,8 @@ struct PACKED vy_stmt_info {
 	uint32_t offset;
 	/* size of statement */
 	uint32_t size;
-	/* flags */
-	uint8_t flags;
+	/* type */
+	uint8_t type;
 	/* for 4-byte alignment */
 	uint8_t reserved[3];
 };
@@ -2059,7 +2040,7 @@ vy_run_dump_stmt(struct vy_stmt *value, struct vy_buf *info_buf,
 	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
 		return -1;
 	struct vy_stmt_info *stmtinfo = (struct vy_stmt_info *)info_buf->p;
-	stmtinfo->flags = value->flags;
+	stmtinfo->type = value->type;
 	stmtinfo->offset = vy_buf_used(data_buf);
 	stmtinfo->size = value->size;
 	stmtinfo->lsn = lsn;
@@ -3301,7 +3282,7 @@ static int
 vy_range_set_delete(struct vy_range *range, struct vy_stmt *stmt,
 		    size_t *write_size)
 {
-	assert(stmt->flags == SVDELETE);
+	assert(stmt->type == IPROTO_DELETE);
 
 	if (range->mem_count == 1 && range->run_count == 0 &&
 	    vy_mem_older_lsn(range->mem, stmt->data, stmt->lsn,
@@ -3324,12 +3305,12 @@ static int
 vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		    size_t *write_size)
 {
-	assert(stmt->flags == SVUPSERT);
+	assert(stmt->type == IPROTO_UPSERT);
 
 	struct vy_index *index = range->index;
 	struct vy_stmt *older = vy_mem_older_lsn(range->mem, stmt->data,
 						 stmt->lsn, index->key_def);
-	if ((older != NULL && older->flags != SVUPSERT) ||
+	if ((older != NULL && older->type != IPROTO_UPSERT) ||
 	    (older == NULL && range->mem_count == 1 && range->run_count == 0)) {
 		/*
 		 * Optimization:
@@ -3343,11 +3324,11 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		 *     resulted REPLACE instead of original UPSERT.
 		 *
 		 */
-		assert(older == NULL || older->flags != SVUPSERT);
+		assert(older == NULL || older->type != IPROTO_UPSERT);
 		stmt = vy_apply_upsert(stmt, older, index, false);
 		if (stmt == NULL)
 			return -1; /* OOM */
-		assert(stmt->flags == SVREPLACE);
+		assert(stmt->type == IPROTO_REPLACE);
 		int rc = vy_range_set(range, stmt, write_size);
 		vy_stmt_unref(stmt);
 		return rc;
@@ -3439,11 +3420,11 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		prev_range = range;
 
 		int rc;
-		switch (stmt->flags) {
-		case SVUPSERT:
+		switch (stmt->type) {
+		case IPROTO_UPSERT:
 			rc = vy_range_set_upsert(range, stmt, write_size);
 			break;
-		case SVDELETE:
+		case IPROTO_DELETE:
 			rc = vy_range_set_delete(range, stmt, write_size);
 			break;
 		default:
@@ -5033,10 +5014,10 @@ vy_stmt_alloc(uint32_t size)
 			 "malloc", "struct vy_stmt");
 		return NULL;
 	}
-	v->size      = size;
-	v->lsn       = 0;
-	v->flags     = 0;
-	v->refs      = 1;
+	v->size = size;
+	v->lsn  = 0;
+	v->type = 0;
+	v->refs = 1;
 	return v;
 }
 
@@ -5177,7 +5158,7 @@ vy_stmt_replace_from_upsert(struct vy_stmt *upsert,
 	if (replace == NULL)
 		return NULL;
 	memcpy(replace->data, upsert->data, size);
-	replace->flags = SVREPLACE;
+	replace->type = IPROTO_REPLACE;
 	replace->lsn = upsert->lsn;
 	return replace;
 }
@@ -5399,7 +5380,7 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	assert(new_stmt != old_stmt);
 	struct key_def *key_def = index->key_def;
 
-	if (old_stmt == NULL || old_stmt->flags & SVDELETE) {
+	if (old_stmt == NULL || old_stmt->type == IPROTO_DELETE) {
 		/*
 		 * INSERT case: return new stmt.
 		 */
@@ -5436,7 +5417,7 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	size_t region_svp = region_used(region);
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
 			    new_ops_end, suppress_error);
-	if (!(old_stmt->flags & SVUPSERT)) {
+	if (!(old_stmt->type == IPROTO_UPSERT)) {
 		/*
 		 * UPDATE case: return the updated old stmt.
 		 */
@@ -5447,8 +5428,9 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 		result_mp = result_mp_end = NULL;
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
-		if (old_stmt->flags & (SVDELETE | SVREPLACE)) {
-			result_stmt->flags = SVREPLACE;
+		if (old_stmt->type == IPROTO_DELETE ||
+		    old_stmt->type == IPROTO_REPLACE) {
+			result_stmt->type = IPROTO_REPLACE;
 		}
 		result_stmt->lsn = new_stmt->lsn;
 		goto check_key;
@@ -5474,7 +5456,7 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	memcpy(extra, old_ops, old_ops_end - old_ops);
 	extra += old_ops_end - old_ops;
 	memcpy(extra, new_ops, new_ops_end - new_ops);
-	result_stmt->flags = SVUPSERT;
+	result_stmt->type = IPROTO_UPSERT;
 	result_stmt->lsn = new_stmt->lsn;
 
 check_key:
@@ -5501,22 +5483,24 @@ check_key:
 
 static void
 vy_tx_set(struct vy_tx *tx, struct vy_index *index,
-	    struct vy_stmt *stmt, uint8_t flags)
+	    struct vy_stmt *stmt, uint8_t type)
 {
-	stmt->flags = flags;
+	stmt->type = type;
 	/* Update concurrent index */
 	struct txv *old = write_set_search_key(&tx->write_set, index,
 					       stmt->data);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
-		if (stmt->flags & SVUPSERT) {
-			assert(old->stmt->flags & (SVUPSERT | SVREPLACE | SVDELETE));
+		if (stmt->type == IPROTO_UPSERT) {
+			assert(old->stmt->type == IPROTO_UPSERT ||
+			       old->stmt->type == IPROTO_REPLACE ||
+			       old->stmt->type == IPROTO_DELETE);
 
 			struct vy_stmt *old_stmt = old->stmt;
 			struct vy_stmt *new_stmt = stmt;
 			stmt = vy_apply_upsert(new_stmt, old_stmt,
 						index, true);
-			assert(stmt->flags);
+			assert(stmt->type);
 		}
 		vy_stmt_unref(old->stmt);
 		vy_stmt_ref(stmt);
@@ -5543,7 +5527,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 						      stmt, stmt_end);
 	if (vystmt == NULL)
 		return -1;
-	vy_tx_set(tx, index, vystmt, SVREPLACE);
+	vy_tx_set(tx, index, vystmt, IPROTO_REPLACE);
 	vy_stmt_unref(vystmt);
 	return 0;
 }
@@ -5566,7 +5550,7 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	extra = mp_encode_uint(extra, 1); /* 1 upsert ops record */
 	extra = mp_encode_uint(extra, index_base);
 	memcpy(extra, expr, expr_end - expr);
-	vy_tx_set(tx, index, vystmt, SVUPSERT);
+	vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
 	vy_stmt_unref(vystmt);
 	return 0;
 }
@@ -5578,7 +5562,7 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 	struct vy_stmt *vykey = vy_stmt_from_key(index, key, part_count);
 	if (vykey == NULL)
 		return -1;
-	vy_tx_set(tx, index, vykey, SVDELETE);
+	vy_tx_set(tx, index, vykey, IPROTO_DELETE);
 	vy_stmt_unref(vykey);
 	return 0;
 }
@@ -6686,7 +6670,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 		return -1;
 	}
 	memcpy(itr->curr_stmt->data, key, info->size);
-	itr->curr_stmt->flags = info->flags;
+	itr->curr_stmt->type = info->type;
 	itr->curr_stmt->lsn = info->lsn;
 	itr->curr_stmt_pos = itr->curr_pos;
 	*result = itr->curr_stmt;
@@ -8267,7 +8251,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 	if (t == NULL)
 		return 0;
 	vy_stmt_ref(t);
-	while (t->flags & SVUPSERT) {
+	while (t->type == IPROTO_UPSERT) {
 		struct vy_stmt *next;
 		int rc = vy_merge_iterator_next_lsn(itr, in, &next);
 		if (rc != 0) {
@@ -8534,18 +8518,19 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 		if (stmt->lsn > wi->oldest_vlsn)
 			break; /* Save the current stmt as the result. */
 		wi->goto_next_key = true;
-		if (stmt->flags == SVDELETE && wi->is_last_level)
+		if (stmt->type == IPROTO_DELETE && wi->is_last_level)
 			continue; /* Skip unnecessary DELETE */
-		if (stmt->flags & (SVREPLACE | SVDELETE))
+		if (stmt->type == IPROTO_REPLACE ||
+		    stmt->type == IPROTO_DELETE)
 			break; /* It's the resulting statement */
 
 		/* Squash upserts */
-		assert(stmt->flags == SVUPSERT);
+		assert(stmt->type == IPROTO_UPSERT);
 		if (vy_merge_iterator_squash_upsert(mi, NULL, &stmt, false)) {
 			vy_stmt_unref(stmt);
 			return -1;
 		}
-		if (stmt->flags & SVUPSERT && wi->is_last_level) {
+		if (stmt->type == IPROTO_UPSERT && wi->is_last_level) {
 			/* Turn UPSERT to REPLACE. */
 			struct vy_stmt *applied;
 			applied = vy_apply_upsert(stmt, NULL, wi->index, false);
@@ -8836,13 +8821,13 @@ restart:
 			goto restart;
 		}
 		assert(t != NULL);
-		if (t->flags != SVDELETE) {
-			if (t->flags == SVUPSERT) {
+		if (t->type != IPROTO_DELETE) {
+			if (t->type == IPROTO_UPSERT) {
 				struct vy_stmt *applied;
 				applied = vy_apply_upsert(t, NULL, itr->index, true);
 				vy_stmt_unref(t);
 				t = applied;
-				assert(t->flags == SVREPLACE);
+				assert(t->type == IPROTO_REPLACE);
 			}
 			if (itr->curr_stmt != NULL)
 				vy_stmt_unref(itr->curr_stmt);
@@ -8942,7 +8927,7 @@ vy_range_optimize_upserts_f(va_list va)
 			      stmt->data, stmt->lsn, false);
 	struct vy_stmt *v;
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
-		assert(v->flags == SVREPLACE);
+		assert(v->type == IPROTO_REPLACE);
 		assert(v->lsn == stmt->lsn);
 		assert(vy_stmt_compare(stmt->data, v->data,
 				       index->key_def) == 0);
