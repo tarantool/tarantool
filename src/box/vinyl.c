@@ -5304,11 +5304,9 @@ vy_update_alloc(void *arg, size_t size)
 	/* TODO: rewrite tuple_upsert_execute() without exceptions */
 	struct region *region = (struct region *) arg;
 	void *data = region_aligned_alloc(region, size, sizeof(uint64_t));
-	if (data == NULL) {
+	if (data == NULL)
 		diag_set(OutOfMemory, sizeof(struct vy_tx), "region",
 			 "upsert");
-		diag_raise();
-	}
 	return data;
 }
 

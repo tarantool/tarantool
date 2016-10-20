@@ -399,9 +399,11 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		 *
 		 * So we have nothing to catch and suppress!
 		 */
-		tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
+		if (tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
 				       request->ops, request->ops_end,
-				       request->index_base);
+				       request->index_base)) {
+			diag_raise();
+		}
 		struct tuple *new_tuple = tuple_new(space->format,
 						    request->tuple,
 						    request->tuple_end);

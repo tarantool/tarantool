@@ -451,9 +451,11 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	/* Check update operations. */
-	tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
+	if (tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
 			       request->ops, request->ops_end,
-			       request->index_base);
+			       request->index_base)) {
+		diag_raise();
+	}
 	const char *key;
 	uint32_t part_count;
 	struct txn_stmt *stmt = txn_current_stmt(txn);

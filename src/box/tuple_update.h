@@ -45,7 +45,7 @@ enum {
 
 typedef void *(*tuple_update_alloc_func)(void *, size_t);
 
-void
+int
 tuple_update_check_ops(tuple_update_alloc_func alloc, void *alloc_ctx,
 		       const char *expr, const char *expr_end, int index_base);
 
