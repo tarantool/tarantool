@@ -407,7 +407,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 	 */
 	index = (VinylIndex *)space->index[0];
 	if (vy_replace(tx, index->db, new_tuple->data,
-			  new_tuple->data + new_tuple->bsize))
+		       new_tuple->data + new_tuple->bsize))
 		diag_raise();
 
 	/* Update secondary keys, avoid duplicates. */

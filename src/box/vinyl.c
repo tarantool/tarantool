@@ -32,6 +32,7 @@
 
 #include <dirent.h>
 #include <pmatomic.h>
+#include <sys/uio.h>
 
 #include <bit/bit.h>
 #include <small/rlist.h>
@@ -467,6 +468,19 @@ vy_stat_tx_write_rate(struct vy_stat *s)
 	return rmean_mean(s->rmean, VY_STAT_TX_WRITE);
 }
 
+/**
+ * Statement structure:
+ *                         ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ *  4 bytes      4 bytes   ┃           MessagePack data    ▼
+ * ┏━━━━━━┳━━━━━┳━━━━━━┳━━━┻━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+ * ┃ off1 ┃ ... ┃ offN ┃ offEnd ┃ header part1 ..... partN ┃ operations ┃
+ * ┗━━┳━━━┻━━━━━┻━━┳━━━┻━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━┛
+ *    ┃     ...    ┃     4 bytes          ▲           ▲
+ *    ┃            ┗━━━━━━━━━━━━━━━━━━━━━━┃━━━━━━━━━━━┛
+ *    ┃                                   ┃
+ *    ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ * Field 'operations' is used for storing operations of UPSERT statement.
+ */
 struct vy_stmt {
 	int64_t  lsn;
 	uint32_t size;
@@ -474,6 +488,117 @@ struct vy_stmt {
 	uint8_t  type;
 	char data[0];
 };
+
+/* {{{ Statement public API */
+
+/**
+ * Compare two statements by their raw data.
+ * @param stmt_data_a Left operand of comparison.
+ * @param stmt_data_b Right operand of comparison.
+ * @param key_def Definition of the format of both statements.
+ *
+ * @retval 0   if a == b
+ * @retval > 0 if a > b
+ * @retval < 0 if a < b
+ */
+static int
+vy_stmt_compare(const char *stmt_data_a, const char *stmt_data_b,
+		const struct key_def *key_def);
+
+/**
+ * Create the SELECT statement from raw MessagePack data.
+ * @param key MessagePack data that contain an array of fields WITHOUT the
+ *            array header.
+ * @param part_count Count of the key fields that will be saved as result.
+ * @param key_def Definition of the format of the key.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+static struct vy_stmt *
+vy_stmt_new_select(const char *key, uint32_t part_count,
+		   struct key_def *key_def);
+
+/**
+ * Create the REPLACE statement from raw MessagePack data.
+ * @param tuple_begin MessagePack data that contain an array of fields WITH the
+ *                    array header.
+ * @param tuple_end End of the array that begins from @param tuple_begin.
+ * @param index Index that will be used for formatting result REPLACE statement.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+static struct vy_stmt *
+vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
+		    struct vy_index *index);
+
+ /**
+ * Create the UPSERT statement from raw MessagePack data.
+ * @param tuple_begin MessagePack data that contain an array of fields WITH the
+ *                    array header.
+ * @param tuple_end End of the array that begins from @param tuple_begin.
+ * @param index Index that will be used for formatting result UPSERT statement.
+ * @param operations Vector of update operations.
+ * @param ops_cnt Length of the update operations vector.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+static struct vy_stmt *
+vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
+		   struct vy_index *index, struct iovec *operations,
+		   uint32_t ops_cnt);
+
+/**
+ * Apply the UPSERT statement to the REPLACE, UPSERT or DELETE statement.
+ * If the second statement is
+ * - REPLACE then update operations of the first one will be applied to the
+ *   second and a REPLACE statement will be returned;
+ *
+ * - UPSERT then the new UPSERT will be created with combined operations of both
+ *   arguments;
+ *
+ * - DELETE or NULL then the first one will be turned into REPLACE and returned
+ *   as the result;
+ *
+ * @param upsert An UPSERT statement.
+ * @param object An REPLACE/DELETE/UPSERT statement or NULL.
+ * @param index Index that will be used for formatting result statement.
+ * @param suppress_error True if ClientErrors must not be written to log.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+static struct vy_stmt *
+vy_apply_upsert(struct vy_stmt *upsert, struct vy_stmt *object,
+		struct vy_index *index, bool suppress_error);
+
+/**
+ * Extract MessagePack data from the REPLACE/UPSERT statement.
+ * @param stmt An UPSERT or REPLACE statement.
+ * @param key_def Definition of the format of the tuple.
+ * @param mp_size Out parameter for size of the returned tuple.
+ *
+ * @retval Pointer on MessagePack array of tuple fields.
+ */
+static const char *
+vy_stmt_tuple_data(struct vy_stmt *stmt, struct key_def *key_def,
+		   uint32_t *mp_size);
+
+/**
+ * Extract the operations array from the UPSERT statement.
+ * @param stmt An UPSERT statement.
+ * @param key_def Definition of the format of the tuple.
+ * @param mp_size Out parameter for size of the returned array.
+ *
+ * @retval Pointer on MessagePack array of update operations.
+ */
+static const char *
+vy_stmt_upsert_ops(struct vy_stmt *stmt, struct key_def *key_def,
+		   uint32_t *mp_size);
+
+/* Statement public API }}} */
 
 static uint32_t
 vy_stmt_size(struct vy_stmt *v);
@@ -487,13 +612,6 @@ vy_stmt_key_part(const char *stmt_data, uint32_t part_id);
 static bool
 vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def);
 
-static int
-vy_stmt_compare(const char *stmt_data_a, const char *stmt_data_b,
-		 const struct key_def *key_def);
-
-static struct vy_stmt *
-vy_stmt_from_key(struct vy_index *index, const char *key,
-			  uint32_t part_count);
 static void
 vy_stmt_ref(struct vy_stmt *stmt);
 
@@ -502,24 +620,6 @@ vy_stmt_unref(struct vy_stmt *stmt);
 
 static struct vy_stmt *
 vy_stmt_extract_key_raw(struct vy_index *index, const char *stmt);
-
-static struct vy_stmt *
-vy_apply_upsert(struct vy_stmt *upsert, struct vy_stmt *object,
-		struct vy_index *index, bool suppress_error);
-
-/**
- * Return statement type name by type id.
- */
-static const char *
-vy_stmt_typename(int type)
-{
-	switch (type) {
-	case IPROTO_REPLACE: return "REPLACE";
-	case IPROTO_DELETE:  return "DELETE";;
-	case IPROTO_UPSERT:  return "UPSERT";
-	default:        return "UNKNOWN";;
-	}
-}
 
 /**
  * Format a key into string.
@@ -557,7 +657,7 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 {
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "%s(",
-		vy_stmt_typename(stmt->type));
+		iproto_type_name(stmt->type));
 	SNPRINT(total, vy_key_snprint, buf, size, stmt->data, key_def);
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
@@ -2399,9 +2499,13 @@ vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
 	return n;
 }
 
+/**
+ * Load SELECT statement of size equal to @param size
+ * from range by the @param offset.
+ */
 static int
-vy_load_stmt(struct vy_range *range, size_t size, off_t offset,
-	      struct vy_stmt **stmt)
+vy_range_load_stmt(struct vy_range *range, size_t size, off_t offset,
+		   struct vy_stmt **stmt)
 {
 	int rc = 0;
 	char *buf;
@@ -2421,7 +2525,7 @@ vy_load_stmt(struct vy_range *range, size_t size, off_t offset,
 }
 
 static int
-vy_load_range_header(struct vy_range *range, off_t *offset)
+vy_range_load_header(struct vy_range *range, off_t *offset)
 {
 	struct vy_range_info info;
 
@@ -2430,14 +2534,14 @@ vy_load_range_header(struct vy_range *range, off_t *offset)
 
 	assert(range->begin == NULL);
 	if (info.begin_key_size != 0 &&
-	    vy_load_stmt(range, info.begin_key_size,
-			  info.begin_key_offset, &range->begin) == -1)
+	    vy_range_load_stmt(range, info.begin_key_size,
+			       info.begin_key_offset, &range->begin) == -1)
 		return -1;
 
 	assert(range->end == NULL);
 	if (info.end_key_size != 0 &&
-	    vy_load_stmt(range, info.end_key_size,
-			  info.end_key_offset, &range->end) == -1)
+	    vy_range_load_stmt(range, info.end_key_size,
+			       info.end_key_offset, &range->end) == -1)
 		return -1;
 
 	*offset = info.first_run_offset;
@@ -2451,7 +2555,7 @@ vy_range_recover(struct vy_range *range)
 	off_t offset;
 	int rc = -1;
 
-	if (vy_load_range_header(range, &offset) == -1)
+	if (vy_range_load_header(range, &offset) == -1)
 		goto out;
 
 	while (true) {
@@ -4742,11 +4846,10 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
 	if (c == NULL) {
-
 		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
 		return NULL;
 	}
-	c->key = vy_stmt_from_key(index, key, part_count);
+	c->key = vy_stmt_new_select(key, part_count, index->key_def);
 	if (c->key == NULL) {
 		mempool_free(&e->cursor_pool, c);
 		return NULL;
@@ -5019,7 +5122,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	tuple_format_ref(index->tuple_format, 1);
 
 	/*
-	 * Create field_id -> part_id mapping used by vy_stmt_from_data().
+	 * Create field_id -> part_id mapping used by vy_stmt_new_replace().
 	 * This code partially duplicates tuple_format_new() logic.
 	 */
 	uint32_t key_map_size = 0;
@@ -5123,9 +5226,9 @@ vy_stmt_delete(struct vy_stmt *stmt)
 }
 
 static struct vy_stmt *
-vy_stmt_from_key(struct vy_index *index, const char *key, uint32_t part_count)
+vy_stmt_new_select(const char *key, uint32_t part_count,
+		   struct key_def *key_def)
 {
-	struct key_def *key_def = index->key_def;
 	assert(part_count == 0 || key != NULL);
 	assert(part_count <= key_def->part_count);
 
@@ -5165,30 +5268,44 @@ vy_stmt_from_key(struct vy_index *index, const char *key, uint32_t part_count)
 	/* Store offset of the end of msgpack data in the last entry */
 	offsets[key_def->part_count] = size;
 	assert(data == stmt->data + size);
-
+	stmt->type = IPROTO_SELECT;
 	return stmt;
 }
 
+/**
+ * Create a statement without type and with reserved space for operations.
+ * Operations can be saved in the space available by @param extra.
+ * For details @sa struct vy_stmt comment.
+ */
 static struct vy_stmt *
-vy_stmt_from_data_ex(struct vy_index *index,
-			 const char *data, const char *data_end,
-			 uint32_t extra_size, char **extra)
+vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
+		     uint8_t type, struct vy_index *index,
+		     struct iovec *operations, uint32_t iovcnt)
 {
 #ifndef NDEBUG
-	const char *data_end_must_be = data;
-	mp_next(&data_end_must_be);
-	assert(data_end == data_end_must_be);
+	const char *tuple_end_must_be = tuple_begin;
+	mp_next(&tuple_end_must_be);
+	assert(tuple_end == tuple_end_must_be);
 #endif
 	struct key_def *key_def = index->key_def;
+	uint32_t part_count = key_def->part_count;
 
-	uint32_t field_count = mp_decode_array(&data);
-	assert(field_count >= key_def->part_count);
+	uint32_t field_count = mp_decode_array(&tuple_begin);
+	assert(field_count >= part_count);
 
-	/* Allocate stmt */
-	uint32_t offsets_size = sizeof(uint32_t) * (key_def->part_count + 1);
-	uint32_t data_size = data_end - data;
+	uint32_t extra_size = 0;
+	for (uint32_t i = 0; i < iovcnt; ++i) {
+		extra_size += operations[i].iov_len;
+	}
+
+	/*
+	 * Allocate stmt. Offsets: one per key part + offset of the
+	 * statement end.
+	 */
+	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
+	uint32_t data_size = tuple_end - tuple_begin;
 	uint32_t size = offsets_size + mp_sizeof_array(field_count) +
-		data_size + extra_size;
+			data_size + extra_size;
 	struct vy_stmt *stmt = vy_stmt_alloc(size);
 	if (stmt == NULL)
 		return NULL;
@@ -5196,7 +5313,7 @@ vy_stmt_from_data_ex(struct vy_index *index,
 	/* Calculate offsets for key parts */
 	uint32_t *offsets = (uint32_t *) stmt->data;
 	uint32_t start_offset = offsets_size + mp_sizeof_array(field_count);
-	const char *data_pos = data;
+	const char *data_pos = tuple_begin;
 	for (uint32_t field_id = 0; field_id < field_count; field_id++) {
 		const char *field = data_pos;
 		mp_next(&data_pos);
@@ -5205,44 +5322,106 @@ vy_stmt_from_data_ex(struct vy_index *index,
 			continue; /* field is not indexed */
 		/* Update offsets for indexed field */
 		uint32_t part_id = index->key_map[field_id];
-		assert(part_id < key_def->part_count);
-		offsets[part_id] = start_offset + (field - data);
+		assert(part_id < part_count);
+		offsets[part_id] = start_offset + (field - tuple_begin);
 	}
 	/* Store offset of the end of msgpack data in the last entry */
-	offsets[key_def->part_count] = start_offset + (data_pos - data);
-	assert(offsets[key_def->part_count] + extra_size == size);
+	offsets[part_count] = start_offset + (data_pos - tuple_begin);
+	assert(offsets[part_count] + extra_size == size);
 
 	/* Copy MsgPack data */
 	char *wpos = stmt->data + offsets_size;
 	wpos = mp_encode_array(wpos, field_count);
-	memcpy(wpos, data, data_size);
+	memcpy(wpos, tuple_begin, data_size);
 	wpos += data_size;
 	assert(wpos == stmt->data + size - extra_size);
-	*extra = wpos;
+	for (struct iovec *op = operations, *end = operations + iovcnt;
+	     op != end; ++op) {
+
+		memcpy(wpos, op->iov_base, op->iov_len);
+		wpos += op->iov_len;
+	}
+	stmt->type = type;
 	return stmt;
 }
 
-/*
- * Create vy_stmt from raw MsgPack data.
+static struct vy_stmt *
+vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
+		   struct vy_index *index, struct iovec *operations,
+		   uint32_t ops_cnt)
+{
+	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_UPSERT,
+				    index, operations, ops_cnt);
+}
+
+static struct vy_stmt *
+vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
+		    struct vy_index *index)
+{
+	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_REPLACE,
+				    index, NULL, 0);
+}
+
+/**
+ * Get size of the statement data of type REPLACE, UPSERTS or DELETE
+ * (without operations array if exists).
+ */
+static uint32_t
+vy_stmt_data_size(struct vy_stmt *stmt, struct key_def *key_def)
+{
+	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
+	return ((uint32_t *)stmt->data)[key_def->part_count];
+}
+
+static const char *
+vy_stmt_tuple_data(struct vy_stmt *stmt, struct key_def *key_def,
+		   uint32_t *mp_size)
+{
+	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
+	uint32_t size = vy_stmt_data_size(stmt, key_def);
+	uint32_t offsets_size = sizeof(uint32_t) * (key_def->part_count + 1);
+	const char *mp = stmt->data + offsets_size;
+	const char *mp_end = stmt->data + size;
+	assert(mp < mp_end);
+	*mp_size = mp_end - mp;
+	return mp;
+}
+
+static const char *
+vy_stmt_upsert_ops(struct vy_stmt *stmt, struct key_def *key_def,
+		   uint32_t *mp_size)
+{
+	assert(stmt->type == IPROTO_UPSERT);
+	const char *ret;
+	ret = stmt->data + vy_stmt_data_size(stmt, key_def);
+	*mp_size = stmt->data + stmt->size - ret;
+	return ret;
+}
+
+
+/**
+ * Extract a SELECT statement with indexes fields from raw data
+ * formated as described in the comment for struct vy_stmt.
  */
 static struct vy_stmt *
-vy_stmt_from_data(struct vy_index *index,
-		      const char *data, const char *data_end)
+vy_stmt_extract_key_raw(struct vy_index *index, const char *stmt)
 {
-	char *unused;
-	return vy_stmt_from_data_ex(index, data, data_end, 0, &unused);
+	uint32_t part_count = index->key_def->part_count;
+	uint32_t size = ((uint32_t *)stmt)[part_count];
+	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
+	const char *mp = stmt + offsets_size;
+	const char *mp_end = stmt + size;
+	return vy_stmt_new_with_ops(mp, mp_end, IPROTO_SELECT, index, NULL, 0);
 }
 
 /*
  * Create REPLACE statement from UPSERT statement.
  */
 static struct vy_stmt *
-vy_stmt_replace_from_upsert(struct vy_stmt *upsert,
-			    const struct key_def *key_def)
+vy_stmt_replace_from_upsert(struct vy_stmt *upsert, struct key_def *key_def)
 {
 	/* Get statement size without UPSERT operations */
-	uint32_t *offsets = (uint32_t *) upsert->data;
-	size_t size = offsets[key_def->part_count];
+	size_t size = vy_stmt_data_size(upsert, key_def);
 	assert(size <= upsert->size);
 
 	/* Copy statement data excluding UPSERT operations */
@@ -5255,51 +5434,13 @@ vy_stmt_replace_from_upsert(struct vy_stmt *upsert,
 	return replace;
 }
 
-static struct vy_stmt *
-vy_stmt_extract_key_raw(struct vy_index *index, const char *stmt)
-{
-	uint32_t part_count = index->key_def->part_count;
-	uint32_t *offsets = (uint32_t *) stmt;
-	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
-	const char *mp = stmt + offsets_size;
-	const char *mp_end = stmt + offsets[part_count];
-	return vy_stmt_from_data(index, mp, mp_end);
-}
-
-static const char *
-vy_stmt_data(struct vy_index *index, struct vy_stmt *stmt,
-		 uint32_t *mp_size)
-{
-	uint32_t part_count = index->key_def->part_count;
-	uint32_t *offsets = (uint32_t *) stmt->data;
-	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
-	const char *mp = stmt->data + offsets_size;
-	const char *mp_end = stmt->data + offsets[part_count];
-	assert(mp < mp_end);
-	*mp_size = mp_end - mp;
-	return mp;
-}
-
-static void
-vy_stmt_data_ex(const struct key_def *key_def,
-		    const char *data, const char *data_end,
-		    const char **msgpack, const char **msgpack_end,
-		    const char **extra, const char **extra_end)
-{
-	uint32_t part_count = key_def->part_count;
-	uint32_t *offsets = (uint32_t *) data;
-	uint32_t offsets_size = sizeof(uint32_t) * (part_count + 1);
-	*msgpack = data + offsets_size;
-	*msgpack_end = data + offsets[part_count];
-	*extra = *msgpack_end;
-	*extra_end = data_end;
-}
-
 static struct tuple *
-vy_convert_stmt(struct vy_index *index, struct vy_stmt *vy_stmt)
+vy_convert_replace(struct vy_index *index, struct vy_stmt *vy_stmt)
 {
+	assert(vy_stmt->type == IPROTO_REPLACE);
 	uint32_t bsize;
-	const char *data = vy_stmt_data(index, vy_stmt, &bsize);
+	const char *data;
+	data = vy_stmt_tuple_data(vy_stmt, index->key_def, &bsize);
 	return box_tuple_new(index->tuple_format, data, data + bsize);
 }
 
@@ -5366,9 +5507,6 @@ vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def)
 	return offsets[key_def->part_count - 1] != VY_STMT_KEY_MISSING;
 }
 
-/**
- * Compare two statements
- */
 static int
 vy_stmt_compare(const char *stmt_data_a, const char *stmt_data_b,
 		 const struct key_def *key_def)
@@ -5483,23 +5621,24 @@ vy_upsert_try_to_squash(struct vy_index *index, struct region *region,
 	if (squashed == NULL)
 		return 0;
 	/* Successful squash! */
-	uint32_t extra_size = squashed_size;
-	extra_size += mp_sizeof_uint(1);
-	extra_size += mp_sizeof_uint(index_base);
-	char *extra;
-	*result_stmt = vy_stmt_from_data_ex(index, key_mp, key_mp_end,
-					    extra_size, &extra);
+	char index_base_buf[32];
+	char *extra = mp_encode_uint(index_base_buf, 1);
+	extra = mp_encode_uint(extra, index_base);
+
+	struct iovec operations[2];
+	operations[0].iov_base = (void *)index_base_buf;
+	operations[0].iov_len = extra - index_base_buf;
+
+	operations[1].iov_base = (void *)squashed;
+	operations[1].iov_len = squashed_size;
+
+	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, index,
+					  operations, 2);
 	if (*result_stmt == NULL)
 		return -1;
-	extra = mp_encode_uint(extra, 1);
-	extra = mp_encode_uint(extra, index_base);
-	memcpy(extra, squashed, squashed_size);
 	return 0;
 }
 
-/*
- * Get the upserted stmt by upsert stmt and original stmt
- */
 static struct vy_stmt *
 vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 		struct vy_index *index, bool suppress_error)
@@ -5511,6 +5650,7 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	 */
 	assert(new_stmt != NULL);
 	assert(new_stmt != old_stmt);
+	assert(new_stmt->type == IPROTO_UPSERT);
 	struct key_def *key_def = index->key_def;
 
 	if (old_stmt == NULL || old_stmt->type == IPROTO_DELETE) {
@@ -5523,51 +5663,45 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	/*
 	 * Unpack UPSERT operation from the new stmt
 	 */
-	const char *new_data = new_stmt->data;
-	const char *new_data_end = new_data + new_stmt->size;
-	const char *new_mp, *new_mp_end, *new_ops, *new_ops_end;
-	vy_stmt_data_ex(key_def, new_data, new_data_end,
-			    &new_mp, &new_mp_end,
-			    &new_ops, &new_ops_end);
+	uint32_t mp_size;
+	const char *new_ops;
+	new_ops = vy_stmt_upsert_ops(new_stmt, key_def, &mp_size);
+	const char *new_ops_end = new_ops + mp_size;
+
+	/*
+	 * Apply new operations to the old stmt
+	 */
+	const char *result_mp;
+	result_mp = vy_stmt_tuple_data(old_stmt, key_def, &mp_size);
+	const char *result_mp_end = result_mp + mp_size;
+	struct vy_stmt *result_stmt = NULL;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	uint8_t old_type = old_stmt->type;
+	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
+			    new_ops_end, suppress_error);
+	if (old_type != IPROTO_UPSERT) {
+		assert(old_type == IPROTO_DELETE || old_type == IPROTO_REPLACE);
+		/*
+		 * UPDATE case: return the updated old stmt.
+		 */
+		result_stmt = vy_stmt_new_replace(result_mp, result_mp_end,
+						  index);
+		region_truncate(region, region_svp);
+		if (result_stmt == NULL)
+			return NULL; /* OOM */
+		result_stmt->lsn = new_stmt->lsn;
+		goto check_key;
+	}
 
 	/*
 	 * Unpack UPSERT operation from the old stmt
 	 */
 	assert(old_stmt != NULL);
-	const char *old_data = old_stmt->data;
-	const char *old_data_end = old_data + old_stmt->size;
-	const char *old_mp, *old_mp_end, *old_ops, *old_ops_end;
-	vy_stmt_data_ex(key_def, old_data, old_data_end,
-			    &old_mp, &old_mp_end, &old_ops, &old_ops_end);
-
-	/*
-	 * Apply new operations to the old stmt
-	 */
-	const char *result_mp = old_mp;
-	const char *result_mp_end = old_mp_end;
-	struct vy_stmt *result_stmt = NULL;
-	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
-	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
-			    new_ops_end, suppress_error);
-	if (!(old_stmt->type == IPROTO_UPSERT)) {
-		/*
-		 * UPDATE case: return the updated old stmt.
-		 */
-		assert(old_ops_end - old_ops == 0);
-		result_stmt = vy_stmt_from_data(index, result_mp,
-						result_mp_end);
-		region_truncate(region, region_svp);
-		result_mp = result_mp_end = NULL;
-		if (result_stmt == NULL)
-			return NULL; /* OOM */
-		if (old_stmt->type == IPROTO_DELETE ||
-		    old_stmt->type == IPROTO_REPLACE) {
-			result_stmt->type = IPROTO_REPLACE;
-		}
-		result_stmt->lsn = new_stmt->lsn;
-		goto check_key;
-	}
+	const char *old_ops;
+	old_ops = vy_stmt_upsert_ops(old_stmt, key_def, &mp_size);
+	const char *old_ops_end = old_ops + mp_size;
+	assert(old_ops_end > old_ops);
 
 	/*
 	 * UPSERT + UPSERT case: combine operations
@@ -5588,24 +5722,26 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	if (result_stmt == NULL) {
 		/* Failed to squash, simply add one upsert to another */
 		uint64_t res_series_count = new_series_count + old_series_count;
-		uint32_t extra_size = mp_sizeof_uint(res_series_count) +
-				      (new_ops_end - new_ops) +
-				      (old_ops_end - old_ops);
-		char *extra;
-		result_stmt = vy_stmt_from_data_ex(index,
-						   result_mp, result_mp_end,
-						   extra_size, &extra);
+		char series_count_buf[16];
+		char *extra = mp_encode_uint(series_count_buf,
+					     res_series_count);
+		struct iovec operations[3];
+		operations[0].iov_base = (void *)series_count_buf;
+		operations[0].iov_len = extra - series_count_buf;
+
+		operations[1].iov_base = (void *)old_ops;
+		operations[1].iov_len = old_ops_end - old_ops;
+
+		operations[2].iov_base = (void *)new_ops;
+		operations[2].iov_len = new_ops_end - new_ops;
+		result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
+						 index, operations, 3);
 		if (result_stmt == NULL) {
 			region_truncate(region, region_svp);
 			return NULL;
 		}
-		extra = mp_encode_uint(extra, res_series_count);
-		memcpy(extra, old_ops, old_ops_end - old_ops);
-		extra += old_ops_end - old_ops;
-		memcpy(extra, new_ops, new_ops_end - new_ops);
 	}
 	region_truncate(region, region_svp);
-	result_stmt->type = IPROTO_UPSERT;
 	result_stmt->lsn = new_stmt->lsn;
 
 check_key:
@@ -5613,7 +5749,7 @@ check_key:
 	 * Check that key hasn't been changed after applying operations.
 	 */
 	if (key_def->iid == 0 &&
-	    vy_stmt_compare(old_data, result_stmt->data, key_def) != 0) {
+	    vy_stmt_compare(old_stmt->data, result_stmt->data, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.
@@ -5670,10 +5806,10 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 
 int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
-	   const char *stmt, const char *stmt_end)
+	   const char *tuple_begin, const char *tuple_end)
 {
-	struct vy_stmt *vystmt = vy_stmt_from_data(index,
-						      stmt, stmt_end);
+	struct vy_stmt *vystmt = vy_stmt_new_replace(tuple_begin, tuple_end,
+						     index);
 	if (vystmt == NULL)
 		return -1;
 	vy_tx_set(tx, index, vystmt, IPROTO_REPLACE);
@@ -5687,18 +5823,19 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *expr, const char *expr_end, int index_base)
 {
 	assert(index_base == 0 || index_base == 1);
-	uint32_t extra_size = ((expr_end - expr) +
-			       mp_sizeof_uint(1) + mp_sizeof_uint(index_base));
-	char *extra;
-	struct vy_stmt *vystmt =
-		vy_stmt_from_data_ex(index, stmt, stmt_end,
-				      extra_size, &extra);
-	if (vystmt == NULL) {
-		return -1;
-	}
-	extra = mp_encode_uint(extra, 1); /* 1 upsert ops record */
+	struct vy_stmt *vystmt;
+	char index_base_buf[32];
+	char *extra = mp_encode_uint(index_base_buf, 1);
 	extra = mp_encode_uint(extra, index_base);
-	memcpy(extra, expr, expr_end - expr);
+	struct iovec operations[2];
+	operations[0].iov_base = (void *)index_base_buf;
+	operations[0].iov_len = extra - index_base_buf;
+
+	operations[1].iov_base = (void *)expr;
+	operations[1].iov_len = expr_end - expr;
+	vystmt = vy_stmt_new_upsert(stmt, stmt_end, index, operations, 2);
+	if (vystmt == NULL)
+		return -1;
 	vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
 	vy_stmt_unref(vystmt);
 	return 0;
@@ -5708,7 +5845,8 @@ int
 vy_delete(struct vy_tx *tx, struct vy_index *index,
 	  const char *key, uint32_t part_count)
 {
-	struct vy_stmt *vykey = vy_stmt_from_key(index, key, part_count);
+	struct vy_stmt *vykey;
+	vykey = vy_stmt_new_select(key, part_count, index->key_def);
 	if (vykey == NULL)
 		return -1;
 	vy_tx_set(tx, index, vykey, IPROTO_DELETE);
@@ -5855,7 +5993,8 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 {
 	int rc = -1;
 	struct vy_stmt *vyresult = NULL;
-	struct vy_stmt *vykey = vy_stmt_from_key(index, key, part_count);
+	struct vy_stmt *vykey;
+	vykey = vy_stmt_new_select(key, part_count, index->key_def);
 	if (vykey == NULL)
 		return -1;
 
@@ -5869,7 +6008,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		*result = NULL;
 		rc = 0;
 	} else {
-		*result = vy_convert_stmt(index, vyresult);
+		*result = vy_convert_replace(index, vyresult);
 		if (*result != NULL)
 			rc = 0;
 	}
@@ -5914,7 +6053,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 		c->key = vyresult;
 		vy_stmt_ref(c->key);
 
-		*result = vy_convert_stmt(index, vyresult);
+		*result = vy_convert_replace(index, vyresult);
 		vy_stmt_unref(vyresult);
 		if (*result == NULL)
 			return -1;
@@ -8569,7 +8708,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_from_key(index, NULL, 0);
+	wi->key = vy_stmt_new_select(NULL, 0, index->key_def);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key->data);
 }
 
@@ -9011,7 +9150,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 	struct vy_read_iterator ri;
 	struct vy_stmt *stmt;
-	struct vy_stmt *key = vy_stmt_from_key(index, NULL, 0);
+	struct vy_stmt *key = vy_stmt_new_select(NULL, 0, index->key_def);
 	if (key == NULL)
 		return -1;
 	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key->data,
@@ -9019,8 +9158,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	rc = vy_read_iterator_next(&ri, &stmt);
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
-		const char *mp_data = vy_stmt_data(index, stmt,
-						    &mp_size);
+		const char *mp_data;
+		mp_data = vy_stmt_tuple_data(stmt, index->key_def, &mp_size);
 		int64_t lsn = stmt->lsn;
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
 		if (rc != 0)
