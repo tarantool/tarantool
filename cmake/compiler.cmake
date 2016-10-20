@@ -73,8 +73,6 @@ set (CMAKE_CXX_FLAGS_DEBUG
 set (CMAKE_CXX_FLAGS_RELWITHDEBUGINFO
     "${CMAKE_CXX_FLAGS_RELWITHDEBUGINFO} ${CC_DEBUG_OPT} -O2")
 
-unset(CC_DEBUG_OPT)
-
 #
 # Set flags for all include files: those maintained by us and
 # coming from third parties.
