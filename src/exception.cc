@@ -156,6 +156,14 @@ SystemError::SystemError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+SystemError::SystemError(const char *file, unsigned line,
+			 const char *format, va_list ap)
+	: Exception(&type_SystemError, file, line),
+	m_errno(errno)
+{
+	error_vformat_msg(this, format, ap);
+}
+
 void
 SystemError::log() const
 {
@@ -264,6 +272,17 @@ BuildLuajitError(const char *file, unsigned line, const char *msg)
 	return new (p) LuajitError(file, line, msg);
 }
 
+static struct error *
+BuildSystemError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(SystemError);
+	va_list ap;
+	va_start(ap, format);
+	SystemError *e = new (p) SystemError(file, line, format, ap);
+	va_end(ap);
+	return e;
+}
+
 #undef BuildAlloc
 
 void
@@ -276,6 +295,7 @@ exception_init()
 	exception_error_factory.TimedOut = BuildTimedOut;
 	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
 	exception_error_factory.LuajitError = BuildLuajitError;
+	exception_error_factory.SystemError = BuildSystemError;
 
 	error_factory = &exception_error_factory;
 
