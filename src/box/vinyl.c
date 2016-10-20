@@ -5712,6 +5712,7 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 	if (vykey == NULL)
 		return -1;
 	vy_tx_set(tx, index, vykey, IPROTO_DELETE);
+
 	vy_stmt_unref(vykey);
 	return 0;
 }
