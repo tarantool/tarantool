@@ -3,7 +3,7 @@ find_path(MYSQL_INCLUDE_DIR
     PATH_SUFFIXES mysql
 )
 find_library(MYSQL_LIBRARIES
-    NAMES mysqlclient_r
+    NAMES mysqlclient
     PATH_SUFFIXES mysql
 )
 
