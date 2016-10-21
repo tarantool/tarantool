@@ -1,5 +1,6 @@
-tarantool-lts (1.5.5-33-g38b2398-1) unstable; urgency=medium
+tarantool-lts (1.5.5.36.gc9ed18a-1) unstable; urgency=medium
 
+  * Fix FTBFS with mysqlclient:20, closes: #841566.
   * Move tarantool-lts-common from dependencies to recommends:
     tarantool-lts (tarantool_box binary) can be installed with tarantool 1.6+.
 
