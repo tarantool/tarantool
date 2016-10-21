@@ -1085,8 +1085,14 @@ MemtxEngine::bootstrap()
 	});
 
 	struct xrow_header row;
-	while (xlog_cursor_next_xc(&cursor, &row) == 0)
+	uint64_t row_count = 0;
+	while (xlog_cursor_next_xc(&cursor, &row) == 0) {
 		recoverSnapshotRow(&row);
+		++row_count;
+		if (row_count % 100000 == 0)
+			say_info("%.1fM rows processed",
+				 row_count / 1000000.);
+	}
 }
 
 static void
