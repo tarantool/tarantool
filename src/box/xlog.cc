@@ -918,9 +918,9 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 				   (const char **)&i->data.rpos,
 				   (const char *)i->data.wpos);
 	} catch (ClientError *e) {
-		if (i->log->panic_if_error)
-			throw;
 		say_warn("failed to read row");
+		/* Discard all subsequnent data */
+		i->data.rpos = i->data.wpos;
 		return -1;
 	}
 	/* This should be moved to upper level */
@@ -947,6 +947,7 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	struct xlog *l = i->log;
 	log_magic_t magic = 0;
 	off_t marker_offset = 0;
+	int rc;
 
 	assert(i->eof_read == false);
 
@@ -955,7 +956,9 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		 * Still more xrows in this batch, unpack the next
 		 * row.
 		 */
-		return xlog_cursor_next_row(i, row);
+		rc = xlog_cursor_next_row(i, row);
+		if (rc == 0 || (rc < 0 && l->panic_if_error))
+			return rc;
 	}
 
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
@@ -987,23 +990,24 @@ restart:
 			(intmax_t)(marker_offset - i->good_offset),
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
-	int rc;
 	rc = xlog_cursor_read_tx(i, magic);
 	if (rc > 0) {
 		goto eof;
 	}
 	if (rc < 0) {
 		if (l->panic_if_error) {
-			diag_raise();
+			return rc;
 		}
-		say_warn("xlog: failed to read row at %lld",
+		say_warn("xlog: failed to read xlog tx at %lld",
 			 (long long)marker_offset);
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 		goto restart;
 	}
 	i->good_offset = ftello(l->f);
-	if (xlog_cursor_next_row(i, row) == 0)
-		return 0;
+	rc = xlog_cursor_next_row(i, row);
+	if (rc == 0 || (rc < 0 && l->panic_if_error))
+		return rc;
+
 	goto restart;
 eof:
 	/*
