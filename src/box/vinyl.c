@@ -3472,9 +3472,8 @@ struct vy_task_ops {
 	/**
 	 * This function is called by the scheduler upon task completion.
 	 * It may be used to finish the task from the tx thread context.
-	 * Returns 0 on success.
 	 */
-	int (*complete)(struct vy_task *);
+	void (*complete)(struct vy_task *);
 };
 
 struct vy_task {
@@ -3579,7 +3578,7 @@ out:
 	return rc;
 }
 
-static int
+static void
 vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
@@ -3619,7 +3618,6 @@ vy_task_dump_complete(struct vy_task *task)
 	range->version++;
 out:
 	vy_scheduler_add_range(env->scheduler, range);
-	return 0;
 }
 
 static struct vy_task *
@@ -3728,7 +3726,7 @@ unlink_error:
 	return rc;
 }
 
-static int
+static void
 vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_range *range = task->compact.range;
@@ -3739,7 +3737,6 @@ vy_task_compact_complete(struct vy_task *task)
 		vy_range_compact_abort(range, n_parts, parts);
 	else
 		vy_range_compact_commit(range, n_parts, parts);
-	return 0;
 }
 
 static struct vy_task *
@@ -4138,8 +4135,8 @@ vy_scheduler_f(va_list va)
 
 		/* Complete and delete all processed tasks. */
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
-			if (task->ops->complete && task->ops->complete(task))
-				error_log(diag_last_error(diag_get()));
+			if (task->ops->complete)
+				task->ops->complete(task);
 			if (task->dump_size > 0)
 				vy_stat_dump(env->stat, task->exec_time,
 					     task->dump_size);
