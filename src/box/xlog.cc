@@ -933,6 +933,33 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 }
 
 /**
+ * Find a next xlog tx magic
+ */
+static int
+xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
+{
+	off_t start_pos = ftello(i->log->f);
+	if (fread(magic, sizeof(*magic), 1, i->log->f) != 1) {
+		return 1;
+	}
+	ssize_t skipped = 0;
+	while (*magic != row_marker && *magic != zrow_marker) {
+		int c = fgetc(i->log->f);
+		if (c == EOF) {
+			return 1;
+		}
+		*magic = *magic >> 8 |
+                ((log_magic_t) c & 0xff) << (sizeof(*magic) * 8 - 8);
+		++skipped;
+	}
+	if (skipped) {
+		say_warn("Skipped %zd after %zd offset untic magic found",
+			 skipped, start_pos);
+	}
+	return 0;
+}
+
+/**
  * Read logfile contents using designated format, panic if
  * the log is corrupted/unreadable.
  *
@@ -976,23 +1003,10 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	region_free_after(&fiber()->gc, 128 * 1024);
 
 restart:
-	if (fread(&magic, sizeof(magic), 1, l->f) != 1)
+	if (xlog_cursor_find_tx_magic(i, &magic) > 0)
 		goto eof;
 
-	while (magic != row_marker && magic != zrow_marker) {
-		int c = fgetc(l->f);
-		if (c == EOF) {
-			say_debug("eof while looking for magic");
-			goto eof;
-		}
-		magic = magic >> 8 |
-			((log_magic_t) c & 0xff) << (sizeof(magic)*8 - 8);
-	}
 	marker_offset = ftello(l->f) - sizeof(row_marker);
-	if (i->good_offset != marker_offset)
-		say_warn("skipped %jd bytes after 0x%08jx offset",
-			(intmax_t)(marker_offset - i->good_offset),
-			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 	rc = xlog_cursor_read_tx(i, magic);
 	if (rc > 0) {
