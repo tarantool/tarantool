@@ -635,10 +635,10 @@ struct tree_mem_key {
 
 struct vy_mem;
 
-int
+static int
 vy_mem_tree_cmp(struct vy_stmt *a, struct vy_stmt *b, struct vy_mem *index);
 
-int
+static int
 vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 			 struct vy_mem *index);
 
@@ -684,7 +684,7 @@ struct vy_mem {
 	uint32_t version;
 };
 
-int
+static int
 vy_mem_tree_cmp(struct vy_stmt *a, struct vy_stmt *b, struct vy_mem *index)
 {
 	int res = vy_stmt_compare(a->data, b->data, index->key_def);
@@ -692,7 +692,7 @@ vy_mem_tree_cmp(struct vy_stmt *a, struct vy_stmt *b, struct vy_mem *index)
 	return res;
 }
 
-int
+static int
 vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 			 struct vy_mem *index)
 {
@@ -1176,8 +1176,8 @@ read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b);
 static int
 read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b);
 
-rb_gen_ext_key(, read_set_, read_set_t, struct txv, in_read_set, read_set_cmp,
-		 struct read_set_key *, read_set_key_cmp);
+rb_gen_ext_key(static inline, read_set_, read_set_t, struct txv, in_read_set,
+	       read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
 read_set_search_key(read_set_t *rbtree, char *data, int size, int64_t tsn)
@@ -1283,8 +1283,8 @@ write_set_key_cmp(write_set_t *index, struct write_set_key *a, struct txv *b)
 	return rc;
 }
 
-rb_gen_ext_key(, write_set_, write_set_t, struct txv, in_write_set, write_set_cmp,
-	       struct write_set_key *, write_set_key_cmp);
+rb_gen_ext_key(static inline, write_set_, write_set_t, struct txv, in_write_set,
+	       write_set_cmp, struct write_set_key *, write_set_key_cmp);
 
 static struct txv *
 write_set_search_key(write_set_t *tree, struct vy_index *index, char *data)
@@ -1293,7 +1293,7 @@ write_set_search_key(write_set_t *tree, struct vy_index *index, char *data)
 	return write_set_search(tree, &key);
 }
 
-bool
+static bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
 	return tx->type == VINYL_TX_RO ||
@@ -1309,7 +1309,7 @@ tx_tree_cmp(tx_tree_t *rbtree, struct vy_tx *a, struct vy_tx *b)
 	return vy_cmp(a->tsn, b->tsn);
 }
 
-rb_gen(, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
+rb_gen(static inline, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
        tx_tree_cmp);
 
 struct tx_manager {
@@ -1396,7 +1396,7 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 /**
  * Remember the read in the conflict manager index.
  */
-int
+static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct vy_stmt *key)
 {
@@ -1585,26 +1585,19 @@ vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem);
 static void
 vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem);
 
-struct vy_range_tree_key {
-	char *data;
-	int size;
-};
-
 static int
 vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *b);
 
 static int
-vy_range_tree_key_cmp(vy_range_tree_t *rbtree,
-		      struct vy_range_tree_key *a, struct vy_range *b);
+vy_range_tree_key_cmp(vy_range_tree_t *rbtree, char *a, struct vy_range *b);
 
-rb_gen_ext_key(, vy_range_tree_, vy_range_tree_t, struct vy_range, tree_node,
-		 vy_range_tree_cmp, struct vy_range_tree_key *,
-		 vy_range_tree_key_cmp);
+rb_gen_ext_key(static inline, vy_range_tree_, vy_range_tree_t, struct vy_range,
+	       tree_node, vy_range_tree_cmp, char *, vy_range_tree_key_cmp);
 
 static void
 vy_range_delete(struct vy_range *);
 
-struct vy_range *
+static struct vy_range *
 vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
@@ -1613,7 +1606,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	return NULL;
 }
 
-struct vy_range *
+static struct vy_range *
 vy_range_tree_unsched_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
@@ -1643,12 +1636,11 @@ vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *
 }
 
 static int
-vy_range_tree_key_cmp(vy_range_tree_t *rbtree,
-		      struct vy_range_tree_key *a, struct vy_range *b)
+vy_range_tree_key_cmp(vy_range_tree_t *rbtree, char *a, struct vy_range *b)
 {
 	struct key_def *key_def =
 		container_of(rbtree, struct vy_index, tree)->key_def;
-	return (-vy_range_cmp(b, a->data, key_def));
+	return (-vy_range_cmp(b, a, key_def));
 }
 
 static void
@@ -1658,22 +1650,20 @@ struct vy_range_iterator {
 	struct vy_index *index;
 	enum vy_order order;
 	char *key;
-	int key_size;
 };
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
-		       enum vy_order order, char *key, int key_size)
+		       enum vy_order order, char *key)
 {
 	itr->index = index;
 	itr->order = order;
 	itr->key = key;
-	itr->key_size = key_size;
 }
 
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
-			  struct key_def *key_def, char *key, int key_size)
+			  struct key_def *key_def, char *key)
 {
 	if (vy_stmt_key_part(key, 0) == NULL) {
 		switch (order) {
@@ -1689,9 +1679,6 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		}
 	}
 	/* route */
-	struct vy_range_tree_key tree_key;
-	tree_key.data = key;
-	tree_key.size = key_size;
 	struct vy_range *range;
 	if (order == VINYL_GE || order == VINYL_GT) {
 		/**
@@ -1716,7 +1703,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		 * vy_range_tree_psearch finds least range with begin == key
 		 * or previous if equal was not found
 		 */
-		range = vy_range_tree_psearch(tree, &tree_key);
+		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
 		    !vy_stmt_key_is_full(key, key_def) &&
@@ -1748,7 +1735,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		 * vy_range_tree_nsearch finds most range with begin == key
 		 * or next if equal was not found
 		 */
-		range = vy_range_tree_nsearch(tree, &tree_key);
+		range = vy_range_tree_nsearch(tree, key);
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
@@ -1766,7 +1753,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		}
 	} else {
 		assert(order == VINYL_EQ);
-		range = vy_range_tree_psearch(tree, &tree_key);
+		range = vy_range_tree_psearch(tree, key);
 	}
 	/* Range tree must span all possible keys. */
 	assert(range != NULL);
@@ -1788,8 +1775,7 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **in_out)
 			return;
 		}
 		*in_out = vy_range_tree_find_by_key(&index->tree, itr->order,
-						    index->key_def, itr->key,
-						    itr->key_size);
+						    index->key_def, itr->key);
 		return;
 	}
 	switch (itr->order) {
@@ -1954,10 +1940,7 @@ vy_index_recover_range(struct vy_index *index, struct vy_range *range)
 	 * The given range starts with a finite key (> -inf).
 	 * Check the predecessor.
 	 */
-	struct vy_range_tree_key tree_key = {
-		.data = range->begin->data,
-	};
-	prev = vy_range_tree_psearch(&index->tree, &tree_key);
+	prev = vy_range_tree_psearch(&index->tree, range->begin->data);
 	if (prev == NULL) {
 		/*
 		 * There is no predecessor, i.e. no range with
@@ -3405,7 +3388,7 @@ vy_stmt_committed(struct vy_index *index, struct vy_stmt *stmt)
 	struct vy_range *range;
 
 	range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
-			index->key_def, stmt->data, stmt->size);
+					  index->key_def, stmt->data);
 	/*
 	 * The newest run, i.e. the run containing a statement with max
 	 * LSN, is at the head of the list.
@@ -3447,8 +3430,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 			continue;
 		/* match range */
 		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
-						  index->key_def, stmt->data,
-						  stmt->size);
+						  index->key_def, stmt->data);
 		if (prev_range != NULL && range != prev_range) {
 			/*
 			 * The write set is key-ordered, hence
@@ -4508,7 +4490,7 @@ static void vy_conf_delete(struct vy_conf *c)
 	free(c);
 }
 
-int
+static int
 vy_index_read(struct vy_index*, struct vy_stmt*, enum vy_order order,
 		struct vy_stmt **, struct vy_tx*);
 
@@ -5064,7 +5046,7 @@ vy_stmt_alloc(uint32_t size)
 	return v;
 }
 
-void
+static void
 vy_stmt_delete(struct vy_stmt *stmt)
 {
 #ifndef NDEBUG
@@ -5404,7 +5386,7 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 	}
 }
 
-extern const char *
+const char *
 space_name_by_id(uint32_t id);
 
 /*
@@ -8640,7 +8622,7 @@ struct vy_read_iterator {
 /**
  * Open the iterator
  */
-void
+static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum vy_order order, char *key, int64_t vlsn,
@@ -8652,13 +8634,13 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * return 1 : no more data
  * return -1 : read error
  */
-int
+static int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
 
 /**
  * Close the iterator and free resources.
  */
-void
+static void
 vy_read_iterator_close(struct vy_read_iterator *itr);
 
 static void
@@ -8701,7 +8683,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 /**
  * Set up merge iterator for the current range.
  */
-void
+static void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
 	if (!itr->only_disk && itr->tx != NULL)
@@ -8722,7 +8704,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 /**
  * Open the iterator.
  */
-void
+static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum vy_order order, char *key, int64_t vlsn,
@@ -8736,7 +8718,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->only_disk = only_disk;
 
 	itr->curr_stmt = NULL;
-	vy_range_iterator_open(&itr->range_iterator, index, order, key, 0);
+	vy_range_iterator_open(&itr->range_iterator, index, order, key);
 	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
@@ -8755,8 +8737,8 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 	int rc;
 restart:
 	key = itr->curr_stmt != 0 ? itr->curr_stmt->data : itr->key;
-	vy_range_iterator_open(&itr->range_iterator, itr->index, itr->order,
-			       key, 0);
+	vy_range_iterator_open(&itr->range_iterator, itr->index,
+			       itr->order, key);
 	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
@@ -8795,7 +8777,7 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
  * return 1 : no more data
  * return -1 : read error
  */
-int
+static int
 vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 {
 	*ret = NULL;
@@ -8829,7 +8811,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
  * return 0 : something was found if *result != NULL
  * return -1 : read error
  */
-int
+static int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 {
 	*result = NULL;
@@ -8883,7 +8865,7 @@ restart:
 /**
  * Close the iterator and free resources
  */
-void
+static void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
 	if (itr->curr_stmt != NULL)
@@ -8928,7 +8910,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 /* }}} replication */
 
-int
+static int
 vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
 {
