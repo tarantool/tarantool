@@ -855,8 +855,8 @@ struct PACKED vy_run_info {
 	uint64_t offset;
 	/** Run page count. */
 	uint32_t  count;
-	/** Size of the page index. */
-	uint32_t pages_size;
+	/* Unused: pages_size = count * sizeof(struct vy_page_info) */
+	uint32_t unused;
 	/** Offset of this run's page index in the file. */
 	uint64_t  pages_offset;
 	/** size of min data block */
@@ -916,10 +916,8 @@ struct PACKED vy_range_info {
 };
 
 struct vy_run {
-	struct vy_page_info *page_infos;
-	uint32_t infos_capacity;
-
 	struct vy_run_info info;
+	struct vy_page_info *page_infos;
 	/* buffer with min keys of pages */
 	struct vy_buf pages_min;
 	struct vy_run *next;
@@ -1457,7 +1455,7 @@ static struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
 	assert(pos < run->info.count);
-	return run->page_infos + pos;
+	return &run->page_infos[pos];
 }
 
 static const char *
@@ -1492,7 +1490,6 @@ vy_run_new()
 			 "struct vy_run");
 		return NULL;
 	}
-	run->infos_capacity = 0;
 	run->page_infos = NULL;
 	vy_buf_create(&run->pages_min);
 	memset(&run->info, 0, sizeof(run->info));
@@ -2164,7 +2161,8 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
 static int
 vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 		  struct vy_stmt *split_key, struct vy_index *index,
-		  uint32_t page_size, struct vy_stmt **curr_stmt)
+		  uint32_t page_size, uint32_t *page_info_capacity,
+		  struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
 	assert(*curr_stmt);
@@ -2176,24 +2174,21 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	vy_buf_create(&stmtsinfo);
 	vy_buf_create(&values);
 	vy_buf_create(&compressed);
-	if (run->infos_capacity == run_info->count) {
-		struct vy_page_info *new_infos;
-		uint32_t new_size = sizeof(struct vy_page_info);
-		if (run->infos_capacity != 0)
-			new_size *= run->infos_capacity * 2;
-		new_infos = realloc(run->page_infos, new_size);
+	if (run_info->count >= *page_info_capacity) {
+		uint32_t cap = *page_info_capacity > 0 ?
+			*page_info_capacity * 2 : 16;
+		struct vy_page_info *new_infos =
+			realloc(run->page_infos, cap * sizeof(*new_infos));
 		if (new_infos == NULL) {
-			diag_set(OutOfMemory, new_size, "realloc",
+			diag_set(OutOfMemory, cap, "realloc",
 				 "struct vy_page_info");
 			rc = -1;
 			goto out;
 		}
 		run->page_infos = new_infos;
-		if (run->infos_capacity == 0)
-			run->infos_capacity = 1;
-		else
-			run->infos_capacity *= 2;
+		*page_info_capacity = cap;
 	}
+	assert(*page_info_capacity >= run_info->count);
 
 	struct vy_page_info *page = run->page_infos + run_info->count;
 	memset(page, 0, sizeof(*page));
@@ -2329,9 +2324,12 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	 * Read from the iterator until it's exhausted or
 	 * the split key is reached.
 	 */
+	assert(run->page_infos == NULL);
+	uint32_t page_infos_capacity = 0;
 	do {
 		rc = vy_run_write_page(run, fd, wi, split_key, index,
-				       page_size, curr_stmt);
+				       page_size, &page_infos_capacity,
+				       curr_stmt);
 		if (rc < 0)
 			goto err;
 	} while (rc == 0);
@@ -2339,10 +2337,11 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	/* Write pages index */
 	header->pages_offset = header->offset +
 				     header->size;
-	header->pages_size = run->info.count * sizeof(struct vy_page_info);
-	if (vy_write_file(fd, run->page_infos, header->pages_size) < 0)
+	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
+	if (vy_write_file(fd, run->page_infos, pages_size) < 0)
 		goto err_file;
-	header->size += header->pages_size;
+	header->size += pages_size;
+	header->unused = pages_size;
 
 	/* Write min-max keys for pages */
 	header->min_offset = header->offset + header->size;
@@ -2535,14 +2534,19 @@ vy_range_recover(struct vy_range *range)
 		}
 
 		/* Allocate buffer for page info. */
-		run->page_infos = malloc(h->pages_size);
-		if (run->page_infos == NULL ||
-		    vy_buf_ensure(&run->pages_min, h->min_size) == -1)
+		size_t pages_size = sizeof(struct vy_page_info) * h->count;
+		run->page_infos = malloc(pages_size);
+		if (run->page_infos == NULL) {
+			diag_set(OutOfMemory, pages_size, "malloc",
+				 "struct vy_page_info");
+			goto out;
+		}
+		if (vy_buf_ensure(&run->pages_min, h->min_size) < 0)
 			goto out;
 
 		/* Read page info. */
 		if (vy_range_read(range, run->page_infos,
-				  h->pages_size, h->pages_offset) < 0 ||
+				  pages_size, h->pages_offset) < 0 ||
 		    vy_range_read(range, run->pages_min.s,
 				  h->min_size, h->min_offset) < 0)
 			goto out;
