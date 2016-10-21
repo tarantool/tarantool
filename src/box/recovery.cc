@@ -226,6 +226,7 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 	 * the file is fully read: it's fully read only
 	 * when EOF marker has been read, see i.eof_read
 	 */
+	uint64_t row_count = 0;
 	while (xlog_cursor_next_xc(&i, &row) == 0) {
 		if (stop_vclock != NULL &&
 		    r->vclock.signature >= stop_vclock->signature)
@@ -236,6 +237,10 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 			if (row.lsn <= current_lsn)
 				continue;
 			xstream_write(stream, &row);
+			++row_count;
+			if (row_count % 100000 == 0)
+				say_info("%.1fM rows processed",
+					 row_count / 1000000.);
 		} catch (ClientError *e) {
 			if (l->panic_if_error)
 				throw;

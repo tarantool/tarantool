@@ -879,7 +879,6 @@ void
 xlog_cursor_open(struct xlog_cursor *i, struct xlog *l)
 {
 	i->log = l;
-	i->row_count = 0;
 	i->good_offset = ftello(l->f);
 	i->eof_read  = false;
 	ibuf_create(&i->data, &cord()->slabc,
@@ -894,7 +893,6 @@ void
 xlog_cursor_close(struct xlog_cursor *i)
 {
 	struct xlog *l = i->log;
-	l->rows += i->row_count;
 	l->eof_read = i->eof_read;
 	/*
 	 * Since we don't close the xlog
@@ -923,12 +921,7 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 		ibuf_reset(&i->data);
 		return -1;
 	}
-	/* This should be moved to upper level */
-	i->row_count++;
 
-	if (i->row_count % 100000 == 0)
-		say_info("%.1fM rows processed",
-			 i->row_count / 1000000.);
 	return 0;
 }
 

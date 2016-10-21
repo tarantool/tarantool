@@ -310,7 +310,6 @@ xlog_atfork(struct xlog **lptr);
 struct xlog_cursor
 {
 	struct xlog *log;
-	int row_count;
 	off_t good_offset;
 	bool eof_read;
 	struct ibuf data;
