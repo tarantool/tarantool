@@ -209,13 +209,9 @@ vinyl_delete_all(struct space *space, struct tuple *tuple,
 	VinylSecondaryIndex *index;
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		index = (VinylSecondaryIndex *) space->index[iid];
-		if (request->index_id == iid) {
-			key = request->key;
-		} else {
-			key = tuple_extract_key(tuple,
-						index->key_def_tuple_to_key,
-						NULL);
-		}
+		key = tuple_extract_key(tuple,
+					index->key_def_tuple_to_key,
+					NULL);
 		part_count = mp_decode_array(&key);
 		if (vy_delete(tx, index->db, key, part_count))
 			diag_raise();
