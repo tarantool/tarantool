@@ -949,31 +949,6 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 		say_warn("Skipped %zd after %zd offset untic magic found",
 			 skipped, start_pos);
 	}
-	return 0;
-}
-
-/**
- * Find a next xlog tx magic
- */
-static int
-xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
-{
-       if (fread(magic, sizeof(*magic), 1, i->log->f) != 1) {
-               return 1;
-       }
-       ssize_t skipped = 0;
-       while (*magic != row_marker && *magic != zrow_marker) {
-               int c = fgetc(i->log->f);
-               if (c == EOF) {
-                       return 1;
-               }
-               *magic = *magic >> 8 |
-                       ((log_magic_t) c & 0xff) << (sizeof(*magic) * 8 - 8);
-               ++skipped;
-       }
-       if (skipped) {
-               say_warn("Skipped %lu untic magic found", skipped);
-       }
        return 0;
 }
 
