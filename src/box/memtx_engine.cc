@@ -757,6 +757,13 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applySnapshotRow(space, request);
+	/*
+	 * Don't let gc pool grow too much. Yet to
+	 * it before reading the next row, to make
+	 * sure it's not freed along here.
+	 */
+	fiber_gc();
+
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */

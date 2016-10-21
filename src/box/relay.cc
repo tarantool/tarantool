@@ -240,6 +240,7 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	packet->sync = relay->sync;
 	coio_write_xrow(&relay->io, packet);
+	fiber_gc();
 }
 
 static void

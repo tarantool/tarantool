@@ -988,13 +988,6 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
 		  row_marker, sizeof(row_marker));
 
-	/*
-	 * Don't let gc pool grow too much. Yet to
-	 * it before reading the next row, to make
-	 * sure it's not freed along here.
-	 */
-	region_free_after(&fiber()->gc, 128 * 1024);
-
 restart:
 	if (xlog_cursor_find_tx_magic(i, &magic) > 0)
 		goto eof;
