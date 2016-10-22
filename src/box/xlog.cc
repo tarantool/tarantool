@@ -949,7 +949,7 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 		say_warn("Skipped %zd after %zd offset untic magic found",
 			 skipped, start_pos);
 	}
-       return 0;
+	return 0;
 }
 
 /**
