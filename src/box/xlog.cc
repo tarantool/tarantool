@@ -942,14 +942,14 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 			return 1;
 		}
 		*magic = *magic >> 8 |
-                ((log_magic_t) c & 0xff) << (sizeof(*magic) * 8 - 8);
+		((log_magic_t) c & 0xff) << (sizeof(*magic) * 8 - 8);
 		++skipped;
 	}
 	if (skipped) {
 		say_warn("Skipped %zd after %zd offset untic magic found",
 			 skipped, start_pos);
 	}
-       return 0;
+	return 0;
 }
 
 /**
@@ -1034,6 +1034,8 @@ eof:
 			i->good_offset = ftello(l->f);
 			i->eof_read = true;
 		} else if (magic == row_marker || magic == zrow_marker) {
+			/* Return to last good offset, we will reread magic */
+			fseeko(l->f, i->good_offset, SEEK_SET);
 			/*
 			 * Row marker at the end of a file: a sign
 			 * of a corrupt log file in case of

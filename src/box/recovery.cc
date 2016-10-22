@@ -166,12 +166,13 @@ recovery_close_log(struct recovery *r)
 {
 	if (r->current_wal == NULL)
 		return;
-	if (r->current_wal->eof_read) {
+	if (r->cursor.eof_read) {
 		say_info("done `%s'", r->current_wal->filename);
 	} else {
 		say_warn("file `%s` wasn't correctly closed",
 			 r->current_wal->filename);
 	}
+	xlog_cursor_close(&r->cursor);
 	xlog_close(r->current_wal);
 	r->current_wal = NULL;
 }
@@ -187,6 +188,7 @@ recovery_delete(struct recovery *r)
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
 		 */
+		xlog_cursor_close(&r->cursor);
 		xlog_close(r->current_wal);
 	}
 	free(r);
@@ -211,14 +213,6 @@ static void
 recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 	     struct vclock *stop_vclock)
 {
-	struct xlog_cursor i;
-
-	xlog_cursor_open(&i, l);
-
-	auto guard = make_scoped_guard([&]{
-		xlog_cursor_close(&i);
-	});
-
 	struct xrow_header row;
 	/*
 	 * xlog_cursor_next() returns 1 when
@@ -227,7 +221,7 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 	 * when EOF marker has been read, see i.eof_read
 	 */
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&i, &row) == 0) {
+	while (xlog_cursor_next_xc(&r->cursor, &row) == 0) {
 		if (stop_vclock != NULL &&
 		    r->vclock.signature >= stop_vclock->signature)
 			return;
@@ -326,11 +320,12 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		recovery_close_log(r);
 
 		r->current_wal = xdir_open_xlog_xc(&r->wal_dir, vclock_sum(clock));
+		xlog_cursor_open(&r->cursor, r->current_wal);
 
 		say_info("recover from `%s'", r->current_wal->filename);
 
 recover_current_wal:
-		if (r->current_wal->eof_read == false)
+		if (r->cursor.eof_read == false)
 			recover_xlog(r, stream, r->current_wal, stop_vclock);
 		/**
 		 * Keep the last log open to remember recovery
@@ -505,7 +500,7 @@ recovery_follow_f(va_list ap)
 			 * If there is no current WAL, or we reached
 			 * an end  of one, look for new WALs.
 			 */
-			if (r->current_wal == NULL || r->current_wal->eof_read)
+			if (r->current_wal == NULL || r->cursor.eof_read)
 				xdir_scan_xc(&r->wal_dir);
 
 			recover_remaining_wals(r, stream, NULL);
@@ -517,7 +512,7 @@ recovery_follow_f(va_list ap)
 			 * Sic: end * is < start (is 0) if someone deleted all logs
 			 * on the filesystem.
 			 */
-		} while (end > start && (r->current_wal == NULL || r->current_wal->eof_read));
+		} while (end > start && (r->current_wal == NULL || r->cursor.eof_read));
 
 		subscription.set_log_path(r->current_wal != NULL ?
 					  r->current_wal->filename : NULL);
