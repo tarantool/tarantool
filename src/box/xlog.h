@@ -228,8 +228,6 @@ struct xlog {
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */
 	bool is_inprogress;
-	/** True if eof has been read when reading the log. */
-	bool eof_read;
 	/**
 	 * Text file header: server uuid. We read
 	 * only logs with our own uuid, to avoid situations

@@ -893,7 +893,6 @@ void
 xlog_cursor_close(struct xlog_cursor *i)
 {
 	struct xlog *l = i->log;
-	l->eof_read = i->eof_read;
 	/*
 	 * Since we don't close the xlog
 	 * we must rewind it to the last known
@@ -1257,7 +1256,6 @@ xlog_open_stream(FILE *file, const char *filename,
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_READ;
 	l->is_inprogress = false;
-	l->eof_read = false;
 	vclock_create(&l->vclock);
 
 	if (xlog_read_meta(l) != 0)
@@ -1344,8 +1342,6 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 
 	l->mode = LOG_WRITE;
 	l->is_inprogress = true;
-	/*  Makes no sense, but well. */
-	l->eof_read = false;
 	vclock_copy(&l->vclock, vclock);
 	setvbuf(l->f, NULL, _IONBF, 0);
 
