@@ -50,6 +50,8 @@ matrix:
       - env: OS=debian DIST=wheezy PACK=deb
       - env: OS=debian DIST=stretch PACK=deb
       - env: OS=debian DIST=sid PACK=deb
+      - env: PACK=none
+        os: osx
 
     exclude:
       - env: PACK=coverage
