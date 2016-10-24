@@ -3741,11 +3741,28 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	return task;
 }
 
+static struct vy_range *
+vy_range_tree_drop_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
+{
+	(void)t;
+	(void)arg;
+	if (range->fd >= 0) {
+		if (close(range->fd) < 0)
+			say_syserror("close failed");
+		if (unlink(range->path) < 0)
+			say_syserror("unlink failed: %s", range->path);
+		range->fd = -1;
+	}
+	return NULL;
+}
+
 static int
 vy_task_drop_execute(struct vy_task *task)
 {
-	assert(task->index->refs == 1); /* referenced by this task */
-	vy_index_delete(task->index);
+	struct vy_index *index = task->index;
+	assert(index->refs == 1); /* referenced by this task */
+	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_drop_cb, NULL);
+	vy_index_delete(index);
 	task->index = NULL;
 	return 0;
 }
