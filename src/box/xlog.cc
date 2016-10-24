@@ -919,8 +919,8 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 				   (const char *)i->data.wpos);
 	} catch (ClientError *e) {
 		say_warn("failed to read row");
-		/* Discard all subsequnent data */
-		i->data.rpos = i->data.wpos;
+		/* Discard remaining row data */
+		ibuf_reset(&i->data);
 		return -1;
 	}
 	/* This should be moved to upper level */
@@ -957,8 +957,12 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		 * row.
 		 */
 		rc = xlog_cursor_next_row(i, row);
-		if (rc == 0 || (rc < 0 && l->panic_if_error))
-			return rc;
+		if (rc == 0)
+			return 0;
+		assert(rc < 0);
+		if (l->panic_if_error)
+			return -1;
+		/* Fall through - read the next row */
 	}
 
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
@@ -993,11 +997,9 @@ restart:
 	rc = xlog_cursor_read_tx(i, magic);
 	if (rc > 0) {
 		goto eof;
-	}
-	if (rc < 0) {
-		if (l->panic_if_error) {
-			return rc;
-		}
+	} else if (rc < 0) {
+		if (l->panic_if_error)
+			return -1;
 		say_warn("xlog: failed to read xlog tx at %lld",
 			 (long long)marker_offset);
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
@@ -1005,8 +1007,11 @@ restart:
 	}
 	i->good_offset = ftello(l->f);
 	rc = xlog_cursor_next_row(i, row);
-	if (rc == 0 || (rc < 0 && l->panic_if_error))
-		return rc;
+	if (rc == 0)
+		return 0;
+	assert(rc < 0);
+	if (l->panic_if_error)
+		return -1;
 
 	goto restart;
 eof:
