@@ -681,15 +681,20 @@ vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 static void *
 vy_mem_tree_extent_alloc(void *ctx)
 {
-	struct vy_env *env = ctx;
-	return mempool_alloc(&env->mem_tree_extent_pool);
+	struct mempool *mem_tree_extent_pool = ctx;
+	void *res = mempool_alloc(mem_tree_extent_pool);
+	if (res == NULL) {
+		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE,
+			 "mempool", "vinyl matras page");
+	}
+	return res;
 }
 
 static void
 vy_mem_tree_extent_free(void *ctx, void *p)
 {
-	struct vy_env *env = ctx;
-	mempool_free(&env->mem_tree_extent_pool, p);
+	struct mempool *mem_tree_extent_pool = ctx;
+	mempool_free(mem_tree_extent_pool, p);
 }
 
 static struct vy_mem *
@@ -708,7 +713,8 @@ vy_mem_new(struct vy_env *env, struct key_def *key_def)
 	index->version = 0;
 	vy_mem_tree_create(&index->tree, index,
 			   vy_mem_tree_extent_alloc,
-			   vy_mem_tree_extent_free, env);
+			   vy_mem_tree_extent_free,
+			   &env->mem_tree_extent_pool);
 	return index;
 }
 
