@@ -106,6 +106,7 @@ struct vy_env {
 	struct vy_scheduler *scheduler;
 	struct vy_stat      *stat;
 	struct mempool      cursor_pool;
+	struct mempool      mem_tree_extent_pool;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
 };
@@ -613,10 +614,11 @@ static int
 vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 			 struct vy_mem *index);
 
-#define BPS_TREE_MEM_INDEX_PAGE_SIZE (16 * 1024)
+#define VY_MEM_TREE_EXTENT_SIZE (16 * 1024)
+
 #define BPS_TREE_NAME vy_mem_tree
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE BPS_TREE_MEM_INDEX_PAGE_SIZE
+#define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, index) vy_mem_tree_cmp(a, b, index)
 #define BPS_TREE_COMPARE_KEY(a, b, index) vy_mem_tree_cmp_key(a, b, index)
 #define bps_tree_elem_t struct vy_stmt *
@@ -677,27 +679,21 @@ vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 }
 
 static void *
-vy_mem_alloc_matras_page(void *ctx)
+vy_mem_tree_extent_alloc(void *ctx)
 {
-	(void)ctx;
-	void *res = mmap(0, BPS_TREE_MEM_INDEX_PAGE_SIZE, PROT_READ|PROT_WRITE,
-			 MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (res == MAP_FAILED) {
-		diag_set(OutOfMemory, BPS_TREE_MEM_INDEX_PAGE_SIZE,
-			 "mmap", "vinyl matras page");
-	}
-	return res;
+	struct vy_env *env = ctx;
+	return mempool_alloc(&env->mem_tree_extent_pool);
 }
 
 static void
-vy_mem_free_matras_page(void *ctx, void *p)
+vy_mem_tree_extent_free(void *ctx, void *p)
 {
-	(void)ctx;
-	munmap(p, BPS_TREE_MEM_INDEX_PAGE_SIZE);
+	struct vy_env *env = ctx;
+	mempool_free(&env->mem_tree_extent_pool, p);
 }
 
 static struct vy_mem *
-vy_mem_new(struct key_def *key_def)
+vy_mem_new(struct vy_env *env, struct key_def *key_def)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -711,8 +707,8 @@ vy_mem_new(struct key_def *key_def)
 	index->key_def = key_def;
 	index->version = 0;
 	vy_mem_tree_create(&index->tree, index,
-			   vy_mem_alloc_matras_page,
-			   vy_mem_free_matras_page, NULL);
+			   vy_mem_tree_extent_alloc,
+			   vy_mem_tree_extent_free, env);
 	return index;
 }
 
@@ -2367,7 +2363,7 @@ vy_range_new(struct vy_index *index, int64_t id)
 			 "struct vy_range");
 		return NULL;
 	}
-	range->mem = vy_mem_new(index->key_def);
+	range->mem = vy_mem_new(index->env, index->key_def);
 	if (!range->mem) {
 		free(range);
 		return NULL;
@@ -3608,12 +3604,13 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 		.execute = vy_task_dump_execute,
 		.complete = vy_task_dump_complete,
 	};
+	struct vy_index *index = range->index;
 
-	struct vy_task *task = vy_task_new(pool, range->index, &dump_ops);
+	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (!task)
 		return NULL;
 
-	struct vy_mem *mem = vy_mem_new(range->index->key_def);
+	struct vy_mem *mem = vy_mem_new(index->env, index->key_def);
 	if (!mem) {
 		vy_task_delete(pool, task);
 		return NULL;
@@ -3762,9 +3759,20 @@ vy_task_drop_execute(struct vy_task *task)
 	struct vy_index *index = task->index;
 	assert(index->refs == 1); /* referenced by this task */
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_drop_cb, NULL);
+	return 0;
+}
+
+static void
+vy_task_drop_complete(struct vy_task *task)
+{
+	struct vy_index *index = task->index;
+	assert(index->refs == 1); /* referenced by this task */
+	/*
+	 * Since we allocate extents for in-memory trees from a memory
+	 * pool, we must destroy the index in the tx thread.
+	 */
 	vy_index_delete(index);
 	task->index = NULL;
-	return 0;
 }
 
 static struct vy_task *
@@ -3772,6 +3780,7 @@ vy_task_drop_new(struct mempool *pool, struct vy_index *index)
 {
 	static struct vy_task_ops drop_ops = {
 		.execute = vy_task_drop_execute,
+		.complete = vy_task_drop_complete,
 	};
 
 	return vy_task_new(pool, index, &drop_ops);
@@ -5922,6 +5931,8 @@ vy_env_new(void)
 
 	mempool_create(&e->cursor_pool, cord_slab_cache(),
 	               sizeof(struct vy_cursor));
+	mempool_create(&e->mem_tree_extent_pool, cord_slab_cache(),
+		       VY_MEM_TREE_EXTENT_SIZE);
 
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
@@ -5952,6 +5963,7 @@ vy_env_delete(struct vy_env *e)
 	vy_quota_delete(e->quota);
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
+	mempool_destroy(&e->mem_tree_extent_pool);
 	free(e);
 }
 
