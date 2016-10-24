@@ -4,6 +4,9 @@
 test_run = require('test_run').new()
 ---
 ...
+fiber = require('fiber')
+---
+...
 errinj = box.error.injection
 ---
 ...
@@ -89,20 +92,29 @@ box.snapshot();
 ---
 - ok
 ...
-errinj.set("ERRINJ_VY_RANGE_CREATE", true);
+errinj.set("ERRINJ_VY_RANGE_DUMP", true);
 ---
 - ok
 ...
 num_rows = num_rows + range();
 ---
 ...
+-- fails due to error injection
 box.snapshot();
+---
+- error: Error injection 'vinyl range dump'
+...
+errinj.set("ERRINJ_VY_RANGE_DUMP", false);
 ---
 - ok
 ...
-errinj.set("ERRINJ_VY_RANGE_CREATE", false);
+-- fails due to scheduler timeout
+box.snapshot();
 ---
-- ok
+- error: Error injection 'vinyl range dump'
+...
+fiber.sleep(1);
+---
 ...
 num_rows = num_rows + range();
 ---

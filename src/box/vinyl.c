@@ -2653,6 +2653,10 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	int fd = *p_fd;
 	bool created = false;
 
+	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
+		     {diag_set(ClientError, ER_INJECTION,
+			       "vinyl range dump"); goto fail;});
+
 	/*
 	 * All keys before the split_key could have cancelled each other.
 	 * Do not create an empty range file in this case.
@@ -2667,9 +2671,6 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		 * doesn't have a file. Create a temporary file for it
 		 * in the index directory to write the run to.
 		 */
-		ERROR_INJECT(ERRINJ_VY_RANGE_CREATE,
-			     {diag_set(ClientError, ER_INJECTION,
-				       "vinyl range create"); goto fail;});
 		snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
 		fd = mkstemp(path);
 		if (fd < 0) {
@@ -3449,7 +3450,7 @@ struct vy_task_ops {
 	/**
 	 * This function is called from a worker. It is supposed to do work
 	 * which is too heavy for the tx thread (like IO or compression).
-	 * Returns 0 on success.
+	 * Returns 0 on success. On failure returns -1 and sets diag.
 	 */
 	int (*execute)(struct vy_task *);
 	/**
@@ -3464,6 +3465,8 @@ struct vy_task {
 
 	/** ->execute ret code */
 	int status;
+	/** If ->execute fails, the error is stored here. */
+	struct diag diag;
 
 	/** index this task is for */
 	struct vy_index *index;
@@ -3512,6 +3515,7 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 	task->ops = ops;
 	task->index = index;
 	vy_index_ref(index);
+	diag_create(&task->diag);
 	return task;
 }
 
@@ -3522,7 +3526,7 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 		vy_index_unref(task->index);
 		task->index = NULL;
 	}
-
+	diag_destroy(&task->diag);
 	TRASH(task);
 	mempool_free(pool, task);
 }
@@ -3881,6 +3885,16 @@ struct vy_scheduler {
 	 */
 	struct mempool task_pool;
 
+	/** Last error seen by the scheduler. */
+	struct diag diag;
+	/**
+	 * Schedule timeout. Grows exponentially with each successive
+	 * failure. Reset on successful task completion.
+	 */
+	ev_tstamp timeout;
+	/** Set if the scheduler is throttled due to errors. */
+	bool throttled;
+
 	/** Total number of non-empty in-memory indexes. */
 	int dirty_mem_count;
 	/**
@@ -3893,12 +3907,15 @@ struct vy_scheduler {
 	 * i.e. have min_lsn <= checkpoint_lsn.
 	 */
 	int checkpoint_pending;
-	/**
-	 * Signaled on checkpoint completion, i.e. when
-	 * checkpoint_pending reaches 0.
-	 */
+	/** Set if checkpoint failed. */
+	bool checkpoint_failed;
+	/** Signaled on checkpoint completion or failure. */
 	struct ipc_cond checkpoint_cond;
 };
+
+/* Min and max values for vy_scheduler->timeout. */
+#define VY_SCHEDULER_TIMEOUT_MIN		1
+#define VY_SCHEDULER_TIMEOUT_MAX		60
 
 static void
 vy_scheduler_start(struct vy_scheduler *scheduler);
@@ -3925,9 +3942,7 @@ vy_scheduler_new(struct vy_env *env)
 		return NULL;
 	}
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
-	scheduler->dirty_mem_count = 0;
-	scheduler->checkpoint_lsn = 0;
-	scheduler->checkpoint_pending = 0;
+	diag_create(&scheduler->diag);
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
 	rlist_create(&scheduler->shutdown);
@@ -3949,7 +3964,7 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 		vy_scheduler_stop(scheduler);
 
 	mempool_destroy(&scheduler->task_pool);
-
+	diag_destroy(&scheduler->diag);
 	vy_compact_heap_destroy(&scheduler->compact_heap);
 	vy_dump_heap_destroy(&scheduler->dump_heap);
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
@@ -4138,6 +4153,7 @@ vy_scheduler_f(va_list va)
 	while (scheduler->is_worker_pool_running) {
 		struct stailq output_queue;
 		struct vy_task *task, *next;
+		int tasks_failed = 0, tasks_done = 0;
 		bool was_empty;
 
 		/* Get the list of processed tasks. */
@@ -4150,6 +4166,12 @@ vy_scheduler_f(va_list va)
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
 			if (task->ops->complete)
 				task->ops->complete(task);
+			if (task->status != 0) {
+				assert(!diag_is_empty(&task->diag));
+				diag_move(&task->diag, &scheduler->diag);
+				tasks_failed++;
+			} else
+				tasks_done++;
 			if (task->dump_size > 0)
 				vy_stat_dump(env->stat, task->exec_time,
 					     task->dump_size);
@@ -4157,6 +4179,16 @@ vy_scheduler_f(va_list va)
 			workers_available++;
 			assert(workers_available <= scheduler->worker_pool_size);
 		}
+		/*
+		 * Reset the timeout if we managed to successfully
+		 * complete at least one task.
+		 */
+		if (tasks_done > 0) {
+			scheduler->timeout = 0;
+			warning_said = false;
+		}
+		if (tasks_failed > 0)
+			goto error;
 
 		/* All worker threads are busy. */
 		if (workers_available == 0)
@@ -4164,13 +4196,11 @@ vy_scheduler_f(va_list va)
 
 		/* Get a task to schedule. */
 		if (vy_schedule(scheduler, env->xm->vlsn, &task) != 0) {
-			/* Log error message once. */
-			if (!warning_said) {
-				error_log(diag_last_error(diag_get()));
-				warning_said = true;
-			}
+			struct diag *diag = diag_get();
+			assert(!diag_is_empty(diag));
+			diag_move(diag, &scheduler->diag);
 			/* Can't schedule task right now */
-			goto wait;
+			goto error;
 		}
 
 		/* Nothing to do. */
@@ -4186,9 +4216,38 @@ vy_scheduler_f(va_list va)
 		tt_pthread_mutex_unlock(&scheduler->mutex);
 
 		workers_available--;
-		warning_said = false;
-
 		fiber_reschedule();
+		continue;
+error:
+		/* Log error message once. */
+		assert(!diag_is_empty(&scheduler->diag));
+		if (!warning_said) {
+			error_log(diag_last_error(&scheduler->diag));
+			warning_said = true;
+		}
+		/* Abort pending checkpoint. */
+		if (scheduler->checkpoint_pending > 0 &&
+		    !scheduler->checkpoint_failed) {
+			scheduler->checkpoint_failed = true;
+			ipc_cond_signal(&scheduler->checkpoint_cond);
+		}
+		/*
+		 * A task can fail either due to lack of memory or IO
+		 * error. In either case it is pointless to schedule
+		 * another task right away, because it is likely to fail
+		 * too. So we throttle the scheduler for a while after
+		 * each failure.
+		 */
+		scheduler->timeout *= 2;
+		if (scheduler->timeout < VY_SCHEDULER_TIMEOUT_MIN)
+			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MIN;
+		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
+			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
+		say_debug("throttling scheduler for %.0f seconds",
+			  scheduler->timeout);
+		scheduler->throttled = true;
+		fiber_sleep(scheduler->timeout);
+		scheduler->throttled = false;
 		continue;
 wait:
 		/* Wait for changes */
@@ -4203,7 +4262,6 @@ vy_worker_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	coeio_enable();
-	bool warning_said = false;
 	struct vy_task *task = NULL;
 
 	tt_pthread_mutex_lock(&scheduler->mutex);
@@ -4227,13 +4285,9 @@ vy_worker_f(va_list va)
 		task->status = task->ops->execute(task);
 		task->exec_time = ev_now(loop()) - start;
 		if (task->status != 0) {
-			assert(!diag_is_empty(diag_get()));
-			if (!warning_said) {
-				error_log(diag_last_error(diag_get()));
-				warning_said = true;
-			}
-		} else {
-			warning_said = false;
+			struct diag *diag = diag_get();
+			assert(!diag_is_empty(diag));
+			diag_move(diag, &task->diag);
 		}
 
 		/* Return processed task to scheduler */
@@ -4344,10 +4398,26 @@ int
 vy_checkpoint(struct vy_env *env)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
-	/* do not initiate checkpoint during bootstrap,
-	 * thread pool is not up yet */
+
+	/*
+	 * Do not initiate checkpoint during bootstrap,
+	 * thread pool is not up yet.
+	 */
 	if (!scheduler->is_worker_pool_running)
 		return 0;
+
+	/*
+	 * If the scheduler is throttled due to errors, do not wait
+	 * until it wakes up as it may take quite a while. Instead
+	 * fail checkpoint immediately with the last error seen by
+	 * the scheduler.
+	 */
+	if (scheduler->throttled) {
+		assert(!diag_is_empty(&scheduler->diag));
+		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
+		return -1;
+	}
+
 	scheduler->checkpoint_lsn = env->xm->lsn;
 	/*
 	 * As LSN is increased on each insertion, all in-memory indexes
@@ -4357,6 +4427,7 @@ vy_checkpoint(struct vy_env *env)
 	 * to dump equals dirty_mem_count.
 	 */
 	scheduler->checkpoint_pending = scheduler->dirty_mem_count;
+	scheduler->checkpoint_failed = false;
 	/*
 	 * Promote ranges that need to be checkpointed to
 	 * the top of the dump heap.
@@ -4369,15 +4440,22 @@ vy_checkpoint(struct vy_env *env)
 	return 0;
 }
 
-void
+int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
 
-	/* TODO: handle dump errors. */
-	while (scheduler->checkpoint_pending > 0)
+	while (scheduler->checkpoint_pending > 0 &&
+	       !scheduler->checkpoint_failed)
 		ipc_cond_wait(&scheduler->checkpoint_cond);
+
+	if (scheduler->checkpoint_failed) {
+		assert(!diag_is_empty(&scheduler->diag));
+		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
+		return -1;
+	}
+	return 0;
 }
 
 /**

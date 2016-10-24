@@ -300,6 +300,5 @@ VinylEngine::beginCheckpoint()
 int
 VinylEngine::waitCheckpoint(struct vclock* vclock)
 {
-	vy_wait_checkpoint(env, vclock);
-	return 0;
+	return vy_wait_checkpoint(env, vclock);
 }

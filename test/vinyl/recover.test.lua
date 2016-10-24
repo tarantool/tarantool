@@ -43,7 +43,7 @@ function gen(i)
     for k = 1,n do
         s:replace{k, i + k, pad}
     end
-    box.snapshot()
+    pcall(box.snapshot)
 end;
 test_run:cmd("setopt delimiter ''");
 

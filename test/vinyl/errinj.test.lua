@@ -2,6 +2,7 @@
 -- gh-1681: vinyl: crash in vy_rollback on ER_WAL_WRITE
 --
 test_run = require('test_run').new()
+fiber = require('fiber')
 errinj = box.error.injection
 s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
@@ -41,10 +42,14 @@ end;
 num_rows = 0;
 num_rows = num_rows + range();
 box.snapshot();
-errinj.set("ERRINJ_VY_RANGE_CREATE", true);
+errinj.set("ERRINJ_VY_RANGE_DUMP", true);
 num_rows = num_rows + range();
+-- fails due to error injection
 box.snapshot();
-errinj.set("ERRINJ_VY_RANGE_CREATE", false);
+errinj.set("ERRINJ_VY_RANGE_DUMP", false);
+-- fails due to scheduler timeout
+box.snapshot();
+fiber.sleep(1);
 num_rows = num_rows + range();
 box.snapshot();
 num_rows = num_rows + range();

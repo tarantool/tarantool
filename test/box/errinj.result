@@ -22,7 +22,7 @@ errinj.info()
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
-  ERRINJ_VY_RANGE_CREATE:
+  ERRINJ_TUPLE_FIELD:
     state: false
   ERRINJ_WAL_IO:
     state: false
@@ -30,7 +30,7 @@ errinj.info()
     state: false
   ERRINJ_TESTING:
     state: false
-  ERRINJ_TUPLE_FIELD:
+  ERRINJ_VY_RANGE_DUMP:
     state: false
   ERRINJ_INDEX_ALLOC:
     state: false
