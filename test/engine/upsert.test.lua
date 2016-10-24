@@ -300,6 +300,18 @@ index2:select{}
 
 space:drop()
 
+-- https://github.com/tarantool/tarantool/issues/1854
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+space:insert({1, 1, 1})
+space:insert({2, 2, 2})
+space:insert({3, 3, 3})
+space:select{}
+space:upsert({2, 18, 76}, {})
+space:upsert({4, 4, 4}, {})
+space:select{}
+space:drop()
+
 s = box.schema.space.create('s', { engine = engine })
 index1 = s:create_index('i1')
 index2 = s:create_index('i2', { parts = {2, 'string'}, unique = false })

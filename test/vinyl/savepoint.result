@@ -420,7 +420,6 @@ space:insert({11})
 ...
 space:upsert({12}, {})
 ---
-- error: Illegal parameters, no operations for update
 ...
 space:insert({'abc'})
 ---
@@ -439,6 +438,7 @@ space:select{}
   - [2]
   - [3]
   - [11]
+  - [12]
 ...
 space:drop()
 ---

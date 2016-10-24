@@ -886,8 +886,6 @@ update_read_ops(struct tuple_update *update, const char *expr,
 
 	if (update->op_count > BOX_UPDATE_OP_CNT_MAX)
 		tnt_raise(IllegalParams, "too many operations for update");
-	if (update->op_count == 0)
-		tnt_raise(IllegalParams, "no operations for update");
 
 	/* Read update operations.  */
 	update->ops = (struct update_op *) update->alloc(update->alloc_ctx,

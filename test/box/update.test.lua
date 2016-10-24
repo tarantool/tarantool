@@ -237,7 +237,6 @@ s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 
 -- some wrong updates --
 s:update({0}, 0)
-s:update({0}, {})
 s:update({0}, {'+', 2, 2})
 s:update({0}, {{}})
 s:update({0}, {{'+'}})
@@ -250,6 +249,11 @@ s:update({0}, {{0, 0, 0}})
 ops = {}
 for i = 1,10 do table.insert(ops, {'=', 2, '1234567890'}) end
 s:upsert({0}, ops)
+
+-- https://github.com/tarantool/tarantool/issues/1854
+s:get{0}
+s:update({0}, {})
+
 --#stop server default
 --#start server default
 s = box.space.tweedledum

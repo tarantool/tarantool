@@ -775,10 +775,6 @@ s:update({0}, 0)
 ---
 - error: Usage index:update(key, ops)
 ...
-s:update({0}, {})
----
-- error: Illegal parameters, no operations for update
-...
 s:update({0}, {'+', 2, 2})
 ---
 - error: Illegal parameters, update operation must be an array {op,..}
@@ -814,6 +810,15 @@ for i = 1,10 do table.insert(ops, {'=', 2, '1234567890'}) end
 ...
 s:upsert({0}, ops)
 ---
+...
+-- https://github.com/tarantool/tarantool/issues/1854
+s:get{0}
+---
+- [0, '1234567890']
+...
+s:update({0}, {})
+---
+- [0, '1234567890']
 ...
 --#stop server default
 --#start server default

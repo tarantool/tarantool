@@ -84,3 +84,13 @@ index2:select{}
 index3:select{}
 space:drop()
 
+-- https://github.com/tarantool/tarantool/issues/1854
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+space:insert({1, 1, 1})
+space:insert({2, 2, 2})
+space:insert({3, 3, 3})
+space:select{}
+space:update({2}, {})
+space:select{}
+space:drop()
