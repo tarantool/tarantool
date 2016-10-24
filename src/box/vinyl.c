@@ -1147,7 +1147,7 @@ read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b);
 static int
 read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b);
 
-rb_gen_ext_key(static inline, read_set_, read_set_t, struct txv, in_read_set,
+rb_gen_ext_key(, read_set_, read_set_t, struct txv, in_read_set,
 	       read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
@@ -1254,7 +1254,7 @@ write_set_key_cmp(write_set_t *index, struct write_set_key *a, struct txv *b)
 	return rc;
 }
 
-rb_gen_ext_key(static inline, write_set_, write_set_t, struct txv, in_write_set,
+rb_gen_ext_key(, write_set_, write_set_t, struct txv, in_write_set,
 	       write_set_cmp, struct write_set_key *, write_set_key_cmp);
 
 static struct txv *
@@ -1280,7 +1280,7 @@ tx_tree_cmp(tx_tree_t *rbtree, struct vy_tx *a, struct vy_tx *b)
 	return vy_cmp(a->tsn, b->tsn);
 }
 
-rb_gen(static inline, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
+rb_gen(, tx_tree_, tx_tree_t, struct vy_tx, tree_node,
        tx_tree_cmp);
 
 struct tx_manager {
@@ -1562,7 +1562,7 @@ vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *
 static int
 vy_range_tree_key_cmp(vy_range_tree_t *rbtree, char *a, struct vy_range *b);
 
-rb_gen_ext_key(static inline, vy_range_tree_, vy_range_tree_t, struct vy_range,
+rb_gen_ext_key(, vy_range_tree_, vy_range_tree_t, struct vy_range,
 	       tree_node, vy_range_tree_cmp, char *, vy_range_tree_key_cmp);
 
 static void
