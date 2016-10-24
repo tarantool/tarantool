@@ -30,7 +30,7 @@ add_library(box STATIC
     tuple_format.cc
     tuple.cc
     tuple_convert.cc
-    tuple_update.cc
+    tuple_update.c
     tuple_compare.cc
     key_def.cc
     index.cc

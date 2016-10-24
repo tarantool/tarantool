@@ -30,15 +30,19 @@
  */
 
 #include "tuple_update.h"
-#include <stdio.h>
 
+#include <stdio.h>
+#include <stdbool.h>
+
+#include "say.h"
+#include "error.h"
+#include "diag.h"
 #include "trivia/util.h"
 #include "third_party/queue.h"
-#include <msgpuck.h>
-#include "bit/int96.h"
-#include "salad/rope.h"
+#include <msgpuck/msgpuck.h>
+#include <bit/int96.h>
+#include <salad/rope.h>
 
-#include "error.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
@@ -448,7 +452,7 @@ static inline int
 make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		     char opcode, uint32_t err_fieldno, struct op_arith_arg *ret)
 {
-	arith_type lowest_type = arg1.type;
+	enum arith_type lowest_type = arg1.type;
 	if (arg1.type > arg2.type)
 		lowest_type = arg2.type;
 
@@ -1082,11 +1086,12 @@ upsert_do_ops(struct tuple_update *update, const char *old_data,
 	for (; op < ops_end; op++) {
 		if (op->meta->do_op(update, op) == 0)
 			continue;
-		ClientError *e;
-		e = type_cast(ClientError, diag_last_error(diag_get()));
-		if (e != NULL && !suppress_error) {
+		struct error *e = diag_last_error(diag_get());
+		if (e->type != &type_ClientError)
+			return -1;
+		if (!suppress_error) {
 			say_error("UPSERT operation failed:");
-			e->log();
+			error_log(e);
 		}
 	}
 	return 0;

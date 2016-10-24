@@ -32,6 +32,7 @@
  */
 
 #include <stddef.h>
+#include <stdbool.h>
 #include "trivia/util.h"
 
 #if defined(__cplusplus)

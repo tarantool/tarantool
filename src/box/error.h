@@ -120,6 +120,8 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 
 /** \endcond public */
 
+extern const struct type type_ClientError;
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #include "exception.h"
@@ -133,7 +135,6 @@ enum rmean_error_name {
 };
 extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
 
-extern const struct type type_ClientError;
 class ClientError: public Exception {
 public:
 	virtual void raise()
