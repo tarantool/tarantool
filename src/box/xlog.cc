@@ -1050,6 +1050,9 @@ eof:
 			say_error("EOF marker is corrupt: %lu %lu",
 				  (unsigned long) magic, (unsigned long) i->good_offset);
 		}
+	} else {
+		/* Return to last good offset, we will reread magic */
+		fseeko(l->f, i->good_offset, SEEK_SET);
 	}
 	/* No more rows. */
 	return 1;
