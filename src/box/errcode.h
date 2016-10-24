@@ -172,6 +172,7 @@ struct errcode_record {
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
 	/*119 */_(ER_COMPRESSION,		"Failed to decompress: error code %d") \
+	/*120 */_(ER_SNAPSHOT_IN_PROGRESS,	"Snapshot is already in progress") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

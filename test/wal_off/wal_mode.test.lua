@@ -10,6 +10,7 @@ space.index['primary']:get(3)
 space.index['primary']:get(4)
 box.snapshot()
 box.snapshot()
+box.error.last().errno
 space:truncate()
 box.snapshot()
 space:drop()

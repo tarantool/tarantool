@@ -157,7 +157,9 @@ result
 f = fiber.create(function () fiber.sleep(1) return true end)
 box.snapshot()
 box.snapshot()
+box.error.last().errno
 box.snapshot()
+box.error.last().errno
 f = fiber.create(function () fiber.sleep(1) end)
 -- Test fiber.sleep()
 fiber.sleep(0)

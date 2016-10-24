@@ -294,10 +294,7 @@ VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 int
 VinylEngine::beginCheckpoint()
 {
-	int rc = vy_checkpoint(env);
-	if (rc == -1)
-		diag_raise();
-	return 0;
+	return vy_checkpoint(env);
 }
 
 int

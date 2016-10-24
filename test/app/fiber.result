@@ -388,11 +388,19 @@ box.snapshot()
 ...
 box.snapshot()
 ---
-- error: can't save snapshot, errno 17 (File exists)
+- error: Can't create xlog
+...
+box.error.last().errno
+---
+- 17
 ...
 box.snapshot()
 ---
-- error: can't save snapshot, errno 17 (File exists)
+- error: Can't create xlog
+...
+box.error.last().errno
+---
+- 17
 ...
 f = fiber.create(function () fiber.sleep(1) end)
 ---

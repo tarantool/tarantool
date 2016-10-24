@@ -338,8 +338,8 @@ engine_begin_checkpoint()
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->beginCheckpoint())
-			return errno;
+		if (engine->beginCheckpoint() < 0)
+			return -1;
 	}
 	return 0;
 }
@@ -350,8 +350,8 @@ engine_commit_checkpoint(struct vclock *vclock)
 	Engine *engine;
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
-		if (engine->waitCheckpoint(vclock))
-			return errno;
+		if (engine->waitCheckpoint(vclock) < 0)
+			return -1;
 	}
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {

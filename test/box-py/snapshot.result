@@ -21,7 +21,11 @@ box.snapshot()
 ...
 box.snapshot()
 ---
-- error: can't save snapshot, errno 17 (File exists)
+- error: Can't create xlog
+...
+box.error.last().errno
+---
+- 17
 ...
 space:insert{2, 'second tuple'}
 ---
@@ -30,7 +34,11 @@ space:insert{2, 'second tuple'}
 # Make 'var' directory read-only.
 box.snapshot()
 ---
-- error: can't save snapshot, errno 13 (Permission denied)
+- error: Can't create xlog
+...
+box.error.last().errno
+---
+- 13
 ...
 space:delete{1}
 ---

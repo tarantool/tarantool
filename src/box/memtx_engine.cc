@@ -1264,7 +1264,7 @@ checkpoint_f(va_list ap)
 	struct xlog *snap = xlog_create(&ckpt->dir, &ckpt->vclock);
 
 	if (snap == NULL)
-		tnt_raise(SystemError, "xlog_open");
+		tnt_raise(SystemError, "Can't create xlog");
 
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 
@@ -1318,9 +1318,6 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 	if (e != NULL) {
 		error_log(e);
 		result = -1;
-		SystemError *se = type_cast(SystemError, e);
-		if (se)
-			errno = se->get_errno();
 	}
 
 	m_checkpoint->waiting_for_snap_thread = false;

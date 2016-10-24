@@ -96,9 +96,7 @@ lbox_snapshot(struct lua_State *L)
 		lua_pushstring(L, "ok");
 		return 1;
 	}
-	luaL_error(L, "can't save snapshot, errno %d (%s)",
-		   ret, strerror(ret));
-	return 1;
+	return lbox_error(L);
 }
 
 static const struct luaL_reg boxlib[] = {

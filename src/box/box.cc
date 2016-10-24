@@ -1340,7 +1340,7 @@ bootstrap(void)
 	}
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&recovery->vclock))
-		panic_syserror("failed to save a snapshot");
+		panic("failed to save a snapshot");
 }
 
 static inline void
@@ -1483,8 +1483,10 @@ box_snapshot()
 	if (! box_init_done)
 		return 0;
 	int rc = 0;
-	if (box_snapshot_is_in_progress)
-		return EINPROGRESS;
+	if (box_snapshot_is_in_progress) {
+		diag_set(ClientError, ER_SNAPSHOT_IN_PROGRESS);
+		return -1;
+	}
 	box_snapshot_is_in_progress = true;
 	/* create snapshot file */
 	latch_lock(&schema_lock);
