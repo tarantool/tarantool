@@ -102,6 +102,7 @@ extern char strict_lua[],
 	v_lua[],
 	clock_lua[],
 	title_lua[],
+	env_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -111,6 +112,7 @@ static const char *lua_modules[] = {
 	"tarantool", init_lua,
 	"errno", errno_lua,
 	"fiber", fiber_lua,
+	"env", env_lua,
 	"buffer", buffer_lua,
 	"msgpackffi", msgpackffi_lua,
 	"fun", fun_lua,
