@@ -1078,3 +1078,126 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		 return NULL;
 	}
 }
+
+static const char *
+tuple_upsert_squash_xc(tuple_update_alloc_func alloc, void *alloc_ctx,
+		       const char *expr1, const char *expr1_end,
+		       const char *expr2, const char *expr2_end,
+		       size_t *result_size, int index_base)
+{
+	const char *expr[2] = {expr1, expr2};
+	const char *expr_end[2] = {expr1_end, expr2_end};
+	struct tuple_update update[2];
+	for (int j = 0; j < 2; j++) {
+		update_init(&update[j], alloc, alloc_ctx, index_base);
+		update_read_ops(&update[j], expr[j], expr_end[j]);
+		mp_decode_array(&expr[j]);
+		int32_t prev_field_no = index_base - 1;
+		for (uint32_t i = 0; i < update[j].op_count; i++) {
+			struct update_op *op = &update[j].ops[i];
+			if (op->opcode != '+' && op->opcode != '-' &&
+			    op->opcode != '=')
+				return NULL;
+			if (op->field_no <= prev_field_no)
+				return NULL;
+			prev_field_no = op->field_no;
+		}
+	}
+	size_t possible_size = expr1_end - expr1 + expr2_end - expr2;
+	const uint32_t space_for_arr_tag = 5;
+	char *buf = (char *)alloc(alloc_ctx,
+				  possible_size + space_for_arr_tag);
+	/* reserve some space for mp array header */
+	char *res_ops = buf + space_for_arr_tag;
+	uint32_t res_count = 0; /* number of resulting operations */
+
+	uint32_t op_count[2] = {update[0].op_count, update[1].op_count};
+	uint32_t op_no[2] = {0, 0};
+	while (op_no[0] < op_count[0] && op_no[1] < op_count[1]) {
+		res_count++;
+		struct update_op *op[2] = {update[0].ops + op_no[0],
+					   update[1].ops + op_no[1]};
+		/*
+		 * from:
+		 * 0 - take op from first update,
+		 * 1 - take op from second update,
+		 * 2 - merge both ops
+		 */
+		uint32_t from;
+		uint32_t has[2] = {op_no[0] < op_count[0], op_no[1] < op_count[1]};
+		assert(has[0] || has[1]);
+		if (has[0] && has[1]) {
+			from = op[0]->field_no < op[1]->field_no ? 0 :
+			       op[0]->field_no > op[1]->field_no ? 1 : 2;
+		} else {
+			assert(has[0] != has[1]);
+			from = has[1];
+		}
+		if (from == 2 && op[1]->opcode == '=') {
+			/*
+			 * If an operation from the second upsert is '='
+			 * it is just overwrites any op from the first upsert.
+			 * So we just skip op from the first upsert and
+			 * copy op from the second
+			 */
+			mp_next(&expr[0]);
+			op_no[0]++;
+			from = 1;
+		}
+		if (from < 2) {
+			/* take op from one of upserts */
+			const char *copy = expr[from];
+			mp_next(&expr[from]);
+			size_t copy_size = expr[from] - copy;
+			memcpy(res_ops, copy, copy_size);
+			res_ops += copy_size;
+			op_no[from]++;
+			continue;
+		}
+		/* merge: apply second '+' or '-' */
+		assert(op[1]->opcode == '+' || op[1]->opcode == '-');
+		if (op[0]->opcode == '-') {
+			op[0]->opcode = '+';
+			int96_invert(&op[0]->arg.arith.int96);
+		}
+		struct op_arith_arg res =
+			make_arith_operation(op[0]->arg.arith, op[1]->arg.arith,
+					     op[1]->opcode,
+					     update[0].index_base +
+					     op[0]->field_no);
+		res_ops = mp_encode_array(res_ops, 3);
+		res_ops = mp_encode_str(res_ops,
+					(const char *)&op[0]->opcode, 1);
+		res_ops = mp_encode_uint(res_ops,
+					 op[0]->field_no +
+						 update[0].index_base);
+		store_op_arith(&res, NULL, res_ops);
+		res_ops += mp_sizeof_op_arith_arg(res);
+		mp_next(&expr[0]);
+		mp_next(&expr[1]);
+		op_no[0]++;
+		op_no[1]++;
+	}
+	assert(op_no[0] == op_count[0] && op_no[1] == op_count[1]);
+	assert(expr[0] == expr_end[0] && expr[1] == expr_end[1]);
+	char *arr_start = buf + space_for_arr_tag -
+		mp_sizeof_array(res_count);
+	mp_encode_array(arr_start, res_count);
+	*result_size = res_ops - arr_start;
+	return arr_start;
+}
+
+const char *
+tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
+		    const char *expr1, const char *expr1_end,
+		    const char *expr2, const char *expr2_end,
+		    size_t *result_size, int index_base)
+{
+	try {
+		return tuple_upsert_squash_xc(alloc, alloc_ctx,
+					      expr1, expr1_end, expr2, expr2_end,
+					      result_size, index_base);
+	} catch (Exception *e) {
+		return NULL;
+	}
+}

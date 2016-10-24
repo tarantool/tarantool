@@ -5364,6 +5364,49 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 const char *
 space_name_by_id(uint32_t id);
 
+/**
+ * Try to squash two upsert series (msgspacked index_base + ops)
+ * Try to create a tuple with squahed operations
+ *
+ * @retval 0 && *result_stmt != NULL : successful squash
+ * @retval 0 && *result_stmt == NULL : unsquashable sources
+ * @retval -1 - memory error
+ */
+static int
+vy_upsert_try_to_squash(struct vy_index *index, struct region *region,
+			const char *key_mp, const char *key_mp_end,
+			const char *old_serie, const char *old_serie_end,
+			const char *new_serie, const char *new_serie_end,
+			struct vy_stmt **result_stmt)
+{
+	*result_stmt = NULL;
+	uint64_t index_base = mp_decode_uint(&new_serie);
+	if (mp_decode_uint(&old_serie) != index_base)
+		return 0;
+
+	size_t squashed_size;
+	const char *squashed =
+		tuple_upsert_squash(vy_update_alloc, region,
+				    old_serie, old_serie_end,
+				    new_serie, new_serie_end,
+				    &squashed_size, index_base);
+	if (squashed == NULL)
+		return 0;
+	/* Successful squash! */
+	uint32_t extra_size = squashed_size;
+	extra_size += mp_sizeof_uint(1);
+	extra_size += mp_sizeof_uint(index_base);
+	char *extra;
+	*result_stmt = vy_stmt_from_data_ex(index, key_mp, key_mp_end,
+					    extra_size, &extra);
+	if (*result_stmt == NULL)
+		return -1;
+	extra = mp_encode_uint(extra, 1);
+	extra = mp_encode_uint(extra, index_base);
+	memcpy(extra, squashed, squashed_size);
+	return 0;
+}
+
 /*
  * Get the upserted stmt by upsert stmt and original stmt
  */
@@ -5412,7 +5455,7 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	 */
 	const char *result_mp = old_mp;
 	const char *result_mp_end = old_mp_end;
-	struct vy_stmt *result_stmt;
+	struct vy_stmt *result_stmt = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
@@ -5440,22 +5483,38 @@ vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	uint64_t ops_series_count = mp_decode_uint(&new_ops) +
-				    mp_decode_uint(&old_ops);
-	uint32_t total_ops_size = mp_sizeof_uint(ops_series_count) +
-				  (new_ops_end - new_ops) +
-				  (old_ops_end - old_ops);
-	char *extra;
-	result_stmt = vy_stmt_from_data_ex(index, result_mp,
-		result_mp_end, total_ops_size, &extra);
+	uint64_t new_series_count = mp_decode_uint(&new_ops);
+	uint64_t old_series_count = mp_decode_uint(&old_ops);
+	if (new_series_count == 1 && old_series_count == 1) {
+		if (vy_upsert_try_to_squash(index, region,
+					    result_mp, result_mp_end,
+					    old_ops, old_ops_end,
+					    new_ops, new_ops_end,
+					    &result_stmt) != 0) {
+			region_truncate(region, region_svp);
+			return NULL;
+		}
+	}
+	if (result_stmt == NULL) {
+		/* Failed to squash, simply add one upsert to another */
+		uint64_t res_series_count = new_series_count + old_series_count;
+		uint32_t extra_size = mp_sizeof_uint(res_series_count) +
+				      (new_ops_end - new_ops) +
+				      (old_ops_end - old_ops);
+		char *extra;
+		result_stmt = vy_stmt_from_data_ex(index,
+						   result_mp, result_mp_end,
+						   extra_size, &extra);
+		if (result_stmt == NULL) {
+			region_truncate(region, region_svp);
+			return NULL;
+		}
+		extra = mp_encode_uint(extra, res_series_count);
+		memcpy(extra, old_ops, old_ops_end - old_ops);
+		extra += old_ops_end - old_ops;
+		memcpy(extra, new_ops, new_ops_end - new_ops);
+	}
 	region_truncate(region, region_svp);
-	result_mp = result_mp_end = NULL;
-	if (result_stmt == NULL)
-		return NULL; /* OOM */
-	extra = mp_encode_uint(extra, ops_series_count);
-	memcpy(extra, old_ops, old_ops_end - old_ops);
-	extra += old_ops_end - old_ops;
-	memcpy(extra, new_ops, new_ops_end - new_ops);
 	result_stmt->type = IPROTO_UPSERT;
 	result_stmt->lsn = new_stmt->lsn;
 
