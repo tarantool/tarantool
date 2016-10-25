@@ -87,6 +87,8 @@ cn = net_box.connect(box.cfg.listen)
 schema_id = cn._schema_id
 bump_schema_id()
 cn:ping()
+-- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
+while cn._schema_id == schema_id do fiber.sleep(0.0001) end
 cn._schema_id == schema_id + 1
 
 -- call
