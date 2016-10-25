@@ -36,7 +36,6 @@
 #include <bit/bit.h>
 #include <small/rlist.h>
 #define RB_COMPACT 1
-#define RB_CMP_TREE_ARG 1
 #include <small/rb.h>
 #include <small/mempool.h>
 #include <small/region.h>
@@ -1144,10 +1143,10 @@ txv_abort(struct txv *v)
 }
 
 static int
-read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b);
+read_set_cmp(struct txv *a, struct txv *b);
 
 static int
-read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b);
+read_set_key_cmp(struct read_set_key *a, struct txv *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
 	       in_read_set, read_set_cmp, struct read_set_key *,
@@ -1164,11 +1163,10 @@ read_set_search_key(read_set_t *rbtree, char *data, int size, int64_t tsn)
 }
 
 static int
-read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b)
+read_set_cmp(struct txv *a, struct txv *b)
 {
-	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, read_set)->key_def;
-	int rc = vy_stmt_compare(a->stmt->data, b->stmt->data, key_def);
+	int rc = vy_stmt_compare(a->stmt->data, b->stmt->data,
+				 b->index->key_def);
 	/**
 	 * While in svindex older value are "bigger" than newer
 	 * ones, i.e. the newest value comes first, in
@@ -1182,11 +1180,9 @@ read_set_cmp(read_set_t *rbtree, struct txv *a, struct txv *b)
 }
 
 static int
-read_set_key_cmp(read_set_t *rbtree, struct read_set_key *a, struct txv *b)
+read_set_key_cmp(struct read_set_key *a, struct txv *b)
 {
-	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, read_set)->key_def;
-	int rc = vy_stmt_compare(a->data, b->stmt->data, key_def);
+	int rc = vy_stmt_compare(a->data, b->stmt->data, b->index->key_def);
 	if (rc == 0)
 		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
 	return rc;
@@ -1220,9 +1216,8 @@ txv_abort_all(struct vy_tx *tx, struct txv *v)
 }
 
 static int
-write_set_cmp(write_set_t *index, struct txv *a, struct txv *b)
+write_set_cmp(struct txv *a, struct txv *b)
 {
-	(void) index;
 	/* Order by index first, by key in the index second. */
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
@@ -1238,9 +1233,8 @@ struct write_set_key {
 };
 
 static int
-write_set_key_cmp(write_set_t *index, struct write_set_key *a, struct txv *b)
+write_set_key_cmp(struct write_set_key *a, struct txv *b)
 {
-	(void) index;
 	/* Order by index first, by key in the index second. */
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
@@ -1278,9 +1272,8 @@ vy_tx_is_ro(struct vy_tx *tx)
 typedef rb_tree(struct vy_tx) tx_tree_t;
 
 static int
-tx_tree_cmp(tx_tree_t *rbtree, struct vy_tx *a, struct vy_tx *b)
+tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
 {
-	(void)rbtree;
 	return vy_cmp(a->tsn, b->tsn);
 }
 
@@ -1561,10 +1554,10 @@ static void
 vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem);
 
 static int
-vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *b);
+vy_range_tree_cmp(struct vy_range *a, struct vy_range *b);
 
 static int
-vy_range_tree_key_cmp(vy_range_tree_t *rbtree, char *a, struct vy_range *b);
+vy_range_tree_key_cmp(char *a, struct vy_range *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 	       struct vy_range, tree_node, vy_range_tree_cmp, char *,
@@ -1604,19 +1597,15 @@ vy_index_key_def(struct vy_index *index)
 }
 
 static int
-vy_range_tree_cmp(vy_range_tree_t *rbtree, struct vy_range *a, struct vy_range *b)
+vy_range_tree_cmp(struct vy_range *a, struct vy_range *b)
 {
-	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, tree)->key_def;
-	return vy_range_cmpnode(a, b, key_def);
+	return vy_range_cmpnode(a, b, b->index->key_def);
 }
 
 static int
-vy_range_tree_key_cmp(vy_range_tree_t *rbtree, char *a, struct vy_range *b)
+vy_range_tree_key_cmp(char *a, struct vy_range *b)
 {
-	struct key_def *key_def =
-		container_of(rbtree, struct vy_index, tree)->key_def;
-	return (-vy_range_cmp(b, a, key_def));
+	return (-vy_range_cmp(b, a, b->index->key_def));
 }
 
 static void
