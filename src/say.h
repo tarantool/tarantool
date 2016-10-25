@@ -41,6 +41,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+extern pid_t logger_pid;
+
 /** \cond public */
 
 /** Log levels */
@@ -54,22 +56,18 @@ enum say_level {
 	S_DEBUG
 };
 
-/** \endcond public */
-
-extern pid_t logger_pid;
 extern int log_level;
 
-inline void
-say_set_log_level(int new_level)
-{
-	log_level = new_level;
-}
-
-inline bool
+static inline bool
 say_log_level_is_enabled(int level)
 {
        return level <= log_level;
 }
+
+/** \endcond public */
+
+void
+say_set_log_level(int new_level);
 
 void
 say_logrotate(int /* signo */);
@@ -101,8 +99,9 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
  * \sa printf()
  * \sa enum say_level
  */
-#define say(level, format, ...) ({ _say(level, __FILE__, __LINE__, format, \
-	##__VA_ARGS__); })
+#define say(level, format, ...) ({ \
+	if (say_log_level_is_enabled(level)) \
+		_say(level, __FILE__, __LINE__, format, ##__VA_ARGS__); })
 
 /**
  * Format and print a message to Tarantool log file.

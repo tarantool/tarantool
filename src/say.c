@@ -117,11 +117,11 @@ say_init(const char *argv0)
 	binary_filename = strdup(argv0);
 }
 
-extern inline void
-say_set_log_level(int new_level);
-
-extern inline bool
-say_log_level_is_enabled(int level);
+void
+say_set_log_level(int new_level)
+{
+	log_level = new_level;
+}
 
 /**
  * Initialize the logger pipe: a standalone

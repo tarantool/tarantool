@@ -71,6 +71,7 @@ void sayf(int level, const char *filename, int line, const char *error,
 		printf("#\t%s\n", error);
 }
 sayfunc_t _say = sayf;
+int log_level = S_DEBUG;
 
 int
 main(void)

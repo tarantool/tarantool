@@ -1774,9 +1774,6 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **in_out)
 static void
 vy_range_log_debug(struct vy_range *range, const char *reason)
 {
-	if (!say_log_level_is_enabled(S_DEBUG))
-		return;
-
 	struct key_def *key_def = range->index->key_def;
 	say_debug("range %s: %s: %s .. %s", reason, vy_range_str(range),
 		  vy_key_str(range->begin != NULL ? range->begin->data : NULL,
