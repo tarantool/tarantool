@@ -300,32 +300,27 @@ admin("space:drop()")
 admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
 
 #
-# gh-272 if the packet was incorrect, respond with an error code before closing
-# connection
+# gh-272 if the packet was incorrect, respond with an error code
+# gh-1654 do not close connnection on invalid request
 #
 print """
-# Test bug gh-272 if the packet was incorrect, respond with an error code
+# Test bugs gh-272, gh-1654 if the packet was incorrect, respond with
+# an error code and do not close connection
 """
 
 c = Connection('localhost', server.iproto.port)
 c.connect()
+s = c._socket
 header = { "hello": "world"}
 body = { "bug": 272 }
-header = msgpack.dumps(header)
-body = msgpack.dumps(body)
-query = msgpack.dumps(len(header) + len(body)) + header + body
-# Send raw request using connectred socket
-s = c._socket
-try:
-    s.send(query)
-    resp_len = s.recv(5)
-    resp_len = msgpack.loads(resp_len)
-    headerbody = s.recv(resp_len)
-    unpacker = msgpack.Unpacker(use_list = True)
-    unpacker.feed(headerbody)
-    header = unpacker.unpack()
-    body = unpacker.unpack()
-    print(body)
-except OSError as e:
-    print '   => ', 'Failed to send request'
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT }
+header[IPROTO_SYNC] = 1234
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+header[IPROTO_SYNC] = 5678
+body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
 c.close()

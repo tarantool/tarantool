@@ -8,7 +8,7 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
 test_run:cmd("setopt delimiter ';'")
 function x_select(cn, ...) return cn:_request('select', ...) end
-function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\2\1\1') end
+function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\x80') end
 test_run:cmd("setopt delimiter ''");
 
 LISTEN = require('uri').parse(box.cfg.listen)

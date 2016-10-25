@@ -489,6 +489,58 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	return newbuf;
 }
 
+static void
+iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
+		  bool *stop_input)
+{
+	xrow_header_decode(&msg->header, pos, reqend);
+	assert(*pos == reqend);
+	request_create(&msg->request, msg->header.type);
+	msg->request.header = &msg->header;
+
+	switch (msg->header.type) {
+	case IPROTO_SELECT:
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPDATE:
+	case IPROTO_DELETE:
+	case IPROTO_CALL_16:
+	case IPROTO_CALL:
+	case IPROTO_AUTH:
+	case IPROTO_EVAL:
+	case IPROTO_UPSERT:
+		/*
+		 * This is a common request which can be parsed with
+		 * request_decode(). Parse it before putting it into
+		 * the queue to save tx some CPU. More complicated
+		 * requests are parsed in tx thread into request type-
+		 * specific objects.
+		 */
+		if (msg->header.bodycnt == 0) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "missing request body");
+		}
+		request_decode(&msg->request,
+			       (const char *) msg->header.body[0].iov_base,
+			       msg->header.body[0].iov_len);
+		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
+		cmsg_init(msg, dml_route[msg->header.type]);
+		break;
+	case IPROTO_PING:
+		cmsg_init(msg, misc_route);
+		break;
+	case IPROTO_JOIN:
+	case IPROTO_SUBSCRIBE:
+		cmsg_init(msg, sync_route);
+		*stop_input = true;
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) msg->header.type);
+		break;
+	}
+}
+
 /** Enqueue all requests which were read up. */
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
@@ -512,55 +564,25 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		msg->iobuf = con->iobuf[0];
 		IprotoMsgGuard guard(msg);
 
-		xrow_header_decode(&msg->header, &pos, reqend);
-		assert(pos == reqend);
 		msg->len = reqend - reqstart; /* total request length */
-		request_create(&msg->request, msg->header.type);
-		msg->request.header = &msg->header;
 
-		switch (msg->header.type) {
-		case IPROTO_SELECT:
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-		case IPROTO_UPDATE:
-		case IPROTO_DELETE:
-		case IPROTO_CALL_16:
-		case IPROTO_CALL:
-		case IPROTO_AUTH:
-		case IPROTO_EVAL:
-		case IPROTO_UPSERT:
+		try {
+			iproto_decode_msg(msg, &pos, reqend, &stop_input);
+			cpipe_push_input(&tx_pipe, guard.release());
+		} catch (Exception *e) {
 			/*
-			 * This is a common  request which can be
-			 * parsed with request_decode(). Parse it
-			 * before  putting it into the queue to
-			 * save tx some CPU. More complicated
-			 * requests are parsed in tx thread into
-			 * request type- specific objects.
+			 * Do not close connection if we failed to
+			 * decode a request, as we have enough info
+			 * to proceed to the next one.
 			 */
-			if (msg->header.bodycnt == 0) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "missing request body");
-			}
-			request_decode(&msg->request,
-				       (const char *) msg->header.body[0].iov_base,
-				       msg->header.body[0].iov_len);
-			assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
-			cmsg_init(msg, dml_route[msg->header.type]);
-			break;
-		case IPROTO_PING:
-			cmsg_init(msg, misc_route);
-			break;
-		case IPROTO_JOIN:
-		case IPROTO_SUBSCRIBE:
-			cmsg_init(msg, sync_route);
-			stop_input = true;
-			break;
-		default:
-			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				  (uint32_t) msg->header.type);
-			break;
+			struct obuf *out = &msg->iobuf->out;
+			iproto_reply_error(out, e, msg->header.sync);
+			out->wend = obuf_create_svp(out);
+			if (!ev_is_active(&con->output))
+				ev_feed_event(con->loop, &con->output, EV_WRITE);
+			e->log();
 		}
-		cpipe_push_input(&tx_pipe, guard.release());
+
 		/* Request is parsed */
 		assert(reqend > reqstart);
 		assert(con->parse_size >= (size_t) (reqend - reqstart));
