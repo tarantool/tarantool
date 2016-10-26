@@ -1024,6 +1024,8 @@ struct vy_range {
 	uint32_t   mem_count;
 	/** Number of times the range was compacted. */
 	int        merge_count;
+	/** Points to the range being compacted to this range. */
+	struct vy_range *shadow;
 	/** The file where the run is stored or -1 if it's not dumped yet. */
 	int fd;
 	char path[PATH_MAX];
@@ -1718,6 +1720,7 @@ struct vy_range_iterator {
 	struct vy_index *index;
 	enum vy_order order;
 	const struct vy_stmt *key;
+	struct vy_range *curr_range;
 };
 
 static void
@@ -1727,8 +1730,20 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 	itr->index = index;
 	itr->order = order;
 	itr->key = key;
+	itr->curr_range = NULL;
 }
 
+/*
+ * Find the first range in which a given key should be looked up.
+ * This function only takes into account the actual range tree layout
+ * and does not handle the compaction case, when a range being compacted
+ * is replaced by new range(s) back-pointing to it via range->shadow.
+ * Therefore, as is, this function is only suitable for handling
+ * insertions, which always go to in-memory indexes of ranges found in
+ * the range tree. Select operations have to check range->shadow to
+ * guarantee that no keys are skipped no matter if there is a
+ * compaction operation in progress (see vy_range_iterator_next()).
+ */
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 			  struct key_def *key_def, const struct vy_stmt *key)
@@ -1828,44 +1843,74 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 }
 
 /**
- * Get the range that follows the one passed in @arg in_out and assign the
- * result to @arg in_out.
+ * Iterate to the next range. The next range is returned in @result.
+ * This function is supposed to be used for iterating over a subset of
+ * keys in an index. Therefore it should handle the compaction case,
+ * i.e. check if the range returned by vy_range_tree_find_by_key()
+ * is a replacement range and return a pointer to the range being
+ * compacted if it is.
  */
 static void
-vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **in_out)
+vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 {
-	if (*in_out == NULL) {
+	struct vy_range *curr = itr->curr_range;
+	struct vy_range *next;
+
+	if (curr == NULL) {
 		/* First iteration */
 		struct vy_index *index = itr->index;
-		if (unlikely(index->range_count == 1)) {
-			*in_out = vy_range_tree_first(&index->tree);
-			return;
-		}
-		*in_out = vy_range_tree_find_by_key(&index->tree, itr->order,
-						    index->key_def, itr->key);
-		return;
+		if (unlikely(index->range_count == 1))
+			next = vy_range_tree_first(&index->tree);
+		else
+			next = vy_range_tree_find_by_key(&index->tree,
+					itr->order, index->key_def, itr->key);
+		goto check;
 	}
+next:
 	switch (itr->order) {
 	case VINYL_LT:
 	case VINYL_LE:
-		*in_out = vy_range_tree_prev(&itr->index->tree, *in_out);
+		next = vy_range_tree_prev(&itr->index->tree, curr);
 		break;
 	case VINYL_GT:
 	case VINYL_GE:
-		*in_out = vy_range_tree_next(&itr->index->tree, *in_out);
+		next = vy_range_tree_next(&itr->index->tree, curr);
 		break;
 	case VINYL_EQ:
-		if ((*in_out)->end != NULL &&
-		    vy_stmt_compare(itr->key, (*in_out)->end,
+		if (curr->end != NULL &&
+		    vy_stmt_compare(itr->key, curr->end,
 				    itr->index->key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
-			*in_out = vy_range_tree_next(&itr->index->tree, *in_out);
-		} else
-			*in_out = NULL;
+			next = vy_range_tree_next(&itr->index->tree, curr);
+		} else {
+			next = NULL;
+		}
 		break;
 	default:
 		unreachable();
 	}
+check:
+	/*
+	 * When compaction starts, the selected range is replaced with
+	 * one or more new ranges, each of which has ->shadow pointing
+	 * to the original range (see vy_range_compact_prepare()). New
+	 * ranges must not be read from until compaction has finished,
+	 * because (1) their in-memory indexes are linked to the
+	 * original range and (2) they don't have on-disk runs yet. So
+	 * whenever we encounter such a range we return ->shadow
+	 * instead. We also have to be careful not to return the same
+	 * range twice in case of split taking place.
+	 */
+	if (next != NULL && next->shadow != NULL) {
+		if (curr != NULL && curr->shadow == next->shadow) {
+			curr = next;
+			goto next;
+		}
+		*result = next->shadow;
+	} else {
+		*result = next;
+	}
+	itr->curr_range = next;
 }
 
 static void
@@ -1883,7 +1928,6 @@ static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
-	index->version++;
 	index->range_count++;
 }
 
@@ -1891,7 +1935,6 @@ static void
 vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_remove(&index->tree, range);
-	index->version++;
 	index->range_count--;
 }
 
@@ -2744,14 +2787,14 @@ vy_write_range_header(int fd, struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_stmt *split_key, int *p_fd, struct vy_run **p_run,
+		   struct vy_stmt *split_key, struct vy_run **p_run,
 		   struct vy_stmt **stmt, size_t *written)
 {
 	assert(stmt);
 	assert(*stmt);
 	struct vy_index *index = range->index;
 	char path[PATH_MAX];
-	int fd = *p_fd;
+	int fd = range->fd;
 	bool created = false;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
@@ -2804,7 +2847,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		}
 	}
 
-	*p_fd = fd;
+	range->fd = fd;
 	return 0;
 fail:
 	if (created) {
@@ -2861,15 +2904,9 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	return true;
 }
 
-struct vy_range_compact_part {
-	struct vy_range *range;
-	struct vy_run *run;
-	int fd;
-};
-
 static int
 vy_range_compact_prepare(struct vy_range *range,
-			 struct vy_range_compact_part *parts, int *p_n_parts)
+			 struct vy_range **parts, int *p_n_parts)
 {
 	struct vy_index *index = range->index;
 	struct vy_stmt *split_key = NULL;
@@ -2884,14 +2921,11 @@ vy_range_compact_prepare(struct vy_range *range,
 		n_parts = 2;
 	}
 
-	/* Allocate new ranges and initialize parts. */
+	/* Allocate new ranges. */
 	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = vy_range_new(index, 0);
-		if (r == NULL)
+		parts[i] = vy_range_new(index, 0);
+		if (parts[i] == NULL)
 			goto fail;
-		parts[i].range = r;
-		parts[i].run = NULL;
-		parts[i].fd = -1;
 	}
 
 	/* Set begin and end keys for the new ranges. */
@@ -2899,41 +2933,47 @@ vy_range_compact_prepare(struct vy_range *range,
 		vy_stmt_ref(range->begin);
 	if (range->end)
 		vy_stmt_ref(range->end);
-	parts[0].range->begin = range->begin;
+	parts[0]->begin = range->begin;
 	if (split_key != NULL) {
 		vy_stmt_ref(split_key);
-		parts[0].range->end = split_key;
-		parts[1].range->begin = split_key;
-		parts[1].range->end = range->end;
-	} else
-		parts[0].range->end = range->end;
+		parts[0]->end = split_key;
+		parts[1]->begin = split_key;
+		parts[1]->end = range->end;
+	} else {
+		parts[0]->end = range->end;
+	}
 
 	vy_range_log_debug(range, "compact prepare");
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
 	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i].range;
+		struct vy_range *r = parts[i];
 
-		/* Link mem and run to the original range. */
+		/*
+		 * While compaction is in progress, new statements are
+		 * inserted to new ranges while read iterator walks over
+		 * the old range (see vy_range_iterator_next()). To make
+		 * new statements visible, link new ranges' in-memory
+		 * trees to the old range.
+		 */
 		r->mem->next = range->mem;
-		r->mem_count = range->mem_count + 1;
-		r->run = range->run;
-		r->run_count = range->run_count;
-		r->fd = range->fd;
+		range->mem = r->mem;
+		range->mem_count++;
+		r->shadow = range;
 
 		vy_index_add_range(index, r);
-
 		vy_range_log_debug(r, "new");
 	}
+	range->version++;
+	index->version++;
 
 	*p_n_parts = n_parts;
 	return 0;
 fail:
 	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i].range;
-		if (r != NULL)
-			vy_range_delete(r);
+		if (parts[i] != NULL)
+			vy_range_delete(parts[i]);
 	}
 	if (split_key != NULL)
 		vy_stmt_unref(split_key);
@@ -2942,7 +2982,7 @@ fail:
 
 static void
 vy_range_compact_commit(struct vy_range *range, int n_parts,
-			struct vy_range_compact_part *parts)
+			struct vy_range **parts)
 {
 	struct vy_index *index = range->index;
 	int i;
@@ -2950,16 +2990,20 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 	vy_range_log_debug(range, "compact complete");
 
 	index->size -= vy_range_size(range);
-	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i].range;
+	for (i = n_parts - 1; i >= 0; i--) {
+		struct vy_range *r = parts[i];
 
-		/* Unlink new ranges from the old one. */
+		/*
+		 * The range has been compacted and so can now be
+		 * deleted from memory. Unlink in-memory trees that
+		 * belong to new ranges so that they won't get destroyed
+		 * along with it.
+		 */
+		assert(range->mem == r->mem);
+		range->mem = range->mem->next;
 		r->mem->next = NULL;
-		r->mem_count = 1;
-		r->run = parts[i].run;
-		r->run_count = r->run ? 1 : 0;
-		r->fd = parts[i].fd;
-		r->version++;
+		assert(r->shadow == range);
+		r->shadow = NULL;
 
 		index->size += vy_range_size(r);
 
@@ -2970,53 +3014,44 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		/* Make the new range visible to the scheduler. */
 		vy_scheduler_add_range(range->index->env->scheduler, r);
 	}
+	index->version++;
 	vy_range_delete(range);
 }
 
 static void
 vy_range_compact_abort(struct vy_range *range, int n_parts,
-		       struct vy_range_compact_part *parts)
+		       struct vy_range **parts)
 {
 	struct vy_index *index = range->index;
 	int i;
 
 	vy_range_log_debug(range, "compact failed");
 
-	/*
-	 * So, we failed to write runs for the new ranges. Attach their
-	 * in-memory indexes to the original range and delete them.
-	 */
-
 	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i].range;
+		struct vy_range *r = parts[i];
 
 		vy_range_log_debug(r, "delete");
-
 		vy_index_remove_range(index, r);
 
-		/* No point in linking an empty mem. */
-		if (r->used != 0) {
-			r->mem->next = range->mem;
-			range->mem = r->mem;
-			range->mem_count++;
-			range->used += r->used;
-			if (range->min_lsn > r->min_lsn)
-				range->min_lsn = r->min_lsn;
-			r->mem = NULL;
-		}
+		/*
+		 * On compaction failure we delete new ranges, but leave
+		 * their in-memory trees linked to the old range so that
+		 * statements inserted during compaction don't get lost.
+		 * So here we have to (1) propagate ->min_lsn and ->used
+		 * changes to the old range and (2) reset ->mem for new
+		 * ranges to prevent them from being deleted.
+		 */
+		if (range->used == 0)
+			range->min_lsn = r->min_lsn;
+		assert(range->min_lsn <= r->min_lsn);
+		range->used += r->used;
+		r->mem = NULL;
+		assert(r->shadow == range);
+		r->shadow = NULL;
 
-		/* Prevent original range's data from being destroyed. */
-		if (r->mem != NULL)
-			r->mem->next = NULL;
-		r->run = NULL;
-		r->fd = -1;
 		vy_range_delete(r);
-
-		if (parts[i].run != NULL)
-			vy_run_delete(parts[i].run);
-		if (parts[i].fd >= 0)
-			close(parts[i].fd);
 	}
+	index->version++;
 
 	/*
 	 * Finally, insert the old range back to the tree and make it
@@ -3060,8 +3095,13 @@ static int vy_profiler(struct vy_profiler *p, struct vy_index *i)
 {
 	memset(p, 0, sizeof(*p));
 	uint64_t memory_used = 0;
-	struct vy_range *range = vy_range_tree_first(&i->tree);
-	while (range) {
+	struct vy_range *curr_range = vy_range_tree_first(&i->tree);
+	while (curr_range != NULL) {
+		struct vy_range *range = curr_range;
+		/* TODO: do not count shadow ranges twice
+		 *       if split is in progress */
+		if (range->shadow)
+			range = range->shadow;
 		p->total_range_count++;
 		p->total_run_count += range->run_count;
 		if (p->total_run_max < range->run_count)
@@ -3085,7 +3125,7 @@ static int vy_profiler(struct vy_profiler *p, struct vy_index *i)
 			p->total_page_count += run->info.count;
 			run = run->next;
 		}
-		range = vy_range_tree_next(&i->tree, range);
+		curr_range = vy_range_tree_next(&i->tree, curr_range);
 	}
 	if (p->total_range_count > 0) {
 		p->total_run_avg =
@@ -3388,7 +3428,8 @@ vy_range_set_delete(struct vy_range *range, struct vy_stmt *stmt,
 {
 	assert(stmt->type == IPROTO_DELETE);
 
-	if (range->mem_count == 1 && range->run_count == 0 &&
+	if (range->shadow == NULL &&
+	    range->mem_count == 1 && range->run_count == 0 &&
 	    vy_mem_older_lsn(range->mem, stmt,
 			     range->index->key_def) == NULL) {
 		/*
@@ -3415,7 +3456,8 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 	struct vy_stmt *older;
 	older = vy_mem_older_lsn(range->mem, stmt, index->key_def);
 	if ((older != NULL && older->type != IPROTO_UPSERT) ||
-	    (older == NULL && range->mem_count == 1 && range->run_count == 0)) {
+	    (older == NULL && range->shadow == NULL &&
+	     range->mem_count == 1 && range->run_count == 0)) {
 		/*
 		 * Optimization:
 		 *
@@ -3592,7 +3634,7 @@ struct vy_task {
 		struct {
 			struct vy_range *range;
 			int n_parts;
-			struct vy_range_compact_part parts[2];
+			struct vy_range *parts[2];
 		} compact;
 	};
 	/**
@@ -3658,8 +3700,8 @@ vy_task_dump_execute(struct vy_task *task)
 	rc = vy_write_iterator_next(wi, &stmt);
 	if (rc || stmt == NULL)
 		goto out;
-	rc = vy_range_write_run(range, wi, NULL, &range->fd,
-				&task->dump.new_run, &stmt, &task->dump_size);
+	rc = vy_range_write_run(range, wi, NULL, &task->dump.new_run, &stmt,
+				&task->dump_size);
 out:
 	vy_write_iterator_delete(wi);
 	return rc;
@@ -3746,7 +3788,7 @@ vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->compact.range;
-	struct vy_range_compact_part *parts = task->compact.parts;
+	struct vy_range **parts = task->compact.parts;
 	int n_parts = task->compact.n_parts;
 	struct vy_write_iterator *wi;
 	int rc = 0;
@@ -3759,11 +3801,19 @@ vy_task_compact_execute(struct vy_task *task)
 		return -1;
 
 	/* Compact in-memory indexes. First add mems then add runs. */
+	int skip = n_parts;
 	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
+		/* Skip in-memory indexes that belong to new ranges. */
+		if (skip > 0) {
+			skip--;
+			assert(mem == parts[skip]->mem);
+			continue;
+		}
 		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
 		if (rc != 0)
 			goto out;
 	}
+	assert(skip == 0);
 
 	/* Compact on disk runs. */
 	for (struct vy_run *run = range->run; run; run = run->next) {
@@ -3779,8 +3829,8 @@ vy_task_compact_execute(struct vy_task *task)
 	if (rc || curr_stmt == NULL)
 		goto out;
 	for (int i = 0; i < n_parts; i++) {
-		struct vy_range_compact_part *p = &parts[i];
-		struct vy_stmt *split_key = parts[i].range->end;
+		struct vy_range *r = parts[i];
+		struct vy_run *new_run = NULL;
 
 		if (i > 0) {
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
@@ -3789,10 +3839,23 @@ vy_task_compact_execute(struct vy_task *task)
 				      rc = -1; goto out;});
 		}
 
-		rc = vy_range_write_run(p->range, wi, split_key, &parts[i].fd,
-					&p->run, &curr_stmt, &task->dump_size);
+		rc = vy_range_write_run(r, wi, r->end, &new_run,
+					&curr_stmt, &task->dump_size);
 		if (rc != 0)
 			goto out;
+
+		/*
+		 * It's safe to link new run right here as the range has
+		 * ->shadow set and hence can't be iterated over at the
+		 * moment (see vy_range_iterator_next()).
+		 */
+		assert(r->shadow == range);
+		assert(r->run == NULL);
+		if (new_run != NULL) {
+			r->run = new_run;
+			r->run_count = 1;
+		}
+
 		if (curr_stmt == NULL) {
 			/* This iteration was last. */
 			goto out;
@@ -3818,7 +3881,7 @@ static void
 vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_range *range = task->compact.range;
-	struct vy_range_compact_part *parts = task->compact.parts;
+	struct vy_range **parts = task->compact.parts;
 	int n_parts = task->compact.n_parts;
 
 	if (task->status != 0)
@@ -8984,6 +9047,7 @@ static void
 vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
+	assert(itr->curr_range->shadow == NULL);
 	for (struct vy_mem *mem = itr->curr_range->mem; mem; mem = mem->next) {
 		/* only the newest range is mutable */
 		bool is_mutable = (mem == itr->curr_range->mem);
@@ -8998,6 +9062,7 @@ static void
 vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
+	assert(itr->curr_range->shadow == NULL);
 	for (struct vy_run *run = itr->curr_range->run;
 	     run != NULL; run = run->next) {
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
@@ -9046,7 +9111,6 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 
 	itr->curr_stmt = NULL;
 	vy_range_iterator_open(&itr->range_iterator, index, order, key);
-	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
 	vy_merge_iterator_open(&itr->merge_iterator, index, order, key);
@@ -9066,7 +9130,6 @@ restart:
 	key = itr->curr_stmt != 0 ? itr->curr_stmt : itr->key;
 	vy_range_iterator_open(&itr->range_iterator, itr->index,
 			       itr->order, key);
-	itr->curr_range = NULL;
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 
 	/* Re-create merge iterator */
