@@ -1,3 +1,11 @@
+tarantool (1.7.2.135.gcdf16ed-1) unstable; urgency=medium
+
+  * Fix unowned symlink on example.lua after purge. Closes: #842073.
+  * Add conflict on tarantool-lts-dev. Closes: #842086.
+  * Bump debhelper compact version as suggested by lintian.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Wed, 26 Oct 2016 14:12:52 +0300
+
 tarantool (1.7.2.29.g2ad1af9-1) unstable; urgency=medium
 
   * Drop conflicts with tarantool-lts and tarantool-common-lts.
