@@ -14,7 +14,7 @@ travis_test_linux: travis_deps_linux
 	cd test && /usr/bin/python test-run.py
 
 travis_coverage: travis_deps_linux
-	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_GCOV=ON
+	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
 	make -j8
 	# Enable --long tests for coverage
 	cd test && /usr/bin/python test-run.py --long
