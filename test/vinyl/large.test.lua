@@ -4,7 +4,7 @@ test_run = require('test_run').new()
 large = require('large')
 
 large.prepare()
-large.large(500, 5)
+large.large(500)
 
 test_run:cmd('restart server default')
 
