@@ -188,6 +188,9 @@ macro(luajit_build)
         set(luajit_ldflags
             ${luajit_ldflags} -Wl,-macosx_version_min,${luajit_osx_deployment_target})
     endif ()
+    if (ENABLE_GCOV)
+        set (luajit_ccdebug ${luajit_ccdebug} -fprofile-arcs -ftest-coverage)
+    endif()
     if (ENABLE_VALGRIND)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
