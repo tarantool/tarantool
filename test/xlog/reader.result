@@ -513,6 +513,8 @@ collect_results(fio.pathjoin(pattern_prefix, "crc.bad.xlog"))
       'lsn': 3, 'server_id': 1}}
   - {'BODY': {'space_id': 512, 'tuple': [1, 2, 3, 4]}, 'HEADER': {'type': 'INSERT',
       'timestamp': 1475796454.2693, 'lsn': 4, 'server_id': 1}}
+  - {'BODY': {'space_id': 512, 'tuple': [2, 2, 3, 4]}, 'HEADER': {'type': 'REPLACE',
+      'timestamp': 1475796459.9428, 'lsn': 5, 'server_id': 1}}
   - {'BODY': {'space_id': 512, 'key': [1]}, 'HEADER': {'type': 'DELETE', 'timestamp': 1475796470.6977,
       'lsn': 6, 'server_id': 1}}
   - {'BODY': {'space_id': 512, 'index_base': 1, 'key': [2], 'tuple': [['=', 3, 4]]},

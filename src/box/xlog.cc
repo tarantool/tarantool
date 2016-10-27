@@ -184,9 +184,10 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct xlog *wal = xdir_open_xlog(dir, signature);
-	if (wal == NULL)
+	struct xlog_cursor cursor;
+	if (xdir_open_cursor(dir, signature, &cursor) < 0)
 		return -1;
+	struct xlog_meta *meta = &cursor.meta;
 
 	/*
 	 * All log files in a directory must satisfy Lamport's
@@ -196,10 +197,11 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
 	 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
 	 */
-	struct vclock *dup = vclockset_search(&dir->index, &wal->vclock);
+	struct vclock *dup = vclockset_search(&dir->index, &meta->vclock);
 	if (dup != NULL) {
-		tnt_error(XlogError, "%s: invalid xlog order", wal->filename);
-		xlog_close(wal);
+		tnt_error(XlogError, "%s: invalid xlog order",
+			  cursor.name);
+		xlog_cursor_close(&cursor);
 		return -1;
 	}
 
@@ -210,52 +212,57 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
 		tnt_error(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
-		xlog_close(wal);
+		xlog_cursor_close(&cursor);
 		return -1;
 	}
 
-	vclock_copy(vclock, &wal->vclock);
-	xlog_close(wal);
+	vclock_copy(vclock, &meta->vclock);
+	xlog_cursor_close(&cursor);
 	vclockset_insert(&dir->index, vclock);
 	return 0;
 }
 
-struct xlog *
-xdir_open_xlog(struct xdir *dir, int64_t signature)
+int
+xdir_open_cursor(struct xdir *dir, int64_t signature,
+		 struct xlog_cursor *cursor)
 {
 	const char *filename = format_filename(dir, signature, NONE);
-	FILE *f = fopen(filename, "r");
-	struct xlog *wal = xlog_open_stream(f, filename,
-					    dir->panic_if_error,
-					    dir->sync_is_async);
-	if (wal == NULL) {
-		return wal;
+	int fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		tnt_error(XlogError, "%s: can't open file",
+			  filename);
+		return fd;
 	}
-	if (strcmp(wal->filetype, dir->filetype) != 0) {
-		xlog_close(wal);
+	if (xlog_cursor_openfd(cursor, fd, filename) < 0) {
+		close(fd);
+		return -1;
+	}
+	struct xlog_meta *meta = &cursor->meta;
+	if (strcmp(meta->filetype, dir->filetype) != 0) {
+		xlog_cursor_close(cursor);
 		tnt_error(XlogError, "%s: unknown filetype", filename);
-		return NULL;
+		return -1;
 	}
 	if (!tt_uuid_is_nil(dir->server_uuid) &&
-	    !tt_uuid_is_equal(dir->server_uuid, &wal->server_uuid)) {
-		xlog_close(wal);
+	    !tt_uuid_is_equal(dir->server_uuid, &meta->server_uuid)) {
+		xlog_cursor_close(cursor);
 		tnt_error(XlogError, "%s: invalid server UUID",
 			  filename);
-		return NULL;
+		return -1;
 	}
 	/*
 	 * Check the match between log file name and contents:
 	 * the sum of vector clock coordinates must be the same
 	 * as the name of the file.
 	 */
-	int64_t signature_check = vclock_sum(&wal->vclock);
+	int64_t signature_check = vclock_sum(&meta->vclock);
 	if (signature_check != signature) {
-		xlog_close(wal);
+		xlog_cursor_close(cursor);
 		tnt_error(XlogError, "%s: signature check failed",
 			  filename);
-		return NULL;
+		return -1;
 	}
-	return wal;
+	return 0;
 }
 
 static int
@@ -451,8 +458,8 @@ format_filename(struct xdir *dir, int64_t signature,
 static int
 xlog_cursor_decompress(struct xlog_cursor *i)
 {
-	if (!ibuf_capacity(&i->data)) {
-		if (!ibuf_reserve(&i->data,
+	if (!ibuf_capacity(&i->zbuf)) {
+		if (!ibuf_reserve(&i->zbuf,
 				  2 * XLOG_TX_AUTOCOMMIT_THRESHOLD)) {
 			tnt_error(OutOfMemory,
 				  XLOG_TX_AUTOCOMMIT_THRESHOLD,
@@ -460,39 +467,118 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 			return -1;
 		}
 	} else {
-		ibuf_reset(&i->data);
+		ibuf_reset(&i->zbuf);
 	}
 
 	ZSTD_initDStream(i->zdctx);
-	ZSTD_inBuffer input = {i->zbuf.rpos, ibuf_used(&i->zbuf), 0};
+	ZSTD_inBuffer input = {i->data_pos, (size_t)(i->data_end - i->data_pos), 0};
 	while (input.pos < input.size) {
-		ZSTD_outBuffer output = {i->data.wpos,
-					 ibuf_unused(&i->data),
+		ZSTD_outBuffer output = {i->zbuf.wpos,
+					 ibuf_unused(&i->zbuf),
 					 0};
 		size_t rc = ZSTD_decompressStream(i->zdctx,
 						  &output,
 						  &input);
-		ibuf_alloc(&i->data, output.pos);
-		if (rc >= 1) {
-			if (!ibuf_reserve(&i->data,
-					  ibuf_capacity(&i->data))){
+		ibuf_alloc(&i->zbuf, output.pos);
+		if (ZSTD_isError(rc)) {
+			tnt_error(ClientError, ER_COMPRESSION, rc);
+			return -1;
+		}
+		if (input.pos == input.size) {
+			break;
+		}
+		if (output.pos == output.size) {
+			if (!ibuf_reserve(&i->zbuf,
+					  ibuf_capacity(&i->zbuf))){
 				tnt_error(OutOfMemory,
-					  2 * ibuf_capacity(&i->data),
+					  2 * ibuf_capacity(&i->zbuf),
 					  "runtime arena",
 					  "xlog decompression buffer");
 				return -1;
 			}
 			continue;
 		}
-		if (rc == 0) {
+	}
+	i->data_pos = i->zbuf.rpos;
+	i->data_end = i->zbuf.wpos;
+	return 0;
+}
+
+#define XLOG_READ_AHEAD		(1 << 14)
+
+/*
+ * Loads next count bytes into read buffer,
+ * set data to next chunk pointer
+ */
+static ssize_t
+xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
+{
+	assert(cursor->buf_offset <= cursor->read_offset);
+	if (cursor->buf_offset + ibuf_used(&cursor->rbuf) <
+	    (size_t)cursor->read_offset) {
+		/* we read something behind of the end of read buffer */
+		ibuf_reset(&cursor->rbuf);
+		cursor->buf_offset = cursor->read_offset;
+	}
+	size_t buf_delta = cursor->read_offset - cursor->buf_offset;
+	if (ibuf_used(&cursor->rbuf) >= buf_delta + count) {
+		*data = cursor->rbuf.rpos + buf_delta;
+		cursor->read_offset += count;
+		return count;
+	}
+	/* inmemory cursor */
+	if (cursor->fd == 0)
+		return 0;
+	size_t to_load = count - (ibuf_used(&cursor->rbuf) - buf_delta);
+	to_load += XLOG_READ_AHEAD;
+	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
+	if (dst == NULL)
+		return -1;
+	ssize_t readen = fio_read(cursor->fd, dst, to_load);
+	if (readen < 0)
+		return readen;
+	ibuf_alloc(&cursor->rbuf, readen);
+	*data = cursor->rbuf.rpos + buf_delta;
+	readen = MIN(ibuf_used(&cursor->rbuf) - buf_delta, count);
+	cursor->read_offset += readen;
+	return readen;
+}
+
+/*
+ * Remove count bytes from read buffer
+ */
+static void
+xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
+{
+	assert(cursor->rbuf.rpos + count <= cursor->rbuf.wpos);
+	cursor->buf_offset += count;
+	cursor->rbuf.rpos += count;
+}
+
+/*
+ * Read a string from cursor
+ */
+static int
+xlog_cursor_gets(struct xlog_cursor *cursor, char *str, size_t len)
+{
+	size_t pos = 0;
+	while (pos < len - 1) {
+		char *next_char;
+		ssize_t rc = xlog_cursor_load(cursor, 1, &next_char);
+		if (rc < 0)
+			return -1;
+		if (rc == 0)
+			break;
+		str[pos] = *next_char;
+		xlog_cursor_consume(cursor, 1);
+		if (*next_char == '\n') {
+			++pos;
 			break;
 		}
-		if (ZSTD_isError(rc)) {
-			tnt_error(ClientError, ER_COMPRESSION, rc);
-			return -1;
-		}
+		++pos;
 	}
-	return 0;
+	str[pos] = '\0';
+	return pos;
 }
 
 /**
@@ -503,27 +589,27 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 static int
 xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 {
-	const char *data;
-	FILE *f = i->log->f;
+	ssize_t header_size = XLOG_FIXHEADER_SIZE - sizeof(log_magic_t);
+	char *fixheader;
+	ssize_t loaded = xlog_cursor_load(i, header_size, &fixheader);
+	if (loaded < 0) {
+		return -1;
+	}
+	if (loaded < header_size)
+		return 1;
 
-	/* Read fixed header */
-	char fixheader[XLOG_FIXHEADER_SIZE - sizeof(log_magic_t)];
-	if (fread(fixheader, sizeof(fixheader), 1, f) != 1) {
-		if (feof(f))
-			return 1;
-error:
+	const char *data = fixheader;
+
+	/* Decode len, previous crc32 and row crc32 */
+	if (mp_check(&data, data + header_size) != 0) {
+	error:
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s: failed to parse row "
-			 "header at offset %" PRIu64, fio_filename(fileno(f)),
-			 (uint64_t) ftello(f));
+		snprintf(buf, sizeof(buf), "%s: failed to parse tx "
+			 "header at offset %" PRIu64, i->name,
+			 (uint64_t)i->search_offset);
 		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
 		return -1;
 	}
-
-	/* Decode len, previous crc32 and row crc32 */
-	data = fixheader;
-	if (mp_check(&data, data + sizeof(fixheader)) != 0)
-		goto error;
 	data = fixheader;
 
 	/* Read length */
@@ -534,7 +620,7 @@ error:
 		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf),
 			 "%s: row is too big at offset %" PRIu64,
-			 fio_filename(fileno(f)), (uint64_t) ftello(f));
+			 i->name, (uint64_t)i->search_offset);
 		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
 		return -1;
 	}
@@ -548,47 +634,34 @@ error:
 	if (mp_typeof(*data) != MP_UINT)
 		goto error;
 	uint32_t crc32c = mp_decode_uint(&data);
-	assert(data <= fixheader + sizeof(fixheader));
+	assert(data <= fixheader + header_size);
 	(void) crc32p;
 
-	struct ibuf *rbuf = &i->data;
-	if (magic == zrow_marker) {
-		rbuf = &i->zbuf;
-	}
-	ibuf_reset(rbuf);
-
-	if (!ibuf_reserve(rbuf, len)) {
-		tnt_error(OutOfMemory, len, "runtime arena",
-			  "xlog cursor read buffer");
+	loaded = xlog_cursor_load(i, len, &i->data_pos);
+	if (loaded < 0)
 		return -1;
-	}
-	if (fread(rbuf->wpos, len, 1, f) != 1)
+	if (loaded < len)
 		return 1;
+	i->data_end = i->data_pos + len;
 
 	/* Validate checksum */
-	if (crc32_calc(0, rbuf->wpos, len) != crc32c) {
+	if (crc32_calc(0, i->data_pos, len) != crc32c) {
 		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf), "%s: row block checksum"
 			 " mismatch (expected %u) at offset %" PRIu64,
-			 fio_filename(fileno(f)), (unsigned) crc32c,
-			 (uint64_t) ftello(f));
+			 i->name, (unsigned) crc32c,
+			 (uint64_t)i->search_offset);
 		if (i->ignore_crc == false) {
 			tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
 			return -1;
 		}
-	}
-	rbuf->wpos += len;
-
-	if (magic == row_marker) {
-		/* Plain row block, just return */
-		return 0;
 	}
 
 	if (magic == zrow_marker) {
 		return xlog_cursor_decompress(i);
 	}
 
-	return -1;
+	return 0;
 }
 
 static int
@@ -877,50 +950,104 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	return 0;
 }
 
-void
-xlog_cursor_open(struct xlog_cursor *i, struct xlog *l)
+static int
+xlog_read_meta(struct xlog_cursor *cursor);
+
+int
+xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 {
-	i->log = l;
-	i->good_offset = ftello(l->f);
+	memset(i, 0, sizeof(*i));
+	i->fd = fd;
 	i->eof_read = false;
 	i->ignore_crc = false;
-	ibuf_create(&i->data, &cord()->slabc,
-		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	ibuf_create(&i->rbuf, &cord()->slabc,
+		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
 	ibuf_create(&i->zbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
+	if (xlog_read_meta(i) < 0)
+		goto error;
+	i->search_offset = i->read_offset;
+	snprintf(i->name, PATH_MAX, "%s", name);
+	return 0;
+error:
+	ibuf_destroy(&i->rbuf);
+	ibuf_destroy(&i->zbuf);
+	ZSTD_freeDStream(i->zdctx);
+	return -1;
 }
 
+int
+xlog_cursor_open(struct xlog_cursor *i, const char *name)
+{
+	int fd = open(name, O_RDONLY);
+	if (fd < 0) {
+		tnt_error(XlogError, "%s: can't open file",
+			  name);
+		return -1;
+	}
+	int rc = xlog_cursor_openfd(i, fd, name);
+	if (rc < 0)
+		close(fd);
+	return rc;
+}
+
+int
+xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
+		    const char *name)
+{
+	memset(i, 0, sizeof(*i));
+	i->fd = 0;
+	i->eof_read = false;
+	i->ignore_crc = false;
+	ibuf_create(&i->rbuf, &cord()->slabc,
+		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
+
+	void *dst = ibuf_alloc(&i->rbuf, size);
+	if (dst == NULL)
+		goto error;
+	memcpy(dst, data, size);
+	ibuf_create(&i->zbuf, &cord()->slabc,
+		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	i->zdctx = ZSTD_createDStream();
+	if (xlog_read_meta(i) < 0)
+		goto error;
+	i->search_offset = i->read_offset;
+	snprintf(i->name, PATH_MAX, "%s", name);
+	return 0;
+error:
+	ibuf_destroy(&i->rbuf);
+	ibuf_destroy(&i->zbuf);
+	ZSTD_freeDStream(i->zdctx);
+	return -1;
+}
 void
 xlog_cursor_close(struct xlog_cursor *i)
 {
-	struct xlog *l = i->log;
-	/*
-	 * Since we don't close the xlog
-	 * we must rewind it to the last known
-	 * good position if there was an error.
-	 * Seek back to last known good offset.
-	 */
-	fseeko(l->f, i->good_offset, SEEK_SET);
-	ibuf_destroy(&i->data);
+	if (i->fd > 0)
+		close(i->fd);
+	ibuf_destroy(&i->rbuf);
 	ibuf_destroy(&i->zbuf);
 	ZSTD_freeDStream(i->zdctx);
 	region_free(&fiber()->gc);
 }
 
+/*
+ * read current tx
+ */
 static int
 xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 {
 	/* Return row from xlog tx buffer */
 	try {
 		xrow_header_decode(row,
-				   (const char **)&i->data.rpos,
-				   (const char *)i->data.wpos);
+				   (const char **)&i->data_pos,
+				   (const char *)i->data_end);
 	} catch (ClientError *e) {
 		say_warn("failed to read row");
 		/* Discard remaining row data */
-		ibuf_reset(&i->data);
+		i->data_pos = i->data_end;
 		return -1;
 	}
 
@@ -928,29 +1055,41 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 }
 
 /**
- * Find a next xlog tx magic
+ * Find a next xlog tx magic, set magic to last readen 4 bytes
  */
 static int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 {
-	off_t start_pos = ftello(i->log->f);
-	if (fread(magic, sizeof(*magic), 1, i->log->f) != 1) {
+	ssize_t loaded, skipped = 0;
+	log_magic_t *magic_ptr;
+	loaded = xlog_cursor_load(i, sizeof(*magic), (char **)&magic_ptr);
+	if (loaded < 0)
+		return -1;
+	if (loaded < (ssize_t)sizeof(*magic))
 		return 1;
-	}
-	ssize_t skipped = 0;
-	while (*magic != row_marker && *magic != zrow_marker) {
-		int c = fgetc(i->log->f);
-		if (c == EOF) {
+	*magic = *magic_ptr;
+
+	while (*magic_ptr != row_marker && *magic_ptr != zrow_marker) {
+		char *last_byte;
+		loaded = xlog_cursor_load(i, 1, &last_byte);
+		if (loaded < 0)
+			return -1;
+		if (loaded < 1) {
 			return 1;
 		}
-		*magic = *magic >> 8 |
-		((log_magic_t) c & 0xff) << (sizeof(*magic) * 8 - 8);
+		magic_ptr = (log_magic_t *)(last_byte - sizeof(*magic) + 1);
+		*magic = *magic_ptr;
+		/* delete first byte from read buf */
+		xlog_cursor_consume(i, 1);
 		++skipped;
 	}
+
 	if (skipped) {
 		say_warn("Skipped %zd after %zd offset untic magic found",
-			 skipped, start_pos);
+			 skipped, i->search_offset);
 	}
+	say_debug("magic found at 0x%08jx",
+		  (uintmax_t)i->read_offset - sizeof(*magic));
 	return 0;
 }
 
@@ -966,14 +1105,12 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 int
 xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 {
-	struct xlog *l = i->log;
 	log_magic_t magic = 0;
-	off_t marker_offset = 0;
 	int rc;
 
 	assert(i->eof_read == false);
 
-	if (ibuf_used(&i->data)) {
+	if (i->data_pos < i->data_end) {
 		/*
 		 * Still more xrows in this batch, unpack the next
 		 * row.
@@ -982,79 +1119,50 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		if (rc == 0)
 			return 0;
 		assert(rc < 0);
-		if (l->panic_if_error)
-			return -1;
+		return -1;
 		/* Fall through - read the next row */
 	}
+	/* set read buffer to current pos */
+	i->read_offset = i->search_offset;
+	xlog_cursor_consume(i, i->read_offset - i->buf_offset);
 
-	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
-		  row_marker, sizeof(row_marker));
-
-restart:
-	if (xlog_cursor_find_tx_magic(i, &magic) > 0)
-		goto eof;
-
-	marker_offset = ftello(l->f) - sizeof(row_marker);
-	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
-	rc = xlog_cursor_read_tx(i, magic);
+	rc = xlog_cursor_find_tx_magic(i, &magic);
 	if (rc > 0) {
+		/** eof, go back and retry later */
 		goto eof;
 	} else if (rc < 0) {
-		if (l->panic_if_error)
-			return -1;
-		say_warn("xlog: failed to read xlog tx at %lld",
-			 (long long)marker_offset);
-		fseeko(l->f, marker_offset + 1, SEEK_SET);
-		goto restart;
-	}
-	i->good_offset = ftello(l->f);
-	rc = xlog_cursor_next_row(i, row);
-	if (rc == 0)
-		return 0;
-	assert(rc < 0);
-	if (l->panic_if_error)
+		/**
+		 * error by readin byte at read_offset,
+		 * restart search from next position
+		 */
+		i->search_offset = i->read_offset + 1;
 		return -1;
-
-	goto restart;
-eof:
-	/*
-	 * According to POSIX, if a partial element is read, value
-	 * of the file position indicator for the stream is
-	 * unspecified.
-	 *
-	 * Thus don't trust the current file position, seek to the
-	 * last good position first.
-	 *
-	 * The only case of a fully read file is when eof_marker
-	 * is present and it is the last record in the file. If
-	 * eof_marker is missing, the caller must make the
-	 * decision whether to switch to the next file or not.
-	 */
-	fseeko(l->f, i->good_offset, SEEK_SET);
-	if (fread(&magic, sizeof(magic), 1, l->f) == 1) {
-		if (magic == eof_marker) {
-			i->good_offset = ftello(l->f);
-			i->eof_read = true;
-		} else if (magic == row_marker || magic == zrow_marker) {
-			/* Return to last good offset, we will reread magic */
-			fseeko(l->f, i->good_offset, SEEK_SET);
-			/*
-			 * Row marker at the end of a file: a sign
-			 * of a corrupt log file in case of
-			 * recovery, but OK in case we're in local
-			 * hot standby or replication relay mode
-			 * (i.e. data is being written to the
-			 * file.
-			 */
-		} else {
-			say_error("EOF marker is corrupt: %lu %lu",
-				  (unsigned long) magic, (unsigned long) i->good_offset);
-		}
-	} else {
-		/* Return to last good offset, we will reread magic */
-		fseeko(l->f, i->good_offset, SEEK_SET);
 	}
-	/* No more rows. */
+	off_t marker_offset;
+	marker_offset = i->read_offset - sizeof(magic);
+	rc = xlog_cursor_read_tx(i, magic);
+	if (rc > 0) {
+		/** eof, go back to marker and retry later */
+		i->search_offset = marker_offset;
+		goto eof;
+	} else if (rc < 0) {
+		/** error, can't read byte at read_offset,
+		 * go to next and restart later
+		 * NOTE: we can have not a some kind of reading issue, but
+		 * in any case we can to find next tx and read it
+		 */
+		say_warn("xlog: failed to read xlog tx at %lld",
+			 marker_offset);
+		/* start reading from next byte from current marker */
+		i->search_offset = marker_offset + 1;
+		return -1;
+	}
+	/* update position */
+	i->search_offset = i->read_offset;
+
+	return xlog_cursor_next_row(i, row);
+eof:
+	i->eof_read = (magic == eof_marker);
 	return 1;
 }
 
@@ -1167,28 +1275,32 @@ xlog_write_meta(struct xlog *l)
  * @return 0 if success, -1 on error.
  */
 static int
-xlog_read_meta(struct xlog *l)
+xlog_read_meta(struct xlog_cursor *cursor)
 {
-	char version[32], buf[256];
-	FILE *stream = l->f;
-
-	if (fgets(l->filetype, sizeof(l->filetype), stream) == NULL ||
-	    fgets(version, sizeof(version), stream) == NULL) {
+	struct xlog_meta *meta = &cursor->meta;
+	if (xlog_cursor_gets(cursor, meta->filetype,
+		     sizeof(meta->filetype)) <= 0 ||
+	    xlog_cursor_gets(cursor, meta->version,
+			     sizeof(meta->version)) <= 0) {
 		tnt_error(XlogError, "%s: failed to read log file header",
-			  l->filename);
+			  cursor->name);
 		return -1;
 	}
 
-	if (strcmp(v13, version) != 0 && strcmp(v12, version) != 0) {
-		size_t len = strlen(l->filetype) - 1;
-		tnt_error(XlogError, "%s: unsupported file format version %.*s",
-			  l->filename, len, version);
+	if (strcmp(v13, meta->version) != 0 &&
+	    strcmp(v12, meta->version) != 0) {
+		size_t len = strlen(meta->filetype) - 1;
+		tnt_error(XlogError,
+			  "%s: unsupported file format version %.*s",
+			  cursor->name, len, meta->version);
 		return -1;
 	}
+
+	char buf[256];
 	for (;;) {
-		if (fgets(buf, sizeof(buf), stream) == NULL) {
+		if (xlog_cursor_gets(cursor, buf, sizeof(buf)) <= 0) {
 			tnt_error(XlogError, "%s: failed to read log file "
-				  "header", l->filename);
+				  "header", cursor->name);
 			return -1;
 		}
 		/** Empty line indicates the end of file header. */
@@ -1202,7 +1314,7 @@ xlog_read_meta(struct xlog *l)
 		char *key = buf;
 		char *val = strchr(buf, ':');
 		if (val == NULL) {
-			tnt_error(XlogError, "%s: invalid meta", l->filename);
+			tnt_error(XlogError, "%s: invalid meta", cursor->name);
 			return -1;
 		}
 		*val++ = 0;
@@ -1211,16 +1323,16 @@ xlog_read_meta(struct xlog *l)
 
 		if (strcmp(key, SERVER_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
-			    tt_uuid_from_string(val, &l->server_uuid) != 0) {
+			    tt_uuid_from_string(val, &meta->server_uuid) != 0) {
 				tnt_error(XlogError, "%s: can't parse node UUID",
-					  l->filename);
+					  cursor->name);
 				return -1;
 			}
 		} else if (strcmp(key, VCLOCK_KEY) == 0){
-			size_t offset = vclock_from_string(&l->vclock, val);
+			size_t offset = vclock_from_string(&meta->vclock, val);
 			if (offset != 0) {
 				tnt_error(XlogError, "%s: invalid vclock at "
-					  "offset %zd", l->filename, offset);
+					  "offset %zd", cursor->name, offset);
 				return -1;
 			}
 		} else {
@@ -1229,47 +1341,6 @@ xlog_read_meta(struct xlog *l)
 	}
 
 	return 0;
-}
-
-struct xlog *
-xlog_open_stream(FILE *file, const char *filename,
-		 bool panic_if_error, bool sync_is_async)
-{
-	/*
-	 * Check fopen() result the caller first thing, to
-	 * preserve the errno.
-	 */
-	if (file == NULL) {
-		tnt_error(SystemError, "%s: failed to open file", filename);
-		return NULL;
-	}
-
-	struct xlog *l = (struct xlog *) calloc(1, sizeof(*l));
-
-	if (l == NULL) {
-		fclose(file);
-		tnt_error(OutOfMemory, sizeof(*l), "malloc", "struct xlog");
-		return NULL;
-	}
-
-	auto log_guard = make_scoped_guard([=]{
-		fclose(file);
-		free(l);
-	});
-	l->panic_if_error = panic_if_error;
-	l->sync_is_async = sync_is_async;
-
-	l->f = file;
-	snprintf(l->filename, PATH_MAX, "%s", filename);
-	l->mode = LOG_READ;
-	l->is_inprogress = false;
-	vclock_create(&l->vclock);
-
-	if (xlog_read_meta(l) != 0)
-		return NULL;
-
-	log_guard.is_active = false;
-	return l;
 }
 
 int
@@ -1343,7 +1414,6 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	/* Setup inherited values */
 	snprintf(l->filetype, sizeof(l->filetype), "%s", dir->filetype);
-	l->panic_if_error = dir->panic_if_error;
 	l->server_uuid = *dir->server_uuid;
 	l->sync_is_async = dir->sync_is_async;
 

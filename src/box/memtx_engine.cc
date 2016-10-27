@@ -698,14 +698,12 @@ MemtxEngine::recoverSnapshot()
 	say_info("recovery start");
 	assert(m_has_checkpoint);
 	int64_t signature = m_last_checkpoint.signature;
-	struct xlog *snap = xdir_open_xlog_xc(&m_snap_dir, signature);
-	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
-	/* Save server UUID */
-	SERVER_UUID = snap->server_uuid;
+	const char *filename = format_filename(&m_snap_dir, signature, NONE);
 
-	say_info("recovering from `%s'", snap->filename);
+	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
-	xlog_cursor_open(&cursor, snap);
+	xlog_cursor_open_xc(&cursor, filename);
+	SERVER_UUID = cursor.meta.server_uuid;
 	auto reader_guard = make_scoped_guard([&]{
 		xlog_cursor_close(&cursor);
 	});
@@ -733,7 +731,7 @@ MemtxEngine::recoverSnapshot()
 	 * should not be trusted.
 	 */
 	if (!cursor.eof_read)
-		panic("snapshot `%s' has no EOF marker", snap->filename);
+		panic("snapshot `%s' has no EOF marker", filename);
 
 }
 
@@ -1074,15 +1072,13 @@ MemtxEngine::bootstrap()
 	say_info("initializing an empty data directory");
 	struct xdir dir;
 	xdir_create(&dir, "", SNAP, &uuid_nil);
-	FILE *f = fmemopen((void *) &bootstrap_bin,
-			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream_xc(f, "bootstrap.snap",
-						dir.panic_if_error, false);
 	struct xlog_cursor cursor;
-	xlog_cursor_open(&cursor, snap);
+	if (xlog_cursor_openmem(&cursor, (const char *)bootstrap_bin,
+				sizeof(bootstrap_bin), "bootstrap") < 0) {
+		diag_raise();
+	};
 	auto guard = make_scoped_guard([&]{
 		xlog_cursor_close(&cursor);
-		xlog_close(snap);
 		xdir_destroy(&dir);
 	});
 
@@ -1401,7 +1397,6 @@ memtx_initial_join_f(va_list ap)
 	struct xstream *stream = arg->stream;
 
 	struct xdir dir;
-	struct xlog *snap = NULL;
 	/*
 	 * snap_dirname and SERVER_UUID don't change after start,
 	 * safe to use in another thread.
@@ -1409,13 +1404,9 @@ memtx_initial_join_f(va_list ap)
 	xdir_create(&dir, snap_dirname, SNAP, &SERVER_UUID);
 	auto guard = make_scoped_guard([&]{
 		xdir_destroy(&dir);
-		if (snap)
-			xlog_close(snap);
 	});
-
-	snap = xdir_open_xlog_xc(&dir, checkpoint_lsn);
 	struct xlog_cursor cursor;
-	xlog_cursor_open(&cursor, snap);
+	xdir_open_cursor_xc(&dir, checkpoint_lsn, &cursor);
 	auto reader_guard = make_scoped_guard([&]{
 		xlog_cursor_close(&cursor);
 	});
@@ -1431,7 +1422,8 @@ memtx_initial_join_f(va_list ap)
 	 */
 	/* TODO: replace panic with tnt_raise() */
 	if (!cursor.eof_read)
-		panic("snapshot `%s' has no EOF marker", snap->filename);
+		panic("snapshot `%s' has no EOF marker",
+		      cursor.name);
 	return 0;
 }
 

@@ -204,11 +204,34 @@ struct xlog_tx {
 };
 
 /**
+ * A xlog meta info
+ */
+struct xlog_meta {
+	/** Text file header: filetype */
+	char filetype[10];
+	/** Text file header: xlog format version */
+	char version[10];
+	/**
+	 * Text file header: server uuid. We read
+	 * only logs with our own uuid, to avoid situations
+	 * when a DBA has manually moved a few logs around
+	 * and messed the data directory up.
+	 */
+	struct tt_uuid server_uuid;
+	/**
+	 * Text file header: vector clock taken at the time
+	 * this file was created. For WALs, this is vector
+	 * clock *at start of WAL*, for snapshots, this
+	 * is vector clock *at the time the snapshot is taken*.
+	 */
+	struct vclock vclock;
+};
+
+/**
  * A single log file - a snapshot or a write ahead log.
  */
 struct xlog {
 	/* Inherited from xdir struct */
-	bool panic_if_error;
 	bool sync_is_async;
 	char filetype[10];
 	/** File handle. */
@@ -247,21 +270,6 @@ struct xlog {
 	 */
 	struct xlog_tx xlog_tx;
 };
-
-/**
- * Open an xlog from a pre-created stdio stream.
- * The log is open for reading.
- * The file is closed on error, even if open fails.
- *
- * The caller must free the created xlog object with
- * xlog_close().
- *
- * Return NULL in case of error.
- */
-
-struct xlog *
-xlog_open_stream(FILE *file, const char *filename,
-		 bool panic_if_error, bool sync_is_async);
 
 /**
  * Create a new file and open it in write (append) mode.
@@ -305,33 +313,108 @@ xlog_atfork(struct xlog **lptr);
 
 /* {{{ xlog_cursor - read rows from a log file */
 
+/**
+ * Xlog cursor, read rows from xlog
+ */
 struct xlog_cursor
 {
-	struct xlog *log;
-	off_t good_offset;
-	bool eof_read;
-	struct ibuf data;
-	bool ignore_crc;
+	/** xlog meta info */
+	struct xlog_meta meta;
+	/** file descriptor or 0 for in memory */
+	int fd;
+	/** associated file name */
+	char name[PATH_MAX];
+	/** file read buffer */
+	struct ibuf rbuf;
+	/** file position for first byte in read buffer */
+	off_t buf_offset;
+	/** cursor read position */
+	off_t read_offset;
 
+	/** position for next tx search */
+	off_t search_offset;
+	/** current parse position in tx memory */
+	char *data_pos;
+	/** end position in tx memory */
+	char *data_end;
+	/** true if eof marker was readen */
+	bool eof_read;
+
+	/** if true then bad crc will be ignored */
+	bool ignore_crc;
+	/** zbuf decompression context */
 	ZSTD_DStream* zdctx;
+	/** zstd decompression buffer */
 	struct ibuf zbuf;
 };
 
-void
-xlog_cursor_open(struct xlog_cursor *i, struct xlog *l);
-
-void
-xlog_cursor_close(struct xlog_cursor *i);
-
+/**
+ * Open cursor from file descriptor
+ * @param cursor cursor
+ * @param fd file descriptor
+ * @param name associated file name
+ * @retval 0 succes
+ * @retval -1 error, check diag
+ */
 int
-xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *packet);
+xlog_cursor_openfd(struct xlog_cursor *cursor, int fd, const char *name);
+
+/**
+ * Open cursor from file
+ * @param cursor cursor
+ * @param name file name
+ * @retval 0 succes
+ * @retval -1 error, check diag
+ */
+int
+xlog_cursor_open(struct xlog_cursor *cursor, const char *name);
+
+/**
+ * Open cursor from memory
+ * @param cursor cursor
+ * @param data pointer to memory block
+ * @param size memory block size
+ * @param name associated file name
+ * @retval 0 succes
+ * @retval -1 error, check diag
+ */
+int
+xlog_cursor_openmem(struct xlog_cursor *cursor, const char *data, size_t size,
+		    const char *name);
+
+/**
+ * Close cursor
+ * @param cursor cursor
+ */
+void
+xlog_cursor_close(struct xlog_cursor *cursor);
+
+/**
+ * Return next row from cursor
+ * @param cursor cursor
+ * @param packet row to return
+ * @retval 0 succes
+ * @retval 1 eof
+ * retval -1 error, check diag
+ */
+int
+xlog_cursor_next(struct xlog_cursor *cursor, struct xrow_header *packet);
 
 /* }}} */
 
 /** {{{ miscellaneous log io functions. */
 
-struct xlog *
-xdir_open_xlog(struct xdir *dir, int64_t signature);
+/**
+ * Open cursor for xdir entry pointed by signature
+ * @param xdir xdir
+ * @param signature xlog signature
+ * @param cursor cursor
+ * @retval 0 succes
+ * @retval -1 error, check diag
+ */
+int
+xdir_open_cursor(struct xdir *dir, int64_t signature,
+		 struct xlog_cursor *cursor);
 
 /**
  * Return a file name based on directory type, vector clock
@@ -412,6 +495,9 @@ xdir_check_xc(struct xdir *dir)
 		diag_raise();
 }
 
+/**
+ * @copydoc xlog_cursor_next
+ */
 static inline int
 xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
 {
@@ -421,25 +507,40 @@ xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
 	return rv;
 }
 
-static inline struct xlog*
-xdir_open_xlog_xc(struct xdir *dir, int64_t signature)
+/**
+ * @copydoc xdir_open_cursor
+ */
+static inline int
+xdir_open_cursor_xc(struct xdir *dir, int64_t signature,
+		    struct xlog_cursor *cursor)
 {
-	struct xlog *log = xdir_open_xlog(dir, signature);
-	if (log)
-		return log;
-	diag_raise();
-	return NULL;
+	int rc = xdir_open_cursor(dir, signature, cursor);
+	if (rc == -1)
+		diag_raise();
+	return rc;
 }
 
-static inline struct xlog *
-xlog_open_stream_xc(FILE *file, const char *filename,
-		    bool panic_if_error, bool sync_is_async)
+/**
+ * @copydoc xlog_cursor_openfd
+ */
+static inline int
+xlog_cursor_openfd_xc(struct xlog_cursor *cursor, int fd, const char *name)
 {
-	struct xlog *rv = xlog_open_stream(file, filename,
-					   panic_if_error, sync_is_async);
-	if (rv == NULL)
+	int rc = xlog_cursor_openfd(cursor, fd, name);
+	if (rc == -1)
 		diag_raise();
-	return rv;
+	return rc;
+}
+/**
+ * @copydoc xlog_cursor_open
+ */
+static inline int
+xlog_cursor_open_xc(struct xlog_cursor *cursor, const char *name)
+{
+	int rc = xlog_cursor_open(cursor, name);
+	if (rc == -1)
+		diag_raise();
+	return rc;
 }
 
 #endif /* defined(__cplusplus) */

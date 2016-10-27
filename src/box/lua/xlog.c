@@ -142,12 +142,14 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	struct xlog_cursor *cur = lbox_checkcursor(L, 1, "xlog:pairs()");
 
 	struct xrow_header row;
-	int rc = xlog_cursor_next(cur, &row);
-	if (rc < 0) {
-		return lbox_error(L);
-	} else if (rc == 1) {
-		return 0; /* EOF */
+	int rc;
+	/* skip all bad read requests */
+	while ((rc = xlog_cursor_next(cur, &row)) < 0) {
+		if (diag_last_error(diag_get())->type != &type_ClientError)
+			lbox_error(L);
 	}
+	if (rc == 1)
+		return 0; /* EOF */
 	assert(rc == 0);
 
 	lua_pushinteger(L, row.lsn);
@@ -191,10 +193,7 @@ static void
 lbox_xlog_parser_close(struct xlog_cursor *cur) {
 	if (cur == NULL)
 		return;
-	struct xlog *log = cur->log;
 	xlog_cursor_close(cur);
-	assert(log != NULL);
-	xlog_close(log);
 	free(cur);
 }
 
@@ -215,25 +214,6 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 
 	const char *filename = luaL_checkstring(L, 1);
 
-	/* Construct xlog object */
-	FILE *f = fopen(filename, "r");
-	if (f == NULL) {
-		diag_set(SystemError, "%s: failed to open file", filename);
-		return lbox_error(L);
-	}
-	struct xlog *log = xlog_open_stream(f, filename, false, false);
-	if (log == NULL) {
-		return lbox_error(L);
-	}
-	if (strncmp(log->filetype, "SNAP\n", 5) != 0 &&
-	    strncmp(log->filetype, "XLOG\n", 5) != 0) {
-		char buf[1024];
-		snprintf(buf, sizeof(buf), "'%.*s' file type",
-			 (int) strlen(log->filetype) - 1, log->filetype);
-		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
-		xlog_close(log);
-		return lbox_error(L);
-	}
 	/* Construct xlog cursor */
 	struct xlog_cursor *cur = (struct xlog_cursor *)calloc(1,
 			sizeof(struct xlog_cursor));
@@ -242,8 +222,22 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 			 "malloc", "struct xlog_cursor");
 		return lbox_error(L);
 	}
+	/* Construct xlog object */
+	if (xlog_cursor_open(cur, filename) < 0) {
+		return lbox_error(L);
+	}
+	if (strncmp(cur->meta.filetype, "SNAP\n", 5) != 0 &&
+	    strncmp(cur->meta.filetype, "XLOG\n", 5) != 0) {
+		char buf[1024];
+		snprintf(buf, sizeof(buf), "'%.*s' file type",
+			 (int) strlen(cur->meta.filetype) - 1,
+			 cur->meta.filetype);
+		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
+		xlog_cursor_close(cur);
+		free(cur);
+		return lbox_error(L);
+	}
 	cur->ignore_crc = true;
-	xlog_cursor_open(cur, log);
 
 	/* push iteration function */
 	lua_pushcclosure(L, &lbox_xlog_parser_iterate, 1);
