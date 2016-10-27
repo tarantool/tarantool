@@ -500,13 +500,6 @@ vy_stmt_ref(struct vy_stmt *stmt);
 static void
 vy_stmt_unref(struct vy_stmt *stmt);
 
-/** The statement, while present in the transaction log, doesn't exist. */
-static bool
-vy_stmt_is_not_found(struct vy_stmt *stmt)
-{
-	return stmt->type == IPROTO_DELETE;
-}
-
 static struct vy_stmt *
 vy_stmt_extract_key_raw(struct vy_index *index, const char *stmt);
 
@@ -5869,14 +5862,6 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	if (vy_index_read(index, vykey, VINYL_EQ, &vyresult, tx))
 		goto end;
 
-	if (vyresult && vy_stmt_is_not_found(vyresult)) {
-		/*
-		 * We deleted this stmt in this
-		 * transaction. No need for a disk lookup.
-		 */
-		vy_stmt_unref(vyresult);
-		vyresult = NULL;
-	}
 	if (tx != NULL && vy_tx_track(tx, index, vykey))
 		goto end;
 	if (vyresult == NULL) { /* not found */
@@ -5912,14 +5897,6 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	if (vy_index_read(index, c->key, c->order, &vyresult, c->tx))
 		return -1;
 	c->n_reads++;
-	if (vyresult && vy_stmt_is_not_found(vyresult)) {
-		/*
-		 * We deleted this stmt in this
-		 * transaction. No need for a disk lookup.
-		 */
-		vy_stmt_unref(vyresult);
-		vyresult = NULL;
-	}
 	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key)) {
 		if (vyresult)
 			vy_stmt_unref(vyresult);
@@ -9005,6 +8982,7 @@ restart:
 		}
 	}
 	*result = itr->curr_stmt;
+	assert(*result == NULL || (*result)->type == IPROTO_REPLACE);
 	return 0;
 }
 
