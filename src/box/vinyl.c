@@ -1331,7 +1331,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 
 struct write_set_key {
 	struct vy_index *index;
-	struct vy_stmt *stmt;
+	const struct vy_stmt *stmt;
 };
 
 static int
@@ -1607,7 +1607,7 @@ vy_range_str(struct vy_range *range)
 }
 
 static int
-vy_range_cmp(struct vy_range *range, struct vy_stmt *key,
+vy_range_cmp(struct vy_range *range, const struct vy_stmt *key,
 	     struct key_def *key_def)
 {
 	/* Any key > -inf. */
@@ -1660,10 +1660,10 @@ static int
 vy_range_tree_cmp(struct vy_range *a, struct vy_range *b);
 
 static int
-vy_range_tree_key_cmp(struct vy_stmt *a, struct vy_range *b);
+vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
-	       struct vy_range, tree_node, vy_range_tree_cmp, struct vy_stmt *,
+	       struct vy_range, tree_node, vy_range_tree_cmp, const struct vy_stmt *,
 	       vy_range_tree_key_cmp);
 
 static void
@@ -1706,7 +1706,7 @@ vy_range_tree_cmp(struct vy_range *a, struct vy_range *b)
 }
 
 static int
-vy_range_tree_key_cmp(struct vy_stmt *a, struct vy_range *b)
+vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b)
 {
 	return (-vy_range_cmp(b, a, b->index->key_def));
 }
@@ -1717,12 +1717,12 @@ vy_index_delete(struct vy_index *index);
 struct vy_range_iterator {
 	struct vy_index *index;
 	enum vy_order order;
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 };
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
-		       enum vy_order order, struct vy_stmt *key)
+		       enum vy_order order, const struct vy_stmt *key)
 {
 	itr->index = index;
 	itr->order = order;
@@ -1731,7 +1731,7 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
-			  struct key_def *key_def, struct vy_stmt *key)
+			  struct key_def *key_def, const struct vy_stmt *key)
 {
 	if (vy_stmt_key_part(key->data, 0) == NULL) {
 		switch (order) {
@@ -6290,7 +6290,7 @@ struct vy_run_iterator {
 	 */
 	enum vy_order order;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	int64_t vlsn;
 
@@ -6317,7 +6317,7 @@ struct vy_run_iterator {
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum vy_order order,
-		     struct vy_stmt *key, int64_t vlsn);
+		     const struct vy_stmt *key, int64_t vlsn);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -6902,7 +6902,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum vy_order order,
-		     struct vy_stmt *key, int64_t vlsn)
+		     const struct vy_stmt *key, int64_t vlsn)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 
@@ -7166,7 +7166,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	/* Restoration is very similar to first search so we'll use that */
 	enum vy_order save_order = itr->order;
-	struct vy_stmt *save_key = itr->key;
+	const struct vy_stmt *save_key = itr->key;
 	if (itr->order == VINYL_GT)
 		itr->order = VINYL_GE;
 	else if (itr->order == VINYL_LT)
@@ -7264,7 +7264,7 @@ struct vy_mem_iterator {
 	 */
 	enum vy_order order;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	int64_t vlsn;
 
@@ -7289,7 +7289,8 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, struct vy_stmt *key, int64_t vlsn);
+		     enum vy_order order, const struct vy_stmt *key,
+		     int64_t vlsn);
 
 /* }}} vy_mem_iterator API forward declaration */
 
@@ -7454,7 +7455,8 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, struct vy_stmt *key, int64_t vlsn)
+		     enum vy_order order, const struct vy_stmt *key,
+		     int64_t vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 
@@ -7589,7 +7591,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 * that.
 		 */
 		enum vy_order save_order = itr->order;
-		struct vy_stmt *save_key = itr->key;
+		const struct vy_stmt *save_key = itr->key;
 		if (itr->order == VINYL_GT)
 			itr->order = VINYL_GE;
 		else if (itr->order == VINYL_LT)
@@ -7751,7 +7753,7 @@ struct vy_txw_iterator {
 	 */
 	enum vy_order order;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 
 	/* Last version of vy_tx */
 	uint32_t version;
@@ -7764,7 +7766,7 @@ struct vy_txw_iterator {
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, struct vy_stmt *key);
+		     enum vy_order order, const struct vy_stmt *key);
 
 static void
 vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
@@ -7780,7 +7782,7 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, struct vy_stmt *key)
+		     enum vy_order order, const struct vy_stmt *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
 
@@ -8066,7 +8068,7 @@ struct vy_merge_iterator {
 	uint32_t range_version;
 	/* Range version checking }}} */
 
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 	/** Order of iteration */
 	enum vy_order order;
 	/** Current stmt that merge iterator is positioned on */
@@ -8111,7 +8113,7 @@ struct vy_merge_iterator {
  */
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
-		       enum vy_order order, struct vy_stmt *key)
+		       enum vy_order order, const struct vy_stmt *key)
 {
 	assert(key != NULL);
 	itr->index = index;
@@ -8883,7 +8885,7 @@ struct vy_read_iterator {
 
 	/* search options */
 	enum vy_order order;
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 	int64_t vlsn;
 
 	/* iterator over ranges */
@@ -9010,7 +9012,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 static NODISCARD int
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
-	struct vy_stmt *key;
+	const struct vy_stmt *key;
 	int rc;
 restart:
 	key = itr->curr_stmt != 0 ? itr->curr_stmt : itr->key;
