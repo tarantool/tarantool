@@ -485,14 +485,35 @@ struct vy_stmt {
 	int64_t  lsn;
 	uint32_t size;
 	uint16_t refs; /* atomic */
-	uint8_t  type;
+	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
 	char data[0];
 };
 
 /* {{{ Statement public API */
 
 /**
- * Compare two statements by their raw data.
+ * There are two groups of comparators - for raw data and for full statements.
+ * Both groups are divided on comparators for various combinations of key
+ * statements and action statements.
+ * SELECT and DELETE are key statements.
+ * DELETE, UPSERT and REPLACE are action statements.
+ * As you can see - the DELETE is both the key statement and action statement.
+ * Such duality appears because DELETE statements are stored as actions in all
+ * iterators (run/mem/txw) and also can be used as keys for
+ * searching (@sa vy_delete).
+ *
+ * The more specific comparator the faster it works.
+ * For example, vy_stmt_compare - slowest comparator because it in worst case
+ * checks all combinations of key and action types, but
+ * vy_stmt_compare_keys/actions - fastest comparators, because they shouldn't
+ * check statement types.
+ *
+ * Thus if you know what types your statements have you can use faster
+ * comparator.
+ */
+
+/**
+ * Compare statements by their raw data.
  * @param stmt_data_a Left operand of comparison.
  * @param stmt_data_b Right operand of comparison.
  * @param key_def Definition of the format of both statements.
@@ -502,11 +523,59 @@ struct vy_stmt {
  * @retval < 0 if a < b
  */
 static int
-vy_stmt_compare_raw(const char *stmt_data_a, const char *stmt_data_b,
+vy_stmt_compare_raw(const char *stmt_data_a, uint8_t a_type,
+		    const char *stmt_data_b, uint8_t b_type,
 		    const struct key_def *key_def);
 
 /**
- * Compare two statements by their raw data.
+ * Compare key statements by their raw data.
+ * @param stmt_data_a Left operand of comparison.
+ * @param a_type Type of the left operand (@sa struct vy_stmt.type).
+ * @param stmt_data_b Right operand of comparison.
+ * @param b_type Type of the right operand (@sa struct vy_stmt.type).
+ * @param key_def Definition of the format of both statements.
+ *
+ * @retval 0   if a == b
+ * @retval > 0 if a > b
+ * @retval < 0 if a < b
+ */
+static int
+vy_stmt_compare_raw_keys(const char *stmt_data_a, const char *stmt_data_b,
+			 const struct key_def *key_def);
+
+/**
+ * Compare a statement of any type with a key statement by their raw data.
+ * @param stmt_data_a Left operand of comparison.
+ * @param stmt_data_b Right operand of comparison.
+ * @param key_def Definition of the format of both statements.
+ *
+ * @retval 0   if a == b
+ * @retval > 0 if a > b
+ * @retval < 0 if a < b
+ */
+static int
+vy_stmt_compare_with_raw_key(const struct vy_stmt *stmt,
+			     const char *key,
+			     const struct key_def *key_def);
+
+/** @sa vy_stmt_compare_raw. */
+static int
+vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
+		const struct key_def *key_def);
+
+/** @sa vy_stmt_compare_raw_keys. */
+static int
+vy_stmt_compare_keys(const struct vy_stmt *left, const struct vy_stmt *right,
+		     const struct key_def *key_def);
+
+/** @sa vy_stmt_compare_with_raw_key. */
+static int
+vy_stmt_compare_with_key(const struct vy_stmt *action,
+			 const struct vy_stmt *key,
+			 const struct key_def *key_def);
+
+/**
+ * Compare action statements.
  * @param left Left operand of comparison.
  * @param right Right operand of comparison.
  * @param key_def Definition of the format of both statements.
@@ -516,8 +585,24 @@ vy_stmt_compare_raw(const char *stmt_data_a, const char *stmt_data_b,
  * @retval < 0 if left < right
  */
 static int
-vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
-		const struct key_def *key_def);
+vy_stmt_compare_actions(const struct vy_stmt *left,
+			const struct vy_stmt *right,
+			const struct key_def *key_def);
+
+/**
+ * Compare a statement of any type with an action statement.
+ * @param stmt Left operand of comparison.
+ * @param action Right operand of comparison.
+ * @param key_def Definition of the format of both statements.
+ *
+ * @retval 0   if stmt == action
+ * @retval > 0 if stmt > action
+ * @retval < 0 if stmt < action
+ */
+static int
+vy_stmt_compare_with_action(const struct vy_stmt *stmt,
+			    const struct vy_stmt *action,
+			    const struct key_def *key_def);
 
 /**
  * Create the SELECT statement from raw MessagePack data.
@@ -622,6 +707,9 @@ vy_stmt_alloc(uint32_t size);
 
 static const char *
 vy_stmt_key_part(const char *stmt_data, uint32_t part_id);
+
+static bool
+vy_stmt_is_empty(const struct vy_stmt *stmt);
 
 static bool
 vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def);
@@ -766,16 +854,16 @@ struct vy_mem {
 static int
 vy_mem_tree_cmp(struct vy_stmt *a, struct vy_stmt *b, struct vy_mem *index)
 {
-	int res = vy_stmt_compare(a, b, index->key_def);
+	int res = vy_stmt_compare_actions(a, b, index->key_def);
 	res = res ? res : a->lsn > b->lsn ? -1 : a->lsn < b->lsn;
 	return res;
 }
 
 static int
 vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
-			 struct vy_mem *index)
+		    struct vy_mem *index)
 {
-	int res = vy_stmt_compare(a, key->stmt, index->key_def);
+	int res = -vy_stmt_compare_with_action(key->stmt, a, index->key_def);
 	if (res == 0) {
 		if (key->lsn == INT64_MAX - 1)
 			return 0;
@@ -828,7 +916,8 @@ static void
 vy_mem_delete(struct vy_mem *index)
 {
 	assert(index == index->tree.arg);
-	struct vy_mem_tree_iterator itr = vy_mem_tree_iterator_first(&index->tree);
+	struct vy_mem_tree_iterator itr;
+	itr = vy_mem_tree_iterator_first(&index->tree);
 	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
 		struct vy_stmt *v =
 			*vy_mem_tree_iterator_get_elem(&index->tree, &itr);
@@ -859,7 +948,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct vy_stmt *stmt,
 
 	struct vy_stmt *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_stmt_compare(result, stmt, key_def) != 0)
+	if (vy_stmt_compare_actions(result, stmt, key_def) != 0)
 		return NULL;
 	return result;
 }
@@ -886,7 +975,7 @@ vy_mem_too_many_upserts(struct vy_mem *mem, const struct vy_stmt *stmt,
 		struct vy_stmt *v =
 			*vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
 		if (v->type != IPROTO_UPSERT ||
-		    vy_stmt_compare(v, stmt, key_def) != 0)
+		    vy_stmt_compare_actions(v, stmt, key_def) != 0)
 			break;
 		if (++count > VY_UPSERT_THRESHOLD)
 			return true;
@@ -1459,7 +1548,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
 		struct key_def *key_def = a->index->key_def;
-		rc = vy_stmt_compare(a->stmt, b->stmt, key_def);
+		rc = vy_stmt_compare_actions(a->stmt, b->stmt, key_def);
 	}
 	return rc;
 }
@@ -1483,7 +1572,7 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 			return -1;
 		}
 		struct key_def *key_def = a->index->key_def;
-		rc = vy_stmt_compare(a->stmt, b->stmt, key_def);
+		rc = vy_stmt_compare_with_action(a->stmt, b->stmt, key_def);
 	}
 	return rc;
 }
@@ -1493,7 +1582,8 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
 		write_set_key_cmp);
 
 static struct txv *
-write_set_search_key(write_set_t *tree, struct vy_index *index, struct vy_stmt *data)
+write_set_search_key(write_set_t *tree, struct vy_index *index,
+		     struct vy_stmt *data)
 {
 	struct write_set_key key = { .index = index, .stmt = data};
 	return write_set_search(tree, &key);
@@ -1742,14 +1832,14 @@ vy_range_str(struct vy_range *range)
 }
 
 static int
-vy_range_cmp(struct vy_range *range, const struct vy_stmt *key,
+vy_range_cmp(const struct vy_stmt *key, struct vy_range *range,
 	     struct key_def *key_def)
 {
 	/* Any key > -inf. */
 	if (range->begin == NULL)
 		return -1;
 
-	return vy_stmt_compare(range->begin, key, key_def);
+	return -vy_stmt_compare_with_key(key, range->begin, key_def);
 }
 
 static int
@@ -1765,7 +1855,7 @@ vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2,
 	if (n2->begin == NULL)
 		return 1;
 
-	return vy_stmt_compare(n1->begin, n2->begin, key_def);
+	return vy_stmt_compare_keys(n1->begin, n2->begin, key_def);
 }
 
 static uint64_t
@@ -1798,8 +1888,8 @@ static int
 vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
-	       struct vy_range, tree_node, vy_range_tree_cmp, const struct vy_stmt *,
-	       vy_range_tree_key_cmp);
+	       struct vy_range, tree_node, vy_range_tree_cmp,
+	       const struct vy_stmt *, vy_range_tree_key_cmp);
 
 static void
 vy_range_delete(struct vy_range *);
@@ -1843,7 +1933,7 @@ vy_range_tree_cmp(struct vy_range *a, struct vy_range *b)
 static int
 vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b)
 {
-	return (-vy_range_cmp(b, a, b->index->key_def));
+	return -vy_range_cmp(a, b, b->index->key_def);
 }
 
 static void
@@ -1874,7 +1964,7 @@ static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 			  struct key_def *key_def, const struct vy_stmt *key)
 {
-	if (vy_stmt_key_part(key->data, 0) == NULL) {
+	if (vy_stmt_is_empty(key)) {
 		switch (order) {
 		case VINYL_LT:
 		case VINYL_LE:
@@ -1917,7 +2007,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
 		    !vy_stmt_key_is_full(key->data, key_def) &&
-		    vy_stmt_compare(range->begin, key, key_def) == 0)
+		    vy_stmt_compare_with_key(key, range->begin, key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -1950,8 +2040,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
-			    vy_stmt_compare(range->begin,
-					    key, key_def) != 0) {
+			    vy_stmt_compare_with_key(key, range->begin,
+						     key_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree,
 							  range);
@@ -2004,8 +2094,8 @@ next:
 		break;
 	case VINYL_EQ:
 		if (curr->end != NULL &&
-		    vy_stmt_compare(itr->key, curr->end,
-				    itr->index->key_def) >= 0) {
+		    vy_stmt_compare_with_key(itr->key, curr->end,
+					     itr->index->key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
 			next = vy_range_tree_next(&itr->index->tree, curr);
 		} else {
@@ -2073,7 +2163,7 @@ vy_range_is_adjacent(struct vy_range *a, struct vy_range *b,
 {
 	if (a->end == NULL || b->begin == NULL)
 		return false;
-	return vy_stmt_compare(a->end, b->begin, key_def) == 0;
+	return vy_stmt_compare_keys(a->end, b->begin, key_def) == 0;
 }
 
 /*
@@ -2085,7 +2175,7 @@ vy_range_precedes(struct vy_range *a, struct vy_range *b,
 {
 	if (a->end == NULL || b->begin == NULL)
 		return false;
-	return vy_stmt_compare(a->end, b->begin, key_def) <= 0;
+	return vy_stmt_compare_keys(a->end, b->begin, key_def) <= 0;
 }
 
 /*
@@ -2099,7 +2189,7 @@ vy_range_ends_before(struct vy_range *a, struct vy_range *b,
 		return a->end != NULL;
 	if (a->end == NULL)
 		return false;
-	return vy_stmt_compare(a->end, b->end, key_def) < 0;
+	return vy_stmt_compare_keys(a->end, b->end, key_def) < 0;
 }
 
 /*
@@ -2419,7 +2509,7 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 	while (true) {
 		struct vy_stmt *stmt = *curr_stmt;
 		if (split_key != NULL &&
-		    vy_stmt_compare(stmt, split_key, key_def) >= 0) {
+		    vy_stmt_compare_with_key(stmt, split_key, key_def) >= 0) {
 			/* Split key reached, proceed to the next run. */
 			rc = 1;
 			break;
@@ -2971,8 +3061,8 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	 * All keys before the split_key could have cancelled each other.
 	 * Do not create an empty range file in this case.
 	 */
-	if (split_key != NULL && vy_stmt_compare(*stmt, split_key,
-						 index->key_def) >= 0)
+	if (split_key != NULL &&
+	    vy_stmt_compare_with_key(*stmt, split_key, index->key_def) >= 0)
 		return 0;
 
 	if (index_fd < 0) {
@@ -3083,7 +3173,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	const char *min_key = vy_run_page_min_key(run, first_page);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_stmt_compare_raw(min_key, split_key, key_def) == 0)
+	if (vy_stmt_compare_raw_keys(min_key, split_key, key_def) == 0)
 		return false;
 
 	*p_split_key = split_key;
@@ -3406,8 +3496,8 @@ vy_index_patch_holes(struct vy_index *index)
 			assert(begin != NULL);
 			end = next->begin;
 			assert(end != NULL);
-			int cmp = vy_stmt_compare(begin, end,
-						  index->key_def);
+			int cmp = vy_stmt_compare_keys(begin, end,
+						       index->key_def);
 			if (cmp == 0)
 				continue;
 			assert(cmp < 0);
@@ -5693,6 +5783,12 @@ vy_stmt_key_part(const char *stmt_data, uint32_t part_id)
 	return stmt_data + offset;
 }
 
+static bool
+vy_stmt_is_empty(const struct vy_stmt *stmt)
+{
+	return vy_stmt_key_part(stmt->data, 0) == NULL;
+}
+
 /**
  * Determine if the key has no missing parts,
  *  i.e. it is not a key of range select
@@ -5705,9 +5801,12 @@ vy_stmt_key_is_full(const char *stmt_data, const struct key_def *key_def)
 }
 
 static int
-vy_stmt_compare_raw(const char *stmt_data_a, const char *stmt_data_b,
+vy_stmt_compare_raw(const char *stmt_data_a, uint8_t a_type,
+		    const char *stmt_data_b, uint8_t b_type,
 		    const struct key_def *key_def)
 {
+	(void)a_type;
+	(void)b_type;
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		const struct key_part *part = &key_def->parts[part_id];
 		const char *field_a = vy_stmt_key_part(stmt_data_a, part_id);
@@ -5722,10 +5821,127 @@ vy_stmt_compare_raw(const char *stmt_data_a, const char *stmt_data_b,
 }
 
 static int
+vy_stmt_compare_raw_keys(const char *stmt_data_a, const char *stmt_data_b,
+			 const struct key_def *key_def)
+{
+	/* TODO: implement specific comparator for keys. @sa gh-1572. */
+	return vy_stmt_compare_raw(stmt_data_a, IPROTO_SELECT,
+				   stmt_data_b, IPROTO_SELECT, key_def);
+}
+
+static int
+vy_stmt_compare_with_offsets(const char *left, const char *right,
+			     const struct key_def *key_def)
+{
+	/*
+	 * TODO: implement specific comparator for replace and upsert.
+	 * @sa gh-1572.
+	 */
+	return vy_stmt_compare_raw(left, IPROTO_REPLACE,
+				   right, IPROTO_REPLACE, key_def);
+}
+
+static int
+vy_stmt_compare_offset_and_not(const char *with_off, const char *without_off,
+			       const struct key_def *key_def)
+{
+	/*
+	 * TODO: implement specific comparator for different formats.
+	 * @sa gh-1572.
+	 */
+	return vy_stmt_compare_raw(with_off, IPROTO_REPLACE,
+				   without_off, IPROTO_SELECT, key_def);
+}
+
+static int
 vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
 		const struct key_def *key_def)
 {
-	return vy_stmt_compare_raw(left->data, right->data, key_def);
+	if (left->type == IPROTO_REPLACE || right->type == IPROTO_UPSERT) {
+		if (left->type == IPROTO_REPLACE ||
+		    right->type == IPROTO_UPSERT) {
+			return vy_stmt_compare_with_offsets(left->data,
+							    right->data,
+							    key_def);
+		}
+		return vy_stmt_compare_offset_and_not(left->data, right->data,
+						      key_def);
+	}
+	if (right->type == IPROTO_REPLACE || right->type == IPROTO_UPSERT)
+		return -vy_stmt_compare_offset_and_not(right->data, left->data,
+						       key_def);
+	return vy_stmt_compare_raw_keys(left->data, right->data, key_def);
+}
+
+static int
+vy_stmt_compare_actions(const struct vy_stmt *left,
+			const struct vy_stmt *right,
+			const struct key_def *key_def)
+{
+	assert(left->type != IPROTO_SELECT);
+	assert(right->type != IPROTO_SELECT);
+	if (left->type == IPROTO_DELETE) {
+		if (right->type == IPROTO_DELETE) {
+			return vy_stmt_compare_raw_keys(left->data, right->data,
+							key_def);
+		}
+		return -vy_stmt_compare_offset_and_not(right->data, left->data,
+						       key_def);
+	}
+	if (right->type == IPROTO_DELETE)
+		return vy_stmt_compare_offset_and_not(left->data, right->data,
+						      key_def);
+	return vy_stmt_compare_with_offsets(left->data, right->data, key_def);
+}
+
+static int
+vy_stmt_compare_keys(const struct vy_stmt *left, const struct vy_stmt *right,
+		     const struct key_def *key_def)
+{
+	assert(left->type == IPROTO_SELECT || left->type == IPROTO_DELETE);
+	assert(right->type == IPROTO_SELECT || right->type == IPROTO_DELETE);
+	return vy_stmt_compare_raw_keys(left->data, right->data, key_def);
+}
+
+static int
+vy_stmt_compare_with_raw_key(const struct vy_stmt *stmt,
+			     const char *key,
+			     const struct key_def *key_def)
+{
+	if (stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT)
+		return vy_stmt_compare_offset_and_not(stmt->data, key, key_def);
+	return vy_stmt_compare_raw_keys(stmt->data, key, key_def);
+}
+
+static int
+vy_stmt_compare_with_key(const struct vy_stmt *stmt,
+			 const struct vy_stmt *key,
+			 const struct key_def *key_def)
+{
+	assert(key->type == IPROTO_SELECT || key->type == IPROTO_DELETE);
+	return vy_stmt_compare_with_raw_key(stmt, key->data, key_def);
+}
+
+static int
+vy_stmt_compare_with_action(const struct vy_stmt *stmt,
+			    const struct vy_stmt *action,
+			    const struct key_def *key_def)
+{
+	assert(action->type != IPROTO_SELECT);
+	if (stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT) {
+		if (action->type == IPROTO_DELETE) {
+			return vy_stmt_compare_offset_and_not(stmt->data,
+							      action->data,
+							      key_def);
+		}
+		return vy_stmt_compare_with_offsets(stmt->data, action->data,
+						    key_def);
+	}
+	if (action->type == IPROTO_DELETE)
+		return vy_stmt_compare_raw_keys(stmt->data, action->data,
+						key_def);
+	return -vy_stmt_compare_offset_and_not(action->data, stmt->data,
+					       key_def);
 }
 
 /* }}} Statement */
@@ -5953,7 +6169,7 @@ check_key:
 	 * Check that key hasn't been changed after applying operations.
 	 */
 	if (key_def->iid == 0 &&
-	    vy_stmt_compare(old_stmt, result_stmt, key_def) != 0) {
+	    vy_stmt_compare_actions(old_stmt, result_stmt, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.
@@ -6554,7 +6770,7 @@ vy_page_delete(struct vy_page *page)
  */
 static const char *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	      struct vy_stmt_info **pinfo)
+	     struct vy_stmt_info **pinfo)
 {
 	assert(stmt_no < page->count);
 	struct vy_stmt_info *info = ((struct vy_stmt_info *) page->data) +
@@ -6736,15 +6952,13 @@ vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
 static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_pos pos,
-		     const char **data, int64_t *lsn)
+		     const char **data, struct vy_stmt_info **info)
 {
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	struct vy_stmt_info *info;
-	*data = vy_page_stmt(page, pos.pos_in_page, &info);
-	*lsn = info->lsn;
+	*data = vy_page_stmt(page, pos.pos_in_page, info);
 	return 0;
 }
 
@@ -6768,8 +6982,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 		struct vy_page_info *page_info;
 		page_info = vy_run_page_info(itr->run, mid);
 		const char *fnd_key = vy_run_page_min_key(itr->run, page_info);
-		int cmp = vy_stmt_compare_raw(fnd_key, key->data,
-					      itr->index->key_def);
+		int cmp = -vy_stmt_compare_with_raw_key(key, fnd_key,
+							itr->index->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
@@ -6788,18 +7002,20 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
  * @retval position in the page
  */
 static uint32_t
-vy_run_iterator_search_in_page(struct vy_run_iterator *itr, const struct vy_stmt *key,
+vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
+			       const struct vy_stmt *key,
 			       struct vy_page *page, bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->count;
 	/* for upper bound we change zero comparison result to -1 */
 	int zero_cmp = itr->order == VINYL_GT || itr->order == VINYL_LE ? -1 : 0;
+	struct vy_stmt_info *info;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct vy_stmt_info *info;
 		const char *fnd_key = vy_page_stmt(page, mid, &info);
-		int cmp = vy_stmt_compare_raw(fnd_key, key->data,
+		int cmp = vy_stmt_compare_raw(fnd_key, info->type,
+					      key->data, key->type,
 					      itr->index->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
@@ -6913,12 +7129,12 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
 	const char *cur_key;
-	int64_t cur_lsn;
+	struct vy_stmt_info *key_info;
 	*ret = NULL;
-	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	int rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &key_info);
 	if (rc != 0)
 		return rc;
-	while (cur_lsn > itr->vlsn) {
+	while (key_info->lsn > itr->vlsn) {
 		rc = vy_run_iterator_next_pos(itr, itr->order, &itr->curr_pos);
 		if (rc < 0)
 			return rc;
@@ -6929,11 +7145,12 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		}
 		assert(rc == 0);
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key,
-					  &cur_lsn);
+					  &key_info);
 		if (rc != 0)
 			return rc;
 		if (itr->order == VINYL_EQ &&
-		    vy_stmt_compare_raw(cur_key, itr->key->data,
+		    vy_stmt_compare_raw(cur_key, key_info->type,
+					itr->key->data, itr->key->type,
 					itr->index->key_def)) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
@@ -6955,14 +7172,15 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
 			const char *test_key;
-			int64_t test_lsn;
+			struct vy_stmt_info *test_key_info;
 			rc = vy_run_iterator_read(itr, test_pos, &test_key,
-						  &test_lsn);
+						  &test_key_info);
 			if (rc != 0)
 				return rc;
 			struct key_def *key_def = itr->index->key_def;
-			if (test_lsn > itr->vlsn ||
-			    vy_stmt_compare_raw(cur_key, test_key,
+			if (test_key_info->lsn > itr->vlsn ||
+			    vy_stmt_compare_raw(cur_key, key_info->type,
+						test_key, test_key_info->type,
 						key_def) != 0)
 				break;
 			itr->curr_pos = test_pos;
@@ -7026,7 +7244,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	struct vy_run_iterator_pos end_pos = {itr->run->info.count, 0};
 	bool equal_found = false;
 	int rc;
-	if (vy_stmt_key_part(itr->key->data, 0) != NULL) {
+	if (!vy_stmt_is_empty(itr->key)) {
 		rc = vy_run_iterator_search(itr, itr->key, &itr->curr_pos,
 					    &equal_found);
 		if (rc != 0)
@@ -7097,7 +7315,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->order = order;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_key_part(key->data, 0) == NULL) {
+	if (vy_stmt_is_empty(key)) {
 		/* NULL key. change itr->order for simplification */
 		itr->order = order == VINYL_LT || order == VINYL_LE ?
 			     VINYL_LE : VINYL_GE;
@@ -7211,14 +7429,13 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	assert(itr->curr_pos.page_no < end_page);
 
 	const char *cur_key;
-	int64_t cur_lsn;
-	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	struct vy_stmt_info *key_info, *next_info;
+	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &key_info);
 	if (rc != 0)
 		return rc;
 	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
 	const char *next_key;
-	int64_t next_lsn;
 	do {
 		int rc = vy_run_iterator_next_pos(itr, itr->order,
 						  &itr->curr_pos);
@@ -7239,16 +7456,19 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key,
-					  &next_lsn);
+					  &next_info);
 		if (rc != 0)
 			return rc;
 
 		/* See above */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
-	} while (vy_stmt_compare_raw(cur_key, next_key, key_def) == 0);
+	} while (vy_stmt_compare_raw(cur_key, key_info->type,
+				     next_key, next_info->type, key_def) == 0);
 
 	if (itr->order == VINYL_EQ &&
-	    vy_stmt_compare_raw(next_key, itr->key->data, key_def) != 0) {
+	    vy_stmt_compare_raw(next_key, next_info->type,
+				itr->key->data, itr->key->type,
+				key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
@@ -7284,14 +7504,14 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		return rc > 0 ? 0 : rc;
 
 	const char *cur_key;
-	int64_t cur_lsn;
-	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &cur_lsn);
+	struct vy_stmt_info *key_info;
+	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &key_info);
 	if (rc != 0)
 		return rc;
 
 	const char *next_key;
-	int64_t next_lsn;
-	rc = vy_run_iterator_read(itr, next_pos, &next_key, &next_lsn);
+	struct vy_stmt_info *next_info;
+	rc = vy_run_iterator_read(itr, next_pos, &next_key, &next_info);
 	if (rc != 0)
 		return rc;
 
@@ -7307,7 +7527,8 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	 *  page lock
 	 */
 	struct key_def *key_def = itr->index->key_def;
-	int cmp = vy_stmt_compare_raw(cur_key, next_key, key_def);
+	int cmp = vy_stmt_compare_raw(cur_key, key_info->type,
+				      next_key, next_info->type, key_def);
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
 	if (rc != 0)
@@ -7365,7 +7586,8 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	else if (next == NULL)
 		return 0;
 	bool position_changed = true;
-	if (vy_stmt_compare(next, last_stmt, itr->index->key_def) == 0) {
+	if (vy_stmt_compare_actions(next, last_stmt,
+				    itr->index->key_def) == 0) {
 		position_changed = false;
 		if (next->lsn >= last_stmt->lsn) {
 			/* skip the same stmt to next stmt or older version */
@@ -7387,7 +7609,8 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 				position_changed = true;
 		}
 	} else if (itr->order == VINYL_EQ &&
-		   vy_stmt_compare(next, itr->key, itr->index->key_def) != 0) {
+		   vy_stmt_compare_with_action(itr->key, next,
+					       itr->index->key_def) != 0) {
 
 		itr->search_ended = true;
 		vy_run_iterator_cache_clean(itr);
@@ -7525,8 +7748,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 	while (itr->curr_stmt->lsn > itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->order == VINYL_EQ &&
-		     vy_stmt_compare(itr->curr_stmt, itr->key,
-				     itr->mem->key_def))) {
+		     vy_stmt_compare_with_action(itr->key, itr->curr_stmt,
+						 itr->mem->key_def))) {
 			vy_stmt_unref(itr->curr_stmt);
 			itr->curr_stmt = NULL;
 			return;
@@ -7542,8 +7765,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 							       &prev_pos);
 			struct key_def *key_def = itr->mem->key_def;
 			if (prev_stmt->lsn > itr->vlsn ||
-			    vy_stmt_compare(itr->curr_stmt,
-					    prev_stmt, key_def) != 0)
+			    vy_stmt_compare_actions(itr->curr_stmt,
+						    prev_stmt, key_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
 			vy_stmt_unref(itr->curr_stmt);
@@ -7572,7 +7795,7 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 	tree_key.stmt = itr->key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (vy_stmt_key_part(itr->key->data, 0) != NULL) {
+	if (!vy_stmt_is_empty(itr->key)) {
 		if (itr->order == VINYL_EQ) {
 			bool exact;
 			itr->curr_pos =
@@ -7650,7 +7873,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 	itr->order = order;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_key_part(key->data, 0) == NULL) {
+	if (vy_stmt_is_empty(key)) {
 		/* NULL key. change itr->order for simplification */
 		itr->order = order == VINYL_LT || order == VINYL_LE ?
 			     VINYL_LE : VINYL_GE;
@@ -7693,11 +7916,12 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 			itr->curr_stmt = NULL;
 			return 0;
 		}
-	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt,
-				  key_def) == 0);
+	} while (vy_stmt_compare_actions(prev_stmt, itr->curr_stmt,
+					 key_def) == 0);
 
 	if (itr->order == VINYL_EQ &&
-	    vy_stmt_compare(itr->curr_stmt, itr->key, key_def) != 0) {
+	    vy_stmt_compare_with_action(itr->key, itr->curr_stmt,
+					key_def) != 0) {
 		vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		return 0;
@@ -7737,7 +7961,7 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 	struct vy_stmt *next_stmt =
 		*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_stmt_compare(itr->curr_stmt, next_stmt, key_def) == 0) {
+	if (vy_stmt_compare_actions(itr->curr_stmt, next_stmt, key_def) == 0) {
 		itr->curr_pos = next_pos;
 		vy_stmt_unref(itr->curr_stmt);
 		itr->curr_stmt = next_stmt;
@@ -7788,8 +8012,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (next_stmt == NULL) /* Search ended. */
 			return 0;
 		bool position_changed = true;
-		if (vy_stmt_compare(next_stmt, last_stmt,
-				    itr->mem->key_def) == 0) {
+		if (vy_stmt_compare_actions(next_stmt, last_stmt,
+					    itr->mem->key_def) == 0) {
 			position_changed = false;
 			if (next_stmt->lsn >= last_stmt->lsn) {
 				/*
@@ -7798,28 +8022,28 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 				 */
 				do {
 					int rc = vy_mem_iterator_next_lsn(vitr,
-								 next_stmt,
-								 &next_stmt);
+								next_stmt,
+								&next_stmt);
 					if (rc < 0)
 						return -1;
-					if (next_stmt == NULL) {
-						rc = vy_mem_iterator_next_key(vitr,
-									 next_stmt,
-									 &next_stmt);
-						if (rc < 0)
-							return -1;
-						break;
-					}
+					if (next_stmt != NULL)
+						continue;
+					rc = vy_mem_iterator_next_key(vitr,
+								next_stmt,
+								&next_stmt);
+					if (rc < 0)
+						return -1;
+					break;
 				} while (next_stmt->lsn >= last_stmt->lsn);
 				if (next_stmt != NULL)
 					position_changed = true;
 			}
-		} else if (itr->order == VINYL_EQ) {
-			if (vy_stmt_compare(itr->curr_stmt, itr->key,
-					    itr->mem->key_def) != 0) {
-				vy_stmt_unref(itr->curr_stmt);
-				itr->curr_stmt = NULL;
-			}
+		} else if (itr->order == VINYL_EQ &&
+			   vy_stmt_compare_with_action(itr->key,
+						       itr->curr_stmt,
+						       itr->mem->key_def) != 0) {
+			vy_stmt_unref(itr->curr_stmt);
+			itr->curr_stmt = NULL;
 		}
 		*ret = itr->curr_stmt;
 		return position_changed;
@@ -7853,7 +8077,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			t = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							   &pos);
 			int cmp;
-			cmp = vy_stmt_compare(t, last_stmt, itr->mem->key_def);
+			cmp = vy_stmt_compare_actions(t, last_stmt,
+						      itr->mem->key_def);
 			if (cmp < 0 || (cmp == 0 && t->lsn >= last_stmt->lsn))
 				break;
 			if (t->lsn <= itr->vlsn) {
@@ -7869,7 +8094,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
 	int cmp;
-	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, itr->mem->key_def);
+	cmp = vy_stmt_compare_actions(itr->curr_stmt, last_stmt,
+				      itr->mem->key_def);
 	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : itr->vlsn + 1;
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
@@ -7878,7 +8104,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		struct vy_stmt *t =
 			*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
 		int cmp;
-		cmp = vy_stmt_compare(t, itr->curr_stmt, itr->mem->key_def);
+		cmp = vy_stmt_compare_actions(t, itr->curr_stmt,
+					      itr->mem->key_def);
 		assert(cmp <= 0);
 		if (cmp < 0 || t->lsn >= break_lsn)
 			break;
@@ -7999,7 +8226,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 	itr->curr_txv = NULL;
 	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
-	if (vy_stmt_key_part(itr->key->data, 0) != NULL) {
+	struct key_def *key_def = itr->index->key_def;
+	if (!vy_stmt_is_empty(itr->key)) {
 		if (itr->order == VINYL_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->order == VINYL_GE || itr->order == VINYL_GT)
@@ -8008,8 +8236,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 			txv = write_set_psearch(&itr->tx->write_set, &key);
 		if (txv == NULL || txv->index != itr->index)
 			return;
-		if (vy_stmt_compare(itr->key, txv->stmt,
-				    itr->index->key_def) == 0) {
+		if (vy_stmt_compare_with_action(itr->key, txv->stmt,
+						key_def) == 0) {
 			while (true) {
 				struct txv *next;
 				if (itr->order == VINYL_LE ||
@@ -8019,7 +8247,9 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 					next = write_set_prev(&itr->tx->write_set, txv);
 				if (next == NULL || next->index != itr->index)
 					break;
-				if (vy_stmt_compare(itr->key, next->stmt, itr->index->key_def) != 0)
+				if (vy_stmt_compare_with_action(itr->key,
+								next->stmt,
+								key_def) != 0)
 					break;
 				txv = next;
 			}
@@ -8069,8 +8299,8 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL && itr->order == VINYL_EQ &&
-	    vy_stmt_compare(itr->curr_txv->stmt, itr->key,
-			    itr->index->key_def) != 0)
+	    vy_stmt_compare_with_action(itr->key, itr->curr_txv->stmt,
+					itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL)
 		*ret = itr->curr_txv->stmt;
@@ -8131,16 +8361,16 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	else
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	if (txv != NULL && txv->index == itr->index &&
-	    vy_stmt_compare(txv->stmt, last_stmt,
-			    itr->index->key_def) == 0) {
+	    vy_stmt_compare_actions(txv->stmt, last_stmt,
+				    itr->index->key_def) == 0) {
 		if (itr->order == VINYL_LE || itr->order == VINYL_LT)
 			txv = write_set_prev(&itr->tx->write_set, txv);
 		else
 			txv = write_set_next(&itr->tx->write_set, txv);
 	}
 	if (txv != NULL && txv->index == itr->index && itr->order == VINYL_EQ &&
-	    vy_stmt_compare(txv->stmt, itr->key,
-			    itr->index->key_def) != 0)
+	    vy_stmt_compare_with_action(itr->key, txv->stmt,
+					itr->index->key_def) != 0)
 		txv = NULL;
 	if (txv == NULL || txv->index != itr->index) {
 		assert(was_stmt == NULL);
@@ -8413,7 +8643,8 @@ restart:
 		t = src->stmt;
 		if (t == NULL)
 			continue;
-		if (vy_stmt_compare(t, itr->key, itr->index->key_def) == 0) {
+		if (vy_stmt_compare_with_action(itr->key, t,
+						itr->index->key_def) == 0) {
 			src->front_id = ++itr->front_id;
 			min_stmt = t;
 			itr->curr_src = i;
@@ -8421,7 +8652,7 @@ restart:
 			break;
 		}
 		int cmp = min_stmt == NULL ? -1 :
-			  order * vy_stmt_compare(t, min_stmt,
+			  order * vy_stmt_compare_actions(t, min_stmt,
 						  itr->index->key_def);
 		if (cmp == 0) {
 			src->front_id = itr->front_id;
@@ -8505,8 +8736,8 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			continue;
 		itr->range_ended = itr->range_ended && !src->belong_range;
 		int cmp = min_stmt == NULL ? -1 :
-			order * vy_stmt_compare(t, min_stmt,
-						itr->index->key_def);
+			order * vy_stmt_compare_actions(t, min_stmt,
+							itr->index->key_def);
 		if (cmp <= 0) {
 			itr->front_id += cmp < 0;
 			src->front_id = itr->front_id;
@@ -8600,8 +8831,8 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 					continue;
 				t = itr->src[i].stmt;
 			}
-			if (vy_stmt_compare(t, itr->key,
-					    itr->index->key_def) == 0) {
+			if (vy_stmt_compare_with_action(itr->key, t,
+							itr->index->key_def) == 0) {
 				itr->src[i].front_id = itr->front_id;
 				itr->curr_src = i;
 				if (itr->curr_stmt != NULL)
@@ -9152,8 +9383,8 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 			 * If the iterator after restoration is on the same key
 			 * then go to the next.
 			 */
-			if (vy_stmt_compare(itr->curr_stmt, *ret,
-					    itr->index->key_def) == 0)
+			if (vy_stmt_compare_with_action(itr->curr_stmt, *ret,
+						itr->index->key_def) == 0)
 				continue;
 			/* Else return the new key. */
 			break;
@@ -9336,8 +9567,7 @@ vy_range_optimize_upserts_f(va_list va)
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
 		assert(v->type == IPROTO_REPLACE);
 		assert(v->lsn == stmt->lsn);
-		assert(vy_stmt_compare(stmt, v,
-				       index->key_def) == 0);
+		assert(vy_stmt_compare_actions(stmt, v, index->key_def) == 0);
 		size_t write_size = 0;
 		if (index->version == index_version &&
 		    range->version == range_version &&
