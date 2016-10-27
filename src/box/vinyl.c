@@ -2234,12 +2234,9 @@ static struct vy_write_iterator *
 vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 		      int64_t oldest_vlsn);
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
-			  struct vy_run *run, bool is_mutable,
-			  bool control_eof);
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range);
 static NODISCARD int
-vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
-			  bool is_mutable, bool control_eof);
+vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem);
 static NODISCARD int
 vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret);
 
@@ -3689,11 +3686,9 @@ vy_task_dump_execute(struct vy_task *task)
 	 * We dump all memory indexes but the newest one - see comment
 	 * in vy_task_dump_new().
 	 */
-	for (struct vy_mem *mem = range->mem->next; mem; mem = mem->next) {
-		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
-		if (rc != 0)
-			goto out;
-	}
+	rc = vy_write_iterator_add_mem(wi, range->mem->next);
+	if (rc != 0)
+		goto out;
 
 	struct vy_stmt *stmt;
 	/* Start iteration. */
@@ -3800,26 +3795,24 @@ vy_task_compact_execute(struct vy_task *task)
 	if (wi == NULL)
 		return -1;
 
-	/* Compact in-memory indexes. First add mems then add runs. */
-	int skip = n_parts;
-	for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
-		/* Skip in-memory indexes that belong to new ranges. */
-		if (skip > 0) {
-			skip--;
-			assert(mem == parts[skip]->mem);
-			continue;
-		}
-		rc = vy_write_iterator_add_mem(wi, mem, 0, 0);
-		if (rc != 0)
-			goto out;
+	/*
+	 * Skip in-memory indexes that belong to new ranges,
+	 * because they are mutable.
+	 */
+	struct vy_mem *mem = range->mem;
+	for (int i = n_parts - 1; i >= 0; i--) {
+		assert(mem == parts[i]->mem);
+		mem = mem->next;
 	}
-	assert(skip == 0);
 
-	/* Compact on disk runs. */
-	for (struct vy_run *run = range->run; run; run = run->next) {
-		rc = vy_write_iterator_add_run(wi, range, run, false, false);
-		if (rc != 0)
-			goto out;
+	/*
+	 * Prepare for merge. Note, merge iterator requires newer
+	 * sources to be added first so mems are added before runs.
+	 */
+	if (vy_write_iterator_add_mem(wi, mem) != 0 ||
+	    vy_write_iterator_add_run(wi, range) != 0) {
+		rc = -1;
+		goto out;
 	}
 
 	assert(n_parts > 0);
@@ -8856,28 +8849,30 @@ vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 }
 
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range,
-			  struct vy_run *run, bool is_mutable, bool control_eof)
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range)
 {
-	struct vy_merge_src *src =
-		vy_merge_iterator_add(&wi->mi, is_mutable, control_eof);
-	if (src == NULL)
-		return -1;
-	vy_run_iterator_open(&src->run_iterator, range, run, VINYL_GE,
-			     wi->key, INT64_MAX);
+	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
+		struct vy_merge_src *src;
+		src = vy_merge_iterator_add(&wi->mi, false, false);
+		if (src == NULL)
+			return -1;
+		vy_run_iterator_open(&src->run_iterator, range, run,
+				     VINYL_GE, wi->key, INT64_MAX);
+	}
 	return 0;
 }
 
 static NODISCARD int
-vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem,
-			  bool is_mutable, bool control_eof)
+vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 {
-	struct vy_merge_src *src =
-		vy_merge_iterator_add(&wi->mi, is_mutable, control_eof);
-	if (src == NULL)
-		return -1;
-	vy_mem_iterator_open(&src->mem_iterator, mem, VINYL_GE, wi->key,
-			     INT64_MAX);
+	for (; mem != NULL; mem = mem->next) {
+		struct vy_merge_src *src;
+		src = vy_merge_iterator_add(&wi->mi, false, false);
+		if (src == NULL)
+			return -1;
+		vy_mem_iterator_open(&src->mem_iterator, mem,
+				     VINYL_GE, wi->key, INT64_MAX);
+	}
 	return 0;
 }
 
