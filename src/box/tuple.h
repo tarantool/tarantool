@@ -269,6 +269,35 @@ int
 tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type);
 
+/**
+ * Extract key from tuple by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * @param tuple - tuple from which need to extract key
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+char *
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
+		  uint32_t *key_size);
+
+/**
+ * Extract key from raw msgpuck by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * @param data - msgpuck data from which need to extract key
+ * @param data_end - pointer at the end of data
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+char *
+tuple_extract_key_raw(const char *data, const char *data_end,
+		      const struct key_def *key_def, uint32_t *key_size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -632,29 +661,6 @@ tuple_next_u32(struct tuple_iterator *it)
  */
 const char *
 tuple_next_cstr(struct tuple_iterator *it);
-
-/**
- * Extract key from tuple by given key definition and return
- * buffer allocated on box_txn_alloc with this key.
- * @param tuple - tuple from which need to extract key
- * @param key_def - definition of key that need to extract
- * @param key_size - here will be size of extracted key
- */
-char *
-tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
-		  uint32_t *key_size);
-
-/**
- * Extract key from raw msgpuck by given key definition and return
- * buffer allocated on box_txn_alloc with this key.
- * @param data - msgpuck data from which need to extract key
- * @param data_end - pointer at the end of data
- * @param key_def - definition of key that need to extract
- * @param key_size - here will be size of extracted key
- */
-char *
-tuple_extract_key_raw(const char *data, const char *data_end,
-		      const struct key_def *key_def, uint32_t *key_size);
 
 struct tuple *
 tuple_update(struct tuple_format *new_format,
