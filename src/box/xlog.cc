@@ -36,7 +36,6 @@
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
-#include "fiob.h"
 #include "third_party/tarantool_eio.h"
 #include <msgpuck.h>
 #include "scoped_guard.h"
@@ -121,6 +120,9 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 
 /* {{{ struct xdir */
 
+/* sync snapshot every 16MB */
+#define SNAP_SYNC_INTERVAL	(1 << 24)
+
 void
 xdir_create(struct xdir *dir, const char *dirname,
 	    enum xdir_type type, const tt_uuid *server_uuid)
@@ -131,14 +133,14 @@ xdir_create(struct xdir *dir, const char *dirname,
 	dir->mode = 0660;
 	dir->server_uuid = server_uuid;
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
+	dir->open_wflags = O_RDWR | O_CREAT | O_EXCL;
 	if (type == SNAP) {
-		strcpy(dir->open_wflags, "wxd");
 		dir->filetype = "SNAP\n";
 		dir->filename_ext = ".snap";
 		dir->panic_if_error = true;
 		dir->suffix = INPROGRESS;
+		dir->sync_interval = SNAP_SYNC_INTERVAL;
 	} else {
-		strcpy(dir->open_wflags, "wx");
 		dir->sync_is_async = true;
 		dir->filetype = "XLOG\n";
 		dir->filename_ext = ".xlog";
@@ -231,7 +233,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	if (fd < 0) {
 		tnt_error(XlogError, "%s: can't open file",
 			  filename);
-		return fd;
+		return -1;
 	}
 	if (xlog_cursor_openfd(cursor, fd, filename) < 0) {
 		close(fd);
@@ -722,10 +724,10 @@ xlog_tx_write_plain(struct xlog *log)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
-	for (iov = block->obuf.iov; iov->iov_len; ++iov) {
-		if (!fwrite(iov->iov_base, iov->iov_len, 1, log->f))
-			return -1;
-	}
+	ssize_t written = fio_writev(log->fd, block->obuf.iov,
+				     block->obuf.pos + 1);
+	if (written < (ssize_t)obuf_size(&block->obuf))
+		return -1;
 	return obuf_size(&block->obuf);
 }
 
@@ -796,23 +798,25 @@ xlog_tx_write_zstd(struct xlog *log)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
-	iov = block->zbuf.iov;
-	for (iov = block->zbuf.iov; iov->iov_len; ++iov) {
-		ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
-			fwrite(iov->iov_base, iov->iov_len >> 2, 1, log->f);
-			goto error;});
-		if (!fwrite(iov->iov_base, iov->iov_len, 1, log->f))
-			goto error;
-	}
+	ssize_t written;
+	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK,
+		     block->zbuf.iov->iov_len >>= 1;);
 
-	off_t zsize;
-	zsize = obuf_size(&block->zbuf);
+	written = fio_writev(log->fd, block->zbuf.iov,
+			     block->zbuf.pos + 1);
+	if (written < (ssize_t)obuf_size(&block->zbuf))
+		goto error;
 	obuf_reset(&block->zbuf);
-	return zsize;
+	return written;
 error:
 	obuf_reset(&block->zbuf);
 	return -1;
 }
+
+/* file syncing and posix_fadvise() should be rounded by a page boundary */
+#define SYNC_MASK		(4096 - 1)
+#define SYNC_ROUND_DOWN(size)	((size) & ~(4096 - 1))
+#define SYNC_ROUND_UP(size)	(SYNC_ROUND_DOWN(size + SYNC_MASK))
 
 /**
  * Writes xlog batch to file
@@ -840,9 +844,28 @@ xlog_tx_write(struct xlog *log)
 	 * position.
 	 */
 	if (written < 0) {
-		if (fseeko(log->f, block->offset, SEEK_SET) < 0 ||
-		    ftruncate(fileno(log->f), block->offset) != 0)
+		if (lseek(log->fd, block->offset, SEEK_SET) < 0 ||
+		    ftruncate(log->fd, block->offset) != 0)
 			panic_syserror("failed to truncate xlog after write error");
+	}
+	if (log->sync_interval && log->xlog_tx.offset >=
+	    (off_t)(log->synced_size + log->sync_interval)) {
+		off_t sync_from = SYNC_ROUND_DOWN(log->synced_size);
+		size_t sync_len = SYNC_ROUND_UP(log->xlog_tx.offset) -
+				  sync_from;
+		/** sync data from cache to disk */
+#ifdef HAVE_SYNC_FILE_RANGE
+		sync_file_range(log->fd, sync_from, sync_len,
+				SYNC_FILE_RANGE_WAIT_BEFORE |
+				SYNC_FILE_RANGE_WRITE |
+				SYNC_FILE_RANGE_WAIT_AFTER);
+#else
+		fdatasync(log->fd);
+#endif
+		/** free page cache */
+		posix_fadvise(log->fd, sync_from, sync_len,
+			      POSIX_FADV_DONTNEED);
+		log->synced_size = log->xlog_tx.offset;
 	}
 	return written;
 }
@@ -1172,18 +1195,16 @@ xlog_close(struct xlog *l)
 {
 	int r;
 
-	if (l->mode == LOG_WRITE) {
-		fwrite(&eof_marker, 1, sizeof(log_magic_t), l->f);
-		/*
-		 * Sync the file before closing, since
-		 * otherwise we can end up with a partially
-		 * written file in case of a crash.
-		 * We sync even if file open O_SYNC, simplify code for low cost
-		 */
-		xlog_sync(l);
-	}
+	fio_write(l->fd, &eof_marker, sizeof(log_magic_t));
+	/*
+	 * Sync the file before closing, since
+	 * otherwise we can end up with a partially
+	 * written file in case of a crash.
+	 * We sync even if file open O_SYNC, simplify code for low cost
+	 */
+	xlog_sync(l);
 
-	r = fclose(l->f);
+	r = close(l->fd);
 	if (r < 0)
 		say_syserror("%s: close() failed", l->filename);
 	xlog_tx_destroy(&l->xlog_tx);
@@ -1205,7 +1226,7 @@ xlog_atfork(struct xlog **lptr)
 		 * make its way into the respective file in
 		 * fclose().
 		 */
-		close(fileno(l->f));
+		close(l->fd);
 		*lptr = NULL;
 	}
 }
@@ -1228,13 +1249,13 @@ int
 xlog_sync(struct xlog *l)
 {
 	if (l->sync_is_async) {
-		int fd = dup(fileno(l->f));
+		int fd = dup(l->fd);
 		if (fd == -1) {
 			say_syserror("%s: dup() failed", l->filename);
 			return -1;
 		}
 		eio_fsync(fd, 0, sync_cb, (void *) (intptr_t) fd);
-	} else if (fsync(fileno(l->f)) < 0) {
+	} else if (fsync(l->fd) < 0) {
 		say_syserror("%s: fsync failed", l->filename);
 		return -1;
 	}
@@ -1247,19 +1268,20 @@ xlog_sync(struct xlog *l)
 static int
 xlog_write_meta(struct xlog *l)
 {
-	char *vstr = NULL;
-	off_t sz1, sz2, sz3;
-	if ((sz1 = fprintf(l->f, "%s%s", l->filetype, v13)) < 0 ||
-	    (sz2 = fprintf(l->f, SERVER_UUID_KEY ": %s\n",
-			   tt_uuid_str(&l->server_uuid))) < 0 ||
-	    (vstr = vclock_to_string(&l->vclock)) == NULL ||
-	    (sz3 = fprintf(l->f, VCLOCK_KEY ": %s\n\n", vstr)) < 0) {
-		free(vstr);
-		return -1;
-	}
+	char *vstr = vclock_to_string(&l->meta.vclock);
+	char *server_uuid = tt_uuid_str(&l->meta.server_uuid);
+	size_t sz = strlen(l->meta.filetype) + strlen(v13) +
+		    strlen(SERVER_UUID_KEY) + 2 +
+		    strlen(server_uuid) + 1 +
+		    strlen(VCLOCK_KEY) + 2 + strlen(vstr) + 2;
+	char meta_str[sz + 1];
+	snprintf(meta_str, sz + 1, "%s%s" SERVER_UUID_KEY ": %s\n"
+		 VCLOCK_KEY ": %s\n\n",
+		 l->meta.filetype, v13, server_uuid, vstr);
 	free(vstr);
+	fio_write(l->fd, meta_str, sz);
 	/* First block starts after meta */
-	l->xlog_tx.offset = sz1 + sz2 + sz3;
+	l->xlog_tx.offset = sz;
 	return 0;
 }
 
@@ -1372,7 +1394,7 @@ struct xlog *
 xlog_create(struct xdir *dir, const struct vclock *vclock)
 {
 	char *filename;
-	FILE *f = NULL;
+	int fd = -1;
 	struct xlog *l = NULL;
 
 	int64_t signature = vclock_sum(vclock);
@@ -1400,24 +1422,24 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	 * replication.
 	 */
 	filename = xdir_format_filename(dir, signature, INPROGRESS);
-	f = fiob_open(filename, dir->open_wflags);
-	if (!f)
-		goto error;
 	say_info("creating `%s'", filename);
+	fd = open(filename, dir->open_wflags, 0644);
+	if (fd < 0)
+		goto error;
 	l = (struct xlog *) calloc(1, sizeof(*l));
 	if (l == NULL)
 		goto error;
-	l->f = f;
+	l->fd = fd;
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	/* Setup inherited values */
-	snprintf(l->filetype, sizeof(l->filetype), "%s", dir->filetype);
-	l->server_uuid = *dir->server_uuid;
+	snprintf(l->meta.filetype, sizeof(l->meta.filetype), "%s", dir->filetype);
+	l->meta.server_uuid = *dir->server_uuid;
+	vclock_copy(&l->meta.vclock, vclock);
 	l->sync_is_async = dir->sync_is_async;
+	l->sync_interval = dir->sync_interval;
+	l->synced_size = 0;
 
-	l->mode = LOG_WRITE;
 	l->is_inprogress = true;
-	vclock_copy(&l->vclock, vclock);
-	setvbuf(l->f, NULL, _IONBF, 0);
 
 	if (xlog_tx_create(&l->xlog_tx))
 		goto error;
@@ -1431,8 +1453,8 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 error:
 	int save_errno = errno;
 	say_syserror("%s: failed to open", filename);
-	if (f != NULL) {
-		fclose(f);
+	if (fd >= 0) {
+		close(fd);
 		unlink(filename); /* try to remove incomplete file */
 	}
 	if (l) {

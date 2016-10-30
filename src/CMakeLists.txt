@@ -99,7 +99,6 @@ set (server_sources
      opts.c
      cfg.c
      cpu_feature.c
-     fiob.c
      tt_uuid.c
      uri.c
      backtrace.cc

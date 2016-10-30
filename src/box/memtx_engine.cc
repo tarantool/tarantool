@@ -1141,7 +1141,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row,
 		 * not really enforced.
 		 */
 		if (bytes > snap_io_rate_limit)
-			fdatasync(fileno(l->f));
+			fdatasync(l->fd);
 	}
 	while (bytes > snap_io_rate_limit) {
 		ev_now_update(loop);

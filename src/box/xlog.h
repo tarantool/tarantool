@@ -90,11 +90,9 @@ struct xdir {
 	/* Default filename suffix for a new file. */
 	enum log_suffix suffix;
 	/**
-	 * Additional flags to apply at fopen(2) to write.
-	 * A write ahead log opened with write mode can use
-	 * O_DIRECT flag, for example.
+	 * Additional flags to apply at open(2) to write.
 	 */
-	char open_wflags[6];
+	int open_wflags;
 	/**
 	 * A pointer to this server uuid. If not assigned
 	 * (tt_uuid_is_nil returns true), server id check
@@ -126,6 +124,12 @@ struct xdir {
 	char dirname[PATH_MAX+1];
 	/** Snapshots or xlogs */
 	enum xdir_type type;
+	/**
+	 * Sync interval in bytes.
+	 * xlog file will be synced every sync_interval bytes,
+	 * corresponding file cache will be marked as free
+	 */
+	uint64_t sync_interval;
 };
 
 /**
@@ -157,12 +161,6 @@ int
 xdir_check(struct xdir *dir);
 
 /* }}} */
-
-/**
- * Basic open mode for a log file: read or write.
- */
-enum log_mode { LOG_READ, LOG_WRITE };
-
 
 /**
  * A serialized WAL buffer with one or more transactions in it.
@@ -231,13 +229,12 @@ struct xlog_meta {
  * A single log file - a snapshot or a write ahead log.
  */
 struct xlog {
-	/* Inherited from xdir struct */
+	/** xlog meta header */
+	struct xlog_meta meta;
+	/** do sync in async mode */
 	bool sync_is_async;
-	char filetype[10];
 	/** File handle. */
-	FILE *f;
-	/** Mode in which this file has been opened: read or write. */
-	enum log_mode mode;
+	int fd;
 	/**
 	 * How many xlog rows are in the file last time it
 	 * was read or written. Updated in xlog_cursor_close()
@@ -251,24 +248,17 @@ struct xlog {
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */
 	bool is_inprogress;
-	/**
-	 * Text file header: server uuid. We read
-	 * only logs with our own uuid, to avoid situations
-	 * when a DBA has manually moved a few logs around
-	 * and messed the data directory up.
-	 */
-	struct tt_uuid server_uuid;
-	/**
-	 * Text file header: vector clock taken at the time
-	 * this file was created. For WALs, this is vector
-	 * clock *at start of WAL*, for snapshots, this
-	 * is vector clock *at the time the snapshot is taken*.
-	 */
-	struct vclock vclock;
-	/**
-	 * Current writing xlog block
-	 */
 	struct xlog_tx xlog_tx;
+	/**
+	 * Sync interval in bytes.
+	 * xlog file will be synced every sync_interval bytes,
+	 * corresponding file cache will be marked as free
+	 */
+	uint64_t sync_interval;
+	/**
+	 * synced file size
+	 */
+	uint64_t synced_size;
 };
 
 /**

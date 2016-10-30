@@ -66,6 +66,7 @@ check_symbol_exists(sched_yield sched.h HAVE_SCHED_YIELD)
 check_symbol_exists(posix_fadvise fcntl.h HAVE_POSIX_FADVISE)
 check_symbol_exists(mremap sys/mman.h HAVE_MREMAP)
 
+check_function_exists(sync_file_range HAVE_SYNC_FILE_RANGE)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)

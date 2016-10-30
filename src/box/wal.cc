@@ -223,7 +223,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, server_uuid);
 	writer->current_wal = NULL;
 	if (wal_mode == WAL_FSYNC)
-		(void) strcat(writer->wal_dir.open_wflags, "s");
+		writer->wal_dir.open_wflags |= O_SYNC;
 	cbus_create(&writer->tx_wal_bus);
 
 	cpipe_create(&writer->tx_pipe);
@@ -347,7 +347,7 @@ wal_checkpoint_f(struct cmsg *data)
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
 	if (msg->rotate && writer->current_wal != NULL &&
-	    vclock_sum(&writer->current_wal->vclock) !=
+	    vclock_sum(&writer->current_wal->meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
 		xlog_close(writer->current_wal);
