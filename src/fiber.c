@@ -267,7 +267,7 @@ fiber_reschedule(void)
 	fiber_yield();
 }
 
-void
+int
 fiber_join(struct fiber *fiber)
 {
 	assert(fiber->flags & FIBER_IS_JOINABLE);
@@ -279,13 +279,20 @@ fiber_join(struct fiber *fiber)
 	assert(fiber_is_dead(fiber));
 	bool fiber_was_cancelled = fiber->flags & FIBER_IS_CANCELLED;
 	/* Move exception to the caller */
-	diag_move(&fiber->diag, &fiber()->diag);
+	int ret = fiber->f_ret;
+	if (ret != 0) {
+		assert(!diag_is_empty(&fiber->diag));
+		diag_move(&fiber->diag, &fiber()->diag);
+	}
 	/** Don't bother with propagation of FiberIsCancelled */
-	if (fiber_was_cancelled)
+	if (fiber_was_cancelled) {
 		diag_clear(&fiber()->diag);
+		ret = 0;
+	}
 
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
+	return ret;
 }
 
 /**
@@ -499,7 +506,8 @@ fiber_loop(MAYBE_UNUSED void *data)
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		if (fiber_invoke(fiber->f, fiber->f_data) != 0) {
+		fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		if (fiber->f_ret != 0) {
 			struct error *e = diag_last_error(&fiber->diag);
 			/* diag must not be empty on error */
 			assert(e != NULL || fiber->flags & FIBER_IS_CANCELLED);
@@ -907,17 +915,15 @@ cord_join(struct cord *cord)
 	void *retval = NULL;
 	int res = tt_pthread_join(cord->id, &retval);
 	if (res == 0) {
-		/*
-		 * cord_thread_func guarantees that
-		 * cord->exception is only set if the subject cord
-		 * has terminated with an uncaught exception,
-		 * transfer it to the caller. If there is
-		 * no exception, this clears the caller's
-		 * diagnostics area.
-		 */
-		diag_move(&cord->fiber->diag, &fiber()->diag);
-	} else
+		struct fiber *f = cord->fiber;
+		if (f->f_ret != 0) {
+			assert(!diag_is_empty(&f->diag));
+			diag_move(&f->diag, diag_get());
+			res = -1;
+		}
+	} else {
 		diag_set(SystemError, "failed to join with thread");
+	}
 	cord_destroy(cord);
 	return res;
 }
@@ -1054,7 +1060,7 @@ cord_costart_thread_func(void *arg)
 	 * terminated, if any.
 	 */
 	assert(fiber_is_dead(f));
-	fiber_join(f);
+	fiber()->f_ret = fiber_join(f);
 
 	return NULL;
 }

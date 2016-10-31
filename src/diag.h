@@ -237,8 +237,8 @@ static inline void
 diag_raise(void)
 {
 	struct error *e = diag_last_error(diag_get());
-	if (e)
-		error_raise(e);
+	assert(e != NULL);
+	error_raise(e);
 }
 
 

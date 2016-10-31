@@ -1312,12 +1312,8 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&m_checkpoint->cord);
-
-	struct error *e = diag_last_error(&fiber()->diag);
-	if (e != NULL) {
-		error_log(e);
-		result = -1;
-	}
+	if (result != 0)
+		error_log(diag_last_error(diag_get()));
 
 	m_checkpoint->waiting_for_snap_thread = false;
 	return result;
@@ -1359,11 +1355,8 @@ MemtxEngine::abortCheckpoint()
 	 */
 	if (m_checkpoint->waiting_for_snap_thread) {
 		/* wait for memtx-part snapshot completion */
-		cord_cojoin(&m_checkpoint->cord);
-
-		struct error *e = diag_last_error(&fiber()->diag);
-		if (e)
-			error_log(e);
+		if (cord_cojoin(&m_checkpoint->cord) != 0)
+			error_log(diag_last_error(diag_get()));
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 
@@ -1453,8 +1446,8 @@ MemtxEngine::join(struct xstream *stream)
 	/* Send snapshot using a thread */
 	struct cord cord;
 	cord_costart(&cord, "initial_join", memtx_initial_join_f, &arg);
-	cord_cojoin(&cord);
-	diag_raise();
+	if (cord_cojoin(&cord) != 0)
+		diag_raise();
 }
 
 /**

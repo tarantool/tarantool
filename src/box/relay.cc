@@ -124,8 +124,8 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 	});
 
 	cord_costart(&relay.cord, "final_join", relay_final_join_f, &relay);
-	cord_cojoin(&relay.cord);
-	diag_raise();
+	if (cord_cojoin(&relay.cord) != 0)
+		diag_raise();
 }
 
 static void
@@ -231,8 +231,8 @@ relay_subscribe(int fd, uint64_t sync, struct server *server,
 
 	struct cord cord;
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
-	cord_cojoin(&cord);
-	diag_raise();
+	if (cord_cojoin(&cord) != 0)
+		diag_raise();
 }
 
 static void

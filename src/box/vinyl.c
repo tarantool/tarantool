@@ -9359,8 +9359,6 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		if (rc != 0)
 			break;
 	}
-	if (rc == 0 && stmt == NULL)
-		rc = 1;
 	vy_read_iterator_close(&ri);
 	vy_stmt_unref(key);
 	return rc;

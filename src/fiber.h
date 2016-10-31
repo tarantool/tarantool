@@ -188,8 +188,9 @@ fiber_set_joinable(struct fiber *fiber, bool yesno);
  * @pre FIBER_IS_JOINABLE flag is set.
  *
  * \param f fiber to be woken up
+ * \return fiber function ret code
  */
-API_EXPORT void
+API_EXPORT int
 fiber_join(struct fiber *f);
 
 /**
@@ -276,6 +277,7 @@ struct fiber {
 	 */
 	fiber_func f;
 	va_list f_data;
+	int f_ret;
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
 	/** Exception which caused this fiber's death. */
@@ -427,7 +429,8 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
  * @param cord cord
  * @sa pthread_join()
  *
- * @return 0 on success, -1 if pthread_join failed.
+ * @return 0 on success, -1 if pthread_join failed or the
+ * thread function terminated with an exception.
  */
 int
 cord_cojoin(struct cord *cord);
@@ -440,11 +443,8 @@ cord_cojoin(struct cord *cord);
  * preserves the exception in the caller's cord.
  *
  * @param cord cord
- * @retval  0  pthread_join succeeded.
- *             If the thread function terminated with an
- *             exception, the exception is raised in the
- *             caller cord.
- * @retval -1   pthread_join failed.
+ * @return 0 on success, -1 if pthread_join failed or the
+ * thread function terminated with an exception.
  */
 int
 cord_join(struct cord *cord);
