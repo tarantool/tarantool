@@ -698,7 +698,8 @@ MemtxEngine::recoverSnapshot()
 	say_info("recovery start");
 	assert(m_has_checkpoint);
 	int64_t signature = m_last_checkpoint.signature;
-	const char *filename = format_filename(&m_snap_dir, signature, NONE);
+	const char *filename = xdir_format_filename(&m_snap_dir, signature,
+						    NONE);
 
 	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
@@ -1338,8 +1339,8 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
 	snprintf(to, sizeof(to), "%s",
-		 format_filename(dir, lsn, NONE));
-	char *from = format_filename(dir, lsn, INPROGRESS);
+		 xdir_format_filename(dir, lsn, NONE));
+	char *from = xdir_format_filename(dir, lsn, INPROGRESS);
 	int rc = coeio_rename(from, to);
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
@@ -1369,9 +1370,10 @@ MemtxEngine::abortCheckpoint()
 	tuple_end_snapshot();
 
 	/** Remove garbage .inprogress file. */
-	char *filename = format_filename(&m_checkpoint->dir,
-					 vclock_sum(&m_checkpoint->vclock),
-					 INPROGRESS);
+	char *filename =
+		xdir_format_filename(&m_checkpoint->dir,
+				     vclock_sum(&m_checkpoint->vclock),
+				     INPROGRESS);
 	(void) coeio_unlink(filename);
 
 	checkpoint_destroy(m_checkpoint);

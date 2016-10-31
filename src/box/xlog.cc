@@ -226,7 +226,7 @@ int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor)
 {
-	const char *filename = format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature, NONE);
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) {
 		tnt_error(XlogError, "%s: can't open file",
@@ -436,7 +436,7 @@ xdir_check(struct xdir *dir)
 }
 
 char *
-format_filename(struct xdir *dir, int64_t signature,
+xdir_format_filename(struct xdir *dir, int64_t signature,
 		enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
@@ -526,8 +526,8 @@ xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
 		cursor->read_offset += count;
 		return count;
 	}
-	/* inmemory cursor */
-	if (cursor->fd == 0)
+	/* in-memory mode */
+	if (cursor->fd < 0)
 		return 0;
 	size_t to_load = count - (ibuf_used(&cursor->rbuf) - buf_delta);
 	to_load += XLOG_READ_AHEAD;
@@ -536,7 +536,7 @@ xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
 		return -1;
 	ssize_t readen = fio_read(cursor->fd, dst, to_load);
 	if (readen < 0)
-		return readen;
+		return -1;
 	ibuf_alloc(&cursor->rbuf, readen);
 	*data = cursor->rbuf.rpos + buf_delta;
 	readen = MIN(ibuf_used(&cursor->rbuf) - buf_delta, count);
@@ -555,9 +555,6 @@ xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
 	cursor->rbuf.rpos += count;
 }
 
-/*
- * Read a string from cursor
- */
 static int
 xlog_cursor_gets(struct xlog_cursor *cursor, char *str, size_t len)
 {
@@ -581,6 +578,7 @@ xlog_cursor_gets(struct xlog_cursor *cursor, char *str, size_t len)
 	return pos;
 }
 
+
 /**
  * @retval -1 error
  * @retval 0 success
@@ -592,9 +590,8 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 	ssize_t header_size = XLOG_FIXHEADER_SIZE - sizeof(log_magic_t);
 	char *fixheader;
 	ssize_t loaded = xlog_cursor_load(i, header_size, &fixheader);
-	if (loaded < 0) {
+	if (loaded < 0)
 		return -1;
-	}
 	if (loaded < header_size)
 		return 1;
 
@@ -657,9 +654,8 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 		}
 	}
 
-	if (magic == zrow_marker) {
+	if (magic == zrow_marker)
 		return xlog_cursor_decompress(i);
-	}
 
 	return 0;
 }
@@ -988,9 +984,11 @@ xlog_cursor_open(struct xlog_cursor *i, const char *name)
 		return -1;
 	}
 	int rc = xlog_cursor_openfd(i, fd, name);
-	if (rc < 0)
+	if (rc < 0) {
 		close(fd);
-	return rc;
+		return -1;
+	}
+	return 0;
 }
 
 int
@@ -998,7 +996,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		    const char *name)
 {
 	memset(i, 0, sizeof(*i));
-	i->fd = 0;
+	i->fd = -1;
 	i->eof_read = false;
 	i->ignore_crc = false;
 	ibuf_create(&i->rbuf, &cord()->slabc,
@@ -1025,16 +1023,17 @@ error:
 void
 xlog_cursor_close(struct xlog_cursor *i)
 {
-	if (i->fd > 0)
+	if (i->fd >= 0)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
 	ibuf_destroy(&i->zbuf);
 	ZSTD_freeDStream(i->zdctx);
 	region_free(&fiber()->gc);
+	TRASH(i);
 }
 
-/*
- * read current tx
+/**
+ * Read the next statement (row) from the current transaction.
  */
 static int
 xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
@@ -1055,7 +1054,7 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 }
 
 /**
- * Find a next xlog tx magic, set magic to last readen 4 bytes
+ * Find a next xlog tx magic, set magic to the last loaded 4 bytes
  */
 static int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
@@ -1074,9 +1073,8 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 		loaded = xlog_cursor_load(i, 1, &last_byte);
 		if (loaded < 0)
 			return -1;
-		if (loaded < 1) {
+		if (loaded < 1)
 			return 1;
-		}
 		magic_ptr = (log_magic_t *)(last_byte - sizeof(*magic) + 1);
 		*magic = *magic_ptr;
 		/* delete first byte from read buf */
@@ -1120,7 +1118,6 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 			return 0;
 		assert(rc < 0);
 		return -1;
-		/* Fall through - read the next row */
 	}
 	/* set read buffer to current pos */
 	i->read_offset = i->search_offset;
@@ -1386,7 +1383,7 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	* Check whether a file with this name already exists.
 	* We don't overwrite existing files.
 	*/
-	filename = format_filename(dir, signature, NONE);
+	filename = xdir_format_filename(dir, signature, NONE);
 	if (access(filename, F_OK) == 0) {
 		errno = EEXIST;
 		goto error;
@@ -1402,7 +1399,7 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	 * may think that this is a corrupt file and stop
 	 * replication.
 	 */
-	filename = format_filename(dir, signature, INPROGRESS);
+	filename = xdir_format_filename(dir, signature, INPROGRESS);
 	f = fiob_open(filename, dir->open_wflags);
 	if (!f)
 		goto error;

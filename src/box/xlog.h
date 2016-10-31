@@ -320,7 +320,7 @@ struct xlog_cursor
 {
 	/** xlog meta info */
 	struct xlog_meta meta;
-	/** file descriptor or 0 for in memory */
+	/** file descriptor or -1 for in memory */
 	int fd;
 	/** associated file name */
 	char name[PATH_MAX];
@@ -421,7 +421,8 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
  * sum, and a suffix (.inprogress or not).
  */
 char *
-format_filename(struct xdir *dir, int64_t signature, enum log_suffix suffix);
+xdir_format_filename(struct xdir *dir, int64_t signature,
+		     enum log_suffix suffix);
 
 /**
  * Write a row to xlog, return count of written bytes (0 if buffered)
