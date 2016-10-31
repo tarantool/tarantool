@@ -1026,9 +1026,12 @@ struct vy_range {
 	int        merge_count;
 	/** Points to the range being compacted to this range. */
 	struct vy_range *shadow;
-	/** The file where the run is stored or -1 if it's not dumped yet. */
-	int fd;
-	char path[PATH_MAX];
+	/** The index file where the run is stored or -1 if it's not dumped yet. */
+	int index_fd;
+	char index_path[PATH_MAX];
+	/** The data file for range */
+	int data_fd;
+	char data_path[PATH_MAX];
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   nodecompact;
 	struct heap_node   nodedump;
@@ -2143,7 +2146,7 @@ check:
 			 *   |----------range----------|
 			 */
 			vy_range_log_debug(range, "recover discard");
-			say_warn("found stale range %s", range->path);
+			say_warn("found stale range %s", range->index_path);
 			vy_range_delete(range);
 			return;
 		}
@@ -2159,7 +2162,7 @@ replace:
 	do {
 		struct vy_range *next = vy_range_tree_next(&index->tree, n);
 		vy_range_log_debug(range, "recover replace");
-		say_warn("found partial range %s", n->path);
+		say_warn("found partial range %s", n->index_path);
 		vy_index_remove_range(index, n);
 		vy_range_delete(n);
 		n = next;
@@ -2252,11 +2255,13 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  *  @retval -1 error occured
  */
 static int
-vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
+vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
+		  struct vy_write_iterator *wi,
 		  struct vy_stmt *split_key, struct vy_index *index,
 		  uint32_t page_size, uint32_t *page_info_capacity,
 		  struct vy_stmt **curr_stmt)
 {
+	(void) index_fd;
 	assert(curr_stmt);
 	assert(*curr_stmt);
 	struct vy_run_info *run_info = &run->info;
@@ -2286,7 +2291,7 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	struct vy_page_info *page = run->page_infos + run_info->count;
 	memset(page, 0, sizeof(*page));
 	page->min_lsn = INT64_MAX;
-	page->offset = run_info->offset + run_info->size;
+	page->offset = lseek(data_fd, 0, SEEK_CUR);
 
 	while (true) {
 		struct vy_stmt *stmt = *curr_stmt;
@@ -2322,7 +2327,7 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	vy_buf_advance(&compressed, vy_buf_used(&values));
 
 	page->size = vy_buf_used(&compressed);
-	if (vy_write_file(fd, compressed.s, page->size) < 0) {
+	if (vy_write_file(data_fd, compressed.s, page->size) < 0) {
 		/* TODO: report file name */
 		diag_set(SystemError, "error writing file");
 		rc = -1;
@@ -2352,7 +2357,6 @@ vy_run_write_page(struct vy_run *run, int fd, struct vy_write_iterator *wi,
 	vy_buf_advance(min_buf, min_stmt->size);
 	vy_stmt_unref(min_stmt);
 
-	run_info->size += page->size;
 	++run_info->count;
 	if (page->min_lsn < run_info->min_lsn)
 		run_info->min_lsn = page->min_lsn;
@@ -2378,7 +2382,7 @@ out:
  *  @retval -1 error occured
  */
 static int
-vy_run_write(int fd, struct vy_write_iterator *wi,
+vy_run_write(int index_fd, int data_fd, struct vy_write_iterator *wi,
 	     struct vy_stmt *split_key, struct vy_index *index,
 	     uint32_t page_size, struct vy_run **result,
 	     struct vy_stmt **curr_stmt)
@@ -2390,6 +2394,10 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	if (!run)
 		return -1;
 
+	/*
+	 * Get data file size to truncate it in case of error
+	 */
+	off_t data_offset = lseek(data_fd, 0, SEEK_CUR);
 	struct vy_run_info *header = &run->info;
 	/*
 	 * Store start run offset in file. In case of run write
@@ -2399,7 +2407,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	 * checks, data restoration or if we decide to use
 	 * relative offsets for run objects.
 	 */
-	header->offset = lseek(fd, 0, SEEK_CUR);
+	header->offset = lseek(index_fd, 0, SEEK_CUR);
 	header->footprint = (struct vy_run_footprint) {
 		sizeof(struct vy_run_info),
 		sizeof(struct vy_page_info),
@@ -2410,7 +2418,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 
 	/* write run info header and adjust size */
 	uint32_t header_size = sizeof(*header);
-	if (vy_write_file(fd, header, header_size) < 0)
+	if (vy_write_file(index_fd, header, header_size) < 0)
 		goto err_file;
 	header->size += header_size;
 
@@ -2421,7 +2429,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	assert(run->page_infos == NULL);
 	uint32_t page_infos_capacity = 0;
 	do {
-		rc = vy_run_write_page(run, fd, wi, split_key, index,
+		rc = vy_run_write_page(run, index_fd, data_fd, wi,
+				       split_key, index,
 				       page_size, &page_infos_capacity,
 				       curr_stmt);
 		if (rc < 0)
@@ -2432,7 +2441,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	header->pages_offset = header->offset +
 				     header->size;
 	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
-	if (vy_write_file(fd, run->page_infos, pages_size) < 0)
+	if (vy_write_file(index_fd, run->page_infos, pages_size) < 0)
 		goto err_file;
 	header->size += pages_size;
 	header->unused = pages_size;
@@ -2440,7 +2449,7 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	/* Write min-max keys for pages */
 	header->min_offset = header->offset + header->size;
 	header->min_size = vy_buf_used(&run->pages_min);
-	if (vy_write_file(fd, run->pages_min.s, header->min_size) < 0)
+	if (vy_write_file(index_fd, run->pages_min.s, header->min_size) < 0)
 		goto err_file;
 	header->size += header->min_size;
 
@@ -2449,7 +2458,9 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	 * TODO: check, maybe we can use O_SYNC flag instead
 	 * of explicitly syncing
 	 */
-	if (fdatasync(fd) == -1)
+	if (fdatasync(index_fd) == -1)
+		goto err_file;
+	if (fdatasync(data_fd) == -1)
 		goto err_file;
 
 	/*
@@ -2459,8 +2470,8 @@ vy_run_write(int fd, struct vy_write_iterator *wi,
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
 	header_size = sizeof(*header);
-	if (vy_pwrite_file(fd, header, header_size, header->offset) < 0 ||
-	    fdatasync(fd) != 0)
+	if (vy_pwrite_file(index_fd, header, header_size, header->offset) < 0 ||
+	    fdatasync(index_fd) != 0)
 		goto err_file;
 
 	*result = run;
@@ -2473,8 +2484,10 @@ err:
 	/*
 	 * Reposition to end of file and trucate it
 	 */
-	lseek(fd, header->offset, SEEK_SET);
-	rc = ftruncate(fd, header->offset);
+	lseek(index_fd, header->offset, SEEK_SET);
+	rc = ftruncate(index_fd, header->offset);
+	lseek(data_fd, data_offset, SEEK_SET);
+	rc = ftruncate(data_fd, data_offset);
 	free(run);
 	return -1;
 }
@@ -2525,10 +2538,13 @@ vy_range_new(struct vy_index *index, int64_t id)
 	         */
 		range->id = ++index->range_id_max;
 	}
-	snprintf(range->path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".range",
+	snprintf(range->index_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".range",
+		 index->path, index->key_def->opts.lsn, range->id);
+	snprintf(range->data_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".data",
 		 index->path, index->key_def->opts.lsn, range->id);
 	range->mem_count = 1;
-	range->fd = -1;
+	range->index_fd = -1;
+	range->data_fd = -1;
 	range->index = index;
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
@@ -2536,19 +2552,19 @@ vy_range_new(struct vy_index *index, int64_t id)
 }
 
 /**
- * Raw read range file
+ * Raw read range index file
  */
 static ssize_t
-vy_range_read(struct vy_range *range, void *buf, size_t size, off_t offset)
+vy_range_read_index(struct vy_range *range, void *buf, size_t size, off_t offset)
 {
-	ssize_t n = vy_pread_file(range->fd, buf, size, offset);
+	ssize_t n = vy_pread_file(range->index_fd, buf, size, offset);
 	if (n < 0) {
 		diag_set(SystemError, "error reading file '%s'",
-			 range->path);
+			 range->index_path);
 		return -1;
 	}
 	if ((size_t)n != size) {
-		diag_set(ClientError, ER_VINYL, "range file corrupted");
+		diag_set(ClientError, ER_VINYL, "range index file corrupted");
 		return -1;
 	}
 	return n;
@@ -2571,7 +2587,7 @@ vy_range_load_stmt(struct vy_range *range, size_t size, off_t offset,
 		return -1;
 	}
 
-	if (vy_range_read(range, buf, size, offset) < 0 ||
+	if (vy_range_read_index(range, buf, size, offset) < 0 ||
 	    (*stmt = vy_stmt_extract_key_raw(range->index, buf)) == NULL)
 		rc = -1;
 
@@ -2584,7 +2600,7 @@ vy_range_load_header(struct vy_range *range, off_t *offset)
 {
 	struct vy_range_info info;
 
-	if (vy_range_read(range, &info, sizeof(info), 0) < 0)
+	if (vy_range_read_index(range, &info, sizeof(info), 0) < 0)
 		return -1;
 
 	assert(range->begin == NULL);
@@ -2623,12 +2639,12 @@ vy_range_recover(struct vy_range *range)
 
 		/* Read run header. */
 		h = &run->info;
-		n = vy_pread_file(range->fd, h, sizeof(*h), offset);
+		n = vy_pread_file(range->index_fd, h, sizeof(*h), offset);
 		if (n == 0)
 			break; /* eof */
 		if (n == -1) {
 			diag_set(SystemError, "error reading file '%s'",
-				 range->path);
+				 range->index_path);
 			goto out;
 		}
 		if (n < (ssize_t)sizeof(*h) || h->size == 0) {
@@ -2648,10 +2664,10 @@ vy_range_recover(struct vy_range *range)
 			goto out;
 
 		/* Read page info. */
-		if (vy_range_read(range, run->page_infos,
-				  pages_size, h->pages_offset) < 0 ||
-		    vy_range_read(range, run->pages_min.s,
-				  h->min_size, h->min_offset) < 0)
+		if (vy_range_read_index(range, run->page_infos,
+					pages_size, h->pages_offset) < 0 ||
+		    vy_range_read_index(range, run->pages_min.s,
+					h->min_size, h->min_offset) < 0)
 			goto out;
 
 		/*
@@ -2671,9 +2687,25 @@ vy_range_recover(struct vy_range *range)
 	 * Set file offset to the end of the last run so that new runs
 	 * will be appended to the range file.
 	 */
-	if (lseek(range->fd, offset, SEEK_SET) == -1) {
+	if (lseek(range->index_fd, offset, SEEK_SET) == -1) {
 		diag_set(SystemError, "failed to seek file '%s'",
-			 range->path);
+			 range->index_path);
+		goto out;
+	}
+
+	if (range->run == NULL) {
+		rc = 0;
+		goto out;
+	}
+	/*
+	 * Get last data offset and seek to the end of data file
+	 */
+	struct vy_page_info *last_page;
+	last_page = vy_run_page_info(range->run, range->run->info.count - 1);
+	if (lseek(range->data_fd, last_page->offset + last_page->size,
+		  SEEK_SET) == -1) {
+		diag_set(SystemError, "failed to seek file '%s'",
+			 range->data_path);
 		goto out;
 	}
 
@@ -2687,10 +2719,17 @@ out:
 static int
 vy_range_open(struct vy_range *range)
 {
-	int rc = range->fd = open(range->path, O_RDWR);
+	int rc = range->index_fd = open(range->index_path, O_RDWR);
 	if (unlikely(rc == -1)) {
 		diag_set(SystemError, "failed to open file '%s'",
-		         range->path);
+		         range->index_path);
+		return -1;
+	}
+	rc = range->data_fd = open(range->data_path, O_RDWR);
+	if (rc == -1) {
+		close(range->index_fd);
+		diag_set(SystemError, "failed to open file '%s'",
+		         range->data_path);
 		return -1;
 	}
 	rc = vy_range_recover(range);
@@ -2732,8 +2771,10 @@ vy_range_delete(struct vy_range *range)
 	range->mem = NULL;
 	range->used = 0;
 
-	if (range->fd >= 0 && close(range->fd) != 0)
-		say_syserror("failed to close range file %s", range->path);
+	if (range->index_fd >= 0 && close(range->index_fd) != 0)
+		say_syserror("failed to close range file %s", range->index_path);
+	if (range->data_fd >= 0 && close(range->data_fd) != 0)
+		say_syserror("failed to close range file %s", range->data_path);
 
 	TRASH(range);
 	free(range);
@@ -2790,8 +2831,10 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	assert(stmt);
 	assert(*stmt);
 	struct vy_index *index = range->index;
-	char path[PATH_MAX];
-	int fd = range->fd;
+	char index_path[PATH_MAX];
+	char data_path[PATH_MAX];
+	int index_fd = range->index_fd;
+	int data_fd = range->data_fd;
 	bool created = false;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
@@ -2806,26 +2849,33 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 						 index->key_def) >= 0)
 		return 0;
 
-	if (fd < 0) {
+	if (index_fd < 0) {
 		/*
 		 * The range hasn't been written to yet and hence
 		 * doesn't have a file. Create a temporary file for it
 		 * in the index directory to write the run to.
 		 */
-		snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-		fd = mkstemp(path);
-		if (fd < 0) {
+		snprintf(index_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+		index_fd = mkstemp(index_path);
+		if (index_fd < 0) {
 			diag_set(SystemError, "failed to create temp file");
 			goto fail;
 		}
+		snprintf(data_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+		data_fd = mkstemp(data_path);
+		if (data_fd < 0) {
+			diag_set(SystemError, "failed to create temp file");
+			goto fail;
+		}
+
 		created = true;
 
-		if (vy_write_range_header(fd, range) != 0)
+		if (vy_write_range_header(index_fd, range) != 0)
 			goto fail;
 	}
 
 	/* Append statements to the range file. */
-	if (vy_run_write(fd, wi, split_key, index,
+	if (vy_run_write(index_fd, data_fd, wi, split_key, index,
 			 index->key_def->opts.page_size, p_run, stmt) != 0)
 		goto fail;
 
@@ -2836,20 +2886,33 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		 * We've successfully written a run to a new range file.
 		 * Commit the range by linking the file to a proper name.
 		 */
-		if (rename(path, range->path) != 0) {
+		if (rename(data_path, range->data_path) != 0) {
 			diag_set(SystemError,
 				 "failed to rename file '%s' to '%s'",
-				 path, range->path);
+				 data_path, range->data_path);
+			goto fail;
+		}
+		snprintf(data_path, PATH_MAX, "%s", range->data_path);
+
+		if (rename(index_path, range->index_path) != 0) {
+			diag_set(SystemError,
+				 "failed to rename file '%s' to '%s'",
+				 index_path, range->index_path);
 			goto fail;
 		}
 	}
 
-	range->fd = fd;
+	range->index_fd = index_fd;
+	range->data_fd = data_fd;
 	return 0;
 fail:
-	if (created) {
-		unlink(path);
-		close(fd);
+	if (created && index_fd >= 0) {
+		unlink(index_path);
+		close(index_fd);
+	}
+	if (created && data_fd >= 0) {
+		unlink(data_path);
+		close(data_fd);
 	}
 	return -1;
 }
@@ -3859,13 +3922,17 @@ out:
 
 	/* Remove old range file on success. */
 	if (rc == 0) {
-		ERROR_INJECT(ERRINJ_VY_GC, {errno = EIO; goto unlink_error;});
-		if (unlink(range->path) != 0) {
-			goto unlink_error; /* suppress warn if NDEBUG */
-unlink_error:
+		ERROR_INJECT(ERRINJ_VY_GC, {
+			errno = EIO;
 			say_syserror("failed to remove range file %s",
-				     range->path);
-		}
+				     range->index_path);
+			return rc;});
+		if (unlink(range->index_path) != 0)
+			say_syserror("failed to remove range file %s",
+				     range->index_path);
+		if (unlink(range->data_path) != 0)
+			say_syserror("failed to remove range file %s",
+				     range->data_path);
 	}
 	return rc;
 }
@@ -3909,12 +3976,19 @@ vy_range_tree_drop_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
 	(void)arg;
-	if (range->fd >= 0) {
-		if (close(range->fd) < 0)
+	if (range->index_fd >= 0) {
+		if (close(range->index_fd) < 0)
 			say_syserror("close failed");
-		if (unlink(range->path) < 0)
-			say_syserror("unlink failed: %s", range->path);
-		range->fd = -1;
+		if (unlink(range->index_path) < 0)
+			say_syserror("unlink failed: %s", range->index_path);
+		range->index_fd = -1;
+	}
+	if (range->data_fd >= 0) {
+		if (close(range->data_fd) < 0)
+			say_syserror("close failed");
+		if (unlink(range->data_path) < 0)
+			say_syserror("unlink failed: %s", range->data_path);
+		range->data_fd = -1;
 	}
 	return NULL;
 }
@@ -6590,7 +6664,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
 
-		rc = coeio_preadn(itr->range->fd, page->data, page_info->size,
+		rc = coeio_preadn(itr->range->data_fd, page->data, page_info->size,
 				  page_info->offset);
 
 		/*
@@ -6610,14 +6684,14 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		rc = vy_pread_file(itr->range->fd, page->data, page_info->size,
+		rc = vy_pread_file(itr->range->data_fd, page->data, page_info->size,
 				   page_info->offset);
 	}
 
 	if (rc < 0) {
 		vy_page_delete(page);
 		diag_set(SystemError, "error reading file '%s'",
-			 itr->range->path);
+			 itr->range->data_path);
 		return -1;
 	}
 
