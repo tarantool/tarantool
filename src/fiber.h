@@ -427,7 +427,7 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
  * @param cord cord
  * @sa pthread_join()
  *
- * @return 0 on success, pthread_join return code on error
+ * @return 0 on success, -1 if pthread_join failed.
  */
 int
 cord_cojoin(struct cord *cord);

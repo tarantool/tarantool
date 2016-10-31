@@ -35,6 +35,7 @@
 #include "trivia/util.h"
 
 #include <stdio.h>
+#include <errno.h>
 #include <pthread.h>
 #if HAVE_PTHREAD_NP_H
 #include <pthread_np.h>
@@ -46,15 +47,17 @@
  * write into the log file where and what has failed.
  *
  * Still give the user an opportunity to manually
- * check for error, by returning the pthread_* 
- * function status.
+ * check for error, by assigning pthread_* function status
+ * to errno and returning -1.
  */
 
 #define tt_pthread_error(e)			\
-	if (e != 0)				\
+	if (e != 0) {				\
 		say_syserror("%s error %d", __func__, e);\
+		errno = e;			\
+	}					\
 	assert(e == 0);				\
-	e
+	e != 0 ? -1 : 0
 
 /**
  * Debug/logging friendly wrappers around pthread

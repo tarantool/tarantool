@@ -874,10 +874,16 @@ cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 	tt_pthread_mutex_lock(&ct_arg.start_mutex);
-	if (!(cord->loop = ev_loop_new(EVFLAG_AUTO | EVFLAG_ALLOCFD)))
+	cord->loop = ev_loop_new(EVFLAG_AUTO | EVFLAG_ALLOCFD);
+	if (cord->loop == NULL) {
+		diag_set(OutOfMemory, 0, "ev_loop_new", "ev_loop");
 		goto end;
-	if (tt_pthread_create(&cord->id, NULL, cord_thread_func, &ct_arg))
+	}
+	if (tt_pthread_create(&cord->id, NULL,
+			      cord_thread_func, &ct_arg) != 0) {
+		diag_set(SystemError, "failed to create thread");
 		goto end;
+	}
 	res = 0;
 	while (! ct_arg.is_started)
 		tt_pthread_cond_wait(&ct_arg.start_cond, &ct_arg.start_mutex);
@@ -910,7 +916,8 @@ cord_join(struct cord *cord)
 		 * diagnostics area.
 		 */
 		diag_move(&cord->fiber->diag, &fiber()->diag);
-	}
+	} else
+		diag_set(SystemError, "failed to join with thread");
 	cord_destroy(cord);
 	return res;
 }
@@ -1057,8 +1064,11 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg)
 {
 	/** Must be allocated to avoid races. */
 	struct costart_ctx *ctx = (struct costart_ctx *) malloc(sizeof(*ctx));
-	if (ctx == NULL)
+	if (ctx == NULL) {
+		diag_set(OutOfMemory, sizeof(struct costart_ctx),
+			 "malloc", "costart_ctx");
 		return -1;
+	}
 	ctx->run = f;
 	ctx->arg = arg;
 	if (cord_start(cord, name, cord_costart_thread_func, ctx) == -1) {
