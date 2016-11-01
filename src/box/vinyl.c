@@ -836,6 +836,7 @@ vy_mem_delete(struct vy_mem *index)
 		vy_mem_tree_iterator_next(&index->tree, &itr);
 	}
 	vy_mem_tree_destroy(&index->tree);
+	TRASH(index);
 	free(index);
 }
 
@@ -7969,6 +7970,11 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 	itr->tx = tx;
 
 	itr->order = order;
+	if (vy_stmt_key_part(key->data, 0) == NULL) {
+		/* NULL key. change itr->order for simplification */
+		itr->order = order == VINYL_LT || order == VINYL_LE ?
+			     VINYL_LE : VINYL_GE;
+	}
 	itr->key = key;
 
 	itr->version = UINT32_MAX;
@@ -8018,14 +8024,11 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 			else if (itr->order == VINYL_LT)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
-	} else if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
-		itr->order = VINYL_LE;
+	} else if (itr->order == VINYL_LE) {
 		key.index = (struct vy_index *)((uintptr_t)key.index + 1);
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	} else {
-		assert(itr->order == VINYL_GE ||
-		       itr->order == VINYL_GT || itr->order == VINYL_EQ);
-		itr->order = VINYL_GE;
+		assert(itr->order == VINYL_GE);
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	}
 	if (txv == NULL || txv->index != itr->index)
@@ -8055,24 +8058,17 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
 		return 0;
-	if (itr->order == VINYL_EQ) {
-		itr->curr_txv = write_set_next(&itr->tx->write_set, itr->curr_txv);
-		if (itr->curr_txv != NULL &&
-		    (itr->curr_txv->index != itr->index ||
-		     vy_stmt_compare(itr->curr_txv->stmt, itr->key,
-				     itr->index->key_def) != 0))
-			itr->curr_txv = NULL;
-	} else if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
 		itr->curr_txv = write_set_prev(&itr->tx->write_set, itr->curr_txv);
-		if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
-			itr->curr_txv = NULL;
-	} else {
-		assert(itr->order == VINYL_GE || itr->order == VINYL_GT);
+	else
 		itr->curr_txv = write_set_next(&itr->tx->write_set, itr->curr_txv);
-		if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
-			itr->curr_txv = NULL;
-	}
-	if (itr->curr_txv)
+	if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
+		itr->curr_txv = NULL;
+	if (itr->curr_txv != NULL && itr->order == VINYL_EQ &&
+	    vy_stmt_compare(itr->curr_txv->stmt, itr->key,
+			    itr->index->key_def) != 0)
+		itr->curr_txv = NULL;
+	if (itr->curr_txv != NULL)
 		*ret = itr->curr_txv->stmt;
 	return 0;
 }
