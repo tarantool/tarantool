@@ -2791,7 +2791,7 @@ vy_write_range_header(int fd, struct vy_range *range)
 	if (range->begin) {
 		if (vy_pwrite_file(fd, range->begin->data,
 				   range->begin->size, offset) < 0)
-			return -1;
+			goto fail;
 		info.begin_key_offset = offset;
 		info.begin_key_size = range->begin->size;
 		offset += range->begin->size;
@@ -2799,7 +2799,7 @@ vy_write_range_header(int fd, struct vy_range *range)
 	if (range->end) {
 		if (vy_pwrite_file(fd, range->end->data,
 				   range->end->size, offset) < 0)
-			return -1;
+			goto fail;
 		info.end_key_offset = offset;
 		info.end_key_size = range->end->size;
 		offset += range->end->size;
@@ -2808,12 +2808,15 @@ vy_write_range_header(int fd, struct vy_range *range)
 	info.first_run_offset = offset;
 
 	if (vy_pwrite_file(fd, &info, sizeof(info), 0) < 0)
-		return -1;
+		goto fail;
 
 	if (lseek(fd, offset, SEEK_SET) == -1)
-		return -1;
+		goto fail;
 
 	return 0;
+fail:
+	diag_set(SystemError, "error writing file");
+	return -1;
 }
 
 /*
