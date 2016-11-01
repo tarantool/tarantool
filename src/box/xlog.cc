@@ -861,10 +861,15 @@ xlog_tx_write(struct xlog *log)
 				SYNC_FILE_RANGE_WAIT_AFTER);
 #else
 		fdatasync(log->fd);
-#endif
+#endif /* HAVE_SYNC_FILE_RANGE */
+#ifdef HAVE_POSIX_FADVISE
 		/** free page cache */
 		posix_fadvise(log->fd, sync_from, sync_len,
 			      POSIX_FADV_DONTNEED);
+#else
+		(void) sync_from;
+		(void) sync_len;
+#endif /* HAVE_POSIX_FADVISE */
 		log->synced_size = log->xlog_tx.offset;
 	}
 	return written;
