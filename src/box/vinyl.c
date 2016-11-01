@@ -1919,7 +1919,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
 	} else {
-		assert(order == VINYL_LT || order == VINYL_LT);
+		assert(order == VINYL_LT || order == VINYL_LE);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
