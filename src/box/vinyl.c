@@ -1195,6 +1195,131 @@ struct vy_tx {
 	struct tx_manager *manager;
 };
 
+/**
+ * Merge iterator takes several iterators as sources and sorts
+ * output from them by the given order and LSN DESC. It has no filter,
+ * it just sorts output from its sources.
+ *
+ * All statements from all sources can be traversed via
+ * next_key()/next_lsn() like in a simple iterator (run, mem etc).
+ * next_key() switches to the youngest statement of
+ * the next key (according to the order), and next_lsn()
+ * switches to an older statement of the same key.
+ *
+ * There are several merge optimizations, which expect that:
+ *
+ * 1) All sources are sorted by age, i.e. the most fresh
+ * sources are added first.
+ * 2) Mutable sources are added before read-blocking sources.
+ *
+ * The iterator can merge the write set of the current
+ * transaction, that does not belong to any range but to entire
+ * index, and mems and runs of some range. For this purpose the
+ * iterator has a special flag (range_ended) that signals to the
+ * read iterator that it must switch to the next range.
+ */
+struct vy_merge_iterator {
+	/** Array of sources */
+	struct vy_merge_src *src;
+	/** Number of elements in the src array */
+	uint32_t src_count;
+	/** Number of elements allocated in the src array */
+	uint32_t src_capacity;
+	/** Current source offset that merge iterator is positioned on */
+	uint32_t curr_src;
+	/** Offset of the first source with is_mutable == true */
+	uint32_t mutable_start;
+	/** Next offset after the last source with is_mutable == true */
+	uint32_t mutable_end;
+	/* Index for key_def and ondex->version */
+	struct vy_index *index;
+
+	/* {{{ Range version checking */
+	/* copy of index->version to track range tree changes */
+	uint32_t index_version;
+	/* current range */
+	struct vy_range *curr_range;
+	/* copy of curr_range->version to track mem/run lists changes */
+	uint32_t range_version;
+	/* Range version checking }}} */
+
+	const struct vy_stmt *key;
+	/** Order of iteration */
+	enum vy_order order;
+	/** Current stmt that merge iterator is positioned on */
+	struct vy_stmt *curr_stmt;
+	/**
+	 * All sources with this front_id are on the same key of
+	 * current iteration (optimization)
+	 */
+	uint32_t front_id;
+	/**
+	 * If index is unique and full key is given we can
+	 * optimize first search in order to avoid unnecessary
+	 * reading from disk.  That flag is set to true during
+	 * initialization if index is unique and  full key is
+	 * given. After first _get or _next_key call is set to
+	 * false
+	 */
+	bool unique_optimization;
+	/**
+	 * After first search with unique_optimization we must do some extra
+	 * moves and optimizations for _next_lsn call. So that flag is set to
+	 * true after first search and will set to false after consequent
+	 * _next_key call */
+	bool is_in_uniq_opt;
+	/**
+	 * This flag is set to false during initialization and
+	 * means that we must do lazy search for first _get or
+	 * _next call. After that is set to false
+	 */
+	bool search_started;
+	/**
+	 * If all sources marked with belong_range = true comes to
+	 * the end of data this flag is automatically set to true;
+	 * is false otherwise.  For read iterator range_ended = true
+	 * means that it must switch to next range
+	 */
+	bool range_ended;
+};
+
+struct vy_range_iterator {
+	struct vy_index *index;
+	enum vy_order order;
+	const struct vy_stmt *key;
+	struct vy_range *curr_range;
+};
+
+/**
+ * Complex read iterator over vinyl index and write_set of current tx
+ * Iterates over ranges, creates merge iterator for every range and outputs
+ * the result.
+ * Can also wor without transaction, just set tx = NULL in _open
+ * Applyes upserts and skips deletes, so only one replace stmt for every key
+ * is output
+ */
+struct vy_read_iterator {
+	/* index to iterate over */
+	struct vy_index *index;
+	/* transaction to iterate over */
+	struct vy_tx *tx;
+	bool only_disk;
+
+	/* search options */
+	enum vy_order order;
+	const struct vy_stmt *key;
+	int64_t vlsn;
+
+	/* iterator over ranges */
+	struct vy_range_iterator range_iterator;
+	/* current range */
+	struct vy_range *curr_range;
+	/* merge iterator over current range */
+	struct vy_merge_iterator merge_iterator;
+
+	struct vy_stmt *curr_stmt;
+};
+
 /** Cursor. */
 struct vy_cursor {
 	/**
@@ -1718,13 +1843,6 @@ vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b)
 
 static void
 vy_index_delete(struct vy_index *index);
-
-struct vy_range_iterator {
-	struct vy_index *index;
-	enum vy_order order;
-	const struct vy_stmt *key;
-	struct vy_range *curr_range;
-};
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
@@ -4984,79 +5102,6 @@ vy_info_gather(struct vy_env *env, struct vy_info_handler *h)
 
 /** }}} Introspection */
 
-/* {{{ Cursor */
-
-struct vy_cursor *
-vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
-	      uint32_t part_count, enum vy_order order)
-{
-	struct vy_env *e = index->env;
-	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
-	if (c == NULL) {
-		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
-		return NULL;
-	}
-	c->key = vy_stmt_new_select(key, part_count, index->key_def);
-	if (c->key == NULL) {
-		mempool_free(&e->cursor_pool, c);
-		return NULL;
-	}
-	c->index = index;
-	c->n_reads = 0;
-	c->order = order;
-	if (tx == NULL) {
-		tx = &c->tx_autocommit;
-		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
-	} else {
-		rlist_add(&tx->cursors, &c->next_in_tx);
-	}
-	c->tx = tx;
-	c->start = tx->start;
-	/*
-	 * Prevent index drop by the backend while the cursor is
-	 * still alive.
-	 */
-	vy_index_ref(c->index);
-	return c;
-}
-
-int
-vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx)
-{
-	if (cursor->tx == NULL) {
-		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
-		return -1;
-	}
-	*tx = cursor->tx;
-	return 0;
-}
-
-void
-vy_cursor_delete(struct vy_cursor *c)
-{
-	struct vy_env *e = c->index->env;
-	if (c->tx != NULL) {
-		if (c->tx == &c->tx_autocommit) {
-			/* Rollback the automatic transaction. */
-			vy_tx_rollback(c->index->env, c->tx);
-		} else {
-			/*
-			 * Delete itself from the list of open cursors
-			 * in the transaction
-			 */
-			rlist_del(&c->next_in_tx);
-		}
-	}
-	if (c->key)
-		vy_stmt_unref(c->key);
-	vy_index_unref(c->index);
-	vy_stat_cursor(e->stat, c->start, c->n_reads);
-	TRASH(c);
-	mempool_free(&e->cursor_pool, c);
-}
-
-/*** }}} Cursor */
-
 static int
 vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 {
@@ -6171,53 +6216,6 @@ end:
 	if (vyresult)
 		vy_stmt_unref(vyresult);
 	return rc;
-}
-
-/**
- * Read the next value from a cursor in a thread pool thread.
- */
-int
-vy_cursor_next(struct vy_cursor *c, struct tuple **result)
-{
-	struct vy_stmt *vyresult = NULL;
-	struct vy_index *index = c->index;
-
-	if (c->tx == NULL) {
-		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
-		return -1;
-	}
-
-	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult, c->tx))
-		return -1;
-	c->n_reads++;
-	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key)) {
-		if (vyresult)
-			vy_stmt_unref(vyresult);
-		return -1;
-	}
-	if (vyresult != NULL) {
-		/* Found. */
-		if (c->order == VINYL_GE)
-			c->order = VINYL_GT;
-		else if (c->order == VINYL_LE)
-			c->order = VINYL_LT;
-
-		vy_stmt_unref(c->key);
-		c->key = vyresult;
-		vy_stmt_ref(c->key);
-
-		*result = vy_convert_replace(index, vyresult);
-		vy_stmt_unref(vyresult);
-		if (*result == NULL)
-			return -1;
-	} else {
-		/* Not found. */
-		vy_stmt_unref(c->key);
-		c->key = NULL;
-		*result = NULL;
-	}
-	return 0;
 }
 
 /** {{{ Environment */
@@ -8202,94 +8200,6 @@ struct vy_merge_src {
 };
 
 /**
- * Merge iterator takes several iterators as sources and sorts
- * output from them by the given order and LSN DESC. It has no filter,
- * it just sorts output from its sources.
- *
- * All statements from all sources can be traversed via
- * next_key()/next_lsn() like in a simple iterator (run, mem etc).
- * next_key() switches to the youngest statement of
- * the next key (according to the order), and next_lsn()
- * switches to an older statement of the same key.
- *
- * There are several merge optimizations, which expect that:
- *
- * 1) All sources are sorted by age, i.e. the most fresh
- * sources are added first.
- * 2) Mutable sources are added before read-blocking sources.
- *
- * The iterator can merge the write set of the current
- * transaction, that does not belong to any range but to entire
- * index, and mems and runs of some range. For this purpose the
- * iterator has a special flag (range_ended) that signals to the
- * read iterator that it must switch to the next range.
- */
-struct vy_merge_iterator {
-	/** Array of sources */
-	struct vy_merge_src *src;
-	/** Number of elements in the src array */
-	uint32_t src_count;
-	/** Number of elements allocated in the src array */
-	uint32_t src_capacity;
-	/** Current source offset that merge iterator is positioned on */
-	uint32_t curr_src;
-	/** Offset of the first source with is_mutable == true */
-	uint32_t mutable_start;
-	/** Next offset after the last source with is_mutable == true */
-	uint32_t mutable_end;
-	/* Index for key_def and ondex->version */
-	struct vy_index *index;
-
-	/* {{{ Range version checking */
-	/* copy of index->version to track range tree changes */
-	uint32_t index_version;
-	/* current range */
-	struct vy_range *curr_range;
-	/* copy of curr_range->version to track mem/run lists changes */
-	uint32_t range_version;
-	/* Range version checking }}} */
-
-	const struct vy_stmt *key;
-	/** Order of iteration */
-	enum vy_order order;
-	/** Current stmt that merge iterator is positioned on */
-	struct vy_stmt *curr_stmt;
-	/**
-	 * All sources with this front_id are on the same key of
-	 * current iteration (optimization)
-	 */
-	uint32_t front_id;
-	/**
-	 * If index is unique and full key is given we can
-	 * optimize first search in order to avoid unnecessary
-	 * reading from disk.  That flag is set to true during
-	 * initialization if index is unique and  full key is
-	 * given. After first _get or _next_key call is set to
-	 * false
-	 */
-	bool unique_optimization;
-	/**
-	 * After first search with unique_optimization we must do some extra
-	 * moves and optimizations for _next_lsn call. So that flag is set to
-	 * true after first search and will set to false after consequent
-	 * _next_key call */
-	bool is_in_uniq_opt;
-	/**
-	 * This flag is set to false during initialization and
-	 * means that we must do lazy search for first _get or
-	 * _next call. After that is set to false
-	 */
-	bool search_started;
-	/**
-	 * If all sources marked with belong_range = true comes to
-	 * the end of data this flag is automatically set to true;
-	 * is false otherwise.  For read iterator range_ended = true
-	 * means that it must switch to next range
-	 */
-	bool range_ended;
-};
-
-/**
  * Open the iterator
  */
 static void
@@ -9052,36 +8962,6 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 /* {{{ Iterator over index */
 
 /**
- * Complex read iterator over vinyl index and write_set of current tx
- * Iterates over ranges, creates merge iterator for every range and outputs
- * the result.
- * Can also wor without transaction, just set tx = NULL in _open
- * Applyes upserts and skips deletes, so only one replace stmt for every key
- * is output
- */
-struct vy_read_iterator {
-	/* index to iterate over */
-	struct vy_index *index;
-	/* transaction to iterate over */
-	struct vy_tx *tx;
-	bool only_disk;
-
-	/* search options */
-	enum vy_order order;
-	const struct vy_stmt *key;
-	int64_t vlsn;
-
-	/* iterator over ranges */
-	struct vy_range_iterator range_iterator;
-	/* current range */
-	struct vy_range *curr_range;
-	/* merge iterator over current range */
-	struct vy_merge_iterator merge_iterator;
-
-	struct vy_stmt *curr_stmt;
-};
-
-/**
  * Open the iterator
  */
 static void
@@ -9438,3 +9318,123 @@ vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
 	vy_index_ref(index);
 	fiber_start(f, range, stmt, index->version, range->version);
 }
+
+/* {{{ Cursor */
+
+struct vy_cursor *
+vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
+	      uint32_t part_count, enum vy_order order)
+{
+	struct vy_env *e = index->env;
+	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
+	if (c == NULL) {
+		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
+		return NULL;
+	}
+	c->key = vy_stmt_new_select(key, part_count, index->key_def);
+	if (c->key == NULL) {
+		mempool_free(&e->cursor_pool, c);
+		return NULL;
+	}
+	c->index = index;
+	c->n_reads = 0;
+	c->order = order;
+	if (tx == NULL) {
+		tx = &c->tx_autocommit;
+		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
+	} else {
+		rlist_add(&tx->cursors, &c->next_in_tx);
+	}
+	c->tx = tx;
+	c->start = tx->start;
+	/*
+	 * Prevent index drop by the backend while the cursor is
+	 * still alive.
+	 */
+	vy_index_ref(c->index);
+	return c;
+}
+
+/**
+ * Read the next value from a cursor in a thread pool thread.
+ */
+int
+vy_cursor_next(struct vy_cursor *c, struct tuple **result)
+{
+	struct vy_stmt *vyresult = NULL;
+	struct vy_index *index = c->index;
+
+	if (c->tx == NULL) {
+		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		return -1;
+	}
+
+	assert(c->key != NULL);
+	if (vy_index_read(index, c->key, c->order, &vyresult, c->tx))
+		return -1;
+	c->n_reads++;
+	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key)) {
+		if (vyresult)
+			vy_stmt_unref(vyresult);
+		return -1;
+	}
+	if (vyresult != NULL) {
+		/* Found. */
+		if (c->order == VINYL_GE)
+			c->order = VINYL_GT;
+		else if (c->order == VINYL_LE)
+			c->order = VINYL_LT;
+
+		vy_stmt_unref(c->key);
+		c->key = vyresult;
+		vy_stmt_ref(c->key);
+
+		*result = vy_convert_replace(index, vyresult);
+		vy_stmt_unref(vyresult);
+		if (*result == NULL)
+			return -1;
+	} else {
+		/* Not found. */
+		vy_stmt_unref(c->key);
+		c->key = NULL;
+		*result = NULL;
+	}
+	return 0;
+}
+
+int
+vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx)
+{
+	if (cursor->tx == NULL) {
+		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	*tx = cursor->tx;
+	return 0;
+}
+
+void
+vy_cursor_delete(struct vy_cursor *c)
+{
+	struct vy_env *e = c->index->env;
+	if (c->tx != NULL) {
+		if (c->tx == &c->tx_autocommit) {
+			/* Rollback the automatic transaction. */
+			vy_tx_rollback(c->index->env, c->tx);
+		} else {
+			/*
+			 * Delete itself from the list of open cursors
+			 * in the transaction
+			 */
+			rlist_del(&c->next_in_tx);
+		}
+	}
+	if (c->key)
+		vy_stmt_unref(c->key);
+	vy_index_unref(c->index);
+	vy_stat_cursor(e->stat, c->start, c->n_reads);
+	TRASH(c);
+	mempool_free(&e->cursor_pool, c);
+}
+
+/*** }}} Cursor */
