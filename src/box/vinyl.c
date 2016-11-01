@@ -2100,6 +2100,24 @@ check:
 	itr->curr_range = next;
 }
 
+/**
+ * Position iterator @itr to the range that contains @last_stmt and
+ * return the current range in @result. If @last_stmt is NULL, restart
+ * the iterator.
+ */
+static void
+vy_range_iterator_restore(struct vy_range_iterator *itr,
+			  const struct vy_stmt *last_stmt,
+			  struct vy_range **result)
+{
+	struct vy_index *index = itr->index;
+	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
+				itr->order, index->key_def,
+				last_stmt != NULL ? last_stmt : itr->key);
+	itr->curr_range = curr;
+	*result = curr->shadow != NULL ? curr->shadow : curr;
+}
+
 static void
 vy_range_log_debug(struct vy_range *range, const char *reason)
 {
@@ -9258,14 +9276,10 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 static NODISCARD int
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
-	const struct vy_stmt *key;
 	int rc;
 restart:
-	key = itr->curr_stmt != 0 ? itr->curr_stmt : itr->key;
-	vy_range_iterator_open(&itr->range_iterator, itr->index,
-			       itr->order, key);
-	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
-
+	vy_range_iterator_restore(&itr->range_iterator, itr->curr_stmt,
+				  &itr->curr_range);
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
