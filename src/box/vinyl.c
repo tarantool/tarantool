@@ -8101,7 +8101,7 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval 0 nothing significant was happend and itr position left the same
  * @retval 1 iterator restored and position changed
  */
-static NODISCARD int
+static int
 vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 			struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
