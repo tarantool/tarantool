@@ -595,6 +595,10 @@ space:replace({5, 5, 25})
 -- Must print all, include tuples added after the iterator creation
 -- because of the opened transaction presense.
 iterate_over(iter_obj)
+iterator_next(iter_obj2)
+space:replace({12, 12, 12})
+iterator_next(iter_obj2)
+space:replace({9, 9, 9})
 iterate_over(iter_obj2)
 box.commit()
 space:truncate()

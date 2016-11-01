@@ -1319,6 +1319,8 @@ struct vy_read_iterator {
 	struct vy_merge_iterator merge_iterator;
 
 	struct vy_stmt *curr_stmt;
+	/* is lazy search started */
+	bool search_started;
 };
 
 /** Cursor. */
@@ -1347,6 +1349,8 @@ struct vy_cursor {
 	 * is closed.
 	 */
 	struct rlist next_in_tx;
+	/** Iterator over index */
+	struct vy_read_iterator iterator;
 };
 
 static struct txv *
@@ -5340,7 +5344,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	}
 
 	vy_range_tree_new(&index->tree);
-	index->version = 0;
+	index->version = 1;
 	rlist_create(&index->link);
 	index->size = 0;
 	index->range_count = 0;
@@ -8105,7 +8109,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 	*ret = NULL;
 
-	if (!itr->search_started) {
+	if (!itr->search_started && last_stmt == NULL) {
 		vy_txw_iterator_start(itr, ret);
 		return 0;
 	}
@@ -8358,6 +8362,8 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 			return rc;
 	}
 	itr->front_id++;
+	if (vy_merge_iterator_check_version(itr))
+		return -2;
 	return 0;
 }
 
@@ -8441,9 +8447,11 @@ restart:
 	if (itr->curr_stmt != NULL)
 		vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = min_stmt;
-	if (min_stmt != NULL)
+	if (itr->curr_stmt != NULL)
 		vy_stmt_ref(itr->curr_stmt);
 	*ret = min_stmt;
+	if (vy_merge_iterator_check_version(itr))
+		return -2;
 	return 0;
 }
 
@@ -8509,9 +8517,11 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 	if (itr->curr_stmt != NULL)
 		vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = min_stmt;
-	*ret = min_stmt;
-	if (min_stmt != NULL)
+	if (itr->curr_stmt != NULL)
 		vy_stmt_ref(itr->curr_stmt);
+	*ret = min_stmt;
+	if (vy_merge_iterator_check_version(itr))
+		return -2;
 	return 0;
 }
 
@@ -8989,6 +8999,8 @@ vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, itr->index, itr->tx,
 			     itr->order, itr->key);
+	vy_txw_iterator_restore(&sub_src->iterator, itr->curr_stmt,
+				&sub_src->stmt);
 }
 
 static void
@@ -9056,12 +9068,27 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 	itr->key = key;
 	itr->vlsn = vlsn;
 	itr->only_disk = only_disk;
-
+	itr->search_started = false;
 	itr->curr_stmt = NULL;
-	vy_range_iterator_open(&itr->range_iterator, index, order, key);
-	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
+	itr->curr_range = NULL;
+}
 
-	vy_merge_iterator_open(&itr->merge_iterator, index, order, key);
+/**
+ * Start lazy search
+ */
+void
+vy_read_iterator_start(struct vy_read_iterator *itr)
+{
+	assert(!itr->search_started);
+	assert(itr->curr_stmt == NULL);
+	assert(itr->curr_range == NULL);
+	itr->search_started = true;
+
+	vy_range_iterator_open(&itr->range_iterator, itr->index,
+			       itr->order, itr->key);
+	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
+	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
+			       itr->order, itr->key);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9103,10 +9130,34 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 {
 	int rc;
 	*ret = NULL;
-	while ((rc = vy_merge_iterator_next_key(&itr->merge_iterator,
+	struct vy_merge_iterator *mi = &itr->merge_iterator;
+	while ((rc = vy_merge_iterator_next_key(mi,
 						itr->curr_stmt, ret)) == -2) {
 		if (vy_read_iterator_restore(itr) < 0)
 			return -1;
+		/* Check if the iterator is restored not on the same key. */
+		if (itr->curr_stmt) {
+			rc = vy_merge_iterator_locate(mi, ret);
+			if (rc == -1)
+				return -1;
+			if (rc == -2) {
+				if (vy_read_iterator_restore(itr) < 0)
+					return -1;
+				continue;
+			}
+			/* If the iterator is empty then return. */
+			if (*ret == NULL)
+				return 0;
+			/*
+			 * If the iterator after restoration is on the same key
+			 * then go to the next.
+			 */
+			if (vy_stmt_compare(itr->curr_stmt, *ret,
+					    itr->index->key_def) == 0)
+				continue;
+			/* Else return the new key. */
+			break;
+		}
 	}
 	return rc;
 }
@@ -9146,6 +9197,8 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 {
+	if (!itr->search_started)
+		vy_read_iterator_start(itr);
 	*result = NULL;
 	struct vy_stmt *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
@@ -9205,7 +9258,8 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 	if (itr->curr_stmt != NULL)
 		vy_stmt_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
-	vy_merge_iterator_close(&itr->merge_iterator);
+	if (itr->search_started)
+		vy_merge_iterator_close(&itr->merge_iterator);
 }
 
 /* }}} Iterator over index */
@@ -9348,12 +9402,11 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 * still alive.
 	 */
 	vy_index_ref(c->index);
+	vy_read_iterator_open(&c->iterator, index, tx, order, c->key,
+			      tx->vlsn, false);
 	return c;
 }
 
-/**
- * Read the next value from a cursor in a thread pool thread.
- */
 int
 vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
@@ -9366,33 +9419,19 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	}
 
 	assert(c->key != NULL);
-	if (vy_index_read(index, c->key, c->order, &vyresult, c->tx))
+	int rc = vy_read_iterator_next(&c->iterator, &vyresult);
+	if (rc)
 		return -1;
 	c->n_reads++;
-	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key)) {
-		if (vyresult)
-			vy_stmt_unref(vyresult);
+	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key))
 		return -1;
-	}
 	if (vyresult != NULL) {
 		/* Found. */
-		if (c->order == VINYL_GE)
-			c->order = VINYL_GT;
-		else if (c->order == VINYL_LE)
-			c->order = VINYL_LT;
-
-		vy_stmt_unref(c->key);
-		c->key = vyresult;
-		vy_stmt_ref(c->key);
-
 		*result = vy_convert_replace(index, vyresult);
-		vy_stmt_unref(vyresult);
 		if (*result == NULL)
 			return -1;
 	} else {
 		/* Not found. */
-		vy_stmt_unref(c->key);
-		c->key = NULL;
 		*result = NULL;
 	}
 	return 0;
@@ -9412,6 +9451,7 @@ vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx)
 void
 vy_cursor_delete(struct vy_cursor *c)
 {
+	vy_read_iterator_close(&c->iterator);
 	struct vy_env *e = c->index->env;
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
