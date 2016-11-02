@@ -53,7 +53,7 @@ request_create(struct request *request, uint32_t type)
 	request->type = type;
 }
 
-void
+int
 request_decode(struct request *request, const char *data, uint32_t len)
 {
 	const char *end = data + len;
@@ -63,7 +63,8 @@ request_decode(struct request *request, const char *data, uint32_t len)
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+		tnt_error(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return -1;
 	}
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
@@ -118,13 +119,17 @@ error:
 		}
 	}
 #ifndef NDEBUG
-	if (data != end)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet end");
+	if (data != end) {
+		tnt_error(ClientError, ER_INVALID_MSGPACK, "packet end");
+		return -1;
+	}
 #endif
 	if (key_map) {
-		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+		tnt_error(ClientError, ER_MISSING_REQUEST_FIELD,
 			  iproto_key_strs[__builtin_ffsll((long long) key_map) - 1]);
-	  }
+		return -1;
+	}
+	return 0;
 }
 
 int

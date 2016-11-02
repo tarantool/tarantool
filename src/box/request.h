@@ -35,6 +35,8 @@
 
 #include "trivia/util.h"
 
+#include "diag.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -76,6 +78,14 @@ struct request
 	int index_base;
 };
 
+int
+request_decode(struct request *request, const char *data, uint32_t len);
+
+struct iovec;
+
+int
+request_encode(struct request *request, struct iovec *iov);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -91,11 +101,21 @@ struct PACKED request_replace_body {
 void
 request_create(struct request *request, uint32_t code);
 
-void
-request_decode(struct request *request, const char *data, uint32_t len);
+static inline void
+request_decode_xc(struct request *request, const char *data, uint32_t len)
+{
+	if (request_decode(request, data, len) == -1)
+		diag_raise();
+}
 
-int
-request_encode(struct request *request, struct iovec *iov);
+static inline int
+request_encode_xc(struct request *request, struct iovec *iov)
+{
+	int rc = 0;
+	if ((rc = request_encode(request, iov)) == -1)
+		diag_raise();
+	return rc;
+}
 
 /**
  * Convert secondary key of request to primary key by given tuple.

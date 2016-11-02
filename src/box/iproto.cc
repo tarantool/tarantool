@@ -520,9 +520,9 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "missing request body");
 		}
-		request_decode(&msg->request,
-			       (const char *) msg->header.body[0].iov_base,
-			       msg->header.body[0].iov_len);
+		request_decode_xc(&msg->request,
+				 (const char *) msg->header.body[0].iov_base,
+				 msg->header.body[0].iov_len);
 		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
 		cmsg_init(msg, dml_route[msg->header.type]);
 		break;
