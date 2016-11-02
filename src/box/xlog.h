@@ -273,7 +273,7 @@ struct xlog {
  * @return  xlog object or NULL in case of error.
  */
 struct xlog *
-xlog_create(struct xdir *dir, const struct vclock *vclock);
+xdir_create_xlog(struct xdir *dir, const struct vclock *vclock);
 
 /**
  * Sync a log file. The exact action is defined

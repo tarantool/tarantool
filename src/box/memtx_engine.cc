@@ -1260,7 +1260,7 @@ checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
-	struct xlog *snap = xlog_create(&ckpt->dir, &ckpt->vclock);
+	struct xlog *snap = xdir_create_xlog(&ckpt->dir, &ckpt->vclock);
 
 	if (snap == NULL)
 		tnt_raise(SystemError, "Can't create xlog");

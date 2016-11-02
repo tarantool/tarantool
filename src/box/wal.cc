@@ -425,7 +425,7 @@ wal_opt_rotate(struct wal_writer *writer)
 			wal_to_close = NULL;
 		}
 		/* Open WAL with '.inprogress' suffix. */
-		l = xlog_create(&writer->wal_dir, &writer->vclock);
+		l = xdir_create_xlog(&writer->wal_dir, &writer->vclock);
 	}
 	assert(wal_to_close == NULL);
 	writer->current_wal = l;

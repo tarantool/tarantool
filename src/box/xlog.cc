@@ -1396,7 +1396,7 @@ xlog_rename(struct xlog *l)
  * and sets errno.
  */
 struct xlog *
-xlog_create(struct xdir *dir, const struct vclock *vclock)
+xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 {
 	char *filename;
 	int fd = -1;
