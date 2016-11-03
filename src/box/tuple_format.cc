@@ -38,7 +38,7 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 static uint32_t formats_size = 0, formats_capacity = 0;
 
 /** Extract all available type info from keys. */
-static void
+static int
 field_type_create(struct tuple_format *format, struct rlist *key_list)
 {
 	/* There may be fields between indexed fields (gaps). */
@@ -55,19 +55,19 @@ field_type_create(struct tuple_format *format, struct rlist *key_list)
 				&format->fields[key_def->parts[i].fieldno].type;
 			if (*fmt_type != FIELD_TYPE_ANY &&
 			    *fmt_type != set_type) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE_MISMATCH,
-					  key_def->name,
-					  i + INDEX_OFFSET,
-					  field_type_strs[set_type],
-					  field_type_strs[*fmt_type]);
+				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
+					 key_def->name, i + INDEX_OFFSET,
+					 field_type_strs[set_type],
+					 field_type_strs[*fmt_type]);
+				return -1;
 			}
 			*fmt_type = set_type;
 		}
 	}
+	return 0;
 }
 
-static void
+static int
 tuple_format_register(struct tuple_format *format)
 {
 	if (recycled_format_ids != FORMAT_ID_NIL) {
@@ -82,21 +82,25 @@ tuple_format_register(struct tuple_format *format)
 			formats = (struct tuple_format **)
 				realloc(tuple_formats, new_capacity *
 						       sizeof(tuple_formats[0]));
-			if (formats == NULL)
-				tnt_raise(OutOfMemory,
-					  sizeof(struct tuple_format),
-					  "malloc", "tuple_formats");
+			if (formats == NULL) {
+				diag_set(OutOfMemory,
+					 sizeof(struct tuple_format), "malloc",
+					 "tuple_formats");
+				return -1;
+			}
 
 			formats_capacity = new_capacity;
 			tuple_formats = formats;
 		}
 		if (formats_size == FORMAT_ID_MAX + 1) {
-			tnt_raise(LoggedError, ER_TUPLE_FORMAT_LIMIT,
-				  (unsigned) formats_capacity);
+			diag_set(ClientError, ER_TUPLE_FORMAT_LIMIT,
+				 (unsigned) formats_capacity);
+			return -1;
 		}
 		format->id = formats_size++;
 	}
 	tuple_formats[format->id] = format;
+	return 0;
 }
 
 static void
@@ -131,9 +135,11 @@ tuple_format_alloc(struct rlist *key_list)
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 
-	if (format == NULL)
-		tnt_raise(OutOfMemory, sizeof(struct tuple_format),
-			  "malloc", "tuple format");
+	if (format == NULL) {
+		diag_set(OutOfMemory, sizeof(struct tuple_format), "malloc",
+			 "tuple format");
+		return NULL;
+	}
 
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
@@ -153,13 +159,15 @@ struct tuple_format *
 tuple_format_new(struct rlist *key_list)
 {
 	struct tuple_format *format = tuple_format_alloc(key_list);
-
-	try {
-		tuple_format_register(format);
-		field_type_create(format, key_list);
-	} catch (Exception *e) {
+	if (format == NULL)
+		return NULL;
+	if (tuple_format_register(format) < 0) {
 		tuple_format_delete(format);
-		throw;
+		return NULL;
+	}
+	if (field_type_create(format, key_list) < 0) {
+		tuple_format_delete(format);
+		return NULL;
 	}
 
 	/* Set up offset slots */
@@ -189,11 +197,52 @@ tuple_format_new(struct rlist *key_list)
 	return format;
 }
 
+/** @sa declaration for details. */
+void
+tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
+		     const char *tuple)
+{
+	if (format->field_count == 0)
+		return; /* Nothing to initialize */
+
+	const char *pos = tuple;
+
+	/* Check to see if the tuple has a sufficient number of fields. */
+	uint32_t field_count = mp_decode_array(&pos);
+	if (format->exact_field_count > 0 &&
+	    format->exact_field_count != field_count)
+		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->exact_field_count);
+	if (unlikely(field_count < format->field_count))
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->field_count);
+
+	/* first field is simply accessible, so we do not store offset to it */
+	enum mp_type mp_type = mp_typeof(*pos);
+	key_mp_type_validate(format->fields[0].type, mp_type,
+			     ER_FIELD_TYPE, INDEX_OFFSET);
+	mp_next(&pos);
+	/* other fields...*/
+	for (uint32_t i = 1; i < format->field_count; i++) {
+		mp_type = mp_typeof(*pos);
+		key_mp_type_validate(format->fields[i].type, mp_type,
+				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+		if (format->fields[i].offset_slot < 0)
+			field_map[format->fields[i].offset_slot] =
+				(uint32_t) (pos - tuple);
+		mp_next(&pos);
+	}
+}
+
 void
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
 	tuple_format_default = tuple_format_new(&empty_list);
+	if (tuple_format_default == NULL)
+		diag_raise();
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_default, 1);
 }

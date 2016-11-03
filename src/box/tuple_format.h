@@ -32,6 +32,7 @@
  */
 
 #include "key_def.h" /* for enum field_type */
+#include "errinj.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -142,10 +143,6 @@ tuple_format_ref(struct tuple_format *format, int count)
 
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
 /**
  * @brief Allocate, construct and register a new in-memory tuple
  *	 format.
@@ -155,6 +152,66 @@ tuple_format_ref(struct tuple_format *format, int count)
  */
 struct tuple_format *
 tuple_format_new(struct rlist *key_list);
+
+/**
+ * Fill field map of tuple by the offsets on its key fields.
+ * Throws an error if tuple data does not match the format.
+ * @param format Tuple format.
+ * @param field_map Where to save offsets on key fields. Offsets are saved BEFORE this
+ *                  pointer.
+ * @param tuple MessagePack array with tuple fields.
+ *            ┏━━━━━━━━━━━━━━━┓
+ * Result:    ┃ offN ... off1 ┃
+ *            ┗━━━━━━━━━━━━━━━┛
+ *                            ▲
+ * tuple + off_i = field_i;   ┗━field_map
+ */
+void
+tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
+		     const char *tuple);
+
+/**
+ * Get a field from tuple by index.
+ * Returns a pointer to MessagePack length prefixed field.
+ * @param format Format that contains map of field offsets.
+ * @param tuple Pointer on the begin of MessagePack array.
+ * @param tuple_size Size of the tuple.
+ * @param field_map Pointer from which field offsets are calculated.
+ * @param i Number of the field that must be returned.
+ *
+ * @pre field < tuple->field_count.
+ * @returns field data if field exists or NULL
+ */
+inline const char *
+tuple_field_raw(const struct tuple_format *format, const char *tuple,
+		uint32_t *field_map, uint32_t i)
+{
+	if (likely(i < format->field_count)) {
+		/* Indexed field */
+
+		if (i == 0) {
+			mp_decode_array(&tuple);
+			return tuple;
+		}
+
+		if (format->fields[i].offset_slot != INT32_MAX) {
+			int32_t slot = format->fields[i].offset_slot;
+			return tuple + field_map[slot];
+		}
+	}
+	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
+	uint32_t size = mp_decode_array(&tuple);
+	if (unlikely(i >= size))
+		return NULL;
+	for (uint32_t k = 0; k < i; k++) {
+		mp_next(&tuple);
+	}
+	return tuple;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 void
 tuple_format_init();

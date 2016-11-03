@@ -298,6 +298,12 @@ char *
 tuple_extract_key_raw(const char *data, const char *data_end,
 		      const struct key_def *key_def, uint32_t *key_size);
 
+inline uint32_t *
+tuple_field_map(const struct tuple *tuple)
+{
+	return (uint32_t *) tuple;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -336,7 +342,7 @@ struct PACKED tuple
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
-	 * with BER-packed field length.
+	 * with MessagePack packed field length.
 	 */
 	char data[0];
 };
@@ -364,14 +370,6 @@ tuple_new(struct tuple_format *format, const char *data, const char *end);
  */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size);
-
-/**
- * Fill field map of tuple by the data in it
- * Used after tuple_alloc call and filling tuple data.
- * Throws an error if tuple data does not match the format.
- */
-void
-tuple_init_field_map(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Free the tuple.
@@ -478,57 +476,6 @@ tuple_field_count(const struct tuple *tuple)
 }
 
 /**
- * Get a field by id from an non-indexed tuple.
- * Returns a pointer to BER-length prefixed field.
- *
- * @returns field data if field exists or NULL
- */
-inline const char *
-tuple_field_raw(const char *data, uint32_t bsize, uint32_t i)
-{
-	const char *pos = data;
-	uint32_t size = mp_decode_array(&pos);
-	if (unlikely(i >= size))
-		return NULL;
-	for (uint32_t k = 0; k < i; k++) {
-		mp_next(&pos);
-	}
-	(void)bsize;
-	assert(pos <= data + bsize);
-	return pos;
-}
-
-/**
- * Get a field from tuple by index.
- * Returns a pointer to BER-length prefixed field.
- *
- * @pre field < tuple->field_count.
- * @returns field data if field exists or NULL
- */
-inline const char *
-tuple_field_old(const struct tuple_format *format,
-		const struct tuple *tuple, uint32_t i)
-{
-	if (likely(i < format->field_count)) {
-		/* Indexed field */
-
-		if (i == 0) {
-			const char *pos = tuple->data;
-			mp_decode_array(&pos);
-			return pos;
-		}
-
-		if (format->fields[i].offset_slot != INT32_MAX) {
-			uint32_t *field_map = (uint32_t *) tuple;
-			int32_t slot = format->fields[i].offset_slot;
-			return tuple->data + field_map[slot];
-		}
-	}
-	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
-	return tuple_field_raw(tuple->data, tuple->bsize, i);
-}
-
-/**
  * @brief Return field data of the field
  * @param tuple tuple
  * @param field_no field number
@@ -536,10 +483,11 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-static inline const char *
+inline const char *
 tuple_field(const struct tuple *tuple, uint32_t i)
 {
-	return tuple_field_old(tuple_format(tuple), tuple, i);
+	return tuple_field_raw(tuple_format(tuple), tuple->data,
+			       tuple_field_map(tuple), i);
 }
 
 /**
@@ -674,50 +622,6 @@ tuple_upsert(struct tuple_format *new_format,
 	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base);
-
-
-/**
- * @brief Compare two tuples using field by field using key definition
- * @param tuple_a tuple
- * @param tuple_b tuple
- * @param key_def key definition
- * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
- * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
- * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
- */
-int
-tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
-	      const struct key_def *key_def);
-
-/**
- * @brief Compare a tuple with a key field by field using key definition
- * @param tuple_a tuple
- * @param key BER-encoded key
- * @param part_count number of parts in \a key
- * @param key_def key definition
- * @retval 0  if key_fields(tuple_a) == parts(key)
- * @retval <0 if key_fields(tuple_a) < parts(key)
- * @retval >0 if key_fields(tuple_a) > parts(key)
- */
-int
-tuple_compare_with_key_default(const struct tuple *tuple_a, const char *key,
-		       uint32_t part_count, const struct key_def *key_def);
-
-
-inline int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
-		       uint32_t part_count, const struct key_def *key_def)
-{
-	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
-}
-
-inline int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
-	      const struct key_def *key_def)
-{
-	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
-}
-
 
 /** These functions are implemented in tuple_convert.cc. */
 

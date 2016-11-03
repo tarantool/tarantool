@@ -61,49 +61,6 @@ static struct mempool tuple_iterator_pool;
  */
 struct tuple *box_tuple_last;
 
-/*
- * Validate a new tuple format and initialize tuple-local
- * format data.
- */
-void
-tuple_init_field_map(struct tuple_format *format, struct tuple *tuple)
-{
-	if (format->field_count == 0)
-		return; /* Nothing to initialize */
-
-	const char *pos = tuple->data;
-	uint32_t *field_map = (uint32_t *) tuple;
-
-	/* Check to see if the tuple has a sufficient number of fields. */
-	uint32_t field_count = mp_decode_array(&pos);
-	if (format->exact_field_count > 0 &&
-	    format->exact_field_count != field_count)
-		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->exact_field_count);
-	if (unlikely(field_count < format->field_count))
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->field_count);
-
-	/* first field is simply accessible, so we do not store offset to it */
-	enum mp_type mp_type = mp_typeof(*pos);
-	key_mp_type_validate(format->fields[0].type, mp_type,
-			     ER_FIELD_TYPE, INDEX_OFFSET);
-	mp_next(&pos);
-	/* other fields...*/
-	for (uint32_t i = 1; i < format->field_count; i++) {
-		mp_type = mp_typeof(*pos);
-		key_mp_type_validate(format->fields[i].type, mp_type,
-				     ER_FIELD_TYPE, i + INDEX_OFFSET);
-		if (format->fields[i].offset_slot < 0)
-			field_map[format->fields[i].offset_slot] =
-				(uint32_t) (pos - tuple->data);
-		mp_next(&pos);
-	}
-}
-
-
 /**
  * Check tuple data correspondence to space format;
  * throw proper exception if smth wrong.
@@ -380,7 +337,8 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	memcpy(new_tuple->data, data, tuple_len);
 	try {
-		tuple_init_field_map(format, new_tuple);
+		tuple_init_field_map(format, (uint32_t *) new_tuple,
+				     new_tuple->data);
 	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;

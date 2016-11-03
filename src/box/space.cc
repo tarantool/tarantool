@@ -116,6 +116,8 @@ space_new(struct space_def *def, struct rlist *key_list)
 				      index_count * sizeof(Index *));
 	space->def = *def;
 	space->format = tuple_format_new(key_list);
+	if (space->format == NULL)
+		diag_raise();
 	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
 	space->format->exact_field_count = def->exact_field_count;

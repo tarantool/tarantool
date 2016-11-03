@@ -223,28 +223,29 @@ tuple_compare_field(const char *field_a, const char *field_b,
 }
 
 int
-tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
-	      const struct key_def *key_def)
+tuple_compare_default_raw(const struct tuple_format *format_a,
+			  const char *tuple_a, uint32_t *field_map_a,
+			  const struct tuple_format *format_b,
+			  const char *tuple_b, uint32_t *field_map_b,
+			  const struct key_def *key_def)
 {
-	if (key_def->part_count == 1 && key_def->parts[0].fieldno == 0) {
-		const char *a = tuple_a->data;
-		const char *b = tuple_b->data;
-		mp_decode_array(&a);
-		mp_decode_array(&b);
-		return tuple_compare_field(a, b, key_def->parts[0].type);
+	const struct key_part *part = key_def->parts;
+	if (key_def->part_count == 1 && part->fieldno == 0) {
+		mp_decode_array(&tuple_a);
+		mp_decode_array(&tuple_b);
+		return tuple_compare_field(tuple_a, tuple_b, part->type);
 	}
 
-	const struct key_part *part = key_def->parts;
 	const struct key_part *end = part + key_def->part_count;
-	struct tuple_format *format_a = tuple_format(tuple_a);
-	struct tuple_format *format_b = tuple_format(tuple_b);
 	const char *field_a;
 	const char *field_b;
 	int r = 0;
 
 	for (; part < end; part++) {
-		field_a = tuple_field_old(format_a, tuple_a, part->fieldno);
-		field_b = tuple_field_old(format_b, tuple_b, part->fieldno);
+		field_a = tuple_field_raw(format_a, tuple_a, field_map_a,
+					  part->fieldno);
+		field_b = tuple_field_raw(format_b, tuple_b, field_map_b,
+					  part->fieldno);
 		assert(field_a != NULL && field_b != NULL);
 		if ((r = tuple_compare_field(field_a, field_b, part->type)))
 			break;
@@ -253,31 +254,95 @@ tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 }
 
 int
-tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
-			       uint32_t part_count, const struct key_def *key_def)
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def)
+{
+	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
+}
+
+int
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		      const struct key_def *key_def)
+{
+	return tuple_compare_default_raw(tuple_format(tuple_a), tuple_a->data,
+					 (uint32_t *) tuple_a,
+					 tuple_format(tuple_b), tuple_b->data,
+					 (uint32_t *) tuple_b, key_def);
+}
+
+int
+tuple_compare_key_raw(const char *key_a, uint32_t part_count_a,
+		      const char *key_b, uint32_t part_count_b,
+		      const struct key_def *key_def)
+{
+	assert(key_a != NULL || part_count_a == 0);
+	assert(key_b != NULL || part_count_b == 0);
+	assert(part_count_a <= key_def->part_count);
+	assert(part_count_b <= key_def->part_count);
+	const struct key_part *part = key_def->parts;
+	uint32_t part_count;
+	part_count = MIN(MIN(part_count_a, key_def->part_count), part_count_b);
+	if (likely(part_count == 1))
+		return tuple_compare_field(key_a, key_b, part->type);
+	const struct key_part *end;
+	end = part + part_count;
+	int r = 0; /* Part count can be 0 in wildcard searches. */
+	for (; part < end; part++) {
+		r = tuple_compare_field(key_a, key_b, part->type);
+		if (r != 0)
+			break;
+		mp_next(&key_a);
+		mp_next(&key_b);
+	}
+	return r;
+}
+
+int
+tuple_compare_with_key_default_raw(const struct tuple_format *format,
+				   const char *tuple, uint32_t *field_map,
+				   const char *key, uint32_t part_count,
+				   const struct key_def *key_def)
 {
 	assert(key != NULL || part_count == 0);
 	assert(part_count <= key_def->part_count);
-	struct tuple_format *format = tuple_format(tuple);
+	const struct key_part *part = key_def->parts;
 	if (likely(part_count == 1)) {
-		const struct key_part *part = key_def->parts;
-		const char *field = tuple_field_old(format, tuple,
-						    part->fieldno);
+		const char *field;
+		field = tuple_field_raw(format, tuple, field_map,
+					part->fieldno);
 		return tuple_compare_field(field, key, part->type);
 	}
 
-	const struct key_part *part = key_def->parts;
 	const struct key_part *end = part + MIN(part_count, key_def->part_count);
 	int r = 0; /* Part count can be 0 in wildcard searches. */
 	for (; part < end; part++) {
-		const char *field = tuple_field_old(format, tuple,
-						    part->fieldno);
+		const char *field;
+		field = tuple_field_raw(format, tuple, field_map,
+					part->fieldno);
 		r = tuple_compare_field(field, key, part->type);
 		if (r != 0)
 			break;
 		mp_next(&key);
 	}
 	return r;
+}
+
+int
+tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
+			       uint32_t part_count,
+			       const struct key_def *key_def)
+{
+	return tuple_compare_with_key_default_raw(tuple_format(tuple),
+						  tuple->data,
+						  (uint32_t *) tuple, key,
+						  part_count, key_def);
+}
+
+int
+tuple_compare_with_key(const struct tuple *tuple, const char *key,
+		       uint32_t part_count, const struct key_def *key_def)
+{
+	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
 }
 
 template <int TYPE>
@@ -362,8 +427,12 @@ struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 		} else {
 			if ((r = field_compare<TYPE>(&field_a, &field_b)) != 0)
 				return r;
-			field_a = tuple_field_old(format_a, tuple_a, IDX2);
-			field_b = tuple_field_old(format_b, tuple_b, IDX2);
+			field_a = tuple_field_raw(format_a, tuple_a->data,
+						  tuple_field_map(tuple_a),
+						  IDX2);
+			field_b = tuple_field_raw(format_b, tuple_b->data,
+						  tuple_field_map(tuple_b),
+						  IDX2);
 		}
 		return FieldCompare<IDX2, TYPE2, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
@@ -397,8 +466,11 @@ struct TupleCompare
 	{
 		struct tuple_format *format_a = tuple_format(tuple_a);
 		struct tuple_format *format_b = tuple_format(tuple_b);
-		const char *field_a = tuple_field_old(format_a, tuple_a, IDX);
-		const char *field_b = tuple_field_old(format_b, tuple_b, IDX);
+		const char *field_a, *field_b;
+		field_a = tuple_field_raw(format_a, tuple_a->data,
+					  tuple_field_map(tuple_a), IDX);
+		field_b = tuple_field_raw(format_b, tuple_b->data,
+					  tuple_field_map(tuple_b), IDX);
 		return FieldCompare<IDX, TYPE, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
 				format_b, field_a, field_b);
@@ -550,7 +622,8 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 			r = field_compare_with_key<TYPE>(&field, &key);
 			if (r || part_count == FLD_ID + 1)
 				return r;
-			field = tuple_field_old(format, tuple, IDX2);
+			field = tuple_field_raw(format, tuple->data,
+						tuple_field_map(tuple), IDX2);
 			mp_next(&key);
 		}
 		return FieldCompareWithKey<FLD_ID + 1, IDX2, TYPE2, MORE_TYPES...>::
@@ -586,7 +659,9 @@ struct TupleCompareWithKey
 		if (part_count == 0)
 			return 0;
 		struct tuple_format *format = tuple_format(tuple);
-		const char *field = tuple_field_old(format, tuple, IDX);
+		const char *field = tuple_field_raw(format, tuple->data,
+						    tuple_field_map(tuple),
+						    IDX);
 		return FieldCompareWithKey<FLD_ID, IDX, TYPE, MORE_TYPES...>::
 				compare(tuple, key, part_count,
 					key_def, format, field);
