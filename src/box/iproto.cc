@@ -625,13 +625,23 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 
 	try {
 		/* Ensure we have sufficient space for the next round.  */
-		struct iobuf *iobuf;
-		if ((mempool_count(&iproto_msg_pool) > IPROTO_MSG_MAX &&
-			/* Don't stop connection if there is no pending requests */
-			(ibuf_used(&con->iobuf[0]->in) > con->parse_size ||
-			 ibuf_used(&con->iobuf[1]->in))) ||
-		    (iobuf = iproto_connection_input_iobuf(con)) == NULL) {
+		struct iobuf *iobuf = iproto_connection_input_iobuf(con);
+		if (iobuf == NULL) {
+			ev_io_stop(loop, &con->input);
+			return;
+		}
 
+		/*
+		 * Throttle if there are too many pending requests,
+		 * otherwise we might deplete the fiber pool and
+		 * deadlock (e.g. WAL writer needs a fiber to wake
+		 * another fiber waiting for write to complete).
+		 * Ignore iproto_connection->disconnect messages.
+		 */
+		assert(mempool_count(&iproto_msg_pool) >=
+		       mempool_count(&iproto_connection_pool));
+		if (mempool_count(&iproto_msg_pool) -
+		    mempool_count(&iproto_connection_pool) > IPROTO_MSG_MAX) {
 			ev_io_stop(loop, &con->input);
 			return;
 		}
