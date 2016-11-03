@@ -44,6 +44,7 @@ extern "C" {
 struct txn;
 struct port;
 struct tuple;
+struct iovec;
 
 /** box statistics */
 extern struct rmean *rmean_box;
@@ -78,11 +79,32 @@ struct request
 	int index_base;
 };
 
+/**
+ * Initialize a request for @a code
+ * @param request request
+ * @param code see `enum iproto_type`
+ */
+void
+request_create(struct request *request, uint32_t code);
+
+/**
+ * Decode @a data buffer
+ * @param request request to fill up
+ * @param data a buffer
+ * @param len a buffer size
+ * @retval 0 on success
+ * @retval -1 on error, see diag
+ */
 int
 request_decode(struct request *request, const char *data, uint32_t len);
 
-struct iovec;
-
+/**
+ * Encode the request fields to iovec using region_alloc().
+ * @param request request to encode
+ * @param iov[out] iovec to fill
+ * @retval -1 on error, see diag
+ * @retval > 0 the number of iovecs used
+ */
 int
 request_encode(struct request *request, struct iovec *iov);
 
@@ -98,23 +120,20 @@ struct PACKED request_replace_body {
 	uint8_t k_tuple;
 };
 
-void
-request_create(struct request *request, uint32_t code);
-
 static inline void
 request_decode_xc(struct request *request, const char *data, uint32_t len)
 {
-	if (request_decode(request, data, len) == -1)
+	if (request_decode(request, data, len) < 0)
 		diag_raise();
 }
 
 static inline int
 request_encode_xc(struct request *request, struct iovec *iov)
 {
-	int rc = 0;
-	if ((rc = request_encode(request, iov)) == -1)
+	int iovcnt = request_encode(request, iov);
+	if (iovcnt < 0)
 		diag_raise();
-	return rc;
+	return iovcnt;
 }
 
 /**
