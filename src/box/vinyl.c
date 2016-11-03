@@ -468,7 +468,14 @@ vy_stat_tx_write_rate(struct vy_stat *s)
 	return rmean_mean(s->rmean, VY_STAT_TX_WRITE);
 }
 
+/* {{{ Statement public API */
+
 /**
+ * There are two groups of statements:
+ *
+ *  - SELECT and DELETE are "key" statements.
+ *  - DELETE, UPSERT and REPLACE are "tuple" statements.
+ *
  * REPLACE/UPSERT statements structure:
  *                         ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
  *  4 bytes      4 bytes   ┃           MessagePack data    ▼
@@ -495,29 +502,21 @@ struct vy_stmt {
 	char data[0];
 };
 
-/* {{{ Statement public API */
-
 /**
  * There are two groups of comparators - for raw data and for full statements.
- * Both groups are divided on comparators for various combinations of key
- * statements and tuple statements.
- * SELECT and DELETE are key statements.
- * DELETE, UPSERT and REPLACE are tuple statements.
- * As you can see - the DELETE is both the key and tuple statement.
- * Such duality appears because DELETE statements are stored as tuples on disk
- * and also can be used as keys for searching (@sa vy_delete).
- *
- * The more specific comparator the faster it works.
+ * Specialized comparators are faster than general-purpose comparators.
  * For example, vy_stmt_compare - slowest comparator because it in worst case
  * checks all combinations of key and tuple types, but
- * vy_compare_keys - fastest comparator, because it shouldn't check statement
+ * vy_key_compare - fastest comparator, because it shouldn't check statement
  * types.
  */
 
 /**
  * Compare statements by their raw data.
- * @param stmt_data_a Left operand of comparison.
- * @param stmt_data_b Right operand of comparison.
+ * @param stmt_a Left operand of comparison.
+ * @param stmt_b Right operand of comparison.
+ * @param a_type iproto_type of stmt_data_a
+ * @param b_type iproto_type of stmt_data_b
  * @param key_def Definition of the format of both statements.
  *
  * @retval 0   if a == b
@@ -525,54 +524,52 @@ struct vy_stmt {
  * @retval < 0 if a < b
  */
 static int
-vy_stmt_compare_raw(const char *stmt_data_a, uint8_t a_type,
-		    const char *stmt_data_b, uint8_t b_type,
+vy_stmt_compare_raw(const char *stmt_a, uint8_t a_type,
+		    const char *stmt_b, uint8_t b_type,
 		    const struct key_def *key_def);
+
+/** @sa vy_stmt_compare_raw. */
+static int
+vy_stmt_compare(const struct vy_stmt *stmt_a, const struct vy_stmt *stmt_b,
+		const struct key_def *key_def);
 
 /**
  * Compare key statements by their raw data.
- * @param stmt_data_a Left operand of comparison.
- * @param a_type Type of the left operand (@sa struct vy_stmt.type).
- * @param stmt_data_b Right operand of comparison.
- * @param b_type Type of the right operand (@sa struct vy_stmt.type).
+ * @param key_a Left operand of comparison.
+ * @param key_b Right operand of comparison.
  * @param key_def Definition of the format of both statements.
  *
- * @retval 0   if a == b
- * @retval > 0 if a > b
- * @retval < 0 if a < b
+ * @retval 0   if key_a == key_b
+ * @retval > 0 if key_a > key_b
+ * @retval < 0 if key_a < key_b
  */
 static int
-vy_compare_raw_keys(const char *stmt_data_a, const char *stmt_data_b,
-		    const struct key_def *key_def);
+vy_key_compare_raw(const char *key_a, const char *key_b,
+		   const struct key_def *key_def);
+
+/** @sa vy_key_compare_raw. */
+static int
+vy_key_compare(const struct vy_stmt *key_a, const struct vy_stmt *key_b,
+	       const struct key_def *key_def);
 
 /**
  * Compare a statement of any type with a key statement by their raw data.
- * @param stmt_data_a Left operand of comparison.
- * @param stmt_data_b Right operand of comparison.
+ * @param stmt Left operand of comparison.
+ * @param key Right operand of comparison.
  * @param key_def Definition of the format of both statements.
  *
- * @retval 0   if a == b
- * @retval > 0 if a > b
- * @retval < 0 if a < b
+ * @retval 0   if stmt == key
+ * @retval > 0 if stmt > key
+ * @retval < 0 if stmt < key
  */
 static int
 vy_stmt_compare_with_raw_key(const struct vy_stmt *stmt,
 			     const char *key,
 			     const struct key_def *key_def);
 
-/** @sa vy_stmt_compare_raw. */
-static int
-vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
-		const struct key_def *key_def);
-
-/** @sa vy_compare_raw_keys. */
-static int
-vy_compare_keys(const struct vy_stmt *left, const struct vy_stmt *right,
-		const struct key_def *key_def);
-
 /** @sa vy_stmt_compare_with_raw_key. */
 static int
-vy_stmt_compare_with_key(const struct vy_stmt *action,
+vy_stmt_compare_with_key(const struct vy_stmt *stmt,
 			 const struct vy_stmt *key,
 			 const struct key_def *key_def);
 
@@ -845,7 +842,7 @@ static int
 vy_mem_tree_cmp_key(struct vy_stmt *a, struct tree_mem_key *key,
 		    struct vy_mem *index)
 {
-	int res = -vy_stmt_compare(key->stmt, a, index->key_def);
+	int res = vy_stmt_compare(a, key->stmt, index->key_def);
 	if (res == 0) {
 		if (key->lsn == INT64_MAX - 1)
 			return 0;
@@ -1817,33 +1814,6 @@ vy_range_str(struct vy_range *range)
 	return buf;
 }
 
-static int
-vy_range_cmp(const struct vy_stmt *key, struct vy_range *range,
-	     struct key_def *key_def)
-{
-	/* Any key > -inf. */
-	if (range->begin == NULL)
-		return -1;
-
-	return -vy_stmt_compare_with_key(key, range->begin, key_def);
-}
-
-static int
-vy_range_cmpnode(struct vy_range *n1, struct vy_range *n2,
-		 struct key_def *key_def)
-{
-	if (n1 == n2)
-		return 0;
-
-	/* Any key > -inf. */
-	if (n1->begin == NULL)
-		return -1;
-	if (n2->begin == NULL)
-		return 1;
-
-	return vy_compare_keys(n1->begin, n2->begin, key_def);
-}
-
 static uint64_t
 vy_range_size(struct vy_range *range)
 {
@@ -1911,15 +1881,30 @@ vy_index_key_def(struct vy_index *index)
 }
 
 static int
-vy_range_tree_cmp(struct vy_range *a, struct vy_range *b)
+vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 {
-	return vy_range_cmpnode(a, b, b->index->key_def);
+	if (range_a == range_b)
+		return 0;
+
+	/* Any key > -inf. */
+	if (range_a->begin == NULL)
+		return -1;
+	if (range_b->begin == NULL)
+		return 1;
+
+	struct key_def *key_def = range_a->index->key_def;
+	return vy_key_compare(range_a->begin, range_b->begin, key_def);
 }
 
 static int
-vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b)
+vy_range_tree_key_cmp(const struct vy_stmt *stmt, struct vy_range *range)
 {
-	return -vy_range_cmp(a, b, b->index->key_def);
+	/* Any key > -inf. */
+	if (range->begin == NULL)
+		return 1;
+
+	struct key_def *key_def = range->index->key_def;
+	return vy_stmt_compare_with_key(stmt, range->begin, key_def);
 }
 
 static void
@@ -2149,7 +2134,7 @@ vy_range_is_adjacent(struct vy_range *a, struct vy_range *b,
 {
 	if (a->end == NULL || b->begin == NULL)
 		return false;
-	return vy_compare_keys(a->end, b->begin, key_def) == 0;
+	return vy_key_compare(a->end, b->begin, key_def) == 0;
 }
 
 /*
@@ -2161,7 +2146,7 @@ vy_range_precedes(struct vy_range *a, struct vy_range *b,
 {
 	if (a->end == NULL || b->begin == NULL)
 		return false;
-	return vy_compare_keys(a->end, b->begin, key_def) <= 0;
+	return vy_key_compare(a->end, b->begin, key_def) <= 0;
 }
 
 /*
@@ -2175,7 +2160,7 @@ vy_range_ends_before(struct vy_range *a, struct vy_range *b,
 		return a->end != NULL;
 	if (a->end == NULL)
 		return false;
-	return vy_compare_keys(a->end, b->end, key_def) < 0;
+	return vy_key_compare(a->end, b->end, key_def) < 0;
 }
 
 /*
@@ -3162,7 +3147,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	const char *min_key = vy_run_page_min_key(run, first_page);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_compare_raw_keys(min_key, split_key, key_def) == 0)
+	if (vy_key_compare_raw(min_key, split_key, key_def) == 0)
 		return false;
 
 	*p_split_key = split_key;
@@ -3486,7 +3471,7 @@ vy_index_patch_holes(struct vy_index *index)
 			assert(begin != NULL);
 			end = next->begin;
 			assert(end != NULL);
-			int cmp = vy_compare_keys(begin, end, index->key_def);
+			int cmp = vy_key_compare(begin, end, index->key_def);
 			if (cmp == 0)
 				continue;
 			assert(cmp < 0);
@@ -5768,15 +5753,15 @@ vy_stmt_part_count(const struct vy_stmt *stmt, const struct key_def *def)
 }
 
 /*
- * Compare statements with field offsets by their raw data.
+ * Compare two tuple statements by their raw data.
  * @retval > 0  If left > right.
  * @retval == 0 If left == right in all fields, or left is prefix of right, or
  *              right is prefix of left.
  * @retval < 0 If left < right.
  */
 static int
-vy_stmt_compare_with_offsets(const char *left, const char *right,
-			     const struct key_def *key_def)
+vy_tuple_compare_raw(const char *left, const char *right,
+		     const struct key_def *key_def)
 {
 	uint32_t *l_offsets = (uint32_t *) left;
 	uint32_t *r_offsets = (uint32_t *) right;
@@ -5792,30 +5777,30 @@ vy_stmt_compare_with_offsets(const char *left, const char *right,
 }
 
 /*
- * Compare a statement with field offsets and a statement without offsets by
- * their raw data.
- * @param with_off Left operand of the comparison WITH field offsets.
- * @param without_off Right operator of the comparison WITHOUT field offsets.
+ * Compare a tuple statement with a key statement using their raw data.
+ * @param tuple_stmt the raw data of a tuple statement
+ * @param key raw data of a key statement
  *
- * @retval > 0  If with_off > without_off.
- * @retval == 0 If with_off == without_off in all fields, or with_off is prefix
- *              of without_off, or without_off is prefix of with_off.
- * @retval < 0 If with_off < without_off.
+ * @retval > 0  tuple > key.
+ * @retval == 0 tuple == key in all fields
+ * @retval == 0 tuple is prefix of key
+ * @retval == 0 key is a prefix of tuple
+ * @retval < 0  tuple < key.
  */
 static int
-vy_stmt_compare_offset_and_not(const char *with_off, const char *without_off,
-			       const struct key_def *key_def)
+vy_tuple_compare_with_key_raw(const char *tuple, const char *key,
+			      const struct key_def *key_def)
 {
-	uint32_t array_len = mp_decode_array(&without_off);
+	uint32_t array_len = mp_decode_array(&key);
 	assert(array_len <= key_def->part_count);
-	uint32_t *offsets = (uint32_t *) with_off;
+	uint32_t *offsets = (uint32_t *) tuple;
 	for (uint32_t part_id = 0; part_id < array_len; part_id++) {
 		const struct key_part *part = &key_def->parts[part_id];
-		const char *left = with_off + offsets[part_id];
-		int rc = tuple_compare_field(left, without_off, part->type);
+		const char *left = tuple + offsets[part_id];
+		int rc = tuple_compare_field(left, key, part->type);
 		if (rc != 0)
 			return rc;
-		mp_next(&without_off);
+		mp_next(&key);
 	}
 	return 0;
 }
@@ -5825,23 +5810,26 @@ vy_stmt_compare_raw(const char *stmt_data_a, uint8_t a_type,
 		    const char *stmt_data_b, uint8_t b_type,
 		    const struct key_def *key_def)
 {
-	if (a_type == IPROTO_REPLACE || a_type == IPROTO_UPSERT) {
-		if (b_type == IPROTO_REPLACE || b_type == IPROTO_UPSERT) {
-			return vy_stmt_compare_with_offsets(stmt_data_a,
-							    stmt_data_b,
-							    key_def);
-		}
-		return vy_stmt_compare_offset_and_not(stmt_data_a, stmt_data_b,
+	bool a_is_tuple = (a_type == IPROTO_REPLACE || a_type == IPROTO_UPSERT);
+	bool b_is_tuple = (b_type == IPROTO_REPLACE || b_type == IPROTO_UPSERT);
+
+	if (a_is_tuple && b_is_tuple) {
+		return vy_tuple_compare_raw(stmt_data_a, stmt_data_b,
+					    key_def);
+	} else if (a_is_tuple && !b_is_tuple) {
+		return vy_tuple_compare_with_key_raw(stmt_data_a, stmt_data_b,
+						     key_def);
+	} else if (!a_is_tuple && b_is_tuple) {
+		return -vy_tuple_compare_with_key_raw(stmt_data_b, stmt_data_a,
 						      key_def);
+	} else {
+		assert(!a_is_tuple && !b_is_tuple);
+		return vy_key_compare_raw(stmt_data_a, stmt_data_b, key_def);
 	}
-	if (b_type == IPROTO_REPLACE || b_type == IPROTO_UPSERT)
-		return -vy_stmt_compare_offset_and_not(stmt_data_b, stmt_data_a,
-						       key_def);
-	return vy_compare_raw_keys(stmt_data_a, stmt_data_b, key_def);
 }
 
 static int
-vy_compare_raw_keys(const char *stmt_data_a, const char *stmt_data_b,
+vy_key_compare_raw(const char *stmt_data_a, const char *stmt_data_b,
 		    const struct key_def *key_def)
 {
 	uint32_t a_size = mp_decode_array(&stmt_data_a);
@@ -5869,12 +5857,12 @@ vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
 }
 
 static int
-vy_compare_keys(const struct vy_stmt *left, const struct vy_stmt *right,
+vy_key_compare(const struct vy_stmt *left, const struct vy_stmt *right,
 		     const struct key_def *key_def)
 {
 	assert(left->type == IPROTO_SELECT || left->type == IPROTO_DELETE);
 	assert(right->type == IPROTO_SELECT || right->type == IPROTO_DELETE);
-	return vy_compare_raw_keys(left->data, right->data, key_def);
+	return vy_key_compare_raw(left->data, right->data, key_def);
 }
 
 static int
@@ -5883,8 +5871,8 @@ vy_stmt_compare_with_raw_key(const struct vy_stmt *stmt,
 			     const struct key_def *key_def)
 {
 	if (stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT)
-		return vy_stmt_compare_offset_and_not(stmt->data, key, key_def);
-	return vy_compare_raw_keys(stmt->data, key, key_def);
+		return vy_tuple_compare_with_key_raw(stmt->data, key, key_def);
+	return vy_key_compare_raw(stmt->data, key, key_def);
 }
 
 static int

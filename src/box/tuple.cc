@@ -306,8 +306,6 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 {
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc_xc(&fiber()->gc, data_end - data);
-	if (key == NULL)
-		return NULL;
 	char *key_buf = mp_encode_array(key, key_def->part_count);
 	const char *field0 = data;
 	mp_decode_array(&field0);
