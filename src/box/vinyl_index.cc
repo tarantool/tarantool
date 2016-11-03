@@ -138,7 +138,7 @@ VinylPrimaryIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, tuple_format_default);
+	db = vy_index_new(env, key_def);
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
@@ -229,7 +229,7 @@ VinylSecondaryIndex::open()
 	/* The engine makes a copy of the key. */
 	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
 	/* Create a vinyl index. */
-	db = vy_index_new(env, key_def_vinyl, tuple_format_default);
+	db = vy_index_new(env, key_def_vinyl);
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }

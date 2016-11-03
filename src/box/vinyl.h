@@ -160,8 +160,7 @@ struct key_def *
 vy_index_key_def(struct vy_index *index);
 
 struct vy_index *
-vy_index_new(struct vy_env *env, struct key_def *key_def,
-		struct tuple_format *tuple_format);
+vy_index_new(struct vy_env *env, struct key_def *key_def);
 
 int
 vy_index_open(struct vy_index *index);
