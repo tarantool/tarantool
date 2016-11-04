@@ -630,11 +630,11 @@ space:truncate()
 
 -- Create the iterator inside the transaction before any other actions
 -- and iterate inside
--- space:replace({1, 1, 1})
--- box.begin()
--- iter_obj = create_iterator(pk)
--- space:replace({2, 2, 2})
--- iterate_over(iter_obj)
--- box.commit()
+space:replace({1, 1, 1})
+box.begin()
+iter_obj = create_iterator(pk)
+space:replace({2, 2, 2})
+iterate_over(iter_obj)
+box.commit()
 
 space:drop()
