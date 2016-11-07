@@ -199,3 +199,11 @@ sort(i5_2:select({-38.5}))
 sort(i5_2:select({-40}, {iterator = 'GE'}))
 
 s5:drop()
+
+-- gh-1897 Crash on index field type 'any'
+
+space = box.schema.space.create('test')
+pk = space:create_index('primary', { parts = {1, 'any'} }) --
+space:insert({1})                                          -- must fail
+space:insert({2})                                          --
+space:drop()

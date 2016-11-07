@@ -365,6 +365,12 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 			mp_next(&parts);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
 		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name_by_id(key_def->space_id),
+				  "unknown field type");
+		}
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }
@@ -389,6 +395,12 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		const char *str = mp_decode_str(&parts, &len);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
 		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name_by_id(key_def->space_id),
+				  "unknown field type");
+		}
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
 }

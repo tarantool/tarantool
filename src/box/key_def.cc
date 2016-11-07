@@ -53,7 +53,12 @@ enum field_type
 field_type_by_name(const char *name)
 {
 	enum field_type field_type = STR2ENUM(field_type, name);
-	if (field_type != field_type_MAX)
+	/*
+	 * FIELD_TYPE_ANY can't be used as type of indexed field,
+	 * because it is internal type used only for filling
+	 * struct tuple_format.fields array.
+	 */
+	if (field_type != field_type_MAX && field_type != FIELD_TYPE_ANY)
 		return field_type;
 	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
 	if (strcasecmp(name, "num") == 0)
@@ -155,7 +160,11 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    uint32_t part_count)
 {
 	size_t sz = key_def_sizeof(part_count);
-	struct key_def *def = (struct key_def *) malloc(sz);
+	/*
+	 * Use calloc for nullifying all struct key_def attributes including
+	 * comparator pointers.
+	 */
+	struct key_def *def = (struct key_def *) calloc(1, sz);
 	if (def == NULL) {
 		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
@@ -176,8 +185,6 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->iid = iid;
 	def->opts = *opts;
 	def->part_count = part_count;
-
-	memset(def->parts, 0, part_count * sizeof(struct key_part));
 	return def;
 }
 
@@ -287,12 +294,8 @@ key_def_check(struct key_def *key_def)
 			  "too many key parts");
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == field_type_MAX) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
-				  space_name(space),
-				  "unknown field type");
-		}
+		assert(key_def->parts[i].type > FIELD_TYPE_ANY &&
+		       key_def->parts[i].type < field_type_MAX);
 		if (key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
@@ -323,6 +326,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type)
 {
 	assert(part_no < def->part_count);
+	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	/**

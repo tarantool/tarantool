@@ -857,3 +857,23 @@ sort(i5_2:select({-40}, {iterator = 'GE'}))
 s5:drop()
 ---
 ...
+-- gh-1897 Crash on index field type 'any'
+space = box.schema.space.create('test')
+---
+...
+pk = space:create_index('primary', { parts = {1, 'any'} }) --
+---
+- error: 'Can''t create or modify index ''primary'' in space ''test'': unknown field
+    type'
+...
+space:insert({1})                                          -- must fail
+---
+- error: 'No index #0 is defined in space ''test'''
+...
+space:insert({2})                                          --
+---
+- error: 'No index #0 is defined in space ''test'''
+...
+space:drop()
+---
+...
