@@ -1016,8 +1016,6 @@ struct PACKED vy_run_info {
 	uint32_t  crc;
 	/** Total run size when stored in a file. */
 	uint64_t size;
-	/** Offset of the run in the file */
-	uint64_t offset;
 	/** Run page count. */
 	uint32_t  count;
 	/* Unused: pages_size = count * sizeof(struct vy_page_info) */
@@ -1033,6 +1031,12 @@ struct PACKED vy_run_info {
 	/* Min and max lsn over all statements in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;
+	/** Offset and size of range->begin. */
+	uint32_t begin_key_offset;
+	uint32_t begin_key_size;
+	/** Offset and size of range->end. */
+	uint32_t end_key_offset;
+	uint32_t end_key_size;
 
 	uint64_t  total;
 	uint64_t  totalorigin;
@@ -1069,22 +1073,13 @@ struct PACKED vy_stmt_info {
 	uint8_t reserved[3];
 };
 
-struct PACKED vy_range_info {
-	/** Offset and size of range->begin. */
-	uint32_t begin_key_offset;
-	uint32_t begin_key_size;
-	/** Offset and size of range->end. */
-	uint32_t end_key_offset;
-	uint32_t end_key_size;
-	/** Offset of the first run in the range */
-	uint32_t first_run_offset;
-};
-
 struct vy_run {
 	struct vy_run_info info;
 	struct vy_page_info *page_infos;
 	/* buffer with min keys of pages */
 	struct vy_buf pages_min;
+	/** Run data file. */
+	int fd;
 	struct vy_run *next;
 };
 
@@ -1116,12 +1111,6 @@ struct vy_range {
 	int        merge_count;
 	/** Points to the range being compacted to this range. */
 	struct vy_range *shadow;
-	/** The index file where the run is stored or -1 if it's not dumped yet. */
-	int index_fd;
-	char index_path[PATH_MAX];
-	/** The data file for range */
-	int data_fd;
-	char data_path[PATH_MAX];
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   nodecompact;
 	struct heap_node   nodedump;
@@ -1795,6 +1784,7 @@ vy_run_new()
 	run->page_infos = NULL;
 	vy_buf_create(&run->pages_min);
 	memset(&run->info, 0, sizeof(run->info));
+	run->fd = -1;
 	run->next = NULL;
 	return run;
 }
@@ -1802,10 +1792,66 @@ vy_run_new()
 static void
 vy_run_delete(struct vy_run *run)
 {
+	if (run->fd >= 0 && close(run->fd) < 0)
+		say_syserror("close failed");
 	free(run->page_infos);
 	vy_buf_destroy(&run->pages_min);
 	TRASH(run);
 	free(run);
+}
+
+enum vy_file_type {
+	VY_FILE_META,
+	VY_FILE_DATA,
+	vy_file_MAX,
+};
+
+static const char *vy_file_suffix[] = {
+	"run",		/* VY_FILE_META */
+	"data",		/* VY_FILE_DATA */
+};
+
+static int
+vy_run_parse_name(const char *name, int64_t *index_lsn, int64_t *range_id,
+		  int *run_no, enum vy_file_type *type)
+{
+	int n = 0;
+
+	sscanf(name, "%"SCNx64".%"SCNx64".%d.%n",
+	       index_lsn, range_id, run_no, &n);
+	if (*run_no < 0)
+		return -1;
+
+	int i;
+	const char *suffix = name + n;
+	for (i = 0; i < vy_file_MAX; i++) {
+		if (strcmp(suffix, vy_file_suffix[i]) == 0)
+			break;
+	}
+	if (i >= vy_file_MAX)
+		return -1;
+
+	*type = i;
+	return 0;
+}
+
+static int
+vy_run_snprint_path(char *buf, size_t size, struct vy_range *range,
+		    int run_no, enum vy_file_type type)
+{
+	return snprintf(buf, size, "%s/%016"PRIx64".%016"PRIx64".%d.%s",
+			range->index->path, range->index->key_def->opts.lsn,
+			range->id, run_no, vy_file_suffix[type]);
+}
+
+static void
+vy_run_unlink_file(struct vy_range *range,
+		   int run_no, enum vy_file_type type)
+{
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), range, run_no, type);
+	if (unlink(path) < 0)
+		say_syserror("failed to unlink file '%s'", path);
 }
 
 #define FILE_ALIGN	512
@@ -2383,7 +2429,7 @@ check:
 			 *   |----------range----------|
 			 */
 			vy_range_log_debug(range, "recover discard");
-			say_warn("found stale range %s", range->index_path);
+			say_warn("found stale range %s", vy_range_str(range));
 			vy_range_delete(range);
 			return;
 		}
@@ -2399,7 +2445,7 @@ replace:
 	do {
 		struct vy_range *next = vy_range_tree_next(&index->tree, n);
 		vy_range_log_debug(range, "recover replace");
-		say_warn("found partial range %s", n->index_path);
+		say_warn("found partial range %s", vy_range_str(n));
 		vy_index_remove_range(index, n);
 		vy_range_delete(n);
 		n = next;
@@ -2621,32 +2667,19 @@ out:
  *  @retval -1 error occured
  */
 static int
-vy_run_write(int index_fd, int data_fd, struct vy_write_iterator *wi,
+vy_run_write(struct vy_range *range, struct vy_run *run,
+	     int index_fd, int data_fd, struct vy_write_iterator *wi,
 	     struct vy_stmt *split_key, struct vy_index *index,
-	     uint32_t page_size, struct vy_run **result,
-	     struct vy_stmt **curr_stmt)
+	     uint32_t page_size, struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
 	assert(*curr_stmt);
 	int rc = 0;
-	struct vy_run *run = vy_run_new();
-	if (!run)
-		return -1;
 
 	/*
 	 * Get data file size to truncate it in case of error
 	 */
-	off_t data_offset = lseek(data_fd, 0, SEEK_CUR);
 	struct vy_run_info *header = &run->info;
-	/*
-	 * Store start run offset in file. In case of run write
-	 * failure the file is truncated to this position.
-	 *
-	 * Start offset can be used in future for integrity
-	 * checks, data restoration or if we decide to use
-	 * relative offsets for run objects.
-	 */
-	header->offset = lseek(index_fd, 0, SEEK_CUR);
 	header->footprint = (struct vy_run_footprint) {
 		sizeof(struct vy_run_info),
 		sizeof(struct vy_page_info),
@@ -2677,8 +2710,7 @@ vy_run_write(int index_fd, int data_fd, struct vy_write_iterator *wi,
 	} while (rc == 0);
 
 	/* Write pages index */
-	header->pages_offset = header->offset +
-				     header->size;
+	header->pages_offset = header->size;
 	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
 	if (vy_write_file(index_fd, run->page_infos, pages_size) < 0)
 		goto err_file;
@@ -2686,11 +2718,31 @@ vy_run_write(int index_fd, int data_fd, struct vy_write_iterator *wi,
 	header->unused = pages_size;
 
 	/* Write min-max keys for pages */
-	header->min_offset = header->offset + header->size;
+	header->min_offset = header->size;
 	header->min_size = vy_buf_used(&run->pages_min);
 	if (vy_write_file(index_fd, run->pages_min.s, header->min_size) < 0)
 		goto err_file;
 	header->size += header->min_size;
+
+	/* Write range boundaries. */
+	if (range->begin) {
+		assert(range->begin->type == IPROTO_SELECT);
+		if (vy_write_file(index_fd, range->begin->data,
+				  range->begin->size) < 0)
+			goto err_file;
+		header->begin_key_offset = header->size;
+		header->begin_key_size = range->begin->size;
+		header->size += range->begin->size;
+	}
+	if (range->end) {
+		assert(range->end->type == IPROTO_SELECT);
+		if (vy_write_file(index_fd, range->end->data,
+				  range->end->size) < 0)
+			goto err_file;
+		header->end_key_offset = header->size;
+		header->end_key_size = range->end->size;
+		header->size += range->end->size;
+	}
 
 	/*
 	 * Sync written data
@@ -2709,40 +2761,17 @@ vy_run_write(int index_fd, int data_fd, struct vy_write_iterator *wi,
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
 	header_size = sizeof(*header);
-	if (vy_pwrite_file(index_fd, header, header_size, header->offset) < 0 ||
+	if (vy_pwrite_file(index_fd, header, header_size, 0) < 0 ||
 	    fdatasync(index_fd) != 0)
 		goto err_file;
 
-	*result = run;
 	return 0;
 
 err_file:
 	/* TODO: report file name */
 	diag_set(SystemError, "error writing file");
 err:
-	/*
-	 * Reposition to end of file and trucate it
-	 */
-	lseek(index_fd, header->offset, SEEK_SET);
-	rc = ftruncate(index_fd, header->offset);
-	lseek(data_fd, data_offset, SEEK_SET);
-	rc = ftruncate(data_fd, data_offset);
-	free(run);
 	return -1;
-}
-
-/**
- * Restore range id from range name and LSN of index creation.
- */
-static int
-vy_parse_range_name(const char *name, int64_t *index_lsn, int64_t *range_id)
-{
-	int n = 0;
-
-	sscanf(name, "%"SCNx64".%"SCNx64".range%n", index_lsn, range_id, &n);
-	if (name[n] != '\0')
-		return -1;
-	return 0;
 }
 
 /**
@@ -2777,45 +2806,36 @@ vy_range_new(struct vy_index *index, int64_t id)
 	         */
 		range->id = ++index->range_id_max;
 	}
-	snprintf(range->index_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".range",
-		 index->path, index->key_def->opts.lsn, range->id);
-	snprintf(range->data_path, PATH_MAX, "%s/%016"PRIx64".%016"PRIx64".data",
-		 index->path, index->key_def->opts.lsn, range->id);
 	range->mem_count = 1;
-	range->index_fd = -1;
-	range->data_fd = -1;
 	range->index = index;
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
 	return range;
 }
 
-/**
- * Raw read range index file
- */
-static ssize_t
-vy_range_read_index(struct vy_range *range, void *buf, size_t size, off_t offset)
+static int
+vy_recover_raw(int fd, const char *path,
+	       void *buf, size_t size, off_t offset)
 {
-	ssize_t n = vy_pread_file(range->index_fd, buf, size, offset);
+	ssize_t n = vy_pread_file(fd, buf, size, offset);
 	if (n < 0) {
-		diag_set(SystemError, "error reading file '%s'",
-			 range->index_path);
+		diag_set(SystemError, "error reading file '%s'", path);
 		return -1;
 	}
 	if ((size_t)n != size) {
-		diag_set(ClientError, ER_VINYL, "range index file corrupted");
+		diag_set(ClientError, ER_VINYL, "run file corrupted");
 		return -1;
 	}
-	return n;
+	return 0;
 }
 
 /**
- * Load SELECT statement of size equal to @param size
- * from range by the @param offset.
+ * Recover SELECT statement of size equal to @param size
+ * at @param offset from file @param fd.
  */
 static int
-vy_range_load_stmt(struct vy_range *range, size_t size, off_t offset,
-                   struct vy_stmt **stmt)
+vy_stmt_recover(int fd, const char *path, size_t size, off_t offset,
+		struct vy_index *index, struct vy_stmt **stmt)
 {
 	int rc = 0;
 	char *buf;
@@ -2826,8 +2846,8 @@ vy_range_load_stmt(struct vy_range *range, size_t size, off_t offset,
 		return -1;
 	}
 
-	if (vy_range_read_index(range, buf, size, offset) < 0 ||
-	    (*stmt = vy_stmt_extract_key_raw(range->index->key_def, buf,
+	if (vy_recover_raw(fd, path, buf, size, offset) < 0 ||
+	    (*stmt = vy_stmt_extract_key_raw(index->key_def, buf,
 					     IPROTO_SELECT)) == NULL)
 		rc = -1;
 
@@ -2836,146 +2856,86 @@ vy_range_load_stmt(struct vy_range *range, size_t size, off_t offset,
 }
 
 static int
-vy_range_load_header(struct vy_range *range, off_t *offset)
+vy_range_recover_run(struct vy_range *range, int run_no)
 {
-	struct vy_range_info info;
-
-	if (vy_range_read_index(range, &info, sizeof(info), 0) < 0)
+	if (run_no != (int)range->run_count) {
+		diag_set(ClientError, ER_VINYL, "run file missing");
 		return -1;
-
-	assert(range->begin == NULL);
-	if (info.begin_key_size != 0 &&
-	    vy_range_load_stmt(range, info.begin_key_size,
-			       info.begin_key_offset, &range->begin) == -1)
-		return -1;
-
-	assert(range->end == NULL);
-	if (info.end_key_size != 0 &&
-	    vy_range_load_stmt(range, info.end_key_size,
-			       info.end_key_offset, &range->end) == -1)
-		return -1;
-
-	*offset = info.first_run_offset;
-	return 0;
-}
-
-static int
-vy_range_recover(struct vy_range *range)
-{
-	struct vy_run *run = NULL;
-	off_t offset;
-	int rc = -1;
-
-	if (vy_range_load_header(range, &offset) == -1)
-		goto out;
-
-	while (true) {
-		struct vy_run_info *h;
-		ssize_t n;
-
-		run = vy_run_new();
-		if (run == NULL)
-			goto out;
-
-		/* Read run header. */
-		h = &run->info;
-		n = vy_pread_file(range->index_fd, h, sizeof(*h), offset);
-		if (n == 0)
-			break; /* eof */
-		if (n == -1) {
-			diag_set(SystemError, "error reading file '%s'",
-				 range->index_path);
-			goto out;
-		}
-		if (n < (ssize_t)sizeof(*h) || h->size == 0) {
-			diag_set(ClientError, ER_VINYL, "range file corrupted");
-			goto out;
-		}
-
-		/* Allocate buffer for page info. */
-		size_t pages_size = sizeof(struct vy_page_info) * h->count;
-		run->page_infos = malloc(pages_size);
-		if (run->page_infos == NULL) {
-			diag_set(OutOfMemory, pages_size, "malloc",
-				 "struct vy_page_info");
-			goto out;
-		}
-		if (vy_buf_ensure(&run->pages_min, h->min_size) < 0)
-			goto out;
-
-		/* Read page info. */
-		if (vy_range_read_index(range, run->page_infos,
-					pages_size, h->pages_offset) < 0 ||
-		    vy_range_read_index(range, run->pages_min.s,
-					h->min_size, h->min_offset) < 0)
-			goto out;
-
-		/*
-		 * Order is important - see comment to vy_range->run.
-		 * Newer runs are written at higher offsets and so end
-		 * up closer to the head of the run list.
-		 */
-		run->next = range->run;
-		range->run = run;
-		++range->run_count;
-		run = NULL;
-
-		offset = h->offset + h->size;
 	}
 
-	/*
-	 * Set file offset to the end of the last run so that new runs
-	 * will be appended to the range file.
-	 */
-	if (lseek(range->index_fd, offset, SEEK_SET) == -1) {
-		diag_set(SystemError, "failed to seek file '%s'",
-			 range->index_path);
-		goto out;
+	struct vy_run *run = vy_run_new();
+	if (run == NULL)
+		return -1;
+
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_META);
+	int fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		diag_set(SystemError, "failed to open file '%s'", path);
+		goto fail;
 	}
 
+	/* Read run header. */
+	struct vy_run_info *h = &run->info;
+	if (vy_recover_raw(fd, path, h, sizeof(*h), 0) != 0)
+		goto fail;
+
+	/* Allocate buffer for page info. */
+	size_t pages_size = sizeof(struct vy_page_info) * h->count;
+	run->page_infos = malloc(pages_size);
+	if (run->page_infos == NULL) {
+		diag_set(OutOfMemory, pages_size, "malloc",
+			 "struct vy_page_info");
+		goto fail;
+	}
+	if (vy_buf_ensure(&run->pages_min, h->min_size) != 0)
+		goto fail;
+
+	/* Read page info. */
+	if (vy_recover_raw(fd, path, run->page_infos,
+			   pages_size, h->pages_offset) != 0 ||
+	    vy_recover_raw(fd, path, run->pages_min.s,
+			   h->min_size, h->min_offset) != 0)
+		goto fail;
+
+	/* Recover range boundaries from the first run. */
 	if (range->run == NULL) {
-		rc = 0;
-		goto out;
-	}
-	/*
-	 * Get last data offset and seek to the end of data file
-	 */
-	struct vy_page_info *last_page;
-	last_page = vy_run_page_info(range->run, range->run->info.count - 1);
-	if (lseek(range->data_fd, last_page->offset + last_page->size,
-		  SEEK_SET) == -1) {
-		diag_set(SystemError, "failed to seek file '%s'",
-			 range->data_path);
-		goto out;
+		assert(range->begin == NULL);
+		assert(range->end == NULL);
+		if (h->begin_key_offset != 0 &&
+		    vy_stmt_recover(fd, path,
+				    h->begin_key_size, h->begin_key_offset,
+				    range->index, &range->begin) != 0)
+			goto fail;
+		if (h->end_key_offset != 0 &&
+		    vy_stmt_recover(fd, path,
+				    h->end_key_size, h->end_key_offset,
+				    range->index, &range->end) != 0)
+			goto fail;
 	}
 
-	rc = 0; /* success */
-out:
-	if (run)
-		vy_run_delete(run);
-	return rc;
-}
+	/* We don't need to keep metadata file open any longer. */
+	close(fd);
 
-static int
-vy_range_open(struct vy_range *range)
-{
-	int rc = range->index_fd = open(range->index_path, O_RDWR);
-	if (unlikely(rc == -1)) {
-		diag_set(SystemError, "failed to open file '%s'",
-		         range->index_path);
-		return -1;
+	/* Prepare data file for reading. */
+	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_DATA);
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		diag_set(SystemError, "failed to open file '%s'", path);
+		goto fail;
 	}
-	rc = range->data_fd = open(range->data_path, O_RDWR);
-	if (rc == -1) {
-		close(range->index_fd);
-		diag_set(SystemError, "failed to open file '%s'",
-		         range->data_path);
-		return -1;
-	}
-	rc = vy_range_recover(range);
-	if (unlikely(rc == -1))
-		return -1;
+
+	/* Finally, link run to the range. */
+	run->fd = fd;
+	run->next = range->run;
+	range->run = run;
+	range->run_count++;
 	return 0;
+fail:
+	vy_run_delete(run);
+	if (fd >= 0)
+		close(fd);
+	return -1;
 }
 
 static void
@@ -3011,62 +2971,29 @@ vy_range_delete(struct vy_range *range)
 	range->mem = NULL;
 	range->used = 0;
 
-	if (range->index_fd >= 0 && close(range->index_fd) != 0)
-		say_syserror("failed to close range file %s", range->index_path);
-	if (range->data_fd >= 0 && close(range->data_fd) != 0)
-		say_syserror("failed to close range file %s", range->data_path);
-
 	TRASH(range);
 	free(range);
 }
 
-static int
-vy_write_range_header(int fd, struct vy_range *range)
+static void
+vy_range_purge(struct vy_range *range)
 {
-	struct vy_range_info info;
-	off_t offset = sizeof(info);
+	ERROR_INJECT(ERRINJ_VY_GC, return);
 
-	memset(&info, 0, sizeof(info));
-
-	if (range->begin) {
-		assert(range->begin->type == IPROTO_SELECT);
-		if (vy_pwrite_file(fd, range->begin->data,
-				   range->begin->size, offset) < 0)
-			goto fail;
-		info.begin_key_offset = offset;
-		info.begin_key_size = range->begin->size;
-		offset += range->begin->size;
+	int run_no = range->run_count;
+	for (struct vy_run *run = range->run; run != NULL; run = run->next) {
+		assert(run_no > 0);
+		run_no--;
+		vy_run_unlink_file(range, run_no, VY_FILE_META);
+		vy_run_unlink_file(range, run_no, VY_FILE_DATA);
 	}
-	if (range->end) {
-		assert(range->end->type == IPROTO_SELECT);
-		if (vy_pwrite_file(fd, range->end->data,
-				   range->end->size, offset) < 0)
-			goto fail;
-		info.end_key_offset = offset;
-		info.end_key_size = range->end->size;
-		offset += range->end->size;
-	}
-
-	info.first_run_offset = offset;
-
-	if (vy_pwrite_file(fd, &info, sizeof(info), 0) < 0)
-		goto fail;
-
-	if (lseek(fd, offset, SEEK_SET) == -1)
-		goto fail;
-
-	return 0;
-fail:
-	diag_set(SystemError, "error writing file");
-	return -1;
 }
 
 /*
- * Append statements returned by a write iterator to a range file until
- * split_key is encountered. p_fd is supposed to point to the range file
- * fd. If fd is < 0, a new file will be created for the range and p_fd
- * initialized appropriately. On success, the function returns 0 and the
- * new run is returned in p_run.
+ * Create a new run for a range and write statements returned by a write
+ * iterator to the run file until the end of the range is encountered.
+ * On success, the function returns 0 and the new run is returned in
+ * p_run.
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
@@ -3078,85 +3005,82 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	struct vy_index *index = range->index;
 	char index_path[PATH_MAX];
 	char data_path[PATH_MAX];
-	int index_fd = range->index_fd;
-	int data_fd = range->data_fd;
-	bool created = false;
+	char new_path[PATH_MAX];
+	int index_fd = -1;
+	int data_fd = -1;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
-			       "vinyl range dump"); goto fail;});
+			       "vinyl range dump"); return -1;});
 
 	/*
 	 * All keys before the split_key could have cancelled each other.
-	 * Do not create an empty range file in this case.
+	 * Do not create an empty run file in this case.
 	 */
 	if (split_key != NULL &&
 	    vy_stmt_compare_with_key(*stmt, split_key, index->format,
 				     index->key_def) >= 0)
 		return 0;
 
+	struct vy_run *run = vy_run_new();
+	if (run == NULL)
+		return -1;
+
+	/* Create data and metadata files for the new run. */
+	snprintf(index_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+	index_fd = mkstemp(index_path);
 	if (index_fd < 0) {
-		/*
-		 * The range hasn't been written to yet and hence
-		 * doesn't have a file. Create a temporary file for it
-		 * in the index directory to write the run to.
-		 */
-		snprintf(index_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-		index_fd = mkstemp(index_path);
-		if (index_fd < 0) {
-			diag_set(SystemError, "failed to create temp file");
-			goto fail;
-		}
-		snprintf(data_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-		data_fd = mkstemp(data_path);
-		if (data_fd < 0) {
-			diag_set(SystemError, "failed to create temp file");
-			goto fail;
-		}
-
-		created = true;
-
-		if (vy_write_range_header(index_fd, range) != 0)
-			goto fail;
+		diag_set(SystemError, "failed to create temp file");
+		goto fail;
+	}
+	snprintf(data_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
+	data_fd = mkstemp(data_path);
+	if (data_fd < 0) {
+		diag_set(SystemError, "failed to create temp file");
+		goto fail;
 	}
 
-	/* Append statements to the range file. */
-	if (vy_run_write(index_fd, data_fd, wi, split_key, index,
-			 index->key_def->opts.page_size, p_run, stmt) != 0)
+	/* Write statements to the run file. */
+	if (vy_run_write(range, run, index_fd, data_fd, wi, split_key, index,
+			 index->key_def->opts.page_size, stmt) != 0)
 		goto fail;
 
-	*written += (*p_run)->info.size;
+	*written += run->info.size;
 
-	if (created) {
-		/*
-		 * We've successfully written a run to a new range file.
-		 * Commit the range by linking the file to a proper name.
-		 */
-		if (rename(data_path, range->data_path) != 0) {
-			diag_set(SystemError,
-				 "failed to rename file '%s' to '%s'",
-				 data_path, range->data_path);
-			goto fail;
-		}
-		snprintf(data_path, PATH_MAX, "%s", range->data_path);
+	/*
+	 * We've successfully written a run to a new range file.
+	 * Commit the range by linking the file to a proper name.
+	 */
+	vy_run_snprint_path(new_path, sizeof(new_path), range,
+			    range->run_count, VY_FILE_DATA);
+	if (rename(data_path, new_path) != 0) {
+		diag_set(SystemError,
+			 "failed to rename file '%s' to '%s'",
+			 data_path, new_path);
+		goto fail;
+	}
+	strcpy(data_path, new_path);
 
-		if (rename(index_path, range->index_path) != 0) {
-			diag_set(SystemError,
-				 "failed to rename file '%s' to '%s'",
-				 index_path, range->index_path);
-			goto fail;
-		}
+	vy_run_snprint_path(new_path, sizeof(new_path), range,
+			    range->run_count, VY_FILE_META);
+	if (rename(index_path, new_path) != 0) {
+		diag_set(SystemError,
+			 "failed to rename file '%s' to '%s'",
+			 index_path, new_path);
+		goto fail;
 	}
 
-	range->index_fd = index_fd;
-	range->data_fd = data_fd;
+	close(index_fd);
+	run->fd = data_fd;
+	*p_run = run;
 	return 0;
 fail:
-	if (created && index_fd >= 0) {
+	vy_run_delete(run);
+	if (index_fd >= 0) {
 		unlink(index_path);
 		close(index_fd);
 	}
-	if (created && data_fd >= 0) {
+	if (data_fd >= 0) {
 		unlink(data_path);
 		close(data_fd);
 	}
@@ -3491,19 +3415,97 @@ vy_index_create(struct vy_index *index)
 	return 0;
 }
 
-static int
-vy_range_id_cmp(const void *p1, const void *p2)
-{
-	struct vy_range *r1 = *(struct vy_range **)p1;
-	struct vy_range *r2 = *(struct vy_range **)p2;
+/*
+ * This structure is only needed for sorting runs for recovery.
+ * Runs with higher range id go first. Runs that belong to the
+ * same range are sorted by serial number in ascending order.
+ * This way, we recover newer images of the same range first,
+ * while within the same range runs are restored in the order
+ * they were dumped.
+ */
+struct vy_run_desc {
+	int64_t range_id;
+	int run_no;
+};
 
-	if (r1->id > r2->id)
+static int
+vy_run_desc_cmp(const void *p1, const void *p2)
+{
+	const struct vy_run_desc *d1 = p1;
+	const struct vy_run_desc *d2 = p2;
+	if (d1->range_id > d2->range_id)
+		return -1;
+	if (d1->range_id < d2->range_id)
 		return 1;
-	if (r1->id < r2->id)
+	if (d1->run_no > d2->run_no)
+		return 1;
+	if (d1->run_no < d2->run_no)
 		return -1;
 	return 0;
 }
 
+/*
+ * Return list of all run files found in the index directory.
+ * A run file is described by range id and run serial number.
+ */
+static int
+vy_index_recover_run_list(struct vy_index *index,
+			  struct vy_run_desc **desc, int *count)
+{
+	DIR *dir = opendir(index->path);
+	if (dir == NULL) {
+		diag_set(SystemError, "failed to open directory '%s'",
+			 index->path);
+		return -1;
+	}
+
+	*desc = NULL;
+	*count = 0;
+	int cap = 0;
+
+	while (true) {
+		errno = 0;
+		struct dirent *dirent = readdir(dir);
+		if (dirent == NULL) {
+			if (errno == 0)
+				break; /* eof */
+			diag_set(SystemError, "error reading directory '%s'",
+				 index->path);
+			goto fail;
+		}
+
+		int64_t index_lsn;
+		struct vy_run_desc v;
+		enum vy_file_type t;
+
+		if (vy_run_parse_name(dirent->d_name, &index_lsn,
+				      &v.range_id, &v.run_no, &t) != 0)
+			continue; /* unknown file */
+		if (index_lsn != index->key_def->opts.lsn)
+			continue; /* different incarnation */
+		if (t != VY_FILE_META)
+			continue; /* data file */
+
+		if (*count == cap) {
+			cap = cap > 0 ? cap * 2 : 16;
+			void *p = realloc(*desc, cap * sizeof(v));
+			if (p == NULL) {
+				diag_set(OutOfMemory, cap * sizeof(v),
+					 "realloc", "struct vy_run_desc");
+				goto fail;
+			}
+			*desc = p;
+		}
+		(*desc)[(*count)++] = v;
+	}
+	closedir(dir);
+	return 0;
+fail:
+	closedir(dir);
+	free(*desc);
+	return -1;
+}
+ 
 /*
  * For each hole in the index (prev->end != next->begin),
  * make a new range filling it (new->begin = prev->end,
@@ -3589,8 +3591,11 @@ vy_index_patch_holes(struct vy_index *index)
  * run. The page index of an active run is fully cached in RAM.
  *
  * All files of an index have the following name pattern:
- * <lsn>.<range_id>.range
+ * <lsn>.<range_id>.<run_no>.{run,data}
  * and are stored together in the index directory.
+ *
+ * Files that end with '.run' store metadata (see vy_run_info)
+ * while '.data' files store vinyl statements.
  *
  * The <lsn> component represents LSN of index creation: it is used
  * to distinguish between different "incarnations" of the same index,
@@ -3603,68 +3608,45 @@ vy_index_patch_holes(struct vy_index *index)
  * have greater ids, and hence by recovering ranges with greater
  * ids first and ignoring ranges which are already fully spanned,
  * we can restore the whole index to its latest state.
+ *
+ * <run_no> is the serial number of the run in the range,
+ * starting from 0.
  */
 static int
 vy_index_open_ex(struct vy_index *index)
 {
-	struct vy_range **range_array = NULL;
-	int range_array_capacity = 0, n_ranges = 0;
+	struct vy_run_desc *desc;
+	int count;
 	int rc = -1;
 
-	DIR *index_dir;
-	index_dir = opendir(index->path);
-	if (!index_dir) {
-		diag_set(SystemError, "failed to open directory '%s'",
-			 index->path);
-		goto out;
-	}
-	struct dirent *dirent;
-	while ((dirent = readdir(index_dir))) {
-		int64_t index_lsn;
-		int64_t range_id;
-
-		if (vy_parse_range_name(dirent->d_name,
-					&index_lsn, &range_id) != 0)
-			continue; /* unknown file */
-		if (index_lsn != index->key_def->opts.lsn)
-			continue; /* different incarnation */
-
-		struct vy_range *range = vy_range_new(index, range_id);
-		if (!range)
-			goto out;
-		if (vy_range_open(range) != 0) {
-			vy_range_delete(range);
-			goto out;
-		}
-
-		if (n_ranges == range_array_capacity) {
-			int n = range_array_capacity > 0 ?
-				range_array_capacity * 2 : 1;
-			void *p = realloc(range_array, n * sizeof(*range_array));
-			if (p == NULL) {
-				diag_set(OutOfMemory, n * sizeof(*range_array),
-					 "realloc", "range_array");
-				vy_range_delete(range);
-				goto out;
-			}
-			range_array = p;
-			range_array_capacity = n;
-		}
-		range_array[n_ranges++] = range;
-	}
-	closedir(index_dir);
-	index_dir = NULL;
+	if (vy_index_recover_run_list(index, &desc, &count) != 0)
+		return -1;
 
 	/*
 	 * Always prefer newer ranges (i.e. those that have greater ids)
 	 * over older ones. Only fall back on an older range, if it has
 	 * not been spanned by the time we get to it. The latter can
-	 * only happen if there was an incomplete range split.
+	 * only happen if there was an incomplete range split. Within
+	 * the same range, start recovery from the oldest run in order
+	 * to restore the original order of vy_range->run list.
 	 */
-	qsort(range_array, n_ranges, sizeof(*range_array), vy_range_id_cmp);
-	for (int i = n_ranges - 1; i >= 0; i--)
-		vy_index_recover_range(index, range_array[i]);
-	n_ranges = 0;
+	qsort(desc, count, sizeof(*desc), vy_run_desc_cmp);
+
+	struct vy_range *range = NULL;
+	for (int i = 0; i < count; i++) {
+		if (range == NULL || range->id != desc[i].range_id) {
+			/* Proceed to the next range. */
+			if (range != NULL)
+				vy_index_recover_range(index, range);
+			range = vy_range_new(index, desc[i].range_id);
+			if (range == NULL)
+				goto out;
+		}
+		if (vy_range_recover_run(range, desc[i].run_no) != 0)
+			goto out;
+	}
+	if (range != NULL)
+		vy_index_recover_range(index, range);
 
 	/*
 	 * Successful compaction may create a range w/o statements, and we
@@ -3675,19 +3657,15 @@ vy_index_open_ex(struct vy_index *index)
 		goto out;
 
 	/* Update index size and make ranges visible to the scheduler. */
-	for (struct vy_range *range = vy_range_tree_first(&index->tree);
-	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
+	for (range = vy_range_tree_first(&index->tree); range != NULL;
+	     range = vy_range_tree_next(&index->tree, range)) {
 		index->size += vy_range_size(range);
 		vy_scheduler_add_range(index->env->scheduler, range);
 	}
 
 	rc = 0; /* success */
 out:
-	if (index_dir)
-		closedir(index_dir);
-	for (int i = 0; i < n_ranges; i++)
-		vy_range_delete(range_array[i]);
-	free(range_array);
+	free(desc);
 	return rc;
 }
 
@@ -4172,19 +4150,8 @@ out:
 	vy_write_iterator_delete(wi);
 
 	/* Remove old range file on success. */
-	if (rc == 0) {
-		ERROR_INJECT(ERRINJ_VY_GC, {
-			errno = EIO;
-			say_syserror("failed to remove range file %s",
-				     range->index_path);
-			return rc;});
-		if (unlink(range->index_path) != 0)
-			say_syserror("failed to remove range file %s",
-				     range->index_path);
-		if (unlink(range->data_path) != 0)
-			say_syserror("failed to remove range file %s",
-				     range->data_path);
-	}
+	if (rc == 0)
+		vy_range_purge(range);
 	return rc;
 }
 
@@ -4227,20 +4194,7 @@ vy_range_tree_drop_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
 	(void)arg;
-	if (range->index_fd >= 0) {
-		if (close(range->index_fd) < 0)
-			say_syserror("close failed");
-		if (unlink(range->index_path) < 0)
-			say_syserror("unlink failed: %s", range->index_path);
-		range->index_fd = -1;
-	}
-	if (range->data_fd >= 0) {
-		if (close(range->data_fd) < 0)
-			say_syserror("close failed");
-		if (unlink(range->data_path) < 0)
-			say_syserror("unlink failed: %s", range->data_path);
-		range->data_fd = -1;
-	}
+	vy_range_purge(range);
 	return NULL;
 }
 
@@ -4981,6 +4935,8 @@ vy_index_gc(struct vy_index *index)
 	while ((dirent = readdir(dir))) {
 		int64_t index_lsn;
 		int64_t range_id;
+		int run_no;
+		enum vy_file_type t;
 
 		if (!(strcmp(".", dirent->d_name)))
 			continue;
@@ -4993,8 +4949,8 @@ vy_index_gc(struct vy_index *index)
 			is_vinyl_file = true;
 		}
 		*/
-		if (vy_parse_range_name(dirent->d_name,
-					&index_lsn, &range_id) == 0) {
+		if (vy_run_parse_name(dirent->d_name, &index_lsn,
+				      &range_id, &run_no, &t) == 0) {
 			is_vinyl_file = true;
 			mh_int_t range = mh_i32ptr_find(ranges, range_id, NULL);
 			if (index_lsn == index->key_def->opts.lsn &&
@@ -5292,8 +5248,10 @@ vy_index_exists(struct vy_index *index, int64_t lsn)
 	while ((dirent = readdir(dir))) {
 		int64_t index_lsn;
 		int64_t range_id;
-		if (vy_parse_range_name(dirent->d_name,
-					&index_lsn, &range_id) == 0 &&
+		int run_no;
+		enum vy_file_type t;
+		if (vy_run_parse_name(dirent->d_name, &index_lsn,
+				      &range_id, &run_no, &t) == 0 &&
 		    index_lsn == lsn)
 			break;
 	}
@@ -6850,7 +6808,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
 
-		rc = coeio_preadn(itr->range->data_fd, page->data, page_info->size,
+		rc = coeio_preadn(itr->run->fd, page->data, page_info->size,
 				  page_info->offset);
 
 		/*
@@ -6870,14 +6828,14 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		rc = vy_pread_file(itr->range->data_fd, page->data, page_info->size,
+		rc = vy_pread_file(itr->run->fd, page->data, page_info->size,
 				   page_info->offset);
 	}
 
 	if (rc < 0) {
 		vy_page_delete(page);
-		diag_set(SystemError, "error reading file '%s'",
-			 itr->range->data_path);
+		/* TODO: report file name */
+		diag_set(SystemError, "error reading file");
 		return -1;
 	}
 
