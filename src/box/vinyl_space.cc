@@ -582,9 +582,9 @@ VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
 	if (old_space->index_count &&
 	    old_space->index_count <= new_space->index_count) {
-
+		VinylEngine *engine = (VinylEngine *)old_space->handler->engine;
 		Index *primary_index = index_find(old_space, 0);
-		if (primary_index->min(NULL, 0)) {
+		if (engine->recovery_complete && primary_index->min(NULL, 0)) {
 			/**
 			 * If space is not empty then forbid new indexes creating
 			 */

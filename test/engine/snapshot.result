@@ -194,3 +194,47 @@ index:select({}, {iterator = box.index.ALL})
 box.space.test:drop()
 ---
 ...
+-- https://github.com/tarantool/tarantool/issues/1899
+engine = test_run:get_cfg('engine')
+---
+...
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { parts = {1, 'unsigned'} } )
+---
+...
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} } )
+---
+...
+space:insert{1, 11, 21}
+---
+- [1, 11, 21]
+...
+space:insert{20, 10, 0}
+---
+- [20, 10, 0]
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd('restart server default')
+box.space.test:select{}
+---
+- - [1, 11, 21]
+  - [20, 10, 0]
+...
+box.space.test.index.primary:select{}
+---
+- - [1, 11, 21]
+  - [20, 10, 0]
+...
+box.space.test.index.secondary:select{}
+---
+- - [20, 10, 0]
+  - [1, 11, 21]
+...
+box.space.test:drop()
+---
+...

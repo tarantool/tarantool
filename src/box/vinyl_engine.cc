@@ -128,7 +128,8 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 {
 	VinylIndex *new_index = (VinylIndex *) new_index_arg;
 	new_index->open();
-	Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
+	if (recovery_complete) /* prevent building existing index */
+		Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 }
 
 struct vinyl_send_row_arg {
