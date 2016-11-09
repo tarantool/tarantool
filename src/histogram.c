@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include "trivia/util.h"
 #include "memory.h"
 #include "histogram.h"
 
@@ -64,8 +65,8 @@ histogram_delete(struct histogram *hist)
 	free(hist);
 }
 
-void
-histogram_collect(struct histogram *hist, int64_t val)
+static struct histogram_bucket *
+histogram_lookup_bucket(struct histogram *hist, int64_t val)
 {
 	size_t begin, end, mid;
 	struct histogram_bucket *bucket;
@@ -90,10 +91,35 @@ histogram_collect(struct histogram *hist, int64_t val)
 	};
 
 	if (val <= bucket->max)
+		return bucket;
+	return NULL;
+}
+
+void
+histogram_collect(struct histogram *hist, int64_t val)
+{
+	struct histogram_bucket *bucket;
+
+	bucket = histogram_lookup_bucket(hist, val);
+	if (bucket != NULL)
 		bucket->count++;
 	if (hist->max < val)
 		hist->max = val;
 	hist->total++;
+}
+
+void
+histogram_discard(struct histogram *hist, int64_t val)
+{
+	struct histogram_bucket *bucket;
+
+	bucket = histogram_lookup_bucket(hist, val);
+	if (bucket != NULL) {
+		assert(bucket->count > 0);
+		bucket->count--;
+	}
+	assert(hist->total > 0);
+	hist->total--;
 }
 
 int64_t
@@ -108,4 +134,31 @@ histogram_percentile(struct histogram *hist, int pct)
 			return bucket->max;
 	}
 	return hist->max;
+}
+
+int
+histogram_snprint(char *buf, int size, struct histogram *hist)
+{
+	int total = 0;
+	bool first = true;
+
+	for (size_t i = 0; i < hist->n_buckets; i++) {
+		int64_t count = hist->buckets[i].count;
+		if (count == 0)
+			continue;
+
+		int64_t min = (i > 0) ? hist->buckets[i - 1].max + 1 : 0;
+		int64_t max = hist->buckets[i].max;
+
+		if (!first)
+			SNPRINT(total, snprintf, buf, size, " ");
+
+		SNPRINT(total, snprintf, buf, size, "[%"PRIi64, min);
+		if (max != min)
+			SNPRINT(total, snprintf, buf, size, "-%"PRIi64, max);
+		SNPRINT(total, snprintf, buf, size, "]:%"PRIi64, count);
+
+		first = false;
+	}
+	return total;
 }

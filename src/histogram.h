@@ -37,6 +37,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
 
 struct histogram_bucket {
 	int64_t max;
@@ -70,11 +71,23 @@ void
 histogram_collect(struct histogram *hist, int64_t val);
 
 /**
+ * Remove a previously collected observation from a historam.
+ */
+void
+histogram_discard(struct histogram *hist, int64_t val);
+
+/**
  * Calculate a percentile, i.e. the value below which a given
  * percentage of observations fall.
  */
 int64_t
 histogram_percentile(struct histogram *hist, int pct);
+
+/**
+ * Print string representation of a histogram.
+ */
+int
+histogram_snprint(char *buf, int size, struct histogram *hist);
 
 
 #if defined(__cplusplus)
