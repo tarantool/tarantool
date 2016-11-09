@@ -12,13 +12,15 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_WAL_ROTATE:
+- ERRINJ_WAL_WRITE:
     state: false
   ERRINJ_RELAY:
     state: false
   ERRINJ_VY_GC:
     state: false
   ERRINJ_VY_RANGE_SPLIT:
+    state: false
+  ERRINJ_VY_RANGE_DUMP:
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
@@ -30,13 +32,13 @@ errinj.info()
     state: false
   ERRINJ_TESTING:
     state: false
-  ERRINJ_VY_RANGE_DUMP:
+  ERRINJ_WAL_DELAY:
     state: false
   ERRINJ_INDEX_ALLOC:
     state: false
   ERRINJ_TUPLE_ALLOC:
     state: false
-  ERRINJ_WAL_WRITE:
+  ERRINJ_WAL_ROTATE:
     state: false
 ...
 errinj.set("some-injection", true)

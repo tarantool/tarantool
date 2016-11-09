@@ -50,6 +50,7 @@ struct errinj {
 	_(ERRINJ_WAL_WRITE, false) \
 	_(ERRINJ_WAL_WRITE_PARTIAL, false) \
 	_(ERRINJ_WAL_WRITE_DISK, false) \
+	_(ERRINJ_WAL_DELAY, false) \
 	_(ERRINJ_INDEX_ALLOC, false) \
 	_(ERRINJ_TUPLE_ALLOC, false) \
 	_(ERRINJ_TUPLE_FIELD, false) \
@@ -71,11 +72,19 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
+#  define ERROR_INJECT_ONCE(ID, CODE)
 #else
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
 		if (errinj_get(ID) == true) \
 			CODE; \
+	} while (0)
+#  define ERROR_INJECT_ONCE(ID, CODE) \
+	do { \
+		if (errinj_get(ID) == true) { \
+			errinj_set(ID, false); \
+			CODE; \
+		} \
 	} while (0)
 #endif
 

@@ -489,6 +489,8 @@ wal_write_to_disk(struct cmsg *msg)
 	struct wal_writer *writer = wal;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
 
+	ERROR_INJECT_ONCE(ERRINJ_WAL_DELAY, sleep(5));
+
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);

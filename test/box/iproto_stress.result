@@ -1,0 +1,57 @@
+test_run = require('test_run').new()
+---
+...
+fiber = require('fiber')
+---
+...
+net_box = require('net.box')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('primary', {unique=true, parts={1, 'unsigned', 2, 'unsigned', 3, 'unsigned'}})
+---
+...
+n_workers = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function worker(i)
+	n_workers = n_workers + 1
+	for j = 1,2 do
+		local conn = net_box.connect(box.cfg.listen)
+		for k = 1,10 do
+			conn.space.test:insert{i, j, k}
+		end
+		conn:close()
+		fiber.sleep(1)
+	end
+	n_workers = n_workers - 1
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+for i = 1,5000 do fiber.create(worker, i) end
+---
+...
+-- check that iproto doesn't deplete tx fiber pool on wal stall (see gh-1892)
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+---
+- ok
+...
+repeat fiber.sleep(1) until n_workers == 0
+---
+...
+s:drop()
+---
+...
