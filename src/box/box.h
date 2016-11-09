@@ -232,9 +232,9 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
  * \param key_end the end of encoded \a key.
  * \param ops encoded operations in MsgPack Arrat format, e.g.
- * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * [ [ '=', fieldno,  value ],  ['!', 2, 'xxx'] ]
  * \param ops_end the end of encoded \a ops
- * \param index_base 0 if field_ids in update operations are zero-based
+ * \param index_base 0 if fieldnos in update operations are zero-based
  * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
  * \param[out] result a new tuple. Can be set to NULL to discard result.
  * \retval -1 on error (check box_error_last())
@@ -253,11 +253,11 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param ops encoded operations in MsgPack Arrat format, e.g.
- * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * [ [ '=', fieldno,  value ],  ['!', 2, 'xxx'] ]
  * \param ops_end the end of encoded \a ops
  * \param tuple encoded tuple in MsgPack Array format ([ field1, field2, ...])
  * \param tuple_end end of @a tuple
- * \param index_base 0 if field_ids in update operations are zero-based
+ * \param index_base 0 if fieldnos in update operations are zero-based
  * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
  * \param[out] result a new tuple. Can be set to NULL to discard result.
  * \retval -1 on error (check box_error_last())

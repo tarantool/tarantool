@@ -88,7 +88,7 @@ tuple_validate_raw(struct tuple_format *format, const char *data)
 	/* Check field types */
 	for (uint32_t i = 0; i < format->field_count; i++) {
 		key_mp_type_validate(format->fields[i].type, mp_typeof(*data),
-				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+				     ER_FIELD_TYPE, i + TUPLE_INDEX_BASE);
 		mp_next(&data);
 	}
 }
@@ -179,12 +179,12 @@ tuple_ref_exception()
 }
 
 const char *
-tuple_seek(struct tuple_iterator *it, uint32_t i)
+tuple_seek(struct tuple_iterator *it, uint32_t fieldno)
 {
-	const char *field = tuple_field(it->tuple, i);
+	const char *field = tuple_field(it->tuple, fieldno);
 	if (likely(field != NULL)) {
 		it->pos = field;
-		it->fieldno = i;
+		it->fieldno = fieldno;
 		return tuple_next(it);
 	} else {
 		it->pos = it->tuple->data + it->tuple->bsize;
@@ -227,23 +227,27 @@ tuple_next_cstr(struct tuple_iterator *it)
 	const char *field = tuple_next(it);
 	if (field == NULL)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
-	if (mp_typeof(*field) != MP_STR)
-		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
+	if (mp_typeof(*field) != MP_STR) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_STRING]);
+	}
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
 }
 
 const char *
-tuple_field_cstr(struct tuple *tuple, uint32_t i)
+tuple_field_cstr(struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field(tuple, i);
+	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, i);
-	if (mp_typeof(*field) != MP_STR)
-		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
+	if (mp_typeof(*field) != MP_STR) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_STRING]);
+	}
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
@@ -270,19 +274,19 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	mp_next(&field0_end);
 	const char *field = field0;
 	const char *field_end = field0_end;
-	uint32_t current_field_no = 0;
+	uint32_t current_fieldno = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		uint32_t field_no = key_def->parts[i].fieldno;
-		if (field_no < current_field_no) {
+		uint32_t fieldno = key_def->parts[i].fieldno;
+		if (fieldno < current_fieldno) {
 			/* Rewind. */
 			field = field0;
 			field_end = field0_end;
-			current_field_no = 0;
+			current_fieldno = 0;
 		}
-		while (current_field_no < field_no) {
+		while (current_fieldno < fieldno) {
 			field = field_end;
 			mp_next(&field_end);
-			current_field_no++;
+			current_fieldno++;
 		}
 		memcpy(key_buf, field, field_end - field);
 		key_buf += field_end - field;
@@ -486,10 +490,10 @@ box_tuple_format(const box_tuple_t *tuple)
 }
 
 const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t i)
+box_tuple_field(const box_tuple_t *tuple, uint32_t fieldno)
 {
 	assert(tuple != NULL);
-	return tuple_field(tuple, i);
+	return tuple_field(tuple, fieldno);
 }
 
 typedef struct tuple_iterator box_tuple_iterator_t;
@@ -530,9 +534,9 @@ box_tuple_rewind(box_tuple_iterator_t *it)
 }
 
 const char *
-box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no)
+box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno)
 {
-	return tuple_seek(it, field_no);
+	return tuple_seek(it, fieldno);
 }
 
 const char *

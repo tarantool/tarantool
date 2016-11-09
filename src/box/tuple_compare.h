@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TUPLE_GEN_H_INCLUDED
-#define TARANTOOL_BOX_TUPLE_GEN_H_INCLUDED
+#ifndef TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
+#define TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -74,7 +74,7 @@ tuple_compare_key_raw(const char *key_a, uint32_t part_count_a,
 		      const struct key_def *key_def);
 
 /**
- * @brief Compare a tuple with a key field by field using key definition.
+ * @brief Compare a tuple with a key using key definition.
  * @param format Tuple format.
  * @param tuple MessagePack array with tuple fields.
  * @param field_map Pointer BEFORE which offsets are stored.
@@ -113,9 +113,6 @@ tuple_compare_default_raw(const struct tuple_format *format_a,
 			  const char *tuple_b, uint32_t *field_map_b,
 			  const struct key_def *key_def);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /** @sa tuple_compare_default_raw */
 int
 tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
@@ -127,15 +124,19 @@ tuple_compare_with_key_default(const struct tuple *tuple_a, const char *key,
 			       uint32_t part_count,
 			       const struct key_def *key_def);
 
-
-int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
-		       uint32_t part_count, const struct key_def *key_def);
-
+/** @sa tuple_compare_default_raw */
 int
 tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def);
 
-#endif /* extern "C" */
 
-#endif /* TARANTOOL_BOX_TUPLE_GEN_H_INCLUDED */
+/** @sa tuple_compare_with_key_default_raw */
+int
+tuple_compare_with_key(const struct tuple *tuple, const char *key,
+		       uint32_t part_count, const struct key_def *key_def);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED */

@@ -42,12 +42,11 @@ enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX};
 
 /*
- * We don't pass INDEX_OFFSET around dynamically all the time,
+ * We don't pass TUPLE_INDEX_BASE around dynamically all the time,
  * at least hard code it so that in most cases it's a nice error
  * message
  */
-enum { INDEX_OFFSET = 1 };
-
+enum { TUPLE_INDEX_BASE = 1 };
 
 /**
  * @brief Tuple field format
@@ -154,11 +153,10 @@ struct tuple_format *
 tuple_format_new(struct rlist *key_list);
 
 /**
- * Fill field map of tuple by the offsets on its key fields.
+ * Fill the field map of tuple with field offsets.
  * Throws an error if tuple data does not match the format.
- * @param format Tuple format.
- * @param field_map Where to save offsets on key fields. Offsets are saved BEFORE this
- *                  pointer.
+ * @param format tuple format.
+ * @param field_map a pointer to the LAST element of field map.
  * @param tuple MessagePack array with tuple fields.
  *            ┏━━━━━━━━━━━━━━━┓
  * Result:    ┃ offN ... off1 ┃
@@ -171,41 +169,39 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple);
 
 /**
- * Get a field from tuple by index.
- * Returns a pointer to MessagePack length prefixed field.
- * @param format Format that contains map of field offsets.
- * @param tuple Pointer on the begin of MessagePack array.
- * @param tuple_size Size of the tuple.
- * @param field_map Pointer from which field offsets are calculated.
- * @param i Number of the field that must be returned.
+ * Get a field at the specific position in this MessagePack array.
+ * Returns a pointer to MessagePack data.
+ * @param format tuple format
+ * @param tuple a pointer to MessagePack array
+ * @param field_map a pointer to the LAST element of field map
+ * @param field_no the index of field to return
  *
- * @pre field < tuple->field_count.
  * @returns field data if field exists or NULL
+ * @sa tuple_init_field_map()
  */
 inline const char *
 tuple_field_raw(const struct tuple_format *format, const char *tuple,
-		uint32_t *field_map, uint32_t i)
+		const uint32_t *field_map, uint32_t field_no)
 {
-	if (likely(i < format->field_count)) {
+	if (likely(field_no < format->field_count)) {
 		/* Indexed field */
 
-		if (i == 0) {
+		if (field_no == 0) {
 			mp_decode_array(&tuple);
 			return tuple;
 		}
 
-		if (format->fields[i].offset_slot != INT32_MAX) {
-			int32_t slot = format->fields[i].offset_slot;
+		if (format->fields[field_no].offset_slot != INT32_MAX) {
+			int32_t slot = format->fields[field_no].offset_slot;
 			return tuple + field_map[slot];
 		}
 	}
 	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
-	uint32_t size = mp_decode_array(&tuple);
-	if (unlikely(i >= size))
+	uint32_t field_count = mp_decode_array(&tuple);
+	if (unlikely(field_no >= field_count))
 		return NULL;
-	for (uint32_t k = 0; k < i; k++) {
+	for (uint32_t k = 0; k < field_no; k++)
 		mp_next(&tuple);
-	}
 	return tuple;
 }
 

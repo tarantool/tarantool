@@ -142,12 +142,12 @@ box_tuple_format(const box_tuple_t *tuple);
  * The buffer is valid until next call to box_tuple_* functions.
  *
  * \param tuple a tuple
- * \param field_id zero-based index in MsgPack array.
+ * \param fieldno zero-based index in MsgPack array.
  * \retval NULL if i >= box_tuple_field_count(tuple)
  * \retval msgpack otherwise
  */
 const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t field_id);
+box_tuple_field(const box_tuple_t *tuple, uint32_t fieldno);
 
 /**
  * Tuple iterator
@@ -217,16 +217,16 @@ box_tuple_rewind(box_tuple_iterator_t *it);
  * Seek the tuple iterator.
  *
  * The returned buffer is valid until next call to box_tuple_* API.
- * Requested field_no returned by next call to box_tuple_next(it).
+ * Requested fieldno returned by next call to box_tuple_next(it).
  *
  * \param it tuple iterator
- * \param field_no field no - zero-based position in MsgPack array.
- * \post box_tuple_position(it) == field_no if returned value is not NULL
+ * \param fieldno - zero-based position in MsgPack array.
+ * \post box_tuple_position(it) == fieldno if returned value is not NULL
  * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
  * value is NULL.
  */
 const char *
-box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
+box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno);
 
 /**
  * Return the next tuple field from tuple iterator.
@@ -298,12 +298,6 @@ char *
 tuple_extract_key_raw(const char *data, const char *data_end,
 		      const struct key_def *key_def, uint32_t *key_size);
 
-inline uint32_t *
-tuple_field_map(const struct tuple *tuple)
-{
-	return (uint32_t *) tuple;
-}
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -339,11 +333,7 @@ struct PACKED tuple
 	uint16_t format_id;
 	/** length of the variable part of the tuple */
 	uint32_t bsize;
-	/**
-	 * Fields can have variable length, and thus are packed
-	 * into a contiguous byte array. Each field is prefixed
-	 * with MessagePack packed field length.
-	 */
+	/** MessagePack array data */
 	char data[0];
 };
 
@@ -463,6 +453,18 @@ tuple_format(const struct tuple *tuple)
 	return format;
 }
 
+/*
+ * Return a field map for the tuple.
+ * @param tuple tuple
+ * @returns a field map for the tuple.
+ * @sa tuple_init_field_map()
+ */
+inline const uint32_t *
+tuple_field_map(const struct tuple *tuple)
+{
+	return (uint32_t *) tuple;
+}
+
 /**
  * @brief Return the number of fields in tuple
  * @param tuple
@@ -476,18 +478,18 @@ tuple_field_count(const struct tuple *tuple)
 }
 
 /**
- * @brief Return field data of the field
+ * Get a field at the specific index in this tuple.
  * @param tuple tuple
- * @param field_no field number
- * @param field pointer where the start of field data will be stored,
- *        or NULL if field is out of range
+ * @param fieldno the index of field to return
  * @param len pointer where the len of the field will be stored
+ * @retval pointer to MessagePack data
+ * @retval NULL when fieldno is out of range
  */
 inline const char *
-tuple_field(const struct tuple *tuple, uint32_t i)
+tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple->data,
-			       tuple_field_map(tuple), i);
+			       tuple_field_map(tuple), fieldno);
 }
 
 /**
@@ -495,19 +497,23 @@ tuple_field(const struct tuple *tuple, uint32_t i)
  * as uint32_t.
  */
 inline uint32_t
-tuple_field_u32(struct tuple *tuple, uint32_t i)
+tuple_field_u32(struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field(tuple, i);
+	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, i);
-	if (mp_typeof(*field) != MP_UINT)
-		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
+	if (mp_typeof(*field) != MP_UINT) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_UNSIGNED]);
+	}
 
 	uint64_t val = mp_decode_uint(&field);
-	if (val > UINT32_MAX)
-		tnt_raise(ClientError, ER_FIELD_TYPE, i + INDEX_OFFSET,
+	if (val > UINT32_MAX) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_UNSIGNED]);
+	}
 	return (uint32_t) val;
 }
 
@@ -516,7 +522,7 @@ tuple_field_u32(struct tuple *tuple, uint32_t i)
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
 const char *
-tuple_field_cstr(struct tuple *tuple, uint32_t i);
+tuple_field_cstr(struct tuple *tuple, uint32_t fieldno);
 
 /** Helper method for the above function. */
 const char *
@@ -569,7 +575,7 @@ tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
  * @retval NULL   otherwise (iteration is out of range)
  */
 const char *
-tuple_seek(struct tuple_iterator *it, uint32_t field_no);
+tuple_seek(struct tuple_iterator *it, uint32_t fieldno);
 
 /**
  * @brief Iterate to the next field
@@ -591,14 +597,18 @@ tuple_next_u32(struct tuple_iterator *it)
 	const char *field = tuple_next(it);
 	if (field == NULL)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
-	if (mp_typeof(*field) != MP_UINT)
-		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
+	if (mp_typeof(*field) != MP_UINT) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_UNSIGNED]);
+	}
 
 	uint32_t val = mp_decode_uint(&field);
-	if (val > UINT32_MAX)
-		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno + INDEX_OFFSET,
+	if (val > UINT32_MAX) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_UNSIGNED]);
+	}
 	return (uint32_t) val;
 }
 
@@ -688,9 +698,9 @@ mp_tuple_assert(const char *tuple, const char *tuple_end)
 }
 
 static inline uint32_t
-box_tuple_field_u32(box_tuple_t *tuple, uint32_t field_no, uint32_t deflt)
+box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
 {
-	const char *field = box_tuple_field(tuple, field_no);
+	const char *field = box_tuple_field(tuple, fieldno);
 	if (field != NULL && mp_typeof(*field) == MP_UINT)
 		return mp_decode_uint(&field);
 	return deflt;

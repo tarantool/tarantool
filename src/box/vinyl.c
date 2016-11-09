@@ -1186,7 +1186,7 @@ struct vy_index {
 	struct key_def *key_def;
 	struct tuple_format *tuple_format;
 	uint32_t key_map_size; /* size of key_map map */
-	uint32_t *key_map; /* field_id -> part_id map */
+	uint32_t *key_map; /* fieldno -> part_id map */
 	/** Member of env->db or scheduler->shutdown. */
 	struct rlist link;
 	/**
@@ -5401,13 +5401,13 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	tuple_format_ref(index->tuple_format, 1);
 
 	/*
-	 * Create field_id -> part_id mapping used by vy_stmt_new_replace().
+	 * Create fieldno -> part_id mapping used by vy_stmt_new_replace().
 	 * This code partially duplicates tuple_format_new() logic.
 	 */
 	uint32_t key_map_size = 0;
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		uint32_t field_id = key_def->parts[part_id].fieldno;
-		key_map_size = MAX(key_map_size, field_id + 1);
+		uint32_t fieldno = key_def->parts[part_id].fieldno;
+		key_map_size = MAX(key_map_size, fieldno + 1);
 	}
 	index->key_map = calloc(key_map_size, sizeof(*index->key_map));
 	if (index->key_map == NULL) {
@@ -5416,13 +5416,13 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 		goto error_4;
 	}
 	index->key_map_size = key_map_size;
-	for (uint32_t field_id = 0; field_id < key_map_size; field_id++) {
-		index->key_map[field_id] = UINT32_MAX;
+	for (uint32_t fieldno = 0; fieldno < key_map_size; fieldno++) {
+		index->key_map[fieldno] = UINT32_MAX;
 	}
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		uint32_t field_id = key_def->parts[part_id].fieldno;
-		assert(index->key_map[field_id] == UINT32_MAX);
-		index->key_map[field_id] = part_id;
+		uint32_t fieldno = key_def->parts[part_id].fieldno;
+		assert(index->key_map[fieldno] == UINT32_MAX);
+		index->key_map[fieldno] = part_id;
 	}
 
 	vy_range_tree_new(&index->tree);
@@ -5570,14 +5570,14 @@ vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 	uint32_t *offsets = (uint32_t *) stmt->data;
 	uint32_t start_offset = offsets_size + mp_sizeof_array(field_count);
 	const char *data_pos = tuple_begin;
-	for (uint32_t field_id = 0; field_id < field_count; field_id++) {
+	for (uint32_t fieldno = 0; fieldno < field_count; fieldno++) {
 		const char *field = data_pos;
 		mp_next(&data_pos);
-		if (field_id >= index->key_map_size ||
-		    index->key_map[field_id] == UINT32_MAX)
+		if (fieldno >= index->key_map_size ||
+		    index->key_map[fieldno] == UINT32_MAX)
 			continue; /* field is not indexed */
 		/* Update offsets for indexed field */
-		uint32_t part_id = index->key_map[field_id];
+		uint32_t part_id = index->key_map[fieldno];
 		assert(part_id < part_count);
 		offsets[part_id] = start_offset + (field - tuple_begin);
 	}

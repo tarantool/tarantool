@@ -43,7 +43,7 @@
 /* {{{ Utilities. *************************************************/
 
 static inline double
-mp_decode_num(const char **data, uint32_t field_no)
+mp_decode_num(const char **data, uint32_t fieldno)
 {
 	double val;
 	switch (mp_typeof(**data)) {
@@ -60,7 +60,8 @@ mp_decode_num(const char **data, uint32_t field_no)
 		val = mp_decode_double(data);
 		break;
 	default:
-		tnt_raise(ClientError, ER_FIELD_TYPE, field_no + INDEX_OFFSET,
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_NUMBER]);
 	}
 	return val;

@@ -56,7 +56,7 @@ field_type_create(struct tuple_format *format, struct rlist *key_list)
 			if (*fmt_type != FIELD_TYPE_ANY &&
 			    *fmt_type != set_type) {
 				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
-					 key_def->name, i + INDEX_OFFSET,
+					 key_def->name, i + TUPLE_INDEX_BASE,
 					 field_type_strs[set_type],
 					 field_type_strs[*fmt_type]);
 				return -1;
@@ -134,7 +134,6 @@ tuple_format_alloc(struct rlist *key_list)
 			 field_count * sizeof(struct tuple_field_format);
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
-
 	if (format == NULL) {
 		diag_set(OutOfMemory, sizeof(struct tuple_format), "malloc",
 			 "tuple format");
@@ -222,13 +221,13 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
 	key_mp_type_validate(format->fields[0].type, mp_type,
-			     ER_FIELD_TYPE, INDEX_OFFSET);
+			     ER_FIELD_TYPE, TUPLE_INDEX_BASE);
 	mp_next(&pos);
 	/* other fields...*/
 	for (uint32_t i = 1; i < format->field_count; i++) {
 		mp_type = mp_typeof(*pos);
 		key_mp_type_validate(format->fields[i].type, mp_type,
-				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+				     ER_FIELD_TYPE, i + TUPLE_INDEX_BASE);
 		if (format->fields[i].offset_slot < 0)
 			field_map[format->fields[i].offset_slot] =
 				(uint32_t) (pos - tuple);
