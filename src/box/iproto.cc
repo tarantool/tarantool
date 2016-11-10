@@ -112,10 +112,18 @@ iproto_msg_new(struct iproto_connection *con)
 	return msg;
 }
 
+/**
+ * Resume stopped connections, if any.
+ */
+static void
+iproto_resume();
+
+
 static inline void
 iproto_msg_delete(struct cmsg *msg)
 {
 	mempool_free(&iproto_msg_pool, msg);
+	iproto_resume();
 }
 
 struct IprotoMsgGuard {
@@ -189,9 +197,48 @@ struct iproto_connection
 	ev_loop *loop;
 	/* Pre-allocated disconnect msg. */
 	struct iproto_msg *disconnect;
+	struct rlist in_stop_list;
 };
 
 static struct mempool iproto_connection_pool;
+static RLIST_HEAD(stopped_connections);
+
+/**
+ * Returns true if we have enough spare messages
+ * in the message pool. Disconnect messages are
+ * discounted: they are mostly reserved and idle.
+ */
+static inline bool
+iproto_stop_input()
+{
+	size_t connection_count = mempool_count(&iproto_connection_pool);
+	size_t request_count = mempool_count(&iproto_msg_pool);
+	return request_count > connection_count + IPROTO_MSG_MAX;
+}
+
+/**
+ * Throttle the queue to the tx thread and ensure the fiber pool
+ * in tx thread is not depleted by a flood of incoming requests:
+ * resume a stopped connection only if there is a spare message
+ * object in the message pool.
+ */
+static void
+iproto_resume()
+{
+	/*
+	 * Most of the time we have nothing to do here: throttling
+	 * is not active.
+	 */
+	if (rlist_empty(&stopped_connections))
+		return;
+	if (iproto_stop_input())
+		return;
+
+	struct iproto_connection *con;
+	con = rlist_first_entry(&stopped_connections, struct iproto_connection,
+				in_stop_list);
+	ev_feed_event(con->loop, &con->input, EV_READ);
+}
 
 /**
  * A connection is idle when the client is gone
@@ -213,6 +260,14 @@ iproto_connection_is_idle(struct iproto_connection *con)
 {
 	return ibuf_used(&con->iobuf[0]->in) == 0 &&
 		ibuf_used(&con->iobuf[1]->in) == 0;
+}
+
+static inline void
+iproto_connection_stop(struct iproto_connection *con)
+{
+	assert(rlist_empty(&con->in_stop_list));
+	ev_io_stop(con->loop, &con->input);
+	rlist_add_tail(&stopped_connections, &con->in_stop_list);
 }
 
 static void
@@ -345,6 +400,7 @@ iproto_connection_new(const char *name, int fd)
 	con->iobuf[1] = iobuf_new_mt(&tx_cord->slabc);
 	con->parse_size = 0;
 	con->session = NULL;
+	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	con->disconnect = iproto_msg_new(con);
 	cmsg_init(con->disconnect, disconnect_route);
@@ -394,6 +450,7 @@ iproto_connection_close(struct iproto_connection *con)
 		con->disconnect = NULL;
 		cpipe_push(&tx_pipe, msg);
 	}
+	rlist_del(&con->in_stop_list);
 }
 
 /**
@@ -605,6 +662,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		ev_io_stop(con->loop, &con->output);
 		ev_io_stop(con->loop, &con->input);
 	} else {
+		assert(rlist_empty(&con->in_stop_list));
 		/*
 		 * Keep reading input, as long as the socket
 		 * supplies data.
@@ -622,26 +680,32 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		(struct iproto_connection *) watcher->data;
 	int fd = con->input.fd;
 	assert(fd >= 0);
+	if (! rlist_empty(&con->in_stop_list)) {
+		/* Resumed stopped connection. */
+		rlist_del(&con->in_stop_list);
+		/*
+		 * This connection may have no input, so
+		 * resume one more connection which might have
+		 * input.
+		 */
+		iproto_resume();
+	}
+	/*
+	 * Throttle if there are too many pending requests,
+	 * otherwise we might deplete the fiber pool and
+	 * deadlock (e.g. WAL writer needs a fiber to wake
+	 * another fiber waiting for write to complete).
+	 * Ignore iproto_connection->disconnect messages.
+	 */
+	if (iproto_stop_input()) {
+		iproto_connection_stop(con);
+		return;
+	}
 
 	try {
 		/* Ensure we have sufficient space for the next round.  */
 		struct iobuf *iobuf = iproto_connection_input_iobuf(con);
 		if (iobuf == NULL) {
-			ev_io_stop(loop, &con->input);
-			return;
-		}
-
-		/*
-		 * Throttle if there are too many pending requests,
-		 * otherwise we might deplete the fiber pool and
-		 * deadlock (e.g. WAL writer needs a fiber to wake
-		 * another fiber waiting for write to complete).
-		 * Ignore iproto_connection->disconnect messages.
-		 */
-		assert(mempool_count(&iproto_msg_pool) >=
-		       mempool_count(&iproto_connection_pool));
-		if (mempool_count(&iproto_msg_pool) -
-		    mempool_count(&iproto_connection_pool) > IPROTO_MSG_MAX) {
 			ev_io_stop(loop, &con->input);
 			return;
 		}
@@ -753,8 +817,10 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 				ev_io_start(loop, &con->output);
 				return;
 			}
-			if (! ev_is_active(&con->input))
+			if (! ev_is_active(&con->input) &&
+			    rlist_empty(&con->in_stop_list)) {
 				ev_feed_event(loop, &con->input, EV_READ);
+			}
 		}
 		if (ev_is_active(&con->output))
 			ev_io_stop(con->loop, &con->output);
