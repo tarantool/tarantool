@@ -47,6 +47,7 @@ const char *
 fio_filename(int fd)
 {
 #ifdef TARGET_OS_LINUX
+	int save_errno = errno;
 	char proc_path[32];
 	static __thread char filename_path[PATH_MAX];
 
@@ -54,7 +55,7 @@ fio_filename(int fd)
 
 	ssize_t sz = readlink(proc_path, filename_path,
 			      sizeof(filename_path));
-
+	errno = save_errno;
 	if (sz >= 0) {
 		filename_path[sz] = '\0';
 		return filename_path;
