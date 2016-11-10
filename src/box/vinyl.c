@@ -1920,15 +1920,29 @@ vy_pread_file(int fd, void *buf, size_t size, off_t offset)
 	return pos;
 }
 
+static int
+vy_range_snprint(char *buf, int size, const struct vy_range *range)
+{
+	int total = 0;
+	struct key_def *key_def = range->index->key_def;
+
+	SNPRINT(total, snprintf, buf, size,
+		"%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64"(",
+		 key_def->space_id, key_def->iid, key_def->opts.lsn, range->id);
+	SNPRINT(total, vy_key_snprint, buf, size,
+		range->begin != NULL ? range->begin->data : NULL);
+	SNPRINT(total, snprintf, buf, size, "..");
+	SNPRINT(total, vy_key_snprint, buf, size,
+		range->end != NULL ? range->end->data : NULL);
+	SNPRINT(total, snprintf, buf, size, ")");
+	return total;
+}
+
 static const char *
 vy_range_str(struct vy_range *range)
 {
-	struct key_def *key_def = range->index->key_def;
 	char *buf = tt_static_buf();
-	snprintf(buf, TT_STATIC_BUF_LEN,
-		 "%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64" (%p)",
-		 key_def->space_id, key_def->iid,
-		 key_def->opts.lsn, range->id, range);
+	vy_range_snprint(buf, TT_STATIC_BUF_LEN, range);
 	return buf;
 }
 
@@ -2232,14 +2246,6 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 }
 
 static void
-vy_range_log_debug(struct vy_range *range, const char *reason)
-{
-	say_debug("range %s: %s: %s .. %s", reason, vy_range_str(range),
-		  vy_key_str(range->begin != NULL ? range->begin->data : NULL),
-		  vy_key_str(range->end != NULL ? range->end->data : NULL));
-}
-
-static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
 	vy_range_tree_insert(&index->tree, range);
@@ -2460,7 +2466,6 @@ check:
 			 *                       |---next---|
 			 *   |----------range----------|
 			 */
-			vy_range_log_debug(range, "recover discard");
 			say_warn("found stale range %s", vy_range_str(range));
 			vy_range_delete(range);
 			return;
@@ -2476,7 +2481,6 @@ replace:
 	n = first;
 	do {
 		struct vy_range *next = vy_range_tree_next(&index->tree, n);
-		vy_range_log_debug(range, "recover replace");
 		say_warn("found partial range %s", vy_range_str(n));
 		vy_index_remove_range(index, n);
 		vy_range_delete(n);
@@ -2488,7 +2492,7 @@ insert:
 	 * 4. Insert the given range to the index.
 	 */
 	vy_index_add_range(index, range);
-	vy_range_log_debug(range, "recover insert");
+	say_debug("range recover insert: %s", vy_range_str(range));
 }
 
 /* dump statement to the run page buffers (stmt header and data) */
@@ -3210,7 +3214,7 @@ vy_range_compact_prepare(struct vy_range *range,
 		parts[0]->end = range->end;
 	}
 
-	vy_range_log_debug(range, "compact prepare");
+	say_debug("range compact prepare: %s", vy_range_str(range));
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
@@ -3230,7 +3234,7 @@ vy_range_compact_prepare(struct vy_range *range,
 		r->shadow = range;
 
 		vy_index_add_range(index, r);
-		vy_range_log_debug(r, "new");
+		say_debug("range new: %s", vy_range_str(r));
 	}
 	range->version++;
 	index->version++;
@@ -3254,7 +3258,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 	struct vy_index *index = range->index;
 	int i;
 
-	vy_range_log_debug(range, "compact complete");
+	say_debug("range compact complete: %s", vy_range_str(range));
 
 	vy_index_unacct_range(index, range);
 	for (i = n_parts - 1; i >= 0; i--) {
@@ -3292,12 +3296,12 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 	struct vy_index *index = range->index;
 	int i;
 
-	vy_range_log_debug(range, "compact failed");
+	say_debug("range compact failed: %s", vy_range_str(range));
 
 	for (i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i];
 
-		vy_range_log_debug(r, "delete");
+		say_debug("range delete: %s", vy_range_str(r));
 		vy_index_remove_range(index, r);
 
 		/*
@@ -3963,8 +3967,9 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_range *range = task->dump.range;
 	struct vy_run *run = task->dump.new_run;
 
-	vy_range_log_debug(range, task->status == 0 ?
-			   "dump complete" : "dump failed");
+	say_debug("range dump %s: %s",
+		  task->status == 0 ? "complete" : "failed",
+		  vy_range_str(range));
 
 	/*
 	 * No need to roll back anything on dump failure - the range will just
@@ -4031,7 +4036,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	range->version++;
 
 	task->dump.range = range;
-	vy_range_log_debug(range, "dump prepare");
+	say_debug("range dump prepare: %s", vy_range_str(range));
 	return task;
 }
 
