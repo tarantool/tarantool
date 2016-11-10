@@ -688,7 +688,7 @@ sync_cb(eio_req *req)
 {
 	int fd = (intptr_t) req->data;
 	if (req->result) {
-		errno = req->result;
+		errno = req->errorno;
 		say_syserror("%s: fsync() failed",
 			     fio_filename(fd));
 		errno = 0;
