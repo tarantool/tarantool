@@ -584,14 +584,12 @@ vy_stmt_compare_with_key(const struct vy_stmt *stmt,
  * @param key MessagePack data that contain an array of fields WITHOUT the
  *            array header.
  * @param part_count Count of the key fields that will be saved as result.
- * @param key_def Definition of the format of the key.
  *
  * @retval NULL     Memory allocation error.
  * @retval not NULL Success.
  */
 static struct vy_stmt *
-vy_stmt_new_select(const char *key, uint32_t part_count,
-		   struct key_def *key_def);
+vy_stmt_new_select(const char *key, uint32_t part_count);
 
 /**
  * Create the REPLACE statement from raw MessagePack data.
@@ -713,8 +711,7 @@ vy_stmt_extract_key_raw(struct key_def *key_def, const char *stmt,
  * \sa mp_snprint()
  */
 static int
-vy_key_snprint(char *buf, int size, const char *key,
-	       const struct key_def *key_def)
+vy_key_snprint(char *buf, int size, const char *key)
 {
 	if (key == NULL)
 		return snprintf(buf, size, "[]");
@@ -722,7 +719,6 @@ vy_key_snprint(char *buf, int size, const char *key,
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "[");
 	uint32_t count = mp_decode_array(&key);
-	assert(key_def->part_count >= count);
 	for (uint32_t i = 0; i < count; i++) {
 		if (i > 0)
 			SNPRINT(total, snprintf, buf, size, ", ");
@@ -750,7 +746,7 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 		uint32_t tuple_size;
 		const char *tuple_data = vy_stmt_tuple_data(stmt, key_def,
 							    &tuple_size);
-		SNPRINT(total, vy_key_snprint, buf, size, tuple_data, key_def);
+		SNPRINT(total, vy_key_snprint, buf, size, tuple_data);
 	}
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
@@ -763,10 +759,10 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
  * \sa vy_key_snprint()
  */
 MAYBE_UNUSED static const char *
-vy_key_str(const char *key, const struct key_def *key_def)
+vy_key_str(const char *key)
 {
 	char *buf = tt_static_buf();
-	if (vy_key_snprint(buf, TT_STATIC_BUF_LEN, key, key_def) < 0)
+	if (vy_key_snprint(buf, TT_STATIC_BUF_LEN, key) < 0)
 		return "<failed to format key>";
 	return buf;
 }
@@ -2199,12 +2195,9 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 static void
 vy_range_log_debug(struct vy_range *range, const char *reason)
 {
-	struct key_def *key_def = range->index->key_def;
 	say_debug("range %s: %s: %s .. %s", reason, vy_range_str(range),
-		  vy_key_str(range->begin != NULL ? range->begin->data : NULL,
-			     key_def),
-		  vy_key_str(range->end != NULL ? range->end->data : NULL,
-			      key_def));
+		  vy_key_str(range->begin != NULL ? range->begin->data : NULL),
+		  vy_key_str(range->end != NULL ? range->end->data : NULL));
 }
 
 static void
@@ -5482,11 +5475,9 @@ vy_stmt_delete(struct vy_stmt *stmt)
 }
 
 static struct vy_stmt *
-vy_stmt_new_select(const char *key, uint32_t part_count,
-		   struct key_def *key_def)
+vy_stmt_new_select(const char *key, uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
-	assert(part_count <= key_def->part_count);
 
 	/* Calculate key length */
 	const char *key_end = key;
@@ -5635,7 +5626,8 @@ vy_stmt_extract_key_raw(struct key_def *key_def, const char *stmt, uint8_t type)
 		 * struct vy_stmt as SELECT.
 		 */
 		part_count = mp_decode_array(&stmt);
-		return vy_stmt_new_select(stmt, part_count, key_def);
+		assert(part_count <= key_def->part_count);
+		return vy_stmt_new_select(stmt, part_count);
 	}
 	assert(type == IPROTO_REPLACE || type == IPROTO_UPSERT);
 	part_count = key_def->part_count;
@@ -6186,8 +6178,9 @@ int
 vy_delete(struct vy_tx *tx, struct vy_index *index,
 	  const char *key, uint32_t part_count)
 {
+	assert(part_count <= index->key_def->part_count);
 	struct vy_stmt *vykey;
-	vykey = vy_stmt_new_select(key, part_count, index->key_def);
+	vykey = vy_stmt_new_select(key, part_count);
 	if (vykey == NULL)
 		return -1;
 	vy_tx_set(tx, index, vykey, IPROTO_DELETE);
@@ -6336,7 +6329,8 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	struct vy_stmt *vyresult = NULL;
 	struct vy_stmt *vykey;
 	struct key_def *def = index->key_def;
-	vykey = vy_stmt_new_select(key, part_count, def);
+	assert(part_count <= def->part_count);
+	vykey = vy_stmt_new_select(key, part_count);
 	if (vykey == NULL)
 		return -1;
 
@@ -8985,7 +8979,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_new_select(NULL, 0, index->key_def);
+	wi->key = vy_stmt_new_select(NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key);
 }
 
@@ -9438,7 +9432,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 	struct vy_read_iterator ri;
 	struct vy_stmt *stmt;
-	struct vy_stmt *key = vy_stmt_new_select(NULL, 0, index->key_def);
+	struct vy_stmt *key = vy_stmt_new_select(NULL, 0);
 	if (key == NULL)
 		return -1;
 	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key,
@@ -9545,7 +9539,8 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
 		return NULL;
 	}
-	c->key = vy_stmt_new_select(key, part_count, index->key_def);
+	assert(part_count <= index->key_def->part_count);
+	c->key = vy_stmt_new_select(key, part_count);
 	if (c->key == NULL) {
 		mempool_free(&e->cursor_pool, c);
 		return NULL;
