@@ -3814,7 +3814,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
  * over all statements written to disk in the same range.
  */
 static bool
-vy_stmt_committed(struct vy_index *index, struct vy_stmt *stmt)
+vy_stmt_is_committed(struct vy_index *index, struct vy_stmt *stmt)
 {
 	struct vy_range *range;
 
@@ -3857,7 +3857,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		 * an older one.
 		 */
 		if (status == VINYL_FINAL_RECOVERY &&
-		    vy_stmt_committed(index, stmt))
+		    vy_stmt_is_committed(index, stmt))
 			continue;
 		/* match range */
 		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
