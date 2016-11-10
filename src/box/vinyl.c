@@ -1120,24 +1120,6 @@ struct vy_range {
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
 
-struct vy_profiler {
-	uint32_t  total_range_count;
-	uint64_t  total_range_size;
-	uint64_t  total_range_origin_size;
-	uint32_t  total_run_count;
-	uint32_t  total_run_avg;
-	uint32_t  total_run_max;
-	uint32_t  total_page_count;
-	uint64_t  total_snapshot_size;
-	uint64_t  memory_used;
-	uint64_t  count;
-	uint64_t  count_dup;
-	int       histogram_run[20];
-	int       histogram_run_20plus;
-	char      histogram_run_sz[256];
-	char     *histogram_run_ptr;
-};
-
 /**
  * A single operation made by a transaction:
  * a single read or write in a vy_index.
@@ -1163,13 +1145,6 @@ typedef rb_tree(struct txv) read_set_t;
 struct vy_index {
 	struct vy_env *env;
 	/**
-	 * An instance of index profiler statistics. Contains
-	 * the last statistics for this index. We instantiate it
-	 * in the index mainly because vy_stat() takes a pointer
-	 * to rtp->run_histogram (@sa vy_info_append_str()
-	 */
-	struct vy_profiler rtp;
-	/**
 	 * Conflict manager index. Contains all changes
 	 * made by transaction before they commit. Is used
 	 * to implement read committed isolation level, i.e.
@@ -1178,8 +1153,27 @@ struct vy_index {
 	 */
 	read_set_t read_set;
 	vy_range_tree_t tree;
+	/** Number of ranges in this index. */
 	int range_count;
+	/** Number of runs in all ranges. */
+	int run_count;
+	/** Number of pages in all runs. */
+	int page_count;
+	/**
+	 * Total number of statements in this index,
+	 * stored both in memory and on disk.
+	 */
+	uint64_t stmt_count;
+	/** Size of data stored on disk. */
 	uint64_t size;
+	/** Amount of memory used by in-memory indexes. */
+	uint64_t used;
+	/** Histogram of number of runs in range. */
+	struct histogram *run_hist;
+	/**
+	 * Reference counter. Used to postpone index drop
+	 * until all pending operations have completed.
+	 */
 	uint32_t refs;
 	/** A schematic name for profiler output. */
 	char *name;
@@ -1850,6 +1844,48 @@ vy_run_unlink_file(struct vy_range *range,
 		say_syserror("failed to unlink file '%s'", path);
 }
 
+static void
+vy_index_acct_run(struct vy_index *index, struct vy_run *run)
+{
+	index->run_count++;
+	index->page_count += run->info.count;
+	index->stmt_count += run->info.keys;
+	index->size += vy_run_size(run) + vy_run_total(run);
+}
+
+static void
+vy_index_unacct_run(struct vy_index *index, struct vy_run *run)
+{
+	index->run_count--;
+	index->page_count -= run->info.count;
+	index->stmt_count -= run->info.keys;
+	index->size -= vy_run_size(run) + vy_run_total(run);
+}
+
+static void
+vy_index_acct_range(struct vy_index *index, struct vy_range *range)
+{
+	for (struct vy_run *run = range->run; run != NULL; run = run->next)
+		vy_index_acct_run(index, run);
+	histogram_collect(index->run_hist, range->run_count);
+}
+
+static void
+vy_index_unacct_range(struct vy_index *index, struct vy_range *range)
+{
+	for (struct vy_run *run = range->run; run != NULL; run = run->next)
+		vy_index_unacct_run(index, run);
+	histogram_discard(index->run_hist, range->run_count);
+}
+
+static void
+vy_index_acct_range_dump(struct vy_index *index, struct vy_range *range)
+{
+	vy_index_acct_run(index, range->run);
+	histogram_discard(index->run_hist, range->run_count - 1);
+	histogram_collect(index->run_hist, range->run_count);
+}
+
 #define FILE_ALIGN	512
 #define ALIGN_POS(pos)	(pos + (FILE_ALIGN - (pos % FILE_ALIGN)) % FILE_ALIGN)
 
@@ -1879,18 +1915,6 @@ vy_range_str(struct vy_range *range)
 		 key_def->space_id, key_def->iid,
 		 key_def->opts.lsn, range->id, range);
 	return buf;
-}
-
-static uint64_t
-vy_range_size(struct vy_range *range)
-{
-	uint64_t size = 0;
-	struct vy_run *run = range->run;
-	while (run) {
-		size += vy_run_size(run) + vy_run_total(run);
-		run = run->next;
-	}
-	return size;
 }
 
 static void
@@ -2936,7 +2960,8 @@ vy_range_delete(struct vy_range *range)
 {
 	assert(range->nodedump.pos == UINT32_MAX);
 	assert(range->nodecompact.pos == UINT32_MAX);
-	struct vy_env *env = range->index->env;
+	struct vy_index *index = range->index;
+	struct vy_env *env = index->env;
 
 	if (range->begin)
 		vy_stmt_unref(range->begin);
@@ -2958,6 +2983,8 @@ vy_range_delete(struct vy_range *range)
 		struct vy_mem *next = mem->next;
 		vy_scheduler_mem_dumped(env->scheduler, mem);
 		vy_quota_release(env->quota, mem->used);
+		index->used -= mem->used;
+		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 		mem = next;
 	}
@@ -3214,7 +3241,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 
 	vy_range_log_debug(range, "compact complete");
 
-	index->size -= vy_range_size(range);
+	vy_index_unacct_range(index, range);
 	for (i = n_parts - 1; i >= 0; i--) {
 		struct vy_range *r = parts[i];
 
@@ -3230,7 +3257,7 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
-		index->size += vy_range_size(r);
+		vy_index_acct_range(index, r);
 
 		/* Account merge w/o split. */
 		if (n_parts == 1 && r->run != NULL)
@@ -3286,82 +3313,6 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
-static void
-vy_profiler_histogram_run(struct vy_profiler *p)
-{
-	/* prepare histogram string */
-	int size = 0;
-	int i = 0;
-	while (i < 20) {
-		if (p->histogram_run[i] == 0) {
-			i++;
-			continue;
-		}
-		size += snprintf(p->histogram_run_sz + size,
-		                 sizeof(p->histogram_run_sz) - size,
-		                 "[%d]:%d ", i,
-		                 p->histogram_run[i]);
-		i++;
-	}
-	if (p->histogram_run_20plus) {
-		size += snprintf(p->histogram_run_sz + size,
-		                 sizeof(p->histogram_run_sz) - size,
-		                 "[20+]:%d ",
-		                 p->histogram_run_20plus);
-	}
-	if (size == 0)
-		p->histogram_run_ptr = NULL;
-	else {
-		p->histogram_run_ptr = p->histogram_run_sz;
-	}
-}
-
-static int vy_profiler(struct vy_profiler *p, struct vy_index *i)
-{
-	memset(p, 0, sizeof(*p));
-	uint64_t memory_used = 0;
-	struct vy_range *curr_range = vy_range_tree_first(&i->tree);
-	while (curr_range != NULL) {
-		struct vy_range *range = curr_range;
-		/* TODO: do not count shadow ranges twice
-		 *       if split is in progress */
-		if (range->shadow)
-			range = range->shadow;
-		p->total_range_count++;
-		p->total_run_count += range->run_count;
-		if (p->total_run_max < range->run_count)
-			p->total_run_max = range->run_count;
-		if (range->run_count < 20)
-			p->histogram_run[range->run_count]++;
-		else
-			p->histogram_run_20plus++;
-		for (struct vy_mem *mem = range->mem; mem; mem = mem->next) {
-			p->count += mem->tree.size;
-			memory_used += mem->used;
-		}
-		struct vy_run *run = range->run;
-		while (run != NULL) {
-			p->count += run->info.keys;
-//			p->count_dup += run->header.dupkeys;
-			int indexsize = vy_run_size(run);
-			p->total_snapshot_size += indexsize;
-			p->total_range_size += indexsize + run->info.total;
-			p->total_range_origin_size += indexsize + run->info.totalorigin;
-			p->total_page_count += run->info.count;
-			run = run->next;
-		}
-		curr_range = vy_range_tree_next(&i->tree, curr_range);
-	}
-	if (p->total_range_count > 0) {
-		p->total_run_avg =
-			p->total_run_count / p->total_range_count;
-	}
-	p->memory_used = memory_used;
-
-	vy_profiler_histogram_run(p);
-	return 0;
-}
-
 /**
  * Create an index directory for a new index.
  * TODO: create index files only after the WAL
@@ -3403,8 +3354,8 @@ vy_index_create(struct vy_index *index)
 	if (unlikely(range == NULL))
 		return -1;
 	vy_index_add_range(index, range);
+	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
-	index->size = vy_range_size(range);
 	return 0;
 }
 
@@ -3652,7 +3603,7 @@ vy_index_open_ex(struct vy_index *index)
 	/* Update index size and make ranges visible to the scheduler. */
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
 	     range = vy_range_tree_next(&index->tree, range)) {
-		index->size += vy_range_size(range);
+		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(index->env->scheduler, range);
 	}
 
@@ -3668,7 +3619,8 @@ out:
 static int
 vy_range_set(struct vy_range *range, struct vy_stmt *stmt, size_t *write_size)
 {
-	struct vy_scheduler *scheduler = range->index->env->scheduler;
+	struct vy_index *index = range->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	struct vy_stmt *replaced_stmt = NULL;
 	struct vy_mem *mem = range->mem;
@@ -3693,6 +3645,8 @@ vy_range_set(struct vy_range *range, struct vy_stmt *stmt, size_t *write_size)
 	size_t size = vy_stmt_size(stmt);
 	mem->used += size;
 	range->used += size;
+	index->used += size;
+	index->stmt_count++;
 	*write_size += size;
 
 	mem->version++;
@@ -4007,7 +3961,8 @@ vy_task_dump_complete(struct vy_task *task)
 	run->next = range->run;
 	range->run = run;
 	range->run_count++;
-	index->size += vy_run_size(run) + vy_run_total(run);
+
+	vy_index_acct_range_dump(index, range);
 
 	/* Release dumped in-memory indexes */
 	struct vy_mem *mem = range->mem->next;
@@ -4019,6 +3974,8 @@ vy_task_dump_complete(struct vy_task *task)
 		struct vy_mem *next = mem->next;
 		vy_scheduler_mem_dumped(env->scheduler, mem);
 		vy_quota_release(env->quota, mem->used);
+		index->used -= mem->used;
+		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 		mem = next;
 	}
@@ -5145,25 +5102,23 @@ vy_info_append_metric(struct vy_env *env, struct vy_info_handler *h)
 static void
 vy_info_append_indices(struct vy_env *env, struct vy_info_handler *h)
 {
-	struct vy_index *o;
+	struct vy_index *i;
+	char buf[1024];
+
 	vy_info_table_begin(h, "db");
-	rlist_foreach_entry(o, &env->indexes, link) {
-		vy_profiler(&o->rtp, o);
-		vy_info_table_begin(h, o->name);
-		vy_info_append_u64(h, "size", o->rtp.total_range_size);
-		vy_info_append_u64(h, "count", o->rtp.count);
-		vy_info_append_u64(h, "count_dup", o->rtp.count_dup);
-		vy_info_append_u32(h, "page_count", o->rtp.total_page_count);
-		vy_info_append_u32(h, "range_count", o->rtp.total_range_count);
-		vy_info_append_u32(h, "run_avg", o->rtp.total_run_avg);
-		vy_info_append_u32(h, "run_max", o->rtp.total_run_max);
-		vy_info_append_u64(h, "memory_used", o->rtp.memory_used);
-		vy_info_append_u32(h, "run_count", o->rtp.total_run_count);
-		vy_info_append_str(h, "run_histogram", o->rtp.histogram_run_ptr);
-		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(h, "size_uncompressed", o->rtp.total_range_origin_size);
-		vy_info_append_u64(h, "range_size", o->key_def->opts.range_size);
-		vy_info_append_u64(h, "page_size", o->key_def->opts.page_size);
+	rlist_foreach_entry(i, &env->indexes, link) {
+		vy_info_table_begin(h, i->name);
+		vy_info_append_u64(h, "range_size", i->key_def->opts.range_size);
+		vy_info_append_u64(h, "page_size", i->key_def->opts.page_size);
+		vy_info_append_u64(h, "memory_used", i->used);
+		vy_info_append_u64(h, "size", i->size);
+		vy_info_append_u64(h, "count", i->stmt_count);
+		vy_info_append_u32(h, "page_count", i->page_count);
+		vy_info_append_u32(h, "range_count", i->range_count);
+		vy_info_append_u32(h, "run_count", i->run_count);
+		vy_info_append_u32(h, "run_avg", i->run_count / i->range_count);
+		histogram_snprint(buf, sizeof(buf), i->run_hist);
+		vy_info_append_str(h, "run_histogram", buf);
 		vy_info_table_end(h);
 	}
 	vy_info_table_end(h);
@@ -5376,6 +5331,10 @@ vy_index_drop(struct vy_index *index)
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *key_def)
 {
+	static int64_t run_buckets[] = {
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
+	};
+
 	assert(key_def->part_count > 0);
 
 	struct rlist key_list;
@@ -5389,34 +5348,39 @@ vy_index_new(struct vy_env *e, struct key_def *key_def)
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_index),
 			 "malloc", "struct vy_index");
-		tuple_format_ref(format, -1);
-		return NULL;
+		goto fail_index;
 	}
 	memset(index, 0, sizeof(*index));
 	index->env = e;
+
 	if (vy_index_conf_create(index, key_def))
-		goto error_2;
+		goto fail_conf;
+
 	index->key_def = key_def_dup(key_def);
 	if (index->key_def == NULL)
-		goto error_3;
+		goto fail_key_def;
+
+	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
+	if (index->run_hist == NULL)
+		goto fail_run_hist;
 
 	index->format = format;
 
 	vy_range_tree_new(&index->tree);
 	index->version = 1;
 	rlist_create(&index->link);
-	index->size = 0;
-	index->range_count = 0;
-	index->refs = 0; /* referenced by scheduler */
 	read_set_new(&index->read_set);
 
 	return index;
 
-error_3:
+fail_run_hist:
+	key_def_delete(index->key_def);
+fail_key_def:
 	free(index->name);
 	free(index->path);
-error_2:
+fail_conf:
 	free(index);
+fail_index:
 	tuple_format_ref(format, -1);
 	return NULL;
 }
@@ -5430,6 +5394,7 @@ vy_index_delete(struct vy_index *index)
 	free(index->path);
 	tuple_format_ref(index->format, -1);
 	key_def_delete(index->key_def);
+	histogram_delete(index->run_hist);
 	TRASH(index);
 	free(index);
 }
@@ -5437,8 +5402,7 @@ vy_index_delete(struct vy_index *index)
 size_t
 vy_index_bsize(struct vy_index *index)
 {
-	vy_profiler(&index->rtp, index);
-	return index->rtp.memory_used;
+	return index->used;
 }
 
 /* {{{ Statements */
