@@ -1245,17 +1245,27 @@ struct vy_tx {
 	 */
 	uint32_t write_set_version;
 	ev_tstamp start;
-	enum tx_type     type;
-	enum tx_state    state;
+	enum tx_type type;
+	enum tx_state state;
+	/**
+	 * The transaction is forbidden to commit if it is not read-only.
+	 */
 	bool is_aborted;
 	/** Transaction logical start time. */
 	int64_t tsn;
 	/**
-	 * Consistent read view LSN: the LSN recorded
-	 * at start of transaction and used to implement
-	 * transactional read view.
+	 * Consistent read view LSN. Originally read-only transactions
+	 * receive a read view lsn upon creation and do not see further
+	 * changes.
+	 * Other transactions are expected to be read-write and
+	 * have vlsn == INT64_MAX to read newest data. Once a value read
+	 * by such a transaction (T) is overwritten by another
+	 * commiting transaction, T permanently goes to read view that does
+	 * not see this change.
+	 * If T does not have any write statements by the commit time it will
+	 * be committed successfully, or aborted as conflicted otherwise.
 	 */
-	int64_t   vlsn;
+	int64_t vlsn;
 	rb_node(struct vy_tx) tree_node;
 	/*
 	 * For non-autocommit transactions, the list of open
@@ -1379,7 +1389,7 @@ struct vy_read_iterator {
 	/* search options */
 	enum vy_order order;
 	const struct vy_stmt *key;
-	int64_t vlsn;
+	const int64_t *vlsn;
 
 	/* iterator over ranges */
 	struct vy_range_iterator range_iterator;
@@ -1447,12 +1457,6 @@ txv_delete(struct txv *v)
 	free(v);
 }
 
-static void
-txv_abort(struct txv *v)
-{
-	v->tx->is_aborted = true;
-}
-
 static int
 read_set_cmp(struct txv *a, struct txv *b);
 
@@ -1500,12 +1504,33 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 	return rc;
 }
 
+typedef rb_tree(struct vy_tx) tx_tree_t;
+
+struct tx_manager {
+	tx_tree_t tree;
+	uint32_t count_rd;
+	uint32_t count_rw;
+	/** Transaction logical time. */
+	int64_t tsn;
+	/**
+	 * The last committed log sequence number known to
+	 * vinyl. Updated in vy_commit().
+	 */
+	int64_t lsn;
+	/**
+	 * View sequence number: the oldest read view maintained
+	 * by the front end.
+	 */
+	int64_t vlsn;
+	struct vy_env *env;
+};
+
 /**
  * Abort all transaction which are reading the stmt v written by
  * tx.
  */
 static void
-txv_abort_all(struct vy_tx *tx, struct txv *v)
+txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 {
 	read_set_t *tree = &v->index->read_set;
 	struct key_def *key_def = v->index->key_def;
@@ -1520,8 +1545,15 @@ txv_abort_all(struct vy_tx *tx, struct txv *v)
 		if (vy_stmt_compare(key.stmt, abort->stmt, format, key_def))
 			break;
 		/* Don't abort self. */
-		if (abort->tx != tx)
-			txv_abort(abort);
+		if (abort->tx != tx) {
+			/* the found tx can only be commited as read-only */
+			abort->tx->is_aborted = true;
+			/* Set the read view of the found (now read-only) tx */
+			if (abort->tx->vlsn == INT64_MAX)
+				abort->tx->vlsn = env->xm->lsn;
+			else
+				assert(abort->tx->vlsn <= env->xm->lsn);
+		}
 		abort = read_set_next(tree, abort);
 	}
 }
@@ -1583,8 +1615,6 @@ vy_tx_is_ro(struct vy_tx *tx)
 		tx->write_set.rbt_root == &tx->write_set.rbt_nil;
 }
 
-typedef rb_tree(struct vy_tx) tx_tree_t;
-
 static int
 tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
 {
@@ -1593,25 +1623,6 @@ tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
 
 rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
        tree_node, tx_tree_cmp);
-
-struct tx_manager {
-	tx_tree_t tree;
-	uint32_t    count_rd;
-	uint32_t    count_rw;
-	/** Transaction logical time. */
-	int64_t tsn;
-	/**
-	 * The last committed log sequence number known to
-	 * vinyl. Updated in vy_commit().
-	 */
-	int64_t lsn;
-	/**
-	 * View sequence number: the oldest read view maintained
-	 * by the front end.
-	 */
-	int64_t vlsn;
-	struct vy_env *env;
-};
 
 static struct tx_manager *
 tx_manager_new(struct vy_env*);
@@ -1666,13 +1677,17 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	rlist_create(&tx->cursors);
 
 	tx->tsn = ++m->tsn;
-	tx->vlsn = m->lsn;
-
 	tx_tree_insert(&m->tree, tx);
-	if (type == VINYL_TX_RO)
+
+	if (type == VINYL_TX_RO) {
+		/* read-only tx obtains read view at once */
+		tx->vlsn = m->lsn;
 		m->count_rd++;
-	else
+	} else {
+		/* possible read-write tx reads latest changes */
+		tx->vlsn = INT64_MAX;
 		m->count_rw++;
+	}
 }
 
 /**
@@ -6177,7 +6192,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 
 	struct txv *v = write_set_first(&tx->write_set);
 	for (; v != NULL; v = write_set_next(&tx->write_set, v))
-		txv_abort_all(tx, v);
+		txv_abort_all(e, tx, v);
 
 	/** Abort all open cursors. */
 	struct vy_cursor *c;
@@ -6572,7 +6587,7 @@ struct vy_run_iterator {
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	int64_t vlsn;
+	const int64_t *vlsn;
 
 	/* State of the iterator */
 	/** Position of the current record */
@@ -6597,7 +6612,7 @@ struct vy_run_iterator {
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum vy_order order,
-		     const struct vy_stmt *key, int64_t vlsn);
+		     const struct vy_stmt *key, const int64_t *vlsn);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -7021,7 +7036,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
 	if (rc != 0)
 		return rc;
-	while (info->lsn > itr->vlsn) {
+	while (info->lsn > *itr->vlsn) {
 		rc = vy_run_iterator_next_pos(itr, order, &itr->curr_pos);
 		if (rc < 0)
 			return rc;
@@ -7062,7 +7077,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 						  &test_info);
 			if (rc != 0)
 				return rc;
-			if (test_info->lsn > itr->vlsn ||
+			if (test_info->lsn > *itr->vlsn ||
 			    vy_stmt_compare_raw(stmt, info->type, test_stmt,
 						test_info->type, format,
 						key_def) != 0)
@@ -7188,7 +7203,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum vy_order order,
-		     const struct vy_stmt *key, int64_t vlsn)
+		     const struct vy_stmt *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 
@@ -7560,7 +7575,7 @@ struct vy_mem_iterator {
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
-	int64_t vlsn;
+	const int64_t *vlsn;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -7584,7 +7599,7 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 		     enum vy_order order, const struct vy_stmt *key,
-		     int64_t vlsn);
+		     const int64_t *vlsn);
 
 /* }}} vy_mem_iterator API forward declaration */
 
@@ -7634,7 +7649,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 	*ret = NULL;
 	struct key_def *key_def = itr->mem->key_def;
 	struct tuple_format *format = itr->mem->format;
-	while (itr->curr_stmt->lsn > itr->vlsn) {
+	while (itr->curr_stmt->lsn > *itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->order == VINYL_EQ &&
 		     vy_stmt_compare(itr->key, itr->curr_stmt, format,
@@ -7652,9 +7667,9 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 			struct vy_stmt *prev_stmt =
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
-			if (prev_stmt->lsn > itr->vlsn ||
+			if (prev_stmt->lsn > *itr->vlsn ||
 			    vy_stmt_compare(itr->curr_stmt, prev_stmt, format,
-			    		    key_def) != 0)
+					    key_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
 			vy_stmt_unref(itr->curr_stmt);
@@ -7751,7 +7766,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 		     enum vy_order order, const struct vy_stmt *key,
-		     int64_t vlsn)
+		     const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 
@@ -7969,7 +7984,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			cmp = vy_stmt_compare(t, last_stmt, format, def);
 			if (cmp < 0 || (cmp == 0 && t->lsn >= last_stmt->lsn))
 				break;
-			if (t->lsn <= itr->vlsn) {
+			if (t->lsn <= *itr->vlsn) {
 				itr->curr_pos = pos;
 				vy_stmt_unref(itr->curr_stmt);
 				itr->curr_stmt = t;
@@ -7983,7 +7998,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
 	int cmp;
 	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, format, def);
-	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : itr->vlsn + 1;
+	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : *itr->vlsn + 1;
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 		if (vy_mem_tree_iterator_is_invalid(&pos))
@@ -8968,8 +8983,9 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_range *range)
 		src = vy_merge_iterator_add(&wi->mi, false, false);
 		if (src == NULL)
 			return -1;
+		static const int64_t vlsn = INT64_MAX;
 		vy_run_iterator_open(&src->run_iterator, range, run,
-				     VINYL_GE, wi->key, INT64_MAX);
+				     VINYL_GE, wi->key, &vlsn);
 	}
 	return 0;
 }
@@ -8982,8 +8998,9 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 		src = vy_merge_iterator_add(&wi->mi, false, false);
 		if (src == NULL)
 			return -1;
+		static const int64_t vlsn = INT64_MAX;
 		vy_mem_iterator_open(&src->mem_iterator, mem,
-				     VINYL_GE, wi->key, INT64_MAX);
+				     VINYL_GE, wi->key, &vlsn);
 	}
 	return 0;
 }
@@ -9095,8 +9112,8 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, struct vy_stmt *key, int64_t vlsn,
-		      bool only_disk);
+		      enum vy_order order, struct vy_stmt *key,
+		      const int64_t *vlsn, bool only_disk);
 
 /**
  * Get current stmt
@@ -9181,8 +9198,8 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, struct vy_stmt *key, int64_t vlsn,
-		      bool only_disk)
+		      enum vy_order order, struct vy_stmt *key,
+		      const int64_t *vlsn, bool only_disk)
 {
 	itr->index = index;
 	itr->tx = tx;
@@ -9391,7 +9408,7 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 int
 vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 {
-	int64_t vlsn = INT64_MAX;
+	static const int64_t vlsn = INT64_MAX;
 	int rc = 0;
 
 	struct vy_read_iterator ri;
@@ -9399,8 +9416,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	struct vy_stmt *key = vy_stmt_new_select(NULL, 0);
 	if (key == NULL)
 		return -1;
-	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key,
-			      vlsn, true);
+	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key, &vlsn, true);
 	rc = vy_read_iterator_next(&ri, &stmt);
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
@@ -9425,10 +9441,15 @@ vy_index_read(struct vy_index *index, struct vy_stmt *key,
 	struct vy_env *e = index->env;
 	ev_tstamp start  = ev_now(loop());
 
-	int64_t vlsn = tx != NULL ? tx->vlsn : e->xm->lsn;
+	int64_t vlsn = INT64_MAX;
+	const int64_t *vlsn_ptr = &vlsn;
+	if (tx == NULL)
+		vlsn = e->xm->lsn;
+	else
+		vlsn_ptr = &tx->vlsn;
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, order, key, vlsn, false);
+	vy_read_iterator_open(&itr, index, tx, order, key, vlsn_ptr, false);
 	int rc = vy_read_iterator_next(&itr, result);
 	if (rc == 0 && *result) {
 		vy_stmt_ref(*result);
@@ -9453,7 +9474,7 @@ vy_range_optimize_upserts_f(va_list va)
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ,
-			      stmt, stmt->lsn, false);
+			      stmt, &stmt->lsn, false);
 	struct vy_stmt *v;
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
 		assert(v->type == IPROTO_REPLACE);
@@ -9526,7 +9547,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 */
 	vy_index_ref(c->index);
 	vy_read_iterator_open(&c->iterator, index, tx, order, c->key,
-			      tx->vlsn, false);
+			      &tx->vlsn, false);
 	return c;
 }
 

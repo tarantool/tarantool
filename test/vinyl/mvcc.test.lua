@@ -1085,7 +1085,7 @@ c2("t:get{200}") -- start transaction in the engine
 c1("t:replace{1, 10}")
 c1:commit()
 --
-c2("t:get{1}") -- finds nothing
+c2("t:get{1}") -- find newest {1, 10}
 --
 c2("t:replace{1, 15}")
 c2:commit() -- rollback
@@ -1183,7 +1183,7 @@ c1("t:delete{1}")
 c7:begin()
 c1:begin()
 c7("t:get{100}") -- start transaction in the engine
-c1("t:get{200}") -- start transaction in the engine
+c1("t:get{1}") -- start transaction in the engine
 --
 c3:begin()
 c3("t:replace{1, 3}")
@@ -1193,9 +1193,10 @@ c2:begin()
 c3:begin()
 c2("t:get{500}") -- start transaction in the engine
 c3("t:get{600}") -- start transaction in the engine
+c2("t:get{1}") -- {1, 3}
 --
 c3("t:replace{1, 6}")
-c3:commit()
+c3:commit() -- c2 goes to read view now
 --
 c4:begin()
 c3:begin()
@@ -1218,7 +1219,7 @@ c2("t:get{1}") -- {1, 3}
 --
 c4("t:get{1}") -- {1, 12}
 --
-c5("t:get{1}") -- {1, 9}
+c5("t:get{1}") -- {1, 12}
 --
 c6("t:get{1}") -- {1, 12}
 --
@@ -1228,13 +1229,13 @@ c3:rollback()
 --
 c1("t:get{1}") -- nothing
 --
-c7("t:get{1}") -- nothing
+c7("t:get{1}") -- {1, 12}
 --
 c2:rollback()
 --
 c4("t:get{1}") -- {1, 12}
 --
-c5("t:get{1}") -- {1, 9}
+c5("t:get{1}") -- {1, 12}
 --
 c6("t:get{1}") -- {1, 12}
 --
@@ -1244,11 +1245,11 @@ c3:rollback()
 --
 c1("t:get{1}") -- nothing
 --
-c7("t:get{1}") -- nothing
+c7("t:get{1}") -- {1, 12}
 --
 c4:rollback()
 --
-c5("t:get{1}") -- {1, 9}
+c5("t:get{1}") -- {1, 12}
 --
 c6("t:get{1}") -- {1, 12}
 --
@@ -1258,7 +1259,7 @@ c3:rollback()
 --
 c1("t:get{1}") -- nothing
 --
-c7("t:get{1}") -- nothing
+c7("t:get{1}") -- {1, 12}
 --
 c5:rollback()
 --
@@ -1270,7 +1271,7 @@ c3:rollback()
 --
 c1("t:get{1}") -- nothing
 --
-c7("t:get{1}") -- nothing
+c7("t:get{1}") -- {1, 12}
 --
 c6:rollback()
 --
@@ -1278,9 +1279,9 @@ c3:begin()
 c3("t:get{1}") -- {1, 12}
 c3:rollback()
 --
-c1("t:get{1}") -- finds nothing
+c1("t:get{1}") -- nothing
 --
-c7("t:get{1}") -- finds nothing
+c7("t:get{1}") -- {1, 12}
 --
 c1:rollback()
 c7:rollback()

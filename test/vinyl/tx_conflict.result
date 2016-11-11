@@ -1,0 +1,305 @@
+-- The test runs loop of given number of rounds.
+-- Every round does the following:
+-- The test starts several concurrent transactions in vinyl.
+-- The transactions make some read/write operations over several keys in
+--  a random order and commit at a random moment.
+-- After that all transactions are sorted in order of commit
+-- With sublist of read-write transactions:
+-- Test tries to make these transactions in memtex, one tx after another,
+--  without interleaving and compares select results with vinyl to make sure
+--  if the transaction could be serialized in order of commit or not
+-- With sublist of read only transactions:
+-- Test tries to insert these transactions between other transactions and checks
+--  that it possible to get same results.
+test_run = require('test_run').new()
+---
+...
+txn_proxy = require('txn_proxy')
+---
+...
+--settings
+num_tx = 10 --number of concurrent transactions
+---
+...
+num_key = 5 --number of keys that transactions use
+---
+...
+num_tests = 80 --number of test rounds to run
+---
+...
+txs = {}
+---
+...
+order_of_commit = {}
+---
+...
+num_commited = 0
+---
+...
+stmts = {}
+---
+...
+errors = {}
+---
+...
+ops = {'begin', 'commit', 'select', 'replace', 'upsert', 'delete'}
+---
+...
+s1 = box.schema.create_space('test1', { engine = 'vinyl' })
+---
+...
+i1 = s1:create_index('test1', { type = 'TREE', parts = {1, 'uint'} })
+---
+...
+s2 = box.schema.create_space('test', { engine = 'memtx' })
+---
+...
+i2 = s2:create_index('test2', { type = 'TREE', parts = {1, 'uint'} })
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for i=1,num_tx do
+    txs[i] = {con = txn_proxy.new()}
+end;
+---
+...
+function my_equal(a, b)
+    local typea = box.tuple.is(a) and 'table' or type(a)
+    local typeb = box.tuple.is(b) and 'table' or type(b)
+    if typea ~= typeb then
+        return false
+    elseif typea ~= 'table' then
+        return a == b
+    end
+    for k,v in pairs(a) do if not my_equal(b[k], v) then return false end end
+    for k,v in pairs(b) do if not my_equal(a[k], v) then return false end end
+    return true
+end;
+---
+...
+function prepare()
+    order_of_commit = {}
+    num_commited = 0
+    stmts = {}
+    for i=1,num_tx do
+        txs[i].started = false
+        txs[i].ended = false
+        if math.random(2) == 1 then
+            txs[i].read_only = true
+        else
+            txs[i].read_only = false
+        end
+        txs[i].read_only_checked = false
+        txs[i].conflicted = false
+        txs[i].expected_to_be_conflicted = false
+        txs[i].possible = nil
+        txs[i].num_writes = 0
+    end
+    s1:truncate()
+    s2:truncate()
+    for i=1,num_key do
+        local r = math.random(5)
+        local v = math.random(10000)
+        if (r >= 2) then
+            s1:replace{i, v}
+            s2:replace{i, v}
+        end
+        if (r == 2) then
+            s1:delete{i}
+            s2:delete{i}
+        end
+    end
+end;
+---
+...
+function apply(t, k, op)
+    local tx = txs[t]
+    local v = nil
+    if op == 'begin' then
+        if tx.started then
+            table.insert(errors, "assert #1")
+        end
+        tx.started = true
+        tx.con:begin()
+    elseif op == 'commit' then
+        if tx.ended or not tx.started then
+            table.insert(errors, "assert #2")
+        end
+        tx.ended = true
+        table.insert(order_of_commit, t)
+        num_commited = num_commited + 1
+        local res = tx.con:commit()
+        if res ~= "" and res[1]['error'] then
+            tx.conflicted = true
+        else
+            tx.select_all = s1:select{}
+            if tx.num_writes == 0 then
+                tx.read_only = true
+            end
+            for _,ws in pairs(stmts) do
+                if (ws.op == 'replace' or ws.op == 'upsert' or ws.op == 'delete') and ws.t == t then
+                    for _,rs in pairs(stmts) do
+                        if rs.op == 'select' and rs.t ~= t and rs.k == ws.k and not txs[rs.t].ended then
+                            txs[rs.t].expected_to_be_conflicted = true
+                        end
+                    end
+                end
+            end
+        end
+    elseif op == 'select' then
+        v = tx.con('s1:select{'..k..'}')
+    elseif op == 'replace' then
+        v = math.random(10000)
+        tx.con('s1:replace{'..k..','..v..'}')
+        tx.num_writes = tx.num_writes + 1
+    elseif op == 'upsert' then
+        v = math.random(10000)
+        tx.con('s1:upsert({'..k..','..v..'}, {{"+", 2,'..v..'}})')
+        tx.num_writes = tx.num_writes + 1
+    elseif op == 'delete' then
+        tx.con('s1:delete{'..k..'}')
+        tx.num_writes = tx.num_writes + 1
+    end
+    table.insert(stmts, {t=t, k=k, op=op, v=v})
+end;
+---
+...
+function act()
+    while true do
+        local t = math.random(num_tx)
+        local k = math.random(num_key)
+        local tx = txs[t]
+        if not tx.ended then
+            local op_no = 0
+            if (tx.read_only) then
+                op_no = math.random(3)
+            else
+                op_no = math.random(6)
+            end
+            local op = ops[op_no]
+            if op ~= 'commit' or tx.started then
+                if not tx.started then
+                    apply(t, k, 'begin')
+                end
+                if op ~= 'begin' then
+                    apply(t, k, op)
+                end
+            end
+            return
+        end
+    end
+end;
+---
+...
+function is_rdonly_tx_possible(t)
+    for _,s in pairs(stmts) do
+        if s.t == t and s.op == 'select' then
+            local cmp_with = {s2:select{s.k}}
+            if not my_equal(s.v, cmp_with) then
+                return false
+            end
+        end
+    end
+    return true
+end;
+---
+...
+function is_write_tx_possible(t)
+    for _,s in pairs(stmts) do
+        if s.t == t then
+            if s.op == 'select' then
+                local cmp_with = {s2:select{s.k}}
+                if not my_equal(s.v, cmp_with) then
+                    return false
+                end
+            elseif s.op == 'replace' then
+                s2:replace{s.k, s.v}
+            elseif s.op == 'upsert' then
+                s2:upsert({s.k, s.v}, {{'+', 2, s.v}})
+            elseif s.op == 'delete' then
+                s2:delete{s.k}
+            end
+        end
+    end
+    return true
+end;
+---
+...
+function check_rdonly_possibility()
+    for i=1,num_tx do
+        if txs[i].read_only and not txs[i].possible then
+            if is_rdonly_tx_possible(i) then
+                txs[i].possible = true
+            end
+        end
+    end
+end;
+---
+...
+function check()
+    for i=1,num_tx do
+        if txs[i].read_only then
+            if txs[i].conflicted then
+                table.insert(errors, "read-only conflicted " .. i)
+            end
+            txs[i].possible = false
+        else
+            if txs[i].conflicted then
+                if not txs[i].expected_to_be_conflicted then
+                    table.insert(errors, "conflicted unexpectedly " .. i)
+                end
+            else
+                if txs[i].expected_to_be_conflicted then
+                    table.insert(errors, "not conflicted unexpectedly " .. i)
+                end
+            end
+        end
+    end
+    check_rdonly_possibility()
+    for _,t in ipairs(order_of_commit) do
+        if not txs[t].read_only then
+            if not txs[t].conflicted then
+                if not is_write_tx_possible(t) then
+                    table.insert(errors, "not serializable " .. t)
+                end
+                if not my_equal(txs[t].select_all, s2:select{}) then
+                    table.insert(errors, "results are different " .. t)
+                end
+                check_rdonly_possibility()
+            end
+        end
+    end
+    for i=1,num_tx do
+        if txs[i].read_only and not txs[i].possible then
+            table.insert(errors, "not valid read view " .. i)
+        end
+    end
+end;
+---
+...
+for i = 1, num_tests do
+    prepare()
+    while num_commited ~= num_tx do
+        act()
+    end
+    check()
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+errors
+---
+- []
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...

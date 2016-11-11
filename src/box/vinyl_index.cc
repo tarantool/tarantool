@@ -349,23 +349,6 @@ vinyl_iterator_eq(struct iterator *ptr)
 	return it->index->iterator_eq(tx, it);
 }
 
-static struct tuple *
-vinyl_iterator_exact(struct iterator *ptr)
-{
-	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
-	ptr->next = vinyl_iterator_last;
-	struct vy_tx *tx;
-	if (vy_cursor_tx(it->cursor, &tx))
-		diag_raise();
-	struct tuple *t = NULL;
-	if (vy_get(tx, it->index->db, it->key, it->part_count, &t))
-		diag_raise();
-	if (it->index->key_def->iid == 0 || t == NULL) {
-		return t;
-	}
-	VinylSecondaryIndex *sec_idx = (VinylSecondaryIndex *)it->index;
-	return lookup_full_tuple(sec_idx, t, tx);
-}
 
 struct iterator*
 VinylIndex::allocIterator() const
@@ -404,7 +387,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_GT:
-		order = part_count > 0 ? VINYL_GT : VINYL_GE;
+		order = VINYL_GT;
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LE:
@@ -412,25 +395,25 @@ VinylIndex::initIterator(struct iterator *ptr,
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LT:
-		order = part_count > 0 ? VINYL_LT : VINYL_LE;
+		order = VINYL_LT;
 		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_EQ:
 		/* point-lookup iterator (optimization) */
 		if ((key_def->opts.is_unique) &&
 		    (part_count == key_def->part_count)) {
-			ptr->next = vinyl_iterator_exact;
+			ptr->next = vinyl_iterator_next;
 			order = VINYL_EQ;
 		} else {
-			order = VINYL_GE;
 			ptr->next = vinyl_iterator_eq;
+			order = VINYL_GE;
 		}
 		break;
 	case ITER_REQ:
 		/* point-lookup iterator (optimization) */
 		if ((key_def->opts.is_unique) &&
 		    (part_count == key_def->part_count)) {
-			ptr->next = vinyl_iterator_exact;
+			ptr->next = vinyl_iterator_next;
 			order = VINYL_EQ;
 		} else {
 			ptr->next = vinyl_iterator_eq;
