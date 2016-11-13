@@ -412,6 +412,14 @@ c = net.connect(box.cfg.listen, {call_16 = true})
 c:call('scalar42')
 c:close()
 
+-- gh-1904 net.box hangs in :close() if a fiber was cancelled
+-- while blocked in :_wait_state() in :_request()
+options = {user = 'netbox', password = 'badpass', wait_connected = false, reconnect_after = 0.01}
+c = net:new(box.cfg.listen, options)
+f = fiber.create(function() c:call("") end)
+fiber.sleep(0.1)
+f:cancel(); c:close()
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
 -- Tarantool < 1.7.1 compatibility (gh-1533)
