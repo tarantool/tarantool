@@ -598,7 +598,9 @@ local remote_methods = {
         for _, fid in pairs(list) do
             if fid ~= fiber.id() then
                 if self.ch.fid[fid] ~= nil then
-                    self.ch.fid[fid]:put(true)
+                    -- timeout=0 prevents deadlock if a client went away
+                    -- without removing the channel
+                    self.ch.fid[fid]:put(true, 0)
                     self.ch.fid[fid] = nil
                 end
             end
@@ -640,6 +642,9 @@ local remote_methods = {
                     return
                 end
                 fiber.sleep(self.opts.reconnect_after)
+                if self.state == 'closed' then
+                    return
+                end
             end
 
             self:_switch_state('connecting')
