@@ -12,8 +12,9 @@ local PREFIX = 'snapshot_daemon'
 
 local daemon = {
     snapshot_period = 0;
-    snapshot_period_bias = 0;
     snapshot_count = 6;
+    fiber = nil;
+    control = nil;
 }
 
 local function sprintf(fmt, ...) return string.format(fmt, ...) end
@@ -25,7 +26,7 @@ local function snapshot()
     if s then
         return true
     end
-    -- don't complain log if snapshot is already exists
+    -- don't complain in the log if the snapshot already exists
     if errno() == errno.EEXIST then
         return false
     end
@@ -33,7 +34,7 @@ local function snapshot()
     return false
 end
 
--- create snapshot by several options
+-- create snapshot
 local function make_snapshot(last_snap)
 
     if daemon.snapshot_period == nil then
@@ -149,50 +150,64 @@ local function process(self)
     end
 end
 
-local function next_snap_interval(self)
-
-    -- don't do anything in hot_standby mode
-    if box.info.status ~= 'running' or
-        self.snapshot_period == nil or
-        self.snapshot_period <= 0 then
-        return nil
-    end
-
-    return self.snapshot_period -
-        (fiber.time() + self.snapshot_period_bias) % self.snapshot_period
-end
-
 local function daemon_fiber(self)
     fiber.name(PREFIX)
     log.info("started")
-    while true do
-        local interval = next_snap_interval(self)
-        if interval == nil then
-            break
-        end
-        fiber.sleep(interval)
-        if self.reloaded ~= true then
-            local s, e = pcall(process, self)
 
+    --
+    -- Add random offset to the initial period to avoid simultaneous
+    -- snapshotting when multiple instances of tarantool are running
+    -- on the same host.
+    -- See https://github.com/tarantool/tarantool/issues/732
+    --
+    local random = pickle.unpack('i', digest.urandom(4))
+    local offset = random % self.snapshot_period
+    while true do
+        local period = self.snapshot_period + offset
+        -- maintain next_snapshot_time as a self member for testing purposes
+        self.next_snapshot_time = fiber.time() + period
+        log.info("scheduled the next snapshot at %s",
+                os.date("%c", self.next_snapshot_time))
+        local msg = self.control:get(period)
+        if msg == 'shutdown' then
+            break
+        elseif msg == 'reload' then
+            log.info("reloaded") -- continue
+        elseif msg == nil and box.info.status == 'running' then
+            local s, e = pcall(process, self)
             if not s then
                 log.error(e)
             end
-        else
-            self.reloaded = false
-            log.info("reloaded")
+            offset = 0
         end
     end
+    self.next_snapshot_time = nil
     log.info("stopped")
-    self.fiber = nil
 end
 
 local function reload(self)
-    if self.snapshot_period > 0 and self.fiber == nil then
-        self.fiber = fiber.create(daemon_fiber, self)
-    elseif self.fiber ~= nil then
-        -- wake up daemon
-        self.reloaded = true
-        fiber.wakeup(self.fiber)
+    if self.snapshot_period > 0 then
+        if self.control == nil then
+            -- Start daemon
+            self.control = fiber.channel()
+            self.fiber = fiber.create(daemon_fiber, self)
+            fiber.sleep(0)
+        else
+            -- Reload daemon
+            self.control:put("reload")
+            --
+            -- channel:put() doesn't block the writer if there
+            -- is a ready reader. Give daemon fiber way so that
+            -- it can execute before reload() returns to the caller.
+            --
+            fiber.sleep(0)
+        end
+    elseif self.control ~= nil then
+        -- Shutdown daemon
+        self.control:put("shutdown")
+        self.fiber = nil
+        self.control = nil
+        fiber.sleep(0) -- see comment above
     end
 end
 
@@ -200,12 +215,6 @@ setmetatable(daemon, {
     __index = {
         set_snapshot_period = function()
             daemon.snapshot_period = box.cfg.snapshot_period
-            if daemon.snapshot_period > 0 then
-                local rnd = pickle.unpack('i', digest.urandom(4))
-                daemon.snapshot_period_bias = rnd % daemon.snapshot_period
-            else
-                daemon.snapshot_period_bias = 0
-            end
             reload(daemon)
             return
         end,
@@ -217,9 +226,7 @@ setmetatable(daemon, {
             end
             daemon.snapshot_count = box.cfg.snapshot_count
             reload(daemon)
-        end,
-
-        next_snap_interval = next_snap_interval
+        end
     }
 })
 
