@@ -140,10 +140,10 @@ c1:commit() -- ok
 c3("t:get{1}") -- {1, 11}
 c2("t:replace{2, 18}")
 c3("t:get{2}") -- {2, 19}
-c2:commit() -- fixme: must be rollback due to conflict
+c2:commit() -- write only transaction - OK to commit
 c3("t:get{2}") -- {2, 19}
 c3("t:get{1}") -- {1, 11}
-c3:commit()
+c3:commit() -- read only transaction - OK to commit, stays with its read view
 
 -- teardown
 t:delete{1}

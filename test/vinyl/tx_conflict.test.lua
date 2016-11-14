@@ -21,7 +21,7 @@ num_tests = 80 --number of test rounds to run
 
 txs = {}
 order_of_commit = {}
-num_commited = 0
+num_committed = 0
 stmts = {}
 errors = {}
 ops = {'begin', 'commit', 'select', 'replace', 'upsert', 'delete'}
@@ -51,7 +51,7 @@ end;
 
 function prepare()
     order_of_commit = {}
-    num_commited = 0
+    num_committed = 0
     stmts = {}
     for i=1,num_tx do
         txs[i].started = false
@@ -98,7 +98,7 @@ function apply(t, k, op)
         end
         tx.ended = true
         table.insert(order_of_commit, t)
-        num_commited = num_commited + 1
+        num_committed = num_committed + 1
         local res = tx.con:commit()
         if res ~= "" and res[1]['error'] then
             tx.conflicted = true
@@ -244,7 +244,7 @@ end;
 
 for i = 1, num_tests do
     prepare()
-    while num_commited ~= num_tx do
+    while num_committed ~= num_tx do
         act()
     end
     check()

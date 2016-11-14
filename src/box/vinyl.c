@@ -1248,7 +1248,7 @@ struct vy_tx {
 	enum tx_type type;
 	enum tx_state state;
 	/**
-	 * The transaction is forbidden to commit if it is not read-only.
+	 * The transaction is forbidden to commit unless it's read-only.
 	 */
 	bool is_aborted;
 	/** Transaction logical start time. */
