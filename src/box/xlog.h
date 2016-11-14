@@ -163,45 +163,6 @@ xdir_check(struct xdir *dir);
 /* }}} */
 
 /**
- * A serialized WAL buffer with one or more transactions in it.
- *
- * Is used to accumulate xlog records up to a given threshold,
- * and flushes them to the journal either when a batch is big
- * enough or is complete. Preserves transactional boundaries,
- * i.e. never flushes parts of a transaction to the file.
- */
-struct xlog_tx {
-	/*
-	 * If true, we can flush the data in this buffer whenever
-	 * we like, and it's usually when the buffer gets
-	 * sufficiently big to get compressed.
-	 *
-	 * Otherwise, we must observe transactional boundaries
-	 * to avoid writing a partial transaction to WAL: a
-	 * single transaction always goes to WAL in a single 
-	 * "chunk" with 1 fixed header and common checksum
-	 * for all transactional rows. This prevents miscarriage
-	 * or partial delivery of transactional rows to a slave
-	 * during replication.
-	 */
-	bool is_autocommit;
-	/** The current offset in the log file, for writing. */
-	off_t offset;
-	/**
-	 * Output buffer, works as row accumulator for
-	 * compression.
-	 */
-	struct obuf obuf;
-
-	/** The context of zstd compression */
-	ZSTD_CCtx *zctx;
-	/** Compressed output buffer, used only if compression is
-	 * ON.
-	 */
-	struct obuf zbuf;
-};
-
-/**
  * A xlog meta info
  */
 struct xlog_meta {
@@ -220,7 +181,7 @@ struct xlog_meta {
 	 * Text file header: vector clock taken at the time
 	 * this file was created. For WALs, this is vector
 	 * clock *at start of WAL*, for snapshots, this
-	 * is vector clock *at the time the snapshot is taken*.
+	 * is vector clock *at the time the snapshot is taken.
 	 */
 	struct vclock vclock;
 };
@@ -248,7 +209,33 @@ struct xlog {
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */
 	bool is_inprogress;
-	struct xlog_tx xlog_tx;
+	/*
+	 * If true, we can flush the data in this buffer whenever
+	 * we like, and it's usually when the buffer gets
+	 * sufficiently big to get compressed.
+	 *
+	 * Otherwise, we must observe transactional boundaries
+	 * to avoid writing a partial transaction to WAL: a
+	 * single transaction always goes to WAL in a single
+	 * "chunk" with 1 fixed header and common checksum
+	 * for all transactional rows. This prevents miscarriage
+	 * or partial delivery of transactional rows to a slave
+	 * during replication.
+	 */
+	bool is_autocommit;
+	/** The current offset in the log file, for writing. */
+	off_t offset;
+	/**
+	 * Output buffer, works as row accumulator for
+	 * compression.
+	 */
+	struct obuf obuf;
+	/** The context of zstd compression */
+	ZSTD_CCtx *zctx;
+	/**
+	 * Compressed output buffer
+	 */
+	struct obuf zbuf;
 	/**
 	 * Sync interval in bytes.
 	 * xlog file will be synced every sync_interval bytes,
