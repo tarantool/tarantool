@@ -126,10 +126,31 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 			       struct space *new_space,
 			       Index *new_index_arg)
 {
+	(void)old_space;
+	(void)new_space;
 	VinylIndex *new_index = (VinylIndex *) new_index_arg;
 	new_index->open();
-	if (recovery_complete) /* prevent building existing index */
-		Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
+	/* Unlike Memtx, Vinyl does not need building of a secondary index.
+	 * This is true because of two things:
+	 * 1) Vinyl does not support alter of non-empty spaces
+	 * 2) During recovery a Vinyl index already has all needed data on disk.
+	 * And there are 3 cases:
+	 * I. The secondary index is added in snapshot. Then Vinyl was
+	 * snapshotted too and all necessary for that moment data is on disk.
+	 * II. The secondary index is added in WAL. That means that vinyl
+	 * space had no data at that point and had nothing to build. The
+	 * index actually could contain recovered data, but it will handle it
+	 * by itself during WAL recovery.
+	 * III. Vinyl is online. The space is definitely empty and there's
+	 * nothing to build.
+	 *
+	 * When we start to implement alter of non-empty vinyl spaces, it
+	 *  seems that we should call here:
+	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
+	 *  but aware of three cases mentioned above.
+	 */
+	assert(!recovery_complete ||
+	       index_find(old_space, 0)->min(NULL, 0) == NULL);
 }
 
 struct vinyl_send_row_arg {
