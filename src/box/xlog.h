@@ -160,6 +160,14 @@ xdir_scan(struct xdir *dir);
 int
 xdir_check(struct xdir *dir);
 
+/**
+ * Return a file name based on directory type, vector clock
+ * sum, and a suffix (.inprogress or not).
+ */
+char *
+xdir_format_filename(struct xdir *dir, int64_t signature,
+		     enum log_suffix suffix);
+
 /* }}} */
 
 /**
@@ -261,6 +269,46 @@ struct xlog {
  */
 struct xlog *
 xdir_create_xlog(struct xdir *dir, const struct vclock *vclock);
+
+/**
+ * Write a row to xlog, 
+ *
+ * @retval count of writen bytes
+ * @retval 0 if packet is buffered
+ * @retval -1 for error
+ */
+ssize_t
+xlog_write_row(struct xlog *log, const struct xrow_header *packet);
+
+/**
+ * Prevent xlog row buffer offloading, should be use
+ * at transaction start to write transaction in one xlog tx
+ */
+void
+xlog_tx_begin(struct xlog *log);
+
+/**
+ * Enable xlog row buffer offloading
+ *
+ * @retval count of writen bytes
+ * @retval 0 if buffer is not writen
+ * @retval -1 if error
+ */
+ssize_t
+xlog_tx_commit(struct xlog *log);
+
+/**
+ * Discard xlog row buffer
+ */
+void
+xlog_tx_rollback(struct xlog *log);
+
+/**
+ * Flush buffered rows and sync file
+ */
+ssize_t
+xlog_flush(struct xlog *log);
+
 
 /**
  * Sync a log file. The exact action is defined
@@ -392,41 +440,6 @@ xlog_cursor_next(struct xlog_cursor *cursor, struct xrow_header *packet);
 int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor);
-
-/**
- * Return a file name based on directory type, vector clock
- * sum, and a suffix (.inprogress or not).
- */
-char *
-xdir_format_filename(struct xdir *dir, int64_t signature,
-		     enum log_suffix suffix);
-
-/**
- * Write a row to xlog, return count of written bytes (0 if buffered)
- * 01 for error
- */
-ssize_t
-xlog_write_row(struct xlog *log, const struct xrow_header *packet);
-
-/**
- * If write row buffer is lock then block can't offloaded.
- * Used for wal request writing.
- * Note: lockand unlock can offload current row buffer.
- */
-void
-xlog_tx_begin(struct xlog *log);
-
-ssize_t
-xlog_tx_commit(struct xlog *log);
-
-void
-xlog_tx_rollback(struct xlog *log);
-
-/**
- * Flush buffered rows and sync file
- */
-ssize_t
-xlog_flush(struct xlog *log);
 
 /** }}} */
 
