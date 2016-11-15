@@ -464,6 +464,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
+		struct txn *txn = txn_begin_ro_stmt(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
 		key_validate(index->key_def, itype, key, part_count);
@@ -473,12 +474,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		it->space_id = space_id;
 		it->index_id = index_id;
 		it->index = index;
-		/*
-		 * No transaction management: iterators are
-		 * "dirty" in tarantool now, they exist in
-		 * their own read view in vinyl or access dirty
-		 * data in memtx.
-		 */
+		txn_commit_ro_stmt(txn);
 		return it;
 	} catch (Exception *) {
 		if (it)

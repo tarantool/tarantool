@@ -371,16 +371,6 @@ VinylIndex::initIterator(struct iterator *ptr,
 {
 	assert(part_count == 0 || key != NULL);
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
-	if (in_txn() != NULL && in_txn()->is_autocommit == false
-	    && in_txn()->engine_tx == NULL) {
-		/* A transaction is started in box but did not start in engine,
-		 * because no statements was made.
-		 * No we have create vinyl transaction and it to the box
-		 * transaction and the iterator in order to provide
-		 * visibility of transaction statement to the iterator */
-		struct space *sp = space_cache_find(key_def->space_id);
-		txn_begin_in_engine(sp->handler->engine, in_txn());
-	}
 	struct vy_tx *tx =
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);

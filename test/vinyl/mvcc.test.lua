@@ -632,7 +632,7 @@ c2("t:get{200}") -- start transaction in the engine
 c2("t:replace{1, 15}")
 c1("t:replace{1, 10}")
 --
-c2:commit() 
+c2:commit()
 c1:rollback()
 --
 c3("t:get{1}")
@@ -1494,6 +1494,53 @@ c1:begin()
 c1("t:select{1}")
 c1("for k, v in box.space.test:pairs() do box.rollback() end")
 c1:rollback()
+t:truncate()
+
+--
+-- Check that min/max/count transactions stay within a read view
+--
+c1:begin()
+c1("t.index.pk:max()")
+c2:begin()
+c2("t:replace{1}")
+c2:commit()
+c1("t.index.pk:max()") -- nothing
+c1("t.index.pk:min()") -- nothing
+c1("t.index.pk:count()") -- 0
+c1:commit()
+--
+-- XXX bug: we read committed doata since there are no gap locks,
+-- and c1 is not turned into a read-only on conflict with c2.
+--
+c1:begin()
+c1("t.index.pk:max()") -- {1}
+c1("t.index.pk:min()") -- {1}
+c1("t.index.pk:count()") -- 0
+c2:begin()
+c2("t:replace{2}")
+c2:commit()
+c1("t.index.pk:max()") -- {2}
+c1("t.index.pk:min()") -- {1}
+c1("t.index.pk:count()") -- 2
+t:truncate()
+--
+-- Convert the reader to a read view: in this test we have
+-- an explicit conflict between c1 and c2, so c1 begins
+-- using a read view
+-- XXX: bug
+--
+c1:begin()
+c1("t.index.pk:max()") -- {1}
+c1("t.index.pk:min()") -- {2}
+c1("t.index.pk:count()") -- 2
+c2:begin()
+c2("t:replace{1, 'new'}") -- conflits with c1 so c1 starts using a read view
+c2("t:replace{3}")
+c2:commit()
+c1("t.index.pk:max()") -- {2}
+c1("t.index.pk:min()") -- {1}
+c1("t.index.pk:count()") -- 2
+t:truncate()
 
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
