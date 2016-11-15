@@ -49,6 +49,8 @@ struct xrow_header;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+extern const struct type type_XlogError;
+
 /* {{{ log dir */
 
 /**

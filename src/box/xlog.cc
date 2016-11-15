@@ -983,11 +983,16 @@ xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
 	size_t to_load = count - (ibuf_used(&cursor->rbuf) - buf_delta);
 	to_load += XLOG_READ_AHEAD;
 	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
-	if (dst == NULL)
+	if (dst == NULL) {
+		diag_set(OutOfMemory, to_load,
+			 "slab", "xlog cursor read buffer");
 		return -1;
+	}
 	ssize_t readen = fio_read(cursor->fd, dst, to_load);
-	if (readen < 0)
+	if (readen < 0) {
+		diag_set(SystemError, "can't read file %s", cursor->name);
 		return -1;
+	}
 	ibuf_alloc(&cursor->rbuf, readen);
 	*data = cursor->rbuf.rpos + buf_delta;
 	readen = MIN(ibuf_used(&cursor->rbuf) - buf_delta, count);
@@ -1135,7 +1140,9 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 						  &input);
 		ibuf_alloc(&i->zbuf, output.pos);
 		if (ZSTD_isError(rc)) {
-			tnt_error(ClientError, ER_COMPRESSION, rc);
+			tnt_error(XlogError,
+				  "can't decompress xlog tx data with "
+				  "code: %i", rc);
 			return -1;
 		}
 		if (input.pos == input.size) {
@@ -1179,11 +1186,9 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 	/* Decode len, previous crc32 and row crc32 */
 	if (mp_check(&data, data + header_size) != 0) {
 	error:
-		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s: failed to parse tx "
-			 "header at offset %" PRIu64, i->name,
-			 (uint64_t)i->search_offset);
-		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+		tnt_error(XlogError, "%s: failed to parse tx "
+			  "header at offset %" PRIu64, i->name,
+			  (uint64_t)i->search_offset);
 		return -1;
 	}
 	data = fixheader;
@@ -1193,11 +1198,9 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 		goto error;
 	uint32_t len = mp_decode_uint(&data);
 	if (len > IPROTO_BODY_LEN_MAX) {
-		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf),
+		tnt_error(XlogError,
 			 "%s: row is too big at offset %" PRIu64,
 			 i->name, (uint64_t)i->search_offset);
-		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
 		return -1;
 	}
 
@@ -1222,13 +1225,13 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
 
 	/* Validate checksum */
 	if (crc32_calc(0, i->data_pos, len) != crc32c) {
-		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s: row block checksum"
-			 " mismatch (expected %u) at offset %" PRIu64,
-			 i->name, (unsigned) crc32c,
-			 (uint64_t)i->search_offset);
 		if (i->ignore_crc == false) {
-			tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+			tnt_error(XlogError,
+				  "%s: row block checksum"
+				  " mismatch (expected %u) at offset %"
+				  PRIu64,
+				  i->name, (unsigned) crc32c,
+				  (uint64_t)i->search_offset);
 			return -1;
 		}
 	}
@@ -1250,6 +1253,8 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 				    (const char *)i->data_end);
 	if (rc != 0) {
 		say_warn("failed to read row");
+		tnt_error(XlogError, "%s: can't parse row",
+			  i->name);
 		/* Discard remaining row data */
 		i->data_pos = i->data_end;
 		return -1;
@@ -1439,6 +1444,7 @@ error:
 	ZSTD_freeDStream(i->zdctx);
 	return -1;
 }
+
 void
 xlog_cursor_close(struct xlog_cursor *i)
 {

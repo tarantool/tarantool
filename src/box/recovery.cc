@@ -241,6 +241,12 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			if (r->wal_dir.panic_if_error) {
 				throw;
 			}
+		} catch (XlogError *e) {
+			say_error("can't read row: ");
+			e->log();
+			if (r->wal_dir.panic_if_error) {
+				throw;
+			}
 		}
 	}
 }
