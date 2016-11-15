@@ -3808,7 +3808,7 @@ c1("t.index.pk:min()") -- {1}
 ---
 - - [1]
 ...
-c1("t.index.pk:count()") -- 0
+c1("t.index.pk:count()") -- 1
 ---
 - - 1
 ...
@@ -3836,9 +3836,6 @@ c1("t.index.pk:count()") -- 2
 ---
 - - 2
 ...
-t:truncate()
----
-...
 --
 -- Convert the reader to a read view: in this test we have
 -- an explicit conflict between c1 and c2, so c1 begins
@@ -3849,17 +3846,17 @@ c1:begin()
 ---
 - - {'error': 'Operation is not permitted when there is an active transaction '}
 ...
-c1("t.index.pk:max()") -- {1}
+c1("t.index.pk:max()") -- {2}
 ---
-- 
+- - [2]
 ...
-c1("t.index.pk:min()") -- {2}
+c1("t.index.pk:min()") -- {1}
 ---
-- 
+- - [1]
 ...
 c1("t.index.pk:count()") -- 2
 ---
-- - 0
+- - 2
 ...
 c2:begin()
 ---
@@ -3879,15 +3876,15 @@ c2:commit()
 ...
 c1("t.index.pk:max()") -- {2}
 ---
-- 
+- - [2]
 ...
 c1("t.index.pk:min()") -- {1}
 ---
-- 
+- - [1]
 ...
 c1("t.index.pk:count()") -- 2
 ---
-- - 0
+- - 2
 ...
 t:truncate()
 ---

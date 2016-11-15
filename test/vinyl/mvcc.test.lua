@@ -1515,14 +1515,13 @@ c1:commit()
 c1:begin()
 c1("t.index.pk:max()") -- {1}
 c1("t.index.pk:min()") -- {1}
-c1("t.index.pk:count()") -- 0
+c1("t.index.pk:count()") -- 1
 c2:begin()
 c2("t:replace{2}")
 c2:commit()
 c1("t.index.pk:max()") -- {2}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
-t:truncate()
 --
 -- Convert the reader to a read view: in this test we have
 -- an explicit conflict between c1 and c2, so c1 begins
@@ -1530,8 +1529,8 @@ t:truncate()
 -- XXX: bug
 --
 c1:begin()
-c1("t.index.pk:max()") -- {1}
-c1("t.index.pk:min()") -- {2}
+c1("t.index.pk:max()") -- {2}
+c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
 c2:begin()
 c2("t:replace{1, 'new'}") -- conflits with c1 so c1 starts using a read view
