@@ -1247,9 +1247,9 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
 {
 	/* Return row from xlog tx buffer */
 	try {
-		xrow_header_decode(row,
-				   (const char **)&i->data_pos,
-				   (const char *)i->data_end);
+		xrow_header_decode_xc(row,
+				      (const char **)&i->data_pos,
+				      (const char *)i->data_end);
 	} catch (ClientError *e) {
 		say_warn("failed to read row");
 		/* Discard remaining row data */

@@ -58,7 +58,7 @@ coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row)
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	xrow_header_decode(row, (const char **) &in->rpos, in->rpos + len);
+	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len);
 }
 
 void

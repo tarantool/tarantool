@@ -550,7 +550,7 @@ static void
 iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		  bool *stop_input)
 {
-	xrow_header_decode(&msg->header, pos, reqend);
+	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
 	request_create(&msg->request, msg->header.type);
 	msg->request.header = &msg->header;

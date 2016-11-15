@@ -35,6 +35,7 @@
 #include <sys/uio.h> /* struct iovec */
 
 #include "tt_uuid.h"
+#include "diag.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -60,6 +61,14 @@ struct xrow_header {
 	struct iovec body[XROW_BODY_IOVMAX];
 
 };
+
+int
+xrow_header_encode(const struct xrow_header *header,
+		   struct iovec *out, size_t fixheader_len);
+
+int
+xrow_header_decode(struct xrow_header *header,
+		   const char **pos, const char *end);
 
 enum {
 	/* Maximal length of protocol name in handshake */
@@ -114,19 +123,19 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-void
-xrow_header_decode(struct xrow_header *header,
-		   const char **pos, const char *end);
+static inline void 
+xrow_header_decode_xc(struct xrow_header *header,
+		      const char **pos, const char *end)
+{
+	if (xrow_header_decode(header, pos, end) < 0)
+		diag_raise();
+}
 
 void
 xrow_decode_uuid(const char **pos, struct tt_uuid *out);
 
 char *
 xrow_encode_uuid(char *pos, const struct tt_uuid *in);
-
-int
-xrow_header_encode(const struct xrow_header *header,
-		   struct iovec *out, size_t fixheader_len);
 
 int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
@@ -137,6 +146,16 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
 */
 void
 xrow_decode_error(struct xrow_header *row);
+
+static inline int
+xrow_header_encode_xc(const struct xrow_header *header,
+		      struct iovec *out, size_t fixheader_len)
+{
+	int iovcnt = xrow_header_encode(header, out, fixheader_len);
+	if (iovcnt < 0)
+		diag_raise();
+	return iovcnt;
+}
 
 /**
  * \brief Encode AUTH command

@@ -43,7 +43,7 @@
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
-void
+int
 xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)
 {
@@ -51,7 +51,8 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 	const char *tmp = *pos;
 	if (mp_check(&tmp, end) != 0) {
 error:
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet header");
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
+		return -1;
 	}
 
 	if (mp_typeof(**pos) != MP_MAP)
@@ -92,12 +93,14 @@ error:
 	if (*pos < end) {
 		const char *body = *pos;
 		if (mp_check(pos, end)) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+			diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+			return -1;
 		}
 		header->bodycnt = 1;
 		header->body[0].iov_base = (void *) body;
 		header->body[0].iov_len = *pos - body;
 	}
+	return 0;
 }
 
 /**
@@ -121,8 +124,13 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		   size_t fixheader_len)
 {
 	/* allocate memory for sign + header */
-	out->iov_base = region_alloc_xc(&fiber()->gc, HEADER_LEN_MAX +
-					fixheader_len);
+	out->iov_base = region_alloc(&fiber()->gc, HEADER_LEN_MAX +
+				     fixheader_len);
+	if (out->iov_base == NULL) {
+		diag_set(OutOfMemory, HEADER_LEN_MAX + fixheader_len,
+			 "gc arena", "xrow header encode");
+		return -1;
+	}
 	char *data = (char *) out->iov_base + fixheader_len;
 
 	/* Header */
@@ -178,7 +186,7 @@ int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
 	static const int iov0_len = mp_sizeof_uint(UINT32_MAX);
-	int iovcnt = xrow_header_encode(row, out, iov0_len);
+	int iovcnt = xrow_header_encode_xc(row, out, iov0_len);
 	ssize_t len = -iov0_len;
 	for (int i = 0; i < iovcnt; i++)
 		len += out[i].iov_len;
