@@ -1526,7 +1526,6 @@ c1("t.index.pk:count()") -- 2
 -- Convert the reader to a read view: in this test we have
 -- an explicit conflict between c1 and c2, so c1 begins
 -- using a read view
--- XXX: bug
 --
 c1:begin()
 c1("t.index.pk:max()") -- {2}
