@@ -219,11 +219,13 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	 * when EOF marker has been read, see i.eof_read
 	 */
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&r->cursor, &row) == 0) {
-		if (stop_vclock != NULL &&
-		    r->vclock.signature >= stop_vclock->signature)
-			return;
+	while (true) {
 		try {
+			if (xlog_cursor_next_xc(&r->cursor, &row) > 0)
+				break;
+			if (stop_vclock != NULL &&
+			    r->vclock.signature >= stop_vclock->signature)
+				return;
 			int64_t current_lsn = vclock_get(&r->vclock,
 							 row.server_id);
 			if (row.lsn <= current_lsn)
