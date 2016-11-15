@@ -447,6 +447,15 @@ int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor);
 
+/**
+ * Move to next xlog tx
+ *
+ * @retval 0 magic found
+ * @retval 1 magic not found and eof reached
+ * @retval -1 error
+ */
+int
+xlog_cursor_find_tx_magic(struct xlog_cursor *i);
 /** }}} */
 
 #if defined(__cplusplus)

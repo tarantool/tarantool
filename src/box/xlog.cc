@@ -1314,19 +1314,18 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 }
 
 /**
- * Find a next xlog tx magic, set magic to the last loaded 4 bytes
+ * Find a next xlog tx magic
  */
-static int
-xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
+int
+xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 {
 	ssize_t loaded, skipped = 0;
 	log_magic_t *magic_ptr;
-	loaded = xlog_cursor_load(i, sizeof(*magic), (char **)&magic_ptr);
+	loaded = xlog_cursor_load(i, sizeof(log_magic_t), (char **)&magic_ptr);
 	if (loaded < 0)
 		return -1;
-	if (loaded < (ssize_t)sizeof(*magic))
+	if (loaded < (ssize_t)sizeof(log_magic_t))
 		return 1;
-	*magic = *magic_ptr;
 
 	while (*magic_ptr != row_marker && *magic_ptr != zrow_marker) {
 		char *last_byte;
@@ -1335,8 +1334,7 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 			return -1;
 		if (loaded < 1)
 			return 1;
-		magic_ptr = (log_magic_t *)(last_byte - sizeof(*magic) + 1);
-		*magic = *magic_ptr;
+		magic_ptr = (log_magic_t *)(last_byte - sizeof(log_magic_t) + 1);
 		/* delete first byte from read buf */
 		xlog_cursor_consume(i, 1);
 		++skipped;
@@ -1347,7 +1345,7 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i, log_magic_t *magic)
 			 skipped, i->search_offset);
 	}
 	say_debug("magic found at 0x%08jx",
-		  (uintmax_t)i->read_offset - sizeof(*magic));
+		  (uintmax_t)i->read_offset - sizeof(*magic_ptr));
 	return 0;
 }
 
@@ -1383,16 +1381,28 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	i->read_offset = i->search_offset;
 	xlog_cursor_consume(i, i->read_offset - i->buf_offset);
 
-	rc = xlog_cursor_find_tx_magic(i, &magic);
-	if (rc > 0) {
-		/** eof, go back and retry later */
-		goto eof;
-	} else if (rc < 0) {
+	log_magic_t *magic_ptr;
+	rc = xlog_cursor_load(i, sizeof(log_magic_t), (char **)&magic_ptr);
+	if (rc < 0) {
 		/**
 		 * error by readin byte at read_offset,
 		 * restart search from next position
 		 */
 		i->search_offset = i->read_offset + 1;
+		return -1;
+	} else if (rc < (int)sizeof(log_magic_t)) {
+		goto eof;
+	}
+	magic = *magic_ptr;
+	if (magic == eof_marker)
+		goto eof;
+	if (magic != zrow_marker && magic != row_marker) {
+		/**
+		 * There is no marker, possible file corruption,
+		 * stop parsing to avoid skiping significant datas
+		 */
+		tnt_error(XlogError, "%s: invalid marker at %lld",
+			  i->name, i->read_offset);
 		return -1;
 	}
 	off_t marker_offset;
@@ -1420,6 +1430,14 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	return xlog_cursor_next_row(i, row);
 eof:
 	i->eof_read = (magic == eof_marker);
+	char *some_char;
+	if (i->eof_read &&
+	    xlog_cursor_load(i, sizeof(log_magic_t) + sizeof(char),
+			     &some_char) > 0) {
+		tnt_error(XlogError, "%s: has some data after eof "
+			  "marker at %lld", i->name, i->read_offset);
+		return -1;
+	}
 	return 1;
 }
 

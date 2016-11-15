@@ -145,8 +145,14 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	int rc;
 	/* skip all bad read requests */
 	while ((rc = xlog_cursor_next(cur, &row)) < 0) {
-		if (diag_last_error(diag_get())->type != &type_ClientError)
+		if (diag_last_error(diag_get())->type != &type_XlogError)
 			lbox_error(L);
+		/* Can't parse current tx, move to the next one */
+		if ((rc = xlog_cursor_find_tx_magic(cur)) < 0)
+			lbox_error(L);
+		if (rc == 0)
+			continue;
+		break;
 	}
 	if (rc == 1)
 		return 0; /* EOF */

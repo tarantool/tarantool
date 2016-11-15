@@ -247,6 +247,12 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			if (r->wal_dir.panic_if_error) {
 				throw;
 			}
+			int rc = xlog_cursor_find_tx_magic(&r->cursor);
+			if (rc == 0)
+				continue;
+			if (rc < 0)
+				diag_raise();
+			break;
 		}
 	}
 }
