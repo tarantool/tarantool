@@ -647,7 +647,7 @@ vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
  * @retval not NULL Success.
  */
 static struct vy_stmt *
-vy_apply_upsert(struct vy_stmt *upsert, struct vy_stmt *object,
+vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
 		const struct key_def *key_def,
 		const struct tuple_format *format, bool suppress_error);
 
@@ -672,13 +672,13 @@ vy_stmt_tuple_data(const struct vy_stmt *stmt, const struct key_def *key_def,
  * @retval Pointer on MessagePack array of update operations.
  */
 static const char *
-vy_stmt_upsert_ops(struct vy_stmt *stmt, const struct key_def *key_def,
+vy_stmt_upsert_ops(const struct vy_stmt *stmt, const struct key_def *key_def,
 		   uint32_t *mp_size);
 
 /* Statement public API }}} */
 
 static uint32_t
-vy_stmt_size(struct vy_stmt *v);
+vy_stmt_size(const struct vy_stmt *v);
 
 static struct vy_stmt *
 vy_stmt_alloc(uint32_t size);
@@ -1602,7 +1602,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
 
 static struct txv *
 write_set_search_key(write_set_t *tree, struct vy_index *index,
-		     struct vy_stmt *data)
+		     const struct vy_stmt *data)
 {
 	struct write_set_key key = { .index = index, .stmt = data};
 	return write_set_search(tree, &key);
@@ -3636,7 +3636,8 @@ out:
  * Save a statement in the range's in-memory index.
  */
 static int
-vy_range_set(struct vy_range *range, struct vy_stmt *stmt, size_t *write_size)
+vy_range_set(struct vy_range *range, struct vy_stmt *stmt,
+	     size_t *write_size)
 {
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -3758,7 +3759,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
  * over all statements written to disk in the same range.
  */
 static bool
-vy_stmt_is_committed(struct vy_index *index, struct vy_stmt *stmt)
+vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 {
 	struct vy_range *range;
 
@@ -4983,7 +4984,7 @@ static void vy_conf_delete(struct vy_conf *c)
 }
 
 static int
-vy_index_read(struct vy_index*, struct vy_stmt*, enum vy_order order,
+vy_index_read(struct vy_index*, const struct vy_stmt*, enum vy_order order,
 		struct vy_stmt **, struct vy_tx*);
 
 /** {{{ Introspection */
@@ -5428,7 +5429,7 @@ vy_index_bsize(struct vy_index *index)
 /* {{{ Statements */
 
 static uint32_t
-vy_stmt_size(struct vy_stmt *v)
+vy_stmt_size(const struct vy_stmt *v)
 {
 	return sizeof(struct vy_stmt) + v->size;
 }
@@ -5590,7 +5591,7 @@ vy_stmt_tuple_data(const struct vy_stmt *stmt, const struct key_def *key_def,
 }
 
 static const char *
-vy_stmt_upsert_ops(struct vy_stmt *stmt, const struct key_def *key_def,
+vy_stmt_upsert_ops(const struct vy_stmt *stmt, const struct key_def *key_def,
 		   uint32_t *mp_size)
 {
 	assert(stmt->type == IPROTO_UPSERT);
@@ -5953,7 +5954,7 @@ vy_upsert_try_to_squash(const struct key_def *key_def,
 }
 
 static struct vy_stmt *
-vy_apply_upsert(struct vy_stmt *new_stmt, struct vy_stmt *old_stmt,
+vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 		const struct key_def *key_def,
 		const struct tuple_format *format, bool suppress_error)
 {
@@ -6072,8 +6073,11 @@ check_key:
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
 		vy_stmt_unref(result_stmt);
-		vy_stmt_ref(old_stmt);
-		result_stmt = old_stmt;
+		result_stmt = vy_stmt_alloc(old_stmt->size);
+		if (result_stmt == NULL)
+			return NULL;
+		memcpy(result_stmt, old_stmt, vy_stmt_size(old_stmt));
+		result_stmt->refs = 1;
 	}
 	return result_stmt;
 }
@@ -6533,7 +6537,7 @@ typedef NODISCARD int
  */
 typedef NODISCARD int
 (*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
-			 struct vy_stmt *last_stmt, struct vy_stmt **ret);
+			 const struct vy_stmt *last_stmt, struct vy_stmt **ret);
 typedef void
 (*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
 
@@ -7459,7 +7463,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static NODISCARD int
 vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
-			struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
 	assert(vitr->iface->restore == vy_run_iterator_restore);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
@@ -7892,7 +7896,7 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static NODISCARD int
 vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
-			struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	struct key_def *def = itr->mem->key_def;
@@ -8239,7 +8243,7 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static int
 vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
-			struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
 {
 	assert(vitr->iface->restore == vy_txw_iterator_restore);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
@@ -8814,7 +8818,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
  */
 static NODISCARD int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
-			  struct vy_stmt *last_stmt)
+			  const struct vy_stmt *last_stmt)
 {
 	itr->unique_optimization = false;
 	itr->is_in_uniq_opt = false;
@@ -9117,7 +9121,7 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, struct vy_stmt *key,
+		      enum vy_order order, const struct vy_stmt *key,
 		      const int64_t *vlsn, bool only_disk);
 
 /**
@@ -9203,7 +9207,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, struct vy_stmt *key,
+		      enum vy_order order, const struct vy_stmt *key,
 		      const int64_t *vlsn, bool only_disk)
 {
 	itr->index = index;
@@ -9440,7 +9444,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 /* }}} replication */
 
 static int
-vy_index_read(struct vy_index *index, struct vy_stmt *key,
+vy_index_read(struct vy_index *index, const struct vy_stmt *key,
 	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
