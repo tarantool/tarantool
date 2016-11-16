@@ -4209,7 +4209,7 @@ vy_task_drop_new(struct mempool *pool, struct vy_index *index)
 #define HEAP_NAME vy_dump_heap
 
 static bool
-vy_range_need_checkpoint(struct vy_range *range);
+vy_range_needs_checkpoint(struct vy_range *range);
 
 static int
 heap_dump_less(struct heap_node *a, struct heap_node *b)
@@ -4218,11 +4218,11 @@ heap_dump_less(struct heap_node *a, struct heap_node *b)
 	struct vy_range *right = container_of(b, struct vy_range, nodedump);
 
 	/* Ranges that need to be checkpointed must be dumped first. */
-	bool left_need_checkpoint = vy_range_need_checkpoint(left);
-	bool right_need_checkpoint = vy_range_need_checkpoint(right);
-	if (left_need_checkpoint && !right_need_checkpoint)
+	bool left_needs_checkpoint = vy_range_needs_checkpoint(left);
+	bool right_needs_checkpoint = vy_range_needs_checkpoint(right);
+	if (left_needs_checkpoint && !right_needs_checkpoint)
 		return true;
-	if (!left_need_checkpoint && right_need_checkpoint)
+	if (!left_needs_checkpoint && right_needs_checkpoint)
 		return false;
 
 	return left->used > right->used;
@@ -4381,16 +4381,15 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 }
 
 static bool
-vy_range_need_checkpoint(struct vy_range *range)
+vy_range_needs_checkpoint(struct vy_range *range)
 {
 	return range->min_lsn <= range->index->env->scheduler->checkpoint_lsn;
 }
 
 static bool
-vy_range_need_dump(struct vy_range *range)
+vy_range_needs_dump(struct vy_range *range)
 {
-	return (range->used >= 10 * 1024 * 1024 ||
-		range->used >= range->index->key_def->opts.range_size);
+	return range->used >= range->index->key_def->opts.range_size;
 }
 
 static void
@@ -4414,7 +4413,7 @@ vy_scheduler_update_range(struct vy_scheduler *scheduler,
 	assert(range->nodedump.pos != UINT32_MAX);
 	assert(range->nodecompact.pos != UINT32_MAX);
 
-	if (vy_range_need_dump(range)) {
+	if (vy_range_needs_dump(range)) {
 		/* Wake up scheduler */
 		ipc_cond_signal(&scheduler->scheduler_cond);
 	}
@@ -4441,8 +4440,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (!vy_quota_exceeded(scheduler->env->quota) &&
-		    !vy_range_need_dump(range) &&
-		    !vy_range_need_checkpoint(range))
+		    !vy_range_needs_dump(range) &&
+		    !vy_range_needs_checkpoint(range))
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
