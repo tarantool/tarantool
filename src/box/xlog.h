@@ -448,7 +448,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor);
 
 /**
- * Move to next xlog tx
+ * Move to the next xlog tx
  *
  * @retval 0 magic found
  * @retval 1 magic not found and eof reached

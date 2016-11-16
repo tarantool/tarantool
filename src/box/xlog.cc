@@ -1398,8 +1398,8 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		goto eof;
 	if (magic != zrow_marker && magic != row_marker) {
 		/**
-		 * There is no marker, possible file corruption,
-		 * stop parsing to avoid skiping significant datas
+		 * There is no marker, possible file is corrupted.
+		 * Stop parsing to avoid skiping significant data.
 		 */
 		tnt_error(XlogError, "%s: invalid marker at %lld",
 			  i->name, i->read_offset);

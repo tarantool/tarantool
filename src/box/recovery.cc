@@ -212,24 +212,52 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	     struct vclock *stop_vclock)
 {
 	struct xrow_header row;
-	/*
-	 * xlog_cursor_next() returns 1 when
-	 * it can not read more rows. This doesn't mean
-	 * the file is fully read: it's fully read only
-	 * when EOF marker has been read, see i.eof_read
-	 */
 	uint64_t row_count = 0;
 	while (true) {
+		/*
+		 * Read the next row from xlog file.
+		 *
+		 * xlog_cursor_next() returns 1 when
+		 * it can not read more rows. This doesn't mean
+		 * the file is fully read: it's fully read only
+		 * when EOF marker has been read, see i.eof_read
+		 */
+		int rc = xlog_cursor_next(&r->cursor, &row);
+		if (rc > 0)
+			break; /* EOF */
+		if (rc < 0) {
+			struct error *e = diag_last_error(diag_get());
+
+			/* Re-throw transient errors (OOM or SystemError) */
+			if (e->type != &type_XlogError)
+				diag_raise();
+
+			/* Handle permanent XlogError */
+			assert(e->type == &type_XlogError);
+			say_error("can't read row: ");
+			error_log(e);
+			if (r->wal_dir.panic_if_error)
+				diag_raise(); /* stop */
+
+			/* Try to skip broken transaction */
+			rc = xlog_cursor_find_tx_magic(&r->cursor);
+			if (rc > 1)
+				break; /* EOF */
+			if (rc < 0)
+				diag_raise(); /* failed to recover, stop */
+			assert(rc == 0);
+			/* recovered from the error, move to the next row */
+			continue;
+		}
+
+		if (stop_vclock != NULL &&
+		    r->vclock.signature >= stop_vclock->signature)
+			return;
+		int64_t current_lsn = vclock_get(&r->vclock, row.server_id);
+		if (row.lsn <= current_lsn)
+			continue; /* already applied, skip */
+
 		try {
-			if (xlog_cursor_next_xc(&r->cursor, &row) > 0)
-				break;
-			if (stop_vclock != NULL &&
-			    r->vclock.signature >= stop_vclock->signature)
-				return;
-			int64_t current_lsn = vclock_get(&r->vclock,
-							 row.server_id);
-			if (row.lsn <= current_lsn)
-				continue;
 			xstream_write(stream, &row);
 			++row_count;
 			if (row_count % 100000 == 0)
@@ -238,21 +266,8 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		} catch (ClientError *e) {
 			say_error("can't apply row: ");
 			e->log();
-			if (r->wal_dir.panic_if_error) {
+			if (r->wal_dir.panic_if_error)
 				throw;
-			}
-		} catch (XlogError *e) {
-			say_error("can't read row: ");
-			e->log();
-			if (r->wal_dir.panic_if_error) {
-				throw;
-			}
-			int rc = xlog_cursor_find_tx_magic(&r->cursor);
-			if (rc == 0)
-				continue;
-			if (rc < 0)
-				diag_raise();
-			break;
 		}
 	}
 }
