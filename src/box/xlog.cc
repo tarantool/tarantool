@@ -1243,14 +1243,12 @@ xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
  * Read the next statement (row) from the current transaction.
  */
 static int
-xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *row)
+xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 {
 	/* Return row from xlog tx buffer */
-	try {
-		xrow_header_decode_xc(row,
-				      (const char **)&i->data_pos,
-				      (const char *)i->data_end);
-	} catch (ClientError *e) {
+	int rc = xrow_header_decode(header, (const char **)&i->data_pos,
+				    (const char *)i->data_end);
+	if (rc != 0) {
 		say_warn("failed to read row");
 		/* Discard remaining row data */
 		i->data_pos = i->data_end;

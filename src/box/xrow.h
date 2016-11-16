@@ -62,10 +62,34 @@ struct xrow_header {
 
 };
 
+/**
+ * Encode xrow into a binary packet
+ *
+ * @param header xrow
+ * @param[out] out iovec to store encoded packet
+ * @param fixheader_len the number of bytes to reserve for fixheader
+ *
+ * @retval > 0 the number of iovector components used (<= XROW_IOVMAX)
+ * @retval -1 on error (check diag)
+ *
+ * @pre out iovec must have space at least for XROW_IOVMAX members
+ * @post retval <= XROW_IOVMAX
+ */
 int
 xrow_header_encode(const struct xrow_header *header,
 		   struct iovec *out, size_t fixheader_len);
 
+/**
+ * Decode xrow from a binary packet
+ *
+ * @param header[out] xrow to fill
+ * @param pos[inout] the start of a packet
+ * @param end the end of a packet
+ *
+ * @retval 0 on success
+ * @retval -1 on error (check diag)
+ * @post *pos == end on success
+ */
 int
 xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
@@ -119,13 +143,15 @@ greeting_encode(char *greetingbuf, uint32_t version_id, const
 int
 greeting_decode(const char *greetingbuf, struct greeting *greeting);
 
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
-static inline void 
-xrow_header_decode_xc(struct xrow_header *header,
-		      const char **pos, const char *end)
+/**
+ * @copydoc xrow_header_decode()
+ */
+static inline void
+xrow_header_decode_xc(struct xrow_header *header, const char **pos,
+		      const char *end)
 {
 	if (xrow_header_decode(header, pos, end) < 0)
 		diag_raise();
@@ -147,6 +173,9 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
 void
 xrow_decode_error(struct xrow_header *row);
 
+/**
+ * @copydoc xrow_header_encode()
+ */
 static inline int
 xrow_header_encode_xc(const struct xrow_header *header,
 		      struct iovec *out, size_t fixheader_len)
