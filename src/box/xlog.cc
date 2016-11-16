@@ -201,8 +201,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 */
 	struct vclock *dup = vclockset_search(&dir->index, &meta->vclock);
 	if (dup != NULL) {
-		tnt_error(XlogError, "%s: invalid xlog order",
-			  cursor.name);
+		tnt_error(XlogError, "%s: invalid xlog order", cursor.name);
 		xlog_cursor_close(&cursor);
 		return -1;
 	}
@@ -231,8 +230,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	const char *filename = xdir_format_filename(dir, signature, NONE);
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) {
-		tnt_error(XlogError, "%s: can't open file",
-			  filename);
+		diag_set(SystemError, "failed to open '%s' file", filename);
 		return -1;
 	}
 	if (xlog_cursor_openfd(cursor, fd, filename) < 0) {
@@ -248,8 +246,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	if (!tt_uuid_is_nil(dir->server_uuid) &&
 	    !tt_uuid_is_equal(dir->server_uuid, &meta->server_uuid)) {
 		xlog_cursor_close(cursor);
-		tnt_error(XlogError, "%s: invalid server UUID",
-			  filename);
+		tnt_error(XlogError, "%s: invalid server UUID", filename);
 		return -1;
 	}
 	/*
@@ -260,8 +257,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	int64_t signature_check = vclock_sum(&meta->vclock);
 	if (signature_check != signature) {
 		xlog_cursor_close(cursor);
-		tnt_error(XlogError, "%s: signature check failed",
-			  filename);
+		tnt_error(XlogError, "%s: signature check failed", filename);
 		return -1;
 	}
 	return 0;
@@ -472,7 +468,9 @@ xlog_rename(struct xlog *l)
 
        if (rename(filename, new_filename) != 0) {
                say_syserror("can't rename %s to %s", filename, new_filename);
-
+	       diag_set(SystemError, "failed to rename '%s' file",
+			filename);
+	       error_log(diag_get());
                return -1;
        }
        l->is_inprogress = false;
@@ -630,8 +628,11 @@ xlog_tx_write_plain(struct xlog *log)
 
 	ssize_t written = fio_writev(log->fd, log->obuf.iov,
 				     log->obuf.pos + 1);
-	if (written < (ssize_t)obuf_size(&log->obuf))
+	if (written < (ssize_t)obuf_size(&log->obuf)) {
+		diag_set(SystemError, "failed to write to '%s' file",
+			 log->name);
 		return -1;
+	}
 	return obuf_size(&log->obuf);
 }
 
@@ -984,15 +985,18 @@ xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
 	to_load += XLOG_READ_AHEAD;
 	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
 	if (dst == NULL) {
-		diag_set(OutOfMemory, to_load,
-			 "slab", "xlog cursor read buffer");
+		diag_set(OutOfMemory, to_load, "runtime",
+			 "xlog cursor read buffer");
 		return -1;
 	}
 	ssize_t readen = fio_read(cursor->fd, dst, to_load);
 	if (readen < 0) {
-		diag_set(SystemError, "can't read file %s", cursor->name);
+		diag_set(SystemError, "failed to read '%s' file",
+			 cursor->name);
 		return -1;
 	}
+	/* ibuf_reserve() has been called above, ibuf_alloc() must not fail */
+	assert((size_t)readen <= to_load);
 	ibuf_alloc(&cursor->rbuf, readen);
 	*data = cursor->rbuf.rpos + buf_delta;
 	readen = MIN(ibuf_used(&cursor->rbuf) - buf_delta, count);
@@ -1120,9 +1124,8 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 	if (!ibuf_capacity(&i->zbuf)) {
 		if (!ibuf_reserve(&i->zbuf,
 				  2 * XLOG_TX_AUTOCOMMIT_THRESHOLD)) {
-			tnt_error(OutOfMemory,
-				  XLOG_TX_AUTOCOMMIT_THRESHOLD,
-				  "slab", "xlog decompression buffer");
+			tnt_error(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
+				  "runtime", "xlog decompression buffer");
 			return -1;
 		}
 	} else {
@@ -1135,9 +1138,9 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 		ZSTD_outBuffer output = {i->zbuf.wpos,
 					 ibuf_unused(&i->zbuf),
 					 0};
-		size_t rc = ZSTD_decompressStream(i->zdctx,
-						  &output,
-						  &input);
+		size_t rc = ZSTD_decompressStream(i->zdctx, &output, &input);
+		/* ibuf_reserve() has been called, alloc() must not fail */
+		assert(output.pos <= ibuf_unused(&i->zbuf));
 		ibuf_alloc(&i->zbuf, output.pos);
 		if (ZSTD_isError(rc)) {
 			tnt_error(XlogError,
@@ -1153,8 +1156,8 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 					  ibuf_capacity(&i->zbuf))){
 				tnt_error(OutOfMemory,
 					  2 * ibuf_capacity(&i->zbuf),
-					  "runtime arena",
-					  "xlog decompression buffer");
+					  "runtime",
+					  "xlog cursor decompression buffer");
 				return -1;
 			}
 			continue;
@@ -1403,8 +1406,7 @@ xlog_cursor_open(struct xlog_cursor *i, const char *name)
 {
 	int fd = open(name, O_RDONLY);
 	if (fd < 0) {
-		tnt_error(XlogError, "%s: can't open file",
-			  name);
+		diag_set(SystemError, "failed to open '%s' file", name);
 		return -1;
 	}
 	int rc = xlog_cursor_openfd(i, fd, name);
@@ -1427,11 +1429,13 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
 	void *dst = ibuf_alloc(&i->rbuf, size);
-	if (dst == NULL)
+	if (dst == NULL) {
+		tnt_error(OutOfMemory, size, "runtime",
+			  "xlog cursor read buffer");
 		goto error;
+	}
 	memcpy(dst, data, size);
-	ibuf_create(&i->zbuf, &cord()->slabc,
-		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	ibuf_create(&i->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	if (xlog_read_meta(i) < 0)
 		goto error;
