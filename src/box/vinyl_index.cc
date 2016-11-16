@@ -380,40 +380,28 @@ VinylIndex::initIterator(struct iterator *ptr,
 	it->part_count = part_count;
 
 	enum vy_order order;
+	ptr->next = vinyl_iterator_next;
 	switch (type) {
 	case ITER_ALL:
 	case ITER_GE:
 		order = VINYL_GE;
-		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_GT:
 		order = VINYL_GT;
-		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LE:
 		order = VINYL_LE;
-		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_LT:
 		order = VINYL_LT;
-		ptr->next = vinyl_iterator_next;
 		break;
 	case ITER_EQ:
-		/* point-lookup iterator (optimization) */
-		if ((key_def->opts.is_unique) &&
-		    (part_count == key_def->part_count)) {
-			ptr->next = vinyl_iterator_next;
-			order = VINYL_EQ;
-		} else {
-			ptr->next = vinyl_iterator_eq;
-			order = VINYL_GE;
-		}
+		order = VINYL_EQ;
 		break;
 	case ITER_REQ:
 		/* point-lookup iterator (optimization) */
 		if ((key_def->opts.is_unique) &&
 		    (part_count == key_def->part_count)) {
-			ptr->next = vinyl_iterator_next;
 			order = VINYL_EQ;
 		} else {
 			ptr->next = vinyl_iterator_eq;

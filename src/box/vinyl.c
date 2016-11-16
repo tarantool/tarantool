@@ -7527,7 +7527,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	/* Restoration is very similar to first search so we'll use that */
 	enum vy_order save_order = itr->order;
 	const struct vy_stmt *save_key = itr->key;
-	if (itr->order == VINYL_GT)
+	if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
 		itr->order = VINYL_GE;
 	else if (itr->order == VINYL_LT)
 		itr->order = VINYL_LE;
@@ -7996,7 +7996,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 */
 		enum vy_order save_order = itr->order;
 		const struct vy_stmt *save_key = itr->key;
-		if (itr->order == VINYL_GT)
+		if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
 			itr->order = VINYL_GE;
 		else if (itr->order == VINYL_LT)
 			itr->order = VINYL_LE;
