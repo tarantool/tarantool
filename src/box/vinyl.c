@@ -1125,7 +1125,7 @@ typedef rb_tree(struct vy_range) vy_range_tree_t;
  * a single read or write in a vy_index.
  */
 struct txv {
-	/** Transaction start logical time - used by conflict manager. */
+	/** Transaction start logical time - unique ID of the transaction. */
 	int64_t tsn;
 	struct vy_index *index;
 	struct vy_stmt *stmt;
@@ -1506,6 +1506,17 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 
 typedef rb_tree(struct vy_tx) tx_tree_t;
 
+static int
+tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
+{
+	int rc = vy_cmp(a->vlsn, b->vlsn);
+	return rc ? rc : vy_cmp(a->tsn, b->tsn);
+}
+
+rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
+       tree_node, tx_tree_cmp);
+
+
 struct tx_manager {
 	tx_tree_t tree;
 	uint32_t count_rd;
@@ -1549,10 +1560,17 @@ txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 			/* the found tx can only be commited as read-only */
 			abort->tx->is_aborted = true;
 			/* Set the read view of the found (now read-only) tx */
-			if (abort->tx->vlsn == INT64_MAX)
+			if (abort->tx->vlsn == INT64_MAX) {
 				abort->tx->vlsn = env->xm->lsn;
-			else
+				tx_tree_insert(&env->xm->tree, abort->tx);
+				if (env->xm->vlsn == INT64_MAX)
+					env->xm->vlsn = abort->tx->vlsn;
+				else
+					assert(env->xm->vlsn <= env->xm->lsn);
+			} else {
 				assert(abort->tx->vlsn <= env->xm->lsn);
+				assert(abort->tx->vlsn >= env->xm->vlsn);
+			}
 		}
 		abort = read_set_next(tree, abort);
 	}
@@ -1615,15 +1633,6 @@ vy_tx_is_ro(struct vy_tx *tx)
 		tx->write_set.rbt_root == &tx->write_set.rbt_nil;
 }
 
-static int
-tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
-{
-	return vy_cmp(a->tsn, b->tsn);
-}
-
-rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
-       tree_node, tx_tree_cmp);
-
 static struct tx_manager *
 tx_manager_new(struct vy_env*);
 
@@ -1643,6 +1652,7 @@ tx_manager_new(struct vy_env *env)
 	m->count_rw = 0;
 	m->tsn = 0;
 	m->lsn = 0;
+	m->vlsn = INT64_MAX;
 	m->env = env;
 	return m;
 }
@@ -1677,11 +1687,13 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	rlist_create(&tx->cursors);
 
 	tx->tsn = ++m->tsn;
-	tx_tree_insert(&m->tree, tx);
 
 	if (type == VINYL_TX_RO) {
 		/* read-only tx obtains read view at once */
 		tx->vlsn = m->lsn;
+		tx_tree_insert(&m->tree, tx);
+		if (m->vlsn == INT64_MAX)
+			m->vlsn = tx->vlsn;
 		m->count_rd++;
 	} else {
 		/* possible read-write tx reads latest changes */
@@ -1711,16 +1723,17 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 static void
 tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 {
-	bool was_oldest = tx == tx_tree_first(&m->tree);
-	tx_tree_remove(&m->tree, tx);
+	if (tx->vlsn != INT64_MAX) {
+		tx_tree_remove(&m->tree, tx);
+		if (tx->vlsn == m->vlsn) {
+			struct vy_tx * oldest = tx_tree_first(&m->tree);
+			m->vlsn = oldest ? oldest->vlsn : INT64_MAX;
+		}
+	}
 	if (tx->type == VINYL_TX_RO)
 		m->count_rd--;
 	else
 		m->count_rw--;
-	if (was_oldest) {
-		struct vy_tx *oldest = tx_tree_first(&m->tree);
-		m->vlsn = oldest ? oldest->vlsn : m->lsn;
-	}
 }
 
 static void
@@ -3979,11 +3992,13 @@ vy_task_dump_complete(struct vy_task *task)
 	if (task->status != 0)
 		goto out;
 
-	run->next = range->run;
-	range->run = run;
-	range->run_count++;
+	if (run != NULL) {
+		run->next = range->run;
+		range->run = run;
+		range->run_count++;
 
-	vy_index_acct_range_dump(index, range);
+		vy_index_acct_range_dump(index, range);
+	}
 
 	/* Release dumped in-memory indexes */
 	struct vy_mem *mem = range->mem->next;
@@ -4600,7 +4615,10 @@ vy_scheduler_f(va_list va)
 			goto wait;
 
 		/* Get a task to schedule. */
-		if (vy_schedule(scheduler, env->xm->vlsn, &task) != 0) {
+		int64_t vlsn = env->xm->vlsn;
+		if (vlsn == INT64_MAX)
+			vlsn = env->xm->lsn;
+		if (vy_schedule(scheduler, vlsn, &task) != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
 			diag_move(diag, &scheduler->diag);
