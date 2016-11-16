@@ -454,27 +454,26 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 static int
 xlog_rename(struct xlog *l)
 {
-       char *filename = l->filename;
-       char new_filename[PATH_MAX];
-       char *suffix = strrchr(filename, '.');
+	char *filename = l->filename;
+	char new_filename[PATH_MAX];
+	char *suffix = strrchr(filename, '.');
 
-       assert(l->is_inprogress);
-       assert(suffix);
-       assert(strcmp(suffix, inprogress_suffix) == 0);
+	assert(l->is_inprogress);
+	assert(suffix);
+	assert(strcmp(suffix, inprogress_suffix) == 0);
 
-       /* Create a new filename without '.inprogress' suffix. */
-       memcpy(new_filename, filename, suffix - filename);
-       new_filename[suffix - filename] = '\0';
+	/* Create a new filename without '.inprogress' suffix. */
+	memcpy(new_filename, filename, suffix - filename);
+	new_filename[suffix - filename] = '\0';
 
-       if (rename(filename, new_filename) != 0) {
-               say_syserror("can't rename %s to %s", filename, new_filename);
-	       diag_set(SystemError, "failed to rename '%s' file",
-			filename);
-	       error_log(diag_get());
-               return -1;
-       }
-       l->is_inprogress = false;
-       return 0;
+	if (rename(filename, new_filename) != 0) {
+		say_syserror("can't rename %s to %s", filename, new_filename);
+		diag_set(SystemError, "failed to rename '%s' file",
+				filename);
+		return -1;
+	}
+	l->is_inprogress = false;
+	return 0;
 }
 
 #define SERVER_UUID_KEY "Server"
@@ -630,7 +629,7 @@ xlog_tx_write_plain(struct xlog *log)
 				     log->obuf.pos + 1);
 	if (written < (ssize_t)obuf_size(&log->obuf)) {
 		diag_set(SystemError, "failed to write to '%s' file",
-			 log->name);
+			 log->filename);
 		return -1;
 	}
 	return obuf_size(&log->obuf);
