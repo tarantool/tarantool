@@ -46,7 +46,25 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { VCLOCK_MAX = 32 };
+enum {
+	/**
+	 * The maximum number of components in vclock
+	 */
+	VCLOCK_MAX = 32,
+
+	/**
+	 * The maximum length of string representation of vclock.
+	 *
+	 * vclock formatted as {<pair>, ..., <pair>} where
+	 *    <pair> is <server_id>: <lsn>,
+	 *    <server_id> is 0..VCLOCK_MAX (2 chars),
+	 *    <lsn> is int64_t (20 chars).
+	 *
+	 * @sa vclock_from_string()
+	 * @sa vclock_to_string()
+	 */
+	VCLOCK_STR_LEN_MAX = 1 + VCLOCK_MAX * (2 + 2 + 20 + 2) + 1
+};
 
 /** Cluster vector clock */
 struct vclock {

@@ -172,6 +172,8 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 
 /* }}} */
 
+/* {{{ xlog meta */
+
 /**
  * A xlog meta info
  */
@@ -195,6 +197,8 @@ struct xlog_meta {
 	 */
 	struct vclock vclock;
 };
+
+/* }}} */
 
 /**
  * A single log file - a snapshot or a write ahead log.
