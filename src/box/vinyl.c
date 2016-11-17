@@ -4614,10 +4614,21 @@ vy_scheduler_f(va_list va)
 		if (workers_available == 0)
 			goto wait;
 
-		/* Get a task to schedule. */
+		/*
+		 * Determine a lowest possible vlsn - the level below which
+		 *  the history could be compacted.
+		 * If there are active read views, it is the xm->vlsn.
+		 * If there is no active read view (xm->vlsn == INT64_MAX),
+		 *  a read view could be created at any moment
+		 *  with vlsn = xm->lsn
+		 * Therefore, minimum of xm->vlsn and xm->lsn must be chosen.
+		 */
+		assert(env->xm->vlsn == INT64_MAX ||
+		       env->xm->vlsn <= env->xm->lsn);
 		int64_t vlsn = env->xm->vlsn;
 		if (vlsn == INT64_MAX)
 			vlsn = env->xm->lsn;
+		/* Get a task to schedule. */
 		if (vy_schedule(scheduler, vlsn, &task) != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
