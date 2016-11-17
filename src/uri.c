@@ -282,6 +282,7 @@ case 146:
 		case 37: goto tr166;
 		case 61: goto tr165;
 		case 95: goto tr165;
+		case 124: goto tr165;
 		case 126: goto tr165;
 	}
 	if ( (*p) < 63 ) {
@@ -301,12 +302,13 @@ st147:
 	if ( ++p == pe )
 		goto _test_eof147;
 case 147:
-#line 305 "src/uri.c"
+#line 306 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st147;
 		case 37: goto st1;
 		case 61: goto st147;
 		case 95: goto st147;
+		case 124: goto st147;
 		case 126: goto st147;
 	}
 	if ( (*p) < 63 ) {
@@ -326,7 +328,7 @@ st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 330 "src/uri.c"
+#line 332 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st147;
 		case 117: goto st2;
@@ -402,7 +404,7 @@ st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 406 "src/uri.c"
+#line 408 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st145;
 		case 117: goto st7;
@@ -505,7 +507,7 @@ st148:
 	if ( ++p == pe )
 		goto _test_eof148;
 case 148:
-#line 509 "src/uri.c"
+#line 511 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -513,6 +515,7 @@ case 148:
 		case 61: goto st148;
 		case 63: goto tr155;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 64 ) {
@@ -726,13 +729,14 @@ st149:
 	if ( ++p == pe )
 		goto _test_eof149;
 case 149:
-#line 730 "src/uri.c"
+#line 733 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr169;
 		case 35: goto tr170;
 		case 37: goto tr171;
 		case 61: goto tr169;
 		case 95: goto tr169;
+		case 124: goto tr169;
 		case 126: goto tr169;
 	}
 	if ( (*p) < 63 ) {
@@ -752,13 +756,14 @@ st150:
 	if ( ++p == pe )
 		goto _test_eof150;
 case 150:
-#line 756 "src/uri.c"
+#line 760 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr172;
 		case 37: goto st16;
 		case 61: goto st150;
 		case 95: goto st150;
+		case 124: goto st150;
 		case 126: goto st150;
 	}
 	if ( (*p) < 63 ) {
@@ -778,7 +783,7 @@ st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 782 "src/uri.c"
+#line 787 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st150;
 		case 117: goto st17;
@@ -863,7 +868,7 @@ st151:
 	if ( ++p == pe )
 		goto _test_eof151;
 case 151:
-#line 867 "src/uri.c"
+#line 872 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr174;
 		case 35: goto tr175;
@@ -896,7 +901,7 @@ st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-#line 900 "src/uri.c"
+#line 905 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 37: goto st22;
@@ -926,7 +931,7 @@ st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-#line 930 "src/uri.c"
+#line 935 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st21;
 		case 117: goto st23;
@@ -1016,7 +1021,7 @@ st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 1020 "src/uri.c"
+#line 1025 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr28;
 		case 37: goto tr29;
@@ -1048,7 +1053,7 @@ st152:
 	if ( ++p == pe )
 		goto _test_eof152;
 case 152:
-#line 1052 "src/uri.c"
+#line 1057 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
@@ -1077,7 +1082,7 @@ st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1081 "src/uri.c"
+#line 1086 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st152;
 		case 117: goto st29;
@@ -1158,7 +1163,7 @@ st153:
 	if ( ++p == pe )
 		goto _test_eof153;
 case 153:
-#line 1162 "src/uri.c"
+#line 1167 "src/uri.c"
 	switch( (*p) ) {
 		case 35: goto tr175;
 		case 47: goto tr177;
@@ -1181,7 +1186,7 @@ st154:
 	if ( ++p == pe )
 		goto _test_eof154;
 case 154:
-#line 1185 "src/uri.c"
+#line 1190 "src/uri.c"
 	switch( (*p) ) {
 		case 35: goto tr186;
 		case 47: goto tr187;
@@ -1198,7 +1203,7 @@ st155:
 	if ( ++p == pe )
 		goto _test_eof155;
 case 155:
-#line 1202 "src/uri.c"
+#line 1207 "src/uri.c"
 	switch( (*p) ) {
 		case 35: goto tr186;
 		case 47: goto tr187;
@@ -1218,12 +1223,13 @@ st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 1222 "src/uri.c"
+#line 1227 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 37: goto st33;
 		case 61: goto st157;
 		case 95: goto st157;
+		case 124: goto st157;
 		case 126: goto st157;
 	}
 	if ( (*p) < 48 ) {
@@ -1247,6 +1253,7 @@ case 157:
 		case 37: goto st33;
 		case 61: goto st157;
 		case 95: goto st157;
+		case 124: goto st157;
 		case 126: goto st157;
 	}
 	if ( (*p) < 64 ) {
@@ -1337,7 +1344,7 @@ st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 1341 "src/uri.c"
+#line 1348 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
@@ -1767,7 +1774,7 @@ st39:
 	if ( ++p == pe )
 		goto _test_eof39;
 case 39:
-#line 1771 "src/uri.c"
+#line 1778 "src/uri.c"
 	if ( (*p) == 58 )
 		goto st43;
 	if ( (*p) > 57 ) {
@@ -2326,7 +2333,7 @@ st173:
 	if ( ++p == pe )
 		goto _test_eof173;
 case 173:
-#line 2330 "src/uri.c"
+#line 2337 "src/uri.c"
 	switch( (*p) ) {
 		case 35: goto tr210;
 		case 47: goto tr211;
@@ -2342,7 +2349,7 @@ st83:
 	if ( ++p == pe )
 		goto _test_eof83;
 case 83:
-#line 2346 "src/uri.c"
+#line 2353 "src/uri.c"
 	switch( (*p) ) {
 		case 58: goto st84;
 		case 93: goto tr52;
@@ -2578,7 +2585,7 @@ st174:
 	if ( ++p == pe )
 		goto _test_eof174;
 case 174:
-#line 2582 "src/uri.c"
+#line 2589 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
@@ -2684,7 +2691,7 @@ st178:
 	if ( ++p == pe )
 		goto _test_eof178;
 case 178:
-#line 2688 "src/uri.c"
+#line 2695 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -2693,6 +2700,7 @@ case 178:
 		case 61: goto st148;
 		case 63: goto tr155;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 64 ) {
@@ -2717,6 +2725,7 @@ case 179:
 		case 61: goto tr219;
 		case 63: goto tr155;
 		case 95: goto tr219;
+		case 124: goto st148;
 		case 126: goto tr219;
 	}
 	if ( (*p) < 64 ) {
@@ -2736,7 +2745,7 @@ st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 2740 "src/uri.c"
+#line 2749 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st180;
 		case 35: goto tr151;
@@ -2746,6 +2755,7 @@ case 180:
 		case 61: goto st180;
 		case 63: goto tr155;
 		case 95: goto st180;
+		case 124: goto st148;
 		case 126: goto st180;
 	}
 	if ( (*p) < 64 ) {
@@ -2765,7 +2775,7 @@ st104:
 	if ( ++p == pe )
 		goto _test_eof104;
 case 104:
-#line 2769 "src/uri.c"
+#line 2779 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st180;
 		case 117: goto st105;
@@ -2843,7 +2853,7 @@ st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 2847 "src/uri.c"
+#line 2857 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st181;
 		case 35: goto tr151;
@@ -2852,6 +2862,7 @@ case 181:
 		case 61: goto st181;
 		case 63: goto tr155;
 		case 95: goto st181;
+		case 124: goto st181;
 		case 126: goto st181;
 	}
 	if ( (*p) < 64 ) {
@@ -2954,7 +2965,7 @@ st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 2958 "src/uri.c"
+#line 2969 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st181;
 		case 35: goto tr210;
@@ -2964,6 +2975,7 @@ case 182:
 		case 61: goto st181;
 		case 63: goto tr213;
 		case 95: goto st181;
+		case 124: goto st181;
 		case 126: goto st181;
 	}
 	if ( (*p) < 64 ) {
@@ -3017,7 +3029,7 @@ st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 3021 "src/uri.c"
+#line 3033 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr210;
@@ -3026,6 +3038,7 @@ case 183:
 		case 61: goto st148;
 		case 63: goto tr213;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 64 ) {
@@ -3047,7 +3060,7 @@ st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 3051 "src/uri.c"
+#line 3064 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 35: goto tr186;
@@ -3082,7 +3095,7 @@ st185:
 	if ( ++p == pe )
 		goto _test_eof185;
 case 185:
-#line 3086 "src/uri.c"
+#line 3099 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 35: goto tr186;
@@ -3112,7 +3125,7 @@ st186:
 	if ( ++p == pe )
 		goto _test_eof186;
 case 186:
-#line 3116 "src/uri.c"
+#line 3129 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st187;
 		case 35: goto tr151;
@@ -3120,6 +3133,7 @@ case 186:
 		case 61: goto st187;
 		case 63: goto tr155;
 		case 95: goto st187;
+		case 124: goto st187;
 		case 126: goto st187;
 	}
 	if ( (*p) < 48 ) {
@@ -3145,6 +3159,7 @@ case 187:
 		case 61: goto st187;
 		case 63: goto tr155;
 		case 95: goto st187;
+		case 124: goto st187;
 		case 126: goto st187;
 	}
 	if ( (*p) < 64 ) {
@@ -3239,7 +3254,7 @@ st188:
 	if ( ++p == pe )
 		goto _test_eof188;
 case 188:
-#line 3243 "src/uri.c"
+#line 3258 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
@@ -3719,7 +3734,7 @@ st205:
 	if ( ++p == pe )
 		goto _test_eof205;
 case 205:
-#line 3723 "src/uri.c"
+#line 3738 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
@@ -3758,7 +3773,7 @@ st206:
 	if ( ++p == pe )
 		goto _test_eof206;
 case 206:
-#line 3762 "src/uri.c"
+#line 3777 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr174;
 		case 35: goto tr175;
@@ -3797,7 +3812,7 @@ st207:
 	if ( ++p == pe )
 		goto _test_eof207;
 case 207:
-#line 3801 "src/uri.c"
+#line 3816 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -3806,6 +3821,7 @@ case 207:
 		case 61: goto st148;
 		case 63: goto tr155;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 64 ) {
@@ -3834,6 +3850,7 @@ case 208:
 		case 91: goto st38;
 		case 95: goto tr251;
 		case 117: goto tr254;
+		case 124: goto st148;
 		case 126: goto tr251;
 	}
 	if ( (*p) < 48 ) {
@@ -3858,7 +3875,7 @@ st209:
 	if ( ++p == pe )
 		goto _test_eof209;
 case 209:
-#line 3862 "src/uri.c"
+#line 3879 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
@@ -3869,6 +3886,7 @@ case 209:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -3890,7 +3908,7 @@ st119:
 	if ( ++p == pe )
 		goto _test_eof119;
 case 119:
-#line 3894 "src/uri.c"
+#line 3912 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st209;
 		case 117: goto st120;
@@ -3975,7 +3993,7 @@ st210:
 	if ( ++p == pe )
 		goto _test_eof210;
 case 210:
-#line 3979 "src/uri.c"
+#line 3997 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr258;
 		case 35: goto tr175;
@@ -3987,6 +4005,7 @@ case 210:
 		case 63: goto tr179;
 		case 64: goto tr261;
 		case 95: goto tr258;
+		case 124: goto st148;
 		case 126: goto tr258;
 	}
 	if ( (*p) < 48 ) {
@@ -4009,7 +4028,7 @@ st211:
 	if ( ++p == pe )
 		goto _test_eof211;
 case 211:
-#line 4013 "src/uri.c"
+#line 4032 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
 		case 35: goto tr151;
@@ -4020,6 +4039,7 @@ case 211:
 		case 63: goto tr155;
 		case 64: goto tr264;
 		case 95: goto st211;
+		case 124: goto st148;
 		case 126: goto st211;
 	}
 	if ( (*p) < 65 ) {
@@ -4039,7 +4059,7 @@ st124:
 	if ( ++p == pe )
 		goto _test_eof124;
 case 124:
-#line 4043 "src/uri.c"
+#line 4063 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st211;
 		case 117: goto st125;
@@ -4129,7 +4149,7 @@ st212:
 	if ( ++p == pe )
 		goto _test_eof212;
 case 212:
-#line 4133 "src/uri.c"
+#line 4153 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr265;
 		case 35: goto tr151;
@@ -4143,6 +4163,7 @@ case 212:
 		case 91: goto st38;
 		case 95: goto tr265;
 		case 117: goto tr268;
+		case 124: goto st148;
 		case 126: goto tr265;
 	}
 	if ( (*p) < 48 ) {
@@ -4165,7 +4186,7 @@ st213:
 	if ( ++p == pe )
 		goto _test_eof213;
 case 213:
-#line 4169 "src/uri.c"
+#line 4190 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
@@ -4176,6 +4197,7 @@ case 213:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4195,7 +4217,7 @@ st129:
 	if ( ++p == pe )
 		goto _test_eof129;
 case 129:
-#line 4199 "src/uri.c"
+#line 4221 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st213;
 		case 117: goto st130;
@@ -4276,7 +4298,7 @@ st214:
 	if ( ++p == pe )
 		goto _test_eof214;
 case 214:
-#line 4280 "src/uri.c"
+#line 4302 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr175;
@@ -4286,6 +4308,7 @@ case 214:
 		case 63: goto tr179;
 		case 64: goto st148;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 58 ) {
@@ -4311,7 +4334,7 @@ st215:
 	if ( ++p == pe )
 		goto _test_eof215;
 case 215:
-#line 4315 "src/uri.c"
+#line 4338 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr186;
@@ -4320,6 +4343,7 @@ case 215:
 		case 61: goto st148;
 		case 63: goto tr189;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 58 ) {
@@ -4345,7 +4369,7 @@ st216:
 	if ( ++p == pe )
 		goto _test_eof216;
 case 216:
-#line 4349 "src/uri.c"
+#line 4373 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr186;
@@ -4355,6 +4379,7 @@ case 216:
 		case 63: goto tr189;
 		case 64: goto st148;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 65 ) {
@@ -4376,7 +4401,7 @@ st217:
 	if ( ++p == pe )
 		goto _test_eof217;
 case 217:
-#line 4380 "src/uri.c"
+#line 4405 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
@@ -4389,6 +4414,7 @@ case 217:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4418,6 +4444,7 @@ case 218:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4448,6 +4475,7 @@ case 219:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4477,6 +4505,7 @@ case 220:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4507,6 +4536,7 @@ case 221:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4536,6 +4566,7 @@ case 222:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4565,6 +4596,7 @@ case 223:
 		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4594,6 +4626,7 @@ case 224:
 		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4622,6 +4655,7 @@ case 225:
 		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4649,6 +4683,7 @@ case 226:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4678,6 +4713,7 @@ case 227:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4705,6 +4741,7 @@ case 228:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4734,6 +4771,7 @@ case 229:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4761,6 +4799,7 @@ case 230:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 48 ) {
@@ -4790,6 +4829,7 @@ case 231:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4809,7 +4849,7 @@ st232:
 	if ( ++p == pe )
 		goto _test_eof232;
 case 232:
-#line 4813 "src/uri.c"
+#line 4853 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
@@ -4821,6 +4861,7 @@ case 232:
 		case 64: goto st148;
 		case 95: goto st213;
 		case 110: goto st233;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4847,6 +4888,7 @@ case 233:
 		case 64: goto st148;
 		case 95: goto st213;
 		case 105: goto st234;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4873,6 +4915,7 @@ case 234:
 		case 64: goto st148;
 		case 95: goto st213;
 		case 120: goto st235;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4898,6 +4941,7 @@ case 235:
 		case 63: goto tr163;
 		case 64: goto st148;
 		case 95: goto st213;
+		case 124: goto st148;
 		case 126: goto st213;
 	}
 	if ( (*p) < 65 ) {
@@ -4919,7 +4963,7 @@ st236:
 	if ( ++p == pe )
 		goto _test_eof236;
 case 236:
-#line 4923 "src/uri.c"
+#line 4967 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
 		case 35: goto tr186;
@@ -4931,6 +4975,7 @@ case 236:
 		case 63: goto tr189;
 		case 64: goto tr264;
 		case 95: goto st211;
+		case 124: goto st148;
 		case 126: goto st211;
 	}
 	if ( (*p) < 48 ) {
@@ -4955,7 +5000,7 @@ st237:
 	if ( ++p == pe )
 		goto _test_eof237;
 case 237:
-#line 4959 "src/uri.c"
+#line 5004 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
 		case 35: goto tr186;
@@ -4966,6 +5011,7 @@ case 237:
 		case 63: goto tr189;
 		case 64: goto tr264;
 		case 95: goto st211;
+		case 124: goto st148;
 		case 126: goto st211;
 	}
 	if ( (*p) < 65 ) {
@@ -4989,7 +5035,7 @@ st238:
 	if ( ++p == pe )
 		goto _test_eof238;
 case 238:
-#line 4993 "src/uri.c"
+#line 5039 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
@@ -5002,6 +5048,7 @@ case 238:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5031,6 +5078,7 @@ case 239:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5061,6 +5109,7 @@ case 240:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5090,6 +5139,7 @@ case 241:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5120,6 +5170,7 @@ case 242:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5149,6 +5200,7 @@ case 243:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5178,6 +5230,7 @@ case 244:
 		case 63: goto tr205;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5207,6 +5260,7 @@ case 245:
 		case 63: goto tr205;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5235,6 +5289,7 @@ case 246:
 		case 63: goto tr205;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5262,6 +5317,7 @@ case 247:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5291,6 +5347,7 @@ case 248:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5318,6 +5375,7 @@ case 249:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5347,6 +5405,7 @@ case 250:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5374,6 +5433,7 @@ case 251:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 48 ) {
@@ -5403,6 +5463,7 @@ case 252:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5424,7 +5485,7 @@ st253:
 	if ( ++p == pe )
 		goto _test_eof253;
 case 253:
-#line 5428 "src/uri.c"
+#line 5489 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
@@ -5436,6 +5497,7 @@ case 253:
 		case 64: goto tr257;
 		case 95: goto st209;
 		case 110: goto st254;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5462,6 +5524,7 @@ case 254:
 		case 64: goto tr257;
 		case 95: goto st209;
 		case 105: goto st255;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5488,6 +5551,7 @@ case 255:
 		case 64: goto tr257;
 		case 95: goto st209;
 		case 120: goto st256;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5513,6 +5577,7 @@ case 256:
 		case 63: goto tr163;
 		case 64: goto tr257;
 		case 95: goto st209;
+		case 124: goto st148;
 		case 126: goto st209;
 	}
 	if ( (*p) < 65 ) {
@@ -5534,7 +5599,7 @@ st257:
 	if ( ++p == pe )
 		goto _test_eof257;
 case 257:
-#line 5538 "src/uri.c"
+#line 5603 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -5543,6 +5608,7 @@ case 257:
 		case 61: goto st148;
 		case 63: goto tr155;
 		case 95: goto st148;
+		case 124: goto st148;
 		case 126: goto st148;
 	}
 	if ( (*p) < 64 ) {
@@ -5567,6 +5633,7 @@ case 258:
 		case 61: goto tr315;
 		case 63: goto tr319;
 		case 95: goto tr315;
+		case 124: goto st148;
 		case 126: goto tr315;
 	}
 	if ( (*p) < 64 ) {
@@ -5586,7 +5653,7 @@ st259:
 	if ( ++p == pe )
 		goto _test_eof259;
 case 259:
-#line 5590 "src/uri.c"
+#line 5657 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st259;
 		case 35: goto tr320;
@@ -5596,6 +5663,7 @@ case 259:
 		case 61: goto st259;
 		case 63: goto tr322;
 		case 95: goto st259;
+		case 124: goto st148;
 		case 126: goto st259;
 	}
 	if ( (*p) < 64 ) {
@@ -5615,7 +5683,7 @@ st134:
 	if ( ++p == pe )
 		goto _test_eof134;
 case 134:
-#line 5619 "src/uri.c"
+#line 5687 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st259;
 		case 117: goto st135;
@@ -5693,7 +5761,7 @@ st260:
 	if ( ++p == pe )
 		goto _test_eof260;
 case 260:
-#line 5697 "src/uri.c"
+#line 5765 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st260;
 		case 35: goto tr320;
@@ -5702,6 +5770,7 @@ case 260:
 		case 61: goto st260;
 		case 63: goto tr322;
 		case 95: goto st260;
+		case 124: goto st260;
 		case 126: goto st260;
 	}
 	if ( (*p) < 64 ) {
@@ -5804,7 +5873,7 @@ st261:
 	if ( ++p == pe )
 		goto _test_eof261;
 case 261:
-#line 5808 "src/uri.c"
+#line 5877 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st260;
 		case 35: goto tr325;
@@ -5814,6 +5883,7 @@ case 261:
 		case 61: goto st260;
 		case 63: goto tr327;
 		case 95: goto st260;
+		case 124: goto st260;
 		case 126: goto st260;
 	}
 	if ( (*p) < 64 ) {
@@ -5837,7 +5907,7 @@ st262:
 	if ( ++p == pe )
 		goto _test_eof262;
 case 262:
-#line 5841 "src/uri.c"
+#line 5911 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
@@ -6494,7 +6564,7 @@ case 265:
 #line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
-#line 6498 "src/uri.c"
+#line 6568 "src/uri.c"
 	}
 	}
 
