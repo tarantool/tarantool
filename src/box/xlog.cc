@@ -57,8 +57,6 @@ static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte ord
 static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
 static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 static const char inprogress_suffix[] = ".inprogress";
-static const char v13[] = "0.13";
-static const char v12[] = "0.12";
 
 enum {
 	/**
@@ -117,6 +115,167 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 	free(s_from);
 	free(s_to);
 }
+
+/* {{{ struct xlog_meta */
+
+enum {
+	/*
+	 * The maximum length of xlog meta
+	 *
+	 * @sa xlog_meta_parse()
+	 */
+	XLOG_META_LEN_MAX = 1024 + VCLOCK_STR_LEN_MAX
+};
+
+#define SERVER_UUID_KEY "Server"
+#define VCLOCK_KEY "VClock"
+
+static const char v13[] = "0.13";
+static const char v12[] = "0.12";
+
+/**
+ * Format xlog metadata into @a buf of size @a size
+ *
+ * @param buf buffer to use.
+ * @param size the size of buffer. This function write at most @a size bytes.
+ * @retval < size the number of characters printed (excluding the null byte)
+ * @retval >=size the number of characters (excluding the null byte),
+ *                which would have been written to the final string if
+ *                enough space had been available.
+ * @retval -1 - error
+ * @sa snprintf()
+ */
+static int
+xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
+{
+	char *vstr = vclock_to_string(&meta->vclock);
+	char *server_uuid = tt_uuid_str(&meta->server_uuid);
+	int total = snprintf(buf, size, "%s\n%s\n" SERVER_UUID_KEY ": "
+		"%s\n" VCLOCK_KEY ": %s\n\n",
+		 meta->filetype, v13, server_uuid, vstr);
+	free(vstr);
+	return total;
+}
+
+/**
+ * Parse xlog meta from buffer, update buffer read
+ * position in case of success
+ *
+ * @retval 0 for success
+ * @retval -1 for parse error
+ * @retval 1 if buffer hasn't enough data
+ */
+static ssize_t
+xlog_meta_parse(struct xlog_meta *meta, const char **data,
+		const char *data_end)
+{
+	memset(meta, 0, sizeof(*meta));
+	const char *end = (const char *)memmem(*data, data_end - *data,
+					       "\n\n", 2);
+	if (end == NULL)
+		return 1;
+	++end; /* include the trailing \n to simplify the checks */
+	const char *pos = (const char *)*data;
+
+	/*
+	 * Parse filetype, i.e "SNAP" or "XLOG"
+	 */
+	const char *eol = (const char *)memchr(pos, '\n', end - pos);
+	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(meta->filetype)) {
+		tnt_error(XlogError, "failed to parse xlog type string");
+		return -1;
+	}
+	memcpy(meta->filetype, pos, eol - pos);
+	meta->filetype[eol - pos] = '\0';
+	pos = eol + 1;
+	assert(pos <= end);
+
+	/*
+	 * Parse version string, i.e. "0.12" or "0.13"
+	 */
+	eol = (const char *)memchr(pos, '\n', end - pos);
+	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(meta->version)) {
+		tnt_error(XlogError, "failed to parse xlog version string");
+		return -1;
+	}
+	memcpy(meta->version, pos, eol - pos);
+	meta->version[eol - pos] = '\0';
+	pos = eol + 1;
+	assert(pos <= end);
+	if (strncmp(meta->version, v12, sizeof(v12)) != 0 &&
+	    strncmp(meta->version, v13, sizeof(v13)) != 0) {
+		tnt_error(XlogError,
+			  "unsupported file format version %s",
+			  meta->version);
+		return -1;
+	}
+
+	/*
+	 * Parse "key: value" pairs
+	 */
+	while (pos < end) {
+		eol = (const char *)memchr(pos, '\n', end - pos);
+		assert(eol <= end);
+		const char *key = pos;
+		const char *key_end = (const char *)
+			memchr(key, ':', eol - key);
+		if (key_end == NULL) {
+			tnt_error(XlogError, "can't extract meta value");
+			return -1;
+		}
+		const char *val = key_end + 1;
+		/* Skip space after colon */
+		while (*val == ' ' || *val == '\t')
+			++val;
+		const char *val_end = eol;
+		assert(val <= val_end);
+		pos = eol + 1;
+
+		if (memcmp(key, SERVER_UUID_KEY, key_end - key) == 0) {
+			/*
+			 * Server: <uuid>
+			 */
+			if (val_end - val != UUID_STR_LEN) {
+				tnt_error(XlogError, "can't parse node UUID");
+				return -1;
+			}
+			char uuid[UUID_STR_LEN + 1];
+			memcpy(uuid, val, UUID_STR_LEN);
+			uuid[UUID_STR_LEN] = '\0';
+			if (tt_uuid_from_string(uuid, &meta->server_uuid) != 0) {
+				tnt_error(XlogError, "can't parse node UUID");
+				return -1;
+			}
+		} else if (memcmp(key, VCLOCK_KEY, key_end - key) == 0){
+			/*
+			 * VClock: <vclock>
+			 */
+			if (val_end - val > VCLOCK_STR_LEN_MAX) {
+				tnt_error(XlogError, "can't parse vclock");
+				return -1;
+			}
+			char vclock[VCLOCK_STR_LEN_MAX + 1];
+			memcpy(vclock, val, val_end - val);
+			vclock[val_end - val] = '\0';
+			size_t off = vclock_from_string(&meta->vclock, vclock);
+			if (off != 0) {
+				tnt_error(XlogError, "invalid vclock at "
+					  "offset %zd", off);
+				return -1;
+			}
+		} else {
+			/*
+			 * Unknown key
+			 */
+			say_warn("Unknown meta item: `%.*s'", key_end - key,
+				 key);
+		}
+	}
+	*data = end + 1; /* skip the last trailing \n of \n\n sequence */
+	return 0;
+}
+
+/* struct xlog }}} */
 
 /* {{{ struct xdir */
 
@@ -474,42 +633,6 @@ xlog_rename(struct xlog *l)
 	}
 	l->is_inprogress = false;
 	return 0;
-}
-
-enum {
-	/*
-	 * The maximum length of xlog meta
-	 *
-	 * @sa xlog_meta_parse()
-	 */
-	XLOG_META_LEN_MAX = 1024 + VCLOCK_STR_LEN_MAX
-};
-
-#define SERVER_UUID_KEY "Server"
-#define VCLOCK_KEY "VClock"
-
-/**
- * Format xlog metadata into @a buf of size @a size
- *
- * @param buf buffer to use.
- * @param size the size of buffer. This function write at most @a size bytes.
- * @retval < size the number of characters printed (excluding the null byte)
- * @retval >=size the number of characters (excluding the null byte),
- *                which would have been written to the final string if
- *                enough space had been available.
- * @retval -1 - error
- * @sa snprintf()
- */
-static int
-xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
-{
-	char *vstr = vclock_to_string(&meta->vclock);
-	char *server_uuid = tt_uuid_str(&meta->server_uuid);
-	int total = snprintf(buf, size, "%s\n%s\n" SERVER_UUID_KEY ": "
-		"%s\n" VCLOCK_KEY ": %s\n\n",
-		 meta->filetype, v13, server_uuid, vstr);
-	free(vstr);
-	return total;
 }
 
 /**
@@ -1040,124 +1163,6 @@ xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
 }
 
 /**
- * Parse xlog meta from buffer, update buffer read
- * position in case of success
- *
- * @retval 0 for success
- * @retval -1 for parse error
- * @retval 1 if buffer hasn't enough data
- */
-static ssize_t
-xlog_meta_parse(struct xlog_meta *meta, const char **data,
-		const char *data_end)
-{
-	memset(meta, 0, sizeof(*meta));
-	const char *end = (const char *)memmem(*data, data_end - *data,
-					       "\n\n", 2);
-	if (end == NULL)
-		return 1;
-	++end; /* include the trailing \n to simplify the checks */
-	const char *pos = (const char *)*data;
-
-	/*
-	 * Parse filetype, i.e "SNAP" or "XLOG"
-	 */
-	const char *eol = (const char *)memchr(pos, '\n', end - pos);
-	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(meta->filetype)) {
-		tnt_error(XlogError, "failed to parse xlog type string");
-		return -1;
-	}
-	memcpy(meta->filetype, pos, eol - pos);
-	meta->filetype[eol - pos] = '\0';
-	pos = eol + 1;
-	assert(pos <= end);
-
-	/*
-	 * Parse version string, i.e. "0.12" or "0.13"
-	 */
-	eol = (const char *)memchr(pos, '\n', end - pos);
-	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(meta->version)) {
-		tnt_error(XlogError, "failed to parse xlog version string");
-		return -1;
-	}
-	memcpy(meta->version, pos, eol - pos);
-	meta->version[eol - pos] = '\0';
-	pos = eol + 1;
-	assert(pos <= end);
-	if (strncmp(meta->version, v12, sizeof(v12)) != 0 &&
-	    strncmp(meta->version, v13, sizeof(v13)) != 0) {
-		tnt_error(XlogError,
-			  "unsupported file format version %s",
-			  meta->version);
-		return -1;
-	}
-
-	/*
-	 * Parse "key: value" pairs
-	 */
-	while (pos < end) {
-		eol = (const char *)memchr(pos, '\n', end - pos);
-		assert(eol <= end);
-		const char *key = pos;
-		const char *key_end = (const char *)
-			memchr(key, ':', eol - key);
-		if (key_end == NULL) {
-			tnt_error(XlogError, "can't extract meta value");
-			return -1;
-		}
-		const char *val = key_end + 1;
-		/* Skip space after colon */
-		while (*val == ' ' || *val == '\t')
-			++val;
-		const char *val_end = eol;
-		assert(val <= val_end);
-		pos = eol + 1;
-
-		if (memcmp(key, SERVER_UUID_KEY, key_end - key) == 0) {
-			/*
-			 * Server: <uuid>
-			 */
-			if (val_end - val != UUID_STR_LEN) {
-				tnt_error(XlogError, "can't parse node UUID");
-				return -1;
-			}
-			char uuid[UUID_STR_LEN + 1];
-			memcpy(uuid, val, UUID_STR_LEN);
-			uuid[UUID_STR_LEN] = '\0';
-			if (tt_uuid_from_string(uuid, &meta->server_uuid) != 0) {
-				tnt_error(XlogError, "can't parse node UUID");
-				return -1;
-			}
-		} else if (memcmp(key, VCLOCK_KEY, key_end - key) == 0){
-			/*
-			 * VClock: <vclock>
-			 */
-			if (val_end - val > VCLOCK_STR_LEN_MAX) {
-				tnt_error(XlogError, "can't parse vclock");
-				return -1;
-			}
-			char vclock[VCLOCK_STR_LEN_MAX + 1];
-			memcpy(vclock, val, val_end - val);
-			vclock[val_end - val] = '\0';
-			size_t off = vclock_from_string(&meta->vclock, vclock);
-			if (off != 0) {
-				tnt_error(XlogError, "invalid vclock at "
-					  "offset %zd", off);
-				return -1;
-			}
-		} else {
-			/*
-			 * Unknown key
-			 */
-			say_warn("Unknown meta item: `%.*s'", key_end - key,
-				 key);
-		}
-	}
-	*data = end + 1; /* skip the last trailing \n of \n\n sequence */
-	return 0;
-}
-
-/**
  * Decompress zstd-compressed buf into cursor row block
  */
 static int
@@ -1534,4 +1539,3 @@ xlog_cursor_close(struct xlog_cursor *i)
 }
 
 /* }}} */
-
