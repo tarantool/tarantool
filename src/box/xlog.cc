@@ -1216,77 +1216,125 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 }
 
 /**
+ * xlog fixheader struct
+ */
+struct xlog_fixheader {
+	/**
+	 * xlog tx magic, row_marker for plain xrows
+	 * or zrow_marker for compressed.
+	 */
+	log_magic_t magic;
+	/**
+	 * crc32 for the previous xlog tx, not used now
+	 */
+	uint32_t crc32p;
+	/**
+	 * crc32 for current xlog tx
+	 */
+	uint32_t crc32c;
+	/**
+	 * xlog tx data length excluding fixheader
+	 */
+	uint32_t len;
+};
+
+/**
+ * Parse xlog tx header, set up magic, crc32c and len
+ *
+ * @retval 0 for success
+ * @retval -1 for error
+ * @retval count of bytes left to parse header
+ */
+static ssize_t
+xlog_fixheader_decode(struct xlog_fixheader *fixheader,
+		   const char **data, const char *data_end)
+{
+	if (data_end - *data < XLOG_FIXHEADER_SIZE)
+		return XLOG_FIXHEADER_SIZE - (data_end - *data);
+	const char *pos = *data;
+
+	if (*(log_magic_t *)pos != row_marker &&
+	    *(log_magic_t *)pos != zrow_marker) {
+		return -1;
+	}
+	fixheader->magic = *(log_magic_t *)pos;
+	pos += sizeof(log_magic_t);
+
+	/* Decode len, previous crc32 and row crc32 */
+	if (mp_check(&pos,
+		     pos + XLOG_FIXHEADER_SIZE - sizeof(log_magic_t)) != 0) {
+		return -1;
+	}
+	pos = *data + sizeof(log_magic_t);
+
+	/* Read length */
+	if (mp_typeof(*pos) != MP_UINT)
+		return -1;
+	fixheader->len = mp_decode_uint(&pos);
+
+	/* Read previous crc32 */
+	if (mp_typeof(*pos) != MP_UINT)
+		return -1;
+
+	/* Read current crc32 */
+	fixheader->crc32p = mp_decode_uint(&pos);
+	if (mp_typeof(*pos) != MP_UINT)
+		return -1;
+	fixheader->crc32c = mp_decode_uint(&pos);
+	assert(pos <= *data + XLOG_FIXHEADER_SIZE);
+	*data += XLOG_FIXHEADER_SIZE;
+	return 0;
+}
+
+/**
  * @retval -1 error
  * @retval 0 success
  * @retval 1 EOF
  */
 static int
-xlog_cursor_read_tx(struct xlog_cursor *i, log_magic_t magic)
+xlog_cursor_read_tx(struct xlog_cursor *i)
 {
-	ssize_t header_size = XLOG_FIXHEADER_SIZE - sizeof(log_magic_t);
-	char *fixheader;
-	ssize_t loaded = xlog_cursor_load(i, header_size, &fixheader);
+	char *data;
+	ssize_t loaded = xlog_cursor_load(i, XLOG_FIXHEADER_SIZE, &data);
 	if (loaded < 0)
 		return -1;
-	if (loaded < header_size)
+	if (loaded < XLOG_FIXHEADER_SIZE)
 		return 1;
 
-	const char *data = fixheader;
-
-	/* Decode len, previous crc32 and row crc32 */
-	if (mp_check(&data, data + header_size) != 0) {
-	error:
-		tnt_error(XlogError, "%s: failed to parse tx "
-			  "header at offset %" PRIu64, i->name,
-			  (uint64_t)i->search_offset);
+	struct xlog_fixheader fixheader;
+	if (xlog_fixheader_decode(&fixheader, (const char **)&data,
+				  (const char *)data + XLOG_FIXHEADER_SIZE) < 0) {
+		tnt_error(XlogError, "%s: can't parse xlog header at %lld",
+			  i->name, i->search_offset);
 		return -1;
 	}
-	data = fixheader;
-
-	/* Read length */
-	if (mp_typeof(*data) != MP_UINT)
-		goto error;
-	uint32_t len = mp_decode_uint(&data);
-	if (len > IPROTO_BODY_LEN_MAX) {
-		tnt_error(XlogError,
-			 "%s: row is too big at offset %" PRIu64,
-			 i->name, (uint64_t)i->search_offset);
+	if (fixheader.len > IPROTO_BODY_LEN_MAX) {
+		tnt_error(XlogError, "%s: tx is too big at %lld",
+			  i->name, i->search_offset);
 		return -1;
 	}
 
-	/* Read previous crc32 */
-	if (mp_typeof(*data) != MP_UINT)
-		goto error;
-
-	/* Read current crc32 */
-	uint32_t crc32p = mp_decode_uint(&data);
-	if (mp_typeof(*data) != MP_UINT)
-		goto error;
-	uint32_t crc32c = mp_decode_uint(&data);
-	assert(data <= fixheader + header_size);
-	(void) crc32p;
-
-	loaded = xlog_cursor_load(i, len, &i->data_pos);
+	loaded = xlog_cursor_load(i, fixheader.len, &i->data_pos);
 	if (loaded < 0)
 		return -1;
-	if (loaded < len)
+	if (loaded < fixheader.len)
 		return 1;
-	i->data_end = i->data_pos + len;
+	i->data_end = i->data_pos + fixheader.len;
 
 	/* Validate checksum */
-	if (crc32_calc(0, i->data_pos, len) != crc32c) {
+	if (crc32_calc(0, i->data_pos, fixheader.len) != fixheader.crc32c) {
 		if (i->ignore_crc == false) {
 			tnt_error(XlogError,
 				  "%s: row block checksum"
 				  " mismatch (expected %u) at offset %"
 				  PRIu64,
-				  i->name, (unsigned) crc32c,
+				  i->name, (unsigned)fixheader.crc32c,
 				  (uint64_t)i->search_offset);
 			return -1;
 		}
 	}
 
-	if (magic == zrow_marker)
+	if (fixheader.magic == zrow_marker)
 		return xlog_cursor_decompress(i);
 
 	return 0;
@@ -1381,33 +1429,23 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	i->read_offset = i->search_offset;
 	xlog_cursor_consume(i, i->read_offset - i->buf_offset);
 
+	off_t marker_offset;
+	marker_offset = i->read_offset;
+	/* Check eof */
 	log_magic_t *magic_ptr;
 	rc = xlog_cursor_load(i, sizeof(log_magic_t), (char **)&magic_ptr);
-	if (rc < 0) {
-		/**
-		 * error by readin byte at read_offset,
-		 * restart search from next position
-		 */
-		i->search_offset = i->read_offset + 1;
+	if (rc < 0)
 		return -1;
-	} else if (rc < (int)sizeof(log_magic_t)) {
+	i->read_offset = marker_offset;
+	if (rc < (ssize_t)sizeof(log_magic_t))
 		goto eof;
-	}
 	magic = *magic_ptr;
-	if (magic == eof_marker)
+	/* return to magic offset*/
+	if (magic == eof_marker) {
+		i->eof_read = true;
 		goto eof;
-	if (magic != zrow_marker && magic != row_marker) {
-		/**
-		 * There is no marker, possible file is corrupted.
-		 * Stop parsing to avoid skiping significant data.
-		 */
-		tnt_error(XlogError, "%s: invalid marker at %lld",
-			  i->name, i->read_offset);
-		return -1;
 	}
-	off_t marker_offset;
-	marker_offset = i->read_offset - sizeof(magic);
-	rc = xlog_cursor_read_tx(i, magic);
+	rc = xlog_cursor_read_tx(i);
 	if (rc > 0) {
 		/** eof, go back to marker and retry later */
 		i->search_offset = marker_offset;
@@ -1429,11 +1467,10 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 
 	return xlog_cursor_next_row(i, row);
 eof:
-	i->eof_read = (magic == eof_marker);
 	char *some_char;
 	if (i->eof_read &&
 	    xlog_cursor_load(i, sizeof(log_magic_t) + sizeof(char),
-			     &some_char) > 0) {
+			     &some_char) > (ssize_t)sizeof(log_magic_t)) {
 		tnt_error(XlogError, "%s: has some data after eof "
 			  "marker at %lld", i->name, i->read_offset);
 		return -1;
