@@ -11,25 +11,25 @@ local function test_parse(test)
     local u
 
     u = uri.parse("scheme://login:password@host:service"..
-        "/path1/path2/path3?q1=v1&q2=v2#fragment")
+        "/path1/path2/path3?q1=v1&q2=v2&q3=v3:1|v3:2#fragment")
     test:is(u.scheme, "scheme", "scheme")
     test:is(u.login, "login", "login")
     test:is(u.password, "password", "password")
     test:is(u.host, "host", "host")
     test:is(u.service, "service", "service")
     test:is(u.path, "/path1/path2/path3", "path")
-    test:is(u.query, "q1=v1&q2=v2", "query")
+    test:is(u.query, "q1=v1&q2=v2&q3=v3:1|v3:2", "query")
     test:is(u.fragment, "fragment", "fragment")
 
     u = uri.parse("scheme://login:@host:service"..
-        "/path1/path2/path3?q1=v1&q2=v2#fragment")
+        "/path1/path2/path3?q1=v1&q2=v2&q3=v3:1|v3:2#fragment")
     test:is(u.scheme, "scheme", "scheme")
     test:is(u.login, "login", "login")
     test:is(u.password, "", "password")
     test:is(u.host, "host", "host")
     test:is(u.service, "service", "service")
     test:is(u.path, "/path1/path2/path3", "path")
-    test:is(u.query, "q1=v1&q2=v2", "query")
+    test:is(u.query, "q1=v1&q2=v2&q3=v3:1|v3:2", "query")
     test:is(u.fragment, "fragment", "fragment")
 
     u = uri.parse('login@host')

@@ -64,7 +64,7 @@ uri_parse(struct uri *uri, const char *p)
 				   | ("%u" xdigit xdigit xdigit xdigit));
 
 		pchar_nc = unreserved | pct_encoded | sub_delims | "@";
-		pchar = pchar_nc | ":";
+		pchar = pchar_nc | ":" | "|";
 
 		query = (pchar | "/" | "?")*
 			>{ s = p; }
