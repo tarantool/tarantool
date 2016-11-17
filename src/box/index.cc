@@ -176,9 +176,12 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /* {{{ Index -- base class for all indexes. ********************/
 
 Index::Index(struct key_def *key_def_arg)
-	:key_def(key_def_dup(key_def_arg)),
-	sc_version(::sc_version)
-{}
+	:key_def(NULL), sc_version(::sc_version)
+{
+	key_def = key_def_dup(key_def_arg);
+	if (key_def == NULL)
+		diag_raise();
+}
 
 Index::~Index()
 {

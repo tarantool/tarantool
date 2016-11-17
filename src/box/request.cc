@@ -202,6 +202,8 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	Index *primary = index_find(space, 0);
 	uint32_t key_len;
 	char *key = tuple_extract_key(found_tuple, primary->key_def, &key_len);
+	if (key == NULL)
+		diag_raise();
 	request->key = key;
 	request->key_end = key + key_len;
 	request->index_id = 0;

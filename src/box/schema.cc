@@ -260,6 +260,8 @@ schema_init()
 					      TREE /* index type */,
 					      &opts,
 					      1); /* part count */
+	if (key_def == NULL)
+		diag_raise();
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
 	(void) sc_space_new(&def, key_def, &on_replace_schema);
@@ -306,6 +308,8 @@ schema_init()
 			      TREE /* index type */,
 			      &opts,
 			      2); /* part count */
+	if (key_def == NULL)
+		diag_raise();
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);

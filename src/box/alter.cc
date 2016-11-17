@@ -449,6 +449,8 @@ key_def_new_from_tuple(struct tuple *tuple)
 	}
 
 	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
+	if (key_def == NULL)
+		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
 
 	if (is_166plus) {

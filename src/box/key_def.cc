@@ -156,7 +156,7 @@ key_def_set_cmp(struct key_def *def)
 
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, struct key_opts *opts,
+	    enum index_type type, const struct key_opts *opts,
 	    uint32_t part_count)
 {
 	size_t sz = key_def_sizeof(part_count);
@@ -166,19 +166,22 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	 */
 	struct key_def *def = (struct key_def *) calloc(1, sz);
 	if (def == NULL) {
-		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
+		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		return NULL;
 	}
 	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
 		struct space *space = space_cache_find(space_id);
-		tnt_raise(LoggedError, ER_MODIFY_INDEX,
-			  name, space_name(space),
-			  "index name is too long");
+		diag_set(ClientError, ER_MODIFY_INDEX, name, space_name(space),
+			 "index name is too long");
+		error_log(diag_last_error(diag_get()));
+		return NULL;
 	}
 	if (!identifier_is_valid(def->name)) {
-		auto scoped_guard = make_scoped_guard([=] { free(def); });
-		tnt_raise(ClientError, ER_IDENTIFIER, def->name);
+		diag_set(ClientError, ER_IDENTIFIER, def->name);
+		free(def);
+		return NULL;
 	}
 	def->type = type;
 	def->space_id = space_id;
@@ -189,7 +192,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 }
 
 struct key_def *
-key_def_dup(struct key_def *def)
+key_def_dup(const struct key_def *def)
 {
 	size_t sz = key_def_sizeof(def->part_count);
 	struct key_def *dup = (struct key_def *) malloc(sz);
@@ -199,15 +202,6 @@ key_def_dup(struct key_def *def)
 	}
 	memcpy(dup, def, key_def_sizeof(def->part_count));
 	rlist_create(&dup->link);
-	return dup;
-}
-
-struct key_def *
-key_def_dup_xc(struct key_def *def)
-{
-	struct key_def *dup = key_def_dup(def);
-	if (dup == NULL)
-		diag_raise();
 	return dup;
 }
 
@@ -343,11 +337,11 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		key_def_set_cmp(def);
 }
 
-struct key_part *
-key_def_find(struct key_def *key_def, uint32_t fieldno)
+const struct key_part *
+key_def_find(const struct key_def *key_def, uint32_t fieldno)
 {
-	struct key_part *part = key_def->parts;
-	struct key_part *end = part + key_def->part_count;
+	const struct key_part *part = key_def->parts;
+	const struct key_part *end = part + key_def->part_count;
 	for (; part != end; part++) {
 		if (part->fieldno == fieldno)
 			return part;
@@ -356,15 +350,15 @@ key_def_find(struct key_def *key_def, uint32_t fieldno)
 }
 
 struct key_def *
-key_def_merge(struct key_def *first, struct key_def *second)
+key_def_merge(const struct key_def *first, const struct key_def *second)
 {
 	uint32_t new_part_count = first->part_count + second->part_count;
 	/*
 	 * Find and remove part duplicates, i.e. parts counted
 	 * twice since they are present in both key defs.
 	 */
-	struct key_part *part = second->parts;
-	struct key_part *end = part + second->part_count;
+	const struct key_part *part = second->parts;
+	const struct key_part *end = part + second->part_count;
 	for (; part != end; part++) {
 		if (key_def_find(first, part->fieldno))
 			--new_part_count;
@@ -372,8 +366,9 @@ key_def_merge(struct key_def *first, struct key_def *second)
 
 	struct key_def *new_def;
 	new_def =  key_def_new(first->space_id, first->iid, first->name,
-			      first->type, &first->opts, new_part_count);
-
+			       first->type, &first->opts, new_part_count);
+	if (new_def == NULL)
+		return NULL;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
 	/* Append first key def's parts to the new key_def. */
@@ -394,8 +389,8 @@ key_def_merge(struct key_def *first, struct key_def *second)
 }
 
 struct key_def *
-key_def_build_secondary_to_primary(struct key_def *primary,
-				   struct key_def *secondary)
+key_def_build_secondary_to_primary(const struct key_def *primary,
+				   const struct key_def *secondary)
 {
 	/*
 	 * Find the order in which keys parts from primary and
@@ -403,15 +398,20 @@ key_def_build_secondary_to_primary(struct key_def *primary,
 	 * index tuple.
 	 */
 	struct key_def *merge = key_def_merge(secondary, primary);
-	auto scoped_guard = make_scoped_guard([=] { key_def_delete(merge); });
+	if (merge == NULL)
+		return NULL;
 
 	struct key_def *def;
 	def = key_def_new(secondary->space_id, secondary->iid,
 			  secondary->name, secondary->type,
 			  &secondary->opts, primary->part_count);
+	if (def == NULL) {
+		key_def_delete(merge);
+		return NULL;
+	}
 	/** Use the order to set parts in the result. */
 	for (uint32_t i = 0; i < primary->part_count; ++i) {
-		struct key_part *part;
+		const struct key_part *part;
 		part = key_def_find(merge, primary->parts[i].fieldno);
 		assert(part);
 		key_def_set_part(def, i, part - merge->parts, part->type);
@@ -420,9 +420,12 @@ key_def_build_secondary_to_primary(struct key_def *primary,
 }
 
 struct key_def *
-key_def_build_secondary(struct key_def *primary, struct key_def *secondary)
+key_def_build_secondary(const struct key_def *primary,
+			const struct key_def *secondary)
 {
 	struct key_def *merge = key_def_merge(secondary, primary);
+	if (merge == NULL)
+		return NULL;
 	/*
 	 * Renumber key parts, since they are stored consequently
 	 * in the secondary index.

@@ -373,6 +373,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
 						key_def, NULL);
+	if (key == NULL)
+		diag_raise();
 	/* Cut array header */
 	mp_decode_array(&key);
 

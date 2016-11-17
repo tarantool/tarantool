@@ -229,7 +229,7 @@ struct key_def {
 };
 
 struct key_def *
-key_def_dup(struct key_def *def);
+key_def_dup(const struct key_def *def);
 
 /* Destroy and free a key_def. */
 void
@@ -355,23 +355,21 @@ typedef struct box_function_ctx box_function_ctx_t;
 typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 static inline size_t
 key_def_sizeof(uint32_t part_count)
 {
 	return sizeof(struct key_def) + sizeof(struct key_part) * (part_count + 1);
 }
 
-/** Initialize a pre-allocated key_def. */
+/**
+ * Allocate a new key definition.
+ * @retval not NULL Success.
+ * @retval NULL     Memory error.
+ */
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, struct key_opts *opts,
+	    enum index_type type, const struct key_opts *opts,
 	    uint32_t part_count);
-
-struct key_def *
-key_def_dup(struct key_def *def);
 
 /**
  * Copy one key def into another, preserving the membership
@@ -402,19 +400,19 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
  * Returns the part in key_def->parts for the specified fieldno.
  * If fieldno is not in key_def->parts returns NULL.
  */
-struct key_part *
-key_def_find(struct key_def *key_def, uint32_t fieldno);
+const struct key_part *
+key_def_find(const struct key_def *key_def, uint32_t fieldno);
 
 /**
  * Allocate a new key_def with a set union of key parts from
  * first and second key defs. Parts of the new key_def consist
  * of the first key_def's parts and those parts of the second
  * key_def that were not among the first parts.
- *
- * @throws OutOfMemory
+ * @retval not NULL Ok.
+ * @retval NULL     Memory error.
  */
 struct key_def *
-key_def_merge(struct key_def *first, struct key_def *second);
+key_def_merge(const struct key_def *first, const struct key_def *second);
 
 /**
  * Create a key_def to fetch primary key parts from the tuple
@@ -440,23 +438,29 @@ key_def_merge(struct key_def *first, struct key_def *second);
  * @param primary the definition of the primary key
  * @param secondary the definition of the secondary key
  *
- * @sa usage in vinyl_index.cc
+ * @retval not NULL Ok.
+ * @retval NULL     Memory error.
  *
- * @throws OutOfMemory
+ * @sa usage in vinyl_index.cc
  */
 struct key_def *
-key_def_build_secondary_to_primary(struct key_def *primary,
-				   struct key_def *secondary);
+key_def_build_secondary_to_primary(const struct key_def *primary,
+				   const struct key_def *secondary);
 
 /**
  * Create a key def with a set union of primary and secondary
  * keys, used to compare such keys between each other. This
  * key_def describes how the index is stored in the engine.
  *
- * @throws OutOfMemory
+ * @retval not NULL Ok.
+ * @retval NULL     Memory error.
  */
 struct key_def *
-key_def_build_secondary(struct key_def *primary, struct key_def *secondary);
+key_def_build_secondary(const struct key_def *primary,
+			const struct key_def *secondary);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /** Compare two key part arrays.
  *
