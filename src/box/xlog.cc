@@ -476,27 +476,40 @@ xlog_rename(struct xlog *l)
 	return 0;
 }
 
+enum {
+	/*
+	 * The maximum length of xlog meta
+	 *
+	 * @sa xlog_meta_parse()
+	 */
+	XLOG_META_LEN_MAX = 1024 + VCLOCK_STR_LEN_MAX
+};
+
 #define SERVER_UUID_KEY "Server"
 #define VCLOCK_KEY "VClock"
 
+/**
+ * Format xlog metadata into @a buf of size @a size
+ *
+ * @param buf buffer to use.
+ * @param size the size of buffer. This function write at most @a size bytes.
+ * @retval < size the number of characters printed (excluding the null byte)
+ * @retval >=size the number of characters (excluding the null byte),
+ *                which would have been written to the final string if
+ *                enough space had been available.
+ * @retval -1 - error
+ * @sa snprintf()
+ */
 static int
-xlog_write_meta(struct xlog *l)
+xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 {
-	char *vstr = vclock_to_string(&l->meta.vclock);
-	char *server_uuid = tt_uuid_str(&l->meta.server_uuid);
-	size_t sz = strlen(l->meta.filetype) + strlen(v13) + 2 +
-		    strlen(SERVER_UUID_KEY) + 2 +
-		    strlen(server_uuid) + 1 +
-		    strlen(VCLOCK_KEY) + 2 + strlen(vstr) + 2;
-	char meta_str[sz + 1];
-	snprintf(meta_str, sz + 1, "%s\n%s\n" SERVER_UUID_KEY ": %s\n"
-		 VCLOCK_KEY ": %s\n\n",
-		 l->meta.filetype, v13, server_uuid, vstr);
+	char *vstr = vclock_to_string(&meta->vclock);
+	char *server_uuid = tt_uuid_str(&meta->server_uuid);
+	int total = snprintf(buf, size, "%s\n%s\n" SERVER_UUID_KEY ": "
+		"%s\n" VCLOCK_KEY ": %s\n\n",
+		 meta->filetype, v13, server_uuid, vstr);
 	free(vstr);
-	fio_write(l->fd, meta_str, sz);
-	/* First log starts after meta */
-	l->offset = sz;
-	return 0;
+	return total;
 }
 
 /**
@@ -509,7 +522,8 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	char *filename;
 	int fd = -1;
 	struct xlog *l = NULL;
-
+	char meta_buf[XLOG_META_LEN_MAX];
+	int meta_len;
 	int64_t signature = vclock_sum(vclock);
 	assert(signature >= 0);
 	assert(!tt_uuid_is_nil(dir->server_uuid));
@@ -561,8 +575,19 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 		goto error;
 	obuf_create(&l->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 
-	if (xlog_write_meta(l) != 0)
+	/* Format metadata */
+	meta_len = xlog_meta_format(&l->meta, meta_buf, sizeof(meta_buf));
+	if (meta_len < 0 || meta_len >= (int)sizeof(meta_buf)) {
+		say_error("%s: failed to format xlog meta", filename);
 		goto error;
+	}
+
+	/* Write metadata */
+	if (fio_write(l->fd, meta_buf, meta_len) != meta_len)
+		goto error;
+	l->offset = meta_len; /* first log starts after meta */
+
+	/* Rename xlog file */
 	if (dir->suffix != INPROGRESS && xlog_rename(l))
 		goto error;
 
@@ -1013,15 +1038,6 @@ xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
 	cursor->buf_offset += count;
 	cursor->rbuf.rpos += count;
 }
-
-enum {
-	/*
-	 * The maximum length of xlog meta
-	 *
-	 * @sa xlog_meta_parse()
-	 */
-	XLOG_META_LEN_MAX = 1024 + VCLOCK_STR_LEN_MAX
-};
 
 /**
  * Parse xlog meta from buffer, update buffer read
