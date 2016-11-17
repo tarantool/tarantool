@@ -226,11 +226,11 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	if (xlog_cursor_open(cur, filename) < 0) {
 		return lbox_error(L);
 	}
-	if (strncmp(cur->meta.filetype, "SNAP\n", 5) != 0 &&
-	    strncmp(cur->meta.filetype, "XLOG\n", 5) != 0) {
+	if (strncmp(cur->meta.filetype, "SNAP", 4) != 0 &&
+	    strncmp(cur->meta.filetype, "XLOG", 4) != 0) {
 		char buf[1024];
 		snprintf(buf, sizeof(buf), "'%.*s' file type",
-			 (int) strlen(cur->meta.filetype) - 1,
+			 (int) strlen(cur->meta.filetype),
 			 cur->meta.filetype);
 		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
 		xlog_cursor_close(cur);

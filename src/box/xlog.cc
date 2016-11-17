@@ -57,8 +57,8 @@ static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte ord
 static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
 static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 static const char inprogress_suffix[] = ".inprogress";
-static const char v13[] = "0.13\n";
-static const char v12[] = "0.12\n";
+static const char v13[] = "0.13";
+static const char v12[] = "0.12";
 
 enum {
 	/**
@@ -135,14 +135,14 @@ xdir_create(struct xdir *dir, const char *dirname,
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
 	dir->open_wflags = O_RDWR | O_CREAT | O_EXCL;
 	if (type == SNAP) {
-		dir->filetype = "SNAP\n";
+		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
 		dir->panic_if_error = true;
 		dir->suffix = INPROGRESS;
 		dir->sync_interval = SNAP_SYNC_INTERVAL;
 	} else {
 		dir->sync_is_async = true;
-		dir->filetype = "XLOG\n";
+		dir->filetype = "XLOG";
 		dir->filename_ext = ".xlog";
 		dir->suffix = NONE;
 	}
@@ -484,12 +484,12 @@ xlog_write_meta(struct xlog *l)
 {
 	char *vstr = vclock_to_string(&l->meta.vclock);
 	char *server_uuid = tt_uuid_str(&l->meta.server_uuid);
-	size_t sz = strlen(l->meta.filetype) + strlen(v13) +
+	size_t sz = strlen(l->meta.filetype) + strlen(v13) + 2 +
 		    strlen(SERVER_UUID_KEY) + 2 +
 		    strlen(server_uuid) + 1 +
 		    strlen(VCLOCK_KEY) + 2 + strlen(vstr) + 2;
 	char meta_str[sz + 1];
-	snprintf(meta_str, sz + 1, "%s%s" SERVER_UUID_KEY ": %s\n"
+	snprintf(meta_str, sz + 1, "%s\n%s\n" SERVER_UUID_KEY ": %s\n"
 		 VCLOCK_KEY ": %s\n\n",
 		 l->meta.filetype, v13, server_uuid, vstr);
 	free(vstr);
@@ -1014,103 +1014,100 @@ xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
 	cursor->rbuf.rpos += count;
 }
 
-static int
-xlog_cursor_gets(struct xlog_cursor *cursor, char *str, size_t len)
-{
-	size_t pos = 0;
-	while (pos < len - 1) {
-		char *next_char;
-		ssize_t rc = xlog_cursor_load(cursor, 1, &next_char);
-		if (rc < 0)
-			return -1;
-		if (rc == 0)
-			break;
-		str[pos] = *next_char;
-		xlog_cursor_consume(cursor, 1);
-		if (*next_char == '\n') {
-			++pos;
-			break;
-		}
-		++pos;
-	}
-	str[pos] = '\0';
-	return pos;
-}
+#define XLOG_MAX_META_LEN 2048
+#define XLOG_MAX_VCLOCK_LEN 2048
 
 /**
- * Verify that file is of the given format.
+ * Parse xlog meta from buffer, update buffer read
+ * position in case of success
  *
- * @param l		xlog object, denoting the file to check.
- * @param[out] errmsg   set if error
- *
- * @return 0 if success, -1 on error.
+ * @retval 0 for success
+ * @retval -1 for parse error
+ * @retval 1 if buffer hasn't enough data
  */
-static int
-xlog_read_meta(struct xlog_cursor *cursor)
+static ssize_t
+xlog_meta_parse(struct xlog_meta *meta, const char **data, const char *data_end)
 {
-	struct xlog_meta *meta = &cursor->meta;
-	if (xlog_cursor_gets(cursor, meta->filetype,
-		     sizeof(meta->filetype)) <= 0 ||
-	    xlog_cursor_gets(cursor, meta->version,
-			     sizeof(meta->version)) <= 0) {
-		tnt_error(XlogError, "%s: failed to read log file header",
-			  cursor->name);
+	memset(meta, 0, sizeof(*meta));
+	const char *meta_end = (const char *)memmem(*data, data_end - *data, "\n\n", 2);
+	if (meta_end == NULL)
+		return 1;
+
+	char *pos = (char *)*data;
+	char *eol = (char *)rawmemchr(pos, '\n');
+	if (eol == NULL || size_t(eol - pos) >= sizeof(meta->filetype) ||
+	    eol == meta_end) {
+		tnt_error(XlogError, "failed to parse xlog type string");
 		return -1;
 	}
+	memcpy(meta->filetype, pos, eol - pos);
+	meta->filetype[eol - pos] = '\0';
+	pos = eol + 1;
 
-	if (strcmp(v13, meta->version) != 0 &&
-	    strcmp(v12, meta->version) != 0) {
-		size_t len = strlen(meta->filetype) - 1;
+	eol = (char *)rawmemchr(pos, '\n');
+	if (eol == NULL || size_t(eol - pos) >= sizeof(meta->version) ||
+	    eol == meta_end) {
+		tnt_error(XlogError, "failed to parse xlog version string");
+		return -1;
+	}
+	memcpy(meta->version, pos, eol - pos);
+	meta->version[eol - pos] = '\0';
+	pos = eol + 1;
+
+	if (strncmp(meta->version, v12, sizeof(v12)) != 0 &&
+	    strncmp(meta->version, v13, sizeof(v13)) != 0) {
 		tnt_error(XlogError,
-			  "%s: unsupported file format version %.*s",
-			  cursor->name, len, meta->version);
+			  "unsupported file format version %s",
+			  meta->version);
 		return -1;
 	}
 
-	char buf[256];
 	for (;;) {
-		if (xlog_cursor_gets(cursor, buf, sizeof(buf)) <= 0) {
-			tnt_error(XlogError, "%s: failed to read log file "
-				  "header", cursor->name);
-			return -1;
-		}
-		/** Empty line indicates the end of file header. */
-		if (strcmp(buf, "\n") == 0)
+		eol = (char *)rawmemchr(pos, '\n');
+		if (eol > meta_end)
 			break;
-
-		/* Parse RFC822-like string */
-		char *end = buf + strlen(buf);
-		if (end > buf && *(end - 1) == '\n')
-			*(--end) = 0; /* skip \n */
-		char *key = buf;
-		char *val = strchr(buf, ':');
-		if (val == NULL) {
-			tnt_error(XlogError, "%s: invalid meta", cursor->name);
+		char *key = pos;
+		char *key_end = (char *)memchr(key, ':', eol - key);
+		if (key_end == NULL) {
+			tnt_error(XlogError, "can't extract meta value");
 			return -1;
 		}
-		*val++ = 0;
+		char *val = key_end + 1;
 		while (isspace(*val))
-			++val;	/* skip starting spaces */
+			++val;
 
-		if (strcmp(key, SERVER_UUID_KEY) == 0) {
-			if ((end - val) != UUID_STR_LEN ||
-			    tt_uuid_from_string(val, &meta->server_uuid) != 0) {
-				tnt_error(XlogError, "%s: can't parse node UUID",
-					  cursor->name);
+		if (strncmp(key, SERVER_UUID_KEY, key_end - key) == 0) {
+			if (eol - val != UUID_STR_LEN) {
+				tnt_error(XlogError, "can't parse node UUID");
 				return -1;
 			}
-		} else if (strcmp(key, VCLOCK_KEY) == 0){
-			size_t offset = vclock_from_string(&meta->vclock, val);
+			char uuid[UUID_STR_LEN + 1];
+			memcpy(uuid, val, UUID_STR_LEN);
+			uuid[UUID_STR_LEN] = '\0';
+			if (tt_uuid_from_string(uuid, &meta->server_uuid) != 0) {
+				tnt_error(XlogError, "can't parse node UUID");
+				return -1;
+			}
+		} else if (strncmp(key, VCLOCK_KEY, key_end - key) == 0){
+			if (eol - val > XLOG_MAX_VCLOCK_LEN) {
+				tnt_error(XlogError, "can't parse vclock");
+				return -1;
+			}
+			char vclock[XLOG_MAX_VCLOCK_LEN + 1];
+			memcpy(vclock, val, eol - val);
+			vclock[eol - val] = '\0';
+			size_t offset = vclock_from_string(&meta->vclock, vclock);
 			if (offset != 0) {
-				tnt_error(XlogError, "%s: invalid vclock at "
-					  "offset %zd", cursor->name, offset);
+				tnt_error(XlogError, "invalid vclock at "
+					  "offset %zd", offset);
 				return -1;
 			}
 		} else {
-			/* Skip unknown key */
+			say_warn("Unknown meta item: `%.*s'", eol - key, pos);
 		}
+		pos = eol + 1;
 	}
-
+	*data = meta_end + 2;
 	return 0;
 }
 
@@ -1388,8 +1385,26 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	ibuf_create(&i->zbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
-	if (xlog_read_meta(i) < 0)
+	ssize_t rc;
+	char *meta_start;
+	rc = xlog_cursor_load(i, XLOG_MAX_META_LEN, &meta_start);
+	if (rc == -1)
 		goto error;
+	if (rc == 0) {
+		tnt_error(XlogError, "Unexpected end of file");
+		goto error;
+	}
+	rc = xlog_meta_parse(&i->meta,
+			     (const char **)&i->rbuf.rpos,
+			     (const char *)i->rbuf.wpos);
+	if (rc == -1)
+		goto error;
+	if (rc > 0) {
+		tnt_error(XlogError, "Unexpected end of file");
+		goto error;
+	}
+	i->read_offset = i->rbuf.rpos - meta_start;
+	i->buf_offset = i->read_offset;
 	i->search_offset = i->read_offset;
 	snprintf(i->name, PATH_MAX, "%s", name);
 	return 0;
@@ -1436,8 +1451,20 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	memcpy(dst, data, size);
 	ibuf_create(&i->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
-	if (xlog_read_meta(i) < 0)
+	int rc;
+	char *meta_start;
+	meta_start = i->rbuf.rpos;
+	rc = xlog_meta_parse(&i->meta,
+			     (const char **)&i->rbuf.rpos,
+			     (const char *)i->rbuf.wpos);
+	if (rc < 0)
 		goto error;
+	if (rc > 0) {
+		tnt_error(XlogError, "Unexpected end of file");
+		goto error;
+	}
+	i->read_offset = i->rbuf.rpos - meta_start;
+	i->buf_offset = i->read_offset;
 	i->search_offset = i->read_offset;
 	snprintf(i->name, PATH_MAX, "%s", name);
 	return 0;
