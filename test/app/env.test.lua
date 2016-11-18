@@ -1,16 +1,15 @@
-env = require('env')
-trun = require('test_run').new()
+os = require('os')
+test_run = require('test_run').new()
 
-env['HELL'] = '123'
-do return env['HELL'] end
-os.getenv('HELL')
-env['HELL'] = nil
-do return env['HELL'] end
-os.getenv('HELL')
+os.setenv('location', 'Hell_Hotel')
+os.getenv('location')
+os.setenv('location', nil)
 
-env_dict = env()
+do os.getenv('location') end
+
+env_dict = os.environ()
 type(env_dict)
-trun:cmd("setopt delimiter ';'")
+test_run:cmd("setopt delimiter ';'")
 do
     for k, v in pairs(env_dict) do
         if type(k) ~= 'string' or type(v) ~= 'string' then
@@ -19,4 +18,4 @@ do
     end
     return true
 end;
-trun:cmd("setopt delimiter ''")
+test_run:cmd("setopt delimiter ''")
