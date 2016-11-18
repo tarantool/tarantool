@@ -1380,22 +1380,23 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 {
-	/**
-	 * We start search from next byte
-	 */
-	++i->rbuf.rpos;
-	while (true) {
-		int rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
+	log_magic_t magic;
+	do {
+		/*
+		 * Read one extra byte to start searching from the next
+		 * byte.
+		 */
+		int rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + 1);
 		if (rc < 0)
 			return -1;
 		if (rc == 1)
 			return 1;
 
-		log_magic_t *magic = (log_magic_t *)i->rbuf.rpos;
-		if (*magic == row_marker || *magic == zrow_marker)
-			return 0;
 		++i->rbuf.rpos;
-	}
+		assert(i->rbuf.rpos + sizeof(log_magic_t) <= i->rbuf.wpos);
+		magic = load_u32(i->rbuf.rpos);
+	} while (magic != row_marker && magic != zrow_marker);
+
 	return 0;
 }
 
