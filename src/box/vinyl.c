@@ -3096,7 +3096,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 			 index->key_def->opts.page_size, stmt) != 0)
 		goto fail;
 
-	*written += run->info.size;
+	*written += vy_run_size(run) + vy_run_total(run);
 
 	/*
 	 * We've successfully written a run to a new range file.
