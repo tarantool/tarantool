@@ -300,7 +300,7 @@ vy_quota_release(struct vy_quota *q, int64_t size)
 }
 
 static void
-vy_quota_update_watermark(struct vy_quota *q, size_t max_range_size,
+vy_quota_update_watermark(struct vy_quota *q, uint64_t max_range_size,
 			  int64_t tx_write_rate, int64_t dump_bandwidth)
 {
 	/*
@@ -835,7 +835,7 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
 struct vy_mem {
 	struct vy_mem *next;
 	struct vy_mem_tree tree;
-	uint32_t used;
+	size_t used;
 	int64_t min_lsn;
 	/* A key definition for this index. */
 	struct key_def *key_def;
@@ -1091,7 +1091,7 @@ struct vy_range {
 	struct vy_index *index;
 	ev_tstamp update_time;
 	/** Total amount of memory used by this range (sum of mem->used). */
-	uint32_t used;
+	size_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
 	int64_t min_lsn;
 	/**
@@ -1773,7 +1773,7 @@ vy_run_page_min_key(struct vy_run *run, const struct vy_page_info *p)
 	return run->pages_min.s + p->min_key_offset;
 }
 
-static uint32_t
+static uint64_t
 vy_run_total(struct vy_run *run)
 {
 	if (unlikely(run->page_infos == NULL))
@@ -1781,7 +1781,7 @@ vy_run_total(struct vy_run *run)
 	return run->info.total;
 }
 
-static uint32_t
+static uint64_t
 vy_run_size(struct vy_run *run)
 {
 	return sizeof(run->info) +
@@ -6399,7 +6399,7 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	int64_t tx_write_rate = vy_stat_tx_write_rate(e->stat);
 	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
 
-	size_t max_range_size = 0;
+	uint64_t max_range_size = 0;
 	struct heap_iterator it;
 	vy_dump_heap_iterator_init(&e->scheduler->dump_heap, &it);
 	struct heap_node *pn = vy_dump_heap_iterator_next(&it);

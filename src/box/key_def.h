@@ -178,7 +178,7 @@ struct key_opts {
 	 * Vinyl index options.
 	 */
 	char path[PATH_MAX];
-	uint32_t range_size;
+	uint64_t range_size;
 	uint32_t page_size;
 	/**
 	 * Begin compaction when there are more than compact_wm
