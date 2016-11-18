@@ -5614,8 +5614,12 @@ vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 	stmt->type = type;
 
 	/* Calculate offsets for key parts */
-	tuple_init_field_map(format, (uint32_t *) (stmt->data + offsets_size),
-			     stmt->data + offsets_size);
+	if (tuple_init_field_map(format,
+				 (uint32_t *) (stmt->data + offsets_size),
+				 stmt->data + offsets_size)) {
+		vy_stmt_unref(stmt);
+		return NULL;
+	}
 	return stmt;
 }
 

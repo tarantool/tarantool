@@ -126,7 +126,8 @@ Engine::buildSecondaryKey(struct space *old_space, struct space *new_space,
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		tuple_validate(format, tuple);
+		if (tuple_validate(format, tuple))
+			diag_raise();
 		/*
 		 * @todo: better message if there is a duplicate.
 		 */
@@ -240,7 +241,8 @@ Handler::executeSelect(struct txn *, struct space *space,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	key_validate(index->key_def, type, key, part_count);
+	if (key_validate(index->key_def, type, key, part_count))
+		diag_raise();
 
 	struct iterator *it = index->allocIterator();
 	IteratorGuard guard(it);

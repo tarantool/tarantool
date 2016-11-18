@@ -169,7 +169,8 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 	struct vy_env *env = ((VinylEngine *)space->handler->engine)->env;
 
 	/* Check the tuple fields. */
-	tuple_validate_raw(space->format, request->tuple);
+	if (tuple_validate_raw(space->format, request->tuple))
+		diag_raise();
 
 	struct vy_tx *tx = vy_begin(env);
 	if (tx == NULL)
@@ -292,7 +293,8 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	assert(request->index_id == 0);
 
 	/* Check the tuple fields. */
-	tuple_validate_raw(space->format, request->tuple);
+	if (tuple_validate_raw(space->format, request->tuple))
+		diag_raise();
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -311,6 +313,8 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
+	if (new_tuple == NULL)
+		diag_raise();
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
 	tuple_ref(new_tuple);
@@ -327,7 +331,8 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	primary_key_validate(index->key_def, key, part_count);
+	if (primary_key_validate(index->key_def, key, part_count))
+		diag_raise();
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	struct tuple *old_tuple = NULL;
@@ -383,7 +388,8 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	primary_key_validate(index->key_def, key, part_count);
+	if (primary_key_validate(index->key_def, key, part_count))
+		diag_raise();
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	/* Find full tuple in the index. */
@@ -447,7 +453,8 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 	pk = (VinylIndex *)index_find_unique(space, 0);
 
 	/* Check tuple fields. */
-	tuple_validate_raw(space->format, request->tuple);
+	if (tuple_validate_raw(space->format, request->tuple))
+		diag_raise();
 
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	/* Check update operations. */
@@ -484,6 +491,8 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 			vinyl_insert_without_lookup(space, request, tx);
 			new_tuple = tuple_new(space->format, request->tuple,
 					      request->tuple_end);
+			if (new_tuple == NULL)
+				diag_raise();
 			tuple_ref(new_tuple);
 			stmt->new_tuple = new_tuple;
 			return;

@@ -154,17 +154,19 @@ tuple_format_new(struct rlist *key_list);
 
 /**
  * Fill the field map of tuple with field offsets.
- * Throws an error if tuple data does not match the format.
  * @param format tuple format.
  * @param field_map a pointer to the LAST element of field map.
  * @param tuple MessagePack array with tuple fields.
+ *
+ * @retval 0  Success.
+ * @retval -1 Error.
  *            ┏━━━━━━━━━━━━━━━┓
  * Result:    ┃ offN ... off1 ┃
  *            ┗━━━━━━━━━━━━━━━┛
  *                            ▲
  * tuple + off_i = field_i;   ┗━field_map
  */
-void
+int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple);
 

@@ -270,6 +270,8 @@ MemtxSpace::applySnapshotRow(struct space *space, struct request *request)
 	assert(request->type == IPROTO_INSERT);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
+	if (new_tuple == NULL)
+		diag_raise();
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
 	if (!rlist_empty(&space->on_replace)) {
@@ -301,6 +303,8 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 {
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
+	if (new_tuple == NULL)
+		diag_raise();
 	/* GC the new tuple if there is an exception below. */
 	TupleRef ref(new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
@@ -318,7 +322,8 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	primary_key_validate(pk->key_def, key, part_count);
+	if (primary_key_validate(pk->key_def, key, part_count))
+		diag_raise();
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 	if (old_tuple == NULL)
 		return NULL;
@@ -336,7 +341,8 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	primary_key_validate(pk->key_def, key, part_count);
+	if (primary_key_validate(pk->key_def, key, part_count))
+		diag_raise();
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL)
@@ -362,7 +368,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 
 	/* Check tuple fields */
-	tuple_validate_raw(space->format, request->tuple);
+	if (tuple_validate_raw(space->format, request->tuple))
+		diag_raise();
 
 	struct key_def *key_def = pk->key_def;
 	uint32_t part_count = pk->key_def->part_count;
@@ -409,6 +416,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		struct tuple *new_tuple = tuple_new(space->format,
 						    request->tuple,
 						    request->tuple_end);
+		if (new_tuple == NULL)
+			diag_raise();
 		TupleRef ref(new_tuple); /* useless, for unified approach */
 		old_tuple = replace(space, NULL, new_tuple, DUP_INSERT);
 		memtx_txn_add_undo(txn, old_tuple, new_tuple);
@@ -501,7 +510,8 @@ MemtxSpace::executeSelect(struct txn *, struct space *space,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	key_validate(index->key_def, type, key, part_count);
+	if (key_validate(index->key_def, type, key, part_count))
+		diag_raise();
 
 	struct iterator *it = index->position();
 	index->initIterator(it, type, key, part_count);

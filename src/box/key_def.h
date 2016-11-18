@@ -523,17 +523,22 @@ extern const uint32_t key_mp_type[];
  * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
  * @param type KeyDef type
  * @param field_type MsgPack type
- * @param field_no - a field number (is used to show an error message)
+ * @param field_no - a field number (is used to store an error message)
+ *
+ * @retval 0  mp_type is valid.
+ * @retval -1 mp_type is invalid.
  */
-static inline void
+static inline int
 key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 	       int err, uint32_t field_no)
 {
 	assert(key_type < field_type_MAX);
 	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
-		tnt_raise(ClientError, err, field_no,
-			  field_type_strs[key_type]);
+	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
+		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
+		return -1;
+	}
+	return 0;
 }
 
 /**

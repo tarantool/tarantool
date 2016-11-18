@@ -298,10 +298,37 @@ char *
 tuple_extract_key_raw(const char *data, const char *data_end,
 		      const struct key_def *key_def, uint32_t *key_size);
 
+/**
+ * Create a new tuple from a sequence of MsgPack encoded fields.
+ * tuple->refs is 0.
+ *
+ * @retval not NULL Success.
+ * @retval NULL     Memory or format error.
+ *
+ * \sa box_tuple_new()
+ */
+struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/**
+ * Allocate a tuple
+ * It's similar to tuple_new, but does not set tuple data and thus does not
+ * initialize field offsets.
+ *
+ * After tuple_alloc and filling tuple data the tuple_init_field_map must be
+ * called!
+ *
+ * @param size  tuple->bsize
+ *
+ * @retval not NULL Success.
+ * @retval NULL     Memory of tuple format error.
+ */
+struct tuple *
+tuple_alloc(struct tuple_format *format, size_t size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
-#include "key_def.h" /* for enum field_type */
 #include "tuple_update.h"
 #include "errinj.h"
 
@@ -338,30 +365,6 @@ struct PACKED tuple
 };
 
 /**
- * Create a new tuple from a sequence of MsgPack encoded fields.
- * tuple->refs is 0.
- *
- * Throws an exception if tuple format is incorrect.
- *
- * \sa box_tuple_new()
- */
-struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end);
-
-/**
- * Allocate a tuple
- * It's similar to tuple_new, but does not set tuple data and thus does not
- * initialize field offsets.
- *
- * After tuple_alloc and filling tuple data the tuple_init_field_map must be
- * called!
- *
- * @param size  tuple->bsize
- */
-struct tuple *
-tuple_alloc(struct tuple_format *format, size_t size);
-
-/**
  * Free the tuple.
  * @pre tuple->refs  == 0
  */
@@ -369,18 +372,26 @@ void
 tuple_delete(struct tuple *tuple);
 
 /**
- * Check tuple data correspondence to space format;
- * throw proper exception if smth wrong.
+ * Check tuple data correspondence to space format.
+ * @param format Format to which the tuple must match.
+ * @param tuple Tuple to validate.
+ *
+ * @retval 0  The tuple is valid.
+ * @retval -1 The tuple is invalid.
  */
-void
+int
 tuple_validate(struct tuple_format *format, struct tuple *tuple);
 
 /**
- * Check tuple data correspondence to space format;
- * throw proper exception if smth wrong.
- * data argument expected to be a proper msgpack array
+ * Check tuple data correspondence to space format.
+ * Actually checks everything that checks tuple_init_field_map.
+ * @param format Format to which the tuple must match.
+ * @param tuple MessagePack array.
+ *
+ * @retval 0  The tuple is valid.
+ * @retval -1 The tuple is invalid.
  */
-void
+int
 tuple_validate_raw(struct tuple_format *format, const char *data);
 
 /**
