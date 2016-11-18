@@ -1075,6 +1075,13 @@ struct vy_run {
 	struct vy_buf pages_min;
 	/** Run data file. */
 	int fd;
+	/**
+	 * Reference counter. The run file is closed and the run
+	 * in-memory structure is freed only when it reaches 0.
+	 * Needed to prevent coeio thread from using a closed
+	 * (worse, reopened) file descriptor.
+	 */
+	int refs;
 	struct vy_run *next;
 };
 
@@ -1802,6 +1809,7 @@ vy_run_new()
 	vy_buf_create(&run->pages_min);
 	memset(&run->info, 0, sizeof(run->info));
 	run->fd = -1;
+	run->refs = 1;
 	run->next = NULL;
 	return run;
 }
@@ -1815,6 +1823,21 @@ vy_run_delete(struct vy_run *run)
 	vy_buf_destroy(&run->pages_min);
 	TRASH(run);
 	free(run);
+}
+
+static void
+vy_run_ref(struct vy_run *run)
+{
+	assert(run->refs > 0);
+	run->refs++;
+}
+
+static void
+vy_run_unref(struct vy_run *run)
+{
+	assert(run->refs > 0);
+	if (--run->refs == 0)
+		vy_run_delete(run);
 }
 
 enum vy_file_type {
@@ -2980,7 +3003,7 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 	range->run_count++;
 	return 0;
 fail:
-	vy_run_delete(run);
+	vy_run_unref(run);
 	if (fd >= 0)
 		close(fd);
 	return -1;
@@ -3003,7 +3026,7 @@ vy_range_delete(struct vy_range *range)
 	struct vy_run *run = range->run;
 	while (run != NULL) {
 		struct vy_run *next = run->next;
-		vy_run_delete(run);
+		vy_run_unref(run);
 		run = next;
 	}
 	range->run = NULL;
@@ -3126,7 +3149,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	*p_run = run;
 	return 0;
 fail:
-	vy_run_delete(run);
+	vy_run_unref(run);
 	if (index_fd >= 0) {
 		unlink(index_path);
 		close(index_fd);
@@ -6834,8 +6857,15 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
 
+		/*
+		 * Make sure the run file descriptor won't be closed
+		 * (even worse, reopened) while a coeio thread is
+		 * reading it.
+		 */
+		vy_run_ref(itr->run);
 		rc = coeio_preadn(itr->run->fd, page->data, page_info->size,
 				  page_info->offset);
+		vy_run_unref(itr->run);
 
 		/*
 		 * Check that vy_index/vy_range/vy_run haven't changed
