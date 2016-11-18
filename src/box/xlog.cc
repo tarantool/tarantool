@@ -1239,7 +1239,7 @@ struct xlog_fixheader {
 };
 
 /**
- * Parse xlog tx header, set up magic, crc32c and len
+ * Decode xlog tx header, set up magic, crc32c and len
  *
  * @retval 0 for success
  * @retval -1 for error
@@ -1247,42 +1247,58 @@ struct xlog_fixheader {
  */
 static ssize_t
 xlog_fixheader_decode(struct xlog_fixheader *fixheader,
-		   const char **data, const char *data_end)
+		      const char **data, const char *data_end)
 {
 	if (data_end - *data < XLOG_FIXHEADER_SIZE)
 		return XLOG_FIXHEADER_SIZE - (data_end - *data);
 	const char *pos = *data;
+	const char *end = pos + XLOG_FIXHEADER_SIZE;
 
-	if (*(log_magic_t *)pos != row_marker &&
-	    *(log_magic_t *)pos != zrow_marker) {
+	/* Decode magic */
+	fixheader->magic = load_u32(pos);
+	if (fixheader->magic != row_marker &&
+	    fixheader->magic != zrow_marker) {
+		tnt_error(XlogError, "invalid magic: 0x%x", fixheader->magic);
 		return -1;
 	}
-	fixheader->magic = *(log_magic_t *)pos;
-	pos += sizeof(log_magic_t);
-
-	/* Decode len, previous crc32 and row crc32 */
-	if (mp_check(&pos,
-		     pos + XLOG_FIXHEADER_SIZE - sizeof(log_magic_t)) != 0) {
-		return -1;
-	}
-	pos = *data + sizeof(log_magic_t);
+	pos += sizeof(fixheader->magic);
 
 	/* Read length */
-	if (mp_typeof(*pos) != MP_UINT)
+	const char *val = pos;
+	if (pos >= end || mp_check(&pos, end) != 0 ||
+	    mp_typeof(*val) != MP_UINT) {
+		tnt_error(XlogError, "broken fixheader length");
 		return -1;
-	fixheader->len = mp_decode_uint(&pos);
+	}
+	fixheader->len = mp_decode_uint(&val);
+	assert(val == pos);
 
 	/* Read previous crc32 */
-	if (mp_typeof(*pos) != MP_UINT)
+	if (pos >= end || mp_check(&pos, end) != 0 ||
+	    mp_typeof(*val) != MP_UINT) {
+		tnt_error(XlogError, "broken fixheader crc32p");
 		return -1;
+	}
+	fixheader->crc32p = mp_decode_uint(&val);
+	assert(val == pos);
 
 	/* Read current crc32 */
-	fixheader->crc32p = mp_decode_uint(&pos);
-	if (mp_typeof(*pos) != MP_UINT)
+	if (pos >= end || mp_check(&pos, end) != 0 ||
+	    mp_typeof(*val) != MP_UINT) {
+		tnt_error(XlogError, "broken fixheader crc32c");
 		return -1;
-	fixheader->crc32c = mp_decode_uint(&pos);
-	assert(pos <= *data + XLOG_FIXHEADER_SIZE);
-	*data += XLOG_FIXHEADER_SIZE;
+	}
+	fixheader->crc32c = mp_decode_uint(&val);
+	assert(val == pos);
+
+	/* Check and skip padding if any */
+	if (pos < end && (mp_check(&pos, end) != 0 || pos != end)) {
+		tnt_error(XlogError, "broken fixheader padding");
+		return -1;
+	}
+
+	assert(pos == end);
+	*data = end;
 	return 0;
 }
 
