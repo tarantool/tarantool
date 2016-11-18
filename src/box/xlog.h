@@ -357,17 +357,9 @@ struct xlog_cursor
 	char name[PATH_MAX];
 	/** file read buffer */
 	struct ibuf rbuf;
-	/** file position for first byte in read buffer */
-	off_t buf_offset;
-	/** cursor read position */
+	/** file read position */
 	off_t read_offset;
 
-	/** position for next tx search */
-	off_t search_offset;
-	/** current parse position in tx memory */
-	char *data_pos;
-	/** end position in tx memory */
-	char *data_end;
 	/** true if eof marker was readen */
 	bool eof_read;
 

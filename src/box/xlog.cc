@@ -1105,31 +1105,25 @@ xlog_atfork(struct xlog **lptr)
 
 #define XLOG_READ_AHEAD		(1 << 14)
 
-/*
- * Loads next count bytes into read buffer,
- * set data to next chunk pointer
+/**
+ * Ensure that at least count bytes are in read buffer
+ *
+ * @retval 0 at least count bytes are in read buf
+ * @retval 1 if eof
+ * @retval -1 if error
  */
-static ssize_t
-xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
+static int
+xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 {
-	assert(cursor->buf_offset <= cursor->read_offset);
-	if (cursor->buf_offset + ibuf_used(&cursor->rbuf) <
-	    (size_t)cursor->read_offset) {
-		/* we read something behind of the end of read buffer */
-		ibuf_reset(&cursor->rbuf);
-		cursor->buf_offset = cursor->read_offset;
-	}
-	size_t buf_delta = cursor->read_offset - cursor->buf_offset;
-	if (ibuf_used(&cursor->rbuf) >= buf_delta + count) {
-		*data = cursor->rbuf.rpos + buf_delta;
-		cursor->read_offset += count;
-		return count;
-	}
+	if (ibuf_used(&cursor->rbuf) >= count)
+		return 0;
 	/* in-memory mode */
 	if (cursor->fd < 0)
-		return 0;
-	size_t to_load = count - (ibuf_used(&cursor->rbuf) - buf_delta);
+		return 1;
+
+	size_t to_load = count - ibuf_used(&cursor->rbuf);
 	to_load += XLOG_READ_AHEAD;
+
 	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
 	if (dst == NULL) {
 		diag_set(OutOfMemory, to_load, "runtime",
@@ -1145,50 +1139,46 @@ xlog_cursor_load(struct xlog_cursor *cursor, size_t count, char **data)
 	/* ibuf_reserve() has been called above, ibuf_alloc() must not fail */
 	assert((size_t)readen <= to_load);
 	ibuf_alloc(&cursor->rbuf, readen);
-	*data = cursor->rbuf.rpos + buf_delta;
-	readen = MIN(ibuf_used(&cursor->rbuf) - buf_delta, count);
 	cursor->read_offset += readen;
-	return readen;
+	return ibuf_used(&cursor->rbuf) >= count ? 0: 1;
 }
 
-/*
- * Remove count bytes from read buffer
+/**
+ * Cursor parse position
  */
-static void
-xlog_cursor_consume(struct xlog_cursor *cursor, size_t count)
+static inline off_t
+xlog_cursor_pos(struct xlog_cursor *cursor)
 {
-	assert(cursor->rbuf.rpos + count <= cursor->rbuf.wpos);
-	cursor->buf_offset += count;
-	cursor->rbuf.rpos += count;
+	return cursor->read_offset - ibuf_used(&cursor->rbuf);
 }
 
 /**
  * Decompress zstd-compressed buf into cursor row block
  */
 static int
-xlog_cursor_decompress(struct xlog_cursor *i)
+xlog_cursor_decompress(struct ibuf *rows, const char **data,
+		       const char *data_end, ZSTD_DStream *zdctx)
 {
-	if (!ibuf_capacity(&i->zbuf)) {
-		if (!ibuf_reserve(&i->zbuf,
-				  2 * XLOG_TX_AUTOCOMMIT_THRESHOLD)) {
+	if (!ibuf_capacity(rows)) {
+		if (!ibuf_reserve(rows, 2 * XLOG_TX_AUTOCOMMIT_THRESHOLD)) {
 			tnt_error(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
-				  "runtime", "xlog decompression buffer");
+				  "runtime", "xlog output buffer");
 			return -1;
 		}
 	} else {
-		ibuf_reset(&i->zbuf);
+		ibuf_reset(rows);
 	}
 
-	ZSTD_initDStream(i->zdctx);
-	ZSTD_inBuffer input = {i->data_pos, (size_t)(i->data_end - i->data_pos), 0};
+	ZSTD_initDStream(zdctx);
+	ZSTD_inBuffer input = {*data, (size_t)(data_end - *data), 0};
 	while (input.pos < input.size) {
-		ZSTD_outBuffer output = {i->zbuf.wpos,
-					 ibuf_unused(&i->zbuf),
+		ZSTD_outBuffer output = {rows->wpos,
+					 ibuf_unused(rows),
 					 0};
-		size_t rc = ZSTD_decompressStream(i->zdctx, &output, &input);
+		size_t rc = ZSTD_decompressStream(zdctx, &output, &input);
 		/* ibuf_reserve() has been called, alloc() must not fail */
-		assert(output.pos <= ibuf_unused(&i->zbuf));
-		ibuf_alloc(&i->zbuf, output.pos);
+		assert(output.pos <= ibuf_unused(rows));
+		ibuf_alloc(rows, output.pos);
 		if (ZSTD_isError(rc)) {
 			tnt_error(XlogError,
 				  "can't decompress xlog tx data with "
@@ -1199,19 +1189,17 @@ xlog_cursor_decompress(struct xlog_cursor *i)
 			break;
 		}
 		if (output.pos == output.size) {
-			if (!ibuf_reserve(&i->zbuf,
-					  ibuf_capacity(&i->zbuf))){
+			if (!ibuf_reserve(rows, ibuf_capacity(rows))){
 				tnt_error(OutOfMemory,
-					  2 * ibuf_capacity(&i->zbuf),
+					  ibuf_capacity(rows),
 					  "runtime",
-					  "xlog cursor decompression buffer");
+					  "xlog rows buffer");
 				return -1;
 			}
 			continue;
 		}
 	}
-	i->data_pos = i->zbuf.rpos;
-	i->data_end = i->zbuf.wpos;
+	*data = data_end;
 	return 0;
 }
 
@@ -1305,54 +1293,63 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 /**
  * @retval -1 error
  * @retval 0 success
- * @retval 1 EOF
+ * @retval >0 how many bytes we will have for continue
  */
-static int
+static size_t
 xlog_cursor_read_tx(struct xlog_cursor *i)
 {
-	char *data;
-	ssize_t loaded = xlog_cursor_load(i, XLOG_FIXHEADER_SIZE, &data);
-	if (loaded < 0)
-		return -1;
-	if (loaded < XLOG_FIXHEADER_SIZE)
-		return 1;
+	const char *rpos = i->rbuf.rpos;
+	const char *end = rpos + ibuf_used(&i->rbuf);
 
 	struct xlog_fixheader fixheader;
-	if (xlog_fixheader_decode(&fixheader, (const char **)&data,
-				  (const char *)data + XLOG_FIXHEADER_SIZE) < 0) {
+	ssize_t to_load = xlog_fixheader_decode(&fixheader, &rpos, end);
+	if (to_load < 0) {
 		tnt_error(XlogError, "%s: can't parse xlog header at %lld",
-			  i->name, i->search_offset);
+			  i->name, xlog_cursor_pos(i));
 		return -1;
+	} if (to_load > 0) {
+		return (end - rpos) + to_load; /* need more data */
 	}
+
 	if (fixheader.len > IPROTO_BODY_LEN_MAX) {
 		tnt_error(XlogError, "%s: tx is too big at %lld",
-			  i->name, i->search_offset);
+			  i->name, xlog_cursor_pos(i));
 		return -1;
 	}
 
-	loaded = xlog_cursor_load(i, fixheader.len, &i->data_pos);
-	if (loaded < 0)
-		return -1;
-	if (loaded < fixheader.len)
-		return 1;
-	i->data_end = i->data_pos + fixheader.len;
+	if ((end - rpos) < (ptrdiff_t)fixheader.len)
+		return (rpos - i->rbuf.rpos) + fixheader.len;
 
 	/* Validate checksum */
-	if (crc32_calc(0, i->data_pos, fixheader.len) != fixheader.crc32c) {
+	if (crc32_calc(0, rpos, fixheader.len) != fixheader.crc32c) {
 		if (i->ignore_crc == false) {
 			tnt_error(XlogError,
 				  "%s: row block checksum"
 				  " mismatch (expected %u) at offset %"
 				  PRIu64,
 				  i->name, (unsigned)fixheader.crc32c,
-				  (uint64_t)i->search_offset);
+				  xlog_cursor_pos(i));
 			return -1;
 		}
 	}
 
-	if (fixheader.magic == zrow_marker)
-		return xlog_cursor_decompress(i);
-
+	if (fixheader.magic == row_marker) {
+		void *dst = ibuf_alloc(&i->zbuf, fixheader.len);
+		if (dst == NULL) {
+			tnt_error(OutOfMemory, fixheader.len,
+				  "runtime", "xlog rows buffer");
+			return -1;
+		}
+		memcpy(dst, rpos, fixheader.len);
+		i->rbuf.rpos = (char *)rpos + fixheader.len;
+		assert(rpos <= i->rbuf.wpos);
+		return 0;
+	};
+	assert(fixheader.magic == zrow_marker);
+	if (xlog_cursor_decompress(&i->zbuf, &rpos,
+				   rpos + fixheader.len, i->zdctx) < 0)
+		return -1;
+	i->rbuf.rpos = (char *)rpos;
 	return 0;
 }
 
@@ -1363,14 +1360,14 @@ static int
 xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 {
 	/* Return row from xlog tx buffer */
-	int rc = xrow_header_decode(header, (const char **)&i->data_pos,
-				    (const char *)i->data_end);
+	int rc = xrow_header_decode(header, (const char **)&i->zbuf.rpos,
+				    (const char *)i->zbuf.wpos);
 	if (rc != 0) {
 		say_warn("failed to read row");
 		tnt_error(XlogError, "%s: can't parse row",
 			  i->name);
 		/* Discard remaining row data */
-		i->data_pos = i->data_end;
+		ibuf_reset(&i->zbuf);
 		return -1;
 	}
 
@@ -1383,33 +1380,22 @@ xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 {
-	ssize_t loaded, skipped = 0;
-	log_magic_t *magic_ptr;
-	loaded = xlog_cursor_load(i, sizeof(log_magic_t), (char **)&magic_ptr);
-	if (loaded < 0)
-		return -1;
-	if (loaded < (ssize_t)sizeof(log_magic_t))
-		return 1;
-
-	while (*magic_ptr != row_marker && *magic_ptr != zrow_marker) {
-		char *last_byte;
-		loaded = xlog_cursor_load(i, 1, &last_byte);
-		if (loaded < 0)
+	/**
+	 * We start search from next byte
+	 */
+	++i->rbuf.rpos;
+	while (true) {
+		int rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
+		if (rc < 0)
 			return -1;
-		if (loaded < 1)
+		if (rc == 1)
 			return 1;
-		magic_ptr = (log_magic_t *)(last_byte - sizeof(log_magic_t) + 1);
-		/* delete first byte from read buf */
-		xlog_cursor_consume(i, 1);
-		++skipped;
-	}
 
-	if (skipped) {
-		say_warn("Skipped %zd after %zd offset untic magic found",
-			 skipped, i->search_offset);
+		log_magic_t *magic = (log_magic_t *)i->rbuf.rpos;
+		if (*magic == row_marker || *magic == zrow_marker)
+			return 0;
+		++i->rbuf.rpos;
 	}
-	say_debug("magic found at 0x%08jx",
-		  (uintmax_t)i->read_offset - sizeof(*magic_ptr));
 	return 0;
 }
 
@@ -1425,12 +1411,10 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 int
 xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 {
-	log_magic_t magic = 0;
 	int rc;
-
 	assert(i->eof_read == false);
 
-	if (i->data_pos < i->data_end) {
+	if (ibuf_used(&i->zbuf)) {
 		/*
 		 * Still more xrows in this batch, unpack the next
 		 * row.
@@ -1441,55 +1425,48 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		assert(rc < 0);
 		return -1;
 	}
-	/* set read buffer to current pos */
-	i->read_offset = i->search_offset;
-	xlog_cursor_consume(i, i->read_offset - i->buf_offset);
-
-	off_t marker_offset;
-	marker_offset = i->read_offset;
-	/* Check eof */
-	log_magic_t *magic_ptr;
-	rc = xlog_cursor_load(i, sizeof(log_magic_t), (char **)&magic_ptr);
+	/* load at lest magic to check eof */
+	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
 	if (rc < 0)
 		return -1;
-	i->read_offset = marker_offset;
-	if (rc < (ssize_t)sizeof(log_magic_t))
-		goto eof;
-	magic = *magic_ptr;
-	/* return to magic offset*/
-	if (magic == eof_marker) {
+	if (rc > 0)
+		return 1;
+	if (load_u32(i->rbuf.rpos) == eof_marker) {
+		/* eof marker found */
 		i->eof_read = true;
 		goto eof;
 	}
-	rc = xlog_cursor_read_tx(i);
-	if (rc > 0) {
-		/** eof, go back to marker and retry later */
-		i->search_offset = marker_offset;
-		goto eof;
-	} else if (rc < 0) {
-		/** error, can't read byte at read_offset,
-		 * go to next and restart later
-		 * NOTE: we can have not a some kind of reading issue, but
-		 * in any case we can to find next tx and read it
-		 */
-		say_warn("xlog: failed to read xlog tx at %lld",
-			 marker_offset);
-		/* start reading from next byte from current marker */
-		i->search_offset = marker_offset + 1;
-		return -1;
+	/*
+	 * preserve current read position, some data can be
+	 * consumed while parsing, then restore read_buf
+	 * in case of error or eof
+	 */
+	ssize_t to_load;
+	while ((to_load = xlog_cursor_read_tx(i)) > 0) {
+		/* not enough data in read buffer */
+		int rc = xlog_cursor_ensure(i, to_load);
+		if (rc < 0)
+			return -1;
+		if (rc > 0)
+			goto eof;
 	}
-	/* update position */
-	i->search_offset = i->read_offset;
+	if (to_load < 0)
+		return -1;
 
 	return xlog_cursor_next_row(i, row);
 eof:
-	char *some_char;
-	if (i->eof_read &&
-	    xlog_cursor_load(i, sizeof(log_magic_t) + sizeof(char),
-			     &some_char) > (ssize_t)sizeof(log_magic_t)) {
-		tnt_error(XlogError, "%s: has some data after eof "
-			  "marker at %lld", i->name, i->read_offset);
-		return -1;
+	if (i->eof_read) {
+		/* eof marker readen, check that no more data in file */
+		rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
+
+		if (rc < 0)
+			return -1;
+		if (rc == 0) {
+			tnt_error(XlogError, "%s: has some data after "
+				  "eof marker at %lld", i->name,
+				  xlog_cursor_pos(i));
+			return -1;
+		}
 	}
 	return 1;
 }
@@ -1508,14 +1485,13 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	ssize_t rc;
-	char *meta_start;
-	rc = xlog_cursor_load(i, XLOG_META_LEN_MAX, &meta_start);
+	/*
+	 * we can have eof here, but this is no error,
+	 * because we don't know exact meta size
+	 */
+	rc = xlog_cursor_ensure(i, XLOG_META_LEN_MAX);
 	if (rc == -1)
 		goto error;
-	if (rc == 0) {
-		tnt_error(XlogError, "Unexpected end of file");
-		goto error;
-	}
 	rc = xlog_meta_parse(&i->meta,
 			     (const char **)&i->rbuf.rpos,
 			     (const char *)i->rbuf.wpos);
@@ -1525,9 +1501,6 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		tnt_error(XlogError, "Unexpected end of file");
 		goto error;
 	}
-	i->read_offset = i->rbuf.rpos - meta_start;
-	i->buf_offset = i->read_offset;
-	i->search_offset = i->read_offset;
 	snprintf(i->name, PATH_MAX, "%s", name);
 	return 0;
 error:
@@ -1571,11 +1544,10 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		goto error;
 	}
 	memcpy(dst, data, size);
+	i->read_offset = size;
 	ibuf_create(&i->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	int rc;
-	char *meta_start;
-	meta_start = i->rbuf.rpos;
 	rc = xlog_meta_parse(&i->meta,
 			     (const char **)&i->rbuf.rpos,
 			     (const char *)i->rbuf.wpos);
@@ -1585,9 +1557,6 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		tnt_error(XlogError, "Unexpected end of file");
 		goto error;
 	}
-	i->read_offset = i->rbuf.rpos - meta_start;
-	i->buf_offset = i->read_offset;
-	i->search_offset = i->read_offset;
 	snprintf(i->name, PATH_MAX, "%s", name);
 	return 0;
 error:
