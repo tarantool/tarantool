@@ -1151,12 +1151,13 @@ struct txv {
 	struct vy_tx *tx;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
-	/** Member of the transaction manager index. */
-	rb_node(struct txv) in_read_set;
-	/** Member of the transaction log index. */
-	rb_node(struct txv) in_write_set;
+	/** Member of either read or write set. */
+	rb_node(struct txv) in_set;
 	/** true for read tx, false for write tx */
 	bool is_read;
+	/** true if that is a read statement,
+	 * and there was no value found for that key */
+	bool is_gap;
 };
 
 typedef rb_tree(struct txv) read_set_t;
@@ -1485,8 +1486,7 @@ static int
 read_set_key_cmp(struct read_set_key *a, struct txv *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
-	       in_read_set, read_set_cmp, struct read_set_key *,
-	       read_set_key_cmp);
+	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
 read_set_search_key(read_set_t *rbtree, struct vy_stmt *stmt, int64_t tsn)
@@ -1571,29 +1571,32 @@ txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 	key.stmt = v->stmt;
 	key.tsn = 0;
 	/** Find the first value equal to or greater than key */
-	struct txv *abort = read_set_nsearch(tree, &key);
-	while (abort) {
+	for (struct txv *abort = read_set_nsearch(tree, &key);
+	     abort != NULL; abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt, format, key_def))
 			break;
 		/* Don't abort self. */
-		if (abort->tx != tx) {
-			/* the found tx can only be commited as read-only */
-			abort->tx->is_aborted = true;
-			/* Set the read view of the found (now read-only) tx */
-			if (abort->tx->vlsn == INT64_MAX) {
-				abort->tx->vlsn = env->xm->lsn;
-				tx_tree_insert(&env->xm->tree, abort->tx);
-				if (env->xm->vlsn == INT64_MAX)
-					env->xm->vlsn = abort->tx->vlsn;
-				else
-					assert(env->xm->vlsn <= env->xm->lsn);
-			} else {
-				assert(abort->tx->vlsn <= env->xm->lsn);
-				assert(abort->tx->vlsn >= env->xm->vlsn);
-			}
+		if (abort->tx == tx)
+			continue;
+		/* Delete of nothing does not cause a conflict */
+		if (abort->is_gap && v->stmt->type == IPROTO_DELETE)
+			continue;
+
+		/* the found tx can only be commited as read-only */
+		abort->tx->is_aborted = true;
+		/* Set the read view of the found (now read-only) tx */
+		if (abort->tx->vlsn == INT64_MAX) {
+			abort->tx->vlsn = env->xm->lsn;
+			tx_tree_insert(&env->xm->tree, abort->tx);
+			if (env->xm->vlsn == INT64_MAX)
+				env->xm->vlsn = abort->tx->vlsn;
+			else
+				assert(env->xm->vlsn <= env->xm->lsn);
+		} else {
+			assert(abort->tx->vlsn <= env->xm->lsn);
+			assert(abort->tx->vlsn >= env->xm->vlsn);
 		}
-		abort = read_set_next(tree, abort);
 	}
 }
 
@@ -1636,7 +1639,7 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 }
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
-		in_write_set, write_set_cmp, struct write_set_key *,
+		in_set, write_set_cmp, struct write_set_key *,
 		write_set_key_cmp);
 
 static struct txv *
@@ -1728,13 +1731,26 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
  */
 static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
-	    struct vy_stmt *key)
+	    struct vy_stmt *key, bool is_gap)
 {
+	if (tx->type == VINYL_TX_RO || tx->is_aborted)
+		return 0; /* no reason to track reads */
+	uint32_t part_count = vy_stmt_part_count(key, index->key_def);
+	if (part_count >= index->key_def->part_count) {
+		struct txv *v =
+			write_set_search_key(&tx->write_set, index, key);
+		if (v != NULL && (v->stmt->type == IPROTO_REPLACE ||
+				  v->stmt->type == IPROTO_DELETE)) {
+			/** reading from own write set is serializable */
+			return 0;
+		}
+	}
 	struct txv *v = read_set_search_key(&index->read_set, key, tx->tsn);
 	if (v == NULL) {
 		if ((v = txv_new(index, key, tx)) == NULL)
 			return -1;
 		v->is_read = true;
+		v->is_gap = is_gap;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 		read_set_insert(&index->read_set, v);
 	}
@@ -6091,6 +6107,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, stmt, tx);
 		v->is_read = false;
+		v->is_gap = false;
 		write_set_insert(&tx->write_set, v);
 		tx->write_set_version++;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
@@ -6298,7 +6315,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	if (vy_index_read(index, vykey, ITER_EQ, &vyresult, tx))
 		goto end;
 
-	if (tx != NULL && vy_tx_track(tx, index, vykey))
+	if (tx != NULL && vy_tx_track(tx, index, vykey, vyresult == NULL))
 		goto end;
 	if (vyresult == NULL) { /* not found */
 		*result = NULL;
@@ -9743,7 +9760,8 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	if (rc)
 		return -1;
 	c->n_reads++;
-	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key))
+	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key,
+			vyresult == NULL))
 		return -1;
 	if (vyresult == NULL)
 		return 0;

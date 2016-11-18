@@ -4,11 +4,14 @@
 -- The transactions make some read/write operations over several keys in
 --  a random order and commit at a random moment.
 -- After that all transactions are sorted in order of commit
--- With sublist of read-write transactions:
+-- With the sublist of read-write transactions committed w/o conflict:
 -- Test tries to make these transactions in memtex, one tx after another,
 --  without interleaving and compares select results with vinyl to make sure
 --  if the transaction could be serialized in order of commit or not
--- With sublist of read only transactions:
+-- With the sublist of read-write transactions committed with conflict:
+-- Test tries to make the same operations end ensures that the read results
+--  are not possible in memtx.
+-- With the sublist of read only transactions:
 -- Test tries to insert these transactions between other transactions and checks
 --  that it possible to get same results.
 
@@ -17,7 +20,7 @@ txn_proxy = require('txn_proxy')
 --settings
 num_tx = 10 --number of concurrent transactions
 num_key = 5 --number of keys that transactions use
-num_tests = 80 --number of test rounds to run
+num_tests = 50 --number of test rounds to run
 
 txs = {}
 order_of_commit = {}
@@ -26,12 +29,28 @@ stmts = {}
 errors = {}
 ops = {'begin', 'commit', 'select', 'replace', 'upsert', 'delete'}
 
-s1 = box.schema.create_space('test1', { engine = 'vinyl' })
-i1 = s1:create_index('test1', { type = 'TREE', parts = {1, 'uint'} })
-s2 = box.schema.create_space('test', { engine = 'memtx' })
-i2 = s2:create_index('test2', { type = 'TREE', parts = {1, 'uint'} })
+-- ignore case of unnecessary conflict:
+-- s:delete{1}
+-- t1:begin() t1:select{1} t1:replace{2} s:replace{1} s:delete{1} t1:commit()
+ignore_unnecessary_conflict1 = true
+
+--avoid first upsert in transaction
+--fails if num_tests = 1000
+ignore_unnecessary_conflict2 = true
 
 test_run:cmd("setopt delimiter ';'")
+
+s1 = box.schema.create_space('test1', { engine = 'vinyl' })
+i1 = s1:create_index('test', { type = 'TREE', parts = {1, 'uint'} })
+s2 = box.schema.create_space('test2', { engine = 'memtx' })
+i2 = s2:create_index('test', { type = 'TREE', parts = {1, 'uint'} })
+if ignore_unnecessary_conflict1 then
+    q1 = box.schema.create_space('testq1', { engine = 'vinyl' })
+    iq1 = q1:create_index('test', { type = 'TREE', parts = {1, 'uint'} })
+    q2 = box.schema.create_space('testq2', { engine = 'memtx' })
+    iq2 = q2:create_index('test', { type = 'TREE', parts = {1, 'uint'} })
+end;
+
 for i=1,num_tx do
     txs[i] = {con = txn_proxy.new()}
 end;
@@ -49,6 +68,12 @@ function my_equal(a, b)
     return true
 end;
 
+unique_value = 0
+function get_unique_value()
+    unique_value = unique_value + 1
+    return unique_value
+end;
+
 function prepare()
     order_of_commit = {}
     num_committed = 0
@@ -56,14 +81,13 @@ function prepare()
     for i=1,num_tx do
         txs[i].started = false
         txs[i].ended = false
-        if math.random(2) == 1 then
+        if math.random(3) == 1 then
             txs[i].read_only = true
         else
             txs[i].read_only = false
         end
         txs[i].read_only_checked = false
         txs[i].conflicted = false
-        txs[i].expected_to_be_conflicted = false
         txs[i].possible = nil
         txs[i].num_writes = 0
     end
@@ -71,10 +95,14 @@ function prepare()
     s2:truncate()
     for i=1,num_key do
         local r = math.random(5)
-        local v = math.random(10000)
+        local v = get_unique_value()
         if (r >= 2) then
             s1:replace{i, v}
-            s2:replace{i, v}
+            s2:replace{i, v }
+            if ignore_unnecessary_conflict1 then
+                q1:replace{i, v}
+                q2:replace{i, v }
+            end
         end
         if (r == 2) then
             s1:delete{i}
@@ -86,12 +114,15 @@ end;
 function apply(t, k, op)
     local tx = txs[t]
     local v = nil
+    local q = nil
+    local k = k
     if op == 'begin' then
         if tx.started then
             table.insert(errors, "assert #1")
         end
         tx.started = true
         tx.con:begin()
+        k = nil
     elseif op == 'commit' then
         if tx.ended or not tx.started then
             table.insert(errors, "assert #2")
@@ -107,31 +138,32 @@ function apply(t, k, op)
             if tx.num_writes == 0 then
                 tx.read_only = true
             end
-            for _,ws in pairs(stmts) do
-                if (ws.op == 'replace' or ws.op == 'upsert' or ws.op == 'delete') and ws.t == t then
-                    for _,rs in pairs(stmts) do
-                        if rs.op == 'select' and rs.t ~= t and rs.k == ws.k and not txs[rs.t].ended then
-                            txs[rs.t].expected_to_be_conflicted = true
-                        end
-                    end
-                end
-            end
         end
+        k = nil
     elseif op == 'select' then
         v = tx.con('s1:select{'..k..'}')
+        if ignore_unnecessary_conflict1 then
+            q = tx.con('q1:select{'..k..'}')
+        end
     elseif op == 'replace' then
-        v = math.random(10000)
+        v = get_unique_value()
         tx.con('s1:replace{'..k..','..v..'}')
+        if ignore_unnecessary_conflict1 then
+            tx.con('q1:replace{'..k..','..v..'}')
+        end
         tx.num_writes = tx.num_writes + 1
     elseif op == 'upsert' then
-        v = math.random(10000)
+        v = math.random(100)
         tx.con('s1:upsert({'..k..','..v..'}, {{"+", 2,'..v..'}})')
+        if ignore_unnecessary_conflict1 then
+            tx.con('q1:upsert({'..k..','..v..'}, {{"+", 2,'..v..'}})')
+        end
         tx.num_writes = tx.num_writes + 1
     elseif op == 'delete' then
         tx.con('s1:delete{'..k..'}')
         tx.num_writes = tx.num_writes + 1
     end
-    table.insert(stmts, {t=t, k=k, op=op, v=v})
+    table.insert(stmts, {t=t, k=k, op=op, v=v, q=q})
 end;
 
 function act()
@@ -147,6 +179,17 @@ function act()
                 op_no = math.random(6)
             end
             local op = ops[op_no]
+            if ignore_unnecessary_conflict2 then
+                local were_ops = false
+                for i,st in ipairs(stmts) do
+                    if st.t == t and st.k == k and st.op ~= 'commit' then
+                        were_ops = true
+                    end
+                end
+                if op == 'upsert' and not were_ops then
+                    op = 'replace'
+                end
+            end
             if op ~= 'commit' or tx.started then
                 if not tx.started then
                     apply(t, k, 'begin')
@@ -172,7 +215,7 @@ function is_rdonly_tx_possible(t)
     return true
 end;
 
-function is_write_tx_possible(t)
+function try_to_apply_tx(t)
     for _,s in pairs(stmts) do
         if s.t == t then
             if s.op == 'select' then
@@ -180,10 +223,22 @@ function is_write_tx_possible(t)
                 if not my_equal(s.v, cmp_with) then
                     return false
                 end
+                if ignore_unnecessary_conflict1 then
+                    cmp_with = {q2:select{s.k}}
+                    if not my_equal(s.q, cmp_with) then
+                        return false
+                    end
+                end
             elseif s.op == 'replace' then
                 s2:replace{s.k, s.v}
+                if ignore_unnecessary_conflict1 then
+                    q2:replace{s.k, s.v }
+                end
             elseif s.op == 'upsert' then
                 s2:upsert({s.k, s.v}, {{'+', 2, s.v}})
+                if ignore_unnecessary_conflict1 then
+                    q2:upsert({s.k, s.v}, {{'+', 2, s.v}})
+                end
             elseif s.op == 'delete' then
                 s2:delete{s.k}
             end
@@ -209,23 +264,19 @@ function check()
                 table.insert(errors, "read-only conflicted " .. i)
             end
             txs[i].possible = false
-        else
-            if txs[i].conflicted then
-                if not txs[i].expected_to_be_conflicted then
-                    table.insert(errors, "conflicted unexpectedly " .. i)
-                end
-            else
-                if txs[i].expected_to_be_conflicted then
-                    table.insert(errors, "not conflicted unexpectedly " .. i)
-                end
-            end
         end
     end
     check_rdonly_possibility()
     for _,t in ipairs(order_of_commit) do
         if not txs[t].read_only then
-            if not txs[t].conflicted then
-                if not is_write_tx_possible(t) then
+            if txs[t].conflicted then
+                box.begin()
+                if try_to_apply_tx(t) then
+                    table.insert(errors, "could be serializable " .. t)
+                end
+                box.rollback()
+            else
+                if not try_to_apply_tx(t) then
                     table.insert(errors, "not serializable " .. t)
                 end
                 if not my_equal(txs[t].select_all, s2:select{}) then
