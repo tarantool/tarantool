@@ -1746,6 +1746,18 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 			m->vlsn = oldest ? oldest->vlsn : INT64_MAX;
 		}
 	}
+
+	/** Abort all open cursors. */
+	struct vy_cursor *c;
+	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
+		c->tx = NULL;
+
+	/* Remove from the conflict manager index */
+	struct txv *v;
+	stailq_foreach_entry(v, &tx->log, next_in_log)
+		if (v->is_read)
+			read_set_remove(&v->index->read_set, v);
+
 	if (tx->type == VINYL_TX_RO)
 		m->count_rd--;
 	else
@@ -1755,24 +1767,13 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 static void
 vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 {
-	if (tx->state != VINYL_TX_COMMIT) {
-		/** Abort all open cursors. */
-		struct vy_cursor *c;
-		rlist_foreach_entry(c, &tx->cursors, next_in_tx)
-			c->tx = NULL;
-
+	if (tx->state == VINYL_TX_READY) {
+		/** freewill rollback, vy_prepare have not been called yet */
 		tx_manager_end(tx->manager, tx);
 	}
 	struct txv *v, *tmp;
-	uint32_t count = 0;
-	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
-		/* Remove from the conflict manager index */
-		if (v->is_read)
-			read_set_remove(&v->index->read_set, v);
-		/* Don't touch write_set, we're deleting all keys. */
+	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
 		txv_delete(v);
-		count++;
-	}
 	e->stat->tx_rlb++;
 }
 
@@ -6198,6 +6199,7 @@ int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
 	   const char *tuple_begin, const char *tuple_end)
 {
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	struct vy_stmt *vystmt = vy_stmt_new_replace(tuple_begin, tuple_end,
 						     index->format,
 						     index->key_def);
@@ -6213,6 +6215,7 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *stmt, const char *stmt_end,
 	  const char *expr, const char *expr_end, int index_base)
 {
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(index_base == 0 || index_base == 1);
 	struct vy_stmt *vystmt;
 	char index_base_buf[32];
@@ -6237,6 +6240,7 @@ int
 vy_delete(struct vy_tx *tx, struct vy_index *index,
 	  const char *key, uint32_t part_count)
 {
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(part_count <= index->key_def->part_count);
 	struct vy_stmt *vykey;
 	vykey = vy_stmt_new_select(key, part_count);
@@ -6252,36 +6256,33 @@ void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
 	vy_tx_rollback(e, tx);
+	TRASH(tx);
 	free(tx);
 }
 
 int
 vy_prepare(struct vy_env *e, struct vy_tx *tx)
 {
-	(void) e;
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
+	int rc = 0;
 
 	/* proceed read-only transactions */
 	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
-		e->stat->tx_conflict++;
 		tx->state = VINYL_TX_ROLLBACK;
+		e->stat->tx_conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
+		rc = -1;
+	} else {
+		tx->state = VINYL_TX_COMMIT;
+		/** Abort read/write intersection */
+		struct txv *v = write_set_first(&tx->write_set);
+		for (; v != NULL; v = write_set_next(&tx->write_set, v))
+			txv_abort_all(e, tx, v);
 	}
-
-	struct txv *v = write_set_first(&tx->write_set);
-	for (; v != NULL; v = write_set_next(&tx->write_set, v))
-		txv_abort_all(e, tx, v);
-
-	/** Abort all open cursors. */
-	struct vy_cursor *c;
-	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
-		c->tx = NULL;
 
 	tx_manager_end(tx->manager, tx);
 
-	tx->state = VINYL_TX_COMMIT;
 	/*
 	 * A half committed transaction is no longer
 	 * being part of concurrent index, but still can be
@@ -6289,7 +6290,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 	 * Yet, it is important to maintain external
 	 * serial commit order.
 	 */
-	return 0;
+	return rc;
 }
 
 int
@@ -6316,12 +6317,11 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
-		if (v->is_read)
-			read_set_remove(&v->index->read_set, v);
-		/* Don't touch write_set, we're deleting all keys. */
 		txv_delete(v);
 	}
 	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
+
+	TRASH(tx);
 	free(tx);
 
 	vy_quota_use(e->quota, write_size, &e->scheduler->scheduler_cond);
@@ -6384,6 +6384,7 @@ int
 vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
        uint32_t part_count, struct tuple **result)
 {
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	int rc = -1;
 	struct vy_stmt *vyresult = NULL;
 	struct vy_stmt *vykey;
