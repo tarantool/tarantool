@@ -1113,6 +1113,8 @@ struct vy_range {
 	int        merge_count;
 	/** Points to the range being compacted to this range. */
 	struct vy_range *shadow;
+	/** List of ranges this range is being compacted to. */
+	struct rlist compact_list;
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   nodecompact;
 	struct heap_node   nodedump;
@@ -2881,6 +2883,7 @@ vy_range_new(struct vy_index *index, int64_t id)
 	range->index = index;
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
+	rlist_create(&range->compact_list);
 	return range;
 }
 
@@ -3209,12 +3212,12 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 }
 
 static int
-vy_range_compact_prepare(struct vy_range *range,
-			 struct vy_range **parts, int *p_n_parts)
+vy_range_compact_prepare(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
 	struct vy_stmt *split_key = NULL;
 	const char *split_key_raw;
+	struct vy_range *parts[2];
 	int n_parts = 1;
 	int i;
 
@@ -3260,12 +3263,10 @@ vy_range_compact_prepare(struct vy_range *range,
 		 * While compaction is in progress, new statements are
 		 * inserted to new ranges while read iterator walks over
 		 * the old range (see vy_range_iterator_next()). To make
-		 * new statements visible, link new ranges' in-memory
-		 * trees to the old range.
+		 * new statements visible, link new ranges to the old
+		 * range via ->compact_list.
 		 */
-		r->mem->next = range->mem;
-		range->mem = r->mem;
-		range->mem_count++;
+		rlist_add_tail(&range->compact_list, &r->compact_list);
 		r->shadow = range;
 
 		vy_index_add_range(index, r);
@@ -3273,8 +3274,6 @@ vy_range_compact_prepare(struct vy_range *range,
 	}
 	range->version++;
 	index->version++;
-
-	*p_n_parts = n_parts;
 	return 0;
 fail:
 	for (i = 0; i < n_parts; i++) {
@@ -3287,34 +3286,30 @@ fail:
 }
 
 static void
-vy_range_compact_commit(struct vy_range *range, int n_parts,
-			struct vy_range **parts)
+vy_range_compact_commit(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-	int i;
+	struct vy_range *r, *tmp;
+	bool split = (rlist_first(&range->compact_list) !=
+		      rlist_last(&range->compact_list));
 
 	say_debug("range compact complete: %s", vy_range_str(range));
 
 	vy_index_unacct_range(index, range);
-	for (i = n_parts - 1; i >= 0; i--) {
-		struct vy_range *r = parts[i];
-
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
 		/*
-		 * The range has been compacted and so can now be
-		 * deleted from memory. Unlink in-memory trees that
-		 * belong to new ranges so that they won't get destroyed
-		 * along with it.
+		 * New ranges' runs now contain all statements
+		 * of the old range, so we can now unlink them
+		 * and delete the old range.
 		 */
-		assert(range->mem == r->mem);
-		range->mem = range->mem->next;
-		r->mem->next = NULL;
+		rlist_del(&r->compact_list);
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
 		vy_index_acct_range(index, r);
 
 		/* Account merge w/o split. */
-		if (n_parts == 1 && r->run != NULL)
+		if (!split && r->run != NULL)
 			r->merge_count = range->merge_count + 1;
 
 		/* Make the new range visible to the scheduler. */
@@ -3325,17 +3320,14 @@ vy_range_compact_commit(struct vy_range *range, int n_parts,
 }
 
 static void
-vy_range_compact_abort(struct vy_range *range, int n_parts,
-		       struct vy_range **parts)
+vy_range_compact_abort(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-	int i;
+	struct vy_range *r, *tmp;
 
 	say_debug("range compact failed: %s", vy_range_str(range));
 
-	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i];
-
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
 		say_debug("range delete: %s", vy_range_str(r));
 		vy_index_remove_range(index, r);
 
@@ -3351,7 +3343,13 @@ vy_range_compact_abort(struct vy_range *range, int n_parts,
 			range->min_lsn = r->min_lsn;
 		assert(range->min_lsn <= r->min_lsn);
 		range->used += r->used;
+
+		r->mem->next = range->mem;
+		range->mem = r->mem;
+		range->mem_count++;
 		r->mem = NULL;
+
+		rlist_del(&r->compact_list);
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
@@ -3934,8 +3932,6 @@ struct vy_task {
 		} dump;
 		struct {
 			struct vy_range *range;
-			int n_parts;
-			struct vy_range *parts[2];
 		} compact;
 	};
 	/**
@@ -4093,9 +4089,8 @@ vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->compact.range;
-	struct vy_range **parts = task->compact.parts;
-	int n_parts = task->compact.n_parts;
 	struct vy_write_iterator *wi;
+	struct vy_range *r;
 	int rc = 0;
 
 	assert(range->nodedump.pos == UINT32_MAX);
@@ -4106,36 +4101,25 @@ vy_task_compact_execute(struct vy_task *task)
 		return -1;
 
 	/*
-	 * Skip in-memory indexes that belong to new ranges,
-	 * because they are mutable.
-	 */
-	struct vy_mem *mem = range->mem;
-	for (int i = n_parts - 1; i >= 0; i--) {
-		assert(mem == parts[i]->mem);
-		mem = mem->next;
-	}
-
-	/*
 	 * Prepare for merge. Note, merge iterator requires newer
 	 * sources to be added first so mems are added before runs.
 	 */
-	if (vy_write_iterator_add_mem(wi, mem) != 0 ||
+	if (vy_write_iterator_add_mem(wi, range->mem) != 0 ||
 	    vy_write_iterator_add_run(wi, range) != 0) {
 		rc = -1;
 		goto out;
 	}
 
-	assert(n_parts > 0);
+	assert(!rlist_empty(&range->compact_list));
 	struct vy_stmt *curr_stmt;
 	/* Start iteration. */
 	rc = vy_write_iterator_next(wi, &curr_stmt);
 	if (rc || curr_stmt == NULL)
 		goto out;
-	for (int i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i];
+	rlist_foreach_entry(r, &range->compact_list, compact_list) {
 		struct vy_run *new_run = NULL;
 
-		if (i > 0) {
+		if (&r->compact_list != rlist_first(&range->compact_list)) {
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
 				     {diag_set(ClientError, ER_INJECTION,
 					       "vinyl range split");
@@ -4177,13 +4161,11 @@ static void
 vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_range *range = task->compact.range;
-	struct vy_range **parts = task->compact.parts;
-	int n_parts = task->compact.n_parts;
 
 	if (task->status != 0)
-		vy_range_compact_abort(range, n_parts, parts);
+		vy_range_compact_abort(range);
 	else
-		vy_range_compact_commit(range, n_parts, parts);
+		vy_range_compact_commit(range);
 }
 
 static struct vy_task *
@@ -4198,8 +4180,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	if (!task)
 		return NULL;
 
-	if (vy_range_compact_prepare(range, task->compact.parts,
-				     &task->compact.n_parts) != 0) {
+	if (vy_range_compact_prepare(range) != 0) {
 		vy_task_delete(pool, task);
 		return NULL;
 	}
@@ -9263,9 +9244,21 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
 	assert(itr->curr_range->shadow == NULL);
+	/*
+	 * If the range is under compaction, add in-memory indexes of
+	 * ranges being compacted to it first. They are mutable.
+	 */
+	struct vy_range *r;
+	rlist_foreach_entry(r, &itr->curr_range->compact_list, compact_list) {
+		struct vy_merge_src *sub_src = vy_merge_iterator_add(
+			&itr->merge_iterator, true, true);
+		vy_mem_iterator_open(&sub_src->mem_iterator, r->mem,
+				     itr->order, itr->key, itr->vlsn);
+	}
+	bool in_compact = !rlist_empty(&itr->curr_range->compact_list);
 	for (struct vy_mem *mem = itr->curr_range->mem; mem; mem = mem->next) {
 		/* only the newest range is mutable */
-		bool is_mutable = (mem == itr->curr_range->mem);
+		bool is_mutable = (!in_compact && mem == itr->curr_range->mem);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, is_mutable, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, mem, itr->order,
