@@ -581,11 +581,11 @@ index1:update({0, 'fwoen'}, {{'=', 3, 5}})
 ...
 index2:update({'fwoen'}, {'=', 3, 1000})
 ---
-- error: More than one tuple found by get()
+- error: Get() doesn't support partial keys and non-unique indexes
 ...
 index3:update({324, 'fwoen', 3}, {{'-', 3, 100}})
 ---
-- error: More than one tuple found by get()
+- error: Get() doesn't support partial keys and non-unique indexes
 ...
 space:drop()
 ---

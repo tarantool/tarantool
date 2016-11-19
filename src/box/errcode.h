@@ -93,7 +93,7 @@ struct errcode_record {
 	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match space field count %u") \
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		"Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
-	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"More than one tuple found by get()") \
+	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"Get() doesn't support partial keys and non-unique indexes") \
 	/* 42 */_(ER_ACCESS_DENIED,		"%s access on %s is denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		"Failed to create user '%s': %s") \
 	/* 44 */_(ER_DROP_USER,			"Failed to drop user or role '%s': %s") \
