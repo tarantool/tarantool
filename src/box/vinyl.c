@@ -3079,17 +3079,20 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 
 	/* We don't need to keep metadata file open any longer. */
 	close(fd);
+	fd = -1;
 
-	/* Prepare data file for reading. */
-	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_RUN);
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		diag_set(SystemError, "failed to open file '%s'", path);
-		goto fail;
+	/* Prepare data file for reading if the run is not empty. */
+	if (h->count > 0) {
+		vy_run_snprint_path(path, sizeof(path), range, run_no,
+				    VY_FILE_RUN);
+		run->fd = open(path, O_RDONLY);
+		if (run->fd < 0) {
+			diag_set(SystemError, "failed to open file '%s'", path);
+			goto fail;
+		}
 	}
 
 	/* Finally, link run to the range. */
-	run->fd = fd;
 	rlist_add_entry(&range->runs, run, link);
 	range->run_count++;
 	return 0;
@@ -3147,28 +3150,30 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   size_t *written)
 {
 	assert(stmt);
-	assert(*stmt);
 	struct vy_index *index = range->index;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
-	/*
-	 * All statements in the range could have cancelled each other.
-	 * Do not create an empty run file in this case.
-	 */
-	if (range->end != NULL &&
-	    vy_stmt_compare_with_key(*stmt, range->end, index->format,
-				     index->key_def) >= 0)
-		return 0;
-
 	struct vy_run *run = vy_run_new();
 	if (run == NULL)
 		return -1;
 
-	if (vy_run_write_data(range, run, wi, stmt) != 0 ||
-	    vy_run_write_index(range, run) != 0) {
+	/*
+	 * All statements in the range could have cancelled each other.
+	 * Do not create an empty data file in this case, but still
+	 * write run header for the sake of recovery.
+	 */
+	bool empty = (*stmt == NULL ||
+		      (range->end != NULL &&
+		       vy_stmt_compare_with_key(*stmt, range->end,
+				index->format, index->key_def) >= 0));
+	if (!empty && vy_run_write_data(range, run, wi, stmt) != 0) {
+		vy_run_delete(run);
+		return -1;
+	}
+	if (vy_run_write_index(range, run) != 0) {
 		vy_run_delete(run);
 		return -1;
 	}
@@ -3520,71 +3525,6 @@ fail:
 	return -1;
 }
  
-/*
- * For each hole in the index (prev->end != next->begin),
- * make a new range filling it (new->begin = prev->end,
- * new->end = next->begin).
- */
-static int
-vy_index_patch_holes(struct vy_index *index)
-{
-	struct vy_range *prev, *next = NULL;
-
-	do {
-		struct vy_stmt *begin, *end;
-		struct vy_range *new;
-
-		prev = next;
-		next = (next == NULL) ?
-			vy_range_tree_first(&index->tree) :
-			vy_range_tree_next(&index->tree, next);
-
-		if (prev != NULL && next != NULL) {
-			begin = prev->end;
-			assert(begin != NULL);
-			end = next->begin;
-			assert(end != NULL);
-			int cmp = vy_key_compare(begin, end, index->key_def);
-			if (cmp == 0)
-				continue;
-			assert(cmp < 0);
-			/* Hole between two adjacent ranges. */
-		} else if (next != NULL) {
-			begin = NULL;
-			end = next->begin;
-			if (end == NULL)
-				continue;
-			/* No leftmost range. */
-		} else if (prev != NULL) {
-			begin = prev->end;
-			end = NULL;
-			if (begin == NULL)
-				continue;
-			/* No rightmost range. */
-		} else {
-			/* Empty index. */
-			assert(index->range_count == 0);
-			begin = end = NULL;
-		}
-
-		new = vy_range_new(index, 0);
-		if (new == NULL)
-			return -1;
-
-		new->begin = begin;
-		if (begin)
-			vy_stmt_ref(begin);
-
-		new->end = end;
-		if (end)
-			vy_stmt_ref(end);
-
-		vy_index_add_range(index, new);
-	} while (next != NULL);
-
-	return 0;
-}
-
 /**
  * A quick intro into Vinyl cosmology and file format
  * --------------------------------------------------
@@ -3662,19 +3602,35 @@ vy_index_open_ex(struct vy_index *index)
 	if (range != NULL)
 		vy_index_recover_range(index, range);
 
-	/*
-	 * Successful compaction may create a range w/o statements, and we
-	 * do not store such ranges on disk. Hence we silently create a
-	 * new range for each gap found in the index.
-	 */
-	if (vy_index_patch_holes(index) != 0)
-		goto out;
+	if (index->range_count == 0) {
+		/*
+		 * Special case: index hasn't been dumped yet.
+		 * Create a range for it.
+		 */
+		range = vy_range_new(index, 0);
+		if (range == NULL)
+			goto out;
+		vy_index_add_range(index, range);
+	}
 
-	/* Update index size and make ranges visible to the scheduler. */
+	/*
+	 * Update index size and make ranges visible to the scheduler.
+	 * Also, make sure that the index does not have holes, i.e.
+	 * all data were recovered.
+	 */
+	struct vy_range *prev = NULL;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
-	     range = vy_range_tree_next(&index->tree, range)) {
+	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
+		if ((prev == NULL && range->begin != NULL) ||
+		    (prev != NULL && !vy_range_is_adjacent(prev, range,
+							   index->key_def)))
+			break;
 		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(index->env->scheduler, range);
+	}
+	if (range != NULL || prev->end != NULL) {
+		diag_set(ClientError, ER_VINYL, "range missing");
+		goto out;
 	}
 
 	rc = 0; /* success */
@@ -4010,7 +3966,7 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_stmt *stmt;
 	/* Start iteration. */
 	rc = vy_write_iterator_next(wi, &stmt);
-	if (rc || stmt == NULL)
+	if (rc != 0)
 		goto out;
 	rc = vy_range_write_run(range, wi, &task->run, &stmt,
 				&task->dump_size);
@@ -4141,7 +4097,7 @@ vy_task_compact_execute(struct vy_task *task)
 	struct vy_stmt *curr_stmt;
 	/* Start iteration. */
 	rc = vy_write_iterator_next(wi, &curr_stmt);
-	if (rc || curr_stmt == NULL)
+	if (rc != 0)
 		goto out;
 	rlist_foreach_entry(r, &range->compact_list, compact_list) {
 		struct vy_run *new_run = NULL;
@@ -4167,11 +4123,6 @@ vy_task_compact_execute(struct vy_task *task)
 		if (new_run != NULL) {
 			rlist_add_entry(&r->runs, new_run, link);
 			r->run_count++;
-		}
-
-		if (curr_stmt == NULL) {
-			/* This iteration was last. */
-			goto out;
 		}
 	}
 out:
@@ -9124,6 +9075,8 @@ static NODISCARD int
 vy_write_iterator_add_run(struct vy_write_iterator *wi,
 			  struct vy_range *range, struct vy_run *run)
 {
+	if (run->fd < 0)
+		return 0; /* empty run */
 	struct vy_merge_src *src;
 	src = vy_merge_iterator_add(&wi->mi, false, false);
 	if (src == NULL)
@@ -9323,6 +9276,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	assert(itr->curr_range->shadow == NULL);
 	struct vy_run *run;
 	rlist_foreach_entry(run, &itr->curr_range->runs, link) {
+		if (run->fd < 0)
+			continue; /* empty run */
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, itr->curr_range,
