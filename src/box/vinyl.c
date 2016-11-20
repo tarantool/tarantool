@@ -1204,7 +1204,7 @@ struct vy_index {
 	/* A tuple format for key_def. */
 	struct tuple_format *format;
 
-	/** Member of env->db or scheduler->shutdown. */
+	/** Member of env->indexes. */
 	struct rlist link;
 	/**
 	 * For each index range list modification,
@@ -2016,17 +2016,9 @@ static struct vy_range *
 vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
-	(void)arg;
-	vy_range_delete(range);
-	return NULL;
-}
-
-static struct vy_range *
-vy_range_tree_unsched_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
-{
-	(void)t;
 	struct vy_index *index = (struct vy_index *) arg;
 	vy_scheduler_remove_range(index->env->scheduler, range);
+	vy_range_delete(range);
 	return NULL;
 }
 
@@ -3984,10 +3976,7 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 static void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
-	if (task->index) {
-		vy_index_unref(task->index);
-		task->index = NULL;
-	}
+	vy_index_unref(task->index);
 	diag_destroy(&task->diag);
 	TRASH(task);
 	mempool_free(pool, task);
@@ -4222,38 +4211,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	return task;
 }
 
-static int
-vy_task_drop_execute(struct vy_task *task)
-{
-	struct vy_index *index = task->index;
-	assert(index->refs == 1); /* referenced by this task */
-	return 0;
-}
-
-static void
-vy_task_drop_complete(struct vy_task *task)
-{
-	struct vy_index *index = task->index;
-	assert(index->refs == 1); /* referenced by this task */
-	/*
-	 * Since we allocate extents for in-memory trees from a memory
-	 * pool, we must destroy the index in the tx thread.
-	 */
-	vy_index_delete(index);
-	task->index = NULL;
-}
-
-static struct vy_task *
-vy_task_drop_new(struct mempool *pool, struct vy_index *index)
-{
-	static struct vy_task_ops drop_ops = {
-		.execute = vy_task_drop_execute,
-		.complete = vy_task_drop_complete,
-	};
-
-	return vy_task_new(pool, index, &drop_ops);
-}
-
 /* Scheduler Task }}} */
 
 /* {{{ Scheduler */
@@ -4305,7 +4262,6 @@ heap_compact_less(struct heap_node *a, struct heap_node *b)
 
 struct vy_scheduler {
 	pthread_mutex_t        mutex;
-	struct rlist   shutdown;
 	struct vy_env    *env;
 	heap_t dump_heap;
 	heap_t compact_heap;
@@ -4403,7 +4359,6 @@ vy_scheduler_new(struct vy_env *env)
 	diag_create(&scheduler->diag);
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
-	rlist_create(&scheduler->shutdown);
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
 	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
@@ -4532,57 +4487,21 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 }
 
 static int
-vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
-			   struct vy_index *index, struct vy_task **ptask)
-{
-	if (index->refs > 0) {
-		*ptask = NULL;
-		return 0; /* index still has tasks */
-	}
-
-	/* make sure the index won't get scheduled any more */
-	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_unsched_cb, index);
-
-	*ptask = vy_task_drop_new(&scheduler->task_pool, index);
-	if (*ptask == NULL)
-		return -1;
-	return 0; /* new task */
-}
-
-static int
 vy_schedule(struct vy_scheduler *scheduler, int64_t vlsn,
 	    struct vy_task **ptask)
 {
-	/* Schedule all pending shutdowns. */
-	struct vy_index *index, *n;
-	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
-		*ptask = NULL;
-		int rc = vy_scheduler_peek_shutdown(scheduler, index, ptask);
-		if (rc < 0)
-			return rc;
-		if (*ptask == NULL)
-			continue;
-		/* Remove from scheduler->shutdown list */
-		rlist_del(&index->link);
-		return 0;
-	}
+	int rc;
 
-	/* peek an index */
 	*ptask = NULL;
 	if (rlist_empty(&scheduler->env->indexes))
 		return 0;
 
-	int rc;
-	*ptask = NULL;
-
-	/* dumping */
 	rc = vy_scheduler_peek_dump(scheduler, ptask);
 	if (rc != 0)
 		return rc; /* error */
 	if (*ptask != NULL)
 		goto found;
 
-	/* compaction */
 	rc = vy_scheduler_peek_compact(scheduler, ptask);
 	if (rc != 0)
 		return rc; /* error */
@@ -5405,10 +5324,9 @@ vy_index_ref(struct vy_index *index)
 static void
 vy_index_unref(struct vy_index *index)
 {
-	/* reduce reference counter */
 	assert(index->refs > 0);
-	--index->refs;
-	/* index will be deleted by scheduler if ref == 0 */
+	if (--index->refs == 0)
+		vy_index_delete(index);
 }
 
 int
@@ -5418,10 +5336,7 @@ vy_index_drop(struct vy_index *index)
 	 * don't drop/recreate index in local wal recovery mode if all
 	 * operations are already done.
 	 */
-	struct vy_env *e = index->env;
-
-	/* schedule index shutdown or drop */
-	rlist_move(&e->scheduler->shutdown, &index->link);
+	rlist_del(&index->link);
 	vy_index_unref(index);
 	return 0;
 }
