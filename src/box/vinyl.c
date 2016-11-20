@@ -1899,16 +1899,6 @@ vy_run_snprint_path(char *buf, size_t size, struct vy_range *range,
 }
 
 static void
-vy_run_unlink_file(struct vy_range *range,
-		   int run_no, enum vy_file_type type)
-{
-	char path[PATH_MAX];
-	vy_run_snprint_path(path, sizeof(path), range, run_no, type);
-	if (unlink(path) < 0)
-		say_syserror("failed to unlink file '%s'", path);
-}
-
-static void
 vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 {
 	index->run_count++;
@@ -3104,21 +3094,6 @@ vy_range_delete(struct vy_range *range)
 	free(range);
 }
 
-static void
-vy_range_purge(struct vy_range *range)
-{
-	ERROR_INJECT(ERRINJ_VY_GC, return);
-
-	int run_no = range->run_count;
-	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, link) {
-		assert(run_no > 0);
-		run_no--;
-		vy_run_unlink_file(range, run_no, VY_FILE_INDEX);
-		vy_run_unlink_file(range, run_no, VY_FILE_RUN);
-	}
-}
-
 /*
  * Create a new run for a range and write statements returned by a write
  * iterator to the run file until the end of the range is encountered.
@@ -4214,9 +4189,7 @@ vy_task_compact_execute(struct vy_task *task)
 out:
 	vy_write_iterator_delete(wi);
 
-	/* Remove old range file on success. */
-	if (rc == 0)
-		vy_range_purge(range);
+	/* Old run files are removed on snapshot. */
 	return rc;
 }
 
@@ -4249,21 +4222,11 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	return task;
 }
 
-static struct vy_range *
-vy_range_tree_drop_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
-{
-	(void)t;
-	(void)arg;
-	vy_range_purge(range);
-	return NULL;
-}
-
 static int
 vy_task_drop_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	assert(index->refs == 1); /* referenced by this task */
-	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_drop_cb, NULL);
 	return 0;
 }
 
@@ -4949,6 +4912,9 @@ vy_checkpoint(struct vy_env *env)
 	return 0;
 }
 
+static void
+vy_index_gc(struct vy_index *index);
+
 int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
@@ -4964,6 +4930,12 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
 	}
+
+	/* Remove old run files. */
+	struct vy_index *index;
+	rlist_foreach_entry(index, &env->indexes, link)
+		vy_index_gc(index);
+
 	return 0;
 }
 
@@ -4975,6 +4947,8 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 static void
 vy_index_gc(struct vy_index *index)
 {
+	ERROR_INJECT(ERRINJ_VY_GC, return);
+
 	struct mh_i32ptr_t *ranges = NULL;
 	DIR *dir = NULL;
 
@@ -6594,11 +6568,6 @@ vy_end_recovery(struct vy_env *e)
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
-
-	struct vy_index *index;
-	rlist_foreach_entry(index, &e->indexes, link)
-		vy_index_gc(index);
-
 	/* Start scheduler if there is at least one index */
 	if (!rlist_empty(&e->indexes))
 		vy_scheduler_start(e->scheduler);
