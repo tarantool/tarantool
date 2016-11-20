@@ -2650,14 +2650,11 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  *  @retval -1 error occured
  */
 static int
-vy_run_write_page(struct vy_run *run, int index_fd,
-		  struct xlog *data_xlog,
-		  struct vy_write_iterator *wi,
-		  struct vy_stmt *split_key, struct vy_index *index,
-		  uint32_t page_size, uint32_t *page_info_capacity,
+vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
+		  struct vy_write_iterator *wi, struct vy_stmt *split_key,
+		  struct vy_index *index, uint32_t *page_info_capacity,
 		  struct vy_stmt **curr_stmt)
 {
-	(void) index_fd;
 	assert(curr_stmt);
 	assert(*curr_stmt);
 	struct vy_run_info *run_info = &run->info;
@@ -2698,7 +2695,7 @@ vy_run_write_page(struct vy_run *run, int index_fd,
 			rc = 1;
 			break;
 		}
-		if (obuf_size(&data_xlog->obuf) >= page_size)
+		if (obuf_size(&data_xlog->obuf) >= index->key_def->opts.page_size)
 			break;
 
 		if (first_stmt) {
@@ -2776,15 +2773,68 @@ out:
  *  @retval -1 error occured
  */
 static int
-vy_run_write(struct vy_range *range, struct vy_run *run,
-	     int index_fd, struct xlog *data_xlog,
-	     struct vy_write_iterator *wi,
-	     struct vy_stmt *split_key, struct vy_index *index,
-	     uint32_t page_size, struct vy_stmt **curr_stmt)
+vy_run_write_data(struct vy_range *range, struct vy_run *run,
+		  struct vy_write_iterator *wi, struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
 	assert(*curr_stmt);
-	int rc = 0;
+
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), range,
+			    range->run_count, VY_FILE_RUN);
+	struct xlog *data_xlog = malloc(sizeof(*data_xlog));
+	struct xlog_meta meta = {
+		.filetype = "RUN",
+		.version = "0.13",
+		.server_uuid = SERVER_UUID,
+	};
+	if (xlog_create(data_xlog, path, &meta) < 0) {
+		free(data_xlog);
+		return -1;
+	}
+
+	/*
+	 * Read from the iterator until it's exhausted or
+	 * the split key is reached.
+	 */
+	run->info.min_lsn = INT64_MAX;
+	assert(run->page_infos == NULL);
+	uint32_t page_infos_capacity = 0;
+	int rc;
+	do {
+		rc = vy_run_write_page(run, data_xlog, wi,
+				       range->end, range->index,
+				       &page_infos_capacity, curr_stmt);
+		if (rc < 0)
+			goto err;
+	} while (rc == 0);
+
+	/* Sync data and link the file to the final name. */
+	if (xlog_sync(data_xlog) < 0 ||
+	    xlog_rename(data_xlog) < 0)
+		goto err;
+
+	run->fd = data_xlog->fd;
+	xlog_close(data_xlog, true);
+	return 0;
+err:
+	xlog_close(data_xlog, false);
+	return -1;
+}
+
+/**
+ * Write run header to file.
+ */
+static int
+vy_run_write_index(struct vy_range *range, struct vy_run *run)
+{
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", range->index->path);
+	int fd = mkstemp(path);
+	if (fd < 0) {
+		diag_set(SystemError, "failed to create file '%s'", path);
+		return -1;
+	}
 
 	/*
 	 * Get data file size to truncate it in case of error
@@ -2800,29 +2850,14 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 
 	/* write run info header and adjust size */
 	uint32_t header_size = sizeof(*header);
-	if (vy_write_file(index_fd, header, header_size) < 0)
+	if (vy_write_file(fd, header, header_size) < 0)
 		goto err_file;
 	header->size += header_size;
-
-	/*
-	 * Read from the iterator until it's exhausted or
-	 * the split key is reached.
-	 */
-	assert(run->page_infos == NULL);
-	uint32_t page_infos_capacity = 0;
-	do {
-		rc = vy_run_write_page(run, index_fd, data_xlog, wi,
-				       split_key, index,
-				       page_size, &page_infos_capacity,
-				       curr_stmt);
-		if (rc < 0)
-			goto err;
-	} while (rc == 0);
 
 	/* Write pages index */
 	header->pages_offset = header->size;
 	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
-	if (vy_write_file(index_fd, run->page_infos, pages_size) < 0)
+	if (vy_write_file(fd, run->page_infos, pages_size) < 0)
 		goto err_file;
 	header->size += pages_size;
 	header->unused = pages_size;
@@ -2830,14 +2865,14 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	/* Write min-max keys for pages */
 	header->min_offset = header->size;
 	header->min_size = vy_buf_used(&run->pages_min);
-	if (vy_write_file(index_fd, run->pages_min.s, header->min_size) < 0)
+	if (vy_write_file(fd, run->pages_min.s, header->min_size) < 0)
 		goto err_file;
 	header->size += header->min_size;
 
 	/* Write range boundaries. */
 	if (range->begin) {
 		assert(range->begin->type == IPROTO_SELECT);
-		if (vy_write_file(index_fd, range->begin->data,
+		if (vy_write_file(fd, range->begin->data,
 				  range->begin->size) < 0)
 			goto err_file;
 		header->begin_key_offset = header->size;
@@ -2846,7 +2881,7 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	}
 	if (range->end) {
 		assert(range->end->type == IPROTO_SELECT);
-		if (vy_write_file(index_fd, range->end->data,
+		if (vy_write_file(fd, range->end->data,
 				  range->end->size) < 0)
 			goto err_file;
 		header->end_key_offset = header->size;
@@ -2855,32 +2890,33 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	}
 
 	/*
-	 * Sync written data
-	 * TODO: check, maybe we can use O_SYNC flag instead
-	 * of explicitly syncing
-	 */
-	if (fdatasync(index_fd) == -1)
-		goto err_file;
-	if (xlog_sync(data_xlog) == -1)
-		goto err_file;
-
-	/*
 	 * Eval run_info header crc and rewrite it
 	 * to finalize the run on disk
 	 * */
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
-	header_size = sizeof(*header);
-	if (vy_pwrite_file(index_fd, header, header_size, 0) < 0 ||
-	    fdatasync(index_fd) != 0)
+	if (vy_pwrite_file(fd, header, header_size, 0) < 0 ||
+	    fdatasync(fd) < 0)
 		goto err_file;
 
+	/* Commit the run file by linking it to the proper name. */
+	char new_path[PATH_MAX];
+	vy_run_snprint_path(new_path, sizeof(new_path), range,
+			    range->run_count, VY_FILE_INDEX);
+	if (rename(path, new_path) != 0) {
+		diag_set(SystemError, "failed to rename file '%s' to '%s'",
+			 path, new_path);
+		goto err;
+	}
+
+	close(fd);
 	return 0;
 
 err_file:
-	/* TODO: report file name */
-	diag_set(SystemError, "error writing file");
+	diag_set(SystemError, "error writing file '%s'", path);
 err:
+	unlink(path);
+	close(fd);
 	return -1;
 }
 
@@ -3094,27 +3130,23 @@ vy_range_delete(struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_stmt *split_key, struct vy_run **p_run,
-		   struct vy_stmt **stmt, size_t *written)
+		   struct vy_run **p_run, struct vy_stmt **stmt,
+		   size_t *written)
 {
 	assert(stmt);
 	assert(*stmt);
 	struct vy_index *index = range->index;
-	char index_path[PATH_MAX];
-	char data_path[PATH_MAX];
-	char new_path[PATH_MAX];
-	int index_fd = -1;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
 	/*
-	 * All keys before the split_key could have cancelled each other.
+	 * All statements in the range could have cancelled each other.
 	 * Do not create an empty run file in this case.
 	 */
-	if (split_key != NULL &&
-	    vy_stmt_compare_with_key(*stmt, split_key, index->format,
+	if (range->end != NULL &&
+	    vy_stmt_compare_with_key(*stmt, range->end, index->format,
 				     index->key_def) >= 0)
 		return 0;
 
@@ -3122,62 +3154,16 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	if (run == NULL)
 		return -1;
 
-	/* Create data and metadata files for the new run. */
-	snprintf(index_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	index_fd = mkstemp(index_path);
-	if (index_fd < 0) {
-		diag_set(SystemError, "failed to create temp file");
-		goto fail;
+	if (vy_run_write_data(range, run, wi, stmt) != 0 ||
+	    vy_run_write_index(range, run) != 0) {
+		vy_run_delete(run);
+		return -1;
 	}
-	vy_run_snprint_path(data_path, sizeof(data_path), range,
-			    range->run_count, VY_FILE_RUN);
-	struct xlog *data_xlog = (struct xlog *)malloc(sizeof(struct xlog));
-	struct xlog_meta meta = {
-		.filetype = "RUN",
-		.version = "0.13",
-		.server_uuid = SERVER_UUID
-	};
-	if (xlog_create(data_xlog, data_path, &meta) < 0) {
-		goto fail;
-	}
-
-	/* Write statements to the run file. */
-	if (vy_run_write(range, run, index_fd, data_xlog, wi, split_key, index,
-			 index->key_def->opts.page_size, stmt) != 0) {
-		xlog_close(data_xlog, false);
-		goto fail;
-	}
-	run->fd = data_xlog->fd;
-	xlog_close(data_xlog, true);
 
 	*written += vy_run_size(run) + vy_run_total(run);
 
-	/*
-	 * We've successfully written a run to a new range file.
-	 * Commit the range by linking the file to a proper name.
-	 */
-	if (xlog_rename(data_xlog) != 0)
-		goto fail;
-
-	vy_run_snprint_path(new_path, sizeof(new_path), range,
-			    range->run_count, VY_FILE_INDEX);
-	if (rename(index_path, new_path) != 0) {
-		diag_set(SystemError,
-			 "failed to rename file '%s' to '%s'",
-			 index_path, new_path);
-		goto fail;
-	}
-
-	close(index_fd);
 	*p_run = run;
 	return 0;
-fail:
-	vy_run_unref(run);
-	if (index_fd >= 0) {
-		unlink(index_path);
-		close(index_fd);
-	}
-	return -1;
 }
 
 /**
@@ -4013,7 +3999,7 @@ vy_task_dump_execute(struct vy_task *task)
 	rc = vy_write_iterator_next(wi, &stmt);
 	if (rc || stmt == NULL)
 		goto out;
-	rc = vy_range_write_run(range, wi, NULL, &task->run, &stmt,
+	rc = vy_range_write_run(range, wi, &task->run, &stmt,
 				&task->dump_size);
 out:
 	vy_write_iterator_delete(wi);
@@ -4154,8 +4140,8 @@ vy_task_compact_execute(struct vy_task *task)
 				      rc = -1; goto out;});
 		}
 
-		rc = vy_range_write_run(r, wi, r->end, &new_run,
-					&curr_stmt, &task->dump_size);
+		rc = vy_range_write_run(r, wi, &new_run, &curr_stmt,
+					&task->dump_size);
 		if (rc != 0)
 			goto out;
 
