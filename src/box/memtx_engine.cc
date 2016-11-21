@@ -723,7 +723,8 @@ MemtxEngine::recoverSnapshot()
 
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&cursor, &row) == 0) {
+	while (xlog_cursor_next_xc(&cursor, &row,
+				   m_snap_dir.panic_if_error) == 0) {
 		try {
 			recoverSnapshotRow(&row);
 		} catch (ClientError *e) {
@@ -1097,7 +1098,7 @@ MemtxEngine::bootstrap()
 
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&cursor, &row) == 0) {
+	while (xlog_cursor_next_xc(&cursor, &row, true) == 0) {
 		recoverSnapshotRow(&row);
 		++row_count;
 		if (row_count % 100000 == 0)
@@ -1419,8 +1420,9 @@ memtx_initial_join_f(va_list ap)
 	});
 
 	struct xrow_header row;
-	while (xlog_cursor_next_xc(&cursor, &row) == 0)
+	while (xlog_cursor_next_xc(&cursor, &row, true) == 0) {
 		xstream_write(stream, &row);
+	}
 
 	/**
 	 * We should never try to read snapshots with no EOF

@@ -367,8 +367,8 @@ struct xlog_cursor
 	bool ignore_crc;
 	/** zbuf decompression context */
 	ZSTD_DStream* zdctx;
-	/** zstd decompression buffer */
-	struct ibuf zbuf;
+	/** current transaction rows */
+	struct ibuf rows;
 };
 
 /**
@@ -413,15 +413,35 @@ void
 xlog_cursor_close(struct xlog_cursor *cursor);
 
 /**
- * Return next row from cursor
+ * Open next tx from xlog
  * @param cursor cursor
- * @param packet row to return
  * @retval 0 succes
  * @retval 1 eof
  * retval -1 error, check diag
  */
 int
-xlog_cursor_next(struct xlog_cursor *cursor, struct xrow_header *packet);
+xlog_cursor_next_tx(struct xlog_cursor *cursor);
+
+/**
+ * Return next row from xlog tx
+ * @param cursor cursor
+ * @param xrow row to return
+ * @retval 0 succes
+ * @retval 1 eof
+ * retval -1 error, check diag
+ */
+int
+xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow);
+
+/**
+ * Move to the next xlog tx
+ *
+ * @retval 0 magic found
+ * @retval 1 magic not found and eof reached
+ * @retval -1 error
+ */
+int
+xlog_cursor_find_tx_magic(struct xlog_cursor *i);
 
 /* }}} */
 
@@ -439,15 +459,6 @@ int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor);
 
-/**
- * Move to the next xlog tx
- *
- * @retval 0 magic found
- * @retval 1 magic not found and eof reached
- * @retval -1 error
- */
-int
-xlog_cursor_find_tx_magic(struct xlog_cursor *i);
 /** }}} */
 
 #if defined(__cplusplus)
@@ -493,16 +504,36 @@ xdir_check_xc(struct xdir *dir)
 		diag_raise();
 }
 
-/**
- * @copydoc xlog_cursor_next
- */
 static inline int
-xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
+xlog_cursor_next_xc(struct xlog_cursor *cursor, struct xrow_header *xrow,
+		    bool panic_if_error)
 {
-	int rv = xlog_cursor_next(i, row);
-	if (rv == -1)
-		diag_raise();
-	return rv;
+	while (true) {
+		int rc = xlog_cursor_next_row(cursor, xrow);
+		if (rc == 0)
+			break;
+		if (rc < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (panic_if_error ||
+			    e->type != &type_XlogError)
+				diag_raise();
+			say_error("can't decode row: %s", e->errmsg);
+		}
+		while ((rc = xlog_cursor_next_tx(cursor)) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (panic_if_error ||
+			    e->type != &type_XlogError)
+				diag_raise();
+			say_error("can't open tx: %s", e->errmsg);
+			if ((rc = xlog_cursor_find_tx_magic(cursor)) < 0)
+				diag_raise();
+			if (rc > 0)
+				break;
+		}
+		if (rc == 1)
+			return 1;
+	}
+	return 0;
 }
 
 /**

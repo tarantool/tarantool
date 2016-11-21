@@ -142,17 +142,26 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	struct xlog_cursor *cur = lbox_checkcursor(L, 1, "xlog:pairs()");
 
 	struct xrow_header row;
-	int rc;
+	int rc = 0;
 	/* skip all bad read requests */
-	while ((rc = xlog_cursor_next(cur, &row)) < 0) {
-		if (diag_last_error(diag_get())->type != &type_XlogError)
-			lbox_error(L);
-		/* Can't parse current tx, move to the next one */
-		if ((rc = xlog_cursor_find_tx_magic(cur)) < 0)
-			lbox_error(L);
+	while (true) {
+		rc = xlog_cursor_next_row(cur, &row);
 		if (rc == 0)
-			continue;
-		break;
+			break;
+		if (rc < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (e->type != &type_XlogError)
+				lbox_error(L);
+		}
+		while ((rc = xlog_cursor_next_tx(cur)) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (e->type != &type_XlogError)
+				lbox_error(L);
+			if ((rc = xlog_cursor_find_tx_magic(cur)) < 1)
+				lbox_error(L);
+		}
+		if (rc == 1)
+			break;
 	}
 	if (rc == 1)
 		return 0; /* EOF */

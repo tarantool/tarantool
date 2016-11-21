@@ -213,43 +213,16 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 {
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	while (true) {
+	while (xlog_cursor_next_xc(&r->cursor, &row,
+				   r->wal_dir.panic_if_error) == 0) {
 		/*
 		 * Read the next row from xlog file.
 		 *
-		 * xlog_cursor_next() returns 1 when
+		 * xlog_cursor_next_xc() returns 1 when
 		 * it can not read more rows. This doesn't mean
 		 * the file is fully read: it's fully read only
 		 * when EOF marker has been read, see i.eof_read
 		 */
-		int rc = xlog_cursor_next(&r->cursor, &row);
-		if (rc > 0)
-			break; /* EOF */
-		if (rc < 0) {
-			struct error *e = diag_last_error(diag_get());
-
-			/* Re-throw transient errors (OOM or SystemError) */
-			if (e->type != &type_XlogError)
-				diag_raise();
-
-			/* Handle permanent XlogError */
-			assert(e->type == &type_XlogError);
-			say_error("can't read row: ");
-			error_log(e);
-			if (r->wal_dir.panic_if_error)
-				diag_raise(); /* stop */
-
-			/* Try to skip broken transaction */
-			rc = xlog_cursor_find_tx_magic(&r->cursor);
-			if (rc > 1)
-				break; /* EOF */
-			if (rc < 0)
-				diag_raise(); /* failed to recover, stop */
-			assert(rc == 0);
-			/* recovered from the error, move to the next row */
-			continue;
-		}
-
 		if (stop_vclock != NULL &&
 		    r->vclock.signature >= stop_vclock->signature)
 			return;

@@ -806,7 +806,7 @@ xlog_tx_write_zstd(struct xlog *log)
 		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
 		if (!zdst) {
 			tnt_error(OutOfMemory, zmax_size, "runtime arena",
-				  "decompression buffer");
+				  "compression buffer");
 			goto error;
 		}
 		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
@@ -1334,7 +1334,7 @@ xlog_cursor_read_tx(struct xlog_cursor *i)
 	}
 
 	if (fixheader.magic == row_marker) {
-		void *dst = ibuf_alloc(&i->zbuf, fixheader.len);
+		void *dst = ibuf_alloc(&i->rows, fixheader.len);
 		if (dst == NULL) {
 			tnt_error(OutOfMemory, fixheader.len,
 				  "runtime", "xlog rows buffer");
@@ -1346,9 +1346,11 @@ xlog_cursor_read_tx(struct xlog_cursor *i)
 		return 0;
 	};
 	assert(fixheader.magic == zrow_marker);
-	if (xlog_cursor_decompress(&i->zbuf, &rpos,
-				   rpos + fixheader.len, i->zdctx) < 0)
+	if (xlog_cursor_decompress(&i->rows, &rpos,
+				   rpos + fixheader.len, i->zdctx) < 0) {
+		ibuf_reset(&i->rows);
 		return -1;
+	}
 	i->rbuf.rpos = (char *)rpos;
 	return 0;
 }
@@ -1356,18 +1358,20 @@ xlog_cursor_read_tx(struct xlog_cursor *i)
 /**
  * Read the next statement (row) from the current transaction.
  */
-static int
+int
 xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 {
+	if (ibuf_used(&i->rows) == 0)
+		return 1;
 	/* Return row from xlog tx buffer */
-	int rc = xrow_header_decode(header, (const char **)&i->zbuf.rpos,
-				    (const char *)i->zbuf.wpos);
+	int rc = xrow_header_decode(header, (const char **)&i->rows.rpos,
+				    (const char *)i->rows.wpos);
 	if (rc != 0) {
 		say_warn("failed to read row");
 		tnt_error(XlogError, "%s: can't parse row",
 			  i->name);
 		/* Discard remaining row data */
-		ibuf_reset(&i->zbuf);
+		ibuf_reset(&i->rows);
 		return -1;
 	}
 
@@ -1400,33 +1404,13 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 	return 0;
 }
 
-/**
- * Read logfile contents using designated format, panic if
- * the log is corrupted/unreadable.
- *
- * @param i	iterator object, encapsulating log specifics.
- *
- * @retval 0    OK
- * @retval 1    EOF
- */
 int
-xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
+xlog_cursor_next_tx(struct xlog_cursor *i)
 {
 	int rc;
 	assert(i->eof_read == false);
 
-	if (ibuf_used(&i->zbuf)) {
-		/*
-		 * Still more xrows in this batch, unpack the next
-		 * row.
-		 */
-		rc = xlog_cursor_next_row(i, row);
-		if (rc == 0)
-			return 0;
-		assert(rc < 0);
-		return -1;
-	}
-	/* load at lest magic to check eof */
+	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
 	if (rc < 0)
 		return -1;
@@ -1437,11 +1421,7 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		i->eof_read = true;
 		goto eof;
 	}
-	/*
-	 * preserve current read position, some data can be
-	 * consumed while parsing, then restore read_buf
-	 * in case of error or eof
-	 */
+
 	ssize_t to_load;
 	while ((to_load = xlog_cursor_read_tx(i)) > 0) {
 		/* not enough data in read buffer */
@@ -1454,7 +1434,7 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	if (to_load < 0)
 		return -1;
 
-	return xlog_cursor_next_row(i, row);
+	return 0;
 eof:
 	if (i->eof_read) {
 		/* eof marker readen, check that no more data in file */
@@ -1482,7 +1462,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
-	ibuf_create(&i->zbuf, &cord()->slabc,
+	ibuf_create(&i->rows, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	ssize_t rc;
@@ -1506,7 +1486,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
 	return -1;
 }
@@ -1546,7 +1526,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	}
 	memcpy(dst, data, size);
 	i->read_offset = size;
-	ibuf_create(&i->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	ibuf_create(&i->rows, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	int rc;
 	rc = xlog_meta_parse(&i->meta,
@@ -1562,7 +1542,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
 	return -1;
 }
@@ -1573,7 +1553,7 @@ xlog_cursor_close(struct xlog_cursor *i)
 	if (i->fd >= 0)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
 	region_free(&fiber()->gc);
 	TRASH(i);
