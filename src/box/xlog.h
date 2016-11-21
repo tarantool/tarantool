@@ -287,8 +287,17 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock);
  */
 
 int
-xlog_create(struct xlog *xlog, int fd, const char *name,
+xlog_create(struct xlog *xlog, const char *name,
 	    const struct xlog_meta *meta);
+
+/**
+ * Rename xlog
+ *
+ * @retval 0 for ok
+ * @retval -1 for error
+ */
+int
+xlog_rename(struct xlog *l);
 
 /**
  * Write a row to xlog, 

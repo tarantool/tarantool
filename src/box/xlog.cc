@@ -612,7 +612,7 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 
 /* {{{ struct xlog */
 
-static int
+int
 xlog_rename(struct xlog *l)
 {
 	char *filename = l->filename;
@@ -645,11 +645,25 @@ xlog_create(struct xlog *xlog, const char *name,
 	int meta_len;
 	memset(xlog, 0, sizeof(*xlog));
 
-	xlog->fd = open(name, O_RDWR | O_CREAT | O_EXCL, 0644);
+	if (access(name, F_OK) == 0) {
+		errno = EEXIST;
+		goto error;
+	}
+	/*
+	 * Open the <lsn>.<suffix>.inprogress file.
+	 * If it exists, open will fail. Always open/create
+	 * a file with .inprogress suffix: for snapshots,
+	 * the rename is done when the snapshot is complete.
+	 * Fox xlogs, we can rename only when we have written
+	 * the log file header, otherwise replication relay
+	 * may think that this is a corrupt file and stop
+	 * replication.
+	 */
+	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
+	xlog->fd = open(xlog->filename, O_RDWR | O_CREAT | O_EXCL, 0644);
 	if (xlog->fd < 0)
 		goto error;
 
-	snprintf(xlog->filename, PATH_MAX, "%s", name);
 	xlog->meta = *meta;
 	xlog->sync_is_async = false;
 	xlog->sync_interval = SNAP_SYNC_INTERVAL;
@@ -658,10 +672,10 @@ xlog_create(struct xlog *xlog, const char *name,
 	xlog->is_inprogress = true;
 	xlog->is_autocommit = true;
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	xlog->zctx = ZSTD_createCCtx();
 	if (!xlog->zctx)
 		goto error;
-	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 
 	/* Format metadata */
 	meta_len = xlog_meta_format(&xlog->meta, meta_buf, sizeof(meta_buf));
@@ -680,7 +694,7 @@ error:
 	say_syserror("%s: failed to open", name);
 	if (xlog->fd >= 0) {
 		close(xlog->fd);
-		unlink(name); /* try to remove incomplete file */
+		unlink(xlog->filename); /* try to remove incomplete file */
 	}
 	obuf_destroy(&xlog->obuf);
 	obuf_destroy(&xlog->zbuf);
@@ -710,27 +724,12 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	* We don't overwrite existing files.
 	*/
 	filename = xdir_format_filename(dir, signature, NONE);
-	if (access(filename, F_OK) == 0) {
-		errno = EEXIST;
-		goto error;
-	}
 
 	/* Setup inherited values */
 	snprintf(meta.filetype, sizeof(meta.filetype), "%s", dir->filetype);
 	meta.server_uuid = *dir->server_uuid;
 	vclock_copy(&meta.vclock, vclock);
 
-	/*
-	 * Open the <lsn>.<suffix>.inprogress file.
-	 * If it exists, open will fail. Always open/create
-	 * a file with .inprogress suffix: for snapshots,
-	 * the rename is done when the snapshot is complete.
-	 * Fox xlogs, we can rename only when we have written
-	 * the log file header, otherwise replication relay
-	 * may think that this is a corrupt file and stop
-	 * replication.
-	 */
-	filename = xdir_format_filename(dir, signature, INPROGRESS);
 	l = (struct xlog *) calloc(1, sizeof(*l));
 	if (l == NULL)
 		goto error;
