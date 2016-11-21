@@ -463,6 +463,10 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 			       request->index_base)) {
 		diag_raise();
 	}
+	if (request->index_base != 0)
+		request_normalize_ops(request);
+	assert(request->index_base == 0);
+
 	const char *key;
 	uint32_t part_count;
 	struct txn_stmt *stmt = txn_current_stmt(txn);

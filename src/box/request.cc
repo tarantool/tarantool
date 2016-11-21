@@ -214,15 +214,16 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 void
 request_normalize_ops(struct request *request)
 {
+	assert(request->type == IPROTO_UPSERT ||
+	       request->type == IPROTO_UPDATE);
+	assert(request->index_base != 0);
+	assert(tuple_update_check_ops(region_aligned_alloc_xc_cb,
+	       &fiber()->gc, request->ops, request->ops_end,
+	       request->index_base) == 0);
 	char *ops;
 	ssize_t ops_len = request->ops_end - request->ops;
 	ops = (char *)region_alloc_xc(&fiber()->gc, ops_len);
 	char *ops_end = ops;
-	if (tuple_update_check_ops(region_aligned_alloc_xc_cb,
-				   &fiber()->gc, request->ops, request->ops_end,
-				   request->index_base)) {
-		diag_raise();
-	}
 	const char *pos = request->ops;
 	int op_cnt = mp_decode_array(&pos);
 	ops_end = mp_encode_array(ops_end, op_cnt);
@@ -272,4 +273,7 @@ request_normalize_ops(struct request *request)
 	request->ops = (const char *)ops;
 	request->ops_end = (const char *)ops_end;
 	request->index_base = 0;
+
+	/* Clear the header to ensure it's rebuilt at commit. */
+	request->header = NULL;
 }

@@ -110,9 +110,6 @@ void
 process_rw(struct request *request, struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
-	if (request->type == IPROTO_UPSERT && request->index_base != 0)
-		request_normalize_ops(request);
-
 	rmean_collect(rmean_box, request->type, 1);
 	try {
 		struct space *space = space_cache_find(request->space_id);
