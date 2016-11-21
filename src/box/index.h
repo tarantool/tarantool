@@ -267,16 +267,21 @@ iterator_type_is_reverse(enum iterator_type type)
  * @param type iterator type (see enum iterator_type)
  * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
+ *
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
  */
-void
+int
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for a search in a unique
  * index (i.e. the key must be fully specified).
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
  */
-void
+int
 primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count);
 

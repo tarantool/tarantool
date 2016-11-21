@@ -113,14 +113,14 @@ extern struct tuple_format *tuple_format_default;
 
 extern struct tuple_format **tuple_formats;
 
-static inline uint32_t
+inline uint32_t
 tuple_format_id(struct tuple_format *format)
 {
 	assert(tuple_formats[format->id] == format);
 	return format->id;
 }
 
-static inline struct tuple_format *
+inline struct tuple_format *
 tuple_format_by_id(uint32_t tuple_format_id)
 {
 	return tuple_formats[tuple_format_id];
@@ -154,17 +154,19 @@ tuple_format_new(struct rlist *key_list);
 
 /**
  * Fill the field map of tuple with field offsets.
- * Throws an error if tuple data does not match the format.
  * @param format tuple format.
  * @param field_map a pointer to the LAST element of field map.
  * @param tuple MessagePack array with tuple fields.
+ *
+ * @retval 0  Success.
+ * @retval -1 Error.
  *            ┏━━━━━━━━━━━━━━━┓
  * Result:    ┃ offN ... off1 ┃
  *            ┗━━━━━━━━━━━━━━━┛
  *                            ▲
  * tuple + off_i = field_i;   ┗━field_map
  */
-void
+int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple);
 

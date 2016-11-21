@@ -40,6 +40,8 @@
 #include <msgpuck.h>
 #include "scoped_guard.h"
 
+#include "coeio_file.h"
+
 #include "error.h"
 #include "xrow.h"
 #include "iproto_constants.h"
@@ -361,7 +363,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	struct vclock *dup = vclockset_search(&dir->index, &meta->vclock);
 	if (dup != NULL) {
 		tnt_error(XlogError, "%s: invalid xlog order", cursor.name);
-		xlog_cursor_close(&cursor);
+		xlog_cursor_close(&cursor, false);
 		return -1;
 	}
 
@@ -372,12 +374,12 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
 		tnt_error(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
-		xlog_cursor_close(&cursor);
+		xlog_cursor_close(&cursor, false);
 		return -1;
 	}
 
 	vclock_copy(vclock, &meta->vclock);
-	xlog_cursor_close(&cursor);
+	xlog_cursor_close(&cursor, false);
 	vclockset_insert(&dir->index, vclock);
 	return 0;
 }
@@ -398,13 +400,13 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	}
 	struct xlog_meta *meta = &cursor->meta;
 	if (strcmp(meta->filetype, dir->filetype) != 0) {
-		xlog_cursor_close(cursor);
+		xlog_cursor_close(cursor, false);
 		tnt_error(XlogError, "%s: unknown filetype", filename);
 		return -1;
 	}
 	if (!tt_uuid_is_nil(dir->server_uuid) &&
 	    !tt_uuid_is_equal(dir->server_uuid, &meta->server_uuid)) {
-		xlog_cursor_close(cursor);
+		xlog_cursor_close(cursor, false);
 		tnt_error(XlogError, "%s: invalid server UUID", filename);
 		return -1;
 	}
@@ -415,7 +417,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	 */
 	int64_t signature_check = vclock_sum(&meta->vclock);
 	if (signature_check != signature) {
-		xlog_cursor_close(cursor);
+		xlog_cursor_close(cursor, false);
 		tnt_error(XlogError, "%s: signature check failed", filename);
 		return -1;
 	}
@@ -610,7 +612,7 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 
 /* {{{ struct xlog */
 
-static int
+int
 xlog_rename(struct xlog *l)
 {
 	char *filename = l->filename;
@@ -635,32 +637,18 @@ xlog_rename(struct xlog *l)
 	return 0;
 }
 
-/**
- * In case of error, writes a message to the server log
- * and sets errno.
- */
-struct xlog *
-xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
+int
+xlog_create(struct xlog *xlog, const char *name,
+	    const struct xlog_meta *meta)
 {
-	char *filename;
-	int fd = -1;
-	struct xlog *l = NULL;
 	char meta_buf[XLOG_META_LEN_MAX];
 	int meta_len;
-	int64_t signature = vclock_sum(vclock);
-	assert(signature >= 0);
-	assert(!tt_uuid_is_nil(dir->server_uuid));
+	memset(xlog, 0, sizeof(*xlog));
 
-	/*
-	* Check whether a file with this name already exists.
-	* We don't overwrite existing files.
-	*/
-	filename = xdir_format_filename(dir, signature, NONE);
-	if (access(filename, F_OK) == 0) {
+	if (access(name, F_OK) == 0) {
 		errno = EEXIST;
 		goto error;
 	}
-
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
 	 * If it exists, open will fail. Always open/create
@@ -671,44 +659,83 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	 * may think that this is a corrupt file and stop
 	 * replication.
 	 */
-	filename = xdir_format_filename(dir, signature, INPROGRESS);
-	say_info("creating `%s'", filename);
-	fd = open(filename, dir->open_wflags, 0644);
-	if (fd < 0)
+	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
+	xlog->fd = open(xlog->filename, O_RDWR | O_CREAT | O_EXCL, 0644);
+	if (xlog->fd < 0)
 		goto error;
-	l = (struct xlog *) calloc(1, sizeof(*l));
-	if (l == NULL)
-		goto error;
-	l->fd = fd;
-	snprintf(l->filename, PATH_MAX, "%s", filename);
-	/* Setup inherited values */
-	snprintf(l->meta.filetype, sizeof(l->meta.filetype), "%s", dir->filetype);
-	l->meta.server_uuid = *dir->server_uuid;
-	vclock_copy(&l->meta.vclock, vclock);
-	l->sync_is_async = dir->sync_is_async;
-	l->sync_interval = dir->sync_interval;
-	l->synced_size = 0;
 
-	l->is_inprogress = true;
+	xlog->meta = *meta;
+	xlog->sync_is_async = false;
+	xlog->sync_interval = SNAP_SYNC_INTERVAL;
+	xlog->synced_size = 0;
 
-	l->is_autocommit = true;
-	obuf_create(&l->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
-	l->zctx = ZSTD_createCCtx();
-	if (!l->zctx)
+	xlog->is_inprogress = true;
+	xlog->is_autocommit = true;
+	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	xlog->zctx = ZSTD_createCCtx();
+	if (!xlog->zctx)
 		goto error;
-	obuf_create(&l->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 
 	/* Format metadata */
-	meta_len = xlog_meta_format(&l->meta, meta_buf, sizeof(meta_buf));
+	meta_len = xlog_meta_format(&xlog->meta, meta_buf, sizeof(meta_buf));
 	if (meta_len < 0 || meta_len >= (int)sizeof(meta_buf)) {
-		say_error("%s: failed to format xlog meta", filename);
+		say_error("%s: failed to format xlog meta", name);
 		goto error;
 	}
 
 	/* Write metadata */
-	if (fio_write(l->fd, meta_buf, meta_len) != meta_len)
+	if (fio_write(xlog->fd, meta_buf, meta_len) != meta_len)
 		goto error;
-	l->offset = meta_len; /* first log starts after meta */
+	xlog->offset = meta_len; /* first log starts after meta */
+	return 0;
+error:
+	int save_errno = errno;
+	say_syserror("%s: failed to open", name);
+	if (xlog->fd >= 0) {
+		close(xlog->fd);
+		unlink(xlog->filename); /* try to remove incomplete file */
+	}
+	obuf_destroy(&xlog->obuf);
+	obuf_destroy(&xlog->zbuf);
+	if (xlog->zctx)
+		ZSTD_freeCCtx(xlog->zctx);
+	errno = save_errno;
+
+	return -1;
+}
+
+/**
+ * In case of error, writes a message to the server log
+ * and sets errno.
+ */
+struct xlog *
+xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
+{
+	char *filename;
+	struct xlog *l = NULL;
+	int64_t signature = vclock_sum(vclock);
+	struct xlog_meta meta;
+	assert(signature >= 0);
+	assert(!tt_uuid_is_nil(dir->server_uuid));
+
+	/*
+	* Check whether a file with this name already exists.
+	* We don't overwrite existing files.
+	*/
+	filename = xdir_format_filename(dir, signature, NONE);
+
+	/* Setup inherited values */
+	snprintf(meta.filetype, sizeof(meta.filetype), "%s", dir->filetype);
+	meta.server_uuid = *dir->server_uuid;
+	vclock_copy(&meta.vclock, vclock);
+
+	l = (struct xlog *) calloc(1, sizeof(*l));
+	if (l == NULL)
+		goto error;
+
+	if (xlog_create(l, filename, &meta) != 0)
+		goto error;
 
 	/* Rename xlog file */
 	if (dir->suffix != INPROGRESS && xlog_rename(l))
@@ -717,17 +744,6 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	return l;
 error:
 	int save_errno = errno;
-	say_syserror("%s: failed to open", filename);
-	if (fd >= 0) {
-		close(fd);
-		unlink(filename); /* try to remove incomplete file */
-	}
-	if (l) {
-		obuf_destroy(&l->obuf);
-		obuf_destroy(&l->zbuf);
-	}
-	if (l && l->zctx)
-		ZSTD_freeCCtx(l->zctx);
 	free(l);
 	errno = save_errno;
 	return NULL;
@@ -773,6 +789,9 @@ xlog_tx_write_plain(struct xlog *log)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
+	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK,
+		     log->zbuf.iov->iov_len >>= 1;);
+
 	ssize_t written = fio_writev(log->fd, log->obuf.iov,
 				     log->obuf.pos + 1);
 	if (written < (ssize_t)obuf_size(&log->obuf)) {
@@ -806,7 +825,7 @@ xlog_tx_write_zstd(struct xlog *log)
 		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
 		if (!zdst) {
 			tnt_error(OutOfMemory, zmax_size, "runtime arena",
-				  "decompression buffer");
+				  "compression buffer");
 			goto error;
 		}
 		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
@@ -1055,7 +1074,7 @@ xlog_sync(struct xlog *l)
 }
 
 int
-xlog_close(struct xlog *l)
+xlog_close(struct xlog *l, bool reuse_fd)
 {
 	int rc = fio_write(l->fd, &eof_marker, sizeof(log_magic_t));
 	if (rc < 0)
@@ -1069,9 +1088,11 @@ xlog_close(struct xlog *l)
 	 */
 	xlog_sync(l);
 
-	rc = close(l->fd);
-	if (rc < 0)
-		say_syserror("%s: close() failed", l->filename);
+	if (!reuse_fd) {
+		rc = close(l->fd);
+		if (rc < 0)
+			say_syserror("%s: close() failed", l->filename);
+	}
 	obuf_destroy(&l->obuf);
 	obuf_destroy(&l->zbuf);
 	if (l->zctx)
@@ -1130,7 +1151,14 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 			 "xlog cursor read buffer");
 		return -1;
 	}
-	ssize_t readen = fio_read(cursor->fd, dst, to_load);
+	ssize_t readen;
+	if (cursor->async) {
+		readen = coeio_pread(cursor->fd, dst, to_load,
+				     cursor->read_offset);
+	} else {
+		readen = fio_pread(cursor->fd, dst, to_load,
+				   cursor->read_offset);
+	}
 	if (readen < 0) {
 		diag_set(SystemError, "failed to read '%s' file",
 			 cursor->name);
@@ -1296,7 +1324,7 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
  * @retval >0 how many bytes we will have for continue
  */
 static size_t
-xlog_cursor_read_tx(struct xlog_cursor *i)
+xlog_cursor_ensure_tx(struct xlog_cursor *i)
 {
 	const char *rpos = i->rbuf.rpos;
 	const char *end = rpos + ibuf_used(&i->rbuf);
@@ -1334,7 +1362,7 @@ xlog_cursor_read_tx(struct xlog_cursor *i)
 	}
 
 	if (fixheader.magic == row_marker) {
-		void *dst = ibuf_alloc(&i->zbuf, fixheader.len);
+		void *dst = ibuf_alloc(&i->rows, fixheader.len);
 		if (dst == NULL) {
 			tnt_error(OutOfMemory, fixheader.len,
 				  "runtime", "xlog rows buffer");
@@ -1346,28 +1374,73 @@ xlog_cursor_read_tx(struct xlog_cursor *i)
 		return 0;
 	};
 	assert(fixheader.magic == zrow_marker);
-	if (xlog_cursor_decompress(&i->zbuf, &rpos,
-				   rpos + fixheader.len, i->zdctx) < 0)
+	if (xlog_cursor_decompress(&i->rows, &rpos,
+				   rpos + fixheader.len, i->zdctx) < 0) {
+		ibuf_reset(&i->rows);
 		return -1;
+	}
 	i->rbuf.rpos = (char *)rpos;
 	return 0;
 }
 
 /**
+ * Open xlog tx from offset in xlog file.
+ * size is a hint for file read size and may be zero.
+ *
+ * @retval 0 for success
+ * @retval 1 eof
+ * @retval -1 for error
+ */
+int
+xlog_cursor_open_tx(struct xlog_cursor *cursor, off_t offset, size_t size)
+{
+	if (offset < cursor->read_offset &&
+	    ibuf_used(&cursor->rbuf) >= (size_t)(cursor->read_offset - offset)) {
+		/*
+		 * We already have bytes from offset in rbuf,
+		 * set rpos to offset instead of discarding rbuf
+		 */
+		cursor->rbuf.rpos = cursor->rbuf.wpos -
+				    (cursor->read_offset - offset);
+	} else {
+		/* Discard rbuf and update file position */
+		ibuf_reset(&cursor->rbuf);
+		cursor->read_offset = offset;
+	}
+
+	if (size > 0 && ibuf_used(&cursor->rbuf) < size) {
+		/* Prefetch data */
+		ssize_t readen;
+		readen = xlog_cursor_ensure(cursor, size);
+		if (readen > 0)
+			return 1;
+		if (readen < 0)
+			return -1;
+	}
+	int rc = xlog_cursor_next_tx(cursor);
+	if (rc <= 0)
+		return rc;
+	tnt_error(XlogError, "eof while reading tx");
+	return -1;
+}
+
+/**
  * Read the next statement (row) from the current transaction.
  */
-static int
+int
 xlog_cursor_next_row(struct xlog_cursor *i, struct xrow_header *header)
 {
+	if (ibuf_used(&i->rows) == 0)
+		return 1;
 	/* Return row from xlog tx buffer */
-	int rc = xrow_header_decode(header, (const char **)&i->zbuf.rpos,
-				    (const char *)i->zbuf.wpos);
+	int rc = xrow_header_decode(header, (const char **)&i->rows.rpos,
+				    (const char *)i->rows.wpos);
 	if (rc != 0) {
 		say_warn("failed to read row");
 		tnt_error(XlogError, "%s: can't parse row",
 			  i->name);
 		/* Discard remaining row data */
-		ibuf_reset(&i->zbuf);
+		ibuf_reset(&i->rows);
 		return -1;
 	}
 
@@ -1400,33 +1473,13 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 	return 0;
 }
 
-/**
- * Read logfile contents using designated format, panic if
- * the log is corrupted/unreadable.
- *
- * @param i	iterator object, encapsulating log specifics.
- *
- * @retval 0    OK
- * @retval 1    EOF
- */
 int
-xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
+xlog_cursor_next_tx(struct xlog_cursor *i)
 {
 	int rc;
 	assert(i->eof_read == false);
 
-	if (ibuf_used(&i->zbuf)) {
-		/*
-		 * Still more xrows in this batch, unpack the next
-		 * row.
-		 */
-		rc = xlog_cursor_next_row(i, row);
-		if (rc == 0)
-			return 0;
-		assert(rc < 0);
-		return -1;
-	}
-	/* load at lest magic to check eof */
+	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
 	if (rc < 0)
 		return -1;
@@ -1437,13 +1490,9 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 		i->eof_read = true;
 		goto eof;
 	}
-	/*
-	 * preserve current read position, some data can be
-	 * consumed while parsing, then restore read_buf
-	 * in case of error or eof
-	 */
+
 	ssize_t to_load;
-	while ((to_load = xlog_cursor_read_tx(i)) > 0) {
+	while ((to_load = xlog_cursor_ensure_tx(i)) > 0) {
 		/* not enough data in read buffer */
 		int rc = xlog_cursor_ensure(i, to_load);
 		if (rc < 0)
@@ -1454,7 +1503,7 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	if (to_load < 0)
 		return -1;
 
-	return xlog_cursor_next_row(i, row);
+	return 0;
 eof:
 	if (i->eof_read) {
 		/* eof marker readen, check that no more data in file */
@@ -1482,7 +1531,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
-	ibuf_create(&i->zbuf, &cord()->slabc,
+	ibuf_create(&i->rows, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	ssize_t rc;
@@ -1506,7 +1555,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
 	return -1;
 }
@@ -1546,7 +1595,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	}
 	memcpy(dst, data, size);
 	i->read_offset = size;
-	ibuf_create(&i->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	ibuf_create(&i->rows, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	i->zdctx = ZSTD_createDStream();
 	int rc;
 	rc = xlog_meta_parse(&i->meta,
@@ -1562,20 +1611,19 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
 	return -1;
 }
 
 void
-xlog_cursor_close(struct xlog_cursor *i)
+xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 {
-	if (i->fd >= 0)
+	if (i->fd >= 0 && !reuse_fd)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
-	ibuf_destroy(&i->zbuf);
+	ibuf_destroy(&i->rows);
 	ZSTD_freeDStream(i->zdctx);
-	region_free(&fiber()->gc);
 	TRASH(i);
 }
 

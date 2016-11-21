@@ -197,42 +197,49 @@ tuple_format_new(struct rlist *key_list)
 }
 
 /** @sa declaration for details. */
-void
+int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple)
 {
 	if (format->field_count == 0)
-		return; /* Nothing to initialize */
+		return 0; /* Nothing to initialize */
 
 	const char *pos = tuple;
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&pos);
 	if (format->exact_field_count > 0 &&
-	    format->exact_field_count != field_count)
-		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->exact_field_count);
-	if (unlikely(field_count < format->field_count))
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->field_count);
+	    format->exact_field_count != field_count) {
+		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
+			 (unsigned) field_count,
+			 (unsigned) format->exact_field_count);
+		return -1;
+	}
+	if (unlikely(field_count < format->field_count)) {
+		diag_set(ClientError, ER_INDEX_FIELD_COUNT,
+			 (unsigned) field_count,
+			 (unsigned) format->field_count);
+		return -1;
+	}
 
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
-	key_mp_type_validate(format->fields[0].type, mp_type,
-			     ER_FIELD_TYPE, TUPLE_INDEX_BASE);
+	if (key_mp_type_validate(format->fields[0].type, mp_type, ER_FIELD_TYPE,
+				 TUPLE_INDEX_BASE))
+		return -1;
 	mp_next(&pos);
 	/* other fields...*/
 	for (uint32_t i = 1; i < format->field_count; i++) {
 		mp_type = mp_typeof(*pos);
-		key_mp_type_validate(format->fields[i].type, mp_type,
-				     ER_FIELD_TYPE, i + TUPLE_INDEX_BASE);
+		if (key_mp_type_validate(format->fields[i].type, mp_type,
+					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE))
+			return -1;
 		if (format->fields[i].offset_slot < 0)
 			field_map[format->fields[i].offset_slot] =
 				(uint32_t) (pos - tuple);
 		mp_next(&pos);
 	}
+	return 0;
 }
 
 void

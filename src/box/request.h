@@ -147,6 +147,19 @@ void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple);
 
+/**
+ * Convert one-based upsert/update operations to zero-based
+ *
+ * @param request a request to convert
+ * @pre request->type == IPROTO_UPDATE || request->type == IPROTO_UPSERT
+ * @pre request->index_base != 0
+ * @pre request->ops are valid (see tuple_update_check_ops())
+ * @post request->index_base = 0
+ */
+void
+request_normalize_ops(struct request *request);
+
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

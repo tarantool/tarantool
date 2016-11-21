@@ -61,46 +61,51 @@ static struct mempool tuple_iterator_pool;
  */
 struct tuple *box_tuple_last;
 
-/**
- * Check tuple data correspondence to space format;
- * throw proper exception if smth wrong.
- * data argument expected to be a proper msgpack array
- * Actually checks everything that checks tuple_init_field_map.
- */
-void
-tuple_validate_raw(struct tuple_format *format, const char *data)
+int
+tuple_validate_raw(struct tuple_format *format, const char *tuple)
 {
 	if (format->field_count == 0)
-		return; /* Nothing to check */
+		return 0; /* Nothing to check */
 
 	/* Check to see if the tuple has a sufficient number of fields. */
-	uint32_t field_count = mp_decode_array(&data);
+	uint32_t field_count = mp_decode_array(&tuple);
 	if (format->exact_field_count > 0 &&
-	    format->exact_field_count != field_count)
-		tnt_raise(ClientError, ER_EXACT_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->exact_field_count);
-	if (unlikely(field_count < format->field_count))
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->field_count);
+	    format->exact_field_count != field_count) {
+		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
+			 (unsigned) field_count,
+			 (unsigned) format->exact_field_count);
+		return -1;
+	}
+	if (unlikely(field_count < format->field_count)) {
+		diag_set(ClientError, ER_INDEX_FIELD_COUNT,
+			 (unsigned) field_count,
+			 (unsigned) format->field_count);
+		return -1;
+	}
 
 	/* Check field types */
 	for (uint32_t i = 0; i < format->field_count; i++) {
-		key_mp_type_validate(format->fields[i].type, mp_typeof(*data),
-				     ER_FIELD_TYPE, i + TUPLE_INDEX_BASE);
-		mp_next(&data);
+		if (key_mp_type_validate(format->fields[i].type,
+					 mp_typeof(*tuple), ER_FIELD_TYPE,
+					 i + TUPLE_INDEX_BASE))
+			return -1;
+		mp_next(&tuple);
 	}
+	return 0;
 }
 
 /**
- * Check tuple data correspondence to space format;
- * throw proper exception if smth wrong.
+ * Check tuple data correspondence to space format.
+ * @param format Format to which the tuple must match.
+ * @param tuple Tuple to validate.
+ *
+ * @retval 0  The tuple is valid.
+ * @retval -1 The tuple is invalid.
  */
-void
+int
 tuple_validate(struct tuple_format *format, struct tuple *tuple)
 {
-	tuple_validate_raw(format, tuple->data);
+	return tuple_validate_raw(format, tuple->data);
 }
 
 /**
@@ -118,8 +123,9 @@ tuple_alloc(struct tuple_format *format, size_t size)
 {
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
-		     tnt_raise(OutOfMemory, (unsigned) total,
-			       "slab allocator", "tuple"));
+		     do { diag_set(OutOfMemory, (unsigned) total,
+				   "slab allocator", "tuple"); return NULL; }
+		     while(false); );
 	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
@@ -131,12 +137,14 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	 */
 	if (ptr == NULL) {
 		if (total > memtx_alloc.objsize_max) {
-			tnt_raise(LoggedError, ER_SLAB_ALLOC_MAX,
-				  (unsigned) total);
+			diag_set(ClientError, ER_SLAB_ALLOC_MAX,
+				 (unsigned) total);
+			error_log(diag_last_error(diag_get()));
 		} else {
-			tnt_raise(OutOfMemory, (unsigned) total,
-				  "slab allocator", "tuple");
+			diag_set(OutOfMemory, (unsigned) total,
+				 "slab allocator", "tuple");
 		}
+		return NULL;
 	}
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
@@ -317,7 +325,10 @@ tuple_update(struct tuple_format *format,
 	if (new_data == NULL)
 		diag_raise();
 
-	return tuple_new(format, new_data, new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
 }
 
 struct tuple *
@@ -335,7 +346,10 @@ tuple_upsert(struct tuple_format *format,
 	if (new_data == NULL)
 		diag_raise();
 
-	return tuple_new(format, new_data, new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
 }
 
 struct tuple *
@@ -344,13 +358,13 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	size_t tuple_len = end - data;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
+	if (new_tuple == NULL)
+		return NULL;
 	memcpy(new_tuple->data, data, tuple_len);
-	try {
-		tuple_init_field_map(format, (uint32_t *) new_tuple,
-				     new_tuple->data);
-	} catch (Exception *e) {
+	if (tuple_init_field_map(format, (uint32_t *) new_tuple,
+				 new_tuple->data)) {
 		tuple_delete(new_tuple);
-		throw;
+		return NULL;
 	}
 	return new_tuple;
 }
@@ -440,8 +454,11 @@ box_tuple_format_default(void)
 box_tuple_t *
 box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 {
+	struct tuple *ret = tuple_new(format, data, end);
+	if (ret == NULL)
+		return NULL;
 	try {
-		return tuple_bless(tuple_new(format, data, end));
+		return tuple_bless(ret);
 	} catch (Exception *e) {
 		return NULL;
 	}

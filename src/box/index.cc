@@ -71,23 +71,31 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 			 space->def.name, space->def.engine_name, what);
 }
 
-void
+/*
+ * Check that parts of the key match with the key definition.
+ * @param key_def Key definition.
+ * @param key MessagePack'ed data for matching.
+ * @param part_count Field count in the key.
+ *
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
+ */
+int
 key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count)
 {
-	(void) key_def;
-	(void) key;
-
 	for (uint32_t part = 0; part < part_count; part++) {
 		enum mp_type mp_type = mp_typeof(*key);
 		mp_next(&key);
 
-		key_mp_type_validate(key_def->parts[part].type, mp_type,
-				     ER_KEY_PART_TYPE, part);
+		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
+					 ER_KEY_PART_TYPE, part))
+			return -1;
 	}
+	return 0;
 }
 
-void
+int
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count)
 {
@@ -101,61 +109,77 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 */
 		if (key_def->type == TREE || type == ITER_ALL ||
 		    (key_def->type == HASH && type == ITER_GT))
-			return;
+			return 0;
 		/* Fall through. */
 	}
 
 	if (key_def->type == RTREE) {
 		unsigned d = key_def->opts.dimension;
-		if (part_count != 1 && part_count != d && part_count != d * 2)
-			tnt_raise(ClientError, ER_KEY_PART_COUNT,
-				  d  * 2, part_count);
+		if (part_count != 1 && part_count != d && part_count != d * 2) {
+			diag_set(ClientError, ER_KEY_PART_COUNT, d  * 2,
+				 part_count);
+			return -1;
+		}
 		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
-			key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
-					     ER_KEY_PART_TYPE, 0);
+			if (key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
+						 ER_KEY_PART_TYPE, 0))
+				return -1;
 			uint32_t array_size = mp_decode_array(&key);
-			if (array_size != d && array_size != d * 2)
-				tnt_raise(ClientError, ER_RTREE_RECT,
-					  "Key", d, d * 2);
+			if (array_size != d && array_size != d * 2) {
+				diag_set(ClientError, ER_RTREE_RECT, "Key", d,
+					 d * 2);
+				return -1;
+			}
 			for (uint32_t part = 0; part < array_size; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(FIELD_TYPE_NUMBER, mp_type,
-						     ER_KEY_PART_TYPE, 0);
+				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
+							 mp_type,
+							 ER_KEY_PART_TYPE, 0))
+					return -1;
 			}
 		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(FIELD_TYPE_NUMBER, mp_type,
-						     ER_KEY_PART_TYPE, part);
+				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
+							 mp_type,
+							 ER_KEY_PART_TYPE,
+							 part))
+					return -1;
 			}
 		}
 	} else {
-		if (part_count > key_def->part_count)
-			tnt_raise(ClientError, ER_KEY_PART_COUNT,
-				  key_def->part_count, part_count);
+		if (part_count > key_def->part_count) {
+			diag_set(ClientError, ER_KEY_PART_COUNT,
+				 key_def->part_count, part_count);
+			return -1;
+		}
 
 		/* Partial keys are allowed only for TREE index type. */
 		if (key_def->type != TREE && part_count < key_def->part_count) {
-			tnt_raise(ClientError, ER_EXACT_MATCH,
-				  key_def->part_count, part_count);
+			diag_set(ClientError, ER_EXACT_MATCH,
+				 key_def->part_count, part_count);
+			return -1;
 		}
-		key_validate_parts(key_def, key, part_count);
+		if (key_validate_parts(key_def, key, part_count))
+			return -1;
 	}
+	return 0;
 }
 
-void
+int
 primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
 	if (key_def->part_count != part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			  key_def->part_count, part_count);
+		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
+			 part_count);
+		return -1;
 	}
-	key_validate_parts(key_def, key, part_count);
+	return key_validate_parts(key_def, key, part_count);
 }
 
 char *
@@ -361,7 +385,8 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		if (!index->key_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		primary_key_validate(index->key_def, key, part_count);
+		if (primary_key_validate(index->key_def, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine. */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->findByKey(key, part_count);
@@ -391,7 +416,8 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 			tnt_raise(UnsupportedIndexFeature, index, "min()");
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, ITER_GE, key, part_count);
+		if (key_validate(index->key_def, ITER_GE, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->min(key, part_count);
@@ -418,7 +444,8 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 			tnt_raise(UnsupportedIndexFeature, index, "max()");
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, ITER_LE, key, part_count);
+		if (key_validate(index->key_def, ITER_LE, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->max(key, part_count);
@@ -441,7 +468,8 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, itype, key, part_count);
+		if (key_validate(index->key_def, itype, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		ssize_t count = index->count(itype, key, part_count);
@@ -470,7 +498,8 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		struct txn *txn = txn_begin_ro_stmt(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
-		key_validate(index->key_def, itype, key, part_count);
+		if (key_validate(index->key_def, itype, key, part_count))
+			diag_raise();
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
 		it->sc_version = sc_version;
