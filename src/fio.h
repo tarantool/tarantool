@@ -49,14 +49,15 @@ const char *
 fio_filename(int fd);
 
 struct iovec;
+
 /**
  * Read up to N bytes from file into the buffer,
  * re-trying for interrupted reads. In case of a non-transient
  * error, writes a message to the error log.
  *
- * @param fd		file descriptor.
- * @param buf		pointer to the buffer.
- * @param count		how many bytes to read.
+ * @param fd file descriptor.
+ * @param buf pointer to the buffer.
+ * @param count how many bytes to read.
  *
  * @return When count is 0, returns 0. When count > SSIZE_MAX,
  *         the result is unspecified. Otherwise, returns the total
@@ -64,21 +65,31 @@ struct iovec;
  *         reached and less than count bytes are read, the actual
  *         number of bytes read is returned (can be 0 or more).
  *
- *         Blocking I/O:
- *         -------------
  *         If an error occurs after a few bytes were read, -1 is
  *         returned and current read offset is unspecified.
- *
- *         Non-blocking I/O
- *         ----------------
- *         Same as with blocking I/O but:
- *         If EAGAIN/EWOULDBLOCK occurs right away, returns -1,
- *         like read().
- *         If EAGAIN/EWOULDBLOCK occurs after a few bytes were
- *        read, the actual number of bytes read is returned.
  */
 ssize_t
 fio_read(int fd, void *buf, size_t count);
+
+/**
+ * Read up to N bytes from file into the buffer,
+ * re-trying for interrupted reads. In case of a non-transient
+ * error, writes a message to the error log.
+ *
+ *
+ * @param fd file descriptor.
+ * @param buf pointer to the buffer.
+ * @param count how many bytes to read.
+ * @param offset file offset
+ *
+ * @return When count is 0, returns 0. When count > SSIZE_MAX,
+ *         the result is unspecified. Otherwise, returns the total
+ *         number of bytes read, or -1 if error.  In case EOF is
+ *         reached and less than count bytes are read, the actual
+ *         number of bytes read is returned (can be 0 or more).
+ */
+ssize_t
+fio_pread(int fd, void *buf, size_t count, off_t offset);
 
 /**
  * Write the given buffer, re-trying for partial writes

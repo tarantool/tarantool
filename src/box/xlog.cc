@@ -1153,13 +1153,13 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 		return -1;
 	}
 	ssize_t readen;
-	if (cursor->async)
+	if (cursor->async) {
 		readen = coeio_pread(cursor->fd, dst, to_load,
 				     cursor->read_offset);
-	else
-		readen = pread(cursor->fd, dst, to_load,
-			       cursor->read_offset);
-
+	} else {
+		readen = fio_pread(cursor->fd, dst, to_load,
+				   cursor->read_offset);
+	}
 	if (readen < 0) {
 		diag_set(SystemError, "failed to read '%s' file",
 			 cursor->name);

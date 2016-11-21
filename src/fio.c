@@ -69,26 +69,47 @@ fio_filename(int fd)
 ssize_t
 fio_read(int fd, void *buf, size_t count)
 {
-	ssize_t to_read = (size_t) count;
-	while (to_read > 0) {
-		ssize_t nrd = read(fd, buf, to_read);
+	size_t n = 0;
+	do {
+		ssize_t nrd = read(fd, buf + n, count - n);
 		if (nrd < 0) {
 			if (errno == EINTR) {
 				errno = 0;
 				continue;
 			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return (ssize_t)count != to_read ? (ssize_t)count - to_read : -1;
 			say_syserror("read, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
+		} else if (nrd == 0) {
+			break; /* EOF */
 		}
-		if (nrd == 0)
-			break;
+		n += nrd;
+	} while (n < count);
 
-		buf += nrd;
-		to_read -= nrd;
-	}
-	return count - to_read;
+	assert(n <= count);
+	return n;
+}
+
+ssize_t
+fio_pread(int fd, void *buf, size_t count, off_t offset)
+{
+	size_t n = 0;
+	do {
+		ssize_t nrd = pread(fd, buf + n, count - n, offset + n);
+		if (nrd < 0) {
+			if (errno == EINTR) {
+				errno = 0;
+				continue;
+			}
+			say_syserror("pread, [%s]", fio_filename(fd));
+			return -1;
+		} else if (nrd == 0) {
+			break; /* EOF */
+		}
+		n += nrd;
+	} while (n < count);
+
+	assert(n <= count);
+	return n;
 }
 
 ssize_t

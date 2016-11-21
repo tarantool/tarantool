@@ -373,17 +373,15 @@ struct xlog_cursor
 	struct ibuf rbuf;
 	/** file read position */
 	off_t read_offset;
-
 	/** true if eof marker was readen */
 	bool eof_read;
-
 	/** if true then bad crc will be ignored */
 	bool ignore_crc;
 	/** zbuf decompression context */
 	ZSTD_DStream* zdctx;
 	/** current transaction rows */
 	struct ibuf rows;
-	/** if true to file read via coeio */
+	/** if true then use coeio for operations */
 	bool async;
 };
 
