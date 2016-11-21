@@ -55,6 +55,8 @@
 #include "coeio.h"
 #include "histogram.h"
 #include "rmean.h"
+#include "assoc.h"
+#include "errinj.h"
 
 #include "errcode.h"
 #include "key_def.h"
@@ -62,10 +64,11 @@
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
 #include "iproto_constants.h"
-
+#include "cluster.h" /* SERVER_UUID */
 #include "vclock.h"
-#include "assoc.h"
-#include "errinj.h"
+#include "request.h"
+#include "xrow.h"
+#include "xlog.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -2546,29 +2549,70 @@ insert:
 
 /* dump statement to the run page buffers (stmt header and data) */
 static int
-vy_run_dump_stmt(struct vy_stmt *value, struct vy_buf *info_buf,
-		  struct vy_buf *data_buf, struct vy_page_info *info)
+vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
+		 struct vy_page_info *info,
+		 struct vy_index *index)
 {
-	int64_t lsn = value->lsn;
-	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
-		return -1;
-	struct vy_stmt_info *stmtinfo = (struct vy_stmt_info *)info_buf->p;
-	stmtinfo->type = value->type;
-	stmtinfo->offset = vy_buf_used(data_buf);
-	stmtinfo->size = value->size;
-	stmtinfo->lsn = lsn;
-	vy_buf_advance(info_buf, sizeof(struct vy_stmt_info));
+	struct xrow_header header = {};
+	memset(&header, 0, sizeof(header));
+	header.type = value->type;
+	header.lsn = value->lsn;
 
-	if (vy_buf_ensure(data_buf, value->size))
+	struct request request = {};
+	memset(&request, 0, sizeof(request));
+	request.space_id = index->key_def->space_id;
+	request.index_id = index->key_def->iid;
+	request.type = value->type;
+	if (value->type == IPROTO_UPSERT || value->type == IPROTO_REPLACE) {
+		uint32_t tuple_size;
+		request.tuple = vy_stmt_tuple_data(value, index->key_def,
+						   &tuple_size);
+		request.tuple_end = request.tuple + tuple_size;
+	}
+	if (value->type == IPROTO_UPSERT) {
+		uint32_t ops_size;
+		const char *ops = vy_stmt_upsert_ops(value, index->key_def,
+						 &ops_size);
+		const char *ops_end = ops + ops_size;
+		int vy_ops_cnt = mp_decode_uint(&ops);
+		int ops_cnt = 0;
+		request.ops = region_alloc(&fiber()->gc, 4 + ops_end - ops);
+		request.ops_end = request.ops + 4;
+		for (int i = 0; i < vy_ops_cnt; ++i) {
+			request.index_base = mp_decode_uint(&ops);
+			const char *op_end = ops;
+			mp_next(&op_end);
+			ops_cnt += mp_decode_array(&ops);
+			memcpy((char *)request.ops_end, ops, op_end - ops);
+			request.ops_end += op_end - ops;
+			ops = op_end;
+		}
+		ops = request.ops;
+		switch (mp_sizeof_array(ops_cnt)) {
+		case 1:
+			++request.ops;
+		case 2:
+			request.ops += 2;
+		case 4:
+			mp_encode_array((char *)request.ops, ops_cnt);
+			break;
+		default:
+			return -1;
+		}
+	}
+	if (value->type == IPROTO_DELETE) {
+		request.key = value->data;
+		request.key_end = request.key + value->size;
+	}
+	header.bodycnt = request_encode(&request, header.body);
+	if (xlog_write_row(data_xlog, &header) < 0)
 		return -1;
-	memcpy(data_buf->p, value->data, value->size);
-	vy_buf_advance(data_buf, value->size);
 
 	++info->count;
-	if (lsn > info->max_lsn)
-		info->max_lsn = lsn;
-	if (lsn < info->min_lsn)
-		info->min_lsn = lsn;
+	if (value->lsn > info->max_lsn)
+		info->max_lsn = value->lsn;
+	if (value->lsn < info->min_lsn)
+		info->min_lsn = value->lsn;
 	return 0;
 }
 
@@ -2624,7 +2668,8 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  *  @retval -1 error occured
  */
 static int
-vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
+vy_run_write_page(struct vy_run *run, int index_fd,
+		  struct xlog *data_xlog,
 		  struct vy_write_iterator *wi,
 		  struct vy_stmt *split_key, struct vy_index *index,
 		  uint32_t page_size, uint32_t *page_info_capacity,
@@ -2637,10 +2682,6 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 	struct key_def *key_def = index->key_def;
 	int rc = 0;
 
-	struct vy_buf stmtsinfo, values, compressed;
-	vy_buf_create(&stmtsinfo);
-	vy_buf_create(&values);
-	vy_buf_create(&compressed);
 	if (run_info->count >= *page_info_capacity) {
 		uint32_t cap = *page_info_capacity > 0 ?
 			*page_info_capacity * 2 : 16;
@@ -2660,7 +2701,11 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 	struct vy_page_info *page = run->page_infos + run_info->count;
 	memset(page, 0, sizeof(*page));
 	page->min_lsn = INT64_MAX;
-	page->offset = lseek(data_fd, 0, SEEK_CUR);
+	page->offset = data_xlog->offset;
+	page->unpacked_size = 0;
+
+	bool first_stmt = true;
+	xlog_tx_begin(data_xlog);
 
 	while (true) {
 		struct vy_stmt *stmt = *curr_stmt;
@@ -2671,9 +2716,34 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 			rc = 1;
 			break;
 		}
-		if (vy_buf_used(&values) >= page_size)
+		if (obuf_size(&data_xlog->obuf) >= page_size)
 			break;
-		if (vy_run_dump_stmt(stmt, &stmtsinfo, &values, page) != 0) {
+
+		if (first_stmt) {
+			first_stmt = false;
+			struct vy_buf *min_buf = &run->pages_min;
+			struct vy_stmt *min_stmt;
+			min_stmt = vy_stmt_extract_key_raw(key_def, stmt->data,
+							   stmt->type);
+			if (min_stmt == NULL) {
+				rc = -1;
+				goto out;
+			}
+			if (vy_buf_ensure(min_buf, min_stmt->size)) {
+				vy_stmt_unref(min_stmt);
+				rc = -1;
+				goto out;
+			}
+
+			page->min_key_offset = vy_buf_used(min_buf);
+			memcpy(min_buf->p, min_stmt->data, min_stmt->size);
+			vy_buf_advance(min_buf, min_stmt->size);
+			vy_stmt_unref(min_stmt);
+		}
+
+		page->unpacked_size += stmt->size;
+		if (vy_run_dump_stmt(stmt, data_xlog, page, index) != 0) {
+			xlog_tx_rollback(data_xlog);
 			rc = -1;
 			goto out;
 		}
@@ -2687,46 +2757,19 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 			break;
 		}
 	}
-	page->unpacked_size = vy_buf_used(&stmtsinfo) + vy_buf_used(&values);
-	page->unpacked_size = ALIGN_POS(page->unpacked_size);
-
-	vy_buf_ensure(&compressed, page->unpacked_size);
-	memcpy(compressed.p, stmtsinfo.s, vy_buf_used(&stmtsinfo));
-	vy_buf_advance(&compressed, vy_buf_used(&stmtsinfo));
-	memcpy(compressed.p, values.s, vy_buf_used(&values));
-	vy_buf_advance(&compressed, vy_buf_used(&values));
-
-	page->size = vy_buf_used(&compressed);
-	if (vy_write_file(data_fd, compressed.s, page->size) < 0) {
+	ssize_t written = xlog_tx_commit(data_xlog);
+	if (written == 0)
+		written = xlog_flush(data_xlog);
+	if (written < 0) {
 		/* TODO: report file name */
 		diag_set(SystemError, "error writing file");
 		rc = -1;
 		goto out;
 	}
 
-	page->crc = crc32_calc(0, compressed.s, vy_buf_used(&compressed));
+	page->size = written;
 
 	assert(page->count > 0);
-	struct vy_buf *min_buf = &run->pages_min;
-	struct vy_stmt_info *stmtsinfoarr = (struct vy_stmt_info *) stmtsinfo.s;
-	char *minvalue = values.s + stmtsinfoarr[0].offset;
-	struct vy_stmt *min_stmt;
-	min_stmt = vy_stmt_extract_key_raw(key_def, minvalue,
-					   stmtsinfoarr[0].type);
-	if (min_stmt == NULL) {
-		rc = -1;
-		goto out;
-	}
-	if (vy_buf_ensure(min_buf, min_stmt->size)) {
-		vy_stmt_unref(min_stmt);
-		rc = -1;
-		goto out;
-	}
-
-	page->min_key_offset = vy_buf_used(min_buf);
-	memcpy(min_buf->p, min_stmt->data, min_stmt->size);
-	vy_buf_advance(min_buf, min_stmt->size);
-	vy_stmt_unref(min_stmt);
 
 	++run_info->count;
 	if (page->min_lsn < run_info->min_lsn)
@@ -2738,9 +2781,6 @@ vy_run_write_page(struct vy_run *run, int index_fd, int data_fd,
 
 	run_info->keys += page->count;
 out:
-	vy_buf_destroy(&compressed);
-	vy_buf_destroy(&stmtsinfo);
-	vy_buf_destroy(&values);
 	return rc;
 }
 
@@ -2754,7 +2794,8 @@ out:
  */
 static int
 vy_run_write(struct vy_range *range, struct vy_run *run,
-	     int index_fd, int data_fd, struct vy_write_iterator *wi,
+	     int index_fd, struct xlog *data_xlog,
+	     struct vy_write_iterator *wi,
 	     struct vy_stmt *split_key, struct vy_index *index,
 	     uint32_t page_size, struct vy_stmt **curr_stmt)
 {
@@ -2787,7 +2828,7 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	assert(run->page_infos == NULL);
 	uint32_t page_infos_capacity = 0;
 	do {
-		rc = vy_run_write_page(run, index_fd, data_fd, wi,
+		rc = vy_run_write_page(run, index_fd, data_xlog, wi,
 				       split_key, index,
 				       page_size, &page_infos_capacity,
 				       curr_stmt);
@@ -2837,7 +2878,7 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	 */
 	if (fdatasync(index_fd) == -1)
 		goto err_file;
-	if (fdatasync(data_fd) == -1)
+	if (xlog_sync(data_xlog) == -1)
 		goto err_file;
 
 	/*
@@ -3095,7 +3136,6 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	char data_path[PATH_MAX];
 	char new_path[PATH_MAX];
 	int index_fd = -1;
-	int data_fd = -1;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
@@ -3121,17 +3161,26 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		diag_set(SystemError, "failed to create temp file");
 		goto fail;
 	}
-	snprintf(data_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	data_fd = mkstemp(data_path);
-	if (data_fd < 0) {
-		diag_set(SystemError, "failed to create temp file");
+	vy_run_snprint_path(data_path, sizeof(data_path), range,
+			    range->run_count, VY_FILE_DATA);
+	struct xlog *data_xlog = (struct xlog *)malloc(sizeof(struct xlog));
+	struct xlog_meta meta = {
+		.filetype = "RUN",
+		.version = "0.13",
+		.server_uuid = SERVER_UUID
+	};
+	if (xlog_create(data_xlog, data_path, &meta) < 0) {
 		goto fail;
 	}
 
 	/* Write statements to the run file. */
-	if (vy_run_write(range, run, index_fd, data_fd, wi, split_key, index,
-			 index->key_def->opts.page_size, stmt) != 0)
+	if (vy_run_write(range, run, index_fd, data_xlog, wi, split_key, index,
+			 index->key_def->opts.page_size, stmt) != 0) {
+		xlog_close(data_xlog, false);
 		goto fail;
+	}
+	run->fd = data_xlog->fd;
+	xlog_close(data_xlog, true);
 
 	*written += vy_run_size(run) + vy_run_total(run);
 
@@ -3139,15 +3188,8 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	 * We've successfully written a run to a new range file.
 	 * Commit the range by linking the file to a proper name.
 	 */
-	vy_run_snprint_path(new_path, sizeof(new_path), range,
-			    range->run_count, VY_FILE_DATA);
-	if (rename(data_path, new_path) != 0) {
-		diag_set(SystemError,
-			 "failed to rename file '%s' to '%s'",
-			 data_path, new_path);
+	if (xlog_rename(data_xlog) != 0)
 		goto fail;
-	}
-	strcpy(data_path, new_path);
 
 	vy_run_snprint_path(new_path, sizeof(new_path), range,
 			    range->run_count, VY_FILE_META);
@@ -3159,7 +3201,6 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	}
 
 	close(index_fd);
-	run->fd = data_fd;
 	*p_run = run;
 	return 0;
 fail:
@@ -3167,10 +3208,6 @@ fail:
 	if (index_fd >= 0) {
 		unlink(index_path);
 		close(index_fd);
-	}
-	if (data_fd >= 0) {
-		unlink(data_path);
-		close(data_fd);
 	}
 	return -1;
 }
@@ -6692,6 +6729,8 @@ struct vy_run_iterator {
 	bool search_started;
 	/** Search is finished, you will not get more values from iterator */
 	bool search_ended;
+	/** xlog cursor to iterate over xlog tx */
+	struct xlog_cursor cursor;
 };
 
 static void
@@ -6712,31 +6751,34 @@ struct vy_page {
 	uint32_t page_no;
 	/** The number of statements */
 	uint32_t count;
-	/** Size of raw page data */
-	uint32_t size;
-	/** Raw page data */
-	char data[0];
+	/** Tuples index array */
+	struct vy_buf info;
+	/** Tuples data */
+	struct vy_buf data;
 };
 
 static struct vy_page *
 vy_page_new(struct vy_page_info *page_info)
 {
-	struct vy_page *page = malloc(sizeof(*page) + page_info->size);
+	struct vy_page *page = malloc(sizeof(*page));
 	if (page == NULL) {
-		diag_set(OutOfMemory, sizeof(*page) + page_info->size,
+		diag_set(OutOfMemory, sizeof(*page),
 			"load_page", "page cache");
 		return NULL;
 	}
 	page->count = page_info->count;
-	page->size = page_info->size;
+	vy_buf_create(&page->info);
+	vy_buf_create(&page->data);
 	return page;
 }
 
 static void
 vy_page_delete(struct vy_page *page)
 {
+	vy_buf_destroy(&page->info);
+	vy_buf_destroy(&page->data);
 #if !defined(NDEBUG)
-	memset(page, '#', sizeof(*page) + page->size); /* fail early */
+	memset(page, '#', sizeof(*page)); /* fail early */
 #endif /* !defined(NDEBUG) */
 	free(page);
 }
@@ -6753,11 +6795,9 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	     struct vy_stmt_info **pinfo)
 {
 	assert(stmt_no < page->count);
-	struct vy_stmt_info *info = ((struct vy_stmt_info *) page->data) +
-		stmt_no;
-	const char *stmt_data = page->data +
-		sizeof(struct vy_stmt_info) * page->count + info->offset;
-	assert(stmt_data <= page->data + page->size);
+	struct vy_stmt_info *info = (struct vy_stmt_info *)page->info.s +
+				    stmt_no;
+	const char *stmt_data = page->data.s + info->offset;
 	*pinfo = info;
 	return stmt_data; /* includes offset table */
 }
@@ -6865,6 +6905,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
+		itr->cursor.async = true;
 
 		/*
 		 * Make sure the run file descriptor won't be closed
@@ -6872,8 +6913,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * reading it.
 		 */
 		vy_run_ref(itr->run);
-		rc = coeio_preadn(itr->run->fd, page->data, page_info->size,
-				  page_info->offset);
+		rc = xlog_cursor_open_tx(&itr->cursor, page_info->offset,
+					 page_info->size);
 		vy_run_unref(itr->run);
 
 		/*
@@ -6893,14 +6934,79 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		rc = vy_pread_file(itr->run->fd, page->data, page_info->size,
-				   page_info->offset);
+		itr->cursor.async = false;
+		rc = xlog_cursor_open_tx(&itr->cursor, page_info->offset,
+					 page_info->size);
+
 	}
 
 	if (rc < 0) {
 		vy_page_delete(page);
 		/* TODO: report file name */
-		diag_set(SystemError, "error reading file");
+		return -1;
+	}
+
+	struct xrow_header xrow;
+	uint32_t row_cnt = 0;
+	while ((rc = xlog_cursor_next_row(&itr->cursor, &xrow)) == 0) {
+		struct vy_stmt_info *info;
+		vy_buf_ensure(&page->info, sizeof(struct vy_stmt_info));
+		info = (struct vy_stmt_info *)page->info.p;
+		vy_buf_advance(&page->info, sizeof(struct vy_stmt_info));
+
+		info->lsn = xrow.lsn;
+		info->offset = page->data.p - page->data.s;
+		struct request request = {.type = xrow.type};
+		request_decode(&request, xrow.body[0].iov_base,
+			       xrow.body[0].iov_len);
+		info->type = request.type;
+		if (info->type == IPROTO_DELETE) {
+			info->size = request.key_end - request.key;
+			vy_buf_ensure(&page->data, info->size);
+			void *data = page->data.p;
+			memcpy(data, request.key,
+			       request.key_end - request.key);
+		} else {
+			int start_offset = (itr->index->key_def->part_count) * sizeof(uint32_t);
+			info->size = start_offset;
+			info->size += request.tuple_end - request.tuple;
+			if (info->type == IPROTO_UPSERT) {
+				info->size += mp_sizeof_uint(1) +
+				      mp_sizeof_uint(request.index_base) +
+				      request.ops_end - request.ops;
+			}
+			vy_buf_ensure(&page->data, info->size);
+			void *data = page->data.p;
+			data += start_offset;
+			memcpy(data, request.tuple,
+			       request.tuple_end - request.tuple);
+			tuple_init_field_map(itr->index->format,
+					     (uint32_t *) (data),
+					     data);
+			data += request.tuple_end - request.tuple;
+			if (info->type == IPROTO_UPSERT) {
+				data = mp_encode_uint(data, 1);
+				data = mp_encode_uint(data, request.index_base);
+				memcpy(data, request.ops,
+				       request.ops_end - request.ops);
+			}
+		}
+		vy_buf_advance(&page->data, info->size);
+		++row_cnt;
+	}
+
+	if (rc < 0)  {
+		vy_page_delete(page);
+		/* TODO: report file name */
+		error_log(diag_last_error(diag_get()));
+		return -1;
+	}
+
+	if (row_cnt != page->count) {
+		diag_set(ClientError, ER_VINYL,
+			 "row count doesn't match!");
+		say_warn("want %u got %u", page->count, row_cnt);
+		vy_page_delete(page);
 		return -1;
 	}
 
@@ -7320,6 +7426,8 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 
 	itr->search_started = false;
 	itr->search_ended = false;
+
+	xlog_cursor_openfd(&itr->cursor, run->fd, "");
 }
 
 /**
@@ -7624,6 +7732,7 @@ vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 
 	vy_run_iterator_cache_clean(itr);
+	xlog_cursor_close(&itr->cursor, true);
 
 	TRASH(itr);
 }
