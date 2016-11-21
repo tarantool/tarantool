@@ -53,8 +53,8 @@ lbox_insert(lua_State *L)
 
 	struct tuple *result;
 	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, result);
 }
 
 static int
@@ -69,16 +69,16 @@ lbox_replace(lua_State *L)
 
 	struct tuple *result;
 	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, result);
 }
 
 static int
 lbox_index_update(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL) ||
-	    (lua_type(L, 4) != LUA_TTABLE && lua_istuple(L, 4) == NULL))
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL) ||
+	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL))
 		return luaL_error(L, "Usage index:update(key, ops)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
@@ -91,16 +91,16 @@ lbox_index_update(lua_State *L)
 	struct tuple *result;
 	if (box_update(space_id, index_id, key, key + key_len,
 		       ops, ops + ops_len, 1, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, result);
 }
 
 static int
 lbox_index_upsert(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL) ||
-	    (lua_type(L, 4) != LUA_TTABLE && lua_istuple(L, 4) == NULL))
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL) ||
+	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL))
 		return luaL_error(L, "Usage index:upsert(tuple_key, ops)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
@@ -113,15 +113,15 @@ lbox_index_upsert(lua_State *L)
 	struct tuple *result;
 	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
 		       ops, ops + ops_len, 1, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, result);
 }
 
 static int
 lbox_index_delete(lua_State *L)
 {
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL))
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
 		return luaL_error(L, "Usage space:delete(key)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
@@ -131,8 +131,8 @@ lbox_index_delete(lua_State *L)
 
 	struct tuple *result;
 	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, result);
 }
 
 static int
@@ -148,8 +148,8 @@ lbox_index_random(lua_State *L)
 
 	struct tuple *tuple;
 	if (box_index_random(space_id, index_id, rnd, &tuple) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, tuple);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, tuple);
 }
 
 static int
@@ -165,8 +165,8 @@ lbox_index_get(lua_State *L)
 
 	struct tuple *tuple;
 	if (box_index_get(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, tuple);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, tuple);
 }
 
 static int
@@ -182,8 +182,8 @@ lbox_index_min(lua_State *L)
 
 	struct tuple *tuple;
 	if (box_index_min(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, tuple);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, tuple);
 }
 
 static int
@@ -199,8 +199,8 @@ lbox_index_max(lua_State *L)
 
 	struct tuple *tuple;
 	if (box_index_max(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, tuple);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, tuple);
 }
 
 static int
@@ -221,7 +221,7 @@ lbox_index_count(lua_State *L)
 	ssize_t count = box_index_count(space_id, index_id, iterator, key,
 					key + key_len);
 	if (count == -1)
-		return lbox_error(L);
+		return luaT_error(L);
 	lua_pushinteger(L, count);
 	return 1;
 }
@@ -255,7 +255,7 @@ lbox_index_iterator(lua_State *L)
 	struct iterator *it = box_index_iterator(space_id, index_id, iterator,
 						 mpkey, mpkey + mpkey_len);
 	if (it == NULL)
-		return lbox_error(L);
+		return luaT_error(L);
 
 	assert(CTID_STRUCT_ITERATOR_REF != 0);
 	struct iterator **ptr = (struct iterator **) luaL_pushcdata(L,
@@ -280,8 +280,8 @@ lbox_iterator_next(lua_State *L)
 	struct iterator *itr = *(struct iterator **) data;
 	struct tuple *tuple;
 	if (box_iterator_next(itr, &tuple) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, tuple);
+		return luaT_error(L);
+	return luaT_pushtupleornil(L, tuple);
 }
 
 /* }}} */

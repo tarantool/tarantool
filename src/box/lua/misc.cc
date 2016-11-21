@@ -65,7 +65,7 @@ lbox_port_buf_to_table(lua_State *L, struct port_buf *port_buf)
 	lua_createtable(L, port_buf->size, 0);
 	struct port_buf_entry *entry = port_buf->first;
 	for (size_t i = 0 ; i < port_buf->size; i++) {
-		lbox_pushtuple(L, entry->tuple);
+		luaT_pushtuple(L, entry->tuple);
 		lua_rawseti(L, -2, i + 1);
 		entry = entry->next;
 	}
@@ -94,7 +94,7 @@ lbox_select(lua_State *L)
 	if (box_select((struct port *) &port, space_id, index_id, iterator,
 			offset, limit, key, key + key_len) != 0) {
 		port_buf_destroy(&port);
-		return lbox_error(L);
+		return luaT_error(L);
 	}
 
 	/*

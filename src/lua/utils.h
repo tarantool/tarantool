@@ -428,6 +428,15 @@ luaL_touint64(struct lua_State *L, int idx);
 LUA_API int64_t
 luaL_toint64(struct lua_State *L, int idx);
 
+LUA_API int
+luaT_error(lua_State *L);
+
+LUA_API int
+luaT_call(lua_State *L, int nargs, int nreturns);
+
+LUA_API int
+luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
 /** \endcond public */
 
 struct error *
@@ -487,15 +496,6 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
-int
-lbox_error(lua_State *L);
-
-int
-lbox_call(lua_State *L, int nargs, int nreturns);
-
-int
-lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -503,9 +503,9 @@ lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
 #include <fiber.h>
 
 static inline void
-lbox_call_xc(lua_State *L, int nargs, int nreturns)
+luaT_call_xc(lua_State *L, int nargs, int nreturns)
 {
-	if (lbox_call(L, nargs, nreturns) != 0)
+	if (luaT_call(L, nargs, nreturns) != 0)
 		diag_raise();
 }
 

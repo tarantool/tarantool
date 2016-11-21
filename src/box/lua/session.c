@@ -120,7 +120,7 @@ lbox_session_su(struct lua_State *L)
 		user = user_find(lua_tointeger(L, 1));
 	}
 	if (user == NULL)
-		lbox_error(L);
+		luaT_error(L);
 	struct credentials orig_cr;
 	credentials_copy(&orig_cr, &session->credentials);
 	credentials_init(&session->credentials, user);
@@ -131,7 +131,7 @@ lbox_session_su(struct lua_State *L)
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
 	credentials_copy(&session->credentials, &orig_cr);
 	if (error)
-		lbox_error(L);
+		luaT_error(L);
 	return lua_gettop(L) - 1;
 }
 

@@ -906,7 +906,7 @@ luaL_pusherror(struct lua_State *L, struct error *e)
 }
 
 int
-lbox_error(lua_State *L)
+luaT_error(lua_State *L)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
@@ -939,7 +939,7 @@ lbox_catch(lua_State *L)
 }
 
 int
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+luaT_call(struct lua_State *L, int nargs, int nreturns)
 {
 	if (lua_pcall(L, nargs, nreturns, 0))
 		return lbox_catch(L);
@@ -947,7 +947,7 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 }
 
 int
-lbox_cpcall(lua_State *L, lua_CFunction func, void *ud)
+luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
 	if (lua_cpcall(L, func, ud))
 		return lbox_catch(L);

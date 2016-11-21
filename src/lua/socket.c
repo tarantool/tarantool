@@ -720,11 +720,11 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 	lua_pushcfunction(L, lbox_getaddrinfo_result_wrapper);
 	lua_pushlightuserdata(L, result);
 
-	int rc = lbox_call(L, 1, 1);
+	int rc = luaT_call(L, 1, 1);
 
 	freeaddrinfo(result);
 	if (rc != 0)
-		return lbox_error(L);
+		return luaT_error(L);
 	return 1;
 }
 
@@ -822,9 +822,9 @@ lbox_socket_accept(struct lua_State *L)
 	lua_pushnumber(L, sc);
 	lua_pushlightuserdata(L, &fa);
 	lua_pushinteger(L, len);
-	if (lbox_call(L, 3, 2)) {
+	if (luaT_call(L, 3, 2)) {
 		close(sc);
-		return lbox_error(L);
+		return luaT_error(L);
 	}
 	return 2;
 }
@@ -867,10 +867,10 @@ lbox_socket_recvfrom(struct lua_State *L)
 	lua_pushcfunction(L, lbox_socket_recvfrom_wrapper);
 	lua_pushlightuserdata(L, buf);
 	lua_pushinteger(L, res);
-	int rc = lbox_call(L, 2, 1);
+	int rc = luaT_call(L, 2, 1);
 	free(buf);
 	if (rc)
-		return lbox_error(L);
+		return luaT_error(L);
 	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
 }
