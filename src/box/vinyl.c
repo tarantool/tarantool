@@ -5740,13 +5740,20 @@ vy_stmt_extract_key_raw(struct key_def *key_def, const char *stmt, uint8_t type)
 	const char *mp_end = mp;
 	mp_next(&mp_end);
 	uint32_t size;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
 	char *key = tuple_extract_key_raw(mp, mp_end, key_def, &size);
-	if (key == NULL)
+	if (key == NULL) {
+		region_truncate(region, region_svp);
 		return NULL;
+	}
 	struct vy_stmt *ret = vy_stmt_alloc(size);
-	if (ret == NULL)
+	if (ret == NULL) {
+		region_truncate(region, region_svp);
 		return NULL;
+	}
 	memcpy(ret->data, key, size);
+	region_truncate(region, region_svp);
 	ret->type = IPROTO_SELECT;
 	return ret;
 }
