@@ -1855,14 +1855,14 @@ vy_run_unref(struct vy_run *run)
 }
 
 enum vy_file_type {
-	VY_FILE_META,
-	VY_FILE_DATA,
+	VY_FILE_INDEX,
+	VY_FILE_RUN,
 	vy_file_MAX,
 };
 
 static const char *vy_file_suffix[] = {
-	"run",		/* VY_FILE_META */
-	"data",		/* VY_FILE_DATA */
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
 };
 
 static int
@@ -3000,7 +3000,7 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 		return -1;
 
 	char path[PATH_MAX];
-	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_META);
+	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_INDEX);
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		diag_set(SystemError, "failed to open file '%s'", path);
@@ -3050,7 +3050,7 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 	close(fd);
 
 	/* Prepare data file for reading. */
-	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_DATA);
+	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_RUN);
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		diag_set(SystemError, "failed to open file '%s'", path);
@@ -3114,8 +3114,8 @@ vy_range_purge(struct vy_range *range)
 	rlist_foreach_entry(run, &range->runs, link) {
 		assert(run_no > 0);
 		run_no--;
-		vy_run_unlink_file(range, run_no, VY_FILE_META);
-		vy_run_unlink_file(range, run_no, VY_FILE_DATA);
+		vy_run_unlink_file(range, run_no, VY_FILE_INDEX);
+		vy_run_unlink_file(range, run_no, VY_FILE_RUN);
 	}
 }
 
@@ -3163,7 +3163,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		goto fail;
 	}
 	vy_run_snprint_path(data_path, sizeof(data_path), range,
-			    range->run_count, VY_FILE_DATA);
+			    range->run_count, VY_FILE_RUN);
 	struct xlog *data_xlog = (struct xlog *)malloc(sizeof(struct xlog));
 	struct xlog_meta meta = {
 		.filetype = "RUN",
@@ -3193,7 +3193,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		goto fail;
 
 	vy_run_snprint_path(new_path, sizeof(new_path), range,
-			    range->run_count, VY_FILE_META);
+			    range->run_count, VY_FILE_INDEX);
 	if (rename(index_path, new_path) != 0) {
 		diag_set(SystemError,
 			 "failed to rename file '%s' to '%s'",
@@ -3531,8 +3531,8 @@ vy_index_recover_run_list(struct vy_index *index,
 			continue; /* unknown file */
 		if (index_lsn != index->key_def->opts.lsn)
 			continue; /* different incarnation */
-		if (t != VY_FILE_META)
-			continue; /* data file */
+		if (t != VY_FILE_INDEX)
+			continue; /* the run file */
 
 		if (*count == cap) {
 			cap = cap > 0 ? cap * 2 : 16;
