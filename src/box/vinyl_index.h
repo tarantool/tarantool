@@ -94,9 +94,6 @@ public:
 	virtual struct tuple *
 	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const;
 
-	virtual struct tuple *
-	iterator_eq(struct vy_tx *tx, struct vinyl_iterator *it) const;
-
 public:
 	struct vy_env *env;
 	struct vy_index *db;
@@ -149,9 +146,6 @@ public:
 
 	virtual struct tuple *
 	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const override;
-
-	virtual struct tuple *
-	iterator_eq(struct vy_tx *tx, struct vinyl_iterator *it) const override;
 
 	virtual ~VinylSecondaryIndex() override;
 

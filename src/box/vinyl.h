@@ -37,6 +37,8 @@
 
 #include <small/region.h>
 
+#include "index.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -192,8 +194,8 @@ enum vy_order {
  * allocates its own transaction.
  */
 struct vy_cursor *
-vy_cursor_new(struct vy_tx *tx, struct vy_index *index,
-	      const char *key, uint32_t part_count, enum vy_order order);
+vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
+	      uint32_t part_count, enum iterator_type type);
 
 /**
  * Fetch the transaction used in the cursor.

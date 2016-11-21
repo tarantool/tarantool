@@ -58,6 +58,7 @@
 #include "assoc.h"
 #include "errinj.h"
 
+#include "index.h"
 #include "errcode.h"
 #include "key_def.h"
 #include "tuple.h"
@@ -1450,6 +1451,8 @@ struct vy_cursor {
 	struct rlist next_in_tx;
 	/** Iterator over index */
 	struct vy_read_iterator iterator;
+	/** Set to true, if need to check statements to match the cursor key. */
+	bool need_check_eq;
 };
 
 static struct txv *
@@ -9641,7 +9644,7 @@ vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
 
 struct vy_cursor *
 vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
-	      uint32_t part_count, enum vy_order order)
+	      uint32_t part_count, enum iterator_type type)
 {
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
@@ -9657,7 +9660,6 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 	c->index = index;
 	c->n_reads = 0;
-	c->order = order;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
 		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
@@ -9671,8 +9673,42 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 * still alive.
 	 */
 	vy_index_ref(c->index);
+	c->need_check_eq = false;
+	enum vy_order order;
+	switch (type) {
+	case ITER_ALL:
+	case ITER_GE:
+		order = VINYL_GE;
+		break;
+	case ITER_GT:
+		order = VINYL_GT;
+		break;
+	case ITER_LE:
+		order = VINYL_LE;
+		break;
+	case ITER_LT:
+		order = VINYL_LT;
+		break;
+	case ITER_EQ:
+		order = VINYL_EQ;
+		break;
+	case ITER_REQ: {
+		struct key_def *def = index->key_def;
+		/* point-lookup iterator (optimization) */
+		if (def->opts.is_unique && part_count == def->part_count) {
+			order = VINYL_EQ;
+		} else {
+			c->need_check_eq = true;
+			order = VINYL_LE;
+		}
+		break;
+	}
+	default:
+		unreachable();
+	}
 	vy_read_iterator_open(&c->iterator, index, tx, order, c->key,
 			      &tx->vlsn, false);
+	c->order = order;
 	return c;
 }
 
@@ -9681,6 +9717,9 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
 	struct vy_stmt *vyresult = NULL;
 	struct vy_index *index = c->index;
+	struct key_def *def = index->key_def;
+	struct tuple_format *format = index->format;
+	*result = NULL;
 
 	if (c->tx == NULL) {
 		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
@@ -9694,17 +9733,13 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	c->n_reads++;
 	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key))
 		return -1;
-	if (vyresult != NULL) {
-		/* Found. */
-		*result = vy_convert_replace(index->key_def, index->format,
-					     vyresult);
-		if (*result == NULL)
-			return -1;
-	} else {
-		/* Not found. */
-		*result = NULL;
-	}
-	return 0;
+	if (vyresult == NULL)
+		return 0;
+	if (c->need_check_eq && vy_stmt_compare_with_key(vyresult, c->key,
+							 format, def))
+		return 0;
+	*result = vy_convert_replace(def, format, vyresult);
+	return *result != NULL ? 0 : -1;
 }
 
 int
