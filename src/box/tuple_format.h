@@ -120,7 +120,7 @@ tuple_format_id(struct tuple_format *format)
 	return format->id;
 }
 
-static inline struct tuple_format *
+inline struct tuple_format *
 tuple_format_by_id(uint32_t tuple_format_id)
 {
 	return tuple_formats[tuple_format_id];

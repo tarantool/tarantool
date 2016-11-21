@@ -257,6 +257,29 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /** \endcond public */
 
 /**
+ * An atom of Tarantool storage. Represents MsgPack Array.
+ */
+struct PACKED tuple
+{
+	/*
+	 * sic: the header of the tuple is used
+	 * to store a free list pointer in smfree_delayed.
+	 * Please don't change it without understanding
+	 * how smfree_delayed and snapshotting COW works.
+	 */
+	/** snapshot generation version */
+	uint32_t version;
+	/** reference counter */
+	uint16_t refs;
+	/** format identifier */
+	uint16_t format_id;
+	/** length of the variable part of the tuple */
+	uint32_t bsize;
+	/** MessagePack array data */
+	char data[0];
+};
+
+/**
  * @brief Compare two tuple fields using using field type definition
  * @param field_a field
  * @param field_b field
@@ -326,44 +349,6 @@ tuple_new(struct tuple_format *format, const char *data, const char *end);
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "tuple_update.h"
-#include "errinj.h"
-
-enum { TUPLE_REF_MAX = UINT16_MAX };
-
-/** Common quota for tuples and indexes */
-extern struct quota memtx_quota;
-/** Tuple allocator */
-extern struct small_alloc memtx_alloc;
-/** Tuple slab arena */
-extern struct slab_arena memtx_arena;
-
-/**
- * An atom of Tarantool storage. Represents MsgPack Array.
- */
-struct PACKED tuple
-{
-	/*
-	 * sic: the header of the tuple is used
-	 * to store a free list pointer in smfree_delayed.
-	 * Please don't change it without understanding
-	 * how smfree_delayed and snapshotting COW works.
-	 */
-	/** snapshot generation version */
-	uint32_t version;
-	/** reference counter */
-	uint16_t refs;
-	/** format identifier */
-	uint16_t format_id;
-	/** length of the variable part of the tuple */
-	uint32_t bsize;
-	/** MessagePack array data */
-	char data[0];
-};
-
 /**
  * Free the tuple.
  * @pre tuple->refs  == 0
@@ -393,6 +378,156 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple);
  */
 int
 tuple_validate_raw(struct tuple_format *format, const char *data);
+
+/**
+* @brief Return a tuple format instance
+* @param tuple tuple
+* @return tuple format instance
+*/
+inline struct tuple_format *
+tuple_format(const struct tuple *tuple)
+{
+	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
+	assert(tuple_format_id(format) == tuple->format_id);
+	return format;
+}
+
+/*
+ * Return a field map for the tuple.
+ * @param tuple tuple
+ * @returns a field map for the tuple.
+ * @sa tuple_init_field_map()
+ */
+inline const uint32_t *
+tuple_field_map(const struct tuple *tuple)
+{
+	return (uint32_t *) tuple;
+}
+
+/**
+ * @brief Return the number of fields in tuple
+ * @param tuple
+ * @return the number of fields in tuple
+ */
+inline uint32_t
+tuple_field_count(const struct tuple *tuple)
+{
+	const char *data = tuple->data;
+	return mp_decode_array(&data);
+}
+
+/**
+ * Get a field at the specific index in this tuple.
+ * @param tuple tuple
+ * @param fieldno the index of field to return
+ * @param len pointer where the len of the field will be stored
+ * @retval pointer to MessagePack data
+ * @retval NULL when fieldno is out of range
+ */
+inline const char *
+tuple_field(const struct tuple *tuple, uint32_t fieldno)
+{
+	return tuple_field_raw(tuple_format(tuple), tuple->data,
+			       tuple_field_map(tuple), fieldno);
+}
+
+/**
+ * @brief Tuple Interator
+ */
+struct tuple_iterator {
+	/** @cond false **/
+	/* State */
+	struct tuple *tuple;
+	/** Always points to the beginning of the next field. */
+	const char *pos;
+	/** @endcond **/
+	/** field no of the next field. */
+	int fieldno;
+};
+
+/**
+ * @brief Initialize an iterator over tuple fields
+ *
+ * A workflow example:
+ * @code
+ * struct tuple_iterator it;
+ * tuple_rewind(&it, tuple);
+ * const char *field;
+ * uint32_t len;
+ * while ((field = tuple_next(&it, &len)))
+ *	lua_pushlstring(L, field, len);
+ *
+ * @endcode
+ *
+ * @param[out] it tuple iterator
+ * @param[in]  tuple tuple
+ */
+inline void
+tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
+{
+	it->tuple = tuple;
+	it->pos = tuple->data;
+	(void) mp_decode_array(&it->pos); /* Skip array header */
+	it->fieldno = 0;
+}
+
+/**
+ * @brief Position the iterator at a given field no.
+ *
+ * @retval field  if the iterator has the requested field
+ * @retval NULL   otherwise (iteration is out of range)
+ */
+const char *
+tuple_seek(struct tuple_iterator *it, uint32_t fieldno);
+
+/**
+ * @brief Iterate to the next field
+ * @param it tuple iterator
+ * @return next field or NULL if the iteration is out of range
+ */
+const char *
+tuple_next(struct tuple_iterator *it);
+
+/**
+ * Assert that buffer is valid MessagePack array
+ * @param tuple buffer
+ * @param the end of the buffer
+ */
+static inline void
+mp_tuple_assert(const char *tuple, const char *tuple_end)
+{
+	assert(mp_typeof(*tuple) == MP_ARRAY);
+#ifndef NDEBUG
+	mp_next(&tuple);
+#endif
+	assert(tuple == tuple_end);
+	(void) tuple;
+	(void) tuple_end;
+}
+
+static inline uint32_t
+box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
+{
+	const char *field = box_tuple_field(tuple, fieldno);
+	if (field != NULL && mp_typeof(*field) == MP_UINT)
+		return mp_decode_uint(&field);
+	return deflt;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "tuple_update.h"
+#include "errinj.h"
+
+enum { TUPLE_REF_MAX = UINT16_MAX };
+
+/** Common quota for tuples and indexes */
+extern struct quota memtx_quota;
+/** Tuple allocator */
+extern struct small_alloc memtx_alloc;
+/** Tuple slab arena */
+extern struct slab_arena memtx_arena;
 
 /**
  * Throw and exception about tuple reference counter overflow.
@@ -452,58 +587,6 @@ struct TupleRefNil {
 };
 
 /**
-* @brief Return a tuple format instance
-* @param tuple tuple
-* @return tuple format instance
-*/
-static inline struct tuple_format *
-tuple_format(const struct tuple *tuple)
-{
-	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
-	assert(tuple_format_id(format) == tuple->format_id);
-	return format;
-}
-
-/*
- * Return a field map for the tuple.
- * @param tuple tuple
- * @returns a field map for the tuple.
- * @sa tuple_init_field_map()
- */
-inline const uint32_t *
-tuple_field_map(const struct tuple *tuple)
-{
-	return (uint32_t *) tuple;
-}
-
-/**
- * @brief Return the number of fields in tuple
- * @param tuple
- * @return the number of fields in tuple
- */
-inline uint32_t
-tuple_field_count(const struct tuple *tuple)
-{
-	const char *data = tuple->data;
-	return mp_decode_array(&data);
-}
-
-/**
- * Get a field at the specific index in this tuple.
- * @param tuple tuple
- * @param fieldno the index of field to return
- * @param len pointer where the len of the field will be stored
- * @retval pointer to MessagePack data
- * @retval NULL when fieldno is out of range
- */
-inline const char *
-tuple_field(const struct tuple *tuple, uint32_t fieldno)
-{
-	return tuple_field_raw(tuple_format(tuple), tuple->data,
-			       tuple_field_map(tuple), fieldno);
-}
-
-/**
  * A convenience shortcut for data dictionary - get a tuple field
  * as uint32_t.
  */
@@ -538,63 +621,6 @@ tuple_field_cstr(struct tuple *tuple, uint32_t fieldno);
 /** Helper method for the above function. */
 const char *
 tuple_field_to_cstr(const char *field, uint32_t len);
-
-/**
- * @brief Tuple Interator
- */
-struct tuple_iterator {
-	/** @cond false **/
-	/* State */
-	struct tuple *tuple;
-	/** Always points to the beginning of the next field. */
-	const char *pos;
-	/** @endcond **/
-	/** field no of the next field. */
-	int fieldno;
-};
-
-/**
- * @brief Initialize an iterator over tuple fields
- *
- * A workflow example:
- * @code
- * struct tuple_iterator it;
- * tuple_rewind(&it, tuple);
- * const char *field;
- * uint32_t len;
- * while ((field = tuple_next(&it, &len)))
- *	lua_pushlstring(L, field, len);
- *
- * @endcode
- *
- * @param[out] it tuple iterator
- * @param[in]  tuple tuple
- */
-inline void
-tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
-{
-	it->tuple = tuple;
-	it->pos = tuple->data;
-	(void) mp_decode_array(&it->pos); /* Skip array header */
-	it->fieldno = 0;
-}
-
-/**
- * @brief Position the iterator at a given field no.
- *
- * @retval field  if the iterator has the requested field
- * @retval NULL   otherwise (iteration is out of range)
- */
-const char *
-tuple_seek(struct tuple_iterator *it, uint32_t fieldno);
-
-/**
- * @brief Iterate to the next field
- * @param it tuple iterator
- * @return next field or NULL if the iteration is out of range
- */
-const char *
-tuple_next(struct tuple_iterator *it);
 
 /**
  * A convenience shortcut for the data dictionary - get next field
@@ -694,27 +720,6 @@ tuple_bless(struct tuple *tuple)
 	/* Remember current tuple */
 	box_tuple_last = tuple;
 	return tuple;
-}
-
-static inline void
-mp_tuple_assert(const char *tuple, const char *tuple_end)
-{
-	assert(mp_typeof(*tuple) == MP_ARRAY);
-#ifndef NDEBUG
-	mp_next(&tuple);
-#endif
-	assert(tuple == tuple_end);
-	(void) tuple;
-	(void) tuple_end;
-}
-
-static inline uint32_t
-box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
-{
-	const char *field = box_tuple_field(tuple, fieldno);
-	if (field != NULL && mp_typeof(*field) == MP_UINT)
-		return mp_decode_uint(&field);
-	return deflt;
 }
 
 #endif /* defined(__cplusplus) */
