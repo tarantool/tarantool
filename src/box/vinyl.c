@@ -2781,6 +2781,7 @@ vy_run_write_page(struct vy_run *run, int index_fd,
 
 	run_info->keys += page->count;
 out:
+	fiber_gc();
 	return rc;
 }
 
