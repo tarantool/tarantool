@@ -350,7 +350,7 @@ wal_checkpoint_f(struct cmsg *data)
 	    vclock_sum(&writer->current_wal->meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
-		xlog_close(writer->current_wal);
+		xlog_close(writer->current_wal, false);
 		writer->current_wal = NULL;
 		/*
 		 * Avoid creating an empty xlog if this is the
@@ -421,7 +421,7 @@ wal_opt_rotate(struct wal_writer *writer)
 			 * A warning is written to the server
 			 * log file.
 			 */
-			xlog_close(wal_to_close);
+			xlog_close(wal_to_close, false);
 			wal_to_close = NULL;
 		}
 		/* Open WAL with '.inprogress' suffix. */
@@ -604,7 +604,7 @@ wal_writer_f(va_list ap)
 	fiber_yield();
 
 	if (writer->current_wal != NULL) {
-		xlog_close(writer->current_wal);
+		xlog_close(writer->current_wal, false);
 		writer->current_wal = NULL;
 	}
 	return 0;

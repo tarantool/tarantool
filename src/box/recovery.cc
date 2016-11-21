@@ -172,7 +172,7 @@ recovery_close_log(struct recovery *r)
 		say_warn("file `%s` wasn't correctly closed",
 			 r->cursor.name);
 	}
-	xlog_cursor_close(&r->cursor);
+	xlog_cursor_close(&r->cursor, false);
 	r->is_active = false;
 }
 
@@ -187,7 +187,7 @@ recovery_delete(struct recovery *r)
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
 		 */
-		xlog_cursor_close(&r->cursor);
+		xlog_cursor_close(&r->cursor, false);
 	}
 	free(r);
 }

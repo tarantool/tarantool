@@ -208,7 +208,7 @@ static void
 lbox_xlog_parser_close(struct xlog_cursor *cur) {
 	if (cur == NULL)
 		return;
-	xlog_cursor_close(cur);
+	xlog_cursor_close(cur, false);
 	free(cur);
 }
 
@@ -248,7 +248,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 			 (int) strlen(cur->meta.filetype),
 			 cur->meta.filetype);
 		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
-		xlog_cursor_close(cur);
+		xlog_cursor_close(cur, false);
 		free(cur);
 		return lbox_error(L);
 	}

@@ -718,7 +718,7 @@ MemtxEngine::recoverSnapshot()
 	xlog_cursor_open_xc(&cursor, filename);
 	SERVER_UUID = cursor.meta.server_uuid;
 	auto reader_guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor);
+		xlog_cursor_close(&cursor, false);
 	});
 
 	struct xrow_header row;
@@ -1092,7 +1092,7 @@ MemtxEngine::bootstrap()
 		diag_raise();
 	};
 	auto guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor);
+		xlog_cursor_close(&cursor, false);
 		xdir_destroy(&dir);
 	});
 
@@ -1278,7 +1278,7 @@ checkpoint_f(va_list ap)
 	if (snap == NULL)
 		tnt_raise(SystemError, "Can't create xlog");
 
-	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
+	auto guard = make_scoped_guard([=]{ xlog_close(snap, false); });
 
 	say_info("saving snapshot `%s'", snap->filename);
 	struct checkpoint_entry *entry;
@@ -1416,7 +1416,7 @@ memtx_initial_join_f(va_list ap)
 	struct xlog_cursor cursor;
 	xdir_open_cursor_xc(&dir, checkpoint_lsn, &cursor);
 	auto reader_guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor);
+		xlog_cursor_close(&cursor, false);
 	});
 
 	struct xrow_header row;

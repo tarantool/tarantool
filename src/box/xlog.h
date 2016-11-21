@@ -277,6 +277,20 @@ struct xlog *
 xdir_create_xlog(struct xdir *dir, const struct vclock *vclock);
 
 /**
+ * Create new xlog writer based on fd.
+ * @param fd            file descriptor
+ * @param name          the assiciated name
+ * @param meta          xlog meta
+ *
+ * @retval 0 for success
+ * @retvl -1 if error
+ */
+
+int
+xlog_create(struct xlog *xlog, int fd, const char *name,
+	    const struct xlog_meta *meta);
+
+/**
  * Write a row to xlog, 
  *
  * @retval count of writen bytes
@@ -333,7 +347,7 @@ xlog_sync(struct xlog *l);
  * @retval -1 error (fclose() failed).
  */
 int
-xlog_close(struct xlog *l);
+xlog_close(struct xlog *l, bool reuse_fd);
 
 /**
  * atfork() handler function to close the log pointed
@@ -369,6 +383,8 @@ struct xlog_cursor
 	ZSTD_DStream* zdctx;
 	/** current transaction rows */
 	struct ibuf rows;
+	/** if true to file read via coeio */
+	bool async;
 };
 
 /**
@@ -410,7 +426,7 @@ xlog_cursor_openmem(struct xlog_cursor *cursor, const char *data, size_t size,
  * @param cursor cursor
  */
 void
-xlog_cursor_close(struct xlog_cursor *cursor);
+xlog_cursor_close(struct xlog_cursor *cursor, bool reuse_fd);
 
 /**
  * Open next tx from xlog
@@ -421,6 +437,17 @@ xlog_cursor_close(struct xlog_cursor *cursor);
  */
 int
 xlog_cursor_next_tx(struct xlog_cursor *cursor);
+
+/**
+ * Open xlog tx from offset in xlog file.
+ * size is a hint for file read size and may be zero.
+ *
+ * @retval 0 for success
+ * @retval 1 eof
+ * @retval -1 for error
+ */
+int
+xlog_cursor_open_tx(struct xlog_cursor *cursor, off_t offset, size_t size);
 
 /**
  * Return next row from xlog tx
