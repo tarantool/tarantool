@@ -210,3 +210,66 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	/* Clear the header to ensure it's rebuilt at commit. */
 	request->header = NULL;
 }
+
+void
+request_normalize_ops(struct request *request)
+{
+	char *ops;
+	ssize_t ops_len = request->ops_end - request->ops;
+	ops = (char *)region_alloc_xc(&fiber()->gc, ops_len);
+	char *ops_end = ops;
+	if (tuple_update_check_ops(region_aligned_alloc_xc_cb,
+				   &fiber()->gc, request->ops, request->ops_end,
+				   request->index_base)) {
+		diag_raise();
+	}
+	const char *pos = request->ops;
+	int op_cnt = mp_decode_array(&pos);
+	ops_end = mp_encode_array(ops_end, op_cnt);
+	int op_no = 0;
+	for (op_no = 0; op_no < op_cnt; ++op_no) {
+		int op_len = mp_decode_array(&pos);
+		ops_end = mp_encode_array(ops_end, op_len);
+
+		uint32_t op_name_len;
+		const char  *op_name = mp_decode_str(&pos, &op_name_len);
+		ops_end = mp_encode_str(ops_end, op_name, op_name_len);
+
+		int field_no;
+		if (mp_typeof(*pos) == MP_INT) {
+			field_no = mp_decode_int(&pos);
+			ops_end = mp_encode_int(ops_end, field_no);
+		} else {
+			field_no = mp_decode_uint(&pos);
+			field_no -= request->index_base;
+			ops_end = mp_encode_uint(ops_end, field_no);
+		}
+
+		if (*op_name == ':') {
+			/**
+			 * splice op adjust string pos and copy
+			 * 2 additional arguments
+			 */
+			int str_pos;
+			if (mp_typeof(*pos) == MP_INT) {
+				str_pos = mp_decode_int(&pos);
+				ops_end = mp_encode_int(ops_end, str_pos);
+			} else {
+				str_pos = mp_decode_uint(&pos);
+				str_pos -= request->index_base;
+				ops_end = mp_encode_uint(ops_end, str_pos);
+			}
+			const char *arg = pos;
+			mp_next(&pos);
+			memcpy(ops_end, arg, pos - arg);
+			ops_end += pos - arg;
+		}
+		const char *arg = pos;
+		mp_next(&pos);
+		memcpy(ops_end, arg, pos - arg);
+		ops_end += pos - arg;
+	}
+	request->ops = (const char *)ops;
+	request->ops_end = (const char *)ops_end;
+	request->index_base = 0;
+}

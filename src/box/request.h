@@ -147,6 +147,10 @@ void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple);
 
+void
+request_normalize_ops(struct request *request);
+
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */
