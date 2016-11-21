@@ -113,7 +113,7 @@ extern struct tuple_format *tuple_format_default;
 
 extern struct tuple_format **tuple_formats;
 
-static inline uint32_t
+inline uint32_t
 tuple_format_id(struct tuple_format *format)
 {
 	assert(tuple_formats[format->id] == format);
