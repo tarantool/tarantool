@@ -23,8 +23,8 @@ env:
       - OS=fedora DIST=rawhide PACK=rpm
       - OS=ubuntu DIST=trusty PACK=deb
       - OS=ubuntu DIST=precise PACK=deb
-      - OS=ubuntu DIST=wily PACK=deb
       - OS=ubuntu DIST=xenial PACK=deb
+      - OS=ubuntu DIST=yakkety PACK=deb
       - OS=debian DIST=jessie PACK=deb
       - OS=debian DIST=wheezy PACK=deb
       - OS=debian DIST=stretch PACK=deb
@@ -42,8 +42,8 @@ matrix:
       - env: OS=fedora DIST=rawhide PACK=rpm
       - env: OS=ubuntu DIST=precise PACK=deb
       - env: OS=ubuntu DIST=trusty PACK=deb
-      - env: OS=ubuntu DIST=wily PACK=deb
       - env: OS=ubuntu DIST=xenial PACK=deb
+      - env: OS=ubuntu DIST=yakkety PACK=deb
       - env: OS=debian DIST=jessie PACK=deb
       - env: OS=debian DIST=wheezy PACK=deb
       - env: OS=debian DIST=stretch PACK=deb
@@ -64,9 +64,9 @@ matrix:
         compiler: clang
       - env: OS=ubuntu DIST=trusty PACK=deb
         compiler: clang
-      - env: OS=ubuntu DIST=wily PACK=deb
-        compiler: clang
       - env: OS=ubuntu DIST=xenial PACK=deb
+        compiler: clang
+      - env: OS=ubuntu DIST=yakkety PACK=deb
         compiler: clang
       - env: OS=debian DIST=wheezy PACK=deb
         compiler: clang
@@ -92,9 +92,9 @@ matrix:
         os: osx
       - env: OS=ubuntu DIST=trusty PACK=deb
         os: osx
-      - env: OS=ubuntu DIST=wily PACK=deb
-        os: osx
       - env: OS=ubuntu DIST=xenial PACK=deb
+        os: osx
+      - env: OS=ubuntu DIST=yakkety PACK=deb
         os: osx
       - env: OS=debian DIST=wheezy PACK=deb
         os: osx
