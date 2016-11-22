@@ -709,11 +709,10 @@ error:
  * In case of error, writes a message to the server log
  * and sets errno.
  */
-struct xlog *
-xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
+int
+xdir_create_xlog(struct xlog *xlog, struct xdir *dir, const struct vclock *vclock)
 {
 	char *filename;
-	struct xlog *l = NULL;
 	int64_t signature = vclock_sum(vclock);
 	struct xlog_meta meta;
 	assert(signature >= 0);
@@ -730,26 +729,19 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	meta.server_uuid = *dir->server_uuid;
 	vclock_copy(&meta.vclock, vclock);
 
-	l = (struct xlog *) calloc(1, sizeof(*l));
-	if (l == NULL)
-		goto error;
-
-	if (xlog_create(l, filename, &meta) != 0)
+	if (xlog_create(xlog, filename, &meta) != 0)
 		goto error;
 
 	/* set sync interval from xdir settings */
-	l->sync_interval = dir->sync_interval;
+	xlog->sync_interval = dir->sync_interval;
 
 	/* Rename xlog file */
-	if (dir->suffix != INPROGRESS && xlog_rename(l))
+	if (dir->suffix != INPROGRESS && xlog_rename(xlog))
 		goto error;
 
-	return l;
+	return 0;
 error:
-	int save_errno = errno;
-	free(l);
-	errno = save_errno;
-	return NULL;
+	return -1;
 }
 
 /**
@@ -1100,7 +1092,6 @@ xlog_close(struct xlog *l, bool reuse_fd)
 	obuf_destroy(&l->zbuf);
 	if (l->zctx)
 		ZSTD_freeCCtx(l->zctx);
-	free(l);
 	return rc;
 }
 
@@ -1109,18 +1100,14 @@ xlog_close(struct xlog *l, bool reuse_fd)
  * effects (for use in the atfork handler).
  */
 void
-xlog_atfork(struct xlog **lptr)
+xlog_atfork(struct xlog *xlog)
 {
-	struct xlog *l = *lptr;
-	if (l) {
-		/*
-		 * Close the file descriptor STDIO buffer does not
-		 * make its way into the respective file in
-		 * fclose().
-		 */
-		close(l->fd);
-		*lptr = NULL;
-	}
+	/*
+	 * Close the file descriptor STDIO buffer does not
+	 * make its way into the respective file in
+	 * fclose().
+	 */
+	close(xlog->fd);
 }
 
 /* }}} */

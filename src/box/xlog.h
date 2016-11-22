@@ -271,10 +271,11 @@ struct xlog {
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
  *
- * @return  xlog object or NULL in case of error.
+ * @retval 0 if OK
+ * @retval -1 if error
  */
-struct xlog *
-xdir_create_xlog(struct xdir *dir, const struct vclock *vclock);
+int
+xdir_create_xlog(struct xlog *xlog, struct xdir *dir, const struct vclock *vclock);
 
 /**
  * Create new xlog writer based on fd.
@@ -360,10 +361,10 @@ xlog_close(struct xlog *l, bool reuse_fd);
 
 /**
  * atfork() handler function to close the log pointed
- * at by *lptr in the child.
+ * at by xlog in the child.
  */
 void
-xlog_atfork(struct xlog **lptr);
+xlog_atfork(struct xlog *xlog);
 
 /* {{{ xlog_cursor - read rows from a log file */
 

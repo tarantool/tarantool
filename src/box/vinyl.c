@@ -2763,14 +2763,13 @@ vy_run_write_data(struct vy_range *range, struct vy_run *run,
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), range,
 			    range->run_count, VY_FILE_RUN);
-	struct xlog *data_xlog = malloc(sizeof(*data_xlog));
+	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = "RUN",
 		.version = "0.13",
 		.server_uuid = SERVER_UUID,
 	};
-	if (xlog_create(data_xlog, path, &meta) < 0) {
-		free(data_xlog);
+	if (xlog_create(&data_xlog, path, &meta) < 0) {
 		return -1;
 	}
 
@@ -2783,7 +2782,7 @@ vy_run_write_data(struct vy_range *range, struct vy_run *run,
 	uint32_t page_infos_capacity = 0;
 	int rc;
 	do {
-		rc = vy_run_write_page(run, data_xlog, wi,
+		rc = vy_run_write_page(run, &data_xlog, wi,
 				       range->end, range->index,
 				       &page_infos_capacity, curr_stmt);
 		if (rc < 0)
@@ -2791,15 +2790,15 @@ vy_run_write_data(struct vy_range *range, struct vy_run *run,
 	} while (rc == 0);
 
 	/* Sync data and link the file to the final name. */
-	if (xlog_sync(data_xlog) < 0 ||
-	    xlog_rename(data_xlog) < 0)
+	if (xlog_sync(&data_xlog) < 0 ||
+	    xlog_rename(&data_xlog) < 0)
 		goto err;
 
-	run->fd = data_xlog->fd;
-	xlog_close(data_xlog, true);
+	run->fd = data_xlog.fd;
+	xlog_close(&data_xlog, true);
 	return 0;
 err:
-	xlog_close(data_xlog, false);
+	xlog_close(&data_xlog, false);
 	return -1;
 }
 

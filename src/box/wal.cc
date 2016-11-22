@@ -90,7 +90,9 @@ struct wal_writer
 	/** Return pipe from 'wal' to tx' */
 	struct cpipe tx_pipe;
 	/** The current WAL file. */
-	struct xlog *current_wal;
+	struct xlog current_wal;
+	/** true if wal file is opened */
+	bool is_active;
 	/**
 	 * Used if there was a WAL I/O error and we need to
 	 * keep adding all incoming requests to the rollback
@@ -221,7 +223,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->rows_per_wal = rows_per_wal;
 
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, server_uuid);
-	writer->current_wal = NULL;
+	writer->is_active = false;
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
 	cbus_create(&writer->tx_wal_bus);
@@ -346,12 +348,12 @@ wal_checkpoint_f(struct cmsg *data)
 	/*
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
-	if (msg->rotate && writer->current_wal != NULL &&
-	    vclock_sum(&writer->current_wal->meta.vclock) !=
+	if (msg->rotate && writer->is_active &&
+	    vclock_sum(&writer->current_wal.meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
-		xlog_close(writer->current_wal, false);
-		writer->current_wal = NULL;
+		xlog_close(&writer->current_wal, false);
+		writer->is_active = false;
 		/*
 		 * Avoid creating an empty xlog if this is the
 		 * last snapshot before shutdown.
@@ -399,37 +401,33 @@ wal_checkpoint(struct wal_writer *writer, struct vclock *vclock, bool rotate)
 static int
 wal_opt_rotate(struct wal_writer *writer)
 {
-	struct xlog *l = writer->current_wal, *wal_to_close = NULL;
-
 	ERROR_INJECT_RETURN(ERRINJ_WAL_ROTATE);
 
-	if (l != NULL && l->rows >= writer->rows_per_wal) {
-		wal_to_close = l;
-		l = NULL;
-	}
-	if (l == NULL) {
+	/*
+	 * Close the file *before* we create the new WAL, to
+	 * make sure local hot standby/replication can see
+	 * EOF in the old WAL before switching to the new
+	 * one.
+	 */
+	if (writer->is_active &&
+	    writer->current_wal.rows >= writer->rows_per_wal) {
 		/*
-		 * Close the file *before* we create the new WAL, to
-		 * make sure local hot standby/replication can see
-		 * EOF in the old WAL before switching to the new
-		 * one.
+		 * We can not handle xlog_close()
+		 * failure in any reasonable way.
+		 * A warning is written to the server
+		 * log file.
 		 */
-		if (wal_to_close) {
-			/*
-			 * We can not handle xlog_close()
-			 * failure in any reasonable way.
-			 * A warning is written to the server
-			 * log file.
-			 */
-			xlog_close(wal_to_close, false);
-			wal_to_close = NULL;
-		}
-		/* Open WAL with '.inprogress' suffix. */
-		l = xdir_create_xlog(&writer->wal_dir, &writer->vclock);
+		xlog_close(&writer->current_wal, false);
+		writer->is_active = false;
 	}
-	assert(wal_to_close == NULL);
-	writer->current_wal = l;
-	return l ? 0 : -1;
+
+	if (!writer->is_active) {
+		writer->is_active = xdir_create_xlog(&writer->current_wal,
+						     &writer->wal_dir,
+						     &writer->vclock) == 0;
+
+	}
+	return writer->is_active ? 0 : -1;
 }
 
 static void
@@ -524,7 +522,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 * of request in xlog file is stored inside `struct wal_request`.
 	 */
 
-	struct xlog *l = writer->current_wal;
+	struct xlog *l = &writer->current_wal;
 
 	/*
 	 * Iterate over requests (transactions)
@@ -603,9 +601,9 @@ wal_writer_f(va_list ap)
 
 	fiber_yield();
 
-	if (writer->current_wal != NULL) {
-		xlog_close(writer->current_wal, false);
-		writer->current_wal = NULL;
+	if (writer->is_active) {
+		xlog_close(&writer->current_wal, false);
+		writer->is_active = false;
 	}
 	return 0;
 }
@@ -717,6 +715,7 @@ wal_atfork()
 {
 	if (wal) { /* NULL when forking for box.cfg{background = true} */
 		xlog_atfork(&wal->current_wal);
+		wal->is_active = false;
 		wal = NULL;
 	}
 }

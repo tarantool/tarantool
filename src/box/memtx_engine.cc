@@ -1273,24 +1273,23 @@ checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
-	struct xlog *snap = xdir_create_xlog(&ckpt->dir, &ckpt->vclock);
-
-	if (snap == NULL)
+	struct xlog snap;
+	if (xdir_create_xlog(&snap, &ckpt->dir, &ckpt->vclock) != 0)
 		tnt_raise(SystemError, "Can't create xlog");
 
-	auto guard = make_scoped_guard([=]{ xlog_close(snap, false); });
+	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
 
-	say_info("saving snapshot `%s'", snap->filename);
+	say_info("saving snapshot `%s'", snap.filename);
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		struct tuple *tuple;
 		struct iterator *it = entry->iterator;
 		for (tuple = it->next(it); tuple; tuple = it->next(it)) {
-			checkpoint_write_tuple(snap, space_id(entry->space),
+			checkpoint_write_tuple(&snap, space_id(entry->space),
 					       tuple, ckpt->snap_io_rate_limit);
 		}
 	}
-	xlog_flush(snap);
+	xlog_flush(&snap);
 	say_info("done");
 	return 0;
 }
