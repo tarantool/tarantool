@@ -80,6 +80,12 @@ bool box_snapshot_is_in_progress = false;
 static bool box_init_done = false;
 static bool is_ro = true;
 
+/**
+ * box.cfg{} will fail if one or more servers can't be reached
+ * within the given period.
+ */
+static const int REPLICATION_CFG_TIMEOUT = 10; /* seconds */
+
 /* Use the shared instance of xstream for all appliers */
 static struct xstream initial_join_stream;
 static struct xstream final_join_stream;
@@ -389,7 +395,7 @@ cfg_get_replication_source(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication_source(void)
+box_sync_replication_source(double timeout)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication_source(&count);
@@ -401,7 +407,7 @@ box_sync_replication_source(void)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	applier_connect_all(appliers, count);
+	applier_connect_all(appliers, count, timeout);
 	cluster_set_appliers(appliers, count);
 
 	guard.is_active = false;
@@ -419,7 +425,8 @@ box_set_replication_source(void)
 		return;
 	}
 
-	box_sync_replication_source();
+	/* Try to connect to all replicas within the timeout period */
+	box_sync_replication_source(REPLICATION_CFG_TIMEOUT);
 	server_foreach(server) {
 		if (server->applier != NULL)
 			applier_resume(server->applier);
@@ -1420,7 +1427,8 @@ box_init(void)
 		box_set_listen();
 		recovery_finalize(recovery, &wal_stream.base);
 
-		box_sync_replication_source();
+		/* Wait cluster to start up */
+		box_sync_replication_source(TIMEOUT_INFINITY);
 
 		engine_end_recovery();
 	} else {
@@ -1435,7 +1443,9 @@ box_init(void)
 		port_init();
 		iproto_init();
 		box_set_listen();
-		box_sync_replication_source();
+
+		/* Wait cluster to start up */
+		box_sync_replication_source(TIMEOUT_INFINITY);
 
 		/* Bootstrap cluster */
 		bootstrap();

@@ -50,7 +50,6 @@
 
 /* TODO: add configuration options */
 static const int RECONNECT_DELAY = 1;
-static const int CONNECT_TIMEOUT = 30;
 
 STRS(applier_state, applier_STATE);
 
@@ -599,7 +598,8 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 }
 
 void
-applier_connect_all(struct applier **appliers, int count)
+applier_connect_all(struct applier **appliers, int count,
+		    double timeout)
 {
 	if (count == 0)
 		return; /* nothing to do */
@@ -624,7 +624,7 @@ applier_connect_all(struct applier **appliers, int count)
 	/* Memory for on_state triggers registered in appliers */
 	struct applier_on_state triggers[VCLOCK_MAX];
 	/* Wait results until this time */
-	double deadline = fiber_time() + CONNECT_TIMEOUT;
+	double deadline = fiber_time() + timeout;
 
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
