@@ -23,9 +23,6 @@ test_run:cmd('switch replica')
 ---
 - true
 ...
-while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end
----
-...
 r = box.info.replication[1]
 ---
 ...
@@ -41,6 +38,10 @@ r.idle < 1
 ---
 - true
 ...
+r.uuid ~= nil
+---
+- true
+...
 r.vclock[1] > 0
 ---
 - true
@@ -49,7 +50,15 @@ r.vclock[2] == nil
 ---
 - true
 ...
-r.uuid ~= nil
+-- replica must have the same vclock as master after JOIN
+master_vclock = test_run:get_vclock('default')
+---
+...
+r.vclock[1] == master_vclock[1]
+---
+- true
+...
+r.vclock[2] == master_vclock[2]
 ---
 - true
 ...
