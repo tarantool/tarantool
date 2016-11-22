@@ -72,7 +72,7 @@ box.info.replication[wal_off_id].message
 ...
 box.info.replication[wal_off_id].status
 ---
-- stopped
+- disconnected
 ...
 box.cfg { replication_source = "" }
 ---

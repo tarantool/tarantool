@@ -63,6 +63,40 @@ applier_set_state(struct applier *applier, enum applier_state state)
 }
 
 /**
+ * Write a nice error message to log file on SocketError or ClientError
+ * in applier_f().
+ */
+static inline void
+applier_log_error(struct applier *applier, struct error *e)
+{
+	uint32_t errcode = box_error_code(e);
+	if (applier->last_logged_errcode == errcode)
+		return;
+	switch (applier->state) {
+	case APPLIER_CONNECT:
+		say_info("can't connect to master");
+		break;
+	case APPLIER_CONNECTED:
+		say_info("can't join/subscribe");
+		break;
+	case APPLIER_AUTH:
+		say_info("failed to authenticate");
+		break;
+	case APPLIER_FOLLOW:
+	case APPLIER_INITIAL_JOIN:
+	case APPLIER_FINAL_JOIN:
+		say_info("can't read row");
+		break;
+	default:
+		break;
+	}
+	error_log(e);
+	if (type_cast(SocketError, e))
+		say_info("will retry every %i second", RECONNECT_DELAY);
+	applier->last_logged_errcode = errcode;
+}
+
+/**
  * Connect to a remote host and authenticate the client.
  */
 void
@@ -109,21 +143,21 @@ applier_connect(struct applier *applier)
 		Exception *e = tnt_error(ClientError, ER_SERVER_UUID_MISMATCH,
 					 tt_uuid_str(&applier->uuid),
 					 tt_uuid_str(&greeting.uuid));
-		/* Log the error only once. */
-		if (!applier->warning_said)
-			e->log();
+		applier_log_error(applier, e);
 		e->raise();
+	}
+
+	if (applier->version_id != greeting.version_id) {
+		say_info("remote master is %u.%u.%u at %s\r\n",
+			 version_id_major(greeting.version_id),
+			 version_id_minor(greeting.version_id),
+			 version_id_patch(greeting.version_id),
+			 sio_strfaddr(&applier->addr, applier->addr_len));
 	}
 
 	/* Save the remote server version and UUID on connect. */
 	applier->uuid = greeting.uuid;
 	applier->version_id = greeting.version_id;
-
-	say_info("connected to %u.%u.%u at %s\r\n",
-		 version_id_major(greeting.version_id),
-		 version_id_minor(greeting.version_id),
-		 version_id_patch(greeting.version_id),
-		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&fiber()->diag);
@@ -262,8 +296,6 @@ applier_subscribe(struct applier *applier)
 	xrow_encode_subscribe(&row, &CLUSTER_UUID, &SERVER_UUID, &r->vclock);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
-	/* Re-enable warnings after successful execution of SUBSCRIBE */
-	applier->warning_said = false;
 
 	/*
 	 * Read SUBSCRIBE response
@@ -291,9 +323,7 @@ applier_subscribe(struct applier *applier)
 						 ER_SERVER_ID_MISMATCH,
 						 tt_uuid_str(&applier->uuid),
 						 applier->id, row.server_id);
-			/* Log the error at most once. */
-			if (!applier->warning_said)
-				e->log();
+			applier_log_error(applier, e);
 			e->raise();
 		}
 
@@ -310,6 +340,9 @@ applier_subscribe(struct applier *applier)
 	 * the binary log.
 	 */
 
+	/* Re-enable warnings after successful execution of SUBSCRIBE */
+	applier->last_logged_errcode = 0;
+
 	/*
 	 * Process a stream of rows from the binary log.
 	 */
@@ -325,39 +358,6 @@ applier_subscribe(struct applier *applier)
 		iobuf_reset(iobuf);
 		fiber_gc();
 	}
-}
-
-/**
- * Write a nice error message to log file on SocketError or ClientError
- * in applier_f().
- */
-static inline void
-applier_log_error(struct applier *applier, struct error *e)
-{
-	if (applier->warning_said)
-		return;
-	switch (applier->state) {
-	case APPLIER_CONNECT:
-		say_info("can't connect to master");
-		break;
-	case APPLIER_CONNECTED:
-		say_info("can't join/subscribe");
-		break;
-	case APPLIER_AUTH:
-		say_info("failed to authenticate");
-		break;
-	case APPLIER_FOLLOW:
-	case APPLIER_INITIAL_JOIN:
-	case APPLIER_FINAL_JOIN:
-		say_info("can't read row");
-		break;
-	default:
-		break;
-	}
-	error_log(e);
-	if (type_cast(SocketError, e))
-		say_info("will retry every %i second", RECONNECT_DELAY);
-	applier->warning_said = true;
 }
 
 static inline void
@@ -400,28 +400,26 @@ applier_f(va_list ap)
 				/* Connection to itself, stop applier */
 				applier_disconnect(applier, APPLIER_OFF);
 				return 0;
-			} else if (e->errcode() != ER_LOADING) {
+			} else if (e->errcode() == ER_LOADING) {
+				/* Autobootstrap */
+				applier_log_error(applier, e);
+				goto reconnect;
+			} else if (e->errcode() == ER_ACCESS_DENIED) {
+				/* Invalid configuration */
+				applier_log_error(applier, e);
+				goto reconnect;
+			} else {
+				/* Unrecoverable errors */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_STOPPED);
 				throw;
 			}
-			assert(e->errcode() == ER_LOADING);
-			/*
-			 * Ignore ER_LOADING
-			 */
-			if (!applier->warning_said) {
-				say_info("bootstrap in progress...");
-				applier->warning_said = true;
-			}
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			/* fall through, try again later */
 		} catch (FiberIsCancelled *e) {
 			applier_disconnect(applier, APPLIER_OFF);
 			throw;
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			/* fall through */
+			goto reconnect;
 		}
 		/* Put fiber_sleep() out of catch block.
 		 *
@@ -435,6 +433,8 @@ applier_f(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
+reconnect:
+		applier_disconnect(applier, APPLIER_DISCONNECTED);
 		fiber_sleep(RECONNECT_DELAY);
 	}
 	return 0;

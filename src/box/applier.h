@@ -76,8 +76,8 @@ struct applier {
 	ev_tstamp lag;
 	/** The last known vclock of the remote master */
 	struct vclock vclock;
-	/** A flag to log connection problems once */
-	bool warning_said;
+	/** The last box_error_code() logged to avoid log flooding */
+	uint32_t last_logged_errcode;
 	/** Remote server_id */
 	uint32_t id;
 	/** Remote UUID */
@@ -107,7 +107,7 @@ struct applier {
 	struct xstream *initial_join_stream;
 	/** xstream to process rows during final JOIN */
 	struct xstream *final_join_stream;
-	/** Xstream to process rows during SUBSCRIBE */
+	/** xstream to process rows during SUBSCRIBE */
 	struct xstream *subscribe_stream;
 };
 
