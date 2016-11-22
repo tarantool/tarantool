@@ -2553,12 +2553,12 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 		 struct vy_page_info *info,
 		 struct vy_index *index)
 {
-	struct xrow_header header = {};
+	struct xrow_header header;
 	memset(&header, 0, sizeof(header));
 	header.type = value->type;
 	header.lsn = value->lsn;
 
-	struct request request = {};
+	struct request request;
 	memset(&request, 0, sizeof(request));
 	request.space_id = index->key_def->space_id;
 	request.index_id = index->key_def->iid;
