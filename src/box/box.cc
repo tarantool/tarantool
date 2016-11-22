@@ -1062,6 +1062,12 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Check that we actually can register a new replica */
 	box_check_writable();
 
+	/* Forbid replication with disabled WAL */
+	if (wal == NULL) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
+	}
+
 	/* Remember start vclock. */
 	struct vclock start_vclock;
 	recovery_last_checkpoint(&start_vclock);
@@ -1149,6 +1155,12 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	if (server == NULL || server->id == SERVER_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&replica_uuid));
+	}
+
+	/* Forbid replication with disabled WAL */
+	if (wal == NULL) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
 	}
 
 	/*
