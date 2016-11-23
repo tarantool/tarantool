@@ -737,6 +737,9 @@ xdir_create_xlog(struct xdir *dir, const struct vclock *vclock)
 	if (xlog_create(l, filename, &meta) != 0)
 		goto error;
 
+	/* set sync interval from xdir settings */
+	l->sync_interval = dir->sync_interval;
+
 	/* Rename xlog file */
 	if (dir->suffix != INPROGRESS && xlog_rename(l))
 		goto error;
