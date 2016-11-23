@@ -459,6 +459,19 @@ struct key_def *
 key_def_build_secondary(const struct key_def *primary,
 			const struct key_def *secondary);
 
+/*
+ * Check that parts of the key match with the key definition.
+ * @param key_def Key definition.
+ * @param key MessagePack'ed data for matching.
+ * @param part_count Field count in the key.
+ *
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
+ */
+int
+key_validate_parts(struct key_def *key_def, const char *key,
+		   uint32_t part_count);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

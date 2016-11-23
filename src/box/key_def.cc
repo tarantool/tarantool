@@ -437,6 +437,21 @@ key_def_build_secondary(const struct key_def *primary,
 	return merge;
 }
 
+int
+key_validate_parts(struct key_def *key_def, const char *key,
+		   uint32_t part_count)
+{
+	for (uint32_t part = 0; part < part_count; part++) {
+		enum mp_type mp_type = mp_typeof(*key);
+		mp_next(&key);
+
+		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
+					 ER_KEY_PART_TYPE, part))
+			return -1;
+	}
+	return 0;
+}
+
 const struct space_opts space_opts_default = {
 	/* .temporary = */ false,
 };

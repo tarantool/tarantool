@@ -1204,7 +1204,7 @@ struct vy_index {
 	/* A tuple format for key_def. */
 	struct tuple_format *format;
 
-	/** Member of env->db or scheduler->shutdown. */
+	/** Member of env->indexes. */
 	struct rlist link;
 	/**
 	 * For each index range list modification,
@@ -1344,8 +1344,8 @@ struct vy_merge_iterator {
 	/* Range version checking }}} */
 
 	const struct vy_stmt *key;
-	/** Order of iteration */
-	enum vy_order order;
+	/** Iteration type. */
+	enum iterator_type iterator_type;
 	/** Current stmt that merge iterator is positioned on */
 	struct vy_stmt *curr_stmt;
 	/**
@@ -1385,7 +1385,7 @@ struct vy_merge_iterator {
 
 struct vy_range_iterator {
 	struct vy_index *index;
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	const struct vy_stmt *key;
 	struct vy_range *curr_range;
 };
@@ -1406,7 +1406,7 @@ struct vy_read_iterator {
 	bool only_disk;
 
 	/* search options */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	const struct vy_stmt *key;
 	const int64_t *vlsn;
 
@@ -1437,7 +1437,7 @@ struct vy_cursor {
 	 * was created.
 	 */
 	struct vy_tx *tx;
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
@@ -1450,6 +1450,8 @@ struct vy_cursor {
 	struct rlist next_in_tx;
 	/** Iterator over index */
 	struct vy_read_iterator iterator;
+	/** Set to true, if need to check statements to match the cursor key. */
+	bool need_check_eq;
 };
 
 static struct txv *
@@ -1899,16 +1901,6 @@ vy_run_snprint_path(char *buf, size_t size, struct vy_range *range,
 }
 
 static void
-vy_run_unlink_file(struct vy_range *range,
-		   int run_no, enum vy_file_type type)
-{
-	char path[PATH_MAX];
-	vy_run_snprint_path(path, sizeof(path), range, run_no, type);
-	if (unlink(path) < 0)
-		say_syserror("failed to unlink file '%s'", path);
-}
-
-static void
 vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 {
 	index->run_count++;
@@ -2026,17 +2018,9 @@ static struct vy_range *
 vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
 	(void)t;
-	(void)arg;
-	vy_range_delete(range);
-	return NULL;
-}
-
-static struct vy_range *
-vy_range_tree_unsched_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
-{
-	(void)t;
 	struct vy_index *index = (struct vy_index *) arg;
 	vy_scheduler_remove_range(index->env->scheduler, range);
+	vy_range_delete(range);
 	return NULL;
 }
 
@@ -2086,10 +2070,11 @@ vy_index_delete(struct vy_index *index);
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
-		       enum vy_order order, const struct vy_stmt *key)
+		       enum iterator_type iterator_type,
+		       const struct vy_stmt *key)
 {
 	itr->index = index;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->curr_range = NULL;
 }
@@ -2106,18 +2091,19 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
  * compaction operation in progress (see vy_range_iterator_next()).
  */
 static struct vy_range *
-vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
+vy_range_tree_find_by_key(vy_range_tree_t *tree,
+			  enum iterator_type iterator_type,
 			  struct tuple_format *format, struct key_def *key_def,
 			  const struct vy_stmt *key)
 {
 	if (vy_stmt_part_count(key, key_def) == 0) {
-		switch (order) {
-		case VINYL_LT:
-		case VINYL_LE:
+		switch (iterator_type) {
+		case ITER_LT:
+		case ITER_LE:
 			return vy_range_tree_last(tree);
-		case VINYL_GT:
-		case VINYL_GE:
-		case VINYL_EQ:
+		case ITER_GT:
+		case ITER_GE:
+		case ITER_EQ:
 			return vy_range_tree_first(tree);
 		default:
 			unreachable();
@@ -2126,7 +2112,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 	}
 	/* route */
 	struct vy_range *range;
-	if (order == VINYL_GE || order == VINYL_GT || order == VINYL_EQ) {
+	if (iterator_type == ITER_GE || iterator_type == ITER_GT ||
+	    iterator_type == ITER_EQ) {
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -2160,7 +2147,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
 	} else {
-		assert(order == VINYL_LT || order == VINYL_LE);
+		assert(iterator_type == ITER_LT || iterator_type == ITER_LE);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -2228,21 +2215,21 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 			next = vy_range_tree_first(&index->tree);
 		else
 			next = vy_range_tree_find_by_key(&index->tree,
-							 itr->order, format,
-							 def, itr->key);
+							 itr->iterator_type,
+							 format, def, itr->key);
 		goto check;
 	}
 next:
-	switch (itr->order) {
-	case VINYL_LT:
-	case VINYL_LE:
+	switch (itr->iterator_type) {
+	case ITER_LT:
+	case ITER_LE:
 		next = vy_range_tree_prev(&index->tree, curr);
 		break;
-	case VINYL_GT:
-	case VINYL_GE:
+	case ITER_GT:
+	case ITER_GE:
 		next = vy_range_tree_next(&index->tree, curr);
 		break;
-	case VINYL_EQ:
+	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_key(itr->key, curr->end, format,
 					     def) >= 0) {
@@ -2291,7 +2278,8 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 {
 	struct vy_index *index = itr->index;
 	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
-				itr->order, index->format, index->key_def,
+				itr->iterator_type, index->format,
+				index->key_def,
 				last_stmt != NULL ? last_stmt : itr->key);
 	itr->curr_range = curr;
 	*result = curr->shadow != NULL ? curr->shadow : curr;
@@ -2553,12 +2541,12 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 		 struct vy_page_info *info,
 		 struct vy_index *index)
 {
-	struct xrow_header header = {};
+	struct xrow_header header;
 	memset(&header, 0, sizeof(header));
 	header.type = value->type;
 	header.lsn = value->lsn;
 
-	struct request request = {};
+	struct request request;
 	memset(&request, 0, sizeof(request));
 	request.space_id = index->key_def->space_id;
 	request.index_id = index->key_def->iid;
@@ -2571,34 +2559,9 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 	}
 	if (value->type == IPROTO_UPSERT) {
 		uint32_t ops_size;
-		const char *ops = vy_stmt_upsert_ops(value, index->key_def,
-						 &ops_size);
-		const char *ops_end = ops + ops_size;
-		int vy_ops_cnt = mp_decode_uint(&ops);
-		int ops_cnt = 0;
-		request.ops = region_alloc(&fiber()->gc, 4 + ops_end - ops);
-		request.ops_end = request.ops + 4;
-		for (int i = 0; i < vy_ops_cnt; ++i) {
-			request.index_base = mp_decode_uint(&ops);
-			const char *op_end = ops;
-			mp_next(&op_end);
-			ops_cnt += mp_decode_array(&ops);
-			memcpy((char *)request.ops_end, ops, op_end - ops);
-			request.ops_end += op_end - ops;
-			ops = op_end;
-		}
-		ops = request.ops;
-		switch (mp_sizeof_array(ops_cnt)) {
-		case 1:
-			++request.ops;
-		case 2:
-			request.ops += 2;
-		case 4:
-			mp_encode_array((char *)request.ops, ops_cnt);
-			break;
-		default:
-			return -1;
-		}
+		request.ops = vy_stmt_upsert_ops(value, index->key_def,
+						  &ops_size);
+		request.ops_end = request.ops + ops_size;
 	}
 	if (value->type == IPROTO_DELETE) {
 		request.key = value->data;
@@ -2668,14 +2631,11 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  *  @retval -1 error occured
  */
 static int
-vy_run_write_page(struct vy_run *run, int index_fd,
-		  struct xlog *data_xlog,
-		  struct vy_write_iterator *wi,
-		  struct vy_stmt *split_key, struct vy_index *index,
-		  uint32_t page_size, uint32_t *page_info_capacity,
+vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
+		  struct vy_write_iterator *wi, struct vy_stmt *split_key,
+		  struct vy_index *index, uint32_t *page_info_capacity,
 		  struct vy_stmt **curr_stmt)
 {
-	(void) index_fd;
 	assert(curr_stmt);
 	assert(*curr_stmt);
 	struct vy_run_info *run_info = &run->info;
@@ -2716,7 +2676,7 @@ vy_run_write_page(struct vy_run *run, int index_fd,
 			rc = 1;
 			break;
 		}
-		if (obuf_size(&data_xlog->obuf) >= page_size)
+		if (obuf_size(&data_xlog->obuf) >= index->key_def->opts.page_size)
 			break;
 
 		if (first_stmt) {
@@ -2794,15 +2754,68 @@ out:
  *  @retval -1 error occured
  */
 static int
-vy_run_write(struct vy_range *range, struct vy_run *run,
-	     int index_fd, struct xlog *data_xlog,
-	     struct vy_write_iterator *wi,
-	     struct vy_stmt *split_key, struct vy_index *index,
-	     uint32_t page_size, struct vy_stmt **curr_stmt)
+vy_run_write_data(struct vy_range *range, struct vy_run *run,
+		  struct vy_write_iterator *wi, struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
 	assert(*curr_stmt);
-	int rc = 0;
+
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), range,
+			    range->run_count, VY_FILE_RUN);
+	struct xlog *data_xlog = malloc(sizeof(*data_xlog));
+	struct xlog_meta meta = {
+		.filetype = "RUN",
+		.version = "0.13",
+		.server_uuid = SERVER_UUID,
+	};
+	if (xlog_create(data_xlog, path, &meta) < 0) {
+		free(data_xlog);
+		return -1;
+	}
+
+	/*
+	 * Read from the iterator until it's exhausted or
+	 * the split key is reached.
+	 */
+	run->info.min_lsn = INT64_MAX;
+	assert(run->page_infos == NULL);
+	uint32_t page_infos_capacity = 0;
+	int rc;
+	do {
+		rc = vy_run_write_page(run, data_xlog, wi,
+				       range->end, range->index,
+				       &page_infos_capacity, curr_stmt);
+		if (rc < 0)
+			goto err;
+	} while (rc == 0);
+
+	/* Sync data and link the file to the final name. */
+	if (xlog_sync(data_xlog) < 0 ||
+	    xlog_rename(data_xlog) < 0)
+		goto err;
+
+	run->fd = data_xlog->fd;
+	xlog_close(data_xlog, true);
+	return 0;
+err:
+	xlog_close(data_xlog, false);
+	return -1;
+}
+
+/**
+ * Write run header to file.
+ */
+static int
+vy_run_write_index(struct vy_range *range, struct vy_run *run)
+{
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", range->index->path);
+	int fd = mkstemp(path);
+	if (fd < 0) {
+		diag_set(SystemError, "failed to create file '%s'", path);
+		return -1;
+	}
 
 	/*
 	 * Get data file size to truncate it in case of error
@@ -2818,29 +2831,14 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 
 	/* write run info header and adjust size */
 	uint32_t header_size = sizeof(*header);
-	if (vy_write_file(index_fd, header, header_size) < 0)
+	if (vy_write_file(fd, header, header_size) < 0)
 		goto err_file;
 	header->size += header_size;
-
-	/*
-	 * Read from the iterator until it's exhausted or
-	 * the split key is reached.
-	 */
-	assert(run->page_infos == NULL);
-	uint32_t page_infos_capacity = 0;
-	do {
-		rc = vy_run_write_page(run, index_fd, data_xlog, wi,
-				       split_key, index,
-				       page_size, &page_infos_capacity,
-				       curr_stmt);
-		if (rc < 0)
-			goto err;
-	} while (rc == 0);
 
 	/* Write pages index */
 	header->pages_offset = header->size;
 	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
-	if (vy_write_file(index_fd, run->page_infos, pages_size) < 0)
+	if (vy_write_file(fd, run->page_infos, pages_size) < 0)
 		goto err_file;
 	header->size += pages_size;
 	header->unused = pages_size;
@@ -2848,14 +2846,14 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	/* Write min-max keys for pages */
 	header->min_offset = header->size;
 	header->min_size = vy_buf_used(&run->pages_min);
-	if (vy_write_file(index_fd, run->pages_min.s, header->min_size) < 0)
+	if (vy_write_file(fd, run->pages_min.s, header->min_size) < 0)
 		goto err_file;
 	header->size += header->min_size;
 
 	/* Write range boundaries. */
 	if (range->begin) {
 		assert(range->begin->type == IPROTO_SELECT);
-		if (vy_write_file(index_fd, range->begin->data,
+		if (vy_write_file(fd, range->begin->data,
 				  range->begin->size) < 0)
 			goto err_file;
 		header->begin_key_offset = header->size;
@@ -2864,7 +2862,7 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	}
 	if (range->end) {
 		assert(range->end->type == IPROTO_SELECT);
-		if (vy_write_file(index_fd, range->end->data,
+		if (vy_write_file(fd, range->end->data,
 				  range->end->size) < 0)
 			goto err_file;
 		header->end_key_offset = header->size;
@@ -2873,32 +2871,33 @@ vy_run_write(struct vy_range *range, struct vy_run *run,
 	}
 
 	/*
-	 * Sync written data
-	 * TODO: check, maybe we can use O_SYNC flag instead
-	 * of explicitly syncing
-	 */
-	if (fdatasync(index_fd) == -1)
-		goto err_file;
-	if (xlog_sync(data_xlog) == -1)
-		goto err_file;
-
-	/*
 	 * Eval run_info header crc and rewrite it
 	 * to finalize the run on disk
 	 * */
 	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
 
-	header_size = sizeof(*header);
-	if (vy_pwrite_file(index_fd, header, header_size, 0) < 0 ||
-	    fdatasync(index_fd) != 0)
+	if (vy_pwrite_file(fd, header, header_size, 0) < 0 ||
+	    fdatasync(fd) < 0)
 		goto err_file;
 
+	/* Commit the run file by linking it to the proper name. */
+	char new_path[PATH_MAX];
+	vy_run_snprint_path(new_path, sizeof(new_path), range,
+			    range->run_count, VY_FILE_INDEX);
+	if (rename(path, new_path) != 0) {
+		diag_set(SystemError, "failed to rename file '%s' to '%s'",
+			 path, new_path);
+		goto err;
+	}
+
+	close(fd);
 	return 0;
 
 err_file:
-	/* TODO: report file name */
-	diag_set(SystemError, "error writing file");
+	diag_set(SystemError, "error writing file '%s'", path);
 err:
+	unlink(path);
+	close(fd);
 	return -1;
 }
 
@@ -3104,21 +3103,6 @@ vy_range_delete(struct vy_range *range)
 	free(range);
 }
 
-static void
-vy_range_purge(struct vy_range *range)
-{
-	ERROR_INJECT(ERRINJ_VY_GC, return);
-
-	int run_no = range->run_count;
-	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, link) {
-		assert(run_no > 0);
-		run_no--;
-		vy_run_unlink_file(range, run_no, VY_FILE_INDEX);
-		vy_run_unlink_file(range, run_no, VY_FILE_RUN);
-	}
-}
-
 /*
  * Create a new run for a range and write statements returned by a write
  * iterator to the run file until the end of the range is encountered.
@@ -3127,27 +3111,23 @@ vy_range_purge(struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_stmt *split_key, struct vy_run **p_run,
-		   struct vy_stmt **stmt, size_t *written)
+		   struct vy_run **p_run, struct vy_stmt **stmt,
+		   size_t *written)
 {
 	assert(stmt);
 	assert(*stmt);
 	struct vy_index *index = range->index;
-	char index_path[PATH_MAX];
-	char data_path[PATH_MAX];
-	char new_path[PATH_MAX];
-	int index_fd = -1;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
 	/*
-	 * All keys before the split_key could have cancelled each other.
+	 * All statements in the range could have cancelled each other.
 	 * Do not create an empty run file in this case.
 	 */
-	if (split_key != NULL &&
-	    vy_stmt_compare_with_key(*stmt, split_key, index->format,
+	if (range->end != NULL &&
+	    vy_stmt_compare_with_key(*stmt, range->end, index->format,
 				     index->key_def) >= 0)
 		return 0;
 
@@ -3155,62 +3135,16 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	if (run == NULL)
 		return -1;
 
-	/* Create data and metadata files for the new run. */
-	snprintf(index_path, PATH_MAX, "%s/.tmpXXXXXX", index->path);
-	index_fd = mkstemp(index_path);
-	if (index_fd < 0) {
-		diag_set(SystemError, "failed to create temp file");
-		goto fail;
+	if (vy_run_write_data(range, run, wi, stmt) != 0 ||
+	    vy_run_write_index(range, run) != 0) {
+		vy_run_delete(run);
+		return -1;
 	}
-	vy_run_snprint_path(data_path, sizeof(data_path), range,
-			    range->run_count, VY_FILE_RUN);
-	struct xlog *data_xlog = (struct xlog *)malloc(sizeof(struct xlog));
-	struct xlog_meta meta = {
-		.filetype = "RUN",
-		.version = "0.13",
-		.server_uuid = SERVER_UUID
-	};
-	if (xlog_create(data_xlog, data_path, &meta) < 0) {
-		goto fail;
-	}
-
-	/* Write statements to the run file. */
-	if (vy_run_write(range, run, index_fd, data_xlog, wi, split_key, index,
-			 index->key_def->opts.page_size, stmt) != 0) {
-		xlog_close(data_xlog, false);
-		goto fail;
-	}
-	run->fd = data_xlog->fd;
-	xlog_close(data_xlog, true);
 
 	*written += vy_run_size(run) + vy_run_total(run);
 
-	/*
-	 * We've successfully written a run to a new range file.
-	 * Commit the range by linking the file to a proper name.
-	 */
-	if (xlog_rename(data_xlog) != 0)
-		goto fail;
-
-	vy_run_snprint_path(new_path, sizeof(new_path), range,
-			    range->run_count, VY_FILE_INDEX);
-	if (rename(index_path, new_path) != 0) {
-		diag_set(SystemError,
-			 "failed to rename file '%s' to '%s'",
-			 index_path, new_path);
-		goto fail;
-	}
-
-	close(index_fd);
 	*p_run = run;
 	return 0;
-fail:
-	vy_run_unref(run);
-	if (index_fd >= 0) {
-		unlink(index_path);
-		close(index_fd);
-	}
-	return -1;
 }
 
 /**
@@ -3863,7 +3797,7 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 {
 	struct vy_range *range;
 
-	range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 					  index->format, index->key_def, stmt);
 	if (rlist_empty(&range->runs))
 		return false;
@@ -3910,7 +3844,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		    vy_stmt_is_committed(index, stmt))
 			continue;
 		/* match range */
-		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
+		range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 						  index->format, index->key_def,
 						  stmt);
 		if (prev_range != NULL && range != prev_range) {
@@ -4009,10 +3943,7 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 static void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
-	if (task->index) {
-		vy_index_unref(task->index);
-		task->index = NULL;
-	}
+	vy_index_unref(task->index);
 	diag_destroy(&task->diag);
 	TRASH(task);
 	mempool_free(pool, task);
@@ -4049,7 +3980,7 @@ vy_task_dump_execute(struct vy_task *task)
 	rc = vy_write_iterator_next(wi, &stmt);
 	if (rc || stmt == NULL)
 		goto out;
-	rc = vy_range_write_run(range, wi, NULL, &task->run, &stmt,
+	rc = vy_range_write_run(range, wi, &task->run, &stmt,
 				&task->dump_size);
 out:
 	vy_write_iterator_delete(wi);
@@ -4190,8 +4121,8 @@ vy_task_compact_execute(struct vy_task *task)
 				      rc = -1; goto out;});
 		}
 
-		rc = vy_range_write_run(r, wi, r->end, &new_run,
-					&curr_stmt, &task->dump_size);
+		rc = vy_range_write_run(r, wi, &new_run, &curr_stmt,
+					&task->dump_size);
 		if (rc != 0)
 			goto out;
 
@@ -4214,9 +4145,7 @@ vy_task_compact_execute(struct vy_task *task)
 out:
 	vy_write_iterator_delete(wi);
 
-	/* Remove old range file on success. */
-	if (rc == 0)
-		vy_range_purge(range);
+	/* Old run files are removed on snapshot. */
 	return rc;
 }
 
@@ -4247,48 +4176,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	}
 	task->range = range;
 	return task;
-}
-
-static struct vy_range *
-vy_range_tree_drop_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
-{
-	(void)t;
-	(void)arg;
-	vy_range_purge(range);
-	return NULL;
-}
-
-static int
-vy_task_drop_execute(struct vy_task *task)
-{
-	struct vy_index *index = task->index;
-	assert(index->refs == 1); /* referenced by this task */
-	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_drop_cb, NULL);
-	return 0;
-}
-
-static void
-vy_task_drop_complete(struct vy_task *task)
-{
-	struct vy_index *index = task->index;
-	assert(index->refs == 1); /* referenced by this task */
-	/*
-	 * Since we allocate extents for in-memory trees from a memory
-	 * pool, we must destroy the index in the tx thread.
-	 */
-	vy_index_delete(index);
-	task->index = NULL;
-}
-
-static struct vy_task *
-vy_task_drop_new(struct mempool *pool, struct vy_index *index)
-{
-	static struct vy_task_ops drop_ops = {
-		.execute = vy_task_drop_execute,
-		.complete = vy_task_drop_complete,
-	};
-
-	return vy_task_new(pool, index, &drop_ops);
 }
 
 /* Scheduler Task }}} */
@@ -4342,7 +4229,6 @@ heap_compact_less(struct heap_node *a, struct heap_node *b)
 
 struct vy_scheduler {
 	pthread_mutex_t        mutex;
-	struct rlist   shutdown;
 	struct vy_env    *env;
 	heap_t dump_heap;
 	heap_t compact_heap;
@@ -4440,7 +4326,6 @@ vy_scheduler_new(struct vy_env *env)
 	diag_create(&scheduler->diag);
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
-	rlist_create(&scheduler->shutdown);
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
 	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
@@ -4569,57 +4454,21 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 }
 
 static int
-vy_scheduler_peek_shutdown(struct vy_scheduler *scheduler,
-			   struct vy_index *index, struct vy_task **ptask)
-{
-	if (index->refs > 0) {
-		*ptask = NULL;
-		return 0; /* index still has tasks */
-	}
-
-	/* make sure the index won't get scheduled any more */
-	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_unsched_cb, index);
-
-	*ptask = vy_task_drop_new(&scheduler->task_pool, index);
-	if (*ptask == NULL)
-		return -1;
-	return 0; /* new task */
-}
-
-static int
 vy_schedule(struct vy_scheduler *scheduler, int64_t vlsn,
 	    struct vy_task **ptask)
 {
-	/* Schedule all pending shutdowns. */
-	struct vy_index *index, *n;
-	rlist_foreach_entry_safe(index, &scheduler->shutdown, link, n) {
-		*ptask = NULL;
-		int rc = vy_scheduler_peek_shutdown(scheduler, index, ptask);
-		if (rc < 0)
-			return rc;
-		if (*ptask == NULL)
-			continue;
-		/* Remove from scheduler->shutdown list */
-		rlist_del(&index->link);
-		return 0;
-	}
+	int rc;
 
-	/* peek an index */
 	*ptask = NULL;
 	if (rlist_empty(&scheduler->env->indexes))
 		return 0;
 
-	int rc;
-	*ptask = NULL;
-
-	/* dumping */
 	rc = vy_scheduler_peek_dump(scheduler, ptask);
 	if (rc != 0)
 		return rc; /* error */
 	if (*ptask != NULL)
 		goto found;
 
-	/* compaction */
 	rc = vy_scheduler_peek_compact(scheduler, ptask);
 	if (rc != 0)
 		return rc; /* error */
@@ -4949,6 +4798,9 @@ vy_checkpoint(struct vy_env *env)
 	return 0;
 }
 
+static void
+vy_index_gc(struct vy_index *index);
+
 int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
@@ -4964,6 +4816,12 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
 	}
+
+	/* Remove old run files. */
+	struct vy_index *index;
+	rlist_foreach_entry(index, &env->indexes, link)
+		vy_index_gc(index);
+
 	return 0;
 }
 
@@ -4975,6 +4833,8 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 static void
 vy_index_gc(struct vy_index *index)
 {
+	ERROR_INJECT(ERRINJ_VY_GC, return);
+
 	struct mh_i32ptr_t *ranges = NULL;
 	DIR *dir = NULL;
 
@@ -5087,8 +4947,9 @@ static void vy_conf_delete(struct vy_conf *c)
 }
 
 static int
-vy_index_read(struct vy_index*, const struct vy_stmt*, enum vy_order order,
-		struct vy_stmt **, struct vy_tx*);
+vy_index_read(struct vy_index*, const struct vy_stmt*,
+	      enum iterator_type iterator_type, struct vy_stmt **,
+	      struct vy_tx*);
 
 /** {{{ Introspection */
 
@@ -5431,10 +5292,9 @@ vy_index_ref(struct vy_index *index)
 static void
 vy_index_unref(struct vy_index *index)
 {
-	/* reduce reference counter */
 	assert(index->refs > 0);
-	--index->refs;
-	/* index will be deleted by scheduler if ref == 0 */
+	if (--index->refs == 0)
+		vy_index_delete(index);
 }
 
 int
@@ -5444,10 +5304,7 @@ vy_index_drop(struct vy_index *index)
 	 * don't drop/recreate index in local wal recovery mode if all
 	 * operations are already done.
 	 */
-	struct vy_env *e = index->env;
-
-	/* schedule index shutdown or drop */
-	rlist_move(&e->scheduler->shutdown, &index->link);
+	rlist_del(&index->link);
 	vy_index_unref(index);
 	return 0;
 }
@@ -5994,36 +5851,23 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 {
 	if (ops == ops_end)
 		return;
-	uint64_t series_count = mp_decode_uint(&ops);
-	for (uint64_t i = 0; i < series_count; i++) {
-		int index_base = mp_decode_uint(&ops);
-		const char *serie_end;
-		if (i == series_count - 1) {
-			serie_end = ops_end;
-		} else {
-			serie_end = ops;
-			mp_next(&serie_end);
-		}
+
 #ifndef NDEBUG
-		if (i == series_count - 1) {
 			const char *serie_end_must_be = ops;
 			mp_next(&serie_end_must_be);
-			assert(serie_end == serie_end_must_be);
-		}
+			assert(ops_end == serie_end_must_be);
 #endif
 		const char *result;
 		uint32_t size;
 		result = tuple_upsert_execute(vy_update_alloc, region,
-					      ops, serie_end,
+					      ops, ops_end,
 					      *stmt, *stmt_end,
-					      &size, index_base, suppress_error);
+					      &size, 0, suppress_error);
 		if (result != NULL) {
 			/* if failed, just skip it and leave stmt the same */
 			*stmt = result;
 			*stmt_end = result + size;
 		}
-		ops = serie_end;
-	}
 }
 
 const char *
@@ -6047,32 +5891,22 @@ vy_upsert_try_to_squash(const struct key_def *key_def,
 			struct vy_stmt **result_stmt)
 {
 	*result_stmt = NULL;
-	uint64_t index_base = mp_decode_uint(&new_serie);
-	if (mp_decode_uint(&old_serie) != index_base)
-		return 0;
 
 	size_t squashed_size;
 	const char *squashed =
 		tuple_upsert_squash(vy_update_alloc, region,
 				    old_serie, old_serie_end,
 				    new_serie, new_serie_end,
-				    &squashed_size, index_base);
+				    &squashed_size, 0);
 	if (squashed == NULL)
 		return 0;
 	/* Successful squash! */
-	char index_base_buf[32];
-	char *extra = mp_encode_uint(index_base_buf, 1);
-	extra = mp_encode_uint(extra, index_base);
-
-	struct iovec operations[2];
-	operations[0].iov_base = (void *)index_base_buf;
-	operations[0].iov_len = extra - index_base_buf;
-
-	operations[1].iov_base = (void *)squashed;
-	operations[1].iov_len = squashed_size;
+	struct iovec operations[1];
+	operations[0].iov_base = (void *)squashed;
+	operations[0].iov_len = squashed_size;
 
 	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, format, key_def,
-					  operations, 2);
+					  operations, 1);
 	if (*result_stmt == NULL)
 		return -1;
 	return 0;
@@ -6146,40 +5980,42 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	uint64_t new_series_count = mp_decode_uint(&new_ops);
-	uint64_t old_series_count = mp_decode_uint(&old_ops);
-	if (new_series_count == 1 && old_series_count == 1) {
-		if (vy_upsert_try_to_squash(key_def, format, region,
-					    result_mp, result_mp_end,
-					    old_ops, old_ops_end,
-					    new_ops, new_ops_end,
-					    &result_stmt) != 0) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
+	if (vy_upsert_try_to_squash(key_def, format, region,
+				    result_mp, result_mp_end,
+				    old_ops, old_ops_end,
+				    new_ops, new_ops_end,
+				    &result_stmt) != 0) {
+		region_truncate(region, region_svp);
+		return NULL;
 	}
+	if (result_stmt != NULL) {
+		region_truncate(region, region_svp);
+		result_stmt->lsn = new_stmt->lsn;
+		goto check_key;
+	}
+
+	/* Failed to squash, simply add one upsert to another */
+	int old_ops_cnt, new_ops_cnt;
+	struct iovec operations[3];
+
+	old_ops_cnt = mp_decode_array(&old_ops);
+	operations[1].iov_base = (void *)old_ops;
+	operations[1].iov_len = old_ops_end - old_ops;
+
+	new_ops_cnt = mp_decode_array(&new_ops);
+	operations[2].iov_base = (void *)new_ops;
+	operations[2].iov_len = new_ops_end - new_ops;
+
+	char ops_buf[16];
+	char *header = mp_encode_array(ops_buf, old_ops_cnt + new_ops_cnt);
+	operations[0].iov_base = (void *)ops_buf;
+	operations[0].iov_len = header - ops_buf;
+
+	result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
+					 format, key_def, operations, 3);
 	if (result_stmt == NULL) {
-		/* Failed to squash, simply add one upsert to another */
-		uint64_t res_series_count = new_series_count + old_series_count;
-		char series_count_buf[16];
-		char *extra = mp_encode_uint(series_count_buf,
-					     res_series_count);
-		struct iovec operations[3];
-		operations[0].iov_base = (void *)series_count_buf;
-		operations[0].iov_len = extra - series_count_buf;
-
-		operations[1].iov_base = (void *)old_ops;
-		operations[1].iov_len = old_ops_end - old_ops;
-
-		operations[2].iov_base = (void *)new_ops;
-		operations[2].iov_len = new_ops_end - new_ops;
-		result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
-						 format, key_def, operations,
-						 3);
-		if (result_stmt == NULL) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
+		region_truncate(region, region_svp);
+		return NULL;
 	}
 	region_truncate(region, region_svp);
 	result_stmt->lsn = new_stmt->lsn;
@@ -6265,19 +6101,13 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *expr, const char *expr_end, int index_base)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	assert(index_base == 0 || index_base == 1);
+	assert(index_base == 0);
 	struct vy_stmt *vystmt;
-	char index_base_buf[32];
-	char *extra = mp_encode_uint(index_base_buf, 1);
-	extra = mp_encode_uint(extra, index_base);
-	struct iovec operations[2];
-	operations[0].iov_base = (void *)index_base_buf;
-	operations[0].iov_len = extra - index_base_buf;
-
-	operations[1].iov_base = (void *)expr;
-	operations[1].iov_len = expr_end - expr;
+	struct iovec operations[1];
+	operations[0].iov_base = (void *)expr;
+	operations[0].iov_len = expr_end - expr;
 	vystmt = vy_stmt_new_upsert(stmt, stmt_end, index->format,
-				    index->key_def, operations, 2);
+				    index->key_def, operations, 1);
 	if (vystmt == NULL)
 		return -1;
 	vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
@@ -6444,7 +6274,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return -1;
 
 	/* Try to look up the stmt in the cache */
-	if (vy_index_read(index, vykey, VINYL_EQ, &vyresult, tx))
+	if (vy_index_read(index, vykey, ITER_EQ, &vyresult, tx))
 		goto end;
 
 	if (tx != NULL && vy_tx_track(tx, index, vykey))
@@ -6594,11 +6424,6 @@ vy_end_recovery(struct vy_env *e)
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
-
-	struct vy_index *index;
-	rlist_foreach_entry(index, &e->indexes, link)
-		vy_index_gc(index);
-
 	/* Start scheduler if there is at least one index */
 	if (!rlist_empty(&e->indexes))
 		vy_scheduler_start(e->scheduler);
@@ -6709,11 +6534,11 @@ struct vy_run_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if the key is not specified, GT and EQ are changed to
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if the key is not specified, GT and EQ are changed to
 	 * GE, LT to LE for beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
@@ -6743,7 +6568,7 @@ struct vy_run_iterator {
 
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
-		     struct vy_run *run, enum vy_order order,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct vy_stmt *key, const int64_t *vlsn);
 
 /* }}} vy_run_iterator API forward declaration */
@@ -6979,9 +6804,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			info->size = start_offset;
 			info->size += request.tuple_end - request.tuple;
 			if (info->type == IPROTO_UPSERT) {
-				info->size += mp_sizeof_uint(1) +
-				      mp_sizeof_uint(request.index_base) +
-				      request.ops_end - request.ops;
+				info->size += request.ops_end - request.ops;
 			}
 			vy_buf_ensure(&page->data, info->size);
 			void *data = page->data.p;
@@ -6993,8 +6816,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 					     data);
 			data += request.tuple_end - request.tuple;
 			if (info->type == IPROTO_UPSERT) {
-				data = mp_encode_uint(data, 1);
-				data = mp_encode_uint(data, request.index_base);
 				memcpy(data, request.ops,
 				       request.ops_end - request.ops);
 			}
@@ -7077,7 +6898,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 	uint32_t beg = 0;
 	uint32_t end = itr->run->info.count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->order == VINYL_GT || itr->order == VINYL_LE ? -1 : 0;
+	int zero_cmp = itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_LE ? -1 : 0;
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
@@ -7112,7 +6934,8 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	uint32_t beg = 0;
 	uint32_t end = page->count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->order == VINYL_GT || itr->order == VINYL_LE ? -1 : 0;
+	int zero_cmp = itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_LE ? -1 : 0;
 	struct vy_stmt_info *info;
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
@@ -7178,12 +7001,13 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const struct vy_stmt *key,
  * Affects: curr_loaded_page
  */
 static NODISCARD int
-vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
+vy_run_iterator_next_pos(struct vy_run_iterator *itr,
+			 enum iterator_type iterator_type,
 			 struct vy_run_iterator_pos *pos)
 {
 	*pos = itr->curr_pos;
 	assert(pos->page_no < itr->run->info.count);
-	if (order == VINYL_LE || order == VINYL_LT) {
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		if (pos->page_no == 0 && pos->pos_in_page == 0)
 			return 1;
 		if (pos->pos_in_page > 0) {
@@ -7198,8 +7022,8 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			pos->pos_in_page = page->count - 1;
 		}
 	} else {
-		assert(order == VINYL_GE || order == VINYL_GT ||
-		       order == VINYL_EQ);
+		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
+		       iterator_type == ITER_EQ);
 		struct vy_page *page;
 		int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 		if (rc != 0)
@@ -7237,13 +7061,14 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	const struct vy_stmt *key = itr->key;
-	enum vy_order order = itr->order;
+	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
 	if (rc != 0)
 		return rc;
 	while (info->lsn > *itr->vlsn) {
-		rc = vy_run_iterator_next_pos(itr, order, &itr->curr_pos);
+		rc = vy_run_iterator_next_pos(itr, iterator_type,
+					      &itr->curr_pos);
 		if (rc < 0)
 			return rc;
 		if (rc > 0) {
@@ -7255,7 +7080,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
 		if (rc != 0)
 			return rc;
-		if (order == VINYL_EQ &&
+		if (iterator_type == ITER_EQ &&
 		    vy_stmt_compare_raw(stmt, info->type, key->data, key->type,
 					format, key_def)) {
 			vy_run_iterator_cache_clean(itr);
@@ -7263,12 +7088,12 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			return 0;
 		}
 	}
-	if (order == VINYL_LE || order == VINYL_LT) {
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		/* Remember the page_no of stmt */
 		uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
 		struct vy_run_iterator_pos test_pos;
-		rc = vy_run_iterator_next_pos(itr, order, &test_pos);
+		rc = vy_run_iterator_next_pos(itr, iterator_type, &test_pos);
 		while (rc == 0) {
 			/*
 			 * The cache is at least two pages. Ensure that
@@ -7293,7 +7118,8 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			/* See above */
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-			rc = vy_run_iterator_next_pos(itr, order, &test_pos);
+			rc = vy_run_iterator_next_pos(itr, iterator_type,
+						      &test_pos);
 		}
 
 		rc = rc > 0 ? 0 : rc;
@@ -7354,41 +7180,42 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 					    &equal_found);
 		if (rc != 0)
 			return rc;
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		itr->curr_pos = end_pos;
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		itr->curr_pos.page_no = 0;
 		itr->curr_pos.pos_in_page = 0;
 	}
-	if (itr->order == VINYL_EQ && !equal_found) {
+	if (itr->iterator_type == ITER_EQ && !equal_found) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if ((itr->order == VINYL_GE || itr->order == VINYL_GT) &&
+	if ((itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT) &&
 	    itr->curr_pos.page_no == end_pos.page_no) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if (itr->order == VINYL_LT || itr->order == VINYL_LE) {
+	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE) {
 		/**
-		 * 1) in case of VINYL_LT we now positioned on the value >= than
+		 * 1) in case of ITER_LT we now positioned on the value >= than
 		 * given, so we need to make a step on previous key
-		 * 2) in case if VINYL_LE we now positioned on the value > than
+		 * 2) in case if ITER_LE we now positioned on the value > than
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need to make a step on previous key
 		 */
 		return vy_run_iterator_next_key(&itr->base, NULL, ret);
 	} else {
-		assert(itr->order == VINYL_GE || itr->order == VINYL_GT ||
-		       itr->order == VINYL_EQ);
+		assert(itr->iterator_type == ITER_GE ||
+		       itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_EQ);
 		/**
-		 * 1) in case of VINYL_GT we now positioned on the value > than
+		 * 1) in case of ITER_GT we now positioned on the value > than
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need just to find proper lsn
-		 * 2) in case if VINYL_GE or VINYL_EQ we now positioned on the
+		 * 2) in case if ITER_GE or ITER_EQ we now positioned on the
 		 * value >= given, so we need just to find proper lsn
 		 */
 		return vy_run_iterator_find_lsn(itr, ret);
@@ -7408,7 +7235,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  */
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
-		     struct vy_run *run, enum vy_order order,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct vy_stmt *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_run_iterator_iface;
@@ -7417,13 +7244,14 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->range = range;
 	itr->run = run;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	if (vy_stmt_part_count(key, itr->index->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 
 	itr->curr_stmt = NULL;
@@ -7509,7 +7337,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	uint32_t end_page = itr->run->info.count;
 	assert(itr->curr_pos.page_no <= end_page);
 	struct key_def *key_def = itr->index->key_def;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		if (itr->curr_pos.page_no == 0 &&
 		    itr->curr_pos.pos_in_page == 0) {
 			vy_run_iterator_cache_clean(itr);
@@ -7545,7 +7373,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	const char *next_key;
 	struct tuple_format *format = itr->index->format;
 	do {
-		int rc = vy_run_iterator_next_pos(itr, itr->order,
+		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
 		if (rc != 0) {
 			if (rc > 0) {
@@ -7574,7 +7402,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 				     next_key, next_info->type, format,
 				     key_def) == 0);
 
-	if (itr->order == VINYL_EQ &&
+	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare_raw(next_key, next_info->type,
 				itr->key->data, itr->key->type, format,
 				key_def) != 0) {
@@ -7608,7 +7436,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	assert(itr->curr_pos.page_no < itr->run->info.count);
 
 	struct vy_run_iterator_pos next_pos;
-	rc = vy_run_iterator_next_pos(itr, VINYL_GE, &next_pos);
+	rc = vy_run_iterator_next_pos(itr, ITER_GE, &next_pos);
 	if (rc != 0)
 		return rc > 0 ? 0 : rc;
 
@@ -7680,16 +7508,16 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		return 0;
 	}
 	/* Restoration is very similar to first search so we'll use that */
-	enum vy_order save_order = itr->order;
+	enum iterator_type save_type = itr->iterator_type;
 	const struct vy_stmt *save_key = itr->key;
-	if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
-		itr->order = VINYL_GE;
-	else if (itr->order == VINYL_LT)
-		itr->order = VINYL_LE;
+	if (itr->iterator_type == ITER_GT || itr->iterator_type == ITER_EQ)
+		itr->iterator_type = ITER_GE;
+	else if (itr->iterator_type == ITER_LT)
+		itr->iterator_type = ITER_LE;
 	itr->key = last_stmt;
 	struct vy_stmt *next;
 	rc = vy_run_iterator_start(itr, &next);
-	itr->order = save_order;
+	itr->iterator_type = save_type;
 	itr->key = save_key;
 	if (rc != 0)
 		return rc;
@@ -7719,7 +7547,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 			if (next != NULL)
 				position_changed = true;
 		}
-	} else if (itr->order == VINYL_EQ &&
+	} else if (itr->iterator_type == ITER_EQ &&
 		   vy_stmt_compare(itr->key, next, format, def) != 0) {
 
 		itr->search_ended = true;
@@ -7777,10 +7605,11 @@ struct vy_mem_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if key == NULL: GT and EQ are changed to GE, LT to LE for
+	 * beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
@@ -7818,7 +7647,7 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, const struct vy_stmt *key,
+		     enum iterator_type iterator_type, const struct vy_stmt *key,
 		     const int64_t *vlsn);
 
 /* }}} vy_mem_iterator API forward declaration */
@@ -7848,14 +7677,14 @@ vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 }
 
 /**
- * Make a step in directions defined by itr->order
+ * Make a step in directions defined by itr->iterator_type
  * @retval 0 success
  * @retval 1 EOF
  */
 static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr)
 {
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
@@ -7882,14 +7711,14 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	struct tuple_format *format = itr->mem->format;
 	while (itr->curr_stmt->lsn > *itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
-		    (itr->order == VINYL_EQ &&
+		    (itr->iterator_type == ITER_EQ &&
 		     vy_stmt_compare(itr->key, itr->curr_stmt, format,
 				     key_def))) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
 	}
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 
@@ -7928,31 +7757,33 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
 	if (vy_stmt_part_count(itr->key, itr->mem->key_def) > 0) {
-		if (itr->order == VINYL_EQ) {
+		if (itr->iterator_type == ITER_EQ) {
 			bool exact;
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, &exact);
 			if (!exact)
 				return 1;
-		} else if (itr->order == VINYL_LE || itr->order == VINYL_GT) {
+		} else if (itr->iterator_type == ITER_LE ||
+			   itr->iterator_type == ITER_GT) {
 			itr->curr_pos =
 				vy_mem_tree_upper_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		} else {
-			assert(itr->order == VINYL_GE || itr->order == VINYL_LT);
+			assert(itr->iterator_type == ITER_GE ||
+			       itr->iterator_type == ITER_LT);
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		}
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
 	}
 
-	if (itr->order == VINYL_LT || itr->order == VINYL_LE)
+	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
@@ -7993,21 +7824,22 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, const struct vy_stmt *key,
-		     const int64_t *vlsn)
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 
 	assert(key != NULL);
 	itr->mem = mem;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	if (vy_stmt_part_count(key, mem->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
@@ -8044,7 +7876,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, format,
 				 key_def) == 0);
 
-	if (itr->order == VINYL_EQ &&
+	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, format, key_def) != 0) {
 		itr->curr_stmt = NULL;
 		return 1;
@@ -8150,15 +7982,16 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 * Restoration is very similar to first search so we'll use
 		 * that.
 		 */
-		enum vy_order save_order = itr->order;
+		enum iterator_type save_type = itr->iterator_type;
 		const struct vy_stmt *save_key = itr->key;
-		if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
-			itr->order = VINYL_GE;
-		else if (itr->order == VINYL_LT)
-			itr->order = VINYL_LE;
+		if (itr->iterator_type == ITER_GT ||
+		    itr->iterator_type == ITER_EQ)
+			itr->iterator_type = ITER_GE;
+		else if (itr->iterator_type == ITER_LT)
+			itr->iterator_type = ITER_LE;
 		itr->key = last_stmt;
 		rc = vy_mem_iterator_start(itr);
-		itr->order = save_order;
+		itr->iterator_type = save_type;
 		itr->key = save_key;
 		if (rc > 0) /* Search ended. */
 			return 0;
@@ -8184,7 +8017,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 				if (itr->curr_stmt != NULL)
 					position_changed = true;
 			}
-		} else if (itr->order == VINYL_EQ &&
+		} else if (itr->iterator_type == ITER_EQ &&
 			   vy_stmt_compare(itr->key, itr->curr_stmt, format,
 					   def) != 0) {
 			return true;
@@ -8213,8 +8046,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	vy_mem_iterator_check_version(itr);
 	struct vy_mem_tree_iterator pos = itr->curr_pos;
 	rc = 0;
-	if (itr->order == VINYL_GE || itr->order == VINYL_GT ||
-	    itr->order == VINYL_EQ) {
+	if (itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT ||
+	    itr->iterator_type == ITER_EQ) {
 		while (true) {
 			vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 			if (vy_mem_tree_iterator_is_invalid(&pos))
@@ -8236,7 +8069,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return -1;
 		return rc;
 	}
-	assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
+	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
 	int cmp;
 	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, format, def);
 	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : *itr->vlsn + 1;
@@ -8300,10 +8133,11 @@ struct vy_txw_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if key == NULL: GT and EQ are changed to GE, LT to LE for
+	 * beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 
@@ -8318,7 +8152,8 @@ struct vy_txw_iterator {
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, const struct vy_stmt *key);
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key);
 
 static void
 vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
@@ -8334,18 +8169,20 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, const struct vy_stmt *key)
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
 
 	itr->index = index;
 	itr->tx = tx;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	if (vy_stmt_part_count(key, index->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 	itr->key = key;
 
@@ -8370,9 +8207,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	if (vy_stmt_part_count(itr->key, key_def) > 0) {
-		if (itr->order == VINYL_EQ)
+		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
-		else if (itr->order == VINYL_GE || itr->order == VINYL_GT)
+		else if (itr->iterator_type == ITER_GE ||
+			 itr->iterator_type == ITER_GT)
 			txv = write_set_nsearch(&itr->tx->write_set, &key);
 		else
 			txv = write_set_psearch(&itr->tx->write_set, &key);
@@ -8382,8 +8220,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 				    key_def) == 0) {
 			while (true) {
 				struct txv *next;
-				if (itr->order == VINYL_LE ||
-				    itr->order == VINYL_GT)
+				if (itr->iterator_type == ITER_LE ||
+				    itr->iterator_type == ITER_GT)
 					next = write_set_next(&itr->tx->write_set, txv);
 				else
 					next = write_set_prev(&itr->tx->write_set, txv);
@@ -8394,16 +8232,16 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 					break;
 				txv = next;
 			}
-			if (itr->order == VINYL_GT)
+			if (itr->iterator_type == ITER_GT)
 				txv = write_set_next(&itr->tx->write_set, txv);
-			else if (itr->order == VINYL_LT)
+			else if (itr->iterator_type == ITER_LT)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		key.index = (struct vy_index *)((uintptr_t)key.index + 1);
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	}
 	if (txv == NULL || txv->index != itr->index)
@@ -8433,13 +8271,13 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
 		return 0;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		itr->curr_txv = write_set_prev(&itr->tx->write_set, itr->curr_txv);
 	else
 		itr->curr_txv = write_set_next(&itr->tx->write_set, itr->curr_txv);
 	if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
 		itr->curr_txv = NULL;
-	if (itr->curr_txv != NULL && itr->order == VINYL_EQ &&
+	if (itr->curr_txv != NULL && itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_txv->stmt, itr->index->format,
 	    		    itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
@@ -8499,18 +8337,20 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct txv *txv;
 	struct key_def *def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	else
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	if (txv != NULL && txv->index == itr->index &&
 	    vy_stmt_compare(txv->stmt, last_stmt, format, def) == 0) {
-		if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+		if (itr->iterator_type == ITER_LE ||
+		    itr->iterator_type == ITER_LT)
 			txv = write_set_prev(&itr->tx->write_set, txv);
 		else
 			txv = write_set_next(&itr->tx->write_set, txv);
 	}
-	if (txv != NULL && txv->index == itr->index && itr->order == VINYL_EQ &&
+	if (txv != NULL && txv->index == itr->index &&
+	    itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, txv->stmt, format, def) != 0)
 		txv = NULL;
 	if (txv == NULL || txv->index != itr->index) {
@@ -8575,7 +8415,8 @@ struct vy_merge_src {
  */
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
-		       enum vy_order order, const struct vy_stmt *key)
+		       enum iterator_type iterator_type,
+		       const struct vy_stmt *key)
 {
 	assert(key != NULL);
 	itr->index = index;
@@ -8583,7 +8424,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->key = key;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->src = NULL;
 	itr->src_count = 0;
 	itr->src_capacity = 0;
@@ -8595,7 +8436,8 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->curr_stmt = NULL;
 	struct key_def *def = index->key_def;
 	itr->unique_optimization =
-		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
+		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
+		 iterator_type == ITER_LE) &&
 		vy_stmt_part_count(key, def) >= def->part_count;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
@@ -8758,8 +8600,8 @@ vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr,
 	itr->search_started = true;
 	itr->unique_optimization = false;
 	struct vy_stmt *min_stmt;
-	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
-		     -1 : 1);
+	int order = (itr->iterator_type == ITER_LE ||
+		     itr->iterator_type == ITER_LT ? -1 : 1);
 restart:
 	itr->is_in_uniq_opt = false;
 	min_stmt = NULL;
@@ -8852,8 +8694,8 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 	struct vy_stmt *min_stmt = NULL;
 	itr->curr_src = UINT32_MAX;
 	itr->range_ended = true;
-	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
-		     -1 : 1);
+	int order = (itr->iterator_type == ITER_LE ||
+		     itr->iterator_type == ITER_LT ? -1 : 1);
 	for (uint32_t i = itr->src_count; i--;) {
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
@@ -9201,7 +9043,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
 	wi->key = vy_stmt_new_select(NULL, 0);
-	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key);
+	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key);
 }
 
 static struct vy_write_iterator *
@@ -9227,7 +9069,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, range, run,
-			     VINYL_GE, wi->key, &vlsn);
+			     ITER_GE, wi->key, &vlsn);
 	return 0;
 }
 
@@ -9240,7 +9082,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_mem_iterator_open(&src->mem_iterator, mem,
-			     VINYL_GE, wi->key, &vlsn);
+			     ITER_GE, wi->key, &vlsn);
 	return 0;
 }
 
@@ -9351,8 +9193,9 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, const struct vy_stmt *key,
-		      const int64_t *vlsn, bool only_disk);
+		      enum iterator_type iterator_type,
+		      const struct vy_stmt *key, const int64_t *vlsn,
+		      bool only_disk);
 
 /**
  * Get current stmt
@@ -9376,7 +9219,7 @@ vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, itr->index, itr->tx,
-			     itr->order, itr->key);
+			     itr->iterator_type, itr->key);
 	vy_txw_iterator_restore(&sub_src->iterator, itr->curr_stmt,
 				&sub_src->stmt);
 }
@@ -9397,7 +9240,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 			&itr->merge_iterator, true, true);
 		mem = rlist_first_entry(&r->mems, struct vy_mem, link);
 		vy_mem_iterator_open(&sub_src->mem_iterator, mem,
-				     itr->order, itr->key, itr->vlsn);
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 	bool in_compact = !rlist_empty(&itr->curr_range->compact_list);
 	rlist_foreach_entry(mem, &itr->curr_range->mems, link) {
@@ -9407,8 +9250,8 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 						 struct vy_mem, link);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, is_mutable, true);
-		vy_mem_iterator_open(&sub_src->mem_iterator, mem, itr->order,
-				     itr->key, itr->vlsn);
+		vy_mem_iterator_open(&sub_src->mem_iterator, mem,
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 }
 
@@ -9422,7 +9265,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, itr->curr_range,
-				     run, itr->order, itr->key, itr->vlsn);
+				     run, itr->iterator_type, itr->key,
+				     itr->vlsn);
 	}
 }
 
@@ -9453,12 +9297,13 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, const struct vy_stmt *key,
-		      const int64_t *vlsn, bool only_disk)
+		      enum iterator_type iterator_type,
+		      const struct vy_stmt *key, const int64_t *vlsn,
+		      bool only_disk)
 {
 	itr->index = index;
 	itr->tx = tx;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	itr->only_disk = only_disk;
@@ -9479,10 +9324,10 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	itr->search_started = true;
 
 	vy_range_iterator_open(&itr->range_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9500,7 +9345,7 @@ restart:
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9566,7 +9411,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 	assert(itr->curr_range != NULL);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct vy_stmt *stmt = NULL;
@@ -9671,7 +9516,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	struct vy_stmt *key = vy_stmt_new_select(NULL, 0);
 	if (key == NULL)
 		return -1;
-	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key, &vlsn, true);
+	vy_read_iterator_open(&ri, index, NULL, ITER_GT, key, &vlsn, true);
 	rc = vy_read_iterator_next(&ri, &stmt);
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
@@ -9691,7 +9536,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 static int
 vy_index_read(struct vy_index *index, const struct vy_stmt *key,
-	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
+	      enum iterator_type iterator_type, struct vy_stmt **result,
+	      struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
 	ev_tstamp start  = ev_now(loop());
@@ -9704,7 +9550,8 @@ vy_index_read(struct vy_index *index, const struct vy_stmt *key,
 		vlsn_ptr = &tx->vlsn;
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, order, key, vlsn_ptr, false);
+	vy_read_iterator_open(&itr, index, tx, iterator_type, key, vlsn_ptr,
+			      false);
 	int rc = vy_read_iterator_next(&itr, result);
 	if (rc == 0 && *result) {
 		vy_stmt_ref(*result);
@@ -9728,7 +9575,7 @@ vy_range_optimize_upserts_f(va_list va)
 	fiber_reschedule();
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ,
+	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
 			      stmt, &stmt->lsn, false);
 	struct vy_stmt *v;
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
@@ -9771,7 +9618,7 @@ vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
 
 struct vy_cursor *
 vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
-	      uint32_t part_count, enum vy_order order)
+	      uint32_t part_count, enum iterator_type type)
 {
 	struct vy_env *e = index->env;
 	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
@@ -9787,7 +9634,6 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 	c->index = index;
 	c->n_reads = 0;
-	c->order = order;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
 		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
@@ -9801,8 +9647,36 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 * still alive.
 	 */
 	vy_index_ref(c->index);
-	vy_read_iterator_open(&c->iterator, index, tx, order, c->key,
+	c->need_check_eq = false;
+	enum iterator_type iterator_type;
+	switch (type) {
+	case ITER_ALL:
+		iterator_type = ITER_GE;
+		break;
+	case ITER_GE:
+	case ITER_GT:
+	case ITER_LE:
+	case ITER_LT:
+	case ITER_EQ:
+		iterator_type = type;
+		break;
+	case ITER_REQ: {
+		struct key_def *def = index->key_def;
+		/* point-lookup iterator (optimization) */
+		if (def->opts.is_unique && part_count == def->part_count) {
+			iterator_type = ITER_EQ;
+		} else {
+			c->need_check_eq = true;
+			iterator_type = ITER_LE;
+		}
+		break;
+	}
+	default:
+		unreachable();
+	}
+	vy_read_iterator_open(&c->iterator, index, tx, iterator_type, c->key,
 			      &tx->vlsn, false);
+	c->iterator_type = iterator_type;
 	return c;
 }
 
@@ -9811,6 +9685,9 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
 	struct vy_stmt *vyresult = NULL;
 	struct vy_index *index = c->index;
+	struct key_def *def = index->key_def;
+	struct tuple_format *format = index->format;
+	*result = NULL;
 
 	if (c->tx == NULL) {
 		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
@@ -9824,17 +9701,13 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	c->n_reads++;
 	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key))
 		return -1;
-	if (vyresult != NULL) {
-		/* Found. */
-		*result = vy_convert_replace(index->key_def, index->format,
-					     vyresult);
-		if (*result == NULL)
-			return -1;
-	} else {
-		/* Not found. */
-		*result = NULL;
-	}
-	return 0;
+	if (vyresult == NULL)
+		return 0;
+	if (c->need_check_eq && vy_stmt_compare_with_key(vyresult, c->key,
+							 format, def))
+		return 0;
+	*result = vy_convert_replace(def, format, vyresult);
+	return *result != NULL ? 0 : -1;
 }
 
 int

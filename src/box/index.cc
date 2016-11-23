@@ -71,30 +71,6 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 			 space->def.name, space->def.engine_name, what);
 }
 
-/*
- * Check that parts of the key match with the key definition.
- * @param key_def Key definition.
- * @param key MessagePack'ed data for matching.
- * @param part_count Field count in the key.
- *
- * @retval 0  The key is valid.
- * @retval -1 The key is invalid.
- */
-int
-key_validate_parts(struct key_def *key_def, const char *key,
-		   uint32_t part_count)
-{
-	for (uint32_t part = 0; part < part_count; part++) {
-		enum mp_type mp_type = mp_typeof(*key);
-		mp_next(&key);
-
-		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
-					 ER_KEY_PART_TYPE, part))
-			return -1;
-	}
-	return 0;
-}
-
 int
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count)

@@ -37,6 +37,8 @@
 
 #include <small/region.h>
 
+#include "index.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -178,22 +180,14 @@ vy_index_bsize(struct vy_index *db);
  * Index Cursor
  */
 
-enum vy_order {
-	VINYL_LT,
-	VINYL_LE,
-	VINYL_GT,
-	VINYL_GE,
-	VINYL_EQ
-};
-
 /**
  * Create a cursor. If tx is not NULL, the cursor life time is
  * bound by the transaction life time. Otherwise, the cursor
  * allocates its own transaction.
  */
 struct vy_cursor *
-vy_cursor_new(struct vy_tx *tx, struct vy_index *index,
-	      const char *key, uint32_t part_count, enum vy_order order);
+vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
+	      uint32_t part_count, enum iterator_type type);
 
 /**
  * Fetch the transaction used in the cursor.

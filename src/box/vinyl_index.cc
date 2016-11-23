@@ -265,47 +265,10 @@ close:
 }
 
 struct tuple *
-VinylIndex::iterator_eq(struct vy_tx *tx, struct vinyl_iterator *it) const
-{
-	(void) tx;
-	struct tuple *tuple;
-	uint32_t it_sc_version = ::sc_version;
-	if (it_sc_version != ::sc_version)
-		goto close;
-
-	if (vy_cursor_next(it->cursor, &tuple) != 0)
-		diag_raise();
-	if (tuple == NULL)
-		goto close;
-	/* check equality */
-	if (tuple_compare_with_key(tuple, it->key, it->part_count,
-				   it->key_def) != 0) {
-		goto close;
-	}
-	return tuple;
-close:
-	/* Immediately close the cursor */
-	vy_cursor_delete(it->cursor);
-	it->cursor = NULL;
-	it->base.next = NULL;
-	return NULL;
-}
-
-struct tuple *
 VinylSecondaryIndex::iterator_next(struct vy_tx *tx,
 				   struct vinyl_iterator *it) const
 {
 	struct tuple *tuple = VinylIndex::iterator_next(tx, it);
-	if (tuple)
-		return lookup_full_tuple(this, tuple, tx);
-	return NULL;
-}
-
-struct tuple *
-VinylSecondaryIndex::iterator_eq(struct vy_tx *tx,
-				 struct vinyl_iterator *it) const
-{
-	struct tuple *tuple = VinylIndex::iterator_eq(tx, it);
 	if (tuple)
 		return lookup_full_tuple(this, tuple, tx);
 	return NULL;
@@ -339,17 +302,6 @@ vinyl_iterator_next(struct iterator *ptr)
 	return it->index->iterator_next(tx, it);
 }
 
-static struct tuple *
-vinyl_iterator_eq(struct iterator *ptr)
-{
-	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
-	struct vy_tx *tx;
-	if (vy_cursor_tx(it->cursor, &tx))
-		diag_raise();
-	return it->index->iterator_eq(tx, it);
-}
-
-
 struct iterator*
 VinylIndex::allocIterator() const
 {
@@ -379,39 +331,11 @@ VinylIndex::initIterator(struct iterator *ptr,
 	it->key = key;
 	it->part_count = part_count;
 
-	enum vy_order order;
 	ptr->next = vinyl_iterator_next;
-	switch (type) {
-	case ITER_ALL:
-	case ITER_GE:
-		order = VINYL_GE;
-		break;
-	case ITER_GT:
-		order = VINYL_GT;
-		break;
-	case ITER_LE:
-		order = VINYL_LE;
-		break;
-	case ITER_LT:
-		order = VINYL_LT;
-		break;
-	case ITER_EQ:
-		order = VINYL_EQ;
-		break;
-	case ITER_REQ:
-		/* point-lookup iterator (optimization) */
-		if ((key_def->opts.is_unique) &&
-		    (part_count == key_def->part_count)) {
-			order = VINYL_EQ;
-		} else {
-			ptr->next = vinyl_iterator_eq;
-			order = VINYL_LE;
-		}
-		break;
-	default:
+	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);
-	}
-	it->cursor = vy_cursor_new(tx, db, key, part_count, order);
+
+	it->cursor = vy_cursor_new(tx, db, key, part_count, type);
 	if (it->cursor == NULL)
 		diag_raise();
 }

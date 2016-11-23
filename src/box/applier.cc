@@ -233,7 +233,9 @@ applier_join(struct applier *applier)
 		}
 	}
 finish:
-	/* Decode end of stream packet */
+	/*
+	 * Decode end of stream packet and overwrite the last known vclock
+	 */
 	vclock_create(&applier->vclock);
 	assert(row.type == IPROTO_OK);
 	xrow_decode_vclock(&row, &applier->vclock);
@@ -263,7 +265,6 @@ applier_subscribe(struct applier *applier)
 	applier_set_state(applier, APPLIER_FOLLOW);
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	applier->warning_said = false;
-	vclock_create(&applier->vclock);
 
 	/*
 	 * Read SUBSCRIBE response
@@ -299,6 +300,7 @@ applier_subscribe(struct applier *applier)
 
 		/* Save the received server_id and vclock */
 		applier->id = row.server_id;
+		/* Overwrite the last known vclock from SUBSCRIBE */
 		vclock_copy(&applier->vclock, &vclock);
 	}
 	/**

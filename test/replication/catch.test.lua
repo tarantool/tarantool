@@ -39,7 +39,7 @@ test_run:cmd("switch replica")
 --
 -- #1: delete tuple on replica
 --
-box.space.test:len()
+box.space.test ~= nil
 d = box.space.test:delete{1}
 box.space.test:get(1) ~= nil
 

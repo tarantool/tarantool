@@ -62,7 +62,7 @@ cfg_filter(box.cfg)
       - - page_size
         - 131072
       - - range_size
-        - 67108864
+        - 1073741824
       - - threads
         - 1
   - - vinyl_dir
@@ -130,7 +130,7 @@ cfg_filter(box.cfg)
       - - page_size
         - 131072
       - - range_size
-        - 67108864
+        - 1073741824
       - - threads
         - 1
   - - vinyl_dir

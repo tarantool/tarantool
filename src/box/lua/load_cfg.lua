@@ -9,7 +9,7 @@ local default_vinyl_cfg = {
     memory_limit      = 1.0, -- 1G
     threads           = 1,
     compact_wm        = 2, -- try to maintain less than 2 runs in a range
-    range_size        = 64 * 1024 * 1024,
+    range_size        = 1024 * 1024 * 1024,
     page_size        = 128 * 1024,
 }
 
