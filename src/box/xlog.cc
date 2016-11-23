@@ -744,7 +744,7 @@ xlog_write_meta(struct xlog *l)
 static int
 xlog_read_meta(struct xlog *l, int64_t signature)
 {
-	char filetype[32], version[32], buf[256];
+	char filetype[32], version[32], buf[1024];
 	struct xdir *dir = l->dir;
 	FILE *stream = l->f;
 
