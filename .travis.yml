@@ -20,6 +20,7 @@ env:
       - OS=el DIST=7 PACK=rpm
       - OS=fedora DIST=23 PACK=rpm
       - OS=fedora DIST=24 PACK=rpm
+      - OS=fedora DIST=25 PACK=rpm
       - OS=fedora DIST=rawhide PACK=rpm
       - OS=ubuntu DIST=trusty PACK=deb
       - OS=ubuntu DIST=precise PACK=deb
@@ -39,6 +40,7 @@ matrix:
       - env: OS=el DIST=7 PACK=rpm
       - env: OS=fedora DIST=23 PACK=rpm
       - env: OS=fedora DIST=24 PACK=rpm
+      - env: OS=fedora DIST=25 PACK=rpm
       - env: OS=fedora DIST=rawhide PACK=rpm
       - env: OS=ubuntu DIST=precise PACK=deb
       - env: OS=ubuntu DIST=trusty PACK=deb
@@ -57,6 +59,8 @@ matrix:
       - env: OS=fedora DIST=23 PACK=rpm
         compiler: clang
       - env: OS=fedora DIST=24 PACK=rpm
+        compiler: clang
+      - env: OS=fedora DIST=25 PACK=rpm
         compiler: clang
       - env: OS=fedora DIST=rawhide PACK=rpm
         compiler: clang
@@ -85,6 +89,8 @@ matrix:
       - env: OS=fedora DIST=23 PACK=rpm
         os: osx
       - env: OS=fedora DIST=24 PACK=rpm
+        os: osx
+      - env: OS=fedora DIST=25 PACK=rpm
         os: osx
       - env: OS=fedora DIST=rawhide PACK=rpm
         os: osx
