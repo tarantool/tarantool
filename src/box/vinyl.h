@@ -180,14 +180,6 @@ vy_index_bsize(struct vy_index *db);
  * Index Cursor
  */
 
-enum vy_order {
-	VINYL_LT,
-	VINYL_LE,
-	VINYL_GT,
-	VINYL_GE,
-	VINYL_EQ
-};
-
 /**
  * Create a cursor. If tx is not NULL, the cursor life time is
  * bound by the transaction life time. Otherwise, the cursor

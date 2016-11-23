@@ -58,7 +58,6 @@
 #include "assoc.h"
 #include "errinj.h"
 
-#include "index.h"
 #include "errcode.h"
 #include "key_def.h"
 #include "tuple.h"
@@ -1345,8 +1344,8 @@ struct vy_merge_iterator {
 	/* Range version checking }}} */
 
 	const struct vy_stmt *key;
-	/** Order of iteration */
-	enum vy_order order;
+	/** Iteration type. */
+	enum iterator_type iterator_type;
 	/** Current stmt that merge iterator is positioned on */
 	struct vy_stmt *curr_stmt;
 	/**
@@ -1386,7 +1385,7 @@ struct vy_merge_iterator {
 
 struct vy_range_iterator {
 	struct vy_index *index;
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	const struct vy_stmt *key;
 	struct vy_range *curr_range;
 };
@@ -1407,7 +1406,7 @@ struct vy_read_iterator {
 	bool only_disk;
 
 	/* search options */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	const struct vy_stmt *key;
 	const int64_t *vlsn;
 
@@ -1438,7 +1437,7 @@ struct vy_cursor {
 	 * was created.
 	 */
 	struct vy_tx *tx;
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
@@ -2071,10 +2070,11 @@ vy_index_delete(struct vy_index *index);
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
-		       enum vy_order order, const struct vy_stmt *key)
+		       enum iterator_type iterator_type,
+		       const struct vy_stmt *key)
 {
 	itr->index = index;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->curr_range = NULL;
 }
@@ -2091,18 +2091,19 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
  * compaction operation in progress (see vy_range_iterator_next()).
  */
 static struct vy_range *
-vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
+vy_range_tree_find_by_key(vy_range_tree_t *tree,
+			  enum iterator_type iterator_type,
 			  struct tuple_format *format, struct key_def *key_def,
 			  const struct vy_stmt *key)
 {
 	if (vy_stmt_part_count(key, key_def) == 0) {
-		switch (order) {
-		case VINYL_LT:
-		case VINYL_LE:
+		switch (iterator_type) {
+		case ITER_LT:
+		case ITER_LE:
 			return vy_range_tree_last(tree);
-		case VINYL_GT:
-		case VINYL_GE:
-		case VINYL_EQ:
+		case ITER_GT:
+		case ITER_GE:
+		case ITER_EQ:
 			return vy_range_tree_first(tree);
 		default:
 			unreachable();
@@ -2111,7 +2112,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 	}
 	/* route */
 	struct vy_range *range;
-	if (order == VINYL_GE || order == VINYL_GT || order == VINYL_EQ) {
+	if (iterator_type == ITER_GE || iterator_type == ITER_GT ||
+	    iterator_type == ITER_EQ) {
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -2145,7 +2147,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree, enum vy_order order,
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
 	} else {
-		assert(order == VINYL_LT || order == VINYL_LE);
+		assert(iterator_type == ITER_LT || iterator_type == ITER_LE);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -2213,21 +2215,21 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 			next = vy_range_tree_first(&index->tree);
 		else
 			next = vy_range_tree_find_by_key(&index->tree,
-							 itr->order, format,
-							 def, itr->key);
+							 itr->iterator_type,
+							 format, def, itr->key);
 		goto check;
 	}
 next:
-	switch (itr->order) {
-	case VINYL_LT:
-	case VINYL_LE:
+	switch (itr->iterator_type) {
+	case ITER_LT:
+	case ITER_LE:
 		next = vy_range_tree_prev(&index->tree, curr);
 		break;
-	case VINYL_GT:
-	case VINYL_GE:
+	case ITER_GT:
+	case ITER_GE:
 		next = vy_range_tree_next(&index->tree, curr);
 		break;
-	case VINYL_EQ:
+	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_key(itr->key, curr->end, format,
 					     def) >= 0) {
@@ -2276,7 +2278,8 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 {
 	struct vy_index *index = itr->index;
 	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
-				itr->order, index->format, index->key_def,
+				itr->iterator_type, index->format,
+				index->key_def,
 				last_stmt != NULL ? last_stmt : itr->key);
 	itr->curr_range = curr;
 	*result = curr->shadow != NULL ? curr->shadow : curr;
@@ -3819,7 +3822,7 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 {
 	struct vy_range *range;
 
-	range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 					  index->format, index->key_def, stmt);
 	if (rlist_empty(&range->runs))
 		return false;
@@ -3866,7 +3869,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		    vy_stmt_is_committed(index, stmt))
 			continue;
 		/* match range */
-		range = vy_range_tree_find_by_key(&index->tree, VINYL_EQ,
+		range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 						  index->format, index->key_def,
 						  stmt);
 		if (prev_range != NULL && range != prev_range) {
@@ -4969,8 +4972,9 @@ static void vy_conf_delete(struct vy_conf *c)
 }
 
 static int
-vy_index_read(struct vy_index*, const struct vy_stmt*, enum vy_order order,
-		struct vy_stmt **, struct vy_tx*);
+vy_index_read(struct vy_index*, const struct vy_stmt*,
+	      enum iterator_type iterator_type, struct vy_stmt **,
+	      struct vy_tx*);
 
 /** {{{ Introspection */
 
@@ -6322,7 +6326,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return -1;
 
 	/* Try to look up the stmt in the cache */
-	if (vy_index_read(index, vykey, VINYL_EQ, &vyresult, tx))
+	if (vy_index_read(index, vykey, ITER_EQ, &vyresult, tx))
 		goto end;
 
 	if (tx != NULL && vy_tx_track(tx, index, vykey))
@@ -6582,11 +6586,11 @@ struct vy_run_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if the key is not specified, GT and EQ are changed to
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if the key is not specified, GT and EQ are changed to
 	 * GE, LT to LE for beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
@@ -6616,7 +6620,7 @@ struct vy_run_iterator {
 
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
-		     struct vy_run *run, enum vy_order order,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct vy_stmt *key, const int64_t *vlsn);
 
 /* }}} vy_run_iterator API forward declaration */
@@ -6950,7 +6954,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 	uint32_t beg = 0;
 	uint32_t end = itr->run->info.count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->order == VINYL_GT || itr->order == VINYL_LE ? -1 : 0;
+	int zero_cmp = itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_LE ? -1 : 0;
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
@@ -6985,7 +6990,8 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	uint32_t beg = 0;
 	uint32_t end = page->count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->order == VINYL_GT || itr->order == VINYL_LE ? -1 : 0;
+	int zero_cmp = itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_LE ? -1 : 0;
 	struct vy_stmt_info *info;
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
@@ -7051,12 +7057,13 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const struct vy_stmt *key,
  * Affects: curr_loaded_page
  */
 static NODISCARD int
-vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
+vy_run_iterator_next_pos(struct vy_run_iterator *itr,
+			 enum iterator_type iterator_type,
 			 struct vy_run_iterator_pos *pos)
 {
 	*pos = itr->curr_pos;
 	assert(pos->page_no < itr->run->info.count);
-	if (order == VINYL_LE || order == VINYL_LT) {
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		if (pos->page_no == 0 && pos->pos_in_page == 0)
 			return 1;
 		if (pos->pos_in_page > 0) {
@@ -7071,8 +7078,8 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr, enum vy_order order,
 			pos->pos_in_page = page->count - 1;
 		}
 	} else {
-		assert(order == VINYL_GE || order == VINYL_GT ||
-		       order == VINYL_EQ);
+		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
+		       iterator_type == ITER_EQ);
 		struct vy_page *page;
 		int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 		if (rc != 0)
@@ -7110,13 +7117,14 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	const struct vy_stmt *key = itr->key;
-	enum vy_order order = itr->order;
+	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
 	if (rc != 0)
 		return rc;
 	while (info->lsn > *itr->vlsn) {
-		rc = vy_run_iterator_next_pos(itr, order, &itr->curr_pos);
+		rc = vy_run_iterator_next_pos(itr, iterator_type,
+					      &itr->curr_pos);
 		if (rc < 0)
 			return rc;
 		if (rc > 0) {
@@ -7128,7 +7136,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
 		if (rc != 0)
 			return rc;
-		if (order == VINYL_EQ &&
+		if (iterator_type == ITER_EQ &&
 		    vy_stmt_compare_raw(stmt, info->type, key->data, key->type,
 					format, key_def)) {
 			vy_run_iterator_cache_clean(itr);
@@ -7136,12 +7144,12 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			return 0;
 		}
 	}
-	if (order == VINYL_LE || order == VINYL_LT) {
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		/* Remember the page_no of stmt */
 		uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
 		struct vy_run_iterator_pos test_pos;
-		rc = vy_run_iterator_next_pos(itr, order, &test_pos);
+		rc = vy_run_iterator_next_pos(itr, iterator_type, &test_pos);
 		while (rc == 0) {
 			/*
 			 * The cache is at least two pages. Ensure that
@@ -7166,7 +7174,8 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			/* See above */
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-			rc = vy_run_iterator_next_pos(itr, order, &test_pos);
+			rc = vy_run_iterator_next_pos(itr, iterator_type,
+						      &test_pos);
 		}
 
 		rc = rc > 0 ? 0 : rc;
@@ -7227,41 +7236,42 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 					    &equal_found);
 		if (rc != 0)
 			return rc;
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		itr->curr_pos = end_pos;
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		itr->curr_pos.page_no = 0;
 		itr->curr_pos.pos_in_page = 0;
 	}
-	if (itr->order == VINYL_EQ && !equal_found) {
+	if (itr->iterator_type == ITER_EQ && !equal_found) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if ((itr->order == VINYL_GE || itr->order == VINYL_GT) &&
+	if ((itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT) &&
 	    itr->curr_pos.page_no == end_pos.page_no) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if (itr->order == VINYL_LT || itr->order == VINYL_LE) {
+	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE) {
 		/**
-		 * 1) in case of VINYL_LT we now positioned on the value >= than
+		 * 1) in case of ITER_LT we now positioned on the value >= than
 		 * given, so we need to make a step on previous key
-		 * 2) in case if VINYL_LE we now positioned on the value > than
+		 * 2) in case if ITER_LE we now positioned on the value > than
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need to make a step on previous key
 		 */
 		return vy_run_iterator_next_key(&itr->base, NULL, ret);
 	} else {
-		assert(itr->order == VINYL_GE || itr->order == VINYL_GT ||
-		       itr->order == VINYL_EQ);
+		assert(itr->iterator_type == ITER_GE ||
+		       itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_EQ);
 		/**
-		 * 1) in case of VINYL_GT we now positioned on the value > than
+		 * 1) in case of ITER_GT we now positioned on the value > than
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need just to find proper lsn
-		 * 2) in case if VINYL_GE or VINYL_EQ we now positioned on the
+		 * 2) in case if ITER_GE or ITER_EQ we now positioned on the
 		 * value >= given, so we need just to find proper lsn
 		 */
 		return vy_run_iterator_find_lsn(itr, ret);
@@ -7281,7 +7291,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  */
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
-		     struct vy_run *run, enum vy_order order,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct vy_stmt *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_run_iterator_iface;
@@ -7290,13 +7300,14 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->range = range;
 	itr->run = run;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	if (vy_stmt_part_count(key, itr->index->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 
 	itr->curr_stmt = NULL;
@@ -7382,7 +7393,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	uint32_t end_page = itr->run->info.count;
 	assert(itr->curr_pos.page_no <= end_page);
 	struct key_def *key_def = itr->index->key_def;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		if (itr->curr_pos.page_no == 0 &&
 		    itr->curr_pos.pos_in_page == 0) {
 			vy_run_iterator_cache_clean(itr);
@@ -7418,7 +7429,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	const char *next_key;
 	struct tuple_format *format = itr->index->format;
 	do {
-		int rc = vy_run_iterator_next_pos(itr, itr->order,
+		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
 		if (rc != 0) {
 			if (rc > 0) {
@@ -7447,7 +7458,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 				     next_key, next_info->type, format,
 				     key_def) == 0);
 
-	if (itr->order == VINYL_EQ &&
+	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare_raw(next_key, next_info->type,
 				itr->key->data, itr->key->type, format,
 				key_def) != 0) {
@@ -7481,7 +7492,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	assert(itr->curr_pos.page_no < itr->run->info.count);
 
 	struct vy_run_iterator_pos next_pos;
-	rc = vy_run_iterator_next_pos(itr, VINYL_GE, &next_pos);
+	rc = vy_run_iterator_next_pos(itr, ITER_GE, &next_pos);
 	if (rc != 0)
 		return rc > 0 ? 0 : rc;
 
@@ -7553,16 +7564,16 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		return 0;
 	}
 	/* Restoration is very similar to first search so we'll use that */
-	enum vy_order save_order = itr->order;
+	enum iterator_type save_type = itr->iterator_type;
 	const struct vy_stmt *save_key = itr->key;
-	if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
-		itr->order = VINYL_GE;
-	else if (itr->order == VINYL_LT)
-		itr->order = VINYL_LE;
+	if (itr->iterator_type == ITER_GT || itr->iterator_type == ITER_EQ)
+		itr->iterator_type = ITER_GE;
+	else if (itr->iterator_type == ITER_LT)
+		itr->iterator_type = ITER_LE;
 	itr->key = last_stmt;
 	struct vy_stmt *next;
 	rc = vy_run_iterator_start(itr, &next);
-	itr->order = save_order;
+	itr->iterator_type = save_type;
 	itr->key = save_key;
 	if (rc != 0)
 		return rc;
@@ -7592,7 +7603,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 			if (next != NULL)
 				position_changed = true;
 		}
-	} else if (itr->order == VINYL_EQ &&
+	} else if (itr->iterator_type == ITER_EQ &&
 		   vy_stmt_compare(itr->key, next, format, def) != 0) {
 
 		itr->search_ended = true;
@@ -7650,10 +7661,11 @@ struct vy_mem_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if key == NULL: GT and EQ are changed to GE, LT to LE for
+	 * beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
@@ -7691,7 +7703,7 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, const struct vy_stmt *key,
+		     enum iterator_type iterator_type, const struct vy_stmt *key,
 		     const int64_t *vlsn);
 
 /* }}} vy_mem_iterator API forward declaration */
@@ -7721,14 +7733,14 @@ vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 }
 
 /**
- * Make a step in directions defined by itr->order
+ * Make a step in directions defined by itr->iterator_type
  * @retval 0 success
  * @retval 1 EOF
  */
 static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr)
 {
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
@@ -7755,14 +7767,14 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	struct tuple_format *format = itr->mem->format;
 	while (itr->curr_stmt->lsn > *itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
-		    (itr->order == VINYL_EQ &&
+		    (itr->iterator_type == ITER_EQ &&
 		     vy_stmt_compare(itr->key, itr->curr_stmt, format,
 				     key_def))) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
 	}
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 
@@ -7801,31 +7813,33 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
 	if (vy_stmt_part_count(itr->key, itr->mem->key_def) > 0) {
-		if (itr->order == VINYL_EQ) {
+		if (itr->iterator_type == ITER_EQ) {
 			bool exact;
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, &exact);
 			if (!exact)
 				return 1;
-		} else if (itr->order == VINYL_LE || itr->order == VINYL_GT) {
+		} else if (itr->iterator_type == ITER_LE ||
+			   itr->iterator_type == ITER_GT) {
 			itr->curr_pos =
 				vy_mem_tree_upper_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		} else {
-			assert(itr->order == VINYL_GE || itr->order == VINYL_LT);
+			assert(itr->iterator_type == ITER_GE ||
+			       itr->iterator_type == ITER_LT);
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		}
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
 	}
 
-	if (itr->order == VINYL_LT || itr->order == VINYL_LE)
+	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
@@ -7866,21 +7880,22 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum vy_order order, const struct vy_stmt *key,
-		     const int64_t *vlsn)
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 
 	assert(key != NULL);
 	itr->mem = mem;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	if (vy_stmt_part_count(key, mem->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
@@ -7917,7 +7932,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, format,
 				 key_def) == 0);
 
-	if (itr->order == VINYL_EQ &&
+	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, format, key_def) != 0) {
 		itr->curr_stmt = NULL;
 		return 1;
@@ -8023,15 +8038,16 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 * Restoration is very similar to first search so we'll use
 		 * that.
 		 */
-		enum vy_order save_order = itr->order;
+		enum iterator_type save_type = itr->iterator_type;
 		const struct vy_stmt *save_key = itr->key;
-		if (itr->order == VINYL_GT || itr->order == VINYL_EQ)
-			itr->order = VINYL_GE;
-		else if (itr->order == VINYL_LT)
-			itr->order = VINYL_LE;
+		if (itr->iterator_type == ITER_GT ||
+		    itr->iterator_type == ITER_EQ)
+			itr->iterator_type = ITER_GE;
+		else if (itr->iterator_type == ITER_LT)
+			itr->iterator_type = ITER_LE;
 		itr->key = last_stmt;
 		rc = vy_mem_iterator_start(itr);
-		itr->order = save_order;
+		itr->iterator_type = save_type;
 		itr->key = save_key;
 		if (rc > 0) /* Search ended. */
 			return 0;
@@ -8057,7 +8073,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 				if (itr->curr_stmt != NULL)
 					position_changed = true;
 			}
-		} else if (itr->order == VINYL_EQ &&
+		} else if (itr->iterator_type == ITER_EQ &&
 			   vy_stmt_compare(itr->key, itr->curr_stmt, format,
 					   def) != 0) {
 			return true;
@@ -8086,8 +8102,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	vy_mem_iterator_check_version(itr);
 	struct vy_mem_tree_iterator pos = itr->curr_pos;
 	rc = 0;
-	if (itr->order == VINYL_GE || itr->order == VINYL_GT ||
-	    itr->order == VINYL_EQ) {
+	if (itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT ||
+	    itr->iterator_type == ITER_EQ) {
 		while (true) {
 			vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 			if (vy_mem_tree_iterator_is_invalid(&pos))
@@ -8109,7 +8125,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return -1;
 		return rc;
 	}
-	assert(itr->order == VINYL_LE || itr->order == VINYL_LT);
+	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
 	int cmp;
 	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, format, def);
 	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : *itr->vlsn + 1;
@@ -8173,10 +8189,11 @@ struct vy_txw_iterator {
 
 	/* Search options */
 	/**
-	 * Order, that specifies direction, start position and stop criteria
-	 * if key == NULL: GT and EQ are changed to GE, LT to LE for beauty.
+	 * Iterator type, that specifies direction, start position and stop
+	 * criteria if key == NULL: GT and EQ are changed to GE, LT to LE for
+	 * beauty.
 	 */
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct vy_stmt *key;
 
@@ -8191,7 +8208,8 @@ struct vy_txw_iterator {
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, const struct vy_stmt *key);
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key);
 
 static void
 vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
@@ -8207,18 +8225,20 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
-		     enum vy_order order, const struct vy_stmt *key)
+		     enum iterator_type iterator_type,
+		     const struct vy_stmt *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
 
 	itr->index = index;
 	itr->tx = tx;
 
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	if (vy_stmt_part_count(key, index->key_def) == 0) {
-		/* NULL key. change itr->order for simplification */
-		itr->order = order == VINYL_LT || order == VINYL_LE ?
-			     VINYL_LE : VINYL_GE;
+		/* NULL key. change itr->iterator_type for simplification */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
 	}
 	itr->key = key;
 
@@ -8243,9 +8263,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	if (vy_stmt_part_count(itr->key, key_def) > 0) {
-		if (itr->order == VINYL_EQ)
+		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
-		else if (itr->order == VINYL_GE || itr->order == VINYL_GT)
+		else if (itr->iterator_type == ITER_GE ||
+			 itr->iterator_type == ITER_GT)
 			txv = write_set_nsearch(&itr->tx->write_set, &key);
 		else
 			txv = write_set_psearch(&itr->tx->write_set, &key);
@@ -8255,8 +8276,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 				    key_def) == 0) {
 			while (true) {
 				struct txv *next;
-				if (itr->order == VINYL_LE ||
-				    itr->order == VINYL_GT)
+				if (itr->iterator_type == ITER_LE ||
+				    itr->iterator_type == ITER_GT)
 					next = write_set_next(&itr->tx->write_set, txv);
 				else
 					next = write_set_prev(&itr->tx->write_set, txv);
@@ -8267,16 +8288,16 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 					break;
 				txv = next;
 			}
-			if (itr->order == VINYL_GT)
+			if (itr->iterator_type == ITER_GT)
 				txv = write_set_next(&itr->tx->write_set, txv);
-			else if (itr->order == VINYL_LT)
+			else if (itr->iterator_type == ITER_LT)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
-	} else if (itr->order == VINYL_LE) {
+	} else if (itr->iterator_type == ITER_LE) {
 		key.index = (struct vy_index *)((uintptr_t)key.index + 1);
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	} else {
-		assert(itr->order == VINYL_GE);
+		assert(itr->iterator_type == ITER_GE);
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	}
 	if (txv == NULL || txv->index != itr->index)
@@ -8306,13 +8327,13 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
 		return 0;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		itr->curr_txv = write_set_prev(&itr->tx->write_set, itr->curr_txv);
 	else
 		itr->curr_txv = write_set_next(&itr->tx->write_set, itr->curr_txv);
 	if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
 		itr->curr_txv = NULL;
-	if (itr->curr_txv != NULL && itr->order == VINYL_EQ &&
+	if (itr->curr_txv != NULL && itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_txv->stmt, itr->index->format,
 	    		    itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
@@ -8372,18 +8393,20 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct txv *txv;
 	struct key_def *def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
-	if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	else
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	if (txv != NULL && txv->index == itr->index &&
 	    vy_stmt_compare(txv->stmt, last_stmt, format, def) == 0) {
-		if (itr->order == VINYL_LE || itr->order == VINYL_LT)
+		if (itr->iterator_type == ITER_LE ||
+		    itr->iterator_type == ITER_LT)
 			txv = write_set_prev(&itr->tx->write_set, txv);
 		else
 			txv = write_set_next(&itr->tx->write_set, txv);
 	}
-	if (txv != NULL && txv->index == itr->index && itr->order == VINYL_EQ &&
+	if (txv != NULL && txv->index == itr->index &&
+	    itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, txv->stmt, format, def) != 0)
 		txv = NULL;
 	if (txv == NULL || txv->index != itr->index) {
@@ -8448,7 +8471,8 @@ struct vy_merge_src {
  */
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
-		       enum vy_order order, const struct vy_stmt *key)
+		       enum iterator_type iterator_type,
+		       const struct vy_stmt *key)
 {
 	assert(key != NULL);
 	itr->index = index;
@@ -8456,7 +8480,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->key = key;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->src = NULL;
 	itr->src_count = 0;
 	itr->src_capacity = 0;
@@ -8468,7 +8492,8 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->curr_stmt = NULL;
 	struct key_def *def = index->key_def;
 	itr->unique_optimization =
-		(order == VINYL_EQ || order == VINYL_GE || order == VINYL_LE) &&
+		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
+		 iterator_type == ITER_LE) &&
 		vy_stmt_part_count(key, def) >= def->part_count;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
@@ -8631,8 +8656,8 @@ vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr,
 	itr->search_started = true;
 	itr->unique_optimization = false;
 	struct vy_stmt *min_stmt;
-	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
-		     -1 : 1);
+	int order = (itr->iterator_type == ITER_LE ||
+		     itr->iterator_type == ITER_LT ? -1 : 1);
 restart:
 	itr->is_in_uniq_opt = false;
 	min_stmt = NULL;
@@ -8725,8 +8750,8 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 	struct vy_stmt *min_stmt = NULL;
 	itr->curr_src = UINT32_MAX;
 	itr->range_ended = true;
-	int order = (itr->order == VINYL_LE || itr->order == VINYL_LT ?
-		     -1 : 1);
+	int order = (itr->iterator_type == ITER_LE ||
+		     itr->iterator_type == ITER_LT ? -1 : 1);
 	for (uint32_t i = itr->src_count; i--;) {
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
@@ -9074,7 +9099,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
 	wi->key = vy_stmt_new_select(NULL, 0);
-	vy_merge_iterator_open(&wi->mi, index, VINYL_GE, wi->key);
+	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key);
 }
 
 static struct vy_write_iterator *
@@ -9100,7 +9125,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, range, run,
-			     VINYL_GE, wi->key, &vlsn);
+			     ITER_GE, wi->key, &vlsn);
 	return 0;
 }
 
@@ -9113,7 +9138,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_mem_iterator_open(&src->mem_iterator, mem,
-			     VINYL_GE, wi->key, &vlsn);
+			     ITER_GE, wi->key, &vlsn);
 	return 0;
 }
 
@@ -9224,8 +9249,9 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, const struct vy_stmt *key,
-		      const int64_t *vlsn, bool only_disk);
+		      enum iterator_type iterator_type,
+		      const struct vy_stmt *key, const int64_t *vlsn,
+		      bool only_disk);
 
 /**
  * Get current stmt
@@ -9249,7 +9275,7 @@ vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, itr->index, itr->tx,
-			     itr->order, itr->key);
+			     itr->iterator_type, itr->key);
 	vy_txw_iterator_restore(&sub_src->iterator, itr->curr_stmt,
 				&sub_src->stmt);
 }
@@ -9270,7 +9296,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 			&itr->merge_iterator, true, true);
 		mem = rlist_first_entry(&r->mems, struct vy_mem, link);
 		vy_mem_iterator_open(&sub_src->mem_iterator, mem,
-				     itr->order, itr->key, itr->vlsn);
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 	bool in_compact = !rlist_empty(&itr->curr_range->compact_list);
 	rlist_foreach_entry(mem, &itr->curr_range->mems, link) {
@@ -9280,8 +9306,8 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 						 struct vy_mem, link);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, is_mutable, true);
-		vy_mem_iterator_open(&sub_src->mem_iterator, mem, itr->order,
-				     itr->key, itr->vlsn);
+		vy_mem_iterator_open(&sub_src->mem_iterator, mem,
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 }
 
@@ -9295,7 +9321,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, itr->curr_range,
-				     run, itr->order, itr->key, itr->vlsn);
+				     run, itr->iterator_type, itr->key,
+				     itr->vlsn);
 	}
 }
 
@@ -9326,12 +9353,13 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum vy_order order, const struct vy_stmt *key,
-		      const int64_t *vlsn, bool only_disk)
+		      enum iterator_type iterator_type,
+		      const struct vy_stmt *key, const int64_t *vlsn,
+		      bool only_disk)
 {
 	itr->index = index;
 	itr->tx = tx;
-	itr->order = order;
+	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
 	itr->only_disk = only_disk;
@@ -9352,10 +9380,10 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	itr->search_started = true;
 
 	vy_range_iterator_open(&itr->range_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9373,7 +9401,7 @@ restart:
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9439,7 +9467,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 	assert(itr->curr_range != NULL);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->order, itr->key);
+			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct vy_stmt *stmt = NULL;
@@ -9544,7 +9572,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	struct vy_stmt *key = vy_stmt_new_select(NULL, 0);
 	if (key == NULL)
 		return -1;
-	vy_read_iterator_open(&ri, index, NULL, VINYL_GT, key, &vlsn, true);
+	vy_read_iterator_open(&ri, index, NULL, ITER_GT, key, &vlsn, true);
 	rc = vy_read_iterator_next(&ri, &stmt);
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
@@ -9564,7 +9592,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 
 static int
 vy_index_read(struct vy_index *index, const struct vy_stmt *key,
-	      enum vy_order order, struct vy_stmt **result, struct vy_tx *tx)
+	      enum iterator_type iterator_type, struct vy_stmt **result,
+	      struct vy_tx *tx)
 {
 	struct vy_env *e = index->env;
 	ev_tstamp start  = ev_now(loop());
@@ -9577,7 +9606,8 @@ vy_index_read(struct vy_index *index, const struct vy_stmt *key,
 		vlsn_ptr = &tx->vlsn;
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, order, key, vlsn_ptr, false);
+	vy_read_iterator_open(&itr, index, tx, iterator_type, key, vlsn_ptr,
+			      false);
 	int rc = vy_read_iterator_next(&itr, result);
 	if (rc == 0 && *result) {
 		vy_stmt_ref(*result);
@@ -9601,7 +9631,7 @@ vy_range_optimize_upserts_f(va_list va)
 	fiber_reschedule();
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, NULL, VINYL_EQ,
+	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
 			      stmt, &stmt->lsn, false);
 	struct vy_stmt *v;
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
@@ -9674,41 +9704,35 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	 */
 	vy_index_ref(c->index);
 	c->need_check_eq = false;
-	enum vy_order order;
+	enum iterator_type iterator_type;
 	switch (type) {
 	case ITER_ALL:
+		iterator_type = ITER_GE;
+		break;
 	case ITER_GE:
-		order = VINYL_GE;
-		break;
 	case ITER_GT:
-		order = VINYL_GT;
-		break;
 	case ITER_LE:
-		order = VINYL_LE;
-		break;
 	case ITER_LT:
-		order = VINYL_LT;
-		break;
 	case ITER_EQ:
-		order = VINYL_EQ;
+		iterator_type = type;
 		break;
 	case ITER_REQ: {
 		struct key_def *def = index->key_def;
 		/* point-lookup iterator (optimization) */
 		if (def->opts.is_unique && part_count == def->part_count) {
-			order = VINYL_EQ;
+			iterator_type = ITER_EQ;
 		} else {
 			c->need_check_eq = true;
-			order = VINYL_LE;
+			iterator_type = ITER_LE;
 		}
 		break;
 	}
 	default:
 		unreachable();
 	}
-	vy_read_iterator_open(&c->iterator, index, tx, order, c->key,
+	vy_read_iterator_open(&c->iterator, index, tx, iterator_type, c->key,
 			      &tx->vlsn, false);
-	c->order = order;
+	c->iterator_type = iterator_type;
 	return c;
 }
 
