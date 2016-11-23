@@ -146,6 +146,12 @@ fio.dirname('/')
 fio.abspath(nil)
 fio.abspath("/")
 fio.abspath("/tmp")
+fio.abspath("/tmp/test/../")
+fio.abspath("/tmp/test/../abc")
+fio.abspath("/tmp/./test")
+fio.abspath("/tmp///test//abc")
+fio.abspath("/../")
+fio.abspath("/../tmp")
 type(string.find(fio.abspath("tmp"), "tmp"))
 
 -- chdir

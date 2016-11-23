@@ -236,11 +236,21 @@ fio.abspath = function(path)
         return nil
     end
     path = tostring(path)
+    local joined_path = ''
+    local path_tab = {}
     if string.sub(path, 1, 1) == '/' then
-        return path
+        joined_path = path
     else
-        return fio.pathjoin(fio.cwd(), path)
+        joined_path = fio.pathjoin(fio.cwd(), path)
     end
+    for sp in string.gmatch(joined_path, '[^/]+') do
+        if sp == '..' then
+            table.remove(path_tab)
+        elseif sp ~= '.' then
+            table.insert(path_tab, sp)
+        end
+    end
+    return '/' .. table.concat(path_tab, '/')
 end
 
 fio.chdir = function(path)

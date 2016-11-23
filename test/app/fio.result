@@ -445,6 +445,30 @@ fio.abspath("/tmp")
 ---
 - /tmp
 ...
+fio.abspath("/tmp/test/../")
+---
+- /tmp
+...
+fio.abspath("/tmp/test/../abc")
+---
+- /tmp/abc
+...
+fio.abspath("/tmp/./test")
+---
+- /tmp/test
+...
+fio.abspath("/tmp///test//abc")
+---
+- /tmp/test/abc
+...
+fio.abspath("/../")
+---
+- /
+...
+fio.abspath("/../tmp")
+---
+- /tmp
+...
 type(string.find(fio.abspath("tmp"), "tmp"))
 ---
 - number
