@@ -2559,34 +2559,9 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 	}
 	if (value->type == IPROTO_UPSERT) {
 		uint32_t ops_size;
-		const char *ops = vy_stmt_upsert_ops(value, index->key_def,
-						 &ops_size);
-		const char *ops_end = ops + ops_size;
-		int vy_ops_cnt = mp_decode_uint(&ops);
-		int ops_cnt = 0;
-		request.ops = region_alloc(&fiber()->gc, 4 + ops_end - ops);
-		request.ops_end = request.ops + 4;
-		for (int i = 0; i < vy_ops_cnt; ++i) {
-			request.index_base = mp_decode_uint(&ops);
-			const char *op_end = ops;
-			mp_next(&op_end);
-			ops_cnt += mp_decode_array(&ops);
-			memcpy((char *)request.ops_end, ops, op_end - ops);
-			request.ops_end += op_end - ops;
-			ops = op_end;
-		}
-		ops = request.ops;
-		switch (mp_sizeof_array(ops_cnt)) {
-		case 1:
-			++request.ops;
-		case 2:
-			request.ops += 2;
-		case 4:
-			mp_encode_array((char *)request.ops, ops_cnt);
-			break;
-		default:
-			return -1;
-		}
+		request.ops = vy_stmt_upsert_ops(value, index->key_def,
+						  &ops_size);
+		request.ops_end = request.ops + ops_size;
 	}
 	if (value->type == IPROTO_DELETE) {
 		request.key = value->data;
@@ -5876,36 +5851,23 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 {
 	if (ops == ops_end)
 		return;
-	uint64_t series_count = mp_decode_uint(&ops);
-	for (uint64_t i = 0; i < series_count; i++) {
-		int index_base = mp_decode_uint(&ops);
-		const char *serie_end;
-		if (i == series_count - 1) {
-			serie_end = ops_end;
-		} else {
-			serie_end = ops;
-			mp_next(&serie_end);
-		}
+
 #ifndef NDEBUG
-		if (i == series_count - 1) {
 			const char *serie_end_must_be = ops;
 			mp_next(&serie_end_must_be);
-			assert(serie_end == serie_end_must_be);
-		}
+			assert(ops_end == serie_end_must_be);
 #endif
 		const char *result;
 		uint32_t size;
 		result = tuple_upsert_execute(vy_update_alloc, region,
-					      ops, serie_end,
+					      ops, ops_end,
 					      *stmt, *stmt_end,
-					      &size, index_base, suppress_error);
+					      &size, 0, suppress_error);
 		if (result != NULL) {
 			/* if failed, just skip it and leave stmt the same */
 			*stmt = result;
 			*stmt_end = result + size;
 		}
-		ops = serie_end;
-	}
 }
 
 const char *
@@ -5929,32 +5891,22 @@ vy_upsert_try_to_squash(const struct key_def *key_def,
 			struct vy_stmt **result_stmt)
 {
 	*result_stmt = NULL;
-	uint64_t index_base = mp_decode_uint(&new_serie);
-	if (mp_decode_uint(&old_serie) != index_base)
-		return 0;
 
 	size_t squashed_size;
 	const char *squashed =
 		tuple_upsert_squash(vy_update_alloc, region,
 				    old_serie, old_serie_end,
 				    new_serie, new_serie_end,
-				    &squashed_size, index_base);
+				    &squashed_size, 0);
 	if (squashed == NULL)
 		return 0;
 	/* Successful squash! */
-	char index_base_buf[32];
-	char *extra = mp_encode_uint(index_base_buf, 1);
-	extra = mp_encode_uint(extra, index_base);
-
-	struct iovec operations[2];
-	operations[0].iov_base = (void *)index_base_buf;
-	operations[0].iov_len = extra - index_base_buf;
-
-	operations[1].iov_base = (void *)squashed;
-	operations[1].iov_len = squashed_size;
+	struct iovec operations[1];
+	operations[0].iov_base = (void *)squashed;
+	operations[0].iov_len = squashed_size;
 
 	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, format, key_def,
-					  operations, 2);
+					  operations, 1);
 	if (*result_stmt == NULL)
 		return -1;
 	return 0;
@@ -6028,40 +5980,42 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	uint64_t new_series_count = mp_decode_uint(&new_ops);
-	uint64_t old_series_count = mp_decode_uint(&old_ops);
-	if (new_series_count == 1 && old_series_count == 1) {
-		if (vy_upsert_try_to_squash(key_def, format, region,
-					    result_mp, result_mp_end,
-					    old_ops, old_ops_end,
-					    new_ops, new_ops_end,
-					    &result_stmt) != 0) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
+	if (vy_upsert_try_to_squash(key_def, format, region,
+				    result_mp, result_mp_end,
+				    old_ops, old_ops_end,
+				    new_ops, new_ops_end,
+				    &result_stmt) != 0) {
+		region_truncate(region, region_svp);
+		return NULL;
 	}
+	if (result_stmt != NULL) {
+		region_truncate(region, region_svp);
+		result_stmt->lsn = new_stmt->lsn;
+		goto check_key;
+	}
+
+	/* Failed to squash, simply add one upsert to another */
+	int old_ops_cnt, new_ops_cnt;
+	struct iovec operations[3];
+
+	old_ops_cnt = mp_decode_array(&old_ops);
+	operations[1].iov_base = (void *)old_ops;
+	operations[1].iov_len = old_ops_end - old_ops;
+
+	new_ops_cnt = mp_decode_array(&new_ops);
+	operations[2].iov_base = (void *)new_ops;
+	operations[2].iov_len = new_ops_end - new_ops;
+
+	char ops_buf[16];
+	char *header = mp_encode_array(ops_buf, old_ops_cnt + new_ops_cnt);
+	operations[0].iov_base = (void *)ops_buf;
+	operations[0].iov_len = header - ops_buf;
+
+	result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
+					 format, key_def, operations, 3);
 	if (result_stmt == NULL) {
-		/* Failed to squash, simply add one upsert to another */
-		uint64_t res_series_count = new_series_count + old_series_count;
-		char series_count_buf[16];
-		char *extra = mp_encode_uint(series_count_buf,
-					     res_series_count);
-		struct iovec operations[3];
-		operations[0].iov_base = (void *)series_count_buf;
-		operations[0].iov_len = extra - series_count_buf;
-
-		operations[1].iov_base = (void *)old_ops;
-		operations[1].iov_len = old_ops_end - old_ops;
-
-		operations[2].iov_base = (void *)new_ops;
-		operations[2].iov_len = new_ops_end - new_ops;
-		result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
-						 format, key_def, operations,
-						 3);
-		if (result_stmt == NULL) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
+		region_truncate(region, region_svp);
+		return NULL;
 	}
 	region_truncate(region, region_svp);
 	result_stmt->lsn = new_stmt->lsn;
@@ -6147,19 +6101,13 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *expr, const char *expr_end, int index_base)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	assert(index_base == 0 || index_base == 1);
+	assert(index_base == 0);
 	struct vy_stmt *vystmt;
-	char index_base_buf[32];
-	char *extra = mp_encode_uint(index_base_buf, 1);
-	extra = mp_encode_uint(extra, index_base);
-	struct iovec operations[2];
-	operations[0].iov_base = (void *)index_base_buf;
-	operations[0].iov_len = extra - index_base_buf;
-
-	operations[1].iov_base = (void *)expr;
-	operations[1].iov_len = expr_end - expr;
+	struct iovec operations[1];
+	operations[0].iov_base = (void *)expr;
+	operations[0].iov_len = expr_end - expr;
 	vystmt = vy_stmt_new_upsert(stmt, stmt_end, index->format,
-				    index->key_def, operations, 2);
+				    index->key_def, operations, 1);
 	if (vystmt == NULL)
 		return -1;
 	vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
@@ -6856,9 +6804,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			info->size = start_offset;
 			info->size += request.tuple_end - request.tuple;
 			if (info->type == IPROTO_UPSERT) {
-				info->size += mp_sizeof_uint(1) +
-				      mp_sizeof_uint(request.index_base) +
-				      request.ops_end - request.ops;
+				info->size += request.ops_end - request.ops;
 			}
 			vy_buf_ensure(&page->data, info->size);
 			void *data = page->data.p;
@@ -6870,8 +6816,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 					     data);
 			data += request.tuple_end - request.tuple;
 			if (info->type == IPROTO_UPSERT) {
-				data = mp_encode_uint(data, 1);
-				data = mp_encode_uint(data, request.index_base);
 				memcpy(data, request.ops,
 				       request.ops_end - request.ops);
 			}
