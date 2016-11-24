@@ -77,6 +77,12 @@ static void title(const char *new_status)
 struct recovery *recovery;
 
 bool box_snapshot_is_in_progress = false;
+/**
+ * The server is in read-write mode: the local checkpoint
+ * and all write ahead logs are processed. For a replica,
+ * it also means we've successfully connected to the master
+ * and began receiving updates from it.
+ */
 static bool box_init_done = false;
 static bool is_ro = true;
 
@@ -1267,7 +1273,7 @@ engine_init()
  * Initialize the first server of a new cluster
  */
 static void
-bootstrap_cluster(void)
+bootstrap_master(void)
 {
 	engine_bootstrap();
 
@@ -1292,18 +1298,18 @@ bootstrap_cluster(void)
 
 	/* Generate UUID of a new cluster */
 	box_set_cluster_uuid();
-
-	/* Ugly hack: bootstrap always starts from scratch */
-	vclock_create(&recovery->vclock);
 }
 
 /**
  * Bootstrap from the remote master
  * \pre  master->applier->state == APPLIER_CONNECTED
  * \post master->applier->state == APPLIER_CONNECTED
+ *
+ * @param[out] start_vclock  the vector time of the master
+ *                           at the moment of replica bootstrap
  */
 static void
-bootstrap_from_master(struct server *master)
+bootstrap_from_master(struct server *master, struct vclock *start_vclock)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
@@ -1334,8 +1340,8 @@ bootstrap_from_master(struct server *master)
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
-	/* Replace server vclock using master's vclock */
-	vclock_copy(&recovery->vclock, &applier->vclock);
+	/* Start server vclock using master's vclock */
+	vclock_copy(start_vclock, &applier->vclock);
 
 	/* Finalize the new replica */
 	engine_end_recovery();
@@ -1345,20 +1351,27 @@ bootstrap_from_master(struct server *master)
 	assert(applier->state == APPLIER_CONNECTED);
 }
 
+/**
+ * Bootstrap a new server either as the first master in a
+ * replica set or as a replica of an existing master.
+ *
+ * @param[out] start_vclock  the start vector time of the new server
+ */
 static void
-bootstrap(void)
+bootstrap(struct vclock *start_vclock)
 {
 	/* Use the first replica by URI as a bootstrap leader */
 	struct server *master = server_first();
 	assert(master == NULL || master->applier != NULL);
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &SERVER_UUID)) {
-		bootstrap_from_master(master);
+		bootstrap_from_master(master, start_vclock);
 	} else {
-		bootstrap_cluster();
+		bootstrap_master();
+		vclock_create(start_vclock);
 	}
 	if (engine_begin_checkpoint() ||
-	    engine_commit_checkpoint(&recovery->vclock))
+	    engine_commit_checkpoint(start_vclock))
 		panic("failed to save a snapshot");
 }
 
@@ -1447,8 +1460,8 @@ box_init(void)
 		/* Wait cluster to start up */
 		box_sync_replication_source(TIMEOUT_INFINITY);
 
-		/* Bootstrap cluster */
-		bootstrap();
+		/* Bootstrap a new server */
+		bootstrap(&recovery->vclock);
 	}
 	fiber_gc();
 
