@@ -710,7 +710,8 @@ error:
  * and sets errno.
  */
 int
-xdir_create_xlog(struct xlog *xlog, struct xdir *dir, const struct vclock *vclock)
+xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
+		 const struct vclock *vclock)
 {
 	char *filename;
 	int64_t signature = vclock_sum(vclock);
@@ -730,18 +731,20 @@ xdir_create_xlog(struct xlog *xlog, struct xdir *dir, const struct vclock *vcloc
 	vclock_copy(&meta.vclock, vclock);
 
 	if (xlog_create(xlog, filename, &meta) != 0)
-		goto error;
+		return -1;
 
 	/* set sync interval from xdir settings */
 	xlog->sync_interval = dir->sync_interval;
 
 	/* Rename xlog file */
-	if (dir->suffix != INPROGRESS && xlog_rename(xlog))
-		goto error;
+	if (dir->suffix != INPROGRESS && xlog_rename(xlog)) {
+		int save_errno = errno;
+		xlog_close(xlog, false);
+		errno = save_errno;
+		return -1;
+	}
 
 	return 0;
-error:
-	return -1;
 }
 
 /**
@@ -1092,6 +1095,7 @@ xlog_close(struct xlog *l, bool reuse_fd)
 	obuf_destroy(&l->zbuf);
 	if (l->zctx)
 		ZSTD_freeCCtx(l->zctx);
+	TRASH(l);
 	return rc;
 }
 

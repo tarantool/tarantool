@@ -421,13 +421,16 @@ wal_opt_rotate(struct wal_writer *writer)
 		writer->is_active = false;
 	}
 
-	if (!writer->is_active) {
-		writer->is_active = xdir_create_xlog(&writer->current_wal,
-						     &writer->wal_dir,
-						     &writer->vclock) == 0;
+	if (writer->is_active)
+		return 0;
 
+	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
+			     &writer->vclock) != 0) {
+		return -1;
 	}
-	return writer->is_active ? 0 : -1;
+	writer->is_active = true;
+
+	return 0;
 }
 
 static void

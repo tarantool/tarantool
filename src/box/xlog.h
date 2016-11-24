@@ -267,6 +267,8 @@ struct xlog {
  * Note: an existing file is impossible to open for append,
  * the old files are never appended to.
  *
+ * @param xdir xdir
+ * @param[out] xlog xlog structure
  * @param server uuid   the server which created the file
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
@@ -275,7 +277,8 @@ struct xlog {
  * @retval -1 if error
  */
 int
-xdir_create_xlog(struct xlog *xlog, struct xdir *dir, const struct vclock *vclock);
+xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
+		 const struct vclock *vclock);
 
 /**
  * Create new xlog writer based on fd.
