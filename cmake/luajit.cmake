@@ -139,7 +139,7 @@ macro(luajit_build)
     #
     # This stuff is extremely fragile, proceed with caution.
     set (luajit_cflags ${CMAKE_C_FLAGS})
-    set (luajut_ldflags ${CMAKE_EXE_LINKER_FLAGS})
+    set (luajit_ldflags ${CMAKE_EXE_LINKER_FLAGS})
     separate_arguments(luajit_cflags)
     separate_arguments(luajit_ldflags)
     if(CC_HAS_WNO_PARENTHESES_EQUALITY)
