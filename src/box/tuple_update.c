@@ -1169,11 +1169,11 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 	return update_finish(&update, p_tuple_len);
 }
 
-static const char *
-tuple_upsert_squash_xc(tuple_update_alloc_func alloc, void *alloc_ctx,
-		       const char *expr1, const char *expr1_end,
-		       const char *expr2, const char *expr2_end,
-		       size_t *result_size, int index_base)
+const char *
+tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
+		    const char *expr1, const char *expr1_end,
+		    const char *expr2, const char *expr2_end,
+		    size_t *result_size, int index_base)
 {
 	const char *expr[2] = {expr1, expr2};
 	const char *expr_end[2] = {expr1_end, expr2_end};
@@ -1279,15 +1279,4 @@ tuple_upsert_squash_xc(tuple_update_alloc_func alloc, void *alloc_ctx,
 	mp_encode_array(arr_start, res_count);
 	*result_size = res_ops - arr_start;
 	return arr_start;
-}
-
-const char *
-tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
-		    const char *expr1, const char *expr1_end,
-		    const char *expr2, const char *expr2_end,
-		    size_t *result_size, int index_base)
-{
-	return tuple_upsert_squash_xc(alloc, alloc_ctx,
-				      expr1, expr1_end, expr2, expr2_end,
-				      result_size, index_base);
 }
