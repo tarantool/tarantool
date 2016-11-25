@@ -404,17 +404,19 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 	struct bit_iterator bit_it;
 	size_t bit;
 	if (type == ITER_BITS_ANY_SET) {
-		/*
-		 * Optimization: get the number of items for each requested bit
-		 * and then found the maximum.
+		/**
+		 * Optimization: for an empty key return 0.
 		 */
 		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
-		size_t result = 0;
-		while ((bit = bit_iterator_next(&bit_it)) != SIZE_MAX) {
-			size_t count = bitset_index_count(&m_index, bit);
-			result = MAX(result, count);
-		}
-		return result;
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return 0;
+		/**
+		 * Optimiation: for a single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return bitset_index_count(&m_index, bit);
 	} else if (type == ITER_BITS_ALL_SET) {
 		/**
 		 * Optimization: for an empty key return the number of items
