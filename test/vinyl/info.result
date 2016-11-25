@@ -74,6 +74,7 @@ box_info_sort(box.info.vinyl())
       - size: <size>
   - memory:
     - limit: 536870912
+    - min_lsn: 9223372036854775807
     - ratio: 0%
     - used: <used>
     - watermark: <watermark>

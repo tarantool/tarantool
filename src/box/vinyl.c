@@ -838,6 +838,8 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
 struct vy_mem {
 	/** Link in range->mems list. */
 	struct rlist link;
+	/** Link in scheduler->dirty_mems list. */
+	struct rlist dirty_link;
 	struct vy_mem_tree tree;
 	size_t used;
 	int64_t min_lsn;
@@ -912,6 +914,7 @@ vy_mem_new(struct key_def *key_def, struct tuple_format *format)
 			   vy_mem_tree_extent_free,
 			   &index->region);
 	rlist_create(&index->link);
+	rlist_create(&index->dirty_link);
 	return index;
 }
 
@@ -4246,8 +4249,15 @@ struct vy_scheduler {
 	/** Set if the scheduler is throttled due to errors. */
 	bool throttled;
 
-	/** Total number of non-empty in-memory indexes. */
+	/**
+	 * List of all non-empty in-memory indexes.
+	 * Older mems are closer to the tail of the list.
+	 */
+	struct rlist dirty_mems;
+	/** Number of items in the dirty_mems list. */
 	int dirty_mem_count;
+	/** Min LSN over all in-memory indexes. */
+	int64_t mem_min_lsn;
 	/**
 	 * LSN at the time of checkpoint start. All in-memory indexes with
 	 * min_lsn <= checkpoint_lsn should be dumped first.
@@ -4294,6 +4304,8 @@ vy_scheduler_new(struct vy_env *env)
 	}
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	diag_create(&scheduler->diag);
+	rlist_create(&scheduler->dirty_mems);
+	scheduler->mem_min_lsn = INT64_MAX;
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
@@ -4702,7 +4714,10 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
 {
-	(void)mem;
+	if (rlist_empty(&scheduler->dirty_mems))
+		scheduler->mem_min_lsn = mem->min_lsn;
+	assert(scheduler->mem_min_lsn <= mem->min_lsn);
+	rlist_add_entry(&scheduler->dirty_mems, mem, dirty_link);
 	scheduler->dirty_mem_count++;
 }
 
@@ -4714,6 +4729,15 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 
 	assert(scheduler->dirty_mem_count > 0);
 	scheduler->dirty_mem_count--;
+	rlist_del_entry(mem, dirty_link);
+
+	if (!rlist_empty(&scheduler->dirty_mems)) {
+		struct vy_mem *oldest;
+		oldest = rlist_last_entry(&scheduler->dirty_mems,
+					  struct vy_mem, dirty_link);
+		scheduler->mem_min_lsn = oldest->min_lsn;
+	} else
+		scheduler->mem_min_lsn = INT64_MAX;
 
 	if (mem->min_lsn <= scheduler->checkpoint_lsn) {
 		/*
@@ -5007,6 +5031,7 @@ vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
 	vy_info_append_u64(h, "watermark", env->quota->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
 	vy_info_append_str(h, "ratio", buf);
+	vy_info_append_u64(h, "min_lsn", env->scheduler->mem_min_lsn);
 	vy_info_table_end(h);
 }
 
