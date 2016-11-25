@@ -419,13 +419,12 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 			return bitset_index_count(&m_index, bit);
 	} else if (type == ITER_BITS_ALL_SET) {
 		/**
-		 * Optimization: for an empty key return the number of items
-		 * in the index.
+		 * Optimization: for an empty key return 0.
 		 */
 		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
 		bit = bit_iterator_next(&bit_it);
 		if (bit == SIZE_MAX)
-			return bitset_index_size(&m_index);
+			return 0;
 		/**
 		 * Optimiation: for a single bit key use
 		 * bitset_index_count().

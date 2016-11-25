@@ -132,3 +132,19 @@ s:insert{9, 8}
 i:count(7, {iterator = box.index.BITS_ANY_SET})
 s:drop()
 s = nil
+
+-- https://github.com/tarantool/tarantool/issues/1946 BITS_ALL_SET crashes
+s = box.schema.space.create('test')
+_ = s:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+i = s:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+for i=1,10 do s:insert{i, math.random(8)} end
+good = true
+function is_good(key, opts) return #i:select({key}, opts) == i:count({key}, opts) end
+function check(key, opts) good = good and is_good(key, opts) end
+for j=1,100 do check(math.random(9) - 1) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ANY_SET}) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ALL_SET}) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ALL_NOT_SET}) end
+good
+s:drop()
+s = nil
