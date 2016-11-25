@@ -3666,8 +3666,10 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 		mem->min_lsn = mem_stmt->lsn;
 		vy_scheduler_mem_dirtied(scheduler, mem);
 	}
-	if (range->used == 0)
+	if (range->used == 0) {
 		range->min_lsn = mem_stmt->lsn;
+		vy_scheduler_update_range(scheduler, range);
+	}
 
 	assert(mem->min_lsn <= mem_stmt->lsn);
 	assert(range->min_lsn <= mem_stmt->lsn);
@@ -3800,7 +3802,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 	 enum vinyl_status status, int64_t lsn, size_t *write_size)
 {
 	struct vy_index *index = v->index;
-	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *prev_range = NULL;
 	struct vy_range *range = NULL;
 
@@ -3832,7 +3833,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 			 * keys for this range.
 			 */
 			prev_range->update_time = time;
-			vy_scheduler_update_range(scheduler, prev_range);
 		}
 		prev_range = range;
 
@@ -3851,10 +3851,8 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 	}
-	if (range != NULL) {
+	if (range != NULL)
 		range->update_time = time;
-		vy_scheduler_update_range(scheduler, range);
-	}
 	return v;
 }
 
@@ -4158,23 +4156,13 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 #define HEAP_NAME vy_dump_heap
 
 static bool
-vy_range_needs_checkpoint(struct vy_range *range);
-
-static int
 heap_dump_less(struct heap_node *a, struct heap_node *b)
 {
 	struct vy_range *left = container_of(a, struct vy_range, nodedump);
 	struct vy_range *right = container_of(b, struct vy_range, nodedump);
 
-	/* Ranges that need to be checkpointed must be dumped first. */
-	bool left_needs_checkpoint = vy_range_needs_checkpoint(left);
-	bool right_needs_checkpoint = vy_range_needs_checkpoint(right);
-	if (left_needs_checkpoint && !right_needs_checkpoint)
-		return true;
-	if (!left_needs_checkpoint && right_needs_checkpoint)
-		return false;
-
-	return left->used > right->used;
+	/* Older ranges are dumped first. */
+	return left->min_lsn < right->min_lsn;
 }
 
 #define HEAP_LESS(h, l, r) heap_dump_less(l, r)
@@ -4336,18 +4324,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	free(scheduler);
 }
 
-static bool
-vy_range_needs_checkpoint(struct vy_range *range)
-{
-	return range->min_lsn <= range->index->env->scheduler->checkpoint_lsn;
-}
-
-static bool
-vy_range_needs_dump(struct vy_range *range)
-{
-	return range->used >= range->index->key_def->opts.range_size;
-}
-
 static void
 vy_scheduler_add_range(struct vy_scheduler *scheduler,
 		       struct vy_range *range)
@@ -4368,11 +4344,6 @@ vy_scheduler_update_range(struct vy_scheduler *scheduler,
 	vy_dump_heap_update(&scheduler->dump_heap, &range->nodedump);
 	assert(range->nodedump.pos != UINT32_MAX);
 	assert(range->nodecompact.pos != UINT32_MAX);
-
-	if (vy_range_needs_dump(range)) {
-		/* Wake up scheduler */
-		ipc_cond_signal(&scheduler->scheduler_cond);
-	}
 }
 
 static void
@@ -4396,8 +4367,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
 		if (!vy_quota_exceeded(scheduler->env->quota) &&
-		    !vy_range_needs_dump(range) &&
-		    !vy_range_needs_checkpoint(range))
+		    range->min_lsn > scheduler->checkpoint_lsn)
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
@@ -4736,8 +4706,9 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		oldest = rlist_last_entry(&scheduler->dirty_mems,
 					  struct vy_mem, dirty_link);
 		scheduler->mem_min_lsn = oldest->min_lsn;
-	} else
+	} else {
 		scheduler->mem_min_lsn = INT64_MAX;
+	}
 
 	if (mem->min_lsn <= scheduler->checkpoint_lsn) {
 		/*
@@ -4787,15 +4758,8 @@ vy_checkpoint(struct vy_env *env)
 	 */
 	scheduler->checkpoint_pending = scheduler->dirty_mem_count;
 	scheduler->checkpoint_failed = false;
-	/*
-	 * Promote ranges that need to be checkpointed to
-	 * the top of the dump heap.
-	 */
-	vy_dump_heap_update_all(&scheduler->dump_heap);
 
-	/* Wake scheduler up */
 	ipc_cond_signal(&scheduler->scheduler_cond);
-
 	return 0;
 }
 
