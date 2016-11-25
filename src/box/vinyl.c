@@ -4863,11 +4863,16 @@ vy_index_gc(struct vy_index *index)
 	 */
 	struct vy_range *range = vy_range_tree_first(&index->tree);
 	while (range) {
-		const struct mh_i32ptr_node_t node = {range->id, range};
-		struct mh_i32ptr_node_t old, *p_old = &old;
-		mh_int_t k = mh_i32ptr_put(ranges, &node, &p_old, NULL);
-		if (k == mh_end(ranges))
+		struct mh_i32ptr_node_t node = {range->id, range};
+		if (mh_i32ptr_put(ranges, &node, NULL, NULL) == mh_end(ranges))
 			goto error;
+		if (range->shadow != NULL) {
+			node.key = range->shadow->id;
+			node.val = range->shadow;
+			if (mh_i32ptr_put(ranges, &node, NULL, NULL) ==
+			    mh_end(ranges))
+				goto error;
+		}
 		range = vy_range_tree_next(&index->tree, range);
 	}
 	/*
