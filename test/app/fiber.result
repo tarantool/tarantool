@@ -906,6 +906,13 @@ fiber.create(function()end):name()
 ---
 - error: the fiber is dead
 ...
+--
+-- gh-1926
+--
+fiber.create(function() fiber.wakeup(fiber.self()) end)
+---
+- the fiber is dead
+...
 fiber = nil
 ---
 ...

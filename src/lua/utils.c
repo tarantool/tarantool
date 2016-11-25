@@ -920,7 +920,15 @@ lbox_error(lua_State *L)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
+	/*
+	 * gh-1955 luaL_pusherror allocates Lua objects, thus it may trigger
+	 * GC. GC may invoke finalizers which are arbitrary Lua code,
+	 * potentially invalidating last error object, hence error_ref
+	 * below.
+	 */
+	error_ref(e);
 	luaL_pusherror(L, e);
+	error_unref(e);
 	lua_error(L);
 	unreachable();
 	return 0;

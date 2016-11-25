@@ -403,7 +403,12 @@ fiber_schedule_list(struct rlist *list)
 	struct fiber *first;
 	struct fiber *last;
 
-	assert(! rlist_empty(list));
+	/*
+	 * Happens when a fiber exits and is removed from cord->ready
+	 * resulting in the empty list.
+	 */
+	if (rlist_empty(list))
+		return;
 
 	first = last = rlist_shift_entry(list, struct fiber, state);
 
@@ -536,8 +541,8 @@ fiber_loop(MAYBE_UNUSED void *data)
 	        }
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
-		/* no pending wakeups */
-		assert(rlist_empty(&fiber->state));
+		/* reset pending wakeups */
+		rlist_del(&fiber->state);
 		if (! (fiber->flags & FIBER_IS_JOINABLE))
 			fiber_recycle(fiber);
 		/*

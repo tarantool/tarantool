@@ -363,4 +363,9 @@ test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 -- #1734 fiber.name irt dead fibers
 fiber.create(function()end):name()
 
+--
+-- gh-1926
+--
+fiber.create(function() fiber.wakeup(fiber.self()) end)
+
 fiber = nil
