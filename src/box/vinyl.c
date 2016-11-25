@@ -3182,7 +3182,8 @@ fail:
  * restore from disk).
  */
 static struct vy_range *
-vy_range_new(struct vy_index *index, int64_t id)
+vy_range_new(struct vy_index *index, int64_t id,
+	     struct vy_stmt *begin, struct vy_stmt *end)
 {
 	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
 	if (range == NULL) {
@@ -3202,6 +3203,14 @@ vy_range_new(struct vy_index *index, int64_t id)
 		 * Creating a new range. Assign a new id.
 	         */
 		range->id = ++index->range_id_max;
+	}
+	if (begin != NULL) {
+		vy_stmt_ref(begin);
+		range->begin = begin;
+	}
+	if (end != NULL) {
+		vy_stmt_ref(end);
+		range->end = end;
 	}
 	rlist_create(&range->runs);
 	rlist_create(&range->mems);
@@ -3493,11 +3502,13 @@ vy_range_compact_prepare(struct vy_range *range)
 	struct vy_stmt *split_key = NULL;
 	const char *split_key_raw;
 	struct vy_range *parts[2];
+	struct vy_stmt *keys[3];
 	int n_parts = 1;
 	int i;
 
 	assert(rlist_empty(&range->compact_list));
 
+	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
 		split_key = vy_stmt_extract_key_raw(index->key_def,
 						    split_key_raw,
@@ -3505,14 +3516,17 @@ vy_range_compact_prepare(struct vy_range *range)
 		if (split_key == NULL)
 			goto fail;
 		n_parts = 2;
-	}
+		keys[1] = split_key;
+		keys[2] = range->end;
+	} else
+		keys[1] = range->end;
 
 	/* Allocate new ranges. */
 	for (i = 0; i < n_parts; i++) {
 		struct vy_range *r;
 		struct vy_mem *mem;
 
-		r = parts[i] = vy_range_new(index, 0);
+		r = parts[i] = vy_range_new(index, 0, keys[i], keys[i + 1]);
 		if (r == NULL)
 			goto fail;
 		r->new_run = vy_run_new();
@@ -3526,21 +3540,6 @@ vy_range_compact_prepare(struct vy_range *range)
 		/* Account merge w/o split. */
 		if (n_parts == 1)
 			r->merge_count = range->merge_count + 1;
-	}
-
-	/* Set begin and end keys for the new ranges. */
-	if (range->begin)
-		vy_stmt_ref(range->begin);
-	if (range->end)
-		vy_stmt_ref(range->end);
-	parts[0]->begin = range->begin;
-	if (split_key != NULL) {
-		vy_stmt_ref(split_key);
-		parts[0]->end = split_key;
-		parts[1]->begin = split_key;
-		parts[1]->end = range->end;
-	} else {
-		parts[0]->end = range->end;
 	}
 
 	say_debug("range compact prepare: %s", vy_range_str(range));
@@ -3638,7 +3637,7 @@ vy_index_create(struct vy_index *index)
 
 	index->range_id_max = 0;
 	/* create initial range */
-	struct vy_range *range = vy_range_new(index, 0);
+	struct vy_range *range = vy_range_new(index, 0, NULL, NULL);
 	if (unlikely(range == NULL))
 		return -1;
 	vy_index_add_range(index, range);
@@ -3811,7 +3810,8 @@ vy_index_open_ex(struct vy_index *index)
 			/* Proceed to the next range. */
 			if (range != NULL)
 				vy_index_recover_range(index, range);
-			range = vy_range_new(index, desc[i].range_id);
+			range = vy_range_new(index, desc[i].range_id,
+					     NULL, NULL);
 			if (range == NULL)
 				goto out;
 		}
@@ -3830,7 +3830,7 @@ vy_index_open_ex(struct vy_index *index)
 		 * Special case: index hasn't been dumped yet.
 		 * Create a range for it.
 		 */
-		range = vy_range_new(index, 0);
+		range = vy_range_new(index, 0, NULL, NULL);
 		if (range == NULL)
 			goto out;
 		vy_index_add_range(index, range);
