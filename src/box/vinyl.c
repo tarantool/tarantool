@@ -40,6 +40,7 @@
 #include <small/rb.h>
 #include <small/mempool.h>
 #include <small/region.h>
+#include <small/lsregion.h>
 #include <msgpuck/msgpuck.h>
 #include <coeio_file.h>
 
@@ -123,6 +124,8 @@ struct vy_env {
 	struct mempool      mem_tree_extent_pool;
 	/** Mempool for struct vy_page_read_task */
 	struct mempool      read_task_pool;
+	/** Allocator for tuples */
+	struct lsregion     allocator;
 	/** Key for thread-local ZSTD context */
 	pthread_key_t       zdctx_key;
 	/** Timer for updating quota watermark. */
@@ -3860,7 +3863,7 @@ out:
  */
 static int
 vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
-	     size_t *write_size)
+	     size_t *write_size, int64_t alloc_id)
 {
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -3869,9 +3872,10 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 	struct vy_mem *mem = rlist_first_entry(&range->mems,
 					       struct vy_mem, link);
 	size_t size = vy_stmt_size(stmt);
-	struct vy_stmt *mem_stmt = region_alloc(&mem->region, size);
+	struct vy_stmt *mem_stmt;
+	mem_stmt = lsregion_alloc(&index->env->allocator, size, alloc_id);
 	if (mem_stmt == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "mem_stmt");
+		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
 		return -1;
 	}
 	memcpy(mem_stmt, stmt, size);
@@ -3930,7 +3934,7 @@ vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt,
 		return 0;
 	}
 
-	return vy_range_set(range, stmt, write_size);
+	return vy_range_set(range, stmt, write_size, stmt->lsn);
 }
 
 static void
@@ -3982,12 +3986,13 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		}
 		assert(older == NULL || upserted->lsn != older->lsn);
 		assert(upserted->type == IPROTO_REPLACE);
-		int rc = vy_range_set(range, upserted, write_size);
+		int rc = vy_range_set(range, upserted, write_size,
+				      upserted->lsn);
 		vy_stmt_unref(upserted);
 		return rc;
 	}
 
-	if (vy_range_set(range, stmt, write_size) != 0)
+	if (vy_range_set(range, stmt, write_size, stmt->lsn) != 0)
 		return -1;
 
 	/*
@@ -4073,7 +4078,7 @@ vy_tx_write(write_set_t *write_set, struct txv *v,
 			rc = vy_range_set_delete(range, stmt, write_size);
 			break;
 		default:
-			rc = vy_range_set(range, stmt, write_size);
+			rc = vy_range_set(range, stmt, write_size, stmt->lsn);
 			break;
 		}
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
@@ -5035,6 +5040,9 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	} else {
 		scheduler->mem_min_lsn = INT64_MAX;
 	}
+
+	struct lsregion *allocator = &scheduler->env->allocator;
+	lsregion_gc(allocator, scheduler->mem_min_lsn);
 
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn) {
 		/*
@@ -6988,12 +6996,14 @@ vy_env_new(void)
 	if (e->scheduler == NULL)
 		goto error_sched;
 
-	mempool_create(&e->cursor_pool, cord_slab_cache(),
+	struct slab_cache *slab_cache = cord_slab_cache();
+	mempool_create(&e->cursor_pool, slab_cache,
 	               sizeof(struct vy_cursor));
-	mempool_create(&e->mem_tree_extent_pool, cord_slab_cache(),
-		       VY_MEM_TREE_EXTENT_SIZE);
-	mempool_create(&e->read_task_pool, cord_slab_cache(),
+	mempool_create(&e->read_task_pool, slab_cache,
 		       sizeof(struct vy_page_read_task));
+	mempool_create(&e->mem_tree_extent_pool, slab_cache,
+		       VY_MEM_TREE_EXTENT_SIZE);
+	lsregion_create(&e->allocator, slab_cache->arena);
 	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
@@ -7025,8 +7035,9 @@ vy_env_delete(struct vy_env *e)
 	vy_quota_delete(e->quota);
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
-	mempool_destroy(&e->mem_tree_extent_pool);
 	mempool_destroy(&e->read_task_pool);
+	mempool_destroy(&e->mem_tree_extent_pool);
+	lsregion_destroy(&e->allocator);
 	tt_pthread_key_delete(e->zdctx_key);
 	free(e);
 }
@@ -10317,7 +10328,8 @@ vy_range_optimize_upserts_f(va_list va)
 		size_t write_size = 0;
 		if (index->version == index_version &&
 		    range->version == range_version &&
-		    vy_range_set(range, v, &write_size) == 0)
+		    vy_range_set(range, v, &write_size,
+				 index->env->xm->lsn) == 0)
 			vy_quota_force_use(index->env->quota, write_size);
 	}
 	vy_read_iterator_close(&itr);
