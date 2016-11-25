@@ -880,6 +880,13 @@ test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 ---
 - 'ER_ILLEGAL_PARAMS: Illegal parameters, oh my'
 ...
+--
+-- gh-1926
+--
+fiber.create(function() fiber.wakeup(fiber.self()) end)
+---
+- the fiber is dead
+...
 fiber = nil
 ---
 ...

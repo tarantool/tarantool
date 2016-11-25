@@ -347,4 +347,9 @@ test_run:grep_log("default", "FiberIsCancelled") == nil
 _ = fiber.create(function() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end)
 test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 
+--
+-- gh-1926
+--
+fiber.create(function() fiber.wakeup(fiber.self()) end)
+
 fiber = nil

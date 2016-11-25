@@ -498,8 +498,8 @@ fiber_loop(void *data __attribute__((unused)))
 	        }
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
-		/* no pending wakeups */
-		assert(rlist_empty(&fiber->state));
+		/* reset pending wakeups */
+		rlist_del(&fiber->state);
 		if (! (fiber->flags & FIBER_IS_JOINABLE))
 			fiber_recycle(fiber);
 		/*
