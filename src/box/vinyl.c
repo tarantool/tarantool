@@ -66,6 +66,7 @@
 #include "iproto_constants.h"
 #include "cluster.h" /* SERVER_UUID */
 #include "vclock.h"
+#include "schema.h"
 #include "request.h"
 #include "xrow.h"
 #include "xlog.h"
@@ -983,70 +984,26 @@ vy_mem_too_many_upserts(struct vy_mem *mem, const struct vy_stmt *stmt,
 }
 
 /**
- * The footprint of run metadata on disk.
- * Run metadata is a set of packed data structures which are
- * written to disk in host byte order. They describe the
- * format of the run itself, which is a collection of
- * equi-sized, aligned pages with statements.
- *
- * This footprint is the first thing written to disk
- * when a run is dumped. It is a way to achieve
- * backward compatibility when restoring runs written
- * by previous versions of tarantool: it is assumed that
- * the data structures will get new members, which will
- * be stored at their end, and we'll be able to check
- * for absent members by looking at this footprint record.
- */
-struct PACKED vy_run_footprint {
-	/** Size of struct vy_run_info */
-	uint16_t run_info_size;
-	/* Size of struct vy_page_info */
-	uint16_t page_info_size;
-	/* Size struct vy_stmt_info */
-	uint16_t stmt_info_size;
-	/* Data alignment */
-	uint16_t alignment;
-};
-
-/**
  * Run metadata. A run is a written to a file as a single
  * chunk.
  */
-struct PACKED vy_run_info {
-	/* Sizes of containing structures */
-	struct vy_run_footprint footprint;
-	uint32_t  crc;
-	/** Total run size when stored in a file. */
-	uint64_t size;
+struct vy_run_info {
 	/** Run page count. */
 	uint32_t  count;
-	/* Unused: pages_size = count * sizeof(struct vy_page_info) */
-	uint32_t unused;
-	/** Offset of this run's page index in the file. */
-	uint64_t  pages_offset;
-	/** size of min data block */
-	uint32_t  min_size;
-	/** start of min keys array (global) */
-	uint64_t  min_offset;
-	/** Number of keys in the min-max key array. */
+	/** Number of keys. */
 	uint32_t  keys;
 	/* Min and max lsn over all statements in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;
-	/** Offset and size of range->begin. */
-	uint32_t begin_key_offset;
-	uint32_t begin_key_size;
-	/** Offset and size of range->end. */
-	uint32_t end_key_offset;
-	uint32_t end_key_size;
-
+	/** Total siz eof run */
 	uint64_t  total;
-	uint64_t  totalorigin;
+	/** Pages meta. */
+	struct vy_page_info *page_infos;
+	/** Buffer with min keys of pages */
+	struct vy_buf pages_min;
 };
 
-struct PACKED vy_page_info {
-	uint32_t crc;
-	/* count of records */
+struct vy_page_info {
 	uint32_t count;
 	/* offset of page data in run */
 	uint64_t offset;
@@ -1062,7 +1019,7 @@ struct PACKED vy_page_info {
 	int64_t max_lsn;
 };
 
-struct PACKED vy_stmt_info {
+struct vy_stmt_info {
 	/* record lsn */
 	int64_t lsn;
 	/* offset in data block */
@@ -1077,9 +1034,6 @@ struct PACKED vy_stmt_info {
 
 struct vy_run {
 	struct vy_run_info info;
-	struct vy_page_info *page_infos;
-	/* buffer with min keys of pages */
-	struct vy_buf pages_min;
 	/** Run data file. */
 	int fd;
 	/**
@@ -1805,20 +1759,20 @@ static struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
 	assert(pos < run->info.count);
-	return &run->page_infos[pos];
+	return &run->info.page_infos[pos];
 }
 
 static const char *
 vy_run_page_min_key(struct vy_run *run, const struct vy_page_info *p)
 {
 	assert(run->info.count > 0);
-	return run->pages_min.s + p->min_key_offset;
+	return run->info.pages_min.s + p->min_key_offset;
 }
 
 static uint64_t
 vy_run_total(struct vy_run *run)
 {
-	if (unlikely(run->page_infos == NULL))
+	if (unlikely(run->info.page_infos == NULL))
 		return 0;
 	return run->info.total;
 }
@@ -1827,8 +1781,7 @@ static uint64_t
 vy_run_size(struct vy_run *run)
 {
 	return sizeof(run->info) +
-	       run->info.count * sizeof(struct vy_page_info) +
-	       run->info.min_size;
+	       run->info.count * sizeof(struct vy_page_info);
 }
 
 static struct vy_run *
@@ -1840,9 +1793,8 @@ vy_run_new()
 			 "struct vy_run");
 		return NULL;
 	}
-	run->page_infos = NULL;
-	vy_buf_create(&run->pages_min);
 	memset(&run->info, 0, sizeof(run->info));
+	vy_buf_create(&run->info.pages_min);
 	run->fd = -1;
 	run->refs = 1;
 	rlist_create(&run->link);
@@ -1854,8 +1806,8 @@ vy_run_delete(struct vy_run *run)
 {
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
-	free(run->page_infos);
-	vy_buf_destroy(&run->pages_min);
+	vy_buf_destroy(&run->info.pages_min);
+	free(run->info.page_infos);
 	TRASH(run);
 	free(run);
 }
@@ -1962,25 +1914,6 @@ vy_index_acct_range_dump(struct vy_index *index,
 	vy_index_acct_run(index, run);
 	histogram_discard(index->run_hist, range->run_count - 1);
 	histogram_collect(index->run_hist, range->run_count);
-}
-
-#define FILE_ALIGN	512
-#define ALIGN_POS(pos)	(pos + (FILE_ALIGN - (pos % FILE_ALIGN)) % FILE_ALIGN)
-
-static ssize_t
-vy_pread_file(int fd, void *buf, size_t size, off_t offset)
-{
-	size_t pos = 0;
-	while (pos < size) {
-		ssize_t readen = pread(fd, buf + pos,
-				       size - pos, offset + pos);
-		if (readen < 0)
-			return -1;
-		if (!readen)
-			break;
-		pos += readen;
-	}
-	return pos;
 }
 
 static int
@@ -2615,33 +2548,6 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 	return 0;
 }
 
-static ssize_t
-vy_write_file(int fd, void *buf, size_t size)
-{
-	size_t pos = 0;
-	while (pos < size) {
-		ssize_t written = write(fd, buf + pos, size - pos);
-		if (written <= 0)
-			return -1;
-		pos += written;
-	}
-	return pos;
-}
-
-static ssize_t
-vy_pwrite_file(int fd, void *buf, size_t size, off_t offset)
-{
-	size_t pos = 0;
-	while (pos < size) {
-		ssize_t written = pwrite(fd, buf + pos,
-					 size - pos, offset + pos);
-		if (written <= 0)
-			return -1;
-		pos += written;
-	}
-	return pos;
-}
-
 struct vy_write_iterator;
 
 static struct vy_write_iterator *
@@ -2685,19 +2591,19 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		uint32_t cap = *page_info_capacity > 0 ?
 			*page_info_capacity * 2 : 16;
 		struct vy_page_info *new_infos =
-			realloc(run->page_infos, cap * sizeof(*new_infos));
+			realloc(run_info->page_infos, cap * sizeof(*new_infos));
 		if (new_infos == NULL) {
 			diag_set(OutOfMemory, cap, "realloc",
 				 "struct vy_page_info");
 			rc = -1;
 			goto out;
 		}
-		run->page_infos = new_infos;
+		run_info->page_infos = new_infos;
 		*page_info_capacity = cap;
 	}
 	assert(*page_info_capacity >= run_info->count);
 
-	struct vy_page_info *page = run->page_infos + run_info->count;
+	struct vy_page_info *page = run_info->page_infos + run_info->count;
 	memset(page, 0, sizeof(*page));
 	page->min_lsn = INT64_MAX;
 	page->offset = data_xlog->offset;
@@ -2720,7 +2626,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 
 		if (first_stmt) {
 			first_stmt = false;
-			struct vy_buf *min_buf = &run->pages_min;
+			struct vy_buf *min_buf = &run_info->pages_min;
 			struct vy_stmt *min_stmt;
 			min_stmt = vy_stmt_extract_key_raw(key_def, stmt->data,
 							   stmt->type);
@@ -2776,7 +2682,6 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	if (page->max_lsn > run_info->max_lsn)
 		run_info->max_lsn = page->max_lsn;
 	run_info->total += page->size;
-	run_info->totalorigin += page->unpacked_size;
 
 	run_info->keys += page->count;
 out:
@@ -2816,7 +2721,7 @@ vy_run_write_data(struct vy_range *range, struct vy_run *run,
 	 * the split key is reached.
 	 */
 	run->info.min_lsn = INT64_MAX;
-	assert(run->page_infos == NULL);
+	assert(run->info.page_infos == NULL);
 	uint32_t page_infos_capacity = 0;
 	int rc;
 	do {
@@ -2841,100 +2746,215 @@ err:
 }
 
 /**
- * Write run header to file.
+ * Keys for msgpuck run encoding
+ */
+enum vy_request_run_key {
+	VY_RUN_MIN_LSN = 2,
+	VY_RUN_MAX_LSN,
+	VY_RUN_PAGE_COUNT,
+	VY_RUN_BEGIN = 65,
+	VY_RUN_END
+};
+
+enum vy_request_page_key {
+	VY_PAGE_REQUEST_COUNT,
+	VY_PAGE_MIN_KEY
+};
+
+/**
+ * Encode vy_page_info as xrow.
+ * Allocates using region_alloc.
+ */
+static int
+vy_page_info_encode(struct vy_page_info *page, struct vy_run *run,
+		    uint64_t run_id, struct xrow_header *xrow)
+{
+	struct region *region = &fiber()->gc;
+
+	struct request request;
+	request_create(&request, IPROTO_REPLACE);
+	request.space_id = BOX_VINYL_PAGE_ID;
+	request.index_id = 0;
+
+	/* get page min key as tuple */
+	const char *min_key = vy_run_page_min_key(run, page);
+	const char *min_key_end = min_key;
+	mp_next(&min_key_end);
+
+	/* calc tuple size */
+	uint32_t size;
+	/* 3 items run_id, page_id and map */
+	size = mp_sizeof_array(4) +
+	       mp_sizeof_uint(run_id) +
+	       mp_sizeof_uint(page->offset) +
+	       mp_sizeof_uint(page->size) +
+	/* page map contains 2 items */
+	       mp_sizeof_map(2) +
+	       mp_sizeof_uint(VY_PAGE_REQUEST_COUNT) +
+	       mp_sizeof_uint(page->count) +
+	       mp_sizeof_uint(VY_PAGE_MIN_KEY) +
+	       min_key_end - min_key;
+
+	request.tuple = region_alloc(region, size);
+	if (request.tuple == NULL) {
+		diag_set(OutOfMemory, size, "region", "page encode");
+		return -1;
+	}
+	/* encode tuple */
+	char * pos = (char *)request.tuple;
+	pos = mp_encode_array(pos, 4);
+	pos = mp_encode_uint(pos, run_id);
+	pos = mp_encode_uint(pos, page->offset);
+	pos = mp_encode_uint(pos, page->size);
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_uint(pos, VY_PAGE_REQUEST_COUNT);
+	pos = mp_encode_uint(pos, page->count);
+	pos = mp_encode_uint(pos, VY_PAGE_MIN_KEY);
+	memcpy(pos, min_key, min_key_end - min_key);
+	pos += min_key_end - min_key;
+	request.tuple_end = (const char *)pos;
+
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->type = IPROTO_REPLACE;
+	xrow->lsn = run->info.min_lsn;
+	if ((xrow->bodycnt = request_encode(&request, xrow->body)) < 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * Write page no page_no from run to xlog
+ */
+static int
+vy_run_write_index_page(struct vy_run *run, uint64_t run_id,
+			uint32_t page_no, struct xlog *xlog)
+{
+	struct xrow_header xrow;
+	if (vy_page_info_encode(vy_run_page_info(run, page_no), run,
+				run_id, &xrow) < 0)
+		return -1;
+	if (xlog_write_row(xlog, &xrow) < 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * Encode vy_run_info as xrow
+ * Allocates using region alloc
+ */
+static int
+vy_run_info_encode(struct vy_run_info *run_info, struct vy_range *range,
+		   struct xrow_header *xrow)
+{
+	/* size for run tuple of 2 items: id + map */
+	size_t size = mp_sizeof_array(2) + mp_sizeof_uint(range->run_count);
+	/*
+	 * run map size: min lsn, max lsn, page count, begin and end keys if defined
+	 */
+	size_t map_size = 3;
+	size += mp_sizeof_uint(VY_RUN_MIN_LSN) +
+		mp_sizeof_uint(run_info->min_lsn);
+	size += mp_sizeof_uint(VY_RUN_MAX_LSN) +
+		mp_sizeof_uint(run_info->max_lsn);
+	size += mp_sizeof_uint(VY_RUN_PAGE_COUNT) +
+		mp_sizeof_uint(run_info->count);
+	if (range->begin) {
+		/* range begin is set */
+		++map_size;
+		size += mp_sizeof_uint(VY_RUN_BEGIN) + range->begin->size;
+	}
+	if (range->end) {
+		/* range end is set */
+		++map_size;
+		size += mp_sizeof_uint(VY_RUN_END) + range->end->size;
+	}
+	size += mp_sizeof_map(map_size);
+
+	char *tuple = region_alloc(&fiber()->gc, size);
+	if (tuple == NULL) {
+		diag_set(OutOfMemory, size, "region", "run encode");
+		return -1;
+	}
+	char *pos = tuple;
+	/* encode values */
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, range->run_count);
+	pos = mp_encode_map(pos, map_size);
+	pos = mp_encode_uint(pos, VY_RUN_MIN_LSN);
+	pos = mp_encode_uint(pos, run_info->min_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_MAX_LSN);
+	pos = mp_encode_uint(pos, run_info->max_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_PAGE_COUNT);
+	pos = mp_encode_uint(pos, run_info->count);
+	if (range->begin) {
+		pos = mp_encode_uint(pos, VY_RUN_BEGIN);
+		memcpy(pos, range->begin->data, range->begin->size);
+		pos += range->begin->size;
+	}
+	if (range->end) {
+		pos = mp_encode_uint(pos, VY_RUN_END);
+		memcpy(pos, range->end->data, range->end->size);
+		pos += range->end->size;
+	}
+	/* put tuple in a replace request to run's space */
+	struct request request;
+	request_create(&request, IPROTO_REPLACE);
+	request.space_id = BOX_VINYL_RUN_ID;;
+	request.index_id = 0;
+	request.tuple = tuple;
+	request.tuple_end = pos;
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->type = IPROTO_REPLACE;
+	xrow->lsn = run_info->min_lsn;
+	if ((xrow->bodycnt = request_encode(&request, xrow->body)) < 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * Write run to file.
  */
 static int
 vy_run_write_index(struct vy_range *range, struct vy_run *run)
 {
 	char path[PATH_MAX];
-	snprintf(path, PATH_MAX, "%s/.tmpXXXXXX", range->index->path);
-	int fd = mkstemp(path);
-	if (fd < 0) {
-		diag_set(SystemError, "failed to create file '%s'", path);
+	vy_run_snprint_path(path, sizeof(path), range,
+			    range->run_count, VY_FILE_INDEX);
+	struct xlog index_xlog;
+	struct xlog_meta meta = {
+		.filetype = "META",
+		.version = "0.13",
+		.server_uuid = SERVER_UUID,
+	};
+	if (xlog_create(&index_xlog, path, &meta) < 0) {
 		return -1;
 	}
+	xlog_tx_begin(&index_xlog);
 
-	/*
-	 * Get data file size to truncate it in case of error
-	 */
-	struct vy_run_info *header = &run->info;
-	header->footprint = (struct vy_run_footprint) {
-		sizeof(struct vy_run_info),
-		sizeof(struct vy_page_info),
-		sizeof(struct vy_stmt_info),
-		FILE_ALIGN
-	};
-	header->min_lsn = INT64_MAX;
+	struct xrow_header xrow;
+	if (vy_run_info_encode(&run->info, range, &xrow) != 0 ||
+	    xlog_write_row(&index_xlog, &xrow) < 0)
+		goto fail;
 
-	/* write run info header and adjust size */
-	uint32_t header_size = sizeof(*header);
-	if (vy_write_file(fd, header, header_size) < 0)
-		goto err_file;
-	header->size += header_size;
-
-	/* Write pages index */
-	header->pages_offset = header->size;
-	size_t pages_size = run->info.count * sizeof(struct vy_page_info);
-	if (vy_write_file(fd, run->page_infos, pages_size) < 0)
-		goto err_file;
-	header->size += pages_size;
-	header->unused = pages_size;
-
-	/* Write min-max keys for pages */
-	header->min_offset = header->size;
-	header->min_size = vy_buf_used(&run->pages_min);
-	if (vy_write_file(fd, run->pages_min.s, header->min_size) < 0)
-		goto err_file;
-	header->size += header->min_size;
-
-	/* Write range boundaries. */
-	if (range->begin) {
-		assert(range->begin->type == IPROTO_SELECT);
-		if (vy_write_file(fd, range->begin->data,
-				  range->begin->size) < 0)
-			goto err_file;
-		header->begin_key_offset = header->size;
-		header->begin_key_size = range->begin->size;
-		header->size += range->begin->size;
-	}
-	if (range->end) {
-		assert(range->end->type == IPROTO_SELECT);
-		if (vy_write_file(fd, range->end->data,
-				  range->end->size) < 0)
-			goto err_file;
-		header->end_key_offset = header->size;
-		header->end_key_size = range->end->size;
-		header->size += range->end->size;
+	uint32_t page_no;
+	for (page_no = 0; page_no < run->info.count; ++page_no) {
+		if (vy_run_write_index_page(run, range->run_count,
+					    page_no, &index_xlog) < 0)
+			goto fail;
 	}
 
-	/*
-	 * Eval run_info header crc and rewrite it
-	 * to finalize the run on disk
-	 * */
-	header->crc = vy_crcs(header, sizeof(struct vy_run_info), 0);
-
-	if (vy_pwrite_file(fd, header, header_size, 0) < 0 ||
-	    fdatasync(fd) < 0)
-		goto err_file;
-
-	/* Commit the run file by linking it to the proper name. */
-	char new_path[PATH_MAX];
-	vy_run_snprint_path(new_path, sizeof(new_path), range,
-			    range->run_count, VY_FILE_INDEX);
-	if (rename(path, new_path) != 0) {
-		diag_set(SystemError, "failed to rename file '%s' to '%s'",
-			 path, new_path);
-		goto err;
-	}
-
-	close(fd);
+	if (xlog_tx_commit(&index_xlog) < 0 ||
+	    xlog_flush(&index_xlog) < 0 ||
+	    xlog_rename(&index_xlog) < 0)
+		goto fail;
+	xlog_close(&index_xlog, false);
+	fiber_gc();
 	return 0;
-
-err_file:
-	diag_set(SystemError, "error writing file '%s'", path);
-err:
+fail:
+	fiber_gc();
+	xlog_tx_rollback(&index_xlog);
+	xlog_close(&index_xlog, false);
 	unlink(path);
-	close(fd);
 	return -1;
 }
 
@@ -2981,51 +3001,174 @@ vy_range_new(struct vy_index *index, int64_t id)
 	return range;
 }
 
+const char *vy_page_info_key_strs[] = {
+	"count",
+	"min"
+};
+
+const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
+				      (1 << VY_PAGE_MIN_KEY);
+
 static int
-vy_recover_raw(int fd, const char *path,
-	       void *buf, size_t size, off_t offset)
+vy_page_info_decode(struct vy_page_info *page, struct vy_run_info *run_info,
+		    uint32_t run_id, struct xrow_header *xrow)
 {
-	ssize_t n = vy_pread_file(fd, buf, size, offset);
-	if (n < 0) {
-		diag_set(SystemError, "error reading file '%s'", path);
+	struct request request;
+	/* extract all pages info */
+	request_create(&request, xrow->type);
+	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
+	if (request.space_id != BOX_VINYL_PAGE_ID) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta: "
+			 "incorrect space id");
 		return -1;
 	}
-	if ((size_t)n != size) {
-		diag_set(ClientError, ER_VINYL, "run file corrupted");
+	const char *pos = request.tuple;
+	if (mp_decode_array(&pos) < 4) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+			 "tuple is too small");
+		return -1;
+	}
+	if (run_id != mp_decode_uint(&pos)) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+			 "incorrect run id");
+		return -1;
+	}
+
+	memset(page, 0, sizeof(*page));
+	page->offset = mp_decode_uint(&pos);
+	page->size = mp_decode_uint(&pos);
+
+	uint64_t key_map = vy_page_info_key_map;
+	uint32_t map_size = mp_decode_map(&pos);
+	uint32_t map_item;
+	const char *key_beg;
+	for (map_item = 0; map_item < map_size; ++map_item) {
+		uint32_t key = mp_decode_uint(&pos);
+		key_map &= ~(1 << key);
+		switch (key) {
+		case VY_PAGE_REQUEST_COUNT:
+			page->count = mp_decode_uint(&pos);
+			break;
+		case VY_PAGE_MIN_KEY:
+			key_beg = pos;
+			mp_next(&pos);
+			vy_buf_ensure(&run_info->pages_min, pos - key_beg);
+			memcpy(run_info->pages_min.p, key_beg, pos - key_beg);
+			page->min_key_offset = vy_buf_used(&run_info->pages_min);
+			vy_buf_advance(&run_info->pages_min, pos - key_beg);
+			break;
+		default:
+			diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+				 "unknown page meta key %d", key);
+			return -1;
+		}
+	}
+	if (key_map) {
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 vy_page_info_key_strs[__builtin_ffsll(key_map) - 1]);
+		return -1;
+	}
+
+	return 0;
+}
+
+const char *vy_run_info_key_strs[] = {
+	"min lsn",
+	"max lsn",
+	"page count",
+	"begin key",
+	"end key"
+};
+
+const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
+				      (1 << VY_RUN_MAX_LSN) |
+				      (1 << VY_RUN_PAGE_COUNT);
+
+static int
+vy_run_info_decode(struct vy_run_info *run_info, struct vy_range *range,
+		   uint64_t run_id, struct xrow_header *xrow)
+{
+	struct key_def *key_def = range->index->key_def;
+
+	struct request request;
+	request_create(&request, xrow->type);
+	if (request_decode(&request, xrow->body->iov_base,
+			   xrow->body->iov_len)) {
+		return -1;
+	}
+
+	/* decode run */
+	if (request.space_id != BOX_VINYL_RUN_ID) {
+		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
+			 "incorrect space id");
+		return -1;
+	}
+	const char *pos = request.tuple;
+	if (mp_decode_array(&pos) < 2) {
+		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
+			 "not enough values");
+		return -1;
+	}
+	if (run_id != mp_decode_uint(&pos)) {
+		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
+			 "incorrect run id");
+		return -1;
+	}
+	memset(run_info, 0, sizeof(*run_info));
+	uint64_t key_map = vy_run_info_key_map;
+	uint32_t map_size = mp_decode_map(&pos);
+	uint32_t map_item;
+	/* decode run values */
+	for (map_item = 0; map_item < map_size; ++map_item) {
+		uint32_t key = mp_decode_uint(&pos);
+		key_map &= ~(1 << key);
+		switch (key) {
+		case VY_RUN_MIN_LSN:
+			run_info->min_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_RUN_MAX_LSN:
+			run_info->max_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_RUN_PAGE_COUNT:
+			run_info->count = mp_decode_uint(&pos);
+			break;
+		case VY_RUN_BEGIN:
+			if (range->begin != NULL) {
+				/* begin already set, skip */
+				mp_next(&pos);
+				break;
+			}
+			range->begin = vy_stmt_extract_key_raw(key_def, pos,
+							       IPROTO_SELECT);
+			mp_next(&pos);
+			break;
+		case VY_RUN_END:
+			if (range->end != NULL) {
+				/* end already set, skip it */
+				mp_next(&pos);
+				break;
+			}
+			range->end = vy_stmt_extract_key_raw(key_def, pos,
+							     IPROTO_SELECT);
+			mp_next(&pos);
+			break;
+		default:
+			diag_set(ClientError, ER_VINYL, "Unknow run meta key %d", key);
+			return -1;
+		}
+	}
+	if (key_map) {
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 vy_run_info_key_strs[__builtin_ffsll(key_map) - 1]);
 		return -1;
 	}
 	return 0;
 }
 
-/**
- * Recover SELECT statement of size equal to @param size
- * at @param offset from file @param fd.
- */
-static int
-vy_stmt_recover(int fd, const char *path, size_t size, off_t offset,
-		struct vy_index *index, struct vy_stmt **stmt)
-{
-	int rc = 0;
-	char *buf;
-
-	buf = malloc(size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "buf");
-		return -1;
-	}
-
-	if (vy_recover_raw(fd, path, buf, size, offset) < 0 ||
-	    (*stmt = vy_stmt_extract_key_raw(index->key_def, buf,
-					     IPROTO_SELECT)) == NULL)
-		rc = -1;
-
-	free(buf);
-	return rc;
-}
-
 static int
 vy_range_recover_run(struct vy_range *range, int run_no)
 {
+
 	if (run_no != range->run_count) {
 		diag_set(ClientError, ER_VINYL, "run file missing");
 		return -1;
@@ -3037,58 +3180,43 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_INDEX);
-	int fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		diag_set(SystemError, "failed to open file '%s'", path);
+	struct xlog_cursor cursor;
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
-	}
 
 	/* Read run header. */
-	struct vy_run_info *h = &run->info;
-	if (vy_recover_raw(fd, path, h, sizeof(*h), 0) != 0)
-		goto fail;
+	struct xrow_header xrow;
+	/* all rows should be in one tx */
+	if (xlog_cursor_next_tx(&cursor) != 0 ||
+	    xlog_cursor_next_row(&cursor, &xrow) != 0 ||
+	    vy_run_info_decode(&run->info, range, range->run_count, &xrow) != 0)
+		goto fail_close;
 
 	/* Allocate buffer for page info. */
-	size_t pages_size = sizeof(struct vy_page_info) * h->count;
-	run->page_infos = malloc(pages_size);
-	if (run->page_infos == NULL) {
+	size_t pages_size = sizeof(struct vy_page_info) * run->info.count;
+	run->info.page_infos = malloc(pages_size);
+	if (run->info.page_infos == NULL) {
 		diag_set(OutOfMemory, pages_size, "malloc",
 			 "struct vy_page_info");
-		goto fail;
+		goto fail_close;
 	}
-	if (vy_buf_ensure(&run->pages_min, h->min_size) != 0)
-		goto fail;
 
-	/* Read page info. */
-	if (vy_recover_raw(fd, path, run->page_infos,
-			   pages_size, h->pages_offset) != 0 ||
-	    vy_recover_raw(fd, path, run->pages_min.s,
-			   h->min_size, h->min_offset) != 0)
-		goto fail;
-
-	/* Recover range boundaries from the first run. */
-	if (rlist_empty(&range->runs)) {
-		assert(range->begin == NULL);
-		assert(range->end == NULL);
-		if (h->begin_key_offset != 0 &&
-		    vy_stmt_recover(fd, path,
-				    h->begin_key_size, h->begin_key_offset,
-				    range->index, &range->begin) != 0)
-			goto fail;
-		if (h->end_key_offset != 0 &&
-		    vy_stmt_recover(fd, path,
-				    h->end_key_size, h->end_key_offset,
-				    range->index, &range->end) != 0)
-			goto fail;
+	int rc;
+	uint32_t page_no = 0;
+	while ((rc = xlog_cursor_next_row(&cursor, &xrow)) == 0) {
+		struct vy_page_info *page = run->info.page_infos + page_no;
+		if (vy_page_info_decode(page, &run->info,
+					range->run_count, &xrow) < 0)
+			goto fail_close;
+		++page_no;
 	}
 
 	/* We don't need to keep metadata file open any longer. */
-	close(fd);
-	fd = -1;
+	xlog_cursor_close(&cursor, false);
 
 	/* Prepare data file for reading. */
 	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_RUN);
-	fd = open(path, O_RDONLY);
+	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		diag_set(SystemError, "failed to open file '%s'", path);
 		goto fail;
@@ -3099,6 +3227,9 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 	rlist_add_entry(&range->runs, run, link);
 	range->run_count++;
 	return 0;
+
+fail_close:
+	xlog_cursor_close(&cursor, false);
 fail:
 	vy_run_unref(run);
 	if (fd >= 0)
@@ -7123,7 +7254,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 
 	if (itr->run->info.count == 1) {
 		/* there can be a stupid bootstrap run in which it's EOF */
-		struct vy_page_info *page_info = itr->run->page_infos;
+		struct vy_page_info *page_info = itr->run->info.page_infos;
 
 		if (!page_info->count) {
 			vy_run_iterator_cache_clean(itr);
