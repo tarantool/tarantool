@@ -103,6 +103,7 @@ extern char strict_lua[],
 	clock_lua[],
 	title_lua[],
 	env_lua[],
+	trigger_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -131,6 +132,7 @@ static const char *lua_modules[] = {
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
 	"internal.argparse", argparse_lua,
+	"internal.trigger", trigger_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,

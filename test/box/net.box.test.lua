@@ -420,6 +420,45 @@ f = fiber.create(function() c:call("") end)
 fiber.sleep(0.1)
 f:cancel(); c:close()
 
+-- check for on_schema_reload callback
+test_run:cmd("setopt delimiter ';'")
+do
+    local a = 0
+    function osr_cb()
+        a = a + 1
+    end
+    local con = net.new(box.cfg.listen, {
+        wait_connected = false
+    })
+    con:on_schema_reload(osr_cb)
+    con:wait_connected()
+    con.space._schema:select{}
+    box.schema.space.create('misisipi')
+    box.space.misisipi:drop()
+    con.space._schema:select{}
+    con = nil
+
+    return a
+end;
+do
+    local a = 0
+    function osr_cb()
+        a = a + 1
+    end
+    local con = net.new(box.cfg.listen, {
+        wait_connected=true
+    })
+    con:on_schema_reload(osr_cb)
+    con.space._schema:select{}
+    box.schema.space.create('misisipi')
+    box.space.misisipi:drop()
+    con.space._schema:select{}
+    con = nil
+
+    return a
+end;
+test_run:cmd("setopt delimiter ''");
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
 -- Tarantool < 1.7.1 compatibility (gh-1533)

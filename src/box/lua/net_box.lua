@@ -8,6 +8,7 @@ local msgpack  = require('msgpack')
 local errno    = require('errno')
 local urilib   = require('uri')
 local internal = require('net.box.lib')
+local trigger  = require('internal.trigger')
 
 local band          = bit.band
 local max           = math.max
@@ -154,7 +155,7 @@ local function create_transport(host, port, user, password, callback)
     -- client fiber explicitly. Otherwize, wait on state_cond completes and
     -- the client reports E_TIMEOUT.
     local requests         = setmetatable({}, { __mode = 'v' })
-    local next_request_id = 1
+    local next_request_id  = 1
 
     local worker_fiber
     local connection
@@ -607,6 +608,7 @@ local function connect(...)
         remote._index_mt = index_metatable(remote)
         if opts.call_16 then remote.call = remote.call_16 end
     end
+    remote._on_schema_reload = trigger.new("on_schema_reload")
     remote._transport = create_transport(host, port, user, password, callback)
     remote._transport.connect()
     if opts.wait_connected ~= false then
@@ -625,6 +627,11 @@ end
 function remote_methods:close()
     remote_check(self, 'close')
     self._transport.close()
+end
+
+function remote_methods:on_schema_reload(...)
+    remote_check(self, 'on_schema_reload')
+    return self._on_schema_reload(...)
 end
 
 function remote_methods:is_connected()
@@ -795,11 +802,12 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
     end
 
     self._schema_id = schema_id
-    self.space = sl
+    self._on_schema_reload:run(self)
 end
 
 -- console methods
 console_methods.close = remote_methods.close
+console_methods.on_schema_reload = remote_methods.on_schema_reload
 console_methods.is_connected = remote_methods.is_connected
 console_methods.wait_state = remote_methods.wait_state
 function console_methods:eval(line, timeout)
