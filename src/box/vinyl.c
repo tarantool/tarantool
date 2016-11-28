@@ -2670,7 +2670,10 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		  struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
-	assert(*curr_stmt);
+
+	if (*curr_stmt == NULL)
+		return 1;
+
 	struct vy_run_info *run_info = &run->info;
 	struct key_def *key_def = index->key_def;
 	int rc = 0;
@@ -2791,7 +2794,6 @@ vy_run_write_data(struct vy_range *range, struct vy_run *run,
 		  struct vy_write_iterator *wi, struct vy_stmt **curr_stmt)
 {
 	assert(curr_stmt);
-	assert(*curr_stmt);
 
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), range,
@@ -3081,18 +3083,16 @@ vy_range_recover_run(struct vy_range *range, int run_no)
 	close(fd);
 	fd = -1;
 
-	/* Prepare data file for reading if the run is not empty. */
-	if (h->count > 0) {
-		vy_run_snprint_path(path, sizeof(path), range, run_no,
-				    VY_FILE_RUN);
-		run->fd = open(path, O_RDONLY);
-		if (run->fd < 0) {
-			diag_set(SystemError, "failed to open file '%s'", path);
-			goto fail;
-		}
+	/* Prepare data file for reading. */
+	vy_run_snprint_path(path, sizeof(path), range, run_no, VY_FILE_RUN);
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		diag_set(SystemError, "failed to open file '%s'", path);
+		goto fail;
 	}
 
 	/* Finally, link run to the range. */
+	run->fd = fd;
 	rlist_add_entry(&range->runs, run, link);
 	range->run_count++;
 	return 0;
@@ -3150,7 +3150,6 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   size_t *written)
 {
 	assert(stmt);
-	struct vy_index *index = range->index;
 
 	ERROR_INJECT(ERRINJ_VY_RANGE_DUMP,
 		     {diag_set(ClientError, ER_INJECTION,
@@ -3160,20 +3159,8 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	if (run == NULL)
 		return -1;
 
-	/*
-	 * All statements in the range could have cancelled each other.
-	 * Do not create an empty data file in this case, but still
-	 * write run header for the sake of recovery.
-	 */
-	bool empty = (*stmt == NULL ||
-		      (range->end != NULL &&
-		       vy_stmt_compare_with_key(*stmt, range->end,
-				index->format, index->key_def) >= 0));
-	if (!empty && vy_run_write_data(range, run, wi, stmt) != 0) {
-		vy_run_delete(run);
-		return -1;
-	}
-	if (vy_run_write_index(range, run) != 0) {
+	if (vy_run_write_data(range, run, wi, stmt) != 0 ||
+	    vy_run_write_index(range, run) != 0) {
 		vy_run_delete(run);
 		return -1;
 	}
@@ -7178,7 +7165,6 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		if (rc != 0)
 			return rc;
 	} else if (itr->run->info.count == 0) {
-		/* never seen that, but it could be possible in future */
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
@@ -9075,8 +9061,6 @@ static NODISCARD int
 vy_write_iterator_add_run(struct vy_write_iterator *wi,
 			  struct vy_range *range, struct vy_run *run)
 {
-	if (run->fd < 0)
-		return 0; /* empty run */
 	struct vy_merge_src *src;
 	src = vy_merge_iterator_add(&wi->mi, false, false);
 	if (src == NULL)
@@ -9276,8 +9260,6 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	assert(itr->curr_range->shadow == NULL);
 	struct vy_run *run;
 	rlist_foreach_entry(run, &itr->curr_range->runs, link) {
-		if (run->fd < 0)
-			continue; /* empty run */
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, itr->curr_range,
