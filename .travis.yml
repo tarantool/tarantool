@@ -15,6 +15,7 @@ env:
     global:
       - ENCRYPTION_LABEL="8f886150b5ec"
       - SFTP_UPLOAD_SOURCE="True"
+      - TARBALL_EXTRA_ARGS="--exclude=doc/www --exclude=doc/sphinx"
     matrix:
       - OS=el DIST=6 PACK=rpm
       - OS=el DIST=7 PACK=rpm
