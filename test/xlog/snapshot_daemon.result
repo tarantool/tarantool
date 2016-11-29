@@ -142,11 +142,11 @@ box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
 ---
 ...
-snapshot_time >= time + PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...
-snapshot_time <= time + 2 * PERIOD
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...
@@ -166,11 +166,11 @@ box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
 ---
 ...
-snapshot_time >= time + PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...
-snapshot_time <= time + 2 * PERIOD
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...
@@ -192,11 +192,11 @@ box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
 ---
 ...
-snapshot_time >= time + PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...
-snapshot_time <= time + 2 * PERIOD
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 ---
 - true
 ...

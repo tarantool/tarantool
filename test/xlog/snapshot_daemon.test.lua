@@ -77,8 +77,8 @@ box.cfg{ snapshot_count = 0 }
 PERIOD = 3600
 box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time >= time + PERIOD
-snapshot_time <= time + 2 * PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 
 daemon_fiber = daemon.fiber
 daemon_control = daemon.control
@@ -87,8 +87,8 @@ daemon_control = daemon.control
 PERIOD = 100
 box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time >= time + PERIOD
-snapshot_time <= time + 2 * PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 daemon.fiber == daemon_fiber
 daemon.control == daemon_control
 
@@ -96,8 +96,8 @@ daemon.control == daemon_control
 PERIOD = 1000
 box.cfg{ snapshot_count = 2, snapshot_period = PERIOD}
 snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time >= time + PERIOD
-snapshot_time <= time + 2 * PERIOD
+snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
+snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
 daemon.fiber == daemon_fiber
 daemon.control == daemon_control
 
