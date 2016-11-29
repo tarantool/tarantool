@@ -208,13 +208,13 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 	for (size_t c = 0; c < expr->size; c++) {
 		struct bitset_expr_conj *exconj = &expr->conjs[c];
 		struct bitset_iterator_conj *itconj = &it->conjs[c];
+		itconj->page_first_pos = 0;
 
 		if (bitset_iterator_conj_reserve(it, itconj, exconj->size) != 0)
 			return -1;
 
 		for (size_t b = 0; b < exconj->size; b++) {
 			assert(exconj->bitset_ids[b] < bitsets_size);
-			itconj->page_first_pos = 0;
 			assert(p_bitsets[exconj->bitset_ids[b]] != NULL);
 			itconj->bitsets[b] = p_bitsets[exconj->bitset_ids[b]];
 			itconj->pre_nots[b] = exconj->pre_nots[b];

@@ -114,3 +114,36 @@ _ = space:create_index('bitset', { type = 'bitset', parts = {2, 'number'}, uniqu
 space:drop()
 space = nil
 
+-- https://github.com/tarantool/tarantool/issues/1896 wrong countspace = box.schema.space.create('test')
+s = box.schema.space.create('test')
+_ = s:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
+i = s:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
+s:insert{1, 0}
+s:insert{2, 0}
+s:insert{3, 0}
+s:insert{4, 2}
+s:insert{5, 2}
+s:insert{6, 3}
+s:insert{7, 4}
+s:insert{8, 5}
+s:insert{9, 8}
+#i:select(7, {iterator = box.index.BITS_ANY_SET})
+i:count(7, {iterator = box.index.BITS_ANY_SET})
+s:drop()
+s = nil
+
+-- https://github.com/tarantool/tarantool/issues/1946 BITS_ALL_SET crashes
+s = box.schema.space.create('test')
+_ = s:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
+i = s:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
+for i=1,10 do s:insert{i, math.random(8)} end
+good = true
+function is_good(key, opts) return #i:select({key}, opts) == i:count({key}, opts) end
+function check(key, opts) good = good and is_good(key, opts) end
+for j=1,100 do check(math.random(9) - 1) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ANY_SET}) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ALL_SET}) end
+for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ALL_NOT_SET}) end
+good
+s:drop()
+s = nil
