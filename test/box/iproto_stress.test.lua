@@ -32,4 +32,5 @@ box.error.injection.set("ERRINJ_WAL_DELAY", true)
 
 repeat fiber.sleep(1) until n_workers == 0
 
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 s:drop()
