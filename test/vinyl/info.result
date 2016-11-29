@@ -359,6 +359,27 @@ box.info.vinyl().performance.write_count - old_count == 8
 space:drop()
 ---
 ...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:replace({1})
+---
+- [1]
+...
+box.info.vinyl().memory.min_lsn == box.info.vclock[1]
+---
+- true
+...
+space:drop()
+---
+...
+box.info.vinyl().memory.min_lsn
+---
+- 9223372036854775807
+...
 test_run:cmd('switch default')
 ---
 - true
