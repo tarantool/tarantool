@@ -4242,8 +4242,6 @@ struct vy_scheduler {
 	 * Older mems are closer to the tail of the list.
 	 */
 	struct rlist dirty_mems;
-	/** Number of items in the dirty_mems list. */
-	int dirty_mem_count;
 	/** Min LSN over all in-memory indexes. */
 	int64_t mem_min_lsn;
 	/**
@@ -4251,13 +4249,6 @@ struct vy_scheduler {
 	 * min_lsn <= checkpoint_lsn should be dumped first.
 	 */
 	int64_t checkpoint_lsn;
-	/**
-	 * Number of in-memory indexes that need to be checkpointed,
-	 * i.e. have min_lsn <= checkpoint_lsn.
-	 */
-	int checkpoint_pending;
-	/** Set if checkpoint failed. */
-	bool checkpoint_failed;
 	/** Signaled on checkpoint completion or failure. */
 	struct ipc_cond checkpoint_cond;
 };
@@ -4536,11 +4527,7 @@ error:
 			warning_said = true;
 		}
 		/* Abort pending checkpoint. */
-		if (scheduler->checkpoint_pending > 0 &&
-		    !scheduler->checkpoint_failed) {
-			scheduler->checkpoint_failed = true;
-			ipc_cond_signal(&scheduler->checkpoint_cond);
-		}
+		ipc_cond_signal(&scheduler->checkpoint_cond);
 		/*
 		 * A task can fail either due to lack of memory or IO
 		 * error. In either case it is pointless to schedule
@@ -4688,7 +4675,6 @@ vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		scheduler->mem_min_lsn = mem->min_lsn;
 	assert(scheduler->mem_min_lsn <= mem->min_lsn);
 	rlist_add_entry(&scheduler->dirty_mems, mem, dirty_link);
-	scheduler->dirty_mem_count++;
 }
 
 static void
@@ -4697,8 +4683,6 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	if (mem->used == 0)
 		return;
 
-	assert(scheduler->dirty_mem_count > 0);
-	scheduler->dirty_mem_count--;
 	rlist_del_entry(mem, dirty_link);
 
 	if (!rlist_empty(&scheduler->dirty_mems)) {
@@ -4710,14 +4694,12 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		scheduler->mem_min_lsn = INT64_MAX;
 	}
 
-	if (mem->min_lsn <= scheduler->checkpoint_lsn) {
+	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn) {
 		/*
-		 * The in-memory index was dirtied before checkpoint was
-		 * initiated and hence it contributes to checkpoint_pending.
+		 * All in-memory indexes have been checkpointed. Wake up
+		 * the fiber waiting for checkpoint to complete.
 		 */
-		assert(scheduler->checkpoint_pending > 0);
-		if (--scheduler->checkpoint_pending == 0)
-			ipc_cond_signal(&scheduler->checkpoint_cond);
+		ipc_cond_signal(&scheduler->checkpoint_cond);
 	}
 }
 
@@ -4736,6 +4718,10 @@ vy_checkpoint(struct vy_env *env)
 	if (!scheduler->is_worker_pool_running)
 		return 0;
 
+	scheduler->checkpoint_lsn = env->xm->lsn;
+	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn)
+		return 0; /* nothing to do */
+
 	/*
 	 * If the scheduler is throttled due to errors, do not wait
 	 * until it wakes up as it may take quite a while. Instead
@@ -4747,17 +4733,6 @@ vy_checkpoint(struct vy_env *env)
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
 	}
-
-	scheduler->checkpoint_lsn = env->xm->lsn;
-	/*
-	 * As LSN is increased on each insertion, all in-memory indexes
-	 * that are currently not empty have min_lsn <= checkpoint_lsn
-	 * while indexes that appear after this point will have min_lsn
-	 * greater than checkpoint_lsn. So the number of indexes we need
-	 * to dump equals dirty_mem_count.
-	 */
-	scheduler->checkpoint_pending = scheduler->dirty_mem_count;
-	scheduler->checkpoint_failed = false;
 
 	ipc_cond_signal(&scheduler->scheduler_cond);
 	return 0;
@@ -4772,11 +4747,11 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
 
-	while (scheduler->checkpoint_pending > 0 &&
-	       !scheduler->checkpoint_failed)
+	while (!scheduler->throttled &&
+	       scheduler->mem_min_lsn <= scheduler->checkpoint_lsn)
 		ipc_cond_wait(&scheduler->checkpoint_cond);
 
-	if (scheduler->checkpoint_failed) {
+	if (scheduler->mem_min_lsn <= scheduler->checkpoint_lsn) {
 		assert(!diag_is_empty(&scheduler->diag));
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
