@@ -119,12 +119,11 @@ script:
   - ./build/pack/travis.sh
 
 notifications:
-  irc:
-    channels:
-      - irc.freenode.net#tarantool
+  email:
+    recipients:
+      - build@tarantool.org
     on_success: change
     on_failure: always
-  email: true
 
 git:
   depth: 500
