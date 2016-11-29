@@ -4670,11 +4670,15 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	ipc_cond_signal(&scheduler->scheduler_cond);
 	scheduler->scheduler = NULL;
 
-	/* Delete all pending tasks and wake up worker threads */
+	/* Abort all pending tasks and wake up worker threads */
 	tt_pthread_mutex_lock(&scheduler->mutex);
 	struct vy_task *task, *next;
-	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link)
+	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link) {
+		task->status = -1;
+		if (task->ops->complete)
+			task->ops->complete(task);
 		vy_task_delete(&scheduler->task_pool, task);
+	}
 	stailq_create(&scheduler->input_queue);
 	pthread_cond_broadcast(&scheduler->worker_cond);
 	tt_pthread_mutex_unlock(&scheduler->mutex);
@@ -4686,9 +4690,12 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	scheduler->worker_pool = NULL;
 	scheduler->worker_pool_size = 0;
 
-	/* Delete all processed tasks */
-	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link)
+	/* Complete all processed tasks */
+	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link) {
+		if (task->ops->complete)
+			task->ops->complete(task);
 		vy_task_delete(&scheduler->task_pool, task);
+	}
 	stailq_create(&scheduler->output_queue);
 }
 
