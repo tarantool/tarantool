@@ -359,6 +359,7 @@ box_set_replication_source(void)
 		return;
 	}
 
+	box_check_replication_source();
 	box_sync_replication_source();
 
 	/* Start all replicas from the cluster registry */

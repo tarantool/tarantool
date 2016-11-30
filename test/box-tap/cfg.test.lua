@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(46)
+test:plan(47)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -190,6 +190,12 @@ os.remove(path2)
 code = " box.cfg{ listen='unix/:'" .. path .. "' } "
 run_script(code)
 test:isnil(fio.stat(path), "delete socket at exit")
+
+--
+-- gh-1962: incorrect replication source
+--
+status, reason = pcall(box.cfg, {replication_source="3303,3304"})
+test:ok(not status and reason:match("Incorrect"), "invalid replication_source")
 
 test:check()
 os.exit(0)
