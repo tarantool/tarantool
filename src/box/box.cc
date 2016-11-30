@@ -419,7 +419,7 @@ box_sync_replication_source(double timeout)
 	guard.is_active = false;
 }
 
-extern "C" void
+void
 box_set_replication_source(void)
 {
 	if (!box_init_done) {
@@ -431,6 +431,7 @@ box_set_replication_source(void)
 		return;
 	}
 
+	box_check_replication_source();
 	/* Try to connect to all replicas within the timeout period */
 	box_sync_replication_source(REPLICATION_CFG_TIMEOUT);
 	server_foreach(server) {
@@ -439,7 +440,7 @@ box_set_replication_source(void)
 	}
 }
 
-extern "C" void
+void
 box_set_listen(void)
 {
 	const char *uri = cfg_gets("listen");
@@ -447,19 +448,19 @@ box_set_listen(void)
 	iproto_set_listen(uri);
 }
 
-extern "C" void
+void
 box_set_log_level(void)
 {
 	say_set_log_level(cfg_geti("log_level"));
 }
 
-extern "C" void
+void
 box_set_io_collect_interval(void)
 {
 	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
 }
 
-extern "C" void
+void
 box_set_snap_io_rate_limit(void)
 {
 	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
@@ -467,13 +468,13 @@ box_set_snap_io_rate_limit(void)
 		memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
 }
 
-extern "C" void
+void
 box_set_too_long_threshold(void)
 {
 	too_long_threshold = cfg_getd("too_long_threshold");
 }
 
-extern "C" void
+void
 box_set_readahead(void)
 {
 	int readahead = cfg_geti("readahead");

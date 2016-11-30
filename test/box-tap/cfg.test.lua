@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(42)
+test:plan(43)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -184,7 +184,9 @@ code = " box.cfg{ listen='unix/:'" .. path .. "' } "
 run_script(code)
 test:isnil(fio.stat(path), "delete socket at exit")
 
+--
 -- gh-1499: AUTH raises ER_LOADING if wal_mode is 'none'
+--
 code = [[
 box.cfg{wal_mode = 'none', listen='unix/:./tarantool.sock' }
 box.once("bootstrap", function()
@@ -196,6 +198,12 @@ if not conn:ping() then os.exit(1) end
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "wal_mode none and ER_LOADING")
+
+--
+-- gh-1962: incorrect replication source
+--
+status, reason = pcall(box.cfg, {replication_source="3303,3304"})
+test:ok(not status and reason:match("Incorrect"), "invalid replication_source")
 
 test:check()
 os.exit(0)
