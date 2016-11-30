@@ -81,6 +81,9 @@ int box_snapshot(void);
  */
 const char *box_status(void);
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 void
 box_process_auth(struct request *request);
 
@@ -113,8 +116,7 @@ void box_set_too_long_threshold(void);
 void box_set_readahead(void);
 void box_set_panic_on_wal_error(void);
 
-#if defined(__cplusplus)
-}
+extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct box_function_ctx {
@@ -281,5 +283,9 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
  */
 int
 box_process1(struct request *request, box_tuple_t **result);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */

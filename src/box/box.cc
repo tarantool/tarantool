@@ -347,7 +347,7 @@ box_sync_replication_source(void)
 	}
 }
 
-extern "C" void
+void
 box_set_replication_source(void)
 {
 	if (recovery->writer == NULL) {
@@ -374,7 +374,7 @@ box_set_replication_source(void)
 	}
 }
 
-extern "C" void
+void
 box_set_listen(void)
 {
 	const char *uri = cfg_gets("listen");
@@ -405,7 +405,7 @@ box_cfg_listen_eq(struct uri *what)
 		memcmp(uri.host, what->host, uri.host_len) == 0);
 }
 
-extern "C" void
+void
 box_set_wal_mode(void)
 {
 	const char *mode_name = cfg_gets("wal_mode");
@@ -423,31 +423,31 @@ box_set_wal_mode(void)
 		recovery_update_mode(recovery, mode);
 }
 
-extern "C" void
+void
 box_set_log_level(void)
 {
 	say_set_log_level(cfg_geti("log_level"));
 }
 
-extern "C" void
+void
 box_set_io_collect_interval(void)
 {
 	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
 }
 
-extern "C" void
+void
 box_set_snap_io_rate_limit(void)
 {
 	recovery_update_io_rate_limit(recovery, cfg_getd("snap_io_rate_limit"));
 }
 
-extern "C" void
+void
 box_set_too_long_threshold(void)
 {
 	too_long_threshold = cfg_getd("too_long_threshold");
 }
 
-extern "C" void
+void
 box_set_readahead(void)
 {
 	int readahead = cfg_geti("readahead");
@@ -455,7 +455,7 @@ box_set_readahead(void)
 	iobuf_set_readahead(readahead);
 }
 
-extern "C" void
+void
 box_set_panic_on_wal_error(void)
 {
 	recovery_setup_panic(recovery,
