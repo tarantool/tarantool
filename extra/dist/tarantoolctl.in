@@ -20,7 +20,6 @@ The file contains common default instances options:
 
     $ cat /etc/default/tarantool
 
-
     -- Options for Tarantool
     default_cfg = {
         -- will become pid_file .. instance .. '.pid'
@@ -130,7 +129,9 @@ struct group{
 int kill(int pid, int sig);
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
+int isatty(int fd);
 ]]
+
 -- command, that we're executing
 local command_name = arg[1]
 -- true if we're running in HOME directory of a user
@@ -682,19 +683,34 @@ end
 local function eval()
     local console_sock_path = uri.parse(console_sock).service
     local filename = arg[3]
+    local stdin_is_file = (ffi.C.isatty(0) == 0 and
+                           (errno() == errno.EINVAL or errno() == errno.ENOTTY))
+    local code = nil
     if filename == nil then
-        log.error("Usage: tarantoolctl eval instance_name file.lua")
-        return 1
+        if not stdin_is_file then
+            log.error("Usage:")
+            log.error(" - tarantoolctl eval instance_name file.lua")
+            log.error(" - <command> | tarantoolctl eval instance_name")
+            return 1
+        end
+        code = io.stdin:read("*a")
+        if not loadstring(code) do
+            log.error("Error, while checking syntax: halting")
+            return 1
+        end
+    else
+        if fio.stat(filename) == nil and errno() == errno.ENOENT then
+            log.error("%s: file not found", filename)
+            return 1
+        end
+        if check_file(filename) ~= nil then
+            log.error("Error, while checking syntax: halting")
+            return 1
+        end
+        code = read_file(filename)
     end
-    if fio.stat(filename) == nil and errno() == errno.ENOENT then
-        log.error("%s: file not found", filename)
-        return 1
-    end
-    if check_file(filename) ~= nil then
-        log.error("Error, while checking syntax: halting")
-        return 1
-    end
-    local code = read_file(filename)
+
+    assert(code ~= nil, "Check that we've successfully loaded file")
 
     if fio.stat(console_sock_path) == nil then
         log.warn("pid file exists, but the control socket (%s) doesn't",
@@ -714,7 +730,7 @@ local function eval()
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
         log.error("Error, while reloading config:")
-        log.info(error_response.error)
+        log.error(error_response.error)
         return 3
     end
 
