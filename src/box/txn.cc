@@ -38,6 +38,14 @@
 #include "request.h" /* for request_name */
 #include "xrow.h"
 
+enum {
+	/**
+	 * Maximum recursion depth for on_replace triggers.
+	 * Large numbers may corrupt C stack.
+	 */
+	TXN_SUB_STMT_MAX = 4
+};
+
 double too_long_threshold;
 
 static inline void
@@ -70,8 +78,6 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
-	assert(txn->in_stmt == false);
-	assert(stailq_empty(&txn->stmts) || !txn->is_autocommit);
 	struct txn_stmt *stmt;
 	stmt = region_alloc_object_xc(&fiber()->gc, struct txn_stmt);
 
@@ -83,8 +89,7 @@ txn_stmt_new(struct txn *txn)
 	stmt->row = NULL;
 
 	stailq_add_tail_entry(&txn->stmts, stmt, next);
-
-	txn->in_stmt = true;
+	++txn->in_sub_stmt;
 	return stmt;
 }
 
@@ -98,7 +103,7 @@ txn_begin(bool is_autocommit)
 	txn->n_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
-	txn->in_stmt = false;
+	txn->in_sub_stmt = 0;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
@@ -144,7 +149,7 @@ txn_begin_stmt(struct space *space)
 void
 txn_commit_stmt(struct txn *txn, struct request *request)
 {
-	assert(txn->in_stmt);
+	assert(txn->in_sub_stmt > 0);
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -168,11 +173,13 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
+		if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
+			tnt_raise(ClientError, ER_TRIGGER_RECURSION);
 		trigger_run(&stmt->space->on_replace, txn);
 	}
 	stmt->engine_savepoint = NULL;
-	txn->in_stmt = false;
-	if (txn->is_autocommit)
+	--txn->in_sub_stmt;
+	if (txn->is_autocommit && txn->in_sub_stmt == 0)
 		txn_commit(txn);
 }
 
@@ -272,7 +279,7 @@ txn_rollback_stmt()
 		return;
 	if (txn->is_autocommit)
 		return txn_rollback();
-	if (txn->in_stmt == false)
+	if (txn->in_sub_stmt == 0)
 		return;
 	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
 						  next);
@@ -282,7 +289,7 @@ txn_rollback_stmt()
 		--txn->n_rows;
 		assert(txn->n_rows >= 0);
 	}
-	txn->in_stmt = false;
+	--txn->in_sub_stmt;
 }
 
 void

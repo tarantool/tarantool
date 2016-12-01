@@ -74,8 +74,8 @@ struct txn {
 	bool is_autocommit;
 	/** True if on_commit and on_rollback lists are non-empty. */
 	bool has_triggers;
-	/** A statement-level transaction is active. */
-	bool in_stmt;
+	/** The number of active nested statement-level transactions. */
+	int in_sub_stmt;
 	/** Engine involved in multi-statement transaction. */
 	Engine *engine;
 	/** Engine-specific transaction data */
@@ -209,7 +209,7 @@ txn_check_autocommit(struct txn *txn, const char *where);
 static inline struct txn_stmt *
 txn_current_stmt(struct txn *txn)
 {
-	return (txn->in_stmt ?
+	return (txn->in_sub_stmt > 0 ?
 		stailq_last_entry(&txn->stmts, struct txn_stmt, next) :
 		NULL);
 }

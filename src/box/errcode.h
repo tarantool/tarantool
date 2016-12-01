@@ -173,6 +173,7 @@ struct errcode_record {
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
 	/*119 */_(ER_COMPRESSION,		"Failed to decompress: error code %d") \
 	/*120 */_(ER_SNAPSHOT_IN_PROGRESS,	"Snapshot is already in progress") \
+	/*121 */_(ER_TRIGGER_RECURSION,		"Can not execute trigger: recursion limit reached") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
