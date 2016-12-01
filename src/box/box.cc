@@ -118,13 +118,12 @@ box_check_slab_alloc_minimal(ssize_t slab_alloc_minimal)
 		  "specified value is out of bounds");
 }
 
-void
-process_rw(struct request *request, struct tuple **result)
+static void
+process_rw(struct request *request, struct space *space, struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
 	try {
-		struct space *space = space_cache_find(request->space_id);
 		struct txn *txn = txn_begin_stmt(space);
 		access_check_space(space, PRIV_W);
 		struct tuple *tuple;
@@ -207,7 +206,8 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	request_decode_xc(request, (const char *) row->body[0].iov_base,
 			  row->body[0].iov_len);
 	request->header = row;
-	process_rw(request, NULL);
+	struct space *space = space_cache_find(request->space_id);
+	process_rw(request, space, NULL);
 }
 
 struct wal_stream {
@@ -536,7 +536,8 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	default:
 		unreachable();
 	}
-	process_rw(request, NULL);
+	struct space *space = space_cache_find(space_id);
+	process_rw(request, space, NULL);
 }
 
 int
@@ -599,8 +600,11 @@ int
 box_process1(struct request *request, box_tuple_t **result)
 {
 	try {
-		box_check_writable();
-		process_rw(request, result);
+		/* Allow to write to temporary spaces in read-only mode. */
+		struct space *space = space_cache_find(request->space_id);
+		if (!space->def.opts.temporary)
+			box_check_writable();
+		process_rw(request, space, result);
 		return 0;
 	} catch (Exception *e) {
 		return -1;

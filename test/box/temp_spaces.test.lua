@@ -28,6 +28,15 @@ s.temporary
 _ = _space:update(s.id, {{'=', FLAGS, ''}})
 s.temporary
 
+-- check that temporary space can be modified in read-only mode (gh-1378)
+box.cfg{read_only=true}
+box.cfg.read_only
+s:insert{2, 3, 4}
+s:get{2}
+s:len()
+box.cfg{read_only=false}
+box.cfg.read_only
+
 env = require('test_run')
 test_run = env.new()
 test_run:cmd('restart server default')
