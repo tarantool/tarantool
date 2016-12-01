@@ -372,6 +372,43 @@ xlog_atfork(struct xlog *xlog);
 /* {{{ xlog_cursor - read rows from a log file */
 
 /**
+ * xlog tx iterator
+ */
+struct xlog_tx_cursor
+{
+	/** rows buffer */
+	struct ibuf rows;
+};
+
+/**
+ * Create xlog tx iterator from memory data.
+ * *data will be adjusted to end of tx
+ *
+ * @retval 0 for Ok
+ * @retval -1 for error
+ * @retval >0 how many additional bytes should be read to parse tx
+ */
+ssize_t
+xlog_tx_cursor_create(struct xlog_tx_cursor *cursor,
+		      const char **data, const char *data_end);
+
+/**
+ * Destroy xlog tx cursor and free all associated memory
+ * including parsed xrows
+ */
+int
+xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor);
+
+/**
+ * Fetch next xrow from xlog tx cursor
+ *
+ * @retval 0 for Ok
+ * @retval -1 for error
+ */
+int
+xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor, struct xrow_header *xrow);
+
+/**
  * Xlog cursor, read rows from xlog
  */
 struct xlog_cursor
@@ -388,14 +425,10 @@ struct xlog_cursor
 	off_t read_offset;
 	/** true if eof marker was readen */
 	bool eof_read;
-	/** if true then bad crc will be ignored */
-	bool ignore_crc;
-	/** zbuf decompression context */
-	ZSTD_DStream* zdctx;
-	/** current transaction rows */
-	struct ibuf rows;
-	/** if true then use coeio for operations */
-	bool async;
+	/** cursor for current tx */
+	struct xlog_tx_cursor tx_cursor;
+	/** true if current tx is opened */
+	bool is_opened;
 };
 
 /**
@@ -450,23 +483,11 @@ int
 xlog_cursor_next_tx(struct xlog_cursor *cursor);
 
 /**
- * Open xlog tx from offset in xlog file.
- * size is a hint for file read size and may be zero.
+ * Fetch next xrow from current xlog tx
  *
- * @retval 0 for success
- * @retval 1 eof
+ * @retval 0 for Ok
+ * @retval 1 if current tx is done
  * @retval -1 for error
- */
-int
-xlog_cursor_open_tx(struct xlog_cursor *cursor, off_t offset, size_t size);
-
-/**
- * Return next row from xlog tx
- * @param cursor cursor
- * @param xrow row to return
- * @retval 0 succes
- * @retval 1 eof
- * retval -1 error, check diag
  */
 int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow);
@@ -542,12 +563,20 @@ xdir_check_xc(struct xdir *dir)
 		diag_raise();
 }
 
+/**
+ * Fetch next row from cursor, ignores xlog tx boundary,
+ * open a next one tx if current is done.
+ *
+ * @retval 0 for Ok
+ * @retval 1 for EOF
+ */
 static inline int
-xlog_cursor_next_xc(struct xlog_cursor *cursor, struct xrow_header *xrow,
-		    bool panic_if_error)
+xlog_cursor_next_xc(struct xlog_cursor *cursor,
+			struct xrow_header *xrow, bool panic_if_error)
 {
 	while (true) {
-		int rc = xlog_cursor_next_row(cursor, xrow);
+		int rc;
+		rc = xlog_cursor_next_row(cursor, xrow);
 		if (rc == 0)
 			break;
 		if (rc < 0) {

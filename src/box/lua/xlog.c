@@ -252,8 +252,6 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 		free(cur);
 		return lbox_error(L);
 	}
-	cur->ignore_crc = true;
-
 	/* push iteration function */
 	lua_pushcclosure(L, &lbox_xlog_parser_iterate, 1);
 	/* push log and set GC */

@@ -70,6 +70,7 @@
 #include "request.h"
 #include "xrow.h"
 #include "xlog.h"
+#include "fio.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -6708,8 +6709,6 @@ struct vy_run_iterator {
 	bool search_started;
 	/** Search is finished, you will not get more values from iterator */
 	bool search_ended;
-	/** xlog cursor to iterate over xlog tx */
-	struct xlog_cursor cursor;
 };
 
 static void
@@ -6858,7 +6857,8 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  */
 static int
 vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
-	       struct vy_buf *data_buf, struct vy_index *index)
+	       struct vy_buf *data_buf, struct tuple_format *format,
+	       uint32_t part_count)
 {
 	struct vy_stmt_info *info;
 	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
@@ -6884,7 +6884,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
 		       request.key_end - request.key);
 	} else {
 		/* space for offsets */
-		int start_offset = (index->key_def->part_count) * sizeof(uint32_t);
+		int start_offset = (part_count) * sizeof(uint32_t);
 		info->size = start_offset;
 		info->size += request.tuple_end - request.tuple;
 		if (info->type == IPROTO_UPSERT) {
@@ -6899,7 +6899,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
 		memcpy(data, request.tuple,
 		       request.tuple_end - request.tuple);
 		/* rebuild offsets */
-		tuple_init_field_map(index->format, (uint32_t *)data, data);
+		tuple_init_field_map(format, (uint32_t *)data, data);
 		data += request.tuple_end - request.tuple;
 		if (info->type == IPROTO_UPSERT) {
 			/* copy ops */
@@ -6908,6 +6908,108 @@ vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
 		}
 	}
 	vy_buf_advance(data_buf, info->size);
+	return 0;
+}
+
+/**
+ * Read a page requests from vinyl xlog data file.
+ *
+ * @retval 0 for Ok
+ * @retval -1 for error
+ */
+static int
+vy_page_read(struct vy_page_info *page_info, struct vy_page **page,
+	     int fd, struct tuple_format *format, uint32_t part_count)
+{
+	/* raed xlog tx from xlog file */
+	size_t region_svp = region_used(&fiber()->gc);
+	char *data = (char *)region_alloc(&fiber()->gc, page_info->size);
+	if (data == NULL) {
+		diag_set(OutOfMemory, page_info->size, "region gc", "page");
+		return -1;
+	}
+	ssize_t rc;
+	rc = fio_pread(fd, data, page_info->size, page_info->offset);
+	if (rc == -1) {
+		diag_set(SystemError, "error readin file");
+		return -1;
+	}
+
+	if (rc != (ssize_t)page_info->size) {
+		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
+		return -1;
+	}
+	/* parse xlog tx and create cursor */
+	const char *data_pos = data;
+	struct xlog_tx_cursor tx_cursor;
+	rc = xlog_tx_cursor_create(&tx_cursor, &data_pos,
+				   data_pos + page_info->size);
+	region_truncate(&fiber()->gc, region_svp);
+	if (rc != 0)
+		return -1;
+
+	*page = vy_page_new(page_info);
+	if (*page == NULL)
+		return -1;
+
+	/* fetch all rows and decode */
+	struct xrow_header xrow;
+	size_t row_cnt = 0;
+	while ((rc = xlog_tx_cursor_next_row(&tx_cursor, &xrow)) == 0 &&
+	       (rc = vy_stmt_decode(&xrow, &(*page)->info, &(*page)->data,
+				    format, part_count) == 0)) {
+		++row_cnt;
+	}
+	xlog_tx_cursor_destroy(&tx_cursor);
+	if (row_cnt != page_info->count) {
+		diag_set(ClientError, ER_VINYL, "Row count doesn't match");
+		vy_page_delete(*page);
+		return -1;
+	}
+	return rc;
+}
+
+/**
+ * coio task for vinyl page read
+ */
+struct vy_page_read_task {
+	struct coio_task base;
+	int rc;
+	/* vinyl run data xlog fd */
+	int fd;
+	/* vinyl page to fetch data */
+	struct vy_page *page;
+	/* vinyl page metadata */
+	struct vy_page_info *page_info;
+	struct tuple_format *format;
+	uint32_t part_count;
+	struct vy_run *run;
+};
+
+/**
+ * vinyl read task callback
+ */
+static ssize_t
+vy_page_read_cb(struct coio_task *base)
+{
+	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
+	task->rc = vy_page_read(task->page_info, &task->page,
+				task->fd, task->format, task->part_count);
+	fiber_gc();
+	return 0;
+}
+
+/**
+ * vinyl read task cleanup callback
+ */
+static ssize_t
+vy_page_read_cb_free(struct coio_task *base)
+{
+	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
+	if (task->page)
+		vy_page_delete(task->page);
+	vy_run_unref(task->run);
+	free(task);
 	return 0;
 }
 
@@ -6929,9 +7031,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 	/* Allocate buffers */
 	struct vy_page_info *page_info = vy_run_page_info(itr->run, page_no);
-	struct vy_page *page = vy_page_new(page_info);
-	if (page == NULL)
-		return -1;
+	struct vy_page *page = NULL;
 
 	/* Read page data from the disk */
 	int rc;
@@ -6945,7 +7045,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
-		itr->cursor.async = true;
 
 		/*
 		 * Make sure the run file descriptor won't be closed
@@ -6953,8 +7052,23 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * reading it.
 		 */
 		vy_run_ref(itr->run);
-		rc = xlog_cursor_open_tx(&itr->cursor, page_info->offset,
-					 page_info->size);
+		/* create page read task */
+		struct vy_page_read_task *task =
+			(struct vy_page_read_task *)calloc(1, sizeof(*task));
+		task->fd = itr->run->fd;
+		task->page = page;
+		task->page_info = page_info;
+		task->part_count = itr->index->key_def->part_count;
+		task->format = itr->index->format;
+		rc = coio_task(&task->base, vy_page_read_cb,
+			       vy_page_read_cb_free, TIMEOUT_INFINITY);
+		if (rc < 0)
+			return -1;
+
+		/* task was posted to worker and finished */
+		rc = task->rc;
+		page = task->page;
+		free(task);
 		vy_run_unref(itr->run);
 
 		/*
@@ -6974,38 +7088,14 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		itr->cursor.async = false;
-		rc = xlog_cursor_open_tx(&itr->cursor, page_info->offset,
-					 page_info->size);
-
-	}
-
-	if (rc < 0) {
-		vy_page_delete(page);
-		/* TODO: report file name */
-		return -1;
-	}
-
-	struct xrow_header xrow;
-	uint32_t row_cnt = 0;
-	while ((rc = xlog_cursor_next_row(&itr->cursor, &xrow)) == 0 &&
-	       (rc = vy_stmt_decode(&xrow, &page->info, &page->data,
-					  itr->index) == 0)) {
-		++row_cnt;
-	}
-
-	if (rc < 0)  {
-		vy_page_delete(page);
-		/* TODO: report file name */
-		error_log(diag_last_error(diag_get()));
-		return -1;
-	}
-
-	if (row_cnt != page->count) {
-		diag_set(ClientError, ER_VINYL,
-			 "row count doesn't match!");
-		vy_page_delete(page);
-		return -1;
+		rc = vy_page_read(page_info, &page, itr->run->fd,
+				  itr->index->format,
+				  itr->index->key_def->part_count);
+		if (rc < 0) {
+			vy_page_delete(page);
+			/* TODO: report file name */
+			return -1;
+		}
 	}
 
 	/* Iterator is never used from multiple fibers */
@@ -7430,8 +7520,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 
 	itr->search_started = false;
 	itr->search_ended = false;
-
-	xlog_cursor_openfd(&itr->cursor, run->fd, "");
 }
 
 /**
@@ -7736,8 +7824,6 @@ vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 
 	vy_run_iterator_cache_clean(itr);
-	xlog_cursor_close(&itr->cursor, true);
-
 	TRASH(itr);
 }
 
