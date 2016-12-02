@@ -260,8 +260,10 @@ box_txn_commit(void);
 
 /**
  * Rollback the current transaction.
+ * May fail if called from a nested
+ * statement.
  */
-API_EXPORT void
+API_EXPORT int
 box_txn_rollback(void);
 
 /**

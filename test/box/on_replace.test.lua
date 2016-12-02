@@ -54,7 +54,7 @@ type(box.space._space:on_replace(f2))
 
 
 --
--- gh-587: crash on attemtp to modify space from triggers
+-- gh-587: crash on attempt to modify space from triggers
 --
 
 first = box.schema.space.create('first')
@@ -133,6 +133,45 @@ first:replace({0, "initial"})
 first:select()
 second:select()
 RECURSION_LIMIT
+first:on_replace(nil, trigger_id)
+first:truncate()
+second:truncate()
+
+
+-- transaction control
+test_run:cmd("setopt delimiter ';'");
+trigger_id = first:on_replace(function()
+    box.commit()
+    first:auto_increment({"recursive", level})
+end);
+test_run:cmd("setopt delimiter ''");
+first:replace({0, "initial"})
+first:select()
+second:select()
+first:on_replace(nil, trigger_id)
+
+test_run:cmd("setopt delimiter ';'");
+trigger_id = first:on_replace(function()
+    box.rollback()
+    first:auto_increment({"recursive", level})
+end);
+test_run:cmd("setopt delimiter ''");
+first:replace({0, "initial"})
+first:select()
+second:select()
+first:on_replace(nil, trigger_id)
+
+test_run:cmd("setopt delimiter ';'");
+trigger_id = first:on_replace(function()
+    box.begin()
+    first:auto_increment({"recursive", level})
+    box.commit()
+end);
+
+test_run:cmd("setopt delimiter ''");
+first:replace({0, "initial"})
+first:select()
+second:select()
 first:on_replace(nil, trigger_id)
 
 first:drop()

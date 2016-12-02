@@ -43,7 +43,7 @@ enum {
 	 * Maximum recursion depth for on_replace triggers.
 	 * Large numbers may corrupt C stack.
 	 */
-	TXN_SUB_STMT_MAX = 4
+	TXN_SUB_STMT_MAX = 3
 };
 
 double too_long_threshold;
@@ -133,6 +133,9 @@ txn_begin_stmt(struct space *space)
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
+	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
+		tnt_raise(ClientError, ER_SUB_STMT_MAX);
+
 	Engine *engine = space->handler->engine;
 	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
@@ -173,8 +176,6 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-		if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
-			tnt_raise(ClientError, ER_TRIGGER_RECURSION);
 		trigger_run(&stmt->space->on_replace, txn);
 	}
 	stmt->engine_savepoint = NULL;
@@ -355,6 +356,10 @@ box_txn_commit()
 	*/
 	if (! txn)
 		return 0;
+	if (txn->in_sub_stmt) {
+		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
+		return -1;
+	}
 	try {
 		txn_commit(txn);
 	} catch (Exception *e) {
@@ -364,10 +369,16 @@ box_txn_commit()
 	return 0;
 }
 
-void
+int
 box_txn_rollback()
 {
+	struct txn *txn = in_txn();
+	if (txn && txn->in_sub_stmt) {
+		diag_set(ClientError, ER_ROLLBACK_IN_SUB_STMT);
+		return -1;
+	}
 	txn_rollback(); /* doesn't throw */
+	return 0;
 }
 
 void *

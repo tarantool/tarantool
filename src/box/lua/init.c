@@ -84,7 +84,8 @@ static int
 lbox_rollback(lua_State *L)
 {
 	(void)L;
-	box_txn_rollback();
+	if (box_txn_rollback() != 0)
+		return lbox_error(L);
 	return 0;
 }
 

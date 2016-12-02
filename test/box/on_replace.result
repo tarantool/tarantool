@@ -143,7 +143,7 @@ type(box.space._space:on_replace(f2))
 - 2
 ...
 --
--- gh-587: crash on attemtp to modify space from triggers
+-- gh-587: crash on attempt to modify space from triggers
 --
 first = box.schema.space.create('first')
 ---
@@ -292,7 +292,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 first:replace({1, "recursive"})
 ---
-- error: 'Can not execute trigger: recursion limit reached'
+- error: 'Can not execute a nested statement: nesting limit reached'
 ...
 first:select()
 ---
@@ -348,6 +348,101 @@ second:select()
 RECURSION_LIMIT
 ---
 - 4
+...
+first:on_replace(nil, trigger_id)
+---
+...
+first:truncate()
+---
+...
+second:truncate()
+---
+...
+-- transaction control
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.commit()
+    first:auto_increment({"recursive", level})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: Can not commit transaction in a nested statement
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.rollback()
+    first:auto_increment({"recursive", level})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: Rollback called in a nested statement
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.begin()
+    first:auto_increment({"recursive", level})
+    box.commit()
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
 ...
 first:on_replace(nil, trigger_id)
 ---
