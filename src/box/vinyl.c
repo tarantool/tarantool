@@ -3938,13 +3938,26 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		 *
 		 */
 		assert(older == NULL || older->type != IPROTO_UPSERT);
-		stmt = vy_apply_upsert(stmt, older, key_def, index->format,
-				       false);
-		if (stmt == NULL)
+		struct vy_stmt *upserted =
+			vy_apply_upsert(stmt, older, key_def, index->format,
+					false);
+		if (upserted == NULL)
 			return -1; /* OOM */
-		assert(stmt->type == IPROTO_REPLACE);
-		int rc = vy_range_set(range, stmt, write_size);
-		vy_stmt_unref(stmt);
+		if (upserted->lsn != stmt->lsn) {
+			/**
+			 * This could only happen if the upsert completely
+			 * failed and the old tuple was returned.
+			 * In this case we shouldn't insert the same replace
+			 * again.
+			 */
+			assert(upserted->lsn == older->lsn);
+			vy_stmt_unref(upserted);
+			return 0;
+		}
+		assert(older == NULL || upserted->lsn != older->lsn);
+		assert(upserted->type == IPROTO_REPLACE);
+		int rc = vy_range_set(range, upserted, write_size);
+		vy_stmt_unref(upserted);
 		return rc;
 	}
 
