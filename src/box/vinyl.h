@@ -133,7 +133,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *tuple, const char *tuple_end,
-	  const char *ops, const char *ops_end, int index_base);
+	  const char *ops, const char *ops_end);
 
 int
 vy_delete(struct vy_tx *tx, struct vy_index *index,

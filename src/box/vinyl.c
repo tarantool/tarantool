@@ -6045,10 +6045,9 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *stmt, const char *stmt_end,
-	  const char *expr, const char *expr_end, int index_base)
+	  const char *expr, const char *expr_end)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	assert(index_base == 0);
 	struct vy_stmt *vystmt;
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;

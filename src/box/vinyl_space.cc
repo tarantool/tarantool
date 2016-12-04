@@ -507,9 +507,10 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 	 * index: this index is covering and we don't need to
 	 * fetch the old tuple to find out the key.
 	 */
+	assert(request->index_base == 0);
 	if (vy_upsert(tx, pk->db, request->tuple,
 		      request->tuple_end, request->ops,
-		      request->ops_end, request->index_base) < 0) {
+		      request->ops_end) < 0) {
 		diag_raise();
 	}
 	/**
