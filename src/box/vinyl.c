@@ -2922,7 +2922,7 @@ vy_run_write_index(struct vy_range *range, struct vy_run *run)
 			    range->run_count, VY_FILE_INDEX);
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
-		.filetype = "META",
+		.filetype = "INDEX",
 		.version = "0.13",
 		.server_uuid = SERVER_UUID,
 	};
