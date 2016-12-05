@@ -22,7 +22,6 @@ admin("box.snapshot()")
 # on LSN.
 #  Don't allow to overwrite snapshots.
 admin("box.snapshot()")
-admin("box.error.last().errno")
 #
 # Increment LSN
 admin("space:insert{2, 'second tuple'}")

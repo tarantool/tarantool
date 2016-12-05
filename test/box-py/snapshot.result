@@ -23,10 +23,6 @@ box.snapshot()
 ---
 - error: Can't create xlog
 ...
-box.error.last().errno
----
-- 17
-...
 space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']

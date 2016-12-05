@@ -390,17 +390,9 @@ box.snapshot()
 ---
 - error: Can't create xlog
 ...
-box.error.last().errno
----
-- 17
-...
 box.snapshot()
 ---
 - error: Can't create xlog
-...
-box.error.last().errno
----
-- 17
 ...
 f = fiber.create(function () fiber.sleep(1) end)
 ---

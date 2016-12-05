@@ -157,7 +157,7 @@ coeio_shutdown(void)
 }
 
 static void
-coio_on_exec(eio_req *req)
+coio_on_feed(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->task_cb(task);
@@ -200,23 +200,16 @@ coio_on_destroy(eio_req *req)
 		task->timeout_cb(task);
 }
 
-/**
- * @retval -1 timeout or the waiting fiber was cancelled;
- *            the caller should not free the task, it
- *            will be freed when it's finished in the timeout
- *            callback.
- * @retval 0  the task completed successfully. Check the result
- *            code in task->rc and free the task.
- */
-
-ssize_t
-coio_task(struct coio_task *task, coio_task_cb func,
-	  coio_task_cb on_timeout, double timeout)
+void
+coio_task_create(struct coio_task *task,
+		 coio_task_cb func, coio_task_cb on_timeout)
 {
+	assert(func != NULL && on_timeout != NULL);
+
 	/* from eio.c: REQ() definition */
 	memset(&task->base, 0, sizeof(task->base));
 	task->base.type = EIO_CUSTOM;
-	task->base.feed = coio_on_exec;
+	task->base.feed = coio_on_feed;
 	task->base.finish = coio_on_finish;
 	task->base.destroy = coio_on_destroy;
 	/* task->base.pri = 0; */
@@ -226,6 +219,19 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	task->timeout_cb = on_timeout;
 	task->complete = 0;
 	diag_create(&task->diag);
+}
+
+void
+coio_task_destroy(struct coio_task *task)
+{
+	diag_destroy(&task->diag);
+}
+
+int
+coio_task_post(struct coio_task *task, double timeout)
+{
+	assert(task->base.type == EIO_CUSTOM);
+	assert(task->fiber == fiber());
 
 	eio_submit(&task->base);
 	fiber_yield_timeout(timeout);
@@ -236,10 +242,6 @@ coio_task(struct coio_task *task, coio_task_cb func,
 			diag_set(FiberIsCancelled);
 		else
 			diag_set(TimedOut);
-		return -1;
-	}
-	if (task->base.result) {
-		diag_move(&task->diag, &fiber()->diag);
 		return -1;
 	}
 	return 0;
@@ -311,7 +313,7 @@ struct async_getaddrinfo_task {
  * Resolver function, run in separate thread by
  * coeio (libeio).
 */
-static ssize_t
+static int
 getaddrinfo_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
@@ -335,15 +337,19 @@ getaddrinfo_cb(struct coio_task *ptr)
 	return 0;
 }
 
-static ssize_t
+static int
 getaddrinfo_free_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) ptr;
-	free(task->host);
-	free(task->port);
+	if (task->host != NULL)
+		free(task->host);
+	if (task->port != NULL)
+		free(task->port);
 	if (task->result != NULL)
 		freeaddrinfo(task->result);
+	coio_task_destroy(&task->base);
+	TRASH(task);
 	free(task);
 	return 0;
 }
@@ -353,13 +359,14 @@ coio_getaddrinfo(const char *host, const char *port,
 		 const struct addrinfo *hints, struct addrinfo **res,
 		 double timeout)
 {
-	int rc = EAI_SYSTEM;
-	int save_errno = 0;
-
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) calloc(1, sizeof(*task));
-	if (task == NULL)
-		return rc;
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "malloc", "getaddrinfo");
+		return -1;
+	}
+
+	coio_task_create(&task->base, getaddrinfo_cb, getaddrinfo_free_cb);
 
 	/*
 	 * getaddrinfo() on osx upto osx 10.8 crashes when AI_NUMERICSERV is
@@ -377,32 +384,39 @@ coio_getaddrinfo(const char *host, const char *port,
 	if (host != NULL && *host) {
 		task->host = strdup(host);
 		if (task->host == NULL) {
-			save_errno = errno;
-			goto cleanup_task;
+			diag_set(OutOfMemory, strlen(host), "malloc",
+				 "getaddrinfo");
+			getaddrinfo_free_cb(&task->base);
+			return -1;
 		}
 	}
 	if (port != NULL) {
 		task->port = strdup(port);
 		if (task->port == NULL) {
-			save_errno = errno;
-			goto cleanup_host;
+			diag_set(OutOfMemory, strlen(host), "malloc",
+				 "getaddrinfo");
+			getaddrinfo_free_cb(&task->base);
+			return -1;
 		}
 	}
-	/* do resolving */
-	/* coio_task() don't throw. */
-	if (coio_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
-		       timeout) == -1) {
+
+	/* Post coio task */
+	if (coio_task_post(&task->base, timeout) != 0)
+		return -1; /* timed out or cancelled */
+
+	/* Task finished */
+	if (task->rc < 0) {
+		/* getaddrinfo() failed */
+		errno = EIO;
+		diag_set(SystemError, "getaddrinfo: %s",
+			 gai_strerror(task->rc));
+		getaddrinfo_free_cb(&task->base);
 		return -1;
 	}
 
-	rc = task->rc;
+	/* getaddrinfo() succeed */
 	*res = task->result;
-	free(task->port);
-cleanup_host:
-	free(task->host);
-cleanup_task:
-	free(task);
-	errno = save_errno;
-	return rc;
+	task->result = NULL;
+	getaddrinfo_free_cb(&task->base);
+	return 0;
 }
-

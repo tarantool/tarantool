@@ -43,10 +43,6 @@ box.snapshot()
 ---
 - error: Can't create xlog
 ...
-box.error.last().errno
----
-- 17
-...
 space:truncate()
 ---
 ...
