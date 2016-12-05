@@ -3190,11 +3190,6 @@ vy_range_new(struct vy_index *index, int64_t id)
 			 "struct vy_range");
 		return NULL;
 	}
-	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
-	if (mem == NULL) {
-		free(range);
-		return NULL;
-	}
 	if (id != 0) {
 		range->id = id;
 		/** Recovering an existing range from disk. Update
@@ -3210,9 +3205,7 @@ vy_range_new(struct vy_index *index, int64_t id)
 	}
 	rlist_create(&range->runs);
 	rlist_create(&range->mems);
-	rlist_add_entry(&range->mems, mem, link);
-	range->mem_count = 1;
-	range->min_lsn = mem->min_lsn;
+	range->min_lsn = INT64_MAX;
 	range->index = index;
 	range->nodedump.pos = UINT32_MAX;
 	range->nodecompact.pos = UINT32_MAX;
@@ -3517,12 +3510,19 @@ vy_range_compact_prepare(struct vy_range *range)
 	/* Allocate new ranges. */
 	for (i = 0; i < n_parts; i++) {
 		struct vy_range *r;
+		struct vy_mem *mem;
+
 		r = parts[i] = vy_range_new(index, 0);
 		if (r == NULL)
 			goto fail;
 		r->new_run = vy_run_new();
 		if (r->new_run == NULL)
 			goto fail;
+		mem = vy_mem_new(index->key_def, index->format);
+		if (mem == NULL)
+			goto fail;
+		rlist_add_entry(&r->mems, mem, link);
+		r->mem_count++;
 		/* Account merge w/o split. */
 		if (n_parts == 1)
 			r->merge_count = range->merge_count + 1;
@@ -3644,6 +3644,12 @@ vy_index_create(struct vy_index *index)
 	vy_index_add_range(index, range);
 	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
+	/* create initial mem */
+	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+	if (mem == NULL)
+		return -1;
+	rlist_add_entry(&range->mems, mem, link);
+	range->mem_count++;
 	return 0;
 }
 
@@ -3844,6 +3850,11 @@ vy_index_open_ex(struct vy_index *index)
 			break;
 		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(index->env->scheduler, range);
+		struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+		if (mem == NULL)
+			goto out;
+		rlist_add_entry(&range->mems, mem, link);
+		range->mem_count++;
 	}
 	if (range != NULL || prev->end != NULL) {
 		diag_set(ClientError, ER_VINYL, "range missing");
