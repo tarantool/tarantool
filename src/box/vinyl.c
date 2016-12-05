@@ -3249,7 +3249,6 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 		diag_set(ClientError, ER_VINYL, "Incorrect run_id: "
 			 "expected %d found %d", run_id, run_id_check);
 		goto fail_close;
-		return -1;
 	}
 
 	/* Allocate buffer for page info. */
@@ -3277,14 +3276,13 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	vy_run_snprint_path(path, sizeof(path), index->path,
 			    key_def->opts.lsn, range->id, run_id,
 			    VY_FILE_RUN);
-	int fd = open(path, O_RDONLY);
-	if (fd < 0) {
+	run->fd = open(path, O_RDONLY);
+	if (run->fd < 0) {
 		diag_set(SystemError, "failed to open file '%s'", path);
 		goto fail;
 	}
 
 	/* Finally, link run to the range. */
-	run->fd = fd;
 	rlist_add_entry(&range->runs, run, link);
 	range->run_count++;
 	return 0;
@@ -3293,8 +3291,6 @@ fail_close:
 	xlog_cursor_close(&cursor, false);
 fail:
 	vy_run_unref(run);
-	if (fd >= 0)
-		close(fd);
 	return -1;
 }
 
