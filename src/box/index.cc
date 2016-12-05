@@ -409,7 +409,8 @@ int
 box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
-	mp_tuple_assert(key, key_end);
+	if (key != NULL)
+		mp_tuple_assert(key, key_end);
 	assert(result != NULL);
 	try {
 		struct space *space;
