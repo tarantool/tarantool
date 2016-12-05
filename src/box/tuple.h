@@ -586,6 +586,31 @@ struct TupleRefNil {
 	void operator=(const TupleRefNil&) = delete;
 };
 
+/** Return a tuple field and check its type. */
+inline const char *
+tuple_field_check(const struct tuple *tuple, uint32_t fieldno,
+		  enum mp_type type)
+{
+	const char *field = tuple_field(tuple, fieldno);
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
+	if (mp_typeof(*field) != type)
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE, mp_type_strs[type]);
+	return field;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as uint64_t.
+ */
+inline uint64_t
+tuple_field_uint(struct tuple *tuple, uint32_t fieldno)
+{
+	const char *field = tuple_field_check(tuple, fieldno, MP_UINT);
+	return mp_decode_uint(&field);
+}
+
 /**
  * A convenience shortcut for data dictionary - get a tuple field
  * as uint32_t.
@@ -593,16 +618,7 @@ struct TupleRefNil {
 inline uint32_t
 tuple_field_u32(struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field(tuple, fieldno);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
-	if (mp_typeof(*field) != MP_UINT) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_UNSIGNED]);
-	}
-
-	uint64_t val = mp_decode_uint(&field);
+	uint64_t val = tuple_field_uint(tuple, fieldno);
 	if (val > UINT32_MAX) {
 		tnt_raise(ClientError, ER_FIELD_TYPE,
 			  fieldno + TUPLE_INDEX_BASE,
