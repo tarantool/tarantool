@@ -3416,6 +3416,83 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	return true;
 }
 
+static void
+vy_range_add_compact_part(struct vy_range *range, struct vy_range *part)
+{
+	struct vy_index *index = range->index;
+
+	if (rlist_empty(&range->compact_list))
+		vy_index_remove_range(index, range);
+
+	/*
+	 * While compaction is in progress, new statements are inserted
+	 * to new ranges while read iterator walks over the old range
+	 * (see vy_range_iterator_next()). To make new statements
+	 * visible, link new ranges to the old range via ->compact_list.
+	 */
+	rlist_add_tail(&range->compact_list, &part->compact_list);
+	assert(part->shadow == NULL);
+	part->shadow = range;
+
+	vy_index_add_range(index, part);
+	say_debug("range new: %s", vy_range_str(part));
+}
+
+static void
+vy_range_commit_compact_parts(struct vy_range *range)
+{
+	struct vy_range *r, *tmp;
+
+	/*
+	 * If compaction completed successfully, all runs and mems of
+	 * the original range were dumped and hence we don't need it any
+	 * longer. So unlink new ranges from the original one and delete
+	 * the latter.
+	 */
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
+		rlist_del(&r->compact_list);
+		assert(r->shadow == range);
+		r->shadow = NULL;
+	}
+	vy_range_delete(range);
+}
+
+static void
+vy_range_discard_compact_parts(struct vy_range *range)
+{
+	struct vy_index *index = range->index;
+	struct vy_range *r, *tmp;
+
+	/*
+	 * On compaction failure we delete new ranges, but leave their
+	 * mems and runs linked to the old range so that statements
+	 * inserted during compaction don't get lost.
+	 */
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
+		if (range->used == 0)
+			range->min_lsn = r->min_lsn;
+		assert(range->min_lsn <= r->min_lsn);
+		range->used += r->used;
+
+		rlist_splice(&range->mems, &r->mems);
+		range->mem_count += r->mem_count;
+		r->mem_count = 0;
+
+		rlist_splice(&range->runs, &r->runs);
+		range->run_count += r->run_count;
+		r->run_count = 0;
+
+		rlist_del(&r->compact_list);
+		assert(r->shadow == range);
+		r->shadow = NULL;
+
+		say_debug("range delete: %s", vy_range_str(r));
+		vy_index_remove_range(index, r);
+		vy_range_delete(r);
+	}
+	vy_index_add_range(index, range);
+}
+
 static int
 vy_range_compact_prepare(struct vy_range *range)
 {
@@ -3425,6 +3502,8 @@ vy_range_compact_prepare(struct vy_range *range)
 	struct vy_range *parts[2];
 	int n_parts = 1;
 	int i;
+
+	assert(rlist_empty(&range->compact_list));
 
 	if (vy_range_needs_split(range, &split_key_raw)) {
 		split_key = vy_stmt_extract_key_raw(index->key_def,
@@ -3444,6 +3523,9 @@ vy_range_compact_prepare(struct vy_range *range)
 		r->new_run = vy_run_new();
 		if (r->new_run == NULL)
 			goto fail;
+		/* Account merge w/o split. */
+		if (n_parts == 1)
+			r->merge_count = range->merge_count + 1;
 	}
 
 	/* Set begin and end keys for the new ranges. */
@@ -3464,23 +3546,9 @@ vy_range_compact_prepare(struct vy_range *range)
 	say_debug("range compact prepare: %s", vy_range_str(range));
 
 	/* Replace the old range with the new ones. */
-	vy_index_remove_range(index, range);
-	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r = parts[i];
+	for (i = 0; i < n_parts; i++)
+		vy_range_add_compact_part(range, parts[i]);
 
-		/*
-		 * While compaction is in progress, new statements are
-		 * inserted to new ranges while read iterator walks over
-		 * the old range (see vy_range_iterator_next()). To make
-		 * new statements visible, link new ranges to the old
-		 * range via ->compact_list.
-		 */
-		rlist_add_tail(&range->compact_list, &r->compact_list);
-		r->shadow = range;
-
-		vy_index_add_range(index, r);
-		say_debug("range new: %s", vy_range_str(r));
-	}
 	range->version++;
 	index->version++;
 	return 0;
@@ -3498,87 +3566,38 @@ static void
 vy_range_compact_commit(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-	struct vy_range *r, *tmp;
-	bool split = (rlist_first(&range->compact_list) !=
-		      rlist_last(&range->compact_list));
+	struct vy_range *r;
 
 	say_debug("range compact complete: %s", vy_range_str(range));
 
 	vy_index_unacct_range(index, range);
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
+	rlist_foreach_entry(r, &range->compact_list, compact_list) {
 		/* Add the new run created by compaction to the list. */
 		rlist_add_entry(&r->runs, r->new_run, link);
 		r->run_count++;
 		r->new_run = NULL;
-
 		/*
-		 * New ranges' runs now contain all statements
-		 * of the old range, so we can now unlink them
-		 * and delete the old range.
+		 * Account the new range and make it visible to
+		 * the scheduler.
 		 */
-		rlist_del(&r->compact_list);
-		assert(r->shadow == range);
-		r->shadow = NULL;
-
 		vy_index_acct_range(index, r);
-
-		/* Account merge w/o split. */
-		if (!split)
-			r->merge_count = range->merge_count + 1;
-
-		/* Make the new range visible to the scheduler. */
-		vy_scheduler_add_range(range->index->env->scheduler, r);
+		vy_scheduler_add_range(index->env->scheduler, r);
 	}
+
+	vy_range_commit_compact_parts(range);
 	index->version++;
-	vy_range_delete(range);
 }
 
 static void
 vy_range_compact_abort(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-	struct vy_range *r, *tmp;
 
 	say_debug("range compact failed: %s", vy_range_str(range));
 
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
-		say_debug("range delete: %s", vy_range_str(r));
-		vy_index_remove_range(index, r);
-
-		/*
-		 * On compaction failure we delete new ranges, but leave
-		 * their in-memory trees linked to the old range so that
-		 * statements inserted during compaction don't get lost.
-		 * So here we have to (1) propagate ->min_lsn and ->used
-		 * changes to the old range and (2) link ->mems of new
-		 * ranges to the old range.
-		 */
-		if (range->used == 0)
-			range->min_lsn = r->min_lsn;
-		assert(range->min_lsn <= r->min_lsn);
-		range->used += r->used;
-
-		struct vy_mem *mem = rlist_shift_entry(&r->mems,
-						       struct vy_mem, link);
-		r->mem_count--;
-		assert(r->mem_count == 0);
-
-		rlist_add_entry(&range->mems, mem, link);
-		range->mem_count++;
-
-		rlist_del(&r->compact_list);
-		assert(r->shadow == range);
-		r->shadow = NULL;
-
-		vy_range_delete(r);
-	}
+	vy_range_discard_compact_parts(range);
 	index->version++;
 
-	/*
-	 * Finally, insert the old range back to the tree and make it
-	 * visible to the scheduler.
-	 */
-	vy_index_add_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
