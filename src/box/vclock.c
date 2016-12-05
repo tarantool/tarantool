@@ -29,10 +29,13 @@
  * SUCH DAMAGE.
  */
 #include "vclock.h"
-#include "say.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <ctype.h>
+
+#include "say.h"
+#include "diag.h"
 
 int64_t
 vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
@@ -76,6 +79,7 @@ rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 			cap *= 2;
 		char *chunk = (char *) realloc(*buf, cap);
 		if (chunk == NULL) {
+			diag_set(OutOfMemory, cap, "malloc", "vclock");
 			free(*buf);
 			*buf = *end = *pos = NULL;
 			rc = -1;

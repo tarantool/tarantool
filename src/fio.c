@@ -112,8 +112,8 @@ fio_pread(int fd, void *buf, size_t count, off_t offset)
 	return n;
 }
 
-ssize_t
-fio_write(int fd, const void *buf, size_t count)
+int
+fio_writen(int fd, const void *buf, size_t count)
 {
 	ssize_t to_write = (ssize_t) count;
 	while (to_write > 0) {
@@ -123,20 +123,16 @@ fio_write(int fd, const void *buf, size_t count)
 				errno = 0;
 				continue;
 			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return (ssize_t)count != to_write ? (ssize_t)count - to_write : -1;
 			say_syserror("write, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}
-		if (nwr == 0)
-			break;
-
 		buf += nwr;
 		to_write -= nwr;
 	}
-	return count - to_write;
-}
+	assert(to_write == 0);
 
+	return 0;
+}
 
 ssize_t
 fio_writev(int fd, struct iovec *iov, int iovcnt)

@@ -144,17 +144,20 @@ static const char v12[] = "0.12";
  * @retval >=size the number of characters (excluding the null byte),
  *                which would have been written to the final string if
  *                enough space had been available.
- * @retval -1 - error
+ * @retval -1 error, check diag
  * @sa snprintf()
  */
 static int
 xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 {
 	char *vstr = vclock_to_string(&meta->vclock);
+	if (vstr == NULL)
+		return -1;
 	char *server_uuid = tt_uuid_str(&meta->server_uuid);
 	int total = snprintf(buf, size, "%s\n%s\n" SERVER_UUID_KEY ": "
 		"%s\n" VCLOCK_KEY ": %s\n\n",
 		 meta->filetype, v13, server_uuid, vstr);
+	assert(total > 0);
 	free(vstr);
 	return total;
 }
@@ -645,10 +648,14 @@ xlog_create(struct xlog *xlog, const char *name,
 	int meta_len;
 	memset(xlog, 0, sizeof(*xlog));
 
+	/*
+	 * Check that the file without .inprogress suffix doesn't exist.
+	 */
 	if (access(name, F_OK) == 0) {
-		errno = EEXIST;
-		goto error;
+		tnt_error(XlogError, "file '%s' already exists", name);
+		return -1;
 	}
+
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
 	 * If it exists, open will fail. Always open/create
@@ -661,8 +668,11 @@ xlog_create(struct xlog *xlog, const char *name,
 	 */
 	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 	xlog->fd = open(xlog->filename, O_RDWR | O_CREAT | O_EXCL, 0644);
-	if (xlog->fd < 0)
+	if (xlog->fd < 0) {
+		say_syserror("open, [%s]", name);
+		diag_set(SystemError, "failed to create file '%s'", name);
 		goto error;
+	}
 
 	xlog->meta = *meta;
 	xlog->sync_is_async = false;
@@ -674,24 +684,27 @@ xlog_create(struct xlog *xlog, const char *name,
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	xlog->zctx = ZSTD_createCCtx();
-	if (!xlog->zctx)
-		goto error;
-
-	/* Format metadata */
-	meta_len = xlog_meta_format(&xlog->meta, meta_buf, sizeof(meta_buf));
-	if (meta_len < 0 || meta_len >= (int)sizeof(meta_buf)) {
-		say_error("%s: failed to format xlog meta", name);
+	if (!xlog->zctx) {
+		diag_set(OutOfMemory, sizeof(xlog->zctx), "malloc", "zstd");
 		goto error;
 	}
 
-	/* Write metadata */
-	if (fio_write(xlog->fd, meta_buf, meta_len) != meta_len)
+	/* Format metadata */
+	meta_len = xlog_meta_format(&xlog->meta, meta_buf, sizeof(meta_buf));
+	if (meta_len < 0)
 		goto error;
+	/* Formatted metadata must fit into meta_buf */
+	assert(meta_len < (int)sizeof(meta_buf));
+
+	/* Write metadata */
+	if (fio_writen(xlog->fd, meta_buf, meta_len) < 0) {
+		diag_set(SystemError, "%s: failed to write xlog meta", name);
+		goto error;
+	}
+
 	xlog->offset = meta_len; /* first log starts after meta */
 	return 0;
 error:
-	int save_errno = errno;
-	say_syserror("%s: failed to open", name);
 	if (xlog->fd >= 0) {
 		close(xlog->fd);
 		unlink(xlog->filename); /* try to remove incomplete file */
@@ -700,7 +713,6 @@ error:
 	obuf_destroy(&xlog->zbuf);
 	if (xlog->zctx)
 		ZSTD_freeCCtx(xlog->zctx);
-	errno = save_errno;
 
 	return -1;
 }
@@ -1074,9 +1086,9 @@ xlog_sync(struct xlog *l)
 int
 xlog_close(struct xlog *l, bool reuse_fd)
 {
-	int rc = fio_write(l->fd, &eof_marker, sizeof(log_magic_t));
+	int rc = fio_writen(l->fd, &eof_marker, sizeof(log_magic_t));
 	if (rc < 0)
-		say_error("Can't finalize xlog %s", l->filename);
+		say_syserror("%s: failed to write EOF marker", l->filename);
 
 	/*
 	 * Sync the file before closing, since

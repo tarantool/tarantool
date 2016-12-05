@@ -101,26 +101,12 @@ fio_pread(int fd, void *buf, size_t count, off_t offset);
  * @param buf		pointer to a buffer.
  * @param count		buffer size.
  *
- * @return When count is 0, returns 0. When count is positive,
- *         returns the total number of bytes written, or -1 if error.
- *
- *         Blocking I/O:
- *         -------------
- *         If an error occurs after a few bytes were written, -1 is
- *         returned and current write offset is unspecified.
- *         In other words, with blocking I/O this function
- *         returns either -1 or count.
- *
- *         Non-blocking I/O
- *         ----------------
- *         If EAGAIN/EWOULDBLOCK occurs and no data's been written
- *         yet, sets errno to EAGAIN and returns -1 (like read()).
- *         If EAGAIN/EWOULDBLOCK happens after a few bytes were
- *         written, the actual number of bytes written is
- *         returned.
+ * @retval  0 on success
+ * @retval -1 on error. If an error occurs after a few bytes were written
+ *            then current write offset of \a fd is unspecified.
  */
-ssize_t
-fio_write(int fd, const void *buf, size_t count);
+int
+fio_writen(int fd, const void *buf, size_t count);
 
 /**
  * A simple wrapper around writev().
