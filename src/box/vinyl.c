@@ -6267,7 +6267,14 @@ check_key:
 
 /* }}} Upsert */
 
-static void
+/**
+ * Add the statement to the current transaction.
+ * @param tx    Current transaction.
+ * @param index Index in whose write_set insert the statement.
+ * @param stmt  Statement to set.
+ * @param type  Statement type.
+ */
+static int
 vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 	  struct vy_stmt *stmt, uint8_t type)
 {
@@ -6287,6 +6294,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 			stmt = vy_apply_upsert(new_stmt, old_stmt,
 					       index->key_def, index->format,
 					       true);
+			if (stmt == NULL)
+				return -1;
 			assert(stmt->type);
 		}
 		vy_stmt_unref(old->stmt);
@@ -6301,6 +6310,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index,
 		tx->write_set_version++;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
+	return 0;
 }
 
 /* {{{ Public API of transaction control: start/end transaction,
@@ -6317,9 +6327,9 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 						     index->key_def);
 	if (vystmt == NULL)
 		return -1;
-	vy_tx_set(tx, index, vystmt, IPROTO_REPLACE);
+	int rc = vy_tx_set(tx, index, vystmt, IPROTO_REPLACE);
 	vy_stmt_unref(vystmt);
-	return 0;
+	return rc;
 }
 
 int
@@ -6336,9 +6346,9 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 				    index->key_def, operations, 1);
 	if (vystmt == NULL)
 		return -1;
-	vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
+	int rc = vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
 	vy_stmt_unref(vystmt);
-	return 0;
+	return rc;
 }
 
 int
@@ -6351,10 +6361,9 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 	vykey = vy_stmt_new_select(key, part_count);
 	if (vykey == NULL)
 		return -1;
-	vy_tx_set(tx, index, vykey, IPROTO_DELETE);
-
+	int rc = vy_tx_set(tx, index, vykey, IPROTO_DELETE);
 	vy_stmt_unref(vykey);
-	return 0;
+	return rc;
 }
 
 void
