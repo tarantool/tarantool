@@ -5672,7 +5672,7 @@ vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
 }
 
 /**
- * Get size of the statement data of type REPLACE, UPSERTS or DELETE
+ * Get size of the statement data of type REPLACE or UPSERT
  * (without operations array if exists).
  */
 static uint32_t
