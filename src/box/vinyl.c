@@ -2730,21 +2730,20 @@ err:
 	return -1;
 }
 
-/**
- * Keys for msgpuck run encoding
- */
-enum vy_request_run_key {
-	VY_RUN_MIN_LSN = 2,
-	VY_RUN_MAX_LSN,
-	VY_RUN_PAGE_COUNT,
-	VY_RUN_BEGIN = 65,
-	VY_RUN_END
-};
+/** {{{ vy_page_info */
 
 enum vy_request_page_key {
 	VY_PAGE_REQUEST_COUNT,
 	VY_PAGE_MIN_KEY
 };
+
+const char *vy_page_info_key_strs[] = {
+	"count",
+	"min"
+};
+
+const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
+				      (1 << VY_PAGE_MIN_KEY);
 
 /**
  * Encode vy_page_info as xrow.
@@ -2811,6 +2810,107 @@ vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
 		return -1;
 	return 0;
 }
+
+/**
+ * Decode page information from xrow.
+ *
+ * @param xrow xrow to decode
+ * @param run_id the run identifier to check
+ * @param[out] page page information
+ * @param[out] run_info the run information
+ *
+ * @retval  0 success
+ * @retval -1 error, check diag
+ */
+static int
+vy_page_info_decode(const struct xrow_header *xrow, int run_id,
+		    struct vy_page_info *page, struct vy_run_info *run_info)
+{
+	struct request request;
+	/* extract all pages info */
+	request_create(&request, xrow->type);
+	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
+	if (request.space_id != BOX_VINYL_PAGE_ID) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta: "
+			 "incorrect space id");
+		return -1;
+	}
+	const char *pos = request.tuple;
+	if (mp_decode_array(&pos) < 4) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+			 "tuple is too small");
+		return -1;
+	}
+	if (run_id != (int) mp_decode_uint(&pos)) {
+		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+			 "incorrect run id");
+		return -1;
+	}
+
+	memset(page, 0, sizeof(*page));
+	page->offset = mp_decode_uint(&pos);
+	page->size = mp_decode_uint(&pos);
+
+	uint64_t key_map = vy_page_info_key_map;
+	uint32_t map_size = mp_decode_map(&pos);
+	uint32_t map_item;
+	const char *key_beg;
+	for (map_item = 0; map_item < map_size; ++map_item) {
+		uint32_t key = mp_decode_uint(&pos);
+		key_map &= ~(1 << key);
+		switch (key) {
+		case VY_PAGE_REQUEST_COUNT:
+			page->count = mp_decode_uint(&pos);
+			break;
+		case VY_PAGE_MIN_KEY:
+			key_beg = pos;
+			mp_next(&pos);
+			vy_buf_ensure(&run_info->pages_min, pos - key_beg);
+			memcpy(run_info->pages_min.p, key_beg, pos - key_beg);
+			page->min_key_offset = vy_buf_used(&run_info->pages_min);
+			vy_buf_advance(&run_info->pages_min, pos - key_beg);
+			break;
+		default:
+			diag_set(ClientError, ER_VINYL, "Can't decode page meta "
+				 "unknown page meta key %d", key);
+			return -1;
+		}
+	}
+	if (key_map) {
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 vy_page_info_key_strs[__builtin_ffsll(key_map) - 1]);
+		return -1;
+	}
+
+	return 0;
+}
+
+/** vy_page_info }}} */
+
+/** {{{ vy_run_info */
+
+/**
+ * Keys for msgpuck run encoding
+ */
+enum vy_request_run_key {
+	VY_RUN_MIN_LSN = 2,
+	VY_RUN_MAX_LSN,
+	VY_RUN_PAGE_COUNT,
+	VY_RUN_BEGIN = 65,
+	VY_RUN_END
+};
+
+const char *vy_run_info_key_strs[] = {
+	"min lsn",
+	"max lsn",
+	"page count",
+	"begin key",
+	"end key"
+};
+
+const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
+				     (1 << VY_RUN_MAX_LSN) |
+				     (1 << VY_RUN_PAGE_COUNT);
 
 /**
  * Encode vy_run_info as xrow
@@ -2897,201 +2997,6 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 
 	return 0;
 }
-
-/**
- * Write run to file.
- */
-static int
-vy_run_write_index(struct vy_run *run, const char *dirpath,
-		   int64_t range_id, int run_id,
-		   const struct vy_stmt *begin,
-		   const struct vy_stmt *end,
-		   const struct key_def *key_def)
-{
-	char path[PATH_MAX];
-	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    key_def->opts.lsn, range_id, run_id,
-			    VY_FILE_INDEX);
-
-	struct xlog index_xlog;
-	struct xlog_meta meta = {
-		.filetype = "INDEX",
-		.version = "0.13",
-		.server_uuid = SERVER_UUID,
-	};
-	if (xlog_create(&index_xlog, path, &meta) < 0)
-		return -1;
-
-	xlog_tx_begin(&index_xlog);
-
-	struct xrow_header xrow;
-	if (vy_run_info_encode(&run->info, run_id, begin, end,
-			       &xrow) != 0 ||
-	    xlog_write_row(&index_xlog, &xrow) < 0)
-		goto fail;
-
-	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
-		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
-		const char *min_key = vy_run_page_min_key(run, page_info);
-		struct xrow_header xrow;
-		if (vy_page_info_encode(page_info, min_key, run_id, &xrow) < 0) {
-			goto fail;
-		}
-		if (xlog_write_row(&index_xlog, &xrow) < 0)
-			goto fail;
-	}
-
-	if (xlog_tx_commit(&index_xlog) < 0 ||
-	    xlog_flush(&index_xlog) < 0 ||
-	    xlog_rename(&index_xlog) < 0)
-		goto fail;
-	xlog_close(&index_xlog, false);
-	fiber_gc();
-	return 0;
-fail:
-	fiber_gc();
-	xlog_tx_rollback(&index_xlog);
-	xlog_close(&index_xlog, false);
-	unlink(path);
-	return -1;
-}
-
-/**
- * Allocate and initialize a range (either a new one or for
- * restore from disk).
- */
-static struct vy_range *
-vy_range_new(struct vy_index *index, int64_t id)
-{
-	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
-	if (range == NULL) {
-		diag_set(OutOfMemory, sizeof(struct vy_range), "malloc",
-			 "struct vy_range");
-		return NULL;
-	}
-	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
-	if (mem == NULL) {
-		free(range);
-		return NULL;
-	}
-	if (id != 0) {
-		range->id = id;
-		/** Recovering an existing range from disk. Update
-		 * range_id_max to not create a new range wit the
-		 * same id.
-		 */
-		index->range_id_max = MAX(index->range_id_max, id);
-	} else {
-		/**
-		 * Creating a new range. Assign a new id.
-	         */
-		range->id = ++index->range_id_max;
-	}
-	rlist_create(&range->runs);
-	rlist_create(&range->mems);
-	rlist_add_entry(&range->mems, mem, link);
-	range->mem_count = 1;
-	range->min_lsn = mem->min_lsn;
-	range->index = index;
-	range->nodedump.pos = UINT32_MAX;
-	range->nodecompact.pos = UINT32_MAX;
-	rlist_create(&range->compact_list);
-	return range;
-}
-
-const char *vy_page_info_key_strs[] = {
-	"count",
-	"min"
-};
-
-const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
-				      (1 << VY_PAGE_MIN_KEY);
-
-/**
- * Decode page information from xrow.
- *
- * @param xrow xrow to decode
- * @param run_id the run identifier to check
- * @param[out] page page information
- * @param[out] run_info the run information
- *
- * @retval  0 success
- * @retval -1 error, check diag
- */
-static int
-vy_page_info_decode(const struct xrow_header *xrow, int run_id,
-		    struct vy_page_info *page, struct vy_run_info *run_info)
-{
-	struct request request;
-	/* extract all pages info */
-	request_create(&request, xrow->type);
-	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
-	if (request.space_id != BOX_VINYL_PAGE_ID) {
-		diag_set(ClientError, ER_VINYL, "Can't decode page meta: "
-			 "incorrect space id");
-		return -1;
-	}
-	const char *pos = request.tuple;
-	if (mp_decode_array(&pos) < 4) {
-		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
-			 "tuple is too small");
-		return -1;
-	}
-	if (run_id != (int) mp_decode_uint(&pos)) {
-		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
-			 "incorrect run id");
-		return -1;
-	}
-
-	memset(page, 0, sizeof(*page));
-	page->offset = mp_decode_uint(&pos);
-	page->size = mp_decode_uint(&pos);
-
-	uint64_t key_map = vy_page_info_key_map;
-	uint32_t map_size = mp_decode_map(&pos);
-	uint32_t map_item;
-	const char *key_beg;
-	for (map_item = 0; map_item < map_size; ++map_item) {
-		uint32_t key = mp_decode_uint(&pos);
-		key_map &= ~(1 << key);
-		switch (key) {
-		case VY_PAGE_REQUEST_COUNT:
-			page->count = mp_decode_uint(&pos);
-			break;
-		case VY_PAGE_MIN_KEY:
-			key_beg = pos;
-			mp_next(&pos);
-			vy_buf_ensure(&run_info->pages_min, pos - key_beg);
-			memcpy(run_info->pages_min.p, key_beg, pos - key_beg);
-			page->min_key_offset = vy_buf_used(&run_info->pages_min);
-			vy_buf_advance(&run_info->pages_min, pos - key_beg);
-			break;
-		default:
-			diag_set(ClientError, ER_VINYL, "Can't decode page meta "
-				 "unknown page meta key %d", key);
-			return -1;
-		}
-	}
-	if (key_map) {
-		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
-			 vy_page_info_key_strs[__builtin_ffsll(key_map) - 1]);
-		return -1;
-	}
-
-	return 0;
-}
-
-const char *vy_run_info_key_strs[] = {
-	"min lsn",
-	"max lsn",
-	"page count",
-	"begin key",
-	"end key"
-};
-
-const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
-				     (1 << VY_RUN_MAX_LSN) |
-				     (1 << VY_RUN_PAGE_COUNT);
 
 /**
  * Decode the run metadata from xrow.
@@ -3196,6 +3101,109 @@ fail:
 	if (end != NULL)
 		vy_stmt_unref(end);
 	return -1;
+}
+
+/* vy_run_info }}} */
+
+/**
+ * Write run to file.
+ */
+static int
+vy_run_write_index(struct vy_run *run, const char *dirpath,
+		   int64_t range_id, int run_id,
+		   const struct vy_stmt *begin,
+		   const struct vy_stmt *end,
+		   const struct key_def *key_def)
+{
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dirpath,
+			    key_def->opts.lsn, range_id, run_id,
+			    VY_FILE_INDEX);
+
+	struct xlog index_xlog;
+	struct xlog_meta meta = {
+		.filetype = "INDEX",
+		.version = "0.13",
+		.server_uuid = SERVER_UUID,
+	};
+	if (xlog_create(&index_xlog, path, &meta) < 0)
+		return -1;
+
+	xlog_tx_begin(&index_xlog);
+
+	struct xrow_header xrow;
+	if (vy_run_info_encode(&run->info, run_id, begin, end,
+			       &xrow) != 0 ||
+	    xlog_write_row(&index_xlog, &xrow) < 0)
+		goto fail;
+
+	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
+		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
+		const char *min_key = vy_run_page_min_key(run, page_info);
+		struct xrow_header xrow;
+		if (vy_page_info_encode(page_info, min_key, run_id, &xrow) < 0) {
+			goto fail;
+		}
+		if (xlog_write_row(&index_xlog, &xrow) < 0)
+			goto fail;
+	}
+
+	if (xlog_tx_commit(&index_xlog) < 0 ||
+	    xlog_flush(&index_xlog) < 0 ||
+	    xlog_rename(&index_xlog) < 0)
+		goto fail;
+	xlog_close(&index_xlog, false);
+	fiber_gc();
+	return 0;
+fail:
+	fiber_gc();
+	xlog_tx_rollback(&index_xlog);
+	xlog_close(&index_xlog, false);
+	unlink(path);
+	return -1;
+}
+
+/**
+ * Allocate and initialize a range (either a new one or for
+ * restore from disk).
+ */
+static struct vy_range *
+vy_range_new(struct vy_index *index, int64_t id)
+{
+	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
+	if (range == NULL) {
+		diag_set(OutOfMemory, sizeof(struct vy_range), "malloc",
+			 "struct vy_range");
+		return NULL;
+	}
+	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+	if (mem == NULL) {
+		free(range);
+		return NULL;
+	}
+	if (id != 0) {
+		range->id = id;
+		/** Recovering an existing range from disk. Update
+		 * range_id_max to not create a new range wit the
+		 * same id.
+		 */
+		index->range_id_max = MAX(index->range_id_max, id);
+	} else {
+		/**
+		 * Creating a new range. Assign a new id.
+	         */
+		range->id = ++index->range_id_max;
+	}
+	rlist_create(&range->runs);
+	rlist_create(&range->mems);
+	rlist_add_entry(&range->mems, mem, link);
+	range->mem_count = 1;
+	range->min_lsn = mem->min_lsn;
+	range->index = index;
+	range->nodedump.pos = UINT32_MAX;
+	range->nodecompact.pos = UINT32_MAX;
+	rlist_create(&range->compact_list);
+	return range;
 }
 
 static int
