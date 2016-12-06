@@ -41,6 +41,7 @@ add_library(box STATIC
     memtx_bitset.cc
     engine.cc
     memtx_engine.cc
+    memtx_space.cc
     sysview_engine.cc
     sysview_index.cc
     vinyl_engine.cc
