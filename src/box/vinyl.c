@@ -4192,8 +4192,16 @@ struct vy_task_ops {
 	/**
 	 * This function is called by the scheduler upon task completion.
 	 * It may be used to finish the task from the tx thread context.
+	 *
+	 * Returns 0 on success. On failure returns -1 and sets diag.
 	 */
-	void (*complete)(struct vy_task *);
+	int (*complete)(struct vy_task *);
+	/**
+	 * This function is called by the scheduler if either ->execute
+	 * or ->complete failed. It may be used to undo changes done to
+	 * the index when preparing the task.
+	 */
+	void (*abort)(struct vy_task *);
 };
 
 struct vy_task {
@@ -4284,7 +4292,7 @@ out:
 	return rc;
 }
 
-static void
+static int
 vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
@@ -4292,21 +4300,10 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
 
+	say_debug("range dump complete: %s", vy_range_str(range));
+
 	assert(run != NULL);
 	range->new_run = NULL;
-
-	say_debug("range dump %s: %s",
-		  task->status == 0 ? "complete" : "failed",
-		  vy_range_str(range));
-
-	/*
-	 * No need to roll back anything on dump failure - the range will just
-	 * carry on with a new shadow memory tree.
-	 */
-	if (task->status != 0) {
-		vy_run_delete(run);
-		goto out;
-	}
 
 	rlist_add_entry(&range->runs, run, link);
 	range->run_count++;
@@ -4331,10 +4328,29 @@ vy_task_dump_complete(struct vy_task *task)
 		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 	}
-
 	range->version++;
-out:
+
 	vy_scheduler_add_range(env->scheduler, range);
+	return 0;
+}
+
+static void
+vy_task_dump_abort(struct vy_task *task)
+{
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->range;
+
+	say_debug("range dump failed: %s", vy_range_str(range));
+
+	/* Delete the run we failed to write. */
+	vy_run_delete(range->new_run);
+	range->new_run = NULL;
+
+	/*
+	 * No need to roll back anything if we failed to write a run.
+	 * The range will carry on with a new shadow in-memory index.
+	 */
+	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
 static struct vy_task *
@@ -4343,6 +4359,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
 		.complete = vy_task_dump_complete,
+		.abort = vy_task_dump_abort,
 	};
 	struct vy_index *index = range->index;
 
@@ -4439,13 +4456,17 @@ out:
 	return rc;
 }
 
-static void
+static int
 vy_task_compact_complete(struct vy_task *task)
 {
-	if (task->status != 0)
-		vy_range_compact_abort(task->range);
-	else
-		vy_range_compact_commit(task->range);
+	vy_range_compact_commit(task->range);
+	return 0;
+}
+
+static void
+vy_task_compact_abort(struct vy_task *task)
+{
+	vy_range_compact_abort(task->range);
 }
 
 static struct vy_task *
@@ -4454,6 +4475,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
 		.complete = vy_task_compact_complete,
+		.abort = vy_task_compact_abort,
 	};
 
 	struct vy_task *task = vy_task_new(pool, range->index, &compact_ops);
@@ -4746,7 +4768,26 @@ found:
 }
 
 static int
-vy_worker_f(va_list va);
+vy_scheduler_complete_task(struct vy_scheduler *scheduler, struct vy_task *task)
+{
+	if (task->status != 0) {
+		/* ->execute failed, propagate diag */
+		assert(!diag_is_empty(&task->diag));
+		diag_move(&task->diag, &scheduler->diag);
+		goto fail;
+	}
+	if (task->ops->complete &&
+	    task->ops->complete(task) != 0) {
+		assert(!diag_is_empty(diag_get()));
+		diag_move(diag_get(), &scheduler->diag);
+		goto fail;
+	}
+	return 0;
+fail:
+	if (task->ops->abort)
+		task->ops->abort(task);
+	return -1;
+}
 
 static int
 vy_scheduler_f(va_list va)
@@ -4770,13 +4811,9 @@ vy_scheduler_f(va_list va)
 
 		/* Complete and delete all processed tasks. */
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
-			if (task->ops->complete)
-				task->ops->complete(task);
-			if (task->status != 0) {
-				assert(!diag_is_empty(&task->diag));
-				diag_move(&task->diag, &scheduler->diag);
+			if (vy_scheduler_complete_task(scheduler, task) != 0)
 				tasks_failed++;
-			} else
+			else
 				tasks_done++;
 			if (task->dump_size > 0)
 				vy_stat_dump(env->stat, task->exec_time,
@@ -4962,9 +4999,8 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	tt_pthread_mutex_lock(&scheduler->mutex);
 	struct vy_task *task, *next;
 	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link) {
-		task->status = -1;
-		if (task->ops->complete)
-			task->ops->complete(task);
+		if (task->ops->abort)
+			task->ops->abort(task);
 		vy_task_delete(&scheduler->task_pool, task);
 	}
 	stailq_create(&scheduler->input_queue);
@@ -4980,8 +5016,7 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 
 	/* Complete all processed tasks */
 	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link) {
-		if (task->ops->complete)
-			task->ops->complete(task);
+		vy_scheduler_complete_task(scheduler, task);
 		vy_task_delete(&scheduler->task_pool, task);
 	}
 	stailq_create(&scheduler->output_queue);
