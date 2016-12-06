@@ -769,8 +769,9 @@ checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple,
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
-	row.body[1].iov_base = tuple->data;
-	row.body[1].iov_len = tuple->bsize;
+	uint32_t bsize;
+	row.body[1].iov_base = (char *) tuple_data_range(tuple, &bsize);
+	row.body[1].iov_len = bsize;
 	checkpoint_write_row(l, &row, snap_io_rate_limit);
 }
 

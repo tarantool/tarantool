@@ -88,7 +88,7 @@ tuple_compare_key_raw(const char *key_a, uint32_t part_count_a,
  */
 int
 tuple_compare_with_key_default_raw(const struct tuple_format *format,
-				   const char *tuple, uint32_t *field_map,
+				   const char *tuple, const uint32_t *field_map,
 				   const char *key, uint32_t part_count,
 				   const struct key_def *key_def);
 
@@ -108,9 +108,9 @@ tuple_compare_with_key_default_raw(const struct tuple_format *format,
  */
 int
 tuple_compare_default_raw(const struct tuple_format *format_a,
-			  const char *tuple_a, uint32_t *field_map_a,
+			  const char *tuple_a, const uint32_t *field_map_a,
 			  const struct tuple_format *format_b,
-			  const char *tuple_b, uint32_t *field_map_b,
+			  const char *tuple_b, const uint32_t *field_map_b,
 			  const struct key_def *key_def);
 
 /** @sa tuple_compare_default_raw */

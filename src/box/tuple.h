@@ -274,10 +274,34 @@ struct PACKED tuple
 	/** format identifier */
 	uint16_t format_id;
 	/** length of the variable part of the tuple */
-	uint32_t bsize;
+	uint32_t size;
 	/** MessagePack array data */
-	char data[0];
+	char raw[0];
 };
+
+/**
+ * Get pointer to MessagePack data of the tuple.
+ * @param tuple Tuple from which get data.
+ * @retval Pointer to MessagePack array.
+ */
+inline const char *
+tuple_data(const struct tuple *tuple)
+{
+	return tuple->raw;
+}
+
+/**
+ * Get pointer to MessagePack data of the tuple.
+ * @param tuple     Tuple from which get data.
+ * @param[out] size Is set to size of the data.
+ * @retval Pointer to MessagePack array.
+ */
+inline const char *
+tuple_data_range(const struct tuple *tuple, uint32_t *size)
+{
+	*size = tuple->size;
+	return tuple->raw;
+}
 
 /**
  * @brief Compare two tuple fields using using field type definition
@@ -401,7 +425,7 @@ tuple_format(const struct tuple *tuple)
 inline const uint32_t *
 tuple_field_map(const struct tuple *tuple)
 {
-	return (uint32_t *) tuple;
+	return (const uint32_t *) tuple;
 }
 
 /**
@@ -412,7 +436,7 @@ tuple_field_map(const struct tuple *tuple)
 inline uint32_t
 tuple_field_count(const struct tuple *tuple)
 {
-	const char *data = tuple->data;
+	const char *data = tuple_data(tuple);
 	return mp_decode_array(&data);
 }
 
@@ -427,7 +451,7 @@ tuple_field_count(const struct tuple *tuple)
 inline const char *
 tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
-	return tuple_field_raw(tuple_format(tuple), tuple->data,
+	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
 			       tuple_field_map(tuple), fieldno);
 }
 
@@ -440,6 +464,8 @@ struct tuple_iterator {
 	struct tuple *tuple;
 	/** Always points to the beginning of the next field. */
 	const char *pos;
+	/** End of the tuple. */
+	const char *end;
 	/** @endcond **/
 	/** field no of the next field. */
 	int fieldno;
@@ -466,9 +492,12 @@ inline void
 tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
 {
 	it->tuple = tuple;
-	it->pos = tuple->data;
+	uint32_t bsize;
+	const char *data = tuple_data_range(tuple, &bsize);
+	it->pos = data;
 	(void) mp_decode_array(&it->pos); /* Skip array header */
 	it->fieldno = 0;
+	it->end = data + bsize;
 }
 
 /**

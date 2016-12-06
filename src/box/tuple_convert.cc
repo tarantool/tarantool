@@ -34,8 +34,10 @@
 int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
-	if (obuf_dup(buf, tuple->data, tuple->bsize) != tuple->bsize) {
-		diag_set(OutOfMemory, tuple->bsize, "tuple_to_obuf", "dup");
+	uint32_t bsize;
+	const char *data = tuple_data_range(tuple, &bsize);
+	if (obuf_dup(buf, data, bsize) != bsize) {
+		diag_set(OutOfMemory, bsize, "tuple_to_obuf", "dup");
 		return -1;
 	}
 	return 0;
@@ -44,8 +46,10 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 ssize_t
 tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
 {
-	if (likely(tuple->bsize <= size)) {
-		memcpy(buf, tuple->data, tuple->bsize);
+	uint32_t bsize;
+	const char *data = tuple_data_range(tuple, &bsize);
+	if (likely(bsize <= size)) {
+		memcpy(buf, data, bsize);
 	}
-	return tuple->bsize;
+	return bsize;
 }

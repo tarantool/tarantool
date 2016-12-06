@@ -406,14 +406,15 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 				 &column_mask);
 	TupleRef new_ref(new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
+	uint32_t bsize;
+	const char *new_data = tuple_data_range(new_tuple, &bsize);
 
 	/**
 	 * In the primary index tuple can be replaced
 	 * without deleting old tuple.
 	 */
 	index = (VinylIndex *)space->index[0];
-	if (vy_replace(tx, index->db, new_tuple->data,
-		       new_tuple->data + new_tuple->bsize))
+	if (vy_replace(tx, index->db, new_data, new_data + bsize))
 		diag_raise();
 
 	/* Update secondary keys, avoid duplicates. */
@@ -433,8 +434,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 		 */
 		if (vy_delete(tx, sec_idx->db, key, part_count))
 			diag_raise();
-		vinyl_insert_secondary(sec_idx, new_tuple->data,
-				       new_tuple->data + new_tuple->bsize, tx);
+		vinyl_insert_secondary(sec_idx, new_data, new_data + bsize, tx);
 	}
 	if (old_tuple)
 		tuple_ref(old_tuple);
@@ -536,6 +536,8 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 			return;
 		}
 		VinylSecondaryIndex *sec_idx;
+		uint32_t bsize;
+		const char *new_data = tuple_data_range(new_tuple, &bsize);
 		for (uint32_t i = 1; i < space->index_count; ++i) {
 			/* Update secondary keys with the new tuple. */
 			sec_idx = (VinylSecondaryIndex *) space->index[i];
@@ -549,9 +551,8 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 			 */
 			if (vy_delete(tx, sec_idx->db, key, part_count))
 				diag_raise();
-			vinyl_insert_secondary(sec_idx, new_tuple->data,
-					       new_tuple->data +
-					       new_tuple->bsize, tx);
+			vinyl_insert_secondary(sec_idx, new_data,
+					       new_data + bsize, tx);
 		}
 		tuple_ref(new_tuple);
 		stmt->new_tuple = new_tuple;

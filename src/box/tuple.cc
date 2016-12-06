@@ -105,7 +105,7 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 int
 tuple_validate(struct tuple_format *format, struct tuple *tuple)
 {
-	return tuple_validate_raw(format, tuple->data);
+	return tuple_validate_raw(format, tuple_data(tuple));
 }
 
 /**
@@ -150,7 +150,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 
 	tuple->refs = 0;
 	tuple->version = snapshot_version;
-	tuple->bsize = size;
+	tuple->size = size;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format, 1);
 
@@ -168,7 +168,8 @@ tuple_delete(struct tuple *tuple)
 	say_debug("tuple_delete(%p)", tuple);
 	assert(tuple->refs == 0);
 	struct tuple_format *format = tuple_format(tuple);
-	size_t total = sizeof(struct tuple) + tuple->bsize + format->field_map_size;
+	size_t total = sizeof(struct tuple) + tuple->size +
+		       format->field_map_size;
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
 	if (!memtx_alloc.is_delayed_free_mode || tuple->version == snapshot_version)
@@ -195,7 +196,7 @@ tuple_seek(struct tuple_iterator *it, uint32_t fieldno)
 		it->fieldno = fieldno;
 		return tuple_next(it);
 	} else {
-		it->pos = it->tuple->data + it->tuple->bsize;
+		it->pos = it->end;
 		it->fieldno = tuple_field_count(it->tuple);
 		return NULL;
 	}
@@ -204,11 +205,10 @@ tuple_seek(struct tuple_iterator *it, uint32_t fieldno)
 const char *
 tuple_next(struct tuple_iterator *it)
 {
-	const char *tuple_end = it->tuple->data + it->tuple->bsize;
-	if (it->pos < tuple_end) {
+	if (it->pos < it->end) {
 		const char *field = it->pos;
 		mp_next(&it->pos);
-		assert(it->pos <= tuple_end);
+		assert(it->pos <= it->end);
 		it->fieldno++;
 		return field;
 	}
@@ -250,8 +250,9 @@ char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
-	return tuple_extract_key_raw(tuple->data, tuple->data + tuple->bsize,
-				     key_def, key_size);
+	uint32_t bsize;
+	const char *data = tuple_data_range(tuple, &bsize);
+	return tuple_extract_key_raw(data, data + bsize, key_def, key_size);
 }
 
 char *
@@ -301,11 +302,11 @@ tuple_update(struct tuple_format *format,
 	     const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end, int field_base, uint64_t *column_mask)
 {
-	uint32_t new_size = 0;
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
 		tuple_update_execute(f, alloc_ctx,
-				     expr, expr_end, old_tuple->data,
-				     old_tuple->data + old_tuple->bsize,
+				     expr, expr_end, old_data, old_data + bsize,
 				     &new_size, field_base, column_mask);
 	if (new_data == NULL)
 		diag_raise();
@@ -322,11 +323,11 @@ tuple_upsert(struct tuple_format *format,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base)
 {
-	uint32_t new_size = 0;
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
 		tuple_upsert_execute(region_alloc, alloc_ctx, expr, expr_end,
-				     old_tuple->data,
-				     old_tuple->data + old_tuple->bsize,
+				     old_data, old_data + bsize,
 				     &new_size, field_base, false);
 	if (new_data == NULL)
 		diag_raise();
@@ -345,9 +346,9 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	if (new_tuple == NULL)
 		return NULL;
-	memcpy(new_tuple->data, data, tuple_len);
+	memcpy(new_tuple->raw, data, tuple_len);
 	if (tuple_init_field_map(format, (uint32_t *) new_tuple,
-				 new_tuple->data)) {
+				 tuple_data(new_tuple))) {
 		tuple_delete(new_tuple);
 		return NULL;
 	}
@@ -479,7 +480,7 @@ size_t
 box_tuple_bsize(const box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
-	return tuple->bsize;
+	return tuple->size;
 }
 
 ssize_t

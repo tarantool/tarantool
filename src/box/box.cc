@@ -765,11 +765,10 @@ space_truncate(struct space *space)
 
 	/* create all indexes again, now they are empty */
 	for (int i = 0; i < index_count; i++) {
-		tuple = indexes[i];
-		if (box_insert(BOX_INDEX_ID, tuple->data,
-			       tuple->data + tuple->bsize, NULL)) {
+		uint32_t bsize;
+		const char *data = tuple_data_range(indexes[i], &bsize);
+		if (box_insert(BOX_INDEX_ID, data, data + bsize, NULL))
 			diag_raise();
-		}
 	}
 }
 
