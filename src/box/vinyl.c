@@ -2299,7 +2299,7 @@ check:
 	/*
 	 * When compaction starts, the selected range is replaced with
 	 * one or more new ranges, each of which has ->shadow pointing
-	 * to the original range (see vy_range_compact_prepare()). New
+	 * to the original range (see vy_task_compact_new()). New
 	 * ranges must not be read from until compaction has finished,
 	 * because (1) their in-memory indexes are linked to the
 	 * original range and (2) they don't have on-disk runs yet. So
@@ -3568,111 +3568,6 @@ vy_range_discard_compact_parts(struct vy_range *range)
 	vy_index_add_range(index, range);
 }
 
-static int
-vy_range_compact_prepare(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-	struct vy_stmt *split_key = NULL;
-	const char *split_key_raw;
-	struct vy_range *parts[2];
-	struct vy_stmt *keys[3];
-	int n_parts = 1;
-	int i;
-
-	assert(rlist_empty(&range->compact_list));
-
-	keys[0] = range->begin;
-	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_stmt_extract_key_raw(split_key_raw,
-						    IPROTO_SELECT,
-						    index->key_def);
-		if (split_key == NULL)
-			goto fail;
-		n_parts = 2;
-		keys[1] = split_key;
-		keys[2] = range->end;
-	} else
-		keys[1] = range->end;
-
-	/* Allocate new ranges. */
-	for (i = 0; i < n_parts; i++) {
-		struct vy_range *r;
-		struct vy_mem *mem;
-
-		r = parts[i] = vy_range_new(index, 0, keys[i], keys[i + 1]);
-		if (r == NULL)
-			goto fail;
-		r->new_run = vy_run_new();
-		if (r->new_run == NULL)
-			goto fail;
-		mem = vy_mem_new(index->key_def, index->format);
-		if (mem == NULL)
-			goto fail;
-		rlist_add_entry(&r->mems, mem, link);
-		r->mem_count++;
-		/* Account merge w/o split. */
-		if (n_parts == 1)
-			r->merge_count = range->merge_count + 1;
-	}
-
-	say_debug("range compact prepare: %s", vy_range_str(range));
-
-	/* Replace the old range with the new ones. */
-	for (i = 0; i < n_parts; i++)
-		vy_range_add_compact_part(range, parts[i]);
-
-	range->version++;
-	index->version++;
-	return 0;
-fail:
-	for (i = 0; i < n_parts; i++) {
-		if (parts[i] != NULL)
-			vy_range_delete(parts[i]);
-	}
-	if (split_key != NULL)
-		vy_stmt_unref(split_key);
-	return -1;
-}
-
-static void
-vy_range_compact_commit(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-	struct vy_range *r;
-
-	say_debug("range compact complete: %s", vy_range_str(range));
-
-	vy_index_unacct_range(index, range);
-	rlist_foreach_entry(r, &range->compact_list, compact_list) {
-		/* Add the new run created by compaction to the list. */
-		rlist_add_entry(&r->runs, r->new_run, link);
-		r->run_count++;
-		r->new_run = NULL;
-		/*
-		 * Account the new range and make it visible to
-		 * the scheduler.
-		 */
-		vy_index_acct_range(index, r);
-		vy_scheduler_add_range(index->env->scheduler, r);
-	}
-
-	vy_range_commit_compact_parts(range);
-	index->version++;
-}
-
-static void
-vy_range_compact_abort(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-
-	say_debug("range compact failed: %s", vy_range_str(range));
-
-	vy_range_discard_compact_parts(range);
-	index->version++;
-
-	vy_scheduler_add_range(index->env->scheduler, range);
-}
-
 /**
  * Create an index directory for a new index.
  * TODO: create index files only after the WAL
@@ -4459,14 +4354,43 @@ out:
 static int
 vy_task_compact_complete(struct vy_task *task)
 {
-	vy_range_compact_commit(task->range);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->range;
+	struct vy_range *r;
+
+	say_debug("range compact complete: %s", vy_range_str(range));
+
+	vy_index_unacct_range(index, range);
+	rlist_foreach_entry(r, &range->compact_list, compact_list) {
+		/* Add the new run created by compaction to the list. */
+		rlist_add_entry(&r->runs, r->new_run, link);
+		r->run_count++;
+		r->new_run = NULL;
+		/*
+		 * Account the new range and make it visible to
+		 * the scheduler.
+		 */
+		vy_index_acct_range(index, r);
+		vy_scheduler_add_range(index->env->scheduler, r);
+	}
+
+	vy_range_commit_compact_parts(range);
+	index->version++;
 	return 0;
 }
 
 static void
 vy_task_compact_abort(struct vy_task *task)
 {
-	vy_range_compact_abort(task->range);
+	struct vy_index *index = task->index;
+	struct vy_range *range = task->range;
+
+	say_debug("range compact failed: %s", vy_range_str(range));
+
+	vy_range_discard_compact_parts(range);
+	index->version++;
+
+	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
 static struct vy_task *
@@ -4478,16 +4402,73 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		.abort = vy_task_compact_abort,
 	};
 
-	struct vy_task *task = vy_task_new(pool, range->index, &compact_ops);
-	if (!task)
+	struct vy_index *index = range->index;
+	struct vy_stmt *split_key = NULL;
+	const char *split_key_raw;
+	struct vy_range *parts[2];
+	struct vy_stmt *keys[3];
+	int n_parts = 1;
+
+	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
+	if (task == NULL)
 		return NULL;
 
-	if (vy_range_compact_prepare(range) != 0) {
-		vy_task_delete(pool, task);
-		return NULL;
+	assert(rlist_empty(&range->compact_list));
+
+	keys[0] = range->begin;
+	if (vy_range_needs_split(range, &split_key_raw)) {
+		split_key = vy_stmt_extract_key_raw(split_key_raw,
+						    IPROTO_SELECT,
+						    index->key_def);
+		if (split_key == NULL)
+			goto fail;
+		n_parts = 2;
+		keys[1] = split_key;
+		keys[2] = range->end;
+	} else
+		keys[1] = range->end;
+
+	/* Allocate new ranges. */
+	for (int i = 0; i < n_parts; i++) {
+		struct vy_range *r;
+		struct vy_mem *mem;
+
+		r = parts[i] = vy_range_new(index, 0, keys[i], keys[i + 1]);
+		if (r == NULL)
+			goto fail;
+		r->new_run = vy_run_new();
+		if (r->new_run == NULL)
+			goto fail;
+		mem = vy_mem_new(index->key_def, index->format);
+		if (mem == NULL)
+			goto fail;
+		rlist_add_entry(&r->mems, mem, link);
+		r->mem_count++;
+		/* Account merge w/o split. */
+		if (n_parts == 1)
+			r->merge_count = range->merge_count + 1;
 	}
+
+	say_debug("range compact prepare: %s", vy_range_str(range));
+
+	/* Replace the old range with the new ones. */
+	for (int i = 0; i < n_parts; i++)
+		vy_range_add_compact_part(range, parts[i]);
+
+	range->version++;
+	index->version++;
+
 	task->range = range;
 	return task;
+fail:
+	for (int i = 0; i < n_parts; i++) {
+		if (parts[i] != NULL)
+			vy_range_delete(parts[i]);
+	}
+	if (split_key != NULL)
+		vy_stmt_unref(split_key);
+	vy_task_delete(pool, task);
+	return NULL;
 }
 
 /* Scheduler Task }}} */
