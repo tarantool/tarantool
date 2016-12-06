@@ -680,6 +680,27 @@ static const char *
 vy_stmt_upsert_ops(const struct vy_stmt *stmt, const struct key_def *key_def,
 		   uint32_t *mp_size);
 
+/**
+ * Encode vy_stmt as xrow_header
+ *
+ * @retval 0 if OK
+ * @retval -1 if error
+ */
+static int
+vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
+	       struct xrow_header *xrow);
+
+/**
+ * Reconstruct vinyl tuple info and data from xrow
+ *
+ * @retval 0 if OK
+ * @retval -1 if error
+ */
+static int
+vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
+	       struct vy_buf *data_buf, const struct tuple_format *format,
+	       uint32_t part_count);
+
 /* Statement public API }}} */
 
 static uint32_t
@@ -2487,47 +2508,6 @@ insert:
 	 */
 	vy_index_add_range(index, range);
 	say_debug("range recover insert: %s", vy_range_str(range));
-}
-
-/**
- * Encode vy_stmt as xrow_header
- *
- * @retval 0 if OK
- * @retval -1 if error
- */
-static int
-vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
-	       struct xrow_header *xrow)
-{
-	memset(xrow, 0, sizeof(*xrow));
-	xrow->type = value->type;
-	xrow->lsn = value->lsn;
-
-	struct request request;
-	request_create(&request, value->type);
-	request.space_id = key_def->space_id;
-	request.index_id = key_def->iid;
-	if (value->type == IPROTO_UPSERT || value->type == IPROTO_REPLACE) {
-		/* extract tuple */
-		uint32_t tuple_size;
-		request.tuple = vy_stmt_tuple_data(value, key_def,
-						   &tuple_size);
-		request.tuple_end = request.tuple + tuple_size;
-	}
-	if (value->type == IPROTO_UPSERT) {
-		/* extract operations */
-		uint32_t ops_size;
-		request.ops = vy_stmt_upsert_ops(value, key_def,
-						  &ops_size);
-		request.ops_end = request.ops + ops_size;
-	}
-	if (value->type == IPROTO_DELETE) {
-		/* extract key */
-		request.key = value->data;
-		request.key_end = request.key + value->size;
-	}
-	xrow->bodycnt = request_encode(&request, xrow->body);
-	return xrow->bodycnt >= 0 ? 0: -1;
 }
 
 /* dump statement to the run page buffers (stmt header and data) */
@@ -5965,7 +5945,98 @@ vy_stmt_compare_with_key(const struct vy_stmt *stmt,
 	return vy_stmt_compare_with_raw_key(stmt, key->data, format, key_def);
 }
 
-/* }}} Statement */
+static int
+vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
+	       struct xrow_header *xrow)
+{
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->type = value->type;
+	xrow->lsn = value->lsn;
+
+	struct request request;
+	request_create(&request, value->type);
+	request.space_id = key_def->space_id;
+	request.index_id = key_def->iid;
+	if (value->type == IPROTO_UPSERT || value->type == IPROTO_REPLACE) {
+		/* extract tuple */
+		uint32_t tuple_size;
+		request.tuple = vy_stmt_tuple_data(value, key_def,
+						   &tuple_size);
+		request.tuple_end = request.tuple + tuple_size;
+	}
+	if (value->type == IPROTO_UPSERT) {
+		/* extract operations */
+		uint32_t ops_size;
+		request.ops = vy_stmt_upsert_ops(value, key_def,
+						  &ops_size);
+		request.ops_end = request.ops + ops_size;
+	}
+	if (value->type == IPROTO_DELETE) {
+		/* extract key */
+		request.key = value->data;
+		request.key_end = request.key + value->size;
+	}
+	xrow->bodycnt = request_encode(&request, xrow->body);
+	return xrow->bodycnt >= 0 ? 0: -1;
+}
+
+static int
+vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
+	       struct vy_buf *data_buf, const struct tuple_format *format,
+	       uint32_t part_count)
+{
+	struct vy_stmt_info *info;
+	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
+		return -1;
+	info = (struct vy_stmt_info *)info_buf->p;
+	vy_buf_advance(info_buf, sizeof(struct vy_stmt_info));
+
+	info->lsn = xrow->lsn;
+	info->offset = data_buf->p - data_buf->s;
+	struct request request;
+	request_create(&request, xrow->type);
+	if (request_decode(&request, xrow->body->iov_base,
+			   xrow->body->iov_len) < 0)
+		return -1;
+	info->type = request.type;
+	if (info->type == IPROTO_DELETE) {
+		/* extract key */
+		info->size = request.key_end - request.key;
+		if (vy_buf_ensure(data_buf, info->size))
+			return -1;
+		void *data = data_buf->p;
+		memcpy(data, request.key,
+		       request.key_end - request.key);
+	} else {
+		/* space for offsets */
+		int start_offset = (part_count) * sizeof(uint32_t);
+		info->size = start_offset;
+		info->size += request.tuple_end - request.tuple;
+		if (info->type == IPROTO_UPSERT) {
+			/* space for series count (1) and operations */
+			info->size += request.ops_end - request.ops;
+		}
+		if (vy_buf_ensure(data_buf, info->size))
+			return -1;
+		void *data = data_buf->p;
+		data += start_offset;
+		/* copy tuple */
+		memcpy(data, request.tuple,
+		       request.tuple_end - request.tuple);
+		/* rebuild offsets */
+		tuple_init_field_map(format, (uint32_t *)data, data);
+		data += request.tuple_end - request.tuple;
+		if (info->type == IPROTO_UPSERT) {
+			/* copy ops */
+			memcpy(data, request.ops,
+			       request.ops_end - request.ops);
+		}
+	}
+	vy_buf_advance(data_buf, info->size);
+	return 0;
+}
+
+/* }}} Statements */
 
 /** {{{ Upsert */
 
@@ -6847,68 +6918,6 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
 			vy_page_delete(itr->prev_page);
 		itr->curr_page = itr->prev_page = NULL;
 	}
-}
-
-/**
- * Reconstruct vinyl tuple info and data from xrow
- *
- * @retval 0 if OK
- * @retval -1 if error
- */
-static int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
-	       struct vy_buf *data_buf, const struct tuple_format *format,
-	       uint32_t part_count)
-{
-	struct vy_stmt_info *info;
-	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
-		return -1;
-	info = (struct vy_stmt_info *)info_buf->p;
-	vy_buf_advance(info_buf, sizeof(struct vy_stmt_info));
-
-	info->lsn = xrow->lsn;
-	info->offset = data_buf->p - data_buf->s;
-	struct request request;
-	request_create(&request, xrow->type);
-	if (request_decode(&request, xrow->body->iov_base,
-			   xrow->body->iov_len) < 0)
-		return -1;
-	info->type = request.type;
-	if (info->type == IPROTO_DELETE) {
-		/* extract key */
-		info->size = request.key_end - request.key;
-		if (vy_buf_ensure(data_buf, info->size))
-			return -1;
-		void *data = data_buf->p;
-		memcpy(data, request.key,
-		       request.key_end - request.key);
-	} else {
-		/* space for offsets */
-		int start_offset = (part_count) * sizeof(uint32_t);
-		info->size = start_offset;
-		info->size += request.tuple_end - request.tuple;
-		if (info->type == IPROTO_UPSERT) {
-			/* space for series count (1) and operations */
-			info->size += request.ops_end - request.ops;
-		}
-		if (vy_buf_ensure(data_buf, info->size))
-			return -1;
-		void *data = data_buf->p;
-		data += start_offset;
-		/* copy tuple */
-		memcpy(data, request.tuple,
-		       request.tuple_end - request.tuple);
-		/* rebuild offsets */
-		tuple_init_field_map(format, (uint32_t *)data, data);
-		data += request.tuple_end - request.tuple;
-		if (info->type == IPROTO_UPSERT) {
-			/* copy ops */
-			memcpy(data, request.ops,
-			       request.ops_end - request.ops);
-		}
-	}
-	vy_buf_advance(data_buf, info->size);
-	return 0;
 }
 
 /**
