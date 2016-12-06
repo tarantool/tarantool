@@ -597,6 +597,18 @@ static struct vy_stmt *
 vy_stmt_new_select(const char *key, uint32_t part_count);
 
 /**
+ * Create the DELETE statement from raw MessagePack data.
+ * @param key MessagePack data that contain an array of fields WITHOUT the
+ *            array header.
+ * @param part_count Count of the key fields that will be saved as result.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+static struct vy_stmt *
+vy_stmt_new_delete(const char *key, uint32_t part_count);
+
+/**
  * Create the REPLACE statement from raw MessagePack data.
  * @param tuple_begin MessagePack data that contain an array of fields WITH the
  *                    array header.
@@ -5565,7 +5577,7 @@ vy_stmt_delete(struct vy_stmt *stmt)
 }
 
 static struct vy_stmt *
-vy_stmt_new_select(const char *key, uint32_t part_count)
+vy_stmt_new_key(const char *key, uint32_t part_count, uint8_t type)
 {
 	assert(part_count == 0 || key != NULL);
 
@@ -5586,8 +5598,20 @@ vy_stmt_new_select(const char *key, uint32_t part_count)
 	data = mp_encode_array(data, part_count);
 	memcpy(data, key, key_size);
 	assert(data + key_size == stmt->data + size);
-	stmt->type = IPROTO_SELECT;
+	stmt->type = type;
 	return stmt;
+}
+
+static struct vy_stmt *
+vy_stmt_new_select(const char *key, uint32_t part_count)
+{
+	return vy_stmt_new_key(key, part_count, IPROTO_SELECT);
+}
+
+static struct vy_stmt *
+vy_stmt_new_delete(const char *key, uint32_t part_count)
+{
+	return vy_stmt_new_key(key, part_count, IPROTO_DELETE);
 }
 
 /**
@@ -6272,13 +6296,12 @@ check_key:
  * @param tx    Current transaction.
  * @param index Index in whose write_set insert the statement.
  * @param stmt  Statement to set.
- * @param type  Statement type.
  */
 static int
-vy_tx_set(struct vy_tx *tx, struct vy_index *index,
-	  struct vy_stmt *stmt, uint8_t type)
+vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct vy_stmt *stmt)
 {
-	stmt->type = type;
+	assert(stmt->type != 0);
+
 	/* Update concurrent index */
 	struct txv *old = write_set_search_key(&tx->write_set, index,
 					       stmt);
@@ -6327,7 +6350,8 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 						     index->key_def);
 	if (vystmt == NULL)
 		return -1;
-	int rc = vy_tx_set(tx, index, vystmt, IPROTO_REPLACE);
+	assert(vystmt->type == IPROTO_REPLACE);
+	int rc = vy_tx_set(tx, index, vystmt);
 	vy_stmt_unref(vystmt);
 	return rc;
 }
@@ -6346,7 +6370,8 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 				    index->key_def, operations, 1);
 	if (vystmt == NULL)
 		return -1;
-	int rc = vy_tx_set(tx, index, vystmt, IPROTO_UPSERT);
+	assert(vystmt->type == IPROTO_UPSERT);
+	int rc = vy_tx_set(tx, index, vystmt);
 	vy_stmt_unref(vystmt);
 	return rc;
 }
@@ -6358,10 +6383,11 @@ vy_delete(struct vy_tx *tx, struct vy_index *index,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(part_count <= index->key_def->part_count);
 	struct vy_stmt *vykey;
-	vykey = vy_stmt_new_select(key, part_count);
+	vykey = vy_stmt_new_delete(key, part_count);
 	if (vykey == NULL)
 		return -1;
-	int rc = vy_tx_set(tx, index, vykey, IPROTO_DELETE);
+	assert(vykey->type == IPROTO_DELETE);
+	int rc = vy_tx_set(tx, index, vykey);
 	vy_stmt_unref(vykey);
 	return rc;
 }
