@@ -316,7 +316,6 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 /** \endcond public */
 
 void close_all_xcpt(int fdc, ...);
-void coredump(int dump_interval);
 
 void __gcov_flush();
 

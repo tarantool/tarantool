@@ -91,30 +91,6 @@ close_all_xcpt(int fdc, ...)
 	}
 }
 
-void
-coredump(int dump_interval)
-{
-	static time_t last_coredump = 0;
-	time_t now = time(NULL);
-
-	if (now - last_coredump < dump_interval)
-		return;
-
-	last_coredump = now;
-
-	/* flush buffers to avoid multiple output */
-	/* https://github.com/tarantool/tarantool/issues/366 */
-	fflush(stdout);
-	fflush(stderr);
-	if (fork() == 0) {
-		close_all_xcpt(0);
-#ifdef ENABLE_GCOV
-		__gcov_flush();
-#endif
-		abort();
-	}
-}
-
 static int
 itoa(int val, char *buf)
 {

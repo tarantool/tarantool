@@ -188,14 +188,6 @@ lbox_tonumber64(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_coredump(struct lua_State *L __attribute__((unused)))
-{
-	coredump(60);
-	lua_pushstring(L, "ok");
-	return 1;
-}
-
 /* }}} */
 
 /**
@@ -329,7 +321,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_call(L, 0, 0);
 
 	lua_register(L, "tonumber64", lbox_tonumber64);
-	lua_register(L, "coredump", lbox_coredump);
 
 	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);
