@@ -2745,8 +2745,8 @@ err:
 /** {{{ vy_page_info */
 
 enum vy_request_page_key {
-	VY_PAGE_REQUEST_COUNT,
-	VY_PAGE_MIN_KEY
+	VY_PAGE_REQUEST_COUNT = 1,
+	VY_PAGE_MIN_KEY = 2
 };
 
 const char *vy_page_info_key_strs[] = {
@@ -2905,19 +2905,19 @@ vy_page_info_decode(const struct xrow_header *xrow, int run_id,
  * Keys for msgpuck run encoding
  */
 enum vy_request_run_key {
-	VY_RUN_MIN_LSN = 2,
-	VY_RUN_MAX_LSN,
-	VY_RUN_PAGE_COUNT,
-	VY_RUN_BEGIN = 65,
-	VY_RUN_END
+	VY_RUN_MIN_LSN = 1,
+	VY_RUN_MAX_LSN = 2,
+	VY_RUN_PAGE_COUNT = 3,
+	VY_RANGE_MIN_KEY = 4,
+	VY_RANGE_MAX_KEY = 5
 };
 
 const char *vy_run_info_key_strs[] = {
 	"min lsn",
 	"max lsn",
 	"page count",
-	"begin key",
-	"end key"
+	"range min key",
+	"range max key"
 };
 
 const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
@@ -2958,12 +2958,12 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	if (begin != NULL) {
 		/* range begin is set */
 		++map_size;
-		size += mp_sizeof_uint(VY_RUN_BEGIN) + begin->size;
+		size += mp_sizeof_uint(VY_RANGE_MIN_KEY) + begin->size;
 	}
 	if (end != NULL) {
 		/* range end is set */
 		++map_size;
-		size += mp_sizeof_uint(VY_RUN_END) + end->size;
+		size += mp_sizeof_uint(VY_RANGE_MAX_KEY) + end->size;
 	}
 	size += mp_sizeof_map(map_size);
 
@@ -2984,12 +2984,12 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	pos = mp_encode_uint(pos, VY_RUN_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->count);
 	if (begin != NULL) {
-		pos = mp_encode_uint(pos, VY_RUN_BEGIN);
+		pos = mp_encode_uint(pos, VY_RANGE_MIN_KEY);
 		memcpy(pos, begin->data, begin->size);
 		pos += begin->size;
 	}
 	if (end != NULL) {
-		pos = mp_encode_uint(pos, VY_RUN_END);
+		pos = mp_encode_uint(pos, VY_RANGE_MAX_KEY);
 		memcpy(pos, end->data, end->size);
 		pos += end->size;
 	}
@@ -3070,7 +3070,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 		case VY_RUN_PAGE_COUNT:
 			run_info->count = mp_decode_uint(&pos);
 			break;
-		case VY_RUN_BEGIN:
+		case VY_RANGE_MIN_KEY:
 			if (begin != NULL) {
 				/* begin already set, skip */
 				mp_next(&pos);
@@ -3080,7 +3080,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 							IPROTO_SELECT);
 			mp_next(&pos);
 			break;
-		case VY_RUN_END:
+		case VY_RANGE_MAX_KEY:
 			if (end != NULL) {
 				/* end already set, skip it */
 				mp_next(&pos);
