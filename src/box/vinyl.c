@@ -6736,7 +6736,7 @@ struct vy_page {
 };
 
 static struct vy_page *
-vy_page_new(struct vy_page_info *page_info)
+vy_page_new(const struct vy_page_info *page_info)
 {
 	struct vy_page *page = malloc(sizeof(*page));
 	if (page == NULL) {
@@ -6857,7 +6857,7 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  */
 static int
 vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
-	       struct vy_buf *data_buf, struct tuple_format *format,
+	       struct vy_buf *data_buf, const struct tuple_format *format,
 	       uint32_t part_count)
 {
 	struct vy_stmt_info *info;
@@ -6914,102 +6914,121 @@ vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
 /**
  * Read a page requests from vinyl xlog data file.
  *
- * @retval 0 for Ok
- * @retval -1 for error
+ * @retval page on success
+ * @retval NULL on error, check diag
  */
-static int
-vy_page_read(struct vy_page_info *page_info, struct vy_page **page,
-	     int fd, struct tuple_format *format, uint32_t part_count)
+static struct vy_page *
+vy_page_read(const struct vy_page_info *page_info, int fd,
+	     const struct tuple_format *format, uint32_t part_count)
 {
-	/* raed xlog tx from xlog file */
+	/* read xlog tx from xlog file */
 	size_t region_svp = region_used(&fiber()->gc);
 	char *data = (char *)region_alloc(&fiber()->gc, page_info->size);
 	if (data == NULL) {
 		diag_set(OutOfMemory, page_info->size, "region gc", "page");
-		return -1;
+		return NULL;
 	}
-	ssize_t rc;
-	rc = fio_pread(fd, data, page_info->size, page_info->offset);
-	if (rc == -1) {
-		diag_set(SystemError, "error readin file");
-		return -1;
+	ssize_t readen = fio_pread(fd, data, page_info->size,
+				   page_info->offset);
+	if (readen < 0) {
+		/* TODO: report filename */
+		diag_set(SystemError, "failed to read from file");
+		region_truncate(&fiber()->gc, region_svp);
+		return NULL;
+	}
+	if (readen != page_info->size) {
+		/* TODO: replace with XlogError, report filename */
+		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
+		region_truncate(&fiber()->gc, region_svp);
+		return NULL;
 	}
 
-	if (rc != (ssize_t)page_info->size) {
-		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
-		return -1;
-	}
 	/* parse xlog tx and create cursor */
 	const char *data_pos = data;
 	struct xlog_tx_cursor tx_cursor;
-	rc = xlog_tx_cursor_create(&tx_cursor, &data_pos,
+	int rc = xlog_tx_cursor_create(&tx_cursor, &data_pos,
 				   data_pos + page_info->size);
 	region_truncate(&fiber()->gc, region_svp);
 	if (rc != 0)
-		return -1;
+		return NULL;
 
-	*page = vy_page_new(page_info);
-	if (*page == NULL)
-		return -1;
+	struct vy_page *page = vy_page_new(page_info);
+	if (page == NULL) {
+		xlog_tx_cursor_destroy(&tx_cursor);
+		return NULL;
+	}
 
 	/* fetch all rows and decode */
 	struct xrow_header xrow;
-	size_t row_cnt = 0;
+	uint32_t row_count = 0;
 	while ((rc = xlog_tx_cursor_next_row(&tx_cursor, &xrow)) == 0 &&
-	       (rc = vy_stmt_decode(&xrow, &(*page)->info, &(*page)->data,
+	       (rc = vy_stmt_decode(&xrow, &page->info, &page->data,
 				    format, part_count) == 0)) {
-		++row_cnt;
+		++row_count;
 	}
 	xlog_tx_cursor_destroy(&tx_cursor);
-	if (row_cnt != page_info->count) {
-		diag_set(ClientError, ER_VINYL, "Row count doesn't match");
-		vy_page_delete(*page);
-		return -1;
+	if (rc < 0) {
+		vy_page_delete(page);
+		return NULL;
 	}
-	return rc;
+
+	if (row_count != page_info->count) {
+		/* TODO: replace with XlogError, report filename */
+		diag_set(ClientError, ER_VINYL, "invalid row count "
+			 "at offset %lld: expected %lu, got %lu",
+			 (long long) page_info->offset,
+			 (unsigned long) row_count,
+			 (unsigned long) page_info->count);
+		vy_page_delete(page);
+		return NULL;
+	}
+
+	return page;
 }
 
 /**
  * coio task for vinyl page read
  */
 struct vy_page_read_task {
+	/** parent */
 	struct coio_task base;
-	int rc;
-	/* vinyl run data xlog fd */
-	int fd;
-	/* vinyl page to fetch data */
-	struct vy_page *page;
-	/* vinyl page metadata */
-	struct vy_page_info *page_info;
+	/** vinyl page metadata */
+	struct vy_page_info page_info;
+	/** tuple format to create tuples - ref. counted */
 	struct tuple_format *format;
+	/** part count - needed to create tuples */
 	uint32_t part_count;
+	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
+	/** [out] resulting vinyl page */
+	struct vy_page *page;
 };
 
 /**
  * vinyl read task callback
  */
-static ssize_t
+static int
 vy_page_read_cb(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
-	task->rc = vy_page_read(task->page_info, &task->page,
-				task->fd, task->format, task->part_count);
-	fiber_gc();
-	return 0;
+	task->page = vy_page_read(&task->page_info, task->run->fd,
+				  task->format, task->part_count);
+	return task->page != NULL ? 0 : -1;
 }
 
 /**
  * vinyl read task cleanup callback
  */
-static ssize_t
+static int
 vy_page_read_cb_free(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	if (task->page)
 		vy_page_delete(task->page);
 	vy_run_unref(task->run);
-	free(task);
+	tuple_format_ref(task->format, -1);
+	coio_task_destroy(&task->base);
+	TRASH(task);
 	return 0;
 }
 
@@ -7024,6 +7043,9 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
+	const struct vy_index *index = itr->index;
+	const struct vy_env *env = index->env;
+
 	/* Check cache */
 	*result = vy_run_iterator_cache_get(itr, page_no);
 	if (*result != NULL)
@@ -7035,7 +7057,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 	/* Read page data from the disk */
 	int rc;
-	if (cord_is_main() && itr->index->env->status == VINYL_ONLINE) {
+	if (cord_is_main() && env->status == VINYL_ONLINE) {
 		/*
 		 * Use coeio for TX thread **after recovery**.
 		 * Please note that vy_run can go away after yield.
@@ -7046,30 +7068,39 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		uint32_t index_version = itr->index->version;
 		uint32_t range_version = itr->range->version;
 
+		/* Allocate a coio task */
+		struct vy_page_read_task *task =
+			(struct vy_page_read_task *)calloc(1, sizeof(*task));
+		if (task == NULL) {
+			diag_set(OutOfMemory, sizeof(*task), "malloc",
+				 "vy_page_read_task");
+			return -1;
+		}
+		coio_task_create(&task->base, vy_page_read_cb,
+				  vy_page_read_cb_free);
+
 		/*
 		 * Make sure the run file descriptor won't be closed
 		 * (even worse, reopened) while a coeio thread is
 		 * reading it.
 		 */
-		vy_run_ref(itr->run);
-		/* create page read task */
-		struct vy_page_read_task *task =
-			(struct vy_page_read_task *)calloc(1, sizeof(*task));
-		task->fd = itr->run->fd;
-		task->page = page;
-		task->page_info = page_info;
-		task->part_count = itr->index->key_def->part_count;
-		task->format = itr->index->format;
-		rc = coio_task(&task->base, vy_page_read_cb,
-			       vy_page_read_cb_free, TIMEOUT_INFINITY);
+		task->run = itr->run;
+		vy_run_ref(task->run);
+		task->page_info = *page_info;
+		task->format = index->format;
+		tuple_format_ref(task->format, 1);
+		task->part_count = index->key_def->part_count;
+		task->page = NULL;
+
+		/* Post task to coeio */
+		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
 		if (rc < 0)
-			return -1;
+			return -1; /* timed out or cancelled */
 
 		/* task was posted to worker and finished */
-		rc = task->rc;
 		page = task->page;
-		free(task);
-		vy_run_unref(itr->run);
+		task->page = NULL;
+		vy_page_read_cb_free(&task->base);
 
 		/*
 		 * Check that vy_index/vy_range/vy_run haven't changed
@@ -7077,10 +7108,11 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 */
 		if (index_version != itr->index->version ||
 		    range_version != itr->range->version) {
-			vy_page_delete(page);
 			itr->index = NULL;
 			itr->range = NULL;
 			itr->run = NULL;
+			if (page != NULL)
+				vy_page_delete(page);
 			return -2; /* iterator is no more valid */
 		}
 	} else {
@@ -7088,14 +7120,13 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		rc = vy_page_read(page_info, &page, itr->run->fd,
-				  itr->index->format,
-				  itr->index->key_def->part_count);
-		if (rc < 0) {
-			vy_page_delete(page);
-			/* TODO: report file name */
-			return -1;
-		}
+		page = vy_page_read(page_info, itr->run->fd, index->format,
+				    index->key_def->part_count);
+	}
+
+	if (page == NULL) {
+		assert(!diag_is_empty(&fiber()->diag));
+		return -1;
 	}
 
 	/* Iterator is never used from multiple fibers */
