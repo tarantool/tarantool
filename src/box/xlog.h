@@ -390,7 +390,8 @@ struct xlog_tx_cursor
  */
 ssize_t
 xlog_tx_cursor_create(struct xlog_tx_cursor *cursor,
-		      const char **data, const char *data_end);
+		      const char **data, const char *data_end,
+		      ZSTD_DStream *zdctx);
 
 /**
  * Destroy xlog tx cursor and free all associated memory
@@ -429,6 +430,8 @@ struct xlog_cursor
 	struct xlog_tx_cursor tx_cursor;
 	/** true if current tx is opened */
 	bool is_opened;
+	/** ZSTD context for decompression */
+	ZSTD_DStream *zdctx;
 };
 
 /**

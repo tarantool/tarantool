@@ -112,6 +112,7 @@ struct vy_env {
 	struct vy_stat      *stat;
 	struct mempool      cursor_pool;
 	struct mempool      mem_tree_extent_pool;
+	pthread_key_t       zdctx_key;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
 };
@@ -6627,6 +6628,12 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 				  tx_write_rate, dump_bandwidth);
 }
 
+static void
+vy_free_zdctx(void *arg)
+{
+	ZSTD_freeDStream(arg);
+}
+
 struct vy_env *
 vy_env_new(void)
 {
@@ -6658,6 +6665,7 @@ vy_env_new(void)
 	               sizeof(struct vy_cursor));
 	mempool_create(&e->mem_tree_extent_pool, cord_slab_cache(),
 		       VY_MEM_TREE_EXTENT_SIZE);
+	pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
@@ -7017,7 +7025,8 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  */
 static struct vy_page *
 vy_page_read(const struct vy_page_info *page_info, int fd,
-	     const struct tuple_format *format, uint32_t part_count)
+	     const struct tuple_format *format, uint32_t part_count,
+	     ZSTD_DStream *zdctx)
 {
 	/* read xlog tx from xlog file */
 	size_t region_svp = region_used(&fiber()->gc);
@@ -7045,7 +7054,7 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 	const char *data_pos = data;
 	struct xlog_tx_cursor tx_cursor;
 	int rc = xlog_tx_cursor_create(&tx_cursor, &data_pos,
-				   data_pos + page_info->size);
+				       data_pos + page_info->size, zdctx);
 	region_truncate(&fiber()->gc, region_svp);
 	if (rc != 0)
 		return NULL;
@@ -7100,7 +7109,27 @@ struct vy_page_read_task {
 	struct vy_run *run;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
+	/** vy_env to get zstd decompression context */
+	struct vy_env *env;
 };
+
+/**
+ * Get thread local zstd decompression context
+ */
+static ZSTD_DStream *
+vy_env_get_zdctx(struct vy_env *env)
+{
+	ZSTD_DStream *zdctx = pthread_getspecific(env->zdctx_key);
+	if (zdctx == NULL) {
+		zdctx = ZSTD_createDStream();
+		if (zdctx == NULL) {
+			diag_set(SystemError, "Can't create decompression context");
+			return NULL;
+		}
+		pthread_setspecific(env->zdctx_key, zdctx);
+	}
+	return zdctx;
+}
 
 /**
  * vinyl read task callback
@@ -7109,8 +7138,11 @@ static int
 vy_page_read_cb(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->env);
+	if (zdctx == NULL)
+		return -1;
 	task->page = vy_page_read(&task->page_info, task->run->fd,
-				  task->format, task->part_count);
+				  task->format, task->part_count, zdctx);
 	return task->page != NULL ? 0 : -1;
 }
 
@@ -7189,6 +7221,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->format = index->format;
 		tuple_format_ref(task->format, 1);
 		task->part_count = index->key_def->part_count;
+		task->env = index->env;
 		task->page = NULL;
 
 		/* Post task to coeio */
@@ -7219,8 +7252,11 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
+		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->index->env);
+		if (zdctx == NULL)
+			return -1;
 		page = vy_page_read(page_info, itr->run->fd, index->format,
-				    index->key_def->part_count);
+				    index->key_def->part_count, zdctx);
 	}
 
 	if (page == NULL) {

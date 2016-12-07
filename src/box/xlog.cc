@@ -1186,9 +1186,8 @@ xlog_cursor_pos(struct xlog_cursor *cursor)
  */
 static int
 xlog_cursor_decompress(struct ibuf *rows, const char **data,
-		       const char *data_end)
+		       const char *data_end, ZSTD_DStream *zdctx)
 {
-	ZSTD_DStream *zdctx = ZSTD_createDStream();
 	ZSTD_initDStream(zdctx);
 	if (zdctx == NULL) {
 		tnt_error(OutOfMemory, sizeof(zdctx),
@@ -1232,10 +1231,8 @@ xlog_cursor_decompress(struct ibuf *rows, const char **data,
 		}
 	}
 	*data = data_end;
-	ZSTD_freeDStream(zdctx);
 	return 0;
 error:
-	ZSTD_freeDStream(zdctx);
 	return -1;
 }
 
@@ -1333,7 +1330,8 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
  */
 ssize_t
 xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
-		      const char **data, const char *data_end)
+		      const char **data, const char *data_end,
+		      ZSTD_DStream *zdctx)
 {
 	const char *rpos = *data;
 	struct xlog_fixheader fixheader;
@@ -1373,7 +1371,7 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	};
 	assert(fixheader.magic == zrow_marker);
 	if (xlog_cursor_decompress(&tx_cursor->rows, &rpos,
-				   rpos + fixheader.len) < 0) {
+				   rpos + fixheader.len, zdctx) < 0) {
 		ibuf_destroy(&tx_cursor->rows);
 		return -1;
 	}
@@ -1456,7 +1454,7 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 	ssize_t to_load;
 	while ((to_load = xlog_tx_cursor_create(&i->tx_cursor,
 						(const char **)&i->rbuf.rpos,
-						i->rbuf.wpos)) > 0) {
+						i->rbuf.wpos, i->zdctx)) > 0) {
 		/* not enough data in read buffer */
 		int rc = xlog_cursor_ensure(i, ibuf_used(&i->rbuf) + to_load);
 		if (rc < 0)
@@ -1526,6 +1524,11 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		goto error;
 	}
 	snprintf(i->name, PATH_MAX, "%s", name);
+	i->zdctx = ZSTD_createDStream();
+	if (i->zdctx == NULL) {
+		diag_set(SystemError, "Can't create decompression context");
+		goto error;
+	}
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -1577,6 +1580,11 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		goto error;
 	}
 	snprintf(i->name, PATH_MAX, "%s", name);
+	i->zdctx = ZSTD_createDStream();
+	if (i->zdctx == NULL) {
+		diag_set(SystemError, "Can't create decompression context");
+		goto error;
+	}
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -1591,6 +1599,7 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 	ibuf_destroy(&i->rbuf);
 	if (i->is_opened)
 		xlog_tx_cursor_destroy(&i->tx_cursor);
+	ZSTD_freeDStream(i->zdctx);
 	TRASH(i);
 }
 
