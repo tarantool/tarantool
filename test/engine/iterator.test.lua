@@ -255,3 +255,50 @@ space:pairs(2, { iterator = 'GE' }):totable()
 space:drop()
 
 inspector:cmd("clear filter")
+
+
+--
+-- gh-1875 Add support for index:pairs(key, iterator-type) syntax
+--
+space = box.schema.space.create('test', {engine='vinyl'})
+pk = space:create_index('pk')
+space:auto_increment{1}
+space:auto_increment{2}
+space:auto_increment{3}
+space:auto_increment{4}
+space:auto_increment{5}
+
+--
+-- test pairs()
+--
+
+space:pairs(3, 'GE'):totable()
+pk:pairs(3, 'GE'):totable()
+space:pairs(3, {iterator = 'GE' }):totable()
+pk:pairs(3, {iterator = 'GE' }):totable()
+
+space:pairs(3, 'EQ'):totable()
+pk:pairs(3, 'EQ'):totable()
+space:pairs(3, {iterator = 'EQ' }):totable()
+pk:pairs(3, {iterator = 'EQ' }):totable()
+
+space:pairs(3, 'GT'):totable()
+pk:pairs(3, 'GT'):totable()
+space:pairs(3, {iterator = 'GT' }):totable()
+pk:pairs(3, {iterator = 'GT' }):totable()
+
+--
+-- test select()
+--
+
+pk:select({3}, 'LE')
+space:select({3}, 'LE')
+
+--
+-- test count()
+--
+
+pk:count({3}, 'GT')
+space:count({3}, 'GT')
+
+space:drop()

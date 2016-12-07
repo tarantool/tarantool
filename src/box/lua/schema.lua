@@ -687,6 +687,11 @@ local function check_iterator_type(opts, key_is_nil)
         else
             box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
         end
+    elseif opts and type(opts) == "string" then
+        itype = box.index[string.upper(opts)]
+        if itype == nil then
+            box.error(box.error.ITERATOR_TYPE, opts)
+        end
     else
         -- Use ALL for {} and nil keys and EQ for other keys
         itype = key_is_nil and box.index.ALL or box.index.EQ

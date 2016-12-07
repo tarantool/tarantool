@@ -626,8 +626,6 @@ box.commit()
 iterate_over(iter_obj)
 space:truncate()
 
--- Not working
-
 -- Create the iterator inside the transaction before any other actions
 -- and iterate inside
 space:replace({1, 1, 1})
