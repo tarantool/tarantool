@@ -57,3 +57,15 @@ box.snapshot()
 box.space.test.index.primary:bsize() == 0
 
 space:drop()
+
+--
+-- gh-1709: need error on altering space
+--
+space = box.schema.space.create('test', {engine='vinyl'})
+pk = space:create_index('pk', {parts = {1, 'unsigned'}})
+space:auto_increment{1}
+space:auto_increment{2}
+space:auto_increment{3}
+box.space._index:replace{space.id, 0, 'pk', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
+space:select{}
+space:drop()
