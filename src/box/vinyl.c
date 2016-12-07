@@ -1621,6 +1621,12 @@ static const char *vy_file_suffix[] = {
 	"run",		/* VY_FILE_RUN */
 };
 
+/** xlog meta type for .run files */
+#define XLOG_META_TYPE_RUN "RUN"
+
+/** xlog meta type for .index files */
+#define XLOG_META_TYPE_INDEX "INDEX"
+
 static int
 vy_run_parse_name(const char *name, int64_t *index_lsn, int64_t *range_id,
 		  int *run_id, enum vy_file_type *type)
@@ -2433,8 +2439,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 			    VY_FILE_RUN);
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
-		.filetype = "RUN",
-		.version = "0.13",
+		.filetype = XLOG_META_TYPE_RUN,
 		.server_uuid = SERVER_UUID,
 	};
 	if (xlog_create(&data_xlog, path, &meta) < 0)
@@ -2872,8 +2877,7 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
-		.filetype = "INDEX",
-		.version = "0.13",
+		.filetype = XLOG_META_TYPE_INDEX,
 		.server_uuid = SERVER_UUID,
 	};
 	if (xlog_create(&index_xlog, path, &meta) < 0)
@@ -2975,6 +2979,13 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 
+	struct xlog_meta *meta = &cursor.meta;
+	if (strcmp(meta->filetype, XLOG_META_TYPE_INDEX) != 0) {
+		diag_set(ClientError, ER_INVALID_XLOG_TYPE,
+			 XLOG_META_TYPE_INDEX, meta->filetype);
+		goto fail_close;
+	}
+
 	/* Read run header. */
 	struct xrow_header xrow;
 	int run_id_check = 0;
@@ -2986,8 +2997,9 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 		goto fail_close;
 	}
 	if (run_id_check != run_id) {
-		diag_set(ClientError, ER_VINYL, "Incorrect run_id: "
-			 "expected %d found %d", run_id, run_id_check);
+		diag_set(ClientError, ER_INVALID_RUN_ID,
+			 (long long) run_id_check,
+			 (long long) run_id);
 		goto fail_close;
 	}
 
@@ -3016,11 +3028,16 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	vy_run_snprint_path(path, sizeof(path), index->path,
 			    key_def->opts.lsn, range->id, run_id,
 			    VY_FILE_RUN);
-	run->fd = open(path, O_RDONLY);
-	if (run->fd < 0) {
-		diag_set(SystemError, "failed to open file '%s'", path);
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
+	meta = &cursor.meta;
+	if (strcmp(meta->filetype, XLOG_META_TYPE_RUN) != 0) {
+		diag_set(ClientError, ER_INVALID_XLOG_TYPE,
+			 XLOG_META_TYPE_RUN, meta->filetype);
+		goto fail_close;
 	}
+	run->fd = cursor.fd;
+	xlog_cursor_close(&cursor, true);
 
 	/* Finally, link run to the range. */
 	rlist_add_entry(&range->runs, run, link);

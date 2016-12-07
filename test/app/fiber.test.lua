@@ -3,6 +3,8 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter '"..box.cfg.snap_dir.."' to '<dir>'")
+
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.
@@ -367,3 +369,5 @@ fiber.create(function()end):name()
 fiber.create(function() fiber.wakeup(fiber.self()) end)
 
 fiber = nil
+
+test_run:cmd("clear filter")

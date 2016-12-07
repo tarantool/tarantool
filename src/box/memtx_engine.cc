@@ -850,7 +850,7 @@ checkpoint_f(va_list ap)
 
 	struct xlog snap;
 	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
-		tnt_raise(SystemError, "Can't create xlog");
+		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
 

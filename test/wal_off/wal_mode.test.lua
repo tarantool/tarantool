@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+test_run:cmd("push filter '"..box.cfg.snap_dir.."' to '<dir>'")
+
 box.cfg.wal_mode
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
@@ -13,3 +16,5 @@ box.snapshot()
 space:truncate()
 box.snapshot()
 space:drop()
+
+test_run:cmd("clear filter")

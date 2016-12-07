@@ -1,3 +1,10 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '"..box.cfg.snap_dir.."' to '<dir>'")
+---
+- true
+...
 box.cfg.wal_mode
 ---
 - none
@@ -41,7 +48,8 @@ box.snapshot()
 ...
 box.snapshot()
 ---
-- error: Can't create xlog
+- error: file '<dir>/00000000000000000031.snap'
+    already exists
 ...
 space:truncate()
 ---
@@ -52,4 +60,8 @@ box.snapshot()
 ...
 space:drop()
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

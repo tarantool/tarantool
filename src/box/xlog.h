@@ -180,8 +180,6 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 struct xlog_meta {
 	/** Text file header: filetype */
 	char filetype[10];
-	/** Text file header: xlog format version */
-	char version[10];
 	/**
 	 * Text file header: server uuid. We read
 	 * only logs with our own uuid, to avoid situations

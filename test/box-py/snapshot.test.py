@@ -1,7 +1,10 @@
 import os
+import sys
 import yaml
 import time
 from signal import SIGUSR1
+
+sys.stdout.push_filter(server.vardir, "<dir>")
 
 admin("space = box.schema.space.create('tweedledum', { id = 0 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
@@ -71,3 +74,5 @@ else:
   print "Snapshot exists."
 
 admin("space:drop()")
+
+sys.stdout.pop_filter()

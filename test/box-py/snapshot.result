@@ -21,7 +21,8 @@ box.snapshot()
 ...
 box.snapshot()
 ---
-- error: Can't create xlog
+- error: file '<dir>/box/00000000000000000273.snap'
+    already exists
 ...
 space:insert{2, 'second tuple'}
 ---
@@ -30,7 +31,7 @@ space:insert{2, 'second tuple'}
 # Make 'var' directory read-only.
 box.snapshot()
 ---
-- error: Can't create xlog
+- error: failed to create file '<dir>/box/00000000000000000274.snap'
 ...
 box.error.last().errno
 ---
