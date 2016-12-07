@@ -112,6 +112,7 @@ struct vy_env {
 	struct vy_stat      *stat;
 	struct mempool      cursor_pool;
 	struct mempool      mem_tree_extent_pool;
+	struct mempool      read_task_pool;
 	pthread_key_t       zdctx_key;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
@@ -1447,6 +1448,26 @@ struct vy_cursor {
 	struct vy_read_iterator iterator;
 	/** Set to true, if need to check statements to match the cursor key. */
 	bool need_check_eq;
+};
+
+/**
+ * coio task for vinyl page read
+ */
+struct vy_page_read_task {
+	/** parent */
+	struct coio_task base;
+	/** vinyl page metadata */
+	struct vy_page_info page_info;
+	/** tuple format to create tuples - ref. counted */
+	struct tuple_format *format;
+	/** part count - needed to create tuples */
+	uint32_t part_count;
+	/** vy_run with fd - ref. counted */
+	struct vy_run *run;
+	/** vy_env - contains environment with task mempool */
+	struct vy_env *env;
+	/** [out] resulting vinyl page */
+	struct vy_page *page;
 };
 
 static struct txv *
@@ -6665,6 +6686,8 @@ vy_env_new(void)
 	               sizeof(struct vy_cursor));
 	mempool_create(&e->mem_tree_extent_pool, cord_slab_cache(),
 		       VY_MEM_TREE_EXTENT_SIZE);
+	mempool_create(&e->read_task_pool, cord_slab_cache(),
+		       sizeof(struct vy_page_read_task));
 	pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
@@ -6697,6 +6720,7 @@ vy_env_delete(struct vy_env *e)
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->mem_tree_extent_pool);
+	mempool_destroy(&e->read_task_pool);
 	free(e);
 }
 
@@ -7094,26 +7118,6 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 }
 
 /**
- * coio task for vinyl page read
- */
-struct vy_page_read_task {
-	/** parent */
-	struct coio_task base;
-	/** vinyl page metadata */
-	struct vy_page_info page_info;
-	/** tuple format to create tuples - ref. counted */
-	struct tuple_format *format;
-	/** part count - needed to create tuples */
-	uint32_t part_count;
-	/** vy_run with fd - ref. counted */
-	struct vy_run *run;
-	/** [out] resulting vinyl page */
-	struct vy_page *page;
-	/** vy_env to get zstd decompression context */
-	struct vy_env *env;
-};
-
-/**
  * Get thread local zstd decompression context
  */
 static ZSTD_DStream *
@@ -7159,7 +7163,7 @@ vy_page_read_cb_free(struct coio_task *base)
 	tuple_format_ref(task->format, -1);
 	coio_task_destroy(&task->base);
 	TRASH(task);
-	free(task);
+	mempool_free(&task->env->read_task_pool, task);
 	return 0;
 }
 
@@ -7201,7 +7205,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/* Allocate a coio task */
 		struct vy_page_read_task *task =
-			(struct vy_page_read_task *)calloc(1, sizeof(*task));
+			(struct vy_page_read_task *)mempool_alloc(&itr->index->env->read_task_pool);
 		if (task == NULL) {
 			diag_set(OutOfMemory, sizeof(*task), "malloc",
 				 "vy_page_read_task");
