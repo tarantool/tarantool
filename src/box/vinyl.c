@@ -92,6 +92,7 @@ struct tx_manager;
 struct vy_scheduler;
 struct vy_task;
 struct vy_stat;
+struct vy_squash_queue;
 
 /**
  * Global configuration of an entire vinyl instance (env object).
@@ -118,6 +119,8 @@ struct vy_env {
 	struct vy_scheduler *scheduler;
 	/** Statistics */
 	struct vy_stat      *stat;
+	/** Upsert squash queue */
+	struct vy_squash_queue *squash_queue;
 	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
 	/** Mempool for matras extents in vy_mem */
@@ -3917,7 +3920,7 @@ vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt,
 }
 
 static void
-vy_index_optimize_upserts(struct vy_index *index, struct vy_stmt *stmt);
+vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt);
 
 static int
 vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
@@ -3986,7 +3989,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 	    older->n_upserts != VY_UPSERT_INF) {
 		stmt->n_upserts = older->n_upserts + 1;
 		if (stmt->n_upserts > VY_UPSERT_THRESHOLD) {
-			vy_index_optimize_upserts(index, stmt);
+			vy_index_squash_upserts(index, stmt);
 			/*
 			 * Prevent further upserts from starting new
 			 * workers while this one is in progress.
@@ -7018,6 +7021,11 @@ vy_free_zdctx(void *arg)
 	ZSTD_freeDStream(arg);
 }
 
+static struct vy_squash_queue *
+vy_squash_queue_new(void);
+static void
+vy_squash_queue_delete(struct vy_squash_queue *q);
+
 struct vy_env *
 vy_env_new(void)
 {
@@ -7044,6 +7052,9 @@ vy_env_new(void)
 	e->scheduler = vy_scheduler_new(e);
 	if (e->scheduler == NULL)
 		goto error_sched;
+	e->squash_queue = vy_squash_queue_new();
+	if (e->squash_queue == NULL)
+		goto error_squash_queue;
 
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
@@ -7059,6 +7070,8 @@ vy_env_new(void)
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
 	return e;
+error_squash_queue:
+	vy_scheduler_delete(e->scheduler);
 error_sched:
 	vy_stat_delete(e->stat);
 error_stat:
@@ -7076,6 +7089,7 @@ void
 vy_env_delete(struct vy_env *e)
 {
 	ev_timer_stop(loop(), &e->quota_timer);
+	vy_squash_queue_delete(e->squash_queue);
 	vy_scheduler_delete(e->scheduler);
 	/* TODO: tarantool doesn't delete indexes during shutdown */
 	//assert(rlist_empty(&e->db));
@@ -10355,14 +10369,59 @@ vy_index_read(struct vy_index *index, const struct vy_stmt *key,
 	return rc;
 }
 
-static int
-vy_index_optimize_upserts_f(va_list va)
-{
-	struct vy_index *index = va_arg(va, struct vy_index *);
-	struct vy_stmt *stmt = va_arg(va, struct vy_stmt *);
+/**
+ * This structure represents a request to squash a sequence of
+ * UPSERT statements by inserting the resulting REPLACE statement
+ * after them.
+ */
+struct vy_squash {
+	/** Next in vy_squash_queue->queue. */
+	struct stailq_entry next;
+	/** Index this request is for. */
+	struct vy_index *index;
+	/** Key to squash upserts for. */
+	struct vy_stmt *stmt;
+};
 
-	/* Make sure we don't stall ongoing transactions. */
-	fiber_reschedule();
+struct vy_squash_queue {
+	/** Fiber doing background upsert squashing. */
+	struct fiber *fiber;
+	/** Used to wake up the fiber to process more requests. */
+	struct ipc_cond cond;
+	/** Queue of vy_squash objects to be processed. */
+	struct stailq queue;
+	/** Mempool for struct vy_squash. */
+	struct mempool pool;
+};
+
+static struct vy_squash *
+vy_squash_new(struct mempool *pool, struct vy_index *index,
+	      struct vy_stmt *stmt)
+{
+	struct vy_squash *squash;
+	squash = mempool_alloc(pool);
+	if (squash == NULL)
+		return NULL;
+	vy_index_ref(index);
+	squash->index = index;
+	vy_stmt_ref(stmt);
+	squash->stmt = stmt;
+	return squash;
+}
+
+static void
+vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
+{
+	vy_index_unref(squash->index);
+	vy_stmt_unref(squash->stmt);
+	mempool_free(pool, squash);
+}
+
+static void
+vy_squash_process(struct vy_squash *squash)
+{
+	struct vy_index *index = squash->index;
+	struct vy_stmt *stmt = squash->stmt;
 
 	struct vy_read_iterator itr;
 	const int64_t lsn = INT64_MAX;
@@ -10379,29 +10438,84 @@ vy_index_optimize_upserts_f(va_list va)
 			vy_quota_force_use(index->env->quota, write_size);
 	}
 	vy_read_iterator_close(&itr);
-	vy_index_unref(index);
-	vy_stmt_unref(stmt);
-	return 0;
+}
+
+static struct vy_squash_queue *
+vy_squash_queue_new(void)
+{
+	struct vy_squash_queue *sq = malloc(sizeof(*sq));
+	if (sq == NULL)
+		return NULL;
+	sq->fiber = NULL;
+	ipc_cond_create(&sq->cond);
+	stailq_create(&sq->queue);
+	mempool_create(&sq->pool, cord_slab_cache(),
+		       sizeof(struct vy_squash));
+	return sq;
 }
 
 static void
-vy_index_optimize_upserts(struct vy_index *index, struct vy_stmt *stmt)
+vy_squash_queue_delete(struct vy_squash_queue *sq)
+{
+	if (sq->fiber != NULL) {
+		sq->fiber = NULL;
+		/* Sic: fiber_cancel() can't be used here */
+		ipc_cond_signal(&sq->cond);
+	}
+	struct vy_squash *squash, *next;
+	stailq_foreach_entry_safe(squash, next, &sq->queue, next)
+		vy_squash_delete(&sq->pool, squash);
+	free(sq);
+}
+
+static int
+vy_squash_queue_f(va_list va)
+{
+	struct vy_squash_queue *sq = va_arg(va, struct vy_squash_queue *);
+	while (sq->fiber != NULL) {
+		if (stailq_empty(&sq->queue)) {
+			ipc_cond_wait(&sq->cond);
+			continue;
+		}
+		struct vy_squash *squash;
+		squash = stailq_shift_entry(&sq->queue, struct vy_squash, next);
+		vy_squash_process(squash);
+		vy_squash_delete(&sq->pool, squash);
+	}
+	return 0;
+}
+
+/*
+ * For a given UPSERT statement, insert the resulting REPLACE
+ * statement after it. Done in a background fiber.
+ */
+static void
+vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt)
 {
 	struct key_def *key_def = index->key_def;
+	struct vy_squash_queue *sq = index->env->squash_queue;
 
 	say_debug("optimize upsert slow: %"PRIu32"/%"PRIu32": %s",
 		  key_def->space_id, key_def->iid, vy_stmt_str(stmt, key_def));
 
-	struct fiber *f = fiber_new("vinyl.optimize_upserts",
-				    vy_index_optimize_upserts_f);
-	if (f == NULL) {
-		error_log(diag_last_error(diag_get()));
-		diag_clear(diag_get());
-		return;
+	/* Start the upsert squashing fiber on demand. */
+	if (sq->fiber == NULL) {
+		sq->fiber = fiber_new("vinyl.squash_queue", vy_squash_queue_f);
+		if (sq->fiber == NULL)
+			goto fail;
+		fiber_start(sq->fiber, sq);
 	}
-	vy_stmt_ref(stmt);
-	vy_index_ref(index);
-	fiber_start(f, index, stmt);
+
+	struct vy_squash *squash = vy_squash_new(&sq->pool, index, stmt);
+	if (squash == NULL)
+		goto fail;
+
+	stailq_add_tail_entry(&sq->queue, squash, next);
+	ipc_cond_signal(&sq->cond);
+	return;
+fail:
+	error_log(diag_last_error(diag_get()));
+	diag_clear(diag_get());
 }
 
 /* {{{ Cursor */
