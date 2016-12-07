@@ -1232,6 +1232,7 @@ xlog_cursor_decompress(struct ibuf *rows, const char **data,
 		}
 	}
 	*data = data_end;
+	ZSTD_freeDStream(zdctx);
 	return 0;
 error:
 	ZSTD_freeDStream(zdctx);
