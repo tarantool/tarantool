@@ -7094,6 +7094,7 @@ vy_page_read_cb_free(struct coio_task *base)
 	tuple_format_ref(task->format, -1);
 	coio_task_destroy(&task->base);
 	TRASH(task);
+	free(task);
 	return 0;
 }
 
