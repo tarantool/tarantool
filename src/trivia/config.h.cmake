@@ -85,6 +85,7 @@
 
 #ifndef HAVE_FDATASYNC
 #if defined(__APPLE__)
+#include <fcntl.h>
 #define fdatasync(fd) fcntl(fd, F_FULLFSYNC)
 #else
 #define fdatasync fsync
