@@ -148,13 +148,6 @@ server_next(struct server *server);
 	     var != NULL; var = server_next(var))
 
 /**
- * Wait until local server uuid will be registered in _cluster table.
- * Used by box_init().
- */
-void
-cluster_wait_for_id();
-
-/**
  * Set numeric cluster-local id of remote server.
  * table. Add server to the cluster lsn table with LSN = 0.
  */

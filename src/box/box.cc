@@ -1342,6 +1342,10 @@ bootstrap_from_master(struct server *master, struct vclock *start_vclock)
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
+	/* Check server_id registration in _cluster */
+	if (recovery->server_id == SERVER_ID_NIL)
+		panic("server id has not received from master");
+
 	/* Start server vclock using master's vclock */
 	vclock_copy(start_vclock, &applier->vclock);
 
@@ -1467,6 +1471,10 @@ box_init(void)
 	}
 	fiber_gc();
 
+	/* Server must be registered in _cluster */
+	assert(recovery->server_id != SERVER_ID_NIL);
+
+	/* Start WAL writer */
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_mode != WAL_NONE) {
@@ -1481,9 +1489,6 @@ box_init(void)
 		if (server->applier != NULL)
 			applier_resume(server->applier);
 	}
-
-	/* Enter read-write mode. */
-	cluster_wait_for_id();
 
 	title("running");
 	say_info("ready to accept requests");

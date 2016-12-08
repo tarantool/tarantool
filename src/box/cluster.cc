@@ -38,7 +38,6 @@
 
 #include "box.h"
 #include "recovery.h"
-#include "wal.h"
 #include "applier.h"
 #include "error.h"
 #include "vclock.h" /* VCLOCK_MAX */
@@ -72,7 +71,6 @@ rb_gen(, serverset_, serverset_t, struct server, link,
 
 static struct mempool server_pool;
 static serverset_t serverset;
-static struct ipc_cond wait_for_id;
 
 void
 cluster_init(void)
@@ -80,14 +78,12 @@ cluster_init(void)
 	mempool_create(&server_pool, &cord()->slabc,
 		       sizeof(struct server));
 	serverset_new(&serverset);
-	ipc_cond_create(&wait_for_id);
 }
 
 void
 cluster_free(void)
 {
 	mempool_destroy(&server_pool);
-	ipc_cond_destroy(&wait_for_id);
 }
 
 extern "C" struct vclock *
@@ -125,13 +121,6 @@ server_delete(struct server *server)
 	mempool_free(&server_pool, server);
 }
 
-void
-cluster_wait_for_id()
-{
-	while (recovery->server_id == 0)
-		ipc_cond_wait(&wait_for_id);
-}
-
 struct server *
 cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 {
@@ -159,14 +148,6 @@ server_set_id(struct server *server, uint32_t server_id)
 		/* Assign local server id */
 		assert(r->server_id == SERVER_ID_NIL);
 		r->server_id = server_id;
-		/*
-		 * Leave read-only mode
-		 * if this is a running server.
-		 * Otherwise, read only is switched
-		 * off after recovery_finalize().
-		 */
-		if (wal)
-			ipc_cond_signal(&wait_for_id);
 	}
 }
 
