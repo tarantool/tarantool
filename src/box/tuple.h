@@ -281,8 +281,8 @@ struct PACKED tuple
 
 /**
  * Get pointer to MessagePack data of the tuple.
- * @param tuple Tuple from which get data.
- * @retval Pointer to MessagePack array.
+ * @param tuple tuple.
+ * @return MessagePack array.
  */
 inline const char *
 tuple_data(const struct tuple *tuple)
@@ -292,14 +292,14 @@ tuple_data(const struct tuple *tuple)
 
 /**
  * Get pointer to MessagePack data of the tuple.
- * @param tuple     Tuple from which get data.
- * @param[out] size Is set to size of the data.
- * @retval Pointer to MessagePack array.
+ * @param tuple tuple.
+ * @param[out] size Size in bytes of the MessagePack array.
+ * @return MessagePack array.
  */
 inline const char *
-tuple_data_range(const struct tuple *tuple, uint32_t *size)
+tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
-	*size = tuple->size;
+	*p_size = tuple->size;
 	return tuple->raw;
 }
 

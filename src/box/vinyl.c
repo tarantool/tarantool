@@ -680,26 +680,45 @@ vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
 		const struct tuple_format *format, bool suppress_error);
 
 /**
+ * Extract MessagePack data from the SELECT/DELETE statement.
+ * @param stmt    An SELECT or DELETE statement.
+ *
+ * @return MessagePack array of key parts.
+ */
+static const char *
+vy_key_data(const struct vy_stmt *key);
+
+/**
+ * Extract MessagePack data from the SELECT/DELETE statement.
+ * @param stmt An SELECT or DELETE statement.
+ * @param[out] p_size Size of the MessagePack array in bytes.
+ *
+ * @return MessagePack array of key parts.
+ */
+static const char *
+vy_key_data_range(const struct vy_stmt *stmt, uint32_t *p_size);
+
+/**
  * Extract MessagePack data from the REPLACE/UPSERT statement.
  * @param stmt    An UPSERT or REPLACE statement.
  * @param key_def Definition of the format of the tuple.
  *
- * @retval Pointer on MessagePack array of tuple fields.
+ * @return MessagePack array of tuple fields.
  */
 static const char *
-vy_stmt_data(const struct vy_stmt *stmt, const struct key_def *key_def);
+vy_tuple_data(const struct vy_stmt *tuple, const struct key_def *key_def);
 
 /**
  * Extract MessagePack data from the REPLACE/UPSERT statement.
  * @param stmt An UPSERT or REPLACE statement.
  * @param key_def Definition of the format of the tuple.
- * @param mp_size Out parameter for size of the returned tuple.
+ * @param[out] p_size Size of the MessagePack array in bytes.
  *
- * @retval Pointer on MessagePack array of tuple fields.
+ * @return MessagePack array of tuple fields.
  */
 static const char *
-vy_stmt_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
-		   uint32_t *mp_size);
+vy_tuple_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
+		    uint32_t *p_size);
 
 /**
  * Extract the operations array from the UPSERT statement.
@@ -756,16 +775,20 @@ vy_stmt_unref(struct vy_stmt *stmt);
 
 /**
  * Extract a SELECT statement with only indexed fields from raw data.
- * @param index Index for which a key is extracted.
  * @param stmt Raw data of struct vy_stmt.
  * @param type IProto type of @param stmt.
+ * @param key_def key definition.
  *
  * @retval not NULL Success.
  * @retval NULL Memory allocation error.
  */
 static struct vy_stmt *
-vy_stmt_extract_key_raw(const struct key_def *key_def, const char *stmt,
-			uint8_t type);
+vy_stmt_extract_key_raw(const char *stmt, uint8_t type,
+		        const struct key_def *key_def);
+
+/** @copydoc vy_stmt_extract_raw */
+static struct vy_stmt *
+vy_stmt_extract_key(const struct vy_stmt *stmt, const struct key_def *key_def);
 
 /**
  * Format a key into string.
@@ -806,7 +829,7 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 		SNPRINT(total, snprintf, buf, size, "[]");
 	} else {
 		uint32_t tuple_size;
-		const char *tuple_data = vy_stmt_data_range(stmt, key_def,
+		const char *tuple_data = vy_tuple_data_range(stmt, key_def,
 							    &tuple_size);
 		SNPRINT(total, vy_key_snprint, buf, size, tuple_data);
 	}
@@ -2004,10 +2027,10 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 		"%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64"(",
 		 key_def->space_id, key_def->iid, key_def->opts.lsn, range->id);
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->begin != NULL ? range->begin->raw : NULL);
+		range->begin != NULL ? vy_key_data(range->begin) : NULL);
 	SNPRINT(total, snprintf, buf, size, "..");
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->end != NULL ? range->end->raw : NULL);
+		range->end != NULL ? vy_key_data(range->end) : NULL);
 	SNPRINT(total, snprintf, buf, size, ")");
 	return total;
 }
@@ -2663,8 +2686,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			first_stmt = false;
 			struct vy_buf *min_buf = &run_info->pages_min;
 			struct vy_stmt *min_stmt;
-			min_stmt = vy_stmt_extract_key_raw(key_def, stmt->raw,
-							   stmt->type);
+			min_stmt = vy_stmt_extract_key(stmt, key_def);
 			if (min_stmt == NULL) {
 				rc = -1;
 				goto out;
@@ -2676,8 +2698,10 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			}
 
 			page->min_key_offset = vy_buf_used(min_buf);
-			memcpy(min_buf->p, min_stmt->raw, min_stmt->size);
-			vy_buf_advance(min_buf, min_stmt->size);
+			uint32_t bsize;
+			const char *data = vy_key_data_range(min_stmt, &bsize);
+			memcpy(min_buf->p, data, bsize);
+			vy_buf_advance(min_buf, bsize);
 			vy_stmt_unref(min_stmt);
 		}
 
@@ -3001,12 +3025,16 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	if (begin != NULL) {
 		/* range begin is set */
 		++map_size;
-		size += mp_sizeof_uint(VY_RANGE_MIN_KEY) + begin->size;
+		uint32_t bsize;
+		vy_key_data_range(begin, &bsize);
+		size += mp_sizeof_uint(VY_RANGE_MIN_KEY) + bsize;
 	}
 	if (end != NULL) {
 		/* range end is set */
 		++map_size;
-		size += mp_sizeof_uint(VY_RANGE_MAX_KEY) + end->size;
+		uint32_t bsize;
+		vy_key_data_range(end, &bsize);
+		size += mp_sizeof_uint(VY_RANGE_MAX_KEY) + bsize;
 	}
 	size += mp_sizeof_map(map_size);
 
@@ -3028,13 +3056,17 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	pos = mp_encode_uint(pos, run_info->count);
 	if (begin != NULL) {
 		pos = mp_encode_uint(pos, VY_RANGE_MIN_KEY);
-		memcpy(pos, begin->raw, begin->size);
-		pos += begin->size;
+		uint32_t bsize;
+		const char *data = vy_key_data_range(begin, &bsize);
+		memcpy(pos, data, bsize);
+		pos += bsize;
 	}
 	if (end != NULL) {
 		pos = mp_encode_uint(pos, VY_RANGE_MAX_KEY);
-		memcpy(pos, end->raw, end->size);
-		pos += end->size;
+		uint32_t bsize;
+		const char *data = vy_key_data_range(end, &bsize);
+		memcpy(pos, data, bsize);
+		pos += bsize;
 	}
 
 	/* put tuple in a replace request to run's space */
@@ -3119,8 +3151,8 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			begin = vy_stmt_extract_key_raw(key_def, pos,
-							IPROTO_SELECT);
+			begin = vy_stmt_extract_key_raw(pos, IPROTO_SELECT,
+							key_def);
 			mp_next(&pos);
 			break;
 		case VY_RANGE_MAX_KEY:
@@ -3129,8 +3161,8 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			end = vy_stmt_extract_key_raw(key_def, pos,
-						      IPROTO_SELECT);
+			end = vy_stmt_extract_key_raw(pos, IPROTO_SELECT,
+						      key_def);
 			mp_next(&pos);
 			break;
 		default:
@@ -3551,9 +3583,9 @@ vy_range_compact_prepare(struct vy_range *range)
 
 	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_stmt_extract_key_raw(index->key_def,
-						    split_key_raw,
-						    IPROTO_SELECT);
+		split_key = vy_stmt_extract_key_raw(split_key_raw,
+						    IPROTO_SELECT,
+						    index->key_def);
 		if (split_key == NULL)
 			goto fail;
 		n_parts = 2;
@@ -5783,7 +5815,22 @@ vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
 }
 
 static const char *
-vy_stmt_data(const struct vy_stmt *stmt, const struct key_def *key_def)
+vy_key_data(const struct vy_stmt *stmt)
+{
+	assert(stmt->type == IPROTO_SELECT || stmt->type == IPROTO_DELETE);
+	return stmt->raw;
+}
+
+static const char *
+vy_key_data_range(const struct vy_stmt *stmt, uint32_t *p_size)
+{
+	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
+	*p_size = stmt->size;
+	return stmt->raw;
+}
+
+static const char *
+vy_tuple_data(const struct vy_stmt *stmt, const struct key_def *key_def)
 {
 	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
 	uint32_t offsets_size = sizeof(uint32_t) * key_def->part_count;
@@ -5791,15 +5838,15 @@ vy_stmt_data(const struct vy_stmt *stmt, const struct key_def *key_def)
 }
 
 static const char *
-vy_stmt_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
-		   uint32_t *mp_size)
+vy_tuple_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
+		   uint32_t *p_size)
 {
 	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
-	const char *mp = vy_stmt_data(stmt, key_def);
+	const char *mp = vy_tuple_data(stmt, key_def);
 	const char *mp_end = mp;
 	mp_next(&mp_end);
 	assert(mp < mp_end);
-	*mp_size = mp_end - mp;
+	*p_size = mp_end - mp;
 	return mp;
 }
 
@@ -5808,15 +5855,15 @@ vy_stmt_upsert_ops(const struct vy_stmt *stmt, const struct key_def *key_def,
 		   uint32_t *mp_size)
 {
 	assert(stmt->type == IPROTO_UPSERT);
-	const char *mp = vy_stmt_data(stmt, key_def);
+	const char *mp = vy_tuple_data(stmt, key_def);
 	mp_next(&mp);
 	*mp_size = stmt->raw + stmt->size - mp;
 	return mp;
 }
 
 static struct vy_stmt *
-vy_stmt_extract_key_raw(const struct key_def *key_def, const char *stmt,
-			uint8_t type)
+vy_stmt_extract_key_raw(const char *stmt, uint8_t type,
+		        const struct key_def *key_def)
 {
 	uint32_t part_count;
 	if (type == IPROTO_SELECT || type == IPROTO_DELETE) {
@@ -5854,6 +5901,12 @@ vy_stmt_extract_key_raw(const struct key_def *key_def, const char *stmt,
 	return ret;
 }
 
+static struct vy_stmt *
+vy_stmt_extract_key(const struct vy_stmt *stmt, const struct key_def *key_def)
+{
+	return vy_stmt_extract_key_raw(stmt->raw, stmt->type, key_def);
+}
+
 /*
  * Create REPLACE statement from UPSERT statement.
  */
@@ -5863,7 +5916,7 @@ vy_stmt_replace_from_upsert(const struct vy_stmt *upsert,
 {
 	assert(upsert->type == IPROTO_UPSERT);
 	/* Get statement size without UPSERT operations */
-	const char *mp = vy_stmt_data(upsert, key_def);
+	const char *mp = vy_tuple_data(upsert, key_def);
 	mp_next(&mp);
 	size_t size = mp - upsert->raw;
 	assert(size <= upsert->size);
@@ -5884,7 +5937,7 @@ vy_convert_replace(const struct key_def *key_def, struct tuple_format *format,
 {
 	assert(vy_stmt->type == IPROTO_REPLACE);
 	uint32_t bsize;
-	const char *data = vy_stmt_data_range(vy_stmt, key_def, &bsize);
+	const char *data = vy_tuple_data_range(vy_stmt, key_def, &bsize);
 	return box_tuple_new(format, data, data + bsize);
 }
 
@@ -6074,7 +6127,7 @@ vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
 	if (value->type == IPROTO_UPSERT || value->type == IPROTO_REPLACE) {
 		/* extract tuple */
 		uint32_t tuple_size;
-		request.tuple = vy_stmt_data_range(value, key_def, &tuple_size);
+		request.tuple = vy_tuple_data_range(value, key_def, &tuple_size);
 		request.tuple_end = request.tuple + tuple_size;
 	}
 	if (value->type == IPROTO_UPSERT) {
@@ -6086,8 +6139,10 @@ vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
 	}
 	if (value->type == IPROTO_DELETE) {
 		/* extract key */
+		uint32_t bsize;
+		request.key = vy_key_data_range(value, &bsize);
 		request.key = value->raw;
-		request.key_end = request.key + value->size;
+		request.key_end = request.key + bsize;
 	}
 	xrow->bodycnt = request_encode(&request, xrow->body);
 	return xrow->bodycnt >= 0 ? 0: -1;
@@ -6276,7 +6331,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 * Apply new operations to the old stmt
 	 */
 	const char *result_mp;
-	result_mp = vy_stmt_data_range(old_stmt, key_def, &mp_size);
+	result_mp = vy_tuple_data_range(old_stmt, key_def, &mp_size);
 	const char *result_mp_end = result_mp + mp_size;
 	struct vy_stmt *result_stmt = NULL;
 	struct region *region = &fiber()->gc;
@@ -9961,7 +10016,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
 		const char *mp_data;
-		mp_data = vy_stmt_data_range(stmt, index->key_def, &mp_size);
+		mp_data = vy_tuple_data_range(stmt, index->key_def, &mp_size);
 		int64_t lsn = stmt->lsn;
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
 		if (rc != 0)
