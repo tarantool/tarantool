@@ -231,15 +231,7 @@ tuple_field_to_cstr(const char *field, uint32_t len)
 const char *
 tuple_next_cstr(struct tuple_iterator *it)
 {
-	uint32_t fieldno = it->fieldno;
-	const char *field = tuple_next(it);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
-	if (mp_typeof(*field) != MP_STR) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_STRING]);
-	}
+	const char *field = tuple_next_check(it, MP_STR);
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
@@ -248,14 +240,7 @@ tuple_next_cstr(struct tuple_iterator *it)
 const char *
 tuple_field_cstr(struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field(tuple, fieldno);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
-	if (mp_typeof(*field) != MP_STR) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_STRING]);
-	}
+	const char *field = tuple_field_check(tuple, fieldno, MP_STR);
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);

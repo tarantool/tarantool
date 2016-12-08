@@ -638,6 +638,23 @@ tuple_field_cstr(struct tuple *tuple, uint32_t fieldno);
 const char *
 tuple_field_to_cstr(const char *field, uint32_t len);
 
+/** Return a tuple field and check its type. */
+inline const char *
+tuple_next_check(struct tuple_iterator *it, enum mp_type type)
+{
+	uint32_t fieldno = it->fieldno;
+	const char *field = tuple_next(it);
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
+	if (mp_typeof(*field) != MP_UINT) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
+			  mp_type_strs[type]);
+	}
+
+	return field;
+}
+
 /**
  * A convenience shortcut for the data dictionary - get next field
  * from iterator as uint32_t or raise an error if there is
@@ -647,15 +664,7 @@ inline uint32_t
 tuple_next_u32(struct tuple_iterator *it)
 {
 	uint32_t fieldno = it->fieldno;
-	const char *field = tuple_next(it);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
-	if (mp_typeof(*field) != MP_UINT) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_UNSIGNED]);
-	}
-
+	const char *field = tuple_next_check(it, MP_UINT);
 	uint32_t val = mp_decode_uint(&field);
 	if (val > UINT32_MAX) {
 		tnt_raise(ClientError, ER_FIELD_TYPE,
