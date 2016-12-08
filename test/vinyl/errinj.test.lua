@@ -62,4 +62,35 @@ for i=1,num_rows do
 end;
 #s:select{} == num_rows;
 s:drop();
-test_run:cmd("setopt delimiter ''")
+test_run:cmd("setopt delimiter ''");
+
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+for i = 1, 10 do s:insert({i, 'test str' .. tostring(i)}) end
+box.snapshot()
+s:select()
+errinj.set("ERRINJ_VY_READ_PAGE", true)
+s:select()
+errinj.set("ERRINJ_VY_READ_PAGE", false)
+s:select()
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+function test_cancel_read () k = s:select() return #k end
+f1 = fiber.create(test_cancel_read)
+fiber.cancel(f1)
+-- task should be done
+fiber.sleep(0.2)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+s:select()
+
+-- error after timeout for canceled fiber
+errinj.set("ERRINJ_VY_READ_PAGE", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+f1 = fiber.create(test_cancel_read)
+fiber.cancel(f1)
+fiber.sleep(0.2)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE", false);
+s:select()
+s:drop()
+

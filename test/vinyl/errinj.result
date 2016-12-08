@@ -148,3 +148,134 @@ end;
 s:drop();
 ---
 ...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s = box.schema.space.create('test', {engine='vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+for i = 1, 10 do s:insert({i, 'test str' .. tostring(i)}) end
+---
+...
+box.snapshot()
+---
+- ok
+...
+s:select()
+---
+- - [1, 'test str1']
+  - [2, 'test str2']
+  - [3, 'test str3']
+  - [4, 'test str4']
+  - [5, 'test str5']
+  - [6, 'test str6']
+  - [7, 'test str7']
+  - [8, 'test str8']
+  - [9, 'test str9']
+  - [10, 'test str10']
+...
+errinj.set("ERRINJ_VY_READ_PAGE", true)
+---
+- ok
+...
+s:select()
+---
+- error: page read injection
+...
+errinj.set("ERRINJ_VY_READ_PAGE", false)
+---
+- ok
+...
+s:select()
+---
+- - [1, 'test str1']
+  - [2, 'test str2']
+  - [3, 'test str3']
+  - [4, 'test str4']
+  - [5, 'test str5']
+  - [6, 'test str6']
+  - [7, 'test str7']
+  - [8, 'test str8']
+  - [9, 'test str9']
+  - [10, 'test str10']
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+---
+- ok
+...
+function test_cancel_read () k = s:select() return #k end
+---
+...
+f1 = fiber.create(test_cancel_read)
+---
+...
+fiber.cancel(f1)
+---
+...
+-- task should be done
+fiber.sleep(0.2)
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+---
+- ok
+...
+s:select()
+---
+- - [1, 'test str1']
+  - [2, 'test str2']
+  - [3, 'test str3']
+  - [4, 'test str4']
+  - [5, 'test str5']
+  - [6, 'test str6']
+  - [7, 'test str7']
+  - [8, 'test str8']
+  - [9, 'test str9']
+  - [10, 'test str10']
+...
+-- error after timeout for canceled fiber
+errinj.set("ERRINJ_VY_READ_PAGE", true)
+---
+- ok
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+---
+- ok
+...
+f1 = fiber.create(test_cancel_read)
+---
+...
+fiber.cancel(f1)
+---
+...
+fiber.sleep(0.2)
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+---
+- ok
+...
+errinj.set("ERRINJ_VY_READ_PAGE", false);
+---
+- ok
+...
+s:select()
+---
+- - [1, 'test str1']
+  - [2, 'test str2']
+  - [3, 'test str3']
+  - [4, 'test str4']
+  - [5, 'test str5']
+  - [6, 'test str6']
+  - [7, 'test str7']
+  - [8, 'test str8']
+  - [9, 'test str9']
+  - [10, 'test str10']
+...
+s:drop()
+---
+...

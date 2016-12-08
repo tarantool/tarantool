@@ -56,6 +56,8 @@ struct errinj {
 	_(ERRINJ_TUPLE_FIELD, false) \
 	_(ERRINJ_VY_RANGE_DUMP, false) \
 	_(ERRINJ_VY_RANGE_SPLIT, false) \
+	_(ERRINJ_VY_READ_PAGE, false) \
+	_(ERRINJ_VY_READ_PAGE_TIMEOUT, false) \
 	_(ERRINJ_VY_GC, false) \
 	_(ERRINJ_RELAY, false)
 
