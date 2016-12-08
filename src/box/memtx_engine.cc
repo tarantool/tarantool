@@ -440,7 +440,7 @@ MemtxEngine::initSystemSpace(struct space *space)
 
 void
 MemtxEngine::buildSecondaryKey(struct space *old_space,
-				    struct space *new_space, Index *new_index)
+			       struct space *new_space, Index *new_index)
 {
 	struct key_def *new_key_def = new_index->key_def;
 	/**
@@ -453,7 +453,38 @@ MemtxEngine::buildSecondaryKey(struct space *old_space,
 		if (!(handler->replace == memtx_replace_all_keys))
 			return;
 	}
-	Engine::buildSecondaryKey(old_space, new_space, new_index);
+	Index *pk = index_find(old_space, 0);
+
+	/* Now deal with any kind of add index during normal operation. */
+	struct iterator *it = pk->allocIterator();
+	IteratorGuard guard(it);
+	pk->initIterator(it, ITER_ALL, NULL, 0);
+
+	/*
+	 * The index has to be built tuple by tuple, since
+	 * there is no guarantee that all tuples satisfy
+	 * new index' constraints. If any tuple can not be
+	 * added to the index (insufficient number of fields,
+	 * etc., the build is aborted.
+	 */
+	/* Build the new index. */
+	struct tuple *tuple;
+	struct tuple_format *format = new_space->format;
+	while ((tuple = it->next(it))) {
+		/*
+		 * Check that the tuple is OK according to the
+		 * new format.
+		 */
+		if (tuple_validate(format, tuple))
+			diag_raise();
+		/*
+		 * @todo: better message if there is a duplicate.
+		 */
+		struct tuple *old_tuple =
+			new_index->replace(NULL, tuple, DUP_INSERT);
+		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
+		(void) old_tuple;
+	}
 }
 
 void
