@@ -7176,7 +7176,6 @@ vy_page_read_cb_free(struct coio_task *base)
 	vy_run_unref(task->run);
 	tuple_format_ref(task->format, -1);
 	coio_task_destroy(&task->base);
-	TRASH(task);
 	mempool_free(&task->env->read_task_pool, task);
 	return 0;
 }
