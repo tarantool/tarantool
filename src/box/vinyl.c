@@ -102,17 +102,27 @@ struct vy_conf {
 };
 
 struct vy_env {
+	/** Recovery status */
 	enum vinyl_status status;
-	/** List of open spaces. */
+	/** The list of indexes for vinyl_info(). */
 	struct rlist indexes;
+	/** Configuration */
 	struct vy_conf      *conf;
+	/** Quota */
 	struct vy_quota     *quota;
+	/** TX manager */
 	struct tx_manager   *xm;
+	/** Scheduler */
 	struct vy_scheduler *scheduler;
+	/** Statistics */
 	struct vy_stat      *stat;
+	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
+	/** Mempool for matras extents in vy_mem */
 	struct mempool      mem_tree_extent_pool;
+	/** Mempool for struct vy_page_read_task */
 	struct mempool      read_task_pool;
+	/** Key for thread-local ZSTD context */
 	pthread_key_t       zdctx_key;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
@@ -6649,9 +6659,11 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 				  tx_write_rate, dump_bandwidth);
 }
 
+/** Destructor for env->zdctx_key thread-local variable */
 static void
 vy_free_zdctx(void *arg)
 {
+	assert(arg != NULL);
 	ZSTD_freeDStream(arg);
 }
 
@@ -6688,7 +6700,7 @@ vy_env_new(void)
 		       VY_MEM_TREE_EXTENT_SIZE);
 	mempool_create(&e->read_task_pool, cord_slab_cache(),
 		       sizeof(struct vy_page_read_task));
-	pthread_key_create(&e->zdctx_key, vy_free_zdctx);
+	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
@@ -6721,6 +6733,7 @@ vy_env_delete(struct vy_env *e)
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->mem_tree_extent_pool);
 	mempool_destroy(&e->read_task_pool);
+	tt_pthread_key_delete(e->zdctx_key);
 	free(e);
 }
 
@@ -7123,14 +7136,15 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 static ZSTD_DStream *
 vy_env_get_zdctx(struct vy_env *env)
 {
-	ZSTD_DStream *zdctx = pthread_getspecific(env->zdctx_key);
+	ZSTD_DStream *zdctx = tt_pthread_getspecific(env->zdctx_key);
 	if (zdctx == NULL) {
 		zdctx = ZSTD_createDStream();
 		if (zdctx == NULL) {
-			diag_set(SystemError, "Can't create decompression context");
+			diag_set(OutOfMemory, sizeof(zdctx), "malloc",
+				 "zstd context");
 			return NULL;
 		}
-		pthread_setspecific(env->zdctx_key, zdctx);
+		tt_pthread_setspecific(env->zdctx_key, zdctx);
 	}
 	return zdctx;
 }

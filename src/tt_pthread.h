@@ -271,6 +271,23 @@
 	tt_pthread_error(e__);				\
 })
 
+#define tt_pthread_key_create(key, dtor)		\
+({	int e__ = pthread_key_create(key, dtor);	\
+	tt_pthread_error(e__);				\
+})
+
+#define tt_pthread_key_delete(key)			\
+({	int e__ = pthread_key_delete(key);		\
+	tt_pthread_error(e__);				\
+})
+
+#define tt_pthread_setspecific(key, value)		\
+({	int e__ = pthread_setspecific(key, value);	\
+	tt_pthread_error(e__);				\
+})
+
+#define tt_pthread_getspecific(key) pthread_getspecific(key)
+
 /** Set the current thread's name
  */
 static inline void
