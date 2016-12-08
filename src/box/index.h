@@ -186,9 +186,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \param[out] result a tuple or NULL if index is empty
  * \retval -1 on error (check box_error_last())
  * \retval 0 on success
@@ -204,9 +202,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \param[out] result a tuple or NULL if index is empty
  * \retval -1 on error (check box_error_last())
  * \retval 0 on success
@@ -223,9 +219,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
  * \param index_id index identifier
  * \param type iterator type - enum \link iterator_type \endlink
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \retval -1 on error (check box_error_last())
  * \retval >=0 on success
  * \sa \code box.space[space_id].index[index_id]:count(key,

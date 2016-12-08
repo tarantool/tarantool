@@ -352,14 +352,14 @@ int
 box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
+	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	assert(result != NULL);
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
 		if (!index->key_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		uint32_t part_count = mp_decode_array(&key);
 		if (primary_key_validate(index->key_def, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine. */
@@ -381,8 +381,8 @@ int
 box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
+	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	assert(result != NULL);
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
@@ -390,7 +390,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "min()");
 		}
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->key_def, ITER_GE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
@@ -409,8 +409,7 @@ int
 box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
-	if (key != NULL)
-		mp_tuple_assert(key, key_end);
+	mp_tuple_assert(key, key_end);
 	assert(result != NULL);
 	try {
 		struct space *space;
@@ -419,7 +418,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "max()");
 		}
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->key_def, ITER_LE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
@@ -438,12 +437,13 @@ ssize_t
 box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		const char *key, const char *key_end)
 {
+	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->key_def, itype, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
@@ -465,6 +465,7 @@ box_iterator_t *
 box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                    const char *key, const char *key_end)
 {
+	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	struct iterator *it = NULL;
 	enum iterator_type itype = (enum iterator_type) type;
