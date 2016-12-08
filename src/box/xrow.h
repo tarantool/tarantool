@@ -94,6 +94,65 @@ int
 xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
 
+struct request
+{
+	/*
+	 * Either log row, or network header, or NULL, depending
+	 * on where this packet originated from: the write ahead
+	 * log/snapshot, client request, or a Lua request.
+	 */
+	struct xrow_header *header;
+	/**
+	 * Request type - IPROTO type code
+	 */
+	uint32_t type;
+	uint32_t space_id;
+	uint32_t index_id;
+	uint32_t offset;
+	uint32_t limit;
+	uint32_t iterator;
+	/** Search key or proc name. */
+	const char *key;
+	const char *key_end;
+	/** Insert/replace/upsert tuple or proc argument or update operations. */
+	const char *tuple;
+	const char *tuple_end;
+	/** Upsert operations. */
+	const char *ops;
+	const char *ops_end;
+	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
+	int index_base;
+};
+
+/**
+ * Initialize a request for @a code
+ * @param request request
+ * @param code see `enum iproto_type`
+ */
+void
+request_create(struct request *request, uint32_t code);
+
+/**
+ * Decode @a data buffer
+ * @param request request to fill up
+ * @param data a buffer
+ * @param len a buffer size
+ * @retval 0 on success
+ * @retval -1 on error, see diag
+ */
+int
+request_decode(struct request *request, const char *data, uint32_t len);
+
+/**
+ * Encode the request fields to iovec using region_alloc().
+ * @param request request to encode
+ * @param iov[out] iovec to fill
+ * @retval -1 on error, see diag
+ * @retval > 0 the number of iovecs used
+ */
+int
+request_encode(struct request *request, struct iovec *iov);
+
 enum {
 	/* Maximal length of protocol name in handshake */
 	GREETING_PROTOCOL_LEN_MAX = 32,
@@ -185,6 +244,25 @@ xrow_header_encode_xc(const struct xrow_header *header,
 		diag_raise();
 	return iovcnt;
 }
+
+static inline void
+request_decode_xc(struct request *request, const char *data, uint32_t len)
+{
+	if (request_decode(request, data, len) < 0)
+		diag_raise();
+}
+
+static inline int
+request_encode_xc(struct request *request, struct iovec *iov)
+{
+	int iovcnt = request_encode(request, iov);
+	if (iovcnt < 0)
+		diag_raise();
+	return iovcnt;
+}
+
+struct request *
+xrow_decode_request(struct xrow_header *row);
 
 /**
  * \brief Encode AUTH command

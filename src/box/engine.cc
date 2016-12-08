@@ -33,7 +33,6 @@
 #include "tuple.h"
 #include "txn.h"
 #include "port.h"
-#include "request.h"
 #include "space.h"
 #include "exception.h"
 #include "schema.h"

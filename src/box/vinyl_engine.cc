@@ -46,7 +46,6 @@
 #include "relay.h"
 #include "space.h"
 #include "schema.h"
-#include "request.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
 

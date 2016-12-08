@@ -200,12 +200,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, row->type);
-	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len);
-	request->header = row;
+	struct request *request = xrow_decode_request(row);
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
@@ -925,6 +920,7 @@ error:
 void
 box_process_call(struct request *request, struct obuf *out)
 {
+	rmean_collect(rmean_box, IPROTO_CALL, 1);
 	/**
 	 * Find the function definition and check access.
 	 */
@@ -984,6 +980,7 @@ box_process_call(struct request *request, struct obuf *out)
 void
 box_process_eval(struct request *request, struct obuf *out)
 {
+	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
 	access_check_universe(PRIV_X);
 	if (box_lua_eval(request, out) != 0) {
@@ -1004,6 +1001,7 @@ box_process_eval(struct request *request, struct obuf *out)
 void
 box_process_auth(struct request *request, struct obuf *out)
 {
+	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 	assert(request->type == IPROTO_AUTH);
 
 	/* Check that bootstrap has been finished */

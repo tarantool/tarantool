@@ -35,7 +35,6 @@
 #include "recovery.h"
 #include "wal.h"
 #include <fiber.h>
-#include "request.h" /* for request_name */
 #include "xrow.h"
 
 enum {

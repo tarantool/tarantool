@@ -50,7 +50,6 @@
 #include "port.h"
 #include "iproto_port.h"
 #include "iobuf.h"
-#include "request.h"
 #include "box.h"
 #include "tuple.h"
 #include "session.h"
@@ -926,17 +925,14 @@ tx_process_misc(struct cmsg *m)
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, IPROTO_CALL, 1);
 			box_process_call(&msg->request, out);
 			break;
 		case IPROTO_EVAL:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
 			box_process_eval(&msg->request, out);
 			break;
 		case IPROTO_AUTH:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
 			box_process_auth(&msg->request, out);
 			break;
 		case IPROTO_PING:

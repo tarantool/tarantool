@@ -35,7 +35,6 @@
 #include "user_def.h"
 #include "space.h"
 #include "iproto_constants.h"
-#include "request.h"
 #include "txn.h"
 #include "rmean.h"
 

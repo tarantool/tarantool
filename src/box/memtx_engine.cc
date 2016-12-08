@@ -37,7 +37,6 @@
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tree.h"
-#include "request.h"
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "xstream.h"
@@ -308,13 +307,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 			  (uint32_t) row->type);
 	}
 
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, row->type);
-	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len);
-	request->header = row;
-
+	struct request *request = xrow_decode_request(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* memtx snapshot must contain only memtx spaces */
 	if (space->handler->engine != this)

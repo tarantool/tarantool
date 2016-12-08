@@ -36,7 +36,6 @@
 #include "lua/msgpack.h"
 
 #include "box/txn.h"
-#include "box/request.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_port.h"

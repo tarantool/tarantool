@@ -67,7 +67,6 @@
 #include "cluster.h" /* SERVER_UUID */
 #include "vclock.h"
 #include "schema.h"
-#include "request.h"
 #include "xrow.h"
 #include "xlog.h"
 #include "fio.h"

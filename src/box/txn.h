@@ -34,6 +34,14 @@
 #include <stdbool.h>
 
 #if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** box statistics */
+extern struct rmean *rmean_box;
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 #include "space.h"
 #include "trigger.h"

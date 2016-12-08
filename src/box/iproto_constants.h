@@ -32,6 +32,7 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include <trivia/util.h>
 
 #include <msgpuck.h>
 
@@ -197,6 +198,15 @@ iproto_type_is_error(uint32_t type)
 {
 	return (type & IPROTO_TYPE_ERROR) != 0;
 }
+
+/** The snapshot row metadata repeats the structure of REPLACE request. */
+struct PACKED request_replace_body {
+	uint8_t m_body;
+	uint8_t k_space_id;
+	uint8_t m_space_id;
+	uint32_t v_space_id;
+	uint8_t k_tuple;
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */
