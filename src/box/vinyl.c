@@ -5824,7 +5824,7 @@ vy_key_data(const struct vy_stmt *stmt)
 static const char *
 vy_key_data_range(const struct vy_stmt *stmt, uint32_t *p_size)
 {
-	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
+	assert(stmt->type == IPROTO_SELECT || stmt->type == IPROTO_DELETE);
 	*p_size = stmt->size;
 	return stmt->raw;
 }
