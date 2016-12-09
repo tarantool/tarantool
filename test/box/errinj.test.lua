@@ -153,4 +153,16 @@ tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(
 
 -- Cleanup
 s:drop()
+
+space = box.schema.space.create('test')
+_ = space:create_index('pk')
+errinj.set("ERRINJ_WAL_WRITE", true)
+space:insert{1}
+errinj.set("ERRINJ_WAL_WRITE", false)
+
+errinj.set("ERRINJ_WAL_WRITE_DISK", true)
+_ = space:insert{1, require'digest'.urandom(192 * 1024)}
+errinj.set("ERRINJ_WAL_WRITE_DISK", false)
+space:drop()
+
 errinj = nil

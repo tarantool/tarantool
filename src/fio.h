@@ -136,6 +136,21 @@ ssize_t
 fio_writev(int fd, struct iovec *iov, int iovcnt);
 
 /**
+ * A wrapper around writev, but retries for partial writes
+ *
+ * @param fd		file descriptor.
+ * @param iov           a vector of buffer descriptors (@sa man
+ *                      writev).
+ * @param count		vector size
+ *
+ * @return When count is 0, returns 0. When count is positive,
+ *         returns the total number of bytes written, or -1 if error.
+ */
+
+ssize_t
+fio_writevn(int fd, struct iovec *iov, int iovcnt);
+
+/**
  * An error-reporting aware wrapper around lseek().
  *
  * @return	file offset value or -1 if error

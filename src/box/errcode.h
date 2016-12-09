@@ -171,11 +171,12 @@ struct errcode_record {
 	/*116 */_(ER_LOADING,			"Server bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
-	/*119 */_(ER_COMPRESSION,		"Failed to decompress: error code %d") \
+	/*119 */_(ER_COMPRESSION,		"Failed to compress: error code %d") \
 	/*120 */_(ER_SNAPSHOT_IN_PROGRESS,	"Snapshot is already in progress") \
 	/*121 */_(ER_SUB_STMT_MAX,		"Can not execute a nested statement: nesting limit reached") \
 	/*122 */_(ER_COMMIT_IN_SUB_STMT,	"Can not commit transaction in a nested statement") \
 	/*123 */_(ER_ROLLBACK_IN_SUB_STMT,	"Rollback called in a nested statement") \
+	/*125 */_(ER_DECOMPRESSION,		"Failed to decompress: error code %d") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

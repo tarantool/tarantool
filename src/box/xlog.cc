@@ -799,12 +799,13 @@ xlog_tx_write_plain(struct xlog *log)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
-	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK,
-		     log->obuf.iov->iov_len >>= 1;);
+	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
+		diag_set(ClientError, ER_INJECTION, "xlog write injection");
+		return -1;
+	});
 
-	ssize_t written = fio_writev(log->fd, log->obuf.iov,
-				     log->obuf.pos + 1);
-	if (written < (ssize_t)obuf_size(&log->obuf)) {
+	ssize_t written = fio_writevn(log->fd, log->obuf.iov, log->obuf.pos + 1);
+	if (written < 0) {
 		diag_set(SystemError, "failed to write to '%s' file",
 			 log->filename);
 		return -1;
@@ -853,8 +854,10 @@ xlog_tx_write_zstd(struct xlog *log)
 		size_t zsize = fcompress(log->zctx, zdst, zmax_size,
 					 (char *)iov->iov_base + offset,
 					 iov->iov_len - offset);
-		if (ZSTD_isError(zsize))
+		if (ZSTD_isError(zsize)) {
+			diag_set(ClientError, ER_COMPRESSION, zsize);
 			goto error;
+		}
 		/* Advance output buffer to the end of compressed data. */
 		obuf_alloc(&log->zbuf, zsize);
 		/* Update crc32c */
@@ -878,14 +881,20 @@ xlog_tx_write_zstd(struct xlog *log)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
+	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
+		diag_set(ClientError, ER_INJECTION, "xlog write injection");
+		obuf_reset(&log->zbuf);
+		return -1;
+	});
 	ssize_t written;
-	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK,
-		     log->zbuf.iov->iov_len >>= 1;);
 
-	written = fio_writev(log->fd, log->zbuf.iov,
-			     log->zbuf.pos + 1);
-	if (written < (ssize_t)obuf_size(&log->zbuf))
+	written = fio_writevn(log->fd, log->zbuf.iov,
+			      log->zbuf.pos + 1);
+	if (written < 0) {
+		diag_set(SystemError, "failed to write to '%s' file",
+			 log->filename);
 		goto error;
+	}
 	obuf_reset(&log->zbuf);
 	return written;
 error:
@@ -983,6 +992,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	for (int i = 0; i < iovcnt; ++i) {
 		ERROR_INJECT(ERRINJ_WAL_WRITE_PARTIAL,
 			{if (obuf_size(&log->obuf) > (1 << 14)) {
+				tnt_error(ClientError, ER_INJECTION, "xlog write injection");
 				obuf_rollback_to_svp(&log->obuf, &svp);
 				return -1;}});
 		if (obuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len) <
@@ -1049,6 +1059,8 @@ ssize_t
 xlog_flush(struct xlog *log)
 {
 	assert(log->is_autocommit);
+	if (log->obuf.used == 0)
+		return 0;
 	return xlog_tx_write(log);
 }
 
@@ -1211,9 +1223,7 @@ xlog_cursor_decompress(struct ibuf *rows, const char **data,
 		assert(output.pos <= ibuf_unused(rows));
 		ibuf_alloc(rows, output.pos);
 		if (ZSTD_isError(rc)) {
-			tnt_error(XlogError,
-				  "can't decompress xlog tx data with "
-				  "code: %i", rc);
+			tnt_error(ClientError, ER_DECOMPRESSION, rc);
 			goto error;
 		}
 		if (input.pos == input.size) {
@@ -1526,7 +1536,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	snprintf(i->name, PATH_MAX, "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
-		diag_set(SystemError, "Can't create decompression context");
+		diag_set(ClientError, ER_DECOMPRESSION, 0);
 		goto error;
 	}
 	return 0;
@@ -1582,7 +1592,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	snprintf(i->name, PATH_MAX, "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
-		diag_set(SystemError, "Can't create decompression context");
+		diag_set(ClientError, ER_DECOMPRESSION, 0);
 		goto error;
 	}
 	return 0;

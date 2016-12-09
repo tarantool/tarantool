@@ -2813,8 +2813,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	if (written == 0)
 		written = xlog_flush(data_xlog);
 	if (written < 0) {
-		/* TODO: report file name */
-		diag_set(SystemError, "error writing file");
 		rc = -1;
 		goto out;
 	}

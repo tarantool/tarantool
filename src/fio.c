@@ -152,6 +152,32 @@ restart:
 	return nwr;
 }
 
+ssize_t
+fio_writevn(int fd, struct iovec *iov, int iovcnt)
+{
+	assert(iov && iovcnt >= 0);
+	ssize_t nwr = 0;
+	int iov_pos = 0;
+	struct fio_batch *batch = fio_batch_new();
+	while (iov_pos < iovcnt) {
+		int iov_to_batch = MIN(batch->max_iov, iovcnt - iov_pos);
+		memmove(batch->iov + batch->iovcnt, iov + iov_pos,
+			sizeof(struct iovec) * iov_to_batch);
+		fio_batch_add(batch, iov_to_batch);
+		iov_pos += iov_to_batch;
+		while (batch->iovcnt) {
+			ssize_t written = fio_batch_write(batch, fd);
+			if (written < 0) {
+				fio_batch_delete(batch);
+				return -1;
+			}
+			nwr += written;
+		}
+	}
+	fio_batch_delete(batch);
+	return nwr;
+}
+
 off_t
 fio_lseek(int fd, off_t offset, int whence)
 {
