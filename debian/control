@@ -6,7 +6,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libreadline-dev,
  libncurses5-dev,
  libiberty-dev | binutils-dev,
- libmysqlclient-dev,
+ default-libmysqlclient-dev,
  libpq-dev
 Section: database
 Standards-Version: 3.9.6

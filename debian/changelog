@@ -1,3 +1,10 @@
+tarantool-lts (1.5.5.37.g1687c02-1) unstable; urgency=medium
+
+  * Fix FTBFS with mysqlclient: use default-libmysqlclient-dev
+    instead libmysqlclient-dev, closes: #845913.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 09 Dec 2016 14:34:12 +0300
+
 tarantool-lts (1.5.5.36.gc9ed18a-1) unstable; urgency=medium
 
   * Fix FTBFS with mysqlclient:20, closes: #841566.
