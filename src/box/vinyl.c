@@ -9757,7 +9757,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 	rlist_foreach_entry(mem, &itr->curr_range->mems, link) {
 		/* only the newest range is mutable */
 		bool is_mutable = !in_compact &&
-			mem == rlist_first_entry(&itr->curr_range->runs,
+			mem == rlist_first_entry(&itr->curr_range->mems,
 						 struct vy_mem, link);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, is_mutable, true);
