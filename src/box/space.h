@@ -30,10 +30,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
 #include "key_def.h"
-#include "engine.h"
 #include "small/rlist.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct Index;
+struct Handler;
 
 struct space {
 	struct access access[BOX_USER_MAX];
@@ -43,7 +48,7 @@ struct space {
 	 * life cycle, throughout phases of recovery or with
 	 * deletion and addition of indexes.
 	 */
-	Handler *handler;
+	struct Handler *handler;
 
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
@@ -78,21 +83,15 @@ struct space {
 	 * Sparse array of indexes defined on the space, indexed
 	 * by id. Used to quickly find index by id (for SELECTs).
 	 */
-	Index **index_map;
+	struct Index **index_map;
 	/**
 	 * Dense array of indexes defined on the space, in order
 	 * of index id. Initially stores only the primary key at
 	 * position 0, and is fully built by
 	 * space_build_secondary_keys().
 	 */
-	Index *index[];
+	struct Index *index[];
 };
-
-/** Check whether or not the current user can be granted
- * the requested access to the space.
- */
-void
-access_check_space(struct space *space, uint8_t access);
 
 /** Get space ordinal number. */
 static inline uint32_t
@@ -102,10 +101,24 @@ space_id(struct space *space) { return space->def.id; }
 static inline const char *
 space_name(struct space *space) { return space->def.name; }
 
-
 /** Return true if space is temporary. */
 static inline bool
 space_is_temporary(struct space *space) { return space->def.opts.temporary; }
+
+extern "C" void
+space_run_triggers(struct space *space, bool yesno);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "index.h"
+#include "engine.h"
+
+/** Check whether or not the current user can be granted
+ * the requested access to the space.
+ */
+void
+access_check_space(struct space *space, uint8_t access);
 
 static inline bool
 space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }
@@ -204,9 +217,6 @@ index_find_system(struct space *space, uint32_t index_id)
 }
 
 
-extern "C" void
-space_run_triggers(struct space *space, bool yesno);
-
 /**
  * Checks that primary key of a tuple did not change during update,
  * otherwise throws ClientError.
@@ -217,5 +227,7 @@ void
 space_check_update(struct space *space,
 		   struct tuple *old_tuple,
 		   struct tuple *new_tuple);
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

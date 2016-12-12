@@ -308,7 +308,7 @@ enum dup_replace_mode {
 	DUP_REPLACE
 };
 
-class Index {
+struct Index {
 public:
 	/* Description of a possibly multipart key. */
 	struct key_def *key_def;

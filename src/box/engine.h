@@ -44,7 +44,7 @@ enum engine_flags {
 
 extern struct rlist engines;
 
-class Handler;
+struct Handler;
 
 /** Engine instance */
 class Engine {
@@ -171,7 +171,7 @@ public:
 
 /** Engine handle - an operator of a space */
 
-class Handler {
+struct Handler {
 public:
 	Handler(Engine *f);
 	virtual ~Handler() {}
