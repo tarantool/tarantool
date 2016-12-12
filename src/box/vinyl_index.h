@@ -156,7 +156,7 @@ public:
 	struct key_def *key_def_secondary_to_primary;
 	/**
 	 * column_mask is the bitmask in that bit 'n' is set if
-	 * key_def (@sa class Index) parts contains a part with
+	 * key_def (@sa struct Index) parts contains a part with
 	 * fieldno equal to 'n'. This mask is used for update
 	 * optimization (@sa VinylSpace::executeUpdate).
 	 */

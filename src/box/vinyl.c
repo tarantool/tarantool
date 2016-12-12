@@ -70,6 +70,7 @@
 #include "xrow.h"
 #include "xlog.h"
 #include "fio.h"
+#include "space.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"

@@ -105,7 +105,10 @@ space_name(struct space *space) { return space->def.name; }
 static inline bool
 space_is_temporary(struct space *space) { return space->def.opts.temporary; }
 
-extern "C" void
+#if defined(__cplusplus)
+extern "C"
+#endif
+void
 space_run_triggers(struct space *space, bool yesno);
 
 #if defined(__cplusplus)

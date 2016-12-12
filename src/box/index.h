@@ -250,7 +250,7 @@ struct iterator {
 	uint32_t sc_version;
 	uint32_t space_id;
 	uint32_t index_id;
-	class Index *index;
+	struct Index *index;
 };
 
 static inline bool
