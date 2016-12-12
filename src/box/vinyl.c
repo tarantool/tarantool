@@ -3943,8 +3943,17 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (range->new_run == NULL)
 		goto err_run;
 
-	struct vy_mem *mem = vy_mem_new(index->env, index->key_def,
-					index->format);
+	struct vy_mem *mem;
+	assert(range->mem_count > 0);
+	mem = rlist_first_entry(&range->mems, struct vy_mem, link);
+	/*
+	 * If the newest mem is empty, we don't need to dump it
+	 * and therefore can omit creating a new mem.
+	 */
+	if (mem->used == 0)
+		goto done;
+
+	mem = vy_mem_new(index->env, index->key_def, index->format);
 	if (mem == NULL)
 		goto err_mem;
 
@@ -3956,7 +3965,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	rlist_add_entry(&range->mems, mem, link);
 	range->mem_count++;
 	range->version++;
-
+done:
+	assert(range->mem_count > 1);
 	task->range = range;
 	say_debug("range dump prepare: %s", vy_range_str(range));
 	return task;
