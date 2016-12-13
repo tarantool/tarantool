@@ -1137,7 +1137,6 @@ struct vy_range {
 	/** Range upper bound. NULL if range is rightmost. */
 	struct vy_stmt *end;
 	struct vy_index *index;
-	ev_tstamp update_time;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	size_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
@@ -1159,7 +1158,7 @@ struct vy_range {
 	/** Number of entries in the ->mems list. */
 	int mem_count;
 	/** Number of times the range was compacted. */
-	int merge_count;
+	int compact_count;
 	/** Points to the range being compacted to this range. */
 	struct vy_range *shadow;
 	/** List of ranges this range is being compacted to. */
@@ -3465,7 +3464,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	struct vy_run *run = NULL;
 
 	/* The range hasn't been merged yet - too early to split it. */
-	if (range->merge_count < 1)
+	if (range->compact_count < 1)
 		return false;
 
 	/* Find the oldest run. */
@@ -4018,11 +4017,10 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
  * Break when the write set begins pointing at the next index.
  */
 static struct txv *
-vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
+vy_tx_write(write_set_t *write_set, struct txv *v,
 	 enum vinyl_status status, int64_t lsn, size_t *write_size)
 {
 	struct vy_index *index = v->index;
-	struct vy_range *prev_range = NULL;
 	struct vy_range *range = NULL;
 
 	/* Sic: the loop below must not yield after recovery */
@@ -4046,16 +4044,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 						  index->format, index->key_def,
 						  stmt);
-		if (prev_range != NULL && range != prev_range) {
-			/*
-			 * The write set is key-ordered, hence
-			 * we can safely assume there won't be new
-			 * keys for this range.
-			 */
-			prev_range->update_time = time;
-		}
-		prev_range = range;
-
 		int rc;
 		switch (stmt->type) {
 		case IPROTO_UPSERT:
@@ -4071,8 +4059,6 @@ vy_tx_write(write_set_t *write_set, struct txv *v, ev_tstamp time,
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void) rc;
 	}
-	if (range != NULL)
-		range->update_time = time;
 	return v;
 }
 
@@ -4447,7 +4433,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		r->mem_count++;
 		/* Account merge w/o split. */
 		if (n_parts == 1)
-			r->merge_count = range->merge_count + 1;
+			r->compact_count = range->compact_count + 1;
 	}
 
 	say_debug("range compact prepare: %s", vy_range_str(range));
@@ -6594,7 +6580,6 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		e->xm->lsn = lsn;
 
 	/* Flush transactional changes to the index. */
-	ev_tstamp now = ev_now(loop());
 	struct txv *v = write_set_first(&tx->write_set);
 
 	uint64_t write_count = 0;
@@ -6602,7 +6587,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	/** @todo: check return value of vy_tx_write(). */
 	while (v != NULL) {
 		++write_count;
-		v = vy_tx_write(&tx->write_set, v, now, e->status, lsn,
+		v = vy_tx_write(&tx->write_set, v, e->status, lsn,
 				&write_size);
 	}
 
