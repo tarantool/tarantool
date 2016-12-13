@@ -523,6 +523,12 @@ struct vy_stmt {
 	uint32_t size;
 	uint16_t refs; /* atomic */
 	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
+	/**
+	 * Number of UPSERT statements for the same key preceding
+	 * this statement. Used to trigger upsert squashing in the
+	 * background (see vy_range_set_upsert()).
+	 */
+	uint8_t n_upserts;
 	char raw[0];
 };
 
@@ -1033,37 +1039,6 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct vy_stmt *stmt,
 	if (vy_stmt_compare(result, stmt, mem->format, key_def) != 0)
 		return NULL;
 	return result;
-}
-
-/*
- * Number of successive upserts for the same statement after
- * which we should consider inserting a replace statement to
- * optimize future selects (see vy_index_optimize_upserts()).
- */
-#define VY_UPSERT_THRESHOLD	10
-
-static bool
-vy_mem_too_many_upserts(struct vy_mem *mem, const struct vy_stmt *stmt,
-			const struct key_def *key_def)
-{
-	struct tree_mem_key tree_key = {
-		.stmt = stmt,
-		.lsn = stmt->lsn - 1,
-	};
-	int count = 0;
-	struct vy_mem_tree_iterator itr =
-		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
-	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
-		const struct vy_stmt *v;
-		v = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-		if (v->type != IPROTO_UPSERT ||
-		    vy_stmt_compare(v, stmt, mem->format, key_def) != 0)
-			break;
-		if (++count > VY_UPSERT_THRESHOLD)
-			return true;
-		vy_mem_tree_iterator_next(&mem->tree, &itr);
-	}
-	return false;
 }
 
 /**
@@ -3996,18 +3971,32 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		return rc;
 	}
 
-	if (vy_range_set(range, stmt, write_size, stmt->lsn) != 0)
-		return -1;
-
 	/*
 	 * If there are a lot of successive upserts for the same key,
 	 * select might take too long to squash them all. So once the
 	 * number of upserts exceeds a certain threshold, we schedule
-	 * a fiber to merge them and substitute the latest upsert with
-	 * the resulting replace statement.
+	 * a fiber to merge them and insert the resulting statement
+	 * after the latest upsert.
 	 */
-	if (vy_mem_too_many_upserts(mem, stmt, key_def))
-		vy_index_optimize_upserts(index, stmt);
+	enum {
+		VY_UPSERT_THRESHOLD = 10,
+		VY_UPSERT_INF = 255,
+	};
+	if (older != NULL && older->type == IPROTO_UPSERT &&
+	    older->n_upserts != VY_UPSERT_INF) {
+		stmt->n_upserts = older->n_upserts + 1;
+		if (stmt->n_upserts > VY_UPSERT_THRESHOLD) {
+			vy_index_optimize_upserts(index, stmt);
+			/*
+			 * Prevent further upserts from starting new
+			 * workers while this one is in progress.
+			 */
+			stmt->n_upserts = VY_UPSERT_INF;
+		}
+	}
+
+	if (vy_range_set(range, stmt, write_size) != 0)
+		return -1;
 
 	return 0;
 }
@@ -5736,6 +5725,7 @@ vy_stmt_alloc(uint32_t size)
 	v->size = size;
 	v->lsn  = 0;
 	v->type = 0;
+	v->n_upserts = 0;
 	v->refs = 1;
 	return v;
 }
@@ -10375,12 +10365,12 @@ vy_index_optimize_upserts_f(va_list va)
 	fiber_reschedule();
 
 	struct vy_read_iterator itr;
+	const int64_t lsn = INT64_MAX;
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
-			      stmt, &stmt->lsn, false);
+			      stmt, &lsn, false);
 	struct vy_stmt *v;
 	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
 		assert(v->type == IPROTO_REPLACE);
-		assert(v->lsn == stmt->lsn);
 		assert(vy_stmt_compare(stmt, v, index->format,
 				       index->key_def) == 0);
 		size_t write_size = 0;
