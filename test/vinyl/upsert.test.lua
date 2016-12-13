@@ -1,3 +1,5 @@
+test_run = require('test_run').new()
+
 -- gh-1671 upsert is broken in a transaction
 
 -- upsert after upsert
@@ -140,32 +142,48 @@ space:select{}
 space:drop()
 
 --
+-- gh-1829: vinyl: merge hot UPSERTS in the background
 -- gh-1828: Automatically convert UPSERT into REPLACE
 -- gh-1826: vinyl: memory explosion on UPSERT
 --
 
+clock = require 'clock'
+
 space = box.schema.space.create('test', { engine = 'vinyl' })
 _ = space:create_index('primary', { type = 'tree', range_size = 250 * 1024 * 1024 } )
 
+test_run:cmd("setopt delimiter ';'")
+-- add a lot of UPSERT statements to the space
+function gen()
+    for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
+end;
+-- check that 'get' takes reasonable time
+function check()
+    local start = clock.monotonic()
+    for i=1,1000 do space:get(0) end
+    return clock.monotonic() - start < 1
+end;
+test_run:cmd("setopt delimiter ''");
+
 -- No runs
-for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
-space:count() -- exploded before #1826
+gen()
+check() -- exploded before #1826
 
 -- Mem has DELETE
 box.snapshot()
 space:delete({0})
-for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
-space:count() -- exploded before #1826
+gen()
+check() -- exploded before #1826
 
 -- Mem has REPLACE
 box.snapshot()
 space:replace({0, 0})
-for i=1,2000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
-space:count() -- exploded before #1826
+gen()
+check() -- exploded before #1826
 
 -- Mem has only UPSERTS
 box.snapshot()
-for i=1,10000 do space:upsert({0, 0}, {{'+', 2, 1}}) end
-space:count() -- exploded before #1829
+gen()
+check() -- exploded before #1829
 
 space:drop()
