@@ -71,6 +71,7 @@
 #include "xlog.h"
 #include "fio.h"
 #include "space.h"
+#include "index.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -1237,8 +1238,22 @@ struct vy_index {
 	/** The path with index files. */
 	char *path;
 
-	/* A key definition for this index. */
+	/**
+	 * A key definition for this index, used to
+	 * compare tuples.
+	 */
 	struct key_def *key_def;
+	/**
+	 * A key definition that was declared by an user with
+	 * space:create_index().
+	 * @sa VinylSecondaryIndex::key_def.
+	 */
+	struct key_def *user_key_def;
+	/**
+	 * A key definition for the key extraction from a tuple.
+	 * @sa VinylSecondaryIndex::key_def_tuple_to_key.
+	 */
+	struct key_def *key_def_tuple_to_key;
 	/* A tuple format for key_def. */
 	struct tuple_format *format;
 
@@ -1255,8 +1270,13 @@ struct vy_index {
 	 * to invalidate iterators.
 	 */
 	uint32_t version;
+	/** Space to which the index belongs. */
+	struct space *space;
 };
 
+/** @sa implementation for details. */
+extern struct vy_index *
+vy_index(struct Index *index);
 
 /** Transaction state. */
 enum tx_state {
@@ -5578,7 +5598,9 @@ vy_index_drop(struct vy_index *index)
 }
 
 struct vy_index *
-vy_index_new(struct vy_env *e, struct key_def *key_def)
+vy_index_new(struct vy_env *e, struct key_def *key_def,
+	     struct key_def *user_key_def, struct key_def *key_def_tuple_to_key,
+	     struct space *space)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -5586,9 +5608,18 @@ vy_index_new(struct vy_env *e, struct key_def *key_def)
 
 	assert(key_def->part_count > 0);
 
+	user_key_def = key_def_dup(user_key_def);
+	if (user_key_def == NULL)
+		return NULL;
+
+	key_def_tuple_to_key = key_def_dup(key_def_tuple_to_key);
+	if (key_def_tuple_to_key == NULL)
+		goto fail_key_def_tuple_to_key;
+
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, key_def, link);
+
 	struct tuple_format *format = tuple_format_new(&key_list);
 	assert(format != NULL);
 	tuple_format_ref(format, 1);
@@ -5619,6 +5650,9 @@ vy_index_new(struct vy_env *e, struct key_def *key_def)
 	index->version = 1;
 	rlist_create(&index->link);
 	read_set_new(&index->read_set);
+	index->space = space;
+	index->user_key_def = user_key_def;
+	index->key_def_tuple_to_key = key_def_tuple_to_key;
 
 	return index;
 
@@ -5631,7 +5665,21 @@ fail_conf:
 	free(index);
 fail_index:
 	tuple_format_ref(format, -1);
+	key_def_delete(key_def_tuple_to_key);
+fail_key_def_tuple_to_key:
+	key_def_delete(user_key_def);
 	return NULL;
+}
+
+void
+vy_commit_alter_space(struct space *old_space, struct space *new_space)
+{
+	(void) old_space;
+	struct vy_index *index;
+	for (uint32_t i = 0; i < new_space->index_count; ++i) {
+		index = vy_index(new_space->index[i]);
+		index->space = new_space;
+	}
 }
 
 static void
@@ -5643,6 +5691,8 @@ vy_index_delete(struct vy_index *index)
 	free(index->path);
 	tuple_format_ref(index->format, -1);
 	key_def_delete(index->key_def);
+	key_def_delete(index->user_key_def);
+	key_def_delete(index->key_def_tuple_to_key);
 	histogram_delete(index->run_hist);
 	TRASH(index);
 	free(index);
@@ -6479,6 +6529,74 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct vy_stmt *stmt)
  * read, write data in the context of a transaction.
  */
 
+/**
+ * Check if the index contains the key. If true, then set
+ * a duplicate key error in the diagnostics area.
+ * @param tx         Current transaction.
+ * @param index      Index in which to search.
+ * @param key        MessagePack'ed data, the array without a
+ *                   header.
+ * @param part_count Part count of the key.
+ *
+ * @retval  0 Success, the key isn't found.
+ * @retval -1 Memory error or the key is found.
+ */
+int
+vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
+		 uint32_t part_count)
+{
+	struct tuple *found;
+	(void) part_count;
+	/*
+	 * Expect a full tuple as input (secondary key || primary key)
+	 * but use only  the secondary key fields (partial key look
+	 * up) to check for duplicates.
+         */
+	assert(part_count == idx->key_def->part_count);
+	if (vy_get(tx, idx, key, idx->user_key_def->part_count, &found))
+		return -1;
+
+	if (found) {
+		diag_set(ClientError, ER_TUPLE_FOUND, idx->user_key_def->name,
+			 space_name(idx->space));
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Insert a tuple in a secondary index.
+ * @param tx        Current transaction.
+ * @param index     Secondary index.
+ * @param tuple     MessagePack array.
+ * @param tuple_end End of the tuple.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error or duplicate key error.
+ */
+int
+vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
+		    const char *tuple, const char *tuple_end)
+{
+	const char *key, *key_end;
+	uint32_t key_len;
+	key = tuple_extract_key_raw(tuple, tuple_end,
+				    index->key_def_tuple_to_key, &key_len);
+	key_end = key + key_len;
+	/*
+	 * If the index is unique then the new tuple must not
+	 * conflict with existing tuples. If the index is not
+	 * unique a conflict is impossible.
+	 */
+	if (index->user_key_def->opts.is_unique) {
+		const char *check_key = key;
+		uint32_t part_count = mp_decode_array(&check_key);
+		if (vy_check_dup_key(tx, index, check_key, part_count))
+			return -1;
+	}
+	return vy_replace(tx, index, key, key_end);
+}
+
 int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
 	   const char *tuple_begin, const char *tuple_end)
@@ -6493,6 +6611,122 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 	int rc = vy_tx_set(tx, index, vystmt);
 	vy_stmt_unref(vystmt);
 	return rc;
+}
+
+/**
+ * Execute REPLACE in a space with a single index, possibly with
+ * lookup for an old tuple if the space has at least one
+ * on_replace trigger.
+ * @param tx      Current transaction.
+ * @param space   Space in which replace.
+ * @param request Request with the tuple data.
+ * @param stmt    Statement for triggers is filled with old
+ *                statement.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory or duplicate error.
+ */
+static inline int
+vy_replace_one(struct vy_tx *tx, struct space *space,
+	       struct request *request, struct txn_stmt *stmt)
+{
+	assert(space->index_count == 1);
+	struct vy_index *pk = vy_index(space->index[0]);
+	assert(pk->key_def->iid == 0);
+	/**
+	 * If the space has triggers, then we need to fetch the
+	 * old tuple to pass it to the trigger. Use vy_get to
+	 * fetch it.
+	 */
+	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
+		const char *key;
+		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
+					    pk->key_def, NULL);
+		uint32_t part_count = mp_decode_array(&key);
+		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple))
+			return -1;
+		if (stmt->old_tuple)
+			box_tuple_ref(stmt->old_tuple);
+	}
+	return vy_replace(tx, pk, request->tuple, request->tuple_end);
+}
+
+/**
+ * Execute REPLACE in a space with multiple indexes and lookup for
+ * an old tuple, that should has been set in \p stmt->old_tuple if
+ * the space has at least one on_replace trigger.
+ * @param tx      Current transaction.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ * @param stmt    Statement for triggers filled with old
+ *                statement.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory or duplicate error.
+ */
+static inline int
+vy_replace_all_impl(struct vy_tx *tx, struct space *space,
+		    struct request *request, struct txn_stmt *stmt)
+{
+	struct tuple *old_tuple;
+	struct vy_index *pk = vy_index(space->index[0]);
+	assert(pk->key_def->iid == 0);
+	const char *key;
+	key = tuple_extract_key_raw(request->tuple, request->tuple_end,
+				    pk->key_def, NULL);
+	uint32_t part_count = mp_decode_array(&key);
+
+	/* Get full tuple from the primary index. */
+	if (vy_get(tx, pk, key, part_count, &old_tuple))
+		return -1;
+	/*
+	 * Replace in the primary index without explicit deletion of
+	 * the old tuple.
+	 */
+	if (vy_replace(tx, pk, request->tuple, request->tuple_end))
+		return -1;
+
+	/* Update secondary keys, avoid duplicates. */
+	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
+		struct vy_index *index;
+		index = vy_index(space->index[iid]);
+		/**
+		 * Delete goes first, so if old and new keys
+		 * fully match, there is no look up beyond the
+		 * transaction index.
+		 */
+		if (old_tuple != NULL) {
+			key = tuple_extract_key(old_tuple,
+						index->key_def_tuple_to_key,
+						NULL);
+			part_count = mp_decode_array(&key);
+			if (vy_delete(tx, index, key, part_count))
+				return -1;
+		}
+		if (vy_insert_secondary(tx, index, request->tuple,
+					   request->tuple_end))
+			return -1;
+	}
+	/** The old tuple is used if there is an on_replace trigger. */
+	if (stmt != NULL) {
+		if (old_tuple)
+			box_tuple_ref(old_tuple);
+		stmt->old_tuple = old_tuple;
+	}
+	return 0;
+}
+
+int
+vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	       struct request *request)
+{
+	if (space->index_count == 1) {
+		/* Replace in a space with a single index. */
+		return vy_replace_one(tx, space, request, stmt);
+	} else {
+		/* Replace in a space with secondary indexes. */
+		return vy_replace_all_impl(tx, space, request, stmt);
+	}
 }
 
 int

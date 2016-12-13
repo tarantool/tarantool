@@ -35,10 +35,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <small/region.h>
-
-#include "index.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,8 +46,11 @@ struct vy_index;
 struct key_def;
 struct tuple;
 struct tuple_format;
-struct region;
 struct vclock;
+struct request;
+struct space;
+struct txn_stmt;
+enum iterator_type;
 
 /*
  * Environment
@@ -130,6 +129,32 @@ int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
 	   const char *tuple, const char *tuple_end);
 
+/* @sa implementation for details. */
+int
+vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
+		 uint32_t part_count);
+
+/* @sa implementation for details. */
+int
+vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
+		    const char *tuple, const char *tuple_end);
+
+
+/**
+ * Execute REPLACE in a vinyl space.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old
+ *                statement.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory or duplicate error.
+ */
+int
+vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
+	       struct space *space, struct request *request);
+
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *tuple, const char *tuple_end,
@@ -161,8 +186,36 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp);
 struct key_def *
 vy_index_key_def(struct vy_index *index);
 
+/**
+ * Create a new vinyl index object without opening it.
+ * @param e                    Vinyl environment.
+ * @param key_def              Key definition to compare tuples
+ *                             in the index.
+ * @param user_key_def         Key definition declared by an user
+ *                             with space:create_index().
+ *                             (different from key_def for
+ *                             secondary keys only).
+ * @param key_def_tuple_to_key Key definition that is used for
+ *                             extraction the key from a tuple
+ *                             (secondary indexes only).
+ * @param space                Space for which the new index
+ *                             belongs.
+ */
 struct vy_index *
-vy_index_new(struct vy_env *env, struct key_def *key_def);
+vy_index_new(struct vy_env *e, struct key_def *key_def,
+	     struct key_def *user_key_def,
+	     struct key_def *key_def_tuple_to_key,
+	     struct space *space);
+
+/**
+ * Hook on an alter space commit event. It is called on each
+ * create_index(), drop_index() and is used for update
+ * vy_index.space attribute.
+ * @param old_space Old space.
+ * @param new_space New space.
+ */
+void
+vy_commit_alter_space(struct space *old_space, struct space *new_space);
 
 int
 vy_index_open(struct vy_index *index);

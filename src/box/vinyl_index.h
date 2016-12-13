@@ -33,7 +33,7 @@
 #include "index.h"
 
 /**
- * A base class for primary and secondary Vinyl indexes.
+ * A base struct for primary and secondary Vinyl indexes.
  *
  * Vinyl primary and secondary indexes work differently:
  *
@@ -55,7 +55,7 @@
  * the secondary index tuple, containing the primary key, and then
  * use this key to find the original tuple in the primary index.
  */
-class VinylIndex: public Index
+struct VinylIndex: public Index
 {
 public:
 	VinylIndex(struct vy_env *env, struct key_def *key_def);
@@ -99,7 +99,7 @@ public:
 	struct vy_index *db;
 };
 
-class VinylPrimaryIndex: public VinylIndex
+struct VinylPrimaryIndex: public VinylIndex
 {
 public:
 	VinylPrimaryIndex(struct vy_env *env, struct key_def *key_def_arg);
@@ -132,7 +132,7 @@ public:
  *   This is key_def_secondary_to_primary.
  *   @sa key_def_build_secondary_to_primary()
  */
-class VinylSecondaryIndex: public VinylIndex
+struct VinylSecondaryIndex: public VinylIndex
 {
 public:
 	VinylSecondaryIndex(struct vy_env *env_arg, VinylPrimaryIndex *pk_arg,

@@ -48,6 +48,17 @@
 #include "txn.h"
 #include "vinyl.h"
 
+/**
+ * Get (struct vy_index *) by (struct Index *).
+ * @param index VinylIndex to convert.
+ * @retval Pointer to index->db.
+ */
+extern "C" struct vy_index *
+vy_index(struct Index *index)
+{
+	return ((struct VinylIndex *) index)->db;
+}
+
 struct vinyl_iterator {
 	struct iterator base;
 	const char *key;
@@ -138,7 +149,8 @@ VinylPrimaryIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def);
+	db = vy_index_new(env, key_def, key_def, key_def,
+			  space_by_id(key_def->iid));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
@@ -229,7 +241,8 @@ VinylSecondaryIndex::open()
 	/* The engine makes a copy of the key. */
 	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
 	/* Create a vinyl index. */
-	db = vy_index_new(env, key_def_vinyl);
+	db = vy_index_new(env, key_def_vinyl, key_def, key_def_tuple_to_key,
+			  space_by_id(key_def->iid));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }

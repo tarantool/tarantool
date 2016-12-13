@@ -32,17 +32,18 @@
  */
 
 #include <stdbool.h>
-
-#include "space.h"
-#include "trigger.h"
-#include "fiber.h"
 #include "salad/stailq.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /** box statistics */
 extern struct rmean *rmean_box;
 
-extern double too_long_threshold;
+struct space;
 struct tuple;
+struct xrow_header;
 
 /**
  * A single statement of a multi-statement
@@ -63,7 +64,16 @@ struct txn_stmt {
 	struct xrow_header *row;
 };
 
+
 #if defined(__cplusplus)
+} /* extern "C" */
+
+#include "space.h"
+#include "trigger.h"
+#include "fiber.h"
+
+extern double too_long_threshold;
+struct tuple;
 
 struct txn {
 	/** List of statements in a transaction. */
