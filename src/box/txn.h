@@ -33,20 +33,13 @@
 
 #include <stdbool.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-/** box statistics */
-extern struct rmean *rmean_box;
-
-#if defined(__cplusplus)
-} /* extern "C" */
-
 #include "space.h"
 #include "trigger.h"
 #include "fiber.h"
 #include "salad/stailq.h"
+
+/** box statistics */
+extern struct rmean *rmean_box;
 
 extern double too_long_threshold;
 struct tuple;
@@ -69,6 +62,8 @@ struct txn_stmt {
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 };
+
+#if defined(__cplusplus)
 
 struct txn {
 	/** List of statements in a transaction. */
