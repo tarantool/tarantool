@@ -1236,6 +1236,8 @@ iproto_on_bind(void *arg)
 	cpipe_push(&tx_pipe, (struct cmsg *) arg);
 }
 
+#define IPROTO_REBIND_INTERVAL 0.1
+
 static void
 iproto_do_set_listen(struct cmsg *m)
 {
@@ -1246,12 +1248,19 @@ iproto_do_set_listen(struct cmsg *m)
 			evio_service_stop(&binary);
 
 		if (msg->uri != NULL) {
-			binary.on_bind = iproto_on_bind;
-			binary.on_bind_param = &msg->wakeup;
-			evio_service_start(&binary, msg->uri);
-		} else {
-			iproto_on_bind(&msg->wakeup);
+			bool first_try = true;
+			while (evio_service_bind(&binary, msg->uri) != 0) {
+				if (first_try) {
+					say_warn("%s: %s is already in use, "
+						 "will retry binding",
+						 "binary", msg->uri);
+				}
+				first_try = false;
+				fiber_sleep(IPROTO_REBIND_INTERVAL);
+			}
+			evio_service_listen(&binary);
 		}
+		iproto_on_bind(&msg->wakeup);
 	} catch (Exception *e) {
 		diag_move(&fiber()->diag, &msg->diag);
 		iproto_on_bind(&msg->wakeup);
