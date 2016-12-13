@@ -484,55 +484,66 @@ box_set_readahead(void)
  * a variable-argument tuple described in format.
  *
  * @example: you want to insert 5 into space 1:
- * boxk(IPROTO_INSERT, 1, "%u", 5);
+ * boxk(IPROTO_INSERT, 1, "[%u]", 5);
+ *
+ * @example: you want to set field 3 (base 0) of
+ * a tuple with key [10, 20] in space 1 to 1000:
+ * boxk(IPROTO_UPDATE, 1, "[%u%u][[%s%u%u]]", 10, 20, "=", 3, 1000);
  *
  * @note Since this is for internal use, it has
  * no boundary or misuse checks.
  */
-static void
+int
 boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 {
 	va_list ap;
 	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request = region_alloc_object(&fiber()->gc, struct request);
+	if (request == NULL)
+		return -1;
 	request_create(request, type);
 	request->space_id = space_id;
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_array(data, strlen(format)/2);
 	va_start(ap, format);
-	while (*format) {
-		switch (*format++) {
-		case 'u':
-			data = mp_encode_uint(data, va_arg(ap, unsigned));
-			break;
-		case 's':
-		{
-			char *arg = va_arg(ap, char *);
-			data = mp_encode_str(data, arg, strlen(arg));
-			break;
-		}
-		default:
-			break;
-		}
-	}
+	size_t buf_size = mp_vformat(NULL, 0, format, ap);
+	char *buf = (char *)region_alloc(&fiber()->gc, buf_size);
+	if (buf == NULL)
+		return -1;
 	va_end(ap);
-	assert(data <= buf + sizeof(buf));
+	va_start(ap, format);
+	if (mp_vformat(buf, buf_size, format, ap) != buf_size)
+		assert(0);
+	va_end(ap);
+	const char *data = buf;
+	const char *data_end = buf + buf_size;
 	switch (type) {
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
-		request->tuple = buf;
-		request->tuple_end = data;
+		request->tuple = data;
+		request->tuple_end = data_end;
 		break;
 	case IPROTO_DELETE:
-		request->key = buf;
+		request->key = data;
+		request->key_end = data_end;
+		break;
+	case IPROTO_UPDATE:
+		request->key = data;
+		mp_next(&data);
 		request->key_end = data;
+		request->tuple = data;
+		mp_next(&data);
+		request->tuple_end = data;
+		request->index_base = 0;
 		break;
 	default:
 		unreachable();
 	}
-	struct space *space = space_cache_find(space_id);
-	process_rw(request, space, NULL);
+	try {
+		struct space *space = space_cache_find(space_id);
+		process_rw(request, space, NULL);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
 }
 
 int
@@ -787,8 +798,9 @@ box_truncate(uint32_t space_id)
 static inline void
 box_register_server(uint32_t id, const struct tt_uuid *uuid)
 {
-	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
-	     (unsigned) id, tt_uuid_str(uuid));
+	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
+		 (unsigned) id, tt_uuid_str(uuid)) != 0)
+		diag_raise();
 	assert(server_by_uuid(uuid) != NULL);
 }
 
@@ -1219,8 +1231,9 @@ box_set_cluster_uuid()
 	/* Generate a new cluster UUID */
 	tt_uuid_create(&uu);
 	/* Save cluster UUID in _schema */
-	boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "%s%s", "cluster",
-	     tt_uuid_str(&uu));
+	if (boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "[%s%s]", "cluster",
+		 tt_uuid_str(&uu)))
+		diag_raise();
 }
 
 void
@@ -1283,7 +1296,8 @@ bootstrap_master(void)
 
 	/* Unregister local server if it was registered by bootstrap.bin */
 	assert(recovery->server_id == 0);
-	boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
+	if (boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "[%u]", 1) != 0)
+		diag_raise();
 
 	/* Register local server */
 	box_register_server(server_id, &SERVER_UUID);

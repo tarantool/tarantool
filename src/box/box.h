@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "iproto_constants.h"
 
 #include <stdbool.h>
 
@@ -291,6 +292,9 @@ box_truncate(uint32_t space_id);
  */
 int
 box_process1(struct request *request, box_tuple_t **result);
+
+int
+boxk(enum iproto_type type, uint32_t space_id, const char *format, ...);
 
 #if defined(__cplusplus)
 } /* extern "C" */
