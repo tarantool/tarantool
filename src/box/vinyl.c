@@ -123,8 +123,6 @@ struct vy_env {
 	struct vy_squash_queue *squash_queue;
 	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
-	/** Mempool for matras extents in vy_mem */
-	struct mempool      mem_tree_extent_pool;
 	/** Mempool for struct vy_page_read_task */
 	struct mempool      read_task_pool;
 	/** Allocator for tuples */
@@ -969,15 +967,7 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
 }
 
 static void *
-vy_mem_tree_extent_alloc(void *ctx)
-{
-	struct region *region = (struct region *) ctx;
-	void *ret = region_alloc(region, VY_MEM_TREE_EXTENT_SIZE);
-	if (ret == NULL)
-		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "region_alloc",
-			 "ret");
-	return ret;
-}
+vy_mem_tree_extent_alloc(void *ctx);
 
 static void
 vy_mem_tree_extent_free(void *ctx, void *p)
@@ -988,7 +978,8 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 static struct vy_mem *
-vy_mem_new(struct key_def *key_def, struct tuple_format *format)
+vy_mem_new(struct vy_env *env, struct key_def *key_def,
+	   struct tuple_format *format)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -1002,10 +993,8 @@ vy_mem_new(struct key_def *key_def, struct tuple_format *format)
 	index->version = 0;
 	index->format = format;
 	region_create(&index->region, cord_slab_cache());
-	vy_mem_tree_create(&index->tree, index,
-			   vy_mem_tree_extent_alloc,
-			   vy_mem_tree_extent_free,
-			   &index->region);
+	vy_mem_tree_create(&index->tree, index, vy_mem_tree_extent_alloc,
+			   vy_mem_tree_extent_free, env);
 	rlist_create(&index->link);
 	rlist_create(&index->dirty_link);
 	return index;
@@ -1618,6 +1607,18 @@ struct tx_manager {
 	int64_t vlsn;
 	struct vy_env *env;
 };
+
+static void *
+vy_mem_tree_extent_alloc(void *ctx)
+{
+	struct vy_env *env = (struct vy_env *) ctx;
+	void *ret = lsregion_alloc(&env->allocator, VY_MEM_TREE_EXTENT_SIZE,
+				   env->xm->lsn);
+	if (ret == NULL)
+		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
+			 "ret");
+	return ret;
+}
 
 /**
  * Abort all transaction which are reading the stmt v written by
@@ -3399,17 +3400,19 @@ vy_range_delete(struct vy_range *range)
 						       struct vy_run, link);
 		vy_run_unref(run);
 	}
-
+	int64_t mem_used_before = lsregion_used(&env->allocator);
 	/* Release all mems */
 	while (!rlist_empty(&range->mems)) {
 		struct vy_mem *mem = rlist_shift_entry(&range->mems,
 						       struct vy_mem, link);
 		vy_scheduler_mem_dumped(env->scheduler, mem);
-		vy_quota_release(env->quota, mem->used);
 		index->used -= mem->used;
 		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 	}
+	int64_t mem_used_after = lsregion_used(&env->allocator);
+	assert(mem_used_after <= mem_used_before);
+	vy_quota_release(env->quota, mem_used_before - mem_used_after);
 
 	TRASH(range);
 	free(range);
@@ -3616,7 +3619,8 @@ vy_index_create(struct vy_index *index)
 	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
 	/* create initial mem */
-	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+	struct vy_mem *mem = vy_mem_new(index->env, index->key_def,
+					index->format);
 	if (mem == NULL)
 		return -1;
 	rlist_add_entry(&range->mems, mem, link);
@@ -3822,7 +3826,8 @@ vy_index_open_ex(struct vy_index *index)
 			break;
 		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(index->env->scheduler, range);
-		struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+		struct vy_mem *mem = vy_mem_new(index->env, index->key_def,
+						index->format);
 		if (mem == NULL)
 			goto out;
 		rlist_add_entry(&range->mems, mem, link);
@@ -3844,7 +3849,7 @@ out:
  */
 static int
 vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
-	     size_t *write_size, int64_t alloc_id)
+	     int64_t alloc_id)
 {
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -3889,7 +3894,6 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 	range->used += size;
 	index->used += size;
 	index->stmt_count++;
-	*write_size += size;
 
 	mem->version++;
 
@@ -3897,8 +3901,7 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 }
 
 static int
-vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt,
-		    size_t *write_size)
+vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt)
 {
 	assert(stmt->type == IPROTO_DELETE);
 
@@ -3915,15 +3918,14 @@ vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt,
 		return 0;
 	}
 
-	return vy_range_set(range, stmt, write_size, stmt->lsn);
+	return vy_range_set(range, stmt, stmt->lsn);
 }
 
 static void
 vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt);
 
 static int
-vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
-		    size_t *write_size)
+vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
 {
 	assert(stmt->type == IPROTO_UPSERT);
 
@@ -3967,8 +3969,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		}
 		assert(older == NULL || upserted->lsn != older->lsn);
 		assert(upserted->type == IPROTO_REPLACE);
-		int rc = vy_range_set(range, upserted, write_size,
-				      upserted->lsn);
+		int rc = vy_range_set(range, upserted, upserted->lsn);
 		vy_stmt_unref(upserted);
 		return rc;
 	}
@@ -3998,7 +3999,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		}
 	}
 
-	if (vy_range_set(range, stmt, write_size, stmt->lsn) != 0)
+	if (vy_range_set(range, stmt, stmt->lsn) != 0)
 		return -1;
 
 	return 0;
@@ -4038,8 +4039,8 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
  * Break when the write set begins pointing at the next index.
  */
 static struct txv *
-vy_tx_write(write_set_t *write_set, struct txv *v,
-	 enum vinyl_status status, int64_t lsn, size_t *write_size)
+vy_tx_write(write_set_t *write_set, struct txv *v, enum vinyl_status status,
+	    int64_t lsn)
 {
 	struct vy_index *index = v->index;
 	struct vy_range *range = NULL;
@@ -4068,13 +4069,13 @@ vy_tx_write(write_set_t *write_set, struct txv *v,
 		int rc;
 		switch (stmt->type) {
 		case IPROTO_UPSERT:
-			rc = vy_range_set_upsert(range, stmt, write_size);
+			rc = vy_range_set_upsert(range, stmt);
 			break;
 		case IPROTO_DELETE:
-			rc = vy_range_set_delete(range, stmt, write_size);
+			rc = vy_range_set_delete(range, stmt);
 			break;
 		default:
-			rc = vy_range_set(range, stmt, write_size, stmt->lsn);
+			rc = vy_range_set(range, stmt, stmt->lsn);
 			break;
 		}
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
@@ -4223,15 +4224,18 @@ vy_task_dump_complete(struct vy_task *task)
 	range->mem_count = 1;
 	range->used = mem->used;
 	range->min_lsn = mem->min_lsn;
+	int64_t mem_used_before = lsregion_used(&env->allocator);
 	while (!rlist_empty(&release)) {
 		mem = rlist_shift_entry(&release, struct vy_mem, link);
 		vy_scheduler_mem_dumped(env->scheduler, mem);
-		vy_quota_release(env->quota, mem->used);
 		index->used -= mem->used;
 		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 	}
 	range->version++;
+	int64_t mem_used_after = lsregion_used(&env->allocator);
+	assert(mem_used_after <= mem_used_before);
+	vy_quota_release(env->quota, mem_used_before - mem_used_after);
 
 	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
@@ -4274,7 +4278,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (range->new_run == NULL)
 		goto err_run;
 
-	struct vy_mem *mem = vy_mem_new(index->key_def, index->format);
+	struct vy_mem *mem = vy_mem_new(index->env, index->key_def,
+					index->format);
 	if (mem == NULL)
 		goto err_mem;
 
@@ -4447,7 +4452,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		r->new_run = vy_run_new();
 		if (r->new_run == NULL)
 			goto fail;
-		mem = vy_mem_new(index->key_def, index->format);
+		mem = vy_mem_new(index->env, index->key_def, index->format);
 		if (mem == NULL)
 			goto fail;
 		rlist_add_entry(&r->mems, mem, link);
@@ -6876,13 +6881,13 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	/* Flush transactional changes to the index. */
 	struct txv *v = write_set_first(&tx->write_set);
 
+	int64_t mem_used_before = lsregion_used(&e->allocator);
+
 	uint64_t write_count = 0;
-	size_t write_size = 0;
 	/** @todo: check return value of vy_tx_write(). */
 	while (v != NULL) {
 		++write_count;
-		v = vy_tx_write(&tx->write_set, v, e->status, lsn,
-				&write_size);
+		v = vy_tx_write(&tx->write_set, v, e->status, lsn);
 	}
 
 	uint32_t count = 0;
@@ -6891,6 +6896,9 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		count++;
 		txv_delete(v);
 	}
+	int64_t mem_used_after = lsregion_used(&e->allocator);
+	assert(mem_used_after >= mem_used_before);
+	int64_t write_size = mem_used_after - mem_used_before;
 	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
 
 	TRASH(tx);
@@ -7061,8 +7069,6 @@ vy_env_new(void)
 	               sizeof(struct vy_cursor));
 	mempool_create(&e->read_task_pool, slab_cache,
 		       sizeof(struct vy_page_read_task));
-	mempool_create(&e->mem_tree_extent_pool, slab_cache,
-		       VY_MEM_TREE_EXTENT_SIZE);
 	lsregion_create(&e->allocator, slab_cache->arena);
 	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
@@ -7099,7 +7105,6 @@ vy_env_delete(struct vy_env *e)
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->read_task_pool);
-	mempool_destroy(&e->mem_tree_extent_pool);
 	lsregion_destroy(&e->allocator);
 	tt_pthread_key_delete(e->zdctx_key);
 	free(e);
@@ -10420,8 +10425,11 @@ vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 static void
 vy_squash_process(struct vy_squash *squash)
 {
-	struct vy_index *index = squash->index;
 	struct vy_stmt *stmt = squash->stmt;
+	struct vy_index *index = squash->index;
+	struct vy_env *env = index->env;
+	struct vy_quota *quota = env->quota;
+	struct lsregion *allocator = &env->allocator;
 
 	struct vy_read_iterator itr;
 	const int64_t lsn = INT64_MAX;
@@ -10432,10 +10440,12 @@ vy_squash_process(struct vy_squash *squash)
 		assert(v->type == IPROTO_REPLACE);
 		assert(vy_stmt_compare(stmt, v, index->format,
 				       index->key_def) == 0);
-		size_t write_size = 0;
-		if (vy_range_set(itr.curr_range, v, &write_size,
-				 index->env->xm->lsn) == 0)
-			vy_quota_force_use(index->env->quota, write_size);
+		size_t mem_before = lsregion_used(allocator);
+		if (vy_range_set(itr.curr_range, v, env->xm->lsn) == 0) {
+			size_t mem_after = lsregion_used(allocator);
+			assert(mem_after >= mem_before);
+			vy_quota_force_use(quota, mem_after - mem_before);
+		}
 	}
 	vy_read_iterator_close(&itr);
 }
