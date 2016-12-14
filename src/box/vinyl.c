@@ -1038,7 +1038,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct vy_stmt *stmt,
 /*
  * Number of successive upserts for the same statement after
  * which we should consider inserting a replace statement to
- * optimize future selects (see vy_range_optimize_upserts()).
+ * optimize future selects (see vy_index_optimize_upserts()).
  */
 #define VY_UPSERT_THRESHOLD	10
 
@@ -3942,7 +3942,7 @@ vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt,
 }
 
 static void
-vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt);
+vy_index_optimize_upserts(struct vy_index *index, struct vy_stmt *stmt);
 
 static int
 vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
@@ -4007,7 +4007,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 	 * the resulting replace statement.
 	 */
 	if (vy_mem_too_many_upserts(mem, stmt, key_def))
-		vy_range_optimize_upserts(range, stmt);
+		vy_index_optimize_upserts(index, stmt);
 
 	return 0;
 }
@@ -10366,13 +10366,10 @@ vy_index_read(struct vy_index *index, const struct vy_stmt *key,
 }
 
 static int
-vy_range_optimize_upserts_f(va_list va)
+vy_index_optimize_upserts_f(va_list va)
 {
-	struct vy_range *range = va_arg(va, struct vy_range *);
+	struct vy_index *index = va_arg(va, struct vy_index *);
 	struct vy_stmt *stmt = va_arg(va, struct vy_stmt *);
-	uint32_t index_version = va_arg(va, uint32_t);
-	uint32_t range_version = va_arg(va, uint32_t);
-	struct vy_index *index = range->index;
 
 	/* Make sure we don't stall ongoing transactions. */
 	fiber_reschedule();
@@ -10387,9 +10384,7 @@ vy_range_optimize_upserts_f(va_list va)
 		assert(vy_stmt_compare(stmt, v, index->format,
 				       index->key_def) == 0);
 		size_t write_size = 0;
-		if (index->version == index_version &&
-		    range->version == range_version &&
-		    vy_range_set(range, v, &write_size,
+		if (vy_range_set(itr.curr_range, v, &write_size,
 				 index->env->xm->lsn) == 0)
 			vy_quota_force_use(index->env->quota, write_size);
 	}
@@ -10400,14 +10395,15 @@ vy_range_optimize_upserts_f(va_list va)
 }
 
 static void
-vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
+vy_index_optimize_upserts(struct vy_index *index, struct vy_stmt *stmt)
 {
-	struct vy_index *index = range->index;
-	say_debug("optimize upsert slow: %s: %s", vy_range_str(range),
-		  vy_stmt_str(stmt, index->key_def));
+	struct key_def *key_def = index->key_def;
+
+	say_debug("optimize upsert slow: %"PRIu32"/%"PRIu32": %s",
+		  key_def->space_id, key_def->iid, vy_stmt_str(stmt, key_def));
 
 	struct fiber *f = fiber_new("vinyl.optimize_upserts",
-				    vy_range_optimize_upserts_f);
+				    vy_index_optimize_upserts_f);
 	if (f == NULL) {
 		error_log(diag_last_error(diag_get()));
 		diag_clear(diag_get());
@@ -10415,7 +10411,7 @@ vy_range_optimize_upserts(struct vy_range *range, struct vy_stmt *stmt)
 	}
 	vy_stmt_ref(stmt);
 	vy_index_ref(index);
-	fiber_start(f, range, stmt, index->version, range->version);
+	fiber_start(f, index, stmt);
 }
 
 /* {{{ Cursor */
