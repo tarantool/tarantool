@@ -61,14 +61,11 @@
 extern "C" struct vy_index *
 vy_index_find(struct space *space, uint32_t iid)
 {
-	Index *index = space_index(space, iid);
-	if (index == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_INDEX, iid,
-			 space_name(space));
-		error_log(diag_last_error(diag_get()));
+	try {
+		return ((struct VinylIndex *) index_find(space, iid))->db;
+	} catch (Exception *e) {
 		return NULL;
 	}
-	return ((struct VinylIndex *) index)->db;
 }
 
 /**

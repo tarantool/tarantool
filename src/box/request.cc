@@ -57,7 +57,7 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	request->key = key;
 	request->key_end = key + key_len;
 	request->index_id = 0;
-	/* Clear the header to ensure it's rebuilt at commit. */
+	/* Clear the *body* to ensure it's rebuilt at commit. */
 	request->header = NULL;
 }
 

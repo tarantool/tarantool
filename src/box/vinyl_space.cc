@@ -67,7 +67,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 
 	int64_t signature = request->header->lsn;
 
-	if (vy_space_replace(tx, NULL, space, request))
+	if (vy_replace_all(tx, NULL, space, request))
 		diag_raise();
 
 	if (vy_prepare(env, tx)) {
@@ -146,10 +146,10 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		if (vy_space_insert(tx, space, request))
+		if (vy_insert_all(tx, space, request))
 			diag_raise();
 	} else {
-		if (vy_space_replace(tx, stmt, space, request))
+		if (vy_replace_all(tx, stmt, space, request))
 			diag_raise();
 	}
 

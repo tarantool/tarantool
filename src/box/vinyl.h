@@ -157,7 +157,7 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
  *            error.
  */
 int
-vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt,
+vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
 		 struct space *space, struct request *request);
 
 /**
@@ -171,7 +171,7 @@ vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt,
  *            index is not found
  */
 int
-vy_space_insert(struct vy_tx *tx, struct space *space, struct request *request);
+vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request);
 
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,

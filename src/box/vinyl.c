@@ -5951,7 +5951,7 @@ vy_stmt_extract_key_raw(const char *stmt, uint8_t type,
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	char *key = tuple_extract_key_raw(mp, mp_end, key_def, &size);
-	if (key == NULL) {
+	if (key == NULL) {                      /* out of memory */
 		region_truncate(region, region_svp);
 		return NULL;
 	}
@@ -6587,16 +6587,16 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
  * @retval -1 Memory error or duplicate key error.
  */
 static inline int
-vinyl_insert_primary(struct vy_tx *tx, struct vy_index *pk,
+vy_insert_primary(struct vy_tx *tx, struct vy_index *pk,
 		     const char *tuple, const char *tuple_end)
 {
 	const char *key;
 	assert(pk->key_def->iid == 0);
 	key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def, NULL);
-	if (key == NULL)
+	if (key == NULL)                        /* out of memory */
 		return -1;
 	/*
-	 * A primary index always is unique and the new tuple must not
+	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
 	uint32_t part_count = mp_decode_array(&key);
@@ -6615,7 +6615,7 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 	uint32_t key_len;
 	key = tuple_extract_key_raw(tuple, tuple_end,
 				    index->key_def_tuple_to_key, &key_len);
-	if (key == NULL)
+	if (key == NULL)                        /* out of memory */
 		return -1;
 	key_end = key + key_len;
 	/*
@@ -6668,9 +6668,7 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 	       struct request *request, struct txn_stmt *stmt)
 {
 	assert(space->index_count == 1);
-	struct vy_index *pk = vy_index_find(space, 0);
-	if (pk == NULL)
-		return -1;
+	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk->key_def->iid == 0);
 	/**
 	 * If the space has triggers, then we need to fetch the
@@ -6681,7 +6679,7 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 		const char *key;
 		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 					    pk->key_def, NULL);
-		if (key == NULL)
+		if (key == NULL)                /* out of memory */
 			return -1;
 		uint32_t part_count = mp_decode_array(&key);
 		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple))
@@ -6708,18 +6706,18 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
  *            error.
  */
 static inline int
-vy_replace_all(struct vy_tx *tx, struct space *space, struct request *request,
+vy_replace_all_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	       struct txn_stmt *stmt)
 {
 	struct tuple *old_tuple;
 	struct vy_index *pk = vy_index_find(space, 0);
-	if (pk == NULL)
+	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
 	const char *key;
 	key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 				    pk->key_def, NULL);
-	if (key == NULL)
+	if (key == NULL)                        /* out of memory */
 		return -1;
 	uint32_t part_count = mp_decode_array(&key);
 
@@ -6766,7 +6764,7 @@ vy_replace_all(struct vy_tx *tx, struct space *space, struct request *request,
 }
 
 int
-vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		 struct request *request)
 {
 	if (space->index_count == 1) {
@@ -6774,19 +6772,19 @@ vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		return vy_replace_one(tx, space, request, stmt);
 	} else {
 		/* Replace in a space with secondary indexes. */
-		return vy_replace_all(tx, space, request, stmt);
+		return vy_replace_all_impl(tx, space, request, stmt);
 	}
 }
 
 int
-vy_space_insert(struct vy_tx *tx, struct space *space, struct request *request)
+vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request)
 {
 	/* First insert into the primary index. */
 	struct vy_index *pk = vy_index_find(space, 0);
-	if (pk == NULL)
+	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
-	if (vinyl_insert_primary(tx, pk, request->tuple, request->tuple_end))
+	if (vy_insert_primary(tx, pk, request->tuple, request->tuple_end))
 		return -1;
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
