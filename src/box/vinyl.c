@@ -7553,6 +7553,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/* task was posted to worker and finished */
 		page = task->page;
+		if (page == NULL)
+			diag_move(&task->base.diag, &fiber()->diag);
 		task->page = NULL;
 		vy_page_read_cb_free(&task->base);
 
