@@ -3987,6 +3987,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 	};
 	if (older != NULL && older->type == IPROTO_UPSERT &&
 	    older->n_upserts != VY_UPSERT_INF) {
+
 		stmt->n_upserts = older->n_upserts + 1;
 		if (stmt->n_upserts > VY_UPSERT_THRESHOLD) {
 			vy_index_squash_upserts(index, stmt);
@@ -3998,7 +3999,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt,
 		}
 	}
 
-	if (vy_range_set(range, stmt, write_size) != 0)
+	if (vy_range_set(range, stmt, write_size, stmt->lsn) != 0)
 		return -1;
 
 	return 0;
