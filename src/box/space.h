@@ -111,6 +111,33 @@ extern "C"
 void
 space_run_triggers(struct space *space, bool yesno);
 
+/**
+ * Get index by index id.
+ * @return NULL if the index is not found.
+ */
+static inline struct Index *
+space_index(struct space *space, uint32_t id)
+{
+	if (id <= space->index_id_max)
+		return space->index_map[id];
+	return NULL;
+}
+
+/**
+ * Look up the index by id.
+ */
+static inline struct Index *
+index_find(struct space *space, uint32_t index_id)
+{
+	struct Index *index = space_index(space, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
+			 space_name(space));
+		error_log(diag_last_error(diag_get()));
+	}
+	return index;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -168,36 +195,22 @@ void
 space_fill_index_map(struct space *space);
 
 /**
- * Get index by index id.
- * @return NULL if the index is not found.
+ * Look up the index by id, and throw an exception if not found.
  */
-static inline Index *
-space_index(struct space *space, uint32_t id)
+static inline struct Index *
+index_find_xc(struct space *space, uint32_t index_id)
 {
-	if (id <= space->index_id_max)
-		return space->index_map[id];
-	return NULL;
-}
-
-/**
- * Look up index by id.
- * Raise an error if the index is not found.
- */
-static inline Index *
-index_find(struct space *space, uint32_t index_id)
-{
-	Index *index = space_index(space, index_id);
+	struct Index *index = index_find(space, index_id);
 	if (index == NULL)
-		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_id,
-			  space_name(space));
+		diag_raise();
 	return index;
 }
 
-static inline Index *
+static inline struct Index *
 index_find_unique(struct space *space, uint32_t index_id)
 {
-	Index *index = index_find(space, index_id);
-	if (!index->key_def->opts.is_unique)
+	struct Index *index = index_find_xc(space, index_id);
+	if (! index->key_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	return index;
 }
@@ -216,9 +229,8 @@ index_find_system(struct space *space, uint32_t index_id)
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  space->handler->engine->name, "system data");
 	}
-	return (MemtxIndex *) index_find(space, index_id);
+	return (MemtxIndex *) index_find_xc(space, index_id);
 }
-
 
 /**
  * Checks that primary key of a tuple did not change during update,

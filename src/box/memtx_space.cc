@@ -50,7 +50,7 @@ memtx_replace_no_keys(struct space *space,
 		      struct tuple * /* new_tuple */,
 		      enum dup_replace_mode /* mode */)
 {
-	Index *index = index_find(space, 0);
+	Index *index = index_find_xc(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
 	return NULL;
@@ -323,7 +323,7 @@ MemtxSpace::executeSelect(struct txn *, struct space *space,
 			  const char *key, const char * /* key_end */,
 			  struct port *port)
 {
-	MemtxIndex *index = (MemtxIndex *) index_find(space, index_id);
+	MemtxIndex *index = (MemtxIndex *) index_find_xc(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 

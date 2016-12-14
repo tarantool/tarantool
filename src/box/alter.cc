@@ -929,7 +929,7 @@ DropIndex::commit(struct alter_space *alter)
 {
 	if (space_index(alter->new_space, old_key_def->iid) != NULL)
 		return;
-	Index *index = index_find(alter->old_space, old_key_def->iid);
+	Index *index = index_find_xc(alter->old_space, old_key_def->iid);
 	alter->old_space->handler->dropIndex(index);
 }
 
@@ -1148,7 +1148,7 @@ AddIndex::alter(struct alter_space *alter)
 	/**
 	 * Get the new index and build it.
 	 */
-	Index *new_index = index_find(alter->new_space, new_key_def->iid);
+	Index *new_index = index_find_xc(alter->new_space, new_key_def->iid);
 	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);

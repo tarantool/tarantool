@@ -163,7 +163,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 {
 	try {
 		struct space *space = space_by_id(space_id);
-		Index *index = index_find(space, index_id);
+		Index *index = index_find_xc(space, index_id);
 		return tuple_extract_key(tuple, index->key_def, key_size);
 	} catch (ClientError *e) {
 		return NULL;
@@ -296,7 +296,7 @@ check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
 	*space = space_cache_find(space_id);
 	access_check_space(*space, PRIV_R);
-	return index_find(*space, index_id);
+	return index_find_xc(*space, index_id);
 }
 
 static inline box_tuple_t *

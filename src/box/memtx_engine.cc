@@ -137,7 +137,7 @@ memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
-		Index *pk = index_find(space, 0);
+		Index *pk = index_find_xc(space, 0);
 		assert(pk->key_def->opts.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
@@ -453,7 +453,7 @@ MemtxEngine::buildSecondaryKey(struct space *old_space,
 		if (!(handler->replace == memtx_replace_all_keys))
 			return;
 	}
-	Index *pk = index_find(old_space, 0);
+	Index *pk = index_find_xc(old_space, 0);
 
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->allocIterator();

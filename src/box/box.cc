@@ -727,7 +727,7 @@ space_truncate(struct space *space)
 
 	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
 	struct space *space_index = space_cache_find(BOX_INDEX_ID);
-	Index *index = index_find(space_index, 0);
+	Index *index = index_find_xc(space_index, 0);
 	struct iterator *it = index->allocIterator();
 	auto guard_it_free = make_scoped_guard([=]{
 		it->free(it);

@@ -200,7 +200,7 @@ Handler::executeSelect(struct txn *, struct space *space,
 		       const char *key, const char * /* key_end */,
 		       struct port *port)
 {
-	Index *index = index_find(space, index_id);
+	Index *index = index_find_xc(space, index_id);
 
 	uint32_t found = 0;
 	if (iterator >= iterator_type_MAX)

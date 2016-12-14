@@ -49,7 +49,7 @@ void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple)
 {
-	Index *primary = index_find(space, 0);
+	Index *primary = index_find_xc(space, 0);
 	uint32_t key_len;
 	char *key = tuple_extract_key(found_tuple, primary->key_def, &key_len);
 	if (key == NULL)

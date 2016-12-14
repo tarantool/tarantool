@@ -87,7 +87,7 @@ vinyl_delete_all(struct space *space, struct tuple *tuple,
 {
 	uint32_t part_count;
 	const char *key;
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
+	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find_xc(space, 0);
 	if (request->index_id == 0) {
 		key = request->key;
 	} else {
@@ -113,7 +113,7 @@ static void
 vinyl_insert_without_lookup(struct space *space, struct request *request,
 			    struct vy_tx *tx)
 {
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
+	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find_xc(space, 0);
 	if (vy_replace(tx, pk->db, request->tuple, request->tuple_end))
 		diag_raise();
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
@@ -170,7 +170,6 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 {
 	VinylIndex *index;
 	index = (VinylIndex *)index_find_unique(space, request->index_id);
-
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (primary_key_validate(index->key_def, key, part_count))
@@ -443,7 +442,7 @@ VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 	if (old_space->index_count &&
 	    old_space->index_count <= new_space->index_count) {
 		VinylEngine *engine = (VinylEngine *)old_space->handler->engine;
-		Index *primary_index = index_find(old_space, 0);
+		Index *primary_index = index_find_xc(old_space, 0);
 		if (engine->recovery_complete && primary_index->min(NULL, 0)) {
 			/**
 			 * If space is not empty then forbid new indexes creating
@@ -462,7 +461,8 @@ VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 		return;
 	}
 	(void)old_space;
-	VinylPrimaryIndex *primary = (VinylPrimaryIndex *)index_find(new_space, 0);
+	VinylPrimaryIndex *primary =
+		(VinylPrimaryIndex *) index_find_xc(new_space, 0);
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		((VinylSecondaryIndex *)new_space->index[i])->primary_index = primary;
 	}

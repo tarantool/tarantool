@@ -116,7 +116,7 @@ VinylEngine::open()
 void
 VinylEngine::addPrimaryKey(struct space *space)
 {
-	VinylIndex *pk = (VinylIndex *)index_find(space, 0);
+	VinylIndex *pk = (VinylIndex *) index_find_xc(space, 0);
 	pk->open();
 }
 
@@ -149,7 +149,7 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 	 *  but aware of three cases mentioned above.
 	 */
 	assert(!recovery_complete ||
-	       index_find(old_space, 0)->min(NULL, 0) == NULL);
+	       index_find_xc(old_space, 0)->min(NULL, 0) == NULL);
 }
 
 struct vinyl_send_row_arg {

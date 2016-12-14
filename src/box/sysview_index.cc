@@ -105,7 +105,7 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
 	struct space *source = space_cache_find(source_space_id);
-	struct Index *pk = index_find(source, source_index_id);
+	struct Index *pk = index_find_xc(source, source_index_id);
 	/*
 	 * Explicitly validate that key matches source's key_def.
 	 * It is possible to change a source space without changing
@@ -132,7 +132,7 @@ struct tuple *
 SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	struct space *source = space_cache_find(source_space_id);
-	struct Index *pk = index_find(source, source_index_id);
+	struct Index *pk = index_find_xc(source, source_index_id);
 	if (!pk->key_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	if (primary_key_validate(pk->key_def, key, part_count))
