@@ -601,6 +601,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
+	int n_requests = 0;
 	bool stop_input = false;
 	while (con->parse_size && stop_input == false) {
 		const char *reqstart = in->wpos - con->parse_size;
@@ -625,6 +626,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		try {
 			iproto_decode_msg(msg, &pos, reqend, &stop_input);
 			cpipe_push_input(&tx_pipe, guard.release());
+			n_requests++;
 		} catch (Exception *e) {
 			/*
 			 * Do not close connection if we failed to
@@ -660,11 +662,24 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		 */
 		ev_io_stop(con->loop, &con->output);
 		ev_io_stop(con->loop, &con->input);
-	} else {
+	} else if (n_requests != 1 || con->parse_size != 0) {
 		assert(rlist_empty(&con->in_stop_list));
 		/*
 		 * Keep reading input, as long as the socket
-		 * supplies data.
+		 * supplies data, but don't waste CPU on an extra
+		 * read() if dealing with a blocking client, it
+		 * has nothing in the socket for us.
+		 *
+		 * We look at the amount of enqueued requests
+		 * and presence of a partial request in the
+		 * input buffer as hints to distinguish
+		 * blocking and non-blocking clients:
+		 *
+		 * For blocking clients, a request typically
+		 * is fully read and enqueued.
+		 * If there is unparsed data, or 0 queued
+		 * requests, keep reading input, if only to avoid
+		 * a deadlock on this connection.
 		 */
 		ev_feed_event(con->loop, &con->input, EV_READ);
 	}
