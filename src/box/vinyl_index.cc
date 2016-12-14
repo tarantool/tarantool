@@ -49,6 +49,29 @@
 #include "vinyl.h"
 
 /**
+ * Get (struct vy_index *) by an space index with the specified
+ * identifier. If the index is not found then set the
+ * corresponding error in the diagnostics area.
+ * @param space Vinyl space.
+ * @param iid   Identifier of the index for search.
+ *
+ * @retval not NULL Pointer to index->db
+ * @retval NULL     The index is not found.
+ */
+extern "C" struct vy_index *
+vy_index_find(struct space *space, uint32_t iid)
+{
+	Index *index = space_index(space, iid);
+	if (index == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_INDEX, iid,
+			 space_name(space));
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
+	return ((struct VinylIndex *) index)->db;
+}
+
+/**
  * Get (struct vy_index *) by (struct Index *).
  * @param index VinylIndex to convert.
  * @retval Pointer to index->db.

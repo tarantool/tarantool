@@ -1279,6 +1279,10 @@ struct vy_index {
 
 /** @sa implementation for details. */
 extern struct vy_index *
+vy_index_find(struct space *space, uint32_t iid);
+
+/** @sa implementation for details. */
+extern struct vy_index *
 vy_index(struct Index *index);
 
 /** Transaction state. */
@@ -6549,7 +6553,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct vy_stmt *stmt)
  * @retval  0 Success, the key isn't found.
  * @retval -1 Memory error or the key is found.
  */
-int
+static inline int
 vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 		 uint32_t part_count)
 {
@@ -6573,23 +6577,46 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 }
 
 /**
- * Insert a tuple in a secondary index.
+ * Insert a tuple in a primary index.
  * @param tx        Current transaction.
- * @param index     Secondary index.
+ * @param pk        Primary vinyl index.
  * @param tuple     MessagePack array.
  * @param tuple_end End of the tuple.
  *
  * @retval  0 Success.
  * @retval -1 Memory error or duplicate key error.
  */
+static inline int
+vinyl_insert_primary(struct vy_tx *tx, struct vy_index *pk,
+		     const char *tuple, const char *tuple_end)
+{
+	const char *key;
+	assert(pk->key_def->iid == 0);
+	key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def, NULL);
+	if (key == NULL)
+		return -1;
+	/*
+	 * A primary index always is unique and the new tuple must not
+	 * conflict with existing tuples.
+	 */
+	uint32_t part_count = mp_decode_array(&key);
+	if (vy_check_dup_key(tx, pk, key, part_count))
+		return -1;
+
+	return vy_replace(tx, pk, tuple, tuple_end);
+}
+
 int
 vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		    const char *tuple, const char *tuple_end)
 {
 	const char *key, *key_end;
+	assert(index->key_def->iid > 0);
 	uint32_t key_len;
 	key = tuple_extract_key_raw(tuple, tuple_end,
 				    index->key_def_tuple_to_key, &key_len);
+	if (key == NULL)
+		return -1;
 	key_end = key + key_len;
 	/*
 	 * If the index is unique then the new tuple must not
@@ -6631,15 +6658,19 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
  * @param stmt    Statement for triggers is filled with old
  *                statement.
  *
- * @retval  0 Success
- * @retval -1 Memory or duplicate error.
+ * @retval  0 Success.
+ * @retval -1 Memory error OR duplicate key error OR the primary
+ *            index is not found OR a tuple reference increment
+ *            error.
  */
 static inline int
 vy_replace_one(struct vy_tx *tx, struct space *space,
 	       struct request *request, struct txn_stmt *stmt)
 {
 	assert(space->index_count == 1);
-	struct vy_index *pk = vy_index(space->index[0]);
+	struct vy_index *pk = vy_index_find(space, 0);
+	if (pk == NULL)
+		return -1;
 	assert(pk->key_def->iid == 0);
 	/**
 	 * If the space has triggers, then we need to fetch the
@@ -6650,6 +6681,8 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 		const char *key;
 		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 					    pk->key_def, NULL);
+		if (key == NULL)
+			return -1;
 		uint32_t part_count = mp_decode_array(&key);
 		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple))
 			return -1;
@@ -6670,18 +6703,24 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
  *                statement.
  *
  * @retval  0 Success
- * @retval -1 Memory or duplicate error.
+ * @retval -1 Memory error OR duplicate key error OR the primary
+ *            index is not found OR a tuple reference increment
+ *            error.
  */
 static inline int
-vy_replace_all_impl(struct vy_tx *tx, struct space *space,
-		    struct request *request, struct txn_stmt *stmt)
+vy_replace_all(struct vy_tx *tx, struct space *space, struct request *request,
+	       struct txn_stmt *stmt)
 {
 	struct tuple *old_tuple;
-	struct vy_index *pk = vy_index(space->index[0]);
+	struct vy_index *pk = vy_index_find(space, 0);
+	if (pk == NULL)
+		return -1;
 	assert(pk->key_def->iid == 0);
 	const char *key;
 	key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 				    pk->key_def, NULL);
+	if (key == NULL)
+		return -1;
 	uint32_t part_count = mp_decode_array(&key);
 
 	/* Get full tuple from the primary index. */
@@ -6707,6 +6746,8 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space,
 			key = tuple_extract_key(old_tuple,
 						index->key_def_tuple_to_key,
 						NULL);
+			if (key == NULL)
+				return -1;
 			part_count = mp_decode_array(&key);
 			if (vy_delete(tx, index, key, part_count))
 				return -1;
@@ -6717,24 +6758,44 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space,
 	}
 	/** The old tuple is used if there is an on_replace trigger. */
 	if (stmt != NULL) {
-		if (old_tuple)
-			box_tuple_ref(old_tuple);
+		if (old_tuple != NULL && box_tuple_ref(old_tuple) != 0)
+			return -1;
 		stmt->old_tuple = old_tuple;
 	}
 	return 0;
 }
 
 int
-vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	       struct request *request)
+vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+		 struct request *request)
 {
 	if (space->index_count == 1) {
 		/* Replace in a space with a single index. */
 		return vy_replace_one(tx, space, request, stmt);
 	} else {
 		/* Replace in a space with secondary indexes. */
-		return vy_replace_all_impl(tx, space, request, stmt);
+		return vy_replace_all(tx, space, request, stmt);
 	}
+}
+
+int
+vy_space_insert(struct vy_tx *tx, struct space *space, struct request *request)
+{
+	/* First insert into the primary index. */
+	struct vy_index *pk = vy_index_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	assert(pk->key_def->iid == 0);
+	if (vinyl_insert_primary(tx, pk, request->tuple, request->tuple_end))
+		return -1;
+
+	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
+		struct vy_index *index = vy_index(space->index[iid]);
+		if (vy_insert_secondary(tx, index, request->tuple,
+					request->tuple_end))
+			return -1;
+	}
+	return 0;
 }
 
 int

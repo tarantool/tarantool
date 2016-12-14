@@ -50,26 +50,6 @@ VinylSpace::VinylSpace(Engine *e)
 	:Handler(e)
 {}
 
-/* Insert a tuple only into the primary index. */
-static void
-vinyl_insert_primary(VinylPrimaryIndex *index, const char *tuple,
-		     const char *tuple_end, struct vy_tx *tx)
-{
-	const char *key;
-	struct key_def *def = index->key_def;
-	key = tuple_extract_key_raw(tuple, tuple_end, def, NULL);
-	/*
-	 * A primary index always is unique and the new tuple must not
-	 * conflict with existing tuples.
-	 */
-	uint32_t part_count = mp_decode_array(&key);
-	if (vy_check_dup_key(tx, index->db, key, part_count))
-		diag_raise();
-
-	if (vy_replace(tx, index->db, tuple, tuple_end))
-		diag_raise();
-}
-
 void
 VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 {
@@ -87,7 +67,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 
 	int64_t signature = request->header->lsn;
 
-	if (vy_replace_all(tx, NULL, space, request))
+	if (vy_space_replace(tx, NULL, space, request))
 		diag_raise();
 
 	if (vy_prepare(env, tx)) {
@@ -129,26 +109,6 @@ vinyl_delete_all(struct space *space, struct tuple *tuple,
 	}
 }
 
-/**
- * Insert a tuple into a space.
- */
-static void
-vinyl_insert_all(struct space *space, struct request *request,
-		 struct vy_tx *tx)
-{
-	/* First insert into the primary index. */
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find(space, 0);
-	vinyl_insert_primary(pk, request->tuple, request->tuple_end, tx);
-
-	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
-		VinylSecondaryIndex *index;
-		index = (VinylSecondaryIndex *) space->index[iid];
-		if (vy_insert_secondary(tx, index->db, request->tuple,
-					   request->tuple_end))
-			diag_raise();
-	}
-}
-
 static void
 vinyl_insert_without_lookup(struct space *space, struct request *request,
 			    struct vy_tx *tx)
@@ -186,9 +146,10 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		vinyl_insert_all(space, request, tx);
+		if (vy_space_insert(tx, space, request))
+			diag_raise();
 	} else {
-		if (vy_replace_all(tx, stmt, space, request))
+		if (vy_space_replace(tx, stmt, space, request))
 			diag_raise();
 	}
 

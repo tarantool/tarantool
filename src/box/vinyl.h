@@ -129,16 +129,19 @@ int
 vy_replace(struct vy_tx *tx, struct vy_index *index,
 	   const char *tuple, const char *tuple_end);
 
-/* @sa implementation for details. */
-int
-vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
-		 uint32_t part_count);
-
-/* @sa implementation for details. */
+/**
+ * Insert a tuple in a secondary index.
+ * @param tx        Current transaction.
+ * @param index     Secondary index.
+ * @param tuple     MessagePack array.
+ * @param tuple_end End of the tuple.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error or duplicate key error.
+ */
 int
 vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		    const char *tuple, const char *tuple_end);
-
 
 /**
  * Execute REPLACE in a vinyl space.
@@ -149,11 +152,26 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
  * @param request Request with the tuple data.
  *
  * @retval  0 Success
- * @retval -1 Memory or duplicate error.
+ * @retval -1 Memory error OR duplicate key error OR the primary
+ *            index is not found OR a tuple reference increment
+ *            error.
  */
 int
-vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
-	       struct space *space, struct request *request);
+vy_space_replace(struct vy_tx *tx, struct txn_stmt *stmt,
+		 struct space *space, struct request *request);
+
+/**
+ * Execute INSERT in a vinyl space.
+ * @param tx      Current transaction.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR duplicate error OR the primary
+ *            index is not found
+ */
+int
+vy_space_insert(struct vy_tx *tx, struct space *space, struct request *request);
 
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,
