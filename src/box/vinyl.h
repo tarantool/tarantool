@@ -121,6 +121,18 @@ vy_info_gather(struct vy_env *env, struct vy_info_handler *h);
 struct vy_tx *
 vy_begin(struct vy_env *e);
 
+/**
+ * Get a tuple from the vinyl index.
+ * @param tx          Current transaction.
+ * @param index       Vinyl index.
+ * @param key         MessagePack'ed data, the array without a
+ *                    header.
+ * @param part_count  Part count of the key
+ * @param[out] result Is set to the the found tuple.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or read error.
+ */
 int
 vy_get(struct vy_tx *tx, struct vy_index *index,
        const char *key, uint32_t part_count, struct tuple **result);
@@ -159,6 +171,22 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 int
 vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
 		 struct space *space, struct request *request);
+
+/**
+ * Execute DELETE in a vinyl space.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with deleted
+ *                statement.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+int
+vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	      struct request *request);
 
 /**
  * Execute INSERT in a vinyl space.
@@ -216,14 +244,18 @@ vy_index_key_def(struct vy_index *index);
  * @param key_def_tuple_to_key Key definition that is used for
  *                             extraction the key from a tuple
  *                             (secondary indexes only).
+ * @param key_def_secondary_to_primary
+ *                             Key definition used for fetching
+ *                             the primary key from a secondary
+ *                             index tuple (secondary indexes
+ *                             only).
  * @param space                Space for which the new index
  *                             belongs.
  */
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *key_def,
-	     struct key_def *user_key_def,
-	     struct key_def *key_def_tuple_to_key,
-	     struct space *space);
+	     struct key_def *user_key_def, struct key_def *key_def_tuple_to_key,
+	     struct key_def *key_def_secondary_to_primary, struct space *space);
 
 /**
  * Hook on an alter space commit event. It is called on each

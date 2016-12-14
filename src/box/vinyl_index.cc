@@ -49,26 +49,6 @@
 #include "vinyl.h"
 
 /**
- * Get (struct vy_index *) by an space index with the specified
- * identifier. If the index is not found then set the
- * corresponding error in the diagnostics area.
- * @param space Vinyl space.
- * @param iid   Identifier of the index for search.
- *
- * @retval not NULL Pointer to index->db
- * @retval NULL     The index is not found.
- */
-extern "C" struct vy_index *
-vy_index_find(struct space *space, uint32_t iid)
-{
-	try {
-		return ((struct VinylIndex *) index_find(space, iid))->db;
-	} catch (Exception *e) {
-		return NULL;
-	}
-}
-
-/**
  * Get (struct vy_index *) by (struct Index *).
  * @param index VinylIndex to convert.
  * @retval Pointer to index->db.
@@ -169,7 +149,7 @@ VinylPrimaryIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, key_def, key_def,
+	db = vy_index_new(env, key_def, key_def, key_def, key_def,
 			  space_by_id(key_def->iid));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
@@ -262,6 +242,7 @@ VinylSecondaryIndex::open()
 	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
 	/* Create a vinyl index. */
 	db = vy_index_new(env, key_def_vinyl, key_def, key_def_tuple_to_key,
+			  key_def_secondary_to_primary,
 			  space_by_id(key_def->iid));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();

@@ -1223,6 +1223,12 @@ struct vy_index {
 	 * @sa VinylSecondaryIndex::key_def_tuple_to_key.
 	 */
 	struct key_def *key_def_tuple_to_key;
+	/**
+	 * A key definition to fetch the primary key from a
+	 * secondary index tuple.
+	 * @sa VinylSecondaryIndex::key_def_secondary_to_primary.
+	 */
+	struct key_def *key_def_secondary_to_primary;
 	/* A tuple format for key_def. */
 	struct tuple_format *format;
 
@@ -1245,11 +1251,49 @@ struct vy_index {
 
 /** @sa implementation for details. */
 extern struct vy_index *
-vy_index_find(struct space *space, uint32_t iid);
-
-/** @sa implementation for details. */
-extern struct vy_index *
 vy_index(struct Index *index);
+
+/**
+ * Get struct vy_index by a space index with the specified
+ * identifier. If the index is not found then set the
+ * corresponding error in the diagnostics area.
+ * @param space Vinyl space.
+ * @param iid   Identifier of the index for search.
+ *
+ * @retval not NULL Pointer to index->db
+ * @retval NULL     The index is not found.
+ */
+static inline struct vy_index *
+vy_index_find(struct space *space, uint32_t iid)
+{
+	struct Index *index = index_find(space, iid);
+	if (index == NULL)
+		return NULL;
+	return vy_index(index);
+}
+
+/**
+ * Get unique struct vy_index by a space index with the specified
+ * identifier. If the index is not found or found not unique then
+ * set the corresponding error in the diagnostics area.
+ * @param space Vinyl space.
+ * @param iid   Identifier of the index for search.
+ *
+ * @retval not NULL Pointer to index->db
+ * @retval NULL     The index is not found, or found not unique.
+ */
+static inline struct vy_index *
+vy_index_find_unique(struct space *space, uint32_t index_id)
+{
+	struct vy_index *index = vy_index_find(space, index_id);
+	if (index != NULL && !index->user_key_def->opts.is_unique) {
+		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		return NULL;
+	}
+	return index;
+}
+
+
 
 /** Transaction state. */
 enum tx_state {
@@ -1452,6 +1496,40 @@ struct vy_read_iterator {
 	/* is lazy search started */
 	bool search_started;
 };
+
+/**
+ * Open the read iterator.
+ * @param itr           Read iterator.
+ * @param index         Vinyl index to iterate.
+ * @param tx            Current transaction, if exists.
+ * @param iterator_type Type of the iterator that determines order
+ *                      of the iteration.
+ * @param key           Key for the iteration.
+ * @param vlsn          Maximal visible LSN of transactions.
+ * @param only_disk     True, if no need to open vy_mems and tx.
+ */
+static void
+vy_read_iterator_open(struct vy_read_iterator *itr,
+		      struct vy_index *index, struct vy_tx *tx,
+		      enum iterator_type iterator_type,
+		      const struct vy_stmt *key, const int64_t *vlsn,
+		      bool only_disk);
+
+/**
+ * Get the next statement with another key, or start the iterator,
+ * if it wasn't started.
+ * @param itr         Read iterator.
+ * @param[out] result Found statement is stored here.
+ *
+ * @retval  0 Success.
+ * @retval -1 Read error.
+ */
+static NODISCARD int
+vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
+
+/** Close the iterator and free resources. */
+static void
+vy_read_iterator_close(struct vy_read_iterator *itr);
 
 /** Cursor. */
 struct vy_cursor {
@@ -5245,11 +5323,6 @@ static void vy_conf_delete(struct vy_conf *c)
 	free(c);
 }
 
-static int
-vy_index_read(struct vy_index*, const struct vy_stmt*,
-	      enum iterator_type iterator_type, struct vy_stmt **,
-	      struct vy_tx*);
-
 /** {{{ Introspection */
 
 static void
@@ -5612,7 +5685,7 @@ vy_index_drop(struct vy_index *index)
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *key_def,
 	     struct key_def *user_key_def, struct key_def *key_def_tuple_to_key,
-	     struct space *space)
+	     struct key_def *key_def_secondary_to_primary, struct space *space)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -5627,6 +5700,11 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	key_def_tuple_to_key = key_def_dup(key_def_tuple_to_key);
 	if (key_def_tuple_to_key == NULL)
 		goto fail_key_def_tuple_to_key;
+
+	key_def_secondary_to_primary =
+		key_def_dup(key_def_secondary_to_primary);
+	if (key_def_secondary_to_primary == NULL)
+		goto fail_key_def_secondary_to_primary;
 
 	struct rlist key_list;
 	rlist_create(&key_list);
@@ -5665,6 +5743,7 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	index->space = space;
 	index->user_key_def = user_key_def;
 	index->key_def_tuple_to_key = key_def_tuple_to_key;
+	index->key_def_secondary_to_primary = key_def_secondary_to_primary;
 
 	return index;
 
@@ -5677,6 +5756,8 @@ fail_conf:
 	free(index);
 fail_index:
 	tuple_format_ref(format, -1);
+	key_def_delete(key_def_secondary_to_primary);
+fail_key_def_secondary_to_primary:
 	key_def_delete(key_def_tuple_to_key);
 fail_key_def_tuple_to_key:
 	key_def_delete(user_key_def);
@@ -5705,6 +5786,7 @@ vy_index_delete(struct vy_index *index)
 	key_def_delete(index->key_def);
 	key_def_delete(index->user_key_def);
 	key_def_delete(index->key_def_tuple_to_key);
+	key_def_delete(index->key_def_secondary_to_primary);
 	histogram_delete(index->run_hist);
 	TRASH(index);
 	free(index);
@@ -6711,7 +6793,7 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space, struct request *reque
 	       struct txn_stmt *stmt)
 {
 	struct tuple *old_tuple;
-	struct vy_index *pk = vy_index_find(space, 0);
+	struct vy_index *pk = vy_index_find_unique(space, 0);
 	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
@@ -6764,10 +6846,293 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space, struct request *reque
 	return 0;
 }
 
+/**
+ * Check that the key can be used for search in the index.
+ * @param  index      Index for checking.
+ * @param  key        MessagePack'ed data, the array without a
+ *                    header.
+ * @param  part_count Part count of the key.
+ *
+ * @retval  0 The key is valid.
+ * @retval -1 The key is not valid, the appropriate error is set
+ *            in the diagnostics area.
+ */
+static inline int
+vy_unique_key_validate(struct vy_index *index, const char *key,
+		       uint32_t part_count)
+{
+	struct key_def *def = index->key_def;
+	assert(def->opts.is_unique);
+	assert(key != NULL || part_count == 0);
+	/*
+	 * It is enough to validate the user defined key parts for
+	 * search in the index instead of validation of the entire
+	 * key (which is like 'secondary | primary'), because the
+	 * secondary index by the user definition already is
+	 * unique even without primary parts.
+	 * Moreover, we MUST validate only secondary parts,
+	 * because the user haven't to know about appended primary
+	 * parts and haven't to specify them.
+	 */
+	uint32_t original_part_count = index->user_key_def->part_count;
+	if (original_part_count != part_count) {
+		diag_set(ClientError, ER_EXACT_MATCH,
+			 original_part_count, part_count);
+		return -1;
+	}
+	return key_validate_parts(def, key, part_count);
+}
+
+/**
+ * Get a vinyl tuple from the index by the key.
+ * @param tx          Current transaction.
+ * @param index       Index in which search.
+ * @param key         MessagePack'ed data, the array without a
+ *                    header.
+ * @param part_count  Part count of the key.
+ * @param[out] result The found tuple is stored here. Must be
+ *                    unreferenced after usage.
+ *
+ * @param  0 Success.
+ * @param -1 Memory error or read error.
+ */
+static inline int
+vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
+	     uint32_t part_count, struct vy_stmt **result)
+{
+	/*
+	 * tx can be NULL, for example, if an user calls
+	 * space.index.get({key}).
+	 */
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
+	struct vy_stmt *vykey;
+	assert(part_count <= index->key_def->part_count);
+	vykey = vy_stmt_new_select(key, part_count);
+	if (vykey == NULL)
+		return -1;
+	struct vy_env *e = index->env;
+	ev_tstamp start  = ev_now(loop());
+	int64_t vlsn = INT64_MAX;
+	const int64_t *vlsn_ptr = &vlsn;
+	if (tx == NULL)
+		vlsn = e->xm->lsn;
+	else
+		vlsn_ptr = &tx->vlsn;
+
+	struct vy_read_iterator itr;
+	vy_read_iterator_open(&itr, index, tx, ITER_EQ, vykey, vlsn_ptr, false);
+	if (vy_read_iterator_next(&itr, result) != 0)
+		goto error;
+	if (tx != NULL && vy_tx_track(tx, index, vykey, *result == NULL) != 0) {
+		vy_read_iterator_close(&itr);
+		goto error;
+	}
+	vy_stmt_unref(vykey);
+	if (*result != NULL)
+		vy_stmt_ref(*result);
+	vy_read_iterator_close(&itr);
+	vy_stat_get(e->stat, start);
+	return 0;
+error:
+	vy_stmt_unref(vykey);
+	return -1;
+}
+
+/**
+ * Get a tuple from the primary index by the partial tuple from
+ * the secondary index.
+ * @param tx        Current transaction.
+ * @param index     Secondary index.
+ * @param partial   Partial tuple from the secondary \p index.
+ * @param[out] full The full tuple is stored here. Must be
+ *                  unreferenced after usage.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+static inline int
+vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
+		      const struct vy_stmt *partial, struct vy_stmt **full)
+{
+	assert(index->key_def->iid > 0);
+	/*
+	 * Fetch the primary key from the secondary index tuple.
+	 */
+	struct key_def *to_pk = index->key_def_secondary_to_primary;
+	uint32_t size;
+	const char *tuple = vy_tuple_data_range(partial, index->key_def, &size);
+	const char *tuple_end = tuple + size;
+	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, to_pk, NULL);
+	if (pkey == NULL)
+		return -1;
+	/* Fetch the tuple from the primary index. */
+	uint32_t part_count = mp_decode_array(&pkey);
+	assert(part_count == to_pk->part_count);
+	struct space *space = index->space;
+	struct vy_index *pk = vy_index_find_unique(space, 0);
+	assert(pk != NULL);
+	return vy_index_get(tx, pk, pkey, part_count, full);
+}
+
+/**
+ * Find a tuple in the primary index by the key of the specified
+ * index.
+ * @param tx          Current transaction.
+ * @param index       Index for which the key is specified. Can be
+ *                    both primary and secondary.
+ * @param key         MessagePack'ed data, the array without a
+ *                    header.
+ * @param part_count  Count of parts in the key.
+ * @param[out] result The found statement is stored here. Must be
+ *                    unreferenced after usage.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+static inline int
+vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
+		     uint32_t part_count, struct vy_stmt **result)
+{
+	struct vy_stmt *found;
+	if (vy_index_get(tx, index, key, part_count, &found))
+		return -1;
+	if (index->key_def->iid == 0 || found == NULL) {
+		*result = found;
+		return 0;
+	}
+	int rc = vy_index_full_by_stmt(tx, index, found, result);
+	vy_stmt_unref(found);
+	return rc;
+}
+
+/**
+ * Delete the tuple from all indexes of the vinyl space.
+ * @param tx         Current transaction.
+ * @param space      Vinyl space.
+ * @param key_iid    ID of the index from which the key is.
+ * @param tuple      MessagePack array, tuple to delete.
+ * @param tuple_end  End of the tuple.
+ * @param key        MessagePack'ed data, the array without a
+ *                   header. The \p tuple contains this key, but
+ *                   passing the key as separate parameter allows
+ *                   to avoid the key extraction from the tuple,
+ *                   if \p index is primary.
+ * @param part_count Part count of the key.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error or the index is not found.
+ */
+static inline int
+vy_delete_all_impl(struct vy_tx *tx, struct space *space, uint32_t key_iid,
+		   const char *tuple, const char *tuple_end, const char *key,
+		   uint32_t part_count)
+{
+	struct vy_index *pk = vy_index_find_unique(space, 0);
+	if (pk == NULL)
+		return -1;
+	/*
+	 * At first, delete from the primary index. If the
+	 * specified index is not primary then extract the primary
+	 * key from the tuple, else the primary key already is
+	 * passed as parameter (@sa the declaration comment).
+	 */
+	if (key_iid > 0) {
+		key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def,
+					    NULL);
+		if (key == NULL)
+			return -1;
+		part_count = mp_decode_array(&key);
+	}
+	if (vy_delete(tx, pk, key, part_count))
+		return -1;
+
+	/* At second, delete from seconary indexes. */
+	struct vy_index *index;
+	for (uint32_t i = 1; i < space->index_count; ++i) {
+		index = vy_index(space->index[i]);
+		key = tuple_extract_key_raw(tuple, tuple_end,
+					    index->key_def_tuple_to_key, NULL);
+		if (key == NULL)
+			return -1;
+		part_count = mp_decode_array(&key);
+		if (vy_delete(tx, index, key, part_count))
+			return -1;
+	}
+	return 0;
+}
+
+int
+vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	      struct request *request)
+{
+	struct vy_index *pk = vy_index_find_unique(space, 0);
+	if (pk == NULL)
+		return -1;
+	struct vy_index *index = vy_index_find_unique(space, request->index_id);
+	if (index == NULL)
+		return -1;
+	struct key_def *pk_def = pk->key_def;
+	struct vy_stmt *old_stmt = NULL;
+	bool has_secondary = space->index_count > 1;
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	if (vy_unique_key_validate(index, key, part_count))
+		return -1;
+	/*
+	 * There are two cases when need to get the full tuple
+	 * before deletion.
+	 * - if the space has on_replace triggers and need to pass
+	 *   to them the old tuple.
+	 *
+	 * - if the space has one or more secondary indexes then
+	 *   need to extract secondary keys from the old tuple.
+	 */
+	if (has_secondary || !rlist_empty(&space->on_replace)) {
+		if (vy_index_full_by_key(tx, index, key, part_count, &old_stmt))
+			return -1;
+	}
+	if (has_secondary) {
+		if (old_stmt != NULL) {
+			/*
+			 * Else nothing to delete. If the space
+			 * has secondary indexes and the old tuple
+			 * exists then delete it from all indexes.
+			 */
+			uint32_t size;
+			const char *tuple;
+			tuple = vy_tuple_data_range(old_stmt, pk_def, &size);
+			const char *tuple_end = tuple + size;
+			if (vy_delete_all_impl(tx, space, index->key_def->iid,
+					       tuple, tuple_end, key,
+					       part_count))
+				goto error;
+		}
+	} else { /* Primary is the single index in the space. */
+		assert(index->key_def->iid == 0);
+		if (vy_delete(tx, pk, key, part_count))
+			goto error;
+	}
+	if (old_stmt == NULL)
+		return 0;
+	stmt->old_tuple = vy_convert_replace(pk_def, space->format, old_stmt);
+	if (stmt->old_tuple == NULL)
+		goto error;
+	if (old_stmt != NULL)
+		vy_stmt_unref(old_stmt);
+	return box_tuple_ref(stmt->old_tuple);
+error:
+	if (old_stmt != NULL)
+		vy_stmt_unref(old_stmt);
+	return -1;
+}
+
 int
 vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		 struct request *request)
 {
+	/* Check the tuple fields. */
+	if (tuple_validate_raw(space->format, request->tuple))
+		return -1;
 	if (space->index_count == 1) {
 		/* Replace in a space with a single index. */
 		return vy_replace_one(tx, space, request, stmt);
@@ -6780,8 +7145,11 @@ vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 int
 vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request)
 {
+	/* Check the tuple fields. */
+	if (tuple_validate_raw(space->format, request->tuple))
+		return -1;
 	/* First insert into the primary index. */
-	struct vy_index *pk = vy_index_find(space, 0);
+	struct vy_index *pk = vy_index_find_unique(space, 0);
 	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
@@ -6963,43 +7331,24 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 
 /* }}} Public API of transaction control */
 
-/**
- * Find a statement by key using a thread pool thread.
- */
 int
 vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
        uint32_t part_count, struct tuple **result)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	int rc = -1;
+	assert(result != NULL);
+	*result = NULL;
 	struct vy_stmt *vyresult = NULL;
-	struct vy_stmt *vykey;
-	struct key_def *def = index->key_def;
-	assert(part_count <= def->part_count);
-	vykey = vy_stmt_new_select(key, part_count);
-	if (vykey == NULL)
+	assert(part_count <= index->key_def->part_count);
+	if (vy_index_get(tx, index, key, part_count, &vyresult))
 		return -1;
-
-	/* Try to look up the stmt in the cache */
-	if (vy_index_read(index, vykey, ITER_EQ, &vyresult, tx))
-		goto end;
-
-	if (tx != NULL && vy_tx_track(tx, index, vykey, vyresult == NULL))
-		goto end;
-	if (vyresult == NULL) { /* not found */
-		*result = NULL;
-		rc = 0;
-	} else {
-		*result = vy_convert_replace(def, index->format, vyresult);
-		if (*result != NULL)
-			rc = 0;
-	}
-end:
-	vy_stmt_unref(vykey);
-	if (vyresult)
-		vy_stmt_unref(vyresult);
-	return rc;
+	if (vyresult == NULL)
+		return 0;
+	*result = vy_convert_replace(index->key_def, index->format, vyresult);
+	vy_stmt_unref(vyresult);
+	return *result == NULL ? -1 : 0;
 }
+
 
 /** {{{ Environment */
 
@@ -10005,31 +10354,6 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 
 /* {{{ Iterator over index */
 
-/**
- * Open the iterator
- */
-static void
-vy_read_iterator_open(struct vy_read_iterator *itr,
-		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type,
-		      const struct vy_stmt *key, const int64_t *vlsn,
-		      bool only_disk);
-
-/**
- * Get current stmt
- * return 0 : something was found
- * return 1 : no more data
- * return -1 : read error
- */
-static NODISCARD int
-vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
-
-/**
- * Close the iterator and free resources.
- */
-static void
-vy_read_iterator_close(struct vy_read_iterator *itr);
-
 static void
 vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 {
@@ -10243,11 +10567,6 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 	return rc;
 }
 
-/**
- * Get current stmt
- * return 0 : something was found if *result != NULL
- * return -1 : read error
- */
 static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
 {
@@ -10351,34 +10670,6 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 }
 
 /* }}} replication */
-
-static int
-vy_index_read(struct vy_index *index, const struct vy_stmt *key,
-	      enum iterator_type iterator_type, struct vy_stmt **result,
-	      struct vy_tx *tx)
-{
-	struct vy_env *e = index->env;
-	ev_tstamp start  = ev_now(loop());
-
-	int64_t vlsn = INT64_MAX;
-	const int64_t *vlsn_ptr = &vlsn;
-	if (tx == NULL)
-		vlsn = e->xm->lsn;
-	else
-		vlsn_ptr = &tx->vlsn;
-
-	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, iterator_type, key, vlsn_ptr,
-			      false);
-	int rc = vy_read_iterator_next(&itr, result);
-	if (rc == 0 && *result) {
-		vy_stmt_ref(*result);
-	}
-	vy_read_iterator_close(&itr);
-
-	vy_stat_get(e->stat, start);
-	return rc;
-}
 
 /**
  * This structure represents a request to squash a sequence of

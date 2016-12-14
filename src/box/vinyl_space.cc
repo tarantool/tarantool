@@ -78,37 +78,6 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 		panic("failed to commit vinyl transaction");
 }
 
-/**
- * Delete a tuple from all indexes, primary and secondary.
- */
-static void
-vinyl_delete_all(struct space *space, struct tuple *tuple,
-		 struct request *request, struct vy_tx *tx)
-{
-	uint32_t part_count;
-	const char *key;
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) index_find_xc(space, 0);
-	if (request->index_id == 0) {
-		key = request->key;
-	} else {
-		key = tuple_extract_key(tuple, pk->key_def, NULL);
-	}
-	part_count = mp_decode_array(&key);
-	if (vy_delete(tx, pk->db, key, part_count))
-		diag_raise();
-
-	VinylSecondaryIndex *index;
-	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
-		index = (VinylSecondaryIndex *) space->index[iid];
-		key = tuple_extract_key(tuple,
-					index->key_def_tuple_to_key,
-					NULL);
-		part_count = mp_decode_array(&key);
-		if (vy_delete(tx, index->db, key, part_count))
-			diag_raise();
-	}
-}
-
 static void
 vinyl_insert_without_lookup(struct space *space, struct request *request,
 			    struct vy_tx *tx)
@@ -137,10 +106,6 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 			   struct request *request)
 {
 	assert(request->index_id == 0);
-
-	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple))
-		diag_raise();
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	VinylEngine *engine = (VinylEngine *)space->handler->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -168,38 +133,10 @@ struct tuple *
 VinylSpace::executeDelete(struct txn *txn, struct space *space,
                           struct request *request)
 {
-	VinylIndex *index;
-	index = (VinylIndex *)index_find_unique(space, request->index_id);
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(index->key_def, key, part_count))
-		diag_raise();
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-
-	struct tuple *old_tuple = NULL;
-	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
-	/**
-	 * If there is more than one index, then get the old tuple and use it
-	 * to extract key parts for all secondary indexes. The old tuple is
-	 * also used if the space has triggers, in which case we need to pass
-	 * it into the trigger.
-	 */
-	if (space->index_count > 1 || !rlist_empty(&space->on_replace)) {
-		old_tuple = index->findByKey(key, part_count);
-	}
-	if (space->index_count > 1) {
-		/**
-		 * Find a full tuple to fetch keys of secondary indexes.
-		 */
-		if (old_tuple)
-			vinyl_delete_all(space, old_tuple, request, tx);
-	} else {
-		if (vy_delete(tx, index->db, key, part_count))
-			diag_raise();
-	}
-	if (old_tuple)
-		tuple_ref(old_tuple);
-	stmt->old_tuple = old_tuple;
+	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
+	if (vy_delete_all(tx, stmt, space, request))
+		diag_raise();
 	return NULL;
 }
 
