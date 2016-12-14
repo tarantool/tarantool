@@ -800,7 +800,7 @@ xlog_tx_write_plain(struct xlog *log)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 
 	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK,
-		     log->zbuf.iov->iov_len >>= 1;);
+		     log->obuf.iov->iov_len >>= 1;);
 
 	ssize_t written = fio_writev(log->fd, log->obuf.iov,
 				     log->obuf.pos + 1);
