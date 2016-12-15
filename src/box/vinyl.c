@@ -133,80 +133,6 @@ struct vy_env {
 	ev_timer            quota_timer;
 };
 
-struct vy_buf {
-	/** Start of the allocated buffer */
-	char *s;
-	/** End of the used area */
-	char *p;
-	/** End of the buffer */
-	char *e;
-};
-
-static void
-vy_buf_create(struct vy_buf *b)
-{
-	b->s = NULL;
-	b->p = NULL;
-	b->e = NULL;
-}
-
-static void
-vy_buf_destroy(struct vy_buf *b)
-{
-	if (unlikely(b->s == NULL))
-		return;
-	free(b->s);
-	b->s = NULL;
-	b->p = NULL;
-	b->e = NULL;
-}
-
-static size_t
-vy_buf_size(struct vy_buf *b) {
-	return b->e - b->s;
-}
-
-static size_t
-vy_buf_used(struct vy_buf *b) {
-	return b->p - b->s;
-}
-
-static int
-vy_buf_ensure(struct vy_buf *b, size_t size)
-{
-	if (likely(b->e - b->p >= (ptrdiff_t)size))
-		return 0;
-	size_t sz = vy_buf_size(b) * 2;
-	size_t actual = vy_buf_used(b) + size;
-	if (unlikely(actual > sz))
-		sz = actual;
-	char *p;
-	if (b->s == NULL) {
-		p = malloc(sz);
-		if (unlikely(p == NULL)) {
-			diag_set(OutOfMemory, sz, "malloc", "vy_buf->p");
-			return -1;
-		}
-	} else {
-		p = realloc(b->s, sz);
-		if (unlikely(p == NULL)) {
-			diag_set(OutOfMemory, sz, "realloc", "vy_buf->p");
-			return -1;
-		}
-	}
-	b->p = p + (b->p - b->s);
-	b->e = p + sz;
-	b->s = p;
-	assert((b->e - b->p) >= (ptrdiff_t)size);
-	return 0;
-}
-
-static void
-vy_buf_advance(struct vy_buf *b, size_t size)
-{
-	b->p += size;
-}
-
 #define vy_crcs(p, size, crc) \
 	crc32_calc(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
 
@@ -521,9 +447,9 @@ vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
  * @retval -1 if error
  */
 static int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
-	       struct vy_buf *data_buf, const struct tuple_format *format,
-	       uint32_t part_count);
+vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
+	       const struct tuple_format *format,
+	       struct key_def *key_def);
 
 struct tree_mem_key {
 	const struct vy_stmt *stmt;
@@ -722,19 +648,6 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 
 static void
 vy_page_info_destroy(struct vy_page_info *page_info);
-
-struct vy_stmt_info {
-	/* record lsn */
-	int64_t lsn;
-	/* offset in data block */
-	uint32_t offset;
-	/* size of statement */
-	uint32_t size;
-	/* type */
-	uint8_t type;
-	/* for 4-byte alignment */
-	uint8_t reserved[3];
-};
 
 struct vy_run {
 	struct vy_run_info info;
@@ -1233,8 +1146,8 @@ struct vy_page_read_task {
 	struct vy_page_info page_info;
 	/** tuple format to create tuples - ref. counted */
 	struct tuple_format *format;
-	/** part count - needed to create tuples */
-	uint32_t part_count;
+	/** key_def needs to create tuples */
+	struct key_def *key_def;
 	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
 	/** vy_env - contains environment with task mempool */
@@ -5464,58 +5377,41 @@ vy_convert_replace(const struct key_def *key_def, struct tuple_format *format,
 }
 
 static int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_buf *info_buf,
-	       struct vy_buf *data_buf, const struct tuple_format *format,
-	       uint32_t part_count)
+vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
+	       const struct tuple_format *format,
+	       struct key_def *key_def)
 {
-	struct vy_stmt_info *info;
-	if (vy_buf_ensure(info_buf, sizeof(struct vy_stmt_info)))
-		return -1;
-	info = (struct vy_stmt_info *)info_buf->p;
-	vy_buf_advance(info_buf, sizeof(struct vy_stmt_info));
-
-	info->lsn = xrow->lsn;
-	info->offset = data_buf->p - data_buf->s;
 	struct request request;
 	request_create(&request, xrow->type);
 	if (request_decode(&request, xrow->body->iov_base,
 			   xrow->body->iov_len) < 0)
 		return -1;
-	info->type = request.type;
-	if (info->type == IPROTO_DELETE) {
+	uint32_t field_count;
+	struct iovec ops;
+	switch (request.type) {
+	case IPROTO_DELETE:
 		/* extract key */
-		info->size = request.key_end - request.key;
-		if (vy_buf_ensure(data_buf, info->size))
-			return -1;
-		void *data = data_buf->p;
-		memcpy(data, request.key,
-		       request.key_end - request.key);
-	} else {
-		/* space for offsets */
-		int start_offset = (part_count) * sizeof(uint32_t);
-		info->size = start_offset;
-		info->size += request.tuple_end - request.tuple;
-		if (info->type == IPROTO_UPSERT) {
-			/* space for series count (1) and operations */
-			info->size += request.ops_end - request.ops;
-		}
-		if (vy_buf_ensure(data_buf, info->size))
-			return -1;
-		void *data = data_buf->p;
-		data += start_offset;
-		/* copy tuple */
-		memcpy(data, request.tuple,
-		       request.tuple_end - request.tuple);
-		/* rebuild offsets */
-		tuple_init_field_map(format, (uint32_t *)data, data);
-		data += request.tuple_end - request.tuple;
-		if (info->type == IPROTO_UPSERT) {
-			/* copy ops */
-			memcpy(data, request.ops,
-			       request.ops_end - request.ops);
-		}
+		field_count = mp_decode_array(&request.key);
+		assert(field_count == key_def->part_count);
+		*stmt_ptr = vy_stmt_new_delete(request.key, field_count);
+		break;
+	case IPROTO_REPLACE:
+		*stmt_ptr = vy_stmt_new_replace(request.tuple, request.tuple_end,
+						format, key_def);
+		break;
+	case IPROTO_UPSERT:
+		ops.iov_base = (char *)request.ops;
+		ops.iov_len = request.ops_end - request.ops;
+		*stmt_ptr = vy_stmt_new_upsert(request.tuple, request.tuple_end,
+					       format, key_def, &ops, 1);
+		break;
+	default:
+		diag_set(ClientError, ER_VINYL, "unknown request type");
+		return -1;
 	}
-	vy_buf_advance(data_buf, info->size);
+	if (*stmt_ptr == NULL)
+		return -1;
+	(*stmt_ptr)->lsn = xrow->lsn;
 	return 0;
 }
 
@@ -7150,10 +7046,7 @@ struct vy_page {
 	uint32_t page_no;
 	/** The number of statements */
 	uint32_t count;
-	/** Tuples index array */
-	struct vy_buf info;
-	/** Tuples data */
-	struct vy_buf data;
+	struct vy_stmt **stmts;
 };
 
 static struct vy_page *
@@ -7166,16 +7059,16 @@ vy_page_new(const struct vy_page_info *page_info)
 		return NULL;
 	}
 	page->count = page_info->count;
-	vy_buf_create(&page->info);
-	vy_buf_create(&page->data);
 	return page;
 }
 
 static void
 vy_page_delete(struct vy_page *page)
 {
-	vy_buf_destroy(&page->info);
-	vy_buf_destroy(&page->data);
+	uint32_t i;
+	for (i = 0; i < page->count; ++i)
+		vy_stmt_unref(page->stmts[i]);
+	free(page->stmts);
 #if !defined(NDEBUG)
 	memset(page, '#', sizeof(*page)); /* fail early */
 #endif /* !defined(NDEBUG) */
@@ -7189,16 +7082,11 @@ vy_page_delete(struct vy_page *page)
  * \param[out] pinfo stmt metadata
  * \return stmt data including offsets table
  */
-static const char *
-vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	     struct vy_stmt_info **pinfo)
+static struct vy_stmt *
+vy_page_stmt(struct vy_page *page, uint32_t stmt_no)
 {
 	assert(stmt_no < page->count);
-	struct vy_stmt_info *info = (struct vy_stmt_info *)page->info.s +
-				    stmt_no;
-	const char *stmt_data = page->data.s + info->offset;
-	*pinfo = info;
-	return stmt_data; /* includes offset table */
+	return page->stmts[stmt_no]; /* includes offset table */
 }
 
 /**
@@ -7278,7 +7166,7 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  */
 static struct vy_page *
 vy_page_read(const struct vy_page_info *page_info, int fd,
-	     const struct tuple_format *format, uint32_t part_count,
+	     const struct tuple_format *format, struct key_def *key_def,
 	     ZSTD_DStream *zdctx)
 {
 	/* read xlog tx from xlog file */
@@ -7319,12 +7207,13 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 		return NULL;
 	}
 
+	page->stmts = calloc(page_info->count, sizeof(struct vy_stmt));
 	/* fetch all rows and decode */
 	struct xrow_header xrow;
 	uint32_t row_count = 0;
 	while ((rc = xlog_tx_cursor_next_row(&tx_cursor, &xrow)) == 0 &&
-	       (rc = vy_stmt_decode(&xrow, &page->info, &page->data,
-				    format, part_count) == 0)) {
+	       (rc = vy_stmt_decode(&xrow, page->stmts + row_count,
+				    format, key_def) == 0)) {
 		++row_count;
 	}
 	xlog_tx_cursor_destroy(&tx_cursor);
@@ -7380,7 +7269,7 @@ vy_page_read_cb(struct coio_task *base)
 	if (zdctx == NULL)
 		return -1;
 	task->page = vy_page_read(&task->page_info, task->run->fd,
-				  task->format, task->part_count, zdctx);
+				  task->format, task->key_def, zdctx);
 	return task->page != NULL ? 0 : -1;
 }
 
@@ -7411,7 +7300,7 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
-	const struct vy_index *index = itr->index;
+	struct vy_index *index = itr->index;
 	const struct vy_env *env = index->env;
 
 	/* Check cache */
@@ -7457,15 +7346,18 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->page_info = *page_info;
 		task->format = index->format;
 		tuple_format_ref(task->format, 1);
-		task->part_count = index->key_def->part_count;
+		task->key_def = index->key_def;
 		task->env = index->env;
 		task->page = NULL;
+
+		vy_index_ref(index);
 
 		/* Post task to coeio */
 		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
 		if (rc < 0)
 			return -1; /* timed out or cancelled */
 
+		vy_index_unref(index);
 		/* task was posted to worker and finished */
 		page = task->page;
 		if (page == NULL)
@@ -7495,7 +7387,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		if (zdctx == NULL)
 			return -1;
 		page = vy_page_read(page_info, itr->run->fd, index->format,
-				    index->key_def->part_count, zdctx);
+				    index->key_def, zdctx);
 	}
 
 	if (page == NULL) {
@@ -7538,13 +7430,14 @@ vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
 static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_pos pos,
-		     const char **data, struct vy_stmt_info **info)
+		     const struct vy_stmt **stmt)
 {
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	*data = vy_page_stmt(page, pos.pos_in_page, info);
+	*stmt = vy_page_stmt(page, pos.pos_in_page);
+	vy_stmt_ref((struct vy_stmt *)*stmt);
 	return 0;
 }
 
@@ -7599,14 +7492,11 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	/* for upper bound we change zero comparison result to -1 */
 	int zero_cmp = itr->iterator_type == ITER_GT ||
 		       itr->iterator_type == ITER_LE ? -1 : 0;
-	struct vy_stmt_info *info;
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		const char *fnd_key = vy_page_stmt(page, mid, &info);
-		int cmp = vy_stmt_compare_raw(fnd_key, info->type, key->raw,
-					      key->type, idx->format,
-					      idx->key_def);
+		struct vy_stmt *fnd_key = vy_page_stmt(page, mid);
+		int cmp = vy_stmt_compare(fnd_key, key, idx->format,idx->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
@@ -7719,17 +7609,16 @@ static NODISCARD int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
-	const char *stmt;
-	struct vy_stmt_info *info;
+	const struct vy_stmt *stmt;
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	const struct vy_stmt *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
-	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
+	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt);
 	if (rc != 0)
 		return rc;
-	while (info->lsn > *itr->vlsn) {
+	while (stmt->lsn > *itr->vlsn) {
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
 					      &itr->curr_pos);
 		if (rc < 0)
@@ -7740,12 +7629,11 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			return 0;
 		}
 		assert(rc == 0);
-		rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt, &info);
+		rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt);
 		if (rc != 0)
 			return rc;
 		if (iterator_type == ITER_EQ &&
-		    vy_stmt_compare_raw(stmt, info->type, key->raw, key->type,
-					format, key_def)) {
+		    vy_stmt_compare(stmt, key, format, key_def)) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			return 0;
@@ -7765,16 +7653,12 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			 */
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-			const char *test_stmt;
-			struct vy_stmt_info *test_info;
-			rc = vy_run_iterator_read(itr, test_pos, &test_stmt,
-						  &test_info);
+			const struct vy_stmt *test_stmt;
+			rc = vy_run_iterator_read(itr, test_pos, &test_stmt);
 			if (rc != 0)
 				return rc;
-			if (test_info->lsn > *itr->vlsn ||
-			    vy_stmt_compare_raw(stmt, info->type, test_stmt,
-						test_info->type, format,
-						key_def) != 0)
+			if (test_stmt->lsn > *itr->vlsn ||
+			    vy_stmt_compare(stmt, test_stmt, format, key_def) != 0)
 				break;
 			itr->curr_pos = test_pos;
 
@@ -7956,16 +7840,9 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 	int rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	struct vy_stmt_info *info;
-	const char *key = vy_page_stmt(page, itr->curr_pos.pos_in_page, &info);
-	itr->curr_stmt = vy_stmt_alloc(info->size);
-	if (itr->curr_stmt == NULL) {
-		diag_set(OutOfMemory, info->size, "run_itr", "stmt");
+	itr->curr_stmt = vy_page_stmt(page, itr->curr_pos.pos_in_page);
+	if (itr->curr_stmt == NULL)
 		return -1;
-	}
-	memcpy(itr->curr_stmt->raw, key, info->size);
-	itr->curr_stmt->type = info->type;
-	itr->curr_stmt->lsn = info->lsn;
 	itr->curr_stmt_pos = itr->curr_pos;
 	*result = itr->curr_stmt;
 	return 0;
@@ -8023,14 +7900,13 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	}
 	assert(itr->curr_pos.page_no < end_page);
 
-	const char *cur_key;
-	struct vy_stmt_info *key_info, *next_info;
-	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &key_info);
+	const struct vy_stmt *cur_key;
+	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
-	const char *next_key;
+	const struct vy_stmt *next_key;
 	struct tuple_format *format = itr->index->format;
 	do {
 		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
@@ -8051,21 +7927,16 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		 */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key,
-					  &next_info);
+		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key);
 		if (rc != 0)
 			return rc;
 
 		/* See above */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
-	} while (vy_stmt_compare_raw(cur_key, key_info->type,
-				     next_key, next_info->type, format,
-				     key_def) == 0);
+	} while (vy_stmt_compare(cur_key, next_key, format, key_def) == 0);
 
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare_raw(next_key, next_info->type,
-				itr->key->raw, itr->key->type, format,
-				key_def) != 0) {
+	    vy_stmt_compare(next_key, itr->key, format,	key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
@@ -8100,15 +7971,13 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (rc != 0)
 		return rc > 0 ? 0 : rc;
 
-	const char *cur_key;
-	struct vy_stmt_info *key_info;
-	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key, &key_info);
+	const struct vy_stmt *cur_key;
+	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 
-	const char *next_key;
-	struct vy_stmt_info *next_info;
-	rc = vy_run_iterator_read(itr, next_pos, &next_key, &next_info);
+	const struct vy_stmt *next_key;
+	rc = vy_run_iterator_read(itr, next_pos, &next_key);
 	if (rc != 0)
 		return rc;
 
@@ -8124,9 +7993,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	 *  page lock
 	 */
 	struct key_def *key_def = itr->index->key_def;
-	int cmp = vy_stmt_compare_raw(cur_key, key_info->type, next_key,
-				      next_info->type, itr->index->format,
-				      key_def);
+	int cmp = vy_stmt_compare(cur_key, next_key, itr->index->format, key_def);
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
 	if (rc != 0)
