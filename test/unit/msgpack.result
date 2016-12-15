@@ -1,4 +1,4 @@
-1..17
+1..18
     1..135
     # *** test_uints ***
     # uint 0U
@@ -1595,3 +1595,72 @@ ok 16 - subtests
     ok 10 - mp_fprint I/O error
     # *** test_mp_print: done ***
 ok 17 - subtests
+    1..65
+    # *** test_mp_check ***
+    ok 1 - invalid fixmap 1
+    ok 2 - invalid fixmap 2
+    ok 3 - invalid fixmap 3
+    ok 4 - invalid fixarray 1
+    ok 5 - invalid fixarray 2
+    ok 6 - invalid fixarray 3
+    ok 7 - invalid fixstr 1
+    ok 8 - invalid fixstr 2
+    ok 9 - invalid fixstr 3
+    ok 10 - invalid bin8 1
+    ok 11 - invalid bin8 2
+    ok 12 - invalid bin16 1
+    ok 13 - invalid bin16 2
+    ok 14 - invalid bin32 1
+    ok 15 - invalid bin32 2
+    ok 16 - invalid ext8 1
+    ok 17 - invalid ext8 2
+    ok 18 - invalid ext8 3
+    ok 19 - invalid ext8 4
+    ok 20 - invalid ext16 1
+    ok 21 - invalid ext16 2
+    ok 22 - invalid ext16 3
+    ok 23 - invalid ext16 4
+    ok 24 - invalid ext32 1
+    ok 25 - invalid ext32 2
+    ok 26 - invalid ext32 3
+    ok 27 - invalid ext32 4
+    ok 28 - invalid float32 1
+    ok 29 - invalid float32 2
+    ok 30 - invalid float64 1
+    ok 31 - invalid float64 2
+    ok 32 - invalid uint8 1
+    ok 33 - invalid uint16 1
+    ok 34 - invalid uint32 1
+    ok 35 - invalid uint64 1
+    ok 36 - invalid int8 1
+    ok 37 - invalid int16 1
+    ok 38 - invalid int32 1
+    ok 39 - invalid int64 1
+    ok 40 - invalid fixext8 1
+    ok 41 - invalid fixext8 2
+    ok 42 - invalid fixext16 1
+    ok 43 - invalid fixext16 2
+    ok 44 - invalid fixext32 1
+    ok 45 - invalid fixext32 2
+    ok 46 - invalid fixext64 1
+    ok 47 - invalid fixext64 2
+    ok 48 - invalid fixext128 1
+    ok 49 - invalid fixext128 2
+    ok 50 - invalid str8 1
+    ok 51 - invalid str8 2
+    ok 52 - invalid str16 1
+    ok 53 - invalid str16 2
+    ok 54 - invalid str32 1
+    ok 55 - invalid str32 2
+    ok 56 - invalid array16 1
+    ok 57 - invalid array16 2
+    ok 58 - invalid array32 1
+    ok 59 - invalid array32 2
+    ok 60 - invalid map16 1
+    ok 61 - invalid map16 2
+    ok 62 - invalid map16 2
+    ok 63 - invalid map32 1
+    ok 64 - invalid map32 2
+    ok 65 - invalid map32 3
+    # *** test_mp_check: done ***
+ok 18 - subtests
