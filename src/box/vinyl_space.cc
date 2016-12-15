@@ -140,88 +140,20 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 	return NULL;
 }
 
-/**
- * Don't modify indexes whose fields were not changed by update.
- *
- * If there is at least one bit in the columns mask (@sa update_read_ops in
- * tuple_update.cc) set that corresponds to one of the columns from
- * key_def->parts, then the update operation changes at least one
- * indexed field and the optimization is inapplicable.
- *
- * Otherwise, we can skip the update.
- */
-static bool
-can_optimize_update(const VinylSecondaryIndex *idx, uint64_t column_mask)
-{
-	return (column_mask & idx->column_mask) == 0;
-}
-
 struct tuple *
 VinylSpace::executeUpdate(struct txn *txn, struct space *space,
                           struct request *request)
 {
-	uint32_t index_id = request->index_id;
-	struct tuple *old_tuple = NULL;
-	VinylIndex *index = (VinylIndex *)index_find_unique(space, index_id);
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(index->key_def, key, part_count))
-		diag_raise();
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-
-	/* Find full tuple in the index. */
-	old_tuple = index->findByKey(key, part_count);
-	if (old_tuple == NULL)
-		return NULL;
-
-	TupleRef old_ref(old_tuple);
-	struct tuple *new_tuple;
-	uint64_t column_mask = 0;
-	new_tuple = tuple_update(space->format, region_aligned_alloc_xc_cb,
-				 &fiber()->gc, old_tuple, request->tuple,
-				 request->tuple_end, request->index_base,
-				 &column_mask);
-	TupleRef new_ref(new_tuple);
-	space_check_update(space, old_tuple, new_tuple);
-	uint32_t bsize;
-	const char *new_data = tuple_data_range(new_tuple, &bsize);
-
-	/**
-	 * In the primary index tuple can be replaced
-	 * without deleting old tuple.
-	 */
-	index = (VinylIndex *)space->index[0];
-	if (vy_replace(tx, index->db, new_data, new_data + bsize))
+	if (vy_update_all(tx, stmt, space, request) != 0)
 		diag_raise();
-
-	/* Update secondary keys, avoid duplicates. */
-	VinylSecondaryIndex *sec_idx;
-	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
-		sec_idx = (VinylSecondaryIndex *) space->index[iid];
-		key = tuple_extract_key(old_tuple, sec_idx->key_def_tuple_to_key,
-					NULL);
-		if (can_optimize_update(sec_idx, column_mask)) {
-			continue;
-		}
-		part_count = mp_decode_array(&key);
-		/**
-		 * Delete goes first, so if old and new keys
-		 * fully match, there is no look up beyond the
-		 * transaction index.
-		 */
-		if (vy_delete(tx, sec_idx->db, key, part_count))
-			diag_raise();
-		if (vy_insert_secondary(tx, sec_idx->db, new_data,
-					   new_data + bsize))
-			diag_raise();
+	if (stmt->new_tuple != NULL) {
+		tuple_ref(stmt->old_tuple);
+		tuple_ref(stmt->new_tuple);
+		return tuple_bless(stmt->new_tuple);
 	}
-	if (old_tuple)
-		tuple_ref(old_tuple);
-	tuple_ref(new_tuple);
-	stmt->old_tuple = old_tuple;
-	stmt->new_tuple = new_tuple;
-	return tuple_bless(new_tuple);
+	return NULL;
 }
 
 void

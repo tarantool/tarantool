@@ -189,10 +189,27 @@ vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	      struct request *request);
 
 /**
+ * Execute UPDATE in a vinyl space.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old and new
+ *                statements.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+int
+vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	      struct request *request);
+
+/**
  * Execute INSERT in a vinyl space.
  * @param tx      Current transaction.
  * @param space   Vinyl space.
- * @param request Request with the tuple data.
+ * @param request Request with the tuple data and update
+ *                operations.
  *
  * @retval  0 Success
  * @retval -1 Memory error OR duplicate error OR the primary
