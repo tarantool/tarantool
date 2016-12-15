@@ -70,13 +70,13 @@ error:
 			mp_check(&data, end);
 			continue;
 		}
-		unsigned char key = mp_decode_uint(&data);
-		key_map &= ~iproto_key_bit(key);
+		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
-		if (mp_check(&data, end))
+		if (mp_check(&data, end) != 0 ||
+		    key >= IPROTO_KEY_MAX ||
+		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
-		if (iproto_key_type[key] != mp_typeof(*value))
-			goto error;
+		key_map &= ~iproto_key_bit(key);
 		switch (key) {
 		case IPROTO_SPACE_ID:
 			request->space_id = mp_decode_uint(&value);

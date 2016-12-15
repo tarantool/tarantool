@@ -60,8 +60,9 @@ error:
 	for (uint32_t i = 0; i < size; i++) {
 		if (mp_typeof(**pos) != MP_UINT)
 			goto error;
-		unsigned char key = mp_decode_uint(pos);
-		if (iproto_key_type[key] != mp_typeof(**pos))
+		uint64_t key = mp_decode_uint(pos);
+		if (key >= IPROTO_KEY_MAX ||
+		    iproto_key_type[key] != mp_typeof(**pos))
 			goto error;
 		switch (key) {
 		case IPROTO_REQUEST_TYPE:
