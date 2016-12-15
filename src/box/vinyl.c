@@ -3604,10 +3604,10 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
 		VY_UPSERT_THRESHOLD = 10,
 		VY_UPSERT_INF = 255,
 	};
-	if (older != NULL && older->type == IPROTO_UPSERT &&
-	    older->n_upserts != VY_UPSERT_INF) {
-
-		stmt->n_upserts = older->n_upserts + 1;
+	if (older != NULL)
+		stmt->n_upserts = older->n_upserts;
+	if (stmt->n_upserts != VY_UPSERT_INF) {
+		stmt->n_upserts++;
 		if (stmt->n_upserts > VY_UPSERT_THRESHOLD) {
 			vy_index_squash_upserts(index, stmt);
 			/*
@@ -10034,32 +10034,73 @@ vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 	mempool_free(pool, squash);
 }
 
-static void
+static int
 vy_squash_process(struct vy_squash *squash)
 {
-	struct vy_stmt *stmt = squash->stmt;
 	struct vy_index *index = squash->index;
-	struct vy_env *env = index->env;
-	struct vy_quota *quota = env->quota;
-	struct lsregion *allocator = &env->allocator;
+	struct tuple_format *format = index->format;
+	struct key_def *key_def = index->key_def;
 
 	struct vy_read_iterator itr;
 	const int64_t lsn = INT64_MAX;
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
-			      stmt, &lsn, false);
-	struct vy_stmt *v;
-	if (vy_read_iterator_next(&itr, &v) == 0 && v != NULL) {
-		assert(v->type == IPROTO_REPLACE);
-		assert(vy_stmt_compare(stmt, v, index->format,
-				       index->key_def) == 0);
-		size_t mem_before = lsregion_used(allocator);
-		if (vy_range_set(itr.curr_range, v, env->xm->lsn) == 0) {
-			size_t mem_after = lsregion_used(allocator);
-			assert(mem_after >= mem_before);
-			vy_quota_force_use(quota, mem_after - mem_before);
-		}
+			      squash->stmt, &lsn, false);
+	struct vy_stmt *result;
+	int rc = vy_read_iterator_next(&itr, &result);
+	if (rc != 0) {
+		vy_read_iterator_close(&itr);
+		return -1;
+	} else if (result == NULL) {
+		vy_read_iterator_close(&itr);
+		return 0;
 	}
+
+	vy_stmt_ref(result);
 	vy_read_iterator_close(&itr);
+
+	struct vy_range *range;
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
+					  format, key_def, result);
+	/*
+	 * While we were reading on-disk runs, new statements could
+	 * have been inserted into the in-memory tree. Apply them to
+	 * the result.
+	 */
+	assert(range->mem_count > 0);
+	struct vy_mem *mem = rlist_first_entry(&range->mems,
+					       struct vy_mem, link);
+	struct tree_mem_key tree_key = {
+		.stmt = result,
+		.lsn = result->lsn,
+	};
+	struct vy_mem_tree_iterator mem_itr =
+		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
+	assert(!vy_mem_tree_iterator_is_invalid(&mem_itr));
+	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
+		const struct vy_stmt *mem_stmt =
+			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
+		if (vy_stmt_compare(result, mem_stmt, format, key_def) != 0)
+			break;
+		struct vy_stmt *applied;
+		if (mem_stmt->type == IPROTO_UPSERT)
+			applied = vy_apply_upsert(mem_stmt, result,
+					    key_def, format, true);
+		else
+			applied = vy_stmt_dup(mem_stmt);
+		vy_stmt_unref(result);
+		if (applied == NULL)
+			return -1;
+		result = applied;
+		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	}
+
+	size_t write_size = 0;
+	rc = vy_range_set(range, result, index->env->xm->lsn);
+	vy_stmt_unref(result);
+	if (rc == 0)
+		vy_quota_force_use(index->env->quota, write_size);
+	return rc;
 }
 
 static struct vy_squash_queue *
@@ -10101,7 +10142,8 @@ vy_squash_queue_f(va_list va)
 		}
 		struct vy_squash *squash;
 		squash = stailq_shift_entry(&sq->queue, struct vy_squash, next);
-		vy_squash_process(squash);
+		if (vy_squash_process(squash) != 0)
+			error_log(diag_last_error(diag_get()));
 		vy_squash_delete(&sq->pool, squash);
 	}
 	return 0;
