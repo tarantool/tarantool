@@ -212,9 +212,9 @@ vy_buf_advance(struct vy_buf *b, size_t size)
 
 struct vy_quota {
 	bool enable;
-	int64_t limit;
-	int64_t watermark;
-	int64_t used;
+	size_t limit;
+	size_t watermark;
+	size_t used;
 	struct ipc_cond cond;
 };
 
@@ -227,7 +227,7 @@ vy_quota_delete(struct vy_quota*);
 static void
 vy_quota_enable(struct vy_quota*);
 
-static int64_t
+static size_t
 vy_quota_used(struct vy_quota *q)
 {
 	return q->used;
@@ -294,7 +294,7 @@ vy_quota_enable(struct vy_quota *q)
 }
 
 static void
-vy_quota_use(struct vy_quota *q, int64_t size,
+vy_quota_use(struct vy_quota *q, size_t size,
 	     struct ipc_cond *no_quota_cond)
 {
 	q->used += size;
@@ -308,13 +308,13 @@ vy_quota_use(struct vy_quota *q, int64_t size,
 }
 
 static void
-vy_quota_force_use(struct vy_quota *q, int64_t size)
+vy_quota_force_use(struct vy_quota *q, size_t size)
 {
 	q->used += size;
 }
 
 static void
-vy_quota_release(struct vy_quota *q, int64_t size)
+vy_quota_release(struct vy_quota *q, size_t size)
 {
 	q->used -= size;
 	if (q->used < q->limit)
@@ -333,10 +333,9 @@ vy_quota_update_watermark(struct vy_quota *q, uint64_t max_range_size,
 	 * us to dump the biggest range before the hard limit is hit,
 	 * basing on average write rate and disk bandwidth.
 	 */
-	q->watermark = q->limit - (double)max_range_size *
-					tx_write_rate / dump_bandwidth;
-	if (q->watermark < 0)
-		q->watermark = 0;
+	double watermark = (double)q->limit - (double)max_range_size *
+			   tx_write_rate / dump_bandwidth;
+	q->watermark = watermark > 0 ? (size_t) watermark : 0;
 }
 
 static int
@@ -3385,6 +3384,8 @@ vy_range_delete(struct vy_range *range)
 	assert(range->nodecompact.pos == UINT32_MAX);
 	struct vy_index *index = range->index;
 	struct vy_env *env = index->env;
+	struct vy_quota *quota = env->quota;
+	struct lsregion *allocator = &env->allocator;
 
 	if (range->begin)
 		vy_stmt_unref(range->begin);
@@ -3400,8 +3401,8 @@ vy_range_delete(struct vy_range *range)
 						       struct vy_run, link);
 		vy_run_unref(run);
 	}
-	int64_t mem_used_before = lsregion_used(&env->allocator);
 	/* Release all mems */
+	size_t mem_used_before = lsregion_used(allocator);
 	while (!rlist_empty(&range->mems)) {
 		struct vy_mem *mem = rlist_shift_entry(&range->mems,
 						       struct vy_mem, link);
@@ -3410,9 +3411,9 @@ vy_range_delete(struct vy_range *range)
 		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 	}
-	int64_t mem_used_after = lsregion_used(&env->allocator);
+	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(env->quota, mem_used_before - mem_used_after);
+	vy_quota_release(quota, mem_used_before - mem_used_after);
 
 	TRASH(range);
 	free(range);
@@ -4201,6 +4202,8 @@ vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_env *env = index->env;
+	struct vy_quota *quota = env->quota;
+	struct lsregion *allocator = &env->allocator;
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
 
@@ -4224,7 +4227,7 @@ vy_task_dump_complete(struct vy_task *task)
 	range->mem_count = 1;
 	range->used = mem->used;
 	range->min_lsn = mem->min_lsn;
-	int64_t mem_used_before = lsregion_used(&env->allocator);
+	size_t mem_used_before = lsregion_used(allocator);
 	while (!rlist_empty(&release)) {
 		mem = rlist_shift_entry(&release, struct vy_mem, link);
 		vy_scheduler_mem_dumped(env->scheduler, mem);
@@ -4233,9 +4236,9 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_mem_delete(mem);
 	}
 	range->version++;
-	int64_t mem_used_after = lsregion_used(&env->allocator);
+	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(env->quota, mem_used_before - mem_used_after);
+	vy_quota_release(quota, mem_used_before - mem_used_after);
 
 	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
@@ -6878,10 +6881,13 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	if (lsn > e->xm->lsn)
 		e->xm->lsn = lsn;
 
+	struct vy_quota *quota = e->quota;
+	struct lsregion *allocator = &e->allocator;
+
 	/* Flush transactional changes to the index. */
 	struct txv *v = write_set_first(&tx->write_set);
 
-	int64_t mem_used_before = lsregion_used(&e->allocator);
+	size_t mem_used_before = lsregion_used(allocator);
 
 	uint64_t write_count = 0;
 	/** @todo: check return value of vy_tx_write(). */
@@ -6896,15 +6902,15 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		count++;
 		txv_delete(v);
 	}
-	int64_t mem_used_after = lsregion_used(&e->allocator);
+	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after >= mem_used_before);
-	int64_t write_size = mem_used_after - mem_used_before;
+	size_t write_size = mem_used_after - mem_used_before;
 	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
 
 	TRASH(tx);
 	free(tx);
 
-	vy_quota_use(e->quota, write_size, &e->scheduler->scheduler_cond);
+	vy_quota_use(quota, write_size, &e->scheduler->scheduler_cond);
 	return 0;
 }
 
