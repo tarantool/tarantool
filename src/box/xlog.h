@@ -307,7 +307,6 @@ xlog_rename(struct xlog *l);
  * Write a row to xlog, 
  *
  * @retval count of writen bytes
- * @retval 0 if packet is buffered
  * @retval -1 for error
  */
 ssize_t

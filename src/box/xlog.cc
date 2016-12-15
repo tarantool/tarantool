@@ -968,8 +968,8 @@ xlog_tx_write(struct xlog *log)
 /*
  * Add a row to a log and possibly flush the log.
  *
- * @retval -1 error
- * @retval >=0 number of bytes flushed to disk by this write.
+ * @retval  -1 error, check diag.
+ * @retval >=0 the number of bytes written to buffer.
  */
 ssize_t
 xlog_write_row(struct xlog *log, const struct xrow_header *packet)
@@ -987,6 +987,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 		}
 	}
 
+	size_t page_offset = obuf_size(&log->obuf);
 	/** encode row into iovec */
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_header_encode(packet, iov, 0);
@@ -1007,11 +1008,13 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	}
 	assert(iovcnt <= XROW_IOVMAX);
 
+	size_t row_size = obuf_size(&log->obuf) - page_offset;
 	if (log->is_autocommit &&
-	    obuf_size(&log->obuf) >= XLOG_TX_AUTOCOMMIT_THRESHOLD) {
-		return xlog_tx_write(log);
-	}
-	return 0;
+	    obuf_size(&log->obuf) >= XLOG_TX_AUTOCOMMIT_THRESHOLD &&
+	    xlog_tx_write(log) != 0)
+		return -1;
+
+	return row_size;
 }
 
 /**
@@ -1197,56 +1200,30 @@ xlog_cursor_pos(struct xlog_cursor *cursor)
 
 /**
  * Decompress zstd-compressed buf into cursor row block
+ *
+ * @retval -1 error, check diag
+ * @retval  0 data fully decompressed
+ * @retval  1 need more bytes in the output buffer
  */
 static int
-xlog_cursor_decompress(struct ibuf *rows, const char **data,
+xlog_cursor_decompress(char **rows, char *rows_end, const char **data,
 		       const char *data_end, ZSTD_DStream *zdctx)
 {
-	ZSTD_initDStream(zdctx);
-	if (zdctx == NULL) {
-		tnt_error(OutOfMemory, sizeof(zdctx),
-			  "runtime", "xlog decompressor");
-		return -1;
-	}
 	ZSTD_inBuffer input = {*data, (size_t)(data_end - *data), 0};
+	ZSTD_outBuffer output = {*rows, (size_t)(rows_end - *rows), 0};
 
-	if (!ibuf_reserve(rows, XLOG_TX_AUTOCOMMIT_THRESHOLD)) {
-		tnt_error(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
-			  "runtime", "xlog output buffer");
-		goto error;
-	}
-
-	while (input.pos < input.size) {
-		ZSTD_outBuffer output = {rows->wpos,
-					 ibuf_unused(rows),
-					 0};
+	while (input.pos < input.size && output.pos < output.size) {
 		size_t rc = ZSTD_decompressStream(zdctx, &output, &input);
-		/* ibuf_reserve() has been called, alloc() must not fail */
-		assert(output.pos <= ibuf_unused(rows));
-		ibuf_alloc(rows, output.pos);
 		if (ZSTD_isError(rc)) {
 			diag_set(ClientError, ER_DECOMPRESSION,
 				 ZSTD_getErrorName(rc));
-			goto error;
+			return -1;
 		}
-		if (input.pos == input.size) {
-			break;
-		}
-		if (output.pos == output.size) {
-			if (!ibuf_reserve(rows, ibuf_capacity(rows))){
-				tnt_error(OutOfMemory,
-					  ibuf_capacity(rows),
-					  "runtime",
-					  "xlog tx rows buffer");
-				goto error;
-			}
-			continue;
-		}
+		assert(output.pos <= (size_t)(rows_end - *rows));
+		*rows = (char *)output.dst + output.pos;
+		*data = (char *)input.src + input.pos;
 	}
-	*data = data_end;
-	return 0;
-error:
-	return -1;
+	return input.pos == input.size ? 0: 1;
 }
 
 /**
@@ -1366,14 +1343,15 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 		tnt_error(XlogError, "tx checksum mismatch");
 		return -1;
 	}
+	data_end = rpos + fixheader.len;
 
 	ibuf_create(&tx_cursor->rows, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	if (fixheader.magic == row_marker) {
 		void *dst = ibuf_alloc(&tx_cursor->rows, fixheader.len);
 		if (dst == NULL) {
-			tnt_error(OutOfMemory, fixheader.len,
-				  "runtime", "xlog rows buffer");
+			diag_set(OutOfMemory, fixheader.len,
+				 "runtime", "xlog rows buffer");
 			ibuf_destroy(&tx_cursor->rows);
 			return -1;
 		}
@@ -1382,12 +1360,24 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 		assert(*data <= data_end);
 		return 0;
 	};
+
 	assert(fixheader.magic == zrow_marker);
-	if (xlog_cursor_decompress(&tx_cursor->rows, &rpos,
-				   rpos + fixheader.len, zdctx) < 0) {
-		ibuf_destroy(&tx_cursor->rows);
+	ZSTD_initDStream(zdctx);
+	int rc;
+	do {
+		if (ibuf_reserve(&tx_cursor->rows,
+				 XLOG_TX_AUTOCOMMIT_THRESHOLD) == NULL) {
+			tnt_error(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
+				  "runtime", "xlog output buffer");
+			ibuf_destroy(&tx_cursor->rows);
+			return -1;
+		}
+	} while ((rc = xlog_cursor_decompress(&tx_cursor->rows.wpos,
+					      tx_cursor->rows.end, &rpos,
+					      data_end, zdctx)) == 1);
+	if (rc != 0)
 		return -1;
-	}
+
 	*data = rpos;
 	assert(*data <= data_end);
 	return 0;
