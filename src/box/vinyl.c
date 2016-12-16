@@ -7149,11 +7149,7 @@ error:
  *
  * The syntax of update operation allows the user to update the
  * primary key of a tuple, which is prohibited, to avoid funny
- * effects during replication. Some engines can track down this
- * situation and abort the operation; such engines (memtx) don't
- * use this function. Other engines can't do it, so they ask the
- * server to verify that the primary key of the tuple has not
- * changed.
+ * effects during replication.
  *
  * @param pk         Primary index.
  * @param index_name Name of the index which was updated - it may
@@ -7166,13 +7162,13 @@ error:
  * @retval -1 Attempt to modify the primary key.
  */
 static inline int
-vy_primary_check_update(const struct vy_index *pk, const char *index_name,
-			const struct vy_stmt *old_tuple,
-			const struct vy_stmt *new_tuple)
+vy_check_update(const struct vy_index *pk, const struct vy_stmt *old_tuple,
+		const struct vy_stmt *new_tuple)
 {
 	if (vy_tuple_compare_raw(old_tuple->raw, new_tuple->raw, pk->format,
 				 pk->key_def)) {
-		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY, index_name,
+		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+			 pk->key_def->name,
 			 space_name_by_id(pk->key_def->space_id));
 		return -1;
 	}
@@ -7181,17 +7177,17 @@ vy_primary_check_update(const struct vy_index *pk, const char *index_name,
 
 /**
  * Don't modify indexes whose fields were not changed by update.
- * If there is at least one bit in the columns mask
+ * If there is at least one bit in the column mask
  * (@sa update_read_ops in tuple_update.cc) set that corresponds
  * to one of the columns from key_def->parts, then the update
  * operation changes at least one indexed field and the
  * optimization is inapplicable. Otherwise, we can skip the
  * update.
- * @param idx         Secondary index which try to update.
+ * @param idx         Secondary index which we try to update.
  * @param column_mask Maks of the update operations.
  */
 static bool
-can_optimize_update(const struct vy_index *idx, uint64_t column_mask)
+vy_can_skip_update(const struct vy_index *idx, uint64_t column_mask)
 {
 	/*
 	 * Update of the primary index can't be skipped, since it
@@ -7262,8 +7258,7 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 				       pk_def);
 	if (new_stmt == NULL)
 		goto error;
-	if (vy_primary_check_update(pk, index->key_def->name, old_stmt,
-				    new_stmt)) {
+	if (vy_check_update(pk, old_stmt, new_stmt)) {
 		vy_stmt_unref(new_stmt);
 		goto error;
 	}
@@ -7283,7 +7278,7 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 					    index->key_def_tuple_to_key, NULL);
 		if (key == NULL)
 			goto error;
-		if (can_optimize_update(index, column_mask))
+		if (vy_can_skip_update(index, column_mask))
 			continue;
 		part_count = mp_decode_array(&key);
 		if (vy_delete(tx, index, key, part_count))
@@ -7295,13 +7290,13 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	vy_stmt_unref(old_stmt);
 	if (stmt->old_tuple == NULL)
 		return -1;
-	if (box_tuple_ref(stmt->old_tuple) != 0) {
-		box_tuple_unref(stmt->old_tuple);
+	if (box_tuple_ref(stmt->old_tuple))
 		return -1;
-	}
 	stmt->new_tuple = box_tuple_new(space->format, upd_tuple,
 					upd_tuple_end);
-	return stmt->new_tuple == NULL ? -1 : 0;
+	if (stmt->new_tuple == NULL)
+		return -1;
+	return box_tuple_ref(stmt->new_tuple);
 error:
 	assert(old_stmt != NULL);
 	vy_stmt_unref(old_stmt);

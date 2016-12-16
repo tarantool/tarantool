@@ -39,7 +39,6 @@ struct relay;
 
 enum engine_flags {
 	ENGINE_CAN_BE_TEMPORARY = 1,
-	ENGINE_AUTO_CHECK_UPDATE = 2,
 };
 
 extern struct rlist engines;

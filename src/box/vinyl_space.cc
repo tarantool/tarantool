@@ -118,15 +118,12 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 			diag_raise();
 	}
 
-	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
-					    request->tuple_end);
-	if (new_tuple == NULL)
+	stmt->new_tuple = tuple_new(space->format, request->tuple,
+				    request->tuple_end);
+	if (stmt->new_tuple == NULL)
 		diag_raise();
-	/* GC the new tuple if there is an exception below. */
-	TupleRef ref(new_tuple);
-	tuple_ref(new_tuple);
-	stmt->new_tuple = new_tuple;
-	return tuple_bless(new_tuple);
+	tuple_ref(stmt->new_tuple);
+	return stmt->new_tuple;
 }
 
 struct tuple *
@@ -137,6 +134,10 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	if (vy_delete_all(tx, stmt, space, request))
 		diag_raise();
+	/*
+	 * Delete may or may not set stmt->old_tuple, but we
+	 * always return NULL.
+	 */
 	return NULL;
 }
 
@@ -148,12 +149,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_update_all(tx, stmt, space, request) != 0)
 		diag_raise();
-	if (stmt->new_tuple != NULL) {
-		tuple_ref(stmt->old_tuple);
-		tuple_ref(stmt->new_tuple);
-		return tuple_bless(stmt->new_tuple);
-	}
-	return NULL;
+	return stmt->new_tuple;
 }
 
 void
