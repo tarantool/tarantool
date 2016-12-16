@@ -60,7 +60,7 @@ BuildRequires: python-yaml >= 3.0.9
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
-Version: 1.7.2.1
+Version: 1.7.2.385
 Release: 1%{?dist}
 Group: Applications/Databases
 Summary: In-memory database and Lua application server
@@ -204,6 +204,20 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+
+* Fri Dec 16 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.385-1
+- Add `tarantoolctl cat/play` commands and `xlog` Lua module.
+- Add Lua library to manipulate environment variables.
+- Allow DML requests from on_replace triggers.
+- Allow UPSERT without operations.
+- Improve support for the large number of active network clients.
+- Fix race conditions during automatic cluster bootstrap.
+- Fix calculation of periods in snapshot daemon.
+- Fix handling of iterator type in space:pairs() and space:select().
+- Fix CVE-2016-9036 and CVE-2016-9037.
+- Dozens of bug fixes to Vinyl storage engine.
+- Remove broken coredump() Lua function.
+
 * Thu Sep 29 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.1-1
 - Vinyl - a new write-optimized storage engine, allowing the amount of
   data stored to exceed the amount of available RAM 10-100x times.

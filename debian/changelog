@@ -1,3 +1,19 @@
+tarantool (1.7.2.385.g952d79e-1) unstable; urgency=medium
+
+  * Add `tarantoolctl cat/play` commands and `xlog` Lua module.
+  * Add Lua library to manipulate environment variables.
+  * Allow DML requests from on_replace triggers.
+  * Allow UPSERT without operations.
+  * Improve support for the large number of active network clients.
+  * Fix race conditions during automatic cluster bootstrap.
+  * Fix calculation of periods in snapshot daemon.
+  * Fix handling of iterator type in space:pairs() and space:select().
+  * Fix CVE-2016-9036 and CVE-2016-9037.
+  * Dozens of bug fixes to Vinyl storage engine.
+  * Remove broken coredump() Lua function.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 16 Dec 2016 19:03:31 +0300
+
 tarantool (1.7.2.314.gedffdc0-1) unstable; urgency=medium
 
   * Fix "ld: Nonrepresentable section on output". Closes: #846773.
