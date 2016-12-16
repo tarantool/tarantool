@@ -205,37 +205,37 @@ chkconfig --del tarantool
 
 %changelog
 * Thu Sep 29 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.1-1
- - Vinyl - a new write-optimized storage engine, allowing the amount of
-   data stored to exceed the amount of available RAM 10-100x times.
- - A new binary protocol command for CALL, which no more restricts a function
-   to returning an array of tuples and allows returning an arbitrary
-   MsgPack/JSON result, including scalars, nil and void (nothing).
- - Automatic replication cluster bootstrap; it's now much easier to configure
-   a new replication cluster.
- - New indexable data types: unsigned, integer, number and scalar.
- - memtx snapshots and xlog files are now compressed on the fly using the
-   fast ZStandard compression algorithm. Compression options are configured
-   automatically to get an optimal trade-off between CPU utilization and disk
-   throughput.
- - fiber.cond() - a new synchronization mechanism for fibers.
- - Tab-based autocompletion in the interactive console.
- - A new implementation of net.box improving performance and solving
-   problems with the garbage collection of dead connections.
- - Native systemd integration alongside sysvinit.
- - A ready-to-use 'example.lua' instance enable by default.
- - Dozens of bugfixes:
-   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
+- Vinyl - a new write-optimized storage engine, allowing the amount of
+  data stored to exceed the amount of available RAM 10-100x times.
+- A new binary protocol command for CALL, which no more restricts a function
+  to returning an array of tuples and allows returning an arbitrary
+  MsgPack/JSON result, including scalars, nil and void (nothing).
+- Automatic replication cluster bootstrap; it's now much easier to configure
+  a new replication cluster.
+- New indexable data types: unsigned, integer, number and scalar.
+- memtx snapshots and xlog files are now compressed on the fly using the
+  fast ZStandard compression algorithm. Compression options are configured
+  automatically to get an optimal trade-off between CPU utilization and disk
+  throughput.
+- fiber.cond() - a new synchronization mechanism for fibers.
+- Tab-based autocompletion in the interactive console.
+- A new implementation of net.box improving performance and solving
+  problems with the garbage collection of dead connections.
+- Native systemd integration alongside sysvinit.
+- A ready-to-use 'example.lua' instance enable by default.
+- Dozens of bugfixes:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
 
 * Wed Sep 28 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.6-1
- - Add dependency on network configuration files used by `socket` module
+- Add dependency on network configuration files used by `socket` module
 
 * Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
- - Tab-based autocompletion in the interactive console
- - LUA_PATH and LUA_CPATH environment variables taken into account
- - A new box.cfg { read_only = true } option
- - Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
- - Bugs fixed:
-   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
+- Tab-based autocompletion in the interactive console
+- LUA_PATH and LUA_CPATH environment variables taken into account
+- A new box.cfg { read_only = true } option
+- Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
+- Bugs fixed:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
 
 * Thu Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
 - Add support for OpenSSL 1.1
