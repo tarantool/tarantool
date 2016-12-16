@@ -1,5 +1,7 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
+
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 net_box = require('net.box')
@@ -11,8 +13,9 @@ test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 
 test_run:cmd("switch default")
-s = box.schema.space.create('test');
-index = s:create_index('primary', {type = 'hash'})
+s = box.schema.space.create('test', {engine = engine});
+-- vinyl does not support hash index
+index = s:create_index('primary', {type = (engine == 'vinyl' and 'tree' or 'hash') })
 
 test_run:cmd("switch replica")
 fiber = require('fiber')

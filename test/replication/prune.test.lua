@@ -4,6 +4,7 @@ print '-------------------------------------------------------------'
 
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 replica_set = require('fast_replica')
 fiber = require('fiber')
 
@@ -12,7 +13,7 @@ box.space._cluster:len() == 1
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 -- Create space and fill it
-space = box.schema.create_space('test')
+space = box.schema.create_space('test', {engine = engine})
 index = box.space.test:create_index('primary')
 for i=1,10 do  space:insert{i, 'test'} end
 

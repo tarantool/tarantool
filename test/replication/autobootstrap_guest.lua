@@ -22,8 +22,12 @@ box.cfg({
     };
 })
 
+env = require('test_run')
+test_run = env.new()
+engine = test_run:get_cfg('engine')
+
 box.once("bootstrap", function()
     box.schema.user.grant("guest", 'replication')
-    box.schema.space.create('test')
+    box.schema.space.create('test', {engine = engine})
     box.space.test:create_index('primary')
 end)

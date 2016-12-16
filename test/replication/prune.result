@@ -13,6 +13,9 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+engine = test_run:get_cfg('engine')
+---
+...
 replica_set = require('fast_replica')
 ---
 ...
@@ -27,7 +30,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
 -- Create space and fill it
-space = box.schema.create_space('test')
+space = box.schema.create_space('test', {engine = engine})
 ---
 ...
 index = box.space.test:create_index('primary')

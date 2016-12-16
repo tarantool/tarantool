@@ -1,11 +1,12 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 errinj = box.error.injection
 
 box.schema.user.grant('guest', 'replication')
-s = box.schema.space.create('test');
+s = box.schema.space.create('test', {engine = engine});
 index = s:create_index('primary')
 
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
@@ -16,9 +17,10 @@ fiber = require('fiber')
 
 s = box.space.test
 test_run:cmd("setopt delimiter ';'")
+-- vinyl does not support index.len() so we use index.count() instead
 function wait_repl(cnt)
     for i = 1, 20 do
-        if s.index[0]:len() >= cnt then
+        if s.index[0]:count() >= cnt then
             return true
         end
         fiber.sleep(0.01)
@@ -58,7 +60,7 @@ test_run:cmd("switch replica")
 wait_repl(30)
 
 test_run:cmd("switch default")
-box.space.test.index[0]:len()
+box.space.test.index[0]:count()
 
 errinj.set("ERRINJ_WAL_WRITE_DISK", true)
 test_f(31, true)
@@ -72,7 +74,10 @@ test_run:cmd("switch replica")
 wait_repl(50)
 
 test_run:cmd("switch default")
-box.space.test.index[0]:len()
+box.space.test.index[0]:count()
 
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+box.space.test:drop()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'replication')
