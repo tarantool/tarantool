@@ -218,6 +218,23 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 int
 vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request);
 
+/**
+ * Execute UPSERT in a vinyl space.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old and new
+ *                statements.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data and update
+ *                operations.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+int
+vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	      struct request *request);
+
 int
 vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *tuple, const char *tuple_end,
