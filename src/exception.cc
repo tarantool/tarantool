@@ -156,14 +156,6 @@ SystemError::SystemError(const char *file, unsigned line,
 	va_end(ap);
 }
 
-SystemError::SystemError(const char *file, unsigned line,
-			 const char *format, va_list ap)
-	: Exception(&type_SystemError, file, line),
-	m_errno(errno)
-{
-	error_vformat_msg(this, format, ap);
-}
-
 void
 SystemError::log() const
 {
