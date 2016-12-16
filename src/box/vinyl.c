@@ -1293,8 +1293,6 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 	return index;
 }
 
-
-
 /** Transaction state. */
 enum tx_state {
 	/** Initial state. */
@@ -6793,7 +6791,7 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space, struct request *reque
 	       struct txn_stmt *stmt)
 {
 	struct tuple *old_tuple;
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
@@ -6847,7 +6845,7 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space, struct request *reque
 }
 
 /**
- * Check that the key can be used for search in the index.
+ * Check that the key can be used for search in a unique index.
  * @param  index      Index for checking.
  * @param  key        MessagePack'ed data, the array without a
  *                    header.
@@ -6865,14 +6863,13 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
 	assert(def->opts.is_unique);
 	assert(key != NULL || part_count == 0);
 	/*
-	 * It is enough to validate the user defined key parts for
-	 * search in the index instead of validation of the entire
-	 * key (which is like 'secondary | primary'), because the
-	 * secondary index by the user definition already is
-	 * unique even without primary parts.
-	 * Moreover, we MUST validate only secondary parts,
-	 * because the user haven't to know about appended primary
-	 * parts and haven't to specify them.
+	 * The index contains tuples with concatenation of
+	 * secondary and primary key fields, while the key
+	 * supplied by the user only contains the secondary key
+	 * fields. Use the correct key def to validate the key.
+	 * The key can be used to look up in the index since the
+	 * supplied key parts uniquely identify the tuple, as long
+	 * as the index is unique.
 	 */
 	uint32_t original_part_count = index->user_key_def->part_count;
 	if (original_part_count != part_count) {
@@ -6969,7 +6966,7 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	uint32_t part_count = mp_decode_array(&pkey);
 	assert(part_count == to_pk->part_count);
 	struct space *space = index->space;
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	assert(pk != NULL);
 	return vy_index_get(tx, pk, pkey, part_count, full);
 }
@@ -7009,40 +7006,25 @@ vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
  * Delete the tuple from all indexes of the vinyl space.
  * @param tx         Current transaction.
  * @param space      Vinyl space.
- * @param key_iid    ID of the index from which the key is.
  * @param tuple      MessagePack array, tuple to delete.
  * @param tuple_end  End of the tuple.
- * @param key        MessagePack'ed data, the array without a
- *                   header. The \p tuple contains this key, but
- *                   passing the key as separate parameter allows
- *                   to avoid the key extraction from the tuple,
- *                   if \p index is primary.
+ * @param key        Primary key. This is an optimization, to
+ *                   avoid extracting the primary key from the
+ *                   \p tuple in the most common case when it's
+ *                   already supplied by the user.
  * @param part_count Part count of the key.
  *
  * @retval  0 Success
  * @retval -1 Memory error or the index is not found.
  */
 static inline int
-vy_delete_all_impl(struct vy_tx *tx, struct space *space, uint32_t key_iid,
-		   const char *tuple, const char *tuple_end, const char *key,
-		   uint32_t part_count)
+vy_delete_all_impl(struct vy_tx *tx, struct space *space,
+		   const char *tuple, const char *tuple_end,
+		   const char *key, uint32_t part_count)
 {
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
-	/*
-	 * At first, delete from the primary index. If the
-	 * specified index is not primary then extract the primary
-	 * key from the tuple, else the primary key already is
-	 * passed as parameter (@sa the declaration comment).
-	 */
-	if (key_iid > 0) {
-		key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def,
-					    NULL);
-		if (key == NULL)
-			return -1;
-		part_count = mp_decode_array(&key);
-	}
 	if (vy_delete(tx, pk, key, part_count))
 		return -1;
 
@@ -7065,7 +7047,7 @@ int
 vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	      struct request *request)
 {
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
 	struct vy_index *index = vy_index_find_unique(space, request->index_id);
@@ -7084,41 +7066,55 @@ vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	 * - if the space has on_replace triggers and need to pass
 	 *   to them the old tuple.
 	 *
-	 * - if the space has one or more secondary indexes then
-	 *   need to extract secondary keys from the old tuple.
+	 * - if the space has one or more secondary indexes, then
+	 *   we need to extract secondary keys from the old tuple
+	 *   and pass them to indexes for deletion.
 	 */
 	if (has_secondary || !rlist_empty(&space->on_replace)) {
 		if (vy_index_full_by_key(tx, index, key, part_count, &old_stmt))
 			return -1;
+		if (old_stmt == NULL)
+			return 0;
 	}
 	if (has_secondary) {
-		if (old_stmt != NULL) {
+		assert(old_stmt != NULL);
+		/*
+		 * If the space has secondary indexes and
+		 * the old tuple exists then delete it
+		 * from all the indexes.
+		 */
+		uint32_t size;
+		const char *tuple;
+		tuple = vy_tuple_data_range(old_stmt, pk_def, &size);
+		const char *tuple_end = tuple + size;
+		if (request->index_id != 0) {
 			/*
-			 * Else nothing to delete. If the space
-			 * has secondary indexes and the old tuple
-			 * exists then delete it from all indexes.
+			 * If the specified index is not
+			 * primary then extract the
+			 * primary key from the tuple,
+			 * else the primary key already is
+			 * passed as parameter.
 			 */
-			uint32_t size;
-			const char *tuple;
-			tuple = vy_tuple_data_range(old_stmt, pk_def, &size);
-			const char *tuple_end = tuple + size;
-			if (vy_delete_all_impl(tx, space, index->key_def->iid,
-					       tuple, tuple_end, key,
-					       part_count))
-				goto error;
+			key = tuple_extract_key_raw(tuple, tuple_end,
+						    pk->key_def, NULL);
+			if (key == NULL)
+				return -1;
+			part_count = mp_decode_array(&key);
 		}
+		if (vy_delete_all_impl(tx, space, tuple, tuple_end,
+				       key, part_count))
+			goto error;
 	} else { /* Primary is the single index in the space. */
 		assert(index->key_def->iid == 0);
 		if (vy_delete(tx, pk, key, part_count))
 			goto error;
+		if (old_stmt == NULL)
+			return 0;               /* nothing else to do */
 	}
-	if (old_stmt == NULL)
-		return 0;
 	stmt->old_tuple = vy_convert_replace(pk_def, space->format, old_stmt);
 	if (stmt->old_tuple == NULL)
 		goto error;
-	if (old_stmt != NULL)
-		vy_stmt_unref(old_stmt);
+	vy_stmt_unref(old_stmt);
 	return box_tuple_ref(stmt->old_tuple);
 error:
 	if (old_stmt != NULL)
@@ -7149,7 +7145,7 @@ vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request)
 	if (tuple_validate_raw(space->format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)                         /* space has no primary key */
 		return -1;
 	assert(pk->key_def->iid == 0);
