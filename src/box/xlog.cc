@@ -1270,7 +1270,7 @@ static ssize_t
 xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 		      const char **data, const char *data_end)
 {
-	if (data_end - *data < XLOG_FIXHEADER_SIZE)
+	if (data_end - *data < (ptrdiff_t)XLOG_FIXHEADER_SIZE)
 		return XLOG_FIXHEADER_SIZE - (data_end - *data);
 	const char *pos = *data;
 	const char *end = pos + XLOG_FIXHEADER_SIZE;

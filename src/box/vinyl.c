@@ -7804,7 +7804,7 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 		region_truncate(&fiber()->gc, region_svp);
 		return NULL;
 	}
-	if (readen != page_info->size) {
+	if (readen != (ssize_t)page_info->size) {
 		/* TODO: replace with XlogError, report filename */
 		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
 		region_truncate(&fiber()->gc, region_svp);

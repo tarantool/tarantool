@@ -858,7 +858,7 @@ update_calc_tuple_length(struct tuple_update *update)
 		struct update_field *field =
 				(struct update_field *) rope_leaf_data(node);
 		uint32_t field_len = (field->op ? field->op->new_field_len :
-				      field->tail - field->old);
+				      (uint32_t)(field->tail - field->old));
 		res += field_len + field->tail_len;
 	}
 

@@ -703,7 +703,7 @@ approximate_count()
 	for (uint64_t i = 0; i < count; i++)
 		approx_insert(&tree, arr[i], NULL);
 
-	printf("Count: %lu\n", tree.size);
+	printf("Count: %zu\n", tree.size);
 
 	count = 0;
 	int err_count = 0;
