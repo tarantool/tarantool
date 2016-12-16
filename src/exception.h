@@ -69,6 +69,8 @@ public:
 
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
+	SystemError(const char *file, unsigned line,
+		    const char *format, va_list ap);
 protected:
 	SystemError(const struct type *type, const char *file, unsigned line);
 protected:
