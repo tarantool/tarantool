@@ -10,9 +10,6 @@ test_run = env.new('localhost')
 session = box.session
 ---
 ...
-dump = function(data) return "'" .. require('json').encode(data) .. "'" end
----
-...
 type(session.id())
 ---
 - number
@@ -35,9 +32,9 @@ session.storage.abc
 all = getmetatable(session).aggregate_storage
 ---
 ...
-dump(all)
+all[session.id()].abc
 ---
-- '''[null,{"abc":"cde"}]'''
+- cde
 ...
 test_run:cmd("create connection second to default")
 ---
@@ -74,17 +71,17 @@ test_run:cmd("set connection second")
 ---
 - true
 ...
-dump(all[session.id()])
+all[session.id()]
 ---
-- '''{"abc":"def"}'''
+- abc: def
 ...
 test_run:cmd("set connection default")
 ---
 - true
 ...
-dump(all[session.id()])
+all[session.id()]
 ---
-- '''{"abc":"cde"}'''
+- abc: cde
 ...
 tres1 = {}
 ---
@@ -111,13 +108,15 @@ table.sort(tres1)
 table.sort(tres2)
 ---
 ...
-dump(tres1)
+tres1
 ---
-- '''["cde","def"]'''
+- - cde
+  - def
 ...
-dump(tres2)
+tres2
 ---
-- '''["cde","def"]'''
+- - cde
+  - def
 ...
 getmetatable(session).aggregate_storage = {}
 ---

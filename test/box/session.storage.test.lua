@@ -3,9 +3,6 @@ env = require('test_run')
 test_run = env.new('localhost')
 session = box.session
 
-dump = function(data) return "'" .. require('json').encode(data) .. "'" end
-
-
 type(session.id())
 session.unknown_field
 
@@ -14,7 +11,7 @@ session.storage.abc = 'cde'
 session.storage.abc
 
 all = getmetatable(session).aggregate_storage
-dump(all)
+all[session.id()].abc
 
 test_run:cmd("create connection second to default")
 test_run:cmd("set connection second")
@@ -29,10 +26,10 @@ test_run:cmd("set connection default")
 session.storage.abc
 
 test_run:cmd("set connection second")
-dump(all[session.id()])
+all[session.id()]
 
 test_run:cmd("set connection default")
-dump(all[session.id()])
+all[session.id()]
 tres1 = {}
 tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
@@ -43,8 +40,8 @@ for k,v in pairs(all) do table.insert(tres2, v.abc) end
 
 table.sort(tres1)
 table.sort(tres2)
-dump(tres1)
-dump(tres2)
+tres1
+tres2
 
 getmetatable(session).aggregate_storage = {}
 session = nil
