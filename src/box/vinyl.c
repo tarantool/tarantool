@@ -7430,8 +7430,7 @@ vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 					       pk->format, pk_def);
 		if (new_stmt == NULL)
 			goto error;
-		if (vy_primary_check_update(pk, pk_def->name, old_stmt,
-					    new_stmt) != 0) {
+		if (vy_check_update(pk, old_stmt, new_stmt)) {
 			vy_stmt_unref(old_stmt);
 			vy_stmt_unref(new_stmt);
 			error_log(diag_last_error(diag_get()));
