@@ -61,16 +61,17 @@ const char *
 tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr, const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_new_size, int index_base, bool suppress_error);
+		     uint32_t *p_new_size, int index_base, bool suppress_error,
+		     uint64_t *column_mask);
 
 /**
  * Try to merge two update/upsert expressions to an equivalent one.
  * Resulting expression is allocated on given allocator.
  * Due to optimization reasons resulting expression
- *  is located inside a bigger allocation. There also some hidden
- *  internal allocations are made in this function.
+ * is located inside a bigger allocation. There also some hidden
+ * internal allocations are made in this function.
  * Thus the only allocator that can be used in this function
- *  is region allocator
+ * is region allocator.
  * If it isn't possible to merge expressions NULL is returned.
  */
 const char *

@@ -153,10 +153,6 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_upsert_all(tx, stmt, space, request) != 0)
 		diag_raise();
-	if (stmt->old_tuple != NULL)
-		tuple_ref(stmt->old_tuple);
-	if (stmt->new_tuple != NULL)
-		tuple_ref(stmt->new_tuple);
 }
 
 Index *

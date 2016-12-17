@@ -6416,7 +6416,7 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 		result = tuple_upsert_execute(vy_update_alloc, region,
 					      ops, ops_end,
 					      *stmt, *stmt_end,
-					      &size, 0, suppress_error);
+					      &size, 0, suppress_error, NULL);
 		if (result != NULL) {
 			/* if failed, just skip it and leave stmt the same */
 			*stmt = result;
@@ -7234,27 +7234,26 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	struct key_def *pk_def = pk->key_def;
 	assert(pk_def->iid == 0);
 	uint64_t column_mask = 0;
-	const char *upd_tuple, *upd_tuple_end;
+	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
-	const char *prev_tuple = vy_tuple_data_range(old_stmt, pk_def,
+	const char *old_tuple = vy_tuple_data_range(old_stmt, pk_def,
 						     &old_size);
-	const char *prev_tuple_end = prev_tuple + old_size;
-	upd_tuple = tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
+	const char *old_tuple_end = old_tuple + old_size;
+	new_tuple = tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
 					 request->tuple, request->tuple_end,
-					 prev_tuple, prev_tuple_end, &new_size,
+					 old_tuple, old_tuple_end, &new_size,
 					 request->index_base, &column_mask);
-	if (upd_tuple == NULL)
+	if (new_tuple == NULL)
 		goto error;
-	upd_tuple_end = upd_tuple + new_size;
+	new_tuple_end = new_tuple + new_size;
 	/*
 	 * Check that the new tuple matches the space format and
 	 * the primary key was not modified.
 	 */
-	if (tuple_validate_raw(space->format, upd_tuple))
+	if (tuple_validate_raw(space->format, new_tuple))
 		goto error;
-
 	struct vy_stmt *new_stmt;
-	new_stmt = vy_stmt_new_replace(upd_tuple, upd_tuple_end, pk->format,
+	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
 				       pk_def);
 	if (new_stmt == NULL)
 		goto error;
@@ -7274,16 +7273,16 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		key = tuple_extract_key_raw(prev_tuple, prev_tuple_end,
+		if (vy_can_skip_update(index, column_mask))
+			continue;
+		key = tuple_extract_key_raw(old_tuple, old_tuple_end,
 					    index->key_def_tuple_to_key, NULL);
 		if (key == NULL)
 			goto error;
-		if (vy_can_skip_update(index, column_mask))
-			continue;
 		part_count = mp_decode_array(&key);
 		if (vy_delete(tx, index, key, part_count))
 			goto error;
-		if (vy_insert_secondary(tx, index, upd_tuple, upd_tuple_end))
+		if (vy_insert_secondary(tx, index, new_tuple, new_tuple_end))
 			goto error;
 	}
 	stmt->old_tuple = vy_convert_replace(pk_def, pk->format, old_stmt);
@@ -7292,8 +7291,8 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		return -1;
 	if (box_tuple_ref(stmt->old_tuple))
 		return -1;
-	stmt->new_tuple = box_tuple_new(space->format, upd_tuple,
-					upd_tuple_end);
+	stmt->new_tuple = box_tuple_new(space->format, new_tuple,
+					new_tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	return box_tuple_ref(stmt->new_tuple);
@@ -7315,7 +7314,7 @@ error:
  * @retval -1 Memory error or a secondary index duplicate error.
  */
 static int
-vy_space_insert_unsafe(struct vy_tx *tx, struct space *space,
+vy_insert_first_upsert(struct vy_tx *tx, struct space *space,
 		       const char *tuple, const char *tuple_end)
 {
 	assert(space->index_count > 0);
@@ -7341,145 +7340,129 @@ vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	const char *tuple_end = request->tuple_end;
 	const char *ops = request->ops;
 	const char *ops_end = request->ops_end;
-	const char *prev_tuple, *prev_tuple_end;
 	bool has_secondary = space->index_count > 1;
 	bool has_triggers = !rlist_empty(&space->on_replace);
-	const char *key;
-	uint32_t part_count;
-	struct vy_stmt *old_stmt;
-	struct vy_index *pk = vy_index_find_unique(space, 0);
+	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
-	struct key_def *pk_def = pk->key_def;
 	if (tuple_validate_raw(space->format, tuple))
 		return -1;
+
+	if (has_secondary == false && has_triggers == false)
+		return vy_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
+
+	const char *old_tuple, *old_tuple_end;
+	const char *new_tuple, *new_tuple_end;
+	uint32_t new_size;
+	const char *key;
+	uint32_t part_count;
+	struct vy_stmt *old_stmt = NULL;
+	struct key_def *pk_def = pk->key_def;
+	uint64_t column_mask;
 	/*
 	 * There are two cases when need to get the old tuple
 	 * before upsert:
-	 * - if on the space are set one or more on_repace
-	 *   triggers;
+	 * - if the space has one or more on_repace triggers;
 	 *
-	 * - if the space has one or more secondary indexes then
-	 *   need to extract secondary keys from the old tuple to
-	 *   delete old tuples from secondary indexes.
+	 * - if the space has one or more secondary indexes: then
+	 *   we need to extract secondary keys from the old tuple
+	 *   to delete old tuples from secondary indexes.
 	 */
-	if (has_secondary || has_triggers) {
-		/* Find the old tuple using the primary key. */
-		key = tuple_extract_key_raw(tuple, tuple_end, pk_def, NULL);
-		if (key == NULL)
-			return -1;
-		part_count = mp_decode_array(&key);
-		if (vy_index_full_by_key(tx, pk, key, part_count, &old_stmt))
-			return -1;
-		/*
-		 * If the old tuple was not found then UPSERT
-		 * turns into INSERT.
-		 */
-		if (old_stmt == NULL) {
-			if (vy_space_insert_unsafe(tx, space, tuple, tuple_end))
-				return -1;
-			if (has_triggers) {
-				stmt->new_tuple = box_tuple_new(space->format,
-								tuple,
-								tuple_end);
-				return stmt->new_tuple == NULL ? -1 : 0;
-			}
-			return 0;
-		}
-		uint32_t mp_size;
-		prev_tuple = vy_tuple_data_range(old_stmt, pk_def, &mp_size);
-		prev_tuple_end = prev_tuple + mp_size;
-		if (has_triggers) {
-			stmt->old_tuple = box_tuple_new(space->format,
-							prev_tuple,
-							prev_tuple_end);
-			if (stmt->old_tuple == NULL)
-				goto error;
-		}
-	}
-	/* At first, upsert into the primary index. */
-	if (vy_upsert(tx, pk, tuple, tuple_end, ops, ops_end)) {
-		if (old_stmt != NULL)
-			vy_stmt_unref(old_stmt);
+	/* Find the old tuple using the primary key. */
+	key = tuple_extract_key_raw(tuple, tuple_end, pk_def, NULL);
+	if (key == NULL)
 		return -1;
-	}
+	part_count = mp_decode_array(&key);
+	if (vy_index_get(tx, pk, key, part_count, &old_stmt))
+		return -1;
 	/*
-	 * At second, upsert into secondary indexes if they exist.
+	 * If the old tuple was not found then UPSERT
+	 * turns into INSERT.
 	 */
-	if (has_secondary || has_triggers) {
-		assert(old_stmt != NULL);
-		/* Apply upsert operations to the old tuple. */
-		const char *upd_tuple, *upd_tuple_end;
-		uint32_t new_size;
-		upd_tuple = tuple_upsert_execute(region_aligned_alloc_cb,
-						 &fiber()->gc, ops, ops_end,
-						 prev_tuple, prev_tuple_end,
-						 &new_size, 0, false);
-		if (upd_tuple == NULL)
-			goto error;
-
-		/*
-		 * Check that the new tuple matched the space
-		 * format and the primary key was not modified.
-		 */
-		if (tuple_validate_raw(space->format, upd_tuple))
-			goto error;
-		upd_tuple_end = upd_tuple + new_size;
-		struct vy_stmt *new_stmt;
-		new_stmt = vy_stmt_new_replace(upd_tuple, upd_tuple_end,
-					       pk->format, pk_def);
-		if (new_stmt == NULL)
-			goto error;
-		if (vy_check_update(pk, old_stmt, new_stmt)) {
-			vy_stmt_unref(old_stmt);
-			vy_stmt_unref(new_stmt);
-			error_log(diag_last_error(diag_get()));
-			if (stmt->old_tuple != NULL)
-				stmt->old_tuple = NULL;
-			return 0;
-		}
-		vy_stmt_unref(new_stmt);
-		/*
-		 * Upsert in secondary indexes works as
-		 * delete + insert.
-		 */
-		struct vy_index *index;
-		for (uint32_t i = 1; i < space->index_count; ++i) {
-			index = vy_index(space->index[i]);
-			key = tuple_extract_key_raw(prev_tuple, prev_tuple_end,
-						    index->key_def_tuple_to_key,
-						    NULL);
-			if (key == NULL)
-				goto error;
-			part_count = mp_decode_array(&key);
-			if (vy_delete(tx, index, key, part_count) != 0)
-				goto error;
-			if (vy_insert_secondary(tx, index, upd_tuple,
-						upd_tuple_end) != 0)
-				goto error;
-		}
+	if (old_stmt == NULL) {
+		if (vy_insert_first_upsert(tx, space, tuple, tuple_end))
+			return -1;
 		if (has_triggers) {
-			/*
-			 * Since box_tuple_new decrements
-			 * reference counter of the previously
-			 * allocated tuple we need to refernece
-			 * the old tuple before the new tuple
-			 * allocation. 
-			 */
-			if (stmt->old_tuple != NULL) {
-				if (box_tuple_ref(stmt->old_tuple))
-					goto error;
-			}
 			stmt->new_tuple = box_tuple_new(space->format,
-							upd_tuple,
-							upd_tuple_end);
+							tuple, tuple_end);
 			if (stmt->new_tuple == NULL)
-				goto error;
+				return -1;
+			box_tuple_ref(stmt->new_tuple);
 		}
+		return 0;
 	}
+	uint32_t old_size;
+	old_tuple = vy_tuple_data_range(old_stmt, pk_def, &old_size);
+	old_tuple_end = old_tuple + old_size;
+	new_tuple = tuple_upsert_execute(region_aligned_alloc_cb,
+					 &fiber()->gc, ops, ops_end,
+					 old_tuple, old_tuple_end,
+					 &new_size, 0, false, &column_mask);
+	if (new_tuple == NULL)
+		goto error;
+	new_tuple_end = new_tuple + new_size;
+	if (has_triggers) {
+		stmt->old_tuple = box_tuple_new(space->format,
+						old_tuple, old_tuple_end);
+		if (stmt->old_tuple == NULL)
+			goto error;
+		box_tuple_ref(stmt->old_tuple);
+		stmt->new_tuple = box_tuple_new(space->format,
+						new_tuple, new_tuple_end);
+		if (stmt->new_tuple == NULL)
+			goto error;
+		box_tuple_ref(stmt->new_tuple);
+	}
+	/* Apply upsert operations to the old tuple. */
+	/*
+	 * Check that the new tuple matched the space
+	 * format and the primary key was not modified.
+	 */
+	if (tuple_validate_raw(space->format, new_tuple))
+		goto error;
+
+	/* Have to create a vinyl stmt just for vy_check_update() */
+	struct vy_stmt *new_stmt;
+	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end,
+				       pk->format, pk_def);
+	if (new_stmt == NULL)
+		goto error;
+
+	if (vy_check_update(pk, old_stmt, new_stmt)) {
+		error_log(diag_last_error(diag_get()));
+		vy_stmt_unref(new_stmt);
+		vy_stmt_unref(old_stmt);
+		/*
+		 * Upsert is skipped, to match the semantics of
+		 * vy_upsert().
+		 */
+		return 0;
+	}
+	vy_stmt_unref(new_stmt);
+	/* We know the new tuple, convert upsert to replace. */
+	if (vy_replace(tx, pk, new_tuple, new_tuple_end))
+		goto error;
+	/* Replace in secondary indexes works as delete insert. */
+	struct vy_index *index;
+	for (uint32_t i = 1; i < space->index_count; ++i) {
+		index = vy_index(space->index[i]);
+		if (vy_can_skip_update(index, column_mask))
+			continue;
+		key = tuple_extract_key_raw(old_tuple, old_tuple_end,
+					    index->key_def_tuple_to_key,
+					    NULL);
+		if (key == NULL)
+			goto error;
+		part_count = mp_decode_array(&key);
+		if (vy_delete(tx, index, key, part_count) != 0)
+			goto error;
+		if (vy_insert_secondary(tx, index, new_tuple,
+					new_tuple_end) != 0)
+			goto error;
+	}
+	vy_stmt_unref(old_stmt);
 	return 0;
 error:
-	assert(old_stmt != NULL);
 	vy_stmt_unref(old_stmt);
 	return -1;
 }

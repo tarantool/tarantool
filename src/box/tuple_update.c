@@ -1156,7 +1156,8 @@ const char *
 tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_tuple_len, int index_base, bool suppress_error)
+		     uint32_t *p_tuple_len, int index_base, bool suppress_error,
+		     uint64_t *column_mask)
 {
 	struct tuple_update update;
 	update_init(&update, alloc, alloc_ctx, index_base);
@@ -1165,6 +1166,8 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		return NULL;
 	if (upsert_do_ops(&update, old_data, old_data_end, suppress_error))
 		return NULL;
+	if (column_mask)
+		*column_mask = update.column_mask;
 
 	return update_finish(&update, p_tuple_len);
 }
