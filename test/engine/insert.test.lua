@@ -44,6 +44,11 @@ t
 space:insert(box.tuple.new{tostring(7)})
 space:drop()
 
+-- In non-unique indexes select output order is undefined,
+-- so it's better to additionally sort output to receive same order every time.
+function sort_cmp(a, b) return a[1] < b[1] and true or false end
+function sort(t) table.sort(t, sort_cmp) return t end
+
 -- insert in space with multiple indices
 space = box.schema.space.create('test', { engine = engine })
 index1 = space:create_index('primary', { type = 'tree', parts = {1, 'number', 2, 'scalar'}})
@@ -55,7 +60,7 @@ space:insert({533, 1293.352, 2132, 'hyorj'})
 space:insert({4824, 1293.352, 684, 'hyorj'})
 index1:select{}
 index2:select{}
-index3:select{}
+sort(index3:select{})
 space:drop()
 
 space = box.schema.space.create('test', { engine = engine })
@@ -69,7 +74,7 @@ space:select{}
 space:insert({1, 2, 3})
 index1:select{}
 index2:select{}
-index3:select{}
+sort(index3:select{})
 space:drop()
 
 -- gh-186 New implementation of box.replace does not check that tuple is
@@ -85,5 +90,3 @@ s:insert{2, 3}
 tmp = s:delete(1, 2, 3)
 s:select{}
 s:drop()
-
-
