@@ -156,14 +156,6 @@ SystemError::SystemError(const char *file, unsigned line,
 	va_end(ap);
 }
 
-SystemError::SystemError(const char *file, unsigned line,
-			 const char *format, va_list ap)
-	: Exception(&type_SystemError, file, line),
-	m_errno(errno)
-{
-	error_vformat_msg(this, format, ap);
-}
-
 void
 SystemError::log() const
 {
@@ -276,9 +268,10 @@ static struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(SystemError);
+	SystemError *e = new (p) SystemError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	SystemError *e = new (p) SystemError(file, line, format, ap);
+	error_vformat_msg(e, format, ap);
 	va_end(ap);
 	return e;
 }
