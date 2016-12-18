@@ -1048,8 +1048,6 @@ struct vy_run_info {
 	uint64_t  total;
 	/** Pages meta. */
 	struct vy_page_info *page_infos;
-	/** Buffer with min keys of pages */
-	struct vy_buf pages_min;
 };
 
 struct vy_page_info {
@@ -1066,7 +1064,16 @@ struct vy_page_info {
 	int64_t min_lsn;
 	/* maximal lsn of all records in page */
 	int64_t max_lsn;
+	/* minimal key */
+	struct vy_stmt *min_key;
 };
+
+static int
+vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
+		    const struct key_def *key_def, struct vy_stmt *min_key);
+
+static void
+vy_page_info_destroy(struct vy_page_info *page_info);
 
 struct vy_stmt_info {
 	/* record lsn */
@@ -1950,13 +1957,6 @@ vy_run_page_info(struct vy_run *run, uint32_t pos)
 	return &run->info.page_infos[pos];
 }
 
-static const char *
-vy_run_page_min_key(struct vy_run *run, const struct vy_page_info *p)
-{
-	assert(run->info.count > 0);
-	return run->info.pages_min.s + p->min_key_offset;
-}
-
 static uint64_t
 vy_run_total(struct vy_run *run)
 {
@@ -1982,7 +1982,6 @@ vy_run_new()
 		return NULL;
 	}
 	memset(&run->info, 0, sizeof(run->info));
-	vy_buf_create(&run->info.pages_min);
 	run->fd = -1;
 	run->refs = 1;
 	rlist_create(&run->link);
@@ -1994,7 +1993,9 @@ vy_run_delete(struct vy_run *run)
 {
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
-	vy_buf_destroy(&run->info.pages_min);
+	uint32_t page_no;
+	for (page_no = 0; page_no < run->info.count; ++page_no)
+		vy_page_info_destroy(run->info.page_infos + page_no);
 	free(run->info.page_infos);
 	TRASH(run);
 	free(run);
@@ -2712,6 +2713,34 @@ static void
 vy_write_iterator_delete(struct vy_write_iterator *wi);
 
 /**
+ * Initialize page info struct
+ *
+ * @retval 0 for Success
+ * @retval -1 for error
+ */
+static int
+vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
+		    const struct key_def *key_def, struct vy_stmt *min_key)
+{
+	memset(page_info, 0, sizeof(*page_info));
+	page_info->min_lsn = INT64_MAX;
+	page_info->offset = offset;
+	page_info->unpacked_size = 0;
+	page_info->min_key = vy_stmt_extract_key(min_key, key_def);
+	return page_info->min_key != NULL ? 0: -1;
+}
+
+/**
+ * Destroy page info struct
+ *
+ */
+static void
+vy_page_info_destroy(struct vy_page_info *page_info)
+{
+	vy_stmt_unref(page_info->min_key);
+}
+
+/**
  * Write statements from the iterator to a new page in the run,
  * update page and run statistics.
  *
@@ -2732,7 +2761,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		return 1;
 	assert(*curr_stmt);
 
-	int rc = 0;
 	if (run_info->count >= *page_info_capacity) {
 		uint32_t cap = *page_info_capacity > 0 ?
 			*page_info_capacity * 2 : 16;
@@ -2741,8 +2769,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		if (new_infos == NULL) {
 			diag_set(OutOfMemory, cap, "realloc",
 				 "struct vy_page_info");
-			rc = -1;
-			goto out;
+			return -1;
 		}
 		run_info->page_infos = new_infos;
 		*page_info_capacity = cap;
@@ -2750,72 +2777,33 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	assert(*page_info_capacity >= run_info->count);
 
 	struct vy_page_info *page = run_info->page_infos + run_info->count;
-	memset(page, 0, sizeof(*page));
-	page->min_lsn = INT64_MAX;
-	page->offset = data_xlog->offset;
-	page->unpacked_size = 0;
-
-	bool first_stmt = true;
+	vy_page_info_create(page, data_xlog->offset, key_def, *curr_stmt);
+	bool end_of_run = false;
 	xlog_tx_begin(data_xlog);
 
-	while (true) {
+	do {
 		struct vy_stmt *stmt = *curr_stmt;
-		if (split_key != NULL &&
-		    vy_stmt_compare_with_key(stmt, split_key, format,
-					     key_def) >= 0) {
-			/* Split key reached, proceed to the next run. */
-			rc = 1;
-			break;
-		}
-		if (obuf_size(&data_xlog->obuf) >= key_def->opts.page_size)
-			break;
-
-		if (first_stmt) {
-			first_stmt = false;
-			struct vy_buf *min_buf = &run_info->pages_min;
-			struct vy_stmt *min_stmt;
-			min_stmt = vy_stmt_extract_key(stmt, key_def);
-			if (min_stmt == NULL) {
-				rc = -1;
-				goto out;
-			}
-			if (vy_buf_ensure(min_buf, min_stmt->size)) {
-				vy_stmt_unref(min_stmt);
-				rc = -1;
-				goto out;
-			}
-
-			page->min_key_offset = vy_buf_used(min_buf);
-			uint32_t bsize;
-			const char *data = vy_key_data_range(min_stmt, &bsize);
-			memcpy(min_buf->p, data, bsize);
-			vy_buf_advance(min_buf, bsize);
-			vy_stmt_unref(min_stmt);
-		}
-
 		page->unpacked_size += stmt->size;
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0) {
 			xlog_tx_rollback(data_xlog);
-			rc = -1;
-			goto out;
+			return -1;
 		}
 		if (vy_write_iterator_next(wi, curr_stmt)) {
-			rc = -1;
-			goto out;
+			return -1;
 		}
-		if (*curr_stmt == NULL) {
-			/* No more data. */
-			rc = 1;
-			break;
-		}
-	}
+		end_of_run = *curr_stmt == NULL ||
+			/* Split key reached, proceed to the next run. */
+			     (split_key != NULL &&
+		             vy_stmt_compare_with_key(*curr_stmt, split_key,
+						      format, key_def) >= 0);
+
+	} while (end_of_run == false &&
+		 obuf_size(&data_xlog->obuf) < key_def->opts.page_size);
 	ssize_t written = xlog_tx_commit(data_xlog);
 	if (written == 0)
 		written = xlog_flush(data_xlog);
-	if (written < 0) {
-		rc = -1;
-		goto out;
-	}
+	if (written < 0)
+		return -1;
 
 	page->size = written;
 
@@ -2827,11 +2815,9 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	if (page->max_lsn > run_info->max_lsn)
 		run_info->max_lsn = page->max_lsn;
 	run_info->total += page->size;
-
 	run_info->keys += page->count;
-out:
-	fiber_gc();
-	return rc;
+
+	return !end_of_run ? 0: 1;
 }
 
 /**
@@ -2879,6 +2865,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 				       curr_stmt, key_def, format);
 		if (rc < 0)
 			goto err;
+		fiber_gc();
 	} while (rc == 0);
 
 	/* Sync data and link the file to the final name. */
@@ -2888,10 +2875,12 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 
 	run->fd = data_xlog.fd;
 	xlog_close(&data_xlog, true);
+	fiber_gc();
 
 	return 0;
 err:
 	xlog_close(&data_xlog, false);
+	fiber_gc();
 	return -1;
 }
 
@@ -2915,7 +2904,6 @@ const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
  * Allocates using region_alloc.
  *
  * @param page_info page information to encode
- * @param min_key the minimal key of the page
  * @param run_id run identifier
  * @param[out] xrow xrow to fill
  *
@@ -2923,7 +2911,7 @@ const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
  * @retval -1 error, check diag
  */
 static int
-vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
+vy_page_info_encode(const struct vy_page_info *page_info,
 		    int run_id, struct xrow_header *xrow)
 {
 	struct region *region = &fiber()->gc;
@@ -2933,8 +2921,9 @@ vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
 	request.space_id = BOX_VINYL_PAGE_ID;
 	request.index_id = 0;
 
-	const char *min_key_end = min_key;
-	mp_next(&min_key_end);
+	uint32_t min_key_size;
+	const char *min_key = vy_key_data_range(page_info->min_key,
+						&min_key_size);
 
 	/* calc tuple size */
 	uint32_t size;
@@ -2948,7 +2937,7 @@ vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
 	       mp_sizeof_uint(VY_PAGE_REQUEST_COUNT) +
 	       mp_sizeof_uint(page_info->count) +
 	       mp_sizeof_uint(VY_PAGE_MIN_KEY) +
-	       min_key_end - min_key;
+	       min_key_size;
 
 	char *pos = region_alloc(region, size);
 	if (pos == NULL) {
@@ -2965,8 +2954,8 @@ vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
 	pos = mp_encode_uint(pos, VY_PAGE_REQUEST_COUNT);
 	pos = mp_encode_uint(pos, page_info->count);
 	pos = mp_encode_uint(pos, VY_PAGE_MIN_KEY);
-	memcpy(pos, min_key, min_key_end - min_key);
-	pos += min_key_end - min_key;
+	memcpy(pos, min_key, min_key_size);
+	pos += min_key_size;
 	request.tuple_end = pos;
 
 	memset(xrow, 0, sizeof(*xrow));
@@ -2988,8 +2977,8 @@ vy_page_info_encode(const struct vy_page_info *page_info, const char *min_key,
  * @retval -1 error, check diag
  */
 static int
-vy_page_info_decode(const struct xrow_header *xrow, int run_id,
-		    struct vy_page_info *page, struct vy_run_info *run_info)
+vy_page_info_decode(struct vy_page_info *page, int run_id,
+		    const struct xrow_header *xrow)
 {
 	struct request request;
 	/* extract all pages info */
@@ -3030,10 +3019,9 @@ vy_page_info_decode(const struct xrow_header *xrow, int run_id,
 		case VY_PAGE_MIN_KEY:
 			key_beg = pos;
 			mp_next(&pos);
-			vy_buf_ensure(&run_info->pages_min, pos - key_beg);
-			memcpy(run_info->pages_min.p, key_beg, pos - key_beg);
-			page->min_key_offset = vy_buf_used(&run_info->pages_min);
-			vy_buf_advance(&run_info->pages_min, pos - key_beg);
+			uint32_t part_count;
+			part_count = mp_decode_array(&key_beg);
+			page->min_key = vy_stmt_new_select(key_beg, part_count);
 			break;
 		default:
 			diag_set(ClientError, ER_VINYL, "Can't decode page meta "
@@ -3312,9 +3300,8 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 
 	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
 		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
-		const char *min_key = vy_run_page_min_key(run, page_info);
 		struct xrow_header xrow;
-		if (vy_page_info_encode(page_info, min_key, run_id, &xrow) < 0) {
+		if (vy_page_info_encode(page_info, run_id, &xrow) < 0) {
 			goto fail;
 		}
 		if (xlog_write_row(&index_xlog, &xrow) < 0)
@@ -3428,7 +3415,7 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	uint32_t page_no = 0;
 	while ((rc = xlog_cursor_next_row(&cursor, &xrow)) == 0) {
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(&xrow, run_id, page, &run->info) < 0)
+		if (vy_page_info_decode(page, run_id, &xrow) < 0)
 			goto fail_close;
 		++page_no;
 	}
@@ -3567,10 +3554,10 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
 	mid_page = vy_run_page_info(run, run->info.count / 2);
-	const char *split_key = vy_run_page_min_key(run, mid_page);
+	const char *split_key = vy_key_data(mid_page->min_key);
 
 	struct vy_page_info *first_page = vy_run_page_info(run, 0);
-	const char *min_key = vy_run_page_min_key(run, first_page);
+	const char *min_key = vy_key_data(first_page->min_key);
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (vy_key_compare_raw(min_key, split_key, key_def) == 0)
@@ -8420,9 +8407,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 		uint32_t mid = beg + (end - beg) / 2;
 		struct vy_page_info *page_info;
 		page_info = vy_run_page_info(itr->run, mid);
-		const char *fnd_key = vy_run_page_min_key(itr->run, page_info);
 		int cmp;
-		cmp = -vy_stmt_compare_with_raw_key(key, fnd_key, idx->format,
+		cmp = -vy_stmt_compare_with_key(key, page_info->min_key, idx->format,
 						    idx->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
