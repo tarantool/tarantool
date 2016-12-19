@@ -63,6 +63,8 @@ enum {
 	BOX_VINYL_RUN_ID = 328,
 	/** Space id of _vinyl_page. */
 	BOX_VINYL_PAGE_ID = 326,
+	/** Space id of _vinyl_rows. */
+	BOX_VINYL_ROW_INDEX_ID = 327,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647

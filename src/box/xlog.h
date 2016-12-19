@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <msgpuck.h>
 #include "tt_uuid.h"
 #include "vclock.h"
 
@@ -48,6 +49,12 @@ struct xrow_header;
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+typedef uint32_t log_magic_t;
+
+static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
+static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
+static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 
 extern const struct type type_XlogError;
 
@@ -367,6 +374,64 @@ void
 xlog_atfork(struct xlog *xlog);
 
 /* {{{ xlog_cursor - read rows from a log file */
+
+/**
+ * xlog fixheader struct
+ */
+struct xlog_fixheader {
+	/**
+	 * xlog tx magic, row_marker for plain xrows
+	 * or zrow_marker for compressed.
+	 */
+	log_magic_t magic;
+	/**
+	 * crc32 for the previous xlog tx, not used now
+	 */
+	uint32_t crc32p;
+	/**
+	 * crc32 for current xlog tx
+	 */
+	uint32_t crc32c;
+	/**
+	 * xlog tx data length excluding fixheader
+	 */
+	uint32_t len;
+};
+
+/**
+ * Decode xlog tx header, set up magic, crc32c and len
+ *
+ * @retval 0 for success
+ * @retval -1 for error
+ * @retval count of bytes left to parse header
+ */
+ssize_t
+xlog_fixheader_decode(struct xlog_fixheader *fixheader,
+		      const char **data, const char *data_end);
+
+/**
+ * Check that data has enough block for tx decoding and checks crc
+ *
+ * @retval 0 for success
+ * @retval -1 for error
+ * @retval count of bytes left to decode tx
+ */
+ssize_t
+xlog_tx_check(struct xlog_fixheader *fixheader, const char *data,
+	      const char **data_end);
+
+
+/**
+ * Decode xlog tx from *data .. data_end into *rows .. rows_end.
+ * Update *rows and *data.
+ *
+ * @retval 0 for success
+ * @retval -1 for error
+ * @retval 1 if there is not enougn data or space in rows
+ */
+int
+xlog_tx_decode(struct xlog_fixheader *fixheader, char **rows, char *rows_end,
+	       const char **data, const char *data_end, ZSTD_DStream *zdctx);
 
 /**
  * xlog tx iterator
