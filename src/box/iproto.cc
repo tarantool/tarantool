@@ -1227,20 +1227,10 @@ struct iproto_set_listen_msg: public cmsg
 	struct cmsg_notify wakeup;
 };
 
-/**
- * The bind has finished, notify the caller.
- */
-static void
-iproto_on_bind(void *arg)
-{
-	cpipe_push(&tx_pipe, (struct cmsg *) arg);
-}
-
-#define IPROTO_REBIND_INTERVAL 0.1
-
 static void
 iproto_do_set_listen(struct cmsg *m)
 {
+	const double BIND_RETRY_DELAY = 0.1;
 	struct iproto_set_listen_msg *msg =
 		(struct iproto_set_listen_msg *) m;
 	try {
@@ -1254,16 +1244,17 @@ iproto_do_set_listen(struct cmsg *m)
 					say_warn("%s: %s is already in use, "
 						 "will retry binding",
 						 "binary", msg->uri);
+					first_try = false;
 				}
-				first_try = false;
-				fiber_sleep(IPROTO_REBIND_INTERVAL);
+				fiber_sleep(BIND_RETRY_DELAY);
 			}
+			/* The bind has finished, notify the caller. */
 			evio_service_listen(&binary);
 		}
-		iproto_on_bind(&msg->wakeup);
+		cpipe_push(&tx_pipe, &msg->wakeup.base);
 	} catch (Exception *e) {
 		diag_move(&fiber()->diag, &msg->diag);
-		iproto_on_bind(&msg->wakeup);
+		cpipe_push(&tx_pipe, &msg->wakeup.base);
 	}
 }
 
