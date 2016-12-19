@@ -685,7 +685,8 @@ xlog_create(struct xlog *xlog, const char *name,
 	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	xlog->zctx = ZSTD_createCCtx();
 	if (!xlog->zctx) {
-		diag_set(OutOfMemory, sizeof(xlog->zctx), "malloc", "zstd");
+		diag_set(ClientError, ER_COMPRESSION,
+			 "failed to create context");
 		goto error;
 	}
 
@@ -855,7 +856,8 @@ xlog_tx_write_zstd(struct xlog *log)
 					 (char *)iov->iov_base + offset,
 					 iov->iov_len - offset);
 		if (ZSTD_isError(zsize)) {
-			diag_set(ClientError, ER_COMPRESSION, zsize);
+			diag_set(ClientError, ER_COMPRESSION,
+				 ZSTD_getErrorName(zsize));
 			goto error;
 		}
 		/* Advance output buffer to the end of compressed data. */
@@ -1223,7 +1225,8 @@ xlog_cursor_decompress(struct ibuf *rows, const char **data,
 		assert(output.pos <= ibuf_unused(rows));
 		ibuf_alloc(rows, output.pos);
 		if (ZSTD_isError(rc)) {
-			tnt_error(ClientError, ER_DECOMPRESSION, rc);
+			diag_set(ClientError, ER_DECOMPRESSION,
+				 ZSTD_getErrorName(rc));
 			goto error;
 		}
 		if (input.pos == input.size) {
@@ -1536,7 +1539,8 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	snprintf(i->name, PATH_MAX, "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
-		diag_set(ClientError, ER_DECOMPRESSION, 0);
+		diag_set(ClientError, ER_DECOMPRESSION,
+			 "failed to create context");
 		goto error;
 	}
 	return 0;
@@ -1592,7 +1596,8 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	snprintf(i->name, PATH_MAX, "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
-		diag_set(ClientError, ER_DECOMPRESSION, 0);
+		diag_set(ClientError, ER_DECOMPRESSION,
+			 "failed to create context");
 		goto error;
 	}
 	return 0;
