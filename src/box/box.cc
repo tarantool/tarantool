@@ -494,7 +494,7 @@ box_set_readahead(void)
  * no boundary or misuse checks.
  */
 int
-boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
+boxk(int type, uint32_t space_id, const char *format, ...)
 {
 	va_list ap;
 	struct request *request;
