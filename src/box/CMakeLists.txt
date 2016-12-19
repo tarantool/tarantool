@@ -48,6 +48,7 @@ add_library(box STATIC
     vinyl_space.cc
     vinyl_index.cc
     vinyl.c
+    vinyl_stmt.c
     space.cc
     func.cc
     alter.cc
