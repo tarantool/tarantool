@@ -158,6 +158,7 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 Index *
 VinylSpace::createIndex(struct space *space, struct key_def *key_def)
 {
+	(void) space;
 	VinylEngine *engine = (VinylEngine *) this->engine;
 	if (key_def->type != TREE) {
 		unreachable();
@@ -165,12 +166,7 @@ VinylSpace::createIndex(struct space *space, struct key_def *key_def)
 	}
 	if (key_def->iid == 0)
 		return new VinylPrimaryIndex(engine->env, key_def);
-	/**
-	 * Get pointer to the primary key from space->index_map, because
-	 * the array space->index can be empty.
-	 */
-	VinylPrimaryIndex *pk = (VinylPrimaryIndex *) space_index(space, 0);
-	return new VinylSecondaryIndex(engine->env, pk, key_def);
+	return new VinylSecondaryIndex(engine->env, key_def);
 }
 
 void
@@ -208,12 +204,6 @@ VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 	if (new_space == NULL || new_space->index_count == 0) {
 		/* This is drop space. */
 		return;
-	}
-	(void)old_space;
-	VinylPrimaryIndex *primary =
-		(VinylPrimaryIndex *) index_find_xc(new_space, 0);
-	for (uint32_t i = 1; i < new_space->index_count; ++i) {
-		((VinylSecondaryIndex *)new_space->index[i])->primary_index = primary;
 	}
 	vy_commit_alter_space(old_space, new_space);
 }

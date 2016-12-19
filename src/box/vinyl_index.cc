@@ -61,10 +61,7 @@ vy_index(struct Index *index)
 
 struct vinyl_iterator {
 	struct iterator base;
-	const char *key;
-	int part_count;
 	const VinylIndex *index;
-	struct key_def *key_def;
 	struct vy_cursor *cursor;
 };
 
@@ -149,95 +146,24 @@ VinylPrimaryIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, key_def, key_def,
-			  space_by_id(key_def->space_id));
+	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
 
 VinylSecondaryIndex::VinylSecondaryIndex(struct vy_env *env_arg,
-					 VinylPrimaryIndex *pk_arg,
 					 struct key_def *key_def_arg)
 	:VinylIndex(env_arg, key_def_arg)
-	 ,key_def_secondary_to_primary(NULL)
-	 ,primary_index(pk_arg)
 {}
-
-/**
- * Get tuple from the primary index by the partial tuple from secondary index.
- */
-static struct tuple *
-lookup_full_tuple(const VinylSecondaryIndex *index, struct tuple *tuple,
-		  struct vy_tx *tx)
-{
-	assert(index->key_def->iid != 0);
-	const char *primary_key;
-	/* Fetch the primary key from the secondary index tuple. */
-	struct key_def *def = index->key_def_secondary_to_primary;
-	primary_key = tuple_extract_key(tuple, def, NULL);
-	/* Fetch the tuple from the primary index. */
-	mp_decode_array(&primary_key); /* Skip array header. */
-	if (vy_get(tx, index->primary_index->db, primary_key,
-		   def->part_count, &tuple) != 0) {
-
-		diag_raise();
-	}
-	return tuple;
-}
-
-struct tuple*
-VinylSecondaryIndex::findByKey(const char *key, uint32_t part_count) const
-{
-	struct tuple *tuple = VinylIndex::findByKey(key, part_count);
-	if (tuple) {
-		struct vy_tx *transaction = in_txn() ?
-			(struct vy_tx *) in_txn()->engine_tx : NULL;
-		/*
-		 * A secondary index does not store all tuple fields, but
-		 * only the fields participating in the index and the fields
-		 * of the primary key. Fetch the full tuple in the primary
-		 * index.
-		 */
-		return lookup_full_tuple(this, tuple, transaction);
-	}
-	return NULL;
-}
 
 void
 VinylSecondaryIndex::open()
 {
 	assert(db == NULL);
-	key_def_secondary_to_primary =
-		key_def_build_secondary_to_primary(primary_index->key_def, key_def);
-
-	/**
-	 * key_def_vinyl is a merged key_def of this index and key_def
-	 * of the primary index, in which parts field number are
-	 * renumbered.
-	 *
-	 * For instance:
-	 * - merged primary and secondary: 3 (str), 6 (uint), 4 (scalar)
-	 * - key_def_vinyl:                0 (str), 1 (uint), 2 (scalar)
-	 *
-	 * Condensing is necessary since partial tuple consists only
-	 * from primary secondary key fields, coalesced.
-	 */
-	struct key_def *key_def_vinyl;
-	key_def_vinyl = key_def_build_secondary(primary_index->key_def, key_def);
-	/* The engine makes a copy of the key. */
-	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
 	/* Create a vinyl index. */
-	db = vy_index_new(env, key_def_vinyl, key_def,
-			  key_def_secondary_to_primary,
-			  space_by_id(key_def->space_id));
+	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
-}
-
-VinylSecondaryIndex::~VinylSecondaryIndex()
-{
-	if (key_def_secondary_to_primary)
-		key_def_delete(key_def_secondary_to_primary);
 }
 
 struct tuple *
@@ -259,16 +185,6 @@ close:
 	vy_cursor_delete(it->cursor);
 	it->cursor = NULL;
 	it->base.next = NULL;
-	return NULL;
-}
-
-struct tuple *
-VinylSecondaryIndex::iterator_next(struct vy_tx *tx,
-				   struct vinyl_iterator *it) const
-{
-	struct tuple *tuple = VinylIndex::iterator_next(tx, it);
-	if (tuple)
-		return lookup_full_tuple(this, tuple, tx);
 	return NULL;
 }
 
@@ -325,10 +241,6 @@ VinylIndex::initIterator(struct iterator *ptr,
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
 	it->index = this;
-	it->key_def = vy_index_key_def(db);
-	it->key = key;
-	it->part_count = part_count;
-
 	ptr->next = vinyl_iterator_next;
 	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);

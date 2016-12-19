@@ -137,24 +137,6 @@ int
 vy_get(struct vy_tx *tx, struct vy_index *index,
        const char *key, uint32_t part_count, struct tuple **result);
 
-int
-vy_replace(struct vy_tx *tx, struct vy_index *index,
-	   const char *tuple, const char *tuple_end);
-
-/**
- * Insert a tuple in a secondary index.
- * @param tx        Current transaction.
- * @param index     Secondary index.
- * @param tuple     MessagePack array.
- * @param tuple_end End of the tuple.
- *
- * @retval  0 Success.
- * @retval -1 Memory error or duplicate key error.
- */
-int
-vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
-		    const char *tuple, const char *tuple_end);
-
 /**
  * Execute REPLACE in a vinyl space.
  * @param tx      Current transaction.
@@ -236,15 +218,6 @@ vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	      struct request *request);
 
 int
-vy_upsert(struct vy_tx *tx, struct vy_index *index,
-	  const char *tuple, const char *tuple_end,
-	  const char *ops, const char *ops_end);
-
-int
-vy_delete(struct vy_tx *tx, struct vy_index *index,
-	  const char *key, uint32_t part_count);
-
-int
 vy_prepare(struct vy_env *e, struct vy_tx *tx);
 
 int
@@ -263,30 +236,17 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp);
  * Index
  */
 
-struct key_def *
-vy_index_key_def(struct vy_index *index);
-
 /**
  * Create a new vinyl index object without opening it.
  * @param e                    Vinyl environment.
- * @param key_def              Key definition to compare tuples
- *                             in the index.
  * @param user_key_def         Key definition declared by an user
  *                             with space:create_index().
- *                             (different from key_def for
- *                             secondary keys only).
- * @param key_def_secondary_to_primary
- *                             Key definition used for fetching
- *                             the primary key from a secondary
- *                             index tuple (secondary indexes
- *                             only).
  * @param space                Space for which the new index
  *                             belongs.
  */
 struct vy_index *
-vy_index_new(struct vy_env *e, struct key_def *key_def,
-	     struct key_def *user_key_def,
-	     struct key_def *key_def_secondary_to_primary, struct space *space);
+vy_index_new(struct vy_env *e, struct key_def *user_key_def,
+	     struct space *space);
 
 /**
  * Hook on an alter space commit event. It is called on each

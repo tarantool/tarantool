@@ -114,7 +114,7 @@ public:
  *
  * - the first one is defined by the user. It contains the key
  *   parts of the secondary key, as present in the original tuple.
- *   This is Index::key_def.
+ *   This is Index::key_def, same as vy_index::user_key_def.
  *
  * - the second one is used to fetch key parts of the secondary
  *   key, *augmented* with the parts of the primary key from the
@@ -128,30 +128,17 @@ public:
  *
  * - the last one is used to build a key for lookup in the primary
  *   index, based on the tuple fetched from the secondary index.
- *   This is key_def_secondary_to_primary.
+ *   This is vy_index::key_def_secondary_to_primary.
  *   @sa key_def_build_secondary_to_primary()
  */
 struct VinylSecondaryIndex: public VinylIndex
 {
 public:
-	VinylSecondaryIndex(struct vy_env *env_arg, VinylPrimaryIndex *pk_arg,
+	VinylSecondaryIndex(struct vy_env *env_arg,
 			    struct key_def *key_def_arg);
-
-	virtual struct tuple*
-	findByKey(const char *key, uint32_t) const override;
 
 	virtual void
 	open() override;
-
-	virtual struct tuple *
-	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const override;
-
-	virtual ~VinylSecondaryIndex() override;
-
-public:
-	/** To fetch the primary key from the secondary index tuple. */
-	struct key_def *key_def_secondary_to_primary;
-	VinylPrimaryIndex *primary_index;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_INDEX_H_INCLUDED */
