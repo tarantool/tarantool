@@ -317,6 +317,46 @@ vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
 }
 
 int
+vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
+	       const struct tuple_format *format, uint32_t part_count)
+{
+	struct request request;
+	request_create(&request, xrow->type);
+	if (request_decode(&request, xrow->body->iov_base,
+			   xrow->body->iov_len) < 0)
+		return -1;
+	uint32_t field_count;
+	struct iovec ops;
+	switch (request.type) {
+	case IPROTO_DELETE:
+		/* extract key */
+		field_count = mp_decode_array(&request.key);
+		assert(field_count == part_count);
+		*stmt_ptr = vy_stmt_new_delete(request.key, field_count);
+		break;
+	case IPROTO_REPLACE:
+		*stmt_ptr = vy_stmt_new_replace(request.tuple,
+						request.tuple_end,
+						format, part_count);
+		break;
+	case IPROTO_UPSERT:
+		ops.iov_base = (char *)request.ops;
+		ops.iov_len = request.ops_end - request.ops;
+		*stmt_ptr = vy_stmt_new_upsert(request.tuple,
+					       request.tuple_end,
+					       format, part_count, &ops, 1);
+		break;
+	default:
+		diag_set(ClientError, ER_VINYL, "unknown request type");
+		return -1;
+	}
+	if (*stmt_ptr == NULL)
+		return -1;
+	(*stmt_ptr)->lsn = xrow->lsn;
+	return 0;
+}
+
+int
 vy_key_snprint(char *buf, int size, const char *key)
 {
 	if (key == NULL)

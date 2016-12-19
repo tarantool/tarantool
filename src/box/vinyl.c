@@ -440,16 +440,6 @@ vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
 		const struct key_def *key_def,
 		const struct tuple_format *format, bool suppress_error);
 
-/**
- * Reconstruct vinyl tuple info and data from xrow
- *
- * @retval 0 if OK
- * @retval -1 if error
- */
-static int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
-	       const struct tuple_format *format, uint32_t part_count);
-
 struct tree_mem_key {
 	const struct vy_stmt *stmt;
 	int64_t lsn;
@@ -5373,46 +5363,6 @@ vy_convert_replace(const struct key_def *key_def, struct tuple_format *format,
 	uint32_t bsize;
 	const char *data = vy_tuple_data_range(vy_stmt, key_def, &bsize);
 	return box_tuple_new(format, data, data + bsize);
-}
-
-static int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
-	       const struct tuple_format *format, uint32_t part_count)
-{
-	struct request request;
-	request_create(&request, xrow->type);
-	if (request_decode(&request, xrow->body->iov_base,
-			   xrow->body->iov_len) < 0)
-		return -1;
-	uint32_t field_count;
-	struct iovec ops;
-	switch (request.type) {
-	case IPROTO_DELETE:
-		/* extract key */
-		field_count = mp_decode_array(&request.key);
-		assert(field_count == part_count);
-		*stmt_ptr = vy_stmt_new_delete(request.key, field_count);
-		break;
-	case IPROTO_REPLACE:
-		*stmt_ptr = vy_stmt_new_replace(request.tuple,
-						request.tuple_end,
-						format, part_count);
-		break;
-	case IPROTO_UPSERT:
-		ops.iov_base = (char *)request.ops;
-		ops.iov_len = request.ops_end - request.ops;
-		*stmt_ptr = vy_stmt_new_upsert(request.tuple,
-					       request.tuple_end,
-					       format, part_count, &ops, 1);
-		break;
-	default:
-		diag_set(ClientError, ER_VINYL, "unknown request type");
-		return -1;
-	}
-	if (*stmt_ptr == NULL)
-		return -1;
-	(*stmt_ptr)->lsn = xrow->lsn;
-	return 0;
 }
 
 /* }}} Statements */
