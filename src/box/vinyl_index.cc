@@ -31,20 +31,10 @@
 #include "vinyl_index.h"
 
 #include <stdio.h>
-#include <inttypes.h>
-#include <bit/bit.h> /* load/store */
 
 #include "trivia/util.h"
-#include "cfg.h"
-#include "say.h"
 #include "scoped_guard.h"
-
-#include "vinyl_engine.h"
-#include "vinyl_space.h"
-#include "tuple.h"
-#include "tuple_update.h"
 #include "schema.h"
-#include "space.h"
 #include "txn.h"
 #include "vinyl.h"
 
@@ -70,6 +60,17 @@ VinylIndex::VinylIndex(struct vy_env *env_arg, struct key_def *key_def_arg)
 	 ,env(env_arg)
 	 ,db(NULL)
 {}
+
+void
+VinylIndex::open()
+{
+	assert(db == NULL);
+	/* Create vinyl database. */
+	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
+	if (db == NULL || vy_index_open(db))
+		diag_raise();
+}
+
 
 struct tuple*
 VinylIndex::findByKey(const char *key, uint32_t part_count) const
@@ -125,40 +126,10 @@ VinylIndex::count(enum iterator_type type, const char *key,
 	return count;
 }
 
-VinylPrimaryIndex::VinylPrimaryIndex(struct vy_env *env_arg,
-				     struct key_def *key_def_arg)
-	:VinylIndex(env_arg, key_def_arg)
-{}
-
-void
-VinylPrimaryIndex::open()
+static inline struct tuple *
+iterator_next(struct iterator *base_it)
 {
-	assert(db == NULL);
-	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
-	if (db == NULL || vy_index_open(db))
-		diag_raise();
-}
-
-VinylSecondaryIndex::VinylSecondaryIndex(struct vy_env *env_arg,
-					 struct key_def *key_def_arg)
-	:VinylIndex(env_arg, key_def_arg)
-{}
-
-void
-VinylSecondaryIndex::open()
-{
-	assert(db == NULL);
-	/* Create a vinyl index. */
-	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
-	if (db == NULL || vy_index_open(db))
-		diag_raise();
-}
-
-struct tuple *
-VinylIndex::iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const
-{
-	(void) tx;
+	struct vinyl_iterator *it = (struct vinyl_iterator *) base_it;
 	struct tuple *tuple;
 	uint32_t it_sc_version = ::sc_version;
 	if (it_sc_version != ::sc_version)
@@ -195,16 +166,6 @@ vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr)
 	return NULL;
 }
 
-struct tuple *
-vinyl_iterator_next(struct iterator *ptr)
-{
-	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
-	struct vy_tx *tx;
-	if (vy_cursor_tx(it->cursor, &tx))
-		diag_raise();
-	return it->index->iterator_next(tx, it);
-}
-
 struct iterator*
 VinylIndex::allocIterator() const
 {
@@ -230,7 +191,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
 	it->index = this;
-	ptr->next = vinyl_iterator_next;
+	ptr->next = iterator_next;
 	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);
 

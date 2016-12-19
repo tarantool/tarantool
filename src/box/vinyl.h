@@ -151,8 +151,8 @@ vy_get(struct vy_tx *tx, struct vy_index *index,
  *            error.
  */
 int
-vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
-		 struct space *space, struct request *request);
+vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	   struct request *request);
 
 /**
  * Execute DELETE in a vinyl space.
@@ -167,8 +167,8 @@ vy_replace_all(struct vy_tx *tx, struct txn_stmt *stmt,
  *            reference increment error.
  */
 int
-vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	      struct request *request);
+vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	  struct request *request);
 
 /**
  * Execute UPDATE in a vinyl space.
@@ -183,8 +183,8 @@ vy_delete_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            reference increment error.
  */
 int
-vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	      struct request *request);
+vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	  struct request *request);
 
 /**
  * Execute INSERT in a vinyl space.
@@ -198,7 +198,7 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            index is not found
  */
 int
-vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request);
+vy_insert(struct vy_tx *tx, struct space *space, struct request *request);
 
 /**
  * Execute UPSERT in a vinyl space.
@@ -214,8 +214,8 @@ vy_insert_all(struct vy_tx *tx, struct space *space, struct request *request);
  *            reference increment error.
  */
 int
-vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	      struct request *request);
+vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	  struct request *request);
 
 int
 vy_prepare(struct vy_env *e, struct vy_tx *tx);
@@ -282,12 +282,6 @@ vy_index_bsize(struct vy_index *db);
 struct vy_cursor *
 vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	      uint32_t part_count, enum iterator_type type);
-
-/**
- * Fetch the transaction used in the cursor.
- */
-int
-vy_cursor_tx(struct vy_cursor *cursor, struct vy_tx **tx);
 
 void
 vy_cursor_delete(struct vy_cursor *cursor);

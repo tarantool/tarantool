@@ -29,19 +29,15 @@
  * SUCH DAMAGE.
  */
 #include "vinyl_space.h"
-#include "vinyl_engine.h"
 #include "vinyl_index.h"
 #include "xrow.h"
 #include "tuple.h"
-#include "scoped_guard.h"
 #include "txn.h"
-#include "index.h"
-#include "space.h"
 #include "schema.h"
-#include "port.h"
 #include "request.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,7 +63,7 @@ VinylSpace::applySnapshotRow(struct space *space, struct request *request)
 
 	int64_t signature = request->header->lsn;
 
-	if (vy_replace_all(tx, NULL, space, request))
+	if (vy_replace(tx, NULL, space, request))
 		diag_raise();
 
 	if (vy_prepare(env, tx)) {
@@ -95,10 +91,10 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		if (vy_insert_all(tx, space, request))
+		if (vy_insert(tx, space, request))
 			diag_raise();
 	} else {
-		if (vy_replace_all(tx, stmt, space, request))
+		if (vy_replace(tx, stmt, space, request))
 			diag_raise();
 	}
 
@@ -116,7 +112,7 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 {
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-	if (vy_delete_all(tx, stmt, space, request))
+	if (vy_delete(tx, stmt, space, request))
 		diag_raise();
 	/*
 	 * Delete may or may not set stmt->old_tuple, but we
@@ -131,7 +127,7 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 {
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_update_all(tx, stmt, space, request) != 0)
+	if (vy_update(tx, stmt, space, request) != 0)
 		diag_raise();
 	return stmt->new_tuple;
 }
@@ -151,7 +147,7 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 		request_normalize_ops(request);
 	assert(request->index_base == 0);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_upsert_all(tx, stmt, space, request) != 0)
+	if (vy_upsert(tx, stmt, space, request) != 0)
 		diag_raise();
 }
 
@@ -164,9 +160,7 @@ VinylSpace::createIndex(struct space *space, struct key_def *key_def)
 		unreachable();
 		return NULL;
 	}
-	if (key_def->iid == 0)
-		return new VinylPrimaryIndex(engine->env, key_def);
-	return new VinylSecondaryIndex(engine->env, key_def);
+	return new VinylIndex(engine->env, key_def);
 }
 
 void

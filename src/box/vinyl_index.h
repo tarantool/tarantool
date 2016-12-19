@@ -33,27 +33,7 @@
 #include "index.h"
 
 /**
- * A base struct for primary and secondary Vinyl indexes.
- *
- * Vinyl primary and secondary indexes work differently:
- *
- * - the primary index is fully covering (also known as
- *   "clustered" in MS SQL circles).
- *   It stores all tuple fields of the tuple coming from
- *   INSERT/REPLACE/UPDATE operations. This index is
- *   the only place where the full tuple is stored.
- *
- * - a secondary index only stores parts participating in the
- *   secondary key, coalesced with parts of the primary key.
- *   Duplicate parts, i.e. identical parts of the primary and
- *   secondary key are only stored once. (@sa key_def_merge
- *   function). This reduces the disk and RAM space necessary to
- *   maintain a secondary index, but adds an extra look-up in the
- *   primary key for every fetched tuple.
- *
- * When a search in a secondary index is made, we first look up
- * the secondary index tuple, containing the primary key, and then
- * use this key to find the original tuple in the primary index.
+ * C++ wrapper for struct vy_index.
  */
 struct VinylIndex: public Index
 {
@@ -61,7 +41,7 @@ public:
 	VinylIndex(struct vy_env *env, struct key_def *key_def);
 
 	virtual void
-	open() = 0;
+	open();
 
 	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
@@ -87,54 +67,9 @@ public:
 	count(enum iterator_type type, const char *key, uint32_t part_count)
 		const override;
 
-	virtual struct tuple *
-	iterator_next(struct vy_tx *tx, struct vinyl_iterator *it) const;
-
 public:
 	struct vy_env *env;
 	struct vy_index *db;
-};
-
-struct VinylPrimaryIndex: public VinylIndex
-{
-public:
-	VinylPrimaryIndex(struct vy_env *env, struct key_def *key_def_arg);
-
-	virtual void
-	open() override;
-};
-
-/**
- * While the primary index has only one key_def that is
- * used for validating tuples, secondary index needs four:
- *
- * - the first one is defined by the user. It contains the key
- *   parts of the secondary key, as present in the original tuple.
- *   This is Index::key_def, same as vy_index::user_key_def.
- *
- * - the second one is used to fetch key parts of the secondary
- *   key, *augmented* with the parts of the primary key from the
- *   original tuple. These parts concatenated together construe the
- *   tuple of the secondary key, i.e. the tuple stored. This is
- *   vy_index::key_def_tuple_to_key.
- *
- * - the third one is used to compare tuples of the secondary key
- *   between each other. This is vy_index::key_def.
- *   @sa key_def_build_secondary()
- *
- * - the last one is used to build a key for lookup in the primary
- *   index, based on the tuple fetched from the secondary index.
- *   This is vy_index::key_def_secondary_to_primary.
- *   @sa key_def_build_secondary_to_primary()
- */
-struct VinylSecondaryIndex: public VinylIndex
-{
-public:
-	VinylSecondaryIndex(struct vy_env *env_arg,
-			    struct key_def *key_def_arg);
-
-	virtual void
-	open() override;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_INDEX_H_INCLUDED */
