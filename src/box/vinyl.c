@@ -5235,14 +5235,14 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 
 	/**
 	 * key_def is a merged user defined key_def of this index
-	 * and key_def of the primary index, in which parts field
-	 * number are renumbered.
+	 * and key_def of the primary index, in which parts are
+	 * renumbered.
 	 *
 	 * For instance:
 	 * - merged primary and secondary: 3 (str), 6 (uint), 4 (scalar)
 	 * - key_def:                      0 (str), 1 (uint), 2 (scalar)
 	 *
-	 * Condensing is necessary since partial tuple consists
+	 * Condensing is necessary since a partial tuple consists
 	 * only from primary and secondary key fields, coalesced.
 	 */
 	struct key_def *key_def;
@@ -5255,20 +5255,12 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 		return NULL;
 
 	/* Original user defined key_def. */
-	if (key_def->iid == 0) {
-		/*
-		 * Don't make the deep copy of the key_def since
-		 * for primary index it is same as user defined.
-		 */
-		user_key_def = key_def;
-	} else {
-		user_key_def = key_def_dup(user_key_def);
-		if (user_key_def == NULL)
-			goto fail_user_key_def;
-	}
+	user_key_def = key_def_dup(user_key_def);
+	if (user_key_def == NULL)
+		goto fail_user_key_def;
 
 	/*
-	 * key_def that is used to extraction the key from a
+	 * key_def that is used for extraction the key from a
 	 * tuple.
 	 */
 	struct key_def *key_def_tuple_to_key;
@@ -5282,8 +5274,8 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	}
 
 	/*
-	 * key_def that is used to extraction the primary key from
-	 * the secondary index tuple.
+	 * key_def that is used for extraction of the primary key
+	 * from  a secondary index tuple.
 	 */
 	struct key_def *key_def_secondary_to_primary;
 	if (key_def->iid == 0) {
@@ -5362,8 +5354,7 @@ fail_key_def_secondary_to_primary:
 	if (key_def->iid > 0)
 		key_def_delete(key_def_tuple_to_key);
 fail_key_def_tuple_to_key:
-	if (key_def->iid > 0)
-		key_def_delete(user_key_def);
+	key_def_delete(user_key_def);
 fail_user_key_def:
 	key_def_delete(key_def);
 	return NULL;
@@ -5389,8 +5380,8 @@ vy_index_delete(struct vy_index *index)
 	free(index->path);
 	tuple_format_ref(index->format, -1);
 	key_def_delete(index->key_def);
+	key_def_delete(index->user_key_def);
 	if (index->key_def->iid > 0) {
-		key_def_delete(index->user_key_def);
 		key_def_delete(index->key_def_tuple_to_key);
 		key_def_delete(index->key_def_secondary_to_primary);
 	}
@@ -5808,7 +5799,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	struct vy_stmt *vystmt = vy_stmt_new_replace(tuple, tuple_end,
 						     index->format,
-						     index->key_def);
+						     index->key_def->part_count);
 	if (vystmt == NULL)
 		return -1;
 	assert(vystmt->type == IPROTO_REPLACE);
@@ -6474,7 +6465,7 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
 	vystmt = vy_stmt_new_upsert(tuple, tuple_end, index->format,
-				    index->key_def, operations, 1);
+				    index->key_def->part_count, operations, 1);
 	if (vystmt == NULL)
 		return -1;
 	assert(vystmt->type == IPROTO_UPSERT);

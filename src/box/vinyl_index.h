@@ -64,10 +64,6 @@ public:
 	open() = 0;
 
 	virtual struct tuple*
-	replace(struct tuple*,
-	        struct tuple*, enum dup_replace_mode) override;
-
-	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
 
 	virtual struct iterator*

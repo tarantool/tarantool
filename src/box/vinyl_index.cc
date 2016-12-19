@@ -87,17 +87,6 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	return tuple;
 }
 
-struct tuple *
-VinylIndex::replace(struct tuple*, struct tuple*, enum dup_replace_mode)
-{
-	/* This method is unused by vinyl index.
-	 *
-	 * see: vinyl_space.cc
-	 */
-	unreachable();
-	return NULL;
-}
-
 size_t
 VinylIndex::bsize() const
 {
