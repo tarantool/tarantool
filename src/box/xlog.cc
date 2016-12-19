@@ -1011,7 +1011,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	size_t row_size = obuf_size(&log->obuf) - page_offset;
 	if (log->is_autocommit &&
 	    obuf_size(&log->obuf) >= XLOG_TX_AUTOCOMMIT_THRESHOLD &&
-	    xlog_tx_write(log) != 0)
+	    xlog_tx_write(log) < 0)
 		return -1;
 
 	return row_size;

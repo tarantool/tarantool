@@ -705,7 +705,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row,
 	ssize_t written = xlog_write_row(l, row);
 	fiber_gc();
 	if (written < 0) {
-		tnt_raise(SystemError, "Can't write snapshot row");
+		diag_raise();
 	}
 	bytes += written;
 
