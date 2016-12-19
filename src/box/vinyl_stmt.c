@@ -147,7 +147,7 @@ vy_stmt_new_delete(const char *key, uint32_t part_count)
 struct vy_stmt *
 vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 		     uint8_t type, const struct tuple_format *format,
-		     const struct key_def *key_def,
+		     uint32_t part_count,
 		     struct iovec *operations, uint32_t iovcnt)
 {
 #ifndef NDEBUG
@@ -155,7 +155,6 @@ vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 	mp_next(&tuple_end_must_be);
 	assert(tuple_end == tuple_end_must_be);
 #endif
-	uint32_t part_count = key_def->part_count;
 
 	uint32_t field_count = mp_decode_array(&tuple_begin);
 	assert(field_count >= part_count);
@@ -203,21 +202,21 @@ vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 
 struct vy_stmt *
 vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
-		   const struct tuple_format *format,
-		   const struct key_def *key_def, struct iovec *operations,
+		   const struct tuple_format *format, uint32_t part_count,
+		   struct iovec *operations,
 		   uint32_t ops_cnt)
 {
 	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_UPSERT,
-				    format, key_def, operations, ops_cnt);
+				    format, part_count, operations, ops_cnt);
 }
 
 struct vy_stmt *
 vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
 		    const struct tuple_format *format,
-		    const struct key_def *key_def)
+		    uint32_t part_count)
 {
 	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_REPLACE,
-				    format, key_def, NULL, 0);
+				    format, part_count, NULL, 0);
 }
 
 struct vy_stmt *

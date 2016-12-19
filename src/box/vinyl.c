@@ -448,8 +448,7 @@ vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
  */
 static int
 vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
-	       const struct tuple_format *format,
-	       struct key_def *key_def);
+	       const struct tuple_format *format, uint32_t part_count);
 
 struct tree_mem_key {
 	const struct vy_stmt *stmt;
@@ -1146,8 +1145,8 @@ struct vy_page_read_task {
 	struct vy_page_info page_info;
 	/** tuple format to create tuples - ref. counted */
 	struct tuple_format *format;
-	/** key_def needs to create tuples */
-	struct key_def *key_def;
+	/** part count - needed to create tuples */
+	uint32_t part_count;
 	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
 	/** vy_env - contains environment with task mempool */
@@ -5378,8 +5377,7 @@ vy_convert_replace(const struct key_def *key_def, struct tuple_format *format,
 
 static int
 vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
-	       const struct tuple_format *format,
-	       struct key_def *key_def)
+	       const struct tuple_format *format, uint32_t part_count)
 {
 	struct request request;
 	request_create(&request, xrow->type);
@@ -5392,18 +5390,20 @@ vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
 	case IPROTO_DELETE:
 		/* extract key */
 		field_count = mp_decode_array(&request.key);
-		assert(field_count == key_def->part_count);
+		assert(field_count == part_count);
 		*stmt_ptr = vy_stmt_new_delete(request.key, field_count);
 		break;
 	case IPROTO_REPLACE:
-		*stmt_ptr = vy_stmt_new_replace(request.tuple, request.tuple_end,
-						format, key_def);
+		*stmt_ptr = vy_stmt_new_replace(request.tuple,
+						request.tuple_end,
+						format, part_count);
 		break;
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;
 		ops.iov_len = request.ops_end - request.ops;
-		*stmt_ptr = vy_stmt_new_upsert(request.tuple, request.tuple_end,
-					       format, key_def, &ops, 1);
+		*stmt_ptr = vy_stmt_new_upsert(request.tuple,
+					       request.tuple_end,
+					       format, part_count, &ops, 1);
 		break;
 	default:
 		diag_set(ClientError, ER_VINYL, "unknown request type");
@@ -5479,8 +5479,8 @@ space_name_by_id(uint32_t id);
  * @retval -1 - memory error
  */
 static int
-vy_upsert_try_to_squash(const struct key_def *key_def,
-			const struct tuple_format *format,
+vy_upsert_try_to_squash(const struct tuple_format *format,
+			uint32_t part_count,
 			struct region *region,
 			const char *key_mp, const char *key_mp_end,
 			const char *old_serie, const char *old_serie_end,
@@ -5502,8 +5502,8 @@ vy_upsert_try_to_squash(const struct key_def *key_def,
 	operations[0].iov_base = (void *)squashed;
 	operations[0].iov_len = squashed_size;
 
-	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, format, key_def,
-					  operations, 1);
+	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, format,
+					  part_count, operations, 1);
 	if (*result_stmt == NULL)
 		return -1;
 	return 0;
@@ -5556,7 +5556,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 		 * UPDATE case: return the updated old stmt.
 		 */
 		result_stmt = vy_stmt_new_replace(result_mp, result_mp_end,
-						  format, key_def);
+						  format, key_def->part_count);
 		region_truncate(region, region_svp);
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
@@ -5577,7 +5577,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(key_def, format, region,
+	if (vy_upsert_try_to_squash(format, key_def->part_count, region,
 				    result_mp, result_mp_end,
 				    old_ops, old_ops_end,
 				    new_ops, new_ops_end,
@@ -5609,7 +5609,8 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	operations[0].iov_len = header - ops_buf;
 
 	result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
-					 format, key_def, operations, 3);
+					 format, key_def->part_count,
+					 operations, 3);
 	if (result_stmt == NULL) {
 		region_truncate(region, region_svp);
 		return NULL;
@@ -5785,7 +5786,7 @@ vy_replace(struct vy_tx *tx, struct vy_index *index,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	struct vy_stmt *vystmt = vy_stmt_new_replace(tuple_begin, tuple_end,
 						     index->format,
-						     index->key_def);
+						     index->key_def->part_count);
 	if (vystmt == NULL)
 		return -1;
 	assert(vystmt->type == IPROTO_REPLACE);
@@ -6297,7 +6298,7 @@ vy_update_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		goto error;
 	struct vy_stmt *new_stmt;
 	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
-				       pk_def);
+				       pk_def->part_count);
 	if (new_stmt == NULL)
 		goto error;
 	if (vy_check_update(pk, old_stmt, new_stmt)) {
@@ -6467,7 +6468,7 @@ vy_upsert_all(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	/* Have to create a vinyl stmt just for vy_check_update() */
 	struct vy_stmt *new_stmt;
 	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end,
-				       pk->format, pk_def);
+				       pk->format, pk_def->part_count);
 	if (new_stmt == NULL)
 		goto error;
 
@@ -6560,7 +6561,7 @@ vy_upsert(struct vy_tx *tx, struct vy_index *index,
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
 	vystmt = vy_stmt_new_upsert(stmt, stmt_end, index->format,
-				    index->key_def, operations, 1);
+				    index->key_def->part_count, operations, 1);
 	if (vystmt == NULL)
 		return -1;
 	assert(vystmt->type == IPROTO_UPSERT);
@@ -7059,6 +7060,7 @@ vy_page_new(const struct vy_page_info *page_info)
 		return NULL;
 	}
 	page->count = page_info->count;
+	page->stmts = NULL;
 	return page;
 }
 
@@ -7166,7 +7168,7 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
  */
 static struct vy_page *
 vy_page_read(const struct vy_page_info *page_info, int fd,
-	     const struct tuple_format *format, struct key_def *key_def,
+	     const struct tuple_format *format, uint32_t part_count,
 	     ZSTD_DStream *zdctx)
 {
 	/* read xlog tx from xlog file */
@@ -7208,12 +7210,20 @@ vy_page_read(const struct vy_page_info *page_info, int fd,
 	}
 
 	page->stmts = calloc(page_info->count, sizeof(struct vy_stmt));
+	if (page->stmts == NULL) {
+		diag_set(OutOfMemory, page_info->count * sizeof(struct vy_stmt),
+			 "malloc", "page->stmts");
+		vy_page_delete(page);
+		xlog_tx_cursor_destroy(&tx_cursor);
+		return NULL;
+	}
+
 	/* fetch all rows and decode */
 	struct xrow_header xrow;
 	uint32_t row_count = 0;
 	while ((rc = xlog_tx_cursor_next_row(&tx_cursor, &xrow)) == 0 &&
 	       (rc = vy_stmt_decode(&xrow, page->stmts + row_count,
-				    format, key_def) == 0)) {
+				    format, part_count) == 0)) {
 		++row_count;
 	}
 	xlog_tx_cursor_destroy(&tx_cursor);
@@ -7269,7 +7279,7 @@ vy_page_read_cb(struct coio_task *base)
 	if (zdctx == NULL)
 		return -1;
 	task->page = vy_page_read(&task->page_info, task->run->fd,
-				  task->format, task->key_def, zdctx);
+				  task->format, task->part_count, zdctx);
 	return task->page != NULL ? 0 : -1;
 }
 
@@ -7346,18 +7356,15 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->page_info = *page_info;
 		task->format = index->format;
 		tuple_format_ref(task->format, 1);
-		task->key_def = index->key_def;
+		task->part_count = index->key_def->part_count;
 		task->env = index->env;
 		task->page = NULL;
-
-		vy_index_ref(index);
 
 		/* Post task to coeio */
 		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
 		if (rc < 0)
 			return -1; /* timed out or cancelled */
 
-		vy_index_unref(index);
 		/* task was posted to worker and finished */
 		page = task->page;
 		if (page == NULL)
@@ -7387,7 +7394,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		if (zdctx == NULL)
 			return -1;
 		page = vy_page_read(page_info, itr->run->fd, index->format,
-				    index->key_def, zdctx);
+				    index->key_def->part_count, zdctx);
 	}
 
 	if (page == NULL) {

@@ -328,7 +328,7 @@ vy_stmt_new_delete(const char *key, uint32_t part_count);
  *                    array header.
  * @param tuple_end End of the array that begins from @param tuple_begin.
  * @param format Format of a tuple for offsets generating.
- * @param key_def Key definition.
+ * @param part_count Part count from key definition.
  *
  * @retval NULL     Memory allocation error.
  * @retval not NULL Success.
@@ -336,7 +336,7 @@ vy_stmt_new_delete(const char *key, uint32_t part_count);
 struct vy_stmt *
 vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
 		    const struct tuple_format *format,
-		    const struct key_def *key_def);
+		    uint32_t part_count);
 
  /**
  * Create the UPSERT statement from raw MessagePack data.
@@ -344,7 +344,7 @@ vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
  *                    array header.
  * @param tuple_end End of the array that begins from @param tuple_begin.
  * @param format Format of a tuple for offsets generating.
- * @param key_def Key definition.
+ * @param part_count Part count from key definition.
  * @param operations Vector of update operations.
  * @param ops_cnt Length of the update operations vector.
  *
@@ -353,9 +353,8 @@ vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
  */
 struct vy_stmt *
 vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
-		   const struct tuple_format *format,
-		   const struct key_def *key_def, struct iovec *operations,
-		   uint32_t ops_cnt);
+		   const struct tuple_format *format, uint32_t part_count,
+		   struct iovec *operations, uint32_t ops_cnt);
 
 /**
  * Create REPLACE statement from UPSERT statement.
