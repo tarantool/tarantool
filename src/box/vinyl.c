@@ -2282,7 +2282,8 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 static void
 vy_page_info_destroy(struct vy_page_info *page_info)
 {
-	vy_stmt_unref(page_info->min_key);
+	if (page_info->min_key != NULL)
+		vy_stmt_unref(page_info->min_key);
 }
 
 /**
