@@ -778,6 +778,7 @@ struct vy_index {
 	/**
 	 * A key definition for the key extraction from a tuple.
 	 * @sa VinylSecondaryIndex::key_def_tuple_to_key.
+	 * NULL for primary index.
 	 */
 	struct key_def *key_def_tuple_to_key;
 	/**
@@ -5224,9 +5225,10 @@ vy_index_drop(struct vy_index *index)
 
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *key_def,
-	     struct key_def *user_key_def, struct key_def *key_def_tuple_to_key,
+	     struct key_def *user_key_def,
 	     struct key_def *key_def_secondary_to_primary, struct space *space)
 {
+	assert(space != NULL);
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
 	};
@@ -5237,9 +5239,17 @@ vy_index_new(struct vy_env *e, struct key_def *key_def,
 	if (user_key_def == NULL)
 		return NULL;
 
-	key_def_tuple_to_key = key_def_dup(key_def_tuple_to_key);
-	if (key_def_tuple_to_key == NULL)
-		goto fail_key_def_tuple_to_key;
+	struct key_def *key_def_tuple_to_key;
+	if (key_def->iid == 0) {
+		key_def_tuple_to_key = NULL;
+	} else {
+		struct vy_index *pk = vy_index_find(space, 0);
+		assert(pk != NULL);
+		key_def_tuple_to_key =
+			key_def_merge(user_key_def, pk->key_def);
+		if (key_def_tuple_to_key == NULL)
+			goto fail_key_def_tuple_to_key;
+	}
 
 	key_def_secondary_to_primary =
 		key_def_dup(key_def_secondary_to_primary);
@@ -5313,7 +5323,8 @@ fail_index:
 	tuple_format_ref(format, -1);
 	key_def_delete(key_def_secondary_to_primary);
 fail_key_def_secondary_to_primary:
-	key_def_delete(key_def_tuple_to_key);
+	if (key_def->iid > 0)
+		key_def_delete(key_def_tuple_to_key);
 fail_key_def_tuple_to_key:
 	key_def_delete(user_key_def);
 	return NULL;
@@ -5340,7 +5351,8 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_ref(index->format, -1);
 	key_def_delete(index->key_def);
 	key_def_delete(index->user_key_def);
-	key_def_delete(index->key_def_tuple_to_key);
+	if (index->key_def->iid > 0)
+		key_def_delete(index->key_def_tuple_to_key);
 	key_def_delete(index->key_def_secondary_to_primary);
 	histogram_delete(index->run_hist);
 	TRASH(index);

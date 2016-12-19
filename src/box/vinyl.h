@@ -275,9 +275,6 @@ vy_index_key_def(struct vy_index *index);
  *                             with space:create_index().
  *                             (different from key_def for
  *                             secondary keys only).
- * @param key_def_tuple_to_key Key definition that is used for
- *                             extraction the key from a tuple
- *                             (secondary indexes only).
  * @param key_def_secondary_to_primary
  *                             Key definition used for fetching
  *                             the primary key from a secondary
@@ -288,7 +285,7 @@ vy_index_key_def(struct vy_index *index);
  */
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *key_def,
-	     struct key_def *user_key_def, struct key_def *key_def_tuple_to_key,
+	     struct key_def *user_key_def,
 	     struct key_def *key_def_secondary_to_primary, struct space *space);
 
 /**

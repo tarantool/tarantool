@@ -120,11 +120,10 @@ public:
  *   key, *augmented* with the parts of the primary key from the
  *   original tuple. These parts concatenated together construe the
  *   tuple of the secondary key, i.e. the tuple stored. This is
- *   VinylSecondaryIndex::key_def_tuple_to_key.
+ *   vy_index::key_def_tuple_to_key.
  *
  * - the third one is used to compare tuples of the secondary key
- *   between each other. This is vy_index::key_def, it is also
- *   known as key_def_tuple_to_key in the code.
+ *   between each other. This is vy_index::key_def.
  *   @sa key_def_build_secondary()
  *
  * - the last one is used to build a key for lookup in the primary
@@ -150,8 +149,6 @@ public:
 	virtual ~VinylSecondaryIndex() override;
 
 public:
-	/** To fetch the secondary index tuple from original tuple */
-	struct key_def *key_def_tuple_to_key;
 	/** To fetch the primary key from the secondary index tuple. */
 	struct key_def *key_def_secondary_to_primary;
 	VinylPrimaryIndex *primary_index;

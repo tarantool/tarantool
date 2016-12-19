@@ -149,8 +149,8 @@ VinylPrimaryIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, key_def, key_def, key_def,
-			  space_by_id(key_def->iid));
+	db = vy_index_new(env, key_def, key_def, key_def,
+			  space_by_id(key_def->space_id));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
@@ -159,7 +159,6 @@ VinylSecondaryIndex::VinylSecondaryIndex(struct vy_env *env_arg,
 					 VinylPrimaryIndex *pk_arg,
 					 struct key_def *key_def_arg)
 	:VinylIndex(env_arg, key_def_arg)
-	 ,key_def_tuple_to_key(NULL)
 	 ,key_def_secondary_to_primary(NULL)
 	 ,primary_index(pk_arg)
 {}
@@ -208,8 +207,6 @@ void
 VinylSecondaryIndex::open()
 {
 	assert(db == NULL);
-	key_def_tuple_to_key = key_def_merge(key_def, primary_index->key_def);
-
 	key_def_secondary_to_primary =
 		key_def_build_secondary_to_primary(primary_index->key_def, key_def);
 
@@ -230,17 +227,15 @@ VinylSecondaryIndex::open()
 	/* The engine makes a copy of the key. */
 	auto guard = make_scoped_guard([=]{key_def_delete(key_def_vinyl);});
 	/* Create a vinyl index. */
-	db = vy_index_new(env, key_def_vinyl, key_def, key_def_tuple_to_key,
+	db = vy_index_new(env, key_def_vinyl, key_def,
 			  key_def_secondary_to_primary,
-			  space_by_id(key_def->iid));
+			  space_by_id(key_def->space_id));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
 
 VinylSecondaryIndex::~VinylSecondaryIndex()
 {
-	if (key_def_tuple_to_key)
-		key_def_delete(key_def_tuple_to_key);
 	if (key_def_secondary_to_primary)
 		key_def_delete(key_def_secondary_to_primary);
 }
