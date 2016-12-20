@@ -72,7 +72,7 @@
 #include "space.h"
 #include "index.h"
 
-#include "vinyl_stmt.h"
+#include "vy_stmt.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"

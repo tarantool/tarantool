@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "vinyl_stmt.h"
+#include "vy_stmt.h"
 
 #include <stdlib.h>
 #include <string.h>
