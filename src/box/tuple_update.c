@@ -246,19 +246,26 @@ update_field_init(struct update_field *field,
 
 /** Read a field index or any other integer field. */
 static inline int
-mp_read_int(int index_base, struct update_op *op,
-	    const char **expr, int64_t *ret)
+mp_read_i32(int index_base, struct update_op *op,
+	    const char **expr, int32_t *ret)
 {
-	if (mp_typeof(**expr) == MP_UINT)
-		*ret = mp_decode_uint(expr);
-	else if (mp_typeof(**expr) == MP_INT)
-		*ret = mp_decode_int(expr);
-	else {
-		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
-			 index_base + op->field_no, "an integer");
-		return -1;
+	if (mp_typeof(**expr) == MP_UINT) {
+		uint64_t val = mp_decode_uint(expr);
+		if (val < INT32_MAX) {
+			*ret = (int32_t) val;
+			return 0;
+		}
+	} else if (mp_typeof(**expr) == MP_INT) {
+		int64_t val = mp_decode_int(expr);
+		if (val > INT32_MIN) {
+			*ret = (int32_t) val;
+			return 0;
+		}
 	}
-	return 0;
+
+	diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+		 index_base + op->field_no, "an integer");
+	return -1;
 }
 
 static inline int
@@ -373,14 +380,11 @@ read_arg_splice(int index_base, struct update_op *op,
 		const char **expr)
 {
 	struct op_splice_arg *arg = &op->arg.splice;
-	int64_t buf;
-	if (mp_read_int(index_base, op, expr, &buf))
+	if (mp_read_i32(index_base, op, expr, &arg->offset))
 		return -1;
-	arg->offset = buf;
 	/* cut length */
-	if (mp_read_int(index_base, op, expr, &buf))
+	if (mp_read_i32(index_base, op, expr, &arg->cut_length))
 		return -1;
-	arg->cut_length = buf;
 	 /* value */
 	return mp_read_str(index_base, op, expr, &arg->paste_length,
 			   &arg->paste);
@@ -994,8 +998,8 @@ update_read_ops(struct tuple_update *update, const char *expr,
 				 "field id must be a number");
 			return -1;
 		}
-		int64_t field_no;
-		if (mp_read_int(update->index_base, op, &expr, &field_no))
+		int32_t field_no;
+		if (mp_read_i32(update->index_base, op, &expr, &field_no))
 			return -1;
 		if (field_no - update->index_base >= 0) {
 			op->field_no = field_no - update->index_base;
