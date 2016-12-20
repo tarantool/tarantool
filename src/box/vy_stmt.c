@@ -380,15 +380,27 @@ vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
 		const struct key_def *key_def)
 {
 	int total = 0;
+	uint32_t mp_size;
 	SNPRINT(total, snprintf, buf, size, "%s(",
 		iproto_type_name(stmt->type));
-	if (stmt == NULL) {
-		SNPRINT(total, snprintf, buf, size, "[]");
-	} else {
-		uint32_t tuple_size;
-		const char *tuple_data = vy_tuple_data_range(stmt, key_def,
-							    &tuple_size);
-		SNPRINT(total, vy_key_snprint, buf, size, tuple_data);
+	switch (stmt->type) {
+	case IPROTO_SELECT:
+	case IPROTO_DELETE:
+		SNPRINT(total, mp_snprint, buf, size, vy_key_data(stmt));
+		break;
+	case IPROTO_REPLACE:
+		SNPRINT(total, mp_snprint, buf, size,
+			vy_tuple_data(stmt, key_def));
+		break;
+	case IPROTO_UPSERT:
+		SNPRINT(total, mp_snprint, buf, size,
+			vy_tuple_data(stmt, key_def));
+		SNPRINT(total, snprintf, buf, size, ", ops=");
+		SNPRINT(total, mp_snprint, buf, size,
+			vy_stmt_upsert_ops(stmt, key_def, &mp_size));
+		break;
+	default:
+		unreachable();
 	}
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) stmt->lsn);
