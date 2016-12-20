@@ -3058,8 +3058,6 @@ vy_range_delete(struct vy_range *range)
 	assert(range->nodecompact.pos == UINT32_MAX);
 	struct vy_index *index = range->index;
 	struct vy_env *env = index->env;
-	struct vy_quota *quota = env->quota;
-	struct lsregion *allocator = &env->allocator;
 
 	if (range->begin)
 		vy_stmt_unref(range->begin);
@@ -3076,7 +3074,6 @@ vy_range_delete(struct vy_range *range)
 		vy_run_unref(run);
 	}
 	/* Release all mems */
-	size_t mem_used_before = lsregion_used(allocator);
 	while (!rlist_empty(&range->mems)) {
 		struct vy_mem *mem = rlist_shift_entry(&range->mems,
 						       struct vy_mem, link);
@@ -3085,9 +3082,6 @@ vy_range_delete(struct vy_range *range)
 		index->stmt_count -= mem->tree.size;
 		vy_mem_delete(mem);
 	}
-	size_t mem_used_after = lsregion_used(allocator);
-	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(quota, mem_used_before - mem_used_after);
 
 	TRASH(range);
 	free(range);
@@ -3876,8 +3870,6 @@ vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_env *env = index->env;
-	struct vy_quota *quota = env->quota;
-	struct lsregion *allocator = &env->allocator;
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
 
@@ -3901,7 +3893,6 @@ vy_task_dump_complete(struct vy_task *task)
 	range->mem_count = 1;
 	range->used = mem->used;
 	range->min_lsn = mem->min_lsn;
-	size_t mem_used_before = lsregion_used(allocator);
 	while (!rlist_empty(&release)) {
 		mem = rlist_shift_entry(&release, struct vy_mem, link);
 		vy_scheduler_mem_dumped(env->scheduler, mem);
@@ -3910,9 +3901,6 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_mem_delete(mem);
 	}
 	range->version++;
-	size_t mem_used_after = lsregion_used(allocator);
-	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(quota, mem_used_before - mem_used_after);
 
 	vy_scheduler_add_range(env->scheduler, range);
 	return 0;
@@ -4705,6 +4693,8 @@ vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
 static void
 vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 {
+	struct vy_env *env = scheduler->env;
+
 	if (mem->used == 0)
 		return;
 
@@ -4719,8 +4709,13 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		scheduler->mem_min_lsn = INT64_MAX;
 	}
 
-	struct lsregion *allocator = &scheduler->env->allocator;
+	/* Free memory and release quota. */
+	struct lsregion *allocator = &env->allocator;
+	size_t mem_used_before = lsregion_used(allocator);
 	lsregion_gc(allocator, scheduler->mem_min_lsn);
+	size_t mem_used_after = lsregion_used(allocator);
+	assert(mem_used_after <= mem_used_before);
+	vy_quota_release(env->quota, mem_used_before - mem_used_after);
 
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn) {
 		/*
