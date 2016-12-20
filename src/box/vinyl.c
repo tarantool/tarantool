@@ -242,6 +242,7 @@ vy_quota_force_use(struct vy_quota *q, size_t size)
 static void
 vy_quota_release(struct vy_quota *q, size_t size)
 {
+	assert(q->used >= size);
 	q->used -= size;
 	if (q->used < q->limit)
 		ipc_cond_broadcast(&q->cond);
@@ -10153,6 +10154,7 @@ static int
 vy_squash_process(struct vy_squash *squash)
 {
 	struct vy_index *index = squash->index;
+	struct vy_env *env = index->env;
 	struct tuple_format *format = index->format;
 	struct key_def *key_def = index->key_def;
 
@@ -10210,11 +10212,18 @@ vy_squash_process(struct vy_squash *squash)
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	}
 
-	size_t write_size = 0;
-	rc = vy_range_set(range, result, index->env->xm->lsn);
+	/*
+	 * Insert the resulting REPLACE statement to the mem
+	 * and adjust the quota.
+	 */
+	size_t mem_used_before = lsregion_used(&env->allocator);
+	rc = vy_range_set(range, result, env->xm->lsn);
+	size_t mem_used_after = lsregion_used(&env->allocator);
+	assert(mem_used_after >= mem_used_before);
 	vy_stmt_unref(result);
 	if (rc == 0)
-		vy_quota_force_use(index->env->quota, write_size);
+		vy_quota_force_use(env->quota,
+				   mem_used_after - mem_used_before);
 	return rc;
 }
 
