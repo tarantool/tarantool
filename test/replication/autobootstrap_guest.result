@@ -1,6 +1,9 @@
 env = require('test_run')
 ---
 ...
+vclock_diff = require('fast_replica').vclock_diff
+---
+...
 test_run = env.new()
 ---
 ...
@@ -20,31 +23,18 @@ test_run:wait_fullmesh(SERVERS)
 ---
 ...
 --
--- Print vclock
+-- Check vclock
 --
-_ = test_run:cmd("switch autobootstrap_guest1")
+vclock1 = test_run:get_vclock('autobootstrap_guest1')
 ---
 ...
-box.info.vclock
+vclock_diff(vclock1, test_run:get_vclock('autobootstrap_guest2'))
 ---
-- {1: 5}
+- 0
 ...
-_ = test_run:cmd("switch autobootstrap_guest2")
+vclock_diff(vclock1, test_run:get_vclock('autobootstrap_guest3'))
 ---
-...
-box.info.vclock
----
-- {1: 5}
-...
-_ = test_run:cmd("switch autobootstrap_guest3")
----
-...
-box.info.vclock
----
-- {1: 5}
-...
-_ = test_run:cmd("switch default")
----
+- 0
 ...
 --
 -- Insert rows on each server
@@ -76,9 +66,12 @@ _ = test_run:cmd("switch default")
 vclock = test_run:get_cluster_vclock(SERVERS)
 ---
 ...
-test_run:wait_cluster_vclock(SERVERS, vclock)
+vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock)
 ---
-- {1: 6, 2: 1, 3: 1}
+...
+vclock_diff(vclock1, vclock2)
+---
+- 3
 ...
 --
 -- Check result

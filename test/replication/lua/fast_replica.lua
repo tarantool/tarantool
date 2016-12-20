@@ -25,7 +25,21 @@ function drop_all(inspector)
     end
 end
 
+function vclock_diff(left, right)
+    local diff = 0
+    for id, lsn in ipairs(left) do
+        diff = diff + (right[id] or 0) - left[id]
+    end
+    for id, lsn in ipairs(right) do
+        if left[id] == nil then
+            diff = diff + right[id]
+        end
+    end
+    return diff
+end
+
 return {
     join = join;
     drop_all = drop_all;
+    vclock_diff = vclock_diff;
 }
