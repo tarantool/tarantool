@@ -5970,7 +5970,7 @@ vy_replace_all_impl(struct vy_tx *tx, struct space *space,
 		return -1;
 	struct key_def *pk_def = pk->key_def;
 	assert(pk_def->iid == 0);
-	const char *key, *old_tuple, *old_tuple_end;
+	const char *key = NULL, *old_tuple = NULL, *old_tuple_end = NULL;
 	key = tuple_extract_key_raw(request->tuple, request->tuple_end, pk_def,
 				    NULL);
 	if (key == NULL) /* out of memory */
@@ -6792,7 +6792,7 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return -1;
 	if (vyresult == NULL)
 		return 0;
-	struct vy_index *pk = vy_index_find(index->space, 0);
+	MAYBE_UNUSED struct vy_index *pk = vy_index_find(index->space, 0);
 	assert(pk != NULL);
 	*result = vy_convert_replace(index->space, vyresult);
 	vy_stmt_unref(vyresult);
