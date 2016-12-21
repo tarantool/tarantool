@@ -258,6 +258,15 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
+ * Tuple has the following structure:
+ *                           uint32       uint32     bsize
+ *                          +-------------------+-------------+
+ * tuple_begin, ..., raw =  | offN | ... | off1 | MessagePack |
+ * |                        +-------------------+-------------+
+ * |                                            ^
+ * +---------------------------------------data_offset
+ *
+ * Each 'off_i' is the offset to the i-th indexed field.
  */
 struct PACKED tuple
 {
@@ -273,10 +282,18 @@ struct PACKED tuple
 	uint16_t refs;
 	/** format identifier */
 	uint16_t format_id;
-	/** length of the variable part of the tuple */
-	uint32_t size;
-	/** MessagePack array data */
-	char raw[0];
+	/**
+	 * Length of the MessagePack data in raw part of the
+	 * tuple.
+	 */
+	uint32_t bsize;
+	/** Offsets count before MessagePack data. */
+	uint16_t data_offset;
+	/**
+	 * Offsets array concatenated with MessagePack fields
+	 * array.
+	 * char raw[0];
+	 */
 };
 
 /**
@@ -287,7 +304,7 @@ struct PACKED tuple
 inline const char *
 tuple_data(const struct tuple *tuple)
 {
-	return tuple->raw;
+	return (const char *) tuple + tuple->data_offset;
 }
 
 /**
@@ -299,8 +316,8 @@ tuple_data(const struct tuple *tuple)
 inline const char *
 tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
-	*p_size = tuple->size;
-	return tuple->raw;
+	*p_size = tuple->bsize;
+	return tuple_data(tuple);
 }
 
 /**
@@ -346,16 +363,45 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 		      const struct key_def *key_def, uint32_t *key_size);
 
 /**
- * Create a new tuple from a sequence of MsgPack encoded fields.
- * tuple->refs is 0.
+ * Get the format of the tuple.
+ * @param tuple Tuple.
+ * @retval Tuple format instance.
+ */
+inline struct tuple_format *
+tuple_format(const struct tuple *tuple)
+{
+	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
+	assert(tuple_format_id(format) == tuple->format_id);
+	return format;
+}
+
+/**
+ * Create a new tuple for the engine specified in the tuple format
+ * from a sequence of MessagePack encoded fields.
+ * @param format Tuple format.
+ * @param data   MessagePack array.
+ * @param end    End of the data.
  *
- * @retval not NULL Success.
+ * @retval not NULL Success, tuple with zero refs.
  * @retval NULL     Memory or format error.
  *
  * \sa box_tuple_new()
  */
+static inline struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	assert(format != NULL);
+	assert(format->tuple_new != NULL);
+	return format->tuple_new(format, data, end);
+}
+
+/** Create a tuple in the vinyl engine format. @sa tuple_new(). */
 struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end);
+vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/** Create a tuple in the memtx engine format. @sa tuple_new(). */
+struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
 
 /**
  * Allocate a tuple
@@ -374,46 +420,56 @@ struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size);
 
 /**
- * Free the tuple.
+ * Free the tuple of any engine.
+ * @pre tuple->refs  == 0
+ */
+static inline void
+tuple_delete(struct tuple *tuple)
+{
+	say_debug("%s(%p)", __func__, tuple);
+	assert(tuple->refs == 0);
+	struct tuple_format *format = tuple_format(tuple);
+	format->tuple_delete(format, tuple);
+}
+
+/**
+ * Free the tuple of a memtx space.
  * @pre tuple->refs  == 0
  */
 void
-tuple_delete(struct tuple *tuple);
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
 /**
- * Check tuple data correspondence to space format.
- * @param format Format to which the tuple must match.
- * @param tuple Tuple to validate.
- *
- * @retval 0  The tuple is valid.
- * @retval -1 The tuple is invalid.
+ * Free the tuple of a vinyl space.
+ * @pre tuple->refs  == 0
  */
-int
-tuple_validate(struct tuple_format *format, struct tuple *tuple);
+void
+vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Check tuple data correspondence to space format.
  * Actually checks everything that checks tuple_init_field_map.
  * @param format Format to which the tuple must match.
- * @param tuple MessagePack array.
+ * @param tuple  MessagePack array.
  *
- * @retval 0  The tuple is valid.
+ * @retval  0 The tuple is valid.
  * @retval -1 The tuple is invalid.
  */
 int
 tuple_validate_raw(struct tuple_format *format, const char *data);
 
 /**
-* @brief Return a tuple format instance
-* @param tuple tuple
-* @return tuple format instance
-*/
-inline struct tuple_format *
-tuple_format(const struct tuple *tuple)
+ * Check tuple data correspondence to the space format.
+ * @param format Format to which the tuple must match.
+ * @param tuple  Tuple to validate.
+ *
+ * @retval  0 The tuple is valid.
+ * @retval -1 The tuple is invalid.
+ */
+static inline int
+tuple_validate(struct tuple_format *format, struct tuple *tuple)
 {
-	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
-	assert(tuple_format_id(format) == tuple->format_id);
-	return format;
+	return tuple_validate_raw(format, tuple_data(tuple));
 }
 
 /*
@@ -425,7 +481,7 @@ tuple_format(const struct tuple *tuple)
 inline const uint32_t *
 tuple_field_map(const struct tuple *tuple)
 {
-	return (const uint32_t *) tuple;
+	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
 }
 
 /**
@@ -545,6 +601,20 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+/**
+ * Create a tuple in the memtx engine format. Throw an exception
+ * if an error occured. @sa memtx_tuple_new().
+ */
+static inline struct tuple *
+memtx_tuple_new_xc(struct tuple_format *format, const char *data,
+		   const char *end)
+{
+	struct tuple *res = memtx_tuple_new(format, data, end);
+	if (res == NULL)
+		diag_raise();
+	return res;
+}
 
 #include "tuple_update.h"
 #include "errinj.h"
@@ -699,7 +769,7 @@ tuple_next_u32(struct tuple_iterator *it)
 			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_UNSIGNED]);
 	}
-	return (uint32_t) val;
+	return val;
 }
 
 /**

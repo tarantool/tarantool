@@ -115,7 +115,10 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	space->def = *def;
-	space->format = tuple_format_new(key_list);
+	if (strcmp(def->engine_name, "vinyl") == 0)
+		space->format = tuple_format_new(key_list, ENGINE_VINYL);
+	else
+		space->format = tuple_format_new(key_list, ENGINE_MEMTX);
 	if (space->format == NULL)
 		diag_raise();
 	space->has_unique_secondary_key = has_unique_secondary_key;

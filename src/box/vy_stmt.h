@@ -42,6 +42,7 @@
 #include "iproto_constants.h"
 #include "key_def.h"
 #include "tuple_compare.h"
+#include "tuple_format.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -58,29 +59,36 @@ struct xrow_header;
  *  - DELETE, UPSERT and REPLACE are "tuple" statements.
  *
  * REPLACE/UPSERT statements structure:
- *
- *  4 bytes      4 bytes     MessagePack data.
- * ┏━━━━━━┳━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓╍╍╍╍╍╍╍╍╍╍╍╍┓
- * ┃ offN ┃ ... ┃ off1 ┃ header ..┃key1┃..┃key2┃..┃keyN┃.. ┃ operations ┇
- * ┗━━┳━━━┻━━━━━┻━━┳━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╍╍╍╍╍╍╍╍╍╍╍╍┛
- *    ┃     ...    ┃              ▲               ▲
- *    ┃            ┗━━━━━━━━━━━━━━┛               ┃
- *    ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ *                               data_offset
+ *                                    ^
+ * +----------------------------------+
+ * |               4 bytes      4 bytes     MessagePack data.
+ * |               +------+----+------+---------------------------+- - - - - - .
+ *tuple, ..., raw: | offN | .. | off1 | header ..|key1|..|keyN|.. | operations |
+ *                 +--+---+----+--+---+---------------------------+- - - - - - .
+ *                 |     ...    |                 ^       ^
+ *                 |            +-----------------+       |
+ *                 +--------------------------------------+
  * Offsets are stored only for indexed fields, though MessagePack'ed tuple data
  * can contain also not indexed fields. For example, if fields 3 and 5 are
  * indexed then before MessagePack data are stored offsets only for field 3 and
  * field 5.
  *
  * SELECT/DELETE statements structure.
- * ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
- * ┃ array header ┃ part1 ... partN ┃  -  MessagePack data
- * ┗━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━┛
+ * +--------------+-----------------+
+ * | array header | part1 ... partN |  -  MessagePack data
+ * +--------------+-----------------+
  *
  * Field 'operations' is used for storing operations of UPSERT statement.
  */
 struct vy_stmt {
 	int64_t  lsn;
-	uint32_t size;
+	/**
+	 * Size of the MessagePack data in raw part of the
+	 * statement. It includes upsert operations, if the
+	 * statement is UPSERT.
+	 */
+	uint32_t bsize;
 	uint16_t refs; /* atomic */
 	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
 	/**
@@ -89,8 +97,21 @@ struct vy_stmt {
 	 * background (see vy_range_set_upsert()).
 	 */
 	uint8_t n_upserts;
-	char raw[0];
+	/** Offsets count before MessagePack data. */
+	uint16_t data_offset;
+	/**
+	 * Offsets array concatenated with MessagePack fields
+	 * array.
+	 * char raw[0];
+	 */
 };
+
+static inline const uint32_t *
+vy_stmt_field_map(const struct vy_stmt *stmt)
+{
+	assert(stmt->type == IPROTO_UPSERT || stmt->type == IPROTO_REPLACE);
+	return (const uint32_t *) ((const char *) stmt + stmt->data_offset);
+}
 
 /**
  * Increase the reference counter of statement.
@@ -130,7 +151,8 @@ vy_stmt_alloc(uint32_t size);
 static inline uint32_t
 vy_stmt_size(const struct vy_stmt *statement)
 {
-	return sizeof(struct vy_stmt) + statement->size;
+	/* data_offset includes sizeof(struct vy_stmt). */
+	return statement->bsize + statement->data_offset;
 }
 
 /**
@@ -162,6 +184,18 @@ vy_key_compare_raw(const char *key_a, const char *key_b,
 				     key_def);
 }
 
+/**
+ * Extract MessagePack data from the SELECT/DELETE statement.
+ * @param stmt    An SELECT or DELETE statement.
+ *
+ * @return MessagePack array of key parts.
+ */
+static inline const char *
+vy_stmt_data(const struct vy_stmt *stmt)
+{
+	return (const char *) stmt + stmt->data_offset;
+}
+
 /** @sa vy_key_compare_raw. */
 static inline int
 vy_key_compare(const struct vy_stmt *left, const struct vy_stmt *right,
@@ -169,7 +203,8 @@ vy_key_compare(const struct vy_stmt *left, const struct vy_stmt *right,
 {
 	assert(left->type == IPROTO_SELECT || left->type == IPROTO_DELETE);
 	assert(right->type == IPROTO_SELECT || right->type == IPROTO_DELETE);
-	return vy_key_compare_raw(left->raw, right->raw, key_def);
+	return vy_key_compare_raw((const char *) (left + 1),
+				  (const char *) (right + 1), key_def);
 }
 
 /**
@@ -185,18 +220,21 @@ vy_key_compare(const struct vy_stmt *left, const struct vy_stmt *right,
  * @retval < 0 if a < b
  */
 static inline int
-vy_tuple_compare_raw(const char *left, const char *right,
-		     const struct tuple_format *format,
-		     const struct key_def *key_def)
+vy_tuple_compare(const struct vy_stmt *left, const struct vy_stmt *right,
+		 const struct tuple_format *format,
+		 const struct key_def *key_def)
 {
-	uint32_t offsets_size = sizeof(uint32_t) * key_def->part_count;
-	left += offsets_size;
-	assert(mp_typeof(*left) == MP_ARRAY);
+	assert(left->type == IPROTO_REPLACE || left->type == IPROTO_UPSERT);
+	assert(right->type == IPROTO_REPLACE || right->type == IPROTO_UPSERT);
+	const uint32_t *left_offsets = vy_stmt_field_map(left);
+	const uint32_t *right_offsets = vy_stmt_field_map(right);
+	const char *ldata = vy_stmt_data(left);
+	assert(mp_typeof(*ldata) == MP_ARRAY);
 
-	right += offsets_size;
-	assert(mp_typeof(*right) == MP_ARRAY);
-	return tuple_compare_default_raw(format, left, (uint32_t *) left,
-					 format, right, (uint32_t *) right,
+	const char *rdata = vy_stmt_data(right);
+	assert(mp_typeof(*rdata) == MP_ARRAY);
+	return tuple_compare_default_raw(format, ldata, left_offsets,
+					 format, rdata, right_offsets,
 					 key_def);
 }
 
@@ -212,81 +250,38 @@ vy_tuple_compare_raw(const char *left, const char *right,
  * @retval < 0  tuple < key.
  */
 static inline int
-vy_tuple_compare_with_key_raw(const char *tuple, const char *key,
-			      const struct tuple_format *format,
-			      const struct key_def *key_def)
+vy_tuple_compare_with_key(const struct vy_stmt *tuple,
+			  const struct vy_stmt *key,
+			  const struct tuple_format *format,
+			  const struct key_def *key_def)
 {
-	uint32_t offsets_size = sizeof(uint32_t) * key_def->part_count;
-	tuple += offsets_size;
-	assert(mp_typeof(*tuple) == MP_ARRAY);
-	uint32_t part_count = mp_decode_array(&key);
-	return tuple_compare_with_key_default_raw(format, tuple,
-						  (uint32_t *) tuple, key,
-						  part_count, key_def);
-}
-
-/**
- * Compare key statements by their raw data.
- * @param key_a Left operand of comparison.
- * @param key_b Right operand of comparison.
- * @param key_def Definition of the format of both statements.
- *
- * @retval 0   if key_a == key_b
- * @retval > 0 if key_a > key_b
- * @retval < 0 if key_a < key_b
- */
-static inline int
-vy_stmt_compare_raw(const char *stmt_a, uint8_t a_type,
-		    const char *stmt_b, uint8_t b_type,
-		    const struct tuple_format *format,
-		    const struct key_def *key_def)
-{
-	bool a_is_tuple = (a_type == IPROTO_REPLACE || a_type == IPROTO_UPSERT);
-	bool b_is_tuple = (b_type == IPROTO_REPLACE || b_type == IPROTO_UPSERT);
-
-	if (a_is_tuple && b_is_tuple) {
-		return vy_tuple_compare_raw(stmt_a, stmt_b, format, key_def);
-	} else if (a_is_tuple && !b_is_tuple) {
-		return vy_tuple_compare_with_key_raw(stmt_a, stmt_b, format,
-						     key_def);
-	} else if (!a_is_tuple && b_is_tuple) {
-		return -vy_tuple_compare_with_key_raw(stmt_b, stmt_a, format,
-						      key_def);
-	} else {
-		assert(!a_is_tuple && !b_is_tuple);
-		return vy_key_compare_raw(stmt_a, stmt_b, key_def);
-	}
+	const uint32_t *offsets = vy_stmt_field_map(tuple);
+	const char *tuple_data = vy_stmt_data(tuple);
+	const char *key_data = vy_stmt_data(key);
+	uint32_t part_count = mp_decode_array(&key_data);
+	return tuple_compare_with_key_default_raw(format, tuple_data, offsets,
+						  key_data, part_count,
+						  key_def);
 }
 
 /** @sa vy_stmt_compare_raw. */
 static inline int
-vy_stmt_compare(const struct vy_stmt *left, const struct vy_stmt *right,
+vy_stmt_compare(const struct vy_stmt *a, const struct vy_stmt *b,
 		const struct tuple_format *format,
 		const struct key_def *key_def)
 {
-	return vy_stmt_compare_raw(left->raw, left->type,
-				   right->raw, right->type, format, key_def);
-}
-
-/**
- * Compare a statement of any type with a key statement by their raw data.
- * @param stmt Left operand of comparison.
- * @param key Right operand of comparison.
- * @param key_def Definition of the format of both statements.
- *
- * @retval 0   if stmt == key
- * @retval > 0 if stmt > key
- * @retval < 0 if stmt < key
- */
-static inline int
-vy_stmt_compare_with_raw_key(const struct vy_stmt *stmt,
-			     const char *key, const struct tuple_format *format,
-			     const struct key_def *key_def)
-{
-	if (stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT)
-		return vy_tuple_compare_with_key_raw(stmt->raw, key, format,
-						     key_def);
-	return vy_key_compare_raw(stmt->raw, key, key_def);
+	bool a_is_tuple = a->type == IPROTO_REPLACE || a->type == IPROTO_UPSERT;
+	bool b_is_tuple = b->type == IPROTO_REPLACE || b->type == IPROTO_UPSERT;
+	if (a_is_tuple && b_is_tuple) {
+		return vy_tuple_compare(a, b, format, key_def);
+	} else if (a_is_tuple && !b_is_tuple) {
+		return vy_tuple_compare_with_key(a, b, format, key_def);
+	} else if (!a_is_tuple && b_is_tuple) {
+		return -vy_tuple_compare_with_key(b, a, format, key_def);
+	} else {
+		assert(!a_is_tuple && !b_is_tuple);
+		return vy_key_compare(a, b, key_def);
+	}
 }
 
 /** @sa vy_stmt_compare_with_raw_key. */
@@ -297,7 +292,9 @@ vy_stmt_compare_with_key(const struct vy_stmt *stmt,
 			 const struct key_def *key_def)
 {
 	assert(key->type == IPROTO_SELECT || key->type == IPROTO_DELETE);
-	return vy_stmt_compare_with_raw_key(stmt, key->raw, format, key_def);
+	if (stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT)
+		return vy_tuple_compare_with_key(stmt, key, format, key_def);
+	return vy_key_compare(stmt, key, key_def);
 }
 
 /**
@@ -362,25 +359,10 @@ vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
  * Create REPLACE statement from UPSERT statement.
  *
  * @param upsert upsert statement.
- * @param key_def key definition.
  * @return stmt REPLACE.
  */
 struct vy_stmt *
-vy_stmt_replace_from_upsert(const struct vy_stmt *upsert,
-			    const struct key_def *key_def);
-
-/**
- * Extract MessagePack data from the SELECT/DELETE statement.
- * @param stmt    An SELECT or DELETE statement.
- *
- * @return MessagePack array of key parts.
- */
-static inline const char *
-vy_key_data(const struct vy_stmt *stmt)
-{
-	assert(stmt->type == IPROTO_SELECT || stmt->type == IPROTO_DELETE);
-	return stmt->raw;
-}
+vy_stmt_replace_from_upsert(const struct vy_stmt *upsert);
 
 /**
  * Extract MessagePack data from the SELECT/DELETE statement.
@@ -393,52 +375,35 @@ static inline const char *
 vy_key_data_range(const struct vy_stmt *stmt, uint32_t *p_size)
 {
 	assert(stmt->type == IPROTO_SELECT || stmt->type == IPROTO_DELETE);
-	*p_size = stmt->size;
-	return stmt->raw;
+	*p_size = stmt->bsize;
+	return vy_stmt_data(stmt);
 }
 
 /* TODO: rename to vy_key_part_count */
 static inline uint32_t
-vy_stmt_part_count(const struct vy_stmt *stmt, const struct key_def *def)
+vy_stmt_part_count(const struct vy_stmt *stmt)
 {
-	if (stmt->type == IPROTO_SELECT || stmt->type == IPROTO_DELETE) {
-		const char *data = stmt->raw;
-		return mp_decode_array(&data);
-	}
-	uint32_t offsets_size = sizeof(uint32_t) * def->part_count;
-	const char *data = stmt->raw + offsets_size;
+	const char *data = vy_stmt_data(stmt);
 	return mp_decode_array(&data);
 }
 
 /**
  * Extract MessagePack data from the REPLACE/UPSERT statement.
- * @param stmt    An UPSERT or REPLACE statement.
- * @param key_def Definition of the format of the tuple.
- *
- * @return MessagePack array of tuple fields.
- */
-static inline const char *
-vy_tuple_data(const struct vy_stmt *stmt, const struct key_def *key_def)
-{
-	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
-	uint32_t offsets_size = sizeof(uint32_t) * key_def->part_count;
-	return stmt->raw + offsets_size;
-}
-
-/**
- * Extract MessagePack data from the REPLACE/UPSERT statement.
  * @param stmt An UPSERT or REPLACE statement.
- * @param key_def Definition of the format of the tuple.
  * @param[out] p_size Size of the MessagePack array in bytes.
  *
  * @return MessagePack array of tuple fields.
  */
 static inline const char *
-vy_tuple_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
-		    uint32_t *p_size)
+vy_tuple_data_range(const struct vy_stmt *stmt, uint32_t *p_size)
 {
 	assert(stmt->type == IPROTO_REPLACE || stmt->type == IPROTO_UPSERT);
-	const char *mp = vy_tuple_data(stmt, key_def);
+	const char *mp = vy_stmt_data(stmt);
+	assert(mp_typeof(*mp) == MP_ARRAY);
+	if (stmt->type == IPROTO_REPLACE) {
+		*p_size = stmt->bsize;
+		return mp;
+	}
 	const char *mp_end = mp;
 	mp_next(&mp_end);
 	assert(mp < mp_end);
@@ -449,40 +414,51 @@ vy_tuple_data_range(const struct vy_stmt *stmt, const struct key_def *key_def,
 /**
  * Extract the operations array from the UPSERT statement.
  * @param stmt An UPSERT statement.
- * @param key_def Definition of the format of the tuple.
  * @param mp_size Out parameter for size of the returned array.
  *
  * @retval Pointer on MessagePack array of update operations.
  */
 static inline const char *
-vy_stmt_upsert_ops(const struct vy_stmt *stmt, const struct key_def *key_def,
-		   uint32_t *mp_size)
+vy_stmt_upsert_ops(const struct vy_stmt *stmt, uint32_t *mp_size)
 {
 	assert(stmt->type == IPROTO_UPSERT);
-	const char *mp = vy_tuple_data(stmt, key_def);
+	const char *mp = vy_stmt_data(stmt);
 	mp_next(&mp);
-	*mp_size = stmt->raw + stmt->size - mp;
+	*mp_size = vy_stmt_data(stmt) + stmt->bsize - mp;
 	return mp;
 }
 
 /**
  * Extract a SELECT statement with only indexed fields from raw data.
  * @param stmt Raw data of struct vy_stmt.
- * @param type IProto type of @param stmt.
  * @param key_def key definition.
  *
  * @retval not NULL Success.
  * @retval NULL Memory allocation error.
  */
 struct vy_stmt *
-vy_stmt_extract_key_raw(const char *stmt, uint8_t type,
-		        const struct key_def *key_def);
+vy_stmt_extract_key(const struct vy_stmt *stmt, const struct key_def *key_def);
 
-/** @copydoc vy_stmt_extract_raw */
+/**
+ * Create the SELECT statement from MessagePack array.
+ * @param key
+ * @param key_def
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Memory error.
+ */
 static inline struct vy_stmt *
-vy_stmt_extract_key(const struct vy_stmt *stmt, const struct key_def *key_def)
+vy_key_from_message_pack(const char *key, const struct key_def *key_def)
 {
-	return vy_stmt_extract_key_raw(stmt->raw, stmt->type, key_def);
+	(void) key_def; /* unused in release. */
+	uint32_t part_count;
+	/*
+	 * The statement already is a key, so simply copy it in
+	 * the new struct vy_stmt as SELECT.
+	 */
+	part_count = mp_decode_array(&key);
+	assert(part_count <= key_def->part_count);
+	return vy_stmt_new_select(key, part_count);
 }
 
 /**
@@ -518,8 +494,7 @@ vy_key_snprint(char *buf, int size, const char *key);
  * Example: REPLACE([1, 2, "string"], lsn=48)
  */
 int
-vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt,
-		const struct key_def *key_def);
+vy_stmt_snprint(char *buf, int size, const struct vy_stmt *stmt);
 
 /*
 * Format a key into string using a static buffer.
@@ -535,7 +510,7 @@ vy_key_str(const char *key);
 * \sa vy_stmt_snprint()
 */
 const char *
-vy_stmt_str(const struct vy_stmt *stmt, const struct key_def *key_def);
+vy_stmt_str(const struct vy_stmt *stmt);
 
 #if defined(__cplusplus)
 } /* extern "C" */

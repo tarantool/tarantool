@@ -96,20 +96,6 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 }
 
 /**
- * Check tuple data correspondence to space format.
- * @param format Format to which the tuple must match.
- * @param tuple Tuple to validate.
- *
- * @retval 0  The tuple is valid.
- * @retval -1 The tuple is invalid.
- */
-int
-tuple_validate(struct tuple_format *format, struct tuple *tuple)
-{
-	return tuple_validate_raw(format, tuple_data(tuple));
-}
-
-/**
  * Incremented on every snapshot and is used to distinguish tuples
  * which were created after start of a snapshot (these tuples can
  * be freed right away, since they are not used for snapshot) or
@@ -127,7 +113,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 		     do { diag_set(OutOfMemory, (unsigned) total,
 				   "slab allocator", "tuple"); return NULL; }
 		     while(false); );
-	char *ptr = (char *) smalloc(&memtx_alloc, total);
+	struct tuple *tuple = (struct tuple *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
 	 * to throw an instance of ClientError. Apart from being
@@ -136,7 +122,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	 * with lower arena than necessary in the circumstances
 	 * of disaster recovery.
 	 */
-	if (ptr == NULL) {
+	if (tuple == NULL) {
 		if (total > memtx_alloc.objsize_max) {
 			diag_set(ClientError, ER_SLAB_ALLOC_MAX,
 				 (unsigned) total);
@@ -147,36 +133,45 @@ tuple_alloc(struct tuple_format *format, size_t size)
 		}
 		return NULL;
 	}
-	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
 	tuple->version = snapshot_version;
-	tuple->size = size;
+	tuple->bsize = size;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format, 1);
-
+	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
 	say_debug("tuple_alloc(%zu) = %p", size, tuple);
 	return tuple;
 }
 
-/**
- * Free the tuple.
- * @pre tuple->refs  == 0
- */
 void
-tuple_delete(struct tuple *tuple)
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
-	say_debug("tuple_delete(%p)", tuple);
+	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	struct tuple_format *format = tuple_format(tuple);
-	size_t total = sizeof(struct tuple) + tuple->size +
+	assert(format->engine == ENGINE_MEMTX);
+	size_t total = sizeof(struct tuple) + tuple->bsize +
 		       format->field_map_size;
-	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	if (!memtx_alloc.is_delayed_free_mode || tuple->version == snapshot_version)
-		smfree(&memtx_alloc, ptr, total);
+	if (!memtx_alloc.is_delayed_free_mode ||
+	    tuple->version == snapshot_version)
+		smfree(&memtx_alloc, tuple, total);
 	else
-		smfree_delayed(&memtx_alloc, ptr, total);
+		smfree_delayed(&memtx_alloc, tuple, total);
+}
+
+void
+vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+{
+	say_debug("%s(%p)", __func__, tuple);
+	assert(tuple->refs == 0);
+	assert(format->engine == ENGINE_VINYL);
+	size_t total = sizeof(struct tuple) + tuple->bsize +
+		       format->field_map_size;
+	tuple_format_ref(format, -1);
+	assert(!memtx_alloc.is_delayed_free_mode ||
+	       tuple->version == snapshot_version);
+	smfree(&memtx_alloc, tuple, total);
 }
 
 /**
@@ -344,17 +339,38 @@ tuple_upsert(struct tuple_format *format,
 }
 
 struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end)
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
+	assert(format->engine = ENGINE_MEMTX);
 	size_t tuple_len = end - data;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	if (new_tuple == NULL)
 		return NULL;
-	memcpy(new_tuple->raw, data, tuple_len);
-	if (tuple_init_field_map(format, (uint32_t *) new_tuple,
-				 tuple_data(new_tuple))) {
-		tuple_delete(new_tuple);
+	char *raw = (char *) new_tuple + new_tuple->data_offset;
+	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw, data, tuple_len);
+	if (tuple_init_field_map(format, field_map, raw)) {
+		memtx_tuple_delete(format, new_tuple);
+		return NULL;
+	}
+	return new_tuple;
+}
+
+struct tuple *
+vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	assert(format->engine = ENGINE_VINYL);
+	size_t tuple_len = end - data;
+	assert(mp_typeof(*data) == MP_ARRAY);
+	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
+	if (new_tuple == NULL)
+		return NULL;
+	char *raw = (char *) new_tuple + new_tuple->data_offset;
+	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw, data, tuple_len);
+	if (tuple_init_field_map(format, field_map, raw)) {
+		vinyl_tuple_delete(format, new_tuple);
 		return NULL;
 	}
 	return new_tuple;
@@ -482,7 +498,7 @@ size_t
 box_tuple_bsize(const box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
-	return tuple->size;
+	return tuple->bsize;
 }
 
 ssize_t

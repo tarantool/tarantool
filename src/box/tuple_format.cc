@@ -144,6 +144,9 @@ tuple_format_alloc(struct rlist *key_list)
 	format->id = FORMAT_ID_NIL;
 	format->field_count = field_count;
 	format->exact_field_count = 0;
+	format->engine = ENGINE_NIL;
+	format->tuple_delete = NULL;
+	format->tuple_new = NULL;
 	return format;
 }
 
@@ -154,12 +157,32 @@ tuple_format_delete(struct tuple_format *format)
 	free(format);
 }
 
+extern "C" void
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+extern "C" void
+vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+extern "C" struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+extern "C" struct tuple *
+vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
 struct tuple_format *
-tuple_format_new(struct rlist *key_list)
+tuple_format_new(struct rlist *key_list, enum engine_type engine)
 {
 	struct tuple_format *format = tuple_format_alloc(key_list);
 	if (format == NULL)
 		return NULL;
+	format->engine = engine;
+	if (engine == ENGINE_MEMTX) {
+		format->tuple_delete = memtx_tuple_delete;
+		format->tuple_new = memtx_tuple_new;
+	} else {
+		format->tuple_delete = vinyl_tuple_delete;
+		format->tuple_new = vinyl_tuple_new;
+	}
 	if (tuple_format_register(format) < 0) {
 		tuple_format_delete(format);
 		return NULL;
@@ -192,6 +215,7 @@ tuple_format_new(struct rlist *key_list)
 		else
 			format->fields[i].offset_slot = --current_slot;
 	}
+	assert((uint32_t) (-current_slot * sizeof(uint32_t)) <= UINT16_MAX);
 	format->field_map_size = -current_slot * sizeof(uint32_t);
 	return format;
 }
@@ -246,7 +270,7 @@ void
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
-	tuple_format_default = tuple_format_new(&empty_list);
+	tuple_format_default = tuple_format_new(&empty_list, ENGINE_MEMTX);
 	if (tuple_format_default == NULL)
 		diag_raise();
 	/* Make sure this one stays around. */

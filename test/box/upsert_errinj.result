@@ -19,7 +19,7 @@ errinj.set("ERRINJ_TUPLE_ALLOC", true)
 ...
 s:upsert({111, '111', 222, '222'}, {{'!', 5, '!'}})
 ---
-- error: Failed to allocate 24 bytes in slab allocator for tuple
+- error: Failed to allocate 26 bytes in slab allocator for tuple
 ...
 errinj.set("ERRINJ_TUPLE_ALLOC", false)
 ---

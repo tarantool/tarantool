@@ -1379,7 +1379,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 {
 	if (tx->type == VINYL_TX_RO || tx->is_aborted)
 		return 0; /* no reason to track reads */
-	uint32_t part_count = vy_stmt_part_count(key, index->key_def);
+	uint32_t part_count = vy_stmt_part_count(key);
 	if (part_count >= index->key_def->part_count) {
 		struct txv *v =
 			write_set_search_key(&tx->write_set, index, key);
@@ -1616,10 +1616,10 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 		"%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64"(",
 		 key_def->space_id, key_def->iid, key_def->opts.lsn, range->id);
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->begin != NULL ? vy_key_data(range->begin) : NULL);
+		range->begin != NULL ? vy_stmt_data(range->begin) : NULL);
 	SNPRINT(total, snprintf, buf, size, "..");
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->end != NULL ? vy_key_data(range->end) : NULL);
+		range->end != NULL ? vy_stmt_data(range->end) : NULL);
 	SNPRINT(total, snprintf, buf, size, ")");
 	return total;
 }
@@ -1732,7 +1732,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  struct tuple_format *format, struct key_def *key_def,
 			  const struct vy_stmt *key)
 {
-	if (vy_stmt_part_count(key, key_def) == 0) {
+	if (vy_stmt_part_count(key) == 0) {
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
@@ -1775,7 +1775,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
-		    vy_stmt_part_count(key, key_def) < key_def->part_count &&
+		    vy_stmt_part_count(key) < key_def->part_count &&
 		    vy_stmt_compare_with_key(key, range->begin, format,
 					     key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
@@ -2293,7 +2293,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	assert(curr_stmt);
 	if (*curr_stmt == NULL)
 		return 1;
-	assert(*curr_stmt);
 
 	/* row offsets accumulator */
 	struct ibuf row_index_buf;
@@ -2813,8 +2812,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			begin = vy_stmt_extract_key_raw(pos, IPROTO_SELECT,
-							key_def);
+			begin = vy_key_from_message_pack(pos, key_def);
 			mp_next(&pos);
 			break;
 		case VY_RANGE_MAX_KEY:
@@ -2823,8 +2821,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			end = vy_stmt_extract_key_raw(pos, IPROTO_SELECT,
-						      key_def);
+			end = vy_key_from_message_pack(pos, key_def);
 			mp_next(&pos);
 			break;
 		default:
@@ -3176,10 +3173,10 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
 	mid_page = vy_run_page_info(run, run->info.count / 2);
-	const char *split_key = vy_key_data(mid_page->min_key);
+	const char *split_key = vy_stmt_data(mid_page->min_key);
 
 	struct vy_page_info *first_page = vy_run_page_info(run, 0);
-	const char *min_key = vy_key_data(first_page->min_key);
+	const char *min_key = vy_stmt_data(first_page->min_key);
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (vy_key_compare_raw(min_key, split_key, key_def) == 0)
@@ -4128,9 +4125,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	/* Determine new ranges' boundaries. */
 	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_stmt_extract_key_raw(split_key_raw,
-						    IPROTO_SELECT,
-						    index->key_def);
+		split_key = vy_key_from_message_pack(split_key_raw,
+						     index->key_def);
 		if (split_key == NULL)
 			goto err_split_key;
 		n_parts = 2;
@@ -5328,7 +5324,7 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, key_def, link);
 
-	struct tuple_format *format = tuple_format_new(&key_list);
+	struct tuple_format *format = tuple_format_new(&key_list, ENGINE_VINYL);
 	assert(format != NULL);
 	tuple_format_ref(format, 1);
 
@@ -5449,8 +5445,7 @@ vy_convert_replace(struct space *space, const struct vy_stmt *vy_stmt)
 	assert(vy_stmt->type == IPROTO_REPLACE);
 	uint32_t bsize;
 	assert(space->index_count > 0);
-	struct vy_index *pk = vy_index(space->index[0]);
-	const char *data = vy_tuple_data_range(vy_stmt, pk->key_def, &bsize);
+	const char *data = vy_tuple_data_range(vy_stmt, &bsize);
 	return box_tuple_new(space->format, data, data + bsize);
 }
 
@@ -5566,7 +5561,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 		/*
 		 * INSERT case: return new stmt.
 		 */
-		return vy_stmt_replace_from_upsert(new_stmt, key_def);
+		return vy_stmt_replace_from_upsert(new_stmt);
 	}
 
 	/*
@@ -5574,14 +5569,14 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 */
 	uint32_t mp_size;
 	const char *new_ops;
-	new_ops = vy_stmt_upsert_ops(new_stmt, key_def, &mp_size);
+	new_ops = vy_stmt_upsert_ops(new_stmt, &mp_size);
 	const char *new_ops_end = new_ops + mp_size;
 
 	/*
 	 * Apply new operations to the old stmt
 	 */
 	const char *result_mp;
-	result_mp = vy_tuple_data_range(old_stmt, key_def, &mp_size);
+	result_mp = vy_tuple_data_range(old_stmt, &mp_size);
 	const char *result_mp_end = result_mp + mp_size;
 	struct vy_stmt *result_stmt = NULL;
 	struct region *region = &fiber()->gc;
@@ -5608,7 +5603,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 */
 	assert(old_stmt != NULL);
 	const char *old_ops;
-	old_ops = vy_stmt_upsert_ops(old_stmt, key_def, &mp_size);
+	old_ops = vy_stmt_upsert_ops(old_stmt, &mp_size);
 	const char *old_ops_end = old_ops + mp_size;
 	assert(old_ops_end > old_ops);
 
@@ -6003,11 +5998,10 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL) /* space has no primary key */
 		return -1;
-	struct key_def *pk_def = pk->key_def;
-	assert(pk_def->iid == 0);
+	assert(pk->key_def->iid == 0);
 	const char *key = NULL, *old_tuple = NULL, *old_tuple_end = NULL;
-	key = tuple_extract_key_raw(request->tuple, request->tuple_end, pk_def,
-				    NULL);
+	key = tuple_extract_key_raw(request->tuple, request->tuple_end,
+				    pk->key_def, NULL);
 	if (key == NULL) /* out of memory */
 		return -1;
 	uint32_t part_count = mp_decode_array(&key);
@@ -6017,7 +6011,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 		return -1;
 	if (old_stmt != NULL) {
 		uint32_t mp_size;
-		old_tuple = vy_tuple_data_range(old_stmt, pk_def, &mp_size);
+		old_tuple = vy_tuple_data_range(old_stmt, &mp_size);
 		old_tuple_end = old_tuple + mp_size;
 	}
 	/*
@@ -6127,7 +6121,7 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	 */
 	struct key_def *to_pk = index->key_def_secondary_to_primary;
 	uint32_t size;
-	const char *tuple = vy_tuple_data_range(partial, index->key_def, &size);
+	const char *tuple = vy_tuple_data_range(partial, &size);
 	const char *tuple_end = tuple + size;
 	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, to_pk, NULL);
 	if (pkey == NULL)
@@ -6223,7 +6217,6 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	struct vy_index *index = vy_index_find_unique(space, request->index_id);
 	if (index == NULL)
 		return -1;
-	struct key_def *pk_def = pk->key_def;
 	struct vy_stmt *old_stmt = NULL;
 	bool has_secondary = space->index_count > 1;
 	const char *key = request->key;
@@ -6255,7 +6248,7 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		 */
 		uint32_t size;
 		const char *tuple;
-		tuple = vy_tuple_data_range(old_stmt, pk_def, &size);
+		tuple = vy_tuple_data_range(old_stmt, &size);
 		const char *tuple_end = tuple + size;
 		if (request->index_id != 0) {
 			/*
@@ -6313,8 +6306,7 @@ static inline int
 vy_check_update(const struct vy_index *pk, const struct vy_stmt *old_tuple,
 		const struct vy_stmt *new_tuple)
 {
-	if (vy_tuple_compare_raw(old_tuple->raw, new_tuple->raw, pk->format,
-				 pk->key_def)) {
+	if (vy_tuple_compare(old_tuple, new_tuple, pk->format, pk->key_def)) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 pk->key_def->name,
 			 space_name_by_id(pk->key_def->space_id));
@@ -6379,13 +6371,11 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	/* Apply update operations. */
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk != NULL);
-	struct key_def *pk_def = pk->key_def;
-	assert(pk_def->iid == 0);
+	assert(pk->key_def->iid == 0);
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
-	const char *old_tuple = vy_tuple_data_range(old_stmt, pk_def,
-						     &old_size);
+	const char *old_tuple = vy_tuple_data_range(old_stmt, &old_size);
 	const char *old_tuple_end = old_tuple + old_size;
 	new_tuple = tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
 					 request->tuple, request->tuple_end,
@@ -6402,7 +6392,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		goto error;
 	struct vy_stmt *new_stmt;
 	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
-				       pk_def->part_count);
+				       pk->key_def->part_count);
 	if (new_stmt == NULL)
 		goto error;
 	if (vy_check_update(pk, old_stmt, new_stmt)) {
@@ -6572,7 +6562,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		return 0;
 	}
 	uint32_t old_size;
-	old_tuple = vy_tuple_data_range(old_stmt, pk_def, &old_size);
+	old_tuple = vy_tuple_data_range(old_stmt, &old_size);
 	old_tuple_end = old_tuple + old_size;
 	new_tuple = tuple_upsert_execute(region_aligned_alloc_cb,
 					 &fiber()->gc, ops, ops_end,
@@ -7105,7 +7095,7 @@ struct vy_run_iterator {
 	 * GE, LT to LE for beauty.
 	 */
 	enum iterator_type iterator_type;
-	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
+	/** Key to search. */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const int64_t *vlsn;
@@ -7846,7 +7836,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	struct vy_run_iterator_pos end_pos = {itr->run->info.count, 0};
 	bool equal_found = false;
 	int rc;
-	if (vy_stmt_part_count(itr->key, itr->index->key_def) > 0) {
+	if (vy_stmt_part_count(itr->key) > 0) {
 		rc = vy_run_iterator_search(itr, itr->key, &itr->curr_pos,
 					    &equal_found);
 		if (rc != 0)
@@ -7918,7 +7908,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_part_count(key, itr->index->key_def) == 0) {
+	if (vy_stmt_part_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -8267,7 +8257,7 @@ struct vy_mem_iterator {
 	 * beauty.
 	 */
 	enum iterator_type iterator_type;
-	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
+	/** Key to search. */
 	const struct vy_stmt *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const int64_t *vlsn;
@@ -8413,7 +8403,7 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	tree_key.stmt = itr->key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (vy_stmt_part_count(itr->key, itr->mem->key_def) > 0) {
+	if (vy_stmt_part_count(itr->key) > 0) {
 		if (itr->iterator_type == ITER_EQ) {
 			bool exact;
 			itr->curr_pos =
@@ -8492,7 +8482,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_part_count(key, mem->key_def) == 0) {
+	if (vy_stmt_part_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -8795,7 +8785,7 @@ struct vy_txw_iterator {
 	 * beauty.
 	 */
 	enum iterator_type iterator_type;
-	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
+	/** Key to search. */
 	const struct vy_stmt *key;
 
 	/* Last version of vy_tx */
@@ -8835,7 +8825,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 	itr->tx = tx;
 
 	itr->iterator_type = iterator_type;
-	if (vy_stmt_part_count(key, index->key_def) == 0) {
+	if (vy_stmt_part_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -8863,7 +8853,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 	struct txv *txv;
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
-	if (vy_stmt_part_count(itr->key, key_def) > 0) {
+	if (vy_stmt_part_count(itr->key) > 0) {
 		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->iterator_type == ITER_GE ||
@@ -9091,11 +9081,10 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->mutable_start = 0;
 	itr->mutable_end = 0;
 	itr->curr_stmt = NULL;
-	struct key_def *def = index->key_def;
 	itr->unique_optimization =
 		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
 		 iterator_type == ITER_LE) &&
-		vy_stmt_part_count(key, def) >= def->part_count;
+		vy_stmt_part_count(key) >= index->key_def->part_count;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
 	itr->range_ended = false;
@@ -10154,7 +10143,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
 		const char *mp_data;
-		mp_data = vy_tuple_data_range(stmt, index->key_def, &mp_size);
+		mp_data = vy_tuple_data_range(stmt, &mp_size);
 		int64_t lsn = stmt->lsn;
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
 		if (rc != 0)
@@ -10347,7 +10336,7 @@ vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt)
 	struct vy_squash_queue *sq = index->env->squash_queue;
 
 	say_debug("optimize upsert slow: %"PRIu32"/%"PRIu32": %s",
-		  key_def->space_id, key_def->iid, vy_stmt_str(stmt, key_def));
+		  key_def->space_id, key_def->iid, vy_stmt_str(stmt));
 
 	/* Start the upsert squashing fiber on demand. */
 	if (sq->fiber == NULL) {

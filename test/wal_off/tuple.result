@@ -37,7 +37,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 tuple_max()
 ---
-- error: 'Failed to allocate 1048599 bytes for tuple in the slab allocator: tuple
+- error: 'Failed to allocate 1048601 bytes for tuple in the slab allocator: tuple
     is too large. Check ''slab_alloc_maximal'' configuration option.'
 ...
 tuple_max = string.rep('a', 1000000)

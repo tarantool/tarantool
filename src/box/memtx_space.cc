@@ -88,8 +88,8 @@ void
 MemtxSpace::prepareReplace(struct txn_stmt *stmt, struct space *space,
 			   struct request *request)
 {
-	stmt->new_tuple = tuple_new_xc(space->format, request->tuple,
-				       request->tuple_end);
+	stmt->new_tuple = memtx_tuple_new_xc(space->format, request->tuple,
+					     request->tuple_end);
 	tuple_ref(stmt->new_tuple);
 }
 
@@ -180,9 +180,9 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 				       request->index_base)) {
 			diag_raise();
 		}
-		stmt->new_tuple = tuple_new_xc(space->format,
-						       request->tuple,
-						       request->tuple_end);
+		stmt->new_tuple = memtx_tuple_new_xc(space->format,
+						     request->tuple,
+						     request->tuple_end);
 		tuple_ref(stmt->new_tuple);
 	} else {
 		/*
