@@ -193,7 +193,8 @@ macro(luajit_build)
     endif()
     if (ENABLE_VALGRIND)
         set (luajit_xcflags ${luajit_xcflags}
-            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
+            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC
+            -I${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
     endif()
     # AddressSanitizer - CFLAGS were set globaly
     if (ENABLE_ASAN)

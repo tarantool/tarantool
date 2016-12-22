@@ -5,11 +5,11 @@
 # is to avoid changing the architecture if it was set explicitly in
 # CMake invocation.
 function(check_cc_atomics TARGET_VAR)
-    set(CMAKE_REQUIRED_INCLUDES ${CMAKE_SOURCE_DIR})
+    set(CMAKE_REQUIRED_INCLUDES ${CMAKE_SOURCE_DIR}/src/lib/small/third_party)
     set(CMAKE_REQUIRED_FLAGS "${ARGN} ${CMAKE_C_FLAGS}")
     set(CMAKE_C_FLAGS "")
     check_c_source_compiles("
-    #include <third_party/pmatomic.h>
+    #include <pmatomic.h>
     int counter;
     int main() {
         return pm_atomic_fetch_add(&counter, 42);
