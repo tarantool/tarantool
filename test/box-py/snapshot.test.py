@@ -24,7 +24,9 @@ admin("box.snapshot()")
 # into the same file, since file name is based
 # on LSN.
 #  Don't allow to overwrite snapshots.
-admin("box.snapshot()")
+admin("_, e = pcall(box.snapshot)")
+admin("e.type")
+admin("e.errno")
 #
 # Increment LSN
 admin("space:insert{2, 'second tuple'}")
@@ -33,8 +35,9 @@ admin("space:insert{2, 'second tuple'}")
 print "# Make 'var' directory read-only."
 data_dir = os.path.join(server.vardir, server.name)
 os.chmod(data_dir, 0555)
-admin("box.snapshot()")
-admin("box.error.last().errno")
+admin("_, e = pcall(box.snapshot)")
+admin("e.type")
+admin("e.errno")
 
 # cleanup
 os.chmod(data_dir, 0755)

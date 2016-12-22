@@ -1347,7 +1347,7 @@ ok 14 - subtests
     ok 227 - mp_compare_uint(18446744073709551615, 18446744073709551615) == 0
     # *** test_compare_uints: done ***
 ok 15 - subtests
-    1..230
+    1..282
     # *** test_format ***
     ok 1 - Test type on step 0
     ok 2 - Test value on step 0
@@ -1464,121 +1464,173 @@ ok 15 - subtests
     ok 113 - check
     ok 114 - type
     ok 115 - check
-    ok 116 - type
-    ok 117 - decode
-    ok 118 - check
-    ok 119 - type
-    ok 120 - decode
-    ok 121 - check
-    ok 122 - type
-    ok 123 - decode
-    ok 124 - check
-    ok 125 - type
-    ok 126 - decode
-    ok 127 - nothing more
-    ok 128 - no magic detected
-    ok 129 - return value on step 0
-    ok 130 - buffer overflow on step 0
-    ok 131 - return value on step 1
-    ok 132 - buffer overflow on step 1
-    ok 133 - return value on step 2
-    ok 134 - buffer overflow on step 2
-    ok 135 - return value on step 3
-    ok 136 - buffer overflow on step 3
-    ok 137 - return value on step 4
-    ok 138 - buffer overflow on step 4
-    ok 139 - return value on step 5
-    ok 140 - buffer overflow on step 5
-    ok 141 - return value on step 6
-    ok 142 - buffer overflow on step 6
-    ok 143 - return value on step 7
-    ok 144 - buffer overflow on step 7
-    ok 145 - return value on step 8
-    ok 146 - buffer overflow on step 8
-    ok 147 - return value on step 9
-    ok 148 - buffer overflow on step 9
-    ok 149 - return value on step 10
-    ok 150 - buffer overflow on step 10
-    ok 151 - return value on step 11
-    ok 152 - buffer overflow on step 11
-    ok 153 - return value on step 12
-    ok 154 - buffer overflow on step 12
-    ok 155 - return value on step 13
-    ok 156 - buffer overflow on step 13
-    ok 157 - return value on step 14
-    ok 158 - buffer overflow on step 14
-    ok 159 - return value on step 15
-    ok 160 - buffer overflow on step 15
-    ok 161 - return value on step 16
-    ok 162 - buffer overflow on step 16
-    ok 163 - return value on step 17
-    ok 164 - buffer overflow on step 17
-    ok 165 - return value on step 18
-    ok 166 - buffer overflow on step 18
-    ok 167 - return value on step 19
-    ok 168 - buffer overflow on step 19
-    ok 169 - return value on step 20
-    ok 170 - buffer overflow on step 20
-    ok 171 - return value on step 21
-    ok 172 - buffer overflow on step 21
-    ok 173 - return value on step 22
-    ok 174 - buffer overflow on step 22
-    ok 175 - return value on step 23
-    ok 176 - buffer overflow on step 23
-    ok 177 - return value on step 24
-    ok 178 - buffer overflow on step 24
-    ok 179 - return value on step 25
-    ok 180 - buffer overflow on step 25
-    ok 181 - return value on step 26
-    ok 182 - buffer overflow on step 26
-    ok 183 - return value on step 27
-    ok 184 - buffer overflow on step 27
-    ok 185 - return value on step 28
-    ok 186 - buffer overflow on step 28
-    ok 187 - return value on step 29
-    ok 188 - buffer overflow on step 29
-    ok 189 - return value on step 30
-    ok 190 - buffer overflow on step 30
-    ok 191 - return value on step 31
-    ok 192 - buffer overflow on step 31
-    ok 193 - return value on step 32
-    ok 194 - buffer overflow on step 32
-    ok 195 - return value on step 33
-    ok 196 - buffer overflow on step 33
-    ok 197 - return value on step 34
-    ok 198 - buffer overflow on step 34
-    ok 199 - return value on step 35
-    ok 200 - buffer overflow on step 35
-    ok 201 - return value on step 36
-    ok 202 - buffer overflow on step 36
-    ok 203 - return value on step 37
-    ok 204 - buffer overflow on step 37
-    ok 205 - return value on step 38
-    ok 206 - buffer overflow on step 38
-    ok 207 - return value on step 39
-    ok 208 - buffer overflow on step 39
-    ok 209 - return value on step 40
-    ok 210 - buffer overflow on step 40
-    ok 211 - return value on step 41
-    ok 212 - buffer overflow on step 41
-    ok 213 - return value on step 42
-    ok 214 - buffer overflow on step 42
-    ok 215 - return value on step 43
-    ok 216 - buffer overflow on step 43
-    ok 217 - return value on step 44
-    ok 218 - buffer overflow on step 44
-    ok 219 - return value on step 45
-    ok 220 - buffer overflow on step 45
-    ok 221 - return value on step 46
-    ok 222 - buffer overflow on step 46
-    ok 223 - return value on step 47
-    ok 224 - buffer overflow on step 47
-    ok 225 - return value on step 48
-    ok 226 - buffer overflow on step 48
-    ok 227 - return value on step 49
-    ok 228 - buffer overflow on step 49
-    ok 229 - return value on step 50
-    ok 230 - buffer overflow on step 50
+    ok 116 - compare
+    ok 117 - check
+    ok 118 - type
+    ok 119 - decode
+    ok 120 - check
+    ok 121 - type
+    ok 122 - decode
+    ok 123 - check
+    ok 124 - type
+    ok 125 - decode
+    ok 126 - compare
+    ok 127 - check
+    ok 128 - type
+    ok 129 - decode
+    ok 130 - check
+    ok 131 - type
+    ok 132 - decode
+    ok 133 - check
+    ok 134 - type
+    ok 135 - decode
+    ok 136 - check
+    ok 137 - type
+    ok 138 - decode
+    ok 139 - nothing more
+    ok 140 - no magic detected
+    ok 141 - return value on step 0
+    ok 142 - buffer overflow on step 0
+    ok 143 - return value on step 1
+    ok 144 - buffer overflow on step 1
+    ok 145 - return value on step 2
+    ok 146 - buffer overflow on step 2
+    ok 147 - return value on step 3
+    ok 148 - buffer overflow on step 3
+    ok 149 - return value on step 4
+    ok 150 - buffer overflow on step 4
+    ok 151 - return value on step 5
+    ok 152 - buffer overflow on step 5
+    ok 153 - return value on step 6
+    ok 154 - buffer overflow on step 6
+    ok 155 - return value on step 7
+    ok 156 - buffer overflow on step 7
+    ok 157 - return value on step 8
+    ok 158 - buffer overflow on step 8
+    ok 159 - return value on step 9
+    ok 160 - buffer overflow on step 9
+    ok 161 - return value on step 10
+    ok 162 - buffer overflow on step 10
+    ok 163 - return value on step 11
+    ok 164 - buffer overflow on step 11
+    ok 165 - return value on step 12
+    ok 166 - buffer overflow on step 12
+    ok 167 - return value on step 13
+    ok 168 - buffer overflow on step 13
+    ok 169 - return value on step 14
+    ok 170 - buffer overflow on step 14
+    ok 171 - return value on step 15
+    ok 172 - buffer overflow on step 15
+    ok 173 - return value on step 16
+    ok 174 - buffer overflow on step 16
+    ok 175 - return value on step 17
+    ok 176 - buffer overflow on step 17
+    ok 177 - return value on step 18
+    ok 178 - buffer overflow on step 18
+    ok 179 - return value on step 19
+    ok 180 - buffer overflow on step 19
+    ok 181 - return value on step 20
+    ok 182 - buffer overflow on step 20
+    ok 183 - return value on step 21
+    ok 184 - buffer overflow on step 21
+    ok 185 - return value on step 22
+    ok 186 - buffer overflow on step 22
+    ok 187 - return value on step 23
+    ok 188 - buffer overflow on step 23
+    ok 189 - return value on step 24
+    ok 190 - buffer overflow on step 24
+    ok 191 - return value on step 25
+    ok 192 - buffer overflow on step 25
+    ok 193 - return value on step 26
+    ok 194 - buffer overflow on step 26
+    ok 195 - return value on step 27
+    ok 196 - buffer overflow on step 27
+    ok 197 - return value on step 28
+    ok 198 - buffer overflow on step 28
+    ok 199 - return value on step 29
+    ok 200 - buffer overflow on step 29
+    ok 201 - return value on step 30
+    ok 202 - buffer overflow on step 30
+    ok 203 - return value on step 31
+    ok 204 - buffer overflow on step 31
+    ok 205 - return value on step 32
+    ok 206 - buffer overflow on step 32
+    ok 207 - return value on step 33
+    ok 208 - buffer overflow on step 33
+    ok 209 - return value on step 34
+    ok 210 - buffer overflow on step 34
+    ok 211 - return value on step 35
+    ok 212 - buffer overflow on step 35
+    ok 213 - return value on step 36
+    ok 214 - buffer overflow on step 36
+    ok 215 - return value on step 37
+    ok 216 - buffer overflow on step 37
+    ok 217 - return value on step 38
+    ok 218 - buffer overflow on step 38
+    ok 219 - return value on step 39
+    ok 220 - buffer overflow on step 39
+    ok 221 - return value on step 40
+    ok 222 - buffer overflow on step 40
+    ok 223 - return value on step 41
+    ok 224 - buffer overflow on step 41
+    ok 225 - return value on step 42
+    ok 226 - buffer overflow on step 42
+    ok 227 - return value on step 43
+    ok 228 - buffer overflow on step 43
+    ok 229 - return value on step 44
+    ok 230 - buffer overflow on step 44
+    ok 231 - return value on step 45
+    ok 232 - buffer overflow on step 45
+    ok 233 - return value on step 46
+    ok 234 - buffer overflow on step 46
+    ok 235 - return value on step 47
+    ok 236 - buffer overflow on step 47
+    ok 237 - return value on step 48
+    ok 238 - buffer overflow on step 48
+    ok 239 - return value on step 49
+    ok 240 - buffer overflow on step 49
+    ok 241 - return value on step 50
+    ok 242 - buffer overflow on step 50
+    ok 243 - return value on step 51
+    ok 244 - buffer overflow on step 51
+    ok 245 - return value on step 52
+    ok 246 - buffer overflow on step 52
+    ok 247 - return value on step 53
+    ok 248 - buffer overflow on step 53
+    ok 249 - return value on step 54
+    ok 250 - buffer overflow on step 54
+    ok 251 - return value on step 55
+    ok 252 - buffer overflow on step 55
+    ok 253 - return value on step 56
+    ok 254 - buffer overflow on step 56
+    ok 255 - return value on step 57
+    ok 256 - buffer overflow on step 57
+    ok 257 - return value on step 58
+    ok 258 - buffer overflow on step 58
+    ok 259 - return value on step 59
+    ok 260 - buffer overflow on step 59
+    ok 261 - return value on step 60
+    ok 262 - buffer overflow on step 60
+    ok 263 - return value on step 61
+    ok 264 - buffer overflow on step 61
+    ok 265 - return value on step 62
+    ok 266 - buffer overflow on step 62
+    ok 267 - return value on step 63
+    ok 268 - buffer overflow on step 63
+    ok 269 - return value on step 64
+    ok 270 - buffer overflow on step 64
+    ok 271 - return value on step 65
+    ok 272 - buffer overflow on step 65
+    ok 273 - return value on step 66
+    ok 274 - buffer overflow on step 66
+    ok 275 - return value on step 67
+    ok 276 - buffer overflow on step 67
+    ok 277 - return value on step 68
+    ok 278 - buffer overflow on step 68
+    ok 279 - return value on step 69
+    ok 280 - buffer overflow on step 69
+    ok 281 - return value on step 70
+    ok 282 - buffer overflow on step 70
     # *** test_format: done ***
 ok 16 - subtests
     1..10

@@ -19,21 +19,30 @@ box.snapshot()
 ---
 - ok
 ...
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: file '<dir>/box/00000000000000000273.snap'
-    already exists
+...
+e.type
+---
+- SystemError
+...
+e.errno
+---
+- 17
 ...
 space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
 # Make 'var' directory read-only.
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: failed to create file '<dir>/box/00000000000000000274.snap'
 ...
-box.error.last().errno
+e.type
+---
+- SystemError
+...
+e.errno
 ---
 - 13
 ...

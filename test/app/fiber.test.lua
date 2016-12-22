@@ -3,7 +3,6 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 env = require('test_run')
 test_run = env.new()
-test_run:cmd("push filter '"..box.cfg.snap_dir.."' to '<dir>'")
 
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
@@ -158,8 +157,10 @@ result
 -- was created
 f = fiber.create(function () fiber.sleep(1) return true end)
 box.snapshot()
-box.snapshot()
-box.snapshot()
+_, e = pcall(box.snapshot)
+(e.message:gsub(box.cfg.snap_dir..'/%d+', '<>'))
+_, e = pcall(box.snapshot)
+(e.message:gsub(box.cfg.snap_dir..'/%d+', '<>'))
 f = fiber.create(function () fiber.sleep(1) end)
 -- Test fiber.sleep()
 fiber.sleep(0)

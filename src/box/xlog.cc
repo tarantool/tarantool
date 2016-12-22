@@ -654,7 +654,8 @@ xlog_create(struct xlog *xlog, const char *name,
 	 * Check that the file without .inprogress suffix doesn't exist.
 	 */
 	if (access(name, F_OK) == 0) {
-		tnt_error(XlogError, "file '%s' already exists", name);
+		errno = EEXIST;
+		diag_set(SystemError, "file '%s' already exists", name);
 		return -1;
 	}
 
