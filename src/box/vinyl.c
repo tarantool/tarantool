@@ -82,8 +82,10 @@
 
 enum vinyl_status {
 	VINYL_OFFLINE,
-	VINYL_INITIAL_RECOVERY,
-	VINYL_FINAL_RECOVERY,
+	VINYL_INITIAL_RECOVERY_LOCAL,
+	VINYL_INITIAL_RECOVERY_REMOTE,
+	VINYL_FINAL_RECOVERY_LOCAL,
+	VINYL_FINAL_RECOVERY_REMOTE,
 	VINYL_ONLINE,
 };
 
@@ -3831,9 +3833,11 @@ vy_tx_write(write_set_t *write_set, struct txv *v, enum vinyl_status status,
 		 * In this case avoid overwriting a newer version with
 		 * an older one.
 		 */
-		if (status == VINYL_FINAL_RECOVERY &&
-		    vy_stmt_is_committed(index, stmt))
-			continue;
+		if (status == VINYL_FINAL_RECOVERY_LOCAL ||
+		    status == VINYL_FINAL_RECOVERY_REMOTE) {
+			if (vy_stmt_is_committed(index, stmt))
+				continue;
+		}
 		/* match range */
 		range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 						  index->format, index->key_def,
@@ -5305,7 +5309,8 @@ vy_index_open_or_create(struct vy_index *index)
 		 */
 		return vy_index_create(index);
 	}
-	if (index->env->status == VINYL_INITIAL_RECOVERY) {
+	if (index->env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+	    index->env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
 		/*
 		 * A local or remote snapshot recovery. For
 		 * a local snapshot recovery, local checkpoint LSN
@@ -7116,25 +7121,35 @@ void
 vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 {
 	assert(e->status == VINYL_OFFLINE);
-	e->status = VINYL_INITIAL_RECOVERY;
 	if (vclock) {
 		e->xm->lsn = vclock_sum(vclock);
+		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
 		e->xm->lsn = 0;
+		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
 }
 
 void
 vy_begin_final_recovery(struct vy_env *e)
 {
-	assert(e->status == VINYL_INITIAL_RECOVERY);
-	e->status = VINYL_FINAL_RECOVERY;
+	switch (e->status) {
+	case VINYL_INITIAL_RECOVERY_LOCAL:
+		e->status = VINYL_FINAL_RECOVERY_LOCAL;
+		break;
+	case VINYL_INITIAL_RECOVERY_REMOTE:
+		e->status = VINYL_FINAL_RECOVERY_REMOTE;
+		break;
+	default:
+		unreachable();
+	}
 }
 
 void
 vy_end_recovery(struct vy_env *e)
 {
-	assert(e->status == VINYL_FINAL_RECOVERY);
+	assert(e->status == VINYL_FINAL_RECOVERY_LOCAL ||
+	       e->status == VINYL_FINAL_RECOVERY_REMOTE);
 	e->status = VINYL_ONLINE;
 	/* enable quota */
 	vy_quota_enable(e->quota);
