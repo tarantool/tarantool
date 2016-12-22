@@ -1587,10 +1587,12 @@ vy_run_delete(struct vy_run *run)
 {
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
-	uint32_t page_no;
-	for (page_no = 0; page_no < run->info.count; ++page_no)
-		vy_page_info_destroy(run->info.page_infos + page_no);
-	free(run->info.page_infos);
+	if (run->info.page_infos != NULL) {
+		uint32_t page_no;
+		for (page_no = 0; page_no < run->info.count; ++page_no)
+			vy_page_info_destroy(run->info.page_infos + page_no);
+		free(run->info.page_infos);
+	}
 	TRASH(run);
 	free(run);
 }
@@ -3108,9 +3110,17 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	int rc;
 	uint32_t page_no = 0;
 	while ((rc = xlog_cursor_next_row(&cursor, &xrow)) == 0) {
-		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, run_id, &xrow) < 0)
+		if (page_no >= run->info.count) {
+			/** To many pages in file */
+			diag_set(ClientError, ER_VINYL, "To many pages in run meta file");
 			goto fail_close;
+		}
+		struct vy_page_info *page = run->info.page_infos + page_no;
+		if (vy_page_info_decode(page, run_id, &xrow) < 0) {
+			/** Limit count of pages to successfully created pages */
+			run->info.count = page_no;
+			goto fail_close;
+		}
 		++page_no;
 	}
 
