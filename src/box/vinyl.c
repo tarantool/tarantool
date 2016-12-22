@@ -5250,46 +5250,6 @@ vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 }
 
 /**
- * Check whether or not an index was created at the
- * given LSN.
- * @note: the index may have been dropped afterwards, and
- * we don't track this fact anywhere except the write
- * ahead log.
- *
- * @note: this function simply reports that the index
- * does not exist if it encounters a read error. It's
- * assumed that the error will be taken care of when
- * someone tries to create the index.
- */
-static bool
-vy_index_exists(struct vy_index *index, int64_t lsn)
-{
-	if (!path_exists(index->path))
-		return false;
-	DIR *dir = opendir(index->path);
-	if (!dir) {
-		return false;
-	}
-	/*
-	 * Try to find a range file with a number in name
-	 * equal to the given LSN.
-	 */
-	struct dirent *dirent;
-	while ((dirent = readdir(dir))) {
-		int64_t index_lsn;
-		int64_t range_id;
-		int run_id;
-		enum vy_file_type t;
-		if (vy_run_parse_name(dirent->d_name, &index_lsn,
-				      &range_id, &run_id, &t) == 0 &&
-		    index_lsn == lsn)
-			break;
-	}
-	closedir(dir);
-	return dirent != NULL;
-}
-
-/**
  * Detect whether we already have non-garbage index files,
  * and open an existing index if that's the case. Otherwise,
  * create a new index. Take the current recovery status into
@@ -5302,64 +5262,33 @@ vy_index_open_or_create(struct vy_index *index)
 	 * TODO: don't drop/recreate index in local wal
 	 * recovery mode if all operations already done.
 	 */
-	if (index->env->status == VINYL_ONLINE) {
+	switch (index->env->status) {
+	case VINYL_ONLINE:
 		/*
 		 * The recovery is complete, simply
 		 * create a new index.
 		 */
 		return vy_index_create(index);
-	}
-	if (index->env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
-	    index->env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
+	case VINYL_INITIAL_RECOVERY_REMOTE:
+	case VINYL_FINAL_RECOVERY_REMOTE:
 		/*
-		 * A local or remote snapshot recovery. For
-		 * a local snapshot recovery, local checkpoint LSN
-		 * is non-zero, while for a remote one (new
-		 * replica bootstrap) it is zero. In either case
-		 * the engine is being fed rows from  system spaces.
-		 *
-		 * If this is a recovery from a non-empty local
-		 * snapshot (lsn != 0), we should have index files
-		 * nicely put on disk.
-		 *
-		 * Otherwise, the index files do not exist
-		 * locally, and we should create the index
-		 * directory from scratch.
+		 * Remote recovery. The index files do not
+		 * exist locally, and we should create the
+		 * index directory from scratch.
 		 */
-		return index->env->xm->lsn ?
-			vy_index_open_ex(index) : vy_index_create(index);
-	}
-	/*
-	 * Case of a WAL replay from either a local or remote
-	 * master.
-	 * If it is a remote WAL replay, there should be no
-	 * local files for this index yet - it's just being
-	 * created.
-	 *
-	 * For a local recovery, however, the index may or may not
-	 * have any files on disk, depending on whether we dumped
-	 * any rows of this index after it had been created and
-	 * before shutdown.
-	 * Moreover, even when the index directory is not empty,
-	 * we need to be careful to not open files from the
-	 * previous incarnation of this index. Imagine the case
-	 * when the index was created, dropped, and created again
-	 * - all without a checkpoint. In this case the index
-	 * directory may contain files from the dropped index
-	 * and we need to be careful to not use them. Fortunately,
-	 * we can rely on the index LSN to check whether
-	 * the files we're looking at belong to this incarnation
-	 * of the index or not, since file names always contain
-	 * this LSN.
-	 */
-	if (vy_index_exists(index, index->key_def->opts.lsn)) {
+		return vy_index_create(index);
+	case VINYL_INITIAL_RECOVERY_LOCAL:
+	case VINYL_FINAL_RECOVERY_LOCAL:
 		/*
-		 * We found a file with LSN equal to
-		 * the index creation lsn.
+		 * Local WAL replay or recovery from snapshot.
+		 * In either case the index directory should
+		 * have already been created, so try to load
+		 * the index files from it.
 		 */
 		return vy_index_open_ex(index);
+	default:
+		unreachable();
 	}
-	return vy_index_create(index);
 }
 
 int
