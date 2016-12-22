@@ -799,8 +799,13 @@ xlog_tx_write_plain(struct xlog *log)
 	 * fixheader always has the same size.
 	 */
 	ssize_t padding = XLOG_FIXHEADER_SIZE - (data - fixheader);
-	if (padding > 0)
-		data = mp_encode_strl(data, padding - 1) + padding - 1;
+	if (padding > 0) {
+		data = mp_encode_strl(data, padding - 1);
+		if (padding > 1) {
+			memset(data, 0, padding - 1);
+			data += padding - 1;
+		}
+	}
 
 	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
@@ -882,8 +887,13 @@ xlog_tx_write_zstd(struct xlog *log)
 	/* Encode padding */
 	ssize_t padding;
 	padding = XLOG_FIXHEADER_SIZE - (data - fixheader);
-	if (padding > 0)
-		data = mp_encode_strl(data, padding - 1) + padding - 1;
+	if (padding > 0) {
+		data = mp_encode_strl(data, padding - 1);
+		if (padding > 1) {
+			memset(data, 0, padding - 1);
+			data += padding - 1;
+		}
+	}
 
 	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
