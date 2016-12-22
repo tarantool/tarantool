@@ -631,7 +631,7 @@ struct vy_page_info {
 	/* minimal key */
 	struct vy_stmt *min_key;
 	/* row index offset in page */
-	int32_t row_index_offset;
+	uint32_t row_index_offset;
 };
 
 static int
@@ -2290,7 +2290,6 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 		info->max_lsn = value->lsn;
 	if (value->lsn < info->min_lsn)
 		info->min_lsn = value->lsn;
-
 	return 0;
 }
 
@@ -2341,19 +2340,18 @@ vy_page_info_destroy(struct vy_page_info *page_info)
 /**
  * Encode uint32_t array of row offsets (row index) as xrow
  *
+ * @param row_index row index
+ * @param count size of row index
+ * @param[out] xrow xrow to fill.
  * @retval 0 for success
  * @retval -1 for error
  */
 static int
-vy_row_index_encode(uint32_t *row_index, uint32_t count, struct xrow_header *xrow)
+vy_row_index_encode(const uint32_t *row_index, uint32_t count,
+		    struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
 	xrow->type = IPROTO_REPLACE;
-
-	/* encode offsets in big-endian */
-	uint32_t i;
-	for (i = 0; i < count; ++i)
-		row_index[i] = htobe32(row_index[i]);
 
 	struct request request;
 	request_create(&request, IPROTO_REPLACE);
@@ -2367,11 +2365,13 @@ vy_row_index_encode(uint32_t *row_index, uint32_t count, struct xrow_header *xro
 	}
 	request.tuple = tuple;
 	tuple = mp_encode_array(tuple, 1);
-	tuple = mp_encode_bin(tuple, (char *)row_index, sizeof(uint32_t) * count);
+	tuple = mp_encode_binl(tuple, sizeof(uint32_t) * count);
+	for (uint32_t i = 0; i < count; ++i)
+		tuple = mp_store_u32(tuple, row_index[i]);
 	request.tuple_end = tuple;
-	assert(request.tuple_end = request.tuple + tuple_size);
+	assert(request.tuple_end == request.tuple + tuple_size);
 	xrow->bodycnt = request_encode(&request, xrow->body);
-	return xrow->bodycnt >= 0 ? 0: -1;
+	return xrow->bodycnt >= 0 ? 0 : -1;
 }
 
 /**
@@ -2396,8 +2396,8 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	assert(*curr_stmt);
 
 	/* row offsets accumulator */
-	struct ibuf row_index;
-	ibuf_create(&row_index, &cord()->slabc, sizeof(uint32_t) * 4096);
+	struct ibuf row_index_buf;
+	ibuf_create(&row_index_buf, &cord()->slabc, sizeof(uint32_t) * 4096);
 
 	if (run_info->count >= *page_info_capacity) {
 		uint32_t cap = *page_info_capacity > 0 ?
@@ -2407,7 +2407,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		if (new_infos == NULL) {
 			diag_set(OutOfMemory, cap, "realloc",
 				 "struct vy_page_info");
-			return -1;
+			goto error_row_index;
 		}
 		run_info->page_infos = new_infos;
 		*page_info_capacity = cap;
@@ -2420,20 +2420,21 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	xlog_tx_begin(data_xlog);
 
 	do {
-		struct vy_stmt *stmt = *curr_stmt;
-		if (ibuf_reserve(&row_index, sizeof(uint32_t)) == NULL) {
+		uint32_t *offset = (uint32_t *) ibuf_alloc(&row_index_buf,
+							   sizeof(uint32_t));
+		if (offset == NULL) {
 			diag_set(OutOfMemory, sizeof(uint32_t),
-				 "region", "row index");
-			goto error;
+				 "ibuf", "row index");
+			goto error_rollback;
 		}
+		*offset = page->unpacked_size;
 
-		*(uint32_t *)row_index.wpos = page->unpacked_size;
+		struct vy_stmt *stmt = *curr_stmt;
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0)
-			goto error;
+			goto error_rollback;
 
-		row_index.wpos += sizeof(uint32_t);
 		if (vy_write_iterator_next(wi, curr_stmt))
-			goto error;
+			goto error_rollback;
 
 		end_of_run = *curr_stmt == NULL ||
 			/* Split key reached, proceed to the next run. */
@@ -2443,16 +2444,20 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < key_def->opts.page_size);
-	/* save row index offset offset and write row_index */
+
+	/* Save offset to row index  */
 	page->row_index_offset = page->unpacked_size;
+
+	/* Write row index */
 	struct xrow_header xrow;
-	if (vy_row_index_encode((uint32_t *)row_index.rpos,
-				page->count, &xrow) < 0)
-		goto error;
+	const uint32_t *row_index = (const uint32_t *) row_index_buf.rpos;
+	assert(ibuf_used(&row_index_buf) == sizeof(uint32_t) * page->count);
+	if (vy_row_index_encode(row_index, page->count, &xrow) < 0)
+		goto error_rollback;
 
 	ssize_t written = xlog_write_row(data_xlog, &xrow);
 	if (written < 0)
-		goto error;
+		goto error_rollback;
 
 	page->unpacked_size += written;
 
@@ -2460,7 +2465,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	if (written == 0)
 		written = xlog_flush(data_xlog);
 	if (written < 0)
-		return -1;
+		goto error_row_index;
 
 	page->size = written;
 
@@ -2474,9 +2479,13 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	run_info->total += page->size;
 	run_info->keys += page->count;
 
+	ibuf_destroy(&row_index_buf);
 	return !end_of_run ? 0: 1;
-error:
+
+error_rollback:
 	xlog_tx_rollback(data_xlog);
+error_row_index:
+	ibuf_destroy(&row_index_buf);
 	return -1;
 }
 
@@ -7265,8 +7274,6 @@ struct vy_page {
 	uint32_t unpacked_size;
 	/** Array with row offsets in page data */
 	uint32_t *row_index;
-	/** Statements array */
-	struct vy_stmt **stmts;
 	/** Page data */
 	char *data;
 };
@@ -7282,26 +7289,20 @@ vy_page_new(const struct vy_page_info *page_info)
 	}
 	page->count = page_info->count;
 	page->unpacked_size = page_info->unpacked_size;
-	page->stmts = calloc(page_info->count, sizeof(struct vy_stmt));
-	if (page->stmts == NULL) {
-		diag_set(OutOfMemory, page_info->count * sizeof(struct vy_stmt),
-			 "malloc", "page->stmts");
-		return NULL;
-	}
 	page->row_index = calloc(page_info->count, sizeof(uint32_t));
 	if (page->row_index == NULL) {
 		diag_set(OutOfMemory, page_info->count * sizeof(uint32_t),
 			 "malloc", "page->row_index");
-		free(page->stmts);
+		free(page);
 		return NULL;
-
 	}
+
 	page->data = (char *)malloc(page_info->unpacked_size);
 	if (page->data == NULL) {
 		diag_set(OutOfMemory, page_info->unpacked_size,
 			 "malloc", "page->data");
-		free(page->stmts);
 		free(page->row_index);
+		free(page);
 		return NULL;
 	}
 	return page;
@@ -7310,31 +7311,16 @@ vy_page_new(const struct vy_page_info *page_info)
 static void
 vy_page_delete(struct vy_page *page)
 {
-	uint32_t i;
-	for (i = 0; i < page->count; ++i)
-		if (page->stmts[i] != NULL)
-			vy_stmt_unref(page->stmts[i]);
-	free(page->stmts);
-	free(page->row_index);
-	free(page->data);
+	uint32_t *row_index = page->row_index;
+	char *data = page->data;
 #if !defined(NDEBUG)
-	memset(page, '#', sizeof(*page)); /* fail early */
+	memset(page->row_index, '#', sizeof(uint32_t) * page->count);
+	memset(page->data, '#', page->unpacked_size);
+	memset(page, '#', sizeof(*page));
 #endif /* !defined(NDEBUG) */
+	free(row_index);
+	free(data);
 	free(page);
-}
-
-static int
-vy_page_stmt_from_data(struct vy_stmt **stmt_ptr, const char *data,
-		       const char *data_end,
-		       const struct tuple_format *format,
-		       const struct key_def *key_def)
-{
-	struct xrow_header xrow;
-	if (xrow_header_decode(&xrow, &data, data_end) != 0)
-		return -1;
-	if (vy_stmt_decode(&xrow, stmt_ptr, format, key_def->part_count))
-		return -1;
-	return 0;
 }
 
 /**
@@ -7349,14 +7335,14 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	     const struct tuple_format *format, const struct key_def *key_def)
 {
 	assert(stmt_no < page->count);
-	if (page->stmts[stmt_no] == NULL) {
-		const char *stmt_data, *stmt_data_end;
-		stmt_data = page->data + page->row_index[stmt_no];
-		stmt_data_end = page->data + page->unpacked_size;
-		vy_page_stmt_from_data(page->stmts + stmt_no, stmt_data,
-				       stmt_data_end, format, key_def);
-	}
-	return page->stmts[stmt_no]; /* includes offset table */
+	const char *data = page->data + page->row_index[stmt_no];
+	const char *data_end = stmt_no + 1 < page->count ?
+		page->data + page->row_index[stmt_no + 1] :
+		page->data + page->unpacked_size;
+	struct xrow_header xrow;
+	if (xrow_header_decode(&xrow, &data, data_end) != 0)
+		return NULL;
+	return vy_stmt_decode(&xrow, format, key_def->part_count);
 }
 
 /**
@@ -7446,14 +7432,12 @@ error:
 	const char *pos = request.tuple;
 	if (mp_decode_array(&pos) != 1)
 		goto error;
-	uint32_t len;
-	uint32_t *row_index_data;
-	row_index_data = (uint32_t *)mp_decode_bin(&pos, &len);
-	if (len != sizeof(uint32_t) * count)
+	uint32_t size = mp_decode_binl(&pos);
+	if (size != sizeof(uint32_t) * count)
 		goto error;
-	uint32_t i;
-	for (i = 0; i < count; ++i)
-		row_index[i] = be32toh(row_index_data[i]);
+	for (uint32_t i = 0; i < count; ++i)
+		row_index[i] = mp_load_u32(&pos);
+	assert(pos == request.tuple_end);
 	return 0;
 }
 /**
@@ -7492,26 +7476,10 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	/* decode xlog tx */
 	const char *data_pos = data;
 	const char *data_end = data + readen;
-	struct xlog_fixheader fixheader;
-	ssize_t to_load;
-	to_load = xlog_fixheader_decode(&fixheader, &data_pos, data_end);
-	if (to_load == 0)
-		to_load = xlog_tx_check(&fixheader, data_pos, &data_end);
-	if (to_load < 0)
-		goto error;
-	if (to_load > 0) {
-		diag_set(ClientError, ER_VINYL, "Not enough data for tx decoding");
-		goto error;
-	}
 	char *rows = page->data;
-	to_load = xlog_tx_decode(&fixheader, &rows, rows + page_info->unpacked_size,
-					&data_pos, data_end, zdctx);
-	if (to_load < 0)
+	char *rows_end = rows + page_info->unpacked_size;
+	if (xlog_tx_decode(data, data_end, rows, rows_end, zdctx) != 0)
 		goto error;
-	if (to_load > 0) {
-		diag_set(ClientError, ER_VINYL, "Not enough space for tx decoding");
-		goto error;
-	}
 
 	struct xrow_header xrow;
 	data_pos = page->data + page_info->row_index_offset;
@@ -7546,7 +7514,6 @@ vy_env_get_zdctx(struct vy_env *env)
 		}
 		tt_pthread_setspecific(env->zdctx_key, zdctx);
 	}
-	ZSTD_initDStream(zdctx);
 	return zdctx;
 }
 
@@ -7602,6 +7569,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	/* Allocate buffers */
 	struct vy_page_info *page_info = vy_run_page_info(itr->run, page_no);
 	struct vy_page *page = vy_page_new(page_info);
+	if (page == NULL)
+		return -1;
 
 	/* Read page data from the disk */
 	int rc;
@@ -7643,12 +7612,14 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		if (rc < 0)
 			return -1; /* timed out or cancelled */
 
-		/* task was posted to worker and finished */
-		if (task->rc == -1) {
+		if (task->rc != 0) {
+			/* posted, but failed */
 			diag_move(&task->base.diag, &fiber()->diag);
-			page = NULL;
-		} else
-			task->page = NULL;
+			vy_page_read_cb_free(&task->base);
+			return -1;
+		}
+
+		task->page = NULL;
 		vy_page_read_cb_free(&task->base);
 
 		/*
@@ -7660,8 +7631,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			itr->index = NULL;
 			itr->range = NULL;
 			itr->run = NULL;
-			if (page != NULL)
-				vy_page_delete(page);
+			vy_page_delete(page);
 			return -2; /* iterator is no more valid */
 		}
 	} else {
@@ -7672,15 +7642,10 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->index->env);
 		if (zdctx == NULL)
 			return -1;
-		if (vy_page_read(page, page_info, itr->run->fd, zdctx) == -1) {
+		if (vy_page_read(page, page_info, itr->run->fd, zdctx) != 0) {
 			vy_page_delete(page);
 			page = NULL;
 		}
-	}
-
-	if (page == NULL) {
-		assert(!diag_is_empty(&fiber()->diag));
-		return -1;
 	}
 
 	/* Iterator is never used from multiple fibers */

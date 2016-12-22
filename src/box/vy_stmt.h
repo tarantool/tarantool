@@ -496,12 +496,12 @@ vy_stmt_encode(const struct vy_stmt *value, const struct key_def *key_def,
 /**
  * Reconstruct vinyl tuple info and data from xrow
  *
- * @retval 0 if OK
- * @retval -1 if error
+ * @retval stmt on success
+ * @retval NULL on error
  */
-int
-vy_stmt_decode(struct xrow_header *xrow, struct vy_stmt **stmt_ptr,
-	       const struct tuple_format *format, uint32_t part_count);
+struct vy_stmt *
+vy_stmt_decode(struct xrow_header *xrow, const struct tuple_format *format,
+	       uint32_t part_count);
 
 /**
  * Format a key into string.

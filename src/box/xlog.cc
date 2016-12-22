@@ -37,6 +37,7 @@
 #include "crc32.h"
 #include "fio.h"
 #include "third_party/tarantool_eio.h"
+#include <msgpuck.h>
 #include "scoped_guard.h"
 
 #include "coeio_file.h"
@@ -52,6 +53,11 @@
  * |  0xd5  |  type  |       data      |
  * +--------+--------+--------+--------+
  */
+typedef uint32_t log_magic_t;
+
+static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
+static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
+static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 static const char inprogress_suffix[] = ".inprogress";
 
 enum {
@@ -1223,13 +1229,36 @@ xlog_cursor_decompress(char **rows, char *rows_end, const char **data,
 }
 
 /**
+ * xlog fixheader struct
+ */
+struct xlog_fixheader {
+	/**
+	 * xlog tx magic, row_marker for plain xrows
+	 * or zrow_marker for compressed.
+	 */
+	log_magic_t magic;
+	/**
+	 * crc32 for the previous xlog tx, not used now
+	 */
+	uint32_t crc32p;
+	/**
+	 * crc32 for current xlog tx
+	 */
+	uint32_t crc32c;
+	/**
+	 * xlog tx data length excluding fixheader
+	 */
+	uint32_t len;
+};
+
+/**
  * Decode xlog tx header, set up magic, crc32c and len
  *
  * @retval 0 for success
  * @retval -1 for error
  * @retval count of bytes left to parse header
  */
-ssize_t
+static ssize_t
 xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 		      const char **data, const char *data_end)
 {
@@ -1256,9 +1285,8 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 	}
 	fixheader->len = mp_decode_uint(&val);
 	assert(val == pos);
-
 	if (fixheader->len > IPROTO_BODY_LEN_MAX) {
-		tnt_error(XlogError, "tx is too big at");
+		tnt_error(XlogError, "too large fixheader length");
 		return -1;
 	}
 
@@ -1291,52 +1319,57 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 	return 0;
 }
 
-/**
- * Check that data has enough block for tx decoding and checks crc
- *
- * @retval 0 for success
- * @retval -1 for error
- * @retval count of bytes left to decode tx
- */
-ssize_t
-xlog_tx_check(struct xlog_fixheader *fixheader, const char *data,
-	      const char **data_end)
+int
+xlog_tx_decode(const char *data, const char *data_end,
+	       char *rows, char *rows_end, ZSTD_DStream *zdctx)
 {
-	if ((*data_end - data) < (ptrdiff_t)fixheader->len)
-		return fixheader->len - (*data_end - data);
+	/* Decode fixheader */
+	struct xlog_fixheader fixheader;
+	if (xlog_fixheader_decode(&fixheader, &data, data_end) != 0)
+		return -1;
+
+	/* Check that buffer has enough bytes */
+	if (data + fixheader.len != data_end) {
+		tnt_error(XlogError, "invalid compressed length: "
+			  "expected %zd, got %u",
+			  data_end - data, fixheader.len);
+		return -1;
+	}
 
 	/* Validate checksum */
-	if (crc32_calc(0, data, fixheader->len) != fixheader->crc32c) {
+	if (crc32_calc(0, data, fixheader.len) != fixheader.crc32c) {
 		tnt_error(XlogError, "tx checksum mismatch");
 		return -1;
 	}
-	*data_end = data + fixheader->len;
-	return 0;
-}
 
-/**
- * Decode xlog tx from *data .. data_end into *rows .. rows_end.
- * Update *rows and *data.
- *
- * @retval 0 for success
- * @retval -1 for error
- * @retval 1 if there is not enougn data or space in rows
- */
-int
-xlog_tx_decode(struct xlog_fixheader *fixheader, char **rows, char *rows_end,
-	       const char **data, const char *data_end, ZSTD_DStream *zdctx)
-{
-	if (fixheader->magic == row_marker) {
-		size_t to_copy = MIN(data_end - *data, rows_end - *rows);
-		memcpy(*rows, *data, to_copy);
-		*data += to_copy;
-		assert(*data <= data_end);
-		*rows += to_copy;
-		assert(*rows <= rows_end);
-		return *data == data_end? 0: 1;
-	};
-	assert(fixheader->magic == zrow_marker);
-	return xlog_cursor_decompress(rows, rows_end, data, data_end, zdctx);
+	/* Copy uncompressed rows */
+	if (fixheader.magic == row_marker) {
+		if (rows_end - rows != (ptrdiff_t)fixheader.len) {
+			tnt_error(XlogError, "invalid unpacked length: "
+				  "expected %zd, got %u",
+				  rows_end - data, fixheader.len);
+			return -1;
+		}
+		memcpy(rows, data, fixheader.len);
+		return 0;
+	}
+
+	/* Decompress zstd rows */
+	assert(fixheader.magic == zrow_marker);
+	ZSTD_initDStream(zdctx);
+	int rc = xlog_cursor_decompress(&rows, rows_end, &data, data_end,
+					zdctx);
+	if (rc < 0) {
+		return -1;
+	} else if (rc > 0) {
+		tnt_error(XlogError, "invalid decompressed length: "
+			  "expected %zd, got %zd", rows_end - data,
+			   rows_end - data + XLOG_TX_AUTOCOMMIT_THRESHOLD);
+		return -1;
+	}
+
+	assert(data == data_end);
+	return 0;
 }
 
 /**
@@ -1356,14 +1389,36 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	if (to_load != 0)
 		return to_load;
 
-	to_load = xlog_tx_check(&fixheader, rpos, &data_end);
-	if (to_load != 0)
-		return to_load;
+	/* Check that buffer has enough bytes */
+	if ((data_end - rpos) < (ptrdiff_t)fixheader.len)
+		return fixheader.len - (data_end - rpos);
+
+	/* Validate checksum */
+	if (crc32_calc(0, rpos, fixheader.len) != fixheader.crc32c) {
+		tnt_error(XlogError, "tx checksum mismatch");
+		return -1;
+	}
+	data_end = rpos + fixheader.len;
 
 	ibuf_create(&tx_cursor->rows, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	if (fixheader.magic == row_marker) {
+		void *dst = ibuf_alloc(&tx_cursor->rows, fixheader.len);
+		if (dst == NULL) {
+			diag_set(OutOfMemory, fixheader.len,
+				 "runtime", "xlog rows buffer");
+			ibuf_destroy(&tx_cursor->rows);
+			return -1;
+		}
+		memcpy(dst, rpos, fixheader.len);
+		*data = (char *)rpos + fixheader.len;
+		assert(*data <= data_end);
+		return 0;
+	};
+
+	assert(fixheader.magic == zrow_marker);
 	ZSTD_initDStream(zdctx);
-	int rc = 0;
+	int rc;
 	do {
 		if (ibuf_reserve(&tx_cursor->rows,
 				 XLOG_TX_AUTOCOMMIT_THRESHOLD) == NULL) {
@@ -1372,13 +1427,11 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 			ibuf_destroy(&tx_cursor->rows);
 			return -1;
 		}
-	} while ((rc = xlog_tx_decode(&fixheader, &tx_cursor->rows.wpos,
-				      tx_cursor->rows.end, &rpos,
-				      data_end, zdctx)) == 1);
-	if (rc != 0) {
-		ibuf_destroy(&tx_cursor->rows);
+	} while ((rc = xlog_cursor_decompress(&tx_cursor->rows.wpos,
+					      tx_cursor->rows.end, &rpos,
+					      data_end, zdctx)) == 1);
+	if (rc != 0)
 		return -1;
-	}
 
 	*data = rpos;
 	assert(*data <= data_end);
