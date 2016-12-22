@@ -3004,11 +3004,10 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	}
 
 	/* Allocate buffer for page info. */
-	size_t pages_size = sizeof(struct vy_page_info) * run->info.count;
-	run->info.page_infos = malloc(pages_size);
+	run->info.page_infos = calloc(run->info.count, sizeof(struct vy_page_info));
 	if (run->info.page_infos == NULL) {
-		diag_set(OutOfMemory, pages_size, "malloc",
-			 "struct vy_page_info");
+		diag_set(OutOfMemory, run->info.count * sizeof(struct vy_page_info),
+			 "malloc", "struct vy_page_info");
 		goto fail_close;
 	}
 
