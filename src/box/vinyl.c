@@ -3651,7 +3651,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
 	 * after the latest upsert.
 	 */
 	enum {
-		VY_UPSERT_THRESHOLD = 10,
+		VY_UPSERT_THRESHOLD = 128,
 		VY_UPSERT_INF = 255,
 	};
 	if (older != NULL)
