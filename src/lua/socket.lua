@@ -981,9 +981,12 @@ end
 
 local function tcp_server_handler(server, sc, from)
     fiber.name(format("%s/%s:%s", server.name, from.host, from.port))
-    server.handler(sc, from)
+    local status, message = pcall(server.handler, sc, from)
     sc:shutdown()
     sc:close()
+    if not status then
+        error(message)
+    end
 end
 
 local function tcp_server_loop(server, s, addr)
