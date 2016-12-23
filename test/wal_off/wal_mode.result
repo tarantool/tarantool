@@ -1,10 +1,6 @@
 test_run = require('test_run').new()
 ---
 ...
-test_run:cmd("push filter '"..box.cfg.snap_dir.."' to '<dir>'")
----
-- true
-...
 box.cfg.wal_mode
 ---
 - none
@@ -46,17 +42,29 @@ box.snapshot()
 ---
 - ok
 ...
-box.snapshot()
----
-- error: file '<dir>/00000000000000000031.snap'
-    already exists
-...
-space:truncate()
+_, e = pcall(box.snapshot)
 ---
 ...
-box.snapshot()
+e.type, e.errno
 ---
-- ok
+- SystemError
+- 17
+...
+e.errno
+---
+- 17
+...
+_, e = pcall(box.snapshot)
+---
+...
+e.type, e.errno
+---
+- SystemError
+- 17
+...
+e.errno
+---
+- 17
 ...
 space:drop()
 ---
