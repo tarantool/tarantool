@@ -7653,7 +7653,7 @@ vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
 static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_pos pos,
-		     const struct vy_stmt **stmt)
+		     struct vy_stmt **stmt)
 {
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
@@ -7661,7 +7661,6 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 		return rc;
 	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->index->format,
 			     itr->index->key_def);
-	vy_stmt_ref((struct vy_stmt *)*stmt);
 	return 0;
 }
 
@@ -7728,6 +7727,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 			beg = mid + 1;
 		else
 			end = mid;
+		vy_stmt_unref(fnd_key);
 	}
 	return end;
 }
@@ -7834,7 +7834,7 @@ static NODISCARD int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
-	const struct vy_stmt *stmt;
+	struct vy_stmt *stmt;
 	struct key_def *key_def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	const struct vy_stmt *key = itr->key;
@@ -7844,6 +7844,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	if (rc != 0)
 		return rc;
 	while (stmt->lsn > *itr->vlsn) {
+		vy_stmt_unref(stmt);
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
 					      &itr->curr_pos);
 		if (rc < 0)
@@ -7859,6 +7860,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			return rc;
 		if (iterator_type == ITER_EQ &&
 		    vy_stmt_compare(stmt, key, format, key_def)) {
+			vy_stmt_unref(stmt);
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			return 0;
@@ -7878,13 +7880,16 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			 */
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-			const struct vy_stmt *test_stmt;
+			struct vy_stmt *test_stmt;
 			rc = vy_run_iterator_read(itr, test_pos, &test_stmt);
 			if (rc != 0)
 				return rc;
 			if (test_stmt->lsn > *itr->vlsn ||
-			    vy_stmt_compare(stmt, test_stmt, format, key_def) != 0)
+			    vy_stmt_compare(stmt, test_stmt, format, key_def) != 0) {
+				vy_stmt_unref(test_stmt);
 				break;
+			}
+			vy_stmt_unref(test_stmt);
 			itr->curr_pos = test_pos;
 
 			/* See above */
@@ -7896,6 +7901,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 
 		rc = rc > 0 ? 0 : rc;
 	}
+	vy_stmt_unref(stmt);
 	if (!rc) /* If next_pos() found something then get it. */
 		rc = vy_run_iterator_get(itr, ret);
 	return rc;
@@ -8126,23 +8132,26 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	}
 	assert(itr->curr_pos.page_no < end_page);
 
-	const struct vy_stmt *cur_key;
+	struct vy_stmt *cur_key;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
-	const struct vy_stmt *next_key;
+	struct vy_stmt *next_key = NULL;
 	struct tuple_format *format = itr->index->format;
 	do {
+		if (next_key != NULL)
+			vy_stmt_unref(next_key);
 		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
 		if (rc != 0) {
 			if (rc > 0) {
 				vy_run_iterator_cache_clean(itr);
 				itr->search_ended = true;
-				return 0;
+				rc = 0;
 			}
+			vy_stmt_unref(cur_key);
 			return rc;
 		}
 
@@ -8154,13 +8163,15 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key);
-		if (rc != 0)
+		if (rc != 0) {
+			vy_stmt_unref(cur_key);
 			return rc;
+		}
 
 		/* See above */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 	} while (vy_stmt_compare(cur_key, next_key, format, key_def) == 0);
-
+	vy_stmt_unref(cur_key);
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(next_key, itr->key, format,	key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
@@ -8197,15 +8208,17 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (rc != 0)
 		return rc > 0 ? 0 : rc;
 
-	const struct vy_stmt *cur_key;
+	struct vy_stmt *cur_key;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 
-	const struct vy_stmt *next_key;
+	struct vy_stmt *next_key;
 	rc = vy_run_iterator_read(itr, next_pos, &next_key);
-	if (rc != 0)
+	if (rc != 0) {
+		vy_stmt_unref(cur_key);
 		return rc;
+	}
 
 	/**
 	 * One can think that we had to lock page of itr->curr_pos,
@@ -8220,6 +8233,8 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	 */
 	struct key_def *key_def = itr->index->key_def;
 	int cmp = vy_stmt_compare(cur_key, next_key, itr->index->format, key_def);
+	vy_stmt_unref(cur_key);
+	vy_stmt_unref(next_key);
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
 	if (rc != 0)
