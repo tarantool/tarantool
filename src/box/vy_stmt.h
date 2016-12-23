@@ -1,3 +1,5 @@
+#ifndef INCLUDES_TARANTOOL_BOX_VY_STMT_H
+#define INCLUDES_TARANTOOL_BOX_VY_STMT_H
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -538,3 +540,5 @@ vy_stmt_str(const struct vy_stmt *stmt, const struct key_def *key_def);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
+
+#endif /* INCLUDES_TARANTOOL_BOX_VY_STMT_H */
