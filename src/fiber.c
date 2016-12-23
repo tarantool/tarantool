@@ -33,12 +33,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pmatomic.h>
 
 #include "say.h"
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
-#include "small/pmatomic.h"
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
 
