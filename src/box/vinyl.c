@@ -6141,6 +6141,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 		if (old_stmt == NULL)
 			return 0;
 		stmt->old_tuple = vy_convert_replace(space, old_stmt);
+		box_tuple_ref(stmt->old_tuple);
 	}
 	if (old_stmt != NULL)
 		vy_stmt_unref(old_stmt);
