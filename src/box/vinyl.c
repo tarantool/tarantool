@@ -7661,6 +7661,8 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 		return rc;
 	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->index->format,
 			     itr->index->key_def);
+	if (*stmt == NULL)
+		return -1;
 	return 0;
 }
 
@@ -7720,6 +7722,8 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 		uint32_t mid = beg + (end - beg) / 2;
 		struct vy_stmt *fnd_key = vy_page_stmt(page, mid, idx->format,
 						       idx->key_def);
+		if (fnd_key == NULL)
+			return end;
 		int cmp = vy_stmt_compare(fnd_key, key, idx->format,idx->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
@@ -7845,6 +7849,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		return rc;
 	while (stmt->lsn > *itr->vlsn) {
 		vy_stmt_unref(stmt);
+		stmt = NULL;
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
 					      &itr->curr_pos);
 		if (rc < 0)
@@ -7861,6 +7866,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		if (iterator_type == ITER_EQ &&
 		    vy_stmt_compare(stmt, key, format, key_def)) {
 			vy_stmt_unref(stmt);
+			stmt = NULL;
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			return 0;
@@ -7887,9 +7893,11 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			if (test_stmt->lsn > *itr->vlsn ||
 			    vy_stmt_compare(stmt, test_stmt, format, key_def) != 0) {
 				vy_stmt_unref(test_stmt);
+				test_stmt = NULL;
 				break;
 			}
 			vy_stmt_unref(test_stmt);
+			test_stmt = NULL;
 			itr->curr_pos = test_pos;
 
 			/* See above */
@@ -8143,6 +8151,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	do {
 		if (next_key != NULL)
 			vy_stmt_unref(next_key);
+		next_key = NULL;
 		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
 		if (rc != 0) {
@@ -8152,6 +8161,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 				rc = 0;
 			}
 			vy_stmt_unref(cur_key);
+			cur_key = NULL;
 			return rc;
 		}
 
@@ -8165,6 +8175,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key);
 		if (rc != 0) {
 			vy_stmt_unref(cur_key);
+			cur_key = NULL;
 			return rc;
 		}
 
@@ -8172,6 +8183,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
 	} while (vy_stmt_compare(cur_key, next_key, format, key_def) == 0);
 	vy_stmt_unref(cur_key);
+	cur_key = NULL;
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(next_key, itr->key, format,	key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
@@ -8234,7 +8246,9 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	struct key_def *key_def = itr->index->key_def;
 	int cmp = vy_stmt_compare(cur_key, next_key, itr->index->format, key_def);
 	vy_stmt_unref(cur_key);
+	cur_key = NULL;
 	vy_stmt_unref(next_key);
+	next_key = NULL;
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
 	if (rc != 0)
