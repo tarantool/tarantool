@@ -344,6 +344,34 @@ local function read_file(filename)
     return table.concat(buf)
 end
 
+local function logger_parse(logger)
+    -- syslog
+    if logger:find("syslog:") then
+        logger = logger:sub(8):gsub("^%s*(.-)%s*$", "%1")
+        local args = {}
+        logger:gsub("([^,]+)", function(keyval)
+            keyval:gsub("([^=]+)=([^=]+)", function(key, val)
+                args[key] = val
+            end)
+        end)
+        return 'syslog', args
+    -- pipes
+    elseif logger:find("pipe:")   then
+        logger = logger:sub(6):gsub("^%s*(.-)%s*$", "%1")
+        return 'pipe', logger
+    elseif logger:find("|")       then
+        logger = logger:sub(2):gsub("^%s*(.-)%s*$", "%1")
+        return 'pipe', logger
+    -- files
+    elseif logger:find("file:")   then
+        logger = logger:sub(6):gsub("^%s*(.-)%s*$", "%1")
+        return 'file', logger
+    else
+        logger = logger:gsub("^%s*(.-)%s*$", "%1")
+        return 'file', logger
+    end
+end
+
 local function mk_default_dirs(cfg)
     local init_dirs = {
         fio.dirname(cfg.pid_file),
@@ -351,9 +379,9 @@ local function mk_default_dirs(cfg)
         cfg.snap_dir,
         cfg.vinyl_dir,
     }
-    local log_dir = fio.dirname(cfg.logger)
-    if log_dir:find('|') == nil then
-        table.insert(init_dirs, log_dir)
+    local log_type, log_args = logger_parse(cfg.logger)
+    if log_type == 'file' then
+        table.insert(init_dirs, fio.dirname(log_args))
     end
     for _, dir in ipairs(init_dirs) do
         if fio.stat(dir) == nil then
@@ -489,8 +517,9 @@ local function wrapper_cfg(cfg)
     local success, data = pcall(orig_cfg, cfg)
     if not success then
         log.error("Configuration failed: %s", data)
-        if fio.stat(default_cfg.logger) then
-            os.execute('tail -n 10 ' .. default_cfg.logger)
+        local log_type, log_args = logger_parse(cfg.logger)
+        if log_type == 'file' and fio.stat(log_args) then
+            os.execute('tail -n 10 ' .. log_args)
         end
         os.exit(1)
     end
@@ -526,8 +555,9 @@ local function start()
     -- if load fails - show last 10 lines of the log file
     if not success then
         log.error("Start failed: %s", data)
-        if fio.stat(default_cfg.logger) then
-            os.execute('tail -n 10 ' .. default_cfg.logger)
+        local log_type, log_args = logger_parse(box.cfg.logger)
+        if log_type == 'file' and fio.stat(log_args) then
+            os.execute('tail -n 10 ' .. log_args)
         end
     end
     return 0
@@ -742,7 +772,7 @@ local function cat()
     local format_cb   = cat_formats[cat_format]
     local is_printed  = false
     for id, file in ipairs(positional_arguments) do
-        log.info(("Processing file '%s'"):format(file))
+        log.error("Processing file '%s'", file)
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
             if (lsn < from) or
