@@ -667,6 +667,14 @@ tuple_field_cstr(struct tuple *tuple, uint32_t fieldno);
 const char *
 tuple_field_to_cstr(const char *field, uint32_t len);
 
+struct tt_uuid;
+/**
+ * Parse a tuple field which is expected to contain a string
+ * representation of UUID, and return a 16-byte representation.
+ */
+void
+tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *result);
+
 /** Return a tuple field and check its type. */
 inline const char *
 tuple_next_check(struct tuple_iterator *it, enum mp_type type)

@@ -35,6 +35,7 @@
 
 #include "trivia/util.h"
 #include "fiber.h"
+#include "tt_uuid.h"
 
 uint32_t snapshot_version;
 
@@ -244,6 +245,14 @@ tuple_field_cstr(struct tuple *tuple, uint32_t fieldno)
 	uint32_t len = 0;
 	const char *str = mp_decode_str(&field, &len);
 	return tuple_field_to_cstr(str, len);
+}
+
+void
+tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *result)
+{
+	const char *value = tuple_field_cstr(tuple, fieldno);
+	if (tt_uuid_from_string(value, result) != 0)
+		tnt_raise(ClientError, ER_INVALID_UUID, value);
 }
 
 char *

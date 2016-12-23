@@ -1915,20 +1915,6 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 /* {{{ cluster configuration */
 
 /**
- * Parse a tuple field which is expected to contain a string
- * representation of UUID, and return a 16-byte representation.
- */
-tt_uuid
-tuple_field_uuid(struct tuple *tuple, int fieldno)
-{
-	const char *value = tuple_field_cstr(tuple, fieldno);
-	tt_uuid uuid;
-	if (tt_uuid_from_string(value, &uuid) != 0)
-		tnt_raise(ClientError, ER_INVALID_UUID, value);
-	return uuid;
-}
-
-/**
  * This trigger is invoked only upon initial recovery, when
  * reading contents of the system spaces from the snapshot.
  *
@@ -1950,7 +1936,8 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	if (strcmp(key, "cluster") == 0) {
 		if (new_tuple == NULL)
 			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
-		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
+		tt_uuid uu;
+		tuple_field_uuid(new_tuple, 1, &uu);
 		CLUSTER_UUID = uu;
 	}
 }
@@ -1969,7 +1956,8 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 
 	if (new_tuple == NULL) {
-		struct tt_uuid old_uuid = tuple_field_uuid(stmt->old_tuple, 1);
+		struct tt_uuid old_uuid;
+		tuple_field_uuid(stmt->old_tuple, 1, &old_uuid);
 		struct server *server = server_by_uuid(&old_uuid);
 		assert(server != NULL);
 		server_clear_id(server);
@@ -1979,7 +1967,8 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	}
 
 	uint32_t id = tuple_field_u32(new_tuple, 0);
-	tt_uuid uuid = tuple_field_uuid(new_tuple, 1);
+	tt_uuid uuid;
+	tuple_field_uuid(new_tuple, 1, &uuid);
 	struct server *server = server_by_uuid(&uuid);
 	if (server != NULL) {
 		server_set_id(server, id);
@@ -2028,7 +2017,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 				  (unsigned) server_id);
 		if (server_id >= VCLOCK_MAX)
 			tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-		tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
+		tt_uuid server_uuid;
+		tuple_field_uuid(new_tuple, 1, &server_uuid);
 		if (tt_uuid_is_nil(&server_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&server_uuid));
@@ -2038,7 +2028,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			 * it requires an extra effort to keep _cluster
 			 * in sync with appliers and relays.
 			 */
-			tt_uuid old_uuid = tuple_field_uuid(old_tuple, 1);
+			tt_uuid old_uuid;
+			tuple_field_uuid(old_tuple, 1, &old_uuid);
 			if (!tt_uuid_is_equal(&server_uuid, &old_uuid)) {
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
