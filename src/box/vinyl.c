@@ -610,13 +610,14 @@ struct vy_run_info {
 	/* Min and max lsn over all statements in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;
-	/** Total siz eof run */
+	/** Total sizeof run */
 	uint64_t  total;
 	/** Pages meta. */
 	struct vy_page_info *page_infos;
 };
 
 struct vy_page_info {
+	/* count of statements in the page */
 	uint32_t count;
 	/* offset of page data in run */
 	uint64_t offset;
@@ -7414,8 +7415,8 @@ error:
 /**
  * Read a page requests from vinyl xlog data file.
  *
- * @retval page on success
- * @retval NULL on error, check diag
+ * @retval 0 on success
+ * @retval -1 on error, check diag
  */
 static int
 vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
@@ -7433,14 +7434,12 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	if (readen < 0) {
 		/* TODO: report filename */
 		diag_set(SystemError, "failed to read from file");
-		region_truncate(&fiber()->gc, region_svp);
-		return -1;
+		goto error;
 	}
 	if (readen != (ssize_t)page_info->size) {
 		/* TODO: replace with XlogError, report filename */
 		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
-		region_truncate(&fiber()->gc, region_svp);
-		return -1;
+		goto error;
 	}
 	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT, {usleep(50000);});
 
@@ -7630,19 +7629,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 }
 
 /**
- * Compare two positions
- */
-static int
-vy_run_iterator_cmp_pos(struct vy_run_iterator_pos pos1,
-			struct vy_run_iterator_pos pos2)
-{
-	return pos1.page_no < pos2.page_no ? -1 :
-		pos1.page_no > pos2.page_no ? 1 :
-		pos1.pos_in_page < pos2.pos_in_page ? -1 :
-		pos1.pos_in_page > pos2.pos_in_page;
-}
-
-/**
  * Read key and lsn by a given wide position.
  * For the first record in a page reads the result from the page
  * index instead of fetching it from disk.
@@ -7779,8 +7765,6 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const struct vy_stmt *key,
  * wide position.
  * @retval 0 success, set *pos to new value
  * @retval 1 EOF
- * @retval -1 read or memory error
- * @retval -2 invalid iterator
  * Affects: curr_loaded_page
  */
 static NODISCARD int
@@ -7791,28 +7775,25 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr,
 	*pos = itr->curr_pos;
 	assert(pos->page_no < itr->run->info.count);
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
-		if (pos->page_no == 0 && pos->pos_in_page == 0)
-			return 1;
 		if (pos->pos_in_page > 0) {
 			pos->pos_in_page--;
 		} else {
+			if (pos->page_no == 0)
+				return 1;
 			pos->page_no--;
-			struct vy_page *page;
-			int rc = vy_run_iterator_load_page(itr, pos->page_no,
-							   &page);
-			if (rc != 0)
-				return rc;
-			pos->pos_in_page = page->count - 1;
+			struct vy_page_info *page_info =
+				vy_run_page_info(itr->run, pos->page_no);
+			assert(page_info->count > 0);
+			pos->pos_in_page = page_info->count - 1;
 		}
 	} else {
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
-		struct vy_page *page;
-		int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
-		if (rc != 0)
-			return rc;
+		struct vy_page_info *page_info =
+			vy_run_page_info(itr->run, pos->page_no);
+		assert(page_info->count > 0);
 		pos->pos_in_page++;
-		if (pos->pos_in_page >= page->count) {
+		if (pos->pos_in_page >= page_info->count) {
 			pos->page_no++;
 			pos->pos_in_page = 0;
 			if (pos->page_no == itr->run->info.count)
@@ -7853,8 +7834,6 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		stmt = NULL;
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
 					      &itr->curr_pos);
-		if (rc < 0)
-			return rc;
 		if (rc > 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
@@ -8017,7 +7996,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 static struct vy_stmt_iterator_iface vy_run_iterator_iface;
 
 /**
- * Open the iterator
+ * Open the iterator.
  */
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
@@ -8066,8 +8045,8 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 	if (itr->search_ended)
 		return 0;
 	if (itr->curr_stmt != NULL) {
-		if (vy_run_iterator_cmp_pos(itr->curr_stmt_pos,
-					    itr->curr_pos) == 0) {
+		if (itr->curr_stmt_pos.page_no == itr->curr_pos.page_no &&
+		    itr->curr_stmt_pos.pos_in_page == itr->curr_pos.pos_in_page) {
 			*result = itr->curr_stmt;
 			return 0;
 		}
@@ -8075,18 +8054,12 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 		itr->curr_stmt = NULL;
 		itr->curr_stmt_pos.page_no = UINT32_MAX;
 	}
-
-	struct vy_page *page;
-	int rc = vy_run_iterator_load_page(itr, itr->curr_pos.page_no, &page);
-	if (rc != 0)
-		return rc;
-	itr->curr_stmt = vy_page_stmt(page, itr->curr_pos.pos_in_page,
-				      itr->index->format, itr->index->key_def);
-	if (itr->curr_stmt == NULL)
-		return -1;
-	itr->curr_stmt_pos = itr->curr_pos;
-	*result = itr->curr_stmt;
-	return 0;
+	int rc = vy_run_iterator_read(itr, itr->curr_pos, result);
+	if (rc == 0) {
+		itr->curr_stmt_pos = itr->curr_pos;
+		itr->curr_stmt = *result;
+	}
+	return rc;
 }
 
 /**
@@ -8155,15 +8128,12 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 		next_key = NULL;
 		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
-		if (rc != 0) {
-			if (rc > 0) {
-				vy_run_iterator_cache_clean(itr);
-				itr->search_ended = true;
-				rc = 0;
-			}
+		if (rc > 0) {
+			vy_run_iterator_cache_clean(itr);
+			itr->search_ended = true;
 			vy_stmt_unref(cur_key);
 			cur_key = NULL;
-			return rc;
+			return 0;
 		}
 
 		/*
@@ -8218,8 +8188,8 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 	struct vy_run_iterator_pos next_pos;
 	rc = vy_run_iterator_next_pos(itr, ITER_GE, &next_pos);
-	if (rc != 0)
-		return rc > 0 ? 0 : rc;
+	if (rc > 0)
+		return 0;
 
 	struct vy_stmt *cur_key;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
@@ -8601,7 +8571,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 /* TODO: move to c file and remove static keyword */
 
 /**
- * Open the iterator
+ * Open the iterator.
  */
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
@@ -8946,7 +8916,7 @@ vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
 /** Vtable for vy_stmt_iterator - declared below */
 static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 
-/* Open the iterator */
+/* Open the iterator. */
 static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
@@ -9192,7 +9162,7 @@ struct vy_merge_src {
 };
 
 /**
- * Open the iterator
+ * Open the iterator.
  */
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
@@ -9226,7 +9196,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 }
 
 /**
- * Close the iteator and free resources
+ * Close the iteator and free resources.
  */
 static void
 vy_merge_iterator_close(struct vy_merge_iterator *itr)
@@ -9275,7 +9245,7 @@ vy_merge_iterator_reserve(struct vy_merge_iterator *itr, uint32_t capacity)
 /**
  * Add another source to merge iterator. Must be called before actual
  * iteration start and must not be called after.
- * See necessary order of adding requirements in struct vy_merge_iterator
+ * @sa necessary order of adding requirements in struct vy_merge_iterator
  * comments.
  * The resulting vy_stmt_iterator must be properly initialized before merge
  * iteration start.
