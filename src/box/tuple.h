@@ -784,6 +784,15 @@ tuple_bless(struct tuple *tuple)
 	return tuple;
 }
 
+static inline struct tuple *
+tuple_new_xc(struct tuple_format *format, const char *data, const char *end)
+{
+	struct tuple *tuple = tuple_new(format, data, end);
+	if (tuple == NULL)
+		diag_raise();
+	return tuple;
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */

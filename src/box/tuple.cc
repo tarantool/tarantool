@@ -320,9 +320,7 @@ tuple_update(struct tuple_format *format,
 	if (new_data == NULL)
 		diag_raise();
 
-	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
-	if (ret == NULL)
-		diag_raise();
+	struct tuple *ret = tuple_new_xc(format, new_data, new_data + new_size);
 	return ret;
 }
 
@@ -341,9 +339,7 @@ tuple_upsert(struct tuple_format *format,
 	if (new_data == NULL)
 		diag_raise();
 
-	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
-	if (ret == NULL)
-		diag_raise();
+	struct tuple *ret = tuple_new_xc(format, new_data, new_data + new_size);
 	return ret;
 }
 
@@ -452,11 +448,8 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 	struct tuple *ret = tuple_new(format, data, end);
 	if (ret == NULL)
 		return NULL;
-	try {
-		return tuple_bless(ret);
-	} catch (Exception *e) {
-		return NULL;
-	}
+	/* Can't throw on zero refs. */
+	return tuple_bless(ret);
 }
 
 int
