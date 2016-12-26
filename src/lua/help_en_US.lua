@@ -60,7 +60,7 @@ t = {"Olá", "Lua"}
 n, t[1], t[2]
 ------------------
 
-Take all three lines and enter them below after the
+Take all the three lines and enter them below after the
 "tarantool>" prompt, then type Enter.
 Or try different values in a different order.
 When you’re ready to go to the next screen, enter <tutorial("next")>.
@@ -298,7 +298,7 @@ tasks each get a slice, but they have to yield
 occasionally so that other tasks get a chance.
 That’s what a properly designed fiber will do.
 More in the Tarantool manual:
-http://tarantool.org/doc/reference/fiber.html
+http://tarantool.org/doc/reference/reference_lua/fiber.html
 
 Request #11 is:
 
@@ -349,7 +349,7 @@ The response will be short, for example
 "- "HTTP/1.1 302 OK\r\n""
 but it shows you’ve gotten in touch with a distant server.
 More in the Tarantool manual:
-http://tarantool.org/doc/reference/socket.html
+http://tarantool.org/doc/reference/reference_lua/socket.html
 ]];
 
 [[
@@ -443,7 +443,7 @@ That’s all you need to replace the rest of the fields with
 new values. The syntax of box.replace(), pared down, is:
 box.space.tutor:replace{primary-key-field, other-fields}
 More in the Tarantool manual:
-http://tarantool.org/doc/book/box/box_schema.html
+http://tarantool.org/doc/book/box/box_space.html#lua-function.space_object.replace
 Tarantool by default keeps database changes in memory,
 but box.replace() will cause a write to a log, and log
 information can later be consolidated with another box
@@ -496,7 +496,7 @@ Indexes can be declared to be "unique", which
 is important because some combination of the
 fields must be unique, for identification purposes.
 More in the Tarantool manual:
-http://tarantool.org/doc/book/box/box_space.html#lua-function.space_object.create_index
+https://tarantool.org/doc/book/box/data_model.html#index
 
 Request #17 is:
 
@@ -566,13 +566,13 @@ package requires, and database-manipulations you want,
 here on this screen. But to really get into Tarantool,
 you should download it so that you can be your own
 administrator and create your own permanent databases. The
-Tarantool manual has two significant tutorials:
+Tarantool manual has three significant tutorials:
 
-Insert one million tuples with a Lua stored procedure
-http://tarantool.org/doc/book/app/c_lua_tutorial.html#insert-one-million-tuples-with-a-lua-stored-procedure
-and
-Sum a JSON field for all tuples
-http://tarantool.org/doc/book/app/c_lua_tutorial.html#sum-a-json-field-for-all-tuples
+Insert one million tuples with a Lua stored procedure,
+Sum a JSON field for all tuples, and
+Indexed pattern search.
+
+See http://tarantool.org/en/doc/tutorials/lua_tutorials.html
 
 Request #20 is:
 
