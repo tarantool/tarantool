@@ -3693,58 +3693,45 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 	return stmt->lsn <= run->info.max_lsn;
 }
 
-/**
- * Iterate over the write set of a single index
- * and flush it to the active in-memory tree of this index.
- *
- * Break when the write set begins pointing at the next index.
+/*
+ * Commit a single write operation made by a transaction.
  */
-static struct txv *
-vy_tx_write(write_set_t *write_set, struct txv *v, enum vinyl_status status,
-	    int64_t lsn)
+static int
+vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
+	struct vy_stmt *stmt = v->stmt;
 	struct vy_range *range = NULL;
 
-	/* Sic: the loop below must not yield after recovery */
-	for (; v && v->index == index; v = write_set_next(write_set, v)) {
+	stmt->lsn = lsn;
 
-		struct vy_stmt *stmt = v->stmt;
-		stmt->lsn = lsn;
-
-		/**
-		 * If we're recovering the WAL, it may happen so
-		 * that this particular run was dumped after the
-		 * checkpoint, and we're replaying records already
-		 * present in the database.
-		 * In this case avoid overwriting a newer version with
-		 * an older one.
-		 */
-		if (status == VINYL_FINAL_RECOVERY_LOCAL ||
-		    status == VINYL_FINAL_RECOVERY_REMOTE) {
-			if (vy_stmt_is_committed(index, stmt))
-				continue;
-		}
-		/* match range */
-		range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-						  index->format, index->key_def,
-						  stmt);
-		int rc;
-		switch (stmt->type) {
-		case IPROTO_UPSERT:
-			rc = vy_range_set_upsert(range, stmt);
-			break;
-		case IPROTO_DELETE:
-			rc = vy_range_set_delete(range, stmt);
-			break;
-		default:
-			rc = vy_range_set(range, stmt, stmt->lsn);
-			break;
-		}
-		assert(rc == 0); /* TODO: handle BPS tree errors properly */
-		(void) rc;
+	/*
+	 * If we're recovering the WAL, it may happen so that this
+	 * particular run was dumped after the checkpoint, and we're
+	 * replaying records already present in the database. In this
+	 * case avoid overwriting a newer version with an older one.
+	 */
+	if (status == VINYL_FINAL_RECOVERY_LOCAL ||
+	    status == VINYL_FINAL_RECOVERY_REMOTE) {
+		if (vy_stmt_is_committed(index, stmt))
+			return 0;
 	}
-	return v;
+	/* Match range. */
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
+					  index->format, index->key_def, stmt);
+	int rc;
+	switch (stmt->type) {
+	case IPROTO_UPSERT:
+		rc = vy_range_set_upsert(range, stmt);
+		break;
+	case IPROTO_DELETE:
+		rc = vy_range_set_delete(range, stmt);
+		break;
+	default:
+		rc = vy_range_set(range, stmt, stmt->lsn);
+		break;
+	}
+	return rc;
 }
 
 /* {{{ Scheduler Task */
@@ -6733,23 +6720,28 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	if (lsn > e->xm->lsn)
 		e->xm->lsn = lsn;
 
+	struct txv *v, *tmp;
 	struct vy_quota *quota = &e->quota;
 	struct lsregion *allocator = &e->allocator;
-
-	/* Flush transactional changes to the index. */
-	struct txv *v = write_set_first(&tx->write_set);
-
 	size_t mem_used_before = lsregion_used(allocator);
-
+	/*
+	 * Flush transactional changes to the index.
+	 * Sic: the loop below must not yield after recovery.
+	 */
 	uint64_t write_count = 0;
-	/** @todo: check return value of vy_tx_write(). */
-	while (v != NULL) {
-		++write_count;
-		v = vy_tx_write(&tx->write_set, v, e->status, lsn);
+	struct vy_index *prev_index = NULL;
+	for (v = write_set_first(&tx->write_set);
+	     v != NULL; v = write_set_next(&tx->write_set, v)) {
+		if (v->index != prev_index) {
+			prev_index = v->index;
+			write_count++;
+		}
+		int rc = vy_tx_write(v, e->status, lsn);
+		assert(rc == 0); /* TODO: handle BPS tree errors properly */
+		(void)rc;
 	}
 
 	uint32_t count = 0;
-	struct txv *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		count++;
 		txv_delete(v);
