@@ -22,6 +22,8 @@ cfg_filter(box.cfg)
     - false
   - - coredump
     - false
+  - - hot_standby
+    - false
   - - listen
     - <hidden>
   - - log_level

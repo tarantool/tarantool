@@ -107,7 +107,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header);
 void
 box_check_config();
 
-void box_set_listen(void);
+void box_bind(void);
+void box_listen(void);
 void box_set_replication_source(void);
 void box_set_log_level(void);
 void box_set_io_collect_interval(void);

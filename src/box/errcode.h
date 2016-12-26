@@ -176,9 +176,10 @@ struct errcode_record {
 	/*121 */_(ER_SUB_STMT_MAX,		"Can not execute a nested statement: nesting limit reached") \
 	/*122 */_(ER_COMMIT_IN_SUB_STMT,	"Can not commit transaction in a nested statement") \
 	/*123 */_(ER_ROLLBACK_IN_SUB_STMT,	"Rollback called in a nested statement") \
-	/*125 */_(ER_DECOMPRESSION,		"Decompression error: %s") \
-	/*126 */_(ER_INVALID_XLOG_TYPE,		"Invalid xlog type: expected %s, got %s") \
-	/*127 */_(ER_INVALID_RUN_ID,		"Invalid run id: expected %lld, got %lld") \
+	/*124 */_(ER_DECOMPRESSION,		"Decompression error: %s") \
+	/*125 */_(ER_INVALID_XLOG_TYPE,		"Invalid xlog type: expected %s, got %s") \
+	/*126 */_(ER_INVALID_RUN_ID,		"Invalid run id: expected %lld, got %lld") \
+	/*127 */_(ER_HOT_STANDBY_DISABLED,	"Can't run more than one instance on same directory without hot standby option")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -44,6 +44,7 @@ local default_cfg = {
     username            = nil,
     coredump            = false,
     read_only           = false,
+    hot_standby	        = false,
 
     -- snapshot_daemon
     snapshot_period     = 0,        -- 0 = disabled
@@ -96,7 +97,8 @@ local template_cfg = {
     coredump            = 'boolean',
     snapshot_period     = 'number',
     snapshot_count      = 'number',
-    read_only           = 'boolean'
+    read_only           = 'boolean',
+    hot_standby         = 'boolean'
 }
 
 local function normalize_uri(port)

@@ -8,5 +8,6 @@ box.cfg({
     wal_dir             = "master",
     snap_dir            = "master",
     vinyl_dir           = "master",
+    hot_standby		= true,
 })
 

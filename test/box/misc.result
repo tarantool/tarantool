@@ -286,9 +286,10 @@ end;
 t;
 ---
 - - 'box.error.CANT_UPDATE_PRIMARY_KEY : 94'
+  - 'box.error.injection : table: <address>
   - 'box.error.EXACT_MATCH : 19'
   - 'box.error.NO_SUCH_TRIGGER : 34'
-  - 'box.error.injection : table: <address>
+  - 'box.error.HOT_STANDBY_DISABLED : 127'
   - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.CLUSTER_ID_IS_RO : 65'
   - 'box.error.INVALID_XLOG_TYPE : 125'
