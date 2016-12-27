@@ -196,6 +196,12 @@
 #cmakedefine HAVE_PTHREAD_SET_NAME_NP 1
 
 #cmakedefine HAVE_PTHREAD_GETATTR_NP 1
+#cmakedefine HAVE_PTHREAD_ATTR_GET_NP 1
+
+#if defined(HAVE_PTHREAD_ATTR_GET_NP)
+#define pthread_getattr_np pthread_attr_get_np
+#endif
+
 #cmakedefine HAVE_PTHREAD_GET_STACKSIZE_NP 1
 #cmakedefine HAVE_PTHREAD_GET_STACKADDR_NP 1
 

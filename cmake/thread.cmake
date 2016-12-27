@@ -32,6 +32,12 @@ function (do_pthread_checks)
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_attr_t a; pthread_getattr_np(pthread_self(), &a); }
         " HAVE_PTHREAD_GETATTR_NP)
+    # pthread_attr_get_np - FreeBSD
+    check_c_source_compiles("
+        #include <pthread.h>
+        ${INCLUDE_MISC_PTHREAD_HEADERS}
+        int main() { pthread_attr_t a; pthread_attr_get_np(pthread_self(), &a); }
+        " HAVE_PTHREAD_ATTR_GET_NP)
     # pthread_get_stacksize_np - OSX
     check_c_source_compiles("
         #include <pthread.h>

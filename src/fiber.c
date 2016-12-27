@@ -803,8 +803,11 @@ cord_create(struct cord *cord, const char *name)
 #if (HAVE_PTHREAD_GET_STACKSIZE_NP && HAVE_PTHREAD_GET_STACKADDR_NP)
 	cord->sched.coro.stack_size = pthread_get_stacksize_np(cord->id);
 	cord->sched.coro.stack = pthread_get_stackaddr_np(cord->id);
-#elif HAVE_PTHREAD_GETATTR_NP
+#elif (HAVE_PTHREAD_GETATTR_NP || HAVE_PTHREAD_ATTR_GET_NP)
 	pthread_attr_t thread_attr;
+#if HAVE_PTHREAD_ATTR_GET_NP
+	pthread_attr_init(&thread_attr);
+#endif
 	pthread_getattr_np(cord->id, &thread_attr);
 	pthread_attr_getstack(&thread_attr, &cord->sched.coro.stack,
 	                      &cord->sched.coro.stack_size);
