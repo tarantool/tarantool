@@ -370,7 +370,7 @@ local function logger_parse(logger)
         logger = string_trim(logger:sub(6))
         return 'file', logger
     else
-        logger = strng_trim(logger)
+        logger = string_trim(logger)
         return 'file', logger
     end
 end
@@ -520,9 +520,11 @@ local function wrapper_cfg(cfg)
     local success, data = pcall(orig_cfg, cfg)
     if not success then
         log.error("Configuration failed: %s", data)
-        local log_type, log_args = logger_parse(cfg.logger)
-        if log_type == 'file' and fio.stat(log_args) then
-            os.execute('tail -n 10 ' .. log_args)
+        if type(cfg) ~= 'function' then
+            local log_type, log_args = logger_parse(cfg.logger)
+            if log_type == 'file' and fio.stat(log_args) then
+                os.execute('tail -n 10 ' .. log_args)
+            end
         end
         os.exit(1)
     end
@@ -541,11 +543,36 @@ local function wrapper_cfg(cfg)
     return data
 end
 
+-- It's not 100% result guaranteed function, but it's ok for most cases
+-- Won't help in multiple race-conditions
+-- Returns nil if tarantool already started, PID otherwise
+local function start_check()
+    local pid_file = default_cfg.pid_file
+
+    local fh = fio.open(pid_file, 'O_RDONLY')
+    if fh == nil then
+        return nil
+    end
+
+    local pid = tonumber(fh:read(64))
+    fh:close()
+
+    if pid == nil or (ffi.C.kill(pid, 0) < 0 and errno() == errno.ESRCH) then
+        return nil
+    end
+    return pid
+end
+
 local function start()
     log.info("Starting instance...")
     local stat = check_file(instance_path)
     if stat ~= nil then
         log.error("Error, while checking syntax: halting")
+        return 1
+    end
+    local pid = start_check()
+    if pid then
+        log.error("The daemon is already running: PID %s", pid)
         return 1
     end
     box.cfg = wrapper_cfg
@@ -555,13 +582,16 @@ local function start()
     }
     shift_argv(arg, 0, 2)
     local success, data = pcall(dofile, instance_path)
-    -- if load fails - show last 10 lines of the log file
+    -- if load fails - show last 10 lines of the log file and exit
     if not success then
         log.error("Start failed: %s", data)
-        local log_type, log_args = logger_parse(cfg.logger)
-        if log_type == 'file' and fio.stat(log_args) then
-            os.execute('tail -n 10 ' .. log_args)
+        if type(box.cfg) ~= 'function' then
+            local log_type, log_args = logger_parse(box.cfg.logger)
+            if log_type == 'file' and fio.stat(log_args) then
+                os.execute('tail -n 10 ' .. log_args)
+            end
         end
+        os.exit(1)
     end
     return 0
 end
