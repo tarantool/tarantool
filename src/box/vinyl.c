@@ -73,6 +73,7 @@
 #include "index.h"
 
 #include "vy_stmt.h"
+#include "vy_quota.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -89,7 +90,6 @@ enum vinyl_status {
 	VINYL_ONLINE,
 };
 
-struct vy_quota;
 struct tx_manager;
 struct vy_scheduler;
 struct vy_task;
@@ -113,8 +113,6 @@ struct vy_env {
 	struct rlist indexes;
 	/** Configuration */
 	struct vy_conf      *conf;
-	/** Quota */
-	struct vy_quota     *quota;
 	/** TX manager */
 	struct tx_manager   *xm;
 	/** Scheduler */
@@ -131,49 +129,14 @@ struct vy_env {
 	struct lsregion     allocator;
 	/** Key for thread-local ZSTD context */
 	pthread_key_t       zdctx_key;
+	/** Memory quota */
+	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
 };
 
 #define vy_crcs(p, size, crc) \
 	crc32_calc(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
-
-struct vy_quota {
-	bool enable;
-	size_t limit;
-	size_t watermark;
-	size_t used;
-	struct ipc_cond cond;
-};
-
-static struct vy_quota *
-vy_quota_new(int64_t);
-
-static int
-vy_quota_delete(struct vy_quota*);
-
-static void
-vy_quota_enable(struct vy_quota*);
-
-static size_t
-vy_quota_used(struct vy_quota *q)
-{
-	return q->used;
-}
-
-static int
-vy_quota_used_percent(struct vy_quota *q)
-{
-	if (q->limit == 0)
-		return 0;
-	return (q->used * 100) / q->limit;
-}
-
-static bool
-vy_quota_exceeded(struct vy_quota *q)
-{
-	return q->used >= q->watermark;
-}
 
 struct vy_latency {
 	uint64_t count;
@@ -188,83 +151,6 @@ vy_latency_update(struct vy_latency *lat, double v)
 	lat->total += v;
 	if (v > lat->max)
 		lat->max = v;
-}
-
-static struct vy_quota *
-vy_quota_new(int64_t limit)
-{
-	struct vy_quota *q = malloc(sizeof(*q));
-	if (q == NULL) {
-		diag_set(OutOfMemory, sizeof(*q), "quota", "struct");
-		return NULL;
-	}
-	q->enable = false;
-	q->limit  = limit;
-	q->watermark = limit;
-	q->used   = 0;
-	ipc_cond_create(&q->cond);
-	return q;
-}
-
-static int
-vy_quota_delete(struct vy_quota *q)
-{
-	ipc_cond_broadcast(&q->cond);
-	ipc_cond_destroy(&q->cond);
-	free(q);
-	return 0;
-}
-
-static void
-vy_quota_enable(struct vy_quota *q)
-{
-	q->enable = true;
-}
-
-static void
-vy_quota_use(struct vy_quota *q, size_t size,
-	     struct ipc_cond *no_quota_cond)
-{
-	q->used += size;
-	while (q->enable) {
-		if (q->used >= q->watermark)
-			ipc_cond_signal(no_quota_cond);
-		if (q->used < q->limit)
-			break;
-		ipc_cond_wait(&q->cond);
-	}
-}
-
-static void
-vy_quota_force_use(struct vy_quota *q, size_t size)
-{
-	q->used += size;
-}
-
-static void
-vy_quota_release(struct vy_quota *q, size_t size)
-{
-	assert(q->used >= size);
-	q->used -= size;
-	if (q->used < q->limit)
-		ipc_cond_broadcast(&q->cond);
-}
-
-static void
-vy_quota_update_watermark(struct vy_quota *q, uint64_t max_range_size,
-			  int64_t tx_write_rate, int64_t dump_bandwidth)
-{
-	/*
-	 * In order to avoid throttling transactions due to the hard
-	 * memory limit, we start dumping ranges beforehand, after
-	 * exceeding the memory watermark. The gap between the watermark
-	 * and the hard limit is set to such a value that should allow
-	 * us to dump the biggest range before the hard limit is hit,
-	 * basing on average write rate and disk bandwidth.
-	 */
-	double watermark = (double)q->limit - (double)max_range_size *
-			   tx_write_rate / dump_bandwidth;
-	q->watermark = watermark > 0 ? (size_t) watermark : 0;
 }
 
 static int
@@ -4345,6 +4231,8 @@ struct vy_scheduler {
 	 */
 	struct ev_async scheduler_async;
 	struct ipc_cond scheduler_cond;
+	/** Used for throttling tx when quota is full. */
+	struct ipc_cond quota_cond;
 	/**
 	 * A queue with all vy_task objects created by the
 	 * scheduler and not yet taken by a worker.
@@ -4395,6 +4283,29 @@ static void
 vy_scheduler_stop(struct vy_scheduler *scheduler);
 
 static void
+vy_scheduler_quota_cb(enum vy_quota_event event, void *arg)
+{
+	struct vy_scheduler *scheduler = arg;
+
+	if (scheduler->env->status != VINYL_ONLINE)
+		return;
+
+	switch (event) {
+	case VY_QUOTA_EXCEEDED:
+		ipc_cond_signal(&scheduler->scheduler_cond);
+		break;
+	case VY_QUOTA_THROTTLED:
+		ipc_cond_wait(&scheduler->quota_cond);
+		break;
+	case VY_QUOTA_RELEASED:
+		ipc_cond_broadcast(&scheduler->quota_cond);
+		break;
+	default:
+		unreachable();
+	}
+}
+
+static void
 vy_scheduler_async_cb(ev_loop *loop, struct ev_async *watcher, int events)
 {
 	(void) loop;
@@ -4425,6 +4336,7 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->loop = loop();
 	ev_async_init(&scheduler->scheduler_async, vy_scheduler_async_cb);
 	ipc_cond_create(&scheduler->scheduler_cond);
+	ipc_cond_create(&scheduler->quota_cond);
 	mempool_create(&scheduler->task_pool, cord_slab_cache(),
 			sizeof(struct vy_task));
 	return scheduler;
@@ -4443,6 +4355,7 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
 	TRASH(&scheduler->scheduler_async);
 	ipc_cond_destroy(&scheduler->scheduler_cond);
+	ipc_cond_destroy(&scheduler->quota_cond);
 	tt_pthread_mutex_destroy(&scheduler->mutex);
 	free(scheduler);
 }
@@ -4489,7 +4402,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, nodedump);
-		if (!vy_quota_exceeded(scheduler->env->quota) &&
+		if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
 		    range->min_lsn > scheduler->checkpoint_lsn)
 			return 0; /* nothing to do */
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
@@ -4849,7 +4762,7 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	lsregion_gc(allocator, scheduler->mem_min_lsn);
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(env->quota, mem_used_before - mem_used_after);
+	vy_quota_release(&env->quota, mem_used_before - mem_used_after);
 
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn) {
 		/*
@@ -5116,11 +5029,12 @@ static void
 vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
 {
 	char buf[16];
+	struct vy_quota *q = &env->quota;
 	vy_info_table_begin(h, "memory");
-	vy_info_append_u64(h, "used", vy_quota_used(env->quota));
-	vy_info_append_u64(h, "limit", env->conf->memory_limit);
-	vy_info_append_u64(h, "watermark", env->quota->watermark);
-	snprintf(buf, sizeof(buf), "%d%%", vy_quota_used_percent(env->quota));
+	vy_info_append_u64(h, "used", q->used);
+	vy_info_append_u64(h, "limit", q->limit);
+	vy_info_append_u64(h, "watermark", q->watermark);
+	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
 	vy_info_append_str(h, "ratio", buf);
 	vy_info_append_u64(h, "min_lsn", env->scheduler->mem_min_lsn);
 	vy_info_table_end(h);
@@ -6818,7 +6732,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	if (lsn > e->xm->lsn)
 		e->xm->lsn = lsn;
 
-	struct vy_quota *quota = e->quota;
+	struct vy_quota *quota = &e->quota;
 	struct lsregion *allocator = &e->allocator;
 
 	/* Flush transactional changes to the index. */
@@ -6847,7 +6761,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	TRASH(tx);
 	free(tx);
 
-	vy_quota_use(quota, write_size, &e->scheduler->scheduler_cond);
+	vy_quota_use(quota, write_size);
 	return 0;
 }
 
@@ -6932,7 +6846,7 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	int64_t tx_write_rate = vy_stat_tx_write_rate(e->stat);
 	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
 
-	uint64_t max_range_size = 0;
+	size_t max_range_size = 0;
 	struct heap_iterator it;
 	vy_dump_heap_iterator_init(&e->scheduler->dump_heap, &it);
 	struct heap_node *pn = vy_dump_heap_iterator_next(&it);
@@ -6942,7 +6856,7 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 		max_range_size = range->used;
 	}
 
-	vy_quota_update_watermark(e->quota, max_range_size,
+	vy_quota_update_watermark(&e->quota, max_range_size,
 				  tx_write_rate, dump_bandwidth);
 }
 
@@ -6973,9 +6887,6 @@ vy_env_new(void)
 	e->conf = vy_conf_new();
 	if (e->conf == NULL)
 		goto error_conf;
-	e->quota = vy_quota_new(e->conf->memory_limit);
-	if (e->quota == NULL)
-		goto error_quota;
 	e->xm = tx_manager_new(e);
 	if (e->xm == NULL)
 		goto error_xm;
@@ -6997,6 +6908,8 @@ vy_env_new(void)
 	lsregion_create(&e->allocator, slab_cache->arena);
 	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
+	vy_quota_init(&e->quota, e->conf->memory_limit,
+		      vy_scheduler_quota_cb, e->scheduler);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
@@ -7008,8 +6921,6 @@ error_sched:
 error_stat:
 	tx_manager_delete(e->xm);
 error_xm:
-	vy_quota_delete(e->quota);
-error_quota:
 	vy_conf_delete(e->conf);
 error_conf:
 	free(e);
@@ -7026,7 +6937,6 @@ vy_env_delete(struct vy_env *e)
 	//assert(rlist_empty(&e->db));
 	tx_manager_delete(e->xm);
 	vy_conf_delete(e->conf);
-	vy_quota_delete(e->quota);
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->read_task_pool);
@@ -7044,8 +6954,6 @@ vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_ONLINE;
-	/* enable quota */
-	vy_quota_enable(e->quota);
 }
 
 void
@@ -7082,8 +6990,6 @@ vy_end_recovery(struct vy_env *e)
 	assert(e->status == VINYL_FINAL_RECOVERY_LOCAL ||
 	       e->status == VINYL_FINAL_RECOVERY_REMOTE);
 	e->status = VINYL_ONLINE;
-	/* enable quota */
-	vy_quota_enable(e->quota);
 	/* Start scheduler if there is at least one index */
 	if (!rlist_empty(&e->indexes))
 		vy_scheduler_start(e->scheduler);
@@ -10375,7 +10281,7 @@ vy_squash_process(struct vy_squash *squash)
 	assert(mem_used_after >= mem_used_before);
 	vy_stmt_unref(result);
 	if (rc == 0)
-		vy_quota_force_use(env->quota,
+		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
 	return rc;
 }
