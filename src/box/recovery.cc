@@ -543,7 +543,6 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 */
 	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r, stream, NULL);
-	recovery_close_log(r);
 
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.
