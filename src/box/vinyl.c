@@ -4278,9 +4278,11 @@ struct vy_scheduler {
 #define VY_SCHEDULER_TIMEOUT_MAX		60
 
 static void
-vy_scheduler_start(struct vy_scheduler *scheduler);
+vy_scheduler_start_workers(struct vy_scheduler *scheduler);
 static void
-vy_scheduler_stop(struct vy_scheduler *scheduler);
+vy_scheduler_stop_workers(struct vy_scheduler *scheduler);
+static int
+vy_scheduler_f(va_list va);
 
 static void
 vy_scheduler_quota_cb(enum vy_quota_event event, void *arg)
@@ -4339,14 +4341,24 @@ vy_scheduler_new(struct vy_env *env)
 	ipc_cond_create(&scheduler->quota_cond);
 	mempool_create(&scheduler->task_pool, cord_slab_cache(),
 			sizeof(struct vy_task));
+	/* Start scheduler fiber. */
+	scheduler->scheduler = fiber_new("vinyl.scheduler", vy_scheduler_f);
+	if (scheduler->scheduler == NULL)
+		panic("failed to start vinyl scheduler fiber");
+	fiber_start(scheduler->scheduler, scheduler);
 	return scheduler;
 }
 
 static void
 vy_scheduler_delete(struct vy_scheduler *scheduler)
 {
+	/* Stop scheduler fiber. */
+	scheduler->scheduler = NULL;
+	/* Sic: fiber_cancel() can't be used here. */
+	ipc_cond_signal(&scheduler->scheduler_cond);
+
 	if (scheduler->is_worker_pool_running)
-		vy_scheduler_stop(scheduler);
+		vy_scheduler_stop_workers(scheduler);
 
 	mempool_destroy(&scheduler->task_pool);
 	diag_destroy(&scheduler->diag);
@@ -4499,10 +4511,16 @@ vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct vy_env *env = scheduler->env;
-	int workers_available = scheduler->worker_pool_size;
 	bool warning_said = false;
 
-	while (scheduler->is_worker_pool_running) {
+	/* Start worker threads on demand. */
+	ipc_cond_wait(&scheduler->scheduler_cond);
+	if (scheduler->scheduler == NULL)
+		return 0; /* destroyed */
+	vy_scheduler_start_workers(scheduler);
+
+	int workers_available = scheduler->worker_pool_size;
+	while (scheduler->scheduler != NULL) {
 		struct stailq output_queue;
 		struct vy_task *task, *next;
 		int tasks_failed = 0, tasks_done = 0;
@@ -4658,7 +4676,7 @@ vy_worker_f(va_list va)
 }
 
 static void
-vy_scheduler_start(struct vy_scheduler *scheduler)
+vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 {
 	assert(!scheduler->is_worker_pool_running);
 	assert(scheduler->env->status == VINYL_ONLINE);
@@ -4668,38 +4686,24 @@ vy_scheduler_start(struct vy_scheduler *scheduler)
 	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
 	if (scheduler->worker_pool_size < 0)
 		scheduler->worker_pool_size = 1;
-	scheduler->worker_pool = NULL;
 	stailq_create(&scheduler->input_queue);
 	stailq_create(&scheduler->output_queue);
 	scheduler->worker_pool = (struct cord *)
 		calloc(scheduler->worker_pool_size, sizeof(struct cord));
 	if (scheduler->worker_pool == NULL)
 		panic("failed to allocate vinyl worker pool");
+	ev_async_start(scheduler->loop, &scheduler->scheduler_async);
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
 		cord_costart(&scheduler->worker_pool[i], "vinyl.worker",
 			     vy_worker_f, scheduler);
 	}
-
-	/* Start scheduler fiber */
-	ev_async_start(scheduler->loop, &scheduler->scheduler_async);
-	scheduler->scheduler = fiber_new("vinyl.scheduler", vy_scheduler_f);
-	if (scheduler->scheduler == NULL)
-		panic("failed to start vinyl scheduler fiber");
-	fiber_set_joinable(scheduler->scheduler, false);
-	fiber_start(scheduler->scheduler, scheduler);
 }
 
 static void
-vy_scheduler_stop(struct vy_scheduler *scheduler)
+vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 {
 	assert(scheduler->is_worker_pool_running);
-
-	/* Stop scheduler fiber */
 	scheduler->is_worker_pool_running = false;
-	ev_async_stop(scheduler->loop, &scheduler->scheduler_async);
-	/* Sic: fiber_cancel() can't be used here */
-	ipc_cond_signal(&scheduler->scheduler_cond);
-	scheduler->scheduler = NULL;
 
 	/* Abort all pending tasks and wake up worker threads */
 	tt_pthread_mutex_lock(&scheduler->mutex);
@@ -4716,6 +4720,7 @@ vy_scheduler_stop(struct vy_scheduler *scheduler)
 	/* Join worker threads */
 	for (int i = 0; i < scheduler->worker_pool_size; i++)
 		cord_join(&scheduler->worker_pool[i]);
+	ev_async_stop(scheduler->loop, &scheduler->scheduler_async);
 	free(scheduler->worker_pool);
 	scheduler->worker_pool = NULL;
 	scheduler->worker_pool_size = 0;
@@ -4781,12 +4786,7 @@ vy_checkpoint(struct vy_env *env)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
 
-	/*
-	 * Do not initiate checkpoint during bootstrap,
-	 * thread pool is not up yet.
-	 */
-	if (!scheduler->is_worker_pool_running)
-		return 0;
+	assert(env->status == VINYL_ONLINE);
 
 	scheduler->checkpoint_lsn = env->xm->lsn;
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn)
@@ -5210,18 +5210,12 @@ int
 vy_index_open(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
-	struct vy_scheduler *scheduler = env->scheduler;
 
 	if (vy_index_open_or_create(index) != 0)
 		return -1;
 
 	vy_index_ref(index);
 	rlist_add(&env->indexes, &index->link);
-
-	/* Start scheduler threads on demand */
-	if (!scheduler->is_worker_pool_running && env->status == VINYL_ONLINE)
-		vy_scheduler_start(scheduler);
-
 	return 0;
 }
 
@@ -6990,9 +6984,6 @@ vy_end_recovery(struct vy_env *e)
 	assert(e->status == VINYL_FINAL_RECOVERY_LOCAL ||
 	       e->status == VINYL_FINAL_RECOVERY_REMOTE);
 	e->status = VINYL_ONLINE;
-	/* Start scheduler if there is at least one index */
-	if (!rlist_empty(&e->indexes))
-		vy_scheduler_start(e->scheduler);
 }
 
 /** }}} Recovery */
