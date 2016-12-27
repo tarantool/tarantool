@@ -643,9 +643,7 @@ coio_service_init(struct coio_service *service, const char *name,
 void
 coio_service_start(struct evio_service *service, const char *uri)
 {
-	const double BIND_RETRY_DELAY = 0.1;
-	while (evio_service_bind(service, uri) != 0)
-		fiber_sleep(BIND_RETRY_DELAY);
+	evio_service_bind(service, uri);
 	evio_service_listen(service);
 }
 

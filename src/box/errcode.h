@@ -179,7 +179,7 @@ struct errcode_record {
 	/*124 */_(ER_DECOMPRESSION,		"Decompression error: %s") \
 	/*125 */_(ER_INVALID_XLOG_TYPE,		"Invalid xlog type: expected %s, got %s") \
 	/*126 */_(ER_INVALID_RUN_ID,		"Invalid run id: expected %lld, got %lld") \
-	/*127 */_(ER_HOT_STANDBY_DISABLED,	"Can't run more than one instance on same directory without hot standby option")
+	/*127 */_(ER_ALREADY_RUNNING,		"Failed to lock WAL directory %s and hot_standby mode is off")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

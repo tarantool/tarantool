@@ -45,6 +45,7 @@ extern const char *wal_mode_STRS[];
 
 extern struct wal_writer *wal;
 extern struct rmean *rmean_tx_wal_bus;
+extern int wal_dir_lock;
 
 #if defined(__cplusplus)
 

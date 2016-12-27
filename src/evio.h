@@ -100,13 +100,8 @@ evio_service_init(ev_loop *loop,
 				    int, struct sockaddr *, socklen_t),
 		  void *on_accept_param);
 
-/**
- * Bind service to specified uri
- *
- * @retval 0 for success
- * @retval -1 for address in use
- */
-int
+/** Bind service to specified uri */
+void
 evio_service_bind(struct evio_service *service, const char *uri);
 
 /**

@@ -42,6 +42,8 @@
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
+int wal_dir_lock = -1;
+
 /*
  * WAL writer - maintain a Write Ahead Log for every change
  * in the data state.

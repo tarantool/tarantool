@@ -192,6 +192,10 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 	}
 }
 
+/*
+ * Check if the unix socket which we file to create exists and
+ * no one is listening on it. Unlink the file if it's the case.
+ */
 static bool
 evio_service_reuse_addr(struct evio_service *service)
 {
@@ -222,9 +226,8 @@ err:
  * Try to bind on the configured port.
  *
  * Throws an exception if error.
- * Returns -1 if the address is already in use
  */
-static int
+static void
 evio_service_bind_addr(struct evio_service *service)
 {
 	say_debug("%s: binding to %s...", evio_service_name(service),
@@ -241,7 +244,7 @@ evio_service_bind_addr(struct evio_service *service)
 		assert(errno == EADDRINUSE);
 		if (!evio_service_reuse_addr(service) ||
 			sio_bind(fd, &service->addr, service->addr_len)) {
-			return -1;
+			tnt_raise(SocketError, fd, "bind");
 		}
 	}
 
@@ -252,7 +255,6 @@ evio_service_bind_addr(struct evio_service *service)
 	ev_io_set(&service->ev, fd, EV_READ);
 
 	fd_guard.is_active = false;
-	return 0;
 }
 
 /**
@@ -300,7 +302,7 @@ evio_service_init(ev_loop *loop,
 /**
  * Try to bind.
  */
-int
+void
 evio_service_bind(struct evio_service *service, const char *uri)
 {
 	struct uri u;
@@ -352,10 +354,8 @@ evio_service_bind(struct evio_service *service, const char *uri)
 			/* ignore */
 		}
 	}
-
 	tnt_raise(SocketError, -1, "%s: failed to bind",
 		  evio_service_name(service));
-	return -1;
 }
 
 /** It's safe to stop a service which is not started yet. */

@@ -73,6 +73,7 @@ set (core_sources
      rmean.c
      histogram.c
      util.c
+     path_lock.c
  )
 
 add_library(core STATIC ${core_sources})

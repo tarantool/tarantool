@@ -30,8 +30,6 @@
  */
 #include "box/box.h"
 
-#include <sys/file.h>
-
 #include <say.h>
 #include <scoped_guard.h>
 #include "iproto.h"
@@ -66,6 +64,7 @@
 #include "xrow.h"
 #include "xrow_io.h"
 #include "authentication.h"
+#include "path_lock.h"
 
 static char status[64] = "unknown";
 
@@ -448,8 +447,7 @@ box_bind(void)
 void
 box_listen(void)
 {
-	if (cfg_gets("listen") != NULL)
-		iproto_listen();
+	iproto_listen();
 }
 
 void
@@ -1294,30 +1292,6 @@ engine_init()
 }
 
 /**
- * Open file descriptor and lock it
- *
- * @retval 0 if path was locked
- * @retval 1 if can't lock path
- */
-static int lock_fd = -1;
-static int
-box_lock_path(const char *path)
-{
-	assert(lock_fd == -1);
-	lock_fd = open(path, O_RDONLY);
-	if (lock_fd < 0)
-		tnt_raise(SystemError, "Can't open path: %s", path);
-	if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
-		close(lock_fd);
-		lock_fd = -1;
-		if (errno != EWOULDBLOCK)
-			tnt_raise(SystemError, "Can't lock path: %s", path);
-		return 1;
-	}
-	return 0;
-}
-
-/**
  * Initialize the first server of a new cluster
  */
 static void
@@ -1451,6 +1425,8 @@ box_init(void)
 	session_init();
 
 	cluster_init();
+	port_init();
+	iproto_init();
 
 	title("loading");
 
@@ -1461,41 +1437,35 @@ box_init(void)
 	xstream_create(&final_join_stream, apply_row);
 	xstream_create(&subscribe_stream, apply_subscribe_row);
 
-	bool hot_standby_enabled = cfg_geti("hot_standby");
-	bool is_hot_standby = box_lock_path(cfg_gets("snap_dir"));
-	if (is_hot_standby) {
-		if (!hot_standby_enabled)
-			tnt_raise(ClientError, ER_HOT_STANDBY_DISABLED);
-		say_warn("Entering hot standby mode");
-	}
-
 	struct vclock checkpoint_vclock;
+	vclock_create(&checkpoint_vclock);
 	int64_t lsn = recovery_last_checkpoint(&checkpoint_vclock);
-	while (is_hot_standby && lsn == -1) {
+	recovery = recovery_new(cfg_gets("wal_dir"),
+				cfg_geti("panic_on_wal_error"),
+				&checkpoint_vclock);
+	/*
+	 * Lock the write ahead log directory to avoid multiple
+	 * instances running in the same dir.
+	 */
+	if (path_lock(cfg_gets("wal_dir"), &wal_dir_lock) < 0)
+		diag_raise();
+	if (wal_dir_lock < 0) {
 		/**
-		 * We are hot standby but master wasn't
-		 * bootstraped yet
+		 * The directory is busy and hot standby mode is off:
+		 * refuse to start. In hot standby mode, a busy
+		 * WAL dir must contain at least one xlog.
 		 */
-		fiber_sleep(0.1);
-		/**
-		 * Master can go away until we wait for bootsraping,
-		 * reacquire snap dir lock
+		if (!cfg_geti("hot_standby") || lsn == -1)
+			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
+	} else {
+		/*
+		 * Try to bind the port before recovery, to fail
+		 * early if the port is busy. In hot standby mode,
+		 * the port is most likely busy.
 		 */
-		is_hot_standby = box_lock_path(cfg_gets("snap_dir"));
-		/** Rescan snap dir */
-		lsn = recovery_last_checkpoint(&checkpoint_vclock);
+		box_bind();
 	}
 	if (lsn != -1) {
-		/* Start network */
-		port_init();
-		iproto_init();
-		if (!is_hot_standby)
-			/* Standalone server, we will bind before recovery */
-			box_bind();
-
-		recovery = recovery_new(cfg_gets("wal_dir"),
-					cfg_geti("panic_on_wal_error"),
-					&checkpoint_vclock);
 		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
@@ -1516,35 +1486,38 @@ box_init(void)
 		title("hot_standby");
 
 		assert(!tt_uuid_is_nil(&SERVER_UUID));
-		if (is_hot_standby) {
-			/** Wait for acquire snap dir lock */
-			while (box_lock_path(cfg_gets("snap_dir")) > 0)
+		/*
+		 * Leave hot standby mode, if any, only
+		 * after acquiring the lock.
+		 */
+		if (wal_dir_lock < 0) {
+			say_warn("Entering hot standby mode");
+			while (true) {
+				if (path_lock(cfg_gets("wal_dir"),
+					      &wal_dir_lock))
+					diag_raise();
+				if (wal_dir_lock >= 0)
+					break;
 				fiber_sleep(0.1);
+			}
 			box_bind();
 		}
-		/** We have master, data was recovered and port bound */
-		box_listen();
 		recovery_finalize(recovery, &wal_stream.base);
-
-		/* Wait cluster to start up */
-		box_sync_replication_source(TIMEOUT_INFINITY);
-
 		engine_end_recovery();
-	} else {
-		/* Start network */
-		port_init();
-		iproto_init();
-		box_bind();
-		/* TODO: don't create recovery for this case */
-		vclock_create(&checkpoint_vclock);
-		recovery = recovery_new(cfg_gets("wal_dir"),
-					cfg_geti("panic_on_wal_error"),
-					&checkpoint_vclock);
 
+		/** Begin listening only when the local recovery is complete. */
+		box_listen();
+		/* Wait for the cluster to start up */
+		box_sync_replication_source(TIMEOUT_INFINITY);
+	} else {
 		tt_uuid_create(&SERVER_UUID);
+		/*
+		 * Begin listening on the server socket to enable
+		 * master-master replication leader election.
+		 */
 		box_listen();
 
-		/* Wait cluster to start up */
+		/* Wait for the  cluster to start up */
 		box_sync_replication_source(TIMEOUT_INFINITY);
 
 		/* Bootstrap a new server */
