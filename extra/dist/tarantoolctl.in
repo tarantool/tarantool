@@ -10,7 +10,7 @@ tarantoolctl - an utility to control tarantool instances
 
     vim /etc/tarantool/instances.enabled/my_instance.lua
     tarantoolctl start my_instance
-    tarantoolctl stop  my_instance
+    tarantoolctl stop my_instance
     tarantoolctl logrotate my_instance
 
 =head1 DESCRIPTION
@@ -28,10 +28,8 @@ The file contains common default instances options:
         wal_dir     =   "/var/lib/tarantool",
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
-
         -- vinyl_dir/instance/
         vinyl_dir  =   "/var/lib/tarantool/vinyl",
-
         -- logger/instance .. '.log'
         logger      =   "/var/log/tarantool",
         username    =   "tarantool",
@@ -304,7 +302,7 @@ local function find_instance_name(arg0, arg2)
         log.error("Can't stat %s: %s", arg0, errno.strerror())
         os.exit(1)
     end
-    if not istat:is_link() then usage() end
+    if not istat:is_link() then usage(command_name) end
     arg[2] = arg0
     linkmode = true
     return fio.basename(arg0, '.lua')
@@ -560,7 +558,7 @@ local function start()
     -- if load fails - show last 10 lines of the log file
     if not success then
         log.error("Start failed: %s", data)
-        local log_type, log_args = logger_parse(box.cfg.logger)
+        local log_type, log_args = logger_parse(cfg.logger)
         if log_type == 'file' and fio.stat(log_args) then
             os.execute('tail -n 10 ' .. log_args)
         end
@@ -858,7 +856,7 @@ local function process_local(cmd_function)
 
     if #arg < 2 then
         log.error("Not enough arguments for '%s' command", command_name)
-        usage()
+        usage(command_name)
     end
 
     instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
@@ -877,18 +875,144 @@ local function process_local(cmd_function)
 end
 
 local commands = setmetatable({
-    start     = { func = start,                   process = process_local  },
-    stop      = { func = exit_wrapper(stop),      process = process_local  },
-    logrotate = { func = exit_wrapper(logrotate), process = process_local  },
-    status    = { func = exit_wrapper(status),    process = process_local  },
-    enter     = { func = exit_wrapper(enter),     process = process_local  },
-    restart   = { func = restart,                 process = process_local  },
-    reload    = { func = exit_wrapper(eval),      process = process_local  },
-    eval      = { func = exit_wrapper(eval),      process = process_local  },
-    check     = { func = exit_wrapper(check),     process = process_local  },
-    connect   = { func = exit_wrapper(connect),   process = process_remote },
-    cat       = { func = exit_wrapper(cat),       process = process_remote },
-    play      = { func = exit_wrapper(play),      process = process_remote }
+    start = {
+        func = start, process = process_local, help = {
+            header = "%s start <instance_name>",
+            linkmode = "%s start",
+            description =
+[=[
+        [cluster command] start Tarantool instance if it's not already started.
+        Tarantool instance should be maintained using tarantoolctl only.
+]=]
+        }
+    }, stop = {
+        func = exit_wrapper(stop), process = process_local, help = {
+            header = "%s stop <instance_name>",
+            linkmode = "%s stop",
+            description =
+[=[
+        [cluster command] stop Tarantool instance if it's not already stopped.
+]=]
+        }
+    }, logrotate = {
+        func = exit_wrapper(logrotate), process = process_local, help = {
+            header = "%s logrotate <instance_name>",
+            linkmode = "%s logrotate",
+            description =
+[=[
+        [cluster command] rotate log of started Tarantool instance. Works only
+        if logging is set into file. Pipe/Syslog aren't supported.
+]=]
+        }
+    }, status = {
+        func = exit_wrapper(status), process = process_local, help = {
+            header = "%s status <instance_name>",
+            linkmode = "%s status",
+            description =
+[=[
+        [cluster command] show status of Tarantool instance. (started/stopped)
+]=]
+        }
+    }, enter = {
+        func = exit_wrapper(enter), process = process_local, help = {
+            header = "%s enter <instance_name>",
+            linkmode = "%s enter",
+            description =
+[=[
+        [cluster command] enter interactive Lua console of instance.
+]=]
+        }
+    }, restart = {
+        func = restart, process = process_local, help = {
+            header = "%s restart <instance_name>",
+            linkmode = "%s restart",
+            description =
+[=[
+        [cluster command] stop and start Tarantool instance (if it's already
+        started, fail otherwise)
+]=]
+        }
+    }, reload = {
+        func = exit_wrapper(eval), process = process_local, help = {
+            header = "%s reload <instance_name> <lua_file>",
+            linkmode = "%s reload <lua_file>",
+            description =
+[=[
+        DEPRECATED in favor of "eval"
+]=]
+        }
+    }, eval = {
+        func = exit_wrapper(eval), process = process_local, help = {
+            header = {
+                "%s eval <instance_name> <lua_file>  # file version",
+                "<command> | %s eval <instance_name> # pipe version"
+            },
+            linkmode = {
+                "%s eval <lua_file>  # file version",
+                "<command> | %s eval # pipe version"
+            },
+            description =
+[=[
+        [cluster command] evaluate local file on Tarantool instance (if it's
+        already started, fail otherwise)
+]=]
+        }
+    }, check = {
+        func = exit_wrapper(check), process = process_local, help = {
+            header = "%s check <instance_name>",
+            linkmode = "%s check",
+            description =
+[=[
+        [cluster command] Check instance script for syntax errors
+]=]
+        }
+    }, connect = {
+        func = exit_wrapper(connect), process = process_remote, help = {
+            header = "%s connect <instance_uri>",
+            description =
+[=[
+        Connect to Tarantool instance on admin/console port.
+        Supports both TCP/Unix sockets.
+]=]
+        }
+    }, cat = {
+        func = exit_wrapper(cat), process = process_remote, help = {
+            header =
+                "%s cat <filename>.. [--space=space_no ..] [--show-system]" ..
+                "[--from=from_lsn] [--to=to_lsn]",
+            description =
+[=[
+        Show contents of snapshot/xlog files.
+
+        * If --space=space_no is passed, then output'll be filtered by space
+          number. May be passed more than once.
+        * If --show-system is passed, then contents of system space'll be showed.
+        * If --from=from_lsn is present, then show operations starting from
+          given lsn.
+        * If --to=to_lsn is present, then show operations ending with given lsn.
+
+        Result is printed to stdout
+]=]
+        }
+    }, play = {
+        func = exit_wrapper(play), process = process_remote, help = {
+            header =
+                "%s play <instance_uri> <filename>.. [--space=space_no ..]" ..
+                " [--show-system] [--from=from_lsn] [--to=to_lsn]",
+            description =
+[=[
+        Play contents of snapshot/xlog files to another Tarantool service.
+
+        * If --space=space_no is passed, then output'll be filtered by space
+          number. May be passed more than once.
+        * If --show-system is passed, then contents of system space'll be showed.
+        * If --from=from_lsn is present, then show operations starting from
+          given lsn.
+        * If --to=to_lsn is present, then show operations ending with given lsn.
+
+]=]
+        }
+    }
 }, {
     __index = function()
         log.error("Unknown command '%s'", command_name)
@@ -896,32 +1020,47 @@ local commands = setmetatable({
     end
 })
 
-usage = function()
-    local local_tbl = fun.iter(commands):filter(function(name, cmd)
-        return cmd.process == process_local
-    end):map(function(name, cmd) return name end):totable()
-    table.sort(local_tbl); local_tbl = table.concat(local_tbl, '|')
-
+local function usage_command(name, cmd)
+    local header = cmd.help.header
     if linkmode then
-        log.error("Usage: %s {%s}",                arg[0], local_tbl )
-    else
-        log.error("Usage: %s {%s} instance_name",  arg[0], local_tbl )
-        log.error("       %s connect URI",         arg[0])
-        log.error("       %s cat [file ...]",      arg[0])
-        log.error("       %s play URI [file ...]", arg[0])
-        log.error("       %s help",                arg[0])
-        log.error("")
-        log.error("Options for cat/play:")
-        log.error("    --space=<number>   filter by space number (may present more than once)")
-        log.error("    --show-system      show tuples from system space")
-        log.error("    --from=<number>    start xlog file from the specified lsn")
-        log.error("    --to=<number>      stop on specified xlog lsn")
-        log.error("    --format=<string>  cat output format ('yaml' [default], 'json', 'lua')")
-        log.error("")
+        header = cmd.help.linkmode
     end
+    if type(header) == 'string' then
+        header = { header }
+    end
+    for no, line in ipairs(header) do
+        log.error("    " .. line, name)
+    end
+end
 
+local function usage_header()
+    log.error("Tarantool client utility (%s)", _TARANTOOL)
+end
+
+usage = function(command)
+    local name = fio.basename(arg[0])
+    do -- in case of command is passed and is valid command
+        local command_struct = rawget(commands, command)
+        if command ~= nil and command_struct then
+            log.error("Usage:\n")
+            usage_command(name, command_struct, true)
+            log.error("")
+            log.error(command_struct.help.description)
+            os.exit(1)
+        end
+    end -- do this otherwise
+    usage_header()
     if default_file ~= nil then
         log.error("Config file: %s", default_file)
+    end
+    log.error("")
+    log.error("Usage:")
+    for _, cmd in pairs(commands) do
+        usage_command(name, cmd, false)
+        if verbose then
+            log.error("")
+            log.error(cmd.help.description)
+        end
     end
     os.exit(1)
 end
@@ -961,16 +1100,17 @@ do
 
     local cmd_name
     cmd_name, positional_arguments, keyword_arguments = parameters_parse(parameters)
-    if cmd_name == 'help' or parameters.help == true or #arg < 1 then usage() end
+    if cmd_name == 'help' or parameters.help == true or #arg < 1 then
+        usage(cmd_name, true)
+    end
     keyword_arguments = keyword_arguments_populate(parameters)
 end
 
-if #arg < 2 then
-    log.error("Not enough arguments for '%s' command", command_name)
-    usage()
-end
-
 local cmd_pair = commands[command_name]
+if #arg < 2 then
+    log.error("Error: not enough arguments for '%s' command\n", command_name)
+    usage(command_name)
+end
 cmd_pair.process(cmd_pair.func)
 
 -- vim: syntax=lua
