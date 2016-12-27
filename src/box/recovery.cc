@@ -543,9 +543,10 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 */
 	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r, stream, NULL);
-
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.
+	 * It will pick up from the position of the currently open
+	 * xlog.
 	 */
 	assert(r->watcher == NULL);
 	r->watcher = fiber_new_xc(name, recovery_follow_f);
