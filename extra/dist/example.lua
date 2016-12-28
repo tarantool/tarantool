@@ -174,19 +174,19 @@ box.once('example-1.0', bootstrap)
 -- N.B. you need install tarantool-shard package to use shadring
 -- Docs: https://github.com/tarantool/shard/blob/master/README.md
 -- Example:
---local shard = require('shard')
---local shards = {
---    servers = {
---        { uri = [[host1.com:4301]]; zone = [[0]]; };
---        { uri = [[host2.com:4302]]; zone = [[1]]; };
---    };
---    login = 'tester';
---    password = 'pass';
---    redundancy = 2;
---    binary = '127.0.0.1:3301';
---    monitor = false;
---}
---shard.init(shards)
+--  local shard = require('shard')
+--  local shards = {
+--      servers = {
+--          { uri = [[host1.com:4301]]; zone = [[0]]; };
+--          { uri = [[host2.com:4302]]; zone = [[1]]; };
+--      };
+--      login = 'tester';
+--      password = 'pass';
+--      redundancy = 2;
+--      binary = '127.0.0.1:3301';
+--      monitor = false;
+--  }
+--  shard.init(shards)
 
 -----------------
 -- Message queue
@@ -194,25 +194,21 @@ box.once('example-1.0', bootstrap)
 -- N.B. you need to install tarantool-queue package to use queue
 -- Docs: https://github.com/tarantool/queue/blob/master/README.md
 -- Example:
---queue = require('queue')
---queue.start()
---queue.create_tube(tube_name, 'fifottl')
+--  local queue = require('queue')
+--  queue.start()
+--  queue.create_tube(tube_name, 'fifottl')
 
 -------------------
 -- Data expiration
 -------------------
 -- N.B. you need to install tarantool-expirationd package to use expirationd
 -- Docs: https://github.com/tarantool/expirationd/blob/master/README.md
--- Example:
---job_name = 'clean_all'
---expirationd = require('expirationd')
---function is_expired(args, tuple)
---  return true
---end
---function delete_tuple(space_id, args, tuple)
---  box.space[space_id]:delete{tuple[1]}
---end
---expirationd.run_task(job_name, space.id, is_expired, {
---    process_expired_tuple = delete_tuple, args = nil,
---    tuple_per_item = 50, full_scan_time = 3600
---})
+-- Example (deletion of all tuples):
+--  local expirationd = require('expirationd')
+--  local function is_expired(args, tuple)
+--    return true
+--  end
+--  expirationd.start("clean_all", space.id, is_expired {
+--    tuple_per_item = 50,
+--    full_scan_time = 3600
+--  })
