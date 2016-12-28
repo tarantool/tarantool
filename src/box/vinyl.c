@@ -4513,7 +4513,14 @@ vy_scheduler_f(va_list va)
 	struct vy_env *env = scheduler->env;
 	bool warning_said = false;
 
-	/* Start worker threads on demand. */
+	/*
+	 * Yield immediately, until the quota watermark is reached
+	 * for the first time or a checkpoint is made.
+	 * Then start the worker threads: we know they will be
+	 * needed. If quota watermark is never reached, workers
+	 * are not started and the scheduler is idle until
+	 * shutdown or checkpoint.
+	 */
 	ipc_cond_wait(&scheduler->scheduler_cond);
 	if (scheduler->scheduler == NULL)
 		return 0; /* destroyed */
