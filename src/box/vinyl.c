@@ -6729,14 +6729,10 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	 * Sic: the loop below must not yield after recovery.
 	 */
 	uint64_t write_count = 0;
-	struct vy_index *prev_index = NULL;
 	for (v = write_set_first(&tx->write_set);
 	     v != NULL; v = write_set_next(&tx->write_set, v)) {
-		if (v->index != prev_index) {
-			prev_index = v->index;
-			write_count++;
-		}
 		int rc = vy_tx_write(v, e->status, lsn);
+		write_count++;
 		assert(rc == 0); /* TODO: handle BPS tree errors properly */
 		(void)rc;
 	}

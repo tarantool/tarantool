@@ -17,7 +17,7 @@ space:update({1}, {{'=', 5, 10}}) -- change secondary index field
 space:update({1}, {{'!', 4, 20}}) -- move range containing index field
 space:update({1}, {{'#', 3, 1}}) -- same
 new_count = box.info.vinyl().performance.write_count
-new_count - old_count == 6
+new_count - old_count == 9
 old_count = new_count
 space:select{}
 index2:select{}
@@ -53,7 +53,7 @@ index:update({2}, {{'+', 1, 10}, {'+', 3, 10}, {'+', 4, 10}, {'+', 5, 10}}) -- c
 index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
 new_count = box.info.vinyl().performance.write_count
-new_count - old_count == 9
+new_count - old_count == 15
 old_count = new_count
 space:select{}
 index2:select{}
@@ -62,12 +62,12 @@ index3:select{}
 -- optimize one 'secondary' index update
 index:update({3}, {{'+', 1, 10}, {'-', 5, 2}, {'!', 6, 100}}) -- change only index 'third'
 new_count = box.info.vinyl().performance.write_count
-new_count - old_count == 2
+new_count - old_count == 3
 old_count = new_count
 -- optimize one 'third' index update
 index:update({3}, {{'=', 1, 20}, {'+', 3, 5}, {'=', 4, 30}, {'!', 6, 110}}) -- change only index 'secondary'
 new_count = box.info.vinyl().performance.write_count
-new_count - old_count == 2
+new_count - old_count == 3
 old_count = new_count
 -- optimize both indexes
 index:update({3}, {{'+', 1, 10}, {'#', 6, 1}}) -- don't change any indexed fields
