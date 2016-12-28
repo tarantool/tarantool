@@ -62,7 +62,7 @@ cfg_filter(box.cfg)
       - - memory_limit
         - 1
       - - page_size
-        - 131072
+        - 8192
       - - range_size
         - 1073741824
       - - threads
@@ -132,7 +132,7 @@ cfg_filter(box.cfg)
       - - memory_limit
         - 1
       - - page_size
-        - 131072
+        - 8192
       - - range_size
         - 1073741824
       - - threads
