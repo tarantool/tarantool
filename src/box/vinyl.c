@@ -583,8 +583,8 @@ struct vy_range {
 	/** List of ranges this range is being compacted to. */
 	struct rlist compact_list;
 	rb_node(struct vy_range) tree_node;
-	struct heap_node   nodecompact;
-	struct heap_node   nodedump;
+	struct heap_node   in_compact;
+	struct heap_node   in_dump;
 	/**
 	 * Incremented whenever an in-memory index or on disk
 	 * run is added to or deleted from this range. Used to
@@ -1318,13 +1318,12 @@ tx_manager_delete(struct tx_manager *m)
 }
 
 /*
- * Determine a lowest possible vlsn - the level below which
- *  the history could be compacted.
- * If there are active read views, it is the m->vlsn.
- * If there is no active read view (m->vlsn == INT64_MAX),
- *  a read view could be created at any moment
- *  with vlsn = m->lsn
- * Therefore, minimum of m->vlsn and m->lsn must be chosen.
+ * Determine a lowest possible vlsn - the level below which the
+ * history could be compacted.
+ * If there are active read views, it is the m->vlsn. If there is
+ * no active read view (m->vlsn == INT64_MAX), a read view could
+ * be created at any moment with vlsn = m->lsn. Therefore, the
+ * minimum of m->vlsn and m->lsn must be chosen.
  */
 static int64_t
 tx_manager_vlsn(struct tx_manager *m)
@@ -2953,8 +2952,8 @@ vy_range_new(struct vy_index *index, int64_t id,
 	rlist_create(&range->mems);
 	range->min_lsn = INT64_MAX;
 	range->index = index;
-	range->nodedump.pos = UINT32_MAX;
-	range->nodecompact.pos = UINT32_MAX;
+	range->in_dump.pos = UINT32_MAX;
+	range->in_compact.pos = UINT32_MAX;
 	rlist_create(&range->compact_list);
 	return range;
 }
@@ -3059,8 +3058,10 @@ fail:
 static void
 vy_range_delete(struct vy_range *range)
 {
-	assert(range->nodedump.pos == UINT32_MAX);
-	assert(range->nodecompact.pos == UINT32_MAX);
+	/* The range has been deleted from the scheduler queues. */
+	assert(range->in_dump.pos == UINT32_MAX);
+	assert(range->in_compact.pos == UINT32_MAX);
+
 	struct vy_index *index = range->index;
 	struct vy_env *env = index->env;
 
@@ -3833,8 +3834,9 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_write_iterator *wi = task->wi;
 	struct vy_stmt *stmt;
 
-	assert(range->nodedump.pos == UINT32_MAX);
-	assert(range->nodecompact.pos == UINT32_MAX);
+	/* The range has been deleted from the scheduler queues. */
+	assert(range->in_dump.pos == UINT32_MAX);
+	assert(range->in_compact.pos == UINT32_MAX);
 
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
@@ -3854,7 +3856,7 @@ vy_task_dump_complete(struct vy_task *task, bool in_shutdown)
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
 
-	say_debug("range dump complete: %s", vy_range_str(range));
+	say_info("dump complete: %s", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3897,7 +3899,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_debug("range dump failed: %s", vy_range_str(range));
+	say_error("dump of range %s failed", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3968,7 +3970,7 @@ done:
 	assert(range->mem_count > 1);
 	task->range = range;
 	task->wi = wi;
-	say_debug("range dump prepare: %s", vy_range_str(range));
+	say_info("started dump of range %s", vy_range_str(range));
 	return task;
 err_mem:
 	vy_run_delete(range->new_run);
@@ -3991,8 +3993,9 @@ vy_task_compact_execute(struct vy_task *task)
 	struct vy_stmt *stmt;
 	struct vy_range *r;
 
-	assert(range->nodedump.pos == UINT32_MAX);
-	assert(range->nodecompact.pos == UINT32_MAX);
+	/* The range has been deleted from the scheduler queues. */
+	assert(range->in_dump.pos == UINT32_MAX);
+	assert(range->in_compact.pos == UINT32_MAX);
 
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
@@ -4022,7 +4025,7 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 	struct vy_range *range = task->range;
 	struct vy_range *r;
 
-	say_debug("range compact complete: %s", vy_range_str(range));
+	say_info("completed compaction of range %s", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -4053,7 +4056,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_debug("range compact failed: %s", vy_range_str(range));
+	say_error("compaction of range %s failed", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -4140,7 +4143,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 			r->compact_count = range->compact_count + 1;
 	}
 
-	say_debug("range compact prepare: %s", vy_range_str(range));
+	say_info("started compaction of range %s", vy_range_str(range));
 
 	/* Replace the old range with the new ones. */
 	for (int i = 0; i < n_parts; i++)
@@ -4178,8 +4181,8 @@ err_task:
 static bool
 heap_dump_less(struct heap_node *a, struct heap_node *b)
 {
-	struct vy_range *left = container_of(a, struct vy_range, nodedump);
-	struct vy_range *right = container_of(b, struct vy_range, nodedump);
+	struct vy_range *left = container_of(a, struct vy_range, in_dump);
+	struct vy_range *right = container_of(b, struct vy_range, in_dump);
 
 	/* Older ranges are dumped first. */
 	return left->min_lsn < right->min_lsn;
@@ -4198,9 +4201,9 @@ static int
 heap_compact_less(struct heap_node *a, struct heap_node *b)
 {
 	const struct vy_range *left =
-				container_of(a, struct vy_range, nodecompact);
+				container_of(a, struct vy_range, in_compact);
 	const struct vy_range *right =
-				container_of(b, struct vy_range, nodecompact);
+				container_of(b, struct vy_range, in_compact);
 	return left->run_count > right->run_count;
 }
 
@@ -4378,32 +4381,32 @@ static void
 vy_scheduler_add_range(struct vy_scheduler *scheduler,
 		       struct vy_range *range)
 {
-	vy_dump_heap_insert(&scheduler->dump_heap, &range->nodedump);
-	vy_compact_heap_insert(&scheduler->compact_heap, &range->nodecompact);
-	assert(range->nodedump.pos != UINT32_MAX);
-	assert(range->nodecompact.pos != UINT32_MAX);
+	vy_dump_heap_insert(&scheduler->dump_heap, &range->in_dump);
+	vy_compact_heap_insert(&scheduler->compact_heap, &range->in_compact);
+	assert(range->in_dump.pos != UINT32_MAX);
+	assert(range->in_compact.pos != UINT32_MAX);
 }
 
 static void
 vy_scheduler_update_range(struct vy_scheduler *scheduler,
 			  struct vy_range *range)
 {
-	if (likely(range->nodedump.pos == UINT32_MAX))
+	if (range->in_dump.pos == UINT32_MAX)
 		return; /* range is being processed by a task */
 
-	vy_dump_heap_update(&scheduler->dump_heap, &range->nodedump);
-	assert(range->nodedump.pos != UINT32_MAX);
-	assert(range->nodecompact.pos != UINT32_MAX);
+	vy_dump_heap_update(&scheduler->dump_heap, &range->in_dump);
+	assert(range->in_dump.pos != UINT32_MAX);
+	assert(range->in_compact.pos != UINT32_MAX);
 }
 
 static void
 vy_scheduler_remove_range(struct vy_scheduler *scheduler,
 			  struct vy_range *range)
 {
-	vy_dump_heap_delete(&scheduler->dump_heap, &range->nodedump);
-	vy_compact_heap_delete(&scheduler->compact_heap, &range->nodecompact);
-	range->nodedump.pos = UINT32_MAX;
-	range->nodecompact.pos = UINT32_MAX;
+	vy_dump_heap_delete(&scheduler->dump_heap, &range->in_dump);
+	vy_compact_heap_delete(&scheduler->compact_heap, &range->in_compact);
+	range->in_dump.pos = UINT32_MAX;
+	range->in_compact.pos = UINT32_MAX;
 }
 
 static int
@@ -4415,7 +4418,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	struct heap_iterator it;
 	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
 	while ((pn = vy_dump_heap_iterator_next(&it))) {
-		range = container_of(pn, struct vy_range, nodedump);
+		range = container_of(pn, struct vy_range, in_dump);
 		if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
 		    range->min_lsn > scheduler->checkpoint_lsn)
 			return 0; /* nothing to do */
@@ -4440,7 +4443,7 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	struct heap_iterator it;
 	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
 	while ((pn = vy_compact_heap_iterator_next(&it))) {
-		range = container_of(pn, struct vy_range, nodecompact);
+		range = container_of(pn, struct vy_range, in_compact);
 		if ((unsigned)range->run_count <
 		    range->index->key_def->opts.compact_wm)
 			break; /* TODO: why ? */
@@ -4611,7 +4614,7 @@ error:
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MIN;
 		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
-		say_debug("throttling scheduler for %.0f seconds",
+		say_info("throttling the scheduler for %.0f seconds",
 			  scheduler->timeout);
 		scheduler->throttled = true;
 		fiber_sleep(scheduler->timeout);
@@ -6838,7 +6841,7 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	struct heap_node *pn = vy_dump_heap_iterator_next(&it);
 	if (pn != NULL) {
 		struct vy_range *range = container_of(pn, struct vy_range,
-						      nodedump);
+						      in_dump);
 		max_range_size = range->used;
 	}
 
