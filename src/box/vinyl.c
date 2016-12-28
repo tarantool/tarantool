@@ -381,7 +381,7 @@ struct vy_mem {
 	/** Link in range->frozen list. */
 	struct rlist in_frozen;
 	/** Link in scheduler->dirty_mems list. */
-	struct rlist dirty_link;
+	struct rlist in_dirty;
 	struct vy_mem_tree tree;
 	size_t used;
 	int64_t min_lsn;
@@ -447,7 +447,7 @@ vy_mem_new(struct vy_env *env, struct key_def *key_def,
 	vy_mem_tree_create(&index->tree, index, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, env);
 	rlist_create(&index->in_frozen);
-	rlist_create(&index->dirty_link);
+	rlist_create(&index->in_dirty);
 	return index;
 }
 
@@ -542,7 +542,7 @@ struct vy_run {
 	 */
 	int refs;
 	/** Link in range->runs list. */
-	struct rlist link;
+	struct rlist in_range;
 };
 
 struct vy_range {
@@ -563,7 +563,7 @@ struct vy_range {
 	/** New run created for dump/compaction. */
 	struct vy_run *new_run;
 	/**
-	 * List of all on-disk runs, linked by vy_run->link.
+	 * List of all on-disk runs, linked by vy_run->in_range.
 	 * The newer a run, the closer it to the list head.
 	 */
 	struct rlist runs;
@@ -1480,7 +1480,7 @@ vy_run_new()
 	memset(&run->info, 0, sizeof(run->info));
 	run->fd = -1;
 	run->refs = 1;
-	rlist_create(&run->link);
+	rlist_create(&run->in_range);
 	return run;
 }
 
@@ -1587,7 +1587,7 @@ static void
 vy_index_acct_range(struct vy_index *index, struct vy_range *range)
 {
 	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, link)
+	rlist_foreach_entry(run, &range->runs, in_range)
 		vy_index_acct_run(index, run);
 	histogram_collect(index->run_hist, range->run_count);
 }
@@ -1596,7 +1596,7 @@ static void
 vy_index_unacct_range(struct vy_index *index, struct vy_range *range)
 {
 	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, link)
+	rlist_foreach_entry(run, &range->runs, in_range)
 		vy_index_unacct_run(index, run);
 	histogram_discard(index->run_hist, range->run_count);
 }
@@ -3045,7 +3045,7 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 	xlog_cursor_close(&cursor, true);
 
 	/* Finally, link run to the range. */
-	rlist_add_entry(&range->runs, run, link);
+	rlist_add_entry(&range->runs, run, in_range);
 	range->run_count++;
 	return 0;
 
@@ -3087,7 +3087,7 @@ vy_range_delete(struct vy_range *range)
 	/* Delete all runs */
 	while (!rlist_empty(&range->runs)) {
 		struct vy_run *run = rlist_shift_entry(&range->runs,
-						       struct vy_run, link);
+						       struct vy_run, in_range);
 		vy_run_unref(run);
 	}
 	/* Release all mems */
@@ -3163,7 +3163,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 		return false;
 
 	/* Find the oldest run. */
-	run = rlist_last_entry(&range->runs, struct vy_run, link);
+	run = rlist_last_entry(&range->runs, struct vy_run, in_range);
 	assert(run != NULL);
 
 	/* The range is too small to be split. */
@@ -3715,7 +3715,7 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 	 * LSN, is at the head of the list.
 	 */
 	struct vy_run *run = rlist_first_entry(&range->runs,
-					       struct vy_run, link);
+					       struct vy_run, in_range);
 	return stmt->lsn <= run->info.max_lsn;
 }
 
@@ -3875,7 +3875,7 @@ vy_task_dump_complete(struct vy_task *task, bool in_shutdown)
 	assert(run != NULL);
 	range->new_run = NULL;
 
-	rlist_add_entry(&range->runs, run, link);
+	rlist_add_entry(&range->runs, run, in_range);
 	range->run_count++;
 	vy_index_acct_range_dump(index, range, run);
 
@@ -4040,7 +4040,7 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 	vy_index_unacct_range(index, range);
 	rlist_foreach_entry(r, &range->compact_list, compact_list) {
 		/* Add the new run created by compaction to the list. */
-		rlist_add_entry(&r->runs, r->new_run, link);
+		rlist_add_entry(&r->runs, r->new_run, in_range);
 		r->run_count++;
 		r->new_run = NULL;
 		/*
@@ -4114,7 +4114,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 			goto err_wi_sub;
 	}
 	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, link) {
+	rlist_foreach_entry(run, &range->runs, in_range) {
 		if (vy_write_iterator_add_run(wi, range, run) != 0)
 			goto err_wi_sub;
 	}
@@ -4268,7 +4268,7 @@ struct vy_scheduler {
 	 */
 	ev_tstamp timeout;
 	/** Set if the scheduler is throttled due to errors. */
-	bool throttled;
+	bool is_throttled;
 
 	/**
 	 * List of all non-empty in-memory indexes.
@@ -4624,9 +4624,9 @@ error:
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
 		say_info("throttling the scheduler for %.0f seconds",
 			  scheduler->timeout);
-		scheduler->throttled = true;
+		scheduler->is_throttled = true;
 		fiber_sleep(scheduler->timeout);
-		scheduler->throttled = false;
+		scheduler->is_throttled = false;
 		continue;
 wait:
 		/* Wait for changes */
@@ -4741,7 +4741,7 @@ vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	if (rlist_empty(&scheduler->dirty_mems))
 		scheduler->mem_min_lsn = mem->min_lsn;
 	assert(scheduler->mem_min_lsn <= mem->min_lsn);
-	rlist_add_entry(&scheduler->dirty_mems, mem, dirty_link);
+	rlist_add_entry(&scheduler->dirty_mems, mem, in_dirty);
 }
 
 static void
@@ -4752,12 +4752,12 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	if (mem->used == 0)
 		return;
 
-	rlist_del_entry(mem, dirty_link);
+	rlist_del_entry(mem, in_dirty);
 
 	if (!rlist_empty(&scheduler->dirty_mems)) {
 		struct vy_mem *oldest;
 		oldest = rlist_last_entry(&scheduler->dirty_mems,
-					  struct vy_mem, dirty_link);
+					  struct vy_mem, in_dirty);
 		scheduler->mem_min_lsn = oldest->min_lsn;
 	} else {
 		scheduler->mem_min_lsn = INT64_MAX;
@@ -4800,7 +4800,7 @@ vy_checkpoint(struct vy_env *env)
 	 * fail checkpoint immediately with the last error seen by
 	 * the scheduler.
 	 */
-	if (scheduler->throttled) {
+	if (scheduler->is_throttled) {
 		assert(!diag_is_empty(&scheduler->diag));
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
@@ -4819,7 +4819,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
 
-	while (!scheduler->throttled &&
+	while (!scheduler->is_throttled &&
 	       scheduler->mem_min_lsn <= scheduler->checkpoint_lsn)
 		ipc_cond_wait(&scheduler->checkpoint_cond);
 
@@ -9893,7 +9893,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	assert(itr->curr_range != NULL);
 	assert(itr->curr_range->shadow == NULL);
 	struct vy_run *run;
-	rlist_foreach_entry(run, &itr->curr_range->runs, link) {
+	rlist_foreach_entry(run, &itr->curr_range->runs, in_range) {
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, itr->curr_range,
