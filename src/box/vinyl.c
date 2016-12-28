@@ -391,8 +391,6 @@ struct vy_mem {
 	struct tuple_format *format;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
-	/* Memory allocator for statements and BPS tree nodes. */
-	struct region region;
 };
 
 static int
@@ -443,7 +441,6 @@ vy_mem_new(struct vy_env *env, struct key_def *key_def,
 	index->key_def = key_def;
 	index->version = 0;
 	index->format = format;
-	region_create(&index->region, cord_slab_cache());
 	vy_mem_tree_create(&index->tree, index, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, env);
 	rlist_create(&index->in_frozen);
@@ -455,7 +452,6 @@ static void
 vy_mem_delete(struct vy_mem *index)
 {
 	assert(index == index->tree.arg);
-	region_destroy(&index->region);
 	TRASH(index);
 	free(index);
 }
