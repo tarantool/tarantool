@@ -296,6 +296,14 @@ struct PACKED tuple
 	 */
 };
 
+/** Size of the tuple including size of struct tuple. */
+static inline size_t
+tuple_size(const struct tuple *tuple)
+{
+	/* data_offset includes sizeof(struct tuple). */
+	return tuple->data_offset + tuple->bsize;
+}
+
 /**
  * Get pointer to MessagePack data of the tuple.
  * @param tuple tuple.
@@ -393,30 +401,6 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	return format->vtab.create(format, data, end);
 }
 
-/** Create a tuple in the vinyl engine format. @sa tuple_new(). */
-struct tuple *
-vy_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
-/** Create a tuple in the memtx engine format. @sa tuple_new(). */
-struct tuple *
-memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
-/**
- * Allocate a tuple
- * It's similar to tuple_new, but does not set tuple data and thus does not
- * initialize field offsets.
- *
- * After tuple_alloc and filling tuple data the tuple_init_field_map must be
- * called!
- *
- * @param size  tuple->bsize
- *
- * @retval not NULL Success.
- * @retval NULL     Memory of tuple format error.
- */
-struct tuple *
-tuple_alloc(struct tuple_format *format, size_t size);
-
 /**
  * Free the tuple of any engine.
  * @pre tuple->refs  == 0
@@ -429,20 +413,6 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	format->vtab.destroy(format, tuple);
 }
-
-/**
- * Free the tuple of a memtx space.
- * @pre tuple->refs  == 0
- */
-void
-memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
-
-/**
- * Free the tuple of a vinyl space.
- * @pre tuple->refs  == 0
- */
-void
-vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Check tuple data correspondence to space format.
@@ -600,37 +570,10 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-/**
- * Create a tuple in the memtx engine format. Throw an exception
- * if an error occurred. @sa memtx_tuple_new().
- */
-static inline struct tuple *
-memtx_tuple_new_xc(struct tuple_format *format, const char *data,
-		   const char *end)
-{
-	struct tuple *res = memtx_tuple_new(format, data, end);
-	if (res == NULL)
-		diag_raise();
-	return res;
-}
-
 #include "tuple_update.h"
 #include "errinj.h"
 
 enum { TUPLE_REF_MAX = UINT16_MAX };
-
-/** Common quota for tuples and indexes */
-extern struct quota memtx_quota;
-/** Tuple allocator */
-extern struct small_alloc memtx_alloc;
-/** Tuple slab arena */
-extern struct slab_arena memtx_arena;
-
-/**
- * Throw and exception about tuple reference counter overflow.
- */
-void
-tuple_ref_exception();
 
 /**
  * Increment tuple reference counter.
@@ -642,7 +585,7 @@ inline void
 tuple_ref(struct tuple *tuple)
 {
 	if (tuple->refs + 1 > TUPLE_REF_MAX)
-		tuple_ref_exception();
+		tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
 
 	tuple->refs++;
 }
@@ -833,7 +776,7 @@ tuple_bless(struct tuple *tuple)
 	assert(tuple != NULL);
 	/* Ensure tuple can be referenced at least once after return */
 	if (tuple->refs + 2 > TUPLE_REF_MAX)
-		tuple_ref_exception();
+		tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
 	tuple->refs++;
 	/* Remove previous tuple */
 	if (likely(box_tuple_last != NULL))

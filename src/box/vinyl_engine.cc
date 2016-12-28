@@ -48,6 +48,7 @@
 #include "schema.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
+#include "vy_stmt.h"
 
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_new,

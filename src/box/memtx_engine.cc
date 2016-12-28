@@ -208,11 +208,6 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	handler->replace = memtx_replace_all_keys;
 }
 
-struct tuple_format_vtab memtx_tuple_format_vtab = {
-	memtx_tuple_new,
-	memtx_tuple_delete,
-};
-
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 			 bool panic_on_wal_error)
 	:Engine("memtx", &memtx_tuple_format_vtab),

@@ -48,8 +48,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct key_def;
-struct tuple_format;
 struct xrow_header;
 
 /**
@@ -106,6 +104,21 @@ struct vy_stmt {
 	 */
 };
 
+/** Create a tuple in the vinyl engine format. @sa tuple_new(). */
+struct tuple *
+vy_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/**
+ * Free the tuple of a vinyl space.
+ * @pre tuple->refs  == 0
+ */
+void
+vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+/**
+ * Get the pointer behind last element of the tuple offsets array.
+ * @sa struct vy_stmt and its offsets array.
+ */
 static inline const uint32_t *
 vy_stmt_field_map(const struct vy_stmt *stmt)
 {

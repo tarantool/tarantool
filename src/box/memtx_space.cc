@@ -39,6 +39,7 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "port.h"
+#include "memtx_tuple.h"
 
 /**
  * A version of space_replace for a space which has

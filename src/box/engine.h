@@ -157,7 +157,6 @@ public:
 	 * An error in one of the engines, abort checkpoint.
 	 */
 	virtual void abortCheckpoint();
-
 public:
 	/** Name of the engine. */
 	const char *name;

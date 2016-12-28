@@ -37,6 +37,7 @@
 #include "request.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
+#include "vy_stmt.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -99,10 +100,9 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	}
 
 	stmt->new_tuple = vy_tuple_new(space->format, request->tuple,
-					  request->tuple_end);
+				       request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		diag_raise();
-	tuple_ref(stmt->new_tuple);
 	return stmt->new_tuple;
 }
 

@@ -170,7 +170,6 @@ tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab)
 		tuple_format_delete(format);
 		return NULL;
 	}
-
 	/* Set up offset slots */
 	if (format->field_count == 0) {
 		/* Nothing to store */

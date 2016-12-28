@@ -104,83 +104,6 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
  * to the snapshot file).
  */
 
-/** Allocate a tuple */
-struct tuple *
-tuple_alloc(struct tuple_format *format, size_t size)
-{
-	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
-		     do { diag_set(OutOfMemory, (unsigned) total,
-				   "slab allocator", "tuple"); return NULL; }
-		     while(false); );
-	struct tuple *tuple = (struct tuple *) smalloc(&memtx_alloc, total);
-	/**
-	 * Use a nothrow version and throw an exception here,
-	 * to throw an instance of ClientError. Apart from being
-	 * more nice to the user, ClientErrors are ignored in
-	 * panic_on_wal_error=false mode, allowing us to start
-	 * with lower arena than necessary in the circumstances
-	 * of disaster recovery.
-	 */
-	if (tuple == NULL) {
-		if (total > memtx_alloc.objsize_max) {
-			diag_set(ClientError, ER_SLAB_ALLOC_MAX,
-				 (unsigned) total);
-			error_log(diag_last_error(diag_get()));
-		} else {
-			diag_set(OutOfMemory, (unsigned) total,
-				 "slab allocator", "tuple");
-		}
-		return NULL;
-	}
-
-	tuple->refs = 0;
-	tuple->version = snapshot_version;
-	tuple->bsize = size;
-	tuple->format_id = tuple_format_id(format);
-	tuple_format_ref(format, 1);
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
-	say_debug("tuple_alloc(%zu) = %p", size, tuple);
-	return tuple;
-}
-
-void
-memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
-{
-	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
-	size_t total = sizeof(struct tuple) + tuple->bsize +
-		       format->field_map_size;
-	tuple_format_ref(format, -1);
-	if (!memtx_alloc.is_delayed_free_mode ||
-	    tuple->version == snapshot_version)
-		smfree(&memtx_alloc, tuple, total);
-	else
-		smfree_delayed(&memtx_alloc, tuple, total);
-}
-
-void
-vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
-{
-	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
-	size_t total = sizeof(struct tuple) + tuple->bsize +
-		       format->field_map_size;
-	tuple_format_ref(format, -1);
-	assert(!memtx_alloc.is_delayed_free_mode ||
-	       tuple->version == snapshot_version);
-	smfree(&memtx_alloc, tuple, total);
-}
-
-/**
- * Throw and exception about tuple reference counter overflow.
- */
-void
-tuple_ref_exception()
-{
-	tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
-}
-
 const char *
 tuple_seek(struct tuple_iterator *it, uint32_t fieldno)
 {
@@ -334,42 +257,6 @@ tuple_upsert(struct tuple_format *format,
 
 	struct tuple *ret = tuple_new_xc(format, new_data, new_data + new_size);
 	return ret;
-}
-
-struct tuple *
-memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
-{
-	size_t tuple_len = end - data;
-	assert(mp_typeof(*data) == MP_ARRAY);
-	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
-	if (new_tuple == NULL)
-		return NULL;
-	char *raw = (char *) new_tuple + new_tuple->data_offset;
-	uint32_t *field_map = (uint32_t *) raw;
-	memcpy(raw, data, tuple_len);
-	if (tuple_init_field_map(format, field_map, raw)) {
-		memtx_tuple_delete(format, new_tuple);
-		return NULL;
-	}
-	return new_tuple;
-}
-
-struct tuple *
-vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
-{
-	size_t tuple_len = end - data;
-	assert(mp_typeof(*data) == MP_ARRAY);
-	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
-	if (new_tuple == NULL)
-		return NULL;
-	char *raw = (char *) new_tuple + new_tuple->data_offset;
-	uint32_t *field_map = (uint32_t *) raw;
-	memcpy(raw, data, tuple_len);
-	if (tuple_init_field_map(format, field_map, raw)) {
-		vy_tuple_delete(format, new_tuple);
-		return NULL;
-	}
-	return new_tuple;
 }
 
 void
