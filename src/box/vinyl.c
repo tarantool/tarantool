@@ -577,10 +577,8 @@ struct vy_range {
 	 * The newer an index, the closer it to the list head.
 	 */
 	struct rlist frozen;
-	/** Number of entries in the ->frozen list. */
-	int frozen_count;
 	/** Number of times the range was compacted. */
-	int compact_count;
+	int n_compactions;
 	/** Points to the range being compacted to this range. */
 	struct vy_range *shadow;
 	/** List of ranges this range is being compacted to. */
@@ -3161,7 +3159,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	struct vy_run *run = NULL;
 
 	/* The range hasn't been merged yet - too early to split it. */
-	if (range->compact_count < 1)
+	if (range->n_compactions < 1)
 		return false;
 
 	/* Find the oldest run. */
@@ -4150,7 +4148,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 			goto err_parts;
 		/* Account merge w/o split. */
 		if (n_parts == 1)
-			r->compact_count = range->compact_count + 1;
+			r->n_compactions = range->n_compactions + 1;
 	}
 
 	say_info("started compaction of range %s", vy_range_str(range));
