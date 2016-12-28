@@ -3199,6 +3199,12 @@ vy_range_add_compact_part(struct vy_range *range, struct vy_range *part)
 	struct vy_index *index = range->index;
 
 	if (rlist_empty(&range->compact_list)) {
+		/*
+		 * Make sure no new statement is inserted into the
+		 * active mem after we start compacting the range.
+		 * Needed by the write iterator, which requires its
+		 * sources to be immutable.
+		 */
 		vy_range_freeze_mem(range);
 		vy_index_remove_range(index, range);
 	}
