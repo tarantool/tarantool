@@ -701,7 +701,40 @@ local function enter()
     return 0
 end
 
+local function stdin_isatty()
+    return ffi.C.isatty(0) == 1
+end
+
+local function execute_remote(uri, code)
+    local remote = netbox.connect(uri, { console = true })
+    if remote == nil then
+        return nil
+    end
+    return true, remote:eval(code)
+end
+
 local function connect()
+    if not stdin_isatty() then
+        local code = io.stdin:read("*a")
+        if code == nil then
+            usage(command_name)
+            return 1
+        end
+        local status, full_response = execute_remote(arg[2], code)
+        if not status then
+            log.error("failed to connect to tarantool")
+            return 2
+        end
+        local error_response = yaml.decode(full_response)[1]
+        if type(error_response) == 'table' and error_response.error then
+            log.error("Error, while executing remote command:")
+            log.error(error_response.error)
+            return 3
+        end
+        print(full_response)
+        return 0
+    end
+    -- Otherwise we're starting console
     console.on_start(function(self)
         local status, reason
         status, reason = pcall(function() require('console').connect(arg[2]) end)
@@ -753,7 +786,7 @@ local function eval()
     local filename = arg[3]
     local code = nil
     if filename == nil then
-        if ffi.C.isatty(0) == 1 then
+        if stdin_isatty() then
             log.error("Usage:")
             log.error(" - tarantoolctl eval instance_name file.lua")
             log.error(" - <command> | tarantoolctl eval instance_name")
@@ -777,15 +810,11 @@ local function eval()
         return 2
     end
 
-    local u = uri.parse(console_sock)
-    local remote = netbox.connect(u.host, u.service,
-        { user = u.login, password = u.password, console = true })
-    if remote == nil then
-        log.warn("control socket exists, but tarantool doesn't listen on it")
+    local status, full_response = execute_remote(console_sock, code)
+    if status == false then
+        log.error("control socket exists, but tarantool doesn't listen on it")
         return 2
     end
-
-    local full_response = remote:eval(code)
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
         log.error("Error, while reloading config:")
@@ -998,7 +1027,10 @@ local commands = setmetatable({
         }
     }, connect = {
         func = exit_wrapper(connect), process = process_remote, help = {
-            header = "%s connect <instance_uri>",
+            header = {
+                "%s connect <instance_uri>",
+                "<command> | %s connect <instance_uri>"
+            },
             description =
 [=[
         Connect to Tarantool instance on admin/console port.
