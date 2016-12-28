@@ -3067,14 +3067,23 @@ vy_range_freeze_mem(struct vy_range *range)
 }
 
 static void
+vy_range_delete_mem(struct vy_range *range, struct vy_mem *mem)
+{
+	struct vy_index *index = range->index;
+	struct vy_env *env = index->env;
+
+	vy_scheduler_mem_dumped(env->scheduler, mem);
+	index->used -= mem->used;
+	index->stmt_count -= mem->tree.size;
+	vy_mem_delete(mem);
+}
+
+static void
 vy_range_delete(struct vy_range *range)
 {
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
 	assert(range->in_compact.pos == UINT32_MAX);
-
-	struct vy_index *index = range->index;
-	struct vy_env *env = index->env;
 
 	if (range->begin)
 		vy_stmt_unref(range->begin);
@@ -3091,15 +3100,13 @@ vy_range_delete(struct vy_range *range)
 		vy_run_unref(run);
 	}
 	/* Release all mems */
-	vy_range_freeze_mem(range);
+	if (range->mem != NULL)
+		vy_range_delete_mem(range, range->mem);
 	while (!rlist_empty(&range->frozen)) {
 		struct vy_mem *mem;
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
-		vy_scheduler_mem_dumped(env->scheduler, mem);
-		index->used -= mem->used;
-		index->stmt_count -= mem->tree.size;
-		vy_mem_delete(mem);
+		vy_range_delete_mem(range, mem);
 	}
 
 	TRASH(range);
@@ -3886,10 +3893,7 @@ vy_task_dump_complete(struct vy_task *task, bool in_shutdown)
 		struct vy_mem *mem;
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
-		vy_scheduler_mem_dumped(env->scheduler, mem);
-		index->used -= mem->used;
-		index->stmt_count -= mem->tree.size;
-		vy_mem_delete(mem);
+		vy_range_delete_mem(range, mem);
 	}
 	range->used = range->mem->used;
 	range->min_lsn = range->mem->min_lsn;
