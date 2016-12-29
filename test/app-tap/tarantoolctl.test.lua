@@ -5,8 +5,34 @@ local fio      = require('fio')
 local tap      = require('tap')
 local uuid     = require('uuid')
 local yaml     = require('yaml')
+local errno    = require('errno')
 local fiber    = require('fiber')
 local test_run = require('test_run').new()
+
+local function recursive_rmdir(path)
+    path = fio.abspath(path)
+    local path_content = fio.glob(fio.pathjoin(path, '*'))
+    for _, val in ipairs(fio.glob(fio.pathjoin(path, '.*'))) do
+        if fio.basename(val) ~= '.' and fio.basename(val) ~= '..' then
+            table.insert(path_content, val)
+        end
+    end
+    for _, file in ipairs(path_content) do
+        local stat = fio.stat(file)
+        if stat:is_dir() then
+            recursive_rmdir(file)
+        else
+            if fio.unlink(file) == false then
+                print(string.format('!!! failed to unlink file "%s"', file))
+                print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
+            end
+        end
+    end
+    if fio.rmdir(path) == false then
+        print(string.format('!!! failed to rmdir path "%s"', file))
+        print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
+    end
+end
 
 ffi.cdef[[
 typedef int32_t pid_t;
@@ -55,9 +81,10 @@ local function run_command(dir, command)
     local line = [[/bin/sh -c 'cd "%s" && %s >"%s" 2>"%s"']]
     line = line:format(dir, command, fstdout, fstderr)
     local res = os.execute(line)
+    fiber.sleep(0.1)
     local fstdout_e, fstderr_e = io.open(fstdout):read('*a'), io.open(fstderr):read('*a')
     fio.unlink(fstdout); fio.unlink(fstderr);
-    return res, fstdout_e, fstderr_e
+    return res/256, fstdout_e, fstderr_e
 end
 
 local function tctl_command(dir, cmd, args)
@@ -72,18 +99,27 @@ end
 local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
     local res, stdout, stderr = tctl_command(dir, cmd, args)
     stdout, stderr = stdout or '', stderr or ''
+    local ares = true
     if (e_res ~= nil) then
-        test:is(res, e_res, ("check '%s' command status"):format(cmd))
+        local val = test:is(res, e_res, ("check '%s' command status for '%s'"):format(cmd,args))
+        ares = ares and val
     end
     if e_stdout ~= nil then
-        if not test:ok(stdout:find(e_stdout), ("check '%s' stdout"):format(cmd)) then
+        local val = test:is(res, e_res, ("check '%s' stdout for '%s'"):format(cmd,args))
+        ares = ares and val
+        if not val then
             print(("Expected to find '%s' in '%s'"):format(e_stdout, stdout))
         end
     end
     if e_stderr ~= nil then
-        if not test:ok(stderr:find(e_stderr), ("check '%s' stderr"):format(cmd)) then
+        local val = test:ok(stderr:find(e_stderr), ("check '%s' stderr for '%s'"):format(cmd,args))
+        ares = ares and val
+        if not val then
             print(("Expected to find '%s' in '%s'"):format(e_stderr, stderr))
         end
+    end
+    if not ares then
+        print(res, stdout, stderr)
     end
 end
 
@@ -100,19 +136,19 @@ do
     local status, err = pcall(function()
         test:test("basic test", function(test_i)
             test_i:plan(16)
-            check_ok(test_i, dir, 'start',  'script', 0,   nil, "Starting instance")
-            check_ok(test_i, dir, 'status', 'script', 0,   nil, "is running")
-            check_ok(test_i, dir, 'start',  'script', 256, nil, "is already running")
-            check_ok(test_i, dir, 'status', 'script', 0,   nil, "is running")
-            check_ok(test_i, dir, 'stop',   'script', 0,   nil, "Stopping")
-            check_ok(test_i, dir, 'status', 'script', 256, nil, "is stopped")
-            check_ok(test_i, dir, 'stop',   'script', 0,   nil, "is not running")
-            check_ok(test_i, dir, 'status', 'script', 256, nil, "is stopped" )
+            check_ok(test_i, dir, 'start',  'script', 0, nil, "Starting instance")
+            check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
+            check_ok(test_i, dir, 'start',  'script', 1, nil, "is already running")
+            check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
+            check_ok(test_i, dir, 'stop',   'script', 0, nil, "Stopping")
+            check_ok(test_i, dir, 'status', 'script', 1, nil, "is stopped")
+            check_ok(test_i, dir, 'stop',   'script', 0, nil, "is not running")
+            check_ok(test_i, dir, 'status', 'script', 1, nil, "is stopped" )
         end)
     end)
 
     cleanup_instance(dir, 'script')
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
@@ -132,19 +168,21 @@ do
     local status, err = pcall(function()
         test:test("basic test for bad script", function(test_i)
             test_i:plan(8)
-            check_ok(test_i, dir, 'start', 'script', 65280, nil,
+            check_ok(test_i, dir, 'start', 'script', 1, nil,
                      'Instance script is not found')
-            check_ok(test_i, dir, 'start', 'bad_script',  0, nil,
+            check_ok(test_i, dir, 'start', 'bad_script', 1, nil,
                      'unexpected symbol near')
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 256,
-                     nil, 'Failed to check instance file')
+            fiber.sleep(0.1)
+            -- wait here
+            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
+                     nil, 'Error, while reloading config:')
             check_ok(test_i, dir, 'stop', 'good_script', 0)
         end)
     end)
 
     cleanup_instance(dir, 'good_script')
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
@@ -167,8 +205,9 @@ do
         test:test("check answers in case of call", function(test_i)
             test_i:plan(6)
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 768,
-                     nil, 'Error, while reloading config')
+            fiber.sleep(0.1)
+            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3, nil,
+                     'Error, while reloading config')
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,
                      '---\n- 1\n...', nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
@@ -176,7 +215,7 @@ do
     end)
 
     cleanup_instance(dir, 'good_script')
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
@@ -211,7 +250,7 @@ do
         end)
     end)
 
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
@@ -224,7 +263,7 @@ do
     local dir = fio.tempdir()
 
     local filler_code = [[
-        box.cfg{slab_alloc_arena = 0.1}
+        box.cfg{slab_alloc_arena = 0.1, background=false}
         local space = box.schema.create_space("test")
         space:create_index("primary")
         space:insert({[1] = 1, [2] = 2, [3] = 3, [4] = 4})
@@ -235,11 +274,11 @@ do
         space:upsert({[1] = 3, [2] = 4, [3] = 5, [4] = 6}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
         os.exit(0)
     ]]
-    local command_base = 'tarantoolctl cat filler/00000000000000000000.xlog'
 
     create_script(dir, 'filler.lua', filler_code)
 
     local function check_ctlcat(test, dir, args, delim, lc)
+        local command_base = 'tarantoolctl cat filler/00000000000000000000.xlog'
         local desc = args and "cat + " .. args or "cat"
         args = args and " " .. args or ""
         local res, stdout, stderr = run_command(dir, command_base .. args)
@@ -261,7 +300,7 @@ do
         end)
     end)
 
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
@@ -300,12 +339,15 @@ do
     local remote_path = create_script(dir, 'remote.lua', remote_code)
     test_run:cmd(("create server remote with script='%s'"):format(remote_path))
     test_run:cmd("start server remote")
-    local port = tonumber(test_run:eval("remote", "return require('uri').parse(box.cfg.listen).service")[1])
+    local port = tonumber(
+        test_run:eval("remote",
+                      "return require('uri').parse(box.cfg.listen).service")[1]
+    )
 
     local command_base = ('tarantoolctl play localhost:%d filler/00000000000000000000.xlog'):format(port)
 
     local status, err = pcall(function()
-        test:test("fill and test cat output", function(test_i)
+        test:test("fill and test play output", function(test_i)
             test_i:plan(6)
             check_ok(test_i, dir, 'start', 'filler', 0)
             fiber.sleep(0.01)
@@ -322,7 +364,7 @@ do
 
     test_run:cmd("stop server remote")
     test_run:cmd("cleanup server remote")
-    fio.rmdir(dir)
+    recursive_rmdir(dir)
 
     if status == false then
         print(("Error: %s"):format(err))
