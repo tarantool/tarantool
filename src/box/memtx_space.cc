@@ -186,16 +186,16 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 {
 	Index *pk = index_find_unique(space, request->index_id);
 
-	/* Check tuple fields */
+	/*
+	 * Check all tuple fields: we should produce an error on
+	 * malformed tuple even if upsert turns into an update.
+	*/
 	if (tuple_validate_raw(space->format, request->tuple))
 		diag_raise();
 
 	struct key_def *key_def = pk->key_def;
 	uint32_t part_count = pk->key_def->part_count;
-	/*
-	 * Extract the primary key from tuple.
-	 * Allocate enough memory to store the key.
-	 */
+	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
 						key_def, NULL);
@@ -209,23 +209,20 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 
 	if (old_tuple == NULL) {
 		/**
-		 * Old tuple was not found. In a "true"
-		 * non-reading-write engine, this is known only
-		 * after commit. Thus any error that can happen
-		 * at this point is ignored. Emulate this by
-		 * suppressing the error. It's logged and ignored.
-		 *
-		 * Taking into account that:
-		 * 1) Default tuple fields are already fully checked
-		 *    at the beginning of the function
-		 * 2) Space with unique secondary indexes does not support
-		 *    upsert and we can't get duplicate error
-		 *
-		 * Thus we could get only OOM error, but according to
-		 *   https://github.com/tarantool/tarantool/issues/1156
-		 *   we should not suppress it
-		 *
-		 * So we have nothing to catch and suppress!
+		 * Old tuple was not found. A write optimized
+		 * engine may only know this after commit, so
+		 * some errors which happen on this branch would
+		 * only make it to the server log in it.
+		 * To provide identical semantics, we should not throw
+		 * anything. However, considering the kind of
+		 * error which may occur, throwing it won't break
+		 * cross-engine compatibility:
+		 * - update ops are checked before commit
+		 * - OOM may happen at any time
+		 * - duplicate key has to be checked by
+		 *   write-optimized engine before commit, so if
+		 *   we get it here, it's also OK to throw it
+		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
 		if (tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
 				       request->ops, request->ops_end,
@@ -239,9 +236,9 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		old_tuple = replace(space, NULL, new_tuple, DUP_INSERT);
 		memtx_txn_add_undo(txn, old_tuple, new_tuple);
 	} else {
-		/**
+		/*
 		 * Update the tuple.
-		 * tuple_upsert throws on totally wrong tuple ops,
+		 * tuple_upsert() throws on totally wrong tuple ops,
 		 * but ignores ops that not suitable for the tuple
 		 */
 		struct tuple *new_tuple;
@@ -252,9 +249,9 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 					 request->index_base);
 		TupleRef ref(new_tuple);
 
-		/**
+		/*
 		 * Ignore and log all client exceptions,
-		 * note that OutOfMemory is not catched.
+		 * note that OutOfMemory is not caught.
 		 */
 		try {
 			replace(space, old_tuple, new_tuple, DUP_REPLACE);
