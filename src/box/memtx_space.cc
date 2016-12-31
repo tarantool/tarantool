@@ -88,7 +88,7 @@ memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
 }
 
 void
-MemtxSpace::applySnapshotRow(struct space *space, struct request *request)
+MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
 	assert(request->type == IPROTO_INSERT);
 	struct tuple *new_tuple = tuple_new_xc(space->format, request->tuple,

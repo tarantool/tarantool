@@ -261,7 +261,7 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 	request->header = row;
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
-	space->handler->applySnapshotRow(space, request);
+	space->handler->applyInitialJoinRow(space, request);
 }
 
 static void

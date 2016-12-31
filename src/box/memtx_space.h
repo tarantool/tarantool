@@ -50,8 +50,8 @@ struct MemtxSpace: public Handler {
 		/* engine->close(this); */
 	}
 	virtual void
-	applySnapshotRow(struct space *space,
-			 struct request *request) override;
+	applyInitialJoinRow(struct space *space,
+			    struct request *request) override;
 	virtual struct tuple *
 	executeReplace(struct txn *txn, struct space *space,
 		       struct request *request) override;

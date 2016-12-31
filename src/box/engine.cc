@@ -152,7 +152,7 @@ Handler::Handler(Engine *f)
 }
 
 void
-Handler::applySnapshotRow(struct space *, struct request *)
+Handler::applyInitialJoinRow(struct space *, struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name,
 		  "applySnapshotRow");

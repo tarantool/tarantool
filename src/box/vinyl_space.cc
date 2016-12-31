@@ -47,7 +47,7 @@ VinylSpace::VinylSpace(Engine *e)
 {}
 
 void
-VinylSpace::applySnapshotRow(struct space *space, struct request *request)
+VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
 	assert(request->type == IPROTO_INSERT);
 	assert(request->header != NULL);

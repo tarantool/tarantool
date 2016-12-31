@@ -178,7 +178,8 @@ public:
 	Handler& operator=(const Handler&) = delete;
 
 	virtual void
-	applySnapshotRow(struct space *space, struct request *);
+	applyInitialJoinRow(struct space *space, struct request *);
+
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *,
 		       struct request *);
