@@ -65,26 +65,6 @@ dup_replace_mode(uint32_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
-/**
- * Do the plumbing necessary for correct statement-level
- * and transaction rollback.
- */
-static inline void
-memtx_txn_add_undo(struct txn_stmt *stmt, struct tuple *old_tuple,
-		   struct tuple *new_tuple)
-{
-	/*
-	 * Remember the old tuple only if we replaced it
-	 * successfully, to not remove a tuple inserted by
-	 * another transaction in rollback().
-	 */
-	assert(stmt->space);
-	stmt->old_tuple = old_tuple;
-	stmt->new_tuple = new_tuple;
-	if (stmt->new_tuple)
-		tuple_ref(stmt->new_tuple);
-}
-
 void
 MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
