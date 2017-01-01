@@ -87,14 +87,13 @@ txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
  * A short-cut version of replace() used during bulk load
  * from snapshot.
  */
-static struct tuple *
-memtx_replace_build_next(struct space *space,
-			 struct tuple *old_tuple, struct tuple *new_tuple,
+static void
+memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
 			 enum dup_replace_mode mode)
 {
-	assert(old_tuple == NULL && mode == DUP_INSERT);
+	assert(stmt->old_tuple == NULL && mode == DUP_INSERT);
 	(void) mode;
-	if (old_tuple) {
+	if (stmt->old_tuple) {
 		/*
 		 * Called from txn_rollback() In practice
 		 * is impossible: all possible checks for tuple
@@ -104,29 +103,29 @@ memtx_replace_build_next(struct space *space,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	((MemtxIndex *) space->index[0])->buildNext(new_tuple);
-	tuple_ref(new_tuple);
-	return NULL;
+	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
+	stmt->engine_savepoint = stmt;
 }
 
 /**
  * A short-cut version of replace() used when loading
  * data from XLOG files.
  */
-static struct tuple *
-memtx_replace_primary_key(struct space *space, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode)
+static void
+memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
+			  enum dup_replace_mode mode)
 {
-	old_tuple = space->index[0]->replace(old_tuple, new_tuple, mode);
-	if (new_tuple)
-		tuple_ref(new_tuple);
-	return old_tuple;
+	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
+						   stmt->new_tuple, mode);
+	stmt->engine_savepoint = stmt;
 }
 
-static struct tuple *
-memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode)
+static void
+memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
+		       enum dup_replace_mode mode)
 {
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
 	/*
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
@@ -160,9 +159,8 @@ memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		}
 		throw;
 	}
-	if (new_tuple)
-		tuple_ref(new_tuple);
-	return old_tuple;
+	stmt->old_tuple = old_tuple;
+	stmt->engine_savepoint = stmt;
 }
 
 static void
@@ -611,7 +609,10 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 	int index_count;
 	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
 
-	if (handler->replace == memtx_replace_all_keys)
+	/* Only roll back the changes if they were made. */
+	if (stmt->engine_savepoint == NULL)
+		index_count = 0;
+	else if (handler->replace == memtx_replace_all_keys)
 		index_count = space->index_count;
 	else if (handler->replace == memtx_replace_primary_key)
 		index_count = 1;

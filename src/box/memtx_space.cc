@@ -44,16 +44,13 @@
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
  */
-struct tuple *
-memtx_replace_no_keys(struct space *space,
-		      struct tuple * /* old_tuple */,
-		      struct tuple * /* new_tuple */,
+void
+memtx_replace_no_keys(struct txn_stmt * /* stmt */, struct space *space,
 		      enum dup_replace_mode /* mode */)
 {
 	Index *index = index_find_xc(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
-	return NULL;
 }
 
 MemtxSpace::MemtxSpace(Engine *e)
@@ -73,7 +70,7 @@ dup_replace_mode(uint32_t op)
  * and transaction rollback.
  */
 static inline void
-memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
+memtx_txn_add_undo(struct txn_stmt *stmt, struct tuple *old_tuple,
 		   struct tuple *new_tuple)
 {
 	/*
@@ -81,120 +78,94 @@ memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
 	 * successfully, to not remove a tuple inserted by
 	 * another transaction in rollback().
 	 */
-	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(stmt->space);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
+	if (stmt->new_tuple)
+		tuple_ref(stmt->new_tuple);
 }
 
 void
 MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
 	assert(request->type == IPROTO_INSERT);
-	struct tuple *new_tuple = tuple_new_xc(space->format, request->tuple,
-					       request->tuple_end);
-	/* GC the new tuple if there is an exception below. */
-	TupleRef ref(new_tuple);
-	if (!rlist_empty(&space->on_replace)) {
-		/*
-		 * Emulate transactions for system spaces with triggers
-		 */
-		assert(in_txn() == NULL);
-		request->header->server_id = 0;
-		struct txn *txn = txn_begin_stmt(space);
-		try {
-			struct tuple *old_tuple = this->replace(space, NULL,
-				new_tuple, DUP_INSERT);
-			memtx_txn_add_undo(txn, old_tuple, new_tuple);
-			txn_commit_stmt(txn, request);
-		} catch (Exception *e) {
-			say_error("rollback: %s", e->errmsg);
-			txn_rollback_stmt();
-			throw;
-		}
-	} else {
-		this->replace(space, NULL, new_tuple, DUP_INSERT);
+	request->header->server_id = 0;
+	struct txn *txn = txn_begin_stmt(space);
+	try {
+		struct txn_stmt *stmt = txn_current_stmt(txn);
+		prepareReplace(stmt, space, request);
+		this->replace(stmt, space, DUP_INSERT);
+		txn_commit_stmt(txn, request);
+	} catch (Exception *e) {
+		say_error("rollback: %s", e->errmsg);
+		txn_rollback_stmt();
+		throw;
 	}
 	/** The new tuple is referenced by the primary key. */
 }
 
-struct tuple *
-MemtxSpace::executeReplace(struct txn *txn, struct space *space,
+void
+MemtxSpace::prepareReplace(struct txn_stmt *stmt, struct space *space,
 			   struct request *request)
 {
-	struct tuple *new_tuple = tuple_new_xc(space->format, request->tuple,
-					       request->tuple_end);
-	/* GC the new tuple if there is an exception below. */
-	TupleRef ref(new_tuple);
-	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	struct tuple *old_tuple = this->replace(space, NULL, new_tuple, mode);
-	memtx_txn_add_undo(txn, old_tuple, new_tuple);
-	/** The new tuple is referenced by the primary key. */
-	return new_tuple;
-}
-
-struct tuple *
-MemtxSpace::executeDelete(struct txn *txn, struct space *space,
-			  struct request *request)
-{
-	/* Try to find the tuple by unique key. */
-	Index *pk = index_find_unique(space, request->index_id);
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->key_def, key, part_count))
-		diag_raise();
-	struct tuple *old_tuple = pk->findByKey(key, part_count);
-	if (old_tuple == NULL)
-		return NULL;
-
-	this->replace(space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
-	memtx_txn_add_undo(txn, old_tuple, NULL);
-	return old_tuple;
-}
-
-struct tuple *
-MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
-			  struct request *request)
-{
-	/* Try to find the tuple by unique key. */
-	Index *pk = index_find_unique(space, request->index_id);
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->key_def, key, part_count))
-		diag_raise();
-	struct tuple *old_tuple = pk->findByKey(key, part_count);
-
-	if (old_tuple == NULL)
-		return NULL;
-
-	/* Update the tuple; legacy, request ops are in request->tuple */
-	struct tuple *new_tuple = tuple_update(space->format,
-					       region_aligned_alloc_xc_cb,
-					       &fiber()->gc,
-					       old_tuple, request->tuple,
-					       request->tuple_end,
-					       request->index_base, NULL);
-	TupleRef ref(new_tuple);
-	this->replace(space, old_tuple, new_tuple, DUP_REPLACE);
-	memtx_txn_add_undo(txn, old_tuple, new_tuple);
-	return new_tuple;
+	stmt->new_tuple = tuple_new_xc(space->format, request->tuple,
+				       request->tuple_end);
+	tuple_ref(stmt->new_tuple);
 }
 
 void
-MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
+MemtxSpace::prepareDelete(struct txn_stmt *stmt, struct space *space,
 			  struct request *request)
 {
+	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	if (primary_key_validate(pk->key_def, key, part_count))
+		diag_raise();
+	stmt->old_tuple = pk->findByKey(key, part_count);
+}
 
+void
+MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
+			  struct request *request)
+{
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	if (primary_key_validate(pk->key_def, key, part_count))
+		diag_raise();
+	stmt->old_tuple = pk->findByKey(key, part_count);
+
+	if (stmt->old_tuple == NULL)
+		return;
+
+	/* Update the tuple; legacy, request ops are in request->tuple */
+	stmt->new_tuple = tuple_update(space->format,
+				       region_aligned_alloc_xc_cb,
+				       &fiber()->gc,
+				       stmt->old_tuple, request->tuple,
+				       request->tuple_end,
+				       request->index_base, NULL);
+	tuple_ref(stmt->new_tuple);
+}
+
+void
+MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
+			  struct request *request)
+{
 	/*
 	 * Check all tuple fields: we should produce an error on
 	 * malformed tuple even if upsert turns into an update.
-	*/
+	 */
 	if (tuple_validate_raw(space->format, request->tuple))
 		diag_raise();
 
-	struct key_def *key_def = pk->key_def;
-	uint32_t part_count = pk->key_def->part_count;
+	Index *index = index_find_unique(space, request->index_id);
+
+	struct key_def *key_def = index->key_def;
+	uint32_t part_count = index->key_def->part_count;
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
@@ -205,9 +176,9 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	mp_decode_array(&key);
 
 	/* Try to find the tuple by primary key. */
-	struct tuple *old_tuple = pk->findByKey(key, part_count);
+	stmt->old_tuple = index->findByKey(key, part_count);
 
-	if (old_tuple == NULL) {
+	if (stmt->old_tuple == NULL) {
 		/**
 		 * Old tuple was not found. A write optimized
 		 * engine may only know this after commit, so
@@ -229,38 +200,84 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 				       request->index_base)) {
 			diag_raise();
 		}
-		struct tuple *new_tuple = tuple_new_xc(space->format,
+		stmt->new_tuple = tuple_new_xc(space->format,
 						       request->tuple,
 						       request->tuple_end);
-		TupleRef ref(new_tuple); /* useless, for unified approach */
-		old_tuple = replace(space, NULL, new_tuple, DUP_INSERT);
-		memtx_txn_add_undo(txn, old_tuple, new_tuple);
+		tuple_ref(stmt->new_tuple);
 	} else {
 		/*
 		 * Update the tuple.
 		 * tuple_upsert() throws on totally wrong tuple ops,
 		 * but ignores ops that not suitable for the tuple
 		 */
-		struct tuple *new_tuple;
-		new_tuple = tuple_upsert(space->format,
-					 region_aligned_alloc_xc_cb,
-					 &fiber()->gc, old_tuple,
-					 request->ops, request->ops_end,
-					 request->index_base);
-		TupleRef ref(new_tuple);
+		stmt->new_tuple = tuple_upsert(space->format,
+					       region_aligned_alloc_xc_cb,
+					       &fiber()->gc, stmt->old_tuple,
+					       request->ops, request->ops_end,
+					       request->index_base);
 
-		/*
-		 * Ignore and log all client exceptions,
-		 * note that OutOfMemory is not caught.
-		 */
-		try {
-			replace(space, old_tuple, new_tuple, DUP_REPLACE);
-			memtx_txn_add_undo(txn, old_tuple, new_tuple);
-		} catch (ClientError *e) {
-			say_error("UPSERT failed:");
-			e->log();
+		tuple_ref(stmt->new_tuple);
+		Index *pk = space->index[0];
+		if (tuple_compare(stmt->old_tuple, stmt->new_tuple, pk->key_def)) {
+			/* Primary key is changed: log error and do nothing. */
+			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+				 pk->key_def->name, space_name(space));
+			error_log(diag_last_error(diag_get()));
+			tuple_unref(stmt->new_tuple);
+			stmt->old_tuple = NULL;
+			stmt->new_tuple = NULL;
 		}
 	}
+}
+
+struct tuple *
+MemtxSpace::executeReplace(struct txn *txn, struct space *space,
+			   struct request *request)
+{
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	enum dup_replace_mode mode = dup_replace_mode(request->type);
+	prepareReplace(stmt, space, request);
+	this->replace(stmt, space, mode);
+	/** The new tuple is referenced by the primary key. */
+	return stmt->new_tuple;
+}
+
+struct tuple *
+MemtxSpace::executeDelete(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	prepareDelete(stmt, space, request);
+	if (stmt->old_tuple)
+		this->replace(stmt, space, DUP_REPLACE_OR_INSERT);
+	return stmt->old_tuple;
+}
+
+struct tuple *
+MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	prepareUpdate(stmt, space, request);
+	if (stmt->old_tuple)
+		this->replace(stmt, space, DUP_REPLACE);
+	return stmt->new_tuple;
+}
+
+void
+MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	prepareUpsert(stmt, space, request);
+	/*
+	 * It's OK to use DUP_REPLACE_OR_INSERT: we don't risk
+	 * inserting a new tuple if the old one exists, since
+	 * prepareUpsert() checked this case explicitly and
+	 * skipped the upsert.
+	 */
+	if (stmt->new_tuple)
+		this->replace(stmt, space, DUP_REPLACE_OR_INSERT);
 	/* Return nothing: UPSERT does not return data. */
 }
 

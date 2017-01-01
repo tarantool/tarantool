@@ -177,7 +177,6 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
 		trigger_run(&stmt->space->on_replace, txn);
 	}
-	stmt->engine_savepoint = NULL;
 	--txn->in_sub_stmt;
 	if (txn->is_autocommit && txn->in_sub_stmt == 0)
 		txn_commit(txn);

@@ -52,7 +52,6 @@ xstream_create(struct xstream *xstream, xstream_write_f write)
 static inline void
 xstream_write(struct xstream *stream, struct xrow_header *row)
 {
-	assert(stream->write != NULL);
 	return stream->write(stream, row);
 }
 

@@ -32,14 +32,11 @@
  */
 #include "engine.h"
 
-typedef struct tuple *
-(*engine_replace_f)(struct space *, struct tuple *, struct tuple *,
-		    enum dup_replace_mode);
+typedef void
+(*engine_replace_f)(struct txn_stmt *, struct space *, enum dup_replace_mode);
 
-struct tuple *
-memtx_replace_no_keys(struct space *space,
-		      struct tuple * /* old_tuple */,
-		      struct tuple * /* new_tuple */,
+void
+memtx_replace_no_keys(struct txn_stmt *, struct space *space,
 		      enum dup_replace_mode /* mode */);
 
 struct MemtxSpace: public Handler {
@@ -162,6 +159,19 @@ public:
 	 * primary key.
 	 */
 	engine_replace_f replace;
+private:
+	void
+	prepareReplace(struct txn_stmt *stmt, struct space *space,
+		       struct request *request);
+	void
+	prepareDelete(struct txn_stmt *stmt, struct space *space,
+		      struct request *request);
+	void
+	prepareUpdate(struct txn_stmt *stmt, struct space *space,
+		      struct request *request);
+	void
+	prepareUpsert(struct txn_stmt *stmt, struct space *space,
+		      struct request *request);
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */
