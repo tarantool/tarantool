@@ -217,12 +217,6 @@ Handler::executeSelect(struct txn *, struct space *space,
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
-		/*
-		 * This is for Vinyl, which returns a tuple
-		 * with zero refs from the iterator, expecting
-		 * the caller to GC it after use.
-		 */
-		TupleRef tuple_gc(tuple);
 		if (offset > 0) {
 			offset--;
 			continue;

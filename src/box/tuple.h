@@ -596,15 +596,6 @@ tuple_unref(struct tuple *tuple)
 }
 
 /** Make tuple references exception-friendly in absence of @finally. */
-struct TupleRef {
-	struct tuple *tuple;
-	TupleRef(struct tuple *arg) :tuple(arg) { tuple_ref(tuple); }
-	~TupleRef() { tuple_unref(tuple); }
-	TupleRef(const TupleRef &) = delete;
-	void operator=(const TupleRef&) = delete;
-};
-
-/** Make tuple references exception-friendly in absence of @finally. */
 struct TupleRefNil {
 	struct tuple *tuple;
 	TupleRefNil (struct tuple *arg) :tuple(arg)
