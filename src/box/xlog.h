@@ -429,11 +429,11 @@ xlog_tx_decode(const char *data, const char *data_end,
 enum xlog_cursor_state {
 	/* Cursor is closed */
 	XLOG_CURSOR_CLOSED = 0,
-	/* Cursor is opened but tx is not readen */
+	/* The cursor is open but no tx is read */
 	XLOG_CURSOR_ACTIVE = 1,
-	/* Cursor is opened and tx is readen */
+	/* The Cursor is open and a tx is read */
 	XLOG_CURSOR_TX = 2,
-	/* Cursor is opened but eof readen */
+	/* The cursor is open but is at the end of file. */
 	XLOG_CURSOR_EOF = 3
 };
 

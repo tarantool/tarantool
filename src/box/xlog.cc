@@ -1538,7 +1538,10 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 	return 0;
 eof:
 	if (i->state == XLOG_CURSOR_EOF) {
-		/* eof marker readen, check that no more data in file */
+		/*
+		 * A eof marker is read, check that there is no
+		 * more data in the file.
+		 */
 		rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
 
 		if (rc < 0)
