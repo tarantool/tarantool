@@ -103,6 +103,7 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 				       request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		diag_raise();
+	tuple_ref(stmt->new_tuple);
 	return stmt->new_tuple;
 }
 

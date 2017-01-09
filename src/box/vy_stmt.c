@@ -72,7 +72,7 @@ vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		vy_tuple_delete(format, new_tuple);
 		return NULL;
 	}
-	new_tuple->refs = 1;
+	new_tuple->refs = 0;
 	return new_tuple;
 }
 
