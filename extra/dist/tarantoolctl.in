@@ -326,12 +326,17 @@ end
 
 local function read_file(filename)
     local file = fio.open(filename, {'O_RDONLY'})
+    if file == nil then
+        return nil, errno.strerror()
+    end
+
     local buf = {}
     local i = 1
-
     while true do
         buf[i] = file:read(1024)
-        if buf[i] == '' then
+        if buf[i] == nil then
+            return nil, errno.strerror()
+        elseif buf[i] == '' then
             break
         end
         i = i + 1
@@ -683,31 +688,22 @@ end
 local function eval()
     local console_sock_path = uri.parse(console_sock).service
     local filename = arg[3]
-    local stdin_is_file = (ffi.C.isatty(0) == 0 and
-                           (errno() == errno.EINVAL or errno() == errno.ENOTTY))
     local code = nil
     if filename == nil then
-        if not stdin_is_file then
+        if ffi.C.isatty(0) == 1 then
             log.error("Usage:")
             log.error(" - tarantoolctl eval instance_name file.lua")
             log.error(" - <command> | tarantoolctl eval instance_name")
             return 1
         end
         code = io.stdin:read("*a")
-        if not loadstring(code) do
-            log.error("Error, while checking syntax: halting")
-            return 1
-        end
     else
-        if fio.stat(filename) == nil and errno() == errno.ENOENT then
-            log.error("%s: file not found", filename)
-            return 1
+        local err
+        code, err = read_file(filename)
+        if code == nil then
+            log.error("%s: %s", filename, err)
+            return 2
         end
-        if check_file(filename) ~= nil then
-            log.error("Error, while checking syntax: halting")
-            return 1
-        end
-        code = read_file(filename)
     end
 
     assert(code ~= nil, "Check that we've successfully loaded file")
