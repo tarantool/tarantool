@@ -37,6 +37,7 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
 
+
 /** Extract all available type info from keys. */
 static int
 field_type_create(struct tuple_format *format, struct rlist *key_list)
@@ -144,9 +145,6 @@ tuple_format_alloc(struct rlist *key_list)
 	format->id = FORMAT_ID_NIL;
 	format->field_count = field_count;
 	format->exact_field_count = 0;
-	format->engine = ENGINE_NIL;
-	format->tuple_delete = NULL;
-	format->tuple_new = NULL;
 	return format;
 }
 
@@ -157,32 +155,13 @@ tuple_format_delete(struct tuple_format *format)
 	free(format);
 }
 
-extern "C" void
-memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
-
-extern "C" void
-vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple);
-
-extern "C" struct tuple *
-memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
-extern "C" struct tuple *
-vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
 struct tuple_format *
-tuple_format_new(struct rlist *key_list, enum engine_type engine)
+tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab)
 {
 	struct tuple_format *format = tuple_format_alloc(key_list);
 	if (format == NULL)
 		return NULL;
-	format->engine = engine;
-	if (engine == ENGINE_MEMTX) {
-		format->tuple_delete = memtx_tuple_delete;
-		format->tuple_new = memtx_tuple_new;
-	} else {
-		format->tuple_delete = vinyl_tuple_delete;
-		format->tuple_new = vinyl_tuple_new;
-	}
+	format->vtab = *vtab;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_delete(format);
 		return NULL;
@@ -270,7 +249,7 @@ void
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
-	tuple_format_default = tuple_format_new(&empty_list, ENGINE_MEMTX);
+	tuple_format_default = tuple_format_new(&empty_list, &memtx_tuple_format_vtab);
 	if (tuple_format_default == NULL)
 		diag_raise();
 	/* Make sure this one stays around. */

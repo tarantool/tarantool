@@ -149,7 +149,6 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	assert(format->engine == ENGINE_MEMTX);
 	size_t total = sizeof(struct tuple) + tuple->bsize +
 		       format->field_map_size;
 	tuple_format_ref(format, -1);
@@ -161,11 +160,10 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 }
 
 void
-vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	assert(format->engine == ENGINE_VINYL);
 	size_t total = sizeof(struct tuple) + tuple->bsize +
 		       format->field_map_size;
 	tuple_format_ref(format, -1);
@@ -341,7 +339,6 @@ tuple_upsert(struct tuple_format *format,
 struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	assert(format->engine = ENGINE_MEMTX);
 	size_t tuple_len = end - data;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
@@ -358,9 +355,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 }
 
 struct tuple *
-vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end)
+vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	assert(format->engine = ENGINE_VINYL);
 	size_t tuple_len = end - data;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
@@ -370,7 +366,7 @@ vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, tuple_len);
 	if (tuple_init_field_map(format, field_map, raw)) {
-		vinyl_tuple_delete(format, new_tuple);
+		vy_tuple_delete(format, new_tuple);
 		return NULL;
 	}
 	return new_tuple;

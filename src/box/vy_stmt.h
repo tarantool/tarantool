@@ -448,7 +448,7 @@ vy_stmt_extract_key(const struct vy_stmt *stmt, const struct key_def *key_def);
  * @retval     NULL Memory error.
  */
 static inline struct vy_stmt *
-vy_key_from_message_pack(const char *key, const struct key_def *key_def)
+vy_key_from_msgpack(const char *key, const struct key_def *key_def)
 {
 	(void) key_def; /* unused in release. */
 	uint32_t part_count;

@@ -35,6 +35,7 @@
 struct request;
 struct space;
 struct tuple;
+struct tuple_format_vtab;
 struct relay;
 
 enum engine_flags {
@@ -48,7 +49,7 @@ struct Handler;
 /** Engine instance */
 class Engine {
 public:
-	Engine(const char *engine_name);
+	Engine(const char *engine_name, struct tuple_format_vtab *format);
 
 	Engine(const Engine &) = delete;
 	Engine& operator=(const Engine&) = delete;
@@ -166,6 +167,7 @@ public:
 	uint32_t flags;
 	/** Used for search for engine by name. */
 	struct rlist link;
+	struct tuple_format_vtab *format;
 };
 
 /** Engine handle - an operator of a space */

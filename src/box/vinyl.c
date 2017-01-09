@@ -2280,7 +2280,7 @@ vy_row_index_encode(const uint32_t *row_index, uint32_t count,
  *
  *  @retval  1 all is ok, the iterator is finished
  *  @retval  0 all is ok, the iterator isn't finished
- *  @retval -1 error occured
+ *  @retval -1 error occurred
  */
 static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
@@ -2393,7 +2393,7 @@ error_row_index:
  *
  *  @retval 0, curr_stmt != NULL: all is ok, the iterator is not finished
  *  @retval 0, curr_stmt == NULL: all is ok, the iterator finished
- *  @retval -1 error occured
+ *  @retval -1 error occurred
  */
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
@@ -2812,7 +2812,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			begin = vy_key_from_message_pack(pos, key_def);
+			begin = vy_key_from_msgpack(pos, key_def);
 			mp_next(&pos);
 			break;
 		case VY_RANGE_MAX_KEY:
@@ -2821,7 +2821,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			end = vy_key_from_message_pack(pos, key_def);
+			end = vy_key_from_msgpack(pos, key_def);
 			mp_next(&pos);
 			break;
 		default:
@@ -4125,7 +4125,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	/* Determine new ranges' boundaries. */
 	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_key_from_message_pack(split_key_raw,
+		split_key = vy_key_from_msgpack(split_key_raw,
 						     index->key_def);
 		if (split_key == NULL)
 			goto err_split_key;
@@ -5249,6 +5249,8 @@ vy_index_drop(struct vy_index *index)
 	return 0;
 }
 
+extern struct tuple_format_vtab vy_tuple_format_vtab;
+
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	     struct space *space)
@@ -5324,7 +5326,8 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, key_def, link);
 
-	struct tuple_format *format = tuple_format_new(&key_list, ENGINE_VINYL);
+	struct tuple_format *format =
+		tuple_format_new(&key_list, &vy_tuple_format_vtab);
 	assert(format != NULL);
 	tuple_format_ref(format, 1);
 

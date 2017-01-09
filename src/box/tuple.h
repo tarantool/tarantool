@@ -390,14 +390,12 @@ tuple_format(const struct tuple *tuple)
 static inline struct tuple *
 tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	assert(format != NULL);
-	assert(format->tuple_new != NULL);
-	return format->tuple_new(format, data, end);
+	return format->vtab.create(format, data, end);
 }
 
 /** Create a tuple in the vinyl engine format. @sa tuple_new(). */
 struct tuple *
-vinyl_tuple_new(struct tuple_format *format, const char *data, const char *end);
+vy_tuple_new(struct tuple_format *format, const char *data, const char *end);
 
 /** Create a tuple in the memtx engine format. @sa tuple_new(). */
 struct tuple *
@@ -429,7 +427,7 @@ tuple_delete(struct tuple *tuple)
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
 	struct tuple_format *format = tuple_format(tuple);
-	format->tuple_delete(format, tuple);
+	format->vtab.destroy(format, tuple);
 }
 
 /**
@@ -444,7 +442,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
  * @pre tuple->refs  == 0
  */
 void
-vinyl_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Check tuple data correspondence to space format.
@@ -604,7 +602,7 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
 
 /**
  * Create a tuple in the memtx engine format. Throw an exception
- * if an error occured. @sa memtx_tuple_new().
+ * if an error occurred. @sa memtx_tuple_new().
  */
 static inline struct tuple *
 memtx_tuple_new_xc(struct tuple_format *format, const char *data,

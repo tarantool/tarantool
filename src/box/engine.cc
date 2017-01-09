@@ -44,9 +44,10 @@
 
 RLIST_HEAD(engines);
 
-Engine::Engine(const char *engine_name)
+Engine::Engine(const char *engine_name, struct tuple_format_vtab *format_arg)
 	:name(engine_name),
-	 link(RLIST_HEAD_INITIALIZER(link))
+	 link(RLIST_HEAD_INITIALIZER(link)),
+	 format(format_arg)
 {}
 
 void Engine::init()

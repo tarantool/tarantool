@@ -49,6 +49,11 @@
 #include "iproto_constants.h"
 #include "vinyl.h"
 
+struct tuple_format_vtab vy_tuple_format_vtab = {
+	vy_tuple_new,
+	vy_tuple_delete,
+};
+
 /* Used by lua/info.c */
 extern "C" struct vy_env *
 vinyl_engine_get_env()
@@ -58,7 +63,7 @@ vinyl_engine_get_env()
 }
 
 VinylEngine::VinylEngine()
-	:Engine("vinyl")
+	:Engine("vinyl", &vy_tuple_format_vtab)
 	,recovery_complete(false)
 {
 	flags = 0;

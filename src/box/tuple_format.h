@@ -48,8 +48,6 @@ enum { FORMAT_REF_MAX = INT32_MAX};
  */
 enum { TUPLE_INDEX_BASE = 1 };
 
-enum engine_type { ENGINE_NIL = 1, ENGINE_MEMTX = 1, ENGINE_VINYL = 2 };
-
 /**
  * @brief Tuple field format
  * Support structure for struct tuple_format.
@@ -84,11 +82,34 @@ struct tuple_field_format {
 
 struct tuple;
 
+/** Engine-specific tuple format methods. */
+struct tuple_format_vtab {
+	/**
+	 * Allocate memory for a new tuple. Reserves memory for
+	 * engine-specific fields, uses engine-specific allocator.
+	 * Initializes the tuple.
+	 */
+	struct tuple *
+	(*create)(struct tuple_format *format, const char *data,
+		     const char *end);
+	/** Free allocated tuple using engine-specific memory allocator. */
+	void
+	(*destroy)(struct tuple_format *format, struct tuple *tuple);
+};
+
+/**
+ * Hack: tuple_format_default and sysview engine use this vtab,
+ * but should use the runtime arena and runtime specific vtab.
+ */
+extern struct tuple_format_vtab memtx_tuple_format_vtab;
+
 /**
  * @brief Tuple format
  * Tuple format describes how tuple is stored and information about its fields
  */
 struct tuple_format {
+	struct tuple_format_vtab vtab;
+
 	uint16_t id;
 	/* Format objects are reference counted. */
 	int refs;
@@ -104,21 +125,6 @@ struct tuple_format {
 	 * See tuple_field_format::ofset for details//
 	 */
 	uint16_t field_map_size;
-
-	/**
-	 * Type of the engine that contains tuples with this
-	 * format.
-	 */
-	enum engine_type engine;
-
-	/** Engine specific tuple deleter. */
-	void
-	(*tuple_delete)(struct tuple_format *format, struct tuple *tuple);
-
-	/** Engine specific tuple allocator. */
-	struct tuple *
-	(*tuple_new)(struct tuple_format *format, const char *data,
-		     const char *end);
 
 	/* Formats of the fields */
 	struct tuple_field_format fields[];
@@ -164,13 +170,13 @@ tuple_format_ref(struct tuple_format *format, int count)
 /**
  * Allocate, construct and register a new in-memory tuple format.
  * @param key_list List of key_defs of a space.
- * @param enfine   Type of the engine.
+ * @param name  name of the tuple format
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
  */
 struct tuple_format *
-tuple_format_new(struct rlist *key_list, enum engine_type engine);
+tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab);
 
 /**
  * Fill the field map of tuple with field offsets.

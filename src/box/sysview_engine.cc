@@ -32,6 +32,7 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
+#include "tuple_format.h"
 
 struct SysviewSpace: public Handler {
 	SysviewSpace(Engine *e) : Handler(e) {}
@@ -109,7 +110,7 @@ SysviewSpace::dropIndex(Index *index)
 }
 
 SysviewEngine::SysviewEngine()
-	:Engine("sysview")
+	:Engine("sysview", &memtx_tuple_format_vtab)
 {
 }
 

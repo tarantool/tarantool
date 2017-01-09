@@ -115,10 +115,8 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	space->def = *def;
-	if (strcmp(def->engine_name, "vinyl") == 0)
-		space->format = tuple_format_new(key_list, ENGINE_VINYL);
-	else
-		space->format = tuple_format_new(key_list, ENGINE_MEMTX);
+	Engine *engine = engine_find(def->engine_name);
+	space->format = tuple_format_new(key_list, engine->format);
 	if (space->format == NULL)
 		diag_raise();
 	space->has_unique_secondary_key = has_unique_secondary_key;
@@ -126,7 +124,6 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->format->exact_field_count = def->exact_field_count;
 	space->index_id_max = index_id_max;
 	/* init space engine instance */
-	Engine *engine = engine_find(def->engine_name);
 	space->handler = engine->open();
 	/* Fill the space indexes. */
 	rlist_foreach_entry(key_def, key_list, link) {

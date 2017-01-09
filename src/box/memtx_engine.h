@@ -42,7 +42,7 @@
  *
  * The states exist to speed up recovery: initial state
  * assumes write-only flow of sorted rows from a snapshot.
- * It's followed by a state for read-write recovery 
+ * It's followed by a state for read-write recovery
  * of rows from the write ahead log; these rows are
  * inserted only into the primary key. The final
  * state is for a fully functional space.
