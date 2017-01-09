@@ -3186,96 +3186,6 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	return true;
 }
 
-static void
-vy_range_add_compact_part(struct vy_range *range, struct vy_range *part)
-{
-	struct vy_index *index = range->index;
-
-	if (rlist_empty(&range->compact_list)) {
-		/*
-		 * Make sure no new statement is inserted into the
-		 * active mem after we start compacting the range.
-		 * Needed by the write iterator, which requires its
-		 * sources to be immutable.
-		 */
-		vy_range_freeze_mem(range);
-		vy_index_remove_range(index, range);
-	}
-
-	/*
-	 * While compaction is in progress, new statements are inserted
-	 * to new ranges while read iterator walks over the old range
-	 * (see vy_range_iterator_next()). To make new statements
-	 * visible, link new ranges to the old range via ->compact_list.
-	 */
-	rlist_add_tail(&range->compact_list, &part->compact_list);
-	assert(part->shadow == NULL);
-	part->shadow = range;
-
-	vy_index_add_range(index, part);
-	say_debug("range new: %s", vy_range_str(part));
-}
-
-static void
-vy_range_commit_compact_parts(struct vy_range *range)
-{
-	struct vy_range *r, *tmp;
-
-	/*
-	 * If compaction completed successfully, all runs and mems of
-	 * the original range were dumped and hence we don't need it any
-	 * longer. So unlink new ranges from the original one and delete
-	 * the latter.
-	 */
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
-		rlist_del(&r->compact_list);
-		assert(r->shadow == range);
-		r->shadow = NULL;
-	}
-	vy_range_delete(range);
-}
-
-static void
-vy_range_discard_compact_parts(struct vy_range *range)
-{
-	struct vy_index *index = range->index;
-	struct vy_range *r, *tmp;
-
-	/*
-	 * On compaction failure we delete new ranges, but leave their
-	 * mems and runs linked to the old range so that statements
-	 * inserted during compaction don't get lost.
-	 */
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
-		if (range->used == 0)
-			range->min_lsn = r->min_lsn;
-		assert(range->min_lsn <= r->min_lsn);
-		range->used += r->used;
-
-		vy_range_freeze_mem(r);
-		rlist_splice(&range->frozen, &r->frozen);
-
-		rlist_splice(&range->runs, &r->runs);
-		range->run_count += r->run_count;
-		r->run_count = 0;
-
-		rlist_del(&r->compact_list);
-		assert(r->shadow == range);
-		r->shadow = NULL;
-
-		say_debug("range delete: %s", vy_range_str(r));
-		vy_index_remove_range(index, r);
-		vy_range_delete(r);
-	}
-	/* Unfreeze the newest in-memory index. */
-	assert(range->mem == NULL);
-	assert(!rlist_empty(&range->frozen));
-	range->mem = rlist_shift_entry(&range->frozen,
-				       struct vy_mem, in_frozen);
-	/* Insert the range back into the tree. */
-	vy_index_add_range(index, range);
-}
-
 /**
  * Create an index directory for a new index.
  * TODO: create index files only after the WAL
@@ -4034,27 +3944,33 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
-	struct vy_range *r;
+	struct vy_range *r, *tmp;
 
 	say_info("completed compaction of range %s", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
+	/*
+	 * If compaction completed successfully, all runs and mems of
+	 * the original range were dumped and hence we don't need it any
+	 * longer. So unlink new ranges from the original one and delete
+	 * the latter.
+	 */
 	vy_index_unacct_range(index, range);
-	rlist_foreach_entry(r, &range->compact_list, compact_list) {
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
 		/* Add the new run created by compaction to the list. */
 		rlist_add_entry(&r->runs, r->new_run, in_range);
 		r->run_count++;
 		r->new_run = NULL;
-		/*
-		 * Account the new range and make it visible to
-		 * the scheduler.
-		 */
+
+		rlist_del(&r->compact_list);
+		assert(r->shadow == range);
+		r->shadow = NULL;
+
 		vy_index_acct_range(index, r);
 		vy_scheduler_add_range(index->env->scheduler, r);
 	}
-
-	vy_range_commit_compact_parts(range);
+	vy_range_delete(range);
 	index->version++;
 	return 0;
 }
@@ -4066,12 +3982,42 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
+	struct vy_range *r, *tmp;
 
 	say_error("compaction of range %s failed", vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
-	vy_range_discard_compact_parts(range);
+	/*
+	 * On compaction failure we delete new ranges, but leave their
+	 * mems and runs linked to the old range so that statements
+	 * inserted during compaction don't get lost.
+	 */
+	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
+		assert(r->run_count == 0);
+
+		vy_range_freeze_mem(r);
+		rlist_splice(&range->frozen, &r->frozen);
+		if (range->used == 0)
+			range->min_lsn = r->min_lsn;
+		assert(range->min_lsn <= r->min_lsn);
+		range->used += r->used;
+
+		rlist_del(&r->compact_list);
+		assert(r->shadow == range);
+		r->shadow = NULL;
+
+		say_debug("range delete: %s", vy_range_str(r));
+		vy_index_remove_range(index, r);
+		vy_range_delete(r);
+	}
+	/* Unfreeze the newest in-memory index. */
+	assert(range->mem == NULL);
+	assert(!rlist_empty(&range->frozen));
+	range->mem = rlist_shift_entry(&range->frozen,
+				       struct vy_mem, in_frozen);
+	/* Insert the range back into the tree. */
+	vy_index_add_range(index, range);
 	index->version++;
 
 	vy_scheduler_add_range(index->env->scheduler, range);
@@ -4155,9 +4101,31 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 
 	say_info("started compaction of range %s", vy_range_str(range));
 
+	/*
+	 * Make sure no new statement is inserted into the active mem
+	 * after we start compacting the range. Needed by the write
+	 * iterator, which requires its sources to be immutable.
+	 */
+	vy_range_freeze_mem(range);
+
 	/* Replace the old range with the new ones. */
-	for (int i = 0; i < n_parts; i++)
-		vy_range_add_compact_part(range, parts[i]);
+	vy_index_remove_range(index, range);
+	for (int i = 0; i < n_parts; i++) {
+		struct vy_range *r = parts[i];
+		/*
+		 * While compaction is in progress, new statements are
+		 * inserted to new ranges while read iterator walks over
+		 * the old range (see vy_range_iterator_next()). To make
+		 * new statements visible, link new ranges to the old
+		 * range via ->compact_list.
+		 */
+		rlist_add_tail(&range->compact_list, &r->compact_list);
+		assert(r->shadow == NULL);
+		r->shadow = range;
+
+		vy_index_add_range(index, r);
+		say_debug("range new: %s", vy_range_str(r));
+	}
 
 	range->version++;
 	index->version++;
