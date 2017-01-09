@@ -6887,11 +6887,12 @@ error_conf:
 void
 vy_env_delete(struct vy_env *e)
 {
+	struct vy_index *index, *tmp;
+	rlist_foreach_entry_safe(index, &e->indexes, link, tmp)
+		vy_index_unref(index);
 	ev_timer_stop(loop(), &e->quota_timer);
 	vy_squash_queue_delete(e->squash_queue);
 	vy_scheduler_delete(e->scheduler);
-	/* TODO: tarantool doesn't delete indexes during shutdown */
-	//assert(rlist_empty(&e->db));
 	tx_manager_delete(e->xm);
 	vy_conf_delete(e->conf);
 	vy_stat_delete(e->stat);
