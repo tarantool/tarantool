@@ -41,14 +41,14 @@ port_add_tuple(struct port *port, struct tuple *tuple)
 {
 	struct port_entry *e;
 	if (port->size == 0) {
-		tuple_ref(tuple); /* throws */
+		tuple_ref_xc(tuple); /* throws */
 		e = &port->first_entry;
 		port->first = port->last = e;
 	} else {
 		e = (struct port_entry *)
 			mempool_alloc_xc(&port_entry_pool); /* throws */
 		try {
-			tuple_ref(tuple); /* throws */
+			tuple_ref_xc(tuple); /* throws */
 		} catch (Exception *) {
 			mempool_free(&port_entry_pool, e);
 			throw;

@@ -323,32 +323,33 @@ vy_stat_tx_write_rate(struct vy_stat *s)
  * - DELETE or NULL then the first one will be turned into REPLACE and returned
  *   as the result;
  *
- * @param upsert An UPSERT statement.
- * @param object An REPLACE/DELETE/UPSERT statement or NULL.
- * @param index Index that will be used for formatting result statement.
+ * @param upsert         An UPSERT statement.
+ * @param object         An REPLACE/DELETE/UPSERT statement or NULL.
+ * @param key_def        Key definition of an index.
+ * @param format         Tuple format of the index.
  * @param suppress_error True if ClientErrors must not be written to log.
  *
  * @retval NULL     Memory allocation error.
  * @retval not NULL Success.
  */
-static struct vy_stmt *
-vy_apply_upsert(const struct vy_stmt *upsert, const struct vy_stmt *object,
-		const struct key_def *key_def,
-		const struct tuple_format *format, bool suppress_error);
+static struct tuple *
+vy_apply_upsert(const struct tuple *upsert, const struct tuple *object,
+		const struct key_def *key_def, struct tuple_format *format,
+		bool suppress_error);
 
 struct tree_mem_key {
-	const struct vy_stmt *stmt;
+	const struct tuple *stmt;
 	int64_t lsn;
 };
 
 struct vy_mem;
 
 static int
-vy_mem_tree_cmp(const struct vy_stmt *a, const struct vy_stmt *b,
+vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
 		struct vy_mem *index);
 
 static int
-vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
+vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 		    struct vy_mem *index);
 
 #define VY_MEM_TREE_EXTENT_SIZE (16 * 1024)
@@ -358,7 +359,7 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
 #define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, index) vy_mem_tree_cmp(a, b, index)
 #define BPS_TREE_COMPARE_KEY(a, b, index) vy_mem_tree_cmp_key(a, b, index)
-#define bps_tree_elem_t const struct vy_stmt *
+#define bps_tree_elem_t const struct tuple *
 #define bps_tree_key_t struct tree_mem_key *
 #define bps_tree_arg_t struct vy_mem *
 #define BPS_TREE_NO_DEBUG
@@ -366,11 +367,11 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
 #include "salad/bps_tree.h"
 
 /*
- * vy_mem is an in-memory container for vy_stmt objects in
- * a single vinyl range.
- * Internally it uses bps_tree to stores struct vy_stmt *objects.
- * which are ordered by statement key and, for the same key,
- * by lsn, in descending order.
+ * vy_mem is an in-memory container for tuples in a single vinyl
+ * range.
+ * Internally it uses bps_tree to store tuples, which are ordered
+ * by statement key and, for the same key, by lsn, in descending
+ * order.
  *
  * For example, assume there are two statements with the same key,
  * but different LSN. These are duplicates of the same key,
@@ -379,10 +380,6 @@ vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
  *
  * vy_mem distinguishes between the first duplicate in the chain
  * and other keys in that chain.
- *
- * During insertion, the reference counter of vy_stmt is
- * incremented, during destruction all vy_stmt' reference
- * counters are decremented.
  */
 struct vy_mem {
 	/** Link in range->frozen list. */
@@ -394,30 +391,32 @@ struct vy_mem {
 	int64_t min_lsn;
 	/* A key definition for this index. */
 	struct key_def *key_def;
-	/* A tuple format for key_def. */
-	struct tuple_format *format;
+
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 };
 
 static int
-vy_mem_tree_cmp(const struct vy_stmt *a, const struct vy_stmt *b,
+vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
 		struct vy_mem *index)
 {
-	int res = vy_stmt_compare(a, b, index->format, index->key_def);
-	res = res ? res : a->lsn > b->lsn ? -1 : a->lsn < b->lsn;
-	return res;
+	int res = vy_stmt_compare(a, b, index->key_def);
+	if (res)
+		return res;
+	int64_t a_lsn = vy_stmt_lsn(a), b_lsn = vy_stmt_lsn(b);
+	return a_lsn > b_lsn ? -1 : a_lsn < b_lsn;
 }
 
 static int
-vy_mem_tree_cmp_key(const struct vy_stmt *a, struct tree_mem_key *key,
+vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 		    struct vy_mem *index)
 {
-	int res = vy_stmt_compare(a, key->stmt, index->format, index->key_def);
+	int res = vy_stmt_compare(a, key->stmt, index->key_def);
 	if (res == 0) {
 		if (key->lsn == INT64_MAX - 1)
 			return 0;
-		res = a->lsn > key->lsn ? -1 : a->lsn < key->lsn;
+		int64_t a_lsn = vy_stmt_lsn(a);
+		res = a_lsn > key->lsn ? -1 : a_lsn < key->lsn;
 	}
 	return res;
 }
@@ -434,8 +433,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 static struct vy_mem *
-vy_mem_new(struct vy_env *env, struct key_def *key_def,
-	   struct tuple_format *format)
+vy_mem_new(struct vy_env *env, struct key_def *key_def)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -447,7 +445,6 @@ vy_mem_new(struct vy_env *env, struct key_def *key_def,
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
-	index->format = format;
 	vy_mem_tree_create(&index->tree, index, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, env);
 	rlist_create(&index->in_frozen);
@@ -466,13 +463,12 @@ vy_mem_delete(struct vy_mem *index)
 /*
  * Return the older statement for the given one.
  */
-static const struct vy_stmt *
-vy_mem_older_lsn(struct vy_mem *mem, const struct vy_stmt *stmt,
-		 const struct key_def *key_def)
+static const struct tuple *
+vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 {
 	struct tree_mem_key tree_key;
 	tree_key.stmt = stmt;
-	tree_key.lsn = stmt->lsn - 1;
+	tree_key.lsn = vy_stmt_lsn(stmt) - 1;
 	bool exact = false;
 	struct vy_mem_tree_iterator itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, &exact);
@@ -480,9 +476,9 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct vy_stmt *stmt,
 	if (vy_mem_tree_iterator_is_invalid(&itr))
 		return NULL;
 
-	const struct vy_stmt *result;
+	const struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_stmt_compare(result, stmt, mem->format, key_def) != 0)
+	if (vy_stmt_compare(result, stmt, mem->key_def) != 0)
 		return NULL;
 	return result;
 }
@@ -521,14 +517,14 @@ struct vy_page_info {
 	/* maximal lsn of all records in page */
 	int64_t max_lsn;
 	/* minimal key */
-	struct vy_stmt *min_key;
+	struct tuple *min_key;
 	/* row index offset in page */
 	uint32_t row_index_offset;
 };
 
 static int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct key_def *key_def, struct vy_stmt *min_key);
+		    const struct key_def *key_def, struct tuple *min_key);
 
 static void
 vy_page_info_destroy(struct vy_page_info *page_info);
@@ -558,9 +554,9 @@ struct vy_range {
 	 * Both 'begin' and 'end' statements have SELECT type with the full
 	 * idexed key.
 	 */
-	struct vy_stmt *begin;
+	struct tuple *begin;
 	/** Range upper bound. NULL if range is rightmost. */
-	struct vy_stmt *end;
+	struct tuple *end;
 	struct vy_index *index;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	size_t used;
@@ -610,7 +606,7 @@ struct txv {
 	/** Transaction start logical time - unique ID of the transaction. */
 	int64_t tsn;
 	struct vy_index *index;
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 	struct vy_tx *tx;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
@@ -814,7 +810,7 @@ enum tx_type {
 };
 
 struct read_set_key {
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 	int64_t tsn;
 };
 
@@ -916,11 +912,11 @@ struct vy_merge_iterator {
 	uint32_t range_version;
 	/* Range version checking }}} */
 
-	const struct vy_stmt *key;
+	const struct tuple *key;
 	/** Iteration type. */
 	enum iterator_type iterator_type;
 	/** Current stmt that merge iterator is positioned on */
-	struct vy_stmt *curr_stmt;
+	struct tuple *curr_stmt;
 	/**
 	 * All sources with this front_id are on the same key of
 	 * current iteration (optimization)
@@ -959,7 +955,7 @@ struct vy_merge_iterator {
 struct vy_range_iterator {
 	struct vy_index *index;
 	enum iterator_type iterator_type;
-	const struct vy_stmt *key;
+	const struct tuple *key;
 	struct vy_range *curr_range;
 };
 
@@ -980,7 +976,7 @@ struct vy_read_iterator {
 
 	/* search options */
 	enum iterator_type iterator_type;
-	const struct vy_stmt *key;
+	const struct tuple *key;
 	const int64_t *vlsn;
 
 	/* iterator over ranges */
@@ -990,7 +986,7 @@ struct vy_read_iterator {
 	/* merge iterator over current range */
 	struct vy_merge_iterator merge_iterator;
 
-	struct vy_stmt *curr_stmt;
+	struct tuple *curr_stmt;
 	/* is lazy search started */
 	bool search_started;
 };
@@ -1010,7 +1006,7 @@ static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum iterator_type iterator_type,
-		      const struct vy_stmt *key, const int64_t *vlsn,
+		      const struct tuple *key, const int64_t *vlsn,
 		      bool only_disk);
 
 /**
@@ -1023,7 +1019,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
  * @retval -1 Read error.
  */
 static NODISCARD int
-vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result);
+vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result);
 
 /** Close the iterator and free resources. */
 static void
@@ -1037,7 +1033,7 @@ struct vy_cursor {
 	 */
 	struct vy_tx tx_autocommit;
 	struct vy_index *index;
-	struct vy_stmt *key;
+	struct tuple *key;
 	/**
 	 * Points either to tx_autocommit for autocommit mode or
 	 * to a multi-statement transaction active when the cursor
@@ -1080,7 +1076,7 @@ struct vy_page_read_task {
 };
 
 static struct txv *
-txv_new(struct vy_index *index, struct vy_stmt *stmt, struct vy_tx *tx)
+txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 {
 	struct txv *v = malloc(sizeof(struct txv));
 	if (unlikely(v == NULL)) {
@@ -1091,7 +1087,7 @@ txv_new(struct vy_index *index, struct vy_stmt *stmt, struct vy_tx *tx)
 	v->index = index;
 	v->tsn = tx->tsn;
 	v->stmt = stmt;
-	vy_stmt_ref(stmt);
+	tuple_ref(stmt);
 	v->tx = tx;
 	return v;
 }
@@ -1099,7 +1095,7 @@ txv_new(struct vy_index *index, struct vy_stmt *stmt, struct vy_tx *tx)
 static void
 txv_delete(struct txv *v)
 {
-	vy_stmt_unref(v->stmt);
+	tuple_unref(v->stmt);
 	free(v);
 }
 
@@ -1113,7 +1109,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
 	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
-read_set_search_key(read_set_t *rbtree, struct vy_stmt *stmt, int64_t tsn)
+read_set_search_key(read_set_t *rbtree, struct tuple *stmt, int64_t tsn)
 {
 	struct read_set_key key;
 	key.stmt = stmt;
@@ -1125,8 +1121,7 @@ static int
 read_set_cmp(struct txv *a, struct txv *b)
 {
 	assert(a->index == b->index);
-	struct vy_index *idx = a->index;
-	int rc = vy_stmt_compare(a->stmt, b->stmt, idx->format, idx->key_def);
+	int rc = vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
 	/**
 	 * While in svindex older value are "bigger" than newer
 	 * ones, i.e. the newest value comes first, in
@@ -1142,10 +1137,9 @@ read_set_cmp(struct txv *a, struct txv *b)
 static int
 read_set_key_cmp(struct read_set_key *a, struct txv *b)
 {
-	struct vy_index *idx = b->index;
-	int rc = vy_stmt_compare(a->stmt, b->stmt, idx->format, idx->key_def);
+	int rc = vy_stmt_compare(a->stmt, b->stmt, b->index->key_def);
 	if (rc == 0)
-		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
+		return a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
 	return rc;
 }
 
@@ -1202,7 +1196,6 @@ txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 {
 	read_set_t *tree = &v->index->read_set;
 	struct key_def *key_def = v->index->key_def;
-	struct tuple_format *format = v->index->format;
 	struct read_set_key key;
 	key.stmt = v->stmt;
 	key.tsn = 0;
@@ -1210,13 +1203,13 @@ txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 	for (struct txv *abort = read_set_nsearch(tree, &key);
 	     abort != NULL; abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
-		if (vy_stmt_compare(key.stmt, abort->stmt, format, key_def))
+		if (vy_stmt_compare(key.stmt, abort->stmt, key_def))
 			break;
 		/* Don't abort self. */
 		if (abort->tx == tx)
 			continue;
 		/* Delete of nothing does not cause a conflict */
-		if (abort->is_gap && v->stmt->type == IPROTO_DELETE)
+		if (abort->is_gap && vy_stmt_type(v->stmt) == IPROTO_DELETE)
 			continue;
 
 		/* the found tx can only be commited as read-only */
@@ -1243,15 +1236,14 @@ write_set_cmp(struct txv *a, struct txv *b)
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
 		struct key_def *key_def = a->index->key_def;
-		struct tuple_format *format = a->index->format;
-		return vy_stmt_compare(a->stmt, b->stmt, format, key_def);
+		return vy_stmt_compare(a->stmt, b->stmt, key_def);
 	}
 	return rc;
 }
 
 struct write_set_key {
 	struct vy_index *index;
-	const struct vy_stmt *stmt;
+	const struct tuple *stmt;
 };
 
 static int
@@ -1268,8 +1260,7 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 			return -1;
 		}
 		struct key_def *key_def = a->index->key_def;
-		struct tuple_format *format = a->index->format;
-		return vy_stmt_compare(a->stmt, b->stmt, format, key_def);
+		return vy_stmt_compare(a->stmt, b->stmt, key_def);
 	}
 	return rc;
 }
@@ -1280,7 +1271,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
 
 static struct txv *
 write_set_search_key(write_set_t *tree, struct vy_index *index,
-		     const struct vy_stmt *data)
+		     const struct tuple *data)
 {
 	struct write_set_key key = { .index = index, .stmt = data};
 	return write_set_search(tree, &key);
@@ -1379,16 +1370,16 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
  */
 static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
-	    struct vy_stmt *key, bool is_gap)
+	    struct tuple *key, bool is_gap)
 {
 	if (tx->type == VINYL_TX_RO || tx->is_aborted)
 		return 0; /* no reason to track reads */
-	uint32_t part_count = vy_stmt_part_count(key);
+	uint32_t part_count = tuple_field_count(key);
 	if (part_count >= index->key_def->part_count) {
 		struct txv *v =
 			write_set_search_key(&tx->write_set, index, key);
-		if (v != NULL && (v->stmt->type == IPROTO_REPLACE ||
-				  v->stmt->type == IPROTO_DELETE)) {
+		if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
+				  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
 			/** reading from own write set is serializable */
 			return 0;
 		}
@@ -1621,10 +1612,10 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 		"%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64"(",
 		 key_def->space_id, key_def->iid, key_def->opts.lsn, range->id);
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->begin != NULL ? vy_stmt_data(range->begin) : NULL);
+		range->begin != NULL ? tuple_data(range->begin) : NULL);
 	SNPRINT(total, snprintf, buf, size, "..");
 	SNPRINT(total, vy_key_snprint, buf, size,
-		range->end != NULL ? vy_stmt_data(range->end) : NULL);
+		range->end != NULL ? tuple_data(range->end) : NULL);
 	SNPRINT(total, snprintf, buf, size, ")");
 	return total;
 }
@@ -1652,11 +1643,11 @@ static int
 vy_range_tree_cmp(struct vy_range *a, struct vy_range *b);
 
 static int
-vy_range_tree_key_cmp(const struct vy_stmt *a, struct vy_range *b);
+vy_range_tree_key_cmp(const struct tuple *a, struct vy_range *b);
 
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 	       struct vy_range, tree_node, vy_range_tree_cmp,
-	       const struct vy_stmt *, vy_range_tree_key_cmp);
+	       const struct tuple *, vy_range_tree_key_cmp);
 
 static void
 vy_range_delete(struct vy_range *);
@@ -1695,15 +1686,14 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 }
 
 static int
-vy_range_tree_key_cmp(const struct vy_stmt *stmt, struct vy_range *range)
+vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 {
 	/* Any key > -inf. */
 	if (range->begin == NULL)
 		return 1;
 
 	struct key_def *key_def = range->index->key_def;
-	struct tuple_format *format = range->index->format;
-	return vy_stmt_compare_with_key(stmt, range->begin, format, key_def);
+	return vy_stmt_compare_with_key(stmt, range->begin, key_def);
 }
 
 static void
@@ -1712,7 +1702,7 @@ vy_index_delete(struct vy_index *index);
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 		       enum iterator_type iterator_type,
-		       const struct vy_stmt *key)
+		       const struct tuple *key)
 {
 	itr->index = index;
 	itr->iterator_type = iterator_type;
@@ -1734,10 +1724,10 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  struct tuple_format *format, struct key_def *key_def,
-			  const struct vy_stmt *key)
+			  struct key_def *key_def, const struct tuple *key)
 {
-	if (vy_stmt_part_count(key) == 0) {
+	uint32_t key_field_count = tuple_field_count(key);
+	if (key_field_count == 0) {
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
@@ -1780,9 +1770,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
-		    vy_stmt_part_count(key) < key_def->part_count &&
-		    vy_stmt_compare_with_key(key, range->begin, format,
-					     key_def) == 0)
+		    key_field_count < key_def->part_count &&
+		    vy_stmt_compare_with_key(key, range->begin, key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -1815,7 +1804,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
-			    vy_stmt_compare_with_key(key, range->begin, format,
+			    vy_stmt_compare_with_key(key, range->begin,
 						     key_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree,
@@ -1848,7 +1837,6 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	struct vy_range *next;
 	struct vy_index *index = itr->index;
 	struct key_def *def = index->key_def;
-	struct tuple_format *format = index->format;
 
 	if (curr == NULL) {
 		/* First iteration */
@@ -1857,7 +1845,7 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 		else
 			next = vy_range_tree_find_by_key(&index->tree,
 							 itr->iterator_type,
-							 format, def, itr->key);
+							 def, itr->key);
 		goto check;
 	}
 next:
@@ -1872,8 +1860,7 @@ next:
 		break;
 	case ITER_EQ:
 		if (curr->end != NULL &&
-		    vy_stmt_compare_with_key(itr->key, curr->end, format,
-					     def) >= 0) {
+		    vy_stmt_compare_with_key(itr->key, curr->end, def) >= 0) {
 			/* A partial key can be found in more than one range. */
 			next = vy_range_tree_next(&index->tree, curr);
 		} else {
@@ -1914,13 +1901,12 @@ check:
  */
 static void
 vy_range_iterator_restore(struct vy_range_iterator *itr,
-			  const struct vy_stmt *last_stmt,
+			  const struct tuple *last_stmt,
 			  struct vy_range **result)
 {
 	struct vy_index *index = itr->index;
 	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
-				itr->iterator_type, index->format,
-				index->key_def,
+				itr->iterator_type, index->key_def,
 				last_stmt != NULL ? last_stmt : itr->key);
 	itr->curr_range = curr;
 	*result = curr->shadow != NULL ? curr->shadow : curr;
@@ -2178,7 +2164,7 @@ insert:
 
 /* dump statement to the run page buffers (stmt header and data) */
 static int
-vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
+vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 		 struct vy_page_info *info, const struct key_def *key_def)
 {
 	struct xrow_header xrow;
@@ -2191,10 +2177,10 @@ vy_run_dump_stmt(struct vy_stmt *value, struct xlog *data_xlog,
 	info->unpacked_size += row_size;
 
 	++info->count;
-	if (value->lsn > info->max_lsn)
-		info->max_lsn = value->lsn;
-	if (value->lsn < info->min_lsn)
-		info->min_lsn = value->lsn;
+	if (vy_stmt_lsn(value) > info->max_lsn)
+		info->max_lsn = vy_stmt_lsn(value);
+	if (vy_stmt_lsn(value) < info->min_lsn)
+		info->min_lsn = vy_stmt_lsn(value);
 	return 0;
 }
 
@@ -2209,7 +2195,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 static NODISCARD int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem);
 static NODISCARD int
-vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret);
+vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret);
 
 static void
 vy_write_iterator_delete(struct vy_write_iterator *wi);
@@ -2222,7 +2208,7 @@ vy_write_iterator_delete(struct vy_write_iterator *wi);
  */
 static int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct key_def *key_def, struct vy_stmt *min_key)
+		    const struct key_def *key_def, struct tuple *min_key)
 {
 	memset(page_info, 0, sizeof(*page_info));
 	page_info->min_lsn = INT64_MAX;
@@ -2239,7 +2225,7 @@ static void
 vy_page_info_destroy(struct vy_page_info *page_info)
 {
 	if (page_info->min_key != NULL)
-		vy_stmt_unref(page_info->min_key);
+		tuple_unref(page_info->min_key);
 }
 
 /**
@@ -2288,11 +2274,9 @@ vy_row_index_encode(const uint32_t *row_index, uint32_t count,
  */
 static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
-		  struct vy_write_iterator *wi,
-		  const struct vy_stmt *split_key,
-		  uint32_t *page_info_capacity, struct vy_stmt **curr_stmt,
-		  const struct key_def *key_def,
-		  const struct tuple_format *format)
+		  struct vy_write_iterator *wi, const struct tuple *split_key,
+		  uint32_t *page_info_capacity, struct tuple **curr_stmt,
+		  const struct key_def *key_def)
 {
 	assert(curr_stmt);
 	if (*curr_stmt == NULL)
@@ -2332,7 +2316,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		}
 		*offset = page->unpacked_size;
 
-		struct vy_stmt *stmt = *curr_stmt;
+		struct tuple *stmt = *curr_stmt;
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0)
 			goto error_rollback;
 
@@ -2343,7 +2327,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			/* Split key reached, proceed to the next run. */
 			     (split_key != NULL &&
 		             vy_stmt_compare_with_key(*curr_stmt, split_key,
-						      format, key_def) >= 0);
+						      key_def) >= 0);
 
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < key_def->opts.page_size);
@@ -2401,12 +2385,11 @@ error_row_index:
  */
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath, int64_t range_id,
-		  struct vy_write_iterator *wi, struct vy_stmt **curr_stmt,
-		  const struct vy_stmt *end_key,
-		  const struct key_def *key_def,
-		  const struct tuple_format *format)
+		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
+		  const struct tuple *end_key,
+		  const struct key_def *key_def)
 {
-	assert(curr_stmt);
+	assert(curr_stmt != NULL);
 	struct vy_run_info *run_info = &run->info;
 
 	char path[PATH_MAX];
@@ -2432,7 +2415,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath, int64_t range_id,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi,
 				       end_key, &page_infos_capacity,
-				       curr_stmt, key_def, format);
+				       curr_stmt, key_def);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2495,8 +2478,8 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 	request_create(&request, IPROTO_REPLACE);
 
 	uint32_t min_key_size;
-	const char *min_key = vy_key_data_range(page_info->min_key,
-						&min_key_size);
+	const char *min_key = tuple_data_range(page_info->min_key,
+					       &min_key_size);
 
 	/* calc tuple size */
 	uint32_t size;
@@ -2547,15 +2530,17 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 /**
  * Decode page information from xrow.
  *
- * @param xrow xrow to decode
- * @param[out] page page information
+ * @param index       Index of the page.
+ * @param[out] page   Page information.
+ * @param run_id      The run identifier to check.
+ * @param xrow        Xrow to decode.
  *
- * @retval  0 success
- * @retval -1 error, check diag
+ * @retval  0 Success.
+ * @retval -1 Error.
  */
 static int
-vy_page_info_decode(struct vy_page_info *page,
-		    const struct xrow_header *xrow)
+vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
+		    struct tuple_format *format)
 {
 	struct request request;
 	/* extract all pages info */
@@ -2588,7 +2573,8 @@ vy_page_info_decode(struct vy_page_info *page,
 			mp_next(&pos);
 			uint32_t part_count;
 			part_count = mp_decode_array(&key_beg);
-			page->min_key = vy_stmt_new_select(key_beg, part_count);
+			page->min_key = vy_stmt_new_select(format, key_beg,
+							   part_count);
 			break;
 		case VY_PAGE_DATA_SIZE:
 			page->unpacked_size = mp_decode_uint(&pos);
@@ -2652,8 +2638,7 @@ const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
  */
 static int
 vy_run_info_encode(const struct vy_run_info *run_info,
-		   const struct vy_stmt *begin,
-		   const struct vy_stmt *end,
+		   const struct tuple *begin, const struct tuple *end,
 		   struct xrow_header *xrow)
 {
 	size_t size = mp_sizeof_array(1);
@@ -2671,14 +2656,14 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 		/* range begin is set */
 		++map_size;
 		uint32_t bsize;
-		vy_key_data_range(begin, &bsize);
+		tuple_data_range(begin, &bsize);
 		size += mp_sizeof_uint(VY_RANGE_MIN_KEY) + bsize;
 	}
 	if (end != NULL) {
 		/* range end is set */
 		++map_size;
 		uint32_t bsize;
-		vy_key_data_range(end, &bsize);
+		tuple_data_range(end, &bsize);
 		size += mp_sizeof_uint(VY_RANGE_MAX_KEY) + bsize;
 	}
 	size += mp_sizeof_map(map_size);
@@ -2701,14 +2686,14 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	if (begin != NULL) {
 		pos = mp_encode_uint(pos, VY_RANGE_MIN_KEY);
 		uint32_t bsize;
-		const char *data = vy_key_data_range(begin, &bsize);
+		const char *data = tuple_data_range(begin, &bsize);
 		memcpy(pos, data, bsize);
 		pos += bsize;
 	}
 	if (end != NULL) {
 		pos = mp_encode_uint(pos, VY_RANGE_MAX_KEY);
 		uint32_t bsize;
-		const char *data = vy_key_data_range(end, &bsize);
+		const char *data = tuple_data_range(end, &bsize);
 		memcpy(pos, data, bsize);
 		pos += bsize;
 	}
@@ -2743,10 +2728,11 @@ static int
 vy_run_info_decode(const struct xrow_header *xrow,
 		   const struct key_def *key_def,
 		   struct vy_run_info *run_info,
-		   struct vy_stmt **p_begin, struct vy_stmt **p_end)
+		   struct tuple **p_begin, struct tuple **p_end,
+		   struct tuple_format *format)
 {
-	struct vy_stmt *begin = NULL;
-	struct vy_stmt *end = NULL;
+	struct tuple *begin = NULL;
+	struct tuple *end = NULL;
 
 	struct request request;
 	request_create(&request, xrow->type);
@@ -2786,7 +2772,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			begin = vy_key_from_msgpack(pos, key_def);
+			begin = vy_key_from_msgpack(format, pos, key_def);
 			mp_next(&pos);
 			break;
 		case VY_RANGE_MAX_KEY:
@@ -2795,7 +2781,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			end = vy_key_from_msgpack(pos, key_def);
+			end = vy_key_from_msgpack(format, pos, key_def);
 			mp_next(&pos);
 			break;
 		default:
@@ -2816,9 +2802,9 @@ vy_run_info_decode(const struct xrow_header *xrow,
 
 fail:
 	if (begin != NULL)
-		vy_stmt_unref(begin);
+		tuple_unref(begin);
 	if (end != NULL)
-		vy_stmt_unref(end);
+		tuple_unref(end);
 	return -1;
 }
 
@@ -2829,7 +2815,7 @@ fail:
  */
 static int
 vy_run_write_index(struct vy_run *run, const char *dirpath, int64_t range_id,
-		   const struct vy_stmt *begin, const struct vy_stmt *end,
+		   const struct tuple *begin, const struct tuple *end,
 		   const struct key_def *key_def)
 {
 	char path[PATH_MAX];
@@ -2883,7 +2869,7 @@ fail:
  */
 static struct vy_range *
 vy_range_new(struct vy_index *index, int64_t id,
-	     struct vy_stmt *begin, struct vy_stmt *end)
+	     struct tuple *begin, struct tuple *end)
 {
 	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
 	if (range == NULL) {
@@ -2891,7 +2877,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 			 "struct vy_range");
 		return NULL;
 	}
-	range->mem = vy_mem_new(index->env, index->key_def, index->format);
+	range->mem = vy_mem_new(index->env, index->key_def);
 	if (range->mem == NULL) {
 		free(range);
 		return NULL;
@@ -2910,11 +2896,11 @@ vy_range_new(struct vy_index *index, int64_t id,
 		range->id = ++index->env->range_id_max;
 	}
 	if (begin != NULL) {
-		vy_stmt_ref(begin);
+		tuple_ref(begin);
 		range->begin = begin;
 	}
 	if (end != NULL) {
-		vy_stmt_ref(end);
+		tuple_ref(end);
 		range->end = end;
 	}
 	rlist_create(&range->runs);
@@ -2958,7 +2944,8 @@ vy_range_recover_run(struct vy_range *range, int64_t run_id)
 	if (xlog_cursor_next_tx(&cursor) != 0 ||
 	    xlog_cursor_next_row(&cursor, &xrow) != 0 ||
 	    vy_run_info_decode(&xrow, key_def, &run->info,
-			       &range->begin, &range->end) != 0) {
+			       &range->begin, &range->end,
+			       range->index->format) != 0) {
 		goto fail_close;
 	}
 
@@ -2979,7 +2966,7 @@ vy_range_recover_run(struct vy_range *range, int64_t run_id)
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, &xrow) < 0) {
+		if (vy_page_info_decode(page, &xrow, range->index->format) < 0) {
 			/** Limit count of pages to successfully created pages */
 			run->info.count = page_no;
 			goto fail_close;
@@ -3047,9 +3034,9 @@ vy_range_delete(struct vy_range *range)
 	assert(range->in_compact.pos == UINT32_MAX);
 
 	if (range->begin)
-		vy_stmt_unref(range->begin);
+		tuple_unref(range->begin);
 	if (range->end)
-		vy_stmt_unref(range->end);
+		tuple_unref(range->end);
 
 	if (range->new_run != NULL)
 		vy_run_delete(range->new_run);
@@ -3080,12 +3067,11 @@ vy_range_delete(struct vy_range *range)
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct vy_stmt **stmt, size_t *written)
+		   struct tuple **stmt, size_t *written)
 {
-	assert(stmt);
+	assert(stmt != NULL);
 	const struct vy_index *index = range->index;
 	const struct key_def *key_def = index->key_def;
-	const struct tuple_format *format = index->format;
 
 	struct vy_run *run = range->new_run;
 	assert(run != NULL);
@@ -3096,7 +3082,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 
 	if (vy_run_write_data(run, index->path, range->id,
 			      wi, stmt, range->end,
-			      key_def, format) != 0 ||
+			      key_def) != 0 ||
 	    vy_run_write_index(run, index->path, range->id,
 		               range->begin, range->end, key_def) != 0) {
 		return -1;
@@ -3140,10 +3126,10 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
 	mid_page = vy_run_page_info(run, run->info.count / 2);
-	const char *split_key = vy_stmt_data(mid_page->min_key);
+	const char *split_key = tuple_data(mid_page->min_key);
 
 	struct vy_page_info *first_page = vy_run_page_info(run, 0);
-	const char *min_key = vy_stmt_data(first_page->min_key);
+	const char *min_key = tuple_data(first_page->min_key);
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (vy_key_compare_raw(min_key, split_key, key_def) == 0)
@@ -3409,16 +3395,16 @@ out:
  * Save a statement in the range's in-memory index.
  */
 static int
-vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
+vy_range_set(struct vy_range *range, const struct tuple *stmt,
 	     int64_t alloc_id)
 {
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
-	const struct vy_stmt *replaced_stmt = NULL;
+	const struct tuple *replaced_stmt = NULL;
 	struct vy_mem *mem = range->mem;
-	size_t size = vy_stmt_size(stmt);
-	struct vy_stmt *mem_stmt;
+	size_t size = tuple_size(stmt);
+	struct tuple *mem_stmt;
 	mem_stmt = lsregion_alloc(&index->env->allocator, size, alloc_id);
 	if (mem_stmt == NULL) {
 		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
@@ -3437,18 +3423,17 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
 	if (rc != 0)
 		return -1;
-
 	if (mem->used == 0) {
-		mem->min_lsn = mem_stmt->lsn;
+		mem->min_lsn = vy_stmt_lsn(mem_stmt);
 		vy_scheduler_mem_dirtied(scheduler, mem);
 	}
 	if (range->used == 0) {
-		range->min_lsn = mem_stmt->lsn;
+		range->min_lsn = vy_stmt_lsn(mem_stmt);
 		vy_scheduler_update_range(scheduler, range);
 	}
 
-	assert(mem->min_lsn <= mem_stmt->lsn);
-	assert(range->min_lsn <= mem_stmt->lsn);
+	assert(mem->min_lsn <= vy_stmt_lsn(mem_stmt));
+	assert(range->min_lsn <= vy_stmt_lsn(mem_stmt));
 
 	mem->used += size;
 	range->used += size;
@@ -3461,14 +3446,14 @@ vy_range_set(struct vy_range *range, const struct vy_stmt *stmt,
 }
 
 static int
-vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt)
+vy_range_set_delete(struct vy_range *range, const struct tuple *stmt)
 {
-	assert(stmt->type == IPROTO_DELETE);
+	assert(vy_stmt_type(stmt) == IPROTO_DELETE);
 
 	struct vy_mem *mem = range->mem;
 	if (range->shadow == NULL &&
 	    rlist_empty(&range->frozen) && range->run_count == 0 &&
-	    vy_mem_older_lsn(mem, stmt, range->index->key_def) == NULL) {
+	    vy_mem_older_lsn(mem, stmt) == NULL) {
 		/*
 		 * Optimization: the active mem index doesn't have statements
 		 * for the key and there are no more mems and runs.
@@ -3477,23 +3462,23 @@ vy_range_set_delete(struct vy_range *range, const struct vy_stmt *stmt)
 		return 0;
 	}
 
-	return vy_range_set(range, stmt, stmt->lsn);
+	return vy_range_set(range, stmt, vy_stmt_lsn(stmt));
 }
 
 static void
-vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt);
+vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt);
 
 static int
-vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
+vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 {
-	assert(stmt->type == IPROTO_UPSERT);
+	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 
 	struct vy_index *index = range->index;
 	struct key_def *key_def = index->key_def;
 	struct vy_mem *mem = range->mem;
-	const struct vy_stmt *older;
-	older = vy_mem_older_lsn(mem, stmt, key_def);
-	if ((older != NULL && older->type != IPROTO_UPSERT) ||
+	const struct tuple *older;
+	older = vy_mem_older_lsn(mem, stmt);
+	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
 	    (older == NULL && range->shadow == NULL &&
 	     rlist_empty(&range->frozen) && range->run_count == 0)) {
 		/*
@@ -3506,29 +3491,29 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
 		 *
 		 *  => apply UPSERT to the older statement and save
 		 *     resulted REPLACE instead of original UPSERT.
-		 *
 		 */
-		assert(older == NULL || older->type != IPROTO_UPSERT);
-		struct vy_stmt *upserted =
+		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
+		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, key_def, index->format,
 					false);
 		if (upserted == NULL)
 			return -1; /* OOM */
-		if (upserted->lsn != stmt->lsn) {
+		int64_t upserted_lsn = vy_stmt_lsn(upserted);
+		if (upserted_lsn != vy_stmt_lsn(stmt)) {
 			/**
 			 * This could only happen if the upsert completely
 			 * failed and the old tuple was returned.
 			 * In this case we shouldn't insert the same replace
 			 * again.
 			 */
-			assert(upserted->lsn == older->lsn);
-			vy_stmt_unref(upserted);
+			assert(upserted_lsn == vy_stmt_lsn(older));
+			tuple_unref(upserted);
 			return 0;
 		}
-		assert(older == NULL || upserted->lsn != older->lsn);
-		assert(upserted->type == IPROTO_REPLACE);
-		int rc = vy_range_set(range, upserted, upserted->lsn);
-		vy_stmt_unref(upserted);
+		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
+		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
+		int rc = vy_range_set(range, upserted, upserted_lsn);
+		tuple_unref(upserted);
 		return rc;
 	}
 
@@ -3544,23 +3529,20 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
 		VY_UPSERT_INF = 255,
 	};
 	if (older != NULL)
-		stmt->n_upserts = older->n_upserts;
-	if (stmt->n_upserts != VY_UPSERT_INF) {
-		stmt->n_upserts++;
-		if (stmt->n_upserts > VY_UPSERT_THRESHOLD) {
+		vy_stmt_n_upserts_set(stmt, vy_stmt_n_upserts(older));
+	if (vy_stmt_n_upserts(stmt) != VY_UPSERT_INF) {
+		vy_stmt_n_upserts_set(stmt, vy_stmt_n_upserts(stmt) + 1);
+		if (vy_stmt_n_upserts(stmt) > VY_UPSERT_THRESHOLD) {
 			vy_index_squash_upserts(index, stmt);
 			/*
 			 * Prevent further upserts from starting new
 			 * workers while this one is in progress.
 			 */
-			stmt->n_upserts = VY_UPSERT_INF;
+			vy_stmt_n_upserts_set(stmt, VY_UPSERT_INF);
 		}
 	}
 
-	if (vy_range_set(range, stmt, stmt->lsn) != 0)
-		return -1;
-
-	return 0;
+	return vy_range_set(range, stmt, vy_stmt_lsn(stmt));
 }
 
 /*
@@ -3572,12 +3554,12 @@ vy_range_set_upsert(struct vy_range *range, struct vy_stmt *stmt)
  * over all statements written to disk in the same range.
  */
 static bool
-vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
+vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
 {
 	struct vy_range *range;
 
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-					  index->format, index->key_def, stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index->key_def,
+					  stmt);
 	if (rlist_empty(&range->runs))
 		return false;
 
@@ -3587,7 +3569,7 @@ vy_stmt_is_committed(struct vy_index *index, const struct vy_stmt *stmt)
 	 */
 	struct vy_run *run = rlist_first_entry(&range->runs,
 					       struct vy_run, in_range);
-	return stmt->lsn <= run->info.max_lsn;
+	return vy_stmt_lsn(stmt) <= run->info.max_lsn;
 }
 
 /*
@@ -3597,10 +3579,10 @@ static int
 vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
-	struct vy_stmt *stmt = v->stmt;
+	struct tuple *stmt = v->stmt;
 	struct vy_range *range = NULL;
 
-	stmt->lsn = lsn;
+	vy_stmt_lsn_set(stmt, lsn);
 
 	/*
 	 * If we're recovering the WAL, it may happen so that this
@@ -3614,10 +3596,10 @@ vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
 			return 0;
 	}
 	/* Match range. */
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-					  index->format, index->key_def, stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index->key_def,
+					  stmt);
 	int rc;
-	switch (stmt->type) {
+	switch (vy_stmt_type(stmt)) {
 	case IPROTO_UPSERT:
 		rc = vy_range_set_upsert(range, stmt);
 		break;
@@ -3625,7 +3607,7 @@ vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
 		rc = vy_range_set_delete(range, stmt);
 		break;
 	default:
-		rc = vy_range_set(range, stmt, stmt->lsn);
+		rc = vy_range_set(range, stmt, vy_stmt_lsn(stmt));
 		break;
 	}
 	return rc;
@@ -3715,7 +3697,7 @@ vy_task_dump_execute(struct vy_task *task)
 {
 	struct vy_range *range = task->range;
 	struct vy_write_iterator *wi = task->wi;
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
@@ -3831,7 +3813,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (range->mem->used == 0)
 		goto done;
 
-	mem = vy_mem_new(index->env, index->key_def, index->format);
+	mem = vy_mem_new(index->env, index->key_def);
 	if (mem == NULL)
 		goto err_mem;
 
@@ -3866,7 +3848,7 @@ vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_range *range = task->range;
 	struct vy_write_iterator *wi = task->wi;
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 	struct vy_range *r;
 
 	/* The range has been deleted from the scheduler queues. */
@@ -4004,10 +3986,10 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	};
 
 	struct vy_index *index = range->index;
-	struct vy_stmt *split_key = NULL;
+	struct tuple *split_key = NULL;
 	const char *split_key_raw;
 	struct vy_range *parts[2] = {NULL, };
-	struct vy_stmt *keys[3];
+	struct tuple *keys[3];
 	int n_parts = 1;
 
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
@@ -4040,8 +4022,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	/* Determine new ranges' boundaries. */
 	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_key_from_msgpack(split_key_raw,
-						     index->key_def);
+		split_key = vy_key_from_msgpack(index->format, split_key_raw,
+						index->key_def);
 		if (split_key == NULL)
 			goto err_split_key;
 		n_parts = 2;
@@ -4105,7 +4087,7 @@ err_parts:
 			vy_range_delete(parts[i]);
 	}
 	if (split_key != NULL)
-		vy_stmt_unref(split_key);
+		tuple_unref(split_key);
 err_split_key:
 	/* Sub iterators are deleted by vy_write_iterator_delete(). */
 err_wi_sub:
@@ -5267,29 +5249,6 @@ vy_index_bsize(struct vy_index *index)
 	return index->used;
 }
 
-/* {{{ Statements */
-
-/**
- * Create struct tuple from struct vy_stmt in the given space
- * format.
- * @param space   Space from which vinyl statement was taken.
- * @param vy_stmt Vinyl statement.
- *
- * @retval not NULL Success
- * @retval     NULL Memory or format error.
- */
-static inline struct tuple *
-vy_convert_replace(struct space *space, const struct vy_stmt *vy_stmt)
-{
-	assert(vy_stmt->type == IPROTO_REPLACE);
-	uint32_t bsize;
-	assert(space->index_count > 0);
-	const char *data = vy_tuple_data_range(vy_stmt, &bsize);
-	return box_tuple_new(space->format, data, data + bsize);
-}
-
-/* }}} Statements */
-
 /** {{{ Upsert */
 
 static void *
@@ -5352,13 +5311,12 @@ space_name_by_id(uint32_t id);
  * @retval -1 - memory error
  */
 static int
-vy_upsert_try_to_squash(const struct tuple_format *format,
-			uint32_t part_count,
+vy_upsert_try_to_squash(struct tuple_format *format, uint32_t part_count,
 			struct region *region,
 			const char *key_mp, const char *key_mp_end,
 			const char *old_serie, const char *old_serie_end,
 			const char *new_serie, const char *new_serie_end,
-			struct vy_stmt **result_stmt)
+			struct tuple **result_stmt)
 {
 	*result_stmt = NULL;
 
@@ -5382,10 +5340,10 @@ vy_upsert_try_to_squash(const struct tuple_format *format,
 	return 0;
 }
 
-static struct vy_stmt *
-vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
-		const struct key_def *key_def,
-		const struct tuple_format *format, bool suppress_error)
+static struct tuple *
+vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
+		const struct key_def *key_def, struct tuple_format *format,
+		bool suppress_error)
 {
 	/*
 	 * old_stmt - previous (old) version of stmt
@@ -5394,9 +5352,9 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 */
 	assert(new_stmt != NULL);
 	assert(new_stmt != old_stmt);
-	assert(new_stmt->type == IPROTO_UPSERT);
+	assert(vy_stmt_type(new_stmt) == IPROTO_UPSERT);
 
-	if (old_stmt == NULL || old_stmt->type == IPROTO_DELETE) {
+	if (old_stmt == NULL || vy_stmt_type(old_stmt) == IPROTO_DELETE) {
 		/*
 		 * INSERT case: return new stmt.
 		 */
@@ -5415,12 +5373,15 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	 * Apply new operations to the old stmt
 	 */
 	const char *result_mp;
-	result_mp = vy_tuple_data_range(old_stmt, &mp_size);
+	if (vy_stmt_type(old_stmt) == IPROTO_REPLACE)
+		result_mp = tuple_data_range(old_stmt, &mp_size);
+	else
+		result_mp = vy_upsert_data_range(old_stmt, &mp_size);
 	const char *result_mp_end = result_mp + mp_size;
-	struct vy_stmt *result_stmt = NULL;
+	struct tuple *result_stmt = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	uint8_t old_type = old_stmt->type;
+	uint8_t old_type = vy_stmt_type(old_stmt);
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
 			    new_ops_end, suppress_error);
 	if (old_type != IPROTO_UPSERT) {
@@ -5433,7 +5394,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 		region_truncate(region, region_svp);
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
-		result_stmt->lsn = new_stmt->lsn;
+		vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
 		goto check_key;
 	}
 
@@ -5460,7 +5421,7 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 	}
 	if (result_stmt != NULL) {
 		region_truncate(region, region_svp);
-		result_stmt->lsn = new_stmt->lsn;
+		vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
 		goto check_key;
 	}
 
@@ -5489,14 +5450,14 @@ vy_apply_upsert(const struct vy_stmt *new_stmt, const struct vy_stmt *old_stmt,
 		return NULL;
 	}
 	region_truncate(region, region_svp);
-	result_stmt->lsn = new_stmt->lsn;
+	vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
 
 check_key:
 	/*
 	 * Check that key hasn't been changed after applying operations.
 	 */
 	if (key_def->iid == 0 &&
-	    vy_stmt_compare(old_stmt, result_stmt, format, key_def) != 0) {
+	    vy_stmt_compare(old_stmt, result_stmt, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.
@@ -5504,7 +5465,7 @@ check_key:
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
-		vy_stmt_unref(result_stmt);
+		tuple_unref(result_stmt);
 		result_stmt = vy_stmt_dup(old_stmt);
 	}
 	return result_stmt;
@@ -5519,31 +5480,30 @@ check_key:
  * @param stmt  Statement to set.
  */
 static int
-vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct vy_stmt *stmt)
+vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 {
-	assert(stmt->type != 0);
+	assert(vy_stmt_type(stmt) != 0);
 
 	/* Update concurrent index */
 	struct txv *old = write_set_search_key(&tx->write_set, index,
 					       stmt);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
-		if (stmt->type == IPROTO_UPSERT) {
-			assert(old->stmt->type == IPROTO_UPSERT ||
-			       old->stmt->type == IPROTO_REPLACE ||
-			       old->stmt->type == IPROTO_DELETE);
+		if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
+			uint8_t old_type = vy_stmt_type(old->stmt);
+			assert(old_type == IPROTO_UPSERT ||
+			       old_type == IPROTO_REPLACE ||
+			       old_type == IPROTO_DELETE);
 
-			struct vy_stmt *old_stmt = old->stmt;
-			struct vy_stmt *new_stmt = stmt;
-			stmt = vy_apply_upsert(new_stmt, old_stmt,
+			stmt = vy_apply_upsert(stmt, old->stmt,
 					       index->key_def, index->format,
 					       true);
 			if (stmt == NULL)
 				return -1;
-			assert(stmt->type);
+			assert(vy_stmt_type(stmt) != 0);
 		}
-		vy_stmt_unref(old->stmt);
-		vy_stmt_ref(stmt);
+		tuple_unref(old->stmt);
+		tuple_ref(stmt);
 		old->stmt = stmt;
 	} else {
 		/* Allocate a MVCC container. */
@@ -5576,16 +5536,16 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct vy_stmt *stmt)
  */
 static inline int
 vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
-	     uint32_t part_count, struct vy_stmt **result)
+	     uint32_t part_count, struct tuple **result)
 {
 	/*
 	 * tx can be NULL, for example, if an user calls
 	 * space.index.get({key}).
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	struct vy_stmt *vykey;
+	struct tuple *vykey;
 	assert(part_count <= index->key_def->part_count);
-	vykey = vy_stmt_new_select(key, part_count);
+	vykey = vy_stmt_new_select(index->format, key, part_count);
 	if (vykey == NULL)
 		return -1;
 	struct vy_env *e = index->env;
@@ -5605,14 +5565,14 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 		vy_read_iterator_close(&itr);
 		goto error;
 	}
-	vy_stmt_unref(vykey);
+	tuple_unref(vykey);
 	if (*result != NULL)
-		vy_stmt_ref(*result);
+		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
 	vy_stat_get(e->stat, start);
 	return 0;
 error:
-	vy_stmt_unref(vykey);
+	tuple_unref(vykey);
 	return -1;
 }
 
@@ -5632,7 +5592,7 @@ static inline int
 vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 		 uint32_t part_count)
 {
-	struct vy_stmt *found;
+	struct tuple *found;
 	(void) part_count;
 	/*
 	 * Expect a full tuple as input (secondary key || primary key)
@@ -5644,7 +5604,7 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 		return -1;
 
 	if (found) {
-		vy_stmt_unref(found);
+		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND, idx->user_key_def->name,
 			 space_name(idx->space));
 		return -1;
@@ -5653,49 +5613,24 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 }
 
 /**
- * Insert REPLACE into the write set of the transaction.
- * @param tx        Transaction which replaces.
- * @param index     Index in which \p tx replaces.
- * @param tuple     MessagePack array.
- * @param tuple_end End of the tuple.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-int
-vy_index_replace(struct vy_tx *tx, struct vy_index *index,
-	   const char *tuple, const char *tuple_end)
-{
-	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	struct vy_stmt *vystmt = vy_stmt_new_replace(tuple, tuple_end,
-						     index->format,
-						     index->key_def->part_count);
-	if (vystmt == NULL)
-		return -1;
-	assert(vystmt->type == IPROTO_REPLACE);
-	int rc = vy_tx_set(tx, index, vystmt);
-	vy_stmt_unref(vystmt);
-	return rc;
-}
-
-/**
  * Insert a tuple in a primary index.
- * @param tx        Current transaction.
- * @param pk        Primary vinyl index.
- * @param tuple     MessagePack array.
- * @param tuple_end End of the tuple.
+ * @param tx   Current transaction.
+ * @param pk   Primary vinyl index.
+ * @param stmt Tuple to insert.
  *
  * @retval  0 Success.
  * @retval -1 Memory error or duplicate key error.
  */
 static inline int
-vy_insert_primary(struct vy_tx *tx, struct vy_index *pk,
-		     const char *tuple, const char *tuple_end)
+vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
 {
+	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	struct key_def *def = pk->key_def;
 	const char *key;
-	assert(pk->key_def->iid == 0);
-	key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def, NULL);
-	if (key == NULL)                        /* out of memory */
+	assert(def->iid == 0);
+	key = tuple_extract_key(stmt, def, NULL);
+	if (key == NULL)
 		return -1;
 	/*
 	 * A primary index is always unique and the new tuple must not
@@ -5704,30 +5639,30 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk,
 	uint32_t part_count = mp_decode_array(&key);
 	if (vy_check_dup_key(tx, pk, key, part_count))
 		return -1;
-
-	return vy_index_replace(tx, pk, tuple, tuple_end);
+	return vy_tx_set(tx, pk, stmt);
 }
 
 /**
  * Insert a tuple in a secondary index.
  * @param tx        Current transaction.
  * @param index     Secondary index.
- * @param tuple     MessagePack array.
- * @param tuple_end End of the tuple.
+ * @param stmt      Tuple to replace.
  *
  * @retval  0 Success.
  * @retval -1 Memory error or duplicate key error.
  */
 int
 vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
-		    const char *tuple, const char *tuple_end)
+		    const struct tuple *stmt)
 {
+	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	const char *key, *key_end;
-	assert(index->key_def->iid > 0);
+	struct key_def *def = index->key_def;
+	assert(def->iid > 0);
 	uint32_t key_len;
-	key = tuple_extract_key_raw(tuple, tuple_end,
-				    index->key_def_tuple_to_key, &key_len);
-	if (key == NULL)                        /* out of memory */
+	key = tuple_extract_key(stmt, index->key_def_tuple_to_key, &key_len);
+	if (key == NULL)
 		return -1;
 	key_end = key + key_len;
 	/*
@@ -5741,7 +5676,13 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		if (vy_check_dup_key(tx, index, check_key, part_count))
 			return -1;
 	}
-	return vy_index_replace(tx, index, key, key_end);
+	struct tuple *tuple = vy_stmt_new_replace(key, key_end, index->format,
+						  def->part_count);
+	if (tuple == NULL)
+		return -1;
+	int rc = vy_tx_set(tx, index, tuple);
+	tuple_unref(tuple);
+	return rc;
 }
 
 /**
@@ -5763,9 +5704,16 @@ static inline int
 vy_replace_one(struct vy_tx *tx, struct space *space,
 	       struct request *request, struct txn_stmt *stmt)
 {
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(space->index_count == 1);
 	struct vy_index *pk = vy_index(space->index[0]);
-	assert(pk->key_def->iid == 0);
+	struct key_def *def = pk->key_def;
+	assert(def->iid == 0);
+	struct tuple *new_tuple =
+		vy_stmt_new_replace(request->tuple, request->tuple_end,
+				    pk->format, def->part_count);
+	if (new_tuple == NULL)
+		return -1;
 	/**
 	 * If the space has triggers, then we need to fetch the
 	 * old tuple to pass it to the trigger. Use vy_get to
@@ -5773,17 +5721,22 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
 		const char *key;
-		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
-					    pk->key_def, NULL);
+		key = tuple_extract_key(new_tuple, def, NULL);
 		if (key == NULL)                /* out of memory */
 			return -1;
 		uint32_t part_count = mp_decode_array(&key);
 		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple))
 			return -1;
-		if (stmt->old_tuple)
-			box_tuple_ref(stmt->old_tuple);
 	}
-	return vy_index_replace(tx, pk, request->tuple, request->tuple_end);
+	if (vy_tx_set(tx, pk, new_tuple)) {
+		tuple_unref(new_tuple);
+		return -1;
+	}
+	if (stmt != NULL)
+		stmt->new_tuple = new_tuple;
+	else
+		tuple_unref(new_tuple);
+	return 0;
 }
 
 /**
@@ -5804,13 +5757,13 @@ vy_index_delete_key(struct vy_tx *tx, struct vy_index *index,
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(part_count <= index->key_def->part_count);
-	struct vy_stmt *vykey;
-	vykey = vy_stmt_new_delete(key, part_count);
+	struct tuple *vykey;
+	vykey = vy_stmt_new_delete(index->format, key, part_count);
 	if (vykey == NULL)
 		return -1;
-	assert(vykey->type == IPROTO_DELETE);
+	assert(vy_stmt_type(vykey) == IPROTO_DELETE);
 	int rc = vy_tx_set(tx, index, vykey);
-	vy_stmt_unref(vykey);
+	tuple_unref(vykey);
 	return rc;
 }
 
@@ -5833,31 +5786,31 @@ static inline int
 vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 		struct txn_stmt *stmt)
 {
-	struct vy_stmt *old_stmt;
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	struct tuple *old_stmt = NULL;
+	struct tuple *new_stmt = NULL;
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL) /* space has no primary key */
 		return -1;
-	assert(pk->key_def->iid == 0);
-	const char *key = NULL, *old_tuple = NULL, *old_tuple_end = NULL;
-	key = tuple_extract_key_raw(request->tuple, request->tuple_end,
-				    pk->key_def, NULL);
-	if (key == NULL) /* out of memory */
+	struct key_def *def = pk->key_def;
+	assert(def->iid == 0);
+	new_stmt = vy_stmt_new_replace(request->tuple, request->tuple_end,
+				       pk->format, def->part_count);
+	if (new_stmt == NULL)
 		return -1;
+	const char *key = tuple_extract_key(new_stmt, def, NULL);
+	if (key == NULL) /* out of memory */
+		goto error;
 	uint32_t part_count = mp_decode_array(&key);
 
 	/* Get full tuple from the primary index. */
-	if (vy_index_get(tx, pk, key, part_count, &old_stmt))
+	if (vy_index_get(tx, pk, key, part_count, &old_stmt) != 0)
 		return -1;
-	if (old_stmt != NULL) {
-		uint32_t mp_size;
-		old_tuple = vy_tuple_data_range(old_stmt, &mp_size);
-		old_tuple_end = old_tuple + mp_size;
-	}
 	/*
 	 * Replace in the primary index without explicit deletion
 	 * of the old tuple.
 	 */
-	if (vy_index_replace(tx, pk, request->tuple, request->tuple_end))
+	if (vy_tx_set(tx, pk, new_stmt) != 0)
 		goto error;
 
 	/* Update secondary keys, avoid duplicates. */
@@ -5870,17 +5823,17 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 		 * transaction index.
 		 */
 		if (old_stmt != NULL) {
-			key = tuple_extract_key_raw(old_tuple, old_tuple_end,
-						    index->key_def_tuple_to_key,
-						    NULL);
+			key = tuple_extract_key(old_stmt,
+						index->key_def_tuple_to_key,
+						NULL);
 			if (key == NULL)
 				goto error;
 			part_count = mp_decode_array(&key);
-			if (vy_index_delete_key(tx, index, key, part_count))
+			if (vy_index_delete_key(tx, index, key,
+						part_count) != 0)
 				goto error;
 		}
-		if (vy_insert_secondary(tx, index, request->tuple,
-					   request->tuple_end))
+		if (vy_insert_secondary(tx, index, new_stmt) != 0)
 			goto error;
 	}
 	/*
@@ -5888,17 +5841,15 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	 * trigger.
 	 */
 	if (stmt != NULL) {
-		if (old_stmt == NULL)
-			return 0;
-		stmt->old_tuple = vy_convert_replace(space, old_stmt);
-		box_tuple_ref(stmt->old_tuple);
+		stmt->new_tuple = new_stmt;
+		stmt->old_tuple = old_stmt;
 	}
-	if (old_stmt != NULL)
-		vy_stmt_unref(old_stmt);
 	return 0;
 error:
 	if (old_stmt != NULL)
-		vy_stmt_unref(old_stmt);
+		tuple_unref(old_stmt);
+	if (new_stmt != NULL)
+		tuple_unref(new_stmt);
 	return -1;
 }
 
@@ -5952,7 +5903,7 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
  */
 static inline int
 vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
-		      const struct vy_stmt *partial, struct vy_stmt **full)
+		      const struct tuple *partial, struct tuple **full)
 {
 	assert(index->key_def->iid > 0);
 	/*
@@ -5960,7 +5911,7 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	 */
 	struct key_def *to_pk = index->key_def_secondary_to_primary;
 	uint32_t size;
-	const char *tuple = vy_tuple_data_range(partial, &size);
+	const char *tuple = tuple_data_range(partial, &size);
 	const char *tuple_end = tuple + size;
 	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, to_pk, NULL);
 	if (pkey == NULL)
@@ -5991,9 +5942,9 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
  */
 static inline int
 vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
-		     uint32_t part_count, struct vy_stmt **result)
+		     uint32_t part_count, struct tuple **result)
 {
-	struct vy_stmt *found;
+	struct tuple *found;
 	if (vy_index_get(tx, index, key, part_count, &found))
 		return -1;
 	if (index->key_def->iid == 0 || found == NULL) {
@@ -6001,7 +5952,7 @@ vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return 0;
 	}
 	int rc = vy_index_full_by_stmt(tx, index, found, result);
-	vy_stmt_unref(found);
+	tuple_unref(found);
 	return rc;
 }
 
@@ -6009,8 +5960,7 @@ vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
  * Delete the tuple from all indexes of the vinyl space.
  * @param tx         Current transaction.
  * @param space      Vinyl space.
- * @param tuple      MessagePack array, tuple to delete.
- * @param tuple_end  End of the tuple.
+ * @param tuple      Tuple to delete.
  * @param key        Primary key. This is an optimization, to
  *                   avoid extracting the primary key from the
  *                   \p tuple in the most common case when it's
@@ -6021,8 +5971,7 @@ vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
  * @retval -1 Memory error or the index is not found.
  */
 static inline int
-vy_delete_impl(struct vy_tx *tx, struct space *space,
-	       const char *tuple, const char *tuple_end,
+vy_delete_impl(struct vy_tx *tx, struct space *space, const struct tuple *tuple,
 	       const char *key, uint32_t part_count)
 {
 	struct vy_index *pk = vy_index_find(space, 0);
@@ -6035,8 +5984,8 @@ vy_delete_impl(struct vy_tx *tx, struct space *space,
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		key = tuple_extract_key_raw(tuple, tuple_end,
-					    index->key_def_tuple_to_key, NULL);
+		key = tuple_extract_key(tuple, index->key_def_tuple_to_key,
+					NULL);
 		if (key == NULL)
 			return -1;
 		part_count = mp_decode_array(&key);
@@ -6056,7 +6005,6 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	struct vy_index *index = vy_index_find_unique(space, request->index_id);
 	if (index == NULL)
 		return -1;
-	struct vy_stmt *old_stmt = NULL;
 	bool has_secondary = space->index_count > 1;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
@@ -6073,22 +6021,19 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	 *   and pass them to indexes for deletion.
 	 */
 	if (has_secondary || !rlist_empty(&space->on_replace)) {
-		if (vy_index_full_by_key(tx, index, key, part_count, &old_stmt))
+		if (vy_index_full_by_key(tx, index, key, part_count,
+					 &stmt->old_tuple))
 			return -1;
-		if (old_stmt == NULL)
+		if (stmt->old_tuple == NULL)
 			return 0;
 	}
 	if (has_secondary) {
-		assert(old_stmt != NULL);
+		assert(stmt->old_tuple != NULL);
 		/*
 		 * If the space has secondary indexes and
 		 * the old tuple exists then delete it
 		 * from all the indexes.
 		 */
-		uint32_t size;
-		const char *tuple;
-		tuple = vy_tuple_data_range(old_stmt, &size);
-		const char *tuple_end = tuple + size;
 		if (request->index_id != 0) {
 			/*
 			 * If the specified index is not
@@ -6097,31 +6042,20 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			 * else the primary key already is
 			 * passed as parameter.
 			 */
-			key = tuple_extract_key_raw(tuple, tuple_end,
-						    pk->key_def, NULL);
+			key = tuple_extract_key(stmt->old_tuple, pk->key_def,
+						NULL);
 			if (key == NULL)
 				return -1;
 			part_count = mp_decode_array(&key);
 		}
-		if (vy_delete_impl(tx, space, tuple, tuple_end, key,
-				   part_count))
-			goto error;
+		if (vy_delete_impl(tx, space, stmt->old_tuple, key, part_count))
+			return -1;
 	} else { /* Primary is the single index in the space. */
 		assert(index->key_def->iid == 0);
 		if (vy_index_delete_key(tx, pk, key, part_count))
-			goto error;
-		if (old_stmt == NULL)
-			return 0;               /* nothing else to do */
+			return -1;
 	}
-	stmt->old_tuple = vy_convert_replace(space, old_stmt);
-	if (stmt->old_tuple == NULL)
-		goto error;
-	vy_stmt_unref(old_stmt);
-	return box_tuple_ref(stmt->old_tuple);
-error:
-	if (old_stmt != NULL)
-		vy_stmt_unref(old_stmt);
-	return -1;
+	return 0;
 }
 
 /**
@@ -6142,10 +6076,10 @@ error:
  * @retval -1 Attempt to modify the primary key.
  */
 static inline int
-vy_check_update(const struct vy_index *pk, const struct vy_stmt *old_tuple,
-		const struct vy_stmt *new_tuple)
+vy_check_update(const struct vy_index *pk, const struct tuple *old_tuple,
+		const struct tuple *new_tuple)
 {
-	if (vy_tuple_compare(old_tuple, new_tuple, pk->format, pk->key_def)) {
+	if (vy_tuple_compare(old_tuple, new_tuple, pk->key_def)) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 pk->key_def->name,
 			 space_name_by_id(pk->key_def->space_id));
@@ -6200,11 +6134,10 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	if (vy_unique_key_validate(index, key, part_count))
 		return -1;
 
-	struct vy_stmt *old_stmt;
-	if (vy_index_full_by_key(tx, index, key, part_count, &old_stmt))
+	if (vy_index_full_by_key(tx, index, key, part_count, &stmt->old_tuple))
 		return -1;
 	/* Nothing to update. */
-	if (old_stmt == NULL)
+	if (stmt->old_tuple == NULL)
 		return 0;
 
 	/* Apply update operations. */
@@ -6214,69 +6147,51 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
-	const char *old_tuple = vy_tuple_data_range(old_stmt, &old_size);
+	const char *old_tuple = tuple_data_range(stmt->old_tuple, &old_size);
 	const char *old_tuple_end = old_tuple + old_size;
 	new_tuple = tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
 					 request->tuple, request->tuple_end,
 					 old_tuple, old_tuple_end, &new_size,
 					 request->index_base, &column_mask);
 	if (new_tuple == NULL)
-		goto error;
+		return -1;
 	new_tuple_end = new_tuple + new_size;
 	/*
 	 * Check that the new tuple matches the space format and
 	 * the primary key was not modified.
 	 */
 	if (tuple_validate_raw(space->format, new_tuple))
-		goto error;
-	struct vy_stmt *new_stmt;
-	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
-				       pk->key_def->part_count);
-	if (new_stmt == NULL)
-		goto error;
-	if (vy_check_update(pk, old_stmt, new_stmt)) {
-		vy_stmt_unref(new_stmt);
-		goto error;
-	}
+		return -1;
+	stmt->new_tuple =
+		vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
+				    pk->key_def->part_count);
+	if (stmt->new_tuple == NULL)
+		return -1;
+	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple))
+		return -1;
 
 	/*
 	 * In the primary index the tuple can be replaced without
 	 * the old tuple deletion.
 	 */
-	int rc = vy_tx_set(tx, pk, new_stmt);
-	vy_stmt_unref(new_stmt);
-	if (rc != 0)
-		goto error;
+	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
+		return -1;
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
 		if (vy_can_skip_update(index, column_mask))
 			continue;
-		key = tuple_extract_key_raw(old_tuple, old_tuple_end,
-					    index->key_def_tuple_to_key, NULL);
+		key = tuple_extract_key(stmt->old_tuple,
+					index->key_def_tuple_to_key, NULL);
 		if (key == NULL)
-			goto error;
+			return -1;
 		part_count = mp_decode_array(&key);
 		if (vy_index_delete_key(tx, index, key, part_count))
-			goto error;
-		if (vy_insert_secondary(tx, index, new_tuple, new_tuple_end))
-			goto error;
+			return -1;
+		if (vy_insert_secondary(tx, index, stmt->new_tuple))
+			return -1;
 	}
-	stmt->old_tuple = vy_convert_replace(space, old_stmt);
-	vy_stmt_unref(old_stmt);
-	if (stmt->old_tuple == NULL)
-		return -1;
-	if (box_tuple_ref(stmt->old_tuple))
-		return -1;
-	stmt->new_tuple = box_tuple_new(space->format, new_tuple,
-					new_tuple_end);
-	if (stmt->new_tuple == NULL)
-		return -1;
-	return box_tuple_ref(stmt->new_tuple);
-error:
-	assert(old_stmt != NULL);
-	vy_stmt_unref(old_stmt);
-	return -1;
+	return 0;
 }
 
 /**
@@ -6284,25 +6199,26 @@ error:
  * the primary index.
  * @param tx        Current transaction.
  * @param space     Space in which insert.
- * @param tuple     MessagePack array.
- * @param tuple_end End of the tuple.
+ * @param stmt      Tuple to upsert.
  *
  * @retval  0 Success.
  * @retval -1 Memory error or a secondary index duplicate error.
  */
 static int
 vy_insert_first_upsert(struct vy_tx *tx, struct space *space,
-		       const char *tuple, const char *tuple_end)
+		       struct tuple *stmt)
 {
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(space->index_count > 0);
+	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk->key_def->iid == 0);
-	if (vy_index_replace(tx, pk, tuple, tuple_end))
+	if (vy_tx_set(tx, pk, stmt) != 0)
 		return -1;
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_insert_secondary(tx, index, tuple, tuple_end))
+		if (vy_insert_secondary(tx, index, stmt) != 0)
 			return -1;
 	}
 	return 0;
@@ -6326,7 +6242,7 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *expr, const char *expr_end)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	struct vy_stmt *vystmt;
+	struct tuple *vystmt;
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
@@ -6334,9 +6250,9 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 				    index->key_def->part_count, operations, 1);
 	if (vystmt == NULL)
 		return -1;
-	assert(vystmt->type == IPROTO_UPSERT);
+	assert(vy_stmt_type(vystmt) == IPROTO_UPSERT);
 	int rc = vy_tx_set(tx, index, vystmt);
-	vy_stmt_unref(vystmt);
+	tuple_unref(vystmt);
 	return rc;
 }
 
@@ -6349,15 +6265,13 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	const char *tuple_end = request->tuple_end;
 	const char *ops = request->ops;
 	const char *ops_end = request->ops_end;
-	bool has_secondary = space->index_count > 1;
-	bool has_triggers = !rlist_empty(&space->on_replace);
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
 	if (tuple_validate_raw(space->format, tuple))
 		return -1;
 
-	if (has_secondary == false && has_triggers == false)
+	if (space->index_count == 1 && rlist_empty(&space->on_replace))
 		return vy_index_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
 	const char *old_tuple, *old_tuple_end;
@@ -6365,7 +6279,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	uint32_t new_size;
 	const char *key;
 	uint32_t part_count;
-	struct vy_stmt *old_stmt = NULL;
+	struct tuple *old_stmt = NULL;
 	struct key_def *pk_def = pk->key_def;
 	uint64_t column_mask;
 	/*
@@ -6389,68 +6303,50 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	 * turns into INSERT.
 	 */
 	if (old_stmt == NULL) {
-		if (vy_insert_first_upsert(tx, space, tuple, tuple_end))
+		stmt->new_tuple =
+			vy_stmt_new_replace(tuple, tuple_end, pk->format,
+					    pk_def->part_count);
+		if (stmt->new_tuple == NULL)
 			return -1;
-		if (has_triggers) {
-			stmt->new_tuple = box_tuple_new(space->format,
-							tuple, tuple_end);
-			if (stmt->new_tuple == NULL)
-				return -1;
-			box_tuple_ref(stmt->new_tuple);
-		}
-		return 0;
+		return vy_insert_first_upsert(tx, space, stmt->new_tuple);
 	}
 	uint32_t old_size;
-	old_tuple = vy_tuple_data_range(old_stmt, &old_size);
+	old_tuple = tuple_data_range(old_stmt, &old_size);
 	old_tuple_end = old_tuple + old_size;
+
+	/* Apply upsert operations to the old tuple. */
 	new_tuple = tuple_upsert_execute(region_aligned_alloc_cb,
 					 &fiber()->gc, ops, ops_end,
 					 old_tuple, old_tuple_end,
 					 &new_size, 0, false, &column_mask);
-	if (new_tuple == NULL)
-		goto error;
-	new_tuple_end = new_tuple + new_size;
-	if (has_triggers) {
-		stmt->old_tuple = box_tuple_new(space->format,
-						old_tuple, old_tuple_end);
-		if (stmt->old_tuple == NULL)
-			goto error;
-		box_tuple_ref(stmt->old_tuple);
-		stmt->new_tuple = box_tuple_new(space->format,
-						new_tuple, new_tuple_end);
-		if (stmt->new_tuple == NULL)
-			goto error;
-		box_tuple_ref(stmt->new_tuple);
+	if (new_tuple == NULL) {
+		tuple_unref(old_stmt);
+		return -1;
 	}
-	/* Apply upsert operations to the old tuple. */
 	/*
 	 * Check that the new tuple matched the space
 	 * format and the primary key was not modified.
 	 */
 	if (tuple_validate_raw(space->format, new_tuple))
-		goto error;
+		return -1;
+	new_tuple_end = new_tuple + new_size;
+	stmt->old_tuple = old_stmt;
+	stmt->new_tuple =
+		vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
+				    pk->key_def->part_count);
+	if (stmt->new_tuple == NULL)
+		return -1;
 
-	/* Have to create a vinyl stmt just for vy_check_update() */
-	struct vy_stmt *new_stmt;
-	new_stmt = vy_stmt_new_replace(new_tuple, new_tuple_end,
-				       pk->format, pk_def->part_count);
-	if (new_stmt == NULL)
-		goto error;
-
-	if (vy_check_update(pk, old_stmt, new_stmt)) {
+	if (vy_check_update(pk, old_stmt, stmt->new_tuple)) {
 		error_log(diag_last_error(diag_get()));
-		vy_stmt_unref(new_stmt);
-		vy_stmt_unref(old_stmt);
 		/*
 		 * Upsert is skipped, to match the semantics of
 		 * vy_index_upsert().
 		 */
 		return 0;
 	}
-	vy_stmt_unref(new_stmt);
-	/* We know the new tuple, convert upsert to replace. */
-	if (vy_index_replace(tx, pk, new_tuple, new_tuple_end))
-		goto error;
+	if (vy_tx_set(tx, pk, stmt->new_tuple))
+		return -1;
 	/* Replace in secondary indexes works as delete insert. */
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
@@ -6461,19 +6357,14 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 					    index->key_def_tuple_to_key,
 					    NULL);
 		if (key == NULL)
-			goto error;
+			return -1;
 		part_count = mp_decode_array(&key);
 		if (vy_index_delete_key(tx, index, key, part_count) != 0)
-			goto error;
-		if (vy_insert_secondary(tx, index, new_tuple,
-					new_tuple_end) != 0)
-			goto error;
+			return -1;
+		if (vy_insert_secondary(tx, index, stmt->new_tuple) != 0)
+			return -1;
 	}
-	vy_stmt_unref(old_stmt);
 	return 0;
-error:
-	vy_stmt_unref(old_stmt);
-	return -1;
 }
 
 int
@@ -6493,23 +6384,31 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 }
 
 int
-vy_insert(struct vy_tx *tx, struct space *space, struct request *request)
+vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	  struct request *request)
 {
+	assert(stmt != NULL);
+	struct vy_index *pk = vy_index_find(space, 0);
+	if (pk == NULL)
+		/* The space hasn't the primary index. */
+		return -1;
+	struct key_def *def = pk->key_def;
+	assert(def->iid == 0);
 	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple))
+	if (tuple_validate_raw(space->format, request->tuple) != 0)
 		return -1;
 	/* First insert into the primary index. */
-	struct vy_index *pk = vy_index_find(space, 0);
-	if (pk == NULL)                         /* space has no primary key */
+	stmt->new_tuple =
+		vy_stmt_new_replace(request->tuple, request->tuple_end,
+				    pk->format, def->part_count);
+	if (stmt->new_tuple == NULL)
 		return -1;
-	assert(pk->key_def->iid == 0);
-	if (vy_insert_primary(tx, pk, request->tuple, request->tuple_end))
+	if (vy_insert_primary(tx, pk, stmt->new_tuple) != 0)
 		return -1;
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index = vy_index(space->index[iid]);
-		if (vy_insert_secondary(tx, index, request->tuple,
-					request->tuple_end))
+		if (vy_insert_secondary(tx, index, stmt->new_tuple) != 0)
 			return -1;
 	}
 	return 0;
@@ -6652,17 +6551,14 @@ vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(result != NULL);
-	struct vy_stmt *vyresult = NULL;
+	struct tuple *vyresult = NULL;
 	assert(part_count <= index->key_def->part_count);
 	if (vy_index_full_by_key(tx, index, key, part_count, &vyresult))
 		return -1;
 	if (vyresult == NULL)
 		return 0;
-	MAYBE_UNUSED struct vy_index *pk = vy_index_find(index->space, 0);
-	assert(pk != NULL);
-	*result = vy_convert_replace(index->space, vyresult);
-	vy_stmt_unref(vyresult);
-	return *result == NULL ? -1 : 0;
+	*result = vyresult;
+	return 0;
 }
 
 
@@ -6833,7 +6729,7 @@ struct vy_stmt_iterator;
 
 typedef NODISCARD int
 (*vy_iterator_next_f)(struct vy_stmt_iterator *virt_iterator,
-		      struct vy_stmt *in, struct vy_stmt **ret);
+		      struct tuple **ret);
 /**
  * The restore() function moves an iterator to the specified
  * statement (@arg last_stmt) and returns the new statement via @arg ret.
@@ -6879,7 +6775,7 @@ typedef NODISCARD int
  */
 typedef NODISCARD int
 (*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
-			 const struct vy_stmt *last_stmt, struct vy_stmt **ret);
+			 const struct tuple *last_stmt, struct tuple **ret);
 typedef void
 (*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
 
@@ -6936,7 +6832,7 @@ struct vy_run_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	const struct vy_stmt *key;
+	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const int64_t *vlsn;
 
@@ -6948,7 +6844,7 @@ struct vy_run_iterator {
 	 * The iterator holds this stmt until the next call to
 	 * vy_run_iterator_get, when it's dereferenced.
 	 */
-	struct vy_stmt *curr_stmt;
+	struct tuple *curr_stmt;
 	/** Position of record that spawned curr_stmt */
 	struct vy_run_iterator_pos curr_stmt_pos;
 	/** LRU cache of two active pages (two pages is enough). */
@@ -6963,7 +6859,7 @@ struct vy_run_iterator {
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum iterator_type iterator_type,
-		     const struct vy_stmt *key, const int64_t *vlsn);
+		     const struct tuple *key, const int64_t *vlsn);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -7038,9 +6934,9 @@ vy_page_delete(struct vy_page *page)
  * \param[out] pinfo stmt metadata
  * \return stmt data including offsets table
  */
-static struct vy_stmt *
+static struct tuple *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	     const struct tuple_format *format, const struct key_def *key_def)
+	     struct tuple_format *format, const struct key_def *key_def)
 {
 	assert(stmt_no < page->count);
 	const char *data = page->data + page->row_index[stmt_no];
@@ -7110,7 +7006,7 @@ static void
 vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
 {
 	if (itr->curr_stmt != NULL) {
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		itr->curr_stmt_pos.page_no = UINT32_MAX;
 	}
@@ -7376,7 +7272,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_pos pos,
-		     struct vy_stmt **stmt)
+		     struct tuple **stmt)
 {
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
@@ -7398,7 +7294,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  */
 static uint32_t
 vy_run_iterator_search_page(struct vy_run_iterator *itr,
-			    const struct vy_stmt *key, bool *equal_key)
+			    const struct tuple *key, bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = itr->run->info.count;
@@ -7411,8 +7307,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 		struct vy_page_info *page_info;
 		page_info = vy_run_page_info(itr->run, mid);
 		int cmp;
-		cmp = -vy_stmt_compare_with_key(key, page_info->min_key, idx->format,
-						    idx->key_def);
+		cmp = -vy_stmt_compare_with_key(key, page_info->min_key,
+						idx->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
@@ -7432,8 +7328,8 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
  */
 static uint32_t
 vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
-			       const struct vy_stmt *key,
-			       struct vy_page *page, bool *equal_key)
+			       const struct tuple *key, struct vy_page *page,
+			       bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->count;
@@ -7443,18 +7339,18 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct vy_stmt *fnd_key = vy_page_stmt(page, mid, idx->format,
+		struct tuple *fnd_key = vy_page_stmt(page, mid, idx->format,
 						       idx->key_def);
 		if (fnd_key == NULL)
 			return end;
-		int cmp = vy_stmt_compare(fnd_key, key, idx->format,idx->key_def);
+		int cmp = vy_stmt_compare(fnd_key, key, idx->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
 			beg = mid + 1;
 		else
 			end = mid;
-		vy_stmt_unref(fnd_key);
+		tuple_unref(fnd_key);
 	}
 	return end;
 }
@@ -7471,7 +7367,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
  * @retval -2 invalid iterator
  */
 static NODISCARD int
-vy_run_iterator_search(struct vy_run_iterator *itr, const struct vy_stmt *key,
+vy_run_iterator_search(struct vy_run_iterator *itr, const struct tuple *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
 	pos->page_no = vy_run_iterator_search_page(itr, key, equal_key);
@@ -7540,7 +7436,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr,
 }
 
 static NODISCARD int
-vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result);
+vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result);
 
 /**
  * Find the next record with lsn <= itr->lsn record.
@@ -7553,20 +7449,19 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result);
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
-vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
+vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 	struct key_def *key_def = itr->index->key_def;
-	struct tuple_format *format = itr->index->format;
-	const struct vy_stmt *key = itr->key;
+	const struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt);
 	if (rc != 0)
 		return rc;
-	while (stmt->lsn > *itr->vlsn) {
-		vy_stmt_unref(stmt);
+	while (vy_stmt_lsn(stmt) > *itr->vlsn) {
+		tuple_unref(stmt);
 		stmt = NULL;
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
 					      &itr->curr_pos);
@@ -7580,8 +7475,8 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		if (rc != 0)
 			return rc;
 		if (iterator_type == ITER_EQ &&
-		    vy_stmt_compare(stmt, key, format, key_def)) {
-			vy_stmt_unref(stmt);
+		    vy_stmt_compare(stmt, key, key_def)) {
+			tuple_unref(stmt);
 			stmt = NULL;
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
@@ -7602,17 +7497,17 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 			 */
 			vy_run_iterator_cache_touch(itr, cur_key_page_no);
 
-			struct vy_stmt *test_stmt;
+			struct tuple *test_stmt;
 			rc = vy_run_iterator_read(itr, test_pos, &test_stmt);
 			if (rc != 0)
 				return rc;
-			if (test_stmt->lsn > *itr->vlsn ||
-			    vy_stmt_compare(stmt, test_stmt, format, key_def) != 0) {
-				vy_stmt_unref(test_stmt);
+			if (vy_stmt_lsn(test_stmt) > *itr->vlsn ||
+			    vy_stmt_compare(stmt, test_stmt, key_def) != 0) {
+				tuple_unref(test_stmt);
 				test_stmt = NULL;
 				break;
 			}
-			vy_stmt_unref(test_stmt);
+			tuple_unref(test_stmt);
 			test_stmt = NULL;
 			itr->curr_pos = test_pos;
 
@@ -7625,7 +7520,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
 
 		rc = rc > 0 ? 0 : rc;
 	}
-	vy_stmt_unref(stmt);
+	tuple_unref(stmt);
 	if (!rc) /* If next_pos() found something then get it. */
 		rc = vy_run_iterator_get(itr, ret);
 	return rc;
@@ -7636,8 +7531,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct vy_stmt **ret)
  * recursivly calls vy_run_iterator_next_key().
  */
 static NODISCARD int
-vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret);
+vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret);
 /**
  * Find next (lower, older) record with the same key as current
  * Return true if the record was found
@@ -7648,7 +7542,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
-vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
+vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	assert(!itr->search_started);
 	itr->search_started = true;
@@ -7676,7 +7570,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 	struct vy_run_iterator_pos end_pos = {itr->run->info.count, 0};
 	bool equal_found = false;
 	int rc;
-	if (vy_stmt_part_count(itr->key) > 0) {
+	if (tuple_field_count(itr->key) > 0) {
 		rc = vy_run_iterator_search(itr, itr->key, &itr->curr_pos,
 					    &equal_found);
 		if (rc != 0)
@@ -7707,7 +7601,7 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct vy_stmt **ret)
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need to make a step on previous key
 		 */
-		return vy_run_iterator_next_key(&itr->base, NULL, ret);
+		return vy_run_iterator_next_key(&itr->base, ret);
 	} else {
 		assert(itr->iterator_type == ITER_GE ||
 		       itr->iterator_type == ITER_GT ||
@@ -7737,7 +7631,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 		     struct vy_run *run, enum iterator_type iterator_type,
-		     const struct vy_stmt *key, const int64_t *vlsn)
+		     const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 
@@ -7748,7 +7642,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_part_count(key) == 0) {
+	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -7774,7 +7668,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_range *range,
  * @retval -2 invalid iterator
  */
 static NODISCARD int
-vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
+vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
 {
 	assert(itr->search_started);
 	*result = NULL;
@@ -7786,7 +7680,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
 			*result = itr->curr_stmt;
 			return 0;
 		}
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		itr->curr_stmt_pos.page_no = UINT32_MAX;
 	}
@@ -7808,10 +7702,8 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct vy_stmt **result)
  * @retval -2 invalid iterator
  */
 static NODISCARD int
-vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)in;
 	assert(vitr->iface->next_key == vy_run_iterator_next_key);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	*ret = NULL;
@@ -7850,24 +7742,23 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	}
 	assert(itr->curr_pos.page_no < end_page);
 
-	struct vy_stmt *cur_key;
+	struct tuple *cur_key;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 	uint32_t cur_key_page_no = itr->curr_pos.page_no;
 
-	struct vy_stmt *next_key = NULL;
-	struct tuple_format *format = itr->index->format;
+	struct tuple *next_key = NULL;
 	do {
 		if (next_key != NULL)
-			vy_stmt_unref(next_key);
+			tuple_unref(next_key);
 		next_key = NULL;
 		int rc = vy_run_iterator_next_pos(itr, itr->iterator_type,
 						  &itr->curr_pos);
 		if (rc > 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
-			vy_stmt_unref(cur_key);
+			tuple_unref(cur_key);
 			cur_key = NULL;
 			return 0;
 		}
@@ -7881,18 +7772,18 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 
 		rc = vy_run_iterator_read(itr, itr->curr_pos, &next_key);
 		if (rc != 0) {
-			vy_stmt_unref(cur_key);
+			tuple_unref(cur_key);
 			cur_key = NULL;
 			return rc;
 		}
 
 		/* See above */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
-	} while (vy_stmt_compare(cur_key, next_key, format, key_def) == 0);
-	vy_stmt_unref(cur_key);
+	} while (vy_stmt_compare(cur_key, next_key, key_def) == 0);
+	tuple_unref(cur_key);
 	cur_key = NULL;
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(next_key, itr->key, format,	key_def) != 0) {
+	    vy_stmt_compare(next_key, itr->key, key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
@@ -7907,10 +7798,8 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval -2 invalid iterator
  */
 static NODISCARD int
-vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)in;
 	assert(vitr->iface->next_lsn == vy_run_iterator_next_lsn);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	*ret = NULL;
@@ -7927,15 +7816,15 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (rc > 0)
 		return 0;
 
-	struct vy_stmt *cur_key;
+	struct tuple *cur_key;
 	rc = vy_run_iterator_read(itr, itr->curr_pos, &cur_key);
 	if (rc != 0)
 		return rc;
 
-	struct vy_stmt *next_key;
+	struct tuple *next_key;
 	rc = vy_run_iterator_read(itr, next_pos, &next_key);
 	if (rc != 0) {
-		vy_stmt_unref(cur_key);
+		tuple_unref(cur_key);
 		return rc;
 	}
 
@@ -7951,10 +7840,10 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	 *  page lock
 	 */
 	struct key_def *key_def = itr->index->key_def;
-	int cmp = vy_stmt_compare(cur_key, next_key, itr->index->format, key_def);
-	vy_stmt_unref(cur_key);
+	int cmp = vy_stmt_compare(cur_key, next_key, key_def);
+	tuple_unref(cur_key);
 	cur_key = NULL;
-	vy_stmt_unref(next_key);
+	tuple_unref(next_key);
 	next_key = NULL;
 	itr->curr_pos = cmp == 0 ? next_pos : itr->curr_pos;
 	rc = cmp != 0;
@@ -7979,7 +7868,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static NODISCARD int
 vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct tuple *last_stmt, struct tuple **ret)
 {
 	assert(vitr->iface->restore == vy_run_iterator_restore);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
@@ -7998,13 +7887,13 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	/* Restoration is very similar to first search so we'll use that */
 	enum iterator_type save_type = itr->iterator_type;
-	const struct vy_stmt *save_key = itr->key;
+	const struct tuple *save_key = itr->key;
 	if (itr->iterator_type == ITER_GT || itr->iterator_type == ITER_EQ)
 		itr->iterator_type = ITER_GE;
 	else if (itr->iterator_type == ITER_LT)
 		itr->iterator_type = ITER_LE;
 	itr->key = last_stmt;
-	struct vy_stmt *next;
+	struct tuple *next;
 	rc = vy_run_iterator_start(itr, &next);
 	itr->iterator_type = save_type;
 	itr->key = save_key;
@@ -8013,31 +7902,28 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 	else if (next == NULL)
 		return 0;
 	struct key_def *def = itr->index->key_def;
-	struct tuple_format *format = itr->index->format;
 	bool position_changed = true;
-	if (vy_stmt_compare(next, last_stmt, format, def) == 0) {
+	if (vy_stmt_compare(next, last_stmt, def) == 0) {
 		position_changed = false;
-		if (next->lsn >= last_stmt->lsn) {
+		if (vy_stmt_lsn(next) >= vy_stmt_lsn(last_stmt)) {
 			/* skip the same stmt to next stmt or older version */
 			do {
-				rc = vy_run_iterator_next_lsn(vitr, next,
-							      &next);
+				rc = vy_run_iterator_next_lsn(vitr, &next);
 				if (rc != 0)
 					return rc;
 				if (next == NULL) {
 					rc = vy_run_iterator_next_key(vitr,
-								      next,
 								      &next);
 					if (rc != 0)
 						return rc;
 					break;
 				}
-			} while (next->lsn >= last_stmt->lsn);
+			} while (vy_stmt_lsn(next) >= vy_stmt_lsn(last_stmt));
 			if (next != NULL)
 				position_changed = true;
 		}
 	} else if (itr->iterator_type == ITER_EQ &&
-		   vy_stmt_compare(itr->key, next, format, def) != 0) {
+		   vy_stmt_compare(itr->key, next, def) != 0) {
 
 		itr->search_ended = true;
 		vy_run_iterator_cache_clean(itr);
@@ -8098,7 +7984,7 @@ struct vy_mem_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	const struct vy_stmt *key;
+	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const int64_t *vlsn;
 
@@ -8111,13 +7997,13 @@ struct vy_mem_iterator {
 	 * For example, cur_pos can be invalid but curr_stmt can point on a
 	 * valid statement.
 	 */
-	const struct vy_stmt *curr_stmt;
+	const struct tuple *curr_stmt;
 	/*
 	 * Copy of the statement returned from one of public methods
 	 * (restore/next_lsn/next_key). Need to store the copy, because can't
 	 * return region allocated curr_stmt.
 	 */
-	struct vy_stmt *last_stmt;
+	struct tuple *last_stmt;
 	/* data version from vy_mem */
 	uint32_t version;
 
@@ -8134,19 +8020,24 @@ static struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum iterator_type iterator_type, const struct vy_stmt *key,
+		     enum iterator_type iterator_type, const struct tuple *key,
 		     const int64_t *vlsn);
 
 /* }}} vy_mem_iterator API forward declaration */
 
 /* {{{ vy_mem_iterator support functions */
 
+/**
+ * Copy current statement into the out parameter. It is necessary
+ * because vy_mem stores its tuples in the lsregion allocated
+ * area, and lsregion tuples can't be referenced or unreferenced.
+ */
 static int
-vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct vy_stmt **ret)
+vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 {
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
-		vy_stmt_unref(itr->last_stmt);
+		tuple_unref(itr->last_stmt);
 	itr->last_stmt = vy_stmt_dup(itr->curr_stmt);
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL)
@@ -8157,7 +8048,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct vy_stmt **ret)
 /**
  * Get a stmt by current position
  */
-static const struct vy_stmt *
+static const struct tuple *
 vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 {
 	return *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
@@ -8195,12 +8086,10 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	struct key_def *key_def = itr->mem->key_def;
-	struct tuple_format *format = itr->mem->format;
-	while (itr->curr_stmt->lsn > *itr->vlsn) {
+	while (vy_stmt_lsn(itr->curr_stmt) > *itr->vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->iterator_type == ITER_EQ &&
-		     vy_stmt_compare(itr->key, itr->curr_stmt, format,
-				     key_def))) {
+		     vy_stmt_compare(itr->key, itr->curr_stmt, key_def))) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
@@ -8210,11 +8099,11 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 
 		while (!vy_mem_tree_iterator_is_invalid(&prev_pos)) {
-			const struct vy_stmt *prev_stmt =
+			const struct tuple *prev_stmt =
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
-			if (prev_stmt->lsn > *itr->vlsn ||
-			    vy_stmt_compare(itr->curr_stmt, prev_stmt, format,
+			if (vy_stmt_lsn(prev_stmt) > *itr->vlsn ||
+			    vy_stmt_compare(itr->curr_stmt, prev_stmt,
 					    key_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
@@ -8243,7 +8132,7 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	tree_key.stmt = itr->key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (vy_stmt_part_count(itr->key) > 0) {
+	if (tuple_field_count(itr->key) > 0) {
 		if (itr->iterator_type == ITER_EQ) {
 			bool exact;
 			itr->curr_pos =
@@ -8288,13 +8177,13 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 	if (itr->version == itr->mem->version)
 		return;
 	itr->version = itr->mem->version;
-	const struct vy_stmt * const *record;
+	const struct tuple * const *record;
 	record = vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
 	if (record != NULL && *record == itr->curr_stmt)
 		return;
 	struct tree_mem_key tree_key;
 	tree_key.stmt = itr->curr_stmt;
-	tree_key.lsn = itr->curr_stmt->lsn;
+	tree_key.lsn = vy_stmt_lsn(itr->curr_stmt);
 	bool exact;
 	itr->curr_pos = vy_mem_tree_lower_bound(&itr->mem->tree,
 						&tree_key, &exact);
@@ -8312,7 +8201,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 static void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 		     enum iterator_type iterator_type,
-		     const struct vy_stmt *key, const int64_t *vlsn)
+		     const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 
@@ -8322,7 +8211,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->vlsn = vlsn;
-	if (vy_stmt_part_count(key) == 0) {
+	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -8352,19 +8241,17 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	struct key_def *key_def = itr->mem->key_def;
-	struct tuple_format *format = itr->mem->format;
 
-	const struct vy_stmt *prev_stmt = itr->curr_stmt;
+	const struct tuple *prev_stmt = itr->curr_stmt;
 	do {
 		if (vy_mem_iterator_step(itr) != 0) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
-	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, format,
-				 key_def) == 0);
+	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, key_def) == 0);
 
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_stmt, format, key_def) != 0) {
+	    vy_stmt_compare(itr->key, itr->curr_stmt, key_def) != 0) {
 		itr->curr_stmt = NULL;
 		return 1;
 	}
@@ -8376,10 +8263,8 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
  * @retval 0 success or EOF (*ret == NULL)
  */
 static NODISCARD int
-vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)in;
 	assert(vitr->iface->next_key == vy_mem_iterator_next_key);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	*ret = NULL;
@@ -8411,10 +8296,9 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 	if (vy_mem_tree_iterator_is_invalid(&next_pos))
 		return 1; /* EOF */
 
-	const struct vy_stmt *next_stmt;
+	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_stmt_compare(itr->curr_stmt, next_stmt, itr->mem->format,
-			    key_def) == 0) {
+	if (vy_stmt_compare(itr->curr_stmt, next_stmt, key_def) == 0) {
 		itr->curr_pos = next_pos;
 		itr->curr_stmt = next_stmt;
 		return 0;
@@ -8427,10 +8311,8 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
  * @retval 0 success or EOF (*ret == NULL)
  */
 static NODISCARD int
-vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)in;
 	assert(vitr->iface->next_lsn == vy_mem_iterator_next_lsn);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	*ret = NULL;
@@ -8450,11 +8332,10 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static NODISCARD int
 vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct tuple *last_stmt, struct tuple **ret)
 {
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	struct key_def *def = itr->mem->key_def;
-	struct tuple_format *format = itr->mem->format;
 	int rc;
 	*ret = NULL;
 
@@ -8470,7 +8351,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 * that.
 		 */
 		enum iterator_type save_type = itr->iterator_type;
-		const struct vy_stmt *save_key = itr->key;
+		const struct tuple *save_key = itr->key;
 		if (itr->iterator_type == ITER_GT ||
 		    itr->iterator_type == ITER_EQ)
 			itr->iterator_type = ITER_GE;
@@ -8483,10 +8364,9 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (rc > 0) /* Search ended. */
 			return 0;
 		bool position_changed = true;
-		if (vy_stmt_compare(itr->curr_stmt, last_stmt, format,
-				    def) == 0) {
+		if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0) {
 			position_changed = false;
-			if (itr->curr_stmt->lsn >= last_stmt->lsn) {
+			if (vy_stmt_lsn(itr->curr_stmt) >= vy_stmt_lsn(last_stmt)) {
 				/*
 				 * Skip the same stmt to next stmt or older
 				 * version.
@@ -8499,13 +8379,13 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 					rc = vy_mem_iterator_next_key_impl(itr);
 					assert(rc >= 0);
 					break;
-				} while (itr->curr_stmt->lsn >=
-					 last_stmt->lsn);
+				} while (vy_stmt_lsn(itr->curr_stmt) >=
+					 vy_stmt_lsn(last_stmt));
 				if (itr->curr_stmt != NULL)
 					position_changed = true;
 			}
 		} else if (itr->iterator_type == ITER_EQ &&
-			   vy_stmt_compare(itr->key, itr->curr_stmt, format,
+			   vy_stmt_compare(itr->key, itr->curr_stmt,
 					   def) != 0) {
 			return true;
 		}
@@ -8523,7 +8403,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 
 	if (last_stmt == NULL || itr->curr_stmt == NULL) {
 		itr->version = itr->mem->version;
-		const struct vy_stmt *was_stmt = itr->curr_stmt;
+		const struct tuple *was_stmt = itr->curr_stmt;
 		itr->search_started = false;
 		itr->curr_stmt = NULL;
 		vy_mem_iterator_start(itr);
@@ -8539,14 +8419,15 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 			if (vy_mem_tree_iterator_is_invalid(&pos))
 				break;
-			const struct vy_stmt *t;
+			const struct tuple *t;
 			t = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							   &pos);
 			int cmp;
-			cmp = vy_stmt_compare(t, last_stmt, format, def);
-			if (cmp < 0 || (cmp == 0 && t->lsn >= last_stmt->lsn))
+			cmp = vy_stmt_compare(t, last_stmt, def);
+			if (cmp < 0 || (cmp == 0 &&
+			    vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt)))
 				break;
-			if (t->lsn <= *itr->vlsn) {
+			if (vy_stmt_lsn(t) <= *itr->vlsn) {
 				itr->curr_pos = pos;
 				itr->curr_stmt = t;
 				rc = 1;
@@ -8558,18 +8439,18 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
 	int cmp;
-	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, format, def);
-	int64_t break_lsn = cmp == 0 ? last_stmt->lsn : *itr->vlsn + 1;
+	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, def);
+	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) : *itr->vlsn + 1;
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 		if (vy_mem_tree_iterator_is_invalid(&pos))
 			break;
-		const struct vy_stmt *t;
+		const struct tuple *t;
 		t = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
 		int cmp;
-		cmp = vy_stmt_compare(t, itr->curr_stmt, format, def);
+		cmp = vy_stmt_compare(t, itr->curr_stmt, def);
 		assert(cmp <= 0);
-		if (cmp < 0 || t->lsn >= break_lsn)
+		if (cmp < 0 || vy_stmt_lsn(t) >= break_lsn)
 			break;
 		itr->curr_pos = pos;
 		itr->curr_stmt = t;
@@ -8589,7 +8470,7 @@ vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 	assert(vitr->iface->close == vy_mem_iterator_close);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	if (itr->last_stmt != NULL)
-		vy_stmt_unref(itr->last_stmt);
+		tuple_unref(itr->last_stmt);
 	TRASH(itr);
 }
 
@@ -8626,7 +8507,7 @@ struct vy_txw_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	const struct vy_stmt *key;
+	const struct tuple *key;
 
 	/* Last version of vy_tx */
 	uint32_t version;
@@ -8640,7 +8521,7 @@ static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
 		     enum iterator_type iterator_type,
-		     const struct vy_stmt *key);
+		     const struct tuple *key);
 
 static void
 vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
@@ -8657,7 +8538,7 @@ static void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_index *index, struct vy_tx *tx,
 		     enum iterator_type iterator_type,
-		     const struct vy_stmt *key)
+		     const struct tuple *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
 
@@ -8665,7 +8546,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 	itr->tx = tx;
 
 	itr->iterator_type = iterator_type;
-	if (vy_stmt_part_count(key) == 0) {
+	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
 				     iterator_type == ITER_LE ?
@@ -8683,7 +8564,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
  *  get/next.
  */
 static void
-vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
+vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
 	itr->search_started = true;
@@ -8692,8 +8573,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
 	struct key_def *key_def = itr->index->key_def;
-	struct tuple_format *format = itr->index->format;
-	if (vy_stmt_part_count(itr->key) > 0) {
+	if (tuple_field_count(itr->key) > 0) {
 		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->iterator_type == ITER_GE ||
@@ -8703,8 +8583,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 			txv = write_set_psearch(&itr->tx->write_set, &key);
 		if (txv == NULL || txv->index != itr->index)
 			return;
-		if (vy_stmt_compare(itr->key, txv->stmt, format,
-				    key_def) == 0) {
+		if (vy_stmt_compare(itr->key, txv->stmt, key_def) == 0) {
 			while (true) {
 				struct txv *next;
 				if (itr->iterator_type == ITER_LE ||
@@ -8715,7 +8594,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
 				if (next == NULL || next->index != itr->index)
 					break;
 				if (vy_stmt_compare(itr->key, next->stmt,
-						    format, key_def) != 0)
+						    key_def) != 0)
 					break;
 				txv = next;
 			}
@@ -8743,10 +8622,8 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct vy_stmt **ret)
  * @retval 0 success or EOF (*ret == NULL)
  */
 static NODISCARD int
-vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)in;
 	assert(vitr->iface->next_key == vy_txw_iterator_next_key);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 	*ret = NULL;
@@ -8765,7 +8642,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
 	if (itr->curr_txv != NULL && itr->curr_txv->index != itr->index)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL && itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_txv->stmt, itr->index->format,
+	    vy_stmt_compare(itr->key, itr->curr_txv->stmt,
 	    		    itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL)
@@ -8778,12 +8655,10 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  * @retval 0 EOF always
  */
 static NODISCARD int
-vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
-			 struct vy_stmt **ret)
+vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
 	assert(vitr->iface->next_lsn == vy_txw_iterator_next_lsn);
 	(void)vitr;
-	(void)in;
 	*ret = NULL;
 	return 0;
 }
@@ -8799,7 +8674,7 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct vy_stmt *in,
  */
 static int
 vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct vy_stmt *last_stmt, struct vy_stmt **ret)
+			const struct tuple *last_stmt, struct tuple **ret)
 {
 	assert(vitr->iface->restore == vy_txw_iterator_restore);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
@@ -8818,18 +8693,17 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
 	struct write_set_key key = { itr->index, last_stmt };
-	struct vy_stmt *was_stmt = itr->curr_txv != NULL ?
-				     itr->curr_txv->stmt : NULL;
+	struct tuple *was_stmt = itr->curr_txv != NULL ?
+				 itr->curr_txv->stmt : NULL;
 	itr->curr_txv = NULL;
 	struct txv *txv;
 	struct key_def *def = itr->index->key_def;
-	struct tuple_format *format = itr->index->format;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	else
 		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	if (txv != NULL && txv->index == itr->index &&
-	    vy_stmt_compare(txv->stmt, last_stmt, format, def) == 0) {
+	    vy_stmt_compare(txv->stmt, last_stmt, def) == 0) {
 		if (itr->iterator_type == ITER_LE ||
 		    itr->iterator_type == ITER_LT)
 			txv = write_set_prev(&itr->tx->write_set, txv);
@@ -8838,7 +8712,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	if (txv != NULL && txv->index == itr->index &&
 	    itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, txv->stmt, format, def) != 0)
+	    vy_stmt_compare(itr->key, txv->stmt, def) != 0)
 		txv = NULL;
 	if (txv == NULL || txv->index != itr->index) {
 		assert(was_stmt == NULL);
@@ -8894,7 +8768,7 @@ struct vy_merge_src {
 	 * stmt (optimization)
 	 */
 	uint32_t front_id;
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 };
 
 /**
@@ -8903,7 +8777,7 @@ struct vy_merge_src {
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 		       enum iterator_type iterator_type,
-		       const struct vy_stmt *key)
+		       const struct tuple *key)
 {
 	assert(key != NULL);
 	itr->index = index;
@@ -8924,7 +8798,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->unique_optimization =
 		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
 		 iterator_type == ITER_LE) &&
-		vy_stmt_part_count(key) >= index->key_def->part_count;
+		tuple_field_count(key) >= index->key_def->part_count;
 	itr->is_in_uniq_opt = false;
 	itr->search_started = false;
 	itr->range_ended = false;
@@ -8937,7 +8811,7 @@ static void
 vy_merge_iterator_close(struct vy_merge_iterator *itr)
 {
 	if (itr->curr_stmt != NULL) {
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 	}
 	for (size_t i = 0; i < itr->src_count; i++)
@@ -9056,7 +8930,6 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
 		if (src->front_id != itr->front_id)
 			continue;
 		int rc = src->iterator.iface->next_key(&itr->src[i].iterator,
-						       itr->curr_stmt,
 						       &itr->src[i].stmt);
 		if (rc != 0)
 			return rc;
@@ -9078,14 +8951,14 @@ vy_merge_iterator_propagate(struct vy_merge_iterator *itr)
  */
 static NODISCARD int
 vy_merge_iterator_locate_uniq_opt(struct vy_merge_iterator *itr,
-				  struct vy_stmt **ret)
+				  struct tuple **ret)
 {
 	assert(itr->src_count);
 	*ret = NULL;
 	itr->range_ended = false;
 	itr->search_started = true;
 	itr->unique_optimization = false;
-	struct vy_stmt *min_stmt;
+	struct tuple *min_stmt;
 	int order = (itr->iterator_type == ITER_LE ||
 		     itr->iterator_type == ITER_LT ? -1 : 1);
 restart:
@@ -9093,13 +8966,12 @@ restart:
 	min_stmt = NULL;
 	itr->curr_src = UINT32_MAX;
 	struct key_def *def = itr->index->key_def;
-	struct tuple_format *format = itr->index->format;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
 		struct vy_merge_src *src = &itr->src[i];
 		struct vy_stmt_iterator *sub_itr = &src->iterator;
-		struct vy_stmt *t;
+		struct tuple *t;
 		/*
 		 * If the tuple of the current source is not set then
 		 * either EOF reached or the source iterator is not started.
@@ -9107,32 +8979,31 @@ restart:
 		 */
 		if (src->stmt == NULL) {
 			int rc;
-			rc = sub_itr->iface->next_key(sub_itr, itr->curr_stmt,
-						      &src->stmt);
+			rc = sub_itr->iface->next_key(sub_itr, &src->stmt);
 			if (rc != 0)
 				return rc;
 		}
 		t = src->stmt;
 		if (t == NULL)
 			continue;
-		if (vy_stmt_compare(itr->key, t, format, def) == 0) {
+		if (vy_stmt_compare(itr->key, t, def) == 0) {
 			src->front_id = ++itr->front_id;
 			min_stmt = t;
-			vy_stmt_ref(t);
+			tuple_ref(t);
 			itr->curr_src = i;
 			itr->is_in_uniq_opt = true;
 			break;
 		}
 		int cmp = min_stmt == NULL ? -1 :
-			  order * vy_stmt_compare(t, min_stmt, format, def);
+			  order * vy_stmt_compare(t, min_stmt, def);
 		if (cmp == 0) {
 			src->front_id = itr->front_id;
 		} else if (cmp < 0) {
 			src->front_id = ++itr->front_id;
 			if (min_stmt != NULL)
-				vy_stmt_unref(min_stmt);
+				tuple_unref(min_stmt);
 			min_stmt = t;
-			vy_stmt_ref(t);
+			tuple_ref(t);
 			itr->curr_src = i;
 		}
 	}
@@ -9150,7 +9021,7 @@ restart:
 	if (must_restart)
 		goto restart;
 	if (itr->curr_stmt != NULL)
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = min_stmt;
 	*ret = min_stmt;
 	if (vy_merge_iterator_check_version(itr))
@@ -9169,7 +9040,7 @@ restart:
  */
 static NODISCARD int
 vy_merge_iterator_locate(struct vy_merge_iterator *itr,
-			 struct vy_stmt **ret)
+			 struct tuple **ret)
 {
 	*ret = NULL;
 	if (itr->src_count == 0)
@@ -9177,7 +9048,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 	if (itr->unique_optimization)
 		return vy_merge_iterator_locate_uniq_opt(itr, ret);
 	itr->search_started = true;
-	struct vy_stmt *min_stmt = NULL;
+	struct tuple *min_stmt = NULL;
 	itr->curr_src = UINT32_MAX;
 	itr->range_ended = true;
 	int order = (itr->iterator_type == ITER_LE ||
@@ -9187,7 +9058,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			return -2;
 		struct vy_merge_src *src = &itr->src[i];
 		struct vy_stmt_iterator *sub_itr = &src->iterator;
-		struct vy_stmt *t;
+		struct tuple *t;
 		int rc = 0;
 		if (src->is_mutable) {
 			rc = sub_itr->iface->restore(sub_itr, itr->curr_stmt,
@@ -9198,8 +9069,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			if (vy_merge_iterator_check_version(itr))
 				return -2;
 		} else if (src->stmt == NULL) {
-			rc = sub_itr->iface->next_key(sub_itr, itr->curr_stmt,
-						      &src->stmt);
+			rc = sub_itr->iface->next_key(sub_itr, &src->stmt);
 		}
 		if (rc != 0)
 			return rc;
@@ -9208,7 +9078,7 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 			continue;
 		itr->range_ended = itr->range_ended && !src->belong_range;
 		int cmp = min_stmt == NULL ? -1 :
-			order * vy_stmt_compare(t, min_stmt, itr->index->format,
+			order * vy_stmt_compare(t, min_stmt,
 						itr->index->key_def);
 		if (cmp <= 0) {
 			itr->front_id += cmp < 0;
@@ -9218,10 +9088,10 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
 		}
 	}
 	if (itr->curr_stmt != NULL)
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = min_stmt;
 	if (itr->curr_stmt != NULL)
-		vy_stmt_ref(itr->curr_stmt);
+		tuple_ref(itr->curr_stmt);
 	*ret = min_stmt;
 	if (vy_merge_iterator_check_version(itr))
 		return -2;
@@ -9235,10 +9105,8 @@ vy_merge_iterator_locate(struct vy_merge_iterator *itr,
  * @retval -2 iterator is not valid anymore
  */
 static NODISCARD int
-vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt *in,
-			   struct vy_stmt **ret)
+vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 {
-	(void)in;
 	int rc;
 	*ret = NULL;
 	if (!itr->search_started)
@@ -9262,10 +9130,8 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct vy_stmt *in,
  * @retval -2 iterator is not valid anymore
  */
 static NODISCARD int
-vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
-			   struct vy_stmt **ret)
+vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 {
-	(void)in;
 	int rc;
 	*ret = NULL;
 	if (!itr->search_started)
@@ -9273,17 +9139,16 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 	if (itr->curr_src == UINT32_MAX)
 		return 0;
 	struct vy_stmt_iterator *sub_itr = &itr->src[itr->curr_src].iterator;
-	rc = sub_itr->iface->next_lsn(sub_itr, itr->curr_stmt,
-				      &itr->src[itr->curr_src].stmt);
+	rc = sub_itr->iface->next_lsn(sub_itr, &itr->src[itr->curr_src].stmt);
 	if (rc != 0) {
 		return rc;
 	} else if (itr->src[itr->curr_src].stmt) {
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
 		if (itr->curr_stmt != NULL)
-			vy_stmt_unref(itr->curr_stmt);
+			tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = itr->src[itr->curr_src].stmt;
-		vy_stmt_ref(itr->curr_stmt);
+		tuple_ref(itr->curr_stmt);
 		*ret = itr->curr_stmt;
 		return 0;
 	}
@@ -9292,10 +9157,10 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 			return -2;
 		if (itr->is_in_uniq_opt) {
 			sub_itr = &itr->src[i].iterator;
-			struct vy_stmt *t;
+			struct tuple *t;
 			t = itr->src[i].stmt;
 			if (t == NULL) {
-				rc = sub_itr->iface->next_lsn(sub_itr, itr->curr_stmt,
+				rc = sub_itr->iface->next_lsn(sub_itr,
 							      &itr->src[i].stmt);
 				if (rc != 0)
 					return rc;
@@ -9303,14 +9168,14 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 					continue;
 				t = itr->src[i].stmt;
 			}
-			if (vy_stmt_compare(itr->key, t, itr->index->format,
+			if (vy_stmt_compare(itr->key, t,
 					    itr->index->key_def) == 0) {
 				itr->src[i].front_id = itr->front_id;
 				itr->curr_src = i;
 				if (itr->curr_stmt != NULL)
-					vy_stmt_unref(itr->curr_stmt);
+					tuple_unref(itr->curr_stmt);
 				itr->curr_stmt = t;
-				vy_stmt_ref(t);
+				tuple_ref(t);
 				*ret = t;
 				return 0;
 			}
@@ -9319,11 +9184,11 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
 			sub_itr = &itr->src[i].iterator;
 			itr->curr_src = i;
 			if (itr->curr_stmt != NULL) {
-				vy_stmt_unref(itr->curr_stmt);
+				tuple_unref(itr->curr_stmt);
 				itr->curr_stmt = NULL;
 			}
 			itr->curr_stmt = itr->src[i].stmt;
-			vy_stmt_ref(itr->curr_stmt);
+			tuple_ref(itr->curr_stmt);
 			*ret = itr->curr_stmt;
 			return 0;
 		}
@@ -9342,29 +9207,27 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct vy_stmt *in,
  */
 static NODISCARD int
 vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
-				struct vy_stmt *in,
-				struct vy_stmt **ret,
-				bool suppress_error)
+				struct tuple **ret, bool suppress_error)
 {
 	*ret = NULL;
-	struct vy_stmt *t = itr->curr_stmt;
+	struct tuple *t = itr->curr_stmt;
 	struct key_def *def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
 	if (t == NULL)
 		return 0;
-	vy_stmt_ref(t);
-	while (t->type == IPROTO_UPSERT) {
-		struct vy_stmt *next;
-		int rc = vy_merge_iterator_next_lsn(itr, in, &next);
+	tuple_ref(t);
+	while (vy_stmt_type(t) == IPROTO_UPSERT) {
+		struct tuple *next;
+		int rc = vy_merge_iterator_next_lsn(itr, &next);
 		if (rc != 0) {
-			vy_stmt_unref(t);
+			tuple_unref(t);
 			return rc;
 		}
 		if (next == NULL)
 			break;
-		struct vy_stmt *applied;
+		struct tuple *applied;
 		applied = vy_apply_upsert(t, next, def, format, suppress_error);
-		vy_stmt_unref(t);
+		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
 		t = applied;
@@ -9379,7 +9242,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
  */
 static NODISCARD int
 vy_merge_iterator_restore(struct vy_merge_iterator *itr,
-			  const struct vy_stmt *last_stmt)
+			  const struct tuple *last_stmt)
 {
 	itr->unique_optimization = false;
 	itr->is_in_uniq_opt = false;
@@ -9511,8 +9374,8 @@ struct vy_write_iterator {
 	bool is_last_level;
 	/* On the next iteration we must move to the next key */
 	bool goto_next_key;
-	struct vy_stmt *key;
-	struct vy_stmt *tmp_stmt;
+	struct tuple *key;
+	struct tuple *tmp_stmt;
 	struct vy_merge_iterator mi;
 };
 
@@ -9528,7 +9391,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_new_select(NULL, 0);
+	wi->key = vy_stmt_new_select(index->format, NULL, 0);
 	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key);
 }
 
@@ -9581,7 +9444,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
  * of statements to write to the output.
  */
 static NODISCARD int
-vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
+vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 {
 	/*
 	 * Nullify the result stmt. If the next stmt is not
@@ -9598,48 +9461,48 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct vy_stmt **ret)
 	 * it must dereference the created stmt here.
 	 */
 	if (wi->tmp_stmt)
-		vy_stmt_unref(wi->tmp_stmt);
+		tuple_unref(wi->tmp_stmt);
 	wi->tmp_stmt = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
-	struct vy_stmt *stmt = NULL;
+	struct tuple *stmt = NULL;
 	struct key_def *def = wi->index->key_def;
 	struct tuple_format *format = wi->index->format;
 	/* @sa vy_write_iterator declaration for the algorithm description. */
 	while (true) {
 		if (wi->goto_next_key) {
 			wi->goto_next_key = false;
-			if (vy_merge_iterator_next_key(mi, NULL, &stmt))
+			if (vy_merge_iterator_next_key(mi, &stmt))
 				return -1;
 		} else {
-			if (vy_merge_iterator_next_lsn(mi, NULL, &stmt))
+			if (vy_merge_iterator_next_lsn(mi, &stmt))
 				return -1;
 			if (stmt == NULL &&
-			    vy_merge_iterator_next_key(mi, NULL, &stmt))
+			    vy_merge_iterator_next_key(mi, &stmt))
 				return -1;
 		}
 		if (stmt == NULL)
 			return 0;
-		if (stmt->lsn > wi->oldest_vlsn)
+		if (vy_stmt_lsn(stmt) > wi->oldest_vlsn)
 			break; /* Save the current stmt as the result. */
 		wi->goto_next_key = true;
-		if (stmt->type == IPROTO_DELETE && wi->is_last_level)
+		if (vy_stmt_type(stmt) == IPROTO_DELETE && wi->is_last_level)
 			continue; /* Skip unnecessary DELETE */
-		if (stmt->type == IPROTO_REPLACE ||
-		    stmt->type == IPROTO_DELETE)
+		if (vy_stmt_type(stmt) == IPROTO_REPLACE ||
+		    vy_stmt_type(stmt) == IPROTO_DELETE)
 			break; /* It's the resulting statement */
 
 		/* Squash upserts */
-		assert(stmt->type == IPROTO_UPSERT);
-		if (vy_merge_iterator_squash_upsert(mi, NULL, &stmt, false)) {
-			vy_stmt_unref(stmt);
+		assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
+		if (vy_merge_iterator_squash_upsert(mi, &stmt, false)) {
+			tuple_unref(stmt);
 			return -1;
 		}
-		if (stmt->type == IPROTO_UPSERT && wi->is_last_level) {
+		if (vy_stmt_type(stmt) == IPROTO_UPSERT && wi->is_last_level) {
 			/* Turn UPSERT to REPLACE. */
-			struct vy_stmt *applied;
+			struct tuple *applied;
 			applied = vy_apply_upsert(stmt, NULL, def, format,
 						  false);
-			vy_stmt_unref(stmt);
+			tuple_unref(stmt);
 			if (applied == NULL)
 				return -1;
 			stmt = applied;
@@ -9655,7 +9518,7 @@ static void
 vy_write_iterator_close(struct vy_write_iterator *wi)
 {
 	if (wi->tmp_stmt) {
-		vy_stmt_unref(wi->tmp_stmt);
+		tuple_unref(wi->tmp_stmt);
 	}
 	wi->tmp_stmt = NULL;
 	vy_merge_iterator_close(&wi->mi);
@@ -9665,7 +9528,7 @@ static void
 vy_write_iterator_delete(struct vy_write_iterator *wi)
 {
 	vy_write_iterator_close(wi);
-	vy_stmt_unref(wi->key);
+	tuple_unref(wi->key);
 	free(wi);
 }
 
@@ -9762,10 +9625,9 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
  * Open the iterator.
  */
 static void
-vy_read_iterator_open(struct vy_read_iterator *itr,
-		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type,
-		      const struct vy_stmt *key, const int64_t *vlsn,
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+		      struct vy_tx *tx, enum iterator_type iterator_type,
+		      const struct tuple *key, const int64_t *vlsn,
 		      bool only_disk)
 {
 	itr->index = index;
@@ -9828,13 +9690,12 @@ restart:
  */
 static NODISCARD int
 vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
-				struct vy_stmt **ret)
+				struct tuple **ret)
 {
 	int rc;
 	*ret = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
-	while ((rc = vy_merge_iterator_next_key(mi,
-						itr->curr_stmt, ret)) == -2) {
+	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2) {
 		if (vy_read_iterator_restore(itr) < 0)
 			return -1;
 		/* Check if the iterator is restored not on the same key. */
@@ -9855,7 +9716,6 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 			 * then go to the next.
 			 */
 			if (vy_stmt_compare(itr->curr_stmt, *ret,
-					    itr->index->format,
 					    itr->index->key_def) == 0)
 				continue;
 			/* Else return the new key. */
@@ -9872,7 +9732,7 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
  * return -1 : read error
  */
 static NODISCARD int
-vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
+vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
 	assert(itr->curr_range != NULL);
@@ -9881,7 +9741,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
-	struct vy_stmt *stmt = NULL;
+	struct tuple *stmt = NULL;
 	int rc = vy_read_iterator_merge_next_key(itr, &stmt);
 	if (rc < 0)
 		return -1;
@@ -9893,12 +9753,12 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct vy_stmt **ret)
 }
 
 static NODISCARD int
-vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_stmt **result)
+vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
 	if (!itr->search_started)
 		vy_read_iterator_start(itr);
 	*result = NULL;
-	struct vy_stmt *t = NULL;
+	struct tuple *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
 	struct key_def *def = itr->index->key_def;
 	struct tuple_format *format = itr->index->format;
@@ -9911,42 +9771,39 @@ restart:
 			return -1;
 		if (t == NULL)
 			return 0; /* No more data. */
-		int rc = vy_merge_iterator_squash_upsert(mi, itr->curr_stmt,
-							 &t, true);
+		int rc = vy_merge_iterator_squash_upsert(mi, &t, true);
 		if (rc != 0) {
 			if (rc == -1)
 				return -1;
 			do {
 				if (vy_read_iterator_restore(itr) < 0)
 					return -1;
-				rc = vy_merge_iterator_next_lsn(mi,
-								itr->curr_stmt,
-								&t);
+				rc = vy_merge_iterator_next_lsn(mi, &t);
 			} while (rc == -2);
 			if (rc != 0)
 				return -1;
 			goto restart;
 		}
 		assert(t != NULL);
-		if (t->type != IPROTO_DELETE) {
-			if (t->type == IPROTO_UPSERT) {
-				struct vy_stmt *applied;
+		if (vy_stmt_type(t) != IPROTO_DELETE) {
+			if (vy_stmt_type(t) == IPROTO_UPSERT) {
+				struct tuple *applied;
 				applied = vy_apply_upsert(t, NULL, def, format,
 							  true);
-				vy_stmt_unref(t);
+				tuple_unref(t);
 				t = applied;
-				assert(t->type == IPROTO_REPLACE);
+				assert(vy_stmt_type(t) == IPROTO_REPLACE);
 			}
 			if (itr->curr_stmt != NULL)
-				vy_stmt_unref(itr->curr_stmt);
+				tuple_unref(itr->curr_stmt);
 			itr->curr_stmt = t;
 			break;
 		} else {
-			vy_stmt_unref(t);
+			tuple_unref(t);
 		}
 	}
 	*result = itr->curr_stmt;
-	assert(*result == NULL || (*result)->type == IPROTO_REPLACE);
+	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
 	return 0;
 }
 
@@ -9957,7 +9814,7 @@ static void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
 	if (itr->curr_stmt != NULL)
-		vy_stmt_unref(itr->curr_stmt);
+		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
 	if (itr->search_started)
 		vy_merge_iterator_close(&itr->merge_iterator);
@@ -9974,8 +9831,8 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	int rc = 0;
 
 	struct vy_read_iterator ri;
-	struct vy_stmt *stmt;
-	struct vy_stmt *key = vy_stmt_new_select(NULL, 0);
+	struct tuple *stmt;
+	struct tuple *key = vy_stmt_new_select(index->format, NULL, 0);
 	if (key == NULL)
 		return -1;
 	vy_read_iterator_open(&ri, index, NULL, ITER_GT, key, &vlsn, true);
@@ -9983,14 +9840,14 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
 		uint32_t mp_size;
 		const char *mp_data;
-		mp_data = vy_tuple_data_range(stmt, &mp_size);
-		int64_t lsn = stmt->lsn;
+		mp_data = tuple_data_range(stmt, &mp_size);
+		int64_t lsn = vy_stmt_lsn(stmt);
 		rc = sendrow(ctx, mp_data, mp_size, lsn);
 		if (rc != 0)
 			break;
 	}
 	vy_read_iterator_close(&ri);
-	vy_stmt_unref(key);
+	tuple_unref(key);
 	return rc;
 }
 
@@ -10007,7 +9864,7 @@ struct vy_squash {
 	/** Index this request is for. */
 	struct vy_index *index;
 	/** Key to squash upserts for. */
-	struct vy_stmt *stmt;
+	struct tuple *stmt;
 };
 
 struct vy_squash_queue {
@@ -10023,7 +9880,7 @@ struct vy_squash_queue {
 
 static struct vy_squash *
 vy_squash_new(struct mempool *pool, struct vy_index *index,
-	      struct vy_stmt *stmt)
+	      struct tuple *stmt)
 {
 	struct vy_squash *squash;
 	squash = mempool_alloc(pool);
@@ -10031,7 +9888,7 @@ vy_squash_new(struct mempool *pool, struct vy_index *index,
 		return NULL;
 	vy_index_ref(index);
 	squash->index = index;
-	vy_stmt_ref(stmt);
+	tuple_ref(stmt);
 	squash->stmt = stmt;
 	return squash;
 }
@@ -10040,7 +9897,7 @@ static void
 vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 {
 	vy_index_unref(squash->index);
-	vy_stmt_unref(squash->stmt);
+	tuple_unref(squash->stmt);
 	mempool_free(pool, squash);
 }
 
@@ -10056,7 +9913,7 @@ vy_squash_process(struct vy_squash *squash)
 	const int64_t lsn = INT64_MAX;
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
 			      squash->stmt, &lsn, false);
-	struct vy_stmt *result;
+	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc != 0) {
 		vy_read_iterator_close(&itr);
@@ -10066,12 +9923,12 @@ vy_squash_process(struct vy_squash *squash)
 		return 0;
 	}
 
-	vy_stmt_ref(result);
+	tuple_ref(result);
 	vy_read_iterator_close(&itr);
 
 	struct vy_range *range;
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-					  format, key_def, result);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, key_def,
+					  result);
 	/*
 	 * While we were reading on-disk runs, new statements could
 	 * have been inserted into the in-memory tree. Apply them to
@@ -10080,24 +9937,24 @@ vy_squash_process(struct vy_squash *squash)
 	struct vy_mem *mem = range->mem;
 	struct tree_mem_key tree_key = {
 		.stmt = result,
-		.lsn = result->lsn,
+		.lsn = vy_stmt_lsn(result),
 	};
 	struct vy_mem_tree_iterator mem_itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
 	assert(!vy_mem_tree_iterator_is_invalid(&mem_itr));
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		const struct vy_stmt *mem_stmt =
+		const struct tuple *mem_stmt =
 			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_compare(result, mem_stmt, format, key_def) != 0)
+		if (vy_stmt_compare(result, mem_stmt, key_def) != 0)
 			break;
-		struct vy_stmt *applied;
-		if (mem_stmt->type == IPROTO_UPSERT)
-			applied = vy_apply_upsert(mem_stmt, result,
-					    key_def, format, true);
+		struct tuple *applied;
+		if (vy_stmt_type(mem_stmt) == IPROTO_UPSERT)
+			applied = vy_apply_upsert(mem_stmt, result, key_def,
+						  format, true);
 		else
 			applied = vy_stmt_dup(mem_stmt);
-		vy_stmt_unref(result);
+		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
 		result = applied;
@@ -10112,7 +9969,7 @@ vy_squash_process(struct vy_squash *squash)
 	rc = vy_range_set(range, result, env->xm->lsn);
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_stmt_unref(result);
+	tuple_unref(result);
 	if (rc == 0)
 		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
@@ -10170,7 +10027,7 @@ vy_squash_queue_f(va_list va)
  * statement after it. Done in a background fiber.
  */
 static void
-vy_index_squash_upserts(struct vy_index *index, struct vy_stmt *stmt)
+vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt)
 {
 	struct key_def *key_def = index->key_def;
 	struct vy_squash_queue *sq = index->env->squash_queue;
@@ -10211,7 +10068,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return NULL;
 	}
 	assert(part_count <= index->key_def->part_count);
-	c->key = vy_stmt_new_select(key, part_count);
+	c->key = vy_stmt_new_select(index->format, key, part_count);
 	if (c->key == NULL) {
 		mempool_free(&e->cursor_pool, c);
 		return NULL;
@@ -10267,7 +10124,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 int
 vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 {
-	struct vy_stmt *vyresult = NULL;
+	struct tuple *vyresult = NULL;
 	struct vy_index *index = c->index;
 	struct key_def *def = index->key_def;
 	assert(index->space->index_count > 0);
@@ -10288,15 +10145,20 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 		return -1;
 	if (vyresult == NULL)
 		return 0;
-	if (c->need_check_eq && vy_stmt_compare_with_key(vyresult, c->key,
-							 index->format, def))
+	if (c->need_check_eq && vy_stmt_compare_with_key(vyresult, c->key, def))
 		return 0;
 	if (def->iid > 0 && vy_index_full_by_stmt(c->tx, index, vyresult,
 						  &vyresult))
 		return -1;
-	*result = vy_convert_replace(index->space, vyresult);
-	if (def->iid > 0)
-		vy_stmt_unref(vyresult);
+	*result = vyresult;
+	/**
+	 * If the index is not primary (def->iid != 0) then no
+	 * need to reference the tuple, because it is returned
+	 * from vy_index_full_by_stmt() as new statement with 1
+	 * reference.
+	 */
+	if (def->iid == 0)
+		tuple_ref(vyresult);
 	return *result != NULL ? 0 : -1;
 }
 
@@ -10318,7 +10180,7 @@ vy_cursor_delete(struct vy_cursor *c)
 		}
 	}
 	if (c->key)
-		vy_stmt_unref(c->key);
+		tuple_unref(c->key);
 	vy_index_unref(c->index);
 	vy_stat_cursor(e->stat, c->start, c->n_reads);
 	TRASH(c);

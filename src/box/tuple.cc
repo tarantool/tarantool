@@ -387,12 +387,7 @@ int
 box_tuple_ref(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
-	try {
-		tuple_ref(tuple);
-		return 0;
-	} catch (Exception *e) {
-		return -1;
-	}
+	return tuple_ref(tuple);
 }
 
 void
@@ -450,7 +445,7 @@ box_tuple_iterator(box_tuple_t *tuple)
 	} catch (Exception *e) {
 		return NULL;
 	}
-	tuple_ref(tuple);
+	tuple_ref_xc(tuple);
 	tuple_rewind(it, tuple);
 	return it;
 }

@@ -189,6 +189,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 /**
  * Execute INSERT in a vinyl space.
  * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with the new
+ *                statement.
  * @param space   Vinyl space.
  * @param request Request with the tuple data and update
  *                operations.
@@ -198,7 +200,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            index is not found
  */
 int
-vy_insert(struct vy_tx *tx, struct space *space, struct request *request);
+vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	  struct request *request);
 
 /**
  * Execute UPSERT in a vinyl space.

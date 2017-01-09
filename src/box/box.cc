@@ -761,7 +761,7 @@ space_truncate(struct space *space)
 			tuple_unref(indexes[i]);
 	});
 	while ((tuple = it->next(it)) != NULL) {
-		tuple_ref(tuple);
+		tuple_ref_xc(tuple);
 		indexes[index_count++] = tuple;
 	}
 	assert(index_count <= BOX_INDEX_MAX);

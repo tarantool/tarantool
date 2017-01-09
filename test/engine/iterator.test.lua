@@ -260,7 +260,7 @@ inspector:cmd("clear filter")
 --
 -- gh-1875 Add support for index:pairs(key, iterator-type) syntax
 --
-space = box.schema.space.create('test', {engine='vinyl'})
+space = box.schema.space.create('test', {engine=engine})
 pk = space:create_index('pk')
 space:auto_increment{1}
 space:auto_increment{2}

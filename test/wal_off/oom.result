@@ -27,7 +27,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 space:len() > 5000;
 ---
@@ -41,7 +41,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 space:len() > 5000;
 ---
@@ -55,7 +55,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 test_run:cmd("setopt delimiter ''");
 ---
@@ -250,7 +250,7 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 definitely_used = index:count() * 16 * 1024
 ---
@@ -275,7 +275,7 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 definitely_used = index:count() * 16 * 1024
 ---

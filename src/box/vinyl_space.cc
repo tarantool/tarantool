@@ -92,18 +92,13 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		if (vy_insert(tx, space, request))
+		if (vy_insert(tx, stmt, space, request))
 			diag_raise();
 	} else {
 		if (vy_replace(tx, stmt, space, request))
 			diag_raise();
 	}
-
-	stmt->new_tuple = vy_tuple_new(space->format, request->tuple,
-				       request->tuple_end);
-	if (stmt->new_tuple == NULL)
-		diag_raise();
-	tuple_ref(stmt->new_tuple);
+	assert(stmt->new_tuple != NULL);
 	return stmt->new_tuple;
 }
 

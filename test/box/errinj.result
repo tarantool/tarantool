@@ -333,7 +333,7 @@ errinj.set("ERRINJ_TUPLE_ALLOC", true)
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -341,7 +341,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -349,7 +349,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -363,7 +363,7 @@ box.begin()
     s:insert{1}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---
@@ -374,7 +374,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---
@@ -385,7 +385,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---
@@ -401,7 +401,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for tuple
+- error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---

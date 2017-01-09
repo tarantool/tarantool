@@ -31,7 +31,9 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-
+#include "say.h"
+#include "diag.h"
+#include "error.h"
 #include "tuple_format.h"
 
 #if defined(__cplusplus)
@@ -270,14 +272,6 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
  */
 struct PACKED tuple
 {
-	/*
-	 * sic: the header of the tuple is used
-	 * to store a free list pointer in smfree_delayed.
-	 * Please don't change it without understanding
-	 * how smfree_delayed and snapshotting COW works.
-	 */
-	/** snapshot generation version */
-	uint32_t version;
 	/** reference counter */
 	uint16_t refs;
 	/** format identifier */
@@ -287,11 +281,13 @@ struct PACKED tuple
 	 * tuple.
 	 */
 	uint32_t bsize;
-	/** Offsets count before MessagePack data. */
+	/**
+	 * Offset to the MessagePack from the begin of the tuple.
+	 */
 	uint16_t data_offset;
 	/**
-	 * Offsets array concatenated with MessagePack fields
-	 * array.
+	 * Engine specific fields and offsets array concatenated
+	 * with MessagePack fields array.
 	 * char raw[0];
 	 */
 };
@@ -569,27 +565,23 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
 	return deflt;
 }
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "tuple_update.h"
-#include "errinj.h"
-
 enum { TUPLE_REF_MAX = UINT16_MAX };
 
 /**
  * Increment tuple reference counter.
- * Throws if overflow detected.
- *
- * @pre tuple->refs + count >= 0
+ * @param tuple Tuple to reference.
+ * @retval  0 Success.
+ * @retval -1 Too many refs error.
  */
-inline void
+static inline int
 tuple_ref(struct tuple *tuple)
 {
-	if (tuple->refs + 1 > TUPLE_REF_MAX)
-		tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
-
+	if (tuple->refs + 1 > TUPLE_REF_MAX) {
+		diag_set(ClientError, ER_TUPLE_REF_OVERFLOW);
+		return -1;
+	}
 	tuple->refs++;
+	return 0;
 }
 
 /**
@@ -597,7 +589,7 @@ tuple_ref(struct tuple *tuple)
  *
  * @pre tuple->refs + count >= 0
  */
-inline void
+static inline void
 tuple_unref(struct tuple *tuple)
 {
 	assert(tuple->refs - 1 >= 0);
@@ -608,11 +600,25 @@ tuple_unref(struct tuple *tuple)
 		tuple_delete(tuple);
 }
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "tuple_update.h"
+#include "errinj.h"
+
+/** @sa tuple_ref(). Throws if overflow detected. */
+static inline void
+tuple_ref_xc(struct tuple *tuple)
+{
+	if (tuple_ref(tuple))
+		diag_raise();
+}
+
 /** Make tuple references exception-friendly in absence of @finally. */
 struct TupleRefNil {
 	struct tuple *tuple;
 	TupleRefNil (struct tuple *arg) :tuple(arg)
-	{ if (tuple) tuple_ref(tuple); }
+	{ if (tuple) tuple_ref_xc(tuple); }
 	~TupleRefNil() { if (tuple) tuple_unref(tuple); }
 
 	TupleRefNil(const TupleRefNil&) = delete;

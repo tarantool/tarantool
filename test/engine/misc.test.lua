@@ -12,12 +12,15 @@ s:insert{5, 8, 13}
 i2:update({2}, {{'+', 3, 3}})
 tmp = i2:delete{8}
 inspector:cmd("restart server default")
+test_run = require('test_run')
+inspector = test_run.new()
+engine = inspector:get_cfg('engine')
 box.space.test:select{}
 box.space.test:drop()
 
 -- https://github.com/tarantool/tarantool/issues/1435
 -- Truncate does not work
-_ = box.schema.space.create('t5',{engine='vinyl'})
+_ = box.schema.space.create('t5',{engine=engine})
 _ = box.space.t5:create_index('primary')
 box.space.t5:insert{44}
 box.space.t5:truncate()
