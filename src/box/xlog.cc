@@ -1506,7 +1506,7 @@ int
 xlog_cursor_next_tx(struct xlog_cursor *i)
 {
 	int rc;
-	assert(i->eof_read == false);
+	assert(i->state != XLOG_CURSOR_EOF);
 
 	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
@@ -1516,7 +1516,7 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		return 1;
 	if (load_u32(i->rbuf.rpos) == eof_marker) {
 		/* eof marker found */
-		i->eof_read = true;
+		i->state = XLOG_CURSOR_EOF;
 		goto eof;
 	}
 
@@ -1534,10 +1534,10 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 	if (to_load < 0)
 		return -1;
 
-	i->is_opened = true;
+	i->state = XLOG_CURSOR_TX;
 	return 0;
 eof:
-	if (i->eof_read) {
+	if (i->state == XLOG_CURSOR_EOF) {
 		/* eof marker readen, check that no more data in file */
 		rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
 
@@ -1556,11 +1556,11 @@ eof:
 int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 {
-	if (!cursor->is_opened)
+	if (cursor->state != XLOG_CURSOR_TX)
 		return 1;
 	int rc = xlog_tx_cursor_next_row(&cursor->tx_cursor, xrow);
 	if (rc != 0) {
-		cursor->is_opened = false;
+		cursor->state = XLOG_CURSOR_ACTIVE;
 		xlog_tx_cursor_destroy(&cursor->tx_cursor);
 	}
 	return rc;
@@ -1571,7 +1571,6 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 {
 	memset(i, 0, sizeof(*i));
 	i->fd = fd;
-	i->eof_read = false;
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
@@ -1599,6 +1598,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 			 "failed to create context");
 		goto error;
 	}
+	i->state = XLOG_CURSOR_ACTIVE;
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -1627,7 +1627,6 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 {
 	memset(i, 0, sizeof(*i));
 	i->fd = -1;
-	i->eof_read = false;
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
@@ -1656,6 +1655,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 			 "failed to create context");
 		goto error;
 	}
+	i->state = XLOG_CURSOR_ACTIVE;
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -1668,10 +1668,11 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 	if (i->fd >= 0 && !reuse_fd)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
-	if (i->is_opened)
+	if (i->state == XLOG_CURSOR_TX)
 		xlog_tx_cursor_destroy(&i->tx_cursor);
 	ZSTD_freeDStream(i->zdctx);
 	TRASH(i);
+	i->state = XLOG_CURSOR_CLOSED;
 }
 
 /* }}} */

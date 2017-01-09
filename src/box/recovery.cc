@@ -164,16 +164,15 @@ recovery_new(const char *wal_dirname, bool panic_on_wal_error,
 static inline void
 recovery_close_log(struct recovery *r)
 {
-	if (!r->is_active)
+	if (r->cursor.state == XLOG_CURSOR_CLOSED)
 		return;
-	if (r->cursor.eof_read) {
+	if (r->cursor.state == XLOG_CURSOR_EOF) {
 		say_info("done `%s'", r->cursor.name);
 	} else {
 		say_warn("file `%s` wasn't correctly closed",
 			 r->cursor.name);
 	}
 	xlog_cursor_close(&r->cursor, false);
-	r->is_active = false;
 }
 
 void
@@ -182,7 +181,7 @@ recovery_delete(struct recovery *r)
 	recovery_stop_local(r);
 
 	xdir_destroy(&r->wal_dir);
-	if (r->is_active) {
+	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
 		/*
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
@@ -268,7 +267,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 	 */
 	struct vclock *last = vclockset_last(&r->wal_dir.index);
 	if (last == NULL) {
-		if (r->is_active) {
+		if (r->cursor.state != XLOG_CURSOR_CLOSED) {
 			say_error("file `%s' was deleted under our feet",
 				  r->cursor.name);
 			recovery_close_log(r);
@@ -280,7 +279,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 
 	/* If the caller already opened WAL for us, recover from it first */
 	struct vclock *clock;
-	if (r->is_active) {
+	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
 		clock = vclockset_match(&r->wal_dir.index,
 					&r->cursor.meta.vclock);
 		if (clock != NULL &&
@@ -320,13 +319,12 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		}
 		recovery_close_log(r);
 
-		r->is_active = true;
 		xdir_open_cursor_xc(&r->wal_dir, vclock_sum(clock), &r->cursor);
 
 		say_info("recover from `%s'", r->cursor.name);
 
 recover_current_wal:
-		if (r->cursor.eof_read == false)
+		if (r->cursor.state != XLOG_CURSOR_EOF)
 			recover_xlog(r, stream, stop_vclock);
 		/**
 		 * Keep the last log open to remember recovery
@@ -496,26 +494,31 @@ recovery_follow_f(va_list ap)
 		 */
 		int64_t start, end;
 		do {
-			start = r->is_active ? vclock_sum(&r->cursor.meta.vclock) : 0;
+			start = r->cursor.state != XLOG_CURSOR_CLOSED ?
+				vclock_sum(&r->cursor.meta.vclock) : 0;
 			/*
 			 * If there is no current WAL, or we reached
 			 * an end  of one, look for new WALs.
 			 */
-			if (!r->is_active || r->cursor.eof_read)
+			if (r->cursor.state == XLOG_CURSOR_CLOSED
+			    || r->cursor.state == XLOG_CURSOR_EOF)
 				xdir_scan_xc(&r->wal_dir);
 
 			recover_remaining_wals(r, stream, NULL);
 
-			end = r->is_active ? vclock_sum(&r->cursor.meta.vclock) : 0;
+			end = r->cursor.state != XLOG_CURSOR_CLOSED ?
+			      vclock_sum(&r->cursor.meta.vclock) : 0;
 			/*
 			 * Continue, given there's been progress *and* there is a
 			 * chance new WALs have appeared since.
 			 * Sic: end * is < start (is 0) if someone deleted all logs
 			 * on the filesystem.
 			 */
-		} while (end > start && (!r->is_active || r->cursor.eof_read));
+		} while (end > start &&
+			 (r->cursor.state == XLOG_CURSOR_CLOSED ||
+			  r->cursor.state == XLOG_CURSOR_EOF));
 
-		subscription.set_log_path(r->is_active ?
+		subscription.set_log_path(r->cursor.state != XLOG_CURSOR_CLOSED ?
 					  r->cursor.name: NULL);
 
 		if (subscription.signaled == false) {

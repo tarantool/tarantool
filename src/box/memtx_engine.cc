@@ -296,7 +296,7 @@ MemtxEngine::recoverSnapshot()
 	 * marker - such snapshots are very likely corrupted and
 	 * should not be trusted.
 	 */
-	if (!cursor.eof_read)
+	if (cursor.state != XLOG_CURSOR_EOF)
 		panic("snapshot `%s' has no EOF marker", filename);
 
 }
@@ -1010,7 +1010,7 @@ memtx_initial_join_f(va_list ap)
 	 * should not be trusted.
 	 */
 	/* TODO: replace panic with tnt_raise() */
-	if (!cursor.eof_read)
+	if (cursor.state != XLOG_CURSOR_EOF)
 		panic("snapshot `%s' has no EOF marker",
 		      cursor.name);
 	return 0;

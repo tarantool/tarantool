@@ -50,8 +50,6 @@ struct recovery {
 	struct vclock vclock;
 	/** The WAL cursor we're currently reading/writing from/to. */
 	struct xlog_cursor cursor;
-	/** The cursor object is initialized/open. */
-	bool is_active;
 	struct xdir wal_dir;
 	/**
 	 * This is used in local hot standby or replication

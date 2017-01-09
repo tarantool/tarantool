@@ -426,11 +426,23 @@ xlog_tx_decode(const char *data, const char *data_end,
 
 /* {{{ xlog_cursor - read rows from a log file */
 
+enum xlog_cursor_state {
+	/* Cursor is closed */
+	XLOG_CURSOR_CLOSED = 0,
+	/* Cursor is opened but tx is not readen */
+	XLOG_CURSOR_ACTIVE = 1,
+	/* Cursor is opened and tx is readen */
+	XLOG_CURSOR_TX = 2,
+	/* Cursor is opened but eof readen */
+	XLOG_CURSOR_EOF = 3
+};
+
 /**
  * Xlog cursor, read rows from xlog
  */
 struct xlog_cursor
 {
+	enum xlog_cursor_state state;
 	/** xlog meta info */
 	struct xlog_meta meta;
 	/** file descriptor or -1 for in memory */
@@ -441,12 +453,8 @@ struct xlog_cursor
 	struct ibuf rbuf;
 	/** file read position */
 	off_t read_offset;
-	/** true if eof marker was readen */
-	bool eof_read;
 	/** cursor for current tx */
 	struct xlog_tx_cursor tx_cursor;
-	/** true if current tx is opened */
-	bool is_opened;
 	/** ZSTD context for decompression */
 	ZSTD_DStream *zdctx;
 };
