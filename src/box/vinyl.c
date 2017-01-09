@@ -2921,6 +2921,11 @@ vy_range_new(struct vy_index *index, int64_t id,
 			 "struct vy_range");
 		return NULL;
 	}
+	range->mem = vy_mem_new(index->env, index->key_def, index->format);
+	if (range->mem == NULL) {
+		free(range);
+		return NULL;
+	}
 	if (id != 0) {
 		range->id = id;
 		/** Recovering an existing range from disk. Update
@@ -3229,10 +3234,6 @@ vy_index_create(struct vy_index *index)
 	vy_index_add_range(index, range);
 	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(index->env->scheduler, range);
-	/* create initial mem */
-	range->mem = vy_mem_new(index->env, index->key_def, index->format);
-	if (range->mem == NULL)
-		return -1;
 	return 0;
 }
 
@@ -3434,10 +3435,6 @@ vy_index_open_ex(struct vy_index *index)
 			break;
 		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(index->env->scheduler, range);
-		range->mem = vy_mem_new(index->env, index->key_def,
-					index->format);
-		if (range->mem == NULL)
-			goto out;
 	}
 	if (range != NULL || prev->end != NULL) {
 		diag_set(ClientError, ER_VINYL, "range missing");
@@ -4090,9 +4087,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 			goto err_parts;
 		r->new_run = vy_run_new();
 		if (r->new_run == NULL)
-			goto err_parts;
-		r->mem = vy_mem_new(index->env, index->key_def, index->format);
-		if (r->mem == NULL)
 			goto err_parts;
 		/* Account merge w/o split. */
 		if (n_parts == 1)
