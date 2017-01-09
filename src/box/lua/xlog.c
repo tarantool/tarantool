@@ -103,8 +103,8 @@ lbox_xlog_parse_body_kv(struct lua_State *L, const char **beg, const char *end)
 		assert(fmt != NULL);
 		tuple = box_tuple_new(fmt, tuple_beg, *beg);
 		if (tuple == NULL)
-			lbox_error(L);
-		lbox_pushtuple(L, tuple);
+			luaT_error(L);
+		luaT_pushtuple(L, tuple);
 	} else {
 		/*
 		 * Push Lua objects
@@ -151,14 +151,14 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 		if (rc < 0) {
 			struct error *e = diag_last_error(diag_get());
 			if (e->type != &type_XlogError)
-				lbox_error(L);
+				luaT_error(L);
 		}
 		while ((rc = xlog_cursor_next_tx(cur)) < 0) {
 			struct error *e = diag_last_error(diag_get());
 			if (e->type != &type_XlogError)
-				lbox_error(L);
+				luaT_error(L);
 			if ((rc = xlog_cursor_find_tx_magic(cur)) < 1)
-				lbox_error(L);
+				luaT_error(L);
 		}
 		if (rc == 1)
 			break;
@@ -235,11 +235,11 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	if (cur == NULL) {
 		diag_set(OutOfMemory, sizeof(struct xlog_cursor),
 			 "malloc", "struct xlog_cursor");
-		return lbox_error(L);
+		return luaT_error(L);
 	}
 	/* Construct xlog object */
 	if (xlog_cursor_open(cur, filename) < 0) {
-		return lbox_error(L);
+		return luaT_error(L);
 	}
 	if (strncmp(cur->meta.filetype, "SNAP", 4) != 0 &&
 	    strncmp(cur->meta.filetype, "XLOG", 4) != 0) {
@@ -250,7 +250,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
 		xlog_cursor_close(cur, false);
 		free(cur);
-		return lbox_error(L);
+		return luaT_error(L);
 	}
 	/* push iteration function */
 	lua_pushcclosure(L, &lbox_xlog_parser_iterate, 1);

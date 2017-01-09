@@ -37,27 +37,43 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tuple;
+typedef struct tuple box_tuple_t;
 struct lua_State;
 struct mpstream;
 struct luaL_serializer;
 
+/** \cond public */
+
 /**
- * Push tuple on lua stack
+ * Push a tuple onto the stack.
+ * @param L Lua State
+ * @sa luaT_istuple
+ * @throws on OOM
  */
 void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
+luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple);
+
+/**
+ * Checks whether argument idx is a tuple
+ *
+ * @param L Lua State
+ * @param idx the stack index
+ * @retval non-NULL argument is tuple
+ * @retval NULL argument is not tuple
+ */
+box_tuple_t *
+luaT_istuple(struct lua_State *L, int idx);
+
+/** \endcond public */
 
 static inline int
-lbox_pushtupleornil(struct lua_State *L, struct tuple *tuple)
+luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple == NULL)
 		return 0;
-	lbox_pushtuple(L, tuple);
+	luaT_pushtuple(L, tuple);
 	return 1;
 }
-
-struct tuple *
-lua_istuple(struct lua_State *L, int narg);
 
 void
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,

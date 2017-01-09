@@ -34,7 +34,7 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include "lua/utils.h" /* lbox_error() */
+#include "lua/utils.h" /* luaT_error() */
 
 #include "box/box.h"
 #include "box/txn.h"
@@ -76,7 +76,7 @@ static int
 lbox_commit(lua_State *L)
 {
 	if (box_txn_commit() != 0)
-		return lbox_error(L);
+		return luaT_error(L);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ lbox_rollback(lua_State *L)
 {
 	(void)L;
 	if (box_txn_rollback() != 0)
-		return lbox_error(L);
+		return luaT_error(L);
 	return 0;
 }
 
@@ -97,7 +97,7 @@ lbox_snapshot(struct lua_State *L)
 		lua_pushstring(L, "ok");
 		return 1;
 	}
-	return lbox_error(L);
+	return luaT_error(L);
 }
 
 static const struct luaL_reg boxlib[] = {

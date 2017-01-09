@@ -55,6 +55,7 @@ extern "C" {
 
 struct lua_State;
 struct ibuf;
+struct error;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -429,7 +430,31 @@ luaL_touint64(struct lua_State *L, int idx);
 LUA_API int64_t
 luaL_toint64(struct lua_State *L, int idx);
 
+/**
+ * Re-throws the last Tarantool error as a Lua object.
+ * \sa lua_error()
+ * \sa box_error_last()
+ */
+LUA_API int
+luaT_error(lua_State *L);
+
+/**
+ * Like lua_call(), but with the proper support of Tarantool errors.
+ * \sa lua_call()
+ */
+LUA_API int
+luaT_call(lua_State *L, int nargs, int nreturns);
+
+/*
+ * Like lua_cpcall(), but with the proper support of Tarantool errors.
+ */
+LUA_API int
+luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
 /** \endcond public */
+
+void
+luaT_pusherror(struct lua_State *L, struct error *e);
 
 struct error *
 luaL_iserror(struct lua_State *L, int narg);
@@ -488,18 +513,6 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
-int
-lbox_error(lua_State *L);
-
-int
-lbox_call(lua_State *L, int nargs, int nreturns);
-
-int
-lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
-
-void
-luaL_pusherror(struct lua_State *L, struct error *e);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -507,9 +520,9 @@ luaL_pusherror(struct lua_State *L, struct error *e);
 #include <fiber.h>
 
 static inline void
-lbox_call_xc(lua_State *L, int nargs, int nreturns)
+luaT_call_xc(lua_State *L, int nargs, int nreturns)
 {
-	if (lbox_call(L, nargs, nreturns) != 0)
+	if (luaT_call(L, nargs, nreturns) != 0)
 		diag_raise();
 }
 

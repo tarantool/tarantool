@@ -442,7 +442,7 @@ run_script_f(va_list ap)
 	lua_checkstack(L, argc - 1);
 	for (int i = 1; i < argc; i++)
 		lua_pushstring(L, argv[i]);
-	if (lbox_call(L, lua_gettop(L) - 1, 0) != 0) {
+	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0) {
 		struct error *e = diag_last_error(&fiber()->diag);
 		panic("%s", e->errmsg);
 	}

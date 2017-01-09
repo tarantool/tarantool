@@ -43,7 +43,7 @@ luaL_testcancel(struct lua_State *L)
 {
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
-		lbox_error(L);
+		luaT_error(L);
 	}
 }
 
@@ -264,7 +264,7 @@ lua_fiber_run_f(va_list ap)
 	int coro_ref = va_arg(ap, int);
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 
-	result = lbox_call(L, lua_gettop(L) - 1, 0);
+	result = luaT_call(L, lua_gettop(L) - 1, 0);
 
 	/* Destroy local storage */
 	int storage_ref = (int)(intptr_t)
@@ -293,7 +293,7 @@ lbox_fiber_create(struct lua_State *L)
 	struct fiber *f = fiber_new("lua", lua_fiber_run_f);
 	if (f == NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
-		lbox_error(L);
+		luaT_error(L);
 	}
 
 	/* Move the arguments to the new coro */

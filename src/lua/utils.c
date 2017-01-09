@@ -903,7 +903,7 @@ luaL_error_gc(struct lua_State *L)
 }
 
 void
-luaL_pusherror(struct lua_State *L, struct error *e)
+luaT_pusherror(struct lua_State *L, struct error *e)
 {
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
 	struct error **ptr = (struct error **) luaL_pushcdata(L,
@@ -916,18 +916,18 @@ luaL_pusherror(struct lua_State *L, struct error *e)
 }
 
 int
-lbox_error(lua_State *L)
+luaT_error(lua_State *L)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
 	/*
-	 * gh-1955 luaL_pusherror allocates Lua objects, thus it may trigger
+	 * gh-1955 luaT_pusherror allocates Lua objects, thus it may trigger
 	 * GC. GC may invoke finalizers which are arbitrary Lua code,
 	 * potentially invalidating last error object, hence error_ref
 	 * below.
 	 */
 	error_ref(e);
-	luaL_pusherror(L, e);
+	luaT_pusherror(L, e);
 	error_unref(e);
 	lua_error(L);
 	unreachable();
@@ -949,7 +949,7 @@ lbox_catch(lua_State *L)
 }
 
 int
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+luaT_call(struct lua_State *L, int nargs, int nreturns)
 {
 	if (lua_pcall(L, nargs, nreturns, 0))
 		return lbox_catch(L);
@@ -957,7 +957,7 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 }
 
 int
-lbox_cpcall(lua_State *L, lua_CFunction func, void *ud)
+luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
 	if (lua_cpcall(L, func, ud))
 		return lbox_catch(L);

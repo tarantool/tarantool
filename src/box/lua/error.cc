@@ -43,7 +43,7 @@ extern "C" {
 #include "box/error.h"
 
 static int
-lbox_error_raise(lua_State *L)
+luaT_error_raise(lua_State *L)
 {
 	uint32_t code = 0;
 	const char *reason = NULL;
@@ -56,7 +56,7 @@ lbox_error_raise(lua_State *L)
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
 		if (box_error_last())
-			lbox_error(L);
+			luaT_error(L);
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
 		code = lua_tointeger(L, 2);
@@ -102,12 +102,12 @@ raise:
 	}
 	say_debug("box.error() at %s:%i", file, line);
 	box_error_set(file, line, code, reason);
-	lbox_error(L);
+	luaT_error(L);
 	return 0;
 }
 
 static int
-lbox_error_last(lua_State *L)
+luaT_error_last(lua_State *L)
 {
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
@@ -118,12 +118,12 @@ lbox_error_last(lua_State *L)
 		return 1;
 	}
 
-	luaL_pusherror(L, e);
+	luaT_pusherror(L, e);
 	return 1;
 }
 
 static int
-lbox_error_clear(lua_State *L)
+luaT_error_clear(lua_State *L)
 {
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.clear(): bad arguments");
@@ -183,20 +183,20 @@ box_lua_error_init(struct lua_State *L) {
 	}
 	lua_newtable(L);
 	{
-		lua_pushcfunction(L, lbox_error_raise);
+		lua_pushcfunction(L, luaT_error_raise);
 		lua_setfield(L, -2, "__call");
 
 		lua_newtable(L);
 		{
-			lua_pushcfunction(L, lbox_error_last);
+			lua_pushcfunction(L, luaT_error_last);
 			lua_setfield(L, -2, "last");
 		}
 		{
-			lua_pushcfunction(L, lbox_error_clear);
+			lua_pushcfunction(L, luaT_error_clear);
 			lua_setfield(L, -2, "clear");
 		}
 		{
-			lua_pushcfunction(L, lbox_error_raise);
+			lua_pushcfunction(L, luaT_error_raise);
 			lua_setfield(L, -2, "raise");
 		}
 		lua_setfield(L, -2, "__index");

@@ -78,7 +78,7 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 	int top = trigger->push_event(L, event);
-	if (lbox_call(L, top, 0)) {
+	if (luaT_call(L, top, 0)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}

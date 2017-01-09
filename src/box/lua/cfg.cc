@@ -48,7 +48,7 @@ lbox_cfg_check(struct lua_State *L)
 	try {
 		box_check_config();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -59,7 +59,7 @@ lbox_cfg_load(struct lua_State *L)
 	try {
 		load_cfg();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -71,7 +71,7 @@ lbox_cfg_set_listen(struct lua_State *L)
 		box_bind();
 		box_listen();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -82,7 +82,7 @@ lbox_cfg_set_replication_source(struct lua_State *L)
 	try {
 		box_set_replication_source();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -93,7 +93,7 @@ lbox_cfg_set_log_level(struct lua_State *L)
 	try {
 		box_set_log_level();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -104,7 +104,7 @@ lbox_cfg_set_readahead(struct lua_State *L)
 	try {
 		box_set_readahead();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -115,7 +115,7 @@ lbox_cfg_set_io_collect_interval(struct lua_State *L)
 	try {
 		box_set_io_collect_interval();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -126,7 +126,7 @@ lbox_cfg_set_too_long_threshold(struct lua_State *L)
 	try {
 		box_set_too_long_threshold();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -137,7 +137,7 @@ lbox_cfg_set_snap_io_rate_limit(struct lua_State *L)
 	try {
 		box_set_snap_io_rate_limit();
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
@@ -148,7 +148,7 @@ lbox_cfg_set_read_only(struct lua_State *L)
 	try {
 		box_set_ro(cfg_geti("read_only") != 0);
 	} catch (Exception *) {
-		lbox_error(L);
+		luaT_error(L);
 	}
 	return 0;
 }
