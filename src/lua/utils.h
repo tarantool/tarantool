@@ -428,12 +428,24 @@ luaL_touint64(struct lua_State *L, int idx);
 LUA_API int64_t
 luaL_toint64(struct lua_State *L, int idx);
 
+/**
+ * Re-throws the last Tarantool error as a Lua object.
+ * \sa lua_error()
+ * \sa box_error_last()
+ */
 LUA_API int
 luaT_error(lua_State *L);
 
+/**
+ * Like lua_call(), but with the proper support of Tarantool errors.
+ * \sa lua_call()
+ */
 LUA_API int
 luaT_call(lua_State *L, int nargs, int nreturns);
 
+/*
+ * Like lua_cpcall(), but with the proper support of Tarantool errors.
+ */
 LUA_API int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
 
