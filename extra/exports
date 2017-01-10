@@ -72,11 +72,6 @@ tnt_EVP_CIPHER_iv_length
 tnt_EVP_MD_CTX_new
 tnt_EVP_MD_CTX_free
 
-# Module API - unstable
-
-lbox_pushtuple
-lua_istuple
-
 # Module API
 
 _say
