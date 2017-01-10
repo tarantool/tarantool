@@ -344,10 +344,15 @@ local function read_file(filename)
     return table.concat(buf)
 end
 
+-- Removes leading and trailing whitespaces
+local function string_trim(str)
+    return str:gsub("^%s*(.-)%s*$", "%1")
+end
+
 local function logger_parse(logger)
     -- syslog
     if logger:find("syslog:") then
-        logger = logger:sub(8):gsub("^%s*(.-)%s*$", "%1")
+        logger = string_trim(logger:sub(8))
         local args = {}
         logger:gsub("([^,]+)", function(keyval)
             keyval:gsub("([^=]+)=([^=]+)", function(key, val)
@@ -357,17 +362,17 @@ local function logger_parse(logger)
         return 'syslog', args
     -- pipes
     elseif logger:find("pipe:")   then
-        logger = logger:sub(6):gsub("^%s*(.-)%s*$", "%1")
+        logger = string_trim(logger:sub(6))
         return 'pipe', logger
     elseif logger:find("|")       then
-        logger = logger:sub(2):gsub("^%s*(.-)%s*$", "%1")
+        logger = string_trim(logger:sub(2))
         return 'pipe', logger
     -- files
     elseif logger:find("file:")   then
-        logger = logger:sub(6):gsub("^%s*(.-)%s*$", "%1")
+        logger = string_trim(logger:sub(6))
         return 'file', logger
     else
-        logger = logger:gsub("^%s*(.-)%s*$", "%1")
+        logger = strng_trim(logger)
         return 'file', logger
     end
 end
