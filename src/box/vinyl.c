@@ -54,7 +54,6 @@
 #include "coeio.h"
 #include "histogram.h"
 #include "rmean.h"
-#include "assoc.h"
 #include "errinj.h"
 
 #include "errcode.h"
@@ -3889,7 +3888,6 @@ vy_task_compact_execute(struct vy_task *task)
 		if (vy_range_write_run(r, wi, &stmt, &task->dump_size) != 0)
 			return -1;
 	}
-	/* Old run files are removed on snapshot. */
 	return 0;
 }
 
@@ -3901,6 +3899,7 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
+	struct vy_run *run;
 
 	say_info("completed compaction of range %s", vy_range_str(range));
 
@@ -3926,6 +3925,20 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 		vy_index_acct_range(index, r);
 		vy_scheduler_add_range(index->env->scheduler, r);
 	}
+
+	/* Delete files left from the old range. */
+	ERROR_INJECT(ERRINJ_VY_GC, goto skip_gc);
+	rlist_foreach_entry(run, &range->runs, in_range) {
+		char path[PATH_MAX];
+		for (int type = 0; type < vy_file_MAX; type++) {
+			vy_run_snprint_path(path, PATH_MAX, index->path,
+					    index->key_def->opts.lsn,
+					    range->id, run->id, type);
+			if (coeio_unlink(path) < 0)
+				say_syserror("failed to delete file '%s'", path);
+		}
+	}
+skip_gc:
 	vy_range_delete(range);
 	index->version++;
 	return 0;
@@ -4733,9 +4746,6 @@ vy_checkpoint(struct vy_env *env)
 	return 0;
 }
 
-static void
-vy_index_gc(struct vy_index *index);
-
 int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
@@ -4751,101 +4761,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		return -1;
 	}
-
-	/* Remove old run files. */
-	struct vy_index *index;
-	rlist_foreach_entry(index, &env->indexes, link)
-		vy_index_gc(index);
-
 	return 0;
-}
-
-/**
- * Unlink old ranges - i.e. ranges which are not relevant
- * any more because of a passed range split, or create/drop
- * index.
- */
-static void
-vy_index_gc(struct vy_index *index)
-{
-	ERROR_INJECT(ERRINJ_VY_GC, return);
-
-	struct mh_i32ptr_t *ranges = NULL;
-	DIR *dir = NULL;
-
-	ranges = mh_i32ptr_new();
-	if (ranges == NULL)
-		goto error;
-	/*
-	 * Construct a hash map of existing ranges, to quickly
-	 * find a valid range by range id.
-	 */
-	struct vy_range *range = vy_range_tree_first(&index->tree);
-	while (range) {
-		struct mh_i32ptr_node_t node = {range->id, range};
-		if (mh_i32ptr_put(ranges, &node, NULL, NULL) == mh_end(ranges))
-			goto error;
-		if (range->shadow != NULL) {
-			node.key = range->shadow->id;
-			node.val = range->shadow;
-			if (mh_i32ptr_put(ranges, &node, NULL, NULL) ==
-			    mh_end(ranges))
-				goto error;
-		}
-		range = vy_range_tree_next(&index->tree, range);
-	}
-	/*
-	 * Scan the index directory and unlink files not
-	 * referenced from any valid range.
-	 */
-	dir = opendir(index->path);
-	if (dir == NULL)
-		goto error;
-	struct dirent *dirent;
-	/**
-	 * @todo: only remove files matching the pattern *and*
-	 * identified as old, not all files.
-	 */
-	while ((dirent = readdir(dir))) {
-		int64_t index_lsn;
-		int64_t range_id;
-		int64_t run_id;
-		enum vy_file_type t;
-
-		if (!(strcmp(".", dirent->d_name)))
-			continue;
-		if (!(strcmp("..", dirent->d_name)))
-			continue;
-		bool is_vinyl_file = false;
-		/*
-		 * Now we can delete in progress file, this is bad
-		if (strstr(dirent->d_name, ".tmp") == dirent->d_name) {
-			is_vinyl_file = true;
-		}
-		*/
-		if (vy_run_parse_name(dirent->d_name, &index_lsn,
-				      &range_id, &run_id, &t) == 0) {
-			is_vinyl_file = true;
-			mh_int_t range = mh_i32ptr_find(ranges, range_id, NULL);
-			if (index_lsn == index->key_def->opts.lsn &&
-			    range != mh_end(ranges))
-				continue;
-		}
-		if (!is_vinyl_file)
-			continue;
-		char path[PATH_MAX];
-		snprintf(path, PATH_MAX, "%s/%s",
-			 index->path, dirent->d_name);
-		unlink(path);
-	}
-	goto end;
-error:
-	say_syserror("failed to cleanup index directory %s", index->path);
-end:
-	if (dir != NULL)
-		closedir(dir);
-	if (ranges != NULL)
-		mh_i32ptr_delete(ranges);
 }
 
 /* Scheduler }}} */
