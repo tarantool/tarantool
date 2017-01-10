@@ -30,44 +30,60 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <limits.h>
 #include "trivia/util.h"
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum errinj_type {
+	ERRINJ_BOOL	= 0,
+	ERRINJ_LONG	= 1
+};
+
 struct errinj {
 	const char *name;
-	bool state;
+	enum errinj_type type;
+	union {
+		bool bparam;
+		long lparam;
+	} state;
 };
 
 /**
  * list of error injection handles.
  */
 #define ERRINJ_LIST(_) \
-	_(ERRINJ_TESTING, false) \
-	_(ERRINJ_WAL_IO, false) \
-	_(ERRINJ_WAL_ROTATE, false) \
-	_(ERRINJ_WAL_WRITE, false) \
-	_(ERRINJ_WAL_WRITE_PARTIAL, false) \
-	_(ERRINJ_WAL_WRITE_DISK, false) \
-	_(ERRINJ_WAL_DELAY, false) \
-	_(ERRINJ_INDEX_ALLOC, false) \
-	_(ERRINJ_TUPLE_ALLOC, false) \
-	_(ERRINJ_TUPLE_FIELD, false) \
-	_(ERRINJ_VY_RANGE_DUMP, false) \
-	_(ERRINJ_VY_RANGE_SPLIT, false) \
-	_(ERRINJ_VY_READ_PAGE, false) \
-	_(ERRINJ_VY_READ_PAGE_TIMEOUT, false) \
-	_(ERRINJ_VY_GC, false) \
-	_(ERRINJ_RELAY, false)
+	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_LONG, {.lparam = LONG_MAX}) \
+	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RANGE_DUMP, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RANGE_SPLIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false})
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
 
-bool errinj_get(int id);
+struct errinj *
+errinj_lookup(char *name);
 
-void errinj_set(int id, bool state);
-int errinj_set_byname(char *name, bool state);
+bool errinj_getb(int id);
+long errinj_getl(int id);
+
+void errinj_setb(int id, bool state);
+int errinj_setb_byname(char *name, bool state);
+void errinj_setl(int id, long state);
+int errinj_setl_byname(char *name, long state);
 
 typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
 int errinj_foreach(errinj_cb cb, void *cb_ctx);
@@ -78,15 +94,20 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 #else
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
-		if (errinj_get(ID) == true) \
+		if (errinj_getb(ID) == true) \
 			CODE; \
 	} while (0)
 #  define ERROR_INJECT_ONCE(ID, CODE) \
 	do { \
-		if (errinj_get(ID) == true) { \
-			errinj_set(ID, false); \
+		if (errinj_getb(ID) == true) { \
+			errinj_setb(ID, false); \
 			CODE; \
 		} \
+	} while (0)
+#  define ERROR_INJECTL(ID, VALUE, CMP, CODE) \
+	do { \
+		if ((long)(VALUE) CMP errinj_getl(ID)) \
+			CODE; \
 	} while (0)
 #endif
 

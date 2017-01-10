@@ -136,11 +136,25 @@ static int
 lbox_errinj_set(struct lua_State *L)
 {
 	char *name = (char*)luaL_checkstring(L, 1);
-	bool state = lua_toboolean(L, 2);
-	if (errinj_set_byname(name, state)) {
+	struct errinj *errinj;
+	errinj = errinj_lookup(name);
+	if (errinj == NULL) {
+		say_error("%s", name);
 		lua_pushfstring(L, "error: can't find error injection '%s'", name);
 		return 1;
 	}
+	switch (errinj->type) {
+	case ERRINJ_BOOL:
+		errinj->state.bparam = lua_toboolean(L, 2);
+		break;
+	case ERRINJ_LONG:
+		errinj->state.lparam = lua_tointeger(L, 2);
+		break;
+	default:
+		lua_pushfstring(L, "error: unknow injection type '%s'", name);
+		return 1;
+	}
+
 	lua_pushstring(L, "ok");
 	return 1;
 }
@@ -152,7 +166,10 @@ lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 	lua_pushstring(L, e->name);
 	lua_newtable(L);
 	lua_pushstring(L, "state");
-	lua_pushboolean(L, e->state);
+	if (e->type == ERRINJ_BOOL)
+		lua_pushboolean(L, e->state.bparam);
+	else
+		lua_pushnumber(L, e->state.lparam);
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 	return 0;

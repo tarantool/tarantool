@@ -1023,11 +1023,10 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	int iovcnt = xrow_header_encode(packet, iov, 0);
 	struct obuf_svp svp = obuf_create_svp(&log->obuf);
 	for (int i = 0; i < iovcnt; ++i) {
-		ERROR_INJECT(ERRINJ_WAL_WRITE_PARTIAL,
-			{if (obuf_size(&log->obuf) > (1 << 14)) {
-				tnt_error(ClientError, ER_INJECTION, "xlog write injection");
+		ERROR_INJECTL(ERRINJ_WAL_WRITE_PARTIAL, obuf_size(&log->obuf), >,
+			{	tnt_error(ClientError, ER_INJECTION, "xlog write injection");
 				obuf_rollback_to_svp(&log->obuf, &svp);
-				return -1;}});
+				return -1;});
 		if (obuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len) <
 		    iov[i].iov_len) {
 			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
