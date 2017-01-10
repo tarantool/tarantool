@@ -2255,7 +2255,6 @@ vy_row_index_encode(const uint32_t *row_index, uint32_t count,
 
 	struct request request;
 	request_create(&request, IPROTO_REPLACE);
-	request.space_id = BOX_VINYL_ROW_INDEX_ID;
 	size_t tuple_size = mp_sizeof_array(1) +
 			    mp_sizeof_bin(sizeof(uint32_t) * count);
 	char *tuple = region_alloc(&fiber()->gc, tuple_size);
@@ -2491,8 +2490,6 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 
 	struct request request;
 	request_create(&request, IPROTO_REPLACE);
-	request.space_id = BOX_VINYL_PAGE_ID;
-	request.index_id = 0;
 
 	uint32_t min_key_size;
 	const char *min_key = vy_key_data_range(page_info->min_key,
@@ -2565,11 +2562,6 @@ vy_page_info_decode(struct vy_page_info *page, int run_id,
 	/* extract all pages info */
 	request_create(&request, xrow->type);
 	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
-	if (request.space_id != BOX_VINYL_PAGE_ID) {
-		diag_set(ClientError, ER_VINYL, "Can't decode page meta: "
-			 "incorrect space id");
-		return -1;
-	}
 	const char *pos = request.tuple;
 	if (mp_decode_array(&pos) < 4) {
 		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
@@ -2733,8 +2725,6 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	/* put tuple in a replace request to run's space */
 	struct request request;
 	request_create(&request, IPROTO_REPLACE);
-	request.space_id = BOX_VINYL_RUN_ID;;
-	request.index_id = 0;
 	request.tuple = tuple;
 	request.tuple_end = pos;
 	memset(xrow, 0, sizeof(*xrow));
@@ -2776,11 +2766,6 @@ vy_run_info_decode(const struct xrow_header *xrow,
 	}
 
 	/* decode run */
-	if (request.space_id != BOX_VINYL_RUN_ID) {
-		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
-			 "incorrect space id");
-		return -1;
-	}
 	const char *pos = request.tuple;
 	if (mp_decode_array(&pos) < 2) {
 		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
