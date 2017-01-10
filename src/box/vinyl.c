@@ -363,6 +363,7 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 #define bps_tree_key_t struct tree_mem_key *
 #define bps_tree_arg_t struct vy_mem *
 #define BPS_TREE_NO_DEBUG
+#define BPS_TREE_SOURCE 1
 
 #include "salad/bps_tree.h"
 
@@ -5513,6 +5514,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			assert(old_type == IPROTO_UPSERT ||
 			       old_type == IPROTO_REPLACE ||
 			       old_type == IPROTO_DELETE);
+			(void) old_type;
 
 			stmt = vy_apply_upsert(stmt, old->stmt,
 					       index->key_def, index->format,
