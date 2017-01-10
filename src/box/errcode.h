@@ -178,7 +178,6 @@ struct errcode_record {
 	/*123 */_(ER_ROLLBACK_IN_SUB_STMT,	"Rollback called in a nested statement") \
 	/*124 */_(ER_DECOMPRESSION,		"Decompression error: %s") \
 	/*125 */_(ER_INVALID_XLOG_TYPE,		"Invalid xlog type: expected %s, got %s") \
-	/*126 */_(ER_INVALID_RUN_ID,		"Invalid run id: expected %lld, got %lld") \
 	/*127 */_(ER_ALREADY_RUNNING,		"Failed to lock WAL directory %s and hot_standby mode is off")
 
 /*

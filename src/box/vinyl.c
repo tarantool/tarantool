@@ -2476,7 +2476,6 @@ const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
  * Allocates using region_alloc.
  *
  * @param page_info page information to encode
- * @param run_id run identifier
  * @param[out] xrow xrow to fill
  *
  * @retval  0 success
@@ -2484,7 +2483,7 @@ const uint64_t vy_page_info_key_map = (1 << VY_PAGE_REQUEST_COUNT) |
  */
 static int
 vy_page_info_encode(const struct vy_page_info *page_info,
-		    int run_id, struct xrow_header *xrow)
+		    struct xrow_header *xrow)
 {
 	struct region *region = &fiber()->gc;
 
@@ -2497,9 +2496,8 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 
 	/* calc tuple size */
 	uint32_t size;
-	/* 3 items run_id, page_id and map */
-	size = mp_sizeof_array(4) +
-	       mp_sizeof_uint(run_id) +
+	/* 3 items: page offset, size, and map */
+	size = mp_sizeof_array(3) +
 	       mp_sizeof_uint(page_info->offset) +
 	       mp_sizeof_uint(page_info->size) +
 	       /* page map contains 4 items */
@@ -2520,8 +2518,7 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 	}
 	/* encode tuple */
 	request.tuple = pos;
-	pos = mp_encode_array(pos, 4);
-	pos = mp_encode_uint(pos, run_id);
+	pos = mp_encode_array(pos, 3);
 	pos = mp_encode_uint(pos, page_info->offset);
 	pos = mp_encode_uint(pos, page_info->size);
 	pos = mp_encode_map(pos, 4);
@@ -2547,15 +2544,13 @@ vy_page_info_encode(const struct vy_page_info *page_info,
  * Decode page information from xrow.
  *
  * @param xrow xrow to decode
- * @param run_id the run identifier to check
  * @param[out] page page information
- * @param[out] run_info the run information
  *
  * @retval  0 success
  * @retval -1 error, check diag
  */
 static int
-vy_page_info_decode(struct vy_page_info *page, int run_id,
+vy_page_info_decode(struct vy_page_info *page,
 		    const struct xrow_header *xrow)
 {
 	struct request request;
@@ -2563,14 +2558,9 @@ vy_page_info_decode(struct vy_page_info *page, int run_id,
 	request_create(&request, xrow->type);
 	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
 	const char *pos = request.tuple;
-	if (mp_decode_array(&pos) < 4) {
+	if (mp_decode_array(&pos) < 3) {
 		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
 			 "tuple is too small");
-		return -1;
-	}
-	if (run_id != (int) mp_decode_uint(&pos)) {
-		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
-			 "incorrect run id");
 		return -1;
 	}
 
@@ -2649,7 +2639,6 @@ const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
  * Allocates using region alloc
  *
  * @param run_info the run information
- * @param run_id the run identifier
  * @param begin left bound of the run
  * @param end right bound of the run
  * @param xrow xrow to fill.
@@ -2658,13 +2647,12 @@ const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
  * @retval -1 on error, check diag
  */
 static int
-vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
+vy_run_info_encode(const struct vy_run_info *run_info,
 		   const struct vy_stmt *begin,
 		   const struct vy_stmt *end,
 		   struct xrow_header *xrow)
 {
-	/* size for run tuple of 2 items: id + map */
-	size_t size = mp_sizeof_array(2) + mp_sizeof_uint(run_id);
+	size_t size = mp_sizeof_array(1);
 	/*
 	 * run map size: min lsn, max lsn, page count, begin and end keys if defined
 	 */
@@ -2698,8 +2686,7 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 	}
 	char *pos = tuple;
 	/* encode values */
-	pos = mp_encode_array(pos, 2);
-	pos = mp_encode_uint(pos, run_id);
+	pos = mp_encode_array(pos, 1);
 	pos = mp_encode_map(pos, map_size);
 	pos = mp_encode_uint(pos, VY_RUN_MIN_LSN);
 	pos = mp_encode_uint(pos, run_info->min_lsn);
@@ -2742,7 +2729,6 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
  * @param xrow xrow to decode
  * @param key_def key definition
  * @param[out] run_info the run information
- * @param[out] p_run_id the run identifier
  * @param[out] p_begin the begin of the run
  * @param[out] p_end the end of the run
  *
@@ -2752,7 +2738,7 @@ vy_run_info_encode(const struct vy_run_info *run_info, int run_id,
 static int
 vy_run_info_decode(const struct xrow_header *xrow,
 		   const struct key_def *key_def,
-		   struct vy_run_info *run_info, int *p_run_id,
+		   struct vy_run_info *run_info,
 		   struct vy_stmt **p_begin, struct vy_stmt **p_end)
 {
 	struct vy_stmt *begin = NULL;
@@ -2767,12 +2753,11 @@ vy_run_info_decode(const struct xrow_header *xrow,
 
 	/* decode run */
 	const char *pos = request.tuple;
-	if (mp_decode_array(&pos) < 2) {
+	if (mp_decode_array(&pos) < 1) {
 		diag_set(ClientError, ER_VINYL, "Can't decode run meta: "
 			 "not enough values");
 		return -1;
 	}
-	int run_id = mp_decode_uint(&pos);
 	memset(run_info, 0, sizeof(*run_info));
 	uint64_t key_map = vy_run_info_key_map;
 	uint32_t map_size = mp_decode_map(&pos);
@@ -2823,7 +2808,6 @@ vy_run_info_decode(const struct xrow_header *xrow,
 
 	*p_begin = begin;
 	*p_end = end;
-	*p_run_id = run_id;
 	return 0;
 
 fail:
@@ -2862,15 +2846,14 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	xlog_tx_begin(&index_xlog);
 
 	struct xrow_header xrow;
-	if (vy_run_info_encode(&run->info, run_id, begin, end,
-			       &xrow) != 0 ||
+	if (vy_run_info_encode(&run->info, begin, end, &xrow) != 0 ||
 	    xlog_write_row(&index_xlog, &xrow) < 0)
 		goto fail;
 
 	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
 		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
 		struct xrow_header xrow;
-		if (vy_page_info_encode(page_info, run_id, &xrow) < 0) {
+		if (vy_page_info_encode(page_info, &xrow) < 0) {
 			goto fail;
 		}
 		if (xlog_write_row(&index_xlog, &xrow) < 0)
@@ -2969,18 +2952,11 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 
 	/* Read run header. */
 	struct xrow_header xrow;
-	int run_id_check = 0;
 	/* all rows should be in one tx */
 	if (xlog_cursor_next_tx(&cursor) != 0 ||
 	    xlog_cursor_next_row(&cursor, &xrow) != 0 ||
-	    vy_run_info_decode(&xrow, key_def, &run->info, &run_id_check,
+	    vy_run_info_decode(&xrow, key_def, &run->info,
 			       &range->begin, &range->end) != 0) {
-		goto fail_close;
-	}
-	if (run_id_check != run_id) {
-		diag_set(ClientError, ER_INVALID_RUN_ID,
-			 (long long) run_id_check,
-			 (long long) run_id);
 		goto fail_close;
 	}
 
@@ -3001,7 +2977,7 @@ vy_range_recover_run(struct vy_range *range, int run_id)
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, run_id, &xrow) < 0) {
+		if (vy_page_info_decode(page, &xrow) < 0) {
 			/** Limit count of pages to successfully created pages */
 			run->info.count = page_no;
 			goto fail_close;

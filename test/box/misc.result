@@ -286,11 +286,10 @@ end;
 t;
 ---
 - - 'box.error.CANT_UPDATE_PRIMARY_KEY : 94'
-  - 'box.error.injection : table: <address>
   - 'box.error.EXACT_MATCH : 19'
   - 'box.error.NO_SUCH_TRIGGER : 34'
-  - 'box.error.ALREADY_RUNNING : 127'
-  - 'box.error.KEY_PART_IS_TOO_LONG : 118'
+  - 'box.error.injection : table: <address>
+  - 'box.error.ALREADY_RUNNING : 126'
   - 'box.error.CLUSTER_ID_IS_RO : 65'
   - 'box.error.INVALID_XLOG_TYPE : 125'
   - 'box.error.DECOMPRESSION : 124'
@@ -305,7 +304,7 @@ t;
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
   - 'box.error.COMPRESSION : 119'
-  - 'box.error.INVALID_RUN_ID : 126'
+  - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.CONNECTION_TO_SELF : 117'
   - 'box.error.NO_SUCH_INDEX : 35'
   - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
