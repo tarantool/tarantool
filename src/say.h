@@ -72,9 +72,6 @@ say_set_log_level(int new_level);
 void
 say_logrotate(int /* signo */);
 
-/** Basic init. */
-void say_init(const char *argv0);
-
 /* Init logger. */
 void say_logger_init(const char *init_str,
                      int log_level, int nonblock, int background);

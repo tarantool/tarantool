@@ -596,7 +596,6 @@ main(int argc, char **argv)
 	}
 
 	random_init();
-	say_init(argv[0]);
 
 	crc32_init();
 	memory_init();

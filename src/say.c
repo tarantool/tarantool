@@ -53,7 +53,6 @@ static const char logger_syntax_reminder[] =
 static bool booting = true;
 static enum say_logger_type logger_type = SAY_LOGGER_STDERR;
 static bool logger_background = true;
-static const char *binary_filename;
 static int logger_nonblock;
 
 static int log_fd = STDERR_FILENO;
@@ -109,12 +108,6 @@ level_to_syslog_priority(int level)
 	default:
 		return LOG_ERR;
 	}
-}
-
-void
-say_init(const char *argv0)
-{
-	binary_filename = strdup(argv0);
 }
 
 void
@@ -342,7 +335,6 @@ vsay(int level, const char *filename, int line, const char *error,
 	static __thread char buf[PIPE_BUF];
 
 	if (booting) {
-		fprintf(stderr, "%s: ", binary_filename);
 		vfprintf(stderr, format, ap);
 		if (error)
 			fprintf(stderr, ": %s", error);
