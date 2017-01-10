@@ -133,6 +133,14 @@ struct vy_env {
 	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
+	/**
+	 * For each index range list modification,
+	 * get a new range id and increment this variable.
+	 * For new ranges, use this id as a sequence.
+	 */
+	int64_t range_id_max;
+	/** Maximal run ID in use. Used for run ID allocation. */
+	int64_t run_id_max;
 };
 
 #define vy_crcs(p, size, crc) \
@@ -539,9 +547,12 @@ struct vy_run {
 	int refs;
 	/** Link in range->runs list. */
 	struct rlist in_range;
+	/** Unique ID of this run. */
+	int64_t id;
 };
 
 struct vy_range {
+	/** Unique ID of this range. */
 	int64_t   id;
 	/**
 	 * Range lower bound. NULL if range is leftmost.
@@ -723,12 +734,6 @@ struct vy_index {
 
 	/** Member of env->indexes. */
 	struct rlist link;
-	/**
-	 * For each index range list modification,
-	 * get a new range id and increment this variable.
-	 * For new ranges, use this id as a sequence.
-	 */
-	int64_t range_id_max;
 	/**
 	 * Incremented for each change of the range list,
 	 * to invalidate iterators.
@@ -1465,7 +1470,7 @@ vy_run_size(struct vy_run *run)
 }
 
 static struct vy_run *
-vy_run_new()
+vy_run_new(int64_t id)
 {
 	struct vy_run *run = (struct vy_run *)malloc(sizeof(struct vy_run));
 	if (unlikely(run == NULL)) {
@@ -1474,6 +1479,7 @@ vy_run_new()
 		return NULL;
 	}
 	memset(&run->info, 0, sizeof(run->info));
+	run->id = id;
 	run->fd = -1;
 	run->refs = 1;
 	rlist_create(&run->in_range);
@@ -1529,11 +1535,11 @@ static const char *vy_file_suffix[] = {
 
 static int
 vy_run_parse_name(const char *name, int64_t *index_lsn, int64_t *range_id,
-		  int *run_id, enum vy_file_type *type)
+		  int64_t *run_id, enum vy_file_type *type)
 {
 	int n = 0;
 
-	sscanf(name, "%"SCNx64".%"SCNx64".%d.%n",
+	sscanf(name, "%"SCNx64".%"SCNx64".%"SCNi64".%n",
 	       index_lsn, range_id, run_id, &n);
 	if (*run_id < 0)
 		return -1;
@@ -1553,10 +1559,10 @@ vy_run_parse_name(const char *name, int64_t *index_lsn, int64_t *range_id,
 
 static int
 vy_run_snprint_path(char *buf, size_t size, const char *dir,
-		    int64_t index_lsn, int64_t range_id, int run_id,
+		    int64_t index_lsn, int64_t range_id, int64_t run_id,
 		    enum vy_file_type type)
 {
-	return snprintf(buf, size, "%s/%016"PRIx64".%016"PRIx64".%d.%s",
+	return snprintf(buf, size, "%s/%016"PRIx64".%016"PRIx64".%"PRIi64".%s",
 			dir, index_lsn, range_id, run_id,
 			vy_file_suffix[type]);
 }
@@ -2395,8 +2401,7 @@ error_row_index:
  *  @retval -1 error occurred
  */
 static int
-vy_run_write_data(struct vy_run *run, const char *dirpath,
-		  int64_t range_id, int run_id,
+vy_run_write_data(struct vy_run *run, const char *dirpath, int64_t range_id,
 		  struct vy_write_iterator *wi, struct vy_stmt **curr_stmt,
 		  const struct vy_stmt *end_key,
 		  const struct key_def *key_def,
@@ -2407,7 +2412,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    key_def->opts.lsn, range_id, run_id,
+			    key_def->opts.lsn, range_id, run->id,
 			    VY_FILE_RUN);
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
@@ -2824,15 +2829,13 @@ fail:
  * Write run to file.
  */
 static int
-vy_run_write_index(struct vy_run *run, const char *dirpath,
-		   int64_t range_id, int run_id,
-		   const struct vy_stmt *begin,
-		   const struct vy_stmt *end,
+vy_run_write_index(struct vy_run *run, const char *dirpath, int64_t range_id,
+		   const struct vy_stmt *begin, const struct vy_stmt *end,
 		   const struct key_def *key_def)
 {
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    key_def->opts.lsn, range_id, run_id,
+			    key_def->opts.lsn, range_id, run->id,
 			    VY_FILE_INDEX);
 
 	struct xlog index_xlog;
@@ -2900,12 +2903,12 @@ vy_range_new(struct vy_index *index, int64_t id,
 		 * range_id_max to not create a new range wit the
 		 * same id.
 		 */
-		index->range_id_max = MAX(index->range_id_max, id);
+		index->env->range_id_max = MAX(index->env->range_id_max, id);
 	} else {
 		/**
 		 * Creating a new range. Assign a new id.
 	         */
-		range->id = ++index->range_id_max;
+		range->id = ++index->env->range_id_max;
 	}
 	if (begin != NULL) {
 		vy_stmt_ref(begin);
@@ -2926,12 +2929,12 @@ vy_range_new(struct vy_index *index, int64_t id,
 }
 
 static int
-vy_range_recover_run(struct vy_range *range, int run_id)
+vy_range_recover_run(struct vy_range *range, int64_t run_id)
 {
 	const struct vy_index *index = range->index;
 	const struct key_def *key_def = index->key_def;
 
-	struct vy_run *run = vy_run_new();
+	struct vy_run *run = vy_run_new(run_id);
 	if (run == NULL)
 		return -1;
 
@@ -3092,11 +3095,10 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
-	int run_id = range->run_count;
-	if (vy_run_write_data(run, index->path, range->id, run_id,
+	if (vy_run_write_data(run, index->path, range->id,
 			      wi, stmt, range->end,
 			      key_def, format) != 0 ||
-	    vy_run_write_index(run, index->path, range->id, run_id,
+	    vy_run_write_index(run, index->path, range->id,
 		               range->begin, range->end, key_def) != 0) {
 		return -1;
 	}
@@ -3187,7 +3189,6 @@ vy_index_create(struct vy_index *index)
 		return -1;
 	}
 
-	index->range_id_max = 0;
 	/* create initial range */
 	struct vy_range *range = vy_range_new(index, 0, NULL, NULL);
 	if (unlikely(range == NULL))
@@ -3201,14 +3202,14 @@ vy_index_create(struct vy_index *index)
 /*
  * This structure is only needed for sorting runs for recovery.
  * Runs with higher range id go first. Runs that belong to the
- * same range are sorted by serial number in ascending order.
+ * same range are sorted by their id in ascending order.
  * This way, we recover newer images of the same range first,
  * while within the same range runs are restored in the order
  * they were dumped.
  */
 struct vy_run_desc {
 	int64_t range_id;
-	int run_id;
+	int64_t run_id;
 };
 
 static int
@@ -3229,7 +3230,7 @@ vy_run_desc_cmp(const void *p1, const void *p2)
 
 /*
  * Return list of all run files found in the index directory.
- * A run file is described by range id and run serial number.
+ * A run file is described by range and run IDs.
  */
 static int
 vy_index_recover_run_list(struct vy_index *index,
@@ -3327,8 +3328,7 @@ fail:
  * ids first and ignoring ranges which are already fully spanned,
  * we can restore the whole index to its latest state.
  *
- * <run_id> is the serial number of the run in the range,
- * starting from 0.
+ * <run_id> is the unique id of this run. Newer runs have greater ids.
  */
 static int
 vy_index_open_ex(struct vy_index *index)
@@ -3361,10 +3361,8 @@ vy_index_open_ex(struct vy_index *index)
 			if (range == NULL)
 				goto out;
 		}
-		if (desc[i].run_id != range->run_count) {
-			diag_set(ClientError, ER_VINYL, "run file missing");
-			return -1;
-		}
+		index->env->run_id_max = MAX(desc[i].run_id,
+					     index->env->run_id_max);
 		if (vy_range_recover_run(range, desc[i].run_id) != 0)
 			goto out;
 	}
@@ -3823,7 +3821,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 			goto err_wi_sub;
 	}
 
-	range->new_run = vy_run_new();
+	range->new_run = vy_run_new(++index->env->run_id_max);
 	if (range->new_run == NULL)
 		goto err_run;
 
@@ -4046,7 +4044,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		r = parts[i] = vy_range_new(index, 0, keys[i], keys[i + 1]);
 		if (r == NULL)
 			goto err_parts;
-		r->new_run = vy_run_new();
+		r->new_run = vy_run_new(++index->env->run_id_max);
 		if (r->new_run == NULL)
 			goto err_parts;
 		/* Account merge w/o split. */
@@ -4811,7 +4809,7 @@ vy_index_gc(struct vy_index *index)
 	while ((dirent = readdir(dir))) {
 		int64_t index_lsn;
 		int64_t range_id;
-		int run_id;
+		int64_t run_id;
 		enum vy_file_type t;
 
 		if (!(strcmp(".", dirent->d_name)))
