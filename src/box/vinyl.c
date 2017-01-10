@@ -491,6 +491,51 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 /**
+ * Insert a statement into the in-memory level.
+ *
+ * @param mem vy_mem
+ * @param stmt statement
+ * @param alloc_lsn LSN for lsregion allocator
+ * @retval 0 on success
+ * @retval -1 on error, check diag
+ */
+static int
+vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt,
+	      int64_t alloc_lsn)
+{
+	size_t size = tuple_size(stmt);
+	struct tuple *mem_stmt;
+	mem_stmt = lsregion_alloc(mem->allocator, size, alloc_lsn);
+	if (mem_stmt == NULL) {
+		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
+		return -1;
+	}
+	memcpy(mem_stmt, stmt, size);
+	/*
+	 * Region allocated statements can't be referenced or unreferenced
+	 * because they are located in monolithic memory region. Referencing has
+	 * sense only for separately allocated memory blocks.
+	 * The reference count here is set to 0 for an assertion if somebody
+	 * will try to unreference this statement.
+	 */
+	mem_stmt->refs = 0;
+
+	const struct tuple *replaced_stmt = NULL;
+	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
+	if (rc != 0)
+		return -1;
+
+	if (mem->used == 0)
+		mem->min_lsn = vy_stmt_lsn(stmt);
+	assert(mem->min_lsn <= vy_stmt_lsn(stmt));
+
+	mem->used += size;
+	mem->version++;
+
+	return 0;
+}
+
+/**
  * Run metadata. A run is a written to a file as a single
  * chunk.
  */
@@ -3412,51 +3457,33 @@ out:
  */
 static int
 vy_range_set(struct vy_range *range, const struct tuple *stmt,
-	     int64_t alloc_id)
+	     int64_t alloc_lsn)
 {
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
-
-	const struct tuple *replaced_stmt = NULL;
 	struct vy_mem *mem = range->mem;
-	size_t size = tuple_size(stmt);
-	struct tuple *mem_stmt;
-	mem_stmt = lsregion_alloc(&index->env->allocator, size, alloc_id);
-	if (mem_stmt == NULL) {
-		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
-		return -1;
-	}
-	memcpy(mem_stmt, stmt, size);
-	/*
-	 * Region allocated statements can't be referenced or unreferenced
-	 * because they are located in monolithic memory region. Referencing has
-	 * sense only for separately allocated memory blocks.
-	 * The reference count here is set to 0 for an assertion if somebody
-	 * will try to unreference this statement.
-	 */
-	mem_stmt->refs = 0;
 
-	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
+	bool was_empty = (mem->used == 0);
+
+	int rc = vy_mem_insert(mem, stmt, alloc_lsn);
 	if (rc != 0)
 		return -1;
-	if (mem->used == 0) {
-		mem->min_lsn = vy_stmt_lsn(mem_stmt);
+
+	if (was_empty)
 		vy_scheduler_mem_dirtied(scheduler, mem);
-	}
+
 	if (range->used == 0) {
-		range->min_lsn = vy_stmt_lsn(mem_stmt);
+		range->min_lsn = vy_stmt_lsn(stmt);
 		vy_scheduler_update_range(scheduler, range);
 	}
 
-	assert(mem->min_lsn <= vy_stmt_lsn(mem_stmt));
-	assert(range->min_lsn <= vy_stmt_lsn(mem_stmt));
+	assert(mem->min_lsn <= vy_stmt_lsn(stmt));
+	assert(range->min_lsn <= vy_stmt_lsn(stmt));
 
-	mem->used += size;
+	size_t size = tuple_size(stmt);
 	range->used += size;
 	index->used += size;
 	index->stmt_count++;
-
-	mem->version++;
 
 	return 0;
 }
