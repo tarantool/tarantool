@@ -3,10 +3,16 @@ local log = require('log')
 
 local table_clear = require('table.clear')
 
+--
+-- Checks that argument is a callable, i.e. a function or a table
+-- with __call metamethod.
+--
 local function is_callable(arg)
-    if arg ~= nil then
-        local mt = (type(arg) == 'table' and getmetatable(arg) or nil)
-        if type(arg) == 'function' or mt ~= nil and type(mt.__call) == 'function' then
+    if type(arg) == 'function' then
+        return true
+    elseif type(arg) == 'table' then
+        local mt = getmetatable(arg)
+        if mt ~= nil and type(mt.__call) == 'function' then
             return true
         end
     end
@@ -16,14 +22,12 @@ end
 local trigger_list_mt = {
     __call = function(self, new_trigger, old_trigger)
         -- prepare, check arguments
-        local tnewt, toldt = type(new_trigger), type(old_trigger)
-        if (type(new_trigger) ~= 'nil' and not is_callable(new_trigger)) then
-            error("Bad type for new_trigger. Expected nil or callable, got '%s'",
-                  type(new_trigger))
+        if new_trigger ~= nil and not is_callable(new_trigger) then
+            error(string.format("Usage: %s(callable)", self.name))
         end
-        if (type(old_trigger) ~= 'nil' and not is_callable(old_trigger)) then
-            error("Bad type for old_trigger. Expected nil or callable, got '%s'",
-                  type(old_trigger))
+        if old_trigger ~= nil and not is_callable(old_trigger) then
+            error(string.format("Usage: trigger(new_callable, old_callable)",
+                  self.name))
         end
         -- do something
         if new_trigger == nil and old_trigger == nil then
@@ -40,7 +44,7 @@ local trigger_list_mt = {
                     return old_trigger
                 end
             end
-            error(string.format("Trigger '%s' wasn't set for '%s'", old_trigger, self.name))
+            error(string.format("%s: trigger is not found", self.name))
         else
             -- if both of the arguments are functions, then
             -- we'll replace triggers and return the old one
@@ -50,19 +54,14 @@ local trigger_list_mt = {
                     return old_trigger
                 end
             end
-            error(string.format("Trigger '%s' wasn't set for '%s'", old_trigger, self.name))
+            error(string.format("%s: trigger is not found", self.name))
         end
     end,
     __index = {
         run = function(self, ...)
+            -- ipairs ignores .name
             for _, func in ipairs(self) do
-                local ok, err = pcall(func, ...)
-                if not ok then
-                    log.info(
-                        "Error, while executing '%s' trigger: %s",
-                        self.name, tostring(err)
-                    )
-                end
+                func(...)
             end
         end,
     }

@@ -802,6 +802,7 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
     end
 
     self._schema_id = schema_id
+    self.space = sl
     self._on_schema_reload:run(self)
 end
 
