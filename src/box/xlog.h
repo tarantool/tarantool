@@ -306,6 +306,17 @@ xlog_create(struct xlog *xlog, const char *name,
 	    const struct xlog_meta *meta);
 
 /**
+ * Open an existing xlog file for appending.
+ * @param xlog          xlog descriptor
+ * @param name          file name
+ *
+ * @retval 0 success
+ * @retval -1 error
+ */
+int
+xlog_open(struct xlog *xlog, const char *name);
+
+/**
  * Rename xlog
  *
  * @retval 0 for ok

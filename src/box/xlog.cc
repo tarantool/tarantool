@@ -642,13 +642,39 @@ xlog_rename(struct xlog *l)
 	return 0;
 }
 
+static int
+xlog_init(struct xlog *xlog)
+{
+	memset(xlog, 0, sizeof(*xlog));
+	xlog->sync_interval = SNAP_SYNC_INTERVAL;
+	xlog->sync_time = ev_now(loop());
+	xlog->is_autocommit = true;
+	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	xlog->zctx = ZSTD_createCCtx();
+	if (xlog->zctx == NULL) {
+		diag_set(ClientError, ER_COMPRESSION,
+			 "failed to create context");
+		return -1;
+	}
+	return 0;
+}
+
+static void
+xlog_destroy(struct xlog *xlog)
+{
+	obuf_destroy(&xlog->obuf);
+	obuf_destroy(&xlog->zbuf);
+	ZSTD_freeCCtx(xlog->zctx);
+	TRASH(xlog);
+}
+
 int
 xlog_create(struct xlog *xlog, const char *name,
 	    const struct xlog_meta *meta)
 {
 	char meta_buf[XLOG_META_LEN_MAX];
 	int meta_len;
-	memset(xlog, 0, sizeof(*xlog));
 
 	/*
 	 * Check that the file without .inprogress suffix doesn't exist.
@@ -656,8 +682,15 @@ xlog_create(struct xlog *xlog, const char *name,
 	if (access(name, F_OK) == 0) {
 		errno = EEXIST;
 		diag_set(SystemError, "file '%s' already exists", name);
-		return -1;
+		goto err;
 	}
+
+	if (xlog_init(xlog) != 0)
+		goto err;
+
+	xlog->meta = *meta;
+	xlog->is_inprogress = true;
+	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
@@ -669,57 +702,101 @@ xlog_create(struct xlog *xlog, const char *name,
 	 * may think that this is a corrupt file and stop
 	 * replication.
 	 */
-	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 	xlog->fd = open(xlog->filename, O_RDWR | O_CREAT | O_EXCL, 0644);
 	if (xlog->fd < 0) {
 		say_syserror("open, [%s]", name);
 		diag_set(SystemError, "failed to create file '%s'", name);
-		goto error;
-	}
-
-	xlog->meta = *meta;
-	xlog->sync_is_async = false;
-	xlog->sync_interval = SNAP_SYNC_INTERVAL;
-	xlog->synced_size = 0;
-	xlog->sync_time = ev_now(loop());
-	xlog->rate_limit = 0;
-
-	xlog->is_inprogress = true;
-	xlog->is_autocommit = true;
-	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
-	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
-	xlog->zctx = ZSTD_createCCtx();
-	if (!xlog->zctx) {
-		diag_set(ClientError, ER_COMPRESSION,
-			 "failed to create context");
-		goto error;
+		goto err_open;
 	}
 
 	/* Format metadata */
 	meta_len = xlog_meta_format(&xlog->meta, meta_buf, sizeof(meta_buf));
 	if (meta_len < 0)
-		goto error;
+		goto err_write;
 	/* Formatted metadata must fit into meta_buf */
 	assert(meta_len < (int)sizeof(meta_buf));
 
 	/* Write metadata */
 	if (fio_writen(xlog->fd, meta_buf, meta_len) < 0) {
 		diag_set(SystemError, "%s: failed to write xlog meta", name);
-		goto error;
+		goto err_write;
 	}
 
 	xlog->offset = meta_len; /* first log starts after meta */
 	return 0;
-error:
-	if (xlog->fd >= 0) {
-		close(xlog->fd);
-		unlink(xlog->filename); /* try to remove incomplete file */
-	}
-	obuf_destroy(&xlog->obuf);
-	obuf_destroy(&xlog->zbuf);
-	if (xlog->zctx)
-		ZSTD_freeCCtx(xlog->zctx);
+err_write:
+	close(xlog->fd);
+	unlink(xlog->filename); /* try to remove incomplete file */
+err_open:
+	xlog_destroy(xlog);
+err:
+	return -1;
+}
 
+int
+xlog_open(struct xlog *xlog, const char *name)
+{
+	char magic[sizeof(log_magic_t)];
+	char meta_buf[XLOG_META_LEN_MAX];
+	const char *meta = meta_buf;
+	int meta_len;
+	int rc;
+
+	if (xlog_init(xlog) != 0)
+		goto err;
+
+	strncpy(xlog->filename, name, PATH_MAX);
+	xlog->fd = open(xlog->filename, O_RDWR);
+	if (xlog->fd < 0) {
+		say_syserror("open, [%s]", name);
+		diag_set(SystemError, "failed to open file '%s'", name);
+		goto err_open;
+	}
+
+	meta_len = fio_read(xlog->fd, meta_buf, sizeof(meta_buf));
+	if (meta_len < 0) {
+		diag_set(SystemError, "failed to read file '%s'",
+			 xlog->filename);
+		goto err_read;
+	}
+
+	rc = xlog_meta_parse(&xlog->meta, &meta, meta + meta_len);
+	if (rc < 0)
+		goto err_read;
+	if (rc > 0) {
+		tnt_error(XlogError, "Unexpected end of file");
+		goto err_read;
+	}
+
+	/*
+	 * If the file has eof marker, reposition the file pointer so
+	 * that the next write will overwrite it.
+	 */
+	xlog->offset = fio_lseek(xlog->fd, -sizeof(magic), SEEK_END);
+	if (xlog->offset < 0)
+		goto no_eof;
+	/* Use pread() so as not to change file pointer. */
+	rc = fio_pread(xlog->fd, magic, sizeof(magic), xlog->offset);
+	if (rc < 0) {
+		diag_set(SystemError, "failed to read file '%s'",
+			 xlog->filename);
+		goto err_read;
+	}
+	if (rc != sizeof(magic) || load_u32(magic) != eof_marker) {
+no_eof:
+		xlog->offset = fio_lseek(xlog->fd, 0, SEEK_END);
+		if (xlog->offset < 0) {
+			diag_set(SystemError, "failed to seek file '%s'",
+				 xlog->filename);
+			goto err_read;
+		}
+	}
+	return 0;
+err_read:
+	close(xlog->fd);
+err_open:
+	xlog_destroy(xlog);
+err:
 	return -1;
 }
 
@@ -1149,11 +1226,8 @@ xlog_close(struct xlog *l, bool reuse_fd)
 		if (rc < 0)
 			say_syserror("%s: close() failed", l->filename);
 	}
-	obuf_destroy(&l->obuf);
-	obuf_destroy(&l->zbuf);
-	if (l->zctx)
-		ZSTD_freeCCtx(l->zctx);
-	TRASH(l);
+
+	xlog_destroy(l);
 	return rc;
 }
 
