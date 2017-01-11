@@ -101,8 +101,6 @@ struct MemtxEngine: public Engine {
 	void setSnapIoRateLimit(double new_limit)
 	{
 		m_snap_io_rate_limit = new_limit * 1024 * 1024;
-		if (m_snap_io_rate_limit == 0)
-			m_snap_io_rate_limit = UINT64_MAX;
 	}
 	/**
 	 * Return LSN of the most recent snapshot or -1 if there is

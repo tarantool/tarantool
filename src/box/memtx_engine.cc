@@ -213,7 +213,7 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 	:Engine("memtx", &memtx_tuple_format_vtab),
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
-	m_snap_io_rate_limit(UINT64_MAX),
+	m_snap_io_rate_limit(0),
 	m_panic_on_wal_error(panic_on_wal_error)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY;
@@ -683,13 +683,13 @@ MemtxEngine::bootstrap()
 }
 
 static void
-checkpoint_write_row(struct xlog *l, struct xrow_header *row,
-		     uint64_t snap_io_rate_limit)
+checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 {
-	static uint64_t bytes;
-	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	ev_loop *loop = loop();
+	if (last == 0) {
+		ev_now_update(loop());
+		last = ev_now(loop());
+	}
 
 	row->tm = last;
 	row->server_id = 0;
@@ -708,53 +708,14 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row,
 	if (written < 0) {
 		diag_raise();
 	}
-	bytes += written;
 
 	if (l->rows % 100000 == 0)
 		say_crit("%.1fM rows written", l->rows / 1000000.);
 
-
-	if (snap_io_rate_limit != UINT64_MAX) {
-		if (last == 0) {
-			/*
-			 * Remember the time of first
-			 * write to disk.
-			 */
-			ev_now_update(loop);
-			last = ev_now(loop);
-		}
-		/**
-		 * If io rate limit is set, flush the
-		 * filesystem cache, otherwise the limit is
-		 * not really enforced.
-		 */
-		if (bytes > snap_io_rate_limit)
-			fdatasync(l->fd);
-	}
-	while (bytes > snap_io_rate_limit) {
-		ev_now_update(loop);
-		/*
-		 * How much time have passed since
-		 * last write?
-		 */
-		elapsed = ev_now(loop) - last;
-		/*
-		 * If last write was in less than
-		 * a second, sleep until the
-		 * second is reached.
-		 */
-		if (elapsed < 1)
-			usleep(((1 - elapsed) * 1000000));
-
-		ev_now_update(loop);
-		last = ev_now(loop);
-		bytes -= snap_io_rate_limit;
-	}
 }
 
 static void
-checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple,
-		       uint64_t snap_io_rate_limit)
+checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
@@ -773,7 +734,7 @@ checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple,
 	uint32_t bsize;
 	row.body[1].iov_base = (char *) tuple_data_range(tuple, &bsize);
 	row.body[1].iov_len = bsize;
-	checkpoint_write_row(l, &row, snap_io_rate_limit);
+	checkpoint_write_row(l, &row);
 }
 
 struct checkpoint_entry {
@@ -854,6 +815,8 @@ checkpoint_f(va_list ap)
 		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
+	if (ckpt->snap_io_rate_limit)
+		snap.rate_limit = ckpt->snap_io_rate_limit;
 
 	say_info("saving snapshot `%s'", snap.filename);
 	struct checkpoint_entry *entry;
@@ -862,7 +825,7 @@ checkpoint_f(va_list ap)
 		struct iterator *it = entry->iterator;
 		for (tuple = it->next(it); tuple; tuple = it->next(it)) {
 			checkpoint_write_tuple(&snap, space_id(entry->space),
-					       tuple, ckpt->snap_io_rate_limit);
+					       tuple);
 		}
 	}
 	xlog_flush(&snap);

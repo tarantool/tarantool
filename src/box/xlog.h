@@ -42,6 +42,8 @@
 #include "small/ibuf.h"
 #include "small/obuf.h"
 
+#include "third_party/tarantool_ev.h"
+
 struct iovec;
 struct xrow_header;
 
@@ -255,9 +257,22 @@ struct xlog {
 	 */
 	uint64_t sync_interval;
 	/**
-	 * synced file size
+	 * Synced file size
 	 */
 	uint64_t synced_size;
+	/**
+	 * If xlog file was synced corresponding cache will be freed if true.
+	 * This can be significant for memtx snapshots (that wouldn't
+	 * be read in normal cases) and vinyl data files (that can be read
+	 * after writing)
+	 */
+	bool free_cache;
+	/**
+	 * Write rate limit
+	 */
+	uint64_t rate_limit;
+	/** Time when xlog wast synced last time */
+	ev_tstamp sync_time;
 };
 
 /**

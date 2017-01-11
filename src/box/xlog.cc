@@ -681,6 +681,8 @@ xlog_create(struct xlog *xlog, const char *name,
 	xlog->sync_is_async = false;
 	xlog->sync_interval = SNAP_SYNC_INTERVAL;
 	xlog->synced_size = 0;
+	xlog->sync_time = ev_now(loop());
+	xlog->rate_limit = 0;
 
 	xlog->is_inprogress = true;
 	xlog->is_autocommit = true;
@@ -751,6 +753,9 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 
 	/* set sync interval from xdir settings */
 	xlog->sync_interval = dir->sync_interval;
+	/* free file cache if dir should be synced */
+	xlog->free_cache = dir->sync_interval != 0 ? true: false;
+	xlog->rate_limit = 0;
 
 	/* Rename xlog file */
 	if (dir->suffix != INPROGRESS && xlog_rename(xlog)) {
@@ -951,11 +956,20 @@ xlog_tx_write(struct xlog *log)
 		    ftruncate(log->fd, log->offset) != 0)
 			panic_syserror("failed to truncate xlog after write error");
 	}
-	if (log->sync_interval && log->offset >=
-	    (off_t)(log->synced_size + log->sync_interval)) {
+	if ((log->sync_interval && log->offset >=
+	    (off_t)(log->synced_size + log->sync_interval)) ||
+	    (log->rate_limit && log->offset >=
+	    (off_t)(log->synced_size + log->rate_limit))) {
 		off_t sync_from = SYNC_ROUND_DOWN(log->synced_size);
 		size_t sync_len = SYNC_ROUND_UP(log->offset) -
 				  sync_from;
+		if (log->rate_limit > 0) {
+			double throttle_time;
+			throttle_time = (double)sync_len / log->rate_limit -
+					(ev_time() - log->sync_time);
+			if (throttle_time > 0)
+				fiber_sleep(throttle_time);
+		}
 		/** sync data from cache to disk */
 #ifdef HAVE_SYNC_FILE_RANGE
 		sync_file_range(log->fd, sync_from, sync_len,
@@ -965,14 +979,17 @@ xlog_tx_write(struct xlog *log)
 #else
 		fdatasync(log->fd);
 #endif /* HAVE_SYNC_FILE_RANGE */
+		log->sync_time = ev_time();
+		if (log->free_cache) {
 #ifdef HAVE_POSIX_FADVISE
-		/** free page cache */
-		posix_fadvise(log->fd, sync_from, sync_len,
-			      POSIX_FADV_DONTNEED);
+			/** free page cache */
+			posix_fadvise(log->fd, sync_from, sync_len,
+				      POSIX_FADV_DONTNEED);
 #else
-		(void) sync_from;
-		(void) sync_len;
+			(void) sync_from;
+			(void) sync_len;
 #endif /* HAVE_POSIX_FADVISE */
+		}
 		log->synced_size = log->offset;
 	}
 	return written;
