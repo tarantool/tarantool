@@ -456,10 +456,9 @@ local function create_transport(host, port, user, password, callback)
         dispatch_response_iproto(hdr, body)
         local status = hdr[IPROTO_STATUS_KEY]
         local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
-        if status ~= 0 and
-           band(status, IPROTO_ERRNO_MASK) == E_WRONG_SCHEMA_VERSION and
-           response_schema_id ~= schema_id
-        then
+        if response_schema_id > 0 and response_schema_id ~= schema_id then
+            -- schema_id has been changed - start to load a new version.
+            -- Sic: self._schema_id will be updated only after reload.
             set_state('fetch_schema',
                       E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
                       response_schema_id)
