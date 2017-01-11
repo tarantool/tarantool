@@ -350,16 +350,22 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 
 	recovery_close_log(r);
 
+	/*
+	 * Check that the last xlog file has rows.
+	 */
 	if (vclockset_last(&r->wal_dir.index) != NULL &&
 	    vclock_sum(&r->vclock) ==
 	    vclock_sum(vclockset_last(&r->wal_dir.index))) {
-		/**
-		 * The last log file had zero rows -> bump
-		 * LSN so that we don't stumble over this
-		 * file when trying to open a new xlog
-		 * for writing.
+		/*
+		 * Delete the last empty xlog file.
 		 */
-		vclock_inc(&r->vclock, r->server_id);
+		char *name = xdir_format_filename(&r->wal_dir,
+						  vclock_sum(&r->vclock),
+						  NONE);
+		if (unlink(name) != 0) {
+			tnt_raise(SystemError, "%s: failed to unlink file",
+				  name);
+		}
 	}
 }
 
