@@ -555,6 +555,13 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 }
 
 /**
+ * Given a tuple with an index definition, update the LSN stored
+ * in the index options.
+ */
+extern struct tuple *
+key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
+
+/**
  * Check object identifier for invalid symbols.
  * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
  * Result is locale-dependent.

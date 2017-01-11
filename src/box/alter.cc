@@ -234,14 +234,20 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 	}
 }
 
-static void
+/**
+ * Populate key options from their msgpack-encoded representation
+ * (msgpack map)
+ *
+ * @return   the end of the msgpack map in the stream
+ */
+static const char *
 opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		       uint32_t errcode, uint32_t field_no)
 {
 	char errmsg[DIAG_ERRMSG_MAX];
 
 	if (mp_typeof(*map) == MP_NIL)
-		return;
+		return map;
 	if (mp_typeof(*map) != MP_MAP)
 		tnt_raise(ClientError, errcode, field_no,
 			  "expected a map with options");
@@ -283,6 +289,7 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 			tnt_raise(ClientError, errcode, field_no, errmsg);
 		}
 	}
+	return map;
 }
 
 /**
@@ -316,15 +323,18 @@ key_opts_decode_distance(const char *str)
  * 1.6.6+
  * Fill key_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
+ *
+ * @return  the end of the map in the msgpack stream
  */
-static void
-key_opts_create_from_field(struct key_opts *opts, const char *map)
+static const char *
+key_opts_create(struct key_opts *opts, const char *map)
 {
 	*opts = key_opts_default;
-	opts_create_from_field(opts, key_opts_reg, map,
-			       ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+	map = opts_create_from_field(opts, key_opts_reg, map,
+				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
 		opts->distance = key_opts_decode_distance(opts->distancebuf);
+	return map;
 }
 
 /**
@@ -436,7 +446,7 @@ key_def_new_from_tuple(struct tuple *tuple)
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
 		const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-		key_opts_create_from_field(&opts, opts_field);
+		key_opts_create(&opts, opts_field);
 		parts = tuple_field(tuple, INDEX_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
@@ -465,11 +475,105 @@ key_def_new_from_tuple(struct tuple *tuple)
 	return key_def;
 }
 
+static char *
+opt_encode(char *data, const void *opts, const void *default_opts,
+	   const struct opt_def *def)
+{
+	const char *opt = ((const char *) opts) + def->offset;
+	const char *default_opt = ((const char *) default_opts) + def->offset;
+	if (memcmp(opt, default_opt, def->len) == 0)
+		return data;
+	data = mp_encode_str(data, def->name, strlen(def->name));
+	switch (def->type) {
+	case MP_BOOL:
+		data = mp_encode_bool(data, load_bool(opt));
+		break;
+	case MP_UINT:
+		if (def->len == sizeof(uint64_t)) {
+			data = mp_encode_uint(data, load_u64(opt));
+		} else if (def->len == sizeof(uint32_t)) {
+			data = mp_encode_uint(data, load_u32(opt));
+		} else {
+			unreachable();
+		}
+		break;
+	case MP_STR:
+		data = mp_encode_str(data, opt, strlen(opt));
+		break;
+	default:
+		unreachable();
+	}
+	return data;
+}
+
+static char *
+opts_encode(char *data, const void *opts, const void *default_opts,
+	    const struct opt_def *reg)
+{
+	char *p = data;
+	uint32_t n_opts = 0;
+	for (const struct opt_def *def = reg; def->name != NULL; def++) {
+		char *end = opt_encode(p, opts, default_opts, def);
+		if (p != end) {
+			p = end;
+			n_opts++;
+		}
+	}
+	ptrdiff_t len = p - data;
+	memmove(data + mp_sizeof_map(n_opts), data, len);
+	data = mp_encode_map(data, n_opts);
+	data += len;
+	return data;
+}
+
+static char *
+key_opts_encode(char *data, const struct key_opts *opts)
+{
+	return opts_encode(data, opts, &key_opts_default, key_opts_reg);
+}
+
+struct tuple *
+key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
+{
+	bool is_166plus;
+	key_def_check_tuple(tuple, &is_166plus);
+	if (!is_166plus)
+		return tuple;
+	struct key_opts opts;
+	const char *opts_field = tuple_field(tuple, INDEX_OPTS);
+	const char *opts_field_end = key_opts_create(&opts, opts_field);
+	opts.lsn = lsn;
+	size_t size = (opts_field_end - opts_field) + 64;
+	char *buf = (char *)malloc(size);
+	if (buf == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "buf");
+	char *buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 2);
+	buf_end = mp_encode_array(buf_end, 3);
+	buf_end = mp_encode_str(buf_end, "#", 1);
+	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
+	buf_end = mp_encode_uint(buf_end, 1);
+	buf_end = mp_encode_array(buf_end, 3);
+	buf_end = mp_encode_str(buf_end, "!", 1);
+	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
+	buf_end = key_opts_encode(buf_end, &opts);
+	assert(buf_end <= buf + size);
+	tuple = box_tuple_update(tuple, buf, buf_end);
+	free(buf);
+	if (tuple == NULL)
+		diag_raise();
+	return tuple;
+}
+
+/**
+ * Fill space opts from the msgpack stream (MP_MAP field in the
+ * tuple).
+ */
 static void
-space_def_init_opts(struct space_def *def, struct tuple *tuple)
+space_opts_create(struct space_opts *opts, struct tuple *tuple)
 {
 	/* default values of opts */
-	def->opts = space_opts_default;
+	*opts = space_opts_default;
 
 	/* there is no property in the space */
 	if (tuple_field_count(tuple) <= OPTS)
@@ -484,16 +588,15 @@ space_def_init_opts(struct space_def *def, struct tuple *tuple)
 			while (isspace(*flags)) /* skip space */
 				flags++;
 			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-				def->opts.temporary = true;
+				opts->temporary = true;
 			flags = strchr(flags, ',');
 			if (flags)
 				flags++;
 		}
-		return;
+	} else {
+		opts_create_from_field(opts, space_opts_reg, data,
+				       ER_WRONG_SPACE_OPTIONS, OPTS);
 	}
-
-	opts_create_from_field(&def->opts, space_opts_reg, data,
-			       ER_WRONG_SPACE_OPTIONS, OPTS);
 }
 
 /**
@@ -511,7 +614,7 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
 			 "%s", tuple_field_cstr(tuple, ENGINE));
 
-	space_def_init_opts(def, tuple);
+	space_opts_create(&def->opts, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
 	access_check_ddl(def->uid, SC_SPACE);
 }

@@ -783,8 +783,10 @@ space_truncate(struct space *space)
 
 	/* create all indexes again, now they are empty */
 	for (int i = 0; i < index_count; i++) {
+		int64_t lsn = vclock_sum(&recovery->vclock);
+		tuple = key_def_tuple_update_lsn(indexes[i], lsn);
 		uint32_t bsize;
-		const char *data = tuple_data_range(indexes[i], &bsize);
+		const char *data = tuple_data_range(tuple, &bsize);
 		if (box_insert(BOX_INDEX_ID, data, data + bsize, NULL))
 			diag_raise();
 	}
