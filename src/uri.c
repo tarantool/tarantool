@@ -6591,14 +6591,48 @@ case 265:
 	return cs >= uri_first_final ? 0 : -1;
 }
 
-char *
-uri_format(const struct uri *uri)
+/*
+ * Macro to return from snprintf count of written bytes
+ * snprintf will write at most size bytes, but can return greather value for
+ * truncated output
+ */
+#define SNPRINTF(STR, SIZE, ...) ({ \
+	size_t size = SIZE; \
+	int ret = snprintf(STR, size, __VA_ARGS__);\
+	ret < (int)size ? ret: (int)size;})
+
+int
+uri_format(char *str, size_t len, const struct uri *uri, bool write_password)
 {
-	static char buf[1024];
-	/* very primitive implementation suitable for our needs */
-	snprintf(buf, sizeof(buf), "%.*s:%.*s",
-		 (int) uri->host_len, uri->host != NULL ? uri->host : "*",
-		 (int) uri->service_len, uri->service);
-	return buf;
+	int pos = 0;
+	pos += SNPRINTF(str + pos, len - pos, "%.*s:",
+			(int)uri->scheme_len, uri->scheme);
+	if (uri->host_len > 0) {
+		pos += SNPRINTF(str + pos, len - pos, "//");
+		if (uri->login_len > 0) {
+			pos += SNPRINTF(str + pos, len - pos, "%.*s",
+					(int)uri->login_len, uri->login);
+			if (uri->password_len > 0 && write_password)
+				pos += SNPRINTF(str + pos, len - pos, ":%.*s",
+						(int)uri->password_len, uri->password);
+			pos += SNPRINTF(str + pos, len - pos, "@");
+		}
+		pos += SNPRINTF(str + pos, len - pos, "%.*s",
+				(int)uri->host_len, uri->host);
+		if (uri->service_len > 0)
+			pos += SNPRINTF(str + pos, len - pos, ":%.*s",
+					(int)uri->service_len, uri->service);
+	}
+	if (uri->path_len > 0)
+		pos += SNPRINTF(str + pos, len - pos, "%.*s",
+				(int)uri->path_len, uri->path);
+	if (uri->query_len > 0)
+		pos += SNPRINTF(str + pos, len - pos, "?%.*s",
+				(int)uri->query_len, uri->query);
+	if (uri->fragment_len > 0)
+		pos += SNPRINTF(str + pos, len - pos, "#%.*s",
+				(int)uri->fragment_len, uri->fragment);
+	return pos;
 }
+
 /* vim: set ft=ragel: */

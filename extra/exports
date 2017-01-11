@@ -50,6 +50,7 @@ tt_uuid_bswap
 tt_uuid_from_string
 log_level
 uri_parse
+uri_format
 PMurHash32
 PMurHash32_Process
 PMurHash32_Result

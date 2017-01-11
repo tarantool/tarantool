@@ -446,8 +446,8 @@ applier_start(struct applier *applier)
 	char name[FIBER_NAME_MAX];
 	assert(applier->reader == NULL);
 
-	const char *uri = uri_format(&applier->uri);
-	snprintf(name, sizeof(name), "applier/%s", uri);
+	int pos = snprintf(name, sizeof(name), "applier/");
+	uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
 
 	struct fiber *f = fiber_new_xc(name, applier_f);
 	/**
