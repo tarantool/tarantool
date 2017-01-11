@@ -545,6 +545,18 @@ int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow);
 
 /**
+ * Fetch next row from cursor, ignores xlog tx boundary,
+ * open a next one tx if current is done.
+ *
+ * @retval 0 for Ok
+ * @retval 1 for EOF
+ * @retval -1 for error
+ */
+int
+xlog_cursor_next(struct xlog_cursor *cursor,
+		 struct xrow_header *xrow, bool panic_if_error);
+
+/**
  * Move to the next xlog tx
  *
  * @retval 0 magic found
@@ -616,46 +628,6 @@ xdir_check_xc(struct xdir *dir)
 }
 
 /**
- * Fetch next row from cursor, ignores xlog tx boundary,
- * open a next one tx if current is done.
- *
- * @retval 0 for Ok
- * @retval 1 for EOF
- */
-static inline int
-xlog_cursor_next_xc(struct xlog_cursor *cursor,
-			struct xrow_header *xrow, bool panic_if_error)
-{
-	while (true) {
-		int rc;
-		rc = xlog_cursor_next_row(cursor, xrow);
-		if (rc == 0)
-			break;
-		if (rc < 0) {
-			struct error *e = diag_last_error(diag_get());
-			if (panic_if_error ||
-			    e->type != &type_XlogError)
-				diag_raise();
-			say_error("can't decode row: %s", e->errmsg);
-		}
-		while ((rc = xlog_cursor_next_tx(cursor)) < 0) {
-			struct error *e = diag_last_error(diag_get());
-			if (panic_if_error ||
-			    e->type != &type_XlogError)
-				diag_raise();
-			say_error("can't open tx: %s", e->errmsg);
-			if ((rc = xlog_cursor_find_tx_magic(cursor)) < 0)
-				diag_raise();
-			if (rc > 0)
-				break;
-		}
-		if (rc == 1)
-			return 1;
-	}
-	return 0;
-}
-
-/**
  * @copydoc xdir_open_cursor
  */
 static inline int
@@ -686,6 +658,19 @@ static inline int
 xlog_cursor_open_xc(struct xlog_cursor *cursor, const char *name)
 {
 	int rc = xlog_cursor_open(cursor, name);
+	if (rc == -1)
+		diag_raise();
+	return rc;
+}
+
+/**
+ * @copydoc xlog_cursor_next
+ */
+static inline int
+xlog_cursor_next_xc(struct xlog_cursor *cursor,
+		    struct xrow_header *xrow, bool panic_if_error)
+{
+	int rc = xlog_cursor_next(cursor, xrow, panic_if_error);
 	if (rc == -1)
 		diag_raise();
 	return rc;

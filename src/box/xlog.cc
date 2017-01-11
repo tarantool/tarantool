@@ -1660,6 +1660,39 @@ xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 }
 
 int
+xlog_cursor_next(struct xlog_cursor *cursor,
+		 struct xrow_header *xrow, bool panic_if_error)
+{
+	while (true) {
+		int rc;
+		rc = xlog_cursor_next_row(cursor, xrow);
+		if (rc == 0)
+			break;
+		if (rc < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (panic_if_error ||
+			    e->type != &type_XlogError)
+				return -1;
+			say_error("can't decode row: %s", e->errmsg);
+		}
+		while ((rc = xlog_cursor_next_tx(cursor)) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			if (panic_if_error ||
+			    e->type != &type_XlogError)
+				return -1;
+			say_error("can't open tx: %s", e->errmsg);
+			if ((rc = xlog_cursor_find_tx_magic(cursor)) < 0)
+				return -1;
+			if (rc > 0)
+				break;
+		}
+		if (rc == 1)
+			return 1;
+	}
+	return 0;
+}
+
+int
 xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 {
 	memset(i, 0, sizeof(*i));
