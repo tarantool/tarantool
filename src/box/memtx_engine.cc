@@ -815,8 +815,7 @@ checkpoint_f(va_list ap)
 		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
-	if (ckpt->snap_io_rate_limit)
-		snap.rate_limit = ckpt->snap_io_rate_limit;
+	snap.rate_limit = ckpt->snap_io_rate_limit;
 
 	say_info("saving snapshot `%s'", snap.filename);
 	struct checkpoint_entry *entry;

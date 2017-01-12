@@ -42,8 +42,6 @@
 #include "small/ibuf.h"
 #include "small/obuf.h"
 
-#include "third_party/tarantool_ev.h"
-
 struct iovec;
 struct xrow_header;
 
@@ -272,7 +270,7 @@ struct xlog {
 	 */
 	uint64_t rate_limit;
 	/** Time when xlog wast synced last time */
-	ev_tstamp sync_time;
+	double sync_time;
 };
 
 /**
