@@ -175,9 +175,41 @@ char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
-	uint32_t bsize;
-	const char *data = tuple_data_range(tuple, &bsize);
-	return tuple_extract_key_raw(data, data + bsize, key_def, key_size);
+	uint32_t bsize = 0;
+	const char *data = tuple_data(tuple);
+	uint32_t part_count = key_def->part_count;
+	const struct tuple_format *format = tuple_format(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+
+	/* Calculate key size. */
+	for (uint32_t i = 0; i < part_count; ++i) {
+		const char *field =
+			tuple_field_raw(format, data, field_map,
+					key_def->parts[i].fieldno);
+		const char *end = field;
+		mp_next(&end);
+		bsize += end - field;
+	}
+
+	char *key = (char *) region_alloc(&fiber()->gc, bsize);
+	if (key == NULL) {
+		diag_set(OutOfMemory, bsize, "region", "tuple_extract_key");
+		return NULL;
+	}
+	char *key_buf = mp_encode_array(key, part_count);
+	for (uint32_t i = 0; i < part_count; ++i) {
+		const char *field =
+			tuple_field_raw(format, data, field_map,
+					key_def->parts[i].fieldno);
+		const char *end = field;
+		mp_next(&end);
+		bsize = end - field;
+		memcpy(key_buf, field, bsize);
+		key_buf += bsize;
+	}
+	if (key_size != NULL)
+		*key_size = key_buf - key;
+	return key;
 }
 
 char *

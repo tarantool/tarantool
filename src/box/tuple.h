@@ -343,7 +343,8 @@ tuple_compare_field(const char *field_a, const char *field_b,
 
 /**
  * Extract key from tuple by given key definition and return
- * buffer allocated on box_txn_alloc with this key.
+ * buffer allocated on box_txn_alloc with this key. This function
+ * has O(n) complexity, where n is the number of key parts.
  * @param tuple - tuple from which need to extract key
  * @param key_def - definition of key that need to extract
  * @param key_size - here will be size of extracted key
@@ -358,6 +359,7 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 /**
  * Extract key from raw msgpuck by given key definition and return
  * buffer allocated on box_txn_alloc with this key.
+ * This function has O(n^2) complexity, where n is the number of key parts.
  * @param data - msgpuck data from which need to extract key
  * @param data_end - pointer at the end of data
  * @param key_def - definition of key that need to extract
