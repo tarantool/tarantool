@@ -69,7 +69,7 @@ vy_env_delete(struct vy_env *e);
 void
 vy_bootstrap(struct vy_env *e);
 
-void
+int
 vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock);
 
 void
