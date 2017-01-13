@@ -434,10 +434,13 @@ struct vy_range {
 	struct rlist frozen;
 	/** Number of times the range was compacted. */
 	int n_compactions;
-	/** Points to the range being compacted to this range. */
+	/**
+	 * If this range is a part of a range that is being split,
+	 * this field points to the original range.
+	 */
 	struct vy_range *shadow;
-	/** List of ranges this range is being compacted to. */
-	struct rlist compact_list;
+	/** List of ranges this range is being split into. */
+	struct rlist split_list;
 	rb_node(struct vy_range) tree_node;
 	struct heap_node   in_compact;
 	struct heap_node   in_dump;
@@ -1558,13 +1561,13 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 /*
  * Find the first range in which a given key should be looked up.
  * This function only takes into account the actual range tree layout
- * and does not handle the compaction case, when a range being compacted
- * is replaced by new range(s) back-pointing to it via range->shadow.
+ * and does not handle the split case, when a range being split
+ * is replaced by new ranges back-pointing to it via range->shadow.
  * Therefore, as is, this function is only suitable for handling
  * insertions, which always go to in-memory indexes of ranges found in
  * the range tree. Select operations have to check range->shadow to
  * guarantee that no keys are skipped no matter if there is a
- * compaction operation in progress (see vy_range_iterator_next()).
+ * split operation in progress (see vy_range_iterator_next()).
  */
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
@@ -1670,10 +1673,10 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 /**
  * Iterate to the next range. The next range is returned in @result.
  * This function is supposed to be used for iterating over a subset of
- * keys in an index. Therefore it should handle the compaction case,
+ * keys in an index. Therefore it should handle the split case,
  * i.e. check if the range returned by vy_range_tree_find_by_key()
  * is a replacement range and return a pointer to the range being
- * compacted if it is.
+ * split if it is.
  */
 static void
 vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
@@ -1717,15 +1720,17 @@ next:
 	}
 check:
 	/*
-	 * When compaction starts, the selected range is replaced with
-	 * one or more new ranges, each of which has ->shadow pointing
-	 * to the original range (see vy_task_compact_new()). New
-	 * ranges must not be read from until compaction has finished,
-	 * because (1) their in-memory indexes are linked to the
-	 * original range and (2) they don't have on-disk runs yet. So
-	 * whenever we encounter such a range we return ->shadow
-	 * instead. We also have to be careful not to return the same
-	 * range twice in case of split taking place.
+	 * When range split starts, the selected range is replaced with
+	 * several new ranges, each of which has ->shadow pointing to
+	 * the original range (see vy_task_compact_new()). New ranges
+	 * must not be read from until split has finished, because they
+	 * only contain in-memory data added after split was initiated,
+	 * while on-disk runs and older in-memory indexes are still
+	 * linked to the original range. So whenever we encounter such
+	 * a range we return ->shadow instead, and assume that the
+	 * caller will handle it (as vy_read_iterator_add_mem() does).
+	 * Note, we have to be careful not to return the same range
+	 * twice.
 	 */
 	if (next != NULL && next->shadow != NULL) {
 		if (curr != NULL && curr->shadow == next->shadow) {
@@ -2453,7 +2458,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 	range->index = index;
 	range->in_dump.pos = UINT32_MAX;
 	range->in_compact.pos = UINT32_MAX;
-	rlist_create(&range->compact_list);
+	rlist_create(&range->split_list);
 	return range;
 }
 
@@ -3298,10 +3303,10 @@ vy_task_compact_execute(struct vy_task *task)
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
 		return -1;
-	assert(!rlist_empty(&range->compact_list));
-	rlist_foreach_entry(r, &range->compact_list, compact_list) {
+	assert(!rlist_empty(&range->split_list));
+	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(r->shadow == range);
-		if (&r->compact_list != rlist_first(&range->compact_list)) {
+		if (&r->split_list != rlist_first(&range->split_list)) {
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
 				     {diag_set(ClientError, ER_INJECTION,
 					       "vinyl range split");
@@ -3330,7 +3335,7 @@ vy_task_compact_complete(struct vy_task *task)
 		vy_log_tx_rollback(env->log);
 		return -1;
 	}
-	rlist_foreach_entry(r, &range->compact_list, compact_list) {
+	rlist_foreach_entry(r, &range->split_list, split_list) {
 		if (vy_log_insert_range(env->log, index->key_def->opts.lsn, r->id,
 				r->begin != NULL ? tuple_data(r->begin) : NULL,
 				r->end != NULL ? tuple_data(r->end) : NULL) < 0 ||
@@ -3348,19 +3353,19 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_write_iterator_delete(task->wi);
 
 	/*
-	 * If compaction completed successfully, all runs and mems of
+	 * If range split completed successfully, all runs and mems of
 	 * the original range were dumped and hence we don't need it any
 	 * longer. So unlink new ranges from the original one and delete
 	 * the latter.
 	 */
 	vy_index_unacct_range(index, range);
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
-		/* Add the new run created by compaction to the list. */
+	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
+		/* Add the new run created by split to the list. */
 		rlist_add_entry(&r->runs, r->new_run, in_range);
 		r->run_count++;
 		r->new_run = NULL;
 
-		rlist_del(&r->compact_list);
+		rlist_del(&r->split_list);
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
@@ -3391,16 +3396,16 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	if (!in_shutdown) {
 		/* Delete files we failed to write. */
-		rlist_foreach_entry(r, &range->compact_list, compact_list)
+		rlist_foreach_entry(r, &range->split_list, split_list)
 			vy_run_unlink_files(index->path, r->new_run->id);
 	}
 
 	/*
-	 * On compaction failure we delete new ranges, but leave their
+	 * On split failure we delete new ranges, but leave their
 	 * mems and runs linked to the old range so that statements
-	 * inserted during compaction don't get lost.
+	 * inserted while split was in progress don't get lost.
 	 */
-	rlist_foreach_entry_safe(r, &range->compact_list, compact_list, tmp) {
+	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
 		assert(r->run_count == 0);
 
 		vy_range_freeze_mem(r);
@@ -3410,7 +3415,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 		assert(range->min_lsn <= r->min_lsn);
 		range->used += r->used;
 
-		rlist_del(&r->compact_list);
+		rlist_del(&r->split_list);
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
@@ -3436,7 +3441,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	struct tx_manager *xm = index->env->xm;
 	struct vy_log *log = index->env->log;
 
-	assert(rlist_empty(&range->compact_list));
+	assert(rlist_empty(&range->split_list));
 
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
@@ -3505,7 +3510,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 
 	/*
 	 * Make sure no new statement is inserted into the active mem
-	 * after we start compacting the range. Needed by the write
+	 * after we start splitting the range. Needed by the write
 	 * iterator, which requires its sources to be immutable.
 	 */
 	vy_range_freeze_mem(range);
@@ -3515,13 +3520,13 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i];
 		/*
-		 * While compaction is in progress, new statements are
+		 * While range split is in progress, new statements are
 		 * inserted to new ranges while read iterator walks over
 		 * the old range (see vy_range_iterator_next()). To make
 		 * new statements visible, link new ranges to the old
-		 * range via ->compact_list.
+		 * range via ->split_list.
 		 */
-		rlist_add_tail(&range->compact_list, &r->compact_list);
+		rlist_add_tail(&range->split_list, &r->split_list);
 		assert(r->shadow == NULL);
 		r->shadow = range;
 		vy_index_add_range(index, r);
@@ -8475,11 +8480,11 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 	assert(range != NULL);
 	assert(range->shadow == NULL);
 	/*
-	 * The range may be under compaction, in which case we must
-	 * add active in-memory indexes of child ranges first.
+	 * The range may be in the middle of split, in which case we
+	 * must add active in-memory indexes of new ranges first.
 	 */
 	struct vy_range *r;
-	rlist_foreach_entry(r, &range->compact_list, compact_list) {
+	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(rlist_empty(&r->frozen));
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
