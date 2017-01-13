@@ -4046,26 +4046,27 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 static int
 vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
-	int rc;
-
 	*ptask = NULL;
 	if (rlist_empty(&scheduler->env->indexes))
 		return 0;
 
-	rc = vy_scheduler_peek_dump(scheduler, ptask);
-	if (rc != 0)
-		return rc; /* error */
+	if (vy_scheduler_peek_dump(scheduler, ptask) != 0)
+		goto fail;
 	if (*ptask != NULL)
 		return 0;
 
-	rc = vy_scheduler_peek_compact(scheduler, ptask);
-	if (rc != 0)
-		return rc; /* error */
+	if (vy_scheduler_peek_compact(scheduler, ptask) != 0)
+		goto fail;
 	if (*ptask != NULL)
 		return 0;
 
 	/* no task to run */
 	return 0;
+fail:
+	assert(!diag_is_empty(diag_get()));
+	diag_move(diag_get(), &scheduler->diag);
+	error_log(diag_last_error(&scheduler->diag));
+	return -1;
 
 }
 
@@ -4087,6 +4088,7 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 	}
 	return 0;
 fail:
+	error_log(diag_last_error(&scheduler->diag));
 	if (task->ops->abort)
 		task->ops->abort(task, in_shutdown);
 	return -1;
@@ -4097,7 +4099,6 @@ vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 	struct vy_env *env = scheduler->env;
-	bool warning_said = false;
 
 	/*
 	 * Yield immediately, until the quota watermark is reached
@@ -4143,26 +4144,17 @@ vy_scheduler_f(va_list va)
 		 * Reset the timeout if we managed to successfully
 		 * complete at least one task.
 		 */
-		if (tasks_done > 0) {
+		if (tasks_done > 0)
 			scheduler->timeout = 0;
-			warning_said = false;
-		}
+		/* Throttle for a while if a task failed. */
 		if (tasks_failed > 0)
 			goto error;
-
 		/* All worker threads are busy. */
 		if (workers_available == 0)
 			goto wait;
-
 		/* Get a task to schedule. */
-		if (vy_schedule(scheduler, &task) != 0) {
-			struct diag *diag = diag_get();
-			assert(!diag_is_empty(diag));
-			diag_move(diag, &scheduler->diag);
-			/* Can't schedule task right now */
+		if (vy_schedule(scheduler, &task) != 0)
 			goto error;
-		}
-
 		/* Nothing to do. */
 		if (task == NULL)
 			goto wait;
@@ -4179,12 +4171,6 @@ vy_scheduler_f(va_list va)
 		fiber_reschedule();
 		continue;
 error:
-		/* Log error message once. */
-		assert(!diag_is_empty(&scheduler->diag));
-		if (!warning_said) {
-			error_log(diag_last_error(&scheduler->diag));
-			warning_said = true;
-		}
 		/* Abort pending checkpoint. */
 		ipc_cond_signal(&scheduler->checkpoint_cond);
 		/*
