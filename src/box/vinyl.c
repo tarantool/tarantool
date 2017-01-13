@@ -1425,24 +1425,31 @@ vy_index_acct_range_dump(struct vy_index *index,
 	histogram_collect(index->run_hist, range->run_count);
 }
 
+/** An snprint-style function to print a range's boundaries. */
 static int
 vy_range_snprint(char *buf, int size, const struct vy_range *range)
 {
 	int total = 0;
-	struct key_def *key_def = range->index->key_def;
-
-	SNPRINT(total, snprintf, buf, size,
-		"%"PRIu32"/%"PRIu32"/%016"PRIx64".%016"PRIx64"(",
-		 key_def->space_id, key_def->iid, key_def->opts.lsn, range->id);
-	SNPRINT(total, vy_key_snprint, buf, size,
-		range->begin != NULL ? tuple_data(range->begin) : NULL);
+	SNPRINT(total, snprintf, buf, size, "(");
+	if (range->begin != NULL)
+		SNPRINT(total, vy_key_snprint, buf, size,
+			tuple_data(range->begin));
+	else
+		SNPRINT(total, snprintf, buf, size, "-inf");
 	SNPRINT(total, snprintf, buf, size, "..");
-	SNPRINT(total, vy_key_snprint, buf, size,
-		range->end != NULL ? tuple_data(range->end) : NULL);
+	if (range->end != NULL)
+		SNPRINT(total, vy_key_snprint, buf, size,
+			tuple_data(range->end));
+	else
+		SNPRINT(total, snprintf, buf, size, "inf");
 	SNPRINT(total, snprintf, buf, size, ")");
 	return total;
 }
 
+/**
+ * Helper function returning a human readable representation
+ * of a range's boundaries.
+ */
 static const char *
 vy_range_str(struct vy_range *range)
 {
@@ -3138,7 +3145,8 @@ vy_task_dump_complete(struct vy_task *task)
 	if (vy_log_insert_run(index->env->log, range->id, run->id) < 0)
 		return -1;
 
-	say_info("dump complete: %s", vy_range_str(range));
+	say_info("%s: completed dumping range %s",
+		 index->name, vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3172,7 +3180,8 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_error("dump of range %s failed", vy_range_str(range));
+	say_error("%s: failed to dump range %s",
+		  index->name, vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3238,7 +3247,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 
 	task->range = range;
 	task->wi = wi;
-	say_info("started dump of range %s", vy_range_str(range));
+
+	say_info("%s: started dumping range %s",
+		 index->name, vy_range_str(range));
 	return task;
 err_run:
 	/* Sub iterators are deleted by vy_write_iterator_delete(). */
@@ -3311,7 +3322,8 @@ vy_task_compact_complete(struct vy_task *task)
 	if (vy_log_tx_commit(env->log) < 0)
 		return -1;
 
-	say_info("completed compaction of range %s", vy_range_str(range));
+	say_info("%s: completed compacting range %s",
+		 index->name, vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3363,7 +3375,8 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
 
-	say_error("compaction of range %s failed", vy_range_str(range));
+	say_error("%s: failed to compact range %s",
+		  index->name, vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
 
@@ -3386,7 +3399,6 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 		assert(r->shadow == range);
 		r->shadow = NULL;
 
-		say_debug("range delete: %s", vy_range_str(r));
 		vy_index_remove_range(index, r);
 		vy_range_delete(r);
 	}
@@ -3475,8 +3487,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 			r->n_compactions = range->n_compactions + 1;
 	}
 
-	say_info("started compaction of range %s", vy_range_str(range));
-
 	/*
 	 * Make sure no new statement is inserted into the active mem
 	 * after we start compacting the range. Needed by the write
@@ -3498,9 +3508,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		rlist_add_tail(&range->compact_list, &r->compact_list);
 		assert(r->shadow == NULL);
 		r->shadow = range;
-
 		vy_index_add_range(index, r);
-		say_debug("range new: %s", vy_range_str(r));
 	}
 
 	range->version++;
@@ -3508,6 +3516,15 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 
 	task->range = range;
 	task->wi = wi;
+
+	if (split_key != NULL) {
+		say_info("%s: started splitting range %s by key %s",
+			 index->name, vy_range_str(range),
+			 vy_key_str(split_key_raw));
+	} else {
+		say_info("%s: started compacting range %s",
+			 index->name, vy_range_str(range));
+	}
 	return task;
 err_parts:
 	for (int i = 0; i < n_parts; i++) {
@@ -3963,8 +3980,8 @@ error:
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MIN;
 		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
-		say_info("throttling the scheduler for %.0f seconds",
-			  scheduler->timeout);
+		say_warn("throttling scheduler for %.0f second(s)",
+			 scheduler->timeout);
 		scheduler->is_throttled = true;
 		fiber_sleep(scheduler->timeout);
 		scheduler->is_throttled = false;
