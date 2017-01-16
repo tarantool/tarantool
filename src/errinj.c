@@ -70,12 +70,12 @@ errinj_getb(int id)
 	return errinjs[id].state.bparam;
 }
 
-long
-errinj_getl(int id)
+uint64_t
+errinj_getu64(int id)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_LONG);
-	return errinjs[id].state.lparam;
+	assert(errinjs[id].type == ERRINJ_U64);
+	return errinjs[id].state.u64param;
 }
 
 /**
@@ -94,11 +94,11 @@ errinj_setb(int id, bool state)
 }
 
 void
-errinj_setl(int id, long state)
+errinj_setu64(int id, uint64_t state)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_LONG);
-	errinjs[id].state.lparam = state;
+	assert(errinjs[id].type == ERRINJ_U64);
+	errinjs[id].state.u64param = state;
 }
 
 /**

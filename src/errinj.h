@@ -38,7 +38,7 @@ extern "C" {
 
 enum errinj_type {
 	ERRINJ_BOOL	= 0,
-	ERRINJ_LONG	= 1
+	ERRINJ_U64	= 1
 };
 
 struct errinj {
@@ -46,7 +46,7 @@ struct errinj {
 	enum errinj_type type;
 	union {
 		bool bparam;
-		long lparam;
+		uint64_t u64param;
 	} state;
 };
 
@@ -58,7 +58,7 @@ struct errinj {
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_LONG, {.lparam = LONG_MAX}) \
+	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_U64, {.u64param = UINT64_MAX}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
@@ -78,12 +78,12 @@ struct errinj *
 errinj_lookup(char *name);
 
 bool errinj_getb(int id);
-long errinj_getl(int id);
+uint64_t errinj_getu64(int id);
 
 void errinj_setb(int id, bool state);
 int errinj_setb_byname(char *name, bool state);
-void errinj_setl(int id, long state);
-int errinj_setl_byname(char *name, long state);
+void errinj_setu64(int id, uint64_t state);
+int errinj_setu64_byname(char *name, uint64_t state);
 
 typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
 int errinj_foreach(errinj_cb cb, void *cb_ctx);
@@ -91,6 +91,7 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
 #  define ERROR_INJECT_ONCE(ID, CODE)
+#  define ERROR_INJECT_U64(ID, CODE)
 #else
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
@@ -104,9 +105,9 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 			CODE; \
 		} \
 	} while (0)
-#  define ERROR_INJECTL(ID, VALUE, CMP, CODE) \
+#  define ERROR_INJECT_U64(ID, VALUE, CMP, CODE) \
 	do { \
-		if ((long)(VALUE) CMP errinj_getl(ID)) \
+		if ((uint64_t)(VALUE) CMP errinj_getu64(ID)) \
 			CODE; \
 	} while (0)
 #endif

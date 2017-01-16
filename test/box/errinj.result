@@ -33,7 +33,7 @@ errinj.info()
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_WRITE_PARTIAL:
-    state: 9223372036854775808
+    state: 0
   ERRINJ_TESTING:
     state: false
   ERRINJ_WAL_DELAY:
