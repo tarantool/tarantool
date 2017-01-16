@@ -130,6 +130,32 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #endif
 
 /**
+ * This macro is used to minimize cache-miss latency by moving data into
+ * a cache before it is accessed. You can insert calls to prefetch() into
+ * code for which you know addresses of data in memory that is likely to be
+ * accessed soon. If the target supports them, data prefetch instructions
+ * will be generated. If the prefetch is done early enough before the access
+ * then the data will be in the cache by the time it is accessed.
+ *
+ * The value of addr is the address of the memory to prefetch. There are two
+ * optional arguments, rw and locality. The value of rw is a compile-time
+ * constant one or zero; one means that the prefetch is preparing for a write
+ * to the memory address and zero, the default, means that the prefetch is
+ * preparing for a read. The value locality must be a compile-time constant
+ * integer between zero and three. A value of zero means that the data has
+ * no temporal locality, so it need not be left in the cache after the access.
+ * A value of three means that the data has a high degree of temporal locality
+ * and should be left in all levels of cache possible. Values of one and two
+ * mean, respectively, a low or moderate degree of temporal locality.
+ * The default is three.
+ */
+#if __has_builtin(__builtin_prefetch) || defined(__GNUC__)
+#  define prefetch(addr, ...) (__builtin_prefetch(addr, __VA_ARGS__))
+#else
+#  define prefetch(addr, ...) ((void) addr)
+#endif
+
+/**
  * If control flow reaches the point of the unreachable(), the program is
  * undefined. It is useful in situations where the compiler cannot deduce
  * the unreachability of the code.
