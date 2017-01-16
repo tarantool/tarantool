@@ -169,9 +169,7 @@ VinylSpace::dropIndex(Index *index)
 {
 	VinylIndex *i = (VinylIndex *)index;
 	/* schedule asynchronous drop */
-	int rc = vy_index_drop(i->db);
-	if (rc == -1)
-		diag_raise();
+	vy_index_drop(i->db);
 	i->db  = NULL;
 	i->env = NULL;
 }

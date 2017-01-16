@@ -264,7 +264,7 @@ vy_index_open(struct vy_index *index);
 /**
  * Close index and drop all data
  */
-int
+void
 vy_index_drop(struct vy_index *index);
 
 size_t

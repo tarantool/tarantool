@@ -5237,7 +5237,7 @@ vy_index_unref(struct vy_index *index)
 		vy_index_delete(index);
 }
 
-int
+void
 vy_index_drop(struct vy_index *index)
 {
 	/* TODO:
@@ -5246,7 +5246,6 @@ vy_index_drop(struct vy_index *index)
 	 */
 	rlist_del(&index->link);
 	vy_index_unref(index);
-	return 0;
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
