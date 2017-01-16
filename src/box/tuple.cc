@@ -175,9 +175,9 @@ char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
-	uint32_t bsize = 0;
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
+	uint32_t bsize = mp_sizeof_array(part_count);
 	const struct tuple_format *format = tuple_format(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 
