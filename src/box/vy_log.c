@@ -28,7 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "vy_log.h"
 
 #include <assert.h>
@@ -107,7 +106,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DELETE_RUN]		= "delete_run",
 };
 
-/** Vinyl metdata log object. */
+/** Vinyl metadata log object. */
 struct vy_log {
 	/** Xlog object used for writing the log. */
 	struct xlog xlog;

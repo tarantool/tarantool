@@ -42,7 +42,7 @@
  * single one. To reflect events like this on disk and be
  * able to recover to a consistent state after restart, we
  * need to log all metadata changes. This module implements
- * the infrastructure necesary for such logging as well
+ * the infrastructure necessary for such logging as well
  * as recovery.
  */
 
@@ -71,7 +71,7 @@ enum vy_log_type {
 	 */
 	VY_LOG_DELETE_RANGE		= 2,
 	/**
-	 * Insert a new run into an index.
+	 * Insert a new run into a range.
 	 * Requires vy_log_record::range_id, run_id.
 	 */
 	VY_LOG_INSERT_RUN		= 3,
@@ -89,20 +89,20 @@ struct vy_log_record {
 	/** Type of the record. */
 	enum vy_log_type type;
 	/**
-	 * Unique ID of index.
+	 * Unique ID of the index.
 	 *
 	 * The ID must be unique for different incarnations of
 	 * the same index, so we use LSN from the time of index
 	 * creation for it.
 	 */
 	int64_t index_id;
-	/** Unique ID of range. */
+	/** Unique ID of the range. */
 	int64_t range_id;
-	/** Unique ID of run. */
+	/** Unique ID of the run. */
 	int64_t run_id;
-	/** Start of range. */
+	/** Msgpack key for start of a range. */
 	const char *range_begin;
-	/** End of range. */
+	/** Msgpack key for end of a range. */
 	const char *range_end;
 };
 
@@ -117,9 +117,9 @@ struct vy_recovery {
 	struct mh_i64ptr_t *range_hash;
 	/** ID -> vy_run_recovery_info. */
 	struct mh_i64ptr_t *run_hash;
-	/** Maximal range ID. */
+	/** Maximal range ID, according to the metadata log. */
 	int64_t range_id_max;
-	/** Maximal run ID. */
+	/** Maximal run ID, according to the metadata log. */
 	int64_t run_id_max;
 };
 
@@ -198,9 +198,11 @@ typedef int
  * a log record and an optional @cb_arg to it. A log record type is
  * either VY_LOG_INSERT_RANGE or VY_LOG_INSERT_RUN. The callback is
  * supposed to rebuild the index structure and open run files. If the
- * callback returns a non-zero value, the function fails. To ease the
- * work done by the callback, records corresponding to runs of a range
- * always go right after the range in the chronological order.
+ * callback returns a non-zero value, the function stops iteration
+ * over ranges and runs and returns error.
+ * To ease the work done by the callback, records corresponding to
+ * runs of a range always go right after the range, in the
+ * chronological order.
  *
  * Returns 0 on success, -1 on failure.
  */
