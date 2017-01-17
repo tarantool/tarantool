@@ -829,7 +829,7 @@ end
 
 local function cat()
     local options = keyword_arguments
-    local from, to, spaces = options.from, options.to, options.spaces
+    local from, to, spaces = options.from, options.to, options.space
     local show_system, cat_format = options['show-system'], options.format
 
     local format_cb   = cat_formats[cat_format]
@@ -838,9 +838,12 @@ local function cat()
         log.error("Processing file '%s'", file)
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
+            local is_filtered    = spaces ~= nil
+            local is_system      = sid < 512 and show_system == false
+            local isnt_specified = not (is_filtered and find_space(sid, spaces))
             if (lsn < from) or
-               (sid < 512 and show_system == false) or
-               (spaces ~= nil and find_space(sid, spaces)) then
+               (is_filtered and is_system and isnt_specified) or
+               (is_system and isnt_specified) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've had finished reading tuple with lsn == to
@@ -861,7 +864,7 @@ end
 
 local function play()
     local options = keyword_arguments
-    local from, to, spaces = options.from, options.to, options.spaces
+    local from, to, spaces = options.from, options.to, options.space
     local show_system = options['show-system']
     local uri = table.remove(positional_arguments, 1)
 
@@ -876,9 +879,12 @@ local function play()
         log.info(("Processing file '%s'"):format(file))
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
+            local is_filtered    = spaces ~= nil
+            local is_system      = sid < 512 and show_system == false
+            local isnt_specified = not (is_filtered and find_space(sid, spaces))
             if (lsn < from) or
-               (sid < 512 and show_system == false) or
-               (spaces ~= nil and find_space(sid, spaces)) then
+               (is_filtered and is_system and isnt_specified) or
+               (is_system and isnt_specified) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've had finished reading tuple with lsn == to
@@ -1042,7 +1048,7 @@ local commands = setmetatable({
         func = exit_wrapper(cat), process = process_remote, help = {
             header =
                 "%s cat <filename>.. [--space=space_no ..] [--show-system]" ..
-                "[--from=from_lsn] [--to=to_lsn]",
+                " [--from=from_lsn] [--to=to_lsn]",
             description =
 [=[
         Show contents of snapshot/xlog files.

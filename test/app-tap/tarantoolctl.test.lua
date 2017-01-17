@@ -277,8 +277,17 @@ do
 
     create_script(dir, 'filler.lua', filler_code)
 
-    local function check_ctlcat(test, dir, args, delim, lc)
+    local function check_ctlcat_xlog(test, dir, args, delim, lc)
         local command_base = 'tarantoolctl cat filler/00000000000000000000.xlog'
+        local desc = args and "cat + " .. args or "cat"
+        args = args and " " .. args or ""
+        local res, stdout, stderr = run_command(dir, command_base .. args)
+        test:is(res, 0, desc .. " result")
+        test:is(select(2, stdout:gsub(delim, delim)), lc, desc .. " line count")
+    end
+
+    local function check_ctlcat_snap(test, dir, args, delim, lc)
+        local command_base = 'tarantoolctl cat filler/00000000000000000000.snap'
         local desc = args and "cat + " .. args or "cat"
         args = args and " " .. args or ""
         local res, stdout, stderr = run_command(dir, command_base .. args)
@@ -288,15 +297,17 @@ do
 
     local status, err = pcall(function()
         test:test("fill and test cat output", function(test_i)
-            test_i:plan(15)
+            test_i:plan(19)
             check_ok(test_i, dir, 'start', 'filler', 0)
-            check_ctlcat(test_i, dir, nil, "---\n", 6)
-            check_ctlcat(test_i, dir, "--show-system", "---\n", 9)
-            check_ctlcat(test_i, dir, "--format=json", "\n", 6)
-            check_ctlcat(test_i, dir, "--format=lua",  "\n", 6)
-            check_ctlcat(test_i, dir, "--from=3 --to=6 --format=json", "\n", 2)
-            check_ctlcat(test_i, dir, "--from=3 --to=6 --format=json --show-system", "\n", 3)
-            check_ctlcat(test_i, dir, "--from=6 --to=3 --format=json --show-system", "\n", 0)
+            check_ctlcat_xlog(test_i, dir, nil, "---\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--show-system", "---\n", 9)
+            check_ctlcat_xlog(test_i, dir, "--format=json", "\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--format=lua",  "\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json", "\n", 2)
+            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system", "\n", 3)
+            check_ctlcat_xlog(test_i, dir, "--from=6 --to=3 --format=json --show-system", "\n", 0)
+            check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 12)
+            check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 31)
         end)
     end)
 
