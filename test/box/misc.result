@@ -456,7 +456,7 @@ tonumber64(1), 1
 -- Testing 64bit
 tonumber64()
 ---
-- error: 'tonumber64: wrong number of arguments'
+- error: 'bad argument #1 to ''?'' (value expected)'
 ...
 tonumber64('invalid number')
 ---
@@ -557,6 +557,54 @@ tostring(tonumber64('123456789012345')) == '123456789012345ULL'
 - true
 ...
 tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
+---
+- true
+...
+tonumber64('0x12') == 18
+---
+- true
+...
+tonumber64('0x12', 16) == 18
+---
+- true
+...
+tonumber64('0x12', 17) == nil
+---
+- true
+...
+tonumber64('0b01') == 1
+---
+- true
+...
+tonumber64('0b01', 2) == 1
+---
+- true
+...
+tonumber64('0b01', 3) == nil
+---
+- true
+...
+tonumber64('  0b1  ') == 1
+---
+- true
+...
+tonumber64('  0b1  ', 'badbase')
+---
+- error: 'bad argument #2 to ''?'' (number expected, got string)'
+...
+tonumber64('  0b1  ', 123) -- big base
+---
+- error: 'bad argument #2 to ''?'' (base out of range)'
+...
+tonumber64('12345', 123) -- big base
+---
+- error: 'bad argument #2 to ''?'' (base out of range)'
+...
+tonumber64('0xfffff') == 1048575
+---
+- true
+...
+tonumber64('0b111111111111111111') == 262143
 ---
 - true
 ...

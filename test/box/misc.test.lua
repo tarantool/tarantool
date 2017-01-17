@@ -149,6 +149,19 @@ tostring(tonumber64('12345678901234')) == '12345678901234'
 tostring(tonumber64('123456789012345')) == '123456789012345ULL'
 tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
 
+tonumber64('0x12') == 18
+tonumber64('0x12', 16) == 18
+tonumber64('0x12', 17) == nil
+tonumber64('0b01') == 1
+tonumber64('0b01', 2) == 1
+tonumber64('0b01', 3) == nil
+tonumber64('  0b1  ') == 1
+tonumber64('  0b1  ', 'badbase')
+tonumber64('  0b1  ', 123) -- big base
+tonumber64('12345', 123) -- big base
+tonumber64('0xfffff') == 1048575
+tonumber64('0b111111111111111111') == 262143
+
 --  dostring()
 dostring('abc')
 dostring('abc=2')
