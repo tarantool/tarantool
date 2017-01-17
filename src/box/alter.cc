@@ -476,30 +476,46 @@ key_def_new_from_tuple(struct tuple *tuple)
 }
 
 static char *
-opt_encode(char *data, const void *opts, const void *default_opts,
-	   const struct opt_def *def)
+opt_encode(char *data, char *data_end, const void *opts,
+	   const void *default_opts, const struct opt_def *def)
 {
 	const char *opt = ((const char *) opts) + def->offset;
 	const char *default_opt = ((const char *) default_opts) + def->offset;
 	if (memcmp(opt, default_opt, def->len) == 0)
 		return data;
-	data = mp_encode_str(data, def->name, strlen(def->name));
+	uint32_t optlen = strlen(def->name);
+	if (data + mp_sizeof_str(optlen) > data_end)
+		return data_end;
+	data = mp_encode_str(data, def->name, optlen);
 	switch (def->type) {
 	case MP_BOOL:
+		if (data + mp_sizeof_bool(true) > data_end)
+			return data_end;
 		data = mp_encode_bool(data, load_bool(opt));
 		break;
 	case MP_UINT:
+	{
+		uint64_t optval;
 		if (def->len == sizeof(uint64_t)) {
-			data = mp_encode_uint(data, load_u64(opt));
+			optval = load_u64(opt);
 		} else if (def->len == sizeof(uint32_t)) {
-			data = mp_encode_uint(data, load_u32(opt));
+			optval = load_u32(opt);
 		} else {
 			unreachable();
 		}
+		if (data + mp_sizeof_uint(optval) > data_end)
+			return data_end;
+		data = mp_encode_uint(data, optval);
 		break;
+	}
 	case MP_STR:
-		data = mp_encode_str(data, opt, strlen(opt));
+	{
+		optlen = strlen(opt);
+		if (data + mp_sizeof_str(optlen) > data_end)
+			return data_end;
+		data = mp_encode_str(data, opt, optlen);
 		break;
+	}
 	default:
 		unreachable();
 	}
@@ -507,29 +523,42 @@ opt_encode(char *data, const void *opts, const void *default_opts,
 }
 
 static char *
-opts_encode(char *data, const void *opts, const void *default_opts,
-	    const struct opt_def *reg)
+opts_encode(char *data, char *data_end, const void *opts,
+	    const void *default_opts, const struct opt_def *reg)
 {
 	char *p = data;
 	uint32_t n_opts = 0;
 	for (const struct opt_def *def = reg; def->name != NULL; def++) {
-		char *end = opt_encode(p, opts, default_opts, def);
+		char *end = opt_encode(p, data_end, opts, default_opts, def);
+		if (end == data_end)
+			return end;
 		if (p != end) {
 			p = end;
 			n_opts++;
 		}
 	}
 	ptrdiff_t len = p - data;
+	if (data + mp_sizeof_map(n_opts) > data_end)
+		return data_end;
 	memmove(data + mp_sizeof_map(n_opts), data, len);
 	data = mp_encode_map(data, n_opts);
 	data += len;
 	return data;
 }
 
+
+/**
+ * Encode options key_opts into msgpack stream.
+ * @pre output buffer is reserved to contain enough space for the
+ * output.
+ *
+ * @return a pointer to the end of the stream.
+ */
 static char *
-key_opts_encode(char *data, const struct key_opts *opts)
+key_opts_encode(char *data, char *data_end, const struct key_opts *opts)
 {
-	return opts_encode(data, opts, &key_opts_default, key_opts_reg);
+	return opts_encode(data, data_end, opts, &key_opts_default,
+			   key_opts_reg);
 }
 
 struct tuple *
@@ -556,8 +585,9 @@ key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
 	buf_end = mp_encode_array(buf_end, 3);
 	buf_end = mp_encode_str(buf_end, "!", 1);
 	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
-	buf_end = key_opts_encode(buf_end, &opts);
-	assert(buf_end <= buf + size);
+	buf_end = key_opts_encode(buf_end, buf + size, &opts);
+	/* No check of return value: buf is checked by box_tuple_update */
+	assert(buf_end < buf + size);
 	tuple = box_tuple_update(tuple, buf, buf_end);
 	free(buf);
 	if (tuple == NULL)

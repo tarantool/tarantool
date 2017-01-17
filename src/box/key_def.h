@@ -557,6 +557,13 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 /**
  * Given a tuple with an index definition, update the LSN stored
  * in the index options.
+ *
+ * @return a tuple with updated lsn in key def. The returned tuple
+ *         is blessed (referenced by box_tuple_bless()).
+ *
+ * Throws an exception if error.
+ *
+ * @note Implemented in alter.cc
  */
 extern struct tuple *
 key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);

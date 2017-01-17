@@ -784,6 +784,10 @@ space_truncate(struct space *space)
 	/* create all indexes again, now they are empty */
 	for (int i = 0; i < index_count; i++) {
 		int64_t lsn = vclock_sum(&recovery->vclock);
+		/*
+		 * The returned tuple is blessed and will be
+		 * collected automatically.
+		 */
 		tuple = key_def_tuple_update_lsn(indexes[i], lsn);
 		uint32_t bsize;
 		const char *data = tuple_data_range(tuple, &bsize);
