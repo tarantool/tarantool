@@ -20,7 +20,7 @@ travis_coverage: travis_deps_linux
 	cd test && /usr/bin/python test-run.py --long
 
 travis_deps_osx:
-	brew install openssl
+	brew install openssl readline --force
 	sudo pip install python-daemon PyYAML
 	sudo pip install six==1.9.0
 	sudo pip install gevent==1.1.2
