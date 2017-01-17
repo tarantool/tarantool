@@ -77,9 +77,21 @@ enum iterator_type {
 	ITER_BITS_ANY_SET     =  8, /* at least one x's bit is set         */
 	ITER_BITS_ALL_NOT_SET =  9, /* all bits are not set                */
 	ITER_OVERLAPS         = 10, /* key overlaps x                      */
-	ITER_NEIGHBOR         = 11, /* typles in distance ascending order from specified point */
+	ITER_NEIGHBOR         = 11, /* tuples in distance ascending order from specified point */
 	iterator_type_MAX     = ITER_NEIGHBOR + 1
 };
+
+/**
+ * Determine a direction of the given iterator type.
+ * That is -1 for REQ, LT and LE and +1 for all others.
+ */
+static inline int
+iterator_direction(enum iterator_type type)
+{
+	const uint32_t reverse =
+		(1u << ITER_REQ) | (1u << ITER_LT) | (1u << ITER_LE);
+	return (reverse & (1u << type)) ? -1 : 1;
+}
 
 /**
  * Allocate and initialize iterator for space_id, index_id.

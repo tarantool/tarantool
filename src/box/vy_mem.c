@@ -384,8 +384,10 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
  * @retval 0 success or EOF (*ret == NULL)
  */
 static NODISCARD int
-vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret)
+vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
+			 bool *stop)
 {
+	(void)stop;
 	assert(vitr->iface->next_key == vy_mem_iterator_next_key);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	*ret = NULL;

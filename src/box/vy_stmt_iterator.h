@@ -41,8 +41,11 @@ struct vy_stmt_iterator;
 struct tuple;
 
 typedef NODISCARD int
-(*vy_iterator_next_f)(struct vy_stmt_iterator *virt_iterator,
-		      struct tuple **ret);
+(*vy_iterator_next_key_f)(struct vy_stmt_iterator *virt_iterator,
+			  struct tuple **ret, bool *stop);
+typedef NODISCARD int
+(*vy_iterator_next_lsn_f)(struct vy_stmt_iterator *virt_iterator,
+			  struct tuple **ret);
 /**
  * The restore() function moves an iterator to the specified
  * statement (@arg last_stmt) and returns the new statement via @arg ret.
@@ -90,13 +93,13 @@ typedef NODISCARD int
 (*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
 			 const struct tuple *last_stmt, struct tuple **ret);
 typedef void
-(*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
+(*vy_iterator_close_f)(struct vy_stmt_iterator *virt_iterator);
 
 struct vy_stmt_iterator_iface {
-	vy_iterator_next_f next_key;
-	vy_iterator_next_f next_lsn;
+	vy_iterator_next_key_f next_key;
+	vy_iterator_next_lsn_f next_lsn;
 	vy_iterator_restore_f restore;
-	vy_iterator_next_close_f close;
+	vy_iterator_close_f close;
 };
 
 /**
