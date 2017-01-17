@@ -3927,7 +3927,8 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 	}
 
 	/* Delete files left from the old range. */
-	ERROR_INJECT(ERRINJ_VY_GC, goto skip_gc);
+	ERROR_INJECT(ERRINJ_VY_GC, { vy_range_delete(range);
+		index->version++; return 0; });
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		char path[PATH_MAX];
 		for (int type = 0; type < vy_file_MAX; type++) {
@@ -3938,7 +3939,6 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 				say_syserror("failed to delete file '%s'", path);
 		}
 	}
-skip_gc:
 	vy_range_delete(range);
 	index->version++;
 	return 0;

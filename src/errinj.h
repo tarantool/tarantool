@@ -91,7 +91,7 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
 #  define ERROR_INJECT_ONCE(ID, CODE)
-#  define ERROR_INJECT_U64(ID, CODE)
+#  define ERROR_INJECT_U64(ID, VALUE, CMP, CODE)
 #else
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
