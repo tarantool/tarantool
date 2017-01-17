@@ -36,20 +36,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <sys/uio.h> /* struct iovec */
 #include <msgpuck.h>
 
-#include "iproto_constants.h"
-#include "key_def.h"
-#include "tuple_compare.h"
-#include "tuple_format.h"
 #include "tuple.h"
+#include "tuple_compare.h"
+#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct xrow_header;
+struct region;
+struct tuple_format;
+struct iovec;
 
 /**
  * There are two groups of statements:
@@ -391,12 +391,15 @@ vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
  * Extract a SELECT statement with only indexed fields from raw data.
  * @param stmt Raw data of struct vy_stmt.
  * @param key_def key definition.
+ * @param a region for temporary allocations. Automatically shrinked
+ * to the original size.
  *
  * @retval not NULL Success.
  * @retval NULL Memory allocation error.
  */
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def);
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct region *gc);
 
 /**
  * Create the SELECT statement from MessagePack array.
@@ -408,17 +411,14 @@ vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def);
  * @retval     NULL Memory error.
  */
 static inline struct tuple *
-vy_key_from_msgpack(struct tuple_format *format, const char *key,
-		    const struct key_def *key_def)
+vy_key_from_msgpack(struct tuple_format *format, const char *key)
 {
-	(void) key_def; /* unused in release. */
 	uint32_t part_count;
 	/*
 	 * The statement already is a key, so simply copy it in
 	 * the new struct vy_stmt as SELECT.
 	 */
 	part_count = mp_decode_array(&key);
-	assert(part_count <= key_def->part_count);
 	return vy_stmt_new_select(format, key, part_count);
 }
 

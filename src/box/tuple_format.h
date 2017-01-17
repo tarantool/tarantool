@@ -138,14 +138,14 @@ extern struct tuple_format *tuple_format_default;
 
 extern struct tuple_format **tuple_formats;
 
-inline uint32_t
+static inline uint32_t
 tuple_format_id(const struct tuple_format *format)
 {
 	assert(tuple_formats[format->id] == format);
 	return format->id;
 }
 
-inline struct tuple_format *
+static inline struct tuple_format *
 tuple_format_by_id(uint32_t tuple_format_id)
 {
 	return tuple_formats[tuple_format_id];
@@ -209,7 +209,7 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
  * @returns field data if field exists or NULL
  * @sa tuple_init_field_map()
  */
-inline const char *
+static inline const char *
 tuple_field_raw(const struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {

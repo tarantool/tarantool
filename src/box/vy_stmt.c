@@ -33,20 +33,15 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/uio.h> /* struct iovec */
 #include <pmatomic.h> /* for refs */
 
 #include "diag.h"
-#include "fiber.h" /* fiber->gc */
+#include <small/region.h>
 
 #include "error.h"
-#include "iproto_constants.h"
-#include "tuple.h"
 #include "tuple_format.h"
-#include "tuple_compare.h"
-#include "tuple_update.h"
 #include "xrow.h"
-#include "small/small.h"
-#include "box.h"
 
 struct tuple *
 vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
@@ -295,7 +290,8 @@ vy_stmt_replace_from_upsert(const struct tuple *upsert)
 }
 
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def)
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct region *region)
 {
 	uint8_t type = vy_stmt_type(stmt);
 	struct tuple_format *format = tuple_format_by_id(stmt->format_id);
@@ -311,7 +307,6 @@ vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def)
 	}
 	assert(type == IPROTO_REPLACE || type == IPROTO_UPSERT);
 	uint32_t size;
-	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	char *key = tuple_extract_key(stmt, key_def, &size);
 	if (key == NULL)

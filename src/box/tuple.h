@@ -305,7 +305,7 @@ tuple_size(const struct tuple *tuple)
  * @param tuple tuple.
  * @return MessagePack array.
  */
-inline const char *
+static inline const char *
 tuple_data(const struct tuple *tuple)
 {
 	return (const char *) tuple + tuple->data_offset;
@@ -317,7 +317,7 @@ tuple_data(const struct tuple *tuple)
  * @param[out] size Size in bytes of the MessagePack array.
  * @return MessagePack array.
  */
-inline const char *
+static inline const char *
 tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
 	*p_size = tuple->bsize;
@@ -373,7 +373,7 @@ tuple_extract_key_raw(const char *data, const char *data_end,
  * @param tuple Tuple.
  * @retval Tuple format instance.
  */
-inline struct tuple_format *
+static inline struct tuple_format *
 tuple_format(const struct tuple *tuple)
 {
 	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
@@ -444,7 +444,7 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @returns a field map for the tuple.
  * @sa tuple_init_field_map()
  */
-inline const uint32_t *
+static inline const uint32_t *
 tuple_field_map(const struct tuple *tuple)
 {
 	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
@@ -455,7 +455,7 @@ tuple_field_map(const struct tuple *tuple)
  * @param tuple
  * @return the number of fields in tuple
  */
-inline uint32_t
+static inline uint32_t
 tuple_field_count(const struct tuple *tuple)
 {
 	const char *data = tuple_data(tuple);
@@ -470,7 +470,7 @@ tuple_field_count(const struct tuple *tuple)
  * @retval pointer to MessagePack data
  * @retval NULL when fieldno is out of range
  */
-inline const char *
+static inline const char *
 tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
@@ -510,7 +510,7 @@ struct tuple_iterator {
  * @param[out] it tuple iterator
  * @param[in]  tuple tuple
  */
-inline void
+static inline void
 tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
 {
 	it->tuple = tuple;
@@ -626,7 +626,7 @@ struct TupleRefNil {
 };
 
 /** Return a tuple field and check its type. */
-inline const char *
+static inline const char *
 tuple_field_check(const struct tuple *tuple, uint32_t fieldno,
 		  enum mp_type type)
 {
@@ -643,7 +643,7 @@ tuple_field_check(const struct tuple *tuple, uint32_t fieldno,
  * A convenience shortcut for data dictionary - get a tuple field
  * as uint64_t.
  */
-inline uint64_t
+static inline uint64_t
 tuple_field_uint(struct tuple *tuple, uint32_t fieldno)
 {
 	const char *field = tuple_field_check(tuple, fieldno, MP_UINT);
@@ -654,7 +654,7 @@ tuple_field_uint(struct tuple *tuple, uint32_t fieldno)
  * A convenience shortcut for data dictionary - get a tuple field
  * as uint32_t.
  */
-inline uint32_t
+static inline uint32_t
 tuple_field_u32(struct tuple *tuple, uint32_t fieldno)
 {
 	uint64_t val = tuple_field_uint(tuple, fieldno);
@@ -686,7 +686,7 @@ void
 tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *result);
 
 /** Return a tuple field and check its type. */
-inline const char *
+static inline const char *
 tuple_next_check(struct tuple_iterator *it, enum mp_type type)
 {
 	uint32_t fieldno = it->fieldno;
@@ -707,7 +707,7 @@ tuple_next_check(struct tuple_iterator *it, enum mp_type type)
  * from iterator as uint32_t or raise an error if there is
  * no next field.
  */
-inline uint32_t
+static inline uint32_t
 tuple_next_u32(struct tuple_iterator *it)
 {
 	uint32_t fieldno = it->fieldno;

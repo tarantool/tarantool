@@ -2267,7 +2267,8 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 	page_info->min_lsn = INT64_MAX;
 	page_info->offset = offset;
 	page_info->unpacked_size = 0;
-	page_info->min_key = vy_stmt_extract_key(min_key, key_def);
+	page_info->min_key = vy_stmt_extract_key(min_key, key_def,
+						 &fiber()->gc);
 	return page_info->min_key != NULL ? 0: -1;
 }
 
@@ -2779,7 +2780,6 @@ vy_run_info_encode(const struct vy_run_info *run_info,
  */
 static int
 vy_run_info_decode(const struct xrow_header *xrow,
-		   const struct key_def *key_def,
 		   struct vy_run_info *run_info,
 		   struct tuple **p_begin, struct tuple **p_end,
 		   struct tuple_format *format)
@@ -2825,7 +2825,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			begin = vy_key_from_msgpack(format, pos, key_def);
+			begin = vy_key_from_msgpack(format, pos);
 			mp_next(&pos);
 			break;
 		case VY_RANGE_MAX_KEY:
@@ -2834,7 +2834,7 @@ vy_run_info_decode(const struct xrow_header *xrow,
 				mp_next(&pos);
 				break;
 			}
-			end = vy_key_from_msgpack(format, pos, key_def);
+			end = vy_key_from_msgpack(format, pos);
 			mp_next(&pos);
 			break;
 		default:
@@ -3000,8 +3000,7 @@ vy_range_recover_run(struct vy_range *range, int64_t run_id)
 	/* all rows should be in one tx */
 	if (xlog_cursor_next_tx(&cursor) != 0 ||
 	    xlog_cursor_next_row(&cursor, &xrow) != 0 ||
-	    vy_run_info_decode(&xrow, key_def, &run->info,
-			       &range->begin, &range->end,
+	    vy_run_info_decode(&xrow, &run->info, &range->begin, &range->end,
 			       range->index->format) != 0) {
 		goto fail_close;
 	}
@@ -4072,8 +4071,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	/* Determine new ranges' boundaries. */
 	keys[0] = range->begin;
 	if (vy_range_needs_split(range, &split_key_raw)) {
-		split_key = vy_key_from_msgpack(index->format, split_key_raw,
-						index->key_def);
+		split_key = vy_key_from_msgpack(index->format, split_key_raw);
 		if (split_key == NULL)
 			goto err_split_key;
 		n_parts = 2;
