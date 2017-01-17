@@ -4144,8 +4144,18 @@ vy_scheduler_f(va_list va)
 		 * Reset the timeout if we managed to successfully
 		 * complete at least one task.
 		 */
-		if (tasks_done > 0)
+		if (tasks_done > 0) {
 			scheduler->timeout = 0;
+			/*
+			 * Task completion callback may yield, which
+			 * opens a time window for a worker to submit
+			 * a processed task and wake up the scheduler
+			 * (via scheduler_async). Hence we should go
+			 * and recheck the output_queue in order not
+			 * to lose a wakeup event and hang for good.
+			 */
+			continue;
+		}
 		/* Throttle for a while if a task failed. */
 		if (tasks_failed > 0)
 			goto error;
