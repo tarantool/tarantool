@@ -464,15 +464,6 @@ typedef uint32_t bps_tree_block_id_t;
 	_bps_tree(debug_check_insert_and_move_to_right_inner)
 #define bps_tree_debug_check_insert_and_move_to_left_inner \
 	_bps_tree(debug_check_insert_and_move_to_left_inner)
-
-#if !defined(BPS_TREE_SOURCE)
-#define BPS_TREE_PROTO inline
-#define BPS_TREE_IMPL inline
-#else /* defined(BPS_TREE_SOURCE) */
-#define BPS_TREE_PROTO extern inline
-#define BPS_TREE_IMPL inline
-#endif
-
 /* }}} */
 
 /* {{{ BPS-tree interface (declaration) */
@@ -566,7 +557,7 @@ typedef void (*bps_tree_extent_free_f)(void *ctx, void *extent);
  * @param alloc_ctx - argument passed to extent allocator
  *  see bps_tree_extent_free_f description for details
  */
-BPS_TREE_PROTO void
+static inline void
 bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 		bps_tree_extent_alloc_f extent_alloc_func,
 		bps_tree_extent_free_f extent_free_func,
@@ -580,7 +571,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
  * @param array_size - size of the array (count of elements)
  * @return 0 on success, -1 on memory error
  */
-BPS_TREE_PROTO int
+static inline int
 bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 	       size_t array_size);
 
@@ -588,7 +579,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
  * @brief Tree destruction. Frees allocated memory.
  * @param tree - pointer to a tree
  */
-BPS_TREE_PROTO void
+static inline void
 bps_tree_destroy(struct bps_tree *tree);
 
 /**
@@ -597,7 +588,7 @@ bps_tree_destroy(struct bps_tree *tree);
  * @param key - key that will be compared with elements
  * @return pointer to the first equal element or NULL if not found
  */
-BPS_TREE_PROTO bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
 
 /**
@@ -612,7 +603,7 @@ bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
  * @replaced - optional pointer for a replaces element
  * @return - 0 on success or -1 if memory allocation failed for insert
  */
-BPS_TREE_PROTO int
+static inline int
 bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 		bps_tree_elem_t *replaced);
 
@@ -622,7 +613,7 @@ bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
  * @param elem - the element tot delete
  * @return - 0 on success or -1 if the element was not found in tree
  */
-BPS_TREE_PROTO int
+static inline int
 bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem);
 
 /**
@@ -630,7 +621,7 @@ bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem);
  * @param tree - pointer to a tree
  * @return - count count of elements in tree
  */
-BPS_TREE_PROTO size_t
+static inline size_t
 bps_tree_size(const struct bps_tree *tree);
 
 /**
@@ -639,7 +630,7 @@ bps_tree_size(const struct bps_tree *tree);
  * @param tree - pointer to a tree
  * @return - count count of elements in tree
  */
-BPS_TREE_PROTO size_t
+static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree);
 
 /**
@@ -648,14 +639,14 @@ bps_tree_mem_used(const struct bps_tree *tree);
  * @param rnd - some random value
  * @return - count count of elements in tree
  */
-BPS_TREE_PROTO bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_random(const struct bps_tree *tree, size_t rnd);
 
 /**
  * @brief Get an invalid iterator. See iterator description.
  * @return - Invalid iterator
  */
-BPS_TREE_PROTO struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_invalid_iterator();
 
 /**
@@ -663,7 +654,7 @@ bps_tree_invalid_iterator();
  * @param itr - iterator to check
  * @return - true if iterator is invalid, false otherwise
  */
-BPS_TREE_PROTO bool
+static inline bool
 bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr);
 
 /**
@@ -675,7 +666,7 @@ bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr);
  * @param itr2 - second iterator
  * @return - true if iterators are equal, false otherwise
  */
-BPS_TREE_PROTO bool
+static inline bool
 bps_tree_iterator_are_equal(const struct bps_tree *tree,
 		            struct bps_tree_iterator *itr1,
 		            struct bps_tree_iterator *itr2);
@@ -685,7 +676,7 @@ bps_tree_iterator_are_equal(const struct bps_tree *tree,
  * @param tree - pointer to a tree
  * @return - First iterator. Could be invalid if the tree is empty.
  */
-BPS_TREE_PROTO struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_iterator_first(const struct bps_tree *tree);
 
 /**
@@ -693,7 +684,7 @@ bps_tree_iterator_first(const struct bps_tree *tree);
  * @param tree - pointer to a tree
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
-BPS_TREE_PROTO struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_iterator_last(const struct bps_tree *tree);
 
 /**
@@ -706,7 +697,7 @@ bps_tree_iterator_last(const struct bps_tree *tree);
  *  Pass NULL if you don't need that info.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
-BPS_TREE_PROTO struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact);
 
@@ -720,7 +711,7 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
-BPS_TREE_PROTO struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact);
 
@@ -739,7 +730,7 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @param key - key that will be compared with elements
  * @return - approximate number of entries that are equal to given key.
  */
-BPS_TREE_PROTO size_t
+static inline size_t
 bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key);
 
 /**
@@ -749,7 +740,7 @@ bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key);
  * @param itr - pointer to tree iterator
  * @return - Pointer to the element. Null for invalid iterator
  */
-BPS_TREE_PROTO bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_iterator_get_elem(const struct bps_tree *tree,
 		           struct bps_tree_iterator *itr);
 
@@ -762,7 +753,7 @@ bps_tree_iterator_get_elem(const struct bps_tree *tree,
  * @param itr - pointer to tree iterator
  * @return - true on success, false if a resulted iterator is set to invalid
  */
-BPS_TREE_PROTO bool
+static inline bool
 bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
@@ -774,7 +765,7 @@ bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *it
  * @param itr - pointer to tree iterator
  * @return - true on success, false if a resulted iterator is set to invalid
  */
-BPS_TREE_PROTO bool
+static inline bool
 bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
@@ -784,7 +775,7 @@ bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *it
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
-BPS_TREE_PROTO void
+static inline void
 bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
@@ -793,7 +784,7 @@ bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
-BPS_TREE_PROTO void
+static inline void
 bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 #ifndef BPS_TREE_NO_DEBUG
@@ -805,7 +796,7 @@ bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr);
  * @param tree - pointer to a tree
  * @return - Bitwise-OR of all errors found
  */
-BPS_TREE_PROTO int
+static inline int
 bps_tree_debug_check(const struct bps_tree *tree);
 
 /**
@@ -814,7 +805,7 @@ bps_tree_debug_check(const struct bps_tree *tree);
  * @param tree - tree to print
  * @param elem_fmt - format for printing an element. "%d" or "%p" for example.
  */
-BPS_TREE_PROTO void
+static inline void
 bps_tree_print(const struct bps_tree *tree, const char *elem_fmt);
 
 /**
@@ -824,7 +815,7 @@ bps_tree_print(const struct bps_tree *tree, const char *elem_fmt);
  *  if false, just error code will be returned.
  * @return 0 if OK; bit mask of errors otherwise.
  */
-BPS_TREE_PROTO int
+static inline int
 bps_tree_debug_check_internal_functions(bool assertme);
 
 #endif /* BPS_TREE_NO_DEBUG */
@@ -1007,7 +998,7 @@ struct bps_leaf_path_elem {
  * @param alloc_ctx - argument passed to extent allocator
  *  see bps_tree_extent_free_f description for details
  */
-BPS_TREE_IMPL void
+static inline void
 bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 		bps_tree_extent_alloc_f extent_alloc_func,
 		bps_tree_extent_free_f extent_free_func,
@@ -1050,7 +1041,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
  * @param array_size - size of the array (count of elements)
  * @return 0 on success, -1 on memory error
  */
-BPS_TREE_IMPL int
+static inline int
 bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 	       size_t array_size)
 {
@@ -1188,7 +1179,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
  * @brief Tree destruction. Frees allocated memory.
  * @param tree - pointer to a tree
  */
-BPS_TREE_IMPL void
+static inline void
 bps_tree_destroy(struct bps_tree *tree)
 {
 	matras_destroy(&tree->matras);
@@ -1199,7 +1190,7 @@ bps_tree_destroy(struct bps_tree *tree)
  * @param tree - pointer to a tree
  * @return - count count of elements in tree
  */
-BPS_TREE_IMPL size_t
+static inline size_t
 bps_tree_size(const struct bps_tree *tree)
 {
 	return tree->size;
@@ -1211,7 +1202,7 @@ bps_tree_size(const struct bps_tree *tree)
  * @param tree - pointer to a tree
  * @return - count count of elements in tree
  */
-BPS_TREE_IMPL size_t
+static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree)
 {
 	size_t res = matras_extent_count(&tree->matras);
@@ -1262,7 +1253,7 @@ bps_tree_touch_block(struct bps_tree *tree, bps_tree_block_id_t id)
  * @param rnd - some random value
  * @return - count count of elements in tree
  */
-BPS_TREE_IMPL bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_random(const struct bps_tree *tree, size_t rnd)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
@@ -1421,7 +1412,7 @@ bps_tree_find_after_ins_point_key(const struct bps_tree *tree,
  * @brief Get an invalid iterator. See iterator description.
  * @return - Invalid iterator
  */
-BPS_TREE_IMPL struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_invalid_iterator()
 {
 	struct bps_tree_iterator res;
@@ -1437,7 +1428,7 @@ bps_tree_invalid_iterator()
  * @param itr - iterator to check
  * @return - true if iterator is invalid, false otherwise
  */
-BPS_TREE_IMPL bool
+static inline bool
 bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr)
 {
 	return itr->block_id == (bps_tree_block_id_t)(-1);
@@ -1505,7 +1496,7 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
  * @param itr2 - second iterator
  * @return - true if iterators are equal, false otherwise
  */
-BPS_TREE_IMPL bool
+static inline bool
 bps_tree_iterator_are_equal(const struct bps_tree *tree,
 		            struct bps_tree_iterator *itr1,
 		            struct bps_tree_iterator *itr2)
@@ -1540,7 +1531,7 @@ bps_tree_iterator_are_equal(const struct bps_tree *tree,
  * @param tree - pointer to a tree
  * @return - First iterator. Could be invalid if the tree is empty.
  */
-BPS_TREE_IMPL struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_iterator_first(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
@@ -1555,7 +1546,7 @@ bps_tree_iterator_first(const struct bps_tree *tree)
  * @param tree - pointer to a tree
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
-BPS_TREE_IMPL struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_iterator_last(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
@@ -1575,7 +1566,7 @@ bps_tree_iterator_last(const struct bps_tree *tree)
  *  Pass NULL if you don't need that info.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
-BPS_TREE_IMPL struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
@@ -1626,7 +1617,7 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
-BPS_TREE_IMPL struct bps_tree_iterator
+static inline struct bps_tree_iterator
 bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
@@ -1688,7 +1679,7 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
  * @param key - key that will be compared with elements
  * @return - approximate number of entries that are equal to given key.
  */
-BPS_TREE_IMPL size_t
+static inline size_t
 bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
@@ -1762,7 +1753,7 @@ bps_tree_approximate_count(const struct bps_tree *tree, bps_tree_key_t key)
  * @param itr - pointer to tree iterator
  * @return - Pointer to the element. Null for invalid iterator
  */
-BPS_TREE_IMPL bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_iterator_get_elem(const struct bps_tree *tree,
 		           struct bps_tree_iterator *itr)
 {
@@ -1781,7 +1772,7 @@ bps_tree_iterator_get_elem(const struct bps_tree *tree,
  * @param itr - pointer to tree iterator
  * @return - true on success, false if a resulted iterator is set to invalid
  */
-BPS_TREE_IMPL bool
+static inline bool
 bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
@@ -1812,7 +1803,7 @@ bps_tree_iterator_next(const struct bps_tree *tree, struct bps_tree_iterator *it
  * @param itr - pointer to tree iterator
  * @return - true on success, false if a resulted iterator is set to invalid
  */
-BPS_TREE_IMPL bool
+static inline bool
 bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
@@ -1842,7 +1833,7 @@ bps_tree_iterator_prev(const struct bps_tree *tree, struct bps_tree_iterator *it
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
-BPS_TREE_IMPL void
+static inline void
 bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	assert(!matras_is_read_view_created(&itr->view));
@@ -1855,7 +1846,7 @@ bps_tree_iterator_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
  */
-BPS_TREE_IMPL void
+static inline void
 bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	matras_destroy_read_view(&tree->matras, &itr->view);
@@ -1867,7 +1858,7 @@ bps_tree_iterator_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr)
  * @param key - key that will be compared with elements
  * @return pointer to the first equal element or NULL if not found
  */
-BPS_TREE_IMPL bps_tree_elem_t *
+static inline bps_tree_elem_t *
 bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
@@ -4159,7 +4150,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
  * @replaced - optional pointer for a replaces element
  * @return - 0 on success or -1 if memory allocation failed for insert
  */
-BPS_TREE_IMPL int
+static inline int
 bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 			   bps_tree_elem_t *replaced)
 {
@@ -4186,7 +4177,7 @@ bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
  * @param elem - the element tot delete
  * @return - true on success or false if the element was not found in tree
  */
-BPS_TREE_IMPL int
+static inline int
 bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
@@ -4332,7 +4323,7 @@ bps_tree_debug_check_block(const struct bps_tree *tree, struct bps_block *block,
  * @param tree - pointer to a tree
  * @return - Bitwise-OR of all errors found
  */
-BPS_TREE_IMPL int
+static inline int
 bps_tree_debug_check(const struct bps_tree *tree)
 {
 	int result = 0;
@@ -4458,7 +4449,7 @@ bps_tree_print_block(const struct bps_tree *tree,
  * @param tree - tree to print
  * @param elem_fmt - format for printing an element. "%d" or "%p" for example.
  */
-BPS_TREE_IMPL void
+static inline void
 bps_tree_print(const struct bps_tree *tree, const char *elem_fmt)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
@@ -5664,7 +5655,7 @@ bps_tree_debug_check_insert_and_move_to_left_inner(struct bps_tree *tree,
  *  if false, just error code will be returned.
  * @return 0 if OK; bit mask of errors otherwise.
  */
-BPS_TREE_IMPL int
+static inline int
 bps_tree_debug_check_internal_functions(bool assertme)
 {
 	int result = 0;
@@ -5818,7 +5809,4 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_debug_check_move_to_left_inner
 #undef bps_tree_debug_check_insert_and_move_to_right_inner
 #undef bps_tree_debug_check_insert_and_move_to_left_inner
-
-#undef BPS_TREE_PROTO
-#undef BPS_TREE_IMPL
 /* }}} */
