@@ -3199,10 +3199,26 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	struct vy_index *index = range->index;
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
+	struct vy_mem *mem;
 
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
+
+	/*
+	 * We create a new in-memory tree, while we dump older trees.
+	 * This way we don't need to bother about synchronization.
+	 * If the newest mem is empty, we don't need to dump it and
+	 * therefore can omit creating a new mem.
+	 */
+	if (range->mem->used > 0) {
+		mem = vy_mem_new(index->key_def, allocator, &xm->lsn);
+		if (mem == NULL)
+			goto err_mem;
+		vy_range_freeze_mem(range);
+		range->mem = mem;
+		range->version++;
+	}
 
 	struct vy_write_iterator *wi;
 	wi = vy_write_iterator_new(index, range->run_count == 0,
@@ -3210,11 +3226,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (wi == NULL)
 		goto err_wi;
 
-	/* We are going to dump all in-memory indexes. */
-	struct vy_mem *mem;
-	if (range->mem->used > 0 &&
-	    vy_write_iterator_add_mem(wi, range->mem) != 0)
-		goto err_wi_sub;
+	/* Prepare to dump frozen in-memory indexes. */
 	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
@@ -3224,38 +3236,17 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (range->new_run == NULL)
 		goto err_run;
 
-	/*
-	 * If the newest mem is empty, we don't need to dump it
-	 * and therefore can omit creating a new mem.
-	 */
-	if (range->mem->used == 0)
-		goto done;
-
-	mem = vy_mem_new(index->key_def, allocator, &xm->lsn);
-	if (mem == NULL)
-		goto err_mem;
-
-	/*
-	 * New insertions will go to the new in-memory tree, while we will dump
-	 * older trees. This way we don't need to bother about synchronization.
-	 * To be consistent, lookups fall back on older trees.
-	 */
-	vy_range_freeze_mem(range);
-	range->mem = mem;
-	range->version++;
-done:
 	task->range = range;
 	task->wi = wi;
 	say_info("started dump of range %s", vy_range_str(range));
 	return task;
-err_mem:
-	vy_run_delete(range->new_run);
-	range->new_run = NULL;
 err_run:
 	/* Sub iterators are deleted by vy_write_iterator_delete(). */
 err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
+	/* Leave the new mem on the list in case of failure. */
+err_mem:
 	vy_task_delete(pool, task);
 err_task:
 	return NULL;
