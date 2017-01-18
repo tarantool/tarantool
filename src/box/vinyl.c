@@ -3040,12 +3040,9 @@ struct vy_task_ops {
 	 * This function is called by the scheduler upon task completion.
 	 * It may be used to finish the task from the tx thread context.
 	 *
-	 * If @in_shutdown is set, the callback is invoked from the
-	 * engine destructor.
-	 *
 	 * Returns 0 on success. On failure returns -1 and sets diag.
 	 */
-	int (*complete)(struct vy_task *task, bool in_shutdown);
+	int (*complete)(struct vy_task *task);
 	/**
 	 * This function is called by the scheduler if either ->execute
 	 * or ->complete failed. It may be used to undo changes done to
@@ -3126,7 +3123,7 @@ vy_task_dump_execute(struct vy_task *task)
 }
 
 static int
-vy_task_dump_complete(struct vy_task *task, bool in_shutdown)
+vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_env *env = index->env;
@@ -3134,10 +3131,6 @@ vy_task_dump_complete(struct vy_task *task, bool in_shutdown)
 	struct vy_run *run = range->new_run;
 
 	assert(run != NULL);
-
-	/* We can't write to log on shutdown. */
-	if (in_shutdown)
-		return -1;
 
 	/*
 	 * Log change in metadata.
@@ -3299,17 +3292,13 @@ vy_task_compact_execute(struct vy_task *task)
 }
 
 static int
-vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
+vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 	struct vy_env *env = index->env;
 	struct vy_range *r, *tmp;
 	struct vy_run *run;
-
-	/* We can't write to log on shutdown. */
-	if (in_shutdown)
-		return -1;
 
 	/*
 	 * Log change in metadata.
@@ -3357,9 +3346,6 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 	}
 	index->version++;
 
-	/* We can't use coeio on shutdown. */
-	if (in_shutdown)
-		goto out;
 	/* Delete files left from the old range. */
 	ERROR_INJECT(ERRINJ_VY_GC, goto out);
 	rlist_foreach_entry(run, &range->runs, in_range) {
@@ -3371,6 +3357,7 @@ vy_task_compact_complete(struct vy_task *task, bool in_shutdown)
 				say_syserror("failed to delete file '%s'", path);
 		}
 	}
+	goto out; /* suppress warning if NDEBUG */
 out:
 	vy_range_delete(range);
 	return 0;
@@ -3863,7 +3850,7 @@ fail:
 
 static int
 vy_scheduler_complete_task(struct vy_scheduler *scheduler,
-			   struct vy_task *task, bool in_shutdown)
+			   struct vy_task *task)
 {
 	if (task->status != 0) {
 		/* ->execute failed, propagate diag */
@@ -3872,7 +3859,7 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 		goto fail;
 	}
 	if (task->ops->complete &&
-	    task->ops->complete(task, in_shutdown) != 0) {
+	    task->ops->complete(task) != 0) {
 		assert(!diag_is_empty(diag_get()));
 		diag_move(diag_get(), &scheduler->diag);
 		goto fail;
@@ -3881,7 +3868,7 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 fail:
 	error_log(diag_last_error(&scheduler->diag));
 	if (task->ops->abort)
-		task->ops->abort(task, in_shutdown);
+		task->ops->abort(task, false);
 	return -1;
 }
 
@@ -3919,8 +3906,7 @@ vy_scheduler_f(va_list va)
 
 		/* Complete and delete all processed tasks. */
 		stailq_foreach_entry_safe(task, next, &output_queue, link) {
-			if (vy_scheduler_complete_task(scheduler,
-						       task, false) != 0)
+			if (vy_scheduler_complete_task(scheduler, task) != 0)
 				tasks_failed++;
 			else
 				tasks_done++;
@@ -4068,22 +4054,19 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 {
+	struct stailq task_queue;
+	stailq_create(&task_queue);
+
 	assert(scheduler->is_worker_pool_running);
 	scheduler->is_worker_pool_running = false;
 
-	/* Abort all pending tasks and wake up worker threads */
+	/* Clear the input queue and wake up worker threads. */
 	tt_pthread_mutex_lock(&scheduler->mutex);
-	struct vy_task *task, *next;
-	stailq_foreach_entry_safe(task, next, &scheduler->input_queue, link) {
-		if (task->ops->abort)
-			task->ops->abort(task, true);
-		vy_task_delete(&scheduler->task_pool, task);
-	}
-	stailq_create(&scheduler->input_queue);
+	stailq_concat(&task_queue, &scheduler->input_queue);
 	pthread_cond_broadcast(&scheduler->worker_cond);
 	tt_pthread_mutex_unlock(&scheduler->mutex);
 
-	/* Join worker threads */
+	/* Wait for worker threads to exit. */
 	for (int i = 0; i < scheduler->worker_pool_size; i++)
 		cord_join(&scheduler->worker_pool[i]);
 	ev_async_stop(scheduler->loop, &scheduler->scheduler_async);
@@ -4091,12 +4074,14 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 	scheduler->worker_pool = NULL;
 	scheduler->worker_pool_size = 0;
 
-	/* Complete all processed tasks */
-	stailq_foreach_entry_safe(task, next, &scheduler->output_queue, link) {
-		vy_scheduler_complete_task(scheduler, task, true);
+	/* Abort all pending tasks. */
+	struct vy_task *task, *next;
+	stailq_concat(&task_queue, &scheduler->output_queue);
+	stailq_foreach_entry_safe(task, next, &task_queue, link) {
+		if (task->ops->abort != NULL)
+			task->ops->abort(task, true);
 		vy_task_delete(&scheduler->task_pool, task);
 	}
-	stailq_create(&scheduler->output_queue);
 }
 
 static void
