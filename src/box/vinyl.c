@@ -1380,6 +1380,29 @@ vy_run_snprint_path(char *buf, size_t size, const char *dir,
 			dir, (long long)run_id, vy_file_suffix[type]);
 }
 
+/**
+ * Given the id of a run, delete its files.
+ *
+ * Note, in order not to stall the tx thread, this function uses
+ * coeio to unlink files and hence may yield. In particular, this
+ * means that it cannot be used on shutdown, because the event loop
+ * is unavailable at that time.
+ */
+static void
+vy_run_unlink_files(const char *dir, int64_t run_id)
+{
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_snprint_path(path, PATH_MAX, dir, run_id, type);
+		ERROR_INJECT(ERRINJ_VY_GC,
+			     {say_error("file '%s' was not deleted "
+					"due to error injection", path);
+			      continue;});
+		if (coeio_unlink(path) < 0 && errno != ENOENT)
+			say_syserror("failed to delete file '%s'", path);
+	}
+}
+
 static void
 vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 {
@@ -3175,8 +3198,6 @@ vy_task_dump_complete(struct vy_task *task)
 static void
 vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 {
-	(void)in_shutdown;
-
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
@@ -3186,6 +3207,8 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	vy_write_iterator_delete(task->wi);
 
 	/* Delete the run we failed to write. */
+	if (!in_shutdown)
+		vy_run_unlink_files(index->path, range->new_run->id);
 	vy_run_delete(range->new_run);
 	range->new_run = NULL;
 
@@ -3350,18 +3373,9 @@ vy_task_compact_complete(struct vy_task *task)
 	index->version++;
 
 	/* Delete files left from the old range. */
-	ERROR_INJECT(ERRINJ_VY_GC, goto out);
-	rlist_foreach_entry(run, &range->runs, in_range) {
-		char path[PATH_MAX];
-		for (int type = 0; type < vy_file_MAX; type++) {
-			vy_run_snprint_path(path, PATH_MAX, index->path,
-					    run->id, type);
-			if (coeio_unlink(path) < 0)
-				say_syserror("failed to delete file '%s'", path);
-		}
-	}
-	goto out; /* suppress warning if NDEBUG */
-out:
+	rlist_foreach_entry(run, &range->runs, in_range)
+		vy_run_unlink_files(index->path, run->id);
+
 	vy_range_delete(range);
 	return 0;
 }
@@ -3369,8 +3383,6 @@ out:
 static void
 vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 {
-	(void)in_shutdown;
-
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
@@ -3379,6 +3391,12 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 		  index->name, vy_range_str(range));
 
 	vy_write_iterator_delete(task->wi);
+
+	if (!in_shutdown) {
+		/* Delete files we failed to write. */
+		rlist_foreach_entry(r, &range->compact_list, compact_list)
+			vy_run_unlink_files(index->path, r->new_run->id);
+	}
 
 	/*
 	 * On compaction failure we delete new ranges, but leave their
