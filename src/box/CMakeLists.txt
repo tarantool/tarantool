@@ -51,6 +51,7 @@ add_library(box STATIC
     vinyl.c
     vy_stmt.c
     vy_log.c
+    vy_mem.c
     space.cc
     func.cc
     alter.cc
