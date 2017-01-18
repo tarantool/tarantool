@@ -949,7 +949,9 @@ local commands = setmetatable({
 [=[
         [cluster command] start Tarantool instance if it's not already started.
         Tarantool instance should be maintained using tarantoolctl only.
-]=]
+]=],
+            weight = 10,
+            deprecated = false,
         }
     }, stop = {
         func = exit_wrapper(stop), process = process_local, help = {
@@ -958,7 +960,9 @@ local commands = setmetatable({
             description =
 [=[
         [cluster command] stop Tarantool instance if it's not already stopped.
-]=]
+]=],
+            weight = 20,
+            deprecated = false,
         }
     }, logrotate = {
         func = exit_wrapper(logrotate), process = process_local, help = {
@@ -968,7 +972,9 @@ local commands = setmetatable({
 [=[
         [cluster command] rotate log of started Tarantool instance. Works only
         if logging is set into file. Pipe/Syslog aren't supported.
-]=]
+]=],
+            weight = 50,
+            deprecated = false,
         }
     }, status = {
         func = exit_wrapper(status), process = process_local, help = {
@@ -977,7 +983,9 @@ local commands = setmetatable({
             description =
 [=[
         [cluster command] show status of Tarantool instance. (started/stopped)
-]=]
+]=],
+            weight = 30,
+            deprecated = false,
         }
     }, enter = {
         func = exit_wrapper(enter), process = process_local, help = {
@@ -986,7 +994,9 @@ local commands = setmetatable({
             description =
 [=[
         [cluster command] enter interactive Lua console of instance.
-]=]
+]=],
+            weight = 65,
+            deprecated = false,
         }
     }, restart = {
         func = restart, process = process_local, help = {
@@ -996,7 +1006,9 @@ local commands = setmetatable({
 [=[
         [cluster command] stop and start Tarantool instance (if it's already
         started, fail otherwise)
-]=]
+]=],
+            weight = 40,
+            deprecated = false,
         }
     }, reload = {
         func = exit_wrapper(eval), process = process_local, help = {
@@ -1005,23 +1017,27 @@ local commands = setmetatable({
             description =
 [=[
         DEPRECATED in favor of "eval"
-]=]
+]=],
+            weight = 0,
+            deprecated = true,
         }
     }, eval = {
         func = exit_wrapper(eval), process = process_local, help = {
             header = {
-                "%s eval <instance_name> <lua_file>  # file version",
-                "<command> | %s eval <instance_name> # pipe version"
+                "%s eval <instance_name> <lua_file>",
+                "<command> | %s eval <instance_name>"
             },
             linkmode = {
-                "%s eval <lua_file>  # file version",
-                "<command> | %s eval # pipe version"
+                "%s eval <lua_file>",
+                "<command> | %s eval"
             },
             description =
 [=[
         [cluster command] evaluate local file on Tarantool instance (if it's
         already started, fail otherwise)
-]=]
+]=],
+            weight = 70,
+            deprecated = false,
         }
     }, check = {
         func = exit_wrapper(check), process = process_local, help = {
@@ -1030,7 +1046,9 @@ local commands = setmetatable({
             description =
 [=[
         [cluster command] Check instance script for syntax errors
-]=]
+]=],
+            weight = 60,
+            deprecated = false,
         }
     }, connect = {
         func = exit_wrapper(connect), process = process_remote, help = {
@@ -1042,7 +1060,9 @@ local commands = setmetatable({
 [=[
         Connect to Tarantool instance on admin/console port.
         Supports both TCP/Unix sockets.
-]=]
+]=],
+            weight = 80,
+            deprecated = false,
         }
     }, cat = {
         func = exit_wrapper(cat), process = process_remote, help = {
@@ -1061,7 +1081,9 @@ local commands = setmetatable({
         * If --to=to_lsn is present, then show operations ending with given lsn.
 
         Result is printed to stdout
-]=]
+]=],
+            weight = 90,
+            deprecated = false,
         }
     }, play = {
         func = exit_wrapper(play), process = process_remote, help = {
@@ -1078,8 +1100,9 @@ local commands = setmetatable({
         * If --from=from_lsn is present, then show operations starting from
           given lsn.
         * If --to=to_lsn is present, then show operations ending with given lsn.
-
-]=]
+]=],
+            weight = 100,
+            deprecated = false,
         }
     }
 }, {
@@ -1124,11 +1147,18 @@ usage = function(command)
     end
     log.error("")
     log.error("Usage:")
-    for _, cmd in pairs(commands) do
-        usage_command(name, cmd, false)
-        if verbose then
-            log.error("")
-            log.error(cmd.help.description)
+    local names = fun.iter(commands):map(
+        function(name, cmd) return {name, cmd.help.weight or 0} end
+    ):totable()
+    table.sort(names, function(left, right) return left[2] < right[2] end)
+    for _, cmd_name in ipairs(names) do
+        local cmd = commands[cmd_name[1]]
+        if cmd.help.deprecated ~= true then
+            usage_command(name, cmd, false)
+            if verbose then
+                log.error("")
+                log.error(cmd.help.description)
+            end
         end
     end
     os.exit(1)
