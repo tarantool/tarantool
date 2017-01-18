@@ -103,7 +103,7 @@ struct vy_stmt_iterator_iface {
  * Common interface for iterator over run, mem, etc.
  */
 struct vy_stmt_iterator {
-	struct vy_stmt_iterator_iface *iface;
+	const struct vy_stmt_iterator_iface *iface;
 };
 
 #if defined(__cplusplus)
