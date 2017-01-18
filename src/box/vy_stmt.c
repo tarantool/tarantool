@@ -428,24 +428,11 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 	uint32_t mp_size;
 	SNPRINT(total, snprintf, buf, size, "%s(",
 		iproto_type_name(vy_stmt_type(stmt)));
-	switch (vy_stmt_type(stmt)) {
-	case IPROTO_SELECT:
-	case IPROTO_DELETE:
 		SNPRINT(total, mp_snprint, buf, size, tuple_data(stmt));
-		break;
-	case IPROTO_REPLACE:
-		SNPRINT(total, mp_snprint, buf, size,
-			tuple_data(stmt));
-		break;
-	case IPROTO_UPSERT:
-		SNPRINT(total, mp_snprint, buf, size,
-			tuple_data(stmt));
+	if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
 		SNPRINT(total, snprintf, buf, size, ", ops=");
 		SNPRINT(total, mp_snprint, buf, size,
 			vy_stmt_upsert_ops(stmt, &mp_size));
-		break;
-	default:
-		unreachable();
 	}
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) vy_stmt_lsn(stmt));
