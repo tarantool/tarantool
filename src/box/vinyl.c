@@ -74,6 +74,7 @@
 #include "vy_stmt.h"
 #include "vy_quota.h"
 #include "vy_log.h"
+#include "vy_stmt_iterator.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -6397,75 +6398,6 @@ vy_end_recovery(struct vy_env *e)
 }
 
 /** }}} Recovery */
-
-/* {{{ vy_stmt_iterator: Common interface for iterator over run, mem, etc */
-
-struct vy_stmt_iterator;
-
-typedef NODISCARD int
-(*vy_iterator_next_f)(struct vy_stmt_iterator *virt_iterator,
-		      struct tuple **ret);
-/**
- * The restore() function moves an iterator to the specified
- * statement (@arg last_stmt) and returns the new statement via @arg ret.
- * In addition two cases are possible either the position of the iterator
- * has been changed after the restoration or it hasn't.
- *
- * 1) The position wasn't changed. This case appears if the iterator is moved
- *    to the statement that equals to the old statement by key and less
- *    or equal by LSN.
- *
- *    Example of the unchanged position:
- *    ┃     ...      ┃                      ┃     ...      ┃
- *    ┃ k2, lsn = 10 ┣▶ read_iterator       ┃ k3, lsn = 20 ┃
- *    ┃ k2, lsn = 9  ┃  position            ┃              ┃
- *    ┃ k2, lsn = 8  ┃                      ┃ k2, lsn = 8  ┣▶ read_iterator
- *    ┃              ┃   restoration ▶▶     ┃              ┃  position - the
- *    ┃ k1, lsn = 10 ┃                      ┃ k1, lsn = 10 ┃  same key and the
- *    ┃ k1, lsn = 9  ┃                      ┃ k1, lsn = 9  ┃  older LSN
- *    ┃     ...      ┃                      ┃     ...      ┃
- *
- * 2) Otherwise the position was changed and points on a statement with another
- *    key or with the same key but the bigger LSN.
- *
- *    Example of the changed position:
- *    ┃     ...      ┃                      ┃     ...      ┃
- *    ┃ k2, lsn = 10 ┣▶ read_iterator       ┃ k2, lsn = 11 ┣▶ read_iterator
- *    ┃ k2, lsn = 9  ┃  position            ┃ k2, lsn = 10 ┃  position - found
- *    ┃ k2, lsn = 8  ┃                      ┃ k2, lsn = 9  ┃  the newer LSN
- *    ┃              ┃   restoration ▶▶     ┃ k2, lsn = 8  ┃
- *    ┃ k1, lsn = 10 ┃                      ┃              ┃
- *    ┃ k1, lsn = 9  ┃                      ┃ k1, lsn = 10 ┃
- *    ┃     ...      ┃                      ┃     ...      ┃
- *
- *    Another example:
- *    ┃     ...      ┃                      ┃              ┃
- *    ┃ k3, lsn = 20 ┃                      ┃     ...      ┃
- *    ┃              ┃                      ┃ k3, lsn = 10 ┃
- *    ┃ k2, lsn = 8  ┣▶ read_iterator       ┃ k3, lsn = 9  ┃
- *    ┃              ┃  position            ┃ k3, lsn = 8  ┣▶ read_iterator
- *    ┃ k1, lsn = 10 ┃                      ┃              ┃  position - k2 was
- *    ┃ k1, lsn = 9  ┃   restoration ▶▶     ┃ k1, lsn = 10 ┃  not found, so go
- *    ┃     ...      ┃                      ┃     ...      ┃  to the next key
- */
-typedef NODISCARD int
-(*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
-			 const struct tuple *last_stmt, struct tuple **ret);
-typedef void
-(*vy_iterator_next_close_f)(struct vy_stmt_iterator *virt_iterator);
-
-struct vy_stmt_iterator_iface {
-	vy_iterator_next_f next_key;
-	vy_iterator_next_f next_lsn;
-	vy_iterator_restore_f restore;
-	vy_iterator_next_close_f close;
-};
-
-struct vy_stmt_iterator {
-	struct vy_stmt_iterator_iface *iface;
-};
-
-/* }}} vy_stmt_iterator: Common interface for iterator over run, mem, etc */
 
 /* {{{ vy_run_itr API forward declaration */
 /* TODO: move to header (with struct vy_run_itr) and remove static keyword */
