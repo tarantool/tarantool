@@ -66,16 +66,16 @@ vy_env_delete(struct vy_env *e);
  * Recovery
  */
 
-void
+int
 vy_bootstrap(struct vy_env *e);
 
 int
 vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock);
 
-void
+int
 vy_begin_final_recovery(struct vy_env *e);
 
-void
+int
 vy_end_recovery(struct vy_env *e);
 
 int

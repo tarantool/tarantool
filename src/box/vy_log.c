@@ -31,6 +31,7 @@
 #include "vy_log.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -117,6 +118,10 @@ struct vy_log {
 	 * xlog object doesn't support concurrent accesses.
 	 */
 	struct latch latch;
+	/** Next ID to use for a range. Used by vy_log_next_range_id(). */
+	int64_t next_range_id;
+	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
+	int64_t next_run_id;
 };
 
 /** Index info stored in a recovery context. */
@@ -252,16 +257,19 @@ vy_log_record_encode(const struct vy_log_record *record,
 	size += mp_sizeof_uint(record->type);
 	size_t n_keys = 0;
 	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
+		assert(record->index_id >= 0);
 		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_ID);
 		size += mp_sizeof_uint(record->index_id);
 		n_keys++;
 	}
 	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID)) {
+		assert(record->range_id >= 0);
 		size += mp_sizeof_uint(VY_LOG_KEY_RANGE_ID);
 		size += mp_sizeof_uint(record->range_id);
 		n_keys++;
 	}
 	if (key_mask & (1 << VY_LOG_KEY_RUN_ID)) {
+		assert(record->run_id >= 0);
 		size += mp_sizeof_uint(VY_LOG_KEY_RUN_ID);
 		size += mp_sizeof_uint(record->run_id);
 		n_keys++;
@@ -428,16 +436,20 @@ fail:
 }
 
 struct vy_log *
-vy_log_new(const char *dir)
+vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
 {
+	assert(start_range_id >= 0);
+	assert(start_run_id >= 0);
+
 	struct vy_log *log = malloc(sizeof(*log));
 	if (log == NULL) {
 		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
 		goto fail;
 	}
 
-	memset(log, 0, sizeof(*log));
 	latch_create(&log->latch);
+	log->next_range_id = start_range_id;
+	log->next_run_id = start_run_id;
 
 	char path[PATH_MAX];
 	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
@@ -475,6 +487,18 @@ vy_log_delete(struct vy_log *log)
 	xlog_close(&log->xlog, false);
 	TRASH(log);
 	free(log);
+}
+
+int64_t
+vy_log_next_run_id(struct vy_log *log)
+{
+	return log->next_run_id++;
+}
+
+int64_t
+vy_log_next_range_id(struct vy_log *log)
+{
+	return log->next_range_id++;
 }
 
 void
@@ -800,7 +824,11 @@ vy_recovery_new(const char *dir)
 		goto fail;
 	}
 
-	memset(recovery, 0, sizeof(*recovery));
+	recovery->index_hash = NULL;
+	recovery->range_hash = NULL;
+	recovery->run_hash = NULL;
+	recovery->range_id_max = -1;
+	recovery->run_id_max = -1;
 
 	recovery->index_hash = mh_i64ptr_new();
 	recovery->range_hash = mh_i64ptr_new();
@@ -814,6 +842,11 @@ vy_recovery_new(const char *dir)
 
 	char path[PATH_MAX];
 	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
+
+	if (access(path, F_OK) < 0 && errno == ENOENT) {
+		/* No log file, nothing to do. */
+		goto out;
+	}
 
 	struct xlog_cursor cursor;
 	if (xlog_cursor_open(&cursor, path) < 0)
@@ -836,6 +869,7 @@ vy_recovery_new(const char *dir)
 		goto fail_close;
 
 	xlog_cursor_close(&cursor, false);
+out:
 	return recovery;
 
 fail_close:

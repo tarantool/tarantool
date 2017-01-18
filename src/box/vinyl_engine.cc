@@ -88,7 +88,8 @@ VinylEngine::init()
 void
 VinylEngine::bootstrap()
 {
-	vy_bootstrap(env);
+	if (vy_bootstrap(env) != 0)
+		diag_raise();
 	recovery_complete = true;
 }
 
@@ -102,7 +103,8 @@ VinylEngine::beginInitialRecovery(struct vclock *vclock)
 void
 VinylEngine::beginFinalRecovery()
 {
-	vy_begin_final_recovery(env);
+	if (vy_begin_final_recovery(env) != 0)
+		diag_raise();
 }
 
 void
@@ -110,7 +112,8 @@ VinylEngine::endRecovery()
 {
 	assert(!recovery_complete);
 	/* complete two-phase recovery */
-	vy_end_recovery(env);
+	if (vy_end_recovery(env) != 0)
+		diag_raise();
 	recovery_complete = true;
 }
 

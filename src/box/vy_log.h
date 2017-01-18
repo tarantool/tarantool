@@ -117,26 +117,42 @@ struct vy_recovery {
 	struct mh_i64ptr_t *range_hash;
 	/** ID -> vy_run_recovery_info. */
 	struct mh_i64ptr_t *run_hash;
-	/** Maximal range ID, according to the metadata log. */
+	/**
+	 * Maximal range ID, according to the metadata log,
+	 * or -1 in case no ranges were recovered.
+	 */
 	int64_t range_id_max;
-	/** Maximal run ID, according to the metadata log. */
+	/**
+	 * Maximal run ID, according to the metadata log,
+	 * or -1 in case no runs were recovered.
+	 */
 	int64_t run_id_max;
 };
 
 /**
  * Open the vinyl metadata log file stored in a given directory
  * for appending, or create a new one if it doesn't exist.
+ * @start_range_id and @start_run_id specify starting IDs to use
+ * for range and runs, respectively.
  *
  * Returns NULL on failure.
  */
 struct vy_log *
-vy_log_new(const char *dir);
+vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id);
 
 /**
  * Close a metadata log and free associated structures.
  */
 void
 vy_log_delete(struct vy_log *log);
+
+/** Allocate a unique ID for a run. */
+int64_t
+vy_log_next_run_id(struct vy_log *log);
+
+/** Allocate a unique ID for a range. */
+int64_t
+vy_log_next_range_id(struct vy_log *log);
 
 /**
  * Begin a transaction in a metadata log.
