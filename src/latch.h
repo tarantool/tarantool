@@ -43,11 +43,12 @@ extern "C" {
 struct latch
 {
 	/**
-	 * State of latch. 0 - not locked, 1 - locked.
+	 * The fiber that locked the latch, or NULL
+	 * if the latch is unlocked.
 	 */
-	int locked;
+	struct fiber *owner;
 	/**
-	 * The queue of fibers waiting on a latch.
+	 * The queue of fibers waiting on the latch.
 	 */
 	struct rlist queue;
 };
@@ -60,32 +61,45 @@ struct latch
 /**
  * Initialize the given latch.
  *
- * @param m - latch to be initialized.
+ * @param l - latch to be initialized.
  */
 static inline void
 latch_create(struct latch *l)
 {
-	l->locked = 0;
+	l->owner = NULL;
 	rlist_create(&l->queue);
 }
 
 /**
  * Destroy the given latch.
  *
- * @param m - latch to be destroyed.
+ * @param l - latch to be destroyed.
  */
 static inline void
 latch_destroy(struct latch *l)
 {
+	assert(l->owner == NULL);
 	assert(rlist_empty(&l->queue));
 	(void) l;
+}
+
+/**
+ * Return the fiber that locked the given latch, or NULL
+ * if the latch is unlocked.
+ *
+ * @param l - latch to be checked.
+ */
+static inline struct fiber *
+latch_owner(struct latch *l)
+{
+	return l->owner;
 }
 
 /**
  * Lock a latch. If the latch is already locked by another fiber,
  * waits for timeout.
  *
- * @param m - latch to be locked.
+ * @param l - latch to be locked.
  * @param timeout - maximal time to wait
  *
  * @retval 0 - success
@@ -94,8 +108,9 @@ latch_destroy(struct latch *l)
 static inline int
 latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 {
-	if (l->locked == 0 && rlist_empty(&l->queue)) {
-		l->locked = 1;
+	assert(l->owner != fiber());
+	if (l->owner == NULL && rlist_empty(&l->queue)) {
+		l->owner = fiber();
 		return 0;
 	}
 	if (timeout <= 0)
@@ -107,8 +122,8 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 	int result = 0;
 	while (true) {
 		fiber_yield_timeout(timeout);
-		if (l->locked == 0) {
-			l->locked = 1;
+		if (l->owner == NULL) {
+			l->owner = fiber();
 			break;
 		}
 		timeout -= ev_now(loop()) - start;
@@ -146,8 +161,8 @@ latch_trylock(struct latch *l)
 static inline void
 latch_unlock(struct latch *l)
 {
-	assert(l->locked);
-	l->locked = 0;
+	assert(l->owner == fiber());
+	l->owner = NULL;
 	if (!rlist_empty(&l->queue)) {
 		struct fiber *f = rlist_first_entry(&l->queue,
 						    struct fiber, state);
@@ -198,7 +213,7 @@ box_latch_trylock(box_latch_t *latch);
  * Unlock a latch. The fiber calling this function must
  * own the latch.
  *
- * \param latch a ltach
+ * \param latch a latch
  */
 void
 box_latch_unlock(box_latch_t *latch);

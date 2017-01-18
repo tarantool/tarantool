@@ -48,8 +48,8 @@
 #include "diag.h"
 #include "errcode.h"
 #include "fiber.h"
-#include "ipc.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
+#include "latch.h"
 #include "say.h"
 #include "trivia/util.h"
 #include "xlog.h"
@@ -110,13 +110,13 @@ static const char *vy_log_type_name[] = {
 struct vy_log {
 	/** Xlog object used for writing the log. */
 	struct xlog xlog;
-	/** Fiber that locked the log (see vy_log_lock()). */
-	struct fiber *owner;
 	/**
-	 * Condition object used for waiting for
-	 * the log to be unlocked.
+	 * Latch protecting the xlog.
+	 *
+	 * We need to lock the log before writing to xlog, because
+	 * xlog object doesn't support concurrent accesses.
 	 */
-	struct ipc_cond cond;
+	struct latch latch;
 };
 
 /** Index info stored in a recovery context. */
@@ -167,30 +167,6 @@ vy_log_type_check(struct xlog_meta *meta)
 		return -1;
 	}
 	return 0;
-}
-
-/**
- * Acquire exclusive write access to a log.
- *
- * We need to lock the log before writing to xlog, because
- * xlog object doesn't support concurrent accesses.
- */
-static void
-vy_log_lock(struct vy_log *log)
-{
-	assert(log->owner != fiber());
-	while (log->owner != NULL)
-		ipc_cond_wait(&log->cond);
-	log->owner = fiber();
-}
-
-/** Undo the effect of vy_log_lock(). */
-static void
-vy_log_unlock(struct vy_log *log)
-{
-	assert(log->owner == fiber());
-	log->owner = NULL;
-	ipc_cond_signal(&log->cond);
 }
 
 /** An snprint-style function to print a log record. */
@@ -461,7 +437,7 @@ vy_log_new(const char *dir)
 	}
 
 	memset(log, 0, sizeof(*log));
-	ipc_cond_create(&log->cond);
+	latch_create(&log->latch);
 
 	char path[PATH_MAX];
 	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
@@ -495,8 +471,7 @@ fail:
 void
 vy_log_delete(struct vy_log *log)
 {
-	assert(log->owner == NULL);
-	ipc_cond_destroy(&log->cond);
+	latch_destroy(&log->latch);
 	xlog_close(&log->xlog, false);
 	TRASH(log);
 	free(log);
@@ -505,7 +480,7 @@ vy_log_delete(struct vy_log *log)
 void
 vy_log_tx_begin(struct vy_log *log)
 {
-	vy_log_lock(log);
+	latch_lock(&log->latch);
 	xlog_tx_begin(&log->xlog);
 	say_debug("%s", __func__);
 }
@@ -531,7 +506,7 @@ vy_log_tx_commit(struct vy_log *log)
 	 */
 	if (coio_call(vy_log_tx_commit_f, log) < 0)
 		rc = -1;
-	vy_log_unlock(log);
+	latch_unlock(&log->latch);
 	return rc;
 }
 
@@ -540,7 +515,7 @@ vy_log_tx_rollback(struct vy_log *log)
 {
 	xlog_tx_rollback(&log->xlog);
 	say_debug("%s", __func__);
-	vy_log_unlock(log);
+	latch_unlock(&log->latch);
 }
 
 int
@@ -548,7 +523,7 @@ vy_log_write(struct vy_log *log, const struct vy_log_record *record)
 {
 	int rc = 0;
 
-	bool autocommit = (log->owner != fiber());
+	bool autocommit = (latch_owner(&log->latch) != fiber());
 	if (autocommit) {
 		/*
 		 * The caller doesn't bother to call vy_log_tx_begin()
