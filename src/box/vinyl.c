@@ -3539,6 +3539,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		say_info("%s: started splitting range %s by key %s",
 			 index->name, vy_range_str(range),
 			 vy_key_str(split_key_raw));
+		tuple_unref(split_key);
 	} else {
 		say_info("%s: started compacting range %s",
 			 index->name, vy_range_str(range));
