@@ -1,5 +1,6 @@
 local ffi = require('ffi')
 local os = require('os')
+local errno = require('errno')
 
 ffi.cdef[[
     extern char **environ;
