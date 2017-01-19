@@ -1129,7 +1129,7 @@ local function usage_header()
     log.error("Tarantool client utility (%s)", _TARANTOOL)
 end
 
-usage = function(command)
+usage = function(command, verbose)
     local name = fio.basename(arg[0])
     do -- in case of command is passed and is valid command
         local command_struct = rawget(commands, command)
