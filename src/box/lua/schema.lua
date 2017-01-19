@@ -386,7 +386,8 @@ box.schema.index.create = function(space_id, name, options)
         path = 'string',
         page_size = 'number',
         range_size = 'number',
-        compact_wm = 'number',
+        max_runs_per_level = 'number',
+        level_size_ratio = 'number',
     }
     check_param_table(options, options_template)
     local options_defaults = {
@@ -408,7 +409,8 @@ box.schema.index.create = function(space_id, name, options)
             -- to a subdirectory of the server data dir if it is not set
             page_size = box.cfg.vinyl.page_size,
             range_size = box.cfg.vinyl.range_size,
-            compact_wm = box.cfg.vinyl.compact_wm,
+            max_runs_per_level = box.cfg.vinyl.max_runs_per_level,
+            level_size_ratio = box.cfg.vinyl.level_size_ratio,
         }
     else
         options_defaults = {}
@@ -454,7 +456,8 @@ box.schema.index.create = function(space_id, name, options)
             path = options.path,
             page_size = options.page_size,
             range_size = options.range_size,
-            compact_wm = options.compact_wm,
+            max_runs_per_level = options.max_runs_per_level,
+            level_size_ratio = options.level_size_ratio,
             lsn = box.info.cluster.signature,
     }
     local field_type_aliases = {

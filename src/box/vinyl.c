@@ -432,6 +432,14 @@ struct vy_range {
 	 * The newer an index, the closer it to the list head.
 	 */
 	struct rlist frozen;
+	/**
+	 * Size of the largest run that was dumped since the last
+	 * range compaction. Required for computing the size of
+	 * the base level in the LSM tree.
+	 */
+	uint64_t max_dump_size;
+	/** Number of runs that need to be compacted. */
+	int compact_priority;
 	/** Number of times the range was compacted. */
 	int n_compactions;
 	/**
@@ -2638,9 +2646,9 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
  * split in two.
  *
  * - We should never split a range until it was merged at least once
- *   (actually, it should be a function of compact_wm/number of runs
- *   used for the merge: with low compact_wm it's more than once, with
- *   high compact_wm it's once).
+ *   (actually, it should be a function of max_runs_per_level/number
+ *   of runs used for the merge: with low max_runs_per_level it's more
+ *   than once, with high max_runs_per_level it's once).
  * - We should use the last run size as the size of the range.
  * - We should split around the last run middle key.
  * - We should only split if the last run size is greater than
@@ -2678,6 +2686,87 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 
 	*p_split_key = split_key;
 	return true;
+}
+
+/**
+ * To reduce write amplification caused by compaction, we follow
+ * the LSM tree design. Runs in each range are divided into groups
+ * called levels:
+ *
+ *   level 1: runs 1 .. L_1
+ *   level 2: runs L_1 + 1 .. L_2
+ *   ...
+ *   level N: runs L_{N-1} .. L_N
+ *
+ * where L_N is the total number of runs, N is the total number of
+ * levels, older runs have greater numbers. Each subsequent level is
+ * level_size_ratio times larger than previous one. When a number of
+ * runs at a level exceeds max_runs_per_level, we compact all its runs
+ * along with all runs from previous levels and in-memory indexes.
+ * Inclusion previous levels into compaction is relatively cheap,
+ * because of the level size ratio.
+ *
+ * Given a range, this function computes the maximal level that needs
+ * to be compacted and sets @compact_priority to the number of runs in
+ * this level and all preceding levels.
+ */
+static void
+vy_range_update_compact_priority(struct vy_range *range)
+{
+	struct key_opts *opts = &range->index->key_def->opts;
+
+	assert(opts->max_runs_per_level > 0);
+	assert(opts->level_size_ratio > 1);
+	assert(range->max_dump_size > 0);
+
+	range->compact_priority = 0;
+
+	/* Total number of checked runs. */
+	uint32_t run_count = 0;
+	/* Sum size of all checked runs. */
+	uint64_t sum_run_size = 0;
+	/* Number of runs at the current level. */
+	uint32_t level_run_count = 0;
+	/* Maximal size of a run at the current level. */
+	uint64_t level_thresh = range->max_dump_size;
+
+	struct vy_run *run;
+	rlist_foreach_entry(run, &range->runs, in_range) {
+		uint64_t run_size = vy_run_total(run);
+		if (run_size > level_thresh) {
+			/*
+                         * The run exceeds the threshold set by the
+                         * current level. Compute the threshold for
+                         * the first level to put this run into and
+                         * reset the run counter.
+			 */
+			do {
+				level_thresh *= opts->level_size_ratio;
+			} while (run_size > level_thresh);
+			level_run_count = 0;
+			if (sum_run_size > (level_thresh /
+					    opts->level_size_ratio)) {
+				/*
+				 * The resulting run is likely to be
+				 * pushed to the next level. Take this
+				 * into account when checking if it's
+				 * worth compacting the next level.
+				 */
+				level_run_count++;
+			}
+		}
+		run_count++;
+		level_run_count++;
+		sum_run_size += run_size;
+		if (level_run_count > opts->max_runs_per_level) {
+			/*
+			 * The number of runs at the current level
+			 * exceeds the configured maximum. Arrange
+			 * for compaction.
+			 */
+			range->compact_priority = run_count;
+		}
+	}
 }
 
 /**
@@ -3186,10 +3275,14 @@ vy_task_dump_complete(struct vy_task *task)
 
 	vy_write_iterator_delete(task->wi);
 
+	if (range->max_dump_size < vy_run_total(run))
+		range->max_dump_size = vy_run_total(run);
+
 	if (!vy_run_is_empty(run)) {
 		rlist_add_entry(&range->runs, run, in_range);
 		range->run_count++;
 		vy_index_acct_range_dump(index, range, run);
+		vy_range_update_compact_priority(range);
 	} else
 		vy_run_delete(run);
 	range->new_run = NULL;
@@ -3632,12 +3725,15 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	RLIST_HEAD(runs_to_release);
-	while (!rlist_empty(&range->runs)) {
+	int n = range->compact_priority;
+	do {
+		assert(!rlist_empty(&range->runs));
 		run = rlist_shift_entry(&range->runs,
 					struct vy_run, in_range);
 		rlist_add_entry(&runs_to_release, run, in_range);
 		range->run_count--;
-	}
+	} while (--n > 0);
+
 	while (!rlist_empty(&range->frozen)) {
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
@@ -3651,6 +3747,8 @@ vy_task_compact_complete(struct vy_task *task)
 	} else
 		vy_run_delete(range->new_run);
 	range->new_run = NULL;
+	range->max_dump_size = 0;
+	range->compact_priority = 0;
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
@@ -3728,8 +3826,13 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		range->mem = mem;
 		range->version++;
 	}
+
+	int n = range->compact_priority;
+	assert(n > 0 && n <= range->run_count);
+
 	struct vy_write_iterator *wi;
-	wi = vy_write_iterator_new(index, true, tx_manager_vlsn(xm));
+	wi = vy_write_iterator_new(index, n == range->run_count,
+				   tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
 
@@ -3741,6 +3844,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		if (vy_write_iterator_add_run(wi, range, run) != 0)
 			goto err_wi_sub;
+		if (--n == 0)
+			break;
 	}
 
 	range->new_run = vy_run_new(vy_log_next_run_id(log));
@@ -3750,8 +3855,9 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	task->range = range;
 	task->wi = wi;
 
-	say_info("%s: started compacting range %s",
-		 index->name, vy_range_str(range));
+	say_info("%s: started compacting range %s, runs %d/%d",
+		 index->name, vy_range_str(range),
+                 range->compact_priority, range->run_count);
 	return task;
 err_run:
 	/* Sub iterators are deleted by vy_write_iterator_delete(). */
@@ -3790,14 +3896,16 @@ heap_dump_less(struct heap_node *a, struct heap_node *b)
 
 #define HEAP_NAME vy_compact_heap
 
-static int
+static bool
 heap_compact_less(struct heap_node *a, struct heap_node *b)
 {
-	const struct vy_range *left =
-				container_of(a, struct vy_range, in_compact);
-	const struct vy_range *right =
-				container_of(b, struct vy_range, in_compact);
-	return left->run_count > right->run_count;
+	struct vy_range *left = container_of(a, struct vy_range, in_compact);
+	struct vy_range *right = container_of(b, struct vy_range, in_compact);
+	/*
+	 * Prefer ranges whose read amplification will be reduced
+	 * most as a result of compaction.
+	 */
+	return left->compact_priority > right->compact_priority;
 }
 
 #define HEAP_LESS(h, l, r) heap_compact_less(l, r)
@@ -4002,10 +4110,21 @@ vy_scheduler_remove_range(struct vy_scheduler *scheduler,
 	range->in_compact.pos = UINT32_MAX;
 }
 
+/**
+ * Create a task for dumping a range. The new task is returned
+ * in @ptask. If there's no range that needs to be dumped @ptask
+ * is set to NULL.
+ *
+ * We only dump a range if it needs to be snapshotted or the quota
+ * on memory usage is exceeded. In either case, the oldest range
+ * is selected, because dumping it will free the maximal amount of
+ * memory due to log structured design of the memory allocator.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
 static int
 vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
-	/* try to peek a range with a biggest in-memory index */
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
@@ -4014,10 +4133,10 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 		range = container_of(pn, struct vy_range, in_dump);
 		if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
 		    range->min_lsn > scheduler->checkpoint_lsn)
-			return 0; /* nothing to do */
+			break;
 		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
-			return -1; /* oom */
+			return -1; /* OOM */
 		vy_scheduler_remove_range(scheduler, range);
 		return 0; /* new task */
 	}
@@ -4025,23 +4144,31 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	return 0; /* nothing to do */
 }
 
+/**
+ * Create a task for compacting a range. The new task is returned
+ * in @ptask. If there's no range that needs to be compacted @ptask
+ * is set to NULL.
+ *
+ * We compact ranges that have more runs in a level than specified
+ * by max_runs_per_level configuration option. Among those runs we
+ * give preference to those ranges whose compaction will reduce
+ * read amplification most.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
 static int
 vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_task **ptask)
 {
-	/* try to peek a range with a biggest number
-	 * of runs */
 	struct vy_range *range;
 	struct heap_node *pn = NULL;
 	struct heap_iterator it;
 	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
 	while ((pn = vy_compact_heap_iterator_next(&it))) {
 		range = container_of(pn, struct vy_range, in_compact);
-		if ((unsigned)range->run_count <
-		    range->index->key_def->opts.compact_wm)
-			break; /* TODO: why ? */
-		*ptask = vy_task_compact_new(&scheduler->task_pool,
-					     range);
+		if (range->compact_priority == 0)
+			break;
+		*ptask = vy_task_compact_new(&scheduler->task_pool, range);
 		if (*ptask == NULL)
 			return -1; /* OOM */
 		vy_scheduler_remove_range(scheduler, range);

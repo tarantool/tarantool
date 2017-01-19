@@ -10,6 +10,8 @@ box.cfg {
         memory_limit = 0.5;
         range_size = 1024*64;
         page_size = 1024;
+        max_runs_per_level = 1,
+        level_size_ratio = 2,
     }
 }
 

@@ -334,6 +334,12 @@ key_opts_create(struct key_opts *opts, const char *map)
 				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
 		opts->distance = key_opts_decode_distance(opts->distancebuf);
+	if (opts->max_runs_per_level == 0)
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, INDEX_OPTS,
+			  "max_runs_per_level must be > 0");
+	if (opts->level_size_ratio <= 1)
+		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS, INDEX_OPTS,
+			  "level_size_ratio must be > 1");
 	return map;
 }
 

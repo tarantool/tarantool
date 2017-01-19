@@ -181,10 +181,16 @@ struct key_opts {
 	uint64_t range_size;
 	uint32_t page_size;
 	/**
-	 * Begin compaction when there are more than compact_wm
-	 * runs in a range.
+	 * Maximal number of runs that can be created in a level
+	 * of the LSM tree before triggering compaction.
 	 */
-	uint32_t compact_wm;
+	uint32_t max_runs_per_level;
+	/**
+	 * The LSM tree multiplier. Each subsequent level of
+	 * the LSM tree is level_size_ratio times larger than
+	 * previous one.
+	 */
+	uint32_t level_size_ratio;
 	/**
 	 * LSN from the time of index creation.
 	 */

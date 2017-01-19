@@ -109,7 +109,8 @@ const struct key_opts key_opts_default = {
 	/* .path                = */ { 0 },
 	/* .range_size          = */ 0,
 	/* .page_size           = */ 0,
-	/* .compact_wm          = */ 2,
+	/* .max_runs_per_level  = */ 2,
+	/* .level_size_ratio    = */ 10,
 	/* .lsn                 = */ 0,
 };
 
@@ -120,7 +121,8 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("path", MP_STR, struct key_opts, path),
 	OPT_DEF("range_size", MP_UINT, struct key_opts, range_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
-	OPT_DEF("compact_wm", MP_UINT, struct key_opts, compact_wm),
+	OPT_DEF("max_runs_per_level", MP_UINT, struct key_opts, max_runs_per_level),
+	OPT_DEF("level_size_ratio", MP_UINT, struct key_opts, level_size_ratio),
 	OPT_DEF("lsn", MP_UINT, struct key_opts, lsn),
 	{ NULL, MP_NIL, 0, 0 }
 };

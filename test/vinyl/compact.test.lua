@@ -2,7 +2,7 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
-_= space:create_index('primary', { parts = { 1, 'unsigned' }, compact_wm = 3 })
+_= space:create_index('primary', { parts = { 1, 'unsigned' }, max_runs_per_level = 2 })
 
 function vyinfo() return box.info.vinyl().db[box.space.vinyl.id..'/0'] end
 
