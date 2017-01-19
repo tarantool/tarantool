@@ -1497,7 +1497,7 @@ box_init(void)
 		 * after acquiring the lock.
 		 */
 		if (wal_dir_lock < 0) {
-			say_warn("Entering hot standby mode");
+			say_info("Entering hot standby mode");
 			while (true) {
 				if (path_lock(cfg_gets("wal_dir"),
 					      &wal_dir_lock))
