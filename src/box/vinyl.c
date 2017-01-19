@@ -1303,6 +1303,12 @@ vy_run_size(struct vy_run *run)
 	       run->info.count * sizeof(struct vy_page_info);
 }
 
+static bool
+vy_run_is_empty(struct vy_run *run)
+{
+	return run->info.count == 0;
+}
+
 static struct vy_run *
 vy_run_new(int64_t id)
 {
@@ -1906,9 +1912,8 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  uint32_t *page_info_capacity, struct tuple **curr_stmt,
 		  const struct key_def *key_def)
 {
-	assert(curr_stmt);
-	if (*curr_stmt == NULL)
-		return 1;
+	assert(curr_stmt != NULL);
+	assert(*curr_stmt != NULL);
 
 	/* row offsets accumulator */
 	struct ibuf row_index_buf;
@@ -2018,6 +2023,8 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  const struct key_def *key_def)
 {
 	assert(curr_stmt != NULL);
+	assert(*curr_stmt != NULL);
+
 	struct vy_run_info *run_info = &run->info;
 
 	char path[PATH_MAX];
@@ -2601,6 +2608,11 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   struct tuple **stmt, size_t *written)
 {
 	assert(stmt != NULL);
+
+	/* Do not create empty run files. */
+	if (*stmt == NULL)
+		return 0;
+
 	const struct vy_index *index = range->index;
 	const struct key_def *key_def = index->key_def;
 
@@ -2616,6 +2628,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	    vy_run_write_index(run, index->path) != 0)
 		return -1;
 
+	assert(!vy_run_is_empty(run));
 	*written += vy_run_size(run) + vy_run_total(run);
 	return 0;
 }
@@ -3161,12 +3174,11 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
 
-	assert(run != NULL);
-
 	/*
 	 * Log change in metadata.
 	 */
-	if (vy_log_insert_run(index->env->log, range->id, run->id) < 0)
+	if (!vy_run_is_empty(run) &&
+	    vy_log_insert_run(index->env->log, range->id, run->id) < 0)
 		return -1;
 
 	say_info("%s: completed dumping range %s",
@@ -3174,10 +3186,13 @@ vy_task_dump_complete(struct vy_task *task)
 
 	vy_write_iterator_delete(task->wi);
 
+	if (!vy_run_is_empty(run)) {
+		rlist_add_entry(&range->runs, run, in_range);
+		range->run_count++;
+		vy_index_acct_range_dump(index, range, run);
+	} else
+		vy_run_delete(run);
 	range->new_run = NULL;
-	rlist_add_entry(&range->runs, run, in_range);
-	range->run_count++;
-	vy_index_acct_range_dump(index, range, run);
 
 	/*
 	 * Release dumped in-memory indexes.
@@ -3338,7 +3353,11 @@ vy_task_split_complete(struct vy_task *task)
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		if (vy_log_insert_range(env->log, index->key_def->opts.lsn, r->id,
 				r->begin != NULL ? tuple_data(r->begin) : NULL,
-				r->end != NULL ? tuple_data(r->end) : NULL) < 0 ||
+				r->end != NULL ? tuple_data(r->end) : NULL) < 0) {
+			vy_log_tx_rollback(env->log);
+			return -1;
+		}
+		if (!vy_run_is_empty(r->new_run) &&
 		    vy_log_insert_run(env->log, r->id, r->new_run->id) < 0) {
 			vy_log_tx_rollback(env->log);
 			return -1;
@@ -3360,9 +3379,15 @@ vy_task_split_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
-		/* Add the new run created by split to the list. */
-		rlist_add_entry(&r->runs, r->new_run, in_range);
-		r->run_count++;
+		/*
+		 * Add the new run created by split to the list
+		 * unless it's empty.
+		 */
+		if (!vy_run_is_empty(r->new_run)) {
+			rlist_add_entry(&r->runs, r->new_run, in_range);
+			r->run_count++;
+		} else
+			vy_run_delete(r->new_run);
 		r->new_run = NULL;
 
 		rlist_del(&r->split_list);
@@ -3588,7 +3613,8 @@ vy_task_compact_complete(struct vy_task *task)
 			return -1;
 		}
 	}
-	if (vy_log_insert_run(index->env->log, range->id,
+	if (!vy_run_is_empty(range->new_run) &&
+	    vy_log_insert_run(index->env->log, range->id,
 			      range->new_run->id) < 0) {
 		vy_log_tx_rollback(env->log);
 		return -1;
@@ -3619,9 +3645,12 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 	range->used = range->mem->used;
 	range->min_lsn = range->mem->min_lsn;
-	rlist_add_entry(&range->runs, range->new_run, in_range);
+	if (!vy_run_is_empty(range->new_run)) {
+		rlist_add_entry(&range->runs, range->new_run, in_range);
+		range->run_count++;
+	} else
+		vy_run_delete(range->new_run);
 	range->new_run = NULL;
-	range->run_count++;
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
