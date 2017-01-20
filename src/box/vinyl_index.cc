@@ -37,6 +37,7 @@
 #include "schema.h"
 #include "txn.h"
 #include "vinyl.h"
+#include "tuple.h"
 
 /**
  * Get (struct vy_index *) by (struct Index *).
@@ -85,6 +86,10 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	struct tuple *tuple = NULL;
 	if (vy_get(transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
+	if (tuple != NULL) {
+		tuple = tuple_bless(tuple);
+		tuple_unref(tuple);
+	}
 	return tuple;
 }
 
@@ -138,8 +143,11 @@ iterator_next(struct iterator *base_it)
 	/* found */
 	if (vy_cursor_next(it->cursor, &tuple) != 0)
 		diag_raise();
-	if (tuple != NULL)
+	if (tuple != NULL) {
+		tuple = tuple_bless(tuple);
+		tuple_unref(tuple);
 		return tuple;
+	}
 close:
 	/* immediately close the cursor */
 	vy_cursor_delete(it->cursor);
