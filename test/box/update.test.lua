@@ -258,4 +258,14 @@ s:update({0}, {})
 --#start server default
 s = box.space.tweedledum
 
+--
+-- gh-2036: msgpackffi doesn't support __serialize hint
+--
+map = setmetatable({}, { __serialize = 'map' })
+t = box.tuple.new({1, 2, 3})
+s:replace({1, 2, 3})
+
+t:update({{'=', 3, map}})
+s:update(1, {{'=', 3, map}})
+
 s:drop()

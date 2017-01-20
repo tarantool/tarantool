@@ -224,7 +224,7 @@ local function test_nil(test, s)
 end
 
 local function test_table(test, s, is_array, is_map)
-    test:plan(s.cfg and 26 or 8)
+    test:plan(s.cfg and 31 or 13)
 
     rt(test, s, {})
     test:ok(is_array(s.encode({})), "empty table is array")
@@ -237,6 +237,26 @@ local function test_table(test, s, is_array, is_map)
     rt(test, s, {Метапеременная = { 'Метазначение' }})
     rt(test, s, {test = { 'Результат' }})
 
+    local arr = setmetatable({1, 2, 3, k1 = 'v1', k2 = 'v2', 4, 5},
+        { __serialize = 'seq'})
+    local map = setmetatable({1, 2, 3, 4, 5}, { __serialize = 'map'})
+    local obj = setmetatable({}, {
+        __serialize = function(x) return 'serialize' end
+    })
+
+    -- __serialize on encode
+    test:ok(is_array(s.encode(arr)), "array load __serialize")
+    -- map
+    test:ok(is_map(s.encode(map)), "map load __serialize")
+    -- string (from __serialize hook)
+    test:is(s.decode(s.encode(obj)), "serialize", "object load __serialize")
+
+    -- __serialize on decode
+    test:is(getmetatable(s.decode(s.encode(arr))).__serialize, "seq",
+        "array save __serialize")
+    test:is(getmetatable(s.decode(s.encode(map))).__serialize, "map",
+        "map save __serialize")
+
     if not s.cfg then
         return
     end
@@ -244,13 +264,6 @@ local function test_table(test, s, is_array, is_map)
     --
     -- encode_load_metatables
     --
-
-    local arr = setmetatable({1, 2, 3, k1 = 'v1', k2 = 'v2', 4, 5},
-        { __serialize = 'seq'})
-    local map = setmetatable({1, 2, 3, 4, 5}, { __serialize = 'map'})
-    local obj = setmetatable({}, {
-        __serialize = function(x) return 'serialize' end
-    })
 
     local ss = s.new()
     ss.cfg{encode_load_metatables = false}
