@@ -105,9 +105,9 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 			CODE; \
 		} \
 	} while (0)
-#  define ERROR_INJECT_U64(ID, VALUE, CMP, CODE) \
+#  define ERROR_INJECT_U64(ID, EXPR, CODE) \
 	do { \
-		if ((uint64_t)(VALUE) CMP errinj_getu64(ID)) \
+		if (EXPR) \
 			CODE; \
 	} while (0)
 #endif
