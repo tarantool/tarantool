@@ -348,8 +348,8 @@ struct vy_run_info {
 	/* Min and max lsn over all statements in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;
-	/** Total sizeof run */
-	uint64_t  total;
+	/** Size of run on disk. */
+	uint64_t size;
 	/** Pages meta. */
 	struct vy_page_info *page_infos;
 };
@@ -1319,18 +1319,9 @@ vy_run_page_info(struct vy_run *run, uint32_t pos)
 }
 
 static uint64_t
-vy_run_total(struct vy_run *run)
-{
-	if (unlikely(run->info.page_infos == NULL))
-		return 0;
-	return run->info.total;
-}
-
-static uint64_t
 vy_run_size(struct vy_run *run)
 {
-	return sizeof(run->info) +
-	       run->info.count * sizeof(struct vy_page_info);
+	return run->info.size;
 }
 
 static bool
@@ -1440,7 +1431,7 @@ vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 	index->run_count++;
 	index->page_count += run->info.count;
 	index->stmt_count += run->info.keys;
-	index->size += vy_run_size(run) + vy_run_total(run);
+	index->size += vy_run_size(run);
 }
 
 static void
@@ -1449,7 +1440,7 @@ vy_index_unacct_run(struct vy_index *index, struct vy_run *run)
 	index->run_count--;
 	index->page_count -= run->info.count;
 	index->stmt_count -= run->info.keys;
-	index->size -= vy_run_size(run) + vy_run_total(run);
+	index->size -= vy_run_size(run);
 }
 
 static void
@@ -2026,7 +2017,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		run_info->min_lsn = page->min_lsn;
 	if (page->max_lsn > run_info->max_lsn)
 		run_info->max_lsn = page->max_lsn;
-	run_info->total += page->size;
+	run_info->size += page->size;
 	run_info->keys += page->count;
 
 	ibuf_destroy(&row_index_buf);
@@ -2659,7 +2650,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		return -1;
 
 	assert(!vy_run_is_empty(run));
-	*written += vy_run_size(run) + vy_run_total(run);
+	*written += vy_run_size(run);
 	return 0;
 }
 
@@ -2687,11 +2678,11 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 		return false;
 
 	/* Find the oldest run. */
+	assert(!rlist_empty(&range->runs));
 	run = rlist_last_entry(&range->runs, struct vy_run, in_range);
-	assert(run != NULL);
 
 	/* The range is too small to be split. */
-	if (run->info.total < key_def->opts.range_size * 4 / 3)
+	if (vy_run_size(run) < key_def->opts.range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
@@ -2762,7 +2753,7 @@ vy_range_update_compact_priority(struct vy_range *range)
 
 	struct vy_run *run;
 	rlist_foreach_entry(run, &range->runs, in_range) {
-		uint64_t run_size = vy_run_total(run);
+		uint64_t run_size = vy_run_size(run);
 		total_size += run_size;
 		level_run_count++;
 		total_run_count++;
@@ -3314,8 +3305,8 @@ vy_task_dump_complete(struct vy_task *task)
 
 	vy_write_iterator_delete(task->wi);
 
-	if (range->max_dump_size < vy_run_total(run))
-		range->max_dump_size = vy_run_total(run);
+	if (range->max_dump_size < vy_run_size(run))
+		range->max_dump_size = vy_run_size(run);
 
 	if (!vy_run_is_empty(run)) {
 		rlist_add_entry(&range->runs, run, in_range);
