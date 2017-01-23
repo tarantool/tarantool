@@ -14,7 +14,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
-#include "msgpuck.h"
+#include "msgpuck/msgpuck.h"
 
 /*
 ** Create a new virtual database engine.

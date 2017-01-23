@@ -518,7 +518,7 @@ struct BtCursor {
   i8 iPage;                 /* Index of current page in apPage */
   u8 curIntKey;             /* Value of apPage[0]->intKey */
   struct KeyInfo *pKeyInfo; /* Argument passed to comparison function */
-  void *padding1;           /* Make object size a multiple of 16 */
+  void *pTaCursor;          /* Tarantool cursor */
   u16 aiIdx[BTCURSOR_MAX_DEPTH];        /* Current index in apPage[i] */
   MemPage *apPage[BTCURSOR_MAX_DEPTH];  /* Pages from root to current page */
 };
@@ -532,6 +532,7 @@ struct BtCursor {
 #define BTCF_AtLast       0x08   /* Cursor is pointing ot the last entry */
 #define BTCF_Incrblob     0x10   /* True if an incremental I/O handle */
 #define BTCF_Multiple     0x20   /* Maybe another cursor on the same btree */
+#define BTCF_TaCursor     0x80   /* Tarantool cursor, pTaCursor valid */
 
 /*
 ** Potential values for BtCursor.eState.

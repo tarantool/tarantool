@@ -15,7 +15,7 @@
 
 #include "sqliteInt.h"
 #include "vdbeInt.h"
-#include "msgpuck.h"
+#include "msgpuck/msgpuck.h"
 
 #ifndef SQLITE_OMIT_INCRBLOB
 

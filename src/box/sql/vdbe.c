@@ -20,7 +20,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
-#include "msgpuck.h"
+#include "msgpuck/msgpuck.h"
 
 /*
 ** Invoke this macro on memory cells just prior to changing the

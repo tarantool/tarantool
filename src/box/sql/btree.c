@@ -14,6 +14,7 @@
 ** Including a description of file format and an overview of operation.
 */
 #include "btreeInt.h"
+#include "tarantoolInt.h"
 
 /*
 ** The header string that appears at the beginning of every
@@ -4169,6 +4170,14 @@ int sqlite3BtreeCursor(
   }else{
     sqlite3BtreeEnter(p);
     rc = btreeCursor(p, iTable, wrFlag, pKeyInfo, pCur);
+    if( iTable!=1 && (p->db->aDb[0].pBt==p || p->db->aDb[1].pBt==p) ) {
+      /* Main database and temporary database "files" are backed by
+      ** Tarantool, except for the sqlite_master table(s)
+      ** (assuming it fits in 1 page).
+      */
+      pCur->curFlags |= BTCF_TaCursor;
+      pCur->pTaCursor = 0; /* sqlite3BtreeCursorZero didn't touch it */
+    }
     sqlite3BtreeLeave(p);
   }
   return rc;
@@ -4227,6 +4236,9 @@ int sqlite3BtreeCloseCursor(BtCursor *pCur){
     }
     unlockBtreeIfUnused(pBt);
     sqlite3_free(pCur->aOverflow);
+    if( pCur->curFlags&BTCF_TaCursor ){
+      tarantoolSqlite3CloseCursor(pCur);
+    }
     /* sqlite3_free(pCur); */
     sqlite3BtreeLeave(pBtree);
   }
@@ -4287,6 +4299,8 @@ i64 sqlite3BtreeIntegerKey(BtCursor *pCur){
   assert( cursorHoldsMutex(pCur) );
   assert( pCur->eState==CURSOR_VALID );
   assert( pCur->curIntKey );
+  /* tables backed by Tarantool are all "WITHOUT ROWID" */
+  assert( !(pCur->curFlags&BTCF_TaCursor) );
   getCellInfo(pCur);
   return pCur->info.nKey;
 }
@@ -4303,6 +4317,11 @@ i64 sqlite3BtreeIntegerKey(BtCursor *pCur){
 u32 sqlite3BtreePayloadSize(BtCursor *pCur){
   assert( cursorHoldsMutex(pCur) );
   assert( pCur->eState==CURSOR_VALID );
+  if( pCur->curFlags & BTCF_TaCursor ){
+    u32 sz;
+    tarantoolSqlite3PayloadFetch(pCur, &sz);
+    return sz;
+  }
   getCellInfo(pCur);
   return pCur->info.nPayload;
 }
@@ -4452,6 +4471,15 @@ static int accessPayload(
   unsigned char *pBuf, /* Write the bytes into this buffer */ 
   int eOp              /* zero to read. non-zero to write. */
 ){
+  if( pCur->curFlags & BTCF_TaCursor ){
+    const void *pPayload;
+    u32 sz;
+    pPayload = tarantoolSqlite3PayloadFetch(pCur, &sz);
+    if ( (uptr)(offset+amt)>sz ) return SQLITE_CORRUPT_BKPT;
+    memcpy(pBuf, pPayload+offset, amt);
+    return SQLITE_OK;
+  }
+
   unsigned char *aPayload;
   int rc = SQLITE_OK;
   int iIdx = 0;
@@ -4740,6 +4768,9 @@ static const void *fetchPayload(
 ** in the common case where no overflow pages are used.
 */
 const void *sqlite3BtreePayloadFetch(BtCursor *pCur, u32 *pAmt){
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3PayloadFetch(pCur, pAmt);
+  }
   return fetchPayload(pCur, pAmt);
 }
 
@@ -4974,6 +5005,9 @@ int sqlite3BtreeFirst(BtCursor *pCur, int *pRes){
 
   assert( cursorOwnsBtShared(pCur) );
   assert( sqlite3_mutex_held(pCur->pBtree->db->mutex) );
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3First(pCur, pRes);
+  }
   rc = moveToRoot(pCur);
   if( rc==SQLITE_OK ){
     if( pCur->eState==CURSOR_INVALID ){
@@ -4997,6 +5031,10 @@ int sqlite3BtreeLast(BtCursor *pCur, int *pRes){
  
   assert( cursorOwnsBtShared(pCur) );
   assert( sqlite3_mutex_held(pCur->pBtree->db->mutex) );
+
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Last(pCur, pRes);
+  }
 
   /* If the cursor already points to the last entry, this is a no-op. */
   if( CURSOR_VALID==pCur->eState && (pCur->curFlags & BTCF_AtLast)!=0 ){
@@ -5078,6 +5116,11 @@ int sqlite3BtreeMovetoUnpacked(
   assert( pRes );
   assert( (pIdxKey==0)==(pCur->pKeyInfo==0) );
   assert( pCur->eState!=CURSOR_VALID || (pIdxKey==0)==(pCur->curIntKey!=0) );
+
+  if( pCur->curFlags & BTCF_TaCursor ){
+    assert(("not implemented", 0));
+    return SQLITE_CORRUPT_BKPT;
+  }
 
   /* If the cursor is already positioned at the point we are trying
   ** to move to, then just return without doing any work */
@@ -5393,6 +5436,9 @@ int sqlite3BtreeNext(BtCursor *pCur, int *pRes){
   pCur->info.nSize = 0;
   pCur->curFlags &= ~(BTCF_ValidNKey|BTCF_ValidOvfl);
   *pRes = 0;
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Next(pCur, pRes);
+  }
   if( pCur->eState!=CURSOR_VALID ) return btreeNext(pCur, pRes);
   pPage = pCur->apPage[pCur->iPage];
   if( (++pCur->aiIdx[pCur->iPage])>=pPage->nCell ){
@@ -5494,6 +5540,9 @@ int sqlite3BtreePrevious(BtCursor *pCur, int *pRes){
   *pRes = 0;
   pCur->curFlags &= ~(BTCF_AtLast|BTCF_ValidOvfl|BTCF_ValidNKey);
   pCur->info.nSize = 0;
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Previous(pCur, pRes);
+  }
   if( pCur->eState!=CURSOR_VALID
    || pCur->aiIdx[pCur->iPage]==0
    || pCur->apPage[pCur->iPage]->leaf==0
