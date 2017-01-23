@@ -14,6 +14,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "msgpuck.h"
 
 /*
 ** Create a new virtual database engine.
@@ -4658,3 +4659,54 @@ void sqlite3VdbePreUpdateHook(
   }
 }
 #endif /* SQLITE_ENABLE_PREUPDATE_HOOK */
+
+i64 sqlite3VdbeMsgpackRecordLen(Mem *pRec, u32 n){
+  i64 nByte = 5; /* largest array header */
+  Mem *pEnd = pRec + n;
+  assert(n != 0);
+  do{
+    assert( memIsValid(pRec) );
+    if( pRec->flags & MEM_Null ){
+      nByte += 1;
+    }else if( pRec->flags & (MEM_Int|MEM_Real) ){
+      nByte += 9;
+    }else{
+      nByte += 5+(u32)pRec->n;
+      if( pRec->flags & MEM_Zero ){
+        nByte += pRec->u.nZero;
+      }
+    }
+  }while( (++pRec)!=pEnd );
+  return nByte;
+}
+
+u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pRec, u32 n){
+  u8 *zNewRecord = mp_encode_array(pBuf, n);
+  Mem *pEnd = pRec + n;
+  assert(n != 0);
+  do{
+    assert( memIsValid(pRec) );
+    if( pRec->flags & MEM_Null ){
+      zNewRecord = mp_encode_nil(zNewRecord);
+    }else if( pRec->flags & MEM_Real ){
+      zNewRecord = mp_encode_double(zNewRecord, pRec->u.r);
+    }else if( pRec->flags & MEM_Int ){
+      if( pRec->u.i>=0 ){
+        zNewRecord = mp_encode_uint(zNewRecord, pRec->u.i);
+      }else{
+        zNewRecord = mp_encode_int(zNewRecord, pRec->u.i);
+      }
+    }else{
+      zNewRecord = ((pRec->flags & MEM_Str) ? mp_encode_strl : mp_encode_binl)(
+          zNewRecord, pRec->n +((pRec->flags & MEM_Zero) ? pRec->u.nZero : 0)
+      );
+      memcpy(zNewRecord, pRec->z, pRec->n);
+      zNewRecord += pRec->n;
+      if( pRec->flags & MEM_Zero ){
+        memset(zNewRecord, 0, pRec->u.nZero);
+        zNewRecord += pRec->u.nZero;
+      }
+    }
+  }while( (++pRec)!=pEnd );
+  return (u32)(zNewRecord-pBuf);
+}

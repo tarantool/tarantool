@@ -20,6 +20,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "msgpuck.h"
 
 /*
 ** Invoke this macro on memory cells just prior to changing the
@@ -211,7 +212,7 @@ static VdbeCursor *allocateCursor(
   int nByte;
   VdbeCursor *pCx = 0;
   nByte = 
-      ROUND8(sizeof(VdbeCursor)) + 2*sizeof(u32)*nField + 
+      ROUND8(sizeof(VdbeCursor)) + sizeof(u32)*nField +
       (eCurType==CURTYPE_BTREE?sqlite3BtreeCursorSize():0);
 
   assert( iCur>=0 && iCur<p->nCursor );
@@ -225,10 +226,9 @@ static VdbeCursor *allocateCursor(
     pCx->eCurType = eCurType;
     pCx->iDb = iDb;
     pCx->nField = nField;
-    pCx->aOffset = &pCx->aType[nField];
     if( eCurType==CURTYPE_BTREE ){
       pCx->uc.pCursor = (BtCursor*)
-          &pMem->z[ROUND8(sizeof(VdbeCursor))+2*sizeof(u32)*nField];
+          &pMem->z[ROUND8(sizeof(VdbeCursor))+sizeof(u32)*nField];
       sqlite3BtreeCursorZero(pCx->uc.pCursor);
     }
   }
@@ -2441,16 +2441,14 @@ case OP_Column: {
   BtCursor *pCrsr;   /* The BTree cursor */
   u32 *aOffset;      /* aOffset[i] is offset to start of data for i-th column */
   int len;           /* The length of the serialized data for the column */
+  int flags;         /* Type of value rendered to pDest */
   int i;             /* Loop counter */
   Mem *pDest;        /* Where to write the extracted value */
   Mem sMem;          /* For storing the record being decoded */
   const u8 *zData;   /* Part of the record being decoded */
-  const u8 *zHdr;    /* Next unparsed byte of the header */
-  const u8 *zEndHdr; /* Pointer to first byte after the header */
-  u32 offset;        /* Offset into the data */
-  u64 offset64;      /* 64-bit offset */
+  const u8 *zEnd;    /* Data end */
+  const u8 *zParse;  /* Next unparsed byte of the row */
   u32 avail;         /* Number of bytes of available data */
-  u32 t;             /* A type code from the record header */
   Mem *pReg;         /* PseudoTable input register */
 
   pC = p->apCsr[pOp->p1];
@@ -2501,117 +2499,76 @@ case OP_Column: {
       }
     }
     pC->cacheStatus = p->cacheCtr;
-    pC->iHdrOffset = getVarint32(pC->aRow, offset);
-    pC->nHdrParsed = 0;
-    aOffset[0] = offset;
-
-
-    if( avail<offset ){      /*OPTIMIZATION-IF-FALSE*/
-      /* pC->aRow does not have to hold the entire row, but it does at least
-      ** need to cover the header of the record.  If pC->aRow does not contain
-      ** the complete header, then set it to zero, forcing the header to be
-      ** dynamically allocated. */
-      pC->aRow = 0;
-      pC->szRow = 0;
-
-      /* Make sure a corrupt database has not given us an oversize header.
-      ** Do this now to avoid an oversize memory allocation.
-      **
-      ** Type entries can be between 1 and 5 bytes each.  But 4 and 5 byte
-      ** types use so much data space that there can only be 4096 and 32 of
-      ** them, respectively.  So the maximum header length results from a
-      ** 3-byte type for each of the maximum of 32768 columns plus three
-      ** extra bytes for the header length itself.  32768*3 + 3 = 98307.
-      */
-      if( offset > 98307 || offset > pC->payloadSize ){
-        rc = SQLITE_CORRUPT_BKPT;
-        goto abort_due_to_error;
-      }
-    }else if( offset>0 ){ /*OPTIMIZATION-IF-TRUE*/
-      /* The following goto is an optimization.  It can be omitted and
-      ** everything will still work.  But OP_Column is measurably faster
-      ** by skipping the subsequent conditional, which is always true.
-      */
-      zData = pC->aRow;
-      assert( pC->nHdrParsed<=p2 );         /* Conditional skipped */
-      goto op_column_read_header;
+    /** Decode the # of record fields (MsgPack array header).
+     ** Assume the header is available even if the data is truncated,
+     ** which happens when overflow pages come into play.
+     */
+    if ( avail==0 || mp_typeof(pC->aRow[0])!=MP_ARRAY ||
+         mp_check_array(pC->aRow, pC->aRow + avail)>0 ){
+      rc = SQLITE_CORRUPT_BKPT;
+      goto abort_due_to_error;
     }
+    zParse = pC->aRow;
+    pC->nRowField = mp_decode_array((const char **)&zParse); /* # of fields */
+    aOffset[0] = (u32)(zParse - pC->aRow);
+    pC->nHdrParsed = 0;
+  }
+
+  if ( p2>=pC->nRowField ){
+    if( pOp->p4type==P4_MEM ){
+      sqlite3VdbeMemShallowCopy(pDest, pOp->p4.pMem, MEM_Static);
+    }else{
+      sqlite3VdbeMemSetNull(pDest);
+    }
+    goto op_column_out;
+  }
+
+  /* Sometimes the data is too large and overflow pages come into play.
+  ** In the later case allocate a buffer and reassamble the row.
+  ** Stock SQLite utilized several clever techniques to optimize here.
+  ** The techniques we ripped out to simplify the code.
+  */
+  if( pC->szRow==pC->payloadSize ){
+    zData = pC->aRow;
+    zEnd = zData + pC->payloadSize;
+  }else{
+    memset(&sMem, 0, sizeof(sMem));
+    rc = sqlite3VdbeMemFromBtree(pCrsr, 0, pC->payloadSize, &sMem);
+    if( rc!=SQLITE_OK ) goto abort_due_to_error;
+    zData = (u8*)sMem.z;
+    zEnd = zData + pC->payloadSize;
   }
 
   /* Make sure at least the first p2+1 entries of the header have been
-  ** parsed and valid information is in aOffset[] and pC->aType[].
+  ** parsed and valid information is in aOffset[]
   */
   if( pC->nHdrParsed<=p2 ){
     /* If there is more header available for parsing in the record, try
-    ** to extract additional fields up through the p2+1-th field 
+    ** to extract additional fields up through the p2+1-th field
     */
-    if( pC->iHdrOffset<aOffset[0] ){
-      /* Make sure zData points to enough of the record to cover the header. */
-      if( pC->aRow==0 ){
-        memset(&sMem, 0, sizeof(sMem));
-        rc = sqlite3VdbeMemFromBtree(pC->uc.pCursor, 0, aOffset[0], &sMem);
-        if( rc!=SQLITE_OK ) goto abort_due_to_error;
-        zData = (u8*)sMem.z;
-      }else{
-        zData = pC->aRow;
-      }
-  
-      /* Fill in pC->aType[i] and aOffset[i] values through the p2-th field. */
-    op_column_read_header:
-      i = pC->nHdrParsed;
-      offset64 = aOffset[i];
-      zHdr = zData + pC->iHdrOffset;
-      zEndHdr = zData + aOffset[0];
-      do{
-        if( (t = zHdr[0])<0x80 ){
-          zHdr++;
-          offset64 += sqlite3VdbeOneByteSerialTypeLen(t);
-        }else{
-          zHdr += sqlite3GetVarint32(zHdr, &t);
-          offset64 += sqlite3VdbeSerialTypeLen(t);
-        }
-        pC->aType[i++] = t;
-        aOffset[i] = (u32)(offset64 & 0xffffffff);
-      }while( i<=p2 && zHdr<zEndHdr );
+    i = pC->nHdrParsed;
+    zParse = zData+aOffset[i];
 
-      /* The record is corrupt if any of the following are true:
-      ** (1) the bytes of the header extend past the declared header size
-      ** (2) the entire header was used but not all data was used
-      ** (3) the end of the data extends beyond the end of the record.
-      */
-      if( (zHdr>=zEndHdr && (zHdr>zEndHdr || offset64!=pC->payloadSize))
-       || (offset64 > pC->payloadSize)
-      ){
-        if( pC->aRow==0 ) sqlite3VdbeMemRelease(&sMem);
+    /* Fill in aOffset[i] values through the p2-th field. */
+    do{
+      if( mp_check((const char **)&zParse, zEnd) != 0 ){
         rc = SQLITE_CORRUPT_BKPT;
-        goto abort_due_to_error;
+        goto op_column_error;
       }
+      aOffset[++i] = (u32)(zParse-zData);
+    }while( i<=p2 );
 
-      pC->nHdrParsed = i;
-      pC->iHdrOffset = (u32)(zHdr - zData);
-      if( pC->aRow==0 ) sqlite3VdbeMemRelease(&sMem);
-    }else{
-      t = 0;
+    /* Excess data? */
+    if( p2==pC->nRowField && zParse!=zEnd) {
+      rc = SQLITE_CORRUPT_BKPT;
+      goto op_column_error;
     }
 
-    /* If after trying to extract new entries from the header, nHdrParsed is
-    ** still not up to p2, that means that the record has fewer than p2
-    ** columns.  So the result will be either the default value or a NULL.
-    */
-    if( pC->nHdrParsed<=p2 ){
-      if( pOp->p4type==P4_MEM ){
-        sqlite3VdbeMemShallowCopy(pDest, pOp->p4.pMem, MEM_Static);
-      }else{
-        sqlite3VdbeMemSetNull(pDest);
-      }
-      goto op_column_out;
-    }
-  }else{
-    t = pC->aType[p2];
+    pC->nHdrParsed = i;
   }
 
   /* Extract the content for the p2+1-th column.  Control can only
-  ** reach this point if aOffset[p2], aOffset[p2+1], and pC->aType[p2] are
+  ** reach this point if aOffset[p2], aOffset[p2+1] are
   ** all valid.
   */
   assert( p2<pC->nHdrParsed );
@@ -2620,59 +2577,93 @@ case OP_Column: {
   if( VdbeMemDynamic(pDest) ){
     sqlite3VdbeMemSetNull(pDest);
   }
-  assert( t==pC->aType[p2] );
-  if( pC->szRow>=aOffset[p2+1] ){
-    /* This is the common case where the desired content fits on the original
-    ** page - where the content is not on an overflow page */
-    zData = pC->aRow + aOffset[p2];
-    if( t<12 ){
-      sqlite3VdbeSerialGet(zData, t, pDest);
-    }else{
-      /* If the column value is a string, we need a persistent value, not
-      ** a MEM_Ephem value.  This branch is a fast short-cut that is equivalent
-      ** to calling sqlite3VdbeSerialGet() and sqlite3VdbeDeephemeralize().
-      */
-      static const u16 aFlag[] = { MEM_Blob, MEM_Str|MEM_Term };
-      pDest->n = len = (t-12)/2;
+
+  zParse = zData + aOffset[p2];
+  switch (mp_typeof(*zParse)) {
+    case MP_NIL: {
+      pDest->flags = MEM_Null;
+      break;
+    }
+    case MP_BOOL: {
+      assert( *zParse==0xc2 || *zParse==0xc3 );
+      pDest->u.i = *zParse-0xc2; /* bool -> Integer {0,1} */
+      pDest->flags = MEM_Int;
+      break;
+    }
+    case MP_UINT: {
+      uint64_t v = mp_decode_uint((const char **)&zParse);
+      if ( v>INT64_MAX ){
+        /*
+        ** If the value exceeds i64 range, convert to double (lossy).
+        */
+        pDest->u.r = v;
+        pDest->flags = MEM_Real;
+      } else {
+        pDest->u.i = v;
+        pDest->flags = MEM_Int;
+      }
+      break;
+    }
+    case MP_INT: {
+      pDest->u.i = mp_decode_int((const char **)&zParse);
+      pDest->flags = MEM_Int;
+      break;
+    }
+    case MP_STR: {
+      /* XXX u32->int */
+      len = (int)mp_decode_strl((const char **)&zParse);
+      flags = MEM_Str|MEM_Term;
+      /* input: len, flags, zParse */
+op_column_deephemeralize:
+      pDest->n = len;
       pDest->enc = encoding;
       if( pDest->szMalloc < len+2 ){
         pDest->flags = MEM_Null;
-        if( sqlite3VdbeMemGrow(pDest, len+2, 0) ) goto no_mem;
+        if( sqlite3VdbeMemGrow(pDest, len+2, 0) ) goto op_column_error;
       }else{
         pDest->z = pDest->zMalloc;
       }
-      memcpy(pDest->z, zData, len);
+      memcpy(pDest->z, zParse, len);
       pDest->z[len] = 0;
       pDest->z[len+1] = 0;
-      pDest->flags = aFlag[t&1];
+      pDest->flags = flags;
+      break;
     }
-  }else{
-    pDest->enc = encoding;
-    /* This branch happens only when content is on overflow pages */
-    if( ((pOp->p5 & (OPFLAG_LENGTHARG|OPFLAG_TYPEOFARG))!=0
-          && ((t>=12 && (t&1)==0) || (pOp->p5 & OPFLAG_TYPEOFARG)!=0))
-     || (len = sqlite3VdbeSerialTypeLen(t))==0
-    ){
-      /* Content is irrelevant for
-      **    1. the typeof() function,
-      **    2. the length(X) function if X is a blob, and
-      **    3. if the content length is zero.
-      ** So we might as well use bogus content rather than reading
-      ** content from disk. */
-      static u8 aZero[8];  /* This is the bogus content */
-      sqlite3VdbeSerialGet(aZero, t, pDest);
-    }else{
-      rc = sqlite3VdbeMemFromBtree(pC->uc.pCursor, aOffset[p2], len, pDest);
-      if( rc!=SQLITE_OK ) goto abort_due_to_error;
-      sqlite3VdbeSerialGet((const u8*)pDest->z, t, pDest);
-      pDest->flags &= ~MEM_Ephem;
+    case MP_BIN: {
+      /* XXX u32->int */
+      len = (int)mp_decode_binl((const char **)&zParse);
+      flags = MEM_Blob;
+      goto op_column_deephemeralize;
+    }
+    case MP_ARRAY:
+    case MP_MAP:
+    case MP_EXT: {
+      /* XXX u32->int */
+      len = (int)(aOffset[p2+1]-aOffset[p2]);
+      flags = MEM_Blob; /* TODO: MEM_MsgPack flag */
+      goto op_column_deephemeralize;
+    }
+    case MP_FLOAT: {
+      pDest->u.r = mp_decode_float((const char **)&zParse);
+      pDest->flags = sqlite3IsNaN(pDest->u.r) ? MEM_Null : MEM_Real;
+      break;
+    }
+    case MP_DOUBLE: {
+      pDest->u.r = mp_decode_double((const char **)&zParse);
+      pDest->flags = sqlite3IsNaN(pDest->u.r) ? MEM_Null : MEM_Real;
+      break;
     }
   }
 
+  if( zData!=pC->aRow ) sqlite3VdbeMemRelease(&sMem);
 op_column_out:
   UPDATE_MAX_BLOBSIZE(pDest);
   REGISTER_TRACE(pOp->p3, pDest);
   break;
+
+op_column_error:
+  if( zData!=pC->aRow ) sqlite3VdbeMemRelease(&sMem);
+  goto abort_due_to_error;
 }
 
 /* Opcode: Affinity P1 P2 * P4 *
@@ -2720,20 +2711,11 @@ case OP_Affinity: {
 case OP_MakeRecord: {
   u8 *zNewRecord;        /* A buffer to hold the data for the new record */
   Mem *pRec;             /* The new record */
-  u64 nData;             /* Number of bytes of data space */
-  int nHdr;              /* Number of bytes of header space */
   i64 nByte;             /* Data space required for this record */
-  i64 nZero;             /* Number of zero bytes at the end of the record */
-  int nVarint;           /* Number of bytes in a varint */
-  u32 serial_type;       /* Type field */
   Mem *pData0;           /* First field to be combined into the record */
   Mem *pLast;            /* Last field of the record */
   int nField;            /* Number of fields in the record */
   char *zAffinity;       /* The affinity string for the record */
-  int file_format;       /* File format to use for encoding */
-  int i;                 /* Space used in zNewRecord[] header */
-  int j;                 /* Space used in zNewRecord[] content */
-  u32 len;               /* Length of a field */
 
   /* Assuming the record contains N fields, the record format looks
   ** like this:
@@ -2750,16 +2732,12 @@ case OP_MakeRecord: {
   ** hdr-size field is also a varint which is the offset from the beginning
   ** of the record to data0.
   */
-  nData = 0;         /* Number of bytes of data space */
-  nHdr = 0;          /* Number of bytes of header space */
-  nZero = 0;         /* Number of zero bytes at the end of the record */
   nField = pOp->p1;
   zAffinity = pOp->p4.z;
   assert( nField>0 && pOp->p2>0 && pOp->p2+nField<=(p->nMem+1 - p->nCursor)+1 );
   pData0 = &aMem[nField];
   nField = pOp->p2;
   pLast = &pData0[nField-1];
-  file_format = p->minWriteFileFormat;
 
   /* Identify the output register */
   assert( pOp->p3<pOp->p1 || pOp->p3>=pOp->p1+pOp->p2 );
@@ -2780,43 +2758,9 @@ case OP_MakeRecord: {
   /* Loop through the elements that will make up the record to figure
   ** out how much space is required for the new record.
   */
-  pRec = pLast;
-  do{
-    assert( memIsValid(pRec) );
-    pRec->uTemp = serial_type = sqlite3VdbeSerialType(pRec, file_format, &len);
-    if( pRec->flags & MEM_Zero ){
-      if( nData ){
-        if( sqlite3VdbeMemExpandBlob(pRec) ) goto no_mem;
-      }else{
-        nZero += pRec->u.nZero;
-        len -= pRec->u.nZero;
-      }
-    }
-    nData += len;
-    testcase( serial_type==127 );
-    testcase( serial_type==128 );
-    nHdr += serial_type<=127 ? 1 : sqlite3VarintLen(serial_type);
-    if( pRec==pData0 ) break;
-    pRec--;
-  }while(1);
+  nByte = sqlite3VdbeMsgpackRecordLen(pData0, nField);
 
-  /* EVIDENCE-OF: R-22564-11647 The header begins with a single varint
-  ** which determines the total number of bytes in the header. The varint
-  ** value is the size of the header in bytes including the size varint
-  ** itself. */
-  testcase( nHdr==126 );
-  testcase( nHdr==127 );
-  if( nHdr<=126 ){
-    /* The common case */
-    nHdr += 1;
-  }else{
-    /* Rare case of a really large header */
-    nVarint = sqlite3VarintLen(nHdr);
-    nHdr += nVarint;
-    if( nVarint<sqlite3VarintLen(nHdr) ) nHdr++;
-  }
-  nByte = nHdr+nData;
-  if( nByte+nZero>db->aLimit[SQLITE_LIMIT_LENGTH] ){
+  if( nByte>db->aLimit[SQLITE_LIMIT_LENGTH] ){
     goto too_big;
   }
 
@@ -2831,29 +2775,9 @@ case OP_MakeRecord: {
   zNewRecord = (u8 *)pOut->z;
 
   /* Write the record */
-  i = putVarint32(zNewRecord, nHdr);
-  j = nHdr;
-  assert( pData0<=pLast );
-  pRec = pData0;
-  do{
-    serial_type = pRec->uTemp;
-    /* EVIDENCE-OF: R-06529-47362 Following the size varint are one or more
-    ** additional varints, one per column. */
-    i += putVarint32(&zNewRecord[i], serial_type);            /* serial type */
-    /* EVIDENCE-OF: R-64536-51728 The values for each column in the record
-    ** immediately follow the header. */
-    j += sqlite3VdbeSerialPut(&zNewRecord[j], pRec, serial_type); /* content */
-  }while( (++pRec)<=pLast );
-  assert( i==nHdr );
-  assert( j==nByte );
-
   assert( pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor) );
-  pOut->n = (int)nByte;
+  pOut->n = sqlite3VdbeMsgpackRecordPut(pOut->z, pData0, nField);
   pOut->flags = MEM_Blob;
-  if( nZero ){
-    pOut->u.nZero = nZero;
-    pOut->flags |= MEM_Zero;
-  }
   pOut->enc = SQLITE_UTF8;  /* In case the blob is ever converted to text */
   REGISTER_TRACE(pOp->p3, pOut);
   UPDATE_MAX_BLOBSIZE(pOut);

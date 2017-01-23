@@ -15,6 +15,7 @@
 
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "msgpuck.h"
 
 #ifndef SQLITE_OMIT_INCRBLOB
 
@@ -67,25 +68,35 @@ static int blobSeekToRow(Incrblob *p, sqlite3_int64 iRow, char **pzErr){
   rc = sqlite3_step(p->pStmt);
   if( rc==SQLITE_ROW ){
     VdbeCursor *pC = v->apCsr[0];
-    u32 type = pC->aType[p->iCol];
-    if( type<12 ){
-      zErr = sqlite3MPrintf(p->db, "cannot open value of type %s",
-          type==0?"null": type==7?"real": "integer"
-      );
-      rc = SQLITE_ERROR;
-      sqlite3_finalize(p->pStmt);
-      p->pStmt = 0;
-    }else{
-      p->iOffset = pC->aType[p->iCol + pC->nField];
-      p->nByte = sqlite3VdbeSerialTypeLen(type);
-      p->pCsr =  pC->uc.pCursor;
-      sqlite3BtreeIncrblobCursor(p->pCsr);
+    u8 buf[8];
+
+    p->pCsr =  pC->uc.pCursor;
+    sqlite3BtreeIncrblobCursor(p->pCsr);
+
+    rc = sqlite3BtreePayload(pC->uc.pCursor,
+        p->iOffset, p->nByte>(u32)sizeof(buf) ? sizeof(buf) : p->nByte, buf);
+    if( rc==SQLITE_OK ) {
+      /* Skip MsgPack header and reject certain types. */
+      u8 *zParse = buf;
+      switch( mp_typeof(*buf) ){
+        default: {
+          zErr = sqlite3MPrintf(p->db, "cannot open value of type %s",
+              "FIXME"
+          );
+          rc = SQLITE_ERROR;
+          break;
+        }
+        case MP_STR:
+        case MP_BIN: {
+          p->nByte = mp_decode_strbinl((const char **)&zParse);
+          p->iOffset = (u32)(zParse - buf);
+          break;
+        }
+      }
     }
   }
 
-  if( rc==SQLITE_ROW ){
-    rc = SQLITE_OK;
-  }else if( p->pStmt ){
+  if( rc!=SQLITE_OK && p->pStmt ){
     rc = sqlite3_finalize(p->pStmt);
     p->pStmt = 0;
     if( rc==SQLITE_OK ){

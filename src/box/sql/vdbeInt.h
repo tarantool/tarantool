@@ -115,18 +115,14 @@ struct VdbeCursor {
   i16 nField;             /* Number of fields in the header */
   u16 nHdrParsed;         /* Number of header fields parsed so far */
   i64 movetoTarget;       /* Argument to the deferred sqlite3BtreeMoveto() */
-  u32 *aOffset;           /* Pointer to aType[nField] */
   const u8 *aRow;         /* Data for the current row, if all on one page */
   u32 payloadSize;        /* Total number of bytes in the record */
   u32 szRow;              /* Byte available in aRow */
 #ifdef SQLITE_ENABLE_COLUMN_USED_MASK
   u64 maskUsed;           /* Mask of columns used by this cursor */
 #endif
-
-  /* 2*nField extra array elements allocated for aType[], beyond the one
-  ** static element declared in the structure.  nField total array slots for
-  ** aType[] and nField+1 array slots for aOffset[] */
-  u32 aType[1];           /* Type values record decode.  MUST BE LAST */
+  u32 nRowField;        /* Number of fields in the current row */
+  u32 aOffset[1];       /* Offsets for all fields in the record [nField+1] */
 };
 
 
@@ -546,5 +542,8 @@ int sqlite3VdbeMemHandleBom(Mem *pMem);
   #define sqlite3VdbeMemExpandBlob(x) SQLITE_OK
   #define ExpandBlob(P) SQLITE_OK
 #endif
+
+i64 sqlite3VdbeMsgpackRecordLen(Mem *pMem, u32 n);
+u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pMem, u32 n);
 
 #endif /* !defined(SQLITE_VDBEINT_H) */
