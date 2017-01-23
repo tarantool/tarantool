@@ -39,15 +39,13 @@ function test_run_itr(itr, key)
 end;
 ---
 ...
-function test_itr(itr, key)
-    test_run_itr(itr, key)
-end;
+jit.off(test_run_itr);
 ---
 ...
 for _,itr in pairs(test_itrs) do
     local t = os.clock()
     for key = 0,2 do
-        test_itr(itr, key)
+        test_run_itr(itr, key)
     end
     local diff = os.clock() - t
     if  diff > 0.05 then
