@@ -411,6 +411,8 @@ struct vy_range {
 	/** Range upper bound. NULL if range is rightmost. */
 	struct tuple *end;
 	struct vy_index *index;
+	/* Size of data stored on disk (sum of run->info.size). */
+	uint64_t size;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	size_t used;
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
@@ -1516,6 +1518,27 @@ vy_range_str(struct vy_range *range)
 	char *buf = tt_static_buf();
 	vy_range_snprint(buf, TT_STATIC_BUF_LEN, range);
 	return buf;
+}
+
+/** Add a run to the head of a range's list. */
+static void
+vy_range_add_run(struct vy_range *range, struct vy_run *run)
+{
+	rlist_add_entry(&range->runs, run, in_range);
+	range->run_count++;
+	range->size += vy_run_size(run);
+}
+
+/** Remove a run from a range's list. */
+static void
+vy_range_remove_run(struct vy_range *range, struct vy_run *run)
+{
+	assert(range->run_count > 0);
+	assert(range->size >= vy_run_size(run));
+	assert(!rlist_empty(&range->runs));
+	rlist_del_entry(run, in_range);
+	range->run_count--;
+	range->size -= vy_run_size(run);
 }
 
 static void
@@ -2955,10 +2978,11 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			return -1;
-		rlist_add_entry(&range->runs, run, in_range);
-		range->run_count++;
-		if (vy_run_recover(run, index->path, index->format) != 0)
+		if (vy_run_recover(run, index->path, index->format) != 0) {
+			vy_run_delete(run);
 			return -1;
+		}
+		vy_range_add_run(range, run);
 		break;
 	default:
 		unreachable();
@@ -3323,8 +3347,7 @@ vy_task_dump_complete(struct vy_task *task)
 	if (range->max_dump_size < vy_run_size(run))
 		range->max_dump_size = vy_run_size(run);
 	if (!vy_run_is_empty(run)) {
-		rlist_add_entry(&range->runs, run, in_range);
-		range->run_count++;
+		vy_range_add_run(range, run);
 		vy_range_update_compact_priority(range);
 	} else
 		vy_run_delete(run);
@@ -3520,10 +3543,9 @@ vy_task_split_complete(struct vy_task *task)
 		 * Add the new run created by split to the list
 		 * unless it's empty.
 		 */
-		if (!vy_run_is_empty(r->new_run)) {
-			rlist_add_entry(&r->runs, r->new_run, in_range);
-			r->run_count++;
-		} else
+		if (!vy_run_is_empty(r->new_run))
+			vy_range_add_run(r, r->new_run);
+		else
 			vy_run_delete(r->new_run);
 		r->new_run = NULL;
 
@@ -3743,7 +3765,7 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_env *env = index->env;
 	struct vy_range *range = task->range;
 	struct vy_mem *mem;
-	struct vy_run *run;
+	struct vy_run *run, *tmp;
 
 	/*
 	 * Log change in metadata.
@@ -3775,14 +3797,13 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_index_unacct_range(index, range);
 	RLIST_HEAD(runs_to_release);
 	int n = range->compact_priority;
-	do {
-		assert(!rlist_empty(&range->runs));
-		run = rlist_shift_entry(&range->runs,
-					struct vy_run, in_range);
+	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
+		vy_range_remove_run(range, run);
 		rlist_add_entry(&runs_to_release, run, in_range);
-		range->run_count--;
-	} while (--n > 0);
-
+		if (--n == 0)
+			break;
+	}
+	assert(n == 0);
 	while (!rlist_empty(&range->frozen)) {
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
@@ -3791,10 +3812,9 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 	range->used = range->mem->used;
 	range->min_lsn = range->mem->min_lsn;
-	if (!vy_run_is_empty(range->new_run)) {
-		rlist_add_entry(&range->runs, range->new_run, in_range);
-		range->run_count++;
-	} else
+	if (!vy_run_is_empty(range->new_run))
+		vy_range_add_run(range, range->new_run);
+	else
 		vy_run_delete(range->new_run);
 	range->new_run = NULL;
 	range->max_dump_size = 0;
