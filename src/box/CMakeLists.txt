@@ -78,6 +78,7 @@ add_library(box STATIC
     relay.cc
     journal.c
     wal.cc
+    sql.c
     ${lua_sources}
     lua/init.c
     lua/call.c
@@ -94,7 +95,9 @@ add_library(box STATIC
     lua/session.c
     lua/net_box.c
     lua/xlog.c
+    lua/sql.c
     ${bin_sources})
 
-target_link_libraries(box ${ZSTD_LIBRARIES})
+target_link_libraries(box ${ZSTD_LIBRARIES} sql)
+
 add_dependencies(box build_bundled_libs)

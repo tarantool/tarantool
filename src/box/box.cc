@@ -69,6 +69,7 @@
 #include "authentication.h"
 #include "path_lock.h"
 #include "gc.h"
+#include "sql.h"
 
 static char status[64] = "unknown";
 
@@ -1354,6 +1355,7 @@ box_free(void)
 #if 0
 		session_free();
 		replication_free();
+		sql_free();
 		user_cache_free();
 		schema_free();
 		tuple_free();
@@ -1552,6 +1554,7 @@ box_cfg_xc(void)
 	port_init();
 	iproto_init();
 	wal_thread_start();
+	sql_init();
 
 	title("loading");
 

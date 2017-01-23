@@ -54,6 +54,7 @@
 #include "box/lua/cfg.h"
 #include "box/lua/xlog.h"
 #include "box/lua/console.h"
+#include "box/lua/sql.h"
 
 extern char session_lua[],
 	tuple_lua[],
@@ -230,6 +231,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_stat_init(L);
 	box_lua_session_init(L);
 	box_lua_xlog_init(L);
+	box_lua_sqlite_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
