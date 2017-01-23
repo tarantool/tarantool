@@ -61,16 +61,16 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - level_size_ratio
-        - 10
-      - - max_runs_per_level
-        - 2
-      - - memory_limit
+    - - - memory_limit
         - 1
       - - page_size
         - 8192
       - - range_size
         - 1073741824
+      - - run_count_per_level
+        - 2
+      - - run_size_ratio
+        - 3
       - - threads
         - 1
   - - vinyl_dir

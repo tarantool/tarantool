@@ -438,7 +438,29 @@ struct vy_range {
 	 * the base level in the LSM tree.
 	 */
 	uint64_t max_dump_size;
-	/** Number of runs that need to be compacted. */
+	/**
+	 * The goal of compaction is to reduce read amplification.
+	 * All ranges for which the LSM tree has more runs per
+	 * level than run_count_per_level or run size larger than
+	 * one defined by run_size_ratio of this level are candidates
+	 * for compaction.
+	 * Unlike other LSM implementations, Vinyl can have many
+	 * sorted runs in a single level, and is able to compact
+	 * runs from any number of adjacent levels. Moreover,
+	 * higher levels are always taken in when compacting
+	 * a lower level - i.e. L1 is always included when
+	 * compacting L2, and both L1 and L2 are always included
+	 * when compacting L3.
+	 *
+	 * This variable contains the number of runs the next
+	 * compaction of this range will include.
+	 *
+	 * The lower the level is scheduled for compaction,
+	 * the bigger it tends to be because upper levels are
+	 * taken in.
+	 * @sa vy_range_update_compact_priority() to see
+	 * how we  decide how many runs to compact next time.
+	 */
 	int compact_priority;
 	/** Number of times the range was compacted. */
 	int n_compactions;
@@ -2646,9 +2668,9 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
  * split in two.
  *
  * - We should never split a range until it was merged at least once
- *   (actually, it should be a function of max_runs_per_level/number
- *   of runs used for the merge: with low max_runs_per_level it's more
- *   than once, with high max_runs_per_level it's once).
+ *   (actually, it should be a function of run_count_per_level/number
+ *   of runs used for the merge: with low run_count_per_level it's more
+ *   than once, with high run_count_per_level it's once).
  * - We should use the last run size as the size of the range.
  * - We should split around the last run middle key.
  * - We should only split if the last run size is greater than
@@ -2699,12 +2721,13 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
  *   level N: runs L_{N-1} .. L_N
  *
  * where L_N is the total number of runs, N is the total number of
- * levels, older runs have greater numbers. Each subsequent level is
- * level_size_ratio times larger than previous one. When a number of
- * runs at a level exceeds max_runs_per_level, we compact all its runs
- * along with all runs from previous levels and in-memory indexes.
- * Inclusion previous levels into compaction is relatively cheap,
- * because of the level size ratio.
+ * levels, older runs have greater numbers. Runs at each subsequent
+ * are run_size_ratio times larger than on the previous one. When
+ * the number of runs at a level exceeds run_count_per_level, we
+ * compact all its runs along with all runs from the upper levels
+ * and in-memory indexes.  Including  previous levels into
+ * compaction is relatively cheap, because of the level size
+ * ratio.
  *
  * Given a range, this function computes the maximal level that needs
  * to be compacted and sets @compact_priority to the number of runs in
@@ -2715,56 +2738,72 @@ vy_range_update_compact_priority(struct vy_range *range)
 {
 	struct key_opts *opts = &range->index->key_def->opts;
 
-	assert(opts->max_runs_per_level > 0);
-	assert(opts->level_size_ratio > 1);
+	assert(opts->run_count_per_level > 0);
+	assert(opts->run_size_ratio > 1);
 	assert(range->max_dump_size > 0);
 
 	range->compact_priority = 0;
 
 	/* Total number of checked runs. */
-	uint32_t run_count = 0;
-	/* Sum size of all checked runs. */
-	uint64_t sum_run_size = 0;
-	/* Number of runs at the current level. */
+	uint32_t total_run_count = 0;
+	/* The total size of runs checked so far. */
+	uint64_t total_size = 0;
+	/* Estimated size of a compacted run, if compaction is scheduled. */
+	uint64_t est_new_run_size = 0;
+	/* The number of runs at the current level. */
 	uint32_t level_run_count = 0;
-	/* Maximal size of a run at the current level. */
-	uint64_t level_thresh = range->max_dump_size;
+	/*
+	 * The target (perfect) size of a run at the current level.
+	 * For the first level, it's the maximal size of a dump.
+	 * For lower levels it's computed as first level run size
+	 * times run_size_ratio.
+	 */
+	uint64_t target_run_size = range->max_dump_size;
 
 	struct vy_run *run;
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		uint64_t run_size = vy_run_total(run);
-		if (run_size > level_thresh) {
-			/*
-                         * The run exceeds the threshold set by the
-                         * current level. Compute the threshold for
-                         * the first level to put this run into and
-                         * reset the run counter.
-			 */
-			do {
-				level_thresh *= opts->level_size_ratio;
-			} while (run_size > level_thresh);
-			level_run_count = 0;
-			if (sum_run_size > (level_thresh /
-					    opts->level_size_ratio)) {
-				/*
-				 * The resulting run is likely to be
-				 * pushed to the next level. Take this
-				 * into account when checking if it's
-				 * worth compacting the next level.
-				 */
-				level_run_count++;
-			}
-		}
-		run_count++;
+		total_size += run_size;
 		level_run_count++;
-		sum_run_size += run_size;
-		if (level_run_count > opts->max_runs_per_level) {
+		total_run_count++;
+		while (run_size > target_run_size) {
+			/*
+			 * The run size exceeds the threshold
+			 * set for the current level. Move this
+			 * run down to a lower level. Switch the
+			 * current level and reset the level run
+			 * count.
+			 */
+			level_run_count = 1;
+			/*
+			 * If we have already scheduled
+			 * a compaction of an upper level, and
+			 * estimated compacted run will end up at
+			 * this level, include the new run into
+			 * this level right away to avoid
+			 * a cascading compaction.
+			 */
+			if (est_new_run_size > target_run_size)
+				level_run_count++;
+			/*
+			 * Calculate the target run size for this
+			 * level.
+			 */
+			target_run_size *= opts->run_size_ratio;
+			/*
+			 * Keep pushing the run down until
+			 * we find an appropriate level for it.
+			 */
+		}
+		if (level_run_count > opts->run_count_per_level) {
 			/*
 			 * The number of runs at the current level
 			 * exceeds the configured maximum. Arrange
-			 * for compaction.
+			 * for compaction. We compact all runs at
+			 * this level and upper levels.
 			 */
-			range->compact_priority = run_count;
+			range->compact_priority = total_run_count;
+			est_new_run_size = total_size;
 		}
 	}
 }
@@ -4150,7 +4189,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
  * is set to NULL.
  *
  * We compact ranges that have more runs in a level than specified
- * by max_runs_per_level configuration option. Among those runs we
+ * by run_count_per_level configuration option. Among those runs we
  * give preference to those ranges whose compaction will reduce
  * read amplification most.
  *

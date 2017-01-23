@@ -2,7 +2,7 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
-_= space:create_index('primary', { parts = { 1, 'unsigned' }, max_runs_per_level = 2 })
+_= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 2 })
 
 function vyinfo() return box.info.vinyl().db[box.space.vinyl.id..'/0'] end
 
@@ -26,8 +26,9 @@ space:replace({2,2})
 space:upsert({2},{{'=',4,5}}) -- bad upsert
 box.snapshot() -- create the second run
 vyinfo().run_count == 2
+-- create a few more runs to trigger compaction
 space:insert({3, 3})
-box.snapshot() -- create the third run to trigger compaction
+box.snapshot()
 
 -- wait for compaction
 while vyinfo().run_count >= 2 do fiber.sleep(0.1) end

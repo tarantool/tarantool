@@ -184,13 +184,13 @@ struct key_opts {
 	 * Maximal number of runs that can be created in a level
 	 * of the LSM tree before triggering compaction.
 	 */
-	uint32_t max_runs_per_level;
+	uint32_t run_count_per_level;
 	/**
 	 * The LSM tree multiplier. Each subsequent level of
-	 * the LSM tree is level_size_ratio times larger than
+	 * the LSM tree is run_size_ratio times larger than
 	 * previous one.
 	 */
-	uint32_t level_size_ratio;
+	uint32_t run_size_ratio;
 	/**
 	 * LSN from the time of index creation.
 	 */

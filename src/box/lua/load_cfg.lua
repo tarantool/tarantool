@@ -8,8 +8,8 @@ local private = require('box.internal')
 local default_vinyl_cfg = {
     memory_limit      = 1.0, -- 1G
     threads           = 1,
-    max_runs_per_level= 2,
-    level_size_ratio  = 10,
+    run_count_per_level= 2,
+    run_size_ratio  = 3,
     range_size        = 1024 * 1024 * 1024,
     page_size         = 8 * 1024,
 }
@@ -56,8 +56,8 @@ local default_cfg = {
 local vinyl_template_cfg = {
     memory_limit      = 'number',
     threads           = 'number',
-    max_runs_per_level= 'number',
-    level_size_ratio  = 'number',
+    run_count_per_level= 'number',
+    run_size_ratio  = 'number',
     range_size        = 'number',
     page_size         = 'number',
 }
