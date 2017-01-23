@@ -101,6 +101,16 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 
 #include <salad/bps_tree.h>
 
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+#undef BPS_TREE_NO_DEBUG
+
 /** @endcond false */
 
 /**

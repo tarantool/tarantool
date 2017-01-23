@@ -90,7 +90,7 @@ vy_quota_init(struct vy_quota *q, int64_t limit,
 static inline bool
 vy_quota_is_exceeded(struct vy_quota *q)
 {
-	return q->used >= q->watermark;
+	return q->used > q->watermark;
 }
 
 /**
@@ -123,9 +123,9 @@ static inline void
 vy_quota_use(struct vy_quota *q, size_t size)
 {
 	q->used += size;
-	if (q->used >= q->watermark)
+	if (q->cb != NULL && q->used >= q->watermark)
 		q->cb(VY_QUOTA_EXCEEDED, q->cb_arg);
-	while (q->used >= q->limit)
+	while (q->cb != NULL && q->used >= q->limit)
 		q->cb(VY_QUOTA_THROTTLED, q->cb_arg);
 }
 
@@ -147,7 +147,7 @@ vy_quota_release(struct vy_quota *q, size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	if (q->used < q->limit)
+	if (q->cb != NULL && q->used < q->limit)
 		q->cb(VY_QUOTA_RELEASED, q->cb_arg);
 }
 

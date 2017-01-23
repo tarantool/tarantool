@@ -12,6 +12,7 @@ local default_vinyl_cfg = {
     run_size_ratio  = 3,
     range_size        = 1024 * 1024 * 1024,
     page_size         = 8 * 1024,
+    cache             = 0.5, -- 512MB
 }
 
 -- all available options
@@ -60,6 +61,7 @@ local vinyl_template_cfg = {
     run_size_ratio  = 'number',
     range_size        = 'number',
     page_size         = 'number',
+    cache             = 'number',
 }
 
 -- types of available options

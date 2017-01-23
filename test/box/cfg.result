@@ -57,7 +57,9 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - memory_limit
+    - - - cache
+        - 0.5
+      - - memory_limit
         - 1
       - - page_size
         - 8192
@@ -129,7 +131,9 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - memory_limit
+    - - - cache
+        - 0.5
+      - - memory_limit
         - 1
       - - page_size
         - 8192
