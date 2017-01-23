@@ -2,19 +2,25 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
-_= space:create_index('primary', { parts = { 1, 'unsigned' } })
+_= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 1 })
 
 function vyinfo() return box.info.vinyl().db[box.space.vinyl.id..'/0'] end
 
 range_size = vyinfo().range_size
-tuple_size = 100 * 1024
+tuple_size = vyinfo().page_size / 2
 tuples_per_range = math.ceil(range_size / tuple_size + 1)
 
 test_run:cmd("setopt delimiter ';'")
-local BUF = string.rep('x', 100 * 1024)
-for r=1,2 do
+function gen_tuple()
+    local pad = {}
+    for i = 1,tuple_size do
+        pad[i] = string.char(math.random(65, 90))
+    end
+    return {math.random(4294967295), table.concat(pad)}
+end;
+for r=1,4 do
     for i=1,tuples_per_range do
-        box.space.vinyl:replace({math.random(4294967295), BUF})
+        box.space.vinyl:replace(gen_tuple())
     end
     box.snapshot()
 end;
@@ -27,6 +33,3 @@ vyinfo().range_count
 for i=1,100 do box.space.vinyl:replace({i}) end
 
 space:drop()
-
-fiber = nil
-test_run = nil
