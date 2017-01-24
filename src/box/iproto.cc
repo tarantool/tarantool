@@ -151,12 +151,10 @@ struct IprotoMsgGuard {
  */
 static struct cpipe tx_pipe;
 static struct cpipe net_pipe;
-static struct cbus net_tx_bus;
 /* A pointer to the transaction processor cord. */
 struct cord *tx_cord;
 
 struct rmean *rmean_net;
-struct rmean *rmean_net_tx_bus;
 
 enum rmean_net_name {
 	IPROTO_SENT,
@@ -1168,7 +1166,9 @@ net_cord_f(va_list /* ap */)
 			  "rmean", "struct rmean");
 	}
 
-	cbus_join(&net_tx_bus, &net_pipe);
+	cbus_join("net");
+	cpipe_create("tx", &tx_pipe);
+	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming
@@ -1188,18 +1188,12 @@ iproto_init()
 {
 	tx_cord = cord();
 
-	cbus_create(&net_tx_bus);
-	rmean_net_tx_bus = net_tx_bus.stats;
-	cpipe_create(&tx_pipe);
-	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
-	cpipe_create(&net_pipe);
-	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
-
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
 
-	cbus_join(&net_tx_bus, &tx_pipe);
+	cpipe_create("net", &net_pipe);
+	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
 }
 
 /**
@@ -1246,7 +1240,8 @@ iproto_bind(const char *uri)
 {
 	static struct iproto_bind_msg m;
 	m.uri = uri;
-	if (cbus_call(&net_tx_bus, &m, iproto_do_bind, NULL, TIMEOUT_INFINITY))
+	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_bind,
+		      NULL, TIMEOUT_INFINITY))
 		diag_raise();
 }
 
@@ -1255,7 +1250,8 @@ iproto_listen()
 {
 	/* Declare static to avoid stack corruption on fiber cancel. */
 	static struct cbus_call_msg m;
-	if (cbus_call(&net_tx_bus, &m, iproto_do_listen, NULL, TIMEOUT_INFINITY))
+	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_listen,
+		      NULL, TIMEOUT_INFINITY))
 		diag_raise();
 }
 

@@ -55,8 +55,6 @@ int wal_dir_lock = -1;
 struct wal_writer
 {
 	/* ----------------- tx ------------------- */
-	/* tx-wal message bus */
-	struct cbus tx_wal_bus;
 	/**
 	 * The rollback queue. An accumulator for all requests
 	 * that need to be rolled back. Also acts as a valve
@@ -228,10 +226,6 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->is_active = false;
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
-	cbus_create(&writer->tx_wal_bus);
-
-	cpipe_create(&writer->tx_pipe);
-	cpipe_create(&writer->wal_pipe);
 	cpipe_set_max_input(&writer->wal_pipe, IOV_MAX);
 
 	stailq_create(&writer->rollback);
@@ -250,7 +244,6 @@ static void
 wal_writer_destroy(struct wal_writer *writer)
 {
 	xdir_destroy(&writer->wal_dir);
-	cbus_destroy(&writer->tx_wal_bus);
 	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
@@ -287,8 +280,6 @@ wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 	wal_writer_create(writer, wal_mode, wal_dirname, server_uuid,
 			vclock, rows_per_wal);
 
-	rmean_tx_wal_bus = writer->tx_wal_bus.stats;
-
 	/* II. Start the thread. */
 
 	if (cord_costart(&writer->cord, "wal", wal_writer_f, writer)) {
@@ -296,7 +287,7 @@ wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 		wal = NULL;
 		panic("failed to start WAL thread");
 	}
-	cbus_join(&writer->tx_wal_bus, &writer->tx_pipe);
+	cpipe_create("wal", &wal_writer_singleton.wal_pipe);
 	wal = writer;
 }
 
@@ -602,7 +593,8 @@ wal_writer_f(va_list ap)
 	coeio_enable();
 
 	writer->main_f = fiber();
-	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
+	cbus_join("wal");
+	cpipe_create("tx", &wal_writer_singleton.tx_pipe);
 
 	fiber_yield();
 

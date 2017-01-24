@@ -119,7 +119,6 @@ struct cpipe {
 	 */
 	struct ev_async flush_input;
 	struct ev_loop *producer;
-	struct cbus *bus;
 	/**
 	 * The fiber pool at destination to handle flushed
 	 * messages.
@@ -131,7 +130,7 @@ struct cpipe {
  * Initialize a pipe. Must be called by the consumer.
  */
 void
-cpipe_create(struct cpipe *pipe);
+cpipe_create(const char *name, struct cpipe *pipe);
 
 /**
  * Set pipe max size of staged push area. The default is infinity.
@@ -212,49 +211,48 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
+struct cbus_item {
+	/** Attached fiber pool */
+	struct fiber_pool *pool;
+	/** Fiber pool name for routing */
+	const char *name;
+	/** List linkage */
+	struct rlist item;
+};
+
 /**
- * Cord interconnect: two pipes one for each message flow
- * direction.
+ * Cord interconnect
  */
 struct cbus {
-	/** Two pipes for two directions between two cords. */
-	struct cpipe *pipe[2];
 	/** cbus statistics */
 	struct rmean *stats;
 	/** A mutex to protect bus join. */
 	pthread_mutex_t mutex;
 	/** Condition for synchronized start of the bus. */
 	pthread_cond_t cond;
+	/** Conneted pools */
+	struct rlist pools;
 };
 
 void
-cbus_create(struct cbus *bus);
-
-void
-cbus_destroy(struct cbus *bus);
+cbus_init();
 
 /**
- * Connect the pipes: join cord1 input to the cord2 output,
- * and cord1 output to cord2 input.
- * Each cord must invoke this method in its own scope,
- * and provide its own callback to handle incoming messages
- * (pop_output_cb).
- * This call synchronizes two threads, and after this method
- * returns, cpipe_push/cpipe_pop are safe to use.
- *
- * @param  bus the bus
- * @param  pipe the pipe for which this thread is a consumer
- *
- * @retval the pipe for this this thread is a producer
- *
- * @example:
- *	cpipe_create(&in);
- *	struct cpipe *out = cbus_join(bus, &in);
- *	cpipe_set_max_input(out, 128);
- *	cpipe_push(out, msg);
+ * Connect the cord to cbus as a named reciever and create
+ * a fiber pool to process incoming messages.
+ * @param name a destination name
+ */
+void
+cbus_join(const char *name);
+
+/**
+ * Create pipe to destination with passed name. Messages can be delivered
+ * to destination with simple cpipe_push call. Will block until cbus has no
+ * corresponding destination.
+ * @param name a destination name where a pipe should be connected
  */
 struct cpipe *
-cbus_join(struct cbus *bus, struct cpipe *pipe);
+cbus_route(const char *name);
 
 /**
  * A helper message to wakeup caller whenever an event
@@ -273,7 +271,7 @@ cmsg_notify_init(struct cmsg_notify *msg);
  * A helper method to invoke a function on the other side of the
  * bus.
  *
- * Creates the relevant messages, pushes them to the bus and
+ * Creates the relevant messages, pushes them to the callee pipe and
  * blocks the caller until func is executed in the correspondent
  * thread.
  * Detects which cord to invoke a function in based on the current
@@ -301,10 +299,9 @@ typedef int (*cbus_call_f)(struct cbus_call_msg *);
 struct cbus_call_msg
 {
 	struct cmsg msg;
-	struct cbus *bus;
-	struct cmsg_hop route[2];
 	struct diag diag;
 	struct fiber *caller;
+	struct cmsg_hop route[2];
 	bool complete;
 	int rc;
 	/** The callback to invoke in the peer thread. */
@@ -317,8 +314,9 @@ struct cbus_call_msg
 };
 
 int
-cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
-	cbus_call_f func, cbus_call_f free_cb, double timeout);
+cbus_call(struct cpipe *callee, struct cpipe *caller,
+	  struct cbus_call_msg *msg,
+	  cbus_call_f func, cbus_call_f free_cb, double timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */

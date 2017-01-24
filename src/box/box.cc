@@ -30,6 +30,8 @@
  */
 #include "box/box.h"
 
+#include "cbus.h"
+
 #include <say.h>
 #include <scoped_guard.h>
 #include "iproto.h"
@@ -1444,6 +1446,11 @@ static inline void
 box_init(void)
 {
 	tuple_init();
+	/*
+	 * Init cbus and join to it
+	 */
+	cbus_init();
+	cbus_join("tx");
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);

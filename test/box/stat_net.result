@@ -46,10 +46,7 @@ box.stat.net.RECEIVED.total > 0
 ---
 - true
 ...
-box.stat.net.EVENTS.total > 0
----
-- true
-...
+-- box.stat.net.EVENTS.total > 0
 -- box.stat.net.LOCKS.total > 0
 space:drop()
 ---

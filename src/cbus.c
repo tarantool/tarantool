@@ -30,6 +30,8 @@
  */
 #include "cbus.h"
 
+static struct cbus cbus;
+
 const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
 	"LOCKS",
@@ -98,7 +100,7 @@ cpipe_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	       int /* events */);
 
 void
-cpipe_create(struct cpipe *pipe)
+cpipe_create(const char *name, struct cpipe *pipe)
 {
 	stailq_create(&pipe->input);
 
@@ -108,17 +110,28 @@ cpipe_create(struct cpipe *pipe)
 	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
 	pipe->flush_input.data = pipe;
 
+	tt_pthread_mutex_lock(&cbus.mutex);
+	do {
+		struct cbus_item *cbus_item;
+		rlist_foreach_entry(cbus_item, &cbus.pools, item) {
+			if (!strcmp(cbus_item->name, name)) {
+				pipe->producer = cord()->loop;
+				pipe->pool = cbus_item->pool;
+				break;
+			}
+		}
+		if (pipe->producer == NULL)
+			tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
+	} while (pipe->producer == NULL);
+	tt_pthread_mutex_unlock(&cbus.mutex);
+
 	/* Set in join() under a mutex. */
-	pipe->producer = NULL;
-	pipe->bus = NULL;
-	pipe->pool = NULL;
 	cpipe_set_max_input(pipe, 2 * FIBER_POOL_SIZE);
 }
 
 void
 cbus_create(struct cbus *bus)
 {
-	bus->pipe[0] = bus->pipe[1] = NULL;
 	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
 	if (bus->stats == NULL)
 		panic_syserror("cbus_create");
@@ -128,6 +141,8 @@ cbus_create(struct cbus *bus)
 	(void) tt_pthread_mutex_init(&bus->mutex, NULL);
 
 	(void) tt_pthread_cond_init(&bus->cond, NULL);
+
+	rlist_create(&bus->pools);
 }
 
 void
@@ -142,50 +157,34 @@ cbus_destroy(struct cbus *bus)
  * @pre both consumers initialized their pipes
  * @post each consumers gets the input end of the opposite pipe
  */
-struct cpipe *
-cbus_join(struct cbus *bus, struct cpipe *pipe)
+void
+cbus_join(const char *name)
 {
-	pipe->pool = &cord()->fiber_pool;
-	if (pipe->pool->max_size == 0) {
-		fiber_pool_create(pipe->pool, FIBER_POOL_SIZE,
+	struct fiber_pool *pool = &cord()->fiber_pool;
+	if (pool->max_size == 0) {
+		fiber_pool_create(pool, FIBER_POOL_SIZE,
 				  FIBER_POOL_IDLE_TIMEOUT, fiber_pool_f);
 	}
-	/*
-	 * We can't let one or the other thread go off and
-	 * produce events/send ev_async callback messages
-	 * until the peer thread has initialized the async
-	 * and started it.
-	 * Use a condition variable to make sure that two
-	 * threads operate in sync.
-	 */
-	tt_pthread_mutex_lock(&bus->mutex);
-	int pipe_idx = bus->pipe[0] != NULL;
-	int peer_idx = !pipe_idx;
-	bus->pipe[pipe_idx] = pipe;
-	while (bus->pipe[peer_idx] == NULL)
-		tt_pthread_cond_wait(&bus->cond, &bus->mutex);
-
-	pipe->bus = bus;
-	pipe->producer = bus->pipe[peer_idx]->pool->consumer;
-	tt_pthread_cond_signal(&bus->cond);
-	/*
-	 * At this point we've have both pipes initialized
-	 * in bus->pipe array, and our pipe joined.
-	 * But the other pipe may have not been joined
-	 * yet, ensure it's fully initialized before return.
-	 */
-	while (bus->pipe[peer_idx]->bus == NULL) {
-		/* Let the other side wakeup and perform the join. */
-		tt_pthread_cond_wait(&bus->cond, &bus->mutex);
+	tt_pthread_mutex_lock(&cbus.mutex);
+	struct cbus_item *item;
+	rlist_foreach_entry(item, &cbus.pools, item) {
+		if (!strcmp(name, item->name))
+			panic("cbus item %s joined twice", name);
 	}
-	tt_pthread_mutex_unlock(&bus->mutex);
+
+	item = (struct cbus_item *)calloc(1, sizeof(struct cbus_item));
+	if (item == NULL)
+		panic("Can't alloc cbus item");
+	item->name = strdup(name);
+	item->pool = pool;
+	rlist_add_tail(&cbus.pools, &item->item);
+	tt_pthread_mutex_unlock(&cbus.mutex);
 	/*
 	 * POSIX: pthread_cond_signal() function shall
 	 * have no effect if there are no threads currently
 	 * blocked on cond.
 	 */
-	tt_pthread_cond_signal(&bus->cond);
-	return bus->pipe[peer_idx];
+	tt_pthread_cond_signal(&cbus.cond);
 }
 
 static void
@@ -210,7 +209,7 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	pipe->n_input = 0;
 	if (pipe_was_empty) {
 		/* Count statistics */
-		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
+		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
 
 		ev_async_send(pool->consumer, &pool->fetch_output);
 	}
@@ -311,18 +310,16 @@ cbus_call_done(struct cmsg *m)
  * Execute a synchronous call over cbus.
  */
 int
-cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
+cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	cbus_call_f func, cbus_call_f free_cb, double timeout)
 {
 	int rc;
 
-	msg->bus = bus;
 	diag_create(&msg->diag);
 	msg->caller = fiber();
-	int peer_idx = bus->pipe[0]->producer != cord()->loop;
 	msg->complete = false;
 	msg->route[0].f = cbus_call_perform;
-	msg->route[0].pipe = bus->pipe[!peer_idx];
+	msg->route[0].pipe = caller;
 	msg->route[1].f = cbus_call_done;
 	msg->route[1].pipe = NULL;
 	cmsg_init(cmsg(msg), msg->route);
@@ -331,7 +328,7 @@ cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
 	msg->free_cb = free_cb;
 	msg->rc = 0;
 
-	cpipe_push(bus->pipe[peer_idx], cmsg(msg));
+	cpipe_push(callee, cmsg(msg));
 
 	fiber_yield_timeout(timeout);
 	if (msg->complete == false) {           /* timed out or cancelled */
@@ -345,5 +342,11 @@ cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
 	if ((rc = msg->rc))
 		diag_move(&msg->diag, &fiber()->diag);
 	return rc;
+}
+
+void
+cbus_init()
+{
+	cbus_create(&cbus);
 }
 
