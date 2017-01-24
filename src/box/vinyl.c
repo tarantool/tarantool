@@ -2987,16 +2987,16 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		VY_UPSERT_INF = 255,
 	};
 	if (older != NULL)
-		vy_stmt_n_upserts_set(stmt, vy_stmt_n_upserts(older));
+		vu_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(older));
 	if (vy_stmt_n_upserts(stmt) != VY_UPSERT_INF) {
-		vy_stmt_n_upserts_set(stmt, vy_stmt_n_upserts(stmt) + 1);
+		vu_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(stmt) + 1);
 		if (vy_stmt_n_upserts(stmt) > VY_UPSERT_THRESHOLD) {
 			vy_index_squash_upserts(index, stmt);
 			/*
 			 * Prevent further upserts from starting new
 			 * workers while this one is in progress.
 			 */
-			vy_stmt_n_upserts_set(stmt, VY_UPSERT_INF);
+			vu_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
 		}
 	}
 
@@ -3040,7 +3040,7 @@ vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
 	struct tuple *stmt = v->stmt;
 	struct vy_range *range = NULL;
 
-	vy_stmt_lsn_set(stmt, lsn);
+	vy_stmt_set_lsn(stmt, lsn);
 
 	/*
 	 * If we're recovering the WAL, it may happen so that this
@@ -5055,7 +5055,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		region_truncate(region, region_svp);
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
-		vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
+		vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
 		goto check_key;
 	}
 
@@ -5082,7 +5082,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	}
 	if (result_stmt != NULL) {
 		region_truncate(region, region_svp);
-		vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
+		vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
 		goto check_key;
 	}
 
@@ -5111,7 +5111,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		return NULL;
 	}
 	region_truncate(region, region_svp);
-	vy_stmt_lsn_set(result_stmt, vy_stmt_lsn(new_stmt));
+	vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
 
 check_key:
 	/*

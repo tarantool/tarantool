@@ -107,7 +107,7 @@ vy_stmt_lsn(const struct tuple *stmt)
 
 /** Set LSN of the vinyl statement. */
 static inline void
-vy_stmt_lsn_set(struct tuple *stmt, int64_t lsn)
+vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 {
 	((struct vy_stmt *) stmt)->lsn = lsn;
 }
@@ -121,7 +121,7 @@ vy_stmt_type(const struct tuple *stmt)
 
 /** Set type of the vinyl statement. */
 static inline void
-vy_stmt_type_set(struct tuple *stmt, uint8_t type)
+vy_stmt_set_type(struct tuple *stmt, uint8_t type)
 {
 	((struct vy_stmt *) stmt)->type = type;
 }
@@ -135,7 +135,7 @@ vy_stmt_n_upserts(const struct tuple *stmt)
 
 /** Set upserts count of the vinyl statement. */
 static inline void
-vy_stmt_n_upserts_set(struct tuple *stmt, uint8_t n)
+vu_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 {
 	((struct vy_stmt *) stmt)->n_upserts = n;
 }
