@@ -72,7 +72,7 @@ cfg_filter(box.cfg)
       - - run_count_per_level
         - 2
       - - run_size_ratio
-        - 3
+        - 3.5
       - - threads
         - 1
   - - vinyl_dir

@@ -200,7 +200,7 @@ struct key_opts {
 	 * the LSM tree is run_size_ratio times larger than
 	 * previous one.
 	 */
-	int64_t run_size_ratio;
+	double run_size_ratio;
 	/**
 	 * LSN from the time of index creation.
 	 */

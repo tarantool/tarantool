@@ -7,13 +7,13 @@ local urilib = require('uri')
 
 -- see default_cfg below
 local default_vinyl_cfg = {
-    memory_limit      = 1.0, -- 1G
-    threads           = 1,
-    run_count_per_level= 2,
-    run_size_ratio  = 3,
-    range_size        = 1024 * 1024 * 1024,
-    page_size         = 8 * 1024,
-    cache             = 0.5, -- 512MB
+    memory_limit        = 1.0, -- 1G
+    threads             = 1,
+    run_count_per_level = 2,
+    run_size_ratio      = 3.5,
+    range_size          = 1024 * 1024 * 1024,
+    page_size           = 8 * 1024,
+    cache               = 0.5, -- 512MB
 }
 
 -- all available options
@@ -26,8 +26,8 @@ local default_cfg = {
     work_dir            = nil,
     snap_dir            = ".",
     wal_dir             = ".",
-    vinyl_dir          = '.',
-    vinyl              = default_vinyl_cfg,
+    vinyl_dir           = '.',
+    vinyl               = default_vinyl_cfg,
     logger              = nil,
     logger_nonblock     = true,
     log_level           = 5,
@@ -56,13 +56,13 @@ local default_cfg = {
 
 -- see template_cfg below
 local vinyl_template_cfg = {
-    memory_limit      = 'number',
-    threads           = 'number',
-    run_count_per_level= 'number',
-    run_size_ratio  = 'number',
-    range_size        = 'number',
-    page_size         = 'number',
-    cache             = 'number',
+    memory_limit        = 'number',
+    threads             = 'number',
+    run_count_per_level = 'number',
+    run_size_ratio      = 'number',
+    range_size          = 'number',
+    page_size           = 'number',
+    cache               = 'number',
 }
 
 -- types of available options
@@ -76,8 +76,8 @@ local template_cfg = {
     work_dir            = 'string',
     snap_dir            = 'string',
     wal_dir             = 'string',
-    vinyl_dir          = 'string',
-    vinyl              = vinyl_template_cfg,
+    vinyl_dir           = 'string',
+    vinyl               = vinyl_template_cfg,
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',

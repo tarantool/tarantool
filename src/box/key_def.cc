@@ -117,7 +117,7 @@ const struct key_opts key_opts_default = {
 	/* .range_size          = */ 0,
 	/* .page_size           = */ 0,
 	/* .run_count_per_level = */ 2,
-	/* .run_size_ratio      = */ 3,
+	/* .run_size_ratio      = */ 3.5,
 	/* .lsn                 = */ 0,
 };
 
@@ -129,7 +129,7 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("range_size", OPT_INT, struct key_opts, range_size),
 	OPT_DEF("page_size", OPT_INT, struct key_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT, struct key_opts, run_count_per_level),
-	OPT_DEF("run_size_ratio", OPT_INT, struct key_opts, run_size_ratio),
+	OPT_DEF("run_size_ratio", OPT_FLOAT, struct key_opts, run_size_ratio),
 	OPT_DEF("lsn", OPT_INT, struct key_opts, lsn),
 	{ NULL, opt_type_MAX, 0, 0 },
 };
