@@ -203,28 +203,33 @@ err:
 	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
 }
 
-static void
+static int
 opt_set(void *opts, const struct opt_def *def, const char **val)
 {
-	uint64_t uval;
+	int64_t ival;
+	double dval;
 	uint32_t str_len;
 	const char *str;
 	char *opt = ((char *) opts) + def->offset;
 	switch (def->type) {
-	case MP_BOOL:
+	case OPT_BOOL:
+		if (mp_typeof(**val) != MP_BOOL)
+			return -1;
 		store_bool(opt, mp_decode_bool(val));
 		break;
-	case MP_UINT:
-		uval = mp_decode_uint(val);
-		if (def->len == sizeof(uint64_t)) {
-			store_u64(opt, uval);
-		} else if (def->len == sizeof(uint32_t)) {
-			store_u32(opt, uval);
-		} else {
-			unreachable();
-		}
+	case OPT_INT:
+		if (mp_read_int64(val, &ival) != 0)
+			return -1;
+		store_u64(opt, ival);
 		break;
-	case MP_STR:
+	case OPT_FLOAT:
+		if (mp_read_double(val, &dval) != 0)
+			return -1;
+		store_double(opt, dval);
+		break;
+	case OPT_STR:
+		if (mp_typeof(**val) != MP_STR)
+			return -1;
 		str = mp_decode_str(val, &str_len);
 		str_len = MIN(str_len, def->len - 1);
 		memcpy(opt, str, str_len);
@@ -233,6 +238,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 	default:
 		unreachable();
 	}
+	return 0;
 }
 
 /**
@@ -271,15 +277,14 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 			    memcmp(key, def->name, key_len) != 0)
 				continue;
 
-			if (mp_typeof(*map) != def->type) {
+			if (opt_set(opts, def, &map) != 0) {
 				snprintf(errmsg, sizeof(errmsg),
 					"'%.*s' must be %s", key_len, key,
-					mp_type_strs[def->type]);
+					opt_type_strs[def->type]);
 				tnt_raise(ClientError, errcode, field_no,
 					  errmsg);
 			}
 
-			opt_set(opts, def, &map);
 			found = true;
 			break;
 		}
@@ -335,7 +340,7 @@ key_opts_create(struct key_opts *opts, const char *map)
 				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
 		opts->distance = key_opts_decode_distance(opts->distancebuf);
-	if (opts->run_count_per_level == 0)
+	if (opts->run_count_per_level <= 0)
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, INDEX_OPTS,
 			  "run_count_per_level must be > 0");
 	if (opts->run_size_ratio <= 1)
@@ -486,6 +491,8 @@ static char *
 opt_encode(char *data, char *data_end, const void *opts,
 	   const void *default_opts, const struct opt_def *def)
 {
+	int64_t ival;
+	double dval;
 	const char *opt = ((const char *) opts) + def->offset;
 	const char *default_opt = ((const char *) default_opts) + def->offset;
 	if (memcmp(opt, default_opt, def->len) == 0)
@@ -495,34 +502,33 @@ opt_encode(char *data, char *data_end, const void *opts,
 		return data_end;
 	data = mp_encode_str(data, def->name, optlen);
 	switch (def->type) {
-	case MP_BOOL:
+	case OPT_BOOL:
 		if (data + mp_sizeof_bool(true) > data_end)
 			return data_end;
 		data = mp_encode_bool(data, load_bool(opt));
 		break;
-	case MP_UINT:
-	{
-		uint64_t optval;
-		if (def->len == sizeof(uint64_t)) {
-			optval = load_u64(opt);
-		} else if (def->len == sizeof(uint32_t)) {
-			optval = load_u32(opt);
-		} else {
-			unreachable();
-		}
-		if (data + mp_sizeof_uint(optval) > data_end)
+	case OPT_INT:
+		ival = load_u64(opt);
+		if ((ival < 0 && data + mp_sizeof_int(ival) > data_end) ||
+		    (ival >= 0 && data + mp_sizeof_uint(ival) > data_end))
 			return data_end;
-		data = mp_encode_uint(data, optval);
+		if (ival < 0)
+			data = mp_encode_int(data, ival);
+		else
+			data = mp_encode_uint(data, ival);
 		break;
-	}
-	case MP_STR:
-	{
+	case OPT_FLOAT:
+		dval = load_double(opt);
+		if (data + mp_sizeof_double(dval) > data_end)
+			return data_end;
+		data = mp_encode_double(data, dval);
+		break;
+	case OPT_STR:
 		optlen = strlen(opt);
 		if (data + mp_sizeof_str(optlen) > data_end)
 			return data_end;
 		data = mp_encode_str(data, opt, optlen);
 		break;
-	}
 	default:
 		unreachable();
 	}

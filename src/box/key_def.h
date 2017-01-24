@@ -133,9 +133,19 @@ enum index_type {
 
 extern const char *index_type_strs[];
 
+enum opt_type {
+	OPT_BOOL,	/* bool */
+	OPT_INT,	/* int64_t */
+	OPT_FLOAT,	/* double */
+	OPT_STR,	/* char[] */
+	opt_type_MAX,
+};
+
+extern const char *opt_type_strs[];
+
 struct opt_def {
 	const char *name;
-	enum mp_type type;
+	enum opt_type type;
 	ptrdiff_t offset;
 	uint32_t len;
 };
@@ -168,7 +178,7 @@ struct key_opts {
 	/**
 	 * RTREE index dimension.
 	 */
-	uint32_t dimension;
+	int64_t dimension;
 	/**
 	 * RTREE distance type.
 	 */
@@ -178,19 +188,19 @@ struct key_opts {
 	 * Vinyl index options.
 	 */
 	char path[PATH_MAX];
-	uint64_t range_size;
-	uint32_t page_size;
+	int64_t range_size;
+	int64_t page_size;
 	/**
 	 * Maximal number of runs that can be created in a level
 	 * of the LSM tree before triggering compaction.
 	 */
-	uint32_t run_count_per_level;
+	int64_t run_count_per_level;
 	/**
 	 * The LSM tree multiplier. Each subsequent level of
 	 * the LSM tree is run_size_ratio times larger than
 	 * previous one.
 	 */
-	uint32_t run_size_ratio;
+	int64_t run_size_ratio;
 	/**
 	 * LSN from the time of index creation.
 	 */

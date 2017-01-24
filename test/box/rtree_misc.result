@@ -583,7 +583,7 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22},
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4): ''dimension'' must be unsigned'
+- error: 'Wrong index options (field 4): ''dimension'' must be integer'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'}}}
 ---

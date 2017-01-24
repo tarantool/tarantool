@@ -2050,7 +2050,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 						      key_def) >= 0);
 
 	} while (end_of_run == false &&
-		 obuf_size(&data_xlog->obuf) < key_def->opts.page_size);
+		 obuf_size(&data_xlog->obuf) < (uint64_t)key_def->opts.page_size);
 
 	/* Save offset to row index  */
 	page->row_index_offset = page->unpacked_size;
@@ -2814,7 +2814,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	run = rlist_last_entry(&range->runs, struct vy_run, in_range);
 
 	/* The range is too small to be split. */
-	if (vy_run_size(run) < key_def->opts.range_size * 4 / 3)
+	if (vy_run_size(run) < (uint64_t)key_def->opts.range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
