@@ -135,7 +135,7 @@ vy_stmt_n_upserts(const struct tuple *stmt)
 
 /** Set upserts count of the vinyl statement. */
 static inline void
-vu_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
+vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 {
 	((struct vy_stmt *) stmt)->n_upserts = n;
 }

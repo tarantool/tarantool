@@ -108,7 +108,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t size)
 	tuple->data_offset = 0;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
-	vu_stmt_set_n_upserts(tuple, 0);
+	vy_stmt_set_n_upserts(tuple, 0);
 	return tuple;
 }
 

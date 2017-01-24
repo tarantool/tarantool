@@ -3115,16 +3115,16 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		VY_UPSERT_INF = 255,
 	};
 	if (older != NULL)
-		vu_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(older));
+		vy_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(older));
 	if (vy_stmt_n_upserts(stmt) != VY_UPSERT_INF) {
-		vu_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(stmt) + 1);
+		vy_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(stmt) + 1);
 		if (vy_stmt_n_upserts(stmt) > VY_UPSERT_THRESHOLD) {
 			vy_index_squash_upserts(index, stmt);
 			/*
 			 * Prevent further upserts from starting new
 			 * workers while this one is in progress.
 			 */
-			vu_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
+			vy_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
 		}
 	}
 
