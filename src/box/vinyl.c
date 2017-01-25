@@ -2622,10 +2622,19 @@ fail:
 static void
 vy_range_freeze_mem(struct vy_range *range)
 {
-	if (range->mem != NULL) {
-		rlist_add_entry(&range->frozen, range->mem, in_frozen);
-		range->mem = NULL;
-	}
+	assert(range->mem != NULL);
+	rlist_add_entry(&range->frozen, range->mem, in_frozen);
+	range->mem = NULL;
+}
+
+/* Activate the newest frozen in-memory index of a range. */
+static void
+vy_range_unfreeze_mem(struct vy_range *range)
+{
+	assert(range->mem == NULL);
+	assert(!rlist_empty(&range->frozen));
+	range->mem = rlist_shift_entry(&range->frozen,
+				       struct vy_mem, in_frozen);
 }
 
 static void
@@ -2660,6 +2669,52 @@ vy_range_delete(struct vy_range *range)
 
 	TRASH(range);
 	free(range);
+}
+
+/**
+ * Create a write iterator for a range.
+ *
+ * We always dump all frozen in-memory indexes, but skip
+ * the active one in order not to conflict with concurrent
+ * insertions. The caller is supposed to freeze the active
+ * mem for it to be dumped.
+ *
+ * @run_count determines how many runs are added to the write
+ * iterator. Set to @range->run_count for major compaction,
+ * 0 < .. < @range->run_count for minor compaction, or 0 for
+ * dump.
+ */
+static struct vy_write_iterator *
+vy_range_get_write_iterator(struct vy_range *range, int run_count, int64_t vlsn)
+{
+	struct vy_write_iterator *wi;
+	struct vy_run *run;
+	struct vy_mem *mem;
+
+	wi = vy_write_iterator_new(range->index,
+				   run_count == range->run_count, vlsn);
+	if (wi == NULL)
+		goto err_wi;
+	/*
+	 * Prepare for merge. Note, merge iterator requires newer
+	 * sources to be added first so mems are added before runs.
+	 */
+	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+		if (vy_write_iterator_add_mem(wi, mem) != 0)
+			goto err_wi_sub;
+	}
+	assert(run_count >= 0 && run_count <= range->run_count);
+	rlist_foreach_entry(run, &range->runs, in_range) {
+		if (run_count-- == 0)
+			break;
+		if (vy_write_iterator_add_run(wi, range, run) != 0)
+			goto err_wi_sub;
+	}
+	return wi;
+err_wi_sub:
+	vy_write_iterator_delete(wi);
+err_wi:
+	return NULL;
 }
 
 /*
@@ -3419,7 +3474,6 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	struct vy_log *log = index->env->log;
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
-	struct vy_mem *mem;
 
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
@@ -3432,7 +3486,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	 * therefore can omit creating a new mem.
 	 */
 	if (range->mem->used > 0) {
-		mem = vy_mem_new(index->key_def, allocator, &xm->lsn);
+		struct vy_mem *mem = vy_mem_new(index->key_def,
+						allocator, &xm->lsn);
 		if (mem == NULL)
 			goto err_mem;
 		vy_range_freeze_mem(range);
@@ -3441,16 +3496,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	}
 
 	struct vy_write_iterator *wi;
-	wi = vy_write_iterator_new(index, range->run_count == 0,
-				   tx_manager_vlsn(xm));
+	wi = vy_range_get_write_iterator(range, 0, tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
-
-	/* Prepare to dump frozen in-memory indexes. */
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
-		if (vy_write_iterator_add_mem(wi, mem) != 0)
-			goto err_wi_sub;
-	}
 
 	range->new_run = vy_run_new(vy_log_next_run_id(log));
 	if (range->new_run == NULL)
@@ -3463,8 +3511,6 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 		 index->name, vy_range_str(range));
 	return task;
 err_run:
-	/* Sub iterators are deleted by vy_write_iterator_delete(). */
-err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
@@ -3623,11 +3669,8 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 		vy_index_remove_range(index, r);
 		vy_range_delete(r);
 	}
-	/* Unfreeze the newest in-memory index. */
-	assert(range->mem == NULL);
-	assert(!rlist_empty(&range->frozen));
-	range->mem = rlist_shift_entry(&range->frozen,
-				       struct vy_mem, in_frozen);
+	vy_range_unfreeze_mem(range);
+
 	/* Insert the range back into the tree. */
 	vy_index_add_range(index, range);
 	index->version++;
@@ -3659,27 +3702,13 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	if (task == NULL)
 		goto err_task;
 
+	vy_range_freeze_mem(range);
+
 	struct vy_write_iterator *wi;
-	wi = vy_write_iterator_new(index, true, tx_manager_vlsn(xm));
+	wi = vy_range_get_write_iterator(range, range->run_count,
+					 tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
-
-	/*
-	 * Prepare for merge. Note, merge iterator requires newer
-	 * sources to be added first so mems are added before runs.
-	 */
-	struct vy_mem *mem;
-	if (vy_write_iterator_add_mem(wi, range->mem) != 0)
-		goto err_wi_sub;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
-		if (vy_write_iterator_add_mem(wi, mem) != 0)
-			goto err_wi_sub;
-	}
-	struct vy_run *run;
-	rlist_foreach_entry(run, &range->runs, in_range) {
-		if (vy_write_iterator_add_run(wi, range, run) != 0)
-			goto err_wi_sub;
-	}
 
 	/* Determine new ranges' boundaries. */
 	split_key = vy_key_from_msgpack(index->format, split_key_raw);
@@ -3700,13 +3729,6 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		if (r->new_run == NULL)
 			goto err_parts;
 	}
-
-	/*
-	 * Make sure no new statement is inserted into the active mem
-	 * after we start splitting the range. Needed by the write
-	 * iterator, which requires its sources to be immutable.
-	 */
-	vy_range_freeze_mem(range);
 
 	/* Replace the old range with the new ones. */
 	vy_index_remove_range(index, range);
@@ -3742,10 +3764,9 @@ err_parts:
 	}
 	tuple_unref(split_key);
 err_split_key:
-	/* Sub iterators are deleted by vy_write_iterator_delete(). */
-err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
+	vy_range_unfreeze_mem(range);
 	vy_task_delete(pool, task);
 err_task:
 	return NULL;
@@ -3873,6 +3894,8 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 static struct vy_task *
 vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 {
+	assert(range->compact_priority > 0);
+
 	/* Consider splitting the range if it's too big. */
 	const char *split_key;
 	if (vy_range_needs_split(range, &split_key))
@@ -3888,8 +3911,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	struct vy_log *log = index->env->log;
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
-	struct vy_mem *mem;
-	struct vy_run *run;
 
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
 	if (task == NULL)
@@ -3901,7 +3922,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	 * therefore can omit creating a new mem.
 	 */
 	if (range->mem->used > 0) {
-		mem = vy_mem_new(index->key_def, allocator, &xm->lsn);
+		struct vy_mem *mem = vy_mem_new(index->key_def,
+						allocator, &xm->lsn);
 		if (mem == NULL)
 			goto err_mem;
 		vy_range_freeze_mem(range);
@@ -3909,26 +3931,11 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		range->version++;
 	}
 
-	int n = range->compact_priority;
-	assert(n > 0 && n <= range->run_count);
-
 	struct vy_write_iterator *wi;
-	wi = vy_write_iterator_new(index, n == range->run_count,
-				   tx_manager_vlsn(xm));
+	wi = vy_range_get_write_iterator(range, range->compact_priority,
+					 tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
-
-	/* Prepare to merge mems and runs */
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
-		if (vy_write_iterator_add_mem(wi, mem) != 0)
-			goto err_wi_sub;
-	}
-	rlist_foreach_entry(run, &range->runs, in_range) {
-		if (vy_write_iterator_add_run(wi, range, run) != 0)
-			goto err_wi_sub;
-		if (--n == 0)
-			break;
-	}
 
 	range->new_run = vy_run_new(vy_log_next_run_id(log));
 	if (range->new_run == NULL)
@@ -3942,8 +3949,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
                  range->compact_priority, range->run_count);
 	return task;
 err_run:
-	/* Sub iterators are deleted by vy_write_iterator_delete(). */
-err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
