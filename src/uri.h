@@ -68,7 +68,7 @@ int
 uri_parse(struct uri *uri, const char *str);
 
 int
-uri_format(char *str, size_t len, const struct uri *uri, bool write_password);
+uri_format(char *str, int len, const struct uri *uri, bool write_password);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "uri.h"
+#include <trivia/util.h> /* SNPRINT */
 #include <string.h>
 #include <stdio.h> /* snprintf */
 int
@@ -209,48 +210,45 @@ uri_parse(struct uri *uri, const char *p)
 	return cs >= uri_first_final ? 0 : -1;
 }
 
-/*
- * Macro to return from snprintf count of written bytes
- * snprintf will write at most size bytes, but can return greather value for
- * truncated output
- */
-#define SNPRINTF(STR, SIZE, ...) ({ \
-	size_t size = SIZE; \
-	int ret = snprintf(STR, size, __VA_ARGS__);\
-	ret < (int)size ? ret: (int)size;})
-
 int
-uri_format(char *str, size_t len, const struct uri *uri, bool write_password)
+uri_format(char *str, int len, const struct uri *uri, bool write_password)
 {
-	int pos = 0;
-	pos += SNPRINTF(str + pos, len - pos, "%.*s:",
-			(int)uri->scheme_len, uri->scheme);
-	if (uri->host_len > 0) {
-		pos += SNPRINTF(str + pos, len - pos, "//");
-		if (uri->login_len > 0) {
-			pos += SNPRINTF(str + pos, len - pos, "%.*s",
-					(int)uri->login_len, uri->login);
-			if (uri->password_len > 0 && write_password)
-				pos += SNPRINTF(str + pos, len - pos, ":%.*s",
-						(int)uri->password_len, uri->password);
-			pos += SNPRINTF(str + pos, len - pos, "@");
-		}
-		pos += SNPRINTF(str + pos, len - pos, "%.*s",
-				(int)uri->host_len, uri->host);
-		if (uri->service_len > 0)
-			pos += SNPRINTF(str + pos, len - pos, ":%.*s",
-					(int)uri->service_len, uri->service);
+	int total = 0;
+	if (uri->scheme_len > 0) {
+		SNPRINT(total, snprintf, str, len, "%.*s://",
+			 (int)uri->scheme_len, uri->scheme);
 	}
-	if (uri->path_len > 0)
-		pos += SNPRINTF(str + pos, len - pos, "%.*s",
-				(int)uri->path_len, uri->path);
-	if (uri->query_len > 0)
-		pos += SNPRINTF(str + pos, len - pos, "?%.*s",
-				(int)uri->query_len, uri->query);
-	if (uri->fragment_len > 0)
-		pos += SNPRINTF(str + pos, len - pos, "#%.*s",
-				(int)uri->fragment_len, uri->fragment);
-	return pos;
+	if (uri->host_len > 0) {
+		if (uri->login_len > 0) {
+			SNPRINT(total, snprintf, str, len, "%.*s",
+				(int)uri->login_len, uri->login);
+			if (uri->password_len > 0 && write_password) {
+				SNPRINT(total, snprintf, str, len, ":%.*s",
+				        (int)uri->password_len,
+					uri->password);
+			}
+			SNPRINT(total, snprintf, str, len, "@");
+		}
+		SNPRINT(total, snprintf, str, len, "%.*s",
+			 (int)uri->host_len, uri->host);
+		if (uri->service_len > 0) {
+			SNPRINT(total, snprintf, str, len, ":%.*s",
+				(int)uri->service_len, uri->service);
+		}
+	}
+	if (uri->path_len > 0) {
+		SNPRINT(total, snprintf, str, len, "%.*s",
+			(int)uri->path_len, uri->path);
+	}
+	if (uri->query_len > 0) {
+		SNPRINT(total, snprintf, str, len, "?%.*s",
+			(int)uri->query_len, uri->query);
+	}
+	if (uri->fragment_len > 0) {
+		SNPRINT(total, snprintf, str, len, "#%.*s",
+			(int)uri->fragment_len, uri->fragment);
+	}
+	return total;
 }
 
 /* vim: set ft=ragel: */
