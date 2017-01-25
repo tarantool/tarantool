@@ -204,7 +204,7 @@ test_run:cmd('switch cfg_tester1')
 ...
 box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
-- 1
+- 0.25
 - 1.1
 - 1
 ...
@@ -294,7 +294,7 @@ test_run:cmd('switch cfg_tester4')
 ...
 box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
 ---
-- 1
+- 0.25
 - 3.14
 - 1
 ...

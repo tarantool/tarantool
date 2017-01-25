@@ -18,7 +18,7 @@ local default_vinyl_cfg = {
 -- all available options
 local default_cfg = {
     listen              = nil,
-    slab_alloc_arena    = 1.0,
+    slab_alloc_arena    = 0.25,
     slab_alloc_minimal  = 16,
     slab_alloc_maximal  = 1024 * 1024,
     slab_alloc_factor   = 1.1,
