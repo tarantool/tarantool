@@ -113,15 +113,15 @@ vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 }
 
 /** Get type of the vinyl statement. */
-static inline uint8_t
+static inline enum iproto_type
 vy_stmt_type(const struct tuple *stmt)
 {
-	return ((const struct vy_stmt *) stmt)->type;
+	return (enum iproto_type)((const struct vy_stmt *) stmt)->type;
 }
 
 /** Set type of the vinyl statement. */
 static inline void
-vy_stmt_set_type(struct tuple *stmt, uint8_t type)
+vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 {
 	((struct vy_stmt *) stmt)->type = type;
 }

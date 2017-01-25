@@ -146,7 +146,7 @@ vy_stmt_dup(const struct tuple *stmt)
  */
 struct tuple *
 vy_stmt_new_key(struct tuple_format *format, const char *key,
-		uint32_t part_count, uint8_t type)
+		uint32_t part_count, enum iproto_type type)
 {
 	assert(part_count == 0 || key != NULL);
 
@@ -193,7 +193,7 @@ vy_stmt_new_delete(struct tuple_format *format, const char *key,
  */
 struct tuple *
 vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
-		     uint8_t type, struct tuple_format *format,
+		     enum iproto_type type, struct tuple_format *format,
 		     uint32_t part_count,
 		     struct iovec *operations, uint32_t iovcnt)
 {
@@ -293,7 +293,7 @@ struct tuple *
 vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
 		    struct region *region)
 {
-	uint8_t type = vy_stmt_type(stmt);
+	enum iproto_type type = vy_stmt_type(stmt);
 	struct tuple_format *format = tuple_format_by_id(stmt->format_id);
 	if (type == IPROTO_SELECT || type == IPROTO_DELETE) {
 		/*
@@ -330,7 +330,7 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
 	       struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
-	uint8_t type = vy_stmt_type(value);
+	enum iproto_type type = vy_stmt_type(value);
 	xrow->type = type;
 	xrow->lsn = vy_stmt_lsn(value);
 
