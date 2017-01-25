@@ -69,7 +69,8 @@ struct errinj {
 	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false})
+	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64, {.u64param = 0})
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];

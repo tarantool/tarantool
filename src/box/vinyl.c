@@ -4595,6 +4595,9 @@ error:
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MIN;
 		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
+		ERROR_INJECT_U64(ERRINJ_VINYL_SCHED_TIMEOUT,
+				 errinj_getu64(ERRINJ_VINYL_SCHED_TIMEOUT) != 0,
+				 {scheduler->timeout = 0.001 * errinj_getu64(ERRINJ_VINYL_SCHED_TIMEOUT);});
 		say_warn("throttling scheduler for %.0f second(s)",
 			 scheduler->timeout);
 		scheduler->is_throttled = true;
