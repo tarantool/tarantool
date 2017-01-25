@@ -1,0 +1,106 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("setopt delimiter ';;'")
+---
+- true
+...
+-- Manually feed in data in sqlite_master row format.
+-- Populate schema objects, make it possible to query
+-- Tarantool spaces with SQL.
+ffi = require "ffi"
+ffi.cdef[[
+    int sql_schema_put(int, int, const char**);
+    void free(void *);
+]]
+
+function sql_schema_put(idb, ...)
+    local argc = select('#', ...)
+    local argv, cargv = {}, ffi.new('const char*[?]', argc+1)
+    for i = 0,argc-1 do
+        local v = tostring(select(i+1, ...))
+        argv[i] = v
+        cargv[i] = v
+    end
+    cargv[argc] = nil
+    local rc = ffi.C.sql_schema_put(idb, argc, cargv);
+    local err_msg
+    if cargv[0] ~= nil then
+        err_msg = ffi.string(cargv[0])
+        ffi.C.free(ffi.cast('void *', cargv[0]))
+    end
+    return rc, err_msg
+end
+
+function sql_pageno(space_id, index_id)
+    return space_id * 32 + index_id
+end
+
+test_run:cmd("setopt delimiter ''");;
+---
+...
+-- test invalid input
+sql_schema_put(0, "invalid", 1, "CREATE FROB")
+---
+- 11
+- 'malformed database schema (invalid) - near "FROB": syntax error'
+...
+-- create space with data
+foobar = box.schema.space.create("foobar")
+---
+...
+_ = foobar:create_index("primary",{parts={1,"number"}})
+---
+...
+foobar:insert({1,"foo"})
+---
+- [1, 'foo']
+...
+foobar:insert({2,"bar"})
+---
+- [2, 'bar']
+...
+foobar:insert({1000,"foobar"})
+---
+- [1000, 'foobar']
+...
+foobar_pageno = sql_pageno(foobar.id, foobar.index.primary.id)
+---
+...
+foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar)"
+---
+...
+sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
+---
+- 0
+- null
+...
+sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
+---
+- 0
+- null
+...
+-- simple select
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
+---
+- - ['foo', 1, 42, 'awesome']
+  - ['bar', 2, 42, 'awesome']
+  - ['foobar', 1000, 42, 'awesome']
+...
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
+---
+- - ['foo', 1, 42, 'awesome']
+  - ['bar', 2, 42, 'awesome']
+...
+--box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
+--box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
+--box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
+--box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
+---
+- - ['foo', 1, 42, 'awesome']
+...
+-- cleanup
+foobar:drop()
+---
+...

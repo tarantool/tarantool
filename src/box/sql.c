@@ -244,3 +244,40 @@ static int sql_copy_error(sqlite3 *db)
 	(void)db;
 	return SQLITE_ERROR;
 }
+
+/*
+ * Manually feed in a row in sqlite_master format; creates schema
+ * objects. Called from Lua (ffi).
+ */
+int sql_schema_put(int idb, int argc, char **argv)
+{
+	InitData init;
+	char *err_msg = NULL;
+
+	if (!db) return SQLITE_ERROR;
+
+	init.db = db;
+	init.iDb = idb;
+	init.rc = SQLITE_OK;
+	init.pzErrMsg = &err_msg;
+
+	sqlite3_mutex_enter(db->mutex);
+	sqlite3BtreeEnterAll(db);
+	db->init.busy = 1;
+	sqlite3InitCallback(&init, argc, argv, NULL);
+	db->init.busy = 0;
+	sqlite3BtreeLeaveAll(db);
+
+	/*
+	 * Overwrite argv[0] with the error message (if any), caller
+	 * should free it.
+	 */
+	if (err_msg) {
+		argv[0] = strdup(err_msg);
+		sqlite3DbFree(db, err_msg);
+	} else
+		argv[0] = NULL;
+
+	sqlite3_mutex_leave(db->mutex);
+	return init.rc;
+}
