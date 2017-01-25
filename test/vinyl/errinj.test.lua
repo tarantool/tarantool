@@ -94,3 +94,15 @@ errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
 s:drop()
 
+s = box.schema.space.create('test', {engine='vinyl'});
+_ = s:create_index('pk');
+_ = s:replace({1, string.rep('a', 128000)})
+errinj.set("ERRINJ_WAL_WRITE_DISK", true)
+box.snapshot()
+errinj.set("ERRINJ_WAL_WRITE_DISK", false)
+-- we can't start new snapshot just after failed because scheduler is in throttled state
+--_ = s:replace({2, string.rep('b', 128000)})
+--box.snapshot();
+--#s:select({1})
+s:drop()
+
