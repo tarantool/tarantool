@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(43)
+test:plan(46)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -204,6 +204,27 @@ test:is(run_script(code), 0, "wal_mode none and ER_LOADING")
 --
 status, reason = pcall(box.cfg, {replication_source="3303,3304"})
 test:ok(not status and reason:match("Incorrect"), "invalid replication_source")
+
+--
+-- gh-1778 vinyl page can't be greather than range
+--
+code = [[
+box.cfg{vinyl = {page_size = 4 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "page size greather than range")
+
+code = [[
+box.cfg{vinyl = {page_size = 1 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "page size less than range")
+
+code = [[
+box.cfg{vinyl = {page_size = 2 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "page size equal with range")
 
 test:check()
 os.exit(0)

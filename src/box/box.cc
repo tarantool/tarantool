@@ -354,6 +354,9 @@ box_check_config()
 	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_slab_alloc_minimal(cfg_geti64("slab_alloc_minimal"));
+	if (cfg_geti64("vinyl.page_size") > cfg_geti64("vinyl.range_size"))
+		tnt_raise(ClientError, ER_CFG, "vinyl.page_size",
+			  "can't be greather then vinyl.range_size");
 }
 
 /*
