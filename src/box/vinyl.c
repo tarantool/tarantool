@@ -194,6 +194,14 @@ static const char *vy_stat_strings[] = {
 struct vy_stat {
 	struct rmean *rmean;
 	uint64_t write_count;
+	/**
+	 * The total count of dumped statemnts.
+	 * Doesn't count compactions and splits.
+	 * Used to test optimization of UPDATE and UPSERT
+	 * optimization.
+	 * @sa vy_can_skip_update().
+	 */
+	uint64_t dumped_statements;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
 	struct vy_latency get_latency;
@@ -296,10 +304,12 @@ vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
 }
 
 static void
-vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written)
+vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written,
+	     uint64_t dumped_statements)
 {
 	histogram_collect(s->dump_bw, written / time);
 	s->dump_total += written;
+	s->dumped_statements += dumped_statements;
 }
 
 static int64_t
@@ -1986,7 +1996,7 @@ static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  struct vy_write_iterator *wi, const struct tuple *split_key,
 		  uint32_t *page_info_capacity, struct tuple **curr_stmt,
-		  const struct key_def *key_def)
+		  const struct key_def *key_def, uint64_t *dumped_statements)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2028,6 +2038,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		struct tuple *stmt = *curr_stmt;
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0)
 			goto error_rollback;
+		++*dumped_statements;
 
 		if (vy_write_iterator_next(wi, curr_stmt))
 			goto error_rollback;
@@ -2095,8 +2106,8 @@ error_row_index:
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
-		  const struct tuple *end_key,
-		  const struct key_def *key_def)
+		  const struct tuple *end_key, const struct key_def *key_def,
+		  uint64_t *dumped_statements)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2125,7 +2136,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi,
 				       end_key, &page_infos_capacity,
-				       curr_stmt, key_def);
+				       curr_stmt, key_def, dumped_statements);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2746,7 +2757,8 @@ err_wi:
  */
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
-		   struct tuple **stmt, size_t *written)
+		   struct tuple **stmt, size_t *written,
+		   uint64_t *dumped_statements)
 {
 	assert(stmt != NULL);
 
@@ -2764,8 +2776,8 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
-	if (vy_run_write_data(run, index->path, wi, stmt,
-			      range->end, key_def) != 0 ||
+	if (vy_run_write_data(run, index->path, wi, stmt, range->end, key_def,
+			      dumped_statements) != 0 ||
 	    vy_run_write_index(run, index->path) != 0)
 		return -1;
 
@@ -3357,6 +3369,8 @@ struct vy_task {
 	ev_tstamp exec_time;
 	/** Number of bytes written to disk by this task. */
 	size_t dump_size;
+	/** Number of statements dumped to the disk. */
+	uint64_t dumped_statements;
 	/** Range to dump or compact. */
 	struct vy_range *range;
 	/** Write iterator producing statements for the new run. */
@@ -3408,9 +3422,8 @@ vy_task_dump_execute(struct vy_task *task)
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
 		return -1;
-	if (vy_range_write_run(range, wi, &stmt, &task->dump_size) != 0)
-		return -1;
-	return 0;
+	return vy_range_write_run(range, wi, &stmt, &task->dump_size,
+				  &task->dumped_statements);
 }
 
 static int
@@ -3538,6 +3551,7 @@ vy_task_split_execute(struct vy_task *task)
 	struct vy_write_iterator *wi = task->wi;
 	struct tuple *stmt;
 	struct vy_range *r;
+	uint64_t unused;
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
@@ -3555,7 +3569,8 @@ vy_task_split_execute(struct vy_task *task)
 					       "vinyl range split");
 				      return -1;});
 		}
-		if (vy_range_write_run(r, wi, &stmt, &task->dump_size) != 0)
+		if (vy_range_write_run(r, wi, &stmt, &task->dump_size,
+				       &unused) != 0)
 			return -1;
 	}
 	return 0;
@@ -3789,6 +3804,7 @@ vy_task_compact_execute(struct vy_task *task)
 	struct vy_range *range = task->range;
 	struct vy_write_iterator *wi = task->wi;
 	struct tuple *stmt;
+	uint64_t unused;
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
@@ -3797,9 +3813,7 @@ vy_task_compact_execute(struct vy_task *task)
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
 		return -1;
-	if (vy_range_write_run(range, wi, &stmt, &task->dump_size) != 0)
-		return -1;
-	return 0;
+	return vy_range_write_run(range, wi, &stmt, &task->dump_size, &unused);
 }
 
 static int
@@ -4356,7 +4370,8 @@ vy_scheduler_f(va_list va)
 				tasks_done++;
 			if (task->dump_size > 0)
 				vy_stat_dump(env->stat, task->exec_time,
-					     task->dump_size);
+					     task->dump_size,
+					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
 			workers_available++;
 			assert(workers_available <= scheduler->worker_pool_size);
@@ -4785,6 +4800,7 @@ vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 
 	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
 	vy_info_append_u64(h, "dump_total", stat->dump_total);
+	vy_info_append_u64(h, "dumped_statements", stat->dumped_statements);
 
 	vy_info_table_end(h);
 }
