@@ -2637,6 +2637,29 @@ vy_range_unfreeze_mem(struct vy_range *range)
 				       struct vy_mem, in_frozen);
 }
 
+/**
+ * Allocate a new active in-memory index for a range while moving
+ * the old one to the frozen list. Used by dump/compaction in order
+ * not to bother about synchronization with concurrent insertions
+ * while a range is being dumped. If the active in-memory index is
+ * empty, we don't need to dump it and therefore can skip rotation.
+ */
+static int
+vy_range_rotate_mem(struct vy_range *range, struct key_def *key_def,
+		    struct lsregion *allocator, const int64_t *allocator_lsn)
+{
+	assert(range->mem != NULL);
+	if (range->mem->used == 0)
+		return 0;
+	struct vy_mem *mem = vy_mem_new(key_def, allocator, allocator_lsn);
+	if (mem == NULL)
+		return -1;
+	vy_range_freeze_mem(range);
+	range->mem = mem;
+	range->version++;
+	return 0;
+}
+
 static void
 vy_range_delete(struct vy_range *range)
 {
@@ -3479,21 +3502,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	if (task == NULL)
 		goto err_task;
 
-	/*
-	 * We create a new in-memory tree, while we dump older trees.
-	 * This way we don't need to bother about synchronization.
-	 * If the newest mem is empty, we don't need to dump it and
-	 * therefore can omit creating a new mem.
-	 */
-	if (range->mem->used > 0) {
-		struct vy_mem *mem = vy_mem_new(index->key_def,
-						allocator, &xm->lsn);
-		if (mem == NULL)
-			goto err_mem;
-		vy_range_freeze_mem(range);
-		range->mem = mem;
-		range->version++;
-	}
+	if (vy_range_rotate_mem(range, index->key_def,
+				allocator, &xm->lsn) != 0)
+		goto err_mem;
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, 0, tx_manager_vlsn(xm));
@@ -3915,21 +3926,10 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
 	if (task == NULL)
 		goto err_task;
-	/*
-	 * We create a new in-memory tree, while we dump older trees.
-	 * This way we don't need to bother about synchronization.
-	 * If the newest mem is empty, we don't need to dump it and
-	 * therefore can omit creating a new mem.
-	 */
-	if (range->mem->used > 0) {
-		struct vy_mem *mem = vy_mem_new(index->key_def,
-						allocator, &xm->lsn);
-		if (mem == NULL)
-			goto err_mem;
-		vy_range_freeze_mem(range);
-		range->mem = mem;
-		range->version++;
-	}
+
+	if (vy_range_rotate_mem(range, index->key_def,
+				allocator, &xm->lsn) != 0)
+		goto err_mem;
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, range->compact_priority,
