@@ -75,29 +75,6 @@ mp_classof(enum mp_type type)
 	return mp_classes[type];
 }
 
-static inline double
-mp_decode_number(const char **data)
-{
-	double val;
-	switch (mp_typeof(**data)) {
-	case MP_UINT:
-		val = mp_decode_uint(data);
-		break;
-	case MP_INT:
-		val = mp_decode_int(data);
-		break;
-	case MP_FLOAT:
-		val = mp_decode_float(data);
-		break;
-	case MP_DOUBLE:
-		val = mp_decode_double(data);
-		break;
-	default:
-		unreachable();
-	}
-	return val;
-}
-
 static int
 mp_compare_bool(const char *field_a, const char *field_b)
 {
@@ -147,8 +124,10 @@ mp_compare_number(const char *field_a, const char *field_b)
 	assert(mp_classof(b_type) == MP_CLASS_NUMBER);
 	if (a_type == MP_FLOAT || a_type == MP_DOUBLE ||
 	    b_type == MP_FLOAT || b_type == MP_DOUBLE) {
-		double a_val = mp_decode_number(&field_a);
-		double b_val = mp_decode_number(&field_b);
+		double a_val, b_val;
+		if (mp_read_double(&field_a, &a_val) != 0 ||
+		    mp_read_double(&field_b, &b_val) != 0)
+			unreachable();
 		return COMPARE_RESULT(a_val, b_val);
 	}
 	return mp_compare_integer(field_a, field_b);

@@ -249,20 +249,8 @@ static inline int
 mp_read_i32(int index_base, struct update_op *op,
 	    const char **expr, int32_t *ret)
 {
-	if (mp_typeof(**expr) == MP_UINT) {
-		uint64_t val = mp_decode_uint(expr);
-		if (val < INT32_MAX) {
-			*ret = (int32_t) val;
-			return 0;
-		}
-	} else if (mp_typeof(**expr) == MP_INT) {
-		int64_t val = mp_decode_int(expr);
-		if (val > INT32_MIN) {
-			*ret = (int32_t) val;
-			return 0;
-		}
-	}
-
+	if (mp_read_int32(expr, ret) == 0)
+		return 0;
 	diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
 		 index_base + op->field_no, "an integer");
 	return -1;

@@ -46,20 +46,7 @@ static inline double
 mp_decode_num(const char **data, uint32_t fieldno)
 {
 	double val;
-	switch (mp_typeof(**data)) {
-	case MP_UINT:
-		val = mp_decode_uint(data);
-		break;
-	case MP_INT:
-		val = mp_decode_int(data);
-		break;
-	case MP_FLOAT:
-		val = mp_decode_float(data);
-		break;
-	case MP_DOUBLE:
-		val = mp_decode_double(data);
-		break;
-	default:
+	if (mp_read_double(data, &val) != 0) {
 		tnt_raise(ClientError, ER_FIELD_TYPE,
 			  fieldno + TUPLE_INDEX_BASE,
 			  field_type_strs[FIELD_TYPE_NUMBER]);

@@ -1,4 +1,4 @@
-1..18
+1..19
     1..135
     # *** test_uints ***
     # uint 0U
@@ -1716,3 +1716,103 @@ ok 17 - subtests
     ok 65 - invalid map32 3
     # *** test_mp_check: done ***
 ok 18 - subtests
+    1..96
+    # *** test_numbers ***
+    ok 1 - mp_read_int32(mp_encode_uint(123)) check success
+    ok 2 - mp_read_int32(mp_encode_uint(123)) check pos advanced
+    ok 3 - mp_read_int32(mp_encode_uint(123)) check result
+    ok 4 - mp_read_int32(mp_encode_uint(12345)) check success
+    ok 5 - mp_read_int32(mp_encode_uint(12345)) check pos advanced
+    ok 6 - mp_read_int32(mp_encode_uint(12345)) check result
+    ok 7 - mp_read_int32(mp_encode_uint(2147483647)) check success
+    ok 8 - mp_read_int32(mp_encode_uint(2147483647)) check pos advanced
+    ok 9 - mp_read_int32(mp_encode_uint(2147483647)) check result
+    ok 10 - mp_read_int32(mp_encode_uint(2147483648)) check fail
+    ok 11 - mp_read_int32(mp_encode_uint(2147483648)) check pos unchanged
+    ok 12 - mp_read_int32(mp_encode_int(-123)) check success
+    ok 13 - mp_read_int32(mp_encode_int(-123)) check pos advanced
+    ok 14 - mp_read_int32(mp_encode_int(-123)) check result
+    ok 15 - mp_read_int32(mp_encode_int(-12345)) check success
+    ok 16 - mp_read_int32(mp_encode_int(-12345)) check pos advanced
+    ok 17 - mp_read_int32(mp_encode_int(-12345)) check result
+    ok 18 - mp_read_int32(mp_encode_int(-2147483648)) check success
+    ok 19 - mp_read_int32(mp_encode_int(-2147483648)) check pos advanced
+    ok 20 - mp_read_int32(mp_encode_int(-2147483648)) check result
+    ok 21 - mp_read_int32(mp_encode_int(-2147483649LL)) check fail
+    ok 22 - mp_read_int32(mp_encode_int(-2147483649LL)) check pos unchanged
+    ok 23 - mp_read_int32(mp_encode_float(-1e2)) check fail
+    ok 24 - mp_read_int32(mp_encode_float(-1e2)) check pos unchanged
+    ok 25 - mp_read_int32(mp_encode_double(1.2345)) check fail
+    ok 26 - mp_read_int32(mp_encode_double(1.2345)) check pos unchanged
+    ok 27 - mp_read_int32(mp_encode_map(5)) check fail
+    ok 28 - mp_read_int32(mp_encode_map(5)) check pos unchanged
+    ok 29 - mp_read_int64(mp_encode_uint(123)) check success
+    ok 30 - mp_read_int64(mp_encode_uint(123)) check pos advanced
+    ok 31 - mp_read_int64(mp_encode_uint(123)) check result
+    ok 32 - mp_read_int64(mp_encode_uint(12345)) check success
+    ok 33 - mp_read_int64(mp_encode_uint(12345)) check pos advanced
+    ok 34 - mp_read_int64(mp_encode_uint(12345)) check result
+    ok 35 - mp_read_int64(mp_encode_uint(123456789)) check success
+    ok 36 - mp_read_int64(mp_encode_uint(123456789)) check pos advanced
+    ok 37 - mp_read_int64(mp_encode_uint(123456789)) check result
+    ok 38 - mp_read_int64(mp_encode_uint(9223372036854775807ULL)) check success
+    ok 39 - mp_read_int64(mp_encode_uint(9223372036854775807ULL)) check pos advanced
+    ok 40 - mp_read_int64(mp_encode_uint(9223372036854775807ULL)) check result
+    ok 41 - mp_read_int64(mp_encode_uint(9223372036854775808ULL)) check fail
+    ok 42 - mp_read_int64(mp_encode_uint(9223372036854775808ULL)) check pos unchanged
+    ok 43 - mp_read_int64(mp_encode_int(-123)) check success
+    ok 44 - mp_read_int64(mp_encode_int(-123)) check pos advanced
+    ok 45 - mp_read_int64(mp_encode_int(-123)) check result
+    ok 46 - mp_read_int64(mp_encode_int(-12345)) check success
+    ok 47 - mp_read_int64(mp_encode_int(-12345)) check pos advanced
+    ok 48 - mp_read_int64(mp_encode_int(-12345)) check result
+    ok 49 - mp_read_int64(mp_encode_int(-123456789)) check success
+    ok 50 - mp_read_int64(mp_encode_int(-123456789)) check pos advanced
+    ok 51 - mp_read_int64(mp_encode_int(-123456789)) check result
+    ok 52 - mp_read_int64(mp_encode_int(-9223372036854775807LL)) check success
+    ok 53 - mp_read_int64(mp_encode_int(-9223372036854775807LL)) check pos advanced
+    ok 54 - mp_read_int64(mp_encode_int(-9223372036854775807LL)) check result
+    ok 55 - mp_read_int64(mp_encode_float(100)) check fail
+    ok 56 - mp_read_int64(mp_encode_float(100)) check pos unchanged
+    ok 57 - mp_read_int64(mp_encode_double(-5.4321)) check fail
+    ok 58 - mp_read_int64(mp_encode_double(-5.4321)) check pos unchanged
+    ok 59 - mp_read_int64(mp_encode_array(10)) check fail
+    ok 60 - mp_read_int64(mp_encode_array(10)) check pos unchanged
+    ok 61 - mp_read_double(mp_encode_uint(123)) check success
+    ok 62 - mp_read_double(mp_encode_uint(123)) check pos advanced
+    ok 63 - mp_read_double(mp_encode_uint(123)) check result
+    ok 64 - mp_read_double(mp_encode_uint(12345)) check success
+    ok 65 - mp_read_double(mp_encode_uint(12345)) check pos advanced
+    ok 66 - mp_read_double(mp_encode_uint(12345)) check result
+    ok 67 - mp_read_double(mp_encode_uint(123456789)) check success
+    ok 68 - mp_read_double(mp_encode_uint(123456789)) check pos advanced
+    ok 69 - mp_read_double(mp_encode_uint(123456789)) check result
+    ok 70 - mp_read_double(mp_encode_uint(1234567890000ULL)) check success
+    ok 71 - mp_read_double(mp_encode_uint(1234567890000ULL)) check pos advanced
+    ok 72 - mp_read_double(mp_encode_uint(1234567890000ULL)) check result
+    ok 73 - mp_read_double(mp_encode_uint(123456789123456789ULL)) check fail
+    ok 74 - mp_read_double(mp_encode_uint(123456789123456789ULL)) check pos unchanged
+    ok 75 - mp_read_double(mp_encode_int(-123)) check success
+    ok 76 - mp_read_double(mp_encode_int(-123)) check pos advanced
+    ok 77 - mp_read_double(mp_encode_int(-123)) check result
+    ok 78 - mp_read_double(mp_encode_int(-12345)) check success
+    ok 79 - mp_read_double(mp_encode_int(-12345)) check pos advanced
+    ok 80 - mp_read_double(mp_encode_int(-12345)) check result
+    ok 81 - mp_read_double(mp_encode_int(-123456789)) check success
+    ok 82 - mp_read_double(mp_encode_int(-123456789)) check pos advanced
+    ok 83 - mp_read_double(mp_encode_int(-123456789)) check result
+    ok 84 - mp_read_double(mp_encode_int(-1234567890000LL)) check success
+    ok 85 - mp_read_double(mp_encode_int(-1234567890000LL)) check pos advanced
+    ok 86 - mp_read_double(mp_encode_int(-1234567890000LL)) check result
+    ok 87 - mp_read_double(mp_encode_int(-123456789123456789LL)) check fail
+    ok 88 - mp_read_double(mp_encode_int(-123456789123456789LL)) check pos unchanged
+    ok 89 - mp_read_double(mp_encode_float(6.565e6)) check success
+    ok 90 - mp_read_double(mp_encode_float(6.565e6)) check pos advanced
+    ok 91 - mp_read_double(mp_encode_float(6.565e6)) check result
+    ok 92 - mp_read_double(mp_encode_double(-5.555)) check success
+    ok 93 - mp_read_double(mp_encode_double(-5.555)) check pos advanced
+    ok 94 - mp_read_double(mp_encode_double(-5.555)) check result
+    ok 95 - mp_read_double(mp_encode_strl(100)) check fail
+    ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
+    # *** test_numbers: done ***
+ok 19 - subtests
