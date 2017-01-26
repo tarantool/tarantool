@@ -58,6 +58,8 @@ box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 --box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 --box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
+box.sql.execute("SELECT count(*) FROM foobar")
+box.sql.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 
 
 -- cleanup

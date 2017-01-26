@@ -8800,6 +8800,10 @@ int sqlite3BtreeCount(BtCursor *pCur, i64 *pnEntry){
   i64 nEntry = 0;                      /* Value to return in *pnEntry */
   int rc;                              /* Return code */
 
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Count(pCur, pnEntry);
+  }
+
   if( pCur->pgnoRoot==0 ){
     *pnEntry = 0;
     return SQLITE_OK;

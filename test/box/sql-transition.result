@@ -100,6 +100,14 @@ box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 ---
 - - ['foo', 1, 42, 'awesome']
 ...
+box.sql.execute("SELECT count(*) FROM foobar")
+---
+- - [3]
+...
+box.sql.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
+---
+- - [1]
+...
 -- cleanup
 foobar:drop()
 ---

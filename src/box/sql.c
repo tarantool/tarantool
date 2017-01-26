@@ -118,6 +118,7 @@ static enum iterator_type normalize_iter_type(BtCursor *pCur)
 #endif
 
 static int sql_copy_error(sqlite3 *);
+static uint32_t get_space_id(Pgno page, uint32_t *index_id);
 
 int tarantoolSqlite3CloseCursor(BtCursor *pCur)
 {
@@ -171,6 +172,16 @@ int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
 	return cursor_advance(pCur, pRes);
 }
 
+int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
+{
+	assert(pCur->curFlags & BTCF_TaCursor);
+
+	uint32_t space_id, index_id;
+	space_id = get_space_id(pCur->pgnoRoot, &index_id);
+	*pnEntry = box_index_len(space_id, index_id);
+	return SQLITE_OK;
+}
+
 /* Cursor positioning. */
 static int
 cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
@@ -181,8 +192,7 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	struct ta_cursor *c;
 	uint32_t space_id, index_id;
 
-	space_id = pCur->pgnoRoot >> 5;
-	index_id = pCur->pgnoRoot & 31;
+	space_id = get_space_id(pCur->pgnoRoot, &index_id);
 
 	c = pCur->pTaCursor;
 	if (c) {
@@ -280,4 +290,11 @@ int sql_schema_put(int idb, int argc, char **argv)
 
 	sqlite3_mutex_leave(db->mutex);
 	return init.rc;
+}
+
+/* Space_id and index_id are encoded in SQLite page number. */
+static uint32_t get_space_id(Pgno page, uint32_t *index_id)
+{
+	if (index_id) *index_id = page & 31;
+	return page >> 5;
 }
