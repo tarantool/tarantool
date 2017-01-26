@@ -33,6 +33,7 @@
 
 #include "diag.h"
 #include "tuple_format.h"
+#include "tuple.h"
 
 /** Create a tuple in the memtx engine format. @sa tuple_new(). */
 struct tuple *
@@ -48,6 +49,40 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 /** tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** \cond public */
+
+/**
+ * Allocate and initialize a new tuple from a raw MsgPack Array data.
+ *
+ * \param format tuple format.
+ * Use box_tuple_format_default() to create space-independent tuple.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval NULL on out of memory
+ * \retval tuple otherwise
+ * \pre data, end is valid MsgPack Array
+ * \sa \code box.tuple.new(data) \endcode
+ */
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+/** \endcond public */
+
+#if defined(__cplusplus)
+}
+
 /**
  * Create a tuple in the memtx engine format. Throw an exception
  * if an error occured. @sa memtx_tuple_new().
@@ -61,5 +96,7 @@ memtx_tuple_new_xc(struct tuple_format *format, const char *data,
 		diag_raise();
 	return res;
 }
+
+#endif /* defined(__cplusplus) */
 
 #endif

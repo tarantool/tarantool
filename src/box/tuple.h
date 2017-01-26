@@ -59,21 +59,6 @@ box_tuple_format_default(void);
 typedef struct tuple box_tuple_t;
 
 /**
- * Allocate and initialize a new tuple from a raw MsgPack Array data.
- *
- * \param format tuple format.
- * Use box_tuple_format_default() to create space-independent tuple.
- * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
- * \param end the end of \a data
- * \retval NULL on out of memory
- * \retval tuple otherwise
- * \pre data, end is valid MsgPack Array
- * \sa \code box.tuple.new(data) \endcode
- */
-box_tuple_t *
-box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
-
-/**
  * Increase the reference counter of tuple.
  *
  * Tuples are reference counted. All functions that return tuples guarantee
@@ -244,14 +229,6 @@ box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno);
 const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
-box_tuple_t *
-box_tuple_update(const box_tuple_t *tuple, const char *expr, const
-		 char *expr_end);
-
-box_tuple_t *
-box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
-		 char *expr_end);
-
 char *
 box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 		      uint32_t index_id, uint32_t *key_size);
@@ -379,24 +356,6 @@ tuple_format(const struct tuple *tuple)
 	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
 	assert(tuple_format_id(format) == tuple->format_id);
 	return format;
-}
-
-/**
- * Create a new tuple for the engine specified in the tuple format
- * from a sequence of MessagePack encoded fields.
- * @param format Tuple format.
- * @param data   MessagePack array.
- * @param end    End of the data.
- *
- * @retval not NULL Success, tuple with zero refs.
- * @retval NULL     Memory or format error.
- *
- * \sa box_tuple_new()
- */
-static inline struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end)
-{
-	return format->vtab.create(format, data, end);
 }
 
 /**
@@ -778,15 +737,6 @@ tuple_bless(struct tuple *tuple)
 		tuple_unref(box_tuple_last); /* do not throw */
 	/* Remember current tuple */
 	box_tuple_last = tuple;
-	return tuple;
-}
-
-static inline struct tuple *
-tuple_new_xc(struct tuple_format *format, const char *data, const char *end)
-{
-	struct tuple *tuple = tuple_new(format, data, end);
-	if (tuple == NULL)
-		diag_raise();
 	return tuple;
 }
 

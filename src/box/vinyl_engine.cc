@@ -51,7 +51,6 @@
 #include "vy_stmt.h"
 
 struct tuple_format_vtab vy_tuple_format_vtab = {
-	vy_tuple_new,
 	vy_tuple_delete,
 };
 

@@ -140,10 +140,6 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 	((struct vy_stmt *) stmt)->n_upserts = n;
 }
 
-/** Create a tuple in the vinyl engine format. @sa tuple_new(). */
-struct tuple *
-vy_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
 /**
  * Free the tuple of a vinyl space.
  * @pre tuple->refs  == 0

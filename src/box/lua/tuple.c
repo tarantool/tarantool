@@ -37,6 +37,7 @@
 
 #include "box/tuple.h"
 #include "box/errcode.h"
+#include "box/memtx_tuple.h"
 
 /** {{{ box.tuple Lua library
  *

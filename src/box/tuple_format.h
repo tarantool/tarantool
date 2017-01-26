@@ -84,14 +84,6 @@ struct tuple;
 
 /** Engine-specific tuple format methods. */
 struct tuple_format_vtab {
-	/**
-	 * Allocate memory for a new tuple. Reserves memory for
-	 * engine-specific fields, uses engine-specific allocator.
-	 * Initializes the tuple.
-	 */
-	struct tuple *
-	(*create)(struct tuple_format *format, const char *data,
-		     const char *end);
 	/** Free allocated tuple using engine-specific memory allocator. */
 	void
 	(*destroy)(struct tuple_format *format, struct tuple *tuple);

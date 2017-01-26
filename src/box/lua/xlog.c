@@ -42,6 +42,7 @@
 #include <box/lua/tuple.h>
 #include <lua/msgpack.h>
 #include <lua/utils.h>
+#include "box/memtx_tuple.h"
 
 /* {{{ Helpers */
 

@@ -45,6 +45,7 @@
 #include "cluster.h" /* for server_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
+#include "memtx_tuple.h"
 
 /** _space columns */
 #define ID               0

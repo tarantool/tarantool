@@ -43,33 +43,6 @@
 #include "tuple_format.h"
 #include "xrow.h"
 
-struct tuple *
-vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
-{
-	size_t tuple_len = end - data;
-	assert(mp_typeof(*data) == MP_ARRAY);
-	uint32_t total =
-		tuple_len + sizeof(struct vy_stmt) + format->field_map_size;
-	struct tuple *new_tuple = malloc(total);
-	if (new_tuple == NULL) {
-		diag_set(OutOfMemory, total, "malloc", "struct tuple");
-		return NULL;
-	}
-	new_tuple->bsize = tuple_len;
-	new_tuple->format_id = tuple_format_id(format);
-	tuple_format_ref(format, 1);
-	new_tuple->data_offset = sizeof(struct vy_stmt) + format->field_map_size;
-	char *raw = (char *) new_tuple + new_tuple->data_offset;
-	uint32_t *field_map = (uint32_t *) raw;
-	memcpy(raw, data, tuple_len);
-	if (tuple_init_field_map(format, field_map, raw)) {
-		vy_tuple_delete(format, new_tuple);
-		return NULL;
-	}
-	new_tuple->refs = 0;
-	return new_tuple;
-}
-
 void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
