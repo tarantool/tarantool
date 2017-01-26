@@ -253,44 +253,6 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	return key;
 }
 
-struct tuple *
-tuple_update(struct tuple_format *format,
-	     tuple_update_alloc_func f, void *alloc_ctx,
-	     const struct tuple *old_tuple, const char *expr,
-	     const char *expr_end, int field_base, uint64_t *column_mask)
-{
-	uint32_t new_size = 0, bsize;
-	const char *old_data = tuple_data_range(old_tuple, &bsize);
-	const char *new_data =
-		tuple_update_execute(f, alloc_ctx,
-				     expr, expr_end, old_data, old_data + bsize,
-				     &new_size, field_base, column_mask);
-	if (new_data == NULL)
-		diag_raise();
-
-	struct tuple *ret = tuple_new_xc(format, new_data, new_data + new_size);
-	return ret;
-}
-
-struct tuple *
-tuple_upsert(struct tuple_format *format,
-	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
-	     const struct tuple *old_tuple,
-	     const char *expr, const char *expr_end, int field_base)
-{
-	uint32_t new_size = 0, bsize;
-	const char *old_data = tuple_data_range(old_tuple, &bsize);
-	const char *new_data =
-		tuple_upsert_execute(region_alloc, alloc_ctx, expr, expr_end,
-				     old_data, old_data + bsize,
-				     &new_size, field_base, false, NULL);
-	if (new_data == NULL)
-		diag_raise();
-
-	struct tuple *ret = tuple_new_xc(format, new_data, new_data + new_size);
-	return ret;
-}
-
 void
 tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	   uint32_t objsize_max, float alloc_factor)
@@ -484,27 +446,47 @@ box_tuple_next(box_tuple_iterator_t *it)
 box_tuple_t *
 box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_end)
 {
-	try {
-		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_update(tuple_format_default,
-			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
-			expr, expr_end, 1, NULL);
-		return tuple_bless(new_tuple);
-	} catch (ClientError *e) {
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(tuple, &bsize);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	const char *new_data =
+		tuple_update_execute(region_aligned_alloc_cb, region, expr,
+				     expr_end, old_data, old_data + bsize,
+				     &new_size, 1, NULL);
+	if (new_data == NULL) {
+		region_truncate(region, used);
 		return NULL;
 	}
+
+	struct tuple *ret = tuple_new(tuple_format_default, new_data,
+				      new_data + new_size);
+	region_truncate(region, used);
+	if (ret != NULL)
+		return tuple_bless(ret);
+	return NULL;
 }
 
 box_tuple_t *
 box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_end)
 {
-	try {
-		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_upsert(tuple_format_default,
-			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
-			expr, expr_end, 1);
-		return tuple_bless(new_tuple);
-	} catch (ClientError *e) {
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(tuple, &bsize);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	const char *new_data =
+		tuple_upsert_execute(region_aligned_alloc_cb, region, expr,
+				     expr_end, old_data, old_data + bsize,
+				     &new_size, 1, false, NULL);
+	if (new_data == NULL) {
+		region_truncate(region, used);
 		return NULL;
 	}
+
+	struct tuple *ret = tuple_new(tuple_format_default, new_data,
+				      new_data + new_size);
+	region_truncate(region, used);
+	if (ret != NULL)
+		return tuple_bless(ret);
+	return NULL;
 }

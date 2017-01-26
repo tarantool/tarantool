@@ -6016,17 +6016,6 @@ vy_can_skip_update(const struct vy_index *idx, uint64_t column_mask)
 	return (column_mask & idx->column_mask) == 0;
 }
 
-/* Callback for tuple_update_execute(). */
-static void *
-region_aligned_alloc_cb(void *ctx, size_t size)
-{
-	void *ptr = region_aligned_alloc((struct region *) ctx, size,
-					 alignof(uint64_t));
-	if (ptr == NULL)
-		diag_set(OutOfMemory, size, "region", "new slab");
-	return ptr;
-}
-
 int
 vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)

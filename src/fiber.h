@@ -597,4 +597,15 @@ fiber_cxx_invoke(fiber_func f, va_list ap)
 
 #endif /* defined(__cplusplus) */
 
+static inline void *
+region_aligned_alloc_cb(void *ctx, size_t size)
+{
+	void *ptr = region_aligned_alloc((struct region *) ctx, size,
+					 alignof(uint64_t));
+	if (ptr == NULL)
+		diag_set(OutOfMemory, size, "region", "new slab");
+	return ptr;
+}
+
+
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

@@ -729,19 +729,6 @@ tuple_next_u32(struct tuple_iterator *it)
 const char *
 tuple_next_cstr(struct tuple_iterator *it);
 
-struct tuple *
-tuple_update(struct tuple_format *new_format,
-	     tuple_update_alloc_func f, void *alloc_ctx,
-	     const struct tuple *old_tuple,
-	     const char *expr, const char *expr_end, int field_base,
-	     uint64_t *column_mask);
-
-struct tuple *
-tuple_upsert(struct tuple_format *new_format,
-	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
-	     const struct tuple *old_tuple,
-	     const char *expr, const char *expr_end, int field_base);
-
 /** These functions are implemented in tuple_convert.cc. */
 
 /* Store tuple in the output buffer in iproto format. */

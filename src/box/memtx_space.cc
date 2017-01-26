@@ -123,12 +123,18 @@ MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
 		return;
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
-	stmt->new_tuple = tuple_update(space->format,
-				       region_aligned_alloc_xc_cb,
-				       &fiber()->gc,
-				       stmt->old_tuple, request->tuple,
-				       request->tuple_end,
-				       request->index_base, NULL);
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(stmt->old_tuple, &bsize);
+	const char *new_data =
+		tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
+				     request->tuple, request->tuple_end,
+				     old_data, old_data + bsize,
+				     &new_size, request->index_base, NULL);
+	if (new_data == NULL)
+		diag_raise();
+
+	stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
+					     new_data + new_size);
 	tuple_ref(stmt->new_tuple);
 }
 
@@ -186,18 +192,28 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 						     request->tuple_end);
 		tuple_ref(stmt->new_tuple);
 	} else {
+		uint32_t new_size = 0, bsize;
+		const char *old_data = tuple_data_range(stmt->old_tuple,
+							&bsize);
 		/*
 		 * Update the tuple.
-		 * tuple_upsert() throws on totally wrong tuple ops,
-		 * but ignores ops that not suitable for the tuple
+		 * tuple_upsert_execute() fails on totally wrong
+		 * tuple ops, but ignores ops that not suitable
+		 * for the tuple.
 		 */
-		stmt->new_tuple = tuple_upsert(space->format,
-					       region_aligned_alloc_xc_cb,
-					       &fiber()->gc, stmt->old_tuple,
-					       request->ops, request->ops_end,
-					       request->index_base);
+		const char *new_data =
+			tuple_upsert_execute(region_aligned_alloc_cb,
+					     &fiber()->gc, request->ops,
+					     request->ops_end, old_data,
+					     old_data + bsize, &new_size, 1,
+					     false, NULL);
+		if (new_data == NULL)
+			diag_raise();
 
+		stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
+						     new_data + new_size);
 		tuple_ref(stmt->new_tuple);
+
 		Index *pk = space->index[0];
 		if (tuple_compare(stmt->old_tuple, stmt->new_tuple, pk->key_def)) {
 			/* Primary key is changed: log error and do nothing. */
