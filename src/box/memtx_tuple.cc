@@ -30,8 +30,10 @@
  */
 
 #include "memtx_tuple.h"
+
 #include "small/small.h"
 #include "small/region.h"
+#include "small/quota.h"
 #include "fiber.h"
 #include "box.h"
 
@@ -47,12 +49,73 @@ struct memtx_tuple {
 	struct tuple base;
 };
 
+/** Memtx slab arena */
+extern struct slab_arena memtx_arena; /* defined in memtx_engine.cc */
+/* Memtx slab_cache for tuples */
+static struct slab_cache memtx_slab_cache;
 /** Common quota for memtx tuples and indexes */
-extern struct quota memtx_quota;
+static struct quota memtx_quota;
 /** Memtx tuple allocator */
-extern struct small_alloc memtx_alloc;
-/** Memtx tuple slab arena */
-extern struct slab_arena memtx_arena;
+struct small_alloc memtx_alloc; /* used box box.slab.info() */
+
+uint32_t snapshot_version;
+
+enum {
+	/** Lowest allowed slab_alloc_minimal */
+	OBJSIZE_MIN = 16,
+	/** Lowest allowed slab_alloc_maximal */
+	OBJSIZE_MAX_MIN = 16 * 1024,
+	/** Lowest allowed slab size, for mmapped slabs */
+	SLAB_SIZE_MIN = 1024 * 1024
+};
+
+void
+memtx_tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
+		 uint32_t objsize_max, float alloc_factor)
+{
+	/* Apply lowest allowed objsize bounds */
+	if (objsize_min < OBJSIZE_MIN)
+		objsize_min = OBJSIZE_MIN;
+	if (objsize_max < OBJSIZE_MAX_MIN)
+		objsize_max = OBJSIZE_MAX_MIN;
+
+	/* Calculate slab size for tuple arena */
+	size_t slab_size = small_round(objsize_max * 4);
+	if (slab_size < SLAB_SIZE_MIN)
+		slab_size = SLAB_SIZE_MIN;
+
+	/*
+	 * Ensure that quota is a multiple of slab_size, to
+	 * have accurate value of quota_used_ratio
+	 */
+	size_t prealloc = small_align(tuple_arena_max_size * 1024
+				      * 1024 * 1024, slab_size);
+	/** Preallocate entire quota. */
+	quota_init(&memtx_quota, prealloc);
+
+	say_info("mapping %zu bytes for tuple arena...", prealloc);
+
+	if (slab_arena_create(&memtx_arena, &memtx_quota,
+			      prealloc, slab_size, MAP_PRIVATE)) {
+		if (ENOMEM == errno) {
+			panic("failed to preallocate %zu bytes: "
+			      "Cannot allocate memory, check option "
+			      "'slab_alloc_arena' in box.cfg(..)",
+			      prealloc);
+		} else {
+			panic_syserror("failed to preallocate %zu bytes",
+				       prealloc);
+		}
+	}
+	slab_cache_create(&memtx_slab_cache, &memtx_arena);
+	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
+			   objsize_min, alloc_factor);
+}
+
+void
+memtx_tuple_free(void)
+{
+}
 
 struct tuple_format_vtab memtx_tuple_format_vtab = {
 	memtx_tuple_delete,
@@ -128,6 +191,19 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 		smfree(&memtx_alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx_alloc, memtx_tuple, total);
+}
+
+void
+memtx_tuple_begin_snapshot()
+{
+	snapshot_version++;
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, true);
+}
+
+void
+memtx_tuple_end_snapshot()
+{
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 }
 
 box_tuple_t *

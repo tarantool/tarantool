@@ -1289,7 +1289,11 @@ engine_init()
 	 */
 	MemtxEngine *memtx = new MemtxEngine(cfg_gets("snap_dir"),
 					     cfg_geti("panic_on_snap_error"),
-					     cfg_geti("panic_on_wal_error"));
+					     cfg_geti("panic_on_wal_error"),
+					     cfg_getd("slab_alloc_arena"),
+					     cfg_geti("slab_alloc_minimal"),
+					     cfg_geti("slab_alloc_maximal"),
+					     cfg_getd("slab_alloc_factor"));
 	engine_register(memtx);
 
 	SysviewEngine *sysview = new SysviewEngine();
@@ -1414,10 +1418,7 @@ bootstrap(struct vclock *start_vclock)
 static inline void
 box_init(void)
 {
-	tuple_init(cfg_getd("slab_alloc_arena"),
-		   cfg_geti("slab_alloc_minimal"),
-		   cfg_geti("slab_alloc_maximal"),
-		   cfg_getd("slab_alloc_factor"));
+	tuple_init();
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);

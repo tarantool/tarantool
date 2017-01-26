@@ -40,6 +40,14 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** Initialize tuple library */
+void
+tuple_init(void);
+
+/** Cleanup tuple library */
+void
+tuple_free(void);
+
 /** \cond public */
 
 typedef struct tuple_format box_tuple_format_t;
@@ -699,21 +707,6 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
  */
 ssize_t
 tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
-
-/** Initialize tuple library */
-void
-tuple_init(float alloc_arena_max_size, uint32_t slab_alloc_minimal,
-	   uint32_t slab_alloc_maximal, float alloc_factor);
-
-/** Cleanup tuple library */
-void
-tuple_free();
-
-void
-tuple_begin_snapshot();
-
-void
-tuple_end_snapshot();
 
 extern struct tuple *box_tuple_last;
 

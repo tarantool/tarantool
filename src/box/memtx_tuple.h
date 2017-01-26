@@ -35,6 +35,23 @@
 #include "tuple_format.h"
 #include "tuple.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+ * Initialize memtx_tuple library
+ */
+void
+memtx_tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
+		uint32_t objsize_max, float alloc_factor);
+
+/**
+ * Cleanup memtx_tuple library
+ */
+void
+memtx_tuple_free(void);
+
 /** Create a tuple in the memtx engine format. @sa tuple_new(). */
 struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
@@ -49,9 +66,11 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 /** tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+void
+memtx_tuple_begin_snapshot();
+
+void
+memtx_tuple_end_snapshot();
 
 /** \cond public */
 

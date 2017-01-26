@@ -30,29 +30,9 @@
  */
 #include "tuple.h"
 
-#include "small/small.h"
-#include "small/quota.h"
-
 #include "trivia/util.h"
 #include "fiber.h"
 #include "tt_uuid.h"
-
-uint32_t snapshot_version;
-
-struct quota memtx_quota;
-
-struct slab_arena memtx_arena;
-static struct slab_cache memtx_slab_cache;
-struct small_alloc memtx_alloc;
-
-enum {
-	/** Lowest allowed slab_alloc_minimal */
-	OBJSIZE_MIN = 16,
-	/** Lowest allowed slab_alloc_maximal */
-	OBJSIZE_MAX_MIN = 16 * 1024,
-	/** Lowest allowed slab size, for mmapped slabs */
-	SLAB_SIZE_MIN = 1024 * 1024
-};
 
 static struct mempool tuple_iterator_pool;
 
@@ -254,48 +234,10 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 }
 
 void
-tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
-	   uint32_t objsize_max, float alloc_factor)
+tuple_init(void)
 {
 	tuple_format_init();
 
-	/* Apply lowest allowed objsize bounds */
-	if (objsize_min < OBJSIZE_MIN)
-		objsize_min = OBJSIZE_MIN;
-	if (objsize_max < OBJSIZE_MAX_MIN)
-		objsize_max = OBJSIZE_MAX_MIN;
-
-	/* Calculate slab size for tuple arena */
-	size_t slab_size = small_round(objsize_max * 4);
-	if (slab_size < SLAB_SIZE_MIN)
-		slab_size = SLAB_SIZE_MIN;
-
-	/*
-	 * Ensure that quota is a multiple of slab_size, to
-	 * have accurate value of quota_used_ratio
-	 */
-	size_t prealloc = small_align(tuple_arena_max_size * 1024
-				      * 1024 * 1024, slab_size);
-	/** Preallocate entire quota. */
-	quota_init(&memtx_quota, prealloc);
-
-	say_info("mapping %zu bytes for tuple arena...", prealloc);
-
-	if (slab_arena_create(&memtx_arena, &memtx_quota,
-			      prealloc, slab_size, MAP_PRIVATE)) {
-		if (ENOMEM == errno) {
-			panic("failed to preallocate %zu bytes: "
-			      "Cannot allocate memory, check option "
-			      "'slab_alloc_arena' in box.cfg(..)",
-			      prealloc);
-		} else {
-			panic_syserror("failed to preallocate %zu bytes",
-				       prealloc);
-		}
-	}
-	slab_cache_create(&memtx_slab_cache, &memtx_arena);
-	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
-			   objsize_min, alloc_factor);
 	mempool_create(&tuple_iterator_pool, &cord()->slabc,
 		       sizeof(struct tuple_iterator));
 
@@ -303,7 +245,7 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 }
 
 void
-tuple_free()
+tuple_free(void)
 {
 	/* Unref last tuple returned by public C API */
 	if (box_tuple_last != NULL) {
@@ -314,19 +256,6 @@ tuple_free()
 	mempool_destroy(&tuple_iterator_pool);
 
 	tuple_format_free();
-}
-
-void
-tuple_begin_snapshot()
-{
-	snapshot_version++;
-	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, true);
-}
-
-void
-tuple_end_snapshot()
-{
-	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 }
 
 box_tuple_format_t *

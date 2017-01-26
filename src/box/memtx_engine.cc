@@ -30,6 +30,7 @@
  */
 #include "memtx_engine.h"
 #include "memtx_space.h"
+#include "memtx_tuple.h"
 
 #include "coeio_file.h"
 #include "scoped_guard.h"
@@ -52,7 +53,7 @@
  */
 extern struct quota memtx_quota;
 static bool memtx_index_arena_initialized = false;
-extern struct slab_arena memtx_arena;
+struct slab_arena memtx_arena; /* used by memtx_tuple.cc */
 static struct slab_cache memtx_index_slab_cache;
 struct mempool memtx_index_extent_pool;
 /**
@@ -209,13 +210,18 @@ memtx_build_secondary_keys(struct space *space, void *param)
 }
 
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
-			 bool panic_on_wal_error)
+			 bool panic_on_wal_error,
+			 float tuple_arena_max_size, uint32_t objsize_min,
+			 uint32_t objsize_max, float alloc_factor)
 	:Engine("memtx", &memtx_tuple_format_vtab),
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
 	m_snap_io_rate_limit(0),
 	m_panic_on_wal_error(panic_on_wal_error)
 {
+	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
+			 alloc_factor);
+
 	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_UUID);
 	m_snap_dir.panic_if_error = panic_on_snap_error;
@@ -233,8 +239,9 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 MemtxEngine::~MemtxEngine()
 {
 	xdir_destroy(&m_snap_dir);
-}
 
+	memtx_tuple_free();
+}
 
 int64_t
 MemtxEngine::lastCheckpoint(struct vclock *vclock)
@@ -843,7 +850,7 @@ MemtxEngine::beginCheckpoint()
 	space_foreach(checkpoint_add_space, m_checkpoint);
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
-	tuple_begin_snapshot();
+	memtx_tuple_begin_snapshot();
 	return 0;
 }
 
@@ -878,7 +885,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	/* waitCheckpoint() must have been done. */
 	assert(!m_checkpoint->waiting_for_snap_thread);
 
-	tuple_end_snapshot();
+	memtx_tuple_end_snapshot();
 
 	int64_t lsn = vclock_sum(&m_checkpoint->vclock);
 	struct xdir *dir = &m_checkpoint->dir;
@@ -910,7 +917,7 @@ MemtxEngine::abortCheckpoint()
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 
-	tuple_end_snapshot();
+	memtx_tuple_end_snapshot();
 
 	/** Remove garbage .inprogress file. */
 	char *filename =
