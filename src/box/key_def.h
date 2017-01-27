@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include "small/rlist.h"
 #include "error.h"
+#include "diag.h"
 #include <msgpuck.h>
 #define RB_COMPACT 1
 #include "small/rb.h"
@@ -488,6 +489,31 @@ int
 key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
 
+/** A helper table for key_mp_type_validate */
+extern const uint32_t key_mp_type[];
+
+/**
+ * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
+ * @param type KeyDef type
+ * @param field_type MsgPack type
+ * @param field_no - a field number (is used to store an error message)
+ *
+ * @retval 0  mp_type is valid.
+ * @retval -1 mp_type is invalid.
+ */
+static inline int
+key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
+	       int err, uint32_t field_no)
+{
+	assert(key_type < field_type_MAX);
+	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
+	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
+		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
+		return -1;
+	}
+	return 0;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -544,31 +570,6 @@ void
 space_def_check(struct space_def *def, uint32_t namelen,
                 uint32_t engine_namelen,
                 int32_t errcode);
-
-/** A helper table for key_mp_type_validate */
-extern const uint32_t key_mp_type[];
-
-/**
- * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
- * @param type KeyDef type
- * @param field_type MsgPack type
- * @param field_no - a field number (is used to store an error message)
- *
- * @retval 0  mp_type is valid.
- * @retval -1 mp_type is invalid.
- */
-static inline int
-key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
-	       int err, uint32_t field_no)
-{
-	assert(key_type < field_type_MAX);
-	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
-		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
-		return -1;
-	}
-	return 0;
-}
 
 /**
  * Given a tuple with an index definition, update the LSN stored

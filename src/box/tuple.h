@@ -567,18 +567,77 @@ tuple_unref(struct tuple *tuple)
 		tuple_delete(tuple);
 }
 
+extern struct tuple *box_tuple_last;
+
+/**
+ * Convert internal `struct tuple` to public `box_tuple_t`.
+ * \retval tuple on success
+ * \retval NULL on error, check diag
+ * \post \a tuple ref counted until the next call.
+ * \post tuple_ref() doesn't fail at least once
+ * \sa tuple_ref
+ */
+static inline box_tuple_t *
+tuple_bless(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	/* Ensure tuple can be referenced at least once after return */
+	if (tuple->refs + 2 > TUPLE_REF_MAX) {
+		diag_set(ClientError, ER_TUPLE_REF_OVERFLOW);
+		return NULL;
+	}
+	tuple->refs++;
+	/* Remove previous tuple */
+	if (likely(box_tuple_last != NULL))
+		tuple_unref(box_tuple_last); /* do not throw */
+	/* Remember current tuple */
+	box_tuple_last = tuple;
+	return tuple;
+}
+
+/** These functions are implemented in tuple_convert.cc. */
+
+struct obuf;
+
+/* Store tuple in the output buffer in iproto format. */
+int
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
+
+/**
+ * \copydoc box_tuple_to_buf()
+ */
+ssize_t
+tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 #include "tuple_update.h"
 #include "errinj.h"
+#include "tt_uuid.h"
 
-/** @sa tuple_ref(). Throws if overflow detected. */
+/**
+ * \copydoc tuple_ref()
+ * \throws if overflow detected.
+ */
 static inline void
 tuple_ref_xc(struct tuple *tuple)
 {
 	if (tuple_ref(tuple))
 		diag_raise();
+}
+
+/**
+ * \copydoc tuple_bless
+ * \throw ER_TUPLE_REF_OVERFLOW
+ */
+static inline box_tuple_t *
+tuple_bless_xc(struct tuple *tuple)
+{
+	box_tuple_t *blessed = tuple_bless(tuple);
+	if (blessed == NULL)
+		diag_raise();
+	return blessed;
 }
 
 /** Make tuple references exception-friendly in absence of @finally. */
@@ -594,7 +653,7 @@ struct TupleRefNil {
 
 /** Return a tuple field and check its type. */
 static inline const char *
-tuple_field_check(const struct tuple *tuple, uint32_t fieldno,
+tuple_field_xc(const struct tuple *tuple, uint32_t fieldno,
 		  enum mp_type type)
 {
 	const char *field = tuple_field(tuple, fieldno);
@@ -611,9 +670,9 @@ tuple_field_check(const struct tuple *tuple, uint32_t fieldno,
  * as uint64_t.
  */
 static inline uint64_t
-tuple_field_uint(struct tuple *tuple, uint32_t fieldno)
+tuple_field_u64_xc(struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field_check(tuple, fieldno, MP_UINT);
+	const char *field = tuple_field_xc(tuple, fieldno, MP_UINT);
 	return mp_decode_uint(&field);
 }
 
@@ -622,9 +681,9 @@ tuple_field_uint(struct tuple *tuple, uint32_t fieldno)
  * as uint32_t.
  */
 static inline uint32_t
-tuple_field_u32(struct tuple *tuple, uint32_t fieldno)
+tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
 {
-	uint64_t val = tuple_field_uint(tuple, fieldno);
+	uint64_t val = tuple_field_u64_xc(tuple, fieldno);
 	if (val > UINT32_MAX) {
 		tnt_raise(ClientError, ER_FIELD_TYPE,
 			  fieldno + TUPLE_INDEX_BASE,
@@ -637,24 +696,30 @@ tuple_field_u32(struct tuple *tuple, uint32_t fieldno)
  * A convenience shortcut for data dictionary - get a tuple field
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
-const char *
-tuple_field_cstr(struct tuple *tuple, uint32_t fieldno);
+static inline const char *
+tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
+{
+	const char *field = tuple_field_xc(tuple, fieldno, MP_STR);
+	uint32_t len = 0;
+	const char *str = mp_decode_str(&field, &len);
+	return tt_cstr(str, len);
+}
 
-/** Helper method for the above function. */
-const char *
-tuple_field_to_cstr(const char *field, uint32_t len);
-
-struct tt_uuid;
 /**
  * Parse a tuple field which is expected to contain a string
  * representation of UUID, and return a 16-byte representation.
  */
-void
-tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *result);
+static inline void
+tuple_field_uuid_xc(struct tuple *tuple, int fieldno, struct tt_uuid *result)
+{
+	const char *value = tuple_field_cstr_xc(tuple, fieldno);
+	if (tt_uuid_from_string(value, result) != 0)
+		tnt_raise(ClientError, ER_INVALID_UUID, value);
+}
 
 /** Return a tuple field and check its type. */
 static inline const char *
-tuple_next_check(struct tuple_iterator *it, enum mp_type type)
+tuple_next_xc(struct tuple_iterator *it, enum mp_type type)
 {
 	uint32_t fieldno = it->fieldno;
 	const char *field = tuple_next(it);
@@ -675,10 +740,10 @@ tuple_next_check(struct tuple_iterator *it, enum mp_type type)
  * no next field.
  */
 static inline uint32_t
-tuple_next_u32(struct tuple_iterator *it)
+tuple_next_u32_xc(struct tuple_iterator *it)
 {
 	uint32_t fieldno = it->fieldno;
-	const char *field = tuple_next_check(it, MP_UINT);
+	const char *field = tuple_next_xc(it, MP_UINT);
 	uint32_t val = mp_decode_uint(&field);
 	if (val > UINT32_MAX) {
 		tnt_raise(ClientError, ER_FIELD_TYPE,
@@ -693,44 +758,13 @@ tuple_next_u32(struct tuple_iterator *it)
  * from iterator as a C string or raise an error if there is no
  * next field.
  */
-const char *
-tuple_next_cstr(struct tuple_iterator *it);
-
-/** These functions are implemented in tuple_convert.cc. */
-
-/* Store tuple in the output buffer in iproto format. */
-int
-tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
-
-/**
- * \copydoc box_tuple_to_buf()
- */
-ssize_t
-tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
-
-extern struct tuple *box_tuple_last;
-
-/**
- * Convert internal `struct tuple` to public `box_tuple_t`.
- * \post \a tuple ref counted until the next call.
- * \post tuple_ref() doesn't fail at least once
- * \sa tuple_ref
- * \throw ER_TUPLE_REF_OVERFLOW
- */
-static inline box_tuple_t *
-tuple_bless(struct tuple *tuple)
+static inline const char *
+tuple_next_cstr_xc(struct tuple_iterator *it)
 {
-	assert(tuple != NULL);
-	/* Ensure tuple can be referenced at least once after return */
-	if (tuple->refs + 2 > TUPLE_REF_MAX)
-		tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
-	tuple->refs++;
-	/* Remove previous tuple */
-	if (likely(box_tuple_last != NULL))
-		tuple_unref(box_tuple_last); /* do not throw */
-	/* Remember current tuple */
-	box_tuple_last = tuple;
-	return tuple;
+	const char *field = tuple_next_xc(it, MP_STR);
+	uint32_t len = 0;
+	const char *str = mp_decode_str(&field, &len);
+	return tt_cstr(str, len);
 }
 
 #endif /* defined(__cplusplus) */

@@ -118,7 +118,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			/* Get space id, primary key, field 0. */
-			uint32_t id = tuple_field_u32(tuple, 0);
+			uint32_t id = tuple_field_u32_xc(tuple, 0);
 			space = space_cache_find(id);
 			if (! space_is_system(space))
 				break;
@@ -221,7 +221,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	struct tuple *tuple = it->next(it);
 	if (tuple) {
 		/* id is always field #1 */
-		return tuple_field_u32(tuple, 0);
+		return tuple_field_u32_xc(tuple, 0);
 	}
 	return BOX_ID_NIL;
 }

@@ -244,15 +244,16 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	return 0;
 }
 
-void
+int
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
 	tuple_format_default = tuple_format_new(&empty_list, &memtx_tuple_format_vtab);
 	if (tuple_format_default == NULL)
-		diag_raise();
+		return -1;
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_default, 1);
+	return 0;
 }
 
 /** Destroy tuple format subsystem and free resourses */

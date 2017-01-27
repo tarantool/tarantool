@@ -38,6 +38,18 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/**
+ * Initialize tuple format subsystem
+ */
+int
+tuple_format_init(void);
+
+/**
+ * Destroy tuple format subsystem and free resourses
+ */
+void
+tuple_format_free();
+
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX};
 
@@ -230,12 +242,5 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
-
-void
-tuple_format_init();
-
-/** Destroy tuple format subsystem and free resourses */
-void
-tuple_format_free();
 
 #endif /* #ifndef TARANTOOL_BOX_TUPLE_FORMAT_H_INCLUDED */

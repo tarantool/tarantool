@@ -392,6 +392,19 @@ tt_static_buf(void)
 }
 
 /**
+ * Return a null-terminated string for \a str of length \a len
+ */
+static inline const char *
+tt_cstr(const char *str, uint32_t len)
+{
+	char *buf = tt_static_buf();
+	len = MIN(len, TT_STATIC_BUF_LEN - 1);
+	memcpy(buf, str, len);
+	buf[len] = '\0';
+	return buf;
+}
+
+/**
  * Helper macro to handle easily snprintf() result
  */
 #define SNPRINT(_total, _fun, _buf, _size, ...) do {				\

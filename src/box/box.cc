@@ -175,7 +175,7 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		txn_commit_stmt(txn, request);
 		if (result) {
 			if (tuple)
-				tuple_bless(tuple);
+				tuple_bless_xc(tuple);
 			*result = tuple;
 		}
 	} catch (Exception *e) {
@@ -775,7 +775,7 @@ space_truncate(struct space *space)
 
 	/* drop all selected indexes */
 	for (int i = index_count - 1; i >= 0; --i) {
-		uint32_t index_id = tuple_field_u32(indexes[i], 1);
+		uint32_t index_id = tuple_field_u32_xc(indexes[i], 1);
 		key_buf_end = mp_encode_array(key_buf, 2);
 		key_buf_end = mp_encode_uint(key_buf_end, x_space_id);
 		key_buf_end = mp_encode_uint(key_buf_end, index_id);
@@ -844,7 +844,7 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	/** Assign a new server id. */
 	uint32_t server_id = 1;
 	while ((tuple = it->next(it))) {
-		if (tuple_field_u32(tuple, 0) != server_id)
+		if (tuple_field_u32_xc(tuple, 0) != server_id)
 			break;
 		server_id++;
 	}

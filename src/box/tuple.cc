@@ -115,42 +115,6 @@ tuple_next(struct tuple_iterator *it)
 extern inline uint32_t
 tuple_next_u32(struct tuple_iterator *it);
 
-const char *
-tuple_field_to_cstr(const char *field, uint32_t len)
-{
-	char *buf = tt_static_buf();
-	len = MIN(len, TT_STATIC_BUF_LEN - 1);
-	memcpy(buf, field, len);
-	buf[len] = '\0';
-	return buf;
-}
-
-const char *
-tuple_next_cstr(struct tuple_iterator *it)
-{
-	const char *field = tuple_next_check(it, MP_STR);
-	uint32_t len = 0;
-	const char *str = mp_decode_str(&field, &len);
-	return tuple_field_to_cstr(str, len);
-}
-
-const char *
-tuple_field_cstr(struct tuple *tuple, uint32_t fieldno)
-{
-	const char *field = tuple_field_check(tuple, fieldno, MP_STR);
-	uint32_t len = 0;
-	const char *str = mp_decode_str(&field, &len);
-	return tuple_field_to_cstr(str, len);
-}
-
-void
-tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *result)
-{
-	const char *value = tuple_field_cstr(tuple, fieldno);
-	if (tt_uuid_from_string(value, result) != 0)
-		tnt_raise(ClientError, ER_INVALID_UUID, value);
-}
-
 char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
@@ -319,14 +283,16 @@ box_tuple_iterator_t *
 box_tuple_iterator(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
-	struct tuple_iterator *it;
-	try {
-		it = (struct tuple_iterator *)
-			mempool_alloc0_xc(&tuple_iterator_pool);
-	} catch (Exception *e) {
+	struct tuple_iterator *it = (struct tuple_iterator *)
+		mempool_alloc(&tuple_iterator_pool);
+	if (it == NULL) {
+		diag_set(OutOfMemory, tuple_iterator_pool.objsize,
+			 "mempool", "new slab");
+	}
+	if (tuple_ref(tuple) != 0) {
+		mempool_free(&tuple_iterator_pool, it);
 		return NULL;
 	}
-	tuple_ref_xc(tuple);
 	tuple_rewind(it, tuple);
 	return it;
 }

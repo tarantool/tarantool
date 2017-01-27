@@ -300,10 +300,10 @@ check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 }
 
 static inline box_tuple_t *
-tuple_bless_null(struct tuple *tuple)
+tuple_bless_null_xc(struct tuple *tuple)
 {
 	if (tuple != NULL)
-		return tuple_bless(tuple);
+		return tuple_bless_xc(tuple);
 	return NULL;
 }
 
@@ -341,7 +341,7 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		/* no tx management, random() is for approximation anyway */
 		Index *index = check_index(space_id, index_id, &space);
 		struct tuple *tuple = index->random(rnd);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	}  catch (Exception *) {
 		return -1;
@@ -368,7 +368,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		/* Count statistics */
 		rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -396,7 +396,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->min(key, part_count);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -424,7 +424,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->max(key, part_count);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -519,7 +519,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	}
 	try {
 		struct tuple *tuple = itr->next(itr);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	} catch (Exception *) {
 		return -1;

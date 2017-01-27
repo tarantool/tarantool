@@ -87,7 +87,7 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	if (vy_get(transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
 	if (tuple != NULL) {
-		tuple = tuple_bless(tuple);
+		tuple = tuple_bless_xc(tuple);
 		tuple_unref(tuple);
 	}
 	return tuple;
@@ -144,7 +144,7 @@ iterator_next(struct iterator *base_it)
 	if (vy_cursor_next(it->cursor, &tuple) != 0)
 		diag_raise();
 	if (tuple != NULL) {
-		tuple = tuple_bless(tuple);
+		tuple = tuple_bless_xc(tuple);
 		tuple_unref(tuple);
 		return tuple;
 	}

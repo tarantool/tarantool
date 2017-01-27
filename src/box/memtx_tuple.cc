@@ -227,7 +227,7 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr,
 					    new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
-		return tuple_bless(ret);
+		return tuple_bless_xc(ret);
 	return NULL;
 }
 
@@ -252,7 +252,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
 					    new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
-		return tuple_bless(ret);
+		return tuple_bless_xc(ret);
 	return NULL;
 }
 
@@ -263,5 +263,5 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 	if (ret == NULL)
 		return NULL;
 	/* Can't throw on zero refs. */
-	return tuple_bless(ret);
+	return tuple_bless_xc(ret);
 }
