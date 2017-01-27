@@ -112,9 +112,6 @@ tuple_next(struct tuple_iterator *it)
 	return NULL;
 }
 
-extern inline uint32_t
-tuple_next_u32(struct tuple_iterator *it);
-
 char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)

@@ -27,9 +27,9 @@ add_library(box STATIC
     xrow.cc
     xrow_io.cc
     xlog.cc
-    tuple_format.cc
-    tuple.cc
-    tuple_convert.cc
+    tuple_format.c
+    tuple.c
+    tuple_convert.c
     tuple_update.c
     tuple_compare.cc
     key_def.cc
