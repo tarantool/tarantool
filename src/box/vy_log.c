@@ -110,7 +110,7 @@ static const char *vy_log_type_name[] = {
 /** Vinyl metadata log object. */
 struct vy_log {
 	/** Xlog object used for writing the log. */
-	struct xlog xlog;
+	struct xlog *xlog;
 	/**
 	 * Latch protecting the xlog.
 	 *
@@ -447,7 +447,14 @@ vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
 		goto fail;
 	}
 
+	struct xlog *xlog = malloc(sizeof(*xlog));
+	if (xlog == NULL) {
+		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
+		goto fail_free;
+	}
+
 	latch_create(&log->latch);
+	log->xlog = xlog;
 	log->next_range_id = start_range_id;
 	log->next_run_id = start_run_id;
 
@@ -456,24 +463,26 @@ vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
 
 	if (access(path, F_OK) == 0) {
 		/* The log already exists, open it for appending. */
-		if (xlog_open(&log->xlog, path) < 0)
-			goto fail_free;
-		if (vy_log_type_check(&log->xlog.meta) < 0)
-			goto fail_close;
+		if (xlog_open(xlog, path) < 0)
+			goto fail_free_xlog;
+		if (vy_log_type_check(&xlog->meta) < 0)
+			goto fail_close_xlog;
 	} else {
 		/* No log. Try to create a new one. */
 		struct xlog_meta meta = {
 			.filetype = VY_LOG_TYPE,
 		};
-		if (xlog_create(&log->xlog, path, &meta) < 0)
-			goto fail_free;
-		if (xlog_rename(&log->xlog) < 0)
-			goto fail_close;
+		if (xlog_create(xlog, path, &meta) < 0)
+			goto fail_free_xlog;
+		if (xlog_rename(xlog) < 0)
+			goto fail_close_xlog;
 	}
 	return log;
 
-fail_close:
-	xlog_close(&log->xlog, false);
+fail_close_xlog:
+	xlog_close(xlog, false);
+fail_free_xlog:
+	free(xlog);
 fail_free:
 	free(log);
 fail:
@@ -484,7 +493,8 @@ void
 vy_log_delete(struct vy_log *log)
 {
 	latch_destroy(&log->latch);
-	xlog_close(&log->xlog, false);
+	xlog_close(log->xlog, false);
+	free(log->xlog);
 	TRASH(log);
 	free(log);
 }
@@ -505,7 +515,7 @@ void
 vy_log_tx_begin(struct vy_log *log)
 {
 	latch_lock(&log->latch);
-	xlog_tx_begin(&log->xlog);
+	xlog_tx_begin(log->xlog);
 	say_debug("%s", __func__);
 }
 
@@ -513,8 +523,8 @@ static ssize_t
 vy_log_tx_commit_f(va_list ap)
 {
 	struct vy_log *log = va_arg(ap, struct vy_log *);
-	if (xlog_tx_commit(&log->xlog) < 0 ||
-	    xlog_flush(&log->xlog) < 0)
+	if (xlog_tx_commit(log->xlog) < 0 ||
+	    xlog_flush(log->xlog) < 0)
 		return -1;
 	return 0;
 }
@@ -537,7 +547,7 @@ vy_log_tx_commit(struct vy_log *log)
 void
 vy_log_tx_rollback(struct vy_log *log)
 {
-	xlog_tx_rollback(&log->xlog);
+	xlog_tx_rollback(log->xlog);
 	say_debug("%s", __func__);
 	latch_unlock(&log->latch);
 }
@@ -560,7 +570,7 @@ vy_log_write(struct vy_log *log, const struct vy_log_record *record)
 
 	struct xrow_header row;
 	if (vy_log_record_encode(record, &row) < 0 ||
-	    xlog_write_row(&log->xlog, &row) < 0)
+	    xlog_write_row(log->xlog, &row) < 0)
 		rc = -1;
 
 	if (autocommit) {
