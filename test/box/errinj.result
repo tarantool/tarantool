@@ -16,33 +16,35 @@ errinj.info()
     state: false
   ERRINJ_WAL_WRITE:
     state: false
-  ERRINJ_RELAY:
-    state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
-    state: false
-  ERRINJ_VY_GC:
-    state: false
-  ERRINJ_VY_RANGE_SPLIT:
-    state: false
-  ERRINJ_VY_RANGE_DUMP:
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
-  ERRINJ_TUPLE_FIELD:
-    state: false
-  ERRINJ_WAL_IO:
-    state: false
   ERRINJ_WAL_WRITE_PARTIAL:
     state: 0
-  ERRINJ_TESTING:
+  ERRINJ_VY_GC:
     state: false
-  ERRINJ_WAL_DELAY:
+  ERRINJ_VY_RANGE_DUMP:
     state: false
   ERRINJ_INDEX_ALLOC:
     state: false
-  ERRINJ_TUPLE_ALLOC:
+  ERRINJ_VY_RANGE_SPLIT:
     state: false
   ERRINJ_WAL_ROTATE:
+    state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_VINYL_SCHED_TIMEOUT:
+    state: 0
+  ERRINJ_RELAY:
+    state: false
+  ERRINJ_WAL_DELAY:
+    state: false
+  ERRINJ_TUPLE_FIELD:
+    state: false
+  ERRINJ_TUPLE_ALLOC:
+    state: false
+  ERRINJ_TESTING:
     state: false
 ...
 errinj.set("some-injection", true)
