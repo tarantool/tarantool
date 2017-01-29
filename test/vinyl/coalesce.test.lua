@@ -28,7 +28,7 @@ while vyinfo().range_count < range_count do
     iter = iter + 1
     for k = key_count,1,-1 do s:replace(gen_tuple(k)) end
     box.snapshot()
-    fiber.sleep(0.1)
+    fiber.sleep(0.01)
 end;
 test_run:cmd("setopt delimiter ''");
 
@@ -46,13 +46,13 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 -- Wait until compaction is over (ranges being compacted can't be coalesced)
-while vyinfo().range_count ~= vyinfo().run_count do fiber.sleep(0.1) end
+while vyinfo().range_count ~= vyinfo().run_count do fiber.sleep(0.01) end
 
 -- Trigger range coalescing by calling snapshot.
 s:replace(gen_tuple(math.random(1, key_count))) box.snapshot()
 
 -- Wait until adjacent ranges are coalesced
-while vyinfo().range_count > 1 do fiber.sleep(0.1) end
+while vyinfo().range_count > 1 do fiber.sleep(0.01) end
 
 vyinfo().range_count
 

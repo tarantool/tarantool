@@ -417,7 +417,7 @@ c:close()
 options = {user = 'netbox', password = 'badpass', wait_connected = false, reconnect_after = 0.01}
 c = net:new(box.cfg.listen, options)
 f = fiber.create(function() c:call("") end)
-fiber.sleep(0.1)
+fiber.sleep(0.01)
 f:cancel(); c:close()
 
 -- check for on_schema_reload callback

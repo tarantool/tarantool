@@ -170,7 +170,7 @@ end;
 
 function wait()
     while (not snaps_done) do
-        fiber.sleep(0.1)
+        fiber.sleep(0.01)
     end
 end;
 

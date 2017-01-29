@@ -68,7 +68,7 @@ MAX_ITERATIONS = 100
 while not os.access(snapshot, os.F_OK) and iteration < MAX_ITERATIONS:
   if iteration % 10 == 0:
     os.kill(pid, SIGUSR1)
-  time.sleep(0.1)
+  time.sleep(0.01)
   iteration = iteration + 1
 
 if iteration == 0 or iteration >= MAX_ITERATIONS:

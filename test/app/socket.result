@@ -1293,7 +1293,7 @@ server ~= nil
 ---
 - true
 ...
-fiber.sleep(.5)
+fiber.sleep(.1)
 ---
 ...
 client = socket.tcp_connect('unix/', path)
@@ -1353,7 +1353,7 @@ addr.family == addr2.family
 ---
 - true
 ...
-fiber.sleep(.5)
+fiber.sleep(.1)
 ---
 ...
 client = socket.tcp_connect(addr2.host, addr2.port)

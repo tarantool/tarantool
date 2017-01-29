@@ -426,7 +426,7 @@ os.remove(path)
 server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 type(addr)
 server ~= nil
-fiber.sleep(.5)
+fiber.sleep(.1)
 client = socket.tcp_connect('unix/', path)
 client ~= nil
 client:read(123)
@@ -446,7 +446,7 @@ server ~= nil
 addr2 = server:name()
 addr.host == addr2.host
 addr.family == addr2.family
-fiber.sleep(.5)
+fiber.sleep(.1)
 client = socket.tcp_connect(addr2.host, addr2.port)
 client ~= nil
 -- Check that listen and client fibers have appropriate names
