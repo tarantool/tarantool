@@ -91,7 +91,9 @@ typedef NODISCARD int
  */
 typedef NODISCARD int
 (*vy_iterator_restore_f)(struct vy_stmt_iterator *virt_iterator,
-			 const struct tuple *last_stmt, struct tuple **ret);
+			 const struct tuple *last_stmt, struct tuple **ret,
+			 bool *stop);
+
 typedef void
 (*vy_iterator_close_f)(struct vy_stmt_iterator *virt_iterator);
 
@@ -107,6 +109,16 @@ struct vy_stmt_iterator_iface {
  */
 struct vy_stmt_iterator {
 	const struct vy_stmt_iterator_iface *iface;
+};
+
+/**
+ * Usage statisctics of one particular type of iterator
+ */
+struct vy_iterator_stat {
+	/* Number of binary searches performed */
+	size_t lookup_count;
+	/* Number of sequential iterations */
+	size_t step_count;
 };
 
 #if defined(__cplusplus)

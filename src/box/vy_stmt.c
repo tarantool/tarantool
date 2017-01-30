@@ -538,6 +538,10 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 {
 	int total = 0;
 	uint32_t mp_size;
+	if (stmt == NULL) {
+		SNPRINT(total, snprintf, buf, size, "<NULL>");
+		return total;
+	}
 	SNPRINT(total, snprintf, buf, size, "%s(",
 		iproto_type_name(vy_stmt_type(stmt)));
 		SNPRINT(total, mp_snprint, buf, size, tuple_data(stmt));

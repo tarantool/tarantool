@@ -115,6 +115,8 @@ struct vy_cache_env {
 	struct vy_quota quota;
 	/** Common mempool for vy_cache_entry struct */
 	struct mempool cache_entry_mempool;
+	/** Number of cached tuples */
+	size_t cached_count;
 };
 
 /**
@@ -193,6 +195,8 @@ vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt);
 struct vy_cache_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
+	/** Iterator usage statistics */
+	struct vy_iterator_stat *stat;
 	/* The cache */
 	struct vy_cache *cache;
 
@@ -228,7 +232,8 @@ struct vy_cache_iterator {
  * @param vlsn - LSN visibility, iterator shows values with lsn <= vlsn
  */
 void
-vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
+vy_cache_iterator_open(struct vy_cache_iterator *itr,
+		       struct vy_iterator_stat *stat, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key, const int64_t *vlsn);
 

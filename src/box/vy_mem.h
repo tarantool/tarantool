@@ -207,6 +207,9 @@ struct vy_mem_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
 
+	/** Usage statistics */
+	struct vy_iterator_stat *stat;
+
 	/* mem */
 	struct vy_mem *mem;
 
@@ -249,9 +252,9 @@ struct vy_mem_iterator {
  * Open the iterator.
  */
 void
-vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum iterator_type iterator_type, const struct tuple *key,
-		     const int64_t *vlsn);
+vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
+		     struct vy_mem *mem, enum iterator_type iterator_type,
+		     const struct tuple *key, const int64_t *vlsn);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -51,6 +51,7 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
 	vy_quota_init(&e->quota, mem_quota, NULL, NULL);
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
+	e->cached_count = 0;
 }
 
 void
@@ -74,6 +75,7 @@ vy_cache_entry_new(struct vy_cache_env *env, struct vy_cache *cache,
 	rlist_add(&env->cache_lru, &entry->in_lru);
 	size_t use = sizeof(struct vy_cache_entry) + tuple_size(stmt);
 	vy_quota_force_use(&env->quota, use);
+	env->cached_count++;
 	return entry;
 }
 
@@ -82,6 +84,7 @@ vy_cache_entry_delete(struct vy_cache_env *env, struct vy_cache_entry *entry)
 {
 	struct tuple *stmt = entry->stmt;
 	size_t put = sizeof(struct vy_cache_entry) + tuple_size(stmt);
+	env->cached_count--;
 	vy_quota_release(&env->quota, put);
 	tuple_unref(stmt);
 	rlist_del(&entry->in_lru);
@@ -318,6 +321,7 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 {
 	assert(!itr->search_started);
 	assert(itr->curr_stmt == NULL);
+	itr->stat->lookup_count++;
 	*ret = NULL;
 	*stop = false;
 	itr->search_started = true;
@@ -423,6 +427,7 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 		return vy_cache_iterator_start(itr, ret, stop);
 	if (!itr->curr_stmt) /* End of search. */
 		return 0;
+	itr->stat->step_count++;
 
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	const struct tuple *key = itr->key;
@@ -506,7 +511,8 @@ vy_cache_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
  */
 int
 vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
-			  const struct tuple *last_stmt, struct tuple **ret)
+			  const struct tuple *last_stmt, struct tuple **ret,
+			  bool *stop)
 {
 	*ret = NULL;
 	assert(vitr->iface->restore == vy_cache_iterator_restore);
@@ -541,6 +547,10 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 				itr->curr_stmt = t;
 				tuple_ref(itr->curr_stmt);
 				rc = 1;
+				if (dir > 0 && ((*e)->flags & VY_CACHE_LEFT_LINKED))
+					*stop = true;
+				else if (dir < 0 && ((*e)->flags & VY_CACHE_RIGHT_LINKED))
+					*stop = true;
 			}
 		}
 		return rc;
@@ -549,8 +559,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(itr->curr_stmt == NULL);
 
 	if (last_stmt == NULL) {
-		bool stop = false;
-		vy_cache_iterator_start(itr, ret, &stop);
+		vy_cache_iterator_start(itr, ret, stop);
 		return *ret != NULL;
 	}
 
@@ -562,14 +571,13 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	const struct tuple *save_key = itr->key;
 	itr->iterator_type = dir > 0 ? ITER_GE : ITER_LE;
 	itr->key = last_stmt;
-	bool stop = false;
-	vy_cache_iterator_start(itr, ret, &stop);
+	vy_cache_iterator_start(itr, ret, stop);
 	itr->iterator_type = save_type;
 	itr->key = save_key;
 	if (*ret == NULL) /* Search ended. */
 		return 0;
 	if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0) {
-		int rc = vy_cache_iterator_next_key(vitr, ret, &stop);
+		int rc = vy_cache_iterator_next_key(vitr, ret, stop);
 		assert(rc == 0);
 		(void)rc;
 	} else if (itr->iterator_type == ITER_EQ &&
@@ -600,11 +608,13 @@ static struct vy_stmt_iterator_iface vy_cache_iterator_iface = {
 };
 
 void
-vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
+vy_cache_iterator_open(struct vy_cache_iterator *itr,
+		       struct vy_iterator_stat *stat, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_cache_iterator_iface;
+	itr->stat = stat;
 
 	itr->cache = cache;
 	itr->iterator_type = iterator_type;

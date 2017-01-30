@@ -185,6 +185,7 @@ vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr)
 {
+	itr->stat->step_count++;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
@@ -248,6 +249,7 @@ static int
 vy_mem_iterator_start(struct vy_mem_iterator *itr)
 {
 	assert(!itr->search_started);
+	itr->stat->lookup_count++;
 	itr->search_started = true;
 	itr->version = itr->mem->version;
 
@@ -321,11 +323,12 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 void
-vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem *mem,
-		     enum iterator_type iterator_type,
+vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
+		     struct vy_mem *mem, enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
+	itr->stat = stat;
 
 	assert(key != NULL);
 	itr->mem = mem;
@@ -456,8 +459,10 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
  */
 static NODISCARD int
 vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt, struct tuple **ret)
+			const struct tuple *last_stmt, struct tuple **ret,
+			bool *stop)
 {
+	(void)stop;
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	struct key_def *def = itr->mem->key_def;
 	int rc;
