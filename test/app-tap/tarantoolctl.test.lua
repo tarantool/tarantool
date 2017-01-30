@@ -81,13 +81,39 @@ local function run_command(dir, command)
     local line = [[/bin/sh -c 'cd "%s" && %s >"%s" 2>"%s"']]
     line = line:format(dir, command, fstdout, fstderr)
     local res = os.execute(line)
-    fiber.sleep(0.1)
     local fstdout_e, fstderr_e = io.open(fstdout):read('*a'), io.open(fstderr):read('*a')
     fio.unlink(fstdout); fio.unlink(fstderr);
     return res/256, fstdout_e, fstderr_e
 end
 
-local function tctl_command(dir, cmd, args)
+local function tctl_wait(dir, name)
+    if name then
+        local path = fio.pathjoin(dir, name .. '.control')
+        while not fio.stat(path) do
+            fiber.sleep(0.01)
+        end
+        ::again::
+        while true do
+            local stat, nb = pcall(require('net.box').new, path, {
+                wait_connected = true, console = true
+            })
+            if stat == false then
+                fiber.sleep(0.01)
+                goto again
+            else
+                break
+            end
+            local stat, msg = pcall(nb.eval, nb, 'require("fiber").time()')
+            if stat == false then
+                fiber.sleep(0.01)
+            else
+                break
+            end
+        end
+    end
+end
+
+local function tctl_command(dir, cmd, args, name)
     local pid = nil
     if not fio.stat(fio.pathjoin(dir, '.tarantoolctl')) then
         create_script(dir, '.tarantoolctl', tctlcfg_code)
@@ -173,7 +199,7 @@ do
             check_ok(test_i, dir, 'start', 'bad_script', 1, nil,
                      'unexpected symbol near')
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            fiber.sleep(0.1)
+            tctl_wait(dir, 'good_script')
             -- wait here
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
                      nil, 'Error, while reloading config:')
@@ -205,7 +231,7 @@ do
         test:test("check answers in case of call", function(test_i)
             test_i:plan(6)
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            fiber.sleep(0.1)
+            tctl_wait(dir, 'good_script')
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3, nil,
                      'Error, while reloading config')
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,
@@ -324,7 +350,7 @@ do
     local dir = fio.tempdir()
 
     local filler_code = [[
-        box.cfg{slab_alloc_arena = 0.1}
+        box.cfg{slab_alloc_arena = 0.1, background=false}
         local space = box.schema.create_space("test")
         space:create_index("primary")
         space:insert({[1] = 1, [2] = 2, [3] = 3, [4] = 4})
@@ -361,7 +387,6 @@ do
         test:test("fill and test play output", function(test_i)
             test_i:plan(6)
             check_ok(test_i, dir, 'start', 'filler', 0)
-            fiber.sleep(0.01)
             local lsn_before = test_run:get_lsn("remote", 1)
             test_i:is(lsn_before, 4, "check lsn before")
             local res, stdout, stderr = run_command(dir, command_base)

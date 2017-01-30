@@ -346,7 +346,7 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
-    local version = _TARANTOOL
+    local version = _TARANTOOL:match("([^-]+)-")
     state:print(string.format("%-63s\n%-63s\n",
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
