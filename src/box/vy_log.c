@@ -46,6 +46,7 @@
 
 #include "assoc.h"
 #include "coeio.h"
+#include "coeio_file.h"
 #include "diag.h"
 #include "errcode.h"
 #include "fiber.h"
@@ -57,7 +58,7 @@
 #include "xrow.h"
 
 /** Vinyl metadata log file name. */
-#define VY_LOG_FILE			"vinyl.meta"
+#define VY_LOG_SUFFIX			"vymeta"
 /** Xlog type of vinyl metadata log. */
 #define VY_LOG_TYPE			"VYMETA"
 
@@ -148,6 +149,14 @@ struct vy_run_recovery_info {
 	/** ID of the run. */
 	int64_t id;
 };
+
+/** An snprint-style function to print a path to a vinyl metadata log. */
+static int
+vy_log_snprint_path(char *buf, size_t size, const char *dir, int64_t signature)
+{
+	return snprintf(buf, size, "%s/%020lld.%s",
+			dir, (long long)signature, VY_LOG_SUFFIX);
+}
 
 /** Check if an xlog meta belongs to a vinyl metadata log. */
 static int
@@ -428,6 +437,7 @@ vy_log_new(void)
 	}
 	latch_create(log->latch);
 
+	log->signature = -1;
 	return log;
 
 fail_free:
@@ -497,7 +507,7 @@ vy_log_flush(struct vy_log *log)
 }
 
 int
-vy_log_open(struct vy_log *log, const char *dir)
+vy_log_open(struct vy_log *log, const char *dir, int64_t signature)
 {
 	assert(log->xlog == NULL);
 	assert(latch_owner(log->latch) == NULL);
@@ -509,7 +519,7 @@ vy_log_open(struct vy_log *log, const char *dir)
 	}
 
 	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
+	vy_log_snprint_path(path, sizeof(path), dir, signature);
 
 	if (access(path, F_OK) == 0) {
 		/* The log already exists, open it for appending. */
@@ -529,6 +539,7 @@ vy_log_open(struct vy_log *log, const char *dir)
 	}
 
 	log->xlog = xlog;
+	log->signature = signature;
 	if (vy_log_flush(log) < 0) {
 		log->xlog = NULL;
 		goto fail_close_xlog;
@@ -554,6 +565,154 @@ vy_log_delete(struct vy_log *log)
 	free(log->latch);
 	TRASH(log);
 	free(log);
+}
+
+static int
+vy_log_rotate_cb(const struct vy_log_record *record, void *cb_arg)
+{
+	struct xlog *xlog = cb_arg;
+	struct xrow_header row;
+
+	if (vy_log_record_encode(record, &row) < 0 ||
+	    xlog_write_row(xlog, &row) < 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * This function does the actual log rotation work. It loads the
+ * current log file to a vy_recovery struct, creates a new xlog, and
+ * then writes the records returned by vy_recovery to the new xlog.
+ */
+static ssize_t
+vy_log_rotate_f(va_list ap)
+{
+	const char *dir = va_arg(ap, const char *);
+	int64_t old_signature = va_arg(ap, int64_t);
+	int64_t new_signature = va_arg(ap, int64_t);
+
+	struct vy_recovery *recovery = vy_recovery_new(dir, old_signature);
+	if (recovery == NULL)
+		goto err_recovery;
+
+	char path[PATH_MAX];
+	vy_log_snprint_path(path, sizeof(path), dir, new_signature);
+
+	struct xlog xlog;
+	struct xlog_meta meta = {
+		.filetype = VY_LOG_TYPE,
+	};
+	if (xlog_create(&xlog, path, &meta) < 0)
+		goto err_create_xlog;
+
+	mh_int_t i;
+	mh_foreach(recovery->index_hash, i) {
+		struct vy_index_recovery_info *index;
+		index = mh_i64ptr_node(recovery->index_hash, i)->val;
+		if (index->is_dropped)
+			continue;
+		if (vy_recovery_load_index(recovery, index->id,
+					   vy_log_rotate_cb, &xlog) < 0)
+			goto err_write_xlog;
+	}
+
+	if (xlog_flush(&xlog) < 0 ||
+	    xlog_sync(&xlog) < 0 ||
+	    xlog_rename(&xlog) < 0)
+		goto err_write_xlog;
+
+	vy_recovery_delete(recovery);
+	xlog_close(&xlog, false);
+	return 0;
+
+err_write_xlog:
+	if (unlink(xlog.filename) < 0)
+		say_syserror("failed to delete file '%s'", xlog.filename);
+	xlog_close(&xlog, false);
+err_create_xlog:
+	vy_recovery_delete(recovery);
+err_recovery:
+	return -1;
+}
+
+int
+vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature)
+{
+	assert(log->xlog != NULL);
+
+	/*
+	 * This function is called right after bootstrap (by snapshot),
+	 * in which case old and new signatures coincide and there's
+	 * nothing we need to do.
+	 */
+	assert(signature >= log->signature);
+	if (signature == log->signature)
+		return 0;
+
+	say_debug("%s: signature %lld", __func__, (long long)signature);
+
+	/*
+	 * Lock out all concurrent log writers while we are rotating it.
+	 * This effectively stalls the vinyl scheduler for a while, but
+	 * this is acceptable, because (1) the log file is small and
+	 * hence can be rotated fairly quickly so the stall isn't going
+	 * to take too long and (2) dumps/compactions, which are scheduled
+	 * by the scheduler, are rare events so there shouldn't be too
+	 * many of them piling up due to log rotation.
+	 */
+	latch_lock(log->latch);
+	/*
+	 * Before proceeding to log rotation, make sure that all
+	 * pending records have been flushed out.
+	 */
+	if (vy_log_flush(log) < 0) {
+		latch_unlock(log->latch);
+		goto err_rotate;
+	}
+	/* Do actual work from coeio so as not to stall tx thread. */
+	if (coio_call(vy_log_rotate_f, dir, log->signature, signature) < 0) {
+		latch_unlock(log->latch);
+		goto err_rotate;
+	}
+	latch_unlock(log->latch);
+
+	/*
+	 * The new xlog was successfully created. Open it now.
+	 * It would be better to simply reuse the xlog struct
+	 * which was used for writing the xlog, but unfortunately
+	 * this is impossible, because an xlog struct can't be
+	 * used by different threads due to debug checks in the
+	 * slab allocator.
+	 */
+	char path[PATH_MAX];
+	vy_log_snprint_path(path, sizeof(path), dir, signature);
+
+	struct xlog *xlog = malloc(sizeof(*xlog));
+	if (xlog == NULL) {
+		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
+		goto err_alloc_xlog;
+	}
+
+	if (xlog_open(xlog, path) < 0)
+		goto err_open_xlog;
+
+	xlog_close(log->xlog, false);
+	free(log->xlog);
+
+	log->xlog = xlog;
+	log->signature = signature;
+
+	say_debug("%s: complete", __func__);
+	return 0;
+
+err_open_xlog:
+	free(xlog);
+err_alloc_xlog:
+	if (coeio_unlink(path) < 0)
+		say_syserror("failed to delete file '%s'", path);
+err_rotate:
+	say_debug("%s: failed", __func__);
+	return -1;
 }
 
 void
@@ -583,7 +742,7 @@ vy_log_tx_commit(struct vy_log *log, bool no_discard)
 		if (rc != 0 && !no_discard)
 			log->tx_end = log->tx_begin;
 	}
-	say_debug("%s(no_discard=%d): success", __func__, no_discard,
+	say_debug("%s(no_discard=%d): %s", __func__, no_discard,
 		  rc == 0 ? "success" : "fail");
 	latch_unlock(log->latch);
 	return rc;
@@ -870,7 +1029,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 }
 
 struct vy_recovery *
-vy_recovery_new(const char *dir)
+vy_recovery_new(const char *dir, int64_t signature)
 {
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
@@ -884,6 +1043,7 @@ vy_recovery_new(const char *dir)
 	recovery->run_hash = NULL;
 	recovery->range_id_max = -1;
 	recovery->run_id_max = -1;
+	recovery->signature = signature;
 
 	recovery->index_hash = mh_i64ptr_new();
 	recovery->range_hash = mh_i64ptr_new();
@@ -896,7 +1056,7 @@ vy_recovery_new(const char *dir)
 	}
 
 	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
+	vy_log_snprint_path(path, sizeof(path), dir, signature);
 
 	if (access(path, F_OK) < 0 && errno == ENOENT) {
 		/* No log file, nothing to do. */

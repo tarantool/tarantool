@@ -125,6 +125,8 @@ struct vy_log_record {
 struct vy_log {
 	/** Xlog object used for writing the log. */
 	struct xlog *xlog;
+	/** Vector clock sum from the time of the log creation. */
+	int64_t signature;
 	/**
 	 * Latch protecting the xlog.
 	 *
@@ -168,6 +170,8 @@ struct vy_recovery {
 	 * or -1 in case no runs were recovered.
 	 */
 	int64_t run_id_max;
+	/** Vector clock sum from the time of the log creation. */
+	int64_t signature;
 };
 
 /**
@@ -179,21 +183,35 @@ struct vy_log *
 vy_log_new(void);
 
 /*
- * Open the vinyl metadata log file stored in a given directory
- * for appending, or create a new one if it doesn't exist.
+ * Open the vinyl metadata log file stored in directory @dir
+ * having signature @signature for appending, or create a new
+ * one if it doesn't exist.
  * On success, it flushes all pending records written with
  * vy_log_write() before the log was opened.
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_open(struct vy_log *log, const char *dir);
+vy_log_open(struct vy_log *log, const char *dir, int64_t signature);
 
 /**
  * Close a metadata log and free associated structures.
  */
 void
 vy_log_delete(struct vy_log *log);
+
+/**
+ * Rotate vinyl metadata log @log. This function creates a
+ * new xlog file in directory @dir having signature @signature
+ * and writes records required to recover active indexes.
+ * The goal of log rotation is to compact the log file by
+ * discarding records cancelling each other and records left
+ * from dropped indexes.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int
+vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature);
 
 /** Allocate a unique ID for a run. */
 static inline int64_t
@@ -242,14 +260,15 @@ void
 vy_log_write(struct vy_log *log, const struct vy_log_record *record);
 
 /**
- * Load the vinyl metadata log from a given directory and return
- * the recovery context that can be further used for recovering
- * vinyl indexes with vy_recovery_load_index().
+ * Load the vinyl metadata log stored in directory @dir and
+ * having signature @signature and return the recovery context
+ * that can be further used for recovering vinyl indexes with
+ * vy_recovery_load_index().
  *
  * Returns NULL on failure.
  */
 struct vy_recovery *
-vy_recovery_new(const char *dir);
+vy_recovery_new(const char *dir, int64_t signature);
 
 /**
  * Free the recovery context created by a call to vy_recovery_new().
