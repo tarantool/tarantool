@@ -162,6 +162,30 @@ tonumber64('12345', 123) -- big base
 tonumber64('0xfffff') == 1048575
 tonumber64('0b111111111111111111') == 262143
 
+tonumber64('20', 36)
+tonumber64(20, 36)
+tonumber64(20, 10)
+tonumber64(20)
+
+tonumber64("", 10)
+tonumber64("", 32)
+
+tonumber64("-1")
+tonumber64("-0x16")
+tonumber64("-0b11")
+tonumber64(" -0x16 ")
+tonumber64(" -0b11 ")
+
+tonumber64(1LL)
+tonumber64(100LL)
+tonumber64(100LL, 10)
+tonumber64(100LL, 2)
+tonumber64(-100LL, 2)
+tonumber64(100ULL, 2)
+tonumber64(32ULL, 5)
+tonumber64(32LL, 3)
+tonumber64(32ULL, 3)
+
 --  dostring()
 dostring('abc')
 dostring('abc=2')

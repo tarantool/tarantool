@@ -609,6 +609,86 @@ tonumber64('0b111111111111111111') == 262143
 ---
 - true
 ...
+tonumber64('20', 36)
+---
+- 72
+...
+tonumber64(20, 36)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(20, 10)
+---
+- 20
+...
+tonumber64(20)
+---
+- 20
+...
+tonumber64("", 10)
+---
+- null
+...
+tonumber64("", 32)
+---
+- null
+...
+tonumber64("-1")
+---
+- -1
+...
+tonumber64("-0x16")
+---
+- -22
+...
+tonumber64("-0b11")
+---
+- -3
+...
+tonumber64(" -0x16 ")
+---
+- -22
+...
+tonumber64(" -0b11 ")
+---
+- -3
+...
+tonumber64(1LL)
+---
+- 1
+...
+tonumber64(100LL)
+---
+- 100
+...
+tonumber64(100LL, 10)
+---
+- 100
+...
+tonumber64(100LL, 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(-100LL, 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(100ULL, 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(32ULL, 5)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(32LL, 3)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(32ULL, 3)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
 --  dostring()
 dostring('abc')
 ---
