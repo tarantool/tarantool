@@ -911,7 +911,10 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 	struct vy_index_recovery_info *index;
 	struct vy_range_recovery_info *range;
 	struct vy_run_recovery_info *run;
-	struct vy_log_record record = { .index_id = index_id };
+	struct vy_log_record record = {
+		.type = VY_LOG_NEW_INDEX,
+		.index_id = index_id,
+	};
 	const char *tmp;
 
 	index = vy_recovery_lookup_index(recovery, index_id);
@@ -919,6 +922,9 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		diag_set(ClientError, ER_VINYL, "unknown index id");
 		return -1;
 	}
+
+	if (cb(&record, cb_arg) != 0)
+		return -1;
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
 		record.type = VY_LOG_INSERT_RANGE;

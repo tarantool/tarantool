@@ -212,10 +212,10 @@ typedef int
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
- * either VY_LOG_INSERT_RANGE or VY_LOG_INSERT_RUN. The callback is
- * supposed to rebuild the index structure and open run files. If the
- * callback returns a non-zero value, the function stops iteration
- * over ranges and runs and returns error.
+ * either VY_LOG_NEW_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN.
+ * The callback is supposed to rebuild the index structure and open run
+ * files. If the callback returns a non-zero value, the function stops
+ * iteration over ranges and runs and returns error.
  * To ease the work done by the callback, records corresponding to
  * runs of a range always go right after the range, in the
  * chronological order.

@@ -3194,6 +3194,9 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_run *run;
 
 	switch (record->type) {
+	case VY_LOG_NEW_INDEX:
+		assert(record->index_id == index->key_def->opts.lsn);
+		break;
 	case VY_LOG_INSERT_RANGE:
 		range = vy_range_new(index, record->range_id, NULL, NULL);
 		if (range == NULL)
@@ -3216,6 +3219,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			return -1;
 		}
 		vy_index_add_range(index, range);
+		arg->range = range;
 		break;
 	case VY_LOG_INSERT_RUN:
 		assert(range != NULL);
@@ -3232,7 +3236,6 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	default:
 		unreachable();
 	}
-	arg->range = range;
 	return 0;
 }
 
