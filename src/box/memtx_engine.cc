@@ -399,6 +399,15 @@ Handler *MemtxEngine::open()
 }
 
 
+/**
+ * Replicate engine state in a newly created space.
+ * This function is invoked when executing a replace into _index
+ * space originating either from a snapshot or from the binary
+ * log. It brings the newly created space up to date with the
+ * engine recovery state: if the event comes from the snapshot,
+ * then the primary key is not built, otherwise it's created
+ * right away.
+ */
 static void
 memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 {
@@ -679,14 +688,8 @@ MemtxEngine::bootstrap()
 	});
 
 	struct xrow_header row;
-	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&cursor, &row, true) == 0) {
+	while (xlog_cursor_next_xc(&cursor, &row, true) == 0)
 		recoverSnapshotRow(&row);
-		++row_count;
-		if (row_count % 100000 == 0)
-			say_info("%.1fM rows processed",
-				 row_count / 1000000.);
-	}
 }
 
 static void
