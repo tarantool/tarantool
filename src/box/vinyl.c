@@ -3985,17 +3985,22 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_range *range = task->range;
 	struct vy_mem *mem;
 	struct vy_run *run, *tmp;
+	int n;
 
 	/*
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin(env->log);
+	n = range->compact_priority;
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		if (vy_log_delete_run(env->log, run->id) < 0) {
 			vy_log_tx_rollback(env->log);
 			return -1;
 		}
+		if (--n == 0)
+			break;
 	}
+	assert(n == 0);
 	if (!vy_run_is_empty(range->new_run) &&
 	    vy_log_insert_run(index->env->log, range->id,
 			      range->new_run->id) < 0) {
@@ -4015,7 +4020,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	RLIST_HEAD(runs_to_release);
-	int n = range->compact_priority;
+	n = range->compact_priority;
 	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
 		vy_range_remove_run(range, run);
 		rlist_add_entry(&runs_to_release, run, in_range);
