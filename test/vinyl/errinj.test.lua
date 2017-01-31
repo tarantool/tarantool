@@ -25,6 +25,8 @@ if  box.cfg.vinyl.page_size > 1024 or box.cfg.vinyl.range_size > 65536 then
 end;
 s = box.schema.space.create('test', {engine='vinyl'});
 _ = s:create_index('pk');
+value = string.rep('a', 1024)
+last_id = 1
 -- fill up a range
 function range()
     local range_size = box.cfg.vinyl.range_size
@@ -32,9 +34,9 @@ function range()
     local s = box.space.test
     local num_rows = 0
     for i=1,range_size/page_size do
-        local value = string.rep('a', 256)
         for j=1, page_size/#value do
-            s:auto_increment{value}
+            s:replace({last_id, value})
+            last_id = last_id + 1
             num_rows = num_rows + 1
         end
     end
@@ -101,7 +103,7 @@ _ = s:replace({1, string.rep('a', 128000)})
 errinj.set("ERRINJ_WAL_WRITE_DISK", true)
 box.snapshot()
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
-fiber.sleep(0.02)
+fiber.sleep(0.04)
 _ = s:replace({2, string.rep('b', 128000)})
 box.snapshot();
 #s:select({1})
