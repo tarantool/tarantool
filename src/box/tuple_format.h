@@ -93,6 +93,7 @@ struct tuple_field_format {
 };
 
 struct tuple;
+struct tuple_format;
 
 /** Engine-specific tuple format methods. */
 struct tuple_format_vtab {

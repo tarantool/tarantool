@@ -180,9 +180,18 @@ mp_compare_scalar(const char *field_a, const char *field_b)
 	return cmp(field_a, field_b);
 }
 
-int
+/**
+ * @brief Compare two fields parts using a type definition
+ * @param field_a field
+ * @param field_b field
+ * @param field_type field type definition
+ * @retval 0  if field_a == field_b
+ * @retval <0 if field_a < field_b
+ * @retval >0 if field_a > field_b
+ */
+static int
 tuple_compare_field(const char *field_a, const char *field_b,
-		    enum field_type type)
+		    int8_t type)
 {
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
@@ -201,12 +210,12 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	}
 }
 
-int
-tuple_compare_default_raw(const struct tuple_format *format_a,
-			  const char *tuple_a, const uint32_t *field_map_a,
-			  const struct tuple_format *format_b,
-			  const char *tuple_b, const uint32_t *field_map_b,
-			  const struct key_def *key_def)
+static int
+tuple_compare_slowpath_raw(const struct tuple_format *format_a,
+			   const char *tuple_a, const uint32_t *field_map_a,
+			   const struct tuple_format *format_b,
+			   const char *tuple_b, const uint32_t *field_map_b,
+			   const struct key_def *key_def)
 {
 	const struct key_part *part = key_def->parts;
 	if (key_def->part_count == 1 && part->fieldno == 0) {
@@ -232,29 +241,22 @@ tuple_compare_default_raw(const struct tuple_format *format_a,
 	return r;
 }
 
-int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
-	      const struct key_def *key_def)
+static int
+tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		       const struct key_def *key_def)
 {
-	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
+	return tuple_compare_slowpath_raw(tuple_format(tuple_a),
+					  tuple_data(tuple_a),
+					  tuple_field_map(tuple_a),
+					  tuple_format(tuple_b),
+					  tuple_data(tuple_b),
+					  tuple_field_map(tuple_b), key_def);
 }
 
 int
-tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
-		      const struct key_def *key_def)
-{
-	return tuple_compare_default_raw(tuple_format(tuple_a),
-					 tuple_data(tuple_a),
-					 tuple_field_map(tuple_a),
-					 tuple_format(tuple_b),
-					 tuple_data(tuple_b),
-					 tuple_field_map(tuple_b), key_def);
-}
-
-int
-tuple_compare_key_raw(const char *key_a, uint32_t part_count_a,
-		      const char *key_b, uint32_t part_count_b,
-		      const struct key_def *key_def)
+key_compare(const char *key_a, uint32_t part_count_a,
+	    const char *key_b, uint32_t part_count_b,
+	    const struct key_def *key_def)
 {
 	assert(key_a != NULL || part_count_a == 0);
 	assert(key_b != NULL || part_count_b == 0);
@@ -278,11 +280,11 @@ tuple_compare_key_raw(const char *key_a, uint32_t part_count_a,
 	return r;
 }
 
-int
-tuple_compare_with_key_default_raw(const struct tuple_format *format,
-				   const char *tuple, const uint32_t *field_map,
-				   const char *key, uint32_t part_count,
-				   const struct key_def *key_def)
+static inline int
+tuple_compare_with_key_slowpath_raw(const struct tuple_format *format,
+				    const char *tuple, const uint32_t *field_map,
+				    const char *key, uint32_t part_count,
+				    const struct key_def *key_def)
 {
 	assert(key != NULL || part_count == 0);
 	assert(part_count <= key_def->part_count);
@@ -308,22 +310,15 @@ tuple_compare_with_key_default_raw(const struct tuple_format *format,
 	return r;
 }
 
-int
-tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
-			       uint32_t part_count,
-			       const struct key_def *key_def)
+static int
+tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
+			        uint32_t part_count,
+			        const struct key_def *key_def)
 {
-	return tuple_compare_with_key_default_raw(tuple_format(tuple),
-						  tuple_data(tuple),
-						  tuple_field_map(tuple), key,
-						  part_count, key_def);
-}
-
-int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
-		       uint32_t part_count, const struct key_def *key_def)
-{
-	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
+	return tuple_compare_with_key_slowpath_raw(tuple_format(tuple),
+						   tuple_data(tuple),
+						   tuple_field_map(tuple), key,
+						   part_count, key_def);
 }
 
 template <int TYPE>
@@ -516,7 +511,7 @@ tuple_compare_create(const struct key_def *def) {
 		if (i == def->part_count && cmp_arr[k].p[i * 2] == UINT32_MAX)
 			return cmp_arr[k].f;
 	}
-	return tuple_compare_default;
+	return tuple_compare_slowpath;
 }
 
 /* }}} tuple_compare */
@@ -717,7 +712,7 @@ tuple_compare_with_key_create(const struct key_def *def)
 		if (i == def->part_count)
 			return cmp_wk_arr[k].f;
 	}
-	return tuple_compare_with_key_default;
+	return tuple_compare_with_key_slowpath;
 }
 
 /* }}} tuple_compare_with_key */

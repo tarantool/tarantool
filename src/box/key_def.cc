@@ -38,6 +38,7 @@
 
 #include "space.h"
 #include "schema.h"
+#include "tuple_compare.h"
 
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",

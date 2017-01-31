@@ -32,7 +32,7 @@
 #include "space.h"
 #include "iproto_constants.h"
 #include "txn.h"
-#include "tuple.h"
+#include "tuple_compare.h"
 #include "xrow.h"
 #include "memtx_hash.h"
 #include "memtx_tree.h"

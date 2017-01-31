@@ -310,19 +310,6 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 }
 
 /**
- * @brief Compare two tuple fields using using field type definition
- * @param field_a field
- * @param field_b field
- * @param field_type field type definition
- * @retval 0  if field_a == field_b
- * @retval <0 if field_a < field_b
- * @retval >0 if field_a > field_b
- */
-int
-tuple_compare_field(const char *field_a, const char *field_b,
-		    enum field_type type);
-
-/**
  * Extract key from tuple by given key definition and return
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.

@@ -31,7 +31,8 @@
 #include "space.h"
 #include <stdlib.h>
 #include <string.h>
-#include "tuple.h"
+#include "tuple_format.h"
+#include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
 #include "user_def.h"

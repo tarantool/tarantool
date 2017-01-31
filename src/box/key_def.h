@@ -40,7 +40,6 @@
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>
-#include "tuple_compare.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -222,6 +221,17 @@ key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
 		return o1->distance < o2->distance ? -1 : 1;
 	return 0;
 }
+
+struct key_def;
+struct tuple;
+
+typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
+			      const char *key,
+			      uint32_t part_count,
+			      const struct key_def *key_def);
+typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
+			   const struct tuple *tuple_b,
+			   const struct key_def *key_def);
 
 /* Descriptor of a multipart key. */
 struct key_def {

@@ -165,14 +165,16 @@ vy_stmt_dup(const struct tuple *stmt);
  */
 
 /**
- * Compare key statements by their raw data.
- * @param key_a Left operand of comparison.
- * @param key_b Right operand of comparison.
- * @param key_def Definition of the format of both statements.
+ * Compare SELECT/DELETE statements using the key definition
+ * @param a left operand (SELECT/DELETE)
+ * @param b right operand (SELECT/DELETE)
+ * @param key_def key definition
  *
- * @retval 0   if key_a == key_b
- * @retval > 0 if key_a > key_b
- * @retval < 0 if key_a < key_b
+ * @retval 0   if a == b
+ * @retval > 0 if a > b
+ * @retval < 0 if a < b
+ *
+ * @sa key_compare()
  */
 static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
@@ -182,24 +184,24 @@ vy_key_compare(const struct tuple *a, const struct tuple *b,
 	       vy_stmt_type(a) == IPROTO_DELETE);
 	assert(vy_stmt_type(b) == IPROTO_SELECT ||
 	       vy_stmt_type(b) == IPROTO_DELETE);
-
 	const char *key_a = tuple_data(a);
 	const char *key_b = tuple_data(b);
 	uint32_t part_count_a = mp_decode_array(&key_a);
 	uint32_t part_count_b = mp_decode_array(&key_b);
-	return tuple_compare_key_raw(key_a, part_count_a, key_b, part_count_b,
-				     key_def);
+	return key_compare(key_a, part_count_a, key_b, part_count_b, key_def);
 }
 
 /**
- * Compare statements by their raw data.
- * @param a       Left operand of comparison.
- * @param b       Right operand of comparison.
- * @param key_def Key definition of the both statements.
+ * Compare REPLACE/UPSERTS statements.
+ * @param a left operand (REPLACE/UPSERT)
+ * @param b right operand (REPLACE/UPSERT)
+ * @param key_def key definition
  *
  * @retval 0   if a == b
  * @retval > 0 if a > b
  * @retval < 0 if a < b
+ *
+ * @sa tuple_compare()
  */
 static inline int
 vy_tuple_compare(const struct tuple *a, const struct tuple *b,
@@ -209,19 +211,21 @@ vy_tuple_compare(const struct tuple *a, const struct tuple *b,
 	       vy_stmt_type(a) == IPROTO_UPSERT);
 	assert(vy_stmt_type(b) == IPROTO_REPLACE ||
 	       vy_stmt_type(b) == IPROTO_UPSERT);
-	return tuple_compare_default(a, b, key_def);
+	return tuple_compare(a, b, key_def);
 }
 
 /*
- * Compare a tuple statement with a key statement using their raw data.
- * @param tuple_stmt the raw data of a tuple statement
- * @param key raw data of a key statement
+ * Compare REPLACE/UPSERT with SELECT/DELETE using the key definition
+ * @param tuple left operand (REPLACE/UPSERT)
+ * @param key right operand (SELECT/DELETE)
  *
  * @retval > 0  tuple > key.
  * @retval == 0 tuple == key in all fields
  * @retval == 0 tuple is prefix of key
  * @retval == 0 key is a prefix of tuple
  * @retval < 0  tuple < key.
+ *
+ * @sa tuple_compare_with_key()
  */
 static inline int
 vy_tuple_compare_with_key(const struct tuple *tuple, const struct tuple *key,
@@ -229,11 +233,10 @@ vy_tuple_compare_with_key(const struct tuple *tuple, const struct tuple *key,
 {
 	const char *key_mp = tuple_data(key);
 	uint32_t part_count = mp_decode_array(&key_mp);
-	return tuple_compare_with_key_default(tuple, key_mp, part_count,
-					      key_def);
+	return tuple_compare_with_key(tuple, key_mp, part_count, key_def);
 }
 
-/** @sa vy_stmt_compare_raw. */
+/** @sa tuple_compare. */
 static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		const struct key_def *key_def)
@@ -254,7 +257,7 @@ vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 	}
 }
 
-/** @sa vy_stmt_compare_with_raw_key. */
+/** @sa tuple_compare_with_raw_key. */
 static inline int
 vy_stmt_compare_with_key(const struct tuple *stmt, const struct tuple *key,
 			 const struct key_def *key_def)
