@@ -343,12 +343,13 @@ local function create_transport(host, port, user, password, callback)
     local console_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
 
     protocol_sm = function ()
-        connection = socket.tcp_connect(host, port)
+        local tm_begin, tm = fiber.time(), callback('fetch_connect_timeout')
+        connection = socket.tcp_connect(host, port, tm)
         if connection == nil then
             return error_sm(E_NO_CONNECTION, errno.strerror(errno()))
         end
         local size = IPROTO_GREETING_SIZE
-        local err, msg = send_and_recv(size, 0.3)
+        local err, msg = send_and_recv(size, tm - (fiber.time() - tm_begin))
         if err then
             return error_sm(err, msg)
         end
@@ -590,6 +591,8 @@ local function connect(...)
             remote.peer_version_id = greeting.version_id
         elseif what == 'will_fetch_schema' then
             return not opts.console
+        elseif what == 'fetch_connect_timeout' then
+            return opts.connect_timeout or 10
         elseif what == 'did_fetch_schema' then
             remote:_install_schema(...)
         elseif what == 'will_reconnect' then

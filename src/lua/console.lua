@@ -204,7 +204,6 @@ local repl_mt = {
 -- REPL = read-eval-print-loop
 --
 local function repl(self)
-    
     fiber.self().storage.console = self
     if type(self.on_start) == 'function' then
         self:on_start()
@@ -220,7 +219,7 @@ end
 
 local function on_start(foo)
     if foo == nil or type(foo) == 'function' then
-        repl_mt.__index.on_start = foo 
+        repl_mt.__index.on_start = foo
         return
     end
     error('Wrong type of on_start hook: ' .. type(foo))
@@ -228,7 +227,7 @@ end
 
 local function on_client_disconnect(foo)
     if foo == nil or type(foo) == 'function' then
-        repl_mt.__index.on_client_disconnect = foo 
+        repl_mt.__index.on_client_disconnect = foo
         return
     end
     error('Wrong type of on_client_disconnect hook: ' .. type(foo))
@@ -285,10 +284,12 @@ end
 -- Connect to remove server
 --
 local netbox_connect
-local function connect(uri)
+local function connect(uri, opts)
     if not netbox_connect then -- workaround the broken loader
         netbox_connect = require('net.box').connect
     end
+
+    opts = opts or {}
 
     local self = fiber.self().storage.console
     if self == nil then
@@ -306,7 +307,8 @@ local function connect(uri)
     -- connect to remote host
     local remote
     remote = netbox_connect(u.host, u.service, {
-        user = u.login, password = u.password, console = true
+        user = u.login, password = u.password,
+        console = true, connect_timeout = opts.timeout
     })
     remote.host, remote.port = u.host or 'localhost', u.service
 

@@ -130,6 +130,8 @@ struct group *getgrgid(int gid);
 int isatty(int fd);
 ]]
 
+local TIMEOUT_INFINITY = 100 * 365 * 86400
+
 -- command, that we're executing
 local command_name = arg[1]
 -- true if we're running in HOME directory of a user
@@ -694,7 +696,10 @@ local function enter()
         return 1
     end
 
-    local cmd = string.format("require('console').connect('%s')", console_sock)
+    local cmd = string.format(
+        "require('console').connect('%s', { connect_timeout = %s })",
+        console_sock, TIMEOUT_INFINITY
+    )
 
     console.on_start(function(self) self:eval(cmd) end)
     console.on_client_disconnect(function(self) self.running = false end)
@@ -707,7 +712,9 @@ local function stdin_isatty()
 end
 
 local function execute_remote(uri, code)
-    local remote = netbox.connect(uri, { console = true })
+    local remote = netbox.connect(uri, {
+        console = true, connect_timeout = TIMEOUT_INFINITY
+    })
     if remote == nil then
         return nil
     end
@@ -738,7 +745,11 @@ local function connect()
     -- Otherwise we're starting console
     console.on_start(function(self)
         local status, reason
-        status, reason = pcall(function() require('console').connect(arg[2]) end)
+        status, reason = pcall(function()
+            require('console').connect(arg[2], {
+                connect_timeout = TIMEOUT_INFINITY
+            })
+        end)
         if not status then
             self:print(reason)
             self.running = false

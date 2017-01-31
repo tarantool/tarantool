@@ -446,7 +446,7 @@ do
         a = a + 1
     end
     local con = net.new(box.cfg.listen, {
-        wait_connected=true
+        wait_connected = true
     })
     con:on_schema_reload(osr_cb)
     con.space._schema:select{}
@@ -465,5 +465,35 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 c = net.new(box.cfg.listen)
 c:ping()
 c:close()
+
+-- Test for connect_timeout > 0 in netbox connect
+test_run:cmd("setopt delimiter ';'");
+greeting =
+"Tarantool 1.7.3 (Lua console)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" ..
+"type 'help' for interactive help~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+socket = require('socket');
+srv = socket.tcp_server('localhost', 3392, {
+    handler = function(fd)
+        local fiber = require('fiber')
+        fiber.sleep(0.1)
+        fd:write(greeting)
+    end
+});
+-- we must get timeout
+nb = net.new('localhost:3392', {
+    wait_connected = true, console = true,
+    connect_timeout = 0.01
+});
+nb.error == "Timeout exceeded";
+nb:close();
+-- we must get peer closed
+nb = net.new('localhost:3392', {
+    wait_connected = true, console = true,
+    connect_timeout = 0.2
+});
+nb.error ~= "Timeout exceeded";
+nb:close();
+test_run:cmd("setopt delimiter ''");
+srv:close()
 
 test_run:cmd("clear filter")
