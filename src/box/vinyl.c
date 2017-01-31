@@ -30,6 +30,13 @@
  */
 #include "vinyl.h"
 
+#include "vy_stmt.h"
+#include "vy_quota.h"
+#include "vy_log.h"
+#include "vy_stmt_iterator.h"
+#include "vy_mem.h"
+#include "vy_cache.h"
+
 #include <dirent.h>
 
 #include <bit/bit.h>
@@ -71,12 +78,7 @@
 #include "space.h"
 #include "index.h"
 
-#include "vy_stmt.h"
-#include "vy_quota.h"
-#include "vy_log.h"
-#include "vy_stmt_iterator.h"
-#include "vy_mem.h"
-#include "vy_cache.h"
+#include "request.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -6319,6 +6321,17 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	/* Check update operations. */
+	if (tuple_update_check_ops(region_aligned_alloc_cb, &fiber()->gc,
+				   request->ops, request->ops_end,
+				   request->index_base)) {
+		return -1;
+	}
+	if (request->index_base != 0) {
+		if (request_normalize_ops(request))
+			return -1;
+	}
+	assert(request->index_base == 0);
 	const char *tuple = request->tuple;
 	const char *tuple_end = request->tuple_end;
 	const char *ops = request->ops;

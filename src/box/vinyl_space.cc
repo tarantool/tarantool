@@ -31,11 +31,7 @@
 #include "vinyl_space.h"
 #include "vinyl_index.h"
 #include "xrow.h"
-#include "tuple.h"
 #include "txn.h"
-#include "schema.h"
-#include "request.h"
-#include "iproto_constants.h"
 #include "vinyl.h"
 #include "vy_stmt.h"
 
@@ -128,15 +124,6 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
-	/* Check update operations. */
-	if (tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
-				   request->ops, request->ops_end,
-				   request->index_base)) {
-		diag_raise();
-	}
-	if (request->index_base != 0)
-		request_normalize_ops(request);
-	assert(request->index_base == 0);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_upsert(tx, stmt, space, request) != 0)
 		diag_raise();

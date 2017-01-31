@@ -30,49 +30,22 @@
  */
 #include "request.h"
 #include "xrow.h"
-#include "tuple.h"
-#include "schema.h"
 #include "iproto_constants.h"
+#include "fiber.h"
 
 struct rmean *rmean_box;
 
-/**
- * Convert a request accessing a secondary key to a primary key undo
- * record, given it found a tuple.
- * Flush iproto header of the request to be reconstructed in txn_add_redo().
- *
- * @param request - request to fix
- * @param space - space corresponding to request
- * @param found_tuple - tuple found by secondary key
- */
-void
-request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple)
-{
-	Index *primary = index_find_xc(space, 0);
-	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple, primary->key_def, &key_len);
-	if (key == NULL)
-		diag_raise();
-	request->key = key;
-	request->key_end = key + key_len;
-	request->index_id = 0;
-	/* Clear the *body* to ensure it's rebuilt at commit. */
-	request->header = NULL;
-}
-
-void
+int
 request_normalize_ops(struct request *request)
 {
 	assert(request->type == IPROTO_UPSERT ||
 	       request->type == IPROTO_UPDATE);
 	assert(request->index_base != 0);
-	assert(tuple_update_check_ops(region_aligned_alloc_xc_cb,
-	       &fiber()->gc, request->ops, request->ops_end,
-	       request->index_base) == 0);
 	char *ops;
 	ssize_t ops_len = request->ops_end - request->ops;
-	ops = (char *)region_alloc_xc(&fiber()->gc, ops_len);
+	ops = (char *)region_alloc(&fiber()->gc, ops_len);
+	if (ops == NULL)
+		return -1;
 	char *ops_end = ops;
 	const char *pos = request->ops;
 	int op_cnt = mp_decode_array(&pos);
@@ -126,4 +99,5 @@ request_normalize_ops(struct request *request)
 
 	/* Clear the header to ensure it's rebuilt at commit. */
 	request->header = NULL;
+	return 0;
 }

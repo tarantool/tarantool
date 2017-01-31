@@ -38,20 +38,6 @@ extern "C" {
 
 struct request;
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-/**
- * Convert secondary key of request to primary key by given tuple.
- * Flush iproto header of the request to be reconstructed in the future.
- * @param request - request to fix
- * @param space - space corresponding to request
- * @param found_tuple - tuple found by secondary key
- */
-void
-request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple);
-
 /**
  * Convert one-based upsert/update operations to zero-based
  *
@@ -61,9 +47,11 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
  * @pre request->ops are valid (see tuple_update_check_ops())
  * @post request->index_base = 0
  */
-void
+int
 request_normalize_ops(struct request *request);
 
+#if defined(__cplusplus)
+} /* extern "C" */
 
 #endif /* defined(__cplusplus) */
 

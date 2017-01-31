@@ -119,6 +119,31 @@ box_check_slab_alloc_minimal(ssize_t slab_alloc_minimal)
 		  "specified value is out of bounds");
 }
 
+/**
+ * Convert a request accessing a secondary key to a primary key undo
+ * record, given it found a tuple.
+ * Flush iproto header of the request to be reconstructed in txn_add_redo().
+ *
+ * @param request - request to fix
+ * @param space - space corresponding to request
+ * @param found_tuple - tuple found by secondary key
+ */
+static void
+request_rebind_to_primary_key(struct request *request, struct space *space,
+			      struct tuple *found_tuple)
+{
+	Index *primary = index_find_xc(space, 0);
+	uint32_t key_len;
+	char *key = tuple_extract_key(found_tuple, primary->key_def, &key_len);
+	if (key == NULL)
+		diag_raise();
+	request->key = key;
+	request->key_end = key + key_len;
+	request->index_id = 0;
+	/* Clear the *body* to ensure it's rebuilt at commit. */
+	request->header = NULL;
+}
+
 static void
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
