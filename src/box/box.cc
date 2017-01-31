@@ -31,6 +31,7 @@
 #include "box/box.h"
 
 #include "cbus.h"
+#include "fiber_pool.h"
 
 #include <say.h>
 #include <scoped_guard.h>
@@ -99,6 +100,8 @@ static const int REPLICATION_CFG_TIMEOUT = 10; /* seconds */
 static struct xstream initial_join_stream;
 static struct xstream final_join_stream;
 static struct xstream subscribe_stream;
+
+static struct fiber_pool tx_fiber_pool;
 
 static void
 box_check_writable(void)
@@ -1447,7 +1450,8 @@ box_init(void)
 {
 	tuple_init();
 	/* Join the cord interconnect as "tx" endpoint. */
-	cbus_join("tx");
+	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
+			  FIBER_POOL_IDLE_TIMEOUT);
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);

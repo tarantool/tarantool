@@ -37,7 +37,6 @@
 #include <unistd.h>
 #include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
-#include "fiber_pool.h"
 #include "diag.h"
 #include "coro.h"
 #include "trivia/util.h"
@@ -334,7 +333,6 @@ struct cord {
 	struct slab_cache slabc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
-	struct fiber_pool fiber_pool;
 	char name[FIBER_NAME_MAX];
 };
 

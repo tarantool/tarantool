@@ -57,15 +57,6 @@ restart:
 }
 
 static void
-fiber_pool_fetch_output(struct fiber_pool *pool)
-{
-	tt_pthread_mutex_lock(&pool->mutex);
-	stailq_concat(&pool->output, &pool->pipe);
-	tt_pthread_mutex_unlock(&pool->mutex);
-}
-
-
-static void
 fiber_pool_idle_cb(ev_loop *loop, struct ev_timer *watcher, int events)
 {
 	(void) events;
@@ -90,7 +81,8 @@ fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	(void) loop;
 	(void) events;
 	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
-	fiber_pool_fetch_output(pool);
+	/** Fetch messages */
+	cbus_endpoint_fetch(&pool->endpoint, &pool->output);
 
 	struct stailq *output = &pool->output;
 	while (! stailq_empty(output)) {
@@ -117,19 +109,7 @@ fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 }
 
 void
-fiber_pool_destroy(struct fiber_pool *pool)
-{
-	/*
-	 * Do not destroy async or idle timers, or fibers:
-	 * events are destroyed along with the event loop,
-	 * and fibers are freed at once when thread runtime
-	 * pool is destroyed.
-         */
-	(void) tt_pthread_mutex_destroy(&pool->mutex);
-}
-
-void
-fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
+fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 		  float idle_timeout)
 {
 	pool->consumer = loop();
@@ -142,13 +122,24 @@ fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
 	pool->size = 0;
 	pool->max_size = max_pool_size;
 	stailq_create(&pool->output);
-	stailq_create(&pool->pipe);
-	ev_async_init(&pool->fetch_output, fiber_pool_cb);
-	pool->fetch_output.data = pool;
-	ev_async_start(pool->consumer, &pool->fetch_output);
-
-	(void) tt_pthread_mutex_init(&pool->mutex, NULL);
+	/* Join fiber pool to cbus */
+	cbus_join(&pool->endpoint, name, fiber_pool_cb, pool);
 }
 
-/* }}} */
+void
+fiber_pool_destroy(struct fiber_pool *pool)
+{
+	(void) pool;
+	/*
+	 * Do not destroy async or idle timers, or fibers:
+	 * events are destroyed along with the event loop,
+	 * and fibers are freed at once when thread runtime
+	 * pool is destroyed.
+         */
+	/*
+	 * cbus leaving is not implemented yet
+	 */
+}
+
+/** }}} fiber_pool */
 

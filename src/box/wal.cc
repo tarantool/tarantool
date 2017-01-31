@@ -107,6 +107,7 @@ struct wal_writer
 	struct rlist watchers;
 	/** The lock protecting the watchers list. */
 	pthread_mutex_t watchers_mutex;
+	bool exiting;
 };
 
 struct wal_msg: public cmsg {
@@ -296,6 +297,7 @@ static void
 wal_writer_stop_f(struct cmsg *msg)
 {
 	(void) msg;
+	wal->exiting = true;
 	fiber_wakeup(wal->main_f);
 }
 
@@ -592,6 +594,14 @@ done:
 	wal_notify_watchers(writer);
 }
 
+static void
+wal_wakeup(ev_loop *loop, ev_async *async, int events)
+{
+	(void) loop;
+	(void) events;
+	fiber_wakeup((fiber *)async->data);
+}
+
 /** WAL writer thread main loop.  */
 static int
 wal_writer_f(va_list ap)
@@ -601,11 +611,20 @@ wal_writer_f(va_list ap)
 	coeio_enable();
 
 	writer->main_f = fiber();
-	cbus_join("wal");
+	struct cbus_endpoint endpoint;
+	cbus_join(&endpoint, "wal", wal_wakeup, fiber());
 	/* Create a pipe to TX thread. */
 	cpipe_create(&wal_writer_singleton.tx_pipe, "tx");
 
-	fiber_yield();
+	while (!writer->exiting && !fiber_is_cancelled()) {
+		struct stailq output;
+		stailq_create(&output);
+		cbus_endpoint_fetch(&endpoint, &output);
+		struct cmsg *msg, *msg_next;
+		stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
+			cmsg_deliver(msg);
+		fiber_yield();
+	}
 
 	if (writer->is_active) {
 		xlog_close(&writer->current_wal, false);

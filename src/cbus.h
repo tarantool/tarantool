@@ -32,6 +32,8 @@
  */
 #include "fiber.h"
 #include "rmean.h"
+#include "small/rlist.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -128,10 +130,10 @@ struct cpipe {
 	/** The event loop of the producer cord. */
 	struct ev_loop *producer;
 	/**
-	 * The fiber pool at the destination cord to handle
+	 * The cbus endpoint at the destination cord to handle
 	 * flushed messages.
 	 */
-	struct fiber_pool *pool;
+	struct cbus_endpoint *endpoint;
 };
 
 /**
@@ -222,13 +224,40 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
-/**
- * Connect the cord to cbus as a named reciever and create
- * a fiber pool to process incoming messages.
- * @param name a destination name
- */
 void
-cbus_join(const char *name);
+cbus_init();
+
+/**
+ * cbus endpoint
+ */
+struct cbus_endpoint {
+	/**
+	 * Endpoint name, used to identify the endpoint when
+	 * establishing a route.
+	 */
+	char name[FIBER_NAME_MAX];
+	/** Member of cbus->endpoints */
+	struct rlist in_cbus;
+	/** The lock around the pipe. */
+	pthread_mutex_t mutex;
+	/** The pipe with incoming messages. */
+	struct stailq pipe;
+	/** Consumer cord loop */
+	ev_loop *consumer;
+	/** Async to notify the consumer */
+	ev_async async;
+};
+
+/**
+ * Fetch incomming messages to output
+ */
+static inline void
+cbus_endpoint_fetch(struct cbus_endpoint *endpoint, struct stailq *output)
+{
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	stailq_concat(output, &endpoint->pipe);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
+}
 
 /** Initialize the global singleton bus. */
 void
@@ -239,17 +268,14 @@ void
 cbus_free();
 
 /**
- * A helper message to wakeup caller whenever an event
- * occurs.
+ * Connect the endpoint to cbus with given name.
+ * fetch_cb callback will be called if peak state was
+ * changed from empty. fetch_data will be installed as
+ * async data property in callback params.
  */
-struct cmsg_notify
-{
-	struct cmsg base;
-	struct fiber *fiber;
-};
-
 void
-cmsg_notify_init(struct cmsg_notify *msg);
+cbus_join(struct cbus_endpoint *endpoint, const char *name,
+	  void (*fetch_cb)(ev_loop *, struct ev_async *, int), void *fetch_data);
 
 /**
  * A helper method to invoke a function on the other side of the
@@ -275,6 +301,7 @@ cmsg_notify_init(struct cmsg_notify *msg);
 struct cbus_call_msg;
 typedef int (*cbus_call_f)(struct cbus_call_msg *);
 
+struct fiber;
 /**
  * The state of a synchronous cross-thread call. Only func and free_cb
  * (if needed) are significant to the caller, other fields are

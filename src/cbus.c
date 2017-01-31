@@ -30,6 +30,9 @@
  */
 #include "cbus.h"
 
+#include <limits.h>
+#include "fiber.h"
+
 /**
  * Cord interconnect.
  */
@@ -46,19 +49,6 @@ struct cbus {
 
 /** A singleton for all cords. */
 static struct cbus cbus;
-
-/* A single cbus endpoint - the context of a connected consumer cord. */
-struct cbus_endpoint {
-	/** Fiber pool associated with the endpoint. */
-	struct fiber_pool *pool;
-	/**
-	 * Endpoint name, used to identify the endpoint when
-	 * establishing a route.
-	 */
-	char name[FIBER_NAME_MAX];
-	/** Member of cbus->endpoints */
-	struct rlist in_cbus;
-};
 
 const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
@@ -105,11 +95,8 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 		endpoint = cbus_find_endpoint(&cbus, consumer);
 	}
 	pipe->producer = cord()->loop;
-	pipe->pool = endpoint->pool;
+	pipe->endpoint = endpoint;
 	tt_pthread_mutex_unlock(&cbus.mutex);
-
-	/* Set the default max input size. */
-	cpipe_set_max_input(pipe, 2 * FIBER_POOL_SIZE);
 }
 
 static void
@@ -118,7 +105,6 @@ cbus_create(struct cbus *bus)
 	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
 	if (bus->stats == NULL)
 		panic_syserror("cbus_create");
-
 
 	/* Initialize queue lock mutex. */
 	(void) tt_pthread_mutex_init(&bus->mutex, NULL);
@@ -143,23 +129,21 @@ cbus_destroy(struct cbus *bus)
  * are blocked waiting for this endpoint to become available.
  */
 void
-cbus_join(const char *name)
+cbus_join(struct cbus_endpoint *endpoint, const char *name,
+	  void (*fetch_cb)(ev_loop *, struct ev_async *, int), void *fetch_data)
 {
-	struct fiber_pool *pool = &cord()->fiber_pool;
-	if (pool->max_size == 0) {
-		fiber_pool_create(pool, FIBER_POOL_SIZE,
-				  FIBER_POOL_IDLE_TIMEOUT);
-	}
 	tt_pthread_mutex_lock(&cbus.mutex);
-	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, name);
-	if (endpoint != NULL)
+	if (cbus_find_endpoint(&cbus, name) != NULL)
 		panic("cbus endpoint %s joined twice", name);
 
-	endpoint = (struct cbus_endpoint *)calloc(1, sizeof(*endpoint));
-	if (endpoint == NULL)
-		panic("failed to allocate cbus endpoint %s", name);
 	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
-	endpoint->pool = pool;
+	endpoint->consumer = loop();
+	tt_pthread_mutex_init(&endpoint->mutex, NULL);
+	stailq_create(&endpoint->pipe);
+	ev_async_init(&endpoint->async, fetch_cb);
+	endpoint->async.data = fetch_data;
+	ev_async_start(endpoint->consumer, &endpoint->async);
+
 	rlist_add_tail(&cbus.endpoints, &endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
 	/*
@@ -178,25 +162,25 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	(void) loop;
 	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
-	struct fiber_pool *pool = pipe->pool;
+	struct cbus_endpoint *endpoint = pipe->endpoint;
 	if (pipe->n_input == 0)
 		return;
 
 	/* Trigger task processing when the queue becomes non-empty. */
 	bool pipe_was_empty;
 
-	tt_pthread_mutex_lock(&pool->mutex);
-	pipe_was_empty = stailq_empty(&pool->pipe);
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	pipe_was_empty = stailq_empty(&endpoint->pipe);
 	/** Flush input */
-	stailq_concat(&pool->pipe, &pipe->input);
-	tt_pthread_mutex_unlock(&pool->mutex);
+	stailq_concat(&endpoint->pipe, &pipe->input);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
 
 	pipe->n_input = 0;
 	if (pipe_was_empty) {
 		/* Count statistics */
 		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
 
-		ev_async_send(pool->consumer, &pool->fetch_output);
+		ev_async_send(endpoint->consumer, &endpoint->async);
 	}
 }
 
@@ -253,21 +237,6 @@ cmsg_deliver(struct cmsg *msg)
 	struct cpipe *pipe = msg->hop->pipe;
 	msg->hop->f(msg);
 	cmsg_dispatch(pipe, msg);
-}
-
-static void
-cmsg_notify_deliver(struct cmsg *msg)
-{
-	fiber_wakeup(((struct cmsg_notify *) msg)->fiber);
-}
-
-void
-cmsg_notify_init(struct cmsg_notify *msg)
-{
-	static struct cmsg_hop route[] = { { cmsg_notify_deliver, NULL }, };
-
-	cmsg_init(&msg->base, route);
-	msg->fiber = fiber();
 }
 
 /* }}} cmsg */

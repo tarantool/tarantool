@@ -669,7 +669,6 @@ void
 cord_create(struct cord *cord, const char *name)
 {
 	cord() = cord;
-	memset(&cord->fiber_pool, 0, sizeof(cord->fiber_pool));
 	slab_cache_set_thread(&cord()->slabc);
 
 	cord->id = pthread_self();
@@ -732,8 +731,6 @@ cord_destroy(struct cord *cord)
 	}
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);
-	if (cord->fiber_pool.consumer)
-		fiber_pool_destroy(&cord->fiber_pool);
 	slab_cache_destroy(&cord->slabc);
 }
 
