@@ -56,8 +56,20 @@ enum iterator_type;
  * Environment
  */
 
+enum vy_status {
+	VINYL_OFFLINE,
+	VINYL_INITIAL_RECOVERY_LOCAL,
+	VINYL_INITIAL_RECOVERY_REMOTE,
+	VINYL_FINAL_RECOVERY_LOCAL,
+	VINYL_FINAL_RECOVERY_REMOTE,
+	VINYL_ONLINE,
+};
+
 struct vy_env *
 vy_env_new(void);
+
+enum vy_status
+vy_status(struct vy_env *env);
 
 void
 vy_env_delete(struct vy_env *e);
@@ -184,23 +196,6 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  */
 int
 vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request);
-
-/**
- * Execute INSERT in a vinyl space.
- * @param tx      Current transaction.
- * @param stmt    Statement for triggers filled with the new
- *                statement.
- * @param space   Vinyl space.
- * @param request Request with the tuple data and update
- *                operations.
- *
- * @retval  0 Success
- * @retval -1 Memory error OR duplicate error OR the primary
- *            index is not found
- */
-int
-vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request);
 
 /**

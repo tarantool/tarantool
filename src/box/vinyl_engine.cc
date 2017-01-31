@@ -64,7 +64,6 @@ vinyl_engine_get_env()
 
 VinylEngine::VinylEngine()
 	:Engine("vinyl", &vy_tuple_format_vtab)
-	,recovery_complete(false)
 {
 	flags = 0;
 	env = NULL;
@@ -89,7 +88,6 @@ VinylEngine::bootstrap()
 {
 	if (vy_bootstrap(env) != 0)
 		diag_raise();
-	recovery_complete = true;
 }
 
 void
@@ -109,11 +107,9 @@ VinylEngine::beginFinalRecovery()
 void
 VinylEngine::endRecovery()
 {
-	assert(!recovery_complete);
 	/* complete two-phase recovery */
 	if (vy_end_recovery(env) != 0)
 		diag_raise();
-	recovery_complete = true;
 }
 
 Handler *
@@ -138,7 +134,8 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 	(void)new_space;
 	VinylIndex *new_index = (VinylIndex *) new_index_arg;
 	new_index->open();
-	/* Unlike Memtx, Vinyl does not need building of a secondary index.
+	/*
+	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
 	 * 1) Vinyl does not support alter of non-empty spaces
 	 * 2) During recovery a Vinyl index already has all needed data on disk.
@@ -157,8 +154,6 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 	 *  but aware of three cases mentioned above.
 	 */
-	assert(!recovery_complete ||
-	       index_find_xc(old_space, 0)->min(NULL, 0) == NULL);
 }
 
 struct vinyl_send_row_arg {

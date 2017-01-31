@@ -84,15 +84,6 @@
 #define vy_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
-enum vinyl_status {
-	VINYL_OFFLINE,
-	VINYL_INITIAL_RECOVERY_LOCAL,
-	VINYL_INITIAL_RECOVERY_REMOTE,
-	VINYL_FINAL_RECOVERY_LOCAL,
-	VINYL_FINAL_RECOVERY_REMOTE,
-	VINYL_ONLINE,
-};
-
 struct tx_manager;
 struct vy_scheduler;
 struct vy_task;
@@ -113,7 +104,7 @@ struct vy_conf {
 
 struct vy_env {
 	/** Recovery status */
-	enum vinyl_status status;
+	enum vy_status status;
 	/** The list of indexes for vinyl_info(). */
 	struct rlist indexes;
 	/** Configuration */
@@ -3439,7 +3430,7 @@ vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
  * Commit a single write operation made by a transaction.
  */
 static int
-vy_tx_write(struct txv *v, enum vinyl_status status, int64_t lsn)
+vy_tx_write(struct txv *v, enum vy_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
 	struct tuple *stmt = v->stmt;
@@ -6434,23 +6425,20 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	return 0;
 }
 
-int
-vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	   struct request *request)
-{
-	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple))
-		return -1;
-	if (space->index_count == 1) {
-		/* Replace in a space with a single index. */
-		return vy_replace_one(tx, space, request, stmt);
-	} else {
-		/* Replace in a space with secondary indexes. */
-		return vy_replace_impl(tx, space, request, stmt);
-	}
-}
-
-int
+/**
+ * Execute INSERT in a vinyl space.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with the new
+ *                statement.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data and update
+ *                operations.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR duplicate error OR the primary
+ *            index is not found
+ */
+static int
 vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)
 {
@@ -6461,9 +6449,6 @@ vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 		return -1;
 	struct key_def *def = pk->key_def;
 	assert(def->iid == 0);
-	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple) != 0)
-		return -1;
 	/* First insert into the primary index. */
 	stmt->new_tuple =
 		vy_stmt_new_replace(request->tuple, request->tuple_end,
@@ -6479,6 +6464,26 @@ vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 	}
 	return 0;
+}
+
+int
+vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
+	   struct request *request)
+{
+	struct vy_env *env = tx->manager->env;
+	/* Check the tuple fields. */
+	if (tuple_validate_raw(space->format, request->tuple))
+		return -1;
+	if (request->type == IPROTO_INSERT && env->status == VINYL_ONLINE)
+		return vy_insert(tx, stmt, space, request);
+
+	if (space->index_count == 1) {
+		/* Replace in a space with a single index. */
+		return vy_replace_one(tx, space, request, stmt);
+	} else {
+		/* Replace in a space with secondary indexes. */
+		return vy_replace_impl(tx, space, request, stmt);
+	}
 }
 
 void
@@ -6722,6 +6727,12 @@ error_xm:
 error_conf:
 	free(e);
 	return NULL;
+}
+
+enum vy_status
+vy_status(struct vy_env *env)
+{
+	return env->status;
 }
 
 void

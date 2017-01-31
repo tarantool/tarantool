@@ -88,16 +88,11 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 {
 	assert(request->index_id == 0);
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
-	VinylEngine *engine = (VinylEngine *)space->handler->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
-	if (request->type == IPROTO_INSERT && engine->recovery_complete) {
-		if (vy_insert(tx, stmt, space, request))
-			diag_raise();
-	} else {
-		if (vy_replace(tx, stmt, space, request))
-			diag_raise();
-	}
+	if (vy_replace(tx, stmt, space, request))
+		diag_raise();
+
 	assert(stmt->new_tuple != NULL);
 	return stmt->new_tuple;
 }
@@ -176,9 +171,11 @@ VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 	    old_space->index_count <= new_space->index_count) {
 		VinylEngine *engine = (VinylEngine *)old_space->handler->engine;
 		Index *primary_index = index_find_xc(old_space, 0);
-		if (engine->recovery_complete && primary_index->min(NULL, 0)) {
+		if (vy_status(engine->env) == VINYL_ONLINE &&
+		    primary_index->min(NULL, 0)) {
 			/**
-			 * If space is not empty then forbid new indexes creating
+			 * If the space is not empty, then forbid new
+			 * index create.
 			 */
 			tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
 				  "altering not empty space");
@@ -190,7 +187,7 @@ void
 VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 {
 	if (new_space == NULL || new_space->index_count == 0) {
-		/* This is drop space. */
+		/* This is a drop space. */
 		return;
 	}
 	vy_commit_alter_space(old_space, new_space);

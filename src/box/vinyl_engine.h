@@ -60,7 +60,6 @@ struct VinylEngine: public Engine {
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 public:
 	struct vy_env *env;
-	bool recovery_complete;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */
