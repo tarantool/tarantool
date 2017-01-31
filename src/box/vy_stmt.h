@@ -54,10 +54,10 @@ struct iovec;
 /**
  * There are two groups of statements:
  *
- *  - SELECT and DELETE are "key" statements.
+ *  - SELECT is "key" statement.
  *  - DELETE, UPSERT and REPLACE are "tuple" statements.
  *
- * REPLACE/UPSERT statements structure:
+ * REPLACE/UPSERT/DELETE statements structure:
  *                               data_offset
  *                                    ^
  * +----------------------------------+
@@ -73,7 +73,7 @@ struct iovec;
  * indexed then before MessagePack data are stored offsets only for field 3 and
  * field 5.
  *
- * SELECT/DELETE statements structure.
+ * SELECT statements structure.
  * +--------------+-----------------+
  * | array header | part1 ... partN |  -  MessagePack data
  * +--------------+-----------------+
@@ -180,10 +180,8 @@ static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
 	       const struct key_def *key_def)
 {
-	assert(vy_stmt_type(a) == IPROTO_SELECT ||
-	       vy_stmt_type(a) == IPROTO_DELETE);
-	assert(vy_stmt_type(b) == IPROTO_SELECT ||
-	       vy_stmt_type(b) == IPROTO_DELETE);
+	assert(vy_stmt_type(a) == IPROTO_SELECT);
+	assert(vy_stmt_type(b) == IPROTO_SELECT);
 	const char *key_a = tuple_data(a);
 	const char *key_b = tuple_data(b);
 	uint32_t part_count_a = mp_decode_array(&key_a);
@@ -208,9 +206,11 @@ vy_tuple_compare(const struct tuple *a, const struct tuple *b,
 		 const struct key_def *key_def)
 {
 	assert(vy_stmt_type(a) == IPROTO_REPLACE ||
-	       vy_stmt_type(a) == IPROTO_UPSERT);
+	       vy_stmt_type(a) == IPROTO_UPSERT ||
+	       vy_stmt_type(a) == IPROTO_DELETE);
 	assert(vy_stmt_type(b) == IPROTO_REPLACE ||
-	       vy_stmt_type(b) == IPROTO_UPSERT);
+	       vy_stmt_type(b) == IPROTO_UPSERT ||
+	       vy_stmt_type(b) == IPROTO_DELETE);
 	return tuple_compare(a, b, key_def);
 }
 
@@ -242,9 +242,11 @@ vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		const struct key_def *key_def)
 {
 	bool a_is_tuple = vy_stmt_type(a) == IPROTO_REPLACE ||
-			  vy_stmt_type(a) == IPROTO_UPSERT;
+			  vy_stmt_type(a) == IPROTO_UPSERT ||
+			  vy_stmt_type(a) == IPROTO_DELETE;
 	bool b_is_tuple = vy_stmt_type(b) == IPROTO_REPLACE ||
-			  vy_stmt_type(b) == IPROTO_UPSERT;
+			  vy_stmt_type(b) == IPROTO_UPSERT ||
+			  vy_stmt_type(b) == IPROTO_DELETE;
 	if (a_is_tuple && b_is_tuple) {
 		return vy_tuple_compare(a, b, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
@@ -262,10 +264,10 @@ static inline int
 vy_stmt_compare_with_key(const struct tuple *stmt, const struct tuple *key,
 			 const struct key_def *key_def)
 {
-	assert(vy_stmt_type(key) == IPROTO_SELECT ||
-	       vy_stmt_type(key) == IPROTO_DELETE);
+	assert(vy_stmt_type(key) == IPROTO_SELECT);
 	if (vy_stmt_type(stmt) == IPROTO_REPLACE ||
-	    vy_stmt_type(stmt) == IPROTO_UPSERT)
+	    vy_stmt_type(stmt) == IPROTO_UPSERT ||
+	    vy_stmt_type(stmt) == IPROTO_DELETE)
 		return vy_tuple_compare_with_key(stmt, key, key_def);
 	return vy_key_compare(stmt, key, key_def);
 }
@@ -286,19 +288,51 @@ vy_stmt_new_select(struct tuple_format *format, const char *key,
 		   uint32_t part_count);
 
 /**
- * Create the DELETE statement from raw MessagePack data.
- * @param format     Format of an index.
- * @param key        MessagePack data that contain an array of
- *                   fields WITHOUT the array header.
- * @param part_count Count of the key fields that will be saved as
- *                   result.
+ * Create a new surrogate DELETE from @a key using format.
  *
- * @retval NULL     Memory allocation error.
+ * Example:
+ * key: {a3, a5}
+ * key_def: { 3, 5 }
+ * result: {nil, nil, a3, nil, a5}
+ *
+ * @param format  Target tuple format.
+ * @param key    MessagePack array with key fields.
+ * @param def    Definition of the result statement.
+ *
  * @retval not NULL Success.
+ * @retval     NULL Memory or format error.
  */
 struct tuple *
-vy_stmt_new_delete(struct tuple_format *format, const char *key,
-		   uint32_t part_count);
+vy_stmt_new_surrogate_delete_from_key(struct tuple_format *format,
+				      const char *key,
+				      const struct key_def *def);
+
+/**
+ * Create a new surrogate DELETE from @a tuple using @a format.
+ * A surrogate tuple has format->field_count fields from the source
+ * with all unindexed fields replaced with MessagePack NIL.
+ *
+ * Example:
+ * original:      {a1, a2, a3, a4, a5}
+ * index key_def: {2, 4}
+ * result:        {null, a2, null, a4, null}
+ *
+ * @param format Target tuple format.
+ * @param src    Source tuple from the primary index.
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Memory or fields format error.
+ */
+struct tuple *
+vy_stmt_new_surrogate_delete(struct tuple_format *format,
+			     const struct tuple *tuple);
+
+/**
+ * @copydoc vy_stmt_new_surrogate_replace()
+ */
+struct tuple *
+vy_stmt_new_surrogate_replace(struct tuple_format *format,
+			      const struct tuple *tuple);
 
 /**
  * Create the REPLACE statement from raw MessagePack data.
@@ -311,8 +345,8 @@ vy_stmt_new_delete(struct tuple_format *format, const char *key,
  * @retval not NULL Success.
  */
 struct tuple *
-vy_stmt_new_replace(struct tuple_format *format,
-		    const char *tuple_begin, const char *tuple_end);
+vy_stmt_new_replace(struct tuple_format *format, const char *tuple,
+                    const char *tuple_end);
 
  /**
  * Create the UPSERT statement from raw MessagePack data.
@@ -393,6 +427,7 @@ struct tuple *
 vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
 		    struct region *gc);
 
+
 /**
  * Create the SELECT statement from MessagePack array.
  * @param format  Format of an index.
@@ -431,7 +466,8 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
  * @retval NULL on error
  */
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format);
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
+	       const struct key_def *def);
 
 /**
  * Format a key into string.

@@ -398,55 +398,6 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	return new_def;
 }
 
-struct key_def *
-key_def_build_secondary_to_primary(const struct key_def *primary,
-				   const struct key_def *secondary)
-{
-	/*
-	 * Find the order in which keys parts from primary and
-	 * secondary key_defs are present in the secondary
-	 * index tuple.
-	 */
-	struct key_def *merge = key_def_merge(secondary, primary);
-	if (merge == NULL)
-		return NULL;
-
-	struct key_def *def;
-	def = key_def_new(secondary->space_id, secondary->iid,
-			  secondary->name, secondary->type,
-			  &secondary->opts, primary->part_count);
-	if (def == NULL) {
-		key_def_delete(merge);
-		return NULL;
-	}
-	/** Use the order to set parts in the result. */
-	for (uint32_t i = 0; i < primary->part_count; ++i) {
-		const struct key_part *part;
-		part = key_def_find(merge, primary->parts[i].fieldno);
-		assert(part);
-		key_def_set_part(def, i, part - merge->parts, part->type);
-	}
-	return def;
-}
-
-struct key_def *
-key_def_build_secondary(const struct key_def *primary,
-			const struct key_def *secondary)
-{
-	struct key_def *merge = key_def_merge(secondary, primary);
-	if (merge == NULL)
-		return NULL;
-	/*
-	 * Renumber key parts, since they are stored consequently
-	 * in the secondary index.
-	 */
-	struct key_part *part = merge->parts;
-	struct key_part *end = part + merge->part_count;
-	for (; part != end; part++)
-		part->fieldno = part - merge->parts;
-	return merge;
-}
-
 int
 key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count)
