@@ -30,7 +30,35 @@
  */
 #include "cbus.h"
 
+/**
+ * Cord interconnect.
+ */
+struct cbus {
+	/** cbus statistics */
+	struct rmean *stats;
+	/** A mutex to protect bus join. */
+	pthread_mutex_t mutex;
+	/** Condition for synchronized start of the bus. */
+	pthread_cond_t cond;
+	/** Connected endpoints */
+	struct rlist endpoints;
+};
+
+/** A singleton for all cords. */
 static struct cbus cbus;
+
+/* A single cbus endpoint - the context of a connected consumer cord. */
+struct cbus_endpoint {
+	/** Fiber pool associated with the endpoint. */
+	struct fiber_pool *pool;
+	/**
+	 * Endpoint name, used to identify the endpoint when
+	 * establishing a route.
+	 */
+	char name[FIBER_NAME_MAX];
+	/** Member of cbus->endpoints */
+	struct rlist in_cbus;
+};
 
 const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
@@ -95,12 +123,30 @@ restart:
 
 /** }}} fiber_pool */
 
+/**
+ * Find a joined cbus endpoint by name.
+ * This is an internal helper method which should be called
+ * under cbus::mutex.
+ *
+ * @return endpoint or NULL if not found
+ */
+static struct cbus_endpoint *
+cbus_find_endpoint(struct cbus *bus, const char *name)
+{
+	struct cbus_endpoint *endpoint;
+	rlist_foreach_entry(endpoint, &bus->endpoints, in_cbus) {
+		if (strcmp(endpoint->name, name) == 0)
+			return endpoint;
+	}
+	return NULL;
+}
+
 static void
 cpipe_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	       int /* events */);
 
 void
-cpipe_create(const char *name, struct cpipe *pipe)
+cpipe_create(struct cpipe *pipe, const char *consumer)
 {
 	stailq_create(&pipe->input);
 
@@ -111,25 +157,20 @@ cpipe_create(const char *name, struct cpipe *pipe)
 	pipe->flush_input.data = pipe;
 
 	tt_pthread_mutex_lock(&cbus.mutex);
-	do {
-		struct cbus_item *cbus_item;
-		rlist_foreach_entry(cbus_item, &cbus.pools, item) {
-			if (!strcmp(cbus_item->name, name)) {
-				pipe->producer = cord()->loop;
-				pipe->pool = cbus_item->pool;
-				break;
-			}
-		}
-		if (pipe->producer == NULL)
-			tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
-	} while (pipe->producer == NULL);
+	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, consumer);
+	while (endpoint == NULL) {
+		tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
+		endpoint = cbus_find_endpoint(&cbus, consumer);
+	}
+	pipe->producer = cord()->loop;
+	pipe->pool = endpoint->pool;
 	tt_pthread_mutex_unlock(&cbus.mutex);
 
-	/* Set in join() under a mutex. */
+	/* Set the default max input size. */
 	cpipe_set_max_input(pipe, 2 * FIBER_POOL_SIZE);
 }
 
-void
+static void
 cbus_create(struct cbus *bus)
 {
 	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
@@ -142,10 +183,10 @@ cbus_create(struct cbus *bus)
 
 	(void) tt_pthread_cond_init(&bus->cond, NULL);
 
-	rlist_create(&bus->pools);
+	rlist_create(&bus->endpoints);
 }
 
-void
+static void
 cbus_destroy(struct cbus *bus)
 {
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
@@ -154,8 +195,10 @@ cbus_destroy(struct cbus *bus)
 }
 
 /**
- * @pre both consumers initialized their pipes
- * @post each consumers gets the input end of the opposite pipe
+ * Join a new endpoint (message consumer) to the bus. The endpoint
+ * must have a unique name. The endpoint object is created
+ * automatically. Wakes up all producers (@sa cpipe_create()) who
+ * are blocked waiting for this endpoint to become available.
  */
 void
 cbus_join(const char *name)
@@ -166,25 +209,25 @@ cbus_join(const char *name)
 				  FIBER_POOL_IDLE_TIMEOUT, fiber_pool_f);
 	}
 	tt_pthread_mutex_lock(&cbus.mutex);
-	struct cbus_item *item;
-	rlist_foreach_entry(item, &cbus.pools, item) {
-		if (!strcmp(name, item->name))
-			panic("cbus item %s joined twice", name);
-	}
+	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, name);
+	if (endpoint != NULL)
+		panic("cbus endpoint %s joined twice", name);
 
-	item = (struct cbus_item *)calloc(1, sizeof(struct cbus_item));
-	if (item == NULL)
-		panic("Can't alloc cbus item");
-	item->name = strdup(name);
-	item->pool = pool;
-	rlist_add_tail(&cbus.pools, &item->item);
+	endpoint = (struct cbus_endpoint *)calloc(1, sizeof(*endpoint));
+	if (endpoint == NULL)
+		panic("failed to allocate cbus endpoint %s", name);
+	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
+	endpoint->pool = pool;
+	rlist_add_tail(&cbus.endpoints, &endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
 	/*
-	 * POSIX: pthread_cond_signal() function shall
+	 * Alert all waiting producers.
+	 *
+	 * POSIX: pthread_cond_broadcast() function shall
 	 * have no effect if there are no threads currently
 	 * blocked on cond.
 	 */
-	tt_pthread_cond_signal(&cbus.cond);
+	tt_pthread_cond_broadcast(&cbus.cond);
 }
 
 static void
@@ -213,6 +256,18 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 
 		ev_async_send(pool->consumer, &pool->fetch_output);
 	}
+}
+
+void
+cbus_init()
+{
+	cbus_create(&cbus);
+}
+
+void
+cbus_free()
+{
+	cbus_destroy(&cbus);
 }
 
 /* {{{ cmsg */
@@ -342,11 +397,5 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	if ((rc = msg->rc))
 		diag_move(&msg->diag, &fiber()->diag);
 	return rc;
-}
-
-void
-cbus_init()
-{
-	cbus_create(&cbus);
 }
 

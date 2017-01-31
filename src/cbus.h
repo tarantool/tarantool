@@ -52,7 +52,7 @@ enum cbus_stat_name {
 extern const char *cbus_stat_strings[CBUS_STAT_LAST];
 
 /**
- * One hop in a message travel route.  A message may need to be
+ * One hop in a message travel route. A message may need to be
  * delivered to many destinations before it can be dispensed with.
  * For example, it may be necessary to return a message to the
  * sender just to destroy it.
@@ -115,22 +115,27 @@ struct cpipe {
 	/**
 	 * Rather than flushing input into the pipe
 	 * whenever a single message or a batch is
-	 * complete, do it once per event loop iteration.
+	 * complete, do it once per event loop iteration
+	 * or when max_input is reached.
 	 */
 	struct ev_async flush_input;
+	/** The event loop of the producer cord. */
 	struct ev_loop *producer;
 	/**
-	 * The fiber pool at destination to handle flushed
-	 * messages.
+	 * The fiber pool at the destination cord to handle
+	 * flushed messages.
 	 */
 	struct fiber_pool *pool;
 };
 
 /**
- * Initialize a pipe. Must be called by the consumer.
+ * Initialize a pipe and connect it to the consumer.
+ * Must be called by the producer. The call returns
+ * only when the consumer, identified by consumer name,
+ * has joined the bus.
  */
 void
-cpipe_create(const char *name, struct cpipe *pipe);
+cpipe_create(struct cpipe *pipe, const char *consumer);
 
 /**
  * Set pipe max size of staged push area. The default is infinity.
@@ -211,32 +216,6 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
-struct cbus_item {
-	/** Attached fiber pool */
-	struct fiber_pool *pool;
-	/** Fiber pool name for routing */
-	const char *name;
-	/** List linkage */
-	struct rlist item;
-};
-
-/**
- * Cord interconnect
- */
-struct cbus {
-	/** cbus statistics */
-	struct rmean *stats;
-	/** A mutex to protect bus join. */
-	pthread_mutex_t mutex;
-	/** Condition for synchronized start of the bus. */
-	pthread_cond_t cond;
-	/** Conneted pools */
-	struct rlist pools;
-};
-
-void
-cbus_init();
-
 /**
  * Connect the cord to cbus as a named reciever and create
  * a fiber pool to process incoming messages.
@@ -245,14 +224,13 @@ cbus_init();
 void
 cbus_join(const char *name);
 
-/**
- * Create pipe to destination with passed name. Messages can be delivered
- * to destination with simple cpipe_push call. Will block until cbus has no
- * corresponding destination.
- * @param name a destination name where a pipe should be connected
- */
-struct cpipe *
-cbus_route(const char *name);
+/** Initialize the global singleton bus. */
+void
+cbus_init();
+
+/** Destroy the global singleton bus. */
+void
+cbus_free();
 
 /**
  * A helper message to wakeup caller whenever an event

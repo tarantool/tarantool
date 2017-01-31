@@ -287,7 +287,8 @@ wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 		wal = NULL;
 		panic("failed to start WAL thread");
 	}
-	cpipe_create("wal", &wal_writer_singleton.wal_pipe);
+	/* Create a pipe to WAL thread. */
+	cpipe_create(&wal_writer_singleton.wal_pipe, "wal");
 	wal = writer;
 }
 
@@ -594,7 +595,8 @@ wal_writer_f(va_list ap)
 
 	writer->main_f = fiber();
 	cbus_join("wal");
-	cpipe_create("tx", &wal_writer_singleton.tx_pipe);
+	/* Create a pipe to TX thread. */
+	cpipe_create(&wal_writer_singleton.tx_pipe, "tx");
 
 	fiber_yield();
 

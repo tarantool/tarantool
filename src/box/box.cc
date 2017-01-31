@@ -1446,10 +1446,7 @@ static inline void
 box_init(void)
 {
 	tuple_init();
-	/*
-	 * Init cbus and join to it
-	 */
-	cbus_init();
+	/* Join the cord interconnect as "tx" endpoint. */
 	cbus_join("tx");
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);

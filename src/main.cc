@@ -50,6 +50,7 @@
 # include <sys/prctl.h>
 #endif
 #include <fiber.h>
+#include <cbus.h>
 #include <coeio.h>
 #include <crc32.h>
 #include "memory.h"
@@ -498,6 +499,7 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
+	cbus_free();
 #if 0
 	/*
 	 * This doesn't work reliably since things
@@ -614,6 +616,7 @@ main(int argc, char **argv)
 	coeio_init();
 	coeio_enable();
 	signal_init();
+	cbus_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 	box_lua_init(tarantool_L);
 

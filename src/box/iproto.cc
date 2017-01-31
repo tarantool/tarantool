@@ -1166,8 +1166,10 @@ net_cord_f(va_list /* ap */)
 			  "rmean", "struct rmean");
 	}
 
+	/* Create "net" endpoint. */
 	cbus_join("net");
-	cpipe_create("tx", &tx_pipe);
+	/* Create a pipe to "tx" thread. */
+	cpipe_create(&tx_pipe, "tx");
 	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	/*
 	 * Nothing to do in the fiber so far, the service
@@ -1192,7 +1194,8 @@ iproto_init()
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
 
-	cpipe_create("net", &net_pipe);
+	/* Create a pipe to "net" thread. */
+	cpipe_create(&net_pipe, "net");
 	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
 }
 

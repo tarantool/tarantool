@@ -231,6 +231,12 @@
 	tt_pthread_error(e__);			\
 })
 
+#define tt_pthread_cond_broadcast(cond)		\
+({	int e__ = pthread_cond_broadcast(cond);	\
+	tt_pthread_error(e__);			\
+})
+
+
 #define tt_pthread_cond_wait(cond, mutex)	\
 ({	int e__ = pthread_cond_wait(cond, mutex);\
 	tt_pthread_error(e__);			\
