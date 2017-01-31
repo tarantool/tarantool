@@ -378,8 +378,7 @@ vy_log_record_decode(struct vy_log_record *record,
 
 	const char *pos = req.tuple;
 
-	if (mp_typeof(*pos) != MP_ARRAY ||
-	    mp_decode_array(&pos) != 2)
+	if (mp_decode_array(&pos) != 2)
 		goto fail;
 
 	record->type = mp_decode_uint(&pos);
@@ -392,29 +391,19 @@ vy_log_record_decode(struct vy_log_record *record,
 		uint32_t key = mp_decode_uint(&pos);
 		switch (key) {
 		case VY_LOG_KEY_INDEX_ID:
-			if (mp_typeof(*pos) != MP_UINT)
-				goto fail;
 			record->index_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_RANGE_ID:
-			if (mp_typeof(*pos) != MP_UINT)
-				goto fail;
 			record->range_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_RUN_ID:
-			if (mp_typeof(*pos) != MP_UINT)
-				goto fail;
 			record->run_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_RANGE_BEGIN:
-			if (mp_typeof(*pos) != MP_ARRAY)
-				goto fail;
 			record->range_begin = pos;
 			mp_next(&pos);
 			break;
 		case VY_LOG_KEY_RANGE_END:
-			if (mp_typeof(*pos) != MP_ARRAY)
-				goto fail;
 			record->range_end = pos;
 			mp_next(&pos);
 			break;
