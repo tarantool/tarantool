@@ -65,8 +65,8 @@ test_insert_1_to_3()
 		value->val1 = i;
 		test_heap_insert(&heap, &value->node);
 
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		if (root_value->val1 != 0) {
 			fail("check that min.val1 is incorrect",
 			     "root_value->val1 != 0");
@@ -96,8 +96,8 @@ test_insert_3_to_1()
 		value->val1 = i;
 		test_heap_insert(&heap, &value->node);
 
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		if (root_value->val1 != i) {
 			fail("check that min.val1 is incorrect",
 			     "root_value->val1 != i");
@@ -127,8 +127,8 @@ test_insert_50_to_150_mod_100()
 		value->val1 = i % 100;
 		test_heap_insert(&heap, &value->node);
 
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 
 		if (i < 100 && root_value->val1 != 50) {
 			fail("min.val1 is incorrect",
@@ -146,8 +146,8 @@ test_insert_50_to_150_mod_100()
 	}
 
 	for (int i = 0; i < 100; ++i) {
-		root_value = (struct test_type *) ((char *)heap.harr[0] -
-						   offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		test_heap_pop(&heap);
 		free(root_value);
 	}
@@ -172,8 +172,8 @@ test_insert_many_random()
 		ans = (value->val1 < ans ? value->val1 : ans);
 		test_heap_insert(&heap, &value->node);
 
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		if (root_value->val1 != ans) {
 			fail("min.val1 is incorrect", "root_value->val1 != ans");
 		}
@@ -205,8 +205,8 @@ test_insert_10_to_1_pop()
 		value->val1 = i;
 
 		test_heap_insert(&heap, &value->node);
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		if (root_value->val1 != i) {
 			fail("check that min.val1 is correct failed",
 			     "root_value->val1 != i");
@@ -218,8 +218,8 @@ test_insert_10_to_1_pop()
 	}
 
 	for (uint32_t i = 1; i <= 10; ++i) {
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 
 		test_heap_pop(&heap);
 		if (root_value->val1 != i) {
@@ -274,8 +274,8 @@ test_insert_many_pop_many_random()
 
 		test_heap_insert(&heap, &value->node);
 
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 		if (root_value->val1 != ans) {
 			fail("check that min.val1 is correct failed",
 			     "root_value->val1 != ans");
@@ -302,8 +302,8 @@ test_insert_many_pop_many_random()
 
 	uint32_t full_size = heap.size;
 	for (uint32_t i = 0; i < TEST_CASE_SIZE; ++i) {
-		root_value = (struct test_type *)((char *)heap.harr[0] -
-						  offsetof(struct test_type, node));
+		root_value = container_of(test_heap_top(&heap),
+					  struct test_type, node);
 
 		test_heap_pop(&heap);
 
@@ -350,8 +350,8 @@ test_insert_pop_workload()
 		}
 		else {
 			current_size--;
-			root_value = (struct test_type *)((char *)heap.harr[0] -
-							  offsetof(struct test_type, node));
+			root_value = container_of(test_heap_top(&heap),
+						  struct test_type, node);
 
 			test_heap_pop(&heap);
 			free(root_value);

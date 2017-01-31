@@ -167,6 +167,11 @@ HEAP(create)(heap_t *heap);
 static inline void
 HEAP(destroy)(heap_t *heap);
 
+/**
+ * Return min value.
+ */
+static inline struct heap_node *
+HEAP(top)(heap_t *heap);
 
 /**
  * Erase min value.
@@ -360,6 +365,18 @@ HEAP(insert)(heap_t *heap, struct heap_node *node)
 	HEAP(sift_up)(heap, node); /* heapify */
 
 	return 0;
+}
+
+/**
+ * Return min value without removing it from heap.
+ * If heap is empty, return NULL.
+ */
+static inline struct heap_node *
+HEAP(top)(heap_t *heap)
+{
+	if (heap->size == 0)
+		return NULL;
+	return heap->harr[0];
 }
 
 /**
