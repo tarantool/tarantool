@@ -2802,7 +2802,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
  *   4/3 * range_size.
  */
 static bool
-vy_range_needs_split(struct vy_range *range, const char **p_split_key)
+vy_range_needs_split(struct vy_range *range, struct tuple **p_split_key)
 {
 	struct key_def *key_def = range->index->key_def;
 	struct vy_run *run = NULL;
@@ -2822,13 +2822,13 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
 	mid_page = vy_run_page_info(run, run->info.count / 2);
-	const char *split_key = tuple_data(mid_page->min_key);
+	struct tuple *split_key = mid_page->min_key;
 
 	struct vy_page_info *first_page = vy_run_page_info(run, 0);
-	const char *min_key = tuple_data(first_page->min_key);
+	struct tuple *min_key = first_page->min_key;
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_key_compare_raw(min_key, split_key, key_def) == 0)
+	if (vy_key_compare(min_key, split_key, key_def) == 0)
 		return false;
 
 	*p_split_key = split_key;
@@ -3862,7 +3862,7 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 
 static struct vy_task *
 vy_task_split_new(struct mempool *pool, struct vy_range *range,
-		  const char *split_key_raw)
+		  struct tuple *split_key)
 {
 	struct vy_index *index = range->index;
 	struct tx_manager *xm = index->env->xm;
@@ -3877,7 +3877,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		.abort = vy_task_split_abort,
 	};
 
-	struct tuple *split_key, *keys[3];
+	struct tuple *keys[3];
 	struct vy_range *parts[2] = {NULL, };
 	const int n_parts = 2;
 
@@ -3894,9 +3894,6 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		goto err_wi;
 
 	/* Determine new ranges' boundaries. */
-	split_key = vy_key_from_msgpack(index->format, split_key_raw);
-	if (split_key == NULL)
-		goto err_split_key;
 	keys[0] = range->begin;
 	keys[1] = split_key;
 	keys[2] = range->end;
@@ -3939,16 +3936,13 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started splitting range %s by key %s",
-		 index->name, vy_range_str(range), vy_key_str(split_key_raw));
-	tuple_unref(split_key);
+		 index->name, vy_range_str(range), vy_stmt_str(split_key));
 	return task;
 err_parts:
 	for (int i = 0; i < n_parts; i++) {
 		if (parts[i] != NULL)
 			vy_range_delete(parts[i]);
 	}
-	tuple_unref(split_key);
-err_split_key:
 	vy_write_iterator_delete(wi);
 err_wi:
 	vy_range_unfreeze_mem(range);
@@ -4086,7 +4080,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	assert(range->compact_priority > 0);
 
 	/* Consider splitting the range if it's too big. */
-	const char *split_key;
+	struct tuple *split_key;
 	if (vy_range_needs_split(range, &split_key))
 		return vy_task_split_new(pool, range, split_key);
 

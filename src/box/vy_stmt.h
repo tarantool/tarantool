@@ -175,17 +175,6 @@ vy_stmt_dup(const struct tuple *stmt);
  * @retval < 0 if key_a < key_b
  */
 static inline int
-vy_key_compare_raw(const char *key_a, const char *key_b,
-		   const struct key_def *key_def)
-{
-	uint32_t part_count_a = mp_decode_array(&key_a);
-	uint32_t part_count_b = mp_decode_array(&key_b);
-	return tuple_compare_key_raw(key_a, part_count_a, key_b, part_count_b,
-				     key_def);
-}
-
-/** @sa vy_key_compare_raw. */
-static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
 	       const struct key_def *key_def)
 {
@@ -193,8 +182,13 @@ vy_key_compare(const struct tuple *a, const struct tuple *b,
 	       vy_stmt_type(a) == IPROTO_DELETE);
 	assert(vy_stmt_type(b) == IPROTO_SELECT ||
 	       vy_stmt_type(b) == IPROTO_DELETE);
-	return vy_key_compare_raw((const char *) a + a->data_offset,
-				  (const char *) b + b->data_offset, key_def);
+
+	const char *key_a = tuple_data(a);
+	const char *key_b = tuple_data(b);
+	uint32_t part_count_a = mp_decode_array(&key_a);
+	uint32_t part_count_b = mp_decode_array(&key_b);
+	return tuple_compare_key_raw(key_a, part_count_a, key_b, part_count_b,
+				     key_def);
 }
 
 /**
