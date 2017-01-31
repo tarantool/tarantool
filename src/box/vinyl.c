@@ -4390,22 +4390,18 @@ vy_scheduler_remove_range(struct vy_scheduler *scheduler,
 static int
 vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
-	struct vy_range *range;
-	struct heap_node *pn = NULL;
-	struct heap_iterator it;
-	vy_dump_heap_iterator_init(&scheduler->dump_heap, &it);
-	while ((pn = vy_dump_heap_iterator_next(&it))) {
-		range = container_of(pn, struct vy_range, in_dump);
-		if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
-		    range->min_lsn > scheduler->checkpoint_lsn)
-			break;
-		*ptask = vy_task_dump_new(&scheduler->task_pool, range);
-		if (*ptask == NULL)
-			return -1; /* OOM */
-		return 0; /* new task */
-	}
 	*ptask = NULL;
-	return 0; /* nothing to do */
+	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
+	if (pn == NULL)
+		return 0; /* nothing to do */
+	struct vy_range *range = container_of(pn, struct vy_range, in_dump);
+	if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
+	    range->min_lsn > scheduler->checkpoint_lsn)
+		return 0; /* nothing to do */
+	*ptask = vy_task_dump_new(&scheduler->task_pool, range);
+	if (*ptask == NULL)
+		return -1; /* OOM */
+	return 0; /* new task */
 }
 
 /**
@@ -4424,21 +4420,17 @@ static int
 vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_task **ptask)
 {
-	struct vy_range *range;
-	struct heap_node *pn = NULL;
-	struct heap_iterator it;
-	vy_compact_heap_iterator_init(&scheduler->compact_heap, &it);
-	while ((pn = vy_compact_heap_iterator_next(&it))) {
-		range = container_of(pn, struct vy_range, in_compact);
-		if (range->compact_priority == 0)
-			break;
-		*ptask = vy_task_compact_new(&scheduler->task_pool, range);
-		if (*ptask == NULL)
-			return -1; /* OOM */
-		return 0; /* new task */
-	}
 	*ptask = NULL;
-	return 0; /* nothing to do */
+	struct heap_node *pn = vy_compact_heap_top(&scheduler->compact_heap);
+	if (pn == NULL)
+		return 0; /* nothing to do */
+	struct vy_range *range = container_of(pn, struct vy_range, in_compact);
+	if (range->compact_priority == 0)
+		return 0; /* nothing to do */
+	*ptask = vy_task_compact_new(&scheduler->task_pool, range);
+	if (*ptask == NULL)
+		return -1; /* OOM */
+	return 0; /* new task */
 }
 
 static int
