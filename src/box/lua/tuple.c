@@ -118,7 +118,7 @@ lbox_tuple_new(lua_State *L)
 	struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 					   buf->buf + ibuf_used(buf));
 	if (tuple == NULL)
-		luaT_error(L);
+		return luaT_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	luaT_pushtuple(L, tuple);
 	ibuf_reinit(tarantool_lua_ibuf);

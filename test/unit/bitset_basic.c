@@ -157,10 +157,7 @@ void test_get_set()
 
 	size_t *pn = nums;
 
-	size_t i_max = (size_t) 1 << 14;
-	if (i_max > RAND_MAX) {
-		i_max = RAND_MAX;
-	}
+	size_t i_max = MIN(1ULL << 14, RAND_MAX);
 
 	for(size_t i = 0; i < i_max; i++) {
 		if (*pn < SIZE_MAX && *pn == i) {

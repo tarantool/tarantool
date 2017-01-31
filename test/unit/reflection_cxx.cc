@@ -22,7 +22,9 @@ const struct type type_Object = make_type("Object", NULL);
 extern const struct type type_Database;
 struct Database: public Object {
 	Database()
-		: Object(&type_Database)
+		: Object(&type_Database),
+		  m_int(0),
+		  m_str{'\0'}
 	{}
 
 	virtual const char *

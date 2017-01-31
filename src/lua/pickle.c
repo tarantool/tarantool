@@ -61,7 +61,6 @@ lbox_pack(struct lua_State *L)
 	/* first arg comes second */
 	int i = 2;
 	int nargs = lua_gettop(L);
-	size_t size;
 	const char *str;
 
 	struct region *buf = &fiber()->gc;
@@ -150,10 +149,13 @@ lbox_pack(struct lua_State *L)
 			break;
 		case 'A':
 		case 'a':
+		{
 			/* A sequence of bytes */
-			str = luaL_checklstring(L, i, &size);
-			luaL_region_dup(L, buf, str, size);
+			size_t len;
+			str = luaL_checklstring(L, i, &len);
+			luaL_region_dup(L, buf, str, len);
 			break;
+		}
 		default:
 			luaL_error(L, "pickle.pack: unsupported pack "
 				   "format specifier '%c'", *format);
@@ -162,14 +164,14 @@ lbox_pack(struct lua_State *L)
 		format++;
 	}
 
-	size_t len = region_used(buf) - used;
-	const char *res = (char *) region_join(buf, len);
+	size_t total_len = region_used(buf) - used;
+	const char *res = (char *) region_join(buf, total_len);
 	if (res == NULL) {
 		region_truncate(buf, used);
-		diag_set(OutOfMemory, size, "region", "region_join");
+		diag_set(OutOfMemory, total_len, "region", "region_join");
 		luaT_error(L);
 	}
-	lua_pushlstring(L, res, len);
+	lua_pushlstring(L, res, total_len);
 	region_truncate(buf, used);
 	return 1;
 }

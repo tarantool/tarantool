@@ -285,6 +285,7 @@ box_tuple_iterator(box_tuple_t *tuple)
 	if (it == NULL) {
 		diag_set(OutOfMemory, tuple_iterator_pool.objsize,
 			 "mempool", "new slab");
+		return NULL;
 	}
 	if (tuple_ref(tuple) != 0) {
 		mempool_free(&tuple_iterator_pool, it);

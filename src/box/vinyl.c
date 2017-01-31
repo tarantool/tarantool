@@ -2265,7 +2265,9 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 	struct request request;
 	/* extract all pages info */
 	request_create(&request, xrow->type);
-	request_decode(&request, xrow->body->iov_base, xrow->body->iov_len);
+	if (request_decode(&request, xrow->body->iov_base,
+			   xrow->body->iov_len) != 0)
+		return -1;
 	const char *pos = request.tuple;
 	if (mp_decode_array(&pos) < 3) {
 		diag_set(ClientError, ER_VINYL, "Can't decode page meta "
@@ -3006,7 +3008,7 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	struct vy_range *result = vy_range_new(index, -1,
 					       first->begin, last->end);
 	if (result == NULL)
-		goto fail;
+		goto fail_range;
 
 	struct vy_range *it;
 	struct vy_range *end = vy_range_tree_next(&index->tree, last);
@@ -3071,6 +3073,8 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 fail_rollback:
 	vy_log_tx_rollback(log);
 fail:
+	vy_range_delete(result);
+fail_range:
 	assert(!diag_is_empty(diag_get()));
 	e = diag_last_error(diag_get());
 	say_error("%s: failed to coalesce range %s: %s",
@@ -3362,7 +3366,8 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 			 * In this case we shouldn't insert the same replace
 			 * again.
 			 */
-			assert(upserted_lsn == vy_stmt_lsn(older));
+			assert(older == NULL ||
+			       upserted_lsn == vy_stmt_lsn(older));
 			tuple_unref(upserted);
 			return 0;
 		}
@@ -5289,12 +5294,12 @@ vy_index_delete(struct vy_index *index)
 	free(index->name);
 	free(index->path);
 	tuple_format_ref(index->format, -1);
-	key_def_delete(index->key_def);
-	key_def_delete(index->user_key_def);
 	if (index->key_def->iid > 0) {
 		key_def_delete(index->key_def_tuple_to_key);
 		key_def_delete(index->key_def_secondary_to_primary);
 	}
+	key_def_delete(index->key_def);
+	key_def_delete(index->user_key_def);
 	histogram_delete(index->run_hist);
 	vy_cache_delete(index->cache);
 	TRASH(index);
@@ -6760,8 +6765,9 @@ vy_env_delete(struct vy_env *e)
 	mempool_destroy(&e->read_task_pool);
 	lsregion_destroy(&e->allocator);
 	tt_pthread_key_delete(e->zdctx_key);
-	free(e);
 	vy_cache_env_destroy(&e->cache_env);
+	TRASH(e);
+	free(e);
 }
 
 /** }}} Environment */
@@ -7317,11 +7323,13 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
 		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->index->env);
-		if (zdctx == NULL)
+		if (zdctx == NULL) {
+			vy_page_delete(page);
 			return -1;
+		}
 		if (vy_page_read(page, page_info, itr->run->fd, zdctx) != 0) {
 			vy_page_delete(page);
-			page = NULL;
+			return -1;
 		}
 	}
 

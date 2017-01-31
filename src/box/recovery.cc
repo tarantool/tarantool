@@ -432,6 +432,8 @@ public:
 			ev_async_stop(loop(), &async);
 			ev_stat_set(&dir_stat, dir_path, 0.0);
 			ev_stat_start(loop(), &dir_stat);
+			watcher.loop = NULL;
+			watcher.async = NULL;
 		}
 	}
 

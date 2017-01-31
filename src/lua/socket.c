@@ -308,7 +308,7 @@ lbox_socket_local_resolve(const char *host, const char *port,
 		}
 		memset(uaddr, 0, sizeof(*uaddr));
 		uaddr->sun_family = AF_UNIX;
-		strncpy(uaddr->sun_path, port, sizeof(uaddr->sun_path));
+		snprintf(uaddr->sun_path, sizeof(uaddr->sun_path), "%s", port);
 		*socklen = sizeof(*uaddr);
 		return 0;
 	}

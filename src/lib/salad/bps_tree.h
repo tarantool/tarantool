@@ -1014,6 +1014,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 	tree->size = 0;
 	tree->garbage_head_id = (bps_tree_block_id_t)(-1);
 	tree->arg = arg;
+	memset(&tree->max_elem, 0, sizeof(tree->max_elem));
 
 	matras_create(&tree->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,

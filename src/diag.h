@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -96,10 +97,11 @@ error_unref(struct error *e)
 		e->destroy(e);
 }
 
-static inline void
+NORETURN static inline void
 error_raise(struct error *e)
 {
 	e->raise(e);
+	unreachable();
 }
 
 static inline void
@@ -233,7 +235,7 @@ struct error_factory {
 struct diag *
 diag_get();
 
-static inline void
+NORETURN static inline void
 diag_raise(void)
 {
 	struct error *e = diag_last_error(diag_get());

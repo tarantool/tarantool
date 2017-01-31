@@ -48,15 +48,15 @@ fio_filename(int fd)
 {
 #ifdef TARGET_OS_LINUX
 	int save_errno = errno;
-	char proc_path[32];
-	static __thread char filename_path[PATH_MAX];
 
-	sprintf(proc_path, "/proc/self/fd/%d", fd);
+	char *proc_path = tt_static_buf();
+	snprintf(proc_path, TT_STATIC_BUF_LEN, "/proc/self/fd/%d", fd);
+	char *filename_path = tt_static_buf();
 
-	ssize_t sz = readlink(proc_path, filename_path,
-			      sizeof(filename_path));
+	ssize_t sz = readlink(proc_path, filename_path, TT_STATIC_BUF_LEN);
 	errno = save_errno;
 	if (sz >= 0) {
+		sz = MIN(sz, TT_STATIC_BUF_LEN - 1);
 		filename_path[sz] = '\0';
 		return filename_path;
 	}

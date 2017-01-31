@@ -99,7 +99,7 @@ vclock_iterator_init(struct vclock_iterator *it, const struct vclock *vclock)
 static inline struct vclock_c
 vclock_iterator_next(struct vclock_iterator *it)
 {
-	struct vclock_c c;
+	struct vclock_c c = { 0, 0 };
 	size_t id = bit_iterator_next(&it->it);
 	c.id = id == SIZE_MAX ? (int) VCLOCK_MAX : id;
 	if (c.id < VCLOCK_MAX)

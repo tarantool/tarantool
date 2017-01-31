@@ -308,7 +308,6 @@ compare_with_sptree_check_branches()
 		if (find_res1 ^ find_res2)
 			fail("trees identity", "false");
 		if (find_res1) {
-			throw 0;
 			fail("trees integrity", "false");
 		}
 

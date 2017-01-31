@@ -393,7 +393,7 @@ coio_getaddrinfo(const char *host, const char *port,
 	if (port != NULL) {
 		task->port = strdup(port);
 		if (task->port == NULL) {
-			diag_set(OutOfMemory, strlen(host), "malloc",
+			diag_set(OutOfMemory, strlen(port), "malloc",
 				 "getaddrinfo");
 			getaddrinfo_free_cb(&task->base);
 			return -1;

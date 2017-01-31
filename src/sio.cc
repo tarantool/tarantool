@@ -433,6 +433,8 @@ sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 	while (bytes_read < size) {
 		size_t to_read_now = MIN(size - bytes_read, buffer_size);
 		ssize_t n = sio_read(sock_fd, buffer, to_read_now);
+		if (n < 0)
+			return -1;
 		sio_writen(file_fd, buffer, n);
 		bytes_read += n;
 	}

@@ -224,6 +224,7 @@ make_method(const struct type *owner, const char *name,
 	m.thiscall = (method_thiscall_f) method_arg;
 	m.isconst = false;
 	m.rtype = ctypeof<R>();
+	memset(m.atype, 0, sizeof(m.atype));
 	method_helper<0, Args...>::init(&m);
 	return m;
 }

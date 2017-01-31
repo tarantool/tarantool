@@ -71,7 +71,7 @@ restart:
 			f->caller = rlist_shift_entry(&pool->idle,
 						      struct fiber,
 						      state);
-			assert(f->caller->caller = &cord->sched);
+			assert(f->caller->caller == &cord->sched);
 		}
 		cmsg_deliver(msg);
 	}

@@ -298,7 +298,7 @@ tt_pthread_setname(const char *name)
 	 * even bother to document the limit.
 	 */
 	char short_name[16];
-	snprintf(short_name, sizeof name, "%s", name);
+	snprintf(short_name, sizeof(short_name), "%s", name);
 
 #if HAVE_PTHREAD_SETNAME_NP
 	pthread_setname_np(pthread_self(), short_name);

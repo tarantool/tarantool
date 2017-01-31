@@ -311,6 +311,8 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		fflush(stdout);
 		if (log_fd == STDERR_FILENO) {
 			int fd = open("/dev/null", O_WRONLY);
+			if (fd < 0)
+				exit(EXIT_FAILURE);
 			dup2(fd, STDERR_FILENO);
 			dup2(fd, STDOUT_FILENO);
 			close(fd);

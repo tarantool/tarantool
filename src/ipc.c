@@ -70,6 +70,7 @@ ipc_channel_new(uint32_t size)
 	if (res == NULL) {
 		diag_set(OutOfMemory, size,
 			 "malloc", "struct ipc_channel");
+		return NULL;
 	}
 	ipc_channel_create(res, size);
 	return res;

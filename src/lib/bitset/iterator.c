@@ -86,7 +86,7 @@ bitset_iterator_destroy(struct bitset_iterator *it)
 		it->realloc(it->page, 0);
 	}
 
-	if (it->page != NULL) {
+	if (it->page_tmp != NULL) {
 		bitset_page_destroy(it->page_tmp);
 		it->realloc(it->page_tmp, 0);
 	}
@@ -148,7 +148,7 @@ bitset_iterator_conj_reserve(struct bitset_iterator *it,
 		goto error_2;
 	struct bitset_page **pages = it->realloc(conj->pages,
 					capacity * sizeof(*conj->pages));
-	if (pre_nots == NULL)
+	if (pages == NULL)
 		goto error_3;
 
 	memset(bitsets + conj->capacity, 0,

@@ -395,12 +395,13 @@ typedef struct {
 static void
 lua_rl_dmfree(dmlist *ml)
 {
-	size_t i;
+	if (ml->list == NULL)
+		return;
 	/*
 	 * Note: item #0 isn't initialized until the very end of
 	 * lua_rl_complete, the only function calling dmfree().
 	 */
-	for (i = 1; i <= ml->idx; i++) {
+	for (size_t i = 1; i <= ml->idx; i++) {
 		free(ml->list[i]);
 	}
 	free(ml->list);

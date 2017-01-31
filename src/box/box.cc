@@ -70,7 +70,7 @@ static char status[64] = "unknown";
 
 static void title(const char *new_status)
 {
-	strncpy(status, new_status, sizeof status);
+	snprintf(status, sizeof(status), "%s", new_status);
 	title_set_status(new_status);
 	title_update();
 }
@@ -541,9 +541,9 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	va_start(ap, format);
 	size_t buf_size = mp_vformat(NULL, 0, format, ap);
 	char *buf = (char *)region_alloc(&fiber()->gc, buf_size);
+	va_end(ap);
 	if (buf == NULL)
 		return -1;
-	va_end(ap);
 	va_start(ap, format);
 	if (mp_vformat(buf, buf_size, format, ap) != buf_size)
 		assert(0);
@@ -780,7 +780,7 @@ space_truncate(struct space *space)
 	});
 	index->initIterator(it, ITER_EQ, key_buf, 1);
 	int index_count = 0;
-	struct tuple *indexes[BOX_INDEX_MAX]; /* max count of idexes*/
+	struct tuple *indexes[BOX_INDEX_MAX] = { NULL };
 	struct tuple *tuple;
 
 	/* select all indexes of given space */

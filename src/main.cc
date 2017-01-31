@@ -319,6 +319,8 @@ daemonize()
 
 	/* redirect stdin; stdout and stderr handled in say_logger_init */
 	fd = open("/dev/null", O_RDONLY);
+	if (fd < 0)
+		goto error;
 	dup2(fd, STDIN_FILENO);
 	close(fd);
 

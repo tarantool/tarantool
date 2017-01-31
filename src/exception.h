@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdarg.h>
 #include <assert.h>
 
@@ -48,7 +49,7 @@ public:
 	int get_line() const { return line; }
 	const char *get_errmsg() const { return errmsg; }
 
-	virtual void raise() = 0;
+	NORETURN virtual void raise() = 0;
 	virtual void log() const;
 	virtual ~Exception();
 

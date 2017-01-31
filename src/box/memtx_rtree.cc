@@ -138,7 +138,8 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
-	delete itr;
+	TRASH(itr);
+	free(itr);
 }
 
 static struct tuple *
@@ -166,7 +167,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def_arg)
 	: MemtxIndex(key_def_arg)
 {
 	assert(key_def->part_count == 1);
-	assert(key_def->parts[0].type = FIELD_TYPE_ARRAY);
+	assert(key_def->parts[0].type == FIELD_TYPE_ARRAY);
 	assert(key_def->opts.is_unique == false);
 
 	m_dimension = key_def->opts.dimension;
@@ -236,13 +237,14 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 struct iterator *
 MemtxRTree::allocIterator() const
 {
-	index_rtree_iterator *it = new index_rtree_iterator;
-	memset(it, 0, sizeof(*it));
-	rtree_iterator_init(&it->impl);
+	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
+		malloc(sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(OutOfMemory, sizeof(struct index_rtree_iterator),
 			  "MemtxRTree", "iterator");
 	}
+	memset(it, 0, sizeof(*it));
+	rtree_iterator_init(&it->impl);
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	return &it->base;

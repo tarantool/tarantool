@@ -58,7 +58,7 @@ main_f(va_list ap)
 	stat_timeout_test(filename);
 	stat_notify_test(f, filename);
 	fclose(f);
-	remove(filename);
+	(void) remove(filename);
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }

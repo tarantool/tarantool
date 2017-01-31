@@ -229,8 +229,8 @@ iterator_invalidate_check()
 			rtree_insert(&tree, &rect, record_t(i+1));
 		}
 		rtree_set2d(&rect, 0, 0, test_size, test_size);
-		rtree_search(&tree, &rect, SOP_BELONGS, &iterators[0]);
-		if (!rtree_iterator_next(&iterators[0])) {
+		if (!rtree_search(&tree, &rect, SOP_BELONGS, &iterators[0]) ||
+		    !rtree_iterator_next(&iterators[0])) {
 			fail("Integrity check failed (15)", "false");
 		}
 		for (size_t i = 1; i < test_size; i++) {

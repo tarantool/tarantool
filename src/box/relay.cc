@@ -74,9 +74,12 @@ relay_set_cord_name(int fd)
 	char name[FIBER_NAME_MAX];
 	struct sockaddr_storage peer;
 	socklen_t addrlen = sizeof(peer);
-	getpeername(fd, ((struct sockaddr*)&peer), &addrlen);
-	snprintf(name, sizeof(name), "relay/%s",
-		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+	if (getpeername(fd, ((struct sockaddr*)&peer), &addrlen) == 0) {
+		snprintf(name, sizeof(name), "relay/%s",
+			 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+	} else {
+		snprintf(name, sizeof(name), "relay/<unknown>");
+	}
 	cord_set_name(name);
 }
 
