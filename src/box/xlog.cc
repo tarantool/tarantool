@@ -647,7 +647,7 @@ xlog_init(struct xlog *xlog)
 {
 	memset(xlog, 0, sizeof(*xlog));
 	xlog->sync_interval = SNAP_SYNC_INTERVAL;
-	xlog->sync_time = ev_now(loop());
+	xlog->sync_time = ev_time();
 	xlog->is_autocommit = true;
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
