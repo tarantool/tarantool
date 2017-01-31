@@ -185,8 +185,8 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt);
  * @retval -1 on error, check diag
  */
 int
-vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt,
-	      int64_t alloc_lsn);
+vy_mem_insert(struct vy_mem *mem, struct tuple_format *mem_format,
+	      const struct tuple *stmt, int64_t alloc_lsn);
 
 /**
  * Iterator for in-memory level.

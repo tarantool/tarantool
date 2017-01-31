@@ -110,8 +110,8 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 int
-vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt,
-	      int64_t alloc_lsn)
+vy_mem_insert(struct vy_mem *mem, struct tuple_format *mem_format,
+	      const struct tuple *stmt, int64_t alloc_lsn)
 {
 	size_t size = tuple_size(stmt);
 	struct tuple *mem_stmt;
@@ -129,6 +129,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt,
 	 * will try to unreference this statement.
 	 */
 	mem_stmt->refs = 0;
+	mem_stmt->format_id = tuple_format_id(mem_format);
 
 	const struct tuple *replaced_stmt = NULL;
 	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
