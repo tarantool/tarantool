@@ -66,102 +66,10 @@ struct mempool memtx_index_extent_pool;
 static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
-enum {
-	/**
-	 * This number is calculated based on the
-	 * max (realistic) number of insertions
-	 * a deletion from a B-tree or an R-tree
-	 * can lead to, and, as a result, the max
-	 * number of new block allocations.
-	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
-	RESERVE_EXTENTS_BEFORE_REPLACE = 16
-};
-
 static void
 txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
 {
 	txn_rollback(); /* doesn't throw */
-}
-
-/**
- * A short-cut version of replace() used during bulk load
- * from snapshot.
- */
-static void
-memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
-			 enum dup_replace_mode mode)
-{
-	assert(stmt->old_tuple == NULL && mode == DUP_INSERT);
-	(void) mode;
-	if (stmt->old_tuple) {
-		/*
-		 * Called from txn_rollback() In practice
-		 * is impossible: all possible checks for tuple
-		 * validity are done before the space is changed,
-		 * and WAL is off, so this part can't fail.
-		 */
-		panic("Failed to commit transaction when loading "
-		      "from snapshot");
-	}
-	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
-	stmt->engine_savepoint = stmt;
-}
-
-/**
- * A short-cut version of replace() used when loading
- * data from XLOG files.
- */
-static void
-memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
-			  enum dup_replace_mode mode)
-{
-	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
-						   stmt->new_tuple, mode);
-	stmt->engine_savepoint = stmt;
-}
-
-static void
-memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
-		       enum dup_replace_mode mode)
-{
-	struct tuple *old_tuple = stmt->old_tuple;
-	struct tuple *new_tuple = stmt->new_tuple;
-	/*
-	 * Ensure we have enough slack memory to guarantee
-	 * successful statement-level rollback.
-	 */
-	memtx_index_extent_reserve(new_tuple ?
-				   RESERVE_EXTENTS_BEFORE_REPLACE :
-				   RESERVE_EXTENTS_BEFORE_DELETE);
-	uint32_t i = 0;
-	try {
-		/* Update the primary key */
-		Index *pk = index_find_xc(space, 0);
-		assert(pk->key_def->opts.is_unique);
-		/*
-		 * If old_tuple is not NULL, the index
-		 * has to find and delete it, or raise an
-		 * error.
-		 */
-		old_tuple = pk->replace(old_tuple, new_tuple, mode);
-
-		assert(old_tuple || new_tuple);
-		/* Update secondary keys. */
-		for (i++; i < space->index_count; i++) {
-			Index *index = space->index[i];
-			index->replace(old_tuple, new_tuple, DUP_INSERT);
-		}
-	} catch (Exception *e) {
-		/* Rollback all changes */
-		for (; i > 0; i--) {
-			Index *index = space->index[i-1];
-			index->replace(new_tuple, old_tuple, DUP_INSERT);
-		}
-		throw;
-	}
-	stmt->old_tuple = old_tuple;
-	stmt->engine_savepoint = stmt;
 }
 
 static void
