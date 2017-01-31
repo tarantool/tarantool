@@ -3131,6 +3131,7 @@ fail_range:
 static int
 vy_index_create(struct vy_index *index)
 {
+	struct key_def *key_def = index->key_def;
 	struct vy_log *log = index->env->log;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
@@ -3173,7 +3174,8 @@ vy_index_create(struct vy_index *index)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin(log);
-	vy_log_create_index(log, index->key_def->opts.lsn);
+	vy_log_create_index(log, key_def->opts.lsn, key_def->iid,
+			    key_def->space_id, key_def->opts.path);
 	vy_log_insert_range(log, index->key_def->opts.lsn,
 			    range->id, NULL, NULL);
 	if (vy_log_tx_commit(log) < 0)

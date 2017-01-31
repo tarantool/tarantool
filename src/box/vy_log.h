@@ -33,6 +33,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 /*
  * Data stored in vinyl is organized in ranges and runs.
@@ -60,7 +61,8 @@ struct mh_i64ptr_t;
 enum vy_log_type {
 	/**
 	 * Create a new index.
-	 * Requires vy_log_record::index_id.
+	 * Requires vy_log_record::index_id, iid, space_id,
+	 * path, path_len.
 	 */
 	VY_LOG_CREATE_INDEX		= 0,
 	/**
@@ -113,6 +115,18 @@ struct vy_log_record {
 	const char *range_begin;
 	/** Msgpack key for end of a range. */
 	const char *range_end;
+	/** Ordinal index number in the space. */
+	uint32_t iid;
+	/** Space ID. */
+	uint32_t space_id;
+	/**
+	 * Path to the index. Empty string if default path is used.
+	 * Note, the string is not necessarily nul-termintaed, its
+	 * length is stored in path_len.
+	 */
+	const char *path;
+	/** Length of the path string. */
+	uint32_t path_len;
 	/**
 	 * This flag is never written to the metadata log.
 	 * It is used on recovery to indicate that the index
@@ -312,11 +326,16 @@ vy_log_recover_index(struct vy_log *log, int64_t index_id,
 
 /** Helper to log an index creation. */
 static inline void
-vy_log_create_index(struct vy_log *log, int64_t index_id)
+vy_log_create_index(struct vy_log *log, int64_t index_id,
+		    uint32_t iid, uint32_t space_id, const char *path)
 {
 	struct vy_log_record record = {
 		.type = VY_LOG_CREATE_INDEX,
 		.index_id = index_id,
+		.iid = iid,
+		.space_id = space_id,
+		.path = path,
+		.path_len = strlen(path),
 	};
 	vy_log_write(log, &record);
 }
