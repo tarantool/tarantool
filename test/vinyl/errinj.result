@@ -80,7 +80,7 @@ function range()
     for i=1,range_size/page_size do
         for j=1, page_size/#value do
             s:replace({last_id, value})
-	    last_id = last_id + 1
+            last_id = last_id + 1
             num_rows = num_rows + 1
         end
     end
