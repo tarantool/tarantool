@@ -789,10 +789,10 @@ static int vdbeSorterCompare(
 ){
   UnpackedRecord *r2 = pTask->pUnpacked;
   if( !*pbKey2Cached ){
-    sqlite3VdbeRecordUnpack(pTask->pSorter->pKeyInfo, nKey2, pKey2, r2);
+    sqlite3VdbeRecordUnpackMsgpack(pTask->pSorter->pKeyInfo, nKey2, pKey2, r2);
     *pbKey2Cached = 1;
   }
-  return sqlite3VdbeRecordCompare(nKey1, pKey1, r2);
+  return sqlite3VdbeRecordCompareMsgpack(nKey1, pKey1, r2);
 }
 
 /*
@@ -1382,11 +1382,13 @@ static SorterRecord *vdbeSorterMerge(
 ** sorter object passed as the only argument.
 */
 static SorterCompare vdbeSorterGetCompare(VdbeSorter *p){
+#if 0
   if( p->typeMask==SORTER_TYPE_INTEGER ){
     return vdbeSorterCompareInt;
   }else if( p->typeMask==SORTER_TYPE_TEXT ){
     return vdbeSorterCompareText; 
   }
+#endif
   return vdbeSorterCompare;
 }
 
@@ -2736,7 +2738,7 @@ int sqlite3VdbeSorterCompare(
   assert( r2->nField==nKeyCol );
 
   pKey = vdbeSorterRowkey(pSorter, &nKey);
-  sqlite3VdbeRecordUnpack(pKeyInfo, nKey, pKey, r2);
+  sqlite3VdbeRecordUnpackMsgpack(pKeyInfo, nKey, pKey, r2);
   for(i=0; i<nKeyCol; i++){
     if( r2->aMem[i].flags & MEM_Null ){
       *pRes = -1;
@@ -2744,6 +2746,6 @@ int sqlite3VdbeSorterCompare(
     }
   }
 
-  *pRes = sqlite3VdbeRecordCompare(pVal->n, pVal->z, r2);
+  *pRes = sqlite3VdbeRecordCompareMsgpack(pVal->n, pVal->z, r2);
   return SQLITE_OK;
 }

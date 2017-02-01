@@ -13,10 +13,11 @@ int tarantoolSqlite3First(BtCursor *pCur, int *pRes);
 int tarantoolSqlite3Last(BtCursor *pCur, int *pRes);
 int tarantoolSqlite3Next(BtCursor *pCur, int *pRes);
 int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes);
+int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
+                                   int *pRes);
 int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry);
 /*
 ** TODO:
-** moveToUnpacked
 ** insert
 ** delete
 */

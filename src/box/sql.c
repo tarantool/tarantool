@@ -40,12 +40,15 @@
 #include "sql/sqliteInt.h"
 #include "sql/btreeInt.h"
 #include "sql/tarantoolInt.h"
+#include "sql/vdbeInt.h"
 #undef Index
 #undef likely
 #undef unlikely
 
 #include "index.h"
 #include "tuple.h"
+#include "fiber.h"
+#include "small/region.h"
 
 static sqlite3 *db = NULL;
 
@@ -77,6 +80,47 @@ sql_get()
  * SQLite cursor implementation on top of Tarantool storage API-s.
  * See the corresponding SQLite function in btree.c for documentation.
  * Ex: sqlite3BtreeCloseCursor -> tarantoolSqlite3CloseCursor
+ *
+ * NB: SQLite btree cursor emulation is less than perfect. The problem
+ * is that btree cursors are more low-level compared to Tarantool
+ * iterators. The 2 most drastic differences being:
+ *
+ * i. Positioning - sqlite3BtreeMovetoUnpacked(key) moves to a leaf
+ *                  entry that is "reasonably close" to the requested
+ *                  key. The result from the last comparator invocation
+ *                  is returned to caller, so she can Prev/Next to
+ *                  adjust the position if needed. Ex:
+ *
+ *                  SQL: "... WHERE v>42",
+ *                  Data: [40,45]
+ *                  The engine does M2U(42), ending up with the cursor
+ *                  @40. The caller learns that the current item under
+ *                  cursor is less than 42, and advances the cursor
+ *                  ending up @45.
+ *
+ *                  Another complication is due to equal keys (sometimes
+ *                  a lookup is done with a key prefix which may equal
+ *                  multiple keys even in a unique index). Depending on
+ *                  the configuration stored in UnpackedRecord either
+ *                  the first or the last key in a run of equal keys is
+ *                  selected.
+ *
+ * ii. Direction  - SQLite cursors are bidirectional while Tarantool
+ *                  iterators are not.
+ *
+ * Fortunately, cursor semantics defined by VDBE matches Tarantool's one
+ * well. Ex: a cursor positioned with Seek_GE can only move forward.
+ *
+ * We extended UnpackedRecord (UR) to include current running opcode
+ * number. In M2U we request the matching Tarantool iterator type and
+ * ignore detailed config in UR which we can't implement anyway. We are
+ * lacking last comparator result so we make up one. The value is
+ * innacurate: for instance for Seek_GE we return 0 (equal item) if
+ * iterator will produce any items. If the first item is greater than
+ * the key, +1 would be more apropriate. However, the value is only used
+ * in VDBE interpretor to invoke Next when the current item is less than
+ * the search key (-1), which is unnecessary since Tarantool iterators
+ * are accurately positioned, hence both 0 and 1 are fine.
  */
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
@@ -170,6 +214,62 @@ int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
 {
 	assert(normalize_iter_type(pCur) == ITER_LE);
 	return cursor_advance(pCur, pRes);
+}
+
+int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
+				   int *pRes)
+{
+	int rc, res_success;
+	size_t ks;
+	const char *k, *ke;
+	enum iterator_type iter_type;
+
+	ks = sqlite3VdbeMsgpackRecordLen(pIdxKey->aMem,
+					 pIdxKey->nField);
+	k = region_reserve(&fiber()->gc, ks);
+	if (k == NULL) return SQLITE_NOMEM;
+	ke = k + sqlite3VdbeMsgpackRecordPut((u8 *)k, pIdxKey->aMem,
+					     pIdxKey->nField);
+
+	switch (pIdxKey->opcode) {
+	default:
+		assert(("Unexpected opcode", 0));
+	case OP_SeekLT:
+		iter_type = ITER_LT;
+		res_success = -1; /* item<key */
+		break;
+	case OP_SeekLE:
+		iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
+			    ITER_REQ : ITER_LE;
+		res_success = 0; /* item==key */
+		break;
+	case OP_SeekGE:
+		iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
+			    ITER_EQ : ITER_GE;
+		res_success = 0; /* item==key */
+		break;
+	case OP_SeekGT:
+		iter_type = ITER_GT;
+		res_success = 1; /* item>key */
+		break;
+	}
+	rc = cursor_seek(pCur, pRes, iter_type, k, ke);
+	if (*pRes == 0) {
+		*pRes = res_success;
+		/*
+		 * To select the first item in a row of equal items
+		 * (last item), SQLite comparator is configured to
+		 * return +1 (-1) if an item equals the key making it
+		 * impossible to distinguish from an item>key (item<key)
+		 * from comparator output alone.
+		 * To make it possible to learn if the current item
+		 * equals the key, the comparator sets eqSeen.
+		 */
+		pIdxKey->eqSeen = 1;
+	} else {
+		*pRes = -1; /* -1 also means EOF */
+	}
+	return rc;
 }
 
 int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)

@@ -2032,6 +2032,8 @@ struct UnpackedRecord {
   i8 r1;              /* Value to return if (lhs > rhs) */
   i8 r2;              /* Value to return if (rhs < lhs) */
   u8 eqSeen;          /* True if an equality comparison has been seen */
+  u8 opcode;          /* Currently executing opcode that invoked
+                      ** movetoUnpacked, used by Tarantool storage layer. */
 };
 
 

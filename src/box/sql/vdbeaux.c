@@ -4339,6 +4339,7 @@ RecordCompare sqlite3VdbeFindCompare(UnpackedRecord *p){
   ** The easiest way to enforce this limit is to consider only records with
   ** 13 fields or less. If the first field is an integer, the maximum legal
   ** header size is (12*5 + 1 + 1) bytes.  */
+#if 0
   if( (p->pKeyInfo->nField + p->pKeyInfo->nXField)<=13 ){
     int flags = p->aMem[0].flags;
     if( p->pKeyInfo->aSortOrder[0] ){
@@ -4359,8 +4360,8 @@ RecordCompare sqlite3VdbeFindCompare(UnpackedRecord *p){
       return vdbeRecordCompareString;
     }
   }
-
-  return sqlite3VdbeRecordCompare;
+#endif
+  return sqlite3VdbeRecordCompareMsgpack;
 }
 
 /*
@@ -4474,7 +4475,7 @@ int sqlite3VdbeIdxKeyCompare(
   if( rc ){
     return rc;
   }
-  *res = sqlite3VdbeRecordCompare(m.n, m.z, pUnpacked);
+  *res = sqlite3VdbeRecordCompareMsgpack(m.n, m.z, pUnpacked);
   sqlite3VdbeMemRelease(&m);
   return SQLITE_OK;
 }
@@ -4709,4 +4710,245 @@ u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pRec, u32 n){
     }
   }while( (++pRec)!=pEnd );
   return (u32)(zNewRecord-pBuf);
+}
+
+int sqlite3VdbeRecordCompareMsgpack(
+  int nKey1, const void *pKey1,   /* Left key */
+  UnpackedRecord *pPKey2          /* Right key */
+){
+  (void)nKey1; /* assume valid data */
+
+  int rc = 0;                     /* Return value */
+  Mem *pRhs = pPKey2->aMem;       /* Next field of pPKey2 to compare */
+  KeyInfo *pKeyInfo = pPKey2->pKeyInfo;
+  const char *aKey1 = (const unsigned char *)pKey1;
+  Mem mem1;
+  u32 i, n = mp_decode_array(&aKey1);
+
+  n = MIN(n, pPKey2->nField);
+
+  for( i=0; i!=n; i++, pRhs++ ){
+    switch( mp_typeof(*aKey1) ) {
+      default: {
+        /* FIXME */
+        rc = -1;
+        break;
+      }
+      case MP_NIL: {
+        rc = -((pRhs->flags & MEM_Null) == 0);
+        break;
+      }
+      case MP_BOOL: {
+        assert( (unsigned)*aKey1==0xc2 || (unsigned)*aKey1==0xc3 );
+        mem1.u.i = (unsigned)aKey1++ - 0xc2;
+        goto do_int;
+      }
+      case MP_UINT: {
+        uint64_t v = mp_decode_uint(&aKey1);
+        if( v>INT64_MAX ){
+          mem1.u.r = (double)v;
+          goto do_float;
+        }
+        mem1.u.i = v;
+        goto do_int;
+      }
+      case MP_INT: {
+        mem1.u.i = mp_decode_int(&aKey1);
+do_int:
+        if( pRhs->flags & MEM_Int ){
+          if( mem1.u.i<pRhs->u.i ){
+            rc = -1;
+          }else if( mem1.u.i>pRhs->u.i){
+            rc = +1;
+          }
+        }else if( pRhs->flags & MEM_Real ){
+          rc = sqlite3IntFloatCompare(mem1.u.i, pRhs->u.r);
+        }else{
+          rc = (pRhs->flags & MEM_Null) ? +1 : -1;
+        }
+        break;
+      }
+      case MP_FLOAT: {
+        mem1.u.r = mp_decode_float(&aKey1);
+        goto do_float;
+      }
+      case MP_DOUBLE: {
+        mem1.u.r = mp_decode_double(&aKey1);
+do_float:
+        if( pRhs->flags & MEM_Int ){
+          rc = -sqlite3IntFloatCompare(pRhs->u.i, mem1.u.r);
+        }else if( pRhs->flags & MEM_Real ){
+          if( mem1.u.r<pRhs->u.r ){
+            rc = -1;
+          }else if( mem1.u.r>pRhs->u.r ){
+            rc = +1;
+          }
+        }else{
+          rc = (pRhs->flags & MEM_Null) ? +1 : -1;
+        }
+        break;
+      }
+      case MP_STR: {
+        if( pRhs->flags & MEM_Str ){
+          mem1.n = mp_decode_strl(&aKey1);
+          mem1.z = (char*)aKey1;
+          aKey1 += mem1.n;
+          if( pKeyInfo->aColl[i] ){
+            mem1.enc = pKeyInfo->enc;
+            mem1.db = pKeyInfo->db;
+            mem1.flags = MEM_Str;
+            rc = vdbeCompareMemString(
+                &mem1, pRhs, pKeyInfo->aColl[i], &pPKey2->errCode
+            );
+          }else{
+            goto do_bin_cmp;
+          }
+        }else{
+          rc = (pRhs->flags & MEM_Blob) ? -1 : +1;
+        }
+        break;
+      }
+      case MP_BIN: {
+        mem1.n = mp_decode_binl(&aKey1);
+        mem1.z = (char*)aKey1;
+        aKey1 += mem1.n;
+do_blob:
+        if( pRhs->flags & MEM_Blob ){
+          if( pRhs->flags & MEM_Zero ){
+            if( !isAllZero((const char*)mem1.z,mem1.n) ){
+              rc = 1;
+            }else{
+              rc = mem1.n - pRhs->u.nZero;
+            }
+          } else {
+            int nCmp;
+do_bin_cmp:
+            nCmp = MIN(mem1.n, pRhs->n);
+            rc = memcmp(mem1.z, pRhs->z, nCmp);
+            if( rc==0 ) rc = mem1.n - pRhs->n;
+          }
+        }else{
+          rc = -1;
+        }
+        break;
+      }
+      case MP_ARRAY:
+      case MP_MAP:
+      case MP_EXT: {
+        mem1.z = (char*)aKey1; mp_next(&aKey1);
+        mem1.n = aKey1 - (char *)mem1.z;
+        goto do_blob;
+      }
+    }
+
+    if( rc!=0 ){
+      if( pKeyInfo->aSortOrder[i] ){
+        rc = -rc;
+      }
+      return rc;
+    }
+  }
+
+  pPKey2->eqSeen = 1;
+  return pPKey2->default_rc;
+}
+
+u32 sqlite3VdbeMsgpackGet(
+  const unsigned char *buf,     /* Buffer to deserialize from */
+  Mem *pMem                     /* Memory cell to write value into */
+){
+  const char *zParse = (const char *)buf;
+  switch (mp_typeof(*zParse)) {
+    case MP_ARRAY:
+    case MP_MAP:
+    case MP_EXT:
+    default: {
+      return 0;
+    }
+    case MP_NIL: {
+      pMem->flags = MEM_Null;
+      break;
+    }
+    case MP_BOOL: {
+      assert( (unsigned)*zParse==0xc2 || (unsigned)*zParse==0xc3 );
+      pMem->u.i = (unsigned)*zParse-0xc2; /* bool -> Integer {0,1} */
+      pMem->flags = MEM_Int;
+      break;
+    }
+    case MP_UINT: {
+      uint64_t v = mp_decode_uint(&zParse);
+      if ( v>INT64_MAX ){
+        /*
+        ** If the value exceeds i64 range, convert to double (lossy).
+        */
+        pMem->u.r = v;
+        pMem->flags = MEM_Real;
+      } else {
+        pMem->u.i = v;
+        pMem->flags = MEM_Int;
+      }
+      break;
+    }
+    case MP_INT: {
+      pMem->u.i = mp_decode_int(&zParse);
+      pMem->flags = MEM_Int;
+      break;
+    }
+    case MP_STR: {
+      /* XXX u32->int */
+      pMem->n = (int)mp_decode_strl((const char **)&zParse);
+      pMem->flags = MEM_Str|MEM_Ephem;
+install_blob:
+      pMem->z = zParse;
+      zParse += pMem->n;
+      break;
+    }
+    case MP_BIN: {
+      /* XXX u32->int */
+      pMem->n = (int)mp_decode_strl((const char **)&zParse);
+      pMem->flags = MEM_Blob|MEM_Ephem;
+      goto install_blob;
+    }
+    case MP_FLOAT: {
+      pMem->u.r = mp_decode_float(&zParse);
+      pMem->flags = sqlite3IsNaN(pMem->u.r) ? MEM_Null : MEM_Real;
+      break;
+    }
+    case MP_DOUBLE: {
+      pMem->u.r = mp_decode_double(&zParse);
+      pMem->flags = sqlite3IsNaN(pMem->u.r) ? MEM_Null : MEM_Real;
+      break;
+    }
+  }
+  return (u32)(zParse - (const char *)buf);
+}
+
+void sqlite3VdbeRecordUnpackMsgpack(
+  KeyInfo *pKeyInfo,     /* Information about the record format */
+  int nKey,              /* Size of the binary record */
+  const void *pKey,      /* The binary record */
+  UnpackedRecord *p      /* Populate this structure before returning. */
+){
+  uint32_t n;
+  const char *zParse = pKey; (void)nKey;
+  Mem *pMem = p->aMem;
+  n = mp_decode_array(&zParse);
+  n = p->nField = MIN(n, pKeyInfo->nField);
+  while(n--) {
+    pMem->enc = pKeyInfo->enc;
+    pMem->db = pKeyInfo->db;
+    /* pMem->flags = 0; // sqlite3VdbeSerialGet() will set this for us */
+    pMem->szMalloc = 0;
+    pMem->z = 0;
+    u32 sz = sqlite3VdbeMsgpackGet(zParse, pMem);
+    if( sz == 0 ){
+      /* MsgPack array, map or ext. Treat as blob. */
+      pMem->z = zParse; mp_next(&zParse);
+      pMem->n = zParse - pMem->z;
+      pMem->flags = MEM_Blob|MEM_Ephem;
+    }else{
+      zParse += sz;
+    }
+    pMem++;
+  }
 }

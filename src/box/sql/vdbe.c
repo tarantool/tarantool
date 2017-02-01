@@ -2440,7 +2440,6 @@ case OP_Column: {
   VdbeCursor *pC;    /* The VDBE cursor */
   BtCursor *pCrsr;   /* The BTree cursor */
   u32 *aOffset;      /* aOffset[i] is offset to start of data for i-th column */
-  int len;           /* The length of the serialized data for the column */
   int flags;         /* Type of value rendered to pDest */
   int i;             /* Loop counter */
   Mem *pDest;        /* Where to write the extracted value */
@@ -2578,81 +2577,25 @@ case OP_Column: {
     sqlite3VdbeMemSetNull(pDest);
   }
 
-  zParse = zData + aOffset[p2];
-  switch (mp_typeof(*zParse)) {
-    case MP_NIL: {
-      pDest->flags = MEM_Null;
-      break;
+  if( sqlite3VdbeMsgpackGet(zData+aOffset[p2], pDest)==0 ) {
+    /* MsgPack map, array or extension. Wrap it in a blob verbatim. */
+    pDest->n = aOffset[p2+1]-aOffset[p2];
+    pDest->z = zData+aOffset[p2];
+    pDest->flags = MEM_Blob|MEM_Ephem;
+  }
+
+  if( pDest->flags & MEM_Ephem ){
+    int len = pDest->n;
+    if( pDest->szMalloc<len+2 ){
+      if( sqlite3VdbeMemGrow(pDest, len+2, 1) ) goto op_column_error;
+    } else {
+      pDest->z = memcpy(pDest->zMalloc, pDest->z, len);
+      pDest->flags &= ~MEM_Ephem;
     }
-    case MP_BOOL: {
-      assert( *zParse==0xc2 || *zParse==0xc3 );
-      pDest->u.i = *zParse-0xc2; /* bool -> Integer {0,1} */
-      pDest->flags = MEM_Int;
-      break;
-    }
-    case MP_UINT: {
-      uint64_t v = mp_decode_uint((const char **)&zParse);
-      if ( v>INT64_MAX ){
-        /*
-        ** If the value exceeds i64 range, convert to double (lossy).
-        */
-        pDest->u.r = v;
-        pDest->flags = MEM_Real;
-      } else {
-        pDest->u.i = v;
-        pDest->flags = MEM_Int;
-      }
-      break;
-    }
-    case MP_INT: {
-      pDest->u.i = mp_decode_int((const char **)&zParse);
-      pDest->flags = MEM_Int;
-      break;
-    }
-    case MP_STR: {
-      /* XXX u32->int */
-      len = (int)mp_decode_strl((const char **)&zParse);
-      flags = MEM_Str|MEM_Term;
-      /* input: len, flags, zParse */
-op_column_deephemeralize:
-      pDest->n = len;
-      pDest->enc = encoding;
-      if( pDest->szMalloc < len+2 ){
-        pDest->flags = MEM_Null;
-        if( sqlite3VdbeMemGrow(pDest, len+2, 0) ) goto op_column_error;
-      }else{
-        pDest->z = pDest->zMalloc;
-      }
-      memcpy(pDest->z, zParse, len);
-      pDest->z[len] = 0;
-      pDest->z[len+1] = 0;
-      pDest->flags = flags;
-      break;
-    }
-    case MP_BIN: {
-      /* XXX u32->int */
-      len = (int)mp_decode_binl((const char **)&zParse);
-      flags = MEM_Blob;
-      goto op_column_deephemeralize;
-    }
-    case MP_ARRAY:
-    case MP_MAP:
-    case MP_EXT: {
-      /* XXX u32->int */
-      len = (int)(aOffset[p2+1]-aOffset[p2]);
-      flags = MEM_Blob; /* TODO: MEM_MsgPack flag */
-      goto op_column_deephemeralize;
-    }
-    case MP_FLOAT: {
-      pDest->u.r = mp_decode_float((const char **)&zParse);
-      pDest->flags = sqlite3IsNaN(pDest->u.r) ? MEM_Null : MEM_Real;
-      break;
-    }
-    case MP_DOUBLE: {
-      pDest->u.r = mp_decode_double((const char **)&zParse);
-      pDest->flags = sqlite3IsNaN(pDest->u.r) ? MEM_Null : MEM_Real;
-      break;
-    }
+    pDest->z[len] = 0;
+    pDest->z[len+1] = 0;
+    pDest->flags |= MEM_Term;
+    pDest->enc = encoding;
   }
 
   if( zData!=pC->aRow ) sqlite3VdbeMemRelease(&sMem);
@@ -3796,6 +3739,7 @@ case OP_SeekGT: {       /* jump, in3 */
     { int i; for(i=0; i<r.nField; i++) assert( memIsValid(&r.aMem[i]) ); }
 #endif
     r.eqSeen = 0;
+    r.opcode = oc;
     rc = sqlite3BtreeMovetoUnpacked(pC->uc.pCursor, &r, 0, 0, &res);
     if( rc!=SQLITE_OK ){
       goto abort_due_to_error;

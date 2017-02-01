@@ -5118,8 +5118,13 @@ int sqlite3BtreeMovetoUnpacked(
   assert( pCur->eState!=CURSOR_VALID || (pIdxKey==0)==(pCur->curIntKey!=0) );
 
   if( pCur->curFlags & BTCF_TaCursor ){
-    assert(("not implemented", 0));
-    return SQLITE_CORRUPT_BKPT;
+    assert(pIdxKey);
+    /*
+    ** Note: pIdxKey/intKey are mutually-exclusive and all Tarantool
+    ** tables are WITHOUT ROWID, hence no intKey parameter.
+    ** BiasRight is a hint used during binary search; ignore it for now.
+    */
+    return tarantoolSqlite3MovetoUnpacked(pCur, pIdxKey, pRes);
   }
 
   /* If the cursor is already positioned at the point we are trying

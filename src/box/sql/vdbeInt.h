@@ -545,5 +545,19 @@ int sqlite3VdbeMemHandleBom(Mem *pMem);
 
 i64 sqlite3VdbeMsgpackRecordLen(Mem *pMem, u32 n);
 u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pMem, u32 n);
+int sqlite3VdbeRecordCompareMsgpack(
+  int nKey1, const void *pKey1,
+  UnpackedRecord *pPKey2
+);
+u32 sqlite3VdbeMsgpackGet(
+  const unsigned char *buf,
+  Mem *pMem
+);
+void sqlite3VdbeRecordUnpackMsgpack(
+  KeyInfo *pKeyInfo,
+  int nKey,
+  const void *pKey,
+  UnpackedRecord *p
+);
 
 #endif /* !defined(SQLITE_VDBEINT_H) */

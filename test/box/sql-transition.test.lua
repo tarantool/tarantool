@@ -46,21 +46,27 @@ foobar:insert({2,"bar"})
 foobar:insert({1000,"foobar"})
 
 foobar_pageno = sql_pageno(foobar.id, foobar.index.primary.id)
-foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar)"
+foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar) WITHOUT ROWID"
 sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
 sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
 
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
---box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
---box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
---box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
---box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 box.sql.execute("SELECT count(*) FROM foobar")
 box.sql.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
-
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
+box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 
 -- cleanup
 foobar:drop()
