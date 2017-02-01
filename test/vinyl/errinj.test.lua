@@ -4,7 +4,7 @@
 test_run = require('test_run').new()
 fiber = require('fiber')
 errinj = box.error.injection
-errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 10)
+errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 40)
 s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 function f() box.begin() s:insert{1, 'hi'} s:insert{2, 'bye'} box.commit() end
@@ -52,7 +52,7 @@ box.snapshot();
 errinj.set("ERRINJ_VY_RANGE_DUMP", false);
 -- fails due to scheduler timeout
 box.snapshot();
-fiber.sleep(0.02);
+fiber.sleep(0.06);
 num_rows = num_rows + range();
 box.snapshot();
 num_rows = num_rows + range();
@@ -82,7 +82,7 @@ function test_cancel_read () k = s:select() return #k end
 f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
 -- task should be done
-fiber.sleep(0.2)
+fiber.sleep(0.1)
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
 s:select()
 
@@ -91,7 +91,7 @@ errinj.set("ERRINJ_VY_READ_PAGE", true)
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
 f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
-fiber.sleep(0.2)
+fiber.sleep(0.1)
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
 errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
@@ -103,7 +103,7 @@ _ = s:replace({1, string.rep('a', 128000)})
 errinj.set("ERRINJ_WAL_WRITE_DISK", true)
 box.snapshot()
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
-fiber.sleep(0.04)
+fiber.sleep(0.06)
 _ = s:replace({2, string.rep('b', 128000)})
 box.snapshot();
 #s:select({1})

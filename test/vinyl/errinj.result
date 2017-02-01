@@ -10,7 +10,7 @@ fiber = require('fiber')
 errinj = box.error.injection
 ---
 ...
-errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 10)
+errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 40)
 ---
 - ok
 ...
@@ -119,7 +119,7 @@ box.snapshot();
 ---
 - error: Error injection 'vinyl range dump'
 ...
-fiber.sleep(0.02);
+fiber.sleep(0.06);
 ---
 ...
 num_rows = num_rows + range();
@@ -223,7 +223,7 @@ fiber.cancel(f1)
 ---
 ...
 -- task should be done
-fiber.sleep(0.2)
+fiber.sleep(0.1)
 ---
 ...
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
@@ -258,7 +258,7 @@ f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
 ---
 ...
-fiber.sleep(0.2)
+fiber.sleep(0.1)
 ---
 ...
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
@@ -306,7 +306,7 @@ errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 ---
 - ok
 ...
-fiber.sleep(0.04)
+fiber.sleep(0.06)
 ---
 ...
 _ = s:replace({2, string.rep('b', 128000)})
