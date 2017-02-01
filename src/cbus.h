@@ -100,6 +100,12 @@ cmsg_init(struct cmsg *msg, const struct cmsg_hop *route)
 	msg->hop = msg->route = route;
 }
 
+/**
+ * Deliver the message and dispatch it to the next hop.
+ */
+void
+cmsg_deliver(struct cmsg *msg);
+
 /** A  uni-directional FIFO queue from one cord to another. */
 struct cpipe {
 	/** Staging area for pushed messages */

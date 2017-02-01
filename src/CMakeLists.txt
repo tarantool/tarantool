@@ -67,6 +67,7 @@ set (core_sources
      memory.c
      fiber.c
      cbus.c
+     fiber_pool.c
      exception.cc
      coro.c
      reflection.c

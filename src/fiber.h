@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
+#include "fiber_pool.h"
 #include "diag.h"
 #include "coro.h"
 #include "trivia/util.h"
@@ -285,53 +286,6 @@ struct fiber {
 };
 
 enum { FIBER_CALL_STACK = 16 };
-
-#define CACHELINE_SIZE 64
-/**
- * A pool of worker fibers to handle messages,
- * so that each message is handled in its own fiber.
- */
-struct fiber_pool {
-	struct {
-		/** Cache of fibers which work on incoming messages. */
-		alignas(CACHELINE_SIZE) struct rlist idle;
-		/** The number of fibers in the pool. */
-		int size;
-		/** The limit on the number of fibers working on tasks. */
-		int max_size;
-		/**
-		 * Fibers in leave the pool if they have nothing to do
-		 * for longer than this.
-		 */
-		float idle_timeout;
-		/** Staged messages (for fibers to work on) */
-		struct stailq output;
-		struct ev_timer idle_timer;
-	};
-	struct {
-		/** The consumer thread loop. */
-		alignas(CACHELINE_SIZE) struct ev_loop *consumer;
-		/**
-		 * Used to trigger task processing when
-		 * the pipe becomes non-empty.
-		 */
-		struct ev_async fetch_output;
-		/** The lock around the pipe. */
-		pthread_mutex_t mutex;
-		/** The pipe with incoming messages. */
-		struct stailq pipe;
-	};
-	fiber_func f;
-};
-#undef CACHELINE_SIZE
-
-/**
- * Initialize a fiber pool and connect it to a pipe. Currently
- * must be done before the pipe is actively used by a bus.
- */
-void
-fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
-		  float idle_timeout, fiber_func f);
 
 struct cord_on_exit;
 

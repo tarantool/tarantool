@@ -65,64 +65,6 @@ const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"LOCKS",
 };
 
-static inline void
-cmsg_deliver(struct cmsg *msg);
-
-/* {{{ fiber_pool */
-
-enum { FIBER_POOL_SIZE = 4096, FIBER_POOL_IDLE_TIMEOUT = 1 };
-
-/**
- * Main function of the fiber invoked to handle all outstanding
- * tasks in a queue.
- */
-static int
-fiber_pool_f(va_list ap)
-{
-	struct fiber_pool *pool = va_arg(ap, struct fiber_pool *);
-	struct cord *cord = cord();
-	struct fiber *f = fiber();
-	struct ev_loop *loop = pool->consumer;
-	struct stailq *output = &pool->output;
-	struct cmsg *msg;
-	ev_tstamp last_active_at = ev_now(loop);
-	pool->size++;
-restart:
-	msg = NULL;
-	while (! stailq_empty(output)) {
-		 msg = stailq_shift_entry(output, struct cmsg, fifo);
-
-		if (f->caller == &cord->sched && ! stailq_empty(output) &&
-		    ! rlist_empty(&pool->idle)) {
-			/*
-			 * Activate a "backup" fiber for the next
-			 * message in the queue.
-			 */
-			f->caller = rlist_shift_entry(&pool->idle,
-						      struct fiber,
-						      state);
-			assert(f->caller->caller == &cord->sched);
-		}
-		cmsg_deliver(msg);
-	}
-	/** Put the current fiber into a fiber cache. */
-	if (msg != NULL || ev_now(loop) - last_active_at < pool->idle_timeout) {
-		if (msg != NULL)
-			last_active_at = ev_now(loop);
-		/*
-		 * Add the fiber to the front of the list, so that
-		 * it is most likely to get scheduled again.
-		 */
-		rlist_add_entry(&pool->idle, fiber(), state);
-		fiber_yield();
-		goto restart;
-	}
-	pool->size--;
-	return 0;
-}
-
-/** }}} fiber_pool */
-
 /**
  * Find a joined cbus endpoint by name.
  * This is an internal helper method which should be called
@@ -206,7 +148,7 @@ cbus_join(const char *name)
 	struct fiber_pool *pool = &cord()->fiber_pool;
 	if (pool->max_size == 0) {
 		fiber_pool_create(pool, FIBER_POOL_SIZE,
-				  FIBER_POOL_IDLE_TIMEOUT, fiber_pool_f);
+				  FIBER_POOL_IDLE_TIMEOUT);
 	}
 	tt_pthread_mutex_lock(&cbus.mutex);
 	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, name);
@@ -300,7 +242,7 @@ cmsg_dispatch(struct cpipe *pipe, struct cmsg *msg)
 /**
  * Deliver the message and dispatch it to the next hop.
  */
-static inline void
+void
 cmsg_deliver(struct cmsg *msg)
 {
 	/*
