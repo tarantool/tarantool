@@ -554,6 +554,12 @@ wal_write_to_disk(struct cmsg *msg)
 					struct wal_request, fifo);
 
 done:
+	struct error *error = diag_last_error(diag_get());
+	if (error) {
+		/* Until we can pass the error to tx, log it and clear. */
+		error_log(error);
+		diag_clear(diag_get());
+	}
 	/*
 	 * We need to start rollback from the first request
 	 * following the last committed request. If
@@ -624,6 +630,9 @@ wal_write(struct wal_writer *writer, struct wal_request *req)
 		 * commit a transaction which has seen changes
 		 * that will be rolled back.
 		 */
+		say_error("Aborting transaction %llu during "
+			  "cascading rollback",
+			  vclock_sum(&writer->vclock));
 		return -1;
 	}
 

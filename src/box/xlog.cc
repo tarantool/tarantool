@@ -1022,7 +1022,6 @@ xlog_tx_write(struct xlog *log)
 	ERROR_INJECT(ERRINJ_WAL_WRITE, written = -1;);
 
 	obuf_reset(&log->obuf);
-	log->offset += written > 0 ? written : 0;
 	/*
 	 * Simplify recovery after a temporary write failure:
 	 * truncate the file to the best known good write
@@ -1032,7 +1031,9 @@ xlog_tx_write(struct xlog *log)
 		if (lseek(log->fd, log->offset, SEEK_SET) < 0 ||
 		    ftruncate(log->fd, log->offset) != 0)
 			panic_syserror("failed to truncate xlog after write error");
+		return -1;
 	}
+	log->offset += written;
 	if ((log->sync_interval && log->offset >=
 	    (off_t)(log->synced_size + log->sync_interval)) ||
 	    (log->rate_limit && log->offset >=
