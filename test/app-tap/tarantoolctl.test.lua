@@ -163,6 +163,7 @@ do
         test:test("basic test", function(test_i)
             test_i:plan(16)
             check_ok(test_i, dir, 'start',  'script', 0, nil, "Starting instance")
+            tctl_wait(dir, 'script')
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
             check_ok(test_i, dir, 'start',  'script', 1, nil, "is already running")
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
