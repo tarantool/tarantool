@@ -42,29 +42,54 @@ static uint32_t formats_size = 0, formats_capacity = 0;
 static int
 field_type_create(struct tuple_format *format, struct rlist *key_list)
 {
+	if (format->field_count == 0)
+		return 0;
+
 	/* There may be fields between indexed fields (gaps). */
-	for (uint32_t i = 0; i < format->field_count; i++)
+	for (uint32_t i = 0; i < format->field_count; i++) {
 		format->fields[i].type = FIELD_TYPE_ANY;
+		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_MISSING;
+	}
+
+	int current_slot = 0;
 
 	struct key_def *key_def;
 	/* extract field type info */
 	rlist_foreach_entry(key_def, key_list, link) {
-		for (uint32_t i = 0; i < key_def->part_count; i++) {
-			assert(key_def->parts[i].fieldno < format->field_count);
-			enum field_type set_type = key_def->parts[i].type;
-			enum field_type *fmt_type =
-				&format->fields[key_def->parts[i].fieldno].type;
-			if (*fmt_type != FIELD_TYPE_ANY &&
-			    *fmt_type != set_type) {
+		bool is_sequential = key_def_is_sequential(key_def);
+		const struct key_part *part = key_def->parts;
+		const struct key_part *parts_end = part + key_def->part_count;
+		for (; part < parts_end; part++) {
+			assert(part->fieldno < format->field_count);
+			struct tuple_field_format *field =
+				&format->fields[part->fieldno];
+			if (field->type != FIELD_TYPE_ANY &&
+			    field->type != part->type) {
 				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
-					 key_def->name, i + TUPLE_INDEX_BASE,
-					 field_type_strs[set_type],
-					 field_type_strs[*fmt_type]);
+					 key_def->name,
+					 part->fieldno + TUPLE_INDEX_BASE,
+					 field_type_strs[part->type],
+					 field_type_strs[field->type]);
 				return -1;
 			}
-			*fmt_type = set_type;
+			field->type = part->type;
+
+			/*
+			 * In the tuple, store only offsets necessary
+			 * to access fields of non-sequential keys.
+			 * First field is always simply accessible,
+			 * so we don't store offset for it.
+			 */
+			if (field->offset_slot == TUPLE_OFFSET_SLOT_MISSING &&
+			    !is_sequential && part->fieldno > 0) {
+				field->offset_slot = --current_slot;
+			}
 		}
 	}
+
+	assert(format->fields[0].offset_slot == TUPLE_OFFSET_SLOT_MISSING);
+	assert((uint32_t) (-current_slot * sizeof(uint32_t)) <= UINT16_MAX);
+	format->field_map_size = -current_slot * sizeof(uint32_t);
 	return 0;
 }
 
@@ -170,31 +195,6 @@ tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab)
 		tuple_format_delete(format);
 		return NULL;
 	}
-	/* Set up offset slots */
-	if (format->field_count == 0) {
-		/* Nothing to store */
-		format->field_map_size = 0;
-		return format;
-	}
-	/**
-	 * First field is always simply accessible,
-	 * so we don't store offset for it
-	 */
-	format->fields[0].offset_slot = INT32_MAX;
-
-	int current_slot = 0;
-	for (uint32_t i = 1; i < format->field_count; i++) {
-		/*
-		 * In the tuple, store only offsets necessary to
-		 * quickly access indexed fields.
-		 */
-		if (format->fields[i].type == FIELD_TYPE_ANY)
-			format->fields[i].offset_slot = INT32_MAX;
-		else
-			format->fields[i].offset_slot = --current_slot;
-	}
-	assert((uint32_t) (-current_slot * sizeof(uint32_t)) <= UINT16_MAX);
-	format->field_map_size = -current_slot * sizeof(uint32_t);
 	return format;
 }
 
@@ -236,7 +236,7 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		if (key_mp_type_validate(format->fields[i].type, mp_type,
 					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE))
 			return -1;
-		if (format->fields[i].offset_slot < 0)
+		if (format->fields[i].offset_slot != TUPLE_OFFSET_SLOT_MISSING)
 			field_map[format->fields[i].offset_slot] =
 				(uint32_t) (pos - tuple);
 		mp_next(&pos);

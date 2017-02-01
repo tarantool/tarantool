@@ -246,8 +246,9 @@ struct key_def {
 	/** Index type. */
 	enum index_type type;
 	struct key_opts opts;
-	/** comparators */
+	/** tuple <-> tuple comparison function */
 	tuple_compare_t tuple_compare;
+	/** tuple <-> key comparison function */
 	tuple_compare_with_key_t tuple_compare_with_key;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
@@ -453,6 +454,24 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
 int
 key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
+
+/**
+ * Return true if @a key_def defines a sequential key without
+ * holes starting from the first field. In other words, for all
+ * key parts key_def->parts[part_id].fieldno == part_id.
+ * @param key_def key_def
+ * @retval true key_def is sequential
+ * @retval false otherwise
+ */
+static inline bool
+key_def_is_sequential(const struct key_def *key_def)
+{
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		if (key_def->parts[part_id].fieldno != part_id)
+			return false;
+	}
+	return true;
+}
 
 /** A helper table for key_mp_type_validate */
 extern const uint32_t key_mp_type[];

@@ -60,6 +60,12 @@ enum { FORMAT_REF_MAX = INT32_MAX};
  */
 enum { TUPLE_INDEX_BASE = 1 };
 
+/*
+ * A special value to indicate that tuple format doesn't store
+ * an offset for a field_id.
+ */
+enum { TUPLE_OFFSET_SLOT_MISSING = INT32_MAX };
+
 /**
  * @brief Tuple field format
  * Support structure for struct tuple_format.
@@ -226,10 +232,9 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
 			return tuple;
 		}
 
-		if (format->fields[field_no].offset_slot != INT32_MAX) {
-			int32_t slot = format->fields[field_no].offset_slot;
-			return tuple + field_map[slot];
-		}
+		int32_t offset_slot = format->fields[field_no].offset_slot;
+		if (offset_slot != TUPLE_OFFSET_SLOT_MISSING)
+			return tuple + field_map[offset_slot];
 	}
 	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
 	uint32_t field_count = mp_decode_array(&tuple);

@@ -154,6 +154,33 @@ tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(
 -- Cleanup
 s:drop()
 
+--
+-- gh-2046: don't store offsets for sequential multi-parts keys
+--
+s = box.schema.space.create('test')
+_ = s:create_index('seq2', { parts = { 1, 'unsigned', 2, 'unsigned' }})
+_ = s:create_index('seq3', { parts = { 1, 'unsigned', 2, 'unsigned', 3, 'unsigned' }})
+_ = s:create_index('seq5', { parts = { 1, 'unsigned', 2, 'unsigned', 3, 'unsigned', 4, 'scalar', 5, 'number' }})
+_ = s:create_index('rnd1', { parts = { 3, 'unsigned' }})
+
+errinj.set("ERRINJ_TUPLE_FIELD", true)
+tuple = s:insert({1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+tuple
+tuple[1] -- not-null, always accessible
+tuple[2] -- null, doesn't have offset
+tuple[3] -- not null, has offset
+tuple[4] -- null, doesn't have offset
+tuple[5] -- null, doesn't have offset
+s.index.seq2:select({1})
+s.index.seq2:select({1, 2})
+s.index.seq3:select({1})
+s.index.seq3:select({1, 2, 3})
+s.index.seq5:select({1})
+s.index.seq5:select({1, 2, 3, 4, 5})
+s.index.rnd1:select({3})
+errinj.set("ERRINJ_TUPLE_FIELD", false)
+s:drop()
+
 space = box.schema.space.create('test')
 _ = space:create_index('pk')
 errinj.set("ERRINJ_WAL_WRITE", true)

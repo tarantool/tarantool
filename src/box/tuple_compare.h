@@ -32,6 +32,7 @@
  */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "key_def.h"
 
