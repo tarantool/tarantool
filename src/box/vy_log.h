@@ -147,15 +147,21 @@ struct vy_recovery {
 };
 
 /**
- * Open the vinyl metadata log file stored in a given directory
- * for appending, or create a new one if it doesn't exist.
- * @start_range_id and @start_run_id specify starting IDs to use
- * for range and runs, respectively.
+ * Allocate and initialize a vy_log structure.
  *
- * Returns NULL on failure.
+ * Returns NULL on memory allocation failure.
  */
 struct vy_log *
-vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id);
+vy_log_new(void);
+
+/*
+ * Open the vinyl metadata log file stored in a given directory
+ * for appending, or create a new one if it doesn't exist.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int
+vy_log_open(struct vy_log *log, const char *dir);
 
 /**
  * Close a metadata log and free associated structures.

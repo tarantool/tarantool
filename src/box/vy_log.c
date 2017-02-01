@@ -408,32 +408,40 @@ fail:
 }
 
 struct vy_log *
-vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
+vy_log_new(void)
 {
-	assert(start_range_id >= 0);
-	assert(start_run_id >= 0);
-
 	struct vy_log *log = malloc(sizeof(*log));
 	if (log == NULL) {
 		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
 		goto fail;
 	}
+	memset(log, 0, sizeof(*log));
+
 	log->latch = malloc(sizeof(*log->latch));
 	if (log->latch == NULL) {
 		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
 		goto fail_free;
 	}
+	latch_create(log->latch);
+
+	return log;
+
+fail_free:
+	free(log);
+fail:
+	return NULL;
+}
+
+int
+vy_log_open(struct vy_log *log, const char *dir)
+{
+	assert(log->xlog == NULL);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
 	if (xlog == NULL) {
 		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
-		goto fail_free_latch;
+		goto fail;
 	}
-
-	latch_create(log->latch);
-	log->xlog = xlog;
-	log->next_range_id = start_range_id;
-	log->next_run_id = start_run_id;
 
 	char path[PATH_MAX];
 	snprintf(path, sizeof(path), "%s/%s", dir, VY_LOG_FILE);
@@ -454,27 +462,27 @@ vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
 		if (xlog_rename(xlog) < 0)
 			goto fail_close_xlog;
 	}
-	return log;
+
+	log->xlog = xlog;
+	return 0;
 
 fail_close_xlog:
 	xlog_close(xlog, false);
 fail_free_xlog:
 	free(xlog);
-fail_free_latch:
-	free(log->latch);
-fail_free:
-	free(log);
 fail:
-	return NULL;
+	return -1;
 }
 
 void
 vy_log_delete(struct vy_log *log)
 {
+	if (log->xlog != NULL) {
+		xlog_close(log->xlog, false);
+		free(log->xlog);
+	}
 	latch_destroy(log->latch);
 	free(log->latch);
-	xlog_close(log->xlog, false);
-	free(log->xlog);
 	TRASH(log);
 	free(log);
 }

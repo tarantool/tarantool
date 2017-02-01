@@ -6706,6 +6706,9 @@ vy_env_new(void)
 	e->squash_queue = vy_squash_queue_new();
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
+	e->log = vy_log_new();
+	if (e->log == NULL)
+		goto error_log;
 
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
@@ -6723,6 +6726,8 @@ vy_env_new(void)
 	vy_cache_env_create(&e->cache_env, slab_cache,
 			    e->conf->cache);
 	return e;
+error_log:
+	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
 	vy_scheduler_delete(e->scheduler);
 error_sched:
@@ -6754,8 +6759,7 @@ vy_env_delete(struct vy_env *e)
 	tx_manager_delete(e->xm);
 	vy_conf_delete(e->conf);
 	vy_stat_delete(e->stat);
-	if (e->log != NULL)
-		vy_log_delete(e->log);
+	vy_log_delete(e->log);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);
 	mempool_destroy(&e->cursor_pool);
@@ -6776,8 +6780,7 @@ vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
 	/* First start. Create a new metadata log. */
-	e->log = vy_log_new(e->conf->path, 0, 0);
-	if (e->log == NULL)
+	if (vy_log_open(e->log, e->conf->path) != 0)
 		return -1;
 	e->status = VINYL_ONLINE;
 	return 0;
@@ -6788,7 +6791,6 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 {
 	assert(e->status == VINYL_OFFLINE);
 	assert(e->recovery == NULL);
-	assert(e->log == NULL);
 	if (vclock != NULL) {
 		/*
 		 * Local recovery. Load the recovery context.
@@ -6808,8 +6810,7 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 		 * we may dump data received from the master, so we
 		 * create a new log right away.
 		 */
-		e->log = vy_log_new(e->conf->path, 0, 0);
-		if (e->log == NULL)
+		if (vy_log_open(e->log, e->conf->path) != 0)
 			return -1;
 		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
@@ -6843,13 +6844,11 @@ vy_end_recovery(struct vy_env *e)
 		 * context and open the metadata log for appending.
 		 */
 		assert(e->recovery != NULL);
-		assert(e->log == NULL);
-		e->log = vy_log_new(e->conf->path,
-				    e->recovery->range_id_max + 1,
-				    e->recovery->run_id_max + 1);
+		e->log->next_range_id = e->recovery->range_id_max + 1;
+		e->log->next_run_id = e->recovery->run_id_max + 1;
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
-		if (e->log == NULL)
+		if (vy_log_open(e->log, e->conf->path) != 0)
 			return -1;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
@@ -6859,7 +6858,6 @@ vy_end_recovery(struct vy_env *e)
 		 * (see vy_begin_initial_recovery()).
 		 */
 		assert(e->recovery == NULL);
-		assert(e->log != NULL);
 		break;
 	default:
 		unreachable();
