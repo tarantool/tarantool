@@ -3017,21 +3017,17 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin(log);
-	if (vy_log_insert_range(log, index->key_def->opts.lsn, result->id,
+	vy_log_insert_range(log, index->key_def->opts.lsn, result->id,
 			result->begin != NULL ? tuple_data(result->begin) : NULL,
-			result->end != NULL ? tuple_data(result->end) : NULL) < 0)
-		goto fail_rollback;
+			result->end != NULL ? tuple_data(result->end) : NULL);
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
-		if (vy_log_delete_range(log, it->id) < 0)
-			goto fail_rollback;
 		struct vy_run *run;
-		rlist_foreach_entry(run, &it->runs, in_range) {
-			if (vy_log_insert_run(log, result->id, run->id) < 0)
-				goto fail_rollback;
-		}
+		vy_log_delete_range(log, it->id);
+		rlist_foreach_entry(run, &it->runs, in_range)
+			vy_log_insert_run(log, result->id, run->id);
 	}
-	if (vy_log_tx_commit(log) < 0)
-		goto fail;
+	if (vy_log_tx_commit(log, false) < 0)
+		goto fail_commit;
 
 	/*
 	 * Move runs and mems of the coalesced ranges to the
@@ -3070,9 +3066,7 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	*p_range = result;
 	return;
 
-fail_rollback:
-	vy_log_tx_rollback(log);
-fail:
+fail_commit:
 	vy_range_delete(result);
 fail_range:
 	assert(!diag_is_empty(diag_get()));
@@ -3089,7 +3083,8 @@ fail_range:
 static int
 vy_index_create(struct vy_index *index)
 {
-	struct vy_env *env = index->env;
+	struct vy_log *log = index->env->log;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/* create directory */
 	int rc;
@@ -3124,19 +3119,16 @@ vy_index_create(struct vy_index *index)
 		return -1;
 	vy_index_add_range(index, range);
 	vy_index_acct_range(index, range);
-	vy_scheduler_add_range(env->scheduler, range);
+	vy_scheduler_add_range(scheduler, range);
 
 	/*
 	 * Log change in metadata.
 	 */
-	vy_log_tx_begin(env->log);
-	if (vy_log_new_index(env->log, index->key_def->opts.lsn) < 0 ||
-	    vy_log_insert_range(env->log, index->key_def->opts.lsn,
-				range->id, NULL, NULL) < 0) {
-		vy_log_tx_rollback(env->log);
-		return -1;
-	}
-	if (vy_log_tx_commit(env->log) < 0)
+	vy_log_tx_begin(log);
+	vy_log_new_index(log, index->key_def->opts.lsn);
+	vy_log_insert_range(log, index->key_def->opts.lsn,
+			    range->id, NULL, NULL);
+	if (vy_log_tx_commit(log, false) < 0)
 		return -1;
 
 	return 0;
@@ -3584,16 +3576,20 @@ static int
 vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
-	struct vy_env *env = index->env;
 	struct vy_range *range = task->range;
 	struct vy_run *run = range->new_run;
+	struct vy_log *log = index->env->log;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/*
 	 * Log change in metadata.
 	 */
-	if (!vy_run_is_empty(run) &&
-	    vy_log_insert_run(index->env->log, range->id, run->id) < 0)
-		return -1;
+	if (!vy_run_is_empty(run)) {
+		vy_log_tx_begin(log);
+		vy_log_insert_run(log, range->id, run->id);
+		if (vy_log_tx_commit(log, false) < 0)
+			return -1;
+	}
 
 	say_info("%s: completed dumping range %s",
 		 index->name, vy_range_str(range));
@@ -3616,14 +3612,14 @@ vy_task_dump_complete(struct vy_task *task)
 		struct vy_mem *mem;
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
-		vy_scheduler_mem_dumped(env->scheduler, mem);
+		vy_scheduler_mem_dumped(scheduler, mem);
 		vy_mem_delete(mem);
 	}
 	range->used = range->mem->used;
 	range->min_lsn = range->mem->min_lsn;
 	range->version++;
 	vy_index_acct_range(index, range);
-	vy_scheduler_add_range(env->scheduler, range);
+	vy_scheduler_add_range(scheduler, range);
 	return 0;
 }
 
@@ -3740,7 +3736,8 @@ vy_task_split_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
-	struct vy_env *env = index->env;
+	struct vy_log *log = index->env->log;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *r, *tmp;
 	struct vy_mem *mem;
 	struct vy_run *run;
@@ -3748,25 +3745,16 @@ vy_task_split_complete(struct vy_task *task)
 	/*
 	 * Log change in metadata.
 	 */
-	vy_log_tx_begin(env->log);
-	if (vy_log_delete_range(env->log, range->id) < 0) {
-		vy_log_tx_rollback(env->log);
-		return -1;
-	}
+	vy_log_tx_begin(log);
+	vy_log_delete_range(log, range->id);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
-		if (vy_log_insert_range(env->log, index->key_def->opts.lsn, r->id,
+		vy_log_insert_range(log, index->key_def->opts.lsn, r->id,
 				r->begin != NULL ? tuple_data(r->begin) : NULL,
-				r->end != NULL ? tuple_data(r->end) : NULL) < 0) {
-			vy_log_tx_rollback(env->log);
-			return -1;
-		}
-		if (!vy_run_is_empty(r->new_run) &&
-		    vy_log_insert_run(env->log, r->id, r->new_run->id) < 0) {
-			vy_log_tx_rollback(env->log);
-			return -1;
-		}
+				r->end != NULL ? tuple_data(r->end) : NULL);
+		if (!vy_run_is_empty(r->new_run))
+			vy_log_insert_run(log, r->id, r->new_run->id);
 	}
-	if (vy_log_tx_commit(env->log) < 0)
+	if (vy_log_tx_commit(log, false) < 0)
 		return -1;
 
 	say_info("%s: completed splitting range %s",
@@ -3797,14 +3785,14 @@ vy_task_split_complete(struct vy_task *task)
 		r->shadow = NULL;
 
 		vy_index_acct_range(index, r);
-		vy_scheduler_add_range(env->scheduler, r);
+		vy_scheduler_add_range(scheduler, r);
 	}
 	index->version++;
 
 	/* Notify the scheduler that the range was dumped. */
 	assert(range->mem == NULL); /* active mem was frozen */
 	rlist_foreach_entry(mem, &range->frozen, in_frozen)
-		vy_scheduler_mem_dumped(env->scheduler, mem);
+		vy_scheduler_mem_dumped(scheduler, mem);
 
 	/* Delete files left from the old range. */
 	rlist_foreach_entry(run, &range->runs, in_range)
@@ -3976,8 +3964,9 @@ static int
 vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
-	struct vy_env *env = index->env;
 	struct vy_range *range = task->range;
+	struct vy_log *log = index->env->log;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_mem *mem;
 	struct vy_run *run, *tmp;
 	int n;
@@ -3985,24 +3974,17 @@ vy_task_compact_complete(struct vy_task *task)
 	/*
 	 * Log change in metadata.
 	 */
-	vy_log_tx_begin(env->log);
+	vy_log_tx_begin(log);
 	n = range->compact_priority;
 	rlist_foreach_entry(run, &range->runs, in_range) {
-		if (vy_log_delete_run(env->log, run->id) < 0) {
-			vy_log_tx_rollback(env->log);
-			return -1;
-		}
+		vy_log_delete_run(log, run->id);
 		if (--n == 0)
 			break;
 	}
 	assert(n == 0);
-	if (!vy_run_is_empty(range->new_run) &&
-	    vy_log_insert_run(index->env->log, range->id,
-			      range->new_run->id) < 0) {
-		vy_log_tx_rollback(env->log);
-		return -1;
-	}
-	if (vy_log_tx_commit(env->log) < 0)
+	if (!vy_run_is_empty(range->new_run))
+		vy_log_insert_run(log, range->id, range->new_run->id);
+	if (vy_log_tx_commit(log, false) < 0)
 		return -1;
 
 	say_info("%s: completed compacting range %s",
@@ -4026,7 +4008,7 @@ vy_task_compact_complete(struct vy_task *task)
 	while (!rlist_empty(&range->frozen)) {
 		mem = rlist_shift_entry(&range->frozen,
 					struct vy_mem, in_frozen);
-		vy_scheduler_mem_dumped(env->scheduler, mem);
+		vy_scheduler_mem_dumped(scheduler, mem);
 		vy_mem_delete(mem);
 	}
 	range->used = range->mem->used;
@@ -4041,7 +4023,7 @@ vy_task_compact_complete(struct vy_task *task)
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
-	vy_scheduler_add_range(env->scheduler, range);
+	vy_scheduler_add_range(scheduler, range);
 
 	/* Delete old runs along with their files. */
 	while (!rlist_empty(&runs_to_release)) {

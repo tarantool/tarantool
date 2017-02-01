@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -109,6 +110,12 @@ struct vy_log_record {
 	const char *range_end;
 };
 
+/**
+ * Max number of records in the log buffer.
+ * This limits the size of a transaction.
+ */
+#define VY_LOG_TX_BUF_SIZE		64
+
 /** Vinyl metadata log object. */
 struct vy_log {
 	/** Xlog object used for writing the log. */
@@ -124,6 +131,18 @@ struct vy_log {
 	int64_t next_range_id;
 	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
 	int64_t next_run_id;
+	/**
+	 * Index of the first record of the current
+	 * transaction in tx_buf.
+	 */
+	int tx_begin;
+	/**
+	 * Index of the record following the last one
+	 * of the current transaction in tx_buf.
+	 */
+	int tx_end;
+	/** Records awaiting to be written to disk. */
+	struct vy_log_record tx_buf[VY_LOG_TX_BUF_SIZE];
 };
 
 /** Recovery context. */
@@ -157,6 +176,8 @@ vy_log_new(void);
 /*
  * Open the vinyl metadata log file stored in a given directory
  * for appending, or create a new one if it doesn't exist.
+ * On success, it flushes all pending records written with
+ * vy_log_write() before the log was opened.
  *
  * Returns 0 on success, -1 on failure.
  */
@@ -186,8 +207,7 @@ vy_log_next_range_id(struct vy_log *log)
 /**
  * Begin a transaction in a metadata log.
  *
- * To commit the transaction, call vy_log_tx_commit(),
- * for rollback call vy_log_tx_rollback().
+ * To commit the transaction, call vy_log_tx_commit().
  */
 void
 vy_log_tx_begin(struct vy_log *log);
@@ -195,26 +215,25 @@ vy_log_tx_begin(struct vy_log *log);
 /**
  * Commit a transaction started with vy_log_tx_begin().
  *
+ * This function flushes all buffered records. If @no_discard is set,
+ * pending records won't be expunged from the buffer on failure, so
+ * that the next transaction will retry to write them to disk.
+ *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_tx_commit(struct vy_log *log);
-
-/**
- * Rollback a transaction started with vy_log_tx_begin().
- */
-void
-vy_log_tx_rollback(struct vy_log *log);
+vy_log_tx_commit(struct vy_log *log, bool no_discard);
 
 /**
  * Write a record to a metadata log.
  *
- * This function may be called outside a vy_log_tx_begin/end block,
- * in which case the write occurs in its own transaction.
+ * This function simply appends the record to the internal buffer.
+ * It must be called inside a vy_log_tx_begin/commit block, and it
+ * is up to vy_log_tx_commit() to actually write the record to disk.
  *
  * Returns 0 on success, -1 on failure.
  */
-int
+void
 vy_log_write(struct vy_log *log, const struct vy_log_record *record);
 
 /**
@@ -256,18 +275,18 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		       vy_recovery_cb cb, void *cb_arg);
 
 /** Helper to log an index creation. */
-static inline int
+static inline void
 vy_log_new_index(struct vy_log *log, int64_t index_id)
 {
 	struct vy_log_record record = {
 		.type = VY_LOG_NEW_INDEX,
 		.index_id = index_id,
 	};
-	return vy_log_write(log, &record);
+	vy_log_write(log, &record);
 }
 
 /** Helper to log a range insertion. */
-static inline int
+static inline void
 vy_log_insert_range(struct vy_log *log, int64_t index_id, int64_t range_id,
 		    const char *range_begin, const char *range_end)
 {
@@ -278,22 +297,22 @@ vy_log_insert_range(struct vy_log *log, int64_t index_id, int64_t range_id,
 		.range_begin = range_begin,
 		.range_end = range_end,
 	};
-	return vy_log_write(log, &record);
+	vy_log_write(log, &record);
 }
 
 /** Helper to log a range deletion. */
-static inline int
+static inline void
 vy_log_delete_range(struct vy_log *log, int64_t range_id)
 {
 	struct vy_log_record record = {
 		.type = VY_LOG_DELETE_RANGE,
 		.range_id = range_id,
 	};
-	return vy_log_write(log, &record);
+	vy_log_write(log, &record);
 }
 
 /** Helper to log a run insertion. */
-static inline int
+static inline void
 vy_log_insert_run(struct vy_log *log, int64_t range_id, int64_t run_id)
 {
 	struct vy_log_record record = {
@@ -301,18 +320,18 @@ vy_log_insert_run(struct vy_log *log, int64_t range_id, int64_t run_id)
 		.range_id = range_id,
 		.run_id = run_id,
 	};
-	return vy_log_write(log, &record);
+	vy_log_write(log, &record);
 }
 
 /** Helper to log a run deletion. */
-static inline int
+static inline void
 vy_log_delete_run(struct vy_log *log, int64_t run_id)
 {
 	struct vy_log_record record = {
 		.type = VY_LOG_DELETE_RUN,
 		.run_id = run_id,
 	};
-	return vy_log_write(log, &record);
+	vy_log_write(log, &record);
 }
 
 #if defined(__cplusplus)

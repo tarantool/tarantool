@@ -432,10 +432,71 @@ fail:
 	return NULL;
 }
 
+static ssize_t
+vy_log_flush_f(va_list ap)
+{
+	struct vy_log *log = va_arg(ap, struct vy_log *);
+	/*
+	 * Differentiate from coio_call() failure caused
+	 * by OOM by returning 1.
+	 */
+	if (xlog_tx_commit(log->xlog) < 0 ||
+	    xlog_flush(log->xlog) < 0)
+		return 1;
+	return 0;
+}
+
+/** Try to flush the log buffer to disk. */
+static int
+vy_log_flush(struct vy_log *log)
+{
+	assert(log->xlog != NULL);
+
+	if (log->tx_end == 0)
+		return 0; /* nothing to do */
+
+	/*
+	 * Encode buffered records.
+	 *
+	 * Ideally, we'd do it from a coeio task, but this is
+	 * impossible as an xlog's buffer cannot be written to
+	 * from multiple threads due to debug checks in the
+	 * slab allocator.
+	 */
+	xlog_tx_begin(log->xlog);
+	for (int i = 0; i < log->tx_end; i++) {
+		struct xrow_header row;
+		if (vy_log_record_encode(&log->tx_buf[i], &row) < 0 ||
+		    xlog_write_row(log->xlog, &row) < 0) {
+			xlog_tx_rollback(log->xlog);
+			return -1;
+		}
+	}
+	/*
+	 * Do actual disk writes in a background fiber
+	 * so as not to block the tx thread.
+	 */
+	int rc = coio_call(vy_log_flush_f, log);
+	if (rc < 0) {
+		/*
+		 * xlog_tx_commit() was never called, because coio_call()
+		 * failed due to OOM, so we need to rollback.
+		 */
+		xlog_tx_rollback(log->xlog);
+	}
+	if (rc != 0)
+		return -1;
+
+	/* Success. Reset the buffer. */
+	log->tx_end = 0;
+	return 0;
+}
+
 int
 vy_log_open(struct vy_log *log, const char *dir)
 {
 	assert(log->xlog == NULL);
+	assert(latch_owner(log->latch) == NULL);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
 	if (xlog == NULL) {
@@ -464,6 +525,10 @@ vy_log_open(struct vy_log *log, const char *dir)
 	}
 
 	log->xlog = xlog;
+	if (vy_log_flush(log) < 0) {
+		log->xlog = NULL;
+		goto fail_close_xlog;
+	}
 	return 0;
 
 fail_close_xlog:
@@ -491,72 +556,47 @@ void
 vy_log_tx_begin(struct vy_log *log)
 {
 	latch_lock(log->latch);
-	xlog_tx_begin(log->xlog);
+	log->tx_begin = log->tx_end;
 	say_debug("%s", __func__);
-}
-
-static ssize_t
-vy_log_tx_commit_f(va_list ap)
-{
-	struct vy_log *log = va_arg(ap, struct vy_log *);
-	if (xlog_tx_commit(log->xlog) < 0 ||
-	    xlog_flush(log->xlog) < 0)
-		return -1;
-	return 0;
 }
 
 int
-vy_log_tx_commit(struct vy_log *log)
+vy_log_tx_commit(struct vy_log *log, bool no_discard)
 {
-	say_debug("%s", __func__);
 	int rc = 0;
+
+	assert(latch_owner(log->latch) == fiber());
 	/*
-	 * Do actual disk writes in a background fiber
-	 * so as not to block the tx thread.
+	 * If the log has not been opened yet, silently return.
+	 * Pending writes will be flushed by vy_log_open().
 	 */
-	if (coio_call(vy_log_tx_commit_f, log) < 0)
-		rc = -1;
+	if (log->xlog != NULL) {
+		rc = vy_log_flush(log);
+		/*
+		 * Reset the buffer on failure unless we were
+		 * explicitly told not to.
+		 */
+		if (rc != 0 && !no_discard)
+			log->tx_end = log->tx_begin;
+	}
+	say_debug("%s(no_discard=%d): success", __func__, no_discard,
+		  rc == 0 ? "success" : "fail");
 	latch_unlock(log->latch);
 	return rc;
 }
 
 void
-vy_log_tx_rollback(struct vy_log *log)
-{
-	xlog_tx_rollback(log->xlog);
-	say_debug("%s", __func__);
-	latch_unlock(log->latch);
-}
-
-int
 vy_log_write(struct vy_log *log, const struct vy_log_record *record)
 {
-	int rc = 0;
-
-	bool autocommit = (latch_owner(log->latch) != fiber());
-	if (autocommit) {
-		/*
-		 * The caller doesn't bother to call vy_log_tx_begin()
-		 * and vy_log_tx_commit(), do her a favor.
-		 */
-		vy_log_tx_begin(log);
-	}
+	assert(latch_owner(log->latch) == fiber());
 
 	say_debug("%s: %s", __func__, vy_log_record_str(record));
-
-	struct xrow_header row;
-	if (vy_log_record_encode(record, &row) < 0 ||
-	    xlog_write_row(log->xlog, &row) < 0)
-		rc = -1;
-
-	if (autocommit) {
-		if (rc == 0)
-			rc = vy_log_tx_commit(log);
-		else
-			vy_log_tx_rollback(log);
+	if (log->tx_end >= VY_LOG_TX_BUF_SIZE) {
+		latch_unlock(log->latch);
+		panic("vinyl metadata log buffer overflow");
 	}
 
-	return rc;
+	log->tx_buf[log->tx_end++] = *record;
 }
 
 /** Lookup an index in vy_recovery::index_hash map. */
