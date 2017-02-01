@@ -103,10 +103,10 @@ const uint32_t key_mp_type[] = {
 };
 
 const char *opt_type_strs[] = {
-	[OPT_BOOL]	= "boolean",
-	[OPT_INT]	= "integer",
-	[OPT_FLOAT]	= "float",
-	[OPT_STR]	= "string",
+	/* [OPT_BOOL]	= */ "boolean",
+	/* [OPT_INT]	= */ "integer",
+	/* [OPT_FLOAT]	= */ "float",
+	/* [OPT_STR]	= */ "string",
 };
 
 const struct key_opts key_opts_default = {
