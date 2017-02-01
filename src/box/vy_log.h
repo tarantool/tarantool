@@ -62,28 +62,33 @@ enum vy_log_type {
 	 * Create a new index.
 	 * Requires vy_log_record::index_id.
 	 */
-	VY_LOG_NEW_INDEX		= 0,
+	VY_LOG_CREATE_INDEX		= 0,
+	/**
+	 * Drop an index.
+	 * Requires vy_log_record::index_id.
+	 */
+	VY_LOG_DROP_INDEX		= 1,
 	/**
 	 * Insert a new range into an index.
 	 * Requires vy_log_record::index_id, range_id,
 	 * range_begin, range_end.
 	 */
-	VY_LOG_INSERT_RANGE		= 1,
+	VY_LOG_INSERT_RANGE		= 2,
 	/**
 	 * Delete a range and all its runs.
 	 * Requires vy_log_record::range_id.
 	 */
-	VY_LOG_DELETE_RANGE		= 2,
+	VY_LOG_DELETE_RANGE		= 3,
 	/**
 	 * Insert a new run into a range.
 	 * Requires vy_log_record::range_id, run_id.
 	 */
-	VY_LOG_INSERT_RUN		= 3,
+	VY_LOG_INSERT_RUN		= 4,
 	/**
 	 * Delete a run.
 	 * Requires vy_log_record::run_id.
 	 */
-	VY_LOG_DELETE_RUN		= 4,
+	VY_LOG_DELETE_RUN		= 5,
 
 	vy_log_MAX
 };
@@ -260,7 +265,7 @@ typedef int
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
- * either VY_LOG_NEW_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN.
+ * either VY_LOG_CREATE_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN.
  * The callback is supposed to rebuild the index structure and open run
  * files. If the callback returns a non-zero value, the function stops
  * iteration over ranges and runs and returns error.
@@ -274,12 +279,30 @@ int
 vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		       vy_recovery_cb cb, void *cb_arg);
 
+/**
+ * Return true if the index with id @index_id was dropped or never
+ * created in the scope of recovery context @recovery.
+ */
+bool
+vy_recovery_index_is_dropped(struct vy_recovery *recovery, int64_t index_id);
+
 /** Helper to log an index creation. */
 static inline void
-vy_log_new_index(struct vy_log *log, int64_t index_id)
+vy_log_create_index(struct vy_log *log, int64_t index_id)
 {
 	struct vy_log_record record = {
-		.type = VY_LOG_NEW_INDEX,
+		.type = VY_LOG_CREATE_INDEX,
+		.index_id = index_id,
+	};
+	vy_log_write(log, &record);
+}
+
+/** Helper to log an index drop. */
+static inline void
+vy_log_drop_index(struct vy_log *log, int64_t index_id)
+{
+	struct vy_log_record record = {
+		.type = VY_LOG_DROP_INDEX,
 		.index_id = index_id,
 	};
 	vy_log_write(log, &record);

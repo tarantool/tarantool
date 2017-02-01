@@ -3125,7 +3125,7 @@ vy_index_create(struct vy_index *index)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin(log);
-	vy_log_new_index(log, index->key_def->opts.lsn);
+	vy_log_create_index(log, index->key_def->opts.lsn);
 	vy_log_insert_range(log, index->key_def->opts.lsn,
 			    range->id, NULL, NULL);
 	if (vy_log_tx_commit(log, false) < 0)
@@ -3186,7 +3186,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_run *run;
 
 	switch (record->type) {
-	case VY_LOG_NEW_INDEX:
+	case VY_LOG_CREATE_INDEX:
 		assert(record->index_id == index->key_def->opts.lsn);
 		break;
 	case VY_LOG_INSERT_RANGE:
@@ -5094,6 +5094,27 @@ vy_index_unref(struct vy_index *index)
 void
 vy_index_drop(struct vy_index *index)
 {
+	struct vy_env *env = index->env;
+	int64_t index_id = index->key_def->opts.lsn;
+
+	/*
+	 * We can't abort here, because the index drop request has
+	 * already been written to WAL. So if we fail to write the
+	 * change to the metadata log, we leave it in the log buffer,
+	 * to be flushed along with the next transaction. If it is
+	 * not flushed before the server is shut down, we replay it
+	 * on local recovery from WAL.
+	 */
+	if (env->status != VINYL_FINAL_RECOVERY_LOCAL ||
+	    !vy_recovery_index_is_dropped(env->recovery, index_id)) {
+		vy_log_tx_begin(env->log);
+		vy_log_drop_index(env->log, index_id);
+		if (vy_log_tx_commit(env->log, true) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			say_warn("failed to log drop index: %s", e->errmsg);
+		}
+	}
+
 	/* TODO:
 	 * don't drop/recreate index in local wal recovery mode if all
 	 * operations are already done.

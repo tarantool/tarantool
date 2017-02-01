@@ -78,7 +78,8 @@ enum vy_log_key {
  * of a particular type.
  */
 static const unsigned long vy_log_key_mask[] = {
-	[VY_LOG_NEW_INDEX]		= (1 << VY_LOG_KEY_INDEX_ID),
+	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_ID),
+	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_ID),
 	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_ID) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
@@ -100,7 +101,8 @@ static const char *vy_log_key_name[] = {
 
 /** vy_log_type -> human readable name. */
 static const char *vy_log_type_name[] = {
-	[VY_LOG_NEW_INDEX]		= "new_index",
+	[VY_LOG_CREATE_INDEX]		= "create_index",
+	[VY_LOG_DROP_INDEX]		= "drop_index",
 	[VY_LOG_INSERT_RANGE]		= "insert_range",
 	[VY_LOG_DELETE_RANGE]		= "delete_range",
 	[VY_LOG_INSERT_RUN]		= "insert_run",
@@ -111,6 +113,8 @@ static const char *vy_log_type_name[] = {
 struct vy_index_recovery_info {
 	/** ID of the index. */
 	int64_t id;
+	/** True if the index was dropped. */
+	bool is_dropped;
 	/**
 	 * List of all ranges in the index, linked by
 	 * vy_range_recovery_info::in_index.
@@ -657,7 +661,29 @@ vy_recovery_hash_index(struct vy_recovery *recovery, int64_t index_id)
 		return -1;
 	}
 	index->id = index_id;
+	index->is_dropped = false;
 	rlist_create(&index->ranges);
+	return 0;
+}
+
+/**
+ * Mark an index as dropped.
+ * Returns 0 on success, -1 if ID not found or index is already marked.
+ */
+static int
+vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_id)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_VINYL, "unknown index id");
+		return -1;
+	}
+	if (index->is_dropped) {
+		diag_set(ClientError, ER_VINYL, "index is already dropped");
+		return -1;
+	}
+	index->is_dropped = true;
 	return 0;
 }
 
@@ -815,8 +841,11 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 
 	int rc;
 	switch (record->type) {
-	case VY_LOG_NEW_INDEX:
+	case VY_LOG_CREATE_INDEX:
 		rc = vy_recovery_hash_index(recovery, record->index_id);
+		break;
+	case VY_LOG_DROP_INDEX:
+		rc = vy_recovery_drop_index(recovery, record->index_id);
 		break;
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_hash_range(recovery, record->index_id,
@@ -939,7 +968,7 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 	struct vy_range_recovery_info *range;
 	struct vy_run_recovery_info *run;
 	struct vy_log_record record = {
-		.type = VY_LOG_NEW_INDEX,
+		.type = VY_LOG_CREATE_INDEX,
 		.index_id = index_id,
 	};
 	const char *tmp;
@@ -982,4 +1011,12 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		}
 	}
 	return 0;
+}
+
+bool
+vy_recovery_index_is_dropped(struct vy_recovery *recovery, int64_t index_id)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_id);
+	return index == NULL || index->is_dropped;
 }
