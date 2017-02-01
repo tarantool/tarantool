@@ -50,6 +50,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct latch;
+struct xlog;
+
 struct mh_i64ptr_t;
 
 /** Type of a vinyl metadata log record. */
@@ -106,8 +109,22 @@ struct vy_log_record {
 	const char *range_end;
 };
 
-/* Opaque to reduce dependencies. */
-struct vy_log;
+/** Vinyl metadata log object. */
+struct vy_log {
+	/** Xlog object used for writing the log. */
+	struct xlog *xlog;
+	/**
+	 * Latch protecting the xlog.
+	 *
+	 * We need to lock the log before writing to xlog, because
+	 * xlog object doesn't support concurrent accesses.
+	 */
+	struct latch *latch;
+	/** Next ID to use for a range. Used by vy_log_next_range_id(). */
+	int64_t next_range_id;
+	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
+	int64_t next_run_id;
+};
 
 /** Recovery context. */
 struct vy_recovery {
@@ -147,12 +164,18 @@ void
 vy_log_delete(struct vy_log *log);
 
 /** Allocate a unique ID for a run. */
-int64_t
-vy_log_next_run_id(struct vy_log *log);
+static inline int64_t
+vy_log_next_run_id(struct vy_log *log)
+{
+	return log->next_run_id++;
+}
 
 /** Allocate a unique ID for a range. */
-int64_t
-vy_log_next_range_id(struct vy_log *log);
+static inline int64_t
+vy_log_next_range_id(struct vy_log *log)
+{
+	return log->next_range_id++;
+}
 
 /**
  * Begin a transaction in a metadata log.

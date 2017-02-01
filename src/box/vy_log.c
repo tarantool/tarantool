@@ -107,23 +107,6 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DELETE_RUN]		= "delete_run",
 };
 
-/** Vinyl metadata log object. */
-struct vy_log {
-	/** Xlog object used for writing the log. */
-	struct xlog *xlog;
-	/**
-	 * Latch protecting the xlog.
-	 *
-	 * We need to lock the log before writing to xlog, because
-	 * xlog object doesn't support concurrent accesses.
-	 */
-	struct latch latch;
-	/** Next ID to use for a range. Used by vy_log_next_range_id(). */
-	int64_t next_range_id;
-	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
-	int64_t next_run_id;
-};
-
 /** Index info stored in a recovery context. */
 struct vy_index_recovery_info {
 	/** ID of the index. */
@@ -435,14 +418,19 @@ vy_log_new(const char *dir, int64_t start_range_id, int64_t start_run_id)
 		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
 		goto fail;
 	}
+	log->latch = malloc(sizeof(*log->latch));
+	if (log->latch == NULL) {
+		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
+		goto fail_free;
+	}
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
 	if (xlog == NULL) {
 		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
-		goto fail_free;
+		goto fail_free_latch;
 	}
 
-	latch_create(&log->latch);
+	latch_create(log->latch);
 	log->xlog = xlog;
 	log->next_range_id = start_range_id;
 	log->next_run_id = start_run_id;
@@ -472,6 +460,8 @@ fail_close_xlog:
 	xlog_close(xlog, false);
 fail_free_xlog:
 	free(xlog);
+fail_free_latch:
+	free(log->latch);
 fail_free:
 	free(log);
 fail:
@@ -481,29 +471,18 @@ fail:
 void
 vy_log_delete(struct vy_log *log)
 {
-	latch_destroy(&log->latch);
+	latch_destroy(log->latch);
+	free(log->latch);
 	xlog_close(log->xlog, false);
 	free(log->xlog);
 	TRASH(log);
 	free(log);
 }
 
-int64_t
-vy_log_next_run_id(struct vy_log *log)
-{
-	return log->next_run_id++;
-}
-
-int64_t
-vy_log_next_range_id(struct vy_log *log)
-{
-	return log->next_range_id++;
-}
-
 void
 vy_log_tx_begin(struct vy_log *log)
 {
-	latch_lock(&log->latch);
+	latch_lock(log->latch);
 	xlog_tx_begin(log->xlog);
 	say_debug("%s", __func__);
 }
@@ -529,7 +508,7 @@ vy_log_tx_commit(struct vy_log *log)
 	 */
 	if (coio_call(vy_log_tx_commit_f, log) < 0)
 		rc = -1;
-	latch_unlock(&log->latch);
+	latch_unlock(log->latch);
 	return rc;
 }
 
@@ -538,7 +517,7 @@ vy_log_tx_rollback(struct vy_log *log)
 {
 	xlog_tx_rollback(log->xlog);
 	say_debug("%s", __func__);
-	latch_unlock(&log->latch);
+	latch_unlock(log->latch);
 }
 
 int
@@ -546,7 +525,7 @@ vy_log_write(struct vy_log *log, const struct vy_log_record *record)
 {
 	int rc = 0;
 
-	bool autocommit = (latch_owner(&log->latch) != fiber());
+	bool autocommit = (latch_owner(log->latch) != fiber());
 	if (autocommit) {
 		/*
 		 * The caller doesn't bother to call vy_log_tx_begin()
