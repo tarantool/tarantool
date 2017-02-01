@@ -147,15 +147,16 @@ cd test && ./test-run.py unit/ app/ app-tap/ box/ box-tap/ engine/ sophia/
 %systemd_post tarantool@.service
 %else
 chkconfig --add tarantool || :
-service tarantool start || :
 %endif
 
 %preun
 %if %{with systemd}
 %systemd_preun tarantool@.service
 %else
-service tarantool stop
-chkconfig --del tarantool
+if [ $1 -eq 0 ] ; then # uninstall
+    service tarantool stop || :
+    chkconfig --del tarantool || :
+fi
 %endif
 
 %postun
