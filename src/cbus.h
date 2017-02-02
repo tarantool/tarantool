@@ -268,10 +268,10 @@ void
 cbus_free();
 
 /**
- * Connect the endpoint to cbus with given name.
- * fetch_cb callback will be called if peak state was
- * changed from empty. fetch_data will be installed as
- * async data property in callback params.
+ * Connect the cord to cbus as a named reciever and create
+ * fiber pool to process incoming messages.
+ * @param name a destination name
+ * @param fetch_cb callback to fetch new messages
  */
 void
 cbus_join(struct cbus_endpoint *endpoint, const char *name,

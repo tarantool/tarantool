@@ -124,9 +124,8 @@ cbus_destroy(struct cbus *bus)
 
 /**
  * Join a new endpoint (message consumer) to the bus. The endpoint
- * must have a unique name. The endpoint object is created
- * automatically. Wakes up all producers (@sa cpipe_create()) who
- * are blocked waiting for this endpoint to become available.
+ * must have a unique name. Wakes up all producers (@sa cpipe_create())
+ * who are blocked waiting for this endpoint to become available.
  */
 void
 cbus_join(struct cbus_endpoint *endpoint, const char *name,
