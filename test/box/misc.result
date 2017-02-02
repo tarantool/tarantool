@@ -286,9 +286,10 @@ end;
 t;
 ---
 - - 'box.error.CANT_UPDATE_PRIMARY_KEY : 94'
+  - 'box.error.injection : table: <address>
   - 'box.error.EXACT_MATCH : 19'
   - 'box.error.NO_SUCH_TRIGGER : 34'
-  - 'box.error.injection : table: <address>
+  - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.ALREADY_RUNNING : 126'
   - 'box.error.CLUSTER_ID_IS_RO : 65'
   - 'box.error.INVALID_XLOG_TYPE : 125'
@@ -359,7 +360,7 @@ t;
   - 'box.error.CREATE_ROLE : 84'
   - 'box.error.WRONG_INDEX_OPTIONS : 108'
   - 'box.error.ROLE_EXISTS : 83'
-  - 'box.error.NO_SUCH_ROLE : 82'
+  - 'box.error.INDEX_FIELD_COUNT_LIMIT : 127'
   - 'box.error.LOAD_FUNCTION : 99'
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
   - 'box.error.UNSUPPORTED : 5'
