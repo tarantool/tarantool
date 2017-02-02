@@ -594,7 +594,12 @@ struct vy_index {
 	char *name;
 	/** The path with index files. */
 	char *path;
-
+	/**
+	 * This flag is set if the index was dropped.
+	 * It is also set on local recovery if the index
+	 * will be dropped when WAL is replayed.
+	 */
+	bool is_dropped;
 	/**
 	 * A key definition for this index, used to
 	 * compare tuples.
@@ -3170,6 +3175,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		assert(record->index_id == index->key_def->opts.lsn);
+		index->is_dropped = record->is_dropped;
 		break;
 	case VY_LOG_INSERT_RANGE:
 		range = vy_range_new(index, record->range_id, NULL, NULL);
@@ -5081,11 +5087,13 @@ vy_index_drop(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
 	int64_t index_id = index->key_def->opts.lsn;
+	bool was_dropped = index->is_dropped;
 
 	/* TODO:
 	 * don't drop/recreate index in local wal recovery mode if all
 	 * operations are already done.
 	 */
+	index->is_dropped = true;
 	rlist_del(&index->link);
 	vy_index_unref(index);
 
@@ -5097,8 +5105,7 @@ vy_index_drop(struct vy_index *index)
 	 * not flushed before the server is shut down, we replay it
 	 * on local recovery from WAL.
 	 */
-	if (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
-	    vy_recovery_index_is_dropped(env->recovery, index_id))
+	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && was_dropped)
 		return;
 
 	vy_log_tx_begin(env->log);

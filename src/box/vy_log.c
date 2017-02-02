@@ -1156,10 +1156,7 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 	struct vy_index_recovery_info *index;
 	struct vy_range_recovery_info *range;
 	struct vy_run_recovery_info *run;
-	struct vy_log_record record = {
-		.type = VY_LOG_CREATE_INDEX,
-		.index_id = index_id,
-	};
+	struct vy_log_record record;
 	const char *tmp;
 
 	index = vy_recovery_lookup_index(recovery, index_id);
@@ -1167,6 +1164,10 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		diag_set(ClientError, ER_VINYL, "unknown index id");
 		return -1;
 	}
+
+	record.type = VY_LOG_CREATE_INDEX,
+	record.index_id = index_id,
+	record.is_dropped = index->is_dropped;
 
 	if (cb(&record, cb_arg) != 0)
 		return -1;
@@ -1200,12 +1201,4 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		}
 	}
 	return 0;
-}
-
-bool
-vy_recovery_index_is_dropped(struct vy_recovery *recovery, int64_t index_id)
-{
-	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
-	return index == NULL || index->is_dropped;
 }

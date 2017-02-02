@@ -113,6 +113,12 @@ struct vy_log_record {
 	const char *range_begin;
 	/** Msgpack key for end of a range. */
 	const char *range_end;
+	/**
+	 * This flag is never written to the metadata log.
+	 * It is used on recovery to indicate that the index
+	 * being recovered was dropped.
+	 */
+	bool is_dropped;
 };
 
 /**
@@ -312,13 +318,6 @@ typedef int
 int
 vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		       vy_recovery_cb cb, void *cb_arg);
-
-/**
- * Return true if the index with id @index_id was dropped or never
- * created in the scope of recovery context @recovery.
- */
-bool
-vy_recovery_index_is_dropped(struct vy_recovery *recovery, int64_t index_id);
 
 /** Helper to log an index creation. */
 static inline void
