@@ -1173,14 +1173,14 @@ net_cord_f(va_list /* ap */)
 
 	struct cbus_endpoint endpoint;
 	/* Create "net" endpoint. */
-	cbus_join(&endpoint, "net", fiber_schedule_cb, fiber());
+	cbus_endpoint_create(&endpoint, "net", fiber_schedule_cb, fiber());
 	/* Create a pipe to "tx" thread. */
 	cpipe_create(&tx_pipe, "tx");
 	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	/* Process incomming messages. */
-
 	cbus_loop(&endpoint);
 
+	cpipe_destroy(&tx_pipe);
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming

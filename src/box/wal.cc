@@ -583,7 +583,7 @@ wal_thread_f(va_list ap)
 	coeio_enable();
 
 	struct cbus_endpoint endpoint;
-	cbus_join(&endpoint, "wal", fiber_schedule_cb, fiber());
+	cbus_endpoint_create(&endpoint, "wal", fiber_schedule_cb, fiber());
 	/*
 	 * Create a pipe to TX thread. Use a high priority
 	 * endpoint, to ensure that WAL messages are delivered
@@ -597,6 +597,7 @@ wal_thread_f(va_list ap)
 		xlog_close(&wal->current_wal, false);
 		wal->is_active = false;
 	}
+	cpipe_destroy(&wal_thread.tx_pipe);
 	return 0;
 }
 

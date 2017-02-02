@@ -84,6 +84,7 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 
 	pipe->n_input = 0;
 	pipe->max_input = INT_MAX;
+	pipe->producer = cord()->loop;
 
 	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
 	pipe->flush_input.data = pipe;
@@ -94,9 +95,40 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 		tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
 		endpoint = cbus_find_endpoint(&cbus, consumer);
 	}
-	pipe->producer = cord()->loop;
 	pipe->endpoint = endpoint;
+	++pipe->endpoint->n_pipes;
 	tt_pthread_mutex_unlock(&cbus.mutex);
+}
+
+struct cmsg_poison {
+	struct cmsg msg;
+	struct cbus_endpoint *endpoint;
+};
+
+static void
+cbus_endpoint_poison_f(struct cmsg *msg)
+{
+	struct cbus_endpoint *endpoint = ((struct cmsg_poison *)msg)->endpoint;
+	--endpoint->n_pipes;
+	ipc_cond_signal(&endpoint->cond);
+	free(msg);
+}
+
+void
+cpipe_destroy(struct cpipe *pipe)
+{
+	static const struct cmsg_hop route[1] = {
+		{cbus_endpoint_poison_f, NULL}
+	};
+	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
+	poison->endpoint = pipe->endpoint;
+	cmsg_init(&poison->msg, route);
+
+	cpipe_push(pipe, &poison->msg);
+	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+
+	ev_async_stop(pipe->producer, &pipe->flush_input);
+	TRASH(pipe);
 }
 
 static void
@@ -127,16 +159,21 @@ cbus_destroy(struct cbus *bus)
  * must have a unique name. Wakes up all producers (@sa cpipe_create())
  * who are blocked waiting for this endpoint to become available.
  */
-void
-cbus_join(struct cbus_endpoint *endpoint, const char *name,
-	  void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data)
+int
+cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
+		     void (*fetch_cb)(ev_loop *, struct ev_watcher *, int),
+		     void *fetch_data)
 {
 	tt_pthread_mutex_lock(&cbus.mutex);
-	if (cbus_find_endpoint(&cbus, name) != NULL)
-		panic("cbus endpoint %s joined twice", name);
+	if (cbus_find_endpoint(&cbus, name) != NULL) {
+		tt_pthread_mutex_unlock(&cbus.mutex);
+		return 1;
+	}
 
 	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
 	endpoint->consumer = loop();
+	endpoint->n_pipes = 0;
+	ipc_cond_create(&endpoint->cond);
 	tt_pthread_mutex_init(&endpoint->mutex, NULL);
 	stailq_create(&endpoint->output);
 	ev_async_init(&endpoint->async,
@@ -154,6 +191,35 @@ cbus_join(struct cbus_endpoint *endpoint, const char *name,
 	 * blocked on cond.
 	 */
 	tt_pthread_cond_broadcast(&cbus.cond);
+	return 0;
+}
+
+int
+cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
+		      void (*process_cb)(struct cbus_endpoint *endpoint))
+{
+	tt_pthread_mutex_lock(&cbus.mutex);
+	/*
+	 * Remove endpoint from cbus registry, so no new pipe can
+	 * be created for this endpoint
+	 */
+	rlist_del(&endpoint->in_cbus);
+	tt_pthread_mutex_unlock(&cbus.mutex);
+
+	while (endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) {
+		/*
+		 * Endpoint has connected pipes or qeued messages
+		 */
+		if (process_cb)
+			process_cb(endpoint);
+		ipc_cond_wait(&endpoint->cond);
+	}
+
+	tt_pthread_mutex_destroy(&endpoint->mutex);
+	ev_async_stop(endpoint->consumer, &endpoint->async);
+	ipc_cond_destroy(&endpoint->cond);
+	TRASH(endpoint);
+	return 0;
 }
 
 static void
