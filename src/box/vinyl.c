@@ -3008,7 +3008,7 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 		rlist_foreach_entry(run, &it->runs, in_range)
 			vy_log_insert_run(log, result->id, run->id);
 	}
-	if (vy_log_tx_commit(log, false) < 0)
+	if (vy_log_tx_commit(log) < 0)
 		goto fail_commit;
 
 	/*
@@ -3110,7 +3110,7 @@ vy_index_create(struct vy_index *index)
 	vy_log_create_index(log, index->key_def->opts.lsn);
 	vy_log_insert_range(log, index->key_def->opts.lsn,
 			    range->id, NULL, NULL);
-	if (vy_log_tx_commit(log, false) < 0)
+	if (vy_log_tx_commit(log) < 0)
 		return -1;
 
 	return 0;
@@ -3569,7 +3569,7 @@ vy_task_dump_complete(struct vy_task *task)
 	if (!vy_run_is_empty(run)) {
 		vy_log_tx_begin(log);
 		vy_log_insert_run(log, range->id, run->id);
-		if (vy_log_tx_commit(log, false) < 0)
+		if (vy_log_tx_commit(log) < 0)
 			return -1;
 	}
 
@@ -3736,7 +3736,7 @@ vy_task_split_complete(struct vy_task *task)
 		if (!vy_run_is_empty(r->new_run))
 			vy_log_insert_run(log, r->id, r->new_run->id);
 	}
-	if (vy_log_tx_commit(log, false) < 0)
+	if (vy_log_tx_commit(log) < 0)
 		return -1;
 
 	say_info("%s: completed splitting range %s",
@@ -3966,7 +3966,7 @@ vy_task_compact_complete(struct vy_task *task)
 	assert(n == 0);
 	if (!vy_run_is_empty(range->new_run))
 		vy_log_insert_run(log, range->id, range->new_run->id);
-	if (vy_log_tx_commit(log, false) < 0)
+	if (vy_log_tx_commit(log) < 0)
 		return -1;
 
 	say_info("%s: completed compacting range %s",
@@ -5082,6 +5082,13 @@ vy_index_drop(struct vy_index *index)
 	struct vy_env *env = index->env;
 	int64_t index_id = index->key_def->opts.lsn;
 
+	/* TODO:
+	 * don't drop/recreate index in local wal recovery mode if all
+	 * operations are already done.
+	 */
+	rlist_del(&index->link);
+	vy_index_unref(index);
+
 	/*
 	 * We can't abort here, because the index drop request has
 	 * already been written to WAL. So if we fail to write the
@@ -5090,22 +5097,15 @@ vy_index_drop(struct vy_index *index)
 	 * not flushed before the server is shut down, we replay it
 	 * on local recovery from WAL.
 	 */
-	if (env->status != VINYL_FINAL_RECOVERY_LOCAL ||
-	    !vy_recovery_index_is_dropped(env->recovery, index_id)) {
-		vy_log_tx_begin(env->log);
-		vy_log_drop_index(env->log, index_id);
-		if (vy_log_tx_commit(env->log, true) < 0) {
-			struct error *e = diag_last_error(diag_get());
-			say_warn("failed to log drop index: %s", e->errmsg);
-		}
-	}
+	if (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
+	    vy_recovery_index_is_dropped(env->recovery, index_id))
+		return;
 
-	/* TODO:
-	 * don't drop/recreate index in local wal recovery mode if all
-	 * operations are already done.
-	 */
-	rlist_del(&index->link);
-	vy_index_unref(index);
+	vy_log_tx_begin(env->log);
+	vy_log_drop_index(env->log, index_id);
+	if (vy_log_tx_try_commit(env->log) < 0)
+		say_warn("failed to log drop index: %s",
+			 diag_last_error(diag_get())->errmsg);
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;

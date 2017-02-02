@@ -450,17 +450,23 @@ static ssize_t
 vy_log_flush_f(va_list ap)
 {
 	struct vy_log *log = va_arg(ap, struct vy_log *);
-	/*
-	 * Differentiate from coio_call() failure caused
-	 * by OOM by returning 1.
-	 */
+	int *rc = va_arg(ap, int *);
+
 	if (xlog_tx_commit(log->xlog) < 0 ||
 	    xlog_flush(log->xlog) < 0)
-		return 1;
+		*rc = -1;
+	else
+		*rc = 0;
 	return 0;
 }
 
-/** Try to flush the log buffer to disk. */
+/**
+ * Try to flush the log buffer to disk.
+ *
+ * We always flush the entire vy_log buffer as a single xlog
+ * transaction, since we do not track boundaries of @no_discard
+ * buffered transactions, and want to avoid a partial write.
+ */
 static int
 vy_log_flush(struct vy_log *log)
 {
@@ -490,16 +496,17 @@ vy_log_flush(struct vy_log *log)
 	 * Do actual disk writes in a background fiber
 	 * so as not to block the tx thread.
 	 */
-	int rc = coio_call(vy_log_flush_f, log);
-	if (rc < 0) {
+	int rc;
+	if (coio_call(vy_log_flush_f, log, &rc) < 0) {
 		/*
-		 * xlog_tx_commit() was never called, because coio_call()
+		 * vy_log_flush_f() was never called, because coio_call()
 		 * failed due to OOM, so we need to rollback.
 		 */
 		xlog_tx_rollback(log->xlog);
+		return -1;
 	}
 	if (rc != 0)
-		return -1;
+		return -1; /* vy_log_flush_f() failed */
 
 	/* Success. Reset the buffer. */
 	log->tx_end = 0;
@@ -541,6 +548,7 @@ vy_log_open(struct vy_log *log, const char *dir, int64_t signature)
 	log->xlog = xlog;
 	log->signature = signature;
 	if (vy_log_flush(log) < 0) {
+		/* Abort recovery if we can't flush the log. */
 		log->xlog = NULL;
 		goto fail_close_xlog;
 	}
@@ -723,21 +731,30 @@ vy_log_tx_begin(struct vy_log *log)
 	say_debug("%s", __func__);
 }
 
-int
-vy_log_tx_commit(struct vy_log *log, bool no_discard)
+/**
+ * Commit a transaction started with vy_log_tx_begin().
+ *
+ * If @no_discard is set, pending records won't be expunged from the
+ * buffer on failure, so that the next transaction will retry to write
+ * them to disk.
+ */
+static int
+vy_log_tx_do_commit(struct vy_log *log, bool no_discard)
 {
 	int rc = 0;
 
 	assert(latch_owner(log->latch) == fiber());
 	/*
-	 * If the log has not been opened yet, silently return.
-	 * Pending writes will be flushed by vy_log_open().
+	 * If the log has not been opened yet, which means this is
+	 * recovery and we are replaying records we failed to commit
+	 * before restart, silently return - pending writes will be
+	 * flushed by vy_log_open().
 	 */
 	if (log->xlog != NULL) {
 		rc = vy_log_flush(log);
 		/*
-		 * Reset the buffer on failure unless we were
-		 * explicitly told not to.
+		 * Rollback the transaction on failure
+		 * unless we were explicitly told not to.
 		 */
 		if (rc != 0 && !no_discard)
 			log->tx_end = log->tx_begin;
@@ -746,6 +763,18 @@ vy_log_tx_commit(struct vy_log *log, bool no_discard)
 		  rc == 0 ? "success" : "fail");
 	latch_unlock(log->latch);
 	return rc;
+}
+
+int
+vy_log_tx_commit(struct vy_log *log)
+{
+	return vy_log_tx_do_commit(log, false);
+}
+
+int
+vy_log_tx_try_commit(struct vy_log *log)
+{
+	return vy_log_tx_do_commit(log, true);
 }
 
 void

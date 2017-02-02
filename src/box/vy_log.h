@@ -119,7 +119,7 @@ struct vy_log_record {
  * Max number of records in the log buffer.
  * This limits the size of a transaction.
  */
-#define VY_LOG_TX_BUF_SIZE		64
+enum { VY_LOG_TX_BUF_SIZE = 64 };
 
 /** Vinyl metadata log object. */
 struct vy_log {
@@ -230,7 +230,8 @@ vy_log_next_range_id(struct vy_log *log)
 /**
  * Begin a transaction in a metadata log.
  *
- * To commit the transaction, call vy_log_tx_commit().
+ * To commit the transaction, call vy_log_tx_commit() or
+ * vy_log_tx_try_commit().
  */
 void
 vy_log_tx_begin(struct vy_log *log);
@@ -238,14 +239,28 @@ vy_log_tx_begin(struct vy_log *log);
 /**
  * Commit a transaction started with vy_log_tx_begin().
  *
- * This function flushes all buffered records. If @no_discard is set,
- * pending records won't be expunged from the buffer on failure, so
- * that the next transaction will retry to write them to disk.
+ * This function flushes all buffered records to disk. If it fails,
+ * all records of the current transaction are discarded.
+ *
+ * See also vy_log_tx_try_commit().
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_tx_commit(struct vy_log *log, bool no_discard);
+vy_log_tx_commit(struct vy_log *log);
+
+/**
+ * Try to commit a transaction started with vy_log_tx_begin().
+ *
+ * Similarly to vy_log_tx_commit(), this function tries to write all
+ * buffered records to disk, but in case of failure pending records
+ * are not expunged from the buffer, so that the next transaction
+ * will retry to flush them.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int
+vy_log_tx_try_commit(struct vy_log *log);
 
 /**
  * Write a record to a metadata log.
