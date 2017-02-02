@@ -164,21 +164,15 @@ vy_stmt_new_delete(struct tuple_format *format, const char *key,
  * Operations can be saved in the space available by @param extra.
  * For details @sa struct vy_stmt comment.
  */
-struct tuple *
-vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
-		     enum iproto_type type, struct tuple_format *format,
-		     uint32_t part_count,
-		     struct iovec *operations, uint32_t iovcnt)
+static struct tuple *
+vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
+		     const char *tuple_end, struct iovec *operations,
+		     uint32_t iovcnt, enum iproto_type type)
 {
-	(void) part_count; /* unused in release. */
-#ifndef NDEBUG
-	const char *tuple_end_must_be = tuple_begin;
-	mp_next(&tuple_end_must_be);
-	assert(tuple_end == tuple_end_must_be);
-#endif
+	mp_tuple_assert(tuple_begin, tuple_end);
 
 	uint32_t field_count = mp_decode_array(&tuple_begin);
-	assert(field_count >= part_count);
+	assert(field_count >= format->field_count);
 
 	uint32_t extra_size = 0;
 	for (uint32_t i = 0; i < iovcnt; ++i) {
@@ -222,20 +216,20 @@ vy_stmt_new_with_ops(const char *tuple_begin, const char *tuple_end,
 }
 
 struct tuple *
-vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
-		   struct tuple_format *format, uint32_t part_count,
-		   struct iovec *operations, uint32_t ops_cnt)
+vy_stmt_new_upsert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end, struct iovec *operations,
+		   uint32_t ops_cnt)
 {
-	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_UPSERT,
-				    format, part_count, operations, ops_cnt);
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    operations, ops_cnt, IPROTO_UPSERT);
 }
 
 struct tuple *
-vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
-		    struct tuple_format *format, uint32_t part_count)
+vy_stmt_new_replace(struct tuple_format *format, const char *tuple_begin,
+		    const char *tuple_end)
 {
-	return vy_stmt_new_with_ops(tuple_begin, tuple_end, IPROTO_REPLACE,
-				    format, part_count, NULL, 0);
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    NULL, 0, IPROTO_REPLACE);
 }
 
 struct tuple *
@@ -333,8 +327,7 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
 }
 
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
-	       uint32_t part_count)
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 {
 	struct request request;
 	request_create(&request, xrow->type);
@@ -348,20 +341,17 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
 	case IPROTO_DELETE:
 		/* extract key */
 		field_count = mp_decode_array(&request.key);
-		assert(field_count == part_count);
 		stmt = vy_stmt_new_delete(format, request.key, field_count);
 		break;
 	case IPROTO_REPLACE:
-		stmt = vy_stmt_new_replace(request.tuple,
-					   request.tuple_end,
-					   format, part_count);
+		stmt = vy_stmt_new_replace(format, request.tuple,
+					   request.tuple_end);
 		break;
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;
 		ops.iov_len = request.ops_end - request.ops;
-		stmt = vy_stmt_new_upsert(request.tuple,
-					  request.tuple_end,
-					  format, part_count, &ops, 1);
+		stmt = vy_stmt_new_upsert(format, request.tuple,
+					  request.tuple_end, &ops, 1);
 		break;
 	default:
 		diag_set(ClientError, ER_VINYL, "unknown request type");

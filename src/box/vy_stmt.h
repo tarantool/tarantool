@@ -302,18 +302,17 @@ vy_stmt_new_delete(struct tuple_format *format, const char *key,
 
 /**
  * Create the REPLACE statement from raw MessagePack data.
+ * @param format Format of a tuple for offsets generating.
  * @param tuple_begin MessagePack data that contain an array of fields WITH the
  *                    array header.
  * @param tuple_end End of the array that begins from @param tuple_begin.
- * @param format Format of a tuple for offsets generating.
- * @param part_count Part count from key definition.
  *
  * @retval NULL     Memory allocation error.
  * @retval not NULL Success.
  */
 struct tuple *
-vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
-		    struct tuple_format *format, uint32_t part_count);
+vy_stmt_new_replace(struct tuple_format *format,
+		    const char *tuple_begin, const char *tuple_end);
 
  /**
  * Create the UPSERT statement from raw MessagePack data.
@@ -329,8 +328,8 @@ vy_stmt_new_replace(const char *tuple_begin, const char *tuple_end,
  * @retval not NULL Success.
  */
 struct tuple *
-vy_stmt_new_upsert(const char *tuple_begin, const char *tuple_end,
-		   struct tuple_format *format, uint32_t part_count,
+vy_stmt_new_upsert(struct tuple_format *format,
+		   const char *tuple_begin, const char *tuple_end,
 		   struct iovec *operations, uint32_t ops_cnt);
 
 /**
@@ -432,8 +431,7 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
  * @retval NULL on error
  */
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
-	       uint32_t part_count);
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format);
 
 /**
  * Format a key into string.

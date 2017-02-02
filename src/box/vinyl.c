@@ -5377,8 +5377,7 @@ space_name_by_id(uint32_t id);
  * @retval -1 - memory error
  */
 static int
-vy_upsert_try_to_squash(struct tuple_format *format, uint32_t part_count,
-			struct region *region,
+vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 			const char *key_mp, const char *key_mp_end,
 			const char *old_serie, const char *old_serie_end,
 			const char *new_serie, const char *new_serie_end,
@@ -5399,8 +5398,8 @@ vy_upsert_try_to_squash(struct tuple_format *format, uint32_t part_count,
 	operations[0].iov_base = (void *)squashed;
 	operations[0].iov_len = squashed_size;
 
-	*result_stmt = vy_stmt_new_upsert(key_mp, key_mp_end, format,
-					  part_count, operations, 1);
+	*result_stmt = vy_stmt_new_upsert(format, key_mp, key_mp_end,
+					  operations, 1);
 	if (*result_stmt == NULL)
 		return -1;
 	return 0;
@@ -5455,8 +5454,8 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		/*
 		 * UPDATE case: return the updated old stmt.
 		 */
-		result_stmt = vy_stmt_new_replace(result_mp, result_mp_end,
-						  format, key_def->part_count);
+		result_stmt = vy_stmt_new_replace(format, result_mp,
+						  result_mp_end);
 		region_truncate(region, region_svp);
 		if (result_stmt == NULL)
 			return NULL; /* OOM */
@@ -5477,7 +5476,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(format, key_def->part_count, region,
+	if (vy_upsert_try_to_squash(format, region,
 				    result_mp, result_mp_end,
 				    old_ops, old_ops_end,
 				    new_ops, new_ops_end,
@@ -5508,8 +5507,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	operations[0].iov_base = (void *)ops_buf;
 	operations[0].iov_len = header - ops_buf;
 
-	result_stmt = vy_stmt_new_upsert(result_mp, result_mp_end,
-					 format, key_def->part_count,
+	result_stmt = vy_stmt_new_upsert(format, result_mp, result_mp_end,
 					 operations, 3);
 	if (result_stmt == NULL) {
 		region_truncate(region, region_svp);
@@ -5747,8 +5745,7 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		if (vy_check_dup_key(tx, index, check_key, part_count))
 			return -1;
 	}
-	struct tuple *tuple = vy_stmt_new_replace(key, key_end, index->format,
-						  def->part_count);
+	struct tuple *tuple = vy_stmt_new_replace(index->format, key, key_end);
 	if (tuple == NULL)
 		return -1;
 	int rc = vy_tx_set(tx, index, tuple);
@@ -5781,8 +5778,8 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 	struct key_def *def = pk->key_def;
 	assert(def->iid == 0);
 	struct tuple *new_tuple =
-		vy_stmt_new_replace(request->tuple, request->tuple_end,
-				    pk->format, def->part_count);
+		vy_stmt_new_replace(pk->format, request->tuple,
+				    request->tuple_end);
 	if (new_tuple == NULL)
 		return -1;
 	/**
@@ -5865,8 +5862,8 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 		return -1;
 	struct key_def *def = pk->key_def;
 	assert(def->iid == 0);
-	new_stmt = vy_stmt_new_replace(request->tuple, request->tuple_end,
-				       pk->format, def->part_count);
+	new_stmt = vy_stmt_new_replace(pk->format, request->tuple,
+				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
 	const char *key = tuple_extract_key(new_stmt, def, NULL);
@@ -6223,8 +6220,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	if (tuple_validate_raw(space->format, new_tuple))
 		return -1;
 	stmt->new_tuple =
-		vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
-				    pk->key_def->part_count);
+		vy_stmt_new_replace(pk->format, new_tuple, new_tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple))
@@ -6306,8 +6302,8 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(tuple, tuple_end, index->format,
-				    index->key_def->part_count, operations, 1);
+	vystmt = vy_stmt_new_upsert(index->format, tuple, tuple_end,
+				    operations, 1);
 	if (vystmt == NULL)
 		return -1;
 	assert(vy_stmt_type(vystmt) == IPROTO_UPSERT);
@@ -6375,8 +6371,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	 */
 	if (old_stmt == NULL) {
 		stmt->new_tuple =
-			vy_stmt_new_replace(tuple, tuple_end, pk->format,
-					    pk_def->part_count);
+			vy_stmt_new_replace(pk->format, tuple, tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		return vy_insert_first_upsert(tx, space, stmt->new_tuple);
@@ -6403,8 +6398,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	new_tuple_end = new_tuple + new_size;
 	stmt->old_tuple = old_stmt;
 	stmt->new_tuple =
-		vy_stmt_new_replace(new_tuple, new_tuple_end, pk->format,
-				    pk->key_def->part_count);
+		vy_stmt_new_replace(pk->format, new_tuple, new_tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 
@@ -6464,8 +6458,8 @@ vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(def->iid == 0);
 	/* First insert into the primary index. */
 	stmt->new_tuple =
-		vy_stmt_new_replace(request->tuple, request->tuple_end,
-				    pk->format, def->part_count);
+		vy_stmt_new_replace(pk->format, request->tuple,
+				    request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	if (vy_insert_primary(tx, pk, stmt->new_tuple) != 0)
@@ -7020,7 +7014,7 @@ vy_page_delete(struct vy_page *page)
  */
 static struct tuple *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	     struct tuple_format *format, const struct key_def *key_def)
+	     struct tuple_format *format)
 {
 	assert(stmt_no < page->count);
 	const char *data = page->data + page->row_index[stmt_no];
@@ -7030,7 +7024,7 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	struct xrow_header xrow;
 	if (xrow_header_decode(&xrow, &data, data_end) != 0)
 		return NULL;
-	return vy_stmt_decode(&xrow, format, key_def->part_count);
+	return vy_stmt_decode(&xrow, format);
 }
 
 /**
@@ -7364,8 +7358,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->index->format,
-			     itr->index->key_def);
+	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->index->format);
 	if (*stmt == NULL)
 		return -1;
 	return 0;
@@ -7425,8 +7418,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key = vy_page_stmt(page, mid, idx->format,
-						       idx->key_def);
+		struct tuple *fnd_key = vy_page_stmt(page, mid, idx->format);
 		if (fnd_key == NULL)
 			return end;
 		int cmp = vy_stmt_compare(fnd_key, key, idx->key_def);
