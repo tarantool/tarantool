@@ -420,6 +420,7 @@ wal_opt_rotate(struct wal_writer *writer)
 
 	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
 			     &writer->vclock) != 0) {
+		error_log(diag_last_error(diag_get()));
 		return -1;
 	}
 	writer->is_active = true;
