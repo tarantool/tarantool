@@ -127,12 +127,18 @@ struct vy_log_record {
  */
 enum { VY_LOG_TX_BUF_SIZE = 64 };
 
+struct vy_recovery;
+
 /** Vinyl metadata log object. */
 struct vy_log {
 	/** Xlog object used for writing the log. */
 	struct xlog *xlog;
+	/** The directory where log files are stored. */
+	char *dir;
 	/** Vector clock sum from the time of the log creation. */
 	int64_t signature;
+	/** Recovery context. */
+	struct vy_recovery *recovery;
 	/**
 	 * Latch protecting the xlog.
 	 *
@@ -158,47 +164,23 @@ struct vy_log {
 	struct vy_log_record tx_buf[VY_LOG_TX_BUF_SIZE];
 };
 
-/** Recovery context. */
-struct vy_recovery {
-	/** ID -> vy_index_recovery_info. */
-	struct mh_i64ptr_t *index_hash;
-	/** ID -> vy_range_recovery_info. */
-	struct mh_i64ptr_t *range_hash;
-	/** ID -> vy_run_recovery_info. */
-	struct mh_i64ptr_t *run_hash;
-	/**
-	 * Maximal range ID, according to the metadata log,
-	 * or -1 in case no ranges were recovered.
-	 */
-	int64_t range_id_max;
-	/**
-	 * Maximal run ID, according to the metadata log,
-	 * or -1 in case no runs were recovered.
-	 */
-	int64_t run_id_max;
-	/** Vector clock sum from the time of the log creation. */
-	int64_t signature;
-};
-
 /**
  * Allocate and initialize a vy_log structure.
+ * @dir is the directory to store log files in.
  *
  * Returns NULL on memory allocation failure.
  */
 struct vy_log *
-vy_log_new(void);
+vy_log_new(const char *dir);
 
 /*
- * Open the vinyl metadata log file stored in directory @dir
- * having signature @signature for appending, or create a new
- * one if it doesn't exist.
- * On success, it flushes all pending records written with
- * vy_log_write() before the log was opened.
+ * Create the initial xlog file having signature 0.
+ * Supposed to be called on bootstrap.
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_open(struct vy_log *log, const char *dir, int64_t signature);
+vy_log_create(struct vy_log *log);
 
 /**
  * Close a metadata log and free associated structures.
@@ -207,8 +189,8 @@ void
 vy_log_delete(struct vy_log *log);
 
 /**
- * Rotate vinyl metadata log @log. This function creates a
- * new xlog file in directory @dir having signature @signature
+ * Rotate vinyl metadata log @log. This function creates a new
+ * xlog file in the log directory having signature @signature
  * and writes records required to recover active indexes.
  * The goal of log rotation is to compact the log file by
  * discarding records cancelling each other and records left
@@ -217,7 +199,7 @@ vy_log_delete(struct vy_log *log);
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature);
+vy_log_rotate(struct vy_log *log, int64_t signature);
 
 /** Allocate a unique ID for a run. */
 static inline int64_t
@@ -281,27 +263,36 @@ void
 vy_log_write(struct vy_log *log, const struct vy_log_record *record);
 
 /**
- * Load the vinyl metadata log stored in directory @dir and
- * having signature @signature and return the recovery context
- * that can be further used for recovering vinyl indexes with
- * vy_recovery_load_index().
+ * Prepare vinyl metadata log @log for recovery from the file having
+ * signature @signature.
  *
- * Returns NULL on failure.
+ * After this function is called, vinyl indexes may be recovered from
+ * the log using vy_log_recover_index(). When recovery is complete,
+ * one must call vy_log_end_recovery().
+ *
+ * Returns 0 on success, -1 on failure.
  */
-struct vy_recovery *
-vy_recovery_new(const char *dir, int64_t signature);
+int
+vy_log_begin_recovery(struct vy_log *log, int64_t signature);
 
 /**
- * Free the recovery context created by a call to vy_recovery_new().
+ * Finish recovery from vinyl metadata log @log.
+ *
+ * This function destroys the recovery context that was created by
+ * vy_log_begin_recovery(), opens the log file for appending, and
+ * flushes all records written to the log buffer during recovery.
+ *
+ * Return 0 on success, -1 on failure.
  */
-void
-vy_recovery_delete(struct vy_recovery *recovery);
+int
+vy_log_end_recovery(struct vy_log *log);
 
 typedef int
 (*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
 
 /**
- * Given a context and index ID, recover the corresponding vinyl index.
+ * Recover a vinyl index having ID @index_id from metadata log @log.
+ * The log must be in recovery mode, see vy_log_begin_recovery().
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
@@ -316,8 +307,8 @@ typedef int
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
-		       vy_recovery_cb cb, void *cb_arg);
+vy_log_recover_index(struct vy_log *log, int64_t index_id,
+		     vy_recovery_cb cb, void *cb_arg);
 
 /** Helper to log an index creation. */
 static inline void

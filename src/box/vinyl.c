@@ -117,8 +117,6 @@ struct vy_env {
 	struct vy_scheduler *scheduler;
 	/** Metadata log. */
 	struct vy_log       *log;
-	/** Recovery context. */
-	struct vy_recovery  *recovery;
 	/** Statistics */
 	struct vy_stat      *stat;
 	/** Upsert squash queue */
@@ -3162,7 +3160,7 @@ struct vy_index_recovery_cb_arg {
 	struct vy_range *range;
 };
 
-/** Index recovery callback, passed to vy_recovery_load_index(). */
+/** Index recovery callback, passed to vy_log_recover_index(). */
 static int
 vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 {
@@ -3223,11 +3221,10 @@ static int
 vy_index_open_ex(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
-	assert(env->recovery != NULL);
 
 	struct vy_index_recovery_cb_arg arg = { .index = index };
-	if (vy_recovery_load_index(env->recovery, index->key_def->opts.lsn,
-				   vy_index_recovery_cb, &arg) != 0)
+	if (vy_log_recover_index(env->log, index->key_def->opts.lsn,
+				 vy_index_recovery_cb, &arg) != 0)
 		return -1;
 
 	/*
@@ -4762,7 +4759,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 		return -1;
 	}
 
-	if (vy_log_rotate(env->log, env->conf->path, vclock_sum(vclock)) != 0)
+	if (vy_log_rotate(env->log, vclock_sum(vclock)) != 0)
 		return -1;
 
 	return 0;
@@ -6611,7 +6608,7 @@ vy_env_new(void)
 	e->squash_queue = vy_squash_queue_new();
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
-	e->log = vy_log_new();
+	e->log = vy_log_new(e->conf->path);
 	if (e->log == NULL)
 		goto error_log;
 
@@ -6665,8 +6662,6 @@ vy_env_delete(struct vy_env *e)
 	vy_conf_delete(e->conf);
 	vy_stat_delete(e->stat);
 	vy_log_delete(e->log);
-	if (e->recovery != NULL)
-		vy_recovery_delete(e->recovery);
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->read_task_pool);
 	lsregion_destroy(&e->allocator);
@@ -6685,7 +6680,7 @@ vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
 	/* First start. Create a new metadata log. */
-	if (vy_log_open(e->log, e->conf->path, 0) != 0)
+	if (vy_log_create(e->log) != 0)
 		return -1;
 	e->status = VINYL_ONLINE;
 	return 0;
@@ -6695,17 +6690,13 @@ int
 vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 {
 	assert(e->status == VINYL_OFFLINE);
-	assert(e->recovery == NULL);
 	if (vclock != NULL) {
 		int64_t signature = vclock_sum(vclock);
 		/*
-		 * Local recovery. Load the recovery context.
-		 * Log is not needed during local recovery so
-		 * it will only be opened after recovery is
-		 * complete (see vy_end_recovery()).
+		 * Local recovery. Load the recovery context
+		 * from the metadata log.
 		 */
-		e->recovery = vy_recovery_new(e->conf->path, signature);
-		if (e->recovery == NULL)
+		if (vy_log_begin_recovery(e->log, signature) != 0)
 			return -1;
 		e->xm->lsn = signature;
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
@@ -6716,7 +6707,7 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 		 * we may dump data received from the master, so we
 		 * create a new log right away.
 		 */
-		if (vy_log_open(e->log, e->conf->path, 0) != 0)
+		if (vy_log_create(e->log) != 0)
 			return -1;
 		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
@@ -6749,13 +6740,7 @@ vy_end_recovery(struct vy_env *e)
 		 * Local recovery completion. Destroy the recovery
 		 * context and open the metadata log for appending.
 		 */
-		assert(e->recovery != NULL);
-		int64_t signature = e->recovery->signature;
-		e->log->next_range_id = e->recovery->range_id_max + 1;
-		e->log->next_run_id = e->recovery->run_id_max + 1;
-		vy_recovery_delete(e->recovery);
-		e->recovery = NULL;
-		if (vy_log_open(e->log, e->conf->path, signature) != 0)
+		if (vy_log_end_recovery(e->log) != 0)
 			return -1;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
@@ -6764,7 +6749,6 @@ vy_end_recovery(struct vy_env *e)
 		 * is already open and there's no recovery context
 		 * (see vy_begin_initial_recovery()).
 		 */
-		assert(e->recovery == NULL);
 		break;
 	default:
 		unreachable();

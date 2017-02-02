@@ -110,6 +110,26 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DELETE_RUN]		= "delete_run",
 };
 
+/** Recovery context. */
+struct vy_recovery {
+	/** ID -> vy_index_recovery_info. */
+	struct mh_i64ptr_t *index_hash;
+	/** ID -> vy_range_recovery_info. */
+	struct mh_i64ptr_t *range_hash;
+	/** ID -> vy_run_recovery_info. */
+	struct mh_i64ptr_t *run_hash;
+	/**
+	 * Maximal range ID, according to the metadata log,
+	 * or -1 in case no ranges were recovered.
+	 */
+	int64_t range_id_max;
+	/**
+	 * Maximal run ID, according to the metadata log,
+	 * or -1 in case no runs were recovered.
+	 */
+	int64_t run_id_max;
+};
+
 /** Index info stored in a recovery context. */
 struct vy_index_recovery_info {
 	/** ID of the index. */
@@ -149,6 +169,14 @@ struct vy_run_recovery_info {
 	/** ID of the run. */
 	int64_t id;
 };
+
+static struct vy_recovery *
+vy_recovery_new(const char *dir, int64_t signature);
+static void
+vy_recovery_delete(struct vy_recovery *recovery);
+static int
+vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
+		       vy_recovery_cb cb, void *cb_arg);
 
 /** An snprint-style function to print a path to a vinyl metadata log. */
 static int
@@ -421,7 +449,7 @@ fail:
 }
 
 struct vy_log *
-vy_log_new(void)
+vy_log_new(const char *dir)
 {
 	struct vy_log *log = malloc(sizeof(*log));
 	if (log == NULL) {
@@ -430,17 +458,25 @@ vy_log_new(void)
 	}
 	memset(log, 0, sizeof(*log));
 
+	log->dir = strdup(dir);
+	if (log->dir == NULL) {
+		diag_set(OutOfMemory, strlen(dir), "malloc", "struct vy_log");
+		goto fail_free;
+	}
+
 	log->latch = malloc(sizeof(*log->latch));
 	if (log->latch == NULL) {
-		diag_set(OutOfMemory, sizeof(*log), "malloc", "struct vy_log");
+		diag_set(OutOfMemory, sizeof(*log->latch),
+			 "malloc", "struct vy_log");
 		goto fail_free;
 	}
 	latch_create(log->latch);
 
-	log->signature = -1;
 	return log;
 
 fail_free:
+	free(log->latch);
+	free(log->dir);
 	free(log);
 fail:
 	return NULL;
@@ -513,10 +549,18 @@ vy_log_flush(struct vy_log *log)
 	return 0;
 }
 
-int
-vy_log_open(struct vy_log *log, const char *dir, int64_t signature)
+/**
+ * Open the vinyl metadata log file for appending, or create a new one
+ * if it doesn't exist. On success, this function flushes all pending
+ * records written with vy_log_write() before the log was opened.
+ *
+ * Return 0 on success, -1 on failure.
+ */
+static int
+vy_log_open_or_create(struct vy_log *log)
 {
 	assert(log->xlog == NULL);
+	assert(log->recovery == NULL);
 	assert(latch_owner(log->latch) == NULL);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
@@ -526,7 +570,7 @@ vy_log_open(struct vy_log *log, const char *dir, int64_t signature)
 	}
 
 	char path[PATH_MAX];
-	vy_log_snprint_path(path, sizeof(path), dir, signature);
+	vy_log_snprint_path(path, sizeof(path), log->dir, log->signature);
 
 	if (access(path, F_OK) == 0) {
 		/* The log already exists, open it for appending. */
@@ -546,7 +590,6 @@ vy_log_open(struct vy_log *log, const char *dir, int64_t signature)
 	}
 
 	log->xlog = xlog;
-	log->signature = signature;
 	if (vy_log_flush(log) < 0) {
 		/* Abort recovery if we can't flush the log. */
 		log->xlog = NULL;
@@ -562,6 +605,13 @@ fail:
 	return -1;
 }
 
+int
+vy_log_create(struct vy_log *log)
+{
+	log->signature = 0;
+	return vy_log_open_or_create(log);
+}
+
 void
 vy_log_delete(struct vy_log *log)
 {
@@ -569,10 +619,48 @@ vy_log_delete(struct vy_log *log)
 		xlog_close(log->xlog, false);
 		free(log->xlog);
 	}
+	if (log->recovery != NULL)
+		vy_recovery_delete(log->recovery);
 	latch_destroy(log->latch);
 	free(log->latch);
+	free(log->dir);
 	TRASH(log);
 	free(log);
+}
+
+int
+vy_log_begin_recovery(struct vy_log *log, int64_t signature)
+{
+	assert(log->xlog == NULL);
+	assert(log->recovery == NULL);
+
+	struct vy_recovery *recovery = vy_recovery_new(log->dir, signature);
+	if (recovery == NULL)
+		return -1;
+
+	log->next_range_id = recovery->range_id_max + 1;
+	log->next_run_id = recovery->run_id_max + 1;
+
+	log->recovery = recovery;
+	log->signature = signature;
+	return 0;
+}
+
+int
+vy_log_end_recovery(struct vy_log *log)
+{
+	assert(log->recovery != NULL);
+	vy_recovery_delete(log->recovery);
+	log->recovery = NULL;
+	return vy_log_open_or_create(log);
+}
+
+int
+vy_log_recover_index(struct vy_log *log, int64_t index_id,
+		     vy_recovery_cb cb, void *cb_arg)
+{
+	assert(log->recovery != NULL);
+	return vy_recovery_load_index(log->recovery, index_id, cb, cb_arg);
 }
 
 static int
@@ -644,7 +732,7 @@ err_recovery:
 }
 
 int
-vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature)
+vy_log_rotate(struct vy_log *log, int64_t signature)
 {
 	assert(log->xlog != NULL);
 
@@ -678,7 +766,8 @@ vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature)
 		goto err_rotate;
 	}
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(vy_log_rotate_f, dir, log->signature, signature) < 0) {
+	if (coio_call(vy_log_rotate_f, log->dir,
+		      log->signature, signature) < 0) {
 		latch_unlock(log->latch);
 		goto err_rotate;
 	}
@@ -693,7 +782,7 @@ vy_log_rotate(struct vy_log *log, const char *dir, int64_t signature)
 	 * slab allocator.
 	 */
 	char path[PATH_MAX];
-	vy_log_snprint_path(path, sizeof(path), dir, signature);
+	vy_log_snprint_path(path, sizeof(path), log->dir, signature);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
 	if (xlog == NULL) {
@@ -726,6 +815,8 @@ err_rotate:
 void
 vy_log_tx_begin(struct vy_log *log)
 {
+	assert(log->xlog != NULL || log->recovery != NULL);
+
 	latch_lock(log->latch);
 	log->tx_begin = log->tx_end;
 	say_debug("%s", __func__);
@@ -1057,7 +1148,15 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	return rc;
 }
 
-struct vy_recovery *
+/**
+ * Load the vinyl metadata log stored in directory @dir and
+ * having signature @signature and return the recovery context
+ * that can be further used for recovering vinyl indexes with
+ * vy_recovery_load_index().
+ *
+ * Returns NULL on failure.
+ */
+static struct vy_recovery *
 vy_recovery_new(const char *dir, int64_t signature)
 {
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
@@ -1072,7 +1171,6 @@ vy_recovery_new(const char *dir, int64_t signature)
 	recovery->run_hash = NULL;
 	recovery->range_id_max = -1;
 	recovery->run_id_max = -1;
-	recovery->signature = signature;
 
 	recovery->index_hash = mh_i64ptr_new();
 	recovery->range_hash = mh_i64ptr_new();
@@ -1134,7 +1232,8 @@ vy_recovery_delete_hash(struct mh_i64ptr_t *h)
 	mh_i64ptr_delete(h);
 }
 
-void
+/** Free recovery context created by vy_recovery_new(). */
+static void
 vy_recovery_delete(struct vy_recovery *recovery)
 {
 	if (recovery->index_hash != NULL)
@@ -1147,7 +1246,11 @@ vy_recovery_delete(struct vy_recovery *recovery)
 	free(recovery);
 }
 
-int
+/**
+ * Given a context and an ID, recover the corresponding vinyl index.
+ * See comment to vy_log_recover_index() for how indexes are loaded.
+ */
+static int
 vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_id,
 		       vy_recovery_cb cb, void *cb_arg)
 {
