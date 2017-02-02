@@ -277,6 +277,10 @@ void
 cbus_join(struct cbus_endpoint *endpoint, const char *name,
 	  void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data);
 
+/**
+ * One round for message fetch and deliver */
+void
+cbus_process(struct cbus_endpoint *endpoint);
 
 /**
  * Run the message delivery loop until the current fiber is

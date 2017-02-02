@@ -588,7 +588,7 @@ wal_writer_f(va_list ap)
 	struct cbus_endpoint endpoint;
 	cbus_join(&endpoint, "wal", fiber_schedule_cb, fiber());
 	/* Create a pipe to TX thread. */
-	cpipe_create(&wal_writer_singleton.tx_pipe, "tx");
+	cpipe_create(&wal_writer_singleton.tx_pipe, "tx_wake");
 
 	cbus_loop(&endpoint);
 

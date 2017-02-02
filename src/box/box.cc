@@ -106,6 +106,7 @@ static struct xstream subscribe_stream;
  * threads.
  */
 static struct fiber_pool tx_fiber_pool;
+static struct cbus_endpoint tx_wake_endpoint;
 
 static void
 box_check_writable(void)
@@ -1449,6 +1450,15 @@ bootstrap(struct vclock *start_vclock)
 		panic("failed to save a snapshot");
 }
 
+static void
+box_tx_wake(struct ev_loop *loop, ev_watcher *watcher, int events)
+{
+	(void) loop;
+	(void) events;
+	struct cbus_endpoint *endpoint = (struct cbus_endpoint *)watcher->data;
+	cbus_process(endpoint);
+}
+
 static inline void
 box_init(void)
 {
@@ -1456,6 +1466,7 @@ box_init(void)
 	/* Join the cord interconnect as "tx" endpoint. */
 	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
 			  FIBER_POOL_IDLE_TIMEOUT);
+	cbus_join(&tx_wake_endpoint, "tx_wake", box_tx_wake, &tx_wake_endpoint);
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);

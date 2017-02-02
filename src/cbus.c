@@ -310,17 +310,22 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	return rc;
 }
 
+void
+cbus_process(struct cbus_endpoint *endpoint)
+{
+	struct stailq output;
+	stailq_create(&output);
+	cbus_endpoint_fetch(endpoint, &output);
+	struct cmsg *msg, *msg_next;
+	stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
+		cmsg_deliver(msg);
+}
 
 void
 cbus_loop(struct cbus_endpoint *endpoint)
 {
 	while (true) {
-		struct stailq output;
-		stailq_create(&output);
-		cbus_endpoint_fetch(endpoint, &output);
-		struct cmsg *msg, *msg_next;
-		stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
-			cmsg_deliver(msg);
+		cbus_process(endpoint);
 		if (fiber_is_cancelled())
 			break;
 		fiber_yield();
