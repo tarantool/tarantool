@@ -52,6 +52,7 @@
 #include "box/lua/net_box.h"
 #include "box/lua/cfg.h"
 #include "box/lua/xlog.h"
+#include "box/lua/console.h"
 
 extern char session_lua[],
 	tuple_lua[],
@@ -59,7 +60,8 @@ extern char session_lua[],
 	load_cfg_lua[],
 	snapshot_daemon_lua[],
 	net_box_lua[],
-	upgrade_lua[];
+	upgrade_lua[],
+	console_lua[];
 
 static const char *lua_sources[] = {
 	"box/session", session_lua,
@@ -68,6 +70,7 @@ static const char *lua_sources[] = {
 	"box/snapshot_daemon", snapshot_daemon_lua,
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
+	"box/console", console_lua,
 	"box/load_cfg", load_cfg_lua,
 	NULL
 };
@@ -129,6 +132,8 @@ box_lua_init(struct lua_State *L)
 	box_lua_session_init(L);
 	box_lua_xlog_init(L);
 	luaopen_net_box(L);
+	lua_pop(L, 1);
+	tarantool_lua_console_init(L);
 	lua_pop(L, 1);
 
 	/* Load Lua extension */

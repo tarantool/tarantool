@@ -43,7 +43,6 @@
 
 #include <fiber.h>
 #include "coio.h"
-#include "lua/console.h"
 #include "lua/fiber.h"
 #include "lua/ipc.h"
 #include "lua/errno.h"
@@ -85,7 +84,6 @@ extern char strict_lua[],
 	log_lua[],
 	uri_lua[],
 	socket_lua[],
-	console_lua[],
 	help_lua[],
 	help_en_US_lua[],
 	tap_lua[],
@@ -126,7 +124,6 @@ static const char *lua_modules[] = {
 	"csv", csv_lua,
 	"clock", clock_lua,
 	"socket", socket_lua,
-	"console", console_lua,
 	"title", title_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
@@ -391,8 +388,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
-	tarantool_lua_console_init(L);
-	lua_pop(L, 1);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {

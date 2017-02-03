@@ -25,7 +25,6 @@ lua_source(lua_sources lua/crypto.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
 lua_source(lua_sources lua/uri.lua)
-lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/socket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
@@ -117,7 +116,6 @@ set (server_sources
      proc_title.c
      coeio_file.c
      clock.c
-     lua/console.c
      lua/digest.c
      lua/init.c
      lua/fiber.c

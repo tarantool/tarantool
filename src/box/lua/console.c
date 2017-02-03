@@ -29,8 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/console.h"
+#include "box/lua/console.h"
 #include "lua/utils.h"
+#include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"
 #include <lua.h>

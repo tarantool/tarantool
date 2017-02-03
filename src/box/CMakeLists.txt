@@ -8,6 +8,7 @@ lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/snapshot_daemon.lua)
 lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/upgrade.lua)
+lua_source(lua_sources lua/console.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
@@ -75,6 +76,7 @@ add_library(box STATIC
     lua/init.c
     lua/call.c
     lua/cfg.cc
+    lua/console.c
     lua/tuple.c
     lua/slab.c
     lua/index.c
