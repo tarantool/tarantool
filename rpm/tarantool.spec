@@ -43,7 +43,10 @@ BuildRequires: zlib-devel
 # in runtime. Tarantool uses the debug symbols to display fiber's stack
 # traces in fiber.info().
 #
-%global debug_package %%{nil}
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+%global __strip /bin/true
 # -fPIE break backtraces
 # https://github.com/tarantool/tarantool/issues/1262
 %undefine _hardened_build
