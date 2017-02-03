@@ -1141,17 +1141,6 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 static struct evio_service binary; /* iproto binary listener */
 
 /**
- * Wake iproto fiber to handle tx messages
- */
-static void
-iproto_wakeup(ev_loop *loop, ev_async *async, int events)
-{
-	(void) loop;
-	(void) events;
-	fiber_wakeup((fiber *)async->data);
-}
-
-/**
  * The network io thread main function:
  * begin serving the message bus.
  */
@@ -1179,21 +1168,14 @@ net_cord_f(va_list /* ap */)
 
 	struct cbus_endpoint endpoint;
 	/* Create "net" endpoint. */
-	cbus_join(&endpoint, "net", iproto_wakeup, fiber());
+	cbus_join(&endpoint, "net", fiber_schedule_cb, fiber());
 	/* Create a pipe to "tx" thread. */
 	cpipe_create(&tx_pipe, "tx");
 	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	/* Process incomming messages. */
-	while (!fiber_is_cancelled()) {
-		struct stailq output;
-		stailq_create(&output);
-		cbus_endpoint_fetch(&endpoint, &output);
-		struct cmsg *msg, *msg_next;
-		stailq_foreach_entry_safe(msg, msg_next, &output, fifo) {
-			cmsg_deliver(msg);
-		}
-		fiber_yield();
-	}
+
+	cbus_loop(&endpoint);
+
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming

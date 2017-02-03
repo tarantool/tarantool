@@ -1,11 +1,7 @@
 #ifndef TARANTOOL_FIBER_POOL_H_INCLUDED
 #define TARANTOOL_FIBER_POOL_H_INCLUDED
-
-#include "salad/stailq.h"
-#include "small/rlist.h"
-#include "tarantool_ev.h"
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -34,13 +30,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "trivia/config.h"
-
 #include "fiber.h"
 #include "cbus.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
+#include "tarantool_ev.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -93,15 +88,8 @@ fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 void
 fiber_pool_destroy(struct fiber_pool *pool);
 
-/*
- * Initialize the fiber pool and connect it to a cbus.
- */
-void
-fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
-		  float idle_timeout);
-
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */
 
-#endif
+#endif /* TARANTOOL_FIBER_POOL_H_INCLUDED */

@@ -107,7 +107,6 @@ struct wal_writer
 	struct rlist watchers;
 	/** The lock protecting the watchers list. */
 	pthread_mutex_t watchers_mutex;
-	bool exiting;
 };
 
 struct wal_msg: public cmsg {
@@ -293,30 +292,13 @@ wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 	wal = writer;
 }
 
-static void
-wal_writer_stop_f(struct cmsg *msg)
-{
-	(void) msg;
-	wal->exiting = true;
-	fiber_wakeup(wal->main_f);
-}
-
 /** Stop and destroy the writer thread (at shutdown). */
 void
 wal_writer_stop()
 {
 	struct wal_writer *writer = wal;
 
-	/* Stop the worker thread. */
-	struct cmsg wakeup;
-	struct cmsg_hop route[1] = {
-		{wal_writer_stop_f, NULL}
-	};
-	cmsg_init(&wakeup, route);
-
-	cpipe_push(&writer->wal_pipe, &wakeup);
-	ev_invoke(writer->wal_pipe.producer,
-		  &writer->wal_pipe.flush_input, EV_CUSTOM);
+	cbus_stop_loop(&writer->wal_pipe);
 
 	if (cord_join(&writer->cord)) {
 		/* We can't recover from this in any reasonable way. */
@@ -594,14 +576,6 @@ done:
 	wal_notify_watchers(writer);
 }
 
-static void
-wal_wakeup(ev_loop *loop, ev_async *async, int events)
-{
-	(void) loop;
-	(void) events;
-	fiber_wakeup((fiber *)async->data);
-}
-
 /** WAL writer thread main loop.  */
 static int
 wal_writer_f(va_list ap)
@@ -612,19 +586,11 @@ wal_writer_f(va_list ap)
 
 	writer->main_f = fiber();
 	struct cbus_endpoint endpoint;
-	cbus_join(&endpoint, "wal", wal_wakeup, fiber());
+	cbus_join(&endpoint, "wal", fiber_schedule_cb, fiber());
 	/* Create a pipe to TX thread. */
 	cpipe_create(&wal_writer_singleton.tx_pipe, "tx");
 
-	while (!writer->exiting && !fiber_is_cancelled()) {
-		struct stailq output;
-		stailq_create(&output);
-		cbus_endpoint_fetch(&endpoint, &output);
-		struct cmsg *msg, *msg_next;
-		stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
-			cmsg_deliver(msg);
-		fiber_yield();
-	}
+	cbus_loop(&endpoint);
 
 	if (writer->is_active) {
 		xlog_close(&writer->current_wal, false);

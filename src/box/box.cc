@@ -30,7 +30,6 @@
  */
 #include "box/box.h"
 
-#include "cbus.h"
 #include "fiber_pool.h"
 
 #include <say.h>
@@ -101,6 +100,11 @@ static struct xstream initial_join_stream;
 static struct xstream final_join_stream;
 static struct xstream subscribe_stream;
 
+/**
+ * The pool of fibers in the transaction processor thread
+ * working on incoming messages from net, wal and other
+ * threads.
+ */
 static struct fiber_pool tx_fiber_pool;
 
 static void

@@ -129,7 +129,7 @@ cbus_destroy(struct cbus *bus)
  */
 void
 cbus_join(struct cbus_endpoint *endpoint, const char *name,
-	  void (*fetch_cb)(ev_loop *, struct ev_async *, int), void *fetch_data)
+	  void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data)
 {
 	tt_pthread_mutex_lock(&cbus.mutex);
 	if (cbus_find_endpoint(&cbus, name) != NULL)
@@ -139,7 +139,8 @@ cbus_join(struct cbus_endpoint *endpoint, const char *name,
 	endpoint->consumer = loop();
 	tt_pthread_mutex_init(&endpoint->mutex, NULL);
 	stailq_create(&endpoint->pipe);
-	ev_async_init(&endpoint->async, fetch_cb);
+	ev_async_init(&endpoint->async,
+		      (void (*)(ev_loop *, struct ev_async *, int)) fetch_cb);
 	endpoint->async.data = fetch_data;
 	ev_async_start(endpoint->consumer, &endpoint->async);
 
@@ -307,5 +308,47 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	if ((rc = msg->rc))
 		diag_move(&msg->diag, &fiber()->diag);
 	return rc;
+}
+
+
+void
+cbus_loop(struct cbus_endpoint *endpoint)
+{
+	while (true) {
+		struct stailq output;
+		stailq_create(&output);
+		cbus_endpoint_fetch(endpoint, &output);
+		struct cmsg *msg, *msg_next;
+		stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
+			cmsg_deliver(msg);
+		if (fiber_is_cancelled())
+			break;
+		fiber_yield();
+	}
+}
+
+static void
+cbus_stop_loop_f(struct cmsg *msg)
+{
+	fiber_cancel(fiber());
+	free(msg);
+}
+
+void
+cbus_stop_loop(struct cpipe *pipe)
+{
+	/*
+	 * Hack: static message only works because cmsg_deliver()
+	 * is a no-op on the second hop.
+	 */
+	static const struct cmsg_hop route[1] = {
+		{cbus_stop_loop_f, NULL}
+	};
+	struct cmsg *cancel = malloc(sizeof(struct cmsg));
+
+	cmsg_init(cancel, route);
+
+	cpipe_push(pipe, cancel);
+	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 

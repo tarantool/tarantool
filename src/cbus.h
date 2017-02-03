@@ -275,7 +275,22 @@ cbus_free();
  */
 void
 cbus_join(struct cbus_endpoint *endpoint, const char *name,
-	  void (*fetch_cb)(ev_loop *, struct ev_async *, int), void *fetch_data);
+	  void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data);
+
+
+/**
+ * Run the message delivery loop until the current fiber is
+ * cancelled.
+ */
+void
+cbus_loop(struct cbus_endpoint *endpoint);
+
+/**
+ * Stop the message delivery loop at the destination the pipe
+ * is pointing at.
+ */
+void
+cbus_stop_loop(struct cpipe *pipe);
 
 /**
  * A helper method to invoke a function on the other side of the
