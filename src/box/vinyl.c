@@ -5745,21 +5745,20 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 {
 	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	const char *key;
 	assert(index->key_def->iid > 0);
-	uint32_t key_len;
-	key = tuple_extract_key(stmt, index->key_def, &key_len);
-	if (key == NULL)
-		return -1;
 	/*
 	 * If the index is unique then the new tuple must not
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
 	if (index->user_key_def->opts.is_unique) {
-		const char *check_key = key;
-		uint32_t part_count = mp_decode_array(&check_key);
-		if (vy_check_dup_key(tx, index, check_key, part_count))
+		uint32_t key_len;
+		const char *key = tuple_extract_key(stmt, index->key_def,
+						    &key_len);
+		if (key == NULL)
+			return -1;
+		uint32_t part_count = mp_decode_array(&key);
+		if (vy_check_dup_key(tx, index, key, part_count))
 			return -1;
 	}
 	struct tuple *tuple = vy_stmt_new_surrogate_replace(index->format,
