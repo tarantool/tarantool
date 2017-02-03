@@ -3041,7 +3041,7 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	 * leave the resulting range as it is, we'd better compact it
 	 * as soon as we can.
 	 */
-	range->compact_priority = range->run_count;
+	result->compact_priority = result->run_count;
 	vy_index_acct_range(index, result);
 	vy_index_add_range(index, result);
 	index->version++;
