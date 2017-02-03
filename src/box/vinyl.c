@@ -7758,8 +7758,12 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	    vy_stmt_compare(next_key, itr->key, key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
+		tuple_unref(next_key);
+		next_key = NULL;
 		return 0;
 	}
+	tuple_unref(next_key);
+	next_key = NULL;
 	return vy_run_iterator_find_lsn(itr, ret);
 }
 
