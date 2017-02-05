@@ -917,11 +917,13 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
 }
 
 /**
- * Register an index with a recovery context.
+ * Handle a VY_LOG_CREATE_INDEX log record.
+ * This function allocates a new index with ID @index_id and
+ * inserts it to the hash.
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_hash_index(struct vy_recovery *recovery, int64_t index_id)
+vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_id)
 {
 	if (vy_recovery_lookup_index(recovery, index_id) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate index id");
@@ -947,7 +949,8 @@ vy_recovery_hash_index(struct vy_recovery *recovery, int64_t index_id)
 }
 
 /**
- * Mark an index as dropped.
+ * Handle a VY_LOG_DROP_INDEX log record.
+ * This function marks the index with ID @index_id as dropped.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
@@ -968,12 +971,15 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_id)
 }
 
 /**
- * Register a run with a recovery context.
+ * Handle a VY_LOG_INSERT_RUN log record.
+ * This function allocates a new run with ID @run_id, inserts it
+ * to the hash, and adds it to the list of runs of the range with
+ * ID @range_id.
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_hash_run(struct vy_recovery *recovery,
-		     int64_t range_id, int64_t run_id)
+vy_recovery_insert_run(struct vy_recovery *recovery,
+		       int64_t range_id, int64_t run_id)
 {
 	if (vy_recovery_lookup_run(recovery, run_id) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate run id");
@@ -1006,11 +1012,13 @@ vy_recovery_hash_run(struct vy_recovery *recovery,
 }
 
 /**
- * Delete a run info from a recovery context.
+ * Handle a VY_LOG_DELETE_RUN log record.
+ * This function deletes the run with ID @run_id from the hash
+ * and from the range's list and frees it.
  * Return 0 on success, -1 if ID not found.
  */
 static int
-vy_recovery_unhash_run(struct vy_recovery *recovery, int64_t run_id)
+vy_recovery_delete_run(struct vy_recovery *recovery, int64_t run_id)
 {
 	struct mh_i64ptr_t *h = recovery->run_hash;
 	mh_int_t k = mh_i64ptr_find(h, run_id, NULL);
@@ -1026,13 +1034,16 @@ vy_recovery_unhash_run(struct vy_recovery *recovery, int64_t run_id)
 }
 
 /**
- * Register a range with a recovery context.
+ * Handle a VY_LOG_INSERT_RANGE log record.
+ * This function allocates a new range with ID @range_id, inserts
+ * it to the hash, and adds it to the list of ranges of the index
+ * with ID @index_id.
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_hash_range(struct vy_recovery *recovery,
-		       int64_t index_id, int64_t range_id,
-		       const char *begin, const char *end)
+vy_recovery_insert_range(struct vy_recovery *recovery,
+			 int64_t index_id, int64_t range_id,
+			 const char *begin, const char *end)
 {
 	if (vy_recovery_lookup_range(recovery, range_id) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate range id");
@@ -1082,11 +1093,14 @@ vy_recovery_hash_range(struct vy_recovery *recovery,
 }
 
 /**
- * Delete info about a range and all its runs from a recovery context.
+ * Handle a VY_LOG_DELETE_RANGE log record.
+ * This function deletes the range with ID @range_id along with
+ * all its runs from the hash, removes it from the index's list,
+ * and frees it.
  * Return 0 on success, -1 if ID not found.
  */
 static int
-vy_recovery_unhash_range(struct vy_recovery *recovery, int64_t range_id)
+vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
 {
 	struct mh_i64ptr_t *h = recovery->range_hash;
 	mh_int_t k = mh_i64ptr_find(h, range_id, NULL);
@@ -1099,7 +1113,7 @@ vy_recovery_unhash_range(struct vy_recovery *recovery, int64_t range_id)
 	rlist_del_entry(range, in_index);
 	struct vy_run_recovery_info *run, *tmp;
 	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
-		if (vy_recovery_unhash_run(recovery, run->id) < 0)
+		if (vy_recovery_delete_run(recovery, run->id) < 0)
 			assert(0);
 	}
 	free(range);
@@ -1122,26 +1136,26 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	int rc;
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
-		rc = vy_recovery_hash_index(recovery, record->index_id);
+		rc = vy_recovery_create_index(recovery, record->index_id);
 		break;
 	case VY_LOG_DROP_INDEX:
 		rc = vy_recovery_drop_index(recovery, record->index_id);
 		break;
 	case VY_LOG_INSERT_RANGE:
-		rc = vy_recovery_hash_range(recovery, record->index_id,
-					    record->range_id,
-					    record->range_begin,
-					    record->range_end);
+		rc = vy_recovery_insert_range(recovery, record->index_id,
+					      record->range_id,
+					      record->range_begin,
+					      record->range_end);
 		break;
 	case VY_LOG_DELETE_RANGE:
-		rc = vy_recovery_unhash_range(recovery, record->range_id);
+		rc = vy_recovery_delete_range(recovery, record->range_id);
 		break;
 	case VY_LOG_INSERT_RUN:
-		rc = vy_recovery_hash_run(recovery, record->range_id,
-					  record->run_id);
+		rc = vy_recovery_insert_run(recovery, record->range_id,
+					    record->run_id);
 		break;
 	case VY_LOG_DELETE_RUN:
-		rc = vy_recovery_unhash_run(recovery, record->run_id);
+		rc = vy_recovery_delete_run(recovery, record->run_id);
 		break;
 	default:
 		unreachable();
