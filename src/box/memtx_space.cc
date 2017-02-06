@@ -382,8 +382,8 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 			tuple_upsert_execute(region_aligned_alloc_cb,
 					     &fiber()->gc, request->ops,
 					     request->ops_end, old_data,
-					     old_data + bsize, &new_size, 1,
-					     false, NULL);
+					     old_data + bsize, &new_size,
+					     request->index_base, false, NULL);
 		if (new_data == NULL)
 			diag_raise();
 

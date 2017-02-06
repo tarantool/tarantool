@@ -5,7 +5,7 @@ import socket
 import msgpack
 from tarantool.const import *
 from tarantool import Connection
-from tarantool.request import Request, RequestInsert, RequestSelect
+from tarantool.request import Request, RequestInsert, RequestSelect, RequestUpdate, RequestUpsert
 from tarantool.response import Response
 from lib.tarantool_connection import TarantoolConnection
 
@@ -324,3 +324,47 @@ body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
 resp = test_request(header, body)
 print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
 c.close()
+
+
+admin("space = box.schema.space.create('test_index_base', { id = 568 })")
+admin("index = space:create_index('primary', { type = 'hash' })")
+admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')")
+
+c = Connection('localhost', server.iproto.port)
+c.connect()
+s = c._socket
+
+request = RequestInsert(c, 568, [1, 0, 0, 0])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+request = RequestUpdate(c, 568, 0, [1], [['+', 2, 1], ['-', 3, 1]])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+request = RequestUpsert(c, 568, 0, [1, 0, 0, 0], [['+', 2, 1], ['-', 3, 1]])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+
+request = RequestSelect(c, 568, 0, [1], 0, 1, 0)
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+c.close()
+admin("space:drop()")
+
