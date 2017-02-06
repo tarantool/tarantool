@@ -486,13 +486,17 @@ static ssize_t
 vy_log_flush_f(va_list ap)
 {
 	struct vy_log *log = va_arg(ap, struct vy_log *);
-	int *rc = va_arg(ap, int *);
+	bool *need_rollback = va_arg(ap, int *);
+
+	/*
+	 * xlog_tx_rollback() must not be called after
+	 * xlog_tx_commit(), even if the latter failed.
+	 */
+	*need_rollback = false;
 
 	if (xlog_tx_commit(log->xlog) < 0 ||
 	    xlog_flush(log->xlog) < 0)
-		*rc = -1;
-	else
-		*rc = 0;
+		return -1;
 	return 0;
 }
 
@@ -532,17 +536,14 @@ vy_log_flush(struct vy_log *log)
 	 * Do actual disk writes in a background fiber
 	 * so as not to block the tx thread.
 	 */
-	int rc;
-	if (coio_call(vy_log_flush_f, log, &rc) < 0) {
-		/*
-		 * vy_log_flush_f() was never called, because coio_call()
-		 * failed due to OOM, so we need to rollback.
-		 */
-		xlog_tx_rollback(log->xlog);
+	bool need_rollback = true;
+	if (coio_call(vy_log_flush_f, log, &need_rollback) < 0) {
+		if (need_rollback) {
+			/* coio_call() failed due to OOM. */
+			xlog_tx_rollback(log->xlog);
+		}
 		return -1;
 	}
-	if (rc != 0)
-		return -1; /* vy_log_flush_f() failed */
 
 	/* Success. Reset the buffer. */
 	log->tx_end = 0;
