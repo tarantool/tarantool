@@ -131,9 +131,9 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 			result = 1;
 			break;
 		}
+		rlist_add_entry(&l->queue, fiber(), state);
 	}
 	fiber_set_cancellable(was_cancellable);
-	rlist_del_entry(fiber(), state);
 	return result;
 }
 
