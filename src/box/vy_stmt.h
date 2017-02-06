@@ -154,7 +154,7 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
  * @return new statement of the same type with the same data.
  */
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt);
+vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format);
 
 /**
  * Specialized comparators are faster than general-purpose comparators.

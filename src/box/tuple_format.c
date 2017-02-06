@@ -213,6 +213,24 @@ tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab)
 	return format;
 }
 
+struct tuple_format *
+tuple_format_dup(const struct tuple_format *src)
+{
+	uint32_t total = sizeof(struct tuple_format) +
+			 src->field_count * sizeof(struct tuple_field_format);
+
+	struct tuple_format *format = (struct tuple_format *) malloc(total);
+	if (format == NULL)
+		return NULL;
+	memcpy(format, src, total);
+	format->id == FORMAT_ID_NIL;
+	if (tuple_format_register(format) != 0) {
+		tuple_format_delete(format);
+		return NULL;
+	}
+	return format;
+}
+
 /** @sa declaration for details. */
 int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,

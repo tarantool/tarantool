@@ -212,6 +212,8 @@ struct vy_mem_iterator {
 
 	/* mem */
 	struct vy_mem *mem;
+	/** Format for copying tuples from lsregion. */
+	struct tuple_format *format;
 
 	/* Search options */
 	/**
@@ -254,7 +256,8 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn);
+		     const struct tuple *key, const int64_t *vlsn,
+		     struct tuple_format *format);
 
 #if defined(__cplusplus)
 } /* extern "C" */

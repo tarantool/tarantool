@@ -87,7 +87,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t size)
 }
 
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt)
+vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format)
 {
 	/*
 	 * Need to subtract sizeof(struct tuple), because
@@ -97,12 +97,13 @@ vy_stmt_dup(const struct tuple *stmt)
 	 * the original tuple.
 	 */
 	uint32_t size = tuple_size(stmt);
-	struct tuple *res = vy_stmt_alloc(tuple_format_by_id(stmt->format_id),
-					  size - sizeof(struct vy_stmt));
+	struct tuple *res =
+		vy_stmt_alloc(format, size - sizeof(struct vy_stmt));
 	if (res == NULL)
 		return NULL;
 	memcpy(res, stmt, size);
 	res->refs = 1;
+	res->format_id = tuple_format_id(format);
 	return res;
 }
 
@@ -276,7 +277,7 @@ vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
 		 * The statement already is a key, so simply copy it in new
 		 * struct vy_stmt as SELECT.
 		 */
-		struct tuple *res = vy_stmt_dup(stmt);
+		struct tuple *res = vy_stmt_dup(stmt, format);
 		if (res != NULL)
 			vy_stmt_set_type(res, IPROTO_SELECT);
 		return res;

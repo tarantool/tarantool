@@ -793,6 +793,11 @@ struct vy_merge_iterator {
 	uint32_t skipped_start;
 	/* Index for key_def and index->version */
 	struct vy_index *index;
+	/**
+	 * Format to allocate tuples
+	 * (from vy_apply_upsert(), run_iterator and mem_iterator)
+	 */
+	struct tuple_format *format;
 
 	/* {{{ Range version checking */
 	/* copy of index->version to track range tree changes */
@@ -5507,7 +5512,7 @@ check_key:
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
 		tuple_unref(result_stmt);
-		result_stmt = vy_stmt_dup(old_stmt);
+		result_stmt = vy_stmt_dup(old_stmt, format);
 	}
 	return result_stmt;
 }
@@ -6832,6 +6837,8 @@ struct vy_run_iterator {
 	/* Members needed for memory allocation and disk access */
 	/* index */
 	struct vy_index *index;
+	/** Format ot allocate new tuples read from pages. */
+	struct tuple_format *format;
 	/* run */
 	struct vy_run *run;
 	/* range of the run */
@@ -6873,7 +6880,8 @@ static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_range *range, struct vy_run *run,
 		     enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn);
+		     const struct tuple *key, const int64_t *vlsn,
+		     struct tuple_format *format);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -7294,7 +7302,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->index->format,
+	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->format,
 			     itr->index->key_def);
 	if (*stmt == NULL)
 		return -1;
@@ -7355,7 +7363,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key = vy_page_stmt(page, mid, idx->format,
+		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->format,
 						     itr->index->key_def);
 		if (fnd_key == NULL)
 			return end;
@@ -7651,11 +7659,12 @@ static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_range *range, struct vy_run *run,
 		     enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn)
+		     const struct tuple *key, const int64_t *vlsn,
+		     struct tuple_format *format)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
-
+	itr->format = format;
 	itr->index = range->index;
 	itr->range = range;
 	itr->run = run;
@@ -8289,10 +8298,11 @@ struct vy_merge_src {
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 		       enum iterator_type iterator_type,
-		       const struct tuple *key)
+		       const struct tuple *key, struct tuple_format *format)
 {
 	assert(key != NULL);
 	itr->index = index;
+	itr->format = format;
 	itr->index_version = 0;
 	itr->curr_range = NULL;
 	itr->range_version = 0;
@@ -8641,7 +8651,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 	struct key_def *def = itr->index->key_def;
 	if (t == NULL)
 		return 0;
-	struct tuple_format *format = itr->index->space->format;
+	struct tuple_format *format = itr->format;
 	/* Upserts enabled only in the primary index. */
 	assert(vy_stmt_type(t) != IPROTO_UPSERT || def->iid == 0);
 	tuple_ref(t);
@@ -8797,6 +8807,13 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
  */
 struct vy_write_iterator {
 	struct vy_index *index;
+	/**
+	 * Format to allocate new tuples. We have to register the
+	 * copy of the index format and use it for tuples
+	 * allocation from the iterator to avoid multithread
+	 * access to index->format.
+	 */
+	struct tuple_format *format;
 	/* The minimal VLSN among all active transactions */
 	int64_t oldest_vlsn;
 	/* There are is no level older than the one we're writing to. */
@@ -8816,7 +8833,7 @@ struct vy_write_iterator {
  * Open an empty write iterator. To add sources to the iterator
  * use vy_write_iterator_add_* functions
  */
-static void
+static int
 vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 		       bool is_last_level, int64_t oldest_vlsn)
 {
@@ -8824,8 +8841,15 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_new_select(index->space->format, NULL, 0);
-	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key);
+	wi->key = vy_stmt_new_select(index->format, NULL, 0);
+	wi->format = tuple_format_dup(index->format);
+	if (wi->format == NULL) {
+		tuple_unref(wi->key);
+		return -1;
+	}
+	tuple_format_ref(wi->format, 1);
+	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key, wi->format);
+	return 0;
 }
 
 static struct vy_write_iterator *
@@ -8837,7 +8861,11 @@ vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 		diag_set(OutOfMemory, sizeof(*wi), "calloc", "wi");
 		return NULL;
 	}
-	vy_write_iterator_open(wi, index, is_last_level, oldest_vlsn);
+	if (vy_write_iterator_open(wi, index, is_last_level,
+				   oldest_vlsn) != 0) {
+		free(wi);
+		return NULL;
+	}
 	return wi;
 }
 
@@ -8851,7 +8879,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
-			     range, run, ITER_GE, wi->key, &vlsn);
+			     range, run, ITER_GE, wi->key, &vlsn, wi->format);
 	return 0;
 }
 
@@ -8864,7 +8892,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_mem_iterator_open(&src->mem_iterator, &wi->mem_iterator_stat,
-			     mem, ITER_GE, wi->key, &vlsn);
+			     mem, ITER_GE, wi->key, &vlsn, wi->format);
 	return 0;
 }
 
@@ -8899,7 +8927,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 	struct vy_merge_iterator *mi = &wi->mi;
 	struct tuple *stmt = NULL;
 	struct key_def *def = wi->index->key_def;
-	struct tuple_format *format = wi->index->space->format;
 	/* @sa vy_write_iterator declaration for the algorithm description. */
 	while (true) {
 		if (wi->goto_next_key) {
@@ -8933,7 +8960,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 		if (vy_stmt_type(stmt) == IPROTO_UPSERT && wi->is_last_level) {
 			/* Turn UPSERT to REPLACE. */
 			struct tuple *applied;
-			applied = vy_apply_upsert(stmt, NULL, def, format,
+			applied = vy_apply_upsert(stmt, NULL, def, wi->format,
 						  false);
 			tuple_unref(stmt);
 			if (applied == NULL)
@@ -8943,6 +8970,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 		wi->tmp_stmt = stmt;
 		break;
 	}
+	assert(stmt->format_id == tuple_format_id(wi->format));
 	*ret = stmt;
 	return 0;
 }
@@ -8954,14 +8982,15 @@ vy_write_iterator_close(struct vy_write_iterator *wi)
 		tuple_unref(wi->tmp_stmt);
 	}
 	wi->tmp_stmt = NULL;
+	tuple_unref(wi->key);
 	vy_merge_iterator_close(&wi->mi);
+	tuple_format_ref(wi->format, -1);
 }
 
 static void
 vy_write_iterator_delete(struct vy_write_iterator *wi)
 {
 	vy_write_iterator_close(wi);
-	tuple_unref(wi->key);
 	free(wi);
 }
 
@@ -9017,14 +9046,16 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , r->mem,
-				     itr->iterator_type, itr->key, itr->vlsn);
+				     itr->iterator_type, itr->key, itr->vlsn,
+				     itr->index->format);
 	}
 	/* Add the active in-memory index of the current range. */
 	if (range->mem != NULL) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , range->mem,
-				     itr->iterator_type, itr->key, itr->vlsn);
+				     itr->iterator_type, itr->key, itr->vlsn,
+				     itr->index->format);
 	}
 	/* Add frozen in-memory indexes. */
 	struct vy_mem *mem;
@@ -9032,7 +9063,8 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , mem,
-				     itr->iterator_type, itr->key, itr->vlsn);
+				     itr->iterator_type, itr->key, itr->vlsn,
+				     itr->index->format);
 	}
 }
 
@@ -9049,7 +9081,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
 				     itr->curr_range,
 				     run, itr->iterator_type, itr->key,
-				     itr->vlsn);
+				     itr->vlsn, itr->index->format);
 	}
 }
 
@@ -9112,7 +9144,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->iterator_type, itr->key);
+			       itr->iterator_type, itr->key,
+			       itr->index->format);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9130,7 +9163,8 @@ restart:
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->iterator_type, itr->key);
+			       itr->iterator_type, itr->key,
+			       itr->index->format);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9194,7 +9228,8 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 	assert(itr->curr_range != NULL);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
-			       itr->iterator_type, itr->key);
+			       itr->iterator_type, itr->key,
+			       itr->index->format);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct tuple *stmt = NULL;
@@ -9223,7 +9258,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	struct tuple *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
 	struct key_def *def = itr->index->key_def;
-	struct tuple_format *format = itr->index->space->format;
 	int rc = 0;
 	while (true) {
 		if (vy_read_iterator_merge_next_key(itr, &t)) {
@@ -9259,8 +9293,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		if (vy_stmt_type(t) != IPROTO_DELETE) {
 			if (vy_stmt_type(t) == IPROTO_UPSERT) {
 				struct tuple *applied;
-				applied = vy_apply_upsert(t, NULL, def, format,
-							  true);
+				applied = vy_apply_upsert(t, NULL, def,
+							  mi->format, true);
 				tuple_unref(t);
 				t = applied;
 				assert(vy_stmt_type(t) == IPROTO_REPLACE);
@@ -9447,7 +9481,7 @@ vy_squash_process(struct vy_squash *squash)
 			applied = vy_apply_upsert(mem_stmt, result, key_def,
 						  format, true);
 		else
-			applied = vy_stmt_dup(mem_stmt);
+			applied = vy_stmt_dup(mem_stmt, format);
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;

@@ -161,7 +161,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
 		tuple_unref(itr->last_stmt);
-	itr->last_stmt = vy_stmt_dup(itr->curr_stmt);
+	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, itr->format);
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL)
 		return 0;
@@ -325,10 +325,12 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn)
+		     const struct tuple *key, const int64_t *vlsn,
+		     struct tuple_format *format)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
+	itr->format = format;
 
 	assert(key != NULL);
 	itr->mem = mem;
