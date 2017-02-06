@@ -153,6 +153,21 @@ vy_stmt_new_select(struct tuple_format *format, const char *key,
 	return vy_stmt_new_key(format, key, part_count, IPROTO_SELECT);
 }
 
+char *
+vy_copy_raw_key(const char *key)
+{
+	assert(mp_typeof(*key) == MP_ARRAY);
+	const char *end = key;
+	mp_next(&end);
+	char *res = malloc(end - key);
+	if (res == NULL) {
+		diag_set(OutOfMemory, end - key, "malloc", "res");
+		return NULL;
+	}
+	memcpy(res, key, end - key);
+	return res;
+}
+
 /**
  * Create a statement without type and with reserved space for operations.
  * Operations can be saved in the space available by @param extra.
