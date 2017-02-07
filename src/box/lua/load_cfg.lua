@@ -254,7 +254,7 @@ local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v
     -- box.net.box uses box.error and box.internal
-    if k ~= 'error' and k ~= 'internal' and k ~= 'index' then
+    if k ~= 'error' and k ~= 'internal' and k ~= 'session' and k ~= 'index' then
         box[k] = nil
     end
 end

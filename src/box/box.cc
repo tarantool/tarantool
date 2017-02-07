@@ -1019,7 +1019,9 @@ box_process_call(struct request *request, struct obuf *out)
 			 * system spaces from a snapshot).
 			 */
 			struct user *owner = user_find_xc(func->def.uid);
-			credentials_init(&func->owner_credentials, owner);
+			credentials_init(&func->owner_credentials,
+					 owner->auth_token,
+					 owner->def.uid);
 		}
 		fiber_set_user(fiber(), &func->owner_credentials);
 	}
@@ -1310,9 +1312,7 @@ box_free(void)
 	 */
 	if (box_init_done) {
 #if 0
-		session_free();
 		cluster_free();
-		user_cache_free();
 		schema_free();
 		tuple_free();
 		port_free();
@@ -1483,13 +1483,6 @@ box_init(void)
 	engine_init();
 
 	schema_init();
-	user_cache_init();
-	/*
-	 * The order is important: to initialize sessions,
-	 * we need to access the admin user, which is used
-	 * as a default session user when running triggers.
-	 */
-	session_init();
 
 	cluster_init();
 	port_init();

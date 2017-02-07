@@ -86,6 +86,6 @@ authenticate(const char *user_name, uint32_t len,
 	if (! rlist_empty(&session_on_auth))
 		session_run_on_auth_triggers(user->def.name);
 ok:
-	credentials_init(&session->credentials, user);
+	credentials_init(&session->credentials, user->auth_token,
+			 user->def.uid);
 }
-

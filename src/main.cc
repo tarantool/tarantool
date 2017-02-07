@@ -74,6 +74,7 @@
 #include "title.h"
 #include <libutil.h>
 #include "box/lua/init.h" /* box_lua_init() */
+#include "box/session.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -506,6 +507,8 @@ tarantool_free(void)
 	 * are too interconnected.
 	 */
 	tarantool_lua_free();
+	session_free();
+	user_cache_free();
 	fiber_free();
 	memory_free();
 	random_free();
@@ -617,6 +620,10 @@ main(int argc, char **argv)
 	coeio_enable();
 	signal_init();
 	cbus_init();
+
+	user_cache_init();
+	session_init();
+
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 	box_lua_init(tarantool_L);
 

@@ -1053,14 +1053,18 @@ tx_process_connect(struct cmsg *m)
 	struct obuf *out = &msg->iobuf->out;
 	try {              /* connect. */
 		con->session = session_create(con->input.fd);
+		if (con->session == NULL)
+			diag_raise();
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = SERVER_UUID;
 		greeting_encode(greeting, tarantool_version_id(),
 				&uuid, con->session->salt, SESSION_SEED_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
-		if (! rlist_empty(&session_on_connect))
-			session_run_on_connect_triggers(con->session);
+		if (! rlist_empty(&session_on_connect)) {
+			if (session_run_on_connect_triggers(con->session) != 0)
+				diag_raise();
+		}
 		msg->write_end = obuf_create_svp(out);
 	} catch (Exception *e) {
 		iproto_reply_error(out, e, 0 /* zero sync for connect error */);

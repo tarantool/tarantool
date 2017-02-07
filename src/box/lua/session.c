@@ -42,6 +42,8 @@
 
 static const char *sessionlib_name = "box.session";
 
+extern uint32_t sc_version;
+
 /**
  * Return a unique monotonic session
  * identifier. The identifier can be used
@@ -105,6 +107,8 @@ lbox_session_user(struct lua_State *L)
 static int
 lbox_session_su(struct lua_State *L)
 {
+	if (sc_version == 0)
+		luaL_error(L, "Please call box.cfg{} first");
 	int top = lua_gettop(L);
 	if (top < 1)
 		luaL_error(L, "session.su(): bad arguments");
@@ -123,7 +127,7 @@ lbox_session_su(struct lua_State *L)
 		luaT_error(L);
 	struct credentials orig_cr;
 	credentials_copy(&orig_cr, &session->credentials);
-	credentials_init(&session->credentials, user);
+	credentials_init(&session->credentials, user->auth_token, user->def.uid);
 	if (top == 1)
 		return 0; /* su */
 
