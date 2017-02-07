@@ -43,11 +43,11 @@ matrix:
 #      - env: OS=fedora DIST=24 PACK=rpm
 #      - env: OS=fedora DIST=25 PACK=rpm
       - env: OS=fedora DIST=rawhide PACK=rpm
-#      - env: OS=ubuntu DIST=precise PACK=deb
+      - env: OS=ubuntu DIST=precise PACK=deb
 #      - env: OS=ubuntu DIST=trusty PACK=deb
 #      - env: OS=ubuntu DIST=xenial PACK=deb
 #      - env: OS=ubuntu DIST=yakkety PACK=deb
-#      - env: OS=debian DIST=wheezy PACK=deb
+      - env: OS=debian DIST=wheezy PACK=deb
 #      - env: OS=debian DIST=jessie PACK=deb
 #      - env: OS=debian DIST=stretch PACK=deb
       - env: OS=debian DIST=sid PACK=deb

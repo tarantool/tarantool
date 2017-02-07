@@ -95,7 +95,8 @@ if (CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7.2 AND
     # vy_stmt.c with enabled optimizations.
     #
     message(WARNING "Detected buggy GCC 4.7.2 on Debian")
-    set_source_files_properties(vy_stmt.c PROPERTIES COMPILE_FLAGS -O0)
+    set_source_files_properties(vy_stmt.c vy_log.c PROPERTIES
+                                COMPILE_FLAGS -O0)
 endif()
 
 target_link_libraries(box ${ZSTD_LIBRARIES})
