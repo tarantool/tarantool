@@ -104,16 +104,16 @@ stage('Build') {
                     }
                 }
             },
-            /*"debianwheezy": {
-              node {
-              ws {
-              deleteDir()
-              unstash 'source'
-              env.OS="debian"; env.DIST="wheezy"; env.PACK="deb"
-              sh './build/pack/travis.sh'
-              }
-              }
-              },*/
+            "debianwheezy": {
+                node {
+                    ws {
+                        deleteDir()
+                        unstash 'source'
+                        env.OS="debian"; env.DIST="wheezy"; env.PACK="deb"
+                        sh './build/pack/travis.sh'
+                    }
+                }
+            },
             "debianjessie": {
                 node {
                     ws {
