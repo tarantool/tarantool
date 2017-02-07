@@ -355,7 +355,6 @@ add_dependencies(build_bundled_libs gopt)
 
 option(ENABLE_BUNDLED_MSGPUCK "Enable building of the bundled MsgPuck" ON)
 if (ENABLE_BUNDLED_MSGPUCK)
-    add_library(msgpuck STATIC src/lib/msgpuck/msgpuck.c)
     set(MSGPUCK_LIBRARIES msgpuck)
     set(MSGPUCK_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/msgpuck)
     find_package_message(MsgPuck

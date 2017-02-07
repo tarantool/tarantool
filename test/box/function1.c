@@ -2,7 +2,6 @@
 #include "module.h"
 
 #include <stdio.h>
-
 #include <msgpuck.h>
 
 int
