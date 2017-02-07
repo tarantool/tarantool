@@ -2,8 +2,6 @@
 #include "module.h"
 
 #include <stdio.h>
-
-#define MP_SOURCE 1
 #include <msgpuck.h>
 
 int
