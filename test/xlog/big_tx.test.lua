@@ -7,3 +7,5 @@ env:cmd('restart server default')
 
 #box.space.big_tx:select()
 
+box.space.big_tx:drop()
+

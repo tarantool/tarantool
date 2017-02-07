@@ -15,3 +15,6 @@ env:cmd('restart server default')
 ---
 - 1
 ...
+box.space.big_tx:drop()
+---
+...

@@ -981,7 +981,7 @@ xlog_tx_write_zstd(struct xlog *log)
 	ERROR_INJECT(ERRINJ_WAL_WRITE_DISK, {
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
 		obuf_reset(&log->zbuf);
-		return -1;
+		goto error;
 	});
 	ssize_t written;
 
