@@ -153,6 +153,12 @@ const box_key_def_t *
 box_index_key_def(uint32_t space_id, uint32_t index_id);
 
 /**
+ * @todo: delete, a hack added by @mejedi for sql
+ */
+const box_key_def_t *
+box_iterator_key_def(box_iterator_t *iterator);
+
+/**
  * Return the number of element in the index.
  *
  * \param space_id space identifier

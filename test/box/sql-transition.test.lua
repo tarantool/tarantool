@@ -38,17 +38,21 @@ test_run:cmd("setopt delimiter ''");;
 -- test invalid input
 sql_schema_put(0, "invalid", 1, "CREATE FROB")
 
--- create space with data
+-- create space
 foobar = box.schema.space.create("foobar")
 _ = foobar:create_index("primary",{parts={1,"number"}})
-foobar:insert({1,"foo"})
-foobar:insert({2,"bar"})
-foobar:insert({1000,"foobar"})
 
 foobar_pageno = sql_pageno(foobar.id, foobar.index.primary.id)
 foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar) WITHOUT ROWID"
 sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
 sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
+
+-- prepare data
+box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
+box.sql.execute("INSERT INTO foobar VALUES (2, 'bar')")
+box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
+
+box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -67,6 +71,14 @@ box.sql.execute("SELECT count(*) FROM foobar")
 box.sql.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
+
+-- updates
+box.sql.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+
 
 -- cleanup
 foobar:drop()

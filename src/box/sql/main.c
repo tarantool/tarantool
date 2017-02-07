@@ -1358,6 +1358,7 @@ const char *sqlite3ErrName(int rc){
       case SQLITE_FORMAT:             zName = "SQLITE_FORMAT";            break;
       case SQLITE_RANGE:              zName = "SQLITE_RANGE";             break;
       case SQLITE_NOTADB:             zName = "SQLITE_NOTADB";            break;
+      case SQLITE_TARANTOOL_ERROR:    zName = "SQLITE_TARANTOOL_ERROR";   break;
       case SQLITE_ROW:                zName = "SQLITE_ROW";               break;
       case SQLITE_NOTICE:             zName = "SQLITE_NOTICE";            break;
       case SQLITE_NOTICE_RECOVER_WAL: zName = "SQLITE_NOTICE_RECOVER_WAL";break;
@@ -1410,6 +1411,7 @@ const char *sqlite3ErrStr(int rc){
     /* SQLITE_FORMAT      */ "auxiliary database format error",
     /* SQLITE_RANGE       */ "bind or column index out of range",
     /* SQLITE_NOTADB      */ "file is encrypted or is not a database",
+    /* SQLITE_TARANTOOL_ERROR */ "sqlite/tarantool error",
   };
   const char *zErr = "unknown error";
   switch( rc ){

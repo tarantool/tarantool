@@ -8033,6 +8033,10 @@ int sqlite3BtreeInsert(
   ** blob of associated data.  */
   assert( (pX->pKey==0)==(pCur->pKeyInfo==0) );
 
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Insert(pCur, pX);
+  }
+
   /* Save the positions of any other cursors open on this table.
   **
   ** In some cases, the call to btreeMoveto() below is a no-op. For
@@ -8210,9 +8214,14 @@ int sqlite3BtreeDelete(BtCursor *pCur, u8 flags){
   assert( pCur->curFlags & BTCF_WriteFlag );
   assert( hasSharedCacheTableLock(p, pCur->pgnoRoot, pCur->pKeyInfo!=0, 2) );
   assert( !hasReadConflicts(p, pCur->pgnoRoot) );
-  assert( pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
   assert( pCur->eState==CURSOR_VALID );
   assert( (flags & ~(BTREE_SAVEPOSITION | BTREE_AUXDELETE))==0 );
+
+  if( pCur->curFlags & BTCF_TaCursor ){
+    return tarantoolSqlite3Delete(pCur, flags);
+  }
+
+  assert( pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
 
   iCellDepth = pCur->iPage;
   iCellIdx = pCur->aiIdx[iCellDepth];

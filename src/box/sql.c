@@ -46,6 +46,7 @@
 #undef unlikely
 
 #include "index.h"
+#include "box.h"
 #include "tuple.h"
 #include "fiber.h"
 #include "small/region.h"
@@ -161,8 +162,12 @@ static enum iterator_type normalize_iter_type(BtCursor *pCur)
 }
 #endif
 
-static int sql_copy_error(sqlite3 *);
 static uint32_t get_space_id(Pgno page, uint32_t *index_id);
+
+const char *tarantoolErrorMessage()
+{
+	return box_error_message(box_error_last());
+}
 
 int tarantoolSqlite3CloseCursor(BtCursor *pCur)
 {
@@ -252,6 +257,12 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 		iter_type = ITER_GT;
 		res_success = 1; /* item>key */
 		break;
+	case OP_NoConflict:
+	case OP_NotFound:
+	case OP_Found:
+		iter_type = ITER_EQ;
+		res_success = 0;
+		break;
 	}
 	rc = cursor_seek(pCur, pRes, iter_type, k, ke);
 	if (*pRes == 0) {
@@ -280,6 +291,48 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
 	space_id = get_space_id(pCur->pgnoRoot, &index_id);
 	*pnEntry = box_index_len(space_id, index_id);
 	return SQLITE_OK;
+}
+
+int tarantoolSqlite3Insert(BtCursor *pCur, const BtreePayload *pX)
+{
+	assert(pCur->curFlags & BTCF_TaCursor);
+
+	if (box_replace(get_space_id(pCur->pgnoRoot, NULL),
+			pX->pKey, (const char *)pX->pKey + pX->nKey,
+			NULL)
+	    != 0) {
+		return SQLITE_TARANTOOL_ERROR;
+	}
+	return SQLITE_OK;
+}
+
+int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
+{
+	(void)flags;
+
+	assert(pCur->curFlags & BTCF_TaCursor);
+
+	struct ta_cursor *c = pCur->pTaCursor;
+	uint32_t space_id, index_id;
+	size_t original_size;
+	const char *key;
+	uint32_t key_size;
+	int rc;
+
+	assert(c);
+	assert(c->iter);
+	assert(c->tuple_last);
+
+	space_id = get_space_id(pCur->pgnoRoot, &index_id);
+	original_size = region_used(&fiber()->gc);
+	key = tuple_extract_key(c->tuple_last,
+				box_iterator_key_def(c->iter),
+				&key_size);
+	if (key == NULL)
+		return SQLITE_TARANTOOL_ERROR;
+	rc = box_delete(space_id, index_id, key, key+key_size, NULL);
+	region_truncate(&fiber()->gc, original_size);
+	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
 }
 
 /* Cursor positioning. */
@@ -313,7 +366,7 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	c->iter = box_index_iterator(space_id, index_id, type, k, ke);
 	if (c->iter == NULL) {
 		pCur->eState = CURSOR_INVALID;
-		return sql_copy_error(pCur->pBtree->db);
+		return SQLITE_TARANTOOL_ERROR;
         }
 	c->type = type;
 	pCur->eState = CURSOR_VALID;
@@ -335,7 +388,7 @@ cursor_advance(BtCursor *pCur, int *pRes)
 
 	rc = box_iterator_next(c->iter, &tuple);
 	if (rc)
-		return sql_copy_error(pCur->pBtree->db);
+		return SQLITE_TARANTOOL_ERROR;
 	if (c->tuple_last) box_tuple_unref(c->tuple_last);
 	if (tuple) {
 		box_tuple_ref(tuple);
@@ -346,13 +399,6 @@ cursor_advance(BtCursor *pCur, int *pRes)
 	}
 	c->tuple_last = tuple;
 	return SQLITE_OK;
-}
-
-/* Copy last error from Tarantool's diag */
-static int sql_copy_error(sqlite3 *db)
-{
-	(void)db;
-	return SQLITE_ERROR;
 }
 
 /*

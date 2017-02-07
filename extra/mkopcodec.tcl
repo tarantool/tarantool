@@ -10,6 +10,7 @@
 #
 puts "/* Automatically generated.  Do not edit */"
 puts "/* See the tool/mkopcodec.tcl script for details. */"
+puts "#include \"sqliteInt.h\""
 puts "#if !defined(SQLITE_OMIT_EXPLAIN) \\"
 puts " || defined(VDBE_PROFILE) \\"
 puts " || defined(SQLITE_DEBUG)"

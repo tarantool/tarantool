@@ -322,6 +322,13 @@ box_index_key_def(uint32_t space_id, uint32_t index_id)
 	}
 }
 
+const box_key_def_t *
+box_iterator_key_def(box_iterator_t *iterator)
+{
+	return &iterator->index->index_def->key_def;
+}
+
+
 ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
 {

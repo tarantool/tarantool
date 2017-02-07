@@ -20,6 +20,8 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "tarantoolInt.h"
+
 #include "msgpuck/msgpuck.h"
 
 /*
@@ -3894,6 +3896,7 @@ case OP_Found: {        /* jump, in3 */
     sqlite3VdbeRecordUnpack(pC->pKeyInfo, pIn3->n, pIn3->z, pIdxKey);
   }
   pIdxKey->default_rc = 0;
+  pIdxKey->opcode = pOp->opcode;
   takeJump = 0;
   if( pOp->opcode==OP_NoConflict ){
     /* For the OP_NoConflict opcode, take the jump if any of the
@@ -6870,7 +6873,9 @@ abort_due_to_error:
   if( db->mallocFailed ) rc = SQLITE_NOMEM_BKPT;
   assert( rc );
   if( p->zErrMsg==0 && rc!=SQLITE_IOERR_NOMEM ){
-    sqlite3VdbeError(p, "%s", sqlite3ErrStr(rc));
+    const char *m = (rc!=SQLITE_TARANTOOL_ERROR) ? sqlite3ErrStr(rc) :
+      tarantoolErrorMessage();
+    sqlite3VdbeError(p, "%s", m);
   }
   p->rc = rc;
   sqlite3SystemError(db, rc);

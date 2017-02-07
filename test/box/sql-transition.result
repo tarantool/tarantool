@@ -45,24 +45,12 @@ sql_schema_put(0, "invalid", 1, "CREATE FROB")
 - 11
 - 'malformed database schema (invalid) - near "FROB": syntax error'
 ...
--- create space with data
+-- create space
 foobar = box.schema.space.create("foobar")
 ---
 ...
 _ = foobar:create_index("primary",{parts={1,"number"}})
 ---
-...
-foobar:insert({1,"foo"})
----
-- [1, 'foo']
-...
-foobar:insert({2,"bar"})
----
-- [2, 'bar']
-...
-foobar:insert({1000,"foobar"})
----
-- [1000, 'foobar']
 ...
 foobar_pageno = sql_pageno(foobar.id, foobar.index.primary.id)
 ---
@@ -79,6 +67,20 @@ sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
 ---
 - 0
 - null
+...
+-- prepare data
+box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
+---
+...
+box.sql.execute("INSERT INTO foobar VALUES (2, 'bar')")
+---
+...
+box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
+---
+...
+box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
+---
+- error: 'UNIQUE constraint failed: foobar.foo'
 ...
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -155,6 +157,25 @@ box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 - - ['foobar', 1000, 42, 'awesome']
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
+...
+-- updates
+box.sql.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
+---
+...
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
+---
+- - [1]
+...
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+---
+- - [1]
+...
+box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
+---
+...
+box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+---
+- - [0]
 ...
 -- cleanup
 foobar:drop()
