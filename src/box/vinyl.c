@@ -5276,11 +5276,12 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	if (index->surrogate_format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->surrogate_format, 1);
-
-	index->format_with_colmask = vy_create_format_with_mask(space->format);
-	if (index->format_with_colmask == NULL)
-		goto fail_format_with_mask;
-	tuple_format_ref(index->format_with_colmask, 1);
+	if (user_key_def->iid == 0) {
+		index->format_with_colmask = vy_create_format_with_mask(space->format);
+		if (index->format_with_colmask == NULL)
+			goto fail_format_with_mask;
+		tuple_format_ref(index->format_with_colmask, 1);
+	}
 
 	if (vy_index_conf_create(index, index->key_def))
 		goto fail_conf;
@@ -5289,7 +5290,7 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
 
-	if (index->key_def->iid > 0) {
+	if (user_key_def->iid > 0) {
 		/**
 		 * Calculate the bitmask of columns used in this
 		 * index.
@@ -5323,11 +5324,12 @@ fail_run_hist:
 	free(index->name);
 	free(index->path);
 fail_conf:
-	tuple_format_ref(index->format_with_colmask, -1);
+	if (user_key_def->iid == 0)
+		tuple_format_ref(index->format_with_colmask, -1);
 fail_format_with_mask:
 	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
-	if (index->key_def->iid > 0)
+	if (user_key_def->iid > 0)
 		key_def_delete(index->key_def);
 fail_key_def:
 	key_def_delete(user_key_def);
@@ -5340,17 +5342,18 @@ int
 vy_commit_alter_space(struct space *old_space, struct space *new_space)
 {
 	(void) old_space;
-	struct vy_index *index;
-	for (uint32_t i = 0; i < new_space->index_count; ++i) {
+	struct vy_index *index = vy_index(new_space->index[0]);
+	index->space = new_space;
+	struct tuple_format *format =
+		vy_create_format_with_mask(new_space->format);
+	if (format == NULL)
+		return -1;
+	tuple_format_ref(format, 1);
+	tuple_format_ref(index->format_with_colmask, -1);
+	index->format_with_colmask = format;
+	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		index = vy_index(new_space->index[i]);
 		index->space = new_space;
-		struct tuple_format *format =
-			vy_create_format_with_mask(new_space->format);
-		if (format == NULL)
-			return -1;
-		tuple_format_ref(format, 1);
-		tuple_format_ref(index->format_with_colmask, -1);
-		index->format_with_colmask = format;
 	}
 	return 0;
 }
@@ -5363,6 +5366,8 @@ vy_index_delete(struct vy_index *index)
 	free(index->name);
 	free(index->path);
 	tuple_format_ref(index->surrogate_format, -1);
+	if (index->key_def->iid == 0)
+		tuple_format_ref(index->format_with_colmask, -1);
 	if (index->key_def->iid > 0)
 		key_def_delete(index->key_def);
 	key_def_delete(index->user_key_def);
