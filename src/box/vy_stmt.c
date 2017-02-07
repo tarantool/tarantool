@@ -409,13 +409,6 @@ vy_stmt_new_surrogate(struct tuple_format *format, const struct tuple *src,
 }
 
 struct tuple *
-vy_stmt_new_surrogate_replace(struct tuple_format *format,
-			      const struct tuple *src)
-{
-	return vy_stmt_new_surrogate(format, src, IPROTO_REPLACE);
-}
-
-struct tuple *
 vy_stmt_new_surrogate_delete(struct tuple_format *format,
 			     const struct tuple *src)
 {

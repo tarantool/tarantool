@@ -62,7 +62,8 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 
 struct vy_mem *
 vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
-	   const int64_t *allocator_lsn, struct tuple_format *format)
+	   const int64_t *allocator_lsn, struct tuple_format *format,
+	   struct tuple_format *format_with_colmask)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -79,6 +80,8 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 	index->allocator_lsn = allocator_lsn;
 	index->format = format;
 	tuple_format_ref(format, 1);
+	index->format_with_colmask = format_with_colmask;
+	tuple_format_ref(format_with_colmask, 1);
 	vy_mem_tree_create(&index->tree, key_def, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_frozen);
@@ -87,9 +90,23 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 }
 
 void
+vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
+		      struct tuple_format *new_format_with_colmask)
+{
+	assert(mem->used == 0);
+	tuple_format_ref(mem->format, -1);
+	tuple_format_ref(mem->format_with_colmask, -1);
+	mem->format = new_format;
+	mem->format_with_colmask = new_format_with_colmask;
+	tuple_format_ref(mem->format, 1);
+	tuple_format_ref(mem->format_with_colmask, 1);
+}
+
+void
 vy_mem_delete(struct vy_mem *index)
 {
 	tuple_format_ref(index->format, -1);
+	tuple_format_ref(index->format_with_colmask, -1);
 	TRASH(index);
 	free(index);
 }
@@ -133,7 +150,10 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt, int64_t alloc_lsn)
 	 * will try to unreference this statement.
 	 */
 	mem_stmt->refs = 0;
-	mem_stmt->format_id = tuple_format_id(mem->format);
+	if (tuple_format(stmt)->extra_size == sizeof(uint64_t))
+		mem_stmt->format_id = tuple_format_id(mem->format_with_colmask);
+	else
+		mem_stmt->format_id = tuple_format_id(mem->format);
 
 	const struct tuple *replaced_stmt = NULL;
 	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
@@ -165,7 +185,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
 		tuple_unref(itr->last_stmt);
-	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, itr->mem->format);
+	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, tuple_format(itr->curr_stmt));
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL)
 		return 0;

@@ -147,10 +147,13 @@ vy_stmt_column_mask(const struct tuple *tuple)
 {
 	enum iproto_type type = vy_stmt_type(tuple);
 	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
-	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
 	(void) type;
-	const char *extra = tuple_extra(tuple);
-	return load_u64(extra);
+	if (tuple_format(tuple)->extra_size == sizeof(uint64_t)) {
+		/* Tuple has column mask */
+		const char *extra = tuple_extra(tuple);
+		return load_u64(extra);
+	}
+	return UINT64_MAX; /* return default value */
 }
 
 /**
@@ -368,13 +371,6 @@ vy_stmt_new_surrogate_delete_from_key(struct tuple_format *format,
 struct tuple *
 vy_stmt_new_surrogate_delete(struct tuple_format *format,
 			     const struct tuple *tuple);
-
-/**
- * @copydoc vy_stmt_new_surrogate_replace()
- */
-struct tuple *
-vy_stmt_new_surrogate_replace(struct tuple_format *format,
-			      const struct tuple *tuple);
 
 /**
  * Create the REPLACE statement from raw MessagePack data.

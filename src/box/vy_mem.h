@@ -149,8 +149,10 @@ struct vy_mem {
 	struct lsregion *allocator;
 	/** The last LSN for lsregion allocator */
 	const int64_t *allocator_lsn;
-	/** Format of vy_mem statements. */
+	/** Format of vy_mem statements without column mask. */
 	struct tuple_format *format;
+	/** Format of vy_mem statements with column mask. */
+	struct tuple_format *format_with_colmask;
 };
 
 /**
@@ -165,7 +167,20 @@ struct vy_mem {
  */
 struct vy_mem *
 vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
-	   const int64_t *allocator_lsn, struct tuple_format *format);
+	   const int64_t *allocator_lsn, struct tuple_format *format,
+	   struct tuple_format *format_with_colmask);
+
+/**
+ * Update formats of vy_mem statements, if vy_mem still is empty.
+ * @param mem Memory index to update formats.
+ * @param new_format New format for statements without column
+ *                   mask.
+ * @param new_format_with_colmask New format for statements with
+ *                   column mask.
+ */
+void
+vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
+		      struct tuple_format *new_format_with_colmask);
 
 /**
  * Delete in-memory level.
