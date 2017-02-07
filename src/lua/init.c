@@ -382,8 +382,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
-	luaopen_msgpack(L);
-	lua_pop(L, 1);
 
 #if defined(HAVE_GNU_READLINE)
 	/*
