@@ -44,6 +44,8 @@ RPM
 tags
 extra/txt2c
 extra/bin2c
+extra/lemon
+extra/mkkeywordhash
 extra/dist/tarantoolctl
 extra/dist/tarantoolctl.1
 extra/dist/tarantool.logrotate
