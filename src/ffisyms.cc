@@ -150,5 +150,9 @@ void *ffi_symbols[] = {
 	(void *) tnt_EVP_CIPHER_key_length,
 	(void *) tnt_EVP_CIPHER_iv_length,
 	(void *) tnt_EVP_MD_CTX_new,
-	(void *) tnt_EVP_MD_CTX_free
+	(void *) tnt_EVP_MD_CTX_free,
+	(void *) mp_encode_float,
+	(void *) mp_decode_float,
+	(void *) mp_encode_double,
+	(void *) mp_decode_double
 };
