@@ -34,16 +34,6 @@ stage('Build') {
                     }
                 }
             },
-            "fedora23": {
-                node {
-                    ws {
-                        deleteDir()
-                        unstash 'source'
-                        env.OS="fedora"; env.DIST="23"; env.PACK="rpm"
-                        sh './build/pack/travis.sh'
-                    }
-                }
-            },
             "fedora24": {
                 node {
                     ws {
@@ -114,16 +104,16 @@ stage('Build') {
                     }
                 }
             },
-            /*"debianwheezy": {
-              node {
-              ws {
-              deleteDir()
-              unstash 'source'
-              env.OS="debian"; env.DIST="wheezy"; env.PACK="deb"
-              sh './build/pack/travis.sh'
-              }
-              }
-              },*/
+            "debianwheezy": {
+                node {
+                    ws {
+                        deleteDir()
+                        unstash 'source'
+                        env.OS="debian"; env.DIST="wheezy"; env.PACK="deb"
+                        sh './build/pack/travis.sh'
+                    }
+                }
+            },
             "debianjessie": {
                 node {
                     ws {
