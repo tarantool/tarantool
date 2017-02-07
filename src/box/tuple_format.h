@@ -132,10 +132,12 @@ struct tuple_format {
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/**
-	 * Size of field map of tuple in bytes.
-	 * See tuple_field_format::ofset for details//
+	 * Size of extra fields of tuple, which are placed after
+	 * tuple struct fields and before offsets table.
 	 */
-	uint16_t field_map_size;
+	uint16_t extra_size;
+	/** Size of field map of tuple in bytes + extra_size. */
+	uint16_t tuple_meta_size;
 
 	/* Formats of the fields */
 	struct tuple_field_format fields[];
@@ -180,14 +182,18 @@ tuple_format_ref(struct tuple_format *format, int count)
 
 /**
  * Allocate, construct and register a new in-memory tuple format.
- * @param key_list List of key_defs of a space.
- * @param name  name of the tuple format
+ * @param key_list         List of key_defs of a space.
+ * @param extra_tuple_size Additional size of each tuple that
+ *                         will be allocated with this format.
+ * @param vtab             Table of virtual functions specific for
+ *                         engines.
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
  */
 struct tuple_format *
-tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab);
+tuple_format_new(struct rlist *key_list, uint16_t extra_tuple_size,
+		 struct tuple_format_vtab *vtab);
 
 /**
  * Register the duplicate of the specified format.

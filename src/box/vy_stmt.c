@@ -200,7 +200,7 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	 * Allocate stmt. Offsets: one per key part + offset of the
 	 * statement end.
 	 */
-	uint32_t offsets_size = format->field_map_size;
+	uint32_t offsets_size = format->tuple_meta_size;
 	uint32_t bsize = tuple_end - tuple_begin;
 	uint32_t size = offsets_size + mp_sizeof_array(field_count) +
 			bsize + extra_size;
@@ -343,7 +343,7 @@ vy_stmt_new_surrogate_from_key(struct tuple_format *format,
 		bsize += key - svp;
 	}
 
-	uint32_t offsets_size = format->field_map_size;
+	uint32_t offsets_size = format->tuple_meta_size;
 	uint32_t size = offsets_size + bsize;
 	struct tuple *stmt = vy_stmt_alloc(format, size);
 	if (stmt == NULL)

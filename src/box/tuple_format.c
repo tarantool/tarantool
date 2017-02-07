@@ -42,10 +42,8 @@ static uint32_t formats_size = 0, formats_capacity = 0;
 static int
 tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 {
-	if (format->field_count == 0) {
-		format->field_map_size = 0;
+	if (format->field_count == 0)
 		return 0;
-	}
 
 	/* There may be fields between indexed fields (gaps). */
 	for (uint32_t i = 0; i < format->field_count; i++) {
@@ -104,7 +102,7 @@ tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 			 -current_slot);
 		return -1;
 	}
-	format->field_map_size = -current_slot * sizeof(uint32_t);
+	format->tuple_meta_size += -current_slot * sizeof(uint32_t);
 	return 0;
 }
 
@@ -196,12 +194,15 @@ tuple_format_delete(struct tuple_format *format)
 }
 
 struct tuple_format *
-tuple_format_new(struct rlist *key_list, struct tuple_format_vtab *vtab)
+tuple_format_new(struct rlist *key_list, uint16_t extra_tuple_size,
+		 struct tuple_format_vtab *vtab)
 {
 	struct tuple_format *format = tuple_format_alloc(key_list);
 	if (format == NULL)
 		return NULL;
 	format->vtab = *vtab;
+	format->tuple_meta_size = extra_tuple_size;
+	format->extra_size = extra_tuple_size;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_delete(format);
 		return NULL;
@@ -284,7 +285,8 @@ int
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
-	tuple_format_default = tuple_format_new(&empty_list, &memtx_tuple_format_vtab);
+	tuple_format_default = tuple_format_new(&empty_list, 0,
+						&memtx_tuple_format_vtab);
 	if (tuple_format_default == NULL)
 		return -1;
 	/* Make sure this one stays around. */

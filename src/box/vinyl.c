@@ -5246,7 +5246,7 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index->key_def, link);
 
-	index->format = tuple_format_new(&key_list, &vy_tuple_format_vtab);
+	index->format = tuple_format_new(&key_list, 0, &vy_tuple_format_vtab);
 	if (index->format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->format, 1);

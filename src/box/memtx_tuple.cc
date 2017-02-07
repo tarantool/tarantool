@@ -126,8 +126,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
 	assert(mp_typeof(*data) == MP_ARRAY);
 	size_t tuple_len = end - data;
-	size_t total =
-		sizeof(struct memtx_tuple) + tuple_len + format->field_map_size;
+	size_t total = sizeof(struct memtx_tuple) + tuple_len +
+		       format->tuple_meta_size;
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
 		     do { diag_set(OutOfMemory, (unsigned) total,
 				   "slab allocator", "memtx_tuple"); return NULL; }
@@ -164,7 +164,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
+	tuple->data_offset = sizeof(struct tuple) + format->tuple_meta_size;
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, tuple_len);
@@ -182,7 +182,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
 	size_t total = sizeof(struct memtx_tuple) + tuple->bsize +
-		       format->field_map_size;
+		       format->tuple_meta_size;
 	tuple_format_ref(format, -1);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
