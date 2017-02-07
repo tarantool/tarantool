@@ -613,8 +613,13 @@ struct vy_index {
 	 * space:create_index().
 	 */
 	struct key_def *user_key_def;
-	/* A tuple format for key_def. */
+	/** A tuple format for key_def. */
 	struct tuple_format *surrogate_format;
+	/**
+	 * A format for the tuples of type REPLACE or DELETE which
+	 * are parts of an UPDATE operation.
+	 */
+	struct tuple_format *format_with_colmask;
 
 	/** Member of env->indexes. */
 	struct rlist link;
@@ -5201,6 +5206,26 @@ vy_index_drop(struct vy_index *index)
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 
+/**
+ * Create the format for tuples with column mask of update
+ * operation. @sa vy_index.column_mask, vy_can_skip_update().
+ * @param space_format Format of the space of an index.
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Memory or format register error.
+ */
+static struct tuple_format *
+vy_create_format_with_mask(struct tuple_format *space_format)
+{
+	struct tuple_format *format = tuple_format_dup(space_format);
+	if (format == NULL)
+		return NULL;
+	/* + size of column mask. */
+	format->tuple_meta_size += sizeof(uint64_t);
+	format->extra_size = sizeof(uint64_t);
+	return format;
+}
+
 struct vy_index *
 vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	     struct space *space)
@@ -5252,6 +5277,11 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 		goto fail_format;
 	tuple_format_ref(index->surrogate_format, 1);
 
+	index->format_with_colmask = vy_create_format_with_mask(space->format);
+	if (index->format_with_colmask == NULL)
+		goto fail_format_with_mask;
+	tuple_format_ref(index->format_with_colmask, 1);
+
 	if (vy_index_conf_create(index, index->key_def))
 		goto fail_conf;
 
@@ -5293,6 +5323,8 @@ fail_run_hist:
 	free(index->name);
 	free(index->path);
 fail_conf:
+	tuple_format_ref(index->format_with_colmask, -1);
+fail_format_with_mask:
 	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
 	if (index->key_def->iid > 0)
@@ -5304,7 +5336,7 @@ fail_user_key_def:
 	return NULL;
 }
 
-void
+int
 vy_commit_alter_space(struct space *old_space, struct space *new_space)
 {
 	(void) old_space;
@@ -5312,7 +5344,15 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 	for (uint32_t i = 0; i < new_space->index_count; ++i) {
 		index = vy_index(new_space->index[i]);
 		index->space = new_space;
+		struct tuple_format *format =
+			vy_create_format_with_mask(new_space->format);
+		if (format == NULL)
+			return -1;
+		tuple_format_ref(format, 1);
+		tuple_format_ref(index->format_with_colmask, -1);
+		index->format_with_colmask = format;
 	}
+	return 0;
 }
 
 static void

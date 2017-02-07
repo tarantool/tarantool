@@ -246,12 +246,18 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
- *                           uint32       uint32     bsize
- *                          +-------------------+-------------+
- * tuple_begin, ..., raw =  | offN | ... | off1 | MessagePack |
- * |                        +-------------------+-------------+
- * |                                            ^
- * +---------------------------------------data_offset
+ *                           format->tuple_meta_size      bsize
+ *                          +------------------------+-------------+
+ * tuple_begin, ..., raw =  |       tuple_meta       | MessagePack |
+ * |                        +------------------------+-------------+
+ * |                                                 ^
+ * +---------------------------------------------data_offset
+ *
+ * tuple_meta structure:
+ *   +----------------------+-----------------------+
+ *   |      extra_size      | offset N ... offset 1 |
+ *   +----------------------+-----------------------+
+ *    @sa tuple_format_new()   uint32  ...  uint32
  *
  * Each 'off_i' is the offset to the i-th indexed field.
  */
@@ -351,6 +357,22 @@ tuple_format(const struct tuple *tuple)
 	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
 	assert(tuple_format_id(format) == tuple->format_id);
 	return format;
+}
+
+/** Get begin of the tuple meta information. */
+static inline const char *
+tuple_meta(const struct tuple *tuple)
+{
+	struct tuple_format *format = tuple_format(tuple);
+	return tuple_data(tuple) - format->tuple_meta_size;
+}
+
+/** Get size of the meta in the tuple. */
+static inline uint16_t
+tuple_meta_size(const struct tuple *tuple)
+{
+	struct tuple_format *format = tuple_format(tuple);
+	return format->extra_size;
 }
 
 /**

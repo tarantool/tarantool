@@ -252,8 +252,11 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
  * vy_index.space attribute.
  * @param old_space Old space.
  * @param new_space New space.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or new format register error.
  */
-void
+int
 vy_commit_alter_space(struct space *old_space, struct space *new_space);
 
 int
