@@ -614,7 +614,7 @@ struct vy_index {
 	 */
 	struct key_def *user_key_def;
 	/* A tuple format for key_def. */
-	struct tuple_format *format;
+	struct tuple_format *surrogate_format;
 
 	/** Member of env->indexes. */
 	struct rlist link;
@@ -2546,7 +2546,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 		goto fail;
 	}
 	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn,
-				index->format);
+				index->surrogate_format);
 	if (range->mem == NULL)
 		goto fail_mem;
 	/* Allocate a new id unless specified. */
@@ -2686,12 +2686,12 @@ vy_range_rotate_mem(struct vy_range *range, struct key_def *key_def,
 	assert(range->mem != NULL);
 	if (range->mem->used == 0) {
 		tuple_format_ref(range->mem->format, -1);
-		range->mem->format = range->index->format;
+		range->mem->format = range->index->surrogate_format;
 		tuple_format_ref(range->mem->format, 1);
 		return 0;
 	}
 	struct vy_mem *mem = vy_mem_new(key_def, allocator, allocator_lsn,
-					range->index->format);
+					range->index->surrogate_format);
 	if (mem == NULL)
 		return -1;
 	vy_range_freeze_mem(range);
@@ -5246,10 +5246,11 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index->key_def, link);
 
-	index->format = tuple_format_new(&key_list, 0, &vy_tuple_format_vtab);
-	if (index->format == NULL)
+	index->surrogate_format = tuple_format_new(&key_list, 0,
+						   &vy_tuple_format_vtab);
+	if (index->surrogate_format == NULL)
 		goto fail_format;
-	tuple_format_ref(index->format, 1);
+	tuple_format_ref(index->surrogate_format, 1);
 
 	if (vy_index_conf_create(index, index->key_def))
 		goto fail_conf;
@@ -5292,7 +5293,7 @@ fail_run_hist:
 	free(index->name);
 	free(index->path);
 fail_conf:
-	tuple_format_ref(index->format, -1);
+	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
 	if (index->key_def->iid > 0)
 		key_def_delete(index->key_def);
@@ -5321,7 +5322,7 @@ vy_index_delete(struct vy_index *index)
 	vy_range_tree_iter(&index->tree, NULL, vy_range_tree_free_cb, index);
 	free(index->name);
 	free(index->path);
-	tuple_format_ref(index->format, -1);
+	tuple_format_ref(index->surrogate_format, -1);
 	if (index->key_def->iid > 0)
 		key_def_delete(index->key_def);
 	key_def_delete(index->user_key_def);
@@ -5761,8 +5762,8 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		if (vy_check_dup_key(tx, index, key, part_count))
 			return -1;
 	}
-	struct tuple *tuple = vy_stmt_new_surrogate_replace(index->format,
-							    stmt);
+	struct tuple *tuple =
+		vy_stmt_new_surrogate_replace(index->surrogate_format, stmt);
 	if (tuple == NULL)
 		return -1;
 	int rc = vy_tx_set(tx, index, tuple);
@@ -5839,7 +5840,8 @@ vy_index_delete_stmt(struct vy_tx *tx, struct vy_index *index,
 		     const struct tuple *old)
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	struct tuple *key = vy_stmt_new_surrogate_delete(index->format, old);
+	struct tuple *key =
+		vy_stmt_new_surrogate_delete(index->surrogate_format, old);
 	if (key == NULL)
 		return -1;
 	int rc = vy_tx_set(tx, index, key);
@@ -6115,8 +6117,9 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 	} else { /* Primary is the single index in the space. */
 		assert(index->key_def->iid == 0);
+		struct tuple_format *format = pk->surrogate_format;
 		struct tuple *delete =
-			vy_stmt_new_surrogate_delete_from_key(pk->format, key,
+			vy_stmt_new_surrogate_delete_from_key(format, key,
 							      pk->key_def);
 		if (delete == NULL)
 			return -1;
@@ -8909,8 +8912,8 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_new_select(index->format, NULL, 0);
-	wi->format = index->format;
+	wi->key = vy_stmt_new_select(index->surrogate_format, NULL, 0);
+	wi->format = index->surrogate_format;
 	tuple_format_ref(wi->format, 1);
 	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key, wi->format);
 	return 0;
@@ -9153,7 +9156,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
 				     itr->curr_range,
 				     run, itr->iterator_type, itr->key,
-				     itr->vlsn, itr->index->format);
+				     itr->vlsn, itr->index->surrogate_format);
 	}
 }
 
@@ -9217,7 +9220,7 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->format);
+			       itr->index->surrogate_format);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9237,7 +9240,7 @@ restart:
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->format);
+			       itr->index->surrogate_format);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9303,7 +9306,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->format);
+			       itr->index->surrogate_format);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct tuple *stmt = NULL;
