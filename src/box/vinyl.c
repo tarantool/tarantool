@@ -2520,7 +2520,8 @@ fail:
  * for the range.
  */
 static struct vy_range *
-vy_range_new(struct vy_index *index, int64_t id, char *begin, char *end)
+vy_range_new(struct vy_index *index, int64_t id,
+	     const char *begin, const char *end)
 {
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
@@ -2531,7 +2532,7 @@ vy_range_new(struct vy_index *index, int64_t id, char *begin, char *end)
 	if (range == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_range), "malloc",
 			 "struct vy_range");
-		return NULL;
+		goto fail;
 	}
 	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn);
 	if (range->mem == NULL)
@@ -2563,6 +2564,7 @@ fail_begin:
 	vy_mem_delete(range->mem);
 fail_mem:
 	free(range);
+fail:
 	return NULL;
 }
 
@@ -2808,13 +2810,9 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
  * - We should split around the last run middle key.
  * - We should only split if the last run size is greater than
  *   4/3 * range_size.
- *
- * @retval -1 Memory error.
- * @retval  0 No need split.
- * @retval  1 Need split.
  */
-static int
-vy_range_needs_split(struct vy_range *range, char **p_split_key)
+static bool
+vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 {
 	struct vy_index *index = range->index;
 	struct key_def *key_def = index->key_def;
@@ -2822,7 +2820,7 @@ vy_range_needs_split(struct vy_range *range, char **p_split_key)
 
 	/* The range hasn't been merged yet - too early to split it. */
 	if (range->n_compactions < 1)
-		return 0;
+		return false;
 
 	/* Find the oldest run. */
 	assert(!rlist_empty(&range->runs));
@@ -2830,7 +2828,7 @@ vy_range_needs_split(struct vy_range *range, char **p_split_key)
 
 	/* The range is too small to be split. */
 	if (vy_run_size(run) < (uint64_t)key_def->opts.range_size * 4 / 3)
-		return 0;
+		return false;
 
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
@@ -2840,9 +2838,9 @@ vy_range_needs_split(struct vy_range *range, char **p_split_key)
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (key_compare(first_page->min_key, mid_page->min_key, key_def) == 0)
-		return 0;
-	*p_split_key = vy_key_dup(mid_page->min_key);
-	return *p_split_key == NULL ? -1 : 1;
+		return false;
+	*p_split_key = mid_page->min_key;
+	return true;
 }
 
 /**
@@ -3200,19 +3198,10 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		index->is_dropped = record->is_dropped;
 		break;
 	case VY_LOG_INSERT_RANGE:
-		range = vy_range_new(index, record->range_id, NULL, NULL);
+		range = vy_range_new(index, record->range_id,
+				     record->range_begin, record->range_end);
 		if (range == NULL)
 			return -1;
-		if (record->range_begin != NULL) {
-			range->begin = vy_key_dup(record->range_begin);
-			if (range->begin == NULL)
-				return -1;
-		}
-		if (record->range_end != NULL) {
-			range->end = vy_key_dup(record->range_end);
-			if (range->end == NULL)
-				return -1;
-		}
 		if (range->begin != NULL && range->end != NULL &&
 		    key_compare(range->begin, range->end, key_def) >= 0) {
 			diag_set(ClientError, ER_VINYL, "invalid range");
@@ -3859,7 +3848,7 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 
 static struct vy_task *
 vy_task_split_new(struct mempool *pool, struct vy_range *range,
-		  char *split_key)
+		  const char *split_key)
 {
 	struct vy_index *index = range->index;
 	struct tx_manager *xm = index->env->xm;
@@ -3874,7 +3863,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		.abort = vy_task_split_abort,
 	};
 
-	char *keys[3];
+	const char *keys[3];
 	struct vy_range *parts[2] = {NULL, };
 	const int n_parts = 2;
 
@@ -4071,13 +4060,9 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	assert(range->compact_priority > 0);
 
 	/* Consider splitting the range if it's too big. */
-	char *split_key;
-	int rc = vy_range_needs_split(range, &split_key);
-	if (rc < 0)
-		return NULL;
-	if (rc == 1)
+	const char *split_key;
+	if (vy_range_needs_split(range, &split_key))
 		return vy_task_split_new(pool, range, split_key);
-	assert(rc == 0); /* don't need split */
 
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
