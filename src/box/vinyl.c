@@ -388,7 +388,7 @@ struct vy_page_info {
 
 static int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct key_def *key_def, struct tuple *min_stmt);
+		    const struct key_def *key_def, struct tuple *min_key);
 
 static void
 vy_page_info_destroy(struct vy_page_info *page_info);
@@ -1614,7 +1614,7 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 
 	assert(range_a->index == range_b->index);
 	struct key_def *key_def = range_a->index->key_def;
-	return vy_key_compare_raw(range_a->begin, range_b->begin, key_def);
+	return key_compare(range_a->begin, range_b->begin, key_def);
 }
 
 static int
@@ -1872,7 +1872,7 @@ vy_range_is_adjacent(struct vy_range *a, struct vy_range *b,
 	if (a->end == NULL || b->begin == NULL)
 		return false;
 	assert(a->index == b->index);
-	return vy_key_compare_raw(a->end, b->begin, key_def) == 0;
+	return key_compare(a->end, b->begin, key_def) == 0;
 }
 
 /* dump statement to the run page buffers (stmt header and data) */
@@ -1934,7 +1934,7 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 	const char *region_key = tuple_extract_key(min_stmt, key_def, &size);
 	if (region_key == NULL)
 		return -1;
-	page_info->min_key = vy_copy_raw_key(region_key);
+	page_info->min_key = vy_key_dup(region_key);
 	region_truncate(region, used);
 	return page_info->min_key == NULL ? -1 : 0;
 }
@@ -2295,7 +2295,7 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow)
 		case VY_PAGE_MIN_KEY:
 			key_beg = pos;
 			mp_next(&pos);
-			page->min_key = vy_copy_raw_key(key_beg);
+			page->min_key = vy_key_dup(key_beg);
 			if (page->min_key == NULL)
 				return -1;
 			break;
@@ -2539,12 +2539,12 @@ vy_range_new(struct vy_index *index, int64_t id, char *begin, char *end)
 	/* Allocate a new id unless specified. */
 	range->id = (id >= 0 ? id : vy_log_next_range_id(log));
 	if (begin != NULL) {
-		range->begin = vy_copy_raw_key(begin);
+		range->begin = vy_key_dup(begin);
 		if (range->begin == NULL)
 			goto fail_begin;
 	}
 	if (end != NULL) {
-		range->end = vy_copy_raw_key(end);
+		range->end = vy_key_dup(end);
 		if (range->end == NULL)
 			goto fail_end;
 	}
@@ -2839,10 +2839,9 @@ vy_range_needs_split(struct vy_range *range, char **p_split_key)
 	struct vy_page_info *first_page = vy_run_page_info(run, 0);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (vy_key_compare_raw(first_page->min_key, mid_page->min_key,
-			       key_def) == 0)
+	if (key_compare(first_page->min_key, mid_page->min_key, key_def) == 0)
 		return 0;
-	*p_split_key = vy_copy_raw_key(mid_page->min_key);
+	*p_split_key = vy_key_dup(mid_page->min_key);
 	return *p_split_key == NULL ? -1 : 1;
 }
 
@@ -3205,18 +3204,17 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (range == NULL)
 			return -1;
 		if (record->range_begin != NULL) {
-			range->begin = vy_copy_raw_key(record->range_begin);
+			range->begin = vy_key_dup(record->range_begin);
 			if (range->begin == NULL)
 				return -1;
 		}
 		if (record->range_end != NULL) {
-			range->end = vy_copy_raw_key(record->range_end);
+			range->end = vy_key_dup(record->range_end);
 			if (range->end == NULL)
 				return -1;
 		}
 		if (range->begin != NULL && range->end != NULL &&
-		    vy_key_compare_raw(range->begin, range->end,
-				       key_def) >= 0) {
+		    key_compare(range->begin, range->end, key_def) >= 0) {
 			diag_set(ClientError, ER_VINYL, "invalid range");
 			return -1;
 		}
@@ -4079,6 +4077,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 		return NULL;
 	if (rc == 1)
 		return vy_task_split_new(pool, range, split_key);
+	assert(rc == 0); /* don't need split */
 
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,

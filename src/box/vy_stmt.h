@@ -177,23 +177,12 @@ vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format);
  * @sa key_compare()
  */
 static inline int
-vy_key_compare_raw(const char *a, const char *b, const struct key_def *key_def)
-{
-	uint32_t part_count_a = mp_decode_array(&a);
-	uint32_t part_count_b = mp_decode_array(&b);
-	return key_compare(a, part_count_a, b, part_count_b, key_def);
-}
-
-/**
- * @sa vy_key_compare_raw().
- */
-static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
 	       const struct key_def *key_def)
 {
 	assert(vy_stmt_type(a) == IPROTO_SELECT);
 	assert(vy_stmt_type(b) == IPROTO_SELECT);
-	return vy_key_compare_raw(tuple_data(a), tuple_data(b), key_def);
+	return key_compare(tuple_data(a), tuple_data(b), key_def);
 }
 
 /**
@@ -285,7 +274,7 @@ vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 	    vy_stmt_type(stmt) == IPROTO_UPSERT ||
 	    vy_stmt_type(stmt) == IPROTO_DELETE)
 		return vy_tuple_compare_with_raw_key(stmt, key, key_def);
-	return vy_key_compare_raw(tuple_data(stmt), key, key_def);
+	return key_compare(tuple_data(stmt), key, key_def);
 }
 
 /**
@@ -309,7 +298,7 @@ vy_stmt_new_select(struct tuple_format *format, const char *key,
  * @retval     NULL Memory error.
  */
 char *
-vy_copy_raw_key(const char *key);
+vy_key_dup(const char *key);
 
 /**
  * Create a new surrogate DELETE from @a key using format.

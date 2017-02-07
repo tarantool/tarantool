@@ -274,10 +274,11 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 }
 
 int
-key_compare(const char *key_a, uint32_t part_count_a,
-	    const char *key_b, uint32_t part_count_b,
+key_compare(const char *key_a, const char *key_b,
 	    const struct key_def *key_def)
 {
+	uint32_t part_count_a = mp_decode_array(&key_a);
+	uint32_t part_count_b = mp_decode_array(&key_b);
 	assert(part_count_a <= key_def->part_count);
 	assert(part_count_b <= key_def->part_count);
 	uint32_t part_count = MIN(part_count_a, part_count_b);

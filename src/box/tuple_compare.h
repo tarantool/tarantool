@@ -59,9 +59,9 @@ tuple_compare_with_key_create(const struct key_def *key_def);
 
 /**
  * Compare keys using the key definition.
- * @param key_a key parts without MessagePack array header
+ * @param key_a key parts with MessagePack array header
  * @param part_count_a the number of parts in the key_a
- * @param key_b key_parts without MessagePack array header
+ * @param key_b key_parts with MessagePack array header
  * @param part_count_b the number of parts in the key_b
  * @param key_def key definition
  *
@@ -70,8 +70,7 @@ tuple_compare_with_key_create(const struct key_def *key_def);
  * @retval >0 if key_a > key_b
  */
 int
-key_compare(const char *key_a, uint32_t part_count_a,
-	    const char *key_b, uint32_t part_count_b,
+key_compare(const char *key_a, const char *key_b,
 	    const struct key_def *key_def);
 
 /**

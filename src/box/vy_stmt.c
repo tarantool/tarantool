@@ -155,14 +155,14 @@ vy_stmt_new_select(struct tuple_format *format, const char *key,
 }
 
 char *
-vy_copy_raw_key(const char *key)
+vy_key_dup(const char *key)
 {
 	assert(mp_typeof(*key) == MP_ARRAY);
 	const char *end = key;
 	mp_next(&end);
 	char *res = malloc(end - key);
 	if (res == NULL) {
-		diag_set(OutOfMemory, end - key, "malloc", "res");
+		diag_set(OutOfMemory, end - key, "malloc", "key");
 		return NULL;
 	}
 	memcpy(res, key, end - key);

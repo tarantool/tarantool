@@ -220,12 +220,15 @@ tuple_format_dup(const struct tuple_format *src)
 			 src->field_count * sizeof(struct tuple_field_format);
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
-	if (format == NULL)
+	if (format == NULL) {
+		diag_set(OutOfMemory, sizeof(struct tuple_format), "malloc",
+			 "tuple format");
 		return NULL;
+	}
 	memcpy(format, src, total);
-	format->id == FORMAT_ID_NIL;
+	format->id = FORMAT_ID_NIL;
 	if (tuple_format_register(format) != 0) {
-		tuple_format_delete(format);
+		free(format);
 		return NULL;
 	}
 	return format;
