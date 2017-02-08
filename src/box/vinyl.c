@@ -1415,6 +1415,14 @@ static const char *vy_file_suffix[] = {
 #define XLOG_META_TYPE_INDEX "INDEX"
 
 static int
+vy_index_snprint_path(char *buf, size_t size, const char *dir,
+		      uint32_t space_id, uint32_t iid)
+{
+	return snprintf(buf, size, "%s/%u/%u",
+			dir, (unsigned)space_id, (unsigned)iid);
+}
+
+static int
 vy_run_snprint_path(char *buf, size_t size, const char *dir,
 		    int64_t run_id, enum vy_file_type type)
 {
@@ -1439,9 +1447,29 @@ vy_run_unlink_files(const char *dir, int64_t run_id)
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, PATH_MAX, dir, run_id, type);
-		if (coeio_unlink(path) < 0 && errno != ENOENT)
+		int rc;
+		if (cord_is_main())
+			rc = coeio_unlink(path);
+		else
+			rc = unlink(path);
+		if (rc < 0 && errno != ENOENT)
 			say_syserror("failed to delete file '%s'", path);
 	}
+}
+
+/** Garbage collection callback. Passed to vy_log_new(). */
+static void
+vy_run_gc_cb(int64_t run_id, uint32_t iid, uint32_t space_id,
+	     const char *path, void *arg)
+{
+	struct vy_env *env = arg;
+	char buf[PATH_MAX];
+	if (path[0] == '\0') {
+		vy_index_snprint_path(buf, sizeof(buf),
+				      env->conf->path, space_id, iid);
+		path = buf;
+	}
+	vy_run_unlink_files(path, run_id);
 }
 
 static void
@@ -5117,9 +5145,8 @@ vy_index_conf_create(struct vy_index *conf, struct key_def *key_def)
 	/* path */
 	if (key_def->opts.path[0] == '\0') {
 		char path[PATH_MAX];
-		snprintf(path, sizeof(path), "%s/%" PRIu32 "/%" PRIu32,
-			 cfg_gets("vinyl_dir"), key_def->space_id,
-			 key_def->iid);
+		vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
+				      key_def->space_id, key_def->iid);
 		conf->path = strdup(path);
 	} else {
 		conf->path = strdup(key_def->opts.path);
@@ -6841,7 +6868,7 @@ vy_env_new(void)
 	e->squash_queue = vy_squash_queue_new();
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
-	e->log = vy_log_new(e->conf->path);
+	e->log = vy_log_new(e->conf->path, vy_run_gc_cb, e);
 	if (e->log == NULL)
 		goto error_log;
 	RLIST_HEAD(empty_list);

@@ -195,6 +195,9 @@ vy_recovery_load_index_by_id(struct vy_recovery *recovery, int64_t index_id,
 static int
 vy_recovery_replay(struct vy_recovery *recovery,
 		   vy_recovery_cb cb, void *cb_arg);
+static void
+vy_recovery_gc(struct vy_recovery *recovery,
+	       vy_log_gc_cb gc_cb, void *gc_arg);
 
 /** An snprint-style function to print a path to a vinyl metadata log. */
 static int
@@ -513,7 +516,7 @@ fail:
 }
 
 struct vy_log *
-vy_log_new(const char *dir)
+vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg)
 {
 	struct vy_log *log = malloc(sizeof(*log));
 	if (log == NULL) {
@@ -536,6 +539,8 @@ vy_log_new(const char *dir)
 	}
 	latch_create(log->latch);
 
+	log->gc_cb = gc_cb;
+	log->gc_arg = gc_arg;
 	return log;
 
 fail_free:
@@ -749,16 +754,15 @@ vy_log_rotate_cb(const struct vy_log_record *record, void *cb_arg)
 static ssize_t
 vy_log_rotate_f(va_list ap)
 {
-	const char *dir = va_arg(ap, const char *);
-	int64_t old_signature = va_arg(ap, int64_t);
-	int64_t new_signature = va_arg(ap, int64_t);
+	struct vy_log *log = va_arg(ap, struct vy_log *);
+	int64_t signature = va_arg(ap, int64_t);
 
-	struct vy_recovery *recovery = vy_recovery_new(dir, old_signature);
+	struct vy_recovery *recovery = vy_recovery_new(log->dir, log->signature);
 	if (recovery == NULL)
 		goto err_recovery;
 
 	char path[PATH_MAX];
-	vy_log_snprint_path(path, sizeof(path), dir, new_signature);
+	vy_log_snprint_path(path, sizeof(path), log->dir, signature);
 
 	struct xlog xlog;
 	struct xlog_meta meta = {
@@ -775,6 +779,7 @@ vy_log_rotate_f(va_list ap)
 	    xlog_rename(&xlog) < 0)
 		goto err_write_xlog;
 
+	vy_recovery_gc(recovery, log->gc_cb, log->gc_arg);
 	vy_recovery_delete(recovery);
 	xlog_close(&xlog, false);
 	return 0;
@@ -824,8 +829,7 @@ vy_log_rotate(struct vy_log *log, int64_t signature)
 		goto err_rotate;
 	}
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(vy_log_rotate_f, log->dir,
-		      log->signature, signature) < 0) {
+	if (coio_call(vy_log_rotate_f, log, signature) < 0) {
 		latch_unlock(log->latch);
 		goto err_rotate;
 	}
@@ -1419,4 +1423,28 @@ vy_recovery_replay(struct vy_recovery *recovery,
 			return -1;
 	}
 	return 0;
+}
+
+/**
+ * Invoke @gc_cb for each run of each dropped index.
+ */
+static void
+vy_recovery_gc(struct vy_recovery *recovery,
+	       vy_log_gc_cb gc_cb, void *gc_arg)
+{
+	mh_int_t i;
+	mh_foreach(recovery->index_hash, i) {
+		struct vy_index_recovery_info *index;
+		index = mh_i64ptr_node(recovery->index_hash, i)->val;
+		if (!index->is_dropped)
+			continue;
+		struct vy_range_recovery_info *range;
+		rlist_foreach_entry(range, &index->ranges, in_index) {
+			struct vy_run_recovery_info *run;
+			rlist_foreach_entry(run, &range->runs, in_range) {
+				gc_cb(run->id, index->iid, index->space_id,
+				      index->path, gc_arg);
+			}
+		}
+	}
 }

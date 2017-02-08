@@ -143,6 +143,10 @@ enum { VY_LOG_TX_BUF_SIZE = 64 };
 
 struct vy_recovery;
 
+typedef void
+(*vy_log_gc_cb)(int64_t run_id, uint32_t iid, uint32_t space_id,
+		const char *path, void *arg);
+
 /** Vinyl metadata log object. */
 struct vy_log {
 	/** Xlog object used for writing the log. */
@@ -153,6 +157,10 @@ struct vy_log {
 	int64_t signature;
 	/** Recovery context. */
 	struct vy_recovery *recovery;
+	/** Garbage collection callback. */
+	vy_log_gc_cb gc_cb;
+	/** Argument to the garbage collection callback. */
+	void *gc_arg;
 	/**
 	 * Latch protecting the xlog.
 	 *
@@ -181,11 +189,14 @@ struct vy_log {
 /**
  * Allocate and initialize a vy_log structure.
  * @dir is the directory to store log files in.
+ * @gc_cb is the callback that will be called on deleted runs
+ * on log rotation (see vy_log_rotate()).
+ * @gc_arg is an argument passed to @gc_cb.
  *
  * Returns NULL on memory allocation failure.
  */
 struct vy_log *
-vy_log_new(const char *dir);
+vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg);
 
 /*
  * Create the initial xlog file having signature 0.
@@ -209,6 +220,10 @@ vy_log_delete(struct vy_log *log);
  * The goal of log rotation is to compact the log file by
  * discarding records cancelling each other and records left
  * from dropped indexes.
+ *
+ * The function calls @gc_cb for each deleted run, passing info
+ * necessary to lookup its files and optional argument @gc_arg.
+ * The callback is supposed to unlink run files.
  *
  * Returns 0 on success, -1 on failure.
  */
