@@ -1040,6 +1040,35 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_id)
 }
 
 /**
+ * Allocate a run with ID @run_id and insert it to the hash.
+ * Return the new run on success, NULL on OOM.
+ */
+static struct vy_run_recovery_info *
+vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
+{
+	struct vy_run_recovery_info *run = malloc(sizeof(*run));
+	if (run == NULL) {
+		diag_set(OutOfMemory, sizeof(*run),
+			 "malloc", "struct vy_run_recovery_info");
+		return NULL;
+	}
+	struct mh_i64ptr_t *h = recovery->run_hash;
+	struct mh_i64ptr_node_t node = { run_id, run };
+	struct mh_i64ptr_node_t *old_node;
+	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
+		free(run);
+		return NULL;
+	}
+	assert(old_node == NULL);
+	run->id = run_id;
+	rlist_create(&run->in_range);
+	if (recovery->run_id_max < run_id)
+		recovery->run_id_max = run_id;
+	return run;
+}
+
+/**
  * Handle a VY_LOG_INSERT_RUN log record.
  * This function allocates a new run with ID @run_id, inserts it
  * to the hash, and adds it to the list of runs of the range with
@@ -1060,23 +1089,11 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 		diag_set(ClientError, ER_VINYL, "unknown range id");
 		return -1;
 	}
-	struct vy_run_recovery_info *run = malloc(sizeof(*run));
-	if (run == NULL) {
-		diag_set(OutOfMemory, sizeof(*run),
-			 "malloc", "struct vy_run_recovery_info");
+	struct vy_run_recovery_info *run;
+	run = vy_recovery_create_run(recovery, run_id);
+	if (run == NULL)
 		return -1;
-	}
-	struct mh_i64ptr_t *h = recovery->run_hash;
-	struct mh_i64ptr_node_t node = { run_id, run };
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		free(run);
-		return -1;
-	}
-	run->id = run_id;
 	rlist_add_entry(&range->runs, run, in_range);
-	if (recovery->run_id_max < run_id)
-		recovery->run_id_max = run_id;
 	return 0;
 }
 
