@@ -304,6 +304,12 @@ local function connect(uri, opts)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
+    if u.password == nil then
+        -- Not specifying a password means empty password.
+        -- Required for passwordless URI forms like admin@host
+        u.password = ''
+    end
+
     -- connect to remote host
     local remote
     remote = netbox_connect(u.host, u.service, {
