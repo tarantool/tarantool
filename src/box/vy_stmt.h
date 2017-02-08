@@ -145,12 +145,12 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 static inline uint64_t
 vy_stmt_column_mask(const struct tuple *tuple)
 {
-#ifndef NDEBUG
 	enum iproto_type type = vy_stmt_type(tuple);
 	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
-#endif
-	const char *meta = tuple_meta(tuple);
-	return load_u64(meta);
+	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
+	(void) type;
+	const char *extra = tuple_extra(tuple);
+	return load_u64(extra);
 }
 
 /**
@@ -161,13 +161,12 @@ vy_stmt_column_mask(const struct tuple *tuple)
 static inline void
 vy_stmt_set_column_mask(struct tuple *tuple, uint64_t column_mask)
 {
-	assert(tuple_meta_size(tuple) == sizeof(uint64_t));
-#ifndef NDEBUG
 	enum iproto_type type = vy_stmt_type(tuple);
 	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
-#endif
-	char *meta = (char *) tuple_meta(tuple);
-	store_u64(meta, column_mask);
+	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
+	(void) type;
+	char *extra = (char *) tuple_extra(tuple);
+	store_u64(extra, column_mask);
 }
 
 /**

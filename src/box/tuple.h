@@ -359,20 +359,16 @@ tuple_format(const struct tuple *tuple)
 	return format;
 }
 
-/** Get begin of the tuple meta information. */
+/**
+ * Return extra data saved in tuple metadata.
+ * @param tuple tuple
+ * @return a pointer to extra data saved in tuple metadata.
+ */
 static inline const char *
-tuple_meta(const struct tuple *tuple)
+tuple_extra(const struct tuple *tuple)
 {
 	struct tuple_format *format = tuple_format(tuple);
-	return tuple_data(tuple) - format->tuple_meta_size;
-}
-
-/** Get size of the meta in the tuple. */
-static inline uint16_t
-tuple_meta_size(const struct tuple *tuple)
-{
-	struct tuple_format *format = tuple_format(tuple);
-	return format->extra_size;
+	return tuple_data(tuple) - tuple_format_meta_size(format);
 }
 
 /**

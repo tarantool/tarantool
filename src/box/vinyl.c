@@ -121,6 +121,8 @@ struct vy_env {
 	struct vy_stat      *stat;
 	/** Upsert squash queue */
 	struct vy_squash_queue *squash_queue;
+	/** Tuple format for keys (SELECT) */
+	struct tuple_format *key_format;
 	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
 	/** Mempool for struct vy_page_read_task */
@@ -5221,7 +5223,6 @@ vy_create_format_with_mask(struct tuple_format *space_format)
 	if (format == NULL)
 		return NULL;
 	/* + size of column mask. */
-	format->tuple_meta_size += sizeof(uint64_t);
 	format->extra_size = sizeof(uint64_t);
 	return format;
 }
@@ -5271,8 +5272,8 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index->key_def, link);
 
-	index->surrogate_format = tuple_format_new(&key_list, 0,
-						   &vy_tuple_format_vtab);
+	index->surrogate_format = tuple_format_new(&vy_tuple_format_vtab,
+						   &key_list, 0);
 	if (index->surrogate_format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->surrogate_format, 1);
@@ -5687,6 +5688,7 @@ static inline int
 vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	     uint32_t part_count, struct tuple **result)
 {
+	struct vy_env *e = index->env;
 	/*
 	 * tx can be NULL, for example, if an user calls
 	 * space.index.get({key}).
@@ -5694,10 +5696,9 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	struct tuple *vykey;
 	assert(part_count <= index->key_def->part_count);
-	vykey = vy_stmt_new_select(index->space->format, key, part_count);
+	vykey = vy_stmt_new_select(e->key_format, key, part_count);
 	if (vykey == NULL)
 		return -1;
-	struct vy_env *e = index->env;
 	ev_tstamp start  = ev_now(loop());
 	int64_t vlsn = INT64_MAX;
 	const int64_t *vlsn_ptr = &vlsn;
@@ -6760,6 +6761,12 @@ vy_env_new(void)
 	e->log = vy_log_new(e->conf->path);
 	if (e->log == NULL)
 		goto error_log;
+	RLIST_HEAD(empty_list);
+	e->key_format = tuple_format_new(&vy_tuple_format_vtab,
+					  &empty_list, 0);
+	if (e->key_format == NULL)
+		goto error_key_format;
+	tuple_format_ref(e->key_format, 1);
 
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
@@ -6777,6 +6784,8 @@ vy_env_new(void)
 	vy_cache_env_create(&e->cache_env, slab_cache,
 			    e->conf->cache);
 	return e;
+error_key_format:
+	vy_log_delete(e->log);
 error_log:
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
@@ -6811,6 +6820,7 @@ vy_env_delete(struct vy_env *e)
 	vy_conf_delete(e->conf);
 	vy_stat_delete(e->stat);
 	vy_log_delete(e->log);
+	tuple_format_ref(e->key_format, -1);
 	mempool_destroy(&e->cursor_pool);
 	mempool_destroy(&e->read_task_pool);
 	lsregion_destroy(&e->allocator);
@@ -8968,11 +8978,14 @@ static int
 vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 		       bool is_last_level, int64_t oldest_vlsn)
 {
+	struct vy_env *env = index->env;
 	wi->index = index;
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
-	wi->key = vy_stmt_new_select(index->surrogate_format, NULL, 0);
+	wi->key = vy_stmt_new_select(env->key_format, NULL, 0);
+	if (wi->key == NULL)
+		return -1;
 	wi->format = index->surrogate_format;
 	tuple_format_ref(wi->format, 1);
 	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key, wi->format);
@@ -9494,12 +9507,13 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 int
 vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 {
+	struct vy_env *env = index->env;
 	static const int64_t vlsn = INT64_MAX;
 	int rc = 0;
 
 	struct vy_read_iterator ri;
 	struct tuple *stmt;
-	struct tuple *key = vy_stmt_new_select(index->space->format, NULL, 0);
+	struct tuple *key = vy_stmt_new_select(env->key_format, NULL, 0);
 	if (key == NULL)
 		return -1;
 	vy_read_iterator_open(&ri, index, NULL, ITER_GT, key, &vlsn, true);
@@ -9734,7 +9748,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		return NULL;
 	}
 	assert(part_count <= index->key_def->part_count);
-	c->key = vy_stmt_new_select(index->space->format, key, part_count);
+	c->key = vy_stmt_new_select(e->key_format, key, part_count);
 	if (c->key == NULL) {
 		mempool_free(&e->cursor_pool, c);
 		return NULL;

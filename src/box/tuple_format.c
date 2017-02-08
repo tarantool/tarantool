@@ -37,13 +37,14 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
 
-
 /** Extract all available type info from keys. */
 static int
 tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 {
-	if (format->field_count == 0)
+	if (format->field_count == 0) {
+		format->field_map_size = 0;
 		return 0;
+	}
 
 	/* There may be fields between indexed fields (gaps). */
 	for (uint32_t i = 0; i < format->field_count; i++) {
@@ -96,13 +97,14 @@ tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 	}
 
 	assert(format->fields[0].offset_slot == TUPLE_OFFSET_SLOT_NIL);
-	if (-current_slot * sizeof(uint32_t) > UINT16_MAX) {
+	size_t field_map_size = -current_slot * sizeof(uint32_t);
+	if (field_map_size + format->extra_size > UINT16_MAX) {
 		/** tuple->data_offset is 16 bits */
 		diag_set(ClientError, ER_INDEX_FIELD_COUNT_LIMIT,
 			 -current_slot);
 		return -1;
 	}
-	format->tuple_meta_size += -current_slot * sizeof(uint32_t);
+	format->field_map_size = field_map_size;
 	return 0;
 }
 
@@ -194,15 +196,14 @@ tuple_format_delete(struct tuple_format *format)
 }
 
 struct tuple_format *
-tuple_format_new(struct rlist *key_list, uint16_t extra_tuple_size,
-		 struct tuple_format_vtab *vtab)
+tuple_format_new(struct tuple_format_vtab *vtab, struct rlist *key_list,
+		 uint16_t extra_size)
 {
 	struct tuple_format *format = tuple_format_alloc(key_list);
 	if (format == NULL)
 		return NULL;
 	format->vtab = *vtab;
-	format->tuple_meta_size = extra_tuple_size;
-	format->extra_size = extra_tuple_size;
+	format->extra_size = extra_size;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_delete(format);
 		return NULL;
@@ -285,8 +286,8 @@ int
 tuple_format_init()
 {
 	RLIST_HEAD(empty_list);
-	tuple_format_default = tuple_format_new(&empty_list, 0,
-						&memtx_tuple_format_vtab);
+	tuple_format_default = tuple_format_new(&memtx_tuple_format_vtab,
+						&empty_list, 0);
 	if (tuple_format_default == NULL)
 		return -1;
 	/* Make sure this one stays around. */
