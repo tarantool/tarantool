@@ -154,20 +154,8 @@ VinylSpace::dropIndex(Index *index)
 void
 VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
-	if (old_space->index_count &&
-	    old_space->index_count <= new_space->index_count) {
-		VinylEngine *engine = (VinylEngine *)old_space->handler->engine;
-		Index *primary_index = index_find_xc(old_space, 0);
-		if (vy_status(engine->env) == VINYL_ONLINE &&
-		    primary_index->min(NULL, 0)) {
-			/**
-			 * If the space is not empty, then forbid new
-			 * index create.
-			 */
-			tnt_raise(ClientError, ER_UNSUPPORTED, "Vinyl",
-				  "altering not empty space");
-		}
-	}
+	if (vy_prepare_alter_space(old_space, new_space) != 0)
+		diag_raise();
 }
 
 void

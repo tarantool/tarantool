@@ -101,6 +101,17 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space:delete({1})
 ---
 ...
+-- must fail because vy_mems have data
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+---
+- error: Vinyl does not support altering not empty space
+...
+box.snapshot()
+---
+- ok
+...
+-- after a dump REPLACE + DELETE = nothing, so the space is empty now and
+-- can be altered.
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ---
 ...
@@ -119,6 +130,47 @@ index:select{}
 index2:select{}
 ---
 - - [1, 2]
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary', { run_count_per_level = 2 })
+---
+...
+space:insert({1, 2})
+---
+- [1, 2]
+...
+box.snapshot()
+---
+- ok
+...
+space:delete({1})
+---
+...
+box.snapshot()
+---
+- ok
+...
+-- must fail because vy_runs have data
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+---
+- error: Vinyl does not support altering not empty space
+...
+-- After compaction the REPLACE + DELETE + DELETE = nothing, so
+-- the space is now empty and can be altered.
+space:delete({1})
+---
+...
+box.snapshot()
+---
+- ok
+...
+index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+---
 ...
 space:drop()
 ---

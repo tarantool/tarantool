@@ -247,6 +247,17 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	     struct space *space);
 
 /**
+ * Hook on an preparation of space alter event.
+ * @param old_space Old space.
+ * @param new_space New space.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+int
+vy_prepare_alter_space(struct space *old_space, struct space *new_space);
+
+/**
  * Hook on an alter space commit event. It is called on each
  * create_index(), drop_index() and is used for update
  * vy_index.space attribute.

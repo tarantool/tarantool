@@ -111,6 +111,7 @@ vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format)
 	memcpy(res, stmt, size);
 	res->refs = 1;
 	res->format_id = tuple_format_id(format);
+	assert(tuple_size(res) == tuple_size(stmt));
 	return res;
 }
 
