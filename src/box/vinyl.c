@@ -1417,13 +1417,12 @@ vy_run_snprint_path(char *buf, size_t size, const char *dir,
 static void
 vy_run_unlink_files(const char *dir, int64_t run_id)
 {
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: run %lld not deleted",
+				(long long)run_id); return;});
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, PATH_MAX, dir, run_id, type);
-		ERROR_INJECT(ERRINJ_VY_GC,
-			     {say_error("file '%s' was not deleted "
-					"due to error injection", path);
-			      continue;});
 		if (coeio_unlink(path) < 0 && errno != ENOENT)
 			say_syserror("failed to delete file '%s'", path);
 	}
