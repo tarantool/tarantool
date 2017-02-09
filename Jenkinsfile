@@ -1,9 +1,11 @@
 #!groovy
 
-stage('Build') {
+stage('Build'){
+    packpack = new org.tarantool.packpack()
     node {
         checkout scm
-        p = new org.tarantool.packpack()
-        p.packpackBuildMatrix('result')
+        packpack.prepareSources()
     }
+
+    packpack.packpackBuildMatrix('result')
 }
