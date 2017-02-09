@@ -369,6 +369,25 @@ fiber.create(function()end):name()
 --
 fiber.create(function() fiber.wakeup(fiber.self()) end)
 
+--
+-- gh-2066 test for fiber wakeup
+--
+
+_ = box.schema.space.create('test2066', {if_not_exists = true})
+_ = box.space.test2066:create_index('pk', {if_not_exists = true})
+
+function fn2() fiber.sleep(60) box.space.test2066:replace({1}) end
+f2 = fiber.create(fn2)
+
+function fn1() fiber.sleep(60) f2:wakeup() end
+f1 = fiber.create(fn1)
+-- push two fibers to ready list
+f1:wakeup() f2:wakeup()
+
+fiber.sleep(0.01)
+
+box.space.test2066:drop()
+
 fiber = nil
 
 test_run:cmd("clear filter")

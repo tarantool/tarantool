@@ -73,6 +73,13 @@ enum {
 	 */
 	FIBER_IS_JOINABLE = 1 << 2,
 	/**
+	 * The fiber is in cord->ready list or in
+	 * a call chain created by fiber_schedule_list().
+	 * The flag is set to help fiber_wakeup() avoid
+	 * double wakeup of an already scheduled fiber.
+	 */
+	FIBER_IS_READY = 1 << 3,
+	/**
 	 * This flag is set when fiber function ends and before
 	 * the fiber is recycled.
 	 */

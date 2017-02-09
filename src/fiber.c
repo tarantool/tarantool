@@ -93,6 +93,9 @@ update_last_stack_frame(struct fiber *fiber)
 static void
 fiber_recycle(struct fiber *fiber);
 
+/**
+ * Transfer control to callee fiber.
+ */
 static void
 fiber_call_impl(struct fiber *callee)
 {
@@ -101,17 +104,14 @@ fiber_call_impl(struct fiber *callee)
 
 	/* Ensure we aren't switching to a fiber parked in fiber_loop */
 	assert(callee->f != NULL);
-
-	/* Ensure the callee was removed from cord->ready list.
+	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
+	assert(! (callee->flags & FIBER_IS_DEAD));
+	/*
+	 * Ensure the callee was removed from cord->ready list.
 	 * If it wasn't, the callee will observe a 'spurious' wakeup
 	 * later, due to a fiber_wakeup() performed in the past.
-	 *
-	 * To put it another way, fiber_wakeup() is a 'request' to
-	 * schedule the fiber for execution, and once it is executing
-	 * a wakeup request is considered complete and it must be
-	 * removed. */
+	 */
 	assert(rlist_empty(&callee->state));
-
 	assert(caller);
 	assert(caller != callee);
 
@@ -119,6 +119,7 @@ fiber_call_impl(struct fiber *callee)
 
 	update_last_stack_frame(caller);
 
+	callee->flags &= ~FIBER_IS_READY;
 	callee->csw++;
 	ASAN_START_SWITCH_FIBER(asan_state, 1,
 				callee->coro.stack,
@@ -131,6 +132,10 @@ void
 fiber_call(struct fiber *callee)
 {
 	callee->caller = fiber();
+	callee->caller->flags |= FIBER_IS_READY;
+	assert(rlist_empty(&callee->state));
+	assert(! (callee->flags & FIBER_IS_READY));
+	callee->flags |= FIBER_IS_READY;
 	fiber_call_impl(callee);
 }
 
@@ -160,6 +165,21 @@ fiber_checkstack()
 void
 fiber_wakeup(struct fiber *f)
 {
+	/**
+	 * Do nothing if the fiber is already in cord->ready
+	 * list *or* is in the call chain created by
+	 * fiber_schedule_list(). While it's harmless to re-add
+	 * a fiber to cord->ready, even if it's already there,
+	 * but the same game is deadly when the fiber is in
+	 * the callee list created by fiber_schedule_list().
+	 *
+	 * To put it another way, fiber_wakeup() is a 'request' to
+	 * schedule the fiber for execution, and once it is executing
+	 * a wakeup request is considered complete and it must be
+	 * removed.
+	 */
+	if (f->flags & FIBER_IS_READY)
+		return;
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
 		/*
@@ -181,6 +201,7 @@ fiber_wakeup(struct fiber *f)
 	 * box/wal.cc)
 	 */
 	rlist_move_tail_entry(&cord->ready, f, state);
+	f->flags |= FIBER_IS_READY;
 }
 
 /** Cancel the subject fiber.
@@ -312,10 +333,13 @@ fiber_yield(void)
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
 
+	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
+	assert(! (callee->flags & FIBER_IS_DEAD));
 	cord->fiber = callee;
 	update_last_stack_frame(caller);
 
 	callee->csw++;
+	callee->flags &= ~FIBER_IS_READY;
 	ASAN_START_SWITCH_FIBER(asan_state,
 				(caller->flags & FIBER_IS_DEAD) == 0,
 				callee->coro.stack,
@@ -411,6 +435,7 @@ fiber_schedule_list(struct rlist *list)
 		return;
 
 	first = last = rlist_shift_entry(list, struct fiber, state);
+	assert(last->flags & FIBER_IS_READY);
 
 	while (! rlist_empty(list)) {
 		last->caller = rlist_shift_entry(list, struct fiber, state);
