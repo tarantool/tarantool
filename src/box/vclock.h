@@ -50,7 +50,7 @@ enum {
 	/**
 	 * The maximum number of components in vclock
 	 */
-	VCLOCK_MAX = 32,
+	VCLOCK_MAX = 99,
 
 	/**
 	 * The maximum length of string representation of vclock.
