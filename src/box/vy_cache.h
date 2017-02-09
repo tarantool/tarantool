@@ -59,6 +59,10 @@ struct vy_cache_entry {
 	/* VY_CACHE_LEFT_LINKED and/or VY_CACHE_RIGHT_LINKED, see
 	 * description of them for more information */
 	uint32_t flags;
+	/* Number of parts in key when the value was the first in EQ search */
+	uint8_t left_boundary_level;
+	/* Number of parts in key when the value was the last in EQ search */
+	uint8_t right_boundary_level;
 };
 
 /**
@@ -122,8 +126,8 @@ struct vy_cache_env {
 /**
  * Initialize common cache environment.
  * @param e - the environment.
- * @slab_cache - source of memory.
- * @mem_quota - memory limit for the cache.
+ * @param slab_cache - source of memory.
+ * @param mem_quota - memory limit for the cache.
  */
 void
 vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache,
@@ -170,20 +174,22 @@ vy_cache_delete(struct vy_cache *cache);
  * Add a value to the cache. Can be used only if the reader read the latest
  * data (vlsn = INT64_MAX).
  * @param cache - pointer to tuple cache.
- * @stmt - statement that was recently read and should be added to the cache.
- * @prev_stmt - previous statement that was read by the reader in one
+ * @param stmt - statement that was recently read and should be added to the
+ * cache.
+ * @param prev_stmt - previous statement that was read by the reader in one
  * sequence (by one iterator).
- * @direction - direction in which the reader (iterator) observes data,
+ * @param direction - direction in which the reader (iterator) observes data,
  *  +1 - forward, -1 - backward.
  */
 void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
-	     struct tuple *prev_stmt, int direction);
+	     struct tuple *prev_stmt, const struct tuple *key,
+	     enum iterator_type order);
 
 /**
  * Invalidate possibly cached value due to its overwriting
  * @param cache - pointer to tuple cache.
- * @stmt - overwritten statement.
+ * @param stmt - overwritten statement.
  */
 void
 vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt);

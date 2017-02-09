@@ -826,6 +826,12 @@ struct vy_merge_iterator {
 	 */
 	uint32_t front_id;
 	/**
+	 * For some optimization the flag is set for unique
+	 * index and full key and EQ order - that means that only
+	 * one value is to be emitted by the iterator.
+	 */
+	bool is_one_value;
+	/**
 	 * If index is unique and full key is given we can
 	 * optimize first search in order to avoid unnecessary
 	 * reading from disk.  That flag is set to true during
@@ -8517,6 +8523,8 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 	itr->mutable_end = 0;
 	itr->skipped_start = 0;
 	itr->curr_stmt = NULL;
+	itr->is_one_value = iterator_type == ITER_EQ &&
+		tuple_field_count(key) >= index->key_def->part_count;
 	itr->unique_optimization =
 		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
 		 iterator_type == ITER_LE) &&
@@ -8662,6 +8670,8 @@ static NODISCARD int
 vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
+	if (itr->search_started && itr->is_one_value)
+		return 0;
 	itr->search_started = true;
 	if (vy_merge_iterator_check_version(itr))
 		return -2;
@@ -8712,6 +8722,13 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 		if (i >= itr->skipped_start)
 			itr->skipped_start++;
 
+		if (stop && src->stmt == NULL && min_stmt == NULL) {
+			itr->front_id++;
+			itr->curr_src = i;
+			src->front_id = itr->front_id;
+			itr->skipped_start = i + 1;
+			break;
+		}
 		if (src->stmt == NULL)
 			continue;
 
@@ -8739,13 +8756,16 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			break;
 		}
 	}
+	if (itr->skipped_start < itr->src_count)
+		itr->range_ended = false;
 
 	for (int i = MIN(itr->skipped_start, itr->mutable_end) - 1;
 	     was_yield_possible && i >= (int) itr->mutable_start; i--) {
 		struct vy_merge_src *src = &itr->src[i];
+		bool stop;
 		rc = src->iterator.iface->restore(&src->iterator,
 						  itr->curr_stmt,
-						  &src->stmt, NULL);
+						  &src->stmt, &stop);
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
 		if (rc < 0)
@@ -8904,8 +8924,9 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 	int result = 0;
 	for (uint32_t i = 0; i < itr->src_count; i++) {
 		struct vy_stmt_iterator *sub_itr = &itr->src[i].iterator;
+		bool stop;
 		int rc = sub_itr->iface->restore(sub_itr, last_stmt,
-						 &itr->src[i].stmt, NULL);
+						 &itr->src[i].stmt, &stop);
 		if (rc < 0)
 			return rc;
 		result = result || rc;
@@ -9508,8 +9529,11 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			goto clear;
 		}
 		if (t == NULL) {
+			if (itr->curr_stmt != NULL)
+				tuple_unref(itr->curr_stmt);
+			itr->curr_stmt = NULL;
 			rc = 0; /* No more data. */
-			goto clear;
+			break;
 		}
 		rc = vy_merge_iterator_squash_upsert(mi, &t, true);
 		if (rc != 0) {
@@ -9551,15 +9575,14 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	/**
 	 * Add a statement to the cache
 	 */
-	if ((*(itr->vlsn) == INT64_MAX) && *result != NULL &&
-	    vy_stmt_lsn(*result) != INT64_MAX) {
-		int direction = iterator_direction(itr->iterator_type);
+	if ((*(itr->vlsn) == INT64_MAX) && (*result == NULL ||
+	    vy_stmt_lsn(*result) != INT64_MAX)) {
 		if (prev_key && vy_stmt_lsn(prev_key) == INT64_MAX) {
 			vy_cache_add(itr->index->cache, *result, NULL,
-					  direction);
+				     itr->key, itr->iterator_type);
 		} else {
 			vy_cache_add(itr->index->cache, *result, prev_key,
-					  direction);
+				     itr->key, itr->iterator_type);
 		}
 	}
 
