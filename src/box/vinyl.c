@@ -932,6 +932,7 @@ struct vy_cursor {
 	 */
 	struct vy_tx tx_autocommit;
 	struct vy_index *index;
+	struct vy_env *env;
 	struct tuple *key;
 	/**
 	 * Points either to tx_autocommit for autocommit mode or
@@ -5189,6 +5190,7 @@ vy_index_drop(struct vy_index *index)
 	index->is_dropped = true;
 	rlist_del(&index->link);
 	vy_index_unref(index);
+	index->space = NULL;
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -9817,6 +9819,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 	c->index = index;
 	c->n_reads = 0;
+	c->env = e;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
 		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
@@ -9825,11 +9828,6 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 	c->tx = tx;
 	c->start = tx->start;
-	/*
-	 * Prevent index drop by the backend while the cursor is
-	 * still alive.
-	 */
-	vy_index_ref(c->index);
 	c->need_check_eq = false;
 	enum iterator_type iterator_type;
 	switch (type) {
@@ -9909,11 +9907,11 @@ void
 vy_cursor_delete(struct vy_cursor *c)
 {
 	vy_read_iterator_close(&c->iterator);
-	struct vy_env *e = c->index->env;
+	struct vy_env *e = c->env;
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
 			/* Rollback the automatic transaction. */
-			vy_tx_rollback(c->index->env, c->tx);
+			vy_tx_rollback(e, c->tx);
 		} else {
 			/*
 			 * Delete itself from the list of open cursors
@@ -9924,7 +9922,6 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		tuple_unref(c->key);
-	vy_index_unref(c->index);
 	vy_stat_cursor(e->stat, c->start, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
