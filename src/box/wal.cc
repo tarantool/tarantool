@@ -587,8 +587,12 @@ wal_writer_f(va_list ap)
 	writer->main_f = fiber();
 	struct cbus_endpoint endpoint;
 	cbus_join(&endpoint, "wal", fiber_schedule_cb, fiber());
-	/* Create a pipe to TX thread. */
-	cpipe_create(&wal_writer_singleton.tx_pipe, "tx_wake");
+	/*
+	 * Create a pipe to TX thread. Use a high priority
+	 * endpoint, to ensure that WAL messages are delivered
+	 * even when tx fiber pool is used up by net messages.
+	 */
+	cpipe_create(&wal_writer_singleton.tx_pipe, "tx_prio");
 
 	cbus_loop(&endpoint);
 

@@ -106,7 +106,14 @@ static struct xstream subscribe_stream;
  * threads.
  */
 static struct fiber_pool tx_fiber_pool;
-static struct cbus_endpoint tx_wake_endpoint;
+/**
+ * A separate endpoint for WAL wakeup messages, to
+ * ensure that WAL messages are delivered even
+ * if all fibers in tx_fiber_pool are used. Without
+ * this endpoint, tx thread could deadlock when there
+ * are too many messages in flight (gh-1892).
+ */
+static struct cbus_endpoint tx_prio_endpoint;
 
 static void
 box_check_writable(void)
@@ -1451,7 +1458,7 @@ bootstrap(struct vclock *start_vclock)
 }
 
 static void
-box_tx_wake(struct ev_loop *loop, ev_watcher *watcher, int events)
+tx_prio_cb(struct ev_loop *loop, ev_watcher *watcher, int events)
 {
 	(void) loop;
 	(void) events;
@@ -1466,7 +1473,8 @@ box_init(void)
 	/* Join the cord interconnect as "tx" endpoint. */
 	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
 			  FIBER_POOL_IDLE_TIMEOUT);
-	cbus_join(&tx_wake_endpoint, "tx_wake", box_tx_wake, &tx_wake_endpoint);
+	/* Add an extra endpoint for WAL wake up/rollback messages. */
+	cbus_join(&tx_prio_endpoint, "tx_prio", tx_prio_cb, &tx_prio_endpoint);
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
