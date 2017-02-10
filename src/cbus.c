@@ -138,7 +138,7 @@ cbus_join(struct cbus_endpoint *endpoint, const char *name,
 	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
 	endpoint->consumer = loop();
 	tt_pthread_mutex_init(&endpoint->mutex, NULL);
-	stailq_create(&endpoint->pipe);
+	stailq_create(&endpoint->output);
 	ev_async_init(&endpoint->async,
 		      (void (*)(ev_loop *, struct ev_async *, int)) fetch_cb);
 	endpoint->async.data = fetch_data;
@@ -167,16 +167,16 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 		return;
 
 	/* Trigger task processing when the queue becomes non-empty. */
-	bool pipe_was_empty;
+	bool output_was_empty;
 
 	tt_pthread_mutex_lock(&endpoint->mutex);
-	pipe_was_empty = stailq_empty(&endpoint->pipe);
+	output_was_empty = stailq_empty(&endpoint->output);
 	/** Flush input */
-	stailq_concat(&endpoint->pipe, &pipe->input);
+	stailq_concat(&endpoint->output, &pipe->input);
 	tt_pthread_mutex_unlock(&endpoint->mutex);
 
 	pipe->n_input = 0;
-	if (pipe_was_empty) {
+	if (output_was_empty) {
 		/* Count statistics */
 		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
 

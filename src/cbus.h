@@ -240,8 +240,8 @@ struct cbus_endpoint {
 	struct rlist in_cbus;
 	/** The lock around the pipe. */
 	pthread_mutex_t mutex;
-	/** The pipe with incoming messages. */
-	struct stailq pipe;
+	/** A queue with incoming messages. */
+	struct stailq output;
 	/** Consumer cord loop */
 	ev_loop *consumer;
 	/** Async to notify the consumer */
@@ -255,7 +255,7 @@ static inline void
 cbus_endpoint_fetch(struct cbus_endpoint *endpoint, struct stailq *output)
 {
 	tt_pthread_mutex_lock(&endpoint->mutex);
-	stailq_concat(output, &endpoint->pipe);
+	stailq_concat(output, &endpoint->output);
 	tt_pthread_mutex_unlock(&endpoint->mutex);
 }
 
