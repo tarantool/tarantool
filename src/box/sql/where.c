@@ -4939,11 +4939,14 @@ void sqlite3WhereEnd(WhereInfo *pWInfo){
         if( pOp->opcode==OP_Column ){
           int x = pOp->p2;
           assert( pIdx->pTable==pTab );
+#if 0
+          /* TARANTOOL: data layout is the same in every index. */
           if( !HasRowid(pTab) ){
             Index *pPk = sqlite3PrimaryKeyIndex(pTab);
             x = pPk->aiColumn[x];
             assert( x>=0 );
           }
+#endif
           x = sqlite3ColumnOfIndex(pIdx, x);
           if( x>=0 ){
             pOp->p2 = x;

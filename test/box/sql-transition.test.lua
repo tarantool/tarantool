@@ -79,6 +79,33 @@ box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 
-
 -- cleanup
 foobar:drop()
+
+-- multi-index
+
+-- create space
+barfoo = box.schema.space.create("barfoo")
+_ = barfoo:create_index("primary",{parts={2,"number"}})
+_ = barfoo:create_index("secondary",{parts={1,"string"}})
+
+barfoo_pageno = sql_pageno(barfoo.id, barfoo.index.primary.id)
+barfoo2_pageno = sql_pageno(barfoo.id, barfoo.index.secondary.id)
+barfoo_sql = "CREATE TABLE barfoo (bar, foo PRIMARY KEY) WITHOUT ROWID"
+sql_schema_put(0, "barfoo", barfoo_pageno, barfoo_sql)
+sql_schema_put(0, "sqlite_autoindex_barfoo_1", barfoo_pageno, "")
+sql_schema_put(0, "barfoo2", barfoo2_pageno, "CREATE INDEX barfoo2 ON barfoo(bar)")
+
+-- prepare data
+barfoo:insert({'foo', 1})
+barfoo:insert({'bar', 2})
+barfoo:insert({'foobar', 1000})
+
+box.sql.execute("SELECT foo, bar FROM barfoo")
+box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo==2")
+box.sql.execute("SELECT foo, bar FROM barfoo WHERE bar=='foobar'")
+box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo>=2")
+box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo<=2")
+
+-- cleanup
+barfoo:drop()

@@ -816,11 +816,18 @@ Index *sqlite3PrimaryKeyIndex(Table *pTab){
 ** column iCol.  Return -1 if not found.
 */
 i16 sqlite3ColumnOfIndex(Index *pIdx, i16 iCol){
+#if 0
   int i;
   for(i=0; i<pIdx->nColumn; i++){
     if( iCol==pIdx->aiColumn[i] ) return i;
   }
   return -1;
+#else
+  /*
+  ** TARANTOOL: Data layout is the same in every index. 
+  */
+  return iCol;
+#endif
 }
 
 /*

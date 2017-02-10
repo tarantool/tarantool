@@ -545,6 +545,11 @@ int sqlite3VdbeMemHandleBom(Mem *pMem);
 
 i64 sqlite3VdbeMsgpackRecordLen(Mem *pMem, u32 n);
 u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pMem, u32 n);
+int sqlite3VdbeCompareMsgpack(
+  const char **pKey1,
+  UnpackedRecord *pUnpacked,
+  int iKey2
+);
 int sqlite3VdbeRecordCompareMsgpack(
   int nKey1, const void *pKey1,
   UnpackedRecord *pPKey2

@@ -47,6 +47,7 @@
 
 #include "index.h"
 #include "box.h"
+#include "key_def.h"
 #include "tuple.h"
 #include "fiber.h"
 #include "small/region.h"
@@ -333,6 +334,75 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	rc = box_delete(space_id, index_id, key, key+key_size, NULL);
 	region_truncate(&fiber()->gc, original_size);
 	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+}
+
+/*
+ * Performs exactly as extract_key + sqlite3VdbeCompareMsgpack,
+ * only faster.
+ */
+int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
+			          int *res)
+{
+	assert(pCur->curFlags & BTCF_TaCursor);
+
+	struct ta_cursor *c = pCur->pTaCursor;
+	const struct key_def *key_def;
+	const struct tuple *tuple;
+	const char *base;
+	const struct tuple_format *format;
+	const uint32_t *field_map;
+	const char *p;
+	u32 i, n;
+	int rc;
+#ifndef NDEBUG
+	size_t original_size;
+	const char *key;
+	uint32_t key_size;
+#endif
+
+	assert(c);
+	assert(c->iter);
+	assert(c->tuple_last);
+
+	key_def = box_iterator_key_def(c->iter);
+	n = MIN(pUnpacked->nField, key_def->part_count);
+	tuple = c->tuple_last;
+	base = tuple_data(tuple);
+	format = tuple_format(tuple);
+	field_map = tuple_field_map(tuple);
+	p = base; mp_decode_array(&p);
+	for (i=0; i<n; i++) {
+		int32_t offset_slot = format->fields[
+			key_def->parts[i].fieldno
+		].offset_slot;
+		if (offset_slot != TUPLE_OFFSET_SLOT_NIL) {
+			p = base + field_map[offset_slot];
+		}
+		rc = sqlite3VdbeCompareMsgpack(&p, pUnpacked, i);
+		if (rc != 0) {
+			if (pUnpacked->pKeyInfo->aSortOrder[i]) {
+				rc = -rc;
+			}
+			*res = rc;
+			goto out;
+		}
+	}
+	*res = pUnpacked->default_rc;
+out:
+#ifndef NDEBUG
+	/* Sanity check. */
+	original_size = region_used(&fiber()->gc);
+	key = tuple_extract_key(tuple,
+				key_def,
+				&key_size);
+	if (key != NULL) {
+		rc = sqlite3VdbeRecordCompareMsgpack((int)key_size, key,
+						     pUnpacked);
+		region_truncate(&fiber()->gc, original_size);
+		assert(rc == *res);
+	}
+#endif
+	return SQLITE_OK;
 }
 
 /* Cursor positioning. */
