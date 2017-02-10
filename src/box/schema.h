@@ -65,6 +65,10 @@ enum {
 };
 /** \endcond public */
 
+#include <stdint.h>
+
+extern uint32_t sc_version;
+
 #if defined(__cplusplus)
 
 #include "error.h"
@@ -76,8 +80,6 @@ enum {
  * Lock of schema modification
  */
 extern struct latch schema_lock;
-
-extern uint32_t sc_version;
 
 struct space;
 

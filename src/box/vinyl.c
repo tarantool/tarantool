@@ -3430,6 +3430,9 @@ static int
 vy_tx_write(struct txv *v, enum vy_status status, int64_t lsn)
 {
 	struct vy_index *index = v->index;
+	struct key_def *key_def = index->key_def;
+	struct lsregion *allocator = &index->env->allocator;
+	const int64_t *allocator_lsn = &index->env->xm->lsn;
 	struct tuple *stmt = v->stmt;
 	struct vy_range *range = NULL;
 
@@ -3447,8 +3450,17 @@ vy_tx_write(struct txv *v, enum vy_status status, int64_t lsn)
 			return 0;
 	}
 	/* Match range. */
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index->key_def,
-					  stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, key_def, stmt);
+	/*
+	 * To avoid mixing statements of different formats in
+	 * the same in-memory tree, allocate a new tree on schema
+	 * version mismatch.
+	 */
+	if (unlikely(range->mem->sc_version != sc_version)) {
+		if (vy_range_rotate_mem(range, key_def,
+					allocator, allocator_lsn) != 0)
+			return -1;
+	}
 	int rc;
 	switch (vy_stmt_type(stmt)) {
 	case IPROTO_UPSERT:

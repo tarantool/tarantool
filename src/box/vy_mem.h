@@ -143,6 +143,8 @@ struct vy_mem {
 	struct key_def *key_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
+	/** Schema version at the time of creation. */
+	uint32_t sc_version;
 	/** Allocator for extents */
 	struct lsregion *allocator;
 	/** The last LSN for lsregion allocator */

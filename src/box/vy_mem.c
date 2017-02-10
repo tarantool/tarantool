@@ -35,6 +35,7 @@
 #include <trivia/util.h>
 #include <small/lsregion.h>
 #include "diag.h"
+#include "schema.h"
 
 /** {{{ vy_mem */
 
@@ -73,6 +74,7 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
+	index->sc_version = sc_version;
 	index->allocator = allocator;
 	index->allocator_lsn = allocator_lsn;
 	vy_mem_tree_create(&index->tree, key_def, vy_mem_tree_extent_alloc,
