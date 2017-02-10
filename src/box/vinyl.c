@@ -1621,11 +1621,18 @@ static void
 vy_range_discard_new_run(struct vy_range *range)
 {
 	struct vy_index *index = range->index;
-	struct vy_run *run = range->new_run;
+	int64_t run_id = range->new_run->id;
 	struct vy_log *log = index->env->log;
 
+	vy_run_delete(range->new_run);
+	range->new_run = NULL;
+
+	ERROR_INJECT(ERRINJ_VY_RUN_DISCARD,
+		     {say_error("error injection: run %lld not discarded",
+				(long long)run_id); return;});
+
 	vy_log_tx_begin(log);
-	vy_log_delete_run(log, range->new_run->id);
+	vy_log_delete_run(log, run_id);
 	if (vy_log_tx_commit(log) < 0) {
 		/*
 		 * Failure to log deletion of an incomplete
@@ -1636,10 +1643,8 @@ vy_range_discard_new_run(struct vy_range *range)
 		 */
 		struct error *e = diag_last_error(diag_get());
 		say_warn("failed to log run %lld deletion: %s",
-			 (long long)run->id, e->errmsg);
+			 (long long)run_id, e->errmsg);
 	}
-	vy_run_delete(run);
-	range->new_run = NULL;
 }
 
 /** Return true if a task was scheduled for a given range. */
@@ -4714,21 +4719,21 @@ static int
 vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 			   struct vy_task *task)
 {
-	if (task->status != 0) {
-		/* ->execute failed, propagate diag */
-		assert(!diag_is_empty(&task->diag));
-		diag_move(&task->diag, &scheduler->diag);
-		goto fail;
-	}
+	struct diag *diag = &task->diag;
+	if (task->status != 0)
+		goto fail; /* ->execute fialed */
+	diag = diag_get();
+	ERROR_INJECT(ERRINJ_VY_TASK_COMPLETE,
+		     {diag_set(ClientError, ER_INJECTION,
+			       "vinyl task completion"); goto fail;});
 	if (task->ops->complete &&
-	    task->ops->complete(task) != 0) {
-		assert(!diag_is_empty(diag_get()));
-		diag_move(diag_get(), &scheduler->diag);
+	    task->ops->complete(task) != 0)
 		goto fail;
-	}
 	return 0;
 fail:
-	error_log(diag_last_error(&scheduler->diag));
+	assert(!diag_is_empty(diag));
+	error_log(diag_last_error(diag));
+	diag_move(diag, &scheduler->diag);
 	if (task->ops->abort)
 		task->ops->abort(task, false);
 	return -1;
