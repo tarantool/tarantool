@@ -62,7 +62,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 
 struct vy_mem *
 vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
-	   const int64_t *allocator_lsn)
+	   const int64_t *allocator_lsn, struct tuple_format *format)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -77,6 +77,8 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 	index->sc_version = sc_version;
 	index->allocator = allocator;
 	index->allocator_lsn = allocator_lsn;
+	index->format = format;
+	tuple_format_ref(format, 1);
 	vy_mem_tree_create(&index->tree, key_def, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_frozen);
@@ -87,6 +89,7 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 void
 vy_mem_delete(struct vy_mem *index)
 {
+	tuple_format_ref(index->format, -1);
 	TRASH(index);
 	free(index);
 }
@@ -112,8 +115,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 int
-vy_mem_insert(struct vy_mem *mem, struct tuple_format *mem_format,
-	      const struct tuple *stmt, int64_t alloc_lsn)
+vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt, int64_t alloc_lsn)
 {
 	size_t size = tuple_size(stmt);
 	struct tuple *mem_stmt;
@@ -131,7 +133,7 @@ vy_mem_insert(struct vy_mem *mem, struct tuple_format *mem_format,
 	 * will try to unreference this statement.
 	 */
 	mem_stmt->refs = 0;
-	mem_stmt->format_id = tuple_format_id(mem_format);
+	mem_stmt->format_id = tuple_format_id(mem->format);
 
 	const struct tuple *replaced_stmt = NULL;
 	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
@@ -163,7 +165,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
 		tuple_unref(itr->last_stmt);
-	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, itr->format);
+	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, itr->mem->format);
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL)
 		return 0;
@@ -327,12 +329,11 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn,
-		     struct tuple_format *format)
+		     const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
+	itr->base.is_cleaned_up = false;
 	itr->stat = stat;
-	itr->format = format;
 
 	assert(key != NULL);
 	itr->mem = mem;
@@ -595,15 +596,29 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Close an iterator and free all resources
+ * Clean up the iterator to free resources and enable its closing.
+ */
+static void
+vy_mem_iterator_clean_up(struct vy_stmt_iterator *vitr)
+{
+	assert(vitr->iface->clean_up == vy_mem_iterator_clean_up);
+	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
+	if (itr->last_stmt != NULL)
+		tuple_unref(itr->last_stmt);
+	itr->last_stmt = NULL;
+	vitr->is_cleaned_up = true;
+}
+
+/**
+ * Close the iterator and free resources. Can be called only after
+ * clean_up().
  */
 static void
 vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_mem_iterator_close);
+	assert(vitr->is_cleaned_up);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-	if (itr->last_stmt != NULL)
-		tuple_unref(itr->last_stmt);
 	TRASH(itr);
 }
 
@@ -611,7 +626,8 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
 	.next_key = vy_mem_iterator_next_key,
 	.next_lsn = vy_mem_iterator_next_lsn,
 	.restore = vy_mem_iterator_restore,
-	.close = vy_mem_iterator_close
+	.close = vy_mem_iterator_close,
+	.clean_up = vy_mem_iterator_clean_up
 };
 
 /* }}} vy_mem_iterator API implementation */

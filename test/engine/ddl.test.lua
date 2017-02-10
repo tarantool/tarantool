@@ -76,3 +76,18 @@ for i=1,box.schema.INDEX_PART_MAX + 1,1 do parts[2 * i - 1] = i; parts[2 * i] = 
 space = box.schema.space.create('test', { engine = engine })
 _ = space:create_index('primary', { type = 'tree', parts = parts })
 space:drop()
+
+--
+-- vy_mem of primary index contains statements with two formats.
+--
+space = box.schema.space.create('test1', { engine = engine })
+pk = space:create_index('primary1')
+idx2 = space:create_index('idx2', { parts = {2, 'unsigned'} })
+space:replace({3, 8, 1})
+idx2:select{}
+space:get{3}
+iter_obj = space:pairs(2, {iterator = 'GT'})
+idx2:drop()
+space:replace({4, 5, 6})
+space:select{}
+space:drop()

@@ -49,7 +49,13 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	tuple_format_ref(format, -1);
+	/*
+	 * Turn off formats referencing in worker threads to avoid
+	 * multithread unsafe modifications of a reference
+	 * counter.
+	 */
+	if (cord_is_main())
+		tuple_format_ref(format, -1);
 #ifndef NDEBUG
 	memset(tuple, '#', tuple_size(tuple)); /* fail early */
 #endif
@@ -77,7 +83,8 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t size)
 	}
 	tuple->refs = 1;
 	tuple->format_id = tuple_format_id(format);
-	tuple_format_ref(format, 1);
+	if (cord_is_main())
+		tuple_format_ref(format, 1);
 	tuple->bsize = 0;
 	tuple->data_offset = 0;
 	vy_stmt_set_lsn(tuple, 0);

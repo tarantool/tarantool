@@ -840,6 +840,11 @@ struct vy_merge_iterator {
 	 * means that it must switch to next range
 	 */
 	bool range_ended;
+	/**
+	 * Before close of the iterator you must call clean_up()
+	 * to free the iterator resources.
+	 */
+	bool is_cleaned_up;
 };
 
 struct vy_range_iterator {
@@ -879,6 +884,11 @@ struct vy_read_iterator {
 	struct tuple *curr_stmt;
 	/* is lazy search started */
 	bool search_started;
+	/**
+	 * Before close of the iterator you must call clean_up()
+	 * to free the iterator resources.
+	 */
+	bool is_cleaned_up;
 };
 
 /**
@@ -911,9 +921,18 @@ vy_read_iterator_open(struct vy_read_iterator *itr,
 static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result);
 
-/** Close the iterator and free resources. */
+/**
+ * Close the iterator and free resources. Can be called only after
+ * clean_up().
+ */
 static void
 vy_read_iterator_close(struct vy_read_iterator *itr);
+
+/**
+ * Clean up the iterator to free resources and enable its closing.
+ */
+static void
+vy_read_iterator_clean_up(struct vy_read_iterator *itr);
 
 /** Cursor. */
 struct vy_cursor {
@@ -1910,8 +1929,18 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem);
 static NODISCARD int
 vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret);
 
+/**
+ * Delete the iterator and free resources. Can be called only
+ * after clean_up().
+ */
 static void
 vy_write_iterator_delete(struct vy_write_iterator *wi);
+
+/**
+ * Clean up the iterator to free resources and enable its closing.
+ */
+static void
+vy_write_iterator_clean_up(struct vy_write_iterator *wi);
 
 /**
  * Initialize page info struct
@@ -2533,7 +2562,8 @@ vy_range_new(struct vy_index *index, int64_t id,
 			 "struct vy_range");
 		goto fail;
 	}
-	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn);
+	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn,
+				index->format);
 	if (range->mem == NULL)
 		goto fail_mem;
 	/* Allocate a new id unless specified. */
@@ -2671,9 +2701,14 @@ vy_range_rotate_mem(struct vy_range *range, struct key_def *key_def,
 		    struct lsregion *allocator, const int64_t *allocator_lsn)
 {
 	assert(range->mem != NULL);
-	if (range->mem->used == 0)
+	if (range->mem->used == 0) {
+		tuple_format_ref(range->mem->format, -1);
+		range->mem->format = range->index->format;
+		tuple_format_ref(range->mem->format, 1);
 		return 0;
-	struct vy_mem *mem = vy_mem_new(key_def, allocator, allocator_lsn);
+	}
+	struct vy_mem *mem = vy_mem_new(key_def, allocator, allocator_lsn,
+					range->index->format);
 	if (mem == NULL)
 		return -1;
 	vy_range_freeze_mem(range);
@@ -2757,6 +2792,7 @@ vy_range_get_write_iterator(struct vy_range *range, int run_count, int64_t vlsn)
 	}
 	return wi;
 err_wi_sub:
+	vy_write_iterator_clean_up(wi);
 	vy_write_iterator_delete(wi);
 err_wi:
 	return NULL;
@@ -3272,7 +3308,7 @@ vy_range_set(struct vy_range *range, const struct tuple *stmt,
 
 	bool was_empty = (mem->used == 0);
 
-	int rc = vy_mem_insert(mem, index->format, stmt, alloc_lsn);
+	int rc = vy_mem_insert(mem, stmt, alloc_lsn);
 	if (rc != 0)
 		return -1;
 
@@ -3573,10 +3609,14 @@ vy_task_dump_execute(struct vy_task *task)
 	assert(range->in_compact.pos == UINT32_MAX);
 
 	/* Start iteration. */
-	if (vy_write_iterator_next(wi, &stmt) != 0)
+	if (vy_write_iterator_next(wi, &stmt) != 0) {
+		vy_write_iterator_clean_up(wi);
 		return -1;
-	return vy_range_write_run(range, wi, &stmt, &task->dump_size,
-				  &task->dumped_statements);
+	}
+	int rc = vy_range_write_run(range, wi, &stmt, &task->dump_size,
+				    &task->dumped_statements);
+	vy_write_iterator_clean_up(wi);
+	return rc;
 }
 
 static int
@@ -3601,6 +3641,7 @@ vy_task_dump_complete(struct vy_task *task)
 	say_info("%s: completed dumping range %s",
 		 index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	vy_index_unacct_range(index, range);
@@ -3639,6 +3680,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	say_error("%s: failed to dump range %s",
 		  index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	/* Delete the run we failed to write. */
@@ -3697,6 +3739,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 		 index->name, vy_range_str(range));
 	return task;
 err_run:
+	vy_write_iterator_clean_up(wi);
 	vy_write_iterator_delete(wi);
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
@@ -3721,7 +3764,7 @@ vy_task_split_execute(struct vy_task *task)
 
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0)
-		return -1;
+		goto error;
 	assert(!rlist_empty(&range->split_list));
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(r->shadow == range);
@@ -3729,13 +3772,17 @@ vy_task_split_execute(struct vy_task *task)
 			ERROR_INJECT(ERRINJ_VY_RANGE_SPLIT,
 				     {diag_set(ClientError, ER_INJECTION,
 					       "vinyl range split");
-				      return -1;});
+				      goto error;});
 		}
 		if (vy_range_write_run(r, wi, &stmt, &task->dump_size,
 				       &unused) != 0)
-			return -1;
+			goto error;
 	}
+	vy_write_iterator_clean_up(wi);
 	return 0;
+error:
+	vy_write_iterator_clean_up(wi);
+	return -1;
 }
 
 static int
@@ -3766,6 +3813,7 @@ vy_task_split_complete(struct vy_task *task)
 	say_info("%s: completed splitting range %s",
 		 index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	/*
@@ -3818,6 +3866,7 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	say_error("%s: failed to split range %s",
 		  index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	if (!in_shutdown) {
@@ -3940,6 +3989,7 @@ err_parts:
 		if (parts[i] != NULL)
 			vy_range_delete(parts[i]);
 	}
+	vy_write_iterator_clean_up(wi);
 	vy_write_iterator_delete(wi);
 err_wi:
 	vy_range_unfreeze_mem(range);
@@ -3961,9 +4011,14 @@ vy_task_compact_execute(struct vy_task *task)
 	assert(range->in_compact.pos == UINT32_MAX);
 
 	/* Start iteration. */
-	if (vy_write_iterator_next(wi, &stmt) != 0)
+	if (vy_write_iterator_next(wi, &stmt) != 0) {
+		vy_write_iterator_clean_up(wi);
 		return -1;
-	return vy_range_write_run(range, wi, &stmt, &task->dump_size, &unused);
+	}
+	int rc = vy_range_write_run(range, wi, &stmt, &task->dump_size,
+				    &unused);
+	vy_write_iterator_clean_up(wi);
+	return rc;
 }
 
 static int
@@ -3996,6 +4051,7 @@ vy_task_compact_complete(struct vy_task *task)
 	say_info("%s: completed compacting range %s",
 		 index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	/*
@@ -4050,6 +4106,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	say_error("%s: failed to compact range %s",
 		  index->name, vy_range_str(range));
 
+	/* The iterator was cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
 	/* Delete the run we failed to write. */
@@ -4117,6 +4174,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
                  range->compact_priority, range->run_count);
 	return task;
 err_run:
+	vy_write_iterator_clean_up(wi);
 	vy_write_iterator_delete(wi);
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
@@ -5607,12 +5665,14 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	if (vy_read_iterator_next(&itr, result) != 0)
 		goto error;
 	if (tx != NULL && vy_tx_track(tx, index, vykey, *result == NULL) != 0) {
+		vy_read_iterator_clean_up(&itr);
 		vy_read_iterator_close(&itr);
 		goto error;
 	}
 	tuple_unref(vykey);
 	if (*result != NULL)
 		tuple_ref(*result);
+	vy_read_iterator_clean_up(&itr);
 	vy_read_iterator_close(&itr);
 	vy_stat_get(e->stat, start);
 	return 0;
@@ -7658,6 +7718,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 		     struct tuple_format *format)
 {
 	itr->base.iface = &vy_run_iterator_iface;
+	itr->base.is_cleaned_up = false;
 	itr->stat = stat;
 	itr->format = format;
 	itr->index = range->index;
@@ -7969,23 +8030,34 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Close an iterator and free all resources
+ * Clean up the iterator to free resources and enable its closing.
+ */
+static void
+vy_run_iterator_clean_up(struct vy_stmt_iterator *vitr)
+{
+	assert(vitr->iface->clean_up == vy_run_iterator_clean_up);
+	vitr->is_cleaned_up = true;
+	vy_run_iterator_cache_clean((struct vy_run_iterator *) vitr);
+}
+
+/**
+ * Close the iterator and free resources. Can be called only after
+ * clean_up().
  */
 static void
 vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_run_iterator_close);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
-
-	vy_run_iterator_cache_clean(itr);
-	TRASH(itr);
+	assert(vitr->is_cleaned_up);
+	TRASH((struct vy_run_iterator *) vitr);
 }
 
 static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 	.next_key = vy_run_iterator_next_key,
 	.next_lsn = vy_run_iterator_next_lsn,
 	.restore = vy_run_iterator_restore,
-	.close = vy_run_iterator_close
+	.close = vy_run_iterator_close,
+	.clean_up = vy_run_iterator_clean_up,
 };
 
 /* }}} vy_run_iterator API implementation */
@@ -8049,6 +8121,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
 		     const struct tuple *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
+	itr->base.is_cleaned_up = false;
 	itr->stat = stat;
 
 	itr->index = index;
@@ -8239,12 +8312,24 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Close the iterator
+ * Clean up the iterator to free resources and enable its closing.
+ */
+static void
+vy_txw_iterator_clean_up(struct vy_stmt_iterator *vitr)
+{
+	assert(vitr->iface->clean_up == vy_txw_iterator_clean_up);
+	vitr->is_cleaned_up = true;
+}
+
+/**
+ * Close the iterator and free resources. Can be called only after
+ * clean_up().
  */
 static void
 vy_txw_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_txw_iterator_close);
+	assert(vitr->is_cleaned_up);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 	(void)itr; /* suppress warn if NDEBUG */
 	TRASH(itr);
@@ -8254,7 +8339,8 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
 	.next_key = vy_txw_iterator_next_key,
 	.next_lsn = vy_txw_iterator_next_lsn,
 	.restore = vy_txw_iterator_restore,
-	.close = vy_txw_iterator_close
+	.close = vy_txw_iterator_close,
+	.clean_up = vy_txw_iterator_clean_up
 };
 
 /* }}} Iterator over transaction writes : implementation */
@@ -8296,6 +8382,7 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 		       const struct tuple *key, struct tuple_format *format)
 {
 	assert(key != NULL);
+	itr->is_cleaned_up = false;
 	itr->index = index;
 	itr->format = format;
 	itr->index_version = 0;
@@ -8322,25 +8409,39 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 }
 
 /**
- * Close the iteator and free resources.
+ * Clean up the iterator to free resources and enable its closing.
  */
 static void
-vy_merge_iterator_close(struct vy_merge_iterator *itr)
+vy_merge_iterator_clean_up(struct vy_merge_iterator *itr)
 {
 	if (itr->curr_stmt != NULL) {
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 	}
 	for (size_t i = 0; i < itr->src_count; i++)
-		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
-	free(itr->src);
-	itr->src_count = 0;
+		itr->src[i].iterator.iface->clean_up(&itr->src[i].iterator);
 	itr->src_capacity = 0;
-	itr->src = NULL;
 	itr->curr_range = NULL;
 	itr->range_version = 0;
 	itr->index = NULL;
 	itr->index_version = 0;
+	itr->is_cleaned_up = true;
+}
+
+/**
+ * Close the iterator and free resources. Can be called only after
+ * clean_up().
+ */
+static void
+vy_merge_iterator_close(struct vy_merge_iterator *itr)
+{
+	assert(cord_is_main());
+	assert(itr->is_cleaned_up);
+	for (size_t i = 0; i < itr->src_count; i++)
+		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
+	free(itr->src);
+	itr->src_count = 0;
+	itr->src = NULL;
 }
 
 /**
@@ -8803,10 +8904,9 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 struct vy_write_iterator {
 	struct vy_index *index;
 	/**
-	 * Format to allocate new tuples. We have to register the
-	 * copy of the index format and use it for tuples
-	 * allocation from the iterator to avoid multithread
-	 * access to index->format.
+	 * Format to allocate new tuples. We have to store the
+	 * reference to the format separate from index, because
+	 * the index can be altered during work of the iterator.
 	 */
 	struct tuple_format *format;
 	/* The minimal VLSN among all active transactions */
@@ -8822,6 +8922,11 @@ struct vy_write_iterator {
 	struct vy_iterator_stat mem_iterator_stat;
 	/* Usage statistics of run iterators */
 	struct vy_iterator_stat run_iterator_stat;
+	/**
+	 * Before close of the iterator you must call clean_up()
+	 * to free the iterator resources.
+	 */
+	bool is_cleaned_up;
 };
 
 /*
@@ -8832,16 +8937,13 @@ static int
 vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 		       bool is_last_level, int64_t oldest_vlsn)
 {
+	wi->is_cleaned_up = false;
 	wi->index = index;
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
 	wi->key = vy_stmt_new_select(index->format, NULL, 0);
-	wi->format = tuple_format_dup(index->format);
-	if (wi->format == NULL) {
-		tuple_unref(wi->key);
-		return -1;
-	}
+	wi->format = index->format;
 	tuple_format_ref(wi->format, 1);
 	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key, wi->format);
 	return 0;
@@ -8887,7 +8989,7 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_mem_iterator_open(&src->mem_iterator, &wi->mem_iterator_stat,
-			     mem, ITER_GE, wi->key, &vlsn, wi->format);
+			     mem, ITER_GE, wi->key, &vlsn);
 	return 0;
 }
 
@@ -8971,14 +9073,24 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 }
 
 static void
+vy_write_iterator_clean_up(struct vy_write_iterator *wi)
+{
+	assert(! cord_is_main());
+	wi->is_cleaned_up = true;
+	if (wi->tmp_stmt != NULL)
+		tuple_unref(wi->tmp_stmt);
+	wi->tmp_stmt = NULL;
+	if (wi->key != NULL)
+		tuple_unref(wi->key);
+	wi->key = NULL;
+	vy_merge_iterator_clean_up(&wi->mi);
+}
+
+static void
 vy_write_iterator_close(struct vy_write_iterator *wi)
 {
-	if (wi->tmp_stmt) {
-		tuple_unref(wi->tmp_stmt);
-	}
-	wi->tmp_stmt = NULL;
-	tuple_unref(wi->key);
-	vy_merge_iterator_close(&wi->mi);
+	assert(wi->is_cleaned_up);
+	assert(cord_is_main());
 	tuple_format_ref(wi->format, -1);
 }
 
@@ -9041,16 +9153,14 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , r->mem,
-				     itr->iterator_type, itr->key, itr->vlsn,
-				     itr->index->format);
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 	/* Add the active in-memory index of the current range. */
 	if (range->mem != NULL) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , range->mem,
-				     itr->iterator_type, itr->key, itr->vlsn,
-				     itr->index->format);
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 	/* Add frozen in-memory indexes. */
 	struct vy_mem *mem;
@@ -9058,8 +9168,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , mem,
-				     itr->iterator_type, itr->key, itr->vlsn,
-				     itr->index->format);
+				     itr->iterator_type, itr->key, itr->vlsn);
 	}
 }
 
@@ -9122,6 +9231,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
 	itr->search_started = false;
 	itr->curr_stmt = NULL;
 	itr->curr_range = NULL;
+	itr->is_cleaned_up = false;
 }
 
 /**
@@ -9156,6 +9266,7 @@ restart:
 	vy_range_iterator_restore(&itr->range_iterator, itr->curr_stmt,
 				  &itr->curr_range);
 	/* Re-create merge iterator */
+	vy_merge_iterator_clean_up(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
@@ -9221,6 +9332,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
 	assert(itr->curr_range != NULL);
+	vy_merge_iterator_clean_up(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
@@ -9328,15 +9440,26 @@ clear:
 	return rc;
 }
 
+static void
+vy_read_iterator_clean_up(struct vy_read_iterator *itr)
+{
+	assert(cord_is_main());
+	if (itr->curr_stmt != NULL)
+		tuple_unref(itr->curr_stmt);
+	itr->curr_stmt = NULL;
+	if (itr->search_started)
+		vy_merge_iterator_clean_up(&itr->merge_iterator);
+	itr->is_cleaned_up = true;
+}
+
 /**
  * Close the iterator and free resources
  */
 static void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
-	if (itr->curr_stmt != NULL)
-		tuple_unref(itr->curr_stmt);
-	itr->curr_stmt = NULL;
+	assert(itr->is_cleaned_up);
+	assert(cord_is_main());
 	if (itr->search_started)
 		vy_merge_iterator_close(&itr->merge_iterator);
 }
@@ -9367,6 +9490,7 @@ vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
 		if (rc != 0)
 			break;
 	}
+	vy_read_iterator_clean_up(&ri);
 	vy_read_iterator_close(&ri);
 	tuple_unref(key);
 	return rc;
@@ -9438,16 +9562,14 @@ vy_squash_process(struct vy_squash *squash)
 			      squash->stmt, &lsn, false);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
-	if (rc != 0) {
-		vy_read_iterator_close(&itr);
-		return -1;
-	} else if (result == NULL) {
-		vy_read_iterator_close(&itr);
-		return 0;
-	}
-
-	tuple_ref(result);
+	if (rc == 0 && result != NULL)
+		tuple_ref(result);
+	vy_read_iterator_clean_up(&itr);
 	vy_read_iterator_close(&itr);
+	if (rc != 0)
+		return -1;
+	if (result == NULL)
+		return 0;
 
 	struct vy_range *range;
 	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, key_def,
@@ -9689,6 +9811,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 void
 vy_cursor_delete(struct vy_cursor *c)
 {
+	vy_read_iterator_clean_up(&c->iterator);
 	vy_read_iterator_close(&c->iterator);
 	struct vy_env *e = c->index->env;
 	if (c->tx != NULL) {
