@@ -101,19 +101,14 @@ struct vy_stmt_iterator_iface {
 	vy_iterator_next_key_f next_key;
 	vy_iterator_next_lsn_f next_lsn;
 	vy_iterator_restore_f restore;
+	vy_iterator_close_f cleanup;
 	vy_iterator_close_f close;
-	vy_iterator_close_f clean_up;
 };
 
 /**
  * Common interface for iterator over run, mem, etc.
  */
 struct vy_stmt_iterator {
-	/**
-	 * Before close of the iterator you must call clean_up()
-	 * to free the iterator resources.
-	 */
-	bool is_cleaned_up;
 	const struct vy_stmt_iterator_iface *iface;
 };
 

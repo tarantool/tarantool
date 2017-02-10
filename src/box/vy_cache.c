@@ -590,37 +590,26 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Clean up the iterator to free resources and enable its closing.
+ * Close the iterator and free resources.
  */
 void
-vy_cache_iterator_clean_up(struct vy_stmt_iterator *vitr)
+vy_cache_iterator_close(struct vy_stmt_iterator *vitr)
 {
-	vitr->is_cleaned_up = true;
-	assert(vitr->iface->clean_up == vy_cache_iterator_clean_up);
+	assert(vitr->iface->close == vy_cache_iterator_close);
 	struct vy_cache_iterator *itr = (struct vy_cache_iterator *) vitr;
 	if (itr->curr_stmt != NULL) {
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 	}
-}
-
-/**
- * Close the iterator and free resources. Can be called only after
- * clean_up().
- */
-void
-vy_cache_iterator_close(struct vy_stmt_iterator *vitr)
-{
-	assert(vitr->is_cleaned_up);
-	assert(vitr->iface->close == vy_cache_iterator_close);
+	TRASH(itr);
 }
 
 static struct vy_stmt_iterator_iface vy_cache_iterator_iface = {
 	.next_key = vy_cache_iterator_next_key,
 	.next_lsn = vy_cache_iterator_next_lsn,
 	.restore = vy_cache_iterator_restore,
+	.cleanup = NULL,
 	.close = vy_cache_iterator_close,
-	.clean_up = vy_cache_iterator_clean_up
 };
 
 void
@@ -630,7 +619,6 @@ vy_cache_iterator_open(struct vy_cache_iterator *itr,
 		       const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_cache_iterator_iface;
-	itr->base.is_cleaned_up = false;
 	itr->stat = stat;
 
 	itr->cache = cache;

@@ -332,7 +332,6 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     const struct tuple *key, const int64_t *vlsn)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
-	itr->base.is_cleaned_up = false;
 	itr->stat = stat;
 
 	assert(key != NULL);
@@ -596,38 +595,38 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Clean up the iterator to free resources and enable its closing.
+ * Free all resources allocated in a worker thread.
  */
 static void
-vy_mem_iterator_clean_up(struct vy_stmt_iterator *vitr)
+vy_mem_iterator_cleanup(struct vy_stmt_iterator *vitr)
 {
-	assert(vitr->iface->clean_up == vy_mem_iterator_clean_up);
+	assert(vitr->iface->cleanup == vy_mem_iterator_cleanup);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
 	itr->last_stmt = NULL;
-	vitr->is_cleaned_up = true;
 }
 
 /**
- * Close the iterator and free resources. Can be called only after
- * clean_up().
+ * Close the iterator and free resources.
+ * Can be called only after cleanup().
  */
 static void
 vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_mem_iterator_close);
-	assert(vitr->is_cleaned_up);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
+	assert(itr->last_stmt == NULL);
 	TRASH(itr);
+	(void) itr;
 }
 
 static const struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
 	.next_key = vy_mem_iterator_next_key,
 	.next_lsn = vy_mem_iterator_next_lsn,
 	.restore = vy_mem_iterator_restore,
-	.close = vy_mem_iterator_close,
-	.clean_up = vy_mem_iterator_clean_up
+	.cleanup = vy_mem_iterator_cleanup,
+	.close = vy_mem_iterator_close
 };
 
 /* }}} vy_mem_iterator API implementation */
