@@ -35,7 +35,6 @@
 #include <string.h>
 #include <pmatomic.h>
 
-#include "say.h"
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
@@ -103,7 +102,7 @@ fiber_call_impl(struct fiber *callee)
 	struct cord *cord = cord();
 
 	/* Ensure we aren't switching to a fiber parked in fiber_loop */
-	assert(callee->f != NULL);
+	assert(callee->f != NULL && callee->fid != 0);
 	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
 	assert(! (callee->flags & FIBER_IS_DEAD));
 	/*
@@ -132,10 +131,11 @@ void
 fiber_call(struct fiber *callee)
 {
 	callee->caller = fiber();
-	callee->caller->flags |= FIBER_IS_READY;
+	assert(! (callee->caller->flags & FIBER_IS_READY));
 	assert(rlist_empty(&callee->state));
 	assert(! (callee->flags & FIBER_IS_READY));
 	callee->flags |= FIBER_IS_READY;
+	callee->caller->flags |= FIBER_IS_READY;
 	fiber_call_impl(callee);
 }
 
@@ -165,6 +165,7 @@ fiber_checkstack()
 void
 fiber_wakeup(struct fiber *f)
 {
+	assert(! (f->flags & FIBER_IS_DEAD));
 	/**
 	 * Do nothing if the fiber is already in cord->ready
 	 * list *or* is in the call chain created by
@@ -177,8 +178,16 @@ fiber_wakeup(struct fiber *f)
 	 * schedule the fiber for execution, and once it is executing
 	 * a wakeup request is considered complete and it must be
 	 * removed.
+	 *
+	 * A dead fiber can be lingering in the cord fiber list
+	 * if it is joinable. This makes it technically possible
+	 * to schedule it. We would never make such a mistake
+	 * in our own code, hence the assert above. But as long
+	 * as fiber.wakeup() is a part of public Lua API, an
+	 * external rock can mess things up. Ignore such attempts
+	 * as well.
 	 */
-	if (f->flags & FIBER_IS_READY)
+	if (f->flags & (FIBER_IS_READY | FIBER_IS_DEAD))
 		return;
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
@@ -440,8 +449,10 @@ fiber_schedule_list(struct rlist *list)
 	while (! rlist_empty(list)) {
 		last->caller = rlist_shift_entry(list, struct fiber, state);
 		last = last->caller;
+		assert(last->flags & FIBER_IS_READY);
 	}
 	last->caller = fiber();
+	assert(fiber() == &cord()->sched);
 	fiber_call_impl(first);
 }
 
@@ -562,6 +573,7 @@ fiber_loop(MAYBE_UNUSED void *data)
 		       struct fiber *f;
 		       f = rlist_shift_entry(&fiber->wake, struct fiber,
 					     state);
+		       assert(f != fiber);
 		       fiber_wakeup(f);
 	        }
 		if (! rlist_empty(&fiber->on_stop))

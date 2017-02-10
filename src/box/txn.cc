@@ -226,8 +226,17 @@ txn_write_to_wal(struct txn *txn)
 	stop = ev_now(loop());
 	if (stop - start > too_long_threshold)
 		say_warn("too long WAL write: %.3f sec", stop - start);
-	if (res < 0)
+	if (res < 0) {
+		/* Cascading rollback. */
+		txn_rollback(); /* Perform our part of cascading rollback. */
+		/*
+		 * Move fiber to end of event loop to avoid
+		 * execution of any new requests before all
+		 * pending rollbacks are processed.
+		 */
+		fiber_reschedule();
 		tnt_raise(LoggedError, ER_WAL_IO);
+	}
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.
 	 */
@@ -305,11 +314,6 @@ txn_rollback()
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
-	/*
-	 * Move fiber to end of event loop to avoid execution of
-	 * any new requests before all pending rollbacks will processed
-	 */
-	fiber_reschedule();
 }
 
 void

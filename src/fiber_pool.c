@@ -58,6 +58,7 @@ restart:
 			f->caller = rlist_shift_entry(&pool->idle,
 						      struct fiber,
 						      state);
+			f->caller->flags |= FIBER_IS_READY;
 			assert(f->caller->caller == &cord->sched);
 		}
 		cmsg_deliver(msg);
