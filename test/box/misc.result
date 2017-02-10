@@ -444,6 +444,9 @@ myinsert = nil
 ---
 ...
 -- A test case for gh-37: print of 64-bit number
+ffi = require('ffi')
+---
+...
 1, 1
 ---
 - 1
@@ -613,18 +616,6 @@ tonumber64('20', 36)
 ---
 - 72
 ...
-tonumber64(20, 36)
----
-- error: 'bad argument #1 to ''?'' (string expected)'
-...
-tonumber64(20, 10)
----
-- 20
-...
-tonumber64(20)
----
-- 20
-...
 tonumber64("", 10)
 ---
 - null
@@ -653,17 +644,111 @@ tonumber64(" -0b11 ")
 ---
 - -3
 ...
-tonumber64(1LL)
+-- numbers/cdata with base = 10 - return as is
+tonumber64(100)
 ---
-- 1
+- 100
+...
+tonumber64(100, 10)
+---
+- 100
 ...
 tonumber64(100LL)
 ---
 - 100
 ...
-tonumber64(100LL, 10)
+tonumber64(100ULL, 10)
 ---
 - 100
+...
+tonumber64(-100LL)
+---
+- -100
+...
+tonumber64(-100LL, 10)
+---
+- -100
+...
+tonumber64(ffi.new('char', 10))
+---
+- 10
+...
+tonumber64(ffi.new('short', 10))
+---
+- 10
+...
+tonumber64(ffi.new('int', 10))
+---
+- 10
+...
+tonumber64(ffi.new('long ', 10))
+---
+- 10
+...
+tonumber64(ffi.new('int8_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('int16_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('int32_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('int64_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('unsigned char', 10))
+---
+- 10
+...
+tonumber64(ffi.new('unsigned short', 10))
+---
+- 10
+...
+tonumber64(ffi.new('unsigned int', 10))
+---
+- 10
+...
+tonumber64(ffi.new('unsigned int', 10))
+---
+- 10
+...
+tonumber64(ffi.new('unsigned long ', 10))
+---
+- 10
+...
+tonumber64(ffi.new('uint8_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('uint16_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('uint32_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('uint64_t', 10))
+---
+- 10
+...
+tonumber64(ffi.new('float', 10))
+---
+- 10
+...
+tonumber64(ffi.new('double', 10))
+---
+- 10
+...
+-- number/cdata with custom `base` - is not supported
+tonumber64(100, 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
 ...
 tonumber64(100LL, 2)
 ---
@@ -677,17 +762,105 @@ tonumber64(100ULL, 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
-tonumber64(32ULL, 5)
+tonumber64(ffi.new('char', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
-tonumber64(32LL, 3)
+tonumber64(ffi.new('short', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
-tonumber64(32ULL, 3)
+tonumber64(ffi.new('int', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('long ', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('int8_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('int16_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('int32_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('int64_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('unsigned char', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('unsigned short', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('unsigned int', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('unsigned int', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('unsigned long ', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('uint8_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('uint16_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('uint32_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('uint64_t', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('float', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+tonumber64(ffi.new('double', 10), 2)
+---
+- error: 'bad argument #1 to ''?'' (string expected)'
+...
+-- invalid types - return nil
+ffi.cdef("struct __tonumber64_test {};")
+---
+...
+tonumber64(ffi.new('struct __tonumber64_test'))
+---
+- null
+...
+tonumber64(nil)
+---
+- null
+...
+tonumber64(function() end)
+---
+- null
+...
+tonumber64({})
+---
+- null
+...
+collectgarbage('collect')
+---
+- 0
 ...
 --  dostring()
 dostring('abc')

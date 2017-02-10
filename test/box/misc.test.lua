@@ -116,6 +116,8 @@ box.space.tweedledum:truncate()
 myinsert = nil
 
 -- A test case for gh-37: print of 64-bit number
+
+ffi = require('ffi')
 1, 1
 tonumber64(1), 1
 
@@ -163,9 +165,6 @@ tonumber64('0xfffff') == 1048575
 tonumber64('0b111111111111111111') == 262143
 
 tonumber64('20', 36)
-tonumber64(20, 36)
-tonumber64(20, 10)
-tonumber64(20)
 
 tonumber64("", 10)
 tonumber64("", 32)
@@ -176,15 +175,66 @@ tonumber64("-0b11")
 tonumber64(" -0x16 ")
 tonumber64(" -0b11 ")
 
-tonumber64(1LL)
+-- numbers/cdata with base = 10 - return as is
+tonumber64(100)
+tonumber64(100, 10)
 tonumber64(100LL)
-tonumber64(100LL, 10)
+tonumber64(100ULL, 10)
+tonumber64(-100LL)
+tonumber64(-100LL, 10)
+tonumber64(ffi.new('char', 10))
+tonumber64(ffi.new('short', 10))
+tonumber64(ffi.new('int', 10))
+tonumber64(ffi.new('long ', 10))
+tonumber64(ffi.new('int8_t', 10))
+tonumber64(ffi.new('int16_t', 10))
+tonumber64(ffi.new('int32_t', 10))
+tonumber64(ffi.new('int64_t', 10))
+tonumber64(ffi.new('unsigned char', 10))
+tonumber64(ffi.new('unsigned short', 10))
+tonumber64(ffi.new('unsigned int', 10))
+tonumber64(ffi.new('unsigned int', 10))
+tonumber64(ffi.new('unsigned long ', 10))
+tonumber64(ffi.new('uint8_t', 10))
+tonumber64(ffi.new('uint16_t', 10))
+tonumber64(ffi.new('uint32_t', 10))
+tonumber64(ffi.new('uint64_t', 10))
+tonumber64(ffi.new('float', 10))
+tonumber64(ffi.new('double', 10))
+
+-- number/cdata with custom `base` - is not supported
+tonumber64(100, 2)
 tonumber64(100LL, 2)
 tonumber64(-100LL, 2)
 tonumber64(100ULL, 2)
-tonumber64(32ULL, 5)
-tonumber64(32LL, 3)
-tonumber64(32ULL, 3)
+tonumber64(ffi.new('char', 10), 2)
+tonumber64(ffi.new('short', 10), 2)
+tonumber64(ffi.new('int', 10), 2)
+tonumber64(ffi.new('long ', 10), 2)
+tonumber64(ffi.new('int8_t', 10), 2)
+tonumber64(ffi.new('int16_t', 10), 2)
+tonumber64(ffi.new('int32_t', 10), 2)
+tonumber64(ffi.new('int64_t', 10), 2)
+tonumber64(ffi.new('unsigned char', 10), 2)
+tonumber64(ffi.new('unsigned short', 10), 2)
+tonumber64(ffi.new('unsigned int', 10), 2)
+tonumber64(ffi.new('unsigned int', 10), 2)
+tonumber64(ffi.new('unsigned long ', 10), 2)
+tonumber64(ffi.new('uint8_t', 10), 2)
+tonumber64(ffi.new('uint16_t', 10), 2)
+tonumber64(ffi.new('uint32_t', 10), 2)
+tonumber64(ffi.new('uint64_t', 10), 2)
+tonumber64(ffi.new('float', 10), 2)
+tonumber64(ffi.new('double', 10), 2)
+
+-- invalid types - return nil
+ffi.cdef("struct __tonumber64_test {};")
+tonumber64(ffi.new('struct __tonumber64_test'))
+tonumber64(nil)
+tonumber64(function() end)
+tonumber64({})
+
+collectgarbage('collect')
 
 --  dostring()
 dostring('abc')
