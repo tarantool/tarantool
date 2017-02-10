@@ -4771,7 +4771,7 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		struct vy_mem *oldest;
 		oldest = rlist_last_entry(&scheduler->dirty_mems,
 					  struct vy_mem, in_dirty);
-		scheduler->mem_min_lsn = oldest->min_lsn;
+		scheduler->mem_min_lsn = oldest->min_lsn - 1;
 	} else {
 		scheduler->mem_min_lsn = INT64_MAX;
 	}
