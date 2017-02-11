@@ -97,6 +97,7 @@ else ()
     set(HAVE_CLOCK_GETTIME ${HAVE_CLOCK_GETTIME_DECL})
 endif ()
 set(CMAKE_REQUIRED_LIBRARIES "")
+check_symbol_exists(__get_cpuid cpuid.h HAVE_CPUID)
 
 # Checks for libev
 include(CheckStructHasMember)

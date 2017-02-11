@@ -31,7 +31,7 @@ macro(libev_build)
         set(ev_compile_flags "${ev_compile_flags} -DEV_USE_INOTIFY")
         set(ev_compile_flags "${ev_compile_flags} -DEV_USE_EVENTFD")
         set(ev_compile_flags "${ev_compile_flags} -DEV_USE_SIGNALFD")
-    elseif (TARGET_OS_FREEBSD OR TARGET_OS_DARWIN)
+    elseif (TARGET_OS_FREEBSD OR TARGET_OS_NETBSD OR TARGET_OS_DARWIN)
         #
         # On FreeBSD build libev loop on top of
         set(ev_compile_flags "${ev_compile_flags} -DEV_USE_KQUEUE")

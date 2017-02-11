@@ -6,16 +6,10 @@ if [ "x$3x" = xDarwinx ]; then
     # _func1
     # _func2
     sed -e 's/#.*//; /^[[:space:]]*$/d; s/^/_/;' $1 > $2
-elif [ "x$3x" = xFreeBSDx ]; then
-    # {
-    #   func1;
-    #   func2;
-    # };
-    sed -e '1 i\'$'\n{' -e '/^\s*$/d;s/$/;/;$s/$/\'$'\n};/' $1 > $2
 else
     # {
     #   func1;
     #   func2;
     # };
-    sed -e '1i{' -e 's/#.*//; /^[[:space:]]*$/d; s/$/;/;$a};' $1 > $2
+    ( echo "{" && sed -e '/^\s*$/d;s/$/;/;' $1 && echo "};" ) > $2
 fi

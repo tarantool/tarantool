@@ -31,19 +31,15 @@
 #cmakedefine TARGET_OS_LINUX 1
 /*  Defined if building for FreeBSD */
 #cmakedefine TARGET_OS_FREEBSD 1
+/*  Defined if building for NetBSD */
+#cmakedefine TARGET_OS_NETBSD 1
 /*  Defined if building for Darwin */
 #cmakedefine TARGET_OS_DARWIN 1
 
-#ifdef TARGET_OS_LINUX
-#define TARANTOOL_LIBEXT "so"
-#endif
-
-#ifdef TARGET_OS_FREEBSD
-#define TARANTOOL_LIBEXT "so"
-#endif
-
 #ifdef TARGET_OS_DARWIN
 #define TARANTOOL_LIBEXT "dylib"
+#else
+#define TARANTOOL_LIBEXT "so"
 #endif
 
 /*

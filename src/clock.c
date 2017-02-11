@@ -49,16 +49,25 @@ clock_monotonic(void)
 double
 clock_process(void)
 {
+#if defined(CLOCK_PROCESS_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
 	return (double) ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+	return (double) clock() / CLOCKS_PER_SEC;
+#endif
 }
+
 double
 clock_thread(void)
 {
+#if defined(CLOCK_THREAD_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
 	return (double) ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+	return (double) clock() / CLOCKS_PER_SEC;
+#endif
 }
 
 uint64_t
@@ -79,14 +88,23 @@ clock_monotonic64(void)
 uint64_t
 clock_process64(void)
 {
+#if defined(CLOCK_PROCESS_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
 	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+#else
+	return (uint64_t) clock() * 1000000000 / CLOCKS_PER_SEC;
+#endif
 }
+
 uint64_t
 clock_thread64(void)
 {
+#if defined(CLOCK_THREAD_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
 	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+#else
+	return (uint64_t) clock() * 1000000000 / CLOCKS_PER_SEC;
+#endif
 }

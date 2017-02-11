@@ -78,6 +78,13 @@ set (core_sources
      path_lock.c
  )
 
+if (TARGET_OS_NETBSD)
+    # A workaround for "undefined reference to `__gcc_personality_v0'"
+    # on x86_64-rumprun-netbsd-gcc
+    set_source_files_properties(util.c PROPERTIES COMPILE_FLAGS
+        -fno-exceptions)
+endif ()
+
 add_library(core STATIC ${core_sources})
 target_link_libraries(core
     salad small pthread

@@ -100,6 +100,7 @@ check_c_compiler_flag("-Wno-dangling-else" CC_HAS_WNO_DANGLING_ELSE)
 check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
 check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
 check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
+check_c_compiler_flag("-Wno-char-subscripts" CC_HAS_WNO_CHAR_SUBSCRIPTS)
 
 #
 # Perform build type specific configuration.
@@ -152,7 +153,8 @@ if (ENABLE_BACKTRACE)
         set (BFD_LIBRARIES ${BFD_LIBRARY} ${IBERTY_LIBRARY} ${ZLIB_LIBRARIES})
         find_package_message(BFD_LIBRARIES "Found libbfd and dependencies"
             ${BFD_LIBRARIES})
-        if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
+        if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD OR
+            TARGET_OS_NETBSD)
             set (BFD_LIBRARIES ${BFD_LIBRARIES} iconv)
         endif()
     endif()
@@ -232,6 +234,10 @@ macro(enable_tnt_compile_flags)
     if (CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_VALUE)
         # False-positive warnings for ({ xx = ...; x; }) macroses
         add_compile_flags("C;CXX" "-Wno-unused-value")
+    endif()
+
+    if (CC_HAS_WNO_CHAR_SUBSCRIPTS)
+        add_compile_flags("C;CXX" "-Wno-char-subscripts")
     endif()
 
     if (CMAKE_COMPILER_IS_GNUCXX)

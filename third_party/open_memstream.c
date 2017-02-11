@@ -35,21 +35,26 @@
 #include <string.h>
 #include <wchar.h>
 
-/* XXX: There is no FPOS_MAX.  This assumes fpos_t is an off_t. */
-#define	FPOS_MAX	OFF_MAX
+#if defined(__NetBSD__)
+typedef off_t funopen_off_t;
+#else
+typedef fpos_t funopen_off_t;
+#endif
+
+#define	FUNOPEN_OFF_MAX __type_max(funopen_off_t)
 
 struct memstream {
 	char **bufp;
 	size_t *sizep;
 	ssize_t len;
-	fpos_t offset;
+	off_t offset;
 };
 
 static int
-memstream_grow(struct memstream *ms, fpos_t newoff)
+memstream_grow(struct memstream *ms, funopen_off_t newoff)
 {
 	char *buf;
-	ssize_t newsize;
+	funopen_off_t newsize;
 
 	if (newoff < 0 || newoff >= SSIZE_MAX)
 		newsize = SSIZE_MAX - 1;
@@ -94,12 +99,12 @@ memstream_write(void *cookie, const char *buf, int len)
 	return (tocopy);
 }
 
-static fpos_t
-memstream_seek(void *cookie, fpos_t pos, int whence)
+static funopen_off_t
+memstream_seek(void *cookie, funopen_off_t pos, int whence)
 {
 	struct memstream *ms;
 #ifdef DEBUG
-	fpos_t old;
+	funopen_off_t old;
 #endif
 
 	ms = cookie;
@@ -123,7 +128,7 @@ memstream_seek(void *cookie, fpos_t pos, int whence)
 				return (-1);
 			}
 		} else {
-			if (FPOS_MAX - ms->len < pos) {
+			if (FUNOPEN_OFF_MAX - ms->len < pos) {
 				errno = EOVERFLOW;
 				return (-1);
 			}

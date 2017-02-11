@@ -36,7 +36,7 @@
 
 #include "cpu_feature.h"
 
-#if defined (__x86_64__) || defined (__i386__)
+#if defined(HAVE_CPUID) && (defined (__x86_64__) || defined (__i386__))
 
 #include <cpuid.h>
 
