@@ -203,9 +203,11 @@ macro(luajit_build)
     endif()
     set (luajit_buildoptions
         BUILDMODE=static
-        CC="${luajit_cc}"
-        CFLAGS="${luajit_cflags}"
-        LDFLAGS="${luajit_ldflags}"
+        HOST_CC="${CMAKE_HOST_C_COMPILER}"
+        TARGET_CC="${luajit_cc}"
+        TARGET_CFLAGS="${luajit_cflags}"
+        TARGET_LDFLAGS="${luajit_ldflags}"
+        TARGET_SYS="${CMAKE_SYSTEM_NAME}"
         CCOPT="${luajit_ccopt}"
         CCDEBUG="${luajit_ccdebug}"
         XCFLAGS="${luajit_xcflags}"
@@ -214,7 +216,7 @@ macro(luajit_build)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) ${luajit_buildoptions} clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} jit/vmdef.lua libluajit.a
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
     else()
@@ -225,7 +227,7 @@ macro(luajit_build)
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/third_party/luajit ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) ${luajit_buildoptions} clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} jit/vmdef.lua libluajit.a
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
     endif()
