@@ -24,7 +24,27 @@ crypto.hmac.sha1('012345678', 'fred')
 key = '012345678'
 message = 'fred'
 
+crypto.hmac.sha1(key, nil)
+crypto.hmac.sha1(nil, message)
+crypto.hmac.sha1(nil, nil)
+
+
+crypto.hmac.md4(key, message)
+crypto.hmac.md5(key, message)
 crypto.hmac.sha1(key, message)
+crypto.hmac.sha224(key, message)
+crypto.hmac.sha256(key, message)
+crypto.hmac.sha384(key, message)
+crypto.hmac.sha512(key, message)
+
+
+--
+-- Incremental update
+--
+hmac_sha1 = crypto.hmac.sha1.new(key)
+hmac_sha1:update('abc')
+hmac_sha1:update('cde')
+hmac_sha1:result() == crypto.hmac.sha1(key, 'abccde')
 
 
 --
@@ -37,6 +57,8 @@ crypto.hmac.sha224(key, '')
 crypto.hmac.sha256(key, '')
 crypto.hmac.sha384(key, '')
 crypto.hmac.sha512(key, '')
+
+
 
 
 test_run:cmd("clear filter")
