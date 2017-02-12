@@ -486,7 +486,7 @@ static ssize_t
 vy_log_flush_f(va_list ap)
 {
 	struct vy_log *log = va_arg(ap, struct vy_log *);
-	bool *need_rollback = va_arg(ap, int *);
+	bool *need_rollback = va_arg(ap, bool *);
 
 	/*
 	 * xlog_tx_rollback() must not be called after
