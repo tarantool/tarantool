@@ -21,6 +21,14 @@ ffi.cdef[[
     int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
     const EVP_MD *EVP_get_digestbyname(const char *name);
 
+    typedef struct {} HMAC_CTX;
+    HMAC_CTX *tnt_HMAC_CTX_new(void);
+    void tnt_HMAC_CTX_free(HMAC_CTX *ctx);
+    int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
+                 const EVP_MD *md, ENGINE *impl);
+    int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len);
+    int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
+
     typedef struct {} EVP_CIPHER_CTX;
     typedef struct {} EVP_CIPHER;
     EVP_CIPHER_CTX *EVP_CIPHER_CTX_new();
@@ -128,6 +136,80 @@ digest_mt = {
     }
 }
 
+local hmacs = digests
+
+local hmac_mt = {}
+
+local function hmac_gc(ctx)
+    ffi.C.tnt_HMAC_CTX_free(ctx)
+end
+
+local function hmac_new(digest, key)
+    if key == nil then
+        return error('Key should be specified for HMAC operations')
+    end
+    local ctx = ffi.C.tnt_HMAC_CTX_new()
+    if ctx == nil then
+        return error('Can\'t create HMAC ctx: ' .. openssl_err_str())
+    end
+    ffi.gc(ctx, hmac_gc)
+    local self = setmetatable({
+        ctx = ctx,
+        digest = digest,
+        buf = buffer.ibuf(64),
+        initialized = false,
+        outl = ffi.new('int[1]')
+    }, hmac_mt)
+    self:init(key)
+    return self
+end
+
+local function hmac_init(self, key)
+    if self.ctx == nil then
+        return error('HMAC context isn\'t usable')
+    end
+    if ffi.C.HMAC_Init_ex(self.ctx, key, key:len(), self.digest, nil) ~= 1 then
+        return error('Can\'t init HMAC: ' .. openssl_err_str())
+    end
+    self.initialized = true
+end
+
+local function hmac_update(self, input)
+    if not self.initialized then
+        return error('HMAC not initialized')
+    end
+    if ffi.C.HMAC_Update(self.ctx, input, input:len()) ~= 1 then
+        return error('Can\'t update HMAC: ' .. openssl_err_str())
+    end
+end
+
+local function hmac_final(self)
+    if not self.initialized then
+        return error('HMAC not initialized')
+    end
+    self.initialized = false
+    if ffi.C.HMAC_Final(self.ctx, self.buf.wpos, self.outl) ~= 1 then
+        return error('Can\'t finalize HMAC: ' .. openssl_err_str())
+    end
+    return ffi.string(self.buf.wpos, self.outl[0])
+end
+
+local function hmac_free(self)
+    ffi.C.tnt_HMAC_CTX_free(self.ctx)
+    ffi.gc(self.ctx, nil)
+    self.ctx = nil
+    self.initialized = false
+end
+
+hmac_mt = {
+    __index = {
+          init = hmac_init,
+          update = hmac_update,
+          result = hmac_final,
+          free = hmac_free
+    }
+}
+
 local ciphers = {}
 for algo, algo_name in pairs({des = 'DES', aes128 = 'AES-128',
     aes192 = 'AES-192', aes256 = 'AES-256'}) do
@@ -224,7 +306,6 @@ local function cipher_free(self)
     self.buf:reset()
 end
 
-
 cipher_mt = {
     __index = {
           init = cipher_init,
@@ -255,6 +336,29 @@ end
 digest_api = setmetatable(digest_api,
     {__index = function(self, digest)
         return error('Digest method "' .. digest .. '" is not supported')
+    end })
+
+local hmac_api = {}
+for class, digest in pairs(hmacs) do
+    hmac_api[class] = setmetatable({
+        new = function (key) return hmac_new(digest, key) end
+    }, {
+        __call = function (self, key, str)
+            if type(str) ~= 'string' then
+                error("Usage: hmac."..class.."(key, string)")
+            end
+            local ctx = hmac_new(digest, key)
+            ctx:update(str)
+            local res = ctx:result()
+            ctx:free()
+            return res
+        end
+    })
+end
+
+hmac_api = setmetatable(hmac_api,
+    {__index = function(self, digest)
+        return error('HMAC method "' .. digest .. '" is not supported')
     end })
 
 local function cipher_mode_error(self, mode)
@@ -295,5 +399,6 @@ cipher_api = setmetatable(cipher_api,
 
 return {
     digest = digest_api,
+    hmac   = hmac_api,
     cipher = cipher_api,
 }

@@ -72,6 +72,8 @@ tnt_EVP_CIPHER_key_length
 tnt_EVP_CIPHER_iv_length
 tnt_EVP_MD_CTX_new
 tnt_EVP_MD_CTX_free
+tnt_HMAC_CTX_new
+tnt_HMAC_CTX_free
 
 # Module API
 

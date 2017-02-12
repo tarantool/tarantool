@@ -46,3 +46,28 @@ void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx)
 	return EVP_MD_CTX_free(ctx);
 #endif
 }
+
+HMAC_CTX *tnt_HMAC_CTX_new(void)
+{
+#if OPENSSL_API_COMPAT < 0x10100000L
+	HMAC_CTX *ctx = (HMAC_CTX *)OPENSSL_malloc(sizeof(HMAC_CTX));
+	if(!ctx){
+		return NULL;
+	}
+	HMAC_CTX_init(ctx);
+	return ctx;
+#else
+	return HMAC_CTX_new();
+#endif
+
+}
+
+void tnt_HMAC_CTX_free(HMAC_CTX *ctx)
+{
+#if OPENSSL_API_COMPAT < 0x10100000L
+	HMAC_cleanup(ctx); /* Remove key from memory */
+	OPENSSL_free(ctx);
+#else
+	HMAC_CTX_free(ctx);
+#endif
+}
