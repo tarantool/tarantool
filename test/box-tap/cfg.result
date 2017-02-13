@@ -1,5 +1,5 @@
 TAP version 13
-1..46
+1..50
 ok - box is not started
 ok - invalid slab_alloc_minimal
 ok - invalid slab_alloc_minimal
@@ -14,6 +14,10 @@ ok - invalid logger
 ok - invalid logger
 ok - box is not started
 ok - exception on unconfigured box
+ok - box.error without box.cfg
+ok - box.runtime without box.cfg
+ok - box.index without box.cfg
+ok - box.session without box.cfg
 ok - vinyl_dir is not auto-created
 ok - configured box
 ok - wal_mode default value

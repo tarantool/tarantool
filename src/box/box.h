@@ -50,15 +50,36 @@ struct xrow_header;
 struct obuf;
 struct ev_io;
 
-/** To be called at program start. */
-void box_load_cfg();
-/** To be called at program end. */
-void box_free(void);
+/*
+ * Initialize box library
+ */
+int
+box_init(void);
 
-/** A pthread_atfork() callback for box */
+/**
+ * Cleanup box library
+ */
 void
-box_atfork();
+box_free(void);
 
+/**
+ * Load configuration for box library.
+ * Panics on error.
+ */
+void
+box_cfg(void);
+
+/**
+ * Return true if box has been configured, i.e. box_cfg() was called.
+ */
+bool
+box_is_configured(void);
+
+/**
+ * A pthread_atfork() callback for box
+ */
+void
+box_atfork(void);
 
 void
 box_set_ro(bool ro);

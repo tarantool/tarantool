@@ -37,12 +37,11 @@
 #include <lualib.h>
 #include <sio.h>
 
+#include "box/box.h"
 #include "box/session.h"
 #include "box/user.h"
 
 static const char *sessionlib_name = "box.session";
-
-extern uint32_t sc_version;
 
 /**
  * Return a unique monotonic session
@@ -107,7 +106,7 @@ lbox_session_user(struct lua_State *L)
 static int
 lbox_session_su(struct lua_State *L)
 {
-	if (sc_version == 0)
+	if (!box_is_configured())
 		luaL_error(L, "Please call box.cfg{} first");
 	int top = lua_gettop(L);
 	if (top < 1)

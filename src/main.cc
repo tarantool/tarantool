@@ -455,7 +455,7 @@ load_cfg()
 
 	title_set_custom(cfg_gets("custom_proc_title"));
 	title_update();
-	box_load_cfg();
+	box_cfg();
 }
 
 void
@@ -621,10 +621,8 @@ main(int argc, char **argv)
 	signal_init();
 	cbus_init();
 
-	user_cache_init();
-	session_init();
-
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+	box_init();
 	box_lua_init(tarantool_L);
 
 	/* main core cleanup routine */

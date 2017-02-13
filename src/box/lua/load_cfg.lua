@@ -248,13 +248,20 @@ local function reload_cfg(oldcfg, cfg)
     end
 end
 
+local box_cfg_guard_whitelist = {
+    error = true;
+    internal = true;
+    index = true;
+    session = true;
+    runtime = true;
+};
+
 local box = require('box')
 -- Move all box members except 'error' to box_configured
 local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v
-    -- box.net.box uses box.error and box.internal
-    if k ~= 'error' and k ~= 'internal' and k ~= 'session' and k ~= 'index' then
+    if not box_cfg_guard_whitelist[k] then
         box[k] = nil
     end
 end
