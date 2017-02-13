@@ -174,21 +174,6 @@ out:
 	return total;
 }
 
-#ifndef HAVE_FMEMOPEN
-FILE *
-fmemopen(void *buf, size_t size, const char *mode)
-{
-	(void) mode;
-	assert(strcmp(mode, "r") == 0);
-
-	FILE *ret = tmpfile();
-	fwrite(buf, 1, size, ret);
-	rewind(ret);
-	return ret;
-}
-#endif /* HAVE_FMEMOPEN */
-
-
 /** Allocate and fill an absolute path to a file. */
 char *
 abspath(const char *filename)

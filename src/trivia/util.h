@@ -348,21 +348,6 @@ void *
 memrchr(const void *s, int c, size_t n);
 #endif /* HAVE_MEMRCHR */
 
-#ifndef HAVE_OPEN_MEMSTREAM
-/* Declare open_memstream(). */
-#include <stdio.h>
-FILE *
-open_memstream(char **ptr, size_t *sizeloc);
-#endif /* HAVE_OPEN_MEMSTREAM */
-
-#ifndef HAVE_FMEMOPEN
-/* Declare open_memstream(). */
-#include <stdio.h>
-FILE *
-fmemopen(void *buf, size_t size, const char *mode);
-#endif /* HAVE_FMEMOPEN */
-
-
 #include <time.h>
 #include <sys/time.h>
 #ifndef HAVE_CLOCK_GETTIME_DECL

@@ -89,16 +89,6 @@
 #endif
 
 /*
- * Defined if this platform has BSD specific funopen()
- */
-#cmakedefine HAVE_FUNOPEN 1
-
-/*
- * Defined if this platform has GNU specific fopencookie()
- */
-#cmakedefine HAVE_FOPENCOOKIE 1
-
-/*
  * Defined if this platform has GNU specific memmem().
  */
 #cmakedefine HAVE_MEMMEM 1
@@ -174,9 +164,6 @@
 #cmakedefine HAVE_MREMAP 1
 
 #cmakedefine HAVE_PRCTL_H 1
-
-#cmakedefine HAVE_OPEN_MEMSTREAM 1
-#cmakedefine HAVE_FMEMOPEN 1
 
 #cmakedefine HAVE_UUIDGEN 1
 #cmakedefine HAVE_CLOCK_GETTIME 1
