@@ -834,6 +834,7 @@ space_truncate(struct space *space)
 		 * collected automatically.
 		 */
 		tuple = key_def_tuple_update_lsn(indexes[i], lsn);
+		TupleRefNil ref(tuple);
 		uint32_t bsize;
 		const char *data = tuple_data_range(tuple, &bsize);
 		if (box_insert(BOX_INDEX_ID, data, data + bsize, NULL))
