@@ -11,6 +11,9 @@ test_run:cmd('switch default')
 ---
 - true
 ...
+fiber = require('fiber')
+---
+...
 box.schema.user.grant('guest', 'replication')
 ---
 ...
@@ -39,14 +42,19 @@ wal_off_id = test_run:eval('wal_off', 'return box.info.server.id')[1]
 box.cfg { replication_source = wal_off_uri }
 ---
 ...
--- Replication does not support wal_mode = 'none'
-box.info.replication[wal_off_id].message
+check = "Replication does not support wal_mode = 'none'"
 ---
-- Replication does not support wal_mode = 'none'
+...
+while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
+---
 ...
 box.info.replication[wal_off_id].status
 ---
 - stopped
+...
+box.info.replication[wal_off_id].message
+---
+- Replication does not support wal_mode = 'none'
 ...
 box.cfg { replication_source = "" }
 ---
@@ -65,14 +73,11 @@ test_run:cmd('switch default')
 box.cfg { replication_source = wal_off_uri }
 ---
 ...
--- Read access is denied
-box.info.replication[wal_off_id].message
+check = "Read access on universe is denied for user 'guest'"
 ---
-- Read access on universe is denied for user 'guest'
 ...
-box.info.replication[wal_off_id].status
+while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
 ---
-- disconnected
 ...
 box.cfg { replication_source = "" }
 ---
