@@ -1,3 +1,4 @@
+fiber = require('fiber')
 env = require('test_run')
 test_run = env.new()
 
@@ -233,3 +234,14 @@ s0.index['primary']:get{2}
 s0.index['primary']:get{3}
 
 s0:drop()
+
+--
+-- gh-2081: snapshot hang
+--
+
+s = box.schema.space.create('tweedledum', {engine='vinyl'})
+i = s:create_index('primary')
+_ = s:insert{1}
+_ = fiber.create(function() fiber.sleep(0.001) s:insert{2} end)
+box.snapshot()
+s:drop()

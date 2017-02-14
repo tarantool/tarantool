@@ -4795,7 +4795,7 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 		struct vy_mem *oldest;
 		oldest = rlist_last_entry(&scheduler->dirty_mems,
 					  struct vy_mem, in_dirty);
-		scheduler->mem_min_lsn = oldest->min_lsn - 1;
+		scheduler->mem_min_lsn = oldest->min_lsn;
 	} else {
 		scheduler->mem_min_lsn = INT64_MAX;
 	}
@@ -4803,7 +4803,7 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	/* Free memory and release quota. */
 	struct lsregion *allocator = &env->allocator;
 	size_t mem_used_before = lsregion_used(allocator);
-	lsregion_gc(allocator, scheduler->mem_min_lsn);
+	lsregion_gc(allocator, scheduler->mem_min_lsn - 1);
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
 	vy_quota_release(&env->quota, mem_used_before - mem_used_after);
