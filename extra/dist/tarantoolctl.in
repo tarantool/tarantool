@@ -32,9 +32,6 @@ The file contains common default instances options:
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
 
-        -- sophia_dir/instance/
-        sophia_dir  =   "/var/lib/tarantool/sophia",
-
         -- logger/instance .. '.log'
         logger      =   "/var/log/tarantool",
 
@@ -265,12 +262,10 @@ local function load_default_file(default_file)
     d.wal_dir    = d.wal_dir     or "/var/lib/tarantool"
     d.snap_dir   = d.snap_dir    or "/var/lib/tarantool"
     d.logger     = d.logger      or "/var/log/tarantool"
-    d.sophia_dir = d.sophia_dir  or "/var/lib/tarantool"
 
     d.pid_file   = fio.pathjoin(d.pid_file,   instance_name .. '.pid')
     d.wal_dir    = fio.pathjoin(d.wal_dir,    instance_name)
     d.snap_dir   = fio.pathjoin(d.snap_dir,   instance_name)
-    d.sophia_dir = fio.pathjoin(d.sophia_dir, instance_name)
     d.logger     = fio.pathjoin(d.logger,     instance_name .. '.log')
 
     default_cfg = d
@@ -362,7 +357,6 @@ local function mk_default_dirs(cfg)
         fio.dirname(cfg.pid_file),
         cfg.wal_dir,
         cfg.snap_dir,
-        cfg.sophia_dir,
     }
     local log_dir = fio.dirname(cfg.logger)
     if log_dir:find('|') == nil then

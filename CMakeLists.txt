@@ -395,13 +395,6 @@ include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
 
-#
-# Sophia
-#
-
-include(BuildSophia)
-sophia_build()
-
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
 # file names are case-insensitive)

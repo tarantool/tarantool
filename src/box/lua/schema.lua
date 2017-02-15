@@ -474,9 +474,6 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
-    if box.space[space_id].engine == 'sophia' then
-        box.error(box.error.SOPHIA, 'alter is not supported for a Sophia index')
-    end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
     end
@@ -878,7 +875,7 @@ function box.schema.space.bless(space)
     end
 
     -- true if reading operations may yield
-    local read_yields = space.engine == 'sophia'
+    local read_yields = false
     local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
     for _, op in ipairs(read_ops) do
         if read_yields then

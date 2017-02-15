@@ -84,14 +84,6 @@ s.index.spatial:select({})
 
 s:drop()
 
-s = box.schema.space.create('sophia', {engine = 'sophia'})
--- rtree indexes are not enabled in sophia
-i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
-i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
--- ... even secondary
-i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
-s:drop()
-
 -- rtree in temp space must work fine
 s = box.schema.space.create('spatial', {temporary = true})
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})

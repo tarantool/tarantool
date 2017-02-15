@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(47)
+test:plan(45)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -45,15 +45,11 @@ local status, result = pcall(testfun)
 test:ok(not status and result:match('Please call box.cfg{}'),
     'exception on unconfigured box')
 
-os.execute("rm -rf sophia")
 box.cfg{
     logger="tarantool.log",
     slab_alloc_arena=0.1,
     wal_mode = "", -- "" means default value
 }
-
--- gh-678: sophia engine creates sophia dir with empty 'snapshot' file
-test:isnil(io.open("sophia", 'r'), 'sophia_dir is not auto-created')
 
 status, result = pcall(testfun)
 test:ok(status and result == 'table', 'configured box')
@@ -145,9 +141,6 @@ test:is(run_script(code), PANIC, 'wal_mode write -> fsync is not supported')
 local code;
 code = [[ box.cfg{ work_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'work_dir is invalid')
-
-code = [[ box.cfg{ sophia_dir='invalid' } ]]
-test:is(run_script(code), PANIC, 'sophia_dir is invalid')
 
 code = [[ box.cfg{ snap_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'snap_dir is invalid')

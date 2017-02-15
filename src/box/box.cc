@@ -46,7 +46,6 @@
 #include "memtx_engine.h"
 #include "memtx_index.h"
 #include "sysview_engine.h"
-#include "sophia_engine.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -986,10 +985,6 @@ engine_init()
 
 	SysviewEngine *sysview = new SysviewEngine();
 	engine_register(sysview);
-
-	SophiaEngine *sophia = new SophiaEngine();
-	sophia->init();
-	engine_register(sophia);
 }
 
 static inline void
@@ -1038,7 +1033,7 @@ box_init(void)
 	struct applier *applier = cluster_applier_first();
 
 	if (recovery_has_data(recovery)) {
-		/* Tell Sophia engine LSN it must recover to. */
+		/* Tell engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);

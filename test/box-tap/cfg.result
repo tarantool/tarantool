@@ -1,5 +1,5 @@
 TAP version 13
-1..47
+1..45
 ok - box is not started
 ok - invalid slab_alloc_minimal
 ok - invalid slab_alloc_minimal
@@ -14,7 +14,6 @@ ok - invalid logger
 ok - invalid logger
 ok - box is not started
 ok - exception on unconfigured box
-ok - sophia_dir is not auto-created
 ok - configured box
 ok - wal_mode default value
 ok - wal_mode default value
@@ -37,7 +36,6 @@ ok - wal_mode fsync -> fsync
 ok - wal_mode fsync -> write is not supported
 ok - wal_mode write -> fsync is not supported
 ok - work_dir is invalid
-ok - sophia_dir is invalid
 ok - snap_dir is invalid
 ok - wal_dir is invalid
 ok - logger_nonblock default value

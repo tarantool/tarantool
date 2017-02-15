@@ -1,7 +1,5 @@
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
-include_directories(${SOPHIA_INCLUDE_DIRS})
-
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
@@ -42,8 +40,6 @@ add_library(box STATIC
     memtx_engine.cc
     sysview_engine.cc
     sysview_index.cc
-    sophia_engine.cc
-    sophia_index.cc
     space.cc
     func.cc
     alter.cc
@@ -73,11 +69,9 @@ add_library(box STATIC
     lua/misc.cc
     lua/info.c
     lua/stat.c
-    lua/sophia.c
     lua/error.cc
     lua/session.c
     lua/net_box.c
     ${bin_sources})
 
 add_dependencies(box build_bundled_libs)
-target_link_libraries(box ${SOPHIA_LIBRARIES})
