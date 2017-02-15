@@ -187,3 +187,74 @@ gen()
 check() -- exploded before #1829
 
 space:drop()
+
+
+-- test upsert statistic against some upsert scenarous
+
+test_run:cmd("setopt delimiter ';'")
+function upsert_stat_diff(stat2, stat1)
+    return {
+        tx = stat2.upsert_optimized_tx.total - stat1.upsert_optimized_tx.total,
+        commit = stat2.upsert_optimized_commit.total - stat1.upsert_optimized_commit.total,
+        chains = stat2.upsert_chains_optimized.total - stat1.upsert_chains_optimized.total,
+        applied = stat2.upsert_applied.total - stat1.upsert_applied.total
+    }
+end;
+test_run:cmd("setopt delimiter ''");
+
+stat1 = box.info.vinyl().performance
+
+space = box.schema.space.create('test', { engine = 'vinyl' })
+index = space:create_index('primary')
+
+-- separate upserts w/o on disk data
+space:upsert({1, 1, 1}, {{'+', 2, 10}})
+space:upsert({1, 1, 1}, {{'-', 2, 20}})
+space:upsert({1, 1, 1}, {{'=', 2, 20}})
+
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+-- in-tx upserts
+box.begin()
+space:upsert({2, 1, 1}, {{'+', 2, 10}})
+space:upsert({2, 1, 1}, {{'-', 2, 20}})
+space:upsert({2, 1, 1}, {{'=', 2, 20}})
+box.commit()
+
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+box.snapshot()
+
+-- upsert with on disk data
+space:upsert({1, 1, 1}, {{'+', 2, 10}})
+space:upsert({1, 1, 1}, {{'-', 2, 20}})
+
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+-- count of applied apserts
+space:get({1})
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+space:get({2})
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+space:select({})
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1)
+stat1 = stat2
+
+-- start upsert optimizer
+for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
+stat2 = box.info.vinyl().performance
+upsert_stat_diff(stat2, stat1).upsert_chain_optimized
+stat1 = stat2

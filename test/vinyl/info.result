@@ -135,6 +135,18 @@ box_info_sort(box.info.vinyl())
     - tx_write:
       - rps: <rps>
       - total: <total>
+    - upsert_applied:
+      - rps: <rps>
+      - total: <total>
+    - upsert_chains_optimized:
+      - rps: <rps>
+      - total: <total>
+    - upsert_optimized_commit:
+      - rps: <rps>
+      - total: <total>
+    - upsert_optimized_tx:
+      - rps: <rps>
+      - total: <total>
     - write_count: <count>
   - vinyl:
     - build: <build>
