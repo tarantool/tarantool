@@ -10,7 +10,8 @@ include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 add_executable(rlist.test rlist.c unit.c)
 add_executable(stailq.test stailq.c unit.c)
-add_executable(uri.test uri.c unit.c ${CMAKE_SOURCE_DIR}/src/uri.c)
+add_executable(uri.test uri.c unit.c)
+target_link_libraries(uri.test uri)
 add_executable(fiob.test unit.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)
@@ -28,7 +29,8 @@ add_executable(bitset_iterator.test bitset_iterator.c)
 target_link_libraries(bitset_iterator.test bitset)
 add_executable(bitset_index.test bitset_index.c)
 target_link_libraries(bitset_index.test bitset)
-add_executable(base64.test base64.c ${CMAKE_SOURCE_DIR}/third_party/base64.c)
+add_executable(base64.test base64.c)
+target_link_libraries(base64.test misc)
 
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)
@@ -73,10 +75,9 @@ add_executable(coio.test coio.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/evio.cc
         ${CMAKE_SOURCE_DIR}/src/coio.cc
         ${CMAKE_SOURCE_DIR}/src/coeio.c
-        ${CMAKE_SOURCE_DIR}/src/uri.c
         ${CMAKE_SOURCE_DIR}/src/fio.c
         ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
-target_link_libraries(coio.test core eio bit)
+target_link_libraries(coio.test core eio bit uri)
 
 if (ENABLE_BUNDLED_MSGPUCK)
     set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
@@ -94,9 +95,8 @@ endif ()
 
 add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/src/scramble.c
-    ${CMAKE_SOURCE_DIR}/third_party/sha1.c
-    ${CMAKE_SOURCE_DIR}/third_party/base64.c
     ${CMAKE_SOURCE_DIR}/src/random.c)
+    target_link_libraries(scramble.test misc)
 
 add_executable(guava.test guava.c)
 target_link_libraries(guava.test salad small)

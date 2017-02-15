@@ -595,6 +595,7 @@ SophiaEngine::prepare(struct txn *txn)
 	switch (rc) {
 	case 1: /* rollback */
 		txn->engine_tx = NULL;
+		break;
 	case 2: /* lock */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;

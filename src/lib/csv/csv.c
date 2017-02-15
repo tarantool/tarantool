@@ -103,10 +103,13 @@ csv_setopt(struct csv *csv, int opt, ...)
 		break;
 	case CSV_OPT_EMIT_FIELD:
 		csv->emit_field = va_arg(args, csv_emit_field_t);
+		break;
 	case CSV_OPT_EMIT_ROW:
 		csv->emit_row = va_arg(args, csv_emit_row_t);
+		break;
 	case CSV_OPT_EMIT_CTX:
 		csv->emit_ctx = va_arg(args, void*);
+		break;
 	}
 	va_end(args);
 }
