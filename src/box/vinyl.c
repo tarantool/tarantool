@@ -9620,27 +9620,13 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 }
 
 static void
-vy_read_iterator_add_mem(struct vy_read_iterator *itr)
+vy_read_iterator_add_mem_range(struct vy_read_iterator *itr,
+			       struct vy_range *range)
 {
-	struct vy_range *range = itr->curr_range;
+	struct vy_iterator_stat *stat = &itr->index->env->stat->mem_stat;
 	struct vy_merge_src *sub_src;
 
-	assert(range != NULL);
-	assert(range->shadow == NULL);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->mem_stat;
-	/*
-	 * The range may be in the middle of split, in which case we
-	 * must add active in-memory indexes of new ranges first.
-	 */
-	struct vy_range *r;
-	rlist_foreach_entry(r, &range->split_list, split_list) {
-		assert(rlist_empty(&r->frozen));
-		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
-						true, true);
-		vy_mem_iterator_open(&sub_src->mem_iterator, stat , r->mem,
-				     itr->iterator_type, itr->key, itr->vlsn);
-	}
-	/* Add the active in-memory index of the current range. */
+	/* Add the active in-memory index. */
 	if (range->mem != NULL) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
@@ -9655,6 +9641,25 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , mem,
 				     itr->iterator_type, itr->key, itr->vlsn);
 	}
+}
+
+static void
+vy_read_iterator_add_mem(struct vy_read_iterator *itr)
+{
+	struct vy_range *range = itr->curr_range;
+
+	assert(range != NULL);
+	assert(range->shadow == NULL);
+
+	/*
+	 * The range may be in the middle of split, in which case we
+	 * must add in-memory indexes of new ranges first.
+	 */
+	struct vy_range *r;
+	rlist_foreach_entry(r, &range->split_list, split_list)
+		vy_read_iterator_add_mem_range(itr, r);
+
+	vy_read_iterator_add_mem_range(itr, range);
 }
 
 static void
