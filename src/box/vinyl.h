@@ -82,7 +82,10 @@ int
 vy_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 int
-vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);
+vy_wait_checkpoint(struct vy_env *env);
+
+void
+vy_end_checkpoint(struct vy_env *env);
 
 /*
  * Introspection

@@ -2925,10 +2925,13 @@ vy_range_delete(struct vy_range *range)
 /**
  * Create a write iterator for a range.
  *
- * We always dump all frozen in-memory indexes, but skip
- * the active one in order not to conflict with concurrent
- * insertions. The caller is supposed to freeze the active
- * mem for it to be dumped.
+ * We only dump frozen in-memory indexes and skip the active
+ * one in order not to conflict with concurrent insertions.
+ * The caller is supposed to freeze the active mem for it to
+ * be dumped.
+ *
+ * @dump_lsn is the maximal LSN to dump. Only in-memory trees
+ * with @min_lsn <= @dump_lsn are addded to the write iterator.
  *
  * @run_count determines how many runs are added to the write
  * iterator. Set to @range->run_count for major compaction,
@@ -2941,7 +2944,8 @@ vy_range_delete(struct vy_range *range)
  */
 static struct vy_write_iterator *
 vy_range_get_write_iterator(struct vy_range *range, int run_count,
-			    int64_t vlsn, size_t *p_max_output_count)
+			    int64_t vlsn, int64_t dump_lsn,
+			    size_t *p_max_output_count)
 {
 	struct vy_write_iterator *wi;
 	struct vy_run *run;
@@ -2957,6 +2961,8 @@ vy_range_get_write_iterator(struct vy_range *range, int run_count,
 	 * sources to be added first so mems are added before runs.
 	 */
 	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+		if (mem->min_lsn > dump_lsn)
+			continue;
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += mem->tree.size;
@@ -3674,13 +3680,16 @@ vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
  * @param region_stmt NULL or the same statement as stmt,
  *                    but allocated on lsregion.
  * @param status Vinyl engine status.
+ * @param checkpoint_lsn snapshot signature if snapshot is
+ *                       in progress, otherwise -1.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static int
 vy_tx_write(struct vy_index *index, struct tuple *stmt,
-	    const struct tuple **region_stmt, enum vy_status status)
+	    const struct tuple **region_stmt, enum vy_status status,
+	    int64_t checkpoint_lsn)
 {
 	assert(!vy_stmt_is_region_allocated(stmt));
 	assert(*region_stmt == NULL ||
@@ -3701,11 +3710,20 @@ vy_tx_write(struct vy_index *index, struct tuple *stmt,
 	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 					  index->key_def, stmt);
 	/*
-	 * To avoid mixing statements of different formats in
-	 * the same in-memory tree, allocate a new tree on schema
-	 * version mismatch.
+	 * Allocate a new in-memory tree if either of the following
+	 * conditions is true:
+	 *
+	 * - Snapshot is in progress and the active in-memory tree
+	 *   contains statements inserted before the snapshot started.
+	 *   In this case we need to dump the tree as is in order to
+	 *   guarantee snapshot consistency.
+	 *
+	 * - Schema version has increased after the tree was created.
+	 *   We have to seal the tree, because we don't support mixing
+	 *   statements of different formats in the same tree.
 	 */
-	if (unlikely(range->mem->sc_version != sc_version)) {
+	if (unlikely(range->mem->min_lsn <= checkpoint_lsn ||
+		     range->mem->sc_version != sc_version)) {
 		if (vy_range_rotate_mem(range) != 0)
 			return -1;
 	}
@@ -3915,9 +3933,14 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	 */
 }
 
+/**
+ * Create a task to dump a range. @dump_lsn is the max LSN to dump:
+ * on success the task is supposed to dump all in-memory trees with
+ * @min_lsn <= @dump_lsn.
+ */
 static int
 vy_task_dump_new(struct mempool *pool, struct vy_range *range,
-		 struct vy_task **p_task)
+		 int64_t dump_lsn, struct vy_task **p_task)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
@@ -3948,13 +3971,13 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, 0, tx_manager_vlsn(xm),
-					 &task->max_output_count);
+					 dump_lsn, &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
 
 	task->range = range;
 	task->wi = wi;
-	task->dump_lsn = xm->lsn;
+	task->dump_lsn = MIN(xm->lsn, dump_lsn);
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_range(scheduler, range);
@@ -4173,7 +4196,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, range->run_count,
-					 tx_manager_vlsn(xm),
+					 tx_manager_vlsn(xm), INT64_MAX,
 					 &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
@@ -4375,7 +4398,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, range->compact_priority,
-					 tx_manager_vlsn(xm),
+					 tx_manager_vlsn(xm), INT64_MAX,
 					 &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
@@ -4507,8 +4530,9 @@ struct vy_scheduler {
 	/** Min LSN over all in-memory indexes. */
 	int64_t mem_min_lsn;
 	/**
-	 * LSN at the time of checkpoint start. All in-memory indexes with
-	 * min_lsn <= checkpoint_lsn should be dumped first.
+	 * Snapshot signature if snapshot is in progress, otherwise -1.
+	 * All in-memory indexes with min_lsn <= checkpoint_lsn must be
+	 * dumped first.
 	 */
 	int64_t checkpoint_lsn;
 	/** Signaled on checkpoint completion or failure. */
@@ -4572,6 +4596,7 @@ vy_scheduler_new(struct vy_env *env)
 	diag_create(&scheduler->diag);
 	rlist_create(&scheduler->dirty_mems);
 	scheduler->mem_min_lsn = INT64_MAX;
+	scheduler->checkpoint_lsn = -1;
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
@@ -4667,10 +4692,22 @@ retry:
 	if (pn == NULL)
 		return 0; /* nothing to do */
 	struct vy_range *range = container_of(pn, struct vy_range, in_dump);
-	if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
-	    range->min_lsn > scheduler->checkpoint_lsn)
-		return 0; /* nothing to do */
-	if (vy_task_dump_new(&scheduler->task_pool, range, ptask) != 0)
+	int64_t dump_lsn = INT64_MAX;
+	if (scheduler->checkpoint_lsn != -1) {
+		/*
+		 * Snapshot is in progress. To make a consistent
+		 * snapshot, we only dump statements inserted before
+		 * the WAL checkpoint.
+		 */
+		dump_lsn = scheduler->checkpoint_lsn;
+		if (range->min_lsn > dump_lsn)
+			return 0;
+	} else {
+		if (!vy_quota_is_exceeded(&scheduler->env->quota))
+			return 0; /* nothing to do */
+	}
+	if (vy_task_dump_new(&scheduler->task_pool,
+			     range, dump_lsn, ptask) != 0)
 		return -1;
 	if (*ptask == NULL)
 		goto retry; /* index dropped */
@@ -4695,6 +4732,9 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 {
 retry:
 	*ptask = NULL;
+	/* Do not schedule compaction until snapshot is complete. */
+	if (scheduler->checkpoint_lsn != -1)
+		return 0;
 	struct heap_node *pn = vy_compact_heap_top(&scheduler->compact_heap);
 	if (pn == NULL)
 		return 0; /* nothing to do */
@@ -5051,6 +5091,7 @@ vy_checkpoint(struct vy_env *env, struct vclock *vclock)
 	struct vy_scheduler *scheduler = env->scheduler;
 
 	assert(env->status == VINYL_ONLINE);
+	assert(scheduler->checkpoint_lsn == -1);
 
 	scheduler->checkpoint_lsn = vclock_sum(vclock);
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn)
@@ -5074,11 +5115,15 @@ vy_checkpoint(struct vy_env *env, struct vclock *vclock)
 	return 0;
 }
 
+/*
+ * Wait for checkpoint. Please call vy_end_checkpoint() after that.
+ */
 int
-vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+vy_wait_checkpoint(struct vy_env *env)
 {
-	(void)vclock;
 	struct vy_scheduler *scheduler = env->scheduler;
+
+	assert(scheduler->checkpoint_lsn != -1);
 
 	while (!scheduler->is_throttled &&
 	       scheduler->mem_min_lsn <= scheduler->checkpoint_lsn)
@@ -5096,6 +5141,23 @@ error:
 	say_error("vinyl checkpoint error: %s",
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
+}
+
+/*
+ * End checkpoint. Called on both checkpoint commit and abort.
+ */
+void
+vy_end_checkpoint(struct vy_env *env)
+{
+	struct vy_scheduler *scheduler = env->scheduler;
+
+	/*
+	 * Checkpoint blocks certain operations (e.g. compaction),
+	 * so wake up the scheduler after we are done so that it
+	 * can catch up.
+	 */
+	scheduler->checkpoint_lsn = -1;
+	ipc_cond_signal(&scheduler->scheduler_cond);
 }
 
 /* Scheduler }}} */
@@ -6980,6 +7042,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	uint64_t write_count = 0;
 	const struct tuple *delete = NULL, *replace = NULL;
 	enum vy_status status = e->status;
+	int64_t checkpoint_lsn = e->scheduler->checkpoint_lsn;
 	uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/*
@@ -7007,7 +7070,8 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		 */
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &replace;
-		if (vy_tx_write(index, stmt, region_stmt, status) != 0)
+		if (vy_tx_write(index, stmt, region_stmt,
+				status, checkpoint_lsn) != 0)
 			return -1;
 		write_count++;
 	}
