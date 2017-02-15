@@ -525,8 +525,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- squashed: 1
-  applied: 1
+- squashed: 3
+  applied: 3
 ...
 stat1 = stat2
 ---
@@ -552,8 +552,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- squashed: 2
-  applied: 2
+- squashed: 3
+  applied: 3
 ...
 stat1 = stat2
 ---
@@ -634,9 +634,10 @@ for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
 stat2 = box.info.vinyl().performance
 ---
 ...
-upsert_stat_diff(stat2, stat1).upsert_chain_optimized
+upsert_stat_diff(stat2, stat1)
 ---
-- null
+- squashed: 872
+  applied: 1000
 ...
 stat1 = stat2
 ---

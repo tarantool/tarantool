@@ -61,8 +61,8 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 struct vy_mem *
-vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
-	   const int64_t *allocator_lsn, struct tuple_format *format,
+vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
+	   struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format)
 {

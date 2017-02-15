@@ -63,7 +63,7 @@ space:insert({4, 4})
 ...
 box.info.vinyl().memory.used
 ---
-- 196764
+- 98460
 ...
 box.snapshot()
 ---

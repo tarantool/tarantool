@@ -163,9 +163,9 @@ struct vy_mem {
 /**
  * Instantiate a new in-memory level.
  *
- * @param key_def key definition.
  * @param allocator lsregion allocator to use for BPS tree extents
  * @param allocator_lsn a pointer to the latest LSN for lsregion.
+ * @param key_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
@@ -174,24 +174,10 @@ struct vy_mem {
  * @retval NULL on error, check diag.
  */
 struct vy_mem *
-vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
-	   const int64_t *allocator_lsn, struct tuple_format *format,
+vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
+	   struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format);
-
-/**
- * Update formats of vy_mem tuples, if vy_mem still is empty.
- * @param mem Memory index to update formats.
- * @param new_format New format for REPLACE and DELETE tuples,
- *        without column mask.
- * @param new_format_with_colmask New format for tuples with
- *        column mask.
- * @param new_upsert_format New format for UPSERT tuples.
- */
-void
-vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
-		      struct tuple_format *new_format_with_colmask,
-		      struct tuple_format *new_upsert_format);
 
 /**
  * Delete in-memory level.
