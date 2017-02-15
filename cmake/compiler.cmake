@@ -101,6 +101,8 @@ check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPAR
 check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
 check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
 check_c_compiler_flag("-Wno-char-subscripts" CC_HAS_WNO_CHAR_SUBSCRIPTS)
+check_c_compiler_flag("-Wno-format-truncation" CC_HAS_WNO_FORMAT_TRUNCATION)
+check_c_compiler_flag("-Wno-implicit-fallthrough" CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
 
 #
 # Perform build type specific configuration.
@@ -238,6 +240,10 @@ macro(enable_tnt_compile_flags)
 
     if (CC_HAS_WNO_CHAR_SUBSCRIPTS)
         add_compile_flags("C;CXX" "-Wno-char-subscripts")
+    endif()
+
+    if (CC_HAS_WNO_FORMAT_TRUNCATION)
+        add_compile_flags("C;CXX" "-Wno-format-truncation")
     endif()
 
     if (CMAKE_COMPILER_IS_GNUCXX)
