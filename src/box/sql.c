@@ -158,7 +158,8 @@ static enum iterator_type normalize_iter_type(BtCursor *pCur)
 	} else if (t == ITER_LE || t == ITER_LT || t == ITER_REQ) {
 		return ITER_LE;
 	} else {
-		assert(("Unexpected iterator type", 0));
+	  /*   "Unexpected iterator type" */
+		assert(0);
 	}
 }
 #endif
@@ -239,7 +240,8 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 
 	switch (pIdxKey->opcode) {
 	default:
-		assert(("Unexpected opcode", 0));
+	  /*  "Unexpected opcode" */
+		assert(0);
 	case OP_SeekLT:
 		iter_type = ITER_LT;
 		res_success = -1; /* item<key */

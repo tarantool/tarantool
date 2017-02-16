@@ -1525,7 +1525,14 @@ void sqlite3GenerateConstraintChecks(
         VdbeComment((v, "%s", iField<0 ? "rowid" : pTab->aCol[iField].zName));
       }
     }
-    sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx, pIdx->nColumn, aRegIdx[ix]);
+
+    if( !HasRowid(pTab) && IsPrimaryKeyIndex(pIdx)){
+      sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1, pTab->nCol, aRegIdx[ix]);
+    } else {
+      /* kyukhin: for Tarantool, this should be evaluated to NOP.  */
+      sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx, pIdx->nColumn, aRegIdx[ix]);
+    }
+
     VdbeComment((v, "for %s", pIdx->zName));
 
     /* In an UPDATE operation, if this index is the PRIMARY KEY index 
@@ -1706,16 +1713,22 @@ void sqlite3CompleteInsertion(
       sqlite3VdbeAddOp2(v, OP_IsNull, aRegIdx[i], sqlite3VdbeCurrentAddr(v)+2);
       VdbeCoverage(v);
     }
-    sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur+i, aRegIdx[i],
-                         aRegIdx[i]+1,
-                         pIdx->uniqNotNull ? pIdx->nKeyCol: pIdx->nColumn);
     pik_flags = 0;
     if( useSeekResult ) pik_flags = OPFLAG_USESEEKRESULT;
     if( IsPrimaryKeyIndex(pIdx) && !HasRowid(pTab) ){
       assert( pParse->nested==0 );
       pik_flags |= OPFLAG_NCHANGE;
+      sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur+i, aRegIdx[i],
+			   aRegIdx[i]+1,
+			   pIdx->uniqNotNull ? pIdx->nKeyCol: pIdx->nColumn);
+      sqlite3VdbeChangeP5(v, pik_flags);
+    } else {
+      /* kyukhin: do not update indices for Tarantool. This is done automatically.  */
+      /*
+      sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur+i, aRegIdx[i],
+			   aRegIdx[i]+1,
+			   pIdx->uniqNotNull ? pIdx->nKeyCol: pIdx->nColumn); */
     }
-    sqlite3VdbeChangeP5(v, pik_flags);
   }
   if( !HasRowid(pTab) ) return;
   regData = regNewData + 1;
