@@ -8456,10 +8456,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
 	itr->curr_txv = NULL;
-	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
 	struct key_def *key_def = itr->index->key_def;
 	if (tuple_field_count(itr->key) > 0) {
+		struct write_set_key key = { itr->index, itr->key };
 		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->iterator_type == ITER_GE ||
@@ -8490,11 +8490,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
 	} else if (itr->iterator_type == ITER_LE) {
-		key.index = (struct vy_index *)((uintptr_t)key.index + 1);
-		txv = write_set_psearch(&itr->tx->write_set, &key);
+		txv = write_set_last(&itr->tx->write_set);
 	} else {
 		assert(itr->iterator_type == ITER_GE);
-		txv = write_set_nsearch(&itr->tx->write_set, &key);
+		txv = write_set_first(&itr->tx->write_set);
 	}
 	if (txv == NULL || txv->index != itr->index)
 		return;

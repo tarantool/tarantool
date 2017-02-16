@@ -1804,3 +1804,84 @@ box.commit()
 space:drop()
 ---
 ...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = space:create_index('primary', { parts = { 1, 'uint', 2, 'uint' } })
+---
+...
+box.begin()
+---
+...
+space:replace({1, 1})
+---
+- [1, 1]
+...
+space:replace({2, 2})
+---
+- [2, 2]
+...
+space:select({1, 1}, {iterator = 'GT'})
+---
+- - [2, 2]
+...
+space:select({1, 1}, {iterator = 'GE'})
+---
+- - [1, 1]
+  - [2, 2]
+...
+space:select({}, {iterator = 'GE'})
+---
+- - [1, 1]
+  - [2, 2]
+...
+space:select({})
+---
+- - [1, 1]
+  - [2, 2]
+...
+space:select({}, {iterator = 'LE'})
+---
+- - [2, 2]
+  - [1, 1]
+...
+space:select({1}, {iterator = 'GT'})
+---
+- - [2, 2]
+...
+space:select({1}, {iterator = 'GE'})
+---
+- - [1, 1]
+  - [2, 2]
+...
+space:select({1}, {iterator = 'LT'})
+---
+- []
+...
+space:select({1}, {iterator = 'LE'})
+---
+- - [1, 1]
+...
+space:select({2}, {iterator = 'GT'})
+---
+- []
+...
+space:select({2}, {iterator = 'GE'})
+---
+- - [2, 2]
+...
+space:select({2}, {iterator = 'LT'})
+---
+- - [1, 1]
+...
+space:select({2}, {iterator = 'LE'})
+---
+- - [2, 2]
+  - [1, 1]
+...
+box.commit()
+---
+...
+space:drop()
+---
+...
