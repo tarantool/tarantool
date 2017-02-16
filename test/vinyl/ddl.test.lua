@@ -1,3 +1,5 @@
+fiber = require('fiber')
+
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index1 = space:create_index('primary')
@@ -57,6 +59,7 @@ space:insert({1, 2})
 box.snapshot()
 space:delete({1})
 box.snapshot()
+old_dumped = box.info.vinyl().performance.dumped_statements
 
 -- must fail because vy_runs have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
@@ -65,6 +68,8 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 -- the space is now empty and can be altered.
 space:delete({1})
 box.snapshot()
+-- Wait until the dump is finished.
+while box.info.vinyl().performance.dumped_statements - old_dumped ~= 1 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 
 space:drop()
