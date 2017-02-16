@@ -82,7 +82,7 @@ enum vy_log_type {
 	 */
 	VY_LOG_DELETE_RANGE		= 3,
 	/**
-	 * Insert a new run into a range.
+	 * Insert a run into a range.
 	 * Requires vy_log_record::range_id, run_id.
 	 */
 	VY_LOG_INSERT_RUN		= 4,

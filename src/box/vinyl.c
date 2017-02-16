@@ -3199,9 +3199,9 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 			    result->begin, result->end);
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_run *run;
-		vy_log_delete_range(log, it->id);
 		rlist_foreach_entry(run, &it->runs, in_range)
 			vy_log_insert_run(log, result->id, run->id);
+		vy_log_delete_range(log, it->id);
 	}
 	if (vy_log_tx_commit(log) < 0)
 		goto fail_commit;

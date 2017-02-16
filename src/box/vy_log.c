@@ -1070,19 +1070,14 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 
 /**
  * Handle a VY_LOG_INSERT_RUN log record.
- * This function allocates a new run with ID @run_id, inserts it
- * to the hash, and adds it to the list of runs of the range with
- * ID @range_id.
- * Return 0 on success, -1 on failure (ID collision or OOM).
+ * Insert the run with ID @run_id to the range with ID @range_id.
+ * If the run does not exist, it will be created.
+ * Return 0 on success, -1 if range not found or OOM.
  */
 static int
 vy_recovery_insert_run(struct vy_recovery *recovery,
 		       int64_t range_id, int64_t run_id)
 {
-	if (vy_recovery_lookup_run(recovery, run_id) != NULL) {
-		diag_set(ClientError, ER_VINYL, "duplicate run id");
-		return -1;
-	}
 	struct vy_range_recovery_info *range;
 	range = vy_recovery_lookup_range(recovery, range_id);
 	if (range == NULL) {
@@ -1090,10 +1085,13 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 		return -1;
 	}
 	struct vy_run_recovery_info *run;
-	run = vy_recovery_create_run(recovery, run_id);
-	if (run == NULL)
-		return -1;
-	rlist_add_entry(&range->runs, run, in_range);
+	run = vy_recovery_lookup_run(recovery, run_id);
+	if (run == NULL) {
+		run = vy_recovery_create_run(recovery, run_id);
+		if (run == NULL)
+			return -1;
+	}
+	rlist_move_entry(&range->runs, run, in_range);
 	return 0;
 }
 
