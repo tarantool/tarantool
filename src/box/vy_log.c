@@ -168,6 +168,8 @@ struct vy_range_recovery_info {
 	char *begin;
 	/** End of the range, stored in MsgPack array. */
 	char *end;
+	/** True if the range was deleted. */
+	bool is_deleted;
 	/**
 	 * List of all runs in the range, linked by
 	 * vy_run_recovery_info::in_range.
@@ -183,6 +185,8 @@ struct vy_run_recovery_info {
 	struct rlist in_range;
 	/** ID of the run. */
 	int64_t id;
+	/** True if the run was deleted. */
+	bool is_deleted;
 };
 
 static struct vy_recovery *
@@ -1062,6 +1066,7 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 	}
 	assert(old_node == NULL);
 	run->id = run_id;
+	run->is_deleted = false;
 	rlist_create(&run->in_range);
 	if (recovery->run_id_max < run_id)
 		recovery->run_id_max = run_id;
@@ -1070,9 +1075,10 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 
 /**
  * Handle a VY_LOG_INSERT_RUN log record.
- * Insert the run with ID @run_id to the range with ID @range_id.
- * If the run does not exist, it will be created.
- * Return 0 on success, -1 if range not found or OOM.
+ * This function inserts the run with ID @run_id to the range with
+ * ID @range_id. If the run does not exist, it will be created.
+ * Return 0 on success, -1 if range not found, run or range is
+ * deleted, or OOM.
  */
 static int
 vy_recovery_insert_run(struct vy_recovery *recovery,
@@ -1084,8 +1090,16 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 		diag_set(ClientError, ER_VINYL, "unknown range id");
 		return -1;
 	}
+	if (range->is_deleted) {
+		diag_set(ClientError, ER_VINYL, "range is deleted");
+		return -1;
+	}
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
+	if (run != NULL && run->is_deleted) {
+		diag_set(ClientError, ER_VINYL, "run is deleted");
+		return -1;
+	}
 	if (run == NULL) {
 		run = vy_recovery_create_run(recovery, run_id);
 		if (run == NULL)
@@ -1097,23 +1111,23 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 
 /**
  * Handle a VY_LOG_DELETE_RUN log record.
- * This function deletes the run with ID @run_id from the hash
- * and from the range's list and frees it.
- * Return 0 on success, -1 if ID not found.
+ * This function marks the run with ID @run_id as deleted.
+ * Return 0 on success, -1 if run not found or already deleted.
  */
 static int
 vy_recovery_delete_run(struct vy_recovery *recovery, int64_t run_id)
 {
-	struct mh_i64ptr_t *h = recovery->run_hash;
-	mh_int_t k = mh_i64ptr_find(h, run_id, NULL);
-	if (k == mh_end(h)) {
+	struct vy_run_recovery_info *run;
+	run = vy_recovery_lookup_run(recovery, run_id);
+	if (run == NULL) {
 		diag_set(ClientError, ER_VINYL, "unknown run id");
 		return -1;
 	}
-	struct vy_run_recovery_info *run = mh_i64ptr_node(h, k)->val;
-	mh_i64ptr_del(h, k, NULL);
-	rlist_del_entry(run, in_range);
-	free(run);
+	if (run->is_deleted) {
+		diag_set(ClientError, ER_VINYL, "run is already deleted");
+		return -1;
+	}
+	run->is_deleted = true;
 	return 0;
 }
 
@@ -1169,6 +1183,7 @@ vy_recovery_insert_range(struct vy_recovery *recovery,
 	memcpy(range->begin, begin, begin_size);
 	range->end = (void *)range + sizeof(*range) + begin_size;
 	memcpy(range->end, end, end_size);
+	range->is_deleted = false;
 	rlist_create(&range->runs);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->range_id_max < range_id)
@@ -1178,29 +1193,23 @@ vy_recovery_insert_range(struct vy_recovery *recovery,
 
 /**
  * Handle a VY_LOG_DELETE_RANGE log record.
- * This function deletes the range with ID @range_id along with
- * all its runs from the hash, removes it from the index's list,
- * and frees it.
- * Return 0 on success, -1 if ID not found.
+ * This function marks the range with ID @range_id as deleted.
+ * Return 0 on success, -1 if range not found or already deleted.
  */
 static int
 vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
 {
-	struct mh_i64ptr_t *h = recovery->range_hash;
-	mh_int_t k = mh_i64ptr_find(h, range_id, NULL);
-	if (k == mh_end(h)) {
+	struct vy_range_recovery_info *range;
+	range = vy_recovery_lookup_range(recovery, range_id);
+	if (range == NULL) {
 		diag_set(ClientError, ER_VINYL, "unknown range id");
 		return -1;
 	}
-	struct vy_range_recovery_info *range = mh_i64ptr_node(h, k)->val;
-	mh_i64ptr_del(h, k, NULL);
-	rlist_del_entry(range, in_index);
-	struct vy_run_recovery_info *run, *tmp;
-	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
-		if (vy_recovery_delete_run(recovery, run->id) < 0)
-			assert(0);
+	if (range->is_deleted) {
+		diag_set(ClientError, ER_VINYL, "range is already deleted");
+		return -1;
 	}
-	free(range);
+	range->is_deleted = true;
 	return 0;
 }
 
@@ -1397,6 +1406,8 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 	}
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
+		if (range->is_deleted)
+			continue;
 		record.type = VY_LOG_INSERT_RANGE;
 		record.range_id = range->id;
 		record.range_begin = tmp = range->begin;
@@ -1413,6 +1424,8 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 		 * order, so use reverse iterator.
 		 */
 		rlist_foreach_entry_reverse(run, &range->runs, in_range) {
+			if (run->is_deleted)
+				continue;
 			record.type = VY_LOG_INSERT_RUN;
 			record.range_id = range->id;
 			record.run_id = run->id;
