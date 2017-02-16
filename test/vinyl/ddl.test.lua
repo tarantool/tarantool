@@ -43,6 +43,7 @@ space:delete({1})
 -- must fail because vy_mems have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 box.snapshot()
+while box.info.vinyl().db[space.id..'/0'].count ~= 0 do fiber.sleep(0.01) end
 
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
 -- can be altered.
@@ -59,8 +60,7 @@ space:insert({1, 2})
 box.snapshot()
 space:delete({1})
 box.snapshot()
-old_dumped = box.info.vinyl().performance.dumped_statements
-
+while box.info.vinyl().db[space.id..'/0'].run_count ~= 2 do fiber.sleep(0.01) end
 -- must fail because vy_runs have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 
@@ -69,7 +69,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space:delete({1})
 box.snapshot()
 -- Wait until the dump is finished.
-while box.info.vinyl().performance.dumped_statements - old_dumped ~= 1 do fiber.sleep(0.01) end
+while box.info.vinyl().db[space.id..'/0'].count ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 
 space:drop()
@@ -83,6 +83,7 @@ for i=1,10 do box.space.test:replace({i}) end
 box.space.test.index.primary:bsize() > 0
 
 box.snapshot()
+while box.info.vinyl().db[space.id..'/0'].run_count ~= 1 do fiber.sleep(0.01) end
 
 box.space.test.index.primary:bsize() == 0
 
