@@ -3867,6 +3867,10 @@ vy_task_split_complete(struct vy_task *task)
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
 
+	/* Delete files left from the old range. */
+	rlist_foreach_entry(run, &range->runs, in_range)
+		vy_run_unlink_files(index->path, run->id);
+
 	/*
 	 * If range split completed successfully, all runs and mems of
 	 * the original range were dumped and hence we don't need it any
@@ -3898,10 +3902,6 @@ vy_task_split_complete(struct vy_task *task)
 	assert(range->mem == NULL); /* active mem was frozen */
 	rlist_foreach_entry(mem, &range->frozen, in_frozen)
 		vy_scheduler_mem_dumped(scheduler, mem);
-
-	/* Delete files left from the old range. */
-	rlist_foreach_entry(run, &range->runs, in_range)
-		vy_run_unlink_files(index->path, run->id);
 
 	vy_range_delete(range);
 	return 0;
@@ -4106,15 +4106,23 @@ vy_task_compact_complete(struct vy_task *task)
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
+	/* Delete old run files. */
+	n = range->compact_priority;
+	rlist_foreach_entry(run, &range->runs, in_range) {
+		vy_run_unlink_files(index->path, run->id);
+		if (--n == 0)
+			break;
+	}
+	assert(n == 0);
+
 	/*
 	 * Replace compacted mems and runs with the resulting run.
 	 */
 	vy_index_unacct_range(index, range);
-	RLIST_HEAD(runs_to_release);
 	n = range->compact_priority;
 	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
 		vy_range_remove_run(range, run);
-		rlist_add_entry(&runs_to_release, run, in_range);
+		vy_run_unref(run);
 		if (--n == 0)
 			break;
 	}
@@ -4140,14 +4148,6 @@ vy_task_compact_complete(struct vy_task *task)
 	range->version++;
 	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(scheduler, range);
-
-	/* Delete old runs along with their files. */
-	while (!rlist_empty(&runs_to_release)) {
-		run = rlist_shift_entry(&runs_to_release,
-					struct vy_run, in_range);
-		vy_run_unlink_files(index->path, run->id);
-		vy_run_unref(run);
-	}
 	return 0;
 }
 
