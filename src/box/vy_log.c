@@ -193,15 +193,14 @@ static struct vy_recovery *
 vy_recovery_new(const char *dir, int64_t signature);
 static void
 vy_recovery_delete(struct vy_recovery *recovery);
+static struct vy_index_recovery_info *
+vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_id);
 static int
-vy_recovery_load_index_by_id(struct vy_recovery *recovery, int64_t index_id,
-			     vy_recovery_cb cb, void *cb_arg);
+vy_recovery_iterate_index(struct vy_index_recovery_info *index,
+		bool include_deleted, vy_recovery_cb cb, void *cb_arg);
 static int
-vy_recovery_replay(struct vy_recovery *recovery,
-		   vy_recovery_cb cb, void *cb_arg);
-static void
-vy_recovery_gc(struct vy_recovery *recovery,
-	       vy_log_gc_cb gc_cb, void *gc_arg);
+vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+		    vy_recovery_cb cb, void *cb_arg);
 
 /** An snprint-style function to print a path to a vinyl metadata log. */
 static int
@@ -734,12 +733,18 @@ vy_log_recover_index(struct vy_log *log, int64_t index_id,
 		     vy_recovery_cb cb, void *cb_arg)
 {
 	assert(log->recovery != NULL);
-	return vy_recovery_load_index_by_id(log->recovery, index_id,
-					    cb, cb_arg);
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(log->recovery, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_VINYL, "unknown index id");
+		return -1;
+	}
+	return vy_recovery_iterate_index(index, false, cb, cb_arg);
 }
 
+/** Callback passed to vy_recovery_iterate() for log rotation. */
 static int
-vy_log_rotate_cb(const struct vy_log_record *record, void *cb_arg)
+vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 {
 	struct xlog *xlog = cb_arg;
 	struct xrow_header row;
@@ -747,6 +752,19 @@ vy_log_rotate_cb(const struct vy_log_record *record, void *cb_arg)
 	if (vy_log_record_encode(record, &row) < 0 ||
 	    xlog_write_row(xlog, &row) < 0)
 		return -1;
+	return 0;
+}
+
+/** Callback passed to vy_recovery_iterate() for garbage collection. */
+static int
+vy_log_gc_cb_func(const struct vy_log_record *record, void *cb_arg)
+{
+	struct vy_log *log = cb_arg;
+
+	if (record->type == VY_LOG_DELETE_RUN) {
+		log->gc_cb(record->run_id, record->iid, record->space_id,
+			   record->path, log->gc_arg);
+	}
 	return 0;
 }
 
@@ -775,7 +793,8 @@ vy_log_rotate_f(va_list ap)
 	if (xlog_create(&xlog, path, &meta) < 0)
 		goto err_create_xlog;
 
-	if (vy_recovery_replay(recovery, vy_log_rotate_cb, &xlog) < 0)
+	if (vy_recovery_iterate(recovery, false, vy_log_rotate_cb_func,
+				&xlog) < 0)
 		goto err_write_xlog;
 
 	if (xlog_flush(&xlog) < 0 ||
@@ -783,7 +802,7 @@ vy_log_rotate_f(va_list ap)
 	    xlog_rename(&xlog) < 0)
 		goto err_write_xlog;
 
-	vy_recovery_gc(recovery, log->gc_cb, log->gc_arg);
+	vy_recovery_iterate(recovery, true, vy_log_gc_cb_func, log);
 	vy_recovery_delete(recovery);
 	xlog_close(&xlog, false);
 	return 0;
@@ -1262,7 +1281,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
  * Load the vinyl metadata log stored in directory @dir and
  * having signature @signature and return the recovery context
  * that can be further used for recovering vinyl indexes with
- * vy_recovery_load_index().
+ * vy_recovery_iterate().
  *
  * Returns NULL on failure.
  */
@@ -1366,12 +1385,16 @@ vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
 }
 
 /**
- * Given a recovery info, load the corresponding vinyl index.
- * See comment to vy_log_recover_index() for how indexes are loaded.
+ * Call function @cb for each range and run of the given index until
+ * it returns != 0 or all objects are iterated. Runs of a particular
+ * range are iterated right after the range, in the chronological
+ * order. If @include_deleted is set, this function will also iterate
+ * over deleted objects, issuing the corresponding "delete" record for
+ * each of them.
  */
 static int
-vy_recovery_load_index(struct vy_index_recovery_info *index,
-		       vy_recovery_cb cb, void *cb_arg)
+vy_recovery_iterate_index(struct vy_index_recovery_info *index,
+		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_range_recovery_info *range;
 	struct vy_run_recovery_info *run;
@@ -1388,7 +1411,7 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;
 
-	if (index->is_dropped) {
+	if (!include_deleted && index->is_dropped) {
 		/*
 		 * Do not load the index as it is going to be
 		 * dropped on WAL recovery anyway. Just create
@@ -1406,7 +1429,7 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 	}
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
-		if (range->is_deleted)
+		if (!include_deleted && range->is_deleted)
 			continue;
 		record.type = VY_LOG_INSERT_RANGE;
 		record.range_id = range->id;
@@ -1424,75 +1447,52 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 		 * order, so use reverse iterator.
 		 */
 		rlist_foreach_entry_reverse(run, &range->runs, in_range) {
-			if (run->is_deleted)
+			if (!include_deleted && run->is_deleted)
 				continue;
 			record.type = VY_LOG_INSERT_RUN;
 			record.range_id = range->id;
 			record.run_id = run->id;
 			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
+			if (index->is_dropped ||
+			    range->is_deleted || run->is_deleted) {
+				record.type = VY_LOG_DELETE_RUN;
+				if (vy_recovery_cb_call(cb, cb_arg,
+							&record) != 0)
+					return -1;
+			}
+		}
+		if (index->is_dropped || range->is_deleted) {
+			record.type = VY_LOG_DELETE_RANGE;
+			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+				return -1;
 		}
 	}
-	return 0;
-}
-
-/**
- * A wrapper that looks up an index by ID and passes it to
- * vy_recovery_load_index().
- */
-static int
-vy_recovery_load_index_by_id(struct vy_recovery *recovery, int64_t index_id,
-			     vy_recovery_cb cb, void *cb_arg)
-{
-	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
-	if (index == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown index id");
-		return -1;
-	}
-	return vy_recovery_load_index(index, cb, cb_arg);
-}
-
-/**
- * Invoke callback @cb for each record necessary to recreate
- * the given recovery context. Used to rotate the metadata log.
- */
-static int
-vy_recovery_replay(struct vy_recovery *recovery,
-		   vy_recovery_cb cb, void *cb_arg)
-{
-	mh_int_t i;
-	mh_foreach(recovery->index_hash, i) {
-		struct vy_index_recovery_info *index;
-		index = mh_i64ptr_node(recovery->index_hash, i)->val;
-		if (index->is_dropped)
-			continue;
-		if (vy_recovery_load_index(index, cb, cb_arg) < 0)
+	if (index->is_dropped) {
+		record.type = VY_LOG_DROP_INDEX;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}
 	return 0;
 }
 
 /**
- * Invoke @gc_cb for each run of each dropped index.
+ * Given a recovery context, iterate over all indexes stored in it.
+ * See vy_recovery_iterate_index() for more details.
  */
-static void
-vy_recovery_gc(struct vy_recovery *recovery,
-	       vy_log_gc_cb gc_cb, void *gc_arg)
+static int
+vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+		    vy_recovery_cb cb, void *cb_arg)
 {
 	mh_int_t i;
 	mh_foreach(recovery->index_hash, i) {
 		struct vy_index_recovery_info *index;
 		index = mh_i64ptr_node(recovery->index_hash, i)->val;
-		if (!index->is_dropped)
+		if (!include_deleted && index->is_dropped)
 			continue;
-		struct vy_range_recovery_info *range;
-		rlist_foreach_entry(range, &index->ranges, in_index) {
-			struct vy_run_recovery_info *run;
-			rlist_foreach_entry(run, &range->runs, in_range) {
-				gc_cb(run->id, index->iid, index->space_id,
-				      index->path, gc_arg);
-			}
-		}
+		if (vy_recovery_iterate_index(index, include_deleted,
+					      cb, cb_arg) < 0)
+			return -1;
 	}
+	return 0;
 }
