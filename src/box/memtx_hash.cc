@@ -39,10 +39,6 @@
 
 #include "third_party/PMurHash.h"
 
-enum {
-	HASH_SEED = 13U
-};
-
 static inline bool
 equal(struct tuple *tuple_a, struct tuple *tuple_b,
 	    const struct key_def *key_def)
@@ -56,92 +52,6 @@ equal_key(struct tuple *tuple, const char *key,
 {
 	return tuple_compare_with_key(tuple, key, key_def->part_count,
 					       key_def) == 0;
-}
-
-static inline uint32_t
-mh_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-	      enum field_type type)
-{
-	const char *f = *field;
-	uint32_t size;
-
-	switch (type) {
-	case FIELD_TYPE_STRING:
-		/*
-		 * (!) MP_STR fields hashed **excluding** MsgPack format
-		 * indentifier. We have to do that to keep compatibility
-		 * with old third-party MsgPack (spec-old.md) implementations.
-		 * \sa https://github.com/tarantool/tarantool/issues/522
-		 */
-		f = mp_decode_str(field, &size);
-		break;
-	default:
-		mp_next(field);
-		size = *field - f;  /* calculate the size of field */
-		/*
-		 * (!) All other fields hashed **including** MsgPack format
-		 * identifier (e.g. 0xcc). This was done **intentionally**
-		 * for performance reasons. Please follow MsgPack specification
-		 * and pack all your numbers to the most compact representation.
-		 * If you still want to add support for broken MsgPack,
-		 * please don't forget to patch tuple_compare_field().
-		 */
-		break;
-	}
-	assert(size < INT32_MAX);
-	PMurHash32_Process(ph1, pcarry, f, size);
-	return size;
-}
-
-static inline uint32_t
-tuple_hash(struct tuple *tuple, const struct key_def *key_def)
-{
-	const struct key_part *part = key_def->parts;
-	/*
-	 * Speed up the simplest case when we have a
-	 * single-part hash_table over an integer field.
-	 */
-	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
-		const char *field = tuple_field(tuple, part->fieldno);
-		uint64_t val = mp_decode_uint(&field);
-		if (likely(val <= UINT32_MAX))
-			return val;
-		return ((uint32_t)((val)>>33^(val)^(val)<<11));
-	}
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	for ( ; part < key_def->parts + key_def->part_count; part++) {
-		const char *field = tuple_field(tuple, part->fieldno);
-		total_size += mh_hash_field(&h, &carry, &field, part->type);
-	}
-
-	return PMurHash32_Result(h, carry, total_size);
-}
-
-static inline uint32_t
-key_hash(const char *key, const struct key_def *key_def)
-{
-	const struct key_part *part = key_def->parts;
-
-	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
-		uint64_t val = mp_decode_uint(&key);
-		if (likely(val <= UINT32_MAX))
-			return val;
-		return ((uint32_t)((val)>>33^(val)^(val)<<11));
-	}
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	/* Hash fields part by part (see mh_hash_field() comments) */
-	for ( ; part < key_def->parts + key_def->part_count; part++)
-		total_size += mh_hash_field(&h, &carry, &key, part->type);
-
-	return PMurHash32_Result(h, carry, total_size);
 }
 
 #define LIGHT_NAME _index
