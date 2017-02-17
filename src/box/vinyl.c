@@ -1442,11 +1442,6 @@ vy_run_snprint_path(char *buf, size_t size, const char *dir,
 
 /**
  * Given the id of a run, delete its files.
- *
- * Note, in order not to stall the tx thread, this function uses
- * coeio to unlink files and hence may yield. In particular, this
- * means that it cannot be used on shutdown, because the event loop
- * is unavailable at that time.
  */
 static void
 vy_run_unlink_files(const char *dir, int64_t run_id)
@@ -1457,12 +1452,7 @@ vy_run_unlink_files(const char *dir, int64_t run_id)
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, PATH_MAX, dir, run_id, type);
-		int rc;
-		if (cord_is_main())
-			rc = coeio_unlink(path);
-		else
-			rc = unlink(path);
-		if (rc < 0 && errno != ENOENT)
+		if (unlink(path) < 0 && errno != ENOENT)
 			say_syserror("failed to delete file '%s'", path);
 	}
 }
@@ -3838,6 +3828,8 @@ vy_task_dump_complete(struct vy_task *task)
 static void
 vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 {
+	(void)in_shutdown;
+
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
@@ -3848,8 +3840,6 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	vy_write_iterator_delete(task->wi);
 
 	/* Delete the run we failed to write. */
-	if (!in_shutdown)
-		vy_run_unlink_files(index->path, range->new_run->id);
 	vy_run_delete(range->new_run);
 	range->new_run = NULL;
 
@@ -3962,7 +3952,6 @@ vy_task_split_complete(struct vy_task *task)
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *r, *tmp;
 	struct vy_mem *mem;
-	struct vy_run *run;
 
 	/*
 	 * Log change in metadata.
@@ -3983,10 +3972,6 @@ vy_task_split_complete(struct vy_task *task)
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
-
-	/* Delete files left from the old range. */
-	rlist_foreach_entry(run, &range->runs, in_range)
-		vy_run_unlink_files(index->path, run->id);
 
 	/*
 	 * If range split completed successfully, all runs and mems of
@@ -4027,6 +4012,8 @@ vy_task_split_complete(struct vy_task *task)
 static void
 vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 {
+	(void)in_shutdown;
+
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
@@ -4036,12 +4023,6 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
-
-	if (!in_shutdown) {
-		/* Delete files we failed to write. */
-		rlist_foreach_entry(r, &range->split_list, split_list)
-			vy_run_unlink_files(index->path, r->new_run->id);
-	}
 
 	/*
 	 * On split failure we delete new ranges, but leave their
@@ -4226,15 +4207,6 @@ vy_task_compact_complete(struct vy_task *task)
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
-	/* Delete old run files. */
-	n = range->compact_priority;
-	rlist_foreach_entry(run, &range->runs, in_range) {
-		vy_run_unlink_files(index->path, run->id);
-		if (--n == 0)
-			break;
-	}
-	assert(n == 0);
-
 	/*
 	 * Replace compacted mems and runs with the resulting run.
 	 */
@@ -4274,6 +4246,8 @@ vy_task_compact_complete(struct vy_task *task)
 static void
 vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 {
+	(void)in_shutdown;
+
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
@@ -4284,8 +4258,6 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	vy_write_iterator_delete(task->wi);
 
 	/* Delete the run we failed to write. */
-	if (!in_shutdown)
-		vy_run_unlink_files(index->path, range->new_run->id);
 	vy_run_delete(range->new_run);
 	range->new_run = NULL;
 

@@ -10,7 +10,7 @@ fio = require('fio')
 index_options = test_run:get_cfg('index_options')
 ---
 ...
-index_options.run_count_per_level = 2
+index_options.run_count_per_level = 1
 ---
 ...
 s = box.schema.space.create('test', {engine='vinyl'})
@@ -31,18 +31,11 @@ function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_co
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 ---
 ...
--- Check that run files are normally removed right after compaction.
+-- Check that run files are deleted on snapshot.
 s:insert{1} box.snapshot() -- dump
 ---
 ...
-s:insert{2} box.snapshot() -- dump
----
-...
-file_count()
----
-- 4
-...
-s:insert{3} box.snapshot() -- dump + compaction
+s:insert{2} box.snapshot() -- dump + compaction
 ---
 ...
 while run_count() > 1 do fiber.sleep(0.01) end -- wait for compaction
@@ -50,7 +43,14 @@ while run_count() > 1 do fiber.sleep(0.01) end -- wait for compaction
 ...
 file_count()
 ---
-- 2
+- 6
+...
+s:insert{3} box.snapshot() -- dump
+---
+...
+file_count()
+---
+- 4
 ...
 -- Check that files left from dropped indexes are deleted on snapshot.
 s:drop() box.snapshot()
