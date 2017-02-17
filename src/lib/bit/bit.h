@@ -177,6 +177,7 @@ store_bool(void *p, bool b)
 
 /**
  * @brief Test bit \a pos in memory chunk \a data
+ * data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
 *  @retval true bit \a pos is set in \a data
@@ -185,15 +186,16 @@ store_bool(void *p, bool b)
 inline bool
 bit_test(const void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	const unsigned char *cdata = (const unsigned char  *) data;
-	return (cdata[chunk] >> offset) & 0x1;
+	const unsigned long *ldata = (const unsigned long  *) data;
+	return (ldata[chunk] >> offset) & 0x1;
 }
 
 /**
  * @brief Set bit \a pos in a memory chunk \a data
+ * data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -203,17 +205,18 @@ bit_test(const void *data, size_t pos)
 inline bool
 bit_set(void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	unsigned char *cdata = (unsigned char  *) data;
-	bool prev = (cdata[chunk] >> offset) & 0x1;
-	cdata[chunk] |= (1U << offset);
+	unsigned long *ldata = (unsigned long  *) data;
+	bool prev = (ldata[chunk] >> offset) & 0x1;
+	ldata[chunk] |= (1UL << offset);
 	return prev;
 }
 
 /**
  * @brief Clear bit \a pos in memory chunk \a data
+ * data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -223,12 +226,12 @@ bit_set(void *data, size_t pos)
 inline bool
 bit_clear(void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	unsigned char *cdata = (unsigned char *) data;
-	bool prev = (cdata[chunk] >> offset) & 0x1;
-	cdata[chunk] &= ~(1U << offset);
+	unsigned long *ldata = (unsigned long *) data;
+	bool prev = (ldata[chunk] >> offset) & 0x1;
+	ldata[chunk] &= ~(1UL << offset);
 	return prev;
 }
 

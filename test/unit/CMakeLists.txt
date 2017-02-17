@@ -50,6 +50,8 @@ add_executable(rtree_multidim.test rtree_multidim.cc)
 target_link_libraries(rtree_multidim.test salad small)
 add_executable(light.test light.cc)
 target_link_libraries(light.test small)
+add_executable(bloom.test bloom.cc)
+target_link_libraries(bloom.test salad)
 add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
