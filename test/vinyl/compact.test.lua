@@ -16,7 +16,7 @@ require('log').info(string.rep(" ", 1024))
 space:select()
 space:select()
 -- gh-1571: bad upsert should not log on reads
-test_run:grep_log('default', 'UPSERT operation failed', 1024) == nil
+test_run:grep_log('default', 'UPSERT operation failed', 400) == nil
 
 box.snapshot()
 vyinfo().run_count == 1

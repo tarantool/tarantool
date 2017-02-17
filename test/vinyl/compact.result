@@ -41,7 +41,7 @@ space:select()
 - - [1, 2]
 ...
 -- gh-1571: bad upsert should not log on reads
-test_run:grep_log('default', 'UPSERT operation failed', 1024) == nil
+test_run:grep_log('default', 'UPSERT operation failed', 400) == nil
 ---
 - true
 ...
