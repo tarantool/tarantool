@@ -1349,6 +1349,15 @@ vy_recovery_delete(struct vy_recovery *recovery)
 	free(recovery);
 }
 
+/** Helper to call a recovery callback and log the event if debugging. */
+static int
+vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
+		    const struct vy_log_record *record)
+{
+	say_debug("%s: %s", __func__, vy_log_record_str(record));
+	return cb(record, cb_arg);
+}
+
 /**
  * Given a recovery info, load the corresponding vinyl index.
  * See comment to vy_log_recover_index() for how indexes are loaded.
@@ -1368,11 +1377,26 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 	record.space_id = index->space_id;
 	record.path = index->path;
 	record.path_len = strlen(index->path);
-	record.is_dropped = index->is_dropped;
 
-	say_debug("%s: %s", __func__, vy_log_record_str(&record));
-	if (cb(&record, cb_arg) != 0)
+	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;
+
+	if (index->is_dropped) {
+		/*
+		 * Do not load the index as it is going to be
+		 * dropped on WAL recovery anyway. Just create
+		 * an initial range to make vy_get() happy.
+		 */
+		record.type = VY_LOG_INSERT_RANGE;
+		record.range_id = INT64_MAX; /* fake id */
+		record.range_begin = record.range_end = NULL;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
+		record.type = VY_LOG_DROP_INDEX;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
+		return 0;
+	}
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
 		record.type = VY_LOG_INSERT_RANGE;
@@ -1383,9 +1407,7 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 		record.range_end = tmp = range->end;
 		if (mp_decode_array(&tmp) == 0)
 			record.range_end = NULL;
-		say_debug("%s: %s", __func__,
-			  vy_log_record_str(&record));
-		if (cb(&record, cb_arg) != 0)
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		/*
 		 * Newer runs are stored closer to the head of the list,
@@ -1396,9 +1418,7 @@ vy_recovery_load_index(struct vy_index_recovery_info *index,
 			record.type = VY_LOG_INSERT_RUN;
 			record.range_id = range->id;
 			record.run_id = run->id;
-			say_debug("%s: %s", __func__,
-				  vy_log_record_str(&record));
-			if (cb(&record, cb_arg) != 0)
+			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
 		}
 	}

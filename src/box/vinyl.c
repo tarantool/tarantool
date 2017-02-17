@@ -3367,7 +3367,9 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		assert(record->index_id == index->key_def->opts.lsn);
-		index->is_dropped = record->is_dropped;
+		break;
+	case VY_LOG_DROP_INDEX:
+		index->is_dropped = true;
 		break;
 	case VY_LOG_INSERT_RANGE:
 		range = vy_range_new(index, record->range_id,
@@ -3579,8 +3581,14 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 static bool
 vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
 {
-	struct vy_range *range;
+	/*
+	 * If the index is going to be dropped on WAL recovery,
+	 * there's no point in inserting statements into it.
+	 */
+	if (index->is_dropped)
+		return true;
 
+	struct vy_range *range;
 	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index->key_def,
 					  stmt);
 	if (rlist_empty(&range->runs))

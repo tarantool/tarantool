@@ -127,12 +127,6 @@ struct vy_log_record {
 	const char *path;
 	/** Length of the path string. */
 	uint32_t path_len;
-	/**
-	 * This flag is never written to the metadata log.
-	 * It is used on recovery to indicate that the index
-	 * being recovered was dropped.
-	 */
-	bool is_dropped;
 };
 
 /**
@@ -325,7 +319,9 @@ typedef int
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
- * either VY_LOG_CREATE_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN.
+ * either VY_LOG_CREATE_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN
+ * unless the index was dropped. In the latter case, a VY_LOG_DROP_INDEX
+ * record is issued in the end.
  * The callback is supposed to rebuild the index structure and open run
  * files. If the callback returns a non-zero value, the function stops
  * iteration over ranges and runs and returns error.
