@@ -89,8 +89,27 @@ enum vy_log_type {
 	/**
 	 * Delete a run.
 	 * Requires vy_log_record::run_id.
+	 *
+	 * A record of this type indicates that the run is not in use
+	 * any more and its files can be safely removed. When the log
+	 * is recovered from, this only marks the run as deleted,
+	 * because we still need it for garbage collection. A run is
+	 * actually freed by VY_LOG_FORGET_RUN. Runs that were
+	 * deleted, but not "forgotten" are not expunged from the log
+	 * on rotation.
 	 */
 	VY_LOG_DELETE_RUN		= 5,
+	/**
+	 * Forget a run.
+	 * Requires vy_log_record::run_id.
+	 *
+	 * A record of this type is written after all files left from
+	 * an unused run have been successfully removed. On recovery,
+	 * this results in freeing all structures associated with the
+	 * run. Information about "forgotten" runs is not included in
+	 * the new log on rotation.
+	 */
+	VY_LOG_FORGET_RUN		= 6,
 
 	vy_log_MAX
 };
@@ -137,7 +156,7 @@ enum { VY_LOG_TX_BUF_SIZE = 64 };
 
 struct vy_recovery;
 
-typedef void
+typedef int
 (*vy_log_gc_cb)(int64_t run_id, uint32_t iid, uint32_t space_id,
 		const char *path, void *arg);
 
@@ -217,7 +236,10 @@ vy_log_delete(struct vy_log *log);
  *
  * The function calls @gc_cb for each deleted run, passing info
  * necessary to lookup its files and optional argument @gc_arg.
- * The callback is supposed to unlink run files.
+ * The callback is supposed to try to unlink run files and
+ * return 0 on success. If it fails, the information about the
+ * deleted run won't be removed from the log and deletion will
+ * be retried on next log rotation.
  *
  * Returns 0 on success, -1 on failure.
  */

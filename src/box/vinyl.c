@@ -1443,22 +1443,26 @@ vy_run_snprint_path(char *buf, size_t size, const char *dir,
 /**
  * Given the id of a run, delete its files.
  */
-static void
+static int
 vy_run_unlink_files(const char *dir, int64_t run_id)
 {
 	ERROR_INJECT(ERRINJ_VY_GC,
 		     {say_error("error injection: run %lld not deleted",
-				(long long)run_id); return;});
+				(long long)run_id); return -1;});
+	int rc = 0;
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, PATH_MAX, dir, run_id, type);
-		if (unlink(path) < 0 && errno != ENOENT)
+		if (unlink(path) < 0 && errno != ENOENT) {
 			say_syserror("failed to delete file '%s'", path);
+			rc = -1;
+		}
 	}
+	return rc;
 }
 
 /** Garbage collection callback. Passed to vy_log_new(). */
-static void
+static int
 vy_run_gc_cb(int64_t run_id, uint32_t iid, uint32_t space_id,
 	     const char *path, void *arg)
 {
@@ -1469,7 +1473,7 @@ vy_run_gc_cb(int64_t run_id, uint32_t iid, uint32_t space_id,
 				      env->conf->path, space_id, iid);
 		path = buf;
 	}
-	vy_run_unlink_files(path, run_id);
+	return vy_run_unlink_files(path, run_id);
 }
 
 static void

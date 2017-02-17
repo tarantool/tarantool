@@ -95,6 +95,7 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_INSERT_RUN]		= (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_DELETE_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
+	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 };
 
 /** vy_log_key -> human readable name. */
@@ -117,6 +118,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DELETE_RANGE]		= "delete_range",
 	[VY_LOG_INSERT_RUN]		= "insert_run",
 	[VY_LOG_DELETE_RUN]		= "delete_run",
+	[VY_LOG_FORGET_RUN]		= "forget_run",
 };
 
 /** Recovery context. */
@@ -199,7 +201,7 @@ static int
 vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		bool include_deleted, vy_recovery_cb cb, void *cb_arg);
 static int
-vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+vy_recovery_iterate(struct vy_recovery *recovery,
 		    vy_recovery_cb cb, void *cb_arg);
 
 /** An snprint-style function to print a path to a vinyl metadata log. */
@@ -761,9 +763,25 @@ vy_log_gc_cb_func(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_log *log = cb_arg;
 
-	if (record->type == VY_LOG_DELETE_RUN) {
-		log->gc_cb(record->run_id, record->iid, record->space_id,
-			   record->path, log->gc_arg);
+	if (record->type == VY_LOG_DELETE_RUN &&
+	    log->gc_cb(record->run_id, record->iid, record->space_id,
+		       record->path, log->gc_arg) == 0) {
+		/*
+		 * On success, write a "forget" record to the log so
+		 * that all information about the run is deleted on
+		 * the next log rotation.
+		 */
+		struct vy_log_record gc_record = {
+			.type = VY_LOG_FORGET_RUN,
+			.run_id = record->run_id,
+		};
+		struct xrow_header row;
+		if (vy_log_record_encode(&gc_record, &row) < 0 ||
+		    xlog_write_row(log->xlog, &row) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			say_warn("failed to log run %lld cleanup: %s",
+				 (long long)record->run_id, e->errmsg);
+		}
 	}
 	return 0;
 }
@@ -793,7 +811,7 @@ vy_log_rotate_f(va_list ap)
 	if (xlog_create(&xlog, path, &meta) < 0)
 		goto err_create_xlog;
 
-	if (vy_recovery_iterate(recovery, false, vy_log_rotate_cb_func,
+	if (vy_recovery_iterate(recovery, vy_log_rotate_cb_func,
 				&xlog) < 0)
 		goto err_write_xlog;
 
@@ -802,7 +820,13 @@ vy_log_rotate_f(va_list ap)
 	    xlog_rename(&xlog) < 0)
 		goto err_write_xlog;
 
-	vy_recovery_iterate(recovery, true, vy_log_gc_cb_func, log);
+	/* Cleanup unused runs. */
+	struct xlog *old_xlog = log->xlog;
+	log->xlog = &xlog;
+	vy_recovery_iterate(recovery, vy_log_gc_cb_func, log);
+	log->xlog = old_xlog;
+	xlog_flush(&xlog);
+
 	vy_recovery_delete(recovery);
 	xlog_close(&xlog, false);
 	return 0;
@@ -1043,22 +1067,28 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_id,
 /**
  * Handle a VY_LOG_DROP_INDEX log record.
  * This function marks the index with ID @index_id as dropped.
+ * If the index has no ranges, it is freed.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
 vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_id)
 {
-	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
-	if (index == NULL) {
+	struct mh_i64ptr_t *h = recovery->index_hash;
+	mh_int_t k = mh_i64ptr_find(h, index_id, NULL);
+	if (k == mh_end(h)) {
 		diag_set(ClientError, ER_VINYL, "unknown index id");
 		return -1;
 	}
+	struct vy_index_recovery_info *index = mh_i64ptr_node(h, k)->val;
 	if (index->is_dropped) {
 		diag_set(ClientError, ER_VINYL, "index is already dropped");
 		return -1;
 	}
 	index->is_dropped = true;
+	if (rlist_empty(&index->ranges)) {
+		mh_i64ptr_del(h, k, NULL);
+		free(index);
+	}
 	return 0;
 }
 
@@ -1131,6 +1161,9 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 /**
  * Handle a VY_LOG_DELETE_RUN log record.
  * This function marks the run with ID @run_id as deleted.
+ * Note, the run is not removed from the recovery context
+ * until it is "forgotten", because it is still needed for
+ * garbage collection.
  * Return 0 on success, -1 if run not found or already deleted.
  */
 static int
@@ -1147,6 +1180,27 @@ vy_recovery_delete_run(struct vy_recovery *recovery, int64_t run_id)
 		return -1;
 	}
 	run->is_deleted = true;
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_FORGET_RUN log record.
+ * This function frees the run with ID @run_id.
+ * Return 0 on success, -1 if run not found.
+ */
+static int
+vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
+{
+	struct mh_i64ptr_t *h = recovery->run_hash;
+	mh_int_t k = mh_i64ptr_find(h, run_id, NULL);
+	if (k == mh_end(h)) {
+		diag_set(ClientError, ER_VINYL, "unknown run id");
+		return -1;
+	}
+	struct vy_run_recovery_info *run = mh_i64ptr_node(h, k)->val;
+	mh_i64ptr_del(h, k, NULL);
+	rlist_del_entry(run, in_range);
+	free(run);
 	return 0;
 }
 
@@ -1213,22 +1267,29 @@ vy_recovery_insert_range(struct vy_recovery *recovery,
 /**
  * Handle a VY_LOG_DELETE_RANGE log record.
  * This function marks the range with ID @range_id as deleted.
+ * If the range has no runs, it is freed.
  * Return 0 on success, -1 if range not found or already deleted.
  */
 static int
 vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
 {
-	struct vy_range_recovery_info *range;
-	range = vy_recovery_lookup_range(recovery, range_id);
-	if (range == NULL) {
+	struct mh_i64ptr_t *h = recovery->range_hash;
+	mh_int_t k = mh_i64ptr_find(h, range_id, NULL);
+	if (k == mh_end(h)) {
 		diag_set(ClientError, ER_VINYL, "unknown range id");
 		return -1;
 	}
+	struct vy_range_recovery_info *range = mh_i64ptr_node(h, k)->val;
 	if (range->is_deleted) {
 		diag_set(ClientError, ER_VINYL, "range is already deleted");
 		return -1;
 	}
 	range->is_deleted = true;
+	if (rlist_empty(&range->runs)) {
+		mh_i64ptr_del(h, k, NULL);
+		rlist_del_entry(range, in_index);
+		free(range);
+	}
 	return 0;
 }
 
@@ -1270,6 +1331,9 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		break;
 	case VY_LOG_DELETE_RUN:
 		rc = vy_recovery_delete_run(recovery, record->run_id);
+		break;
+	case VY_LOG_FORGET_RUN:
+		rc = vy_recovery_forget_run(recovery, record->run_id);
 		break;
 	default:
 		unreachable();
@@ -1481,17 +1545,14 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
  * See vy_recovery_iterate_index() for more details.
  */
 static int
-vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+vy_recovery_iterate(struct vy_recovery *recovery,
 		    vy_recovery_cb cb, void *cb_arg)
 {
 	mh_int_t i;
 	mh_foreach(recovery->index_hash, i) {
 		struct vy_index_recovery_info *index;
 		index = mh_i64ptr_node(recovery->index_hash, i)->val;
-		if (!include_deleted && index->is_dropped)
-			continue;
-		if (vy_recovery_iterate_index(index, include_deleted,
-					      cb, cb_arg) < 0)
+		if (vy_recovery_iterate_index(index, true, cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;
