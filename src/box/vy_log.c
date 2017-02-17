@@ -1018,6 +1018,8 @@ vy_log_rotate(struct vy_log *log, int64_t signature)
 fail:
 	latch_unlock(&log->latch);
 	say_debug("%s: failed", __func__);
+	say_error("failed to rotate vinyl metadata log: %s",
+		  diag_last_error(diag_get())->errmsg);
 	return -1;
 }
 

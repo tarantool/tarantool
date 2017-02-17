@@ -3910,8 +3910,9 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_error("%s: failed to dump range %s",
-		  index->name, vy_range_str(range));
+	say_error("%s: failed to dump range %s: %s",
+		  index->name, vy_range_str(range),
+		  diag_last_error(&task->diag)->errmsg);
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
@@ -3976,6 +3977,8 @@ err_mem:
 err_run:
 	vy_task_delete(pool, task);
 err_task:
+	say_error("%s: can't start range dump %s: %s", index->name,
+		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
 	return NULL;
 }
 
@@ -4093,8 +4096,9 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
 
-	say_error("%s: failed to split range %s",
-		  index->name, vy_range_str(range));
+	say_error("%s: failed to split range %s: %s",
+		  index->name, vy_range_str(range),
+		  diag_last_error(&task->diag)->errmsg);
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
@@ -4226,6 +4230,8 @@ err_parts:
 	}
 	vy_task_delete(pool, task);
 err_task:
+	say_error("%s: can't start range splitting %s: %s", index->name,
+		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
 	return NULL;
 }
 
@@ -4331,8 +4337,9 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_error("%s: failed to compact range %s",
-		  index->name, vy_range_str(range));
+	say_error("%s: failed to compact range %s: %s",
+		  index->name, vy_range_str(range),
+		  diag_last_error(&task->diag)->errmsg);
 
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
@@ -4405,6 +4412,8 @@ err_mem:
 err_run:
 	vy_task_delete(pool, task);
 err_task:
+	say_error("%s: can't start range compacting %s: %s", index->name,
+		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
 	return NULL;
 }
 
@@ -4727,7 +4736,6 @@ vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 fail:
 	assert(!diag_is_empty(diag_get()));
 	diag_move(diag_get(), &scheduler->diag);
-	error_log(diag_last_error(&scheduler->diag));
 	return -1;
 
 }
@@ -4737,22 +4745,26 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 			   struct vy_task *task)
 {
 	struct diag *diag = &task->diag;
-	if (task->status != 0)
+	if (task->status != 0) {
+		assert(!diag_is_empty(diag));
 		goto fail; /* ->execute fialed */
-	diag = diag_get();
-	ERROR_INJECT(ERRINJ_VY_TASK_COMPLETE,
-		     {diag_set(ClientError, ER_INJECTION,
-			       "vinyl task completion"); goto fail;});
+	}
+	ERROR_INJECT(ERRINJ_VY_TASK_COMPLETE, {
+			diag_set(ClientError, ER_INJECTION,
+			       "vinyl task completion");
+			diag_move(diag_get(), diag);
+			goto fail; });
 	if (task->ops->complete &&
-	    task->ops->complete(task) != 0)
+	    task->ops->complete(task) != 0) {
+		assert(!diag_is_empty(diag_get()));
+		diag_move(diag_get(), diag);
 		goto fail;
+	}
 	return 0;
 fail:
-	assert(!diag_is_empty(diag));
-	error_log(diag_last_error(diag));
-	diag_move(diag, &scheduler->diag);
 	if (task->ops->abort)
 		task->ops->abort(task, false);
+	diag_move(diag, &scheduler->diag);
 	return -1;
 }
 
@@ -5040,6 +5052,8 @@ vy_checkpoint(struct vy_env *env)
 	if (scheduler->is_throttled) {
 		assert(!diag_is_empty(&scheduler->diag));
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
+		say_error("Can't checkpoint, scheduler is throttled with: %s",
+			  diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
 
@@ -5059,13 +5073,18 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	if (scheduler->mem_min_lsn <= scheduler->checkpoint_lsn) {
 		assert(!diag_is_empty(&scheduler->diag));
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
-		return -1;
+		goto error;
 	}
 
 	if (vy_log_rotate(env->log, vclock_sum(vclock)) != 0)
-		return -1;
+		goto error;
 
+	say_info("vinyl checkpoint done");
 	return 0;
+error:
+	say_error("vinyl checkpoint error: %s",
+		  diag_last_error(diag_get())->errmsg);
+	return -1;
 }
 
 /* Scheduler }}} */
