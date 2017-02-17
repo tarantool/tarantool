@@ -92,6 +92,8 @@ static const unsigned long vy_log_key_mask[] = {
 					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
 					  (1 << VY_LOG_KEY_RANGE_END),
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
+	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_ID) |
+					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_INSERT_RUN]		= (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_DELETE_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
@@ -116,6 +118,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DROP_INDEX]		= "drop_index",
 	[VY_LOG_INSERT_RANGE]		= "insert_range",
 	[VY_LOG_DELETE_RANGE]		= "delete_range",
+	[VY_LOG_PREPARE_RUN]		= "prepare_run",
 	[VY_LOG_INSERT_RUN]		= "insert_run",
 	[VY_LOG_DELETE_RUN]		= "delete_run",
 	[VY_LOG_FORGET_RUN]		= "forget_run",
@@ -158,6 +161,12 @@ struct vy_index_recovery_info {
 	 * vy_range_recovery_info::in_index.
 	 */
 	struct rlist ranges;
+	/**
+	 * List of runs that were prepared, but never
+	 * inserted into a range or deleted, linked by
+	 * vy_run_recovery_info::in_incomplete.
+	 */
+	struct rlist incomplete_runs;
 };
 
 /** Range info stored in a recovery context. */
@@ -185,6 +194,8 @@ struct vy_range_recovery_info {
 struct vy_run_recovery_info {
 	/** Link in vy_range_recovery_info::runs. */
 	struct rlist in_range;
+	/** Link in vy_index_recovery_info::incomplete_runs. */
+	struct rlist in_incomplete;
 	/** ID of the run. */
 	int64_t id;
 	/** True if the run was deleted. */
@@ -635,7 +646,6 @@ static int
 vy_log_open_or_create(struct vy_log *log)
 {
 	assert(log->xlog == NULL);
-	assert(log->recovery == NULL);
 	assert(latch_owner(log->latch) == NULL);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
@@ -683,6 +693,7 @@ fail:
 int
 vy_log_create(struct vy_log *log)
 {
+	assert(log->recovery == NULL);
 	log->signature = 0;
 	return vy_log_open_or_create(log);
 }
@@ -703,6 +714,31 @@ vy_log_delete(struct vy_log *log)
 	free(log);
 }
 
+/**
+ * Given a record encoding information about a run, try to delete
+ * the corresponding files. On success, write a "forget" record to
+ * the log so that all information about the run is deleted on the
+ * next log rotation.
+ */
+static void
+vy_log_gc(struct vy_log *log, const struct vy_log_record *record)
+{
+	if (log->gc_cb(record->run_id, record->iid, record->space_id,
+		       record->path, log->gc_arg) == 0) {
+		struct vy_log_record gc_record = {
+			.type = VY_LOG_FORGET_RUN,
+			.run_id = record->run_id,
+		};
+		struct xrow_header row;
+		if (vy_log_record_encode(&gc_record, &row) < 0 ||
+		    xlog_write_row(log->xlog, &row) < 0) {
+			struct error *e = diag_last_error(diag_get());
+			say_warn("failed to log run %lld cleanup: %s",
+				 (long long)record->run_id, e->errmsg);
+		}
+	}
+}
+
 int
 vy_log_begin_recovery(struct vy_log *log, int64_t signature)
 {
@@ -721,13 +757,40 @@ vy_log_begin_recovery(struct vy_log *log, int64_t signature)
 	return 0;
 }
 
+/**
+ * Callback passed to vy_recovery_iterate() to remove files
+ * left from incomplete runs.
+ */
+static int
+vy_log_gc_incomplete_cb_func(const struct vy_log_record *record, void *cb_arg)
+{
+	struct vy_log *log = cb_arg;
+	if (record->type == VY_LOG_PREPARE_RUN)
+		vy_log_gc(log, record);
+	return 0;
+}
+
 int
 vy_log_end_recovery(struct vy_log *log)
 {
+	assert(log->xlog == NULL);
 	assert(log->recovery != NULL);
+
+	if (vy_log_open_or_create(log) < 0)
+		return -1;
+
+	/*
+	 * If the server is shut down while a dump/compaction task
+	 * is in progress, we'll get an unfinished run file on disk,
+	 * i.e. a run file which was either not written to the end
+	 * or not inserted into a range. We need to delete such runs
+	 * on recovery.
+	 */
+	vy_recovery_iterate(log->recovery, vy_log_gc_incomplete_cb_func, log);
+
 	vy_recovery_delete(log->recovery);
 	log->recovery = NULL;
-	return vy_log_open_or_create(log);
+	return 0;
 }
 
 int
@@ -757,32 +820,16 @@ vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 	return 0;
 }
 
-/** Callback passed to vy_recovery_iterate() for garbage collection. */
+/**
+ * Callback passed to vy_recovery_iterate() to remove files
+ * left from deleted runs.
+ */
 static int
-vy_log_gc_cb_func(const struct vy_log_record *record, void *cb_arg)
+vy_log_gc_deleted_cb_func(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_log *log = cb_arg;
-
-	if (record->type == VY_LOG_DELETE_RUN &&
-	    log->gc_cb(record->run_id, record->iid, record->space_id,
-		       record->path, log->gc_arg) == 0) {
-		/*
-		 * On success, write a "forget" record to the log so
-		 * that all information about the run is deleted on
-		 * the next log rotation.
-		 */
-		struct vy_log_record gc_record = {
-			.type = VY_LOG_FORGET_RUN,
-			.run_id = record->run_id,
-		};
-		struct xrow_header row;
-		if (vy_log_record_encode(&gc_record, &row) < 0 ||
-		    xlog_write_row(log->xlog, &row) < 0) {
-			struct error *e = diag_last_error(diag_get());
-			say_warn("failed to log run %lld cleanup: %s",
-				 (long long)record->run_id, e->errmsg);
-		}
-	}
+	if (record->type == VY_LOG_DELETE_RUN)
+		vy_log_gc(log, record);
 	return 0;
 }
 
@@ -823,7 +870,7 @@ vy_log_rotate_f(va_list ap)
 	/* Cleanup unused runs. */
 	struct xlog *old_xlog = log->xlog;
 	log->xlog = &xlog;
-	vy_recovery_iterate(recovery, vy_log_gc_cb_func, log);
+	vy_recovery_iterate(recovery, vy_log_gc_deleted_cb_func, log);
 	log->xlog = old_xlog;
 	xlog_flush(&xlog);
 
@@ -1061,13 +1108,14 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_id,
 	index->path[path_len] = '\0';
 	index->is_dropped = false;
 	rlist_create(&index->ranges);
+	rlist_create(&index->incomplete_runs);
 	return 0;
 }
 
 /**
  * Handle a VY_LOG_DROP_INDEX log record.
  * This function marks the index with ID @index_id as dropped.
- * If the index has no ranges, it is freed.
+ * If the index has no ranges and runs, it is freed.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
@@ -1085,7 +1133,8 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_id)
 		return -1;
 	}
 	index->is_dropped = true;
-	if (rlist_empty(&index->ranges)) {
+	if (rlist_empty(&index->ranges) &&
+	    rlist_empty(&index->incomplete_runs)) {
 		mh_i64ptr_del(h, k, NULL);
 		free(index);
 	}
@@ -1117,9 +1166,39 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 	run->id = run_id;
 	run->is_deleted = false;
 	rlist_create(&run->in_range);
+	rlist_create(&run->in_incomplete);
 	if (recovery->run_id_max < run_id)
 		recovery->run_id_max = run_id;
 	return run;
+}
+
+/**
+ * Handle a VY_LOG_PREPARE_RUN log record.
+ * This function creates a new run with ID @run_id and adds it
+ * to the list of incomplete runs of the index with ID @index_id.
+ * Return 0 on success, -1 if run already exists, index not found,
+ * or OOM.
+ */
+static int
+vy_recovery_prepare_run(struct vy_recovery *recovery,
+			int64_t index_id, int64_t run_id)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_VINYL, "unknown index id");
+		return -1;
+	}
+	if (vy_recovery_lookup_run(recovery, run_id) != NULL) {
+		diag_set(ClientError, ER_VINYL, "duplicate run id");
+		return -1;
+	}
+	struct vy_run_recovery_info *run;
+	run = vy_recovery_create_run(recovery, run_id);
+	if (run == NULL)
+		return -1;
+	rlist_add_entry(&index->incomplete_runs, run, in_incomplete);
+	return 0;
 }
 
 /**
@@ -1154,6 +1233,7 @@ vy_recovery_insert_run(struct vy_recovery *recovery,
 		if (run == NULL)
 			return -1;
 	}
+	rlist_del_entry(run, in_incomplete);
 	rlist_move_entry(&range->runs, run, in_range);
 	return 0;
 }
@@ -1200,6 +1280,7 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
 	struct vy_run_recovery_info *run = mh_i64ptr_node(h, k)->val;
 	mh_i64ptr_del(h, k, NULL);
 	rlist_del_entry(run, in_range);
+	rlist_del_entry(run, in_incomplete);
 	free(run);
 	return 0;
 }
@@ -1324,6 +1405,10 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		break;
 	case VY_LOG_DELETE_RANGE:
 		rc = vy_recovery_delete_range(recovery, record->range_id);
+		break;
+	case VY_LOG_PREPARE_RUN:
+		rc = vy_recovery_prepare_run(recovery, record->index_id,
+					     record->run_id);
 		break;
 	case VY_LOG_INSERT_RUN:
 		rc = vy_recovery_insert_run(recovery, record->range_id,
@@ -1532,6 +1617,23 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 				return -1;
 		}
 	}
+
+	if (include_deleted) {
+		rlist_foreach_entry(run, &index->incomplete_runs,
+				    in_incomplete) {
+			record.type = VY_LOG_PREPARE_RUN;
+			record.run_id = run->id;
+			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+				return -1;
+			if (index->is_dropped || run->is_deleted) {
+				record.type = VY_LOG_DELETE_RUN;
+				if (vy_recovery_cb_call(cb, cb_arg,
+							&record) != 0)
+					return -1;
+			}
+		}
+	}
+
 	if (index->is_dropped) {
 		record.type = VY_LOG_DROP_INDEX;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
