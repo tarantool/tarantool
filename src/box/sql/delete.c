@@ -710,7 +710,8 @@ void sqlite3GenerateRowDelete(
   */ 
   if( pTab->pSelect==0 ){
     u8 p5 = 0;
-    sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur,0,iIdxNoSeek);
+    /* kyukhin: Tarantool handles indices uypdate automatically.  */
+    /* sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur,0,iIdxNoSeek);  */
     sqlite3VdbeAddOp2(v, OP_Delete, iDataCur, (count?OPFLAG_NCHANGE:0));
     sqlite3VdbeAppendP4(v, (char*)pTab, P4_TABLE);
     if( eMode!=ONEPASS_OFF ){

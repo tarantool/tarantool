@@ -1,51 +1,18 @@
+wa = require 'sqlworkaround'
+
 test_run = require('test_run').new()
 
-test_run:cmd("setopt delimiter ';;'")
-
-ffi = require "ffi"
-ffi.cdef[[
-    int sql_schema_put(int, int, const char**);
-    void free(void *);
-]]
-
--- Manually feed in data in sqlite_master row format.
--- Populate schema objects, make it possible to query
--- Tarantool spaces with SQL.
-function sql_schema_put(idb, ...)
-    local argc = select('#', ...)
-    local argv, cargv = {}, ffi.new('const char*[?]', argc+1)
-    for i = 0,argc-1 do
-        local v = tostring(select(i+1, ...))
-        argv[i] = v
-        cargv[i] = v
-    end
-    cargv[argc] = nil
-    local rc = ffi.C.sql_schema_put(idb, argc, cargv);
-    local err_msg
-    if cargv[0] ~= nil then
-        err_msg = ffi.string(cargv[0])
-        ffi.C.free(ffi.cast('void *', cargv[0]))
-    end
-    return rc, err_msg
-end
-
-function sql_pageno(space_id, index_id)
-    return space_id * 32 + index_id
-end
-
-test_run:cmd("setopt delimiter ''");;
-
 -- test invalid input
-sql_schema_put(0, "invalid", 1, "CREATE FROB")
+wa.sql_schema_put(0, "invalid", 1, "CREATE FROB")
 
 -- create space
 foobar = box.schema.space.create("foobar")
 _ = foobar:create_index("primary",{parts={1,"number"}})
 
-foobar_pageno = sql_pageno(foobar.id, foobar.index.primary.id)
+foobar_pageno = wa.sql_pageno(foobar.id, foobar.index.primary.id)
 foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar) WITHOUT ROWID"
-sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
-sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
+wa.sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
+wa.sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
 
 -- prepare data
 box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
@@ -89,12 +56,12 @@ barfoo = box.schema.space.create("barfoo")
 _ = barfoo:create_index("primary",{parts={2,"number"}})
 _ = barfoo:create_index("secondary",{parts={1,"string"}})
 
-barfoo_pageno = sql_pageno(barfoo.id, barfoo.index.primary.id)
-barfoo2_pageno = sql_pageno(barfoo.id, barfoo.index.secondary.id)
+barfoo_pageno = wa.sql_pageno(barfoo.id, barfoo.index.primary.id)
+barfoo2_pageno = wa.sql_pageno(barfoo.id, barfoo.index.secondary.id)
 barfoo_sql = "CREATE TABLE barfoo (bar, foo PRIMARY KEY) WITHOUT ROWID"
-sql_schema_put(0, "barfoo", barfoo_pageno, barfoo_sql)
-sql_schema_put(0, "sqlite_autoindex_barfoo_1", barfoo_pageno, "")
-sql_schema_put(0, "barfoo2", barfoo2_pageno, "CREATE INDEX barfoo2 ON barfoo(bar)")
+wa.sql_schema_put(0, "barfoo", barfoo_pageno, barfoo_sql)
+wa.sql_schema_put(0, "sqlite_autoindex_barfoo_1", barfoo_pageno, "")
+wa.sql_schema_put(0, "barfoo2", barfoo2_pageno, "CREATE INDEX barfoo2 ON barfoo(bar)")
 
 -- prepare data
 barfoo:insert({'foo', 1})
