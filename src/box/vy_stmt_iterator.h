@@ -120,6 +120,8 @@ struct vy_iterator_stat {
 	size_t lookup_count;
 	/* Number of sequential iterations */
 	size_t step_count;
+	/* Number of searches avoided using bloom filter */
+	size_t bloom_reflections;
 };
 
 #if defined(__cplusplus)

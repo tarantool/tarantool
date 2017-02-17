@@ -14,6 +14,7 @@ local default_vinyl_cfg = {
     range_size          = 1024 * 1024 * 1024,
     page_size           = 8 * 1024,
     cache               = 0.5, -- 512MB
+    bloom_fpr           = 0.05,
 }
 
 -- all available options
@@ -63,6 +64,7 @@ local vinyl_template_cfg = {
     range_size          = 'number',
     page_size           = 'number',
     cache               = 'number',
+    bloom_fpr           = 'number',
 }
 
 -- types of available options

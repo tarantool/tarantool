@@ -57,7 +57,9 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - cache
+    - - - bloom_fpr
+        - 0.05
+      - - cache
         - 0.5
       - - memory_limit
         - 1
@@ -131,7 +133,9 @@ cfg_filter(box.cfg)
   - - too_long_threshold
     - 0.5
   - - vinyl
-    - - - cache
+    - - - bloom_fpr
+        - 0.05
+      - - cache
         - 0.5
       - - memory_limit
         - 1

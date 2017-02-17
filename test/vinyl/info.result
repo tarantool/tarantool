@@ -105,15 +105,19 @@ box_info_sort(box.info.vinyl())
       - max: <max>
     - iterator:
       - cache:
+        - bloom_reflect_count: <count>
         - lookup_count: <count>
         - step_count: <count>
       - mem:
+        - bloom_reflect_count: <count>
         - lookup_count: <count>
         - step_count: <count>
       - run:
+        - bloom_reflect_count: <count>
         - lookup_count: <count>
         - step_count: <count>
       - txw:
+        - bloom_reflect_count: <count>
         - lookup_count: <count>
         - step_count: <count>
     - tx:

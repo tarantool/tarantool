@@ -61,6 +61,7 @@
 #include "coeio.h"
 #include "histogram.h"
 #include "rmean.h"
+#include "salad/bloom.h"
 #include "errinj.h"
 
 #include "errcode.h"
@@ -102,6 +103,8 @@ struct vy_conf {
 	uint64_t memory_limit;
 	/* read cache quota */
 	uint64_t cache;
+	/* bloom filter false positive rate */
+	double bloom_fpr;
 };
 
 struct vy_env {
@@ -363,6 +366,9 @@ struct vy_run_info {
 	int64_t  max_lsn;
 	/** Size of run on disk. */
 	uint64_t size;
+	/** Bloom filter of all tuples in run */
+	bool has_bloom;
+	struct bloom bloom;
 	/** Pages meta. */
 	struct vy_page_info *page_infos;
 };
@@ -1364,6 +1370,8 @@ vy_run_new(int64_t id)
 	run->fd = -1;
 	run->refs = 1;
 	rlist_create(&run->in_range);
+	TRASH(&run->info.bloom);
+	run->info.has_bloom = false;
 	return run;
 }
 
@@ -1378,6 +1386,8 @@ vy_run_delete(struct vy_run *run)
 			vy_page_info_destroy(run->info.page_infos + page_no);
 		free(run->info.page_infos);
 	}
+	if (run->info.has_bloom)
+		bloom_destroy(&run->info.bloom, runtime.quota);
 	TRASH(run);
 	free(run);
 }
@@ -2049,8 +2059,10 @@ vy_row_index_encode(const uint32_t *row_index, uint32_t count,
 static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  struct vy_write_iterator *wi, const char *split_key,
-		  uint32_t *page_info_capacity, struct tuple **curr_stmt,
-		  const struct key_def *key_def, uint64_t *dumped_statements)
+		  uint32_t *page_info_capacity, struct bloom_spectrum *bs,
+		  struct tuple **curr_stmt, const struct key_def *key_def,
+		  const struct key_def *user_key_def,
+		  uint64_t *dumped_statements)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2092,6 +2104,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		struct tuple *stmt = *curr_stmt;
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0)
 			goto error_rollback;
+		bloom_spectrum_add(bs, tuple_hash(stmt, user_key_def));
 		++*dumped_statements;
 
 		if (vy_write_iterator_next(wi, curr_stmt))
@@ -2099,10 +2112,9 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 
 		end_of_run = *curr_stmt == NULL ||
 			/* Split key reached, proceed to the next run. */
-			     (split_key != NULL &&
-		             vy_tuple_compare_with_raw_key(*curr_stmt,
-							   split_key,
-							   key_def) >= 0);
+			(split_key != NULL &&
+			 vy_tuple_compare_with_raw_key(*curr_stmt, split_key,
+						       key_def) >= 0);
 
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < (uint64_t)key_def->opts.page_size);
@@ -2161,7 +2173,9 @@ error_row_index:
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
-		  const char *end_key, const struct key_def *key_def,
+		  const char *end_key, struct bloom_spectrum *bs,
+		  const struct key_def *key_def,
+		  const struct key_def *user_key_def,
 		  uint64_t *dumped_statements)
 {
 	assert(curr_stmt != NULL);
@@ -2190,8 +2204,9 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	int rc;
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi,
-				       end_key, &page_infos_capacity,
-				       curr_stmt, key_def, dumped_statements);
+				       end_key, &page_infos_capacity, bs,
+				       curr_stmt, key_def, user_key_def,
+				       dumped_statements);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2384,19 +2399,79 @@ enum vy_request_run_key {
 	VY_RUN_MIN_LSN = 1,
 	VY_RUN_MAX_LSN = 2,
 	VY_RUN_PAGE_COUNT = 3,
+	VY_RUN_BLOOM = 4,
 };
 
 const char *vy_run_info_key_strs[] = {
 	"min lsn",
 	"max lsn",
 	"page count",
-	"range min key",
-	"range max key"
+	"bloom filter"
 };
 
 const uint64_t vy_run_info_key_map = (1 << VY_RUN_MIN_LSN) |
 				     (1 << VY_RUN_MAX_LSN) |
 				     (1 << VY_RUN_PAGE_COUNT);
+
+enum { VY_BLOOM_VERSION = 0 };
+
+static size_t
+vy_run_bloom_encode_size(const struct bloom *bloom)
+{
+	size_t size = mp_sizeof_array(4);
+	size += mp_sizeof_uint(VY_BLOOM_VERSION); /* version */
+	size += mp_sizeof_uint(bloom->table_size);
+	size += mp_sizeof_uint(bloom->hash_count);
+	size += mp_sizeof_bin(bloom_store_size(bloom));
+	return size;
+}
+
+char *
+vy_run_bloom_encode(char *buffer, const struct bloom *bloom)
+{
+	char *pos = buffer;
+	pos = mp_encode_array(pos, 4);
+	pos = mp_encode_uint(pos, VY_BLOOM_VERSION);
+	pos = mp_encode_uint(pos, bloom->table_size);
+	pos = mp_encode_uint(pos, bloom->hash_count);
+	pos = mp_encode_binl(pos, bloom_store_size(bloom));
+	pos = bloom_store(bloom, pos);
+	return pos;
+}
+
+int
+vy_run_bloom_decode(const char **buffer, struct bloom *bloom)
+{
+	const char **pos = buffer;
+	memset(bloom, 0, sizeof(*bloom));
+	uint32_t array_size = mp_decode_array(pos);
+	if (array_size != 4) {
+		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
+			"wrong size of an array");
+		return -1;
+	}
+	uint64_t version = mp_decode_uint(pos);
+	if (version != VY_BLOOM_VERSION) {
+		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
+			"wrong version");
+		return -1;
+	}
+	bloom->table_size = mp_decode_uint(pos);
+	bloom->hash_count = mp_decode_uint(pos);
+	size_t table_size = mp_decode_binl(pos);
+	if (table_size != bloom_store_size(bloom)) {
+		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
+			"wrong size of a table");
+		return -1;
+	}
+	if (bloom_load_table(bloom, *pos, runtime.quota) != 0) {
+		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
+			"alloc failed");
+		return -1;
+	}
+	*pos += table_size;
+	return 0;
+}
 
 /**
  * Encode vy_run_info as xrow
@@ -2412,17 +2487,20 @@ static int
 vy_run_info_encode(const struct vy_run_info *run_info,
 		   struct xrow_header *xrow)
 {
+	assert(run_info->has_bloom);
 	size_t size = mp_sizeof_array(1);
 	/*
 	 * run map size: min lsn, max lsn, page count
 	 */
-	size += mp_sizeof_map(3);
+	size += mp_sizeof_map(4);
 	size += mp_sizeof_uint(VY_RUN_MIN_LSN) +
 		mp_sizeof_uint(run_info->min_lsn);
 	size += mp_sizeof_uint(VY_RUN_MAX_LSN) +
 		mp_sizeof_uint(run_info->max_lsn);
 	size += mp_sizeof_uint(VY_RUN_PAGE_COUNT) +
 		mp_sizeof_uint(run_info->count);
+	size += mp_sizeof_uint(VY_RUN_BLOOM) +
+		vy_run_bloom_encode_size(&run_info->bloom);
 
 	char *tuple = region_alloc(&fiber()->gc, size);
 	if (tuple == NULL) {
@@ -2432,13 +2510,15 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	char *pos = tuple;
 	/* encode values */
 	pos = mp_encode_array(pos, 1);
-	pos = mp_encode_map(pos, 3);
+	pos = mp_encode_map(pos, 4);
 	pos = mp_encode_uint(pos, VY_RUN_MIN_LSN);
 	pos = mp_encode_uint(pos, run_info->min_lsn);
 	pos = mp_encode_uint(pos, VY_RUN_MAX_LSN);
 	pos = mp_encode_uint(pos, run_info->max_lsn);
 	pos = mp_encode_uint(pos, VY_RUN_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->count);
+	pos = mp_encode_uint(pos, VY_RUN_BLOOM);
+	pos = vy_run_bloom_encode(pos, &run_info->bloom);
 
 	/* put tuple in a replace request to run's space */
 	struct request request;
@@ -2499,6 +2579,12 @@ vy_run_info_decode(struct vy_run_info *run_info,
 		case VY_RUN_PAGE_COUNT:
 			run_info->count = mp_decode_uint(&pos);
 			break;
+		case VY_RUN_BLOOM:
+			if (vy_run_bloom_decode(&pos, &run_info->bloom) == 0)
+				run_info->has_bloom = true;
+			else
+				return -1;
+			break;
 		default:
 			diag_set(ClientError, ER_VINYL,
 				 "Unknown run meta key %d", key);
@@ -2516,7 +2602,7 @@ vy_run_info_decode(struct vy_run_info *run_info,
 /* vy_run_info }}} */
 
 /**
- * Write run to file.
+ * Write run index to file.
  */
 static int
 vy_run_write_index(struct vy_run *run, const char *dirpath)
@@ -2542,7 +2628,6 @@ vy_run_write_index(struct vy_run *run, const char *dirpath)
 
 	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
 		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
-		struct xrow_header xrow;
 		if (vy_page_info_encode(page_info, &xrow) < 0) {
 			goto fail;
 		}
@@ -2794,14 +2879,20 @@ vy_range_delete(struct vy_range *range)
  *
  * The number of in-memory indexes added to the iterator is
  * returned in @p_mem_count.
+ *
+ * The maximum possible number of output tuples of the
+ * iterator is returned in @p_max_output_count
+ *
  */
 static struct vy_write_iterator *
 vy_range_get_write_iterator(struct vy_range *range, int run_count,
-			    int64_t vlsn, int *p_mem_count)
+			    int64_t vlsn, int *p_mem_count,
+			    size_t *p_max_output_count)
 {
 	struct vy_write_iterator *wi;
 	struct vy_run *run;
 	struct vy_mem *mem;
+	*p_max_output_count = 0;
 
 	wi = vy_write_iterator_new(range->index,
 				   run_count == range->run_count, vlsn);
@@ -2816,6 +2907,7 @@ vy_range_get_write_iterator(struct vy_range *range, int run_count,
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
 		++*p_mem_count;
+		*p_max_output_count += mem->tree.size;
 	}
 	assert(run_count >= 0 && run_count <= range->run_count);
 	rlist_foreach_entry(run, &range->runs, in_range) {
@@ -2823,6 +2915,7 @@ vy_range_get_write_iterator(struct vy_range *range, int run_count,
 			break;
 		if (vy_write_iterator_add_run(wi, range, run) != 0)
 			goto err_wi_sub;
+		*p_max_output_count += run->info.keys;
 	}
 	return wi;
 err_wi_sub:
@@ -2839,6 +2932,7 @@ err_wi:
 static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   struct tuple **stmt, size_t *written,
+		   size_t max_output_count, double bloom_fpr,
 		   uint64_t *dumped_statements)
 {
 	assert(stmt != NULL);
@@ -2849,6 +2943,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 
 	const struct vy_index *index = range->index;
 	const struct key_def *key_def = index->key_def;
+	const struct key_def *user_key_def = index->user_key_def;
 
 	struct vy_run *run = range->new_run;
 	assert(run != NULL);
@@ -2857,9 +2952,18 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl range dump"); return -1;});
 
-	if (vy_run_write_data(run, index->path, wi, stmt, range->end, key_def,
-			      dumped_statements) != 0 ||
-	    vy_run_write_index(run, index->path) != 0)
+	struct bloom_spectrum bs;
+	bloom_spectrum_create(&bs, max_output_count, bloom_fpr, runtime.quota);
+
+	if (vy_run_write_data(run, index->path, wi, stmt, range->end, &bs,
+			      key_def, user_key_def, dumped_statements) != 0)
+		return -1;
+
+	bloom_spectrum_choose(&bs, &run->info.bloom);
+	run->info.has_bloom = true;
+	bloom_spectrum_destroy(&bs, runtime.quota);
+
+	if (vy_run_write_index(run, index->path) != 0)
 		return -1;
 
 	assert(!vy_run_is_empty(run));
@@ -3616,6 +3720,10 @@ struct vy_task {
 	 * task scheduler.
 	 */
 	struct stailq_entry link;
+	/** For run-writing tasks: maximum possible number of tuple to write */
+	size_t max_output_count;
+	/** For run-writing tasks: bloom filter false-positive-rate setting */
+	double bloom_fpr;
 };
 
 static struct vy_task *
@@ -3658,6 +3766,7 @@ vy_task_dump_execute(struct vy_task *task)
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
+			       task->max_output_count, task->bloom_fpr,
 			       &task->dumped_statements) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
@@ -3773,7 +3882,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, 0, tx_manager_vlsn(xm),
-					 &task->mem_count);
+					 &task->mem_count,
+					 &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -3783,6 +3893,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 
 	task->range = range;
 	task->wi = wi;
+	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_range(scheduler, range);
 
@@ -3826,6 +3937,7 @@ vy_task_split_execute(struct vy_task *task)
 				      goto error;});
 		}
 		if (vy_range_write_run(r, wi, &stmt, &task->dump_size,
+				       task->max_output_count, task->bloom_fpr,
 				       &unused) != 0)
 			goto error;
 	}
@@ -3986,7 +4098,8 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, range->run_count,
-					 tx_manager_vlsn(xm), &task->mem_count);
+					 tx_manager_vlsn(xm), &task->mem_count,
+					 &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -4029,6 +4142,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	task->range = range;
 	task->wi = wi;
+	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_range(scheduler, range);
 
@@ -4064,6 +4178,7 @@ vy_task_compact_execute(struct vy_task *task)
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
+			       task->max_output_count, task->bloom_fpr,
 			       &unused) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
@@ -4210,7 +4325,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_write_iterator(range, range->compact_priority,
-					 tx_manager_vlsn(xm), &task->mem_count);
+					 tx_manager_vlsn(xm), &task->mem_count,
+					 &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -4220,6 +4336,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 
 	task->range = range;
 	task->wi = wi;
+	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_range(scheduler, range);
 
@@ -4912,6 +5029,7 @@ vy_conf_new()
 			     * 1024 * 1024 * 1024;
 	conf->cache = cfg_getd("vinyl.cache")
 				 * 1024 * 1024 * 1024;
+	conf->bloom_fpr = cfg_getd("vinyl.bloom_fpr");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
@@ -5047,6 +5165,7 @@ vy_info_append_iterator_stat(struct vy_info_handler *h, const char *name,
 	vy_info_table_begin(h, name);
 	vy_info_append_u64(h, "lookup_count", stat->lookup_count);
 	vy_info_append_u64(h, "step_count", stat->step_count);
+	vy_info_append_u64(h, "bloom_reflect_count", stat->bloom_reflections);
 	vy_info_table_end(h);
 }
 
@@ -7793,6 +7912,25 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 	assert(!itr->search_started);
 	itr->search_started = true;
 	*ret = NULL;
+
+	struct key_def *user_key_def = itr->index->user_key_def;
+	if (itr->run->info.has_bloom && itr->iterator_type == ITER_EQ &&
+	    tuple_field_count(itr->key) >= user_key_def->part_count) {
+		uint32_t hash;
+		if (vy_stmt_type(itr->key) == IPROTO_SELECT) {
+			const char *data = tuple_data(itr->key);
+			mp_decode_array(&data);
+			hash = key_hash(data, user_key_def);
+		} else {
+			hash = tuple_hash(itr->key, user_key_def);
+		}
+		if (!bloom_possible_has(&itr->run->info.bloom, hash)) {
+			itr->search_ended = true;
+			itr->stat->bloom_reflections++;
+			return 0;
+		}
+	}
+
 	itr->stat->lookup_count++;
 
 	if (itr->run->info.count == 1) {
