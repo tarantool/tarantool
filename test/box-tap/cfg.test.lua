@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(61)
+test:plan(62)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -317,6 +317,24 @@ os.exit(box.cfg.checkpoint_interval == 150
       and box.cfg.checkpoint_count == 8 and 0 or 1)
 ]]
 test:is(run_script(code), 0, "update checkpoint params")
+
+--
+--  test wal_max_size option
+--
+code = [[
+digest = require'digest'
+fio = require'fio'
+box.cfg{wal_max_size = 1024}
+_ = box.schema.space.create('test'):create_index('pk')
+data = digest.urandom(1024)
+cnt1 = #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
+for i = 0, 9 do
+  box.space.test:replace({1, data})
+end
+cnt2 = #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
+os.exit(cnt1 < cnt2 - 8 and 0 or 1)
+]]
+test:is(run_script(code), 0, "wal_max_size xlog rotation")
 
 test:check()
 os.exit(0)

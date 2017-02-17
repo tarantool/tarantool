@@ -75,7 +75,9 @@ struct wal_writer
 	struct stailq rollback;
 	/* ----------------- wal ------------------- */
 	/** A setting from instance configuration - rows_per_wal */
-	int64_t rows_per_wal;
+	int64_t wal_max_rows;
+	/** A setting from instance configuration - wal_max_size */
+	int64_t wal_max_size;
 	/** Another one - wal_mode */
 	enum wal_mode wal_mode;
 	/** wal_dir, from the configuration file. */
@@ -253,10 +255,12 @@ tx_schedule_rollback(struct cmsg *msg)
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  const char *wal_dirname, const struct tt_uuid *instance_uuid,
-		  struct vclock *vclock, int64_t rows_per_wal)
+		  struct vclock *vclock, int64_t wal_max_rows,
+		  int64_t wal_max_size)
 {
 	writer->wal_mode = wal_mode;
-	writer->rows_per_wal = rows_per_wal;
+	writer->wal_max_rows = wal_max_rows;
+	writer->wal_max_size = wal_max_size;
 
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid);
 	writer->is_active = false;
@@ -308,14 +312,14 @@ wal_thread_start()
 void
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
-	 int64_t rows_per_wal)
+	 int64_t wal_max_rows, int64_t wal_max_size)
 {
-	assert(rows_per_wal > 1);
+	assert(wal_max_rows > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
 
 	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
-			  vclock, rows_per_wal);
+			  vclock, wal_max_rows, wal_max_size);
 
 	wal = writer;
 }
@@ -419,7 +423,8 @@ wal_opt_rotate(struct wal_writer *writer)
 	 * one.
 	 */
 	if (writer->is_active &&
-	    writer->current_wal.rows >= writer->rows_per_wal) {
+	    (writer->current_wal.rows >= writer->wal_max_rows ||
+	     writer->current_wal.offset >= writer->wal_max_size)) {
 		/*
 		 * We can not handle xlog_close()
 		 * failure in any reasonable way.

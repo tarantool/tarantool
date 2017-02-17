@@ -80,6 +80,8 @@ cfg_filter(box.cfg)
     - <hidden>
   - - wal_dir_rescan_delay
     - 2
+  - - wal_max_size
+    - 274877906944
   - - wal_mode
     - write
 ...

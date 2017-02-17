@@ -1,5 +1,5 @@
 TAP version 13
-1..61
+1..62
 ok - box is not started
 ok - invalid memtx_min_tuple_size
 ok - invalid memtx_min_tuple_size
@@ -61,3 +61,4 @@ ok - panic_on_wal_error
 ok - panic_on_snap_error
 ok - setup checkpoint params
 ok - update checkpoint params
+ok - wal_max_size xlog rotation

@@ -269,7 +269,7 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 }
 
 static void
-wal_stream_create(struct wal_stream *ctx, size_t rows_per_wal)
+wal_stream_create(struct wal_stream *ctx, size_t wal_max_rows)
 {
 	xstream_create(&ctx->base, apply_wal_row);
 	ctx->rows = 0;
@@ -279,7 +279,7 @@ wal_stream_create(struct wal_stream *ctx, size_t rows_per_wal)
 	 * Each yield can take up to 1ms if there are no events,
 	 * so we can't afford many of them during recovery.
 	 */
-	ctx->yield = (rows_per_wal >> 4)  + 1;
+	ctx->yield = (wal_max_rows >> 4)  + 1;
 }
 
 static void
@@ -373,14 +373,25 @@ box_check_readahead(int readahead)
 }
 
 static int64_t
-box_check_rows_per_wal(int64_t rows_per_wal)
+box_check_wal_max_rows(int64_t wal_max_rows)
 {
 	/* check rows_per_wal configuration */
-	if (rows_per_wal <= 1) {
+	if (wal_max_rows <= 1) {
 		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
 			  "the value must be greater than one");
 	}
-	return rows_per_wal;
+	return wal_max_rows;
+}
+
+static int64_t
+box_check_wal_max_size(int64_t wal_max_size)
+{
+	/* check wal_max_bytes configuration */
+	if (wal_max_size <= 1) {
+		tnt_raise(ClientError, ER_CFG, "wal_max_size",
+			  "the value must be greater than one");
+	}
+	return wal_max_size;
 }
 
 void
@@ -390,7 +401,8 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
 	box_check_readahead(cfg_geti("readahead"));
-	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
+	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
+	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
@@ -1627,11 +1639,12 @@ box_cfg_xc(void)
 	}
 
 	/* Start WAL writer */
-	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
+	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
+	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_mode != WAL_NONE) {
 		wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-			 &recovery->vclock, rows_per_wal);
+			 &recovery->vclock, wal_max_rows, wal_max_size);
 	}
 
 	rmean_cleanup(rmean_box);
