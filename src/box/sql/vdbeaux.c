@@ -303,6 +303,12 @@ void sqlite3VdbeAddParseSchemaOp(Vdbe *p, int iDb, char *zWhere){
   for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
 }
 
+void sqlite3VdbeAddParseSchema2Op(Vdbe *p, int iDb, int iRec, int n){
+  int j;
+  sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, iDb);
+  for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
+}
+
 /*
 ** Add an opcode that includes the p4 value as an integer.
 */

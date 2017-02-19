@@ -5399,6 +5399,77 @@ case OP_ParseSchema: {
   break;  
 }
 
+/* Opcode: ParseSchema2 P1 P2 P3 * *
+** Synopsis: rows=r[P1@P2] iDb=P3
+**
+** For each 4-tuple from r[P1@P2] range convert to SQLITE_MASTER row
+** format and update the schema with the resulting entry.
+*/
+case OP_ParseSchema2: {
+  int iDb;
+  const char *zMaster;
+  char *zSql;
+  InitData initData;
+  Mem *pRec, *pRecEnd;
+  char zPgnoBuf[16];
+  char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
+
+  /* Any prepared statement that invokes this opcode will hold mutexes
+  ** on every btree.  This is a prerequisite for invoking
+  ** sqlite3InitCallback().
+  */
+#ifdef SQLITE_DEBUG
+  for(iDb=0; iDb<db->nDb; iDb++){
+    assert( iDb==1 || sqlite3BtreeHoldsMutex(db->aDb[iDb].pBt) );
+  }
+#endif
+
+  iDb = pOp->p3;
+  assert( iDb>=0 && iDb<db->nDb );
+  assert( DbHasProperty(db, iDb, DB_SchemaLoaded) );
+
+  initData.db = db;
+  initData.iDb = iDb;
+  initData.pzErrMsg = &p->zErrMsg;
+
+  assert( db->init.busy==0 );
+  db->init.busy = 1;
+  initData.rc = SQLITE_OK;
+  assert( !db->mallocFailed );
+
+  pRec = &aMem[pOp->p1];
+  pRecEnd = pRec + pOp->p2;
+
+  /*
+   * A register range contains
+   *   name1, spaceId1, indexId1, sql1,
+   *   ...
+   *   nameN, spaceIdN, indexIdN, sqlN.
+   *
+   * Convert to SQLite master format and update schema.
+   */
+  for( ; pRecEnd-pRec>=4 && initData.rc==SQLITE_OK; pRec+=4 ){
+    argv[0] = pRec[0].z;
+    /* argv[1] = */ snprintf(zPgnoBuf, sizeof(zPgnoBuf), "%d",
+      SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(pRec[1].u.i, pRec[2].u.i)
+    );
+    argv[2] = pRec[3].z;
+    sqlite3InitCallback(&initData, 3, argv, NULL);
+  }
+
+  rc = initData.rc;
+  db->init.busy = 0;
+
+  if( rc ){
+    sqlite3ResetAllSchemasOfConnection(db);
+    if( rc==SQLITE_NOMEM ){
+      goto no_mem;
+    }
+    goto abort_due_to_error;
+  }
+  break;
+}
+
 #if !defined(SQLITE_OMIT_ANALYZE)
 /* Opcode: LoadAnalysis P1 * * * *
 **

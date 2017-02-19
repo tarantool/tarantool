@@ -46,6 +46,7 @@
 #undef unlikely
 
 #include "index.h"
+#include "schema.h"
 #include "box.h"
 #include "key_def.h"
 #include "tuple.h"
@@ -53,6 +54,66 @@
 #include "small/region.h"
 
 static sqlite3 *db = NULL;
+
+/*
+ * Manually add objects to SQLite in-memory schema.
+ * Argv must adhere to sqlite_master format.
+ * It is interpreted as follows:
+ *   argv[0] = name
+ *   argv[1] = pageNo
+ *   argv[2] = sql
+ */
+int sql_schema_put(int idb, int argc, char **argv);
+
+/*
+ * Add _space system space to SQLite in-memory schema.
+ * End result: _space table is registered and accessible from SQL.
+ */
+static void
+sql_schema_put_sys_space()
+{
+	char sys_space_name[] = "_space";
+	char sys_space_pageno[16];
+	char sys_space_sql[] = "CREATE TABLE _space ("
+		"id INT PRIMARY KEY, "
+		"owner INT, name STR, engine STR, field_count INT, flags, format"
+	") WITHOUT ROWID";
+	char *sys_space_argv[] = {
+		sys_space_name,
+		sys_space_pageno,
+		sys_space_sql,
+		NULL
+	};
+	snprintf(sys_space_pageno, sizeof(sys_space_pageno), "%d",
+		SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(BOX_SPACE_ID, 0)
+	);
+	sql_schema_put(0, 3, sys_space_argv);
+}
+
+/*
+ * Add _index system space to SQLite in-memory schema.
+ * End result: _index table is registered and accessible from SQL.
+ */
+static void
+sql_schema_put_sys_index()
+{
+	char sys_index_name[] = "_index";
+	char sys_index_pageno[16];
+	char sys_index_sql[] = "CREATE TABLE _index ("
+		"id INT, iid INT, name STR, type STR, opts, parts, "
+		"PRIMARY KEY (id, iid)"
+	") WITHOUT ROWID";
+	char *sys_index_argv[] = {
+		sys_index_name,
+		sys_index_pageno,
+		sys_index_sql,
+		NULL
+	};
+	snprintf(sys_index_pageno, sizeof(sys_index_pageno), "%d",
+		SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(BOX_INDEX_ID, 0)
+	);
+	sql_schema_put(0, 3, sys_index_argv);
+}
 
 void
 sql_init()
@@ -62,8 +123,10 @@ sql_init()
 	if (rc == SQLITE_OK) {
 		assert(db);
 	} else {
-        /* XXX */
+		/* XXX */
 	}
+	sql_schema_put_sys_space();
+	sql_schema_put_sys_index();
 }
 
 void
@@ -473,9 +536,13 @@ cursor_advance(BtCursor *pCur, int *pRes)
 	return SQLITE_OK;
 }
 
-/*
- * Manually feed in a row in sqlite_master format; creates schema
- * objects. Called from Lua (ffi).
+/*********************************************************************
+ * Manually add objects to SQLite in-memory schema.
+ * Argv must adhere to sqlite_master format.
+ * It is interpreted as follows:
+ *   argv[0] = name
+ *   argv[1] = pageNo
+ *   argv[2] = sql
  */
 int sql_schema_put(int idb, int argc, char **argv)
 {
