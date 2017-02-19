@@ -1165,17 +1165,21 @@ case OP_SoftNull: {
   break;
 }
 
-/* Opcode: Blob P1 P2 * P4 *
-** Synopsis: r[P2]=P4 (len=P1)
+/* Opcode: Blob P1 P2 P3 P4 *
+** Synopsis: r[P2]=P4 (len=P1, subtype=P3)
 **
 ** P4 points to a blob of data P1 bytes long.  Store this
-** blob in register P2.
+** blob in register P2.  Set subtype to P3.
 */
 case OP_Blob: {                /* out2 */
   assert( pOp->p1 <= SQLITE_MAX_LENGTH );
   pOut = out2Prerelease(p, pOp);
   sqlite3VdbeMemSetStr(pOut, pOp->p4.z, pOp->p1, 0, 0);
   pOut->enc = encoding;
+  if( pOp->p3!=0 ){
+    pOut->flags |= MEM_Subtype;
+    pOut->eSubtype = pOp->p3;
+  }
   UPDATE_MAX_BLOBSIZE(pOut);
   break;
 }
@@ -2583,7 +2587,8 @@ case OP_Column: {
     /* MsgPack map, array or extension. Wrap it in a blob verbatim. */
     pDest->n = aOffset[p2+1]-aOffset[p2];
     pDest->z = zData+aOffset[p2];
-    pDest->flags = MEM_Blob|MEM_Ephem;
+    pDest->flags = MEM_Blob|MEM_Ephem|MEM_Subtype;
+    pDest->eSubtype = MSGPACK_SUBTYPE;
   }
 
   if( pDest->flags & MEM_Ephem ){

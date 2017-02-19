@@ -254,6 +254,9 @@ struct Mem {
   #define MEM_Zero 0x0000
 #endif
 
+/* The "subtype" set for MsgPack values */
+#define MSGPACK_SUBTYPE  77    /* Ascii for "M" */
+
 /* Return TRUE if Mem X contains dynamically allocated content - anything
 ** that needs to be deallocated to avoid a leak.
 */

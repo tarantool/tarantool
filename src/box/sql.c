@@ -513,6 +513,6 @@ int sql_schema_put(int idb, int argc, char **argv)
 /* Space_id and index_id are encoded in SQLite page number. */
 static uint32_t get_space_id(Pgno page, uint32_t *index_id)
 {
-	if (index_id) *index_id = page & 31;
-	return page >> 5;
+	if (index_id) *index_id = SQLITE_PAGENO_TO_INDEXID(page);
+	return SQLITE_PAGENO_TO_SPACEID(page);
 }

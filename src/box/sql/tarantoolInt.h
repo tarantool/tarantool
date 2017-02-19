@@ -6,6 +6,21 @@
 ** that's why we are using a weird naming schema.
 */
 
+/*
+ * SQLite uses the root page number to identify a Table or Index BTree.
+ * We switched it to using Tarantool spaces and indices instead of the
+ * BTrees. Hence the functions to encode index and space id in
+ * a page number.
+ */
+#define SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(spaceid, iid) \
+  (((unsigned)(spaceid) << 5) | (iid))
+
+#define SQLITE_PAGENO_TO_SPACEID(pgno) \
+  ((unsigned)(pgno) >> 5)
+
+#define SQLITE_PAGENO_TO_INDEXID(pgno) \
+  ((pgno) & 31)
+
 /* Misc */
 const char *tarantoolErrorMessage();
 

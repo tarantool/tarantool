@@ -4701,10 +4701,15 @@ u32 sqlite3VdbeMsgpackRecordPut(u8 *pBuf, Mem *pRec, u32 n){
       }else{
         zNewRecord = mp_encode_int(zNewRecord, pRec->u.i);
       }
+    }else if( pRec->flags & MEM_Str ){
+      zNewRecord = mp_encode_str(zNewRecord, pRec->z, pRec->n);
     }else{
-      zNewRecord = ((pRec->flags & MEM_Str) ? mp_encode_strl : mp_encode_binl)(
-          zNewRecord, pRec->n +((pRec->flags & MEM_Zero) ? pRec->u.nZero : 0)
-      );
+      /* Emit BIN header iff the BLOB doesn't store MsgPack content */
+      if( (pRec->flags & MEM_Subtype)==0 || pRec->eSubtype != MSGPACK_SUBTYPE ){
+        zNewRecord = mp_encode_binl(
+            zNewRecord, pRec->n +((pRec->flags & MEM_Zero) ? pRec->u.nZero : 0)
+        );
+      }
       memcpy(zNewRecord, pRec->z, pRec->n);
       zNewRecord += pRec->n;
       if( pRec->flags & MEM_Zero ){
