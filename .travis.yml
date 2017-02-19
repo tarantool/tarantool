@@ -32,6 +32,7 @@ env:
       - OS=debian DIST=wheezy PACK=deb
       - OS=debian DIST=stretch PACK=deb
       - OS=debian DIST=sid PACK=deb
+      - OS=rumprun DIST=hw PACK=rumprun
 
 matrix:
     allow_failures:
@@ -49,6 +50,7 @@ matrix:
 #      - env: OS=debian DIST=jessie PACK=deb
 #      - env: OS=debian DIST=stretch PACK=deb
       - env: OS=debian DIST=sid PACK=deb
+      - env: OS=rumprun DIST=hw PACK=rumprun
       - env: PACK=none
         os: osx
 
@@ -81,6 +83,8 @@ matrix:
         compiler: clang
       - env: OS=debian DIST=sid PACK=deb
         compiler: clang
+      - env: OS=rumprun DIST=hw PACK=rumprun
+        compiler: clang
       - env: PACK=coverage
         os: osx
       - env: PACK=source
@@ -112,6 +116,8 @@ matrix:
       - env: OS=debian DIST=stretch PACK=deb
         os: osx
       - env: OS=debian DIST=sid PACK=deb
+        os: osx
+      - env: OS=rumprun DIST=hw PACK=rumprun
         os: osx
       - os: osx
         compiler: gcc
