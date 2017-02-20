@@ -5049,13 +5049,13 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
  * Schedule checkpoint. Please call vy_wait_checkpoint() after that.
  */
 int
-vy_checkpoint(struct vy_env *env)
+vy_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
 
 	assert(env->status == VINYL_ONLINE);
 
-	scheduler->checkpoint_lsn = env->xm->lsn;
+	scheduler->checkpoint_lsn = vclock_sum(vclock);
 	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn)
 		return 0; /* nothing to do */
 

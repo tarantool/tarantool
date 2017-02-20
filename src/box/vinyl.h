@@ -79,7 +79,7 @@ int
 vy_end_recovery(struct vy_env *e);
 
 int
-vy_checkpoint(struct vy_env *env);
+vy_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vlock);

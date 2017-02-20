@@ -142,8 +142,15 @@ public:
 	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
+	 * Must not yield.
 	 */
 	virtual int beginCheckpoint();
+	/**
+	 * Prepare to wait for a checkpoint.
+	 * Called right after WAL checkpoint.
+	 * Must not yield.
+	 */
+	virtual int prepareWaitCheckpoint(struct vclock *vclock);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */

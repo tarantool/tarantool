@@ -317,9 +317,9 @@ VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 
 
 int
-VinylEngine::beginCheckpoint()
+VinylEngine::prepareWaitCheckpoint(struct vclock *vclock)
 {
-	return vy_checkpoint(env);
+	return vy_checkpoint(env, vclock);
 }
 
 int

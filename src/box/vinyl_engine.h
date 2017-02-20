@@ -56,7 +56,7 @@ struct VinylEngine: public Engine {
 	virtual void beginFinalRecovery() override;
 	virtual void endRecovery() override;
 	virtual void join(struct xstream *stream) override;
-	virtual int beginCheckpoint() override;
+	virtual int prepareWaitCheckpoint(struct vclock *vclock) override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 public:
 	struct vy_env *env;
