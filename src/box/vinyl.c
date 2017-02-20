@@ -1995,6 +1995,9 @@ static int
 vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 		 struct vy_page_info *info, const struct key_def *key_def)
 {
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+
 	struct xrow_header xrow;
 	if (vy_stmt_encode(value, key_def, &xrow) != 0)
 		return -1;
@@ -2002,6 +2005,8 @@ vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 	ssize_t row_size;
 	if ((row_size = xlog_write_row(data_xlog, &xrow)) < 0)
 		return -1;
+
+	region_truncate(region, used);
 
 	info->unpacked_size += row_size;
 
@@ -2799,12 +2804,16 @@ vy_run_recover(struct vy_run *run, const char *dir)
 		goto fail_close;
 	}
 
-	int rc;
-	uint32_t page_no = 0;
-	while ((rc = xlog_cursor_next_row(&cursor, &xrow)) == 0) {
-		if (page_no >= run->info.count) {
-			/** To many pages in file */
-			diag_set(ClientError, ER_VINYL, "To many pages in run meta file");
+	for (uint32_t page_no = 0; page_no < run->info.count; page_no++) {
+		int rc = xlog_cursor_next_row(&cursor, &xrow);
+		if (rc != 0) {
+			if (rc > 0) {
+				/** To few pages in file */
+				diag_set(ClientError, ER_VINYL,
+					 "Too few pages in run meta file");
+			}
+			/** Limit count of pages to successfully created pages */
+			run->info.count = page_no;
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
@@ -2813,7 +2822,12 @@ vy_run_recover(struct vy_run *run, const char *dir)
 			run->info.count = page_no;
 			goto fail_close;
 		}
-		++page_no;
+	}
+	if (xlog_cursor_next_row(&cursor, &xrow) == 0) {
+		/** To many pages in file */
+		diag_set(ClientError, ER_VINYL,
+			 "Too many pages in run meta file");
+		goto fail_close;
 	}
 
 	/* We don't need to keep metadata file open any longer. */
