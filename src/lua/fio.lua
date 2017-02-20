@@ -93,7 +93,9 @@ fio_methods.seek = function(self, offset, whence)
 end
 
 fio_methods.close = function(self)
-    return internal.close(self.fh)
+    local res = internal.close(self.fh)
+    self.fh = -1
+    return res
 end
 
 fio_methods.fsync = function(self)
