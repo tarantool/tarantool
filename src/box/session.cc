@@ -128,42 +128,58 @@ session_create_on_demand()
  */
 struct credentials admin_credentials;
 
-int
-session_run_on_disconnect_triggers(struct session *session)
+static int
+session_run_triggers(struct session *session, struct rlist *triggers)
 {
 	struct fiber *fiber = fiber();
-	/* For triggers. */
+	assert(session == current_session());
+
+	/* Save original credentials */
+	struct credentials orig_credentials;
+	credentials_copy(&orig_credentials, &session->credentials);
+
+	/* Run triggers with admin credentals */
+	credentials_copy(&session->credentials, &admin_credentials);
 	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &admin_credentials);
+	fiber_set_user(fiber, &session->credentials);
+
+	int rc = 0;
 	try {
-		trigger_run(&session_on_disconnect, NULL);
+		trigger_run(triggers, NULL);
 	} catch (Exception *e) {
-		e->log();
+		rc = -1;
 	}
+
+	/* Restore original credentials */
+	credentials_copy(&session->credentials, &orig_credentials);
+	fiber_set_user(fiber, &session->credentials);
+
+	return rc;
+}
+
+void
+session_run_on_disconnect_triggers(struct session *session)
+{
+	if (session_run_triggers(session, &session_on_disconnect) != 0)
+		error_log(diag_last_error(diag_get()));
 	session_storage_cleanup(session->id);
-	return 0;
 }
 
 int
 session_run_on_connect_triggers(struct session *session)
 {
-	/* Run on_connect with admin credentals */
-	struct fiber *fiber = fiber();
-	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &admin_credentials);
-	try {
-		trigger_run(&session_on_connect, NULL);
-	} catch (Exception *) {
-		return -1;
-	}
-	/* Set session user to guest, until it is authenticated. */
-	return 0;
+	return session_run_triggers(session, &session_on_connect);
 }
 
-void
+int
 session_run_on_auth_triggers(const char *user_name)
 {
-	trigger_run(&session_on_auth, (void *)user_name);
+	try {
+		trigger_run(&session_on_auth, (void *)user_name);
+		return 0;
+	} catch(Exception *e) {
+		return -1;
+	}
 }
 
 void

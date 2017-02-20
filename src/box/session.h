@@ -187,14 +187,15 @@ int
 session_run_on_connect_triggers(struct session *session);
 
 /** Run on-disconnect triggers */
-int
+void
 session_run_on_disconnect_triggers(struct session *session);
+
+/** Run auth triggers */
+int
+session_run_on_auth_triggers(const char *user_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-void
-session_run_on_auth_triggers(const char *user_name);
 
 /*
  * Return the current user. Create it if it doesn't

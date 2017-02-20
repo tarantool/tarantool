@@ -307,6 +307,14 @@ tx_process_join_subscribe(struct cmsg *msg);
 static void
 net_end_join_subscribe(struct cmsg *msg);
 
+static void
+tx_fiber_init(struct session *session, uint64_t sync)
+{
+	session->sync = sync;
+	fiber_set_session(fiber(), session);
+	fiber_set_user(fiber(), &session->credentials);
+}
+
 /**
  * Fire on_disconnect triggers in the tx
  * thread and destroy the session object,
@@ -317,6 +325,7 @@ tx_process_disconnect(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
+	tx_fiber_init(con->session, 0);
 	if (con->session) {
 		if (! rlist_empty(&session_on_disconnect))
 			session_run_on_disconnect_triggers(con->session);
@@ -842,14 +851,6 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
-static void
-tx_fiber_init(struct session *session, uint64_t sync)
-{
-	session->sync = sync;
-	fiber_set_session(fiber(), session);
-	fiber_set_user(fiber(), &session->credentials);
-}
-
 static int
 tx_check_schema(uint32_t schema_id)
 {
@@ -1055,6 +1056,7 @@ tx_process_connect(struct cmsg *m)
 		con->session = session_create(con->input.fd);
 		if (con->session == NULL)
 			diag_raise();
+		tx_fiber_init(con->session, 0);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = SERVER_UUID;

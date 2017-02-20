@@ -92,3 +92,27 @@ session.sync()
 fiber = nil
 session = nil
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+-- audit permission in on_connect/on_disconnect triggers
+box.schema.user.create('tester', { password = 'tester' })
+
+on_connect_user = nil
+on_disconnect_user = nil
+function on_connect() on_connect_user = box.session.user() end
+function on_disconnect() on_disconnect_user = box.session.user() end
+_ = box.session.on_connect(on_connect)
+_ = box.session.on_disconnect(on_disconnect)
+
+conn = require('net.box').connect('tester:tester@'..box.cfg.listen)
+-- Triggers must not lead to privilege escalation
+conn:eval('box.space._user:select()')
+conn:close()
+conn = nil
+
+-- Triggers are executed with admin permissions
+on_connect_user == 'admin'
+on_disconnect_user == 'admin'
+
+box.session.on_connect(nil, on_connect)
+box.session.on_disconnect(nil, on_disconnect)
+box.schema.user.drop('tester')
