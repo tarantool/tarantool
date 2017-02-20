@@ -143,6 +143,7 @@ enum opt_type {
 	OPT_INT,	/* int64_t */
 	OPT_FLOAT,	/* double */
 	OPT_STR,	/* char[] */
+	OPT_STRPTR,	/* char*, size_t */
 	opt_type_MAX,
 };
 
@@ -209,6 +210,10 @@ struct index_opts {
 	 * LSN from the time of index creation.
 	 */
 	int64_t lsn;
+	/**
+	 * SQL statement that produced this index.
+	 */
+	char *sql;
 };
 
 extern const struct index_opts index_opts_default;
@@ -388,6 +393,10 @@ struct space_opts {
 	 * - changes are not part of a snapshot
 	 */
 	bool temporary;
+	/**
+	 * SQL statement that produced this space.
+	 */
+	const char *sql;
 };
 
 extern const struct space_opts space_opts_default;

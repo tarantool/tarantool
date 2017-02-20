@@ -14,6 +14,7 @@
 ** from disk.
 */
 #include "sqliteInt.h"
+#include "tarantoolInt.h"
 
 /*
 ** Fill the InitData structure with an error message that indicates
@@ -66,7 +67,8 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
   if( argv==0 ) return 0;   /* Might happen if EMPTY_RESULT_CALLBACKS are on */
   if( argv[1]==0 ){
     corruptSchema(pData, argv[0], 0);
-  }else if( sqlite3_strnicmp(argv[2],"create ",7)==0 ){
+  }else if( (strlen(argv[2])>7) &&
+	    sqlite3_strnicmp(argv[2],"create ",7)==0 ){
     /* Call the parser to process a CREATE TABLE, INDEX or VIEW.
     ** But because db->init.busy is set to 1, no VDBE code is generated
     ** or executed.  All the parser does is build the internal data
@@ -81,7 +83,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     db->init.iDb = iDb;
     db->init.newTnum = sqlite3Atoi(argv[1]);
     db->init.orphanTrigger = 0;
-    TESTONLY(rcp = ) sqlite3_prepare(db, argv[2], -1, &pStmt, 0);
+    TESTONLY(rcp = ) sqlite3_prepare(db, argv[2], strlen(argv[2])+1, &pStmt, 0);
     rc = db->errCode;
     assert( (rc&0xFF)==(rcp&0xFF) );
     db->init.iDb = saved_iDb;
@@ -99,7 +101,8 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
       }
     }
     sqlite3_finalize(pStmt);
-  }else if( argv[0]==0 || (argv[2]!=0 && argv[2][0]!=0) ){
+  }else if( argv[0]==0 ||
+	    (argv[2]!=0 && argv[2][0]!=0) ){
     corruptSchema(pData, argv[0], 0);
   }else{
     /* If the SQL column is blank it means this is an index that
@@ -165,6 +168,12 @@ static int sqlite3InitOne(sqlite3 *db, int iDb, char **pzErrMsg){
   initData.rc = SQLITE_OK;
   initData.pzErrMsg = pzErrMsg;
   sqlite3InitCallback(&initData, 3, (char **)azArg, 0);
+
+  /* Load schema from Tarantool - into the primary db only. */
+  if( iDb==0 && initData.rc==SQLITE_OK ){
+    tarantoolSqlite3LoadSchema(&initData);
+  }
+
   if( initData.rc ){
     rc = initData.rc;
     goto error_out;

@@ -1,18 +1,5 @@
-wa = require 'sqlworkaround'
-
-test_run = require('test_run').new()
-
--- test invalid input
-wa.sql_schema_put(0, "invalid", 1, "CREATE FROB")
-
 -- create space
-foobar = box.schema.space.create("foobar")
-_ = foobar:create_index("primary",{parts={1,"number"}})
-
-foobar_pageno = wa.sql_pageno(foobar.id, foobar.index.primary.id)
-foobar_sql = "CREATE TABLE foobar (foo PRIMARY KEY, bar) WITHOUT ROWID"
-wa.sql_schema_put(0, "foobar", foobar_pageno, foobar_sql)
-wa.sql_schema_put(0, "sqlite_autoindex_foobar_1", foobar_pageno, "")
+box.sql.execute("CREATE TABLE foobar (foo PRIMARY KEY, bar) WITHOUT ROWID")
 
 -- prepare data
 box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
@@ -47,26 +34,21 @@ box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 
 -- cleanup
-foobar:drop()
+box.space.foobar:drop()
 
 -- multi-index
 
 -- create space
-barfoo = box.schema.space.create("barfoo")
-_ = barfoo:create_index("primary",{parts={2,"number"}})
-_ = barfoo:create_index("secondary",{parts={1,"string"}})
-
-barfoo_pageno = wa.sql_pageno(barfoo.id, barfoo.index.primary.id)
-barfoo2_pageno = wa.sql_pageno(barfoo.id, barfoo.index.secondary.id)
-barfoo_sql = "CREATE TABLE barfoo (bar, foo PRIMARY KEY) WITHOUT ROWID"
-wa.sql_schema_put(0, "barfoo", barfoo_pageno, barfoo_sql)
-wa.sql_schema_put(0, "sqlite_autoindex_barfoo_1", barfoo_pageno, "")
-wa.sql_schema_put(0, "barfoo2", barfoo2_pageno, "CREATE INDEX barfoo2 ON barfoo(bar)")
+box.sql.execute("CREATE TABLE barfoo (bar, foo NUM PRIMARY KEY) WITHOUT ROWID")
+box.sql.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 
 -- prepare data
-barfoo:insert({'foo', 1})
-barfoo:insert({'bar', 2})
-barfoo:insert({'foobar', 1000})
+box.sql.execute("INSERT INTO barfoo VALUES ('foo', 1)")
+box.sql.execute("INSERT INTO barfoo VALUES ('bar', 2)")
+box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
+
+-- prove barfoo2 was created
+box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 
 box.sql.execute("SELECT foo, bar FROM barfoo")
 box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo==2")
@@ -75,4 +57,17 @@ box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo>=2")
 box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo<=2")
 
 -- cleanup
-barfoo:drop()
+box.sql.execute("DROP INDEX barfoo2")
+box.sql.execute("DROP TABLE foobar")
+box.sql.execute("DROP TABLE barfoo")
+
+-- attempt to create a WITHOUT ROWID table lacking PRIMARY KEY
+box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x) WITHOUT ROWID")
+
+-- attempt to create a table lacking WITHOUT ROWID clause
+box.sql.execute("CREATE TABLE rowid(x)")
+
+-- create a table with implicit indices (used to SEGFAULT)
+box.sql.execute("CREATE TABLE implicit_indices(a PRIMARY KEY,b,c,d UNIQUE) WITHOUT ROWID")
+box.space.implicit_indices:drop()
+box.sql.execute("DROP TABLE implicit_indices")

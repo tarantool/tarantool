@@ -55,65 +55,7 @@
 
 static sqlite3 *db = NULL;
 
-/*
- * Manually add objects to SQLite in-memory schema.
- * Argv must adhere to sqlite_master format.
- * It is interpreted as follows:
- *   argv[0] = name
- *   argv[1] = pageNo
- *   argv[2] = sql
- */
-int sql_schema_put(int idb, int argc, char **argv);
-
-/*
- * Add _space system space to SQLite in-memory schema.
- * End result: _space table is registered and accessible from SQL.
- */
-static void
-sql_schema_put_sys_space()
-{
-	char sys_space_name[] = "_space";
-	char sys_space_pageno[16];
-	char sys_space_sql[] = "CREATE TABLE _space ("
-		"id INT PRIMARY KEY, "
-		"owner INT, name STR, engine STR, field_count INT, flags, format"
-	") WITHOUT ROWID";
-	char *sys_space_argv[] = {
-		sys_space_name,
-		sys_space_pageno,
-		sys_space_sql,
-		NULL
-	};
-	snprintf(sys_space_pageno, sizeof(sys_space_pageno), "%d",
-		SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(BOX_SPACE_ID, 0)
-	);
-	sql_schema_put(0, 3, sys_space_argv);
-}
-
-/*
- * Add _index system space to SQLite in-memory schema.
- * End result: _index table is registered and accessible from SQL.
- */
-static void
-sql_schema_put_sys_index()
-{
-	char sys_index_name[] = "_index";
-	char sys_index_pageno[16];
-	char sys_index_sql[] = "CREATE TABLE _index ("
-		"id INT, iid INT, name STR, type STR, opts, parts, "
-		"PRIMARY KEY (id, iid)"
-	") WITHOUT ROWID";
-	char *sys_index_argv[] = {
-		sys_index_name,
-		sys_index_pageno,
-		sys_index_sql,
-		NULL
-	};
-	snprintf(sys_index_pageno, sizeof(sys_index_pageno), "%d",
-		SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(BOX_INDEX_ID, 0)
-	);
-	sql_schema_put(0, 3, sys_index_argv);
-}
+static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
 void
 sql_init()
@@ -125,8 +67,6 @@ sql_init()
 	} else {
 		/* XXX */
 	}
-	sql_schema_put_sys_space();
-	sql_schema_put_sys_index();
 }
 
 void
@@ -188,8 +128,6 @@ sql_get()
  * are accurately positioned, hence both 0 and 1 are fine.
  */
 
-static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
-
 /*
  * Tarantool iterator API was apparently designed by space aliens.
  * This wrapper is necessary for interfacing with the SQLite btree code.
@@ -200,6 +138,8 @@ struct ta_cursor
 	struct tuple     *tuple_last;
 	enum iterator_type type;
 };
+
+static struct ta_cursor *cursor_create();
 
 static int
 cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
@@ -411,7 +351,7 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	assert(pCur->curFlags & BTCF_TaCursor);
 
 	struct ta_cursor *c = pCur->pTaCursor;
-	const struct key_def *key_def;
+	const box_key_def_t *key_def;
 	const struct tuple *tuple;
 	const char *base;
 	const struct tuple_format *format;
@@ -457,9 +397,7 @@ out:
 #ifndef NDEBUG
 	/* Sanity check. */
 	original_size = region_used(&fiber()->gc);
-	key = tuple_extract_key(tuple,
-				key_def,
-				&key_size);
+	key = tuple_extract_key(tuple, key_def, &key_size);
 	if (key != NULL) {
 		rc = sqlite3VdbeRecordCompareMsgpack((int)key_size, key,
 						     pUnpacked);
@@ -468,6 +406,65 @@ out:
 	}
 #endif
 	return SQLITE_OK;
+}
+
+/*
+ * The function assumes the cursor is open on _schema.
+ * Increment max_id and store updated tuple in the cursor
+ * object.
+ */
+int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
+{
+	/* ["max_id"] */
+	static const char key[] = {
+		(char)0x91, /* MsgPack array(1) */
+		(char)0xa6, /* MsgPack string(6) */
+		'm', 'a', 'x', '_', 'i', 'd'
+	};
+	/* [["+", 1, 1]]*/
+	static const char ops[] = {
+		(char)0x91, /* MsgPack array(1) */
+		(char)0x93, /* MsgPack array(3) */
+		(char)0xa1, /* MsgPack string(1) */
+		'+',
+		1,          /* MsgPack int(1) */
+		1           /* MsgPack int(1) */
+	};
+
+	assert(pCur->curFlags & BTCF_TaCursor);
+
+	struct ta_cursor *c = pCur->pTaCursor;
+	uint32_t space_id, index_id;
+	box_tuple_t *res;
+	int rc;
+
+	space_id = get_space_id(pCur->pgnoRoot, &index_id);
+	rc = box_update(space_id, index_id,
+		key, key + sizeof(key),
+		ops, ops + sizeof(ops),
+		0,
+		&res);
+	if (rc != 0 || res == NULL) {
+		return SQLITE_TARANTOOL_ERROR;
+	}
+	if (!c) {
+		c = cursor_create();
+		if (!c) return SQLITE_NOMEM;
+		pCur->pTaCursor = c;
+		c->iter = NULL;
+		c->type = ITER_EQ; /* store some meaningfull value */
+	} else if (c->tuple_last) {
+		box_tuple_unref(c->tuple_last);
+	}
+	box_tuple_ref(res);
+	c->tuple_last = res;
+	pCur->eState = CURSOR_VALID;
+	return SQLITE_OK;
+}
+
+static struct ta_cursor *cursor_create()
+{
+	return malloc(sizeof(struct ta_cursor));
 }
 
 /* Cursor positioning. */
@@ -490,7 +487,7 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 			c->iter = NULL;
 		}
 	} else {
-		c = malloc(sizeof(*c));
+		c = cursor_create();
 		if (!c) {
 			*pRes = 1;
 			return SQLITE_NOMEM;
@@ -536,50 +533,316 @@ cursor_advance(BtCursor *pCur, int *pRes)
 	return SQLITE_OK;
 }
 
-/*********************************************************************
- * Manually add objects to SQLite in-memory schema.
- * Argv must adhere to sqlite_master format.
- * It is interpreted as follows:
- *   argv[0] = name
- *   argv[1] = pageNo
- *   argv[2] = sql
- */
-int sql_schema_put(int idb, int argc, char **argv)
-{
-	InitData init;
-	char *err_msg = NULL;
-
-	if (!db) return SQLITE_ERROR;
-
-	init.db = db;
-	init.iDb = idb;
-	init.rc = SQLITE_OK;
-	init.pzErrMsg = &err_msg;
-
-	sqlite3_mutex_enter(db->mutex);
-	sqlite3BtreeEnterAll(db);
-	db->init.busy = 1;
-	sqlite3InitCallback(&init, argc, argv, NULL);
-	db->init.busy = 0;
-	sqlite3BtreeLeaveAll(db);
-
-	/*
-	 * Overwrite argv[0] with the error message (if any), caller
-	 * should free it.
-	 */
-	if (err_msg) {
-		argv[0] = strdup(err_msg);
-		sqlite3DbFree(db, err_msg);
-	} else
-		argv[0] = NULL;
-
-	sqlite3_mutex_leave(db->mutex);
-	return init.rc;
-}
-
 /* Space_id and index_id are encoded in SQLite page number. */
 static uint32_t get_space_id(Pgno page, uint32_t *index_id)
 {
 	if (index_id) *index_id = SQLITE_PAGENO_TO_INDEXID(page);
 	return SQLITE_PAGENO_TO_SPACEID(page);
+}
+
+/*********************************************************************
+ * Schema support.
+ */
+
+/*
+ * Manully add objects to SQLite in-memory schema.
+ * This is loosely based on sqlite_master row format.
+ * @Params
+ *   name - object name
+ *   id   - SQLITE_PAGENO_FROM_SPACEID_INDEXID(...)
+ *          for tables and indices
+ *   sql  - SQL statement that created this object
+ */
+static void
+sql_schema_put(InitData *init,
+	       const char *name,
+	       uint32_t spaceid, uint32_t indexid,
+	       const char *sql)
+{
+	char pageno[16];
+	char *argv[] = {
+		(char *)name,
+		pageno,
+		(char *)sql,
+		NULL
+	};
+
+	if (init->rc != SQLITE_OK) return;
+
+	snprintf(pageno, sizeof(pageno), "%d",
+		 SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(
+			 spaceid, indexid));
+
+	sqlite3InitCallback(init, 3, argv, NULL);
+}
+
+/* TODO move to public header */
+void
+space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
+			    uint32_t errcode);
+struct index_def *
+index_def_new_from_tuple(struct tuple *tuple);
+
+/* Load database schema from Tarantool. */
+void tarantoolSqlite3LoadSchema(InitData *init)
+{
+	box_iterator_t *it;
+	box_tuple_t *tuple;
+
+	sql_schema_put(
+		init, TARANTOOL_SYS_SCHEMA_NAME,
+		BOX_SCHEMA_ID, 0,
+		"CREATE TABLE "TARANTOOL_SYS_SCHEMA_NAME" ("
+			"key TEXT PRIMARY KEY, value"
+	        ")"
+	);
+
+	sql_schema_put(
+		init, TARANTOOL_SYS_SPACE_NAME,
+		BOX_SPACE_ID, 0,
+		"CREATE TABLE "TARANTOOL_SYS_SPACE_NAME" ("
+			"id INT PRIMARY KEY, owner INT, name TEXT, "
+			"engine TEXT, field_count INT, opts, format"
+		")"
+	);
+
+	sql_schema_put(
+		init, TARANTOOL_SYS_INDEX_NAME,
+		BOX_INDEX_ID, 0,
+		"CREATE TABLE "TARANTOOL_SYS_INDEX_NAME" ("
+			"id INT, iid INT, "
+			"name TEXT, type TEXT, opts, parts, "
+			"PRIMARY KEY (id, iid)"
+		")"
+	);
+
+	/* Read _space */
+	it = box_index_iterator(BOX_SPACE_ID, 0, ITER_GE,
+				nil_key, nil_key + sizeof(nil_key));
+
+	if (it == NULL) {
+		init->rc = SQLITE_TARANTOOL_ERROR;
+		return;
+	}
+
+	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
+		struct space_def def;
+		space_def_create_from_tuple(&def, tuple, 0);
+		if (def.opts.sql != NULL) {
+			sql_schema_put(
+				init, def.name,
+				def.id, 0,
+				def.opts.sql
+			);
+		}
+	}
+
+	box_iterator_free(it);
+
+	/* Read _index */
+	it = box_index_iterator(BOX_INDEX_ID, 0, ITER_GE,
+				nil_key, nil_key + sizeof(nil_key));
+
+	if (it == NULL) {
+		init->rc = SQLITE_TARANTOOL_ERROR;
+		return;
+	}
+
+	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
+		struct index_def *def;
+		def = index_def_new_from_tuple(tuple);
+		if (def->opts.sql != NULL) {
+			sql_schema_put(
+				init, def->name,
+				def->space_id, def->iid,
+				def->opts.sql
+			);
+		}
+		index_def_delete(def);
+	}
+
+	box_iterator_free(it);
+}
+
+/*********************************************************************
+ * Metainformation about available spaces and indices is stored in
+ * _space and _index system spaces respectively.
+ *
+ * SQLite inserts entries in system spaces.
+ *
+ * The routines below are called during SQL query processing in order to
+ * format data for certain fields in _space and _index.
+ */
+
+/*
+ * Resulting data is of the variable length. Routines are called twice:
+ *  1. with a NULL buffer, yielding result size estimation;
+ *  2. with a buffer of the estimated size, rendering the result.
+ *
+ * For convenience, formatting routines use Enc structure to call
+ * Enc is either configured to perform size estimation
+ * or to render the result.
+ */
+struct Enc
+{
+	char *(*encode_uint)  (char *data, uint64_t num);
+	char *(*encode_str)   (char *data, const char *str, uint32_t len);
+	char *(*encode_bool)  (char *data, bool v);
+	char *(*encode_array) (char *data, uint32_t len);
+	char *(*encode_map)   (char *data, uint32_t len);
+};
+
+/* no_encode_XXX functions estimate result size */
+
+static char *no_encode_uint(char *data, uint64_t num)
+{
+	/* MsgPack UINT is encoded in 9 bytes or less */
+	(void)num; return data + 9;
+}
+
+static char *no_encode_str(char *data, const char *str, uint32_t len)
+{
+	/* MsgPack STR header is encoded in 5 bytes or less, followed by
+	 * the string data. */
+	(void)str; return data + 5 + len;
+}
+
+static char *no_encode_bool(char *data, bool v)
+{
+	/* MsgPack BOOL is encoded in 1 byte. */
+	(void)v; return data + 1;
+}
+
+static char *no_encode_array_or_map(char *data, uint32_t len)
+{
+	/* MsgPack ARRAY or MAP header is encoded in 5 bytes or less. */
+	(void)len; return data + 5;
+}
+
+/*
+ * If buf==NULL, return Enc that will perform size estimation;
+ * otherwize, return Enc that renders results in the provided buf.
+ */
+static const struct Enc *get_enc(void *buf)
+{
+	static const struct Enc mp_enc = {
+		mp_encode_uint, mp_encode_str, mp_encode_bool,
+		mp_encode_array, mp_encode_map
+	}, no_enc = {
+		no_encode_uint, no_encode_str, no_encode_bool,
+		no_encode_array_or_map, no_encode_array_or_map
+	};
+	return buf ? &mp_enc : &no_enc;
+}
+
+/*
+ * Convert SQLite affinity value to the corresponding Tarantool type
+ * string which is suitable for _index.parts field.
+ */
+static const char *convertSqliteAffinity(int affinity)
+{
+	switch (affinity) {
+	default:
+		assert(false);
+	case SQLITE_AFF_BLOB:
+		return "scalar";
+	case SQLITE_AFF_TEXT:
+		return "string";
+	case SQLITE_AFF_NUMERIC:
+	case SQLITE_AFF_REAL:
+		return "number";
+	case SQLITE_AFF_INTEGER:
+		return "integer";
+	}
+}
+
+/*
+ * Render "format" array for _space entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ *
+ * Ex: [{"name": "col1", "type": "integer"}, ... ]
+ */
+int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
+{
+	struct Column *aCol = pTable->aCol;
+	const struct Enc *enc = get_enc(buf);
+	char *base = buf, *p;
+	int i, n = pTable->nCol;
+	p = enc->encode_array(base, n);
+	for (i=0; i<n; i++) {
+		const char *t;
+		p = enc->encode_map(p, 2);
+		p = enc->encode_str(p, "name", 4);
+		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
+		p = enc->encode_str(p, "type", 4);
+		t = aCol[i].affinity == SQLITE_AFF_BLOB ? "*" :
+			convertSqliteAffinity(aCol[i].affinity);
+		p = enc->encode_str(p, t, strlen(t));
+	}
+	return (int)(p - base);
+}
+
+/*
+ * Format "opts" dictionary for _space entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ *
+ * Ex: {"temporary": true, "sql": "CREATE TABLE student (name, grade)"}
+ */
+int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
+{
+	(void)pTable;
+	const struct Enc *enc = get_enc(buf);
+	char *base = buf, *p;
+	p = enc->encode_map(base, 1);
+	p = enc->encode_str(p, "sql", 3);
+	p = enc->encode_str(p, zSql, strlen(zSql));
+	return (int)(p - base);
+}
+
+/*
+ * Format "parts" array for _index entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ *
+ * Ex: [[0, "integer"]]
+ */
+int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
+{
+	struct Column *aCol = pIndex->pTable->aCol;
+	const struct Enc *enc = get_enc(buf);
+	char *base = buf, *p;
+	int i, n = pIndex->nKeyCol;
+	p = enc->encode_array(base, n);
+	for (i=0; i<n; i++) {
+		int col = pIndex->aiColumn[i];
+		const char *t = convertSqliteAffinity(aCol[col].affinity);
+		p = enc->encode_array(p, 2),
+		p = enc->encode_uint(p, col);
+		p = enc->encode_str(p, t, strlen(t));
+	}
+	return (int)(p - base);
+}
+
+/*
+ * Format "opts" dictionary for _index entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ *
+ * Ex: {
+ *   "unique": "true",
+ *   "sql": "CREATE INDEX student_by_name ON students(name)"
+ * }
+ */
+int tarantoolSqlite3MakeIdxOpts(SqliteIndex *index, const char *zSql, void *buf)
+{
+	const struct Enc *enc = get_enc(buf);
+	char *base = buf, *p;
+	p = enc->encode_map(base, 2);
+	p = enc->encode_str(p, "unique", 6);
+	p = enc->encode_bool(p, index->onError != OE_None);
+	p = enc->encode_str(p, "sql", 3);
+	p = enc->encode_str(p, zSql, zSql ? strlen(zSql) : 0);
+	return (int)(p - base);
 }

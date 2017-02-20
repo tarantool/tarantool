@@ -23,6 +23,8 @@
 **     ROLLBACK
 */
 #include "sqliteInt.h"
+#include "vdbeInt.h"
+#include "tarantoolInt.h"
 
 #ifndef SQLITE_OMIT_SHARED_CACHE
 /*
@@ -970,11 +972,6 @@ void sqlite3StartTable(
   ** now.
   */
   if( !db->init.busy && (v = sqlite3GetVdbe(pParse))!=0 ){
-    int addr1;
-    int fileFormat;
-    int reg1, reg2, reg3;
-    /* nullRow[] is an OP_Record encoding of a row containing 5 NULLs */
-    static const char nullRow[] = { 6, 0, 0, 0, 0, 0 };
     sqlite3BeginWriteOperation(pParse, 1, iDb);
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
@@ -982,45 +979,6 @@ void sqlite3StartTable(
       sqlite3VdbeAddOp0(v, OP_VBegin);
     }
 #endif
-
-    /* If the file format and encoding in the database have not been set, 
-    ** set them now.
-    */
-    reg1 = pParse->regRowid = ++pParse->nMem;
-    reg2 = pParse->regRoot = ++pParse->nMem;
-    reg3 = ++pParse->nMem;
-    sqlite3VdbeAddOp3(v, OP_ReadCookie, iDb, reg3, BTREE_FILE_FORMAT);
-    sqlite3VdbeUsesBtree(v, iDb);
-    addr1 = sqlite3VdbeAddOp1(v, OP_If, reg3); VdbeCoverage(v);
-    fileFormat = (db->flags & SQLITE_LegacyFileFmt)!=0 ?
-                  1 : SQLITE_MAX_FILE_FORMAT;
-    sqlite3VdbeAddOp3(v, OP_SetCookie, iDb, BTREE_FILE_FORMAT, fileFormat);
-    sqlite3VdbeAddOp3(v, OP_SetCookie, iDb, BTREE_TEXT_ENCODING, ENC(db));
-    sqlite3VdbeJumpHere(v, addr1);
-
-    /* This just creates a place-holder record in the sqlite_master table.
-    ** The record created does not contain anything yet.  It will be replaced
-    ** by the real entry in code generated at sqlite3EndTable().
-    **
-    ** The rowid for the new entry is left in register pParse->regRowid.
-    ** The root page number of the new table is left in reg pParse->regRoot.
-    ** The rowid and root page number values are needed by the code that
-    ** sqlite3EndTable will generate.
-    */
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE)
-    if( isView || isVirtual ){
-      sqlite3VdbeAddOp2(v, OP_Integer, 0, reg2);
-    }else
-#endif
-    {
-      pParse->addrCrTab = sqlite3VdbeAddOp2(v, OP_CreateTable, iDb, reg2);
-    }
-    sqlite3OpenMasterTable(pParse, iDb);
-    sqlite3VdbeAddOp2(v, OP_NewRowid, 0, reg1);
-    sqlite3VdbeAddOp4(v, OP_Blob, 6, reg3, 0, nullRow, P4_STATIC);
-    sqlite3VdbeAddOp3(v, OP_Insert, 0, reg3, reg1);
-    sqlite3VdbeChangeP5(v, OPFLAG_APPEND);
-    sqlite3VdbeAddOp0(v, OP_Close);
   }
 
   /* Normal (non-error) return. */
@@ -1672,12 +1630,6 @@ static int hasColumn(const i16 *aiCol, int nCol, int x){
 ** Changes include:
 **
 **     (1)  Set all columns of the PRIMARY KEY schema object to be NOT NULL.
-**     (2)  Convert the OP_CreateTable into an OP_CreateIndex.  There is
-**          no rowid btree for a WITHOUT ROWID.  Instead, the canonical
-**          data storage is a covering index btree.
-**     (3)  Bypass the creation of the sqlite_master table entry
-**          for the PRIMARY KEY as the primary key index is now
-**          identified by the sqlite_master table entry of the table itself.
 **     (4)  Set the Index.tnum of the PRIMARY KEY Index object in the
 **          schema to the rootpage from the main table.
 **     (5)  Add all table columns to the PRIMARY KEY Index object
@@ -1695,7 +1647,6 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
   int nPk;
   int i, j;
   sqlite3 *db = pParse->db;
-  Vdbe *v = pParse->pVdbe;
 
   /* Mark every PRIMARY KEY column as NOT NULL (except for imposter tables)
   */
@@ -1710,15 +1661,6 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
   /* The remaining transformations only apply to b-tree tables, not to
   ** virtual tables */
   if( IN_DECLARE_VTAB ) return;
-
-  /* Convert the OP_CreateTable opcode that would normally create the
-  ** root-page for the table into an OP_CreateIndex opcode.  The index
-  ** created will become the PRIMARY KEY index.
-  */
-  if( pParse->addrCrTab ){
-    assert( v );
-    sqlite3VdbeChangeOpcode(v, pParse->addrCrTab, OP_CreateIndex);
-  }
 
   /* Locate the PRIMARY KEY index.  Or, if this table was originally
   ** an INTEGER PRIMARY KEY table, create a new PRIMARY KEY index. 
@@ -1739,15 +1681,6 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
     pTab->iPKey = -1;
   }else{
     pPk = sqlite3PrimaryKeyIndex(pTab);
-
-    /* Bypass the creation of the PRIMARY KEY btree and the sqlite_master
-    ** table entry. This is only required if currently generating VDBE
-    ** code for a CREATE TABLE (not when parsing one as part of reading
-    ** a database schema).  */
-    if( v ){
-      assert( db->init.busy==0 );
-      sqlite3VdbeChangeOpcode(v, pPk->tnum, OP_Goto);
-    }
 
     /*
     ** Remove all redundant columns from the PRIMARY KEY.  For example, change
@@ -1817,6 +1750,259 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
 }
 
 /*
+** Generate code to determine the new space Id.
+** Assume _schema was open and accessible via iCursor.
+** Fetch the max space id seen so far from _schema and increment it.
+** Return register storing the result.
+*/
+static int getNewSpaceId(
+  Parse *pParse,
+  int iCursor
+){
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iRes = ++pParse->nMem;
+
+  sqlite3VdbeAddOp1(v, OP_IncMaxid, iCursor);
+  sqlite3VdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
+  return iRes;
+}
+
+/*
+** Generate VDBE code to create an Index. This is acomplished by adding
+** an entry to the _index table. ISpaceId either contains the literal
+** space id or designates a register storing the id.
+*/
+static void createIndex(
+  Parse *pParse,
+  Index *pIndex,
+  int iSpaceId,
+  int iIndexId,
+  const char *zSql,
+  Table *pSysIndex,
+  int iCursor
+){
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iFirstCol = ++pParse->nMem;
+  int iRecord = (pParse->nMem += 6); /* 6 total columns */
+  char *zOpts, *zParts;
+  int zOptsSz, zPartsSz;
+
+  /* Format "opts" and "parts" for _index entry. */
+  zOpts = sqlite3DbMallocRaw(pParse->db,
+    tarantoolSqlite3MakeIdxOpts(pIndex, zSql, NULL) +
+    tarantoolSqlite3MakeIdxParts(pIndex, NULL) + 2
+  );
+  if (!zOpts) return;
+  zOptsSz = tarantoolSqlite3MakeIdxOpts(pIndex, zSql, zOpts);
+  zParts = zOpts + zOptsSz + 1;
+  zPartsSz = tarantoolSqlite3MakeIdxParts(pIndex, zParts);
+#if SQLITE_DEBUG
+  /* NUL-termination is necessary for VDBE trace facility only */
+  zOpts[zOptsSz] = 0;
+  zParts[zPartsSz] = 0;
+#endif
+
+  if( pParse->pNewTable ){
+    /*
+     * A new table is being created, hence iSpaceId is a register, but
+     * iIndexId is literal.
+     */
+    sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol);
+    sqlite3VdbeAddOp2(v, OP_Integer, iIndexId, iFirstCol+1);
+  }else{
+    /*
+     * An existing table is being modified; iSpaceId is literal, but
+     * iIndexId is a register.
+     */
+    sqlite3VdbeAddOp2(v, OP_Integer, iSpaceId, iFirstCol);
+    sqlite3VdbeAddOp2(v, OP_SCopy, iIndexId, iFirstCol+1);
+  }
+  sqlite3VdbeAddOp4(v,
+    OP_String8, 0, iFirstCol+2, 0,
+    sqlite3DbStrDup(pParse->db, pIndex->zName),
+    P4_DYNAMIC
+  );
+  sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol+3, 0, "tree", P4_STATIC);
+  sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol+4, MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
+  /* zOpts and zParts are co-located, hence STATIC */
+  sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol+5, MSGPACK_SUBTYPE, zParts, P4_STATIC);
+  sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
+  sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 6);
+  sqlite3TableAffinity(v, pSysIndex, 0);
+}
+
+/*
+ * Generate code to initialize register range with arguments for
+ * ParseSchema2. Consumes zSql. Returns the first register used.
+ */
+static int makeIndexSchemaRecord(
+  Parse *pParse,
+  Index *pIndex,
+  int iSpaceId,
+  int iIndexId,
+  const char *zSql
+){
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iP4Type;
+  int iFirstCol = pParse->nMem + 1;
+  pParse->nMem += 4;
+
+  sqlite3VdbeAddOp4(v,
+    OP_String8, 0, iFirstCol, 0,
+    sqlite3DbStrDup(pParse->db, pIndex->zName),
+    P4_DYNAMIC
+  );
+
+  if( pParse->pNewTable ){
+    /*
+     * A new table is being created, hence iSpaceId is a register, but
+     * iIndexId is literal.
+     */
+    sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol+1);
+    sqlite3VdbeAddOp2(v, OP_Integer, iIndexId, iFirstCol+2);
+  }else{
+    /*
+     * An existing table is being modified; iSpaceId is literal, but
+     * iIndexId is a register.
+     */
+    sqlite3VdbeAddOp2(v, OP_Integer, iSpaceId, iFirstCol+1);
+    sqlite3VdbeAddOp2(v, OP_SCopy, iIndexId, iFirstCol+2);
+  }
+
+  iP4Type = P4_DYNAMIC;
+  if( zSql == 0 ){
+    zSql = ""; iP4Type = P4_STATIC;
+  }
+  sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol+3, 0, zSql, iP4Type);
+  return iFirstCol;
+}
+
+/*
+ * Generate code to create a new space.
+ * iSpaceId is a register storing the id of the space.
+ * iCursor is a cursor to access _space.
+ */
+static void createSpace(
+  Parse *pParse,
+  int iSpaceId,
+  char *zStmt,
+  int iCursor,
+  Table *pSysSpace
+){
+  Table *p = pParse->pNewTable;
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iFirstCol = ++pParse->nMem;
+  int iRecord = (pParse->nMem += 7);
+  char *zOpts, *zFormat;
+  int zOptsSz, zFormatSz;
+
+  zOpts = sqlite3DbMallocRaw(pParse->db,
+    tarantoolSqlite3MakeTableFormat(p, NULL) +
+    tarantoolSqlite3MakeTableOpts(p, zStmt, NULL) + 2
+  );
+  if( !zOpts ){
+    zOptsSz = 0;
+    zFormat = NULL;
+    zFormatSz = 0;
+  }else{
+    zOptsSz = tarantoolSqlite3MakeTableOpts(p, zStmt, zOpts);
+    zFormat = zOpts + zOptsSz + 1;
+    zFormatSz = tarantoolSqlite3MakeTableFormat(p, zFormat);
+#if SQLITE_DEBUG
+    /* NUL-termination is necessary for VDBE-tracing facility only */
+    zOpts[zOptsSz] = 0;
+    zFormat[zFormatSz] = 0;
+#endif
+  }
+
+  sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */);
+  sqlite3VdbeAddOp2(v, OP_Integer, 1, iFirstCol+1 /* owner */);
+  sqlite3VdbeAddOp4(v,
+    OP_String8, 0, iFirstCol+2 /* name */, 0,
+    sqlite3DbStrDup(pParse->db, p->zName),
+    P4_DYNAMIC
+  );
+  sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol+3 /* engine */, 0, "memtx", P4_STATIC);
+  sqlite3VdbeAddOp2(v, OP_Integer, p->nCol, iFirstCol+4 /* field_count */);
+  sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol+5, MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
+  /* zOpts and zFormat are co-located, hence STATIC */
+  sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol+6, MSGPACK_SUBTYPE, zFormat, P4_STATIC);
+  sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
+  sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 7);
+  sqlite3TableAffinity(v, pSysSpace, 0);
+}
+
+/*
+ * Generate code to create implicit indexes in the new table.
+ * iSpaceId is a register storing the id of the space.
+ * iCursor is a cursor to access _index.
+ */
+static void createImplicitIndices(
+  Parse *pParse,
+  int iSpaceId,
+  int iCursor,
+  Table *pSysIndex
+){
+  Table *p = pParse->pNewTable;
+  Index *pIdx, *pPrimaryIdx = sqlite3PrimaryKeyIndex(p);
+  int i;
+
+  if( pPrimaryIdx ){
+    /* Tarantool quirk: primary index is created first */
+    createIndex(pParse, pPrimaryIdx, iSpaceId, 0, NULL, pSysIndex, iCursor);
+  } else {
+    /*
+     * Until ROWID support is back, this branch should not be taken.
+     * If it is, then the current CREATE TABLE statement fails to
+     * specify the PRIMARY KEY. The error is reported elsewhere.
+     */
+  }
+
+  /* (pIdx->i) mapping must be consistent with parseTableSchemaRecord */
+  for( pIdx=p->pIndex, i=0; pIdx; pIdx = pIdx->pNext ){
+    if( pIdx == pPrimaryIdx )continue;
+    createIndex(pParse, pIdx, iSpaceId, ++i, NULL, pSysIndex, iCursor);
+  }
+}
+
+/*
+ * Generate code to emit and parse table schema record.
+ * iSpaceId is a register storing the id of the space.
+ * Consumes zStmt.
+ */
+static void parseTableSchemaRecord(
+  Parse *pParse,
+  int iDb,
+  int iSpaceId,
+  char *zStmt
+){
+  Table *p = pParse->pNewTable;
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  Index *pIdx, *pPrimaryIdx;
+  int i, iTop = pParse->nMem+1;
+  pParse->nMem += 4;
+
+  sqlite3VdbeAddOp4(v,
+    OP_String8, 0, iTop, 0,
+    sqlite3DbStrDup(pParse->db, p->zName),
+    P4_DYNAMIC
+  );
+  sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iTop+1);
+  sqlite3VdbeAddOp2(v, OP_Integer, 0, iTop+2);
+  sqlite3VdbeAddOp4(v, OP_String8, 0, iTop+3, 0, zStmt, P4_DYNAMIC);
+
+  pPrimaryIdx = sqlite3PrimaryKeyIndex(p);
+  /* (pIdx->i) mapping must be consistent with createImplicitIndices */
+  for( pIdx=p->pIndex, i=0; pIdx; pIdx = pIdx->pNext ){
+    if( pIdx == pPrimaryIdx )continue;
+    makeIndexSchemaRecord(pParse, pIdx, iSpaceId, ++i, NULL);
+  }
+
+  sqlite3ChangeCookie(pParse, iDb);
+  sqlite3VdbeAddParseSchema2Op(v, iDb, iTop, pParse->nMem-iTop+1);
+}
+
+/*
 ** This routine is called to report the final ")" that terminates
 ** a CREATE TABLE statement.
 **
@@ -1871,6 +2057,14 @@ void sqlite3EndTable(
     if( p->tnum==1 ) p->tabFlags |= TF_Readonly;
   }
 
+  /*
+   * Enforce WITHOUT ROWID, but not for sqlite_master.
+   * Skip VIEWs.
+   */
+  if( !pSelect && (!db->init.busy || p->tnum!=1) ){
+    tabOpts |= TF_WithoutRowid;
+  }
+
   /* Special processing for WITHOUT ROWID Tables */
   if( tabOpts & TF_WithoutRowid ){
     if( (p->tabFlags & TF_Autoincrement) ){
@@ -1911,27 +2105,43 @@ void sqlite3EndTable(
   if( !db->init.busy ){
     int n;
     Vdbe *v;
-    char *zType;    /* "view" or "table" */
-    char *zType2;   /* "VIEW" or "TABLE" */
+    char *zType;   /* "VIEW" or "TABLE" */
     char *zStmt;    /* Text of the CREATE TABLE or CREATE VIEW statement */
+    Table *pSysSchema, *pSysSpace, *pSysIndex;
+    int iCursor = pParse->nTab++;
+    int iSpaceId;
 
     v = sqlite3GetVdbe(pParse);
     if( NEVER(v==0) ) return;
 
-    sqlite3VdbeAddOp1(v, OP_Close, 0);
+    pSysSchema = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash,
+      TARANTOOL_SYS_SCHEMA_NAME
+    );
+    if( NEVER(!pSysSchema) ) return;
 
-    /* 
+    pSysSpace = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash,
+      TARANTOOL_SYS_SPACE_NAME
+    );
+    if( NEVER(!pSysSpace) ) return;
+
+    pSysIndex = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash,
+      TARANTOOL_SYS_INDEX_NAME
+    );
+    if( NEVER(!pSysIndex) ) return;
+
+    /*
     ** Initialize zType for the new view or table.
     */
     if( p->pSelect==0 ){
       /* A regular table */
-      zType = "table";
-      zType2 = "TABLE";
+      zType = "TABLE";
 #ifndef SQLITE_OMIT_VIEW
     }else{
       /* A view */
-      zType = "view";
-      zType2 = "VIEW";
+      zType = "VIEW";
 #endif
     }
 
@@ -1999,28 +2209,18 @@ void sqlite3EndTable(
       n = (int)(pEnd2->z - pParse->sNameToken.z);
       if( pEnd2->z[0]!=';' ) n += pEnd2->n;
       zStmt = sqlite3MPrintf(db, 
-          "CREATE %s %.*s", zType2, n, pParse->sNameToken.z
+          "CREATE %s %.*s", zType, n, pParse->sNameToken.z
       );
     }
 
-    /* A slot for the record has already been allocated in the 
-    ** SQLITE_MASTER table.  We just need to update that slot with all
-    ** the information we've collected.
-    */
-    sqlite3NestedParse(pParse,
-      "UPDATE %Q.%s "
-         "SET type='%s', name=%Q, tbl_name=%Q, rootpage=#%d, sql=%Q "
-       "WHERE rowid=#%d",
-      db->aDb[iDb].zDbSName, MASTER_NAME,
-      zType,
-      p->zName,
-      p->zName,
-      pParse->regRoot,
-      zStmt,
-      pParse->regRowid
-    );
-    sqlite3DbFree(db, zStmt);
-    sqlite3ChangeCookie(pParse, iDb);
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysSchema, OP_OpenRead);
+    sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
+    iSpaceId = getNewSpaceId(pParse, iCursor);
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysSpace, OP_OpenWrite);
+    createSpace(pParse, iSpaceId, zStmt, iCursor, pSysSpace);
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysIndex, OP_OpenWrite);
+    createImplicitIndices(pParse, iSpaceId, iCursor, pSysIndex);
+    sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
     /* Check to see if we need to create an sqlite_sequence table for
@@ -2039,10 +2239,8 @@ void sqlite3EndTable(
 #endif
 
     /* Reparse everything to update our internal data structures */
-    sqlite3VdbeAddParseSchemaOp(v, iDb,
-           sqlite3MPrintf(db, "tbl_name='%q' AND type!='trigger'", p->zName));
+    parseTableSchemaRecord(pParse, iDb, iSpaceId, zStmt); /* consumes zStmt */
   }
-
 
   /* Add the table to the in-memory representation of the database.
   */
@@ -2325,95 +2523,6 @@ void sqlite3RootPageMoved(sqlite3 *db, int iDb, int iFrom, int iTo){
 #endif
 
 /*
-** Write code to erase the table with root-page iTable from database iDb.
-** Also write code to modify the sqlite_master table and internal schema
-** if a root-page of another table is moved by the btree-layer whilst
-** erasing iTable (this can happen with an auto-vacuum database).
-*/ 
-static void destroyRootPage(Parse *pParse, int iTable, int iDb){
-  Vdbe *v = sqlite3GetVdbe(pParse);
-  int r1 = sqlite3GetTempReg(pParse);
-  assert( iTable>1 );
-  sqlite3VdbeAddOp3(v, OP_Destroy, iTable, r1, iDb);
-  sqlite3MayAbort(pParse);
-#ifndef SQLITE_OMIT_AUTOVACUUM
-  /* OP_Destroy stores an in integer r1. If this integer
-  ** is non-zero, then it is the root page number of a table moved to
-  ** location iTable. The following code modifies the sqlite_master table to
-  ** reflect this.
-  **
-  ** The "#NNN" in the SQL is a special constant that means whatever value
-  ** is in register NNN.  See grammar rules associated with the TK_REGISTER
-  ** token for additional information.
-  */
-  sqlite3NestedParse(pParse, 
-     "UPDATE %Q.%s SET rootpage=%d WHERE #%d AND rootpage=#%d",
-     pParse->db->aDb[iDb].zDbSName, MASTER_NAME, iTable, r1, r1);
-#endif
-  sqlite3ReleaseTempReg(pParse, r1);
-}
-
-/*
-** Write VDBE code to erase table pTab and all associated indices on disk.
-** Code to update the sqlite_master tables and internal schema definitions
-** in case a root-page belonging to another table is moved by the btree layer
-** is also added (this can happen with an auto-vacuum database).
-*/
-static void destroyTable(Parse *pParse, Table *pTab){
-#ifdef SQLITE_OMIT_AUTOVACUUM
-  Index *pIdx;
-  int iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
-  destroyRootPage(pParse, pTab->tnum, iDb);
-  for(pIdx=pTab->pIndex; pIdx; pIdx=pIdx->pNext){
-    destroyRootPage(pParse, pIdx->tnum, iDb);
-  }
-#else
-  /* If the database may be auto-vacuum capable (if SQLITE_OMIT_AUTOVACUUM
-  ** is not defined), then it is important to call OP_Destroy on the
-  ** table and index root-pages in order, starting with the numerically 
-  ** largest root-page number. This guarantees that none of the root-pages
-  ** to be destroyed is relocated by an earlier OP_Destroy. i.e. if the
-  ** following were coded:
-  **
-  ** OP_Destroy 4 0
-  ** ...
-  ** OP_Destroy 5 0
-  **
-  ** and root page 5 happened to be the largest root-page number in the
-  ** database, then root page 5 would be moved to page 4 by the 
-  ** "OP_Destroy 4 0" opcode. The subsequent "OP_Destroy 5 0" would hit
-  ** a free-list page.
-  */
-  int iTab = pTab->tnum;
-  int iDestroyed = 0;
-
-  while( 1 ){
-    Index *pIdx;
-    int iLargest = 0;
-
-    if( iDestroyed==0 || iTab<iDestroyed ){
-      iLargest = iTab;
-    }
-    for(pIdx=pTab->pIndex; pIdx; pIdx=pIdx->pNext){
-      int iIdx = pIdx->tnum;
-      assert( pIdx->pSchema==pTab->pSchema );
-      if( (iDestroyed==0 || (iIdx<iDestroyed)) && iIdx>iLargest ){
-        iLargest = iIdx;
-      }
-    }
-    if( iLargest==0 ){
-      return;
-    }else{
-      int iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
-      assert( iDb>=0 && iDb<pParse->db->nDb );
-      destroyRootPage(pParse, iLargest, iDb);
-      iDestroyed = iLargest;
-    }
-  }
-#endif
-}
-
-/*
 ** Remove entries from the sqlite_statN tables (for N in (1,2,3))
 ** after a DROP INDEX or DROP TABLE command.
 */
@@ -2482,19 +2591,37 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
   }
 #endif
 
-  /* Drop all SQLITE_MASTER table and index entries that refer to the
-  ** table. The program name loops through the master table and deletes
-  ** every row that refers to a table of the same name as the one being
-  ** dropped. Triggers are handled separately because a trigger can be
+  /* Drop all _space and _index entries that refer to the
+  ** table. The program loops through the _index & _space tables and deletes
+  ** every row that refers to a table.
+  ** Triggers are handled separately because a trigger can be
   ** created in the temp database that refers to a table in another
   ** database.
   */
-  sqlite3NestedParse(pParse, 
-      "DELETE FROM %Q.%s WHERE tbl_name=%Q and type!='trigger'",
-      pDb->zDbSName, MASTER_NAME, pTab->zName);
   if( !isView && !IsVirtual(pTab) ){
-    destroyTable(pParse, pTab);
+    if( pTab->pIndex && pTab->pIndex->pNext ){
+      /*  Remove all indexes, except for primary.
+          Tarantool won't allow remove primary when secondary exist. */
+      sqlite3NestedParse(pParse,
+                         "DELETE FROM %Q.%s WHERE id=%d AND iid>0",
+                         pDb->zDbSName,
+                         TARANTOOL_SYS_INDEX_NAME,
+                         SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+    }
+
+    /*  Remove primary index. */
+    sqlite3NestedParse(pParse,
+                       "DELETE FROM %Q.%s WHERE id=%d AND iid=0",
+                       pDb->zDbSName,
+                       TARANTOOL_SYS_INDEX_NAME,
+                       SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
   }
+
+  sqlite3NestedParse(pParse,
+                     "DELETE FROM %Q.%s WHERE id=%d",
+                     pDb->zDbSName,
+                     TARANTOOL_SYS_SPACE_NAME,
+                     SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
 
   /* Remove the table entry from SQLite's internal schema and modify
   ** the schema cookie.
@@ -2882,6 +3009,50 @@ Index *sqlite3AllocateIndexObject(
     *ppExtra = ((char*)p) + nByte;
   }
   return p;
+}
+
+/*
+** Generate code to determine next free Iid in the space identified by
+** the iSpaceId. Return register number holding the result.
+*/
+static int getNewIid(
+  Parse *pParse,
+  int iSpaceId,
+  int iCursor
+){
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iRes = ++pParse->nMem;
+  int iKey = ++pParse->nMem;
+  int iSeekInst, iGotoInst;
+
+  sqlite3VdbeAddOp2(v, OP_Integer, iSpaceId, iKey);
+  iSeekInst = sqlite3VdbeAddOp4Int(v, OP_SeekLE, iCursor, 0, iKey, 1);
+  sqlite3VdbeAddOp4Int(v, OP_IdxLT, iCursor, 0, iKey, 1);
+
+  /*
+   * If SeekLE succeeds, the control falls through here, skipping
+   * IdxLt.
+   *
+   * If it fails (no entry with the given key prefix: invalid spaceId)
+   * VDBE jumps to the next code block (jump target is IMM, fixed up
+   * later with sqlite3VdbeJumpHere()).
+   */
+  iGotoInst = sqlite3VdbeAddOp0(v, OP_Goto); /* Jump over Halt */
+
+  /* Invalid spaceId detected. Halt now. */
+  sqlite3VdbeJumpHere(v, iSeekInst);
+  sqlite3VdbeJumpHere(v, iSeekInst+1);
+  sqlite3VdbeAddOp4(v,
+    OP_Halt, SQLITE_ERROR, OE_Fail, 0,
+    sqlite3MPrintf(pParse->db, "Invalid space id: %d", iSpaceId),
+    P4_DYNAMIC
+  );
+
+  /* Fetch iid from the row and ++it. */
+  sqlite3VdbeJumpHere(v, iGotoInst);
+  sqlite3VdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
+  sqlite3VdbeAddOp2(v, OP_AddImm, iRes, 1);
+  return iRes;
 }
 
 /*
@@ -3345,64 +3516,53 @@ void sqlite3CreateIndex(
   ** has just been created, it contains no data and the index initialization
   ** step can be skipped.
   */
-  else if( HasRowid(pTab) || pTblName!=0 ){
+  else if( pTblName ){
     Vdbe *v;
     char *zStmt;
-    int iMem = ++pParse->nMem;
+    Table *pSysIndex;
+    int iCursor = pParse->nTab++;
+    int iSpaceId, iIndexId, iFirstSchemaCol;
 
     v = sqlite3GetVdbe(pParse);
     if( v==0 ) goto exit_create_index;
 
     sqlite3BeginWriteOperation(pParse, 1, iDb);
 
-    /* Create the rootpage for the index using CreateIndex. But before
-    ** doing so, code a Noop instruction and store its address in 
-    ** Index.tnum. This is required in case this index is actually a 
-    ** PRIMARY KEY and the table is actually a WITHOUT ROWID table. In 
-    ** that case the convertToWithoutRowidTable() routine will replace
-    ** the Noop with a Goto to jump over the VDBE code generated below. */
-    pIndex->tnum = sqlite3VdbeAddOp0(v, OP_Noop);
-    sqlite3VdbeAddOp2(v, OP_CreateIndex, iDb, iMem);
+    pSysIndex = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash, TARANTOOL_SYS_INDEX_NAME
+    );
+    if( NEVER(!pSysIndex) ) return;
+
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysIndex, OP_OpenWrite);
+    sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
 
     /* Gather the complete text of the CREATE INDEX statement into
     ** the zStmt variable
     */
-    if( pStart ){
+    assert( pStart ); {
       int n = (int)(pParse->sLastToken.z - pName->z) + pParse->sLastToken.n;
       if( pName->z[n-1]==';' ) n--;
       /* A named index with an explicit CREATE INDEX statement */
       zStmt = sqlite3MPrintf(db, "CREATE%s INDEX %.*s",
         onError==OE_None ? "" : " UNIQUE", n, pName->z);
-    }else{
-      /* An automatic index created by a PRIMARY KEY or UNIQUE constraint */
-      /* zStmt = sqlite3MPrintf(""); */
-      zStmt = 0;
     }
 
-    /* Add an entry in sqlite_master for this index
-    */
-    sqlite3NestedParse(pParse, 
-        "INSERT INTO %Q.%s VALUES('index',%Q,%Q,#%d,%Q);",
-        db->aDb[iDb].zDbSName, MASTER_NAME,
-        pIndex->zName,
-        pTab->zName,
-        iMem,
-        zStmt
-    );
-    sqlite3DbFree(db, zStmt);
+    iSpaceId = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
+    iIndexId = getNewIid(pParse, iSpaceId, iCursor);
+    createIndex(pParse, pIndex, iSpaceId, iIndexId, zStmt, pSysIndex, iCursor);
+    sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
-    /* Fill the index with data and reparse the schema. Code an OP_Expire
+    /* consumes zStmt */
+    iFirstSchemaCol = makeIndexSchemaRecord(
+        pParse, pIndex, iSpaceId, iIndexId, zStmt
+    );
+
+    /* Reparse the schema. Code an OP_Expire
     ** to invalidate all pre-compiled statements.
     */
-    if( pTblName ){
-      sqlite3RefillIndex(pParse, pIndex, iMem);
-      sqlite3ChangeCookie(pParse, iDb);
-      sqlite3VdbeAddParseSchemaOp(v, iDb,
-         sqlite3MPrintf(db, "name='%q' AND type='index'", pIndex->zName));
-      sqlite3VdbeAddOp0(v, OP_Expire);
-    }
-
-    sqlite3VdbeJumpHere(v, pIndex->tnum);
+    sqlite3ChangeCookie(pParse, iDb);
+    sqlite3VdbeAddParseSchema2Op(v, iDb, iFirstSchemaCol, 4);
+    sqlite3VdbeAddOp0(v, OP_Expire);
   }
 
   /* When adding an index to the list of indices for a table, make
@@ -3533,13 +3693,15 @@ void sqlite3DropIndex(Parse *pParse, SrcList *pName, int ifExists){
   v = sqlite3GetVdbe(pParse);
   if( v ){
     sqlite3BeginWriteOperation(pParse, 1, iDb);
+
     sqlite3NestedParse(pParse,
-       "DELETE FROM %Q.%s WHERE name=%Q AND type='index'",
-       db->aDb[iDb].zDbSName, MASTER_NAME, pIndex->zName
-    );
+                       "DELETE FROM %Q.%s WHERE id=%d AND iid=%d",
+                       db->aDb[iDb].zDbSName,
+                       TARANTOOL_SYS_INDEX_NAME,
+                       SQLITE_PAGENO_TO_SPACEID(pIndex->tnum),
+                       SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
     sqlite3ClearStatTables(pParse, iDb, "idx", pIndex->zName);
     sqlite3ChangeCookie(pParse, iDb);
-    destroyRootPage(pParse, pIndex->tnum, iDb);
     sqlite3VdbeAddOp4(v, OP_DropIndex, iDb, 0, 0, pIndex->zName, 0);
   }
 

@@ -7,6 +7,16 @@
 */
 
 /*
+ * Tarantool system spaces.
+ */
+#define TARANTOOL_SYS_SCHEMA_NAME  "_schema"
+#define TARANTOOL_SYS_SPACE_NAME   "_space"
+#define TARANTOOL_SYS_INDEX_NAME   "_index"
+
+/* Max space id seen so far. */
+#define TARANTOOL_SYS_SCHEMA_MAXID_KEY "max_id"
+
+/*
  * SQLite uses the root page number to identify a Table or Index BTree.
  * We switched it to using Tarantool spaces and indices instead of the
  * BTrees. Hence the functions to encode index and space id in
@@ -20,6 +30,10 @@
 
 #define SQLITE_PAGENO_TO_INDEXID(pgno) \
   ((pgno) & 31)
+
+
+/* Load database schema from Tarantool. */
+void tarantoolSqlite3LoadSchema(InitData *init);
 
 /* Misc */
 const char *tarantoolErrorMessage();
@@ -43,3 +57,39 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags);
  */
 int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
                                   int *res);
+
+/*
+ * The function assumes the cursor is open on _schema.
+ * Increment max_id and store updated tuple in the cursor
+ * object.
+ */
+int tarantoolSqlite3IncrementMaxid(BtCursor *pCur);
+
+
+/*
+ * Render "format" array for _space entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ */
+int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf);
+
+/*
+ * Format "opts" dictionary for _space entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ */
+int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf);
+
+/*
+ * Format "parts" array for _index entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ */
+int tarantoolSqlite3MakeIdxParts(Index *index, void *buf);
+
+/*
+ * Format "opts" dictionary for _index entry.
+ * Returns result size.
+ * If buf==NULL estimate result size.
+ */
+int tarantoolSqlite3MakeIdxOpts(Index *index, const char *zSql, void *buf);

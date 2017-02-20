@@ -121,6 +121,7 @@ const struct index_opts index_opts_default = {
 	/* .run_count_per_level = */ 2,
 	/* .run_size_ratio      = */ 3.5,
 	/* .lsn                 = */ 0,
+	/* .sql                 = */ NULL,
 };
 
 const struct opt_def index_opts_reg[] = {
@@ -132,8 +133,22 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
+	OPT_DEF("sql", OPT_STRPTR, struct index_opts, sql),
 	{ NULL, opt_type_MAX, 0, 0 },
 };
+
+/**
+ * Destructor for struct index_opts.
+ * The only relevant action so far is to free sql field if not-null.
+ */
+static void
+index_opts_destroy(struct index_opts *opts)
+{
+	if (opts->sql) {
+		free(opts->sql);
+		opts->sql = 0;
+	}
+}
 
 static const char *object_type_strs[] = {
 	"unknown", "universe", "space", "function", "user", "role" };
@@ -232,6 +247,17 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	return def;
 }
 
+void
+index_opts_dup(struct index_opts *dst, const struct index_opts *src)
+{
+	*dst = *src;
+	if (src->sql) {
+		dst->sql = (char*)strdup(src->sql);
+		if (dst->sql == NULL)
+		  diag_set(OutOfMemory, strlen(src->sql), "sql", "char *");
+	}
+}
+
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
@@ -243,6 +269,7 @@ index_def_dup(const struct index_def *def)
 	}
 	memcpy(dup, def, index_def_sizeof(def->key_def.part_count));
 	rlist_create(&dup->link);
+	index_opts_dup(&dup->opts, &def->opts);
 	return dup;
 }
 
@@ -250,6 +277,7 @@ index_def_dup(const struct index_def *def)
 void
 index_def_delete(struct index_def *index_def)
 {
+	index_opts_destroy(&index_def->opts);
 	free(index_def);
 }
 
@@ -547,11 +575,13 @@ key_validate_parts(struct index_def *index_def, const char *key,
 }
 
 const struct space_opts space_opts_default = {
-	/* .temporary = */ false,
+	/* .temporary  = */ false,
+	/* .sql        = */ NULL,
 };
 
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, temporary),
+	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	{ NULL, opt_type_MAX, 0, 0 }
 };
 

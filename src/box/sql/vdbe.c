@@ -6887,6 +6887,27 @@ case OP_CursorHint: {
 }
 #endif /* SQLITE_ENABLE_CURSOR_HINTS */
 
+/* Opcode: IncMaxid P1 * * * *
+**
+** The cursor (P1) should be open on _schema.
+** Increment the max_id (max space id) and store updated tuple in the
+** cursor.
+*/
+case OP_IncMaxid: {
+  VdbeCursor *pC;
+
+  assert( pOp->p1>=0 && pOp->p1<p->nCursor );
+  pC = p->apCsr[pOp->p1];
+  assert( pC != 0 );
+
+  rc = tarantoolSqlite3IncrementMaxid(pC->uc.pCursor);
+  if( rc!=SQLITE_OK ){
+      goto abort_due_to_error;
+  }
+  pC->nullRow = 0;
+  break;
+}
+
 /* Opcode: Noop * * * * *
 **
 ** Do nothing.  This instruction is often useful as a jump
