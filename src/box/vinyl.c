@@ -2061,8 +2061,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  struct vy_write_iterator *wi, const char *split_key,
 		  uint32_t *page_info_capacity, struct bloom_spectrum *bs,
 		  struct tuple **curr_stmt, const struct key_def *key_def,
-		  const struct key_def *user_key_def,
-		  uint64_t *dumped_statements)
+		  const struct key_def *user_key_def)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2105,7 +2104,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		if (vy_run_dump_stmt(stmt, data_xlog, page, key_def) != 0)
 			goto error_rollback;
 		bloom_spectrum_add(bs, tuple_hash(stmt, user_key_def));
-		++*dumped_statements;
 
 		if (vy_write_iterator_next(wi, curr_stmt))
 			goto error_rollback;
@@ -2175,8 +2173,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
 		  const char *end_key, struct bloom_spectrum *bs,
 		  const struct key_def *key_def,
-		  const struct key_def *user_key_def,
-		  uint64_t *dumped_statements)
+		  const struct key_def *user_key_def)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2205,8 +2202,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi,
 				       end_key, &page_infos_capacity, bs,
-				       curr_stmt, key_def, user_key_def,
-				       dumped_statements);
+				       curr_stmt, key_def, user_key_def);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2956,7 +2952,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	bloom_spectrum_create(&bs, max_output_count, bloom_fpr, runtime.quota);
 
 	if (vy_run_write_data(run, index->path, wi, stmt, range->end, &bs,
-			      key_def, user_key_def, dumped_statements) != 0)
+			      key_def, user_key_def) != 0)
 		return -1;
 
 	bloom_spectrum_choose(&bs, &run->info.bloom);
@@ -2968,6 +2964,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 
 	assert(!vy_run_is_empty(run));
 	*written += vy_run_size(run);
+	*dumped_statements += run->info.keys;
 	return 0;
 }
 
