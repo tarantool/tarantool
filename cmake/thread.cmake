@@ -26,13 +26,13 @@ function (do_pthread_checks)
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_set_name_np(pthread_self(), \"\"); }
         " HAVE_PTHREAD_SET_NAME_NP)
-    # pthread_getattr_np - Linux
+    # pthread_getattr_np - Glibc
     check_c_source_compiles("
         #include <pthread.h>
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_attr_t a; pthread_getattr_np(pthread_self(), &a); }
         " HAVE_PTHREAD_GETATTR_NP)
-    # pthread_attr_get_np - FreeBSD
+    # pthread_attr_get_np - xBSD/macOS
     check_c_source_compiles("
         #include <pthread.h>
         ${INCLUDE_MISC_PTHREAD_HEADERS}

@@ -315,4 +315,41 @@ tt_pthread_setname(const char *name)
 #endif
 }
 
+static inline void
+tt_pthread_attr_getstack(pthread_t thread, void **stackaddr, size_t *stacksize)
+{
+#if HAVE_PTHREAD_GETATTR_NP
+	/*
+	 * GLIBC
+	 *
+	 * From glib-2.24/sysdeps/nptl/pthread.h pthread_getattr_np():
+	 * It shall be called on uninitialized ATTR and destroyed with
+	 * pthread_attr_destroy when no longer needed.
+	 */
+	pthread_attr_t thread_attr;
+	pthread_getattr_np(thread, &thread_attr);
+	pthread_attr_getstack(&thread_attr, stackaddr, stacksize);
+	pthread_attr_destroy(&thread_attr);
+#elif HAVE_PTHREAD_ATTR_GET_NP
+	/*
+	 * xBSD/new macOS
+	 *
+	 * From pthread_attr_get_np(3):
+	 * It is HIGHLY RECOMMENDED to use pthread_attr_init(3) function to
+	 * allocate attribute storage.
+	 */
+	pthread_attr_t thread_attr;
+	pthread_attr_init(&thread_attr);
+	pthread_attr_get_np(thread, &thread_attr);
+	pthread_attr_getstack(&thread_attr, stackaddr, stacksize);
+	pthread_attr_destroy(&thread_attr);
+#elif (HAVE_PTHREAD_GET_STACKSIZE_NP && HAVE_PTHREAD_GET_STACKADDR_NP)
+	/* Old macOS */
+	*stacksize = pthread_get_stacksize_np(thread);
+	*stackaddr = pthread_get_stackaddr_np(thread);
+#else
+#error Unable to get thread stack
+#endif
+}
+
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */

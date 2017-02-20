@@ -737,21 +737,13 @@ cord_create(struct cord *cord, const char *name)
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 	cord_set_name(name);
 
+#if ENABLE_ASAN
 	/* Record stack extents */
-#if (HAVE_PTHREAD_GET_STACKSIZE_NP && HAVE_PTHREAD_GET_STACKADDR_NP)
-	cord->sched.coro.stack_size = pthread_get_stacksize_np(cord->id);
-	cord->sched.coro.stack = pthread_get_stackaddr_np(cord->id);
-#elif (HAVE_PTHREAD_GETATTR_NP || HAVE_PTHREAD_ATTR_GET_NP)
-	pthread_attr_t thread_attr;
-#if HAVE_PTHREAD_ATTR_GET_NP
-	pthread_attr_init(&thread_attr);
-#endif
-	pthread_getattr_np(cord->id, &thread_attr);
-	pthread_attr_getstack(&thread_attr, &cord->sched.coro.stack,
-	                      &cord->sched.coro.stack_size);
-	pthread_attr_destroy(&thread_attr);
+	tt_pthread_attr_getstack(cord->id, &cord->sched.coro.stack,
+				 &cord->sched.coro.stack_size);
 #else
-#error Unable to get thread stack
+	cord->sched.coro.stack = NULL;
+	cord->sched.coro.stack_size = 0;
 #endif
 }
 
