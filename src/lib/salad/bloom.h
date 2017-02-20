@@ -67,7 +67,7 @@ typedef uint32_t bloom_hash_t;
  * Cache-line-size block of bloom filter
  */
 struct bloom_block {
-	unsigned long bits[BLOOM_CACHE_LINE / sizeof(unsigned long)];
+	unsigned char bits[BLOOM_CACHE_LINE];
 };
 
 /**

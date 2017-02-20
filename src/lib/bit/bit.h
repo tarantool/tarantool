@@ -177,10 +177,11 @@ store_bool(void *p, bool b)
 
 /**
  * @brief Test bit \a pos in memory chunk \a data
- * data size must be sizeof(long) aligned
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
-*  @retval true bit \a pos is set in \a data
+ * @retval true bit \a pos is set in \a data
  * @retval false otherwise
  */
 inline bool
@@ -195,7 +196,8 @@ bit_test(const void *data, size_t pos)
 
 /**
  * @brief Set bit \a pos in a memory chunk \a data
- * data size must be sizeof(long) aligned
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -216,7 +218,8 @@ bit_set(void *data, size_t pos)
 
 /**
  * @brief Clear bit \a pos in memory chunk \a data
- * data size must be sizeof(long) aligned
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
