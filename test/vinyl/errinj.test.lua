@@ -111,3 +111,22 @@ s:drop()
 
 errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 0)
 
+--
+-- Check that upsert squash fiber does not crash if index or
+-- in-memory tree is gone.
+--
+errinj.set("ERRINJ_VY_SQUASH_TIMEOUT", 50)
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+s:insert{0, 0}
+box.snapshot()
+for i=1,256 do s:upsert({0, 0}, {{'+', 2, 1}}) end
+box.snapshot() -- in-memory tree is gone
+fiber.sleep(0.05)
+s:select()
+s:replace{0, 0}
+box.snapshot()
+for i=1,256 do s:upsert({0, 0}, {{'+', 2, 1}}) end
+s:drop() -- index is gone
+fiber.sleep(0.05)
+errinj.set("ERRINJ_VY_SQUASH_TIMEOUT", 0)

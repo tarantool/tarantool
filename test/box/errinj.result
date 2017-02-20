@@ -32,19 +32,21 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_WAL_IO:
-    state: false
   ERRINJ_VINYL_SCHED_TIMEOUT:
     state: 0
+  ERRINJ_WAL_IO:
+    state: false
   ERRINJ_RELAY:
+    state: false
+  ERRINJ_TESTING:
     state: false
   ERRINJ_WAL_DELAY:
     state: false
-  ERRINJ_TUPLE_FIELD:
-    state: false
+  ERRINJ_VY_SQUASH_TIMEOUT:
+    state: 0
   ERRINJ_TUPLE_ALLOC:
     state: false
-  ERRINJ_TESTING:
+  ERRINJ_TUPLE_FIELD:
     state: false
 ...
 errinj.set("some-injection", true)

@@ -9858,9 +9858,12 @@ vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 static int
 vy_squash_process(struct vy_squash *squash)
 {
+	ERROR_INJECT_U64(ERRINJ_VY_SQUASH_TIMEOUT,
+		errinj_getu64(ERRINJ_VY_SQUASH_TIMEOUT) > 0,
+		fiber_sleep(errinj_getu64(ERRINJ_VY_SQUASH_TIMEOUT) * 0.001));
+
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
-	struct tuple_format *format = index->space->format;
 	struct key_def *key_def = index->key_def;
 	/* Upserts enabled only in the primary index. */
 	assert(key_def->iid == 0);
@@ -9894,7 +9897,14 @@ vy_squash_process(struct vy_squash *squash)
 	};
 	struct vy_mem_tree_iterator mem_itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
-	assert(!vy_mem_tree_iterator_is_invalid(&mem_itr));
+	if (vy_mem_tree_iterator_is_invalid(&mem_itr)) {
+		/*
+		 * The in-memory tree we are squashing an upsert
+		 * for was dumped, nothing to do.
+		 */
+		tuple_unref(result);
+		return 0;
+	}
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
 		const struct tuple *mem_stmt =
@@ -9904,9 +9914,9 @@ vy_squash_process(struct vy_squash *squash)
 		struct tuple *applied;
 		if (vy_stmt_type(mem_stmt) == IPROTO_UPSERT)
 			applied = vy_apply_upsert(mem_stmt, result, key_def,
-						  format, true);
+						  mem->format, true);
 		else
-			applied = vy_stmt_dup(mem_stmt, format);
+			applied = vy_stmt_dup(mem_stmt, mem->format);
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
