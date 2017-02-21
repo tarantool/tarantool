@@ -90,3 +90,6 @@ test_run:cmd("cleanup server wal_off")
 ---
 - true
 ...
+box.schema.user.revoke('guest', 'replication')
+---
+...
