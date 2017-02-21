@@ -898,7 +898,8 @@ static inline struct func *
 access_check_func(const char *name, uint32_t name_len)
 {
 	struct func *func = func_by_name(name, name_len);
-	struct credentials *credentials = current_user();
+	struct session *session = current_session();
+	struct credentials *credentials = &session->credentials;
 	/*
 	 * If the user has universal access, don't bother with checks.
 	 * No special check for ADMIN user is necessary
@@ -1007,10 +1008,13 @@ box_process_call(struct request *request, struct obuf *out)
 	 * a set-definer-uid one. If the function is not
 	 * defined, it's obviously not a setuid one.
 	 */
-	struct credentials *orig_credentials = NULL;
+
+	struct credentials orig_credentials;
+	struct session *session;
 	if (func && func->def.setuid) {
-		orig_credentials = current_user();
-		/* Remember and change the current user id. */
+		/* Save original credentials */
+		session = current_session();
+		credentials_copy(&orig_credentials, &session->credentials);
 		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
 			/*
 			 * Fill the cache upon first access, since
@@ -1023,7 +1027,9 @@ box_process_call(struct request *request, struct obuf *out)
 					 owner->auth_token,
 					 owner->def.uid);
 		}
-		fiber_set_user(fiber(), &func->owner_credentials);
+		/* Set credentials to function owner (SUID) */
+		credentials_copy(&session->credentials,
+				 &func->owner_credentials);
 	}
 
 	int rc;
@@ -1032,9 +1038,11 @@ box_process_call(struct request *request, struct obuf *out)
 	} else {
 		rc = box_lua_call(request, out);
 	}
-	/* Restore the original user */
-	if (orig_credentials)
-		fiber_set_user(fiber(), orig_credentials);
+
+	if (func && func->def.setuid) {
+		/* Restore original credentials after SUID */
+		credentials_copy(&session->credentials, &orig_credentials);
+	}
 
 	if (rc != 0) {
 		txn_rollback();

@@ -118,7 +118,6 @@ session_create_on_demand()
 	credentials_init(&s->credentials, admin_user->auth_token,
 			 admin_user->def.uid);
 	fiber_set_session(fiber(), s);
-	fiber_set_user(fiber(), &s->credentials);
 	return s;
 }
 
@@ -131,7 +130,6 @@ struct credentials admin_credentials;
 static int
 session_run_triggers(struct session *session, struct rlist *triggers)
 {
-	struct fiber *fiber = fiber();
 	assert(session == current_session());
 
 	/* Save original credentials */
@@ -140,8 +138,6 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 
 	/* Run triggers with admin credentals */
 	credentials_copy(&session->credentials, &admin_credentials);
-	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &session->credentials);
 
 	int rc = 0;
 	try {
@@ -152,7 +148,6 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 
 	/* Restore original credentials */
 	credentials_copy(&session->credentials, &orig_credentials);
-	fiber_set_user(fiber, &session->credentials);
 
 	return rc;
 }

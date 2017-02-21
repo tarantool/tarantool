@@ -98,9 +98,8 @@ enum fiber_key {
 	/** transaction */
 	FIBER_KEY_TXN = 2,
 	/** User global privilege and authentication token */
-	FIBER_KEY_USER = 3,
-	FIBER_KEY_MSG = 4,
-	FIBER_KEY_MAX = 5
+	FIBER_KEY_MSG = 3,
+	FIBER_KEY_MAX = 4
 };
 
 /** \cond public */
