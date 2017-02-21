@@ -422,12 +422,14 @@ vy_stmt_new_upsert(struct tuple_format *format,
 /**
  * Create REPLACE statement from UPSERT statement.
  *
- * @param upsert upsert statement.
+ * @param replace_format Format for new REPLACE statement.
+ * @param upsert         Upsert statement.
  * @retval not NULL Success.
  * @retval     NULL Memory error.
  */
 struct tuple *
-vy_stmt_replace_from_upsert(const struct tuple *upsert);
+vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
+			    const struct tuple *upsert);
 
 /**
  * Extract MessagePack data from the REPLACE/UPSERT statement.
@@ -440,6 +442,8 @@ static inline const char *
 vy_upsert_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
 	assert(vy_stmt_type(tuple) == IPROTO_UPSERT);
+	/* UPSERT must have the n_upserts field. */
+	assert(tuple_format(tuple)->extra_size == sizeof(uint8_t));
 	const char *mp = tuple_data(tuple);
 	assert(mp_typeof(*mp) == MP_ARRAY);
 	const char *mp_end = mp;
@@ -465,21 +469,6 @@ vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
 	*mp_size = tuple_data(tuple) + tuple->bsize - mp;
 	return mp;
 }
-
-/**
- * Extract a SELECT statement with only indexed fields from raw data.
- * @param stmt Raw data of struct vy_stmt.
- * @param key_def key definition.
- * @param a region for temporary allocations. Automatically shrinked
- * to the original size.
- *
- * @retval not NULL Success.
- * @retval NULL Memory allocation error.
- */
-struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
-		    struct region *gc);
-
 
 /**
  * Create the SELECT statement from MessagePack array.

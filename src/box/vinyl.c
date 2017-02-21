@@ -350,7 +350,8 @@ vy_stat_tx_write_rate(struct vy_stat *s)
  * @param upsert         An UPSERT statement.
  * @param object         An REPLACE/DELETE/UPSERT statement or NULL.
  * @param key_def        Key definition of an index.
- * @param format         Tuple format of the index.
+ * @param format         Format for REPLACE/DELETE tuples.
+ * @param upsert_format  Format for UPSERT tuples.
  * @param suppress_error True if ClientErrors must not be written to log.
  *
  * @retval NULL     Memory allocation error.
@@ -359,7 +360,7 @@ vy_stat_tx_write_rate(struct vy_stat *s)
 static struct tuple *
 vy_apply_upsert(const struct tuple *upsert, const struct tuple *object,
 		const struct key_def *key_def, struct tuple_format *format,
-		bool suppress_error);
+		struct tuple_format *upsert_format, bool suppress_error);
 
 /**
  * Run metadata. A run is a written to a file as a single
@@ -651,6 +652,11 @@ struct vy_index {
 	 * was deleted.
 	 */
 	uint32_t space_index_count;
+	/*
+	 * Format for UPSERT statements. Note, that UPSERTs can
+	 * appear only in spaces with a single primary index.
+	 */
+	struct tuple_format *upsert_format;
 
 	/** Member of env->indexes. */
 	struct rlist link;
@@ -822,11 +828,10 @@ struct vy_merge_iterator {
 	uint32_t skipped_start;
 	/* Index for key_def and index->version */
 	struct vy_index *index;
-	/**
-	 * Format to allocate tuples
-	 * (from vy_apply_upsert(), run_iterator and mem_iterator)
-	 */
+	/** Format to allocate REPLACE and DELETE tuples. */
 	struct tuple_format *format;
+	/** Format to allocate UPSERT tuples. */
+	struct tuple_format *upsert_format;
 
 	/* {{{ Range version checking */
 	/* copy of index->version to track range tree changes */
@@ -2728,7 +2733,8 @@ vy_range_new(struct vy_index *index, int64_t id,
 	}
 	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn,
 				index->space_format,
-				index->space_format_with_colmask);
+				index->space_format_with_colmask,
+				index->upsert_format);
 	if (range->mem == NULL)
 		goto fail_mem;
 	/* Allocate a new id unless specified. */
@@ -2881,12 +2887,13 @@ vy_range_rotate_mem(struct vy_range *range, struct key_def *key_def,
 	struct vy_mem *mem = range->mem;
 	if (mem->used == 0) {
 		vy_mem_update_formats(mem, index->space_format,
-				      index->space_format_with_colmask);
+				      index->space_format_with_colmask,
+				      index->upsert_format);
 		return 0;
 	}
-	mem = vy_mem_new(key_def, allocator, allocator_lsn,
-			 index->space_format,
-			 index->space_format_with_colmask);
+	mem = vy_mem_new(key_def, allocator, allocator_lsn, index->space_format,
+			 index->space_format_with_colmask,
+			 index->upsert_format);
 	if (mem == NULL)
 		return -1;
 	vy_range_freeze_mem(range);
@@ -3571,7 +3578,8 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, key_def,
-					index->space_format, false);
+					index->space_format,
+					index->upsert_format, false);
 		if (upserted == NULL)
 			return -1; /* OOM */
 		int64_t upserted_lsn = vy_stmt_lsn(upserted);
@@ -5536,12 +5544,12 @@ extern struct tuple_format_vtab vy_tuple_format_vtab;
 /**
  * Create the format for tuples with column mask of update
  * operation. @sa vy_index.column_mask, vy_can_skip_update().
- * @param space_format Format of the space of an index.
+ * @param space_format Format of a space.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
-static struct tuple_format *
+static inline struct tuple_format *
 vy_create_space_format_with_colmask(struct tuple_format *space_format)
 {
 	struct tuple_format *format = tuple_format_dup(space_format);
@@ -5549,6 +5557,26 @@ vy_create_space_format_with_colmask(struct tuple_format *space_format)
 		return NULL;
 	/* + size of column mask. */
 	format->extra_size = sizeof(uint64_t);
+	return format;
+}
+
+/**
+ * Create the format for UPSERT tuples. UPSERTs has an additional
+ * extra byte before an offsets table, that stores the count
+ * of squashed upserts @sa vy_squash.
+ * @param space_format Format of a space.
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Memory or format register error.
+ */
+static inline struct tuple_format *
+vy_create_upsert_statements_format(struct tuple_format *space_format)
+{
+	struct tuple_format *format = tuple_format_dup(space_format);
+	if (format == NULL)
+		return NULL;
+	/* + size of n_upserts. */
+	format->extra_size = sizeof(uint8_t);
 	return format;
 }
 
@@ -5602,7 +5630,13 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	if (index->surrogate_format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->surrogate_format, 1);
+
 	if (user_key_def->iid == 0) {
+		index->upsert_format =
+			vy_create_upsert_statements_format(space->format);
+		if (index->upsert_format == NULL)
+			goto fail_upsert_format;
+
 		index->space_format_with_colmask =
 			vy_create_space_format_with_colmask(space->format);
 		if (index->space_format_with_colmask == NULL)
@@ -5610,8 +5644,10 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	} else {
 		index->space_format_with_colmask =
 			pk->space_format_with_colmask;
+		index->upsert_format = pk->upsert_format;
 	}
 	tuple_format_ref(index->space_format_with_colmask, 1);
+	tuple_format_ref(index->upsert_format, 1);
 
 	if (vy_index_conf_create(index, index->key_def))
 		goto fail_conf;
@@ -5659,6 +5695,8 @@ fail_run_hist:
 fail_conf:
 	tuple_format_ref(index->space_format_with_colmask, -1);
 fail_space_format_with_colmask:
+	tuple_format_ref(index->upsert_format, -1);
+fail_upsert_format:
 	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
 	if (user_key_def->iid > 0)
@@ -5691,17 +5729,33 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 	(void) old_space;
 	struct vy_index *pk = vy_index(new_space->index[0]);
 	pk->space = new_space;
+
+	/* Update the format with column mask. */
 	struct tuple_format *format =
 		vy_create_space_format_with_colmask(new_space->format);
 	if (format == NULL)
 		return -1;
 	tuple_format_ref(format, 1);
-	tuple_format_ref(pk->space_format_with_colmask, -1);
-	pk->space_format_with_colmask = format;
+
+	/* Update the upsert format. */
+	struct tuple_format *upsert_format =
+		vy_create_upsert_statements_format(new_space->format);
+	if (upsert_format == NULL) {
+		tuple_format_ref(format, -1);
+		return -1;
+	}
+	tuple_format_ref(upsert_format, 1);
+
+	/* Set new formats. */
 	tuple_format_ref(pk->space_format, -1);
+	tuple_format_ref(pk->upsert_format, -1);
+	tuple_format_ref(pk->space_format_with_colmask, -1);
+	pk->upsert_format = upsert_format;
+	pk->space_format_with_colmask = format;
 	pk->space_format = new_space->format;
-	tuple_format_ref(pk->space_format, 1);
 	pk->space_index_count = new_space->index_count;
+	tuple_format_ref(pk->space_format, 1);
+
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
 		index->space = new_space;
@@ -5725,8 +5779,8 @@ vy_index_delete(struct vy_index *index)
 	free(index->name);
 	free(index->path);
 	tuple_format_ref(index->surrogate_format, -1);
-	if (index->key_def->iid == 0)
-		tuple_format_ref(index->space_format_with_colmask, -1);
+	tuple_format_ref(index->space_format_with_colmask, -1);
+	tuple_format_ref(index->upsert_format, -1);
 	if (index->key_def->iid > 0)
 		key_def_delete(index->key_def);
 	key_def_delete(index->user_key_def);
@@ -5836,7 +5890,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 static struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		const struct key_def *key_def, struct tuple_format *format,
-		bool suppress_error)
+		struct tuple_format *upsert_format, bool suppress_error)
 {
 	/*
 	 * old_stmt - previous (old) version of stmt
@@ -5851,7 +5905,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		/*
 		 * INSERT case: return new stmt.
 		 */
-		return vy_stmt_replace_from_upsert(new_stmt);
+		return vy_stmt_replace_from_upsert(format, new_stmt);
 	}
 
 	/*
@@ -5904,7 +5958,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(format, region,
+	if (vy_upsert_try_to_squash(upsert_format, region,
 				    result_mp, result_mp_end,
 				    old_ops, old_ops_end,
 				    new_ops, new_ops_end,
@@ -5935,8 +5989,8 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	operations[0].iov_base = (void *)ops_buf;
 	operations[0].iov_len = header - ops_buf;
 
-	result_stmt = vy_stmt_new_upsert(format, result_mp, result_mp_end,
-					 operations, 3);
+	result_stmt = vy_stmt_new_upsert(upsert_format, result_mp,
+					 result_mp_end, operations, 3);
 	region_truncate(region, region_svp);
 	if (result_stmt == NULL)
 		return NULL;
@@ -5956,7 +6010,8 @@ check_key:
 			 key_def->name, space_name_by_id(key_def->space_id));
 		error_log(diag_last_error(diag_get()));
 		tuple_unref(result_stmt);
-		result_stmt = vy_stmt_dup(old_stmt, format);
+		result_stmt = vy_stmt_dup(old_stmt, old_type == IPROTO_UPSERT ?
+						    upsert_format : format);
 	}
 	return result_stmt;
 }
@@ -5991,7 +6046,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			(void) old_type;
 
 			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
-					       index->space_format, true);
+					       index->space_format,
+					       index->upsert_format, true);
 			if (stmt == NULL)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
@@ -6719,7 +6775,7 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(index->space_format, tuple, tuple_end,
+	vystmt = vy_stmt_new_upsert(index->upsert_format, tuple, tuple_end,
 				    operations, 1);
 	if (vystmt == NULL)
 		return -1;
@@ -7392,8 +7448,13 @@ struct vy_run_iterator {
 	/* Members needed for memory allocation and disk access */
 	/* index */
 	struct vy_index *index;
-	/** Format ot allocate new tuples read from pages. */
+	/**
+	 * Format ot allocate REPLACE and DELETE tuples read from
+	 * pages.
+	 */
 	struct tuple_format *format;
+	/** Same as format, but for UPSERT tuples. */
+	struct tuple_format *upsert_format;
 	/* run */
 	struct vy_run *run;
 	/* range of the run */
@@ -7436,7 +7497,8 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_range *range, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
-		     struct tuple_format *format);
+		     struct tuple_format *format,
+		     struct tuple_format *upsert_format);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -7506,14 +7568,19 @@ vy_page_delete(struct vy_page *page)
 
 /**
  * Read raw stmt data from the page
- * \param page page
- * \param stmt_no stmt position in the page
- * \param[out] pinfo stmt metadata
- * \return stmt data including offsets table
+ * @param page          Page.
+ * @param stmt_no       Statement position in the page.
+ * @param format        Format for REPLACE/DELETE tuples.
+ * @param upsert_format Format for UPSERT tuples.
+ * @param key_def       Key definition of an index.
+ *
+ * @retval not NULL Statement read from page.
+ * @retval     NULL Memory error.
  */
 static struct tuple *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	     struct tuple_format *format, struct key_def *key_def)
+	     struct tuple_format *format, struct tuple_format *upsert_format,
+	     struct key_def *key_def)
 {
 	assert(stmt_no < page->count);
 	const char *data = page->data + page->row_index[stmt_no];
@@ -7523,7 +7590,10 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	struct xrow_header xrow;
 	if (xrow_header_decode(&xrow, &data, data_end) != 0)
 		return NULL;
-	return vy_stmt_decode(&xrow, format, key_def);
+	if (xrow.type != IPROTO_UPSERT)
+		return vy_stmt_decode(&xrow, format, key_def);
+	else
+		return vy_stmt_decode(&xrow, upsert_format, key_def);
 }
 
 /**
@@ -7858,7 +7928,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	if (rc != 0)
 		return rc;
 	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->format,
-			     itr->index->key_def);
+			     itr->upsert_format, itr->index->key_def);
 	if (*stmt == NULL)
 		return -1;
 	return 0;
@@ -7919,6 +7989,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
 		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->format,
+						     itr->upsert_format,
 						     itr->index->key_def);
 		if (fnd_key == NULL)
 			return end;
@@ -8234,11 +8305,13 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_range *range, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
-		     struct tuple_format *format)
+		     struct tuple_format *format,
+		     struct tuple_format *upsert_format)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
 	itr->format = format;
+	itr->upsert_format = upsert_format;
 	itr->index = range->index;
 	itr->range = range;
 	itr->run = run;
@@ -8885,11 +8958,13 @@ struct vy_merge_src {
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr, struct vy_index *index,
 		       enum iterator_type iterator_type,
-		       const struct tuple *key, struct tuple_format *format)
+		       const struct tuple *key, struct tuple_format *format,
+		       struct tuple_format *upsert_format)
 {
 	assert(key != NULL);
 	itr->index = index;
 	itr->format = format;
+	itr->upsert_format = upsert_format;
 	itr->index_version = 0;
 	itr->curr_range = NULL;
 	itr->range_version = 0;
@@ -9270,7 +9345,6 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 	struct key_def *def = itr->index->key_def;
 	if (t == NULL)
 		return 0;
-	struct tuple_format *format = itr->format;
 	/* Upserts enabled only in the primary index. */
 	assert(vy_stmt_type(t) != IPROTO_UPSERT || def->iid == 0);
 	tuple_ref(t);
@@ -9284,7 +9358,8 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 		if (next == NULL)
 			break;
 		struct tuple *applied;
-		applied = vy_apply_upsert(t, next, def, format, suppress_error);
+		applied = vy_apply_upsert(t, next, def, itr->format,
+					  itr->upsert_format, suppress_error);
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
@@ -9428,12 +9503,14 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 struct vy_write_iterator {
 	struct vy_index *index;
 	/**
-	 * Format to allocate new tuples from vy_run. We have to
-	 * store the reference to the format separate from index,
-	 * because the index can be altered during work of the
-	 * iterator.
+	 * Format to allocate new REPLACE and DELETE tuples from
+	 * vy_run. We have to store the reference to the format
+	 * separate from index, because the index can be altered
+	 * during work of the iterator.
 	 */
 	struct tuple_format *surrogate_format;
+	/** Same as surrogate_format, but for UPSERT tuples. */
+	struct tuple_format *upsert_format;
 	/* The minimal VLSN among all active transactions */
 	int64_t oldest_vlsn;
 	/* There are is no level older than the one we're writing to. */
@@ -9467,9 +9544,11 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	if (wi->key == NULL)
 		return -1;
 	wi->surrogate_format = index->surrogate_format;
+	wi->upsert_format = index->upsert_format;
 	tuple_format_ref(wi->surrogate_format, 1);
+	tuple_format_ref(wi->upsert_format, 1);
 	vy_merge_iterator_open(&wi->mi, index, ITER_GE, wi->key,
-			       wi->surrogate_format);
+			       wi->surrogate_format, wi->upsert_format);
 	return 0;
 }
 
@@ -9501,7 +9580,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
 			     range, run, ITER_GE, wi->key, &vlsn,
-			     wi->surrogate_format);
+			     wi->surrogate_format, wi->upsert_format);
 	return 0;
 }
 
@@ -9596,7 +9675,8 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 			/* Turn UPSERT to REPLACE. */
 			struct tuple *applied;
 			applied = vy_apply_upsert(stmt, NULL, def,
-						  wi->surrogate_format, false);
+						  wi->surrogate_format,
+						  wi->upsert_format, false);
 			tuple_unref(stmt);
 			if (applied == NULL)
 				return -1;
@@ -9630,6 +9710,7 @@ vy_write_iterator_delete(struct vy_write_iterator *wi)
 	assert(wi->tmp_stmt == NULL);
 	assert(wi->key == NULL);
 	tuple_format_ref(wi->surrogate_format, -1);
+	tuple_format_ref(wi->upsert_format, -1);
 	vy_merge_iterator_close(&wi->mi);
 
 	free(wi);
@@ -9727,7 +9808,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
 				     itr->curr_range,
 				     run, itr->iterator_type, itr->key,
-				     itr->vlsn, format);
+				     itr->vlsn, format,
+				     itr->index->upsert_format);
 	}
 }
 
@@ -9791,7 +9873,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->space_format);
+			       itr->index->space_format,
+			       itr->index->upsert_format);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9811,7 +9894,8 @@ restart:
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->space_format);
+			       itr->index->space_format,
+			       itr->index->upsert_format);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9877,7 +9961,8 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->space_format);
+			       itr->index->space_format,
+			       itr->index->upsert_format);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct tuple *stmt = NULL;
@@ -9945,7 +10030,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			if (vy_stmt_type(t) == IPROTO_UPSERT) {
 				struct tuple *applied;
 				applied = vy_apply_upsert(t, NULL, def,
-							  mi->format, true);
+							  mi->format,
+							  mi->upsert_format,
+							  true);
 				tuple_unref(t);
 				t = applied;
 				assert(vy_stmt_type(t) == IPROTO_REPLACE);
@@ -10142,7 +10229,8 @@ vy_squash_process(struct vy_squash *squash)
 		struct tuple *applied;
 		if (vy_stmt_type(mem_stmt) == IPROTO_UPSERT)
 			applied = vy_apply_upsert(mem_stmt, result, key_def,
-						  mem->format, true);
+						  mem->format,
+						  mem->upsert_format, true);
 		else
 			applied = vy_stmt_dup(mem_stmt, mem->format);
 		tuple_unref(result);

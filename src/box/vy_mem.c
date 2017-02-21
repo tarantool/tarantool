@@ -63,7 +63,8 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 struct vy_mem *
 vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 	   const int64_t *allocator_lsn, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask)
+	   struct tuple_format *format_with_colmask,
+	   struct tuple_format *upsert_format)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -82,6 +83,8 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 	tuple_format_ref(format, 1);
 	index->format_with_colmask = format_with_colmask;
 	tuple_format_ref(format_with_colmask, 1);
+	index->upsert_format = upsert_format;
+	tuple_format_ref(upsert_format, 1);
 	vy_mem_tree_create(&index->tree, key_def, vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_frozen);
@@ -91,15 +94,19 @@ vy_mem_new(struct key_def *key_def, struct lsregion *allocator,
 
 void
 vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
-		      struct tuple_format *new_format_with_colmask)
+		      struct tuple_format *new_format_with_colmask,
+		      struct tuple_format *new_upsert_format)
 {
 	assert(mem->used == 0);
 	tuple_format_ref(mem->format, -1);
 	tuple_format_ref(mem->format_with_colmask, -1);
+	tuple_format_ref(mem->upsert_format, -1);
 	mem->format = new_format;
 	mem->format_with_colmask = new_format_with_colmask;
+	mem->upsert_format = new_upsert_format;
 	tuple_format_ref(mem->format, 1);
 	tuple_format_ref(mem->format_with_colmask, 1);
+	tuple_format_ref(mem->upsert_format, 1);
 }
 
 void
@@ -107,6 +114,7 @@ vy_mem_delete(struct vy_mem *index)
 {
 	tuple_format_ref(index->format, -1);
 	tuple_format_ref(index->format_with_colmask, -1);
+	tuple_format_ref(index->upsert_format, -1);
 	TRASH(index);
 	free(index);
 }
@@ -136,7 +144,8 @@ static inline bool
 vy_mem_compatible_with_stmt(struct vy_mem *mem, const struct tuple *stmt)
 {
 	return stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format);
+	       stmt->format_id == tuple_format_id(mem->format) ||
+	       stmt->format_id == tuple_format_id(mem->upsert_format);
 }
 
 int
