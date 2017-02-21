@@ -93,7 +93,6 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
-	vy_stmt_set_n_upserts(tuple, 0);
 	return tuple;
 }
 
@@ -270,8 +269,13 @@ vy_stmt_new_upsert(struct tuple_format *format, const char *tuple_begin,
 	 * memory.
 	 */
 	assert(format->extra_size == sizeof(uint8_t));
-	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
-				    operations, ops_cnt, IPROTO_UPSERT);
+	struct tuple *upsert =
+		vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				     operations, ops_cnt, IPROTO_UPSERT);
+	if (upsert == NULL)
+		return NULL;
+	vy_stmt_set_n_upserts(upsert, 0);
+	return upsert;
 }
 
 struct tuple *

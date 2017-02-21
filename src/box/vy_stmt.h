@@ -88,11 +88,12 @@ struct vy_stmt {
 	/**
 	 * Number of UPSERT statements for the same key preceding
 	 * this statement. Used to trigger upsert squashing in the
-	 * background (see vy_range_set_upsert()).
-	 */
-	uint8_t n_upserts;
-	/** Offsets count before MessagePack data. */
-	/**
+	 * background (see vy_range_set_upsert()). This member is
+	 * stored only for UPSERT statements in the extra memory
+	 * space before offsets table.
+	 *
+	 *     uint8_t n_upserts;
+	 *
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
 	 * char raw[0];
@@ -131,14 +132,19 @@ vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 static inline uint8_t
 vy_stmt_n_upserts(const struct tuple *stmt)
 {
-	return ((const struct vy_stmt *) stmt)->n_upserts;
+	assert(tuple_format(stmt)->extra_size == sizeof(uint8_t));
+	return *((const uint8_t *) tuple_extra(stmt));
 }
 
 /** Set upserts count of the vinyl statement. */
 static inline void
 vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 {
-	((struct vy_stmt *) stmt)->n_upserts = n;
+	struct tuple_format *format = tuple_format(stmt);
+	assert(format->extra_size == sizeof(uint8_t));
+	char *extra = (char *) stmt + stmt->data_offset -
+		      tuple_format_meta_size(format);
+	*((uint8_t *) extra) = n;
 }
 
 /** Get the column mask of the specified tuple. */
