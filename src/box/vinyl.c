@@ -3524,26 +3524,6 @@ vy_range_set(struct vy_range *range, const struct tuple *stmt,
 	return 0;
 }
 
-static int
-vy_range_set_delete(struct vy_range *range, const struct tuple *stmt)
-{
-	assert(vy_stmt_type(stmt) == IPROTO_DELETE);
-
-	struct vy_mem *mem = range->mem;
-	if (range->shadow == NULL &&
-	    rlist_empty(&range->frozen) && range->run_count == 0 &&
-	    vy_mem_older_lsn(mem, stmt) == NULL) {
-		/*
-		 * Optimization: the active mem index doesn't have statements
-		 * for the key and there are no more mems and runs.
-		 *  => discard DELETE statement.
-		 */
-		return 0;
-	}
-
-	return vy_range_set(range, stmt, vy_stmt_lsn(stmt));
-}
-
 static void
 vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt);
 
@@ -3697,17 +3677,10 @@ vy_tx_write(struct txv *v, enum vy_status status, int64_t lsn)
 			return -1;
 	}
 	int rc;
-	switch (vy_stmt_type(stmt)) {
-	case IPROTO_UPSERT:
+	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
 		rc = vy_range_set_upsert(range, stmt);
-		break;
-	case IPROTO_DELETE:
-		rc = vy_range_set_delete(range, stmt);
-		break;
-	default:
+	else
 		rc = vy_range_set(range, stmt, vy_stmt_lsn(stmt));
-		break;
-	}
 
 	/*
 	 * Invalidate cache element.
