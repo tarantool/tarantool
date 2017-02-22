@@ -180,13 +180,28 @@ void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
 /**
- * Duplicate statememnt.
+ * Duplicate the statememnt.
  *
  * @param stmt statement
  * @return new statement of the same type with the same data.
  */
 struct tuple *
 vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format);
+
+struct lsregion;
+
+/**
+ * Duplicate the statement, using the lsregion as allocator.
+ * @param stmt      Statement to duplicate.
+ * @param lsregion  Allocator.
+ * @param alloc_lsn Allocation identifier for the lsregion.
+ *
+ * @retval not NULL The new statement with the same data.
+ * @retval     NULL Memory error.
+ */
+struct tuple *
+vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
+		     int64_t alloc_lsn);
 
 /**
  * Specialized comparators are faster than general-purpose comparators.

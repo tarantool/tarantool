@@ -140,30 +140,16 @@ vy_mem_compatible_with_stmt(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 int
-vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt, int64_t alloc_lsn)
+vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	size_t size = tuple_size(stmt);
 	/* Prune the release build warning. */
 	(void) vy_mem_compatible_with_stmt;
 	assert(vy_mem_compatible_with_stmt(mem, stmt));
-	struct tuple *mem_stmt;
-	mem_stmt = lsregion_alloc(mem->allocator, size, alloc_lsn);
-	if (mem_stmt == NULL) {
-		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
-		return -1;
-	}
-	memcpy(mem_stmt, stmt, size);
-	/*
-	 * Region allocated statements can't be referenced or unreferenced
-	 * because they are located in monolithic memory region. Referencing has
-	 * sense only for separately allocated memory blocks.
-	 * The reference count here is set to 0 for an assertion if somebody
-	 * will try to unreference this statement.
-	 */
-	mem_stmt->refs = 0;
-
+	/* The statement must be from a lsregion. */
+	assert(stmt->refs == 0);
 	const struct tuple *replaced_stmt = NULL;
-	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);
+	int rc = vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt);
 	if (rc != 0)
 		return -1;
 
