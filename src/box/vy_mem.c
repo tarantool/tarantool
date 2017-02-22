@@ -131,10 +131,21 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 	return result;
 }
 
+/** Check if the statement can be inserted in the vy_mem. */
+static inline bool
+vy_mem_compatible_with_stmt(struct vy_mem *mem, const struct tuple *stmt)
+{
+	return stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
+	       stmt->format_id == tuple_format_id(mem->format);
+}
+
 int
 vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt, int64_t alloc_lsn)
 {
 	size_t size = tuple_size(stmt);
+	/* Prune the release build warning. */
+	(void) vy_mem_compatible_with_stmt;
+	assert(vy_mem_compatible_with_stmt(mem, stmt));
 	struct tuple *mem_stmt;
 	mem_stmt = lsregion_alloc(mem->allocator, size, alloc_lsn);
 	if (mem_stmt == NULL) {
@@ -150,10 +161,6 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt, int64_t alloc_lsn)
 	 * will try to unreference this statement.
 	 */
 	mem_stmt->refs = 0;
-	if (tuple_format(stmt)->extra_size == sizeof(uint64_t))
-		mem_stmt->format_id = tuple_format_id(mem->format_with_colmask);
-	else
-		mem_stmt->format_id = tuple_format_id(mem->format);
 
 	const struct tuple *replaced_stmt = NULL;
 	int rc = vy_mem_tree_insert(&mem->tree, mem_stmt, &replaced_stmt);

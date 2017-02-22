@@ -637,6 +637,20 @@ struct vy_index {
 	 * are parts of an UPDATE operation.
 	 */
 	struct tuple_format *space_format_with_colmask;
+	/**
+	 * A format of the space of this index. It is need as the
+	 * separate member, because there is cthe ase, when the
+	 * index is dropped, but we still need the format of the
+	 * space.
+	 */
+	struct tuple_format *space_format;
+	/**
+	 * Count of indexes in the space. This member is need by
+	 * the same reason, as the previous - we need to know the
+	 * count of indexes was in the space, that maybe already
+	 * was deleted.
+	 */
+	uint32_t space_index_count;
 
 	/** Member of env->indexes. */
 	struct rlist link;
@@ -2713,7 +2727,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 		goto fail;
 	}
 	range->mem = vy_mem_new(index->key_def, allocator, allocator_lsn,
-				index->space->format,
+				index->space_format,
 				index->space_format_with_colmask);
 	if (range->mem == NULL)
 		goto fail_mem;
@@ -2866,12 +2880,12 @@ vy_range_rotate_mem(struct vy_range *range, struct key_def *key_def,
 	struct vy_index *index = range->index;
 	struct vy_mem *mem = range->mem;
 	if (mem->used == 0) {
-		vy_mem_update_formats(mem, index->space->format,
+		vy_mem_update_formats(mem, index->space_format,
 				      index->space_format_with_colmask);
 		return 0;
 	}
 	mem = vy_mem_new(key_def, allocator, allocator_lsn,
-			 index->space->format,
+			 index->space_format,
 			 index->space_format_with_colmask);
 	if (mem == NULL)
 		return -1;
@@ -3554,7 +3568,7 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, key_def,
-					index->space->format, false);
+					index->space_format, false);
 		if (upserted == NULL)
 			return -1; /* OOM */
 		int64_t upserted_lsn = vy_stmt_lsn(upserted);
@@ -5554,6 +5568,9 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 	read_set_new(&index->read_set);
 	index->space = space;
 	index->user_key_def = user_key_def;
+	index->space_format = space->format;
+	tuple_format_ref(index->space_format, 1);
+	index->space_index_count = space->index_count;
 
 	return index;
 
@@ -5604,13 +5621,21 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 	tuple_format_ref(format, 1);
 	tuple_format_ref(pk->space_format_with_colmask, -1);
 	pk->space_format_with_colmask = format;
+	tuple_format_ref(pk->space_format, -1);
+	pk->space_format = new_space->format;
+	tuple_format_ref(pk->space_format, 1);
+	pk->space_index_count = new_space->index_count;
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
 		index->space = new_space;
 		tuple_format_ref(index->space_format_with_colmask, -1);
+		tuple_format_ref(index->space_format, -1);
 		index->space_format_with_colmask =
 			pk->space_format_with_colmask;
+		index->space_format = new_space->format;
 		tuple_format_ref(index->space_format_with_colmask, 1);
+		tuple_format_ref(index->space_format, 1);
+		index->space_index_count = new_space->index_count;
 	}
 	return 0;
 }
@@ -5630,6 +5655,7 @@ vy_index_delete(struct vy_index *index)
 	key_def_delete(index->user_key_def);
 	histogram_delete(index->run_hist);
 	vy_cache_delete(index->cache);
+	tuple_format_ref(index->space_format, -1);
 	TRASH(index);
 	free(index);
 }
@@ -5888,7 +5914,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			(void) old_type;
 
 			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
-					       index->space->format, true);
+					       index->space_format, true);
 			if (stmt == NULL)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
@@ -6616,7 +6642,7 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(index->space->format, tuple, tuple_end,
+	vystmt = vy_stmt_new_upsert(index->space_format, tuple, tuple_end,
 				    operations, 1);
 	if (vystmt == NULL)
 		return -1;
@@ -9526,13 +9552,21 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	assert(itr->curr_range->shadow == NULL);
 	struct vy_iterator_stat *stat = &itr->index->env->stat->run_stat;
 	struct vy_run *run;
+	struct tuple_format *format = itr->index->surrogate_format;
+	/*
+	 * The format of the statement must be exactly the space
+	 * format with the same identifier to fully match the
+	 * format in vy_mem.
+	 */
+	if (itr->index->space_index_count == 1)
+		format = itr->index->space_format;
 	rlist_foreach_entry(run, &itr->curr_range->runs, in_range) {
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
 				     itr->curr_range,
 				     run, itr->iterator_type, itr->key,
-				     itr->vlsn, itr->index->surrogate_format);
+				     itr->vlsn, format);
 	}
 }
 
@@ -9596,7 +9630,7 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->surrogate_format);
+			       itr->index->space_format);
 	vy_read_iterator_use_range(itr);
 }
 
@@ -9616,7 +9650,7 @@ restart:
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->surrogate_format);
+			       itr->index->space_format);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
 	if (rc == -1)
@@ -9682,7 +9716,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->index,
 			       itr->iterator_type, itr->key,
-			       itr->index->surrogate_format);
+			       itr->index->space_format);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
 	struct tuple *stmt = NULL;
@@ -10118,7 +10152,7 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 	struct tuple *vyresult = NULL;
 	struct vy_index *index = c->index;
 	struct key_def *def = index->key_def;
-	assert(index->space->index_count > 0);
+	assert(index->space_index_count > 0);
 	*result = NULL;
 
 	if (c->tx == NULL) {
