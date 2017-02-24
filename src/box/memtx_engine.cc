@@ -134,14 +134,6 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_UUID);
 	m_snap_dir.panic_if_error = panic_on_snap_error;
 	xdir_scan_xc(&m_snap_dir);
-	struct vclock *vclock = vclockset_last(&m_snap_dir.index);
-	if (vclock) {
-		vclock_copy(&m_last_checkpoint, vclock);
-		m_has_checkpoint = true;
-	} else {
-		vclock_create(&m_last_checkpoint);
-		m_has_checkpoint = false;
-	}
 }
 
 MemtxEngine::~MemtxEngine()
@@ -154,10 +146,11 @@ MemtxEngine::~MemtxEngine()
 int64_t
 MemtxEngine::lastCheckpoint(struct vclock *vclock)
 {
-	if (!m_has_checkpoint)
+	struct vclock *last = vclockset_last(&m_snap_dir.index);
+	if (last == NULL)
 		return -1;
 	assert(vclock);
-	vclock_copy(vclock, &m_last_checkpoint);
+	vclock_copy(vclock, last);
 	/* Return the lsn of the last checkpoint. */
 	return vclock->signature;
 }
@@ -165,13 +158,13 @@ MemtxEngine::lastCheckpoint(struct vclock *vclock)
 void
 MemtxEngine::recoverSnapshot()
 {
-	if (!m_has_checkpoint)
+	struct vclock vclock;
+	if (lastCheckpoint(&vclock) < 0)
 		return;
 
 	/* Process existing snapshot */
 	say_info("recovery start");
-	assert(m_has_checkpoint);
-	int64_t signature = m_last_checkpoint.signature;
+	int64_t signature = vclock.signature;
 	const char *filename = xdir_format_filename(&m_snap_dir, signature,
 						    NONE);
 
@@ -671,7 +664,7 @@ struct checkpoint {
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
-	struct vclock vclock;
+	struct vclock *vclock;
 	struct xdir dir;
 };
 
@@ -684,7 +677,11 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
-	vclock_create(&ckpt->vclock);
+	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
+	if (ckpt->vclock == NULL)
+		tnt_raise(OutOfMemory, sizeof(*ckpt->vclock),
+			  "malloc", "vclock");
+	vclock_create(ckpt->vclock);
 }
 
 static void
@@ -698,6 +695,7 @@ checkpoint_destroy(struct checkpoint *ckpt)
 	}
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	xdir_destroy(&ckpt->dir);
+	free(ckpt->vclock);
 }
 
 
@@ -729,7 +727,7 @@ checkpoint_f(va_list ap)
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, ckpt->vclock) != 0)
 		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
@@ -770,7 +768,7 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
 
-	vclock_copy(&m_checkpoint->vclock, vclock);
+	vclock_copy(m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",
 			 checkpoint_f, m_checkpoint)) {
@@ -798,7 +796,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 
 	memtx_tuple_end_snapshot();
 
-	int64_t lsn = vclock_sum(&m_checkpoint->vclock);
+	int64_t lsn = vclock_sum(m_checkpoint->vclock);
 	struct xdir *dir = &m_checkpoint->dir;
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
@@ -809,8 +807,8 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
-	vclock_copy(&m_last_checkpoint, &m_checkpoint->vclock);
-	m_has_checkpoint = true;
+	vclockset_insert(&m_snap_dir.index, m_checkpoint->vclock);
+	m_checkpoint->vclock = NULL;
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
@@ -833,7 +831,7 @@ MemtxEngine::abortCheckpoint()
 	/** Remove garbage .inprogress file. */
 	char *filename =
 		xdir_format_filename(&m_checkpoint->dir,
-				     vclock_sum(&m_checkpoint->vclock),
+				     vclock_sum(m_checkpoint->vclock),
 				     INPROGRESS);
 	(void) coeio_unlink(filename);
 
@@ -900,7 +898,8 @@ MemtxEngine::join(struct xstream *stream)
 	 * as a replica. Our best effort is to not crash in such
 	 * case: raise ER_MISSING_SNAPSHOT.
 	 */
-	if (!m_has_checkpoint)
+	struct vclock vclock;
+	if (lastCheckpoint(&vclock) < 0)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 
 	/*
@@ -908,7 +907,7 @@ MemtxEngine::join(struct xstream *stream)
 	 */
 	struct memtx_join_arg arg = {
 		/* .snap_dirname   = */ m_snap_dir.dirname,
-		/* .checkpoint_lsn = */ vclock_sum(&m_last_checkpoint),
+		/* .checkpoint_lsn = */ vclock_sum(&vclock),
 		/* .stream         = */ stream
 	};
 
