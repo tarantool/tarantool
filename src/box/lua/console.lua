@@ -345,7 +345,6 @@ local function client_handler(client, peer)
     session_internal.create(client:fd())
     session_internal.run_on_connect()
     session_internal.run_on_auth(box.session.user())
-    log.info("client %s:%s connected", peer.host, peer.port)
     local state = setmetatable({
         running = true;
         read = client_read;
@@ -358,7 +357,6 @@ local function client_handler(client, peer)
         "type 'help' for interactive help"))
     repl(state)
     session_internal.run_on_disconnect()
-    log.info("client %s:%s disconnected", peer.host, peer.port)
 end
 
 --
