@@ -11,120 +11,121 @@ compiler:
   - clang
   - gcc
 
+cache:
+    directories:
+      - $HOME/.cache
+
+git:
+    depth: 100500
+
 env:
     global:
-      - ENCRYPTION_LABEL="8f886150b5ec"
-      - SFTP_UPLOAD_SOURCE="True"
+      - PACKAGECLOUD_REPO=1_7
     matrix:
-      - PACK=none
-      - PACK=source
-      - PACK=coverage
-      - OS=el DIST=6 PACK=rpm
-      - OS=el DIST=7 PACK=rpm
-      - OS=fedora DIST=24 PACK=rpm
-      - OS=fedora DIST=25 PACK=rpm
-      - OS=fedora DIST=rawhide PACK=rpm
-      - OS=ubuntu DIST=trusty PACK=deb
-      - OS=ubuntu DIST=precise PACK=deb
-      - OS=ubuntu DIST=xenial PACK=deb
-      - OS=ubuntu DIST=yakkety PACK=deb
-      - OS=debian DIST=jessie PACK=deb
-      - OS=debian DIST=wheezy PACK=deb
-      - OS=debian DIST=stretch PACK=deb
-      - OS=debian DIST=sid PACK=deb
-      - OS=rumprun DIST=hw PACK=rumprun
+      - TARGET=source
+      - TARGET=test
+      - OS=el DIST=6
+      - OS=el DIST=7
+      - OS=fedora DIST=24
+      - OS=fedora DIST=25
+      - OS=ubuntu DIST=precise
+      - OS=ubuntu DIST=trusty
+      - OS=ubuntu DIST=xenial
+      - OS=ubuntu DIST=yakkety
+      - OS=debian DIST=wheezy
+      - OS=debian DIST=jessie
+      - OS=debian DIST=stretch
 
 matrix:
     allow_failures:
-#      - env: PACK=source
-#      - env: OS=el DIST=6 PACK=rpm
-#      - env: OS=el DIST=7 PACK=rpm
-#      - env: OS=fedora DIST=24 PACK=rpm
-#      - env: OS=fedora DIST=25 PACK=rpm
-      - env: OS=fedora DIST=rawhide PACK=rpm
-      - env: OS=ubuntu DIST=precise PACK=deb
-#      - env: OS=ubuntu DIST=trusty PACK=deb
-#      - env: OS=ubuntu DIST=xenial PACK=deb
-#      - env: OS=ubuntu DIST=yakkety PACK=deb
-      - env: OS=debian DIST=wheezy PACK=deb
-#      - env: OS=debian DIST=jessie PACK=deb
-#      - env: OS=debian DIST=stretch PACK=deb
-      - env: OS=debian DIST=sid PACK=deb
-      - env: OS=rumprun DIST=hw PACK=rumprun
-      - env: PACK=none
-        os: osx
-
+#      - env: OS=el DIST=6
+#      - env: OS=el DIST=7
+#      - env: OS=fedora DIST=24
+#      - env: OS=fedora DIST=25
+#      - env: OS=ubuntu DIST=precise
+#      - env: OS=ubuntu DIST=trusty
+#      - env: OS=ubuntu DIST=xenial
+#      - env: OS=ubuntu DIST=yakkety
+#      - env: OS=debian DIST=wheezy
+#      - env: OS=debian DIST=jessie
+#      - env: OS=debian DIST=stretch
     exclude:
-      - env: PACK=coverage
+      - env: OS=el DIST=6
         compiler: clang
-      - env: OS=el DIST=6 PACK=rpm
+      - env: OS=el DIST=7
         compiler: clang
-      - env: OS=el DIST=7 PACK=rpm
+      - env: OS=fedora DIST=24
         compiler: clang
-      - env: OS=fedora DIST=24 PACK=rpm
+      - env: OS=fedora DIST=25
         compiler: clang
-      - env: OS=fedora DIST=25 PACK=rpm
+      - env: OS=ubuntu DIST=precise
         compiler: clang
-      - env: OS=fedora DIST=rawhide PACK=rpm
+      - env: OS=ubuntu DIST=trusty
         compiler: clang
-      - env: OS=ubuntu DIST=precise PACK=deb
+      - env: OS=ubuntu DIST=xenial
         compiler: clang
-      - env: OS=ubuntu DIST=trusty PACK=deb
+      - env: OS=ubuntu DIST=yakkety
         compiler: clang
-      - env: OS=ubuntu DIST=xenial PACK=deb
+      - env: OS=debian DIST=wheezy
         compiler: clang
-      - env: OS=ubuntu DIST=yakkety PACK=deb
+      - env: OS=debian DIST=jessie
         compiler: clang
-      - env: OS=debian DIST=wheezy PACK=deb
+      - env: OS=debian DIST=stretch
         compiler: clang
-      - env: OS=debian DIST=jessie PACK=deb
+      - env: TARGET=source
         compiler: clang
-      - env: OS=debian DIST=stretch PACK=deb
-        compiler: clang
-      - env: OS=debian DIST=sid PACK=deb
-        compiler: clang
-      - env: OS=rumprun DIST=hw PACK=rumprun
-        compiler: clang
-      - env: PACK=coverage
+      - env: OS=el DIST=6
         os: osx
-      - env: PACK=source
-        compiler: clang
-      - env: PACK=source
+      - env: OS=el DIST=7
         os: osx
-      - env: OS=el DIST=6 PACK=rpm
+      - env: OS=fedora DIST=24
         os: osx
-      - env: OS=el DIST=7 PACK=rpm
+      - env: OS=fedora DIST=25
         os: osx
-      - env: OS=fedora DIST=24 PACK=rpm
+      - env: OS=ubuntu DIST=precise
         os: osx
-      - env: OS=fedora DIST=25 PACK=rpm
+      - env: OS=ubuntu DIST=trusty
         os: osx
-      - env: OS=fedora DIST=rawhide PACK=rpm
+      - env: OS=ubuntu DIST=xenial
         os: osx
-      - env: OS=ubuntu DIST=precise PACK=deb
+      - env: OS=ubuntu DIST=yakkety
         os: osx
-      - env: OS=ubuntu DIST=trusty PACK=deb
+      - env: OS=debian DIST=wheezy
         os: osx
-      - env: OS=ubuntu DIST=xenial PACK=deb
+      - env: OS=debian DIST=jessie
         os: osx
-      - env: OS=ubuntu DIST=yakkety PACK=deb
+      - env: OS=debian DIST=stretch
         os: osx
-      - env: OS=debian DIST=wheezy PACK=deb
-        os: osx
-      - env: OS=debian DIST=jessie PACK=deb
-        os: osx
-      - env: OS=debian DIST=stretch PACK=deb
-        os: osx
-      - env: OS=debian DIST=sid PACK=deb
-        os: osx
-      - env: OS=rumprun DIST=hw PACK=rumprun
+      - env: TARGET=source
         os: osx
       - os: osx
         compiler: gcc
 
 script:
-  - git clone https://github.com/tarantool/build.git
-  - ./build/pack/travis.sh
+  - make -f .travis.mk ${TARGET}
+
+before_deploy:
+  - ls -l build/
+
+deploy:
+  # Deploy packages to PackageCloud
+  - provider: packagecloud
+    username: "${PACKAGECLOUD_USER}"
+    repository: "${PACKAGECLOUD_REPO}"
+    token: "${PACKAGECLOUD_TOKEN}"
+    dist: "${OS}/${DIST}"
+    package_glob: build/*.{rpm,deb,dsc}
+    skip_cleanup: true
+    on:
+      branch: "1.7"
+      condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
+  # Deploy sources to SFTP
+  - provider: script
+    script: ./packpack/tools/sftp ${TRAVIS_BRANCH}/src build/*.tar.gz
+    skip_cleanup: true
+    on:
+      branch: "1.7"
+      condition: "x${TARGET} = xsource"
 
 notifications:
   email:
@@ -132,6 +133,3 @@ notifications:
       - build@tarantool.org
     on_success: change
     on_failure: always
-
-git:
-  depth: 500
