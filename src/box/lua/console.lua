@@ -1,6 +1,7 @@
 -- console.lua -- internal file
 
 local internal = require('console')
+local session_internal = require('box.internal.session')
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
@@ -341,6 +342,9 @@ local function connect(uri, opts)
 end
 
 local function client_handler(client, peer)
+    session_internal.create(client:fd())
+    session_internal.run_on_connect()
+    session_internal.run_on_auth(box.session.user())
     log.info("client %s:%s connected", peer.host, peer.port)
     local state = setmetatable({
         running = true;
@@ -353,6 +357,7 @@ local function client_handler(client, peer)
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
     repl(state)
+    session_internal.run_on_disconnect()
     log.info("client %s:%s disconnected", peer.host, peer.port)
 end
 

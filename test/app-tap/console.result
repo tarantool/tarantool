@@ -1,5 +1,5 @@
 TAP version 13
-1..34
+1..50
 ok - console.listen started
 ok - Handshake
 ok - connect to console
@@ -34,3 +34,19 @@ ok - console.listen uri support
 ok - console.listen uri support
 ok - console.listen uri support
 ok - console.listen uri support
+ok - on_connect session.user()
+ok - on_connect session.peer()
+ok - on_connect session.id()
+ok - on_auth session.user()
+ok - on_auth session.peer()
+ok - on_auth session.id()
+ok - on_auth argument
+ok - eval with triggers
+ok - on_disconnect session.user()
+ok - on_disconnect session.peer()
+ok - on_disconnect session.id()
+ok - on_connect session.user()
+ok - on_connect session.peer()
+ok - on_connect session.id()
+ok - on_auth aborts connection
+ok - on_connect -> on_auth_error order

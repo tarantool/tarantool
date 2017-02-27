@@ -92,6 +92,23 @@ extern struct rlist session_on_connect;
 
 extern struct rlist session_on_auth;
 
+/**
+ * Get the current session from @a fiber
+ * @param fiber fiber
+ * @return session if any
+ * @retval NULL if there is no active session
+ */
+static inline struct session *
+fiber_get_session(struct fiber *fiber)
+{
+	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
+}
+
+/**
+ * Set the current session in @a fiber
+ * @param fiber fiber
+ * @param session a value to set
+ */
 static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
@@ -124,7 +141,7 @@ extern struct credentials admin_credentials;
  * trigger to destroy it when this fiber ends.
  */
 struct session *
-session_create_on_demand();
+session_create_on_demand(int fd);
 
 /*
  * When creating a new fiber, the database (box)
@@ -139,9 +156,13 @@ session_create_on_demand();
 static inline struct session *
 current_session()
 {
-	struct session *s = (struct session *)
-		fiber_get_key(fiber(), FIBER_KEY_SESSION);
-	return s ? s : session_create_on_demand();
+	struct session *session = fiber_get_session(fiber());
+	if (session == NULL) {
+		session = session_create_on_demand(-1);
+		if (session == NULL)
+			diag_raise();
+	}
+	return session;
 }
 
 /** Global on-disconnect triggers. */

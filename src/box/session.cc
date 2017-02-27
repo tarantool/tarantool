@@ -104,10 +104,12 @@ session_create(int fd)
 }
 
 struct session *
-session_create_on_demand()
+session_create_on_demand(int fd)
 {
+	assert(fiber_get_session(fiber()) == NULL);
+
 	/* Create session on demand */
-	struct session *s = session_create(-1);
+	struct session *s = session_create(fd);
 	if (s == NULL)
 		return NULL;
 	s->fiber_on_stop = {

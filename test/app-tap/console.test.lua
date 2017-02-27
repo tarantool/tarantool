@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(34)
+test:plan(50)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -170,6 +170,71 @@ test:is(addr.family, 'AF_UNIX', 'console.listen uri support')
 test:is(addr.host, 'unix/', 'console.listen uri support')
 test:is(addr.port, CONSOLE_SOCKET, 'console.listen uri support')
 s:close()
+
+--
+-- gh-1938: on_connect/on_disconnect/on_auth triggers
+--
+local session_id = box.session.id()
+local triggers_ran = 0
+
+local function console_on_connect()
+    test:is(box.session.user(), "admin", "on_connect session.user()")
+    test:like(box.session.peer(), "unix", "on_connect session.peer()")
+    test:isnt(box.session.id(), session_id, "on_connect session.id()")
+    triggers_ran = triggers_ran + 1
+end
+
+local function console_on_disconnect()
+    test:is(box.session.user(), "admin", "on_disconnect session.user()")
+    test:like(box.session.peer(), "unix", "on_disconnect session.peer()")
+    test:isnt(box.session.id(), session_id, "on_disconnect session.id()")
+    triggers_ran = triggers_ran + 1
+end
+
+local function console_on_auth(username)
+    test:is(box.session.user(), "admin", "on_auth session.user()")
+    test:like(box.session.peer(), "unix", "on_auth session.peer()")
+    test:isnt(box.session.id(), session_id, "on_auth session.id()")
+    test:is(username, "admin", "on_auth argument")
+    triggers_ran = triggers_ran + 1
+end
+
+box.session.on_connect(console_on_connect)
+box.session.on_disconnect(console_on_disconnect)
+box.session.on_auth(console_on_auth)
+
+-- check on_connect/on_disconnect/on_auth triggers
+local server = console.listen('console://unix/:'..CONSOLE_SOCKET)
+client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+_ = client:read(128)
+client:write("1\n")
+test:is(yaml.decode(client:read(EOL))[1], 1, "eval with triggers")
+client:shutdown()
+client:close()
+while triggers_ran < 3 do fiber.yield() end
+
+-- check on_auth with error()
+local function console_on_auth_error()
+    error("Authorization error")
+    triggers_ran = triggers_ran + 1
+end
+box.session.on_auth(console_on_auth_error)
+
+client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+_ = client:read(128)
+test:is(client:read(1024), "", "on_auth aborts connection")
+client:close()
+while triggers_ran < 4 do fiber.yield() end
+test:is(triggers_ran, 4, "on_connect -> on_auth_error order")
+box.session.on_auth(nil, console_on_auth_error)
+
+server:close()
+
+box.session.on_connect(nil, console_on_connect)
+box.session.on_disconnect(nil, console_on_disconnect)
+box.session.on_auth(nil, console_on_auth)
+session_id = nil
+triggers_ran = nil
 
 test:check()
 

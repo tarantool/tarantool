@@ -16,7 +16,7 @@ session.exists(session.id())
 ...
 session.peer(session.id())
 ---
-- null
+- unix/:(socket)
 ...
 session.exists()
 ---
