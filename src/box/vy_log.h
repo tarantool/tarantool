@@ -52,11 +52,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct latch;
-struct xlog;
-
-struct mh_i64ptr_t;
-
 /** Type of a vinyl metadata log record. */
 enum vy_log_type {
 	/**
@@ -157,56 +152,9 @@ struct vy_log_record {
 	uint32_t path_len;
 };
 
-/**
- * Max number of records in the log buffer.
- * This limits the size of a transaction.
- */
-enum { VY_LOG_TX_BUF_SIZE = 64 };
-
-struct vy_recovery;
-
 typedef int
 (*vy_log_gc_cb)(int64_t run_id, uint32_t iid, uint32_t space_id,
 		const char *path, void *arg);
-
-/** Vinyl metadata log object. */
-struct vy_log {
-	/** Xlog object used for writing the log. */
-	struct xlog *xlog;
-	/** The directory where log files are stored. */
-	char *dir;
-	/** Vector clock sum from the time of the log creation. */
-	int64_t signature;
-	/** Recovery context. */
-	struct vy_recovery *recovery;
-	/** Garbage collection callback. */
-	vy_log_gc_cb gc_cb;
-	/** Argument to the garbage collection callback. */
-	void *gc_arg;
-	/**
-	 * Latch protecting the xlog.
-	 *
-	 * We need to lock the log before writing to xlog, because
-	 * xlog object doesn't support concurrent accesses.
-	 */
-	struct latch *latch;
-	/** Next ID to use for a range. Used by vy_log_next_range_id(). */
-	int64_t next_range_id;
-	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
-	int64_t next_run_id;
-	/**
-	 * Index of the first record of the current
-	 * transaction in tx_buf.
-	 */
-	int tx_begin;
-	/**
-	 * Index of the record following the last one
-	 * of the current transaction in tx_buf.
-	 */
-	int tx_end;
-	/** Records awaiting to be written to disk. */
-	struct vy_log_record tx_buf[VY_LOG_TX_BUF_SIZE];
-};
 
 /**
  * Allocate and initialize a vy_log structure.
@@ -247,18 +195,12 @@ int
 vy_log_rotate(struct vy_log *log, int64_t signature);
 
 /** Allocate a unique ID for a run. */
-static inline int64_t
-vy_log_next_run_id(struct vy_log *log)
-{
-	return log->next_run_id++;
-}
+int64_t
+vy_log_next_run_id(struct vy_log *log);
 
 /** Allocate a unique ID for a range. */
-static inline int64_t
-vy_log_next_range_id(struct vy_log *log)
-{
-	return log->next_range_id++;
-}
+int64_t
+vy_log_next_range_id(struct vy_log *log);
 
 /**
  * Begin a transaction in a metadata log.

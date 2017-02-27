@@ -124,6 +124,53 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_FORGET_RUN]		= "forget_run",
 };
 
+struct vy_recovery;
+
+/**
+ * Max number of records in the log buffer.
+ * This limits the size of a transaction.
+ */
+enum { VY_LOG_TX_BUF_SIZE = 64 };
+
+/** Vinyl metadata log object. */
+struct vy_log {
+	/** Xlog object used for writing the log. */
+	struct xlog *xlog;
+	/** The directory where log files are stored. */
+	char *dir;
+	/** Vector clock sum from the time of the log creation. */
+	int64_t signature;
+	/** Recovery context. */
+	struct vy_recovery *recovery;
+	/** Garbage collection callback. */
+	vy_log_gc_cb gc_cb;
+	/** Argument to the garbage collection callback. */
+	void *gc_arg;
+	/**
+	 * Latch protecting the xlog.
+	 *
+	 * We need to lock the log before writing to xlog, because
+	 * xlog object doesn't support concurrent accesses.
+	 */
+	struct latch latch;
+	/** Next ID to use for a range. Used by vy_log_next_range_id(). */
+	int64_t next_range_id;
+	/** Next ID to use for a run. Used by vy_log_next_run_id(). */
+	int64_t next_run_id;
+	/**
+	 * Index of the first record of the current
+	 * transaction in tx_buf.
+	 */
+	int tx_begin;
+	/**
+	 * Index of the record following the last one
+	 * of the current transaction in tx_buf.
+	 */
+	int tx_end;
+	/** Records awaiting to be written to disk. */
+	struct vy_log_record tx_buf[VY_LOG_TX_BUF_SIZE];
+};
+
 /** Recovery context. */
 struct vy_recovery {
 	/** ID -> vy_index_recovery_info. */
@@ -547,20 +594,13 @@ vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg)
 		goto fail_free;
 	}
 
-	log->latch = malloc(sizeof(*log->latch));
-	if (log->latch == NULL) {
-		diag_set(OutOfMemory, sizeof(*log->latch),
-			 "malloc", "struct vy_log");
-		goto fail_free;
-	}
-	latch_create(log->latch);
+	latch_create(&log->latch);
 
 	log->gc_cb = gc_cb;
 	log->gc_arg = gc_arg;
 	return log;
 
 fail_free:
-	free(log->latch);
 	free(log->dir);
 	free(log);
 fail:
@@ -698,11 +738,22 @@ vy_log_delete(struct vy_log *log)
 	}
 	if (log->recovery != NULL)
 		vy_recovery_delete(log->recovery);
-	latch_destroy(log->latch);
-	free(log->latch);
+	latch_destroy(&log->latch);
 	free(log->dir);
 	TRASH(log);
 	free(log);
+}
+
+int64_t
+vy_log_next_run_id(struct vy_log *log)
+{
+	return log->next_run_id++;
+}
+
+int64_t
+vy_log_next_range_id(struct vy_log *log)
+{
+	return log->next_range_id++;
 }
 
 /**
@@ -936,7 +987,7 @@ vy_log_rotate(struct vy_log *log, int64_t signature)
 	 * by the scheduler, are rare events so there shouldn't be too
 	 * many of them piling up due to log rotation.
 	 */
-	latch_lock(log->latch);
+	latch_lock(&log->latch);
 
 	/*
 	 * Before proceeding to log rotation, make sure that all
@@ -960,12 +1011,12 @@ vy_log_rotate(struct vy_log *log, int64_t signature)
 	}
 	log->signature = signature;
 
-	latch_unlock(log->latch);
+	latch_unlock(&log->latch);
 	say_debug("%s: complete", __func__);
 	return 0;
 
 fail:
-	latch_unlock(log->latch);
+	latch_unlock(&log->latch);
 	say_debug("%s: failed", __func__);
 	return -1;
 }
@@ -973,7 +1024,7 @@ fail:
 void
 vy_log_tx_begin(struct vy_log *log)
 {
-	latch_lock(log->latch);
+	latch_lock(&log->latch);
 	log->tx_begin = log->tx_end;
 	say_debug("%s", __func__);
 }
@@ -990,7 +1041,7 @@ vy_log_tx_do_commit(struct vy_log *log, bool no_discard)
 {
 	int rc = 0;
 
-	assert(latch_owner(log->latch) == fiber());
+	assert(latch_owner(&log->latch) == fiber());
 	/*
 	 * During recovery, we may replay records we failed to commit
 	 * before restart (e.g. drop index). Since the log isn't open
@@ -1010,7 +1061,7 @@ vy_log_tx_do_commit(struct vy_log *log, bool no_discard)
 out:
 	say_debug("%s(no_discard=%d): %s", __func__, no_discard,
 		  rc == 0 ? "success" : "fail");
-	latch_unlock(log->latch);
+	latch_unlock(&log->latch);
 	return rc;
 }
 
@@ -1029,11 +1080,11 @@ vy_log_tx_try_commit(struct vy_log *log)
 void
 vy_log_write(struct vy_log *log, const struct vy_log_record *record)
 {
-	assert(latch_owner(log->latch) == fiber());
+	assert(latch_owner(&log->latch) == fiber());
 
 	say_debug("%s: %s", __func__, vy_log_record_str(record));
 	if (log->tx_end >= VY_LOG_TX_BUF_SIZE) {
-		latch_unlock(log->latch);
+		latch_unlock(&log->latch);
 		panic("vinyl metadata log buffer overflow");
 	}
 
