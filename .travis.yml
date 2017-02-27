@@ -24,6 +24,7 @@ env:
     matrix:
       - TARGET=source
       - TARGET=test
+      - TARGET=coverage
       - OS=el DIST=6
       - OS=el DIST=7
       - OS=fedora DIST=24
@@ -38,6 +39,7 @@ env:
 
 matrix:
     allow_failures:
+      - TARGET=coverage
 #      - env: OS=el DIST=6
 #      - env: OS=el DIST=7
 #      - env: OS=fedora DIST=24
@@ -74,6 +76,8 @@ matrix:
         compiler: clang
       - env: TARGET=source
         compiler: clang
+      - env: TARGET=coverage
+        compiler: clang
       - env: OS=el DIST=6
         os: osx
       - env: OS=el DIST=7
@@ -97,6 +101,8 @@ matrix:
       - env: OS=debian DIST=stretch
         os: osx
       - env: TARGET=source
+        os: osx
+      - env: TARGET=coverage
         os: osx
       - os: osx
         compiler: gcc
