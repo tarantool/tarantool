@@ -299,12 +299,6 @@ tuple_size(const struct tuple *tuple)
 static inline const char *
 tuple_data(const struct tuple *tuple)
 {
-	/*
-	 * MessagePack data are likely to be accessed soon.
-	 * Prefetch some more bytes to reduce the possibility of
-	 * a cache miss for the most cases.
-	 */
-	prefetch((const char *) tuple + 32, 0);
 	return (const char *) tuple + tuple->data_offset;
 }
 
@@ -317,7 +311,6 @@ tuple_data(const struct tuple *tuple)
 static inline const char *
 tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
-	prefetch((const char *) tuple + 32, 0);
 	*p_size = tuple->bsize;
 	return (const char *) tuple + tuple->data_offset;
 }
