@@ -570,3 +570,24 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+--
+-- create_index() does not modify index options
+--
+s = box.schema.space.create('test', {engine='vinyl'})
+---
+...
+opts = {parts={1, 'unsigned'}}
+---
+...
+_ = s:create_index('pk', opts)
+---
+...
+opts
+---
+- parts:
+  - 1
+  - unsigned
+...
+s:drop()
+---
+...

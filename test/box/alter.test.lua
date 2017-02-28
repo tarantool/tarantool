@@ -232,3 +232,11 @@ lsn < box.space._index:select{box.space.test.id, 0}[1][5].lsn
 space:drop()
 
 test_run:cmd("clear filter")
+--
+-- create_index() does not modify index options
+--
+s = box.schema.space.create('test', {engine='vinyl'})
+opts = {parts={1, 'unsigned'}}
+_ = s:create_index('pk', opts)
+opts
+s:drop()
