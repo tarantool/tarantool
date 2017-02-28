@@ -61,8 +61,8 @@ test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
 
 box.cfg{
     listen=IPROTO_SOCKET;
-    slab_alloc_arena=0.1,
-    logger="tarantool.log",
+    memtx_memory = 107374182,
+    log="tarantool.log",
 }
 
 -- Connect to iproto console (CALL)

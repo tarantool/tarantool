@@ -80,7 +80,7 @@ struct xdir {
 	 * partial or corrupt rows. Incorrect objects
 	 * are skipped.
 	 */
-	bool panic_if_error;
+	bool force_recovery;
 
 	/**
 	 * true if a log file in this directory can by fsync()ed
@@ -578,7 +578,7 @@ xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow);
  */
 int
 xlog_cursor_next(struct xlog_cursor *cursor,
-		 struct xrow_header *xrow, bool panic_if_error);
+		 struct xrow_header *xrow, bool force_recovery);
 
 /**
  * Move to the next xlog tx
@@ -617,7 +617,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
  * XlogError is raised when there is an error with contents
  * of the data directory or a log file. A special subclass
  * of exception is introduced to gracefully skip such errors
- * in panic_if_error = false mode.
+ * in force_recovery = true mode.
  */
 struct XlogError: public Exception
 {
@@ -692,9 +692,9 @@ xlog_cursor_open_xc(struct xlog_cursor *cursor, const char *name)
  */
 static inline int
 xlog_cursor_next_xc(struct xlog_cursor *cursor,
-		    struct xrow_header *xrow, bool panic_if_error)
+		    struct xrow_header *xrow, bool force_recovery)
 {
-	int rc = xlog_cursor_next(cursor, xrow, panic_if_error);
+	int rc = xlog_cursor_next(cursor, xrow, force_recovery);
 	if (rc == -1)
 		diag_raise();
 	return rc;

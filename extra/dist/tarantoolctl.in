@@ -30,8 +30,8 @@ The file contains common default instances options:
         snap_dir    =   "/var/lib/tarantool",
         -- vinyl_dir/instance/
         vinyl_dir  =   "/var/lib/tarantool/vinyl",
-        -- logger/instance .. '.log'
-        logger      =   "/var/log/tarantool",
+        -- log/instance .. '.log'
+        log      =   "/var/log/tarantool",
         username    =   "tarantool",
     }
 
@@ -245,15 +245,15 @@ local function load_default_file(default_file)
 
     d.pid_file  = d.pid_file  or "/var/run/tarantool"
     d.wal_dir   = d.wal_dir   or "/var/lib/tarantool"
-    d.snap_dir  = d.snap_dir  or "/var/lib/tarantool"
-    d.logger    = d.logger    or "/var/log/tarantool"
+    d.memtx_dir = d.memtx_dir or "/var/lib/tarantool"
+    d.log       = d.log       or "/var/log/tarantool"
     d.vinyl_dir = d.vinyl_dir or "/var/lib/tarantool"
 
     d.pid_file  = fio.pathjoin(d.pid_file,  instance_name .. '.pid')
     d.wal_dir   = fio.pathjoin(d.wal_dir,   instance_name)
-    d.snap_dir  = fio.pathjoin(d.snap_dir,  instance_name)
+    d.memtx_dir = fio.pathjoin(d.memtx_dir, instance_name)
     d.vinyl_dir = fio.pathjoin(d.vinyl_dir, instance_name)
-    d.logger    = fio.pathjoin(d.logger,    instance_name .. '.log')
+    d.log       = fio.pathjoin(d.log,       instance_name .. '.log')
 
     default_cfg = d
 
@@ -384,7 +384,7 @@ local function mk_default_dirs(cfg)
         cfg.snap_dir,
         cfg.vinyl_dir,
     }
-    local log_type, log_args = logger_parse(cfg.logger)
+    local log_type, log_args = logger_parse(cfg.log)
     if log_type == 'file' then
         table.insert(init_dirs, fio.dirname(log_args))
     end
@@ -523,7 +523,7 @@ local function wrapper_cfg(cfg)
     if not success then
         log.error("Configuration failed: %s", data)
         if type(cfg) ~= 'function' then
-            local log_type, log_args = logger_parse(cfg.logger)
+            local log_type, log_args = logger_parse(cfg.log)
             if log_type == 'file' and fio.stat(log_args) then
                 os.execute('tail -n 10 ' .. log_args)
             end
@@ -588,7 +588,7 @@ local function start()
     if not success then
         log.error("Start failed: %s", data)
         if type(box.cfg) ~= 'function' then
-            local log_type, log_args = logger_parse(box.cfg.logger)
+            local log_type, log_args = logger_parse(box.cfg.log)
             if log_type == 'file' and fio.stat(log_args) then
                 os.execute('tail -n 10 ' .. log_args)
             end

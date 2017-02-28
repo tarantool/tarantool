@@ -4,30 +4,37 @@
 
 box.cfg
 1	background:false
-2	coredump:false
-3	hot_standby:false
-4	listen:port
-5	log_level:5
-6	logger:tarantool.log
-7	logger_nonblock:true
-8	panic_on_snap_error:true
-9	panic_on_wal_error:true
-10	pid_file:box.pid
-11	read_only:false
-12	readahead:16320
-13	rows_per_wal:500000
-14	slab_alloc_arena:0.1
-15	slab_alloc_factor:1.1
-16	slab_alloc_maximal:1048576
-17	slab_alloc_minimal:16
-18	snap_dir:.
-19	snapshot_count:6
-20	snapshot_period:0
-21	too_long_threshold:0.5
-22	vinyl_dir:.
-23	wal_dir:.
-24	wal_dir_rescan_delay:2
-25	wal_mode:write
+2	checkpoint_count:6
+3	checkpoint_interval:0
+4	coredump:false
+5	force_recovery:false
+6	hot_standby:false
+7	listen:port
+8	log:tarantool.log
+9	log_level:5
+10	log_nonblock:true
+11	memtx_dir:.
+12	memtx_max_tuple_size:1048576
+13	memtx_memory:107374182
+14	memtx_min_tuple_size:16
+15	pid_file:box.pid
+16	read_only:false
+17	readahead:16320
+18	rows_per_wal:500000
+19	slab_alloc_factor:1.1
+20	too_long_threshold:0.5
+21	vinyl_bloom_fpr:0.05
+22	vinyl_cache:134217728
+23	vinyl_dir:.
+24	vinyl_memory:134217728
+25	vinyl_page_size:8192
+26	vinyl_range_size:1073741824
+27	vinyl_run_count_per_level:2
+28	vinyl_run_size_ratio:3.5
+29	vinyl_threads:2
+30	wal_dir:.
+31	wal_dir_rescan_delay:2
+32	wal_mode:write
 --
 -- Test insert from detached fiber
 --

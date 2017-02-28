@@ -1,17 +1,17 @@
 TAP version 13
-1..52
+1..61
 ok - box is not started
-ok - invalid slab_alloc_minimal
-ok - invalid slab_alloc_minimal
-ok - invalid slab_alloc_minimal
-ok - invalid slab_alloc_minimal
-ok - invalid slab_alloc_minimal
-ok - invalid replication_source
+ok - invalid memtx_min_tuple_size
+ok - invalid memtx_min_tuple_size
+ok - invalid memtx_min_tuple_size
+ok - invalid memtx_min_tuple_size
+ok - invalid memtx_min_tuple_size
+ok - invalid replication
 ok - invalid wal_mode
 ok - invalid rows_per_wal
 ok - invalid listen
-ok - invalid logger
-ok - invalid logger
+ok - invalid log
+ok - invalid log
 ok - box is not started
 ok - exception on unconfigured box
 ok - box.error without box.cfg
@@ -21,8 +21,8 @@ ok - box.session without box.cfg
 ok - vinyl_dir is not auto-created
 ok - configured box
 ok - wal_mode default value
-ok - panic_on_wal_mode default value
-ok - panic_on_wal_mode new value
+ok - force_recovery default value
+ok - force_recovery new value
 ok - wal_dir_rescan_delay default value
 ok - wal_dir_rescan_delay new value
 ok - too_long_threshold default value
@@ -39,16 +39,25 @@ ok - work_dir is invalid
 ok - vinyl_dir is invalid
 ok - snap_dir is invalid
 ok - wal_dir is invalid
-ok - logger_nonblock default value
-ok - logger_nonblock new value
+ok - log_nonblock default value
+ok - log_nonblock new value
 ok - dynamic listen
 ok - dynamic listen
 ok - reuse unix socket
 ok - delete socket at exit
 ok - wal_mode none and ER_LOADING
-ok - invalid replication_source
+ok - invalid replication
 ok - page size greather than range
 ok - page size less than range
 ok - page size equal with range
-ok - vinyl.threads = 1
-ok - vinyl.threads = 2
+ok - vinyl_threads = 1
+ok - vinyl_threads = 2
+ok - upgrade memtx memory options
+ok - equal new and old memtx options
+ok - different new and old memtx_memory
+ok - different new and old min_tuple_size
+ok - different memtx_dir
+ok - panic_on_wal_error
+ok - panic_on_snap_error
+ok - setup checkpoint params
+ok - update checkpoint params

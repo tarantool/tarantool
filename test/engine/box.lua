@@ -9,18 +9,20 @@ local vinyl = {
 
 box.cfg{
     listen              = os.getenv("LISTEN"),
-    slab_alloc_arena    = 0.1,
+    memtx_memory        = 107374182,
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50,
-    vinyl               = vinyl,
+    vinyl_threads       = 3,
+    vinyl_range_size    = 64 * 1024,
+    vinyl_page_size     = 1024,
 }
 
 require('console').listen(os.getenv('ADMIN'))
 
 _to_exclude = {
-    'pid_file', 'logger', 'vinyl_dir',
-    'snap_dir', 'wal_dir',
-    'slab_alloc_maximal', 'slab_alloc_minimal'
+    'pid_file', 'log', 'vinyl_dir',
+    'memtx_dir', 'wal_dir',
+    'memtx_min_tuple_size', 'memtx_max_tuple_size'
 }
 
 _exclude = {}

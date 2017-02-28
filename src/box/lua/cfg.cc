@@ -77,10 +77,10 @@ lbox_cfg_set_listen(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_replication_source(struct lua_State *L)
+lbox_cfg_set_replication(struct lua_State *L)
 {
 	try {
-		box_set_replication_source();
+		box_set_replication();
 	} catch (Exception *) {
 		luaT_error(L);
 	}
@@ -160,7 +160,9 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_check", lbox_cfg_check},
 		{"cfg_load", lbox_cfg_load},
 		{"cfg_set_listen", lbox_cfg_set_listen},
-		{"cfg_set_replication_source", lbox_cfg_set_replication_source},
+		{"cfg_set_replication", lbox_cfg_set_replication},
+		/* Backward compatibility */
+		{"cfg_set_replication", lbox_cfg_set_replication},
 		{"cfg_set_log_level", lbox_cfg_set_log_level},
 		{"cfg_set_readahead", lbox_cfg_set_readahead},
 		{"cfg_set_io_collect_interval", lbox_cfg_set_io_collect_interval},

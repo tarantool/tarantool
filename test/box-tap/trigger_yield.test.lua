@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
 box.cfg{
     pid_file = "box.pid",
-    slab_alloc_arena=0.1,
-    logger="tarantool.log"
+    memtx_memory = 104857600,
+    log = "tarantool.log"
 }
 
 fiber = require('fiber')

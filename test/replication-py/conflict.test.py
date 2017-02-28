@@ -51,7 +51,7 @@ def prepare_cluster():
     replica.cleanup(True)
     replica.start()
 
-    master.admin("box.cfg{replication_source='%s'}" % replica.iproto.uri, silent=True)
+    master.admin("box.cfg{replication='%s'}" % replica.iproto.uri, silent=True)
     r1_id = replica.get_param('server')['id']
     r2_id = master.get_param('server')['id']
 

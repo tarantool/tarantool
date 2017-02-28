@@ -127,7 +127,7 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
  * Throws an exception in  case of error.
  */
 struct recovery *
-recovery_new(const char *wal_dirname, bool panic_on_wal_error,
+recovery_new(const char *wal_dirname, bool force_recovery,
 	     struct vclock *vclock)
 {
 	struct recovery *r = (struct recovery *)
@@ -143,7 +143,7 @@ recovery_new(const char *wal_dirname, bool panic_on_wal_error,
 	});
 
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &INSTANCE_UUID);
-	r->wal_dir.panic_if_error = panic_on_wal_error;
+	r->wal_dir.force_recovery = force_recovery;
 
 	vclock_copy(&r->vclock, vclock);
 
@@ -214,7 +214,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	while (xlog_cursor_next_xc(&r->cursor, &row,
-				   r->wal_dir.panic_if_error) == 0) {
+				   r->wal_dir.force_recovery) == 0) {
 		/*
 		 * Read the next row from xlog file.
 		 *
@@ -239,7 +239,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		} catch (ClientError *e) {
 			say_error("can't apply row: ");
 			e->log();
-			if (r->wal_dir.panic_if_error)
+			if (!r->wal_dir.force_recovery)
 				throw;
 		}
 	}
@@ -312,7 +312,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 			XlogGapError *e =
 				tnt_error(XlogGapError, &r->vclock, clock);
 
-			if (r->wal_dir.panic_if_error)
+			if (!r->wal_dir.force_recovery)
 				throw e;
 			e->log();
 			/* Ignore missing WALs */

@@ -273,14 +273,14 @@ print '-------------------------------------------------------------'
 # Sync master with replica
 replication_source = yaml.load(replica.admin('box.cfg.listen', silent = True))[0]
 sys.stdout.push_filter(replication_source, '<replication_source>')
-master.admin("box.cfg{ replication_source = '%s' }" % replication_source)
+master.admin("box.cfg{ replication = '%s' }" % replication_source)
 
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
 master.admin('box.info.vclock[%d] == 1' % replica_id)
 master.admin('box.info.vclock[%d] == nil' % replica_id2)
 master.admin('box.info.vclock[%d] == nil' % replica_id3)
 
-master.admin("box.cfg{ replication_source = '' }")
+master.admin("box.cfg{ replication = '' }")
 replica.stop()
 replica.cleanup(True)
 

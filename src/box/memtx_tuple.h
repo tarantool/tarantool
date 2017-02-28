@@ -43,8 +43,8 @@ extern "C" {
  * Initialize memtx_tuple library
  */
 void
-memtx_tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
-		uint32_t objsize_max, float alloc_factor);
+memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
+		 uint32_t objsize_max, float alloc_factor);
 
 /**
  * Cleanup memtx_tuple library

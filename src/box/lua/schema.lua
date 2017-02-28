@@ -412,10 +412,10 @@ box.schema.index.create = function(space_id, name, options)
         options_defaults = {
             -- path has no default, or, rather, it defaults
             -- to a subdirectory of the server data dir if it is not set
-            page_size = box.cfg.vinyl.page_size,
-            range_size = box.cfg.vinyl.range_size,
-            run_count_per_level = box.cfg.vinyl.run_count_per_level,
-            run_size_ratio = box.cfg.vinyl.run_size_ratio,
+            page_size = box.cfg.vinyl_page_size,
+            range_size = box.cfg.vinyl_range_size,
+            run_count_per_level = box.cfg.vinyl_run_count_per_level,
+            run_size_ratio = box.cfg.vinyl_run_size_ratio,
         }
     else
         options_defaults = {}

@@ -4971,7 +4971,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
-	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
+	scheduler->worker_pool_size = cfg_geti("vinyl_threads");
 	/* One thread is reserved for dumps, see vy_schedule(). */
 	assert(scheduler->worker_pool_size >= 2);
 	scheduler->workers_available = scheduler->worker_pool_size;
@@ -5134,11 +5134,9 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
-	conf->memory_limit = cfg_getd("vinyl.memory_limit")
-			     * 1024 * 1024 * 1024;
-	conf->cache = cfg_getd("vinyl.cache")
-				 * 1024 * 1024 * 1024;
-	conf->bloom_fpr = cfg_getd("vinyl.bloom_fpr");
+	conf->memory_limit = cfg_getd("vinyl_memory");
+	conf->cache = cfg_getd("vinyl_cache");
+	conf->bloom_fpr = cfg_getd("vinyl_bloom_fpr");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {

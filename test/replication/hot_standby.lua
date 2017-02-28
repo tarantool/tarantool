@@ -3,10 +3,10 @@
 require('console').listen(os.getenv('ADMIN'))
 box.cfg({
     listen              = os.getenv("MASTER"),
-    slab_alloc_arena    = 0.1,
+    memtx_memory        = 107374182,
     custom_proc_title   = "hot_standby",
     wal_dir             = "master",
-    snap_dir            = "master",
+    memtx_dir           = "master",
     vinyl_dir           = "master",
     hot_standby         = true,
 })

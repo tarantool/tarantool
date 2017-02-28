@@ -43,7 +43,7 @@ res = os.execute(cmd)
 str_res = 'precheck ' .. (res == 0 and ' ok(2)' or 'failed(2)')
 str_res
 
-snap_search_wildcard = fio.pathjoin(box.cfg.snap_dir, '*.snap');
+snap_search_wildcard = fio.pathjoin(box.cfg.memtx_dir, '*.snap');
 snaps = fio.glob(snap_search_wildcard);
 initial_snap_count = #snaps
 
@@ -196,11 +196,11 @@ s1 = nil s2 = nil additional_spaces = nil;
 
 script_code = [[
 fio = require'fio'
-new_snap_dir = "]] .. fio.pathjoin(box.cfg.snap_dir, "snap_test") .. [["
+new_snap_dir = "]] .. fio.pathjoin(box.cfg.memtx_dir, "snap_test") .. [["
 os.execute("mkdir " .. new_snap_dir)
-os.execute("cp ]] .. fio.pathjoin(box.cfg.snap_dir, "*.xlog") .. [[ " .. new_snap_dir .. "/")
-os.execute("cp ]] .. fio.pathjoin(box.cfg.snap_dir, "*.snap") .. [[ " .. new_snap_dir .. "/")
-box.cfg{ slab_alloc_arena = 0.5, snap_dir = new_snap_dir, wal_mode = "none" }
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xlog") .. [[ " .. new_snap_dir .. "/")
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.snap") .. [[ " .. new_snap_dir .. "/")
+box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_mode = "none" }
 
 log = require('log')
 
@@ -248,7 +248,7 @@ while #snaps > initial_snap_count do
         end
     end
     if max_snap:sub(1, 1) ~= "/" then
-        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
+        max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
     end
     fio.unlink(max_snap)
     snaps[max_snap_k] = nil
@@ -262,7 +262,7 @@ while #snaps > initial_snap_count do
         end
     end
     if max_snap:sub(1, 1) ~= "/" then
-        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
+        max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
     end
     fio.unlink(max_snap)
     snaps[max_snap_k] = nil

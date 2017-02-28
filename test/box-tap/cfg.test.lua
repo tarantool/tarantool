@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(52)
+test:plan(61)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -17,17 +17,17 @@ local function invalid(name, val)
     test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
-invalid('slab_alloc_minimal', 7)
-invalid('slab_alloc_minimal', 0)
-invalid('slab_alloc_minimal', -1)
-invalid('slab_alloc_minimal', 1048281)
-invalid('slab_alloc_minimal', 1000000000)
-invalid('replication_source', '//guest@localhost:3301')
+invalid('memtx_min_tuple_size', 7)
+invalid('memtx_min_tuple_size', 0)
+invalid('memtx_min_tuple_size', -1)
+invalid('memtx_min_tuple_size', 1048281)
+invalid('memtx_min_tuple_size', 1000000000)
+invalid('replication', '//guest@localhost:3301')
 invalid('wal_mode', 'invalid')
 invalid('rows_per_wal', -1)
 invalid('listen', '//!')
-invalid('logger', ':')
-invalid('logger', 'syslog:xxx=')
+invalid('log', ':')
+invalid('log', 'syslog:xxx=')
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
@@ -56,8 +56,8 @@ test:ok(status, "box.session without box.cfg")
 
 os.execute("rm -rf vinyl")
 box.cfg{
-    logger="tarantool.log",
-    slab_alloc_arena=0.1,
+    log="tarantool.log",
+    memtx_memory=104857600,
     wal_mode = "", -- "" means default value
 }
 
@@ -84,9 +84,9 @@ test:is(box.cfg.wal_mode, "write", "wal_mode default value")
 -- box.cfg{wal_mode = require('msgpack').NULL}
 -- test:is(box.cfg.wal_mode, "write", "wal_mode default value")
 
-test:is(box.cfg.panic_on_wal_error, true, "panic_on_wal_mode default value")
-box.cfg{panic_on_wal_error=false}
-test:is(box.cfg.panic_on_wal_error, false, "panic_on_wal_mode new value")
+test:is(box.cfg.force_recovery, false, "force_recovery default value")
+box.cfg{force_recovery=true}
+test:is(box.cfg.force_recovery, true, "force_recovery new value")
 
 test:is(box.cfg.wal_dir_rescan_delay, 2, "wal_dir_rescan_delay default value")
 box.cfg{wal_dir_rescan_delay=0.2}
@@ -131,7 +131,7 @@ function run_script(code)
 end
 
 -- gh-715: Cannot switch to/from 'fsync'
-code = [[ box.cfg{ logger="tarantool.log", wal_mode = 'fsync' }; ]]
+code = [[ box.cfg{ log="tarantool.log", wal_mode = 'fsync' }; ]]
 test:is(run_script(code), 0, 'wal_mode fsync')
 
 code = [[ box.cfg{ wal_mode = 'fsync' }; box.cfg { wal_mode = 'fsync' }; ]]
@@ -151,18 +151,18 @@ test:is(run_script(code), PANIC, 'work_dir is invalid')
 code = [[ box.cfg{ vinyl_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'vinyl_dir is invalid')
 
-code = [[ box.cfg{ snap_dir='invalid' } ]]
+code = [[ box.cfg{ memtx_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'snap_dir is invalid')
 
 code = [[ box.cfg{ wal_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'wal_dir is invalid')
 
-test:is(box.cfg.logger_nonblock, true, "logger_nonblock default value")
+test:is(box.cfg.log_nonblock, true, "log_nonblock default value")
 code = [[
-box.cfg{logger_nonblock = false }
-os.exit(box.cfg.logger_nonblock == false and 0 or 1)
+box.cfg{log_nonblock = false }
+os.exit(box.cfg.log_nonblock == false and 0 or 1)
 ]]
-test:is(run_script(code), 0, "logger_nonblock new value")
+test:is(run_script(code), 0, "log_nonblock new value")
 
 -- box.cfg { listen = xx }
 local path = './tarantool.sock'
@@ -211,26 +211,26 @@ test:is(run_script(code), 0, "wal_mode none and ER_LOADING")
 --
 -- gh-1962: incorrect replication source
 --
-status, reason = pcall(box.cfg, {replication_source="3303,3304"})
-test:ok(not status and reason:match("Incorrect"), "invalid replication_source")
+status, reason = pcall(box.cfg, {replication="3303,3304"})
+test:ok(not status and reason:match("Incorrect"), "invalid replication")
 
 --
 -- gh-1778 vinyl page can't be greather than range
 --
 code = [[
-box.cfg{vinyl = {page_size = 4 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+box.cfg{vinyl_page_size = 4 * 1024 * 1024, vinyl_range_size = 2 * 1024 * 1024}
 os.exit(0)
 ]]
 test:is(run_script(code), PANIC, "page size greather than range")
 
 code = [[
-box.cfg{vinyl = {page_size = 1 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+box.cfg{vinyl_page_size = 1 * 1024 * 1024, vinyl_range_size = 2 * 1024 * 1024}
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "page size less than range")
 
 code = [[
-box.cfg{vinyl = {page_size = 2 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
+box.cfg{vinyl_page_size = 2 * 1024 * 1024, vinyl_range_size = 2 * 1024 * 1024}
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "page size equal with range")
@@ -239,16 +239,84 @@ test:is(run_script(code), 0, "page size equal with range")
 -- gh-2150 one vinyl worker thread is reserved for dumps
 --
 code = [[
-box.cfg{vinyl = {threads=1}}
+box.cfg{vinyl_threads=1}
 os.exit(0)
 ]]
-test:is(run_script(code), PANIC, "vinyl.threads = 1")
+test:is(run_script(code), PANIC, "vinyl_threads = 1")
 
 code = [[
-box.cfg{vinyl = {threads=2}}
+box.cfg{vinyl_threads=2}
 os.exit(0)
 ]]
-test:is(run_script(code), 0, "vinyl.threads = 2")
+test:is(run_script(code), 0, "vinyl_threads = 2")
+
+-- test memtx options upgrade
+code = [[
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16,
+    slab_alloc_maximal = 64 * 1024}
+os.exit(box.cfg.memtx_memory == 214748364 
+    and box.cfg.memtx_min_tuple_size == 16
+    and box.cfg.memtx_max_tuple_size == 64 * 1024
+and 0 or 1)
+]]
+test:is(run_script(code), 0, "upgrade memtx memory options")
+
+code = [[
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+    memtx_memory = 214748364, memtx_min_tuple_size = 16,
+    memtx_max_tuple_size = 64 * 1024}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "equal new and old memtx options")
+
+code = [[
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+    memtx_memory = 107374182, memtx_min_tuple_size = 16,
+    memtx_max_tuple_size = 64 * 1024}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "different new and old memtx_memory")
+
+code = [[
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+    memtx_memory = 214748364, memtx_min_tuple_size = 32,
+    memtx_max_tuple_size = 64 * 1024}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "different new and old min_tuple_size")
+
+code = [[
+box.cfg{snap_dir = 'tmp1', memtx_dir = 'tmp2'}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "different memtx_dir")
+
+code = [[
+box.cfg{panic_on_wal_error = true}
+os.exit(box.cfg.force_recovery == false and 0 or 1)
+]]
+test:is(run_script(code), 0, "panic_on_wal_error")
+
+code = [[
+box.cfg{panic_on_snap_error = false}
+os.exit(box.cfg.force_recovery == true and 0 or 1)
+]]
+test:is(run_script(code), 0, "panic_on_snap_error")
+
+code = [[
+box.cfg{snapshot_period = 100, snapshot_count = 4}
+os.exit(box.cfg.checkpoint_interval == 100
+      and box.cfg.checkpoint_count == 4 and 0 or 1)
+]]
+test:is(run_script(code), 0, "setup checkpoint params")
+
+code = [[
+box.cfg{snapshot_period = 100, snapshot_count = 4}
+box.cfg{snapshot_period = 150, snapshot_count = 8}
+os.exit(box.cfg.checkpoint_interval == 150
+      and box.cfg.checkpoint_count == 8 and 0 or 1)
+]]
+test:is(run_script(code), 0, "update checkpoint params")
 
 test:check()
 os.exit(0)

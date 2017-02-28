@@ -384,7 +384,7 @@ load_cfg()
 	}
 
 	int background = cfg_geti("background");
-	const char *logger = cfg_gets("logger");
+	const char *log = cfg_gets("log");
 
 	pid_file = (char *)cfg_gets("pid_file");
 	if (pid_file != NULL) {
@@ -394,10 +394,10 @@ load_cfg()
 	}
 
 	if (background) {
-		if (logger == NULL) {
+		if (log == NULL) {
 			say_crit(
 				"'background' requires "
-				"'logger' configuration option to be set");
+				"'log' configuration option to be set");
 			exit(EXIT_FAILURE);
 		}
 		if (pid_file == NULL) {
@@ -433,9 +433,9 @@ load_cfg()
 	 * logger init must happen before daemonising in order for the error
 	 * to show and for the process to exit with a failure status
 	 */
-	say_logger_init(logger,
+	say_logger_init(log,
 			cfg_geti("log_level"),
-			cfg_geti("logger_nonblock"),
+			cfg_geti("log_nonblock"),
 			background);
 
 	if (background)

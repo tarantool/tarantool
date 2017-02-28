@@ -11,8 +11,8 @@ local pickle = require 'pickle'
 local PREFIX = 'snapshot_daemon'
 
 local daemon = {
-    snapshot_period = 0;
-    snapshot_count = 6;
+    checkpoint_interval = 0;
+    checkpoint_count = 6;
     fiber = nil;
     control = nil;
 }
@@ -37,11 +37,11 @@ end
 -- create snapshot
 local function make_snapshot(last_snap)
 
-    if daemon.snapshot_period == nil then
+    if daemon.checkpoint_interval == nil then
         return false
     end
 
-    if not(daemon.snapshot_period > 0) then
+    if not(daemon.checkpoint_interval > 0) then
         return false
     end
 
@@ -71,17 +71,17 @@ local function make_snapshot(last_snap)
         log.error("can't stat %s: %s", last_snap, errno.strerror())
         return false
     end
-    if snstat.mtime <= fiber.time() + daemon.snapshot_period then
+    if snstat.mtime <= fiber.time() + daemon.checkpoint_interval then
         return snapshot()
     end
 end
 
 -- check filesystem and current time
 local function process(self)
-    local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
+    local snaps = fio.glob(fio.pathjoin(box.cfg.memtx_dir, '*.snap'))
 
     if snaps == nil then
-        log.error("can't read snap_dir %s: %s", box.cfg.snap_dir,
+        log.error("can't read memtx_dir %s: %s", box.cfg.memtx_dir,
                   errno.strerror())
         return
     end
@@ -91,17 +91,17 @@ local function process(self)
     end
 
     -- cleanup code
-    if daemon.snapshot_count == nil then
+    if daemon.checkpoint_count == nil then
         return
     end
 
-    if not (self.snapshot_count > 0) then
+    if not (self.checkpoint_count > 0) then
         return
     end
 
 
     -- reload snap list after snapshot
-    snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
+    snaps = fio.glob(fio.pathjoin(box.cfg.memtx_dir, '*.snap'))
     local xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
     if xlogs == nil then
         log.error("can't read wal_dir %s: %s", box.cfg.wal_dir,
@@ -109,7 +109,7 @@ local function process(self)
         return
     end
 
-    while #snaps > self.snapshot_count do
+    while #snaps > self.checkpoint_count do
         local rm = snaps[1]
         table.remove(snaps, 1)
 
@@ -161,9 +161,9 @@ local function daemon_fiber(self)
     -- See https://github.com/tarantool/tarantool/issues/732
     --
     local random = pickle.unpack('i', digest.urandom(4))
-    local offset = random % self.snapshot_period
+    local offset = random % self.checkpoint_interval
     while true do
-        local period = self.snapshot_period + offset
+        local period = self.checkpoint_interval + offset
         -- maintain next_snapshot_time as a self member for testing purposes
         self.next_snapshot_time = fiber.time() + period
         log.info("scheduled the next snapshot at %s",
@@ -186,7 +186,7 @@ local function daemon_fiber(self)
 end
 
 local function reload(self)
-    if self.snapshot_period > 0 then
+    if self.checkpoint_interval > 0 then
         if self.control == nil then
             -- Start daemon
             self.control = fiber.channel()
@@ -213,18 +213,18 @@ end
 
 setmetatable(daemon, {
     __index = {
-        set_snapshot_period = function()
-            daemon.snapshot_period = box.cfg.snapshot_period
+        set_checkpoint_interval = function()
+            daemon.checkpoint_interval = box.cfg.checkpoint_interval
             reload(daemon)
             return
         end,
 
-        set_snapshot_count = function()
-            if math.floor(box.cfg.snapshot_count) ~= box.cfg.snapshot_count then
-                box.error(box.error.CFG, "snapshot_count",
+        set_checkpoint_count = function()
+            if math.floor(box.cfg.checkpoint_count) ~= box.cfg.checkpoint_count then
+                box.error(box.error.CFG, "checkpoint_count",
                          "must be an integer")
             end
-            daemon.snapshot_count = box.cfg.snapshot_count
+            daemon.checkpoint_count = box.cfg.checkpoint_count
             reload(daemon)
         end
     }

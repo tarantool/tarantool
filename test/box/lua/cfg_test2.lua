@@ -3,8 +3,7 @@ os = require('os')
 
 box.cfg{
     listen              = os.getenv("LISTEN"),
-    slab_alloc_arena = 0.2,
-    vinyl = {},
+    memtx_memory = 214748364,
 }
 
 require('console').listen(os.getenv('ADMIN'))

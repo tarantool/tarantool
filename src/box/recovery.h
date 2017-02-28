@@ -61,7 +61,7 @@ struct recovery {
 };
 
 struct recovery *
-recovery_new(const char *wal_dirname, bool panic_on_wal_error,
+recovery_new(const char *wal_dirname, bool force_recovery,
 	     struct vclock *vclock);
 
 void

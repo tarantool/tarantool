@@ -3,9 +3,9 @@ os = require('os')
 
 box.cfg{
     listen              = os.getenv("LISTEN"),
-    slab_alloc_arena    = 0.1,
+    memtx_memory        = 107374182,
     pid_file            = "tarantool.pid",
-    panic_on_wal_error  = false,
+    force_recovery      = true,
     rows_per_wal        = 10,
     snap_io_rate_limit  = 16
 }

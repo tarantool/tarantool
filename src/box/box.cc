@@ -128,11 +128,11 @@ box_check_writable(void)
 }
 
 static void
-box_check_slab_alloc_minimal(ssize_t slab_alloc_minimal)
+box_check_memtx_min_tuple_size(ssize_t memtx_min_tuple_size)
 {
 
-	if (slab_alloc_minimal < 8 || slab_alloc_minimal > 1048280)
-	tnt_raise(ClientError, ER_CFG, "slab_alloc_minimal",
+	if (memtx_min_tuple_size < 8 || memtx_min_tuple_size > 1048280)
+	tnt_raise(ClientError, ER_CFG, "memtx_min_tuple_size",
 		  "specified value is out of bounds");
 }
 
@@ -319,14 +319,14 @@ apply_subscribe_row(struct xstream *stream, struct xrow_header *row)
 /* {{{ configuration bindings */
 
 static void
-box_check_logger(const char *logger)
+box_check_log(const char *log)
 {
 	char *error_msg;
-	if (logger == NULL)
+	if (log == NULL)
 		return;
-	if (say_check_init_str(logger, &error_msg) == -1) {
+	if (say_check_init_str(log, &error_msg) == -1) {
 		auto guard = make_scoped_guard([=]{ free(error_msg); });
-		tnt_raise(ClientError, ER_CFG, "logger", error_msg);
+		tnt_raise(ClientError, ER_CFG, "log", error_msg);
 	}
 }
 
@@ -345,12 +345,12 @@ box_check_uri(const char *source, const char *option_name)
 }
 
 static void
-box_check_replication_source(void)
+box_check_replication(void)
 {
-	int count = cfg_getarr_size("replication_source");
+	int count = cfg_getarr_size("replication");
 	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("replication_source", i);
-		box_check_uri(source, "replication_source");
+		const char *source = cfg_getarr_elem("replication", i);
+		box_check_uri(source, "replication");
 	}
 }
 
@@ -389,38 +389,38 @@ box_check_rows_per_wal(int64_t rows_per_wal)
 void
 box_check_config()
 {
-	box_check_logger(cfg_gets("logger"));
+	box_check_log(cfg_gets("log"));
 	box_check_uri(cfg_gets("listen"), "listen");
-	box_check_replication_source();
+	box_check_replication();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	box_check_slab_alloc_minimal(cfg_geti64("slab_alloc_minimal"));
-	if (cfg_geti("vinyl.threads") < 2)
-		tnt_raise(ClientError, ER_CFG, "vinyl.threads", "must be >= 2");
-	if (cfg_geti64("vinyl.page_size") > cfg_geti64("vinyl.range_size"))
-		tnt_raise(ClientError, ER_CFG, "vinyl.page_size",
-			  "can't be greather then vinyl.range_size");
+	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
+	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
+		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
+			  "can't be greater than vinyl_range_size");
+	if (cfg_geti("vinyl_threads") < 2)
+		tnt_raise(ClientError, ER_CFG, "vinyl_threads", "must be >= 2");
 }
 
 /*
- * Parse box.cfg.replication_source and create appliers.
+ * Parse box.cfg.replication and create appliers.
  */
 static struct applier **
-cfg_get_replication_source(int *p_count)
+cfg_get_replication(int *p_count)
 {
 
 	/* Use static buffer for result */
 	static struct applier *appliers[VCLOCK_MAX];
 
-	int count = cfg_getarr_size("replication_source");
+	int count = cfg_getarr_size("replication");
 	if (count >= VCLOCK_MAX) {
-		tnt_raise(ClientError, ER_CFG, "replication_source",
+		tnt_raise(ClientError, ER_CFG, "replication",
 				"too many replicas");
 	}
 
 	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("replication_source", i);
+		const char *source = cfg_getarr_elem("replication", i);
 		struct applier *applier = applier_new(source,
 						      &initial_join_stream,
 						      &final_join_stream,
@@ -440,14 +440,14 @@ cfg_get_replication_source(int *p_count)
 }
 
 /*
- * Sync box.cfg.replication_source with the cluster registry, but
+ * Sync box.cfg.replication with the cluster registry, but
  * don't start appliers.
  */
 static void
-box_sync_replication_source(double timeout)
+box_sync_replication(double timeout)
 {
 	int count = 0;
-	struct applier **appliers = cfg_get_replication_source(&count);
+	struct applier **appliers = cfg_get_replication(&count);
 	if (appliers == NULL)
 		diag_raise();
 
@@ -463,7 +463,7 @@ box_sync_replication_source(double timeout)
 }
 
 void
-box_set_replication_source(void)
+box_set_replication(void)
 {
 	if (!is_box_configured) {
 		/*
@@ -474,9 +474,9 @@ box_set_replication_source(void)
 		return;
 	}
 
-	box_check_replication_source();
+	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication_source(REPLICATION_CFG_TIMEOUT);
+	box_sync_replication(REPLICATION_CFG_TIMEOUT);
 	replicaset_foreach(replica) {
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
@@ -1344,12 +1344,11 @@ engine_init()
 	 * in snapshotting (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxEngine *memtx = new MemtxEngine(cfg_gets("snap_dir"),
-					     cfg_geti("panic_on_snap_error"),
-					     cfg_geti("panic_on_wal_error"),
-					     cfg_getd("slab_alloc_arena"),
-					     cfg_geti("slab_alloc_minimal"),
-					     cfg_geti("slab_alloc_maximal"),
+	MemtxEngine *memtx = new MemtxEngine(cfg_gets("memtx_dir"),
+					     cfg_geti("force_recovery"),
+					     cfg_getd("memtx_memory"),
+					     cfg_geti("memtx_min_tuple_size"),
+					     cfg_geti("memtx_max_tuple_size"),
 					     cfg_getd("slab_alloc_factor"));
 	engine_register(memtx);
 
@@ -1536,7 +1535,7 @@ box_cfg_xc(void)
 	vclock_create(&checkpoint_vclock);
 	int64_t lsn = recovery_last_checkpoint(&checkpoint_vclock);
 	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("panic_on_wal_error"),
+				cfg_geti("force_recovery"),
 				&checkpoint_vclock);
 	/*
 	 * Lock the write ahead log directory to avoid multiple
@@ -1603,7 +1602,7 @@ box_cfg_xc(void)
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
 		/* Wait for the cluster to start up */
-		box_sync_replication_source(TIMEOUT_INFINITY);
+		box_sync_replication(TIMEOUT_INFINITY);
 	} else {
 		tt_uuid_create(&INSTANCE_UUID);
 		/*
@@ -1613,7 +1612,7 @@ box_cfg_xc(void)
 		box_listen();
 
 		/* Wait for the  cluster to start up */
-		box_sync_replication_source(TIMEOUT_INFINITY);
+		box_sync_replication(TIMEOUT_INFINITY);
 
 		/* Bootstrap a new master */
 		bootstrap(&recovery->vclock);

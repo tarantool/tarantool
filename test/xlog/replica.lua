@@ -2,8 +2,8 @@
 
 box.cfg({
     listen              = os.getenv("LISTEN"),
-    replication_source  = os.getenv("MASTER"),
-    slab_alloc_arena    = 0.1,
+    replication         = os.getenv("MASTER"),
+    memtx_memory        = 107374182,
 --    pid_file            = "tarantool.pid",
 --    logger              = "tarantool.log",
 })

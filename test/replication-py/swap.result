@@ -185,7 +185,7 @@ box.space.vinyl:select{9}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -351,7 +351,7 @@ box.space.vinyl:select{19}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -518,7 +518,7 @@ box.space.vinyl:select{29}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -684,7 +684,7 @@ box.space.vinyl:select{39}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -851,7 +851,7 @@ box.space.vinyl:select{49}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -1017,7 +1017,7 @@ box.space.vinyl:select{59}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -1184,7 +1184,7 @@ box.space.vinyl:select{69}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -1350,7 +1350,7 @@ box.space.vinyl:select{79}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -1517,7 +1517,7 @@ box.space.vinyl:select{89}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -1683,7 +1683,7 @@ box.space.vinyl:select{99}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -1850,7 +1850,7 @@ box.space.vinyl:select{109}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -2016,7 +2016,7 @@ box.space.vinyl:select{119}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -2183,7 +2183,7 @@ box.space.vinyl:select{129}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -2349,7 +2349,7 @@ box.space.vinyl:select{139}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -2516,7 +2516,7 @@ box.space.vinyl:select{149}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -2682,7 +2682,7 @@ box.space.vinyl:select{159}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -2849,7 +2849,7 @@ box.space.vinyl:select{169}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -3015,7 +3015,7 @@ box.space.vinyl:select{179}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -3182,7 +3182,7 @@ box.space.vinyl:select{189}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -3348,7 +3348,7 @@ box.space.vinyl:select{199}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -3515,7 +3515,7 @@ box.space.vinyl:select{209}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -3681,7 +3681,7 @@ box.space.vinyl:select{219}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -3848,7 +3848,7 @@ box.space.vinyl:select{229}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -4014,7 +4014,7 @@ box.space.vinyl:select{239}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -4181,7 +4181,7 @@ box.space.vinyl:select{249}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -4347,7 +4347,7 @@ box.space.vinyl:select{259}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -4514,7 +4514,7 @@ box.space.vinyl:select{269}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -4680,7 +4680,7 @@ box.space.vinyl:select{279}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -4847,7 +4847,7 @@ box.space.vinyl:select{289}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -5013,7 +5013,7 @@ box.space.vinyl:select{299}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -5180,7 +5180,7 @@ box.space.vinyl:select{309}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -5346,7 +5346,7 @@ box.space.vinyl:select{319}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -5513,7 +5513,7 @@ box.space.vinyl:select{329}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -5679,7 +5679,7 @@ box.space.vinyl:select{339}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -5846,7 +5846,7 @@ box.space.vinyl:select{349}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -6012,7 +6012,7 @@ box.space.vinyl:select{359}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -6179,7 +6179,7 @@ box.space.vinyl:select{369}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -6345,7 +6345,7 @@ box.space.vinyl:select{379}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica
@@ -6512,7 +6512,7 @@ box.space.vinyl:select{389}
 
 swap servers
 switch replica to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch master to replica
@@ -6678,7 +6678,7 @@ box.space.vinyl:select{399}
 
 rollback servers configuration
 switch master to master
-box.cfg{replication_source=''}
+box.cfg{replication=''}
 ---
 ...
 switch replica to replica

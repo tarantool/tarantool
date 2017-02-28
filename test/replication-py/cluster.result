@@ -281,7 +281,7 @@ JOIN replica to read-only master
 -------------------------------------------------------------
 Sync master with replica
 -------------------------------------------------------------
-box.cfg{ replication_source = '<replication_source>' }
+box.cfg{ replication = '<replication_source>' }
 ---
 ...
 box.info.vclock[2] == 1
@@ -296,7 +296,7 @@ box.info.vclock[11] == nil
 ---
 - true
 ...
-box.cfg{ replication_source = '' }
+box.cfg{ replication = '' }
 ---
 ...
 -------------------------------------------------------------

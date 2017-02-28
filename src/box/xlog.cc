@@ -304,7 +304,6 @@ xdir_create(struct xdir *dir, const char *dirname,
 	if (type == SNAP) {
 		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
-		dir->panic_if_error = true;
 		dir->suffix = INPROGRESS;
 		dir->sync_interval = SNAP_SYNC_INTERVAL;
 	} else {
@@ -312,6 +311,7 @@ xdir_create(struct xdir *dir, const char *dirname,
 		dir->filetype = "XLOG";
 		dir->filename_ext = ".xlog";
 		dir->suffix = NONE;
+		dir->force_recovery = true;
 	}
 	dir->type = type;
 }
@@ -458,16 +458,16 @@ cmp_i64(const void *_a, const void *_b)
  * directory to discover newly created logs.
  *
  * On error, this function throws an exception. If
- * dir->panic_if_error is false, *some* errors are not
+ * dir->force_recovery is true, *some* errors are not
  * propagated up but only logged in the error log file.
  *
- * The list of errors ignored in panic_if_error = false mode
+ * The list of errors ignored in force_recovery = true mode
  * includes:
  * - a file can not be opened
  * - some of the files have incorrect metadata (such files are
  *   skipped)
  *
- * The goal of panic_if_error = false mode is partial recovery
+ * The goal of force_recovery = true mode is partial recovery
  * from a damaged/incorrect data directory. It doesn't
  * silence conditions such as out of memory or lack of OS
  * resources.
@@ -567,10 +567,10 @@ xdir_scan(struct xdir *dir)
 			/** Add a new file. */
 			if (xdir_index_file(dir, s_new) != 0) {
 				/*
-				 * panic_if_error must not affect OOM
+				 * force_recovery must not affect OOM
 				 */
 				struct error *e = diag_last_error(&fiber()->diag);
-				if (dir->panic_if_error ||
+				if (!dir->force_recovery ||
 				    type_cast(OutOfMemory, e))
 					return -1;
 				/** Skip a corrupted file */
@@ -1665,7 +1665,7 @@ xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 
 int
 xlog_cursor_next(struct xlog_cursor *cursor,
-		 struct xrow_header *xrow, bool panic_if_error)
+		 struct xrow_header *xrow, bool force_recovery)
 {
 	while (true) {
 		int rc;
@@ -1674,14 +1674,14 @@ xlog_cursor_next(struct xlog_cursor *cursor,
 			break;
 		if (rc < 0) {
 			struct error *e = diag_last_error(diag_get());
-			if (panic_if_error ||
+			if (!force_recovery ||
 			    e->type != &type_XlogError)
 				return -1;
 			say_error("can't decode row: %s", e->errmsg);
 		}
 		while ((rc = xlog_cursor_next_tx(cursor)) < 0) {
 			struct error *e = diag_last_error(diag_get());
-			if (panic_if_error ||
+			if (!force_recovery ||
 			    e->type != &type_XlogError)
 				return -1;
 			say_error("can't open tx: %s", e->errmsg);

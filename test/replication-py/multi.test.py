@@ -45,7 +45,7 @@ print '----------------------------------------------------------------------'
 
 # Connect each server to each other to make full mesh
 for server in cluster:
-    server.iproto.py_con.eval("box.cfg { replication_source = ... }", [sources])
+    server.iproto.py_con.eval("box.cfg { replication = ... }", [sources])
 
 # Wait connections to establish
 for server in cluster:

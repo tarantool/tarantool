@@ -9,8 +9,8 @@ print[[
 ]]
 
 box.cfg{
-    logger="tarantool.log",
-    slab_alloc_arena=0.1,
+    log="tarantool.log",
+    memtx_memory=107374182,
 }
 function pcalltest()
     local ERRMSG = "module 'some_invalid_module' not found"

@@ -71,8 +71,8 @@ enum memtx_recovery_state {
 extern struct mempool memtx_index_extent_pool;
 
 struct MemtxEngine: public Engine {
-	MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
-		    bool panic_on_wal_error, float tuple_arena_max_size,
+	MemtxEngine(const char *snap_dirname, bool force_recovery,
+		    uint64_t tuple_arena_max_size,
 		    uint32_t objsize_min, uint32_t objsize_max,
 		    float alloc_factor);
 	~MemtxEngine();
@@ -120,7 +120,7 @@ private:
 	struct xdir m_snap_dir;
 	/** Limit disk usage of checkpointing (bytes per second). */
 	uint64_t m_snap_io_rate_limit;
-	bool m_panic_on_wal_error;
+	bool m_force_recovery;
 };
 
 enum {

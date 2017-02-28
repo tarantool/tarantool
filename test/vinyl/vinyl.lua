@@ -2,18 +2,16 @@
 
 box.cfg {
     listen            = os.getenv("LISTEN"),
-    slab_alloc_arena  = 0.5,
-    slab_alloc_maximal = 4 * 1024 * 1024,
+    memtx_memory      = 512 * 1024 * 1024,
+    memtx_max_tuple_size = 4 * 1024 * 1024,
     rows_per_wal      = 1000000,
-    vinyl = {
-        threads = 3;
-        memory_limit = 0.5;
-        range_size = 1024*64;
-        page_size = 1024;
-        run_count_per_level = 1;
-        run_size_ratio = 2;
-        cache = 0.00001; -- 10kB
-    }
+    vinyl_threads = 3;
+    vinyl_memory = 512 * 1024 * 1024;
+    vinyl_range_size = 1024 * 64;
+    vinyl_page_size = 1024;
+    vinyl_run_count_per_level = 1;
+    vinyl_run_size_ratio = 2;
+    vinyl_cache = 10240; -- 10kB
 }
 
 function box_info_sort(data)

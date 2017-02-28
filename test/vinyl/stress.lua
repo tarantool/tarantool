@@ -30,7 +30,7 @@ end)
 local spaces = {box.space.s1, box.space.s2, box.space.s3, box.space.s4,
     box.space.s5}
 
-local max_data_size = box.cfg.vinyl.page_size * 1.5
+local max_data_size = box.cfg.vinyl_page_size * 1.5
 
 local function t1(ch, time_limit)
     local t1 = fiber.time()

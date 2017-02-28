@@ -89,7 +89,7 @@ r.message:match('Duplicate') ~= nil
 ---
 - true
 ...
-box.cfg { replication_source = "" }
+box.cfg { replication = "" }
 ---
 ...
 next(box.info.replication) == nil

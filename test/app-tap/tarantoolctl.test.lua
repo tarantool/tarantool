@@ -48,8 +48,8 @@ int execvp(const char *file, char *const argv[]);
 
 -- background checks
 tctlcfg_code = [[default_cfg = {
-    pid_file  = '.', wal_dir = '.', snap_dir   = '.' ,
-    vinyl_dir = '.', logger  = '.', background = true,
+    pid_file  = '.', wal_dir = '.', memtx_dir   = '.' ,
+    vinyl_dir = '.', log  = '.', background = true,
 }
 
 instance_dir = require('fio').abspath('.')]]
@@ -156,7 +156,7 @@ test:plan(6)
 -- must be stopped afterwards
 do
     local dir = fio.tempdir()
-    local code = [[ box.cfg{slab_alloc_arena = 0.1} ]]
+    local code = [[ box.cfg{memtx_memory = 104857600} ]]
     create_script(dir, 'script.lua', code)
 
     local status, err = pcall(function()
@@ -189,7 +189,7 @@ do
     -- bad code
     local code = [[ box.cfg{ ]]
     create_script(dir, 'bad_script.lua',  code)
-    local code = [[ box.cfg{slab_alloc_arena = 0.1} ]]
+    local code = [[ box.cfg{memtx_memory = 104857600} ]]
     create_script(dir, 'good_script.lua', code)
 
     local status, err = pcall(function()
@@ -225,7 +225,7 @@ do
     create_script(dir, 'bad_script.lua',  code)
     local code = [[ return 1]]
     create_script(dir, 'ok_script.lua',  code)
-    local code = [[ box.cfg{slab_alloc_arena = 0.1} box.once('help', function() end)]]
+    local code = [[ box.cfg{memtx_memory = 104857600} box.once('help', function() end)]]
     create_script(dir, 'good_script.lua', code)
 
     local status, err = pcall(function()
@@ -290,7 +290,7 @@ do
     local dir = fio.tempdir()
 
     local filler_code = [[
-        box.cfg{slab_alloc_arena = 0.1, background=false}
+        box.cfg{memtx_memory = 104857600, background=false}
         local space = box.schema.create_space("test")
         space:create_index("primary")
         space:insert({[1] = 1, [2] = 2, [3] = 3, [4] = 4})
@@ -351,7 +351,7 @@ do
     local dir = fio.tempdir()
 
     local filler_code = [[
-        box.cfg{slab_alloc_arena = 0.1, background=false}
+        box.cfg{memtx_memory = 104857600, background=false}
         local space = box.schema.create_space("test")
         space:create_index("primary")
         space:insert({[1] = 1, [2] = 2, [3] = 3, [4] = 4})
@@ -367,7 +367,7 @@ do
     local remote_code = [[
         box.cfg{
             listen = os.getenv("LISTEN"),
-            slab_alloc_arena = 0.1
+            memtx_memory = 104857600
         }
         local space = box.schema.create_space("test")
         space:create_index("primary")

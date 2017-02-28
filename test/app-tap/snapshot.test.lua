@@ -6,7 +6,7 @@ local tap = require('tap')
 local ffi = require('ffi')
 local fio = require('fio')
 
-box.cfg{ logger="tarantool.log", slab_alloc_arena=0.1, rows_per_wal=5000}
+box.cfg{ log="tarantool.log", memtx_memory=107374182, rows_per_wal=5000}
 
 local test = tap.test("snapshot")
 test:plan(3)

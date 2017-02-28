@@ -39,7 +39,7 @@ function gen(i)
     local pad_size = 256
     local range_count = 5
     local pad = string.rep('x', pad_size + i)
-    local n = (range_count + i) * math.floor(box.cfg.vinyl.range_size / pad_size)
+    local n = (range_count + i) * math.floor(box.cfg.vinyl_range_size / pad_size)
     for k = 1,n do
         s:replace{k, i + k, pad}
     end
@@ -60,7 +60,7 @@ test_run:cmd("setopt delimiter ';'")
 function check(i)
     local pad_size = 256
     local range_count = 5
-    local n = (range_count + i) * math.floor(box.cfg.vinyl.range_size / pad_size)
+    local n = (range_count + i) * math.floor(box.cfg.vinyl_range_size / pad_size)
     local n_corrupted = 0
     for k=1,n do
         local v = s:get(k)

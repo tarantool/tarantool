@@ -14,7 +14,7 @@ glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
 ---
 ...
-glob = fio.pathjoin(box.cfg.snap_dir, '*.snap')
+glob = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
 ---
 ...
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
@@ -125,12 +125,12 @@ box.space.test:auto_increment{'after snapshot and restart - one more row'}
 --  
 --  check that panic is true
 --
-box.cfg{panic_on_wal_error=true}
+box.cfg{force_recovery=false}
 ---
 ...
-box.cfg.panic_on_wal_error
+box.cfg.force_recovery
 ---
-- true
+- false
 ...
 -- 
 -- try to start the replica, ha-ha

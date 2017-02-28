@@ -232,7 +232,7 @@ t = nil
 ...
 -- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
 test_run:cmd('restart server default')
-arena_bytes = box.cfg.slab_alloc_arena * 1024 * 1024 * 1024
+arena_bytes = box.cfg.memtx_memory
 ---
 ...
 str = string.rep('a', 15000) -- about size of index memory block

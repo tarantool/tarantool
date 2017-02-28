@@ -4,33 +4,30 @@ local log = require('log')
 local json = require('json')
 local private = require('box.internal')
 local urilib = require('uri')
-
--- see default_cfg below
-local default_vinyl_cfg = {
-    memory_limit        = 1.0, -- 1G
-    threads             = 2,
-    run_count_per_level = 2,
-    run_size_ratio      = 3.5,
-    range_size          = 1024 * 1024 * 1024,
-    page_size           = 8 * 1024,
-    cache               = 0.5, -- 512MB
-    bloom_fpr           = 0.05,
-}
+local math = require('math')
 
 -- all available options
 local default_cfg = {
     listen              = nil,
-    slab_alloc_arena    = 0.25,
-    slab_alloc_minimal  = 16,
-    slab_alloc_maximal  = 1024 * 1024,
+    memtx_memory        = 256 * 1024 *1024,
+    memtx_min_tuple_size = 16,
+    memtx_max_tuple_size = 1024 * 1024,
     slab_alloc_factor   = 1.1,
     work_dir            = nil,
-    snap_dir            = ".",
+    memtx_dir           = ".",
     wal_dir             = ".",
+
     vinyl_dir           = '.',
-    vinyl               = default_vinyl_cfg,
-    logger              = nil,
-    logger_nonblock     = true,
+    vinyl_memory        = 128 * 1024 * 1024,
+    vinyl_cache         = 128 * 1024 * 1024,
+    vinyl_threads       = 2,
+    vinyl_run_count_per_level = 2,
+    vinyl_run_size_ratio      = 3.5,
+    vinyl_range_size          = 1024 * 1024 * 1024,
+    vinyl_page_size           = 8 * 1024,
+    vinyl_bloom_fpr           = 0.05,
+    log                 = nil,
+    log_nonblock        = true,
     log_level           = 5,
     io_collect_interval = nil,
     readahead           = 16320,
@@ -39,49 +36,44 @@ local default_cfg = {
     wal_mode            = "write",
     rows_per_wal        = 500000,
     wal_dir_rescan_delay= 2,
-    panic_on_snap_error = true,
-    panic_on_wal_error  = true,
-    replication_source  = nil,
+    force_recovery      = false,
+    replication         = nil,
     custom_proc_title   = nil,
     pid_file            = nil,
     background          = false,
     username            = nil,
     coredump            = false,
     read_only           = false,
-    hot_standby	        = false,
+    hot_standby         = false,
 
     -- snapshot_daemon
-    snapshot_period     = 0,        -- 0 = disabled
-    snapshot_count      = 6,
-}
-
--- see template_cfg below
-local vinyl_template_cfg = {
-    memory_limit        = 'number',
-    threads             = 'number',
-    run_count_per_level = 'number',
-    run_size_ratio      = 'number',
-    range_size          = 'number',
-    page_size           = 'number',
-    cache               = 'number',
-    bloom_fpr           = 'number',
+    checkpoint_interval = 0,        -- 0 = disabled
+    checkpoint_count    = 6,
 }
 
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
     listen              = 'string, number',
-    slab_alloc_arena    = 'number',
-    slab_alloc_minimal  = 'number',
-    slab_alloc_maximal  = 'number',
+    memtx_memory        = 'number',
+    memtx_min_tuple_size  = 'number',
+    memtx_max_tuple_size  = 'number',
     slab_alloc_factor   = 'number',
     work_dir            = 'string',
-    snap_dir            = 'string',
+    memtx_dir            = 'string',
     wal_dir             = 'string',
     vinyl_dir           = 'string',
-    vinyl               = vinyl_template_cfg,
-    logger              = 'string',
-    logger_nonblock     = 'boolean',
+    vinyl_memory        = 'number',
+    vinyl_cache               = 'number',
+    vinyl_threads             = 'number',
+    vinyl_run_count_per_level = 'number',
+    vinyl_run_size_ratio      = 'number',
+    vinyl_range_size          = 'number',
+    vinyl_page_size           = 'number',
+    vinyl_bloom_fpr           = 'number',
+
+    log              = 'string',
+    log_nonblock     = 'boolean',
     log_level           = 'number',
     io_collect_interval = 'number',
     readahead           = 'number',
@@ -90,16 +82,15 @@ local template_cfg = {
     wal_mode            = 'string',
     rows_per_wal        = 'number',
     wal_dir_rescan_delay= 'number',
-    panic_on_snap_error = 'boolean',
-    panic_on_wal_error  = 'boolean',
-    replication_source  = 'string, number, table',
+    force_recovery      = 'boolean',
+    replication         = 'string, number, table',
     custom_proc_title   = 'string',
     pid_file            = 'string',
     background          = 'boolean',
     username            = 'string',
     coredump            = 'boolean',
-    snapshot_period     = 'number',
-    snapshot_count      = 'number',
+    checkpoint_interval = 'number',
+    checkpoint_count    = 'number',
     read_only           = 'boolean',
     hot_standby         = 'boolean'
 }
@@ -114,7 +105,7 @@ end
 -- options that require special handling
 local modify_cfg = {
     listen             = normalize_uri,
-    replication_source = normalize_uri,
+    replication        = normalize_uri,
 }
 
 local function purge_login_frourilib(uri)
@@ -126,38 +117,83 @@ end
 
 -- options that require modification for logging
 local log_cfg_option = {
-    replication_source = purge_login_frourilib,
+    replication = purge_login_frourilib,
 }
 
 -- dynamically settable options
 local dynamic_cfg = {
     listen                  = private.cfg_set_listen,
-    replication_source      = private.cfg_set_replication_source,
+    replication             = private.cfg_set_replication,
     log_level               = private.cfg_set_log_level,
     io_collect_interval     = private.cfg_set_io_collect_interval,
     readahead               = private.cfg_set_readahead,
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
-    panic_on_wal_error      = function() end,
     read_only               = private.cfg_set_read_only,
     -- snapshot_daemon
-    snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
-    snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
+    checkpoint_interval     = box.internal.snapshot_daemon.set_checkpoint_interval,
+    checkpoint_count        = box.internal.snapshot_daemon.set_checkpoint_count,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
-    end
+    end,
+    force_recovery          = function() end,
 }
 
 local dynamic_cfg_skip_at_load = {
     wal_mode                = true,
     listen                  = true,
-    replication_source      = true,
+    replication             = true,
     wal_dir_rescan_delay    = true,
-    panic_on_wal_error      = true,
     custom_proc_title       = true,
+    force_recovery          = true,
 }
+
+local function convert_gb(size)
+    return math.floor(size * 1024 * 1024 * 1024)
+end
+
+-- Old to new config translation tables
+local translate_cfg = {
+    snapshot_count = {'checkpoint_count'},
+    snapshot_period = {'checkpoint_interval'},
+    slab_alloc_arena = {'memtx_memory', convert_gb},
+    slab_alloc_min = {'memtx_min_tuple_size'},
+    slab_alloc_maximal = {'memtx_max_tuple_size'},
+    snap_dir = {'memtx_dir'},
+    logger = {'log'},
+    logger_nonblock = {'log_nonblock'},
+    panic_on_snap_error = {'force_recovery', function (p) return not p end},
+    panic_on_wal_error = {'force_recovery', function (p) return not p end},
+    replication_source = {'replication'},
+}
+
+-- Upgrade old config
+local function upgrade_cfg(cfg, translate_cfg)
+    local result_cfg = {}
+    for k, v in pairs(cfg) do
+        local translation = translate_cfg[k]
+        if translation ~= nil then
+            log.warn('Deprecated option %s, please use %s instead', k, translation[1])
+            local new_val
+            if translation[2] == nil then
+                new_val = v
+            else
+                new_val = translation[2](v)
+            end
+            if cfg[translation[1]] ~= nil and
+               cfg[translation[1]] ~= new_val then
+                box.error(box.error.CFG, k,
+                          'can not override a value for a deprecated option')
+            end
+            result_cfg[translation[1]] = new_val
+        else
+            result_cfg[k] = v
+        end
+    end
+    return result_cfg
+end
 
 local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     if cfg == nil then
@@ -222,6 +258,7 @@ local function apply_default_cfg(cfg, default_cfg)
 end
 
 local function reload_cfg(oldcfg, cfg)
+    cfg = upgrade_cfg(cfg, translate_cfg)
     local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     -- iterate over original table because prepare_cfg() may store NILs
     for key, val in pairs(cfg) do
@@ -276,6 +313,7 @@ setmetatable(box, {
 })
 
 local function load_cfg(cfg)
+    cfg = upgrade_cfg(cfg, translate_cfg)
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     apply_default_cfg(cfg, default_cfg);
     -- Save new box.cfg

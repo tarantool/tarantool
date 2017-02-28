@@ -501,7 +501,7 @@ applier_new(const char *uri, struct xstream *initial_join_stream,
 	/* uri_parse() sets pointers to applier->source buffer */
 	snprintf(applier->source, sizeof(applier->source), "%s", uri);
 	int rc = uri_parse(&applier->uri, applier->source);
-	/* URI checked by box_check_replication_source() */
+	/* URI checked by box_check_replication() */
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 
@@ -672,7 +672,7 @@ error:
 	}
 
 	/* ignore original error */
-	tnt_raise(ClientError, ER_CFG, "replication_source",
+	tnt_raise(ClientError, ER_CFG, "replication",
 		  "failed to connect to one or more replicas");
 }
 

@@ -11,10 +11,10 @@ tempdir = fio.tempdir()
 
 box.cfg {
     wal_dir = tempdir,
-    snap_dir = tempdir,
+    memtx_dir = tempdir,
     vinyl_dir = tempdir,
-    logger      = fio.pathjoin(tempdir, 'tarantool.log'),
-    slab_alloc_arena=0.1 -- for small systems
+    log       = fio.pathjoin(tempdir, 'tarantool.log'),
+    memtx_memory = 104857600 -- for small systems
 }
 
 local function test_replace(old_tuple, new_tuple)

@@ -20,7 +20,7 @@ s:drop()
 --
 --
 test_run:cmd("setopt delimiter ';'")
-if  box.cfg.vinyl.page_size > 1024 or box.cfg.vinyl.range_size > 65536 then
+if  box.cfg.vinyl_page_size > 1024 or box.cfg.vinyl_range_size > 65536 then
     error("This test relies on splits and dumps")
 end;
 s = box.schema.space.create('test', {engine='vinyl'});
@@ -29,8 +29,8 @@ value = string.rep('a', 1024)
 last_id = 1
 -- fill up a range
 function range()
-    local range_size = box.cfg.vinyl.range_size
-    local page_size = box.cfg.vinyl.page_size
+    local range_size = box.cfg.vinyl_range_size
+    local page_size = box.cfg.vinyl_page_size
     local s = box.space.test
     local num_rows = 0
     for i=1,range_size/page_size do

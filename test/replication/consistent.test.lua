@@ -69,8 +69,8 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
-old_replication_source = box.cfg.replication_source
-box.cfg{replication_source=""}
+old_replication = box.cfg.replication
+box.cfg{replication=""}
 --# set connection default
 _insert(11, 20, 'master')
 _select(11, 20)
@@ -88,7 +88,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
-box.cfg{replication_source=old_replication_source}
+box.cfg{replication=old_replication}
 _select(11, 20)
 --# set connection default
 -- Master LSN:
@@ -103,7 +103,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
-box.cfg{replication_source=""}
+box.cfg{replication=""}
 --# set connection default
 _insert(21, 30, 'master')
 _select(21, 30)
@@ -121,7 +121,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
-box.cfg{replication_source=old_replication_source}
+box.cfg{replication=old_replication}
 _select(21, 30)
 
 --# set connection default
@@ -137,7 +137,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
-box.cfg{replication_source=""}
+box.cfg{replication=""}
 --# set connection default
 _insert(31, 40, 'master')
 _select(31, 40)
@@ -155,7 +155,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
-box.cfg{replication_source=old_replication_source}
+box.cfg{replication=old_replication}
 _select(31, 50)
 --# set connection default
 _insert(41, 60, 'master')

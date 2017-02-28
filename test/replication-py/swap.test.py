@@ -86,11 +86,11 @@ for i in range(REPEAT):
     # reconfigure replica to master
     replica.rpl_master = None
     print("switch replica to master")
-    replica.admin("box.cfg{replication_source=''}")
+    replica.admin("box.cfg{replication=''}")
     # reconfigure master to replica
     master.rpl_master = replica
     print("switch master to replica")
-    master.admin("box.cfg{replication_source='%s'}" % replica.uri, silent=True)
+    master.admin("box.cfg{replication='%s'}" % replica.uri, silent=True)
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
@@ -110,11 +110,11 @@ for i in range(REPEAT):
     # reconfigure replica to master
     master.rpl_master = None
     print("switch master to master")
-    master.admin("box.cfg{replication_source=''}")
+    master.admin("box.cfg{replication=''}")
     # reconfigure master to replica
     replica.rpl_master = master
     print("switch replica to replica")
-    replica.admin("box.cfg{replication_source='%s'}" % master.uri, silent=True)
+    replica.admin("box.cfg{replication='%s'}" % master.uri, silent=True)
 
 
 # Cleanup.

@@ -3,7 +3,7 @@
 local table_clear = require('table.clear')
 
 box.cfg{
-    logger = "tarantool.log"
+    log = "tarantool.log"
 }
 
 local trigger = require('internal.trigger')

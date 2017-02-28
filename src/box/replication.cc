@@ -184,7 +184,7 @@ replicaset_update(struct applier **appliers, int count)
 	for (int i = 0; i < count; i++) {
 		replica = replica_new(&appliers[i]->uuid);
 		if (replicaset_search(&uniq, replica) != NULL) {
-			tnt_raise(ClientError, ER_CFG, "replication_source",
+			tnt_raise(ClientError, ER_CFG, "replication",
 				  "duplicate connection to the same replica");
 		}
 

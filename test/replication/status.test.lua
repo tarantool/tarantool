@@ -26,7 +26,7 @@ r = box.info.replication[1]
 r.status == "stopped"
 r.message:match('Duplicate') ~= nil
 
-box.cfg { replication_source = "" }
+box.cfg { replication = "" }
 next(box.info.replication) == nil
 
 test_run:cmd('switch default')

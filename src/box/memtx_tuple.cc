@@ -70,7 +70,7 @@ enum {
 };
 
 void
-memtx_tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
+memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 uint32_t objsize_max, float alloc_factor)
 {
 	/* Apply lowest allowed objsize bounds */
@@ -88,8 +88,7 @@ memtx_tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	 * Ensure that quota is a multiple of slab_size, to
 	 * have accurate value of quota_used_ratio
 	 */
-	size_t prealloc = small_align(tuple_arena_max_size * 1024
-				      * 1024 * 1024, slab_size);
+	size_t prealloc = small_align(tuple_arena_max_size, slab_size);
 	/** Preallocate entire quota. */
 	quota_init(&memtx_quota, prealloc);
 
@@ -139,7 +138,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * Use a nothrow version and throw an exception here,
 	 * to throw an instance of ClientError. Apart from being
 	 * more nice to the user, ClientErrors are ignored in
-	 * panic_on_wal_error=false mode, allowing us to start
+	 * force_recovery=true mode, allowing us to start
 	 * with lower arena than necessary in the circumstances
 	 * of disaster recovery.
 	 */

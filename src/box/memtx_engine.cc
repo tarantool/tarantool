@@ -117,22 +117,21 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	handler->replace = memtx_replace_all_keys;
 }
 
-MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
-			 bool panic_on_wal_error,
-			 float tuple_arena_max_size, uint32_t objsize_min,
+MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
+			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 			 uint32_t objsize_max, float alloc_factor)
 	:Engine("memtx", &memtx_tuple_format_vtab),
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
 	m_snap_io_rate_limit(0),
-	m_panic_on_wal_error(panic_on_wal_error)
+	m_force_recovery(force_recovery)
 {
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
 			 alloc_factor);
 
 	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
-	m_snap_dir.panic_if_error = panic_on_snap_error;
+	m_snap_dir.force_recovery = force_recovery;
 	xdir_scan_xc(&m_snap_dir);
 }
 
@@ -173,11 +172,11 @@ MemtxEngine::recoverSnapshot()
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	while (xlog_cursor_next_xc(&cursor, &row,
-				   m_snap_dir.panic_if_error) == 0) {
+				   m_snap_dir.force_recovery) == 0) {
 		try {
 			recoverSnapshotRow(&row);
 		} catch (ClientError *e) {
-			if (m_snap_dir.panic_if_error)
+			if (!m_snap_dir.force_recovery)
 				throw;
 			say_error("can't apply row: ");
 			e->log();
@@ -234,12 +233,12 @@ MemtxEngine::beginInitialRecovery(struct vclock *vclock)
 	 * from the snapshot, in which they are stored in key
 	 * order, and bulk build of the primary key.
 	 *
-	 * If panic_on_snap_error = false, it's a disaster
+	 * If force_recovery = true, it's a disaster
 	 * recovery mode. Enable all keys on start, to detect and
 	 * discard duplicates in the snapshot.
 	 */
-	m_state = (m_snap_dir.panic_if_error ?
-		   MEMTX_INITIAL_RECOVERY : MEMTX_OK);
+	m_state = (m_snap_dir.force_recovery?
+		   MEMTX_OK : MEMTX_INITIAL_RECOVERY);
 }
 
 void
@@ -252,7 +251,7 @@ MemtxEngine::beginFinalRecovery()
 	/* End of the fast path: loaded the primary key. */
 	space_foreach(memtx_end_build_primary_key, this);
 
-	if (m_panic_on_wal_error) {
+	if (!m_force_recovery) {
 		/*
 		 * Fast start path: "play out" WAL
 		 * records using the primary key only,
@@ -261,7 +260,7 @@ MemtxEngine::beginFinalRecovery()
 		m_state = MEMTX_FINAL_RECOVERY;
 	} else {
 		/*
-		 * If panic_on_wal_error = false, it's
+		 * If force_recovery = true, it's
 		 * a disaster recovery mode. Build
 		 * secondary keys before reading the WAL,
 		 * to detect and discard duplicates in
@@ -277,8 +276,8 @@ MemtxEngine::endRecovery()
 {
 	/*
 	 * Recovery is started with enabled keys when:
-	 * - either of panic_on_snap_error/panic_on_wal_error
-	 *   is true
+	 * - either of force_recovery
+	 *   is false
 	 * - it's a replication join
 	 */
 	if (m_state != MEMTX_OK) {

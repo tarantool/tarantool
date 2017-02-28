@@ -9,8 +9,8 @@ test:plan(3)
 local filename = "1.log"
 local message = "Hello, World!"
 box.cfg{
-    logger=filename,
-    slab_alloc_arena=0.1,
+    log=filename,
+    memtx_memory=107374182,
 }
 local log = require('log')
 local io = require('io')

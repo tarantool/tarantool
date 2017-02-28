@@ -3,16 +3,16 @@ os = require('os')
 
 box.cfg{
     listen              = os.getenv("LISTEN"),
-    slab_alloc_arena    = 0.1,
+    memtx_memory        = 107374182,
     pid_file            = "tarantool.pid",
 }
 
 require('console').listen(os.getenv('ADMIN'))
 
 local _hide = {
-    pid_file=1, logger=1, listen=1, vinyl_dir=1,
-    snap_dir=1, wal_dir=1,
-    slab_alloc_maximal=1, slab_alloc_minimal=1
+    pid_file=1, log=1, listen=1, vinyl_dir=1,
+    memtx_dir=1, wal_dir=1,
+    memtx_max_tuple_size=1, memtx_min_tuple_size=1
 }
 
 function cfg_filter(data)

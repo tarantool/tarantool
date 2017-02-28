@@ -16,22 +16,32 @@ cfg_filter(box.cfg)
 ---
 - - - background
     - false
+  - - checkpoint_count
+    - 6
+  - - checkpoint_interval
+    - 0
   - - coredump
+    - false
+  - - force_recovery
     - false
   - - hot_standby
     - false
   - - listen
     - <hidden>
+  - - log
+    - <hidden>
   - - log_level
     - 5
-  - - logger
+  - - log_nonblock
+    - true
+  - - memtx_dir
     - <hidden>
-  - - logger_nonblock
-    - true
-  - - panic_on_snap_error
-    - true
-  - - panic_on_wal_error
-    - true
+  - - memtx_max_tuple_size
+    - <hidden>
+  - - memtx_memory
+    - 107374182
+  - - memtx_min_tuple_size
+    - <hidden>
   - - pid_file
     - <hidden>
   - - read_only
@@ -40,41 +50,28 @@ cfg_filter(box.cfg)
     - 16320
   - - rows_per_wal
     - 500000
-  - - slab_alloc_arena
-    - 0.1
   - - slab_alloc_factor
     - 1.1
-  - - slab_alloc_maximal
-    - <hidden>
-  - - slab_alloc_minimal
-    - <hidden>
-  - - snap_dir
-    - <hidden>
-  - - snapshot_count
-    - 6
-  - - snapshot_period
-    - 0
   - - too_long_threshold
     - 0.5
-  - - vinyl
-    - - - bloom_fpr
-        - 0.05
-      - - cache
-        - 0.5
-      - - memory_limit
-        - 1
-      - - page_size
-        - 8192
-      - - range_size
-        - 1073741824
-      - - run_count_per_level
-        - 2
-      - - run_size_ratio
-        - 3.5
-      - - threads
-        - 2
+  - - vinyl_bloom_fpr
+    - 0.05
+  - - vinyl_cache
+    - 134217728
   - - vinyl_dir
     - <hidden>
+  - - vinyl_memory
+    - 134217728
+  - - vinyl_page_size
+    - 8192
+  - - vinyl_range_size
+    - 1073741824
+  - - vinyl_run_count_per_level
+    - 2
+  - - vinyl_run_size_ratio
+    - 3.5
+  - - vinyl_threads
+    - 2
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -92,22 +89,32 @@ cfg_filter(box.cfg)
 ---
 - - - background
     - false
+  - - checkpoint_count
+    - 6
+  - - checkpoint_interval
+    - 0
   - - coredump
+    - false
+  - - force_recovery
     - false
   - - hot_standby
     - false
   - - listen
     - <hidden>
+  - - log
+    - <hidden>
   - - log_level
     - 5
-  - - logger
+  - - log_nonblock
+    - true
+  - - memtx_dir
     - <hidden>
-  - - logger_nonblock
-    - true
-  - - panic_on_snap_error
-    - true
-  - - panic_on_wal_error
-    - true
+  - - memtx_max_tuple_size
+    - <hidden>
+  - - memtx_memory
+    - 107374182
+  - - memtx_min_tuple_size
+    - <hidden>
   - - pid_file
     - <hidden>
   - - read_only
@@ -116,41 +123,28 @@ cfg_filter(box.cfg)
     - 16320
   - - rows_per_wal
     - 500000
-  - - slab_alloc_arena
-    - 0.1
   - - slab_alloc_factor
     - 1.1
-  - - slab_alloc_maximal
-    - <hidden>
-  - - slab_alloc_minimal
-    - <hidden>
-  - - snap_dir
-    - <hidden>
-  - - snapshot_count
-    - 6
-  - - snapshot_period
-    - 0
   - - too_long_threshold
     - 0.5
-  - - vinyl
-    - - - bloom_fpr
-        - 0.05
-      - - cache
-        - 0.5
-      - - memory_limit
-        - 1
-      - - page_size
-        - 8192
-      - - range_size
-        - 1073741824
-      - - run_count_per_level
-        - 2
-      - - run_size_ratio
-        - 3.5
-      - - threads
-        - 2
+  - - vinyl_bloom_fpr
+    - 0.05
+  - - vinyl_cache
+    - 134217728
   - - vinyl_dir
     - <hidden>
+  - - vinyl_memory
+    - 134217728
+  - - vinyl_page_size
+    - 8192
+  - - vinyl_range_size
+    - 1073741824
+  - - vinyl_run_count_per_level
+    - 2
+  - - vinyl_run_size_ratio
+    - 3.5
+  - - vinyl_threads
+    - 2
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -179,17 +173,17 @@ box.cfg{coredump = 'true'}
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------
-box.cfg{slab_alloc_arena = "100500"}
+box.cfg{memtx_memory = "100500"}
 ---
-- error: 'Incorrect value for option ''slab_alloc_arena'': should be of type number'
+- error: 'Incorrect value for option ''memtx_memory'': should be of type number'
 ...
 box.cfg{vinyl = "vinyl"}
 ---
-- error: 'Incorrect value for option ''vinyl'': should be a table'
+- error: 'Incorrect value for option ''vinyl'': unexpected option'
 ...
-box.cfg{vinyl = {threads = "threads"}}
+box.cfg{vinyl_threads = "threads"}
 ---
-- error: 'Incorrect value for option ''vinyl.threads'': should be of type number'
+- error: 'Incorrect value for option ''vinyl_threads'': should be of type number'
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options
@@ -206,9 +200,9 @@ test_run:cmd('switch cfg_tester1')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
 ---
-- 0.25
+- 268435456
 - 1.1
 - 2
 ...
@@ -236,9 +230,9 @@ test_run:cmd('switch cfg_tester2')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
 ---
-- 0.2
+- 214748364
 - 1.1
 - 2
 ...
@@ -266,9 +260,9 @@ test_run:cmd('switch cfg_tester3')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
 ---
-- 0.2
+- 214748364
 - 1.1
 - 10
 ...
@@ -296,9 +290,9 @@ test_run:cmd('switch cfg_tester4')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.vinyl.threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
 ---
-- 0.25
+- 268435456
 - 3.14
 - 2
 ...

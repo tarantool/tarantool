@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 
-box.cfg{logger = "tarantool.log"}
+box.cfg{log = "tarantool.log"}
 
 package.cpath = '../app-tap/?.so;../app-tap/?.dylib;'
 
