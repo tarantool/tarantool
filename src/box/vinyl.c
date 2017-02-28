@@ -5410,8 +5410,8 @@ vy_index_drop(struct vy_index *index)
 	 */
 	index->is_dropped = true;
 	rlist_del(&index->link);
-	vy_index_unref(index);
 	index->space = NULL;
+	vy_index_unref(index);
 
 	/*
 	 * We can't abort here, because the index drop request has
