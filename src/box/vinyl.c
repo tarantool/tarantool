@@ -3784,6 +3784,13 @@ struct vy_task {
 	double bloom_fpr;
 };
 
+/**
+ * Allocate a new task to be executed by a worker thread.
+ * When preparing an asynchronous task, this function must
+ * be called before yielding the current fiber in order to
+ * pin the index the task is for so that a concurrent fiber
+ * does not free it from under us.
+ */
 static struct vy_task *
 vy_task_new(struct mempool *pool, struct vy_index *index,
 	    const struct vy_task_ops *ops)
@@ -3801,6 +3808,7 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 	return task;
 }
 
+/** Free a task allocated with vy_task_new(). */
 static void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
@@ -3923,11 +3931,11 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
-	vy_range_maybe_coalesce(&range);
-
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
+
+	vy_range_maybe_coalesce(&range);
 
 	if (vy_range_prepare_new_run(range) != 0)
 		goto err_run;
@@ -4351,11 +4359,11 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
-	vy_range_maybe_coalesce(&range);
-
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
 	if (task == NULL)
 		goto err_task;
+
+	vy_range_maybe_coalesce(&range);
 
 	if (vy_range_prepare_new_run(range) != 0)
 		goto err_run;
