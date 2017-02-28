@@ -234,7 +234,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 		str = mp_decode_str(val, &str_len);
 		str_len = MIN(str_len, def->len - 1);
 		memcpy(opt, str, str_len);
-		opt[str_len + 1] = '\0';
+		opt[str_len] = '\0';
 		break;
 	default:
 		unreachable();
