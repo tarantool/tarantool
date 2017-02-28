@@ -210,6 +210,18 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_lsn);
 
 /**
+ * Return true if @a stmt was allocated on lsregion.
+ * @param stmt a statement
+ * @retval true if @a stmt was allocated on lsregion
+ * @retval false otherwise
+ */
+static inline bool
+vy_stmt_is_region_allocated(const struct tuple *stmt)
+{
+	return stmt->refs == 0;
+}
+
+/**
  * Specialized comparators are faster than general-purpose comparators.
  * For example, vy_stmt_compare - slowest comparator because it in worst case
  * checks all combinations of key and tuple types, but

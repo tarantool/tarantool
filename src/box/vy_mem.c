@@ -139,24 +139,16 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 	return result;
 }
 
-/** Check if the statement can be inserted in the vy_mem. */
-static inline bool
-vy_mem_compatible_with_stmt(struct vy_mem *mem, const struct tuple *stmt)
-{
-	return stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format) ||
-	       stmt->format_id == tuple_format_id(mem->upsert_format);
-}
-
 int
 vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 {
-	size_t size = tuple_size(stmt);
-	/* Prune the release build warning. */
-	(void) vy_mem_compatible_with_stmt;
-	assert(vy_mem_compatible_with_stmt(mem, stmt));
+	/* Check if the statement can be inserted in the vy_mem. */
+	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
+	       stmt->format_id == tuple_format_id(mem->format) ||
+	       stmt->format_id == tuple_format_id(mem->upsert_format));
 	/* The statement must be from a lsregion. */
-	assert(stmt->refs == 0);
+	assert(vy_stmt_is_region_allocated(stmt));
+	size_t size = tuple_size(stmt);
 	const struct tuple *replaced_stmt = NULL;
 	int rc = vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt);
 	if (rc != 0)

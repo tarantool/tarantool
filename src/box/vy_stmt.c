@@ -100,16 +100,12 @@ struct tuple *
 vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format)
 {
 	/*
-	 * Need to subtract sizeof(struct tuple), because
-	 * vy_stmt_alloc adds it.
 	 * We don't use tuple_new() to avoid the initializing of
 	 * tuple field map. This map can be simple memcopied from
 	 * the original tuple.
 	 */
-	assert((vy_stmt_type(stmt) != IPROTO_UPSERT &&
-		format->extra_size != sizeof(uint8_t)) ||
-	       (vy_stmt_type(stmt) == IPROTO_UPSERT &&
-		format->extra_size == sizeof(uint8_t)));
+	assert((vy_stmt_type(stmt) == IPROTO_UPSERT) ==
+	       (format->extra_size == sizeof(uint8_t)));
 	struct tuple *res = vy_stmt_alloc(format, stmt->bsize);
 	if (res == NULL)
 		return NULL;

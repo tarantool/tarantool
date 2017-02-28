@@ -640,7 +640,7 @@ struct vy_index {
 	struct tuple_format *space_format_with_colmask;
 	/**
 	 * A format of the space of this index. It is need as the
-	 * separate member, because there is cthe ase, when the
+	 * separate member, because there is a case, when the
 	 * index is dropped, but we still need the format of the
 	 * space.
 	 */
@@ -3511,32 +3511,53 @@ vy_index_open_ex(struct vy_index *index)
 }
 
 /*
- * Save a statement in the range's in-memory index.
+ * Save a statement in the range's in-memory index. If the
+ * region_stmt is NULL and the statement successfully inserted
+ * then the new lsregion statement is returned via @a region_stmt.
+ * @param range Range to which the statement insert to.
+ * @param stmt Statement, allocated on malloc().
+ * @param region_stmt NULL or the same statement, allocated on
+ *                    lsregion.
+ * @retval  0 Success.
+ * @retval -1 Memory error.
  */
 static int
-vy_range_set(struct vy_range *range, const struct tuple *stmt)
+vy_range_set(struct vy_range *range, const struct tuple *stmt,
+	     const struct tuple **region_stmt)
 {
-	/* The statement must be allocated in a lsregion. */
-	assert(stmt->refs == 0);
+	assert(!vy_stmt_is_region_allocated(stmt));
+	assert(*region_stmt == NULL ||
+	       vy_stmt_is_region_allocated(*region_stmt));
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+	struct lsregion *allocator = &index->env->allocator;
 	struct vy_mem *mem = range->mem;
+	int64_t lsn = vy_stmt_lsn(stmt);
 
 	bool was_empty = (mem->used == 0);
-
-	if (vy_mem_insert(mem, stmt) != 0)
+	/*
+	 * Allocate region_stmt on demand.
+	 */
+	if (*region_stmt == NULL) {
+		*region_stmt = vy_stmt_dup_lsregion(stmt, allocator, lsn);
+		if (*region_stmt == NULL)
+			return -1;
+	}
+	if (vy_mem_insert(mem, *region_stmt) != 0) {
+		/* Sic: can't free region_stmt allocated on lsregion */
 		return -1;
+	}
 
 	if (was_empty)
 		vy_scheduler_mem_dirtied(scheduler, mem);
 
 	if (range->used == 0) {
-		range->min_lsn = vy_stmt_lsn(stmt);
+		range->min_lsn = lsn;
 		vy_scheduler_update_range(scheduler, range);
 	}
 
-	assert(mem->min_lsn <= vy_stmt_lsn(stmt));
-	assert(range->min_lsn <= vy_stmt_lsn(stmt));
+	assert(mem->min_lsn <= lsn);
+	assert(range->min_lsn <= lsn);
 
 	size_t size = tuple_size(stmt);
 	range->used += size;
@@ -3555,12 +3576,12 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 
 	struct vy_index *index = range->index;
-	struct lsregion *allocator = &index->env->allocator;
 	struct key_def *key_def = index->key_def;
 	struct vy_mem *mem = range->mem;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	older = vy_mem_older_lsn(mem, stmt);
+	const struct tuple *region_stmt = NULL;
 	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
 	    (older == NULL && range->shadow == NULL &&
 	     rlist_empty(&range->frozen) && range->run_count == 0)) {
@@ -3597,11 +3618,9 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		}
 		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
-		stmt = vy_stmt_dup_lsregion(upserted, allocator, upserted_lsn);
-		if (stmt == NULL)
-			return -1;
+		int rc = vy_range_set(range, upserted, &region_stmt);
 		tuple_unref(upserted);
-		return vy_range_set(range, stmt);
+		return rc;
 	}
 
 	/*
@@ -3628,10 +3647,7 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 			vy_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
 		}
 	}
-	stmt = vy_stmt_dup_lsregion(stmt, allocator, lsn);
-	if (stmt == NULL)
-		return -1;
-	return vy_range_set(range, stmt);
+	return vy_range_set(range, stmt, &region_stmt);
 }
 
 /*
@@ -3668,28 +3684,33 @@ vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
 }
 
 /**
- * Find the range, into which need to insert the statement, and
- * rotate its mem, if neccessary.
- * But if the statement already is commited, then no range will
- * be returned, and it is ok - you simply must go to the next
- * statement in a transaction log. For details see the comment
- * below in the code.
+ * Write a single statement into an index. If the statement has an
+ * lsregion copy then use it, else create it.
+ * @param index Index to write to.
+ * @param stmt Statement allocated from malloc().
+ * @param region_stmt NULL or the same statement as stmt,
+ *                    but allocated on lsregion.
+ * @param status Vinyl engine status.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
  */
-static inline int
-vy_tx_prepare_write(struct vy_index *index, struct tuple *stmt,
-		    enum vy_status status, struct vy_range **range)
+static int
+vy_tx_write(struct vy_index *index, struct tuple *stmt,
+	    const struct tuple **region_stmt, enum vy_status status)
 {
-	assert(range != NULL);
-	struct key_def *key_def = index->key_def;
+	assert(!vy_stmt_is_region_allocated(stmt));
+	assert(*region_stmt == NULL ||
+	       vy_stmt_is_region_allocated(*region_stmt));
 	struct lsregion *allocator = &index->env->allocator;
 	const int64_t *allocator_lsn = &index->env->xm->lsn;
-	*range = NULL;
+	struct key_def *key_def = index->key_def;
+	struct vy_range *range = NULL;
 	/*
 	 * If we're recovering the WAL, it may happen so that this
-	 * particular run was dumped after the checkpoint, and
-	 * we're replaying records already present in the
-	 * database. In this case avoid overwriting a newer
-	 * version with an older one.
+	 * particular run was dumped after the checkpoint, and we're
+	 * replaying records already present in the database. In this
+	 * case avoid overwriting a newer version with an older one.
 	 */
 	if (status == VINYL_FINAL_RECOVERY_LOCAL ||
 	    status == VINYL_FINAL_RECOVERY_REMOTE) {
@@ -3697,90 +3718,26 @@ vy_tx_prepare_write(struct vy_index *index, struct tuple *stmt,
 			return 0;
 	}
 	/* Match range. */
-	*range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, key_def,
-					   stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, key_def, stmt);
 	/*
 	 * To avoid mixing statements of different formats in
 	 * the same in-memory tree, allocate a new tree on schema
 	 * version mismatch.
 	 */
-	if (unlikely((*range)->mem->sc_version != sc_version)) {
-		if (vy_range_rotate_mem(*range, key_def,
+	if (unlikely(range->mem->sc_version != sc_version)) {
+		if (vy_range_rotate_mem(range, key_def,
 					allocator, allocator_lsn) != 0)
 			return -1;
 	}
-	return 0;
-}
-
-/**
- * Commit a single write operation made by a transaction in the
- * index, which is the single index in its space.
- * @param pk     Index to write to.
- * @param stmt   Statement to write to.
- * @param status Status of the vinyl engine.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static int
-vy_tx_write_one(struct vy_index *pk, struct tuple *stmt, enum vy_status status)
-{
-	assert(pk->space_index_count == 1);
-	/* Statement must not be from a lsregion. */
-	assert(stmt->refs > 0);
-	struct vy_range *range;
-	struct lsregion *allocator = &pk->env->allocator;
-	if (vy_tx_prepare_write(pk, stmt, status, &range) != 0)
-		return -1;
-	if (range == NULL)
-		return 0;
 	int rc;
-	if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
+	switch (vy_stmt_type(stmt)) {
+	case IPROTO_UPSERT:
 		rc = vy_range_set_upsert(range, stmt);
-	} else {
-		stmt = vy_stmt_dup_lsregion(stmt, allocator, vy_stmt_lsn(stmt));
-		if (stmt == NULL)
-			return -1;
-		rc = vy_range_set(range, stmt);
+		break;
+	default:
+		rc = vy_range_set(range, stmt, region_stmt);
+		break;
 	}
-
-	/*
-	 * Invalidate cache element.
-	 */
-	struct vy_cache *cache = pk->cache;
-	vy_cache_on_write(cache, stmt);
-
-	return rc;
-}
-
-/**
- * Commit a single write operation made by a transaction in the
- * index, which is not the single index in its space.
- * @param pk     Index to write to.
- * @param stmt   Statement to write to.
- * @param status Status of the vinyl engine.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static int
-vy_tx_write(struct vy_index *index, struct tuple *stmt, enum vy_status status)
-{
-	assert(index->space_index_count > 1);
-	/*
-	 * In such a case of the space with multiple indexes we
-	 * can't make pure UPSERT operations - they always are
-	 * decomposed into REPLACE or DELETE + REPLACE.
-	 */
-	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
-	/* Statement must be from a lsregion. */
-	assert(stmt->refs == 0);
-	struct vy_range *range;
-	if (vy_tx_prepare_write(index, stmt, status, &range) != 0)
-		return -1;
-	if (range == NULL)
-		return 0;
-	int rc = vy_range_set(range, stmt);
 	/*
 	 * Invalidate cache element.
 	 */
@@ -5542,40 +5499,42 @@ vy_index_drop(struct vy_index *index)
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 
 /**
- * Create the format for tuples with column mask of update
- * operation. @sa vy_index.column_mask, vy_can_skip_update().
- * @param space_format Format of a space.
+ * Create a tuple format with column mask of an update operation.
+ * @sa vy_index.column_mask, vy_can_skip_update().
+ * @param space_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 static inline struct tuple_format *
-vy_create_space_format_with_colmask(struct tuple_format *space_format)
+vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
 {
 	struct tuple_format *format = tuple_format_dup(space_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of column mask. */
+	assert(format->extra_size == 0);
 	format->extra_size = sizeof(uint64_t);
 	return format;
 }
 
 /**
- * Create the format for UPSERT tuples. UPSERTs has an additional
+ * Create a tuple format for UPSERT tuples. UPSERTs has an additional
  * extra byte before an offsets table, that stores the count
  * of squashed upserts @sa vy_squash.
- * @param space_format Format of a space.
+ * @param space_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 static inline struct tuple_format *
-vy_create_upsert_statements_format(struct tuple_format *space_format)
+vy_tuple_format_new_upsert(struct tuple_format *space_format)
 {
 	struct tuple_format *format = tuple_format_dup(space_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of n_upserts. */
+	assert(format->extra_size == 0);
 	format->extra_size = sizeof(uint8_t);
 	return format;
 }
@@ -5633,12 +5592,12 @@ vy_index_new(struct vy_env *e, struct key_def *user_key_def,
 
 	if (user_key_def->iid == 0) {
 		index->upsert_format =
-			vy_create_upsert_statements_format(space->format);
+			vy_tuple_format_new_upsert(space->format);
 		if (index->upsert_format == NULL)
 			goto fail_upsert_format;
 
 		index->space_format_with_colmask =
-			vy_create_space_format_with_colmask(space->format);
+			vy_tuple_format_new_with_colmask(space->format);
 		if (index->space_format_with_colmask == NULL)
 			goto fail_space_format_with_colmask;
 	} else {
@@ -5732,14 +5691,14 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 
 	/* Update the format with column mask. */
 	struct tuple_format *format =
-		vy_create_space_format_with_colmask(new_space->format);
+		vy_tuple_format_new_with_colmask(new_space->format);
 	if (format == NULL)
 		return -1;
 	tuple_format_ref(format, 1);
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
-		vy_create_upsert_statements_format(new_space->format);
+		vy_tuple_format_new_upsert(new_space->format);
 	if (upsert_format == NULL) {
 		tuple_format_ref(format, -1);
 		return -1;
@@ -7041,96 +7000,38 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	 * Sic: the loop below must not yield after recovery.
 	 */
 	uint64_t write_count = 0;
-	struct tuple *delete = NULL, *replace = NULL, *stmt = NULL;
-	struct vy_index *index = NULL;
-	enum iproto_type type;
+	const struct tuple *delete = NULL, *replace = NULL;
 	enum vy_status status = e->status;
 	uint32_t current_space_id = 0;
-	uint32_t prev_index_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/*
-		 * The tx log contains both read and write
-		 * statements, but we must save only write ones.
+		 * The tx log contains both reads and writes, but
+		 * we must save only writes.
 		 */
 		if (v->is_read)
 			continue;
-		index = v->index;
-		stmt = v->stmt;
+		struct vy_index *index = v->index;
+		struct tuple *stmt = v->stmt;
 		vy_stmt_set_lsn(stmt, lsn);
-		type = vy_stmt_type(stmt);
+		enum iproto_type type = vy_stmt_type(stmt);
 		if (index->key_def->iid == 0) {
+			/*
+			 * The beginning of the new txn_stmt is met.
+			 */
 			current_space_id = index->space->def.id;
-			prev_index_id = 0;
-			/*
-			 * A special case for the space with
-			 * the single index. In such a case we
-			 * 1) can met UPSERT statements;
-			 * 2) can squash UPSERT statements, if
-			 *    in memory we have an older DELETE or
-			 *    REPLACE statement.
-			 * Because of these reasons, the UPSERT
-			 * statement possibly will be squashed
-			 * with another statements and will not be
-			 * written in vy_mem as is, and we must
-			 * not copy it in the lsregion just now.
-			 * vy_tx_write_one makes lazy copying in
-			 * the lsregion.
-			 */
-			if (index->space_index_count == 1) {
-				if (vy_tx_write_one(index, stmt, status) != 0)
-					return -1;
-				continue;
-			}
-			stmt = vy_stmt_dup_lsregion(stmt, allocator, lsn);
-			if (stmt == NULL)
-				return -1;
-			/*
-			 * Rmemeber the current lsregion statement
-			 * for next indexes.
-			 */
-			if (type == IPROTO_DELETE) {
-				replace = NULL;
-				delete = stmt;
-			} else {
-				assert(type == IPROTO_REPLACE);
-				delete = NULL;
-				replace = stmt;
-			}
-			if (vy_tx_write(index, stmt, status) != 0)
-				return -1;
-			write_count++;
-			continue;
+			replace = NULL;
+			delete = NULL;
 		}
 		assert(index->space->def.id == current_space_id);
-		assert(prev_index_id <= index->key_def->iid);
-		if (type == IPROTO_DELETE) {
-			/*
-			 * 'delete' statement can be NULL, if the
-			 * original txn_stmt has
-			 * UPDATE/UPSERT/REPLACE type and the
-			 * primary index contains only REPLACE,
-			 * but in the secondary indexes we must
-			 * delete the old statement before insert
-			 * the new one, so in some secondary
-			 * indexes we have DELETE + REPLACE in
-			 * contrast to the primary index.
-			 */
-			if (delete == NULL) {
-				delete = vy_stmt_dup_lsregion(stmt, allocator,
-							      lsn);
-				if (delete == NULL)
-					return -1;
-			}
-			stmt = delete;
-		} else {
-			assert(type == IPROTO_REPLACE);
-			assert(replace != NULL);
-			stmt = replace;
-		}
-		if (vy_tx_write(index, stmt, status) != 0)
+		/*
+		 * In secondary indexes only REPLACE and DELETE
+		 * can be wrote.
+		 */
+		const struct tuple **region_stmt =
+			(type == IPROTO_DELETE) ? &delete : &replace;
+		if (vy_tx_write(index, stmt, region_stmt, status) != 0)
 			return -1;
 		write_count++;
-		prev_index_id = index->key_def->iid;
 	}
 
 	uint32_t count = 0;
@@ -7590,10 +7491,9 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	struct xrow_header xrow;
 	if (xrow_header_decode(&xrow, &data, data_end) != 0)
 		return NULL;
-	if (xrow.type != IPROTO_UPSERT)
-		return vy_stmt_decode(&xrow, format, key_def);
-	else
-		return vy_stmt_decode(&xrow, upsert_format, key_def);
+	struct tuple_format *format_to_use = (xrow.type == IPROTO_UPSERT)
+		? upsert_format : format;
+	return vy_stmt_decode(&xrow, format_to_use, key_def);
 }
 
 /**
@@ -10178,13 +10078,12 @@ vy_squash_process(struct vy_squash *squash)
 
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
-	struct lsregion *allocator = &env->allocator;
 	struct key_def *key_def = index->key_def;
 	/* Upserts enabled only in the primary index. */
 	assert(key_def->iid == 0);
 
 	struct vy_read_iterator itr;
-	int64_t lsn = INT64_MAX;
+	const int64_t lsn = INT64_MAX;
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
 			      squash->stmt, &lsn, false);
 	struct tuple *result;
@@ -10245,12 +10144,9 @@ vy_squash_process(struct vy_squash *squash)
 	 * and adjust the quota.
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
-	lsn = env->xm->lsn;
-	struct tuple *stmt = vy_stmt_dup_lsregion(result, allocator, lsn);
+	const struct tuple *region_stmt = NULL;
+	rc = vy_range_set(range, result, &region_stmt);
 	tuple_unref(result);
-	if (stmt == NULL)
-		return -1;
-	rc = vy_range_set(range, stmt);
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
 	if (rc == 0)
