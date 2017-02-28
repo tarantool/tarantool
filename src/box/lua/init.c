@@ -103,10 +103,23 @@ lbox_snapshot(struct lua_State *L)
 	return luaT_error(L);
 }
 
+static int
+lbox_gc(struct lua_State *L)
+{
+	int64_t lsn = luaL_checkint64(L, 1);
+	box_gc(lsn);
+	return 0;
+}
+
 static const struct luaL_reg boxlib[] = {
 	{"commit", lbox_commit},
 	{"rollback", lbox_rollback},
 	{"snapshot", lbox_snapshot},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg boxlib_internal[] = {
+	{"gc", lbox_gc},
 	{NULL, NULL}
 };
 
@@ -117,6 +130,9 @@ box_lua_init(struct lua_State *L)
 {
 	/* Use luaL_register() to set _G.box */
 	luaL_register(L, "box", boxlib);
+	lua_pop(L, 1);
+
+	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 
 	box_lua_error_init(L);

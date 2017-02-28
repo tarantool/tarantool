@@ -321,6 +321,8 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
 			  vclock, wal_max_rows, wal_max_size);
 
+	xdir_scan_xc(&writer->wal_dir);
+
 	wal = writer;
 }
 
@@ -401,6 +403,32 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 	fiber_set_cancellable(true);
 }
 
+struct wal_gc_msg: public cbus_call_msg
+{
+	int64_t lsn;
+};
+
+static int
+wal_collect_garbage_f(struct cbus_call_msg *data)
+{
+	int64_t lsn = ((struct wal_gc_msg *)data)->lsn;
+	xdir_collect_garbage(&wal->wal_dir, lsn);
+	return 0;
+}
+
+void
+wal_collect_garbage(int64_t lsn)
+{
+	if (wal == NULL)
+		return;
+	struct wal_gc_msg msg;
+	msg.lsn = lsn;
+	bool cancellable = fiber_set_cancellable(false);
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+}
+
 /**
  * If there is no current WAL, try to open it, and close the
  * previous WAL. We close the previous WAL only after opening
@@ -437,11 +465,22 @@ wal_opt_rotate(struct wal_writer *writer)
 	if (writer->is_active)
 		return 0;
 
-	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
-			     &writer->vclock) != 0) {
+	struct vclock *vclock = (struct vclock *)malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		diag_set(OutOfMemory, sizeof(*vclock),
+			 "malloc", "struct vclock");
 		error_log(diag_last_error(diag_get()));
 		return -1;
 	}
+	vclock_copy(vclock, &writer->vclock);
+
+	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
+			     &writer->vclock) != 0) {
+		error_log(diag_last_error(diag_get()));
+		free(vclock);
+		return -1;
+	}
+	xdir_add_vclock(&writer->wal_dir, vclock);
 	writer->is_active = true;
 
 	return 0;

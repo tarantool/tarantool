@@ -99,6 +99,12 @@ extern uint32_t snapshot_version;
 int box_snapshot(void);
 
 /**
+ * Remove files that are not needed to recover
+ * from snapshot with @lsn or newer.
+ */
+void box_gc(int64_t lsn);
+
+/**
  * Spit out some basic module status (master/slave, etc.
  */
 const char *box_status(void);

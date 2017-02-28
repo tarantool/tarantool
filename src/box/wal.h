@@ -115,6 +115,13 @@ void
 wal_checkpoint(struct vclock *vclock, bool rotate);
 
 /**
+ * Remove WAL files that are not needed to recover
+ * from snapshot with @lsn or newer.
+ */
+void
+wal_collect_garbage(int64_t lsn);
+
+/**
  * Write xrows to the metadata log.
  */
 int

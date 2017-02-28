@@ -142,6 +142,12 @@ Engine::abortCheckpoint()
 }
 
 void
+Engine::collectGarbage(int64_t lsn)
+{
+	(void) lsn;
+}
+
+void
 Engine::join(struct xstream *stream)
 {
 	(void) stream;
@@ -339,7 +345,6 @@ engine_commit_checkpoint(struct vclock *vclock)
 	engine_foreach(engine) {
 		engine->commitCheckpoint(vclock);
 	}
-	xctl_collect_garbage(vclock_sum(vclock));
 	return 0;
 }
 
@@ -350,6 +355,14 @@ engine_abort_checkpoint()
 	/* rollback snapshot creation */
 	engine_foreach(engine)
 		engine->abortCheckpoint();
+}
+
+void
+engine_collect_garbage(int64_t lsn)
+{
+	Engine *engine;
+	engine_foreach(engine)
+		engine->collectGarbage(lsn);
 }
 
 void

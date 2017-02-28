@@ -102,51 +102,12 @@ local function process(self)
 
     -- reload snap list after snapshot
     snaps = fio.glob(fio.pathjoin(box.cfg.memtx_dir, '*.snap'))
-    local xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
-    if xlogs == nil then
-        log.error("can't read wal_dir %s: %s", box.cfg.wal_dir,
-                  errno.strerror())
-        return
-    end
 
-    while #snaps > self.checkpoint_count do
-        local rm = snaps[1]
-        table.remove(snaps, 1)
-
-        log.info("removing old snapshot %s", rm)
-        if not fio.unlink(rm) then
-            log.error("error while removing %s: %s",
-                      rm, errno.strerror())
-            return
-        end
-    end
-
-
-    local snapno = fio.basename(snaps[1], '.snap')
-
-    while #xlogs > 0 do
-        if #xlogs < 2 then
-            break
-        end
-
-        if fio.basename(xlogs[1], '.xlog') > snapno then
-            break
-        end
-
-        if fio.basename(xlogs[2], '.xlog') > snapno then
-            break
-        end
-
-
-        local rm = xlogs[1]
-        table.remove(xlogs, 1)
-        log.info("removing old xlog %s", rm)
-
-        if not fio.unlink(rm) then
-            log.error("error while removing %s: %s",
-                      rm, errno.strerror())
-            return
-        end
+    -- delete all but most recent @checkpoint_count snapshots
+    local oldest_snap = snaps[#snaps - self.checkpoint_count + 1]
+    if oldest_snap ~= nil then
+        local lsn = fio.basename(oldest_snap, '.snap')
+        box.internal.gc(tonumber(lsn))
     end
 end
 

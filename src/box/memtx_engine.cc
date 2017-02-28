@@ -32,6 +32,7 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
+#include "coeio.h"
 #include "coeio_file.h"
 #include "scoped_guard.h"
 
@@ -830,6 +831,21 @@ MemtxEngine::abortCheckpoint()
 
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
+}
+
+static ssize_t
+memtx_collect_garbage_f(va_list ap)
+{
+	struct xdir *dir = va_arg(ap, struct xdir *);
+	int64_t lsn = va_arg(ap, int64_t);
+	xdir_collect_garbage(dir, lsn);
+	return 0;
+}
+
+void
+MemtxEngine::collectGarbage(int64_t lsn)
+{
+	coio_call(memtx_collect_garbage_f, &m_snap_dir, lsn);
 }
 
 /** Used to pass arguments to memtx_initial_join_f */

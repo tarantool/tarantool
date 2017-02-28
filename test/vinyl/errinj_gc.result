@@ -35,18 +35,21 @@ function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_co
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 ---
 ...
+function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+---
+...
 --
--- Check that on snapshot we retry to delete files left
+-- Check that gc retries to delete files left
 -- from compacted runs.
 --
 errinj.set('ERRINJ_VY_GC', true)
 ---
 - ok
 ...
-s:insert{12345, 'abcdef'} box.snapshot() -- dump
+s:insert{12345, 'abcdef'} snapshot() -- dump
 ---
 ...
-s:insert{67890, 'ghijkl'} box.snapshot() -- dump + compaction
+s:insert{67890, 'ghijkl'} snapshot() -- dump + compaction
 ---
 ...
 while run_count() > 1 do fiber.sleep(0.01) end -- wait for compaction
@@ -56,7 +59,7 @@ file_count()
 ---
 - 6
 ...
-temp:auto_increment{} box.snapshot()
+temp:auto_increment{} snapshot()
 ---
 ...
 file_count()
@@ -67,7 +70,7 @@ errinj.set('ERRINJ_VY_GC', false)
 ---
 - ok
 ...
-temp:auto_increment{} box.snapshot()
+temp:auto_increment{} snapshot()
 ---
 ...
 file_count()
@@ -75,14 +78,14 @@ file_count()
 - 2
 ...
 --
--- Check that on snapshot we retry to delete files left
+-- Check that gc retries to delete files left
 -- from dropped indexes.
 --
 errinj.set('ERRINJ_VY_GC', true)
 ---
 - ok
 ...
-s:drop() box.snapshot()
+s:drop() snapshot()
 ---
 ...
 file_count()
@@ -93,7 +96,7 @@ errinj.set('ERRINJ_VY_GC', false)
 ---
 - ok
 ...
-temp:auto_increment{} box.snapshot()
+temp:auto_increment{} snapshot()
 ---
 ...
 file_count()
@@ -116,7 +119,7 @@ _ = s:create_index('pk', {path=path, run_count_per_level=1})
 if not path then path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id)) end
 ---
 ...
-s:insert{100, '12345'} box.snapshot() -- dump
+s:insert{100, '12345'} snapshot() -- dump
 ---
 ...
 file_count()
@@ -131,7 +134,7 @@ errinj.set('ERRINJ_VY_TASK_COMPLETE', true)
 ---
 - ok
 ...
-s:insert{200, '67890'} box.snapshot() -- run file created, but dump fails
+s:insert{200, '67890'} snapshot() -- run file created, but dump fails
 ---
 - error: Error injection 'vinyl task completion'
 ...
@@ -161,6 +164,9 @@ if not path then path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 ---
 ...
+function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+---
+...
 file_count()
 ---
 - 2
@@ -173,7 +179,7 @@ s:select()
 --
 -- Cleanup.
 --
-s:drop() box.snapshot()
+s:drop() snapshot()
 ---
 ...
 file_count()

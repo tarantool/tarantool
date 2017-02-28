@@ -614,6 +614,25 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 	return filename;
 }
 
+void
+xdir_collect_garbage(struct xdir *dir, int64_t signature)
+{
+	struct vclock *it = vclockset_first(&dir->index);
+	while (it != NULL && vclock_sum(it) < signature) {
+		struct vclock *next = vclockset_next(&dir->index, it);
+		char *filename = xdir_format_filename(dir, vclock_sum(it),
+						      NONE);
+		say_info("removing %s", filename);
+		if (unlink(filename) < 0 && errno != ENOENT) {
+			say_syserror("error while removing %s", filename);
+		} else {
+			vclockset_remove(&dir->index, it);
+			free(it);
+		}
+		it = next;
+	}
+}
+
 /* }}} */
 
 

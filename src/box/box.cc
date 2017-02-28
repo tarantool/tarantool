@@ -1717,6 +1717,14 @@ end:
 	return rc;
 }
 
+void
+box_gc(int64_t lsn)
+{
+	xctl_collect_garbage(lsn);
+	wal_collect_garbage(lsn);
+	engine_collect_garbage(lsn);
+}
+
 const char *
 box_status(void)
 {
