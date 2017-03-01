@@ -1311,8 +1311,6 @@ box_free(void)
 	if (recovery) {
 		recovery_exit(recovery);
 		recovery = NULL;
-		if (wal)
-			wal_writer_stop();
 	}
 	/*
 	 * See gh-584 "box_free() is called even if box is not
@@ -1328,6 +1326,7 @@ box_free(void)
 		port_free();
 #endif
 		engine_shutdown();
+		wal_thread_stop();
 	}
 }
 
@@ -1517,6 +1516,7 @@ box_cfg_xc(void)
 	cluster_init();
 	port_init();
 	iproto_init();
+	wal_thread_start();
 
 	title("loading");
 
@@ -1622,8 +1622,8 @@ box_cfg_xc(void)
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_mode != WAL_NONE) {
-		wal_writer_start(wal_mode, cfg_gets("wal_dir"), &SERVER_UUID,
-				 &recovery->vclock, rows_per_wal);
+		wal_init(wal_mode, cfg_gets("wal_dir"), &SERVER_UUID,
+			 &recovery->vclock, rows_per_wal);
 	}
 
 	rmean_cleanup(rmean_box);
