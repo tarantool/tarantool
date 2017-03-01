@@ -662,9 +662,9 @@ wal_write(struct wal_writer *writer, struct wal_request *req)
 }
 
 int
-wal_set_watcher(struct wal_writer *writer, struct wal_watcher *watcher,
-		struct ev_async *async)
+wal_set_watcher(struct wal_watcher *watcher, struct ev_async *async)
 {
+	struct wal_writer *writer = wal;
 
 	if (writer == NULL)
 		return -1;
@@ -678,8 +678,9 @@ wal_set_watcher(struct wal_writer *writer, struct wal_watcher *watcher,
 }
 
 void
-wal_clear_watcher(struct wal_writer *writer, struct wal_watcher *watcher)
+wal_clear_watcher(struct wal_watcher *watcher)
 {
+	struct wal_writer *writer = wal;
 	if (writer == NULL)
 		return;
 

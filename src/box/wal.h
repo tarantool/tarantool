@@ -92,11 +92,10 @@ struct wal_watcher
  * Fails (-1) if recovery is NULL or lacking a WAL writer.
  */
 int
-wal_set_watcher(struct wal_writer *, struct wal_watcher *,
-		struct ev_async *);
+wal_set_watcher(struct wal_watcher *, struct ev_async *);
 
 void
-wal_clear_watcher(struct wal_writer *, struct wal_watcher *);
+wal_clear_watcher(struct wal_watcher *);
 
 void
 wal_atfork();
