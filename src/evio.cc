@@ -40,8 +40,6 @@
 
 #include <trivia/util.h>
 
-#define BIND_RETRY_DELAY 0.1
-
 static void
 evio_setsockopt_server(int fd, int family, int type);
 
@@ -194,6 +192,10 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 	}
 }
 
+/*
+ * Check if the unix socket which we file to create exists and
+ * no one is listening on it. Unlink the file if it's the case.
+ */
 static bool
 evio_service_reuse_addr(struct evio_service *service)
 {
@@ -220,11 +222,10 @@ err:
 	return false;
 }
 
-/** Try to bind and listen on the configured port.
+/**
+ * Try to bind on the configured port.
  *
  * Throws an exception if error.
- * Returns -1 if the address is already in use, and one
- * needs to retry binding.
  */
 static int
 evio_service_bind_addr(struct evio_service *service)
@@ -243,31 +244,81 @@ evio_service_bind_addr(struct evio_service *service)
 		assert(errno == EADDRINUSE);
 		if (!evio_service_reuse_addr(service) ||
 			sio_bind(fd, &service->addr, service->addr_len)) {
-			return -1;
+			return 1;
 		}
-	}
-
-	if (sio_listen(fd)) {
-		return -1;
 	}
 
 	say_info("%s: bound to %s", evio_service_name(service),
 		 sio_strfaddr(&service->addr, service->addr_len));
 
-	/* Invoke on_bind callback if it is set. */
-	if (service->on_bind)
-		service->on_bind(service->on_bind_param);
-
 	/* Register the socket in the event loop. */
 	ev_io_set(&service->ev, fd, EV_READ);
-	ev_io_start(service->loop, &service->ev);
+
 	fd_guard.is_active = false;
 	return 0;
 }
 
-static int
-evio_service_bind_and_listen(struct evio_service *service)
+/**
+ * Listen on bounded port.
+ *
+ * @retval 0 for success
+ */
+void
+evio_service_listen(struct evio_service *service)
 {
+	say_debug("%s: listening on %s...", evio_service_name(service),
+		  sio_strfaddr(&service->addr, service->addr_len));
+
+	int fd = service->ev.fd;
+	if (sio_listen(fd)) {
+		/* raise for addr in use to */
+		tnt_raise(SocketError, fd, "listen");
+	}
+	ev_io_start(service->loop, &service->ev);
+}
+
+void
+evio_service_init(ev_loop *loop,
+		  struct evio_service *service, const char *name,
+		  void (*on_accept)(struct evio_service *, int,
+				    struct sockaddr *, socklen_t),
+		  void *on_accept_param)
+{
+	memset(service, 0, sizeof(struct evio_service));
+	snprintf(service->name, sizeof(service->name), "%s", name);
+
+	service->loop = loop;
+
+	service->on_accept = on_accept;
+	service->on_accept_param = on_accept_param;
+	/*
+	 * Initialize libev objects to be able to detect if they
+	 * are active or not in evio_service_stop().
+	 */
+	ev_init(&service->ev, evio_service_accept_cb);
+	ev_io_set(&service->ev, -1, 0);
+	service->ev.data = service;
+}
+
+/**
+ * Try to bind.
+ */
+int
+evio_service_bind(struct evio_service *service, const char *uri)
+{
+	struct uri u;
+	if (uri_parse(&u, uri) || u.service == NULL)
+		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
+
+	snprintf(service->serv, sizeof(service->serv), "%.*s",
+		 (int) u.service_len, u.service);
+	if (u.host != NULL && strncmp(u.host, "*", u.host_len) != 0) {
+		snprintf(service->host, sizeof(service->host), "%.*s",
+			(int) u.host_len, u.host);
+	} /* else { service->host[0] = '\0'; } */
+
+	assert(! ev_is_active(&service->ev));
+
 	if (strcmp(service->host, URI_HOST_UNIX) == 0) {
 		/* UNIX domain socket */
 		struct sockaddr_un *un = (struct sockaddr_un *) &service->addr;
@@ -304,84 +355,8 @@ evio_service_bind_and_listen(struct evio_service *service)
 			/* ignore */
 		}
 	}
-
 	tnt_raise(SocketError, -1, "%s: failed to bind",
 		  evio_service_name(service));
-}
-
-/** A callback invoked by libev when sleep timer expires.
- *
- * Retry binding. On success, stop the timer. If the port
- * is still in use, pause again.
- */
-static void
-evio_service_timer_cb(ev_loop *loop, ev_timer *watcher, int /* revents */)
-{
-	struct evio_service *service = (struct evio_service *) watcher->data;
-	assert(! ev_is_active(&service->ev));
-
-	if (evio_service_bind_and_listen(service) == 0)
-		ev_timer_stop(loop, watcher);
-}
-
-void
-evio_service_init(ev_loop *loop,
-		  struct evio_service *service, const char *name,
-		  void (*on_accept)(struct evio_service *, int,
-				    struct sockaddr *, socklen_t),
-		  void *on_accept_param)
-{
-	memset(service, 0, sizeof(struct evio_service));
-	snprintf(service->name, sizeof(service->name), "%s", name);
-
-	service->loop = loop;
-
-	service->on_accept = on_accept;
-	service->on_accept_param = on_accept_param;
-	/*
-	 * Initialize libev objects to be able to detect if they
-	 * are active or not in evio_service_stop().
-	 */
-	ev_init(&service->ev, evio_service_accept_cb);
-	ev_init(&service->timer, evio_service_timer_cb);
-	service->timer.data = service->ev.data = service;
-}
-
-/**
- * Try to bind and listen. If the port is in use,
- * say a warning, and start the timer which will retry
- * binding periodically.
- */
-void
-evio_service_start(struct evio_service *service, const char *uri)
-{
-	struct uri u;
-	if (uri_parse(&u, uri) || u.service == NULL)
-		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
-
-	snprintf(service->serv, sizeof(service->serv), "%.*s",
-		 (int) u.service_len, u.service);
-	if (u.host != NULL && strncmp(u.host, "*", u.host_len) != 0) {
-		snprintf(service->host, sizeof(service->host), "%.*s",
-			(int) u.host_len, u.host);
-	} /* else { service->host[0] = '\0'; } */
-
-	assert(! ev_is_active(&service->ev));
-
-	say_info("%s: started", evio_service_name(service));
-
-	if (evio_service_bind_and_listen(service)) {
-		/* Try again after a delay. */
-		say_warn("%s: %s is already in use, will "
-			 "retry binding after %lf seconds.",
-			 evio_service_name(service),
-			 sio_strfaddr(&service->addr, service->addr_len),
-			 BIND_RETRY_DELAY);
-
-		ev_timer_set(&service->timer,
-			     BIND_RETRY_DELAY, BIND_RETRY_DELAY);
-		ev_timer_start(service->loop, &service->timer);
-	}
 }
 
 /** It's safe to stop a service which is not started yet. */
@@ -390,11 +365,13 @@ evio_service_stop(struct evio_service *service)
 {
 	say_info("%s: stopped", evio_service_name(service));
 
-	if (! ev_is_active(&service->ev)) {
-		ev_timer_stop(service->loop, &service->timer);
-	} else {
+	if (ev_is_active(&service->ev)) {
 		ev_io_stop(service->loop, &service->ev);
+	}
+
+	if (service->ev.fd >= 0) {
 		close(service->ev.fd);
+		ev_io_set(&service->ev, -1, 0);
 		if (service->addr.sa_family == AF_UNIX) {
 			unlink(((struct sockaddr_un *) &service->addr)->sun_path);
 		}

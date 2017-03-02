@@ -34,6 +34,9 @@ void
 iproto_init();
 
 void
-iproto_set_listen(const char *uri);
+iproto_bind(const char *uri);
+
+void
+iproto_listen();
 
 #endif

@@ -53,7 +53,8 @@
  * struct evio_service *service;
  * service = malloc(sizeof(struct evio_service));
  * evio_service_init(service, ..., on_accept_cb, ...);
- * evio_service_start(service);
+ * evio_service_bind(service);
+ * evio_service_listen(service);
  * ...
  * evio_service_stop(service);
  * free(service);
@@ -76,12 +77,6 @@ struct evio_service
 	};
 	socklen_t addr_len;
 
-	/** A callback invoked upon a successful bind, optional.
-	 * If on_bind callback throws an exception, it's
-	 * service start is aborted, and exception is re-thrown.
-	 */
-	void (*on_bind)(void *);
-	void *on_bind_param;
 	/**
 	 * A callback invoked on every accepted client socket.
 	 * It's OK to throw an exception in the callback:
@@ -92,8 +87,6 @@ struct evio_service
 			  struct sockaddr *, socklen_t);
 	void *on_accept_param;
 
-	/** libev timer object for the bind retry delay. */
-	struct ev_timer timer;
 	/** libev io object for the acceptor socket. */
 	struct ev_io ev;
 	ev_loop *loop;
@@ -107,19 +100,17 @@ evio_service_init(ev_loop *loop,
 				    int, struct sockaddr *, socklen_t),
 		  void *on_accept_param);
 
-/** Set an optional callback to be invoked upon a successful bind. */
-static inline void
-evio_service_on_bind(struct evio_service *service,
-		     void (*on_bind)(void *),
-		     void *on_bind_param)
-{
-	service->on_bind = on_bind;
-	service->on_bind_param = on_bind_param;
-}
+/** Bind service to specified uri */
+int
+evio_service_bind(struct evio_service *service, const char *uri);
 
-/** Bind to the port and begin listening. */
+/**
+ * Listen on bounded socket
+ *
+ * @retval 0 for success
+ */
 void
-evio_service_start(struct evio_service *service, const char *uri);
+evio_service_listen(struct evio_service *service);
 
 /** If started, stop event flow and close the acceptor socket. */
 void
@@ -134,7 +125,7 @@ evio_close(ev_loop *loop, struct ev_io *evio);
 static inline bool
 evio_service_is_active(struct evio_service *service)
 {
-	return ev_is_active(&service->ev) || ev_is_active(&service->timer);
+	return service->ev.fd >= 0;
 }
 
 static inline bool

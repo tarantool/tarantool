@@ -968,7 +968,7 @@ iproto_init()
  * we need to bounce a couple of messages to and
  * from this thread.
  */
-struct iproto_set_listen_msg: public cmsg
+struct iproto_bind_msg: public cmsg
 {
 	/**
 	 * If there was an error setting the listen port,
@@ -985,44 +985,42 @@ struct iproto_set_listen_msg: public cmsg
 	 * bind.
 	 */
 	struct cmsg_notify wakeup;
+	/**
+	 * Return code for bind:
+	 * 0 - Ok,
+	 * 1 - busy,
+	 * -1 - an error
+	 */
+	int rc;
 };
 
-/**
- * The bind has finished, notify the caller.
- */
 static void
-iproto_on_bind(void *arg)
+iproto_do_bind(struct cmsg *m)
 {
-	cpipe_push(&tx_pipe, (struct cmsg *) arg);
-}
-
-static void
-iproto_do_set_listen(struct cmsg *m)
-{
-	struct iproto_set_listen_msg *msg =
-		(struct iproto_set_listen_msg *) m;
+	struct iproto_bind_msg *msg = (struct iproto_bind_msg *) m;
 	try {
 		if (evio_service_is_active(&binary))
 			evio_service_stop(&binary);
-
+		msg->rc = 0;
 		if (msg->uri != NULL) {
-			binary.on_bind = iproto_on_bind;
-			binary.on_bind_param = &msg->wakeup;
-			evio_service_start(&binary, msg->uri);
-		} else {
-			iproto_on_bind(&msg->wakeup);
+			msg->rc = evio_service_bind(&binary, msg->uri);
+			{
+			}
+			/* The bind has finished, notify the caller. */
 		}
+		cpipe_push(&tx_pipe, &msg->wakeup.base);
 	} catch (Exception *e) {
+		msg->rc = -1;
 		diag_move(&fiber()->diag, &msg->diag);
-		iproto_on_bind(&msg->wakeup);
+		cpipe_push(&tx_pipe, &msg->wakeup.base);
 	}
 }
 
 static void
-iproto_set_listen_msg_init(struct iproto_set_listen_msg *msg,
+iproto_bind_msg_init(struct iproto_bind_msg *msg,
 			    const char *uri)
 {
-	static cmsg_hop route[] = { { iproto_do_set_listen, NULL }, };
+	static cmsg_hop route[] = { { iproto_do_bind, NULL }, };
 	cmsg_init(msg, route);
 	msg->uri = uri;
 	diag_create(&msg->diag);
@@ -1031,7 +1029,7 @@ iproto_set_listen_msg_init(struct iproto_set_listen_msg *msg,
 }
 
 void
-iproto_set_listen(const char *uri)
+iproto_bind(const char *uri)
 {
 	/**
 	 * This is a tricky orchestration for something
@@ -1042,8 +1040,75 @@ iproto_set_listen(const char *uri)
 	 * uri, and another one, which will alert tx
 	 * thread when bind() on the new port is done.
 	 */
-	static struct iproto_set_listen_msg msg;
-	iproto_set_listen_msg_init(&msg, uri);
+	const double BIND_RETRY_DELAY = 0.1;
+	static struct iproto_bind_msg msg;
+	iproto_bind_msg_init(&msg, uri);
+
+	bool first_bind = true;
+	while (true) {
+		cpipe_push(&net_pipe, &msg);
+		/** Wait for the end of bind. */
+		fiber_yield();
+		if (msg.rc != 1)
+			break;
+		if (first_bind)
+			say_warn("%s: %s is already in use, "
+				 "will retry binding",
+				 "binary", msg.uri);
+//		first_try = false;
+		fiber_sleep(BIND_RETRY_DELAY);
+	}
+	if (msg.rc != 0) {
+		assert(!diag_is_empty(&msg.diag));
+		diag_move(&msg.diag, &fiber()->diag);
+		diag_raise();
+	}
+}
+
+struct iproto_listen_msg: public cmsg
+{
+	/**
+	 * If there was an error while listen port,
+	 * this will contain the error when the message
+	 * returns to the caller.
+	 */
+	struct diag diag;
+	/**
+	 * The way to tell the caller about the end of
+	 * bind.
+	 */
+	struct cmsg_notify wakeup;
+};
+
+static void
+iproto_do_listen(struct cmsg *m)
+{
+	struct iproto_listen_msg *msg =
+		(struct iproto_listen_msg *) m;
+	try {
+		if (evio_service_is_active(&binary))
+			evio_service_listen(&binary);
+	} catch (Exception *e) {
+		diag_move(&fiber()->diag, &msg->diag);
+	}
+	cpipe_push(&tx_pipe, &msg->wakeup.base);
+}
+
+static void
+iproto_listen_msg_init(struct iproto_listen_msg *msg)
+{
+	static cmsg_hop route[] = { { iproto_do_listen, NULL }, };
+	cmsg_init(msg, route);
+	diag_create(&msg->diag);
+
+	cmsg_notify_init(&msg->wakeup);
+}
+
+void
+iproto_listen()
+{
+	static struct iproto_listen_msg msg;
+	iproto_listen_msg_init(&msg);
 
 	cpipe_push(&net_pipe, &msg);
 	/** Wait for the end of bind. */
@@ -1052,6 +1117,7 @@ iproto_set_listen(const char *uri)
 		diag_move(&msg.diag, &fiber()->diag);
 		diag_raise();
 	}
+
 }
 
 /* vim: set foldmethod=marker */

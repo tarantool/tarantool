@@ -375,11 +375,17 @@ box_set_replication_source(void)
 }
 
 void
-box_set_listen(void)
+box_bind(void)
 {
 	const char *uri = cfg_gets("listen");
 	box_check_uri(uri, "listen");
-	iproto_set_listen(uri);
+	iproto_bind(uri);
+}
+
+void
+box_listen(void)
+{
+	iproto_listen();
 }
 
 /**
@@ -1010,6 +1016,8 @@ box_init(void)
 	session_init();
 
 	cluster_init();
+	port_init();
+	iproto_init();
 
 	title("loading");
 
@@ -1070,7 +1078,7 @@ box_init(void)
 
 	port_init();
 	iproto_init();
-	box_set_listen();
+	box_bind();
 
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
@@ -1085,6 +1093,7 @@ box_init(void)
 
 	/* Enter read-write mode. */
 	cluster_wait_for_id();
+	box_listen();
 
 	title("running");
 	say_info("ready to accept requests");
