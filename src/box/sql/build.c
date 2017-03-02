@@ -4517,13 +4517,21 @@ void sqlite3Reindex(Parse *pParse, Token *pName1, Token *pName2){
 KeyInfo *sqlite3KeyInfoOfIndex(Parse *pParse, Index *pIdx){
   int i;
   int nCol = pIdx->nColumn;
+  int nTableCol = pIdx->pTable->nCol;
   int nKey = pIdx->nKeyCol;
   KeyInfo *pKey;
   if( pParse->nErr ) return 0;
+  /*
+   * KeyInfo describes the index (i.e. the number of key columns,
+   * comparator options, and the number of columns beyond the key).
+   * Since Tarantool iterator yields the full tuple, we need a KeyInfo
+   * as wide as the table itself.  Otherwize, not enough slots
+   * for row parser cache are allocated in VdbeCursor object.
+   */
   if( pIdx->uniqNotNull ){
-    pKey = sqlite3KeyInfoAlloc(pParse->db, nKey, nCol-nKey);
+    pKey = sqlite3KeyInfoAlloc(pParse->db, nKey, nTableCol-nKey);
   }else{
-    pKey = sqlite3KeyInfoAlloc(pParse->db, nCol, 0);
+    pKey = sqlite3KeyInfoAlloc(pParse->db, nCol, nTableCol-nCol);
   }
   if( pKey ){
     assert( sqlite3KeyInfoIsWriteable(pKey) );
