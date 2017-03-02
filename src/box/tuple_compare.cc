@@ -115,22 +115,120 @@ mp_compare_integer(const char *field_a, const char *field_b)
 	}
 }
 
+#define EXP2_53 9007199254740992.0      /* 2.0 ^ 53 */
+#define EXP2_64 1.8446744073709552e+19  /* 2.0 ^ 64 */
+
+/*
+ * Compare LHS with RHS, return a value <0, 0 or >0 depending on the
+ * comparison result (strcmp-style).
+ * Normally, K==1. If K==-1, the result is inverted (as if LHS and RHS
+ * were swapped).
+ * K is needed to enable tail call optimization in Release build.
+ * Noinline attribute was added to avoid aggressive inlining which
+ * resulted in over 2Kb code size for mp_compare_number.
+ */
 static int
-mp_compare_number(const char *field_a, const char *field_b)
+cmp_double_uint64(double lhs, uint64_t rhs, int k)
+__attribute__((__noinline__));
+
+static int
+cmp_double_uint64(double lhs, uint64_t rhs, int k)
 {
-	enum mp_type a_type = mp_typeof(*field_a);
-	enum mp_type b_type = mp_typeof(*field_b);
-	assert(mp_classof(a_type) == MP_CLASS_NUMBER);
-	assert(mp_classof(b_type) == MP_CLASS_NUMBER);
-	if (a_type == MP_FLOAT || a_type == MP_DOUBLE ||
-	    b_type == MP_FLOAT || b_type == MP_DOUBLE) {
-		double a_val, b_val;
-		if (mp_read_double(&field_a, &a_val) != 0 ||
-		    mp_read_double(&field_b, &b_val) != 0)
-			unreachable();
-		return COMPARE_RESULT(a_val, b_val);
+	assert(k==1 || k==-1);
+	/*
+	 * IEEE double represents 2^N precisely.
+	 * The value below is 2^53.  If a double exceeds this threshold,
+	 * there's no fractional part. Moreover, the "next" float is
+	 * 2^53+2, i.e. there's not enough precision to encode even some
+	 * "odd" integers.
+	 * Note: ">=" is important, see next block.
+	 */
+	if (lhs >= EXP2_53) {
+		/*
+		 * The value below is 2^64.
+		 * Note: UINT64_MAX is 2^64-1, hence ">="
+		 */
+		if (lhs >= EXP2_64)
+			return k;
+		/* Within [2^53, 2^64) double->uint64_t is lossless. */
+		assert((double)(uint64_t)lhs == lhs);
+		return k*COMPARE_RESULT((uint64_t)lhs, rhs);
 	}
-	return mp_compare_integer(field_a, field_b);
+	/*
+	 * If RHS < 2^53, uint64_t->double is lossless.
+	 * Otherwize the value may get rounded.	 It's unspecified
+	 * whether it gets rounded up or down, i.e. the conversion may
+	 * yield 2^53 for a RHS > 2^53.
+	 * Since we've aready ensured that LHS < 2^53, the result is
+	 * still correct even if rounding happens.
+	 */
+	assert(lhs < EXP2_53);
+	assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
+	return k*COMPARE_RESULT(lhs, (double)rhs);
+}
+
+static int
+cmp_double_any_int(double lhs,
+		   const char *rhs, enum mp_type rhs_type, int k)
+{
+	if (rhs_type == MP_INT) {
+		int64_t v = mp_decode_int(&rhs);
+		if (v < 0) {
+			return cmp_double_uint64(
+				-lhs, (uint64_t)-v, -k
+			);
+		}
+		return cmp_double_uint64(lhs, (uint64_t)v, k);
+	}
+	assert(rhs_type == MP_UINT);
+	return cmp_double_uint64(lhs, mp_decode_uint(&rhs), k);
+}
+
+static int
+cmp_double_any_number(double lhs,
+		      const char *rhs, enum mp_type rhs_type, int k)
+{
+	double v;
+	if (rhs_type == MP_FLOAT)
+		v = mp_decode_float(&rhs);
+	else if (rhs_type == MP_DOUBLE)
+		v = mp_decode_double(&rhs);
+	else
+		return cmp_double_any_int(lhs, rhs, rhs_type, k);
+	return k*COMPARE_RESULT(lhs, v);
+}
+
+static int
+mp_compare_number(const char *lhs, const char *rhs)
+{
+	enum mp_type lhs_type = mp_typeof(*lhs);
+	enum mp_type rhs_type = mp_typeof(*rhs);
+	assert(mp_classof(lhs_type) == MP_CLASS_NUMBER);
+	assert(mp_classof(rhs_type) == MP_CLASS_NUMBER);
+
+	if (rhs_type == MP_FLOAT) {
+		return cmp_double_any_number(
+			mp_decode_float(&rhs), lhs, lhs_type, -1
+		);
+	}
+	if (rhs_type == MP_DOUBLE) {
+		return cmp_double_any_number(
+			mp_decode_double(&rhs), lhs, lhs_type, -1
+		);
+	}
+	assert(rhs_type == MP_INT || rhs_type == MP_UINT);
+	if (lhs_type == MP_FLOAT) {
+		return cmp_double_any_int(
+			mp_decode_float(&lhs), rhs, rhs_type, 1
+		);
+	}
+	if (lhs_type == MP_DOUBLE) {
+		return cmp_double_any_int(
+			mp_decode_double(&lhs), rhs, rhs_type, 1
+		);
+	}
+	assert(lhs_type == MP_INT || lhs_type == MP_UINT);
+	return mp_compare_integer(lhs, rhs);
 }
 
 static inline int
