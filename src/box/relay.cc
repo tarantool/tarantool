@@ -35,7 +35,7 @@
 #include "recovery.h"
 #include "iproto_constants.h"
 #include "engine.h"
-#include "cluster.h"
+#include "replication.h"
 #include "vclock.h"
 #include "xrow.h"
 #include "coio.h"
@@ -207,12 +207,12 @@ relay_subscribe_f(va_list ap)
 
 /** Replication acceptor fiber handler. */
 void
-relay_subscribe(int fd, uint64_t sync, struct server *server,
+relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 		struct vclock *replica_clock)
 {
-	assert(server->id != SERVER_ID_NIL);
-	/* Don't allow multiple relays for the same server */
-	if (server->relay != NULL) {
+	assert(replica->id != REPLICA_ID_NIL);
+	/* Don't allow multiple relays for the same replica */
+	if (replica->relay != NULL) {
 		tnt_raise(ClientError, ER_CFG, "replication_source",
 			  "duplicate connection with the same replica UUID");
 	}
@@ -222,12 +222,12 @@ relay_subscribe(int fd, uint64_t sync, struct server *server,
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("panic_on_wal_error"),
 			       replica_clock);
-	relay.r->server_id = server->id;
+	relay.r->replica_id = replica->id;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
-	server_set_relay(server, &relay);
+	replica_set_relay(replica, &relay);
 
 	auto scope_guard = make_scoped_guard([&]{
-		server_clear_relay(server);
+		replica_clear_relay(replica);
 		recovery_delete(relay.r);
 		relay_destroy(&relay);
 	});
@@ -264,7 +264,7 @@ relay_send_final_join_row(struct xstream *stream, struct xrow_header *row)
 	assert(iproto_type_is_dml(row->type));
 	struct recovery *r = relay->r;
 
-	vclock_follow(&r->vclock, row->server_id, row->lsn);
+	vclock_follow(&r->vclock, row->replica_id, row->lsn);
 
 	relay_send(relay, row);
 	ERROR_INJECT(ERRINJ_RELAY,
@@ -284,10 +284,10 @@ relay_send_subscribe_row(struct xstream *stream, struct xrow_header *packet)
 
 	/*
 	 * We're feeding a WAL, thus responding to SUBSCRIBE request.
-	 * In that case, only send a row if it is not from the same server
+	 * In that case, only send a row if it is not from the same replica
 	 * (i.e. don't send replica's own rows back).
 	 */
-	if (packet->server_id != r->server_id) {
+	if (packet->replica_id != r->replica_id) {
 		relay_send(relay, packet);
 		ERROR_INJECT(ERRINJ_RELAY,
 		{
@@ -299,5 +299,5 @@ relay_send_subscribe_row(struct xstream *stream, struct xrow_header *packet)
 	 * updates local vclock. In relay mode we have to update
 	 * it here.
 	 */
-	vclock_follow(&r->vclock, packet->server_id, packet->lsn);
+	vclock_follow(&r->vclock, packet->replica_id, packet->lsn);
 }

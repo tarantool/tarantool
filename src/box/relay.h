@@ -35,7 +35,7 @@
 #include "vclock.h"
 #include "xstream.h"
 
-struct server;
+struct replica;
 struct tt_uuid;
 
 /** State of a replication relay. */
@@ -77,7 +77,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
  * @return none.
  */
 void
-relay_subscribe(int fd, uint64_t sync, struct server *server,
-		struct vclock *server_vclock);
+relay_subscribe(int fd, uint64_t sync, struct replica *replica,
+		struct vclock *replica_vclock);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */

@@ -35,7 +35,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
+		/* 0x02 */	MP_UINT,   /* IPROTO_REPLICA_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 		/* 0x05 */	MP_UINT,   /* IPROTO_SCHEMA_ID */
@@ -81,7 +81,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
-	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
+	/* 0x24 */	MP_STR, /* IPROTO_INSTANCE_UUID */
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
@@ -123,7 +123,7 @@ const uint64_t iproto_body_key_map[IPROTO_CALL + 1] = {
 const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
-	"server_id",          /* 0x02 */
+	"replica_id",       /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
 	"",                 /* 0x05 */
@@ -157,7 +157,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"server UUID",      /* 0x24 */
+	"instance UUID",    /* 0x24 */
 	"cluster UUID",     /* 0x25 */
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */

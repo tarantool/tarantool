@@ -42,7 +42,7 @@
 #include "xrow.h"
 #include "xstream.h"
 #include "bootstrap.h"
-#include "cluster.h"
+#include "replication.h"
 #include "schema.h"
 
 /** For all memory used by all indexes.
@@ -131,7 +131,7 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 			 alloc_factor);
 
 	flags = ENGINE_CAN_BE_TEMPORARY;
-	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_UUID);
+	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	m_snap_dir.panic_if_error = panic_on_snap_error;
 	xdir_scan_xc(&m_snap_dir);
 }
@@ -171,7 +171,7 @@ MemtxEngine::recoverSnapshot()
 	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
 	xlog_cursor_open_xc(&cursor, filename);
-	SERVER_UUID = cursor.meta.server_uuid;
+	INSTANCE_UUID = cursor.meta.instance_uuid;
 	auto reader_guard = make_scoped_guard([&]{
 		xlog_cursor_close(&cursor, false);
 	});
@@ -603,7 +603,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	}
 
 	row->tm = last;
-	row->server_id = 0;
+	row->replica_id = 0;
 	/**
 	 * Rows in snapshot are numbered from 1 to %rows.
 	 * This makes streaming such rows to a replica or
@@ -674,7 +674,7 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_UUID);
+	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
 	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
@@ -859,10 +859,10 @@ memtx_initial_join_f(va_list ap)
 
 	struct xdir dir;
 	/*
-	 * snap_dirname and SERVER_UUID don't change after start,
+	 * snap_dirname and INSTANCE_UUID don't change after start,
 	 * safe to use in another thread.
 	 */
-	xdir_create(&dir, snap_dirname, SNAP, &SERVER_UUID);
+	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	auto guard = make_scoped_guard([&]{
 		xdir_destroy(&dir);
 	});

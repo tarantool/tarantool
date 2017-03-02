@@ -41,7 +41,7 @@
 #include "recovery.h"
 #include "wal.h"
 #include "xrow.h"
-#include "box/cluster.h"
+#include "replication.h"
 #include "iproto_constants.h"
 #include "version.h"
 #include "trigger.h"
@@ -124,7 +124,7 @@ applier_connect(struct applier *applier)
 	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
 	applier->last_row_time = ev_now(loop());
 
-	/* Decode server version and name from greeting */
+	/* Decode instance version and name from greeting */
 	struct greeting greeting;
 	if (greeting_decode(greetingbuf, &greeting) != 0)
 		tnt_raise(LoggedError, ER_PROTOCOL, "Invalid greeting");
@@ -136,11 +136,11 @@ applier_connect(struct applier *applier)
 
 	/*
 	 * Forbid changing UUID dynamically on connect because
-	 * applier is registered by UUID in cluster.h.
+	 * applier is registered by UUID in the replica set.
 	 */
 	if (!tt_uuid_is_nil(&applier->uuid) &&
 	    !tt_uuid_is_equal(&applier->uuid, &greeting.uuid)) {
-		Exception *e = tnt_error(ClientError, ER_SERVER_UUID_MISMATCH,
+		Exception *e = tnt_error(ClientError, ER_INSTANCE_UUID_MISMATCH,
 					 tt_uuid_str(&applier->uuid),
 					 tt_uuid_str(&greeting.uuid));
 		applier_log_error(applier, e);
@@ -155,7 +155,7 @@ applier_connect(struct applier *applier)
 			 sio_strfaddr(&applier->addr, applier->addr_len));
 	}
 
-	/* Save the remote server version and UUID on connect. */
+	/* Save the remote instance version and UUID on connect. */
 	applier->uuid = greeting.uuid;
 	applier->version_id = greeting.version_id;
 
@@ -165,7 +165,7 @@ applier_connect(struct applier *applier)
 	applier_set_state(applier, APPLIER_CONNECTED);
 
 	/* Detect connection to itself */
-	if (tt_uuid_is_equal(&applier->uuid, &SERVER_UUID))
+	if (tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Perform authentication if user provided at least login */
@@ -190,7 +190,7 @@ applier_connect(struct applier *applier)
 }
 
 /**
- * Execute and process JOIN request (bootstrap the server).
+ * Execute and process JOIN request (bootstrap the instance).
  */
 static void
 applier_join(struct applier *applier)
@@ -199,7 +199,7 @@ applier_join(struct applier *applier)
 	struct ev_io *coio = &applier->io;
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
-	xrow_encode_join(&row, &SERVER_UUID);
+	xrow_encode_join(&row, &INSTANCE_UUID);
 	coio_write_xrow(coio, &row);
 
 	/**
@@ -293,7 +293,7 @@ applier_subscribe(struct applier *applier)
 
 	/* TODO: don't use struct recovery here */
 	struct recovery *r = ::recovery;
-	xrow_encode_subscribe(&row, &CLUSTER_UUID, &SERVER_UUID, &r->vclock);
+	xrow_encode_subscribe(&row, &REPLICASET_UUID, &INSTANCE_UUID, &r->vclock);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
 
@@ -311,24 +311,24 @@ applier_subscribe(struct applier *applier)
 
 		/*
 		 * Don't overwrite applier->vclock before performing
-		 * sanity checks for a valid server id.
+		 * sanity checks for a valid replica id.
 		 */
 		struct vclock vclock;
 		vclock_create(&vclock);
 		xrow_decode_vclock(&row, &vclock);
 
-		/* Forbid changing the server_id */
-		if (applier->id != 0 && applier->id != row.server_id) {
+		/* Forbid changing the replica_id */
+		if (applier->id != 0 && applier->id != row.replica_id) {
 			Exception *e = tnt_error(ClientError,
-						 ER_SERVER_ID_MISMATCH,
+						 ER_REPLICA_ID_MISMATCH,
 						 tt_uuid_str(&applier->uuid),
-						 applier->id, row.server_id);
+						 applier->id, row.replica_id);
 			applier_log_error(applier, e);
 			e->raise();
 		}
 
-		/* Save the received server_id and vclock */
-		applier->id = row.server_id;
+		/* Save the received replica id and vclock */
+		applier->id = row.replica_id;
 		/* Overwrite the last known vclock from SUBSCRIBE */
 		vclock_copy(&applier->vclock, &vclock);
 	}
@@ -378,7 +378,7 @@ applier_f(va_list ap)
 	while (!fiber_is_cancelled()) {
 		try {
 			applier_connect(applier);
-			if (tt_uuid_is_nil(&CLUSTER_UUID)) {
+			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
 				 * Execute JOIN if this is a bootstrap,
 				 * and there is no snapshot. The
@@ -396,7 +396,7 @@ applier_f(va_list ap)
 			return 0;
 		} catch (ClientError *e) {
 			if (e->errcode() == ER_CONNECTION_TO_SELF &&
-			    tt_uuid_is_equal(&applier->uuid, &SERVER_UUID)) {
+			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
 				/* Connection to itself, stop applier */
 				applier_disconnect(applier, APPLIER_OFF);
 				return 0;
@@ -429,7 +429,7 @@ applier_f(va_list ap)
 		 * uses global state inside the catch block.
 		 *
 		 * This could lead to incorrect exception processing
-		 * and crash the server.
+		 * and crash the program.
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
@@ -662,7 +662,7 @@ error:
 
 	/* ignore original error */
 	tnt_raise(ClientError, ER_CFG, "replication_source",
-		  "failed to connect to one or more servers");
+		  "failed to connect to one or more replicas");
 }
 
 void

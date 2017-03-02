@@ -43,7 +43,7 @@
 #include "box/applier.h"
 #include "box/recovery.h"
 #include "box/wal.h"
-#include "box/cluster.h"
+#include "box/replication.h"
 #include "main.h"
 #include "box/box.h"
 #include "lua/utils.h"
@@ -57,23 +57,23 @@ lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
 	lua_createtable(L, 0, vclock_size(vclock));
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server) {
-		lua_pushinteger(L, server.id);
-		luaL_pushuint64(L, server.lsn);
+	vclock_foreach(&it, replica) {
+		lua_pushinteger(L, replica.id);
+		luaL_pushuint64(L, replica.lsn);
 		lua_settable(L, -3);
 	}
 	luaL_setmaphint(L, -1); /* compact flow */
 }
 
 static void
-lbox_pushreplica(lua_State *L, struct server *server)
+lbox_pushreplica(lua_State *L, struct replica *replica)
 {
-	struct applier *applier = server->applier;
+	struct applier *applier = replica->applier;
 
 	lua_createtable(L, 0, 4);
 
 	lua_pushstring(L, "uuid");
-	lua_pushstring(L, tt_uuid_str(&server->uuid));
+	lua_pushstring(L, tt_uuid_str(&replica->uuid));
 	lua_settable(L, -3);
 
 	/* Get applier state in lower case */
@@ -120,14 +120,14 @@ lbox_info_replication(struct lua_State *L)
 	lua_setfield(L, -2, "__serialize");
 	lua_setmetatable(L, -2);
 
-	server_foreach(server) {
-		/* Applier hasn't received server_id yet */
-		if (server->id == SERVER_ID_NIL || server->applier == NULL)
+	replicaset_foreach(replica) {
+		/* Applier hasn't received replica id yet */
+		if (replica->id == REPLICA_ID_NIL || replica->applier == NULL)
 			continue;
 
-		lbox_pushreplica(L, server);
+		lbox_pushreplica(L, replica);
 
-		lua_rawseti(L, -2, server->id);
+		lua_rawseti(L, -2, replica->id);
 	}
 
 	return 1;
@@ -138,16 +138,16 @@ lbox_info_server(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, recovery->server_id);
+	lua_pushinteger(L, recovery->replica_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&SERVER_UUID), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	if (recovery->server_id != SERVER_ID_NIL && wal != NULL) {
+	if (recovery->replica_id != REPLICA_ID_NIL && wal != NULL) {
 		struct vclock vclock;
 		wal_checkpoint(&vclock, false);
-		luaL_pushint64(L, vclock_get(&vclock, recovery->server_id));
+		luaL_pushint64(L, vclock_get(&vclock, recovery->replica_id));
 	} else {
 		luaL_pushint64(L, -1);
 	}
@@ -198,7 +198,7 @@ lbox_info_cluster(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&CLUSTER_UUID), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&REPLICASET_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "signature");
 	luaL_pushint64(L, vclock_sum(&recovery->vclock));

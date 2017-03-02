@@ -67,7 +67,7 @@ add_library(box STATIC
     user.cc
     authentication.cc
     vclock.c
-    cluster.cc
+    replication.cc
     recovery.cc
     applier.cc
     relay.cc

@@ -42,7 +42,7 @@
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
-#include "cluster.h" /* for server_set_id() */
+#include "replication.h" /* for replica_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
 #include "memtx_tuple.h"
@@ -1064,7 +1064,7 @@ DropIndex::alter(struct alter_space *alter)
 	 * since it may have to reset handler->replace function,
 	 * so that:
 	 * - DML returns proper errors rather than crashes the
-	 *   server
+	 *   program
 	 * - when a new primary key is finally added, the space
 	 *   can be put back online properly.
 	 */
@@ -1447,7 +1447,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		/* @todo lock space metadata until commit. */
 		/*
 		 * dd_space_delete() can't fail, any such
-		 * failure would have to abort the server.
+		 * failure would have to abort the program.
 		 */
 		struct trigger *on_commit =
 				txn_alter_trigger_new(on_drop_space, NULL);
@@ -2082,15 +2082,15 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 					   new_tuple : old_tuple, 0);
 	if (strcmp(key, "cluster") == 0) {
 		if (new_tuple == NULL)
-			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
+			tnt_raise(ClientError, ER_REPLICASET_UUID_IS_RO);
 		tt_uuid uu;
 		tuple_field_uuid_xc(new_tuple, 1, &uu);
-		CLUSTER_UUID = uu;
+		REPLICASET_UUID = uu;
 	}
 }
 
 /**
- * A record with id of the new server has been synced to the
+ * A record with id of the new instance has been synced to the
  * write ahead log. Update the cluster configuration cache
  * with it.
  */
@@ -2105,9 +2105,9 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	if (new_tuple == NULL) {
 		struct tt_uuid old_uuid;
 		tuple_field_uuid_xc(stmt->old_tuple, 1, &old_uuid);
-		struct server *server = server_by_uuid(&old_uuid);
-		assert(server != NULL);
-		server_clear_id(server);
+		struct replica *replica = replica_by_uuid(&old_uuid);
+		assert(replica != NULL);
+		replica_clear_id(replica);
 		return;
 	} else if (old_tuple != NULL) {
 		return; /* nothing to change */
@@ -2116,15 +2116,15 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	uint32_t id = tuple_field_u32_xc(new_tuple, 0);
 	tt_uuid uuid;
 	tuple_field_uuid_xc(new_tuple, 1, &uuid);
-	struct server *server = server_by_uuid(&uuid);
-	if (server != NULL) {
-		server_set_id(server, id);
+	struct replica *replica = replica_by_uuid(&uuid);
+	if (replica != NULL) {
+		replica_set_id(replica, id);
 	} else {
 		try {
-			server = cluster_add_server(id, &uuid);
+			replica = replicaset_add(id, &uuid);
 			/* Can't throw exceptions from on_commit trigger */
 		} catch(Exception *e) {
-			panic("Can't register server: %s", e->errmsg);
+			panic("Can't register replica: %s", e->errmsg);
 		}
 	}
 }
@@ -2137,15 +2137,15 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
  * protocol.
  *
  * The trigger updates the cluster configuration cache
- * with uuid of the newly joined server.
+ * with uuid of the newly joined instance.
  *
  * During recovery, it acts the same way, loading identifiers
- * of all servers into the cache. Node globally unique
+ * of all instances into the cache. Instance globally unique
  * identifiers are used to keep track of cluster configuration,
- * so that a server that previously joined the cluster can
- * follow updates, and a server that belongs to a different
- * cluster can not by mistake join/follow another cluster
- * without first being reset (emptied).
+ * so that a replica that previously joined a replica set can
+ * follow updates, and a replica that belongs to a different
+ * replica set can not by mistake join/follow another replica
+ * set without first being reset (emptied).
  */
 static void
 on_replace_dd_cluster(struct trigger *trigger, void *event)
@@ -2158,29 +2158,29 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) {
 		/* Check fields */
-		uint32_t server_id = tuple_field_u32_xc(new_tuple, 0);
-		if (server_id_is_reserved(server_id))
-			tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
-				  (unsigned) server_id);
-		if (server_id >= VCLOCK_MAX)
-			tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-		tt_uuid server_uuid;
-		tuple_field_uuid_xc(new_tuple, 1, &server_uuid);
-		if (tt_uuid_is_nil(&server_uuid))
+		uint32_t replica_id = tuple_field_u32_xc(new_tuple, 0);
+		if (replica_id_is_reserved(replica_id))
+			tnt_raise(ClientError, ER_REPLICA_ID_IS_RESERVED,
+				  (unsigned) replica_id);
+		if (replica_id >= VCLOCK_MAX)
+			tnt_raise(LoggedError, ER_REPLICA_MAX, replica_id);
+		tt_uuid instance_uuid;
+		tuple_field_uuid_xc(new_tuple, 1, &instance_uuid);
+		if (tt_uuid_is_nil(&instance_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
-				  tt_uuid_str(&server_uuid));
+				  tt_uuid_str(&instance_uuid));
 		if (old_tuple != NULL) {
 			/*
-			 * Forbid UUID changing for registered server:
+			 * Forbid changes of UUID for a registered instance:
 			 * it requires an extra effort to keep _cluster
 			 * in sync with appliers and relays.
 			 */
 			tt_uuid old_uuid;
 			tuple_field_uuid_xc(old_tuple, 1, &old_uuid);
-			if (!tt_uuid_is_equal(&server_uuid, &old_uuid)) {
+			if (!tt_uuid_is_equal(&instance_uuid, &old_uuid)) {
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
-					  "updates of server uuid");
+					  "updates of instance uuid");
 			}
 		}
 	}

@@ -96,13 +96,13 @@ struct xdir {
 	 */
 	int open_wflags;
 	/**
-	 * A pointer to this server uuid. If not assigned
-	 * (tt_uuid_is_nil returns true), server id check
+	 * A pointer to this instance uuid. If not assigned
+	 * (tt_uuid_is_nil returns true), instance id check
 	 * for logs in this directory is not performed.
 	 * Otherwise, any log in this directory must have
-	 * the matching server id.
+	 * the matching instance id.
 	 */
-	const struct tt_uuid *server_uuid;
+	const struct tt_uuid *instance_uuid;
 	/**
 	 * Text of a marker written to the text file header:
 	 * XLOG (meaning it's a write ahead log) or SNAP (a
@@ -139,7 +139,7 @@ struct xdir {
  */
 void
 xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
-	    const struct tt_uuid *server_uuid);
+	    const struct tt_uuid *instance_uuid);
 
 /**
  * Destroy a log dir object.
@@ -181,12 +181,12 @@ struct xlog_meta {
 	/** Text file header: filetype */
 	char filetype[10];
 	/**
-	 * Text file header: server uuid. We read
+	 * Text file header: instance uuid. We read
 	 * only logs with our own uuid, to avoid situations
 	 * when a DBA has manually moved a few logs around
 	 * and messed the data directory up.
 	 */
-	struct tt_uuid server_uuid;
+	struct tt_uuid instance_uuid;
 	/**
 	 * Text file header: vector clock taken at the time
 	 * this file was created. For WALs, this is vector
@@ -280,7 +280,7 @@ struct xlog {
  *
  * @param xdir xdir
  * @param[out] xlog xlog structure
- * @param server uuid   the server which created the file
+ * @param instance uuid   the instance which created the file
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
  *

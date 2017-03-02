@@ -780,7 +780,7 @@ vy_log_end_recovery(struct vy_log *log)
 		return -1;
 
 	/*
-	 * If the server is shut down while a dump/compaction task
+	 * If the instance is shut down while a dump/compaction task
 	 * is in progress, we'll get an unfinished run file on disk,
 	 * i.e. a run file which was either not written to the end
 	 * or not inserted into a range. We need to delete such runs

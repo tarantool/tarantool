@@ -38,7 +38,7 @@
  * Separate version exists since compare is a very
  * often used operation, so any performance speed up
  * in it can have dramatic impact on the overall
- * server performance.
+ * performance.
  */
 inline __attribute__((always_inline)) int
 mp_compare_uint(const char **data_a, const char **data_b);

@@ -53,7 +53,7 @@ enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
 	/* Replication keys (header) */
-	IPROTO_SERVER_ID = 0x02,
+	IPROTO_REPLICA_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	IPROTO_SCHEMA_ID = 0x05,
@@ -70,7 +70,7 @@ enum iproto_key {
 	IPROTO_FUNCTION_NAME = 0x22,
 	IPROTO_USER_NAME = 0x23,
 	/* Replication keys (body) */
-	IPROTO_SERVER_UUID = 0x24,
+	IPROTO_INSTANCE_UUID = 0x24,
 	IPROTO_CLUSTER_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
 	IPROTO_EXPR = 0x27, /* EVAL */
@@ -83,7 +83,7 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(SERVER_ID) |\
+#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(REPLICA_ID) |\
 			  bit(LSN) | bit(SCHEMA_ID))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\

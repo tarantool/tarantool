@@ -51,7 +51,7 @@ struct xrow_header {
 	/* (!) Please update txn_add_redo() after changing members */
 
 	uint32_t type;
-	uint32_t server_id;
+	uint32_t replica_id;
 	uint64_t sync;
 	int64_t lsn; /* LSN must be signed for correct comparison */
 	double tm;
@@ -169,14 +169,14 @@ struct greeting {
 };
 
 /**
- * \brief Format a text greeting sent by the server during handshake.
+ * \brief Format a text greeting sent by the instance during handshake.
  * This function encodes greeting for binary protocol (adds "(Binary)"
  * after version signature).
  *
  * \param[out] greetingbuf buffer to store result. Exactly
  * IPROTO_GREETING_SIZE bytes will be written.
- * \param version_id server version_id created by version_id()
- * \param uuid server UUID
+ * \param version_id instance version_id created by version_id()
+ * \param uuid instance UUID
  * \param salt random bytes that client should use to sign passwords.
  * \param salt_len size of \a salt. Up to GREETING_SALT_LEN_MAX bytes.
  *
@@ -189,7 +189,7 @@ greeting_encode(char *greetingbuf, uint32_t version_id, const
 		uint32_t salt_len);
 
 /**
- * \brief Parse a text greeting send by the server during handshake.
+ * \brief Parse a text greeting send by the instance during handshake.
  * This function supports both binary and console protocol.
  *
  * \param greetingbuf a text greeting
@@ -282,44 +282,44 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 /**
  * \brief Encode SUBSCRIBE command
  * \param row[out]
- * \param cluster_uuid cluster uuid
- * \param server_uuid server uuid
- * \param vclock server vclock
+ * \param replicaset_uuid replica set uuid
+ * \param instance_uuid instance uuid
+ * \param vclock replication clock
 */
 void
 xrow_encode_subscribe(struct xrow_header *row,
-		      const struct tt_uuid *cluster_uuid,
-		      const struct tt_uuid *server_uuid,
+		      const struct tt_uuid *replicaset_uuid,
+		      const struct tt_uuid *instance_uuid,
 		      const struct vclock *vclock);
 
 /**
  * \brief Decode SUBSCRIBE command
  * \param row
- * \param[out] cluster_uuid
- * \param[out] server_uuid
+ * \param[out] replicaset_uuid
+ * \param[out] instance_uuid
  * \param[out] vclock
 */
 void
-xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
-		      struct tt_uuid *server_uuid, struct vclock *vclock);
+xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
+		      struct tt_uuid *instance_uuid, struct vclock *vclock);
 
 /**
  * \brief Encode JOIN command
  * \param[out] row
- * \param server_uuid
+ * \param instance_uuid
 */
 void
-xrow_encode_join(struct xrow_header *row, const struct tt_uuid *server_uuid);
+xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 
 /**
  * \brief Decode JOIN command
  * \param row
- * \param[out] server_uuid
+ * \param[out] instance_uuid
 */
 static inline void
-xrow_decode_join(struct xrow_header *row, struct tt_uuid *server_uuid)
+xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	return xrow_decode_subscribe(row, NULL, server_uuid, NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL);
 }
 
 /**

@@ -55,7 +55,7 @@
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* sc_version */
-#include "cluster.h" /* server_uuid */
+#include "replication.h" /* instance_uuid */
 #include "iproto_constants.h"
 #include "rmean.h"
 
@@ -463,7 +463,7 @@ iproto_connection_close(struct iproto_connection *con)
  * following:
  * - try to get a new iobuf, so that it can fit the request.
  *   Always getting a new input buffer when there is no space
- *   makes the server susceptible to input-flood attacks.
+ *   makes the instance susceptible to input-flood attacks.
  *   Therefore, at most 2 iobufs are used in a single connection,
  *   one is "open", receiving input, and the  other is closed,
  *   flushing output.
@@ -1058,7 +1058,7 @@ tx_process_connect(struct cmsg *m)
 		tx_fiber_init(con->session, 0);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
-		struct tt_uuid uuid = SERVER_UUID;
+		struct tt_uuid uuid = INSTANCE_UUID;
 		greeting_encode(greeting, tarantool_version_id(),
 				&uuid, con->session->salt, SESSION_SEED_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);

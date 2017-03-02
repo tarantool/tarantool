@@ -65,7 +65,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	row = region_alloc_object_xc(&fiber()->gc, struct xrow_header);
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
-	row->server_id = 0;
+	row->replica_id = 0;
 	row->lsn = 0;
 	row->sync = 0;
 	row->tm = 0;

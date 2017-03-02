@@ -129,7 +129,8 @@ enum {
 	XLOG_META_LEN_MAX = 1024 + VCLOCK_STR_LEN_MAX
 };
 
-#define SERVER_UUID_KEY "Server"
+#define INSTANCE_UUID_KEY "Instance"
+#define INSTANCE_UUID_KEY_V12 "Server"
 #define VCLOCK_KEY "VClock"
 
 static const char v13[] = "0.13";
@@ -153,10 +154,10 @@ xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 	char *vstr = vclock_to_string(&meta->vclock);
 	if (vstr == NULL)
 		return -1;
-	char *server_uuid = tt_uuid_str(&meta->server_uuid);
-	int total = snprintf(buf, size, "%s\n%s\n" SERVER_UUID_KEY ": "
+	char *instance_uuid = tt_uuid_str(&meta->instance_uuid);
+	int total = snprintf(buf, size, "%s\n%s\n" INSTANCE_UUID_KEY ": "
 		"%s\n" VCLOCK_KEY ": %s\n\n",
-		 meta->filetype, v13, server_uuid, vstr);
+		 meta->filetype, v13, instance_uuid, vstr);
 	assert(total > 0);
 	free(vstr);
 	return total;
@@ -237,19 +238,20 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 		assert(val <= val_end);
 		pos = eol + 1;
 
-		if (memcmp(key, SERVER_UUID_KEY, key_end - key) == 0) {
+		if (memcmp(key, INSTANCE_UUID_KEY, key_end - key) == 0 ||
+		    memcmp(key, INSTANCE_UUID_KEY_V12, key_end - key) == 0) {
 			/*
-			 * Server: <uuid>
+			 * Instance: <uuid>
 			 */
 			if (val_end - val != UUID_STR_LEN) {
-				tnt_error(XlogError, "can't parse node UUID");
+				tnt_error(XlogError, "can't parse instance UUID");
 				return -1;
 			}
 			char uuid[UUID_STR_LEN + 1];
 			memcpy(uuid, val, UUID_STR_LEN);
 			uuid[UUID_STR_LEN] = '\0';
-			if (tt_uuid_from_string(uuid, &meta->server_uuid) != 0) {
-				tnt_error(XlogError, "can't parse node UUID");
+			if (tt_uuid_from_string(uuid, &meta->instance_uuid) != 0) {
+				tnt_error(XlogError, "can't parse instance UUID");
 				return -1;
 			}
 		} else if (memcmp(key, VCLOCK_KEY, key_end - key) == 0){
@@ -290,13 +292,13 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 
 void
 xdir_create(struct xdir *dir, const char *dirname,
-	    enum xdir_type type, const tt_uuid *server_uuid)
+	    enum xdir_type type, const tt_uuid *instance_uuid)
 {
 	memset(dir, 0, sizeof(*dir));
 	vclockset_new(&dir->index);
 	/* Default mode. */
 	dir->mode = 0660;
-	dir->server_uuid = server_uuid;
+	dir->instance_uuid = instance_uuid;
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
 	dir->open_wflags = O_RDWR | O_CREAT | O_EXCL;
 	if (type == SNAP) {
@@ -409,10 +411,10 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 			 dir->filetype, meta->filetype);
 		return -1;
 	}
-	if (!tt_uuid_is_nil(dir->server_uuid) &&
-	    !tt_uuid_is_equal(dir->server_uuid, &meta->server_uuid)) {
+	if (!tt_uuid_is_nil(dir->instance_uuid) &&
+	    !tt_uuid_is_equal(dir->instance_uuid, &meta->instance_uuid)) {
 		xlog_cursor_close(cursor, false);
-		tnt_error(XlogError, "%s: invalid server UUID", filename);
+		tnt_error(XlogError, "%s: invalid instance UUID", filename);
 		return -1;
 	}
 	/*
@@ -445,7 +447,7 @@ cmp_i64(const void *_a, const void *_b)
  * The name of the file is based on its vclock signature,
  * which is the sum of all elements in the vector clock recorded
  * when the file was created. Elements in the vector
- * reflect log sequence numbers of servers in the asynchronous
+ * reflect log sequence numbers of replicas in the asynchronous
  * replication set (see also _cluster system space and vclock.h
  * comments).
  *
@@ -801,7 +803,7 @@ err:
 }
 
 /**
- * In case of error, writes a message to the server log
+ * In case of error, writes a message to the error log
  * and sets errno.
  */
 int
@@ -812,7 +814,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	int64_t signature = vclock_sum(vclock);
 	struct xlog_meta meta;
 	assert(signature >= 0);
-	assert(!tt_uuid_is_nil(dir->server_uuid));
+	assert(!tt_uuid_is_nil(dir->instance_uuid));
 
 	/*
 	* Check whether a file with this name already exists.
@@ -822,7 +824,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 
 	/* Setup inherited values */
 	snprintf(meta.filetype, sizeof(meta.filetype), "%s", dir->filetype);
-	meta.server_uuid = *dir->server_uuid;
+	meta.instance_uuid = *dir->instance_uuid;
 	vclock_copy(&meta.vclock, vclock);
 
 	if (xlog_create(xlog, filename, &meta) != 0)

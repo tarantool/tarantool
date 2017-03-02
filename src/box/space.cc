@@ -196,7 +196,7 @@ space_run_triggers(struct space *space, bool yesno)
  * effects during replication. Some engines can
  * track down this situation and abort the operation;
  * such engines (memtx) don't use this function.
- * Other engines can't do it, so they ask the server to
+ * Other engines can't do it, so they ask the box to
  * verify that the primary key of the tuple has not changed.
  */
 void

@@ -50,7 +50,7 @@ local function format(status, ...)
 end
 
 --
--- Evaluate command on local server
+-- Evaluate command on local instance
 --
 local function local_eval(self, line)
     if not line then
@@ -77,7 +77,7 @@ local function eval(line)
 end
 
 --
--- Evaluate command on remote server
+-- Evaluate command on remote instance
 --
 local function remote_eval(self, line)
     if not line or self.remote.state ~= 'active' then
@@ -282,7 +282,7 @@ local function start()
 end
 
 --
--- Connect to remove server
+-- Connect to remove instance
 --
 local netbox_connect
 local function connect(uri, opts)
@@ -360,7 +360,7 @@ local function client_handler(client, peer)
 end
 
 --
--- Start admin server
+-- Start admin console
 --
 local function listen(uri)
     local host, port

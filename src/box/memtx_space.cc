@@ -247,7 +247,7 @@ void
 MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
 	assert(request->type == IPROTO_INSERT);
-	request->header->server_id = 0;
+	request->header->replica_id = 0;
 	struct txn *txn = txn_begin_stmt(space);
 	try {
 		struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -347,7 +347,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		 * Old tuple was not found. A write optimized
 		 * engine may only know this after commit, so
 		 * some errors which happen on this branch would
-		 * only make it to the server log in it.
+		 * only make it to the error log in it.
 		 * To provide identical semantics, we should not throw
 		 * anything. However, considering the kind of
 		 * error which may occur, throwing it won't break

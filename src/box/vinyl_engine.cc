@@ -177,7 +177,7 @@ vinyl_send_row(void *arg, const char *tuple, uint32_t tuple_size, int64_t lsn)
 	struct xrow_header row;
 	memset(&row, 0, sizeof(row));
 	row.type = IPROTO_INSERT;
-	row.server_id = 0;
+	row.replica_id = 0;
 	row.lsn = lsn;
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;

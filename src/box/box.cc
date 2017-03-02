@@ -59,7 +59,7 @@
 #include "cfg.h"
 #include "iobuf.h"
 #include "coio.h"
-#include "cluster.h" /* replica */
+#include "replication.h" /* replica */
 #include "title.h"
 #include "lua/call.h" /* box_lua_call */
 #include "iproto_port.h"
@@ -81,7 +81,7 @@ struct recovery *recovery;
 
 bool box_snapshot_is_in_progress = false;
 /**
- * The server is in read-write mode: the local checkpoint
+ * The instance is in read-write mode: the local checkpoint
  * and all write ahead logs are processed. For a replica,
  * it also means we've successfully connected to the master
  * and began receiving updates from it.
@@ -90,7 +90,7 @@ static bool is_box_configured = false;
 static bool is_ro = true;
 
 /**
- * box.cfg{} will fail if one or more servers can't be reached
+ * box.cfg{} will fail if one or more replicas can't be reached
  * within the given period.
  */
 static const int REPLICATION_CFG_TIMEOUT = 10; /* seconds */
@@ -121,9 +121,9 @@ box_check_writable(void)
 	/*
 	 * box is only writable if
 	 *   box.cfg.read_only == false and
-	 *   server id is registered in _cluster table
+	 *   replica id is registered in _cluster table
 	 */
-	if (is_ro || recovery->server_id == 0)
+	if (is_ro || recovery->replica_id == 0)
 		tnt_raise(LoggedError, ER_READONLY);
 }
 
@@ -310,7 +310,7 @@ static void
 apply_subscribe_row(struct xstream *stream, struct xrow_header *row)
 {
 	/* Check lsn */
-	int64_t current_lsn = vclock_get(&recovery->vclock, row->server_id);
+	int64_t current_lsn = vclock_get(&recovery->vclock, row->replica_id);
 	if (row->lsn <= current_lsn)
 		return;
 	apply_row(stream, row);
@@ -455,7 +455,7 @@ box_sync_replication_source(double timeout)
 	});
 
 	applier_connect_all(appliers, count, timeout);
-	cluster_set_appliers(appliers, count);
+	replicaset_update(appliers, count);
 
 	guard.is_active = false;
 }
@@ -465,7 +465,7 @@ box_set_replication_source(void)
 {
 	if (!is_box_configured) {
 		/*
-		 * Do nothing, we're in local hot standby mode, the server
+		 * Do nothing, we're in local hot standby mode, this instance
 		 * will automatically begin following the replica when local
 		 * hot standby mode is finished, see box_cfg().
 		 */
@@ -475,9 +475,9 @@ box_set_replication_source(void)
 	box_check_replication_source();
 	/* Try to connect to all replicas within the timeout period */
 	box_sync_replication_source(REPLICATION_CFG_TIMEOUT);
-	server_foreach(server) {
-		if (server->applier != NULL)
-			applier_resume(server->applier);
+	replicaset_foreach(replica) {
+		if (replica->applier != NULL)
+			applier_resume(replica->applier);
 	}
 }
 
@@ -855,43 +855,43 @@ box_truncate(uint32_t space_id)
 }
 
 static inline void
-box_register_server(uint32_t id, const struct tt_uuid *uuid)
+box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {
 	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
 		 (unsigned) id, tt_uuid_str(uuid)) != 0)
 		diag_raise();
-	assert(server_by_uuid(uuid) != NULL);
+	assert(replica_by_uuid(uuid) != NULL);
 }
 
 /**
- * @brief Called when recovery/replication wants to add a new server
- * to cluster.
- * server_set_id() is called as a commit trigger on cluster
- * space and actually adds the server to the cluster.
- * @param server_uuid
+ * @brief Called when recovery/replication wants to add a new
+ * replica to the replica set.
+ * replica_set_id() is called as a commit trigger on _cluster
+ * space and actually adds the replica to the replica set.
+ * @param instance_uuid
  */
 static void
-box_on_cluster_join(const tt_uuid *server_uuid)
+box_on_join(const tt_uuid *instance_uuid)
 {
 	box_check_writable();
-	struct server *server = server_by_uuid(server_uuid);
-	if (server != NULL)
+	struct replica *replica = replica_by_uuid(instance_uuid);
+	if (replica != NULL)
 		return; /* nothing to do - already registered */
 
-	/** Find the largest existing server id. */
+	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
 	class MemtxIndex *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
-	/** Assign a new server id. */
-	uint32_t server_id = 1;
+	/** Assign a new replica id. */
+	uint32_t replica_id = 1;
 	while ((tuple = it->next(it))) {
-		if (tuple_field_u32_xc(tuple, 0) != server_id)
+		if (tuple_field_u32_xc(tuple, 0) != replica_id)
 			break;
-		server_id++;
+		replica_id++;
 	}
-	box_register_server(server_id, server_uuid);
+	box_register_replica(replica_id, instance_uuid);
 }
 
 static inline struct func *
@@ -1104,7 +1104,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 *
 	 * Replica => Master
 	 *
-	 * => JOIN { SERVER_UUID: replica_uuid }
+	 * => JOIN { INSTANCE_UUID: replica_uuid }
 	 * <= OK { VCLOCK: start_vclock }
 	 *    Replica has enough permissions and master is ready for JOIN.
 	 *     - start_vclock - vclock of the latest master's checkpoint.
@@ -1113,19 +1113,19 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 *    ...
 	 *    Initial data: a stream of engine-specifc rows, e.g. snapshot
 	 *    rows for memtx or dirty cursor data for Vinyl. Engine can
-	 *    use SERVER_ID, LSN and other fields for internal purposes.
+	 *    use REPLICA_ID, LSN and other fields for internal purposes.
 	 *    ...
 	 * <= INSERT
 	 * <= OK { VCLOCK: stop_vclock } - end of initial JOIN stage.
 	 *     - `stop_vclock` - master's vclock after initial stage.
 	 *
-	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { SERVER_ID, LSN }
+	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { REPLICA_ID, LSN }
 	 *    ...
 	 *    Final data: a stream of WAL rows from `start_vclock` to
-	 *    `stop_vclock`, inclusive. SERVER_ID and LSN fields are
+	 *    `stop_vclock`, inclusive. REPLICA_ID and LSN fields are
 	 *    original values from WAL and master-master replication.
 	 *    ...
-	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { SERVER_ID, LSN }
+	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { REPLICA_ID, LSN }
 	 * <= OK { VCLOCK: current_vclock } - end of final JOIN stage.
 	 *      - `current_vclock` - master's vclock after final stage.
 	 *
@@ -1140,15 +1140,15 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	assert(header->type == IPROTO_JOIN);
 
 	/* Decode JOIN request */
-	struct tt_uuid server_uuid = uuid_nil;
-	xrow_decode_join(header, &server_uuid);
+	struct tt_uuid instance_uuid = uuid_nil;
+	xrow_decode_join(header, &instance_uuid);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
 	/* Forbid connection to itself */
-	if (tt_uuid_is_equal(&server_uuid, &SERVER_UUID))
+	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
@@ -1186,7 +1186,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * sending OK - if the hook fails, the error reaches the
 	 * client.
 	 */
-	box_on_cluster_join(&server_uuid);
+	box_on_join(&instance_uuid);
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -1221,14 +1221,14 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	struct tt_uuid cluster_uuid = uuid_nil, replica_uuid = uuid_nil;
+	struct tt_uuid replicaset_uuid = uuid_nil, replica_uuid = uuid_nil;
 	struct vclock replica_clock;
 	vclock_create(&replica_clock);
-	xrow_decode_subscribe(header, &cluster_uuid, &replica_uuid,
+	xrow_decode_subscribe(header, &replicaset_uuid, &replica_uuid,
 			      &replica_clock);
 
 	/* Forbid connection to itself */
-	if (tt_uuid_is_equal(&replica_uuid, &SERVER_UUID))
+	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
@@ -1236,21 +1236,22 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 
 	/**
 	 * Check that the given UUID matches the UUID of the
-	 * cluster this server belongs to. Used to handshake
+	 * replica set this replica belongs to. Used to handshake
 	 * replica connect, and refuse a connection from a replica
-	 * which belongs to a different cluster.
+	 * which belongs to a different replica set.
 	 */
-	if (!tt_uuid_is_equal(&cluster_uuid, &CLUSTER_UUID)) {
-		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
-			  tt_uuid_str(&cluster_uuid),
-			  tt_uuid_str(&CLUSTER_UUID));
+	if (!tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
+		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+			  tt_uuid_str(&replicaset_uuid),
+			  tt_uuid_str(&REPLICASET_UUID));
 	}
 
-	/* Check server uuid */
-	struct server *server = server_by_uuid(&replica_uuid);
-	if (server == NULL || server->id == SERVER_ID_NIL) {
-		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-			  tt_uuid_str(&replica_uuid));
+	/* Check replica uuid */
+	struct replica *replica = replica_by_uuid(&replica_uuid);
+	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
+		tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
+			  tt_uuid_str(&replica_uuid),
+			  tt_uuid_str(&REPLICASET_UUID));
 	}
 
 	/* Forbid replication with disabled WAL */
@@ -1262,18 +1263,18 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
-	 * and identify ourselves with our own server id.
+	 * and identify ourselves with our own replica id.
 	 */
 	struct xrow_header row;
 	struct vclock current_vclock;
 	wal_checkpoint(&current_vclock, true);
 	xrow_encode_vclock(&row, &current_vclock);
 	/*
-	 * Identify the message with the server id of this
-	 * server, this is the only way for a replica to find
-	 * out the id of the server it has connected to.
+	 * Identify the message with the replica id of this
+	 * instance, this is the only way for a replica to find
+	 * out the id of the instance it has connected to.
 	 */
-	row.server_id = recovery->server_id;
+	row.replica_id = recovery->replica_id;
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1289,17 +1290,17 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(io->fd, header->sync, server, &replica_clock);
+	relay_subscribe(io->fd, header->sync, replica, &replica_clock);
 }
 
 /** Insert a new cluster into _schema */
 static void
-box_set_cluster_uuid()
+box_set_replicaset_uuid()
 {
 	tt_uuid uu;
-	/* Generate a new cluster UUID */
+	/* Generate a new replica set UUID */
 	tt_uuid_create(&uu);
-	/* Save cluster UUID in _schema */
+	/* Save replica set UUID in _schema */
 	if (boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "[%s%s]", "cluster",
 		 tt_uuid_str(&uu)))
 		diag_raise();
@@ -1319,7 +1320,7 @@ box_free(void)
 	if (is_box_configured) {
 #if 0
 		session_free();
-		cluster_free();
+		replication_free();
 		user_cache_free();
 		schema_free();
 		tuple_free();
@@ -1357,35 +1358,35 @@ engine_init()
 }
 
 /**
- * Initialize the first server of a new cluster
+ * Initialize the first replica of a new replica set.
  */
 static void
 bootstrap_master(void)
 {
 	engine_bootstrap();
 
-	uint32_t server_id = 1;
+	uint32_t replica_id = 1;
 
-	/* Unregister local server if it was registered by bootstrap.bin */
-	assert(recovery->server_id == 0);
+	/* Unregister a local replica if it was registered by bootstrap.bin */
+	assert(recovery->replica_id == 0);
 	if (boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "[%u]", 1) != 0)
 		diag_raise();
 
-	/* Register local server */
-	box_register_server(server_id, &SERVER_UUID);
-	assert(recovery->server_id == 1);
+	/* Register the first replica in the replica set */
+	box_register_replica(replica_id, &INSTANCE_UUID);
+	assert(recovery->replica_id == 1);
 
 	/* Register other cluster members */
-	server_foreach(server) {
-		if (tt_uuid_is_equal(&server->uuid, &SERVER_UUID))
+	replicaset_foreach(replica) {
+		if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID))
 			continue;
-		assert(server->applier != NULL);
-		box_register_server(++server_id, &server->uuid);
-		assert(server->id == server_id);
+		assert(replica->applier != NULL);
+		box_register_replica(++replica_id, &replica->uuid);
+		assert(replica->id == replica_id);
 	}
 
-	/* Generate UUID of a new cluster */
-	box_set_cluster_uuid();
+	/* Generate UUID of a new replica set */
+	box_set_replicaset_uuid();
 }
 
 /**
@@ -1397,7 +1398,7 @@ bootstrap_master(void)
  *                           at the moment of replica bootstrap
  */
 static void
-bootstrap_from_master(struct server *master, struct vclock *start_vclock)
+bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
@@ -1411,7 +1412,7 @@ bootstrap_from_master(struct server *master, struct vclock *start_vclock)
 	 * See box_process_join().
 	 */
 
-	assert(!tt_uuid_is_nil(&SERVER_UUID));
+	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	applier_resume_to_state(applier, APPLIER_INITIAL_JOIN, TIMEOUT_INFINITY);
 
 	/*
@@ -1428,11 +1429,11 @@ bootstrap_from_master(struct server *master, struct vclock *start_vclock)
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
-	/* Check server_id registration in _cluster */
-	if (recovery->server_id == SERVER_ID_NIL)
-		panic("server id has not received from master");
+	/* Check replica_id registration in _cluster */
+	if (recovery->replica_id == REPLICA_ID_NIL)
+		panic("replica id has not received from master");
 
-	/* Start server vclock using master's vclock */
+	/* Start replica vclock using master's vclock */
 	vclock_copy(start_vclock, &applier->vclock);
 
 	/* Finalize the new replica */
@@ -1444,19 +1445,20 @@ bootstrap_from_master(struct server *master, struct vclock *start_vclock)
 }
 
 /**
- * Bootstrap a new server either as the first master in a
+ * Bootstrap a new instance either as the first master in a
  * replica set or as a replica of an existing master.
  *
- * @param[out] start_vclock  the start vector time of the new server
+ * @param[out] start_vclock  the start vector time of the new
+ * instance
  */
 static void
 bootstrap(struct vclock *start_vclock)
 {
 	/* Use the first replica by URI as a bootstrap leader */
-	struct server *master = server_first();
+	struct replica *master = replicaset_first();
 	assert(master == NULL || master->applier != NULL);
 
-	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &SERVER_UUID)) {
+	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 		bootstrap_from_master(master, start_vclock);
 	} else {
 		bootstrap_master();
@@ -1513,7 +1515,7 @@ box_cfg_xc(void)
 
 	schema_init();
 
-	cluster_init();
+	replication_init();
 	port_init();
 	iproto_init();
 	wal_thread_start();
@@ -1567,7 +1569,7 @@ box_cfg_xc(void)
 		 */
 		memtx->recoverSnapshot();
 
-		/* Replace server vclock using the data from snapshot */
+		/* Replace instance vclock using the data from snapshot */
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);
 		engine_begin_final_recovery();
 		title("orphan");
@@ -1575,7 +1577,7 @@ box_cfg_xc(void)
 				      cfg_getd("wal_dir_rescan_delay"));
 		title("hot_standby");
 
-		assert(!tt_uuid_is_nil(&SERVER_UUID));
+		assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 		/*
 		 * Leave hot standby mode, if any, only
 		 * after acquiring the lock.
@@ -1600,9 +1602,9 @@ box_cfg_xc(void)
 		/* Wait for the cluster to start up */
 		box_sync_replication_source(TIMEOUT_INFINITY);
 	} else {
-		tt_uuid_create(&SERVER_UUID);
+		tt_uuid_create(&INSTANCE_UUID);
 		/*
-		 * Begin listening on the server socket to enable
+		 * Begin listening on the socket to enable
 		 * master-master replication leader election.
 		 */
 		box_listen();
@@ -1610,28 +1612,28 @@ box_cfg_xc(void)
 		/* Wait for the  cluster to start up */
 		box_sync_replication_source(TIMEOUT_INFINITY);
 
-		/* Bootstrap a new server */
+		/* Bootstrap a new master */
 		bootstrap(&recovery->vclock);
 	}
 	fiber_gc();
 
-	/* Server must be registered in _cluster */
-	assert(recovery->server_id != SERVER_ID_NIL);
+	/* The replica must be registered in _cluster */
+	assert(recovery->replica_id != REPLICA_ID_NIL);
 
 	/* Start WAL writer */
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_mode != WAL_NONE) {
-		wal_init(wal_mode, cfg_gets("wal_dir"), &SERVER_UUID,
+		wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
 			 &recovery->vclock, rows_per_wal);
 	}
 
 	rmean_cleanup(rmean_box);
 
 	/* Follow replica */
-	server_foreach(server) {
-		if (server->applier != NULL)
-			applier_resume(server->applier);
+	replicaset_foreach(replica) {
+		if (replica->applier != NULL)
+			applier_resume(replica->applier);
 	}
 
 	title("running");

@@ -73,7 +73,7 @@ struct wal_writer
 	 */
 	struct stailq rollback;
 	/* ----------------- wal ------------------- */
-	/** A setting from server configuration - rows_per_wal */
+	/** A setting from instance configuration - rows_per_wal */
 	int64_t rows_per_wal;
 	/** Another one - wal_mode */
 	enum wal_mode wal_mode;
@@ -219,13 +219,13 @@ tx_schedule_rollback(struct cmsg *msg)
  */
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
-		  const char *wal_dirname, const struct tt_uuid *server_uuid,
+		  const char *wal_dirname, const struct tt_uuid *instance_uuid,
 		  struct vclock *vclock, int64_t rows_per_wal)
 {
 	writer->wal_mode = wal_mode;
 	writer->rows_per_wal = rows_per_wal;
 
-	xdir_create(&writer->wal_dir, wal_dirname, XLOG, server_uuid);
+	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid);
 	writer->is_active = false;
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
@@ -268,20 +268,20 @@ wal_thread_start()
 /**
  * Initialize WAL writer.
  *
- * @pre   The server has completed recovery from a snapshot
+ * @pre   The instance has completed recovery from a snapshot
  *        and/or existing WALs. All WALs opened in read-only
  *        mode are closed. WAL thread has been started.
  */
 void
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
-	 const struct tt_uuid *server_uuid, struct vclock *vclock,
+	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
 	 int64_t rows_per_wal)
 {
 	assert(rows_per_wal > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
 
-	wal_writer_create(writer, wal_mode, wal_dirname, server_uuid,
+	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
 			  vclock, rows_per_wal);
 
 	wal = writer;
@@ -390,8 +390,7 @@ wal_opt_rotate(struct wal_writer *writer)
 		/*
 		 * We can not handle xlog_close()
 		 * failure in any reasonable way.
-		 * A warning is written to the server
-		 * log file.
+		 * A warning is written to the error log.
 		 */
 		xlog_close(&writer->current_wal, false);
 		writer->is_active = false;
@@ -558,7 +557,7 @@ done:
 
 		/* Update internal vclock */
 		vclock_follow(&writer->vclock,
-			      req->rows[req->n_rows - 1]->server_id,
+			      req->rows[req->n_rows - 1]->replica_id,
 			      req->rows[req->n_rows - 1]->lsn);
 		/* Update row counter for wal_opt_rotate() */
 		l->rows += req->n_rows;

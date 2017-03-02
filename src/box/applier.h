@@ -70,15 +70,15 @@ struct applier {
 	struct fiber *reader;
 	/** Finite-state machine */
 	enum applier_state state;
-	/** Local time of this server when the last row has been received */
+	/** Local time of this replica when the last row has been received */
 	ev_tstamp last_row_time;
-	/** Number of seconds this server is behind the remote master */
+	/** Number of seconds this replica is behind the remote master */
 	ev_tstamp lag;
 	/** The last known vclock of the remote master */
 	struct vclock vclock;
 	/** The last box_error_code() logged to avoid log flooding */
 	uint32_t last_logged_errcode;
-	/** Remote server_id */
+	/** Remote replica_id */
 	uint32_t id;
 	/** Remote UUID */
 	struct tt_uuid uuid;
@@ -112,7 +112,7 @@ struct applier {
 };
 
 /**
- * Start a client to a remote server using a background fiber.
+ * Start a client to a remote master using a background fiber.
  *
  * If recovery is finalized (i.e. r->writer != NULL) then the client
  * connect to a master and follow remote updates using SUBSCRIBE command.

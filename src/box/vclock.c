@@ -38,21 +38,21 @@
 #include "diag.h"
 
 int64_t
-vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
+vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 {
 	assert(lsn >= 0);
-	assert(server_id < VCLOCK_MAX);
-	int64_t prev_lsn = vclock->lsn[server_id];
+	assert(replica_id < VCLOCK_MAX);
+	int64_t prev_lsn = vclock->lsn[replica_id];
 	if (lsn <= prev_lsn) {
 		/* Never confirm LSN out of order. */
 		panic("LSN for %u is used twice or COMMIT order is broken: "
 		      "confirmed: %lld, new: %lld",
-		      (unsigned) server_id,
+		      (unsigned) replica_id,
 		      (long long) prev_lsn, (long long) lsn);
 	}
 	/* Easier add each time than check. */
-	vclock->map |= 1 << server_id;
-	vclock->lsn[server_id] = lsn;
+	vclock->map |= 1 << replica_id;
+	vclock->lsn[replica_id] = lsn;
 	vclock->signature += lsn - prev_lsn;
 	return prev_lsn;
 }
@@ -105,9 +105,9 @@ vclock_to_string(const struct vclock *vclock)
 	const char *sep = "";
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server) {
+	vclock_foreach(&it, replica) {
 		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep,
-			      server.id, (long long) server.lsn) != 0)
+			      replica.id, (long long) replica.lsn) != 0)
 			return NULL;
 		sep = ", ";
 	}
@@ -121,7 +121,7 @@ vclock_to_string(const struct vclock *vclock)
 size_t
 vclock_from_string(struct vclock *vclock, const char *str)
 {
-	long server_id;
+	long replica_id;
 	long long lsn;
 
 	const char *p = str;
@@ -137,8 +137,8 @@ vclock_from_string(struct vclock *vclock, const char *str)
 	key:
 		if (isdigit(*p)) {
 			errno = 0;
-			server_id = strtol(p, (char **) &p, 10);
-			if (errno != 0 || server_id < 0 || server_id >= VCLOCK_MAX)
+			replica_id = strtol(p, (char **) &p, 10);
+			if (errno != 0 || replica_id < 0 || replica_id >= VCLOCK_MAX)
 				goto error;
 			goto sep;
 		} else if (*p == '}') {
@@ -166,10 +166,10 @@ vclock_from_string(struct vclock *vclock, const char *str)
 			errno = 0;
 			lsn = strtoll(p, (char **)  &p, 10);
 			if (errno != 0 || lsn < 0 || lsn > INT64_MAX ||
-			    server_id >= VCLOCK_MAX || vclock->lsn[server_id] > 0)
+			    replica_id >= VCLOCK_MAX || vclock->lsn[replica_id] > 0)
 				goto error;
-			vclock->map |= 1 << server_id;
-			vclock->lsn[server_id] = lsn;
+			vclock->map |= 1 << replica_id;
+			vclock->lsn[replica_id] = lsn;
 			goto comma;
 		}
 		goto error;

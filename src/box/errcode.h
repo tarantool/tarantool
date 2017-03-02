@@ -59,7 +59,7 @@ struct errcode_record {
 	/*  4 */_(ER_TUPLE_NOT_FOUND,		"Tuple doesn't exist in index '%s' in space '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		"%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			"Can't modify data on a replication slave. My master is: %s") \
-	/*  7 */_(ER_READONLY,			"Can't modify data because this server is in read-only mode.") \
+	/*  7 */_(ER_READONLY,			"Can't modify data because this instance is in read-only mode.") \
 	/*  8 */_(ER_INJECTION,			"Error injection '%s'") \
 	/*  9 */_(ER_CREATE_SPACE,		"Failed to create space '%s': %s") \
 	/* 10 */_(ER_SPACE_EXISTS,		"Space '%s' already exists") \
@@ -113,14 +113,14 @@ struct errcode_record {
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			"Incorrect value for option '%s': %s") \
 	/* 60 */_(ER_VINYL,			"%s") \
-	/* 61 */_(ER_LOCAL_SERVER_IS_NOT_ACTIVE,"Local server is not active") \
-	/* 62 */_(ER_UNKNOWN_SERVER,		"Server %s is not registered with the cluster") \
-	/* 63 */_(ER_CLUSTER_ID_MISMATCH,	"Cluster id of the replica %s doesn't match cluster id of the master %s") \
+	/* 61 */_(ER_UNUSED ,			"") \
+	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %u") \
+	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
-	/* 65 */_(ER_CLUSTER_ID_IS_RO,		"Can't reset cluster id: it is already assigned") \
-	/* 66 */_(ER_SERVER_ID_MISMATCH,	"Remote ID mismatch for %s: expected %u, got %u") \
-	/* 67 */_(ER_SERVER_ID_IS_RESERVED,	"Can't initialize server id with a reserved value %u") \
-	/* 68 */_(ER_INVALID_ORDER,		"Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu") \
+	/* 65 */_(ER_REPLICASET_UUID_IS_RO,	"Can't reset replica set UUID: it is already assigned") \
+	/* 66 */_(ER_INSTANCE_UUID_MISMATCH,	"Remote ID mismatch for %s: expected %u, got %u") \
+	/* 67 */_(ER_REPLICA_ID_IS_RESERVED,	"Can't initialize replica id with a reserved value %u") \
+	/* 68 */_(ER_INVALID_ORDER,		"Invalid LSN order for instance %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	"Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		"Invalid identifier '%s' (expected letters, digits or an underscore)") \
 	/* 71 */_(ER_DROP_FUNCTION,		"Can't drop function %u: %s") \
@@ -166,9 +166,9 @@ struct errcode_record {
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \
-	/*114 */_(ER_SERVER_UUID_MISMATCH,	"Remote UUID mismatch: expected %s, got %s") \
+	/*114 */_(ER_REPLICA_ID_MISMATCH,	"Replica id mismatch: expected %s, got %s") \
 	/*115 */_(ER_SYSTEM,			"%s") \
-	/*116 */_(ER_LOADING,			"Server bootstrap hasn't finished yet") \
+	/*116 */_(ER_LOADING,			"Instance bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
 	/*119 */_(ER_COMPRESSION,		"Compression error: %s") \

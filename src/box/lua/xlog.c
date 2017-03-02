@@ -184,9 +184,9 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	lua_pushstring(L, "lsn");
 	lua_pushinteger(L, row.lsn);
 	lua_settable(L, -3); /* lsn */
-	lua_pushstring(L, "server_id");
-	lua_pushinteger(L, row.server_id);
-	lua_settable(L, -3); /* server_id */
+	lua_pushstring(L, "replica_id");
+	lua_pushinteger(L, row.replica_id);
+	lua_settable(L, -3); /* replica_id */
 	lua_pushstring(L, "timestamp");
 	lua_pushnumber(L, row.tm);
 	lua_settable(L, -3); /* timestamp */

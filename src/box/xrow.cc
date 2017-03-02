@@ -43,6 +43,11 @@
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
+/**
+ * Globally unique identifier of this instance.
+ */
+struct tt_uuid INSTANCE_UUID;
+
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)
@@ -73,8 +78,8 @@ error:
 		case IPROTO_SYNC:
 			header->sync = mp_decode_uint(pos);
 			break;
-		case IPROTO_SERVER_ID:
-			header->server_id = mp_decode_uint(pos);
+		case IPROTO_REPLICA_ID:
+			header->replica_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
 			header->lsn = mp_decode_uint(pos);
@@ -150,9 +155,9 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 	}
 #endif
 
-	if (header->server_id) {
-		d = mp_encode_uint(d, IPROTO_SERVER_ID);
-		d = mp_encode_uint(d, header->server_id);
+	if (header->replica_id) {
+		d = mp_encode_uint(d, IPROTO_REPLICA_ID);
+		d = mp_encode_uint(d, header->replica_id);
 		map_size++;
 	}
 
@@ -429,28 +434,28 @@ raise:
 
 void
 xrow_encode_subscribe(struct xrow_header *row,
-		      const struct tt_uuid *cluster_uuid,
-		      const struct tt_uuid *server_uuid,
+		      const struct tt_uuid *replicaset_uuid,
+		      const struct tt_uuid *instance_uuid,
 		      const struct vclock *vclock)
 {
 	memset(row, 0, sizeof(*row));
-	uint32_t cluster_size = vclock_size(vclock);
-	size_t size = BODY_LEN_MAX + cluster_size *
+	uint32_t replicaset_size = vclock_size(vclock);
+	size_t size = BODY_LEN_MAX + replicaset_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = xrow_encode_uuid(data, cluster_uuid);
-	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
-	data = xrow_encode_uuid(data, server_uuid);
+	data = xrow_encode_uuid(data, replicaset_uuid);
+	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
+	data = xrow_encode_uuid(data, instance_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, cluster_size);
+	data = mp_encode_map(data, replicaset_size);
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server) {
-		data = mp_encode_uint(data, server.id);
-		data = mp_encode_uint(data, server.lsn);
+	vclock_foreach(&it, replica) {
+		data = mp_encode_uint(data, replica.id);
+		data = mp_encode_uint(data, replica.lsn);
 	}
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
@@ -460,8 +465,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 }
 
 void
-xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
-		      struct tt_uuid *server_uuid, struct vclock *vclock)
+xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
+		      struct tt_uuid *instance_uuid, struct vclock *vclock)
 {
 	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -484,14 +489,14 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
 		uint8_t key = mp_decode_uint(&d);
 		switch (key) {
 		case IPROTO_CLUSTER_UUID:
-			if (cluster_uuid == NULL)
+			if (replicaset_uuid == NULL)
 				goto skip;
-			xrow_decode_uuid(&d, cluster_uuid);
+			xrow_decode_uuid(&d, replicaset_uuid);
 			break;
-		case IPROTO_SERVER_UUID:
-			if (server_uuid == NULL)
+		case IPROTO_INSTANCE_UUID:
+			if (instance_uuid == NULL)
 				goto skip;
-			xrow_decode_uuid(&d, server_uuid);
+			xrow_decode_uuid(&d, instance_uuid);
 			break;
 		case IPROTO_VCLOCK:
 			if (vclock == NULL)
@@ -529,7 +534,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
 }
 
 void
-xrow_encode_join(struct xrow_header *row, const struct tt_uuid *server_uuid)
+xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid)
 {
 	memset(row, 0, sizeof(*row));
 
@@ -537,9 +542,9 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *server_uuid)
 	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
-	/* Greet the remote server with our server UUID */
-	data = xrow_encode_uuid(data, server_uuid);
+	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
+	/* Greet the remote replica with our replica UUID */
+	data = xrow_encode_uuid(data, instance_uuid);
 	assert(data <= buf + size);
 
 	row->body[0].iov_base = buf;
@@ -554,19 +559,19 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	memset(row, 0, sizeof(*row));
 
 	/* Add vclock to response body */
-	uint32_t cluster_size = vclock_size(vclock);
-	size_t size = 8 + cluster_size *
+	uint32_t replicaset_size = vclock_size(vclock);
+	size_t size = 8 + replicaset_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, cluster_size);
+	data = mp_encode_map(data, replicaset_size);
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server) {
-		data = mp_encode_uint(data, server.id);
-		data = mp_encode_uint(data, server.lsn);
+	vclock_foreach(&it, replica) {
+		data = mp_encode_uint(data, replica.id);
+		data = mp_encode_uint(data, replica.lsn);
 	}
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;

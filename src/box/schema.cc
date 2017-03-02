@@ -291,7 +291,7 @@ schema_init()
 	snprintf(def.name, sizeof(def.name), "_priv");
 	(void) sc_space_new(&def, key_def, &on_replace_priv);
 	/*
-	 * _cluster - association server uuid <-> server id
+	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
 	key_def->space_id = def.id = BOX_CLUSTER_ID;

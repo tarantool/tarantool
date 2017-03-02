@@ -70,7 +70,7 @@
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
 #include "iproto_constants.h"
-#include "cluster.h" /* SERVER_UUID */
+#include "replication.h" /* INSTANCE_UUID */
 #include "vclock.h"
 #include "schema.h"
 #include "xrow.h"
@@ -2239,7 +2239,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_RUN,
-		.server_uuid = SERVER_UUID,
+		.instance_uuid = INSTANCE_UUID,
 	};
 	if (xlog_create(&data_xlog, path, &meta) < 0)
 		return -1;
@@ -2663,7 +2663,7 @@ vy_run_write_index(struct vy_run *run, const char *dirpath)
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_INDEX,
-		.server_uuid = SERVER_UUID,
+		.instance_uuid = INSTANCE_UUID,
 	};
 	if (xlog_create(&index_xlog, path, &meta) < 0)
 		return -1;
@@ -5418,7 +5418,7 @@ vy_index_drop(struct vy_index *index)
 	 * already been written to WAL. So if we fail to write the
 	 * change to the metadata log, we leave it in the log buffer,
 	 * to be flushed along with the next transaction. If it is
-	 * not flushed before the server is shut down, we replay it
+	 * not flushed before the instance is shut down, we replay it
 	 * on local recovery from WAL.
 	 */
 	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && was_dropped)

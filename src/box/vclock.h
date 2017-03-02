@@ -56,8 +56,8 @@ enum {
 	 * The maximum length of string representation of vclock.
 	 *
 	 * vclock formatted as {<pair>, ..., <pair>} where
-	 *    <pair> is <server_id>: <lsn>,
-	 *    <server_id> is 0..VCLOCK_MAX (2 chars),
+	 *    <pair> is <replica_id>: <lsn>,
+	 *    <replica_id> is 0..VCLOCK_MAX (2 chars),
 	 *    <lsn> is int64_t (20 chars).
 	 *
 	 * @sa vclock_from_string()
@@ -77,7 +77,7 @@ struct vclock {
 	rb_node(struct vclock) link;
 };
 
-/* Server id, coordinate */
+/* Replica id, coordinate */
 struct vclock_c {
 	uint32_t id;
 	int64_t lsn;
@@ -119,20 +119,20 @@ vclock_create(struct vclock *vclock)
 }
 
 static inline int64_t
-vclock_get(const struct vclock *vclock, uint32_t server_id)
+vclock_get(const struct vclock *vclock, uint32_t replica_id)
 {
-	if (server_id >= VCLOCK_MAX)
+	if (replica_id >= VCLOCK_MAX)
 		return 0;
-	return vclock->lsn[server_id];
+	return vclock->lsn[replica_id];
 }
 
 static inline int64_t
-vclock_inc(struct vclock *vclock, uint32_t server_id)
+vclock_inc(struct vclock *vclock, uint32_t replica_id)
 {
 	/* Easier add each time than check. */
-	vclock->map |= 1 << server_id;
+	vclock->map |= 1 << replica_id;
 	vclock->signature++;
-	return ++vclock->lsn[server_id];
+	return ++vclock->lsn[replica_id];
 }
 
 static inline void
@@ -153,8 +153,8 @@ vclock_calc_sum(const struct vclock *vclock)
 	int64_t sum = 0;
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server)
-		sum += server.lsn;
+	vclock_foreach(&it, replica)
+		sum += replica.lsn;
 	return sum;
 }
 
@@ -165,11 +165,11 @@ vclock_sum(const struct vclock *vclock)
 }
 
 int64_t
-vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
+vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn);
 
 /**
  * \brief Format vclock to YAML-compatible string representation:
- * { server_id: lsn, server_id:lsn })
+ * { replica_id: lsn, replica_id:lsn })
  * \param vclock vclock
  * \return fomatted string. This pointer should be passed to free(3) to
  * release the allocated storage when it is no longer needed.
@@ -207,11 +207,11 @@ vclock_compare(const struct vclock *a, const struct vclock *b)
 	struct bit_iterator it;
 	bit_iterator_init(&it, &map, sizeof(map), true);
 
-	for (size_t server_id = bit_iterator_next(&it); server_id < VCLOCK_MAX;
-	     server_id = bit_iterator_next(&it)) {
+	for (size_t replica_id = bit_iterator_next(&it); replica_id < VCLOCK_MAX;
+	     replica_id = bit_iterator_next(&it)) {
 
-		int64_t lsn_a = a->lsn[server_id];
-		int64_t lsn_b = b->lsn[server_id];
+		int64_t lsn_a = a->lsn[replica_id];
+		int64_t lsn_b = b->lsn[replica_id];
 		le = le && lsn_a <= lsn_b;
 		ge = ge && lsn_a >= lsn_b;
 		if (!ge && !le)
