@@ -75,7 +75,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	tbuf_assert(e);
 
 	/* Make new capacity a multiple of alloc factor. */
-	size_t new_capacity = MAX(e->capacity, (uint32_t)TBUF_ALLOC_FACTOR) * 2;
+	size_t new_capacity = MAX(e->capacity, (size_t)TBUF_ALLOC_FACTOR) * 2;
 
 	while (new_capacity < e->size + required)
 		new_capacity *= 2;

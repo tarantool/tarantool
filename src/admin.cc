@@ -171,7 +171,7 @@ static void
 fail(struct tbuf *out, struct tbuf *err)
 {
 	start(out);
-	tbuf_printf(out, "fail:%.*s" CRLF, err->size, (char *)err->data);
+	tbuf_printf(out, "fail:%.*s" CRLF, (uint32_t)err->size, (char *)err->data);
 	end(out);
 }
 

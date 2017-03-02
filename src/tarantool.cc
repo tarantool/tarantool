@@ -786,7 +786,7 @@ main(int argc, char **argv)
 	if (gopt(opt, 'k')) {
 		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
 			say_error("check_config FAILED"
-				  "%.*s", cfg_out->size, (char *)cfg_out->data);
+				  "%.*s", (uint32_t)cfg_out->size, (char *)cfg_out->data);
 
 			return 1;
 		}
@@ -796,7 +796,7 @@ main(int argc, char **argv)
 
 	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
 		panic("can't load config:"
-		      "%.*s", cfg_out->size, (char *)cfg_out->data);
+		      "%.*s", (uint32_t)cfg_out->size, (char *)cfg_out->data);
 
 	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;
