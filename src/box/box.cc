@@ -1190,7 +1190,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	wal_checkpoint(wal, &stop_vclock, false);
+	wal_checkpoint(&stop_vclock, false);
 
 	/* Send end of initial stage data marker */
 	xrow_encode_vclock(&row, &stop_vclock);
@@ -1206,7 +1206,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Send end of WAL stream marker */
 	struct vclock current_vclock;
-	wal_checkpoint(wal, &current_vclock, false);
+	wal_checkpoint(&current_vclock, false);
 	xrow_encode_vclock(&row, &current_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
@@ -1266,7 +1266,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 */
 	struct xrow_header row;
 	struct vclock current_vclock;
-	wal_checkpoint(wal, &current_vclock, true);
+	wal_checkpoint(&current_vclock, true);
 	xrow_encode_vclock(&row, &current_vclock);
 	/*
 	 * Identify the message with the server id of this
@@ -1683,7 +1683,7 @@ box_snapshot()
 	if (wal == NULL) {
 		vclock_copy(&vclock, &recovery->vclock);
 	} else {
-		wal_checkpoint(wal, &vclock, true);
+		wal_checkpoint(&vclock, true);
 	}
 	rc = engine_commit_checkpoint(&vclock);
 end:

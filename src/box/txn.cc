@@ -220,7 +220,7 @@ txn_write_to_wal(struct txn *txn)
 		/** wal_mode = NONE or initial recovery. */
 		res = vclock_sum(&recovery->vclock);
 	} else {
-		res = wal_write(wal, req);
+		res = wal_write(req);
 	}
 
 	stop = ev_now(loop());

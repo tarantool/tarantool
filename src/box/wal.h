@@ -66,7 +66,7 @@ struct wal_request {
 };
 
 int64_t
-wal_write(struct wal_writer *writer, struct wal_request *req);
+wal_write(struct wal_request *req);
 
 void
 wal_thread_start();
@@ -111,8 +111,7 @@ extern "C" {
  *
  */
 void
-wal_checkpoint(struct wal_writer *writer, struct vclock *vclock,
-	       bool rotate);
+wal_checkpoint(struct vclock *vclock, bool rotate);
 
 #if defined(__cplusplus)
 } /* extern "C" */

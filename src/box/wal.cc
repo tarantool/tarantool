@@ -282,7 +282,7 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	struct wal_writer *writer = &wal_writer_singleton;
 
 	wal_writer_create(writer, wal_mode, wal_dirname, server_uuid,
-			vclock, rows_per_wal);
+			  vclock, rows_per_wal);
 
 	wal = writer;
 }
@@ -346,9 +346,8 @@ wal_checkpoint_done_f(struct cmsg *data)
 }
 
 void
-wal_checkpoint(struct wal_writer *writer, struct vclock *vclock, bool rotate)
+wal_checkpoint(struct vclock *vclock, bool rotate)
 {
-	(void) writer;
 	static struct cmsg_hop wal_checkpoint_route[] = {
 		{wal_checkpoint_f, &wal_thread.tx_pipe},
 		{wal_checkpoint_done_f, NULL},
@@ -607,8 +606,9 @@ wal_thread_f(va_list ap)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct wal_writer *writer, struct wal_request *req)
+wal_write(struct wal_request *req)
 {
+	struct wal_writer *writer = wal;
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	if (! stailq_empty(&writer->rollback)) {

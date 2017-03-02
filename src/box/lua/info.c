@@ -146,7 +146,7 @@ lbox_info_server(struct lua_State *L)
 	lua_pushliteral(L, "lsn");
 	if (recovery->server_id != SERVER_ID_NIL && wal != NULL) {
 		struct vclock vclock;
-		wal_checkpoint(wal, &vclock, false);
+		wal_checkpoint(&vclock, false);
 		luaL_pushint64(L, vclock_get(&vclock, recovery->server_id));
 	} else {
 		luaL_pushint64(L, -1);
@@ -164,7 +164,7 @@ lbox_info_vclock(struct lua_State *L)
 {
 	struct vclock vclock;
 	if (wal != NULL) {
-		wal_checkpoint(wal, &vclock, false);
+		wal_checkpoint(&vclock, false);
 	} else {
 		vclock_create(&vclock);
 	}
