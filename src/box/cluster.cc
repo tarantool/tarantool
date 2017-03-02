@@ -86,12 +86,6 @@ cluster_free(void)
 	mempool_destroy(&server_pool);
 }
 
-extern "C" struct vclock *
-cluster_clock()
-{
-        return &recovery->vclock;
-}
-
 /* Return true if server doesn't have id, relay and applier */
 static bool
 server_is_orphan(struct server *server)

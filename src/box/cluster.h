@@ -99,9 +99,6 @@ extern struct tt_uuid CLUSTER_UUID;
 /** UUID of the instance. */
 extern struct tt_uuid SERVER_UUID;
 
-struct vclock *
-cluster_clock();
-
 /* }}} */
 
 /** {{{ Cluster server API **/
