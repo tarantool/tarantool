@@ -585,6 +585,9 @@ vy_log_flush_f(va_list ap)
 	return 0;
 }
 
+static int
+vy_log_open_or_create(struct vy_log *log);
+
 /**
  * Try to flush the log buffer to disk.
  *
@@ -595,10 +598,13 @@ vy_log_flush_f(va_list ap)
 static int
 vy_log_flush(struct vy_log *log)
 {
-	assert(log->xlog != NULL);
-
 	if (log->tx_end == 0)
 		return 0; /* nothing to do */
+
+	/* Open the xlog on the first write. */
+	if (log->xlog == NULL &&
+	    vy_log_open_or_create(log) < 0)
+		return -1;
 
 	/*
 	 * Encode buffered records.
@@ -637,8 +643,7 @@ vy_log_flush(struct vy_log *log)
 
 /**
  * Open the vinyl metadata log file for appending, or create a new one
- * if it doesn't exist. On success, this function flushes all pending
- * records written with vy_log_write() before the log was opened.
+ * if it doesn't exist.
  *
  * Return 0 on success, -1 on failure.
  */
@@ -646,7 +651,6 @@ static int
 vy_log_open_or_create(struct vy_log *log)
 {
 	assert(log->xlog == NULL);
-	assert(latch_owner(log->latch) == NULL);
 
 	struct xlog *xlog = malloc(sizeof(*xlog));
 	if (xlog == NULL) {
@@ -675,11 +679,6 @@ vy_log_open_or_create(struct vy_log *log)
 	}
 
 	log->xlog = xlog;
-	if (vy_log_flush(log) < 0) {
-		/* Abort recovery if we can't flush the log. */
-		log->xlog = NULL;
-		goto fail_close_xlog;
-	}
 	return 0;
 
 fail_close_xlog:
@@ -688,14 +687,6 @@ fail_free_xlog:
 	free(xlog);
 fail:
 	return -1;
-}
-
-int
-vy_log_create(struct vy_log *log)
-{
-	assert(log->recovery == NULL);
-	log->signature = 0;
-	return vy_log_open_or_create(log);
 }
 
 void
@@ -729,14 +720,19 @@ vy_log_gc(struct vy_log *log, const struct vy_log_record *record)
 			.type = VY_LOG_FORGET_RUN,
 			.run_id = record->run_id,
 		};
+		if (log->xlog == NULL &&
+		    vy_log_open_or_create(log) < 0)
+			goto err;
 		struct xrow_header row;
 		if (vy_log_record_encode(&gc_record, &row) < 0 ||
-		    xlog_write_row(log->xlog, &row) < 0) {
-			struct error *e = diag_last_error(diag_get());
-			say_warn("failed to log run %lld cleanup: %s",
-				 (long long)record->run_id, e->errmsg);
-		}
+		    xlog_write_row(log->xlog, &row) < 0)
+			goto err;
 	}
+	return;
+err:
+	say_warn("failed to log run %lld cleanup: %s",
+		 (long long)record->run_id,
+		 diag_last_error(diag_get())->errmsg);
 }
 
 int
@@ -776,7 +772,8 @@ vy_log_end_recovery(struct vy_log *log)
 	assert(log->xlog == NULL);
 	assert(log->recovery != NULL);
 
-	if (vy_log_open_or_create(log) < 0)
+	/* Flush all pending records. */
+	if (vy_log_flush(log) < 0)
 		return -1;
 
 	/*
@@ -807,15 +804,38 @@ vy_log_recover_index(struct vy_log *log, int64_t index_id,
 	return vy_recovery_iterate_index(index, false, cb, cb_arg);
 }
 
+/** Argument passed to vy_log_rotate_cb_func(). */
+struct vy_log_rotate_cb_arg {
+	/** The xlog created during rotation. */
+	struct xlog xlog;
+	/** Set if the xlog was created. */
+	bool xlog_is_open;
+	/** Path to the xlog. */
+	const char *xlog_path;
+};
+
 /** Callback passed to vy_recovery_iterate() for log rotation. */
 static int
 vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 {
-	struct xlog *xlog = cb_arg;
+	struct vy_log_rotate_cb_arg *arg = cb_arg;
 	struct xrow_header row;
 
+	/*
+	 * Only create the new xlog if we have something to write
+	 * so as not to pollute the filesystem with metadata logs
+	 * if vinyl is not used.
+	 */
+	if (!arg->xlog_is_open) {
+		struct xlog_meta meta = {
+			.filetype = VY_LOG_TYPE,
+		};
+		if (xlog_create(&arg->xlog, arg->xlog_path, &meta) < 0)
+			return -1;
+		arg->xlog_is_open = true;
+	}
 	if (vy_log_record_encode(record, &row) < 0 ||
-	    xlog_write_row(xlog, &row) < 0)
+	    xlog_write_row(&arg->xlog, &row) < 0)
 		return -1;
 	return 0;
 }
@@ -851,38 +871,41 @@ vy_log_rotate_f(va_list ap)
 	char path[PATH_MAX];
 	vy_log_snprint_path(path, sizeof(path), log->dir, signature);
 
-	struct xlog xlog;
-	struct xlog_meta meta = {
-		.filetype = VY_LOG_TYPE,
+	struct vy_log_rotate_cb_arg arg = {
+		.xlog_is_open = false,
+		.xlog_path = path,
 	};
-	if (xlog_create(&xlog, path, &meta) < 0)
-		goto err_create_xlog;
-
-	if (vy_recovery_iterate(recovery, vy_log_rotate_cb_func,
-				&xlog) < 0)
+	if (vy_recovery_iterate(recovery, vy_log_rotate_cb_func, &arg) < 0)
 		goto err_write_xlog;
 
-	if (xlog_flush(&xlog) < 0 ||
-	    xlog_sync(&xlog) < 0 ||
-	    xlog_rename(&xlog) < 0)
+	if (!arg.xlog_is_open)
+		goto out; /* no records in the log */
+
+	/* Finalize the new xlog. */
+	if (xlog_flush(&arg.xlog) < 0 ||
+	    xlog_sync(&arg.xlog) < 0 ||
+	    xlog_rename(&arg.xlog) < 0)
 		goto err_write_xlog;
 
 	/* Cleanup unused runs. */
 	struct xlog *old_xlog = log->xlog;
-	log->xlog = &xlog;
+	log->xlog = &arg.xlog;
 	vy_recovery_iterate(recovery, vy_log_gc_deleted_cb_func, log);
 	log->xlog = old_xlog;
-	xlog_flush(&xlog);
-
+	xlog_flush(&arg.xlog);
+	xlog_close(&arg.xlog, false);
+out:
 	vy_recovery_delete(recovery);
-	xlog_close(&xlog, false);
 	return 0;
 
 err_write_xlog:
-	if (unlink(xlog.filename) < 0)
-		say_syserror("failed to delete file '%s'", xlog.filename);
-	xlog_close(&xlog, false);
-err_create_xlog:
+	if (arg.xlog_is_open) {
+		/* Delete the unfinished xlog. */
+		if (unlink(arg.xlog.filename) < 0)
+			say_syserror("failed to delete file '%s'",
+				     arg.xlog.filename);
+		xlog_close(&arg.xlog, false);
+	}
 	vy_recovery_delete(recovery);
 err_recovery:
 	return -1;
@@ -891,7 +914,7 @@ err_recovery:
 int
 vy_log_rotate(struct vy_log *log, int64_t signature)
 {
-	assert(log->xlog != NULL);
+	assert(log->recovery == NULL);
 
 	/*
 	 * This function is called right after bootstrap (by snapshot),
@@ -914,56 +937,35 @@ vy_log_rotate(struct vy_log *log, int64_t signature)
 	 * many of them piling up due to log rotation.
 	 */
 	latch_lock(log->latch);
+
 	/*
 	 * Before proceeding to log rotation, make sure that all
 	 * pending records have been flushed out.
 	 */
-	if (vy_log_flush(log) < 0) {
-		latch_unlock(log->latch);
-		goto err_rotate;
-	}
+	if (vy_log_flush(log) < 0)
+		goto fail;
+
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(vy_log_rotate_f, log, signature) < 0) {
-		latch_unlock(log->latch);
-		goto err_rotate;
-	}
-	latch_unlock(log->latch);
+	if (coio_call(vy_log_rotate_f, log, signature) < 0)
+		goto fail;
 
 	/*
-	 * The new xlog was successfully created. Open it now.
-	 * It would be better to simply reuse the xlog struct
-	 * which was used for writing the xlog, but unfortunately
-	 * this is impossible, because an xlog struct can't be
-	 * used by different threads due to debug checks in the
-	 * slab allocator.
+	 * Success. Close the old log. The new one will be opened
+	 * automatically on the first write (see vy_log_flush()).
 	 */
-	char path[PATH_MAX];
-	vy_log_snprint_path(path, sizeof(path), log->dir, signature);
-
-	struct xlog *xlog = malloc(sizeof(*xlog));
-	if (xlog == NULL) {
-		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
-		goto err_alloc_xlog;
+	if (log->xlog != NULL) {
+		xlog_close(log->xlog, false);
+		free(log->xlog);
+		log->xlog = NULL;
 	}
-
-	if (xlog_open(xlog, path) < 0)
-		goto err_open_xlog;
-
-	xlog_close(log->xlog, false);
-	free(log->xlog);
-
-	log->xlog = xlog;
 	log->signature = signature;
 
+	latch_unlock(log->latch);
 	say_debug("%s: complete", __func__);
 	return 0;
 
-err_open_xlog:
-	free(xlog);
-err_alloc_xlog:
-	if (coeio_unlink(path) < 0)
-		say_syserror("failed to delete file '%s'", path);
-err_rotate:
+fail:
+	latch_unlock(log->latch);
 	say_debug("%s: failed", __func__);
 	return -1;
 }
@@ -971,8 +973,6 @@ err_rotate:
 void
 vy_log_tx_begin(struct vy_log *log)
 {
-	assert(log->xlog != NULL || log->recovery != NULL);
-
 	latch_lock(log->latch);
 	log->tx_begin = log->tx_end;
 	say_debug("%s", __func__);
@@ -992,20 +992,22 @@ vy_log_tx_do_commit(struct vy_log *log, bool no_discard)
 
 	assert(latch_owner(log->latch) == fiber());
 	/*
-	 * If the log has not been opened yet, which means this is
-	 * recovery and we are replaying records we failed to commit
-	 * before restart, silently return - pending writes will be
-	 * flushed by vy_log_open().
+	 * During recovery, we may replay records we failed to commit
+	 * before restart (e.g. drop index). Since the log isn't open
+	 * yet, simply leave them in the tx buffer to be flushed upon
+	 * recovery completion.
 	 */
-	if (log->xlog != NULL) {
-		rc = vy_log_flush(log);
-		/*
-		 * Rollback the transaction on failure
-		 * unless we were explicitly told not to.
-		 */
-		if (rc != 0 && !no_discard)
-			log->tx_end = log->tx_begin;
-	}
+	if (log->recovery != NULL)
+		goto out;
+
+	rc = vy_log_flush(log);
+	/*
+	 * Rollback the transaction on failure unless
+	 * we were explicitly told not to.
+	 */
+	if (rc != 0 && !no_discard)
+		log->tx_end = log->tx_begin;
+out:
 	say_debug("%s(no_discard=%d): %s", __func__, no_discard,
 		  rc == 0 ? "success" : "fail");
 	latch_unlock(log->latch);

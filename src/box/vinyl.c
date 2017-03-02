@@ -7111,9 +7111,6 @@ int
 vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
-	/* First start. Create a new metadata log. */
-	if (vy_log_create(e->log) != 0)
-		return -1;
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -7133,14 +7130,6 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 		e->xm->lsn = signature;
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
-		/*
-		 * Remote recovery. There's no local metadata log,
-		 * hence no recovery context. During remote recovery
-		 * we may dump data received from the master, so we
-		 * create a new log right away.
-		 */
-		if (vy_log_create(e->log) != 0)
-			return -1;
 		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
@@ -7176,11 +7165,6 @@ vy_end_recovery(struct vy_env *e)
 			return -1;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
-		/*
-		 * Remote recovery completion. The metadata log
-		 * is already open and there's no recovery context
-		 * (see vy_begin_initial_recovery()).
-		 */
 		break;
 	default:
 		unreachable();

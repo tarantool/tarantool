@@ -220,15 +220,6 @@ struct vy_log {
 struct vy_log *
 vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg);
 
-/*
- * Create the initial xlog file having signature 0.
- * Supposed to be called on bootstrap.
- *
- * Returns 0 on success, -1 on failure.
- */
-int
-vy_log_create(struct vy_log *log);
-
 /**
  * Close a metadata log and free associated structures.
  */
