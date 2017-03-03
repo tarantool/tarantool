@@ -170,6 +170,30 @@ char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
 
+/**
+ * Return LSN of the newest file in a directory
+ * or -1 if the directory is empty.
+ */
+static inline int64_t
+xdir_last_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	struct vclock *last = vclockset_last(&xdir->index);
+	if (last == NULL)
+		return -1;
+	vclock_copy(vclock, last);
+	return vclock_sum(vclock);
+}
+
+/**
+ * Insert a vclock into the file index of a directory.
+ * The vclock must be allocated with malloc.
+ */
+static inline void
+xdir_add_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	vclockset_insert(&xdir->index, vclock);
+}
+
 /* }}} */
 
 /* {{{ xlog meta */

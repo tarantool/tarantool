@@ -146,13 +146,7 @@ MemtxEngine::~MemtxEngine()
 int64_t
 MemtxEngine::lastCheckpoint(struct vclock *vclock)
 {
-	struct vclock *last = vclockset_last(&m_snap_dir.index);
-	if (last == NULL)
-		return -1;
-	assert(vclock);
-	vclock_copy(vclock, last);
-	/* Return the lsn of the last checkpoint. */
-	return vclock->signature;
+	return xdir_last_vclock(&m_snap_dir, vclock);
 }
 
 void
@@ -807,7 +801,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
-	vclockset_insert(&m_snap_dir.index, m_checkpoint->vclock);
+	xdir_add_vclock(&m_snap_dir, m_checkpoint->vclock);
 	m_checkpoint->vclock = NULL;
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
