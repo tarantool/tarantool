@@ -714,12 +714,6 @@ enum tx_state {
 	VINYL_TX_ROLLBACK
 };
 
-/** Transaction type. */
-enum tx_type {
-	VINYL_TX_RO,
-	VINYL_TX_RW
-};
-
 struct read_set_key {
 	struct tuple *stmt;
 	int64_t tsn;
@@ -744,7 +738,6 @@ struct vy_tx {
 	 */
 	uint32_t write_set_version;
 	ev_tstamp start;
-	enum tx_type type;
 	enum tx_state state;
 	/**
 	 * The transaction is forbidden to commit unless it's read-only.
@@ -1079,8 +1072,7 @@ rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
 
 struct tx_manager {
 	tx_tree_t tree;
-	uint32_t count_rd;
-	uint32_t count_rw;
+	uint32_t count_tx;
 	/** Transaction logical time. */
 	int64_t tsn;
 	/**
@@ -1189,8 +1181,7 @@ write_set_search_key(write_set_t *tree, struct vy_index *index,
 static bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
-	return tx->type == VINYL_TX_RO ||
-		tx->write_set.rbt_root == &tx->write_set.rbt_nil;
+	return tx->write_set.rbt_root == &tx->write_set.rbt_nil;
 }
 
 static struct tx_manager *
@@ -1202,8 +1193,7 @@ tx_manager_new(struct vy_env *env)
 		return NULL;
 	}
 	tx_tree_new(&m->tree);
-	m->count_rd = 0;
-	m->count_rw = 0;
+	m->count_tx = 0;
 	m->tsn = 0;
 	m->lsn = 0;
 	m->vlsn = INT64_MAX;
@@ -1246,7 +1236,7 @@ read_set_delete_cb(read_set_t *t, struct txv *v, void *arg)
 }
 
 static void
-vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
+vy_tx_begin(struct tx_manager *m, struct vy_tx *tx)
 {
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
@@ -1254,24 +1244,14 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx, enum tx_type type)
 	tx->start = ev_now(loop());
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
-	tx->type = type;
 	tx->is_aborted = false;
 	rlist_create(&tx->cursors);
 
 	tx->tsn = ++m->tsn;
 
-	if (type == VINYL_TX_RO) {
-		/* read-only tx obtains read view at once */
-		tx->vlsn = m->lsn;
-		tx_tree_insert(&m->tree, tx);
-		if (m->vlsn == INT64_MAX)
-			m->vlsn = tx->vlsn;
-		m->count_rd++;
-	} else {
-		/* possible read-write tx reads latest changes */
-		tx->vlsn = INT64_MAX;
-		m->count_rw++;
-	}
+	/* possible read-write tx reads latest changes */
+	tx->vlsn = INT64_MAX;
+	m->count_tx++;
 }
 
 /**
@@ -1281,7 +1261,7 @@ static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *key, bool is_gap)
 {
-	if (tx->type == VINYL_TX_RO || tx->is_aborted)
+	if (tx->is_aborted)
 		return 0; /* no reason to track reads */
 	uint32_t part_count = tuple_field_count(key);
 	if (part_count >= index->key_def->part_count) {
@@ -1327,10 +1307,7 @@ tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
 		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
 
-	if (tx->type == VINYL_TX_RO)
-		m->count_rd--;
-	else
-		m->count_rw--;
+	m->count_tx--;
 }
 
 static void
@@ -5274,8 +5251,7 @@ vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
 
 	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
 	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
-	vy_info_append_u32(h, "tx_active_rw", env->xm->count_rw);
-	vy_info_append_u32(h, "tx_active_ro", env->xm->count_rd);
+	vy_info_append_u32(h, "tx_active", env->xm->count_tx);
 
 	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
 	vy_info_append_u64(h, "dump_total", stat->dump_total);
@@ -5978,9 +5954,7 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	ev_tstamp start  = ev_now(loop());
 	int64_t vlsn = INT64_MAX;
 	const int64_t *vlsn_ptr = &vlsn;
-	if (tx == NULL)
-		vlsn = e->xm->lsn;
-	else
+	if (tx != NULL)
 		vlsn_ptr = &tx->vlsn;
 
 	struct vy_read_iterator itr;
@@ -6954,7 +6928,7 @@ vy_begin(struct vy_env *e)
 			 "struct vy_tx");
 		return NULL;
 	}
-	vy_tx_begin(e->xm, tx, VINYL_TX_RW);
+	vy_tx_begin(e->xm, tx);
 	return tx;
 }
 
@@ -10110,7 +10084,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	c->env = e;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
-		vy_tx_begin(e->xm, tx, VINYL_TX_RO);
+		vy_tx_begin(e->xm, tx);
 	} else {
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}

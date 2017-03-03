@@ -496,6 +496,9 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 	struct tuple *candidate = (*entry)->stmt;
 
 	while (vy_stmt_lsn(candidate) > *itr->vlsn) {
+		/* The cache stores the latest tuple of the key,
+		 * but there could be earlier tuples in runs */
+		*stop = false;
 		if (iterator_direction(itr->iterator_type) > 0)
 			vy_cache_tree_iterator_next(tree, &itr->curr_pos);
 		else
@@ -508,12 +511,6 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 		if (itr->iterator_type == ITER_EQ &&
 		    vy_stmt_compare(key, candidate, itr->cache->key_def))
 			return;
-		/* Once link is broken we cannot ignore other sources */
-		int dir = iterator_direction(itr->iterator_type);
-		if (dir > 0 && !((*entry)->flags & VY_CACHE_LEFT_LINKED))
-			*stop = false;
-		else if (dir < 0 && !((*entry)->flags & VY_CACHE_RIGHT_LINKED))
-			*stop = false;
 	}
 	itr->curr_stmt = candidate;
 	tuple_ref(itr->curr_stmt);
@@ -561,6 +558,13 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 	*ret = NULL;
 	*stop = false;
 	struct vy_cache_iterator *itr = (struct vy_cache_iterator *) vitr;
+
+	/* disable cache for errinj test - let it try to read from disk */
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
+		     { itr->search_started = true; return 0; });
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
+		     { itr->search_started = true; return 0; });
+
 	if (!itr->search_started) {
 		vy_cache_iterator_start(itr, ret, stop);
 		return 0;
@@ -609,6 +613,9 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 	vy_cache_iterator_is_stop(itr, *entry, stop);
 
 	while (vy_stmt_lsn(itr->curr_stmt) > *itr->vlsn) {
+		/* The cache stores the latest tuple of the key,
+		 * but there could be earlier tuples in runs */
+		*stop = false;
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 		if (dir > 0)
@@ -623,11 +630,6 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 		if (itr->iterator_type == ITER_EQ &&
 		    vy_stmt_compare(key, stmt, itr->cache->key_def))
 			return 0;
-		/* Once link is broken we cannot ignore other sources */
-		if (dir > 0 && !((*entry)->flags & VY_CACHE_LEFT_LINKED))
-			*stop = false;
-		else if (dir < 0 && !((*entry)->flags & VY_CACHE_RIGHT_LINKED))
-			*stop = false;
 		itr->curr_stmt = stmt;
 		tuple_ref(itr->curr_stmt);
 	}
@@ -660,9 +662,15 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			  const struct tuple *last_stmt, struct tuple **ret,
 			  bool *stop)
 {
-	*ret = NULL;
 	assert(vitr->iface->restore == vy_cache_iterator_restore);
+	*ret = NULL;
 	struct vy_cache_iterator *itr = (struct vy_cache_iterator *) vitr;
+
+	/* disable cache for errinj test - let it try to read from disk */
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
+		     { itr->search_started = true; return 0; });
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
+		     { itr->search_started = true; return 0; });
 
 	struct key_def *def = itr->cache->key_def;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;

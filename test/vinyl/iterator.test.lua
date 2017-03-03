@@ -126,7 +126,7 @@ space:upsert({2}, {{'!', 2, 2}})
 space:upsert({3}, {{'!', 2, 3}})
 space:delete{1}
 space:delete{2}
-iter_obj = create_iterator(space) -- key 3 must remain
+iter_obj = create_iterator(space)
 space:delete{3}
 space:select{}
 iterate_over(iter_obj)
@@ -163,7 +163,7 @@ space:upsert({1}, {{'!', 2, 1}})
 space:upsert({2}, {{'!', 2, 2}})
 space:upsert({3}, {{'!', 2, 3}})
 space:upsert({1}, {{'!', 2, 1}})
-iter_obj = create_iterator(space) -- keys 2 and 3 must remain in the old state
+iter_obj = create_iterator(space)
 space:upsert({2}, {{'!', 2, 2}})
 space:upsert({3}, {{'!', 2, 3}})
 space:select{}
@@ -241,7 +241,7 @@ space:replace({1, 10})
 space:replace({2, 20})
 space:replace({3, 30})
 space:upsert({1}, {{'!', 2, 1}})
-iter_obj = create_iterator(space) -- keys 2 and 3 must remain in the old state
+iter_obj = create_iterator(space)
 space:upsert({2}, {{'!', 2, 2}})
 space:upsert({3}, {{'!', 2, 3}})
 space:select{}
@@ -279,7 +279,7 @@ space:replace({2, 20})
 space:replace({3, 30})
 space:delete{1}
 space:delete{2}
-iter_obj = create_iterator(space) -- key 3 must remain
+iter_obj = create_iterator(space)
 space:delete{3}
 space:select{}
 iterate_over(iter_obj)
@@ -544,17 +544,17 @@ idx3 = space:create_index('idx3', { parts = {3, 'integer'}, unique = false })
 -- Test iterator type EQ
 
 space:select{}
-iter_obj = create_iterator(space, 1, {iterator = 'EQ'}) -- always must return nothing
+iter_obj = create_iterator(space, 1, {iterator = 'EQ'})
 
 space:replace({1, 2, 3})
 space:delete({1})
 space:replace({1, 1, 1})
 space:upsert({1, 1, 1}, {{'+', 2, 1}, {'+', 3, 2}})
 space:select{}
-iterate_over(iter_obj) -- return nothing
+iterate_over(iter_obj)
 
 iter_obj2 = create_iterator(idx2, 2, {iterator = 'EQ'})
-space:delete({1}) -- delete {1, 2, 3}, but iter_obj2 must return it
+space:delete({1})
 iterate_over(iter_obj2)
 
 space:truncate()
