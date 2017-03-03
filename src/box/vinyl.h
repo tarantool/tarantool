@@ -56,20 +56,8 @@ enum iterator_type;
  * Environment
  */
 
-enum vy_status {
-	VINYL_OFFLINE,
-	VINYL_INITIAL_RECOVERY_LOCAL,
-	VINYL_INITIAL_RECOVERY_REMOTE,
-	VINYL_FINAL_RECOVERY_LOCAL,
-	VINYL_FINAL_RECOVERY_REMOTE,
-	VINYL_ONLINE,
-};
-
 struct vy_env *
 vy_env_new(void);
-
-enum vy_status
-vy_status(struct vy_env *env);
 
 void
 vy_env_delete(struct vy_env *e);

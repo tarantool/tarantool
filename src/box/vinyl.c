@@ -93,6 +93,15 @@ struct vy_task;
 struct vy_stat;
 struct vy_squash_queue;
 
+enum vy_status {
+	VINYL_OFFLINE,
+	VINYL_INITIAL_RECOVERY_LOCAL,
+	VINYL_INITIAL_RECOVERY_REMOTE,
+	VINYL_FINAL_RECOVERY_LOCAL,
+	VINYL_FINAL_RECOVERY_REMOTE,
+	VINYL_ONLINE,
+};
+
 /**
  * Global configuration of an entire vinyl instance (env object).
  */
@@ -5573,7 +5582,7 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 	if (old_space->index_count &&
 	    old_space->index_count <= new_space->index_count) {
 		struct vy_index *pk = vy_index(old_space->index[0]);
-		if (vy_status(pk->env) == VINYL_ONLINE && pk->stmt_count != 0) {
+		if (pk->env->status == VINYL_ONLINE && pk->stmt_count != 0) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 				 "altering not empty space");
 			return -1;
@@ -7072,12 +7081,6 @@ error_xm:
 error_conf:
 	free(e);
 	return NULL;
-}
-
-enum vy_status
-vy_status(struct vy_env *env)
-{
-	return env->status;
 }
 
 void
