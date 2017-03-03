@@ -4460,7 +4460,10 @@ struct vy_scheduler {
 	struct cord *worker_pool;
 	struct fiber *scheduler;
 	struct ev_loop *loop;
+	/** Total number of worker threads. */
 	int worker_pool_size;
+	/** Number worker threads that are currently idle. */
+	int workers_available;
 	bool is_worker_pool_running;
 
 	/**
@@ -4719,6 +4722,18 @@ vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	if (*ptask != NULL)
 		return 0;
 
+	if (scheduler->workers_available <= 1) {
+		/*
+		 * If all worker threads are busy doing compaction
+		 * when we run out of quota, ongoing transactions will
+		 * hang until one of the threads has finished, which
+		 * may take quite a while. To avoid unpredictably long
+		 * stalls, always keep one worker thread reserved for
+		 * dumps.
+		 */
+		return 0;
+	}
+
 	if (vy_scheduler_peek_compact(scheduler, ptask) != 0)
 		goto fail;
 	if (*ptask != NULL)
@@ -4780,7 +4795,6 @@ vy_scheduler_f(va_list va)
 		return 0; /* destroyed */
 	vy_scheduler_start_workers(scheduler);
 
-	int workers_available = scheduler->worker_pool_size;
 	while (scheduler->scheduler != NULL) {
 		struct stailq output_queue;
 		struct vy_task *task, *next;
@@ -4804,8 +4818,9 @@ vy_scheduler_f(va_list va)
 					     task->dump_size,
 					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
-			workers_available++;
-			assert(workers_available <= scheduler->worker_pool_size);
+			scheduler->workers_available++;
+			assert(scheduler->workers_available <=
+			       scheduler->worker_pool_size);
 		}
 		/*
 		 * Reset the timeout if we managed to successfully
@@ -4827,7 +4842,7 @@ vy_scheduler_f(va_list va)
 		if (tasks_failed > 0)
 			goto error;
 		/* All worker threads are busy. */
-		if (workers_available == 0)
+		if (scheduler->workers_available == 0)
 			goto wait;
 		/* Get a task to schedule. */
 		if (vy_schedule(scheduler, &task) != 0)
@@ -4844,7 +4859,7 @@ vy_scheduler_f(va_list va)
 			tt_pthread_cond_signal(&scheduler->worker_cond);
 		tt_pthread_mutex_unlock(&scheduler->mutex);
 
-		workers_available--;
+		scheduler->workers_available--;
 		fiber_reschedule();
 		continue;
 error:
@@ -4929,8 +4944,9 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
 	scheduler->worker_pool_size = cfg_geti("vinyl.threads");
-	if (scheduler->worker_pool_size < 0)
-		scheduler->worker_pool_size = 1;
+	/* One thread is reserved for dumps, see vy_schedule(). */
+	assert(scheduler->worker_pool_size >= 2);
+	scheduler->workers_available = scheduler->worker_pool_size;
 	stailq_create(&scheduler->input_queue);
 	stailq_create(&scheduler->output_queue);
 	scheduler->worker_pool = (struct cord *)

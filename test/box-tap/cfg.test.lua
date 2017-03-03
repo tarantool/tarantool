@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(50)
+test:plan(52)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -234,6 +234,21 @@ box.cfg{vinyl = {page_size = 2 * 1024 * 1024, range_size = 2 * 1024 * 1024}}
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "page size equal with range")
+
+--
+-- gh-2150 one vinyl worker thread is reserved for dumps
+--
+code = [[
+box.cfg{vinyl = {threads=1}}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "vinyl.threads = 1")
+
+code = [[
+box.cfg{vinyl = {threads=2}}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "vinyl.threads = 2")
 
 test:check()
 os.exit(0)

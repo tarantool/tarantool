@@ -1,5 +1,5 @@
 TAP version 13
-1..50
+1..52
 ok - box is not started
 ok - invalid slab_alloc_minimal
 ok - invalid slab_alloc_minimal
@@ -50,3 +50,5 @@ ok - invalid replication_source
 ok - page size greather than range
 ok - page size less than range
 ok - page size equal with range
+ok - vinyl.threads = 1
+ok - vinyl.threads = 2

@@ -8,7 +8,7 @@ local urilib = require('uri')
 -- see default_cfg below
 local default_vinyl_cfg = {
     memory_limit        = 1.0, -- 1G
-    threads             = 1,
+    threads             = 2,
     run_count_per_level = 2,
     run_size_ratio      = 3.5,
     range_size          = 1024 * 1024 * 1024,
