@@ -232,13 +232,15 @@ fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
 	struct fiber *self = fiber();
+	if (fiber_is_dead(f))
+		return;
 
 	f->flags |= FIBER_IS_CANCELLED;
 
 	/**
 	 * Don't wake self and zombies.
 	 */
-	if (f != self && !fiber_is_dead(f)) {
+	if (f != self) {
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
 	}
