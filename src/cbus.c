@@ -123,6 +123,7 @@ cpipe_destroy(struct cpipe *pipe)
 	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
 	poison->endpoint = pipe->endpoint;
 	cmsg_init(&poison->msg, route);
+	poison->endpoint = pipe->endpoint;
 
 	cpipe_push(pipe, &poison->msg);
 	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
