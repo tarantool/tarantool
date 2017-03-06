@@ -8589,22 +8589,7 @@ cleardatabasepage_out:
 ** entries in the table.
 */
 int sqlite3BtreeClearTable(Btree *p, int iTable, int *pnChange){
-  int rc;
-  BtShared *pBt = p->pBt;
-  sqlite3BtreeEnter(p);
-  assert( p->inTrans==TRANS_WRITE );
-
-  rc = saveAllCursors(pBt, (Pgno)iTable, 0);
-
-  if( SQLITE_OK==rc ){
-    /* Invalidate all incrblob cursors open on table iTable (assuming iTable
-    ** is the root of a table b-tree - if it is not, the following call is
-    ** a no-op).  */
-    invalidateIncrblobCursors(p, 0, 1);
-    rc = clearDatabasePage(pBt, (Pgno)iTable, 0, pnChange);
-  }
-  sqlite3BtreeLeave(p);
-  return rc;
+  return tarantoolSqlite3ClearTable(iTable);
 }
 
 /*

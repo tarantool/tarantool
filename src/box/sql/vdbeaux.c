@@ -4894,6 +4894,7 @@ u32 sqlite3VdbeMsgpackGet(
       return 0;
     }
     case MP_NIL: {
+      mp_decode_nil((const char**)&zParse); /*  Still need to promote zParse.  */
       pMem->flags = MEM_Null;
       break;
     }
