@@ -129,6 +129,10 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 	cord_costart(&relay.cord, "final_join", relay_final_join_f, &relay);
 	if (cord_cojoin(&relay.cord) != 0)
 		diag_raise();
+	ERROR_INJECT(ERRINJ_RELAY_FINAL_SLEEP, {
+		while (vclock_compare(stop_vclock, &recovery->vclock) == 0)
+			fiber_sleep(0.001);
+	});
 }
 
 static void

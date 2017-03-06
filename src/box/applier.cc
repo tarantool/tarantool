@@ -215,6 +215,8 @@ applier_join(struct applier *applier)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
 		}
+		vclock_create(&applier->vclock);
+		xrow_decode_vclock(&row, &applier->vclock);
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -229,6 +231,8 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write(applier->initial_join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
+			vclock_create(&applier->vclock);
+			xrow_decode_vclock(&row, &applier->vclock);
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */
@@ -257,6 +261,8 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write(applier->final_join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
+			vclock_create(&applier->vclock);
+			xrow_decode_vclock(&row, &applier->vclock);
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */
@@ -266,12 +272,6 @@ applier_join(struct applier *applier)
 		}
 	}
 finish:
-	/*
-	 * Decode end of stream packet and overwrite the last known vclock
-	 */
-	vclock_create(&applier->vclock);
-	assert(row.type == IPROTO_OK);
-	xrow_decode_vclock(&row, &applier->vclock);
 	say_info("final data received");
 
 	applier_set_state(applier, APPLIER_JOINED);

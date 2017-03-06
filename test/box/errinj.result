@@ -30,6 +30,8 @@ errinj.info()
     state: false
   ERRINJ_VY_RANGE_SPLIT:
     state: false
+  ERRINJ_RELAY_FINAL_SLEEP:
+    state: false
   ERRINJ_VY_RUN_DISCARD:
     state: false
   ERRINJ_WAL_ROTATE:

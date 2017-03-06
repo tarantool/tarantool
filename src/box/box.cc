@@ -1423,6 +1423,11 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	engine_begin_initial_recovery(NULL);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+	/*
+	 * Save end of final join stream
+	 */
+	struct vclock master_vclock;
+	vclock_copy(&master_vclock, &applier->vclock);
 
 	/*
 	 * Process final data (WALs).
@@ -1436,7 +1441,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 		panic("replica id has not received from master");
 
 	/* Start replica vclock using master's vclock */
-	vclock_copy(start_vclock, &applier->vclock);
+	vclock_copy(start_vclock, &master_vclock);
 
 	/* Finalize the new replica */
 	engine_end_recovery();

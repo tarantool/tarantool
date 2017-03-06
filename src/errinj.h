@@ -73,7 +73,8 @@ struct errinj {
 	_(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_U64, {.u64param = 0}) \
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64, {.u64param = 0})
+	_(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64, {.u64param = 0}) \
+	_(ERRINJ_RELAY_FINAL_SLEEP, ERRINJ_BOOL, {.bparam = false})
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
