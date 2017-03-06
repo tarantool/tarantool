@@ -646,7 +646,7 @@ rope_node_print(struct rope_node *node,
 		print(node->data, node->leaf_size);
 		printf("'}\n");
 
-		if (node && (node->link[0] || node->link[1]))
+		if (node->link[0] || node->link[1])
 			rope_node_print(node->link[1], print, child_prefix, 1);
 	}
 
