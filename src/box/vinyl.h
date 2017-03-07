@@ -50,6 +50,7 @@ struct vclock;
 struct request;
 struct space;
 struct txn_stmt;
+struct xrow_header;
 enum iterator_type;
 
 /*
@@ -297,9 +298,10 @@ vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
  */
 
 typedef int
-(*vy_send_row_f)(void *, const char *tuple, uint32_t tuple_size, int64_t lsn);
+(*vy_send_row_f)(struct xrow_header *row, void *arg);
+
 int
-vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx);
+vy_join(struct vy_env *env, vy_send_row_f send_row, void *send_row_arg);
 
 #ifdef __cplusplus
 }

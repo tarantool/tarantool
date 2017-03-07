@@ -303,6 +303,16 @@ int
 xctl_recover_vy_index(int64_t vy_index_id,
 		      xctl_recovery_cb cb, void *cb_arg);
 
+/**
+ * Call @cb for each active object stored in the most recent
+ * snapshot of the metadata log. Vinyl objects are iterated in
+ * the same order as the one used by xctl_recover_vy_index().
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int
+xctl_relay(xctl_recovery_cb cb, void *cb_arg);
+
 /** Helper to log a vinyl index creation. */
 static inline void
 xctl_create_vy_index(int64_t vy_index_id, uint32_t iid,

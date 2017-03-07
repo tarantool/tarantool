@@ -284,11 +284,6 @@ wal_stream_create(struct wal_stream *ctx, size_t wal_max_rows)
 static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
-	if (row->type != IPROTO_INSERT) {
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				(uint32_t) row->type);
-	}
-
 	(void) stream;
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);

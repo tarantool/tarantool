@@ -7493,6 +7493,18 @@ vy_page_delete(struct vy_page *page)
 	free(page);
 }
 
+static int
+vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
+	     struct xrow_header *xrow)
+{
+	assert(stmt_no < page->count);
+	const char *data = page->data + page->row_index[stmt_no];
+	const char *data_end = stmt_no + 1 < page->count ?
+		page->data + page->row_index[stmt_no + 1] :
+		page->data + page->unpacked_size;
+	return xrow_header_decode(xrow, &data, data_end);
+}
+
 /**
  * Read raw stmt data from the page
  * @param page          Page.
@@ -7509,13 +7521,8 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	     struct tuple_format *format, struct tuple_format *upsert_format,
 	     struct key_def *key_def)
 {
-	assert(stmt_no < page->count);
-	const char *data = page->data + page->row_index[stmt_no];
-	const char *data_end = stmt_no + 1 < page->count ?
-		page->data + page->row_index[stmt_no + 1] :
-		page->data + page->unpacked_size;
 	struct xrow_header xrow;
-	if (xrow_header_decode(&xrow, &data, data_end) != 0)
+	if (vy_page_xrow(page, stmt_no, &xrow) != 0)
 		return NULL;
 	struct tuple_format *format_to_use = (xrow.type == IPROTO_UPSERT)
 		? upsert_format : format;
@@ -10019,31 +10026,119 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 
 /** {{{ Replication */
 
-int
-vy_index_send(struct vy_index *index, vy_send_row_f sendrow, void *ctx)
+/** Argument passed to vy_join_cb(). */
+struct vy_join_arg {
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** Function for sending a statement. */
+	vy_send_row_f send_row;
+	/** Argument passed to send_row(). */
+	void *send_row_arg;
+	/** ID of the space currently being relayed. */
+	uint32_t space_id;
+	/** Ordinal number of the index. */
+	uint32_t index_id;
+	/** Path to the index directory. */
+	char *index_path;
+	/**
+	 * LSN to assign to the next statement.
+	 *
+	 * We can't use original statements' LSNs, because we
+	 * send statements not in the chronological order while
+	 * the receiving end expects LSNs to grow monotonically
+	 * due to the design of the lsregion allocator, which is
+	 * used for storing statements in memory.
+	 */
+	int64_t lsn;
+};
+
+/** Relay callback, passed to xctl_relay(). */
+static int
+vy_join_cb(const struct xctl_record *record, void *cb_arg)
 {
-	struct vy_env *env = index->env;
-	static const int64_t vlsn = INT64_MAX;
+	struct vy_join_arg *arg = cb_arg;
 	int rc = 0;
 
-	struct vy_read_iterator ri;
-	struct tuple *stmt;
-	struct tuple *key = vy_stmt_new_select(env->key_format, NULL, 0);
-	if (key == NULL)
-		return -1;
-	vy_read_iterator_open(&ri, index, NULL, ITER_GT, key, &vlsn, true);
-	rc = vy_read_iterator_next(&ri, &stmt);
-	for (; rc == 0 && stmt; rc = vy_read_iterator_next(&ri, &stmt)) {
-		uint32_t mp_size;
-		const char *mp_data;
-		mp_data = tuple_data_range(stmt, &mp_size);
-		int64_t lsn = vy_stmt_lsn(stmt);
-		rc = sendrow(ctx, mp_data, mp_size, lsn);
-		if (rc != 0)
-			break;
+	if (record->type == XCTL_CREATE_VY_INDEX) {
+		arg->space_id = record->space_id;
+		arg->index_id = record->iid;
+		vy_index_snprint_path(arg->index_path, PATH_MAX,
+				      arg->env->conf->path,
+				      arg->space_id, arg->index_id);
 	}
-	vy_read_iterator_close(&ri);
-	tuple_unref(key);
+
+	/*
+	 * We are only interested in the primary index.
+	 * Secondary keys will be rebuilt on the destination.
+	 */
+	if (arg->index_id != 0)
+		goto out;
+
+	/*
+	 * We only send statements, not metadata, because the
+	 * latter is a replica's private business.
+	 */
+	if (record->type != XCTL_INSERT_VY_RUN)
+		goto out;
+
+	rc = -1;
+
+	/* Load the run. */
+	struct vy_run *run = vy_run_new(record->vy_run_id);
+	if (run == NULL)
+		goto out;
+	if (vy_run_recover(run, arg->index_path) != 0)
+		goto out_free_run;
+
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(arg->env);
+	if (zdctx == NULL)
+		goto out_free_run;
+
+	/* Send the run's statements to the replica. */
+	for (uint32_t page_no = 0; page_no < run->info.count; page_no++) {
+		struct vy_page_info *pi = vy_run_page_info(run, page_no);
+		struct vy_page *page = vy_page_new(pi);
+		if (page == NULL)
+			goto out_free_run;
+		if (vy_page_read(page, pi, run->fd, zdctx) != 0)
+			goto out_free_page;
+		for (uint32_t stmt_no = 0; stmt_no < pi->count; stmt_no++) {
+			struct xrow_header xrow;
+			if (vy_page_xrow(page, stmt_no, &xrow) != 0)
+				goto out_free_page;
+			xrow.lsn = arg->lsn++;
+			if (arg->send_row(&xrow, arg->send_row_arg) != 0)
+				goto out_free_page;
+		}
+		vy_page_delete(page);
+		continue;
+out_free_page:
+		vy_page_delete(page);
+		goto out_free_run;
+	}
+	rc = 0; /* success */
+
+out_free_run:
+	vy_run_delete(run);
+out:
+	return rc;
+}
+
+int
+vy_join(struct vy_env *env, vy_send_row_f send_row, void *send_row_arg)
+{
+	struct vy_join_arg arg = {
+		.env = env,
+		.send_row = send_row,
+		.send_row_arg = send_row_arg,
+	};
+	arg.index_path = malloc(PATH_MAX);
+	if (arg.index_path == NULL) {
+		diag_set(OutOfMemory, PATH_MAX, "malloc", "path");
+		return -1;
+	}
+	int rc = xctl_relay(vy_join_cb, &arg);
+	free(arg.index_path);
 	return rc;
 }
 

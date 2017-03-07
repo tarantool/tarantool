@@ -156,74 +156,23 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 	 */
 }
 
-struct vinyl_send_row_arg {
-	struct xstream *stream;
-	uint32_t space_id;
-};
-
 static int
-vinyl_send_row(void *arg, const char *tuple, uint32_t tuple_size, int64_t lsn)
+vinyl_send_row(struct xrow_header *row, void *arg)
 {
-	struct xstream *stream = ((struct vinyl_send_row_arg *) arg)->stream;
-	uint32_t space_id = ((struct vinyl_send_row_arg *) arg)->space_id;
-
-	struct request_replace_body body;
-	memset(&body, 0, sizeof(body));
-	body.m_body = 0x82; /* map of two elements. */
-	body.k_space_id = IPROTO_SPACE_ID;
-	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(space_id);
-	body.k_tuple = IPROTO_TUPLE;
-	struct xrow_header row;
-	memset(&row, 0, sizeof(row));
-	row.type = IPROTO_INSERT;
-	row.replica_id = 0;
-	row.lsn = lsn;
-	row.bodycnt = 2;
-	row.body[0].iov_base = &body;
-	row.body[0].iov_len = sizeof(body);
-	row.body[1].iov_base = (char *) tuple;
-	row.body[1].iov_len = tuple_size;
+	struct xstream *stream = (struct xstream *) arg;
 	try {
-		xstream_write(stream, &row);
+		xstream_write(stream, row);
 	} catch (Exception *e) {
 		 return -1;
 	}
 	return 0;
 }
 
-struct join_send_space_arg {
-	struct vy_env *env;
-	struct xstream *stream;
-};
-
-static void
-join_send_space(struct space *sp, void *data)
-{
-	struct xstream *stream = ((struct join_send_space_arg *) data)->stream;
-	if (space_is_temporary(sp))
-		return;
-	if (!space_is_vinyl(sp))
-		return;
-	VinylIndex *pk = (VinylIndex *) space_index(sp, 0);
-	if (!pk)
-		return;
-
-	/* send database */
-	struct vinyl_send_row_arg arg = { stream, sp->def.id };
-	if (vy_index_send(pk->db, vinyl_send_row, &arg) != 0)
-		diag_raise();
-}
-
-/**
- * Relay all data currently stored in Vinyl engine
- * to the replica.
- */
 void
 VinylEngine::join(struct xstream *stream)
 {
-	struct join_send_space_arg arg = { env, stream };
-	space_foreach(join_send_space, &arg);
+	if (vy_join(env, vinyl_send_row, stream) != 0)
+		diag_raise();
 }
 
 void

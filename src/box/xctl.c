@@ -275,7 +275,7 @@ static int
 xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 		bool include_deleted, xctl_recovery_cb cb, void *cb_arg);
 static int
-xctl_recovery_iterate(struct xctl_recovery *recovery,
+xctl_recovery_iterate(struct xctl_recovery *recovery, bool include_deleted,
 		      xctl_recovery_cb cb, void *cb_arg);
 
 /** An snprint-style function to print a path to a metadata log file. */
@@ -810,7 +810,8 @@ xctl_end_recovery(void)
 	 * or not inserted into a range. We need to delete such runs
 	 * on recovery.
 	 */
-	xctl_recovery_iterate(recovery, xctl_incomplete_vy_run_gc, NULL);
+	xctl_recovery_iterate(recovery, true,
+			      xctl_incomplete_vy_run_gc, NULL);
 	xctl_recovery_delete(recovery);
 	return 0;
 }
@@ -900,7 +901,8 @@ xctl_rotate_f(va_list ap)
 		.xlog_is_open = false,
 		.xlog_path = path,
 	};
-	if (xctl_recovery_iterate(recovery, xctl_rotate_cb_func, &arg) < 0)
+	if (xctl_recovery_iterate(recovery, true,
+				  xctl_rotate_cb_func, &arg) < 0)
 		goto err_write_xlog;
 
 	if (!arg.xlog_is_open)
@@ -1017,7 +1019,8 @@ xctl_collect_garbage(int64_t signature)
 
 	if (rc == 0) {
 		/* Cleanup unused runs. */
-		xctl_recovery_iterate(recovery, xctl_deleted_vy_run_gc, NULL);
+		xctl_recovery_iterate(recovery, true,
+				      xctl_deleted_vy_run_gc, NULL);
 		xctl_recovery_delete(recovery);
 	} else {
 		say_warn("garbage collection failed: %s",
@@ -1025,6 +1028,60 @@ xctl_collect_garbage(int64_t signature)
 	}
 
 	say_debug("%s: done", __func__);
+}
+
+/** Argument passed to xctl_relay_f(). */
+struct xctl_relay_arg {
+	/** The recovery context to relay. */
+	struct xctl_recovery *recovery;
+	/** The relay callback. */
+	xctl_recovery_cb cb;
+	/** The relay callback argument. */
+	void *cb_arg;
+};
+
+/** Relay cord function. */
+static int
+xctl_relay_f(va_list ap)
+{
+	struct xctl_relay_arg *arg = va_arg(ap, struct xctl_relay_arg *);
+	return xctl_recovery_iterate(arg->recovery, false,
+				     arg->cb, arg->cb_arg);
+}
+
+int
+xctl_relay(xctl_recovery_cb cb, void *cb_arg)
+{
+	/*
+	 * First, load the latest snapshot of the metadata log.
+	 * Use coeio in order not ot block tx thread.
+	 */
+	latch_lock(&xctl.latch);
+	struct xctl_recovery *recovery;
+	int rc = coio_call(xctl_recovery_new_f, xctl.signature,
+			   xctl.signature, &recovery);
+	latch_unlock(&xctl.latch);
+	if (rc != 0)
+		return -1;
+
+	/*
+	 * Second, relay the state stored in the log via
+	 * the provided callback.
+	 */
+	struct xctl_relay_arg arg = {
+		.recovery = recovery,
+		.cb = cb,
+		.cb_arg = cb_arg,
+	};
+	struct cord cord;
+	if (cord_costart(&cord, "initial_join", xctl_relay_f, &arg) != 0) {
+		xctl_recovery_delete(recovery);
+		return -1;
+	}
+	if (cord_cojoin(&cord) != 0)
+		return -1;
+
+	return 0;
 }
 
 void
@@ -1772,14 +1829,15 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
  * See xctl_recovery_iterate_vy_index() for more details.
  */
 static int
-xctl_recovery_iterate(struct xctl_recovery *recovery,
+xctl_recovery_iterate(struct xctl_recovery *recovery, bool include_deleted,
 		      xctl_recovery_cb cb, void *cb_arg)
 {
 	mh_int_t i;
 	mh_foreach(recovery->vy_index_hash, i) {
 		struct vy_index_recovery_info *index;
 		index = mh_i64ptr_node(recovery->vy_index_hash, i)->val;
-		if (xctl_recovery_iterate_vy_index(index, true, cb, cb_arg) < 0)
+		if (xctl_recovery_iterate_vy_index(index, include_deleted,
+						   cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;

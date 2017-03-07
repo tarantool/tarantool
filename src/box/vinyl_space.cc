@@ -46,13 +46,8 @@ VinylSpace::VinylSpace(Engine *e)
 void
 VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
-	assert(request->type == IPROTO_INSERT);
 	assert(request->header != NULL);
 	struct vy_env *env = ((VinylEngine *)space->handler->engine)->env;
-
-	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple))
-		diag_raise();
 
 	struct vy_tx *tx = vy_begin(env);
 	if (tx == NULL)
@@ -60,8 +55,31 @@ VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 
 	int64_t signature = request->header->lsn;
 
-	if (vy_replace(tx, NULL, space, request))
+	struct txn_stmt stmt;
+	memset(&stmt, 0, sizeof(stmt));
+
+	int rc;
+	switch (request->type) {
+	case IPROTO_REPLACE:
+		rc = vy_replace(tx, &stmt, space, request);
+		break;
+	case IPROTO_UPSERT:
+		rc = vy_upsert(tx, &stmt, space, request);
+		break;
+	case IPROTO_DELETE:
+		rc = vy_delete(tx, &stmt, space, request);
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) request->type);
+	}
+	if (rc != 0)
 		diag_raise();
+
+	if (stmt.old_tuple)
+		tuple_unref(stmt.old_tuple);
+	if (stmt.new_tuple)
+		tuple_unref(stmt.new_tuple);
 
 	if (vy_prepare(env, tx)) {
 		vy_rollback(env, tx);

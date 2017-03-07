@@ -19,7 +19,10 @@ box.schema.user.grant('guest', 'replication')
 space = box.schema.space.create('test', { id = 99999, engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = index})
+_ = space:create_index('primary', { type = index})
+---
+...
+_ = space:create_index('secondary', { type = index, unique = false, parts = {2, 'unsigned'}})
 ---
 ...
 box.snapshot()
@@ -47,6 +50,10 @@ box.space.test:select()
 ---
 - []
 ...
+box.space.test.index.secondary:select()
+---
+- []
+...
 test_run:cmd('switch default')
 ---
 - true
@@ -59,9 +66,11 @@ _ = test_run:cmd("cleanup server replica")
 ---
 ...
 -- new data
-box.space.test:insert{1, 1}
+for k = 1, 8 do box.space.test:insert{k, 17 - k} end
 ---
-- [1, 1]
+...
+for k = 16, 9, -1 do box.space.test:insert{k, 17 - k} end
+---
 ...
 -- replica join
 test_run:cmd("deploy server replica")
@@ -82,7 +91,41 @@ test_run:cmd('switch replica')
 ...
 box.space.test:select()
 ---
-- - [1, 1]
+- - [1, 16]
+  - [2, 15]
+  - [3, 14]
+  - [4, 13]
+  - [5, 12]
+  - [6, 11]
+  - [7, 10]
+  - [8, 9]
+  - [9, 8]
+  - [10, 7]
+  - [11, 6]
+  - [12, 5]
+  - [13, 4]
+  - [14, 3]
+  - [15, 2]
+  - [16, 1]
+...
+box.space.test.index.secondary:select()
+---
+- - [16, 1]
+  - [15, 2]
+  - [14, 3]
+  - [13, 4]
+  - [12, 5]
+  - [11, 6]
+  - [10, 7]
+  - [9, 8]
+  - [8, 9]
+  - [7, 10]
+  - [6, 11]
+  - [5, 12]
+  - [4, 13]
+  - [3, 14]
+  - [2, 15]
+  - [1, 16]
 ...
 test_run:cmd('switch default')
 ---
@@ -119,7 +162,41 @@ test_run:cmd('switch replica')
 ...
 box.space.test:select()
 ---
-- - [1, 1]
+- - [1, 16]
+  - [2, 15]
+  - [3, 14]
+  - [4, 13]
+  - [5, 12]
+  - [6, 11]
+  - [7, 10]
+  - [8, 9]
+  - [9, 8]
+  - [10, 7]
+  - [11, 6]
+  - [12, 5]
+  - [13, 4]
+  - [14, 3]
+  - [15, 2]
+  - [16, 1]
+...
+box.space.test.index.secondary:select()
+---
+- - [16, 1]
+  - [15, 2]
+  - [14, 3]
+  - [13, 4]
+  - [12, 5]
+  - [11, 6]
+  - [10, 7]
+  - [9, 8]
+  - [8, 9]
+  - [7, 10]
+  - [6, 11]
+  - [5, 12]
+  - [4, 13]
+  - [3, 14]
+  - [2, 15]
+  - [1, 16]
 ...
 test_run:cmd('switch default')
 ---
@@ -133,7 +210,10 @@ _ = test_run:cmd("cleanup server replica")
 ---
 ...
 -- new data
-for k = 2, 123 do box.space.test:insert{k, k*k} end
+for k = 8, 1, -1 do box.space.test:update(k, {{'-', 2, 8}}) end
+---
+...
+for k = 9, 16 do box.space.test:delete(k) end
 ---
 ...
 box.snapshot()
@@ -159,129 +239,74 @@ test_run:cmd('switch replica')
 ...
 box.space.test:select()
 ---
-- - [1, 1]
-  - [2, 4]
-  - [3, 9]
-  - [4, 16]
-  - [5, 25]
-  - [6, 36]
-  - [7, 49]
-  - [8, 64]
-  - [9, 81]
-  - [10, 100]
-  - [11, 121]
-  - [12, 144]
-  - [13, 169]
-  - [14, 196]
-  - [15, 225]
-  - [16, 256]
-  - [17, 289]
-  - [18, 324]
-  - [19, 361]
-  - [20, 400]
-  - [21, 441]
-  - [22, 484]
-  - [23, 529]
-  - [24, 576]
-  - [25, 625]
-  - [26, 676]
-  - [27, 729]
-  - [28, 784]
-  - [29, 841]
-  - [30, 900]
-  - [31, 961]
-  - [32, 1024]
-  - [33, 1089]
-  - [34, 1156]
-  - [35, 1225]
-  - [36, 1296]
-  - [37, 1369]
-  - [38, 1444]
-  - [39, 1521]
-  - [40, 1600]
-  - [41, 1681]
-  - [42, 1764]
-  - [43, 1849]
-  - [44, 1936]
-  - [45, 2025]
-  - [46, 2116]
-  - [47, 2209]
-  - [48, 2304]
-  - [49, 2401]
-  - [50, 2500]
-  - [51, 2601]
-  - [52, 2704]
-  - [53, 2809]
-  - [54, 2916]
-  - [55, 3025]
-  - [56, 3136]
-  - [57, 3249]
-  - [58, 3364]
-  - [59, 3481]
-  - [60, 3600]
-  - [61, 3721]
-  - [62, 3844]
-  - [63, 3969]
-  - [64, 4096]
-  - [65, 4225]
-  - [66, 4356]
-  - [67, 4489]
-  - [68, 4624]
-  - [69, 4761]
-  - [70, 4900]
-  - [71, 5041]
-  - [72, 5184]
-  - [73, 5329]
-  - [74, 5476]
-  - [75, 5625]
-  - [76, 5776]
-  - [77, 5929]
-  - [78, 6084]
-  - [79, 6241]
-  - [80, 6400]
-  - [81, 6561]
-  - [82, 6724]
-  - [83, 6889]
-  - [84, 7056]
-  - [85, 7225]
-  - [86, 7396]
-  - [87, 7569]
-  - [88, 7744]
-  - [89, 7921]
-  - [90, 8100]
-  - [91, 8281]
-  - [92, 8464]
-  - [93, 8649]
-  - [94, 8836]
-  - [95, 9025]
-  - [96, 9216]
-  - [97, 9409]
-  - [98, 9604]
-  - [99, 9801]
-  - [100, 10000]
-  - [101, 10201]
-  - [102, 10404]
-  - [103, 10609]
-  - [104, 10816]
-  - [105, 11025]
-  - [106, 11236]
-  - [107, 11449]
-  - [108, 11664]
-  - [109, 11881]
-  - [110, 12100]
-  - [111, 12321]
-  - [112, 12544]
-  - [113, 12769]
-  - [114, 12996]
-  - [115, 13225]
-  - [116, 13456]
-  - [117, 13689]
-  - [118, 13924]
-  - [119, 14161]
-  - [120, 14400]
-  - [121, 14641]
-  - [122, 14884]
-  - [123, 15129]
+- - [1, 8]
+  - [2, 7]
+  - [3, 6]
+  - [4, 5]
+  - [5, 4]
+  - [6, 3]
+  - [7, 2]
+  - [8, 1]
+...
+box.space.test.index.secondary:select()
+---
+- - [8, 1]
+  - [7, 2]
+  - [6, 3]
+  - [5, 4]
+  - [4, 5]
+  - [3, 6]
+  - [2, 7]
+  - [1, 8]
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+_ = test_run:cmd("cleanup server replica")
+---
+...
+-- recreate space
+space:drop()
+---
+...
+space = box.schema.space.create('test', { id = 12345, engine = engine })
+---
+...
+_ = space:create_index('primary', { type = index})
+---
+...
+_ = space:insert{12345}
+---
+...
+-- replica join
+test_run:cmd("deploy server replica")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('wait_lsn replica default')
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space.test.id
+---
+- 12345
+...
+box.space.test:select()
+---
+- - [12345]
 ...
 test_run:cmd('switch default')
 ---

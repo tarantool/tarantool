@@ -5,7 +5,8 @@ index = test_run:get_cfg('index')
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
 space = box.schema.space.create('test', { id = 99999, engine = engine })
-index = space:create_index('primary', { type = index})
+_ = space:create_index('primary', { type = index})
+_ = space:create_index('secondary', { type = index, unique = false, parts = {2, 'unsigned'}})
 box.snapshot()
 
 -- replica join
@@ -14,12 +15,14 @@ test_run:cmd("start server replica")
 test_run:cmd('wait_lsn replica default')
 test_run:cmd('switch replica')
 box.space.test:select()
+box.space.test.index.secondary:select()
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 
 -- new data
-box.space.test:insert{1, 1}
+for k = 1, 8 do box.space.test:insert{k, 17 - k} end
+for k = 16, 9, -1 do box.space.test:insert{k, 17 - k} end
 
 -- replica join
 test_run:cmd("deploy server replica")
@@ -27,6 +30,7 @@ test_run:cmd("start server replica")
 test_run:cmd('wait_lsn replica default')
 test_run:cmd('switch replica')
 box.space.test:select()
+box.space.test.index.secondary:select()
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -40,12 +44,14 @@ test_run:cmd("start server replica")
 test_run:cmd('wait_lsn replica default')
 test_run:cmd('switch replica')
 box.space.test:select()
+box.space.test.index.secondary:select()
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 
 -- new data
-for k = 2, 123 do box.space.test:insert{k, k*k} end
+for k = 8, 1, -1 do box.space.test:update(k, {{'-', 2, 8}}) end
+for k = 9, 16 do box.space.test:delete(k) end
 box.snapshot()
 
 -- replica join
@@ -53,6 +59,24 @@ test_run:cmd("deploy server replica")
 test_run:cmd("start server replica")
 test_run:cmd('wait_lsn replica default')
 test_run:cmd('switch replica')
+box.space.test:select()
+box.space.test.index.secondary:select()
+test_run:cmd('switch default')
+test_run:cmd("stop server replica")
+_ = test_run:cmd("cleanup server replica")
+
+-- recreate space
+space:drop()
+space = box.schema.space.create('test', { id = 12345, engine = engine })
+_ = space:create_index('primary', { type = index})
+_ = space:insert{12345}
+
+-- replica join
+test_run:cmd("deploy server replica")
+test_run:cmd("start server replica")
+test_run:cmd('wait_lsn replica default')
+test_run:cmd('switch replica')
+box.space.test.id
 box.space.test:select()
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")

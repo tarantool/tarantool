@@ -249,7 +249,10 @@ dup_replace_mode(uint32_t op)
 void
 MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 {
-	assert(request->type == IPROTO_INSERT);
+	if (request->type != IPROTO_INSERT) {
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				(uint32_t) request->type);
+	}
 	request->header->replica_id = 0;
 	struct txn *txn = txn_begin_stmt(space);
 	try {
