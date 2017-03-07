@@ -51,6 +51,7 @@
 #include <lj_cconv.h>
 
 #include <ctype.h>
+#include <inttypes.h>
 
 #include "strbuf.h"
 #include "fpconv.h"
@@ -641,7 +642,7 @@ static void json_append_cdata(lua_State *l, json_config_t *cfg,
             {
                 int64_t num = *(int64_t*) cdataptr(cd);
                 strbuf_ensure_empty_length(json, FPCONV_G_FMT_BUFSIZE_64);
-                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%ld",num);
+                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%"PRIi64,num);
                 strbuf_extend_length(json, len);
             }
             break;
@@ -649,7 +650,7 @@ static void json_append_cdata(lua_State *l, json_config_t *cfg,
             {
                 uint64_t unum = *(uint64_t*) cdataptr(cd);
                 strbuf_ensure_empty_length(json,FPCONV_G_FMT_BUFSIZE_64);
-                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%lu",unum);
+                len = snprintf(strbuf_empty_ptr(json),FPCONV_G_FMT_BUFSIZE_64,"%"PRIi64,unum);
                 strbuf_extend_length(json, len);
             }
             break;
