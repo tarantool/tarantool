@@ -4692,8 +4692,10 @@ static int accessPayload(
 int sqlite3BtreePayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf){
   assert( cursorHoldsMutex(pCur) );
   assert( pCur->eState==CURSOR_VALID );
-  assert( pCur->iPage>=0 && pCur->apPage[pCur->iPage] );
-  assert( pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
+  assert( (pCur->curFlags & BTCF_TaCursor) ||
+          (pCur->iPage>=0 && pCur->apPage[pCur->iPage]) );
+  assert( (pCur->curFlags & BTCF_TaCursor) ||
+          pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
   return accessPayload(pCur, offset, amt, (unsigned char*)pBuf, 0);
 }
 #ifndef SQLITE_OMIT_INCRBLOB
@@ -4706,8 +4708,10 @@ int sqlite3BtreePayloadChecked(BtCursor *pCur, u32 offset, u32 amt, void *pBuf){
   rc = restoreCursorPosition(pCur);
   if( rc==SQLITE_OK ){
     assert( pCur->eState==CURSOR_VALID );
-    assert( pCur->iPage>=0 && pCur->apPage[pCur->iPage] );
-    assert( pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
+    assert( (pCur->curFlags & BTCF_TaCursor) ||
+            (pCur->iPage>=0 && pCur->apPage[pCur->iPage]) );
+    assert( (pCur->curFlags & BTCF_TaCursor) ||
+            pCur->aiIdx[pCur->iPage]<pCur->apPage[pCur->iPage]->nCell );
     rc = accessPayload(pCur, offset, amt, pBuf, 0);
   }
   return rc;

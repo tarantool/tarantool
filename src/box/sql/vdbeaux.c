@@ -4934,7 +4934,7 @@ install_blob:
     }
     case MP_BIN: {
       /* XXX u32->int */
-      pMem->n = (int)mp_decode_strl((const char **)&zParse);
+      pMem->n = (int)mp_decode_binl((const char **)&zParse);
       pMem->flags = MEM_Blob|MEM_Ephem;
       goto install_blob;
     }

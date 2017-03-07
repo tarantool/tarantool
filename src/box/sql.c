@@ -134,12 +134,15 @@ sql_get()
  */
 struct ta_cursor
 {
-	box_iterator_t   *iter;
-	struct tuple     *tuple_last;
+	size_t             size;
+	box_iterator_t    *iter;
+	struct tuple      *tuple_last;
 	enum iterator_type type;
+	char               key[1];
 };
 
-static struct ta_cursor *cursor_create();
+static struct ta_cursor *
+cursor_create(struct ta_cursor *c, size_t key_size);
 
 static int
 cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
@@ -447,10 +450,9 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 		return SQLITE_TARANTOOL_ERROR;
 	}
 	if (!c) {
-		c = cursor_create();
+		c = cursor_create(NULL, 0);
 		if (!c) return SQLITE_NOMEM;
 		pCur->pTaCursor = c;
-		c->iter = NULL;
 		c->type = ITER_EQ; /* store some meaningfull value */
 	} else if (c->tuple_last) {
 		box_tuple_unref(c->tuple_last);
@@ -462,9 +464,36 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 	return SQLITE_OK;
 }
 
-static struct ta_cursor *cursor_create()
+/*
+ * Allocate or grow cursor.
+ * Result->type value is unspecified.
+ */
+static struct ta_cursor *
+cursor_create(struct ta_cursor *c, size_t key_size)
 {
-	return malloc(sizeof(struct ta_cursor));
+	size_t             size;
+	struct ta_cursor  *res;
+
+	if (c) {
+		size = c->size;
+		if (size - offsetof(struct ta_cursor, key) >= key_size)
+			return c;
+	} else {
+		size = sizeof(*c);
+	}
+
+	while (size - offsetof(struct ta_cursor, key) < key_size)
+		size *= 2;
+
+	res = realloc(c, size);
+	if (res) {
+		res->size = size;
+		if (!c) {
+			res->iter = NULL;
+			res->tuple_last = NULL;
+		}
+	}
+	return res;
 }
 
 /* Cursor positioning. */
@@ -474,27 +503,35 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
-	struct ta_cursor *c;
+	struct ta_cursor *c = pCur->pTaCursor;
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
 	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
+	size_t key_size = 0;
 
-
-	c = pCur->pTaCursor;
-	if (c) {
-		/* close existing iterator, if any */
-		if (c->iter) {
-			box_iterator_free(c->iter);
-			c->iter = NULL;
-		}
-	} else {
-		c = cursor_create();
-		if (!c) {
-			*pRes = 1;
-			return SQLITE_NOMEM;
-		}
-		pCur->pTaCursor = c;
-		c->tuple_last = NULL;
+	/* Close existing iterator, if any */
+	if (c && c->iter) {
+		box_iterator_free(c->iter);
+		c->iter = NULL;
 	}
+
+	/* Allocate or grow cursor if needed. */
+	if (type == ITER_EQ || type == ITER_REQ) {
+		key_size = (size_t)(ke - k);
+	}
+	c = cursor_create(c, key_size);
+	if (!c) {
+		*pRes = 1;
+		return SQLITE_NOMEM;
+	}
+	pCur->pTaCursor = c;
+
+	/* Copy key if necessary. */
+	if (key_size != 0) {
+		memcpy(c->key, k, ke-k);
+		ke = c->key + (ke-k);
+		k = c->key;
+	}
+
 	c->iter = box_index_iterator(space_id, index_id, type, k, ke);
 	if (c->iter == NULL) {
 		pCur->eState = CURSOR_INVALID;

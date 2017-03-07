@@ -3898,7 +3898,7 @@ case OP_Found: {        /* jump, in3 */
     if( pIdxKey==0 ) goto no_mem;
     assert( pIn3->flags & MEM_Blob );
     (void)ExpandBlob(pIn3);
-    sqlite3VdbeRecordUnpack(pC->pKeyInfo, pIn3->n, pIn3->z, pIdxKey);
+    sqlite3VdbeRecordUnpackMsgpack(pC->pKeyInfo, pIn3->n, pIn3->z, pIdxKey);
   }
   pIdxKey->default_rc = 0;
   pIdxKey->opcode = pOp->opcode;
