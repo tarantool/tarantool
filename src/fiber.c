@@ -232,6 +232,11 @@ fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
 	struct fiber *self = fiber();
+	/**
+	 * Do nothing if the fiber is dead, since cancelling
+	 * the fiber would clear the diagnostics area and
+	 * the cause of death would be lost.
+	 */
 	if (fiber_is_dead(f))
 		return;
 
