@@ -2797,9 +2797,11 @@ vy_run_recover(struct vy_run *run, const char *dir)
 	}
 
 	/* Allocate buffer for page info. */
-	run->info.page_infos = calloc(run->info.count, sizeof(struct vy_page_info));
+	run->info.page_infos = calloc(run->info.count,
+				      sizeof(struct vy_page_info));
 	if (run->info.page_infos == NULL) {
-		diag_set(OutOfMemory, run->info.count * sizeof(struct vy_page_info),
+		diag_set(OutOfMemory,
+			 run->info.count * sizeof(struct vy_page_info),
 			 "malloc", "struct vy_page_info");
 		goto fail_close;
 	}
@@ -2812,22 +2814,22 @@ vy_run_recover(struct vy_run *run, const char *dir)
 				diag_set(ClientError, ER_VINYL,
 					 "Too few pages in run meta file");
 			}
-			/** Limit count of pages to successfully created pages */
+			/*
+			 * Limit the count of pages to
+			 * successfully created pages.
+			 */
 			run->info.count = page_no;
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
 		if (vy_page_info_decode(page, &xrow) < 0) {
-			/** Limit count of pages to successfully created pages */
+			/**
+			 * Limit the count of pages to successfully
+			 * created pages
+			 */
 			run->info.count = page_no;
 			goto fail_close;
 		}
-	}
-	if (xlog_cursor_next_row(&cursor, &xrow) == 0) {
-		/** To many pages in file */
-		diag_set(ClientError, ER_VINYL,
-			 "Too many pages in run meta file");
-		goto fail_close;
 	}
 
 	/* We don't need to keep metadata file open any longer. */
