@@ -4991,6 +4991,7 @@ case OP_IdxDelete: {
   r.nField = (u16)pOp->p3;
   r.default_rc = 0;
   r.aMem = &aMem[pOp->p2];
+  r.opcode = OP_IdxDelete;
   rc = sqlite3BtreeMovetoUnpacked(pCrsr, &r, 0, 0, &res);
   if( rc ) goto abort_due_to_error;
   if( res==0 ){

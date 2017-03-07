@@ -256,6 +256,7 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 	case OP_NoConflict:
 	case OP_NotFound:
 	case OP_Found:
+	case OP_IdxDelete:
 		iter_type = ITER_EQ;
 		res_success = 0;
 		break;
