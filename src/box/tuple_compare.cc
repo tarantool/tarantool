@@ -249,9 +249,17 @@ mp_compare_bin(const char *field_a, const char *field_b)
 	return COMPARE_RESULT(size_a, size_b);
 }
 
+static int
+mp_compare_nil(const char *field_a, const char *field_b)
+{
+	(void)field_a;
+	(void)field_b;
+	return 0;
+}
+
 typedef int (*mp_compare_f)(const char *, const char *);
 static mp_compare_f mp_class_comparators[] = {
-	/* .MP_CLASS_NIL    = */ NULL,
+	/* .MP_CLASS_NIL    = */ mp_compare_nil,
 	/* .MP_CLASS_BOOL   = */ mp_compare_bool,
 	/* .MP_CLASS_NUMBER = */ mp_compare_number,
 	/* .MP_CLASS_STR    = */ mp_compare_str,

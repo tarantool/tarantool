@@ -101,7 +101,7 @@ const uint32_t key_mp_type[] = {
 	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
 	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
-		(1U << MP_BIN) | (1U << MP_BOOL),
+		(1U << MP_BIN) | (1U << MP_BOOL) | (1U << MP_NIL),
 };
 
 const char *opt_type_strs[] = {
