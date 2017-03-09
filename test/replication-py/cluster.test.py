@@ -253,6 +253,7 @@ failed.script = 'replication-py/failed.lua'
 failed.vardir = server.vardir
 failed.rpl_master = master
 failed.name = "failed"
+failed.crash_expected = True
 try:
     failed.deploy()
 except Exception as e:
