@@ -4118,14 +4118,13 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_range *range = task->range;
 	struct vy_range *r, *tmp;
 
-	say_error("%s: failed to split range %s: %s",
-		  index->name, vy_range_str(range),
-		  diag_last_error(&task->diag)->errmsg);
-
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
 
 	if (!in_shutdown) {
+		say_error("%s: failed to split range %s: %s",
+			  index->name, vy_range_str(range),
+			  diag_last_error(&task->diag)->errmsg);
 		rlist_foreach_entry(r, &range->split_list, split_list)
 			vy_range_discard_new_run(r);
 	}
@@ -4359,15 +4358,15 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
 
-	say_error("%s: failed to compact range %s: %s",
-		  index->name, vy_range_str(range),
-		  diag_last_error(&task->diag)->errmsg);
-
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
-	if (!in_shutdown)
+	if (!in_shutdown) {
+		say_error("%s: failed to compact range %s: %s",
+			  index->name, vy_range_str(range),
+			  diag_last_error(&task->diag)->errmsg);
 		vy_range_discard_new_run(range);
+	}
 
 	/*
 	 * No need to roll back anything if we failed to write a run.
