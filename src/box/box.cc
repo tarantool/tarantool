@@ -123,7 +123,7 @@ box_check_writable(void)
 	 *   box.cfg.read_only == false and
 	 *   replica id is registered in _cluster table
 	 */
-	if (is_ro || recovery->replica_id == 0)
+	if (is_ro || instance_id == 0)
 		tnt_raise(LoggedError, ER_READONLY);
 }
 
@@ -1278,7 +1278,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * instance, this is the only way for a replica to find
 	 * out the id of the instance it has connected to.
 	 */
-	row.replica_id = recovery->replica_id;
+	row.replica_id = instance_id;
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1371,13 +1371,13 @@ bootstrap_master(void)
 	uint32_t replica_id = 1;
 
 	/* Unregister a local replica if it was registered by bootstrap.bin */
-	assert(recovery->replica_id == 0);
+	assert(instance_id == 0);
 	if (boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "[%u]", 1) != 0)
 		diag_raise();
 
 	/* Register the first replica in the replica set */
 	box_register_replica(replica_id, &INSTANCE_UUID);
-	assert(recovery->replica_id == 1);
+	assert(instance_id == 1);
 
 	/* Register other cluster members */
 	replicaset_foreach(replica) {
@@ -1432,7 +1432,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
 	/* Check replica_id registration in _cluster */
-	if (recovery->replica_id == REPLICA_ID_NIL)
+	if (instance_id == REPLICA_ID_NIL)
 		panic("replica id has not received from master");
 
 	/* Start replica vclock using master's vclock */
@@ -1620,7 +1620,7 @@ box_cfg_xc(void)
 	fiber_gc();
 
 	/* The replica must be registered in _cluster */
-	assert(recovery->replica_id != REPLICA_ID_NIL);
+	assert(instance_id != REPLICA_ID_NIL);
 
 	/* Start WAL writer */
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));

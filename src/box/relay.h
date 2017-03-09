@@ -50,6 +50,7 @@ struct relay {
 	struct xstream stream;
 	struct vclock stop_vclock;
 	ev_tstamp wal_dir_rescan_delay;
+	uint32_t replica_id;
 };
 
 /**

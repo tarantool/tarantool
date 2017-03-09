@@ -68,6 +68,7 @@ rb_gen(, replicaset_, replicaset_t, struct replica, link,
 
 static struct mempool replica_pool;
 static replicaset_t replicaset;
+uint32_t instance_id = REPLICA_ID_NIL;
 
 void
 replication_init(void)
@@ -132,13 +133,10 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 	assert(replica->id == REPLICA_ID_NIL); /* replica id is read-only */
 	replica->id = replica_id;
 
-	/* Add replica */
-	struct recovery *r = ::recovery;
-
 	if (tt_uuid_is_equal(&INSTANCE_UUID, &replica->uuid)) {
 		/* Assign local replica id */
-		assert(r->replica_id == REPLICA_ID_NIL);
-		r->replica_id = replica_id;
+		assert(instance_id == REPLICA_ID_NIL);
+		instance_id = replica_id;
 	}
 }
 
@@ -147,7 +145,6 @@ replica_clear_id(struct replica *replica)
 {
 	assert(replica->id != REPLICA_ID_NIL);
 
-	struct recovery *r = ::recovery;
 	/*
 	 * Don't remove replicas from vclock here.
 	 * The vclock_sum() must always grow, it is a core invariant of
@@ -157,8 +154,8 @@ replica_clear_id(struct replica *replica)
 	 * Some records may arrive later on due to asynchronous nature of
 	 * replication.
 	 */
-	if (r->replica_id == replica->id)
-		r->replica_id = REPLICA_ID_NIL;
+	if (instance_id == replica->id)
+		instance_id = REPLICA_ID_NIL;
 	replica->id = REPLICA_ID_NIL;
 	if (replica_is_orphan(replica)) {
 		replicaset_remove(&replicaset, replica);

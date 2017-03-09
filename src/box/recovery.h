@@ -57,7 +57,6 @@ struct recovery {
 	 * locally or send to the replica.
 	 */
 	struct fiber *watcher;
-	uint32_t replica_id;
 };
 
 struct recovery *

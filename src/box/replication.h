@@ -92,6 +92,9 @@ replication_init(void);
 void
 replication_free(void);
 
+/** Instance id vclock identifier */
+extern uint32_t instance_id;
+
 /** UUID of the instance. */
 extern struct tt_uuid INSTANCE_UUID;
 /** UUID of the replica set. */

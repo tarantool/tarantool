@@ -226,7 +226,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       replica_clock);
-	relay.r->replica_id = replica->id;
+	relay.replica_id = replica->id;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
 
@@ -291,7 +291,7 @@ relay_send_subscribe_row(struct xstream *stream, struct xrow_header *packet)
 	 * In that case, only send a row if it is not from the same replica
 	 * (i.e. don't send replica's own rows back).
 	 */
-	if (packet->replica_id != r->replica_id) {
+	if (packet->replica_id != relay->replica_id) {
 		relay_send(relay, packet);
 		ERROR_INJECT(ERRINJ_RELAY,
 		{

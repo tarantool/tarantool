@@ -138,16 +138,16 @@ lbox_info_server(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, recovery->replica_id);
+	lua_pushinteger(L, instance_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	if (recovery->replica_id != REPLICA_ID_NIL && wal != NULL) {
+	if (instance_id != REPLICA_ID_NIL && wal != NULL) {
 		struct vclock vclock;
 		wal_checkpoint(&vclock, false);
-		luaL_pushint64(L, vclock_get(&vclock, recovery->replica_id));
+		luaL_pushint64(L, vclock_get(&vclock, instance_id));
 	} else {
 		luaL_pushint64(L, -1);
 	}

@@ -101,8 +101,8 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
 {
 	if (row->replica_id == 0) {
 		/* Local request. */
-		row->replica_id = r->replica_id;
-		row->lsn = vclock_inc(&r->vclock, r->replica_id);
+		row->replica_id = instance_id;
+		row->lsn = vclock_inc(&r->vclock, instance_id);
 	} else {
 		/* Replication request. */
 		if (replica_id_is_reserved(row->replica_id) ||
