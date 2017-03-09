@@ -359,6 +359,7 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	const char *base;
 	const struct tuple_format *format;
 	const uint32_t *field_map;
+	uint32_t field_map_size;
 	const char *p;
 	u32 i, n;
 	int rc;
@@ -378,13 +379,31 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	base = tuple_data(tuple);
 	format = tuple_format(tuple);
 	field_map = tuple_field_map(tuple);
+	field_map_size = format->field_map_size;
 	p = base; mp_decode_array(&p);
 	for (i=0; i<n; i++) {
-		int32_t offset_slot = format->fields[
-			key_def->parts[i].fieldno
-		].offset_slot;
-		if (offset_slot != TUPLE_OFFSET_SLOT_NIL) {
-			p = base + field_map[offset_slot];
+		/*
+		 * Tuple contains offset map to make it possible to
+		 * extract indexed fields without decoding all prior
+		 * fields.  There's a caveat though:
+		 *  (1) The very first field's offset is never stored;
+		 *  (2) if an index samples consequetive fields,
+		 *      ex: 3-4-5, only the very first field in a run
+		 *      has its offset stored;
+		 *  (3) field maps are rebuilt lazily when a new index
+		 *      is added, i.e. it is possible to encounter a
+		 *      tuple with an incomplete offset map.
+		 */
+		uint32_t fieldno = key_def->parts[i].fieldno;
+		if (fieldno >= field_map_size) {
+			/* Outdated field_map. */
+			p = tuple_field(tuple, fieldno);
+		} else {
+			int32_t slot = format->fields[fieldno].offset_slot;
+			/* p stores a pointer to the field following the
+			 * one examined last (or the very fist one) */
+			if (slot != TUPLE_OFFSET_SLOT_NIL)
+				p = base + field_map[slot];
 		}
 		rc = sqlite3VdbeCompareMsgpack(&p, pUnpacked, i);
 		if (rc != 0) {
@@ -771,8 +790,11 @@ static const struct Enc *get_enc(void *buf)
  * Convert SQLite affinity value to the corresponding Tarantool type
  * string which is suitable for _index.parts field.
  */
-static const char *convertSqliteAffinity(int affinity)
+static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
 {
+	if (allow_nulls) {
+		return "scalar";
+	}
 	switch (affinity) {
 	default:
 		assert(false);
@@ -809,7 +831,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
 		t = aCol[i].affinity == SQLITE_AFF_BLOB ? "*" :
-			convertSqliteAffinity(aCol[i].affinity);
+			convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
 		p = enc->encode_str(p, t, strlen(t));
 	}
 	return (int)(p - base);
@@ -849,7 +871,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	p = enc->encode_array(base, n);
 	for (i=0; i<n; i++) {
 		int col = pIndex->aiColumn[i];
-		const char *t = convertSqliteAffinity(aCol[col].affinity);
+		const char *t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 		p = enc->encode_array(p, 2),
 		p = enc->encode_uint(p, col);
 		p = enc->encode_str(p, t, strlen(t));

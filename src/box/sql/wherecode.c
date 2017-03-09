@@ -1413,9 +1413,22 @@ Bitmask sqlite3WhereCodeOneLoopStart(
      && pWInfo->nOBSat>0
      && (pIdx->nKeyCol>nEq)
     ){
-      assert( pLoop->nSkip==0 );
-      bSeekPastNull = 1;
-      nExtraReg = 1;
+      j = pIdx->aiColumn[nEq];
+      /* Allow seek for column with `NOT NULL` == false attribute.
+      ** If a column may contain NULL-s, the comparator installed
+      ** by Tarantool is prepared to seek using a NULL value.
+      ** Otherwise, the seek will ultimately fail. Fortunately,
+      ** if the column MUST NOT contain NULL-s, it suffices to
+      ** fetch the very first/last value to obtain min/max.
+      **
+      ** FYI: entries in an index are ordered as follows:
+      **      NULL, ... NULL, min_value, ...
+      */
+      if( (j>=0 && pIdx->pTable->aCol[j].notNull==0) || j==XN_EXPR ){
+        assert( pLoop->nSkip==0 );
+        bSeekPastNull = 1;
+        nExtraReg = 1;
+      }
     }
 
     /* Find any inequality constraint terms for the start and end 
