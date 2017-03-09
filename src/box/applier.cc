@@ -215,6 +215,10 @@ applier_join(struct applier *applier)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
 		}
+		/*
+		 * Start vclock. The vclock of the checkpoint
+		 * the master is sending to the replica.
+		 */
 		vclock_create(&applier->vclock);
 		xrow_decode_vclock(&row, &applier->vclock);
 	}
@@ -231,6 +235,11 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write(applier->initial_join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
+			/*
+			 * Stop vclock. Used to initialize
+			 * the replica's initial vclock in
+			 * bootstrap_from_master()
+			 */
 			vclock_create(&applier->vclock);
 			xrow_decode_vclock(&row, &applier->vclock);
 			break; /* end of stream */
@@ -261,8 +270,10 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write(applier->final_join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
-			vclock_create(&applier->vclock);
-			xrow_decode_vclock(&row, &applier->vclock);
+			/*
+			 * Current vclock. This is not used now,
+			 * ignore.
+			 */
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */

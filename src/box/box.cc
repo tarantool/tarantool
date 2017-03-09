@@ -1119,7 +1119,9 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 *    ...
 	 * <= INSERT
 	 * <= OK { VCLOCK: stop_vclock } - end of initial JOIN stage.
-	 *     - `stop_vclock` - master's vclock after initial stage.
+	 *     - `stop_vclock` - master's vclock when it's done
+	 *     done sending rows from the snapshot (i.e. vclock
+	 *     for the end of final join).
 	 *
 	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { REPLICA_ID, LSN }
 	 *    ...
@@ -1424,12 +1426,6 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 	/*
-	 * Save end of final join stream
-	 */
-	struct vclock master_vclock;
-	vclock_copy(&master_vclock, &applier->vclock);
-
-	/*
 	 * Process final data (WALs).
 	 */
 	engine_begin_final_recovery();
@@ -1441,7 +1437,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 		panic("replica id has not received from master");
 
 	/* Start replica vclock using master's vclock */
-	vclock_copy(start_vclock, &master_vclock);
+	vclock_copy(start_vclock, &applier->vclock);
 
 	/* Finalize the new replica */
 	engine_end_recovery();
