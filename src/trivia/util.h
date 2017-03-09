@@ -267,6 +267,18 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #endif
 
 /**
+ * This function attribute prevents a function from being considered for
+ * inlining.
+ *
+ * \example NOINLINE int function() { return 0; };
+ */
+#if __has_attribute(noinline) || defined(__GNUC__)
+#  define NOINLINE __attribute__((noinline))
+#else
+#  define NOINLINE
+#endif
+
+/**
  * A function declared as NORETURN shall not return to its caller.
  * The compiler will generate a diagnostic for a function declared as
  * NORETURN that appears to be capable of returning to its caller.

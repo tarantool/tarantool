@@ -66,6 +66,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <trivia/util.h>
+
 #define mh_cat(a, b) mh##a##_##b
 #define mh_ecat(a, b) mh_cat(a, b)
 #define _mh(x) mh_ecat(mh_name, x)
@@ -162,7 +164,7 @@ int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		      mh_arg_t arg);
 int _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 		  mh_arg_t arg);
-void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
+void NOINLINE _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 					       mh_arg_t arg);
 size_t _mh(memsize)(struct _mh(t) *h);
 void _mh(dump)(struct _mh(t) *h);
@@ -386,7 +388,7 @@ static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
 };
 #endif /* __ac_HASH_PRIME_SIZE */
 
-void __attribute__((noinline))
+NOINLINE void
 _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 		mh_arg_t arg)
 {

@@ -30,6 +30,7 @@
  */
 #include "tuple_compare.h"
 #include "tuple.h"
+#include "trivia/util.h" /* NOINLINE */
 
 /* {{{ tuple_compare */
 
@@ -124,15 +125,11 @@ mp_compare_integer(const char *field_a, const char *field_b)
  * Normally, K==1. If K==-1, the result is inverted (as if LHS and RHS
  * were swapped).
  * K is needed to enable tail call optimization in Release build.
- * Noinline attribute was added to avoid aggressive inlining which
+ * NOINLINE attribute was added to avoid aggressive inlining which
  * resulted in over 2Kb code size for mp_compare_number.
  */
-static int
-cmp_double_uint64(double lhs, uint64_t rhs, int k)
-__attribute__((__noinline__));
-
-static int
-cmp_double_uint64(double lhs, uint64_t rhs, int k)
+NOINLINE static int
+mp_compare_double_uint64(double lhs, uint64_t rhs, int k)
 {
 	assert(k==1 || k==-1);
 	/*
@@ -168,25 +165,24 @@ cmp_double_uint64(double lhs, uint64_t rhs, int k)
 }
 
 static int
-cmp_double_any_int(double lhs,
-		   const char *rhs, enum mp_type rhs_type, int k)
+mp_compare_double_any_int(double lhs, const char *rhs, enum mp_type rhs_type,
+			  int k)
 {
 	if (rhs_type == MP_INT) {
 		int64_t v = mp_decode_int(&rhs);
 		if (v < 0) {
-			return cmp_double_uint64(
-				-lhs, (uint64_t)-v, -k
-			);
+			return mp_compare_double_uint64(-lhs, (uint64_t)-v,
+							-k);
 		}
-		return cmp_double_uint64(lhs, (uint64_t)v, k);
+		return mp_compare_double_uint64(lhs, (uint64_t)v, k);
 	}
 	assert(rhs_type == MP_UINT);
-	return cmp_double_uint64(lhs, mp_decode_uint(&rhs), k);
+	return mp_compare_double_uint64(lhs, mp_decode_uint(&rhs), k);
 }
 
 static int
-cmp_double_any_number(double lhs,
-		      const char *rhs, enum mp_type rhs_type, int k)
+mp_compare_double_any_number(double lhs, const char *rhs,
+			     enum mp_type rhs_type, int k)
 {
 	double v;
 	if (rhs_type == MP_FLOAT)
@@ -194,7 +190,7 @@ cmp_double_any_number(double lhs,
 	else if (rhs_type == MP_DOUBLE)
 		v = mp_decode_double(&rhs);
 	else
-		return cmp_double_any_int(lhs, rhs, rhs_type, k);
+		return mp_compare_double_any_int(lhs, rhs, rhs_type, k);
 	return k*COMPARE_RESULT(lhs, v);
 }
 
@@ -207,23 +203,23 @@ mp_compare_number(const char *lhs, const char *rhs)
 	assert(mp_classof(rhs_type) == MP_CLASS_NUMBER);
 
 	if (rhs_type == MP_FLOAT) {
-		return cmp_double_any_number(
+		return mp_compare_double_any_number(
 			mp_decode_float(&rhs), lhs, lhs_type, -1
 		);
 	}
 	if (rhs_type == MP_DOUBLE) {
-		return cmp_double_any_number(
+		return mp_compare_double_any_number(
 			mp_decode_double(&rhs), lhs, lhs_type, -1
 		);
 	}
 	assert(rhs_type == MP_INT || rhs_type == MP_UINT);
 	if (lhs_type == MP_FLOAT) {
-		return cmp_double_any_int(
+		return mp_compare_double_any_int(
 			mp_decode_float(&lhs), rhs, rhs_type, 1
 		);
 	}
 	if (lhs_type == MP_DOUBLE) {
-		return cmp_double_any_int(
+		return mp_compare_double_any_int(
 			mp_decode_double(&lhs), rhs, rhs_type, 1
 		);
 	}
