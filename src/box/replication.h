@@ -119,12 +119,6 @@ enum {
 	REPLICA_ID_NIL = 0,
 };
 
-static inline bool
-replica_id_is_reserved(uint32_t id)
-{
-        return id == REPLICA_ID_NIL;
-}
-
 /**
  * Find a replica by UUID
  */
@@ -172,6 +166,9 @@ replica_clear_relay(struct replica *replica);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+void
+replica_check_id(uint32_t replica_id);
 
 /**
  * Register the universally unique identifier of a remote replica and

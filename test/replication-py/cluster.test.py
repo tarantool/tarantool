@@ -161,124 +161,51 @@ replica.admin('box.info.server.lsn == 0')
 replica.admin('box.info.vclock[%d] == nil' % replica_id)
 
 print '-------------------------------------------------------------'
-print 'Modify data to change LSN and check box.info'
+print 'Modify data to bump LSN and check box.info'
 print '-------------------------------------------------------------'
 replica.admin('box.space._schema:insert{"test", 48}')
 replica.admin('box.info.server.lsn == 1')
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
 
 print '-------------------------------------------------------------'
-print 'Unregister replica and check box.info'
+print 'Connect master to replica'
 print '-------------------------------------------------------------'
-# gh-527: update vclock on delete from box.space._cluster'
-master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica.admin('box.info.server.id ~= %d' % replica_id)
-replica.admin('box.info.server.lsn == -1')
-# gh-1219: LSN must not be removed from vclock on unregister
-replica.admin('box.info.vclock[%d] == 1' % replica_id)
-# gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx }
-# unregistration doesn't change box.info.server.ro
-replica.admin('not box.info.server.ro')
-# actually box is read-only if id is not registered
-replica.admin('box.space._schema:replace{"test", 48}')
-replica.admin('box.cfg { read_only = true }')
-replica.admin('box.space._schema:replace{"test", 48}')
-replica.admin('box.cfg { read_only = false }')
-replica.admin('box.space._schema:replace{"test", 48}')
-
-print '-------------------------------------------------------------'
-print 'Re-register replica with the same server_id'
-print '-------------------------------------------------------------'
-
-replica.admin('box.cfg { read_only = true }')
-master.admin('box.space._cluster:insert{%d, "%s"} ~= nil' %
-    (replica_id, replica_uuid))
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica.admin('box.info.server.id == %d' % replica_id)
-# gh-1219: LSN must not be removed from vclock on unregister
-replica.admin('box.info.server.lsn == 1')
-replica.admin('box.info.vclock[%d] == 1' % replica_id)
-
-# gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx  }
-# registration doesn't change box.info.server.ro
-replica.admin('box.info.server.ro == true')
-# is ro
-replica.admin('box.space._schema:replace{"test", 48}')
-replica.admin('box.cfg { read_only = false }')
-# is not ro
-#replica.admin('box.space._schema:replace{"test", 48}')
-
-print '-------------------------------------------------------------'
-print 'Re-register replica with a new server_id'
-print '-------------------------------------------------------------'
-master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica_id2 = 10
-master.admin('box.space._cluster:insert{%d, "%s"} ~= nil' %
-    (replica_id2, replica_uuid))
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica.admin('box.info.server.id == %d' % replica_id2)
-replica.admin('not box.info.server.ro')
-replica.admin('box.info.server.lsn == 0')
-replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == nil' % replica_id2)
-
-print '-------------------------------------------------------------'
-print 'Check that server_id can\'t be changed by UPDATE'
-print '-------------------------------------------------------------'
-replica_id3 = 11
-server.admin("box.space._cluster:update(%d, {{'=', 1, %d}})" %
-    (replica_id2, replica_id3))
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica.admin('box.info.server.id == %d' % replica_id2)
-replica.admin('not box.info.server.ro')
-replica.admin('box.info.server.lsn == 0')
-replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == nil' % replica_id2)
-replica.admin('box.info.vclock[%d] == nil' % replica_id3)
-
-print '-------------------------------------------------------------'
-print 'Unregister replica and check box.info (second attempt)'
-print '-------------------------------------------------------------'
-# gh-527: update vclock on delete from box.space._cluster'
-master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id2)
-replica.wait_lsn(master_id, master.get_lsn(master_id))
-replica.admin('box.info.server.id ~= %d' % replica_id)
-# Backward-compatibility: box.info.server.lsn is -1 instead of nil
-replica.admin('box.info.server.lsn == -1')
-replica.admin('box.info.vclock[%d] == nil' % replica_id2)
-
-print '-------------------------------------------------------------'
-print 'JOIN replica to read-only master'
-print '-------------------------------------------------------------'
-
-#gh-1230 Assertion vclock_has on attempt to JOIN read-only master
-failed = TarantoolServer(server.ini)
-failed.script = 'replication-py/failed.lua'
-failed.vardir = server.vardir
-failed.rpl_master = replica
-failed.name = "failed"
-try:
-    failed.deploy()
-except Exception as e:
-    line = "ER_READONLY"
-    if failed.logfile_pos.seek_once(line) >= 0:
-        print "'%s' exists in server log" % line
-
-print '-------------------------------------------------------------'
-print 'Sync master with replica'
-print '-------------------------------------------------------------'
-
-# Sync master with replica
 replication_source = yaml.load(replica.admin('box.cfg.listen', silent = True))[0]
 sys.stdout.push_filter(replication_source, '<replication_source>')
+master.admin("box.cfg{ replication_source = '%s' }" % replication_source)
+master.wait_lsn(replica_id, replica.get_lsn(replica_id))
+
+print '-------------------------------------------------------------'
+print 'Disconnect replica from master'
+print '-------------------------------------------------------------'
+replica.admin('box.cfg { replication_source = "" }')
+
+print '-------------------------------------------------------------'
+print 'Unregister replica'
+print '-------------------------------------------------------------'
+
+master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
+
+# gh-1219: LSN must not be removed from vclock on unregister
+master.admin('box.info.vclock[%d] == 1' % replica_id)
+
+print '-------------------------------------------------------------'
+print 'Modify data to bump LSN on replica'
+print '-------------------------------------------------------------'
+replica.admin('box.space._schema:insert{"tost", 49}')
+replica.admin('box.info.server.lsn == 2')
+replica.admin('box.info.vclock[%d] == 2' % replica_id)
+
+print '-------------------------------------------------------------'
+print 'Master must not crash then receives orphan rows from replica'
+print '-------------------------------------------------------------'
+
+replication_source = yaml.load(replica.admin('box.cfg.listen', silent = True))[0]
+sys.stdout.push_filter(replication_source, '<replication>')
 master.admin("box.cfg{ replication = '%s' }" % replication_source)
 
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
-master.admin('box.info.vclock[%d] == 1' % replica_id)
-master.admin('box.info.vclock[%d] == nil' % replica_id2)
-master.admin('box.info.vclock[%d] == nil' % replica_id3)
+master.admin('box.info.vclock[%d] == 2' % replica_id)
 
 master.admin("box.cfg{ replication = '' }")
 replica.stop()
@@ -294,7 +221,7 @@ print '-------------------------------------------------------------'
 # Snapshot is required. Otherwise a relay will skip records made by previous
 # replica with the re-used id.
 master.admin("box.snapshot()")
-master.admin('box.info.vclock[%d] == 1' % replica_id)
+master.admin('box.info.vclock[%d] == 2' % replica_id)
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication-py/replica.lua'
@@ -307,21 +234,125 @@ replica.admin('box.info.server.id == %d' % replica_id)
 replica.admin('not box.info.server.ro')
 # All records were succesfully recovered.
 # Replica should have the same vclock as master.
-master.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == 1' % replica_id)
-master.admin('box.info.vclock[%d] == nil' % replica_id2)
-replica.admin('box.info.vclock[%d] == nil' % replica_id2)
-master.admin('box.info.vclock[%d] == nil' % replica_id3)
-replica.admin('box.info.vclock[%d] == nil' % replica_id3)
+master.admin('box.info.vclock[%d] == 2' % replica_id)
+replica.admin('box.info.vclock[%d] == 2' % replica_id)
+
+replica.stop()
+replica.cleanup(True)
+
+print '-------------------------------------------------------------'
+print 'JOIN replica to read-only master'
+print '-------------------------------------------------------------'
+
+# master server
+master = server
+master.admin('box.cfg { read_only = true }')
+#gh-1230 Assertion vclock_has on attempt to JOIN read-only master
+failed = TarantoolServer(server.ini)
+failed.script = 'replication-py/failed.lua'
+failed.vardir = server.vardir
+failed.rpl_master = master
+failed.name = "failed"
+try:
+    failed.deploy()
+except Exception as e:
+    line = "ER_READONLY"
+    if failed.logfile_pos.seek_once(line) >= 0:
+        print "'%s' exists in server log" % line
+
+master.admin('box.cfg { read_only = false }')
+
 
 print '-------------------------------------------------------------'
 print 'Cleanup'
 print '-------------------------------------------------------------'
 
-replica.stop()
-replica.cleanup(True)
-
 # Cleanup
 sys.stdout.pop_filter()
 
 master.admin("box.schema.user.revoke('guest', 'replication')")
+
+########################################################################
+# @todo George: rewrite to check ER_LOCAL_INSTANCE_ID_IS_READ_ONLY
+########################################################################
+# print '-------------------------------------------------------------'
+# print 'Unregister replica and check box.info'
+# print '-------------------------------------------------------------'
+# # gh-527: update vclock on delete from box.space._cluster'
+# master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica.admin('box.info.server.id ~= %d' % replica_id)
+# replica.admin('box.info.server.lsn == -1')
+# # gh-1219: LSN must not be removed from vclock on unregister
+# replica.admin('box.info.vclock[%d] == 1' % replica_id)
+# # gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx }
+# # unregistration doesn't change box.info.server.ro
+# replica.admin('not box.info.server.ro')
+# # actually box is read-only if id is not registered
+# replica.admin('box.space._schema:replace{"test", 48}')
+# replica.admin('box.cfg { read_only = true }')
+# replica.admin('box.space._schema:replace{"test", 48}')
+# replica.admin('box.cfg { read_only = false }')
+# replica.admin('box.space._schema:replace{"test", 48}')
+# 
+# print '-------------------------------------------------------------'
+# print 'Re-register replica with the same server_id'
+# print '-------------------------------------------------------------'
+# 
+# replica.admin('box.cfg { read_only = true }')
+# master.admin('box.space._cluster:insert{%d, "%s"} ~= nil' %
+#     (replica_id, replica_uuid))
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica.admin('box.info.server.id == %d' % replica_id)
+# # gh-1219: LSN must not be removed from vclock on unregister
+# replica.admin('box.info.server.lsn == 1')
+# replica.admin('box.info.vclock[%d] == 1' % replica_id)
+# 
+# # gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx  }
+# # registration doesn't change box.info.server.ro
+# replica.admin('box.info.server.ro == true')
+# # is ro
+# replica.admin('box.space._schema:replace{"test", 48}')
+# replica.admin('box.cfg { read_only = false }')
+# # is not ro
+# #replica.admin('box.space._schema:replace{"test", 48}')
+# 
+# print '-------------------------------------------------------------'
+# print 'Re-register replica with a new server_id'
+# print '-------------------------------------------------------------'
+# master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica_id2 = 10
+# master.admin('box.space._cluster:insert{%d, "%s"} ~= nil' %
+#     (replica_id2, replica_uuid))
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica.admin('box.info.server.id == %d' % replica_id2)
+# replica.admin('not box.info.server.ro')
+# replica.admin('box.info.server.lsn == 0')
+# replica.admin('box.info.vclock[%d] == 1' % replica_id)
+# replica.admin('box.info.vclock[%d] == nil' % replica_id2)
+# 
+# print '-------------------------------------------------------------'
+# print 'Check that server_id can\'t be changed by UPDATE'
+# print '-------------------------------------------------------------'
+# replica_id3 = 11
+# server.admin("box.space._cluster:update(%d, {{'=', 1, %d}})" %
+#     (replica_id2, replica_id3))
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica.admin('box.info.server.id == %d' % replica_id2)
+# replica.admin('not box.info.server.ro')
+# replica.admin('box.info.server.lsn == 0')
+# replica.admin('box.info.vclock[%d] == 1' % replica_id)
+# replica.admin('box.info.vclock[%d] == nil' % replica_id2)
+# replica.admin('box.info.vclock[%d] == nil' % replica_id3)
+# 
+# print '-------------------------------------------------------------'
+# print 'Unregister replica and check box.info (second attempt)'
+# print '-------------------------------------------------------------'
+# # gh-527: update vclock on delete from box.space._cluster'
+# master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id2)
+# replica.wait_lsn(master_id, master.get_lsn(master_id))
+# replica.admin('box.info.server.id ~= %d' % replica_id)
+# # Backward-compatibility: box.info.server.lsn is -1 instead of nil
+# replica.admin('box.info.server.lsn == -1')
+# replica.admin('box.info.vclock[%d] == nil' % replica_id2)

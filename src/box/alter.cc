@@ -2156,19 +2156,15 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	if (new_tuple != NULL) {
+	if (new_tuple != NULL) { /* Insert or replace */
 		/* Check fields */
 		uint32_t replica_id = tuple_field_u32_xc(new_tuple, 0);
-		if (replica_id_is_reserved(replica_id))
-			tnt_raise(ClientError, ER_REPLICA_ID_IS_RESERVED,
-				  (unsigned) replica_id);
-		if (replica_id >= VCLOCK_MAX)
-			tnt_raise(LoggedError, ER_REPLICA_MAX, replica_id);
-		tt_uuid instance_uuid;
-		tuple_field_uuid_xc(new_tuple, 1, &instance_uuid);
-		if (tt_uuid_is_nil(&instance_uuid))
+		replica_check_id(replica_id);
+		tt_uuid replica_uuid;
+		tuple_field_uuid_xc(new_tuple, 1, &replica_uuid);
+		if (tt_uuid_is_nil(&replica_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
-				  tt_uuid_str(&instance_uuid));
+				  tt_uuid_str(&replica_uuid));
 		if (old_tuple != NULL) {
 			/*
 			 * Forbid changes of UUID for a registered instance:
@@ -2177,12 +2173,20 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			 */
 			tt_uuid old_uuid;
 			tuple_field_uuid_xc(old_tuple, 1, &old_uuid);
-			if (!tt_uuid_is_equal(&instance_uuid, &old_uuid)) {
+			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
 					  "updates of instance uuid");
 			}
 		}
+	} else {
+		/*
+		 * Don't allow deletion of the record for this instance
+		 * from _cluster.
+		 */
+		assert(old_tuple != NULL);
+		uint32_t replica_id = tuple_field_u32_xc(old_tuple, 0);
+		replica_check_id(replica_id);
 	}
 
 	struct trigger *on_commit =

@@ -118,12 +118,8 @@ static struct cbus_endpoint tx_prio_endpoint;
 static void
 box_check_writable(void)
 {
-	/*
-	 * box is only writable if
-	 *   box.cfg.read_only == false and
-	 *   replica id is registered in _cluster table
-	 */
-	if (is_ro || instance_id == 0)
+	/* box is only writable if box.cfg.read_only == false and */
+	if (is_ro)
 		tnt_raise(LoggedError, ER_READONLY);
 }
 
@@ -1278,7 +1274,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * instance, this is the only way for a replica to find
 	 * out the id of the instance it has connected to.
 	 */
-	row.replica_id = instance_id;
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	row.replica_id = self->id;
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1371,13 +1368,12 @@ bootstrap_master(void)
 	uint32_t replica_id = 1;
 
 	/* Unregister a local replica if it was registered by bootstrap.bin */
-	assert(instance_id == 0);
 	if (boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "[%u]", 1) != 0)
 		diag_raise();
 
 	/* Register the first replica in the replica set */
 	box_register_replica(replica_id, &INSTANCE_UUID);
-	assert(instance_id == 1);
+	assert(replica_by_uuid(&INSTANCE_UUID)->id == 1);
 
 	/* Register other cluster members */
 	replicaset_foreach(replica) {

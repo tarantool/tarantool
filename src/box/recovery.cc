@@ -105,7 +105,7 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
 		row->lsn = vclock_inc(&r->vclock, instance_id);
 	} else {
 		/* Replication request. */
-		if (replica_id_is_reserved(row->replica_id) ||
+		if (row->replica_id == REPLICA_ID_NIL ||
 		    row->replica_id >= VCLOCK_MAX) {
 			/*
 			 * A safety net, this can only occur
