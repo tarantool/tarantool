@@ -1,3 +1,9 @@
+tarantool (1.7.3.353.g06ee320-1) unstable; urgency=medium
+
+  * Bump the minimum required version of tarantool-common.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 10 Mar 2017 16:17:09 +0300
+
 tarantool (1.7.2.385.g952d79e-1) unstable; urgency=medium
 
   * Add `tarantoolctl cat/play` commands and `xlog` Lua module.
