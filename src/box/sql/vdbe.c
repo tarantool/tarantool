@@ -5248,22 +5248,9 @@ case OP_Destroy: {     /* out2 */
 ** See also: Destroy
 */
 case OP_Clear: {
-  int nChange;
- 
-  nChange = 0;
   assert( p->readOnly==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p2) );
-  rc = sqlite3BtreeClearTable(
-      db->aDb[pOp->p2].pBt, pOp->p1, (pOp->p3 ? &nChange : 0)
-  );
-  if( pOp->p3 ){
-    p->nChange += nChange;
-    if( pOp->p3>0 ){
-      assert( memIsValid(&aMem[pOp->p3]) );
-      memAboutToChange(p, &aMem[pOp->p3]);
-      aMem[pOp->p3].u.i += nChange;
-    }
-  }
+  rc = tarantoolSqlite3ClearTable(pOp->p1);
   if( rc ) goto abort_due_to_error;
   break;
 }

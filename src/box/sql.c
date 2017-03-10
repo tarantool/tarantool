@@ -867,7 +867,13 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	struct Column *aCol = pIndex->pTable->aCol;
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
-	int i, n = pIndex->nKeyCol;
+	/* gh-2187
+	 *
+	 * Include all index columns, i.e. "key" columns followed by the
+	 * primary key columns. Query planner depends on this particular
+	 * data layout.
+	 */
+	int i, n = pIndex->nColumn;
 	p = enc->encode_array(base, n);
 	for (i=0; i<n; i++) {
 		int col = pIndex->aiColumn[i];
@@ -893,9 +899,18 @@ int tarantoolSqlite3MakeIdxOpts(SqliteIndex *index, const char *zSql, void *buf)
 {
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
+
+	(void)index;
+
 	p = enc->encode_map(base, 2);
+	/* gh-2187
+	 *
+	 * Include all index columns, i.e. "key" columns followed by the
+	 * primary key columns, in secondary indices. It means that all
+	 * indices created via SQL engine are unique.
+	 */
 	p = enc->encode_str(p, "unique", 6);
-	p = enc->encode_bool(p, index->onError != OE_None);
+	p = enc->encode_bool(p, 1);
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, zSql ? strlen(zSql) : 0);
 	return (int)(p - base);
