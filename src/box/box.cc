@@ -1431,10 +1431,6 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
-	/* Check replica_id registration in _cluster */
-	if (instance_id == REPLICA_ID_NIL)
-		panic("replica id has not received from master");
-
 	/* Start replica vclock using master's vclock */
 	vclock_copy(start_vclock, &applier->vclock);
 
@@ -1619,8 +1615,15 @@ box_cfg_xc(void)
 	}
 	fiber_gc();
 
-	/* The replica must be registered in _cluster */
-	assert(instance_id != REPLICA_ID_NIL);
+	/* Check for correct registration of the instance in _cluster */
+	{
+		struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+		if (self == NULL || self->id == REPLICA_ID_NIL) {
+			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
+				  tt_uuid_str(&INSTANCE_UUID),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
+	}
 
 	/* Start WAL writer */
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
