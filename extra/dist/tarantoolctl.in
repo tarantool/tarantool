@@ -245,8 +245,10 @@ local function load_default_file(default_file)
 
     d.pid_file  = d.pid_file  or "/var/run/tarantool"
     d.wal_dir   = d.wal_dir   or "/var/lib/tarantool"
-    d.memtx_dir = d.memtx_dir or "/var/lib/tarantool"
-    d.log       = d.log       or "/var/log/tarantool"
+    d.memtx_dir = d.memtx_dir or d.snap_dir or "/var/lib/tarantool"
+    d.snap_dir  = nil
+    d.log       = d.log       or d.logger or "/var/log/tarantool"
+    d.logger    = nil
     d.vinyl_dir = d.vinyl_dir or "/var/lib/tarantool"
 
     d.pid_file  = fio.pathjoin(d.pid_file,  instance_name .. '.pid')
