@@ -252,7 +252,7 @@ test:is(run_script(code), 0, "vinyl_threads = 2")
 
 -- test memtx options upgrade
 code = [[
-box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16,
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_minimal = 16,
     slab_alloc_maximal = 64 * 1024}
 os.exit(box.cfg.memtx_memory == 214748364 
     and box.cfg.memtx_min_tuple_size == 16
@@ -262,7 +262,7 @@ and 0 or 1)
 test:is(run_script(code), 0, "upgrade memtx memory options")
 
 code = [[
-box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_minimal = 16, slab_alloc_maximal = 64 * 1024,
     memtx_memory = 214748364, memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 64 * 1024}
 os.exit(0)
@@ -270,7 +270,7 @@ os.exit(0)
 test:is(run_script(code), 0, "equal new and old memtx options")
 
 code = [[
-box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_minimal = 16, slab_alloc_maximal = 64 * 1024,
     memtx_memory = 107374182, memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 64 * 1024}
 os.exit(0)
@@ -278,7 +278,7 @@ os.exit(0)
 test:is(run_script(code), PANIC, "different new and old memtx_memory")
 
 code = [[
-box.cfg{slab_alloc_arena = 0.2, slab_alloc_min = 16, slab_alloc_maximal = 64 * 1024,
+box.cfg{slab_alloc_arena = 0.2, slab_alloc_minimal = 16, slab_alloc_maximal = 64 * 1024,
     memtx_memory = 214748364, memtx_min_tuple_size = 32,
     memtx_max_tuple_size = 64 * 1024}
 os.exit(0)
