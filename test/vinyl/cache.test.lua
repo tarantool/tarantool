@@ -313,3 +313,17 @@ i1:min()
 i1:max()
 
 s:drop()
+
+-- https://github.com/tarantool/tarantool/issues/2189
+
+local_space = box.schema.space.create('test', {engine='vinyl'})
+pk = local_space:create_index('primary')
+local_space:replace({1, 1})
+local_space:replace({2, 2})
+local_space:select{}
+box.begin()
+local_space:replace({1})
+local_space:select{}
+box.commit()
+local_space:select{}
+local_space:drop()

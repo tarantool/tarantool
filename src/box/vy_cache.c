@@ -210,6 +210,19 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	/* Delete some entries if quota overused */
 	vy_cache_gc(cache->env);
 
+	if (stmt != NULL && vy_stmt_lsn(stmt) == INT64_MAX) {
+		/* Do not store a statement from write set of a tx */
+		return;
+	}
+
+	/* The case of the first or the last result in key+order query */
+	bool is_boundary = (stmt != NULL) != (prev_stmt != NULL);
+
+	if (prev_stmt != NULL && vy_stmt_lsn(prev_stmt) == INT64_MAX) {
+		/* Previous statement is from tx write set, can't store it */
+		prev_stmt = NULL;
+	}
+
 	if (prev_stmt == NULL && stmt == NULL) {
 		/* Do not store empty ranges */
 		return;
@@ -221,15 +234,17 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	 * in cache to be inserted.
 	 */
 	uint8_t boundary_level = cache->key_def->part_count;
-	if (prev_stmt == NULL) {
-		/**
-		 * That means that the value 'stmt' is the first in result.
-		 * Regardless of order, the statement is the first in
-		 * sequence of statements that is equal to key.
-		 */
-		boundary_level = tuple_field_count(key);
-	}
-	if (stmt == NULL) {
+	if (stmt != NULL) {
+		if (is_boundary) {
+			/**
+			 * That means that the stmt is the first in a result.
+			 * Regardless of order, the statement is the first in
+			 * sequence of statements that is equal to the key.
+			 */
+			boundary_level = tuple_field_count(key);
+		}
+	} else {
+		assert(prev_stmt != NULL);
 		if (order == ITER_EQ) {
 			/* that is the last statement that is equal to key */
 			boundary_level = tuple_field_count(key);

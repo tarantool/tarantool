@@ -9933,16 +9933,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	/**
 	 * Add a statement to the cache
 	 */
-	if ((*(itr->vlsn) == INT64_MAX) && (*result == NULL ||
-	    vy_stmt_lsn(*result) != INT64_MAX)) {
-		if (prev_key && vy_stmt_lsn(prev_key) == INT64_MAX) {
-			vy_cache_add(itr->index->cache, *result, NULL,
-				     itr->key, itr->iterator_type);
-		} else {
-			vy_cache_add(itr->index->cache, *result, prev_key,
-				     itr->key, itr->iterator_type);
-		}
-	}
+	if (*(itr->vlsn) == INT64_MAX) /* Do not store non-latest data */
+		vy_cache_add(itr->index->cache, *result, prev_key,
+			     itr->key, itr->iterator_type);
 
 clear:
 	if (prev_key != NULL)
