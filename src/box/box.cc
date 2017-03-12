@@ -67,6 +67,7 @@
 #include "xrow_io.h"
 #include "authentication.h"
 #include "path_lock.h"
+#include "xctl.h"
 
 static char status[64] = "unknown";
 
@@ -1329,6 +1330,7 @@ box_free(void)
 #endif
 		engine_shutdown();
 		wal_thread_stop();
+		xctl_destroy();
 	}
 }
 
@@ -1506,6 +1508,7 @@ box_cfg_xc(void)
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
 	engine_init();
+	xctl_init();
 
 	schema_init();
 
@@ -1552,6 +1555,7 @@ box_cfg_xc(void)
 		box_bind();
 	}
 	if (lsn != -1) {
+		xctl_begin_recovery(vclock_sum(&checkpoint_vclock));
 		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
@@ -1590,6 +1594,7 @@ box_cfg_xc(void)
 		}
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery();
+		xctl_end_recovery();
 
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();

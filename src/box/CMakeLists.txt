@@ -51,7 +51,6 @@ add_library(box STATIC
     vinyl_index.cc
     vinyl.c
     vy_stmt.c
-    vy_log.c
     vy_mem.c
     vy_cache.c
     space.cc
@@ -69,6 +68,7 @@ add_library(box STATIC
     vclock.c
     replication.cc
     recovery.cc
+    xctl.c
     applier.cc
     relay.cc
     wal.cc

@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_VY_LOG_H
-#define INCLUDES_TARANTOOL_BOX_VY_LOG_H
+#ifndef INCLUDES_TARANTOOL_BOX_XCTL_H
+#define INCLUDES_TARANTOOL_BOX_XCTL_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -52,60 +52,60 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/** Type of a vinyl metadata log record. */
-enum vy_log_type {
+/** Type of a metadata log record. */
+enum xctl_record_type {
 	/**
-	 * Create a new index.
-	 * Requires vy_log_record::index_id, iid, space_id,
+	 * Create a new vinyl index.
+	 * Requires xctl_record::vy_index_id, iid, space_id,
 	 * path, path_len.
 	 */
-	VY_LOG_CREATE_INDEX		= 0,
+	XCTL_CREATE_VY_INDEX		= 0,
 	/**
 	 * Drop an index.
-	 * Requires vy_log_record::index_id.
+	 * Requires xctl_record::vy_index_id.
 	 */
-	VY_LOG_DROP_INDEX		= 1,
+	XCTL_DROP_VY_INDEX		= 1,
 	/**
-	 * Insert a new range into an index.
-	 * Requires vy_log_record::index_id, range_id,
-	 * range_begin, range_end.
+	 * Insert a new range into a vinyl index.
+	 * Requires xctl_record::vy_index_id, vy_range_id,
+	 * vy_range_begin, vy_range_end.
 	 */
-	VY_LOG_INSERT_RANGE		= 2,
+	XCTL_INSERT_VY_RANGE		= 2,
 	/**
-	 * Delete a range and all its runs.
-	 * Requires vy_log_record::range_id.
+	 * Delete a vinyl range and all its runs.
+	 * Requires xctl_record::vy_range_id.
 	 */
-	VY_LOG_DELETE_RANGE		= 3,
+	XCTL_DELETE_VY_RANGE		= 3,
 	/**
-	 * Prepare a run file.
-	 * Requires vy_log_record::index_id, run_id.
+	 * Prepare a vinyl run file.
+	 * Requires xctl_record::vy_index_id, vy_run_id.
 	 *
 	 * Record of this type is written before creating a run file.
 	 * It is needed to keep track of unfinished due to errors run
 	 * files so that we could remove them after recovery.
 	 */
-	VY_LOG_PREPARE_RUN		= 4,
+	XCTL_PREPARE_VY_RUN		= 4,
 	/**
-	 * Insert a run into a range.
-	 * Requires vy_log_record::range_id, run_id.
+	 * Insert a run into a vinyl range.
+	 * Requires xctl_record::vy_range_id, vy_run_id.
 	 */
-	VY_LOG_INSERT_RUN		= 5,
+	XCTL_INSERT_VY_RUN		= 5,
 	/**
-	 * Delete a run.
-	 * Requires vy_log_record::run_id.
+	 * Delete a vinyl run.
+	 * Requires xctl_record::vy_run_id.
 	 *
 	 * A record of this type indicates that the run is not in use
 	 * any more and its files can be safely removed. When the log
 	 * is recovered from, this only marks the run as deleted,
 	 * because we still need it for garbage collection. A run is
-	 * actually freed by VY_LOG_FORGET_RUN. Runs that were
+	 * actually freed by XCTL_FORGET_VY_RUN. Runs that were
 	 * deleted, but not "forgotten" are not expunged from the log
 	 * on rotation.
 	 */
-	VY_LOG_DELETE_RUN		= 6,
+	XCTL_DELETE_VY_RUN		= 6,
 	/**
-	 * Forget a run.
-	 * Requires vy_log_record::run_id.
+	 * Forget a vinyl run.
+	 * Requires xctl_record::vy_run_id.
 	 *
 	 * A record of this type is written after all files left from
 	 * an unused run have been successfully removed. On recovery,
@@ -113,31 +113,31 @@ enum vy_log_type {
 	 * run. Information about "forgotten" runs is not included in
 	 * the new log on rotation.
 	 */
-	VY_LOG_FORGET_RUN		= 7,
+	XCTL_FORGET_VY_RUN		= 7,
 
-	vy_log_MAX
+	xctl_record_type_MAX
 };
 
-/** Record in vinyl metadata log. */
-struct vy_log_record {
+/** Record in the metadata log. */
+struct xctl_record {
 	/** Type of the record. */
-	enum vy_log_type type;
+	enum xctl_record_type type;
 	/**
-	 * Unique ID of the index.
+	 * Unique ID of the vinyl index.
 	 *
 	 * The ID must be unique for different incarnations of
 	 * the same index, so we use LSN from the time of index
 	 * creation for it.
 	 */
-	int64_t index_id;
-	/** Unique ID of the range. */
-	int64_t range_id;
-	/** Unique ID of the run. */
-	int64_t run_id;
-	/** Msgpack key for start of a range. */
-	const char *range_begin;
-	/** Msgpack key for end of a range. */
-	const char *range_end;
+	int64_t vy_index_id;
+	/** Unique ID of the vinyl range. */
+	int64_t vy_range_id;
+	/** Unique ID of the vinyl run. */
+	int64_t vy_run_id;
+	/** Msgpack key for start of the vinyl range. */
+	const char *vy_range_begin;
+	/** Msgpack key for end of the vinyl range. */
+	const char *vy_range_end;
 	/** Ordinal index number in the space. */
 	uint32_t iid;
 	/** Space ID. */
@@ -153,22 +153,19 @@ struct vy_log_record {
 };
 
 /**
- * Allocate and initialize a vy_log structure.
- * @dir is the directory to store log files in.
- *
- * Returns NULL on memory allocation failure.
- */
-struct vy_log *
-vy_log_new(const char *dir);
-
-/**
- * Close a metadata log and free associated structures.
+ * Initialize the metadata log.
  */
 void
-vy_log_delete(struct vy_log *log);
+xctl_init(void);
 
 /**
- * Rotate vinyl metadata log @log. This function creates a new
+ * Destroy the metadata log.
+ */
+void
+xctl_destroy(void);
+
+/**
+ * Rotate the metadata log. This function creates a new
  * xlog file in the log directory having signature @signature
  * and writes records required to recover active indexes.
  * The goal of log rotation is to compact the log file by
@@ -183,42 +180,42 @@ vy_log_delete(struct vy_log *log);
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_rotate(struct vy_log *log, int64_t signature);
+xctl_rotate(int64_t signature);
 
-/** Allocate a unique ID for a run. */
+/** Allocate a unique ID for a vinyl run. */
 int64_t
-vy_log_next_run_id(struct vy_log *log);
+xctl_next_vy_run_id(void);
 
-/** Allocate a unique ID for a range. */
+/** Allocate a unique ID for a vinyl range. */
 int64_t
-vy_log_next_range_id(struct vy_log *log);
+xctl_next_vy_range_id(void);
 
 /**
- * Begin a transaction in a metadata log.
+ * Begin a transaction in the metadata log.
  *
- * To commit the transaction, call vy_log_tx_commit() or
- * vy_log_tx_try_commit().
+ * To commit the transaction, call xctl_tx_commit() or
+ * xctl_tx_try_commit().
  */
 void
-vy_log_tx_begin(struct vy_log *log);
+xctl_tx_begin(void);
 
 /**
- * Commit a transaction started with vy_log_tx_begin().
+ * Commit a transaction started with xctl_tx_begin().
  *
  * This function flushes all buffered records to disk. If it fails,
  * all records of the current transaction are discarded.
  *
- * See also vy_log_tx_try_commit().
+ * See also xctl_tx_try_commit().
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_tx_commit(struct vy_log *log);
+xctl_tx_commit(void);
 
 /**
- * Try to commit a transaction started with vy_log_tx_begin().
+ * Try to commit a transaction started with xctl_tx_begin().
  *
- * Similarly to vy_log_tx_commit(), this function tries to write all
+ * Similarly to xctl_tx_commit(), this function tries to write all
  * buffered records to disk, but in case of failure pending records
  * are not expunged from the buffer, so that the next transaction
  * will retry to flush them.
@@ -226,56 +223,56 @@ vy_log_tx_commit(struct vy_log *log);
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_tx_try_commit(struct vy_log *log);
+xctl_tx_try_commit(void);
 
 /**
- * Write a record to a metadata log.
+ * Write a record to the metadata log.
  *
  * This function simply appends the record to the internal buffer.
- * It must be called inside a vy_log_tx_begin/commit block, and it
- * is up to vy_log_tx_commit() to actually write the record to disk.
+ * It must be called inside a xctl_tx_begin/commit block, and it
+ * is up to xctl_tx_commit() to actually write the record to disk.
  *
  * Returns 0 on success, -1 on failure.
  */
 void
-vy_log_write(struct vy_log *log, const struct vy_log_record *record);
+xctl_write(const struct xctl_record *record);
 
 /**
- * Prepare vinyl metadata log @log for recovery from the file having
+ * Prepare the metadata log for recovery from the file having
  * signature @signature.
  *
  * After this function is called, vinyl indexes may be recovered from
- * the log using vy_log_recover_index(). When recovery is complete,
- * one must call vy_log_end_recovery().
+ * the log using xctl_recover_vy_index(). When recovery is complete,
+ * one must call xctl_end_recovery().
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_begin_recovery(struct vy_log *log, int64_t signature);
+xctl_begin_recovery(int64_t signature);
 
 /**
- * Finish recovery from vinyl metadata log @log.
+ * Finish recovery from the metadata log.
  *
  * This function destroys the recovery context that was created by
- * vy_log_begin_recovery(), opens the log file for appending, and
+ * xctl_begin_recovery(), opens the log file for appending, and
  * flushes all records written to the log buffer during recovery.
  *
  * Return 0 on success, -1 on failure.
  */
 int
-vy_log_end_recovery(struct vy_log *log);
+xctl_end_recovery(void);
 
 typedef int
-(*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
+(*xctl_recovery_cb)(const struct xctl_record *record, void *arg);
 
 /**
- * Recover a vinyl index having ID @index_id from metadata log @log.
- * The log must be in recovery mode, see vy_log_begin_recovery().
+ * Recover a vinyl index having ID @index_id from the metadata log.
+ * The log must be in recovery mode, see xctl_begin_recovery().
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
- * either VY_LOG_CREATE_INDEX, VY_LOG_INSERT_RANGE, or VY_LOG_INSERT_RUN
- * unless the index was dropped. In the latter case, a VY_LOG_DROP_INDEX
+ * either XCTL_CREATE_VY_INDEX, XCTL_INSERT_VY_RANGE, or XCTL_INSERT_VY_RUN
+ * unless the index was dropped. In the latter case, a XCTL_DROP_VY_INDEX
  * record is issued in the end.
  * The callback is supposed to rebuild the index structure and open run
  * files. If the callback returns a non-zero value, the function stops
@@ -287,99 +284,92 @@ typedef int
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_recover_index(struct vy_log *log, int64_t index_id,
-		     vy_recovery_cb cb, void *cb_arg);
+xctl_recover_vy_index(int64_t vy_index_id,
+		      xctl_recovery_cb cb, void *cb_arg);
 
-/** Helper to log an index creation. */
+/** Helper to log a vinyl index creation. */
 static inline void
-vy_log_create_index(struct vy_log *log, int64_t index_id,
-		    uint32_t iid, uint32_t space_id, const char *path)
+xctl_create_vy_index(int64_t vy_index_id, uint32_t iid,
+		     uint32_t space_id, const char *path)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_CREATE_INDEX,
-		.index_id = index_id,
-		.iid = iid,
-		.space_id = space_id,
-		.path = path,
-		.path_len = strlen(path),
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_CREATE_VY_INDEX;
+	record.vy_index_id = vy_index_id;
+	record.iid = iid;
+	record.space_id = space_id;
+	record.path = path;
+	record.path_len = strlen(path);
+	xctl_write(&record);
 }
 
-/** Helper to log an index drop. */
+/** Helper to log a vinyl index drop. */
 static inline void
-vy_log_drop_index(struct vy_log *log, int64_t index_id)
+xctl_drop_vy_index(int64_t vy_index_id)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_DROP_INDEX,
-		.index_id = index_id,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_DROP_VY_INDEX;
+	record.vy_index_id = vy_index_id;
+	xctl_write(&record);
 }
 
-/** Helper to log a range insertion. */
+/** Helper to log a vinyl range insertion. */
 static inline void
-vy_log_insert_range(struct vy_log *log, int64_t index_id, int64_t range_id,
-		    const char *range_begin, const char *range_end)
+xctl_insert_vy_range(int64_t vy_index_id, int64_t vy_range_id,
+		     const char *vy_range_begin, const char *vy_range_end)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_INSERT_RANGE,
-		.index_id = index_id,
-		.range_id = range_id,
-		.range_begin = range_begin,
-		.range_end = range_end,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_INSERT_VY_RANGE;
+	record.vy_index_id = vy_index_id;
+	record.vy_range_id = vy_range_id;
+	record.vy_range_begin = vy_range_begin;
+	record.vy_range_end = vy_range_end;
+	xctl_write(&record);
 }
 
-/** Helper to log a range deletion. */
+/** Helper to log a vinyl range deletion. */
 static inline void
-vy_log_delete_range(struct vy_log *log, int64_t range_id)
+xctl_delete_vy_range(int64_t vy_range_id)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_DELETE_RANGE,
-		.range_id = range_id,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_DELETE_VY_RANGE;
+	record.vy_range_id = vy_range_id;
+	xctl_write(&record);
 }
 
-/** Helper to log a run file creation. */
+/** Helper to log a vinyl run file creation. */
 static inline void
-vy_log_prepare_run(struct vy_log *log, int64_t index_id, int64_t run_id)
+xctl_prepare_vy_run(int64_t vy_index_id, int64_t vy_run_id)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_PREPARE_RUN,
-		.index_id = index_id,
-		.run_id = run_id,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_PREPARE_VY_RUN;
+	record.vy_index_id = vy_index_id;
+	record.vy_run_id = vy_run_id;
+	xctl_write(&record);
 }
 
-/** Helper to log a run insertion. */
+/** Helper to log a vinyl run insertion. */
 static inline void
-vy_log_insert_run(struct vy_log *log, int64_t range_id, int64_t run_id)
+xctl_insert_vy_run(int64_t vy_range_id, int64_t vy_run_id)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_INSERT_RUN,
-		.range_id = range_id,
-		.run_id = run_id,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_INSERT_VY_RUN;
+	record.vy_range_id = vy_range_id;
+	record.vy_run_id = vy_run_id;
+	xctl_write(&record);
 }
 
 /** Helper to log a run deletion. */
 static inline void
-vy_log_delete_run(struct vy_log *log, int64_t run_id)
+xctl_delete_vy_run(int64_t vy_run_id)
 {
-	struct vy_log_record record = {
-		.type = VY_LOG_DELETE_RUN,
-		.run_id = run_id,
-	};
-	vy_log_write(log, &record);
+	struct xctl_record record;
+	record.type = XCTL_DELETE_VY_RUN;
+	record.vy_run_id = vy_run_id;
+	xctl_write(&record);
 }
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_BOX_VY_LOG_H */
+#endif /* INCLUDES_TARANTOOL_BOX_XCTL_H */
