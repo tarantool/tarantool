@@ -49,6 +49,7 @@
 #include "coeio_file.h"
 #include "diag.h"
 #include "errcode.h"
+#include "errinj.h"
 #include "fiber.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
 #include "latch.h"
@@ -142,10 +143,6 @@ struct vy_log {
 	int64_t signature;
 	/** Recovery context. */
 	struct vy_recovery *recovery;
-	/** Garbage collection callback. */
-	vy_log_gc_cb gc_cb;
-	/** Argument to the garbage collection callback. */
-	void *gc_arg;
 	/**
 	 * Latch protecting the xlog.
 	 *
@@ -579,7 +576,7 @@ fail:
 }
 
 struct vy_log *
-vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg)
+vy_log_new(const char *dir)
 {
 	struct vy_log *log = malloc(sizeof(*log));
 	if (log == NULL) {
@@ -595,9 +592,6 @@ vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg)
 	}
 
 	latch_create(&log->latch);
-
-	log->gc_cb = gc_cb;
-	log->gc_arg = gc_arg;
 	return log;
 
 fail_free:
@@ -757,6 +751,44 @@ vy_log_next_range_id(struct vy_log *log)
 }
 
 /**
+ * Try to delete files of a vinyl run.
+ * Return 0 on success, -1 on failure.
+ */
+static int
+vy_run_unlink_files(const char *vinyl_dir, uint32_t space_id, uint32_t iid,
+		    const char *index_path, int64_t run_id)
+{
+	static const char *suffix[] = { "index", "run" };
+
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: run %lld not deleted",
+				(long long)run_id); return -1;});
+	int rc = 0;
+	char path[PATH_MAX];
+	for (int type = 0; type < (int)nelem(suffix); type++) {
+		/*
+		 * TODO: File name formatting does not belong here.
+		 * We should move it to a shared header and use it
+		 * both in vinyl.c and here.
+		 */
+		if (index_path[0] != '\0') {
+			snprintf(path, sizeof(path), "%s/%020lld.%s",
+				 index_path, (long long)run_id, suffix[type]);
+		} else {
+			/* Default path. */
+			snprintf(path, sizeof(path), "%s/%u/%u/%020lld.%s",
+				 vinyl_dir, (unsigned)space_id, (unsigned)iid,
+				 (long long)run_id, suffix[type]);
+		}
+		if (unlink(path) < 0 && errno != ENOENT) {
+			say_syserror("failed to delete file '%s'", path);
+			rc = -1;
+		}
+	}
+	return rc;
+}
+
+/**
  * Given a record encoding information about a run, try to delete
  * the corresponding files. On success, write a "forget" record to
  * the log so that all information about the run is deleted on the
@@ -765,8 +797,8 @@ vy_log_next_range_id(struct vy_log *log)
 static void
 vy_log_gc(struct vy_log *log, const struct vy_log_record *record)
 {
-	if (log->gc_cb(record->run_id, record->iid, record->space_id,
-		       record->path, log->gc_arg) == 0) {
+	if (vy_run_unlink_files(log->dir, record->space_id, record->iid,
+				record->path, record->run_id) == 0) {
 		struct vy_log_record gc_record = {
 			.type = VY_LOG_FORGET_RUN,
 			.run_id = record->run_id,

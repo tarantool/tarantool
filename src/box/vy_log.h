@@ -152,21 +152,14 @@ struct vy_log_record {
 	uint32_t path_len;
 };
 
-typedef int
-(*vy_log_gc_cb)(int64_t run_id, uint32_t iid, uint32_t space_id,
-		const char *path, void *arg);
-
 /**
  * Allocate and initialize a vy_log structure.
  * @dir is the directory to store log files in.
- * @gc_cb is the callback that will be called on deleted runs
- * on log rotation (see vy_log_rotate()).
- * @gc_arg is an argument passed to @gc_cb.
  *
  * Returns NULL on memory allocation failure.
  */
 struct vy_log *
-vy_log_new(const char *dir, vy_log_gc_cb gc_cb, void *gc_arg);
+vy_log_new(const char *dir);
 
 /**
  * Close a metadata log and free associated structures.
@@ -182,12 +175,10 @@ vy_log_delete(struct vy_log *log);
  * discarding records cancelling each other and records left
  * from dropped indexes.
  *
- * The function calls @gc_cb for each deleted run, passing info
- * necessary to lookup its files and optional argument @gc_arg.
- * The callback is supposed to try to unlink run files and
- * return 0 on success. If it fails, the information about the
- * deleted run won't be removed from the log and deletion will
- * be retried on next log rotation.
+ * The function tries to remove files left from deleted runs.
+ * If it fails, the information about the deleted run won't be
+ * removed from the log and deletion will be retried on next
+ * log rotation.
  *
  * Returns 0 on success, -1 on failure.
  */
