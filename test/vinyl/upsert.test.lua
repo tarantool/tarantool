@@ -256,3 +256,5 @@ for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
 stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1).upsert_chain_optimized
 stat1 = stat2
+
+space:drop()

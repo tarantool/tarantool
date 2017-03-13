@@ -622,7 +622,7 @@ stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 ---
 - squashed: 0
-  applied: 2
+  applied: 0
 ...
 stat1 = stat2
 ---
@@ -639,5 +639,8 @@ upsert_stat_diff(stat2, stat1).upsert_chain_optimized
 - null
 ...
 stat1 = stat2
+---
+...
+space:drop()
 ---
 ...
