@@ -482,6 +482,44 @@ fiber_schedule_idle(ev_loop *loop, ev_idle *watcher,
 	(void) revents;
 }
 
+/* task_run_with_large_stack */
+struct task_state {
+	void (*task)(void *);
+	void *param;
+	struct fiber *caller;
+};
+
+static void
+task_run_callback(ev_loop *loop, ev_idle *w, int r)
+{
+	(void)loop;
+	(void)r;
+
+	struct task_state *ts = w->data;
+	ts->task(ts->param);
+	ts->task = NULL;
+	fiber_call(ts->caller);
+}
+
+int
+task_run_with_large_stack(void (*task)(void *), void *param)
+{
+	ev_idle idle;
+	struct task_state ts = { task, param, fiber()};
+
+	/* Already executing on a large stack? */
+	if (fiber() == &cord()->sched) {
+		task(param);
+		return 0;
+	}
+
+	ev_idle_init(&idle, task_run_callback);
+	idle.data = &ts;
+	ev_idle_start(loop(), &idle);
+	while (ts.task) fiber_yield();
+	ev_idle_stop(loop(), &idle);
+	return 0;
+}
 
 struct fiber *
 fiber_find(uint32_t fid)

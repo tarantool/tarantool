@@ -699,6 +699,40 @@ static int sqlite3LockAndPrepare(
   assert( rc==SQLITE_OK || *ppStmt==0 );
   return rc;
 }
+struct Prepare {
+  sqlite3 *db;
+  const char *zSql;
+  int nBytes;
+  int saveSqlFlag;
+  Vdbe *pOld;
+  sqlite3_stmt **ppStmt;
+  const char **pzTail;
+  int rc;
+};
+void sqlite3LockAndPrepare1(void *p) {
+  struct Prepare *prepare = p;
+  prepare->rc = sqlite3LockAndPrepare(
+    prepare->db, prepare->zSql, prepare->nBytes, prepare->saveSqlFlag,
+    prepare->pOld, prepare->ppStmt, prepare->pzTail
+  );
+}
+extern int task_run_with_large_stack(void(*)(void *), void *);
+static int sqlite3LockAndPrepare2(
+  sqlite3 *db,
+  const char *zSql,
+  int nBytes,
+  int saveSqlFlag,
+  Vdbe *pOld,
+  sqlite3_stmt **ppStmt,
+  const char **pzTail
+){
+  struct Prepare prepare = {
+    db, zSql, nBytes, saveSqlFlag, pOld, ppStmt, pzTail, 0
+  };
+  (void)task_run_with_large_stack(sqlite3LockAndPrepare1, &prepare);
+  return prepare.rc;
+}
+#define sqlite3LockAndPrepare sqlite3LockAndPrepare2
 
 /*
 ** Rerun the compilation of a statement after a schema change.

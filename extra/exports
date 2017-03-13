@@ -186,6 +186,7 @@ clock_realtime64
 clock_monotonic64
 clock_process64
 clock_thread64
+task_run_with_large_stack
 
 # Lua / LuaJIT
 

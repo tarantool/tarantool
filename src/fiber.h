@@ -241,6 +241,17 @@ struct slab_cache;
 API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
+/**
+ * Run a task on a large stack. In contrast with fiber stack which is
+ * 64KB, this one is 1MB+.
+ * Caveat: fiber switching is not permitted in the task.
+ *
+ * Returns: 0 - success, !0 - failure
+ */
+API_EXPORT
+int
+task_run_with_large_stack(void (*task)(void *), void *param);
+
 /** \endcond public */
 
 struct fiber {

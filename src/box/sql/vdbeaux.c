@@ -4744,6 +4744,7 @@ int sqlite3VdbeCompareMsgpack(
     }
     case MP_NIL: {
       rc = -((pKey2->flags & MEM_Null) == 0);
+      mp_decode_nil(&aKey1);
       break;
     }
     case MP_BOOL: {

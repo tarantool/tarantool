@@ -23,13 +23,13 @@
  * a page number.
  */
 #define SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(spaceid, iid) \
-  (((unsigned)(spaceid) << 5) | (iid))
+  (((unsigned)(spaceid) << 10) | (iid))
 
 #define SQLITE_PAGENO_TO_SPACEID(pgno) \
-  ((unsigned)(pgno) >> 5)
+  ((unsigned)(pgno) >> 10)
 
 #define SQLITE_PAGENO_TO_INDEXID(pgno) \
-  ((pgno) & 31)
+  ((pgno) & 1023)
 
 
 /* Load database schema from Tarantool. */
