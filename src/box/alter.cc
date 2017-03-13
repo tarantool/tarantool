@@ -806,6 +806,10 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	rlist_swap(&alter->new_space->on_replace,
 		   &alter->old_space->on_replace);
 	/*
+	 * Init space bsize.
+	 */
+	alter->new_space->bsize = alter->old_space->bsize;
+	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */

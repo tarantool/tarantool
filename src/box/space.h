@@ -52,6 +52,8 @@ struct space {
 
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
+	/* Number of bytes used in memory by tuples in the space. */
+	size_t bsize;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *
@@ -105,9 +107,6 @@ space_name(struct space *space) { return space->def.name; }
 static inline bool
 space_is_temporary(struct space *space) { return space->def.opts.temporary; }
 
-#if defined(__cplusplus)
-extern "C"
-#endif
 void
 space_run_triggers(struct space *space, bool yesno);
 
@@ -137,6 +136,12 @@ index_find(struct space *space, uint32_t index_id)
 	}
 	return index;
 }
+
+/**
+ * Returns number of bytes used in memory by tuples in the space.
+ */
+size_t
+space_bsize(struct space *space);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -242,6 +247,15 @@ void
 space_check_update(struct space *space,
 		   struct tuple *old_tuple,
 		   struct tuple *new_tuple);
+
+/**
+ * Updates space bsize field: decrease it by old tuple's bsize and
+ * increase it by new one's.
+ */
+void
+space_bsize_update(struct space *space,
+		   const struct tuple *old_tuple,
+		   const struct tuple *new_tuple);
 
 #endif /* defined(__cplusplus) */
 
