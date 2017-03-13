@@ -66,6 +66,7 @@ tarantool_uptime
 log_pid
 space_by_id
 space_run_triggers
+space_bsize
 
 tnt_openssl_init
 tnt_EVP_CIPHER_key_length

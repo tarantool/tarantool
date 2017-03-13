@@ -31,6 +31,7 @@
 #include "space.h"
 #include <stdlib.h>
 #include <string.h>
+#include "tuple.h"
 #include "tuple_format.h"
 #include "tuple_compare.h"
 #include "scoped_guard.h"
@@ -209,6 +210,23 @@ space_check_update(struct space *space,
 	if (tuple_compare(old_tuple, new_tuple, index->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			  index_name(index), space_name(space));
+}
+
+void
+space_bsize_update(struct space *space,
+		   const struct tuple *old_tuple,
+		   const struct tuple *new_tuple)
+{
+	size_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0,
+	       new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
+	assert(space->bsize >= old_bsize);
+	space->bsize += new_bsize - old_bsize;
+}
+
+size_t
+space_bsize(struct space *space)
+{
+	return space->bsize;
 }
 
 /* vim: set fm=marker */

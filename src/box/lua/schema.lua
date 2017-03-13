@@ -19,6 +19,7 @@ assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
+    size_t space_bsize(struct space *space);
 
     typedef struct tuple box_tuple_t;
     typedef struct iterator box_iterator_t;
@@ -939,6 +940,13 @@ function box.schema.space.bless(space)
             return 0 -- empty space without indexes, return 0
         end
         return space.index[0]:count(key, opts)
+    end
+    space_mt.bsize = function(space)
+        local s = builtin.space_by_id(space.id)
+        if s == nil then
+            box.error(box.error.NO_SUCH_SPACE, space.name)
+        end
+        return builtin.space_bsize(s)
     end
     space_mt.__newindex = index_mt.__newindex
 

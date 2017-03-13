@@ -195,6 +195,15 @@ function check_space(space, N)
     return errors
 end
 
+function space_bsize(s)
+    local bsize = 0
+    for _, t in s:pairs() do
+        bsize = bsize + t:bsize()
+    end
+
+    return bsize
+end
+
 return {
     space_field_types = space_field_types;
     iterate = iterate;
@@ -204,4 +213,5 @@ return {
     sort = sort;
     tuple_to_string = tuple_to_string;
     check_space = check_space;
+    space_bsize = space_bsize;
 };
