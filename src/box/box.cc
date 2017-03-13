@@ -1330,7 +1330,7 @@ box_free(void)
 #endif
 		engine_shutdown();
 		wal_thread_stop();
-		xctl_destroy();
+		xctl_free();
 	}
 }
 
@@ -1507,8 +1507,8 @@ box_cfg_xc(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
-	engine_init();
 	xctl_init();
+	engine_init();
 
 	schema_init();
 

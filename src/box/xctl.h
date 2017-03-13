@@ -52,6 +52,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** Xlog type of a metadata log file. */
+#define XCTL_TYPE			"XCTL"
+
 /** Type of a metadata log record. */
 enum xctl_record_type {
 	/**
@@ -162,7 +165,13 @@ xctl_init(void);
  * Destroy the metadata log.
  */
 void
-xctl_destroy(void);
+xctl_free(void);
+
+/**
+ * Return the path to the current xctl log file.
+ */
+const char *
+xctl_path(void);
 
 /**
  * Rotate the metadata log. This function creates a new

@@ -57,13 +57,12 @@
 #include "latch.h"
 #include "say.h"
 #include "trivia/util.h"
+#include "wal.h"
 #include "xlog.h"
 #include "xrow.h"
 
 /** File extension of a metadata log file. */
 #define XCTL_SUFFIX			"xctl"
-/** Xlog type of a metadata log file. */
-#define XCTL_TYPE			"XCTL"
 
 /**
  * Integer key of a field in the xctl_record structure.
@@ -137,8 +136,6 @@ enum { XCTL_TX_BUF_SIZE = 64 };
 
 /** Metadata log object. */
 struct xctl {
-	/** Xlog object used for writing the log. */
-	struct xlog *xlog;
 	/** The directory where log files are stored. */
 	char log_dir[PATH_MAX];
 	/** The vinyl directory. Used for garbage collection. */
@@ -147,12 +144,7 @@ struct xctl {
 	int64_t signature;
 	/** Recovery context. */
 	struct xctl_recovery *recovery;
-	/**
-	 * Latch protecting the xlog.
-	 *
-	 * We need to lock the log before writing to xlog, because
-	 * xlog object doesn't support concurrent accesses.
-	 */
+	/** Latch protecting the log buffer. */
 	struct latch latch;
 	/**
 	 * Next ID to use for a vinyl range.
@@ -277,6 +269,14 @@ xctl_snprint_path(char *buf, size_t size, int64_t signature)
 {
 	return snprintf(buf, size, "%s/%020lld.%s",
 			xctl.log_dir, (long long)signature, XCTL_SUFFIX);
+}
+
+const char *
+xctl_path(void)
+{
+	char *filename = tt_static_buf();
+	xctl_snprint_path(filename, TT_STATIC_BUF_LEN, xctl.signature);
+	return filename;
 }
 
 /** Check if an xlog meta belongs to a metadata log file. */
@@ -600,26 +600,6 @@ xctl_init(void)
 	latch_create(&xctl.latch);
 }
 
-static ssize_t
-xctl_flush_f(va_list ap)
-{
-	bool *need_rollback = va_arg(ap, bool *);
-
-	/*
-	 * xlog_tx_rollback() must not be called after
-	 * xlog_tx_commit(), even if the latter failed.
-	 */
-	*need_rollback = false;
-
-	if (xlog_tx_commit(xctl.xlog) < 0 ||
-	    xlog_flush(xctl.xlog) < 0)
-		return -1;
-	return 0;
-}
-
-static int
-xctl_open_or_create(void);
-
 /**
  * Try to flush the log buffer to disk.
  *
@@ -633,101 +613,47 @@ xctl_flush(void)
 	if (xctl.tx_end == 0)
 		return 0; /* nothing to do */
 
-	/* Open the xlog on the first write. */
-	if (xctl.xlog == NULL &&
-	    xctl_open_or_create() < 0)
+	struct wal_request *req;
+	req = region_aligned_alloc(&fiber()->gc,
+				   sizeof(struct wal_request) +
+				   xctl.tx_end * sizeof(req->rows[0]),
+				   alignof(struct wal_request));
+	if (req == NULL)
+		return -1;
+
+	req->n_rows = 0;
+
+	struct xrow_header *rows;
+	rows = region_aligned_alloc(&fiber()->gc,
+				    xctl.tx_end * sizeof(struct xrow_header),
+				    alignof(struct xrow_header));
+	if (rows == NULL)
 		return -1;
 
 	/*
 	 * Encode buffered records.
-	 *
-	 * Ideally, we'd do it from a coeio task, but this is
-	 * impossible as an xlog's buffer cannot be written to
-	 * from multiple threads due to debug checks in the
-	 * slab allocator.
 	 */
-	xlog_tx_begin(xctl.xlog);
 	for (int i = 0; i < xctl.tx_end; i++) {
-		struct xrow_header row;
-		if (xctl_record_encode(&xctl.tx_buf[i], &row) < 0 ||
-		    xlog_write_row(xctl.xlog, &row) < 0) {
-			xlog_tx_rollback(xctl.xlog);
+		struct xrow_header *row = &rows[req->n_rows];
+		if (xctl_record_encode(&xctl.tx_buf[i], row) < 0)
 			return -1;
-		}
+		req->rows[req->n_rows++] = row;
 	}
 	/*
-	 * Do actual disk writes in a background fiber
+	 * Do actual disk writes on behalf of the WAL
 	 * so as not to block the tx thread.
 	 */
-	bool need_rollback = true;
-	if (coio_call(xctl_flush_f, &need_rollback) < 0) {
-		if (need_rollback) {
-			/* coio_call() failed due to OOM. */
-			xlog_tx_rollback(xctl.xlog);
-		}
+	if (wal_write_xctl(req) != 0)
 		return -1;
-	}
 
 	/* Success. Reset the buffer. */
 	xctl.tx_end = 0;
 	return 0;
 }
 
-/**
- * Open the metadata log file for appending, or create a new one
- * if it doesn't exist.
- *
- * Return 0 on success, -1 on failure.
- */
-static int
-xctl_open_or_create(void)
-{
-	assert(xctl.xlog == NULL);
-
-	struct xlog *xlog = malloc(sizeof(*xlog));
-	if (xlog == NULL) {
-		diag_set(OutOfMemory, sizeof(*xlog), "malloc", "struct xlog");
-		goto fail;
-	}
-
-	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), xctl.signature);
-
-	if (access(path, F_OK) == 0) {
-		/* The log already exists, open it for appending. */
-		if (xlog_open(xlog, path) < 0)
-			goto fail_free_xlog;
-		if (xctl_type_check(&xlog->meta) < 0)
-			goto fail_close_xlog;
-	} else {
-		/* No log. Try to create a new one. */
-		struct xlog_meta meta = {
-			.filetype = XCTL_TYPE,
-		};
-		if (xlog_create(xlog, path, &meta) < 0)
-			goto fail_free_xlog;
-		if (xlog_rename(xlog) < 0)
-			goto fail_close_xlog;
-	}
-
-	xctl.xlog = xlog;
-	return 0;
-
-fail_close_xlog:
-	xlog_close(xlog, false);
-fail_free_xlog:
-	free(xlog);
-fail:
-	return -1;
-}
-
 void
-xctl_destroy(void)
+xctl_free(void)
 {
-	if (xctl.xlog != NULL) {
-		xlog_close(xctl.xlog, false);
-		free(xctl.xlog);
-	}
 	if (xctl.recovery != NULL)
 		xctl_recovery_delete(xctl.recovery);
 	latch_destroy(&xctl.latch);
@@ -775,7 +701,7 @@ vy_run_unlink_files(const char *vinyl_dir, uint32_t space_id, uint32_t iid,
 				 vinyl_dir, (unsigned)space_id, (unsigned)iid,
 				 (long long)run_id, suffix[type]);
 		}
-		if (unlink(path) < 0 && errno != ENOENT) {
+		if (coeio_unlink(path) < 0 && errno != ENOENT) {
 			say_syserror("failed to delete file '%s'", path);
 			rc = -1;
 		}
@@ -798,25 +724,19 @@ xctl_vy_run_gc(const struct xctl_record *record)
 			.type = XCTL_FORGET_VY_RUN,
 			.vy_run_id = record->vy_run_id,
 		};
-		if (xctl.xlog == NULL &&
-		    xctl_open_or_create() < 0)
-			goto err;
-		struct xrow_header row;
-		if (xctl_record_encode(&gc_record, &row) < 0 ||
-		    xlog_write_row(xctl.xlog, &row) < 0)
-			goto err;
+		xctl_tx_begin();
+		xctl_write(&gc_record);
+		if (xctl_tx_commit() < 0) {
+			say_warn("failed to log vinyl run %lld cleanup: %s",
+				 (long long)record->vy_run_id,
+				 diag_last_error(diag_get())->errmsg);
+		}
 	}
-	return;
-err:
-	say_warn("failed to log vinyl run %lld cleanup: %s",
-		 (long long)record->vy_run_id,
-		 diag_last_error(diag_get())->errmsg);
 }
 
 int
 xctl_begin_recovery(int64_t signature)
 {
-	assert(xctl.xlog == NULL);
 	assert(xctl.recovery == NULL);
 
 	struct xctl_recovery *recovery = xctl_recovery_new(signature);
@@ -847,7 +767,6 @@ xctl_incomplete_vy_run_gc(const struct xctl_record *record, void *cb_arg)
 int
 xctl_end_recovery(void)
 {
-	assert(xctl.xlog == NULL);
 	assert(xctl.recovery != NULL);
 
 	/* Flush all pending records. */
@@ -940,6 +859,7 @@ static ssize_t
 xctl_rotate_f(va_list ap)
 {
 	int64_t signature = va_arg(ap, int64_t);
+	struct xctl_recovery **p_recovery = va_arg(ap, struct xctl_recovery **);
 
 	struct xctl_recovery *recovery = xctl_recovery_new(xctl.signature);
 	if (recovery == NULL)
@@ -963,16 +883,8 @@ xctl_rotate_f(va_list ap)
 	    xlog_sync(&arg.xlog) < 0 ||
 	    xlog_rename(&arg.xlog) < 0)
 		goto err_write_xlog;
-
-	/* Cleanup unused runs. */
-	struct xlog *old_xlog = xctl.xlog;
-	xctl.xlog = &arg.xlog;
-	xctl_recovery_iterate(recovery, xctl_delete_vy_run_gc, NULL);
-	xctl.xlog = old_xlog;
-	xlog_flush(&arg.xlog);
-	xlog_close(&arg.xlog, false);
 out:
-	xctl_recovery_delete(recovery);
+	*p_recovery = recovery;
 	return 0;
 
 err_write_xlog:
@@ -1023,21 +935,23 @@ xctl_rotate(int64_t signature)
 		goto fail;
 
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(xctl_rotate_f, signature) < 0)
+	struct xctl_recovery *recovery;
+	if (coio_call(xctl_rotate_f, signature, &recovery) < 0)
 		goto fail;
 
 	/*
 	 * Success. Close the old log. The new one will be opened
-	 * automatically on the first write (see xctl_flush()).
+	 * automatically on the first write (see wal_write_xctl()).
 	 */
-	if (xctl.xlog != NULL) {
-		xlog_close(xctl.xlog, false);
-		free(xctl.xlog);
-		xctl.xlog = NULL;
-	}
+	wal_rotate_xctl();
 	xctl.signature = signature;
 
 	latch_unlock(&xctl.latch);
+
+	/* Cleanup unused runs. */
+	xctl_recovery_iterate(recovery, xctl_delete_vy_run_gc, NULL);
+	xctl_recovery_delete(recovery);
+
 	say_debug("%s: complete", __func__);
 	return 0;
 

@@ -37,6 +37,7 @@
 
 #include "xlog.h"
 #include "xrow.h"
+#include "xctl.h"
 #include "cbus.h"
 #include "coeio.h"
 
@@ -121,6 +122,17 @@ struct wal_msg: public cmsg {
 	struct stailq rollback;
 };
 
+/**
+ * Metadata log writer.
+ */
+struct xctl_writer {
+	/** The metadata log file. */
+	struct xlog xlog;
+	/** Set if the xlog is open. */
+	bool is_active;
+};
+static struct xctl_writer xctl_writer;
+
 static struct wal_thread wal_thread;
 static struct wal_writer wal_writer_singleton;
 
@@ -150,6 +162,27 @@ static struct wal_msg *
 wal_msg(struct cmsg *msg)
 {
 	return msg->route == wal_request_route ? (struct wal_msg *) msg : NULL;
+}
+
+/** Write a request to a log in a single transaction. */
+static ssize_t
+wal_request_write(struct wal_request *req, struct xlog *l)
+{
+	/*
+	 * Iterate over request rows (tx statements)
+	 */
+	xlog_tx_begin(l);
+	struct xrow_header **row = req->rows;
+	for (; row < req->rows + req->n_rows; row++) {
+		if (xlog_write_row(l, *row) < 0) {
+			/*
+			 * Rollback all un-written rows
+			 */
+			xlog_tx_rollback(l);
+			return -1;
+		}
+	}
+	return xlog_tx_commit(l);
 }
 
 /**
@@ -508,21 +541,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 */
 	struct wal_request *req, *last_commit_req = NULL;
 	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
-		/*
-		 * Iterate over request rows (tx statements)
-		 */
-		xlog_tx_begin(l);
-		struct xrow_header **row = req->rows;
-		for (; row < req->rows + req->n_rows; row++) {
-			if (xlog_write_row(l, *row) < 0) {
-				/*
-				 * Rollback all un-written rows
-				 */
-				xlog_tx_rollback(l);
-				goto done;
-			}
-		}
-		int rc = xlog_tx_commit(l);
+		int rc = wal_request_write(req, l);
 		if (rc < 0) {
 			goto done;
 		}
@@ -597,6 +616,10 @@ wal_thread_f(va_list ap)
 		xlog_close(&wal->current_wal, false);
 		wal->is_active = false;
 	}
+	if (xctl_writer.is_active) {
+		xlog_close(&xctl_writer.xlog, false);
+		xctl_writer.is_active = false;
+	}
 	cpipe_destroy(&wal_thread.tx_pipe);
 	return 0;
 }
@@ -661,6 +684,80 @@ wal_write(struct wal_request *req)
 	return req->res;
 }
 
+struct wal_write_xctl_msg: public cbus_call_msg
+{
+	struct wal_request *req;
+};
+
+static int
+wal_write_xctl_f(struct cbus_call_msg *msg)
+{
+	struct wal_request *req = ((struct wal_write_xctl_msg *)msg)->req;
+
+	if (!xctl_writer.is_active) {
+		const char *path = xctl_path();
+		if (access(path, F_OK) == 0) {
+			/* The log already exists, open it for appending. */
+			if (xlog_open(&xctl_writer.xlog, path) < 0)
+				return -1;
+		} else {
+			/* No log. Try to create a new one. */
+			struct xlog_meta meta;
+			memset(&meta, 0, sizeof(meta));
+			snprintf(meta.filetype, sizeof(meta.filetype),
+				 "%s", XCTL_TYPE);
+			if (xlog_create(&xctl_writer.xlog, path, &meta) < 0)
+				return -1;
+			if (xlog_rename(&xctl_writer.xlog) < 0) {
+				unlink(xctl_writer.xlog.filename);
+				xlog_close(&xctl_writer.xlog, false);
+			}
+		}
+		xctl_writer.is_active = true;
+	}
+
+	if (wal_request_write(req, &xctl_writer.xlog) < 0)
+		return -1;
+
+	if (xlog_flush(&xctl_writer.xlog) < 0)
+		return -1;
+
+	return 0;
+}
+
+int
+wal_write_xctl(struct wal_request *req)
+{
+	struct wal_write_xctl_msg msg;
+	msg.req = req;
+	bool cancellable = fiber_set_cancellable(false);
+	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+			   wal_write_xctl_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+	return rc;
+}
+
+static int
+wal_rotate_xctl_f(struct cbus_call_msg *msg)
+{
+	(void) msg;
+	if (xctl_writer.is_active) {
+		xlog_close(&xctl_writer.xlog, false);
+		xctl_writer.is_active = false;
+	}
+	return 0;
+}
+
+void
+wal_rotate_xctl()
+{
+	struct cbus_call_msg msg;
+	bool cancellable = fiber_set_cancellable(false);
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+		  wal_rotate_xctl_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+}
+
 int
 wal_set_watcher(struct wal_watcher *watcher, struct ev_async *async)
 {
@@ -715,5 +812,9 @@ wal_atfork()
 		xlog_atfork(&wal->current_wal);
 		wal->is_active = false;
 		wal = NULL;
+	}
+	if (xctl_writer.is_active) {
+		xlog_atfork(&xctl_writer.xlog);
+		xctl_writer.is_active = false;
 	}
 }

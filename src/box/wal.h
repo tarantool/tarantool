@@ -36,6 +36,7 @@
 #include "salad/stailq.h"
 
 struct fiber;
+struct vclock;
 struct wal_writer;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
@@ -46,8 +47,6 @@ extern const char *wal_mode_STRS[];
 extern struct wal_writer *wal;
 extern struct rmean *rmean_tx_wal_bus;
 extern int wal_dir_lock;
-
-#if defined(__cplusplus)
 
 struct wal_request {
 	struct stailq_entry fifo;
@@ -64,6 +63,8 @@ struct wal_request {
 	int n_rows;
 	struct xrow_header *rows[];
 };
+
+#if defined(__cplusplus)
 
 int64_t
 wal_write(struct wal_request *req);
@@ -112,6 +113,18 @@ extern "C" {
  */
 void
 wal_checkpoint(struct vclock *vclock, bool rotate);
+
+/**
+ * Write xrows to the metadata log.
+ */
+int
+wal_write_xctl(struct wal_request *req);
+
+/**
+ * Rotate the metadata log.
+ */
+void
+wal_rotate_xctl();
 
 #if defined(__cplusplus)
 } /* extern "C" */
