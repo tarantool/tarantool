@@ -1706,7 +1706,13 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &range->frozen, in_frozen)
 		vy_scheduler_mem_dumped(scheduler, mem);
-	vy_scheduler_remove_range(scheduler, range);
+	if (range->in_dump.pos != UINT32_MAX) {
+		/*
+		 * The range could have already been removed
+		 * by vy_schedule().
+		 */
+		vy_scheduler_remove_range(scheduler, range);
+	}
 
 	vy_range_delete(range);
 	return NULL;
@@ -3946,22 +3952,23 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
 
-	if (!in_shutdown) {
+	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to dump range %s: %s",
 			  index->name, vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_range_discard_new_run(range);
+		vy_scheduler_add_range(index->env->scheduler, range);
 	}
 
 	/*
 	 * No need to roll back anything if we failed to write a run.
 	 * The range will carry on with a new shadow in-memory index.
 	 */
-	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
-static struct vy_task *
-vy_task_dump_new(struct mempool *pool, struct vy_range *range)
+static int
+vy_task_dump_new(struct mempool *pool, struct vy_range *range,
+		 struct vy_task **p_task)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
@@ -3973,6 +3980,11 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+
+	if (index->is_dropped) {
+		vy_scheduler_remove_range(scheduler, range);
+		return 0;
+	}
 
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
@@ -4002,7 +4014,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range)
 
 	say_info("%s: started dumping range %s",
 		 index->name, vy_range_str(range));
-	return task;
+	*p_task = task;
+	return 0;
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
 err_mem:
@@ -4012,7 +4025,7 @@ err_run:
 err_task:
 	say_error("%s: can't start range dump %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
-	return NULL;
+	return -1;
 }
 
 static int
@@ -4132,12 +4145,13 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
 
-	if (!in_shutdown) {
+	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to split range %s: %s",
 			  index->name, vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		rlist_foreach_entry(r, &range->split_list, split_list)
 			vy_range_discard_new_run(r);
+		vy_scheduler_add_range(index->env->scheduler, range);
 	}
 
 	/*
@@ -4167,13 +4181,11 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	/* Insert the range back into the tree. */
 	vy_index_add_range(index, range);
 	index->version++;
-
-	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
-static struct vy_task *
+static int
 vy_task_split_new(struct mempool *pool, struct vy_range *range,
-		  const char *split_key)
+		  const char *split_key, struct vy_task **p_task)
 {
 	struct vy_index *index = range->index;
 	struct tx_manager *xm = index->env->xm;
@@ -4248,7 +4260,8 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	say_info("%s: started splitting range %s by key %s",
 		 index->name, vy_range_str(range), vy_key_str(split_key));
-	return task;
+	*p_task = task;
+	return 0;
 err_wi:
 	vy_range_unfreeze_mem(range);
 err_parts:
@@ -4264,7 +4277,7 @@ err_parts:
 err_task:
 	say_error("%s: can't start range splitting %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
-	return NULL;
+	return -1;
 }
 
 static int
@@ -4372,29 +4385,25 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
 
-	if (!in_shutdown) {
+	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
 			  index->name, vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_range_discard_new_run(range);
+		vy_scheduler_add_range(index->env->scheduler, range);
 	}
 
 	/*
 	 * No need to roll back anything if we failed to write a run.
 	 * The range will carry on with a new shadow in-memory index.
 	 */
-	vy_scheduler_add_range(index->env->scheduler, range);
 }
 
-static struct vy_task *
-vy_task_compact_new(struct mempool *pool, struct vy_range *range)
+static int
+vy_task_compact_new(struct mempool *pool, struct vy_range *range,
+		    struct vy_task **p_task)
 {
 	assert(range->compact_priority > 0);
-
-	/* Consider splitting the range if it's too big. */
-	const char *split_key;
-	if (vy_range_needs_split(range, &split_key))
-		return vy_task_split_new(pool, range, split_key);
 
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
@@ -4406,6 +4415,16 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+
+	if (index->is_dropped) {
+		vy_scheduler_remove_range(scheduler, range);
+		return 0;
+	}
+
+	/* Consider splitting the range if it's too big. */
+	const char *split_key;
+	if (vy_range_needs_split(range, &split_key))
+		return vy_task_split_new(pool, range, split_key, p_task);
 
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
 	if (task == NULL)
@@ -4436,7 +4455,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range)
 	say_info("%s: started compacting range %s, runs %d/%d",
 		 index->name, vy_range_str(range),
                  range->compact_priority, range->run_count);
-	return task;
+	*p_task = task;
+	return 0;
 err_wi:
 	/* Leave the new mem on the list in case of failure. */
 err_mem:
@@ -4446,7 +4466,7 @@ err_run:
 err_task:
 	say_error("%s: can't start range compacting %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
-	return NULL;
+	return -1;
 }
 
 /* Scheduler Task }}} */
@@ -4706,6 +4726,7 @@ vy_scheduler_remove_range(struct vy_scheduler *scheduler,
 static int
 vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
+retry:
 	*ptask = NULL;
 	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
 	if (pn == NULL)
@@ -4714,9 +4735,10 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	if (!vy_quota_is_exceeded(&scheduler->env->quota) &&
 	    range->min_lsn > scheduler->checkpoint_lsn)
 		return 0; /* nothing to do */
-	*ptask = vy_task_dump_new(&scheduler->task_pool, range);
+	if (vy_task_dump_new(&scheduler->task_pool, range, ptask) != 0)
+		return -1;
 	if (*ptask == NULL)
-		return -1; /* OOM */
+		goto retry; /* index dropped */
 	return 0; /* new task */
 }
 
@@ -4736,6 +4758,7 @@ static int
 vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_task **ptask)
 {
+retry:
 	*ptask = NULL;
 	struct heap_node *pn = vy_compact_heap_top(&scheduler->compact_heap);
 	if (pn == NULL)
@@ -4743,9 +4766,10 @@ vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 	struct vy_range *range = container_of(pn, struct vy_range, in_compact);
 	if (range->compact_priority == 0)
 		return 0; /* nothing to do */
-	*ptask = vy_task_compact_new(&scheduler->task_pool, range);
+	if (vy_task_compact_new(&scheduler->task_pool, range, ptask) != 0)
+		return -1;
 	if (*ptask == NULL)
-		return -1; /* OOM */
+		goto retry; /* index dropped */
 	return 0; /* new task */
 }
 
@@ -4791,6 +4815,12 @@ static int
 vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 			   struct vy_task *task)
 {
+	if (task->index->is_dropped) {
+		if (task->ops->abort)
+			task->ops->abort(task, false);
+		return 0;
+	}
+
 	struct diag *diag = &task->diag;
 	if (task->status != 0) {
 		assert(!diag_is_empty(diag));
