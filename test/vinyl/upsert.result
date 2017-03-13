@@ -491,9 +491,7 @@ test_run:cmd("setopt delimiter ';'")
 ...
 function upsert_stat_diff(stat2, stat1)
     return {
-        tx = stat2.upsert_optimized_tx.total - stat1.upsert_optimized_tx.total,
-        commit = stat2.upsert_optimized_commit.total - stat1.upsert_optimized_commit.total,
-        chains = stat2.upsert_chains_optimized.total - stat1.upsert_chains_optimized.total,
+        squashed = stat2.upsert_squashed.total - stat1.upsert_squashed.total,
         applied = stat2.upsert_applied.total - stat1.upsert_applied.total
     }
 end;
@@ -527,10 +525,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 1
   applied: 1
-  commit: 1
-  tx: 0
 ...
 stat1 = stat2
 ---
@@ -556,10 +552,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 2
   applied: 2
-  commit: 0
-  tx: 2
 ...
 stat1 = stat2
 ---
@@ -580,10 +574,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 0
   applied: 0
-  commit: 0
-  tx: 0
 ...
 stat1 = stat2
 ---
@@ -598,10 +590,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 0
   applied: 2
-  commit: 0
-  tx: 0
 ...
 stat1 = stat2
 ---
@@ -615,10 +605,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 0
   applied: 0
-  commit: 0
-  tx: 0
 ...
 stat1 = stat2
 ---
@@ -633,10 +621,8 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- chains: 0
+- squashed: 0
   applied: 2
-  commit: 0
-  tx: 0
 ...
 stat1 = stat2
 ---

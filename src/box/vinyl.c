@@ -184,13 +184,9 @@ enum vy_stat_name {
 	VY_STAT_TX_WRITE,
 	VY_STAT_CURSOR,
 	VY_STAT_CURSOR_OPS,
-	/* How many upserts was optimized while tx set */
-	VY_STAT_UPSERT_OPTIMIZED_TX,
-	/* How many upserts was optimized while commit */
-	VY_STAT_UPSERT_OPTIMIZED_COMMIT,
-	/* How many upsert chains was optimized */
-	VY_STAT_UPSERT_CHAINS_OPTIMIZED,
-	/* How many upserts was applied (except write operations) */
+	/* How many upsert chains was squashed */
+	VY_STAT_UPSERT_SQUASHED,
+	/* How many upserts was applied on read */
 	VY_STAT_UPSERT_APPLIED,
 	VY_STAT_LAST,
 };
@@ -202,9 +198,7 @@ static const char *vy_stat_strings[] = {
 	"tx_write",
 	"cursor",
 	"cursor_ops",
-	"upsert_optimized_tx",
-	"upsert_optimized_commit",
-	"upsert_chains_optimized",
+	"upsert_squashed",
 	"upsert_applied"
 };
 
@@ -3634,10 +3628,10 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
 		int rc = vy_range_set(range, upserted, &region_stmt);
 		tuple_unref(upserted);
-		if (rc == 0)
-			rmean_collect(stat->rmean,
-				      VY_STAT_UPSERT_OPTIMIZED_COMMIT, 1);
-		return rc;
+		if (rc < 0)
+			return -1;
+		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+		return 0;
 	}
 
 	/*
@@ -6029,9 +6023,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 					       stat);
 			if (stmt == NULL)
 				return -1;
-			rmean_collect(index->env->stat->rmean,
-				      VY_STAT_UPSERT_OPTIMIZED_TX, 1);
 			assert(vy_stmt_type(stmt) != 0);
+			rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 		}
 		tuple_unref(old->stmt);
 		tuple_ref(stmt);
@@ -10169,7 +10162,8 @@ vy_squash_process(struct vy_squash *squash)
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	}
 
-	rmean_collect(stat->rmean, VY_STAT_UPSERT_CHAINS_OPTIMIZED, 1);
+	rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+
 	/*
 	 * Insert the resulting REPLACE statement to the mem
 	 * and adjust the quota.

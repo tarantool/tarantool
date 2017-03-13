@@ -194,9 +194,7 @@ space:drop()
 test_run:cmd("setopt delimiter ';'")
 function upsert_stat_diff(stat2, stat1)
     return {
-        tx = stat2.upsert_optimized_tx.total - stat1.upsert_optimized_tx.total,
-        commit = stat2.upsert_optimized_commit.total - stat1.upsert_optimized_commit.total,
-        chains = stat2.upsert_chains_optimized.total - stat1.upsert_chains_optimized.total,
+        squashed = stat2.upsert_squashed.total - stat1.upsert_squashed.total,
         applied = stat2.upsert_applied.total - stat1.upsert_applied.total
     }
 end;
