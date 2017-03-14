@@ -204,6 +204,11 @@ struct vy_index_recovery_info {
 	/** True if the index was dropped. */
 	bool is_dropped;
 	/**
+	 * Log signature from the time when the index was created
+	 * or dropped.
+	 */
+	int64_t signature;
+	/**
 	 * List of all ranges in the index, linked by
 	 * vy_range_recovery_info::in_index.
 	 */
@@ -229,6 +234,11 @@ struct vy_range_recovery_info {
 	/** True if the range was deleted. */
 	bool is_deleted;
 	/**
+	 * Log signature from the time when the range was created
+	 * or deleted.
+	 */
+	int64_t signature;
+	/**
 	 * List of all runs in the range, linked by
 	 * vy_run_recovery_info::in_range.
 	 *
@@ -247,10 +257,15 @@ struct vy_run_recovery_info {
 	int64_t id;
 	/** True if the run was deleted. */
 	bool is_deleted;
+	/**
+	 * Log signature from the time when the run was last modified
+	 * (created, inserted into a range, or deleted).
+	 */
+	int64_t signature;
 };
 
 static struct xctl_recovery *
-xctl_recovery_new(int64_t signature);
+xctl_recovery_new(int64_t log_signature, int64_t recovery_signature);
 static void
 xctl_recovery_delete(struct xctl_recovery *recovery);
 static struct vy_index_recovery_info *
@@ -300,6 +315,8 @@ xctl_record_snprint(char *buf, int size, const struct xctl_record *record)
 	unsigned long key_mask = xctl_key_mask[record->type];
 	SNPRINT(total, snprintf, buf, size, "%s{",
 		xctl_type_name[record->type]);
+	SNPRINT(total, snprintf, buf, size,
+		"signature=%"PRIi64", ", record->signature);
 	if (key_mask & (1 << XCTL_KEY_VY_INDEX_ID))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			xctl_key_name[XCTL_KEY_VY_INDEX_ID],
@@ -511,6 +528,7 @@ xctl_record_encode(const struct xctl_record *record,
 	req.tuple = tuple;
 	req.tuple_end = pos;
 	memset(row, 0, sizeof(*row));
+	row->lsn = record->signature;
 	row->bodycnt = request_encode(&req, row->body);
 	return 0;
 }
@@ -526,6 +544,7 @@ xctl_record_decode(struct xctl_record *record,
 	char *buf;
 
 	memset(record, 0, sizeof(*record));
+	record->signature = row->lsn;
 
 	struct request req;
 	request_create(&req, row->type);
@@ -722,6 +741,7 @@ xctl_vy_run_gc(const struct xctl_record *record)
 				record->path, record->vy_run_id) == 0) {
 		struct xctl_record gc_record = {
 			.type = XCTL_FORGET_VY_RUN,
+			.signature = record->signature,
 			.vy_run_id = record->vy_run_id,
 		};
 		xctl_tx_begin();
@@ -739,7 +759,8 @@ xctl_begin_recovery(int64_t signature)
 {
 	assert(xctl.recovery == NULL);
 
-	struct xctl_recovery *recovery = xctl_recovery_new(signature);
+	struct xctl_recovery *recovery;
+	recovery = xctl_recovery_new(signature, INT64_MAX);
 	if (recovery == NULL)
 		return -1;
 
@@ -849,7 +870,7 @@ xctl_rotate_cb_func(const struct xctl_record *record, void *cb_arg)
  * left from deleted runs.
  */
 static int
-xctl_delete_vy_run_gc(const struct xctl_record *record, void *cb_arg)
+xctl_deleted_vy_run_gc(const struct xctl_record *record, void *cb_arg)
 {
 	(void)cb_arg;
 	if (record->type == XCTL_DELETE_VY_RUN)
@@ -866,9 +887,9 @@ static ssize_t
 xctl_rotate_f(va_list ap)
 {
 	int64_t signature = va_arg(ap, int64_t);
-	struct xctl_recovery **p_recovery = va_arg(ap, struct xctl_recovery **);
 
-	struct xctl_recovery *recovery = xctl_recovery_new(xctl.signature);
+	struct xctl_recovery *recovery;
+	recovery = xctl_recovery_new(xctl.signature, INT64_MAX);
 	if (recovery == NULL)
 		goto err_recovery;
 
@@ -891,7 +912,7 @@ xctl_rotate_f(va_list ap)
 	    xlog_rename(&arg.xlog) < 0)
 		goto err_write_xlog;
 out:
-	*p_recovery = recovery;
+	xctl_recovery_delete(recovery);
 	return 0;
 
 err_write_xlog:
@@ -942,8 +963,7 @@ xctl_rotate(int64_t signature)
 		goto fail;
 
 	/* Do actual work from coeio so as not to stall tx thread. */
-	struct xctl_recovery *recovery;
-	if (coio_call(xctl_rotate_f, signature, &recovery) < 0)
+	if (coio_call(xctl_rotate_f, signature) < 0)
 		goto fail;
 
 	/*
@@ -954,11 +974,6 @@ xctl_rotate(int64_t signature)
 	xctl.signature = signature;
 
 	latch_unlock(&xctl.latch);
-
-	/* Cleanup unused runs. */
-	xctl_recovery_iterate(recovery, xctl_delete_vy_run_gc, NULL);
-	xctl_recovery_delete(recovery);
-
 	say_debug("%s: complete", __func__);
 	return 0;
 
@@ -968,6 +983,46 @@ fail:
 	say_error("failed to rotate metadata log: %s",
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
+}
+
+static ssize_t
+xctl_recovery_new_f(va_list ap)
+{
+	int64_t log_signature = va_arg(ap, int64_t);
+	int64_t recovery_signature = va_arg(ap, int64_t);
+	struct xctl_recovery **p_recovery = va_arg(ap, struct xctl_recovery **);
+
+	struct xctl_recovery *recovery;
+	recovery = xctl_recovery_new(log_signature, recovery_signature);
+	if (recovery == NULL)
+		return -1;
+	*p_recovery = recovery;
+	return 0;
+}
+
+void
+xctl_collect_garbage(int64_t signature)
+{
+	say_debug("%s: signature %lld", __func__, (long long)signature);
+
+	/* Lock out concurrent writers while we are loading the log. */
+	latch_lock(&xctl.latch);
+	/* Load the log from coeio so as not to stall tx thread. */
+	struct xctl_recovery *recovery;
+	int rc = coio_call(xctl_recovery_new_f, xctl.signature,
+			   signature, &recovery);
+	latch_unlock(&xctl.latch);
+
+	if (rc == 0) {
+		/* Cleanup unused runs. */
+		xctl_recovery_iterate(recovery, xctl_deleted_vy_run_gc, NULL);
+		xctl_recovery_delete(recovery);
+	} else {
+		say_warn("garbage collection failed: %s",
+			 diag_last_error(diag_get())->errmsg);
+	}
+
+	say_debug("%s: done", __func__);
 }
 
 void
@@ -1037,7 +1092,52 @@ xctl_write(const struct xctl_record *record)
 		panic("metadata log buffer overflow");
 	}
 
-	xctl.tx_buf[xctl.tx_end++] = *record;
+	struct xctl_record *tx_record = &xctl.tx_buf[xctl.tx_end++];
+	*tx_record = *record;
+	if (tx_record->signature < 0)
+		tx_record->signature = xctl.signature;
+}
+
+/** Mark a vinyl run as deleted. */
+static void
+vy_run_mark_deleted(struct vy_run_recovery_info *run, int64_t signature)
+{
+	assert(!run->is_deleted);
+	run->is_deleted = true;
+	run->signature = signature;
+}
+
+/** Mark a vinyl range and all its runs as deleted. */
+static void
+vy_range_mark_deleted(struct vy_range_recovery_info *range, int64_t signature)
+{
+	assert(!range->is_deleted);
+	range->is_deleted = true;
+	range->signature = signature;
+	struct vy_run_recovery_info *run;
+	rlist_foreach_entry(run, &range->runs, in_range) {
+		if (!run->is_deleted)
+			vy_run_mark_deleted(run, signature);
+	}
+}
+
+/** Mark a vinyl index, all its ranges, and all its runs as deleted. */
+static void
+vy_index_mark_deleted(struct vy_index_recovery_info *index, int64_t signature)
+{
+	assert(!index->is_dropped);
+	index->is_dropped = true;
+	index->signature = signature;
+	struct vy_range_recovery_info *range;
+	rlist_foreach_entry(range, &index->ranges, in_index) {
+		if (!range->is_deleted)
+			vy_range_mark_deleted(range, signature);
+	}
+	struct vy_run_recovery_info *run;
+	rlist_foreach_entry(run, &index->incomplete_runs, in_incomplete) {
+		if (!run->is_deleted)
+			vy_run_mark_deleted(run, signature);
+	}
 }
 
 /** Lookup a vinyl index in xctl_recovery::vy_index_hash map. */
@@ -1084,7 +1184,7 @@ xctl_recovery_lookup_vy_run(struct xctl_recovery *recovery,
  */
 static int
 xctl_recovery_create_vy_index(struct xctl_recovery *recovery,
-			      int64_t vy_index_id,
+			      int64_t signature, int64_t vy_index_id,
 			      uint32_t iid, uint32_t space_id,
 			      const char *path, uint32_t path_len)
 {
@@ -1113,6 +1213,7 @@ xctl_recovery_create_vy_index(struct xctl_recovery *recovery,
 	memcpy(index->path, path, path_len);
 	index->path[path_len] = '\0';
 	index->is_dropped = false;
+	index->signature = signature;
 	rlist_create(&index->ranges);
 	rlist_create(&index->incomplete_runs);
 	return 0;
@@ -1125,7 +1226,8 @@ xctl_recovery_create_vy_index(struct xctl_recovery *recovery,
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
-xctl_recovery_drop_vy_index(struct xctl_recovery *recovery, int64_t vy_index_id)
+xctl_recovery_drop_vy_index(struct xctl_recovery *recovery,
+			    int64_t signature, int64_t vy_index_id)
 {
 	struct mh_i64ptr_t *h = recovery->vy_index_hash;
 	mh_int_t k = mh_i64ptr_find(h, vy_index_id, NULL);
@@ -1138,7 +1240,7 @@ xctl_recovery_drop_vy_index(struct xctl_recovery *recovery, int64_t vy_index_id)
 		diag_set(ClientError, ER_VINYL, "index is already dropped");
 		return -1;
 	}
-	index->is_dropped = true;
+	vy_index_mark_deleted(index, signature);
 	if (rlist_empty(&index->ranges) &&
 	    rlist_empty(&index->incomplete_runs)) {
 		mh_i64ptr_del(h, k, NULL);
@@ -1171,6 +1273,7 @@ xctl_recovery_create_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
 	assert(old_node == NULL);
 	run->id = vy_run_id;
 	run->is_deleted = false;
+	run->signature = -1;
 	rlist_create(&run->in_range);
 	rlist_create(&run->in_incomplete);
 	if (recovery->vy_run_id_max < vy_run_id)
@@ -1187,7 +1290,7 @@ xctl_recovery_create_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
  */
 static int
 xctl_recovery_prepare_vy_run(struct xctl_recovery *recovery,
-			     int64_t vy_index_id, int64_t vy_run_id)
+		int64_t signature, int64_t vy_index_id, int64_t vy_run_id)
 {
 	struct vy_index_recovery_info *index;
 	index = xctl_recovery_lookup_vy_index(recovery, vy_index_id);
@@ -1203,6 +1306,7 @@ xctl_recovery_prepare_vy_run(struct xctl_recovery *recovery,
 	run = xctl_recovery_create_vy_run(recovery, vy_run_id);
 	if (run == NULL)
 		return -1;
+	run->signature = signature;
 	rlist_add_entry(&index->incomplete_runs, run, in_incomplete);
 	return 0;
 }
@@ -1216,7 +1320,7 @@ xctl_recovery_prepare_vy_run(struct xctl_recovery *recovery,
  */
 static int
 xctl_recovery_insert_vy_run(struct xctl_recovery *recovery,
-			    int64_t vy_range_id, int64_t vy_run_id)
+		int64_t signature, int64_t vy_range_id, int64_t vy_run_id)
 {
 	struct vy_range_recovery_info *range;
 	range = xctl_recovery_lookup_vy_range(recovery, vy_range_id);
@@ -1239,6 +1343,7 @@ xctl_recovery_insert_vy_run(struct xctl_recovery *recovery,
 		if (run == NULL)
 			return -1;
 	}
+	run->signature = signature;
 	rlist_del_entry(run, in_incomplete);
 	rlist_move_entry(&range->runs, run, in_range);
 	return 0;
@@ -1252,7 +1357,8 @@ xctl_recovery_insert_vy_run(struct xctl_recovery *recovery,
  * Return 0 on success, -1 if run not found or already deleted.
  */
 static int
-xctl_recovery_delete_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
+xctl_recovery_delete_vy_run(struct xctl_recovery *recovery,
+			    int64_t signature, int64_t vy_run_id)
 {
 	struct vy_run_recovery_info *run;
 	run = xctl_recovery_lookup_vy_run(recovery, vy_run_id);
@@ -1264,7 +1370,7 @@ xctl_recovery_delete_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
 		diag_set(ClientError, ER_VINYL, "vinyl run is already deleted");
 		return -1;
 	}
-	run->is_deleted = true;
+	vy_run_mark_deleted(run, signature);
 	return 0;
 }
 
@@ -1299,8 +1405,8 @@ xctl_recovery_forget_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
  */
 static int
 xctl_recovery_insert_vy_range(struct xctl_recovery *recovery,
-			      int64_t vy_index_id, int64_t vy_range_id,
-			      const char *begin, const char *end)
+		int64_t signature, int64_t vy_index_id, int64_t vy_range_id,
+		const char *begin, const char *end)
 {
 	if (xctl_recovery_lookup_vy_range(recovery, vy_range_id) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl range id");
@@ -1343,6 +1449,7 @@ xctl_recovery_insert_vy_range(struct xctl_recovery *recovery,
 	range->end = (void *)range + sizeof(*range) + begin_size;
 	memcpy(range->end, end, end_size);
 	range->is_deleted = false;
+	range->signature = signature;
 	rlist_create(&range->runs);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->vy_range_id_max < vy_range_id)
@@ -1358,7 +1465,7 @@ xctl_recovery_insert_vy_range(struct xctl_recovery *recovery,
  */
 static int
 xctl_recovery_delete_vy_range(struct xctl_recovery *recovery,
-			      int64_t vy_range_id)
+			      int64_t signature, int64_t vy_range_id)
 {
 	struct mh_i64ptr_t *h = recovery->vy_range_hash;
 	mh_int_t k = mh_i64ptr_find(h, vy_range_id, NULL);
@@ -1372,7 +1479,7 @@ xctl_recovery_delete_vy_range(struct xctl_recovery *recovery,
 			 "vinyl range is already deleted");
 		return -1;
 	}
-	range->is_deleted = true;
+	vy_range_mark_deleted(range, signature);
 	if (rlist_empty(&range->runs)) {
 		mh_i64ptr_del(h, k, NULL);
 		rlist_del_entry(range, in_index);
@@ -1398,33 +1505,34 @@ xctl_recovery_process_record(struct xctl_recovery *recovery,
 	switch (record->type) {
 	case XCTL_CREATE_VY_INDEX:
 		rc = xctl_recovery_create_vy_index(recovery,
-				record->vy_index_id,
+				record->signature, record->vy_index_id,
 				record->iid, record->space_id,
 				record->path, record->path_len);
 		break;
 	case XCTL_DROP_VY_INDEX:
-		rc = xctl_recovery_drop_vy_index(recovery,
+		rc = xctl_recovery_drop_vy_index(recovery, record->signature,
 						 record->vy_index_id);
 		break;
 	case XCTL_INSERT_VY_RANGE:
-		rc = xctl_recovery_insert_vy_range(recovery,
+		rc = xctl_recovery_insert_vy_range(recovery, record->signature,
 				record->vy_index_id, record->vy_range_id,
 				record->vy_range_begin, record->vy_range_end);
 		break;
 	case XCTL_DELETE_VY_RANGE:
-		rc = xctl_recovery_delete_vy_range(recovery,
+		rc = xctl_recovery_delete_vy_range(recovery, record->signature,
 						   record->vy_range_id);
 		break;
 	case XCTL_PREPARE_VY_RUN:
-		rc = xctl_recovery_prepare_vy_run(recovery,
+		rc = xctl_recovery_prepare_vy_run(recovery, record->signature,
 				record->vy_index_id, record->vy_run_id);
 		break;
 	case XCTL_INSERT_VY_RUN:
-		rc = xctl_recovery_insert_vy_run(recovery, record->vy_range_id,
-						 record->vy_run_id);
+		rc = xctl_recovery_insert_vy_run(recovery, record->signature,
+				record->vy_range_id, record->vy_run_id);
 		break;
 	case XCTL_DELETE_VY_RUN:
-		rc = xctl_recovery_delete_vy_run(recovery, record->vy_run_id);
+		rc = xctl_recovery_delete_vy_run(recovery, record->signature,
+						 record->vy_run_id);
 		break;
 	case XCTL_FORGET_VY_RUN:
 		rc = xctl_recovery_forget_vy_run(recovery, record->vy_run_id);
@@ -1436,13 +1544,14 @@ xctl_recovery_process_record(struct xctl_recovery *recovery,
 }
 
 /**
- * Load the metadata log having signature @signature and return
+ * Load records having signatures < @recovery_signature from
+ * the metadata log with signature @log_signature and return
  * the recovery context.
  *
  * Returns NULL on failure.
  */
 static struct xctl_recovery *
-xctl_recovery_new(int64_t signature)
+xctl_recovery_new(int64_t log_signature, int64_t recovery_signature)
 {
 	struct xctl_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
@@ -1468,7 +1577,7 @@ xctl_recovery_new(int64_t signature)
 	}
 
 	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), signature);
+	xctl_snprint_path(path, sizeof(path), log_signature);
 
 	if (access(path, F_OK) < 0 && errno == ENOENT) {
 		/* No log file, nothing to do. */
@@ -1488,6 +1597,8 @@ xctl_recovery_new(int64_t signature)
 		rc = xctl_record_decode(&record, &row);
 		if (rc < 0)
 			break;
+		if (record.signature >= recovery_signature)
+			continue;
 		rc = xctl_recovery_process_record(recovery, &record);
 		if (rc < 0)
 			break;
@@ -1557,8 +1668,9 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 	struct xctl_record record;
 	const char *tmp;
 
-	record.type = XCTL_CREATE_VY_INDEX,
-	record.vy_index_id = index->id,
+	record.type = XCTL_CREATE_VY_INDEX;
+	record.signature = index->signature;
+	record.vy_index_id = index->id;
 	record.iid = index->iid;
 	record.space_id = index->space_id;
 	record.path = index->path;
@@ -1588,6 +1700,7 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 		if (!include_deleted && range->is_deleted)
 			continue;
 		record.type = XCTL_INSERT_VY_RANGE;
+		record.signature = range->signature;
 		record.vy_range_id = range->id;
 		record.vy_range_begin = tmp = range->begin;
 		if (mp_decode_array(&tmp) == 0)
@@ -1606,20 +1719,21 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 			if (!include_deleted && run->is_deleted)
 				continue;
 			record.type = XCTL_INSERT_VY_RUN;
+			record.signature = run->signature;
 			record.vy_range_id = range->id;
 			record.vy_run_id = run->id;
 			if (xctl_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
-			if (index->is_dropped ||
-			    range->is_deleted || run->is_deleted) {
+			if (run->is_deleted) {
 				record.type = XCTL_DELETE_VY_RUN;
 				if (xctl_recovery_cb_call(cb, cb_arg,
 							  &record) != 0)
 					return -1;
 			}
 		}
-		if (index->is_dropped || range->is_deleted) {
+		if (range->is_deleted) {
 			record.type = XCTL_DELETE_VY_RANGE;
+			record.signature = range->signature;
 			if (xctl_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
 		}
@@ -1629,6 +1743,7 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 		rlist_foreach_entry(run, &index->incomplete_runs,
 				    in_incomplete) {
 			record.type = XCTL_PREPARE_VY_RUN;
+			record.signature = run->signature;
 			record.vy_run_id = run->id;
 			if (xctl_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
@@ -1643,6 +1758,7 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 
 	if (index->is_dropped) {
 		record.type = XCTL_DROP_VY_INDEX;
+		record.signature = index->signature;
 		if (xctl_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}

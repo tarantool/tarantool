@@ -126,6 +126,11 @@ struct xctl_record {
 	/** Type of the record. */
 	enum xctl_record_type type;
 	/**
+	 * The log signature from the time when the record was
+	 * written. Set by xctl_write().
+	 */
+	int64_t signature;
+	/**
 	 * Unique ID of the vinyl index.
 	 *
 	 * The ID must be unique for different incarnations of
@@ -181,15 +186,17 @@ xctl_path(void);
  * discarding records cancelling each other and records left
  * from dropped indexes.
  *
- * The function tries to remove files left from deleted runs.
- * If it fails, the information about the deleted run won't be
- * removed from the log and deletion will be retried on next
- * log rotation.
- *
  * Returns 0 on success, -1 on failure.
  */
 int
 xctl_rotate(int64_t signature);
+
+/**
+ * Remove files left from objects deleted before the log
+ * received signature @signature.
+ */
+void
+xctl_collect_garbage(int64_t signature);
 
 /** Allocate a unique ID for a vinyl run. */
 int64_t
@@ -303,6 +310,7 @@ xctl_create_vy_index(int64_t vy_index_id, uint32_t iid,
 {
 	struct xctl_record record;
 	record.type = XCTL_CREATE_VY_INDEX;
+	record.signature = -1;
 	record.vy_index_id = vy_index_id;
 	record.iid = iid;
 	record.space_id = space_id;
@@ -317,6 +325,7 @@ xctl_drop_vy_index(int64_t vy_index_id)
 {
 	struct xctl_record record;
 	record.type = XCTL_DROP_VY_INDEX;
+	record.signature = -1;
 	record.vy_index_id = vy_index_id;
 	xctl_write(&record);
 }
@@ -328,6 +337,7 @@ xctl_insert_vy_range(int64_t vy_index_id, int64_t vy_range_id,
 {
 	struct xctl_record record;
 	record.type = XCTL_INSERT_VY_RANGE;
+	record.signature = -1;
 	record.vy_index_id = vy_index_id;
 	record.vy_range_id = vy_range_id;
 	record.vy_range_begin = vy_range_begin;
@@ -341,6 +351,7 @@ xctl_delete_vy_range(int64_t vy_range_id)
 {
 	struct xctl_record record;
 	record.type = XCTL_DELETE_VY_RANGE;
+	record.signature = -1;
 	record.vy_range_id = vy_range_id;
 	xctl_write(&record);
 }
@@ -351,6 +362,7 @@ xctl_prepare_vy_run(int64_t vy_index_id, int64_t vy_run_id)
 {
 	struct xctl_record record;
 	record.type = XCTL_PREPARE_VY_RUN;
+	record.signature = -1;
 	record.vy_index_id = vy_index_id;
 	record.vy_run_id = vy_run_id;
 	xctl_write(&record);
@@ -362,6 +374,7 @@ xctl_insert_vy_run(int64_t vy_range_id, int64_t vy_run_id)
 {
 	struct xctl_record record;
 	record.type = XCTL_INSERT_VY_RUN;
+	record.signature = -1;
 	record.vy_range_id = vy_range_id;
 	record.vy_run_id = vy_run_id;
 	xctl_write(&record);
@@ -373,6 +386,7 @@ xctl_delete_vy_run(int64_t vy_run_id)
 {
 	struct xctl_record record;
 	record.type = XCTL_DELETE_VY_RUN;
+	record.signature = -1;
 	record.vy_run_id = vy_run_id;
 	xctl_write(&record);
 }

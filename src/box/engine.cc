@@ -339,6 +339,7 @@ engine_commit_checkpoint(struct vclock *vclock)
 	engine_foreach(engine) {
 		engine->commitCheckpoint(vclock);
 	}
+	xctl_collect_garbage(vclock_sum(vclock));
 	return 0;
 }
 
