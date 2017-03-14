@@ -1,3 +1,8 @@
+test_run = require('test_run').new()
+---
+...
+-- Restart the server to finish all snaphsots from prior tests.
+test_run:cmd('restart server default')
 -- optimize one index
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
@@ -12,7 +17,27 @@ box.snapshot()
 ---
 - ok
 ...
-old_count = box.info.vinyl().performance.dumped_statements
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function wait_for_dump(old_count)
+	while box.info.vinyl().db[space.id..'/0'] == old_count or
+	      box.info.vinyl().db[space.id..'/1'] == old_count do
+		fiber.sleep(0.01)
+	end
+	return box.info.vinyl().db[space.id..'/0']
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+run_count = box.info.vinyl().db[space.id..'/0']
+---
+...
+old_stmt_count = box.info.vinyl().performance.dumped_statements
 ---
 ...
 space:insert({1, 2, 3, 4, 5})
@@ -35,14 +60,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 8
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 8
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 -- not optimized updates
@@ -58,6 +86,9 @@ box.snapshot()
 ---
 - ok
 ...
+run_count = wait_for_dump(run_count)
+---
+...
 space:update({1}, {{'!', 4, 20}}) -- move range containing index field
 ---
 - [1, 2, 3, 20, 4, 10]
@@ -65,6 +96,9 @@ space:update({1}, {{'!', 4, 20}}) -- move range containing index field
 box.snapshot()
 ---
 - ok
+...
+run_count = wait_for_dump(run_count)
+---
 ...
 space:update({1}, {{'#', 3, 1}}) -- same
 ---
@@ -74,14 +108,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 9
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 9
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 space:select{}
@@ -107,6 +144,9 @@ box.snapshot()
 ---
 - ok
 ...
+run_count = wait_for_dump(run_count)
+---
+...
 space:update({2}, {{'!', 7, 20}}) -- move range that doesn't contain 
 ---
 - [2, 3, 4, 5, 6, 10, 20]
@@ -114,6 +154,9 @@ space:update({2}, {{'!', 7, 20}}) -- move range that doesn't contain
 box.snapshot()
 ---
 - ok
+...
+run_count = wait_for_dump(run_count)
+---
 ...
 space:update({2}, {{'#', 6, 1}}) -- same
 ---
@@ -123,14 +166,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 3
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 3
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 space:select{}
@@ -163,11 +209,29 @@ index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'
 index3 = space:create_index('third', { parts = {5, 'unsigned'} })
 ---
 ...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function wait_for_dump(old_count)
+	while box.info.vinyl().db[space.id..'/0'] == old_count or
+	      box.info.vinyl().db[space.id..'/1'] == old_count or
+	      box.info.vinyl().db[space.id..'/2'] == old_count do
+		fiber.sleep(0.01)
+	end
+	return box.info.vinyl().db[space.id..'/0']
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 box.snapshot()
 ---
 - ok
 ...
-old_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = box.info.vinyl().performance.dumped_statements
 ---
 ...
 space:insert({1, 2, 3, 4, 5})
@@ -190,14 +254,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 12
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 12
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 -- not optimizes updates
@@ -209,6 +276,9 @@ box.snapshot()
 ---
 - ok
 ...
+run_count = wait_for_dump(run_count)
+---
+...
 index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
 ---
 - [11, 2, 20, 13, 14, 15]
@@ -216,6 +286,9 @@ index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
 box.snapshot()
 ---
 - ok
+...
+run_count = wait_for_dump(run_count)
+---
 ...
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
 ---
@@ -225,14 +298,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 15
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 15
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 space:select{}
@@ -265,14 +341,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 3
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 3
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 -- optimize one 'third' index update
@@ -284,14 +363,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 3
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 3
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 -- optimize both indexes
@@ -303,14 +385,17 @@ box.snapshot()
 ---
 - ok
 ...
-new_count = box.info.vinyl().performance.dumped_statements
+run_count = wait_for_dump(run_count)
 ---
 ...
-new_count - old_count == 1
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+---
+...
+new_stmt_count - old_stmt_count == 1
 ---
 - true
 ...
-old_count = new_count
+old_stmt_count = new_stmt_count
 ---
 ...
 space:select{}
