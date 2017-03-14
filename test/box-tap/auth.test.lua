@@ -12,7 +12,7 @@ box.cfg {
     slab_alloc_arena=0.1;
 }
 local uri = urilib.parse(box.cfg.listen)
-local HOST, PORT = uri.host or '*', uri.service
+local HOST, PORT = uri.host or 'localhost', uri.service
 
 local test = tap.test("auth")
 test:plan(27)
