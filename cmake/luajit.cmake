@@ -127,6 +127,7 @@ unset (LUAJIT_RUNS)
 
 macro(luajit_build)
     set (luajit_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
+    set (luajit_hostcc ${CMAKE_HOST_C_COMPILER})
     # Cmake rules concerning strings and lists of strings are weird.
     #   set (foo "1 2 3") defines a string, while
     #   set (foo 1 2 3) defines a list.
@@ -176,6 +177,7 @@ macro(luajit_build)
         if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
             set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
             set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+            set (luajit_hostcc ${luajit_hostcc} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
         endif()
         # Pass deployment target
         if ("${CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
@@ -203,7 +205,7 @@ macro(luajit_build)
     endif()
     set (luajit_buildoptions
         BUILDMODE=static
-        HOST_CC="${CMAKE_HOST_C_COMPILER}"
+        HOST_CC="${luajit_hostcc}"
         TARGET_CC="${luajit_cc}"
         TARGET_CFLAGS="${luajit_cflags}"
         TARGET_LDFLAGS="${luajit_ldflags}"
