@@ -1,5 +1,5 @@
 TAP version 13
-1..50
+1..49
 ok - console.listen started
 ok - Handshake
 ok - connect to console
@@ -43,7 +43,6 @@ ok - on_auth session.id()
 ok - on_auth argument
 ok - eval with triggers
 ok - on_disconnect session.user()
-ok - on_disconnect session.peer()
 ok - on_disconnect session.id()
 ok - on_connect session.user()
 ok - on_connect session.peer()

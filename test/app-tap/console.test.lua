@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(50)
+test:plan(49)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -186,7 +186,6 @@ end
 
 local function console_on_disconnect()
     test:is(box.session.user(), "admin", "on_disconnect session.user()")
-    test:like(box.session.peer(), "unix", "on_disconnect session.peer()")
     test:isnt(box.session.id(), session_id, "on_disconnect session.id()")
     triggers_ran = triggers_ran + 1
 end
