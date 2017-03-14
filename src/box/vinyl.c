@@ -525,8 +525,6 @@ typedef rb_tree(struct vy_range) vy_range_tree_t;
  * a single read or write in a vy_index.
  */
 struct txv {
-	/** Transaction start logical time - unique ID of the transaction. */
-	int64_t tsn;
 	struct vy_index *index;
 	struct tuple *stmt;
 	struct vy_tx *tx;
@@ -741,7 +739,7 @@ enum tx_state {
 
 struct read_set_key {
 	struct tuple *stmt;
-	int64_t tsn;
+	struct vy_tx *tx;
 };
 
 typedef rb_tree(struct txv) write_set_t;
@@ -767,9 +765,7 @@ struct vy_tx {
 	/**
 	 * The transaction is forbidden to commit unless it's read-only.
 	 */
-	bool is_aborted;
-	/** Transaction logical start time. */
-	int64_t tsn;
+	bool is_in_read_view;
 	/**
 	 * Consistent read view LSN. Originally read-only transactions
 	 * receive a read view lsn upon creation and do not see further
@@ -1023,7 +1019,6 @@ txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 		return NULL;
 	}
 	v->index = index;
-	v->tsn = tx->tsn;
 	v->stmt = stmt;
 	tuple_ref(stmt);
 	v->tx = tx;
@@ -1047,11 +1042,11 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
 	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
-read_set_search_key(read_set_t *rbtree, struct tuple *stmt, int64_t tsn)
+read_set_search_key(read_set_t *rbtree, struct tuple *stmt, struct vy_tx *tx)
 {
 	struct read_set_key key;
 	key.stmt = stmt;
-	key.tsn = tsn;
+	key.tx = tx;
 	return read_set_search(rbtree, &key);
 }
 
@@ -1068,7 +1063,7 @@ read_set_cmp(struct txv *a, struct txv *b)
 	 * @sa vy_mem_tree_cmp
 	 */
 	if (rc == 0)
-		rc = a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
+		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
 	return rc;
 }
 
@@ -1077,7 +1072,7 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 {
 	int rc = vy_stmt_compare(a->stmt, b->stmt, b->index->key_def);
 	if (rc == 0)
-		return a->tsn < b->tsn ? -1 : a->tsn > b->tsn;
+		return a->tx < b->tx ? -1 : a->tx > b->tx;
 	return rc;
 }
 
@@ -1087,7 +1082,7 @@ static int
 tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
 {
 	int rc = vy_cmp(a->vlsn, b->vlsn);
-	return rc ? rc : vy_cmp(a->tsn, b->tsn);
+	return rc ? rc : vy_cmp(a, b);
 }
 
 rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
@@ -1097,8 +1092,6 @@ rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
 struct tx_manager {
 	tx_tree_t tree;
 	uint32_t count_tx;
-	/** Transaction logical time. */
-	int64_t tsn;
 	/**
 	 * The last committed log sequence number known to
 	 * vinyl. Updated in vy_commit().
@@ -1113,17 +1106,17 @@ struct tx_manager {
 };
 
 /**
- * Abort all transaction which are reading the stmt v written by
- * tx.
+ * Send to a read view all transaction which are reading the stmt v
+ *  written by tx.
  */
 static void
-txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
+vy_send_to_read_view(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 {
 	read_set_t *tree = &v->index->read_set;
 	struct key_def *key_def = v->index->key_def;
 	struct read_set_key key;
 	key.stmt = v->stmt;
-	key.tsn = 0;
+	key.tx = NULL;
 	/** Find the first value equal to or greater than key */
 	for (struct txv *abort = read_set_nsearch(tree, &key);
 	     abort != NULL; abort = read_set_next(tree, abort)) {
@@ -1138,7 +1131,7 @@ txv_abort_all(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 			continue;
 
 		/* the found tx can only be commited as read-only */
-		abort->tx->is_aborted = true;
+		abort->tx->is_in_read_view = true;
 		/* Set the read view of the found (now read-only) tx */
 		if (abort->tx->vlsn == INT64_MAX) {
 			abort->tx->vlsn = env->xm->lsn;
@@ -1218,7 +1211,6 @@ tx_manager_new(struct vy_env *env)
 	}
 	tx_tree_new(&m->tree);
 	m->count_tx = 0;
-	m->tsn = 0;
 	m->lsn = 0;
 	m->vlsn = INT64_MAX;
 	m->env = env;
@@ -1268,10 +1260,8 @@ vy_tx_begin(struct tx_manager *m, struct vy_tx *tx)
 	tx->start = ev_now(loop());
 	tx->manager = m;
 	tx->state = VINYL_TX_READY;
-	tx->is_aborted = false;
+	tx->is_in_read_view = false;
 	rlist_create(&tx->cursors);
-
-	tx->tsn = ++m->tsn;
 
 	/* possible read-write tx reads latest changes */
 	tx->vlsn = INT64_MAX;
@@ -1285,7 +1275,7 @@ static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *key, bool is_gap)
 {
-	if (tx->is_aborted)
+	if (tx->is_in_read_view)
 		return 0; /* no reason to track reads */
 	uint32_t part_count = tuple_field_count(key);
 	if (part_count >= index->key_def->part_count) {
@@ -1297,7 +1287,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 			return 0;
 		}
 	}
-	struct txv *v = read_set_search_key(&index->read_set, key, tx->tsn);
+	struct txv *v = read_set_search_key(&index->read_set, key, tx);
 	if (v == NULL) {
 		if ((v = txv_new(index, key, tx)) == NULL)
 			return -1;
@@ -1310,7 +1300,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 }
 
 static void
-tx_manager_end(struct tx_manager *m, struct vy_tx *tx)
+vy_tx_destroy(struct tx_manager *m, struct vy_tx *tx)
 {
 	if (tx->vlsn != INT64_MAX) {
 		tx_tree_remove(&m->tree, tx);
@@ -1339,7 +1329,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 {
 	if (tx->state == VINYL_TX_READY) {
 		/** freewill rollback, vy_prepare have not been called yet */
-		tx_manager_end(tx->manager, tx);
+		vy_tx_destroy(tx->manager, tx);
 	}
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
@@ -6956,7 +6946,7 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 	int rc = 0;
 
 	/* proceed read-only transactions */
-	if (!vy_tx_is_ro(tx) && tx->is_aborted) {
+	if (!vy_tx_is_ro(tx) && tx->is_in_read_view) {
 		tx->state = VINYL_TX_ROLLBACK;
 		e->stat->tx_conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
@@ -6966,10 +6956,10 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 		/** Abort read/write intersection */
 		struct txv *v = write_set_first(&tx->write_set);
 		for (; v != NULL; v = write_set_next(&tx->write_set, v))
-			txv_abort_all(e, tx, v);
+			vy_send_to_read_view(e, tx, v);
 	}
 
-	tx_manager_end(tx->manager, tx);
+	vy_tx_destroy(tx->manager, tx);
 
 	/*
 	 * A half committed transaction is no longer
