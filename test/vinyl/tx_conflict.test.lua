@@ -307,3 +307,4 @@ errors
 
 s1:drop()
 s2:drop()
+if ignore_unnecessary_conflict1 then q1:drop() q2:drop() end
