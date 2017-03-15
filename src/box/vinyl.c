@@ -80,7 +80,7 @@
 #include "index.h"
 #include "vy_log.h"
 #include "xstream.h"
-
+#include "info.h"
 #include "request.h"
 
 #define HEAP_FORWARD_DECLARATION
@@ -5211,189 +5211,136 @@ static void vy_conf_delete(struct vy_conf *c)
 /** {{{ Introspection */
 
 static void
-vy_info_append_u32(struct vy_info_handler *h, const char *key, uint32_t value)
+vy_info_append_global(struct vy_env *env, struct info_handler *h)
 {
-	struct vy_info_node node = {
-		.type = VY_INFO_U32,
-		.key = key,
-		.value.u32 = value,
-	};
-	h->fn(&node, h->ctx);
+	info_table_begin(h, "vinyl");
+	info_append_str(h, "path", env->conf->path);
+	info_append_str(h, "build", PACKAGE_VERSION);
+	info_table_end(h);
 }
 
 static void
-vy_info_append_u64(struct vy_info_handler *h, const char *key, uint64_t value)
-{
-	struct vy_info_node node = {
-		.type = VY_INFO_U64,
-		.key = key,
-		.value.u64 = value,
-	};
-	h->fn(&node, h->ctx);
-}
-
-static void
-vy_info_append_str(struct vy_info_handler *h, const char *key,
-		   const char *value)
-{
-	struct vy_info_node node = {
-		.type = VY_INFO_STRING,
-		.key = key,
-		.value.str = value,
-	};
-	h->fn(&node, h->ctx);
-}
-
-static void
-vy_info_table_begin(struct vy_info_handler *h, const char *key)
-{
-	struct vy_info_node node = {
-		.type = VY_INFO_TABLE_BEGIN,
-		.key = key,
-	};
-	h->fn(&node, h->ctx);
-}
-
-static void
-vy_info_table_end(struct vy_info_handler *h)
-{
-	struct vy_info_node node = {
-		.type = VY_INFO_TABLE_END,
-	};
-	h->fn(&node, h->ctx);
-}
-
-static void
-vy_info_append_global(struct vy_env *env, struct vy_info_handler *h)
-{
-	vy_info_table_begin(h, "vinyl");
-	vy_info_append_str(h, "path", env->conf->path);
-	vy_info_append_str(h, "build", PACKAGE_VERSION);
-	vy_info_table_end(h);
-}
-
-static void
-vy_info_append_memory(struct vy_env *env, struct vy_info_handler *h)
+vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 {
 	char buf[16];
 	struct vy_quota *q = &env->quota;
-	vy_info_table_begin(h, "memory");
-	vy_info_append_u64(h, "used", q->used);
-	vy_info_append_u64(h, "limit", q->limit);
-	vy_info_append_u64(h, "watermark", q->watermark);
+	info_table_begin(h, "memory");
+	info_append_u64(h, "used", q->used);
+	info_append_u64(h, "limit", q->limit);
+	info_append_u64(h, "watermark", q->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
-	vy_info_append_str(h, "ratio", buf);
-	vy_info_append_u64(h, "min_lsn", env->scheduler->mem_min_lsn);
-	vy_info_table_end(h);
+	info_append_str(h, "ratio", buf);
+	info_append_u64(h, "min_lsn", env->scheduler->mem_min_lsn);
+	info_table_end(h);
 }
 
 static int
 vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 {
-	struct vy_info_handler *h = ctx;
-	vy_info_table_begin(h, name);
-	vy_info_append_u32(h, "rps", rps);
-	vy_info_append_u64(h, "total", total);
-	vy_info_table_end(h);
+	struct info_handler *h = ctx;
+	info_table_begin(h, name);
+	info_append_u32(h, "rps", rps);
+	info_append_u64(h, "total", total);
+	info_table_end(h);
 	return 0;
 }
 
 static void
-vy_info_append_stat_latency(struct vy_info_handler *h,
+vy_info_append_stat_latency(struct info_handler *h,
 			    const char *name, struct vy_latency *lat)
 {
-	vy_info_table_begin(h, name);
-	vy_info_append_u64(h, "max", lat->max * 1000000000);
-	vy_info_append_u64(h, "avg", lat->count == 0 ? 0 :
+	info_table_begin(h, name);
+	info_append_u64(h, "max", lat->max * 1000000000);
+	info_append_u64(h, "avg", lat->count == 0 ? 0 :
 			   lat->total / lat->count * 1000000000);
-	vy_info_table_end(h);
+	info_table_end(h);
 }
 
 static void
-vy_info_append_iterator_stat(struct vy_info_handler *h, const char *name,
+vy_info_append_iterator_stat(struct info_handler *h, const char *name,
 			     struct vy_iterator_stat *stat)
 {
-	vy_info_table_begin(h, name);
-	vy_info_append_u64(h, "lookup_count", stat->lookup_count);
-	vy_info_append_u64(h, "step_count", stat->step_count);
-	vy_info_append_u64(h, "bloom_reflect_count", stat->bloom_reflections);
-	vy_info_table_end(h);
+	info_table_begin(h, name);
+	info_append_u64(h, "lookup_count", stat->lookup_count);
+	info_append_u64(h, "step_count", stat->step_count);
+	info_append_u64(h, "bloom_reflect_count", stat->bloom_reflections);
+	info_table_end(h);
 }
 
 static void
-vy_info_append_performance(struct vy_env *env, struct vy_info_handler *h)
+vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
 
-	vy_info_table_begin(h, "performance");
+	info_table_begin(h, "performance");
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
 
-	vy_info_append_u64(h, "write_count", stat->write_count);
+	info_append_u64(h, "write_count", stat->write_count);
 
 	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
 	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
 	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
-	vy_info_append_u64(h, "tx_rollback", stat->tx_rlb);
-	vy_info_append_u64(h, "tx_conflict", stat->tx_conflict);
-	vy_info_append_u32(h, "tx_active", env->xm->tx_count);
+	info_append_u64(h, "tx_rollback", stat->tx_rlb);
+	info_append_u64(h, "tx_conflict", stat->tx_conflict);
+	info_append_u32(h, "tx_active", env->xm->tx_count);
 
-	vy_info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	vy_info_append_u64(h, "dump_total", stat->dump_total);
-	vy_info_append_u64(h, "dumped_statements", stat->dumped_statements);
+	info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	info_append_u64(h, "dump_total", stat->dump_total);
+	info_append_u64(h, "dumped_statements", stat->dumped_statements);
 
 	struct vy_cache_env *ce = &env->cache_env;
-	vy_info_table_begin(h, "cache");
-	vy_info_append_u64(h, "count", ce->cached_count);
-	vy_info_append_u64(h, "used", ce->quota.used);
-	vy_info_table_end(h);
+	info_table_begin(h, "cache");
+	info_append_u64(h, "count", ce->cached_count);
+	info_append_u64(h, "used", ce->quota.used);
+	info_table_end(h);
 
-	vy_info_table_begin(h, "iterator");
+	info_table_begin(h, "iterator");
 	vy_info_append_iterator_stat(h, "txw", &stat->txw_stat);
 	vy_info_append_iterator_stat(h, "cache", &stat->cache_stat);
 	vy_info_append_iterator_stat(h, "mem", &stat->mem_stat);
 	vy_info_append_iterator_stat(h, "run", &stat->run_stat);
-	vy_info_table_end(h);
+	info_table_end(h);
 
-	vy_info_table_end(h);
+	info_table_end(h);
 }
 
 static void
-vy_info_append_metric(struct vy_env *env, struct vy_info_handler *h)
+vy_info_append_metric(struct vy_env *env, struct info_handler *h)
 {
-	vy_info_table_begin(h, "metric");
-	vy_info_append_u64(h, "lsn", env->xm->lsn);
-	vy_info_table_end(h);
+	info_table_begin(h, "metric");
+	info_append_u64(h, "lsn", env->xm->lsn);
+	info_table_end(h);
 }
 
 static void
-vy_info_append_indices(struct vy_env *env, struct vy_info_handler *h)
+vy_info_append_indices(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_index *i;
 	char buf[1024];
 
-	vy_info_table_begin(h, "db");
+	info_table_begin(h, "db");
 	rlist_foreach_entry(i, &env->indexes, link) {
-		vy_info_table_begin(h, i->name);
-		vy_info_append_u64(h, "range_size", i->index_def->opts.range_size);
-		vy_info_append_u64(h, "page_size", i->index_def->opts.page_size);
-		vy_info_append_u64(h, "memory_used", i->used);
-		vy_info_append_u64(h, "size", i->size);
-		vy_info_append_u64(h, "count", i->stmt_count);
-		vy_info_append_u32(h, "page_count", i->page_count);
-		vy_info_append_u32(h, "range_count", i->range_count);
-		vy_info_append_u32(h, "run_count", i->run_count);
-		vy_info_append_u32(h, "run_avg", i->run_count / i->range_count);
+		info_table_begin(h, i->name);
+		info_append_u64(h, "range_size", i->index_def->opts.range_size);
+		info_append_u64(h, "page_size", i->index_def->opts.page_size);
+		info_append_u64(h, "memory_used", i->used);
+		info_append_u64(h, "size", i->size);
+		info_append_u64(h, "count", i->stmt_count);
+		info_append_u32(h, "page_count", i->page_count);
+		info_append_u32(h, "range_count", i->range_count);
+		info_append_u32(h, "run_count", i->run_count);
+		info_append_u32(h, "run_avg", i->run_count / i->range_count);
 		histogram_snprint(buf, sizeof(buf), i->run_hist);
-		vy_info_append_str(h, "run_histogram", buf);
-		vy_info_table_end(h);
+		info_append_str(h, "run_histogram", buf);
+		info_table_end(h);
 	}
-	vy_info_table_end(h);
+	info_table_end(h);
 }
 
 void
-vy_info_gather(struct vy_env *env, struct vy_info_handler *h)
+vy_info_gather(struct vy_env *env, struct info_handler *h)
 {
 	vy_info_append_indices(env, h);
 	vy_info_append_global(env, h);

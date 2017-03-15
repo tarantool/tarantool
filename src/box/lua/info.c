@@ -44,6 +44,7 @@
 #include "box/relay.h"
 #include "box/wal.h"
 #include "box/replication.h"
+#include "box/info.h"
 #include "main.h"
 #include "box/box.h"
 #include "lua/utils.h"
@@ -239,34 +240,36 @@ lbox_info_cluster(struct lua_State *L)
 }
 
 static void
-lbox_vinyl_info_handler(struct vy_info_node *node, void *ctx)
+luaT_info_handler(struct info_node *node, void *ctx)
 {
 	struct lua_State *L = ctx;
 
-	if (node->type != VY_INFO_TABLE_END)
-		lua_pushstring(L, node->key);
-
 	switch (node->type) {
-	case VY_INFO_TABLE_BEGIN:
+	case INFO_TABLE_BEGIN:
+		lua_pushstring(L, node->key);
 		lua_newtable(L);
 		break;
-	case VY_INFO_TABLE_END:
+	case INFO_TABLE_END:
+		lua_settable(L, -3);
 		break;
-	case VY_INFO_U32:
+	case INFO_U32:
+		lua_pushstring(L, node->key);
 		lua_pushnumber(L, node->value.u32);
+		lua_settable(L, -3);
 		break;
-	case VY_INFO_U64:
+	case INFO_U64:
+		lua_pushstring(L, node->key);
 		luaL_pushuint64(L, node->value.u64);
+		lua_settable(L, -3);
 		break;
-	case VY_INFO_STRING:
+	case INFO_STRING:
+		lua_pushstring(L, node->key);
 		lua_pushstring(L, node->value.str);
+		lua_settable(L, -3);
 		break;
 	default:
 		unreachable();
 	}
-
-	if (node->type != VY_INFO_TABLE_BEGIN)
-		lua_settable(L, -3);
 }
 
 /* Declared in vinyl_engine.cc */
@@ -276,8 +279,8 @@ vinyl_engine_get_env();
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
-	struct vy_info_handler h = {
-		.fn = lbox_vinyl_info_handler,
+	struct info_handler h = {
+		.fn = luaT_info_handler,
 		.ctx = L,
 	};
 	vy_info_gather(vinyl_engine_get_env(), &h);
