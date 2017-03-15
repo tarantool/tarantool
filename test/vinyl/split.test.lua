@@ -4,7 +4,7 @@ fiber = require('fiber')
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
 _= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 1 })
 
-function vyinfo() return box.info.vinyl().db[box.space.vinyl.id..'/0'] end
+function vyinfo() return space.index.primary:info() end
 
 range_size = vyinfo().range_size
 tuple_size = vyinfo().page_size / 2

@@ -243,6 +243,21 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 
 /** \endcond public */
 
+struct info_handler;
+
+/**
+ * Index introspection (index:info())
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param info info handler
+ * \retval -1 on error (check box_error_last())
+ * \retval >=0 on success
+ */
+int
+box_index_info(uint32_t space_id, uint32_t index_id,
+	       struct info_handler *info);
+
 extern const char *iterator_type_strs[];
 
 #if defined(__cplusplus)
@@ -367,6 +382,9 @@ public:
 	 * for which createReadViewForIterator() was called.
 	 */
 	virtual void destroyReadViewForIterator(struct iterator *iterator);
+
+	/** Introspection (index:info()) */
+	virtual void info(struct info_handler *handler) const;
 };
 
 /*

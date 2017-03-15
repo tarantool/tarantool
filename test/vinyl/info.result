@@ -61,19 +61,7 @@ box.snapshot()
 ...
 box_info_sort(box.info.vinyl())
 ---
-- - db:
-    - 512/0:
-      - count: <count>
-      - memory_used: <used>
-      - page_count: <count>
-      - page_size: <size>
-      - range_count: <count>
-      - range_size: <size>
-      - run_avg: <avg>
-      - run_count: <count>
-      - run_histogram: <run_histogram>
-      - size: <size>
-  - memory:
+- - memory:
     - limit: 536870912
     - min_lsn: 9223372036854775807
     - ratio: 0%
@@ -153,20 +141,23 @@ test_run:cmd("clear filter")
 space:drop()
 ---
 ...
+info = {}
+---
+...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
 for i = 1, 16 do
-	c = box.schema.space.create('i'..i, { engine='vinyl' })
-	c:create_index('pk')
+    local space = box.schema.space.create('i'..i, { engine='vinyl' })
+    local pk = space:create_index('pk')
+    info[i] = box_info_sort(pk:info())
 end;
 ---
 ...
-box_info_sort(box.info.vinyl().db);
+info;
 ---
-- - 513/0:
-    - count: 0
+- - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -176,8 +167,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 514/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -187,8 +177,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 515/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -198,8 +187,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 516/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -209,8 +197,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 517/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -220,8 +207,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 518/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -231,8 +217,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 519/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -242,8 +227,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 520/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -253,8 +237,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 521/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -264,8 +247,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 522/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -275,8 +257,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 523/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -286,8 +267,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 524/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -297,8 +277,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 525/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -308,8 +287,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 526/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -319,8 +297,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 527/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -330,8 +307,7 @@ box_info_sort(box.info.vinyl().db);
     - run_count: 0
     - run_histogram: '[0]:1'
     - size: 0
-  - 528/0:
-    - count: 0
+  - - count: 0
     - memory_used: 0
     - page_count: 0
     - page_size: 1024
@@ -350,6 +326,9 @@ end;
 test_run:cmd("setopt delimiter ''");
 ---
 - true
+...
+info = nil;
+---
 ...
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---

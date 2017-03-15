@@ -245,6 +245,11 @@ luaT_info_handler(struct info_node *node, void *ctx)
 	struct lua_State *L = ctx;
 
 	switch (node->type) {
+	case INFO_BEGIN:
+		lua_newtable(L);
+		break;
+	case INFO_END:
+		break;
 	case INFO_TABLE_BEGIN:
 		lua_pushstring(L, node->key);
 		lua_newtable(L);
@@ -272,6 +277,13 @@ luaT_info_handler(struct info_node *node, void *ctx)
 	}
 }
 
+void
+luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
+{
+	h->ctx = L;
+	h->fn = luaT_info_handler;
+}
+
 /* Declared in vinyl_engine.cc */
 extern struct vy_env *
 vinyl_engine_get_env();
@@ -279,11 +291,10 @@ vinyl_engine_get_env();
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
-	struct info_handler h = {
-		.fn = luaT_info_handler,
-		.ctx = L,
-	};
-	vy_info_gather(vinyl_engine_get_env(), &h);
+	struct info_handler h;
+	luaT_info_handler_create(&h, L);
+	if (vy_info(vinyl_engine_get_env(), &h) != 0)
+		luaT_error(L);
 	return 1;
 }
 

@@ -56,7 +56,7 @@ for i=5,6 do gen(i) end
 -- and the number of runs are the same before and after recovery.
 tmp = box.schema.space.create('tmp')
 _ = tmp:create_index('primary')
-_ = tmp:insert{0, box.info.vinyl().db[s.id .. '/0']}
+_ = tmp:insert{0, s.index.primary:info()}
 
 test_run:cmd('restart server default')
 
@@ -64,7 +64,7 @@ s = box.space.test
 tmp = box.space.tmp
 
 vyinfo1 = tmp:select(0)[1][2]
-vyinfo2 = box.info.vinyl().db[s.id .. '/0']
+vyinfo2 = s.index.primary:info()
 vyinfo1.size == vyinfo2.size or {vyinfo1.size, vyinfo2.size}
 vyinfo1.page_count == vyinfo2.page_count or {vyinfo1.page_count, vyinfo2.page_count}
 vyinfo1.run_count == vyinfo2.run_count or {vyinfo1.run_count, vyinfo2.run_count}

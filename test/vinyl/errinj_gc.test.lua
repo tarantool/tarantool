@@ -12,7 +12,7 @@ s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk', {run_count_per_level=1})
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
-function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_count end
+function run_count() return s.index.pk:info().run_count end
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 

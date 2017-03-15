@@ -95,8 +95,23 @@ vy_end_checkpoint(struct vy_env *env);
 
 struct info_handler;
 
-void
-vy_info_gather(struct vy_env *env, struct info_handler *h);
+/*
+ * Engine introspection (box.info.vinyl())
+ *
+ * @param env environment
+ * @param handler info handler
+ */
+int
+vy_info(struct vy_env *env, struct info_handler *handler);
+
+/**
+ * Index introspection (index:info())
+ *
+ * @param index index
+ * @param handler info handler
+ */
+int
+vy_index_info(struct vy_index *index, struct info_handler *handler);
 
 /*
  * Transaction

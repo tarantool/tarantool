@@ -5314,39 +5314,36 @@ vy_info_append_metric(struct vy_env *env, struct info_handler *h)
 	info_table_end(h);
 }
 
-static void
-vy_info_append_indices(struct vy_env *env, struct info_handler *h)
+int
+vy_info(struct vy_env *env, struct info_handler *h)
 {
-	struct vy_index *i;
-	char buf[1024];
-
-	info_table_begin(h, "db");
-	rlist_foreach_entry(i, &env->indexes, link) {
-		info_table_begin(h, i->name);
-		info_append_u64(h, "range_size", i->index_def->opts.range_size);
-		info_append_u64(h, "page_size", i->index_def->opts.page_size);
-		info_append_u64(h, "memory_used", i->used);
-		info_append_u64(h, "size", i->size);
-		info_append_u64(h, "count", i->stmt_count);
-		info_append_u32(h, "page_count", i->page_count);
-		info_append_u32(h, "range_count", i->range_count);
-		info_append_u32(h, "run_count", i->run_count);
-		info_append_u32(h, "run_avg", i->run_count / i->range_count);
-		histogram_snprint(buf, sizeof(buf), i->run_hist);
-		info_append_str(h, "run_histogram", buf);
-		info_table_end(h);
-	}
-	info_table_end(h);
-}
-
-void
-vy_info_gather(struct vy_env *env, struct info_handler *h)
-{
-	vy_info_append_indices(env, h);
+	info_begin(h);
 	vy_info_append_global(env, h);
 	vy_info_append_memory(env, h);
 	vy_info_append_metric(env, h);
 	vy_info_append_performance(env, h);
+	info_end(h);
+	return 0;
+}
+
+int
+vy_index_info(struct vy_index *index, struct info_handler *h)
+{
+	char buf[1024];
+	info_begin(h);
+	info_append_u64(h, "range_size", index->index_def->opts.range_size);
+	info_append_u64(h, "page_size", index->index_def->opts.page_size);
+	info_append_u64(h, "memory_used", index->used);
+	info_append_u64(h, "size", index->size);
+	info_append_u64(h, "count", index->stmt_count);
+	info_append_u32(h, "page_count", index->page_count);
+	info_append_u32(h, "range_count", index->range_count);
+	info_append_u32(h, "run_count", index->run_count);
+	info_append_u32(h, "run_avg", index->run_count / index->range_count);
+	histogram_snprint(buf, sizeof(buf), index->run_hist);
+	info_append_str(h, "run_histogram", buf);
+	info_end(h);
+	return 0;
 }
 
 /** }}} Introspection */
