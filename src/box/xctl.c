@@ -774,16 +774,23 @@ xctl_end_recovery(void)
 		return -1;
 
 	/*
+	 * Reset xctl.recovery before getting to garbage collection
+	 * so that xctl_commit() called by xctl_vy_run_gc() writes
+	 * "forget" records to disk instead of accumulating them in
+	 * the log buffer.
+	 */
+	struct xctl_recovery *recovery = xctl.recovery;
+	xctl.recovery = NULL;
+
+	/*
 	 * If the instance is shut down while a dump/compaction task
 	 * is in progress, we'll get an unfinished run file on disk,
 	 * i.e. a run file which was either not written to the end
 	 * or not inserted into a range. We need to delete such runs
 	 * on recovery.
 	 */
-	xctl_recovery_iterate(xctl.recovery, xctl_incomplete_vy_run_gc, NULL);
-
-	xctl_recovery_delete(xctl.recovery);
-	xctl.recovery = NULL;
+	xctl_recovery_iterate(recovery, xctl_incomplete_vy_run_gc, NULL);
+	xctl_recovery_delete(recovery);
 	return 0;
 }
 
