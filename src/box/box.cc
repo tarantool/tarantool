@@ -1567,7 +1567,8 @@ box_cfg_xc(void)
 		box_bind();
 	}
 	if (lsn != -1) {
-		xctl_begin_recovery(vclock_sum(&checkpoint_vclock));
+		if (xctl_begin_recovery(vclock_sum(&checkpoint_vclock)) != 0)
+			diag_raise();
 		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
@@ -1606,7 +1607,8 @@ box_cfg_xc(void)
 		}
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery();
-		xctl_end_recovery();
+		if (xctl_end_recovery() != 0)
+			diag_raise();
 
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
