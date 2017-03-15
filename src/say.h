@@ -41,7 +41,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern pid_t logger_pid;
+extern pid_t log_pid;
 
 /** \cond public */
 

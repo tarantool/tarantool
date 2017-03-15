@@ -20,7 +20,7 @@ ffi.cdef[[
         S_DEBUG
     };
 
-    pid_t logger_pid;
+    pid_t log_pid;
     extern int log_level;
 ]]
 
@@ -62,8 +62,13 @@ return {
         ffi.C.say_logrotate(0)
     end,
 
+    log_pid = function()
+        return tonumber(ffi.C.log_pid)
+    end,
+
     logger_pid = function()
-        return tonumber(ffi.C.logger_pid)
+        say(S_WARN, 'logger_pid is deprecated, use log_pid instead')
+        return tonumber(ffi.C.log_pid)
     end,
 
     level = function(level)

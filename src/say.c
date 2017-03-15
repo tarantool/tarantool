@@ -44,7 +44,7 @@
 
 #include "fiber.h"
 
-pid_t logger_pid = 0;
+pid_t log_pid = 0;
 int log_level = S_INFO;
 
 static const char logger_syntax_reminder[] =
@@ -144,13 +144,13 @@ say_pipe_init(const char *init_str)
 	/* https://github.com/tarantool/tarantool/issues/366 */
 	fflush(stdout);
 	fflush(stderr);
-	logger_pid = fork();
-	if (logger_pid == -1) {
+	log_pid = fork();
+	if (log_pid == -1) {
 		say_syserror("pipe");
 		goto error;
 	}
 
-	if (logger_pid == 0) {
+	if (log_pid == 0) {
 		sigprocmask(SIG_UNBLOCK, &mask, NULL);
 
 		close(pipefd[1]);
