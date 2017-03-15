@@ -3,14 +3,17 @@ test_run = require('test_run').new()
 ...
 -- Restart the server to finish all snaphsots from prior tests.
 test_run:cmd('restart server default')
+fiber = require('fiber')
+---
+...
 -- optimize one index
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
-index = space:create_index('primary')
+index = space:create_index('primary', { run_count_per_level = 20 })
 ---
 ...
-index2 = space:create_index('secondary', { parts = {5, 'unsigned'} })
+index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
 box.snapshot()
@@ -21,12 +24,11 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function wait_for_dump(old_count)
-	while box.info.vinyl().db[space.id..'/0'] == old_count or
-	      box.info.vinyl().db[space.id..'/1'] == old_count do
-		fiber.sleep(0.01)
+function wait_for_dump(index_id, old_count)
+	while box.info.vinyl().db[space.id..'/'..index_id].run_count == old_count do
+		fiber.sleep(0)
 	end
-	return box.info.vinyl().db[space.id..'/0']
+	return box.info.vinyl().db[space.id..'/'..index_id].run_count
 end;
 ---
 ...
@@ -34,7 +36,10 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-run_count = box.info.vinyl().db[space.id..'/0']
+index_run_count = box.info.vinyl().db[space.id..'/0'].run_count
+---
+...
+index2_run_count = box.info.vinyl().db[space.id..'/1'].run_count
 ---
 ...
 old_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -60,7 +65,11 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+-- Wait for dump both indexes.
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -78,15 +87,16 @@ space:update({1}, {{'=', 5, 10}}) -- change secondary index field
 ---
 - [1, 2, 3, 4, 10]
 ...
---
 -- Need a snapshot after each operation to avoid purging some
 -- statements in vy_write_iterator during dump.
---
 box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
 ---
 ...
 space:update({1}, {{'!', 4, 20}}) -- move range containing index field
@@ -97,7 +107,10 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
 ---
 ...
 space:update({1}, {{'#', 3, 1}}) -- same
@@ -108,7 +121,10 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -144,10 +160,11 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
 ---
 ...
-space:update({2}, {{'!', 7, 20}}) -- move range that doesn't contain 
+-- Move range that doesn't contain indexed fields.
+space:update({2}, {{'!', 7, 20}})
 ---
 - [2, 3, 4, 5, 6, 10, 20]
 ...
@@ -155,7 +172,7 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
 ---
 ...
 space:update({2}, {{'#', 6, 1}}) -- same
@@ -166,7 +183,7 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -200,36 +217,27 @@ space:drop()
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
-index = space:create_index('primary', { parts = {2, 'unsigned'} } )
+index = space:create_index('primary', { parts = {2, 'unsigned'}, run_count_per_level = 20 } )
 ---
 ...
-index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'} })
+index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
-index3 = space:create_index('third', { parts = {5, 'unsigned'} })
+index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-function wait_for_dump(old_count)
-	while box.info.vinyl().db[space.id..'/0'] == old_count or
-	      box.info.vinyl().db[space.id..'/1'] == old_count or
-	      box.info.vinyl().db[space.id..'/2'] == old_count do
-		fiber.sleep(0.01)
-	end
-	return box.info.vinyl().db[space.id..'/0']
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
 ...
 box.snapshot()
 ---
 - ok
+...
+index_run_count = box.info.vinyl().db[space.id..'/0'].run_count
+---
+...
+index2_run_count = box.info.vinyl().db[space.id..'/1'].run_count
+---
+...
+index3_run_count = box.info.vinyl().db[space.id..'/2'].run_count
+---
 ...
 old_stmt_count = box.info.vinyl().performance.dumped_statements
 ---
@@ -254,7 +262,13 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
+---
+...
+index3_run_count = wait_for_dump(2, index3_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -276,7 +290,13 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
+---
+...
+index3_run_count = wait_for_dump(2, index3_run_count)
 ---
 ...
 index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
@@ -287,7 +307,13 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
+---
+...
+index3_run_count = wait_for_dump(2, index3_run_count)
 ---
 ...
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
@@ -298,7 +324,13 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
+---
+...
+index3_run_count = wait_for_dump(2, index3_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -341,7 +373,10 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index3_run_count = wait_for_dump(2, index3_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -363,7 +398,10 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
+---
+...
+index2_run_count = wait_for_dump(1, index2_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
@@ -385,7 +423,7 @@ box.snapshot()
 ---
 - ok
 ...
-run_count = wait_for_dump(run_count)
+index_run_count = wait_for_dump(0, index_run_count)
 ---
 ...
 new_stmt_count = box.info.vinyl().performance.dumped_statements
