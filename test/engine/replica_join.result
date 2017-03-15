@@ -301,6 +301,66 @@ box.snapshot()
 ---
 - ok
 ...
+space = box.schema.space.create('test', { id = 99998, engine = engine })
+---
+...
+index = space:create_index('primary', { type = test_run:get_cfg('index')})
+---
+...
+for i = 0, 9 do space:insert({i, 'test' .. tostring(i)}) end
+---
+...
+test_run:cmd("deploy server replica")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('wait_lsn replica default')
+---
+- true
+...
+test_run:cmd('restart server replica')
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space.test:select()
+---
+- - [0, 'test0']
+  - [1, 'test1']
+  - [2, 'test2']
+  - [3, 'test3']
+  - [4, 'test4']
+  - [5, 'test5']
+  - [6, 'test6']
+  - [7, 'test7']
+  - [8, 'test8']
+  - [9, 'test9']
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+_ = test_run:cmd("cleanup server replica")
+---
+...
+space:drop()
+---
+...
+box.snapshot()
+---
+- ok
+...
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
