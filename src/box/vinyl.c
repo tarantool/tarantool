@@ -4557,9 +4557,6 @@ vy_scheduler_quota_cb(enum vy_quota_event event, void *arg)
 {
 	struct vy_scheduler *scheduler = arg;
 
-	if (scheduler->env->status != VINYL_ONLINE)
-		return;
-
 	switch (event) {
 	case VY_QUOTA_EXCEEDED:
 		ipc_cond_signal(&scheduler->scheduler_cond);
@@ -4841,6 +4838,22 @@ vy_scheduler_f(va_list va)
 	ipc_cond_wait(&scheduler->scheduler_cond);
 	if (scheduler->scheduler == NULL)
 		return 0; /* destroyed */
+
+	/*
+	 * The scheduler must be disabled during local recovery so as
+	 * not to distort data stored on disk. Not that we really need
+	 * it anyway, because the memory footprint is limited by the
+	 * memory limit from the previous run.
+	 *
+	 * On the contrary, remote recovery does require the scheduler
+	 * to be up and running, because the amount of data received
+	 * when bootstrapping from a remote master is only limited by
+	 * its disk size, which can exceed the size of available
+	 * memory by orders of magnitude.
+	 */
+	assert(env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
+	       env->status != VINYL_FINAL_RECOVERY_LOCAL);
+
 	vy_scheduler_start_workers(scheduler);
 
 	while (scheduler->scheduler != NULL) {
@@ -4987,7 +5000,6 @@ static void
 vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 {
 	assert(!scheduler->is_worker_pool_running);
-	assert(scheduler->env->status == VINYL_ONLINE);
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
@@ -7243,8 +7255,7 @@ vy_env_new(void)
 	lsregion_create(&e->allocator, slab_cache->arena);
 	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
-	vy_quota_init(&e->quota, e->conf->memory_limit,
-		      vy_scheduler_quota_cb, e->scheduler);
+	vy_quota_init(&e->quota, vy_scheduler_quota_cb, e->scheduler);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
@@ -7297,6 +7308,7 @@ vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_ONLINE;
+	vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 	return 0;
 }
 
@@ -7310,6 +7322,7 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 	} else {
 		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
+		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 	}
 	return 0;
 }
@@ -7335,6 +7348,8 @@ vy_end_recovery(struct vy_env *e)
 {
 	switch (e->status) {
 	case VINYL_FINAL_RECOVERY_LOCAL:
+		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
+		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
 	default:

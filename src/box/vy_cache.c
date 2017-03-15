@@ -54,7 +54,8 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
 		    uint64_t mem_quota)
 {
 	rlist_create(&e->cache_lru);
-	vy_quota_init(&e->quota, mem_quota, NULL, NULL);
+	vy_quota_init(&e->quota, NULL, NULL);
+	vy_quota_set_limit(&e->quota, mem_quota);
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
 	e->cached_count = 0;
