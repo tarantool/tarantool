@@ -2061,7 +2061,7 @@ void sqlite3EndTable(
    * Enforce WITHOUT ROWID, but not for sqlite_master.
    * Skip VIEWs.
    */
-  if( !pSelect && (!db->init.busy || p->tnum!=1) ){
+  if( !p->pSelect && (!db->init.busy || p->tnum!=1) ){
     tabOpts |= TF_WithoutRowid;
   }
 

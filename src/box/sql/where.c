@@ -99,6 +99,11 @@ int sqlite3WhereBreakLabel(WhereInfo *pWInfo){
 */
 int sqlite3WhereOkOnePass(WhereInfo *pWInfo, int *aiCur){
   memcpy(aiCur, pWInfo->aiCurOnePass, sizeof(int)*2);
+  /*  Tarantool workaround: one pass is not working right now, since deleting tuple
+      invalidates pointing iterator (which is used to go through table).  */
+  if (pWInfo->eOnePass == ONEPASS_MULTI){
+    pWInfo->eOnePass = ONEPASS_OFF;
+  }
 #ifdef WHERETRACE_ENABLED
   if( sqlite3WhereTrace && pWInfo->eOnePass!=ONEPASS_OFF ){
     sqlite3DebugPrintf("%s cursors: %d %d\n",

@@ -4839,7 +4839,7 @@ do_bin_cmp:
 	  if( rc==0 ) rc = mem1.n - pKey2->n;
 	}
       }else{
-	rc = -1;
+	rc = 1;
       }
       break;
     }
