@@ -804,9 +804,14 @@ static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
 		return "string";
 	case SQLITE_AFF_NUMERIC:
 	case SQLITE_AFF_REAL:
-		return "number";
+	  /* Tarantool workaround: to make comparators able to compare, e.g.
+	     double and int use generic type. This might be a performance issue.  */
+	  /* return "number"; */
+		return "scalar";
 	case SQLITE_AFF_INTEGER:
-		return "integer";
+	  /* See comment above.  */
+	  /* return "integer"; */
+		return "scalar";
 	}
 }
 

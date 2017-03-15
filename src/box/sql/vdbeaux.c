@@ -4964,6 +4964,7 @@ void sqlite3VdbeRecordUnpackMsgpack(
   Mem *pMem = p->aMem;
   n = mp_decode_array(&zParse);
   n = p->nField = MIN(n, pKeyInfo->nField);
+  p->default_rc = 0;
   while(n--) {
     pMem->enc = pKeyInfo->enc;
     pMem->db = pKeyInfo->db;
