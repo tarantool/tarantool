@@ -78,8 +78,6 @@ struct applier {
 	struct vclock vclock;
 	/** The last box_error_code() logged to avoid log flooding */
 	uint32_t last_logged_errcode;
-	/** Remote replica_id */
-	uint32_t id;
 	/** Remote UUID */
 	struct tt_uuid uuid;
 	/** Remote URI (string) */

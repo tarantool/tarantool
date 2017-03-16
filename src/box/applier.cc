@@ -319,29 +319,13 @@ applier_subscribe(struct applier *applier)
 			tnt_raise(ClientError, ER_PROTOCOL,
 				  "Invalid response to SUBSCRIBE");
 		}
-
 		/*
-		 * Don't overwrite applier->vclock before performing
-		 * sanity checks for a valid replica id.
+		 * In case of successful subscribe, the server
+		 * responds with its current vclock.
 		 */
 		struct vclock vclock;
 		vclock_create(&vclock);
 		xrow_decode_vclock(&row, &vclock);
-
-		/* Forbid changing the replica_id */
-		if (applier->id != 0 && applier->id != row.replica_id) {
-			Exception *e = tnt_error(ClientError,
-						 ER_REPLICA_ID_MISMATCH,
-						 tt_uuid_str(&applier->uuid),
-						 applier->id, row.replica_id);
-			applier_log_error(applier, e);
-			e->raise();
-		}
-
-		/* Save the received replica id and vclock */
-		applier->id = row.replica_id;
-		/* Overwrite the last known vclock from SUBSCRIBE */
-		vclock_copy(&applier->vclock, &vclock);
 	}
 	/**
 	 * Tarantool < 1.6.7:
