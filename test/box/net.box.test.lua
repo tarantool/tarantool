@@ -7,7 +7,10 @@ test_run = env.new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
 test_run:cmd("setopt delimiter ';'")
-function x_select(cn, ...) return cn:_request('select', ...) end
+function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
+    return cn:_request('select', opts, space_id, index_id, iterator,
+                       offset, limit, key)
+end
 function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\x80') end
 test_run:cmd("setopt delimiter ''");
 
@@ -103,12 +106,11 @@ box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()
 cn = remote.connect(box.cfg.listen)
 
-x_select(cn, space.id, space.index.primary.id, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 0xFFFFFFFF, 123)
 space:insert{123, 345}
-x_select(cn, space.id, space.index.primary.id, 123)
-x_select(cn, space.id, space.index.primary.id, 123, { limit = 0 })
-x_select(cn, space.id, space.index.primary.id, 123, { limit = 1 })
-x_select(cn, space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 0, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 1, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 1, 1, 123)
 
 cn.space[space.id]  ~= nil
 cn.space.net_box_test_space ~= nil
@@ -196,7 +198,7 @@ cn.state
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 
 x_fatal(cn)
-x_select(cn, space.id, 0, {}, { iterator = 'ALL' })
+x_select(cn, space.id, 0, box.index.ALL, 0, 0xFFFFFFFF, {})
 
 cn.state
 cn:ping()
@@ -204,7 +206,7 @@ cn:ping()
 -- -- dot-new-method
 
 cn1 = remote.new(LISTEN.host, LISTEN.service)
-x_select(cn1, space.id, 0, {}, { iterator = 'ALL' })
+x_select(cn1, space.id, 0, box.index.ALL, 0, 0xFFFFFFF, {})
 
 -- -- error while waiting for response
 type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
@@ -255,7 +257,100 @@ cn:ping()
 
 function ret_after(to) fiber.sleep(to) return {{to}} end
 
--- timeouts
+cn:ping({timeout = 1.00})
+cn:ping({timeout = 1e-9})
+cn:ping()
+
+remote_space = cn.space.net_box_test_space
+remote_pk = remote_space.index.primary
+
+remote_space:insert({0}, { timeout = 1.00 })
+remote_space:insert({1}, { timeout = 1e-9 })
+remote_space:insert({2})
+
+remote_space:replace({0}, { timeout = 1e-9 })
+remote_space:replace({1})
+remote_space:replace({2}, { timeout = 1.00 })
+
+remote_space:upsert({3}, {}, { timeout = 1e-9 })
+remote_space:upsert({4}, {})
+remote_space:upsert({5}, {}, { timeout = 1.00 })
+remote_space:upsert({3}, {})
+
+remote_space:update({3}, {}, { timeout = 1e-9 })
+remote_space:update({4}, {})
+remote_space:update({5}, {}, { timeout = 1.00 })
+remote_space:update({3}, {})
+
+remote_pk:update({5}, {}, { timeout = 1e-9 })
+remote_pk:update({4}, {})
+remote_pk:update({3}, {}, { timeout = 1.00 })
+remote_pk:update({5}, {})
+
+remote_space:get({0})
+remote_space:get({1}, { timeout = 1.00 })
+remote_space:get({2}, { timeout = 1e-9 })
+
+remote_pk:get({3}, { timeout = 1e-9 })
+remote_pk:get({4})
+remote_pk:get({5}, { timeout = 1.00 })
+
+remote_space:select({2}, { timeout = 1e-9 })
+remote_space:select({2}, { timeout = 1.00 })
+remote_space:select({2})
+
+remote_pk:select({2}, { timeout = 1.00 })
+remote_pk:select({2}, { timeout = 1e-9 })
+remote_pk:select({2})
+
+remote_space:select({5}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+remote_space:select({5}, { iterator = 'LE', limit = 5})
+remote_space:select({5}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+
+remote_pk:select({2}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+remote_pk:select({2}, { iterator = 'LE', limit = 5})
+remote_pk:select({2}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+
+remote_pk:count({2}, { timeout = 1.00})
+remote_pk:count({2}, { timeout = 1e-9})
+remote_pk:count({2})
+
+remote_pk:count({2}, { timeout = 1.00, iterator = 'LE' })
+remote_pk:count({2}, { iterator = 'LE'})
+remote_pk:count({2}, { timeout = 1e-9, iterator = 'LE' })
+
+remote_pk:min(nil, { timeout = 1.00 })
+remote_pk:min(nil, { timeout = 1e-9 })
+remote_pk:min(nil)
+
+remote_pk:min({0}, { timeout = 1e-9 })
+remote_pk:min({1})
+remote_pk:min({2}, { timeout = 1.00 })
+
+remote_pk:max(nil)
+remote_pk:max(nil, { timeout = 1e-9 })
+remote_pk:max(nil, { timeout = 1.00 })
+
+remote_pk:max({0}, { timeout = 1.00 })
+remote_pk:max({1}, { timeout = 1e-9 })
+remote_pk:max({2})
+
+_ = remote_space:delete({0}, { timeout = 1e-9 })
+_ = remote_pk:delete({0}, { timeout = 1.00 })
+_ = remote_space:delete({1}, { timeout = 1.00 })
+_ = remote_pk:delete({1}, { timeout = 1e-9 })
+_ = remote_space:delete({2}, { timeout = 1e-9 })
+_ = remote_pk:delete({2})
+_ = remote_pk:delete({3})
+_ = remote_pk:delete({4})
+_ = remote_pk:delete({5})
+
+remote_space:get(0)
+remote_space:get(1)
+remote_space:get(2)
+
+remote_space = nil
+
 cn:timeout(1).space.net_box_test_space.index.primary:select{234}
 cn:call('ret_after', .01)
 cn:timeout(1):call('ret_after', .01)
@@ -263,9 +358,6 @@ cn:timeout(.01):call('ret_after', 1)
 
 cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-
-
-
 
 remote.self:ping()
 remote.self.space.net_box_test_space:select{234}

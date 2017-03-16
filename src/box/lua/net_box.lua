@@ -59,24 +59,7 @@ local method_codec           = {
     delete  = internal.encode_delete,
     update  = internal.encode_update,
     upsert  = internal.encode_upsert,
-    select  = function(buf, id, schema_id, spaceno, indexno, key, opts)
-        if type(spaceno) ~= 'number' then
-            box.error(box.error.NO_SUCH_SPACE, '#'..tostring(spaceno))
-        end
-
-        if type(indexno) ~= 'number' then
-            box.error(box.error.NO_SUCH_INDEX, indexno, '#'..tostring(indexno))
-        end
-
-        local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
-        local offset = tonumber(opts and opts.offset) or 0
-
-        local key_is_nil = (key == nil or
-                            (type(key) == 'table' and #key == 0))
-        encode_select(buf, id, schema_id, spaceno, indexno,
-                      check_iterator_type(opts, key_is_nil),
-                      offset, limit, key)
-    end,
+    select  = internal.encode_select,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, schema_id, bytes)
         local ptr = buf:reserve(#bytes)
@@ -608,7 +591,9 @@ local function connect(...)
         setmetatable(remote, console_mt)
     else
         setmetatable(remote, remote_mt)
+        -- @deprecated since 1.7.4
         remote._deadlines = setmetatable({}, {__mode = 'k'})
+
         remote._space_mt = space_metatable(remote)
         remote._index_mt = index_metatable(remote)
         if opts.call_16 then remote.call = remote.call_16 end
@@ -649,13 +634,21 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, ...)
+function remote_methods:_request(method, opts, ...)
     local this_fiber = fiber_self()
     local transport = self._transport
     local perform_request = transport.perform_request
     local wait_state = transport.wait_state
-    local deadlines = self._deadlines
-    local deadline = deadlines[this_fiber]
+    local deadline = nil
+    if opts and opts.timeout then
+        -- conn.space:request(, { timeout = timeout })
+        deadline = fiber_time() + opts.timeout
+    else
+        -- conn:timeout(timeout).space:request()
+        -- @deprecated since 1.7.4
+        deadline = self._deadlines[this_fiber]
+    end
+
     local err, res
     repeat
         local timeout = deadline and max(0, deadline - fiber_time())
@@ -682,10 +675,16 @@ function remote_methods:_request(method, ...)
     box.error({code = err, reason = res})
 end
 
-function remote_methods:ping()
+function remote_methods:ping(opts)
     remote_check(self, 'ping')
-    local deadline = self._deadlines[fiber_self()]
-    local timeout = deadline and max(0, deadline-fiber_time())
+    local timeout = opts and opts.timeout
+    if timeout == nil then
+        -- conn:timeout(timeout):ping()
+        -- @deprecated since 1.7.4
+        local deadline = self._deadlines[fiber_self()]
+        timeout = deadline and max(0, deadline - fiber_time())
+                            or (opts and opts.timeout)
+    end
     local err = self._transport.perform_request(timeout, 'ping',
                                                 self._schema_id)
     return not err or err == E_WRONG_SCHEMA_VERSION
@@ -693,22 +692,23 @@ end
 
 function remote_methods:reload_schema()
     remote_check(self, 'reload_schema')
-    self:_request('select', VSPACE_ID, 0, nil, {limit = 0})
+    self:_request('select', nil, VSPACE_ID, 0, box.index.GE, 0, 0xFFFFFFFF,
+                  nil)
 end
 
 function remote_methods:call_16(func_name, ...)
     remote_check(self, 'call')
-    return self:_request('call_16', tostring(func_name), {...})
+    return self:_request('call_16', nil, tostring(func_name), {...})
 end
 
 function remote_methods:call(func_name, ...)
     remote_check(self, 'call')
-    return unpack(self:_request('call_17', tostring(func_name), {...}))
+    return unpack(self:_request('call_17', nil, tostring(func_name), {...}))
 end
 
 function remote_methods:eval(code, ...)
     remote_check(self, 'eval')
-    return unpack(self:_request('eval', code, {...}))
+    return unpack(self:_request('eval', nil, code, {...}))
 end
 
 function remote_methods:wait_state(state, timeout)
@@ -720,8 +720,17 @@ function remote_methods:wait_state(state, timeout)
     return self._transport.wait_state(state, timeout)
 end
 
+local compat_warning_said = false
+
+-- @deprecated since 1.7.4
 function remote_methods:timeout(timeout)
     remote_check(self, 'timeout')
+    if not compat_warning_said then
+        compat_warning_said = true
+        log.warn("netbox:timeout(timeout) is deprecated since 1.7.4, "..
+                 "please use space:<request>(..., {timeout = t}) instead.")
+    end
+    -- Sic: this is broken by design
     self._deadlines[fiber_self()] = (timeout and fiber_time() + timeout)
     return self
 end
@@ -846,14 +855,14 @@ end
 space_metatable = function(remote)
     local methods = {}
 
-    function methods:insert(tuple)
+    function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return one_tuple(remote:_request('insert', self.id, tuple))
+        return one_tuple(remote:_request('insert', opts, self.id, tuple))
     end
 
-    function methods:replace(tuple)
+    function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return one_tuple(remote:_request('replace', self.id, tuple))
+        return one_tuple(remote:_request('replace', opts, self.id, tuple))
     end
 
     function methods:select(key, opts)
@@ -861,23 +870,23 @@ space_metatable = function(remote)
         return check_primary_index(self):select(key, opts)
     end
 
-    function methods:delete(key)
+    function methods:delete(key, opts)
         check_space_arg(self, 'delete')
         return check_primary_index(self):delete(key, opts)
     end
 
-    function methods:update(key, oplist)
+    function methods:update(key, oplist, opts)
         check_space_arg(self, 'update')
         return check_primary_index(self):update(key, oplist, opts)
     end
 
-    function methods:upsert(key, oplist)
-        space_check(self, 'upsert')
-        remote:_request('upsert', self.id, key, oplist)
+    function methods:upsert(key, oplist, opts)
+        check_space_arg(self, 'upsert')
+        remote:_request('upsert', opts, self.id, key, oplist)
         return
     end
 
-    function methods:get(key)
+    function methods:get(key, opts)
         check_space_arg(self, 'get')
         return check_primary_index(self):get(key, opts)
     end
@@ -890,47 +899,54 @@ index_metatable = function(remote)
 
     function methods:select(key, opts)
         check_index_arg(self, 'select')
-        return remote:_request('select', self.space.id, self.id, key, opts)
+        local key_is_nil = (key == nil or
+                            (type(key) == 'table' and #key == 0))
+        local iterator = check_iterator_type(opts, key_is_nil)
+        local offset = tonumber(opts and opts.offset) or 0
+        local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
+        return remote:_request('select', opts, self.space.id, self.id,
+                               iterator, offset, limit, key)
     end
 
-    function methods:get(key)
+    function methods:get(key, opts)
         check_index_arg(self, 'get')
-        local res = remote:_request('select', self.space.id, self.id, key,
-                                    { limit = 2, iterator = 'EQ' })
+        local res = remote:_request('select', opts, self.space.id, self.id,
+                                    box.index.EQ, 0, 2, key)
         if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
         if res[1] ~= nil then return res[1] end
     end
 
-    function methods:min(key)
+    function methods:min(key, opts)
         check_index_arg(self, 'min')
-        local res = remote:_request('select', self.space.id, self.id, key,
-                                    { limit = 1, iterator = 'GE' })
+        local res = remote:_request('select', opts, self.space.id, self.id,
+                                    box.index.GE, 0, 1, key)
         return one_tuple(res)
     end
 
-    function methods:max(key)
+    function methods:max(key, opts)
         check_index_arg(self, 'max')
-        local res = remote:_request('select', self.space.id, self.id, key,
-                                    { limit = 1, iterator = 'LE' })
+        local res = remote:_request('select', opts, self.space.id, self.id,
+                                    box.index.LE, 0, 1, key)
         return one_tuple(res)
     end
 
-    function methods:count(key)
+    function methods:count(key, opts)
         check_index_arg(self, 'count')
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('call_16', code, { key })[1][1]
+        return remote:_request('call_16', opts, code, { key })[1][1]
     end
 
-    function methods:delete(key)
+    function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        local res = remote:_request('delete', self.space.id, self.id, key)
+        local res = remote:_request('delete', opts, self.space.id, self.id,
+                                    key)
         return one_tuple(res)
     end
 
-    function methods:update(key, oplist)
+    function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
-        local res = remote:_request('update', self.space.id, self.id,
+        local res = remote:_request('update', opts, self.space.id, self.id,
                                     key, oplist)
         return one_tuple(res)
     end

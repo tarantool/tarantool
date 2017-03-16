@@ -41,7 +41,7 @@ conn:ping()
 -- xxx: bug  currently selects no rows
 space:select{}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 space:insert{1, 'I am a tuple'}
 ---
@@ -49,17 +49,17 @@ space:insert{1, 'I am a tuple'}
 ...
 space:select{1}
 ---
-- - [1, 'I am a tuple']
+- error: 'No index #0 is defined in space ''test'''
 ...
 -- currently there is no way to find out how many records
 -- a space contains 
 space:select{0}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 space:select{2}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 test_run:cmd('restart server default')
 net_box = require('net.box')
