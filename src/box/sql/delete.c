@@ -521,7 +521,10 @@ void sqlite3DeleteFrom(
     {
       int count = (pParse->nested==0);    /* True to count changes */
       int iIdxNoSeek = -1;
-      if( bComplex==0 && aiCurOnePass[1]!=iDataCur ){
+      if( bComplex==0 && aiCurOnePass[1]!=iDataCur
+	  /* Tarantool: as far as ONEPASS is disabled, there's no index
+	     w/o need of seeking.  */
+	  && eOnePass != ONEPASS_OFF){
         iIdxNoSeek = aiCurOnePass[1];
       }
       sqlite3GenerateRowDelete(pParse, pTab, pTrigger, iDataCur, iIdxCur,
