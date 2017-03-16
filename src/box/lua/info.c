@@ -136,18 +136,19 @@ lbox_info_replication(struct lua_State *L)
 static int
 lbox_info_server(struct lua_State *L)
 {
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, instance_id);
+	lua_pushinteger(L, self ? self->id : REPLICA_ID_NIL);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	if (instance_id != REPLICA_ID_NIL && wal != NULL) {
+	if (self != NULL && wal != NULL) {
 		struct vclock vclock;
 		wal_checkpoint(&vclock, false);
-		luaL_pushint64(L, vclock_get(&vclock, instance_id));
+		luaL_pushint64(L, vclock_get(&vclock, self->id));
 	} else {
 		luaL_pushint64(L, -1);
 	}
