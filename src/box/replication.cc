@@ -158,7 +158,6 @@ void
 replica_clear_id(struct replica *replica)
 {
 	assert(replica->id != REPLICA_ID_NIL && replica->id != instance_id);
-
 	/*
 	 * Don't remove replicas from vclock here.
 	 * The vclock_sum() must always grow, it is a core invariant of
@@ -168,8 +167,6 @@ replica_clear_id(struct replica *replica)
 	 * Some records may arrive later on due to asynchronous nature of
 	 * replication.
 	 */
-	if (instance_id == replica->id)
-		instance_id = REPLICA_ID_NIL;
 	replica->id = REPLICA_ID_NIL;
 	if (replica_is_orphan(replica)) {
 		replicaset_remove(&replicaset, replica);

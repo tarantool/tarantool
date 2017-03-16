@@ -136,6 +136,12 @@ lbox_info_replication(struct lua_State *L)
 static int
 lbox_info_server(struct lua_State *L)
 {
+	/*
+	 * Self can be NULL during bootstrap: entire box.info
+	 * bundle becomes available soon after entering box.cfg{}
+	 * and replication bootstrap relies on this as it looks
+	 * at box.info.status.
+	 */
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
