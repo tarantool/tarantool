@@ -1555,7 +1555,7 @@ box_cfg_xc(void)
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
-		if (xctl_begin_recovery(vclock_sum(&checkpoint_vclock)) != 0)
+		if (xctl_begin_recovery(&checkpoint_vclock) != 0)
 			diag_raise();
 		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");

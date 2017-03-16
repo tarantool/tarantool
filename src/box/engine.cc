@@ -339,7 +339,7 @@ engine_commit_checkpoint(struct vclock *vclock)
 		if (engine->waitCheckpoint(vclock) < 0)
 			return -1;
 	}
-	if (xctl_rotate(vclock_sum(vclock)) != 0)
+	if (xctl_rotate(vclock) != 0)
 		return -1;
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {

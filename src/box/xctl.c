@@ -58,6 +58,7 @@
 #include "say.h"
 #include "trivia/util.h"
 #include "wal.h"
+#include "vclock.h"
 #include "xlog.h"
 #include "xrow.h"
 
@@ -140,8 +141,8 @@ struct xctl {
 	char log_dir[PATH_MAX];
 	/** The vinyl directory. Used for garbage collection. */
 	char vinyl_dir[PATH_MAX];
-	/** Vector clock sum from the time of the log creation. */
-	int64_t signature;
+	/** Vector clock from the time of the log creation. */
+	struct vclock vclock;
 	/** Recovery context. */
 	struct xctl_recovery *recovery;
 	/** Latch protecting the log buffer. */
@@ -265,7 +266,7 @@ struct vy_run_recovery_info {
 };
 
 static struct xctl_recovery *
-xctl_recovery_new(int64_t log_signature, int64_t recovery_signature);
+xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature);
 static void
 xctl_recovery_delete(struct xctl_recovery *recovery);
 static struct vy_index_recovery_info *
@@ -280,17 +281,17 @@ xctl_recovery_iterate(struct xctl_recovery *recovery, bool include_deleted,
 
 /** An snprint-style function to print a path to a metadata log file. */
 static int
-xctl_snprint_path(char *buf, size_t size, int64_t signature)
+xctl_snprint_path(char *buf, size_t size, const struct vclock *vclock)
 {
-	return snprintf(buf, size, "%s/%020lld.%s",
-			xctl.log_dir, (long long)signature, XCTL_SUFFIX);
+	return snprintf(buf, size, "%s/%020lld.%s", xctl.log_dir,
+			(long long)vclock_sum(vclock), XCTL_SUFFIX);
 }
 
 const char *
 xctl_path(void)
 {
 	char *filename = tt_static_buf();
-	xctl_snprint_path(filename, TT_STATIC_BUF_LEN, xctl.signature);
+	xctl_snprint_path(filename, TT_STATIC_BUF_LEN, &xctl.vclock);
 	return filename;
 }
 
@@ -755,12 +756,12 @@ xctl_vy_run_gc(const struct xctl_record *record)
 }
 
 int
-xctl_begin_recovery(int64_t signature)
+xctl_begin_recovery(const struct vclock *vclock)
 {
 	assert(xctl.recovery == NULL);
 
 	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(signature, INT64_MAX);
+	recovery = xctl_recovery_new(vclock, INT64_MAX);
 	if (recovery == NULL)
 		return -1;
 
@@ -768,7 +769,7 @@ xctl_begin_recovery(int64_t signature)
 	xctl.next_vy_run_id = recovery->vy_run_id_max + 1;
 
 	xctl.recovery = recovery;
-	xctl.signature = signature;
+	vclock_copy(&xctl.vclock, vclock);
 	return 0;
 }
 
@@ -887,15 +888,15 @@ xctl_deleted_vy_run_gc(const struct xctl_record *record, void *cb_arg)
 static ssize_t
 xctl_rotate_f(va_list ap)
 {
-	int64_t signature = va_arg(ap, int64_t);
+	const struct vclock *vclock = va_arg(ap, const struct vclock *);
 
 	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(xctl.signature, INT64_MAX);
+	recovery = xctl_recovery_new(&xctl.vclock, INT64_MAX);
 	if (recovery == NULL)
 		goto err_recovery;
 
 	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), signature);
+	xctl_snprint_path(path, sizeof(path), vclock);
 
 	struct xctl_rotate_cb_arg arg = {
 		.xlog_is_open = false,
@@ -933,7 +934,7 @@ err_recovery:
 }
 
 int
-xctl_rotate(int64_t signature)
+xctl_rotate(const struct vclock *vclock)
 {
 	assert(xctl.recovery == NULL);
 
@@ -942,11 +943,12 @@ xctl_rotate(int64_t signature)
 	 * in which case old and new signatures coincide and there's
 	 * nothing we need to do.
 	 */
-	assert(signature >= xctl.signature);
-	if (signature == xctl.signature)
+	assert(vclock_compare(vclock, &xctl.vclock) >= 0);
+	if (vclock_compare(vclock, &xctl.vclock) == 0)
 		return 0;
 
-	say_debug("%s: signature %lld", __func__, (long long)signature);
+	say_debug("%s: signature %lld", __func__,
+		  (long long)vclock_sum(vclock));
 
 	/*
 	 * Lock out all concurrent log writers while we are rotating it.
@@ -967,7 +969,7 @@ xctl_rotate(int64_t signature)
 		goto fail;
 
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(xctl_rotate_f, signature) < 0)
+	if (coio_call(xctl_rotate_f, vclock) < 0)
 		goto fail;
 
 	/*
@@ -975,7 +977,7 @@ xctl_rotate(int64_t signature)
 	 * automatically on the first write (see wal_write_xctl()).
 	 */
 	wal_rotate_xctl();
-	xctl.signature = signature;
+	vclock_copy(&xctl.vclock, vclock);
 
 	latch_unlock(&xctl.latch);
 	say_debug("%s: complete", __func__);
@@ -992,12 +994,12 @@ fail:
 static ssize_t
 xctl_recovery_new_f(va_list ap)
 {
-	int64_t log_signature = va_arg(ap, int64_t);
+	const struct vclock *vclock = va_arg(ap, const struct vclock *);
 	int64_t recovery_signature = va_arg(ap, int64_t);
 	struct xctl_recovery **p_recovery = va_arg(ap, struct xctl_recovery **);
 
 	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(log_signature, recovery_signature);
+	recovery = xctl_recovery_new(vclock, recovery_signature);
 	if (recovery == NULL)
 		return -1;
 	*p_recovery = recovery;
@@ -1013,7 +1015,7 @@ xctl_collect_garbage(int64_t signature)
 	latch_lock(&xctl.latch);
 	/* Load the log from coeio so as not to stall tx thread. */
 	struct xctl_recovery *recovery;
-	int rc = coio_call(xctl_recovery_new_f, xctl.signature,
+	int rc = coio_call(xctl_recovery_new_f, &xctl.vclock,
 			   signature, &recovery);
 	latch_unlock(&xctl.latch);
 
@@ -1058,8 +1060,8 @@ xctl_relay(xctl_recovery_cb cb, void *cb_arg)
 	 */
 	latch_lock(&xctl.latch);
 	struct xctl_recovery *recovery;
-	int rc = coio_call(xctl_recovery_new_f, xctl.signature,
-			   xctl.signature, &recovery);
+	int rc = coio_call(xctl_recovery_new_f, &xctl.vclock,
+			   vclock_sum(&xctl.vclock), &recovery);
 	latch_unlock(&xctl.latch);
 	if (rc != 0)
 		return -1;
@@ -1154,7 +1156,7 @@ xctl_write(const struct xctl_record *record)
 	struct xctl_record *tx_record = &xctl.tx_buf[xctl.tx_end++];
 	*tx_record = *record;
 	if (tx_record->signature < 0)
-		tx_record->signature = xctl.signature;
+		tx_record->signature = vclock_sum(&xctl.vclock);
 }
 
 /** Mark a vinyl run as deleted. */
@@ -1604,13 +1606,13 @@ xctl_recovery_process_record(struct xctl_recovery *recovery,
 
 /**
  * Load records having signatures < @recovery_signature from
- * the metadata log with signature @log_signature and return
- * the recovery context.
+ * the metadata log with vclock @vclock and return the recovery
+ * context.
  *
  * Returns NULL on failure.
  */
 static struct xctl_recovery *
-xctl_recovery_new(int64_t log_signature, int64_t recovery_signature)
+xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature)
 {
 	struct xctl_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
@@ -1636,7 +1638,7 @@ xctl_recovery_new(int64_t log_signature, int64_t recovery_signature)
 	}
 
 	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), log_signature);
+	xctl_snprint_path(path, sizeof(path), vclock);
 
 	if (access(path, F_OK) < 0 && errno == ENOENT) {
 		/* No log file, nothing to do. */

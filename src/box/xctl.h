@@ -52,6 +52,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vclock;
+
 /** Xlog type of a metadata log file. */
 #define XCTL_TYPE			"XCTL"
 
@@ -180,7 +182,7 @@ xctl_path(void);
 
 /**
  * Rotate the metadata log. This function creates a new
- * xlog file in the log directory having signature @signature
+ * xlog file in the log directory having vclock @vclock
  * and writes records required to recover active indexes.
  * The goal of log rotation is to compact the log file by
  * discarding records cancelling each other and records left
@@ -189,7 +191,7 @@ xctl_path(void);
  * Returns 0 on success, -1 on failure.
  */
 int
-xctl_rotate(int64_t signature);
+xctl_rotate(const struct vclock *vclock);
 
 /**
  * Remove files left from objects deleted before the log
@@ -255,7 +257,7 @@ xctl_write(const struct xctl_record *record);
 
 /**
  * Prepare the metadata log for recovery from the file having
- * signature @signature.
+ * vclock @vclock.
  *
  * After this function is called, vinyl indexes may be recovered from
  * the log using xctl_recover_vy_index(). When recovery is complete,
@@ -264,7 +266,7 @@ xctl_write(const struct xctl_record *record);
  * Returns 0 on success, -1 on failure.
  */
 int
-xctl_begin_recovery(int64_t signature);
+xctl_begin_recovery(const struct vclock *vclock);
 
 /**
  * Finish recovery from the metadata log.
