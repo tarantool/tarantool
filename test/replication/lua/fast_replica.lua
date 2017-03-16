@@ -13,16 +13,33 @@ function join(inspector, n)
 end
 
 
-function drop_all(inspector)
+function call_all(callback)
     local all = box.space._cluster:select{}
     for _, tuple in pairs(all) do
         local id = tuple[1]
         if id ~= box.info.server.id then
-            box.space._cluster:delete{id}
-            inspector:cmd('stop server replica'..tostring(id - 1))
-            inspector:cmd('delete server replica'..tostring(id - 1))
-        end
+	    callback(id)
+       end
     end
+    
+end
+
+function unregister(inspector, id)
+    box.space._cluster:delete{id}
+end
+
+function delete(inspector, id)
+    inspector:cmd('stop server replica'..tostring(id - 1))
+    inspector:cmd('delete server replica'..tostring(id - 1))
+end
+
+function drop(inspector, id)
+    unregister(inspector, id)
+    delete(inspector, id)
+end
+
+function drop_all(inspector)
+    call_all(function (id) drop(inspector, id) end)
 end
 
 function vclock_diff(left, right)
@@ -42,4 +59,6 @@ return {
     join = join;
     drop_all = drop_all;
     vclock_diff = vclock_diff;
+    unregister = unregister;
+    delete = delete;
 }

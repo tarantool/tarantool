@@ -50,5 +50,27 @@ box.space._cluster:len() == 2
 -- Cleanup
 replica_set.drop_all(test_run)
 box.space._cluster:len() == 1
+
+-- delete replica from master
+replica_set.join(test_run, 1)
+while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
+-- Check server ids
+test_run:cmd('eval replica1 "return box.info.server.id"')
+box.space._cluster:len() == 2
+replica_set.unregister(test_run, 2)
+
+while test_run:cmd('eval replica1 "box.info.replication[1].status"')[1] ~= 'stopped' do fiber.sleep(0.001) end
+test_run:cmd('eval replica1 "box.info.replication[1].message"')
+
+-- restart replica and check that replica isn't able to join to cluster
+test_run:cmd('restart server replica1')
+test_run:cmd('switch default')
+box.space._cluster:len() == 1
+test_run:cmd('eval replica1 "box.info.replication[1].status"')
+test_run:cmd('eval replica1 "box.info.replication[1].message"')[1]:match("is not registered with replica set") ~= nil
+replica_set.delete(test_run, 2)
+
 box.space.test:drop()
+
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
