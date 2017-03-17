@@ -248,7 +248,7 @@ tfbr = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr', v})
+            table.insert(buffer, v)
         end
     end
 );
@@ -258,7 +258,7 @@ tfbr2 = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr2', v})
+            table.insert(buffer, v)
         end
     end
 );
@@ -323,43 +323,27 @@ t
   - true
   - true
 ...
-table.sort(buffer, function(a, b) return a[2] < b[2] end)
+table.sort(buffer)
 ---
 ...
 buffer
 ---
-- - - tfbr
-    - 1
-  - - tfbr2
-    - 2
-  - - tfbr
-    - 3
-  - - tfbr2
-    - 4
-  - - tfbr
-    - 5
-  - - tfbr2
-    - 35
-  - - tfbr
-    - 36
-  - - tfbr2
-    - 37
-  - - tfbr2
-    - 38
-  - - tfbr2
-    - 39
-  - - tfbr
-    - 40
-  - - tfbr2
-    - 41
-  - - tfbr2
-    - 42
-  - - tfbr2
-    - 43
-  - - tfbr
-    - 44
-  - - tfbr2
-    - 45
+- - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 35
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
 ...
 ch = fiber.channel(1)
 ---
@@ -376,6 +360,9 @@ type(fiber.create(function() if ch:get() == nil then passed = true end end))
 - userdata
 ...
 ch:close()
+---
+...
+fiber.yield()
 ---
 ...
 passed
@@ -421,6 +408,9 @@ type(fiber.create(function() if ch:put(true) == false then passed = true end end
 - userdata
 ...
 ch:close()
+---
+...
+fiber.yield()
 ---
 ...
 passed
