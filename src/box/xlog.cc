@@ -301,17 +301,28 @@ xdir_create(struct xdir *dir, const char *dirname,
 	dir->instance_uuid = instance_uuid;
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
 	dir->open_wflags = O_RDWR | O_CREAT | O_EXCL;
-	if (type == SNAP) {
+	switch (type) {
+	case SNAP:
 		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
 		dir->suffix = INPROGRESS;
 		dir->sync_interval = SNAP_SYNC_INTERVAL;
-	} else {
+		break;
+	case XLOG:
 		dir->sync_is_async = true;
 		dir->filetype = "XLOG";
 		dir->filename_ext = ".xlog";
 		dir->suffix = NONE;
 		dir->force_recovery = true;
+		break;
+	case XCTL:
+		dir->filetype = "XCTL";
+		dir->filename_ext = ".xctl";
+		dir->suffix = INPROGRESS;
+		dir->force_recovery = true;
+		break;
+	default:
+		unreachable();
 	}
 	dir->type = type;
 }

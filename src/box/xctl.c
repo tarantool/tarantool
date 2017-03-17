@@ -55,15 +55,13 @@
 #include "fiber.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
 #include "latch.h"
+#include "replication.h" /* INSTANCE_UUID */
 #include "say.h"
 #include "trivia/util.h"
 #include "wal.h"
 #include "vclock.h"
 #include "xlog.h"
 #include "xrow.h"
-
-/** File extension of a metadata log file. */
-#define XCTL_SUFFIX			"xctl"
 
 /**
  * Integer key of a field in the xctl_record structure.
@@ -138,7 +136,7 @@ enum { XCTL_TX_BUF_SIZE = 64 };
 /** Metadata log object. */
 struct xctl {
 	/** The directory where log files are stored. */
-	char log_dir[PATH_MAX];
+	struct xdir dir;
 	/** The vinyl directory. Used for garbage collection. */
 	char vinyl_dir[PATH_MAX];
 	/** Vector clock from the time of the log creation. */
@@ -278,34 +276,6 @@ xctl_recovery_iterate_vy_index(struct vy_index_recovery_info *index,
 static int
 xctl_recovery_iterate(struct xctl_recovery *recovery, bool include_deleted,
 		      xctl_recovery_cb cb, void *cb_arg);
-
-/** An snprint-style function to print a path to a metadata log file. */
-static int
-xctl_snprint_path(char *buf, size_t size, const struct vclock *vclock)
-{
-	return snprintf(buf, size, "%s/%020lld.%s", xctl.log_dir,
-			(long long)vclock_sum(vclock), XCTL_SUFFIX);
-}
-
-const char *
-xctl_path(void)
-{
-	char *filename = tt_static_buf();
-	xctl_snprint_path(filename, TT_STATIC_BUF_LEN, &xctl.vclock);
-	return filename;
-}
-
-/** Check if an xlog meta belongs to a metadata log file. */
-static int
-xctl_type_check(struct xlog_meta *meta)
-{
-	if (strcmp(meta->filetype, XCTL_TYPE) != 0) {
-		diag_set(ClientError, ER_INVALID_XLOG_TYPE,
-			 XCTL_TYPE, meta->filetype);
-		return -1;
-	}
-	return 0;
-}
 
 /** An snprint-style function to print a log record. */
 static int
@@ -613,8 +583,7 @@ fail:
 void
 xctl_init(void)
 {
-	snprintf(xctl.log_dir, sizeof(xctl.log_dir), "%s",
-		 cfg_gets("wal_dir"));
+	xdir_create(&xctl.dir, cfg_gets("wal_dir"), XCTL, &INSTANCE_UUID);
 	snprintf(xctl.vinyl_dir, sizeof(xctl.vinyl_dir), "%s",
 		 cfg_gets("vinyl_dir"));
 	latch_create(&xctl.latch);
@@ -674,9 +643,30 @@ xctl_flush(void)
 void
 xctl_free(void)
 {
+	xdir_destroy(&xctl.dir);
 	if (xctl.recovery != NULL)
 		xctl_recovery_delete(xctl.recovery);
 	latch_destroy(&xctl.latch);
+}
+
+int
+xctl_open(struct xlog *xlog)
+{
+	char *path = xdir_format_filename(&xctl.dir, vclock_sum(&xctl.vclock),
+					  NONE);
+	if (access(path, F_OK) == 0) {
+		/* The log already exists, open it for appending. */
+		return xlog_open(xlog, path);
+	}
+
+	/* Create a new log. */
+	if (xdir_create_xlog(&xctl.dir, xlog, &xctl.vclock) < 0)
+		return -1;
+	if (xlog_rename(xlog) < 0) {
+		unlink(xlog->filename);
+		xlog_close(xlog, false);
+	}
+	return 0;
 }
 
 int64_t
@@ -837,8 +827,8 @@ struct xctl_rotate_cb_arg {
 	struct xlog xlog;
 	/** Set if the xlog was created. */
 	bool xlog_is_open;
-	/** Path to the xlog. */
-	const char *xlog_path;
+	/** The new xlog's vclock. */
+	const struct vclock *vclock;
 };
 
 /** Callback passed to xctl_recovery_iterate() for log rotation. */
@@ -854,10 +844,7 @@ xctl_rotate_cb_func(const struct xctl_record *record, void *cb_arg)
 	 * if vinyl is not used.
 	 */
 	if (!arg->xlog_is_open) {
-		struct xlog_meta meta = {
-			.filetype = XCTL_TYPE,
-		};
-		if (xlog_create(&arg->xlog, arg->xlog_path, &meta) < 0)
+		if (xdir_create_xlog(&xctl.dir, &arg->xlog, arg->vclock) < 0)
 			return -1;
 		arg->xlog_is_open = true;
 	}
@@ -895,12 +882,9 @@ xctl_rotate_f(va_list ap)
 	if (recovery == NULL)
 		goto err_recovery;
 
-	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), vclock);
-
 	struct xctl_rotate_cb_arg arg = {
 		.xlog_is_open = false,
-		.xlog_path = path,
+		.vclock = vclock,
 	};
 	if (xctl_recovery_iterate(recovery, true,
 				  xctl_rotate_cb_func, &arg) < 0)
@@ -1637,19 +1621,15 @@ xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature)
 		goto fail_free;
 	}
 
-	char path[PATH_MAX];
-	xctl_snprint_path(path, sizeof(path), vclock);
-
+	char *path = xdir_format_filename(&xctl.dir, vclock_sum(vclock), NONE);
 	if (access(path, F_OK) < 0 && errno == ENOENT) {
 		/* No log file, nothing to do. */
 		goto out;
 	}
 
 	struct xlog_cursor cursor;
-	if (xlog_cursor_open(&cursor, path) < 0)
+	if (xdir_open_cursor(&xctl.dir, vclock_sum(vclock), &cursor) < 0)
 		goto fail_free;
-	if (xctl_type_check(&cursor.meta) < 0)
-		goto fail_close;
 
 	int rc;
 	struct xrow_header row;

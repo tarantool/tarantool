@@ -750,24 +750,8 @@ wal_write_xctl_f(struct cbus_call_msg *msg)
 	struct wal_request *req = ((struct wal_write_xctl_msg *)msg)->req;
 
 	if (!xctl_writer.is_active) {
-		const char *path = xctl_path();
-		if (access(path, F_OK) == 0) {
-			/* The log already exists, open it for appending. */
-			if (xlog_open(&xctl_writer.xlog, path) < 0)
-				return -1;
-		} else {
-			/* No log. Try to create a new one. */
-			struct xlog_meta meta;
-			memset(&meta, 0, sizeof(meta));
-			snprintf(meta.filetype, sizeof(meta.filetype),
-				 "%s", XCTL_TYPE);
-			if (xlog_create(&xctl_writer.xlog, path, &meta) < 0)
-				return -1;
-			if (xlog_rename(&xctl_writer.xlog) < 0) {
-				unlink(xctl_writer.xlog.filename);
-				xlog_close(&xctl_writer.xlog, false);
-			}
-		}
+		if (xctl_open(&xctl_writer.xlog) < 0)
+			return -1;
 		xctl_writer.is_active = true;
 	}
 

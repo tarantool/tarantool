@@ -52,10 +52,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct xlog;
 struct vclock;
-
-/** Xlog type of a metadata log file. */
-#define XCTL_TYPE			"XCTL"
 
 /** Type of a metadata log record. */
 enum xctl_record_type {
@@ -175,10 +173,10 @@ void
 xctl_free(void);
 
 /**
- * Return the path to the current xctl log file.
+ * Open current xctl file.
  */
-const char *
-xctl_path(void);
+int
+xctl_open(struct xlog *xlog);
 
 /**
  * Rotate the metadata log. This function creates a new

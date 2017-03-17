@@ -58,7 +58,11 @@ extern const struct type type_XlogError;
  * used for logs and snapshots, but an xlog object sees only
  * those files which match its type.
  */
-enum xdir_type { SNAP, XLOG };
+enum xdir_type {
+	SNAP,		/* memtx snapshot */
+	XLOG,		/* write ahead log */
+	XCTL,		/* metadata log */
+};
 
 /**
  * Newly created snapshot files get .inprogress filename suffix.
