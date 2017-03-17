@@ -748,12 +748,19 @@ xctl_vy_run_gc(const struct xctl_record *record)
 int
 xctl_bootstrap(void)
 {
-	struct vclock vclock;
-	vclock_create(&vclock);
+	/* Add initial vclock to the xdir. */
+	struct vclock *vclock = malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		diag_set(OutOfMemory, sizeof(*vclock),
+			 "malloc", "struct vclock");
+		return -1;
+	}
+	vclock_create(vclock);
+	xdir_add_vclock(&xctl.dir, vclock);
 
 	/* Create initial xctl file. */
 	struct xlog xlog;
-	if (xdir_create_xlog(&xctl.dir, &xlog, &vclock) < 0)
+	if (xdir_create_xlog(&xctl.dir, &xlog, vclock) < 0)
 		return -1;
 
 	int rc = xlog_rename(&xlog);
@@ -765,6 +772,9 @@ int
 xctl_begin_recovery(const struct vclock *vclock)
 {
 	assert(xctl.recovery == NULL);
+
+	if (xdir_scan(&xctl.dir) < 0)
+		return -1;
 
 	struct xctl_recovery *recovery;
 	recovery = xctl_recovery_new(vclock, INT64_MAX);
@@ -921,6 +931,14 @@ xctl_rotate(const struct vclock *vclock)
 	if (vclock_compare(vclock, &xctl.vclock) == 0)
 		return 0;
 
+	struct vclock *new_vclock = malloc(sizeof(*new_vclock));
+	if (new_vclock == NULL) {
+		diag_set(OutOfMemory, sizeof(*new_vclock),
+			 "malloc", "struct vclock");
+		return -1;
+	}
+	vclock_copy(new_vclock, vclock);
+
 	say_debug("%s: signature %lld", __func__,
 		  (long long)vclock_sum(vclock));
 
@@ -953,6 +971,9 @@ xctl_rotate(const struct vclock *vclock)
 	wal_rotate_xctl();
 	vclock_copy(&xctl.vclock, vclock);
 
+	/* Add the new vclock to the xdir so that we can track it. */
+	xdir_add_vclock(&xctl.dir, new_vclock);
+
 	latch_unlock(&xctl.latch);
 	say_debug("%s: complete", __func__);
 	return 0;
@@ -962,6 +983,7 @@ fail:
 	say_debug("%s: failed", __func__);
 	say_error("failed to rotate metadata log: %s",
 		  diag_last_error(diag_get())->errmsg);
+	free(new_vclock);
 	return -1;
 }
 
@@ -977,6 +999,14 @@ xctl_recovery_new_f(va_list ap)
 	if (recovery == NULL)
 		return -1;
 	*p_recovery = recovery;
+	return 0;
+}
+
+static ssize_t
+xctl_collect_garbage_f(va_list ap)
+{
+	int64_t signature = va_arg(ap, int64_t);
+	xdir_collect_garbage(&xctl.dir, signature);
 	return 0;
 }
 
@@ -1002,6 +1032,9 @@ xctl_collect_garbage(int64_t signature)
 		say_warn("garbage collection failed: %s",
 			 diag_last_error(diag_get())->errmsg);
 	}
+
+	/* Delete old log files. */
+	coio_call(xctl_collect_garbage_f, signature);
 
 	say_debug("%s: done", __func__);
 }
