@@ -164,3 +164,25 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"operations",       /* 0x28 */
 };
 
+const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
+	"",
+	"offset",
+	"size",
+	"unpacked size",
+	"count",
+	"min",
+	"page index offset"
+};
+
+const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
+	"",
+	"min lsn",
+	"max lsn",
+	"page count",
+	"bloom filter"
+};
+
+const char *vy_page_index_key_strs[VY_PAGE_INDEX_KEY_MAX] = {
+	"",
+	"page index",
+};

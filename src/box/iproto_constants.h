@@ -137,6 +137,12 @@ enum iproto_type {
 	IPROTO_JOIN = 65,
 	IPROTO_SUBSCRIBE = 66,
 	IPROTO_TYPE_ADMIN_MAX = IPROTO_SUBSCRIBE + 1,
+
+	/* vinyl type codes */
+	VY_INDEX_RUN_INFO = 100,
+	VY_INDEX_PAGE_INFO = 101,
+	VY_RUN_PAGE_INDEX = 102,
+
 	/* command failed = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h) */
 	IPROTO_TYPE_ERROR = 1 << 15
 };
@@ -207,6 +213,35 @@ struct PACKED request_replace_body {
 	uint32_t v_space_id;
 	uint8_t k_tuple;
 };
+
+enum vy_run_info_key {
+	VY_RUN_INFO_MIN_LSN = 1,
+	VY_RUN_INFO_MAX_LSN = 2,
+	VY_RUN_INFO_PAGE_COUNT = 3,
+	VY_RUN_INFO_BLOOM = 4,
+	VY_RUN_INFO_KEY_MAX = VY_RUN_INFO_BLOOM + 1
+};
+
+extern const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX];
+
+enum vy_page_info_key {
+	VY_PAGE_INFO_OFFSET = 1,
+	VY_PAGE_INFO_SIZE = 2,
+	VY_PAGE_INFO_UNPACKED_SIZE = 3,
+	VY_PAGE_INFO_ROW_COUNT = 4,
+	VY_PAGE_INFO_MIN_KEY = 5,
+	VY_PAGE_INFO_PAGE_INDEX_OFFSET = 6,
+	VY_PAGE_INFO_KEY_MAX = VY_PAGE_INFO_PAGE_INDEX_OFFSET + 1
+};
+
+extern const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX];
+
+enum vy_page_index_key {
+	VY_PAGE_INDEX_INDEX = 1,
+	VY_PAGE_INDEX_KEY_MAX = VY_PAGE_INDEX_INDEX + 1
+};
+
+extern const char *vy_page_index_key_strs[VY_PAGE_INDEX_KEY_MAX];
 
 #if defined(__cplusplus)
 } /* extern "C" */

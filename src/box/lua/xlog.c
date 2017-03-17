@@ -76,14 +76,21 @@ lbox_checkcursor(struct lua_State *L, int narg, const char *src)
 /* {{{ Xlog Parser */
 
 static void
-lbox_xlog_parse_body_kv(struct lua_State *L, const char **beg, const char *end)
+lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const char *end)
 {
 	if (mp_typeof(**beg) != MP_UINT)
-		luaL_error(L, "Broken size of package");
+		luaL_error(L, "Broken type of body key");
 	uint32_t v = mp_decode_uint(beg);
-	if (v < IPROTO_KEY_MAX && iproto_key_strs[v] != NULL &&
+	if (type < IPROTO_TYPE_STAT_MAX && v < IPROTO_KEY_MAX &&
+	    iproto_key_strs[v] != NULL &&
 	    iproto_key_strs[v][0] > 0) {
 		lua_pushstring(L, iproto_key_strs[v]);
+	} else if (type == VY_INDEX_RUN_INFO && v < VY_RUN_INFO_KEY_MAX) {
+		lua_pushstring(L, vy_run_info_key_strs[v]);
+	} else if (type == VY_INDEX_PAGE_INFO && v < VY_PAGE_INFO_KEY_MAX) {
+		lua_pushstring(L, vy_page_info_key_strs[v]);
+	} else if (type == VY_RUN_PAGE_INDEX && v < VY_PAGE_INDEX_KEY_MAX) {
+		lua_pushstring(L, vy_page_index_key_strs[v]);
 	} else {
 		lua_pushinteger(L, v); /* unknown key */
 	}
@@ -121,7 +128,7 @@ lbox_xlog_parse_body_kv(struct lua_State *L, const char **beg, const char *end)
 }
 
 static int
-lbox_xlog_parse_body(struct lua_State *L, const char *ptr, size_t len)
+lbox_xlog_parse_body(struct lua_State *L, int type, const char *ptr, size_t len)
 {
 	const char **beg = &ptr;
 	const char *end = ptr + len;
@@ -130,7 +137,7 @@ lbox_xlog_parse_body(struct lua_State *L, const char *ptr, size_t len)
 	uint32_t size = mp_decode_map(beg);
 	uint32_t i;
 	for (i = 0; i < size && *beg < end; i++)
-		lbox_xlog_parse_body_kv(L, beg, end);
+		lbox_xlog_parse_body_kv(L, type, beg, end);
 	if (i != size)
 		say_warn("warning: decoded %u values from"
 			 " MP_MAP, %u expected", i, size);
@@ -196,7 +203,7 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	assert(row.bodycnt == 1); /* always 1 for read */
 	lua_pushstring(L, "BODY");
 	lua_newtable(L);
-	lbox_xlog_parse_body(L, (char *)row.body[0].iov_base,
+	lbox_xlog_parse_body(L, row.type, (char *)row.body[0].iov_base,
 			     row.body[0].iov_len);
 	lua_settable(L, -3);  /* BODY */
 
@@ -243,7 +250,11 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 		return luaT_error(L);
 	}
 	if (strncmp(cur->meta.filetype, "SNAP", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "XLOG", 4) != 0) {
+	    strncmp(cur->meta.filetype, "XLOG", 4) != 0 &&
+	    strncmp(cur->meta.filetype, "RUN", 3) != 0 &&
+	    strncmp(cur->meta.filetype, "INDEX", 5) != 0 &&
+	    strncmp(cur->meta.filetype, "DATA", 4) != 0 &&
+	    strncmp(cur->meta.filetype, "XCTL", 4) != 0) {
 		char buf[1024];
 		snprintf(buf, sizeof(buf), "'%.*s' file type",
 			 (int) strlen(cur->meta.filetype),
