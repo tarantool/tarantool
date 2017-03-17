@@ -828,6 +828,7 @@ i16 sqlite3ColumnOfIndex(Index *pIdx, i16 iCol){
   /*
   ** TARANTOOL: Data layout is the same in every index. 
   */
+  (void)pIdx;
   return iCol;
 #endif
 }

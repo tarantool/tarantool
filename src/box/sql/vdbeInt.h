@@ -561,11 +561,5 @@ u32 sqlite3VdbeMsgpackGet(
   const unsigned char *buf,
   Mem *pMem
 );
-void sqlite3VdbeRecordUnpackMsgpack(
-  KeyInfo *pKeyInfo,
-  int nKey,
-  const void *pKey,
-  UnpackedRecord *p
-);
 
 #endif /* !defined(SQLITE_VDBEINT_H) */

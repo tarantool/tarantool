@@ -367,8 +367,8 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	const char *base;
 	const struct tuple_format *format;
 	const uint32_t *field_map;
-	uint32_t field_map_size;
-	const char *p;
+	uint32_t field_count, next_fieldno = 0;
+	const char *p, *field0;
 	u32 i, n;
 	int rc;
 #ifndef NDEBUG
@@ -387,8 +387,8 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	base = tuple_data(tuple);
 	format = tuple_format(tuple);
 	field_map = tuple_field_map(tuple);
-	field_map_size = format->field_map_size;
-	p = base; mp_decode_array(&p);
+	field_count = format->field_count;
+	field0 = base; mp_decode_array(&field0); p = field0;
 	for (i=0; i<n; i++) {
 		/*
 		 * Tuple contains offset map to make it possible to
@@ -403,16 +403,22 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 		 *      tuple with an incomplete offset map.
 		 */
 		uint32_t fieldno = key_def->parts[i].fieldno;
-		if (fieldno >= field_map_size) {
-			/* Outdated field_map. */
-			p = tuple_field(tuple, fieldno);
-		} else {
-			int32_t slot = format->fields[fieldno].offset_slot;
-			/* p stores a pointer to the field following the
-			 * one examined last (or the very fist one) */
-			if (slot != TUPLE_OFFSET_SLOT_NIL)
-				p = base + field_map[slot];
+		if (fieldno != next_fieldno) {
+			if (fieldno >= field_count ||
+			    format->fields[fieldno].offset_slot ==
+			    TUPLE_OFFSET_SLOT_NIL) {
+				/* Outdated field_map. */
+				uint32_t j = 0;
+				p = field0;
+				while (j++ != fieldno)
+					mp_next(&p);
+			} else {
+				p = base + field_map[
+					format->fields[fieldno].offset_slot
+				];
+			}
 		}
+		next_fieldno = fieldno + 1;
 		rc = sqlite3VdbeCompareMsgpack(&p, pUnpacked, i);
 		if (rc != 0) {
 			if (pUnpacked->pKeyInfo->aSortOrder[i]) {
@@ -800,7 +806,7 @@ static const struct Enc *get_enc(void *buf)
  */
 static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
 {
-	if (allow_nulls) {
+	if (allow_nulls || 1) {
 		return "scalar";
 	}
 	switch (affinity) {

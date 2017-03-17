@@ -750,25 +750,6 @@ static int vdbePmaReaderInit(
 }
 
 /*
-** A version of vdbeSorterCompare() that assumes that it has already been
-** determined that the first field of key1 is equal to the first field of 
-** key2.
-*/
-static int vdbeSorterCompareTail(
-  SortSubtask *pTask,             /* Subtask context (for pKeyInfo) */
-  int *pbKey2Cached,              /* True if pTask->pUnpacked is pKey2 */
-  const void *pKey1, int nKey1,   /* Left side of comparison */
-  const void *pKey2, int nKey2    /* Right side of comparison */
-){
-  UnpackedRecord *r2 = pTask->pUnpacked;
-  if( *pbKey2Cached==0 ){
-    sqlite3VdbeRecordUnpack(pTask->pSorter->pKeyInfo, nKey2, pKey2, r2);
-    *pbKey2Cached = 1;
-  }
-  return sqlite3VdbeRecordCompareWithSkip(nKey1, pKey1, r2, 1);
-}
-
-/*
 ** Compare key1 (buffer pKey1, size nKey1 bytes) with key2 (buffer pKey2, 
 ** size nKey2 bytes). Use (pTask->pKeyInfo) for the collation sequences
 ** used by the comparison. Return the result of the comparison.
@@ -793,116 +774,6 @@ static int vdbeSorterCompare(
     *pbKey2Cached = 1;
   }
   return sqlite3VdbeRecordCompareMsgpack(nKey1, pKey1, r2);
-}
-
-/*
-** A specially optimized version of vdbeSorterCompare() that assumes that
-** the first field of each key is a TEXT value and that the collation
-** sequence to compare them with is BINARY.
-*/
-static int vdbeSorterCompareText(
-  SortSubtask *pTask,             /* Subtask context (for pKeyInfo) */
-  int *pbKey2Cached,              /* True if pTask->pUnpacked is pKey2 */
-  const void *pKey1, int nKey1,   /* Left side of comparison */
-  const void *pKey2, int nKey2    /* Right side of comparison */
-){
-  const u8 * const p1 = (const u8 * const)pKey1;
-  const u8 * const p2 = (const u8 * const)pKey2;
-  const u8 * const v1 = &p1[ p1[0] ];   /* Pointer to value 1 */
-  const u8 * const v2 = &p2[ p2[0] ];   /* Pointer to value 2 */
-
-  int n1;
-  int n2;
-  int res;
-
-  getVarint32(&p1[1], n1); n1 = (n1 - 13) / 2;
-  getVarint32(&p2[1], n2); n2 = (n2 - 13) / 2;
-  res = memcmp(v1, v2, MIN(n1, n2));
-  if( res==0 ){
-    res = n1 - n2;
-  }
-
-  if( res==0 ){
-    if( pTask->pSorter->pKeyInfo->nField>1 ){
-      res = vdbeSorterCompareTail(
-          pTask, pbKey2Cached, pKey1, nKey1, pKey2, nKey2
-      );
-    }
-  }else{
-    if( pTask->pSorter->pKeyInfo->aSortOrder[0] ){
-      res = res * -1;
-    }
-  }
-
-  return res;
-}
-
-/*
-** A specially optimized version of vdbeSorterCompare() that assumes that
-** the first field of each key is an INTEGER value.
-*/
-static int vdbeSorterCompareInt(
-  SortSubtask *pTask,             /* Subtask context (for pKeyInfo) */
-  int *pbKey2Cached,              /* True if pTask->pUnpacked is pKey2 */
-  const void *pKey1, int nKey1,   /* Left side of comparison */
-  const void *pKey2, int nKey2    /* Right side of comparison */
-){
-  const u8 * const p1 = (const u8 * const)pKey1;
-  const u8 * const p2 = (const u8 * const)pKey2;
-  const int s1 = p1[1];                 /* Left hand serial type */
-  const int s2 = p2[1];                 /* Right hand serial type */
-  const u8 * const v1 = &p1[ p1[0] ];   /* Pointer to value 1 */
-  const u8 * const v2 = &p2[ p2[0] ];   /* Pointer to value 2 */
-  int res;                              /* Return value */
-
-  assert( (s1>0 && s1<7) || s1==8 || s1==9 );
-  assert( (s2>0 && s2<7) || s2==8 || s2==9 );
-
-  if( s1>7 && s2>7 ){
-    res = s1 - s2;
-  }else{
-    if( s1==s2 ){
-      if( (*v1 ^ *v2) & 0x80 ){
-        /* The two values have different signs */
-        res = (*v1 & 0x80) ? -1 : +1;
-      }else{
-        /* The two values have the same sign. Compare using memcmp(). */
-        static const u8 aLen[] = {0, 1, 2, 3, 4, 6, 8 };
-        int i;
-        res = 0;
-        for(i=0; i<aLen[s1]; i++){
-          if( (res = v1[i] - v2[i]) ) break;
-        }
-      }
-    }else{
-      if( s2>7 ){
-        res = +1;
-      }else if( s1>7 ){
-        res = -1;
-      }else{
-        res = s1 - s2;
-      }
-      assert( res!=0 );
-
-      if( res>0 ){
-        if( *v1 & 0x80 ) res = -1;
-      }else{
-        if( *v2 & 0x80 ) res = +1;
-      }
-    }
-  }
-
-  if( res==0 ){
-    if( pTask->pSorter->pKeyInfo->nField>1 ){
-      res = vdbeSorterCompareTail(
-          pTask, pbKey2Cached, pKey1, nKey1, pKey2, nKey2
-      );
-    }
-  }else if( pTask->pSorter->pKeyInfo->aSortOrder[0] ){
-    res = res * -1;
-  }
-
-  return res;
 }
 
 /*
@@ -1382,13 +1253,7 @@ static SorterRecord *vdbeSorterMerge(
 ** sorter object passed as the only argument.
 */
 static SorterCompare vdbeSorterGetCompare(VdbeSorter *p){
-#if 0
-  if( p->typeMask==SORTER_TYPE_INTEGER ){
-    return vdbeSorterCompareInt;
-  }else if( p->typeMask==SORTER_TYPE_TEXT ){
-    return vdbeSorterCompareText; 
-  }
-#endif
+  (void)p;
   return vdbeSorterCompare;
 }
 
