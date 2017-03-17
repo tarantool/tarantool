@@ -911,6 +911,8 @@ xctl_rotate_f(va_list ap)
 	    xlog_sync(&arg.xlog) < 0 ||
 	    xlog_rename(&arg.xlog) < 0)
 		goto err_write_xlog;
+
+	xlog_close(&arg.xlog, false);
 out:
 	xctl_recovery_delete(recovery);
 	return 0;
