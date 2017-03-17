@@ -18,10 +18,9 @@ function call_all(callback)
     for _, tuple in pairs(all) do
         local id = tuple[1]
         if id ~= box.info.server.id then
-	    callback(id)
-       end
+            callback(id)
+        end
     end
-    
 end
 
 function unregister(inspector, id)
