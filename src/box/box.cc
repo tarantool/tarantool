@@ -1428,12 +1428,27 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	applier_resume_to_state(applier, APPLIER_INITIAL_JOIN, TIMEOUT_INFINITY);
 
+	/* Save the vclock of the checkpoint sent by the master. */
+	struct vclock checkpoint_vclock;
+	vclock_copy(&checkpoint_vclock, &applier->vclock);
+
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery(NULL);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+
+	/*
+	 * The number of rows received during initial join may be
+	 * greater than the LSN of the checkpoint sent by the master,
+	 * because there are rows that do not contribute to LSN
+	 * (system spaces, etc). So in order to assign LSNs starting
+	 * from the checkpoint LSN on final join, we need to fix
+	 * recovery->vclock.
+	 */
+	vclock_copy(&recovery->vclock, &checkpoint_vclock);
+
 	/*
 	 * Process final data (WALs).
 	 */
