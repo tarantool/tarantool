@@ -11,12 +11,6 @@ r.status == "follow"
 r.lag < 1
 r.idle < 1
 r.uuid ~= nil
-r.vclock[1] > 0
-r.vclock[2] == nil
--- replica must have the same vclock as master after JOIN
-master_vclock = test_run:get_vclock('default')
-r.vclock[1] == master_vclock[1]
-r.vclock[2] == master_vclock[2]
 
 box.space._schema:insert({'dup'})
 test_run:cmd('switch default')

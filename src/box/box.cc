@@ -97,8 +97,7 @@ static bool is_ro = true;
 static const int REPLICATION_CFG_TIMEOUT = 10; /* seconds */
 
 /* Use the shared instance of xstream for all appliers */
-static struct xstream initial_join_stream;
-static struct xstream final_join_stream;
+static struct xstream join_stream;
 static struct xstream subscribe_stream;
 
 /**
@@ -235,6 +234,14 @@ box_is_ro(void)
 	return is_ro;
 }
 
+struct wal_stream {
+	struct xstream base;
+	/** How many rows have been recovered so far. */
+	size_t rows;
+	/** Yield once per 'yield' rows. */
+	size_t yield;
+};
+
 static inline void
 apply_row(struct xstream *stream, struct xrow_header *row)
 {
@@ -244,14 +251,6 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
-
-struct wal_stream {
-	struct xstream base;
-	/** How many rows have been recovered so far. */
-	size_t rows;
-	/** Yield once per 'yield' rows. */
-	size_t yield;
-};
 
 static void
 apply_wal_row(struct xstream *stream, struct xrow_header *row)
@@ -301,16 +300,6 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
-}
-
-static void
-apply_subscribe_row(struct xstream *stream, struct xrow_header *row)
-{
-	/* Check lsn */
-	int64_t current_lsn = vclock_get(&recovery->vclock, row->replica_id);
-	if (row->lsn <= current_lsn)
-		return;
-	apply_row(stream, row);
 }
 
 /* {{{ configuration bindings */
@@ -431,8 +420,7 @@ cfg_get_replication(int *p_count)
 	for (int i = 0; i < count; i++) {
 		const char *source = cfg_getarr_elem("replication", i);
 		struct applier *applier = applier_new(source,
-						      &initial_join_stream,
-						      &final_join_stream,
+						      &join_stream,
 						      &subscribe_stream);
 		if (applier == NULL) {
 			/* Delete created appliers */
@@ -1442,7 +1430,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
 	/* Start replica vclock using master's vclock */
-	vclock_copy(start_vclock, &applier->vclock);
+	vclock_copy(start_vclock, &replicaset_vclock);
 
 	/* Finalize the new replica */
 	engine_end_recovery();
@@ -1534,9 +1522,8 @@ box_cfg_xc(void)
 	box_set_too_long_threshold();
 	struct wal_stream wal_stream;
 	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
-	xstream_create(&initial_join_stream, apply_initial_join_row);
-	xstream_create(&final_join_stream, apply_row);
-	xstream_create(&subscribe_stream, apply_subscribe_row);
+	xstream_create(&join_stream, apply_initial_join_row);
+	xstream_create(&subscribe_stream, apply_row);
 
 	struct vclock checkpoint_vclock;
 	vclock_create(&checkpoint_vclock);
@@ -1581,6 +1568,8 @@ box_cfg_xc(void)
 		memtx->recoverSnapshot();
 
 		/* Replace instance vclock using the data from snapshot */
+		/* Set instance vclock to snapshot vclock */
+		vclock_copy(&replicaset_vclock, &checkpoint_vclock);
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);
 		engine_begin_final_recovery();
 		title("orphan");

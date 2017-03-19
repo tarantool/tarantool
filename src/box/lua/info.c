@@ -87,10 +87,6 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	lua_pushstring(L, status);
 	lua_settable(L, -3);
 
-	lua_pushstring(L, "vclock");
-	lbox_pushvclock(L, &applier->vclock);
-	lua_settable(L, -3);
-
 	if (applier->reader) {
 		lua_pushstring(L, "lag");
 		lua_pushnumber(L, applier->lag);

@@ -50,9 +50,9 @@ extern int wal_dir_lock;
 
 struct wal_request {
 	struct stailq_entry fifo;
-	/*
-	 * On success, contains vclock signature (lsn) of
-	 * committed transaction, on error is -1
+	/**
+	 * On success, contains vclock signature of
+	 * the committed transaction, on error is -1
 	 */
 	int64_t res;
 	struct fiber *fiber;
@@ -65,6 +65,9 @@ struct wal_request {
 };
 
 #if defined(__cplusplus)
+
+struct wal_request *
+wal_request_new(size_t n_rows);
 
 int64_t
 wal_write(struct wal_request *req);

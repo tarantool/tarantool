@@ -42,6 +42,8 @@
 #include "error.h"
 #include "vclock.h" /* VCLOCK_MAX */
 
+struct vclock replicaset_vclock;
+uint32_t instance_id = REPLICA_ID_NIL;
 /**
  * Globally unique identifier of this replica set.
  * A replica set is a set of appliers and their matching
@@ -68,7 +70,6 @@ rb_gen(, replicaset_, replicaset_t, struct replica, link,
 
 static struct mempool replica_pool;
 static replicaset_t replicaset;
-uint32_t instance_id = REPLICA_ID_NIL;
 
 void
 replication_init(void)
@@ -76,6 +77,7 @@ replication_init(void)
 	mempool_create(&replica_pool, &cord()->slabc,
 		       sizeof(struct replica));
 	replicaset_new(&replicaset);
+	vclock_create(&replicaset_vclock);
 }
 
 void

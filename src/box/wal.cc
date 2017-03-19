@@ -166,6 +166,21 @@ wal_msg(struct cmsg *msg)
 	return msg->route == wal_request_route ? (struct wal_msg *) msg : NULL;
 }
 
+struct wal_request *
+wal_request_new(size_t n_rows)
+{
+	struct wal_request *req;
+	req = (struct wal_request *)region_aligned_alloc_xc(
+		&fiber()->gc,
+		sizeof(struct wal_request) +
+		         sizeof(req->rows[0]) * n_rows,
+		alignof(struct wal_request));
+	req->n_rows = n_rows;
+	req->res = -1;
+	req->fiber = fiber();
+	return req;
+}
+
 /** Write a request to a log in a single transaction. */
 static ssize_t
 wal_request_write(struct wal_request *req, struct xlog *l)
@@ -618,10 +633,10 @@ done:
 	/* Update status of the successfully committed requests. */
 	for (; req != rollback_req; req = stailq_next_entry(req, fifo)) {
 
+		/** All rows in a transaction have the same replica_id */
+		struct xrow_header *last = req->rows[req->n_rows - 1];
 		/* Update internal vclock */
-		vclock_follow(&writer->vclock,
-			      req->rows[req->n_rows - 1]->replica_id,
-			      req->rows[req->n_rows - 1]->lsn);
+		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
 		/* Update row counter for wal_opt_rotate() */
 		l->rows += req->n_rows;
 		/* Mark request as successful for tx thread */
@@ -691,9 +706,6 @@ wal_write(struct wal_request *req)
 			  vclock_sum(&writer->vclock));
 		return -1;
 	}
-
-	req->fiber = fiber();
-	req->res = -1;
 
 	struct wal_msg *batch;
 	if (!stailq_empty(&wal_thread.wal_pipe.input) &&

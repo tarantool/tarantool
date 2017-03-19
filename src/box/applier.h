@@ -74,8 +74,6 @@ struct applier {
 	ev_tstamp last_row_time;
 	/** Number of seconds this replica is behind the remote master */
 	ev_tstamp lag;
-	/** The last known vclock of the remote master */
-	struct vclock vclock;
 	/** The last box_error_code() logged to avoid log flooding */
 	uint32_t last_logged_errcode;
 	/** Remote UUID */
@@ -102,10 +100,8 @@ struct applier {
 	/** Channel used by applier_connect_all() and applier_resume() */
 	struct ipc_channel pause;
 	/** xstream to process rows during initial JOIN */
-	struct xstream *initial_join_stream;
-	/** xstream to process rows during final JOIN */
-	struct xstream *final_join_stream;
-	/** xstream to process rows during SUBSCRIBE */
+	struct xstream *join_stream;
+	/** xstream to process rows during final JOIN and SUBSCRIBE */
 	struct xstream *subscribe_stream;
 };
 
@@ -138,8 +134,7 @@ applier_stop(struct applier *applier);
  * @error   throws OutOfMemory exception if out of memory.
  */
 struct applier *
-applier_new(const char *uri, struct xstream *initial_join_stream,
-	    struct xstream *final_join_stream,
+applier_new(const char *uri, struct xstream *join_stream,
 	    struct xstream *subscribe_stream);
 
 /**

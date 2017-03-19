@@ -42,26 +42,6 @@ r.uuid ~= nil
 ---
 - true
 ...
-r.vclock[1] > 0
----
-- true
-...
-r.vclock[2] == nil
----
-- true
-...
--- replica must have the same vclock as master after JOIN
-master_vclock = test_run:get_vclock('default')
----
-...
-r.vclock[1] == master_vclock[1]
----
-- true
-...
-r.vclock[2] == master_vclock[2]
----
-- true
-...
 box.space._schema:insert({'dup'})
 ---
 - ['dup']

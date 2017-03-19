@@ -218,9 +218,8 @@ applier_join(struct applier *applier)
 		/*
 		 * Start vclock. The vclock of the checkpoint
 		 * the master is sending to the replica.
+		 * Not used at the moment.
 		 */
-		vclock_create(&applier->vclock);
-		xrow_decode_vclock(&row, &applier->vclock);
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -228,20 +227,19 @@ applier_join(struct applier *applier)
 	/*
 	 * Receive initial data.
 	 */
-	assert(applier->initial_join_stream != NULL);
+	assert(applier->join_stream != NULL);
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			xstream_write(applier->initial_join_stream, &row);
+			xstream_write(applier->join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*
 			 * Stop vclock. Used to initialize
 			 * the replica's initial vclock in
 			 * bootstrap_from_master()
 			 */
-			vclock_create(&applier->vclock);
-			xrow_decode_vclock(&row, &applier->vclock);
+			xrow_decode_vclock(&row, &replicaset_vclock);
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */
@@ -263,12 +261,11 @@ applier_join(struct applier *applier)
 	/*
 	 * Receive final data.
 	 */
-	assert(applier->final_join_stream != NULL);
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			xstream_write(applier->final_join_stream, &row);
+			xstream_write(applier->subscribe_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*
 			 * Current vclock. This is not used now,
@@ -348,7 +345,18 @@ applier_subscribe(struct applier *applier)
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error(&row);  /* error */
-		xstream_write(applier->subscribe_stream, &row);
+		if (vclock_get(&replicaset_vclock, row.replica_id) < row.lsn) {
+			/**
+			 * Promote the replica set vclock before
+			 * applying the row. If there is an
+			 * exception (conflict) applying the row,
+			 * the row is skipped when the replication
+			 * is resumed.
+			 */
+			vclock_follow(&replicaset_vclock, row.replica_id,
+				      row.lsn);
+			xstream_write(applier->subscribe_stream, &row);
+		}
 
 		iobuf_reset(iobuf);
 		fiber_gc();
@@ -467,8 +475,7 @@ applier_stop(struct applier *applier)
 }
 
 struct applier *
-applier_new(const char *uri, struct xstream *initial_join_stream,
-	    struct xstream *final_join_stream,
+applier_new(const char *uri, struct xstream *join_stream,
 	    struct xstream *subscribe_stream)
 {
 	struct applier *applier = (struct applier *)
@@ -480,7 +487,6 @@ applier_new(const char *uri, struct xstream *initial_join_stream,
 	}
 	coio_init(&applier->io, -1);
 	applier->iobuf = iobuf_new();
-	vclock_create(&applier->vclock);
 
 	/* uri_parse() sets pointers to applier->source buffer */
 	snprintf(applier->source, sizeof(applier->source), "%s", uri);
@@ -489,8 +495,7 @@ applier_new(const char *uri, struct xstream *initial_join_stream,
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 
-	applier->initial_join_stream = initial_join_stream;
-	applier->final_join_stream = final_join_stream;
+	applier->join_stream = join_stream;
 	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_now(loop());
 	rlist_create(&applier->on_state);

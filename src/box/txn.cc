@@ -33,6 +33,7 @@
 #include "box.h" /* global recovery */
 #include "tuple.h"
 #include "recovery.h"
+#include "replication.h"
 #include "wal.h"
 #include <fiber.h>
 #include "xrow.h"
@@ -188,19 +189,10 @@ txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_rows > 0);
 
-	struct wal_request *req;
-	req = (struct wal_request *)region_aligned_alloc_xc(
-		&fiber()->gc,
-		sizeof(struct wal_request) +
-		         sizeof(req->rows[0]) * txn->n_rows,
-		alignof(struct wal_request));
-	/*
-	 * Note: offsetof(struct wal_request, rows) is more appropriate,
-	 * but compiler warns.
-	 */
-	req->n_rows = 0;
+	struct wal_request *req = wal_request_new(txn->n_rows);
 
 	struct txn_stmt *stmt;
+	struct xrow_header **row = req->rows;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
@@ -210,9 +202,9 @@ txn_write_to_wal(struct txn *txn)
 		 */
 		recovery_fill_lsn(recovery, stmt->row);
 		stmt->row->tm = ev_now(loop());
-		req->rows[req->n_rows++] = stmt->row;
+		*row++ = stmt->row;
 	}
-	assert(req->n_rows == txn->n_rows);
+	assert(row == req->rows + req->n_rows);
 
 	ev_tstamp start = ev_now(loop()), stop;
 	int64_t res;
@@ -221,6 +213,13 @@ txn_write_to_wal(struct txn *txn)
 		res = vclock_sum(&recovery->vclock);
 	} else {
 		res = wal_write(req);
+		/* All rows in request have the same replica id. */
+		struct xrow_header *last = req->rows[req->n_rows - 1];
+		/* Promote replica set vclock with local writes. */
+		if (last->replica_id == instance_id) {
+			vclock_follow(&replicaset_vclock,
+				      instance_id, last->lsn);
+		}
 	}
 
 	stop = ev_now(loop());
