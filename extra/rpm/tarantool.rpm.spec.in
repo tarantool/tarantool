@@ -19,8 +19,8 @@
 
 %if 0%{?rhel} < 7 && 0%{?rhel} > 0
 BuildRequires: cmake28
-BuildRequires: devtoolset-2-toolchain
-BuildRequires: devtoolset-2-binutils-devel
+BuildRequires: devtoolset-6-toolchain
+BuildRequires: devtoolset-6-binutils-devel
 %else
 BuildRequires: cmake >= 2.8
 BuildRequires: gcc >= 4.5
@@ -157,7 +157,7 @@ with history support.
     end
     function wrap_with_toolset(cmd)
         local cmd = rpm.expand(cmd)
-        local devtoolset = 'scl enable devtoolset-2 %q\n'
+        local devtoolset = 'scl enable devtoolset-6 %q\n'
         if is_rhel_old() then
             return string.format(devtoolset, cmd)
         end

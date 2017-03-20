@@ -75,7 +75,7 @@ set(PostgreSQL_ROOT_DIR_MESSAGE "Set the PostgreSQL_ROOT system variable to wher
 
 set(PostgreSQL_KNOWN_ROOTS "/usr/include" "/usr/include/postgres"
     "/usr/include/pgsql" "/usr/include/postgresql")
-set(PostgreSQL_KNOWN_VERSIONS "9.3" "9.2" "9.1" "9.0")
+set(PostgreSQL_KNOWN_VERSIONS "9.6" "9.5" "9.4" "9.3" "9.2" "9.1" "9.0")
 
 set(PostgreSQL_ROOT_DIRECTORIES)
 foreach (root ${PostgreSQL_KNOWN_ROOTS} )
