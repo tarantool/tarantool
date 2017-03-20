@@ -4694,6 +4694,8 @@ retry:
 	if (pn == NULL)
 		return 0; /* nothing to do */
 	struct vy_range *range = container_of(pn, struct vy_range, in_dump);
+	if (range->used == 0)
+		return 0; /* nothing to do */
 	int64_t dump_lsn = INT64_MAX;
 	if (scheduler->checkpoint_lsn != -1) {
 		/*
