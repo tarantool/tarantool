@@ -1421,7 +1421,12 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	 */
 	engine_begin_initial_recovery(NULL);
 
+
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+	/*
+	 * Hack: reset recovery vclock polluted by initial join
+	 */
+	vclock_create(&::recovery->vclock);
 	/*
 	 * Process final data (WALs).
 	 */
