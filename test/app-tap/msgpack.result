@@ -1,6 +1,6 @@
 TAP version 13
 # msgpack
-1..9
+1..10
     # unsigned
     1..104
     ok - encode/decode for 0
@@ -274,4 +274,11 @@ ok - ucdata
     ok - invalid offset
     # offsets: end
 ok - offsets
+    # misc
+    1..3
+    ok - ibuf_decode argument is constant
+    ok - ibuf_decode position
+    ok - ibuf_decode result
+    # misc: end
+ok - misc
 # msgpack: end

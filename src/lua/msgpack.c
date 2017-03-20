@@ -479,9 +479,12 @@ lua_msgpack_decode(lua_State *L)
 static int
 lua_ibuf_msgpack_decode(lua_State *L)
 {
-	const char **start = (const char **)lua_topointer(L, 1);
+	uint32_t ctypeid = 0;
+	const char *rpos = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
-	luamp_decode(L, cfg, start);
+	luamp_decode(L, cfg, &rpos);
+	*(const char **)luaL_pushcdata(L, ctypeid) = rpos;
+	lua_pushvalue(L, -2);
 	return 2;
 }
 
