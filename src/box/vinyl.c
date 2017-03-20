@@ -2788,6 +2788,8 @@ vy_run_recover(struct vy_run *run, const char *dir)
 			run->info.count = page_no;
 			goto fail_close;
 		}
+		run->info.size += page->size;
+		run->info.keys += page->count;
 	}
 
 	/* We don't need to keep metadata file open any longer. */
