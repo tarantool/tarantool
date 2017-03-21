@@ -1426,7 +1426,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	/*
 	 * Hack: reset recovery vclock polluted by initial join
 	 */
-	vclock_create(&::recovery->vclock);
+	vclock_create(start_vclock);
 	/*
 	 * Process final data (WALs).
 	 */
@@ -1573,8 +1573,6 @@ box_cfg_xc(void)
 		memtx->recoverSnapshot();
 
 		/* Replace instance vclock using the data from snapshot */
-		/* Set instance vclock to snapshot vclock */
-		vclock_copy(&replicaset_vclock, &checkpoint_vclock);
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);
 		engine_begin_final_recovery();
 		title("orphan");
@@ -1633,6 +1631,14 @@ box_cfg_xc(void)
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
 	}
+
+	/*
+	 * Initialize the replica set vclock from recovery.
+	 * The local WAL may contain rows from remote masters,
+	 * so we must reflect this in replicaset_vclock to
+	 * not attempt to apply these rows twice.
+	 */
+	vclock_copy(&replicaset_vclock, &recovery->vclock);
 
 	/* Start WAL writer */
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
