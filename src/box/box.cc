@@ -822,7 +822,7 @@ space_truncate(struct space *space)
 
 	/* create all indexes again, now they are empty */
 	for (int i = 0; i < index_count; i++) {
-		int64_t lsn = vclock_sum(&recovery->vclock);
+		int64_t lsn = vclock_sum(&replicaset_vclock);
 		/*
 		 * The returned tuple is blessed and will be
 		 * collected automatically.

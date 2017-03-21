@@ -37,7 +37,6 @@
 #include <small/mempool.h>
 
 #include "box.h"
-#include "recovery.h"
 #include "applier.h"
 #include "error.h"
 #include "vclock.h" /* VCLOCK_MAX */
