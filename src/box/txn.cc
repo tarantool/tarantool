@@ -201,7 +201,6 @@ txn_write_to_wal(struct txn *txn)
 		 * snapshots still works with WAL turned off.
 		 */
 		recovery_fill_lsn(recovery, stmt->row);
-		stmt->row->tm = ev_now(loop());
 		*row++ = stmt->row;
 	}
 	assert(row == req->rows + req->n_rows);

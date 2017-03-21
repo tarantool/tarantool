@@ -191,6 +191,7 @@ wal_request_write(struct wal_request *req, struct xlog *l)
 	xlog_tx_begin(l);
 	struct xrow_header **row = req->rows;
 	for (; row < req->rows + req->n_rows; row++) {
+		(*row)->tm = ev_now(loop());
 		if (xlog_write_row(l, *row) < 0) {
 			/*
 			 * Rollback all un-written rows
