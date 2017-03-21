@@ -49,14 +49,15 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 #define applier_STATE(_)                                             \
 	_(APPLIER_OFF, 0)                                            \
 	_(APPLIER_CONNECT, 1)                                        \
-	_(APPLIER_AUTH, 2)                                           \
-	_(APPLIER_CONNECTED, 3)                                      \
-	_(APPLIER_INITIAL_JOIN, 4)                                   \
-	_(APPLIER_FINAL_JOIN, 5)                                     \
-	_(APPLIER_JOINED, 6)                                         \
-	_(APPLIER_FOLLOW, 7)                                         \
-	_(APPLIER_STOPPED, 8)                                        \
-	_(APPLIER_DISCONNECTED, 9)                                   \
+	_(APPLIER_CONNECTED, 2)                                      \
+	_(APPLIER_AUTH, 3)                                           \
+	_(APPLIER_READY, 4)                                          \
+	_(APPLIER_INITIAL_JOIN, 5)                                   \
+	_(APPLIER_FINAL_JOIN, 6)                                     \
+	_(APPLIER_JOINED, 7)                                         \
+	_(APPLIER_FOLLOW, 8)                                         \
+	_(APPLIER_STOPPED, 9)                                        \
+	_(APPLIER_DISCONNECTED, 10)                                  \
 
 /** States for the applier */
 ENUM(applier_state, applier_STATE);

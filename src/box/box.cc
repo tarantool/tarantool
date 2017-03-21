@@ -1420,7 +1420,7 @@ bootstrap_master(void)
 /**
  * Bootstrap from the remote master
  * \pre  master->applier->state == APPLIER_CONNECTED
- * \post master->applier->state == APPLIER_CONNECTED
+ * \post master->applier->state == APPLIER_READY
  *
  * @param[out] start_vclock  the vector time of the master
  *                           at the moment of replica bootstrap
@@ -1430,7 +1430,8 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
-	assert(applier->state == APPLIER_CONNECTED);
+	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
+	assert(applier->state == APPLIER_READY);
 
 	say_info("bootstraping replica from %s",
 		 sio_strfaddr(&applier->addr, applier->addr_len));
@@ -1468,8 +1469,8 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 	engine_end_recovery();
 
 	/* Switch applier to initial state */
-	applier_resume_to_state(applier, APPLIER_CONNECTED, TIMEOUT_INFINITY);
-	assert(applier->state == APPLIER_CONNECTED);
+	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
+	assert(applier->state == APPLIER_READY);
 }
 
 /**

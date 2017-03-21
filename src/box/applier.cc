@@ -76,6 +76,7 @@ applier_log_error(struct applier *applier, struct error *e)
 		say_info("can't connect to master");
 		break;
 	case APPLIER_CONNECTED:
+	case APPLIER_READY:
 		say_info("can't join/subscribe");
 		break;
 	case APPLIER_AUTH:
@@ -169,7 +170,7 @@ applier_connect(struct applier *applier)
 
 	/* Perform authentication if user provided at least login */
 	if (!uri->login)
-		return;
+		goto done;
 
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
@@ -183,9 +184,10 @@ applier_connect(struct applier *applier)
 	if (row.type != IPROTO_OK)
 		xrow_decode_error(&row); /* auth failed */
 
+done:
 	/* auth succeeded */
 	say_info("authenticated");
-	applier_set_state(applier, APPLIER_CONNECTED);
+	applier_set_state(applier, APPLIER_READY);
 }
 
 /**
@@ -282,7 +284,7 @@ finish:
 	say_info("final data received");
 
 	applier_set_state(applier, APPLIER_JOINED);
-	applier_set_state(applier, APPLIER_CONNECTED);
+	applier_set_state(applier, APPLIER_READY);
 }
 
 /**
