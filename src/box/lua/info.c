@@ -147,10 +147,8 @@ lbox_info_server(struct lua_State *L)
 	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	if (self != NULL && wal != NULL) {
-		struct vclock vclock;
-		wal_checkpoint(&vclock, false);
-		luaL_pushint64(L, vclock_get(&vclock, self->id));
+	if (self != NULL) {
+		luaL_pushint64(L, vclock_get(&replicaset_vclock, self->id));
 	} else {
 		luaL_pushint64(L, -1);
 	}
@@ -165,13 +163,7 @@ lbox_info_server(struct lua_State *L)
 static int
 lbox_info_vclock(struct lua_State *L)
 {
-	struct vclock vclock;
-	if (wal != NULL) {
-		wal_checkpoint(&vclock, false);
-	} else {
-		vclock_create(&vclock);
-	}
-	lbox_pushvclock(L, &vclock);
+	lbox_pushvclock(L, &replicaset_vclock);
 	return 1;
 }
 
