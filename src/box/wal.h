@@ -45,7 +45,6 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 extern const char *wal_mode_STRS[];
 
 extern struct wal_writer *wal;
-extern struct rmean *rmean_tx_wal_bus;
 extern int wal_dir_lock;
 
 struct wal_request {
@@ -56,10 +55,6 @@ struct wal_request {
 	 */
 	int64_t res;
 	struct fiber *fiber;
-	/* Relative position of the start of request (used for rollback) */
-	off_t start_offset;
-	/* Relative position of the end of request (used for rollback) */
-	off_t end_offset;
 	int n_rows;
 	struct xrow_header *rows[];
 };

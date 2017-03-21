@@ -124,25 +124,6 @@ lbox_stat_net_call(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_stat_wal_index(struct lua_State *L)
-{
-	luaL_checkstring(L, -1);
-	if (rmean_tx_wal_bus == NULL)
-		return 0;
-	return rmean_foreach(rmean_tx_wal_bus, seek_stat_item, L);
-}
-
-static int
-lbox_stat_wal_call(struct lua_State *L)
-{
-	lua_newtable(L);
-	if (rmean_tx_wal_bus)
-		rmean_foreach(rmean_tx_wal_bus, set_stat_item, L);
-	return 1;
-}
-
-
 static const struct luaL_reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
 	{"__call",  lbox_stat_call},
@@ -154,13 +135,6 @@ static const struct luaL_reg lbox_stat_net_meta [] = {
 	{"__call",  lbox_stat_net_call},
 	{NULL, NULL}
 };
-
-static const struct luaL_reg lbox_stat_wal_meta [] = {
-	{"__index", lbox_stat_wal_index},
-	{"__call",  lbox_stat_wal_call},
-	{NULL, NULL}
-};
-
 
 /** Initialize box.stat package. */
 void
@@ -184,12 +158,5 @@ box_lua_stat_init(struct lua_State *L)
 	luaL_register(L, NULL, lbox_stat_net_meta);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat net module */
-
-	luaL_register_module(L, "box.stat.wal", statlib);
-
-	lua_newtable(L);
-	luaL_register(L, NULL, lbox_stat_wal_meta);
-	lua_setmetatable(L, -2);
-	lua_pop(L, 1); /* stat wal module */
 }
 

@@ -139,7 +139,6 @@ static struct wal_thread wal_thread;
 static struct wal_writer wal_writer_singleton;
 
 struct wal_writer *wal = NULL;
-struct rmean *rmean_tx_wal_bus;
 
 static void
 wal_write_to_disk(struct cmsg *msg);
@@ -361,7 +360,6 @@ wal_thread_stop()
 		wal = NULL;
 	}
 
-	rmean_tx_wal_bus = NULL;
 }
 
 struct wal_checkpoint: public cmsg

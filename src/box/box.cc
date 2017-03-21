@@ -1520,8 +1520,6 @@ box_cfg_xc(void)
 	title("loading");
 
 	box_set_too_long_threshold();
-	struct wal_stream wal_stream;
-	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
@@ -1554,6 +1552,9 @@ box_cfg_xc(void)
 		box_bind();
 	}
 	if (lsn != -1) {
+		struct wal_stream wal_stream;
+		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
+
 		if (xctl_begin_recovery(vclock_sum(&checkpoint_vclock)) != 0)
 			diag_raise();
 		engine_begin_initial_recovery(&checkpoint_vclock);
