@@ -343,6 +343,17 @@ applier_subscribe(struct applier *applier)
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error(&row);  /* error */
+		/* Replication request. */
+		if (row.replica_id == REPLICA_ID_NIL ||
+		    row.replica_id >= VCLOCK_MAX) {
+			/*
+			 * A safety net, this can only occur
+			 * if we're fed a strangely broken xlog.
+			 */
+			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
+				  int2str(row.replica_id),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
 		if (vclock_get(&replicaset_vclock, row.replica_id) < row.lsn) {
 			/**
 			 * Promote the replica set vclock before
