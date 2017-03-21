@@ -156,22 +156,10 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 	 */
 }
 
-static int
-vinyl_send_row(struct xrow_header *row, void *arg)
-{
-	struct xstream *stream = (struct xstream *) arg;
-	try {
-		xstream_write(stream, row);
-	} catch (Exception *e) {
-		 return -1;
-	}
-	return 0;
-}
-
 void
 VinylEngine::join(struct xstream *stream)
 {
-	if (vy_join(env, vinyl_send_row, stream) != 0)
+	if (vy_join(env, stream) != 0)
 		diag_raise();
 }
 

@@ -231,7 +231,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			 * when we skip the failed row anyway.
 			 */
 			vclock_follow(&r->vclock,  row.replica_id, row.lsn);
-			xstream_write(stream, &row);
+			xstream_write_xc(stream, &row);
 			++row_count;
 			if (row_count % 100000 == 0)
 				say_info("%.1fM rows processed",

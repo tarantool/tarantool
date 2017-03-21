@@ -883,7 +883,7 @@ memtx_initial_join_f(va_list ap)
 
 	struct xrow_header row;
 	while (xlog_cursor_next_xc(&cursor, &row, true) == 0) {
-		xstream_write(stream, &row);
+		xstream_write_xc(stream, &row);
 	}
 
 	/**

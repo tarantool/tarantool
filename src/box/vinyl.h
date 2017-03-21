@@ -51,6 +51,7 @@ struct request;
 struct space;
 struct txn_stmt;
 struct xrow_header;
+struct xstream;
 enum iterator_type;
 
 /*
@@ -297,11 +298,8 @@ vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
  * Replication
  */
 
-typedef int
-(*vy_send_row_f)(struct xrow_header *row, void *arg);
-
 int
-vy_join(struct vy_env *env, vy_send_row_f send_row, void *send_row_arg);
+vy_join(struct vy_env *env, struct xstream *stream);
 
 #ifdef __cplusplus
 }

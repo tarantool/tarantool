@@ -69,6 +69,7 @@ add_library(box STATIC
     replication.cc
     recovery.cc
     xctl.c
+    xstream.cc
     applier.cc
     relay.cc
     wal.cc

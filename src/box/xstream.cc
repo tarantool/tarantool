@@ -1,6 +1,3 @@
-#ifndef TARANTOOL_XSTREAM_H_INCLUDED
-#define TARANTOOL_XSTREAM_H_INCLUDED
-
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -32,40 +29,16 @@
  * SUCH DAMAGE.
  */
 
-#include "diag.h"
-
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-struct xrow_header;
-struct xstream;
-
-typedef void (*xstream_write_f)(struct xstream *, struct xrow_header *);
-
-struct xstream {
-	xstream_write_f write;
-};
-
-static inline void
-xstream_create(struct xstream *xstream, xstream_write_f write)
-{
-	xstream->write = write;
-}
+#include "xstream.h"
+#include "exception.h"
 
 int
-xstream_write(struct xstream *stream, struct xrow_header *row);
-
-#if defined(__cplusplus)
-} /* extern C */
-
-static inline void
-xstream_write_xc(struct xstream *stream, struct xrow_header *row)
+xstream_write(struct xstream *stream, struct xrow_header *row)
 {
-	if (xstream_write(stream, row) != 0)
-		diag_raise();
+	try {
+		stream->write(stream, row);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
 }
-
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_XSTREAM_H_INCLUDED */

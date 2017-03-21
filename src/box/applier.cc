@@ -231,7 +231,7 @@ applier_join(struct applier *applier)
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			xstream_write(applier->join_stream, &row);
+			xstream_write_xc(applier->join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*
 			 * Stop vclock. Used to initialize
@@ -264,7 +264,7 @@ applier_join(struct applier *applier)
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			xstream_write(applier->subscribe_stream, &row);
+			xstream_write_xc(applier->subscribe_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*
 			 * Current vclock. This is not used now,
@@ -364,9 +364,8 @@ applier_subscribe(struct applier *applier)
 			 */
 			vclock_follow(&replicaset_vclock, row.replica_id,
 				      row.lsn);
-			xstream_write(applier->subscribe_stream, &row);
+			xstream_write_xc(applier->subscribe_stream, &row);
 		}
-
 		iobuf_reset(iobuf);
 		fiber_gc();
 	}

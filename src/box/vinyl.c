@@ -78,6 +78,7 @@
 #include "space.h"
 #include "index.h"
 #include "xctl.h"
+#include "xstream.h"
 
 #include "request.h"
 
@@ -10045,10 +10046,8 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 struct vy_join_arg {
 	/** Vinyl environment. */
 	struct vy_env *env;
-	/** Function for sending a statement. */
-	vy_send_row_f send_row;
-	/** Argument passed to send_row(). */
-	void *send_row_arg;
+	/** Stream to relay statements to. */
+	struct xstream *stream;
 	/** ID of the space currently being relayed. */
 	uint32_t space_id;
 	/** Ordinal number of the index. */
@@ -10122,7 +10121,7 @@ vy_join_cb(const struct xctl_record *record, void *cb_arg)
 			if (vy_page_xrow(page, stmt_no, &xrow) != 0)
 				goto out_free_page;
 			xrow.lsn = arg->lsn++;
-			if (arg->send_row(&xrow, arg->send_row_arg) != 0)
+			if (xstream_write(arg->stream, &xrow) != 0)
 				goto out_free_page;
 		}
 		vy_page_delete(page);
@@ -10140,12 +10139,11 @@ out:
 }
 
 int
-vy_join(struct vy_env *env, vy_send_row_f send_row, void *send_row_arg)
+vy_join(struct vy_env *env, struct xstream *stream)
 {
 	struct vy_join_arg arg = {
 		.env = env,
-		.send_row = send_row,
-		.send_row_arg = send_row_arg,
+		.stream = stream,
 	};
 	arg.index_path = malloc(PATH_MAX);
 	if (arg.index_path == NULL) {
