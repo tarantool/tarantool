@@ -48,9 +48,7 @@
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
 static void
-relay_send_final_join_row(struct xstream *stream, struct xrow_header *packet);
-static void
-relay_send_subscribe_row(struct xstream *stream, struct xrow_header *row);
+relay_send_row(struct xstream *stream, struct xrow_header *row);
 
 static inline void
 relay_create(struct relay *relay, int fd, uint64_t sync,
@@ -116,7 +114,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 	         struct vclock *stop_vclock)
 {
 	struct relay relay;
-	relay_create(&relay, fd, sync, relay_send_final_join_row);
+	relay_create(&relay, fd, sync, relay_send_row);
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       start_vclock);
@@ -152,7 +150,7 @@ relay_subscribe_f(va_list ap)
 	struct relay *relay = va_arg(ap, struct relay *);
 	struct recovery *r = relay->r;
 	coeio_enable();
-	relay->stream.write = relay_send_subscribe_row;
+	relay->stream.write = relay_send_row;
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
@@ -222,7 +220,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	}
 
 	struct relay relay;
-	relay_create(&relay, fd, sync, relay_send_subscribe_row);
+	relay_create(&relay, fd, sync, relay_send_row);
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       replica_clock);
@@ -261,31 +259,12 @@ relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 	});
 }
 
-static void
-relay_send_final_join_row(struct xstream *stream, struct xrow_header *row)
-{
-	struct relay *relay = container_of(stream, struct relay, stream);
-	assert(iproto_type_is_dml(row->type));
-	struct recovery *r = relay->r;
-
-	vclock_follow(&r->vclock, row->replica_id, row->lsn);
-
-	relay_send(relay, row);
-	ERROR_INJECT(ERRINJ_RELAY,
-	{
-		fiber_sleep(1000.0);
-	});
-}
-
 /** Send a single row to the client. */
 static void
-relay_send_subscribe_row(struct xstream *stream, struct xrow_header *packet)
+relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
 	assert(iproto_type_is_dml(packet->type));
-
-	struct recovery *r = relay->r;
-
 	/*
 	 * We're feeding a WAL, thus responding to SUBSCRIBE request.
 	 * In that case, only send a row if it is not from the same replica
@@ -298,10 +277,4 @@ relay_send_subscribe_row(struct xstream *stream, struct xrow_header *packet)
 			fiber_sleep(1000.0);
 		});
 	}
-	/*
-	 * Update local vclock. During normal operation wal_write()
-	 * updates local vclock. In relay mode we have to update
-	 * it here.
-	 */
-	vclock_follow(&r->vclock, packet->replica_id, packet->lsn);
 }

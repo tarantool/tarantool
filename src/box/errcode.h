@@ -114,7 +114,7 @@ struct errcode_record {
 	/* 59 */_(ER_CFG,			"Incorrect value for option '%s': %s") \
 	/* 60 */_(ER_VINYL,			"%s") \
 	/* 61 */_(ER_UNUSED ,			"") \
-	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %u") \
+	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
 	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
 	/* 65 */_(ER_REPLICASET_UUID_IS_RO,	"Can't reset replica set UUID: it is already assigned") \

@@ -104,8 +104,6 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
 		/* Local request. */
 		row->replica_id = instance_id;
 		row->lsn = vclock_inc(&r->vclock, instance_id);
-	} else {
-		vclock_follow(&r->vclock,  row->replica_id, row->lsn);
 	}
 }
 
@@ -221,6 +219,18 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			continue; /* already applied, skip */
 
 		try {
+			/*
+			 * All rows in xlog files have an assigned
+			 * replica id.
+			 */
+			assert(row.replica_id != 0);
+			/*
+			 * We can promote the vclock either before
+			 * or after xstream_write(): it only makes
+			 * any impact in case of forced recovery,
+			 * when we skip the failed row anyway.
+			 */
+			vclock_follow(&r->vclock,  row.replica_id, row.lsn);
 			xstream_write(stream, &row);
 			++row_count;
 			if (row_count % 100000 == 0)
