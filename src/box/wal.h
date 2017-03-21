@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include "small/rlist.h"
-#include "salad/stailq.h"
+#include "journal.h"
 
 struct fiber;
 struct vclock;
@@ -47,25 +47,10 @@ extern const char *wal_mode_STRS[];
 extern struct wal_writer *wal;
 extern int wal_dir_lock;
 
-struct wal_request {
-	struct stailq_entry fifo;
-	/**
-	 * On success, contains vclock signature of
-	 * the committed transaction, on error is -1
-	 */
-	int64_t res;
-	struct fiber *fiber;
-	int n_rows;
-	struct xrow_header *rows[];
-};
-
 #if defined(__cplusplus)
 
-struct wal_request *
-wal_request_new(size_t n_rows);
-
 int64_t
-wal_write(struct wal_request *req);
+wal_write(struct journal_entry *req);
 
 void
 wal_thread_start();
@@ -123,7 +108,7 @@ wal_collect_garbage(int64_t lsn);
  * Write xrows to the metadata log.
  */
 int
-wal_write_xctl(struct wal_request *req);
+wal_write_xctl(struct journal_entry *req);
 
 /**
  * Rotate the metadata log.

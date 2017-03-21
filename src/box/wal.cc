@@ -165,24 +165,9 @@ wal_msg(struct cmsg *msg)
 	return msg->route == wal_request_route ? (struct wal_msg *) msg : NULL;
 }
 
-struct wal_request *
-wal_request_new(size_t n_rows)
-{
-	struct wal_request *req;
-	req = (struct wal_request *)region_aligned_alloc_xc(
-		&fiber()->gc,
-		sizeof(struct wal_request) +
-		         sizeof(req->rows[0]) * n_rows,
-		alignof(struct wal_request));
-	req->n_rows = n_rows;
-	req->res = -1;
-	req->fiber = fiber();
-	return req;
-}
-
 /** Write a request to a log in a single transaction. */
 static ssize_t
-wal_request_write(struct wal_request *req, struct xlog *l)
+wal_request_write(struct journal_entry *req, struct xlog *l)
 {
 	/*
 	 * Iterate over request rows (tx statements)
@@ -203,7 +188,7 @@ wal_request_write(struct wal_request *req, struct xlog *l)
 }
 
 /**
- * Invoke fibers waiting for their wal_request's to be
+ * Invoke fibers waiting for their journal_entry's to be
  * completed. The fibers are invoked in strict fifo order:
  * this ensures that, in case of rollback, requests are
  * rolled back in strict reverse order, producing
@@ -216,7 +201,7 @@ tx_schedule_queue(struct stailq *queue)
 	 * fiber_wakeup() is faster than fiber_call() when there
 	 * are many ready fibers.
 	 */
-	struct wal_request *req;
+	struct journal_entry *req;
 	stailq_foreach_entry(req, queue, fifo)
 		fiber_wakeup(req->fiber);
 }
@@ -589,7 +574,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 * In order to guarantee that a transaction is either fully written
 	 * to file or isn't written at all, ftruncate(2) is used to shrink
 	 * the file to the last fully written request. The absolute position
-	 * of request in xlog file is stored inside `struct wal_request`.
+	 * of request in xlog file is stored inside `struct journal_entry`.
 	 */
 
 	struct xlog *l = &writer->current_wal;
@@ -597,7 +582,7 @@ wal_write_to_disk(struct cmsg *msg)
 	/*
 	 * Iterate over requests (transactions)
 	 */
-	struct wal_request *req, *last_commit_req = NULL;
+	struct journal_entry *req, *last_commit_req = NULL;
 	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
 		int rc = wal_request_write(req, l);
 		if (rc < 0) {
@@ -610,7 +595,7 @@ wal_write_to_disk(struct cmsg *msg)
 		goto done;
 	}
 	last_commit_req = stailq_last_entry(&wal_msg->commit,
-					struct wal_request, fifo);
+					struct journal_entry, fifo);
 
 done:
 	struct error *error = diag_last_error(diag_get());
@@ -626,8 +611,8 @@ done:
 	 * nothing, and need to start rollback from the first
 	 * request. Otherwise we rollback from the first request.
 	 */
-	req = stailq_first_entry(&wal_msg->commit, struct wal_request, fifo);
-	struct wal_request *rollback_req = last_commit_req ?
+	req = stailq_first_entry(&wal_msg->commit, struct journal_entry, fifo);
+	struct journal_entry *rollback_req = last_commit_req ?
 		stailq_next_entry(last_commit_req, fifo) : req;
 	/* Update status of the successfully committed requests. */
 	for (; req != rollback_req; req = stailq_next_entry(req, fifo)) {
@@ -687,7 +672,7 @@ wal_thread_f(va_list ap)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct wal_request *req)
+wal_write(struct journal_entry *req)
 {
 	struct wal_writer *writer = wal;
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
@@ -741,13 +726,13 @@ wal_write(struct wal_request *req)
 
 struct wal_write_xctl_msg: public cbus_call_msg
 {
-	struct wal_request *req;
+	struct journal_entry *req;
 };
 
 static int
 wal_write_xctl_f(struct cbus_call_msg *msg)
 {
-	struct wal_request *req = ((struct wal_write_xctl_msg *)msg)->req;
+	struct journal_entry *req = ((struct wal_write_xctl_msg *)msg)->req;
 
 	if (!xctl_writer.is_active) {
 		if (xctl_open(&xctl_writer.xlog) < 0)
@@ -765,7 +750,7 @@ wal_write_xctl_f(struct cbus_call_msg *msg)
 }
 
 int
-wal_write_xctl(struct wal_request *req)
+wal_write_xctl(struct journal_entry *req)
 {
 	struct wal_write_xctl_msg msg;
 	msg.req = req;

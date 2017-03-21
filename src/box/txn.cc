@@ -189,7 +189,9 @@ txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_rows > 0);
 
-	struct wal_request *req = wal_request_new(txn->n_rows);
+	struct journal_entry *req = journal_entry_new(txn->n_rows);
+	if (req == NULL)
+		diag_raise();
 
 	struct txn_stmt *stmt;
 	struct xrow_header **row = req->rows;

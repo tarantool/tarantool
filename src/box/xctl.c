@@ -601,15 +601,9 @@ xctl_flush(void)
 	if (xctl.tx_end == 0)
 		return 0; /* nothing to do */
 
-	struct wal_request *req;
-	req = region_aligned_alloc(&fiber()->gc,
-				   sizeof(struct wal_request) +
-				   xctl.tx_end * sizeof(req->rows[0]),
-				   alignof(struct wal_request));
+	struct journal_entry *req = journal_entry_new(xctl.tx_end);
 	if (req == NULL)
 		return -1;
-
-	req->n_rows = 0;
 
 	struct xrow_header *rows;
 	rows = region_aligned_alloc(&fiber()->gc,
@@ -622,10 +616,10 @@ xctl_flush(void)
 	 * Encode buffered records.
 	 */
 	for (int i = 0; i < xctl.tx_end; i++) {
-		struct xrow_header *row = &rows[req->n_rows];
+		struct xrow_header *row = &rows[i];
 		if (xctl_record_encode(&xctl.tx_buf[i], row) < 0)
 			return -1;
-		req->rows[req->n_rows++] = row;
+		req->rows[i] = row;
 	}
 	/*
 	 * Do actual disk writes on behalf of the WAL

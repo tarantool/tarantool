@@ -72,6 +72,7 @@ add_library(box STATIC
     xstream.cc
     applier.cc
     relay.cc
+    journal.c
     wal.cc
     ${lua_sources}
     lua/init.c
