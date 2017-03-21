@@ -11,7 +11,7 @@ function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
     return cn:_request('select', opts, space_id, index_id, iterator,
                        offset, limit, key)
 end
-function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\x80') end
+function x_fatal(cn) cn._transport.perform_request(nil, nil, 'inject', nil, '\x80') end
 test_run:cmd("setopt delimiter ''");
 
 LISTEN = require('uri').parse(box.cfg.listen)
@@ -503,6 +503,77 @@ c:close()
 c = net.connect(box.cfg.listen, {call_16 = true})
 c:call('scalar42')
 c:close()
+
+--
+-- gh-2195 export pure msgpack from net.box
+--
+
+space = box.schema.space.create('test')
+_ = box.space.test:create_index('primary')
+c = net.connect(box.cfg.listen)
+ibuf = require('buffer').ibuf()
+
+c:ping()
+c.space.test ~= nil
+
+c.space.test:replace({1, 'hello'})
+
+-- replace
+c.space.test:replace({2}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- insert
+c.space.test:insert({3}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- update
+c.space.test:update({3}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- upsert
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- delete
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- select
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- select
+len = c.space.test:select({}, {buffer = ibuf})
+ibuf.rpos + len == ibuf.wpos
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+ibuf.rpos == ibuf.wpos
+len
+result
+
+-- unsupported methods
+c.space.test:get({1}, { buffer = ibuf})
+c.space.test.index.primary:min({}, { buffer = ibuf})
+c.space.test.index.primary:max({}, { buffer = ibuf})
+c.space.test.index.primary:count({}, { buffer = ibuf})
+c.space.test.index.primary:get({1}, { buffer = ibuf})
+
+-- error handling
+rpos, wpos = ibuf.rpos, ibuf.wpos
+c.space.test:insert({1}, {buffer = ibuf})
+ibuf.rpos == rpos, ibuf.wpos == wpos
+
+ibuf = nil
+c:close()
+space:drop()
 
 -- gh-1904 net.box hangs in :close() if a fiber was cancelled
 -- while blocked in :_wait_state() in :_request()

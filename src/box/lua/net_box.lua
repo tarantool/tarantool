@@ -219,7 +219,7 @@ local function create_transport(host, port, user, password, callback)
     end
 
     -- REQUEST/RESPONSE --
-    local function perform_request(timeout, method, schema_id, ...)
+    local function perform_request(timeout, buffer, method, schema_id, ...)
         if state ~= 'active' then
             return last_errno or E_NO_CONNECTION, last_error
         end
@@ -232,10 +232,11 @@ local function create_transport(host, port, user, password, callback)
         local id = next_request_id
         method_codec[method](send_buf, id, schema_id, ...)
         next_request_id = next_id(id)
-        local request = table_new(0, 5) -- reserve space for 5 keys
+        local request = table_new(0, 6) -- reserve space for 6 keys
         request.client = fiber_self()
         request.method = method
         request.schema_id = schema_id
+        request.buffer = buffer
         requests[id] = request
         repeat
             local timeout = max(0, deadline - fiber_time())
@@ -247,25 +248,48 @@ local function create_transport(host, port, user, password, callback)
         return request.errno, request.response
     end
 
-    local function dispatch_response(id, errno, response)
-        local request = requests[id]
-        if request then -- someone is waiting for the response
-            requests[id] = nil
-            request.errno, request.response = errno, response
-            local client = request.client
-            if client:status() ~= 'dead' then client:wakeup() end
+    local function wakeup_client(client)
+        if client:status() ~= 'dead' then
+            client:wakeup()
         end
     end
 
-    local function dispatch_response_iproto(hdr, body)
+    local function dispatch_response_iproto(hdr, body_rpos, body_end)
         local id = hdr[IPROTO_SYNC_KEY]
-        local status = hdr[IPROTO_STATUS_KEY]
-        if status ~= 0 then
-            return dispatch_response(id, band(status, IPROTO_ERRNO_MASK),
-                                     body[IPROTO_ERROR_KEY])
-        else
-            return dispatch_response(id, nil, body[IPROTO_DATA_KEY])
+        local request = requests[id]
+        if request == nil then -- nobody is waiting for the response
+            return
         end
+        requests[id] = nil
+        local status = hdr[IPROTO_STATUS_KEY]
+        local body, body_end_check
+
+        if status ~= 0 then
+            -- Handle errors
+            body_end_check, body = ibuf_decode(body_rpos)
+            assert(body_end == body_end_check, "invalid xrow length")
+            request.errno = band(status, IPROTO_ERRNO_MASK)
+            request.response = body[IPROTO_ERROR_KEY]
+            wakeup_client(request.client)
+            return
+        end
+
+        local buffer = request.buffer
+        if buffer ~= nil then
+            -- Copy xrow.body to user-provided buffer
+            local body_len = body_end - body_rpos
+            local wpos = buffer:alloc(body_len)
+            ffi.copy(wpos, body_rpos, body_len)
+            request.response = tonumber(body_len)
+            wakeup_client(request.client)
+            return
+        end
+
+        -- Decode xrow.body[DATA] to Lua objects
+        body_end_check, body = ibuf_decode(body_rpos)
+        assert(body_end == body_end_check, "invalid xrow length")
+        request.response = body[IPROTO_DATA_KEY]
+        wakeup_client(request.client)
     end
 
     local function new_request_id()
@@ -287,17 +311,14 @@ local function create_transport(host, port, user, password, callback)
             required = 5
         else
             -- PWN! insufficient input validation
-            local rpos, len = ibuf_decode(recv_buf.rpos)
-            required = (rpos - recv_buf.rpos) + len
+            local bufpos = recv_buf.rpos
+            local rpos, len = ibuf_decode(bufpos)
+            required = (rpos - bufpos) + len
             if data_len >= required then
-                local hdr
-                rpos, hdr = ibuf_decode(rpos)
-                local body = {}
-                if rpos - recv_buf.rpos < required then
-                    rpos, body = ibuf_decode(rpos)
-                end
-                recv_buf.rpos = rpos
-                return nil, hdr, body
+                local body_end = rpos + len
+                local body_rpos, hdr = ibuf_decode(rpos)
+                recv_buf.rpos = body_end
+                return nil, hdr, body_rpos, body_end
             end
         end
         local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
@@ -373,7 +394,13 @@ local function create_transport(host, port, user, password, callback)
         if err then
             return error_sm(err, response)
         else
-            dispatch_response(rid, nil, response)
+            local request = requests[rid]
+            if request == nil then -- nobody is waiting for the response
+                return
+            end
+            requests[rid] = nil
+            request.response = response
+            wakeup_client(request.client)
             return console_sm(next_id(rid))
         end
     end
@@ -385,11 +412,13 @@ local function create_transport(host, port, user, password, callback)
             return iproto_schema_sm()
         end
         encode_auth(send_buf, new_request_id(), nil, user, password, salt)
-        local err, hdr, body = send_and_recv_iproto()
+        local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
         end
         if hdr[IPROTO_STATUS_KEY] ~= 0 then
+            local body
+            body_end, body = ibuf_decode(body_rpos)
             return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
         end
         set_state('fetch_schema')
@@ -411,9 +440,9 @@ local function create_transport(host, port, user, password, callback)
         schema_id = nil -- any schema_id will do provided that
                         -- it is consistent across responses
         repeat
-            local err, hdr, body = send_and_recv_iproto()
+            local err, hdr, body_rpos, body_end = send_and_recv_iproto()
             if err then return error_sm(err, hdr) end
-            dispatch_response_iproto(hdr, body)
+            dispatch_response_iproto(hdr, body_rpos, body_end)
             local id = hdr[IPROTO_SYNC_KEY]
             if id == select1_id or id == select2_id then
                 -- response to a schema query we've submitted
@@ -428,6 +457,8 @@ local function create_transport(host, port, user, password, callback)
                     -- schema changed while fetching schema; restart loader
                     return iproto_schema_sm()
                 end
+                local body
+                body_end, body = ibuf_decode(body_rpos)
                 response[id] = body[IPROTO_DATA_KEY]
             end
         until response[select1_id] and response[select2_id]
@@ -438,14 +469,16 @@ local function create_transport(host, port, user, password, callback)
     end
 
     iproto_sm = function(schema_id)
-        local err, hdr, body = send_and_recv_iproto()
+        local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then return error_sm(err, hdr) end
-        dispatch_response_iproto(hdr, body)
+        dispatch_response_iproto(hdr, body_rpos, body_end)
         local status = hdr[IPROTO_STATUS_KEY]
         local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
         if response_schema_id > 0 and response_schema_id ~= schema_id then
             -- schema_id has been changed - start to load a new version.
             -- Sic: self._schema_id will be updated only after reload.
+            local body
+            body_end, body = ibuf_decode(body_rpos)
             set_state('fetch_schema',
                       E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
                       response_schema_id)
@@ -648,7 +681,7 @@ function remote_methods:_request(method, opts, ...)
         -- @deprecated since 1.7.4
         deadline = self._deadlines[this_fiber]
     end
-
+    local buffer = opts and opts.buffer
     local err, res
     repeat
         local timeout = deadline and max(0, deadline - fiber_time())
@@ -656,9 +689,11 @@ function remote_methods:_request(method, opts, ...)
             wait_state('active', timeout)
             timeout = deadline and max(0, deadline - fiber_time())
         end
-        err, res = perform_request(timeout, method,
+        err, res = perform_request(timeout, buffer, method,
                                    self._schema_id, ...)
-        if not err then
+        if not err and buffer ~= nil then
+            return res -- the length of xrow.body
+        elseif not err then
             setmetatable(res, sequence_mt)
             local postproc = method ~= 'eval' and method ~= 'call_17'
             if postproc and rawget(box, 'tuple') then
@@ -667,7 +702,7 @@ function remote_methods:_request(method, opts, ...)
                     res[i] = tnew(v)
                 end
             end
-            return res
+            return res -- decoded xrow.body[DATA]
         elseif err == E_WRONG_SCHEMA_VERSION then
             err = nil
         end
@@ -685,7 +720,7 @@ function remote_methods:ping(opts)
         timeout = deadline and max(0, deadline - fiber_time())
                             or (opts and opts.timeout)
     end
-    local err = self._transport.perform_request(timeout, 'ping',
+    local err = self._transport.perform_request(timeout, nil, 'ping',
                                                 self._schema_id)
     return not err or err == E_WRONG_SCHEMA_VERSION
 end
@@ -837,10 +872,10 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        err, res = pr(timeout, 'eval', nil, loader, {line})
+        err, res = pr(timeout, nil, 'eval', nil, loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        err, res = pr(timeout, 'inject', nil, line..'$EOF$\n')
+        err, res = pr(timeout, nil, 'inject', nil, line..'$EOF$\n')
     end
     if err then
         box.error({code = err, reason = res})
@@ -849,7 +884,11 @@ function console_methods:eval(line, timeout)
 end
 
 local function one_tuple(tab)
-    if tab[1] ~= nil then return tab[1] end
+    if type(tab) ~= 'table' then
+        return tab
+    elseif tab[1] ~= nil then
+        return tab[1]
+    end
 end
 
 space_metatable = function(remote)
@@ -910,6 +949,9 @@ index_metatable = function(remote)
 
     function methods:get(key, opts)
         check_index_arg(self, 'get')
+        if opts and opts.buffer then
+            error("index:get() doesn't support `buffer` argument")
+        end
         local res = remote:_request('select', opts, self.space.id, self.id,
                                     box.index.EQ, 0, 2, key)
         if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
@@ -918,6 +960,9 @@ index_metatable = function(remote)
 
     function methods:min(key, opts)
         check_index_arg(self, 'min')
+        if opts and opts.buffer then
+            error("index:min() doesn't support `buffer` argument")
+        end
         local res = remote:_request('select', opts, self.space.id, self.id,
                                     box.index.GE, 0, 1, key)
         return one_tuple(res)
@@ -925,6 +970,9 @@ index_metatable = function(remote)
 
     function methods:max(key, opts)
         check_index_arg(self, 'max')
+        if opts and opts.buffer then
+            error("index:max() doesn't support `buffer` argument")
+        end
         local res = remote:_request('select', opts, self.space.id, self.id,
                                     box.index.LE, 0, 1, key)
         return one_tuple(res)
@@ -932,6 +980,9 @@ index_metatable = function(remote)
 
     function methods:count(key, opts)
         check_index_arg(self, 'count')
+        if opts and opts.buffer then
+            error("index:count() doesn't support `buffer` argument")
+        end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
         return remote:_request('call_16', opts, code, { key })[1][1]

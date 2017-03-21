@@ -28,7 +28,7 @@ function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
     return cn:_request('select', opts, space_id, index_id, iterator,
                        offset, limit, key)
 end
-function x_fatal(cn) cn._transport.perform_request(nil, 'inject', nil, '\x80') end
+function x_fatal(cn) cn._transport.perform_request(nil, nil, 'inject', nil, '\x80') end
 test_run:cmd("setopt delimiter ''");
 ---
 ...
@@ -1314,6 +1314,180 @@ c:call('scalar42')
 - - [42]
 ...
 c:close()
+---
+...
+--
+-- gh-2195 export pure msgpack from net.box
+--
+space = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('primary')
+---
+...
+c = net.connect(box.cfg.listen)
+---
+...
+ibuf = require('buffer').ibuf()
+---
+...
+c:ping()
+---
+- true
+...
+c.space.test ~= nil
+---
+- true
+...
+c.space.test:replace({1, 'hello'})
+---
+- [1, 'hello']
+...
+-- replace
+c.space.test:replace({2}, {buffer = ibuf})
+---
+- 9
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[2]]}
+...
+-- insert
+c.space.test:insert({3}, {buffer = ibuf})
+---
+- 9
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+-- update
+c.space.test:update({3}, {}, {buffer = ibuf})
+---
+- 9
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
+---
+- 9
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+-- upsert
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+---
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- delete
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+---
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- select
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
+---
+- 19
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3], [2], [1, 'hello']]}
+...
+-- select
+len = c.space.test:select({}, {buffer = ibuf})
+---
+...
+ibuf.rpos + len == ibuf.wpos
+---
+- true
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+ibuf.rpos == ibuf.wpos
+---
+- true
+...
+len
+---
+- 21
+...
+result
+---
+- {48: [[1, 'hello'], [2], [3], [4]]}
+...
+-- unsupported methods
+c.space.test:get({1}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:get() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:min({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:min() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:max({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:max() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:count({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:count() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:get({1}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:get() doesn''t support `buffer` argument'
+...
+-- error handling
+rpos, wpos = ibuf.rpos, ibuf.wpos
+---
+...
+c.space.test:insert({1}, {buffer = ibuf})
+---
+- error: Duplicate key exists in unique index 'primary' in space 'test'
+...
+ibuf.rpos == rpos, ibuf.wpos == wpos
+---
+- true
+- true
+...
+ibuf = nil
+---
+...
+c:close()
+---
+...
+space:drop()
 ---
 ...
 -- gh-1904 net.box hangs in :close() if a fiber was cancelled
