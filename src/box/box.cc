@@ -1454,6 +1454,8 @@ bootstrap(struct vclock *start_vclock)
 	struct replica *master = replicaset_first();
 	assert(master == NULL || master->applier != NULL);
 
+	if (xctl_bootstrap() != 0)
+		diag_raise();
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 		bootstrap_from_master(master, start_vclock);
 	} else {

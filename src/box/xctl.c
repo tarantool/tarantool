@@ -746,6 +746,22 @@ xctl_vy_run_gc(const struct xctl_record *record)
 }
 
 int
+xctl_bootstrap(void)
+{
+	struct vclock vclock;
+	vclock_create(&vclock);
+
+	/* Create initial xctl file. */
+	struct xlog xlog;
+	if (xdir_create_xlog(&xctl.dir, &xlog, &vclock) < 0)
+		return -1;
+
+	int rc = xlog_rename(&xlog);
+	xlog_close(&xlog, false);
+	return rc;
+}
+
+int
 xctl_begin_recovery(const struct vclock *vclock)
 {
 	assert(xctl.recovery == NULL);
@@ -821,35 +837,15 @@ xctl_recover_vy_index(int64_t vy_index_id,
 	return xctl_recovery_iterate_vy_index(index, false, cb, cb_arg);
 }
 
-/** Argument passed to xctl_rotate_cb_func(). */
-struct xctl_rotate_cb_arg {
-	/** The xlog created during rotation. */
-	struct xlog xlog;
-	/** Set if the xlog was created. */
-	bool xlog_is_open;
-	/** The new xlog's vclock. */
-	const struct vclock *vclock;
-};
-
 /** Callback passed to xctl_recovery_iterate() for log rotation. */
 static int
 xctl_rotate_cb_func(const struct xctl_record *record, void *cb_arg)
 {
-	struct xctl_rotate_cb_arg *arg = cb_arg;
+	struct xlog *xlog = cb_arg;
 	struct xrow_header row;
 
-	/*
-	 * Only create the new xlog if we have something to write
-	 * so as not to pollute the filesystem with metadata logs
-	 * if vinyl is not used.
-	 */
-	if (!arg->xlog_is_open) {
-		if (xdir_create_xlog(&xctl.dir, &arg->xlog, arg->vclock) < 0)
-			return -1;
-		arg->xlog_is_open = true;
-	}
 	if (xctl_record_encode(record, &row) < 0 ||
-	    xlog_write_row(&arg->xlog, &row) < 0)
+	    xlog_write_row(xlog, &row) < 0)
 		return -1;
 	return 0;
 }
@@ -882,36 +878,30 @@ xctl_rotate_f(va_list ap)
 	if (recovery == NULL)
 		goto err_recovery;
 
-	struct xctl_rotate_cb_arg arg = {
-		.xlog_is_open = false,
-		.vclock = vclock,
-	};
-	if (xctl_recovery_iterate(recovery, true,
-				  xctl_rotate_cb_func, &arg) < 0)
-		goto err_write_xlog;
+	struct xlog xlog;
+	if (xdir_create_xlog(&xctl.dir, &xlog, vclock) < 0)
+		goto err_create_xlog;
 
-	if (!arg.xlog_is_open)
-		goto out; /* no records in the log */
+	if (xctl_recovery_iterate(recovery, true,
+				  xctl_rotate_cb_func, &xlog) < 0)
+		goto err_write_xlog;
 
 	/* Finalize the new xlog. */
-	if (xlog_flush(&arg.xlog) < 0 ||
-	    xlog_sync(&arg.xlog) < 0 ||
-	    xlog_rename(&arg.xlog) < 0)
+	if (xlog_flush(&xlog) < 0 ||
+	    xlog_sync(&xlog) < 0 ||
+	    xlog_rename(&xlog) < 0)
 		goto err_write_xlog;
 
-	xlog_close(&arg.xlog, false);
-out:
+	xlog_close(&xlog, false);
 	xctl_recovery_delete(recovery);
 	return 0;
 
 err_write_xlog:
-	if (arg.xlog_is_open) {
-		/* Delete the unfinished xlog. */
-		if (unlink(arg.xlog.filename) < 0)
-			say_syserror("failed to delete file '%s'",
-				     arg.xlog.filename);
-		xlog_close(&arg.xlog, false);
-	}
+	/* Delete the unfinished xlog. */
+	if (unlink(xlog.filename) < 0)
+		say_syserror("failed to delete file '%s'", xlog.filename);
+	xlog_close(&xlog, false);
+err_create_xlog:
 	xctl_recovery_delete(recovery);
 err_recovery:
 	return -1;

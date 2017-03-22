@@ -254,6 +254,12 @@ void
 xctl_write(const struct xctl_record *record);
 
 /**
+ * Bootstrap xctl.
+ */
+int
+xctl_bootstrap(void);
+
+/**
  * Prepare the metadata log for recovery from the file having
  * vclock @vclock.
  *
