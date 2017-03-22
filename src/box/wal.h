@@ -44,13 +44,12 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
-extern struct wal_writer *wal;
 extern int wal_dir_lock;
 
 #if defined(__cplusplus)
 
 int64_t
-wal_write(struct journal_entry *req);
+wal_write(struct journal *journal, struct journal_entry *entry);
 
 void
 wal_thread_start();
@@ -59,6 +58,9 @@ void
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
 	 int64_t wal_max_rows, int64_t wal_max_size);
+
+enum wal_mode
+wal_mode();
 
 void
 wal_thread_stop();
@@ -103,6 +105,9 @@ wal_checkpoint(struct vclock *vclock, bool rotate);
  */
 void
 wal_collect_garbage(int64_t lsn);
+
+void
+wal_init_xctl();
 
 /**
  * Write xrows to the metadata log.

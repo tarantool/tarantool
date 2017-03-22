@@ -692,6 +692,13 @@ xlog_init(struct xlog *xlog)
 	return 0;
 }
 
+void
+xlog_clear(struct xlog *l)
+{
+	memset(l, 0, sizeof(*l));
+	l->fd = -1;
+}
+
 static void
 xlog_destroy(struct xlog *xlog)
 {
@@ -699,6 +706,7 @@ xlog_destroy(struct xlog *xlog)
 	obuf_destroy(&xlog->zbuf);
 	ZSTD_freeCCtx(xlog->zctx);
 	TRASH(xlog);
+	xlog->fd = -1;
 }
 
 int
@@ -1278,6 +1286,7 @@ xlog_atfork(struct xlog *xlog)
 	 * fclose().
 	 */
 	close(xlog->fd);
+	xlog->fd = -1;
 }
 
 /* }}} */

@@ -350,6 +350,24 @@ xlog_create(struct xlog *xlog, const char *name,
 int
 xlog_open(struct xlog *xlog, const char *name);
 
+
+/**
+ * Reset an xlog object without opening it.
+ * The object is in limbo state: it doesn't hold
+ * any resources and doesn't need close, but
+ * xlog_is_open() returns false.
+ */
+void
+xlog_clear(struct xlog *xlog);
+
+
+/** Returns true if the xlog file is open. */
+static inline bool
+xlog_is_open(struct xlog *l)
+{
+	return l->fd != -1;
+}
+
 /**
  * Rename xlog
  *

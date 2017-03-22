@@ -586,6 +586,7 @@ xctl_init(void)
 	snprintf(xctl.vinyl_dir, sizeof(xctl.vinyl_dir), "%s",
 		 cfg_gets("vinyl_dir"));
 	latch_create(&xctl.latch);
+	wal_init_xctl();
 }
 
 /**

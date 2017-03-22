@@ -40,6 +40,9 @@
 #include "xctl.h"
 #include "cbus.h"
 #include "coeio.h"
+#include "recovery.h"
+#include "replication.h"
+
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
@@ -65,6 +68,7 @@ struct wal_thread {
  */
 struct wal_writer
 {
+	struct journal base;
 	/* ----------------- tx ------------------- */
 	/**
 	 * The rollback queue. An accumulator for all requests
@@ -96,8 +100,6 @@ struct wal_writer
 	struct vclock vclock;
 	/** The current WAL file. */
 	struct xlog current_wal;
-	/** true if wal file is opened */
-	bool is_active;
 	/**
 	 * Used if there was a WAL I/O error and we need to
 	 * keep adding all incoming requests to the rollback
@@ -130,15 +132,17 @@ struct wal_msg: public cmsg {
 struct xctl_writer {
 	/** The metadata log file. */
 	struct xlog xlog;
-	/** Set if the xlog is open. */
-	bool is_active;
 };
-static struct xctl_writer xctl_writer;
 
+static struct xctl_writer xctl_writer;
 static struct wal_thread wal_thread;
 static struct wal_writer wal_writer_singleton;
 
-struct wal_writer *wal = NULL;
+enum wal_mode
+wal_mode()
+{
+	return wal_writer_singleton.wal_mode;
+}
 
 static void
 wal_write_to_disk(struct cmsg *msg);
@@ -222,7 +226,7 @@ tx_schedule_commit(struct cmsg *msg)
 	 * iteration of tx_schedule_queue loop.
 	 */
 	if (! stailq_empty(&batch->rollback)) {
-		struct wal_writer *writer = wal;
+		struct wal_writer *writer = &wal_writer_singleton;
 		/* Closes the input valve. */
 		stailq_concat(&writer->rollback, &batch->rollback);
 	}
@@ -233,7 +237,7 @@ static void
 tx_schedule_rollback(struct cmsg *msg)
 {
 	(void) msg;
-	struct wal_writer *writer = (struct wal_writer *) wal;
+	struct wal_writer *writer = &wal_writer_singleton;
 	/*
 	 * Perform a cascading abort of all transactions which
 	 * depend on the transaction which failed to get written
@@ -261,9 +265,10 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->wal_mode = wal_mode;
 	writer->wal_max_rows = wal_max_rows;
 	writer->wal_max_size = wal_max_size;
+	journal_create(&writer->base, wal_write, NULL);
 
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid);
-	writer->is_active = false;
+	xlog_clear(&writer->current_wal);
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
 
@@ -323,7 +328,7 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 
 	xdir_scan_xc(&writer->wal_dir);
 
-	wal = writer;
+	journal_set(&writer->base);
 }
 
 /**
@@ -340,11 +345,8 @@ wal_thread_stop()
 		panic_syserror("WAL writer: thread join failed");
 	}
 
-	if (wal != NULL) {
-		wal_writer_destroy(wal);
-		wal = NULL;
-	}
-
+	if (journal_is_initialized(&wal_writer_singleton.base))
+		wal_writer_destroy(&wal_writer_singleton);
 }
 
 struct wal_checkpoint: public cmsg
@@ -358,16 +360,15 @@ void
 wal_checkpoint_f(struct cmsg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
-	struct wal_writer *writer = wal;
+	struct wal_writer *writer = &wal_writer_singleton;
 	/*
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
-	if (msg->rotate && writer->is_active &&
+	if (msg->rotate && xlog_is_open(&writer->current_wal) &&
 	    vclock_sum(&writer->current_wal.meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
 		xlog_close(&writer->current_wal, false);
-		writer->is_active = false;
 		/*
 		 * Avoid creating an empty xlog if this is the
 		 * last snapshot before shutdown.
@@ -386,6 +387,11 @@ wal_checkpoint_done_f(struct cmsg *data)
 void
 wal_checkpoint(struct vclock *vclock, bool rotate)
 {
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE) {
+		vclock_copy(vclock, &recovery->vclock);
+		return;
+	}
 	static struct cmsg_hop wal_checkpoint_route[] = {
 		{wal_checkpoint_f, &wal_thread.tx_pipe},
 		{wal_checkpoint_done_f, NULL},
@@ -411,14 +417,15 @@ static int
 wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	int64_t lsn = ((struct wal_gc_msg *)data)->lsn;
-	xdir_collect_garbage(&wal->wal_dir, lsn);
+	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn);
 	return 0;
 }
 
 void
 wal_collect_garbage(int64_t lsn)
 {
-	if (wal == NULL)
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE)
 		return;
 	struct wal_gc_msg msg;
 	msg.lsn = lsn;
@@ -449,7 +456,7 @@ wal_opt_rotate(struct wal_writer *writer)
 	 * EOF in the old WAL before switching to the new
 	 * one.
 	 */
-	if (writer->is_active &&
+	if (xlog_is_open(&writer->current_wal) &&
 	    (writer->current_wal.rows >= writer->wal_max_rows ||
 	     writer->current_wal.offset >= writer->wal_max_size)) {
 		/*
@@ -458,10 +465,9 @@ wal_opt_rotate(struct wal_writer *writer)
 		 * A warning is written to the error log.
 		 */
 		xlog_close(&writer->current_wal, false);
-		writer->is_active = false;
 	}
 
-	if (writer->is_active)
+	if (xlog_is_open(&writer->current_wal))
 		return 0;
 
 	struct vclock *vclock = (struct vclock *)malloc(sizeof(*vclock));
@@ -480,7 +486,6 @@ wal_opt_rotate(struct wal_writer *writer)
 		return -1;
 	}
 	xdir_add_vclock(&writer->wal_dir, vclock);
-	writer->is_active = true;
 
 	return 0;
 }
@@ -495,7 +500,7 @@ static void
 wal_writer_end_rollback(struct cmsg *msg)
 {
 	(void) msg;
-	struct wal_writer *writer = wal;
+	struct wal_writer *writer = &wal_writer_singleton;
 	cmsg_init(&writer->in_rollback, NULL);
 }
 
@@ -539,7 +544,7 @@ wal_notify_watchers(struct wal_writer *writer);
 static void
 wal_write_to_disk(struct cmsg *msg)
 {
-	struct wal_writer *writer = wal;
+	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
 
 	ERROR_INJECT_ONCE(ERRINJ_WAL_DELAY, sleep(5));
@@ -658,14 +663,14 @@ wal_thread_f(va_list ap)
 
 	cbus_loop(&endpoint);
 
-	if (wal != NULL && wal->is_active) {
-		xlog_close(&wal->current_wal, false);
-		wal->is_active = false;
-	}
-	if (xctl_writer.is_active) {
+	struct wal_writer *writer = &wal_writer_singleton;
+
+	if (xlog_is_open(&writer->current_wal))
+		xlog_close(&writer->current_wal, false);
+
+	if (xlog_is_open(&xctl_writer.xlog))
 		xlog_close(&xctl_writer.xlog, false);
-		xctl_writer.is_active = false;
-	}
+
 	cpipe_destroy(&wal_thread.tx_pipe);
 	return 0;
 }
@@ -675,9 +680,11 @@ wal_thread_f(va_list ap)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct journal_entry *req)
+wal_write(struct journal *journal, struct journal_entry *entry)
 {
-	struct wal_writer *writer = wal;
+	struct wal_writer *writer = (struct wal_writer *) journal;
+	if (writer->wal_mode == WAL_NONE)
+		return vclock_sum(&recovery->vclock);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	if (! stailq_empty(&writer->rollback)) {
@@ -699,7 +706,7 @@ wal_write(struct journal_entry *req)
 	    (batch = wal_msg(stailq_first_entry(&wal_thread.wal_pipe.input,
 						struct cmsg, fifo)))) {
 
-		stailq_add_tail_entry(&batch->commit, req, fifo);
+		stailq_add_tail_entry(&batch->commit, entry, fifo);
 	} else {
 		batch = (struct wal_msg *)
 			region_alloc_xc(&fiber()->gc,
@@ -710,10 +717,10 @@ wal_write(struct journal_entry *req)
 		 * since cpipe_push() may pass the batch to WAL
 		 * thread right away.
 		 */
-		stailq_add_tail_entry(&batch->commit, req, fifo);
+		stailq_add_tail_entry(&batch->commit, entry, fifo);
 		cpipe_push(&wal_thread.wal_pipe, batch);
 	}
-	wal_thread.wal_pipe.n_input += req->n_rows * XROW_IOVMAX;
+	wal_thread.wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&wal_thread.wal_pipe);
 	/**
 	 * It's not safe to spuriously wakeup this fiber
@@ -724,7 +731,19 @@ wal_write(struct journal_entry *req)
 	bool cancellable = fiber_set_cancellable(false);
 	fiber_yield(); /* Request was inserted. */
 	fiber_set_cancellable(cancellable);
-	return req->res;
+	/* All rows in request have the same replica id. */
+	struct xrow_header *last = entry->rows[entry->n_rows - 1];
+	/* Promote replica set vclock with local writes. */
+	if (last->replica_id == instance_id) {
+		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
+	}
+	return entry->res;
+}
+
+void
+wal_init_xctl()
+{
+	xlog_clear(&xctl_writer.xlog);
 }
 
 struct wal_write_xctl_msg: public cbus_call_msg
@@ -737,10 +756,9 @@ wal_write_xctl_f(struct cbus_call_msg *msg)
 {
 	struct journal_entry *entry = ((struct wal_write_xctl_msg *)msg)->entry;
 
-	if (!xctl_writer.is_active) {
+	if (! xlog_is_open(&xctl_writer.xlog)) {
 		if (xctl_open(&xctl_writer.xlog) < 0)
 			return -1;
-		xctl_writer.is_active = true;
 	}
 
 	if (xlog_write_entry(&xctl_writer.xlog, entry) < 0)
@@ -768,10 +786,8 @@ static int
 wal_rotate_xctl_f(struct cbus_call_msg *msg)
 {
 	(void) msg;
-	if (xctl_writer.is_active) {
+	if (xlog_is_open(&xctl_writer.xlog))
 		xlog_close(&xctl_writer.xlog, false);
-		xctl_writer.is_active = false;
-	}
 	return 0;
 }
 
@@ -788,9 +804,9 @@ wal_rotate_xctl()
 int
 wal_set_watcher(struct wal_watcher *watcher, struct ev_async *async)
 {
-	struct wal_writer *writer = wal;
+	struct wal_writer *writer = &wal_writer_singleton;
 
-	if (writer == NULL)
+	if (journal_is_initialized(&wal_writer_singleton.base) == false)
 		return -1;
 
 	watcher->loop = loop();
@@ -804,8 +820,8 @@ wal_set_watcher(struct wal_watcher *watcher, struct ev_async *async)
 void
 wal_clear_watcher(struct wal_watcher *watcher)
 {
-	struct wal_writer *writer = wal;
-	if (writer == NULL)
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (journal_is_initialized(&wal_writer_singleton.base) == false)
 		return;
 
 	tt_pthread_mutex_lock(&writer->watchers_mutex);
@@ -835,13 +851,8 @@ wal_notify_watchers(struct wal_writer *writer)
 void
 wal_atfork()
 {
-	if (wal) { /* NULL when forking for box.cfg{background = true} */
-		xlog_atfork(&wal->current_wal);
-		wal->is_active = false;
-		wal = NULL;
-	}
-	if (xctl_writer.is_active) {
+	if (xlog_is_open(&wal_writer_singleton.current_wal))
+		xlog_atfork(&wal_writer_singleton.current_wal);
+	if (xlog_is_open(&xctl_writer.xlog))
 		xlog_atfork(&xctl_writer.xlog);
-		xctl_writer.is_active = false;
-	}
 }

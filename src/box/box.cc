@@ -242,6 +242,37 @@ struct wal_stream {
 	size_t yield;
 };
 
+/**
+ * A stub used in txn_commit() during local recovery. We "replay"
+ * transactions during local recovery, with WAL turned off.
+ * Since each transaction attempts to write itself to WAL at
+ * commit, we need an implementation which would fake WAL write.
+ */
+struct recovery_journal {
+	struct journal base;
+	struct recovery *r;
+};
+
+/**
+ * Use the current row LSN as commit LSN - vinyl needs to see the
+ * exact same signature during local recovery to properly mark
+ * min/max LSN of created LSM levels.
+ */
+int64_t
+recovery_journal_write(struct journal *base,
+		       struct journal_entry * /* entry */)
+{
+	struct recovery_journal *journal = (struct recovery_journal *) base;
+	return vclock_sum(&journal->r->vclock);
+}
+
+static inline void
+recovery_journal_create(struct recovery_journal *journal, struct recovery *r)
+{
+	journal_create(&journal->base, recovery_journal_write, NULL);
+	journal->r = r;
+}
+
 static inline void
 apply_row(struct xstream *stream, struct xrow_header *row)
 {
@@ -1155,7 +1186,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	box_check_writable();
 
 	/* Forbid replication with disabled WAL */
-	if (wal == NULL) {
+	if (wal_mode() == WAL_NONE) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
 			  "wal_mode = 'none'");
 	}
@@ -1251,7 +1282,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	}
 
 	/* Forbid replication with disabled WAL */
-	if (wal == NULL) {
+	if (wal_mode() == WAL_NONE) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
 			  "wal_mode = 'none'");
 	}
@@ -1572,6 +1603,11 @@ box_cfg_xc(void)
 
 		/* Replace instance vclock using the data from snapshot */
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);
+
+		struct recovery_journal journal;
+		recovery_journal_create(&journal, recovery);
+		journal_set(&journal.base);
+
 		engine_begin_final_recovery();
 		title("orphan");
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
@@ -1642,10 +1678,8 @@ box_cfg_xc(void)
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_mode != WAL_NONE) {
-		wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-			 &recovery->vclock, wal_max_rows, wal_max_size);
-	}
+	wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
+		 &recovery->vclock, wal_max_rows, wal_max_size);
 
 	rmean_cleanup(rmean_box);
 
@@ -1701,11 +1735,7 @@ box_snapshot()
 		goto end;
 
 	struct vclock vclock;
-	if (wal == NULL) {
-		vclock_copy(&vclock, &recovery->vclock);
-	} else {
-		wal_checkpoint(&vclock, true);
-	}
+	wal_checkpoint(&vclock, true);
 	rc = engine_commit_checkpoint(&vclock);
 end:
 	if (rc)

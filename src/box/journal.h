@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
+#include <stdbool.h>
 #include "salad/stailq.h"
 
 #if defined(__cplusplus)
@@ -131,6 +132,21 @@ journal_set(struct journal *new_journal)
 	if (current_journal && current_journal->destroy)
 		current_journal->destroy(current_journal);
 	current_journal = new_journal;
+}
+
+static inline void
+journal_create(struct journal *journal,
+	       int64_t (*write)(struct journal *, struct journal_entry *),
+	       void (*destroy)(struct journal *))
+{
+	journal->write = write;
+	journal->destroy = destroy;
+}
+
+static inline bool
+journal_is_initialized(struct journal *journal)
+{
+	return journal->write != NULL;
 }
 
 #if defined(__cplusplus)

@@ -33,8 +33,7 @@
 #include "box.h" /* global recovery */
 #include "tuple.h"
 #include "recovery.h"
-#include "replication.h"
-#include "wal.h"
+#include "journal.h"
 #include <fiber.h>
 #include "xrow.h"
 
@@ -208,20 +207,7 @@ txn_write_to_wal(struct txn *txn)
 	assert(row == req->rows + req->n_rows);
 
 	ev_tstamp start = ev_now(loop()), stop;
-	int64_t res;
-	if (wal == NULL) {
-		/** wal_mode = NONE or initial recovery. */
-		res = vclock_sum(&recovery->vclock);
-	} else {
-		res = wal_write(req);
-		/* All rows in request have the same replica id. */
-		struct xrow_header *last = req->rows[req->n_rows - 1];
-		/* Promote replica set vclock with local writes. */
-		if (last->replica_id == instance_id) {
-			vclock_follow(&replicaset_vclock,
-				      instance_id, last->lsn);
-		}
-	}
+	int64_t res = journal_write(req);
 
 	stop = ev_now(loop());
 	if (stop - start > too_long_threshold)
