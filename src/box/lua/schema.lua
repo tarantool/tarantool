@@ -677,6 +677,7 @@ local function check_space_arg(space, method)
         error(string.format(fmt, method, method))
     end
 end
+box.internal.check_space_arg = check_space_arg -- for net.box
 
 -- Helper function for nicer error messages
 -- in some cases when space object is misused
@@ -695,6 +696,7 @@ local function check_index_arg(index, method)
         error(string.format(fmt, method, method))
     end
 end
+box.internal.check_index_arg = check_index_arg -- for net.box
 
 -- Helper function to check that space have primary key and return it
 local function check_primary_index(space)
@@ -704,6 +706,7 @@ local function check_primary_index(space)
     end
     return pk
 end
+box.internal.check_primary_index = check_primary_index -- for net.box
 
 local function check_iterator_type(opts, key_is_nil)
     local itype

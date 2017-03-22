@@ -18,6 +18,9 @@ local ibuf_decode   = msgpack.ibuf_decode
 
 local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
+local check_index_arg     = box.internal.check_index_arg
+local check_space_arg     = box.internal.check_space_arg
+local check_primary_index = box.internal.check_primary_index
 
 local communicate     = internal.communicate
 local encode_auth     = internal.encode_auth
@@ -836,14 +839,6 @@ function console_methods:eval(line, timeout)
     return res[1] or res
 end
 
--- space, index metatable
-local function space_check(space, method)
-    if type(space) ~= 'table' or space.id == nil then
-        local fmt = 'Use space:%s(...) instead of space.%s(...)'
-        box.error(E_PROC_LUA, string.format(fmt, method, method))
-    end
-end
-
 local function one_tuple(tab)
     if tab[1] ~= nil then return tab[1] end
 end
@@ -852,63 +847,54 @@ space_metatable = function(remote)
     local methods = {}
 
     function methods:insert(tuple)
-        space_check(self, 'insert')
+        check_space_arg(self, 'insert')
         return one_tuple(remote:_request('insert', self.id, tuple))
     end
 
     function methods:replace(tuple)
-        space_check(self, 'replace')
+        check_space_arg(self, 'replace')
         return one_tuple(remote:_request('replace', self.id, tuple))
     end
 
     function methods:select(key, opts)
-        space_check(self, 'select')
-        return remote:_request('select', self.id, 0, key, opts)
+        check_space_arg(self, 'select')
+        return check_primary_index(self):select(key, opts)
     end
 
     function methods:delete(key)
-        space_check(self, 'delete')
-        return one_tuple(remote:_request('delete', self.id, 0, key))
+        check_space_arg(self, 'delete')
+        return check_primary_index(self):delete(key, opts)
     end
 
     function methods:update(key, oplist)
-        space_check(self, 'update')
-        return one_tuple(remote:_request('update', self.id, 0, key, oplist))
+        check_space_arg(self, 'update')
+        return check_primary_index(self):update(key, oplist, opts)
     end
 
     function methods:upsert(key, oplist)
         space_check(self, 'upsert')
-        return one_tuple(remote:_request('upsert', self.id, key, oplist))
+        remote:_request('upsert', self.id, key, oplist)
+        return
     end
 
     function methods:get(key)
-        space_check(self, 'get')
-        local res = remote:_request('select', self.id, 0, key,
-                                    { limit = 2, iterator = 'EQ' })
-        if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
-        if res[1] ~= nil then return res[1] end
+        check_space_arg(self, 'get')
+        return check_primary_index(self):get(key, opts)
     end
 
     return { __index = methods, __metatable = false }
-end
-
-local function index_check(index, method)
-    if type(index) ~= 'table' or index.id == nil then
-        local fmt = 'Use index:%s(...) instead of index.%s(...)'
-        box.error(E_PROC_LUA, string.format(fmt, method, method))
-    end
 end
 
 index_metatable = function(remote)
     local methods = {}
 
     function methods:select(key, opts)
-        index_check(self, 'select')
+        check_index_arg(self, 'select')
         return remote:_request('select', self.space.id, self.id, key, opts)
     end
 
     function methods:get(key)
-        index_check(self, 'get')
+        check_index_arg(self, 'get')
         local res = remote:_request('select', self.space.id, self.id, key,
                                     { limit = 2, iterator = 'EQ' })
         if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
@@ -916,34 +902,34 @@ index_metatable = function(remote)
     end
 
     function methods:min(key)
-        index_check(self, 'min')
+        check_index_arg(self, 'min')
         local res = remote:_request('select', self.space.id, self.id, key,
                                     { limit = 1, iterator = 'GE' })
         return one_tuple(res)
     end
 
     function methods:max(key)
-        index_check(self, 'max')
+        check_index_arg(self, 'max')
         local res = remote:_request('select', self.space.id, self.id, key,
                                     { limit = 1, iterator = 'LE' })
         return one_tuple(res)
     end
 
     function methods:count(key)
-        index_check(self, 'count')
+        check_index_arg(self, 'count')
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
         return remote:_request('call_16', code, { key })[1][1]
     end
 
     function methods:delete(key)
-        index_check(self, 'delete')
+        check_index_arg(self, 'delete')
         local res = remote:_request('delete', self.space.id, self.id, key)
         return one_tuple(res)
     end
 
     function methods:update(key, oplist)
-        index_check(self, 'update')
+        check_index_arg(self, 'update')
         local res = remote:_request('update', self.space.id, self.id,
                                     key, oplist)
         return one_tuple(res)
