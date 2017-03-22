@@ -878,7 +878,7 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist)
         space_check(self, 'upsert')
-        return one_tuple(remote:_request('upsert', self.id, 0, key, oplist))
+        return one_tuple(remote:_request('upsert', self.id, key, oplist))
     end
 
     function methods:get(key)
@@ -945,13 +945,6 @@ index_metatable = function(remote)
     function methods:update(key, oplist)
         index_check(self, 'update')
         local res = remote:_request('update', self.space.id, self.id,
-                                    key, oplist)
-        return one_tuple(res)
-    end
-
-    function methods:upsert(key, oplist)
-        index_check(self, 'upsert')
-        local res = remote:_request('upsert', self.space.id, self.id,
                                     key, oplist)
         return one_tuple(res)
     end
