@@ -1201,7 +1201,7 @@ tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
 
 	uint32_t op_count[2] = {update[0].op_count, update[1].op_count};
 	uint32_t op_no[2] = {0, 0};
-	while (op_no[0] < op_count[0] && op_no[1] < op_count[1]) {
+	while (op_no[0] < op_count[0] || op_no[1] < op_count[1]) {
 		res_count++;
 		struct update_op *op[2] = {update[0].ops + op_no[0],
 					   update[1].ops + op_no[1]};

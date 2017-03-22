@@ -258,3 +258,15 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 space:drop()
+
+-- fix behaviour after https://github.com/tarantool/tarantool/issues/2104
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('test')
+
+s:replace({1, 1})
+box.snapshot()
+s:upsert({1, 1}, {{'+', 1, 1}})
+s:upsert({1, 1}, {{'+', 2, 1}})
+s:select() --both upserts are ignored due to primary key change
+
+s:drop()

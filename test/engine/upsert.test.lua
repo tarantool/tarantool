@@ -428,3 +428,16 @@ s = box.space.s
 'dump ' .. anything_to_string(box.space.s:select{})-- compare with (1) visually!
 
 box.space.s:drop()
+
+--https://github.com/tarantool/tarantool/issues/2104
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('test')
+
+s:replace({1, 1, 1})
+box.snapshot()
+s:upsert({1, 1}, {{'+', 2, 2}})
+s:upsert({1, 1}, {{'+', 3, 4}})
+s:select()
+
+s:drop()
