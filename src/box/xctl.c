@@ -31,15 +31,12 @@
 #include "xctl.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <msgpuck/msgpuck.h>
 #include <small/region.h>
@@ -139,8 +136,8 @@ struct xctl {
 	struct xdir dir;
 	/** The vinyl directory. Used for garbage collection. */
 	char vinyl_dir[PATH_MAX];
-	/** Vector clock from the time of the log creation. */
-	struct vclock vclock;
+	/** Last checkpoint vclock. */
+	struct vclock last_checkpoint;
 	/** Recovery context. */
 	struct xctl_recovery *recovery;
 	/** Latch protecting the log buffer. */
@@ -264,7 +261,7 @@ struct vy_run_recovery_info {
 };
 
 static struct xctl_recovery *
-xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature);
+xctl_recovery_new(int64_t recovery_signature);
 static void
 xctl_recovery_delete(struct xctl_recovery *recovery);
 static struct vy_index_recovery_info *
@@ -652,21 +649,9 @@ xctl_free(void)
 int
 xctl_open(struct xlog *xlog)
 {
-	char *path = xdir_format_filename(&xctl.dir, vclock_sum(&xctl.vclock),
-					  NONE);
-	if (access(path, F_OK) == 0) {
-		/* The log already exists, open it for appending. */
-		return xlog_open(xlog, path);
-	}
-
-	/* Create a new log. */
-	if (xdir_create_xlog(&xctl.dir, xlog, &xctl.vclock) < 0)
-		return -1;
-	if (xlog_rename(xlog) < 0) {
-		unlink(xlog->filename);
-		xlog_close(xlog, false);
-	}
-	return 0;
+	char *path = xdir_format_filename(&xctl.dir,
+			vclock_sum(&xctl.last_checkpoint), NONE);
+	return xlog_open(xlog, path);
 }
 
 int64_t
@@ -777,7 +762,7 @@ xctl_begin_recovery(const struct vclock *vclock)
 		return -1;
 
 	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(vclock, INT64_MAX);
+	recovery = xctl_recovery_new(INT64_MAX);
 	if (recovery == NULL)
 		return -1;
 
@@ -785,7 +770,7 @@ xctl_begin_recovery(const struct vclock *vclock)
 	xctl.next_vy_run_id = recovery->vy_run_id_max + 1;
 
 	xctl.recovery = recovery;
-	vclock_copy(&xctl.vclock, vclock);
+	vclock_copy(&xctl.last_checkpoint, vclock);
 	return 0;
 }
 
@@ -802,6 +787,9 @@ xctl_incomplete_vy_run_gc(const struct xctl_record *record, void *cb_arg)
 	return 0;
 }
 
+static int
+xctl_create(const struct vclock *vclock, struct xctl_recovery *recovery);
+
 int
 xctl_end_recovery(void)
 {
@@ -810,7 +798,6 @@ xctl_end_recovery(void)
 	/* Flush all pending records. */
 	if (xctl_flush() < 0)
 		return -1;
-
 	/*
 	 * Reset xctl.recovery before getting to garbage collection
 	 * so that xctl_commit() called by xctl_vy_run_gc() writes
@@ -819,6 +806,31 @@ xctl_end_recovery(void)
 	 */
 	struct xctl_recovery *recovery = xctl.recovery;
 	xctl.recovery = NULL;
+
+	/*
+	 * On backup we copy files corresponding to the most recent
+	 * checkpoint. Since xctl does not create snapshots of its log
+	 * files, but instead appends records written after checkpoint
+	 * to the most recent log file, the signature of the xctl file
+	 * corresponding to the last checkpoint equals the signature
+	 * of the previous checkpoint. So upon successful recovery
+	 * from a backup we need to rotate the log to keep checkpoint
+	 * and xctl signatures in sync.
+	 */
+	struct vclock xctl_vclock;
+	if (xdir_last_vclock(&xctl.dir, &xctl_vclock) < 0 ||
+	    vclock_compare(&xctl_vclock, &xctl.last_checkpoint) != 0) {
+		struct vclock *vclock = malloc(sizeof(*vclock));
+		if (vclock == NULL) {
+			diag_set(OutOfMemory, sizeof(*vclock),
+				 "malloc", "struct vclock");
+			return -1;
+		}
+		vclock_copy(vclock, &xctl.last_checkpoint);
+		xdir_add_vclock(&xctl.dir, vclock);
+		if (xctl_create(vclock, recovery) < 0)
+			return -1;
+	}
 
 	/*
 	 * If the instance is shut down while a dump/compaction task
@@ -874,20 +886,11 @@ xctl_deleted_vy_run_gc(const struct xctl_record *record, void *cb_arg)
 }
 
 /**
- * This function does the actual log rotation work. It loads the
- * current log file to a xctl_recovery struct, creates a new xlog, and
- * then writes the records returned by xctl_recovery to the new xlog.
+ * Create an xctl file from a recovery context.
  */
-static ssize_t
-xctl_rotate_f(va_list ap)
+static int
+xctl_create(const struct vclock *vclock, struct xctl_recovery *recovery)
 {
-	const struct vclock *vclock = va_arg(ap, const struct vclock *);
-
-	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(&xctl.vclock, INT64_MAX);
-	if (recovery == NULL)
-		goto err_recovery;
-
 	struct xlog xlog;
 	if (xdir_create_xlog(&xctl.dir, &xlog, vclock) < 0)
 		goto err_create_xlog;
@@ -903,7 +906,6 @@ xctl_rotate_f(va_list ap)
 		goto err_write_xlog;
 
 	xlog_close(&xlog, false);
-	xctl_recovery_delete(recovery);
 	return 0;
 
 err_write_xlog:
@@ -912,9 +914,27 @@ err_write_xlog:
 		say_syserror("failed to delete file '%s'", xlog.filename);
 	xlog_close(&xlog, false);
 err_create_xlog:
-	xctl_recovery_delete(recovery);
-err_recovery:
 	return -1;
+}
+
+/**
+ * This function does the actual log rotation work. It loads the
+ * current log file to a xctl_recovery struct, creates a new xlog, and
+ * then writes the records returned by xctl_recovery to the new xlog.
+ */
+static ssize_t
+xctl_rotate_f(va_list ap)
+{
+	const struct vclock *vclock = va_arg(ap, const struct vclock *);
+
+	struct xctl_recovery *recovery;
+	recovery = xctl_recovery_new(INT64_MAX);
+	if (recovery == NULL)
+		return -1;
+
+	int rc = xctl_create(vclock, recovery);
+	xctl_recovery_delete(recovery);
+	return rc;
 }
 
 int
@@ -927,8 +947,8 @@ xctl_rotate(const struct vclock *vclock)
 	 * in which case old and new signatures coincide and there's
 	 * nothing we need to do.
 	 */
-	assert(vclock_compare(vclock, &xctl.vclock) >= 0);
-	if (vclock_compare(vclock, &xctl.vclock) == 0)
+	assert(vclock_compare(vclock, &xctl.last_checkpoint) >= 0);
+	if (vclock_compare(vclock, &xctl.last_checkpoint) == 0)
 		return 0;
 
 	struct vclock *new_vclock = malloc(sizeof(*new_vclock));
@@ -969,7 +989,7 @@ xctl_rotate(const struct vclock *vclock)
 	 * automatically on the first write (see wal_write_xctl()).
 	 */
 	wal_rotate_xctl();
-	vclock_copy(&xctl.vclock, vclock);
+	vclock_copy(&xctl.last_checkpoint, vclock);
 
 	/* Add the new vclock to the xdir so that we can track it. */
 	xdir_add_vclock(&xctl.dir, new_vclock);
@@ -990,12 +1010,11 @@ fail:
 static ssize_t
 xctl_recovery_new_f(va_list ap)
 {
-	const struct vclock *vclock = va_arg(ap, const struct vclock *);
 	int64_t recovery_signature = va_arg(ap, int64_t);
 	struct xctl_recovery **p_recovery = va_arg(ap, struct xctl_recovery **);
 
 	struct xctl_recovery *recovery;
-	recovery = xctl_recovery_new(vclock, recovery_signature);
+	recovery = xctl_recovery_new(recovery_signature);
 	if (recovery == NULL)
 		return -1;
 	*p_recovery = recovery;
@@ -1019,8 +1038,7 @@ xctl_collect_garbage(int64_t signature)
 	latch_lock(&xctl.latch);
 	/* Load the log from coeio so as not to stall tx thread. */
 	struct xctl_recovery *recovery;
-	int rc = coio_call(xctl_recovery_new_f, &xctl.vclock,
-			   signature, &recovery);
+	int rc = coio_call(xctl_recovery_new_f, signature, &recovery);
 	latch_unlock(&xctl.latch);
 
 	if (rc == 0) {
@@ -1067,8 +1085,8 @@ xctl_relay(xctl_recovery_cb cb, void *cb_arg)
 	 */
 	latch_lock(&xctl.latch);
 	struct xctl_recovery *recovery;
-	int rc = coio_call(xctl_recovery_new_f, &xctl.vclock,
-			   vclock_sum(&xctl.vclock), &recovery);
+	int rc = coio_call(xctl_recovery_new_f,
+			   vclock_sum(&xctl.last_checkpoint), &recovery);
 	latch_unlock(&xctl.latch);
 	if (rc != 0)
 		return -1;
@@ -1163,7 +1181,7 @@ xctl_write(const struct xctl_record *record)
 	struct xctl_record *tx_record = &xctl.tx_buf[xctl.tx_end++];
 	*tx_record = *record;
 	if (tx_record->signature < 0)
-		tx_record->signature = vclock_sum(&xctl.vclock);
+		tx_record->signature = vclock_sum(&xctl.last_checkpoint);
 }
 
 /** Mark a vinyl run as deleted. */
@@ -1613,13 +1631,12 @@ xctl_recovery_process_record(struct xctl_recovery *recovery,
 
 /**
  * Load records having signatures < @recovery_signature from
- * the metadata log with vclock @vclock and return the recovery
- * context.
+ * the metadata log and return the recovery context.
  *
  * Returns NULL on failure.
  */
 static struct xctl_recovery *
-xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature)
+xctl_recovery_new(int64_t recovery_signature)
 {
 	struct xctl_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
@@ -1644,14 +1661,14 @@ xctl_recovery_new(const struct vclock *vclock, int64_t recovery_signature)
 		goto fail_free;
 	}
 
-	char *path = xdir_format_filename(&xctl.dir, vclock_sum(vclock), NONE);
-	if (access(path, F_OK) < 0 && errno == ENOENT) {
+	struct vclock vclock;
+	if (xdir_last_vclock(&xctl.dir, &vclock) < 0) {
 		/* No log file, nothing to do. */
 		goto out;
 	}
 
 	struct xlog_cursor cursor;
-	if (xdir_open_cursor(&xctl.dir, vclock_sum(vclock), &cursor) < 0)
+	if (xdir_open_cursor(&xctl.dir, vclock_sum(&vclock), &cursor) < 0)
 		goto fail_free;
 
 	int rc;
