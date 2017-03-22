@@ -199,6 +199,10 @@ int tarantoolSqlite3Last(BtCursor *pCur, int *pRes)
 int tarantoolSqlite3Next(BtCursor *pCur, int *pRes)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
+	if( pCur->eState==CURSOR_INVALID ){
+	  *pRes = 1;
+	  return SQLITE_OK;
+	}
 	assert(pCur->pTaCursor);
 	assert(iterator_direction(
 		((struct ta_cursor *)pCur->pTaCursor)->type
@@ -209,6 +213,10 @@ int tarantoolSqlite3Next(BtCursor *pCur, int *pRes)
 int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
+	if( pCur->eState==CURSOR_INVALID ){
+	  *pRes = 1;
+	  return SQLITE_OK;
+	}
 	assert(pCur->pTaCursor);
 	assert(iterator_direction(
 		((struct ta_cursor *)pCur->pTaCursor)->type
