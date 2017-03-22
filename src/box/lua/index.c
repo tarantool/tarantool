@@ -286,11 +286,7 @@ lbox_iterator_next(lua_State *L)
 static int
 lbox_truncate(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1 || lua_type(L, -1) != LUA_TTABLE)
-		return luaL_error(L, "usage: index:truncate()");
-	lua_getfield(L, -1, "id"); /* stack: id */
-	uint32_t space_id = lua_tointeger(L, -1); /* get id */
-	lua_pop(L, 1);
+	uint32_t space_id = luaL_checkinteger(L, 1);
 	if (box_truncate(space_id) != 0)
 		return luaT_error(L);
 	return 0;

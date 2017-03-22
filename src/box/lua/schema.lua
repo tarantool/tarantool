@@ -670,17 +670,39 @@ end
 local port = ffi.new('struct port')
 local port_entry_t = ffi.typeof('struct port_entry')
 
+-- Helper function to check space:method() usage
+local function check_space_arg(space, method)
+    if type(space) ~= 'table' or space.id == nil then
+        local fmt = 'Use space:%s(...) instead of space.%s(...)'
+        error(string.format(fmt, method, method))
+    end
+end
+
 -- Helper function for nicer error messages
 -- in some cases when space object is misused
 -- Takes time so should not be used for DML.
-local function space_object_check(space)
-        if type(space) ~= 'table' then
-            space = { name = space }
-        end
-        local s = box.space[space.id]
-        if s == nil then
-            box.error(box.error.NO_SUCH_SPACE, space.name)
-        end
+local function check_space_exists(space)
+    local s = box.space[space.id]
+    if s == nil then
+        box.error(box.error.NO_SUCH_SPACE, space.name)
+    end
+end
+
+-- Helper function to check index:method() usage
+local function check_index_arg(index, method)
+    if type(index) ~= 'table' or index.id == nil then
+        local fmt = 'Use index:%s(...) instead of index.%s(...)'
+        error(string.format(fmt, method, method))
+    end
+end
+
+-- Helper function to check that space have primary key and return it
+local function check_primary_index(space)
+    local pk = space.index[0]
+    if pk == nil then
+        box.error(box.error.NO_SUCH_INDEX, 0, space.name)
+    end
+    return pk
 end
 
 local function check_iterator_type(opts, key_is_nil)
@@ -714,6 +736,7 @@ function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
     index_mt.len = function(index)
+        check_index_arg(index, 'len')
         local ret = builtin.box_index_len(index.space_id, index.id)
         if ret == -1 then
             box.error()
@@ -722,6 +745,7 @@ function box.schema.space.bless(space)
     end
     -- index.bsize
     index_mt.bsize = function(index)
+        check_index_arg(index, 'bsize')
         local ret = builtin.box_index_bsize(index.space_id, index.id)
         if ret == -1 then
             box.error()
@@ -734,6 +758,7 @@ function box.schema.space.bless(space)
     index_mt.__index = index_mt
     -- min and max
     index_mt.min_ffi = function(index, key)
+        check_index_arg(index, 'min')
         local pkey, pkey_end = tuple_encode(key)
         if builtin.box_index_min(index.space_id, index.id,
                                  pkey, pkey_end, ptuple) ~= 0 then
@@ -745,10 +770,12 @@ function box.schema.space.bless(space)
         end
     end
     index_mt.min_luac = function(index, key)
+        check_index_arg(index, 'min')
         key = keify(key)
         return internal.min(index.space_id, index.id, key);
     end
     index_mt.max_ffi = function(index, key)
+        check_index_arg(index, 'max')
         local pkey, pkey_end = tuple_encode(key)
         if builtin.box_index_max(index.space_id, index.id,
                                  pkey, pkey_end, ptuple) ~= 0 then
@@ -760,10 +787,12 @@ function box.schema.space.bless(space)
         end
     end
     index_mt.max_luac = function(index, key)
+        check_index_arg(index, 'max')
         key = keify(key)
         return internal.max(index.space_id, index.id, key);
     end
     index_mt.random_ffi = function(index, rnd)
+        check_index_arg(index, 'random')
         rnd = rnd or math.random()
         if builtin.box_index_random(index.space_id, index.id, rnd,
                                     ptuple) ~= 0 then
@@ -775,11 +804,13 @@ function box.schema.space.bless(space)
         end
     end
     index_mt.random_luac = function(index, rnd)
+        check_index_arg(index, 'random')
         rnd = rnd or math.random()
         return internal.random(index.space_id, index.id, rnd);
     end
     -- iteration
     index_mt.pairs_ffi = function(index, key, opts)
+        check_index_arg(index, 'pairs')
         local pkey, pkey_end = tuple_encode(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
@@ -794,6 +825,7 @@ function box.schema.space.bless(space)
             ffi.gc(cdata, builtin.box_iterator_free))
     end
     index_mt.pairs_luac = function(index, key, opts)
+        check_index_arg(index, 'pairs')
         key = keify(key)
         local itype = check_iterator_type(opts, #key == 0);
         local keymp = msgpack.encode(key)
@@ -805,6 +837,7 @@ function box.schema.space.bless(space)
 
     -- index subtree size
     index_mt.count_ffi = function(index, key, opts)
+        check_index_arg(index, 'count')
         local pkey, pkey_end = tuple_encode(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
         local count = builtin.box_index_count(index.space_id, index.id,
@@ -815,18 +848,14 @@ function box.schema.space.bless(space)
         return tonumber(count)
     end
     index_mt.count_luac = function(index, key, opts)
+        check_index_arg(index, 'count')
         key = keify(key)
         local itype = check_iterator_type(opts, #key == 0);
         return internal.count(index.space_id, index.id, itype, key);
     end
 
-    local function check_index(space, index_id)
-        if space.index[index_id] == nil then
-            box.error(box.error.NO_SUCH_INDEX, index_id, space.name)
-        end
-    end
-
     index_mt.get_ffi = function(index, key)
+        check_index_arg(index, 'get')
         local key, key_end = tuple_encode(key)
         if builtin.box_index_get(index.space_id, index.id,
                                  key, key_end, ptuple) ~= 0 then
@@ -838,6 +867,7 @@ function box.schema.space.bless(space)
         end
     end
     index_mt.get_luac = function(index, key)
+        check_index_arg(index, 'get')
         key = keify(key)
         return internal.get(index.space_id, index.id, key)
     end
@@ -858,6 +888,7 @@ function box.schema.space.bless(space)
     end
 
     index_mt.select_ffi = function(index, key, opts)
+        check_index_arg(index, 'select')
         local key, key_end = tuple_encode(key)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
@@ -879,6 +910,7 @@ function box.schema.space.bless(space)
     end
 
     index_mt.select_luac = function(index, key, opts)
+        check_index_arg(index, 'select')
         local key = keify(key)
         local iterator, offset, limit = check_select_opts(opts, #key == 0)
         return internal.select(index.space_id, index.id, iterator,
@@ -886,18 +918,23 @@ function box.schema.space.bless(space)
     end
 
     index_mt.update = function(index, key, ops)
+        check_index_arg(index, 'update')
         return internal.update(index.space_id, index.id, keify(key), ops);
     end
     index_mt.delete = function(index, key)
+        check_index_arg(index, 'delete')
         return internal.delete(index.space_id, index.id, keify(key));
     end
     index_mt.drop = function(index)
+        check_index_arg(index, 'drop')
         return box.schema.index.drop(index.space_id, index.id)
     end
     index_mt.rename = function(index, name)
+        check_index_arg(index, 'rename')
         return box.schema.index.rename(index.space_id, index.id, name)
     end
-    index_mt.alter= function(index, options)
+    index_mt.alter = function(index, options)
+        check_index_arg(index, 'alter')
         if index.id == nil or index.space_id == nil then
             box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
         end
@@ -921,18 +958,23 @@ function box.schema.space.bless(space)
     --
     local space_mt = {}
     space_mt.len = function(space)
-        if space.index[0] == nil then
+        check_space_arg(space, 'len')
+        local pk = space.index[0]
+        if pk == nil then
             return 0 -- empty space without indexes, return 0
         end
         return space.index[0]:len()
     end
     space_mt.count = function(space, key, opts)
-        if space.index[0] == nil then
+        check_space_arg(space, 'count')
+        local pk = space.index[0]
+        if pk == nil then
             return 0 -- empty space without indexes, return 0
         end
-        return space.index[0]:count(key, opts)
+        return pk:count(key, opts)
     end
     space_mt.bsize = function(space)
+        check_space_arg(space, 'bsize')
         local s = builtin.space_by_id(space.id)
         if s == nil then
             box.error(box.error.NO_SUCH_SPACE, space.name)
@@ -942,42 +984,45 @@ function box.schema.space.bless(space)
     space_mt.__newindex = index_mt.__newindex
 
     space_mt.get = function(space, key)
-        check_index(space, 0)
-        return space.index[0]:get(key)
+        check_space_arg(space, 'get')
+        return check_primary_index(space):get(key)
     end
     space_mt.select = function(space, key, opts)
-        check_index(space, 0)
-        return space.index[0]:select(key, opts)
+        check_space_arg(space, 'select')
+        return check_primary_index(space):select(key, opts)
     end
     space_mt.insert = function(space, tuple)
+        check_space_arg(space, 'insert')
         return internal.insert(space.id, tuple);
     end
     space_mt.replace = function(space, tuple)
+        check_space_arg(space, 'replace')
         return internal.replace(space.id, tuple);
     end
     space_mt.put = space_mt.replace; -- put is an alias for replace
     space_mt.update = function(space, key, ops)
-        check_index(space, 0)
-        return space.index[0]:update(key, ops)
+        check_space_arg(space, 'update')
+        return check_primary_index(space):update(key, ops)
     end
     space_mt.upsert = function(space, tuple_key, ops, deprecated)
+        check_space_arg(space, 'upsert')
         if deprecated ~= nil then
             local msg = "Error: extra argument in upsert call: "
             msg = msg .. tostring(deprecated)
             msg = msg .. ". Usage :upsert(tuple, operations)"
             box.error(box.error.PROC_LUA, msg)
         end
-        check_index(space, 0)
         return internal.upsert(space.id, tuple_key, ops);
     end
     space_mt.delete = function(space, key)
-        check_index(space, 0)
-        return space.index[0]:delete(key)
+        check_space_arg(space, 'delete')
+        return check_primary_index(space):delete(key)
     end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the
 -- primary key and returns it back to the user
     space_mt.auto_increment = function(space, tuple)
+        check_space_arg(space, 'auto_increment')
         local max_tuple = space.index[0]:max()
         local max = 0
         if max_tuple ~= nil then
@@ -988,31 +1033,41 @@ function box.schema.space.bless(space)
     end
 
     space_mt.pairs = function(space, key, opts)
-        if space.index[0] == nil then
+        check_space_arg(space, 'pairs')
+        local pk = space.index[0]
+        if pk == nil then
             -- empty space without indexes, return empty iterator
             return fun.iter({})
         end
-        check_index(space, 0)
-        return space.index[0]:pairs(key, opts)
+        return pk:pairs(key, opts)
     end
     space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
-    space_mt.truncate = internal.truncate
+    space_mt.truncate = function(space)
+        check_space_arg(space, 'truncate')
+        return internal.truncate(space.id)
+    end
     space_mt.format = function(space, format)
+        check_space_arg(space, 'format')
         return box.schema.space.format(space.id, format)
     end
     space_mt.drop = function(space)
+        check_space_arg(space, 'drop')
+        check_space_exists(space)
         return box.schema.space.drop(space.id, space.name)
     end
     space_mt.rename = function(space, name)
-        space_object_check(space)
+        check_space_arg(space, 'rename')
+        check_space_exists(space)
         return box.schema.space.rename(space.id, name)
     end
     space_mt.create_index = function(space, name, options)
-        space_object_check(space)
+        check_space_arg(space, 'create_index')
+        check_space_exists(space)
         return box.schema.index.create(space.id, name, options)
     end
     space_mt.run_triggers = function(space, yesno)
+        check_space_arg(space, 'run_triggers')
         local s = builtin.space_by_id(space.id)
         if s == nil then
             box.error(box.error.NO_SUCH_SPACE, space.name)

@@ -284,5 +284,53 @@ index_random_test(space, 'secondary')
 space:drop()
 space = nil
 
+-------------------------------------------------------------------------------
+-- Invalid arguments
+-------------------------------------------------------------------------------
+
+space = box.schema.space.create('tweedledum')
+pk = space:create_index('primary')
+
+space.len()
+space.count({}, {iterator = 'EQ'})
+space.bsize()
+space.get({1})
+space.select({}, {iterator = 'GE'})
+space.insert({1, 2, 3})
+space.replace({1, 2, 3})
+space.put({1, 2, 3})
+space.update({1}, {})
+space.upsert({1, 2, 3}, {})
+space.delete({1})
+space.auto_increment({'hello'})
+space.pairs({}, {iterator = 'EQ'})
+space.truncate()
+space.format({})
+space.drop()
+space.rename()
+space.create_index('secondary')
+space.run_triggers(false)
+
+pk.len()
+pk.bsize()
+pk.min()
+pk.min({})
+pk.max()
+pk.max({})
+pk.random(42)
+pk.pairs({}, {iterator = 'EQ'})
+pk.count({}, {iterator = 'EQ'})
+pk.get({1})
+pk.select({}, {iterator = 'GE'})
+pk.update({1}, {})
+pk.delete({1})
+pk.drop()
+pk.rename("newname")
+pk.alter({})
+
+space:drop()
+pk = nil
+space = nil
+
 test_run:cmd("clear filter")
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

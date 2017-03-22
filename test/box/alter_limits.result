@@ -4,6 +4,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
 -- ----------------------------------------------------------------
 -- LIMITS
 -- ----------------------------------------------------------------
@@ -223,6 +227,19 @@ s:delete{0}
 -- cleanup
 s:drop()
 ---
+...
+-- check DDL on invalid space object
+s:create_index('primary')
+---
+- error: Space 'tweedledee' does not exist
+...
+s:rename('xxx')
+---
+- error: Space 'tweedledee' does not exist
+...
+s:drop()
+---
+- error: Space 'tweedledee' does not exist
 ...
 -- create a space with reserved id (ok, but warns in the log)
 s = box.schema.space.create('test', { id = 256 })
@@ -651,7 +668,7 @@ index = s:create_index('primary', { type = 'hash' })
 -- correct error on misuse of alter
 s.index.primary.alter({unique=false})
 ---
-- error: 'Usage: index:alter{opts}'
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:alter(...) instead of index.alter(...)'
 ...
 s.index.primary:alter({unique=false})
 ---
@@ -1249,3 +1266,8 @@ r_disabled:drop()
 -- @todo features
 --------
 -- - ffi function to enable/disable space
+--
+test_run:cmd("clear filter")
+---
+- true
+...

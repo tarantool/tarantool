@@ -1,5 +1,7 @@
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+
 -- ----------------------------------------------------------------
 -- LIMITS
 -- ----------------------------------------------------------------
@@ -77,6 +79,10 @@ s.name
 s:insert{0}
 s:delete{0}
 -- cleanup
+s:drop()
+-- check DDL on invalid space object
+s:create_index('primary')
+s:rename('xxx')
 s:drop()
 -- create a space with reserved id (ok, but warns in the log)
 s = box.schema.space.create('test', { id = 256 })
@@ -442,3 +448,6 @@ r_disabled:drop()
 -- @todo features
 --------
 -- - ffi function to enable/disable space
+--
+
+test_run:cmd("clear filter")
