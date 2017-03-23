@@ -554,6 +554,9 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		itr->search_started = false;
 		itr->curr_stmt = NULL;
 		vy_mem_iterator_start(itr);
+		if (itr->curr_stmt != NULL &&
+		    vy_mem_iterator_copy_to(itr, ret) < 0)
+			return -1;
 		return was_stmt != itr->curr_stmt;
 	}
 

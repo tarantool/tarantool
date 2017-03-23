@@ -691,6 +691,10 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct key_def *def = itr->cache->key_def;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	int dir = iterator_direction(itr->iterator_type);
+	if (itr->curr_stmt != NULL) {
+		bool step_was_made;
+		vy_cache_iterator_restore_pos(itr, &step_was_made);
+	}
 
 	if (itr->search_started) {
 		if (itr->curr_stmt == NULL)
@@ -700,8 +704,8 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (last_stmt == NULL && itr->curr_stmt != NULL) {
 			struct vy_cache_entry **entry =
 				vy_cache_tree_iterator_get_elem(tree, &pos);
-			if (entry != NULL)
-				vy_cache_iterator_is_stop(itr, *entry, stop);
+			assert(entry != NULL);
+			vy_cache_iterator_is_stop(itr, *entry, stop);
 			*ret = itr->curr_stmt;
 			return 0;
 		}
@@ -717,7 +721,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			struct vy_cache_entry **entry =
 				vy_cache_tree_iterator_get_elem(tree, &pos);
 			struct tuple *t = (*entry)->stmt;
-			int cmp = vy_stmt_compare(t, last_stmt, def);
+			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
 			if (cmp < 0)
 				break;
 			if (vy_stmt_lsn(t) <= *itr->vlsn) {
@@ -730,6 +734,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 				vy_cache_iterator_is_stop(itr, *entry, stop);
 			}
 		}
+		*ret = itr->curr_stmt;
 		return rc;
 	}
 
