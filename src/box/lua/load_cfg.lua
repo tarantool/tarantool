@@ -114,6 +114,13 @@ local function purge_login_frourilib(uri)
     if uri == nil then
         return nil
     end
+    if type(uri) == 'table' then
+    local new_table = {}
+        for k, v in pairs(uri) do
+            new_table[k] = urilib.format(urilib.parse(v), false)
+        end
+        return new_table
+    end
     return urilib.format(urilib.parse(uri), false)
 end
 
@@ -173,6 +180,9 @@ local translate_cfg = {
 
 -- Upgrade old config
 local function upgrade_cfg(cfg, translate_cfg)
+    if cfg == nil then
+        return {}
+    end
     local result_cfg = {}
     for k, v in pairs(cfg) do
         local translation = translate_cfg[k]

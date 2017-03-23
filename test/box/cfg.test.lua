@@ -15,7 +15,9 @@ box.cfg{listen = {}}
 box.cfg{wal_dir = 0}
 box.cfg{coredump = 'true'}
 
-
+-- check comment to issue #2191 - bad argument #2 to ''uri_parse''
+box.cfg{replication = {}}
+box.cfg{replication = {}}
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------

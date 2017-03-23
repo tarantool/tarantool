@@ -84,8 +84,6 @@ cfg_filter(box.cfg)
 -- must be read-only
 box.cfg()
 ---
-- error: 'builtin/box/load_cfg.lua:<line>: bad argument #1 to ''pairs'' (table expected,
-    got nil)'
 ...
 cfg_filter(box.cfg)
 ---
@@ -173,6 +171,13 @@ box.cfg{wal_dir = 0}
 box.cfg{coredump = 'true'}
 ---
 - error: 'Incorrect value for option ''coredump'': should be of type boolean'
+...
+-- check comment to issue #2191 - bad argument #2 to ''uri_parse''
+box.cfg{replication = {}}
+---
+...
+box.cfg{replication = {}}
+---
 ...
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
