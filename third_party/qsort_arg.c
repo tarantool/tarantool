@@ -186,11 +186,11 @@ loop:SWAPINIT(a, es);
 	pn = (char *) a + n * es;
 	r = min(pa - (char *) a, pb - pa);
 	vecswap(a, pb - r, r);
-	r = min(pd - pc, pn - pd - es);
+	r = min(pd - pc, pn - pd - (intptr_t)es);
 	vecswap(pb, pn - r, r);
-	if ((r = pb - pa) > es)
+	if ((r = pb - pa) > (intptr_t)es)
 		qsort_arg(a, r / es, es, cmp, arg);
-	if ((r = pd - pc) > es)
+	if ((r = pd - pc) > (intptr_t)es)
 	{
 		/* Iterate rather than recurse to save stack space */
 		a = pn - r;

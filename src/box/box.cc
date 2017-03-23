@@ -1004,7 +1004,7 @@ box_process_call(struct request *request, struct obuf *out)
 	 */
 
 	struct credentials orig_credentials;
-	struct session *session;
+	struct session *session = NULL;
 	if (func && func->def.setuid) {
 		/* Save original credentials */
 		session = current_session();

@@ -1,5 +1,5 @@
 macro(zstd_build)
-    add_library(zstd STATIC
+    set(zstd_src
         third_party/zstd/lib/common/zstd_common.c
         third_party/zstd/lib/common/entropy_common.c
         third_party/zstd/lib/common/xxhash.c
@@ -9,7 +9,14 @@ macro(zstd_build)
         third_party/zstd/lib/compress/zstd_compress.c
         third_party/zstd/lib/compress/huf_compress.c
         third_party/zstd/lib/compress/fse_compress.c
-)
+    )
+
+    if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
+        set_source_files_properties(${zstd_src}
+            PROPERTIES COMPILE_FLAGS -Wno-implicit-fallthrough)
+    endif()
+
+    add_library(zstd STATIC ${zstd_src})
     set(ZSTD_LIBRARIES zstd)
     set(ZSTD_INCLUDE_DIRS
             ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zstd/lib

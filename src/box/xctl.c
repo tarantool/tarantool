@@ -1362,7 +1362,7 @@ xctl_recovery_create_vy_run(struct xctl_recovery *recovery, int64_t vy_run_id)
 	}
 	struct mh_i64ptr_t *h = recovery->vy_run_hash;
 	struct mh_i64ptr_node_t node = { vy_run_id, run };
-	struct mh_i64ptr_node_t *old_node;
+	struct mh_i64ptr_node_t *old_node = NULL;
 	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
 		free(run);

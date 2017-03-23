@@ -298,6 +298,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 
 	/* Copy statement data excluding UPSERT operations */
 	struct tuple_format *format = tuple_format_by_id(upsert->format_id);
+	(void)format;
 	/*
 	 * UPSERT must have the n_upserts field in the extra
 	 * memory.

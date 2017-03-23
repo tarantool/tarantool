@@ -5,10 +5,8 @@ macro(libyaml_build)
     set(LIBYAML_LIBRARIES yaml)
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/libyaml)
-    if (CC_HAS_WNO_PARENTHESES_EQUALITY)
-        set(yaml_compile_flags "${yaml_compile_flags} -Wno-parentheses-equality")
-    endif()
-    set_target_properties(yaml PROPERTIES COMPILE_FLAGS "${yaml_compile_flags}")
+    # See comments in BuildLibEV.cmake
+    set_target_properties(yaml PROPERTIES COMPILE_FLAGS "-w")
 
     find_package_message(LIBYAML
         "Using bundled libyaml"

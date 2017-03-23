@@ -43,7 +43,12 @@
 #ifdef __cplusplus
 # define EV_CPP(x) x
 # if __cplusplus >= 201103L
-#  define EV_THROW noexcept
+/*
+ * Avoid noisy "mangled name of 'ev_set_syserr_cb' will change in C++17
+ * due to non-throwing" warnings.
+ * #  define EV_THROW noexcept
+ */
+#  define EV_THROW
 # else
 #  define EV_THROW throw ()
 # endif

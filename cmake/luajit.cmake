@@ -155,6 +155,10 @@ macro(luajit_build)
     if(CC_HAS_WNO_VARARGS)
         set(luajit_cflags ${luajit_cflags} -Wno-varargs)
     endif()
+    if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
+        set(luajit_cflags ${luajit_cflags} -Wno-implicit-fallthrough)
+    endif()
+
     # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)

@@ -11,18 +11,6 @@ macro(libev_build)
 # place:
     set(ev_compile_flags "${ev_compile_flags} -w")
 
-#    if (CC_HAS_WNO_UNUSED_RESULT)
-#        set(ev_compile_flags "${ev_compile_flags} -Wno-unused-value")
-#    endif()
-#    if (CC_HAS_WNO_COMMENT)
-#        set(ev_compile_flags "${ev_compile_flags} -Wno-comment")
-#    endif()
-#    if (CC_HAS_FNO_STRICT_ALIASING)
-#        set(ev_compile_flags "${ev_compile_flags} -fno-strict-aliasing")
-#    endif()
-#    if (CC_HAS_WNO_PARENTHESES)
-#        set(ev_compile_flags "${ev_compile_flags} -Wno-parentheses")
-#    endif()
     set(ev_compile_flags "${ev_compile_flags} -DENABLE_BUNDLED_LIBEV=1")
 
     if (TARGET_OS_LINUX)

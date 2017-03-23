@@ -7060,7 +7060,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	const struct tuple *delete = NULL, *replace = NULL;
 	enum vy_status status = e->status;
 	int64_t checkpoint_lsn = e->scheduler->checkpoint_lsn;
-	uint32_t current_space_id = 0;
+	MAYBE_UNUSED uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/*
 		 * The tx log contains both reads and writes, but

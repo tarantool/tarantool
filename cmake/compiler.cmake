@@ -87,16 +87,8 @@ endif()
 # GCC can also be built on top of llvm runtime (on mac).
 #
 
-check_c_compiler_flag("-Wno-unused-const-variable" CC_HAS_WNO_UNUSED_CONST_VARIABLE)
-check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
-check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
-check_c_compiler_flag("-Wno-unused-function" CC_HAS_WNO_UNUSED_FUNCTION)
-check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
-check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
 check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
 check_c_compiler_flag("-Wno-parentheses-equality" CC_HAS_WNO_PARENTHESES_EQUALITY)
-check_c_compiler_flag("-Wno-undefined-inline" CC_HAS_WNO_UNDEFINED_INLINE)
-check_c_compiler_flag("-Wno-dangling-else" CC_HAS_WNO_DANGLING_ELSE)
 check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
 check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
 check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
