@@ -138,6 +138,8 @@ struct xctl {
 	char vinyl_dir[PATH_MAX];
 	/** Last checkpoint vclock. */
 	struct vclock last_checkpoint;
+	/** Next to last checkpoint vclock. */
+	struct vclock prev_checkpoint;
 	/** Recovery context. */
 	struct xctl_recovery *recovery;
 	/** Latch protecting the log buffer. */
@@ -817,10 +819,10 @@ xctl_end_recovery(void)
 	 * from a backup we need to rotate the log to keep checkpoint
 	 * and xctl signatures in sync.
 	 */
-	struct vclock xctl_vclock;
-	if (xdir_last_vclock(&xctl.dir, &xctl_vclock) < 0 ||
-	    vclock_compare(&xctl_vclock, &xctl.last_checkpoint) != 0) {
-		struct vclock *vclock = malloc(sizeof(*vclock));
+	struct vclock *vclock = vclockset_last(&xctl.dir.index);
+	if (vclock == NULL ||
+	    vclock_compare(vclock, &xctl.last_checkpoint) != 0) {
+		vclock = malloc(sizeof(*vclock));
 		if (vclock == NULL) {
 			diag_set(OutOfMemory, sizeof(*vclock),
 				 "malloc", "struct vclock");
@@ -831,6 +833,10 @@ xctl_end_recovery(void)
 		if (xctl_create(vclock, recovery) < 0)
 			return -1;
 	}
+
+	vclock = vclockset_prev(&xctl.dir.index, vclock);
+	if (vclock != NULL)
+		vclock_copy(&xctl.prev_checkpoint, vclock);
 
 	/*
 	 * If the instance is shut down while a dump/compaction task
@@ -989,6 +995,7 @@ xctl_rotate(const struct vclock *vclock)
 	 * automatically on the first write (see wal_write_xctl()).
 	 */
 	wal_rotate_xctl();
+	vclock_copy(&xctl.prev_checkpoint, &xctl.last_checkpoint);
 	vclock_copy(&xctl.last_checkpoint, vclock);
 
 	/* Add the new vclock to the xdir so that we can track it. */
@@ -1051,7 +1058,12 @@ xctl_collect_garbage(int64_t signature)
 			 diag_last_error(diag_get())->errmsg);
 	}
 
-	/* Delete old log files. */
+	/*
+	 * Delete old log files.
+	 * Always keep the previous file, because
+	 * it is still needed for backups.
+	 */
+	signature = MIN(signature, vclock_sum(&xctl.prev_checkpoint));
 	coio_call(xctl_collect_garbage_f, signature);
 
 	say_debug("%s: done", __func__);
