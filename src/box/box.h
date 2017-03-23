@@ -104,6 +104,23 @@ int box_snapshot(void);
  */
 void box_gc(int64_t lsn);
 
+typedef int (*box_backup_cb)(const char *path, void *arg);
+
+/**
+ * Start a backup. This function calls @cb for each file that
+ * needs to be backed up to recover from the last checkpoint.
+ * The caller is supposed to call box_backup_stop() after he's
+ * done copying the files.
+ */
+int
+box_backup_start(box_backup_cb cb, void *cb_arg);
+
+/**
+ * Finish backup started with box_backup_start().
+ */
+void
+box_backup_stop(void);
+
 /**
  * Spit out some basic module status (master/slave, etc.
  */

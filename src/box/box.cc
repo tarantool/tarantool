@@ -81,6 +81,7 @@ static void title(const char *new_status)
 struct recovery *recovery;
 
 bool box_snapshot_is_in_progress = false;
+bool box_backup_is_in_progress = false;
 /**
  * The instance is in read-write mode: the local checkpoint
  * and all write ahead logs are processed. For a replica,
@@ -1751,6 +1752,25 @@ box_gc(int64_t lsn)
 	xctl_collect_garbage(lsn);
 	wal_collect_garbage(lsn);
 	engine_collect_garbage(lsn);
+}
+
+int
+box_backup_start(box_backup_cb cb, void *cb_arg)
+{
+	if (box_backup_is_in_progress) {
+		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
+		return -1;
+	}
+	int rc = xctl_backup(cb, cb_arg);
+	if (rc == 0)
+		box_backup_is_in_progress = true;
+	return rc;
+}
+
+void
+box_backup_stop(void)
+{
+	box_backup_is_in_progress = false;
 }
 
 const char *

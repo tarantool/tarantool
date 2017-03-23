@@ -134,7 +134,9 @@ enum { XCTL_TX_BUF_SIZE = 64 };
 struct xctl {
 	/** The directory where log files are stored. */
 	struct xdir dir;
-	/** The vinyl directory. Used for garbage collection. */
+	/** The memtx direcotry. */
+	char memtx_dir[PATH_MAX];
+	/** The vinyl directory. */
 	char vinyl_dir[PATH_MAX];
 	/** Last checkpoint vclock. */
 	struct vclock last_checkpoint;
@@ -583,6 +585,8 @@ void
 xctl_init(void)
 {
 	xdir_create(&xctl.dir, cfg_gets("wal_dir"), XCTL, &INSTANCE_UUID);
+	snprintf(xctl.memtx_dir, sizeof(xctl.memtx_dir), "%s",
+		 cfg_gets("memtx_dir"));
 	snprintf(xctl.vinyl_dir, sizeof(xctl.vinyl_dir), "%s",
 		 cfg_gets("vinyl_dir"));
 	latch_create(&xctl.latch);
@@ -663,36 +667,61 @@ xctl_next_vy_range_id(void)
 	return xctl.next_vy_range_id++;
 }
 
+/*
+ * TODO: File name formatting does not belong here.
+ * We should move it to a shared header and use it
+ * both in vinyl.c and here.
+ */
+enum vy_file_type {
+	VY_FILE_INDEX,
+	VY_FILE_RUN,
+	vy_file_MAX,
+};
+
+static const char *vy_file_suffix[] = {
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
+};
+
+static int
+xctl_snprint_vy_run_path(char *buf, int size, const char *index_path,
+			 uint32_t space_id, uint32_t iid, int64_t run_id,
+			 enum vy_file_type type)
+{
+	int total = 0;
+	if (index_path[0] != '\0')
+		SNPRINT(total, snprintf, buf, size, "%s/", index_path);
+	else
+		SNPRINT(total, snprintf, buf, size, "%s/%u/%u/",
+			xctl.vinyl_dir, (unsigned)space_id, (unsigned)iid);
+	SNPRINT(total, snprintf, buf, size, "%020lld.%s",
+		(long long)run_id, vy_file_suffix[type]);
+	return total;
+}
+
+static int
+xctl_snprint_memtx_snap_path(char *buf, int size, int64_t signature)
+{
+	return snprintf(buf, size, "%s/%020lld.snap",
+			xctl.memtx_dir, (long long)signature);
+}
+
 /**
  * Try to delete files of a vinyl run.
  * Return 0 on success, -1 on failure.
  */
 static int
-vy_run_unlink_files(const char *vinyl_dir, uint32_t space_id, uint32_t iid,
-		    const char *index_path, int64_t run_id)
+xctl_delete_vy_run_files(uint32_t space_id, uint32_t iid,
+			 const char *index_path, int64_t run_id)
 {
-	static const char *suffix[] = { "index", "run" };
-
 	ERROR_INJECT(ERRINJ_VY_GC,
 		     {say_error("error injection: run %lld not deleted",
 				(long long)run_id); return -1;});
 	int rc = 0;
 	char path[PATH_MAX];
-	for (int type = 0; type < (int)nelem(suffix); type++) {
-		/*
-		 * TODO: File name formatting does not belong here.
-		 * We should move it to a shared header and use it
-		 * both in vinyl.c and here.
-		 */
-		if (index_path[0] != '\0') {
-			snprintf(path, sizeof(path), "%s/%020lld.%s",
-				 index_path, (long long)run_id, suffix[type]);
-		} else {
-			/* Default path. */
-			snprintf(path, sizeof(path), "%s/%u/%u/%020lld.%s",
-				 vinyl_dir, (unsigned)space_id, (unsigned)iid,
-				 (long long)run_id, suffix[type]);
-		}
+	for (int type = 0; type < vy_file_MAX; type++) {
+		xctl_snprint_vy_run_path(path, sizeof(path), index_path,
+					 space_id, iid, run_id, type);
 		if (coeio_unlink(path) < 0 && errno != ENOENT) {
 			say_syserror("failed to delete file '%s'", path);
 			rc = -1;
@@ -710,8 +739,8 @@ vy_run_unlink_files(const char *vinyl_dir, uint32_t space_id, uint32_t iid,
 static void
 xctl_vy_run_gc(const struct xctl_record *record)
 {
-	if (vy_run_unlink_files(xctl.vinyl_dir, record->space_id, record->iid,
-				record->path, record->vy_run_id) == 0) {
+	if (xctl_delete_vy_run_files(record->space_id, record->iid,
+				     record->path, record->vy_run_id) == 0) {
 		struct xctl_record gc_record = {
 			.type = XCTL_FORGET_VY_RUN,
 			.signature = record->signature,
@@ -1129,6 +1158,92 @@ xctl_relay(xctl_recovery_cb cb, void *cb_arg)
 		return -1;
 
 	return 0;
+}
+
+/** Argument passed to xctl_backup_func(). */
+struct xctl_backup_arg {
+	/** Callback passed to xctl_backup(). */
+	xctl_backup_cb cb;
+	/** Extra argument to cb(). */
+	void *cb_arg;
+	/** Path buffer. */
+	char *path;
+};
+
+/**
+ * Callback passed to xctl_recovery_iterate() to return
+ * the list of files needed for backup.
+ */
+static int
+xctl_backup_func(const struct xctl_record *record, void *cb_arg)
+{
+	struct xctl_backup_arg *arg = cb_arg;
+
+	if (record->type == XCTL_INSERT_VY_RUN) {
+		for (int type = 0; type < vy_file_MAX; type++) {
+			xctl_snprint_vy_run_path(arg->path, PATH_MAX,
+					record->path,
+					(unsigned)record->space_id,
+					(unsigned)record->iid,
+					(long long)record->vy_run_id, type);
+			if (arg->cb(arg->path, arg->cb_arg) != 0)
+				return -1;
+		}
+	}
+	fiber_reschedule();
+	return 0;
+}
+
+int
+xctl_backup(xctl_backup_cb cb, void *cb_arg)
+{
+	int rc = -1;
+	char *path = malloc(PATH_MAX);
+	if (path == NULL) {
+		diag_set(OutOfMemory, PATH_MAX, "malloc", "path");
+		goto out;
+	}
+
+	/* Load recovery context. */
+	latch_lock(&xctl.latch);
+	struct xctl_recovery *recovery;
+	rc = coio_call(xctl_recovery_new_f,
+		       vclock_sum(&xctl.last_checkpoint), &recovery);
+	latch_unlock(&xctl.latch);
+	if (rc != 0)
+		goto out_free_path;
+
+	/*
+	 * Backup xctl log.
+	 * Use the previous log file, because the current one
+	 * contains records written after the last checkpoint.
+	 */
+	rc = cb(xdir_format_filename(&xctl.dir,
+			vclock_sum(&xctl.prev_checkpoint), NONE), cb_arg);
+	if (rc != 0)
+		goto out_free_recovery;
+
+	/* Backup memtx snapshot. */
+	xctl_snprint_memtx_snap_path(path, PATH_MAX,
+			vclock_sum(&xctl.last_checkpoint));
+	rc = cb(path, cb_arg);
+	if (rc != 0)
+		goto out_free_recovery;
+
+	/* Backup vinyl runs. */
+	struct xctl_backup_arg arg = {
+		.cb = cb,
+		.cb_arg = cb_arg,
+		.path = path,
+	};
+	rc = xctl_recovery_iterate(recovery, false, xctl_backup_func, &arg);
+
+out_free_recovery:
+	xctl_recovery_delete(recovery);
+out_free_path:
+	free(path);
+out:
+	return rc;
 }
 
 void

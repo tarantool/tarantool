@@ -111,6 +111,44 @@ lbox_gc(struct lua_State *L)
 	return 0;
 }
 
+/** Argument passed to lbox_backup_fn(). */
+struct lbox_backup_arg {
+	/** Lua state. */
+	struct lua_State *L;
+	/** Number of files in the resulting table. */
+	int file_count;
+};
+
+static int
+lbox_backup_cb(const char *path, void *cb_arg)
+{
+	struct lbox_backup_arg *arg = cb_arg;
+	lua_pushinteger(arg->L, ++arg->file_count);
+	lua_pushstring(arg->L, path);
+	lua_settable(arg->L, -3);
+	return 0;
+}
+
+static int
+lbox_backup_start(struct lua_State *L)
+{
+	lua_newtable(L);
+	struct lbox_backup_arg arg = {
+		.L = L,
+	};
+	if (box_backup_start(lbox_backup_cb, &arg) != 0)
+		return luaT_error(L);
+	return 1;
+}
+
+static int
+lbox_backup_stop(struct lua_State *L)
+{
+	(void)L;
+	box_backup_stop();
+	return 0;
+}
+
 static const struct luaL_reg boxlib[] = {
 	{"commit", lbox_commit},
 	{"rollback", lbox_rollback},
@@ -120,6 +158,12 @@ static const struct luaL_reg boxlib[] = {
 
 static const struct luaL_reg boxlib_internal[] = {
 	{"gc", lbox_gc},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg boxlib_backup[] = {
+	{"start", lbox_backup_start},
+	{"stop", lbox_backup_stop},
 	{NULL, NULL}
 };
 
@@ -133,6 +177,9 @@ box_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	luaL_register(L, "box.internal", boxlib_internal);
+	lua_pop(L, 1);
+
+	luaL_register(L, "box.backup", boxlib_backup);
 	lua_pop(L, 1);
 
 	box_lua_error_init(L);

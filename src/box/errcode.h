@@ -181,6 +181,7 @@ struct errcode_record {
 	/*126 */_(ER_ALREADY_RUNNING,		"Failed to lock WAL directory %s and hot_standby mode is off") \
 	/*127 */_(ER_INDEX_FIELD_COUNT_LIMIT,	"Indexed field count limit reached: %d indexed fields") \
 	/*128 */_(ER_LOCAL_INSTANCE_ID_IS_READ_ONLY, "The local instance id %u is read-only") \
+	/*129 */_(ER_BACKUP_IN_PROGRESS,	"Backup is already in progress") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

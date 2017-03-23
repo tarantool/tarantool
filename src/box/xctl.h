@@ -319,6 +319,16 @@ xctl_recover_vy_index(int64_t vy_index_id,
 int
 xctl_relay(xctl_recovery_cb cb, void *cb_arg);
 
+typedef int
+(*xctl_backup_cb)(const char *filename, void *arg);
+
+/**
+ * Call @cb for each file that needs to be backed up in
+ * order to recover from the latest checkpoint.
+ */
+int
+xctl_backup(xctl_backup_cb cb, void *cb_arg);
+
 /** Helper to log a vinyl index creation. */
 static inline void
 xctl_create_vy_index(int64_t vy_index_id, uint32_t iid,

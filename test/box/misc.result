@@ -55,7 +55,8 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - begin
+- - backup
+  - begin
   - cfg
   - commit
   - error
@@ -290,6 +291,7 @@ t;
   - 'box.error.EXACT_MATCH : 19'
   - 'box.error.NO_SUCH_TRIGGER : 34'
   - 'box.error.injection : table: <address>
+  - 'box.error.UNSUPPORTED_INDEX_FEATURE : 112'
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.LOCAL_INSTANCE_ID_IS_READ_ONLY : 128'
   - 'box.error.REPLICASET_UUID_IS_RO : 65'
@@ -324,7 +326,7 @@ t;
   - 'box.error.LOADING : 116'
   - 'box.error.VINYL : 60'
   - 'box.error.SLAB_ALLOC_MAX : 110'
-  - 'box.error.UNSUPPORTED_INDEX_FEATURE : 112'
+  - 'box.error.BACKUP_IN_PROGRESS : 129'
   - 'box.error.DROP_USER : 44'
   - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.WRONG_SCHEMA_VERSION : 109'
