@@ -2181,7 +2181,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  struct vy_write_iterator *wi, const char *split_key,
 		  uint32_t *page_info_capacity, struct bloom_spectrum *bs,
 		  struct tuple **curr_stmt, const struct index_def *index_def,
-		  const struct index_def *user_index_def)
+		  const struct index_def *user_index_def, const char **max_key)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2209,6 +2209,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	vy_page_info_create(page, data_xlog->offset, index_def, *curr_stmt);
 	bool end_of_run = false;
 	xlog_tx_begin(data_xlog);
+	struct tuple *stmt = NULL;
 
 	do {
 		uint32_t *offset = (uint32_t *) ibuf_alloc(&page_index_buf,
@@ -2220,7 +2221,10 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		}
 		*offset = page->unpacked_size;
 
-		struct tuple *stmt = *curr_stmt;
+		if (stmt != NULL)
+			tuple_unref(stmt);
+		stmt = *curr_stmt;
+		tuple_ref(stmt);
 		if (vy_run_dump_stmt(stmt, data_xlog, page, index_def) != 0)
 			goto error_rollback;
 		bloom_spectrum_add(bs, tuple_hash(stmt, user_index_def));
@@ -2233,10 +2237,28 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			(split_key != NULL &&
 			 vy_tuple_compare_with_raw_key(*curr_stmt, split_key,
 						       &index_def->key_def) >= 0);
-
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < (uint64_t)index_def->opts.page_size);
 
+	if (end_of_run && stmt != NULL && max_key != NULL) {
+		/*
+		 * Tuple_extract_key allocates the key on a
+		 * region, but the max_key must be allocated on
+		 * the heap, because the max_key can live longer
+		 * than a fiber. To reach this, we must copy the
+		 * key into malloced memory.
+		 */
+		*max_key = tuple_extract_key(stmt, index_def, NULL);
+		tuple_unref(stmt);
+		if (*max_key == NULL)
+			goto error_rollback;
+		stmt = NULL;
+		*max_key = vy_key_dup(*max_key);
+		if (*max_key == NULL)
+			goto error_rollback;
+	}
+	if (stmt != NULL)
+		tuple_unref(stmt);
 	/* Save offset to row index  */
 	page->page_index_offset = page->unpacked_size;
 
@@ -2293,7 +2315,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
 		  const char *end_key, struct bloom_spectrum *bs,
 		  const struct index_def *index_def,
-		  const struct index_def *user_index_def)
+		  const struct index_def *user_index_def, const char **max_key)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2322,7 +2344,8 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi,
 				       end_key, &page_infos_capacity, bs,
-				       curr_stmt, index_def, user_index_def);
+				       curr_stmt, index_def, user_index_def,
+				       max_key);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -3070,7 +3093,7 @@ static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   struct tuple **stmt, size_t *written,
 		   size_t max_output_count, double bloom_fpr,
-		   uint64_t *dumped_statements)
+		   uint64_t *dumped_statements, const char **max_key)
 {
 	assert(stmt != NULL);
 
@@ -3093,7 +3116,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	bloom_spectrum_create(&bs, max_output_count, bloom_fpr, runtime.quota);
 
 	if (vy_run_write_data(run, index->path, wi, stmt, range->end, &bs,
-			      index_def, user_index_def) != 0)
+			      index_def, user_index_def, max_key) != 0)
 		return -1;
 
 	bloom_spectrum_choose(&bs, &run->info.bloom);
@@ -3506,7 +3529,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
-		assert(record->index_lsn == index->index_def->opts.lsn);
+		assert(record->index_lsn == index_def->opts.lsn);
 		break;
 	case VY_LOG_DROP_INDEX:
 		index->is_dropped = true;
@@ -3892,6 +3915,8 @@ struct vy_task {
 	size_t max_output_count;
 	/** For run-writing tasks: bloom filter false-positive-rate setting */
 	double bloom_fpr;
+	/** Max written key. */
+	char *max_written_key;
 };
 
 /**
@@ -3924,6 +3949,8 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
 	vy_index_unref(task->index);
 	diag_destroy(&task->diag);
+	if (task->max_written_key != NULL)
+		free(task->max_written_key);
 	TRASH(task);
 	mempool_free(pool, task);
 }
@@ -3939,12 +3966,15 @@ vy_task_dump_execute(struct vy_task *task)
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
 	assert(range->in_compact.pos == UINT32_MAX);
+	const char **max_key = NULL;
+	if (range->is_level_zero)
+		max_key = (const char **) &task->max_written_key;
 
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
 			       task->max_output_count, task->bloom_fpr,
-			       &task->dumped_statements) != 0) {
+			       &task->dumped_statements, max_key) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
 	}
@@ -3986,6 +4016,7 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_range_add_run(range, range->new_run);
 		vy_range_update_compact_priority(range);
 		range->new_run = NULL;
+		assert(! range->is_level_zero || task->max_written_key != NULL);
 	}
 	range->version++;
 	vy_index_acct_range(index, range);
@@ -4110,7 +4141,7 @@ vy_task_split_execute(struct vy_task *task)
 		}
 		if (vy_range_write_run(r, wi, &stmt, &task->dump_size,
 				       task->max_output_count, task->bloom_fpr,
-				       &unused) != 0)
+				       &unused, NULL) != 0)
 			goto error;
 	}
 	vy_write_iterator_cleanup(wi);
@@ -4351,7 +4382,7 @@ vy_task_compact_execute(struct vy_task *task)
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
 			       task->max_output_count, task->bloom_fpr,
-			       &unused) != 0) {
+			       &unused, NULL) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
 	}
