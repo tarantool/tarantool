@@ -519,6 +519,13 @@ struct vy_range {
 	 * invalidate iterators.
 	 */
 	uint32_t version;
+	/**
+	 * Ranges tree now is flat, so this flag always is true.
+	 * But when we will have introduced the single mem per
+	 * index, this flag will be false for ranges from the
+	 * index tree and true for the index range.
+	 */
+	bool is_level_zero;
 };
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
@@ -2732,6 +2739,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 		goto fail_mem;
 	/* Allocate a new id unless specified. */
 	range->id = (id >= 0 ? id : vy_log_next_range_id());
+	range->is_level_zero = true;
 	if (begin != NULL) {
 		range->begin = vy_key_dup(begin);
 		if (range->begin == NULL)
@@ -3303,7 +3311,7 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	 */
 	vy_log_tx_begin();
 	vy_log_insert_range(index->index_def->opts.lsn, result->id,
-			    result->begin, result->end);
+			    result->begin, result->end, result->is_level_zero);
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_run *run;
 		rlist_foreach_entry(run, &it->runs, in_range)
@@ -3412,7 +3420,7 @@ vy_index_create(struct vy_index *index)
 	vy_log_create_index(index_def->opts.lsn, index_def->iid,
 			    index_def->space_id, index_def->opts.path);
 	vy_log_insert_range(index->index_def->opts.lsn,
-			    range->id, NULL, NULL);
+			    range->id, NULL, NULL, true);
 	if (vy_log_tx_commit() < 0)
 		return -1;
 
@@ -3900,6 +3908,7 @@ vy_task_dump_execute(struct vy_task *task)
 	struct vy_range *range = task->range;
 	struct vy_write_iterator *wi = task->wi;
 	struct tuple *stmt;
+	assert(range->is_level_zero);
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
@@ -3923,6 +3932,7 @@ vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
+	assert(range->is_level_zero);
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/*
@@ -3962,6 +3972,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
+	assert(range->is_level_zero);
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
@@ -3989,6 +4000,7 @@ static int
 vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 		 int64_t dump_lsn, struct vy_task **p_task)
 {
+	assert(range->is_level_zero);
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
 		.complete = vy_task_dump_complete,
@@ -4098,7 +4110,7 @@ vy_task_split_complete(struct vy_task *task)
 	vy_log_delete_range(range->id);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		vy_log_insert_range(index->index_def->opts.lsn, r->id,
-				    r->begin, r->end);
+				    r->begin, r->end, r->is_level_zero);
 		if (!vy_run_is_empty(r->new_run))
 			vy_log_insert_run(r->id, r->new_run->id);
 	}

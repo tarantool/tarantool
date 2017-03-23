@@ -160,6 +160,11 @@ struct vy_log_record {
 	const char *path;
 	/** Length of the path string. */
 	uint32_t path_len;
+	/**
+	 * True if the range is on the zero level of the index
+	 * ranges tree.
+	 */
+	bool is_level_zero;
 };
 
 /**
@@ -379,7 +384,8 @@ vy_log_drop_index(int64_t index_lsn)
 /** Helper to log a vinyl range insertion. */
 static inline void
 vy_log_insert_range(int64_t index_lsn, int64_t range_id,
-		    const char *range_begin, const char *range_end)
+		    const char *range_begin, const char *range_end,
+		    bool is_level_zero)
 {
 	struct vy_log_record record;
 	record.type = VY_LOG_INSERT_RANGE;
@@ -388,6 +394,7 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 	record.range_id = range_id;
 	record.range_begin = range_begin;
 	record.range_end = range_end;
+	record.is_level_zero = is_level_zero;
 	vy_log_write(&record);
 }
 

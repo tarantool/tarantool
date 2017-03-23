@@ -70,6 +70,7 @@ enum vy_log_key {
 	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_PATH			= 7,
+	VY_LOG_IS_LEVEL_ZERO		= 8
 };
 
 /**
@@ -85,7 +86,8 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
-					  (1 << VY_LOG_KEY_RANGE_END),
+					  (1 << VY_LOG_KEY_RANGE_END) |
+					  (1 << VY_LOG_IS_LEVEL_ZERO),
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
 	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
@@ -105,6 +107,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_PATH]		= "path",
+	[VY_LOG_IS_LEVEL_ZERO]		= "is_level_zero"
 };
 
 /** vy_log_type -> human readable name. */
@@ -226,6 +229,11 @@ struct vy_range_recovery_info {
 	char *end;
 	/** True if the range was deleted. */
 	bool is_deleted;
+	/**
+	 * True if the range is on the zero level of the index
+	 * ranges tree.
+	 */
+	bool is_level_zero;
 	/**
 	 * Log signature from the time when the range was created
 	 * or deleted.
@@ -409,6 +417,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_str(record->path_len);
 		n_keys++;
 	}
+	if (key_mask & (1 << VY_LOG_IS_LEVEL_ZERO)) {
+		size += mp_sizeof_uint(VY_LOG_IS_LEVEL_ZERO);
+		size += mp_sizeof_bool(record->is_level_zero);
+		n_keys++;
+	}
 	size += mp_sizeof_map(n_keys);
 
 	/*
@@ -468,6 +481,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (key_mask & (1 << VY_LOG_KEY_PATH)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_PATH);
 		pos = mp_encode_str(pos, record->path, record->path_len);
+	}
+	if (key_mask & (1 << VY_LOG_IS_LEVEL_ZERO)) {
+		pos = mp_encode_uint(pos, VY_LOG_IS_LEVEL_ZERO);
+		pos = mp_encode_bool(pos, record->is_level_zero);
 	}
 	assert(pos == tuple + size);
 
@@ -542,6 +559,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_PATH:
 			record->path = mp_decode_str(&pos, &record->path_len);
+			break;
+		case VY_LOG_IS_LEVEL_ZERO:
+			record->is_level_zero = mp_decode_bool(&pos);
 			break;
 		default:
 			goto fail;
@@ -1280,7 +1300,7 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
 static int
 vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 			 int64_t index_lsn, int64_t range_id,
-			 const char *begin, const char *end)
+			 const char *begin, const char *end, bool is_level_zero)
 {
 	if (vy_recovery_lookup_range(recovery, range_id) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl range id");
@@ -1324,6 +1344,7 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 	memcpy(range->end, end, end_size);
 	range->is_deleted = false;
 	range->signature = signature;
+	range->is_level_zero = is_level_zero;
 	rlist_create(&range->runs);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->range_id_max < range_id)
@@ -1390,7 +1411,8 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_insert_range(recovery, record->signature,
 				record->index_lsn, record->range_id,
-				record->range_begin, record->range_end);
+				record->range_begin, record->range_end,
+				record->is_level_zero);
 		break;
 	case VY_LOG_DELETE_RANGE:
 		rc = vy_recovery_delete_range(recovery, record->signature,
@@ -1569,6 +1591,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		record.type = VY_LOG_INSERT_RANGE;
 		record.range_id = INT64_MAX; /* fake id */
 		record.range_begin = record.range_end = NULL;
+		record.is_level_zero = true;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		record.type = VY_LOG_DROP_INDEX;
@@ -1584,6 +1607,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		record.signature = range->signature;
 		record.range_id = range->id;
 		record.range_begin = tmp = range->begin;
+		record.is_level_zero = true;
 		if (mp_decode_array(&tmp) == 0)
 			record.range_begin = NULL;
 		record.range_end = tmp = range->end;
