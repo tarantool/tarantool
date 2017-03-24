@@ -36,3 +36,13 @@ for i = 1, 13, 2 do s:insert{ i, string.rep('y', i) } end
 
 s:bsize()
 utils.space_bsize(s)
+
+s:truncate()
+
+s:bsize()
+utils.space_bsize(s)
+
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+
+s:bsize()
+utils.space_bsize(s)

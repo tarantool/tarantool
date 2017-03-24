@@ -808,7 +808,8 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	/*
 	 * Init space bsize.
 	 */
-	alter->new_space->bsize = alter->old_space->bsize;
+	if (alter->new_space->index_count != 0)
+		alter->new_space->bsize = alter->old_space->bsize;
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.

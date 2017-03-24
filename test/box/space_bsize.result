@@ -76,3 +76,25 @@ utils.space_bsize(s)
 ---
 - 172
 ...
+s:truncate()
+---
+...
+s:bsize()
+---
+- 0
+...
+utils.space_bsize(s)
+---
+- 0
+...
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+---
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
