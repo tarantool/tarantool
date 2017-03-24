@@ -89,9 +89,9 @@ snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(data_path, snapshot)
 server.stop()
 os.rename(snapshot, snapshot + ".inprogress")
-# remove .xlogs
+# remove .xlogs and .xctl
 for f in os.listdir(data_path):
-    if f.endswith(".xlog"):
+    if f.endswith((".xlog", ".xctl")):
         os.remove(os.path.join(data_path, f))
 
 # check that .snap.inprogress is ignored during scan

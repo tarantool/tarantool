@@ -763,6 +763,19 @@ xctl_begin_recovery(const struct vclock *vclock)
 	if (xdir_scan(&xctl.dir) < 0)
 		return -1;
 
+	struct vclock xctl_vclock;
+	if (xdir_last_vclock(&xctl.dir, &xctl_vclock) >= 0 &&
+	    vclock_compare(&xctl_vclock, vclock) > 0) {
+		/*
+		 * Last xctl log is newer than the last snapshot.
+		 * This can't normally happen, as xctl is rotated
+		 * after snapshot is created. Looks like somebody
+		 * deleted snap file, but forgot to delete xctl.
+		 */
+		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		return -1;
+	}
+
 	struct xctl_recovery *recovery;
 	recovery = xctl_recovery_new(INT64_MAX);
 	if (recovery == NULL)

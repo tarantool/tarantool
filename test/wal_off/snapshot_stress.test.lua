@@ -199,8 +199,9 @@ fio = require'fio'
 new_snap_dir = "]] .. fio.pathjoin(box.cfg.memtx_dir, "snap_test") .. [["
 os.execute("mkdir " .. new_snap_dir)
 os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xlog") .. [[ " .. new_snap_dir .. "/")
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xctl") .. [[ " .. new_snap_dir .. "/")
 os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.snap") .. [[ " .. new_snap_dir .. "/")
-box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_mode = "none" }
+box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_dir = new_snap_dir, wal_mode = "none" }
 
 log = require('log')
 
@@ -234,11 +235,10 @@ log.info('Part II: checking snapshot start');
 snaps = fio.glob(snap_search_wildcard);
 snaps_find_status = #snaps <= initial_snap_count and 'where are my snapshots?' or 'snaps found';
 snaps_find_status;
-snapshot_check_status = "snap check ok";
+snapshot_check_failed = false
 while #snaps > initial_snap_count do
-    if os.execute(cmd) ~= 0 then
-        snapshot_check_status = "snap check failed!"
-        break
+    if not snapshot_check_failed and os.execute(cmd) ~= 0 then
+        snapshot_check_failed = true
     end
     max_snap = nil
     for k,v in pairs(snaps) do
@@ -251,23 +251,12 @@ while #snaps > initial_snap_count do
         max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
     end
     fio.unlink(max_snap)
+    max_xctl = fio.basename(max_snap, '.snap') .. '.xctl'
+    max_xctl = fio.pathjoin(box.cfg.wal_dir, max_xctl)
+    fio.unlink(max_xctl)
     snaps[max_snap_k] = nil
 end;
-while #snaps > initial_snap_count do
-    max_snap = nil
-    for k,v in pairs(snaps) do
-        if max_snap == nil or v > max_snap then
-            max_snap = v
-            max_snap_k = k
-        end
-    end
-    if max_snap:sub(1, 1) ~= "/" then
-        max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
-    end
-    fio.unlink(max_snap)
-    snaps[max_snap_k] = nil
-end;
-snapshot_check_status;
+snapshot_check_failed;
 
 log.info('Part II: checking snapshot done');
 
