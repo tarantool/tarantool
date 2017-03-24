@@ -40,9 +40,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct recovery;
-extern struct recovery *recovery;
-
 struct xrow_header;
 struct xstream;
 
