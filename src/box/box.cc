@@ -1016,8 +1016,6 @@ box_init(void)
 	session_init();
 
 	cluster_init();
-	port_init();
-	iproto_init();
 
 	title("loading");
 
