@@ -601,8 +601,8 @@ xctl_flush(void)
 	if (xctl.tx_end == 0)
 		return 0; /* nothing to do */
 
-	struct journal_entry *req = journal_entry_new(xctl.tx_end);
-	if (req == NULL)
+	struct journal_entry *entry = journal_entry_new(xctl.tx_end);
+	if (entry == NULL)
 		return -1;
 
 	struct xrow_header *rows;
@@ -619,13 +619,13 @@ xctl_flush(void)
 		struct xrow_header *row = &rows[i];
 		if (xctl_record_encode(&xctl.tx_buf[i], row) < 0)
 			return -1;
-		req->rows[i] = row;
+		entry->rows[i] = row;
 	}
 	/*
 	 * Do actual disk writes on behalf of the WAL
 	 * so as not to block the tx thread.
 	 */
-	if (wal_write_xctl(req) != 0)
+	if (wal_write_xctl(entry) != 0)
 		return -1;
 
 	/* Success. Reset the buffer. */

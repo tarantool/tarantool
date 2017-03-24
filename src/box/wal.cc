@@ -167,14 +167,14 @@ wal_msg(struct cmsg *msg)
 
 /** Write a request to a log in a single transaction. */
 static ssize_t
-wal_request_write(struct journal_entry *req, struct xlog *l)
+xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 {
 	/*
 	 * Iterate over request rows (tx statements)
 	 */
 	xlog_tx_begin(l);
-	struct xrow_header **row = req->rows;
-	for (; row < req->rows + req->n_rows; row++) {
+	struct xrow_header **row = entry->rows;
+	for (; row < entry->rows + entry->n_rows; row++) {
 		(*row)->tm = ev_now(loop());
 		if (xlog_write_row(l, *row) < 0) {
 			/*
@@ -582,20 +582,20 @@ wal_write_to_disk(struct cmsg *msg)
 	/*
 	 * Iterate over requests (transactions)
 	 */
-	struct journal_entry *req, *last_commit_req = NULL;
-	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
-		int rc = wal_request_write(req, l);
+	struct journal_entry *entry, *last_commit_entry = NULL;
+	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
+		int rc = xlog_write_entry(l, entry);
 		if (rc < 0) {
 			goto done;
 		}
 		if (rc > 0)
-			last_commit_req = req;
+			last_commit_entry = entry;
 	}
 	if (xlog_flush(l) < 0) {
 		goto done;
 	}
-	last_commit_req = stailq_last_entry(&wal_msg->commit,
-					struct journal_entry, fifo);
+	last_commit_entry = stailq_last_entry(&wal_msg->commit,
+					      struct journal_entry, fifo);
 
 done:
 	struct error *error = diag_last_error(diag_get());
@@ -611,24 +611,27 @@ done:
 	 * nothing, and need to start rollback from the first
 	 * request. Otherwise we rollback from the first request.
 	 */
-	req = stailq_first_entry(&wal_msg->commit, struct journal_entry, fifo);
-	struct journal_entry *rollback_req = last_commit_req ?
-		stailq_next_entry(last_commit_req, fifo) : req;
+	entry = stailq_first_entry(&wal_msg->commit, struct journal_entry,
+				   fifo);
+	struct journal_entry *rollback_entry = last_commit_entry ?
+		stailq_next_entry(last_commit_entry, fifo) : entry;
 	/* Update status of the successfully committed requests. */
-	for (; req != rollback_req; req = stailq_next_entry(req, fifo)) {
+	for (; entry != rollback_entry;
+	     entry = stailq_next_entry(entry, fifo)) {
 
 		/** All rows in a transaction have the same replica_id */
-		struct xrow_header *last = req->rows[req->n_rows - 1];
+		struct xrow_header *last = entry->rows[entry->n_rows - 1];
 		/* Update internal vclock */
 		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
 		/* Update row counter for wal_opt_rotate() */
-		l->rows += req->n_rows;
+		l->rows += entry->n_rows;
 		/* Mark request as successful for tx thread */
-		req->res = vclock_sum(&writer->vclock);
+		entry->res = vclock_sum(&writer->vclock);
 	}
-	if (rollback_req) {
+	if (rollback_entry) {
 		/* Rollback unprocessed requests */
-		stailq_splice(&wal_msg->commit, &req->fifo, &wal_msg->rollback);
+		stailq_splice(&wal_msg->commit, &entry->fifo,
+			      &wal_msg->rollback);
 		wal_writer_begin_rollback(writer);
 	}
 	fiber_gc();
@@ -726,13 +729,13 @@ wal_write(struct journal_entry *req)
 
 struct wal_write_xctl_msg: public cbus_call_msg
 {
-	struct journal_entry *req;
+	struct journal_entry *entry;
 };
 
 static int
 wal_write_xctl_f(struct cbus_call_msg *msg)
 {
-	struct journal_entry *req = ((struct wal_write_xctl_msg *)msg)->req;
+	struct journal_entry *entry = ((struct wal_write_xctl_msg *)msg)->entry;
 
 	if (!xctl_writer.is_active) {
 		if (xctl_open(&xctl_writer.xlog) < 0)
@@ -740,7 +743,7 @@ wal_write_xctl_f(struct cbus_call_msg *msg)
 		xctl_writer.is_active = true;
 	}
 
-	if (wal_request_write(req, &xctl_writer.xlog) < 0)
+	if (xlog_write_entry(&xctl_writer.xlog, entry) < 0)
 		return -1;
 
 	if (xlog_flush(&xctl_writer.xlog) < 0)
@@ -750,10 +753,10 @@ wal_write_xctl_f(struct cbus_call_msg *msg)
 }
 
 int
-wal_write_xctl(struct journal_entry *req)
+wal_write_xctl(struct journal_entry *entry)
 {
 	struct wal_write_xctl_msg msg;
-	msg.req = req;
+	msg.entry= entry;
 	bool cancellable = fiber_set_cancellable(false);
 	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
 			   wal_write_xctl_f, NULL, TIMEOUT_INFINITY);
