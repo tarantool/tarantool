@@ -30,9 +30,7 @@
  */
 #include "txn.h"
 #include "engine.h"
-#include "box.h" /* global recovery */
 #include "tuple.h"
-#include "recovery.h"
 #include "journal.h"
 #include <fiber.h>
 #include "xrow.h"
@@ -197,11 +195,6 @@ txn_write_to_wal(struct txn *txn)
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
-		/*
-		 * Bump current LSN even if wal_mode = NONE, so that
-		 * snapshots still works with WAL turned off.
-		 */
-		recovery_fill_lsn(recovery, stmt->row);
 		*row++ = stmt->row;
 	}
 	assert(row == req->rows + req->n_rows);

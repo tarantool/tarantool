@@ -95,20 +95,6 @@
  * R -> M           # remote_stop()
  */
 
-/* {{{ LSN API */
-
-void
-recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
-{
-	if (row->replica_id == 0) {
-		/* Local request. */
-		row->replica_id = instance_id;
-		row->lsn = vclock_inc(&r->vclock, instance_id);
-	}
-}
-
-/* }}} */
-
 /* {{{ Initial recovery */
 
 /**

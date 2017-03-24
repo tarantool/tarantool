@@ -80,9 +80,6 @@ recovery_stop_local(struct recovery *r);
 void
 recovery_finalize(struct recovery *r, struct xstream *stream);
 
-void
-recovery_fill_lsn(struct recovery *r, struct xrow_header *row);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

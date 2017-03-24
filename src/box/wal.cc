@@ -40,7 +40,6 @@
 #include "xctl.h"
 #include "cbus.h"
 #include "coeio.h"
-#include "recovery.h"
 #include "replication.h"
 
 
@@ -396,7 +395,7 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE) {
-		vclock_copy(vclock, &recovery->vclock);
+		vclock_copy(vclock, &writer->vclock);
 		return;
 	}
 	static struct cmsg_hop wal_checkpoint_route[] = {
@@ -549,6 +548,19 @@ static void
 wal_notify_watchers(struct wal_writer *writer);
 
 static void
+wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
+	       struct xrow_header **end)
+{
+	/** Assign LSN to all local rows. */
+	if ((*row)->replica_id == 0) {
+		for ( ; row < end; row++) {
+			(*row)->lsn = vclock_inc(&writer->vclock, instance_id);
+			(*row)->replica_id = instance_id;
+		}
+	}
+}
+
+static void
 wal_write_to_disk(struct cmsg *msg)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
@@ -596,6 +608,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 */
 	struct journal_entry *entry, *last_commit_entry = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
+		wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
 		int rc = xlog_write_entry(l, entry);
 		if (rc < 0) {
 			goto done;
@@ -634,7 +647,10 @@ done:
 		/** All rows in a transaction have the same replica_id */
 		struct xrow_header *last = entry->rows[entry->n_rows - 1];
 		/* Update internal vclock */
-		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
+		if (last->replica_id != instance_id) {
+			vclock_follow(&writer->vclock, last->replica_id,
+				      last->lsn);
+		}
 		/* Update row counter for wal_opt_rotate() */
 		l->rows += entry->n_rows;
 		/* Mark request as successful for tx thread */
@@ -746,14 +762,29 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 }
 
 int64_t
-wal_write_in_wal_mode_none(struct journal * /* journal */,
+wal_write_in_wal_mode_none(struct journal *journal,
 			   struct journal_entry *entry)
 {
+	struct wal_writer *writer = (struct wal_writer *) journal;
+	/** All rows in a request have the same replica id. */
 	struct xrow_header *last = entry->rows[entry->n_rows - 1];
-	/* Promote replica set vclock with local writes. */
-	if (last->replica_id == instance_id)
-		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
-	return vclock_sum(&recovery->vclock);
+	if (last->replica_id != 0) {
+		/*
+		 * All rows in a transaction have the same
+		 * replica_id
+		 */
+		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
+	} else {
+		/*
+		 * Fake the local WAL by assigning an LSN to each
+		 * row.
+		 */
+		int64_t new_lsn = vclock_get(&writer->vclock, instance_id) +
+			entry->n_rows;
+		vclock_follow(&writer->vclock, instance_id, new_lsn);
+		vclock_follow(&replicaset_vclock, instance_id, new_lsn);
+	}
+	return vclock_sum(&writer->vclock);
 }
 
 void
