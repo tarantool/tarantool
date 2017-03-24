@@ -48,6 +48,12 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 int wal_dir_lock = -1;
 
+static int64_t
+wal_write(struct journal *, struct journal_entry *);
+
+static int64_t
+wal_write_in_wal_mode_none(struct journal *, struct journal_entry *);
+
 /* WAL thread. */
 struct wal_thread {
 	/** 'wal' thread doing the writes. */
@@ -265,7 +271,8 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->wal_mode = wal_mode;
 	writer->wal_max_rows = wal_max_rows;
 	writer->wal_max_size = wal_max_size;
-	journal_create(&writer->base, wal_write, NULL);
+	journal_create(&writer->base, wal_mode == WAL_NONE ?
+		       wal_write_in_wal_mode_none : wal_write, NULL);
 
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid);
 	xlog_clear(&writer->current_wal);
@@ -683,8 +690,7 @@ int64_t
 wal_write(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
-	if (writer->wal_mode == WAL_NONE)
-		return vclock_sum(&recovery->vclock);
+
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	if (! stailq_empty(&writer->rollback)) {
@@ -734,10 +740,20 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	/* All rows in request have the same replica id. */
 	struct xrow_header *last = entry->rows[entry->n_rows - 1];
 	/* Promote replica set vclock with local writes. */
-	if (last->replica_id == instance_id) {
+	if (last->replica_id == instance_id)
 		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
-	}
 	return entry->res;
+}
+
+int64_t
+wal_write_in_wal_mode_none(struct journal * /* journal */,
+			   struct journal_entry *entry)
+{
+	struct xrow_header *last = entry->rows[entry->n_rows - 1];
+	/* Promote replica set vclock with local writes. */
+	if (last->replica_id == instance_id)
+		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
+	return vclock_sum(&recovery->vclock);
 }
 
 void

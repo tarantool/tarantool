@@ -48,9 +48,6 @@ extern int wal_dir_lock;
 
 #if defined(__cplusplus)
 
-int64_t
-wal_write(struct journal *journal, struct journal_entry *entry);
-
 void
 wal_thread_start();
 
