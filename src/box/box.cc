@@ -78,8 +78,6 @@ static void title(const char *new_status)
 	title_update();
 }
 
-struct recovery *recovery;
-
 bool box_snapshot_is_in_progress = false;
 bool box_backup_is_in_progress = false;
 /**
@@ -1338,10 +1336,6 @@ box_set_replicaset_uuid()
 void
 box_free(void)
 {
-	if (recovery) {
-		recovery_exit(recovery);
-		recovery = NULL;
-	}
 	/*
 	 * See gh-584 "box_free() is called even if box is not
 	 * initialized
@@ -1426,7 +1420,7 @@ bootstrap_master(void)
  *                           at the moment of replica bootstrap
  */
 static void
-bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
+bootstrap_from_master(struct replica *master)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
@@ -1452,18 +1446,11 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 	/*
-	 * Hack: reset recovery vclock polluted by initial join
-	 */
-	vclock_create(start_vclock);
-	/*
 	 * Process final data (WALs).
 	 */
 	engine_begin_final_recovery();
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
-
-	/* Start replica vclock using master's vclock */
-	vclock_copy(start_vclock, &replicaset_vclock);
 
 	/* Finalize the new replica */
 	engine_end_recovery();
@@ -1481,7 +1468,7 @@ bootstrap_from_master(struct replica *master, struct vclock *start_vclock)
  * instance
  */
 static void
-bootstrap(struct vclock *start_vclock)
+bootstrap()
 {
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_first();
@@ -1490,13 +1477,12 @@ bootstrap(struct vclock *start_vclock)
 	if (xctl_bootstrap() != 0)
 		diag_raise();
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
-		bootstrap_from_master(master, start_vclock);
+		bootstrap_from_master(master);
 	} else {
 		bootstrap_master();
-		vclock_create(start_vclock);
 	}
 	if (engine_begin_checkpoint() ||
-	    engine_commit_checkpoint(start_vclock))
+	    engine_commit_checkpoint(&replicaset_vclock))
 		panic("failed to save a snapshot");
 }
 
@@ -1561,9 +1547,6 @@ box_cfg_xc(void)
 	struct vclock checkpoint_vclock;
 	vclock_create(&checkpoint_vclock);
 	int64_t lsn = recovery_last_checkpoint(&checkpoint_vclock);
-	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("force_recovery"),
-				&checkpoint_vclock);
 	/*
 	 * Lock the write ahead log directory to avoid multiple
 	 * instances running in the same dir.
@@ -1603,8 +1586,11 @@ box_cfg_xc(void)
 		 */
 		memtx->recoverSnapshot();
 
-		/* Replace instance vclock using the data from snapshot */
-		vclock_copy(&recovery->vclock, &checkpoint_vclock);
+		struct recovery *recovery;
+		recovery = recovery_new(cfg_gets("wal_dir"),
+					cfg_geti("force_recovery"),
+					&checkpoint_vclock);
+		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, recovery);
@@ -1638,6 +1624,14 @@ box_cfg_xc(void)
 		if (xctl_end_recovery() != 0)
 			diag_raise();
 
+		/*
+		 * Initialize the replica set vclock from recovery.
+		 * The local WAL may contain rows from remote masters,
+		 * so we must reflect this in replicaset_vclock to
+		 * not attempt to apply these rows twice.
+		 */
+		vclock_copy(&replicaset_vclock, &recovery->vclock);
+
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
 		/* Wait for the cluster to start up */
@@ -1654,7 +1648,7 @@ box_cfg_xc(void)
 		box_sync_replication(TIMEOUT_INFINITY);
 
 		/* Bootstrap a new master */
-		bootstrap(&recovery->vclock);
+		bootstrap();
 	}
 	fiber_gc();
 
@@ -1668,20 +1662,12 @@ box_cfg_xc(void)
 		}
 	}
 
-	/*
-	 * Initialize the replica set vclock from recovery.
-	 * The local WAL may contain rows from remote masters,
-	 * so we must reflect this in replicaset_vclock to
-	 * not attempt to apply these rows twice.
-	 */
-	vclock_copy(&replicaset_vclock, &recovery->vclock);
-
 	/* Start WAL writer */
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-		 &recovery->vclock, wal_max_rows, wal_max_size);
+		 &replicaset_vclock, wal_max_rows, wal_max_size);
 
 	rmean_cleanup(rmean_box);
 
