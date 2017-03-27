@@ -331,7 +331,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 }
 
 void
-vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt)
+vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt)
 {
 	vy_cache_gc(cache->env);
 	bool exact = false;

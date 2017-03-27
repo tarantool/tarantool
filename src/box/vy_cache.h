@@ -192,7 +192,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
  * @param stmt - overwritten statement.
  */
 void
-vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt);
+vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt);
 
 
 /**
