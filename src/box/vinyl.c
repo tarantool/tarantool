@@ -1393,6 +1393,7 @@ vy_run_delete(struct vy_run *run)
 	free(run);
 }
 
+/** Increment a run's reference counter. */
 static void
 vy_run_ref(struct vy_run *run)
 {
@@ -1400,12 +1401,19 @@ vy_run_ref(struct vy_run *run)
 	run->refs++;
 }
 
-static void
+/*
+ * Decrement a run's reference counter.
+ * Return true if the run was deleted.
+ */
+static bool
 vy_run_unref(struct vy_run *run)
 {
 	assert(run->refs > 0);
-	if (--run->refs == 0)
+	if (--run->refs == 0) {
 		vy_run_delete(run);
+		return true;
+	}
+	return false;
 }
 
 enum vy_file_type {
@@ -1983,8 +1991,7 @@ static struct vy_write_iterator *
 vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 		      int64_t oldest_vlsn);
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi,
-			  struct vy_range *range, struct vy_run *run);
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run);
 static NODISCARD int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem);
 static NODISCARD int
@@ -2974,7 +2981,7 @@ vy_range_get_write_iterator(struct vy_range *range, int run_count,
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		if (run_count-- == 0)
 			break;
-		if (vy_write_iterator_add_run(wi, range, run) != 0)
+		if (vy_write_iterator_add_run(wi, run) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += run->info.keys;
 	}
@@ -7400,8 +7407,6 @@ struct vy_run_iterator {
 	struct tuple_format *upsert_format;
 	/* run */
 	struct vy_run *run;
-	/* range of the run */
-	struct vy_range *range;
 
 	/* Search options */
 	/**
@@ -7437,7 +7442,7 @@ struct vy_run_iterator {
 
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_range *range, struct vy_run *run,
+		     struct vy_index *index, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
 		     struct tuple_format *format,
@@ -7737,8 +7742,7 @@ static int
 vy_page_read_cb_free(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
-	if (task->page)
-		vy_page_delete(task->page);
+	vy_page_delete(task->page);
 	vy_run_unref(task->run);
 	coio_task_destroy(&task->base);
 	mempool_free(&task->env->read_task_pool, task);
@@ -7780,9 +7784,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * rc = -2 is returned to the caller.
 		 */
 
-		uint32_t index_version = itr->index->version;
-		uint32_t range_version = itr->range->version;
-
 		/* Allocate a coio task */
 		struct vy_page_read_task *task =
 			(struct vy_page_read_task *)mempool_alloc(&itr->index->env->read_task_pool);
@@ -7817,20 +7818,18 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			return -1;
 		}
 
-		task->page = NULL;
-		vy_page_read_cb_free(&task->base);
+		coio_task_destroy(&task->base);
+		mempool_free(&task->env->read_task_pool, task);
 
-		/*
-		 * Check that vy_index/vy_range/vy_run haven't changed
-		 * during coeio_pread().
-		 */
-		if (index_version != itr->index->version ||
-		    range_version != itr->range->version) {
+		if (vy_run_unref(itr->run)) {
+			/*
+			 * The run's gone so the iterator isn't
+			 * valid anymore.
+			 */
 			itr->index = NULL;
-			itr->range = NULL;
 			itr->run = NULL;
 			vy_page_delete(page);
-			return -2; /* iterator is no more valid */
+			return -2;
 		}
 	} else {
 		/*
@@ -8251,7 +8250,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  */
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_range *range, struct vy_run *run,
+		     struct vy_index *index, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
 		     struct tuple_format *format,
@@ -8261,8 +8260,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 	itr->stat = stat;
 	itr->format = format;
 	itr->upsert_format = upsert_format;
-	itr->index = range->index;
-	itr->range = range;
+	itr->index = index;
 	itr->run = run;
 
 	itr->iterator_type = iterator_type;
@@ -9521,8 +9519,7 @@ vy_write_iterator_new(struct vy_index *index, bool is_last_level,
 }
 
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi,
-			  struct vy_range *range, struct vy_run *run)
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run)
 {
 	struct vy_merge_src *src;
 	src = vy_merge_iterator_add(&wi->mi, false, false);
@@ -9530,7 +9527,7 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi,
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
-			     range, run, ITER_GE, wi->key, &vlsn,
+			     wi->index, run, ITER_GE, wi->key, &vlsn,
 			     wi->surrogate_format, wi->upsert_format);
 	return 0;
 }
@@ -9763,9 +9760,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
-				     itr->curr_range,
-				     run, itr->iterator_type, itr->key,
-				     itr->vlsn, format,
+				     itr->index, run, itr->iterator_type,
+				     itr->key, itr->vlsn, format,
 				     itr->index->upsert_format);
 	}
 }
