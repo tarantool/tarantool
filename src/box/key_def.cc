@@ -256,19 +256,6 @@ key_def_cmp(const struct key_def *key1, const struct key_def *key2)
 }
 
 void
-key_list_del_key(struct rlist *key_list, uint32_t iid)
-{
-	struct key_def *key;
-	rlist_foreach_entry(key, key_list, link) {
-		if (key->iid == iid) {
-			rlist_del_entry(key, link);
-			return;
-		}
-	}
-	unreachable();
-}
-
-void
 key_def_check(struct key_def *key_def)
 {
 	struct space *space = space_cache_find(key_def->space_id);

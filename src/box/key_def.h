@@ -530,17 +530,6 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 int
 key_def_cmp(const struct key_def *key1, const struct key_def *key2);
 
-/** Add a key to the list of keys. */
-static inline  void
-key_list_add_key(struct rlist *key_list, struct key_def *key)
-{
-	rlist_add_entry(key_list, key, link);
-}
-
-/** Remove a key from the list of keys. */
-void
-key_list_del_key(struct rlist *key_list, uint32_t id);
-
 /**
  * Check a key definition for violation of various limits.
  *
