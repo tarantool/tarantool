@@ -148,15 +148,15 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 }
 
 Index *
-VinylSpace::createIndex(struct space *space, struct key_def *key_def)
+VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 {
 	(void) space;
 	VinylEngine *engine = (VinylEngine *) this->engine;
-	if (key_def->type != TREE) {
+	if (index_def->type != TREE) {
 		unreachable();
 		return NULL;
 	}
-	return new VinylIndex(engine->env, key_def);
+	return new VinylIndex(engine->env, index_def);
 }
 
 void

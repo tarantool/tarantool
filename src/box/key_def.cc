@@ -164,19 +164,19 @@ key_def_set_cmp(struct key_def *def)
 	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
 }
 
-struct key_def *
-key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, const struct key_opts *opts,
-	    uint32_t part_count)
+struct index_def *
+index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	      enum index_type type, const struct key_opts *opts,
+	      uint32_t part_count)
 {
-	size_t sz = key_def_sizeof(part_count);
+	size_t sz = index_def_sizeof(part_count);
 	/*
-	 * Use calloc for nullifying all struct key_def attributes including
+	 * Use calloc for nullifying all struct index_def attributes including
 	 * comparator pointers.
 	 */
-	struct key_def *def = (struct key_def *) calloc(1, sz);
+	struct index_def *def = (struct index_def *) calloc(1, sz);
 	if (def == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
 	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
@@ -197,29 +197,29 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
-	def->part_count = part_count;
+	def->key_def.part_count = part_count;
 	return def;
 }
 
-struct key_def *
-key_def_dup(const struct key_def *def)
+struct index_def *
+index_def_dup(const struct index_def *def)
 {
-	size_t sz = key_def_sizeof(def->part_count);
-	struct key_def *dup = (struct key_def *) malloc(sz);
+	size_t sz = index_def_sizeof(def->key_def.part_count);
+	struct index_def *dup = (struct index_def *) malloc(sz);
 	if (dup == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
-	memcpy(dup, def, key_def_sizeof(def->part_count));
+	memcpy(dup, def, index_def_sizeof(def->key_def.part_count));
 	rlist_create(&dup->link);
 	return dup;
 }
 
 /** Free a key definition. */
 void
-key_def_delete(struct key_def *key_def)
+index_def_delete(struct index_def *index_def)
 {
-	free(key_def);
+	free(index_def);
 }
 
 int
@@ -240,7 +240,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 }
 
 int
-key_def_cmp(const struct key_def *key1, const struct key_def *key2)
+index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 {
 	if (key1->iid != key2->iid)
 		return key1->iid < key2->iid ? -1 : 1;
@@ -251,45 +251,45 @@ key_def_cmp(const struct key_def *key1, const struct key_def *key2)
 	if (key_opts_cmp(&key1->opts, &key2->opts))
 		return key_opts_cmp(&key1->opts, &key2->opts);
 
-	return key_part_cmp(key1->parts, key1->part_count,
-			    key2->parts, key2->part_count);
+	return key_part_cmp(key1->key_def.parts, key1->key_def.part_count,
+			    key2->key_def.parts, key2->key_def.part_count);
 }
 
 void
-key_def_check(struct key_def *key_def)
+index_def_check(struct index_def *index_def)
 {
-	struct space *space = space_cache_find(key_def->space_id);
+	struct space *space = space_cache_find(index_def->space_id);
 
-	if (key_def->iid >= BOX_INDEX_MAX) {
+	if (index_def->iid >= BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  key_def->name,
+			  index_def->name,
 			  space_name(space),
 			  "index id too big");
 	}
-	if (key_def->iid == 0 && key_def->opts.is_unique == false) {
+	if (index_def->iid == 0 && index_def->opts.is_unique == false) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  key_def->name,
+			  index_def->name,
 			  space_name(space),
 			  "primary key must be unique");
 	}
-	if (key_def->part_count == 0) {
+	if (index_def->key_def.part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  key_def->name,
+			  index_def->name,
 			  space_name(space),
 			  "part count must be positive");
 	}
-	if (key_def->part_count > BOX_INDEX_PART_MAX) {
+	if (index_def->key_def.part_count > BOX_INDEX_PART_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  key_def->name,
+			  index_def->name,
 			  space_name(space),
 			  "too many key parts");
 	}
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		assert(key_def->parts[i].type > FIELD_TYPE_ANY &&
-		       key_def->parts[i].type < field_type_MAX);
-		if (key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
+	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
+		assert(index_def->key_def.parts[i].type > FIELD_TYPE_ANY &&
+		       index_def->key_def.parts[i].type < field_type_MAX);
+		if (index_def->key_def.parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "field no is too big");
 		}
@@ -298,40 +298,40 @@ key_def_check(struct key_def *key_def)
 			 * Courtesy to a user who could have made
 			 * a typo.
 			 */
-			if (key_def->parts[i].fieldno ==
-			    key_def->parts[j].fieldno) {
+			if (index_def->key_def.parts[i].fieldno ==
+			    index_def->key_def.parts[j].fieldno) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  key_def->name,
+					  index_def->name,
 					  space_name(space),
 					  "same key part is indexed twice");
 			}
 		}
 	}
 
-	/* validate key_def->type */
-	space->handler->engine->keydefCheck(space, key_def);
+	/* validate index_def->type */
+	space->handler->engine->checkIndexDef(space, index_def);
 }
 
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type)
+index_def_set_part(struct index_def *def, uint32_t part_no,
+		   uint32_t fieldno, enum field_type type)
 {
-	assert(part_no < def->part_count);
+	assert(part_no < def->key_def.part_count);
 	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
-	def->parts[part_no].fieldno = fieldno;
-	def->parts[part_no].type = type;
+	def->key_def.parts[part_no].fieldno = fieldno;
+	def->key_def.parts[part_no].type = type;
 	/**
 	 * When all parts are set, initialize the tuple
 	 * comparator function.
 	 */
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
-	for (uint32_t i = 0; i < def->part_count; i++) {
-		if (def->parts[i].type == FIELD_TYPE_ANY)
+	for (uint32_t i = 0; i < def->key_def.part_count; i++) {
+		if (def->key_def.parts[i].type == FIELD_TYPE_ANY)
 			all_parts_set = false;
 	}
 	if (all_parts_set)
-		key_def_set_cmp(def);
+		key_def_set_cmp(&def->key_def);
 }
 
 const struct key_part *
@@ -346,54 +346,54 @@ key_def_find(const struct key_def *key_def, uint32_t fieldno)
 	return NULL;
 }
 
-struct key_def *
-key_def_merge(const struct key_def *first, const struct key_def *second)
+struct index_def *
+index_def_merge(const struct index_def *first, const struct index_def *second)
 {
-	uint32_t new_part_count = first->part_count + second->part_count;
+	uint32_t new_part_count = first->key_def.part_count + second->key_def.part_count;
 	/*
 	 * Find and remove part duplicates, i.e. parts counted
 	 * twice since they are present in both key defs.
 	 */
-	const struct key_part *part = second->parts;
-	const struct key_part *end = part + second->part_count;
+	const struct key_part *part = second->key_def.parts;
+	const struct key_part *end = part + second->key_def.part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part->fieldno))
+		if (key_def_find(&first->key_def, part->fieldno))
 			--new_part_count;
 	}
 
-	struct key_def *new_def;
-	new_def =  key_def_new(first->space_id, first->iid, first->name,
+	struct index_def *new_def;
+	new_def =  index_def_new(first->space_id, first->iid, first->name,
 			       first->type, &first->opts, new_part_count);
 	if (new_def == NULL)
 		return NULL;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
-	/* Append first key def's parts to the new key_def. */
-	part = first->parts;
-	end = part + first->part_count;
+	/* Append first key def's parts to the new index_def. */
+	part = first->key_def.parts;
+	end = part + first->key_def.part_count;
 	for (; part != end; part++)
-	     key_def_set_part(new_def, pos++, part->fieldno, part->type);
+	     index_def_set_part(new_def, pos++, part->fieldno, part->type);
 
 	/* Set-append second key def's part to the new key def. */
-	part = second->parts;
-	end = part + second->part_count;
+	part = second->key_def.parts;
+	end = part + second->key_def.part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part->fieldno))
+		if (key_def_find(&first->key_def, part->fieldno))
 			continue;
-		key_def_set_part(new_def, pos++, part->fieldno, part->type);
+		index_def_set_part(new_def, pos++, part->fieldno, part->type);
 	}
 	return new_def;
 }
 
 int
-key_validate_parts(struct key_def *key_def, const char *key,
+key_validate_parts(struct index_def *index_def, const char *key,
 		   uint32_t part_count)
 {
 	for (uint32_t part = 0; part < part_count; part++) {
 		enum mp_type mp_type = mp_typeof(*key);
 		mp_next(&key);
 
-		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
+		if (key_mp_type_validate(index_def->key_def.parts[part].type, mp_type,
 					 ER_KEY_PART_TYPE, part))
 			return -1;
 	}

@@ -324,7 +324,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 
 struct tuple *
 vy_stmt_new_surrogate_from_key(struct tuple_format *format,
-			       const char *key, const struct key_def *def,
+			       const char *key, const struct index_def *def,
 			       enum iproto_type type)
 {
 	/**
@@ -345,13 +345,13 @@ vy_stmt_new_surrogate_from_key(struct tuple_format *format,
 	memset(iov, '#', sizeof(*iov) * field_count);
 #endif
 	uint32_t part_count = mp_decode_array(&key);
-	assert(part_count == def->part_count);
+	assert(part_count == def->key_def.part_count);
 	assert(part_count <= field_count);
-	uint32_t nulls_count = field_count - def->part_count;
+	uint32_t nulls_count = field_count - def->key_def.part_count;
 	uint32_t bsize = mp_sizeof_array(field_count) +
 		mp_sizeof_nil() * nulls_count;
 	for (uint32_t i = 0; i < part_count; ++i) {
-		const struct key_part *part = &def->parts[i];
+		const struct key_part *part = &def->key_def.parts[i];
 		assert(part->fieldno < field_count);
 		const char *svp = key;
 		iov[part->fieldno].iov_base = (char *) key;
@@ -390,7 +390,7 @@ vy_stmt_new_surrogate_from_key(struct tuple_format *format,
 struct tuple *
 vy_stmt_new_surrogate_delete_from_key(struct tuple_format *format,
 				      const char *key,
-				      const struct key_def *def)
+				      const struct index_def *def)
 {
 	return vy_stmt_new_surrogate_from_key(format, key, def, IPROTO_DELETE);
 }
@@ -445,7 +445,7 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 }
 
 int
-vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
+vy_stmt_encode(const struct tuple *value, const struct index_def *index_def,
 	       struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
@@ -455,17 +455,17 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
 
 	struct request request;
 	request_create(&request, type);
-	request.space_id = key_def->space_id;
-	request.index_id = key_def->iid;
+	request.space_id = index_def->space_id;
+	request.index_id = index_def->iid;
 	uint32_t size;
 	const char *extracted = NULL;
-	if (key_def->iid != 0 || type == IPROTO_DELETE) {
-		extracted = tuple_extract_key(value, key_def, &size);
+	if (index_def->iid != 0 || type == IPROTO_DELETE) {
+		extracted = tuple_extract_key(value, index_def, &size);
 		if (extracted == NULL)
 			return -1;
 	}
 
-	if (key_def->iid == 0) {
+	if (index_def->iid == 0) {
 		if (type == IPROTO_REPLACE) {
 			request.tuple = tuple_data_range(value, &size);
 			request.tuple_end = request.tuple + size;
@@ -502,7 +502,7 @@ vy_stmt_encode(const struct tuple *value, const struct key_def *key_def,
 
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
-	       const struct key_def *def)
+	       const struct index_def *def)
 {
 	struct request request;
 	request_create(&request, xrow->type);

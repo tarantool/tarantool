@@ -206,7 +206,7 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 	try {
 		/* Update the primary key */
 		Index *pk = index_find_xc(space, 0);
-		assert(pk->key_def->opts.is_unique);
+		assert(pk->index_def->opts.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
 		 * has to find and delete it, or raise an
@@ -285,7 +285,7 @@ MemtxSpace::prepareDelete(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->key_def, key, part_count))
+	if (primary_key_validate(pk->index_def, key, part_count))
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 }
@@ -298,7 +298,7 @@ MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->key_def, key, part_count))
+	if (primary_key_validate(pk->index_def, key, part_count))
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 
@@ -334,12 +334,12 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 
 	Index *index = space->index[0];
 
-	struct key_def *key_def = index->key_def;
-	uint32_t part_count = index->key_def->part_count;
+	struct index_def *index_def = index->index_def;
+	uint32_t part_count = index->index_def->key_def.part_count;
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
-						key_def, NULL);
+						index_def, NULL);
 	if (key == NULL)
 		diag_raise();
 	/* Cut array header */
@@ -398,10 +398,11 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		tuple_ref(stmt->new_tuple);
 
 		Index *pk = space->index[0];
-		if (tuple_compare(stmt->old_tuple, stmt->new_tuple, pk->key_def)) {
+		if (tuple_compare(stmt->old_tuple, stmt->new_tuple,
+				  &pk->index_def->key_def)) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 pk->key_def->name, space_name(space));
+				 pk->index_def->name, space_name(space));
 			error_log(diag_last_error(diag_get()));
 			tuple_unref(stmt->new_tuple);
 			stmt->old_tuple = NULL;
@@ -462,18 +463,18 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 }
 
 Index *
-MemtxSpace::createIndex(struct space *space, struct key_def *key_def_arg)
+MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
 {
 	(void) space;
-	switch (key_def_arg->type) {
+	switch (index_def_arg->type) {
 	case HASH:
-		return new MemtxHash(key_def_arg);
+		return new MemtxHash(index_def_arg);
 	case TREE:
-		return new MemtxTree(key_def_arg);
+		return new MemtxTree(index_def_arg);
 	case RTREE:
-		return new MemtxRTree(key_def_arg);
+		return new MemtxRTree(index_def_arg);
 	case BITSET:
-		return new MemtxBitset(key_def_arg);
+		return new MemtxBitset(index_def_arg);
 	default:
 		unreachable();
 		return NULL;
@@ -483,7 +484,7 @@ MemtxSpace::createIndex(struct space *space, struct key_def *key_def_arg)
 void
 MemtxSpace::dropIndex(Index *index)
 {
-	if (index->key_def->iid != 0)
+	if (index->index_def->iid != 0)
 		return; /* nothing to do for secondary keys */
 	/*
 	 * Delete all tuples in the old space if dropping the
@@ -521,7 +522,7 @@ MemtxSpace::executeSelect(struct txn *, struct space *space,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->key_def, type, key, part_count))
+	if (key_validate(index->index_def, type, key, part_count))
 		diag_raise();
 
 	struct iterator *it = index->position();

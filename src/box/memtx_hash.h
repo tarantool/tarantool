@@ -37,7 +37,7 @@ struct light_index_core;
 
 class MemtxHash: public MemtxIndex {
 public:
-	MemtxHash(struct key_def *key_def);
+	MemtxHash(struct index_def *index_def);
 	virtual ~MemtxHash() override;
 
 	virtual void reserve(uint32_t size_hint) override;

@@ -78,7 +78,7 @@ struct MemtxSpace: public Handler {
 		      struct port *port) override;
 
 	virtual Index *createIndex(struct space *space,
-				   struct key_def *key_def) override;
+				   struct index_def *index_def) override;
 	virtual void dropIndex(Index *index) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;

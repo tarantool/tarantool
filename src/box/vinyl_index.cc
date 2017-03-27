@@ -56,8 +56,8 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct vy_env *env_arg, struct key_def *key_def_arg)
-	:Index(key_def_arg)
+VinylIndex::VinylIndex(struct vy_env *env_arg, struct index_def *index_def_arg)
+	:Index(index_def_arg)
 	 ,env(env_arg)
 	 ,db(NULL)
 {}
@@ -67,7 +67,7 @@ VinylIndex::open()
 {
 	assert(db == NULL);
 	/* Create vinyl database. */
-	db = vy_index_new(env, key_def, space_by_id(key_def->space_id));
+	db = vy_index_new(env, index_def, space_by_id(index_def->space_id));
 	if (db == NULL || vy_index_open(db))
 		diag_raise();
 }
@@ -76,7 +76,7 @@ VinylIndex::open()
 struct tuple*
 VinylIndex::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->opts.is_unique && part_count == key_def->part_count);
+	assert(index_def->opts.is_unique && part_count == index_def->key_def.part_count);
 	/*
 	 * engine_tx might be empty, even if we are in txn context.
 	 * This can happen on a first-read statement.

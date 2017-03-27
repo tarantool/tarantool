@@ -43,7 +43,7 @@ struct VinylEngine: public Engine {
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index) override;
-	virtual void keydefCheck(struct space *space, struct key_def *f) override;
+	virtual void checkIndexDef(struct space *space, struct index_def *f) override;
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;

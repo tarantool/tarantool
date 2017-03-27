@@ -175,12 +175,12 @@ space_cache_replace(struct space *space)
 /** A wrapper around space_new() for data dictionary spaces. */
 struct space *
 sc_space_new(struct space_def *space_def,
-	     struct key_def *key_def,
+	     struct index_def *index_def,
 	     struct trigger *trigger)
 {
 	struct rlist key_list;
 	rlist_create(&key_list);
-	rlist_add_entry(&key_list, key_def, link);
+	rlist_add_entry(&key_list, index_def, link);
 	struct space *space = space_new(space_def, &key_list);
 	(void) space_cache_replace(space);
 	if (trigger)
@@ -254,70 +254,70 @@ schema_init()
 		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", {false}
 	};
 	struct key_opts opts = key_opts_default;
-	struct key_def *key_def = key_def_new(def.id,
+	struct index_def *index_def = index_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */
 					      TREE /* index type */,
 					      &opts,
 					      1); /* part count */
-	if (key_def == NULL)
+	if (index_def == NULL)
 		diag_raise();
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
-	(void) sc_space_new(&def, key_def, &on_replace_schema);
+	(void) sc_space_new(&def, index_def, &on_replace_schema);
 
 	/* _space - home for all spaces. */
-	key_def->space_id = def.id = BOX_SPACE_ID;
+	index_def->space_id = def.id = BOX_SPACE_ID;
 	snprintf(def.name, sizeof(def.name), "_space");
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 
-	(void) sc_space_new(&def, key_def, &alter_space_on_replace_space);
+	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space);
 
 	/* _user - all existing users */
-	key_def->space_id = def.id = BOX_USER_ID;
+	index_def->space_id = def.id = BOX_USER_ID;
 	snprintf(def.name, sizeof(def.name), "_user");
-	(void) sc_space_new(&def, key_def, &on_replace_user);
+	(void) sc_space_new(&def, index_def, &on_replace_user);
 
 	/* _func - all executable objects on which one can have grants */
-	key_def->space_id = def.id = BOX_FUNC_ID;
+	index_def->space_id = def.id = BOX_FUNC_ID;
 	snprintf(def.name, sizeof(def.name), "_func");
-	(void) sc_space_new(&def, key_def, &on_replace_func);
+	(void) sc_space_new(&def, index_def, &on_replace_func);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	key_def->space_id = def.id = BOX_PRIV_ID;
+	index_def->space_id = def.id = BOX_PRIV_ID;
 	snprintf(def.name, sizeof(def.name), "_priv");
-	(void) sc_space_new(&def, key_def, &on_replace_priv);
+	(void) sc_space_new(&def, index_def, &on_replace_priv);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
-	key_def->space_id = def.id = BOX_CLUSTER_ID;
+	index_def->space_id = def.id = BOX_CLUSTER_ID;
 	snprintf(def.name, sizeof(def.name), "_cluster");
-	(void) sc_space_new(&def, key_def, &on_replace_cluster);
-	key_def_delete(key_def);
+	(void) sc_space_new(&def, index_def, &on_replace_cluster);
+	index_def_delete(index_def);
 
 	/* _index - definition of indexes in all spaces */
 	def.id = BOX_INDEX_ID;
 	snprintf(def.name, sizeof(def.name), "_index");
-	key_def = key_def_new(def.id,
+	index_def = index_def_new(def.id,
 			      0 /* index id */,
 			      "primary",
 			      TREE /* index type */,
 			      &opts,
 			      2); /* part count */
-	if (key_def == NULL)
+	if (index_def == NULL)
 		diag_raise();
 	/* space no */
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 	/* index no */
-	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
+	index_def_set_part(index_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
-	(void) sc_space_new(&def, key_def, &alter_space_on_replace_index);
-	key_def_delete(key_def);
+	(void) sc_space_new(&def, index_def, &alter_space_on_replace_index);
+	index_def_delete(index_def);
 }
 
 void

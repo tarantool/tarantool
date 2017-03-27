@@ -82,7 +82,7 @@ struct MemtxEngine: public Engine {
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index) override;
-	virtual void keydefCheck(struct space *space, struct key_def *key_def) override;
+	virtual void checkIndexDef(struct space *space, struct index_def *index_def) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *,
 				       struct txn_stmt *stmt) override;

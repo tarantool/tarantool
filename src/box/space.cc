@@ -93,12 +93,12 @@ space_new(struct space_def *def, struct rlist *key_list)
 	 * unique index constraint.
 	 */
 	bool has_unique_secondary_key = false;
-	struct key_def *key_def;
-	rlist_foreach_entry(key_def, key_list, link) {
+	struct index_def *index_def;
+	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		if (key_def->iid > 0 && key_def->opts.is_unique == true)
+		if (index_def->iid > 0 && index_def->opts.is_unique == true)
 			has_unique_secondary_key = true;
-		index_id_max = MAX(index_id_max, key_def->iid);
+		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
@@ -119,7 +119,14 @@ space_new(struct space_def *def, struct rlist *key_list)
 				      index_count * sizeof(Index *));
 	space->def = *def;
 	Engine *engine = engine_find(def->engine_name);
-	space->format = tuple_format_new(engine->format, key_list, 0);
+	struct key_def **keys;
+	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
+						  sizeof(*keys) * index_count);
+	uint32_t key_no = 0;
+	rlist_foreach_entry(index_def, key_list, link) {
+		keys[key_no++] = &index_def->key_def;
+	}
+	space->format = tuple_format_new(engine->format, keys, index_count, 0);
 	if (space->format == NULL)
 		diag_raise();
 	space->has_unique_secondary_key = has_unique_secondary_key;
@@ -129,9 +136,9 @@ space_new(struct space_def *def, struct rlist *key_list)
 	/* init space engine instance */
 	space->handler = engine->open();
 	/* Fill the space indexes. */
-	rlist_foreach_entry(key_def, key_list, link) {
-		space->index_map[key_def->iid] =
-			space->handler->createIndex(space, key_def);
+	rlist_foreach_entry(index_def, key_list, link) {
+		space->index_map[index_def->iid] =
+			space->handler->createIndex(space, index_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;
@@ -170,7 +177,7 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 	rlist_create(key_list);
 
 	for (unsigned j = 0; j < space->index_count; j++)
-		rlist_add_tail_entry(key_list, space->index[j]->key_def,
+		rlist_add_tail_entry(key_list, space->index[j]->index_def,
 				     link);
 }
 
@@ -207,7 +214,7 @@ space_check_update(struct space *space,
 {
 	assert(space->index_count > 0);
 	Index *index = space->index[0];
-	if (tuple_compare(old_tuple, new_tuple, index->key_def))
+	if (tuple_compare(old_tuple, new_tuple, &index->index_def->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			  index_name(index), space_name(space));
 }

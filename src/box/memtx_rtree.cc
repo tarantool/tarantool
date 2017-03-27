@@ -116,11 +116,11 @@ mp_decode_rect_from_key(struct rtree_rect *rect, unsigned dimension,
 
 inline void
 extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
-		  struct key_def *key_def)
+		  struct index_def *index_def)
 {
-	assert(key_def->part_count == 1);
-	const char *elems = tuple_field(tuple, key_def->parts[0].fieldno);
-	unsigned dimension = key_def->opts.dimension;
+	assert(index_def->key_def.part_count == 1);
+	const char *elems = tuple_field(tuple, index_def->key_def.parts[0].fieldno);
+	unsigned dimension = index_def->opts.dimension;
 	if (mp_decode_rect(rect, dimension, elems)) {
 		tnt_raise(ClientError, ER_RTREE_RECT,
 			  "Field", dimension, dimension * 2);
@@ -163,14 +163,14 @@ MemtxRTree::~MemtxRTree()
 	rtree_destroy(&m_tree);
 }
 
-MemtxRTree::MemtxRTree(struct key_def *key_def_arg)
-	: MemtxIndex(key_def_arg)
+MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
+	: MemtxIndex(index_def_arg)
 {
-	assert(key_def->part_count == 1);
-	assert(key_def->parts[0].type == FIELD_TYPE_ARRAY);
-	assert(key_def->opts.is_unique == false);
+	assert(index_def->key_def.part_count == 1);
+	assert(index_def->key_def.parts[0].type == FIELD_TYPE_ARRAY);
+	assert(index_def->opts.is_unique == false);
 
-	m_dimension = key_def->opts.dimension;
+	m_dimension = index_def->opts.dimension;
 	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
 		char message[64];
 		snprintf(message, 64, "dimension (%u): must belong to range "
@@ -182,7 +182,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def_arg)
 	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
 	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
 	enum rtree_distance_type distance_type =
-		(enum rtree_distance_type)(int)key_def->opts.distance;
+		(enum rtree_distance_type)(int)index_def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
 		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
 		   distance_type);
@@ -223,11 +223,11 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 {
 	struct rtree_rect rect;
 	if (new_tuple) {
-		extract_rectangle(&rect, new_tuple, key_def);
+		extract_rectangle(&rect, new_tuple, index_def);
 		rtree_insert(&m_tree, &rect, new_tuple);
 	}
 	if (old_tuple) {
-		extract_rectangle(&rect, old_tuple, key_def);
+		extract_rectangle(&rect, old_tuple, index_def);
 		if (!rtree_remove(&m_tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}

@@ -161,42 +161,42 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		Index *index = space_index(space, k);
 		if (index == NULL)
 			continue;
-		struct key_def *key_def = index->key_def;
-		lua_pushnumber(L, key_def->iid);
+		struct index_def *index_def = index->index_def;
+		lua_pushnumber(L, index_def->iid);
 		lua_newtable(L);		/* space.index[k] */
 
-		if (key_def->type == HASH || key_def->type == TREE) {
-			lua_pushboolean(L, key_def->opts.is_unique);
+		if (index_def->type == HASH || index_def->type == TREE) {
+			lua_pushboolean(L, index_def->opts.is_unique);
 			lua_setfield(L, -2, "unique");
-		} else if (key_def->type == RTREE) {
-			lua_pushnumber(L, key_def->opts.dimension);
+		} else if (index_def->type == RTREE) {
+			lua_pushnumber(L, index_def->opts.dimension);
 			lua_setfield(L, -2, "dimension");
 		}
 
-		lua_pushstring(L, index_type_strs[key_def->type]);
+		lua_pushstring(L, index_type_strs[index_def->type]);
 		lua_setfield(L, -2, "type");
 
-		lua_pushnumber(L, key_def->iid);
+		lua_pushnumber(L, index_def->iid);
 		lua_setfield(L, -2, "id");
 
 		lua_pushnumber(L, space->def.id);
 		lua_setfield(L, -2, "space_id");
 
-		lua_pushstring(L, key_def->name);
+		lua_pushstring(L, index_def->name);
 		lua_setfield(L, -2, "name");
 
 		lua_pushstring(L, "parts");
 		lua_newtable(L);
 
-		for (uint32_t j = 0; j < key_def->part_count; j++) {
+		for (uint32_t j = 0; j < index_def->key_def.part_count; j++) {
 			lua_pushnumber(L, j + 1);
 			lua_newtable(L);
 
 			lua_pushstring(L,
-			       field_type_strs[key_def->parts[j].type]);
+			       field_type_strs[index_def->key_def.parts[j].type]);
 			lua_setfield(L, -2, "type");
 
-			lua_pushnumber(L, key_def->parts[j].fieldno + 1);
+			lua_pushnumber(L, index_def->key_def.parts[j].fieldno + 1);
 			lua_setfield(L, -2, "fieldno");
 
 			lua_settable(L, -3); /* index[k].parts[j] */
@@ -205,8 +205,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_settable(L, -3); /* space.index[k].parts */
 
 		lua_settable(L, -3); /* space.index[k] */
-		lua_rawgeti(L, -1, key_def->iid);
-		lua_setfield(L, -2, key_def->name);
+		lua_rawgeti(L, -1, index_def->iid);
+		lua_setfield(L, -2, index_def->name);
 	}
 
 	lua_pop(L, 1); /* pop the index field */

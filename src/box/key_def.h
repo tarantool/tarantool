@@ -233,8 +233,20 @@ typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
 			   const struct key_def *key_def);
 
-/* Descriptor of a multipart key. */
+/* Definition of a multipart key. */
 struct key_def {
+	/** tuple <-> tuple comparison function */
+	tuple_compare_t tuple_compare;
+	/** tuple <-> key comparison function */
+	tuple_compare_with_key_t tuple_compare_with_key;
+	/** The size of the 'parts' array. */
+	uint32_t part_count;
+	/** Description of parts of a multipart index. */
+	struct key_part parts[];
+};
+
+/* Definition of an index. */
+struct index_def {
 	/* A link in key list. */
 	struct rlist link;
 	/** Ordinal index number in the index array. */
@@ -246,22 +258,15 @@ struct key_def {
 	/** Index type. */
 	enum index_type type;
 	struct key_opts opts;
-	/** tuple <-> tuple comparison function */
-	tuple_compare_t tuple_compare;
-	/** tuple <-> key comparison function */
-	tuple_compare_with_key_t tuple_compare_with_key;
-	/** The size of the 'parts' array. */
-	uint32_t part_count;
-	/** Description of parts of a multipart index. */
-	struct key_part parts[];
+	struct key_def key_def;
 };
 
-struct key_def *
-key_def_dup(const struct key_def *def);
+struct index_def *
+index_def_dup(const struct index_def *def);
 
-/* Destroy and free a key_def. */
+/* Destroy and free an index_def. */
 void
-key_def_delete(struct key_def *def);
+index_def_delete(struct index_def *def);
 
 /**
  * Encapsulates privileges of a user on an object.
@@ -384,9 +389,9 @@ typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
 
 static inline size_t
-key_def_sizeof(uint32_t part_count)
+index_def_sizeof(uint32_t part_count)
 {
-	return sizeof(struct key_def) + sizeof(struct key_part) * (part_count + 1);
+	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
 }
 
 /**
@@ -394,8 +399,8 @@ key_def_sizeof(uint32_t part_count)
  * @retval not NULL Success.
  * @retval NULL     Memory error.
  */
-struct key_def *
-key_def_new(uint32_t space_id, uint32_t iid, const char *name,
+struct index_def *
+index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, const struct key_opts *opts,
 	    uint32_t part_count);
 
@@ -405,12 +410,12 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
  * parts.
  */
 static inline void
-key_def_copy(struct key_def *to, const struct key_def *from)
+index_def_copy(struct index_def *to, const struct index_def *from)
 {
 	struct rlist save_link = to->link;
-	int part_count = (to->part_count < from->part_count ?
-			  to->part_count : from->part_count);
-	size_t size  = (sizeof(struct key_def) +
+	int part_count = (to->key_def.part_count < from->key_def.part_count ?
+			  to->key_def.part_count : from->key_def.part_count);
+	size_t size  = (sizeof(struct index_def) +
 			sizeof(struct key_part) * part_count);
 	memcpy(to, from, size);
 	to->link = save_link;
@@ -421,30 +426,30 @@ key_def_copy(struct key_def *to, const struct key_def *from)
  * @pre part_no < part_count
  */
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type);
+index_def_set_part(struct index_def *def, uint32_t part_no,
+		   uint32_t fieldno, enum field_type type);
 
 /**
- * Returns the part in key_def->parts for the specified fieldno.
- * If fieldno is not in key_def->parts returns NULL.
+ * Returns the part in index_def->parts for the specified fieldno.
+ * If fieldno is not in index_def->parts returns NULL.
  */
 const struct key_part *
 key_def_find(const struct key_def *key_def, uint32_t fieldno);
 
 /**
- * Allocate a new key_def with a set union of key parts from
- * first and second key defs. Parts of the new key_def consist
- * of the first key_def's parts and those parts of the second
- * key_def that were not among the first parts.
+ * Allocate a new index_def with a set union of key parts from
+ * first and second key defs. Parts of the new index_def consist
+ * of the first index_def's parts and those parts of the second
+ * index_def that were not among the first parts.
  * @retval not NULL Ok.
  * @retval NULL     Memory error.
  */
-struct key_def *
-key_def_merge(const struct key_def *first, const struct key_def *second);
+struct index_def *
+index_def_merge(const struct index_def *first, const struct index_def *second);
 
 /*
  * Check that parts of the key match with the key definition.
- * @param key_def Key definition.
+ * @param index_def Key definition.
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
  *
@@ -452,15 +457,15 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
  * @retval -1 The key is invalid.
  */
 int
-key_validate_parts(struct key_def *key_def, const char *key,
+key_validate_parts(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
 
 /**
- * Return true if @a key_def defines a sequential key without
+ * Return true if @a index_def defines a sequential key without
  * holes starting from the first field. In other words, for all
- * key parts key_def->parts[part_id].fieldno == part_id.
- * @param key_def key_def
- * @retval true key_def is sequential
+ * key parts index_def->parts[part_id].fieldno == part_id.
+ * @param index_def index_def
+ * @retval true index_def is sequential
  * @retval false otherwise
  */
 static inline bool
@@ -528,15 +533,15 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  * (HASH < TREE < BITSET) or its key part array is greater.
  */
 int
-key_def_cmp(const struct key_def *key1, const struct key_def *key2);
+index_def_cmp(const struct index_def *key1, const struct index_def *key2);
 
 /**
  * Check a key definition for violation of various limits.
  *
- * @param key_def   key_def
+ * @param index_def   index_def
  */
 void
-key_def_check(struct key_def *key_def);
+index_def_check(struct index_def *index_def);
 
 /** Check space definition structure for errors. */
 void
@@ -556,7 +561,7 @@ space_def_check(struct space_def *def, uint32_t namelen,
  * @note Implemented in alter.cc
  */
 extern struct tuple *
-key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
+index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
 
 /**
  * Check object identifier for invalid symbols.

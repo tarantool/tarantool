@@ -60,10 +60,10 @@ public:
 	virtual Handler *open() = 0;
 	virtual void initSystemSpace(struct space *space);
 	/**
-	 * Check a key definition for violation of
+	 * Check an index definition for violation of
 	 * various limits.
 	 */
-	virtual void keydefCheck(struct space *space, struct key_def*);
+	virtual void checkIndexDef(struct space *space, struct index_def*);
 	/**
 	 * Called by alter when a primary key added,
 	 * after createIndex is invoked for the new
@@ -216,7 +216,7 @@ public:
 	 * Create an instance of space index. Used in alter
 	 * space.
 	 */
-	virtual Index *createIndex(struct space *space, struct key_def*) = 0;
+	virtual Index *createIndex(struct space *space, struct index_def*) = 0;
 	/**
 	 * Delete all tuples in the index on drop.
 	 */

@@ -49,7 +49,7 @@ struct SysviewSpace: public Handler {
 	executeUpsert(struct txn *, struct space *, struct request *) override;
 
 	virtual Index *createIndex(struct space *space,
-				   struct key_def *key_def) override;
+				   struct index_def *index_def) override;
 	virtual void dropIndex(Index *index) override;
 };
 
@@ -82,22 +82,22 @@ SysviewSpace::executeUpsert(struct txn *, struct space *space, struct request *)
 }
 
 Index *
-SysviewSpace::createIndex(struct space *space, struct key_def *key_def)
+SysviewSpace::createIndex(struct space *space, struct index_def *index_def)
 {
-	assert(key_def->type == TREE);
-	switch (key_def->space_id) {
+	assert(index_def->type == TREE);
+	switch (index_def->space_id) {
 	case BOX_VSPACE_ID:
-		return new SysviewVspaceIndex(key_def);
+		return new SysviewVspaceIndex(index_def);
 	case BOX_VINDEX_ID:
-		return new SysviewVindexIndex(key_def);
+		return new SysviewVindexIndex(index_def);
 	case BOX_VUSER_ID:
-		return new SysviewVuserIndex(key_def);
+		return new SysviewVuserIndex(index_def);
 	case BOX_VFUNC_ID:
-		return new SysviewVfuncIndex(key_def);
+		return new SysviewVfuncIndex(index_def);
 	case BOX_VPRIV_ID:
-		return new SysviewVprivIndex(key_def);
+		return new SysviewVprivIndex(index_def);
 	default:
-		tnt_raise(ClientError, ER_MODIFY_INDEX, key_def->name,
+		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
 			  space_name(space), "unknown space for system view");
 		return NULL;
 	}

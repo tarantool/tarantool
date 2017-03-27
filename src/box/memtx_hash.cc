@@ -41,17 +41,17 @@
 
 static inline bool
 equal(struct tuple *tuple_a, struct tuple *tuple_b,
-	    const struct key_def *key_def)
+      const struct key_def *key_def)
 {
 	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
 }
 
 static inline bool
 equal_key(struct tuple *tuple, const char *key,
-		const struct key_def *key_def)
+	  const struct key_def *key_def)
 {
 	return tuple_compare_with_key(tuple, key, key_def->part_count,
-					       key_def) == 0;
+				      key_def) == 0;
 }
 
 #define LIGHT_NAME _index
@@ -121,8 +121,8 @@ hash_iterator_eq(struct iterator *it)
 
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
-MemtxHash::MemtxHash(struct key_def *key_def_arg)
-	: MemtxIndex(key_def_arg)
+MemtxHash::MemtxHash(struct index_def *index_def_arg)
+	: MemtxIndex(index_def_arg)
 {
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
@@ -132,7 +132,7 @@ MemtxHash::MemtxHash(struct key_def *key_def_arg)
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   NULL, this->key_def);
+			   NULL, &this->index_def->key_def);
 }
 
 MemtxHash::~MemtxHash()
@@ -175,11 +175,11 @@ MemtxHash::random(uint32_t rnd) const
 struct tuple *
 MemtxHash::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->opts.is_unique && part_count == key_def->part_count);
+	assert(index_def->opts.is_unique && part_count == index_def->key_def.part_count);
 	(void) part_count;
 
 	struct tuple *ret = NULL;
-	uint32_t h = key_hash(key, key_def);
+	uint32_t h = key_hash(key, index_def);
 	uint32_t k = light_index_find_key(hash_table, h, key);
 	if (k != light_index_end)
 		ret = light_index_get(hash_table, k);
@@ -193,7 +193,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	uint32_t errcode;
 
 	if (new_tuple) {
-		uint32_t h = tuple_hash(new_tuple, key_def);
+		uint32_t h = tuple_hash(new_tuple, index_def);
 		struct tuple *dup_tuple = NULL;
 		hash_t pos = light_index_replace(hash_table, h, new_tuple, &dup_tuple);
 		if (pos == light_index_end)
@@ -220,7 +220,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			struct space *sp = space_cache_find(key_def->space_id);
+			struct space *sp = space_cache_find(index_def->space_id);
 			tnt_raise(ClientError, errcode, index_name(this),
 				  space_name(sp));
 		}
@@ -230,7 +230,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (old_tuple) {
-		uint32_t h = tuple_hash(old_tuple, key_def);
+		uint32_t h = tuple_hash(old_tuple, index_def);
 		int res = light_index_delete_value(hash_table, h, old_tuple);
 		assert(res == 0); (void) res;
 	}
@@ -268,7 +268,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	case ITER_GT:
 		if (part_count != 0) {
 			light_index_iterator_key(it->hash_table, &it->iterator,
-					    key_hash(key, key_def), key);
+					    key_hash(key, index_def), key);
 			it->base.next = hash_iterator_gt;
 		} else {
 			light_index_iterator_begin(it->hash_table, &it->iterator);
@@ -282,7 +282,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	case ITER_EQ:
 		assert(part_count > 0);
 		light_index_iterator_key(it->hash_table, &it->iterator,
-				         key_hash(key, key_def), key);
+				         key_hash(key, index_def), key);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:

@@ -38,7 +38,7 @@
 struct VinylIndex: public Index
 {
 public:
-	VinylIndex(struct vy_env *env, struct key_def *key_def);
+	VinylIndex(struct vy_env *env, struct index_def *index_def);
 
 	virtual void
 	open();

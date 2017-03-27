@@ -73,9 +73,9 @@ sysview_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
-SysviewIndex::SysviewIndex(struct key_def *key_def, uint32_t source_space_id,
+SysviewIndex::SysviewIndex(struct index_def *index_def, uint32_t source_space_id,
 		     uint32_t source_index_id, sysview_filter_f filter)
-	: Index(key_def), source_space_id(source_space_id),
+	: Index(index_def), source_space_id(source_space_id),
 	  source_index_id(source_index_id), filter(filter)
 {
 }
@@ -107,11 +107,11 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	struct space *source = space_cache_find(source_space_id);
 	struct Index *pk = index_find_xc(source, source_index_id);
 	/*
-	 * Explicitly validate that key matches source's key_def.
+	 * Explicitly validate that key matches source's index_def.
 	 * It is possible to change a source space without changing
 	 * the view.
 	 */
-	if (key_validate(pk->key_def, type, key, part_count))
+	if (key_validate(pk->index_def, type, key, part_count))
 		diag_raise();
 	/* Re-allocate iterator if schema was changed */
 	if (it->source != NULL && it->source->sc_version != ::sc_version) {
@@ -133,9 +133,9 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	struct space *source = space_cache_find(source_space_id);
 	struct Index *pk = index_find_xc(source, source_index_id);
-	if (!pk->key_def->opts.is_unique)
+	if (!pk->index_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
-	if (primary_key_validate(pk->key_def, key, part_count))
+	if (primary_key_validate(pk->index_def, key, part_count))
 		diag_raise();
 	struct tuple *tuple = pk->findByKey(key, part_count);
 	if (tuple == NULL || !filter(source, tuple))
@@ -160,13 +160,13 @@ vspace_filter(struct space *source, struct tuple *tuple)
 		space->def.uid == cr->uid);
 }
 
-SysviewVspaceIndex::SysviewVspaceIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, BOX_SPACE_ID, key_def->iid, vspace_filter)
+SysviewVspaceIndex::SysviewVspaceIndex(struct index_def *index_def)
+	: SysviewIndex(index_def, BOX_SPACE_ID, index_def->iid, vspace_filter)
 {
 }
 
-SysviewVindexIndex::SysviewVindexIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, BOX_INDEX_ID, key_def->iid, vspace_filter)
+SysviewVindexIndex::SysviewVindexIndex(struct index_def *index_def)
+	: SysviewIndex(index_def, BOX_INDEX_ID, index_def->iid, vspace_filter)
 {
 }
 
@@ -185,8 +185,8 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	return uid == cr->uid || owner_id == cr->uid;
 }
 
-SysviewVuserIndex::SysviewVuserIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, BOX_USER_ID, key_def->iid, vuser_filter)
+SysviewVuserIndex::SysviewVuserIndex(struct index_def *index_def)
+	: SysviewIndex(index_def, BOX_USER_ID, index_def->iid, vuser_filter)
 {
 }
 
@@ -205,8 +205,8 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 	return grantor_id == cr->uid || grantee_id == cr->uid;
 }
 
-SysviewVprivIndex::SysviewVprivIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, BOX_PRIV_ID, key_def->iid, vpriv_filter)
+SysviewVprivIndex::SysviewVprivIndex(struct index_def *index_def)
+	: SysviewIndex(index_def, BOX_PRIV_ID, index_def->iid, vpriv_filter)
 {
 }
 
@@ -230,7 +230,7 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	return false;
 }
 
-SysviewVfuncIndex::SysviewVfuncIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, BOX_FUNC_ID, key_def->iid, vfunc_filter)
+SysviewVfuncIndex::SysviewVfuncIndex(struct index_def *index_def)
+	: SysviewIndex(index_def, BOX_FUNC_ID, index_def->iid, vfunc_filter)
 {
 }

@@ -50,7 +50,7 @@ struct VinylSpace: public Handler {
 	executeUpsert(struct txn*, struct space *space,
 	              struct request *request) override;
 	virtual void dropIndex(Index*) override;
-	virtual Index *createIndex(struct space *, struct key_def *) override;
+	virtual Index *createIndex(struct space *, struct index_def *) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
 	/**

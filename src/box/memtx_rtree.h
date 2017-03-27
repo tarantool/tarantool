@@ -37,7 +37,7 @@
 class MemtxRTree: public MemtxIndex
 {
 public:
-	MemtxRTree(struct key_def *key_def);
+	MemtxRTree(struct index_def *index_def);
 	~MemtxRTree();
 
 	virtual void beginBuild() override;

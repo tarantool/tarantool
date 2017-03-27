@@ -164,11 +164,11 @@ VinylEngine::join(struct xstream *stream)
 }
 
 void
-VinylEngine::keydefCheck(struct space *space, struct key_def *key_def)
+VinylEngine::checkIndexDef(struct space *space, struct index_def *index_def)
 {
-	if (key_def->type != TREE) {
+	if (index_def->type != TREE) {
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-		          key_def->name,
+		          index_def->name,
 		          space_name(space));
 	}
 }

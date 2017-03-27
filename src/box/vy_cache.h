@@ -145,7 +145,7 @@ vy_cache_env_destroy(struct vy_cache_env *e);
  */
 struct vy_cache {
 	/* Key definition for tuple comparison */
-	struct key_def *key_def;
+	struct index_def *index_def;
 	/* Tree of cache entries */
 	struct vy_cache_tree cache_tree;
 	/* The vesrion of state of cache_tree. Increments on every change */
@@ -157,11 +157,11 @@ struct vy_cache {
 /**
  * Allocate and initialize tuple cache.
  * @param env - pointer to common cache environment.
- * @param key_def - key definition for tuple comparison.
+ * @param index_def - key definition for tuple comparison.
  * @retval - new tuple cache.
  */
 struct vy_cache *
-vy_cache_new(struct vy_cache_env *env, struct key_def *key_def);
+vy_cache_new(struct vy_cache_env *env, struct index_def *index_def);
 
 /**
  * Destroy and deallocate tuple cache.

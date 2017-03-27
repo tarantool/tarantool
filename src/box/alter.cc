@@ -110,7 +110,7 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * Checks tuple (of _index space) and throws a nice error if it is invalid
  * Checks only types of fields and their count!
  * Additionally determines version of tuple structure
@@ -118,7 +118,7 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
  * is_166plus is set as false if tuple structure is 1.6.5-
  */
 static void
-key_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
+index_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
 {
 	*is_166plus = true;
 	const mp_type common_template[] = {MP_UINT, MP_UINT, MP_STR, MP_STR};
@@ -300,7 +300,7 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
  * Decode distance type from message pached string to enum
  * Does not check message type, MP_STRING expected
@@ -326,7 +326,7 @@ key_opts_decode_distance(const char *str)
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
  * Fill key_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
@@ -351,17 +351,17 @@ key_opts_create(struct key_opts *opts, const char *map)
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
- * Decode parts array from tuple field and write'em to key_def structure.
+ * Decode parts array from tuple field and write'em to index_def structure.
  * Throws a nice error about invalid types, but does not check ranges of
  *  resulting values field_no and field_type
  * Parts expected to be a sequence of <part_count> arrays like this:
  *  [NUM, STR, ..][NUM, STR, ..]..,
  */
 static void
-key_def_fill_parts(struct key_def *key_def, const char *parts,
-		   uint32_t part_count)
+index_def_fill_parts(struct index_def *index_def, const char *parts,
+		     uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -390,26 +390,26 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 		enum field_type field_type = field_type_by_name(buf);
 		if (field_type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
-				  space_name_by_id(key_def->space_id),
+				  index_def->name,
+				  space_name_by_id(index_def->space_id),
 				  "unknown field type");
 		}
-		key_def_set_part(key_def, i, field_no, field_type);
+		index_def_set_part(index_def, i, field_no, field_type);
 	}
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.5-
  * TODO: Remove it in newer version, find all 1.6.5-
- * Decode parts array from tuple fieldw and write'em to key_def structure.
+ * Decode parts array from tuple fieldw and write'em to index_def structure.
  * Does not check anything since tuple must be validated before
  * Parts expected to be a sequence of <part_count> 2 * arrays values this:
  *  NUM, STR, NUM, STR, ..,
  */
 static void
-key_def_fill_parts_165(struct key_def *key_def, const char *parts,
-		       uint32_t part_count)
+index_def_fill_parts_165(struct index_def *index_def, const char *parts,
+			 uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -420,17 +420,17 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		enum field_type field_type = field_type_by_name(buf);
 		if (field_type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
-				  space_name_by_id(key_def->space_id),
+				  index_def->name,
+				  space_name_by_id(index_def->space_id),
 				  "unknown field type");
 		}
-		key_def_set_part(key_def, i, field_no, field_type);
+		index_def_set_part(index_def, i, field_no, field_type);
 	}
 }
 
 
 /**
- * Create a key_def object from a record in _index
+ * Create a index_def object from a record in _index
  * system space.
  *
  * Check that:
@@ -441,13 +441,13 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
  * - types of parts in the parts array are known to the system
  * - fieldno of each part in the parts array is within limits
  */
-static struct key_def *
-key_def_new_from_tuple(struct tuple *tuple)
+static struct index_def *
+index_def_new_from_tuple(struct tuple *tuple)
 {
 	bool is_166plus;
-	key_def_check_tuple(tuple, &is_166plus);
+	index_def_check_tuple(tuple, &is_166plus);
 
-	struct key_def *key_def;
+	struct index_def *index_def;
 	struct key_opts opts;
 	uint32_t id = tuple_field_u32_xc(tuple, ID);
 	uint32_t index_id = tuple_field_u32_xc(tuple, INDEX_ID);
@@ -471,21 +471,21 @@ key_def_new_from_tuple(struct tuple *tuple)
 		parts = tuple_field(tuple, INDEX_165_PARTS);
 	}
 
-	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
-	if (key_def == NULL)
+	index_def = index_def_new(id, index_id, name, type, &opts, part_count);
+	if (index_def == NULL)
 		diag_raise();
-	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
+	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 
 	if (is_166plus) {
 		/* 1.6.6+ */
-		key_def_fill_parts(key_def, parts, part_count);
+		index_def_fill_parts(index_def, parts, part_count);
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		key_def_fill_parts_165(key_def, parts, part_count);
+		index_def_fill_parts_165(index_def, parts, part_count);
 	}
-	key_def_check(key_def);
+	index_def_check(index_def);
 	scoped_guard.is_active = false;
-	return key_def;
+	return index_def;
 }
 
 static char *
@@ -576,10 +576,10 @@ key_opts_encode(char *data, char *data_end, const struct key_opts *opts)
 }
 
 struct tuple *
-key_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
+index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
 {
 	bool is_166plus;
-	key_def_check_tuple(tuple, &is_166plus);
+	index_def_check_tuple(tuple, &is_166plus);
 	if (!is_166plus)
 		return tuple;
 	struct key_opts opts;
@@ -781,8 +781,8 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 		 * new one.
 		 */
 		if (old_index != NULL &&
-		    key_def_cmp(new_index->key_def,
-				old_index->key_def) == 0) {
+		    index_def_cmp(new_index->index_def,
+				  old_index->index_def) == 0) {
 			space_swap_index(alter->old_space,
 					 alter->new_space,
 					 index_id(old_index),
@@ -1021,7 +1021,7 @@ class AddIndex;
 class DropIndex: public AlterSpaceOp {
 public:
 	/** A reference to Index key def of the dropped index. */
-	struct key_def *old_key_def;
+	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
@@ -1034,7 +1034,7 @@ public:
 void
 DropIndex::alter_def(struct alter_space * /* alter */)
 {
-	rlist_del_entry(old_key_def, link);
+	rlist_del_entry(old_index_def, link);
 }
 
 /* Do the drop. */
@@ -1079,9 +1079,9 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter)
 {
-	if (space_index(alter->new_space, old_key_def->iid) != NULL)
+	if (space_index(alter->new_space, old_index_def->iid) != NULL)
 		return;
-	Index *index = index_find_xc(alter->old_space, old_key_def->iid);
+	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
 	alter->old_space->handler->dropIndex(index);
 }
 
@@ -1089,8 +1089,8 @@ DropIndex::commit(struct alter_space *alter)
 class ModifyIndex: public AlterSpaceOp
 {
 public:
-	struct key_def *new_key_def;
-	struct key_def *old_key_def;
+	struct index_def *new_index_def;
+	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
 	virtual ~ModifyIndex();
@@ -1100,8 +1100,8 @@ public:
 void
 ModifyIndex::alter_def(struct alter_space *alter)
 {
-	rlist_del_entry(old_key_def, link);
-	rlist_add_entry(&alter->key_list, new_key_def, link);
+	rlist_del_entry(old_index_def, link);
+	rlist_add_entry(&alter->key_list, new_index_def, link);
 }
 
 /** Move the index from the old space to the new one. */
@@ -1110,15 +1110,15 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space,
-			 old_key_def->iid, new_key_def->iid);
-	key_def_copy(old_key_def, new_key_def);
+			 old_index_def->iid, new_index_def->iid);
+	index_def_copy(old_index_def, new_index_def);
 }
 
 ModifyIndex::~ModifyIndex()
 {
-	/* new_key_def is NULL if exception is raised before it's set. */
-	if (new_key_def)
-		key_def_delete(new_key_def);
+	/* new_index_def is NULL if exception is raised before it's set. */
+	if (new_index_def)
+		index_def_delete(new_index_def);
 }
 
 /**
@@ -1138,8 +1138,8 @@ ModifyIndex::~ModifyIndex()
 /** AddIndex - add a new index to the space. */
 class AddIndex: public AlterSpaceOp {
 public:
-	/** New index key_def. */
-	struct key_def *new_key_def;
+	/** New index index_def. */
+	struct index_def *new_index_def;
 	struct trigger *on_replace;
 	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
@@ -1151,20 +1151,20 @@ public:
  * Support function for AddIndex::prepare
  */
 static bool
-key_def_change_require_index_rebuid(struct key_def *old_key_def,
-				    struct key_def *new_key_def)
+index_def_change_require_index_rebuid(struct index_def *old_index_def,
+				    struct index_def *new_index_def)
 {
-	if (old_key_def->type != new_key_def->type ||
-	    old_key_def->opts.is_unique != new_key_def->opts.is_unique ||
-	    key_part_cmp(old_key_def->parts,
-			 old_key_def->part_count,
-			 new_key_def->parts,
-			 new_key_def->part_count) != 0) {
+	if (old_index_def->type != new_index_def->type ||
+	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
+	    key_part_cmp(old_index_def->key_def.parts,
+			 old_index_def->key_def.part_count,
+			 new_index_def->key_def.parts,
+			 new_index_def->key_def.part_count) != 0) {
 		return true;
 	}
-	if (old_key_def->type == RTREE) {
-		if (old_key_def->opts.dimension != new_key_def->opts.dimension
-		    || old_key_def->opts.distance != new_key_def->opts.distance)
+	if (old_index_def->type == RTREE) {
+		if (old_index_def->opts.dimension != new_index_def->opts.dimension
+		    || old_index_def->opts.distance != new_index_def->opts.distance)
 			return true;
 	}
 	return false;
@@ -1182,8 +1182,8 @@ AddIndex::prepare(struct alter_space *alter)
 	DropIndex *drop = dynamic_cast<DropIndex *>(prev_op);
 
 	if (drop == NULL ||
-	    key_def_change_require_index_rebuid(drop->old_key_def,
-					       new_key_def)) {
+	    index_def_change_require_index_rebuid(drop->old_index_def,
+						  new_index_def)) {
 		/*
 		 * The new index is too distinct from the old one,
 		 * have to rebuild.
@@ -1194,12 +1194,12 @@ AddIndex::prepare(struct alter_space *alter)
 	rlist_del_entry(drop, link);
 	rlist_del_entry(this, link);
 	/* Add ModifyIndex only if the there is a change. */
-	if (key_def_cmp(drop->old_key_def, new_key_def) != 0) {
+	if (index_def_cmp(drop->old_index_def, new_index_def) != 0) {
 		ModifyIndex *modify = AlterSpaceOp::create<ModifyIndex>();
 		alter_space_add_op(alter, modify);
-		modify->new_key_def = new_key_def;
-		new_key_def = NULL;
-		modify->old_key_def = drop->old_key_def;
+		modify->new_index_def = new_index_def;
+		new_index_def = NULL;
+		modify->old_index_def = drop->old_index_def;
 	}
 	AlterSpaceOp::destroy(drop);
 	AlterSpaceOp::destroy(this);
@@ -1209,7 +1209,7 @@ AddIndex::prepare(struct alter_space *alter)
 void
 AddIndex::alter_def(struct alter_space *alter)
 {
-	rlist_add_tail_entry(&alter->key_list, new_key_def, link);
+	rlist_add_tail_entry(&alter->key_list, new_index_def, link);
 }
 
 /**
@@ -1224,7 +1224,7 @@ on_rollback_in_old_space(struct trigger *trigger, void *event)
 	/* Remove the failed tuple from the new index. */
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space->def.id != new_index->key_def->space_id)
+		if (stmt->space->def.id != new_index->index_def->space_id)
 			continue;
 		new_index->replace(stmt->new_tuple, stmt->old_tuple,
 				   DUP_INSERT);
@@ -1275,7 +1275,7 @@ AddIndex::alter(struct alter_space *alter)
 	Engine *engine = alter->new_space->handler->engine;
 
 	if (space_index(alter->old_space, 0) == NULL) {
-		if (new_key_def->iid == 0) {
+		if (new_index_def->iid == 0) {
 			/*
 			 * Adding a primary key: bring the space
 			 * up to speed with the current recovery
@@ -1300,7 +1300,7 @@ AddIndex::alter(struct alter_space *alter)
 	/**
 	 * Get the new index and build it.
 	 */
-	Index *new_index = index_find_xc(alter->new_space, new_key_def->iid);
+	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
 	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
@@ -1316,8 +1316,8 @@ AddIndex::~AddIndex()
 	 */
 	if (on_replace)
 		trigger_clear(on_replace);
-	if (new_key_def)
-		key_def_delete(new_key_def);
+	if (new_index_def)
+		index_def_delete(new_index_def);
 }
 
 /* }}} */
@@ -1540,12 +1540,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (old_index != NULL) {
 		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
 		alter_space_add_op(alter, drop_index);
-		drop_index->old_key_def = old_index->key_def;
+		drop_index->old_index_def = old_index->index_def;
 	}
 	if (new_tuple != NULL) {
 		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
 		alter_space_add_op(alter, add_index);
-		add_index->new_key_def = key_def_new_from_tuple(new_tuple);
+		add_index->new_index_def = index_def_new_from_tuple(new_tuple);
 	}
 	alter_space_do(txn, alter, old_space);
 	scoped_guard.is_active = false;

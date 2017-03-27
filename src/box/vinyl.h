@@ -43,7 +43,7 @@ struct vy_env;
 struct vy_tx;
 struct vy_cursor;
 struct vy_index;
-struct key_def;
+struct index_def;
 struct tuple;
 struct tuple_format;
 struct vclock;
@@ -230,13 +230,13 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp);
 /**
  * Create a new vinyl index object without opening it.
  * @param e                    Vinyl environment.
- * @param user_key_def         Key definition declared by an user
+ * @param user_index_def         Key definition declared by an user
  *                             with space:create_index().
  * @param space                Space for which the new index
  *                             belongs.
  */
 struct vy_index *
-vy_index_new(struct vy_env *e, struct key_def *user_key_def,
+vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	     struct space *space);
 
 /**

@@ -154,12 +154,12 @@ Engine::join(struct xstream *stream)
 }
 
 void
-Engine::keydefCheck(struct space *space, struct key_def *key_def)
+Engine::checkIndexDef(struct space *space, struct index_def *index_def)
 {
 	(void) space;
-	(void) key_def;
+	(void) index_def;
 	/*
-	 * Don't bother checking key_def to match the view requirements.
+	 * Don't bother checking index_def to match the view requirements.
 	 * Index::initIterator() must check key on each call.
 	 */
 }
@@ -226,7 +226,7 @@ Handler::executeSelect(struct txn *, struct space *space,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->key_def, type, key, part_count))
+	if (key_validate(index->index_def, type, key, part_count))
 		diag_raise();
 
 	struct iterator *it = index->allocIterator();

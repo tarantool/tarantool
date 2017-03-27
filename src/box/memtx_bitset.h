@@ -45,7 +45,7 @@ struct mh_bitset_index_t;
 
 class MemtxBitset: public MemtxIndex {
 public:
-	MemtxBitset(struct key_def *key_def);
+	MemtxBitset(struct index_def *index_def);
 	virtual ~MemtxBitset() override;
 	virtual size_t size() const override;
 	virtual size_t count(enum iterator_type type, const char *key,

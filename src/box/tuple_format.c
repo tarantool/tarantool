@@ -39,7 +39,8 @@ static uint32_t formats_size = 0, formats_capacity = 0;
 
 /** Extract all available type info from keys. */
 static int
-tuple_format_create(struct tuple_format *format, struct rlist *key_list)
+tuple_format_create(struct tuple_format *format, struct key_def **keys,
+		    uint16_t key_count)
 {
 	if (format->field_count == 0) {
 		format->field_map_size = 0;
@@ -54,10 +55,9 @@ tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 
 	int current_slot = 0;
 
-	struct key_def *key_def;
 	/* extract field type info */
-	rlist_foreach_entry(key_def, key_list, link) {
-
+	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
+		struct key_def *key_def = keys[key_no];
 		bool is_sequential = key_def_is_sequential(key_def);
 		const struct key_part *part = key_def->parts;
 		const struct key_part *parts_end = part + key_def->part_count;
@@ -76,7 +76,6 @@ tuple_format_create(struct tuple_format *format, struct rlist *key_list)
 				 * indexed field type.
 				 */
 				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
-					 key_def->name,
 					 part->fieldno + TUPLE_INDEX_BASE,
 					 field_type_strs[part->type],
 					 field_type_strs[field->type]);
@@ -155,17 +154,15 @@ tuple_format_deregister(struct tuple_format *format)
 }
 
 static struct tuple_format *
-tuple_format_alloc(struct rlist *key_list)
+tuple_format_alloc(struct key_def **keys, uint16_t key_count)
 {
-	struct key_def *key_def;
 	uint32_t max_fieldno = 0;
-	uint32_t key_count = 0;
 
 	/* find max max field no */
-	rlist_foreach_entry(key_def, key_list, link) {
+	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
+		struct key_def *key_def = keys[key_no];
 		struct key_part *part = key_def->parts;
 		struct key_part *pend = part + key_def->part_count;
-		key_count++;
 		for (; part < pend; part++)
 			max_fieldno = MAX(max_fieldno, part->fieldno);
 	}
@@ -196,10 +193,10 @@ tuple_format_delete(struct tuple_format *format)
 }
 
 struct tuple_format *
-tuple_format_new(struct tuple_format_vtab *vtab, struct rlist *key_list,
-		 uint16_t extra_size)
+tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
+		 uint16_t key_count, uint16_t extra_size)
 {
-	struct tuple_format *format = tuple_format_alloc(key_list);
+	struct tuple_format *format = tuple_format_alloc(keys, key_count);
 	if (format == NULL)
 		return NULL;
 	format->vtab = *vtab;
@@ -208,7 +205,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct rlist *key_list,
 		tuple_format_delete(format);
 		return NULL;
 	}
-	if (tuple_format_create(format, key_list) < 0) {
+	if (tuple_format_create(format, keys, key_count) < 0) {
 		tuple_format_delete(format);
 		return NULL;
 	}
@@ -285,9 +282,8 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 int
 tuple_format_init()
 {
-	RLIST_HEAD(empty_list);
 	tuple_format_default = tuple_format_new(&memtx_tuple_format_vtab,
-						&empty_list, 0);
+						NULL, 0, 0);
 	if (tuple_format_default == NULL)
 		return -1;
 	/* Make sure this one stays around. */

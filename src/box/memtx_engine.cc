@@ -351,12 +351,12 @@ void
 MemtxEngine::buildSecondaryKey(struct space *old_space,
 			       struct space *new_space, Index *new_index)
 {
-	struct key_def *new_key_def = new_index->key_def;
+	struct index_def *new_index_def = new_index->index_def;
 	/**
 	 * If it's a secondary key, and we're not building them
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
 	 */
-	if (new_key_def->iid != 0) {
+	if (new_index_def->iid != 0) {
 		struct MemtxSpace *handler;
 		handler = (struct MemtxSpace *) new_space->handler;
 		if (!(handler->replace == memtx_replace_all_keys))
@@ -397,13 +397,13 @@ MemtxEngine::buildSecondaryKey(struct space *old_space,
 }
 
 void
-MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
+MemtxEngine::checkIndexDef(struct space *space, struct index_def *index_def)
 {
-	switch (key_def->type) {
+	switch (index_def->type) {
 	case HASH:
-		if (! key_def->opts.is_unique) {
+		if (! index_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "HASH index must be unique");
 		}
@@ -412,43 +412,43 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 		/* TREE index has no limitations. */
 		break;
 	case RTREE:
-		if (key_def->part_count != 1) {
+		if (index_def->key_def.part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "RTREE index key can not be multipart");
 		}
-		if (key_def->opts.is_unique) {
+		if (index_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "RTREE index can not be unique");
 		}
-		if (key_def->parts[0].type != FIELD_TYPE_ARRAY) {
+		if (index_def->key_def.parts[0].type != FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "RTREE index field type must be ARRAY");
 		}
 		/* no furter checks of parts needed */
 		return;
 	case BITSET:
-		if (key_def->part_count != 1) {
+		if (index_def->key_def.part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "BITSET index key can not be multipart");
 		}
-		if (key_def->opts.is_unique) {
+		if (index_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "BITSET can not be unique");
 		}
-		if (key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
-		    key_def->parts[0].type != FIELD_TYPE_STRING) {
+		if (index_def->key_def.parts[0].type != FIELD_TYPE_UNSIGNED &&
+		    index_def->key_def.parts[0].type != FIELD_TYPE_STRING) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "BITSET index field type must be NUM or STR");
 		}
@@ -456,16 +456,16 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 		return;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  key_def->name,
+			  index_def->name,
 			  space_name(space));
 		break;
 	}
 	/* Only HASH and TREE indexes checks parts there */
 	/* Just check that there are no ARRAY parts */
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == FIELD_TYPE_ARRAY) {
+	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
+		if (index_def->key_def.parts[i].type == FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
+				  index_def->name,
 				  space_name(space),
 				  "ARRAY field type is not supported");
 		}

@@ -140,7 +140,7 @@ struct vy_mem {
 	/** The minimum value of stmt->lsn in this tree */
 	int64_t min_lsn;
 	/* A key definition for this index. */
-	struct key_def *key_def;
+	struct index_def *index_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Schema version at the time of creation. */
@@ -165,7 +165,7 @@ struct vy_mem {
  *
  * @param allocator lsregion allocator to use for BPS tree extents
  * @param allocator_lsn a pointer to the latest LSN for lsregion.
- * @param key_def key definition.
+ * @param index_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
@@ -175,7 +175,7 @@ struct vy_mem {
  */
 struct vy_mem *
 vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
-	   struct key_def *key_def, struct tuple_format *format,
+	   struct index_def *index_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format);
 

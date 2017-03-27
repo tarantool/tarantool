@@ -34,8 +34,8 @@
 
 class MemtxIndex: public Index {
 public:
-	MemtxIndex(struct key_def *key_def_arg)
-		:Index(key_def_arg), m_position(NULL)
+	MemtxIndex(struct index_def *index_def_arg)
+		:Index(index_def_arg), m_position(NULL)
 	{}
 	virtual ~MemtxIndex() override {
 		if (m_position != NULL)

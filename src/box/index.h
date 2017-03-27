@@ -269,7 +269,7 @@ iterator_type_is_reverse(enum iterator_type type)
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
  *
- * @param key_def key definition
+ * @param index_def key definition
  * @param type iterator type (see enum iterator_type)
  * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
@@ -278,7 +278,7 @@ iterator_type_is_reverse(enum iterator_type type)
  * @retval -1 The key is invalid.
  */
 int
-key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
 	     uint32_t part_count);
 
 /**
@@ -288,7 +288,7 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
  * @retval -1 The key is invalid.
  */
 int
-primary_key_validate(struct key_def *key_def, const char *key,
+primary_key_validate(struct index_def *index_def, const char *key,
 		     uint32_t part_count);
 
 /**
@@ -317,7 +317,7 @@ enum dup_replace_mode {
 struct Index {
 public:
 	/* Description of a possibly multipart key. */
-	struct key_def *key_def;
+	struct index_def *index_def;
 	/* Schema version on index construction moment */
 	uint32_t sc_version;
 
@@ -325,9 +325,9 @@ protected:
 	/**
 	 * Initialize index instance.
 	 *
-	 * @param key_def  key part description
+	 * @param index_def  key part description
 	 */
-	Index(struct key_def *key_def);
+	Index(struct index_def *index_def);
 
 public:
 	virtual ~Index();
@@ -422,13 +422,13 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 static inline uint32_t
 index_id(const Index *index)
 {
-	return index->key_def->iid;
+	return index->index_def->iid;
 }
 
 static inline const char *
 index_name(const Index *index)
 {
-	return index->key_def->name;
+	return index->index_def->name;
 }
 
 /** True if this index is a primary key. */

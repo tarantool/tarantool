@@ -187,15 +187,16 @@ tuple_format_ref(struct tuple_format *format, int count)
 /**
  * Allocate, construct and register a new in-memory tuple format.
  * @param vtab             Virtual function table for specific engines.
- * @param key_list         List of key_defs of a space.
+ * @param keys             Array of key_defs of a space.
+ * @param key_count        The number of keys in @a keys array.
  * @param extra_size       Extra bytes to reserve in tuples metadata.
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
  */
 struct tuple_format *
-tuple_format_new(struct tuple_format_vtab *vtab, struct rlist *key_list,
-		 uint16_t extra_size);
+tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
+		 uint16_t key_count, uint16_t extra_size);
 
 /**
  * Register the duplicate of the specified format.
