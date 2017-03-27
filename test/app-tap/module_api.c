@@ -2,6 +2,7 @@
 #include <module.h>
 
 #include <small/ibuf.h>
+#include <msgpuck/msgpuck.h>
 
 #include <errno.h>
 #include <sys/types.h>
@@ -264,6 +265,42 @@ test_clock(lua_State *L)
 	return 1;
 }
 
+static int
+test_pushtuple(lua_State *L)
+{
+	char tuple_buf[64];
+	char *tuple_end = tuple_buf;
+	tuple_end = mp_encode_array(tuple_end, 3);
+	tuple_end = mp_encode_uint(tuple_end, 456734643353);
+	tuple_end = mp_encode_str(tuple_end, "abcddcba", 8);
+	tuple_end = mp_encode_array(tuple_end, 2);
+	tuple_end = mp_encode_map(tuple_end, 2);
+	tuple_end = mp_encode_uint(tuple_end, 8);
+	tuple_end = mp_encode_uint(tuple_end, 4);
+	tuple_end = mp_encode_array(tuple_end, 1);
+	tuple_end = mp_encode_str(tuple_end, "a", 1);
+	tuple_end = mp_encode_str(tuple_end, "b", 1);
+	tuple_end = mp_encode_nil(tuple_end);
+	assert(tuple_end <= tuple_buf + sizeof(tuple_buf));
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	luaT_pushtuple(L, box_tuple_new(fmt, tuple_buf, tuple_end));
+	struct tuple *tuple = luaT_istuple(L, -1);
+	if (tuple == NULL)
+		goto error;
+
+	char lua_buf[sizeof(tuple_buf)];
+	int lua_buf_size = box_tuple_to_buf(tuple, lua_buf, sizeof(lua_buf));
+	if (lua_buf_size != tuple_end - tuple_buf)
+		goto error;
+	if (memcmp(tuple_buf, lua_buf, lua_buf_size) != 0)
+		goto error;
+	lua_pushboolean(L, true);
+	return 1;
+error:
+	lua_pushboolean(L, false);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -284,6 +321,7 @@ luaopen_module_api(lua_State *L)
 		{"pushcdata", test_pushcdata },
 		{"checkcdata", test_checkcdata },
 		{"test_clock", test_clock },
+		{"test_pushtuple", test_pushtuple},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

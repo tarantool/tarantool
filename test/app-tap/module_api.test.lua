@@ -33,7 +33,7 @@ local function test_pushcdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(15)
+    test:plan(16)
     local status, module = pcall(require, 'module_api')
     test:ok(status, "module is loaded")
     if not status then
@@ -42,7 +42,7 @@ local test = require('tap').test("module_api", function(test)
 
     for name, fun in pairs(module) do
         if string.sub(name,1, 5) == 'test_' then
-            test:ok(fun, name .. " is ok")
+            test:ok(fun(), name .. " is ok")
         end
     end
 

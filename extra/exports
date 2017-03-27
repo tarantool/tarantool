@@ -108,6 +108,8 @@ luaL_checkuint64
 luaL_checkint64
 luaL_touint64
 luaL_toint64
+luaT_pushtuple
+luaT_istuple
 box_txn
 box_txn_begin
 box_txn_commit

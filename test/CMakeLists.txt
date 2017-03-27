@@ -5,6 +5,7 @@ include_directories(${MSGPUCK_INCLUDE_DIRS})
 
 function(build_module module files)
     add_library(${module} SHARED ${files})
+    target_link_libraries(${module} msgpuck)
     set_target_properties(${module} PROPERTIES PREFIX "")
     add_dependencies(${module} api)
     if(TARGET_OS_DARWIN)
