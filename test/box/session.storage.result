@@ -92,6 +92,10 @@ tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 ---
 ...
+test_run:cmd("drop connection default")
+---
+- true
+...
 test_run:cmd("drop connection second")
 ---
 - true

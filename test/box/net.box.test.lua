@@ -207,7 +207,7 @@ cn:ping()
 
 cn1 = remote.new(LISTEN.host, LISTEN.service)
 x_select(cn1, space.id, 0, box.index.ALL, 0, 0xFFFFFFF, {})
-
+cn1:close()
 -- -- error while waiting for response
 type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
 function pause() fiber.sleep(10) return true end
@@ -357,6 +357,7 @@ cn:timeout(1):call('ret_after', .01)
 cn:timeout(.01):call('ret_after', 1)
 
 cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn:close()
 cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 
 remote.self:ping()
@@ -366,6 +367,7 @@ remote.self:is_connected()
 remote.self:wait_connected()
 
 
+cn:close()
 -- cleanup database after tests
 space:drop()
 
@@ -454,6 +456,7 @@ _ = fiber.create(
    function()
          local conn = require('net.box').new(box.cfg.listen)
          conn:call('no_such_function', {})
+	 conn:close()
    end
 );
 test_run:cmd("setopt delimiter ''");
@@ -599,6 +602,7 @@ do
     box.schema.space.create('misisipi')
     box.space.misisipi:drop()
     con.space._schema:select{}
+    con:close()
     con = nil
 
     return a
@@ -616,6 +620,7 @@ do
     box.schema.space.create('misisipi')
     box.space.misisipi:drop()
     con.space._schema:select{}
+    con:close()
     con = nil
 
     return a

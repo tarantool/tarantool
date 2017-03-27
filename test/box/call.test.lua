@@ -237,6 +237,7 @@ conn:call("return_sparse4")
 conn:eval("return return_sparse4()")
 conn:call_16("return_sparse4")
 
+conn:close()
 require('msgpack').cfg { encode_sparse_safe = sparse_safe }
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

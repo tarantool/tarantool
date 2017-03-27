@@ -53,3 +53,4 @@ box.schema.func.create('f15', {language = 'c'}),    func_lang('f15')
 box.schema.func.create('f16', {language = 'C'}),    func_lang('f16')
 
 box.space.test:drop()
+c:close()

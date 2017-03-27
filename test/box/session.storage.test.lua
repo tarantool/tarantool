@@ -34,6 +34,7 @@ tres1 = {}
 tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 
+test_run:cmd("drop connection default")
 test_run:cmd("drop connection second")
 require('fiber').sleep(.01)
 for k,v in pairs(all) do table.insert(tres2, v.abc) end

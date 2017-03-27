@@ -1,3 +1,7 @@
+env = require('test_run')
+test_run = env.new()
+-- restart the server to reset all active connections from previous tests
+test_run:cmd('restart server default')
 session = box.session
 fiber = require('fiber')
 
