@@ -148,6 +148,7 @@ lbox_session_su(struct lua_State *L)
 		return 0; /* su */
 
 	/* sudo */
+	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
 	credentials_copy(&session->credentials, &orig_cr);
 	if (error)

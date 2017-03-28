@@ -333,3 +333,14 @@ box.schema.func.drop('f1')
 box.schema.func.drop('f2')
 ---
 ...
+--
+--gh-2063 - improper params to su function
+--
+box.session.su('admin', box.session.user)
+---
+- admin
+...
+box.session.su('admin', box.session.user())
+---
+- error: 'bad argument #2 to ''?'' (function expected, got string)'
+...

@@ -125,3 +125,9 @@ c:close()
 box.schema.user.revoke('guest', 'execute', 'universe')
 box.schema.func.drop('f1')
 box.schema.func.drop('f2')
+
+--
+--gh-2063 - improper params to su function
+--
+box.session.su('admin', box.session.user)
+box.session.su('admin', box.session.user())
