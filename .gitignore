@@ -82,6 +82,7 @@ tarantool-*.tar.gz
 test/lib/
 test/unit/*.test
 test/unit/fiob
+test/small
 test/var
 third_party/luajit/src/luajit
 third_party/luajit/lib/vmdef.lua

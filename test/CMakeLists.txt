@@ -21,11 +21,24 @@ if(POLICY CMP0037)
     cmake_policy(SET CMP0037 OLD)
 endif(POLICY CMP0037)
 
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${PROJECT_SOURCE_DIR}/src/lib/small/test/
+        ${CMAKE_CURRENT_BINARY_DIR}/small
+        COMMENT Create a symlink for libsmall to fix out-of-source tests)
+
 add_custom_target(test
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        --vardir=${PROJECT_BINARY_DIR}/test/var)
 
 add_custom_target(test-force
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        --vardir=${PROJECT_BINARY_DIR}/test/var
+        --force)
 
 add_subdirectory(app-tap)
 add_subdirectory(box)
