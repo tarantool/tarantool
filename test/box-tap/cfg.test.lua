@@ -53,6 +53,9 @@ status, result = pcall(function() return box.index.EQ end)
 test:ok(status and type(result) == 'number', "box.index without box.cfg")
 status, result = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
+status, result = pcall(function() return box.sql end)
+test:ok(not status and result:match('Please call box.cfg{}'),
+	'exception on unconfigured box')
 
 os.execute("rm -rf vinyl")
 box.cfg{

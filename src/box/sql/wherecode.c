@@ -402,6 +402,7 @@ static int codeEqualityTerm(
   Expr *pX = pTerm->pExpr;
   Vdbe *v = pParse->pVdbe;
   int iReg;                  /* Register holding results */
+  int iSingleIdxCol = 0;     /* Tarantool. In case of (nExpr == 1) store column index here.  */
 
   assert( pLevel->pWLoop->aLTerm[iEq]==pTerm );
   assert( iTarget>0 );
@@ -442,7 +443,7 @@ static int codeEqualityTerm(
     }
 
     if( (pX->flags & EP_xIsSelect)==0 || pX->x.pSelect->pEList->nExpr==1 ){
-      eType = sqlite3FindInIndex(pParse, pX, IN_INDEX_LOOP, 0, 0);
+      eType = sqlite3FindInIndex(pParse, pX, IN_INDEX_LOOP, 0, 0, &iSingleIdxCol);
     }else{
       Select *pSelect = pX->x.pSelect;
       sqlite3 *db = pParse->db;
@@ -491,7 +492,7 @@ static int codeEqualityTerm(
         }
         pSelect->pEList = pRhs;
         db->dbOptFlags |= SQLITE_QueryFlattener;
-        eType = sqlite3FindInIndex(pParse, pX, IN_INDEX_LOOP, 0, aiMap);
+        eType = sqlite3FindInIndex(pParse, pX, IN_INDEX_LOOP, 0, aiMap, 0);
         db->dbOptFlags = savedDbOptFlags;
         testcase( aiMap!=0 && aiMap[0]!=0 );
         pSelect->pEList = pOrigRhs;
@@ -533,7 +534,9 @@ static int codeEqualityTerm(
             testcase( nEq>1 );  /* Happens with a UNIQUE index on ROWID */
             pIn->addrInTop = sqlite3VdbeAddOp2(v, OP_Rowid, iTab, iOut);
           }else{
-            int iCol = aiMap ? aiMap[iMap++] : 0;
+            int iCol = aiMap ? aiMap[iMap++] : iSingleIdxCol;
+	    if( pX->x.pSelect->pEList->nExpr==1 ){
+	    }
             pIn->addrInTop = sqlite3VdbeAddOp3(v,OP_Column,iTab, iCol, iOut);
           }
           sqlite3VdbeAddOp1(v, OP_IsNull, iOut); VdbeCoverage(v);

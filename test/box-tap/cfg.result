@@ -18,6 +18,7 @@ ok - box.error without box.cfg
 ok - box.runtime without box.cfg
 ok - box.index without box.cfg
 ok - box.session without box.cfg
+ok - exception on unconfigured box
 ok - vinyl_dir is not auto-created
 ok - configured box
 ok - wal_mode default value
@@ -62,3 +63,4 @@ ok - panic_on_snap_error
 ok - setup checkpoint params
 ok - update checkpoint params
 ok - wal_max_size xlog rotation
+# bad plan: planned 62 run 63

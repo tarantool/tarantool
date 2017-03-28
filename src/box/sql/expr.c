@@ -2129,7 +2129,12 @@ int sqlite3FindInIndex(
   Expr *pX,                  /* The right-hand side (RHS) of the IN operator */
   u32 inFlags,               /* IN_INDEX_LOOP, _MEMBERSHIP, and/or _NOOP_OK */
   int *prRhsHasNull,         /* Register holding NULL status.  See notes */
-  int *aiMap                 /* Mapping from Index fields to RHS fields */
+  int *aiMap,                /* Mapping from Index fields to RHS fields */
+  int *pSingleIdxCol         /* Tarantool. In case (nExpr == 1) it is meant by SQLite that
+                                column of interest is always 0, since index columns appear first
+                                in index. This is not the case for Tarantool, where index columns
+                                don't change order of appearance.
+                                So, use this field to store single column index.  */
 ){
   Select *p;                            /* SELECT to the right of IN operator */
   int eType = 0;                        /* Type of RHS table. IN_INDEX_* */
@@ -2256,7 +2261,11 @@ int sqlite3FindInIndex(
             mCol = MASKBIT(j);
             if( mCol & colUsed ) break; /* Each column used only once */
             colUsed |= mCol;
-            if( aiMap ) aiMap[i] = j;
+            if( aiMap )
+              aiMap[i] = pRhs->iColumn;
+            else
+              if (pSingleIdxCol && nExpr == 1)
+                *pSingleIdxCol = pRhs->iColumn;
           }
   
           assert( i==nExpr || colUsed!=(MASKBIT(nExpr)-1) );
@@ -2762,7 +2771,7 @@ static void sqlite3ExprCodeIN(
   VdbeNoopComment((v, "begin IN expr"));
   eType = sqlite3FindInIndex(pParse, pExpr,
                              IN_INDEX_MEMBERSHIP | IN_INDEX_NOOP_OK,
-                             destIfFalse==destIfNull ? 0 : &rRhsHasNull, aiMap);
+                             destIfFalse==destIfNull ? 0 : &rRhsHasNull, aiMap, 0);
 
   assert( pParse->nErr || nVector==1 || eType==IN_INDEX_EPH
        || eType==IN_INDEX_INDEX_ASC || eType==IN_INDEX_INDEX_DESC 
