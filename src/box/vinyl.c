@@ -1381,6 +1381,7 @@ vy_run_new(int64_t id)
 static void
 vy_run_delete(struct vy_run *run)
 {
+	assert(run->refs == 0);
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
 	if (run->info.page_infos != NULL) {
@@ -1656,7 +1657,7 @@ vy_range_prepare_new_run(struct vy_range *range)
 	vy_log_tx_begin();
 	vy_log_prepare_run(index->index_def->opts.lsn, run->id);
 	if (vy_log_tx_commit() < 0) {
-		vy_run_delete(run);
+		vy_run_unref(run);
 		return -1;
 	}
 	range->new_run = run;
@@ -1673,7 +1674,7 @@ vy_range_discard_new_run(struct vy_range *range)
 {
 	int64_t run_id = range->new_run->id;
 
-	vy_run_delete(range->new_run);
+	vy_run_unref(range->new_run);
 	range->new_run = NULL;
 
 	ERROR_INJECT(ERRINJ_VY_RUN_DISCARD,
@@ -2946,7 +2947,7 @@ vy_range_delete(struct vy_range *range)
 
 	/* Delete all runs. */
 	if (range->new_run != NULL)
-		vy_run_delete(range->new_run);
+		vy_run_unref(range->new_run);
 	while (!rlist_empty(&range->runs)) {
 		struct vy_run *run = rlist_shift_entry(&range->runs,
 						       struct vy_run, in_range);
@@ -3497,7 +3498,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (run == NULL)
 			return -1;
 		if (vy_run_recover(run, index->path) != 0) {
-			vy_run_delete(run);
+			vy_run_unref(run);
 			return -1;
 		}
 		vy_range_add_run(range, run);
@@ -10212,7 +10213,7 @@ out_free_page:
 	rc = 0; /* success */
 
 out_free_run:
-	vy_run_delete(run);
+	vy_run_unref(run);
 out:
 	return rc;
 }
