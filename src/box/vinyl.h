@@ -84,7 +84,7 @@ int
 vy_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 int
-vy_wait_checkpoint(struct vy_env *env);
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 void
 vy_end_checkpoint(struct vy_env *env);
@@ -300,6 +300,20 @@ vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
 
 int
 vy_join(struct vy_env *env, struct xstream *stream);
+
+/*
+ * Garbage collection
+ */
+
+void
+vy_collect_garbage(struct vy_env *env, int64_t lsn);
+
+/*
+ * Backup
+ */
+
+int
+vy_backup(struct vy_env *env, int (*cb)(const char *, void *), void *cb_arg);
 
 #ifdef __cplusplus
 }

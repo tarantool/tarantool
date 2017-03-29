@@ -5099,7 +5099,7 @@ vy_checkpoint(struct vy_env *env, struct vclock *vclock)
  * Wait for checkpoint. Please call vy_end_checkpoint() after that.
  */
 int
-vy_wait_checkpoint(struct vy_env *env)
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	struct vy_scheduler *scheduler = env->scheduler;
 
@@ -5114,6 +5114,9 @@ vy_wait_checkpoint(struct vy_env *env)
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		goto error;
 	}
+
+	if (xctl_rotate(vclock) != 0)
+		goto error;
 
 	say_info("vinyl checkpoint done");
 	return 0;
@@ -7222,6 +7225,7 @@ vy_env_new(void)
 	ev_timer_start(loop(), &e->quota_timer);
 	vy_cache_env_create(&e->cache_env, slab_cache,
 			    e->conf->cache);
+	xctl_init();
 	return e;
 error_key_format:
 	vy_squash_queue_delete(e->squash_queue);
@@ -7256,6 +7260,7 @@ vy_env_delete(struct vy_env *e)
 	lsregion_destroy(&e->allocator);
 	tt_pthread_key_delete(e->zdctx_key);
 	vy_cache_env_destroy(&e->cache_env);
+	xctl_free();
 	TRASH(e);
 	free(e);
 }
@@ -7270,6 +7275,8 @@ vy_bootstrap(struct vy_env *e)
 	assert(e->status == VINYL_OFFLINE);
 	e->status = VINYL_ONLINE;
 	vy_quota_set_limit(&e->quota, e->conf->memory_limit);
+	if (xctl_bootstrap() != 0)
+		return -1;
 	return 0;
 }
 
@@ -7280,10 +7287,14 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 	if (vclock != NULL) {
 		e->xm->lsn = vclock_sum(vclock);
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
+		if (xctl_begin_recovery(vclock) != 0)
+			return -1;
 	} else {
 		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
+		if (xctl_bootstrap() != 0)
+			return -1;
 	}
 	return 0;
 }
@@ -7310,6 +7321,8 @@ vy_end_recovery(struct vy_env *e)
 	switch (e->status) {
 	case VINYL_FINAL_RECOVERY_LOCAL:
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
+		if (xctl_end_recovery() != 0)
+			return -1;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
@@ -10112,6 +10125,20 @@ vy_join(struct vy_env *env, struct xstream *stream)
 }
 
 /* }}} replication */
+
+void
+vy_collect_garbage(struct vy_env *env, int64_t lsn)
+{
+	(void)env;
+	xctl_collect_garbage(lsn);
+}
+
+int
+vy_backup(struct vy_env *env, int (*cb)(const char *, void *), void *cb_arg)
+{
+	(void)env;
+	return xctl_backup(cb, cb_arg);
+}
 
 /**
  * This structure represents a request to squash a sequence of

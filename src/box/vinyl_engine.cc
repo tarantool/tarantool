@@ -262,8 +262,7 @@ VinylEngine::prepareWaitCheckpoint(struct vclock *vclock)
 int
 VinylEngine::waitCheckpoint(struct vclock *vclock)
 {
-	(void)vclock;
-	return vy_wait_checkpoint(env);
+	return vy_wait_checkpoint(env, vclock);
 }
 
 void
@@ -277,4 +276,16 @@ void
 VinylEngine::abortCheckpoint()
 {
 	vy_end_checkpoint(env);
+}
+
+void
+VinylEngine::collectGarbage(int64_t lsn)
+{
+	vy_collect_garbage(env, lsn);
+}
+
+int
+VinylEngine::backup(engine_backup_cb cb, void *arg)
+{
+	return vy_backup(env, cb, arg);
 }

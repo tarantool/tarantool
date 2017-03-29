@@ -38,7 +38,6 @@
 #include "schema.h"
 #include "small/rlist.h"
 #include "scoped_guard.h"
-#include "xctl.h"
 #include "vclock.h"
 #include <stdlib.h>
 #include <string.h>
@@ -347,8 +346,6 @@ engine_commit_checkpoint(struct vclock *vclock)
 		if (engine->waitCheckpoint(vclock) < 0)
 			return -1;
 	}
-	if (xctl_rotate(vclock) != 0)
-		return -1;
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
 		engine->commitCheckpoint(vclock);

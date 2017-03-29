@@ -67,7 +67,6 @@
 #include "xrow_io.h"
 #include "authentication.h"
 #include "path_lock.h"
-#include "xctl.h"
 
 static char status[64] = "unknown";
 
@@ -1351,7 +1350,6 @@ box_free(void)
 #endif
 		engine_shutdown();
 		wal_thread_stop();
-		xctl_free();
 	}
 }
 
@@ -1474,8 +1472,6 @@ bootstrap()
 	struct replica *master = replicaset_first();
 	assert(master == NULL || master->applier != NULL);
 
-	if (xctl_bootstrap() != 0)
-		diag_raise();
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 		bootstrap_from_master(master);
 	} else {
@@ -1528,7 +1524,6 @@ box_cfg_xc(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
-	xctl_init();
 	engine_init();
 
 	schema_init();
@@ -1573,8 +1568,6 @@ box_cfg_xc(void)
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
-		if (xctl_begin_recovery(&checkpoint_vclock) != 0)
-			diag_raise();
 		engine_begin_initial_recovery(&checkpoint_vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
@@ -1621,8 +1614,6 @@ box_cfg_xc(void)
 		}
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery();
-		if (xctl_end_recovery() != 0)
-			diag_raise();
 
 		/*
 		 * Initialize the replica set vclock from recovery.
@@ -1736,7 +1727,6 @@ end:
 void
 box_gc(int64_t lsn)
 {
-	xctl_collect_garbage(lsn);
 	wal_collect_garbage(lsn);
 	engine_collect_garbage(lsn);
 }
@@ -1749,8 +1739,6 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 		return -1;
 	}
 	int rc = engine_backup(cb, cb_arg);
-	if (rc == 0)
-		rc = xctl_backup(cb, cb_arg);
 	if (rc == 0)
 		box_backup_is_in_progress = true;
 	return rc;
