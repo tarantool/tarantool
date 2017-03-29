@@ -251,11 +251,18 @@ space_check_update(struct space *space,
 /**
  * Updates space bsize field: decrease it by old tuple's bsize and
  * increase it by new one's.
+ * Return an increment in space.bsize
  */
-void
+ptrdiff_t
 space_bsize_update(struct space *space,
 		   const struct tuple *old_tuple,
 		   const struct tuple *new_tuple);
+
+/**
+ * Revert previous change in space_bsize
+ */
+void
+space_bsize_rollback(struct space *space, ptrdiff_t bsize_change);
 
 #endif /* defined(__cplusplus) */
 

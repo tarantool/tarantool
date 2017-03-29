@@ -88,7 +88,7 @@ memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
 	}
 	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
 	stmt->engine_savepoint = stmt;
-	space_bsize_update(space, NULL, stmt->new_tuple);
+	stmt->bsize_change = space_bsize_update(space, NULL, stmt->new_tuple);
 }
 
 /**
@@ -102,7 +102,7 @@ memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
 	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
 						   stmt->new_tuple, mode);
 	stmt->engine_savepoint = stmt;
-	space_bsize_update(space, stmt->old_tuple, stmt->new_tuple);
+	stmt->bsize_change = space_bsize_update(space, stmt->old_tuple, stmt->new_tuple);
 }
 
 /**
@@ -230,7 +230,7 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 	}
 	stmt->old_tuple = old_tuple;
 	stmt->engine_savepoint = stmt;
-	space_bsize_update(space, old_tuple, new_tuple);
+	stmt->bsize_change = space_bsize_update(space, old_tuple, new_tuple);
 }
 
 

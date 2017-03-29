@@ -46,3 +46,17 @@ for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
 
 s:bsize()
 utils.space_bsize(s)
+
+box.error.injection.set("ERRINJ_TUPLE_ALLOC", true)
+
+s:replace{1, "test"}
+s:bsize()
+utils.space_bsize(s)
+
+s:update({1}, {{'=', 3, '!'}})
+s:bsize()
+utils.space_bsize(s)
+
+box.error.injection.set("ERRINJ_TUPLE_ALLOC", false)
+
+s:drop()

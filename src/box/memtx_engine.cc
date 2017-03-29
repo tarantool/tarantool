@@ -534,6 +534,9 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 		Index *index = space->index[i];
 		index->replace(stmt->new_tuple, stmt->old_tuple, DUP_INSERT);
 	}
+	/** Rollback change of bsize */
+	space_bsize_rollback(space, stmt->bsize_change);
+
 	if (stmt->new_tuple)
 		tuple_unref(stmt->new_tuple);
 

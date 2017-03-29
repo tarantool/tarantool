@@ -27,3 +27,13 @@ box.space.t5:truncate()
 box.space.t5:insert{55}
 box.space.t5:drop()
 
+-- https://github.com/tarantool/tarantool/issues/2257
+-- crash somewhere in bsize
+s = box.schema.space.create('test',{engine=engine})
+_ = s:create_index('primary')
+s:replace{1}
+box.begin()
+_ = s:delete{1}
+box.rollback()
+_ = s:delete{1}
+s:drop()
