@@ -5,7 +5,7 @@ test_run = env.new()
 fio = require('fio')
 glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
-glob = fio.pathjoin(box.cfg.wal_dir, '*.xctl')
+glob = fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
 glob = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end

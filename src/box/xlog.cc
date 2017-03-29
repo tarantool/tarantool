@@ -315,9 +315,9 @@ xdir_create(struct xdir *dir, const char *dirname,
 		dir->suffix = NONE;
 		dir->force_recovery = true;
 		break;
-	case XCTL:
-		dir->filetype = "XCTL";
-		dir->filename_ext = ".xctl";
+	case VYLOG:
+		dir->filetype = "VYLOG";
+		dir->filename_ext = ".vylog";
 		dir->suffix = INPROGRESS;
 		dir->force_recovery = true;
 		break;

@@ -51,11 +51,11 @@ log.info(string.format('save backup to %s', backup_dir))
 _ = test_run:cmd("setopt delimiter ';'")
 for _, path in ipairs(files) do
     suffix = string.gsub(path, '.*%.', '')
-    if suffix == 'xlog' or suffix == 'xctl' then
+    if suffix == 'xlog' then
         dir = box.cfg.wal_dir
     elseif suffix == 'snap' then
         dir = box.cfg.memtx_dir
-    elseif suffix == 'run' or suffix == 'index' then
+    elseif suffix == 'vylog' or suffix == 'run' or suffix == 'index' then
         dir = box.cfg.vinyl_dir
     end
     assert(dir ~= nil)

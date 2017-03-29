@@ -331,9 +331,9 @@ fio = require'fio'
 new_snap_dir = "]] .. fio.pathjoin(box.cfg.memtx_dir, "snap_test") .. [["
 os.execute("mkdir " .. new_snap_dir)
 os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xlog") .. [[ " .. new_snap_dir .. "/")
-os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xctl") .. [[ " .. new_snap_dir .. "/")
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.vylog") .. [[ " .. new_snap_dir .. "/")
 os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.snap") .. [[ " .. new_snap_dir .. "/")
-box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_dir = new_snap_dir, wal_mode = "none" }
+box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_dir = new_snap_dir, vinyl_dir = new_snap_dir, wal_mode = "none" }
 
 log = require('log')
 
@@ -393,9 +393,9 @@ while #snaps > initial_snap_count do
         max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
     end
     fio.unlink(max_snap)
-    max_xctl = fio.basename(max_snap, '.snap') .. '.xctl'
-    max_xctl = fio.pathjoin(box.cfg.wal_dir, max_xctl)
-    fio.unlink(max_xctl)
+    max_vylog = fio.basename(max_snap, '.snap') .. '.vylog'
+    max_vylog = fio.pathjoin(box.cfg.vinyl_dir, max_vylog)
+    fio.unlink(max_vylog)
     snaps[max_snap_k] = nil
 end;
 ---

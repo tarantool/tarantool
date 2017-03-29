@@ -53,6 +53,7 @@ add_library(box STATIC
     vy_stmt.c
     vy_mem.c
     vy_cache.c
+    vy_log.c
     space.cc
     func.cc
     alter.cc
@@ -68,7 +69,6 @@ add_library(box STATIC
     vclock.c
     replication.cc
     recovery.cc
-    xctl.c
     xstream.cc
     applier.cc
     relay.cc

@@ -104,19 +104,19 @@ void
 wal_collect_garbage(int64_t lsn);
 
 void
-wal_init_xctl();
+wal_init_vy_log();
 
 /**
- * Write xrows to the metadata log.
+ * Write xrows to the vinyl metadata log.
  */
 int
-wal_write_xctl(struct journal_entry *req);
+wal_write_vy_log(struct journal_entry *req);
 
 /**
- * Rotate the metadata log.
+ * Rotate the vinyl metadata log.
  */
 void
-wal_rotate_xctl();
+wal_rotate_vy_log();
 
 #if defined(__cplusplus)
 } /* extern "C" */

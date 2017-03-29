@@ -61,7 +61,7 @@ extern const struct type type_XlogError;
 enum xdir_type {
 	SNAP,		/* memtx snapshot */
 	XLOG,		/* write ahead log */
-	XCTL,		/* metadata log */
+	VYLOG,		/* vinyl metadata log */
 };
 
 /**
