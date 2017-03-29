@@ -1748,7 +1748,9 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	int rc = xctl_backup(cb, cb_arg);
+	int rc = engine_backup(cb, cb_arg);
+	if (rc == 0)
+		rc = xctl_backup(cb, cb_arg);
 	if (rc == 0)
 		box_backup_is_in_progress = true;
 	return rc;

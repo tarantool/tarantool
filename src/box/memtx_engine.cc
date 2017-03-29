@@ -851,6 +851,19 @@ MemtxEngine::collectGarbage(int64_t lsn)
 	coio_call(memtx_collect_garbage_f, &m_snap_dir, lsn);
 }
 
+int
+MemtxEngine::backup(engine_backup_cb cb, void *cb_arg)
+{
+	struct vclock vclock;
+	if (lastCheckpoint(&vclock) < 0) {
+		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		return -1;
+	}
+	char *filename = xdir_format_filename(&m_snap_dir,
+					      vclock_sum(&vclock), NONE);
+	return cb(filename, cb_arg);
+}
+
 /** Used to pass arguments to memtx_initial_join_f */
 struct memtx_join_arg {
 	const char *snap_dirname;

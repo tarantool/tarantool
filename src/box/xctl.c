@@ -134,8 +134,6 @@ enum { XCTL_TX_BUF_SIZE = 64 };
 struct xctl {
 	/** The directory where log files are stored. */
 	struct xdir dir;
-	/** The memtx direcotry. */
-	char memtx_dir[PATH_MAX];
 	/** The vinyl directory. */
 	char vinyl_dir[PATH_MAX];
 	/** Last checkpoint vclock. */
@@ -585,8 +583,6 @@ void
 xctl_init(void)
 {
 	xdir_create(&xctl.dir, cfg_gets("wal_dir"), XCTL, &INSTANCE_UUID);
-	snprintf(xctl.memtx_dir, sizeof(xctl.memtx_dir), "%s",
-		 cfg_gets("memtx_dir"));
 	snprintf(xctl.vinyl_dir, sizeof(xctl.vinyl_dir), "%s",
 		 cfg_gets("vinyl_dir"));
 	latch_create(&xctl.latch);
@@ -697,13 +693,6 @@ xctl_snprint_vy_run_path(char *buf, int size, const char *index_path,
 	SNPRINT(total, snprintf, buf, size, "%020lld.%s",
 		(long long)run_id, vy_file_suffix[type]);
 	return total;
-}
-
-static int
-xctl_snprint_memtx_snap_path(char *buf, int size, int64_t signature)
-{
-	return snprintf(buf, size, "%s/%020lld.snap",
-			xctl.memtx_dir, (long long)signature);
 }
 
 /**
@@ -1220,13 +1209,6 @@ xctl_backup(xctl_backup_cb cb, void *cb_arg)
 	 */
 	rc = cb(xdir_format_filename(&xctl.dir,
 			vclock_sum(&xctl.prev_checkpoint), NONE), cb_arg);
-	if (rc != 0)
-		goto out_free_recovery;
-
-	/* Backup memtx snapshot. */
-	xctl_snprint_memtx_snap_path(path, PATH_MAX,
-			vclock_sum(&xctl.last_checkpoint));
-	rc = cb(path, cb_arg);
 	if (rc != 0)
 		goto out_free_recovery;
 

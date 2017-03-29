@@ -46,6 +46,9 @@ extern struct rlist engines;
 
 struct Handler;
 
+typedef int
+engine_backup_cb(const char *path, void *arg);
+
 /** Engine instance */
 class Engine {
 public:
@@ -169,6 +172,12 @@ public:
 	 * from snapshot with @lsn or newer.
 	 */
 	virtual void collectGarbage(int64_t lsn);
+	/**
+	 * Backup callback. It is supposed to call @cb for each file
+	 * that needs to be backed up in order to restore from the
+	 * last checkpoint.
+	 */
+	virtual int backup(engine_backup_cb cb, void *cb_arg);
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -304,6 +313,9 @@ engine_abort_checkpoint();
 
 void
 engine_collect_garbage(int64_t lsn);
+
+int
+engine_backup(engine_backup_cb cb, void *cb_arg);
 
 /**
  * Feed snapshot data as join events to the replicas.

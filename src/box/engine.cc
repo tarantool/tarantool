@@ -147,6 +147,14 @@ Engine::collectGarbage(int64_t lsn)
 	(void) lsn;
 }
 
+int
+Engine::backup(engine_backup_cb cb, void *cb_arg)
+{
+	(void) cb;
+	(void) cb_arg;
+	return 0;
+}
+
 void
 Engine::join(struct xstream *stream)
 {
@@ -363,6 +371,17 @@ engine_collect_garbage(int64_t lsn)
 	Engine *engine;
 	engine_foreach(engine)
 		engine->collectGarbage(lsn);
+}
+
+int
+engine_backup(engine_backup_cb cb, void *cb_arg)
+{
+	Engine *engine;
+	engine_foreach(engine) {
+		if (engine->backup(cb, cb_arg) < 0)
+			return -1;
+	}
+	return 0;
 }
 
 void

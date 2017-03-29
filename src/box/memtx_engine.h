@@ -99,6 +99,7 @@ struct MemtxEngine: public Engine {
 	virtual void commitCheckpoint(struct vclock *vclock) override;
 	virtual void abortCheckpoint() override;
 	virtual void collectGarbage(int64_t lsn) override;
+	virtual int backup(engine_backup_cb cb, void *arg) override;
 	virtual void initSystemSpace(struct space *space) override;
 	/* Update snap_io_rate_limit. */
 	void setSnapIoRateLimit(double new_limit)
