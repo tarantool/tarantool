@@ -151,7 +151,10 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/coeio.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
+    ${CMAKE_SOURCE_DIR}/src/box/key_def.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple_compare.h
     ${CMAKE_SOURCE_DIR}/src/box/memtx_tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/schema.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h

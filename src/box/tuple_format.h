@@ -221,6 +221,39 @@ tuple_format_meta_size(const struct tuple_format *format)
 	return format->extra_size + format->field_map_size;
 }
 
+/** \cond public */
+
+typedef struct tuple_format box_tuple_format_t;
+
+/**
+ * Return new in-memory tuple format based on passed key definitions.
+ *
+ * \param keys array of keys defined for the format
+ * \key_count count of keys
+ * \retval new tuple format if success
+ * \retval NULL for error
+ */
+box_tuple_format_t *
+box_tuple_format_new(struct key_def **keys, uint16_t key_count);
+
+/**
+ * Increment tuple format ref count.
+ *
+ * \param tuple_format the tuple format to ref
+ */
+void
+box_tuple_format_ref(box_tuple_format_t *format);
+
+/**
+ * Decrement tuple format ref count.
+ *
+ * \param tuple_format the tuple format to unref
+ */
+void
+box_tuple_format_unref(box_tuple_format_t *format);
+
+/** \endcond public */
+
 /**
  * Fill the field map of tuple with field offsets.
  * @param format    Tuple format.

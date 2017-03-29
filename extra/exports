@@ -115,6 +115,8 @@ box_txn_begin
 box_txn_commit
 box_txn_rollback
 box_txn_alloc
+box_key_def_new
+box_key_def_delete
 box_tuple_format_default
 box_tuple_new
 box_tuple_ref
@@ -123,6 +125,9 @@ box_tuple_field_count
 box_tuple_bsize
 box_tuple_to_buf
 box_tuple_format
+box_tuple_format_new
+box_tuple_format_ref
+box_tuple_format_unref
 box_tuple_field
 box_tuple_iterator
 box_tuple_iterator_free
@@ -133,6 +138,7 @@ box_tuple_next
 box_tuple_update
 box_tuple_upsert
 box_tuple_extract_key
+box_tuple_compare
 box_return_tuple
 box_space_id_by_name
 box_index_id_by_name

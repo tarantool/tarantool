@@ -164,6 +164,37 @@ key_def_set_cmp(struct key_def *def)
 	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
 }
 
+static size_t
+key_def_size(uint32_t part_count)
+{
+	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+}
+
+box_key_def_t *
+box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
+{
+	size_t sz = key_def_size(part_count);
+	box_key_def_t *key_def = (box_key_def_t *)malloc(sz);
+	if (key_def == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		return NULL;
+	}
+
+	for (uint32_t item = 0; item < part_count; ++item) {
+		key_def->parts[item].fieldno = fields[item];
+		key_def->parts[item].type = (enum field_type)types[item];
+	}
+	key_def->part_count = part_count;
+	key_def_set_cmp(key_def);
+	return key_def;
+}
+
+void
+box_key_def_delete(box_key_def_t *key_def)
+{
+	free(key_def);
+}
+
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      enum index_type type, const struct key_opts *opts,

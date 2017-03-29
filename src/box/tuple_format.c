@@ -307,3 +307,25 @@ tuple_format_free()
 		free(*format); /* ignore the reference count. */
 	free(tuple_formats);
 }
+
+box_tuple_format_t *
+box_tuple_format_new(struct key_def **keys, uint16_t key_count)
+{
+	box_tuple_format_t *format = tuple_format_new(&memtx_tuple_format_vtab,
+						      keys, key_count, 0);
+	if (format != NULL)
+		tuple_format_ref(format, 1);
+	return format;
+}
+
+void
+box_tuple_format_ref(box_tuple_format_t *format)
+{
+	tuple_format_ref(format, 1);
+}
+
+void
+box_tuple_format_unref(box_tuple_format_t *format)
+{
+	tuple_format_ref(format, -1);
+}

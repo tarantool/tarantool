@@ -35,12 +35,11 @@
 #include <stdbool.h>
 
 #include "key_def.h"
+#include "tuple.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-struct tuple;
 
 /**
  * Create a comparison function for the key_def
@@ -106,6 +105,23 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 {
 	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
 }
+
+/** \cond public */
+
+/**
+ * Compare tuples using the key definition.
+ * @param tuple_a first tuple
+ * @param tuple_b second tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+int
+box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
+		  const box_key_def_t *key_def);
+
+/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

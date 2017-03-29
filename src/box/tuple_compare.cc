@@ -850,3 +850,10 @@ tuple_compare_with_key_create(const struct key_def *def)
 }
 
 /* }}} tuple_compare_with_key */
+
+int
+box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
+		  const box_key_def_t *key_def)
+{
+	return tuple_compare(tuple_a, tuple_b, key_def);
+}
