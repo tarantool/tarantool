@@ -3917,6 +3917,13 @@ struct vy_task {
 	double bloom_fpr;
 	/** Max written key. */
 	char *max_written_key;
+	/**
+	 * Max dump size remembered before compaction. Used to
+	 * restore the max dump size in case of compaction abort.
+	 */
+	uint64_t saved_max_dump_size;
+	/** Count of ranges to compact. */
+	int run_count;
 };
 
 /**
@@ -4404,7 +4411,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	n = range->compact_priority;
+	n = task->run_count;
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		vy_log_delete_run(run->id);
 		if (--n == 0)
@@ -4430,7 +4437,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	vy_range_dump_mems(range, scheduler, task->dump_lsn);
-	n = range->compact_priority;
+	n = task->run_count;
 	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
 		vy_range_remove_run(range, run);
 		vy_run_unref(run);
@@ -4442,8 +4449,6 @@ vy_task_compact_complete(struct vy_task *task)
 		vy_range_add_run(range, range->new_run);
 		range->new_run = NULL;
 	}
-	range->max_dump_size = 0;
-	range->compact_priority = 0;
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
@@ -4459,6 +4464,10 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
+	/* Restore the max dump size and compact priority. */
+	range->max_dump_size = MAX(task->saved_max_dump_size,
+				   range->max_dump_size);
+	vy_range_update_compact_priority(range);
 
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
@@ -4524,6 +4533,10 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	task->wi = wi;
 	task->dump_lsn = xm->lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
+	task->saved_max_dump_size = range->max_dump_size;
+	task->run_count = range->compact_priority;
+	range->max_dump_size = 0;
+	range->compact_priority = 0;
 
 	vy_scheduler_remove_range(scheduler, range);
 
