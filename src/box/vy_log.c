@@ -948,24 +948,12 @@ err_create_xlog:
 	return -1;
 }
 
-/**
- * This function does the actual log rotation work. It loads the
- * current log file to a vy_recovery struct, creates a new xlog, and
- * then writes the records returned by vy_recovery to the new xlog.
- */
 static ssize_t
 vy_log_rotate_f(va_list ap)
 {
+	struct vy_recovery *recovery = va_arg(ap, struct vy_recovery *);
 	const struct vclock *vclock = va_arg(ap, const struct vclock *);
-
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(INT64_MAX);
-	if (recovery == NULL)
-		return -1;
-
-	int rc = vy_log_create(vclock, recovery);
-	vy_recovery_delete(recovery);
-	return rc;
+	return vy_log_create(vclock, recovery);
 }
 
 int
@@ -993,6 +981,10 @@ vy_log_rotate(const struct vclock *vclock)
 	say_debug("%s: signature %lld", __func__,
 		  (long long)vclock_sum(vclock));
 
+	struct vy_recovery *recovery = vy_recovery_new(INT64_MAX);
+	if (recovery == NULL)
+		goto fail;
+
 	/*
 	 * Lock out all concurrent log writers while we are rotating it.
 	 * This effectively stalls the vinyl scheduler for a while, but
@@ -1004,16 +996,13 @@ vy_log_rotate(const struct vclock *vclock)
 	 */
 	latch_lock(&vy_log.latch);
 
-	/*
-	 * Before proceeding to log rotation, make sure that all
-	 * pending records have been flushed out.
-	 */
-	if (vy_log_flush() < 0)
-		goto fail;
-
 	/* Do actual work from coeio so as not to stall tx thread. */
-	if (coio_call(vy_log_rotate_f, vclock) < 0)
+	int rc = coio_call(vy_log_rotate_f, recovery, vclock);
+	vy_recovery_delete(recovery);
+	if (rc < 0) {
+		latch_unlock(&vy_log.latch);
 		goto fail;
+	}
 
 	/*
 	 * Success. Close the old log. The new one will be opened
@@ -1031,26 +1020,11 @@ vy_log_rotate(const struct vclock *vclock)
 	return 0;
 
 fail:
-	latch_unlock(&vy_log.latch);
 	say_debug("%s: failed", __func__);
 	say_error("failed to rotate metadata log: %s",
 		  diag_last_error(diag_get())->errmsg);
 	free(new_vclock);
 	return -1;
-}
-
-static ssize_t
-vy_recovery_new_f(va_list ap)
-{
-	int64_t recovery_signature = va_arg(ap, int64_t);
-	struct vy_recovery **p_recovery = va_arg(ap, struct vy_recovery **);
-
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(recovery_signature);
-	if (recovery == NULL)
-		return -1;
-	*p_recovery = recovery;
-	return 0;
 }
 
 static ssize_t
@@ -1066,14 +1040,8 @@ vy_log_collect_garbage(int64_t signature)
 {
 	say_debug("%s: signature %lld", __func__, (long long)signature);
 
-	/* Lock out concurrent writers while we are loading the log. */
-	latch_lock(&vy_log.latch);
-	/* Load the log from coeio so as not to stall tx thread. */
-	struct vy_recovery *recovery;
-	int rc = coio_call(vy_recovery_new_f, signature, &recovery);
-	latch_unlock(&vy_log.latch);
-
-	if (rc == 0) {
+	struct vy_recovery *recovery = vy_recovery_new(signature);
+	if (recovery != NULL) {
 		/* Cleanup unused runs. */
 		vy_recovery_iterate(recovery, true,
 				      vy_log_deleted_run_gc, NULL);
@@ -1118,14 +1086,10 @@ vy_log_relay(vy_recovery_cb cb, void *cb_arg)
 {
 	/*
 	 * First, load the latest snapshot of the metadata log.
-	 * Use coeio in order not ot block tx thread.
 	 */
-	latch_lock(&vy_log.latch);
 	struct vy_recovery *recovery;
-	int rc = coio_call(vy_recovery_new_f,
-			   vclock_sum(&vy_log.last_checkpoint), &recovery);
-	latch_unlock(&vy_log.latch);
-	if (rc != 0)
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint));
+	if (recovery == NULL)
 		return -1;
 
 	/*
@@ -1193,12 +1157,9 @@ vy_log_backup(vy_log_backup_cb cb, void *cb_arg)
 	}
 
 	/* Load recovery context. */
-	latch_lock(&vy_log.latch);
 	struct vy_recovery *recovery;
-	rc = coio_call(vy_recovery_new_f,
-		       vclock_sum(&vy_log.last_checkpoint), &recovery);
-	latch_unlock(&vy_log.latch);
-	if (rc != 0)
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint));
+	if (recovery == NULL)
 		goto out_free_path;
 
 	/*
@@ -1741,15 +1702,12 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	return rc;
 }
 
-/**
- * Load records having signatures < @recovery_signature from
- * the metadata log and return the recovery context.
- *
- * Returns NULL on failure.
- */
-static struct vy_recovery *
-vy_recovery_new(int64_t recovery_signature)
+static ssize_t
+vy_recovery_new_f(va_list ap)
 {
+	int64_t recovery_signature = va_arg(ap, int64_t);
+	struct vy_recovery **p_recovery = va_arg(ap, struct vy_recovery **);
+
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
 		diag_set(OutOfMemory, sizeof(*recovery),
@@ -1801,14 +1759,44 @@ vy_recovery_new(int64_t recovery_signature)
 
 	xlog_cursor_close(&cursor, false);
 out:
-	return recovery;
+	*p_recovery = recovery;
+	return 0;
 
 fail_close:
 	xlog_cursor_close(&cursor, false);
 fail_free:
 	vy_recovery_delete(recovery);
 fail:
-	return NULL;
+	return -1;
+}
+
+/**
+ * Load records having signatures < @recovery_signature from
+ * the metadata log and return the recovery context.
+ *
+ * Returns NULL on failure.
+ */
+static struct vy_recovery *
+vy_recovery_new(int64_t recovery_signature)
+{
+	int rc;
+	struct vy_recovery *recovery;
+
+	/* Lock out concurrent writers while we are loading the log. */
+	latch_lock(&vy_log.latch);
+	/*
+	 * Before proceeding to log recovery, make sure that all
+	 * pending records have been flushed out.
+	 */
+	rc = vy_log_flush();
+	if (rc != 0)
+		goto out;
+
+	/* Load the log from coeio so as not to stall tx thread. */
+	rc = coio_call(vy_recovery_new_f, recovery_signature, &recovery);
+out:
+	latch_unlock(&vy_log.latch);
+	return rc == 0 ? recovery : NULL;
 }
 
 /** Helper to delete mh_i64ptr_t along with all its records. */
