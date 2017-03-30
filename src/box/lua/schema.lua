@@ -1026,7 +1026,7 @@ function box.schema.space.bless(space)
 -- primary key and returns it back to the user
     space_mt.auto_increment = function(space, tuple)
         check_space_arg(space, 'auto_increment')
-        local max_tuple = space.index[0]:max()
+        local max_tuple = check_primary_index(space):max()
         local max = 0
         if max_tuple ~= nil then
             max = max_tuple[1]

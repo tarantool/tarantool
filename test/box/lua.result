@@ -274,6 +274,50 @@ space:auto_increment{'c'}
 ---
 - [7, 'c']
 ...
+-- gh-2258: Incomprehensive failure of auto_increment in absence of indices
+space.index.primary:drop()
+---
+...
+space:auto_increment{'a'}
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:get({1})
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:select()
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:update({1}, {})
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:upsert({1}, {})
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:delete({1})
+---
+- error: 'No index #0 is defined in space ''tweedledum'''
+...
+space:bsize()
+---
+- 0
+...
+space:count()
+---
+- 0
+...
+space:len()
+---
+- 0
+...
+space:pairs():totable()
+---
+- []
+...
 space:drop()
 ---
 ...
