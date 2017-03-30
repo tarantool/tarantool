@@ -625,6 +625,62 @@ errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 space:drop()
 ---
 ...
+--test space:bsize() in case of memory error
+utils = dofile('utils.lua')
+---
+...
+s = box.schema.space.create('space_bsize')
+---
+...
+idx = s:create_index('primary')
+---
+...
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+---
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+---
+- ok
+...
+s:replace{1, "test"}
+---
+- error: Failed to allocate 23 bytes in slab allocator for memtx_tuple
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
+s:update({1}, {{'=', 3, '!'}})
+---
+- error: Failed to allocate 22 bytes in slab allocator for memtx_tuple
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+---
+- ok
+...
+s:drop()
+---
+...
 errinj = nil
 ---
 ...

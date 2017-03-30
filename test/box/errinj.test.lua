@@ -192,4 +192,28 @@ _ = space:insert{1, require'digest'.urandom(192 * 1024)}
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 space:drop()
 
+--test space:bsize() in case of memory error
+utils = dofile('utils.lua')
+s = box.schema.space.create('space_bsize')
+idx = s:create_index('primary')
+
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+
+s:bsize()
+utils.space_bsize(s)
+
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+
+s:replace{1, "test"}
+s:bsize()
+utils.space_bsize(s)
+
+s:update({1}, {{'=', 3, '!'}})
+s:bsize()
+utils.space_bsize(s)
+
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+
+s:drop()
+
 errinj = nil

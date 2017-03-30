@@ -98,35 +98,6 @@ utils.space_bsize(s)
 ---
 - 130
 ...
-box.error.injection.set("ERRINJ_TUPLE_ALLOC", true)
+s:drop()
 ---
-- ok
-...
-s:replace{1, "test"}
----
-- error: Failed to allocate 23 bytes in slab allocator for memtx_tuple
-...
-s:bsize()
----
-- 130
-...
-utils.space_bsize(s)
----
-- 130
-...
-s:update({1}, {{'=', 3, '!'}})
----
-- error: Failed to allocate 22 bytes in slab allocator for memtx_tuple
-...
-s:bsize()
----
-- 130
-...
-utils.space_bsize(s)
----
-- 130
-...
-box.error.injection.set("ERRINJ_TUPLE_ALLOC", false)
----
-- ok
 ...
