@@ -601,46 +601,43 @@ local function start()
 end
 
 local function stop()
-    local pid_file = default_cfg.pid_file
+    log.info("Stopping instance...")
 
-    local function base_stop()
-        log.info("Stopping instance...")
-        if fio.stat(pid_file) == nil then
-            log.error("Process is not running (pid: %s)", pid_file)
-            return 0
-        end
-
-        local f = fio.open(pid_file, 'O_RDONLY')
-        if f == nil then
-            log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
-            return 1
-        end
-
-        local pid = tonumber(f:read(64))
-        f:close()
-
-        if pid == nil or pid <= 0 then
-            log.error("Broken pid file %s", pid_file)
-            return 1
-        end
-
-        if ffi.C.kill(pid, 15) < 0 then
-            log.error("Can't kill process %d: %s", pid, errno.strerror())
-            return 1
-        end
-
-        return 0
-    end
-
-    local rv = base_stop()
-    if fio.stat(pid_file) then
-        fio.unlink(pid_file)
-    end
+    -- remove console socket
     local console_sock = uri.parse(console_sock).service
     if fio.stat(console_sock) then
         fio.unlink(console_sock)
     end
-    return rv
+
+    -- kill process and remove pid file
+    local pid_file = default_cfg.pid_file
+    if fio.stat(pid_file) == nil then
+        log.error("Process is not running (pid: %s)", pid_file)
+        return 0
+    end
+
+    local f = fio.open(pid_file, 'O_RDONLY')
+    if f == nil then
+        log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
+        return 1
+    end
+
+    local pid = tonumber(f:read(64))
+    f:close()
+
+    if pid == nil or pid <= 0 then
+        log.error("Broken pid file %s", pid_file)
+        fio.unlink(pid_file)
+        return 1
+    end
+
+    if ffi.C.kill(pid, 15) < 0 then
+        log.error("Can't kill process %d: %s", pid, errno.strerror())
+        fio.unlink(pid_file)
+        return 1
+    end
+
+    return 0
 end
 
 local function check()
