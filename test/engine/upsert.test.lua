@@ -1,8 +1,6 @@
 
-env = require('test_run')
-inspector = env.new()
-test_run = env.new()
-engine = inspector:get_cfg('engine')
+test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
 
 -- upsert (str)
 space = box.schema.space.create('test', { engine = engine })
@@ -393,6 +391,8 @@ test(t, {{':', 3, 3, 3, ''}, {'|', 3, 4}}, {{1, '1', 4, '1'}, {2, '1', 1, 'qwert
 
 'dump ' .. anything_to_string(box.space.s:select{}) -- (1)
 test_run:cmd("restart server default")
+test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
 
 test_run:cmd("setopt delimiter ';'")
 function anything_to_string(tab)

@@ -1,13 +1,7 @@
-env = require('test_run')
+test_run = require('test_run').new()
 ---
 ...
-inspector = env.new()
----
-...
-test_run = env.new()
----
-...
-engine = inspector:get_cfg('engine')
+engine = test_run:get_cfg('engine')
 ---
 ...
 -- upsert (str)
@@ -2178,6 +2172,12 @@ test(t, {{':', 3, 3, 3, ''}, {'|', 3, 4}}, {{1, '1', 4, '1'}, {2, '1', 1, 'qwert
 - dump [[1,'1',4,'1'],[2,'1',1,'qwerty'],[3,'3',7,'3']]
 ...
 test_run:cmd("restart server default")
+test_run = require('test_run').new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
