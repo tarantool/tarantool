@@ -299,7 +299,7 @@ vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
  */
 
 int
-vy_join(struct vy_env *env, struct xstream *stream);
+vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream);
 
 /*
  * Garbage collection
@@ -313,7 +313,8 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn);
  */
 
 int
-vy_backup(struct vy_env *env, int (*cb)(const char *, void *), void *cb_arg);
+vy_backup(struct vy_env *env, struct vclock *vclock,
+	  int (*cb)(const char *, void *), void *cb_arg);
 
 #ifdef __cplusplus
 }

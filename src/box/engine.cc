@@ -147,16 +147,18 @@ Engine::collectGarbage(int64_t lsn)
 }
 
 int
-Engine::backup(engine_backup_cb cb, void *cb_arg)
+Engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
+	(void) vclock;
 	(void) cb;
 	(void) cb_arg;
 	return 0;
 }
 
 void
-Engine::join(struct xstream *stream)
+Engine::join(struct vclock *vclock, struct xstream *stream)
 {
+	(void) vclock;
 	(void) stream;
 }
 
@@ -371,21 +373,21 @@ engine_collect_garbage(int64_t lsn)
 }
 
 int
-engine_backup(engine_backup_cb cb, void *cb_arg)
+engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->backup(cb, cb_arg) < 0)
+		if (engine->backup(vclock, cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;
 }
 
 void
-engine_join(struct xstream *stream)
+engine_join(struct vclock *vclock, struct xstream *stream)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(stream);
+		engine->join(vclock, stream);
 	}
 }

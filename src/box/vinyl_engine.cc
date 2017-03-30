@@ -157,9 +157,9 @@ VinylEngine::buildSecondaryKey(struct space *old_space,
 }
 
 void
-VinylEngine::join(struct xstream *stream)
+VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 {
-	if (vy_join(env, stream) != 0)
+	if (vy_join(env, vclock, stream) != 0)
 		diag_raise();
 }
 
@@ -285,7 +285,7 @@ VinylEngine::collectGarbage(int64_t lsn)
 }
 
 int
-VinylEngine::backup(engine_backup_cb cb, void *arg)
+VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 {
-	return vy_backup(env, cb, arg);
+	return vy_backup(env, vclock, cb, arg);
 }

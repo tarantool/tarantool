@@ -852,15 +852,10 @@ MemtxEngine::collectGarbage(int64_t lsn)
 }
 
 int
-MemtxEngine::backup(engine_backup_cb cb, void *cb_arg)
+MemtxEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
-	struct vclock vclock;
-	if (lastCheckpoint(&vclock) < 0) {
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return -1;
-	}
 	char *filename = xdir_format_filename(&m_snap_dir,
-					      vclock_sum(&vclock), NONE);
+					      vclock_sum(vclock), NONE);
 	return cb(filename, cb_arg);
 }
 
@@ -915,24 +910,14 @@ memtx_initial_join_f(va_list ap)
 }
 
 void
-MemtxEngine::join(struct xstream *stream)
+MemtxEngine::join(struct vclock *vclock, struct xstream *stream)
 {
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such
-	 * case: raise ER_MISSING_SNAPSHOT.
-	 */
-	struct vclock vclock;
-	if (lastCheckpoint(&vclock) < 0)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-
 	/*
 	 * cord_costart() passes only void * pointer as an argument.
 	 */
 	struct memtx_join_arg arg = {
 		/* .snap_dirname   = */ m_snap_dir.dirname,
-		/* .checkpoint_lsn = */ vclock_sum(&vclock),
+		/* .checkpoint_lsn = */ vclock_sum(vclock),
 		/* .stream         = */ stream
 	};
 

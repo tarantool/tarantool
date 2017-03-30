@@ -1191,7 +1191,14 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Remember start vclock. */
 	struct vclock start_vclock;
-	recovery_last_checkpoint(&start_vclock);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such
+	 * case: raise ER_MISSING_SNAPSHOT.
+	 */
+	if (recovery_last_checkpoint(&start_vclock) < 0)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
@@ -1202,7 +1209,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/*
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
-	relay_initial_join(io->fd, header->sync);
+	relay_initial_join(io->fd, header->sync, &start_vclock);
 	say_info("initial data sent.");
 
 	/**
@@ -1738,7 +1745,12 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	int rc = engine_backup(cb, cb_arg);
+	struct vclock vclock;
+	if (recovery_last_checkpoint(&vclock) < 0) {
+		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		return -1;
+	}
+	int rc = engine_backup(&vclock, cb, cb_arg);
 	if (rc == 0)
 		box_backup_is_in_progress = true;
 	return rc;

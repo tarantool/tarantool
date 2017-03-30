@@ -82,7 +82,7 @@ relay_set_cord_name(int fd)
 }
 
 void
-relay_initial_join(int fd, uint64_t sync)
+relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 {
 	struct relay relay;
 	relay_create(&relay, fd, sync, relay_send_initial_join_row);
@@ -91,7 +91,7 @@ relay_initial_join(int fd, uint64_t sync)
 	});
 
 	assert(relay.stream.write != NULL);
-	engine_join(&relay.stream);
+	engine_join(vclock, &relay.stream);
 }
 
 int

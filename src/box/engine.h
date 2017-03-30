@@ -88,8 +88,10 @@ public:
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index);
-
-	virtual void join(struct xstream *);
+	/**
+	 * Write statements stored in checkpoint @vclock to @stream.
+	 */
+	virtual void join(struct vclock *vclock, struct xstream *stream);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -175,9 +177,10 @@ public:
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
-	 * last checkpoint.
+	 * checkpoint @vclock.
 	 */
-	virtual int backup(engine_backup_cb cb, void *cb_arg);
+	virtual int backup(struct vclock *vclock,
+			   engine_backup_cb cb, void *cb_arg);
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -315,13 +318,13 @@ void
 engine_collect_garbage(int64_t lsn);
 
 int
-engine_backup(engine_backup_cb cb, void *cb_arg);
+engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
 /**
  * Feed snapshot data as join events to the replicas.
  * (called on the master).
  */
 void
-engine_join(struct xstream *stream);
+engine_join(struct vclock *vclock, struct xstream *stream);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */
