@@ -32,6 +32,8 @@ errinj.set("ERRINJ_RELAY", true)
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 
+fiber = require('fiber')
+while box.space.test:count() < 1 do fiber.sleep(0.01) end
 -- Check that replica doesn't enter read-write mode before
 -- catching up with the master: to check that we inject sleep into
 -- the master relay_send function and attempt a data modifying
@@ -44,15 +46,14 @@ test_run:cmd("switch replica")
 --
 box.space.test ~= nil
 d = box.space.test:delete{1}
-box.space.test:get(1) ~= nil
+box.space.test:get(1) == nil
 
 -- case #2: delete tuple by net.box
 
 test_run:cmd("switch default")
 test_run:cmd("set variable r_uri to 'replica.listen'")
 c = net_box.connect(r_uri)
-d = c.space.test:delete{1}
-c.space.test:get(1) ~= nil
+c.space.test:get(1) == nil
 
 -- check sync
 errinj.set("ERRINJ_RELAY", false)
