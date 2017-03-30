@@ -81,16 +81,14 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 	if (mp_typeof(**beg) != MP_UINT)
 		luaL_error(L, "Broken type of body key");
 	uint32_t v = mp_decode_uint(beg);
-	if (type < IPROTO_TYPE_STAT_MAX && v < IPROTO_KEY_MAX &&
-	    iproto_key_strs[v] != NULL &&
-	    iproto_key_strs[v][0] > 0) {
-		lua_pushstring(L, iproto_key_strs[v]);
-	} else if (type == VY_INDEX_RUN_INFO && v < VY_RUN_INFO_KEY_MAX) {
-		lua_pushstring(L, vy_run_info_key_strs[v]);
-	} else if (type == VY_INDEX_PAGE_INFO && v < VY_PAGE_INFO_KEY_MAX) {
-		lua_pushstring(L, vy_page_info_key_strs[v]);
-	} else if (type == VY_RUN_PAGE_INDEX && v < VY_PAGE_INDEX_KEY_MAX) {
-		lua_pushstring(L, vy_page_index_key_strs[v]);
+	if (iproto_key_name(v)) {
+		lua_pushstring(L, iproto_key_name(v));
+	} else if (type == VY_INDEX_RUN_INFO && vy_run_info_key_name(v)) {
+		lua_pushstring(L, vy_run_info_key_name(v));
+	} else if (type == VY_INDEX_PAGE_INFO && vy_page_info_key_name(v)) {
+		lua_pushstring(L, vy_page_info_key_name(v));
+	} else if (type == VY_RUN_PAGE_INDEX && vy_page_index_key_name(v)) {
+		lua_pushstring(L, vy_page_index_key_name(v));
 	} else {
 		lua_pushinteger(L, v); /* unknown key */
 	}

@@ -199,9 +199,7 @@ int
 request_decode(struct request *request, const char *data, uint32_t len)
 {
 	const char *end = data + len;
-	/** Advanced requests don't have a defined key map. */
-	assert(request->type <= IPROTO_CALL);
-	uint64_t key_map = iproto_body_key_map[request->type];
+	uint64_t key_map = request_key_map(request->type);
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
@@ -267,8 +265,9 @@ error:
 	}
 #endif
 	if (key_map) {
+		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
 		tnt_error(ClientError, ER_MISSING_REQUEST_FIELD,
-			  iproto_key_strs[__builtin_ffsll((long long) key_map) - 1]);
+			  iproto_key_name(key));
 		return -1;
 	}
 	return 0;

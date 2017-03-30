@@ -126,33 +126,33 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"replica_id",       /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
-	"",                 /* 0x05 */
-	"",                 /* 0x06 */
-	"",                 /* 0x07 */
-	"",                 /* 0x08 */
-	"",                 /* 0x09 */
-	"",                 /* 0x0a */
-	"",                 /* 0x0b */
-	"",                 /* 0x0c */
-	"",                 /* 0x0d */
-	"",                 /* 0x0e */
-	"",                 /* 0x0f */
+	NULL,               /* 0x05 */
+	NULL,               /* 0x06 */
+	NULL,               /* 0x07 */
+	NULL,               /* 0x08 */
+	NULL,               /* 0x09 */
+	NULL,               /* 0x0a */
+	NULL,               /* 0x0b */
+	NULL,               /* 0x0c */
+	NULL,               /* 0x0d */
+	NULL,               /* 0x0e */
+	NULL,               /* 0x0f */
 	"space_id",         /* 0x10 */
 	"index_id",         /* 0x11 */
 	"limit",            /* 0x12 */
 	"offset",           /* 0x13 */
 	"iterator",         /* 0x14 */
 	"index_base",       /* 0x15 */
-	"",                 /* 0x16 */
-	"",                 /* 0x17 */
-	"",                 /* 0x18 */
-	"",                 /* 0x19 */
-	"",                 /* 0x1a */
-	"",                 /* 0x1b */
-	"",                 /* 0x1c */
-	"",                 /* 0x1d */
-	"",                 /* 0x1e */
-	"",                 /* 0x1f */
+	NULL,               /* 0x16 */
+	NULL,               /* 0x17 */
+	NULL,               /* 0x18 */
+	NULL,               /* 0x19 */
+	NULL,               /* 0x1a */
+	NULL,               /* 0x1b */
+	NULL,               /* 0x1c */
+	NULL,               /* 0x1d */
+	NULL,               /* 0x1e */
+	NULL,               /* 0x1f */
 	"key",              /* 0x20 */
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
@@ -162,10 +162,13 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
+	NULL,               /* 0x29 */
+	"data"              /* 0x30 */
+	"error"             /* 0x31 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
-	"",
+	NULL,
 	"offset",
 	"size",
 	"unpacked size",
@@ -175,7 +178,7 @@ const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
 };
 
 const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
-	"",
+	NULL,
 	"min lsn",
 	"max lsn",
 	"page count",
@@ -183,6 +186,6 @@ const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
 };
 
 const char *vy_page_index_key_strs[VY_PAGE_INDEX_KEY_MAX] = {
-	"",
+	NULL,
 	"page index",
 };
