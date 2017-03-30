@@ -43,12 +43,9 @@
 #include <small/rlist.h>
 
 #include "assoc.h"
-#include "cfg.h"
 #include "coeio.h"
-#include "coeio_file.h"
 #include "diag.h"
 #include "errcode.h"
-#include "errinj.h"
 #include "fiber.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
 #include "latch.h"
@@ -134,8 +131,6 @@ enum { VY_LOG_TX_BUF_SIZE = 64 };
 struct vy_log {
 	/** The directory where log files are stored. */
 	struct xdir dir;
-	/** The vinyl directory. */
-	char vinyl_dir[PATH_MAX];
 	/** Last checkpoint vclock. */
 	struct vclock last_checkpoint;
 	/** Next to last checkpoint vclock. */
@@ -261,19 +256,6 @@ struct vy_run_recovery_info {
 	 */
 	int64_t signature;
 };
-
-static struct vy_recovery *
-vy_recovery_new(int64_t recovery_signature);
-static void
-vy_recovery_delete(struct vy_recovery *recovery);
-static struct vy_index_recovery_info *
-vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_id);
-static int
-vy_recovery_iterate_index(struct vy_index_recovery_info *index,
-		bool include_deleted, vy_recovery_cb cb, void *cb_arg);
-static int
-vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
-		    vy_recovery_cb cb, void *cb_arg);
 
 /** An snprint-style function to print a log record. */
 static int
@@ -579,11 +561,9 @@ fail:
 }
 
 void
-vy_log_init(void)
+vy_log_init(const char *dir)
 {
-	xdir_create(&vy_log.dir, cfg_gets("vinyl_dir"), VYLOG, &INSTANCE_UUID);
-	snprintf(vy_log.vinyl_dir, sizeof(vy_log.vinyl_dir), "%s",
-		 cfg_gets("vinyl_dir"));
+	xdir_create(&vy_log.dir, dir, VYLOG, &INSTANCE_UUID);
 	latch_create(&vy_log.latch);
 	wal_init_vy_log();
 }
@@ -637,8 +617,6 @@ void
 vy_log_free(void)
 {
 	xdir_destroy(&vy_log.dir);
-	if (vy_log.recovery != NULL)
-		vy_recovery_delete(vy_log.recovery);
 	latch_destroy(&vy_log.latch);
 }
 
@@ -660,88 +638,6 @@ int64_t
 vy_log_next_range_id(void)
 {
 	return vy_log.next_range_id++;
-}
-
-/*
- * TODO: File name formatting does not belong here.
- * We should move it to a shared header and use it
- * both in vinyl.c and here.
- */
-enum vy_file_type {
-	VY_FILE_INDEX,
-	VY_FILE_RUN,
-	vy_file_MAX,
-};
-
-static const char *vy_file_suffix[] = {
-	"index",	/* VY_FILE_INDEX */
-	"run",		/* VY_FILE_RUN */
-};
-
-static int
-vy_log_snprint_run_path(char *buf, int size, const char *index_path,
-			uint32_t space_id, uint32_t iid, int64_t run_id,
-			enum vy_file_type type)
-{
-	int total = 0;
-	if (index_path[0] != '\0')
-		SNPRINT(total, snprintf, buf, size, "%s/", index_path);
-	else
-		SNPRINT(total, snprintf, buf, size, "%s/%u/%u/",
-			vy_log.vinyl_dir, (unsigned)space_id, (unsigned)iid);
-	SNPRINT(total, snprintf, buf, size, "%020lld.%s",
-		(long long)run_id, vy_file_suffix[type]);
-	return total;
-}
-
-/**
- * Try to delete files of a vinyl run.
- * Return 0 on success, -1 on failure.
- */
-static int
-vy_log_delete_run_files(uint32_t space_id, uint32_t iid,
-			const char *index_path, int64_t run_id)
-{
-	ERROR_INJECT(ERRINJ_VY_GC,
-		     {say_error("error injection: run %lld not deleted",
-				(long long)run_id); return -1;});
-	int rc = 0;
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_log_snprint_run_path(path, sizeof(path), index_path,
-					 space_id, iid, run_id, type);
-		if (coeio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("failed to delete file '%s'", path);
-			rc = -1;
-		}
-	}
-	return rc;
-}
-
-/**
- * Given a record encoding information about a vinyl run, try to
- * delete the corresponding files. On success, write a "forget" record
- * to the log so that all information about the run is deleted on the
- * next log rotation.
- */
-static void
-vy_log_run_gc(const struct vy_log_record *record)
-{
-	if (vy_log_delete_run_files(record->space_id, record->iid,
-				     record->path, record->run_id) == 0) {
-		struct vy_log_record gc_record = {
-			.type = VY_LOG_FORGET_RUN,
-			.signature = record->signature,
-			.run_id = record->run_id,
-		};
-		vy_log_tx_begin();
-		vy_log_write(&gc_record);
-		if (vy_log_tx_commit() < 0) {
-			say_warn("failed to log vinyl run %lld cleanup: %s",
-				 (long long)record->run_id,
-				 diag_last_error(diag_get())->errmsg);
-		}
-	}
 }
 
 int
@@ -767,13 +663,13 @@ vy_log_bootstrap(void)
 	return rc;
 }
 
-int
+struct vy_recovery *
 vy_log_begin_recovery(const struct vclock *vclock)
 {
 	assert(vy_log.recovery == NULL);
 
 	if (xdir_scan(&vy_log.dir) < 0)
-		return -1;
+		return NULL;
 
 	struct vclock vy_log_vclock;
 	if (xdir_last_vclock(&vy_log.dir, &vy_log_vclock) >= 0 &&
@@ -785,33 +681,20 @@ vy_log_begin_recovery(const struct vclock *vclock)
 		 * deleted snap file, but forgot to delete vy_log.
 		 */
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return -1;
+		return NULL;
 	}
 
 	struct vy_recovery *recovery;
 	recovery = vy_recovery_new(INT64_MAX);
 	if (recovery == NULL)
-		return -1;
+		return NULL;
 
 	vy_log.next_range_id = recovery->range_id_max + 1;
 	vy_log.next_run_id = recovery->run_id_max + 1;
 
 	vy_log.recovery = recovery;
 	vclock_copy(&vy_log.last_checkpoint, vclock);
-	return 0;
-}
-
-/**
- * Callback passed to vy_recovery_iterate() to remove files
- * left from incomplete vinyl runs.
- */
-static int
-vy_log_incomplete_run_gc(const struct vy_log_record *record, void *cb_arg)
-{
-	(void)cb_arg;
-	if (record->type == VY_LOG_PREPARE_RUN)
-		vy_log_run_gc(record);
-	return 0;
+	return recovery;
 }
 
 static int
@@ -825,14 +708,6 @@ vy_log_end_recovery(void)
 	/* Flush all pending records. */
 	if (vy_log_flush() < 0)
 		return -1;
-	/*
-	 * Reset vy_log.recovery before getting to garbage collection
-	 * so that vy_log_commit() called by vy_log_run_gc() writes
-	 * "forget" records to disk instead of accumulating them in
-	 * the log buffer.
-	 */
-	struct vy_recovery *recovery = vy_log.recovery;
-	vy_log.recovery = NULL;
 
 	/*
 	 * On backup we copy files corresponding to the most recent
@@ -855,7 +730,7 @@ vy_log_end_recovery(void)
 		}
 		vclock_copy(vclock, &vy_log.last_checkpoint);
 		xdir_add_vclock(&vy_log.dir, vclock);
-		if (vy_log_create(vclock, recovery) < 0)
+		if (vy_log_create(vclock, vy_log.recovery) < 0)
 			return -1;
 	}
 
@@ -863,31 +738,8 @@ vy_log_end_recovery(void)
 	if (vclock != NULL)
 		vclock_copy(&vy_log.prev_checkpoint, vclock);
 
-	/*
-	 * If the instance is shut down while a dump/compaction task
-	 * is in progress, we'll get an unfinished run file on disk,
-	 * i.e. a run file which was either not written to the end
-	 * or not inserted into a range. We need to delete such runs
-	 * on recovery.
-	 */
-	vy_recovery_iterate(recovery, true,
-			      vy_log_incomplete_run_gc, NULL);
-	vy_recovery_delete(recovery);
+	vy_log.recovery = NULL;
 	return 0;
-}
-
-int
-vy_log_recover_index(int64_t index_id,
-		     vy_recovery_cb cb, void *cb_arg)
-{
-	assert(vy_log.recovery != NULL);
-	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(vy_log.recovery, index_id);
-	if (index == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
-		return -1;
-	}
-	return vy_recovery_iterate_index(index, false, cb, cb_arg);
 }
 
 /** Callback passed to vy_recovery_iterate() for log rotation. */
@@ -900,19 +752,6 @@ vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 	if (vy_log_record_encode(record, &row) < 0 ||
 	    xlog_write_row(xlog, &row) < 0)
 		return -1;
-	return 0;
-}
-
-/**
- * Callback passed to vy_recovery_iterate() to remove files
- * left from deleted runs.
- */
-static int
-vy_log_deleted_run_gc(const struct vy_log_record *record, void *cb_arg)
-{
-	(void)cb_arg;
-	if (record->type == VY_LOG_DELETE_RUN)
-		vy_log_run_gc(record);
 	return 0;
 }
 
@@ -1038,154 +877,29 @@ vy_log_collect_garbage_f(va_list ap)
 void
 vy_log_collect_garbage(int64_t signature)
 {
-	say_debug("%s: signature %lld", __func__, (long long)signature);
-
-	struct vy_recovery *recovery = vy_recovery_new(signature);
-	if (recovery != NULL) {
-		/* Cleanup unused runs. */
-		vy_recovery_iterate(recovery, true,
-				      vy_log_deleted_run_gc, NULL);
-		vy_recovery_delete(recovery);
-	} else {
-		say_warn("garbage collection failed: %s",
-			 diag_last_error(diag_get())->errmsg);
-	}
-
 	/*
-	 * Delete old log files.
 	 * Always keep the previous file, because
 	 * it is still needed for backups.
 	 */
 	signature = MIN(signature, vclock_sum(&vy_log.prev_checkpoint));
 	coio_call(vy_log_collect_garbage_f, signature);
-
-	say_debug("%s: done", __func__);
 }
 
-/** Argument passed to vy_log_relay_f(). */
-struct vy_log_relay_arg {
-	/** The recovery context to relay. */
-	struct vy_recovery *recovery;
-	/** The relay callback. */
-	vy_recovery_cb cb;
-	/** The relay callback argument. */
-	void *cb_arg;
-};
-
-/** Relay cord function. */
-static int
-vy_log_relay_f(va_list ap)
-{
-	struct vy_log_relay_arg *arg = va_arg(ap, struct vy_log_relay_arg *);
-	return vy_recovery_iterate(arg->recovery, false,
-				     arg->cb, arg->cb_arg);
-}
-
-int
-vy_log_relay(vy_recovery_cb cb, void *cb_arg)
+const char *
+vy_log_backup_path(struct vclock *vclock)
 {
 	/*
-	 * First, load the latest snapshot of the metadata log.
-	 */
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint));
-	if (recovery == NULL)
-		return -1;
-
-	/*
-	 * Second, relay the state stored in the log via
-	 * the provided callback.
-	 */
-	struct vy_log_relay_arg arg = {
-		.recovery = recovery,
-		.cb = cb,
-		.cb_arg = cb_arg,
-	};
-	struct cord cord;
-	if (cord_costart(&cord, "initial_join", vy_log_relay_f, &arg) != 0) {
-		vy_recovery_delete(recovery);
-		return -1;
-	}
-	if (cord_cojoin(&cord) != 0)
-		return -1;
-
-	return 0;
-}
-
-/** Argument passed to vy_log_backup_func(). */
-struct vy_log_backup_arg {
-	/** Callback passed to vy_log_backup(). */
-	vy_log_backup_cb cb;
-	/** Extra argument to cb(). */
-	void *cb_arg;
-	/** Path buffer. */
-	char *path;
-};
-
-/**
- * Callback passed to vy_recovery_iterate() to return
- * the list of files needed for backup.
- */
-static int
-vy_log_backup_func(const struct vy_log_record *record, void *cb_arg)
-{
-	struct vy_log_backup_arg *arg = cb_arg;
-
-	if (record->type == VY_LOG_INSERT_RUN) {
-		for (int type = 0; type < vy_file_MAX; type++) {
-			vy_log_snprint_run_path(arg->path, PATH_MAX,
-					record->path,
-					(unsigned)record->space_id,
-					(unsigned)record->iid,
-					(long long)record->run_id, type);
-			if (arg->cb(arg->path, arg->cb_arg) != 0)
-				return -1;
-		}
-	}
-	fiber_reschedule();
-	return 0;
-}
-
-int
-vy_log_backup(vy_log_backup_cb cb, void *cb_arg)
-{
-	int rc = -1;
-	char *path = malloc(PATH_MAX);
-	if (path == NULL) {
-		diag_set(OutOfMemory, PATH_MAX, "malloc", "path");
-		goto out;
-	}
-
-	/* Load recovery context. */
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint));
-	if (recovery == NULL)
-		goto out_free_path;
-
-	/*
-	 * Backup vy_log log.
 	 * Use the previous log file, because the current one
 	 * contains records written after the last checkpoint.
 	 */
-	rc = cb(xdir_format_filename(&vy_log.dir,
-			vclock_sum(&vy_log.prev_checkpoint), NONE), cb_arg);
-	if (rc != 0)
-		goto out_free_recovery;
-
-	/* Backup vinyl runs. */
-	struct vy_log_backup_arg arg = {
-		.cb = cb,
-		.cb_arg = cb_arg,
-		.path = path,
-	};
-	rc = vy_recovery_iterate(recovery, false, vy_log_backup_func, &arg);
-
-out_free_recovery:
-	vy_recovery_delete(recovery);
-out_free_path:
-	free(path);
-out:
-	return rc;
+	struct vclock *prev = vclockset_psearch(&vy_log.dir.index, vclock);
+	if (prev != NULL && vclock_compare(prev, vclock) == 0)
+		prev = vclockset_prev(&vy_log.dir.index, prev);
+	if (prev == NULL) {
+		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		return NULL;
+	}
+	return xdir_format_filename(&vy_log.dir, vclock_sum(prev), NONE);
 }
 
 void
@@ -1770,13 +1484,7 @@ fail:
 	return -1;
 }
 
-/**
- * Load records having signatures < @recovery_signature from
- * the metadata log and return the recovery context.
- *
- * Returns NULL on failure.
- */
-static struct vy_recovery *
+struct vy_recovery *
 vy_recovery_new(int64_t recovery_signature)
 {
 	int rc;
@@ -1809,8 +1517,7 @@ vy_recovery_delete_hash(struct mh_i64ptr_t *h)
 	mh_i64ptr_delete(h);
 }
 
-/** Free recovery context created by vy_recovery_new(). */
-static void
+void
 vy_recovery_delete(struct vy_recovery *recovery)
 {
 	if (recovery->index_hash != NULL)
@@ -1832,16 +1539,8 @@ vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
 	return cb(record, cb_arg);
 }
 
-/**
- * Call function @cb for each range and run of the given index until
- * it returns != 0 or all objects are iterated. Runs of a particular
- * range are iterated right after the range, in the chronological
- * order. If @include_deleted is set, this function will also iterate
- * over deleted objects, issuing the corresponding "delete" record for
- * each of them.
- */
 static int
-vy_recovery_iterate_index(struct vy_index_recovery_info *index,
+vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_range_recovery_info *range;
@@ -1946,20 +1645,30 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 	return 0;
 }
 
-/**
- * Given a recovery context, iterate over all indexes stored in it.
- * See vy_recovery_iterate_index() for more details.
- */
-static int
+int
+vy_recovery_iterate_index(struct vy_recovery *recovery,
+			  int64_t index_id, bool include_deleted,
+			  vy_recovery_cb cb, void *cb_arg)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
+		return -1;
+	}
+	return vy_recovery_do_iterate_index(index, include_deleted, cb, cb_arg);
+}
+
+int
 vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
-		      vy_recovery_cb cb, void *cb_arg)
+		    vy_recovery_cb cb, void *cb_arg)
 {
 	mh_int_t i;
 	mh_foreach(recovery->index_hash, i) {
 		struct vy_index_recovery_info *index;
 		index = mh_i64ptr_node(recovery->index_hash, i)->val;
-		if (vy_recovery_iterate_index(index, include_deleted,
-						   cb, cb_arg) < 0)
+		if (vy_recovery_do_iterate_index(index, include_deleted,
+						 cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;

@@ -55,6 +55,8 @@ extern "C" {
 struct xlog;
 struct vclock;
 
+struct vy_recovery;
+
 /** Type of a metadata log record. */
 enum vy_log_record_type {
 	/**
@@ -162,9 +164,10 @@ struct vy_log_record {
 
 /**
  * Initialize the metadata log.
+ * @dir is the directory where log files are stored.
  */
 void
-vy_log_init(void);
+vy_log_init(const char *dir);
 
 /**
  * Destroy the metadata log.
@@ -192,11 +195,18 @@ int
 vy_log_rotate(const struct vclock *vclock);
 
 /**
- * Remove files left from objects deleted before the log
- * received signature @signature.
+ * Remove metadata log files that are not needed to recover
+ * from the snapshot with the given signature or newer.
  */
 void
 vy_log_collect_garbage(int64_t signature);
+
+/**
+ * Return the path to the log file that needs to be backed up
+ * in order to recover to checkpoint @vclock.
+ */
+const char *
+vy_log_backup_path(struct vclock *vclock);
 
 /** Allocate a unique ID for a vinyl run. */
 int64_t
@@ -261,15 +271,16 @@ vy_log_bootstrap(void);
 
 /**
  * Prepare the metadata log for recovery from the file having
- * vclock @vclock.
+ * vclock @vclock and return the recovery context.
  *
  * After this function is called, vinyl indexes may be recovered from
- * the log using vy_log_recover_index(). When recovery is complete,
- * one must call vy_log_end_recovery().
+ * the log using vy_recovery methods. When recovery is complete,
+ * one must call vy_log_end_recovery(). After that the recovery context
+ * may be deleted with vy_recovery_delete().
  *
- * Returns 0 on success, -1 on failure.
+ * Returns NULL on failure.
  */
-int
+struct vy_recovery *
 vy_log_begin_recovery(const struct vclock *vclock);
 
 /**
@@ -284,12 +295,26 @@ vy_log_begin_recovery(const struct vclock *vclock);
 int
 vy_log_end_recovery(void);
 
+/**
+ * Load records having signatures < @recovery_signature from
+ * the metadata log and return the recovery context.
+ *
+ * Returns NULL on failure.
+ */
+struct vy_recovery *
+vy_recovery_new(int64_t recovery_signature);
+
+/**
+ * Free a recovery context created by vy_recovery_new().
+ */
+void
+vy_recovery_delete(struct vy_recovery *recovery);
+
 typedef int
 (*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
 
 /**
- * Recover a vinyl index having ID @index_id from the metadata log.
- * The log must be in recovery mode, see vy_log_begin_recovery().
+ * Recover the vinyl index with ID @index_id from a recovery context.
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
@@ -303,31 +328,26 @@ typedef int
  * runs of a range always go right after the range, in the
  * chronological order.
  *
- * Returns 0 on success, -1 on failure.
- */
-int
-vy_log_recover_index(int64_t index_id,
-		     vy_recovery_cb cb, void *cb_arg);
-
-/**
- * Call @cb for each active object stored in the most recent
- * snapshot of the metadata log. Vinyl objects are iterated in
- * the same order as the one used by vy_log_recover_index().
+ * If @include_deleted is set, this function will also iterate over
+ * deleted objects, issuing the corresponding "delete" record for each
+ * of them.
  *
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_relay(vy_recovery_cb cb, void *cb_arg);
-
-typedef int
-(*vy_log_backup_cb)(const char *filename, void *arg);
+vy_recovery_iterate_index(struct vy_recovery *recovery,
+			  int64_t index_id, bool include_deleted,
+			  vy_recovery_cb cb, void *cb_arg);
 
 /**
- * Call @cb for each file that needs to be backed up in
- * order to recover from the latest checkpoint.
+ * Given a recovery context, iterate over all indexes stored in it.
+ * See vy_recovery_iterate_index() for more details.
+ *
+ * Returns 0 on success, -1 on failure.
  */
 int
-vy_log_backup(vy_log_backup_cb cb, void *cb_arg);
+vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+		    vy_recovery_cb cb, void *cb_arg);
 
 /** Helper to log a vinyl index creation. */
 static inline void

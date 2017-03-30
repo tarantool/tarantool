@@ -148,6 +148,8 @@ struct vy_env {
 	ev_timer            quota_timer;
 	/** Enviroment for cache subsystem */
 	struct vy_cache_env cache_env;
+	/** Local recovery context. */
+	struct vy_recovery *recovery;
 };
 
 #define vy_crcs(p, size, crc) \
@@ -1434,7 +1436,7 @@ static const char *vy_file_suffix[] = {
 #define XLOG_META_TYPE_INDEX "INDEX"
 
 static int
-vy_index_snprint_path(char *buf, size_t size, const char *dir,
+vy_index_snprint_path(char *buf, int size, const char *dir,
 		      uint32_t space_id, uint32_t iid)
 {
 	return snprintf(buf, size, "%s/%u/%u",
@@ -1442,11 +1444,88 @@ vy_index_snprint_path(char *buf, size_t size, const char *dir,
 }
 
 static int
-vy_run_snprint_path(char *buf, size_t size, const char *dir,
+vy_run_snprint_name(char *buf, int size, int64_t run_id, enum vy_file_type type)
+{
+	return snprintf(buf, size, "%020lld.%s",
+			(long long)run_id, vy_file_suffix[type]);
+}
+
+static int
+vy_run_snprint_path(char *buf, int size, const char *dir,
 		    int64_t run_id, enum vy_file_type type)
 {
-	return snprintf(buf, size, "%s/%020lld.%s",
-			dir, (long long)run_id, vy_file_suffix[type]);
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "%s/", dir);
+	SNPRINT(total, vy_run_snprint_name, buf, size, run_id, type);
+	return total;
+}
+
+/** Return the path to the run encoded by a metadata log record. */
+static int
+vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
+			   const struct vy_log_record *record,
+			   enum vy_file_type type)
+{
+	assert(record->type == VY_LOG_PREPARE_RUN ||
+	       record->type == VY_LOG_INSERT_RUN ||
+	       record->type == VY_LOG_DELETE_RUN);
+
+	int total = 0;
+	if (record->path[0] != '\0')
+		SNPRINT(total, snprintf, buf, size, "%.*s",
+			record->path_len, record->path);
+	else
+		SNPRINT(total, vy_index_snprint_path, buf, size,
+			vinyl_dir, record->space_id, record->iid);
+	SNPRINT(total, snprintf, buf, size, "/");
+	SNPRINT(total, vy_run_snprint_name, buf, size, record->run_id, type);
+	return total;
+}
+
+/**
+ * Given a record encoding information about a vinyl run, try to
+ * delete the corresponding files. On success, write a "forget" record
+ * to the log so that all information about the run is deleted on the
+ * next log rotation.
+ */
+static void
+vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
+{
+	assert(record->type == VY_LOG_PREPARE_RUN ||
+	       record->type == VY_LOG_DELETE_RUN);
+
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: vinyl run %lld not deleted",
+				(long long)record->run_id); return;});
+
+	/* Try to delete files. */
+	bool forget = true;
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_record_snprint_path(path, sizeof(path),
+					   vinyl_dir, record, type);
+		if (coeio_unlink(path) < 0 && errno != ENOENT) {
+			say_syserror("failed to delete file '%s'", path);
+			forget = false;
+		}
+	}
+
+	if (!forget)
+		return;
+
+	/* Forget the run on success. */
+	struct vy_log_record gc_record = {
+		.type = VY_LOG_FORGET_RUN,
+		.signature = record->signature,
+		.run_id = record->run_id,
+	};
+	vy_log_tx_begin();
+	vy_log_write(&gc_record);
+	if (vy_log_tx_commit() < 0) {
+		say_warn("failed to log vinyl run %lld cleanup: %s",
+			 (long long)record->run_id,
+			 diag_last_error(diag_get())->errmsg);
+	}
 }
 
 static void
@@ -3380,7 +3459,7 @@ struct vy_index_recovery_cb_arg {
 	struct vy_range *range;
 };
 
-/** Index recovery callback, passed to vy_log_recover_index(). */
+/** Index recovery callback, passed to vy_recovery_iterate_index(). */
 static int
 vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 {
@@ -3433,10 +3512,11 @@ static int
 vy_index_open_ex(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
+	assert(env->recovery != NULL);
 
 	struct vy_index_recovery_cb_arg arg = { .index = index };
-	if (vy_log_recover_index(index->index_def->opts.lsn,
-				 vy_index_recovery_cb, &arg) != 0)
+	if (vy_recovery_iterate_index(env->recovery, index->index_def->opts.lsn,
+				      false, vy_index_recovery_cb, &arg) != 0)
 		return -1;
 
 	/*
@@ -7225,7 +7305,7 @@ vy_env_new(void)
 	ev_timer_start(loop(), &e->quota_timer);
 	vy_cache_env_create(&e->cache_env, slab_cache,
 			    e->conf->cache);
-	vy_log_init();
+	vy_log_init(e->conf->path);
 	return e;
 error_key_format:
 	vy_squash_queue_delete(e->squash_queue);
@@ -7260,6 +7340,8 @@ vy_env_delete(struct vy_env *e)
 	lsregion_destroy(&e->allocator);
 	tt_pthread_key_delete(e->zdctx_key);
 	vy_cache_env_destroy(&e->cache_env);
+	if (e->recovery != NULL)
+		vy_recovery_delete(e->recovery);
 	vy_log_free();
 	TRASH(e);
 	free(e);
@@ -7287,7 +7369,8 @@ vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
 	if (vclock != NULL) {
 		e->xm->lsn = vclock_sum(vclock);
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
-		if (vy_log_begin_recovery(vclock) != 0)
+		e->recovery = vy_log_begin_recovery(vclock);
+		if (e->recovery == NULL)
 			return -1;
 	} else {
 		e->xm->lsn = 0;
@@ -7315,6 +7398,26 @@ vy_begin_final_recovery(struct vy_env *e)
 	return 0;
 }
 
+/**
+ * Callback passed to vy_recovery_iterate() to delete files
+ * left from incomplete runs.
+ *
+ * If the instance is shut down while a dump/compaction task
+ * is in progress, we'll get an unfinished run file on disk,
+ * i.e. a run file which was either not written to the end
+ * or not inserted into a range. We need to delete such runs
+ * on recovery.
+ */
+static int
+vy_end_recovery_cb(const struct vy_log_record *record, void *cb_arg)
+{
+	struct vy_env *env = cb_arg;
+
+	if (record->type == VY_LOG_PREPARE_RUN)
+		vy_run_record_gc(env->conf->path, record);
+	return 0;
+}
+
 int
 vy_end_recovery(struct vy_env *e)
 {
@@ -7323,6 +7426,11 @@ vy_end_recovery(struct vy_env *e)
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_end_recovery() != 0)
 			return -1;
+
+		vy_recovery_iterate(e->recovery, true,
+				    vy_end_recovery_cb, e);
+		vy_recovery_delete(e->recovery);
+		e->recovery = NULL;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
@@ -10015,6 +10123,8 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 struct vy_join_arg {
 	/** Vinyl environment. */
 	struct vy_env *env;
+	/** Recovery context to relay. */
+	struct vy_recovery *recovery;
 	/** Stream to relay statements to. */
 	struct xstream *stream;
 	/** ID of the space currently being relayed. */
@@ -10035,7 +10145,7 @@ struct vy_join_arg {
 	int64_t lsn;
 };
 
-/** Relay callback, passed to vy_log_relay(). */
+/** Relay callback, passed to vy_recovery_iterate(). */
 static int
 vy_join_cb(const struct vy_log_record *record, void *cb_arg)
 {
@@ -10107,6 +10217,14 @@ out:
 	return rc;
 }
 
+/** Relay cord function. */
+static int
+vy_join_f(va_list ap)
+{
+	struct vy_join_arg *arg = va_arg(ap, struct vy_join_arg *);
+	return vy_recovery_iterate(arg->recovery, false, vy_join_cb, arg);
+}
+
 int
 vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 {
@@ -10115,33 +10233,130 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 		.env = env,
 		.stream = stream,
 	};
+
 	arg.index_path = malloc(PATH_MAX);
 	if (arg.index_path == NULL) {
 		diag_set(OutOfMemory, PATH_MAX, "malloc", "path");
-		return -1;
+		goto err_path;
 	}
-	int rc = vy_log_relay(vy_join_cb, &arg);
+
+	arg.recovery = vy_recovery_new(vclock_sum(vclock));
+	if (arg.recovery == NULL)
+		goto err_recovery;
+
+	struct cord cord;
+	if (cord_costart(&cord, "initial_join", vy_join_f, &arg) != 0)
+		goto err_cord;
+
+	int rc = cord_cojoin(&cord);
+
+	vy_recovery_delete(arg.recovery);
 	free(arg.index_path);
 	return rc;
+
+err_cord:
+	vy_recovery_delete(arg.recovery);
+err_recovery:
+	free(arg.index_path);
+err_path:
+	return -1;
 }
 
-/* }}} replication */
+/* }}} Replication */
+
+/* {{{ Garbage collection */
+
+/** Garbage collection callback, passed to vy_recovery_iterate(). */
+static int
+vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
+{
+	struct vy_env *env = cb_arg;
+
+	if (record->type == VY_LOG_DELETE_RUN)
+		vy_run_record_gc(env->conf->path, record);
+
+	fiber_reschedule();
+	return 0;
+}
 
 void
 vy_collect_garbage(struct vy_env *env, int64_t lsn)
 {
-	(void)env;
+	/* Cleanup old metadata log files. */
 	vy_log_collect_garbage(lsn);
+
+	/* Cleanup run files. */
+	struct vy_recovery *recovery = vy_recovery_new(lsn);
+	if (recovery == NULL) {
+		say_warn("vinyl garbage collection failed: %s",
+			 diag_last_error(diag_get())->errmsg);
+		return;
+	}
+	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, env);
+	vy_recovery_delete(recovery);
+}
+
+/* }}} Garbage collection */
+
+/* {{{ Backup */
+
+/** Argument passed to vy_backup_cb(). */
+struct vy_backup_arg {
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** Backup callback. */
+	int (*cb)(const char *, void *);
+	/** Argument passed to @cb. */
+	void *cb_arg;
+};
+
+/** Backup callback, passed to vy_recovery_iterate(). */
+static int
+vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
+{
+	struct vy_backup_arg *arg = cb_arg;
+
+	if (record->type != VY_LOG_INSERT_RUN)
+		goto out;
+
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_record_snprint_path(path, sizeof(path),
+					   arg->env->conf->path, record, type);
+		if (arg->cb(path, arg->cb_arg) != 0)
+			return -1;
+	}
+out:
+	fiber_reschedule();
+	return 0;
 }
 
 int
 vy_backup(struct vy_env *env, struct vclock *vclock,
 	  int (*cb)(const char *, void *), void *cb_arg)
 {
-	(void)env;
-	(void)vclock;
-	return vy_log_backup(cb, cb_arg);
+	/* Backup the metadata log. */
+	const char *path = vy_log_backup_path(vclock);
+	if (path == NULL)
+		return -1;
+	if (cb(path, cb_arg) != 0)
+		return -1;
+
+	/* Backup run files. */
+	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	if (recovery == NULL)
+		return -1;
+	struct vy_backup_arg arg = {
+		.env = env,
+		.cb = cb,
+		.cb_arg = cb_arg,
+	};
+	int rc = vy_recovery_iterate(recovery, false, vy_backup_cb, &arg);
+	vy_recovery_delete(recovery);
+	return rc;
 }
+
+/* }}} Backup */
 
 /**
  * This structure represents a request to squash a sequence of
