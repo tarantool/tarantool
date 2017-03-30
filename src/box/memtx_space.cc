@@ -332,7 +332,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 	if (tuple_validate_raw(space->format, request->tuple))
 		diag_raise();
 
-	Index *index = space->index[0];
+	Index *index = index_find_unique(space, 0);
 
 	struct index_def *index_def = index->index_def;
 	uint32_t part_count = index->index_def->key_def.part_count;

@@ -2225,8 +2225,10 @@ s = box.space.s
 box.space.s:drop()
 ---
 ...
---https://github.com/tarantool/tarantool/issues/2104
-s = box.schema.space.create('test', {engine = 'vinyl'})
+--
+-- gh-2104: vinyl: assert in tuple_upsert_squash
+--
+s = box.schema.space.create('test', {engine = engine})
 ---
 ...
 i = s:create_index('test')
@@ -2249,6 +2251,19 @@ s:upsert({1, 1}, {{'+', 3, 4}})
 s:select()
 ---
 - - [1, 3, 5]
+...
+s:drop()
+---
+...
+--
+-- gh-2259: space:upsert() crashes in absence of indices
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+s:upsert({1}, {})
+---
+- error: 'No index #0 is defined in space ''test'''
 ...
 s:drop()
 ---

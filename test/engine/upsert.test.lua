@@ -429,9 +429,11 @@ s = box.space.s
 
 box.space.s:drop()
 
---https://github.com/tarantool/tarantool/issues/2104
+--
+-- gh-2104: vinyl: assert in tuple_upsert_squash
+--
 
-s = box.schema.space.create('test', {engine = 'vinyl'})
+s = box.schema.space.create('test', {engine = engine})
 i = s:create_index('test')
 
 s:replace({1, 1, 1})
@@ -440,4 +442,11 @@ s:upsert({1, 1}, {{'+', 2, 2}})
 s:upsert({1, 1}, {{'+', 3, 4}})
 s:select()
 
+s:drop()
+
+--
+-- gh-2259: space:upsert() crashes in absence of indices
+--
+s = box.schema.space.create('test', {engine = engine})
+s:upsert({1}, {})
 s:drop()
