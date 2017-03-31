@@ -61,7 +61,7 @@ struct vy_recovery;
 enum vy_log_record_type {
 	/**
 	 * Create a new vinyl index.
-	 * Requires vy_log_record::index_lsn, iid, space_id,
+	 * Requires vy_log_record::index_lsn, index_id, space_id,
 	 * path, path_len.
 	 */
 	VY_LOG_CREATE_INDEX		= 0,
@@ -149,7 +149,7 @@ struct vy_log_record {
 	/** Msgpack key for end of the vinyl range. */
 	const char *range_end;
 	/** Ordinal index number in the space. */
-	uint32_t iid;
+	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
 	/**
@@ -351,14 +351,14 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 
 /** Helper to log a vinyl index creation. */
 static inline void
-vy_log_create_index(int64_t index_lsn, uint32_t iid,
+vy_log_create_index(int64_t index_lsn, uint32_t index_id,
 		    uint32_t space_id, const char *path)
 {
 	struct vy_log_record record;
 	record.type = VY_LOG_CREATE_INDEX;
 	record.signature = -1;
 	record.index_lsn = index_lsn;
-	record.iid = iid;
+	record.index_id = index_id;
 	record.space_id = space_id;
 	record.path = path;
 	record.path_len = strlen(path);

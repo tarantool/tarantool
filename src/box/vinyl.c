@@ -1476,7 +1476,7 @@ vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
 			record->path_len, record->path);
 	else
 		SNPRINT(total, vy_index_snprint_path, buf, size,
-			vinyl_dir, record->space_id, record->iid);
+			vinyl_dir, record->space_id, record->index_id);
 	SNPRINT(total, snprintf, buf, size, "/");
 	SNPRINT(total, vy_run_snprint_name, buf, size, record->run_id, type);
 	return total;
@@ -10154,7 +10154,7 @@ vy_join_cb(const struct vy_log_record *record, void *cb_arg)
 
 	if (record->type == VY_LOG_CREATE_INDEX) {
 		arg->space_id = record->space_id;
-		arg->index_id = record->iid;
+		arg->index_id = record->index_id;
 		vy_index_snprint_path(arg->index_path, PATH_MAX,
 				      arg->env->conf->path,
 				      arg->space_id, arg->index_id);

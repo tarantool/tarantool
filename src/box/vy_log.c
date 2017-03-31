@@ -67,7 +67,7 @@ enum vy_log_key {
 	VY_LOG_KEY_RUN_ID		= 2,
 	VY_LOG_KEY_RANGE_BEGIN		= 3,
 	VY_LOG_KEY_RANGE_END		= 4,
-	VY_LOG_KEY_IID			= 5,
+	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_PATH			= 7,
 };
@@ -78,7 +78,7 @@ enum vy_log_key {
  */
 static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_IID) |
+					  (1 << VY_LOG_KEY_INDEX_ID) |
 					  (1 << VY_LOG_KEY_SPACE_ID) |
 					  (1 << VY_LOG_KEY_PATH),
 	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
@@ -102,7 +102,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_RUN_ID]		= "run_id",
 	[VY_LOG_KEY_RANGE_BEGIN]	= "range_begin",
 	[VY_LOG_KEY_RANGE_END]		= "range_end",
-	[VY_LOG_KEY_IID]		= "iid",
+	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_PATH]		= "path",
 };
@@ -186,10 +186,10 @@ struct vy_recovery {
 
 /** Vinyl index info stored in a recovery context. */
 struct vy_index_recovery_info {
-	/** ID of the index. */
-	int64_t id;
+	/** LSN of the index creation. */
+	int64_t index_lsn;
 	/** Ordinal index number in the space. */
-	uint32_t iid;
+	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
 	/** Path to the index. Empty string if default. */
@@ -300,9 +300,9 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 			SNPRINT(total, snprintf, buf, size, "[]");
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (key_mask & (1 << VY_LOG_KEY_IID))
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
-			vy_log_key_name[VY_LOG_KEY_IID], record->iid);
+			vy_log_key_name[VY_LOG_KEY_INDEX_ID], record->index_id);
 	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_SPACE_ID], record->space_id);
@@ -394,9 +394,9 @@ vy_log_record_encode(const struct vy_log_record *record,
 			size += mp_sizeof_array(0);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_IID)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_IID);
-		size += mp_sizeof_uint(record->iid);
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
+		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_ID);
+		size += mp_sizeof_uint(record->index_id);
 		n_keys++;
 	}
 	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
@@ -457,9 +457,9 @@ vy_log_record_encode(const struct vy_log_record *record,
 		} else
 			pos = mp_encode_array(pos, 0);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_IID)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_IID);
-		pos = mp_encode_uint(pos, record->iid);
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_ID);
+		pos = mp_encode_uint(pos, record->index_id);
 	}
 	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
@@ -534,8 +534,8 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->range_end = pos;
 			mp_next(&pos);
 			break;
-		case VY_LOG_KEY_IID:
-			record->iid = mp_decode_uint(&pos);
+		case VY_LOG_KEY_INDEX_ID:
+			record->index_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_SPACE_ID:
 			record->space_id = mp_decode_uint(&pos);
@@ -1058,8 +1058,9 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
  */
 static int
 vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
-			 int64_t index_lsn, uint32_t iid, uint32_t space_id,
-			 const char *path, uint32_t path_len)
+			 int64_t index_lsn, uint32_t index_id,
+			 uint32_t space_id, const char *path,
+			 uint32_t path_len)
 {
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl index id");
@@ -1079,8 +1080,8 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 		free(index);
 		return -1;
 	}
-	index->id = index_lsn;
-	index->iid = iid;
+	index->index_lsn = index_lsn;
+	index->index_id = index_id;
 	index->space_id = space_id;
 	index->path = (void *)index + sizeof(*index);
 	memcpy(index->path, path, path_len);
@@ -1379,7 +1380,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_CREATE_INDEX:
 		rc = vy_recovery_create_index(recovery,
 				record->signature, record->index_lsn,
-				record->iid, record->space_id,
+				record->index_id, record->space_id,
 				record->path, record->path_len);
 		break;
 	case VY_LOG_DROP_INDEX:
@@ -1550,8 +1551,8 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 
 	record.type = VY_LOG_CREATE_INDEX;
 	record.signature = index->signature;
-	record.index_lsn = index->id;
-	record.iid = index->iid;
+	record.index_lsn = index->index_lsn;
+	record.index_id = index->index_id;
 	record.space_id = index->space_id;
 	record.path = index->path;
 	record.path_len = strlen(index->path);
