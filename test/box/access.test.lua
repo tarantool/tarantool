@@ -274,3 +274,13 @@ box.space._user.index.name:delete{'admin'}
 box.schema.role.drop('public')
 box.space._user.index.name:delete{'public'}
 #box.schema.role.info('public') > 0
+
+-- A test case for: http://bugs.launchpad.net/bugs/712456
+-- Verify that when trying to access a non-existing or
+-- very large space id, no crash occurs.
+LISTEN = require('uri').parse(box.cfg.listen)
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
+c:_request("select", nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request("select", nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request("select", nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:close()
