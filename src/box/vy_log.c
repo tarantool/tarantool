@@ -138,8 +138,6 @@ struct vy_log {
 	struct xdir dir;
 	/** Last checkpoint vclock. */
 	struct vclock last_checkpoint;
-	/** Next to last checkpoint vclock. */
-	struct vclock prev_checkpoint;
 	/** Recovery context. */
 	struct vy_recovery *recovery;
 	/** Latch protecting the log buffer. */
@@ -266,6 +264,25 @@ struct vy_run_recovery_info {
 	 */
 	int64_t signature;
 };
+
+/**
+ * Return the lsn of the checkpoint that was taken
+ * before the given lsn.
+ */
+static int64_t
+vy_log_prev_checkpoint(int64_t lsn)
+{
+	int64_t ret = -1;
+	for (struct vclock *vclock = vclockset_last(&vy_log.dir.index);
+	     vclock != NULL;
+	     vclock = vclockset_prev(&vy_log.dir.index, vclock)) {
+		if (vclock_sum(vclock) < lsn) {
+			ret = vclock_sum(vclock);
+			break;
+		}
+	}
+	return ret;
+}
 
 /** An snprint-style function to print a log record. */
 static int
@@ -781,10 +798,6 @@ vy_log_end_recovery(void)
 			return -1;
 	}
 
-	vclock = vclockset_prev(&vy_log.dir.index, vclock);
-	if (vclock != NULL)
-		vclock_copy(&vy_log.prev_checkpoint, vclock);
-
 	vy_log.recovery = NULL;
 	return 0;
 }
@@ -895,7 +908,6 @@ vy_log_rotate(const struct vclock *vclock)
 	 * automatically on the first write (see wal_write_vy_log()).
 	 */
 	wal_rotate_vy_log();
-	vclock_copy(&vy_log.prev_checkpoint, &vy_log.last_checkpoint);
 	vclock_copy(&vy_log.last_checkpoint, vclock);
 
 	/* Add the new vclock to the xdir so that we can track it. */
@@ -928,8 +940,7 @@ vy_log_collect_garbage(int64_t signature)
 	 * Always keep the previous file, because
 	 * it is still needed for backups.
 	 */
-	signature = MIN(signature, vclock_sum(&vy_log.prev_checkpoint));
-	coio_call(vy_log_collect_garbage_f, signature);
+	coio_call(vy_log_collect_garbage_f, vy_log_prev_checkpoint(signature));
 }
 
 const char *
@@ -939,14 +950,12 @@ vy_log_backup_path(struct vclock *vclock)
 	 * Use the previous log file, because the current one
 	 * contains records written after the last checkpoint.
 	 */
-	struct vclock *prev = vclockset_psearch(&vy_log.dir.index, vclock);
-	if (prev != NULL && vclock_compare(prev, vclock) == 0)
-		prev = vclockset_prev(&vy_log.dir.index, prev);
-	if (prev == NULL) {
+	int64_t lsn = vy_log_prev_checkpoint(vclock_sum(vclock));
+	if (lsn < 0) {
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return NULL;
 	}
-	return xdir_format_filename(&vy_log.dir, vclock_sum(prev), NONE);
+	return xdir_format_filename(&vy_log.dir, lsn, NONE);
 }
 
 void
