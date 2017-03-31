@@ -109,7 +109,7 @@ const char *opt_type_strs[] = {
 	/* [OPT_STR]	= */ "string",
 };
 
-const struct key_opts key_opts_default = {
+const struct index_opts index_opts_default = {
 	/* .unique              = */ true,
 	/* .dimension           = */ 2,
 	/* .distancebuf         = */ { '\0' },
@@ -122,16 +122,16 @@ const struct key_opts key_opts_default = {
 	/* .lsn                 = */ 0,
 };
 
-const struct opt_def key_opts_reg[] = {
-	OPT_DEF("unique", OPT_BOOL, struct key_opts, is_unique),
-	OPT_DEF("dimension", OPT_INT, struct key_opts, dimension),
-	OPT_DEF("distance", OPT_STR, struct key_opts, distancebuf),
-	OPT_DEF("path", OPT_STR, struct key_opts, path),
-	OPT_DEF("range_size", OPT_INT, struct key_opts, range_size),
-	OPT_DEF("page_size", OPT_INT, struct key_opts, page_size),
-	OPT_DEF("run_count_per_level", OPT_INT, struct key_opts, run_count_per_level),
-	OPT_DEF("run_size_ratio", OPT_FLOAT, struct key_opts, run_size_ratio),
-	OPT_DEF("lsn", OPT_INT, struct key_opts, lsn),
+const struct opt_def index_opts_reg[] = {
+	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
+	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
+	OPT_DEF("distance", OPT_STR, struct index_opts, distancebuf),
+	OPT_DEF("path", OPT_STR, struct index_opts, path),
+	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
+	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
+	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
+	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
+	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
 	{ NULL, opt_type_MAX, 0, 0 },
 };
 
@@ -197,7 +197,7 @@ box_key_def_delete(box_key_def_t *key_def)
 
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	      enum index_type type, const struct key_opts *opts,
+	      enum index_type type, const struct index_opts *opts,
 	      uint32_t part_count)
 {
 	size_t sz = index_def_sizeof(part_count);
@@ -279,8 +279,8 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 		return strcmp(key1->name, key2->name);
 	if (key1->type != key2->type)
 		return (int) key1->type < (int) key2->type ? -1 : 1;
-	if (key_opts_cmp(&key1->opts, &key2->opts))
-		return key_opts_cmp(&key1->opts, &key2->opts);
+	if (index_opts_cmp(&key1->opts, &key2->opts))
+		return index_opts_cmp(&key1->opts, &key2->opts);
 
 	return key_part_cmp(key1->key_def.parts, key1->key_def.part_count,
 			    key2->key_def.parts, key2->key_def.part_count);

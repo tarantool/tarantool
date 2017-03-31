@@ -3146,7 +3146,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 static void
 vy_range_update_compact_priority(struct vy_range *range)
 {
-	struct key_opts *opts = &range->index->index_def->opts;
+	struct index_opts *opts = &range->index->index_def->opts;
 
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);

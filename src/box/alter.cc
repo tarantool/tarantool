@@ -307,7 +307,7 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
  * Throws an error if the the value does not correspond to any enum value
  */
 static enum rtree_index_distance_type
-key_opts_decode_distance(const char *str)
+index_opts_decode_distance(const char *str)
 {
 	uint32_t len = strlen(str);
 	if (len == strlen("euclid") &&
@@ -328,19 +328,19 @@ key_opts_decode_distance(const char *str)
 /**
  * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
- * Fill key_opts structure from opts field in tuple of space _index
+ * Fill index_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
  *
  * @return  the end of the map in the msgpack stream
  */
 static const char *
-key_opts_create(struct key_opts *opts, const char *map)
+index_opts_create(struct index_opts *opts, const char *map)
 {
-	*opts = key_opts_default;
-	map = opts_create_from_field(opts, key_opts_reg, map,
+	*opts = index_opts_default;
+	map = opts_create_from_field(opts, index_opts_reg, map,
 				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
-		opts->distance = key_opts_decode_distance(opts->distancebuf);
+		opts->distance = index_opts_decode_distance(opts->distancebuf);
 	if (opts->run_count_per_level <= 0)
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, INDEX_OPTS,
 			  "run_count_per_level must be > 0");
@@ -448,7 +448,7 @@ index_def_new_from_tuple(struct tuple *tuple)
 	index_def_check_tuple(tuple, &is_166plus);
 
 	struct index_def *index_def;
-	struct key_opts opts;
+	struct index_opts opts;
 	uint32_t id = tuple_field_u32_xc(tuple, ID);
 	uint32_t index_id = tuple_field_u32_xc(tuple, INDEX_ID);
 	enum index_type type = STR2ENUM(index_type,
@@ -459,13 +459,13 @@ index_def_new_from_tuple(struct tuple *tuple)
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
 		const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-		key_opts_create(&opts, opts_field);
+		index_opts_create(&opts, opts_field);
 		parts = tuple_field(tuple, INDEX_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5- _index space structure */
 		/* TODO: remove it in newer versions, find all 1.6.5- */
-		opts = key_opts_default;
+		opts = index_opts_default;
 		opts.is_unique = tuple_field_u32_xc(tuple, INDEX_165_IS_UNIQUE);
 		part_count = tuple_field_u32_xc(tuple, INDEX_165_PART_COUNT);
 		parts = tuple_field(tuple, INDEX_165_PARTS);
@@ -562,17 +562,17 @@ opts_encode(char *data, char *data_end, const void *opts,
 
 
 /**
- * Encode options key_opts into msgpack stream.
+ * Encode options index_opts into msgpack stream.
  * @pre output buffer is reserved to contain enough space for the
  * output.
  *
  * @return a pointer to the end of the stream.
  */
 static char *
-key_opts_encode(char *data, char *data_end, const struct key_opts *opts)
+index_opts_encode(char *data, char *data_end, const struct index_opts *opts)
 {
-	return opts_encode(data, data_end, opts, &key_opts_default,
-			   key_opts_reg);
+	return opts_encode(data, data_end, opts, &index_opts_default,
+			   index_opts_reg);
 }
 
 struct tuple *
@@ -582,9 +582,9 @@ index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
 	index_def_check_tuple(tuple, &is_166plus);
 	if (!is_166plus)
 		return tuple;
-	struct key_opts opts;
+	struct index_opts opts;
 	const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-	const char *opts_field_end = key_opts_create(&opts, opts_field);
+	const char *opts_field_end = index_opts_create(&opts, opts_field);
 	opts.lsn = lsn;
 	size_t size = (opts_field_end - opts_field) + 64;
 	char *buf = (char *)malloc(size);
@@ -599,7 +599,7 @@ index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
 	buf_end = mp_encode_array(buf_end, 3);
 	buf_end = mp_encode_str(buf_end, "!", 1);
 	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
-	buf_end = key_opts_encode(buf_end, buf + size, &opts);
+	buf_end = index_opts_encode(buf_end, buf + size, &opts);
 	/* No check of return value: buf is checked by box_tuple_update */
 	assert(buf_end < buf + size);
 	tuple = box_tuple_update(tuple, buf, buf_end);

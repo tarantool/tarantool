@@ -454,8 +454,8 @@ box.schema.index.create = function(space_id, name, options)
         table.insert(parts, {options.parts[i], options.parts[i + 1]})
     end
     -- create_index() options contains type, parts, etc,
-    -- stored separately. Remove these members from key_opts
-    local key_opts = {
+    -- stored separately. Remove these members from index_opts
+    local index_opts = {
             dimension = options.dimension,
             unique = options.unique,
             distance = options.distance,
@@ -480,7 +480,7 @@ box.schema.index.create = function(space_id, name, options)
                      "please use '%s' instead", field_type, part[2])
         end
     end
-    _index:insert{space_id, iid, name, options.type, key_opts, parts}
+    _index:insert{space_id, iid, name, options.type, index_opts, parts}
     return box.space[space_id].index[name]
 end
 
@@ -562,19 +562,19 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     local tuple = _index:get{space_id, index_id }
     local parts = {}
-    local key_opts = {}
+    local index_opts = {}
     local OPTS = 5
     local PARTS = 6
     if type(tuple[OPTS]) == 'number' then
         -- old format
-        key_opts.unique = tuple[OPTS] == 1
+        index_opts.unique = tuple[OPTS] == 1
         local part_count = tuple[PARTS]
         for i = 1, part_count do
             table.insert(parts, {tuple[2 * i + 4], tuple[2 * i + 5]});
         end
     else
         -- new format
-        key_opts = tuple[OPTS]
+        index_opts = tuple[OPTS]
         parts = tuple[PARTS]
     end
     if options.name == nil then
@@ -584,13 +584,13 @@ box.schema.index.alter = function(space_id, index_id, options)
         options.type = tuple[4]
     end
     if options.unique ~= nil then
-        key_opts.unique = options.unique and true or false
+        index_opts.unique = options.unique and true or false
     end
     if options.dimension ~= nil then
-        key_opts.dimension = options.dimension
+        index_opts.dimension = options.dimension
     end
     if options.distance ~= nil then
-        key_opts.distance = options.distance
+        index_opts.distance = options.distance
     end
     if options.parts ~= nil then
         check_index_parts(options.parts)
@@ -601,7 +601,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         end
     end
     _index:replace{space_id, index_id, options.name, options.type,
-                   key_opts, parts}
+                   index_opts, parts}
 end
 
 -- a static box_tuple_t ** instance for calling box_index_* API

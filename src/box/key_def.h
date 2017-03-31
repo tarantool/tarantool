@@ -174,7 +174,7 @@ struct key_part {
 };
 
 /** Index options */
-struct key_opts {
+struct index_opts {
 	/**
 	 * Is this index unique or not - relevant to HASH/TREE
 	 * index
@@ -212,11 +212,11 @@ struct key_opts {
 	int64_t lsn;
 };
 
-extern const struct key_opts key_opts_default;
-extern const struct opt_def key_opts_reg[];
+extern const struct index_opts index_opts_default;
+extern const struct opt_def index_opts_reg[];
 
 static inline int
-key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
+index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 {
 	if (o1->is_unique != o2->is_unique)
 		return o1->is_unique < o2->is_unique ? -1 : 1;
@@ -288,7 +288,7 @@ struct index_def {
 	char name[BOX_NAME_MAX + 1];
 	/** Index type. */
 	enum index_type type;
-	struct key_opts opts;
+	struct index_opts opts;
 	struct key_def key_def;
 };
 
@@ -432,7 +432,7 @@ index_def_sizeof(uint32_t part_count)
  */
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, const struct key_opts *opts,
+	    enum index_type type, const struct index_opts *opts,
 	    uint32_t part_count);
 
 /**
