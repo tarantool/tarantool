@@ -3471,7 +3471,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
-		assert(record->index_id == index->index_def->opts.lsn);
+		assert(record->index_lsn == index->index_def->opts.lsn);
 		break;
 	case VY_LOG_DROP_INDEX:
 		index->is_dropped = true;

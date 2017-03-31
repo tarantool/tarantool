@@ -62,7 +62,7 @@
  * Used for packing a record in MsgPack.
  */
 enum vy_log_key {
-	VY_LOG_KEY_INDEX_ID		= 0,
+	VY_LOG_KEY_INDEX_LSN		= 0,
 	VY_LOG_KEY_RANGE_ID		= 1,
 	VY_LOG_KEY_RUN_ID		= 2,
 	VY_LOG_KEY_RANGE_BEGIN		= 3,
@@ -77,17 +77,17 @@ enum vy_log_key {
  * of a particular type.
  */
 static const unsigned long vy_log_key_mask[] = {
-	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_ID) |
+	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_IID) |
 					  (1 << VY_LOG_KEY_SPACE_ID) |
 					  (1 << VY_LOG_KEY_PATH),
-	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_ID),
-	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_ID) |
+	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
+	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
 					  (1 << VY_LOG_KEY_RANGE_END),
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
-	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_ID) |
+	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_INSERT_RUN]		= (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RUN_ID),
@@ -97,7 +97,7 @@ static const unsigned long vy_log_key_mask[] = {
 
 /** vy_log_key -> human readable name. */
 static const char *vy_log_key_name[] = {
-	[VY_LOG_KEY_INDEX_ID]		= "index_id",
+	[VY_LOG_KEY_INDEX_LSN]		= "index_lsn",
 	[VY_LOG_KEY_RANGE_ID]		= "range_id",
 	[VY_LOG_KEY_RUN_ID]		= "run_id",
 	[VY_LOG_KEY_RANGE_BEGIN]	= "range_begin",
@@ -268,10 +268,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		vy_log_type_name[record->type]);
 	SNPRINT(total, snprintf, buf, size,
 		"signature=%"PRIi64", ", record->signature);
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID))
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_INDEX_ID],
-			record->index_id);
+			vy_log_key_name[VY_LOG_KEY_INDEX_LSN],
+			record->index_lsn);
 	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_RANGE_ID],
@@ -354,10 +354,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	size += mp_sizeof_array(2);
 	size += mp_sizeof_uint(record->type);
 	size_t n_keys = 0;
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
-		assert(record->index_id >= 0);
-		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_ID);
-		size += mp_sizeof_uint(record->index_id);
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN)) {
+		assert(record->index_lsn >= 0);
+		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_LSN);
+		size += mp_sizeof_uint(record->index_lsn);
 		n_keys++;
 	}
 	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID)) {
@@ -423,9 +423,9 @@ vy_log_record_encode(const struct vy_log_record *record,
 	pos = mp_encode_array(pos, 2);
 	pos = mp_encode_uint(pos, record->type);
 	pos = mp_encode_map(pos, n_keys);
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_ID);
-		pos = mp_encode_uint(pos, record->index_id);
+	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_LSN);
+		pos = mp_encode_uint(pos, record->index_lsn);
 	}
 	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_RANGE_ID);
@@ -517,8 +517,8 @@ vy_log_record_decode(struct vy_log_record *record,
 	for (uint32_t i = 0; i < n_keys; i++) {
 		uint32_t key = mp_decode_uint(&pos);
 		switch (key) {
-		case VY_LOG_KEY_INDEX_ID:
-			record->index_id = mp_decode_uint(&pos);
+		case VY_LOG_KEY_INDEX_LSN:
+			record->index_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_RANGE_ID:
 			record->range_id = mp_decode_uint(&pos);
@@ -1019,10 +1019,10 @@ vy_index_mark_deleted(struct vy_index_recovery_info *index, int64_t signature)
 
 /** Lookup a vinyl index in vy_recovery::index_hash map. */
 static struct vy_index_recovery_info *
-vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_id)
+vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn)
 {
 	struct mh_i64ptr_t *h = recovery->index_hash;
-	mh_int_t k = mh_i64ptr_find(h, index_id, NULL);
+	mh_int_t k = mh_i64ptr_find(h, index_lsn, NULL);
 	if (k == mh_end(h))
 		return NULL;
 	return mh_i64ptr_node(h, k)->val;
@@ -1052,16 +1052,16 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
 
 /**
  * Handle a VY_LOG_CREATE_INDEX log record.
- * This function allocates a new vinyl index with ID @index_id
+ * This function allocates a new vinyl index with ID @index_lsn
  * and inserts it to the hash.
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
 vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
-			 int64_t index_id, uint32_t iid, uint32_t space_id,
+			 int64_t index_lsn, uint32_t iid, uint32_t space_id,
 			 const char *path, uint32_t path_len)
 {
-	if (vy_recovery_lookup_index(recovery, index_id) != NULL) {
+	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl index id");
 		return -1;
 	}
@@ -1073,13 +1073,13 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 		return -1;
 	}
 	struct mh_i64ptr_t *h = recovery->index_hash;
-	struct mh_i64ptr_node_t node = { index_id, index };
+	struct mh_i64ptr_node_t node = { index_lsn, index };
 	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
 		free(index);
 		return -1;
 	}
-	index->id = index_id;
+	index->id = index_lsn;
 	index->iid = iid;
 	index->space_id = space_id;
 	index->path = (void *)index + sizeof(*index);
@@ -1094,16 +1094,16 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 
 /**
  * Handle a VY_LOG_DROP_INDEX log record.
- * This function marks the vinyl index with ID @index_id as dropped.
+ * This function marks the vinyl index with ID @index_lsn as dropped.
  * If the index has no ranges and runs, it is freed.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
 vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
-		       int64_t index_id)
+		       int64_t index_lsn)
 {
 	struct mh_i64ptr_t *h = recovery->index_hash;
-	mh_int_t k = mh_i64ptr_find(h, index_id, NULL);
+	mh_int_t k = mh_i64ptr_find(h, index_lsn, NULL);
 	if (k == mh_end(h)) {
 		diag_set(ClientError, ER_VINYL, "unknown index id");
 		return -1;
@@ -1157,16 +1157,16 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 /**
  * Handle a VY_LOG_PREPARE_RUN log record.
  * This function creates a new vinyl run with ID @run_id and adds it
- * to the list of incomplete runs of the index with ID @index_id.
+ * to the list of incomplete runs of the index with ID @index_lsn.
  * Return 0 on success, -1 if run already exists, index not found,
  * or OOM.
  */
 static int
 vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
-			int64_t index_id, int64_t run_id)
+			int64_t index_lsn, int64_t run_id)
 {
 	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
+	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
 		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
 		return -1;
@@ -1273,12 +1273,12 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
  * Handle a VY_LOG_INSERT_RANGE log record.
  * This function allocates a new vinyl range with ID @range_id,
  * inserts it to the hash, and adds it to the list of ranges of the
- * index with ID @index_id.
+ * index with ID @index_lsn.
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
 vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
-			 int64_t index_id, int64_t range_id,
+			 int64_t index_lsn, int64_t range_id,
 			 const char *begin, const char *end)
 {
 	if (vy_recovery_lookup_range(recovery, range_id) != NULL) {
@@ -1286,7 +1286,7 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 		return -1;
 	}
 	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
+	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
 		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
 		return -1;
@@ -1378,17 +1378,17 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		rc = vy_recovery_create_index(recovery,
-				record->signature, record->index_id,
+				record->signature, record->index_lsn,
 				record->iid, record->space_id,
 				record->path, record->path_len);
 		break;
 	case VY_LOG_DROP_INDEX:
 		rc = vy_recovery_drop_index(recovery, record->signature,
-					    record->index_id);
+					    record->index_lsn);
 		break;
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_insert_range(recovery, record->signature,
-				record->index_id, record->range_id,
+				record->index_lsn, record->range_id,
 				record->range_begin, record->range_end);
 		break;
 	case VY_LOG_DELETE_RANGE:
@@ -1397,7 +1397,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		break;
 	case VY_LOG_PREPARE_RUN:
 		rc = vy_recovery_prepare_run(recovery, record->signature,
-				record->index_id, record->run_id);
+				record->index_lsn, record->run_id);
 		break;
 	case VY_LOG_INSERT_RUN:
 		rc = vy_recovery_insert_run(recovery, record->signature,
@@ -1550,7 +1550,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 
 	record.type = VY_LOG_CREATE_INDEX;
 	record.signature = index->signature;
-	record.index_id = index->id;
+	record.index_lsn = index->id;
 	record.iid = index->iid;
 	record.space_id = index->space_id;
 	record.path = index->path;
@@ -1647,11 +1647,11 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 
 int
 vy_recovery_iterate_index(struct vy_recovery *recovery,
-			  int64_t index_id, bool include_deleted,
+			  int64_t index_lsn, bool include_deleted,
 			  vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_id);
+	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
 		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
 		return -1;
