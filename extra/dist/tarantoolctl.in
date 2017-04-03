@@ -132,11 +132,11 @@ int isatty(int fd);
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
 
--- command, that we're executing
+-- command that we're executing
 local command_name = arg[1]
--- true if we're running in HOME directory of a user
+-- true if we're running in user's HOME directory
 local usermode = false
--- true if we're tarantoolctl is symlink and name != tarantoolctl
+-- true if tarantoolctl is a symlink and name != tarantoolctl
 local linkmode = false
 -- a file with system-wide settings
 local default_file
@@ -151,7 +151,7 @@ local default_cfg
 local positional_arguments
 local keyword_arguments
 
--- usage printer function
+-- function for printing usage reference
 local usage
 
 -- shift argv to remove 'tarantoolctl' from arg[0]
@@ -188,7 +188,7 @@ local function check_user_level()
 end
 
 --
--- Find if we're running under a user, and this user has a default file in his
+-- Find if we're running under a user, and this user has a default file in their
 -- home directory. If present, use it. Otherwise assume a system-wide default.
 -- If it's missing, it's OK as well.
 --
@@ -199,13 +199,13 @@ local function find_default_file()
         return user_level
     end
 
-    -- no user-level defaults, use a system-wide one
+    -- no user-level defaults, use system-wide ones
     local cfg = '@CMAKE_INSTALL_FULL_SYSCONFDIR@/@SYSCONFIG_DEFAULT@/tarantool'
     if fio.stat(cfg) then
         return cfg
     end
-    -- It's OK if there is no default file - load_default_file() will assume
-    -- some defaults
+    -- It's OK if there is no default file.
+    -- load_default_file() will assume some defaults
     return nil
 end
 
@@ -220,16 +220,17 @@ local function check_file(path)
 end
 
 --
--- System-wide default file may be missing, this is OK, we'll assume built-in
--- defaults
--- It uses sandboxing for isolation. It's not completely safe, but it won't
--- allow a pollution of global variables
+-- System-wide default file may be missing, this is OK,
+-- we'll assume built-in defaults.
+-- It uses sandboxing for isolation.
+-- It's not completely safe, but it won't
+-- allow pollution of global variables.
 --
 local function load_default_file(default_file)
     if default_file then
         local env = setmetatable({}, { __index = _G })
         local ufunc, msg = loadfile(default_file)
-        -- if load fails - show last 10 lines of the log file
+        -- if load fails - show the last 10 lines of the log file
         if not ufunc then
             log.error("Failed to load defaults file: %s", msg)
         end
@@ -549,7 +550,7 @@ end
 
 -- It's not 100% result guaranteed function, but it's ok for most cases
 -- Won't help in multiple race-conditions
--- Returns nil if tarantool already started, PID otherwise
+-- Returns nil if Tarantool already started, PID otherwise
 local function start_check()
     local pid_file = default_cfg.pid_file
 
@@ -571,7 +572,7 @@ local function start()
     log.info("Starting instance...")
     local stat = check_file(instance_path)
     if stat ~= nil then
-        log.error("Error, while checking syntax: halting")
+        log.error("Error while checking syntax: halting")
         os.exit(1)
     end
     local pid = start_check()
@@ -652,7 +653,7 @@ end
 local function restart()
     local stat = check_file(instance_path)
     if stat ~= nil then
-        log.error("Error, while checking syntax: halting")
+        log.error("Error while checking syntax: halting")
         return 1
     end
     stop()
@@ -729,12 +730,12 @@ local function connect()
         end
         local status, full_response = execute_remote(arg[2], code)
         if not status then
-            log.error("failed to connect to tarantool")
+            log.error("Failed to connect to Tarantool")
             return 2
         end
         local error_response = yaml.decode(full_response)[1]
         if type(error_response) == 'table' and error_response.error then
-            log.error("Error, while executing remote command:")
+            log.error("Error while executing remote command:")
             log.error(error_response.error)
             return 3
         end
@@ -816,19 +817,19 @@ local function eval()
     assert(code ~= nil, "Check that we've successfully loaded file")
 
     if fio.stat(console_sock_path) == nil then
-        log.warn("pid file exists, but the control socket (%s) doesn't",
+        log.warn("Pid file exists, but the control socket (%s) doesn't",
                  console_sock_path)
         return 2
     end
 
     local status, full_response = execute_remote(console_sock, code)
     if status == false then
-        log.error("control socket exists, but tarantool doesn't listen on it")
+        log.error("Control socket exists, but Tarantool doesn't listen on it")
         return 2
     end
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
-        log.error("Error, while reloading config:")
+        log.error("Error while reloading config:")
         log.error(error_response.error)
         return 3
     end
@@ -856,8 +857,8 @@ local function cat()
                (is_system and isnt_specified) then
                 -- pass this tuple
             elseif lsn >= to then
-                -- stop, as we've had finished reading tuple with lsn == to
-                -- and next lsn's will be bigger
+                -- stop, as we've finished reading tuple with lsn == to
+                -- and the next lsn's will be bigger
                 break
             else
                 is_printed = true
@@ -883,7 +884,7 @@ local function play()
     end
     local remote = netbox.new(uri)
     if not remote:wait_connected() then
-        error(("Error, while connecting to host '%s'"):format(uri))
+        error(("Error while connecting to host '%s'"):format(uri))
     end
     for id, file in ipairs(positional_arguments) do
         log.info(("Processing file '%s'"):format(file))
@@ -897,8 +898,8 @@ local function play()
                (is_system and isnt_specified) then
                 -- pass this tuple
             elseif lsn >= to then
-                -- stop, as we've had finished reading tuple with lsn == to
-                -- and next lsn's will be bigger
+                -- stop, as we've finished reading tuple with lsn == to
+                -- and the next lsn's will be bigger
                 break
             else
                 local args, so = {}, remote.space[sid]
@@ -957,8 +958,7 @@ local commands = setmetatable({
             linkmode = "%s start",
             description =
 [=[
-        [cluster command] start Tarantool instance if it's not already started.
-        Tarantool instance should be maintained using tarantoolctl only.
+        Start a Tarantool instance (if not started; fail otherwise).
 ]=],
             weight = 10,
             deprecated = false,
@@ -969,7 +969,7 @@ local commands = setmetatable({
             linkmode = "%s stop",
             description =
 [=[
-        [cluster command] stop Tarantool instance if it's not already stopped.
+        Stop a Tarantool instance (if not stopped; fail otherwise).
 ]=],
             weight = 20,
             deprecated = false,
@@ -980,8 +980,9 @@ local commands = setmetatable({
             linkmode = "%s logrotate",
             description =
 [=[
-        [cluster command] rotate log of started Tarantool instance. Works only
-        if logging is set into file. Pipe/Syslog aren't supported.
+        Rotate logs of a started Tarantool instance.
+        Works only if logging-into-file is enabled in the instance file.
+        Pipe/syslog make no effect.
 ]=],
             weight = 50,
             deprecated = false,
@@ -992,7 +993,13 @@ local commands = setmetatable({
             linkmode = "%s status",
             description =
 [=[
-        [cluster command] show status of Tarantool instance. (started/stopped)
+        Show an instance's status (started/stopped).
+        If pid file exists and an alive control socket exists, the return code
+        is C<0>. Otherwise, the return code is not C<0>.
+
+        Reports typical problems to stderr (e.g. pid file exists and control
+        socket doesn't).
+
 ]=],
             weight = 30,
             deprecated = false,
@@ -1003,7 +1010,7 @@ local commands = setmetatable({
             linkmode = "%s enter",
             description =
 [=[
-        [cluster command] enter interactive Lua console of instance.
+        Enter an instance's interactive Lua console.
 ]=],
             weight = 65,
             deprecated = false,
@@ -1014,8 +1021,8 @@ local commands = setmetatable({
             linkmode = "%s restart",
             description =
 [=[
-        [cluster command] stop and start Tarantool instance (if it's already
-        started, fail otherwise)
+        Stop and start a Tarantool instance (if started;
+        fail otherwise).
 ]=],
             weight = 40,
             deprecated = false,
@@ -1043,8 +1050,8 @@ local commands = setmetatable({
             },
             description =
 [=[
-        [cluster command] evaluate local file on Tarantool instance (if it's
-        already started, fail otherwise)
+        Evaluate a local file on a Tarantool instance (if started;
+        fail otherwise).
 ]=],
             weight = 70,
             deprecated = false,
@@ -1055,7 +1062,7 @@ local commands = setmetatable({
             linkmode = "%s check",
             description =
 [=[
-        [cluster command] Check instance script for syntax errors
+        Check an instance's script for syntax errors.
 ]=],
             weight = 60,
             deprecated = false,
@@ -1068,7 +1075,7 @@ local commands = setmetatable({
             },
             description =
 [=[
-        Connect to Tarantool instance on admin/console port.
+        Connect to a Tarantool instance on an admin-console port.
         Supports both TCP/Unix sockets.
 ]=],
             weight = 80,
@@ -1081,16 +1088,14 @@ local commands = setmetatable({
                 " [--from=from_lsn] [--to=to_lsn]",
             description =
 [=[
-        Show contents of snapshot/xlog files.
-
-        * If --space=space_no is passed, then output'll be filtered by space
-          number. May be passed more than once.
-        * If --show-system is passed, then contents of system space'll be showed.
-        * If --from=from_lsn is present, then show operations starting from
-          given lsn.
-        * If --to=to_lsn is present, then show operations ending with given lsn.
-
-        Result is printed to stdout
+        Print into stdout the contents of .snap/.xlog files.
+        
+        Supported options:
+        * --space=space_no to filter the output by space number.
+          May be passed more than once.
+        * --show-system to show the contents of system spaces.
+        * --from=from_lsn to show operations starting from the given lsn.
+        * --to=to_lsn to show operations ending with the given lsn.
 ]=],
             weight = 90,
             deprecated = false,
@@ -1102,14 +1107,14 @@ local commands = setmetatable({
                 " [--show-system] [--from=from_lsn] [--to=to_lsn]",
             description =
 [=[
-        Play contents of snapshot/xlog files to another Tarantool service.
+        Play the contents of .snap/.xlog files to another Tarantool instance.
 
-        * If --space=space_no is passed, then output'll be filtered by space
-          number. May be passed more than once.
-        * If --show-system is passed, then contents of system space'll be showed.
-        * If --from=from_lsn is present, then show operations starting from
-          given lsn.
-        * If --to=to_lsn is present, then show operations ending with given lsn.
+        Supported options:
+        * --space=space_no to filter the output by space number.
+          May be passed more than once.
+        * --show-system to show the contents of system spaces.
+        * --from=from_lsn to show operations starting from the given lsn.
+        * --to=to_lsn to show operations ending with the given lsn.
 ]=],
             weight = 100,
             deprecated = false,
@@ -1141,7 +1146,7 @@ end
 
 usage = function(command, verbose)
     local name = fio.basename(arg[0])
-    do -- in case of command is passed and is valid command
+    do -- in case a command is passed and is a valid command
         local command_struct = rawget(commands, command)
         if command ~= nil and command_struct then
             log.error("Usage:\n")
@@ -1173,7 +1178,7 @@ usage = function(command, verbose)
     end
     os.exit(1)
 end
--- parse parameters and put result into positional/keyword_arguments
+-- parse parameters and put the result into positional/keyword_arguments
 do
     local function keyword_arguments_populate(ka)
         ka                = ka                or {}
@@ -1184,7 +1189,7 @@ do
         return ka
     end
 
-    -- returns command name, file list and named parameters
+    -- returns the command name, file list and named parameters
     local function parameters_parse(parameters)
         local command_name = table.remove(parameters, 1)
         local positional_arguments, keyword_arguments = {}, {}
@@ -1217,7 +1222,7 @@ end
 
 local cmd_pair = commands[command_name]
 if #arg < 2 then
-    log.error("Error: not enough arguments for '%s' command\n", command_name)
+    log.error("Not enough arguments for '%s' command\n", command_name)
     usage(command_name)
 end
 cmd_pair.process(cmd_pair.func)
