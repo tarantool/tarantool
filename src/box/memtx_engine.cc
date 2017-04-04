@@ -183,9 +183,11 @@ MemtxEngine::recoverSnapshot()
 			e->log();
 		}
 		++row_count;
-		if (row_count % 100000 == 0)
+		if (row_count % 100000 == 0) {
 			say_info("%.1fM rows processed",
 				 row_count / 1000000.);
+			fiber_yield_timeout(0);
+		}
 	}
 
 	/**
