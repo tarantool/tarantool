@@ -45,6 +45,9 @@
 #include "errinj.h"
 #include "xrow_io.h"
 
+/* Report relay status at least one time per second */
+#define RELAY_REPORT_PERIOD 1
+
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
 static void
@@ -139,6 +142,58 @@ feed_event_f(struct trigger *trigger, void * /* event */)
 	ev_feed_event(loop(), (struct ev_io *) trigger->data, EV_CUSTOM);
 }
 
+static void
+relay_status_updated(struct cmsg *msg)
+{
+	msg->route = NULL;
+	struct relay_status_msg *status_msg = (struct relay_status_msg *)msg;
+	ipc_cond_signal(&status_msg->relay->status_cond);
+}
+
+static void
+relay_status_update(struct cmsg *msg)
+{
+	struct relay_status_msg *status = (struct relay_status_msg *)msg;
+	vclock_copy(&status->relay->vclock, &status->vclock);
+	static const struct cmsg_hop route[] = {
+		{relay_status_updated, NULL}
+	};
+	cmsg_init(msg, route);
+	cpipe_push(&status->relay->relay_pipe, msg);
+}
+
+static void
+relay_will_exit_cb(struct cmsg *msg)
+{
+	struct relay_exit_msg *m = (struct relay_exit_msg *)msg;
+	ipc_cond_signal(&m->relay->will_exit_cond);
+}
+
+static void
+relay_cbus_detach(struct relay *relay)
+{
+	say_crit("exiting the relay loop");
+	/* Check that we have no in-flight status message */
+	while (relay->status_msg.msg.route != NULL) {
+		ipc_cond_wait(&relay->status_cond);
+	}
+
+	static const struct cmsg_hop exit_route[] = {
+		{relay_will_exit_cb, NULL}
+	};
+	cmsg_init(&relay->exit_msg.msg, exit_route);
+	relay->exit_msg.relay = relay;
+	cpipe_push(&relay->tx_pipe, &relay->exit_msg.msg);
+	/*
+	 * Relay should not destroy its endpoint
+	 * until corresponding callee fiber/cord pipe created,
+	 * otherwise callee will wait infinitelly
+	 */
+	cpipe_destroy(&relay->tx_pipe);
+	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
+	ipc_cond_destroy(&relay->status_cond);
+}
+
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -151,6 +206,16 @@ relay_subscribe_f(va_list ap)
 	struct recovery *r = relay->r;
 	coeio_enable();
 	relay->stream.write = relay_send_row;
+	ipc_cond_create(&relay->status_cond);
+	cbus_endpoint_create(&relay->endpoint, relay->name, fiber_schedule_cb, fiber());
+	/*
+	 * We use prio route because our code will never yield but
+	 * just update status
+	 */
+	cpipe_create(&relay->tx_pipe, "tx_prio");
+
+	/* Create guard to destroy relay cbus linkage if any */
+	auto cbus_guard = make_scoped_guard([&]{relay_cbus_detach(relay);});
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
@@ -183,8 +248,14 @@ relay_subscribe_f(va_list ap)
 	trigger_add(&r->watcher->on_stop, &on_follow_error);
 	while (! fiber_is_dead(r->watcher)) {
 		ev_io_start(loop(), &read_ev);
-		fiber_yield();
+		fiber_yield_timeout(RELAY_REPORT_PERIOD);
 		ev_io_stop(loop(), &read_ev);
+		/*
+		 * The fiber can be woken by io read event, status
+		 * messaging timeout or status message reply.
+		 * First hadnle cbus incomming messages.
+		 */
+		cbus_process(&relay->endpoint);
 
 		uint8_t data;
 		int rc = recv(read_ev.fd, &data, sizeof(data), 0);
@@ -196,6 +267,19 @@ relay_subscribe_f(va_list ap)
 		if (rc < 0 && errno != EINTR && errno != EAGAIN &&
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
+
+		/* Check that vclock updated and previous status delivered */
+		if (relay->status_msg.msg.route != NULL ||
+		    vclock_compare(&relay->status_msg.vclock,
+				   &r->vclock) == 0)
+			continue;
+		static const struct cmsg_hop route[] = {
+			{relay_status_update, NULL}
+		};
+		cmsg_init(&relay->status_msg.msg, route);
+		vclock_copy(&relay->status_msg.vclock, &r->vclock);
+		relay->status_msg.relay = relay;
+		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 	/*
 	 * Avoid double wakeup: both from the on_stop and fiber
@@ -203,7 +287,6 @@ relay_subscribe_f(va_list ap)
 	 */
 	trigger_clear(&on_follow_error);
 	recovery_stop_local(r);
-	say_crit("exiting the relay loop");
 	return 0;
 }
 
@@ -235,9 +318,24 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	});
 
 	struct cord cord;
+	snprintf(relay.name, sizeof(relay.name), "relay: %i", replica->id);
+	ipc_cond_create(&relay.will_exit_cond);
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
-	if (cord_cojoin(&cord) != 0)
+	cpipe_create(&relay.relay_pipe, relay.name);
+	/*
+	 * When relay will exit then send a message with exit condition
+	 * signal.
+	 */
+	ipc_cond_wait(&relay.will_exit_cond);
+	ipc_cond_destroy(&relay.will_exit_cond);
+	/*
+	 * Destroy cpipe so relay fiber can destroy corresponding
+	 * endpoint and exit.
+	 */
+	cpipe_destroy(&relay.relay_pipe);
+	if (cord_cojoin(&cord) != 0) {
 		diag_raise();
+	}
 }
 
 static void
