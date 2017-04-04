@@ -30,13 +30,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "evio.h"
 #include "fiber.h"
+#include "cbus.h"
 #include "vclock.h"
 #include "xstream.h"
 
 struct replica;
 struct tt_uuid;
+
+struct relay;
+
+struct relay_status_msg {
+	struct cmsg msg;
+	struct relay *relay;
+	struct vclock vclock;
+};
+
+struct relay_exit_msg {
+	struct cmsg msg;
+	struct relay *relay;
+};
 
 /** State of a replication relay. */
 struct relay {
@@ -51,6 +64,24 @@ struct relay {
 	struct vclock stop_vclock;
 	ev_tstamp wal_dir_rescan_delay;
 	uint32_t replica_id;
+	/** Current vclock sent by relay */
+	struct vclock vclock;
+	/** Relay endpoint */
+	struct cbus_endpoint endpoint;
+	/** Pipe to send relay status to tx */
+	struct cpipe tx_pipe;
+	/** Pipe to send replies from tx */
+	struct cpipe relay_pipe;
+	/** Relay name, used as relay endpoint name */
+	char name[FIBER_NAME_MAX];
+	/** Status message */
+	struct relay_status_msg status_msg;
+	/** The condition will be signaled if status message was replied */
+	struct ipc_cond status_cond;
+	/** The condition will be signaled if relay want to exit. */
+	struct ipc_cond will_exit_cond;
+	/** Relay exit orchestration message */
+	struct relay_exit_msg exit_msg;
 };
 
 /**
