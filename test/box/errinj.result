@@ -21,7 +21,7 @@ errinj.info()
   ERRINJ_WAL_WRITE_DISK:
     state: false
   ERRINJ_WAL_WRITE_PARTIAL:
-    state: 0
+    state: 18446744073709551615
   ERRINJ_VY_GC:
     state: false
   ERRINJ_VY_RANGE_DUMP:

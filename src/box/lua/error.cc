@@ -148,7 +148,7 @@ lbox_errinj_set(struct lua_State *L)
 		errinj->state.bparam = lua_toboolean(L, 2);
 		break;
 	case ERRINJ_U64:
-		errinj->state.u64param = lua_tointeger(L, 2);
+		errinj->state.u64param = luaL_checkuint64(L, 2);
 		break;
 	default:
 		lua_pushfstring(L, "error: unknow injection type '%s'", name);
@@ -166,10 +166,16 @@ lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 	lua_pushstring(L, e->name);
 	lua_newtable(L);
 	lua_pushstring(L, "state");
-	if (e->type == ERRINJ_BOOL)
+	switch (e->type) {
+	case ERRINJ_BOOL:
 		lua_pushboolean(L, e->state.bparam);
-	else
-		lua_pushnumber(L, e->state.u64param);
+		break;
+	case ERRINJ_U64:
+		luaL_pushuint64(L, e->state.u64param);
+		break;
+	default:
+		unreachable();
+	}
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 	return 0;
