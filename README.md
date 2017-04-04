@@ -1,7 +1,11 @@
-# tarantool
+# Tarantool
 
-[![Coverage Status](https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.7)](https://coveralls.io/github/tarantool/tarantool?branch=1.7)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status][travis-badge]][travis-url]
+[![Code Coverage][coverage-badge]][coverage-url]
+[![Telegram][telegram-badge]][telegram-url]
+[![Slack][slack-badge]][slack-url]
+[![Gitter][gitter-badge]][gitter-url]
+[![Google Groups][groups-badge]][groups-url]
 
 http://tarantool.org
 
@@ -45,3 +49,16 @@ We also warmly welcome your feedback in the discussion mailing
 list, tarantool@googlegroups.com.
 
 Thank you for your interest in Tarantool!
+
+[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=1.7
+[travis-url]: https://travis-ci.org/tarantool/tarantool
+[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.7
+[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=1.7
+[groups-badge]: https://img.shields.io/badge/Google-Groups-orange.svg
+[groups-url]: https://groups.google.com/forum/#!forum/tarantool
+[telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
+[telegram-url]: http://telegram.me/tarantool
+[slack-badge]: https://img.shields.io/badge/Slack-join%20chat-lightgrey.svg
+[slack-url]: http://slack.tarantool.org/
+[gitter-badge]: https://badges.gitter.im/Join%20Chat.svg
+[gitter-url]: https://gitter.im/tarantool/tarantool
