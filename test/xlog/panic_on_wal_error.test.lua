@@ -67,9 +67,9 @@ box.cfg.force_recovery
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 fiber = require('fiber')
-while box.info.replication[1].status ~= "stopped" do fiber.sleep(0.001) end
-box.info.replication[1].status
-box.info.replication[1].message
+while box.info.replication[1].upstream.status ~= "stopped" do fiber.sleep(0.001) end
+box.info.replication[1].upstream.status
+box.info.replication[1].upstream.message
 box.space.test:select{}
 --
 --

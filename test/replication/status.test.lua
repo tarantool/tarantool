@@ -7,9 +7,9 @@ test_run:cmd("start server replica")
 test_run:cmd('switch replica')
 
 r = box.info.replication[1]
-r.status == "follow"
-r.lag < 1
-r.idle < 1
+r.upstream.status == "follow"
+r.upstream.lag < 1
+r.upstream.idle < 1
 r.uuid ~= nil
 
 box.space._schema:insert({'dup'})
@@ -17,8 +17,8 @@ test_run:cmd('switch default')
 box.space._schema:insert({'dup'})
 test_run:cmd('switch replica')
 r = box.info.replication[1]
-r.status == "stopped"
-r.message:match('Duplicate') ~= nil
+r.upstream.status == "stopped"
+r.upstream.message:match('Duplicate') ~= nil
 
 box.cfg { replication = "" }
 next(box.info.replication) == nil
