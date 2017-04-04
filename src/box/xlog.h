@@ -251,6 +251,11 @@ struct xlog {
 	 * appended to the file.
 	 */
 	int64_t rows; /* should have the same type as lsn */
+	/**
+	 * The number of rows in the current tx, part of
+	 * tx state used only in write mode.
+	 */
+	int64_t tx_rows;
 	/** Log file name. */
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */

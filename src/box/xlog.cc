@@ -1074,6 +1074,8 @@ xlog_tx_write(struct xlog *log)
 		return -1;
 	}
 	log->offset += written;
+	log->rows += log->tx_rows;
+	log->tx_rows = 0;
 	if ((log->sync_interval && log->offset >=
 	    (off_t)(log->synced_size + log->sync_interval)) ||
 	    (log->rate_limit && log->offset >=
@@ -1155,6 +1157,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 		}
 	}
 	assert(iovcnt <= XROW_IOVMAX);
+	log->tx_rows++;
 
 	size_t row_size = obuf_size(&log->obuf) - page_offset;
 	if (log->is_autocommit &&
@@ -1201,6 +1204,7 @@ void
 xlog_tx_rollback(struct xlog *log)
 {
 	log->is_autocommit = true;
+	log->tx_rows = 0;
 	obuf_reset(&log->obuf);
 }
 

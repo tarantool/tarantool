@@ -557,6 +557,9 @@ wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
 			(*row)->lsn = vclock_inc(&writer->vclock, instance_id);
 			(*row)->replica_id = instance_id;
 		}
+	} else {
+		struct xrow_header *last = end[-1];
+		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
 	}
 }
 
@@ -609,16 +612,17 @@ wal_write_to_disk(struct cmsg *msg)
 	struct journal_entry *entry, *last_commit_entry = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
 		wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
+		entry->res = vclock_sum(&writer->vclock);
 		int rc = xlog_write_entry(l, entry);
-		if (rc < 0) {
+		if (rc < 0)
 			goto done;
-		}
 		if (rc > 0)
 			last_commit_entry = entry;
+		/* rc == 0: the write is buffered in xlog_tx */
 	}
-	if (xlog_flush(l) < 0) {
+	if (xlog_flush(l) < 0)
 		goto done;
-	}
+
 	last_commit_entry = stailq_last_entry(&wal_msg->commit,
 					      struct journal_entry, fifo);
 
@@ -636,29 +640,19 @@ done:
 	 * nothing, and need to start rollback from the first
 	 * request. Otherwise we rollback from the first request.
 	 */
-	entry = stailq_first_entry(&wal_msg->commit, struct journal_entry,
-				   fifo);
 	struct journal_entry *rollback_entry = last_commit_entry ?
-		stailq_next_entry(last_commit_entry, fifo) : entry;
-	/* Update status of the successfully committed requests. */
-	for (; entry != rollback_entry;
-	     entry = stailq_next_entry(entry, fifo)) {
-
-		/** All rows in a transaction have the same replica_id */
-		struct xrow_header *last = entry->rows[entry->n_rows - 1];
-		/* Update internal vclock */
-		if (last->replica_id != instance_id) {
-			vclock_follow(&writer->vclock, last->replica_id,
-				      last->lsn);
-		}
-		/* Update row counter for wal_opt_rotate() */
-		l->rows += entry->n_rows;
-		/* Mark request as successful for tx thread */
-		entry->res = vclock_sum(&writer->vclock);
-	}
+		stailq_next_entry(last_commit_entry, fifo) :
+		stailq_first_entry(&wal_msg->commit, struct journal_entry,
+				   fifo);
 	if (rollback_entry) {
+		/* Update status of the successfully committed requests. */
+		for (entry = rollback_entry; entry != NULL;
+		     entry = stailq_next_entry(entry, fifo)) {
+
+			entry->res = -1;
+		}
 		/* Rollback unprocessed requests */
-		stailq_splice(&wal_msg->commit, &entry->fifo,
+		stailq_splice(&wal_msg->commit, &rollback_entry->fifo,
 			      &wal_msg->rollback);
 		wal_writer_begin_rollback(writer);
 	}
