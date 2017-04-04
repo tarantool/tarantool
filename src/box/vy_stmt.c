@@ -148,14 +148,13 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
  *                   fields WITHOUT the array header.
  * @param part_count Count of the key fields that will be saved as
  *                   result.
- * @param type       Type of the key statement.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory allocation error.
  */
 struct tuple *
-vy_stmt_new_key(struct tuple_format *format, const char *key,
-		uint32_t part_count, enum iproto_type type)
+vy_stmt_new_select(struct tuple_format *format, const char *key,
+		   uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
 	/* Key don't have field map */
@@ -179,15 +178,8 @@ vy_stmt_new_key(struct tuple_format *format, const char *key,
 	char *data = mp_encode_array(raw, part_count);
 	memcpy(data, key, key_size);
 	assert(data + key_size == raw + bsize);
-	vy_stmt_set_type(stmt, type);
+	vy_stmt_set_type(stmt, IPROTO_SELECT);
 	return stmt;
-}
-
-struct tuple *
-vy_stmt_new_select(struct tuple_format *format, const char *key,
-		   uint32_t part_count)
-{
-	return vy_stmt_new_key(format, key, part_count, IPROTO_SELECT);
 }
 
 char *
