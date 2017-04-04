@@ -99,7 +99,7 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		if (ENOMEM == errno) {
 			panic("failed to preallocate %zu bytes: "
 			      "Cannot allocate memory, check option "
-			      "'slab_alloc_arena' in box.cfg(..)",
+			      "'memtx_memory' in box.cfg(..)",
 			      prealloc);
 		} else {
 			panic_syserror("failed to preallocate %zu bytes",
@@ -144,7 +144,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 */
 	if (memtx_tuple == NULL) {
 		if (total > memtx_alloc.objsize_max) {
-			diag_set(ClientError, ER_SLAB_ALLOC_MAX,
+			diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
 				 (unsigned) total);
 			error_log(diag_last_error(diag_get()));
 		} else {

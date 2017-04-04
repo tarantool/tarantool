@@ -162,7 +162,7 @@ struct errcode_record {
 	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts (field %u): %s; expected field1 id (number), field1 type (string), ...") \
 	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %u") \
-	/*110 */_(ER_SLAB_ALLOC_MAX,		"Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.") \
+	/*110 */_(ER_MEMTX_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'memtx_max_tuple_size' configuration option.") \
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \

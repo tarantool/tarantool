@@ -957,7 +957,7 @@ ffi.typeof('struct tuple')
 box.tuple.new(string.rep('x', 100 * 1024 * 1024)) == nil
 ---
 - error: 'Failed to allocate 104857622 bytes for tuple in the slab allocator: tuple
-    is too large. Check ''slab_alloc_maximal'' configuration option.'
+    is too large. Check ''memtx_max_tuple_size'' configuration option.'
 ...
 collectgarbage('collect') -- collect huge string
 ---
