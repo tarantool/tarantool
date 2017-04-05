@@ -423,7 +423,7 @@ local function write_lua_string(string)
     io.stdout:write("'")
     local pos, byte = 1, string:byte(1)
     while byte ~= nil do
-        io.stdout:write(("\\x%x"):format(byte))
+        io.stdout:write(("\\x%02x"):format(byte))
         pos = pos + 1
         byte = string:byte(pos)
     end
@@ -1089,7 +1089,7 @@ local commands = setmetatable({
             description =
 [=[
         Print into stdout the contents of .snap/.xlog files.
-        
+
         Supported options:
         * --space=space_no to filter the output by space number.
           May be passed more than once.
