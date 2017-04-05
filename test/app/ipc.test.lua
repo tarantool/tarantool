@@ -129,7 +129,7 @@ ch:is_closed()
 
 
 -- race conditions
-chs, res, count = {}, {}, 0
+chs, test_res, count = {}, {}, 0
 test_run:cmd("setopt delimiter ';'")
 for i = 1, 10 do table.insert(chs, fiber.channel()) end;
 
@@ -149,21 +149,20 @@ for i = 1, 10 do
         while true do
             local r = chs[no]:get(math.random() * .001)
             if r ~= nil and r[1] == no then
-                res[no] = true
+                test_res[no] = true
             elseif r ~= nil then
                 break
             end
             fiber.sleep(0.001 * math.random())
             count = count + 1
         end
-        res[no] = false
+        test_res[no] = false
     end, i)
 end;
 
 for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
 
-count > 2000, #res, res;
-
+count > 2000, #test_res, test_res;
 test_run:cmd("setopt delimiter ''");
 
 --
