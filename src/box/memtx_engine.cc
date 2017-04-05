@@ -222,7 +222,6 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	 * sure it's not freed along here.
 	 */
 	fiber_gc();
-
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */

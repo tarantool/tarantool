@@ -219,8 +219,10 @@ applier_join(struct applier *applier)
 		/*
 		 * Start vclock. The vclock of the checkpoint
 		 * the master is sending to the replica.
-		 * Not used at the moment.
+		 * Used to initialize the replica's initial
+		 * vclock in bootstrap_from_master()
 		 */
+		xrow_decode_vclock(&row, &replicaset_vclock);
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -235,12 +237,16 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write_xc(applier->join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
-			/*
-			 * Stop vclock. Used to initialize
-			 * the replica's initial vclock in
-			 * bootstrap_from_master()
-			 */
-			xrow_decode_vclock(&row, &replicaset_vclock);
+			if (applier->version_id < version_id(1, 7, 0)) {
+				/*
+				 * This is the start vclock if the
+				 * server is 1.6. Since we have
+				 * not initialized replication
+				 * vclock yet, do it now. In 1.7+
+				 * this vlcock is not used.
+				 */
+				xrow_decode_vclock(&row, &replicaset_vclock);
+			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */
@@ -266,6 +272,8 @@ applier_join(struct applier *applier)
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (iproto_type_is_dml(row.type)) {
+			vclock_follow(&replicaset_vclock, row.replica_id,
+				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*

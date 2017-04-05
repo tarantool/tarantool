@@ -248,7 +248,7 @@ struct wal_stream {
  */
 struct recovery_journal {
 	struct journal base;
-	struct recovery *r;
+	struct vclock *vclock;
 };
 
 /**
@@ -261,14 +261,14 @@ recovery_journal_write(struct journal *base,
 		       struct journal_entry * /* entry */)
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
-	return vclock_sum(&journal->r->vclock);
+	return vclock_sum(journal->vclock);
 }
 
 static inline void
-recovery_journal_create(struct recovery_journal *journal, struct recovery *r)
+recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 {
 	journal_create(&journal->base, recovery_journal_write, NULL);
-	journal->r = r;
+	journal->vclock = v;
 }
 
 static inline void
@@ -1454,8 +1454,14 @@ bootstrap_from_master(struct replica *master)
 	 * Process final data (WALs).
 	 */
 	engine_begin_final_recovery();
+	struct recovery_journal journal;
+	recovery_journal_create(&journal, &replicaset_vclock);
+	journal_set(&journal.base);
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
+
+	/* Clear the pointer to journal before it goes out of scope */
+	journal_set(NULL);
 
 	/* Finalize the new replica */
 	engine_end_recovery();
@@ -1593,7 +1599,7 @@ box_cfg_xc(void)
 		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
 
 		struct recovery_journal journal;
-		recovery_journal_create(&journal, recovery);
+		recovery_journal_create(&journal, &recovery->vclock);
 		journal_set(&journal.base);
 
 		engine_begin_final_recovery();
@@ -1622,6 +1628,8 @@ box_cfg_xc(void)
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery();
 
+		/* Clear the pointer to journal before it goes out of scope */
+		journal_set(NULL);
 		/*
 		 * Initialize the replica set vclock from recovery.
 		 * The local WAL may contain rows from remote masters,
