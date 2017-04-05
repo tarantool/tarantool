@@ -33,11 +33,45 @@
 
 #include <stdint.h>
 
+#include "vclock.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vclock;
+/** Checkpoint info. */
+struct checkpoint_info {
+	/** Checkpoint vclock, linked in gc_state.checkpoints. */
+	struct vclock vclock;
+	/**
+	 * Number of active users of this checkpoint.
+	 * A checkpoint can't be collected unless @refs is 0.
+	 */
+	int refs;
+};
+
+/** Iterator over checkpoints tracked by gc. */
+struct checkpoint_iterator {
+	struct vclock *curr;
+};
+
+/** Init a checkpoint iterator. */
+static inline void
+checkpoint_iterator_init(struct checkpoint_iterator *it)
+{
+	it->curr = NULL;
+}
+
+/**
+ * Iterate to the next checkpoint.
+ * Returns NULL to stop.
+ */
+const struct checkpoint_info *
+checkpoint_iterator_next(struct checkpoint_iterator *it);
+
+#define checkpoint_foreach(it, cpt) \
+	for (cpt = checkpoint_iterator_next(it); cpt != NULL; \
+	     cpt = checkpoint_iterator_next(it))
 
 /**
  * Initialize the garbage collection state.
@@ -88,6 +122,14 @@ gc_unref_checkpoint(struct vclock *vclock);
  */
 void
 gc_run(int64_t signature);
+
+/**
+ * Return max signature garbage collection has been called for
+ * since the server start, or -1 if garbage collection hasn't
+ * been called at all.
+ */
+int64_t
+gc_signature(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

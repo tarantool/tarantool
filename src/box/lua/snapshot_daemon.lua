@@ -107,7 +107,7 @@ local function process(self)
     local oldest_snap = snaps[#snaps - self.checkpoint_count + 1]
     if oldest_snap ~= nil then
         local lsn = fio.basename(oldest_snap, '.snap')
-        box.internal.gc(tonumber(lsn))
+        box.internal.gc.run(tonumber(lsn))
     end
 end
 

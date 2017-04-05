@@ -14,7 +14,7 @@ path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_count end
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 
 --
 -- Check that gc retries to delete files left
@@ -71,7 +71,7 @@ temp = box.space.temp
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 
 file_count()
 

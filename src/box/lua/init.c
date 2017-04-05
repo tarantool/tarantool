@@ -105,11 +105,45 @@ lbox_snapshot(struct lua_State *L)
 }
 
 static int
-lbox_gc(struct lua_State *L)
+lbox_gc_run(struct lua_State *L)
 {
-	int64_t lsn = luaL_checkint64(L, 1);
-	gc_run(lsn);
+	int64_t signature = luaL_checkint64(L, 1);
+	gc_run(signature);
 	return 0;
+}
+
+static int
+lbox_gc_info(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_pushstring(L, "signature");
+	luaL_pushint64(L, gc_signature());
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "checkpoints");
+	lua_newtable(L);
+
+	struct checkpoint_iterator it;
+	checkpoint_iterator_init(&it);
+
+	int checkpoint_count = 0;
+	const struct checkpoint_info *cpt;
+	checkpoint_foreach(&it, cpt) {
+		lua_createtable(L, 0, 2);
+
+		lua_pushstring(L, "signature");
+		luaL_pushint64(L, vclock_sum(&cpt->vclock));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "refs");
+		lua_pushinteger(L, cpt->refs);
+		lua_settable(L, -3);
+
+		lua_rawseti(L, -2, ++checkpoint_count);
+	}
+	lua_settable(L, -3);
+	return 1;
 }
 
 /** Argument passed to lbox_backup_fn(). */
@@ -157,8 +191,9 @@ static const struct luaL_reg boxlib[] = {
 	{NULL, NULL}
 };
 
-static const struct luaL_reg boxlib_internal[] = {
-	{"gc", lbox_gc},
+static const struct luaL_reg boxlib_gc[] = {
+	{"run", lbox_gc_run},
+	{"info", lbox_gc_info},
 	{NULL, NULL}
 };
 
@@ -177,7 +212,7 @@ box_lua_init(struct lua_State *L)
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 
-	luaL_register(L, "box.internal", boxlib_internal);
+	luaL_register(L, "box.internal.gc", boxlib_gc);
 	lua_pop(L, 1);
 
 	luaL_register(L, "box.backup", boxlib_backup);

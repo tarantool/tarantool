@@ -19,7 +19,7 @@ function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_co
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 ---
 ...
-function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 ---
 ...
 -- Check that run files are deleted by gc.

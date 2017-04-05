@@ -42,17 +42,6 @@
 #include "replication.h"	/* INSTANCE_UUID */
 #include "wal.h"		/* wal_collect_garbage() */
 
-/** Checkpoint info. */
-struct checkpoint_info {
-	/** Checkpoint vclock, linked in gc_state.checkpoints. */
-	struct vclock vclock;
-	/**
-	 * Number of active users of this checkpoint.
-	 * A checkpoint can't be collected unless @refs is 0.
-	 */
-	int refs;
-};
-
 /** Garbage collection state. */
 struct gc_state {
 	/** Max signature garbage collection has been called for. */
@@ -61,6 +50,16 @@ struct gc_state {
 	vclockset_t checkpoints;
 };
 static struct gc_state gc;
+
+const struct checkpoint_info *
+checkpoint_iterator_next(struct checkpoint_iterator *it)
+{
+	it->curr = (it->curr == NULL ?
+		    vclockset_first(&gc.checkpoints) :
+		    vclockset_next(&gc.checkpoints, it->curr));
+	return (it->curr == NULL ? NULL :
+		container_of(it->curr, struct checkpoint_info, vclock));
+}
 
 int
 gc_init(const char *snap_dirname)
@@ -199,4 +198,10 @@ gc_run(int64_t signature)
 		wal_collect_garbage(gc_signature);
 		engine_collect_garbage(gc_signature);
 	}
+}
+
+int64_t
+gc_signature(void)
+{
+	return gc.signature;
 }
