@@ -652,7 +652,7 @@ nb = net.new('localhost:3392', {
     wait_connected = true, console = true,
     connect_timeout = 0.01
 });
-nb.error == "Timeout exceeded";
+nb.error == "Timeout exceeded" or nb.error == "Connection timed out";
 nb:close();
 -- we must get peer closed
 nb = net.new('localhost:3392', {

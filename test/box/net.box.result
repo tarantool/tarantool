@@ -1612,7 +1612,7 @@ nb = net.new('localhost:3392', {
 });
 ---
 ...
-nb.error == "Timeout exceeded";
+nb.error == "Timeout exceeded" or nb.error == "Connection timed out";
 ---
 - true
 ...

@@ -481,9 +481,11 @@ netbox_communicate(lua_State *L)
 	ev_tstamp timeout = TIMEOUT_INFINITY;
 	if (lua_type(L, 5) == LUA_TNUMBER)
 		timeout = lua_tonumber(L, 5);
-	if (timeout < 0)
-		return luaL_error(L, "timeout < 0");
-
+	if (timeout < 0) {
+		lua_pushinteger(L, ER_TIMEOUT);
+		lua_pushstring(L, "Timeout exceeded");
+		return 2;
+	}
 	int revents = COIO_READ;
 	while (true) {
 		/* reader serviced first */
