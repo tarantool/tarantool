@@ -71,6 +71,7 @@
 #include "iproto_constants.h"
 #include "replication.h" /* INSTANCE_UUID */
 #include "vclock.h"
+#include "box.h"
 #include "schema.h"
 #include "xrow.h"
 #include "xlog.h"
@@ -536,6 +537,7 @@ typedef rb_tree(struct vy_range) vy_range_tree_t;
  */
 struct txv {
 	struct vy_index *index;
+	struct vy_mem *mem;
 	struct tuple *stmt;
 	struct vy_tx *tx;
 	/** Next in the transaction log. */
@@ -1029,6 +1031,7 @@ txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 		return NULL;
 	}
 	v->index = index;
+	v->mem = NULL;
 	v->stmt = stmt;
 	tuple_ref(stmt);
 	v->tx = tx;
@@ -1702,6 +1705,20 @@ vy_range_discard_new_run(struct vy_range *range)
 		say_warn("failed to log run %lld deletion: %s",
 			 (long long)run_id, e->errmsg);
 	}
+}
+
+/**
+ * Wait until all in-memory indexes of the given range are unpinned.
+ * This is called right before devolving a dump or compaction task
+ * on a worker thread to make sure we don't dump an in-memory index
+ * which has active transactions.
+ */
+static void
+vy_range_wait_pinned(struct vy_range *range)
+{
+	struct vy_mem *mem;
+	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+		vy_mem_wait_pinned(mem);
 }
 
 /** Return true if a task was scheduled for a given range. */
@@ -3604,6 +3621,7 @@ vy_index_open_ex(struct vy_index *index)
  * region_stmt is NULL and the statement successfully inserted
  * then the new lsregion statement is returned via @a region_stmt.
  * @param range Range to which the statement insert to.
+ * @param mem Range's in-memory tree to insert the statement into.
  * @param stmt Statement, allocated on malloc().
  * @param region_stmt NULL or the same statement, allocated on
  *                    lsregion.
@@ -3611,8 +3629,8 @@ vy_index_open_ex(struct vy_index *index)
  * @retval -1 Memory error.
  */
 static int
-vy_range_set(struct vy_range *range, const struct tuple *stmt,
-	     const struct tuple **region_stmt)
+vy_range_set(struct vy_range *range, struct vy_mem *mem,
+	     const struct tuple *stmt, const struct tuple **region_stmt)
 {
 	assert(!vy_stmt_is_region_allocated(stmt));
 	assert(*region_stmt == NULL ||
@@ -3620,7 +3638,6 @@ vy_range_set(struct vy_range *range, const struct tuple *stmt,
 	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct lsregion *allocator = &index->env->allocator;
-	struct vy_mem *mem = range->mem;
 	int64_t lsn = vy_stmt_lsn(stmt);
 
 	bool was_empty = (mem->used == 0);
@@ -3660,14 +3677,14 @@ static void
 vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt);
 
 static int
-vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
+vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
+		    struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 
 	struct vy_index *index = range->index;
 	struct vy_stat *stat = index->env->stat;
 	struct index_def *index_def = index->index_def;
-	struct vy_mem *mem = range->mem;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	older = vy_mem_older_lsn(mem, stmt);
@@ -3708,7 +3725,7 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 		}
 		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
-		int rc = vy_range_set(range, upserted, &region_stmt);
+		int rc = vy_range_set(range, mem, upserted, &region_stmt);
 		tuple_unref(upserted);
 		if (rc < 0)
 			return -1;
@@ -3740,7 +3757,7 @@ vy_range_set_upsert(struct vy_range *range, struct tuple *stmt)
 			vy_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
 		}
 	}
-	return vy_range_set(range, stmt, &region_stmt);
+	return vy_range_set(range, mem, stmt, &region_stmt);
 }
 
 /*
@@ -3777,28 +3794,65 @@ vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
 }
 
 /**
+ * Look up the range the given transaction goes into, rotate its
+ * in-memory index if necessary, and pin it to make sure it is not
+ * dumped until the transaction is complete.
+ */
+static int
+vy_tx_write_prepare(struct txv *v)
+{
+	struct vy_index *index = v->index;
+	struct tuple *stmt = v->stmt;
+	struct vy_range *range;
+
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
+					  index->index_def, stmt);
+	/*
+	 * Allocate a new in-memory tree if either of the following
+	 * conditions is true:
+	 *
+	 * - Snapshot version has increased after the tree was created.
+	 *   In this case we need to dump the tree as is in order to
+	 *   guarantee snapshot consistency.
+	 *
+	 * - Schema version has increased after the tree was created.
+	 *   We have to seal the tree, because we don't support mixing
+	 *   statements of different formats in the same tree.
+	 */
+	if (unlikely(range->mem->sc_version != sc_version ||
+		     range->mem->snapshot_version != snapshot_version)) {
+		if (vy_range_rotate_mem(range) != 0)
+			return -1;
+	}
+	vy_mem_pin(range->mem);
+	v->mem = range->mem;
+	return 0;
+}
+
+/**
  * Write a single statement into an index. If the statement has an
  * lsregion copy then use it, else create it.
  * @param index Index to write to.
+ * @param mem In-memory tree to write to.
  * @param stmt Statement allocated from malloc().
  * @param region_stmt NULL or the same statement as stmt,
  *                    but allocated on lsregion.
  * @param status Vinyl engine status.
- * @param checkpoint_lsn snapshot signature if snapshot is
- *                       in progress, otherwise -1.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static int
-vy_tx_write(struct vy_index *index, struct tuple *stmt,
-	    const struct tuple **region_stmt, enum vy_status status,
-	    int64_t checkpoint_lsn)
+vy_tx_write(struct vy_index *index, struct vy_mem *mem,
+	    struct tuple *stmt, const struct tuple **region_stmt,
+	    enum vy_status status)
 {
 	assert(!vy_stmt_is_region_allocated(stmt));
 	assert(*region_stmt == NULL ||
 	       vy_stmt_is_region_allocated(*region_stmt));
-	struct vy_range *range = NULL;
+
+	vy_mem_unpin(mem);
+
 	/*
 	 * If we're recovering the WAL, it may happen so that this
 	 * particular run was dumped after the checkpoint, and we're
@@ -3810,34 +3864,19 @@ vy_tx_write(struct vy_index *index, struct tuple *stmt,
 		if (vy_stmt_is_committed(index, stmt))
 			return 0;
 	}
+
 	/* Match range. */
+	struct vy_range *range;
 	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
 					  index->index_def, stmt);
-	/*
-	 * Allocate a new in-memory tree if either of the following
-	 * conditions is true:
-	 *
-	 * - Snapshot is in progress and the active in-memory tree
-	 *   contains statements inserted before the snapshot started.
-	 *   In this case we need to dump the tree as is in order to
-	 *   guarantee snapshot consistency.
-	 *
-	 * - Schema version has increased after the tree was created.
-	 *   We have to seal the tree, because we don't support mixing
-	 *   statements of different formats in the same tree.
-	 */
-	if (unlikely(range->mem->min_lsn <= checkpoint_lsn ||
-		     range->mem->sc_version != sc_version)) {
-		if (vy_range_rotate_mem(range) != 0)
-			return -1;
-	}
+
 	int rc;
 	switch (vy_stmt_type(stmt)) {
 	case IPROTO_UPSERT:
-		rc = vy_range_set_upsert(range, stmt);
+		rc = vy_range_set_upsert(range, mem, stmt);
 		break;
 	default:
-		rc = vy_range_set(range, stmt, region_stmt);
+		rc = vy_range_set(range, mem, stmt, region_stmt);
 		break;
 	}
 	/*
@@ -4103,6 +4142,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 	task->dump_lsn = MIN(xm->lsn, dump_lsn);
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
+	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started dumping range %s",
@@ -4349,6 +4389,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	task->dump_lsn = xm->lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
+	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started splitting range %s by key %s",
@@ -4538,6 +4579,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	range->max_dump_size = 0;
 	range->compact_priority = 0;
 
+	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started compacting range %s, runs %d/%d",
@@ -7131,6 +7173,11 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 void
 vy_rollback(struct vy_env *e, struct vy_tx *tx)
 {
+	for (struct txv *v = write_set_first(&tx->write_set);
+	     v != NULL; v = write_set_next(&tx->write_set, v)) {
+		if (v->mem != NULL)
+			vy_mem_unpin(v->mem);
+	}
 	vy_tx_rollback(e, tx);
 	TRASH(tx);
 	free(tx);
@@ -7151,10 +7198,13 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 		rc = -1;
 	} else {
 		tx->state = VINYL_TX_COMMIT;
-		/** Abort read/write intersection */
-		struct txv *v = write_set_first(&tx->write_set);
-		for (; v != NULL; v = write_set_next(&tx->write_set, v))
+		for (struct txv *v = write_set_first(&tx->write_set);
+		     v != NULL; v = write_set_next(&tx->write_set, v)) {
+			if (vy_tx_write_prepare(v) != 0)
+				rc = -1;
+			/* Abort read/write intersection. */
 			vy_send_to_read_view(e, tx, v);
+		}
 	}
 
 	vy_tx_destroy(tx->manager, tx);
@@ -7187,7 +7237,6 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 	uint64_t write_count = 0;
 	const struct tuple *delete = NULL, *replace = NULL;
 	enum vy_status status = e->status;
-	int64_t checkpoint_lsn = e->scheduler->checkpoint_lsn;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/*
@@ -7215,8 +7264,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 		 */
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &replace;
-		if (vy_tx_write(index, stmt, region_stmt,
-				status, checkpoint_lsn) != 0)
+		if (vy_tx_write(index, v->mem, stmt, region_stmt, status) != 0)
 			return -1;
 		write_count++;
 	}
@@ -10572,7 +10620,7 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	const struct tuple *region_stmt = NULL;
-	rc = vy_range_set(range, result, &region_stmt);
+	rc = vy_range_set(range, mem, result, &region_stmt);
 	tuple_unref(result);
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);

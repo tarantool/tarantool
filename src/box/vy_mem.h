@@ -36,6 +36,7 @@
 
 #include <small/rlist.h>
 
+#include "ipc.h"
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_mem.h" /* struct vy_mem_tree_iterator */
@@ -145,6 +146,8 @@ struct vy_mem {
 	uint32_t version;
 	/** Schema version at the time of creation. */
 	uint32_t sc_version;
+	/** Snapshot version at the time of creation. */
+	uint32_t snapshot_version;
 	/** Allocator for extents */
 	struct lsregion *allocator;
 	/** The last LSN for lsregion allocator */
@@ -158,7 +161,55 @@ struct vy_mem {
 	struct tuple_format *format_with_colmask;
 	/** Same as format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
+	/**
+	 * Number of active writers to this index.
+	 *
+	 * Incremented for modified in-memory trees when
+	 * preparing a transaction. Decremented after writing
+	 * to WAL or rollback.
+	 */
+	int pin_count;
+	/**
+	 * Condition variable signaled by vy_mem_unpin()
+	 * if pin_count reaches 0.
+	 */
+	struct ipc_cond pin_cond;
 };
+
+/**
+ * Pin an in-memory index.
+ *
+ * A pinned in-memory index can't be dumped until it's unpinned.
+ */
+static inline void
+vy_mem_pin(struct vy_mem *mem)
+{
+	mem->pin_count++;
+}
+
+/**
+ * Unpin an in-memory index.
+ *
+ * This function reverts the effect of vy_mem_pin().
+ */
+static inline void
+vy_mem_unpin(struct vy_mem *mem)
+{
+	assert(mem->pin_count > 0);
+	mem->pin_count--;
+	if (mem->pin_count == 0)
+		ipc_cond_broadcast(&mem->pin_cond);
+}
+
+/**
+ * Wait until an in-memory index is unpinned.
+ */
+static inline void
+vy_mem_wait_pinned(struct vy_mem *mem)
+{
+	while (mem->pin_count > 0)
+		ipc_cond_wait(&mem->pin_cond);
+}
 
 /**
  * Instantiate a new in-memory level.

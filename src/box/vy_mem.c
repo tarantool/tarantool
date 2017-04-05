@@ -35,6 +35,7 @@
 #include <trivia/util.h>
 #include <small/lsregion.h>
 #include "diag.h"
+#include "box.h"
 #include "schema.h"
 
 /** {{{ vy_mem */
@@ -77,6 +78,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	index->index_def = index_def;
 	index->version = 0;
 	index->sc_version = sc_version;
+	index->snapshot_version = snapshot_version;
 	index->allocator = allocator;
 	index->allocator_lsn = allocator_lsn;
 	index->format = format;
@@ -90,6 +92,8 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_frozen);
 	rlist_create(&index->in_dirty);
+	index->pin_count = 0;
+	ipc_cond_create(&index->pin_cond);
 	return index;
 }
 
@@ -116,6 +120,7 @@ vy_mem_delete(struct vy_mem *index)
 	tuple_format_ref(index->format, -1);
 	tuple_format_ref(index->format_with_colmask, -1);
 	tuple_format_ref(index->upsert_format, -1);
+	ipc_cond_destroy(&index->pin_cond);
 	TRASH(index);
 	free(index);
 }
