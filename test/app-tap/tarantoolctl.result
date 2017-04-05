@@ -51,7 +51,7 @@ ok - check answers in case of call
     # check basic help: end
 ok - check basic help
     # fill and test cat output
-    1..19
+    1..25
     ok - check 'start' command status for 'filler'
     ok - cat result
     ok - cat line count
@@ -67,6 +67,12 @@ ok - check basic help
     ok - cat + --from=3 --to=6 --format=json --show-system line count
     ok - cat + --from=6 --to=3 --format=json --show-system result
     ok - cat + --from=6 --to=3 --format=json --show-system line count
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 1 result
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 1 line count
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 1 --replica 2 result
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 1 --replica 2 line count
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 2 result
+    ok - cat + --from=3 --to=6 --format=json --show-system --replica 2 line count
     ok - cat + --space=280 result
     ok - cat + --space=280 line count
     ok - cat + --space=288 result

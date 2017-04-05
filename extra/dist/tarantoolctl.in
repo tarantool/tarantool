@@ -413,18 +413,16 @@ end
 --                            CAT command helpers                             --
 -- -------------------------------------------------------------------------- --
 
-local function find_space(sid, spaces)
-    if type(spaces) == 'number' then
-        return sid == spaces
+local function find_in_list(id, list)
+    if type(list) == 'number' then
+        return id == list
     end
-    local shown = false
-    for _, v in ipairs(spaces) do
-        if v == sid then
-            shown = true
-            break
+    for _, v in ipairs(list) do
+        if v == id then
+            return true
         end
     end
-    return shown
+    return false
 end
 
 local write_lua_table = nil
@@ -865,6 +863,7 @@ local function cat()
     local options = keyword_arguments
     local from, to, spaces = options.from, options.to, options.space
     local show_system, cat_format = options['show-system'], options.format
+    local replicas = options.replica
 
     local format_cb   = cat_formats[cat_format]
     local is_printed  = false
@@ -872,12 +871,22 @@ local function cat()
         log.error("Processing file '%s'", file)
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
-            local is_filtered    = spaces ~= nil
-            local is_system      = sid < 512 and show_system == false
-            local isnt_specified = not (is_filtered and find_space(sid, spaces))
+            local rid = record.HEADER.replica_id
+            -- space filter rules
+            local is_space_filtered    = spaces ~= nil
+            local is_space_system      = sid < 512 and show_system == false
+            local isnt_space_specified = not (is_space_filtered and
+                                              find_in_list(sid, spaces))
+            -- replica id filter rules
+            local is_replica_id_filtered    = replicas ~= nil
+            local isnt_replica_id_specified = not (is_replica_id_filtered and
+                                                   find_in_list(rid, replicas))
+
             if (lsn < from) or
-               (is_filtered and is_system and isnt_specified) or
-               (is_system and isnt_specified) then
+               (is_space_filtered and is_space_system and
+                isnt_space_specified) or
+               (is_space_system and isnt_space_specified) or
+               (is_replica_id_filtered and isnt_replica_id_specified) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
@@ -901,6 +910,7 @@ local function play()
     local from, to, spaces = options.from, options.to, options.space
     local show_system = options['show-system']
     local uri = table.remove(positional_arguments, 1)
+    local replicas = options.replica
 
     if uri == nil then
         error("Empty URI is provided")
@@ -913,12 +923,22 @@ local function play()
         log.info(("Processing file '%s'"):format(file))
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
-            local is_filtered    = spaces ~= nil
-            local is_system      = sid < 512 and show_system == false
-            local isnt_specified = not (is_filtered and find_space(sid, spaces))
+            local rid = record.HEADER.replica_id
+            -- space filter rules
+            local is_space_filtered    = spaces ~= nil
+            local is_space_system      = sid < 512 and show_system == false
+            local isnt_space_specified = not (is_space_filtered and
+                                              find_in_list(sid, spaces))
+            -- replica id filter rules
+            local is_replica_id_filtered    = replicas ~= nil
+            local isnt_replica_id_specified = not (is_replica_id_filtered and
+                                                   find_in_list(rid, replicas))
+
             if (lsn < from) or
-               (is_filtered and is_system and isnt_specified) or
-               (is_system and isnt_specified) then
+               (is_space_filtered and is_space_system and
+                isnt_space_specified) or
+               (is_space_system and isnt_space_specified) or
+               (is_replica_id_filtered and isnt_replica_id_specified) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
@@ -1108,7 +1128,7 @@ local commands = setmetatable({
         func = exit_wrapper(cat), process = process_remote, help = {
             header =
                 "%s cat <filename>.. [--space=space_no ..] [--show-system]" ..
-                " [--from=from_lsn] [--to=to_lsn]",
+                " [--from=from_lsn] [--to=to_lsn] [--replica=replica_id ..]",
             description =
 [=[
         Print into stdout the contents of .snap/.xlog files.
@@ -1119,6 +1139,8 @@ local commands = setmetatable({
         * --show-system to show the contents of system spaces.
         * --from=from_lsn to show operations starting from the given lsn.
         * --to=to_lsn to show operations ending with the given lsn.
+        * --replica=replica_id to filter the output by replica id.
+          May be passed more than once.
 ]=],
             weight = 90,
             deprecated = false,
@@ -1138,6 +1160,8 @@ local commands = setmetatable({
         * --show-system to show the contents of system spaces.
         * --from=from_lsn to show operations starting from the given lsn.
         * --to=to_lsn to show operations ending with the given lsn.
+        * --replica=replica_id to filter the output by replica id.
+          May be passed more than once.
 ]=],
             weight = 100,
             deprecated = false,
@@ -1232,7 +1256,8 @@ do
         { 'from',        'number'  },
         { 'to',          'number'  },
         { 'help',        'boolean' },
-        { 'format',      'string'  }
+        { 'format',      'string'  },
+        { 'replica',     'number+' },
     })
 
     local cmd_name

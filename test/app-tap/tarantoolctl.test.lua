@@ -324,7 +324,7 @@ do
 
     local status, err = pcall(function()
         test:test("fill and test cat output", function(test_i)
-            test_i:plan(19)
+            test_i:plan(25)
             check_ok(test_i, dir, 'start', 'filler', 0)
             check_ctlcat_xlog(test_i, dir, nil, "---\n", 6)
             check_ctlcat_xlog(test_i, dir, "--show-system", "---\n", 9)
@@ -333,6 +333,9 @@ do
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json", "\n", 2)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=6 --to=3 --format=json --show-system", "\n", 0)
+            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1", "\n", 3)
+            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1 --replica 2", "\n", 3)
+            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 2", "\n", 0)
             check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 12)
             check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 31)
         end)
