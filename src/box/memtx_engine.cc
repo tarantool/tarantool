@@ -143,22 +143,12 @@ MemtxEngine::~MemtxEngine()
 	memtx_tuple_free();
 }
 
-int64_t
-MemtxEngine::lastCheckpoint(struct vclock *vclock)
-{
-	return xdir_last_vclock(&m_snap_dir, vclock);
-}
-
 void
-MemtxEngine::recoverSnapshot()
+MemtxEngine::recoverSnapshot(const struct vclock *vclock)
 {
-	struct vclock vclock;
-	if (lastCheckpoint(&vclock) < 0)
-		return;
-
 	/* Process existing snapshot */
 	say_info("recovery start");
-	int64_t signature = vclock.signature;
+	int64_t signature = vclock_sum(vclock);
 	const char *filename = xdir_format_filename(&m_snap_dir, signature,
 						    NONE);
 
@@ -1006,10 +996,4 @@ memtx_index_extent_reserve(int num)
 		memtx_index_reserved_extents = ext;
 		memtx_index_num_reserved_extents++;
 	}
-}
-
-int
-recovery_last_checkpoint(struct vclock *vclock)
-{
-	return ((MemtxEngine *)engine_find("memtx"))->lastCheckpoint(vclock);
 }

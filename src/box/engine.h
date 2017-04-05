@@ -44,10 +44,12 @@ enum engine_flags {
 
 extern struct rlist engines;
 
-struct Handler;
-
 typedef int
 engine_backup_cb(const char *path, void *arg);
+
+#if defined(__cplusplus)
+
+struct Handler;
 
 /** Engine instance */
 class Engine {
@@ -302,6 +304,16 @@ engine_begin_final_recovery();
 void
 engine_end_recovery();
 
+/**
+ * Feed snapshot data as join events to the replicas.
+ * (called on the master).
+ */
+void
+engine_join(struct vclock *vclock, struct xstream *stream);
+
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 int
 engine_begin_checkpoint();
 
@@ -320,11 +332,8 @@ engine_collect_garbage(int64_t lsn);
 int
 engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
-/**
- * Feed snapshot data as join events to the replicas.
- * (called on the master).
- */
-void
-engine_join(struct vclock *vclock, struct xstream *stream);
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

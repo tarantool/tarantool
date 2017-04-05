@@ -98,12 +98,6 @@ extern uint32_t snapshot_version;
  */
 int box_snapshot(void);
 
-/**
- * Remove files that are not needed to recover
- * from snapshot with @lsn or newer.
- */
-void box_gc(int64_t lsn);
-
 typedef int (*box_backup_cb)(const char *path, void *arg);
 
 /**

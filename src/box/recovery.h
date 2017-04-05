@@ -82,21 +82,6 @@ recovery_finalize(struct recovery *r, struct xstream *stream);
 #endif /* defined(__cplusplus) */
 
 /**
- * The write ahead log doesn't store the last checkpoint:
- * it is represented by the last valid snapshot of memtx engine.
- * This is legacy from the time the entire box was single-engine.
- *
- * @param[out] vclock vclock of the last checkpoint
- * @retval         signature of the last checkpoint, or -1
- *                 in case of fresh boot
- *
- * The function may throw XlogError exception.
- * It is implemented in memtx_engine.cc
- */
-int
-recovery_last_checkpoint(struct vclock *vclock);
-
-/**
  * Find out if there are new .xlog files since the current
  * vclock, and read them all up.
  *

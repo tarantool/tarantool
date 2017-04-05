@@ -39,6 +39,7 @@
 #include "small/rlist.h"
 #include "scoped_guard.h"
 #include "vclock.h"
+#include "gc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errinj.h>
@@ -348,6 +349,8 @@ engine_commit_checkpoint(struct vclock *vclock)
 		if (engine->waitCheckpoint(vclock) < 0)
 			return -1;
 	}
+	if (gc_add_checkpoint(vclock) < 0)
+		return -1;
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
 		engine->commitCheckpoint(vclock);

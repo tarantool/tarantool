@@ -38,6 +38,7 @@
 
 #include "box/box.h"
 #include "box/txn.h"
+#include "box/gc.h"
 
 #include "box/lua/error.h"
 #include "box/lua/tuple.h"
@@ -107,7 +108,7 @@ static int
 lbox_gc(struct lua_State *L)
 {
 	int64_t lsn = luaL_checkint64(L, 1);
-	box_gc(lsn);
+	gc_run(lsn);
 	return 0;
 }
 

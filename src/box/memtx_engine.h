@@ -108,12 +108,7 @@ struct MemtxEngine: public Engine {
 	{
 		m_snap_io_rate_limit = new_limit * 1024 * 1024;
 	}
-	/**
-	 * Return LSN of the most recent snapshot or -1 if there is
-	 * no snapshot.
-	 */
-	int64_t lastCheckpoint(struct vclock *vclock);
-	void recoverSnapshot();
+	void recoverSnapshot(const struct vclock *vclock);
 private:
 	void
 	recoverSnapshotRow(struct xrow_header *row);

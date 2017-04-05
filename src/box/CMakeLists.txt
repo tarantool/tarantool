@@ -63,6 +63,7 @@ add_library(box STATIC
     request.c
     txn.cc
     box.cc
+    gc.c
     user_def.c
     user.cc
     authentication.cc
