@@ -2930,8 +2930,8 @@ vy_range_unfreeze_mem(struct vy_range *range)
  * the old one to the frozen list. Used by dump/compaction in order
  * not to bother about synchronization with concurrent insertions
  * while a range is being dumped. If the active in-memory index is
- * empty, we don't need to dump it and therefore can delete it right
- * away.
+ * empty and not pinned by an ongoing transaction, we don't need
+ * to dump it and therefore can delete it right away.
  */
 static int
 vy_range_rotate_mem(struct vy_range *range)
@@ -2948,7 +2948,7 @@ vy_range_rotate_mem(struct vy_range *range)
 			 index->upsert_format, sc_version);
 	if (mem == NULL)
 		return -1;
-	if (range->mem->used > 0)
+	if (range->mem->used > 0 || range->mem->pin_count > 0)
 		vy_range_freeze_mem(range);
 	else
 		vy_mem_delete(range->mem);
