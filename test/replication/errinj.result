@@ -159,6 +159,26 @@ box.space.test.index[0]:count()
 ---
 - 50
 ...
+test_run:cmd("switch replica")
+---
+- true
+...
+test_run:cmd("stop server default")
+---
+- true
+...
+test_run:cmd("deploy server default")
+---
+- true
+...
+test_run:cmd("start server default")
+---
+- true
+...
+test_run:cmd("switch default")
+---
+- true
+...
 test_run:cmd("stop server replica")
 ---
 - true
@@ -166,13 +186,4 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 ---
 - true
-...
-box.space.test:drop()
----
-...
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
----
-...
-box.schema.user.revoke('guest', 'replication')
----
 ...
