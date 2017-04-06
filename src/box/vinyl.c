@@ -10283,7 +10283,7 @@ vy_join_cb(const struct vy_log_record *record, void *cb_arg)
 			struct xrow_header xrow;
 			if (vy_page_xrow(page, stmt_no, &xrow) != 0)
 				goto out_free_page;
-			xrow.lsn = arg->lsn++;
+			xrow.lsn = ++arg->lsn;
 			if (xstream_write(arg->stream, &xrow) != 0)
 				goto out_free_page;
 		}
