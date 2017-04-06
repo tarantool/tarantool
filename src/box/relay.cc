@@ -29,24 +29,100 @@
  * SUCH DAMAGE.
  */
 #include "relay.h"
-#include <say.h>
+
+#include "trivia/config.h"
+#include "trivia/util.h"
+#include "cbus.h"
+#include "cfg.h"
+#include "errinj.h"
+#include "fiber.h"
+#include "say.h"
 #include "scoped_guard.h"
 
-#include "recovery.h"
-#include "iproto_constants.h"
+#include "coeio.h"
+#include "coio.h"
 #include "engine.h"
+#include "iproto_constants.h"
+#include "recovery.h"
 #include "replication.h"
+#include "trigger.h"
 #include "vclock.h"
 #include "xrow.h"
-#include "coio.h"
-#include "coeio.h"
-#include "cfg.h"
-#include "trigger.h"
-#include "errinj.h"
 #include "xrow_io.h"
+#include "xstream.h"
 
 /** Report relay status to tx at least with this interval */
 static const int RELAY_REPORT_INTERVAL = 1;
+
+/**
+ * Cbus message to send status updates from Relay to TX
+ */
+struct relay_status_msg {
+	/** Parent */
+	struct cmsg msg;
+	/** Relay instance */
+	struct relay *relay;
+	/** New vclock */
+	struct vclock vclock;
+};
+
+/**
+ * Cbus message to notify TX thread that relay is stopping.
+ */
+struct relay_exit_msg {
+	/** Parent */
+	struct cmsg msg;
+	/** Relay instance */
+	struct relay *relay;
+};
+
+/** State of a replication relay. */
+struct relay {
+	/** The thread in which we relay data to the replica. */
+	struct cord cord;
+	/** Replica connection */
+	struct ev_io io;
+	/** Request sync */
+	uint64_t sync;
+	/** Recovery instance to read xlog from the disk */
+	struct recovery *r;
+	/** Xstream argument to recovery */
+	struct xstream stream;
+	/** Vclock to stop playing xlogs */
+	struct vclock stop_vclock;
+	/** Directory rescan delay for recovery */
+	ev_tstamp wal_dir_rescan_delay;
+	/** Remote replica id */
+	uint32_t replica_id;
+
+	/** Relay endpoint */
+	struct cbus_endpoint endpoint;
+	/** A pipe from 'relay' thread to 'tx' */
+	struct cpipe tx_pipe;
+	/** A pipe from 'tx' thread to 'relay' */
+	struct cpipe relay_pipe;
+	/** Status message */
+	struct relay_status_msg status_msg;
+	/** A condition to signal when status message is handled. */
+	struct ipc_cond status_cond;
+	/** Relay exit orchestration message */
+	struct relay_exit_msg exit_msg;
+
+	struct {
+		/* Align to prevent false-sharing with TX thread */
+		alignas(CACHELINE_SIZE)
+		/** Current vclock sent by relay */
+		struct vclock vclock;
+		/** The condition will be signaled if relay want to exit. */
+		struct ipc_cond exit_cond;
+	} tx;
+};
+
+const struct vclock *
+relay_vclock(const struct relay *relay)
+{
+	return &relay->tx.vclock;
+}
 
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);

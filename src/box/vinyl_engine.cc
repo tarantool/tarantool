@@ -43,7 +43,6 @@
 #include "xrow.h"
 #include "tuple.h"
 #include "txn.h"
-#include "relay.h"
 #include "space.h"
 #include "schema.h"
 #include "iproto_constants.h"
