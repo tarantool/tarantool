@@ -5,9 +5,6 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
--- need to restart because we need clean server
--- related to #2280
-test_run:cmd("restart server default")
 spaces = {}
 ---
 ...

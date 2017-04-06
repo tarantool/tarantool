@@ -1,9 +1,6 @@
 -- wal is off, good opportunity to test something more CPU intensive:
 env = require('test_run')
 test_run = env.new()
--- need to restart because we need clean server
--- related to #2280
-test_run:cmd("restart server default")
 spaces = {}
 box.schema.FORMAT_ID_MAX
 test_run:cmd("setopt delimiter ';'")
