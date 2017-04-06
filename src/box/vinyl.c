@@ -7171,10 +7171,11 @@ vy_send_to_read_view(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 }
 
 int
-vy_prepare(struct vy_env *e, struct vy_tx *tx)
+vy_prepare(struct vy_tx *tx)
 {
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
+	struct vy_env *e = tx->manager->env;
 	int rc = 0;
 
 	/* proceed read-only transactions */
@@ -7207,8 +7208,9 @@ vy_prepare(struct vy_env *e, struct vy_tx *tx)
 }
 
 int
-vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
+vy_commit(struct vy_tx *tx, int64_t lsn)
 {
+	struct vy_env *e = tx->manager->env;
 	assert(tx->state == VINYL_TX_COMMIT);
 	if (lsn > e->xm->lsn)
 		e->xm->lsn = lsn;
@@ -7274,7 +7276,7 @@ vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn)
 }
 
 static void
-vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
+vy_tx_rollback(struct vy_tx *tx)
 {
 	if (tx->state == VINYL_TX_READY) {
 		/** freewill rollback, vy_prepare have not been called yet */
@@ -7283,7 +7285,7 @@ vy_tx_rollback(struct vy_env *e, struct vy_tx *tx)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
 		txv_delete(v);
-	e->stat->tx_rlb++;
+	tx->manager->env->stat->tx_rlb++;
 }
 
 struct vy_tx *
@@ -7301,14 +7303,14 @@ vy_begin(struct vy_env *e)
 }
 
 void
-vy_rollback(struct vy_env *e, struct vy_tx *tx)
+vy_rollback(struct vy_tx *tx)
 {
 	for (struct txv *v = write_set_first(&tx->write_set);
 	     v != NULL; v = write_set_next(&tx->write_set, v)) {
 		if (v->mem != NULL)
 			vy_mem_unpin(v->mem);
 	}
-	vy_tx_rollback(e, tx);
+	vy_tx_rollback(tx);
 	TRASH(tx);
 	free(tx);
 }
@@ -10836,7 +10838,7 @@ vy_cursor_delete(struct vy_cursor *c)
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
 			/* Rollback the automatic transaction. */
-			vy_tx_rollback(e, c->tx);
+			vy_tx_rollback(c->tx);
 		} else {
 			/*
 			 * Delete itself from the list of open cursors

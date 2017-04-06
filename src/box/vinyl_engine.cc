@@ -196,7 +196,7 @@ VinylEngine::prepare(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
-	if (vy_prepare(env, tx))
+	if (vy_prepare(tx))
 		diag_raise();
 }
 
@@ -220,7 +220,7 @@ VinylEngine::commit(struct txn *txn, int64_t lsn)
 		txn_stmt_unref_tuples(stmt);
 	}
 	if (tx) {
-		int rc = vy_commit(env, tx, txn->n_rows ? lsn : 0);
+		int rc = vy_commit(tx, txn->n_rows ? lsn : 0);
 		if (rc == -1) {
 			panic("vinyl commit failed: txn->signature = %"
 			      PRIu64, lsn);
@@ -236,7 +236,7 @@ VinylEngine::rollback(struct txn *txn)
 		return;
 
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-	vy_rollback(env, tx);
+	vy_rollback(tx);
 	txn->engine_tx = NULL;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {

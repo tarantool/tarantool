@@ -209,13 +209,13 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request);
 
 int
-vy_prepare(struct vy_env *e, struct vy_tx *tx);
+vy_prepare(struct vy_tx *tx);
 
 int
-vy_commit(struct vy_env *e, struct vy_tx *tx, int64_t lsn);
+vy_commit(struct vy_tx *tx, int64_t lsn);
 
 void
-vy_rollback(struct vy_env *e, struct vy_tx *tx);
+vy_rollback(struct vy_tx *tx);
 
 void *
 vy_savepoint(struct vy_tx *tx);
