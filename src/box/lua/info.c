@@ -113,13 +113,22 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	struct applier *applier = replica->applier;
 	struct relay *relay = replica->relay;
 
-	lua_newtable(L);
+	/* 32 is used to get the best visual expirience in YAML output */
+	lua_createtable(L, 0, 32);
+
+	lua_pushstring(L, "id");
+	lua_pushinteger(L, replica->id);
+	lua_settable(L, -3);
 
 	lua_pushstring(L, "uuid");
 	lua_pushstring(L, tt_uuid_str(&replica->uuid));
 	lua_settable(L, -3);
 
-	if (applier != NULL) {
+	lua_pushstring(L, "lsn");
+	luaL_pushuint64(L, vclock_get(&replicaset_vclock, replica->id));
+	lua_settable(L, -3);
+
+	if (applier != NULL && applier->state != APPLIER_OFF) {
 		lua_pushstring(L, "upstream");
 		lbox_pushapplier(L, applier);
 		lua_settable(L, -3);
@@ -128,6 +137,16 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	if (relay != NULL) {
 		lua_pushstring(L, "downstream");
 		lbox_pushrelay(L, relay);
+		lua_settable(L, -3);
+	}
+
+	if (replica->id == instance_id) {
+		lua_pushliteral(L, "vclock");
+		lbox_pushvclock(L, &replicaset_vclock);
+		lua_settable(L, -3);
+
+		lua_pushliteral(L, "signature");
+		luaL_pushint64(L, vclock_sum(&replicaset_vclock));
 		lua_settable(L, -3);
 	}
 }
@@ -145,8 +164,7 @@ lbox_info_replication(struct lua_State *L)
 
 	replicaset_foreach(replica) {
 		/* Applier hasn't received replica id yet */
-		if (replica->id == REPLICA_ID_NIL ||
-		    (replica->applier == NULL && replica->relay == NULL))
+		if (replica->id == REPLICA_ID_NIL)
 			continue;
 
 		lbox_pushreplica(L, replica);
@@ -154,44 +172,9 @@ lbox_info_replication(struct lua_State *L)
 		lua_rawseti(L, -2, replica->id);
 	}
 
-	return 1;
-}
+	lua_rawgeti(L, -1, instance_id);
+	lua_setfield(L, -2, "self");
 
-static int
-lbox_info_server(struct lua_State *L)
-{
-	/*
-	 * Self can be NULL during bootstrap: entire box.info
-	 * bundle becomes available soon after entering box.cfg{}
-	 * and replication bootstrap relies on this as it looks
-	 * at box.info.status.
-	 */
-	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
-	lua_createtable(L, 0, 2);
-	lua_pushliteral(L, "id");
-	lua_pushinteger(L, self ? self->id : REPLICA_ID_NIL);
-	lua_settable(L, -3);
-	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
-	lua_settable(L, -3);
-	lua_pushliteral(L, "lsn");
-	if (self != NULL) {
-		luaL_pushint64(L, vclock_get(&replicaset_vclock, self->id));
-	} else {
-		luaL_pushint64(L, -1);
-	}
-	lua_settable(L, -3);
-	lua_pushliteral(L, "ro");
-	lua_pushboolean(L, box_is_ro());
-	lua_settable(L, -3);
-
-	return 1;
-}
-
-static int
-lbox_info_vclock(struct lua_State *L)
-{
-	lbox_pushvclock(L, &replicaset_vclock);
 	return 1;
 }
 
@@ -222,9 +205,6 @@ lbox_info_cluster(struct lua_State *L)
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&REPLICASET_UUID), UUID_STR_LEN);
-	lua_settable(L, -3);
-	lua_pushliteral(L, "signature");
-	luaL_pushint64(L, vclock_sum(&replicaset_vclock));
 	lua_settable(L, -3);
 
 	return 1;
@@ -295,8 +275,6 @@ lbox_info_vinyl(struct lua_State *L)
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
-	{"vclock", lbox_info_vclock},
-	{"server", lbox_info_server},
 	{"replication", lbox_info_replication},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
