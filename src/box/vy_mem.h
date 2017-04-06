@@ -39,7 +39,6 @@
 #include "ipc.h"
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
-#include "vy_mem.h" /* struct vy_mem_tree_iterator */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
 
 #if defined(__cplusplus)
@@ -228,7 +227,7 @@ struct vy_mem *
 vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	   struct index_def *index_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
-	   struct tuple_format *upsert_format);
+	   struct tuple_format *upsert_format, uint32_t schema_version);
 
 /**
  * Delete in-memory level.

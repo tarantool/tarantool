@@ -36,7 +36,6 @@
 #include <small/lsregion.h>
 #include "diag.h"
 #include "box.h"
-#include "schema.h"
 
 /** {{{ vy_mem */
 
@@ -65,7 +64,7 @@ struct vy_mem *
 vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	   struct index_def *index_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
-	   struct tuple_format *upsert_format)
+	   struct tuple_format *upsert_format, uint32_t schema_version)
 {
 	struct vy_mem *index = malloc(sizeof(*index));
 	if (!index) {
@@ -77,7 +76,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	index->used = 0;
 	index->index_def = index_def;
 	index->version = 0;
-	index->sc_version = sc_version;
+	index->sc_version = schema_version;
 	index->snapshot_version = snapshot_version;
 	index->allocator = allocator;
 	index->allocator_lsn = allocator_lsn;

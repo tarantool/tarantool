@@ -2774,7 +2774,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 	range->mem = vy_mem_new(allocator, allocator_lsn,
 				index->index_def, index->space_format,
 				index->space_format_with_colmask,
-				index->upsert_format);
+				index->upsert_format, sc_version);
 	if (range->mem == NULL)
 		goto fail_mem;
 	/* Allocate a new id unless specified. */
@@ -2945,7 +2945,7 @@ vy_range_rotate_mem(struct vy_range *range)
 	mem = vy_mem_new(allocator, allocator_lsn,
 			 index->index_def, index->space_format,
 			 index->space_format_with_colmask,
-			 index->upsert_format);
+			 index->upsert_format, sc_version);
 	if (mem == NULL)
 		return -1;
 	if (range->mem->used > 0)
