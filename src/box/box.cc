@@ -65,6 +65,7 @@
 #include "iproto_port.h"
 #include "xrow.h"
 #include "xrow_io.h"
+#include "xstream.h"
 #include "authentication.h"
 #include "path_lock.h"
 #include "gc.h"

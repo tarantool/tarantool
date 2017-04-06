@@ -30,82 +30,29 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trivia/config.h"
-#include "trivia/util.h"
 
-#include "fiber.h"
-#include "cbus.h"
-#include "vclock.h"
-#include "xstream.h"
+#include <stdint.h>
 
-struct replica;
-struct tt_uuid;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct relay;
+struct replica;
+struct tt_uuid;
+struct vclock;
 
 /**
- * Cbus message to send status updates from Relay to TX
+ * Returns relay's vclock
+ * @param relay relay
+ * @returns relay's vclock
  */
-struct relay_status_msg {
-	/** Parent */
-	struct cmsg msg;
-	/** Relay instance */
-	struct relay *relay;
-	/** New vclock */
-	struct vclock vclock;
-};
+const struct vclock *
+relay_vclock(const struct relay *relay);
 
-/**
- * Cbus message to notify TX thread that relay is stopping.
- */
-struct relay_exit_msg {
-	/** Parent */
-	struct cmsg msg;
-	/** Relay instance */
-	struct relay *relay;
-};
-
-/** State of a replication relay. */
-struct relay {
-	/** The thread in which we relay data to the replica. */
-	struct cord cord;
-	/** Replica connection */
-	struct ev_io io;
-	/** Request sync */
-	uint64_t sync;
-	/** Recovery instance to read xlog from the disk */
-	struct recovery *r;
-	/** Xstream argument to recovery */
-	struct xstream stream;
-	/** Vclock to stop playing xlogs */
-	struct vclock stop_vclock;
-	/** Directory rescan delay for recovery */
-	ev_tstamp wal_dir_rescan_delay;
-	/** Remote replica id */
-	uint32_t replica_id;
-
-	/** Relay endpoint */
-	struct cbus_endpoint endpoint;
-	/** A pipe from 'relay' thread to 'tx' */
-	struct cpipe tx_pipe;
-	/** A pipe from 'tx' thread to 'relay' */
-	struct cpipe relay_pipe;
-	/** Status message */
-	struct relay_status_msg status_msg;
-	/** A condition to signal when status message is handled. */
-	struct ipc_cond status_cond;
-	/** Relay exit orchestration message */
-	struct relay_exit_msg exit_msg;
-
-	struct {
-		/* Align to prevent false-sharing with TX thread */
-		alignas(CACHELINE_SIZE)
-		/** Current vclock sent by relay */
-		struct vclock vclock;
-		/** The condition will be signaled if relay want to exit. */
-		struct ipc_cond exit_cond;
-	} tx;
-};
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 /**
  * Send initial JOIN rows to the replica
