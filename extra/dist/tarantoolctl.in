@@ -128,6 +128,7 @@ int kill(int pid, int sig);
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
 int isatty(int fd);
+int getppid(void);
 ]]
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
@@ -398,6 +399,16 @@ local function mk_default_dirs(cfg)
     end
 end
 
+-- systemd detection based on http://unix.stackexchange.com/a/164092
+local function forward_to_systemd()
+    local rv = os.execute("systemctl 2>/dev/null | grep '\\-\\.mount' " ..
+                          "1>/dev/null 2>/dev/null")
+    if rv ~= 0 or ffi.C.getppid() < 2 or usermode then
+        return false
+    end
+    return true
+end
+
 -- -------------------------------------------------------------------------- --
 --                            CAT command helpers                             --
 -- -------------------------------------------------------------------------- --
@@ -570,6 +581,12 @@ end
 
 local function start()
     log.info("Starting instance...")
+    if forward_to_systemd() then
+        local cmd = "systemctl start tarantool@" .. instance_name
+        log.info("Forwarding to '" .. cmd .. "'")
+        os.execute(cmd)
+        return
+    end
     local stat = check_file(instance_path)
     if stat ~= nil then
         log.error("Error while checking syntax: halting")
@@ -603,6 +620,12 @@ end
 
 local function stop()
     log.info("Stopping instance...")
+    if forward_to_systemd() then
+        local cmd = "systemctl stop tarantool@" .. instance_name
+        log.info("Forwarding to '" .. cmd .. "'")
+        os.execute(cmd)
+        return
+    end
 
     -- remove console socket
     local console_sock = uri.parse(console_sock).service
