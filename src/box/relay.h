@@ -30,6 +30,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "trivia/config.h"
+#include "trivia/util.h"
+
 #include "fiber.h"
 #include "cbus.h"
 #include "vclock.h"
@@ -40,14 +43,25 @@ struct tt_uuid;
 
 struct relay;
 
+/**
+ * Cbus message to send status updates from Relay to TX
+ */
 struct relay_status_msg {
+	/** Parent */
 	struct cmsg msg;
+	/** Relay instance */
 	struct relay *relay;
+	/** New vclock */
 	struct vclock vclock;
 };
 
+/**
+ * Cbus message to notify TX thread that relay is stopping.
+ */
 struct relay_exit_msg {
+	/** Parent */
 	struct cmsg msg;
+	/** Relay instance */
 	struct relay *relay;
 };
 
@@ -57,31 +71,40 @@ struct relay {
 	struct cord cord;
 	/** Replica connection */
 	struct ev_io io;
-	/* Request sync */
+	/** Request sync */
 	uint64_t sync;
+	/** Recovery instance to read xlog from the disk */
 	struct recovery *r;
+	/** Xstream argument to recovery */
 	struct xstream stream;
+	/** Vclock to stop playing xlogs */
 	struct vclock stop_vclock;
+	/** Directory rescan delay for recovery */
 	ev_tstamp wal_dir_rescan_delay;
+	/** Remote replica id */
 	uint32_t replica_id;
-	/** Current vclock sent by relay */
-	struct vclock vclock;
+
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
-	/** Pipe to send relay status to tx */
+	/** A pipe from 'relay' thread to 'tx' */
 	struct cpipe tx_pipe;
-	/** Pipe to send replies from tx */
+	/** A pipe from 'tx' thread to 'relay' */
 	struct cpipe relay_pipe;
-	/** Relay name, used as relay endpoint name */
-	char name[FIBER_NAME_MAX];
 	/** Status message */
 	struct relay_status_msg status_msg;
-	/** The condition will be signaled if status message was replied */
+	/** A condition to signal when status message is handled. */
 	struct ipc_cond status_cond;
-	/** The condition will be signaled if relay want to exit. */
-	struct ipc_cond will_exit_cond;
 	/** Relay exit orchestration message */
 	struct relay_exit_msg exit_msg;
+
+	struct {
+		/* Align to prevent false-sharing with TX thread */
+		alignas(CACHELINE_SIZE)
+		/** Current vclock sent by relay */
+		struct vclock vclock;
+		/** The condition will be signaled if relay want to exit. */
+		struct ipc_cond exit_cond;
+	} tx;
 };
 
 /**

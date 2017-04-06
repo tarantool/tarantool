@@ -45,8 +45,8 @@
 #include "errinj.h"
 #include "xrow_io.h"
 
-/* Report relay status at least one time per second */
-#define RELAY_REPORT_PERIOD 1
+/** Report relay status to tx at least with this interval */
+static const int RELAY_REPORT_INTERVAL = 1;
 
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
@@ -151,10 +151,10 @@ relay_status_updated(struct cmsg *msg)
 }
 
 static void
-relay_status_update(struct cmsg *msg)
+tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
-	vclock_copy(&status->relay->vclock, &status->vclock);
+	vclock_copy(&status->relay->tx.vclock, &status->vclock);
 	static const struct cmsg_hop route[] = {
 		{relay_status_updated, NULL}
 	};
@@ -163,10 +163,10 @@ relay_status_update(struct cmsg *msg)
 }
 
 static void
-relay_will_exit_cb(struct cmsg *msg)
+tx_exit_cb(struct cmsg *msg)
 {
 	struct relay_exit_msg *m = (struct relay_exit_msg *)msg;
-	ipc_cond_signal(&m->relay->will_exit_cond);
+	ipc_cond_signal(&m->relay->tx.exit_cond);
 }
 
 static void
@@ -179,7 +179,7 @@ relay_cbus_detach(struct relay *relay)
 	}
 
 	static const struct cmsg_hop exit_route[] = {
-		{relay_will_exit_cb, NULL}
+		{tx_exit_cb, NULL}
 	};
 	cmsg_init(&relay->exit_msg.msg, exit_route);
 	relay->exit_msg.relay = relay;
@@ -207,15 +207,18 @@ relay_subscribe_f(va_list ap)
 	coeio_enable();
 	relay->stream.write = relay_send_row;
 	ipc_cond_create(&relay->status_cond);
-	cbus_endpoint_create(&relay->endpoint, relay->name, fiber_schedule_cb, fiber());
+	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
+			     fiber_schedule_cb, fiber());
 	/*
-	 * We use prio route because our code will never yield but
-	 * just update status
+	 * Use tx_prio router because our handler never yields and
+	 * ust updates struct relay members.
 	 */
 	cpipe_create(&relay->tx_pipe, "tx_prio");
 
-	/* Create guard to destroy relay cbus linkage if any */
-	auto cbus_guard = make_scoped_guard([&]{relay_cbus_detach(relay);});
+	/* Create guard to deatach relay from cbus on exit */
+	auto cbus_guard = make_scoped_guard([&]{
+		relay_cbus_detach(relay);
+	});
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
@@ -248,12 +251,12 @@ relay_subscribe_f(va_list ap)
 	trigger_add(&r->watcher->on_stop, &on_follow_error);
 	while (! fiber_is_dead(r->watcher)) {
 		ev_io_start(loop(), &read_ev);
-		fiber_yield_timeout(RELAY_REPORT_PERIOD);
+		fiber_yield_timeout(RELAY_REPORT_INTERVAL);
 		ev_io_stop(loop(), &read_ev);
 		/*
-		 * The fiber can be woken by io read event, status
-		 * messaging timeout or status message reply.
-		 * First hadnle cbus incomming messages.
+		 * The fiber can be woken by IO read event, by the timeout of
+		 * status messaging or by an acknowledge to status message.
+		 * Handle cbus messages first.
 		 */
 		cbus_process(&relay->endpoint);
 
@@ -274,7 +277,7 @@ relay_subscribe_f(va_list ap)
 				   &r->vclock) == 0)
 			continue;
 		static const struct cmsg_hop route[] = {
-			{relay_status_update, NULL}
+			{tx_status_update, NULL}
 		};
 		cmsg_init(&relay->status_msg.msg, route);
 		vclock_copy(&relay->status_msg.vclock, &r->vclock);
@@ -318,16 +321,17 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	});
 
 	struct cord cord;
-	snprintf(relay.name, sizeof(relay.name), "relay: %i", replica->id);
-	ipc_cond_create(&relay.will_exit_cond);
-	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
-	cpipe_create(&relay.relay_pipe, relay.name);
+	char name[FIBER_NAME_MAX];
+	snprintf(name, sizeof(name), "relay: %u", replica->id);
+	ipc_cond_create(&relay.tx.exit_cond);
+	cord_costart(&cord, name, relay_subscribe_f, &relay);
+	cpipe_create(&relay.relay_pipe, name);
 	/*
 	 * When relay will exit then send a message with exit condition
 	 * signal.
 	 */
-	ipc_cond_wait(&relay.will_exit_cond);
-	ipc_cond_destroy(&relay.will_exit_cond);
+	ipc_cond_wait(&relay.tx.exit_cond);
+	ipc_cond_destroy(&relay.tx.exit_cond);
 	/*
 	 * Destroy cpipe so relay fiber can destroy corresponding
 	 * endpoint and exit.
