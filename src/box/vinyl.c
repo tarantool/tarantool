@@ -118,6 +118,14 @@ struct vy_conf {
 	double bloom_fpr;
 };
 
+/** Part of vinyl environment for run read/write */
+struct vy_run_env {
+	/** Mempool for struct vy_page_read_task */
+	struct mempool read_task_pool;
+	/** Key for thread-local ZSTD context */
+	pthread_key_t zdctx_key;
+};
+
 struct vy_env {
 	/** Recovery status */
 	enum vy_status status;
@@ -137,18 +145,16 @@ struct vy_env {
 	struct tuple_format *key_format;
 	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
-	/** Mempool for struct vy_page_read_task */
-	struct mempool      read_task_pool;
 	/** Allocator for tuples */
 	struct lsregion     allocator;
-	/** Key for thread-local ZSTD context */
-	pthread_key_t       zdctx_key;
 	/** Memory quota */
 	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
 	ev_timer            quota_timer;
-	/** Enviroment for cache subsystem */
+	/** Environment for cache subsystem */
 	struct vy_cache_env cache_env;
+	/** Environment for run subsystem */
+	struct vy_run_env run_env;
 	/** Local recovery context. */
 	struct vy_recovery *recovery;
 };
@@ -1028,8 +1034,8 @@ struct vy_page_read_task {
 	struct vy_page_info page_info;
 	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
-	/** vy_env - contains environment with task mempool */
-	struct vy_env *env;
+	/** vy_run_env - contains environment with task mempool */
+	struct vy_run_env *run_env;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
 	/** [out] result code */
@@ -2351,6 +2357,11 @@ const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_LSN) |
 
 enum { VY_BLOOM_VERSION = 0 };
 
+/**
+ * Calculate the size on disk that is needed to store give bloom filter.
+ * @param bloom - storing bloom filter.
+ * @return - calculated size.
+ */
 static size_t
 vy_run_bloom_encode_size(const struct bloom *bloom)
 {
@@ -2362,8 +2373,15 @@ vy_run_bloom_encode_size(const struct bloom *bloom)
 	return size;
 }
 
+/**
+ * Write bloom filter to given buffer.
+ * The buffer must have at least vy_run_bloom_encode_size()
+ * @param bloom - a bloom filter to write.
+ * @param buffer - a buffer to write to.
+ * @return - buffer + number of bytes written.
+ */
 char *
-vy_run_bloom_encode(char *buffer, const struct bloom *bloom)
+vy_run_bloom_encode(const struct bloom *bloom, char *buffer)
 {
 	char *pos = buffer;
 	pos = mp_encode_array(pos, 4);
@@ -2375,8 +2393,15 @@ vy_run_bloom_encode(char *buffer, const struct bloom *bloom)
 	return pos;
 }
 
+/**
+ * Read bloom filter from given buffer.
+ * @param bloom - a bloom filter to read.
+ * @param buffer[in/out] - a buffer to read from.
+ *  The pointer is incremented on the number of bytes read.
+ * @return - 0 on success or -1 on format/memory error
+ */
 int
-vy_run_bloom_decode(const char **buffer, struct bloom *bloom)
+vy_run_bloom_decode(struct bloom *bloom, const char **buffer)
 {
 	const char **pos = buffer;
 	memset(bloom, 0, sizeof(*bloom));
@@ -2450,7 +2475,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->count);
 	pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
-	pos = vy_run_bloom_encode(pos, &run_info->bloom);
+	pos = vy_run_bloom_encode(&run_info->bloom, pos);
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	xrow->bodycnt = 1;
 	xrow->type = VY_INDEX_RUN_INFO;
@@ -2493,7 +2518,7 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			run_info->count = mp_decode_uint(&pos);
 			break;
 		case VY_RUN_INFO_BLOOM:
-			if (vy_run_bloom_decode(&pos, &run_info->bloom) == 0)
+			if (vy_run_bloom_decode(&run_info->bloom, &pos) == 0)
 				run_info->has_bloom = true;
 			else
 				return -1;
@@ -2623,13 +2648,19 @@ fail:
 	return NULL;
 }
 
+/**
+ * Load run from disk
+ * @param run - run to laod
+ * @param index_path - path to index part of the run
+ * @param run_path - path to run part of the run
+ * @return - 0 on sucess, -1 on fail
+ */
 static int
-vy_run_recover(struct vy_run *run, const char *dir)
+vy_run_recover(struct vy_run *run, const char *index_path,
+	       const char *run_path)
 {
-	char path[PATH_MAX];
-	vy_run_snprint_path(path, sizeof(path), dir, run->id, VY_FILE_INDEX);
 	struct xlog_cursor cursor;
-	if (xlog_cursor_open(&cursor, path))
+	if (xlog_cursor_open(&cursor, index_path))
 		goto fail;
 
 	struct xlog_meta *meta = &cursor.meta;
@@ -2701,8 +2732,7 @@ vy_run_recover(struct vy_run *run, const char *dir)
 	xlog_cursor_close(&cursor, false);
 
 	/* Prepare data file for reading. */
-	vy_run_snprint_path(path, sizeof(path), dir, run->id, VY_FILE_RUN);
-	if (xlog_cursor_open(&cursor, path))
+	if (xlog_cursor_open(&cursor, run_path))
 		goto fail;
 	meta = &cursor.meta;
 	if (strcmp(meta->filetype, XLOG_META_TYPE_RUN) != 0) {
@@ -3315,7 +3345,13 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			return -1;
-		if (vy_run_recover(run, index->path) != 0) {
+		char index_path[PATH_MAX];
+		vy_run_snprint_path(index_path, sizeof(index_path),
+				    index->path, run->id, VY_FILE_INDEX);
+		char run_path[PATH_MAX];
+		vy_run_snprint_path(run_path, sizeof(run_path),
+				    index->path, run->id, VY_FILE_RUN);
+		if (vy_run_recover(run, index_path, run_path) != 0) {
 			vy_run_unref(run);
 			return -1;
 		}
@@ -7459,6 +7495,29 @@ vy_squash_queue_new(void);
 static void
 vy_squash_queue_delete(struct vy_squash_queue *q);
 
+/**
+ * Initialize vinyl run environment
+ */
+void
+vy_run_env_create(struct vy_run_env *env)
+{
+	tt_pthread_key_create(&env->zdctx_key, vy_free_zdctx);
+
+	struct slab_cache *slab_cache = cord_slab_cache();
+	mempool_create(&env->read_task_pool, slab_cache,
+		       sizeof(struct vy_page_read_task));
+}
+
+/**
+ * Destroy vinyl run environment
+ */
+void
+vy_run_env_destroy(struct vy_run_env *env)
+{
+	mempool_destroy(&env->read_task_pool);
+	tt_pthread_key_delete(env->zdctx_key);
+}
+
 struct vy_env *
 vy_env_new(void)
 {
@@ -7494,10 +7553,7 @@ vy_env_new(void)
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
 	               sizeof(struct vy_cursor));
-	mempool_create(&e->read_task_pool, slab_cache,
-		       sizeof(struct vy_page_read_task));
 	lsregion_create(&e->allocator, slab_cache->arena);
-	tt_pthread_key_create(&e->zdctx_key, vy_free_zdctx);
 
 	vy_quota_init(&e->quota, vy_scheduler_quota_cb, e->scheduler);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
@@ -7505,6 +7561,7 @@ vy_env_new(void)
 	ev_timer_start(loop(), &e->quota_timer);
 	vy_cache_env_create(&e->cache_env, slab_cache,
 			    e->conf->cache);
+	vy_run_env_create(&e->run_env);
 	vy_log_init(e->conf->path);
 	return e;
 error_key_format:
@@ -7536,9 +7593,8 @@ vy_env_delete(struct vy_env *e)
 	vy_stat_delete(e->stat);
 	tuple_format_ref(e->key_format, -1);
 	mempool_destroy(&e->cursor_pool);
-	mempool_destroy(&e->read_task_pool);
+	vy_run_env_destroy(&e->run_env);
 	lsregion_destroy(&e->allocator);
-	tt_pthread_key_delete(e->zdctx_key);
 	vy_cache_env_destroy(&e->cache_env);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);
@@ -7668,14 +7724,16 @@ struct vy_run_iterator {
 	struct vy_stmt_iterator base;
 	/** Usage statistics */
 	struct vy_iterator_stat *stat;
-	/** Vinyl environment. */
-	struct vy_env *env;
+	/** Vinyl run environment. */
+	struct vy_run_env *run_env;
 
 	/* Members needed for memory allocation and disk access */
 	/** Index key definition used for storing statements on disk. */
 	const struct key_def *key_def;
 	/** Index key definition defined by the user. */
 	const struct key_def *user_key_def;
+	/** Should the iterator use coio task for reading or not */
+	bool coio_read;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
 	 * pages.
@@ -7721,9 +7779,9 @@ struct vy_run_iterator {
 };
 
 static void
-vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_env *env, struct vy_run *run,
-		     enum iterator_type iterator_type,
+vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
+		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
@@ -7995,7 +8053,7 @@ error:
  * Get thread local zstd decompression context
  */
 static ZSTD_DStream *
-vy_env_get_zdctx(struct vy_env *env)
+vy_env_get_zdctx(struct vy_run_env *env)
 {
 	ZSTD_DStream *zdctx = tt_pthread_getspecific(env->zdctx_key);
 	if (zdctx == NULL) {
@@ -8017,7 +8075,7 @@ static int
 vy_page_read_cb(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->env);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run_env);
 	if (zdctx == NULL)
 		return -1;
 	task->rc = vy_page_read(task->page, &task->page_info,
@@ -8035,7 +8093,7 @@ vy_page_read_cb_free(struct coio_task *base)
 	vy_page_delete(task->page);
 	vy_run_unref(task->run);
 	coio_task_destroy(&task->base);
-	mempool_free(&task->env->read_task_pool, task);
+	mempool_free(&task->run_env->read_task_pool, task);
 	return 0;
 }
 
@@ -8050,8 +8108,6 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
-	struct vy_env *env = itr->env;
-
 	/* Check cache */
 	*result = vy_run_iterator_cache_get(itr, page_no);
 	if (*result != NULL)
@@ -8065,7 +8121,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 	/* Read page data from the disk */
 	int rc;
-	if (cord_is_main() && env->status == VINYL_ONLINE) {
+	if (itr->coio_read) {
 		/*
 		 * Use coeio for TX thread **after recovery**.
 		 * Please note that vy_run can go away after yield.
@@ -8075,7 +8131,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/* Allocate a coio task */
 		struct vy_page_read_task *task =
-			(struct vy_page_read_task *)mempool_alloc(&env->read_task_pool);
+			(struct vy_page_read_task *)mempool_alloc(&itr->run_env->read_task_pool);
 		if (task == NULL) {
 			diag_set(OutOfMemory, sizeof(*task), "malloc",
 				 "vy_page_read_task");
@@ -8092,7 +8148,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->run = itr->run;
 		vy_run_ref(task->run);
 		task->page_info = *page_info;
-		task->env = env;
+		task->run_env = itr->run_env;
 		task->page = page;
 
 		/* Post task to coeio */
@@ -8108,7 +8164,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		}
 
 		coio_task_destroy(&task->base);
-		mempool_free(&env->read_task_pool, task);
+		mempool_free(&task->run_env->read_task_pool, task);
 
 		if (vy_run_unref(itr->run)) {
 			/*
@@ -8124,7 +8180,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		ZSTD_DStream *zdctx = vy_env_get_zdctx(env);
+		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->run_env);
 		if (zdctx == NULL) {
 			vy_page_delete(page);
 			return -1;
@@ -8535,9 +8591,9 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  * Open the iterator.
  */
 static void
-vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_env *env, struct vy_run *run,
-		     enum iterator_type iterator_type,
+vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
+		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run *run, enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
@@ -8547,13 +8603,14 @@ vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
 {
 	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
-	itr->env = env;
 	itr->key_def = key_def;
 	itr->user_key_def = user_key_def;
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
+	itr->run_env = run_env;
 	itr->run = run;
+	itr->coio_read = coio_read;
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
@@ -9847,8 +9904,8 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run)
 	if (src == NULL)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
-	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
-			     wi->env, run, ITER_GE, wi->key, &vlsn,
+	vy_run_iterator_open(&src->run_iterator, false, &wi->run_iterator_stat,
+			     &wi->env->run_env, run, ITER_GE, wi->key, &vlsn,
 			     wi->key_def, wi->user_key_def,
 			     wi->surrogate_format, wi->upsert_format,
 			     wi->is_primary);
@@ -10078,11 +10135,13 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	 */
 	if (itr->index->space_index_count == 1)
 		format = itr->index->space_format;
+	bool coio_read = cord_is_main() && itr->index->env->status == VINYL_ONLINE;
 	rlist_foreach_entry(run, &itr->curr_range->runs, in_range) {
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
-		vy_run_iterator_open(&sub_src->run_iterator, stat,
-				     itr->index->env, run, itr->iterator_type,
+		vy_run_iterator_open(&sub_src->run_iterator, coio_read, stat,
+				     &itr->index->env->run_env,
+				     run, itr->iterator_type,
 				     itr->key, itr->vlsn,
 				     &itr->index->index_def->key_def,
 				     &itr->index->user_index_def->key_def,
@@ -10375,8 +10434,10 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 
 /** Argument passed to vy_join_cb(). */
 struct vy_join_arg {
-	/** Vinyl environment. */
-	struct vy_env *env;
+	/** Vinyl run environment. */
+	struct vy_run_env *env;
+	/* path to vinyl_dir */
+	char *path;
 	/** Recovery context to relay. */
 	struct vy_recovery *recovery;
 	/** Stream to relay statements to. */
@@ -10409,8 +10470,7 @@ vy_join_cb(const struct vy_log_record *record, void *cb_arg)
 	if (record->type == VY_LOG_CREATE_INDEX) {
 		arg->space_id = record->space_id;
 		arg->index_id = record->index_id;
-		vy_index_snprint_path(arg->index_path, PATH_MAX,
-				      arg->env->conf->path,
+		vy_index_snprint_path(arg->index_path, PATH_MAX, arg->path,
 				      arg->space_id, arg->index_id);
 	}
 
@@ -10434,7 +10494,13 @@ vy_join_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_run *run = vy_run_new(record->run_id);
 	if (run == NULL)
 		goto out;
-	if (vy_run_recover(run, arg->index_path) != 0)
+	char index_path[PATH_MAX];
+	vy_run_snprint_path(index_path, sizeof(index_path),
+			    arg->index_path, run->id, VY_FILE_INDEX);
+	char run_path[PATH_MAX];
+	vy_run_snprint_path(run_path, sizeof(run_path),
+			    arg->index_path, run->id, VY_FILE_RUN);
+	if (vy_run_recover(run, index_path, run_path) != 0)
 		goto out_free_run;
 
 	ZSTD_DStream *zdctx = vy_env_get_zdctx(arg->env);
@@ -10484,7 +10550,8 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 {
 	(void)vclock;
 	struct vy_join_arg arg = {
-		.env = env,
+		.env = &env->run_env,
+		.path = env->conf->path,
 		.stream = stream,
 	};
 
