@@ -863,8 +863,8 @@ space = box.schema.space.create('test')
 ...
 pk = space:create_index('primary', { parts = {1, 'any'} }) --
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''test'': unknown field
-    type'
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
 ...
 space:insert({1})                                          -- must fail
 ---
