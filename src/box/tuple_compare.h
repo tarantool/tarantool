@@ -121,6 +121,21 @@ int
 box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
 		  const box_key_def_t *key_def);
 
+/**
+ * @brief Compare tuple with key using the key definition.
+ * @param tuple tuple
+ * @param key key with MessagePack array header
+ * @param key_def key definition
+ *
+ * @retval 0  if key_fields(tuple) == parts(key)
+ * @retval <0 if key_fields(tuple) < parts(key)
+ * @retval >0 if key_fields(tuple) > parts(key)
+ */
+
+int
+box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
+			   const box_key_def_t *key_def);
+
 /** \endcond public */
 
 #if defined(__cplusplus)

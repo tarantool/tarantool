@@ -329,10 +329,18 @@ test_key_def_api(lua_State *L)
 	buf_end = mp_encode_uint(buf_end, 6);
 	box_tuple_t *tuple2 = box_tuple_new(format, buf, buf_end);
 
+	/* Enocode key */
+	buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 2);
+	buf_end = mp_encode_uint(buf_end, 6);
+	buf_end = mp_encode_str(buf_end, "aa", 2);
+
 	bool cmp1 = box_tuple_compare(tuple1, tuple2, key_defs[0]) > 0;
 	bool cmp2 = box_tuple_compare(tuple1, tuple2, key_defs[1]) < 0;
+	bool cmp3 = box_tuple_compare_with_key(tuple1, buf, key_defs[0]) > 0;
+	bool cmp4 = box_tuple_compare_with_key(tuple2, buf, key_defs[0]) == 0;
 	box_tuple_unref(tuple1);
-	lua_pushboolean(L, cmp1 && cmp2);
+	lua_pushboolean(L, cmp1 && cmp2 && cmp3 && cmp4);
 	box_tuple_format_unref(format);
 	box_key_def_delete(key_defs[0]);
 	box_key_def_delete(key_defs[1]);
