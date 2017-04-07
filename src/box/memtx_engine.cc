@@ -32,7 +32,6 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
-#include "coeio.h"
 #include "coeio_file.h"
 #include "scoped_guard.h"
 
@@ -132,8 +131,6 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 
 	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
-	m_snap_dir.force_recovery = force_recovery;
-	xdir_scan_xc(&m_snap_dir);
 }
 
 MemtxEngine::~MemtxEngine()
@@ -162,12 +159,11 @@ MemtxEngine::recoverSnapshot(const struct vclock *vclock)
 
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&cursor, &row,
-				   m_snap_dir.force_recovery) == 0) {
+	while (xlog_cursor_next_xc(&cursor, &row, m_force_recovery) == 0) {
 		try {
 			recoverSnapshotRow(&row);
 		} catch (ClientError *e) {
-			if (!m_snap_dir.force_recovery)
+			if (!m_force_recovery)
 				throw;
 			say_error("can't apply row: ");
 			e->log();
@@ -229,8 +225,7 @@ MemtxEngine::beginInitialRecovery(struct vclock *vclock)
 	 * recovery mode. Enable all keys on start, to detect and
 	 * discard duplicates in the snapshot.
 	 */
-	m_state = (m_snap_dir.force_recovery?
-		   MEMTX_OK : MEMTX_INITIAL_RECOVERY);
+	m_state = (m_force_recovery ? MEMTX_OK : MEMTX_INITIAL_RECOVERY);
 }
 
 void
@@ -652,7 +647,7 @@ struct checkpoint {
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
-	struct vclock *vclock;
+	struct vclock vclock;
 	struct xdir dir;
 };
 
@@ -665,11 +660,7 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
-	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
-	if (ckpt->vclock == NULL)
-		tnt_raise(OutOfMemory, sizeof(*ckpt->vclock),
-			  "malloc", "vclock");
-	vclock_create(ckpt->vclock);
+	vclock_create(&ckpt->vclock);
 }
 
 static void
@@ -683,7 +674,6 @@ checkpoint_destroy(struct checkpoint *ckpt)
 	}
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	xdir_destroy(&ckpt->dir);
-	free(ckpt->vclock);
 }
 
 
@@ -715,7 +705,7 @@ checkpoint_f(va_list ap)
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, ckpt->vclock) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
 		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
@@ -756,7 +746,7 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
 
-	vclock_copy(m_checkpoint->vclock, vclock);
+	vclock_copy(&m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",
 			 checkpoint_f, m_checkpoint)) {
@@ -784,7 +774,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 
 	memtx_tuple_end_snapshot();
 
-	int64_t lsn = vclock_sum(m_checkpoint->vclock);
+	int64_t lsn = vclock_sum(&m_checkpoint->vclock);
 	struct xdir *dir = &m_checkpoint->dir;
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
@@ -795,8 +785,6 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
-	xdir_add_vclock(&m_snap_dir, m_checkpoint->vclock);
-	m_checkpoint->vclock = NULL;
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
@@ -819,27 +807,12 @@ MemtxEngine::abortCheckpoint()
 	/** Remove garbage .inprogress file. */
 	char *filename =
 		xdir_format_filename(&m_checkpoint->dir,
-				     vclock_sum(m_checkpoint->vclock),
+				     vclock_sum(&m_checkpoint->vclock),
 				     INPROGRESS);
 	(void) coeio_unlink(filename);
 
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
-}
-
-static ssize_t
-memtx_collect_garbage_f(va_list ap)
-{
-	struct xdir *dir = va_arg(ap, struct xdir *);
-	int64_t lsn = va_arg(ap, int64_t);
-	xdir_collect_garbage(dir, lsn);
-	return 0;
-}
-
-void
-MemtxEngine::collectGarbage(int64_t lsn)
-{
-	coio_call(memtx_collect_garbage_f, &m_snap_dir, lsn);
 }
 
 int

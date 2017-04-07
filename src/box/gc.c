@@ -30,11 +30,14 @@
  */
 #include "gc.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "coeio_file.h"
 #include "diag.h"
 #include "errcode.h"
+#include "say.h"
 #include "vclock.h"
 #include "xlog.h"
 
@@ -48,6 +51,8 @@ struct gc_state {
 	int64_t signature;
 	/** Uncollected checkpoints, see checkpoint_info. */
 	vclockset_t checkpoints;
+	/** Snapshot directory. */
+	struct xdir snap_dir;
 };
 static struct gc_state gc;
 
@@ -66,21 +71,19 @@ gc_init(const char *snap_dirname)
 {
 	gc.signature = -1;
 	vclockset_new(&gc.checkpoints);
+	xdir_create(&gc.snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 
-	struct xdir dir;
-	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID);
-	if (xdir_scan(&dir) < 0)
+	if (xdir_scan(&gc.snap_dir) < 0)
 		goto fail;
 
-	for (struct vclock *vclock = vclockset_first(&dir.index);
-	     vclock != NULL; vclock = vclockset_next(&dir.index, vclock)) {
+	struct vclock *vclock;
+	for (vclock = vclockset_first(&gc.snap_dir.index); vclock != NULL;
+	     vclock = vclockset_next(&gc.snap_dir.index, vclock)) {
 		if (gc_add_checkpoint(vclock) < 0)
 			goto fail;
 	}
-	xdir_destroy(&dir);
 	return 0;
 fail:
-	xdir_destroy(&dir);
 	gc_free();
 	return -1;
 }
@@ -97,6 +100,7 @@ gc_free(void)
 		free(cpt);
 		vclock = next;
 	}
+	xdir_destroy(&gc.snap_dir);
 }
 
 int
@@ -183,6 +187,14 @@ gc_run(int64_t signature)
 				struct checkpoint_info, vclock);
 		if (cpt->refs > 0)
 			break; /* checkpoint still in use */
+
+		const char *filename = xdir_format_filename(&gc.snap_dir,
+						vclock_sum(vclock), NONE);
+		say_info("removing %s", filename);
+		if (coeio_unlink(filename) < 0 && errno != ENOENT) {
+			say_syserror("error while removing %s", filename);
+			break;
+		}
 
 		struct vclock *next = vclockset_next(&gc.checkpoints, vclock);
 		vclockset_remove(&gc.checkpoints, vclock);
