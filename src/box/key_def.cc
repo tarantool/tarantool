@@ -344,25 +344,25 @@ index_def_check(struct index_def *index_def)
 }
 
 void
-index_def_set_part(struct index_def *def, uint32_t part_no,
-		   uint32_t fieldno, enum field_type type)
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type)
 {
-	assert(part_no < def->key_def.part_count);
+	assert(part_no < def->part_count);
 	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
-	def->key_def.parts[part_no].fieldno = fieldno;
-	def->key_def.parts[part_no].type = type;
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
 	/**
 	 * When all parts are set, initialize the tuple
 	 * comparator function.
 	 */
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
-	for (uint32_t i = 0; i < def->key_def.part_count; i++) {
-		if (def->key_def.parts[i].type == FIELD_TYPE_ANY)
+	for (uint32_t i = 0; i < def->part_count; i++) {
+		if (def->parts[i].type == FIELD_TYPE_ANY)
 			all_parts_set = false;
 	}
 	if (all_parts_set)
-		key_def_set_cmp(&def->key_def);
+		key_def_set_cmp(def);
 }
 
 const struct key_part *
@@ -403,7 +403,8 @@ index_def_merge(const struct index_def *first, const struct index_def *second)
 	part = first->key_def.parts;
 	end = part + first->key_def.part_count;
 	for (; part != end; part++)
-	     index_def_set_part(new_def, pos++, part->fieldno, part->type);
+	     key_def_set_part(&new_def->key_def, pos++,
+			      part->fieldno, part->type);
 
 	/* Set-append second key def's part to the new key def. */
 	part = second->key_def.parts;
@@ -411,7 +412,8 @@ index_def_merge(const struct index_def *first, const struct index_def *second)
 	for (; part != end; part++) {
 		if (key_def_find(&first->key_def, part->fieldno))
 			continue;
-		index_def_set_part(new_def, pos++, part->fieldno, part->type);
+		key_def_set_part(&new_def->key_def, pos++,
+				 part->fieldno, part->type);
 	}
 	return new_def;
 }

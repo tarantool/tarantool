@@ -394,7 +394,7 @@ index_def_fill_parts(struct index_def *index_def, const char *parts,
 				  space_name_by_id(index_def->space_id),
 				  "unknown field type");
 		}
-		index_def_set_part(index_def, i, field_no, field_type);
+		key_def_set_part(&index_def->key_def, i, field_no, field_type);
 	}
 }
 
@@ -424,7 +424,7 @@ index_def_fill_parts_165(struct index_def *index_def, const char *parts,
 				  space_name_by_id(index_def->space_id),
 				  "unknown field type");
 		}
-		index_def_set_part(index_def, i, field_no, field_type);
+		key_def_set_part(&index_def->key_def, i, field_no, field_type);
 	}
 }
 

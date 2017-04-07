@@ -457,8 +457,8 @@ index_def_copy(struct index_def *to, const struct index_def *from)
  * @pre part_no < part_count
  */
 void
-index_def_set_part(struct index_def *def, uint32_t part_no,
-		   uint32_t fieldno, enum field_type type);
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.
