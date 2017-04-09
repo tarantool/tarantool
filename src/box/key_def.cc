@@ -368,6 +368,51 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 }
 
 int
+key_def_snprint(char *buf, int size, const struct key_def *key_def)
+{
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "[");
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		assert(part->type < field_type_MAX);
+		SNPRINT(total, snprintf, buf, size, "%d, '%s'",
+			(int)part->fieldno, field_type_strs[part->type]);
+		if (i < key_def->part_count - 1)
+			SNPRINT(total, snprintf, buf, size, ", ");
+	}
+	SNPRINT(total, snprintf, buf, size, "]");
+	return total;
+}
+
+size_t
+key_def_sizeof_parts(const struct key_def *key_def)
+{
+	size_t size = 0;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		size += mp_sizeof_array(2);
+		size += mp_sizeof_uint(part->fieldno);
+		assert(part->type < field_type_MAX);
+		size += mp_sizeof_str(strlen(field_type_strs[part->type]));
+	}
+	return size;
+}
+
+char *
+key_def_encode_parts(char *data, const struct key_def *key_def)
+{
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		data = mp_encode_array(data, 2);
+		data = mp_encode_uint(data, part->fieldno);
+		assert(part->type < field_type_MAX);
+		const char *type_str = field_type_strs[part->type];
+		data = mp_encode_str(data, type_str, strlen(type_str));
+	}
+	return data;
+}
+
+int
 key_def_decode_parts(struct key_def *key_def, const char **data)
 {
 	char buf[BOX_NAME_MAX];

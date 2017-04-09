@@ -48,6 +48,7 @@
 #include "errcode.h"
 #include "fiber.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
+#include "key_def.h"
 #include "latch.h"
 #include "replication.h" /* INSTANCE_UUID */
 #include "say.h"
@@ -70,7 +71,8 @@ enum vy_log_key {
 	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_PATH			= 7,
-	VY_LOG_IS_LEVEL_ZERO		= 8
+	VY_LOG_IS_LEVEL_ZERO		= 8,
+	VY_LOG_KEY_DEF			= 9,
 };
 
 /**
@@ -81,7 +83,8 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_INDEX_ID) |
 					  (1 << VY_LOG_KEY_SPACE_ID) |
-					  (1 << VY_LOG_KEY_PATH),
+					  (1 << VY_LOG_KEY_PATH) |
+					  (1 << VY_LOG_KEY_DEF),
 	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
 	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
@@ -107,7 +110,8 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_PATH]		= "path",
-	[VY_LOG_IS_LEVEL_ZERO]		= "is_level_zero"
+	[VY_LOG_IS_LEVEL_ZERO]		= "is_level_zero",
+	[VY_LOG_KEY_DEF]		= "key_def",
 };
 
 /** vy_log_type -> human readable name. */
@@ -195,6 +199,8 @@ struct vy_index_recovery_info {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
+	/** Index key definition. */
+	struct key_def *key_def;
 	/** Path to the index. Empty string if default. */
 	char *path;
 	/** True if the index was dropped. */
@@ -318,6 +324,12 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%.*s, ",
 			vy_log_key_name[VY_LOG_KEY_PATH],
 			record->path_len, record->path);
+	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
+		SNPRINT(total, snprintf, buf, size, "%s=",
+			vy_log_key_name[VY_LOG_KEY_DEF]);
+		SNPRINT(total, key_def_snprint, buf, size, record->key_def);
+		SNPRINT(total, snprintf, buf, size, ", ");
+	}
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -422,6 +434,14 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_bool(record->is_level_zero);
 		n_keys++;
 	}
+	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
+		const struct key_def *key_def = record->key_def;
+		assert(key_def != NULL);
+		size += mp_sizeof_uint(VY_LOG_KEY_DEF);
+		size += mp_sizeof_array(key_def->part_count);
+		size += key_def_sizeof_parts(key_def);
+		n_keys++;
+	}
 	size += mp_sizeof_map(n_keys);
 
 	/*
@@ -485,6 +505,12 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (key_mask & (1 << VY_LOG_IS_LEVEL_ZERO)) {
 		pos = mp_encode_uint(pos, VY_LOG_IS_LEVEL_ZERO);
 		pos = mp_encode_bool(pos, record->is_level_zero);
+	}
+	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
+		const struct key_def *key_def = record->key_def;
+		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
+		pos = mp_encode_array(pos, key_def->part_count);
+		pos = key_def_encode_parts(pos, key_def);
 	}
 	assert(pos == tuple + size);
 
@@ -563,6 +589,25 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_IS_LEVEL_ZERO:
 			record->is_level_zero = mp_decode_bool(&pos);
 			break;
+		case VY_LOG_KEY_DEF: {
+			uint32_t part_count = mp_decode_array(&pos);
+			struct key_def *key_def = region_alloc(&fiber()->gc,
+						key_def_sizeof(part_count));
+			if (key_def == NULL) {
+				diag_set(OutOfMemory,
+					 key_def_sizeof(part_count),
+					 "region", "struct key_def");
+				return -1;
+			}
+			memset(key_def, 0, key_def_sizeof(part_count));
+			key_def->part_count = part_count;
+			if (key_def_decode_parts(key_def, &pos) != 0) {
+				error_log(diag_last_error(diag_get()));
+				goto fail;
+			}
+			record->key_def = key_def;
+			break;
+		}
 		default:
 			goto fail;
 		}
@@ -1079,17 +1124,18 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
 static int
 vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 			 int64_t index_lsn, uint32_t index_id,
-			 uint32_t space_id, const char *path,
-			 uint32_t path_len)
+			 uint32_t space_id, const struct key_def *key_def,
+			 const char *path, uint32_t path_len)
 {
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl index id");
 		return -1;
 	}
-	struct vy_index_recovery_info *index = malloc(sizeof(*index) +
-						      path_len + 1);
+	size_t size = sizeof(struct vy_index_recovery_info) +
+		key_def_sizeof(key_def->part_count) + path_len + 1;
+	struct vy_index_recovery_info *index = malloc(size);
 	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index) + path_len + 1,
+		diag_set(OutOfMemory, size,
 			 "malloc", "struct vy_index_recovery_info");
 		return -1;
 	}
@@ -1103,7 +1149,10 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 	index->index_lsn = index_lsn;
 	index->index_id = index_id;
 	index->space_id = space_id;
-	index->path = (void *)index + sizeof(*index);
+	index->key_def = (void *)index + sizeof(*index);
+	memcpy(index->key_def, key_def, key_def_sizeof(key_def->part_count));
+	index->path = (void *)index->key_def +
+		key_def_sizeof(key_def->part_count);
 	memcpy(index->path, path, path_len);
 	index->path[path_len] = '\0';
 	index->is_dropped = false;
@@ -1402,7 +1451,8 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_create_index(recovery,
 				record->signature, record->index_lsn,
 				record->index_id, record->space_id,
-				record->path, record->path_len);
+				record->key_def, record->path,
+				record->path_len);
 		break;
 	case VY_LOG_DROP_INDEX:
 		rc = vy_recovery_drop_index(recovery, record->signature,
@@ -1490,7 +1540,9 @@ vy_recovery_new_f(va_list ap)
 		rc = vy_recovery_process_record(recovery, &record);
 		if (rc < 0)
 			break;
+		fiber_gc();
 	}
+	fiber_gc();
 	if (rc < 0)
 		goto fail_close;
 
@@ -1576,6 +1628,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 	record.index_lsn = index->index_lsn;
 	record.index_id = index->index_id;
 	record.space_id = index->space_id;
+	record.key_def = index->key_def;
 	record.path = index->path;
 	record.path_len = strlen(index->path);
 

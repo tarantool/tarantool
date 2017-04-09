@@ -420,6 +420,12 @@ typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
 
 static inline size_t
+key_def_sizeof(uint32_t part_count)
+{
+	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+}
+
+static inline size_t
 index_def_sizeof(uint32_t part_count)
 {
 	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
@@ -459,6 +465,26 @@ index_def_copy(struct index_def *to, const struct index_def *from)
 void
 key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type);
+
+/**
+ * An snprint-style function to print a key definition.
+ */
+int
+key_def_snprint(char *buf, int size, const struct key_def *key_def);
+
+/**
+ * Return size of key parts array when encoded in MsgPack.
+ * See also key_def_encode_parts().
+ */
+size_t
+key_def_sizeof_parts(const struct key_def *key_def);
+
+/**
+ * Encode key parts array in MsgPack and return a pointer following
+ * the end of encoded data.
+ */
+char *
+key_def_encode_parts(char *data, const struct key_def *key_def);
 
 /**
  * 1.6.6+

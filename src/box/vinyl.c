@@ -3278,7 +3278,7 @@ fail_range:
 static int
 vy_index_create(struct vy_index *index)
 {
-	struct index_def *index_def = index->index_def;
+	struct index_def *index_def = index->user_index_def;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/* create directory */
@@ -3321,7 +3321,8 @@ vy_index_create(struct vy_index *index)
 	 */
 	vy_log_tx_begin();
 	vy_log_create_index(index_def->opts.lsn, index_def->iid,
-			    index_def->space_id, index_def->opts.path);
+			    index_def->space_id, &index_def->key_def,
+			    index_def->opts.path);
 	vy_log_insert_range(index->index_def->opts.lsn,
 			    range->id, NULL, NULL, true);
 	if (vy_log_tx_commit() < 0)
