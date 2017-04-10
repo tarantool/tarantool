@@ -13,8 +13,8 @@ c = fiber.channel(n_workers)
 test_run:cmd("setopt delimiter ';'")
 for i=1,n_workers do
     fiber.create(function()
-        for i=1,1000,n_workers do
-            s:insert{i}
+        for j=i,1000,n_workers do
+            s:insert{j}
         end
         c:put(true)
     end)
