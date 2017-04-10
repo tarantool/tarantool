@@ -60,7 +60,9 @@ struct errinj {
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_U64, {.u64param = UINT64_MAX}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE_COUNTDOWN, ERRINJ_U64, {.u64param = UINT64_MAX}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_SHORT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \

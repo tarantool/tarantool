@@ -130,3 +130,143 @@ for i=1,256 do s:upsert({0, 0}, {{'+', 2, 1}}) end
 s:drop() -- index is gone
 fiber.sleep(0.05)
 errinj.set("ERRINJ_VY_SQUASH_TIMEOUT", 0)
+
+--https://github.com/tarantool/tarantool/issues/1842
+--test error injection
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+s:replace{0, 0}
+
+errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 2)
+s:replace{1, 0}
+s:replace{2, 0}
+s:replace{3, 0}
+s:replace{4, 0}
+s:replace{5, 0}
+s:replace{6, 0}
+errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+s:replace{7, 0}
+s:replace{8, 0}
+s:select{}
+
+s:drop()
+
+--iterator test
+test_run:cmd("setopt delimiter ';'")
+
+function create_iterator(obj, key, opts)
+    local iter, key, state = obj:pairs(key, opts)
+    local res = {}
+    res['iter'] = iter
+    res['key'] = key
+    res['state'] = state
+    return res
+end;
+
+function iterator_next(iter_obj)
+    local st, tp = iter_obj.iter.gen(iter_obj.key, iter_obj.state)
+    return tp
+end;
+
+function iterate_over(iter_obj)
+    local tp = nil
+    local ret = {}
+    local i = 0
+    tp = iterator_next(iter_obj)
+    while tp do
+        ret[i] = tp
+        i = i + 1
+        tp = iterator_next(iter_obj)
+    end
+    return ret
+end;
+
+fiber_status = 0
+
+function fiber_func()
+    box.begin()
+    s:replace{5, 5}
+    fiber_status = 1
+    local res = {pcall(box.commit) }
+    fiber_status = 2
+    return unpack(res)
+end;
+
+test_run:cmd("setopt delimiter ''");
+
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+fiber = require('fiber')
+
+_ = s:replace{0, 0}
+_ = s:replace{10, 0}
+_ = s:replace{20, 0}
+
+test_run:cmd("setopt delimiter ';'");
+
+faced_trash = false
+for i = 1,100 do
+    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0)
+    local f = fiber.create(fiber_func)
+    local itr = create_iterator(s, {0}, {iterator='GE'})
+    local first = iterator_next(itr)
+    local second = iterator_next(itr)
+    if (second[1] ~= 5 and second[1] ~= 10) then faced_trash = true end
+    while fiber_status <= 1 do fiber.sleep(0.001) end
+    local _,next = pcall(iterator_next, itr)
+    _,next = pcall(iterator_next, itr)
+    _,next = pcall(iterator_next, itr)
+    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+    s:delete{5}
+end;
+
+test_run:cmd("setopt delimiter ''");
+
+faced_trash
+
+s:drop()
+
+-- TX in prepared but not committed state
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+fiber = require('fiber')
+txn_proxy = require('txn_proxy')
+
+s:replace{1, "original"}
+s:replace{2, "original"}
+s:replace{3, "original"}
+
+c0 = txn_proxy.new()
+c0:begin()
+c1 = txn_proxy.new()
+c1:begin()
+c2 = txn_proxy.new()
+c2:begin()
+c3 = txn_proxy.new()
+c3:begin()
+
+errinj.set("ERRINJ_WAL_SHORT_DELAY", true)
+
+c0('s:replace{1, "c0"}')
+c0('s:replace{2, "c0"}')
+c0('s:replace{3, "c0"}')
+_ = fiber.create(c0.commit, c0)
+c1('s:replace{1, "c1"}')
+c1('s:replace{2, "c1"}')
+_ = fiber.create(c1.commit, c1)
+c3('s:select{1}') -- c1 is visible
+c2('s:replace{1, "c2"}')
+c2('s:replace{3, "c2"}')
+_ = fiber.create(c2.commit, c2)
+c3('s:select{1}') -- c1 is visible, c2 is not
+c3('s:select{2}') -- c1 is visible
+c3('s:select{3}') -- c2 is not visible
+fiber.sleep(0.1)
+c3('s:select{1}') -- c1 is visible, c2 is not
+c3('s:select{2}') -- c1 is visible
+c3('s:select{3}') -- c2 is not visible
+c3:commit()
+
+errinj.set("ERRINJ_WAL_SHORT_DELAY", false)
+
+s:drop()

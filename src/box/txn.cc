@@ -237,6 +237,7 @@ txn_commit(struct txn *txn)
 
 		if (txn->n_rows > 0)
 			signature = txn_write_to_wal(txn);
+		ERROR_INJECT(ERRINJ_WAL_SHORT_DELAY, fiber_sleep(0.01););
 		/*
 		 * The transaction is in the binary log. No action below
 		 * may throw. In case an error has happened, there is

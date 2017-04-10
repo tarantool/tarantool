@@ -16,11 +16,13 @@ errinj.info()
     state: false
   ERRINJ_WAL_WRITE:
     state: false
+  ERRINJ_WAL_SHORT_DELAY:
+    state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
-  ERRINJ_WAL_WRITE_PARTIAL:
+  ERRINJ_WAL_WRITE_COUNTDOWN:
     state: 18446744073709551615
   ERRINJ_VY_GC:
     state: false
@@ -40,14 +42,16 @@ errinj.info()
     state: false
   ERRINJ_VINYL_SCHED_TIMEOUT:
     state: 0
-  ERRINJ_WAL_IO:
-    state: false
   ERRINJ_RELAY:
     state: false
-  ERRINJ_TESTING:
+  ERRINJ_WAL_IO:
     state: false
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
+  ERRINJ_TESTING:
+    state: false
+  ERRINJ_WAL_WRITE_PARTIAL:
+    state: 18446744073709551615
   ERRINJ_TUPLE_FIELD:
     state: false
   ERRINJ_TUPLE_ALLOC:

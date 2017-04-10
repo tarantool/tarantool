@@ -934,6 +934,16 @@ xlog_tx_write_plain(struct xlog *log)
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
 		return -1;
 	});
+	ERROR_INJECT_U64(ERRINJ_WAL_WRITE_COUNTDOWN,
+			 errinj_getu64(ERRINJ_WAL_WRITE_COUNTDOWN) != UINT64_MAX,
+	{
+		uint64_t countdown = errinj_getu64(ERRINJ_WAL_WRITE_COUNTDOWN);
+		if (countdown == 0) {
+			diag_set(ClientError, ER_INJECTION, "xlog write injection");
+			return -1;
+		}
+		errinj_setu64(ERRINJ_WAL_WRITE_COUNTDOWN, countdown - 1);
+	});
 
 	ssize_t written = fio_writevn(log->fd, log->obuf.iov, log->obuf.pos + 1);
 	if (written < 0) {
@@ -1022,6 +1032,16 @@ xlog_tx_write_zstd(struct xlog *log)
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
 		obuf_reset(&log->zbuf);
 		goto error;
+	});
+	ERROR_INJECT_U64(ERRINJ_WAL_WRITE_COUNTDOWN,
+			 errinj_getu64(ERRINJ_WAL_WRITE_COUNTDOWN) != UINT64_MAX,
+	{
+		uint64_t countdown = errinj_getu64(ERRINJ_WAL_WRITE_COUNTDOWN);
+		if (countdown == 0) {
+			diag_set(ClientError, ER_INJECTION, "xlog write injection");
+			return -1;
+		}
+		errinj_setu64(ERRINJ_WAL_WRITE_COUNTDOWN, countdown - 1);
 	});
 	ssize_t written;
 
