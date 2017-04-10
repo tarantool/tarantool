@@ -132,7 +132,7 @@ struct errcode_record {
 	/* 77 */_(ER_NO_CONNECTION,		"Connection is not established") \
 	/* 78 */_(ER_TIMEOUT,			"Timeout exceeded") \
 	/* 79 */_(ER_ACTIVE_TRANSACTION,	"Operation is not permitted when there is an active transaction ") \
-	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	"Operation is not permitted when there is no active transaction ") \
+	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	"The transaction that own the cursor has ended") \
 	/* 81 */_(ER_CROSS_ENGINE_TRANSACTION,	"A multi-statement transaction can not use multiple storage engines") \
 	/* 82 */_(ER_NO_SUCH_ROLE,		"Role '%s' is not found") \
 	/* 83 */_(ER_ROLE_EXISTS,		"Role '%s' already exists") \
@@ -182,6 +182,7 @@ struct errcode_record {
 	/*127 */_(ER_INDEX_FIELD_COUNT_LIMIT,	"Indexed field count limit reached: %d indexed fields") \
 	/*128 */_(ER_LOCAL_INSTANCE_ID_IS_READ_ONLY, "The local instance id %u is read-only") \
 	/*129 */_(ER_BACKUP_IN_PROGRESS,	"Backup is already in progress") \
+	/*130 */_(ER_READ_VIEW_ABORTED,         "The read view is aborted") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -3728,7 +3728,7 @@ c1("t:select{1}")
 ...
 c1("for k, v in box.space.test:pairs() do box.commit() end")
 ---
-- - {'error': 'Operation is not permitted when there is no active transaction '}
+- - {'error': 'The transaction that own the cursor has ended'}
 ...
 c1:rollback()
 ---
@@ -3744,7 +3744,7 @@ c1("t:select{1}")
 ...
 c1("for k, v in box.space.test:pairs() do box.rollback() end")
 ---
-- - {'error': 'Operation is not permitted when there is no active transaction '}
+- - {'error': 'The transaction that own the cursor has ended'}
 ...
 c1:rollback()
 ---
