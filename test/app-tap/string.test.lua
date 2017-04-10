@@ -2,7 +2,7 @@
 
 local tap = require('tap')
 local test = tap.test("string extensions")
-test:plan(1)
+test:plan(2)
 
 -- gh-2214 - string.ljust()/string.rjust() Lua API
 test:test("ljust/rjust/center", function(test)
@@ -28,4 +28,42 @@ test:test("ljust/rjust/center", function(test)
     test:is(("help"):center(6, '.'), ".help.", "center, length 6, two extra charachters, custom fill char")
 end)
 
-os.exit(test:check() == true and 0 or -1)
+test:test("split", function(test)
+    test:plan(10)
+
+    -- testing basic split (works over gsplit)
+    test:is_deeply((""):split(""), {""},   "empty split")
+    test:is_deeply((""):split("z"), {""},  "empty split")
+    test:is_deeply(("a"):split(""), {"a"}, "empty split")
+    test:is_deeply(("a"):split("a"), {"", ""}, "split self")
+    test:is_deeply(
+        (" 1 2  3  "):split(),
+        {"1", "2", "3"},
+        "complex split on empty separator"
+    )
+    test:is_deeply(
+        (" 1 2  3  "):split(" "),
+        {"", "1", "2", "", "3", "", ""},
+        "complex split on space separator"
+    )
+    test:is_deeply(
+        (" 1 2  \n\n\n\r\t\n3  "):split(),
+        {"1", "2", "3"},
+        "complex split on empty separator"
+    )
+    test:is_deeply(
+        ("a*bb*c*ddd"):split("*"),
+        {"a", "bb", "c", "ddd"},
+        "another * separator"
+    )
+    test:is_deeply(
+        ("dog:fred:bonzo:alice"):split(":", 2),
+        {"dog", "fred", "bonzo:alice"},
+        "testing max separator"
+    )
+    test:is_deeply(
+        ("///"):split("/"),
+        {"", "", "", ""},
+        "testing splitting on one char"
+    )
+end)
