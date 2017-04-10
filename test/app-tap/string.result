@@ -1,5 +1,5 @@
 TAP version 13
-1..1
+1..2
     # ljust/rjust/center
     1..15
     ok - ljust, length 0, do nothing
@@ -19,3 +19,17 @@ TAP version 13
     ok - center, length 6, two extra charachters, custom fill char
     # ljust/rjust/center: end
 ok - ljust/rjust/center
+    # split
+    1..10
+    ok - empty split
+    ok - empty split
+    ok - empty split
+    ok - split self
+    ok - complex split on empty separator
+    ok - complex split on space separator
+    ok - complex split on empty separator
+    ok - another * separator
+    ok - testing max separator
+    ok - testing splitting on one char
+    # split: end
+ok - split
