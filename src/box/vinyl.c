@@ -1347,12 +1347,8 @@ vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
 	       record->type == VY_LOG_DELETE_RUN);
 
 	int total = 0;
-	if (record->path[0] != '\0')
-		SNPRINT(total, snprintf, buf, size, "%.*s",
-			record->path_len, record->path);
-	else
-		SNPRINT(total, vy_index_snprint_path, buf, size,
-			vinyl_dir, record->space_id, record->index_id);
+	SNPRINT(total, vy_index_snprint_path, buf, size, vinyl_dir,
+		record->space_id, record->index_id);
 	SNPRINT(total, snprintf, buf, size, "/");
 	SNPRINT(total, vy_run_snprint_name, buf, size, record->run_id, type);
 	return total;
@@ -3321,8 +3317,7 @@ vy_index_create(struct vy_index *index)
 	 */
 	vy_log_tx_begin();
 	vy_log_create_index(index_def->opts.lsn, index_def->iid,
-			    index_def->space_id, &index_def->key_def,
-			    index_def->opts.path);
+			    index_def->space_id, &index_def->key_def);
 	vy_log_insert_range(index->index_def->opts.lsn,
 			    range->id, NULL, NULL, true);
 	if (vy_log_tx_commit() < 0)
@@ -5429,15 +5424,10 @@ vy_index_conf_create(struct vy_index *conf, struct index_def *index_def)
 	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
 	         index_def->space_id, index_def->iid);
 	conf->name = strdup(name);
-	/* path */
-	if (index_def->opts.path[0] == '\0') {
-		char path[PATH_MAX];
-		vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
-				      index_def->space_id, index_def->iid);
-		conf->path = strdup(path);
-	} else {
-		conf->path = strdup(index_def->opts.path);
-	}
+	char path[PATH_MAX];
+	vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
+			      index_def->space_id, index_def->iid);
+	conf->path = strdup(path);
 	if (conf->name == NULL || conf->path == NULL) {
 		if (conf->name)
 			free(conf->name);
@@ -5445,8 +5435,7 @@ vy_index_conf_create(struct vy_index *conf, struct index_def *index_def)
 			free(conf->path);
 		conf->name = NULL;
 		conf->path = NULL;
-		diag_set(OutOfMemory, strlen(index_def->opts.path),
-			 "strdup", "char *");
+		diag_set(OutOfMemory, strlen(path) + 1, "strdup", "path");
 		return -1;
 	}
 	return 0;

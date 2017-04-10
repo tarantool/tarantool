@@ -71,8 +71,8 @@ enum vy_log_key {
 	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_PATH			= 7,
-	VY_LOG_IS_LEVEL_ZERO		= 8,
-	VY_LOG_KEY_DEF			= 9,
+	VY_LOG_KEY_DEF			= 7,
+	VY_LOG_KEY_IS_LEVEL_ZERO		= 8,
 };
 
 /**
@@ -83,14 +83,13 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_INDEX_ID) |
 					  (1 << VY_LOG_KEY_SPACE_ID) |
-					  (1 << VY_LOG_KEY_PATH) |
 					  (1 << VY_LOG_KEY_DEF),
 	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
 	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
 					  (1 << VY_LOG_KEY_RANGE_END) |
-					  (1 << VY_LOG_IS_LEVEL_ZERO),
+					  (1 << VY_LOG_KEY_IS_LEVEL_ZERO),
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
 	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
@@ -109,9 +108,8 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_RANGE_END]		= "range_end",
 	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
-	[VY_LOG_KEY_PATH]		= "path",
-	[VY_LOG_IS_LEVEL_ZERO]		= "is_level_zero",
 	[VY_LOG_KEY_DEF]		= "key_def",
+	[VY_LOG_KEY_IS_LEVEL_ZERO]	= "is_level_zero",
 };
 
 /** vy_log_type -> human readable name. */
@@ -201,8 +199,6 @@ struct vy_index_recovery_info {
 	uint32_t space_id;
 	/** Index key definition. */
 	struct key_def *key_def;
-	/** Path to the index. Empty string if default. */
-	char *path;
 	/** True if the index was dropped. */
 	bool is_dropped;
 	/**
@@ -317,13 +313,11 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_INDEX_ID], record->index_id);
-	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID))
+	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
-			vy_log_key_name[VY_LOG_KEY_SPACE_ID], record->space_id);
-	if (key_mask & (1 << VY_LOG_KEY_PATH))
-		SNPRINT(total, snprintf, buf, size, "%s=%.*s, ",
-			vy_log_key_name[VY_LOG_KEY_PATH],
-			record->path_len, record->path);
+			vy_log_key_name[VY_LOG_KEY_SPACE_ID],
+			record->space_id);
+	}
 	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_DEF]);
@@ -424,22 +418,17 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->space_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_PATH)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_PATH);
-		size += mp_sizeof_str(record->path_len);
-		n_keys++;
-	}
-	if (key_mask & (1 << VY_LOG_IS_LEVEL_ZERO)) {
-		size += mp_sizeof_uint(VY_LOG_IS_LEVEL_ZERO);
-		size += mp_sizeof_bool(record->is_level_zero);
-		n_keys++;
-	}
 	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
 		const struct key_def *key_def = record->key_def;
 		assert(key_def != NULL);
 		size += mp_sizeof_uint(VY_LOG_KEY_DEF);
 		size += mp_sizeof_array(key_def->part_count);
 		size += key_def_sizeof_parts(key_def);
+		n_keys++;
+	}
+	if (key_mask & (1 << VY_LOG_KEY_IS_LEVEL_ZERO)) {
+		size += mp_sizeof_uint(VY_LOG_KEY_IS_LEVEL_ZERO);
+		size += mp_sizeof_bool(record->is_level_zero);
 		n_keys++;
 	}
 	size += mp_sizeof_map(n_keys);
@@ -498,19 +487,15 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
 		pos = mp_encode_uint(pos, record->space_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_PATH)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_PATH);
-		pos = mp_encode_str(pos, record->path, record->path_len);
-	}
-	if (key_mask & (1 << VY_LOG_IS_LEVEL_ZERO)) {
-		pos = mp_encode_uint(pos, VY_LOG_IS_LEVEL_ZERO);
-		pos = mp_encode_bool(pos, record->is_level_zero);
-	}
 	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
 		const struct key_def *key_def = record->key_def;
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
 		pos = mp_encode_array(pos, key_def->part_count);
 		pos = key_def_encode_parts(pos, key_def);
+	}
+	if (key_mask & (1 << VY_LOG_KEY_IS_LEVEL_ZERO)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_IS_LEVEL_ZERO);
+		pos = mp_encode_bool(pos, record->is_level_zero);
 	}
 	assert(pos == tuple + size);
 
@@ -583,12 +568,6 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_SPACE_ID:
 			record->space_id = mp_decode_uint(&pos);
 			break;
-		case VY_LOG_KEY_PATH:
-			record->path = mp_decode_str(&pos, &record->path_len);
-			break;
-		case VY_LOG_IS_LEVEL_ZERO:
-			record->is_level_zero = mp_decode_bool(&pos);
-			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
 			struct key_def *key_def = region_alloc(&fiber()->gc,
@@ -608,6 +587,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->key_def = key_def;
 			break;
 		}
+		case VY_LOG_KEY_IS_LEVEL_ZERO:
+			record->is_level_zero = mp_decode_bool(&pos);
+			break;
 		default:
 			goto fail;
 		}
@@ -1124,15 +1106,14 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
 static int
 vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 			 int64_t index_lsn, uint32_t index_id,
-			 uint32_t space_id, const struct key_def *key_def,
-			 const char *path, uint32_t path_len)
+			 uint32_t space_id, const struct key_def *key_def)
 {
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_VINYL, "duplicate vinyl index id");
 		return -1;
 	}
 	size_t size = sizeof(struct vy_index_recovery_info) +
-		key_def_sizeof(key_def->part_count) + path_len + 1;
+			key_def_sizeof(key_def->part_count);
 	struct vy_index_recovery_info *index = malloc(size);
 	if (index == NULL) {
 		diag_set(OutOfMemory, size,
@@ -1151,10 +1132,6 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 	index->space_id = space_id;
 	index->key_def = (void *)index + sizeof(*index);
 	memcpy(index->key_def, key_def, key_def_sizeof(key_def->part_count));
-	index->path = (void *)index->key_def +
-		key_def_sizeof(key_def->part_count);
-	memcpy(index->path, path, path_len);
-	index->path[path_len] = '\0';
 	index->is_dropped = false;
 	index->signature = signature;
 	rlist_create(&index->ranges);
@@ -1451,8 +1428,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_create_index(recovery,
 				record->signature, record->index_lsn,
 				record->index_id, record->space_id,
-				record->key_def, record->path,
-				record->path_len);
+				record->key_def);
 		break;
 	case VY_LOG_DROP_INDEX:
 		rc = vy_recovery_drop_index(recovery, record->signature,
@@ -1629,8 +1605,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 	record.index_id = index->index_id;
 	record.space_id = index->space_id;
 	record.key_def = index->key_def;
-	record.path = index->path;
-	record.path_len = strlen(index->path);
 
 	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;

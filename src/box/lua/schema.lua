@@ -389,7 +389,6 @@ box.schema.index.create = function(space_id, name, options)
         if_not_exists = 'boolean',
         dimension = 'number',
         distance = 'string',
-        path = 'string',
         page_size = 'number',
         range_size = 'number',
         run_count_per_level = 'number',
@@ -411,8 +410,6 @@ box.schema.index.create = function(space_id, name, options)
     options = update_param_table(options, options_defaults)
     if box.space[space_id] ~= nil and box.space[space_id].engine == 'vinyl' then
         options_defaults = {
-            -- path has no default, or, rather, it defaults
-            -- to a subdirectory of the server data dir if it is not set
             page_size = box.cfg.vinyl_page_size,
             range_size = box.cfg.vinyl_range_size,
             run_count_per_level = box.cfg.vinyl_run_count_per_level,
@@ -459,7 +456,6 @@ box.schema.index.create = function(space_id, name, options)
             dimension = options.dimension,
             unique = options.unique,
             distance = options.distance,
-            path = options.path,
             page_size = options.page_size,
             range_size = options.range_size,
             run_count_per_level = options.run_count_per_level,

@@ -192,7 +192,6 @@ struct index_opts {
 	/**
 	 * Vinyl index options.
 	 */
-	char path[PATH_MAX];
 	int64_t range_size;
 	int64_t page_size;
 	/**
