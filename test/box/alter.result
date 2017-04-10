@@ -236,7 +236,7 @@ box.snapshot()
 ---
 - ok
 ...
-test_run:cmd("restart server default")
+test_run:cmd("restart server default with cleanup=1")
 ADMIN = 1
 ---
 ...

@@ -323,6 +323,9 @@ t
   - true
   - true
 ...
+while #buffer < 15 do fiber.sleep(0.001) end
+---
+...
 table.sort(buffer)
 ---
 ...

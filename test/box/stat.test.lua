@@ -1,7 +1,7 @@
 -- clear statistics
 env = require('test_run')
 test_run = env.new()
-test_run:cmd('restart server default')
+test_run:cmd('restart server default with cleanup=1')
 
 box.stat.INSERT.total
 box.stat.DELETE.total

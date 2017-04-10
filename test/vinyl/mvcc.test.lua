@@ -1,4 +1,7 @@
 test_run = require('test_run').new()
+-- need to restart in order to reset box.info.vinyl() stats
+test_run:cmd("restart server default")
+
 txn_proxy = require('txn_proxy')
 
 _ = box.schema.space.create('test', {engine = 'vinyl'})

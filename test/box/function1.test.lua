@@ -53,5 +53,12 @@ box.schema.func.create('f14', {language = 'lUa'}),  func_lang('f14')
 box.schema.func.create('f15', {language = 'c'}),    func_lang('f15')
 box.schema.func.create('f16', {language = 'C'}),    func_lang('f16')
 
+box.schema.func.drop("f11")
+box.schema.func.drop("f12")
+box.schema.func.drop("f13")
+box.schema.func.drop("f14")
+box.schema.func.drop("f15")
+box.schema.func.drop("f16")
+
 box.space.test:drop()
 c:close()

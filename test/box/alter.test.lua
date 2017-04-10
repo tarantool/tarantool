@@ -76,7 +76,7 @@ box.space[1000]
 _index:run_triggers(false)
 _space:run_triggers(false)
 box.snapshot()
-test_run:cmd("restart server default")
+test_run:cmd("restart server default with cleanup=1")
 ADMIN = 1
 box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
 box.space[1000].id

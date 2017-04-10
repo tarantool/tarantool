@@ -97,6 +97,7 @@ ch:put(5)
 t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
+while #buffer < 15 do fiber.sleep(0.001) end
 table.sort(buffer)
 buffer
 
