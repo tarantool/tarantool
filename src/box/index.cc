@@ -497,6 +497,7 @@ int
 box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 {
 	assert(result != NULL);
+	assert(itr->next != NULL);
 	try {
 		if (itr->sc_version != sc_version) {
 			struct space *space;
