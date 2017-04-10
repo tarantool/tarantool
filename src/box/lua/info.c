@@ -113,13 +113,22 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	struct applier *applier = replica->applier;
 	struct relay *relay = replica->relay;
 
-	lua_newtable(L);
+	/* 16 is used to get the best visual expirience in YAML output */
+	lua_createtable(L, 0, 16);
+
+	lua_pushstring(L, "id");
+	lua_pushinteger(L, replica->id);
+	lua_settable(L, -3);
 
 	lua_pushstring(L, "uuid");
 	lua_pushstring(L, tt_uuid_str(&replica->uuid));
 	lua_settable(L, -3);
 
-	if (applier != NULL) {
+	lua_pushstring(L, "lsn");
+	luaL_pushuint64(L, vclock_get(&replicaset_vclock, replica->id));
+	lua_settable(L, -3);
+
+	if (applier != NULL && applier->state != APPLIER_OFF) {
 		lua_pushstring(L, "upstream");
 		lbox_pushapplier(L, applier);
 		lua_settable(L, -3);
@@ -145,8 +154,7 @@ lbox_info_replication(struct lua_State *L)
 
 	replicaset_foreach(replica) {
 		/* Applier hasn't received replica id yet */
-		if (replica->id == REPLICA_ID_NIL ||
-		    (replica->applier == NULL && replica->relay == NULL))
+		if (replica->id == REPLICA_ID_NIL)
 			continue;
 
 		lbox_pushreplica(L, replica);

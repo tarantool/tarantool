@@ -386,6 +386,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       replica_clock);
+	vclock_copy(&relay.tx.vclock, replica_clock);
 	relay.replica_id = replica->id;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
