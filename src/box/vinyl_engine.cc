@@ -219,11 +219,7 @@ VinylEngine::commit(struct txn *txn, int64_t lsn)
 		txn_stmt_unref_tuples(stmt);
 	}
 	if (tx) {
-		int rc = vy_commit(tx, txn->n_rows ? lsn : 0);
-		if (rc == -1) {
-			panic("vinyl commit failed: txn->signature = %"
-			      PRIu64, lsn);
-		}
+		vy_commit(tx, txn->n_rows ? lsn : 0);
 		txn->engine_tx = NULL;
 	}
 }

@@ -205,7 +205,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 int
 vy_prepare(struct vy_tx *tx);
 
-int
+void
 vy_commit(struct vy_tx *tx, int64_t lsn);
 
 void

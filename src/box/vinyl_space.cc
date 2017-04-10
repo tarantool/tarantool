@@ -85,8 +85,7 @@ VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 		vy_rollback(tx);
 		diag_raise();
 	}
-	if (vy_commit(tx, signature))
-		panic("failed to commit vinyl transaction");
+	vy_commit(tx, signature);
 }
 
 /*

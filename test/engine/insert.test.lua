@@ -90,3 +90,36 @@ s:insert{2, 3}
 tmp = s:delete(1, 2, 3)
 s:select{}
 s:drop()
+
+-- concurrent insert fail
+fiber = require('fiber')
+s = box.schema.space.create('s', { engine = engine })
+index = s:create_index('pk')
+n_workers = 3
+n_success = 0
+n_failed = 0
+c = fiber.channel(n_workers)
+
+inspector:cmd("setopt delimiter ';'")
+for i=1,n_workers do
+    fiber.create(function()
+        if pcall(s.insert, s, {42}) then
+            n_success = n_success + 1
+        else
+            n_failed = n_failed + 1
+        end
+        c:put(true)
+    end)
+end;
+inspector:cmd("setopt delimiter ''");
+
+-- Join background fibers.
+for i=1,n_workers do c:get() end
+
+n_success
+n_failed
+
+s:select{}
+s:drop()
+fiber = nil
+

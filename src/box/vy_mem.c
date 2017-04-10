@@ -74,6 +74,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	}
 	index->min_lsn = INT64_MAX;
 	index->max_lsn = -1;
+	index->lsregion_id = INT64_MAX;
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
@@ -92,6 +93,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_sealed);
 	rlist_create(&index->in_dump_fifo);
+	rlist_create(&index->in_checkpoint_fifo);
 	index->pin_count = 0;
 	ipc_cond_create(&index->pin_cond);
 	return index;
@@ -156,22 +158,50 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	assert(vy_stmt_is_region_allocated(stmt));
 	size_t size = tuple_size(stmt);
 	const struct tuple *replaced_stmt = NULL;
-	int rc = vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt);
-	if (rc != 0)
+	if (vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt))
 		return -1;
+	/*
+	 * Statement LSN is a commit sequence number here, not
+	 * transaction sequence number.
+	 */
+	if (mem->lsregion_id == INT64_MAX)
+		mem->lsregion_id = vy_stmt_lsn(stmt);
+	/*
+	 * All iterators begin to see the new statement, and
+	 * will be aborted in case of rollback.
+	 */
+	mem->version++;
+	/*
+	 * We will not be able to free memory even in case of
+	 * rollback.
+	 */
+	mem->used += size;
+	return 0;
+}
 
+void
+vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt)
+{
+	/* The statement must be from a lsregion. */
+	assert(vy_stmt_is_region_allocated(stmt));
 	int64_t lsn = vy_stmt_lsn(stmt);
-	if (mem->used == 0)
+	if (mem->min_lsn == INT64_MAX)
 		mem->min_lsn = lsn;
 	assert(mem->min_lsn <= lsn);
+	if (mem->max_lsn < lsn)
+		mem->max_lsn = lsn;
+}
 
-	assert(lsn >= mem->max_lsn);
-	mem->max_lsn = lsn;
+void
+vy_mem_erase(struct vy_mem *mem, const struct tuple *stmt)
+{
+	/* This is the statement we've inserted before. */
+	assert(vy_stmt_is_region_allocated(stmt));
+	int rc = vy_mem_tree_delete(&mem->tree, stmt);
+	assert(rc == 0);
+	(void) rc;
 
-	mem->used += size;
 	mem->version++;
-
-	return 0;
 }
 
 /* }}} vy_mem */

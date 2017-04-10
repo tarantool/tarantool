@@ -131,8 +131,18 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 struct vy_mem {
 	/** Link in range->sealed list. */
 	struct rlist in_sealed;
-	/** Link in scheduler->dump_fifo list. */
+	/*
+	 * Link in scheduler->dump_fifo list. The mem is
+	 * added to the list when it has the first statement
+	 * allocated in it.
+	 */
 	struct rlist in_dump_fifo;
+	/**
+	 * Link in scheduler->checkpoint_fifo list. The mem
+	 * is added to the list when it receives the first
+	 * committed change.
+	 */
+	struct rlist in_checkpoint_fifo;
 	/** BPS tree */
 	struct vy_mem_tree tree;
 	/** The total size of all tuples in this tree in bytes */
@@ -140,6 +150,12 @@ struct vy_mem {
 	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
 	int64_t max_lsn;
+	/**
+	 * The minimum lsregion ID that was allocated for this mem.
+	 * When a mem is dumped, memory can be reclaimed by
+	 * lsregion  up to this id.
+	 */
+	int64_t lsregion_id;
 	/* A key definition for this index. */
 	const struct key_def *key_def;
 	/** version is initially 0 and is incremented on every write */
@@ -252,6 +268,22 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt);
  */
 int
 vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt);
+
+/**
+ * Confirm insertion of a statement into the in-memory level.
+ * @param mem        vy_mem.
+ * @param stmt       Vinyl statement.
+ */
+void
+vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt);
+
+/**
+ * Remove a statement from the in-memory level.
+ * @param mem        vy_mem.
+ * @param stmt       Vinyl statement.
+ */
+void
+vy_mem_erase(struct vy_mem *mem, const struct tuple *stmt);
 
 /**
  * Iterator for in-memory level.
