@@ -401,12 +401,14 @@ end
 
 -- systemd detection based on http://unix.stackexchange.com/a/164092
 local function forward_to_systemd()
-    local rv = os.execute("systemctl 2>/dev/null | grep '\\-\\.mount' " ..
-                          "1>/dev/null 2>/dev/null")
-    if rv ~= 0 or ffi.C.getppid() < 2 or usermode then
-        return false
+    if not usermode then
+        local rv = os.execute("systemctl 2>/dev/null | grep '\\-\\.mount' " ..
+                              "1>/dev/null 2>/dev/null")
+        if rv == 0 and ffi.C.getppid() >= 2 then
+            return true
+        end
     end
-    return true
+    return false
 end
 
 -- -------------------------------------------------------------------------- --
