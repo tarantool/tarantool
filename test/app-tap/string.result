@@ -1,0 +1,21 @@
+TAP version 13
+1..1
+    # ljust/rjust/center
+    1..15
+    ok - ljust, length 0, do nothing
+    ok - rjust, length 0, do nothing
+    ok - center, length 0, do nothing
+    ok - ljust, length 3, do nothing
+    ok - rjust, length 3, do nothing
+    ok - center, length 3, do nothing
+    ok - ljust, length 5, one extra charachter
+    ok - rjust, length 5, one extra charachter
+    ok - center, length 5, one extra charachter
+    ok - ljust, length 6, two extra charachters
+    ok - rjust, length 6, two extra charachters
+    ok - center, length 6, two extra charachters
+    ok - ljust, length 6, two extra charachters, custom fill char
+    ok - rjust, length 6, two extra charachters, custom fill char
+    ok - center, length 6, two extra charachters, custom fill char
+    # ljust/rjust/center: end
+ok - ljust/rjust/center

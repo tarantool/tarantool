@@ -103,6 +103,7 @@ extern char strict_lua[],
 	title_lua[],
 	env_lua[],
 	trigger_lua[],
+	ext_string_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -129,6 +130,7 @@ static const char *lua_modules[] = {
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
+	"ext_string", ext_string_lua,
 	"internal.argparse", argparse_lua,
 	"internal.trigger", trigger_lua,
 	/* jit.* library */
