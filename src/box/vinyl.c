@@ -794,7 +794,10 @@ struct vy_tx {
 	 * be committed successfully, or aborted as conflicted otherwise.
 	 */
 	int64_t vlsn;
-	rb_node(struct vy_tx) tree_node;
+	union {
+		/** The link in read_views of the TX manager */
+		struct rlist in_read_views;
+	};
 	/*
 	 * For non-autocommit transactions, the list of open
 	 * cursors. When a transaction ends, all open cursors are
@@ -1096,21 +1099,7 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 	return rc;
 }
 
-typedef rb_tree(struct vy_tx) tx_tree_t;
-
-static int
-tx_tree_cmp(struct vy_tx *a, struct vy_tx *b)
-{
-	int rc = vy_cmp(a->vlsn, b->vlsn);
-	return rc ? rc : vy_cmp(a, b);
-}
-
-rb_gen(MAYBE_UNUSED static inline, tx_tree_, tx_tree_t, struct vy_tx,
-       tree_node, tx_tree_cmp);
-
-
 struct tx_manager {
-	tx_tree_t tree;
 	/** The number of active transactions. */
 	uint32_t tx_count;
 	/**
@@ -1119,10 +1108,10 @@ struct tx_manager {
 	 */
 	int64_t lsn;
 	/**
-	 * View sequence number: the oldest read view maintained
-	 * by the front end.
+	 * The list of TXs with a read view in order of vlsn.
+	 *
 	 */
-	int64_t vlsn;
+	struct rlist read_views;
 	struct vy_env *env;
 };
 
@@ -1182,11 +1171,10 @@ tx_manager_new(struct vy_env *env)
 		diag_set(OutOfMemory, sizeof(*m), "tx_manager", "struct");
 		return NULL;
 	}
-	tx_tree_new(&m->tree);
 	m->tx_count = 0;
 	m->lsn = 0;
-	m->vlsn = INT64_MAX;
 	m->env = env;
+	rlist_create(&m->read_views);
 	return m;
 }
 
@@ -1200,19 +1188,18 @@ tx_manager_delete(struct tx_manager *m)
 /*
  * Determine a lowest possible vlsn - the level below which the
  * history could be compacted.
- * If there are active read views, it is the m->vlsn. If there is
- * no active read view (m->vlsn == INT64_MAX), a read view could
- * be created at any moment with vlsn = m->lsn. Therefore, the
- * minimum of m->vlsn and m->lsn must be chosen.
+ * If there are active read views, it is the first's vlsn. If there is
+ * no active read view, a read view could be created at any moment
+ * with vlsn = m->lsn, so m->lsn must be chosen.
  */
 static int64_t
-tx_manager_vlsn(struct tx_manager *m)
+tx_manager_vlsn(struct tx_manager *xm)
 {
-	assert(m->vlsn == INT64_MAX || m->vlsn <= m->lsn);
-	int64_t vlsn = m->vlsn;
-	if (vlsn == INT64_MAX)
-		vlsn = m->lsn;
-	return vlsn;
+	if (rlist_empty(&xm->read_views))
+		return xm->lsn;
+	struct vy_tx *lowest = rlist_first_entry(&xm->read_views,
+						 struct vy_tx, in_read_views);
+	return lowest->vlsn;
 }
 
 static struct vy_page_info *
@@ -7034,20 +7021,21 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 }
 
 static void
-vy_tx_begin(struct tx_manager *m, struct vy_tx *tx)
+vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 {
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->start = ev_now(loop());
-	tx->manager = m;
+	tx->manager = xm;
 	tx->state = VINYL_TX_READY;
 	tx->is_in_read_view = false;
+	rlist_create(&tx->in_read_views);
 	rlist_create(&tx->cursors);
 
 	/* possible read-write tx reads latest changes */
 	tx->vlsn = INT64_MAX;
-	m->tx_count++;
+	xm->tx_count++;
 }
 
 static void
@@ -7059,15 +7047,10 @@ vy_tx_abort_cursors(struct vy_tx *tx)
 }
 
 static void
-vy_tx_destroy(struct tx_manager *xm, struct vy_tx *tx)
+vy_tx_destroy(struct vy_tx *tx)
 {
-	if (tx->vlsn != INT64_MAX) {
-		tx_tree_remove(&xm->tree, tx);
-		if (tx->vlsn == xm->vlsn) {
-			struct vy_tx * oldest = tx_tree_first(&xm->tree);
-			xm->vlsn = oldest ? oldest->vlsn : INT64_MAX;
-		}
-	}
+	struct tx_manager *xm = tx->manager;
+	rlist_del_entry(tx, in_read_views);
 
 	/** Abort all open cursors. */
 	vy_tx_abort_cursors(tx);
@@ -7123,10 +7106,11 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
  *  written by tx.
  */
 static void
-vy_send_to_read_view(struct vy_env *env, struct vy_tx *tx, struct txv *v)
+vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 {
+	struct tx_manager *xm = tx->manager;
 	read_set_t *tree = &v->index->read_set;
-	struct index_def *index_def = v->index->index_def;
+	struct key_def *key_def = &v->index->index_def->key_def;
 	struct read_set_key key;
 	key.stmt = v->stmt;
 	key.tx = NULL;
@@ -7134,7 +7118,7 @@ vy_send_to_read_view(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 	for (struct txv *abort = read_set_nsearch(tree, &key);
 	     abort != NULL; abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
-		if (vy_stmt_compare(key.stmt, abort->stmt, &index_def->key_def))
+		if (vy_stmt_compare(key.stmt, abort->stmt, key_def))
 			break;
 		/* Don't abort self. */
 		if (abort->tx == tx)
@@ -7142,21 +7126,15 @@ vy_send_to_read_view(struct vy_env *env, struct vy_tx *tx, struct txv *v)
 		/* Delete of nothing does not cause a conflict */
 		if (abort->is_gap && vy_stmt_type(v->stmt) == IPROTO_DELETE)
 			continue;
+		/* already in (earlier) read view */
+		if (abort->tx->is_in_read_view)
+			continue;
 
 		/* the found tx can only be commited as read-only */
 		abort->tx->is_in_read_view = true;
-		/* Set the read view of the found (now read-only) tx */
-		if (abort->tx->vlsn == INT64_MAX) {
-			abort->tx->vlsn = env->xm->lsn;
-			tx_tree_insert(&env->xm->tree, abort->tx);
-			if (env->xm->vlsn == INT64_MAX)
-				env->xm->vlsn = abort->tx->vlsn;
-			else
-				assert(env->xm->vlsn <= env->xm->lsn);
-		} else {
-			assert(abort->tx->vlsn <= env->xm->lsn);
-			assert(abort->tx->vlsn >= env->xm->vlsn);
-		}
+		abort->tx->vlsn = xm->lsn;
+		rlist_add_tail_entry(&xm->read_views, abort->tx, in_read_views);
+		assert(abort->tx->vlsn <= abort->tx->manager->lsn);
 	}
 }
 
@@ -7181,11 +7159,11 @@ vy_prepare(struct vy_tx *tx)
 			if (vy_tx_write_prepare(v) != 0)
 				rc = -1;
 			/* Abort read/write intersection. */
-			vy_send_to_read_view(e, tx, v);
+			vy_tx_send_to_read_view(tx, v);
 		}
 	}
 
-	vy_tx_destroy(tx->manager, tx);
+	vy_tx_destroy(tx);
 
 	/*
 	 * A half committed transaction is no longer
@@ -7270,7 +7248,7 @@ vy_tx_rollback(struct vy_tx *tx)
 {
 	if (tx->state == VINYL_TX_READY) {
 		/** freewill rollback, vy_prepare have not been called yet */
-		vy_tx_destroy(tx->manager, tx);
+		vy_tx_destroy(tx);
 	}
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
@@ -7288,7 +7266,7 @@ vy_begin(struct vy_env *e)
 			 "struct vy_tx");
 		return NULL;
 	}
-	vy_tx_begin(e->xm, tx);
+	vy_tx_create(e->xm, tx);
 	return tx;
 }
 
@@ -10739,7 +10717,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 	c->env = e;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
-		vy_tx_begin(e->xm, tx);
+		vy_tx_create(e->xm, tx);
 	} else {
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}
