@@ -174,9 +174,19 @@ extern const char *iproto_type_strs[];
 static inline const char *
 iproto_type_name(uint32_t type)
 {
-	if (type >= IPROTO_TYPE_STAT_MAX)
+	if (type < IPROTO_TYPE_STAT_MAX)
+		return iproto_type_strs[type];
+
+	switch (type) {
+	case VY_INDEX_RUN_INFO:
+		return "RUNINFO";
+	case VY_INDEX_PAGE_INFO:
+		return "PAGEINFO";
+	case VY_RUN_PAGE_INDEX:
+		return "PAGEINDEX";
+	default:
 		return NULL;
-	return iproto_type_strs[type];
+	}
 }
 
 /**

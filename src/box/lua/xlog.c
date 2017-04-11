@@ -95,7 +95,7 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 	if (mp_typeof(**beg) != MP_UINT)
 		luaL_error(L, "Broken type of body key");
 	uint32_t v = mp_decode_uint(beg);
-	if (iproto_key_name(v)) {
+	if (iproto_type_is_dml(type) && iproto_key_name(v)) {
 		lbox_xlog_pushkey(L, iproto_key_name(v));
 	} else if (type == VY_INDEX_RUN_INFO && vy_run_info_key_name(v)) {
 		lbox_xlog_pushkey(L, vy_run_info_key_name(v));
@@ -272,7 +272,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	    strncmp(cur->meta.filetype, "RUN", 3) != 0 &&
 	    strncmp(cur->meta.filetype, "INDEX", 5) != 0 &&
 	    strncmp(cur->meta.filetype, "DATA", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "XCTL", 4) != 0) {
+	    strncmp(cur->meta.filetype, "VYLOG", 4) != 0) {
 		char buf[1024];
 		snprintf(buf, sizeof(buf), "'%.*s' file type",
 			 (int) strlen(cur->meta.filetype),
