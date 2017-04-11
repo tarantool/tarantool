@@ -188,10 +188,10 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	assert(rc == 0);
 
 	lua_pushinteger(L, row.lsn);
-	lua_newtable(L);
+	lua_createtable(L, 0, 8);
 	lua_pushstring(L, "HEADER");
 
-	lua_newtable(L);
+	lua_createtable(L, 0, 8);
 	lua_pushstring(L, iproto_key_name(IPROTO_REQUEST_TYPE));
 	const char *typename = iproto_type_name(row.type);
 	if (typename != NULL) {
