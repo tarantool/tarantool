@@ -10396,7 +10396,7 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 	/* Backup the metadata log. */
 	const char *path = vy_log_backup_path(vclock);
 	if (path == NULL)
-		return -1;
+		return 0; /* vinyl not used */
 	if (cb(path, cb_arg) != 0)
 		return -1;
 

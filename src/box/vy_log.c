@@ -31,12 +31,14 @@
 #include "vy_log.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <msgpuck/msgpuck.h>
 #include <small/region.h>
@@ -134,7 +136,11 @@ enum { VY_LOG_TX_BUF_SIZE = 64 };
 
 /** Metadata log object. */
 struct vy_log {
-	/** The directory where log files are stored. */
+	/**
+	 * The directory where log files are stored.
+	 * Note, dir.index contains vclocks of all snapshots,
+	 * even those that didn't result in file creation.
+	 */
 	struct xdir dir;
 	/** Last checkpoint vclock. */
 	struct vclock last_checkpoint;
@@ -687,9 +693,22 @@ vy_log_free(void)
 int
 vy_log_open(struct xlog *xlog)
 {
+	/*
+	 * Open the current log file or create a new one
+	 * if it doesn't exist.
+	 */
 	char *path = xdir_format_filename(&vy_log.dir,
 			vclock_sum(&vy_log.last_checkpoint), NONE);
-	return xlog_open(xlog, path);
+	if (access(path, F_OK) < 0 && errno == ENOENT) {
+		if (xdir_create_xlog(&vy_log.dir, xlog,
+				     &vy_log.last_checkpoint) < 0 ||
+		    xlog_rename(xlog) < 0)
+			return -1;
+	} else {
+		if (xlog_open(xlog, path) < 0)
+			return -1;
+	}
+	return 0;
 }
 
 int64_t
@@ -716,15 +735,7 @@ vy_log_bootstrap(void)
 	}
 	vclock_create(vclock);
 	xdir_add_vclock(&vy_log.dir, vclock);
-
-	/* Create initial vy_log file. */
-	struct xlog xlog;
-	if (xdir_create_xlog(&vy_log.dir, &xlog, vclock) < 0)
-		return -1;
-
-	int rc = xlog_rename(&xlog);
-	xlog_close(&xlog, false);
-	return rc;
+	return 0;
 }
 
 struct vy_recovery *
@@ -802,12 +813,25 @@ vy_log_end_recovery(void)
 	return 0;
 }
 
+/** Argument passed to vy_log_rotate_cb_func(). */
+struct vy_log_rotate_cb_arg {
+	struct xdir *dir;
+	struct xlog *xlog;
+	const struct vclock *vclock;
+};
+
 /** Callback passed to vy_recovery_iterate() for log rotation. */
 static int
 vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 {
-	struct xlog *xlog = cb_arg;
+	struct vy_log_rotate_cb_arg *arg = cb_arg;
+	struct xlog *xlog = arg->xlog;
 	struct xrow_header row;
+
+	/* Create the log file on the first write. */
+	if (!xlog_is_open(xlog) &&
+	    xdir_create_xlog(arg->dir, xlog, arg->vclock) < 0)
+		return -1;
 
 	if (vy_log_record_encode(record, &row) < 0 ||
 	    xlog_write_row(xlog, &row) < 0)
@@ -821,13 +845,24 @@ vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 static int
 vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 {
+	/*
+	 * Only create the log file if we have something
+	 * to write to it.
+	 */
 	struct xlog xlog;
-	if (xdir_create_xlog(&vy_log.dir, &xlog, vclock) < 0)
-		goto err_create_xlog;
+	xlog_clear(&xlog);
 
+	struct vy_log_rotate_cb_arg arg = {
+		.xlog = &xlog,
+		.dir = &vy_log.dir,
+		.vclock = vclock,
+	};
 	if (vy_recovery_iterate(recovery, true,
-				  vy_log_rotate_cb_func, &xlog) < 0)
+				vy_log_rotate_cb_func, &arg) < 0)
 		goto err_write_xlog;
+
+	if (!xlog_is_open(&xlog))
+		return 0; /* nothing written */
 
 	/* Finalize the new xlog. */
 	if (xlog_flush(&xlog) < 0 ||
@@ -840,10 +875,12 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 
 err_write_xlog:
 	/* Delete the unfinished xlog. */
-	if (unlink(xlog.filename) < 0)
-		say_syserror("failed to delete file '%s'", xlog.filename);
-	xlog_close(&xlog, false);
-err_create_xlog:
+	if (xlog_is_open(&xlog)) {
+		if (unlink(xlog.filename) < 0)
+			say_syserror("failed to delete file '%s'",
+				     xlog.filename);
+		xlog_close(&xlog, false);
+	}
 	return -1;
 }
 
@@ -951,11 +988,12 @@ vy_log_backup_path(struct vclock *vclock)
 	 * contains records written after the last checkpoint.
 	 */
 	int64_t lsn = vy_log_prev_checkpoint(vclock_sum(vclock));
-	if (lsn < 0) {
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+	if (lsn < 0)
 		return NULL;
-	}
-	return xdir_format_filename(&vy_log.dir, lsn, NONE);
+	const char *path = xdir_format_filename(&vy_log.dir, lsn, NONE);
+	if (access(path, F_OK) == -1 && errno == ENOENT)
+		return NULL; /* vinyl not used */
+	return path;
 }
 
 void
@@ -1508,6 +1546,16 @@ vy_recovery_new_f(va_list ap)
 		/* No log file, nothing to do. */
 		goto out;
 	}
+
+	/*
+	 * We don't create a log file if there are no objects to
+	 * be stored in it, so if the log doesn't exist, assume
+	 * the recovery context is empty.
+	 */
+	const char *path = xdir_format_filename(&vy_log.dir,
+						vclock_sum(&vclock), NONE);
+	if (access(path, F_OK) < 0 && errno == ENOENT)
+		goto out;
 
 	struct xlog_cursor cursor;
 	if (xdir_open_cursor(&vy_log.dir, vclock_sum(&vclock), &cursor) < 0)
