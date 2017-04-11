@@ -208,6 +208,5 @@ VinylIndex::initIterator(struct iterator *ptr,
 void
 VinylIndex::info(struct info_handler *handler) const
 {
-	if (vy_index_info(db, handler) != 0)
-		diag_raise();
+	vy_index_info(db, handler);
 }

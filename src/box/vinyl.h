@@ -101,7 +101,7 @@ struct info_handler;
  * @param env environment
  * @param handler info handler
  */
-int
+void
 vy_info(struct vy_env *env, struct info_handler *handler);
 
 /**
@@ -110,7 +110,7 @@ vy_info(struct vy_env *env, struct info_handler *handler);
  * @param index index
  * @param handler info handler
  */
-int
+void
 vy_index_info(struct vy_index *index, struct info_handler *handler);
 
 /*

@@ -5314,7 +5314,7 @@ vy_info_append_metric(struct vy_env *env, struct info_handler *h)
 	info_table_end(h);
 }
 
-int
+void
 vy_info(struct vy_env *env, struct info_handler *h)
 {
 	info_begin(h);
@@ -5323,10 +5323,9 @@ vy_info(struct vy_env *env, struct info_handler *h)
 	vy_info_append_metric(env, h);
 	vy_info_append_performance(env, h);
 	info_end(h);
-	return 0;
 }
 
-int
+void
 vy_index_info(struct vy_index *index, struct info_handler *h)
 {
 	char buf[1024];
@@ -5343,7 +5342,6 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
 	info_end(h);
-	return 0;
 }
 
 /** }}} Introspection */

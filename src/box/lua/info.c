@@ -240,48 +240,77 @@ lbox_info_cluster(struct lua_State *L)
 }
 
 static void
-luaT_info_handler(struct info_node *node, void *ctx)
+luaT_info_begin(struct info_handler *info)
 {
-	struct lua_State *L = ctx;
+	lua_State *L = (lua_State *) info->ctx;
+	lua_newtable(L);
+}
 
-	switch (node->type) {
-	case INFO_BEGIN:
-		lua_newtable(L);
-		break;
-	case INFO_END:
-		break;
-	case INFO_TABLE_BEGIN:
-		lua_pushstring(L, node->key);
-		lua_newtable(L);
-		break;
-	case INFO_TABLE_END:
-		lua_settable(L, -3);
-		break;
-	case INFO_U32:
-		lua_pushstring(L, node->key);
-		lua_pushnumber(L, node->value.u32);
-		lua_settable(L, -3);
-		break;
-	case INFO_U64:
-		lua_pushstring(L, node->key);
-		luaL_pushuint64(L, node->value.u64);
-		lua_settable(L, -3);
-		break;
-	case INFO_STRING:
-		lua_pushstring(L, node->key);
-		lua_pushstring(L, node->value.str);
-		lua_settable(L, -3);
-		break;
-	default:
-		unreachable();
-	}
+static void
+luaT_info_end(struct info_handler *info)
+{
+	(void) info;
+}
+
+static void
+luaT_info_begin_table(struct info_handler *info, const char *key)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_newtable(L);
+}
+
+static void
+luaT_info_end_table(struct info_handler *info)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_u32(struct info_handler *info, const char *key,
+		     uint32_t value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_pushnumber(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_u64(struct info_handler *info, const char *key,
+		     uint64_t value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	luaL_pushuint64(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_str(struct info_handler *info, const char *key,
+		     const char *value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_pushstring(L, value);
+	lua_settable(L, -3);
 }
 
 void
 luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 {
+	static struct info_handler_vtab lua_vtab = {
+		.begin = luaT_info_begin,
+		.end = luaT_info_end,
+		.begin_table = luaT_info_begin_table,
+		.end_table = luaT_info_end_table,
+		.append_u32 = luaT_info_append_u32,
+		.append_u64 = luaT_info_append_u64,
+		.append_str = luaT_info_append_str,
+	};
+	h->vtab = &lua_vtab;
 	h->ctx = L;
-	h->fn = luaT_info_handler;
 }
 
 /* Declared in vinyl_engine.cc */
@@ -293,8 +322,7 @@ lbox_info_vinyl_call(struct lua_State *L)
 {
 	struct info_handler h;
 	luaT_info_handler_create(&h, L);
-	if (vy_info(vinyl_engine_get_env(), &h) != 0)
-		luaT_error(L);
+	vy_info(vinyl_engine_get_env(), &h);
 	return 1;
 }
 

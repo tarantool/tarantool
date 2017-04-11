@@ -41,18 +41,18 @@
  *
  * TREE STRUCTURE
  *
- * { -- INFO_BEGIN
- *    section = { -- INFO_TABLE_BEGIN
- *        key1 = u32; -- INFO_U32
- *        key2 = u64; -- INFO_U64
- *        key3 = str;  -- INFO_STRING;
- *    };          -- INFO_TABLE_END
+ * { -- info_begin
+ *    section = { -- info_begin_table
+ *        key1 = u32; --  info_append_u32
+ *        key2 = u64; -- info_append_u64
+ *        key3 = str;  -- info_append_str;
+ *    };          -- info_end_table
  *
  *    section2 = {
  *        ...
  *    };
  *    ...
- * } -- INFO_END
+ * } -- info_end
  *
  *
  * IMPLEMENTATION DETAILS
@@ -69,49 +69,33 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
- * Tree element type
+ * Virtual method table for struct info_handler.
  */
-enum info_type {
+struct info_handler_vtab {
 	/** The begin of document. */
-	INFO_BEGIN,
+	void (*begin)(struct info_handler *);
 	/** The end of document. */
-	INFO_END,
-	/* The begin of associative array (a map). */
-	INFO_TABLE_BEGIN,
-	/* The end of associative array (a map). */
-	INFO_TABLE_END,
-	/* Null-terminated string value. */
-	INFO_STRING,
-	/* uint32_t value. */
-	INFO_U32,
-	/* uint64_t value. */
-	INFO_U64,
-};
-
-/**
- * Represents an element in box.info() tree.
- */
-struct info_node {
-	/** Element type. */
-	enum info_type type;
-	/** Key in associative array. */
-	const char *key;
-	union {
-		/** Value of INFO_STRING type. */
-		const char *str;
-		/** Value of INFO_U32 type. */
-		uint32_t u32;
-		/** Value of INFO_U64 type. */
-		uint64_t u64;
-	} value;
+	void (*end)(struct info_handler *);
+	/** The begin of associative array (a map). */
+	void (*begin_table)(struct info_handler *, const char *key);
+	/** The end of associative array (a map). */
+	void (*end_table)(struct info_handler *);
+	/** Set string value. */
+	void (*append_str)(struct info_handler *, const char *key,
+			   const char *value);
+	/** Set uint32_t value. */
+	void (*append_u32)(struct info_handler *, const char *key,
+			   uint32_t value);
+	/** Set uint64_t value. */
+	void (*append_u64)(struct info_handler *, const char *key,
+			   uint64_t value);
 };
 
 /**
  * Adapter for Lua/C API to generate box.info() sections from engines.
  */
 struct info_handler {
-	/** A callback called by info_XXX() methods. */
-	void (*fn)(struct info_node *node, void *ctx);
+	struct info_handler_vtab *vtab;
 	/** Context for this callback. */
 	void *ctx;
 };
@@ -125,12 +109,7 @@ struct info_handler {
 static inline void
 info_begin(struct info_handler *info)
 {
-	struct info_node node = {
-		.type = INFO_BEGIN,
-		.key = NULL,
-		.value = {}
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->begin(info);
 }
 
 /**
@@ -142,12 +121,7 @@ info_begin(struct info_handler *info)
 static inline void
 info_end(struct info_handler *info)
 {
-	struct info_node node = {
-		.type = INFO_END,
-		.key = NULL,
-		.value = {}
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->end(info);
 }
 
 /**
@@ -161,14 +135,7 @@ info_end(struct info_handler *info)
 static inline void
 info_append_u32(struct info_handler *info, const char *key, uint32_t value)
 {
-	struct info_node node = {
-		.type = INFO_U32,
-		.key = key,
-		.value = {
-			.u32 = value,
-		}
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->append_u32(info, key, value);
 }
 
 /**
@@ -182,14 +149,7 @@ info_append_u32(struct info_handler *info, const char *key, uint32_t value)
 static inline void
 info_append_u64(struct info_handler *info, const char *key, uint64_t value)
 {
-	struct info_node node = {
-		.type = INFO_U64,
-		.key = key,
-		.value = {
-			 .u64 = value,
-		},
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->append_u64(info, key, value);
 }
 
 /**
@@ -204,14 +164,7 @@ static inline void
 info_append_str(struct info_handler *info, const char *key,
 		   const char *value)
 {
-	struct info_node node = {
-		.type = INFO_STRING,
-		.key = key,
-		.value = {
-			 .str = value,
-		},
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->append_str(info, key, value);
 }
 
 /*
@@ -223,12 +176,7 @@ info_append_str(struct info_handler *info, const char *key,
 static inline void
 info_table_begin(struct info_handler *info, const char *key)
 {
-	struct info_node node = {
-		.type = INFO_TABLE_BEGIN,
-		.key = key,
-		.value = {}
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->begin_table(info, key);
 }
 
 /*
@@ -239,12 +187,7 @@ info_table_begin(struct info_handler *info, const char *key)
 static inline void
 info_table_end(struct info_handler *info)
 {
-	struct info_node node = {
-		.type = INFO_TABLE_END,
-		.key = NULL,
-		.value = {}
-	};
-	info->fn(&node, info->ctx);
+	return info->vtab->end_table(info);
 }
 
 #if defined(__cplusplus)
