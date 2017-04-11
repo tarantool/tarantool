@@ -1919,8 +1919,12 @@ vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 struct vy_write_iterator;
 
 static struct vy_write_iterator *
-vy_write_iterator_new(struct vy_index *index, bool is_last_level,
-		      int64_t oldest_vlsn);
+vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
+		      const struct key_def *user_key_def,
+		      struct tuple_format *surrogate_format,
+		      struct tuple_format *upsert_format,
+		      bool is_primary, uint64_t column_mask,
+		      bool is_last_level, int64_t oldest_vlsn);
 static NODISCARD int
 vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run);
 static NODISCARD int
@@ -2861,11 +2865,18 @@ static struct vy_write_iterator *
 vy_range_get_dump_iterator(struct vy_range *range, int64_t vlsn,
 			   int64_t dump_lsn, size_t *p_max_output_count)
 {
+	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
 	struct vy_mem *mem;
 	*p_max_output_count = 0;
 
-	wi = vy_write_iterator_new(range->index, range->run_count == 0, vlsn);
+	wi = vy_write_iterator_new(index->env, &index->index_def->key_def,
+				   &index->user_index_def->key_def,
+				   index->surrogate_format,
+				   index->upsert_format,
+				   index->index_def->iid == 0,
+				   index->column_mask,
+				   range->run_count == 0, vlsn);
 	if (wi == NULL)
 		goto err_wi;
 	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
@@ -2897,12 +2908,19 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 			      int64_t vlsn, int64_t dump_lsn,
 			      bool is_last_level, size_t *p_max_output_count)
 {
+	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
 	struct vy_run *run;
 	struct vy_mem *mem;
 	*p_max_output_count = 0;
 
-	wi = vy_write_iterator_new(range->index, is_last_level, vlsn);
+	wi = vy_write_iterator_new(index->env, &index->index_def->key_def,
+				   &index->user_index_def->key_def,
+				   index->surrogate_format,
+				   index->upsert_format,
+				   index->index_def->iid == 0,
+				   index->column_mask,
+				   is_last_level, vlsn);
 	if (wi == NULL)
 		goto err_wi;
 	/*
@@ -6617,18 +6635,17 @@ vy_check_update(const struct space *space, const struct vy_index *pk,
  * operation changes at least one indexed field and the
  * optimization is inapplicable. Otherwise, we can skip the
  * update.
- * @param idx         Secondary index which we try to update.
- * @param column_mask Maks of the update operations.
+ * @param index_column_mask Mask of index we try to update.
+ * @param stmt_column_mask  Maks of the update operations.
  */
 static bool
-vy_can_skip_update(const struct vy_index *idx, uint64_t column_mask)
+vy_can_skip_update(uint64_t index_column_mask, uint64_t stmt_column_mask)
 {
 	/*
 	 * Update of the primary index can't be skipped, since it
 	 * stores not indexes tuple fields besides indexed.
 	 */
-	assert(idx->index_def->iid > 0);
-	return (column_mask & idx->column_mask) == 0;
+	return (index_column_mask & stmt_column_mask) == 0;
 }
 
 /**
@@ -6643,7 +6660,7 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 {
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_index *index = vy_index(space->index[i]);
-		if (vy_can_skip_update(index, column_mask))
+		if (vy_can_skip_update(index->column_mask, column_mask))
 			return false;
 	}
 	return true;
@@ -9651,7 +9668,12 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
  *     ┃      ...      ┃
  */
 struct vy_write_iterator {
-	struct vy_index *index;
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** Index key definition used for storing statements on disk. */
+	const struct key_def *key_def;
+	/** Index key definition defined by the user. */
+	const struct key_def *user_key_def;
 	/**
 	 * Format to allocate new REPLACE and DELETE tuples from
 	 * vy_run. We have to store the reference to the format
@@ -9661,6 +9683,10 @@ struct vy_write_iterator {
 	struct tuple_format *surrogate_format;
 	/** Same as surrogate_format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
+	/** Set if this iterator is for a primary index. */
+	bool is_primary;
+	/** Index column mask. */
+	uint64_t column_mask;
 	/* The minimal VLSN among all active transactions */
 	int64_t oldest_vlsn;
 	/* There are is no level older than the one we're writing to. */
@@ -9681,11 +9707,15 @@ struct vy_write_iterator {
  * use vy_write_iterator_add_* functions
  */
 static int
-vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
-		       bool is_last_level, int64_t oldest_vlsn)
+vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_env *env,
+		       const struct key_def *key_def,
+		       const struct key_def *user_key_def,
+		       struct tuple_format *surrogate_format,
+		       struct tuple_format *upsert_format,
+		       bool is_primary, uint64_t column_mask,
+		       bool is_last_level, uint64_t oldest_vlsn)
 {
-	struct vy_env *env = index->env;
-	wi->index = index;
+	wi->env = env;
 	wi->oldest_vlsn = oldest_vlsn;
 	wi->is_last_level = is_last_level;
 	wi->goto_next_key = false;
@@ -9693,28 +9723,36 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_index *index,
 	wi->key = vy_stmt_new_select(env->key_format, NULL, 0);
 	if (wi->key == NULL)
 		return -1;
-	wi->surrogate_format = index->surrogate_format;
-	wi->upsert_format = index->upsert_format;
-	tuple_format_ref(wi->surrogate_format, 1);
-	tuple_format_ref(wi->upsert_format, 1);
-	vy_merge_iterator_open(&wi->mi, ITER_GE, wi->key,
-			       &index->index_def->key_def,
-			       wi->surrogate_format, wi->upsert_format,
-			       index->index_def->iid == 0);
+	wi->key_def = key_def;
+	wi->user_key_def = user_key_def;
+	wi->surrogate_format = surrogate_format;
+	wi->upsert_format = upsert_format;
+	tuple_format_ref(surrogate_format, 1);
+	tuple_format_ref(upsert_format, 1);
+	wi->is_primary = is_primary;
+	wi->column_mask = column_mask;
+	vy_merge_iterator_open(&wi->mi, ITER_GE, wi->key, key_def,
+			       surrogate_format, upsert_format, is_primary);
 	return 0;
 }
 
 static struct vy_write_iterator *
-vy_write_iterator_new(struct vy_index *index, bool is_last_level,
-		      int64_t oldest_vlsn)
+vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
+		      const struct key_def *user_key_def,
+		      struct tuple_format *surrogate_format,
+		      struct tuple_format *upsert_format,
+		      bool is_primary, uint64_t column_mask,
+		      bool is_last_level, int64_t oldest_vlsn)
 {
 	struct vy_write_iterator *wi = calloc(1, sizeof(*wi));
 	if (wi == NULL) {
 		diag_set(OutOfMemory, sizeof(*wi), "calloc", "wi");
 		return NULL;
 	}
-	if (vy_write_iterator_open(wi, index, is_last_level,
-				   oldest_vlsn) != 0) {
+	if (vy_write_iterator_open(wi, env, key_def, user_key_def,
+				   surrogate_format, upsert_format,
+				   is_primary, column_mask,
+				   is_last_level, oldest_vlsn) != 0) {
 		free(wi);
 		return NULL;
 	}
@@ -9730,11 +9768,10 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
-			     wi->index->env, run, ITER_GE, wi->key, &vlsn,
-			     &wi->index->index_def->key_def,
-			     &wi->index->user_index_def->key_def,
+			     wi->env, run, ITER_GE, wi->key, &vlsn,
+			     wi->key_def, wi->user_key_def,
 			     wi->surrogate_format, wi->upsert_format,
-			     wi->index->index_def->iid == 0);
+			     wi->is_primary);
 	return 0;
 }
 
@@ -9781,8 +9818,6 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 	wi->tmp_stmt = NULL;
 	struct vy_merge_iterator *mi = &wi->mi;
 	struct tuple *stmt = NULL;
-	struct vy_index *index = wi->index;
-	struct index_def *def = index->index_def;
 	/* @sa vy_write_iterator declaration for the algorithm description. */
 	while (true) {
 		if (wi->goto_next_key) {
@@ -9813,8 +9848,9 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 			 * skipped during dump,
 			 * @sa vy_can_skip_update().
 			 */
-			if (def->iid > 0 &&
-			    vy_can_skip_update(index, vy_stmt_column_mask(stmt)))
+			if (!wi->is_primary &&
+			    vy_can_skip_update(wi->column_mask,
+					       vy_stmt_column_mask(stmt)))
 				continue;
 			break; /* It's the resulting statement */
 		}
@@ -9828,10 +9864,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 		if (vy_stmt_type(stmt) == IPROTO_UPSERT && wi->is_last_level) {
 			/* Turn UPSERT to REPLACE. */
 			struct tuple *applied;
-			applied = vy_apply_upsert(stmt, NULL, &def->key_def,
+			applied = vy_apply_upsert(stmt, NULL, wi->key_def,
 						  wi->surrogate_format,
 						  wi->upsert_format,
-						  def->iid == 0, false, NULL);
+						  wi->is_primary, false, NULL);
 			tuple_unref(stmt);
 			if (applied == NULL)
 				return -1;
