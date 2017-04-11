@@ -1890,7 +1890,9 @@ vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 	size_t used = region_used(region);
 
 	struct xrow_header xrow;
-	if (vy_stmt_encode(value, index_def, &xrow) != 0)
+	if (vy_stmt_encode(value, &index_def->key_def,
+			   index_def->space_id, index_def->iid,
+			   &xrow) != 0)
 		return -1;
 
 	ssize_t row_size;
@@ -6526,9 +6528,8 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	} else { /* Primary is the single index in the space. */
 		assert(index->index_def->iid == 0);
 		struct tuple *delete =
-			vy_stmt_new_surrogate_delete_from_key(space->format,
-							      request->key,
-							      pk->index_def);
+			vy_stmt_new_surrogate_delete_from_key(request->key,
+					&pk->index_def->key_def, space->format);
 		if (delete == NULL)
 			return -1;
 		int rc = vy_tx_set(tx, pk, delete);
@@ -7682,7 +7683,8 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 		return NULL;
 	struct tuple_format *format_to_use = (xrow.type == IPROTO_UPSERT)
 		? upsert_format : format;
-	return vy_stmt_decode(&xrow, format_to_use, index_def);
+	return vy_stmt_decode(&xrow, &index_def->key_def, format_to_use,
+			      index_def->iid == 0);
 }
 
 /**

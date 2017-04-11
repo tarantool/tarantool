@@ -233,7 +233,7 @@ vy_stmt_is_region_allocated(const struct tuple *stmt)
  * Compare SELECT/DELETE statements using the key definition
  * @param a left operand (SELECT/DELETE)
  * @param b right operand (SELECT/DELETE)
- * @param index_def key definition
+ * @param key_def key definition
  *
  * @retval 0   if a == b
  * @retval > 0 if a > b
@@ -254,7 +254,7 @@ vy_key_compare(const struct tuple *a, const struct tuple *b,
  * Compare REPLACE/UPSERTS statements.
  * @param a left operand (REPLACE/UPSERT)
  * @param b right operand (REPLACE/UPSERT)
- * @param index_def key definition
+ * @param key_def key definition
  *
  * @retval 0   if a == b
  * @retval > 0 if a > b
@@ -370,20 +370,20 @@ vy_key_dup(const char *key);
  *
  * Example:
  * key: {a3, a5}
- * index_def: { 3, 5 }
+ * key_def: { 3, 5 }
  * result: {nil, nil, a3, nil, a5}
  *
+ * @param key     MessagePack array with key fields.
+ * @param key_def Key definition of the result statement.
  * @param format  Target tuple format.
- * @param key    MessagePack array with key fields.
- * @param def    Definition of the result statement.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format error.
  */
 struct tuple *
-vy_stmt_new_surrogate_delete_from_key(struct tuple_format *format,
-				      const char *key,
-				      const struct index_def *def);
+vy_stmt_new_surrogate_delete_from_key(const char *key,
+				      const struct key_def *def,
+				      struct tuple_format *format);
 
 /**
  * Create a new surrogate DELETE from @a tuple using @a format.
@@ -392,7 +392,7 @@ vy_stmt_new_surrogate_delete_from_key(struct tuple_format *format,
  *
  * Example:
  * original:      {a1, a2, a3, a4, a5}
- * index index_def: {2, 4}
+ * index key_def: {2, 4}
  * result:        {null, a2, null, a4, null}
  *
  * @param format Target tuple format.
@@ -492,7 +492,6 @@ vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
  * Create the SELECT statement from MessagePack array.
  * @param format  Format of an index.
  * @param key     MessagePack array of key fields.
- * @param index_def Definition of the key.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory error.
@@ -516,7 +515,9 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
  * @retval -1 if error
  */
 int
-vy_stmt_encode(const struct tuple *value, const struct index_def *index_def,
+vy_stmt_encode(const struct tuple *value,
+	       const struct key_def *key_def,
+	       uint32_t space_id, uint32_t index_id,
 	       struct xrow_header *xrow);
 
 /**
@@ -526,8 +527,8 @@ vy_stmt_encode(const struct tuple *value, const struct index_def *index_def,
  * @retval NULL on error
  */
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
-	       const struct index_def *def);
+vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
+	       struct tuple_format *format, bool is_primary);
 
 /**
  * Format a key into string.
