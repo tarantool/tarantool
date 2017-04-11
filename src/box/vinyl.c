@@ -7571,10 +7571,14 @@ struct vy_run_iterator {
 	struct vy_stmt_iterator base;
 	/** Usage statistics */
 	struct vy_iterator_stat *stat;
+	/** Vinyl environment. */
+	struct vy_env *env;
 
 	/* Members needed for memory allocation and disk access */
-	/* index */
-	struct vy_index *index;
+	/** Index key definition used for storing statements on disk. */
+	const struct key_def *key_def;
+	/** Index key definition defined by the user. */
+	const struct key_def *user_key_def;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
 	 * pages.
@@ -7582,6 +7586,8 @@ struct vy_run_iterator {
 	struct tuple_format *format;
 	/** Same as format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
+	/** Set if this iterator is for a primary index. */
+	bool is_primary;
 	/* run */
 	struct vy_run *run;
 
@@ -7619,11 +7625,14 @@ struct vy_run_iterator {
 
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_index *index, struct vy_run *run,
+		     struct vy_env *env, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
+		     const struct key_def *key_def,
+		     const struct key_def *user_key_def,
 		     struct tuple_format *format,
-		     struct tuple_format *upsert_format);
+		     struct tuple_format *upsert_format,
+		     bool is_primary);
 
 /* }}} vy_run_iterator API forward declaration */
 
@@ -7707,25 +7716,25 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
  * Read raw stmt data from the page
  * @param page          Page.
  * @param stmt_no       Statement position in the page.
+ * @param key_def       Key definition of an index.
  * @param format        Format for REPLACE/DELETE tuples.
  * @param upsert_format Format for UPSERT tuples.
- * @param index_def       Key definition of an index.
+ * @param is_primary    True if the index is primary.
  *
  * @retval not NULL Statement read from page.
  * @retval     NULL Memory error.
  */
 static struct tuple *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
-	     struct tuple_format *format, struct tuple_format *upsert_format,
-	     struct index_def *index_def)
+	     const struct key_def *key_def, struct tuple_format *format,
+	     struct tuple_format *upsert_format, bool is_primary)
 {
 	struct xrow_header xrow;
 	if (vy_page_xrow(page, stmt_no, &xrow) != 0)
 		return NULL;
 	struct tuple_format *format_to_use = (xrow.type == IPROTO_UPSERT)
 		? upsert_format : format;
-	return vy_stmt_decode(&xrow, &index_def->key_def, format_to_use,
-			      index_def->iid == 0);
+	return vy_stmt_decode(&xrow, key_def, format_to_use, is_primary);
 }
 
 /**
@@ -7944,8 +7953,7 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
-	struct vy_index *index = itr->index;
-	const struct vy_env *env = index->env;
+	struct vy_env *env = itr->env;
 
 	/* Check cache */
 	*result = vy_run_iterator_cache_get(itr, page_no);
@@ -7970,7 +7978,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/* Allocate a coio task */
 		struct vy_page_read_task *task =
-			(struct vy_page_read_task *)mempool_alloc(&itr->index->env->read_task_pool);
+			(struct vy_page_read_task *)mempool_alloc(&env->read_task_pool);
 		if (task == NULL) {
 			diag_set(OutOfMemory, sizeof(*task), "malloc",
 				 "vy_page_read_task");
@@ -7987,7 +7995,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->run = itr->run;
 		vy_run_ref(task->run);
 		task->page_info = *page_info;
-		task->env = index->env;
+		task->env = env;
 		task->page = page;
 
 		/* Post task to coeio */
@@ -8003,14 +8011,13 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		}
 
 		coio_task_destroy(&task->base);
-		mempool_free(&task->env->read_task_pool, task);
+		mempool_free(&env->read_task_pool, task);
 
 		if (vy_run_unref(itr->run)) {
 			/*
 			 * The run's gone so the iterator isn't
 			 * valid anymore.
 			 */
-			itr->index = NULL;
 			itr->run = NULL;
 			vy_page_delete(page);
 			return -2;
@@ -8020,7 +8027,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->index->env);
+		ZSTD_DStream *zdctx = vy_env_get_zdctx(env);
 		if (zdctx == NULL) {
 			vy_page_delete(page);
 			return -1;
@@ -8059,8 +8066,8 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
 	if (rc != 0)
 		return rc;
-	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->format,
-			     itr->upsert_format, itr->index->index_def);
+	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->key_def,
+			     itr->format, itr->upsert_format, itr->is_primary);
 	if (*stmt == NULL)
 		return -1;
 	return 0;
@@ -8082,14 +8089,13 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
 	/* for upper bound we change zero comparison result to -1 */
 	int zero_cmp = itr->iterator_type == ITER_GT ||
 		       itr->iterator_type == ITER_LE ? -1 : 0;
-	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
 		struct vy_page_info *page_info;
 		page_info = vy_run_page_info(itr->run, mid);
 		int cmp;
 		cmp = -vy_stmt_compare_with_raw_key(key, page_info->min_key,
-						    &idx->index_def->key_def);
+						    itr->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
@@ -8117,15 +8123,14 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	/* for upper bound we change zero comparison result to -1 */
 	int zero_cmp = itr->iterator_type == ITER_GT ||
 		       itr->iterator_type == ITER_LE ? -1 : 0;
-	struct vy_index *idx = itr->index;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->format,
-						     itr->upsert_format,
-						     itr->index->index_def);
+		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->key_def,
+						itr->format, itr->upsert_format,
+						itr->is_primary);
 		if (fnd_key == NULL)
 			return end;
-		int cmp = vy_stmt_compare(fnd_key, key, &idx->index_def->key_def);
+		int cmp = vy_stmt_compare(fnd_key, key, itr->key_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
@@ -8236,7 +8241,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	assert(itr->curr_pos.page_no < itr->run->info.count);
 	struct tuple *stmt;
-	struct index_def *index_def = itr->index->index_def;
+	const struct key_def *key_def = itr->key_def;
 	const struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
@@ -8258,7 +8263,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 		if (rc != 0)
 			return rc;
 		if (iterator_type == ITER_EQ &&
-		    vy_stmt_compare(stmt, key, &index_def->key_def)) {
+		    vy_stmt_compare(stmt, key, key_def)) {
 			tuple_unref(stmt);
 			stmt = NULL;
 			vy_run_iterator_cache_clean(itr);
@@ -8285,8 +8290,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 			if (rc != 0)
 				return rc;
 			if (vy_stmt_lsn(test_stmt) > *itr->vlsn ||
-			    vy_tuple_compare(stmt, test_stmt,
-					     &index_def->key_def) != 0) {
+			    vy_tuple_compare(stmt, test_stmt, key_def) != 0) {
 				tuple_unref(test_stmt);
 				test_stmt = NULL;
 				break;
@@ -8333,16 +8337,16 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 	itr->search_started = true;
 	*ret = NULL;
 
-	struct index_def *user_index_def = itr->index->user_index_def;
+	const struct key_def *user_key_def = itr->user_key_def;
 	if (itr->run->info.has_bloom && itr->iterator_type == ITER_EQ &&
-	    tuple_field_count(itr->key) >= user_index_def->key_def.part_count) {
+	    tuple_field_count(itr->key) >= user_key_def->part_count) {
 		uint32_t hash;
 		if (vy_stmt_type(itr->key) == IPROTO_SELECT) {
 			const char *data = tuple_data(itr->key);
 			mp_decode_array(&data);
-			hash = key_hash(data, &user_index_def->key_def);
+			hash = key_hash(data, user_key_def);
 		} else {
-			hash = tuple_hash(itr->key, &user_index_def->key_def);
+			hash = tuple_hash(itr->key, user_key_def);
 		}
 		if (!bloom_possible_has(&itr->run->info.bloom, hash)) {
 			itr->search_ended = true;
@@ -8435,17 +8439,23 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  */
 static void
 vy_run_iterator_open(struct vy_run_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_index *index, struct vy_run *run,
+		     struct vy_env *env, struct vy_run *run,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, const int64_t *vlsn,
+		     const struct key_def *key_def,
+		     const struct key_def *user_key_def,
 		     struct tuple_format *format,
-		     struct tuple_format *upsert_format)
+		     struct tuple_format *upsert_format,
+		     bool is_primary)
 {
 	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
+	itr->env = env;
+	itr->key_def = key_def;
+	itr->user_key_def = user_key_def;
 	itr->format = format;
 	itr->upsert_format = upsert_format;
-	itr->index = index;
+	itr->is_primary = is_primary;
 	itr->run = run;
 
 	itr->iterator_type = iterator_type;
@@ -8526,7 +8536,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 		return vy_run_iterator_start(itr, ret);
 	uint32_t end_page = itr->run->info.count;
 	assert(itr->curr_pos.page_no <= end_page);
-	struct index_def *index_def = itr->index->index_def;
+	const struct key_def *key_def = itr->key_def;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		if (itr->curr_pos.page_no == 0 &&
 		    itr->curr_pos.pos_in_page == 0) {
@@ -8590,11 +8600,11 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 
 		/* See above */
 		vy_run_iterator_cache_touch(itr, cur_key_page_no);
-	} while (vy_tuple_compare(cur_key, next_key, &index_def->key_def) == 0);
+	} while (vy_tuple_compare(cur_key, next_key, key_def) == 0);
 	tuple_unref(cur_key);
 	cur_key = NULL;
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(next_key, itr->key, &index_def->key_def) != 0) {
+	    vy_stmt_compare(next_key, itr->key, key_def) != 0) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		tuple_unref(next_key);
@@ -8654,8 +8664,7 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 	 *  So in the case no page will be unloaded and we don't need
 	 *  page lock
 	 */
-	struct index_def *index_def = itr->index->index_def;
-	int cmp = vy_tuple_compare(cur_key, next_key, &index_def->key_def);
+	int cmp = vy_tuple_compare(cur_key, next_key, itr->key_def);
 	tuple_unref(cur_key);
 	cur_key = NULL;
 	tuple_unref(next_key);
@@ -8719,7 +8728,7 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		return rc;
 	else if (next == NULL)
 		return 0;
-	struct key_def *def = &itr->index->index_def->key_def;
+	const struct key_def *def = itr->key_def;
 	bool position_changed = true;
 	if (vy_stmt_compare(next, last_stmt, def) == 0) {
 		position_changed = false;
@@ -9721,8 +9730,11 @@ vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run)
 		return -1;
 	static const int64_t vlsn = INT64_MAX;
 	vy_run_iterator_open(&src->run_iterator, &wi->run_iterator_stat,
-			     wi->index, run, ITER_GE, wi->key, &vlsn,
-			     wi->surrogate_format, wi->upsert_format);
+			     wi->index->env, run, ITER_GE, wi->key, &vlsn,
+			     &wi->index->index_def->key_def,
+			     &wi->index->user_index_def->key_def,
+			     wi->surrogate_format, wi->upsert_format,
+			     wi->index->index_def->iid == 0);
 	return 0;
 }
 
@@ -9954,9 +9966,12 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, stat,
-				     itr->index, run, itr->iterator_type,
-				     itr->key, itr->vlsn, format,
-				     itr->index->upsert_format);
+				     itr->index->env, run, itr->iterator_type,
+				     itr->key, itr->vlsn,
+				     &itr->index->index_def->key_def,
+				     &itr->index->user_index_def->key_def,
+				     format, itr->index->upsert_format,
+				     itr->index->index_def->iid == 0);
 	}
 }
 
