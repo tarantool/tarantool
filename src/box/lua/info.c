@@ -113,7 +113,7 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	struct applier *applier = replica->applier;
 	struct relay *relay = replica->relay;
 
-	/* 16 is used to get the best visual expirience in YAML output */
+	/* 16 is used to get the best visual experience in YAML output */
 	lua_createtable(L, 0, 16);
 
 	lua_pushstring(L, "id");

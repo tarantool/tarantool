@@ -51,11 +51,11 @@
 #include "xrow_io.h"
 #include "xstream.h"
 
-/** Report relay status to tx at least with this interval */
+/** Report relay status to tx thread at least once per this interval */
 static const int RELAY_REPORT_INTERVAL = 1;
 
 /**
- * Cbus message to send status updates from Relay to TX
+ * Cbus message to send status updates from relay to tx thread.
  */
 struct relay_status_msg {
 	/** Parent */
@@ -67,7 +67,7 @@ struct relay_status_msg {
 };
 
 /**
- * Cbus message to notify TX thread that relay is stopping.
+ * Cbus message to notify tx thread that relay is stopping.
  */
 struct relay_exit_msg {
 	/** Parent */
@@ -109,11 +109,11 @@ struct relay {
 	struct relay_exit_msg exit_msg;
 
 	struct {
-		/* Align to prevent false-sharing with TX thread */
+		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
 		/** Current vclock sent by relay */
 		struct vclock vclock;
-		/** The condition will be signaled if relay want to exit. */
+		/** The condition is signaled at relay exit. */
 		struct ipc_cond exit_cond;
 	} tx;
 };
@@ -218,21 +218,28 @@ feed_event_f(struct trigger *trigger, void * /* event */)
 	ev_feed_event(loop(), (struct ev_io *) trigger->data, EV_CUSTOM);
 }
 
+/**
+ * The message which updated tx thread with a new vclock has returned back
+ * to the relay.
+ */
 static void
-relay_status_updated(struct cmsg *msg)
+relay_status_update(struct cmsg *msg)
 {
 	msg->route = NULL;
 	struct relay_status_msg *status_msg = (struct relay_status_msg *)msg;
 	ipc_cond_signal(&status_msg->relay->status_cond);
 }
 
+/**
+ * Deliver a fresh relay vclock to tx thread.
+ */
 static void
 tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
 	static const struct cmsg_hop route[] = {
-		{relay_status_updated, NULL}
+		{relay_status_update, NULL}
 	};
 	cmsg_init(msg, route);
 	cpipe_push(&status->relay->relay_pipe, msg);
@@ -261,9 +268,10 @@ relay_cbus_detach(struct relay *relay)
 	relay->exit_msg.relay = relay;
 	cpipe_push(&relay->tx_pipe, &relay->exit_msg.msg);
 	/*
-	 * Relay should not destroy its endpoint
-	 * until corresponding callee fiber/cord pipe created,
-	 * otherwise callee will wait infinitelly
+	 * The relay must not destroy its endpoint until the
+	 * corresponding callee's fiber/cord has destroyed its
+	 * counterpart, otherwise the callee will wait
+	 * indefinitely.
 	 */
 	cpipe_destroy(&relay->tx_pipe);
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
@@ -287,11 +295,11 @@ relay_subscribe_f(va_list ap)
 			     fiber_schedule_cb, fiber());
 	/*
 	 * Use tx_prio router because our handler never yields and
-	 * ust updates struct relay members.
+	 * just updates struct relay members.
 	 */
 	cpipe_create(&relay->tx_pipe, "tx_prio");
 
-	/* Create guard to deatach relay from cbus on exit */
+	/* Create a guard to detach the relay from cbus on exit */
 	auto cbus_guard = make_scoped_guard([&]{
 		relay_cbus_detach(relay);
 	});
@@ -347,7 +355,10 @@ relay_subscribe_f(va_list ap)
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 
-		/* Check that vclock updated and previous status delivered */
+		/*
+		 * Check that the vclock has been updated and the previous
+		 * status message is delivered
+		 */
 		if (relay->status_msg.msg.route != NULL ||
 		    vclock_compare(&relay->status_msg.vclock,
 				   &r->vclock) == 0)
@@ -404,14 +415,14 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	cord_costart(&cord, name, relay_subscribe_f, &relay);
 	cpipe_create(&relay.relay_pipe, name);
 	/*
-	 * When relay will exit then send a message with exit condition
-	 * signal.
+	 * When relay exits, it sends a message which signals the
+	 * exit condition in tx thread.
 	 */
 	ipc_cond_wait(&relay.tx.exit_cond);
 	ipc_cond_destroy(&relay.tx.exit_cond);
 	/*
-	 * Destroy cpipe so relay fiber can destroy corresponding
-	 * endpoint and exit.
+	 * Destroy the cpipe so that relay fiber can destroy
+	 * the corresponding endpoint and exit.
 	 */
 	cpipe_destroy(&relay.relay_pipe);
 	if (cord_cojoin(&cord) != 0) {
