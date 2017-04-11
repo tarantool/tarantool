@@ -123,7 +123,7 @@ const uint64_t iproto_body_key_map[IPROTO_CALL + 1] = {
 const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
-	"replica_id",       /* 0x02 */
+	"replica id",       /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
 	NULL,               /* 0x05 */
@@ -137,12 +137,12 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	NULL,               /* 0x0d */
 	NULL,               /* 0x0e */
 	NULL,               /* 0x0f */
-	"space_id",         /* 0x10 */
-	"index_id",         /* 0x11 */
+	"space id",         /* 0x10 */
+	"index id",         /* 0x11 */
 	"limit",            /* 0x12 */
 	"offset",           /* 0x13 */
 	"iterator",         /* 0x14 */
-	"index_base",       /* 0x15 */
+	"index base",       /* 0x15 */
 	NULL,               /* 0x16 */
 	NULL,               /* 0x17 */
 	NULL,               /* 0x18 */
@@ -157,8 +157,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"instance UUID",    /* 0x24 */
-	"cluster UUID",     /* 0x25 */
+	"instance uuid",    /* 0x24 */
+	"cluster uuid",     /* 0x25 */
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
