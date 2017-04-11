@@ -1,6 +1,8 @@
 -- wal is off, good opportunity to test something more CPU intensive:
 env = require('test_run')
 test_run = env.new()
+-- need a clean server to count the number of tuple formats
+test_run:cmd('restart server default with cleanup=1')
 spaces = {}
 box.schema.FORMAT_ID_MAX
 test_run:cmd("setopt delimiter ';'")
