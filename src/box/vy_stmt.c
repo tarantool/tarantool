@@ -452,7 +452,7 @@ vy_stmt_encode(const struct tuple *value, const struct index_def *index_def,
 	uint32_t size;
 	const char *extracted = NULL;
 	if (index_def->iid != 0 || type == IPROTO_DELETE) {
-		extracted = tuple_extract_key(value, index_def, &size);
+		extracted = tuple_extract_key(value, &index_def->key_def, &size);
 		if (extracted == NULL)
 			return -1;
 	}

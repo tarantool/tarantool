@@ -1951,7 +1951,8 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	uint32_t size;
-	const char *region_key = tuple_extract_key(min_stmt, index_def, &size);
+	const char *region_key = tuple_extract_key(min_stmt,
+				&index_def->key_def, &size);
 	if (region_key == NULL)
 		return -1;
 	page_info->min_key = vy_key_dup(region_key);
@@ -2064,7 +2065,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		tuple_ref(stmt);
 		if (vy_run_dump_stmt(stmt, data_xlog, page, index_def) != 0)
 			goto error_rollback;
-		bloom_spectrum_add(bs, tuple_hash(stmt, user_index_def));
+		bloom_spectrum_add(bs, tuple_hash(stmt, &user_index_def->key_def));
 
 		if (vy_write_iterator_next(wi, curr_stmt))
 			goto error_rollback;
@@ -2085,7 +2086,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		 * than a fiber. To reach this, we must copy the
 		 * key into malloced memory.
 		 */
-		*max_key = tuple_extract_key(stmt, index_def, NULL);
+		*max_key = tuple_extract_key(stmt, &index_def->key_def, NULL);
 		tuple_unref(stmt);
 		if (*max_key == NULL)
 			goto error_rollback;
@@ -6155,7 +6156,7 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
 	struct index_def *def = pk->index_def;
 	const char *key;
 	assert(def->iid == 0);
-	key = tuple_extract_key(stmt, def, NULL);
+	key = tuple_extract_key(stmt, &def->key_def, NULL);
 	if (key == NULL)
 		return -1;
 	/*
@@ -6183,7 +6184,8 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 {
 	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	assert(index->index_def->iid > 0);
+	struct index_def *def = index->index_def;
+	assert(def->iid > 0);
 	/*
 	 * If the index is unique then the new tuple must not
 	 * conflict with existing tuples. If the index is not
@@ -6191,7 +6193,7 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 	 */
 	if (index->user_index_def->opts.is_unique) {
 		uint32_t key_len;
-		const char *key = tuple_extract_key(stmt, index->index_def,
+		const char *key = tuple_extract_key(stmt, &def->key_def,
 						    &key_len);
 		if (key == NULL)
 			return -1;
@@ -6238,7 +6240,7 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
 		const char *key;
-		key = tuple_extract_key(new_tuple, def, NULL);
+		key = tuple_extract_key(new_tuple, &def->key_def, NULL);
 		if (key == NULL)                /* out of memory */
 			return -1;
 		uint32_t part_count = mp_decode_array(&key);
@@ -6288,7 +6290,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
-	const char *key = tuple_extract_key(new_stmt, def, NULL);
+	const char *key = tuple_extract_key(new_stmt, &def->key_def, NULL);
 	if (key == NULL) /* out of memory */
 		goto error;
 	uint32_t part_count = mp_decode_array(&key);
@@ -6406,7 +6408,8 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	uint32_t size;
 	const char *tuple = tuple_data_range(partial, &size);
 	const char *tuple_end = tuple + size;
-	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, to_pk, NULL);
+	const char *pkey = tuple_extract_key_raw(tuple, tuple_end,
+						 &to_pk->key_def, NULL);
 	if (pkey == NULL)
 		return -1;
 	/* Fetch the tuple from the primary index. */
@@ -6809,7 +6812,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	 *   to delete old tuples from secondary indexes.
 	 */
 	/* Find the old tuple using the primary key. */
-	key = tuple_extract_key_raw(tuple, tuple_end, pk_def, NULL);
+	key = tuple_extract_key_raw(tuple, tuple_end, &pk_def->key_def, NULL);
 	if (key == NULL)
 		return -1;
 	part_count = mp_decode_array(&key);
@@ -8294,9 +8297,9 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 		if (vy_stmt_type(itr->key) == IPROTO_SELECT) {
 			const char *data = tuple_data(itr->key);
 			mp_decode_array(&data);
-			hash = key_hash(data, user_index_def);
+			hash = key_hash(data, &user_index_def->key_def);
 		} else {
-			hash = tuple_hash(itr->key, user_index_def);
+			hash = tuple_hash(itr->key, &user_index_def->key_def);
 		}
 		if (!bloom_possible_has(&itr->run->info.bloom, hash)) {
 			itr->search_ended = true;

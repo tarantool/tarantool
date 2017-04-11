@@ -339,7 +339,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
-						index_def, NULL);
+						&index_def->key_def, NULL);
 	if (key == NULL)
 		diag_raise();
 	/* Cut array header */
