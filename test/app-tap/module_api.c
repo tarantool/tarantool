@@ -347,6 +347,31 @@ test_key_def_api(lua_State *L)
 	return 1;
 }
 
+static int
+check_error(lua_State *L)
+{
+	uint32_t fieldno1[] = {0};
+	uint32_t type1[] = {FIELD_TYPE_STRING};
+	uint32_t fieldno2[] = {0};
+	uint32_t type2[] = {FIELD_TYPE_UNSIGNED};
+	box_key_def_t *key_defs[] = {
+		box_key_def_new(fieldno1, type1, 1),
+		box_key_def_new(fieldno2, type2, 1)};
+	box_tuple_format_t *format = box_tuple_format_new(key_defs, 2);
+	if (format != NULL) {
+		box_tuple_format_unref(format);
+		box_key_def_delete(key_defs[0]);
+		box_key_def_delete(key_defs[1]);
+		lua_pushboolean(L, false);
+		return 1;
+	}
+	luaT_error(L);
+	box_tuple_format_unref(format);
+	box_key_def_delete(key_defs[0]);
+	box_key_def_delete(key_defs[1]);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -369,6 +394,7 @@ luaopen_module_api(lua_State *L)
 		{"test_clock", test_clock },
 		{"test_pushtuple", test_pushtuple},
 		{"test_key_def_api", test_key_def_api},
+		{"check_error", check_error},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
