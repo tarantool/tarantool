@@ -1651,7 +1651,7 @@ iterate_over(iter_obj3)
 ...
 iterate_over(iter_obj4)
 ---
-- error: The transaction that own the cursor has ended
+- error: The transaction the cursor belongs to has ended
 ...
 space:truncate()
 ---
@@ -1792,7 +1792,7 @@ box.commit()
 ...
 iterate_over(iter_obj)
 ---
-- error: The transaction that own the cursor has ended
+- error: The transaction the cursor belongs to has ended
 ...
 space:truncate()
 ---
