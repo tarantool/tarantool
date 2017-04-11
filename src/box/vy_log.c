@@ -524,6 +524,7 @@ vy_log_record_encode(const struct vy_log_record *record,
 	req.tuple = tuple;
 	req.tuple_end = pos;
 	memset(row, 0, sizeof(*row));
+	row->type = req.type;
 	row->lsn = record->signature;
 	row->bodycnt = request_encode(&req, row->body);
 	return 0;
