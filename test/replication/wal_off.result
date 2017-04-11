@@ -45,14 +45,22 @@ box.cfg { replication = wal_off_uri }
 check = "Replication does not support wal_mode = 'none'"
 ---
 ...
-while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
+while box.info.replication[wal_off_id].upstream.message ~= check do fiber.sleep(0) end
 ---
 ...
-box.info.replication[wal_off_id].status
+box.info.replication[wal_off_id].upstream ~= nil
+---
+- true
+...
+box.info.replication[wal_off_id].downstream ~= nil
+---
+- true
+...
+box.info.replication[wal_off_id].upstream.status
 ---
 - stopped
 ...
-box.info.replication[wal_off_id].message
+box.info.replication[wal_off_id].upstream.message
 ---
 - Replication does not support wal_mode = 'none'
 ...
@@ -76,7 +84,7 @@ box.cfg { replication = wal_off_uri }
 check = "Read access on universe is denied for user 'guest'"
 ---
 ...
-while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
+while box.info.replication[wal_off_id].upstream.message ~= check do fiber.sleep(0) end
 ---
 ...
 box.cfg { replication = "" }

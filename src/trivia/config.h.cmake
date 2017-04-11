@@ -227,6 +227,9 @@
 
 #cmakedefine ENABLE_ASAN 1
 
+/* Cacheline size to calculate alignments */
+#define CACHELINE_SIZE 64
+
 /*
  * vim: syntax=c
  */

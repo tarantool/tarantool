@@ -43,7 +43,6 @@ extern "C" {
 
 enum { FIBER_POOL_SIZE = 4096, FIBER_POOL_IDLE_TIMEOUT = 1 };
 
-#define CACHELINE_SIZE 64
 /**
  * A pool of worker fibers to handle messages,
  * so that each message is handled in its own fiber.
@@ -75,7 +74,6 @@ struct fiber_pool {
 		struct cbus_endpoint endpoint;
 	};
 };
-#undef CACHELINE_SIZE
 
 /**
  * Initialize a fiber pool and connect it to a pipe. Currently

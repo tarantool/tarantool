@@ -26,15 +26,15 @@ test_run:cmd('switch replica')
 r = box.info.replication[1]
 ---
 ...
-r.status == "follow"
+r.upstream.status == "follow"
 ---
 - true
 ...
-r.lag < 1
+r.upstream.lag < 1
 ---
 - true
 ...
-r.idle < 1
+r.upstream.idle < 1
 ---
 - true
 ...
@@ -61,11 +61,11 @@ test_run:cmd('switch replica')
 r = box.info.replication[1]
 ---
 ...
-r.status == "stopped"
+r.upstream.status == "stopped"
 ---
 - true
 ...
-r.message:match('Duplicate') ~= nil
+r.upstream.message:match('Duplicate') ~= nil
 ---
 - true
 ...
