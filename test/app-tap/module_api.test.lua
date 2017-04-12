@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
 
 box.cfg{log = "tarantool.log"}
-
-package.cpath = '../app-tap/?.so;../app-tap/?.dylib;'
+build_path = os.getenv("BUILDDIR")
+package.cpath = build_path .. '/test/app-tap/?.so;' .. build_path .. '/test/app-tap/?.dylib;'
 
 local function test_pushcdata(test, module)
     test:plan(6)
