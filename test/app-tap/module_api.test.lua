@@ -47,7 +47,7 @@ local test = require('tap').test("module_api", function(test)
     end
 
     local status, msg = pcall(module.check_error)
-    test:like(msg, 'Ambiguous field type, field 1', 'luaT_error')
+    test:like(msg, 'luaT_error', 'luaT_error')
 
     test:test("pushcdata", test_pushcdata, module)
 end)

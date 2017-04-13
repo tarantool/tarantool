@@ -350,25 +350,8 @@ test_key_def_api(lua_State *L)
 static int
 check_error(lua_State *L)
 {
-	uint32_t fieldno1[] = {0};
-	uint32_t type1[] = {FIELD_TYPE_STRING};
-	uint32_t fieldno2[] = {0};
-	uint32_t type2[] = {FIELD_TYPE_UNSIGNED};
-	box_key_def_t *key_defs[] = {
-		box_key_def_new(fieldno1, type1, 1),
-		box_key_def_new(fieldno2, type2, 1)};
-	box_tuple_format_t *format = box_tuple_format_new(key_defs, 2);
-	if (format != NULL) {
-		box_tuple_format_unref(format);
-		box_key_def_delete(key_defs[0]);
-		box_key_def_delete(key_defs[1]);
-		lua_pushboolean(L, false);
-		return 1;
-	}
+	box_error_raise(ER_UNSUPPORTED, "test for luaT_error");
 	luaT_error(L);
-	box_tuple_format_unref(format);
-	box_key_def_delete(key_defs[0]);
-	box_key_def_delete(key_defs[1]);
 	return 1;
 }
 
