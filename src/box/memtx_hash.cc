@@ -127,7 +127,7 @@ MemtxHash::MemtxHash(struct index_def *index_def_arg)
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
 	if (hash_table == NULL) {
-		tnt_raise(OutOfMemory, sizeof(hash_table),
+		tnt_raise(OutOfMemory, sizeof(*hash_table),
 			  "MemtxHash", "hash_table");
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,

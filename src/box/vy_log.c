@@ -616,7 +616,7 @@ vy_log_record_decode(struct vy_log_record *record,
 		default:
 			goto fail;
 		}
-		key_mask |= 1 << key;
+		key_mask |= 1UL << key;
 	}
 	if ((key_mask & vy_log_key_mask[record->type]) !=
 			vy_log_key_mask[record->type])

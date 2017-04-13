@@ -2315,7 +2315,7 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow)
 	const char *key_beg;
 	for (map_item = 0; map_item < map_size; ++map_item) {
 		uint32_t key = mp_decode_uint(&pos);
-		key_map &= ~(1 << key);
+		key_map &= ~(1ULL << key);
 		switch (key) {
 		case VY_PAGE_INFO_OFFSET:
 			page->offset = mp_decode_uint(&pos);
@@ -2499,7 +2499,7 @@ vy_run_info_decode(struct vy_run_info *run_info,
 	/* decode run values */
 	for (map_item = 0; map_item < map_size; ++map_item) {
 		uint32_t key = mp_decode_uint(&pos);
-		key_map &= ~(1 << key);
+		key_map &= ~(1ULL << key);
 		switch (key) {
 		case VY_RUN_INFO_MIN_LSN:
 			run_info->min_lsn = mp_decode_uint(&pos);

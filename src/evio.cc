@@ -106,19 +106,17 @@ evio_setsockopt_client(int fd, int family, int type)
 	/* In case this throws, the socket is not leaked. */
 	sio_setfl(fd, O_NONBLOCK, on);
 	if (type == SOCK_STREAM && family != AF_UNIX) {
-		if (family != AF_UNIX) {
-			/*
-			 * SO_KEEPALIVE to ensure connections don't hang
-			 * around for too long when a link goes away.
-			 */
-			evio_setsockopt_keepalive(fd);
-			/*
-			 * Lower latency is more important than higher
-			 * bandwidth, and we usually write entire
-			 * request/response in a single syscall.
-			 */
-			sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
-		}
+		/*
+		 * SO_KEEPALIVE to ensure connections don't hang
+		 * around for too long when a link goes away.
+		 */
+		evio_setsockopt_keepalive(fd);
+		/*
+		 * Lower latency is more important than higher
+		 * bandwidth, and we usually write entire
+		 * request/response in a single syscall.
+		 */
+		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
 	}
 }
 

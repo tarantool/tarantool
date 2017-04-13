@@ -378,7 +378,7 @@ void test_not_last() {
 		pos = bitset_iterator_next(&it);
 		fail_unless (result[i] == pos);
 	}
-	fail_unless (pos = bitset_iterator_next(&it) == SIZE_MAX);
+	fail_unless ((pos = bitset_iterator_next(&it)) == SIZE_MAX);
 
 	bitset_iterator_destroy(&it);
 

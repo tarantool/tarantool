@@ -93,13 +93,12 @@ iterator_check()
 	printf("Test tree size: %d\n", (int)test_size(&tree));
 
 	/* Test that tree filled ok */
-	for (long i = 0; i < count1; i++) {
-		for (long j = 0; j < count2; j++) {
-			if (test_find(&tree, i * 2) == 0)
-				fail("Integrity check failed (1)", "true");
-			if (test_find(&tree, i * 2 + 1) != 0)
-				fail("Integrity check failed (2)", "true");
-		}
+	for (long i = 0; i < count1 * count2; i++) {
+		long key = i % count1;
+		if (test_find(&tree, key * 2) == 0)
+			fail("Integrity check failed (1)", "true");
+		if (test_find(&tree, key * 2 + 1) != 0)
+			fail("Integrity check failed (2)", "true");
 	}
 
 	/* Print first 7 elems */

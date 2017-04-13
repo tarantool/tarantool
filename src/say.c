@@ -489,7 +489,7 @@ say_parse_syslog_opts(const char *init_str,
 
 	/* strsep() overwrites the separator with '\0' */
 	while ((option = strsep(&ptr, ","))) {
-		if (option == NULL || *option == '\0')
+		if (*option == '\0')
 			break;
 
 		value = option;
