@@ -460,7 +460,7 @@ box.schema.index.create = function(space_id, name, options)
             range_size = options.range_size,
             run_count_per_level = options.run_count_per_level,
             run_size_ratio = options.run_size_ratio,
-            lsn = box.info.cluster.signature,
+            lsn = box.info.signature,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2

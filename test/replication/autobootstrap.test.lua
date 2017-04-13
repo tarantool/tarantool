@@ -26,11 +26,11 @@ vclock_diff(vclock1, test_run:get_vclock('autobootstrap3'))
 -- Insert rows on each server
 --
 _ = test_run:cmd("switch autobootstrap1")
-_ = box.space.test:insert({box.info.server.id})
+_ = box.space.test:insert({box.info.id})
 _ = test_run:cmd("switch autobootstrap2")
-_ = box.space.test:insert({box.info.server.id})
+_ = box.space.test:insert({box.info.id})
 _ = test_run:cmd("switch autobootstrap3")
-_ = box.space.test:insert({box.info.server.id})
+_ = box.space.test:insert({box.info.id})
 _ = test_run:cmd("switch default")
 
 --

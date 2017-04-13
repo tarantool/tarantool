@@ -19,7 +19,7 @@ print 'Bootstrap replicas'
 print '----------------------------------------------------------------------'
 
 # Start replicas
-master.id = master.get_param('server')['id']
+master.id = master.get_param('id')
 cluster = [ master ]
 for i in range(REPLICA_N - 1):
     server = TarantoolServer(server.ini)
@@ -35,7 +35,7 @@ for i in range(REPLICA_N - 1):
 sources = []
 for server in cluster:
     sources.append(yaml.load(server.admin('box.cfg.listen', silent = True))[0])
-    server.id = server.get_param('server')['id']
+    server.id = server.get_param('id')
 
 print 'done'
 

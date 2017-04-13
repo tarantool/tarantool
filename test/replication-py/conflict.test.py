@@ -52,8 +52,8 @@ def prepare_cluster():
     replica.start()
 
     master.admin("box.cfg{replication='%s'}" % replica.iproto.uri, silent=True)
-    r1_id = replica.get_param('server')['id']
-    r2_id = master.get_param('server')['id']
+    r1_id = replica.get_param('id')
+    r2_id = master.get_param('id')
 
     master.admin("space = box.schema.space.create('test')", silent=True)
     master.admin("index = space:create_index('primary', { type = 'tree'})", silent=True)

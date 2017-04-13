@@ -100,7 +100,7 @@ print '-------------------------------------------------------------'
 print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
 
-master_uuid = server.get_param('server')['uuid']
+master_uuid = server.get_param('uuid')
 sys.stdout.push_filter(master_uuid, '<master uuid>')
 
 # Invalid UUID
@@ -142,7 +142,7 @@ print 'Start a new replica and check box.info on the start'
 print '-------------------------------------------------------------'
 # master server
 master = server
-master_id = master.get_param('server')['id']
+master_id = master.get_param('id')
 
 master.admin("box.schema.user.grant('guest', 'replication')")
 
@@ -151,20 +151,20 @@ replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
-replica_id = replica.get_param('server')['id']
-replica_uuid = replica.get_param('server')['uuid']
+replica_id = replica.get_param('id')
+replica_uuid = replica.get_param('uuid')
 sys.stdout.push_filter(replica_uuid, '<replica uuid>')
 
-replica.admin('box.info.server.id == %d' % replica_id)
-replica.admin('not box.info.server.ro')
-replica.admin('box.info.server.lsn == 0')
+replica.admin('box.info.id == %d' % replica_id)
+replica.admin('not box.info.ro')
+replica.admin('box.info.lsn == 0')
 replica.admin('box.info.vclock[%d] == nil' % replica_id)
 
 print '-------------------------------------------------------------'
 print 'Modify data to bump LSN and check box.info'
 print '-------------------------------------------------------------'
 replica.admin('box.space._schema:insert{"test", 48}')
-replica.admin('box.info.server.lsn == 1')
+replica.admin('box.info.lsn == 1')
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
 
 print '-------------------------------------------------------------'
@@ -193,7 +193,7 @@ print '-------------------------------------------------------------'
 print 'Modify data to bump LSN on replica'
 print '-------------------------------------------------------------'
 replica.admin('box.space._schema:insert{"tost", 49}')
-replica.admin('box.info.server.lsn == 2')
+replica.admin('box.info.lsn == 2')
 replica.admin('box.info.vclock[%d] == 2' % replica_id)
 
 print '-------------------------------------------------------------'
@@ -230,8 +230,8 @@ replica.rpl_master = master
 replica.deploy()
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 # Check that replica_id was re-used
-replica.admin('box.info.server.id == %d' % replica_id)
-replica.admin('not box.info.server.ro')
+replica.admin('box.info.id == %d' % replica_id)
+replica.admin('not box.info.ro')
 # All records were succesfully recovered.
 # Replica should have the same vclock as master.
 master.admin('box.info.vclock[%d] == 2' % replica_id)

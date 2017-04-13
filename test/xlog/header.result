@@ -26,7 +26,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-test_run:cmd("push filter '"..box.info.server.uuid.."' to '<instance_uuid>'")
+test_run:cmd("push filter '"..box.info.uuid.."' to '<instance_uuid>'")
 ---
 - true
 ...
@@ -34,7 +34,7 @@ test_run:cmd("push filter '".._TARANTOOL.."' to '<version>'")
 ---
 - true
 ...
-checkpoint_lsn = box.info.server.lsn
+checkpoint_lsn = box.info.lsn
 ---
 ...
 -- SNAP files
@@ -73,7 +73,7 @@ box.snapshot()
 ---
 - ok
 ...
-checkpoint_lsn = box.info.server.lsn
+checkpoint_lsn = box.info.lsn
 ---
 ...
 -- SNAP files

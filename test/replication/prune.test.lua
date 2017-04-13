@@ -43,7 +43,7 @@ replica_set.join(test_run, 1)
 while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
 
 -- Check server ids
-test_run:cmd('eval replica1 "return box.info.server.id"')
+test_run:cmd('eval replica1 "return box.info.id"')
 
 box.space._cluster:len() == 2
 
@@ -55,7 +55,7 @@ box.space._cluster:len() == 1
 replica_set.join(test_run, 1)
 while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
 -- Check server ids
-test_run:cmd('eval replica1 "return box.info.server.id"')
+test_run:cmd('eval replica1 "return box.info.id"')
 box.space._cluster:len() == 2
 replica_set.unregister(test_run, 2)
 

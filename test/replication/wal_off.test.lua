@@ -12,7 +12,7 @@ test_run:cmd("start server wal_off")
 test_run:cmd('switch default')
 wal_off_uri = test_run:eval('wal_off', 'return box.cfg.listen')[1]
 wal_off_uri ~= nil
-wal_off_id = test_run:eval('wal_off', 'return box.info.server.id')[1]
+wal_off_id = test_run:eval('wal_off', 'return box.info.id')[1]
 
 box.cfg { replication = wal_off_uri }
 check = "Replication does not support wal_mode = 'none'"

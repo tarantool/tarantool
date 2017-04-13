@@ -111,13 +111,8 @@ function test_box_info()
     local num = {'pid', 'uptime'}
     local str = {'version', 'status' }
     local failed = {}
-    if check_type(tmp.server, 'table') == false then
-        table.insert(failed1, 'box.info().server')
-    else
-        tmp.server = nil
-    end
     if check_type(tmp.replication, 'table') == false then
-        table.insert(failed1, 'box.info().replication')
+        table.insert(failed, 'box.info().replication')
     else
         tmp.replication = nil
     end

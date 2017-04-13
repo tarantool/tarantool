@@ -13,7 +13,7 @@ test_run:cmd("start server replica")
 test_run:cmd("setopt delimiter ';'")
 test_run:cmd("set connection default, hot_standby, replica")
 fiber = require('fiber');
-while box.info.server.id == 0 do fiber.sleep(0.01) end;
+while box.info.id == 0 do fiber.sleep(0.01) end;
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
 do
     local pri_id = ''
@@ -77,7 +77,7 @@ test_run:cmd("set variable replica_port to 'replica.listen'")
 REPLICA = require('uri').parse(tostring(replica_port))
 REPLICA ~= nil
 a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
-a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
+a:call('_set_pri_lsn', box.info.id, box.info.lsn)
 a:close()
 
 _insert(1, 10)
@@ -98,7 +98,7 @@ test_run:cmd("set variable hot_standby_port to 'hot_standby.master'")
 HOT_STANDBY = require('uri').parse(tostring(hot_standby_port))
 HOT_STANDBY ~= nil
 a = (require 'net.box').connect(HOT_STANDBY.host, HOT_STANDBY.service)
-a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
+a:call('_set_pri_lsn', box.info.id, box.info.lsn)
 a:close()
 
 test_run:cmd("switch hot_standby")

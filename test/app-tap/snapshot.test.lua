@@ -43,7 +43,7 @@ end
 local function snapshot(lsn)
     fiber.name('snapshot')
     while continue_snapshoting do
-        local new_lsn = box.info.server.lsn
+        local new_lsn = box.info.lsn
         if new_lsn ~= lsn then
             lsn = new_lsn;
             pcall(box.snapshot)
@@ -66,7 +66,7 @@ fiber.create(noise)
 fiber.create(purge)
 fiber.create(noise)
 fiber.create(purge)
-fiber.create(snapshot, box.info.server.lsn)
+fiber.create(snapshot, box.info.lsn)
 
 fiber.sleep(0.3)
 continue_snapshoting = false

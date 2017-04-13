@@ -17,7 +17,7 @@ function call_all(callback)
     local all = box.space._cluster:select{}
     for _, tuple in pairs(all) do
         local id = tuple[1]
-        if id ~= box.info.server.id then
+        if id ~= box.info.id then
             callback(id)
         end
     end

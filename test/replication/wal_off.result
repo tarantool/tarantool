@@ -36,7 +36,7 @@ wal_off_uri ~= nil
 ---
 - true
 ...
-wal_off_id = test_run:eval('wal_off', 'return box.info.server.id')[1]
+wal_off_id = test_run:eval('wal_off', 'return box.info.id')[1]
 ---
 ...
 box.cfg { replication = wal_off_uri }

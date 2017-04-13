@@ -8,7 +8,7 @@ import yaml
 
 server.stop()
 server.deploy()
-lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
+lsn = int(yaml.load(server.admin("box.info.lsn", silent=True))[0])
 filename = str(lsn).zfill(20) + ".xlog"
 vardir = os.path.join(server.vardir, server.name)
 wal_old = os.path.join(vardir, "old_" + filename)

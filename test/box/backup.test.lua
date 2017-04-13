@@ -44,7 +44,7 @@ _ = test_run:cmd("setopt delimiter ''");
 
 -- Make sure that garbage collection is disabled
 -- while backup is in progress.
-box.internal.gc.run(box.info.cluster.signature)
+box.internal.gc.run(box.info.signature)
 
 -- Prepare backup directory
 backup_dir = fio.pathjoin(fio.cwd(), 'backup')

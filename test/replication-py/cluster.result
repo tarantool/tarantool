@@ -87,15 +87,15 @@ Start a new replica and check box.info on the start
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-box.info.server.id == 2
+box.info.id == 2
 ---
 - true
 ...
-not box.info.server.ro
+not box.info.ro
 ---
 - true
 ...
-box.info.server.lsn == 0
+box.info.lsn == 0
 ---
 - true
 ...
@@ -110,7 +110,7 @@ box.space._schema:insert{"test", 48}
 ---
 - ['test', 48]
 ...
-box.info.server.lsn == 1
+box.info.lsn == 1
 ---
 - true
 ...
@@ -148,7 +148,7 @@ box.space._schema:insert{"tost", 49}
 ---
 - ['tost', 49]
 ...
-box.info.server.lsn == 2
+box.info.lsn == 2
 ---
 - true
 ...
@@ -180,11 +180,11 @@ box.info.vclock[2] == 2
 ---
 - true
 ...
-box.info.server.id == 2
+box.info.id == 2
 ---
 - true
 ...
-not box.info.server.ro
+not box.info.ro
 ---
 - true
 ...

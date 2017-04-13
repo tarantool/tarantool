@@ -12,7 +12,7 @@ test_run:cmd('switch default')
 --
 -- No replication
 --
-master_id = box.info.server.id
+master_id = box.info.id
 ---
 ...
 #box.info.vclock == 0
@@ -27,7 +27,7 @@ box.space._cluster:count() == 1
 ---
 - true
 ...
-box.info.server.uuid == box.space._cluster:get(master_id)[2]
+box.info.uuid == box.space._cluster:get(master_id)[2]
 ---
 - true
 ...
@@ -36,8 +36,8 @@ box.info.vclock[master_id] == nil
 ---
 - true
 ...
---- box.info.server.lsn == box.info.vclock[master_id]
-box.info.server.lsn == 0
+--- box.info.lsn == box.info.vclock[master_id]
+box.info.lsn == 0
 ---
 - true
 ...
@@ -54,7 +54,7 @@ box.info.vclock[master_id] == 1
 ---
 - true
 ...
-box.info.server.lsn == box.info.vclock[master_id]
+box.info.lsn == box.info.vclock[master_id]
 ---
 - true
 ...
@@ -110,14 +110,14 @@ box.space._cluster:count() == 2
 - true
 ...
 -- master's status
-master_id = box.info.server.id
+master_id = box.info.id
 ---
 ...
 box.info.vclock[master_id] == 2 -- grant + registration == 2
 ---
 - true
 ...
-box.info.server.lsn == box.info.vclock[master_id]
+box.info.lsn == box.info.vclock[master_id]
 ---
 - true
 ...
@@ -235,15 +235,15 @@ master.downstream == nil
 - true
 ...
 -- replica's status
-replica_id = box.info.server.id
+replica_id = box.info.id
 ---
 ...
 box.info.vclock[replica_id] == nil
 ---
 - true
 ...
--- box.info.server.lsn == box.info.vclock[replica_id]
-box.info.server.lsn == 0
+-- box.info.lsn == box.info.vclock[replica_id]
+box.info.lsn == 0
 ---
 - true
 ...

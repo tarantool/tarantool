@@ -45,7 +45,7 @@ replica = TarantoolServer()
 replica.script = "replication-py/replica.lua"
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.deploy()
-replica.admin("while box.info.server.id == 0 do require('fiber').sleep(0.01) end")
+replica.admin("while box.info.id == 0 do require('fiber').sleep(0.01) end")
 replica.uri = '%s:%s@%s' % (LOGIN, PASSWORD, replica.iproto.uri)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.iproto.py_con.authenticate(LOGIN, PASSWORD)
@@ -61,8 +61,8 @@ for engine in engines:
 #if not m or m.group(1) != host_port:
 #    print 'invalid box.info.status', status, 'expected host:port', host_port
 
-master_id = master.get_param('server')['id']
-replica_id = replica.get_param('server')['id']
+master_id = master.get_param('id')
+replica_id = replica.get_param('id')
 
 id = ID_BEGIN
 for i in range(REPEAT):

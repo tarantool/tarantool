@@ -167,7 +167,7 @@ lbox_info_replication(struct lua_State *L)
 }
 
 static int
-lbox_info_server(struct lua_State *L)
+lbox_info_id(struct lua_State *L)
 {
 	/*
 	 * Self can be NULL during bootstrap: entire box.info
@@ -176,24 +176,45 @@ lbox_info_server(struct lua_State *L)
 	 * at box.info.status.
 	 */
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
-	lua_createtable(L, 0, 2);
-	lua_pushliteral(L, "id");
-	lua_pushinteger(L, self ? self->id : REPLICA_ID_NIL);
-	lua_settable(L, -3);
-	lua_pushliteral(L, "uuid");
+	if (self != NULL && self->id != REPLICA_ID_NIL) {
+		lua_pushinteger(L, self->id);
+	} else {
+		luaL_pushnull(L);
+	}
+	return 1;
+}
+
+static int
+lbox_info_uuid(struct lua_State *L)
+{
 	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
-	lua_settable(L, -3);
-	lua_pushliteral(L, "lsn");
-	if (self != NULL) {
+	return 1;
+}
+
+static int
+lbox_info_lsn(struct lua_State *L)
+{
+	/* See comments in lbox_info_id */
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	if (self != NULL && self->id != REPLICA_ID_NIL) {
 		luaL_pushint64(L, vclock_get(&replicaset_vclock, self->id));
 	} else {
 		luaL_pushint64(L, -1);
 	}
-	lua_settable(L, -3);
-	lua_pushliteral(L, "ro");
-	lua_pushboolean(L, box_is_ro());
-	lua_settable(L, -3);
+	return 1;
+}
 
+static int
+lbox_info_signature(struct lua_State *L)
+{
+	luaL_pushint64(L, vclock_sum(&replicaset_vclock));
+	return 1;
+}
+
+static int
+lbox_info_ro(struct lua_State *L)
+{
+	lua_pushboolean(L, box_is_ro());
 	return 1;
 }
 
@@ -232,10 +253,6 @@ lbox_info_cluster(struct lua_State *L)
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&REPLICASET_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
-	lua_pushliteral(L, "signature");
-	luaL_pushint64(L, vclock_sum(&replicaset_vclock));
-	lua_settable(L, -3);
-
 	return 1;
 }
 
@@ -345,8 +362,12 @@ lbox_info_vinyl(struct lua_State *L)
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
+	{"id", lbox_info_id},
+	{"uuid", lbox_info_uuid},
+	{"lsn", lbox_info_lsn},
+	{"signature", lbox_info_signature},
 	{"vclock", lbox_info_vclock},
-	{"server", lbox_info_server},
+	{"ro", lbox_info_ro},
 	{"replication", lbox_info_replication},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},

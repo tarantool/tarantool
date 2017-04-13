@@ -2,7 +2,7 @@
 import sys
 import yaml
 
-server_uuid = server.get_param('server')['uuid']
+server_uuid = server.get_param('uuid')
 sys.stdout.push_filter(server_uuid, '<server uuid>')
 cluster_uuid = yaml.load(server.admin('box.space._schema:get("cluster")',
     silent = True))[0][1]

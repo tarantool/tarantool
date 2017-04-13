@@ -7,23 +7,23 @@ test_run:cmd('switch default')
 -- No replication
 --
 
-master_id = box.info.server.id
+master_id = box.info.id
 
 #box.info.vclock == 0
 #box.info.replication == 1
 box.space._cluster:count() == 1
 
-box.info.server.uuid == box.space._cluster:get(master_id)[2]
+box.info.uuid == box.space._cluster:get(master_id)[2]
 -- LSN is nil until a first request is made
 box.info.vclock[master_id] == nil
---- box.info.server.lsn == box.info.vclock[master_id]
-box.info.server.lsn == 0
+--- box.info.lsn == box.info.vclock[master_id]
+box.info.lsn == 0
 -- Make the first request
 box.schema.user.grant('guest', 'replication')
 -- LSN is 1 after the first request
 #box.info.vclock == 1
 box.info.vclock[master_id] == 1
-box.info.server.lsn == box.info.vclock[master_id]
+box.info.lsn == box.info.vclock[master_id]
 master = box.info.replication[master_id]
 master.id == master_id
 master.uuid == box.space._cluster:get(master_id)[2]
@@ -45,9 +45,9 @@ test_run:cmd('switch default')
 box.space._cluster:count() == 2
 
 -- master's status
-master_id = box.info.server.id
+master_id = box.info.id
 box.info.vclock[master_id] == 2 -- grant + registration == 2
-box.info.server.lsn == box.info.vclock[master_id]
+box.info.lsn == box.info.vclock[master_id]
 master = box.info.replication[master_id]
 master.id == master_id
 master.uuid == box.space._cluster:get(master_id)[2]
@@ -88,10 +88,10 @@ master.upstream.idle < 1
 master.downstream == nil
 
 -- replica's status
-replica_id = box.info.server.id
+replica_id = box.info.id
 box.info.vclock[replica_id] == nil
--- box.info.server.lsn == box.info.vclock[replica_id]
-box.info.server.lsn == 0
+-- box.info.lsn == box.info.vclock[replica_id]
+box.info.lsn == 0
 replica = box.info.replication[replica_id]
 replica.id == replica_id
 replica.uuid == box.space._cluster:get(replica_id)[2]

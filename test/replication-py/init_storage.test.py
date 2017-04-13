@@ -4,7 +4,7 @@ from lib.tarantool_server import TarantoolServer
 
 # master server
 master = server
-master_id = master.get_param('server')['id']
+master_id = master.get_param('id')
 master.admin("box.schema.user.grant('guest', 'replication')")
 
 print '-------------------------------------------------------------'
