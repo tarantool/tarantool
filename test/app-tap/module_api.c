@@ -347,6 +347,14 @@ test_key_def_api(lua_State *L)
 	return 1;
 }
 
+static int
+check_error(lua_State *L)
+{
+	box_error_raise(ER_UNSUPPORTED, "test for luaT_error");
+	luaT_error(L);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -369,6 +377,7 @@ luaopen_module_api(lua_State *L)
 		{"test_clock", test_clock },
 		{"test_pushtuple", test_pushtuple},
 		{"test_key_def_api", test_key_def_api},
+		{"check_error", check_error},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

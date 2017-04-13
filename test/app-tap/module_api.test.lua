@@ -33,7 +33,7 @@ local function test_pushcdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(17)
+    test:plan(18)
     local status, module = pcall(require, 'module_api')
     test:ok(status, "module is loaded")
     if not status then
@@ -45,6 +45,9 @@ local test = require('tap').test("module_api", function(test)
             test:ok(fun(), name .. " is ok")
         end
     end
+
+    local status, msg = pcall(module.check_error)
+    test:like(msg, 'luaT_error', 'luaT_error')
 
     test:test("pushcdata", test_pushcdata, module)
 end)
