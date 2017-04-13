@@ -132,6 +132,7 @@ enum {
 #define INSTANCE_UUID_KEY "Instance"
 #define INSTANCE_UUID_KEY_V12 "Server"
 #define VCLOCK_KEY "VClock"
+#define VERSION_KEY "Version"
 
 static const char v13[] = "0.13";
 static const char v12[] = "0.12";
@@ -155,9 +156,13 @@ xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 	if (vstr == NULL)
 		return -1;
 	char *instance_uuid = tt_uuid_str(&meta->instance_uuid);
-	int total = snprintf(buf, size, "%s\n%s\n" INSTANCE_UUID_KEY ": "
-		"%s\n" VCLOCK_KEY ": %s\n\n",
-		 meta->filetype, v13, instance_uuid, vstr);
+	int total = snprintf(buf, size,
+		"%s\n"
+		"%s\n"
+		VERSION_KEY ": %s\n"
+		INSTANCE_UUID_KEY ": %s\n"
+		VCLOCK_KEY ": %s\n\n",
+		meta->filetype, v13, PACKAGE_VERSION, instance_uuid, vstr);
 	assert(total > 0);
 	free(vstr);
 	return total;
