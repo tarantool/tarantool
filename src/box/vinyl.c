@@ -2889,8 +2889,8 @@ err_wi:
  */
 static struct vy_write_iterator *
 vy_range_get_compact_iterator(struct vy_range *range, int run_count,
-			      int64_t vlsn, bool is_last_level,
-			      size_t *p_max_output_count)
+			      int64_t vlsn, int64_t dump_lsn,
+			      bool is_last_level, size_t *p_max_output_count)
 {
 	struct vy_write_iterator *wi;
 	struct vy_run *run;
@@ -2905,6 +2905,8 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 	 * sources to be added first so mems are added before runs.
 	 */
 	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+		if (mem->min_lsn > dump_lsn)
+			continue;
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += mem->tree.size;
@@ -3953,6 +3955,25 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 	if (vy_range_rotate_mem(range) != 0)
 		goto err_mem;
 
+	/*
+	 * Before adding in-memory trees to the write iterator,
+	 * wait until all writes to them are over and mem->min_lsn,
+	 * used for filtering dumped mems, is stabilized.
+	 */
+	vy_range_wait_pinned(range);
+	/*
+	 * Remember the current value of xm->lsn. It will be used
+	 * to delete dumped in-memory trees on task completion
+	 * (see vy_range_dump_mems()). Every in-memory tree created
+	 * after this point (and so not dumped by this task) will
+	 * have min_lsn > xm->lsn.
+	 *
+	 * In case checkpoint is in progress (dump_lsn != INT64_MAX)
+	 * also filter mems that were created after checkpoint_lsn
+	 * to make checkpoint consistent.
+	 */
+	dump_lsn = MIN(xm->lsn, dump_lsn);
+
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_dump_iterator(range, tx_manager_vlsn(xm), dump_lsn,
 					&task->max_output_count);
@@ -3961,10 +3982,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 
 	task->range = range;
 	task->wi = wi;
-	task->dump_lsn = MIN(xm->lsn, dump_lsn);
+	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
-	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started dumping range %s",
@@ -4179,9 +4199,15 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	vy_range_freeze_mem(range);
 
+	/*
+	 * See comment in vy_task_dump_new().
+	 */
+	vy_range_wait_pinned(range);
+	int64_t dump_lsn = xm->lsn;
+
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_compact_iterator(range, range->run_count,
-					   tx_manager_vlsn(xm), true,
+					   tx_manager_vlsn(xm), dump_lsn, true,
 					   &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
@@ -4208,10 +4234,9 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	task->range = range;
 	task->wi = wi;
-	task->dump_lsn = xm->lsn;
+	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
-	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started splitting range %s by key %s",
@@ -4384,24 +4409,30 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	if (vy_range_rotate_mem(range) != 0)
 		goto err_mem;
 
+	/*
+	 * See comment in vy_task_dump_new().
+	 */
+	vy_range_wait_pinned(range);
+	int64_t dump_lsn = xm->lsn;
+
 	struct vy_write_iterator *wi;
 	bool is_last_level = range->compact_priority == range->run_count;
 	wi = vy_range_get_compact_iterator(range, range->compact_priority,
-					   tx_manager_vlsn(xm), is_last_level,
+					   tx_manager_vlsn(xm), dump_lsn,
+					   is_last_level,
 					   &task->max_output_count);
 	if (wi == NULL)
 		goto err_wi;
 
 	task->range = range;
 	task->wi = wi;
-	task->dump_lsn = xm->lsn;
+	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 	task->saved_max_dump_size = range->max_dump_size;
 	task->run_count = range->compact_priority;
 	range->max_dump_size = 0;
 	range->compact_priority = 0;
 
-	vy_range_wait_pinned(range);
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started compacting range %s, runs %d/%d",
