@@ -188,7 +188,7 @@ lbox_trigger_reset(struct lua_State *L, int top,
 		lua_rawgeti(L, LUA_REGISTRYINDEX, trg->ref);
 		return 1;
 
-	} else {
+	} else if (trg) {
 		trigger_clear(&trg->base);
 		free(trg);
 	}

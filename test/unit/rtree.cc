@@ -256,6 +256,22 @@ neighbor_test()
 		rtree_destroy(&tree);
 	}
 
+	struct rtree_iterator iterator;
+	rtree_iterator_init(&iterator);
+	struct rtree tree;
+	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free, &page_count, 
+			RTREE_EUCLID);
+	if (rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator)) {
+		fail("found in empty", "true");
+	}
+	/*
+	 * Test unchecked return value from rtree_search
+	 */
+	record_t rec = rtree_iterator_next(&iterator);
+	if (rec != NULL) {
+		fail("something found from empty iterator ", "true");
+	}
+	rtree_iterator_destroy(&iterator);
 
 	footer();
 }

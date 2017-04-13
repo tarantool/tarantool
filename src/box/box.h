@@ -52,8 +52,9 @@ struct ev_io;
 
 /*
  * Initialize box library
+ * @throws C++ exception
  */
-int
+void
 box_init(void);
 
 /**

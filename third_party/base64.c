@@ -205,7 +205,7 @@ base64_decode_value(int value)
 	static const int decoding_size = sizeof(decoding);
 	int codepos = value;
 	codepos -= 43;
-	if (codepos < 0 || codepos > decoding_size)
+	if (codepos < 0 || codepos >= decoding_size)
 		return -1;
 	return decoding[codepos];
 }

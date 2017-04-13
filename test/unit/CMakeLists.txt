@@ -36,7 +36,7 @@ target_link_libraries(base64.test misc)
 add_executable(uuid.test uuid.c unit.c
         ${CMAKE_SOURCE_DIR}/src/tt_uuid.c
         ${CMAKE_SOURCE_DIR}/src/random.c)
-target_link_libraries(uuid.test bit)
+target_link_libraries(uuid.test bit core)
 
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)
@@ -105,7 +105,7 @@ endif ()
 add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/src/scramble.c
     ${CMAKE_SOURCE_DIR}/src/random.c)
-target_link_libraries(scramble.test misc)
+target_link_libraries(scramble.test misc core)
 
 add_executable(guava.test guava.c)
 target_link_libraries(guava.test salad small)

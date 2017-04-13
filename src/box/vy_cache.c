@@ -722,6 +722,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 				break;
 			struct vy_cache_entry **entry =
 				vy_cache_tree_iterator_get_elem(tree, &pos);
+			assert(*entry && (*entry)->stmt);
 			struct tuple *t = (*entry)->stmt;
 			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
 			if (cmp < 0)

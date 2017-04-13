@@ -165,7 +165,7 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 			/* symbol not handled, continue to the next switch */
 			break;
 		case CSV_QUOTE_OPENING:
-			if (*p == csv->quote_char) {
+			if (*p == csv->quote_char && csv->bufp) {
 				/* double-quote "" */
 				*csv->bufp++ = csv->quote_char;
 				csv->state = CSV_OUT_OF_QUOTES;

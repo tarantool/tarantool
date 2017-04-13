@@ -151,9 +151,6 @@ void test_splice()
 	STAILQ_SPLICE(&queue2, STAILQ_FIRST(&queue2), entry, &queue1);
 	printf("q1: %s\n", queue2str(&queue1));
 	printf("q2: %s\n", queue2str(&queue2));
-	STAILQ_SPLICE(&queue2, STAILQ_FIRST(&queue2), entry, &queue1);
-	printf("q1: %s\n", queue2str(&queue1));
-	printf("q2: %s\n", queue2str(&queue2));
 	footer();
 }
 

@@ -33,6 +33,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 /*
  * Data stored in vinyl is organized in ranges and runs.
@@ -362,6 +363,7 @@ vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
 		    const struct key_def *key_def)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_CREATE_INDEX;
 	record.signature = -1;
 	record.index_lsn = index_lsn;
@@ -376,6 +378,7 @@ static inline void
 vy_log_drop_index(int64_t index_lsn)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DROP_INDEX;
 	record.signature = -1;
 	record.index_lsn = index_lsn;
@@ -389,6 +392,7 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 		    bool is_level_zero)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_INSERT_RANGE;
 	record.signature = -1;
 	record.index_lsn = index_lsn;
@@ -404,6 +408,7 @@ static inline void
 vy_log_delete_range(int64_t range_id)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DELETE_RANGE;
 	record.signature = -1;
 	record.range_id = range_id;
@@ -415,6 +420,7 @@ static inline void
 vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_PREPARE_RUN;
 	record.signature = -1;
 	record.index_lsn = index_lsn;
@@ -429,6 +435,7 @@ vy_log_insert_run(int64_t range_id, int64_t run_id,
 		  bool is_empty)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_INSERT_RUN;
 	record.signature = -1;
 	record.range_id = range_id;
@@ -444,6 +451,7 @@ static inline void
 vy_log_delete_run(int64_t run_id)
 {
 	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DELETE_RUN;
 	record.signature = -1;
 	record.run_id = run_id;

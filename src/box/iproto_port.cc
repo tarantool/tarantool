@@ -133,14 +133,17 @@ iproto_write_error(int fd, const struct error *e)
 
 	/* Set to blocking to write the error. */
 	int flags = fcntl(fd, F_GETFL, 0);
-	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (flags < 0)
+		return;
 
-	ssize_t r = write(fd, &header, sizeof(header));
+	(void) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+	size_t r = write(fd, &header, sizeof(header));
 	r = write(fd, &body, sizeof(body));
 	r = write(fd, e->errmsg, msg_len);
-
-	fcntl(fd, F_SETFL, flags);
 	(void) r;
+
+	(void) fcntl(fd, F_SETFL, flags);
 }
 
 enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };

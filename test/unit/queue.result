@@ -31,6 +31,4 @@ q1: 1 3
 q2: 2 
 q1: 1 3 2 
 q2: 
-q1: 1 3 2 
-q2: 
 	*** test_splice: done ***

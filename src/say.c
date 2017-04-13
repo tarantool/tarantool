@@ -216,8 +216,10 @@ say_logrotate(int signo)
 		dup2(log_fd, STDERR_FILENO);
 	}
 	if (logger_nonblock) {
-		int flags = fcntl(log_fd, F_GETFL, 0);
-		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
+		int flags;
+		if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
+		    fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+			say_syserror("fcntl, fd=%i", log_fd);
 	}
 	char logrotate_message[] = "log file has been reopened\n";
 	int r = write(log_fd,
@@ -322,8 +324,10 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		}
 	}
 	if (nonblock) {
-		int flags = fcntl(log_fd, F_GETFL, 0);
-		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
+		int flags;
+		if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
+		    fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+			say_syserror("fcntl, fd=%i", log_fd);
 	}
 	booting = false;
 }

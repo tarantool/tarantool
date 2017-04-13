@@ -196,9 +196,8 @@ lbox_tonumber64(struct lua_State *L)
 			           (base == 2 || base == -1)) {
 				base = 2;  arg += 2; argl -= 2;
 			}
-		} else if (base == -1) {
-			base = 10;
 		}
+		base = (base == -1 ? 10 : base);
 		errno = 0;
 		char *arge;
 		unsigned long long result = strtoull(arg, &arge, base);

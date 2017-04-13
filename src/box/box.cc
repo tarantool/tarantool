@@ -1310,6 +1310,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * out the id of the instance it has connected to.
 	 */
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	assert(self != NULL); /* the local registration is read-only */
 	row.replica_id = self->id;
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
@@ -1508,7 +1509,7 @@ tx_prio_cb(struct ev_loop *loop, ev_watcher *watcher, int events)
 	cbus_process(endpoint);
 }
 
-int
+void
 box_init(void)
 {
 	user_cache_init();
@@ -1518,7 +1519,6 @@ box_init(void)
 	 * as a default session user when running triggers.
 	 */
 	session_init();
-	return 0;
 }
 
 bool

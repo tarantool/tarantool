@@ -1002,40 +1002,39 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		 * only if there are unset bits in the mask.
 		 */
 		if (column_mask != UINT64_MAX) {
-			/*
-			 * The optimization is only used if update
-			 * doesn't touch outside range [0..63]
-			 */
-			if (op->field_no > 63) {
+			if (op->field_no < 0 || op->field_no > 63) {
+				/*
+				 * The optimization is only used if update
+				 * doesn't touch outside range [0..63]
+				 */
 				column_mask = UINT64_MAX;
-			} else {
+			} else if (op->opcode == '!' || op->opcode == '#') {
 				/*
 				 * If the operation is insertion or deletion
 				 * then it potentially changes a range of
 				 * columns by moving them, so need to set a
 				 * range of bits.
 				 */
-				if (op->opcode == '!' || op->opcode == '#') {
-					/* Set all bits. */
-					uint64_t range = UINT64_MAX;
-					/*
-					 * Unset bits that are placed before
-					 * the operation field number. Fields
-					 * corresponding to this bits
-					 * definitely will not be changed.
-					 */
-					range = range >> op->field_no;
-					column_mask |= range;
-				} else {
-					/*
-					 * If the operation changes only one
-					 * column, then set the
-					 * corresponding bit.
-					 */
-					uint64_t one_col = 1;
-					one_col = one_col << (63 - op->field_no);
-					column_mask |= one_col;
-				}
+
+				/* Set all bits. */
+				uint64_t range = UINT64_MAX;
+				/*
+				 * Unset bits that are placed before
+				 * the operation field number. Fields
+				 * corresponding to this bits
+				 * definitely will not be changed.
+				 */
+				range = range >> op->field_no;
+				column_mask |= range;
+			} else {
+				/*
+				 * If the operation changes only one
+				 * column, then set the
+				 * corresponding bit.
+				 */
+				uint64_t one_col = 1;
+				one_col = one_col << (63 - op->field_no);
+				column_mask |= one_col;
 			}
 		}
 		if (op->meta->read_arg(update->index_base, op, &expr))

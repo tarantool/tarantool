@@ -1103,8 +1103,10 @@ xlog_tx_write(struct xlog *log)
 		if (log->free_cache) {
 #ifdef HAVE_POSIX_FADVISE
 			/** free page cache */
-			posix_fadvise(log->fd, sync_from, sync_len,
-				      POSIX_FADV_DONTNEED);
+			if (posix_fadvise(log->fd, sync_from, sync_len,
+					  POSIX_FADV_DONTNEED) != 0) {
+				say_syserror("posix_fadvise, fd=%i", log->fd);
+			}
 #else
 			(void) sync_from;
 			(void) sync_len;

@@ -517,7 +517,9 @@ rand_test()
 			size_t id = set.RandUsedID();
 			struct rtree_rect rt;
 			set.entries[id].box.FillRTreeRect(&rt);
-			rtree_remove(&tree, &rt, (void *)(id + 1));
+			if (!rtree_remove(&tree, &rt, (void *)(id + 1))) {
+				printf("Error in remove\n");
+			}
 			set.DeleteBox(id);
 		}
 		assert(set.boxCount == tree.n_records);

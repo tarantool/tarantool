@@ -677,6 +677,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		if (task == NULL) {
 			diag_set(OutOfMemory, sizeof(*task), "malloc",
 				 "vy_page_read_task");
+			vy_page_delete(page);
 			return -1;
 		}
 		coio_task_create(&task->base, vy_page_read_cb,

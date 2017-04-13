@@ -2960,6 +2960,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("begin >= end for range id %lld",
 					    (long long)range->id));
+			vy_range_delete(range);
 			return -1;
 		}
 		vy_index_add_range(index, range);
@@ -6082,21 +6083,24 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
 		const char *key;
 		key = tuple_extract_key(new_tuple, &def->key_def, NULL);
-		if (key == NULL)                /* out of memory */
-			return -1;
+		if (key == NULL)
+			goto error_unref;
 		uint32_t part_count = mp_decode_array(&key);
-		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple))
-			return -1;
+		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple) != 0)
+			goto error_unref;
 	}
-	if (vy_tx_set(tx, pk, new_tuple)) {
-		tuple_unref(new_tuple);
-		return -1;
-	}
+	if (vy_tx_set(tx, pk, new_tuple))
+		goto error_unref;
+
 	if (stmt != NULL)
 		stmt->new_tuple = new_tuple;
 	else
 		tuple_unref(new_tuple);
 	return 0;
+
+error_unref:
+	tuple_unref(new_tuple);
+	return -1;
 }
 
 /**
@@ -6138,7 +6142,8 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 
 	/* Get full tuple from the primary index. */
 	if (vy_index_get(tx, pk, key, part_count, &old_stmt) != 0)
-		return -1;
+		goto error;
+
 	/*
 	 * Replace in the primary index without explicit deletion
 	 * of the old tuple.

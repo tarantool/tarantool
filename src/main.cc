@@ -620,18 +620,18 @@ main(int argc, char **argv)
 	coeio_enable();
 	signal_init();
 	cbus_init();
-
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
-	box_init();
-	box_lua_init(tarantool_L);
-
-	/* main core cleanup routine */
-	atexit(tarantool_free);
-
-	if (!loop())
-		panic("%s", "can't init event loop");
 
 	try {
+		box_init();
+		box_lua_init(tarantool_L);
+
+		/* main core cleanup routine */
+		atexit(tarantool_free);
+
+		if (!loop())
+			panic("%s", "can't init event loop");
+
 		int events = ev_activecnt(loop());
 		/*
 		 * Load user init script.  The script should have access

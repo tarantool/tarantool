@@ -35,6 +35,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include "say.h"
 
 static int rfd;
 
@@ -52,9 +53,10 @@ random_init(void)
 		goto srand;
 	}
 
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags != -1)
-		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
+	int flags;
+	if ( (flags = fcntl(rfd, F_GETFD)) < 0 ||
+	     fcntl(rfd, F_SETFD, flags | FD_CLOEXEC) < 0)
+		say_syserror("fcntl, fd=%i", rfd);
 
 	ssize_t res = read(rfd, &seed, sizeof(seed));
 	(void) res;

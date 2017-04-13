@@ -324,8 +324,8 @@ tx_process_disconnect(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
-	tx_fiber_init(con->session, 0);
 	if (con->session) {
+		tx_fiber_init(con->session, 0);
 		if (! rlist_empty(&session_on_disconnect))
 			session_run_on_disconnect_triggers(con->session);
 		session_destroy(con->session);

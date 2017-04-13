@@ -518,7 +518,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		/* hash size is already greater than requested */
 		return 0;
 	}
-	while (h->prime < __ac_HASH_PRIME_SIZE) {
+	while (h->prime < __ac_HASH_PRIME_SIZE - 1) {
 		if (__ac_prime_list[h->prime] >= buckets)
 			break;
 		h->prime += 1;

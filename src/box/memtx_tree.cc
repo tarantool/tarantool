@@ -366,16 +366,24 @@ MemtxTree::reserve(uint32_t size_hint)
 {
 	if (size_hint < build_array_alloc_size)
 		return;
-	build_array = (struct tuple**)
-		realloc(build_array, size_hint * sizeof(struct tuple *));
+	struct tuple **tmp = (struct tuple**)
+		realloc(build_array, size_hint * sizeof(*tmp));
+	if (tmp == NULL)
+		tnt_raise(OutOfMemory, size_hint * sizeof(*tmp),
+			"MemtxTree", "reserve");
+	build_array = tmp;
 	build_array_alloc_size = size_hint;
 }
 
 void
 MemtxTree::buildNext(struct tuple *tuple)
 {
-	if (!build_array) {
-		build_array = (struct tuple**)malloc(BPS_TREE_EXTENT_SIZE);
+	if (build_array == NULL) {
+		build_array = (struct tuple**) malloc(BPS_TREE_EXTENT_SIZE);
+		if (build_array == NULL) {
+			tnt_raise(OutOfMemory, BPS_TREE_EXTENT_SIZE,
+				"MemtxTree", "buildNext");
+		}
 		build_array_alloc_size =
 			BPS_TREE_EXTENT_SIZE / sizeof(struct tuple*);
 	}
@@ -383,10 +391,14 @@ MemtxTree::buildNext(struct tuple *tuple)
 	if (build_array_size == build_array_alloc_size) {
 		build_array_alloc_size = build_array_alloc_size +
 					 build_array_alloc_size / 2;
-		build_array = (struct tuple**)
-			realloc(build_array,
-				build_array_alloc_size *
-				sizeof(struct tuple *));
+		struct tuple **tmp = (struct tuple **)
+			realloc(build_array, build_array_alloc_size *
+				sizeof(*tmp));
+		if (tmp == NULL) {
+			tnt_raise(OutOfMemory, build_array_alloc_size *
+				sizeof(*tmp), "MemtxTree", "buildNext");
+		}
+		build_array = tmp;
 	}
 	build_array[build_array_size++] = tuple;
 }
