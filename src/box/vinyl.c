@@ -4197,13 +4197,12 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 			goto err_parts;
 	}
 
-	vy_range_freeze_mem(range);
-
 	/*
-	 * See comment in vy_task_dump_new().
+	 * Dump all in-memory trees of the old range
+	 * because we can't split them.
 	 */
-	vy_range_wait_pinned(range);
-	int64_t dump_lsn = xm->lsn;
+	vy_range_freeze_mem(range);
+	int64_t dump_lsn = INT64_MAX;
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_compact_iterator(range, range->run_count,
@@ -4231,6 +4230,15 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	range->version++;
 	index->version++;
+
+	/*
+	 * Do not start dumping in-memory trees until all writes
+	 * to them are complete. After this function completes,
+	 * no new transaction can modify any of the old range's
+	 * in-memory trees, because the range was removed from
+	 * the index.
+	 */
+	vy_range_wait_pinned(range);
 
 	task->range = range;
 	task->wi = wi;
