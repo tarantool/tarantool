@@ -93,7 +93,7 @@ vy_run_env_destroy(struct vy_run_env *env)
  */
 int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct index_def *index_def, struct tuple *min_stmt)
+		    const struct tuple *min_key, const struct key_def *key_def)
 {
 	memset(page_info, 0, sizeof(*page_info));
 	page_info->min_lsn = INT64_MAX;
@@ -102,8 +102,7 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	uint32_t size;
-	const char *region_key = tuple_extract_key(min_stmt,
-						   &index_def->key_def, &size);
+	const char *region_key = tuple_extract_key(min_key, key_def, &size);
 	if (region_key == NULL)
 		return -1;
 	page_info->min_key = vy_key_dup(region_key);

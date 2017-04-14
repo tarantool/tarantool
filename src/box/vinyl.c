@@ -1479,7 +1479,8 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  struct index_def *index_def, const struct tuple *key)
+			  const struct tuple *key,
+			  const struct key_def *key_def)
 {
 	uint32_t key_field_count = tuple_field_count(key);
 	if (key_field_count == 0) {
@@ -1525,9 +1526,9 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
-		    key_field_count < index_def->key_def.part_count &&
+		    key_field_count < key_def->part_count &&
 		    vy_stmt_compare_with_raw_key(key, range->begin,
-						 &index_def->key_def) == 0)
+						 key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -1561,7 +1562,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
 			    vy_stmt_compare_with_raw_key(key, range->begin,
-							 &index_def->key_def) != 0) {
+							 key_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree,
 							  range);
@@ -1592,7 +1593,7 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	struct vy_range *curr = itr->curr_range;
 	struct vy_range *next;
 	struct vy_index *index = itr->index;
-	struct index_def *def = index->index_def;
+	const struct key_def *key_def = &index->index_def->key_def;
 
 	if (curr == NULL) {
 		/* First iteration */
@@ -1601,7 +1602,7 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 		else
 			next = vy_range_tree_find_by_key(&index->tree,
 							 itr->iterator_type,
-							 def, itr->key);
+							 itr->key, key_def);
 		goto check;
 	}
 next:
@@ -1617,7 +1618,7 @@ next:
 	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_raw_key(itr->key, curr->end,
-						 &def->key_def) >= 0) {
+						 key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
 			next = vy_range_tree_next(&index->tree, curr);
 		} else {
@@ -1665,8 +1666,9 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 {
 	struct vy_index *index = itr->index;
 	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
-				itr->iterator_type, index->index_def,
-				last_stmt != NULL ? last_stmt : itr->key);
+				itr->iterator_type,
+				last_stmt != NULL ? last_stmt : itr->key,
+				&index->index_def->key_def);
 	itr->curr_range = curr;
 	*result = curr->shadow != NULL ? curr->shadow : curr;
 }
@@ -1688,15 +1690,16 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 /* dump statement to the run page buffers (stmt header and data) */
 static int
 vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
-		 struct vy_page_info *info, const struct index_def *index_def)
+		 struct vy_page_info *info, const struct key_def *key_def,
+		 bool is_primary)
 {
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 
 	struct xrow_header xrow;
-	int rc = (index_def->iid == 0 ?
-		  vy_stmt_encode_primary(value, &index_def->key_def, 0, &xrow) :
-		  vy_stmt_encode_secondary(value, &index_def->key_def, &xrow));
+	int rc = (is_primary ?
+		  vy_stmt_encode_primary(value, key_def, 0, &xrow) :
+		  vy_stmt_encode_secondary(value, key_def, &xrow));
 	if (rc != 0)
 		return -1;
 
@@ -1791,10 +1794,11 @@ vy_page_index_encode(const uint32_t *page_index, uint32_t count,
  */
 static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
-		  struct vy_write_iterator *wi, const char *split_key,
-		  uint32_t *page_info_capacity, struct bloom_spectrum *bs,
-		  struct tuple **curr_stmt, const struct index_def *index_def,
-		  const struct index_def *user_index_def, const char **max_key)
+		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
+		  const char *end_key, uint64_t page_size,
+		  struct bloom_spectrum *bs, const struct key_def *key_def,
+		  const struct key_def *user_key_def, bool is_primary,
+		  const char **max_key, uint32_t *page_info_capacity)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -1819,7 +1823,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	assert(*page_info_capacity >= run_info->count);
 
 	struct vy_page_info *page = run_info->page_infos + run_info->count;
-	vy_page_info_create(page, data_xlog->offset, index_def, *curr_stmt);
+	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
 	bool end_of_run = false;
 	xlog_tx_begin(data_xlog);
 	struct tuple *stmt = NULL;
@@ -1838,20 +1842,21 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			tuple_unref(stmt);
 		stmt = *curr_stmt;
 		tuple_ref(stmt);
-		if (vy_run_dump_stmt(stmt, data_xlog, page, index_def) != 0)
+		if (vy_run_dump_stmt(stmt, data_xlog, page,
+				     key_def, is_primary) != 0)
 			goto error_rollback;
-		bloom_spectrum_add(bs, tuple_hash(stmt, &user_index_def->key_def));
+		bloom_spectrum_add(bs, tuple_hash(stmt, user_key_def));
 
 		if (vy_write_iterator_next(wi, curr_stmt))
 			goto error_rollback;
 
 		end_of_run = *curr_stmt == NULL ||
 			/* Split key reached, proceed to the next run. */
-			(split_key != NULL &&
-			 vy_tuple_compare_with_raw_key(*curr_stmt, split_key,
-						       &index_def->key_def) >= 0);
+			(end_key != NULL &&
+			 vy_tuple_compare_with_raw_key(*curr_stmt, end_key,
+						       key_def) >= 0);
 	} while (end_of_run == false &&
-		 obuf_size(&data_xlog->obuf) < (uint64_t)index_def->opts.page_size);
+		 obuf_size(&data_xlog->obuf) < page_size);
 
 	if (end_of_run && stmt != NULL && max_key != NULL) {
 		/*
@@ -1861,7 +1866,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		 * than a fiber. To reach this, we must copy the
 		 * key into malloced memory.
 		 */
-		*max_key = tuple_extract_key(stmt, &index_def->key_def, NULL);
+		*max_key = tuple_extract_key(stmt, key_def, NULL);
 		tuple_unref(stmt);
 		if (*max_key == NULL)
 			goto error_rollback;
@@ -1926,9 +1931,10 @@ error_page_index:
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
-		  const char *end_key, struct bloom_spectrum *bs,
-		  const struct index_def *index_def,
-		  const struct index_def *user_index_def, const char **max_key)
+		  const char *end_key, uint64_t page_size,
+		  struct bloom_spectrum *bs, const struct key_def *key_def,
+		  const struct key_def *user_key_def, bool is_primary,
+		  const char **max_key)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -1955,10 +1961,10 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	uint32_t page_infos_capacity = 0;
 	int rc;
 	do {
-		rc = vy_run_write_page(run_info, &data_xlog, wi,
-				       end_key, &page_infos_capacity, bs,
-				       curr_stmt, index_def, user_index_def,
-				       max_key);
+		rc = vy_run_write_page(run_info, &data_xlog, wi, curr_stmt,
+				       end_key, page_size, bs, key_def,
+				       user_key_def, is_primary,
+				       max_key, &page_infos_capacity);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2495,8 +2501,10 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	struct bloom_spectrum bs;
 	bloom_spectrum_create(&bs, max_output_count, bloom_fpr, runtime.quota);
 
-	if (vy_run_write_data(run, index->path, wi, stmt, range->end, &bs,
-			      index_def, user_index_def, max_key) != 0)
+	if (vy_run_write_data(run, index->path, wi, stmt,
+			      range->end, index_def->opts.page_size, &bs,
+			      &index_def->key_def, &user_index_def->key_def,
+			      index_def->iid == 0, max_key) != 0)
 		return -1;
 
 	bloom_spectrum_choose(&bs, &run->info.bloom);
@@ -3090,8 +3098,8 @@ vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
 		return true;
 
 	struct vy_range *range;
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index->index_def,
-					  stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, stmt,
+					  &index->index_def->key_def);
 	if (rlist_empty(&range->runs))
 		return false;
 
@@ -3116,8 +3124,8 @@ vy_tx_write_prepare(struct txv *v)
 	struct tuple *stmt = v->stmt;
 	struct vy_range *range;
 
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-					  index->index_def, stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, stmt,
+					  &index->index_def->key_def);
 	/*
 	 * Allocate a new in-memory tree if either of the following
 	 * conditions is true:
@@ -3179,8 +3187,8 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 
 	/* Match range. */
 	struct vy_range *range;
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ,
-					  index->index_def, stmt);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, stmt,
+					  &index->index_def->key_def);
 
 	int rc;
 	switch (vy_stmt_type(stmt)) {
@@ -9116,8 +9124,8 @@ vy_squash_process(struct vy_squash *squash)
 		return 0;
 
 	struct vy_range *range;
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, index_def,
-					  result);
+	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, result,
+					  &index_def->key_def);
 	/*
 	 * While we were reading on-disk runs, new statements could
 	 * have been inserted into the in-memory tree. Apply them to

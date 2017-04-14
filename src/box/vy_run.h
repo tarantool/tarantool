@@ -247,7 +247,7 @@ vy_run_env_destroy(struct vy_run_env *env);
 
 int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct index_def *index_def, struct tuple *min_key);
+		    const struct tuple *min_key, const struct key_def *key_def);
 
 void
 vy_page_info_destroy(struct vy_page_info *page_info);
