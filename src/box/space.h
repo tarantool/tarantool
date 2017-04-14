@@ -101,7 +101,10 @@ space_id(struct space *space) { return space->def.id; }
 
 /** Get space name. */
 static inline const char *
-space_name(struct space *space) { return space->def.name; }
+space_name(const struct space *space)
+{
+	return space->def.name;
+}
 
 /** Return true if space is temporary. */
 static inline bool

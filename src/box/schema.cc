@@ -83,13 +83,6 @@ space_by_id(uint32_t id)
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;
 }
 
-extern "C" const char *
-space_name_by_id(uint32_t id)
-{
-	struct space *space = space_by_id(id);
-	return space ? space_name(space) : "";
-}
-
 /**
  * Visit all spaces and apply 'func'.
  */

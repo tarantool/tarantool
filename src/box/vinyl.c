@@ -5860,9 +5860,6 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 		}
 }
 
-const char *
-space_name_by_id(uint32_t id);
-
 /**
  * Try to squash two upsert series (msgspacked index_base + ops)
  * Try to create a tuple with squahed operations
@@ -6592,13 +6589,12 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  * @retval -1 Attempt to modify the primary key.
  */
 static inline int
-vy_check_update(const struct vy_index *pk, const struct tuple *old_tuple,
-		const struct tuple *new_tuple)
+vy_check_update(const struct space *space, const struct vy_index *pk,
+		const struct tuple *old_tuple, const struct tuple *new_tuple)
 {
 	if (vy_tuple_compare(old_tuple, new_tuple, &pk->index_def->key_def)) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 pk->index_def->name,
-			 space_name_by_id(pk->index_def->space_id));
+			 pk->index_def->name, space_name(space));
 		return -1;
 	}
 	return 0;
@@ -6701,7 +6697,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
 	}
-	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple))
+	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple))
 		return -1;
 
 	/*
@@ -6899,7 +6895,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
 	}
-	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple)) {
+	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple)) {
 		error_log(diag_last_error(diag_get()));
 		/*
 		 * Upsert is skipped, to match the semantics of
