@@ -6023,9 +6023,6 @@ check_key:
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.
 		 */
-		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 index_def->name, space_name_by_id(index_def->space_id));
-		error_log(diag_last_error(diag_get()));
 		tuple_unref(result_stmt);
 		result_stmt = vy_stmt_dup(old_stmt, old_type == IPROTO_UPSERT ?
 						    upsert_format : format);
