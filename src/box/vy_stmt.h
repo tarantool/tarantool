@@ -509,16 +509,36 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
 }
 
 /**
- * Encode vy_stmt as xrow_header
+ * Encode vy_stmt for a primary key as xrow_header
+ *
+ * @param value statement to encode
+ * @param key_def key definition
+ * @param space_id is written to the request header unless it is 0.
+ * Pass 0 to save some space in xrow.
+ * @param xrow[out] xrow to fill
  *
  * @retval 0 if OK
  * @retval -1 if error
  */
 int
-vy_stmt_encode(const struct tuple *value,
-	       const struct key_def *key_def,
-	       uint32_t space_id, uint32_t index_id,
-	       struct xrow_header *xrow);
+vy_stmt_encode_primary(const struct tuple *value,
+		       const struct key_def *key_def, uint32_t space_id,
+		       struct xrow_header *xrow);
+
+/**
+ * Encode vy_stmt for a secondary key as xrow_header
+ *
+ * @param value statement to encode
+ * @param key_def key definition
+ * @param xrow[out] xrow to fill
+ *
+ * @retval 0 if OK
+ * @retval -1 if error
+ */
+int
+vy_stmt_encode_secondary(const struct tuple *value,
+			 const struct key_def *key_def,
+			 struct xrow_header *xrow);
 
 /**
  * Reconstruct vinyl tuple info and data from xrow

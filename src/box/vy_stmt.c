@@ -438,10 +438,9 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 }
 
 int
-vy_stmt_encode(const struct tuple *value,
-	       const struct key_def *key_def,
-	       uint32_t space_id, uint32_t index_id,
-	       struct xrow_header *xrow)
+vy_stmt_encode_primary(const struct tuple *value,
+		       const struct key_def *key_def, uint32_t space_id,
+		       struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
 	enum iproto_type type = vy_stmt_type(value);
@@ -451,44 +450,62 @@ vy_stmt_encode(const struct tuple *value,
 	struct request request;
 	request_create(&request, type);
 	request.space_id = space_id;
-	request.index_id = index_id;
 	uint32_t size;
 	const char *extracted = NULL;
-	if (index_id != 0 || type == IPROTO_DELETE) {
+	switch (type) {
+	case IPROTO_DELETE:
+		/* extract key */
 		extracted = tuple_extract_key(value, key_def, &size);
 		if (extracted == NULL)
 			return -1;
+		request.key = extracted;
+		request.key_end = request.key + size;
+		break;
+	case IPROTO_REPLACE:
+		request.tuple = tuple_data_range(value, &size);
+		request.tuple_end = request.tuple + size;
+		break;
+	case IPROTO_UPSERT:
+		request.tuple = vy_upsert_data_range(value, &size);
+		request.tuple_end = request.tuple + size;
+		/* extract operations */
+		request.ops = vy_stmt_upsert_ops(value, &size);
+		request.ops_end = request.ops + size;
+		break;
+	default:
+		unreachable();
 	}
+	xrow->bodycnt = request_encode(&request, xrow->body);
+	if (xrow->bodycnt < 0)
+		return -1;
+	return 0;
+}
 
-	if (index_id == 0) {
-		if (type == IPROTO_REPLACE) {
-			request.tuple = tuple_data_range(value, &size);
-			request.tuple_end = request.tuple + size;
-		} else if (type == IPROTO_UPSERT) {
-			request.tuple = vy_upsert_data_range(value, &size);
-			request.tuple_end = request.tuple + size;
+int
+vy_stmt_encode_secondary(const struct tuple *value,
+			 const struct key_def *key_def,
+			 struct xrow_header *xrow)
+{
+	memset(xrow, 0, sizeof(*xrow));
+	enum iproto_type type = vy_stmt_type(value);
+	xrow->type = type;
+	xrow->lsn = vy_stmt_lsn(value);
 
-			/* extract operations */
-			request.ops = vy_stmt_upsert_ops(value, &size);
-			request.ops_end = request.ops + size;
-		}
-		if (type == IPROTO_DELETE) {
-			/* extract key */
-			request.key = extracted;
-			request.key_end = request.key + size;
-		}
-		xrow->bodycnt = request_encode(&request, xrow->body);
+	struct request request;
+	request_create(&request, type);
+	uint32_t size;
+	const char *extracted = tuple_extract_key(value, key_def, &size);
+	if (extracted == NULL)
+		return -1;
+	if (type == IPROTO_REPLACE) {
+		request.tuple = extracted;
+		request.tuple_end = extracted + size;
 	} else {
-		if (type == IPROTO_REPLACE) {
-			request.tuple = extracted;
-			request.tuple_end = extracted + size;
-		} else {
-			assert(type == IPROTO_DELETE);
-			request.key = extracted;
-			request.key_end = extracted + size;
-		}
-		xrow->bodycnt = request_encode(&request, xrow->body);
+		assert(type == IPROTO_DELETE);
+		request.key = extracted;
+		request.key_end = extracted + size;
 	}
+	xrow->bodycnt = request_encode(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;
 	else

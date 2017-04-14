@@ -1694,9 +1694,10 @@ vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 	size_t used = region_used(region);
 
 	struct xrow_header xrow;
-	if (vy_stmt_encode(value, &index_def->key_def,
-			   index_def->space_id, index_def->iid,
-			   &xrow) != 0)
+	int rc = (index_def->iid == 0 ?
+		  vy_stmt_encode_primary(value, &index_def->key_def, 0, &xrow) :
+		  vy_stmt_encode_secondary(value, &index_def->key_def, &xrow));
+	if (rc != 0)
 		return -1;
 
 	ssize_t row_size;
@@ -8741,8 +8742,8 @@ vy_send_range_f(struct cbus_call_msg *cmsg)
 	while ((rc = vy_write_iterator_next(ctx->wi, &stmt)) == 0 &&
 	       stmt != NULL) {
 		struct xrow_header xrow;
-		rc = vy_stmt_encode(stmt, ctx->key_def,
-				    ctx->space_id, ctx->index_id, &xrow);
+		rc = vy_stmt_encode_primary(stmt, ctx->key_def,
+					    ctx->space_id, &xrow);
 		if (rc != 0)
 			break;
 		/* See comment to vy_join_ctx::lsn. */
