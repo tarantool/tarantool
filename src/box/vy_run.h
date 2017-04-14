@@ -131,8 +131,12 @@ struct vy_run {
 	 * (worse, reopened) file descriptor.
 	 */
 	int refs;
-	/** Link in range->runs list. */
-	struct rlist in_range;
+	union {
+		/** Link in range->runs list. */
+		struct rlist in_range;
+		/** Link in vy_join_ctx->runs list. */
+		struct rlist in_join;
+	};
 	/** Unique ID of this run. */
 	int64_t id;
 };

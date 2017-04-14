@@ -59,6 +59,7 @@
 #include "fiber.h" /* cord_slab_cache() */
 #include "ipc.h"
 #include "coeio.h"
+#include "cbus.h"
 #include "histogram.h"
 #include "rmean.h"
 #include "errinj.h"
@@ -369,7 +370,6 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		const struct key_def *key_def, struct tuple_format *format,
 		struct tuple_format *upsert_format, bool is_primary,
 		bool suppress_error, struct vy_stat *stat);
-
 
 struct vy_range {
 	/** Unique ID of this range. */
@@ -8662,22 +8662,45 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 
 /** {{{ Replication */
 
-/** Argument passed to vy_join_cb(). */
-struct vy_join_arg {
-	/** Vinyl run environment. */
-	struct vy_run_env *env;
+/** Relay context, passed to all relay functions. */
+struct vy_join_ctx {
+	/** Environment. */
+	struct vy_env *env;
 	/* path to vinyl_dir */
 	char *path;
-	/** Recovery context to relay. */
-	struct vy_recovery *recovery;
 	/** Stream to relay statements to. */
 	struct xstream *stream;
+	/** Pipe to the relay thread. */
+	struct cpipe relay_pipe;
+	/** Pipe to the tx thread. */
+	struct cpipe tx_pipe;
+	/**
+	 * Cbus message, used for calling functions
+	 * on behalf of the relay thread.
+	 */
+	struct cbus_call_msg cmsg;
 	/** ID of the space currently being relayed. */
 	uint32_t space_id;
 	/** Ordinal number of the index. */
 	uint32_t index_id;
 	/** Path to the index directory. */
-	char *index_path;
+	char index_path[PATH_MAX];
+	/** Index key definition. */
+	const struct key_def *key_def;
+	/** Index format used for REPLACE and DELETE statements. */
+	struct tuple_format *format;
+	/** Index format used for UPSERT statements. */
+	struct tuple_format *upsert_format;
+	/**
+	 * Write iterator for merging runs before sending
+	 * them to the replica.
+	 */
+	struct vy_write_iterator *wi;
+	/**
+	 * List of runs of the current range, linked by vy_run::in_join.
+	 * The newer the run the closer it is to the head of the list.
+	 */
+	struct rlist runs;
 	/**
 	 * LSN to assign to the next statement.
 	 *
@@ -8690,127 +8713,214 @@ struct vy_join_arg {
 	int64_t lsn;
 };
 
+static int
+vy_send_range_f(struct cbus_call_msg *cmsg)
+{
+	struct vy_join_ctx *ctx = container_of(cmsg, struct vy_join_ctx, cmsg);
+
+	int rc;
+	struct tuple *stmt;
+	while ((rc = vy_write_iterator_next(ctx->wi, &stmt)) == 0 &&
+	       stmt != NULL) {
+		struct xrow_header xrow;
+		rc = vy_stmt_encode(stmt, ctx->key_def,
+				    ctx->space_id, ctx->index_id, &xrow);
+		if (rc != 0)
+			break;
+		/* See comment to vy_join_ctx::lsn. */
+		xrow.lsn = ++ctx->lsn;
+		rc = xstream_write(ctx->stream, &xrow);
+		if (rc != 0)
+			break;
+		fiber_gc();
+	}
+	vy_write_iterator_cleanup(ctx->wi);
+	fiber_gc();
+	return rc;
+}
+
+/**
+ * Merge and send all runs from the given relay context.
+ * On success, delete runs.
+ */
+static int
+vy_send_range(struct vy_join_ctx *ctx)
+{
+	if (rlist_empty(&ctx->runs))
+		return 0; /* nothing to do */
+
+	int rc = -1;
+	ctx->wi = vy_write_iterator_new(ctx->env, ctx->key_def, ctx->key_def,
+					ctx->format, ctx->upsert_format,
+					true, 0, true, INT64_MAX);
+	if (ctx->wi == NULL)
+		goto out;
+
+	struct vy_run *run;
+	rlist_foreach_entry(run, &ctx->runs, in_join) {
+		if (vy_write_iterator_add_run(ctx->wi, run) != 0)
+			goto out_delete_wi;
+	}
+
+	/* Do the actual work from the relay thread. */
+	bool cancellable = fiber_set_cancellable(false);
+	rc = cbus_call(&ctx->relay_pipe, &ctx->tx_pipe, &ctx->cmsg,
+		       vy_send_range_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+
+	struct vy_run *tmp;
+	rlist_foreach_entry_safe(run, &ctx->runs, in_join, tmp)
+		vy_run_unref(run);
+	rlist_create(&ctx->runs);
+
+out_delete_wi:
+	vy_write_iterator_delete(ctx->wi);
+	ctx->wi = NULL;
+out:
+	return rc;
+}
+
 /** Relay callback, passed to vy_recovery_iterate(). */
 static int
-vy_join_cb(const struct vy_log_record *record, void *cb_arg)
+vy_join_cb(const struct vy_log_record *record, void *arg)
 {
-	struct vy_join_arg *arg = cb_arg;
-	int rc = 0;
+	struct vy_join_ctx *ctx = arg;
 
-	if (record->type == VY_LOG_CREATE_INDEX) {
-		arg->space_id = record->space_id;
-		arg->index_id = record->index_id;
-		vy_index_snprint_path(arg->index_path, PATH_MAX, arg->path,
-				      arg->space_id, arg->index_id);
+	if (record->type == VY_LOG_CREATE_INDEX ||
+	    record->type == VY_LOG_INSERT_RANGE) {
+		/*
+		 * All runs of the current range have been recovered,
+		 * so send them to the replica.
+		 */
+		if (vy_send_range(ctx) != 0)
+			return -1;
 	}
 
 	/*
 	 * We are only interested in the primary index.
 	 * Secondary keys will be rebuilt on the destination.
 	 */
-	if (arg->index_id != 0)
-		goto out;
+	if (record->index_id != 0)
+		return 0;
 
-	/*
-	 * We only send statements, not metadata, because the
-	 * latter is a replica's private business.
-	 */
-	if (record->type != VY_LOG_INSERT_RUN)
-		goto out;
-
-	rc = -1;
-
-	/* Load the run. */
-	struct vy_run *run = vy_run_new(record->run_id);
-	if (run == NULL)
-		goto out;
-	char index_path[PATH_MAX];
-	vy_run_snprint_path(index_path, sizeof(index_path),
-			    arg->index_path, run->id, VY_FILE_INDEX);
-	char run_path[PATH_MAX];
-	vy_run_snprint_path(run_path, sizeof(run_path),
-			    arg->index_path, run->id, VY_FILE_RUN);
-	if (vy_run_recover(run, index_path, run_path) != 0)
-		goto out_free_run;
-
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(arg->env);
-	if (zdctx == NULL)
-		goto out_free_run;
-
-	/* Send the run's statements to the replica. */
-	for (uint32_t page_no = 0; page_no < run->info.count; page_no++) {
-		struct vy_page_info *pi = vy_run_page_info(run, page_no);
-		struct vy_page *page = vy_page_new(pi);
-		if (page == NULL)
-			goto out_free_run;
-		if (vy_page_read(page, pi, run->fd, zdctx) != 0)
-			goto out_free_page;
-		for (uint32_t stmt_no = 0; stmt_no < pi->count; stmt_no++) {
-			struct xrow_header xrow;
-			if (vy_page_xrow(page, stmt_no, &xrow) != 0)
-				goto out_free_page;
-			xrow.lsn = ++arg->lsn;
-			if (xstream_write(arg->stream, &xrow) != 0)
-				goto out_free_page;
-		}
-		vy_page_delete(page);
-		continue;
-out_free_page:
-		vy_page_delete(page);
-		goto out_free_run;
+	if (record->type == VY_LOG_CREATE_INDEX) {
+		vy_index_snprint_path(ctx->index_path, sizeof(ctx->index_path),
+				      ctx->path,
+				      record->space_id, record->index_id);
+		ctx->space_id = record->space_id;
+		ctx->index_id = record->index_id;
+		ctx->key_def = record->key_def;
+		if (ctx->format != NULL)
+			tuple_format_ref(ctx->format, -1);
+		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
+				(struct key_def **)&ctx->key_def, 1, 0);
+		if (ctx->format == NULL)
+			return -1;
+		tuple_format_ref(ctx->format, 1);
+		if (ctx->upsert_format != NULL)
+			tuple_format_ref(ctx->upsert_format, -1);
+		ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
+		if (ctx->upsert_format == NULL)
+			return -1;
+		tuple_format_ref(ctx->upsert_format, 1);
 	}
-	rc = 0; /* success */
 
-out_free_run:
-	vy_run_unref(run);
-out:
-	return rc;
+	if (record->type == VY_LOG_INSERT_RUN) {
+		struct vy_run *run = vy_run_new(record->run_id);
+		if (run == NULL)
+			return -1;
+		rlist_add_entry(&ctx->runs, run, in_join);
+		char index_path[PATH_MAX];
+		vy_run_snprint_path(index_path, sizeof(index_path),
+				    ctx->index_path, run->id, VY_FILE_INDEX);
+		char run_path[PATH_MAX];
+		vy_run_snprint_path(run_path, sizeof(run_path),
+				    ctx->index_path, run->id, VY_FILE_RUN);
+		if (vy_run_recover(run, index_path, run_path) != 0) {
+			rlist_del_entry(run, in_join);
+			vy_run_unref(run);
+			return -1;
+		}
+	}
+	return 0;
 }
 
 /** Relay cord function. */
 static int
 vy_join_f(va_list ap)
 {
-	struct vy_join_arg *arg = va_arg(ap, struct vy_join_arg *);
-	return vy_recovery_iterate(arg->recovery, false, vy_join_cb, arg);
+	struct vy_join_ctx *ctx = va_arg(ap, struct vy_join_ctx *);
+
+	coeio_enable();
+
+	cpipe_create(&ctx->tx_pipe, "tx");
+
+	struct cbus_endpoint endpoint;
+	cbus_endpoint_create(&endpoint, cord_name(cord()),
+			     fiber_schedule_cb, fiber());
+
+	cbus_loop(&endpoint);
+
+	cbus_endpoint_destroy(&endpoint, cbus_process);
+	cpipe_destroy(&ctx->tx_pipe);
+	return 0;
 }
 
 int
 vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 {
-	(void)vclock;
-	struct vy_join_arg arg = {
-		.env = &env->run_env,
-		.path = env->conf->path,
-		.stream = stream,
-	};
+	int rc = -1;
 
-	arg.index_path = malloc(PATH_MAX);
-	if (arg.index_path == NULL) {
-		diag_set(OutOfMemory, PATH_MAX, "malloc", "path");
-		goto err_path;
+	/* Allocate the relay context. */
+	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
+	if (ctx == NULL) {
+		diag_set(OutOfMemory, PATH_MAX, "malloc", "struct vy_join_ctx");
+		goto out;
 	}
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->env = env;
+	ctx->path = env->conf->path;
+	ctx->stream = stream;
+	rlist_create(&ctx->runs);
 
-	arg.recovery = vy_recovery_new(vclock_sum(vclock));
-	if (arg.recovery == NULL)
-		goto err_recovery;
-
+	/* Start the relay cord. */
+	char name[FIBER_NAME_MAX];
+	snprintf(name, sizeof(name), "initial_join_%p", stream);
 	struct cord cord;
-	if (cord_costart(&cord, "initial_join", vy_join_f, &arg) != 0)
-		goto err_cord;
+	if (cord_costart(&cord, name, vy_join_f, ctx) != 0)
+		goto out_free_ctx;
+	cpipe_create(&ctx->relay_pipe, name);
 
-	int rc = cord_cojoin(&cord);
+	/*
+	 * Load the recovery context from the given point in time.
+	 * Send all runs stored in it to the replica.
+	 */
+	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	if (recovery == NULL)
+		goto out_join_cord;
+	rc = vy_recovery_iterate(recovery, false, vy_join_cb, ctx);
+	vy_recovery_delete(recovery);
+	/* Send the last range. */
+	if (rc == 0)
+		rc = vy_send_range(ctx);
 
-	vy_recovery_delete(arg.recovery);
-	free(arg.index_path);
+	/* Cleanup. */
+	if (ctx->format != NULL)
+		tuple_format_ref(ctx->format, -1);
+	if (ctx->upsert_format != NULL)
+		tuple_format_ref(ctx->upsert_format, -1);
+	struct vy_run *run, *tmp;
+	rlist_foreach_entry_safe(run, &ctx->runs, in_join, tmp)
+		vy_run_unref(run);
+out_join_cord:
+	cbus_stop_loop(&ctx->relay_pipe);
+	cpipe_destroy(&ctx->relay_pipe);
+	if (cord_cojoin(&cord) != 0)
+		rc = -1;
+out_free_ctx:
+	free(ctx);
+out:
 	return rc;
-
-err_cord:
-	vy_recovery_delete(arg.recovery);
-err_recovery:
-	free(arg.index_path);
-err_path:
-	return -1;
 }
 
 /* }}} Replication */
