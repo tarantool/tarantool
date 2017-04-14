@@ -2226,7 +2226,8 @@ vy_range_new(struct vy_index *index, int64_t id,
 		goto fail;
 	}
 	range->mem = vy_mem_new(allocator, allocator_lsn,
-				index->index_def, index->space_format,
+				&index->index_def->key_def,
+				index->space_format,
 				index->space_format_with_colmask,
 				index->upsert_format, sc_version);
 	if (range->mem == NULL)
@@ -2300,7 +2301,8 @@ vy_range_rotate_mem(struct vy_range *range)
 
 	assert(range->mem != NULL);
 	mem = vy_mem_new(allocator, allocator_lsn,
-			 index->index_def, index->space_format,
+			 &index->index_def->key_def,
+			 index->space_format,
 			 index->space_format_with_colmask,
 			 index->upsert_format, sc_version);
 	if (mem == NULL)
