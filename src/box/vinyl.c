@@ -805,7 +805,7 @@ struct vy_tx {
 	 * forcibly closed.
 	 */
 	struct rlist cursors;
-	struct tx_manager *manager;
+	struct tx_manager *xm;
 };
 
 static int
@@ -1036,30 +1036,6 @@ struct vy_page_read_task {
 	int rc;
 };
 
-static struct txv *
-txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
-{
-	struct txv *v = malloc(sizeof(struct txv));
-	if (unlikely(v == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct txv), "malloc",
-			 "struct txv");
-		return NULL;
-	}
-	v->index = index;
-	v->mem = NULL;
-	v->stmt = stmt;
-	tuple_ref(stmt);
-	v->tx = tx;
-	return v;
-}
-
-static void
-txv_delete(struct txv *v)
-{
-	tuple_unref(v->stmt);
-	free(v);
-}
-
 static int
 read_set_cmp(struct txv *a, struct txv *b);
 
@@ -1118,6 +1094,8 @@ struct tx_manager {
 	 */
 	struct rlist read_views;
 	struct vy_env *env;
+	struct mempool tx_mempool;
+	struct mempool txv_mempool;
 };
 
 static int
@@ -1180,12 +1158,16 @@ tx_manager_new(struct vy_env *env)
 	m->lsn = 0;
 	m->env = env;
 	rlist_create(&m->read_views);
+	mempool_create(&m->tx_mempool, cord_slab_cache(), sizeof(struct vy_tx));
+	mempool_create(&m->txv_mempool, cord_slab_cache(), sizeof(struct txv));
 	return m;
 }
 
 static int
 tx_manager_delete(struct tx_manager *m)
 {
+	mempool_destroy(&m->txv_mempool);
+	mempool_destroy(&m->tx_mempool);
 	free(m);
 	return 0;
 }
@@ -5851,6 +5833,30 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 }
 
 static struct txv *
+txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
+{
+	struct txv *v = mempool_alloc(&tx->xm->txv_mempool);
+	if (unlikely(v == NULL)) {
+		diag_set(OutOfMemory, sizeof(struct txv), "mempool_alloc",
+			 "struct txv");
+		return NULL;
+	}
+	v->index = index;
+	v->mem = NULL;
+	v->stmt = stmt;
+	tuple_ref(stmt);
+	v->tx = tx;
+	return v;
+}
+
+static void
+txv_delete(struct txv *v)
+{
+	tuple_unref(v->stmt);
+	mempool_free(&v->tx->xm->txv_mempool, v);
+}
+
+static struct txv *
 read_set_delete_cb(read_set_t *t, struct txv *v, void *arg)
 {
 	(void) t;
@@ -5922,8 +5928,7 @@ vy_update_alloc(void *arg, size_t size)
 	struct region *region = (struct region *) arg;
 	void *data = region_aligned_alloc(region, size, sizeof(uint64_t));
 	if (data == NULL)
-		diag_set(OutOfMemory, sizeof(struct vy_tx), "region",
-			 "upsert");
+		diag_set(OutOfMemory, size, "region", "upsert");
 	return data;
 }
 
@@ -7087,7 +7092,7 @@ int
 vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	   struct request *request)
 {
-	struct vy_env *env = tx->manager->env;
+	struct vy_env *env = tx->xm->env;
 	/* Check the tuple fields. */
 	if (tuple_validate_raw(space->format, request->tuple))
 		return -1;
@@ -7110,7 +7115,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->start = ev_now(loop());
-	tx->manager = xm;
+	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
 	tx->is_in_read_view = false;
 	rlist_create(&tx->in_read_views);
@@ -7132,7 +7137,6 @@ vy_tx_abort_cursors(struct vy_tx *tx)
 static void
 vy_tx_destroy(struct vy_tx *tx)
 {
-	struct tx_manager *xm = tx->manager;
 	rlist_del_entry(tx, in_read_views);
 
 	/** Abort all open cursors. */
@@ -7144,7 +7148,7 @@ vy_tx_destroy(struct vy_tx *tx)
 		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
 
-	xm->tx_count--;
+	tx->xm->tx_count--;
 }
 
 static bool
@@ -7191,7 +7195,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 static void
 vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 {
-	struct tx_manager *xm = tx->manager;
+	struct tx_manager *xm = tx->xm;
 	read_set_t *tree = &v->index->read_set;
 	struct key_def *key_def = &v->index->index_def->key_def;
 	struct read_set_key key;
@@ -7217,7 +7221,7 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 		abort->tx->is_in_read_view = true;
 		abort->tx->vlsn = xm->lsn;
 		rlist_add_tail_entry(&xm->read_views, abort->tx, in_read_views);
-		assert(abort->tx->vlsn <= abort->tx->manager->lsn);
+		assert(abort->tx->vlsn <= abort->tx->xm->lsn);
 	}
 }
 
@@ -7226,7 +7230,7 @@ vy_prepare(struct vy_tx *tx)
 {
 	/* prepare transaction */
 	assert(tx->state == VINYL_TX_READY);
-	struct vy_env *e = tx->manager->env;
+	struct vy_env *e = tx->xm->env;
 	int rc = 0;
 
 	/* proceed read-only transactions */
@@ -7261,7 +7265,7 @@ vy_prepare(struct vy_tx *tx)
 int
 vy_commit(struct vy_tx *tx, int64_t lsn)
 {
-	struct vy_env *e = tx->manager->env;
+	struct vy_env *e = tx->xm->env;
 	assert(tx->state == VINYL_TX_COMMIT);
 	if (lsn > e->xm->lsn)
 		e->xm->lsn = lsn;
@@ -7319,8 +7323,7 @@ vy_commit(struct vy_tx *tx, int64_t lsn)
 	size_t write_size = mem_used_after - mem_used_before;
 	vy_stat_tx(e->stat, tx->start, count, write_count, write_size);
 
-	TRASH(tx);
-	free(tx);
+	mempool_free(&tx->xm->tx_mempool, tx);
 
 	vy_quota_use(quota, write_size);
 	return 0;
@@ -7336,16 +7339,15 @@ vy_tx_rollback(struct vy_tx *tx)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
 		txv_delete(v);
-	tx->manager->env->stat->tx_rlb++;
+	tx->xm->env->stat->tx_rlb++;
 }
 
 struct vy_tx *
 vy_begin(struct vy_env *e)
 {
-	struct vy_tx *tx;
-	tx = malloc(sizeof(struct vy_tx));
+	struct vy_tx *tx = mempool_alloc(&e->xm->tx_mempool);
 	if (unlikely(tx == NULL)) {
-		diag_set(OutOfMemory, sizeof(struct vy_tx), "malloc",
+		diag_set(OutOfMemory, sizeof(struct vy_tx), "mempool_alloc",
 			 "struct vy_tx");
 		return NULL;
 	}
@@ -7362,8 +7364,7 @@ vy_rollback(struct vy_tx *tx)
 			vy_mem_unpin(v->mem);
 	}
 	vy_tx_rollback(tx);
-	TRASH(tx);
-	free(tx);
+	mempool_free(&tx->xm->tx_mempool, tx);
 }
 
 
