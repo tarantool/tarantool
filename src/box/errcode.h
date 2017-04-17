@@ -186,6 +186,7 @@ struct errcode_record {
 	/*131 */_(ER_INVALID_INDEX_FILE,	"Invalid INDEX file %s: %s") \
 	/*132 */_(ER_INVALID_RUN_FILE,		"Invalid RUN file: %s") \
 	/*133 */_(ER_INVALID_VYLOG_FILE,	"Invalid VYLOG file: %s") \
+	/*134 */_(ER_SNAPSHOT_ROLLBACK,		"Can't start snapshot while rollback")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

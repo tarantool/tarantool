@@ -41,3 +41,31 @@ box.space.test:select{}
 box.space.test.index.primary:select{}
 box.space.test.index.secondary:select{}
 box.space.test:drop()
+
+
+
+engine = test_run:get_cfg('engine')
+space = box.schema.space.create('test', { engine = engine })
+index1 = space:create_index('primary', { parts = {1, 'unsigned'} } )
+fiber = require'fiber'
+errinj = box.error.injection
+
+ch = fiber.channel(1)
+
+test_run:cmd('setopt delimiter ";"')
+function test()
+  errinj.set('ERRINJ_WAL_WRITE_DISK', true)
+  pcall(box.space.test.replace, box.space.test, {1, 1})
+  errinj.set('ERRINJ_WAL_WRITE_DISK', false)
+  ch:put(true)
+end ;
+test_run:cmd('setopt delimiter ""');
+
+-- should be on one line
+f = fiber.create(test) box.snapshot()
+ch:get()
+
+box.space.test:select()
+test_run:cmd('restart server default')
+box.space.test:select()
+box.space.test:drop()
