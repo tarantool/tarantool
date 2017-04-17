@@ -360,6 +360,7 @@ struct wal_checkpoint: public cmsg
 	struct vclock *vclock;
 	struct fiber *fiber;
 	bool rotate;
+	int status;
 };
 
 void
@@ -367,6 +368,11 @@ wal_checkpoint_f(struct cmsg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->in_rollback.route != NULL) {
+		/* We're rolling back a failed write. */
+		msg->status = -1;
+		return;
+	}
 	/*
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
@@ -390,13 +396,26 @@ wal_checkpoint_done_f(struct cmsg *data)
 	fiber_wakeup(msg->fiber);
 }
 
-void
+int
 wal_checkpoint(struct vclock *vclock, bool rotate)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
+	if (! stailq_empty(&writer->rollback)) {
+		/*
+		 * The writer rollback queue is not empty,
+		 * roll back this transaction immediately.
+		 * This is to ensure we do not accidentally
+		 * commit a transaction which has seen changes
+		 * that will be rolled back.
+		 */
+		say_error("Aborting transaction %llu during "
+			  "cascading rollback",
+			  vclock_sum(&writer->vclock));
+		return -1;
+	}
 	if (writer->wal_mode == WAL_NONE) {
 		vclock_copy(vclock, &writer->vclock);
-		return;
+		return 0;
 	}
 	static struct cmsg_hop wal_checkpoint_route[] = {
 		{wal_checkpoint_f, &wal_thread.tx_pipe},
@@ -408,10 +427,12 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 	msg.vclock = vclock;
 	msg.fiber = fiber();
 	msg.rotate = rotate;
+	msg.status = 0;
 	cpipe_push(&wal_thread.wal_pipe, &msg);
 	fiber_set_cancellable(false);
 	fiber_yield();
 	fiber_set_cancellable(true);
+	return msg.status;
 }
 
 struct wal_gc_msg: public cbus_call_msg
