@@ -93,7 +93,7 @@ extern "C" {
  * @param[out] vclock WAL vclock
  *
  */
-void
+int
 wal_checkpoint(struct vclock *vclock, bool rotate);
 
 /**

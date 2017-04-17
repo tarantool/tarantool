@@ -1742,7 +1742,10 @@ box_snapshot()
 		goto end;
 
 	struct vclock vclock;
-	wal_checkpoint(&vclock, true);
+	if ((rc = wal_checkpoint(&vclock, true))) {
+		tnt_error(ClientError, ER_SNAPSHOT_ROLLBACK);
+		goto end;
+	}
 	rc = engine_commit_checkpoint(&vclock);
 end:
 	if (rc)
