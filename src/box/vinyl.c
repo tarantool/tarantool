@@ -1685,19 +1685,6 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 	index->range_count--;
 }
 
-/*
- * Check if a is left-adjacent to b, i.e. a->end == b->begin.
- */
-static bool
-vy_range_is_adjacent(struct vy_range *a, struct vy_range *b,
-		     struct index_def *index_def)
-{
-	if (a->end == NULL || b->begin == NULL)
-		return false;
-	assert(a->index == b->index);
-	return key_compare(a->end, b->begin, &index_def->key_def) == 0;
-}
-
 /* dump statement to the run page buffers (stmt header and data) */
 static int
 vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
@@ -2848,7 +2835,9 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			return -1;
 		if (range->begin != NULL && range->end != NULL &&
 		    key_compare(range->begin, range->end, &index_def->key_def) >= 0) {
-			diag_set(ClientError, ER_VINYL, "invalid range");
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("begin >= end for range id %lld",
+					    (long long)range->id));
 			return -1;
 		}
 		vy_index_add_range(index, range);
@@ -2895,17 +2884,44 @@ vy_index_open_ex(struct vy_index *index)
 	 * all data were recovered.
 	 */
 	struct vy_range *range, *prev = NULL;
+	const struct key_def *key_def = &index->index_def->key_def;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
 	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
-		if ((prev == NULL && range->begin != NULL) ||
-		    (prev != NULL && !vy_range_is_adjacent(prev, range,
-							   index->index_def)))
-			break;
+		if (prev == NULL && range->begin != NULL) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Range %lld is leftmost but "
+					    "starts with a finite key",
+					    (long long)range->id));
+			return -1;
+		}
+		int cmp = 0;
+		if (prev != NULL &&
+		    (prev->end == NULL || range->begin == NULL ||
+		     (cmp = key_compare(prev->end, range->begin,
+					key_def)) != 0)) {
+			const char *errmsg = cmp > 0 ?
+				"Nearby ranges %lld and %lld overlap" :
+				"Keys between ranges %lld and %lld not spanned";
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf(errmsg,
+					    (long long)prev->id,
+					    (long long)range->id));
+			return -1;
+		}
 		vy_index_acct_range(index, range);
 		vy_scheduler_add_range(env->scheduler, range);
 	}
-	if (range != NULL || prev->end != NULL) {
-		diag_set(ClientError, ER_VINYL, "range overlap or hole");
+	if (prev == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Index %lld has empty range tree",
+				    (long long)index->index_def->opts.lsn));
+		return -1;
+	}
+	if (prev->end != NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Range %lld is rightmost but "
+				    "ends with a finite key",
+				    (long long)prev->id));
 		return -1;
 	}
 	return 0;

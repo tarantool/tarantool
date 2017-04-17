@@ -316,22 +316,26 @@ vy_run_unref(struct vy_run *run)
  *
  * @param[out] page Page information.
  * @param xrow      Xrow to decode.
+ * @param filename  Filename for error reporting.
  *
  * @retval  0 Success.
  * @retval -1 Error.
  */
 int
-vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow);
+vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
+		    const char *filename);
 
 /**
  * Read bloom filter from given buffer.
  * @param bloom - a bloom filter to read.
  * @param buffer[in/out] - a buffer to read from.
  *  The pointer is incremented on the number of bytes read.
+ * @param filename Filename for error reporting.
  * @return - 0 on success or -1 on format/memory error
  */
 int
-vy_run_bloom_decode(struct bloom *bloom, const char **buffer);
+vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
+		    const char *filename);
 
 void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,

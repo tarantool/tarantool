@@ -190,7 +190,7 @@ errinj.set("ERRINJ_VY_READ_PAGE", true)
 ...
 s:select()
 ---
-- error: page read injection
+- error: Error injection 'vinyl page read'
 ...
 errinj.set("ERRINJ_VY_READ_PAGE", false)
 ---

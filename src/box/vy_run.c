@@ -163,12 +163,14 @@ vy_run_delete(struct vy_run *run)
  *
  * @param[out] page Page information.
  * @param xrow      Xrow to decode.
+ * @param filename  Filename for error reporting.
  *
  * @retval  0 Success.
  * @retval -1 Error.
  */
 int
-vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow)
+vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
+		    const char *filename)
 {
 	assert(xrow->type == VY_INDEX_PAGE_INFO);
 	const char *pos = xrow->body->iov_base;
@@ -203,20 +205,19 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow)
 		case VY_PAGE_INFO_PAGE_INDEX_OFFSET:
 			page->page_index_offset = mp_decode_uint(&pos);
 			break;
-		default: {
-			char errmsg[512];
-			snprintf(errmsg, sizeof(errmsg), "%s %d",
-				 "Can't decode page info: unknown key ",
-				 key);
-			diag_set(ClientError, ER_VINYL, errmsg);
-		}
+		default:
+			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+				 tt_sprintf("Can't decode page info: "
+					    "unknown key %u", (unsigned)key));
 			return -1;
 		}
 	}
 	if (key_map) {
 		enum vy_page_info_key key = bit_ctz_u64(key_map);
-		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
-			 vy_page_info_key_name(key));
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Can't decode page info: "
+				    "missing mandatory key %s",
+				    vy_page_info_key_name(key)));
 		return -1;
 	}
 
@@ -228,36 +229,42 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow)
  * @param bloom - a bloom filter to read.
  * @param buffer[in/out] - a buffer to read from.
  *  The pointer is incremented on the number of bytes read.
+ * @param filename Filename for error reporting.
  * @return - 0 on success or -1 on format/memory error
  */
 int
-vy_run_bloom_decode(struct bloom *bloom, const char **buffer)
+vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
+		    const char *filename)
 {
 	const char **pos = buffer;
 	memset(bloom, 0, sizeof(*bloom));
 	uint32_t array_size = mp_decode_array(pos);
 	if (array_size != 4) {
-		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
-			"wrong size of an array");
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Can't decode bloom meta: "
+				    "wrong array size (expected %d, got %u)",
+				    4, (unsigned)array_size));
 		return -1;
 	}
 	uint64_t version = mp_decode_uint(pos);
 	if (version != VY_BLOOM_VERSION) {
-		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
-			"wrong version");
-		return -1;
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Can't decode bloom meta: "
+				    "wrong version (expected %d, got %u)",
+				    VY_BLOOM_VERSION, (unsigned)version));
 	}
 	bloom->table_size = mp_decode_uint(pos);
 	bloom->hash_count = mp_decode_uint(pos);
 	size_t table_size = mp_decode_binl(pos);
 	if (table_size != bloom_store_size(bloom)) {
-		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
-			"wrong size of a table");
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Can't decode bloom meta: "
+				    "wrong table size (expected %zu, got %zu)",
+				    bloom_store_size(bloom), table_size));
 		return -1;
 	}
 	if (bloom_load_table(bloom, *pos, runtime.quota) != 0) {
-		diag_set(ClientError, ER_VINYL, "Can't decode bloom meta: "
-			"alloc failed");
+		diag_set(OutOfMemory, bloom_store_size(bloom), "mmap", "bloom");
 		return -1;
 	}
 	*pos += table_size;
@@ -269,13 +276,15 @@ vy_run_bloom_decode(struct bloom *bloom, const char **buffer)
  *
  * @param xrow xrow to decode
  * @param[out] run_info the run information
+ * @param filename File name for error reporting.
  *
  * @retval  0 success
  * @retval -1 error (check diag)
  */
-static int
+int
 vy_run_info_decode(struct vy_run_info *run_info,
-		   const struct xrow_header *xrow)
+		   const struct xrow_header *xrow,
+		   const char *filename)
 {
 	assert(xrow->type == VY_INDEX_RUN_INFO);
 	/* decode run */
@@ -299,21 +308,25 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			run_info->count = mp_decode_uint(&pos);
 			break;
 		case VY_RUN_INFO_BLOOM:
-			if (vy_run_bloom_decode(&run_info->bloom, &pos) == 0)
+			if (vy_run_bloom_decode(&run_info->bloom, &pos,
+						filename) == 0)
 				run_info->has_bloom = true;
 			else
 				return -1;
 			break;
 		default:
-			diag_set(ClientError, ER_VINYL,
-				 "Unknown run meta key %d", key);
+			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+				"Can't decode run info: unknown key %u",
+				(unsigned)key);
 			return -1;
 		}
 	}
 	if (key_map) {
 		enum vy_run_info_key key = bit_ctz_u64(key_map);
-		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
-			 vy_run_info_key_name(key));
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Can't decode run info: "
+				    "missing mandatory key %s",
+				    vy_run_info_key_name(key)));
 		return -1;
 	}
 	return 0;
@@ -490,7 +503,11 @@ vy_page_index_decode(uint32_t *page_index, uint32_t count,
 		}
 	}
 	if (size != sizeof(uint32_t) * count) {
-		diag_set(ClientError, ER_VINYL, "Invalid page index size");
+		/* TODO: report filename */
+		diag_set(ClientError, ER_INVALID_RUN_FILE,
+			 tt_sprintf("Wrong page index size "
+				    "(expected %zu, got %u",
+				    sizeof(uint32_t) * count, (unsigned)size));
 		return -1;
 	}
 	for (uint32_t i = 0; i < count; ++i) {
@@ -526,7 +543,8 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	}
 	if (readen != (ssize_t)page_info->size) {
 		/* TODO: replace with XlogError, report filename */
-		diag_set(ClientError, ER_VINYL, "Unexpected end of file");
+		diag_set(ClientError, ER_INVALID_RUN_FILE,
+			 "Unexpected end of file");
 		goto error;
 	}
 	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT, {usleep(50000);});
@@ -545,14 +563,18 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	if (xrow_header_decode(&xrow, &data_pos, data_end) == -1)
 		goto error;
 	if (xrow.type != VY_RUN_PAGE_INDEX) {
-		diag_set(ClientError, ER_VINYL, "Invalid page index type");
+		/* TODO: report filename */
+		diag_set(ClientError, ER_INVALID_RUN_FILE,
+			 tt_sprintf("Wrong page index type "
+				    "(expected %d, got %u)",
+				    VY_RUN_PAGE_INDEX, (unsigned)xrow.type));
 		goto error;
 	}
 	if (vy_page_index_decode(page->page_index, page->count, &xrow) != 0)
 		goto error;
 	region_truncate(&fiber()->gc, region_svp);
 	ERROR_INJECT(ERRINJ_VY_READ_PAGE, {
-		diag_set(ClientError, ER_VINYL, "page read injection");
+		diag_set(ClientError, ER_INJECTION, "vinyl page read");
 		return -1;});
 	return 0;
 	error:
@@ -1485,17 +1507,28 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	/* Read run header. */
 	struct xrow_header xrow;
 	/* all rows should be in one tx */
-	if ((xlog_cursor_next_tx(&cursor)) != 0 ||
-	    (xlog_cursor_next_row(&cursor, &xrow)) != 0) {
-		diag_set(ClientError, ER_VINYL, "Invalid .index file");
+	int rc = xlog_cursor_next_tx(&cursor);
+	if (rc != 0) {
+		if (rc > 0)
+			diag_set(ClientError, ER_INVALID_INDEX_FILE,
+				 index_path, "Unexpected end of file");
+		goto fail_close;
+	}
+	rc = xlog_cursor_next_row(&cursor, &xrow);
+	if (rc != 0) {
+		if (rc > 0)
+			diag_set(ClientError, ER_INVALID_INDEX_FILE,
+				 index_path, "Unexpected end of file");
 		goto fail_close;
 	}
 
 	if (xrow.type != VY_INDEX_RUN_INFO) {
-		diag_set(ClientError, ER_VINYL, "Invalid run info type");
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, index_path,
+			 tt_sprintf("Wrong xrow type (expected %d, got %u)",
+				    VY_INDEX_RUN_INFO, (unsigned)xrow.type));
 		return -1;
 	}
-	if (vy_run_info_decode(&run->info, &xrow) != 0)
+	if (vy_run_info_decode(&run->info, &xrow, index_path) != 0)
 		goto fail_close;
 
 	/* Allocate buffer for page info. */
@@ -1513,8 +1546,8 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 		if (rc != 0) {
 			if (rc > 0) {
 				/** To few pages in file */
-				diag_set(ClientError, ER_VINYL,
-					 "Too few pages in run meta file");
+				diag_set(ClientError, ER_INVALID_INDEX_FILE,
+					 index_path, "Unexpected end of file");
 			}
 			/*
 			 * Limit the count of pages to
@@ -1524,11 +1557,15 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 			goto fail_close;
 		}
 		if (xrow.type != VY_INDEX_PAGE_INFO) {
-			diag_set(ClientError, ER_VINYL, "Invalid page info type");
+			diag_set(ClientError, ER_INVALID_INDEX_FILE,
+				 tt_sprintf("Wrong xrow type "
+					    "(expected %d, got %u)",
+					    VY_INDEX_PAGE_INFO,
+					    (unsigned)xrow.type));
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, &xrow) < 0) {
+		if (vy_page_info_decode(page, &xrow, index_path) < 0) {
 			/**
 			 * Limit the count of pages to successfully
 			 * created pages

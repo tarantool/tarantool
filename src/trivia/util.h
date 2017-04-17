@@ -32,6 +32,8 @@
  */
 #include "trivia/config.h"
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
@@ -424,6 +426,21 @@ tt_cstr(const char *str, uint32_t len)
 	len = MIN(len, TT_STATIC_BUF_LEN - 1);
 	memcpy(buf, str, len);
 	buf[len] = '\0';
+	return buf;
+}
+
+/**
+ * Wrapper around sprintf() that prints the result to
+ * the static buffer returned by tt_static_buf().
+ */
+static inline const char *
+tt_sprintf(const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	char *buf = tt_static_buf();
+	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
+	va_end(ap);
 	return buf;
 }
 

@@ -532,7 +532,11 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 					  request.tuple_end, &ops, 1);
 		break;
 	default:
-		diag_set(ClientError, ER_VINYL, "unknown request type");
+		/* TODO: report filename. */
+		diag_set(ClientError, ER_INVALID_RUN_FILE,
+			 tt_sprintf("Can't decode statement: "
+				    "unknown request type %u",
+				    (unsigned)request.type));
 		return NULL;
 	}
 

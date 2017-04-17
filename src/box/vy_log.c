@@ -40,6 +40,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <bit/bit.h>
 #include <msgpuck/msgpuck.h>
 #include <small/region.h>
 #include <small/rlist.h>
@@ -551,19 +552,33 @@ vy_log_record_decode(struct vy_log_record *record,
 	struct request req;
 	request_create(&req, row->type);
 	if (request_decode(&req, row->body->iov_base,
-			   row->body->iov_len) < 0)
+			   row->body->iov_len) < 0) {
+		error_log(diag_last_error(diag_get()));
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 "Bad record: failed to decode request");
 		return -1;
+	}
 
 	const char *pos = req.tuple;
 
-	if (mp_decode_array(&pos) != 2)
+	uint32_t array_size = mp_decode_array(&pos);
+	if (array_size != 2) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Bad record: wrong array size "
+				    "(expected %d, got %u)",
+				    2, (unsigned)array_size));
 		goto fail;
+	}
 
 	record->type = mp_decode_uint(&pos);
-	if (record->type >= vy_log_record_type_MAX)
+	if (record->type >= vy_log_record_type_MAX) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Bad record: unknown record type %d",
+				    record->type));
 		goto fail;
+	}
 
-	unsigned long key_mask = 0;
+	uint64_t key_mask = vy_log_key_mask[record->type];
 	uint32_t n_keys = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < n_keys; i++) {
 		uint32_t key = mp_decode_uint(&pos);
@@ -605,6 +620,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			key_def->part_count = part_count;
 			if (key_def_decode_parts(key_def, &pos) != 0) {
 				error_log(diag_last_error(diag_get()));
+				diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+					 "Bad record: failed to decode "
+					 "index key definition");
 				goto fail;
 			}
 			record->key_def = key_def;
@@ -614,19 +632,25 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->is_level_zero = mp_decode_bool(&pos);
 			break;
 		default:
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Bad record: unknown key %u",
+					    (unsigned)key));
 			goto fail;
 		}
-		key_mask |= 1UL << key;
+		key_mask &= ~(1UL << key);
 	}
-	if ((key_mask & vy_log_key_mask[record->type]) !=
-			vy_log_key_mask[record->type])
+	if (key_mask != 0) {
+		enum vy_log_key key = bit_ctz_u64(key_mask);
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Bad record: missing mandatory key %s",
+				    vy_log_key_name[key]));
 		goto fail;
+	}
 	return 0;
 fail:
 	buf = tt_static_buf();
 	mp_snprint(buf, TT_STATIC_BUF_LEN, req.tuple);
 	say_error("invalid record in metadata log: %s", buf);
-	diag_set(ClientError, ER_VINYL, "invalid vy_log record");
 	return -1;
 }
 
@@ -1156,7 +1180,9 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 			 uint32_t space_id, const struct key_def *key_def)
 {
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
-		diag_set(ClientError, ER_VINYL, "duplicate vinyl index id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Duplicate index id %lld",
+				    (long long)index_lsn));
 		return -1;
 	}
 	size_t size = sizeof(struct vy_index_recovery_info) +
@@ -1199,12 +1225,16 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 	struct mh_i64ptr_t *h = recovery->index_hash;
 	mh_int_t k = mh_i64ptr_find(h, index_lsn, NULL);
 	if (k == mh_end(h)) {
-		diag_set(ClientError, ER_VINYL, "unknown index id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Index %lld deleted but not registered",
+				    (long long)index_lsn));
 		return -1;
 	}
 	struct vy_index_recovery_info *index = mh_i64ptr_node(h, k)->val;
 	if (index->is_dropped) {
-		diag_set(ClientError, ER_VINYL, "index is already dropped");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Index %lld deleted twice",
+				    (long long)index_lsn));
 		return -1;
 	}
 	vy_index_mark_deleted(index, signature);
@@ -1262,11 +1292,16 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld created for unregistered "
+				    "index %lld", (long long)run_id,
+				    (long long)index_lsn));
 		return -1;
 	}
 	if (vy_recovery_lookup_run(recovery, run_id) != NULL) {
-		diag_set(ClientError, ER_VINYL, "duplicate vinyl run id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Duplicate run id %lld",
+				    (long long)run_id));
 		return -1;
 	}
 	struct vy_run_recovery_info *run;
@@ -1292,17 +1327,26 @@ vy_recovery_insert_run(struct vy_recovery *recovery, int64_t signature,
 	struct vy_range_recovery_info *range;
 	range = vy_recovery_lookup_range(recovery, range_id);
 	if (range == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl range id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld inserted into unregistered "
+				    "range %lld", (long long)run_id,
+				    (long long)range_id));
 		return -1;
 	}
 	if (range->is_deleted) {
-		diag_set(ClientError, ER_VINYL, "vinyl range is deleted");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld inserted into deleted "
+				    "range %lld", (long long)run_id,
+				    (long long)range_id));
 		return -1;
 	}
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
 	if (run != NULL && run->is_deleted) {
-		diag_set(ClientError, ER_VINYL, "vinyl run is deleted");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Deleted run %lld inserted into "
+				    "range %lld", (long long)run_id,
+				    (long long)range_id));
 		return -1;
 	}
 	if (run == NULL) {
@@ -1330,11 +1374,15 @@ vy_recovery_delete_run(struct vy_recovery *recovery, int64_t signature,
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
 	if (run == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl run id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld deleted but not registered",
+				    (long long)run_id));
 		return -1;
 	}
 	if (run->is_deleted) {
-		diag_set(ClientError, ER_VINYL, "vinyl run is already deleted");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld deleted twice",
+				    (long long)run_id));
 		return -1;
 	}
 	vy_run_mark_deleted(run, signature);
@@ -1352,7 +1400,9 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
 	struct mh_i64ptr_t *h = recovery->run_hash;
 	mh_int_t k = mh_i64ptr_find(h, run_id, NULL);
 	if (k == mh_end(h)) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl run id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Run %lld forgotten but not registered",
+				    (long long)run_id));
 		return -1;
 	}
 	struct vy_run_recovery_info *run = mh_i64ptr_node(h, k)->val;
@@ -1376,13 +1426,18 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 			 const char *begin, const char *end, bool is_level_zero)
 {
 	if (vy_recovery_lookup_range(recovery, range_id) != NULL) {
-		diag_set(ClientError, ER_VINYL, "duplicate vinyl range id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Duplicate range id %lld",
+				    (long long)range_id));
 		return -1;
 	}
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Range %lld created for unregistered "
+				    "index %lld", (long long)range_id,
+				    (long long)index_lsn));
 		return -1;
 	}
 
@@ -1438,13 +1493,16 @@ vy_recovery_delete_range(struct vy_recovery *recovery, int64_t signature,
 	struct mh_i64ptr_t *h = recovery->range_hash;
 	mh_int_t k = mh_i64ptr_find(h, range_id, NULL);
 	if (k == mh_end(h)) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl range id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Range %lld deleted but not registered",
+				    (long long)range_id));
 		return -1;
 	}
 	struct vy_range_recovery_info *range = mh_i64ptr_node(h, k)->val;
 	if (range->is_deleted) {
-		diag_set(ClientError, ER_VINYL,
-			 "vinyl range is already deleted");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Range %lld deleted twice",
+				    (long long)range_id));
 		return -1;
 	}
 	vy_range_mark_deleted(range, signature);
@@ -1762,7 +1820,9 @@ vy_recovery_iterate_index(struct vy_recovery *recovery,
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL) {
-		diag_set(ClientError, ER_VINYL, "unknown vinyl index id");
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Index %lld not registered",
+				    (long long)index_lsn));
 		return -1;
 	}
 	return vy_recovery_do_iterate_index(index, include_deleted, cb, cb_arg);

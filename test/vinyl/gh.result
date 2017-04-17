@@ -144,7 +144,7 @@ s:insert{5}
 ...
 s.index.primary:alter({parts={1,'unsigned'}})
 ---
-- error: alter is not supported for a Vinyl index
+- error: Vinyl index does not support alter
 ...
 s:drop()
 ---

@@ -502,7 +502,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
     if box.space[space_id].engine == 'vinyl' then
-        box.error(box.error.VINYL, 'alter is not supported for a Vinyl index')
+        box.error(box.error.UNSUPPORTED, 'Vinyl index', 'alter')
     end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
