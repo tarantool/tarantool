@@ -179,8 +179,8 @@ const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
 
 const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
 	NULL,
-	"min lsn",
-	"max lsn",
+	NULL,
+	NULL,
 	"page count",
 	"bloom filter"
 };
