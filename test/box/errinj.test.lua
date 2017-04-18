@@ -216,4 +216,30 @@ errinj.set("ERRINJ_TUPLE_ALLOC", false)
 
 s:drop()
 
-errinj = nil
+space = box.schema.space.create('test')
+index1 = space:create_index('primary')
+fiber = require'fiber'
+ch = fiber.channel(1)
+
+test_run:cmd('setopt delimiter ";"')
+function test()
+  errinj.set('ERRINJ_WAL_WRITE_DISK', true)
+  pcall(box.space.test.replace, box.space.test, {1, 1})
+  errinj.set('ERRINJ_WAL_WRITE_DISK', false)
+  ch:put(true)
+end ;
+
+function run()
+  fiber.create(test)
+  box.snapshot()
+end ;
+
+test_run:cmd('setopt delimiter ""');
+
+run()
+ch:get()
+
+box.space.test:select()
+test_run:cmd('restart server default')
+box.space.test:select()
+box.space.test:drop()
