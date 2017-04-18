@@ -2936,7 +2936,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		char run_path[PATH_MAX];
 		vy_run_snprint_path(run_path, sizeof(run_path),
 				    index->path, run->id, VY_FILE_RUN);
-		if (vy_run_recover(run, index_path, run_path) != 0) {
+		if (!record->is_empty &&
+		    vy_run_recover(run, index_path, run_path) != 0) {
 			vy_run_unref(run);
 			return -1;
 		}
@@ -3430,15 +3431,13 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * Log change in metadata.
 	 */
-	if (!vy_run_is_empty(range->new_run)) {
-		vy_log_tx_begin();
-		vy_log_insert_run(range->id, range->new_run->id,
-				  range->new_run->info.min_lsn,
-				  range->new_run->info.max_lsn);
-		if (vy_log_tx_commit() < 0)
-			return -1;
-	} else
-		vy_range_discard_new_run(range);
+	vy_log_tx_begin();
+	vy_log_insert_run(range->id, range->new_run->id,
+			  range->new_run->info.min_lsn,
+			  range->new_run->info.max_lsn,
+			  vy_run_is_empty(range->new_run));
+	if (vy_log_tx_commit() < 0)
+		return -1;
 
 	say_info("%s: completed dumping range %s",
 		 index->name, vy_range_str(range));
@@ -3448,12 +3447,9 @@ vy_task_dump_complete(struct vy_task *task)
 
 	vy_index_unacct_range(index, range);
 	vy_range_dump_mems(range, scheduler, task->dump_lsn);
-	if (range->new_run != NULL) {
-		vy_range_add_run(range, range->new_run);
-		vy_range_update_compact_priority(range);
-		range->new_run = NULL;
-		assert(! range->is_level_zero || task->max_written_key != NULL);
-	}
+	vy_range_add_run(range, range->new_run);
+	vy_range_update_compact_priority(range);
+	range->new_run = NULL;
 	range->version++;
 	vy_index_acct_range(index, range);
 	vy_scheduler_add_range(scheduler, range);
@@ -3621,18 +3617,13 @@ vy_task_split_complete(struct vy_task *task)
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		vy_log_insert_range(index->index_def->opts.lsn, r->id,
 				    r->begin, r->end, r->is_level_zero);
-		if (!vy_run_is_empty(r->new_run))
-			vy_log_insert_run(r->id, r->new_run->id,
-					  r->new_run->info.min_lsn,
-					  r->new_run->info.max_lsn);
+		vy_log_insert_run(r->id, r->new_run->id,
+				  r->new_run->info.min_lsn,
+				  r->new_run->info.max_lsn,
+				  vy_run_is_empty(r->new_run));
 	}
 	if (vy_log_tx_commit() < 0)
 		return -1;
-
-	rlist_foreach_entry(r, &range->split_list, split_list) {
-		if (vy_run_is_empty(r->new_run))
-			vy_range_discard_new_run(r);
-	}
 
 	say_info("%s: completed splitting range %s",
 		 index->name, vy_range_str(range));
@@ -3648,14 +3639,8 @@ vy_task_split_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
-		/*
-		 * Add the new run created by split to the list
-		 * unless it's empty.
-		 */
-		if (r->new_run != NULL) {
-			vy_range_add_run(r, r->new_run);
-			r->new_run = NULL;
-		}
+		vy_range_add_run(r, r->new_run);
+		r->new_run = NULL;
 
 		rlist_del(&r->split_list);
 		assert(r->shadow == range);
@@ -3870,10 +3855,10 @@ vy_task_coalesce_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	vy_log_insert_range(index->index_def->opts.lsn, result->id,
 			    result->begin, result->end, result->is_level_zero);
-	if (! vy_run_is_empty(result->new_run))
-		vy_log_insert_run(result->id, result->new_run->id,
-				  result->new_run->info.min_lsn,
-				  result->new_run->info.max_lsn);
+	vy_log_insert_run(result->id, result->new_run->id,
+			  result->new_run->info.min_lsn,
+			  result->new_run->info.max_lsn,
+			  vy_run_is_empty(result->new_run));
 	/* Delete the old ranges from the log. */
 	while(it != task->coalesce_end) {
 		vy_log_delete_range(it->id);
@@ -3882,10 +3867,7 @@ vy_task_coalesce_complete(struct vy_task *task)
 	if (vy_log_tx_commit() < 0)
 		/* Schedule old ranges in abort() function. */
 		return -1;
-	if (vy_run_is_empty(result->new_run))
-		vy_range_discard_new_run(result);
-	else
-		vy_range_add_run(result, result->new_run);
+	vy_range_add_run(result, result->new_run);
 	/* Remove old ranges from the index. */
 	it = task->coalesce_begin;
 	while(it != task->coalesce_end) {
@@ -4043,15 +4025,12 @@ vy_task_compact_complete(struct vy_task *task)
 			break;
 	}
 	assert(n == 0);
-	if (!vy_run_is_empty(range->new_run))
-		vy_log_insert_run(range->id, range->new_run->id,
-				  range->new_run->info.min_lsn,
-				  range->new_run->info.max_lsn);
+	vy_log_insert_run(range->id, range->new_run->id,
+			  range->new_run->info.min_lsn,
+			  range->new_run->info.max_lsn,
+			  vy_run_is_empty(range->new_run));
 	if (vy_log_tx_commit() < 0)
 		return -1;
-
-	if (vy_run_is_empty(range->new_run))
-		vy_range_discard_new_run(range);
 
 	say_info("%s: completed compacting range %s",
 		 index->name, vy_range_str(range));
@@ -4072,10 +4051,8 @@ vy_task_compact_complete(struct vy_task *task)
 			break;
 	}
 	assert(n == 0);
-	if (range->new_run != NULL) {
-		vy_range_add_run(range, range->new_run);
-		range->new_run = NULL;
-	}
+	vy_range_add_run(range, range->new_run);
+	range->new_run = NULL;
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
@@ -9080,7 +9057,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_backup_arg *arg = cb_arg;
 
-	if (record->type != VY_LOG_INSERT_RUN)
+	if (record->type != VY_LOG_INSERT_RUN || record->is_empty)
 		goto out;
 
 	char path[PATH_MAX];

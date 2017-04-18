@@ -7,7 +7,12 @@ xlog = require 'xlog'
 fun = require 'fun'
 
 space = box.schema.space.create('test', {engine='vinyl'})
-_ = space:create_index('pk')
+_ = space:create_index('pk', {run_count_per_level=3})
+
+-- Empty run
+space:insert{100}
+space:delete{100}
+box.snapshot()
 
 space:replace({1})
 space:replace({2})

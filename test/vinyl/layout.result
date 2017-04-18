@@ -17,8 +17,20 @@ fun = require 'fun'
 space = box.schema.space.create('test', {engine='vinyl'})
 ---
 ...
-_ = space:create_index('pk')
+_ = space:create_index('pk', {run_count_per_level=3})
 ---
+...
+-- Empty run
+space:insert{100}
+---
+- [100]
+...
+space:delete{100}
+---
+...
+box.snapshot()
+---
+- ok
 ...
 space:replace({1})
 ---
@@ -71,12 +83,12 @@ table.sort(files)
 ...
 files
 ---
-- - vinyl/00000000000000000006.vylog
-  - vinyl/00000000000000000009.snap
-  - vinyl/512/0/00000000000000000000.index
-  - vinyl/512/0/00000000000000000000.run
+- - vinyl/00000000000000000008.vylog
+  - vinyl/00000000000000000011.snap
   - vinyl/512/0/00000000000000000001.index
   - vinyl/512/0/00000000000000000001.run
+  - vinyl/512/0/00000000000000000002.index
+  - vinyl/512/0/00000000000000000002.run
 ...
 result = {}
 ---
@@ -112,7 +124,7 @@ test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
 ...
 result
 ---
-- - - vinyl/00000000000000000006.vylog
+- - - vinyl/00000000000000000008.vylog
     - - HEADER:
           type: INSERT
         BODY:
@@ -124,22 +136,27 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {1: 0, 2: 0, 10: 6, 9: 4}]
+          tuple: [5, {1: 0, 2: 0, 9: 0, 10: 0, 11: true}]
       - HEADER:
-          lsn: 6
+          lsn: 5
+          type: INSERT
+        BODY:
+          tuple: [5, {1: 0, 2: 1, 9: 6, 10: 8, 11: false}]
+      - HEADER:
+          lsn: 8
           type: INSERT
           timestamp: <timestamp>
         BODY:
-          tuple: [4, {0: 2, 2: 1}]
+          tuple: [4, {0: 2, 2: 2}]
       - HEADER:
-          lsn: 6
+          lsn: 8
           type: INSERT
           timestamp: <timestamp>
         BODY:
-          tuple: [5, {1: 0, 2: 1, 10: 9, 9: 7}]
-  - - vinyl/512/0/00000000000000000000.index
+          tuple: [5, {1: 0, 2: 2, 9: 9, 10: 11, 11: false}]
+  - - vinyl/512/0/00000000000000000001.index
     - - HEADER:
-          lsn: 4
+          lsn: 6
           type: RUNINFO
         BODY:
           page_count: 1
@@ -153,19 +170,19 @@ result
           count: 3
           min: [1]
           page_index_offset: 27
-  - - vinyl/512/0/00000000000000000000.run
+  - - vinyl/512/0/00000000000000000001.run
     - - HEADER:
-          lsn: 4
+          lsn: 6
           type: REPLACE
         BODY:
           tuple: [1]
       - HEADER:
-          lsn: 5
+          lsn: 7
           type: REPLACE
         BODY:
           tuple: [2]
       - HEADER:
-          lsn: 6
+          lsn: 8
           type: REPLACE
         BODY:
           tuple: [3]
@@ -173,9 +190,9 @@ result
           type: PAGEINDEX
         BODY:
           page_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
-  - - vinyl/512/0/00000000000000000001.index
+  - - vinyl/512/0/00000000000000000002.index
     - - HEADER:
-          lsn: 7
+          lsn: 9
           type: RUNINFO
         BODY:
           page_count: 1
@@ -189,19 +206,19 @@ result
           count: 3
           min: [4]
           page_index_offset: 27
-  - - vinyl/512/0/00000000000000000001.run
+  - - vinyl/512/0/00000000000000000002.run
     - - HEADER:
-          lsn: 7
+          lsn: 9
           type: REPLACE
         BODY:
           tuple: [4]
       - HEADER:
-          lsn: 8
+          lsn: 10
           type: REPLACE
         BODY:
           tuple: [5]
       - HEADER:
-          lsn: 9
+          lsn: 11
           type: REPLACE
         BODY:
           tuple: [6]

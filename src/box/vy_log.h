@@ -97,7 +97,7 @@ enum vy_log_record_type {
 	VY_LOG_INSERT_RUN		= 5,
 	/**
 	 * Delete a vinyl run.
-	 * Requires vy_log_record::run_id, min_lsn, max_lsn.
+	 * Requires vy_log_record::run_id, min_lsn, max_lsn, is_empty.
 	 *
 	 * A record of this type indicates that the run is not in use
 	 * any more and its files can be safely removed. When the log
@@ -162,6 +162,11 @@ struct vy_log_record {
 	/** Min and max LSN spanned by the run. */
 	int64_t min_lsn;
 	int64_t max_lsn;
+	/**
+	 * True if the run is empty and has no data file.
+	 * (Empty runs are kept for the sake of min/max LSN).
+	 */
+	bool is_empty;
 };
 
 /**
@@ -420,7 +425,8 @@ vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 /** Helper to log a vinyl run insertion. */
 static inline void
 vy_log_insert_run(int64_t range_id, int64_t run_id,
-		  int64_t min_lsn, int64_t max_lsn)
+		  int64_t min_lsn, int64_t max_lsn,
+		  bool is_empty)
 {
 	struct vy_log_record record;
 	record.type = VY_LOG_INSERT_RUN;
@@ -429,6 +435,7 @@ vy_log_insert_run(int64_t range_id, int64_t run_id,
 	record.run_id = run_id;
 	record.min_lsn = min_lsn;
 	record.max_lsn = max_lsn;
+	record.is_empty = is_empty;
 	vy_log_write(&record);
 }
 
