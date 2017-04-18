@@ -1732,7 +1732,7 @@ box_snapshot()
 		return 0;
 	int rc = 0;
 	if (box_snapshot_is_in_progress) {
-		diag_set(ClientError, ER_SNAPSHOT_IN_PROGRESS);
+		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
 		return -1;
 	}
 	box_snapshot_is_in_progress = true;
@@ -1743,7 +1743,7 @@ box_snapshot()
 
 	struct vclock vclock;
 	if ((rc = wal_checkpoint(&vclock, true))) {
-		tnt_error(ClientError, ER_SNAPSHOT_ROLLBACK);
+		tnt_error(ClientError, ER_CHECKPOINT_ROLLBACK);
 		goto end;
 	}
 	rc = engine_commit_checkpoint(&vclock);

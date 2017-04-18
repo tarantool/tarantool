@@ -360,7 +360,7 @@ struct wal_checkpoint: public cmsg
 	struct vclock *vclock;
 	struct fiber *fiber;
 	bool rotate;
-	int status;
+	int res;
 };
 
 void
@@ -370,7 +370,7 @@ wal_checkpoint_f(struct cmsg *data)
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
-		msg->status = -1;
+		msg->res = -1;
 		return;
 	}
 	/*
@@ -427,12 +427,12 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 	msg.vclock = vclock;
 	msg.fiber = fiber();
 	msg.rotate = rotate;
-	msg.status = 0;
+	msg.res = 0;
 	cpipe_push(&wal_thread.wal_pipe, &msg);
 	fiber_set_cancellable(false);
 	fiber_yield();
 	fiber_set_cancellable(true);
-	return msg.status;
+	return msg.res;
 }
 
 struct wal_gc_msg: public cbus_call_msg

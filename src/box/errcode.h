@@ -172,7 +172,7 @@ struct errcode_record {
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
 	/*119 */_(ER_COMPRESSION,		"Compression error: %s") \
-	/*120 */_(ER_SNAPSHOT_IN_PROGRESS,	"Snapshot is already in progress") \
+	/*120 */_(ER_CHECKPOINT_IN_PROGRESS,	"Snapshot is already in progress") \
 	/*121 */_(ER_SUB_STMT_MAX,		"Can not execute a nested statement: nesting limit reached") \
 	/*122 */_(ER_COMMIT_IN_SUB_STMT,	"Can not commit transaction in a nested statement") \
 	/*123 */_(ER_ROLLBACK_IN_SUB_STMT,	"Rollback called in a nested statement") \
@@ -186,7 +186,7 @@ struct errcode_record {
 	/*131 */_(ER_INVALID_INDEX_FILE,	"Invalid INDEX file %s: %s") \
 	/*132 */_(ER_INVALID_RUN_FILE,		"Invalid RUN file: %s") \
 	/*133 */_(ER_INVALID_VYLOG_FILE,	"Invalid VYLOG file: %s") \
-	/*134 */_(ER_SNAPSHOT_ROLLBACK,		"Can't start snapshot while rollback")
+	/*134 */_(ER_CHECKPOINT_ROLLBACK,	"Can't start a checkpoint while in cascading rollback")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
