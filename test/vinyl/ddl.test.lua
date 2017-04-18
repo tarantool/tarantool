@@ -67,6 +67,9 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 -- After compaction the REPLACE + DELETE + DELETE = nothing, so
 -- the space is now empty and can be altered.
 space:delete({1})
+-- Make sure the run is big enough to trigger compaction.
+space:insert({2, 3})
+space:delete({2})
 box.snapshot()
 -- Wait until the dump is finished.
 while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end

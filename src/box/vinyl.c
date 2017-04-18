@@ -407,12 +407,6 @@ struct vy_range {
 	 */
 	struct rlist sealed;
 	/**
-	 * Size of the largest run that was dumped since the last
-	 * range compaction. Required for computing the size of
-	 * the base level in the LSM tree.
-	 */
-	uint64_t max_dump_size;
-	/**
 	 * The goal of compaction is to reduce read amplification.
 	 * All ranges for which the LSM tree has more runs per
 	 * level than run_count_per_level or run size larger than
@@ -2667,7 +2661,6 @@ vy_range_update_compact_priority(struct vy_range *range)
 
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);
-	assert(range->max_dump_size > 0);
 
 	range->compact_priority = 0;
 
@@ -2681,15 +2674,21 @@ vy_range_update_compact_priority(struct vy_range *range)
 	uint32_t level_run_count = 0;
 	/*
 	 * The target (perfect) size of a run at the current level.
-	 * For the first level, it's the maximal size of a dump.
+	 * For the first level, it's the size of the newest run.
 	 * For lower levels it's computed as first level run size
 	 * times run_size_ratio.
 	 */
-	uint64_t target_run_size = range->max_dump_size;
+	uint64_t target_run_size = 0;
 
 	struct vy_run *run;
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		uint64_t run_size = vy_run_size(run);
+		/*
+		 * The size of the first level is defined by
+		 * the size of the most recent run.
+		 */
+		if (target_run_size == 0)
+			target_run_size = run_size;
 		total_size += run_size;
 		level_run_count++;
 		total_run_count++;
@@ -3349,11 +3348,6 @@ struct vy_task {
 	double bloom_fpr;
 	/** Max written key. */
 	char *max_written_key;
-	/**
-	 * Max dump size remembered before compaction. Used to
-	 * restore the max dump size in case of compaction abort.
-	 */
-	uint64_t saved_max_dump_size;
 	/** Count of ranges to compact. */
 	int run_count;
 	/** Range of ranges to coalesce: [begin, end). */
@@ -3455,8 +3449,6 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_index_unacct_range(index, range);
 	vy_range_dump_mems(range, scheduler, task->dump_lsn);
 	if (range->new_run != NULL) {
-		range->max_dump_size = MAX(range->max_dump_size,
-					   vy_run_size(range->new_run));
 		vy_range_add_run(range, range->new_run);
 		vy_range_update_compact_priority(range);
 		range->new_run = NULL;
@@ -3910,7 +3902,6 @@ vy_task_coalesce_complete(struct vy_task *task)
 	}
 	result->new_run = NULL;
 	result->compact_priority = 0;
-	result->max_dump_size = 0;
 	vy_index_acct_range(index, result);
 	vy_index_add_range(index, result);
 	index->version++;
@@ -4100,9 +4091,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
-	/* Restore the max dump size and compact priority. */
-	range->max_dump_size = MAX(task->saved_max_dump_size,
-				   range->max_dump_size);
+	/* Restore compact priority. */
 	vy_range_update_compact_priority(range);
 
 	if (!in_shutdown && !index->is_dropped) {
@@ -4178,9 +4167,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	task->wi = wi;
 	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
-	task->saved_max_dump_size = range->max_dump_size;
 	task->run_count = range->compact_priority;
-	range->max_dump_size = 0;
 	range->compact_priority = 0;
 
 	vy_scheduler_remove_range(scheduler, range);
