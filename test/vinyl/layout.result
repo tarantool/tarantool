@@ -136,7 +136,7 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {1: 0, 2: 0, 9: 0, 10: 0, 11: true}]
+          tuple: [5, {1: 0, 2: 0, 9: 4, 10: 5, 11: true}]
       - HEADER:
           lsn: 5
           type: INSERT
@@ -156,7 +156,6 @@ result
           tuple: [5, {1: 0, 2: 2, 9: 9, 10: 11, 11: false}]
   - - vinyl/512/0/00000000000000000001.index
     - - HEADER:
-          lsn: 6
           type: RUNINFO
         BODY:
           page_count: 1
@@ -192,7 +191,6 @@ result
           page_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
   - - vinyl/512/0/00000000000000000002.index
     - - HEADER:
-          lsn: 9
           type: RUNINFO
         BODY:
           page_count: 1

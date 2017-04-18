@@ -73,6 +73,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 		return NULL;
 	}
 	index->min_lsn = INT64_MAX;
+	index->max_lsn = -1;
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
@@ -159,9 +160,13 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	if (rc != 0)
 		return -1;
 
+	int64_t lsn = vy_stmt_lsn(stmt);
 	if (mem->used == 0)
-		mem->min_lsn = vy_stmt_lsn(stmt);
-	assert(mem->min_lsn <= vy_stmt_lsn(stmt));
+		mem->min_lsn = lsn;
+	assert(mem->min_lsn <= lsn);
+
+	assert(lsn >= mem->max_lsn);
+	mem->max_lsn = lsn;
 
 	mem->used += size;
 	mem->version++;

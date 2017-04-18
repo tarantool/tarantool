@@ -105,10 +105,6 @@ struct vy_page_info {
 	uint32_t unpacked_size;
 	/* Offset of the min key in the parent run->pages_min. */
 	uint32_t min_key_offset;
-	/* minimal lsn of all records in page */
-	int64_t min_lsn;
-	/* maximal lsn of all records in page */
-	int64_t max_lsn;
 	/* minimal key */
 	char *min_key;
 	/* row index offset in page */

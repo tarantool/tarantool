@@ -96,7 +96,6 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 		    const struct tuple *min_key, const struct key_def *key_def)
 {
 	memset(page_info, 0, sizeof(*page_info));
-	page_info->min_lsn = INT64_MAX;
 	page_info->offset = offset;
 	page_info->unpacked_size = 0;
 	struct region *region = &fiber()->gc;

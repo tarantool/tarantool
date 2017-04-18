@@ -1783,12 +1783,7 @@ vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 	region_truncate(region, used);
 
 	info->unpacked_size += row_size;
-
 	++info->count;
-	if (vy_stmt_lsn(value) > info->max_lsn)
-		info->max_lsn = vy_stmt_lsn(value);
-	if (vy_stmt_lsn(value) < info->min_lsn)
-		info->min_lsn = vy_stmt_lsn(value);
 	return 0;
 }
 
@@ -1977,10 +1972,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	assert(page->count > 0);
 
 	++run_info->count;
-	if (page->min_lsn < run_info->min_lsn)
-		run_info->min_lsn = page->min_lsn;
-	if (page->max_lsn > run_info->max_lsn)
-		run_info->max_lsn = page->max_lsn;
 	run_info->size += page->size;
 	run_info->keys += page->count;
 
@@ -2029,7 +2020,6 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	 * Read from the iterator until it's exhausted or
 	 * the split key is reached.
 	 */
-	run_info->min_lsn = INT64_MAX;
 	assert(run_info->page_infos == NULL);
 	uint32_t page_infos_capacity = 0;
 	int rc;
@@ -2208,7 +2198,6 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	xrow->bodycnt = 1;
 	xrow->type = VY_INDEX_RUN_INFO;
-	xrow->lsn = run_info->min_lsn;
 	return 0;
 }
 
@@ -2449,12 +2438,16 @@ vy_range_delete(struct vy_range *range)
  */
 static struct vy_write_iterator *
 vy_range_get_dump_iterator(struct vy_range *range, int64_t vlsn,
-			   int64_t dump_lsn, size_t *p_max_output_count)
+			   int64_t dump_lsn, size_t *p_max_output_count,
+			   int64_t *p_min_lsn, int64_t *p_max_lsn)
 {
 	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
 	struct vy_mem *mem;
 	*p_max_output_count = 0;
+
+	*p_min_lsn = INT64_MAX;
+	*p_max_lsn = -1;
 
 	wi = vy_write_iterator_new(index->env, &index->index_def->key_def,
 				   &index->user_index_def->key_def,
@@ -2471,6 +2464,8 @@ vy_range_get_dump_iterator(struct vy_range *range, int64_t vlsn,
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += mem->tree.size;
+		*p_min_lsn = MIN(*p_min_lsn, mem->min_lsn);
+		*p_max_lsn = MAX(*p_max_lsn, mem->max_lsn);
 	}
 	return wi;
 err_wi_sub:
@@ -2492,13 +2487,17 @@ err_wi:
 static struct vy_write_iterator *
 vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 			      int64_t vlsn, int64_t dump_lsn,
-			      bool is_last_level, size_t *p_max_output_count)
+			      bool is_last_level, size_t *p_max_output_count,
+			      int64_t *p_min_lsn, int64_t *p_max_lsn)
 {
 	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
 	struct vy_run *run;
 	struct vy_mem *mem;
 	*p_max_output_count = 0;
+
+	*p_min_lsn = INT64_MAX;
+	*p_max_lsn = -1;
 
 	wi = vy_write_iterator_new(index->env, &index->index_def->key_def,
 				   &index->user_index_def->key_def,
@@ -2519,6 +2518,8 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += mem->tree.size;
+		*p_min_lsn = MIN(*p_min_lsn, mem->min_lsn);
+		*p_max_lsn = MAX(*p_max_lsn, mem->max_lsn);
 	}
 	assert(run_count >= 0 && run_count <= range->run_count);
 	rlist_foreach_entry(run, &range->runs, in_range) {
@@ -2527,6 +2528,8 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 		if (vy_write_iterator_add_run(wi, run) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += run->info.keys;
+		*p_min_lsn = MIN(*p_min_lsn, run->info.min_lsn);
+		*p_max_lsn = MAX(*p_max_lsn, run->info.max_lsn);
 	}
 	return wi;
 err_wi_sub:
@@ -3536,7 +3539,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_dump_iterator(range, tx_manager_vlsn(xm), dump_lsn,
-					&task->max_output_count);
+					&task->max_output_count,
+					&range->new_run->info.min_lsn,
+					&range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -3755,10 +3760,12 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	vy_range_seal_mem(range);
 	int64_t dump_lsn = INT64_MAX;
 
+	int64_t min_lsn, max_lsn;
 	struct vy_write_iterator *wi;
 	wi = vy_range_get_compact_iterator(range, range->run_count,
 					   tx_manager_vlsn(xm), dump_lsn, true,
-					   &task->max_output_count);
+					   &task->max_output_count,
+					   &min_lsn, &max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -3766,6 +3773,8 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	vy_index_remove_range(index, range);
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i];
+		r->new_run->info.min_lsn = min_lsn;
+		r->new_run->info.max_lsn = max_lsn;
 		/*
 		 * While range split is in progress, new statements are
 		 * inserted to new ranges while read iterator walks over
@@ -3959,6 +3968,9 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 	/* Add sealed mems and runs. */
 	it = first;
 	while (it != end) {
+		struct vy_run_info *info = &result->new_run->info;
+		info->min_lsn = INT64_MAX;
+		info->max_lsn = -1;
 		if (vy_range_rotate_mem(it) != 0)
 			goto err_wi_sub;
 		struct vy_mem *mem;
@@ -3966,12 +3978,16 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 			if (vy_write_iterator_add_mem(wi, mem) != 0)
 				goto err_wi_sub;
 			task->max_output_count += mem->tree.size;
+			info->min_lsn = MIN(info->min_lsn, mem->min_lsn);
+			info->max_lsn = MAX(info->max_lsn, mem->max_lsn);
 		}
 		struct vy_run *run;
 		rlist_foreach_entry(run, &it->runs, in_range) {
 			if (vy_write_iterator_add_run(wi, run) != 0)
 				goto err_wi_sub;
 			task->max_output_count += run->info.keys;
+			info->min_lsn = MIN(info->min_lsn, run->info.min_lsn);
+			info->max_lsn = MAX(info->max_lsn, run->info.max_lsn);
 		}
 		vy_scheduler_remove_range(scheduler, it);
 		it = vy_range_tree_next(&index->tree, it);
@@ -4136,7 +4152,9 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	wi = vy_range_get_compact_iterator(range, range->compact_priority,
 					   tx_manager_vlsn(xm), dump_lsn,
 					   is_last_level,
-					   &task->max_output_count);
+					   &task->max_output_count,
+					   &range->new_run->info.min_lsn,
+					   &range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 

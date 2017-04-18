@@ -137,8 +137,9 @@ struct vy_mem {
 	struct vy_mem_tree tree;
 	/** The total size of all tuples in this tree in bytes */
 	size_t used;
-	/** The minimum value of stmt->lsn in this tree */
+	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
+	int64_t max_lsn;
 	/* A key definition for this index. */
 	const struct key_def *key_def;
 	/** version is initially 0 and is incremented on every write */
