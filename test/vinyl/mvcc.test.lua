@@ -1522,6 +1522,7 @@ c2:commit()
 c1("t.index.pk:max()") -- {2}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
+c1:commit()
 --
 -- Convert the reader to a read view: in this test we have
 -- an explicit conflict between c1 and c2, so c1 begins
@@ -1538,6 +1539,7 @@ c2:commit()
 c1("t.index.pk:max()") -- {2}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
+c1:commit()
 t:truncate()
 
 -- *************************************************************************
