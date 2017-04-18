@@ -127,10 +127,6 @@ struct vy_iterator_stat {
 /** The state of the database the cursor should be looking at. */
 struct vy_read_view {
 	/**
-	 * The transaction is forbidden to commit unless it's read-only.
-	 */
-	bool is_in_read_view;
-	/**
 	 * Consistent read view LSN. Originally read-only transactions
 	 * receive a read view lsn upon creation and do not see further
 	 * changes.

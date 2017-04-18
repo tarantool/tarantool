@@ -698,7 +698,6 @@ typedef rb_tree(struct txv) write_set_t;
 void
 vy_read_view_create(struct vy_read_view *rv)
 {
-	rv->is_in_read_view = false;
 	rlist_create(&rv->in_read_views);
 	/*
 	 * By default, the transaction is assumed to be
@@ -1130,7 +1129,6 @@ tx_manager_read_view(struct tx_manager *xm)
 			 "mempool", "read view");
 		return NULL;
 	}
-	rv->is_in_read_view = true;
 	rv->vlsn = xm->lsn;
 	rv->refs = 1;
 	/*
@@ -5794,6 +5792,13 @@ check_key:
 
 /* }}} Upsert */
 
+/** True if the transaction is in a read view. */
+bool
+vy_tx_is_in_read_view(struct vy_tx *tx)
+{
+	return tx->read_view->vlsn != INT64_MAX;
+}
+
 /**
  * Add the statement to the current transaction.
  * @param tx    Current transaction.
@@ -6819,7 +6824,7 @@ static int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *key, bool is_gap)
 {
-	if (tx->read_view->is_in_read_view)
+	if (vy_tx_is_in_read_view(tx))
 		return 0; /* no reason to track reads */
 	uint32_t part_count = tuple_field_count(key);
 	if (part_count >= index->index_def->key_def.part_count) {
@@ -6868,7 +6873,7 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 		if (abort->is_gap && vy_stmt_type(v->stmt) == IPROTO_DELETE)
 			continue;
 		/* already in (earlier) read view */
-		if (abort->tx->read_view->is_in_read_view)
+		if (vy_tx_is_in_read_view(abort->tx))
 			continue;
 
 		struct vy_read_view *rv = tx_manager_read_view(tx->xm);
@@ -6888,7 +6893,7 @@ vy_prepare(struct vy_tx *tx)
 	int rc = 0;
 
 	/* proceed read-only transactions */
-	if (!vy_tx_is_ro(tx) && tx->read_view->is_in_read_view) {
+	if (!vy_tx_is_ro(tx) && vy_tx_is_in_read_view(tx)) {
 		tx->state = VINYL_TX_ROLLBACK;
 		e->stat->tx_conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
