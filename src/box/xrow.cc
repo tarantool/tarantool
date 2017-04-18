@@ -196,10 +196,10 @@ request_create(struct request *request, uint32_t type)
 }
 
 int
-request_decode(struct request *request, const char *data, uint32_t len)
+request_decode(struct request *request, const char *data, uint32_t len,
+	       uint64_t key_map)
 {
 	const char *end = data + len;
-	uint64_t key_map = request_key_map(request->type);
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
@@ -284,7 +284,7 @@ request_encode(struct request *request, struct iovec *iov)
 	char *begin = (char *) region_alloc_xc(&fiber()->gc, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
-	if (true) {
+	if (request->space_id) {
 		pos = mp_encode_uint(pos, IPROTO_SPACE_ID);
 		pos = mp_encode_uint(pos, request->space_id);
 		map_size++;
@@ -334,7 +334,8 @@ xrow_decode_request(struct xrow_header *row)
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
 	request_create(request, row->type);
 	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len);
+			  row->body[0].iov_len,
+			  request_key_map(row->type));
 	request->header = row;
 	return request;
 }

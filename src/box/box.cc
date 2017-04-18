@@ -323,13 +323,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, row->type);
-	assert(row->bodycnt == 1); /* always 1 for read */
-	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len);
-	request->header = row;
+	struct request *request = xrow_decode_request(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);

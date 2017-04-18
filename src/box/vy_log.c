@@ -551,8 +551,9 @@ vy_log_record_decode(struct vy_log_record *record,
 
 	struct request req;
 	request_create(&req, row->type);
-	if (request_decode(&req, row->body->iov_base,
-			   row->body->iov_len) < 0) {
+	uint64_t key_map = 1ULL<<IPROTO_TUPLE;
+	if (request_decode(&req, row->body->iov_base, row->body->iov_len,
+			   key_map) < 0) {
 		error_log(diag_last_error(diag_get()));
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 "Bad record: failed to decode request");
