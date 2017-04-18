@@ -233,7 +233,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	const struct key_def *key_def = itr->mem->key_def;
-	while (vy_stmt_lsn(itr->curr_stmt) > *itr->vlsn) {
+	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->iterator_type == ITER_EQ &&
 		     vy_stmt_compare(itr->key, itr->curr_stmt, key_def))) {
@@ -249,7 +249,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 			const struct tuple *prev_stmt =
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
-			if (vy_stmt_lsn(prev_stmt) > *itr->vlsn ||
+			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
 			    vy_stmt_compare(itr->curr_stmt, prev_stmt,
 					    key_def) != 0)
 				break;
@@ -348,7 +348,7 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn)
+		     const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
@@ -358,7 +358,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	itr->vlsn = vlsn;
+	itr->read_view = rv;
 	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
@@ -582,7 +582,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			if (cmp < 0 || (cmp == 0 &&
 			    vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt)))
 				break;
-			if (vy_stmt_lsn(t) <= *itr->vlsn) {
+			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
 				itr->curr_pos = pos;
 				itr->curr_stmt = t;
 				rc = 1;
@@ -595,7 +595,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
 	int cmp;
 	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, def);
-	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) : *itr->vlsn + 1;
+	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) :
+		(**itr->read_view).vlsn + 1;
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 		if (vy_mem_tree_iterator_is_invalid(&pos))

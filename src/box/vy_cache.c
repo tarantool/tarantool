@@ -511,7 +511,7 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 	vy_cache_iterator_is_stop(itr, *entry, stop);
 	struct tuple *candidate = (*entry)->stmt;
 
-	while (vy_stmt_lsn(candidate) > *itr->vlsn) {
+	while (vy_stmt_lsn(candidate) > (**itr->read_view).vlsn) {
 		/* The cache stores the latest tuple of the key,
 		 * but there could be earlier tuples in runs */
 		*stop = false;
@@ -630,7 +630,7 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 	vy_cache_iterator_is_stop(itr, *entry, stop);
 
-	while (vy_stmt_lsn(itr->curr_stmt) > *itr->vlsn) {
+	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
 		/* The cache stores the latest tuple of the key,
 		 * but there could be earlier tuples in runs */
 		*stop = false;
@@ -726,7 +726,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
 			if (cmp < 0)
 				break;
-			if (vy_stmt_lsn(t) <= *itr->vlsn) {
+			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
 				if (itr->curr_stmt != NULL)
 					tuple_unref(itr->curr_stmt);
 				itr->curr_pos = pos;
@@ -800,7 +800,7 @@ void
 vy_cache_iterator_open(struct vy_cache_iterator *itr,
 		       struct vy_iterator_stat *stat, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
-		       const struct tuple *key, const int64_t *vlsn)
+		       const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_cache_iterator_iface;
 	itr->stat = stat;
@@ -808,7 +808,7 @@ vy_cache_iterator_open(struct vy_cache_iterator *itr,
 	itr->cache = cache;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	itr->vlsn = vlsn;
+	itr->read_view = rv;
 	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||

@@ -215,7 +215,7 @@ struct vy_cache_iterator {
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	const int64_t *vlsn;
+	const struct vy_read_view **read_view;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -241,7 +241,7 @@ void
 vy_cache_iterator_open(struct vy_cache_iterator *itr,
 		       struct vy_iterator_stat *stat, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
-		       const struct tuple *key, const int64_t *vlsn);
+		       const struct tuple *key, const struct vy_read_view **rv);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

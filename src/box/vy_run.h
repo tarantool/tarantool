@@ -195,7 +195,7 @@ struct vy_run_iterator {
 	/** Key to search. */
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
-	const int64_t *vlsn;
+	const struct vy_read_view **read_view;
 
 	/* State of the iterator */
 	/** Position of the current record */
@@ -341,7 +341,8 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_run *run, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn,
+		     const struct tuple *key,
+		     const struct vy_read_view **read_view,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
 		     struct tuple_format *format,

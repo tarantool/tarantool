@@ -285,7 +285,7 @@ struct vy_mem_iterator {
 	/** Key to search. */
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
-	const int64_t *vlsn;
+	const struct vy_read_view **read_view;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -316,7 +316,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn);
+		     const struct tuple *key, const struct vy_read_view **rv);
 
 #if defined(__cplusplus)
 } /* extern "C" */

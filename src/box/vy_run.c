@@ -933,7 +933,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt);
 	if (rc != 0)
 		return rc;
-	while (vy_stmt_lsn(stmt) > *itr->vlsn) {
+	while (vy_stmt_lsn(stmt) > (**itr->read_view).vlsn) {
 		tuple_unref(stmt);
 		stmt = NULL;
 		rc = vy_run_iterator_next_pos(itr, iterator_type,
@@ -974,7 +974,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 			rc = vy_run_iterator_read(itr, test_pos, &test_stmt);
 			if (rc != 0)
 				return rc;
-			if (vy_stmt_lsn(test_stmt) > *itr->vlsn ||
+			if (vy_stmt_lsn(test_stmt) > (**itr->read_view).vlsn ||
 			    vy_tuple_compare(stmt, test_stmt, key_def) != 0) {
 				tuple_unref(test_stmt);
 				test_stmt = NULL;
@@ -1125,7 +1125,7 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_run *run, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn,
+		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
 		     struct tuple_format *format,
@@ -1145,7 +1145,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	itr->vlsn = vlsn;
+	itr->read_view = rv;
 	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
