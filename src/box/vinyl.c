@@ -5083,6 +5083,14 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_append_u64(h, "tx_conflict", stat->tx_conflict);
 	info_append_u32(h, "tx_active", env->xm->tx_count);
 
+	struct mempool_stats mstats;
+	mempool_stats(&env->xm->tx_mempool, &mstats);
+	info_append_u32(h, "tx_allocated", mstats.objcount);
+	mempool_stats(&env->xm->txv_mempool, &mstats);
+	info_append_u32(h, "txv_allocated", mstats.objcount);
+	mempool_stats(&env->xm->read_view_mempool, &mstats);
+	info_append_u32(h, "read_view", mstats.objcount);
+
 	info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
 	info_append_u64(h, "dump_total", stat->dump_total);
 	info_append_u64(h, "dumped_statements", stat->dumped_statements);
