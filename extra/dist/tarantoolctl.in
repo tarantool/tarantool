@@ -910,7 +910,7 @@ end
 local commands = setmetatable({
     start = {
         func = start, process = process_local, help = {
-            header = "%s start <instance_name>",
+            header = "%s start NAME",
             linkmode = "%s start",
             description =
 [=[
@@ -921,7 +921,7 @@ local commands = setmetatable({
         }
     }, stop = {
         func = exit_wrapper(stop), process = process_local, help = {
-            header = "%s stop <instance_name>",
+            header = "%s stop NAME",
             linkmode = "%s stop",
             description =
 [=[
@@ -932,7 +932,7 @@ local commands = setmetatable({
         }
     }, logrotate = {
         func = exit_wrapper(logrotate), process = process_local, help = {
-            header = "%s logrotate <instance_name>",
+            header = "%s logrotate NAME",
             linkmode = "%s logrotate",
             description =
 [=[
@@ -945,7 +945,7 @@ local commands = setmetatable({
         }
     }, status = {
         func = exit_wrapper(status), process = process_local, help = {
-            header = "%s status <instance_name>",
+            header = "%s status NAME",
             linkmode = "%s status",
             description =
 [=[
@@ -955,14 +955,13 @@ local commands = setmetatable({
 
         Reports typical problems to stderr (e.g. pid file exists and control
         socket doesn't).
-
 ]=],
             weight = 30,
             deprecated = false,
         }
     }, enter = {
         func = exit_wrapper(enter), process = process_local, help = {
-            header = "%s enter <instance_name>",
+            header = "%s enter NAME",
             linkmode = "%s enter",
             description =
 [=[
@@ -973,7 +972,7 @@ local commands = setmetatable({
         }
     }, restart = {
         func = restart, process = process_local, help = {
-            header = "%s restart <instance_name>",
+            header = "%s restart NAME",
             linkmode = "%s restart",
             description =
 [=[
@@ -985,8 +984,8 @@ local commands = setmetatable({
         }
     }, reload = {
         func = exit_wrapper(eval), process = process_local, help = {
-            header = "%s reload <instance_name> <lua_file>",
-            linkmode = "%s reload <lua_file>",
+            header = "%s reload NAME FILE",
+            linkmode = "%s reload FILE",
             description =
 [=[
         DEPRECATED in favor of "eval"
@@ -997,16 +996,16 @@ local commands = setmetatable({
     }, eval = {
         func = exit_wrapper(eval), process = process_local, help = {
             header = {
-                "%s eval <instance_name> <lua_file>",
-                "<command> | %s eval <instance_name>"
+                "%s eval NAME FILE",
+                "COMMAND | %s eval NAME"
             },
             linkmode = {
-                "%s eval <lua_file>",
-                "<command> | %s eval"
+                "%s eval FILE",
+                "COMMAND | %s eval"
             },
             description =
 [=[
-        Evaluate a local file on a Tarantool instance (if started;
+        Evaluate a local Lua file on a Tarantool instance (if started;
         fail otherwise).
 ]=],
             weight = 70,
@@ -1014,11 +1013,11 @@ local commands = setmetatable({
         }
     }, check = {
         func = exit_wrapper(check), process = process_local, help = {
-            header = "%s check <instance_name>",
+            header = "%s check NAME",
             linkmode = "%s check",
             description =
 [=[
-        Check an instance's script for syntax errors.
+        Check an instance file for syntax errors.
 ]=],
             weight = 60,
             deprecated = false,
@@ -1026,8 +1025,8 @@ local commands = setmetatable({
     }, connect = {
         func = exit_wrapper(connect), process = process_remote, help = {
             header = {
-                "%s connect <instance_uri>",
-                "<command> | %s connect <instance_uri>"
+                "%s connect URI",
+                "COMMAND | %s connect URI"
             },
             description =
 [=[
@@ -1040,7 +1039,7 @@ local commands = setmetatable({
     }, cat = {
         func = exit_wrapper(cat), process = process_remote, help = {
             header =
-                "%s cat <filename>.. [--space=space_no ..] [--show-system]" ..
+                "%s cat FILE.. [--space=space_no ..] [--show-system]" ..
                 " [--from=from_lsn] [--to=to_lsn] [--replica=replica_id ..]",
             description =
 [=[
@@ -1061,8 +1060,9 @@ local commands = setmetatable({
     }, play = {
         func = exit_wrapper(play), process = process_remote, help = {
             header =
-                "%s play <instance_uri> <filename>.. [--space=space_no ..]" ..
-                " [--show-system] [--from=from_lsn] [--to=to_lsn]",
+                "%s play URI FILE.. [--space=space_no ..]" ..
+                " [--show-system] [--from=from_lsn] [--to=to_lsn]" ..
+                " [--replica=replica_id ..]",
             description =
 [=[
         Play the contents of .snap/.xlog files to another Tarantool instance.
