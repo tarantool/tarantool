@@ -3519,12 +3519,6 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 		goto err_mem;
 
 	/*
-	 * Before adding in-memory trees to the write iterator,
-	 * wait until all writes to them are over and mem->min_lsn,
-	 * used for filtering dumped mems, is stabilized.
-	 */
-	vy_range_wait_pinned(range);
-	/*
 	 * Remember the current value of xm->lsn. It will be used
 	 * to delete dumped in-memory trees on task completion
 	 * (see vy_range_dump_mems()). Every in-memory tree created
@@ -3544,6 +3538,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 					&range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
+
+	vy_range_wait_pinned(range);
 
 	task->range = range;
 	task->wi = wi;
@@ -3965,6 +3961,11 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 	task->coalesce_begin = first;
 	task->coalesce_end = end;
 
+	/*
+	 * See comment in vy_task_dump_new().
+	 */
+	int64_t dump_lsn = xm->lsn;
+
 	/* Add sealed mems and runs. */
 	it = first;
 	while (it != end) {
@@ -3975,6 +3976,8 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 			goto err_wi_sub;
 		struct vy_mem *mem;
 		rlist_foreach_entry(mem, &it->sealed, in_sealed) {
+			if (mem->min_lsn > dump_lsn)
+				continue;
 			if (vy_write_iterator_add_mem(wi, mem) != 0)
 				goto err_wi_sub;
 			task->max_output_count += mem->tree.size;
@@ -3989,6 +3992,7 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 			info->min_lsn = MIN(info->min_lsn, run->info.min_lsn);
 			info->max_lsn = MAX(info->max_lsn, run->info.max_lsn);
 		}
+		vy_range_wait_pinned(it);
 		vy_scheduler_remove_range(scheduler, it);
 		it = vy_range_tree_next(&index->tree, it);
 	}
@@ -4144,7 +4148,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	/*
 	 * See comment in vy_task_dump_new().
 	 */
-	vy_range_wait_pinned(range);
 	int64_t dump_lsn = xm->lsn;
 
 	struct vy_write_iterator *wi;
@@ -4157,6 +4160,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 					   &range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
+
+	vy_range_wait_pinned(range);
 
 	task->range = range;
 	task->wi = wi;
