@@ -155,6 +155,20 @@ box.error.raise()
 space = box.space.tweedledum
 ---
 ...
+--
+-- gh-2080: box.error() crashes with wrong parameters
+box.error(box.error.UNSUPPORTED, "x", "x%s")
+---
+- error: x does not support x%s
+...
+box.error(box.error.UNSUPPORTED, "x")
+---
+- error: 'bad argument #3 to ''?'' (no value)'
+...
+box.error(box.error.UNSUPPORTED)
+---
+- error: 'box.error(): bad arguments'
+...
 ----------------
 -- # box.stat
 ----------------

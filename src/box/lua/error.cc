@@ -50,7 +50,6 @@ luaT_error_raise(lua_State *L)
 	const char *file = "";
 	unsigned line = 0;
 	lua_Debug info;
-
 	/* lua_type(L, 1) == LUA_TTABLE - box.error table */
 	int top = lua_gettop(L);
 	if (top <= 1) {
@@ -74,6 +73,9 @@ luaT_error_raise(lua_State *L)
 				lua_pushvalue(L, i);
 			lua_call(L, top - 1, 1);
 			reason = lua_tostring(L, -1);
+		} else if (strchr(reason, '%') != NULL) {
+			/* Missing arguments to format string */
+			luaL_error(L, "box.error(): bad arguments");
 		}
 	} else if (top == 2 && lua_istable(L, 2)) {
 		/* A special case that rethrows raw error (used by net.box) */
@@ -101,7 +103,7 @@ raise:
 		line = info.currentline;
 	}
 	say_debug("box.error() at %s:%i", file, line);
-	box_error_set(file, line, code, reason);
+	box_error_set(file, line, code, "%s", reason);
 	luaT_error(L);
 	return 0;
 }

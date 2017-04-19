@@ -46,6 +46,11 @@ box.error.clear()
 box.error.last()
 box.error.raise()
 space = box.space.tweedledum
+--
+-- gh-2080: box.error() crashes with wrong parameters
+box.error(box.error.UNSUPPORTED, "x", "x%s")
+box.error(box.error.UNSUPPORTED, "x")
+box.error(box.error.UNSUPPORTED)
 
 ----------------
 -- # box.stat
