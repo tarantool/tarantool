@@ -594,7 +594,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	 * WAL. @sa the place which skips old rows in
 	 * recovery_apply_row().
 	 */
-	row->lsn = ++l->rows;
+	row->lsn = l->rows + l->tx_rows;
 	row->sync = 0; /* don't write sync to wal */
 
 	ssize_t written = xlog_write_row(l, row);
@@ -603,8 +603,8 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 		diag_raise();
 	}
 
-	if (l->rows % 100000 == 0)
-		say_crit("%.1fM rows written", l->rows / 1000000.);
+	if ((l->rows + l->tx_rows) % 100000 == 0)
+		say_crit("%.1fM rows written", (l->rows + l->tx_rows) / 1000000.0);
 
 }
 
