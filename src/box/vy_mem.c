@@ -89,8 +89,8 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	vy_mem_tree_create(&index->tree, key_def,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
-	rlist_create(&index->in_frozen);
-	rlist_create(&index->in_dirty);
+	rlist_create(&index->in_sealed);
+	rlist_create(&index->in_dump_fifo);
 	index->pin_count = 0;
 	ipc_cond_create(&index->pin_cond);
 	return index;

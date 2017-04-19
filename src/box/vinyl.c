@@ -401,11 +401,11 @@ struct vy_range {
 	/** Active in-memory index, i.e. the one used for insertions. */
 	struct vy_mem *mem;
 	/**
-	 * List of frozen in-memory indexes, i.e. indexes that can't
-	 * be inserted into, only read from, linked by vy_mem->in_frozen.
+	 * List of sealed in-memory indexes, i.e. indexes that can't
+	 * be inserted into, only read from, linked by vy_mem->in_sealed.
 	 * The newer an index, the closer it to the list head.
 	 */
-	struct rlist frozen;
+	struct rlist sealed;
 	/**
 	 * Size of the largest run that was dumped since the last
 	 * range compaction. Required for computing the size of
@@ -1321,7 +1321,7 @@ vy_index_acct_range(struct vy_index *index, struct vy_range *range)
 	if (range->mem != NULL)
 		vy_index_acct_mem(index, range->mem);
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_index_acct_mem(index, mem);
 	struct vy_run *run;
 	rlist_foreach_entry(run, &range->runs, in_range)
@@ -1335,7 +1335,7 @@ vy_index_unacct_range(struct vy_index *index, struct vy_range *range)
 	if (range->mem != NULL)
 		vy_index_unacct_mem(index, range->mem);
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_index_unacct_mem(index, mem);
 	struct vy_run *run;
 	rlist_foreach_entry(run, &range->runs, in_range)
@@ -1461,7 +1461,7 @@ static void
 vy_range_wait_pinned(struct vy_range *range)
 {
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_mem_wait_pinned(mem);
 }
 
@@ -1479,7 +1479,7 @@ vy_scheduler_update_range(struct vy_scheduler *, struct vy_range *range);
 static void
 vy_scheduler_remove_range(struct vy_scheduler *, struct vy_range*);
 static void
-vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem);
+vy_scheduler_add_mem(struct vy_scheduler *scheduler, struct vy_mem *mem);
 static void
 vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem);
 
@@ -2319,7 +2319,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 			goto fail_end;
 	}
 	rlist_create(&range->runs);
-	rlist_create(&range->frozen);
+	rlist_create(&range->sealed);
 	range->min_lsn = INT64_MAX;
 	range->index = index;
 	range->in_dump.pos = UINT32_MAX;
@@ -2337,28 +2337,28 @@ fail:
 	return NULL;
 }
 
-/* Move the active in-memory index of a range to the frozen list. */
+/* Move the active in-memory index of a range to the sealed list. */
 static void
-vy_range_freeze_mem(struct vy_range *range)
+vy_range_seal_mem(struct vy_range *range)
 {
 	assert(range->mem != NULL);
-	rlist_add_entry(&range->frozen, range->mem, in_frozen);
+	rlist_add_entry(&range->sealed, range->mem, in_sealed);
 	range->mem = NULL;
 }
 
-/* Activate the newest frozen in-memory index of a range. */
+/* Activate the newest sealed in-memory index of a range. */
 static void
-vy_range_unfreeze_mem(struct vy_range *range)
+vy_range_unseal_mem(struct vy_range *range)
 {
 	assert(range->mem == NULL);
-	assert(!rlist_empty(&range->frozen));
-	range->mem = rlist_shift_entry(&range->frozen,
-				       struct vy_mem, in_frozen);
+	assert(!rlist_empty(&range->sealed));
+	range->mem = rlist_shift_entry(&range->sealed,
+				       struct vy_mem, in_sealed);
 }
 
 /**
  * Allocate a new active in-memory index for a range while moving
- * the old one to the frozen list. Used by dump/compaction in order
+ * the old one to the sealed list. Used by dump/compaction in order
  * not to bother about synchronization with concurrent insertions
  * while a range is being dumped. If the active in-memory index is
  * empty and not pinned by an ongoing transaction, we don't need
@@ -2381,7 +2381,7 @@ vy_range_rotate_mem(struct vy_range *range)
 	if (mem == NULL)
 		return -1;
 	if (range->mem->used > 0 || range->mem->pin_count > 0)
-		vy_range_freeze_mem(range);
+		vy_range_seal_mem(range);
 	else
 		vy_mem_delete(range->mem);
 	range->mem = mem;
@@ -2390,7 +2390,7 @@ vy_range_rotate_mem(struct vy_range *range)
 }
 
 /**
- * Delete frozen in-memory trees created at <= @dump_lsn and notify
+ * Delete sealed in-memory trees created at <= @dump_lsn and notify
  * the scheduler. Called after successful dump or compaction.
  */
 static void
@@ -2401,9 +2401,9 @@ vy_range_dump_mems(struct vy_range *range, struct vy_scheduler *scheduler,
 
 	range->used = range->mem->used;
 	range->min_lsn = range->mem->min_lsn;
-	rlist_foreach_entry_safe(mem, &range->frozen, in_frozen, tmp) {
+	rlist_foreach_entry_safe(mem, &range->sealed, in_sealed, tmp) {
 		if (mem->min_lsn <= dump_lsn) {
-			rlist_del_entry(mem, in_frozen);
+			rlist_del_entry(mem, in_sealed);
 			vy_scheduler_mem_dumped(scheduler, mem);
 			vy_mem_delete(mem);
 		} else {
@@ -2436,10 +2436,10 @@ vy_range_delete(struct vy_range *range)
 	/* Delete all mems. */
 	if (range->mem != NULL)
 		vy_mem_delete(range->mem);
-	while (!rlist_empty(&range->frozen)) {
+	while (!rlist_empty(&range->sealed)) {
 		struct vy_mem *mem;
-		mem = rlist_shift_entry(&range->frozen,
-					struct vy_mem, in_frozen);
+		mem = rlist_shift_entry(&range->sealed,
+					struct vy_mem, in_sealed);
 		vy_mem_delete(mem);
 	}
 
@@ -2450,7 +2450,7 @@ vy_range_delete(struct vy_range *range)
 /**
  * Create a write iterator to dump in-memory indexes.
  *
- * We only dump frozen in-memory indexes and skip the active
+ * We only dump sealed in-memory indexes and skip the active
  * one in order not to conflict with concurrent insertions.
  * The caller is supposed to freeze the active mem for it to
  * be dumped.
@@ -2479,7 +2479,7 @@ vy_range_get_dump_iterator(struct vy_range *range, int64_t vlsn,
 				   range->run_count == 0, vlsn);
 	if (wi == NULL)
 		goto err_wi;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+	rlist_foreach_entry(mem, &range->sealed, in_sealed) {
 		if (mem->min_lsn > dump_lsn)
 			continue;
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
@@ -2527,7 +2527,7 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 	 * Prepare for merge. Note, merge iterator requires newer
 	 * sources to be added first so mems are added before runs.
 	 */
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+	rlist_foreach_entry(mem, &range->sealed, in_sealed) {
 		if (mem->min_lsn > dump_lsn)
 			continue;
 		if (vy_write_iterator_add_mem(wi, mem) != 0)
@@ -3052,7 +3052,7 @@ vy_range_set(struct vy_range *range, struct vy_mem *mem,
 	}
 
 	if (was_empty)
-		vy_scheduler_mem_dirtied(scheduler, mem);
+		vy_scheduler_add_mem(scheduler, mem);
 
 	if (range->used == 0) {
 		range->min_lsn = lsn;
@@ -3088,7 +3088,7 @@ vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
 	const struct tuple *region_stmt = NULL;
 	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
 	    (older == NULL && range->shadow == NULL &&
-	     rlist_empty(&range->frozen) && range->run_count == 0)) {
+	     rlist_empty(&range->sealed) && range->run_count == 0)) {
 		/*
 		 * Optimization:
 		 *
@@ -3335,7 +3335,7 @@ struct vy_task {
 	/**
 	 * Max LSN dumped by this task.
 	 *
-	 * When we dump or compact a range, we write all its frozen
+	 * When we dump or compact a range, we write all its sealed
 	 * in-memory trees that existed when the task was scheduled
 	 * (@sa vy_range_get_dump/compact_iterator()). During task
 	 * execution, new trees can be added due to DDL
@@ -3677,8 +3677,8 @@ vy_task_split_complete(struct vy_task *task)
 	index->version++;
 
 	/* Notify the scheduler that the range was dumped. */
-	assert(range->mem == NULL); /* active mem was frozen */
-	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+	assert(range->mem == NULL); /* active mem was sealed */
+	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_scheduler_mem_dumped(scheduler, mem);
 
 	vy_range_delete(range);
@@ -3712,8 +3712,8 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
 		assert(r->run_count == 0);
 
-		vy_range_freeze_mem(r);
-		rlist_splice(&range->frozen, &r->frozen);
+		vy_range_seal_mem(r);
+		rlist_splice(&range->sealed, &r->sealed);
 		if (range->used == 0)
 			range->min_lsn = r->min_lsn;
 		assert(range->min_lsn <= r->min_lsn);
@@ -3726,7 +3726,7 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 		vy_index_remove_range(index, r);
 		vy_range_delete(r);
 	}
-	vy_range_unfreeze_mem(range);
+	vy_range_unseal_mem(range);
 
 	/* Insert the range back into the tree. */
 	vy_index_add_range(index, range);
@@ -3777,7 +3777,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	 * Dump all in-memory trees of the old range
 	 * because we can't split them.
 	 */
-	vy_range_freeze_mem(range);
+	vy_range_seal_mem(range);
 	int64_t dump_lsn = INT64_MAX;
 
 	struct vy_write_iterator *wi;
@@ -3828,7 +3828,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	*p_task = task;
 	return 0;
 err_wi:
-	vy_range_unfreeze_mem(range);
+	vy_range_unseal_mem(range);
 err_parts:
 	for (int i = 0; i < n_parts; i++) {
 		struct vy_range *r = parts[i];
@@ -3899,8 +3899,8 @@ vy_task_coalesce_complete(struct vy_task *task)
 	while(it != task->coalesce_end) {
 		vy_index_unacct_range(index, it);
 		vy_range_dump_mems(it, scheduler, task->dump_lsn);
-		vy_range_freeze_mem(it);
-		rlist_splice(&result->frozen, &it->frozen);
+		vy_range_seal_mem(it);
+		rlist_splice(&result->sealed, &it->sealed);
 		result->min_lsn = MIN(result->min_lsn, it->min_lsn);
 		result->used += it->used;
 		struct vy_range *next = vy_range_tree_next(&index->tree, it);
@@ -3983,13 +3983,13 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 	task->coalesce_begin = first;
 	task->coalesce_end = end;
 
-	/* Add frozen mems and runs. */
+	/* Add sealed mems and runs. */
 	it = first;
 	while (it != end) {
 		if (vy_range_rotate_mem(it) != 0)
 			goto err_wi_sub;
 		struct vy_mem *mem;
-		rlist_foreach_entry(mem, &it->frozen, in_frozen) {
+		rlist_foreach_entry(mem, &it->sealed, in_sealed) {
 			if (vy_write_iterator_add_mem(wi, mem) != 0)
 				goto err_wi_sub;
 			task->max_output_count += mem->tree.size;
@@ -4296,12 +4296,13 @@ struct vy_scheduler {
 	bool is_throttled;
 
 	/**
-	 * List of all non-empty (in terms of allocated data) in-memory indexes.
-	 * Older mems are closer to the tail of the list.
+	 * List of all non-empty (in terms of allocated data)
+	 * in-memory indexes, scheduled for dump. Older mems are closer
+	 * to the  tail of the list.
 	 */
-	struct rlist dirty_mems;
-	/** Min LSN over all in-memory indexes. */
-	int64_t mem_min_lsn;
+	struct rlist dump_fifo;
+	/** Min LSN over all in-memory indexes in the dump FIFO. */
+	int64_t dump_min_lsn;
 	/**
 	 * Snapshot signature if snapshot is in progress, otherwise -1.
 	 * All in-memory indexes with min_lsn <= checkpoint_lsn must be
@@ -4364,8 +4365,8 @@ vy_scheduler_new(struct vy_env *env)
 	}
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	diag_create(&scheduler->diag);
-	rlist_create(&scheduler->dirty_mems);
-	scheduler->mem_min_lsn = INT64_MAX;
+	rlist_create(&scheduler->dump_fifo);
+	scheduler->dump_min_lsn = INT64_MAX;
 	scheduler->checkpoint_lsn = -1;
 	ipc_cond_create(&scheduler->checkpoint_cond);
 	scheduler->env = env;
@@ -4825,12 +4826,12 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 }
 
 static void
-vy_scheduler_mem_dirtied(struct vy_scheduler *scheduler, struct vy_mem *mem)
+vy_scheduler_add_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 {
-	if (rlist_empty(&scheduler->dirty_mems))
-		scheduler->mem_min_lsn = mem->min_lsn;
-	assert(scheduler->mem_min_lsn <= mem->min_lsn);
-	rlist_add_entry(&scheduler->dirty_mems, mem, in_dirty);
+	if (rlist_empty(&scheduler->dump_fifo))
+		scheduler->dump_min_lsn = mem->min_lsn;
+	assert(scheduler->dump_min_lsn <= mem->min_lsn);
+	rlist_add_entry(&scheduler->dump_fifo, mem, in_dump_fifo);
 }
 
 static void
@@ -4841,26 +4842,26 @@ vy_scheduler_mem_dumped(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	if (mem->used == 0)
 		return;
 
-	rlist_del_entry(mem, in_dirty);
+	rlist_del_entry(mem, in_dump_fifo);
 
-	if (!rlist_empty(&scheduler->dirty_mems)) {
+	if (!rlist_empty(&scheduler->dump_fifo)) {
 		struct vy_mem *oldest;
-		oldest = rlist_last_entry(&scheduler->dirty_mems,
-					  struct vy_mem, in_dirty);
-		scheduler->mem_min_lsn = oldest->min_lsn;
+		oldest = rlist_last_entry(&scheduler->dump_fifo,
+					  struct vy_mem, in_dump_fifo);
+		scheduler->dump_min_lsn = oldest->min_lsn;
 	} else {
-		scheduler->mem_min_lsn = INT64_MAX;
+		scheduler->dump_min_lsn = INT64_MAX;
 	}
 
 	/* Free memory and release quota. */
 	struct lsregion *allocator = &env->allocator;
 	size_t mem_used_before = lsregion_used(allocator);
-	lsregion_gc(allocator, scheduler->mem_min_lsn - 1);
+	lsregion_gc(allocator, scheduler->dump_min_lsn - 1);
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
 	vy_quota_release(&env->quota, mem_used_before - mem_used_after);
 
-	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn) {
+	if (scheduler->dump_min_lsn > scheduler->checkpoint_lsn) {
 		/*
 		 * All in-memory indexes have been checkpointed. Wake up
 		 * the fiber waiting for checkpoint to complete.
@@ -4881,7 +4882,7 @@ vy_checkpoint(struct vy_env *env, struct vclock *vclock)
 	assert(scheduler->checkpoint_lsn == -1);
 
 	scheduler->checkpoint_lsn = vclock_sum(vclock);
-	if (scheduler->mem_min_lsn > scheduler->checkpoint_lsn)
+	if (scheduler->dump_min_lsn > scheduler->checkpoint_lsn)
 		return 0; /* nothing to do */
 
 	/*
@@ -4913,10 +4914,10 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	assert(scheduler->checkpoint_lsn != -1);
 
 	while (!scheduler->is_throttled &&
-	       scheduler->mem_min_lsn <= scheduler->checkpoint_lsn)
+	       scheduler->dump_min_lsn <= scheduler->checkpoint_lsn)
 		ipc_cond_wait(&scheduler->checkpoint_cond);
 
-	if (scheduler->mem_min_lsn <= scheduler->checkpoint_lsn) {
+	if (scheduler->dump_min_lsn <= scheduler->checkpoint_lsn) {
 		assert(!diag_is_empty(&scheduler->diag));
 		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
 		goto error;
@@ -5012,7 +5013,7 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_append_u64(h, "watermark", q->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
 	info_append_str(h, "ratio", buf);
-	info_append_u64(h, "min_lsn", env->scheduler->mem_min_lsn);
+	info_append_u64(h, "min_lsn", env->scheduler->dump_min_lsn);
 	info_table_end(h);
 }
 
@@ -5534,7 +5535,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	if (range->mem != NULL)
 		vy_scheduler_mem_dumped(scheduler, range->mem);
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen)
+	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_scheduler_mem_dumped(scheduler, mem);
 	if (range->in_dump.pos != UINT32_MAX) {
 		/*
@@ -8434,9 +8435,9 @@ vy_read_iterator_add_mem_range(struct vy_read_iterator *itr,
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , range->mem,
 				     itr->iterator_type, itr->key, itr->read_view);
 	}
-	/* Add frozen in-memory indexes. */
+	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &range->frozen, in_frozen) {
+	rlist_foreach_entry(mem, &range->sealed, in_sealed) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , mem,
