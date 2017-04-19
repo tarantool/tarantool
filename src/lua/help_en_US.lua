@@ -1,6 +1,17 @@
 --- help (en_US)
 
 return {
+    help = [[
+To get help, see the Tarantool manual at https://tarantool.org/doc/
+To start the interactive Tarantool tutorial, type 'tutorial()'
+
+Available backslash commands:
+
+  \set language <language> for setting language
+  \set delimiter <delimiter> for setting delimiter
+  \help show this screen
+  \quit quit interactive console
+]];
     tutorial = {
     [[
 Tutorial -- Screen #1 -- Hello, Moon

@@ -1,11 +1,8 @@
 local doc = require('help.en_US')
 
-help = {}
-help[1] = {}
-help[1] = "To get help, see the Tarantool manual at http://tarantool.org/doc/"
-help[2] = "To start the interactive Tarantool tutorial, type 'tutorial()'"
+help = { doc.help }
 tutorial = {}
-tutorial[1] = help[2]
+tutorial[1] = help[1]
 
 local help_function_data = {};
 local help_object_data = {}
