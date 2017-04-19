@@ -69,27 +69,16 @@ space:drop()
 ...
 -- Get the list of files from the last checkpoint.
 -- convert names to relative
-work_dir = require('fio').cwd()
----
-...
+-- work_dir = fio.cwd()
 files = box.backup.start()
 ---
 ...
-for i, name in pairs(files) do files[i] = name:sub(#work_dir + 2) end
----
-...
+-- use abspath to work correclty with symlinks
+-- for i, name in pairs(files) do files[i] = fio.abspath(files[i]):sub(#work_dir + 2) end
 table.sort(files)
 ---
 ...
-files
----
-- - vinyl/00000000000000000008.vylog
-  - vinyl/00000000000000000011.snap
-  - vinyl/512/0/00000000000000000001.index
-  - vinyl/512/0/00000000000000000001.run
-  - vinyl/512/0/00000000000000000002.index
-  - vinyl/512/0/00000000000000000002.run
-...
+-- files
 result = {}
 ---
 ...
@@ -106,7 +95,7 @@ for i, path in pairs(files) do
             rows[i] = row
             i = i + 1
         end
-        table.insert(result, { path, rows })
+        table.insert(result, { fio.basename(path), rows })
     end
 end;
 ---
@@ -124,7 +113,7 @@ test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
 ...
 result
 ---
-- - - vinyl/00000000000000000008.vylog
+- - - 00000000000000000008.vylog
     - - HEADER:
           type: INSERT
         BODY:
@@ -154,7 +143,7 @@ result
           timestamp: <timestamp>
         BODY:
           tuple: [5, {1: 0, 2: 2, 9: 9, 10: 11, 11: false}]
-  - - vinyl/512/0/00000000000000000001.index
+  - - 00000000000000000001.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -169,7 +158,7 @@ result
           count: 3
           min: [1]
           page_index_offset: 27
-  - - vinyl/512/0/00000000000000000001.run
+  - - 00000000000000000001.run
     - - HEADER:
           lsn: 6
           type: REPLACE
@@ -189,7 +178,7 @@ result
           type: PAGEINDEX
         BODY:
           page_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
-  - - vinyl/512/0/00000000000000000002.index
+  - - 00000000000000000002.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -204,7 +193,7 @@ result
           count: 3
           min: [4]
           page_index_offset: 27
-  - - vinyl/512/0/00000000000000000002.run
+  - - 00000000000000000002.run
     - - HEADER:
           lsn: 9
           type: REPLACE

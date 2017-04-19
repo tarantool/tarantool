@@ -27,11 +27,12 @@ space:drop()
 
 -- Get the list of files from the last checkpoint.
 -- convert names to relative
-work_dir = require('fio').cwd()
+-- work_dir = fio.cwd()
 files = box.backup.start()
-for i, name in pairs(files) do files[i] = name:sub(#work_dir + 2) end
+-- use abspath to work correclty with symlinks
+-- for i, name in pairs(files) do files[i] = fio.abspath(files[i]):sub(#work_dir + 2) end
 table.sort(files)
-files
+-- files
 result = {}
 test_run:cmd("setopt delimiter ';'")
 for i, path in pairs(files) do
@@ -43,7 +44,7 @@ for i, path in pairs(files) do
             rows[i] = row
             i = i + 1
         end
-        table.insert(result, { path, rows })
+        table.insert(result, { fio.basename(path), rows })
     end
 end;
 
