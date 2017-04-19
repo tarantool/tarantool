@@ -144,8 +144,13 @@ iterator_next(struct iterator *base_it)
 	struct tuple *tuple;
 
 	/* found */
-	if (vy_cursor_next(it->cursor, &tuple) != 0)
+	if (vy_cursor_next(it->cursor, &tuple) != 0) {
+		/* immediately close the cursor */
+		vy_cursor_delete(it->cursor);
+		it->cursor = NULL;
+		it->base.next = vinyl_iterator_last;
 		diag_raise();
+	}
 	if (tuple != NULL) {
 		tuple = tuple_bless_xc(tuple);
 		tuple_unref(tuple);
