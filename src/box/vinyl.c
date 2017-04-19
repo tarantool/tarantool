@@ -1866,7 +1866,7 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  const char *end_key, uint64_t page_size,
 		  struct bloom_spectrum *bs, const struct key_def *key_def,
 		  const struct key_def *user_key_def, bool is_primary,
-		  const char **max_key, uint32_t *page_info_capacity)
+		  uint32_t *page_info_capacity)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -1889,6 +1889,18 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		*page_info_capacity = cap;
 	}
 	assert(*page_info_capacity >= run_info->count);
+
+	const char *region_key;
+	if (run_info->count == 0) {
+		/* See comment to run_info->max_key allocation below. */
+		region_key = tuple_extract_key(*curr_stmt, key_def, NULL);
+		if (region_key == NULL)
+			goto error_page_index;
+		assert(run_info->min_key == NULL);
+		run_info->min_key = vy_key_dup(region_key);
+		if (run_info->min_key == NULL)
+			goto error_page_index;
+	}
 
 	struct vy_page_info *page = run_info->page_infos + run_info->count;
 	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
@@ -1926,7 +1938,10 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < page_size);
 
-	if (end_of_run && stmt != NULL && max_key != NULL) {
+	/* We don't write empty pages. */
+	assert(stmt != NULL);
+
+	if (end_of_run) {
 		/*
 		 * Tuple_extract_key allocates the key on a
 		 * region, but the max_key must be allocated on
@@ -1934,17 +1949,17 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		 * than a fiber. To reach this, we must copy the
 		 * key into malloced memory.
 		 */
-		*max_key = tuple_extract_key(stmt, key_def, NULL);
-		tuple_unref(stmt);
-		if (*max_key == NULL)
+		region_key = tuple_extract_key(stmt, key_def, NULL);
+		if (region_key == NULL)
 			goto error_rollback;
-		stmt = NULL;
-		*max_key = vy_key_dup(*max_key);
-		if (*max_key == NULL)
+		assert(run_info->max_key == NULL);
+		run_info->max_key = vy_key_dup(region_key);
+		if (run_info->max_key == NULL)
 			goto error_rollback;
 	}
-	if (stmt != NULL)
-		tuple_unref(stmt);
+	tuple_unref(stmt);
+	stmt = NULL;
+
 	/* Save offset to row index  */
 	page->page_index_offset = page->unpacked_size;
 
@@ -1982,6 +1997,8 @@ error_rollback:
 	xlog_tx_rollback(data_xlog);
 error_page_index:
 	ibuf_destroy(&page_index_buf);
+	if (stmt != NULL)
+		tuple_unref(stmt);
 	return -1;
 }
 
@@ -1997,8 +2014,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
 		  const char *end_key, uint64_t page_size,
 		  struct bloom_spectrum *bs, const struct key_def *key_def,
-		  const struct key_def *user_key_def, bool is_primary,
-		  const char **max_key)
+		  const struct key_def *user_key_def, bool is_primary)
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
@@ -2027,7 +2043,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		rc = vy_run_write_page(run_info, &data_xlog, wi, curr_stmt,
 				       end_key, page_size, bs, key_def,
 				       user_key_def, is_primary,
-				       max_key, &page_infos_capacity);
+				       &page_infos_capacity);
 		if (rc < 0)
 			goto err;
 		fiber_gc();
@@ -2175,8 +2191,18 @@ static int
 vy_run_info_encode(const struct vy_run_info *run_info,
 		   struct xrow_header *xrow)
 {
+	const char *tmp;
+	tmp = run_info->min_key;
+	mp_next(&tmp);
+	size_t min_key_size = tmp - run_info->min_key;
+	tmp = run_info->max_key;
+	mp_next(&tmp);
+	size_t max_key_size = tmp - run_info->max_key;
+
 	assert(run_info->has_bloom);
-	size_t size = mp_sizeof_map(2);
+	size_t size = mp_sizeof_map(4);
+	size += mp_sizeof_uint(VY_RUN_INFO_MIN_KEY) + min_key_size;
+	size += mp_sizeof_uint(VY_RUN_INFO_MAX_KEY) + max_key_size;
 	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
 		mp_sizeof_uint(run_info->count);
 	size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
@@ -2190,7 +2216,13 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	memset(xrow, 0, sizeof(*xrow));
 	xrow->body->iov_base = pos;
 	/* encode values */
-	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_map(pos, 4);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_KEY);
+	memcpy(pos, run_info->min_key, min_key_size);
+	pos += min_key_size;
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MAX_KEY);
+	memcpy(pos, run_info->max_key, max_key_size);
+	pos += max_key_size;
 	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->count);
 	pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
@@ -2547,7 +2579,7 @@ static int
 vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 		   struct tuple **stmt, size_t *written,
 		   size_t max_output_count, double bloom_fpr,
-		   uint64_t *dumped_statements, const char **max_key)
+		   uint64_t *dumped_statements)
 {
 	assert(stmt != NULL);
 
@@ -2572,7 +2604,7 @@ vy_range_write_run(struct vy_range *range, struct vy_write_iterator *wi,
 	if (vy_run_write_data(run, index->path, wi, stmt,
 			      range->end, index_def->opts.page_size, &bs,
 			      &index_def->key_def, &user_index_def->key_def,
-			      index_def->iid == 0, max_key) != 0)
+			      index_def->iid == 0) != 0)
 		return -1;
 
 	bloom_spectrum_choose(&bs, &run->info.bloom);
@@ -3350,8 +3382,6 @@ struct vy_task {
 	size_t max_output_count;
 	/** For run-writing tasks: bloom filter false-positive-rate setting */
 	double bloom_fpr;
-	/** Max written key. */
-	char *max_written_key;
 	/** Count of ranges to compact. */
 	int run_count;
 	/** Range of ranges to coalesce: [begin, end). */
@@ -3389,8 +3419,6 @@ vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
 	vy_index_unref(task->index);
 	diag_destroy(&task->diag);
-	if (task->max_written_key != NULL)
-		free(task->max_written_key);
 	TRASH(task);
 	mempool_free(pool, task);
 }
@@ -3406,15 +3434,12 @@ vy_task_dump_execute(struct vy_task *task)
 	/* The range has been deleted from the scheduler queues. */
 	assert(range->in_dump.pos == UINT32_MAX);
 	assert(range->in_compact.pos == UINT32_MAX);
-	const char **max_key = NULL;
-	if (range->is_level_zero)
-		max_key = (const char **) &task->max_written_key;
 
 	/* Start iteration. */
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
 			       task->max_output_count, task->bloom_fpr,
-			       &task->dumped_statements, max_key) != 0) {
+			       &task->dumped_statements) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
 	}
@@ -3591,7 +3616,7 @@ vy_task_split_execute(struct vy_task *task)
 		}
 		if (vy_range_write_run(r, wi, &stmt, &task->dump_size,
 				       task->max_output_count, task->bloom_fpr,
-				       &unused, NULL) != 0)
+				       &unused) != 0)
 			goto error;
 	}
 	vy_write_iterator_cleanup(wi);
@@ -3841,7 +3866,7 @@ vy_task_compact_execute(struct vy_task *task)
 	if (vy_write_iterator_next(wi, &stmt) != 0 ||
 	    vy_range_write_run(range, wi, &stmt, &task->dump_size,
 			       task->max_output_count, task->bloom_fpr,
-			       &unused, NULL) != 0) {
+			       &unused) != 0) {
 		vy_write_iterator_cleanup(wi);
 		return -1;
 	}

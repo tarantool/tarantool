@@ -152,6 +152,8 @@ vy_run_delete(struct vy_run *run)
 	}
 	if (run->info.has_bloom)
 		bloom_destroy(&run->info.bloom, runtime.quota);
+	free(run->info.min_key);
+	free(run->info.max_key);
 	TRASH(run);
 	free(run);
 }
@@ -291,11 +293,26 @@ vy_run_info_decode(struct vy_run_info *run_info,
 	uint64_t key_map = vy_run_info_key_map;
 	uint32_t map_size = mp_decode_map(&pos);
 	uint32_t map_item;
+	const char *tmp;
 	/* decode run values */
 	for (map_item = 0; map_item < map_size; ++map_item) {
 		uint32_t key = mp_decode_uint(&pos);
 		key_map &= ~(1ULL << key);
 		switch (key) {
+		case VY_RUN_INFO_MIN_KEY:
+			tmp = pos;
+			mp_next(&pos);
+			run_info->min_key = vy_key_dup(tmp);
+			if (run_info->min_key == NULL)
+				return -1;
+			break;
+		case VY_RUN_INFO_MAX_KEY:
+			tmp = pos;
+			mp_next(&pos);
+			run_info->max_key = vy_key_dup(tmp);
+			if (run_info->max_key == NULL)
+				return -1;
+			break;
 		case VY_RUN_INFO_PAGE_COUNT:
 			run_info->count = mp_decode_uint(&pos);
 			break;

@@ -53,7 +53,9 @@ static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
 					     (1 << VY_PAGE_INFO_MIN_KEY) |
 					     (1 << VY_PAGE_INFO_PAGE_INDEX_OFFSET);
 
-static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_PAGE_COUNT);
+static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
+					    (1 << VY_RUN_INFO_MAX_KEY) |
+					    (1 << VY_RUN_INFO_PAGE_COUNT);
 
 enum { VY_BLOOM_VERSION = 0 };
 
@@ -79,6 +81,9 @@ struct vy_run_info {
 	uint32_t  count;
 	/** Number of keys. */
 	uint32_t  keys;
+	/** Min and max keys in the run. */
+	char *min_key;
+	char *max_key;
 	/* Min and max lsn over all statements in the run. */
 	int64_t  min_lsn;
 	int64_t  max_lsn;

@@ -273,6 +273,10 @@ struct PACKED request_replace_body {
  * @sa struct vy_run_info.
  */
 enum vy_run_info_key {
+	/** Min key in the run. */
+	VY_RUN_INFO_MIN_KEY = 1,
+	/** Max key in the run. */
+	VY_RUN_INFO_MAX_KEY = 2,
 	/** Number of pages in a run. */
 	VY_RUN_INFO_PAGE_COUNT = 3,
 	/** Bloom filter for keys. */
@@ -288,7 +292,7 @@ enum vy_run_info_key {
 static inline const char *
 vy_run_info_key_name(enum vy_run_info_key key)
 {
-	if (key < VY_RUN_INFO_PAGE_COUNT || key >= VY_RUN_INFO_KEY_MAX)
+	if (key < VY_RUN_INFO_MIN_KEY || key >= VY_RUN_INFO_KEY_MAX)
 		return NULL;
 	extern const char *vy_run_info_key_strs[];
 	return vy_run_info_key_strs[key];
