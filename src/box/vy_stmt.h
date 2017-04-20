@@ -342,6 +342,15 @@ vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 	return key_compare(tuple_data(stmt), key, key_def);
 }
 
+/** @sa tuple_compare_with_key. */
+static inline int
+vy_stmt_compare_with_key(const struct tuple *stmt, const struct tuple *key,
+			 const struct key_def *key_def)
+{
+	assert(vy_stmt_type(key) == IPROTO_SELECT);
+	return vy_stmt_compare_with_raw_key(stmt, tuple_data(key), key_def);
+}
+
 /**
  * Create the SELECT statement from raw MessagePack data.
  * @param format     Format of an index.

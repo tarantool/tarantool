@@ -303,6 +303,15 @@ tuple_data(const struct tuple *tuple)
 }
 
 /**
+ * Wrapper around tuple_data() which returns NULL if @tuple == NULL.
+ */
+static inline const char *
+tuple_data_or_null(const struct tuple *tuple)
+{
+	return tuple != NULL ? tuple_data(tuple) : NULL;
+}
+
+/**
  * Get pointer to MessagePack data of the tuple.
  * @param tuple tuple.
  * @param[out] size Size in bytes of the MessagePack array.

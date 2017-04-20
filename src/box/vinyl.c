@@ -381,9 +381,9 @@ struct vy_range {
 	 * Both 'begin' and 'end' statements have SELECT type with the full
 	 * idexed key.
 	 */
-	char *begin;
+	struct tuple *begin;
 	/** Range upper bound. NULL if range is rightmost. */
-	char *end;
+	struct tuple *end;
 	struct vy_index *index;
 	/* Size of data stored on disk (sum of run->info.size). */
 	uint64_t size;
@@ -1380,12 +1380,14 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "(");
 	if (range->begin != NULL)
-		SNPRINT(total, vy_key_snprint, buf, size, range->begin);
+		SNPRINT(total, vy_key_snprint, buf, size,
+			tuple_data(range->begin));
 	else
 		SNPRINT(total, snprintf, buf, size, "-inf");
 	SNPRINT(total, snprintf, buf, size, "..");
 	if (range->end != NULL)
-		SNPRINT(total, vy_key_snprint, buf, size, range->end);
+		SNPRINT(total, vy_key_snprint, buf, size,
+			tuple_data(range->end));
 	else
 		SNPRINT(total, snprintf, buf, size, "inf");
 	SNPRINT(total, snprintf, buf, size, ")");
@@ -1548,7 +1550,8 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 
 	assert(range_a->index == range_b->index);
 	struct index_def *index_def = range_a->index->index_def;
-	return key_compare(range_a->begin, range_b->begin, &index_def->key_def);
+	return vy_key_compare(range_a->begin, range_b->begin,
+			      &index_def->key_def);
 }
 
 static int
@@ -1559,7 +1562,8 @@ vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 		return 1;
 
 	struct index_def *index_def = range->index->index_def;
-	return vy_stmt_compare_with_raw_key(stmt, range->begin, &index_def->key_def);
+	return vy_stmt_compare_with_key(stmt, range->begin,
+					&index_def->key_def);
 }
 
 static void
@@ -1638,8 +1642,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
 		    key_field_count < key_def->part_count &&
-		    vy_stmt_compare_with_raw_key(key, range->begin,
-						 key_def) == 0)
+		    vy_stmt_compare_with_key(key, range->begin, key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -1672,8 +1675,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
-			    vy_stmt_compare_with_raw_key(key, range->begin,
-							 key_def) != 0) {
+			    vy_stmt_compare_with_key(key, range->begin,
+						     key_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree,
 							  range);
@@ -1728,8 +1731,8 @@ next:
 		break;
 	case ITER_EQ:
 		if (curr->end != NULL &&
-		    vy_stmt_compare_with_raw_key(itr->key, curr->end,
-						 key_def) >= 0) {
+		    vy_stmt_compare_with_key(itr->key, curr->end,
+					     key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
 			next = vy_range_tree_next(&index->tree, curr);
 		} else {
@@ -1901,7 +1904,7 @@ vy_page_index_encode(const uint32_t *page_index, uint32_t count,
 static int
 vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
-		  const char *end_key, uint64_t page_size,
+		  const struct tuple *end_key, uint64_t page_size,
 		  struct bloom_spectrum *bs, const struct key_def *key_def,
 		  const struct key_def *user_key_def, bool is_primary,
 		  uint32_t *page_info_capacity)
@@ -1972,8 +1975,8 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 		end_of_run = *curr_stmt == NULL ||
 			/* Split key reached, proceed to the next run. */
 			(end_key != NULL &&
-			 vy_tuple_compare_with_raw_key(*curr_stmt, end_key,
-						       key_def) >= 0);
+			 vy_tuple_compare_with_key(*curr_stmt, end_key,
+						   key_def) >= 0);
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < page_size);
 
@@ -2051,7 +2054,7 @@ error_page_index:
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  struct vy_write_iterator *wi, struct tuple **curr_stmt,
-		  const char *end_key, uint64_t page_size,
+		  const struct tuple *end_key, uint64_t page_size,
 		  struct bloom_spectrum *bs, const struct key_def *key_def,
 		  const struct key_def *user_key_def, bool is_primary)
 {
@@ -2332,7 +2335,7 @@ fail:
  */
 static struct vy_range *
 vy_range_new(struct vy_index *index, int64_t id,
-	     const char *begin, const char *end)
+	     struct tuple *begin, struct tuple *end)
 {
 	struct tx_manager *xm = index->env->xm;
 	struct lsregion *allocator = &index->env->allocator;
@@ -2354,14 +2357,12 @@ vy_range_new(struct vy_index *index, int64_t id,
 	/* Allocate a new id unless specified. */
 	range->id = (id >= 0 ? id : vy_log_next_range_id());
 	if (begin != NULL) {
-		range->begin = vy_key_dup(begin);
-		if (range->begin == NULL)
-			goto fail_begin;
+		tuple_ref(begin);
+		range->begin = begin;
 	}
 	if (end != NULL) {
-		range->end = vy_key_dup(end);
-		if (range->end == NULL)
-			goto fail_end;
+		tuple_ref(end);
+		range->end = end;
 	}
 	rlist_create(&range->runs);
 	rlist_create(&range->sealed);
@@ -2371,11 +2372,6 @@ vy_range_new(struct vy_index *index, int64_t id,
 	range->in_compact.pos = UINT32_MAX;
 	rlist_create(&range->split_list);
 	return range;
-fail_end:
-	if (range->begin != NULL)
-		free(range->begin);
-fail_begin:
-	vy_mem_delete(range->mem);
 fail_mem:
 	free(range);
 fail:
@@ -2466,10 +2462,10 @@ vy_range_delete(struct vy_range *range)
 	assert(range->in_dump.pos == UINT32_MAX);
 	assert(range->in_compact.pos == UINT32_MAX);
 
-	if (range->begin)
-		free(range->begin);
-	if (range->end)
-		free(range->end);
+	if (range->begin != NULL)
+		tuple_unref(range->begin);
+	if (range->end != NULL)
+		tuple_unref(range->end);
 
 	/* Delete all runs. */
 	if (range->new_run != NULL)
@@ -2850,7 +2846,8 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 	 */
 	vy_log_tx_begin();
 	vy_log_insert_range(index->index_def->opts.lsn, result->id,
-			    result->begin, result->end);
+			    tuple_data_or_null(result->begin),
+			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_run *run;
 		rlist_foreach_entry(run, &it->runs, in_range)
@@ -3017,6 +3014,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
 	struct index_def *index_def = index->index_def;
+	struct tuple_format *key_format = index->env->key_format;
 	struct vy_run *run;
 
 	switch (record->type) {
@@ -3027,13 +3025,28 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		index->is_dropped = true;
 		break;
 	case VY_LOG_INSERT_RANGE:
-		range = vy_range_new(index, record->range_id,
-				     record->range_begin,
-				     record->range_end);
+		range = vy_range_new(index, record->range_id, NULL, NULL);
 		if (range == NULL)
 			return -1;
+		if (record->range_begin != NULL) {
+			range->begin = vy_key_from_msgpack(key_format,
+							   record->range_begin);
+			if (range->begin == NULL) {
+				vy_range_delete(range);
+				return -1;
+			}
+		}
+		if (record->range_end != NULL) {
+			range->end = vy_key_from_msgpack(key_format,
+							 record->range_end);
+			if (range->end == NULL) {
+				vy_range_delete(range);
+				return -1;
+			}
+		}
 		if (range->begin != NULL && range->end != NULL &&
-		    key_compare(range->begin, range->end, &index_def->key_def) >= 0) {
+		    vy_key_compare(range->begin, range->end,
+				   &index_def->key_def) >= 0) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("begin >= end for range id %lld",
 					    (long long)range->id));
@@ -3100,8 +3113,8 @@ vy_index_open_ex(struct vy_index *index)
 		int cmp = 0;
 		if (prev != NULL &&
 		    (prev->end == NULL || range->begin == NULL ||
-		     (cmp = key_compare(prev->end, range->begin,
-					key_def)) != 0)) {
+		     (cmp = vy_key_compare(prev->end, range->begin,
+					   key_def)) != 0)) {
 			const char *errmsg = cmp > 0 ?
 				"Nearby ranges %lld and %lld overlap" :
 				"Keys between ranges %lld and %lld not spanned";
@@ -3818,7 +3831,8 @@ vy_task_split_complete(struct vy_task *task)
 	vy_log_delete_range(range->id);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		vy_log_insert_range(index->index_def->opts.lsn, r->id,
-				    r->begin, r->end);
+				    tuple_data_or_null(r->begin),
+				    tuple_data_or_null(r->end));
 		vy_log_insert_run(r->id, r->new_run->id,
 				  r->new_run->info.min_lsn,
 				  r->new_run->info.max_lsn,
@@ -3912,11 +3926,12 @@ vy_task_split_abort(struct vy_task *task, bool in_shutdown)
 
 static int
 vy_task_split_new(struct mempool *pool, struct vy_range *range,
-		  const char *split_key, struct vy_task **p_task)
+		  const char *split_key_raw, struct vy_task **p_task)
 {
 	struct vy_index *index = range->index;
 	struct tx_manager *xm = index->env->xm;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+	struct tuple_format *key_format = index->env->key_format;
 
 	assert(rlist_empty(&range->split_list));
 
@@ -3926,9 +3941,14 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		.abort = vy_task_split_abort,
 	};
 
-	const char *keys[3];
+	struct tuple *keys[3];
 	struct vy_range *parts[2] = {NULL, };
 	const int n_parts = 2;
+
+	struct tuple *split_key = vy_key_from_msgpack(key_format,
+						      split_key_raw);
+	if (split_key == NULL)
+		goto err_split_key;
 
 	struct vy_task *task = vy_task_new(pool, index, &split_ops);
 	if (task == NULL)
@@ -3949,6 +3969,9 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 		if (vy_range_prepare_new_run(r) != 0)
 			goto err_parts;
 	}
+
+	tuple_unref(split_key);
+	split_key = NULL;
 
 	/*
 	 * Dump all in-memory trees of the old range
@@ -4005,7 +4028,7 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started splitting range %s by key %s",
-		 index->name, vy_range_str(range), vy_key_str(split_key));
+		 index->name, vy_range_str(range), vy_key_str(split_key_raw));
 	*p_task = task;
 	return 0;
 err_wi:
@@ -4021,6 +4044,9 @@ err_parts:
 	}
 	vy_task_delete(pool, task);
 err_task:
+	if (split_key != NULL)
+		tuple_unref(split_key);
+err_split_key:
 	say_error("%s: can't start range splitting %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
 	return -1;
