@@ -118,6 +118,49 @@ tuple_next(struct tuple_iterator *it)
 }
 
 char *
+tuple_extract_key_sequential_raw(const char *data, const char *data_end,
+			const struct key_def *key_def, uint32_t *key_size)
+{
+	assert(key_def_is_sequential(key_def));
+	const char *field_start = data;
+	uint32_t bsize = mp_sizeof_array(key_def->part_count);
+
+	mp_decode_array(&field_start);
+	const char *field_end = field_start;
+
+	for (uint32_t i = 0;i < key_def->part_count; i++) {
+		mp_next(&field_end);
+	}
+	bsize += field_end - field_start;
+
+	assert(!data_end || (field_end - field_start <= data_end - data));
+	(void) data_end;
+
+	char *key = (char *) region_alloc(&fiber()->gc, bsize);
+	if (key == NULL) {
+		diag_set(OutOfMemory, bsize, "region",
+			"tuple_extract_key_raw_sequential");
+		return NULL;
+	}
+	char *key_buf = mp_encode_array(key, key_def->part_count);
+	memcpy(key_buf, field_start, field_end - field_start);
+
+	if (key_size != NULL) {
+		*key_size = bsize;
+	}
+	return key;
+}
+
+static inline char *
+tuple_extract_key_sequential(const struct tuple *tuple,
+			const struct key_def *key_def, uint32_t *key_size)
+{
+	assert(key_def_is_sequential(key_def));
+	const char *data = tuple_data(tuple);
+	return tuple_extract_key_sequential_raw(data, NULL, key_def, key_size);
+}
+
+char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
@@ -133,6 +176,18 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
+		/*
+		 * Skipping sequential part in order to minimize tuple_field_raw
+		 * calls
+		 */
+		for (; i < key_def->part_count - 1; i++) {
+			if (key_def->parts[i].fieldno + 1 !=
+				key_def->parts[i + 1].fieldno) {
+				/* end of sequential part */
+				break;
+			}
+			mp_next(&end);
+		}
 		mp_next(&end);
 		bsize += end - field;
 	}
@@ -148,6 +203,18 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
+		/*
+		 * Skipping sequential part in order to minimize tuple_field_raw
+		 * calls
+		 */
+		for (; i < key_def->part_count - 1; i++) {
+			if (key_def->parts[i].fieldno + 1 !=
+				key_def->parts[i + 1].fieldno) {
+				/* end of sequential part */
+				break;
+			}
+			mp_next(&end);
+		}
 		mp_next(&end);
 		bsize = end - field;
 		memcpy(key_buf, field, bsize);
@@ -170,6 +237,7 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 		return NULL;
 	}
 	char *key_buf = mp_encode_array(key, key_def->part_count);
+
 	const char *field0 = data;
 	mp_decode_array(&field0);
 	const char *field0_end = field0;
@@ -179,14 +247,28 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	uint32_t current_fieldno = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		uint32_t fieldno = key_def->parts[i].fieldno;
+		for (; i < key_def->part_count - 1; i++){
+			if (key_def->parts[i].fieldno + 1 !=
+				key_def->parts[i + 1].fieldno) {
+				break;
+			}
+		}
 		if (fieldno < current_fieldno) {
 			/* Rewind. */
 			field = field0;
 			field_end = field0_end;
 			current_fieldno = 0;
 		}
+
 		while (current_fieldno < fieldno) {
+			/* search first field of key in tuple raw data */
 			field = field_end;
+			mp_next(&field_end);
+			current_fieldno++;
+		}
+
+		while (current_fieldno < key_def->parts[i].fieldno) {
+			/* search the last field in subsequence */
 			mp_next(&field_end);
 			current_fieldno++;
 		}
@@ -197,6 +279,18 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	if (key_size != NULL)
 		*key_size = (uint32_t)(key_buf - key);
 	return key;
+}
+
+
+void
+tuple_extract_key_set(struct key_def *key_def) {
+	if (key_def_is_sequential(key_def)) {
+		key_def->tuple_extract_key = tuple_extract_key_sequential;
+		key_def->tuple_extract_key_raw = tuple_extract_key_sequential_raw;
+	} else {
+		key_def->tuple_extract_key = tuple_extract_key;
+		key_def->tuple_extract_key_raw = tuple_extract_key_raw;
+	}
 }
 
 void

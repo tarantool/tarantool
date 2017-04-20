@@ -162,6 +162,7 @@ key_def_set_cmp(struct key_def *def)
 {
 	def->tuple_compare = tuple_compare_create(def);
 	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
+	tuple_extract_key_set(def);
 }
 
 static size_t

@@ -316,7 +316,15 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 }
 
 /**
- * Extract key from tuple by given key definition and return
+ * Sets a key extraction functions for the key_def
+ *
+ * @param key_def key_definition
+ *
+ */
+void
+tuple_extract_key_set(struct key_def *key_def);
+
+/* Extract key from tuple by given key definition and return
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.
  * @param tuple - tuple from which need to extract key
@@ -329,11 +337,10 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 char *
 tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size);
-
 /**
  * Extract key from raw msgpuck by given key definition and return
  * buffer allocated on box_txn_alloc with this key.
- * This function has O(n^2) complexity, where n is the number of key parts.
+ * This function has O(n) complexity, where n is the number of key parts.
  * @param data - msgpuck data from which need to extract key
  * @param data_end - pointer at the end of data
  * @param key_def - definition of key that need to extract
