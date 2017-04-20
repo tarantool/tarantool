@@ -47,24 +47,24 @@ _, e = pcall(box.snapshot)
 ...
 e.type, e.errno
 ---
-- SystemError
-- 17
+- null
+- null
 ...
 e.errno
 ---
-- 17
+- null
 ...
 _, e = pcall(box.snapshot)
 ---
 ...
 e.type, e.errno
 ---
-- SystemError
-- 17
+- null
+- null
 ...
 e.errno
 ---
-- 17
+- null
 ...
 space:drop()
 ---

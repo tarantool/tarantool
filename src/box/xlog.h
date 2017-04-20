@@ -313,6 +313,19 @@ struct xlog {
 };
 
 /**
+ * Touch xdir snapshot file.
+ *
+ * @param xdir xdir
+ * @param vclock        the global state of replication (vector
+ *			clock) at the moment the file is created.
+ *
+ * @retval 0 if OK
+ * @retval -1 if error
+ */
+int
+xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
+
+/**
  * Create a new file and open it in write (append) mode.
  * Note: an existing file is impossible to open for append,
  * the old files are never appended to.

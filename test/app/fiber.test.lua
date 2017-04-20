@@ -158,9 +158,9 @@ result
 f = fiber.create(function () fiber.sleep(1) return true end)
 box.snapshot()
 _, e = pcall(box.snapshot)
-e.message:match('already exists')
+e
 _, e = pcall(box.snapshot)
-e.message:match('already exists')
+e
 f = fiber.create(function () fiber.sleep(1) end)
 -- Test fiber.sleep()
 fiber.sleep(0)

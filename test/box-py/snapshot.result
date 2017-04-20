@@ -19,17 +19,6 @@ box.snapshot()
 ---
 - ok
 ...
-_, e = pcall(box.snapshot)
----
-...
-e.type
----
-- SystemError
-...
-e.errno
----
-- 17
-...
 space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']

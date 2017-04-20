@@ -106,6 +106,10 @@ gc_free(void)
 int
 gc_add_checkpoint(const struct vclock *vclock)
 {
+	struct vclock *prev = vclockset_last(&gc.checkpoints);
+	if (prev != NULL && vclock_compare(vclock, prev) == 0)
+		return 0;
+
 	struct checkpoint_info *cpt;
 	cpt = (struct checkpoint_info *)malloc(sizeof(*cpt));
 	if (cpt == NULL) {
@@ -114,7 +118,6 @@ gc_add_checkpoint(const struct vclock *vclock)
 		return -1;
 	}
 
-	struct vclock *prev = vclockset_last(&gc.checkpoints);
 	/*
 	 * Do not allow to remove the last checkpoint,
 	 * because we need it for recovery.

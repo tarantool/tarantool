@@ -389,16 +389,16 @@ box.snapshot()
 _, e = pcall(box.snapshot)
 ---
 ...
-e.message:match('already exists')
+e
 ---
-- already exists
+- ok
 ...
 _, e = pcall(box.snapshot)
 ---
 ...
-e.message:match('already exists')
+e
 ---
-- already exists
+- ok
 ...
 f = fiber.create(function () fiber.sleep(1) end)
 ---

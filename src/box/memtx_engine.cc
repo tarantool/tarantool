@@ -45,6 +45,8 @@
 #include "replication.h"
 #include "schema.h"
 
+#include "gc.h"
+
 /** For all memory used by all indexes.
  * If you decide to use memtx_index_arena or
  * memtx_index_slab_cache for anything other than
@@ -649,6 +651,11 @@ struct checkpoint {
 	/** The vclock of the snapshot file. */
 	struct vclock vclock;
 	struct xdir dir;
+	/**
+	 * Do nothing, just touch the snapshot file - the
+	 * checkpoint already exists.
+	 */
+	bool touch;
 };
 
 static void
@@ -661,6 +668,7 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
 	vclock_create(&ckpt->vclock);
+	ckpt->touch = false;
 }
 
 static void
@@ -704,6 +712,16 @@ checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
+	if (ckpt->touch) {
+		if (xdir_touch_xlog(&ckpt->dir, &ckpt->vclock) == 0)
+			return 0;
+		/*
+		 * Failed to touch an existing snapshot, create
+		 * a new one.
+		 */
+		ckpt->touch = false;
+	}
+
 	struct xlog snap;
 	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
 		diag_raise();
@@ -745,7 +763,12 @@ int
 MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
-
+	struct vclock last_vclock;
+	/*
+	 * If a snapshot already exists, do not create a new one.
+	 */
+	m_checkpoint->touch = (gc_last_checkpoint(&last_vclock) >= 0) &&
+			      (vclock_compare(&last_vclock, vclock) == 0);
 	vclock_copy(&m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",
@@ -774,16 +797,18 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 
 	memtx_tuple_end_snapshot();
 
-	int64_t lsn = vclock_sum(&m_checkpoint->vclock);
-	struct xdir *dir = &m_checkpoint->dir;
-	/* rename snapshot on completion */
-	char to[PATH_MAX];
-	snprintf(to, sizeof(to), "%s",
-		 xdir_format_filename(dir, lsn, NONE));
-	char *from = xdir_format_filename(dir, lsn, INPROGRESS);
-	int rc = coeio_rename(from, to);
-	if (rc != 0)
-		panic("can't rename .snap.inprogress");
+	if (!m_checkpoint->touch) {
+		int64_t lsn = vclock_sum(&m_checkpoint->vclock);
+		struct xdir *dir = &m_checkpoint->dir;
+		/* rename snapshot on completion */
+		char to[PATH_MAX];
+		snprintf(to, sizeof(to), "%s",
+			 xdir_format_filename(dir, lsn, NONE));
+		char *from = xdir_format_filename(dir, lsn, INPROGRESS);
+		int rc = coeio_rename(from, to);
+		if (rc != 0)
+			panic("can't rename .snap.inprogress");
+	}
 
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
