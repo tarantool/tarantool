@@ -155,11 +155,6 @@ struct vy_log_record {
 	uint32_t space_id;
 	/** Index key definition. */
 	const struct key_def *key_def;
-	/**
-	 * True if the range is on the zero level of the index
-	 * ranges tree.
-	 */
-	bool is_level_zero;
 	/** Min and max LSN spanned by the run. */
 	int64_t min_lsn;
 	int64_t max_lsn;
@@ -388,8 +383,7 @@ vy_log_drop_index(int64_t index_lsn)
 /** Helper to log a vinyl range insertion. */
 static inline void
 vy_log_insert_range(int64_t index_lsn, int64_t range_id,
-		    const char *range_begin, const char *range_end,
-		    bool is_level_zero)
+		    const char *range_begin, const char *range_end)
 {
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
@@ -399,7 +393,6 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 	record.range_id = range_id;
 	record.range_begin = range_begin;
 	record.range_end = range_end;
-	record.is_level_zero = is_level_zero;
 	vy_log_write(&record);
 }
 

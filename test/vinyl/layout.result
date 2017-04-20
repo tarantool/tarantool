@@ -125,7 +125,7 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [2, {0: 2, 1: 0, 3: [], 4: [], 8: true}]
+          tuple: [2, {0: 2, 1: 0, 3: [], 4: []}]
       - HEADER:
           type: INSERT
         BODY:
