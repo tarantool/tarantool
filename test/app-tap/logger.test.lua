@@ -1,11 +1,11 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(3)
+test:plan(6)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
--- 
+--
 local filename = "1.log"
 local message = "Hello, World!"
 box.cfg{
@@ -25,7 +25,18 @@ test:is(line:sub(-message:len()), message, "message")
 -- gh-700: Crash on calling log.info() with formatting characters
 --
 log.info("gh-700: %%s %%f %%d")
-test:is(file:read():match('I>%s+(.*)'), "gh-700: %s %f %d", "formatting")
+test:is(file:read():match('I>%s+(.*)'), "gh-700: %%s %%f %%d", "formatting")
+
+log.info("gh-2340: %s %D")
+test:is(file:read():match('I>%s+(.*)'), "gh-2340: %s %D", "formatting without arguments")
+
+
+function help() log.info("gh-2340: %s %s", 'help') end
+
+xpcall(help, function(err)
+    test:ok(err:match("bad argument #3"), "found error string")
+    test:ok(err:match("logger.test.lua:34:"), "found error place")
+end)
 
 file:close()
 log.rotate()

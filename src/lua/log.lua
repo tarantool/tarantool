@@ -35,15 +35,20 @@ local function say(level, fmt, ...)
         return
     end
     local debug = require('debug')
-    local str = string.format(tostring(fmt), ...)
+    if select('#', ...) ~= 0 then
+        local stat
+        stat, fmt = pcall(string.format, fmt, ...)
+        if not stat then
+            error(fmt, 3)
+        end
+    end
     local frame = debug.getinfo(3, "Sl")
-    local line = 0
-    local file = 'eval'
+    local line, file = 0, 'eval'
     if type(frame) == 'table' then
         line = frame.currentline or 0
         file = frame.short_src or frame.src or 'eval'
     end
-    ffi.C._say(level, file, line, nil, "%s", str)
+    ffi.C._say(level, file, line, nil, "%s", fmt)
 end
 
 local function say_closure(lvl)
