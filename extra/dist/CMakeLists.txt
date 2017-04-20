@@ -111,7 +111,7 @@ endif()
 # man page for tarantoolctl
 pod2man (
     tarantoolctl.pod "tarantoolctl" 1
-    "tarantoolctl instances control"
+    "Tarantool instances control"
 )
 
 #

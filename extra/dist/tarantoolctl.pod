@@ -1,17 +1,17 @@
 =head1 NAME
 
-C<tarantoolctl> - a utility to control Tarantool instances
+tarantoolctl - a utility to control Tarantool instances
 
 =head1 SYNOPSIS
 
-tarantoolctl COMMAND [NAME] [FILE] [URI] [OPTIONS...]
+tarantoolctl COMMAND [INSTANCE] [FILE] [URI] [OPTIONS...]
 
 =head1 DESCRIPTION
 
-C<tarantoolctl> may be used to introspect and control the state
+tarantoolctl may be used to introspect and control the state
 of Tarantool instances.
 
-The C<NAME> typically represents the name of an instance file.
+The C<INSTANCE> represents the name of an instance file.
 
 =head1 COMMANDS
 
@@ -19,17 +19,17 @@ The following commands are understood:
 
 =over
 
-=item start NAME
+=item start INSTANCE
 
 Start the Tarantool instance specified on the command line if the
 instance is not running. This does nothing if an instance is running.
 
-=item stop NAME
+=item stop INSTANCE
 
 Stop the Tarantool instance specified on the command line if the instance
 is running. This does nothing if an instance is not running.
 
-=item status NAME
+=item status INSTANCE
 
 Show status of the Tarantool instance specified on the command line
 (started/stopped). If pid file exists and an alive control socket exists,
@@ -37,35 +37,37 @@ the return code is C<0>. Otherwise, the return code is not C<0>.
 Reports typical problems to stderr (e.g. pid file exists and control
 socket does not).
 
-=item restart NAME
+=item restart INSTANCE
 
 Stop and start the Tarantool instance specified on the command line if
 the instance is running. This does nothing if an instance is not running.
 
-=item logrotate NAME
+=item logrotate INSTANCE
 
 Rotate logs of the Tarantool instance specified on the command line if
 the instance is running. This works only if logging-into-file is enabled in
 the instance file (C<box.cfg{log=...}> parameter). Pipe/syslog make no effect.
 
-=item check NAME
+=item check INSTANCE
 
 Check if there are syntax errors in the instance script of the Tarantool
-instance specified on the command line. 
+instance specified on the command line.
 
-=item enter NAME
+=item enter INSTANCE
 
 Enter the interactive console of the Tarantool instance specified on
-the command line. 
+the command line.
 
-=item eval NAME FILE
-=item COMMAND | tarantoolctl eval NAME
+=item eval INSTANCE FILE
+
+=item COMMAND | tarantoolctl eval INSTANCE
 
 Evaluate a local file on the Tarantool instance specified on the command
 line if the instance is running. This does nothing if an instance is not
 running.
 
 =item connect URI
+
 =item COMMAND | tarantoolctl connect URI
 
 Connect on an admin-console port to the Tarantool instance with the URI
@@ -113,12 +115,12 @@ Filter the output by replica ID. May be passed more than once.
 
 =head1 CONFIGURATION
 
-The file with system-wide defaults for C<tarantoolctl> is installed in
-C</etc/default/tarantool>. This file is used when C<tarantoolctl> is invoked
-by root. When invoked by a local user, C<tarantoolctl> first looks for its
+The file with system-wide defaults for tarantoolctl is installed in
+C</etc/default/tarantool>. This file is used when tarantoolctl is invoked
+by root. When invoked by a local user, tarantoolctl first looks for its
 defaults file in the current directory (C<$PWD/.tarantoolctl>), and then in
 the current user's home directory (C<$HOME/.config/tarantool/tarantool>).
-If not found, C<tarantoolctl> falls back to built-in defaults:
+If not found, tarantoolctl falls back to built-in defaults:
 
     default_cfg = {
     pid_file  = "/var/run/tarantool",
@@ -136,27 +138,27 @@ Most of these parameters are similar to those in C<box.cfg{}>:
 
 =item pid_file
 
-Directory for the pid file and control-socket file; C<tarantoolctl> will add
+Directory for the pid file and control-socket file; tarantoolctl will add
 "/instance_name" to the directory name.
 
 =item wal_dir
 
-Directory for write-ahead *.xlog files; C<tarantoolctl> will add
+Directory for write-ahead *.xlog files; tarantoolctl will add
 "/instance_name" to the directory name.
 
 =item memtx_dir
 
-Directory for snapshot *.snap files; C<tarantoolctl> will add
+Directory for snapshot *.snap files; tarantoolctl will add
 "/instance_name" to the directory name.
 
 =item vinyl_dir
 
-Directory for vinyl files; C<tarantoolctl> will add "/instance_name" to the
+Directory for vinyl files; tarantoolctl will add "/instance_name" to the
 directory name.
 
 =item log
 
-The place where the application log will go; C<tarantoolctl> will add
+The place where the application log will go; tarantoolctl will add
 "/instance_name.log" to the name.
 
 =item username
@@ -181,7 +183,7 @@ On success, C<0> is returned, a non-zero failure code otherwise.
 
 =head1 SEE ALSO
 
-Tarantool manual at L<http://tarantool.org/doc/>.
+Tarantool manual at http://tarantool.org/doc/
 
 =head1 COPYRIGHT
 
