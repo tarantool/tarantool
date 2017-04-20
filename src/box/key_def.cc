@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <msgpuck/msgpuck.h>
+
 #include "trivia/util.h"
 #include "scoped_guard.h"
 
@@ -114,7 +116,6 @@ const struct index_opts index_opts_default = {
 	/* .dimension           = */ 2,
 	/* .distancebuf         = */ { '\0' },
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
-	/* .path                = */ { 0 },
 	/* .range_size          = */ 0,
 	/* .page_size           = */ 0,
 	/* .run_count_per_level = */ 2,
@@ -126,7 +127,6 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
 	OPT_DEF("distance", OPT_STR, struct index_opts, distancebuf),
-	OPT_DEF("path", OPT_STR, struct index_opts, path),
 	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
 	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
@@ -344,25 +344,138 @@ index_def_check(struct index_def *index_def)
 }
 
 void
-index_def_set_part(struct index_def *def, uint32_t part_no,
-		   uint32_t fieldno, enum field_type type)
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type)
 {
-	assert(part_no < def->key_def.part_count);
+	assert(part_no < def->part_count);
 	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
-	def->key_def.parts[part_no].fieldno = fieldno;
-	def->key_def.parts[part_no].type = type;
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
 	/**
 	 * When all parts are set, initialize the tuple
 	 * comparator function.
 	 */
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
-	for (uint32_t i = 0; i < def->key_def.part_count; i++) {
-		if (def->key_def.parts[i].type == FIELD_TYPE_ANY)
+	for (uint32_t i = 0; i < def->part_count; i++) {
+		if (def->parts[i].type == FIELD_TYPE_ANY)
 			all_parts_set = false;
 	}
 	if (all_parts_set)
-		key_def_set_cmp(&def->key_def);
+		key_def_set_cmp(def);
+}
+
+int
+key_def_snprint(char *buf, int size, const struct key_def *key_def)
+{
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "[");
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		assert(part->type < field_type_MAX);
+		SNPRINT(total, snprintf, buf, size, "%d, '%s'",
+			(int)part->fieldno, field_type_strs[part->type]);
+		if (i < key_def->part_count - 1)
+			SNPRINT(total, snprintf, buf, size, ", ");
+	}
+	SNPRINT(total, snprintf, buf, size, "]");
+	return total;
+}
+
+size_t
+key_def_sizeof_parts(const struct key_def *key_def)
+{
+	size_t size = 0;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		size += mp_sizeof_array(2);
+		size += mp_sizeof_uint(part->fieldno);
+		assert(part->type < field_type_MAX);
+		size += mp_sizeof_str(strlen(field_type_strs[part->type]));
+	}
+	return size;
+}
+
+char *
+key_def_encode_parts(char *data, const struct key_def *key_def)
+{
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		data = mp_encode_array(data, 2);
+		data = mp_encode_uint(data, part->fieldno);
+		assert(part->type < field_type_MAX);
+		const char *type_str = field_type_strs[part->type];
+		data = mp_encode_str(data, type_str, strlen(type_str));
+	}
+	return data;
+}
+
+int
+key_def_decode_parts(struct key_def *key_def, const char **data)
+{
+	char buf[BOX_NAME_MAX];
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (mp_typeof(**data) != MP_ARRAY) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "expected an array");
+			return -1;
+		}
+		uint32_t item_count = mp_decode_array(data);
+		if (item_count < 1) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "expected a non-empty array");
+			return -1;
+		}
+		if (item_count < 2) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "a field type is missing");
+			return -1;
+		}
+		if (mp_typeof(**data) != MP_UINT) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "field id must be an integer");
+			return -1;
+		}
+		uint32_t field_no = (uint32_t) mp_decode_uint(data);
+		if (mp_typeof(**data) != MP_STR) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "field type must be a string");
+			return -1;
+		}
+		uint32_t len;
+		const char *str = mp_decode_str(data, &len);
+		for (uint32_t j = 2; j < item_count; j++)
+			mp_next(data);
+		snprintf(buf, sizeof(buf), "%.*s", len, str);
+		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "unknown field type");
+			return -1;
+		}
+		key_def_set_part(key_def, i, field_no, field_type);
+	}
+	return 0;
+}
+
+int
+key_def_decode_parts_165(struct key_def *key_def, const char **data)
+{
+	char buf[BOX_NAME_MAX];
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		uint32_t field_no = (uint32_t) mp_decode_uint(data);
+		uint32_t len;
+		const char *str = mp_decode_str(data, &len);
+		snprintf(buf, sizeof(buf), "%.*s", len, str);
+		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+				 "unknown field type");
+			return -1;
+		}
+		key_def_set_part(key_def, i, field_no, field_type);
+	}
+	return 0;
 }
 
 const struct key_part *
@@ -403,7 +516,8 @@ index_def_merge(const struct index_def *first, const struct index_def *second)
 	part = first->key_def.parts;
 	end = part + first->key_def.part_count;
 	for (; part != end; part++)
-	     index_def_set_part(new_def, pos++, part->fieldno, part->type);
+	     key_def_set_part(&new_def->key_def, pos++,
+			      part->fieldno, part->type);
 
 	/* Set-append second key def's part to the new key def. */
 	part = second->key_def.parts;
@@ -411,7 +525,8 @@ index_def_merge(const struct index_def *first, const struct index_def *second)
 	for (; part != end; part++) {
 		if (key_def_find(&first->key_def, part->fieldno))
 			continue;
-		index_def_set_part(new_def, pos++, part->fieldno, part->type);
+		key_def_set_part(&new_def->key_def, pos++,
+				 part->fieldno, part->type);
 	}
 	return new_def;
 }

@@ -129,18 +129,19 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
  * and other keys in that chain.
  */
 struct vy_mem {
-	/** Link in range->frozen list. */
-	struct rlist in_frozen;
-	/** Link in scheduler->dirty_mems list. */
-	struct rlist in_dirty;
+	/** Link in range->sealed list. */
+	struct rlist in_sealed;
+	/** Link in scheduler->dump_fifo list. */
+	struct rlist in_dump_fifo;
 	/** BPS tree */
 	struct vy_mem_tree tree;
 	/** The total size of all tuples in this tree in bytes */
 	size_t used;
-	/** The minimum value of stmt->lsn in this tree */
+	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
+	int64_t max_lsn;
 	/* A key definition for this index. */
-	struct index_def *index_def;
+	const struct key_def *key_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Schema version at the time of creation. */
@@ -215,7 +216,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  *
  * @param allocator lsregion allocator to use for BPS tree extents
  * @param allocator_lsn a pointer to the latest LSN for lsregion.
- * @param index_def key definition.
+ * @param key_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
@@ -225,7 +226,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  */
 struct vy_mem *
 vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
-	   struct index_def *index_def, struct tuple_format *format,
+	   const struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version);
 
@@ -285,7 +286,7 @@ struct vy_mem_iterator {
 	/** Key to search. */
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
-	const int64_t *vlsn;
+	const struct vy_read_view **read_view;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -316,7 +317,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn);
+		     const struct tuple *key, const struct vy_read_view **rv);
 
 #if defined(__cplusplus)
 } /* extern "C" */

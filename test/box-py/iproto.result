@@ -172,7 +172,7 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 # an error code and do not close connection
 
 sync=0, {49: 'Invalid MsgPack - packet header'}
-sync=1234, {49: "Missing mandatory field 'space_id' in request"}
+sync=1234, {49: "Missing mandatory field 'space id' in request"}
 sync=5678, {49: "Read access is denied for user 'guest' to space '_user'"}
 space = box.schema.space.create('test_index_base', { id = 568 })
 ---

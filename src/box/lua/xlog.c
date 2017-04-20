@@ -75,20 +75,34 @@ lbox_checkcursor(struct lua_State *L, int narg, const char *src)
 
 /* {{{ Xlog Parser */
 
+/**
+ * Replaces whitespace with underscore for xlog key names, e.g.
+ * "page index offset" => "page_index_offset".
+ */
+static void
+lbox_xlog_pushkey(lua_State *L, const char *key)
+{
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	for (const char *pos = key; *pos; pos++)
+		luaL_addchar(&b, (*pos != ' ') ? *pos : '_');
+	luaL_pushresult(&b);
+}
+
 static void
 lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const char *end)
 {
 	if (mp_typeof(**beg) != MP_UINT)
 		luaL_error(L, "Broken type of body key");
 	uint32_t v = mp_decode_uint(beg);
-	if (iproto_key_name(v)) {
-		lua_pushstring(L, iproto_key_name(v));
+	if (iproto_type_is_dml(type) && iproto_key_name(v)) {
+		lbox_xlog_pushkey(L, iproto_key_name(v));
 	} else if (type == VY_INDEX_RUN_INFO && vy_run_info_key_name(v)) {
-		lua_pushstring(L, vy_run_info_key_name(v));
+		lbox_xlog_pushkey(L, vy_run_info_key_name(v));
 	} else if (type == VY_INDEX_PAGE_INFO && vy_page_info_key_name(v)) {
-		lua_pushstring(L, vy_page_info_key_name(v));
+		lbox_xlog_pushkey(L, vy_page_info_key_name(v));
 	} else if (type == VY_RUN_PAGE_INDEX && vy_page_index_key_name(v)) {
-		lua_pushstring(L, vy_page_index_key_name(v));
+		lbox_xlog_pushkey(L, vy_page_index_key_name(v));
 	} else {
 		lua_pushinteger(L, v); /* unknown key */
 	}
@@ -174,27 +188,33 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	assert(rc == 0);
 
 	lua_pushinteger(L, row.lsn);
-	lua_newtable(L);
+	lua_createtable(L, 0, 8);
 	lua_pushstring(L, "HEADER");
 
-	lua_newtable(L);
-	lua_pushstring(L, "type");
-	if (row.type < IPROTO_TYPE_STAT_MAX &&
-	    iproto_type_strs[row.type] != NULL) {
-		lua_pushstring(L, iproto_type_strs[row.type]);
+	lua_createtable(L, 0, 8);
+	lua_pushstring(L, iproto_key_name(IPROTO_REQUEST_TYPE));
+	const char *typename = iproto_type_name(row.type);
+	if (typename != NULL) {
+		lua_pushstring(L, typename);
 	} else {
 		lua_pushnumber(L, row.type); /* unknown key */
 	}
 	lua_settable(L, -3); /* type */
-	lua_pushstring(L, "lsn");
-	lua_pushinteger(L, row.lsn);
-	lua_settable(L, -3); /* lsn */
-	lua_pushstring(L, "replica_id");
-	lua_pushinteger(L, row.replica_id);
-	lua_settable(L, -3); /* replica_id */
-	lua_pushstring(L, "timestamp");
-	lua_pushnumber(L, row.tm);
-	lua_settable(L, -3); /* timestamp */
+	if (row.lsn != 0) {
+		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_LSN));
+		lua_pushinteger(L, row.lsn);
+		lua_settable(L, -3); /* lsn */
+	}
+	if (row.replica_id != 0) {
+		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_REPLICA_ID));
+		lua_pushinteger(L, row.replica_id);
+		lua_settable(L, -3); /* replica_id */
+	}
+	if (row.tm != 0) {
+		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_TIMESTAMP));
+		lua_pushnumber(L, row.tm);
+		lua_settable(L, -3); /* timestamp */
+	}
 
 	lua_settable(L, -3); /* HEADER */
 
@@ -252,7 +272,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	    strncmp(cur->meta.filetype, "RUN", 3) != 0 &&
 	    strncmp(cur->meta.filetype, "INDEX", 5) != 0 &&
 	    strncmp(cur->meta.filetype, "DATA", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "XCTL", 4) != 0) {
+	    strncmp(cur->meta.filetype, "VYLOG", 4) != 0) {
 		char buf[1024];
 		snprintf(buf, sizeof(buf), "'%.*s' file type",
 			 (int) strlen(cur->meta.filetype),

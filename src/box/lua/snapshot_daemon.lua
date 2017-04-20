@@ -17,8 +17,6 @@ local daemon = {
     control = nil;
 }
 
-local function sprintf(fmt, ...) return string.format(fmt, ...) end
-
 -- create snapshot, return true if no errors
 local function snapshot()
     log.info("making snapshot...")
@@ -35,7 +33,7 @@ local function snapshot()
 end
 
 -- create snapshot
-local function make_snapshot(last_snap)
+local function make_snapshot()
 
     if daemon.checkpoint_interval == nil then
         return false
@@ -45,27 +43,15 @@ local function make_snapshot(last_snap)
         return false
     end
 
-
-    if last_snap == nil then
-        return snapshot()
-    end
-
-    local vclock = box.info.vclock
-    local lsn = 0
-    for i, vlsn in pairs(vclock) do
-        lsn = lsn + vlsn
-    end
-
-    local snap_name = sprintf('%020d.snap', tonumber(lsn))
-    if fio.basename(last_snap) == snap_name then
-        if daemon.last_snap_name ~= snap_name then
-            daemon.last_snap_name = snap_name
-            log.debug('snapshot file %s already exists', last_snap)
-        end
+    local checkpoints = box.internal.gc.info().checkpoints
+    local last_checkpoint = checkpoints[#checkpoints]
+    if last_checkpoint.signature == box.info.cluster.signature then
+        log.debug('snapshot %d already exists', last_checkpoint.signature)
         return false
     end
-    daemon.last_snap_name = snap_name
 
+    local last_snap = fio.pathjoin(box.cfg.memtx_dir,
+            string.format('%020d.snap', last_checkpoint.signature))
     local snstat = fio.stat(last_snap)
     if snstat == nil then
         log.error("can't stat %s: %s", last_snap, errno.strerror())
@@ -78,15 +64,7 @@ end
 
 -- check filesystem and current time
 local function process(self)
-    local snaps = fio.glob(fio.pathjoin(box.cfg.memtx_dir, '*.snap'))
-
-    if snaps == nil then
-        log.error("can't read memtx_dir %s: %s", box.cfg.memtx_dir,
-                  errno.strerror())
-        return
-    end
-
-    if not make_snapshot(snaps[#snaps]) then
+    if not make_snapshot() then
         return
     end
 
@@ -99,15 +77,12 @@ local function process(self)
         return
     end
 
-
-    -- reload snap list after snapshot
-    snaps = fio.glob(fio.pathjoin(box.cfg.memtx_dir, '*.snap'))
-
     -- delete all but most recent @checkpoint_count snapshots
-    local oldest_snap = snaps[#snaps - self.checkpoint_count + 1]
-    if oldest_snap ~= nil then
-        local lsn = fio.basename(oldest_snap, '.snap')
-        box.internal.gc(tonumber(lsn))
+    local checkpoints = box.internal.gc.info().checkpoints
+    local oldest_checkpoint = checkpoints[#checkpoints + 1 -
+                                          self.checkpoint_count]
+    if oldest_checkpoint ~= nil then
+        box.internal.gc.run(oldest_checkpoint.signature)
     end
 end
 

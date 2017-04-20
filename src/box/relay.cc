@@ -29,21 +29,100 @@
  * SUCH DAMAGE.
  */
 #include "relay.h"
-#include <say.h>
+
+#include "trivia/config.h"
+#include "trivia/util.h"
+#include "cbus.h"
+#include "cfg.h"
+#include "errinj.h"
+#include "fiber.h"
+#include "say.h"
 #include "scoped_guard.h"
 
-#include "recovery.h"
-#include "iproto_constants.h"
+#include "coeio.h"
+#include "coio.h"
 #include "engine.h"
+#include "iproto_constants.h"
+#include "recovery.h"
 #include "replication.h"
+#include "trigger.h"
 #include "vclock.h"
 #include "xrow.h"
-#include "coio.h"
-#include "coeio.h"
-#include "cfg.h"
-#include "trigger.h"
-#include "errinj.h"
 #include "xrow_io.h"
+#include "xstream.h"
+
+/** Report relay status to tx thread at least once per this interval */
+static const int RELAY_REPORT_INTERVAL = 1;
+
+/**
+ * Cbus message to send status updates from relay to tx thread.
+ */
+struct relay_status_msg {
+	/** Parent */
+	struct cmsg msg;
+	/** Relay instance */
+	struct relay *relay;
+	/** New vclock */
+	struct vclock vclock;
+};
+
+/**
+ * Cbus message to notify tx thread that relay is stopping.
+ */
+struct relay_exit_msg {
+	/** Parent */
+	struct cmsg msg;
+	/** Relay instance */
+	struct relay *relay;
+};
+
+/** State of a replication relay. */
+struct relay {
+	/** The thread in which we relay data to the replica. */
+	struct cord cord;
+	/** Replica connection */
+	struct ev_io io;
+	/** Request sync */
+	uint64_t sync;
+	/** Recovery instance to read xlog from the disk */
+	struct recovery *r;
+	/** Xstream argument to recovery */
+	struct xstream stream;
+	/** Vclock to stop playing xlogs */
+	struct vclock stop_vclock;
+	/** Directory rescan delay for recovery */
+	ev_tstamp wal_dir_rescan_delay;
+	/** Remote replica id */
+	uint32_t replica_id;
+
+	/** Relay endpoint */
+	struct cbus_endpoint endpoint;
+	/** A pipe from 'relay' thread to 'tx' */
+	struct cpipe tx_pipe;
+	/** A pipe from 'tx' thread to 'relay' */
+	struct cpipe relay_pipe;
+	/** Status message */
+	struct relay_status_msg status_msg;
+	/** A condition to signal when status message is handled. */
+	struct ipc_cond status_cond;
+	/** Relay exit orchestration message */
+	struct relay_exit_msg exit_msg;
+
+	struct {
+		/* Align to prevent false-sharing with tx thread */
+		alignas(CACHELINE_SIZE)
+		/** Current vclock sent by relay */
+		struct vclock vclock;
+		/** The condition is signaled at relay exit. */
+		struct ipc_cond exit_cond;
+	} tx;
+};
+
+const struct vclock *
+relay_vclock(const struct relay *relay)
+{
+	return &relay->tx.vclock;
+}
 
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
@@ -140,6 +219,66 @@ feed_event_f(struct trigger *trigger, void * /* event */)
 }
 
 /**
+ * The message which updated tx thread with a new vclock has returned back
+ * to the relay.
+ */
+static void
+relay_status_update(struct cmsg *msg)
+{
+	msg->route = NULL;
+	struct relay_status_msg *status_msg = (struct relay_status_msg *)msg;
+	ipc_cond_signal(&status_msg->relay->status_cond);
+}
+
+/**
+ * Deliver a fresh relay vclock to tx thread.
+ */
+static void
+tx_status_update(struct cmsg *msg)
+{
+	struct relay_status_msg *status = (struct relay_status_msg *)msg;
+	vclock_copy(&status->relay->tx.vclock, &status->vclock);
+	static const struct cmsg_hop route[] = {
+		{relay_status_update, NULL}
+	};
+	cmsg_init(msg, route);
+	cpipe_push(&status->relay->relay_pipe, msg);
+}
+
+static void
+tx_exit_cb(struct cmsg *msg)
+{
+	struct relay_exit_msg *m = (struct relay_exit_msg *)msg;
+	ipc_cond_signal(&m->relay->tx.exit_cond);
+}
+
+static void
+relay_cbus_detach(struct relay *relay)
+{
+	say_crit("exiting the relay loop");
+	/* Check that we have no in-flight status message */
+	while (relay->status_msg.msg.route != NULL) {
+		ipc_cond_wait(&relay->status_cond);
+	}
+
+	static const struct cmsg_hop exit_route[] = {
+		{tx_exit_cb, NULL}
+	};
+	cmsg_init(&relay->exit_msg.msg, exit_route);
+	relay->exit_msg.relay = relay;
+	cpipe_push(&relay->tx_pipe, &relay->exit_msg.msg);
+	/*
+	 * The relay must not destroy its endpoint until the
+	 * corresponding callee's fiber/cord has destroyed its
+	 * counterpart, otherwise the callee will wait
+	 * indefinitely.
+	 */
+	cpipe_destroy(&relay->tx_pipe);
+	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
+	ipc_cond_destroy(&relay->status_cond);
+}
+
+/**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
  * its socket, and we get an EOF.
@@ -151,6 +290,19 @@ relay_subscribe_f(va_list ap)
 	struct recovery *r = relay->r;
 	coeio_enable();
 	relay->stream.write = relay_send_row;
+	ipc_cond_create(&relay->status_cond);
+	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
+			     fiber_schedule_cb, fiber());
+	/*
+	 * Use tx_prio router because our handler never yields and
+	 * just updates struct relay members.
+	 */
+	cpipe_create(&relay->tx_pipe, "tx_prio");
+
+	/* Create a guard to detach the relay from cbus on exit */
+	auto cbus_guard = make_scoped_guard([&]{
+		relay_cbus_detach(relay);
+	});
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
@@ -183,8 +335,14 @@ relay_subscribe_f(va_list ap)
 	trigger_add(&r->watcher->on_stop, &on_follow_error);
 	while (! fiber_is_dead(r->watcher)) {
 		ev_io_start(loop(), &read_ev);
-		fiber_yield();
+		fiber_yield_timeout(RELAY_REPORT_INTERVAL);
 		ev_io_stop(loop(), &read_ev);
+		/*
+		 * The fiber can be woken by IO read event, by the timeout of
+		 * status messaging or by an acknowledge to status message.
+		 * Handle cbus messages first.
+		 */
+		cbus_process(&relay->endpoint);
 
 		uint8_t data;
 		int rc = recv(read_ev.fd, &data, sizeof(data), 0);
@@ -196,6 +354,22 @@ relay_subscribe_f(va_list ap)
 		if (rc < 0 && errno != EINTR && errno != EAGAIN &&
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
+
+		/*
+		 * Check that the vclock has been updated and the previous
+		 * status message is delivered
+		 */
+		if (relay->status_msg.msg.route != NULL ||
+		    vclock_compare(&relay->status_msg.vclock,
+				   &r->vclock) == 0)
+			continue;
+		static const struct cmsg_hop route[] = {
+			{tx_status_update, NULL}
+		};
+		cmsg_init(&relay->status_msg.msg, route);
+		vclock_copy(&relay->status_msg.vclock, &r->vclock);
+		relay->status_msg.relay = relay;
+		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 	/*
 	 * Avoid double wakeup: both from the on_stop and fiber
@@ -203,7 +377,6 @@ relay_subscribe_f(va_list ap)
 	 */
 	trigger_clear(&on_follow_error);
 	recovery_stop_local(r);
-	say_crit("exiting the relay loop");
 	return 0;
 }
 
@@ -224,6 +397,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       replica_clock);
+	vclock_copy(&relay.tx.vclock, replica_clock);
 	relay.replica_id = replica->id;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
@@ -235,9 +409,25 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	});
 
 	struct cord cord;
-	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
-	if (cord_cojoin(&cord) != 0)
+	char name[FIBER_NAME_MAX];
+	snprintf(name, sizeof(name), "relay: %u", replica->id);
+	ipc_cond_create(&relay.tx.exit_cond);
+	cord_costart(&cord, name, relay_subscribe_f, &relay);
+	cpipe_create(&relay.relay_pipe, name);
+	/*
+	 * When relay exits, it sends a message which signals the
+	 * exit condition in tx thread.
+	 */
+	ipc_cond_wait(&relay.tx.exit_cond);
+	ipc_cond_destroy(&relay.tx.exit_cond);
+	/*
+	 * Destroy the cpipe so that relay fiber can destroy
+	 * the corresponding endpoint and exit.
+	 */
+	cpipe_destroy(&relay.relay_pipe);
+	if (cord_cojoin(&cord) != 0) {
 		diag_raise();
+	}
 }
 
 static void

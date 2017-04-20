@@ -659,3 +659,24 @@ space:select({2}, {iterator = 'LE'})
 box.commit()
 
 space:drop()
+
+--make runs with more than one record with every key
+s = box.schema.space.create('test', { engine = 'vinyl' })
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+
+for i=1,10 do s:upsert({i, 1}, {{'+', 2, 1}}) end
+itr = create_iterator(s, {}, {})
+iterator_next(itr)
+for i=1,10 do s:upsert({i, 1}, {{'+', 2, 1}}) end
+iterator_next(itr)
+box.snapshot() -- create last-level run
+iterator_next(itr)
+for i=1,10 do s:upsert({i, 1}, {{'+', 2, 1}}) end
+iterator_next(itr)
+box.snapshot() -- create not-last-level run
+iterator_next(itr)
+for i=1,10 do s:upsert({i, 1}, {{'+', 2, 1}}) end
+iterator_next(itr)
+s:select{1}
+
+s:drop()

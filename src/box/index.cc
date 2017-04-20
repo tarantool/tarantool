@@ -37,6 +37,7 @@
 #include "iproto_constants.h"
 #include "txn.h"
 #include "rmean.h"
+#include "info.h"
 
 const char *iterator_type_strs[] = {
 	/* [ITER_EQ]  = */ "EQ",
@@ -164,7 +165,8 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 	try {
 		struct space *space = space_by_id(space_id);
 		Index *index = index_find_xc(space, index_id);
-		return tuple_extract_key(tuple, index->index_def, key_size);
+		return tuple_extract_key(tuple, &index->index_def->key_def,
+					 key_size);
 	} catch (ClientError *e) {
 		return NULL;
 	}
@@ -497,6 +499,7 @@ int
 box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 {
 	assert(result != NULL);
+	assert(itr->next != NULL);
 	try {
 		if (itr->sc_version != sc_version) {
 			struct space *space;
@@ -531,6 +534,31 @@ box_iterator_free(box_iterator_t *it)
 {
 	if (it->free)
 		it->free(it);
+}
+
+/* }}} */
+
+/* {{{ Introspection */
+
+void
+Index::info(struct info_handler *info) const
+{
+	info_begin(info);
+	info_end(info);
+}
+
+int
+box_index_info(uint32_t space_id, uint32_t index_id,
+	       struct info_handler *info)
+{
+	try {
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
+		index->info(info);
+		return 0;
+	}  catch (Exception *) {
+		return -1;
+	}
 }
 
 /* }}} */

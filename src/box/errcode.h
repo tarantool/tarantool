@@ -112,8 +112,8 @@ struct errcode_record {
 	/* 57 */_(ER_NO_SUCH_ENGINE,		"Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			"Incorrect value for option '%s': %s") \
-	/* 60 */_(ER_VINYL,			"%s") \
-	/* 61 */_(ER_UNUSED ,			"") \
+	/* 60 */_(ER_UNUSED60,			"") \
+	/* 61 */_(ER_UNUSED61,			"") \
 	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
 	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
@@ -132,7 +132,7 @@ struct errcode_record {
 	/* 77 */_(ER_NO_CONNECTION,		"Connection is not established") \
 	/* 78 */_(ER_TIMEOUT,			"Timeout exceeded") \
 	/* 79 */_(ER_ACTIVE_TRANSACTION,	"Operation is not permitted when there is an active transaction ") \
-	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	"Operation is not permitted when there is no active transaction ") \
+	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	"The transaction the cursor belongs to has ended") \
 	/* 81 */_(ER_CROSS_ENGINE_TRANSACTION,	"A multi-statement transaction can not use multiple storage engines") \
 	/* 82 */_(ER_NO_SUCH_ROLE,		"Role '%s' is not found") \
 	/* 83 */_(ER_ROLE_EXISTS,		"Role '%s' already exists") \
@@ -159,20 +159,20 @@ struct errcode_record {
 	/*104 */_(ER_PROTOCOL,			"%s") \
 	/*105 */_(ER_UPSERT_UNIQUE_SECONDARY_KEY, "Space %s has a unique secondary index and does not support UPSERT") \
 	/*106 */_(ER_WRONG_INDEX_RECORD,	"Wrong record in _index space: got {%s}, expected {%s}") \
-	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts (field %u): %s; expected field1 id (number), field1 type (string), ...") \
+	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts: %s; expected field1 id (number), field1 type (string), ...") \
 	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %u") \
 	/*110 */_(ER_MEMTX_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'memtx_max_tuple_size' configuration option.") \
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \
-	/*114 */_(ER_UNUSED1,			"") \
+	/*114 */_(ER_UNUSED114,			"") \
 	/*115 */_(ER_SYSTEM,			"%s") \
 	/*116 */_(ER_LOADING,			"Instance bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
 	/*118 */_(ER_KEY_PART_IS_TOO_LONG,	"Key part is too long: %u of %u bytes") \
 	/*119 */_(ER_COMPRESSION,		"Compression error: %s") \
-	/*120 */_(ER_SNAPSHOT_IN_PROGRESS,	"Snapshot is already in progress") \
+	/*120 */_(ER_CHECKPOINT_IN_PROGRESS,	"Snapshot is already in progress") \
 	/*121 */_(ER_SUB_STMT_MAX,		"Can not execute a nested statement: nesting limit reached") \
 	/*122 */_(ER_COMMIT_IN_SUB_STMT,	"Can not commit transaction in a nested statement") \
 	/*123 */_(ER_ROLLBACK_IN_SUB_STMT,	"Rollback called in a nested statement") \
@@ -182,6 +182,11 @@ struct errcode_record {
 	/*127 */_(ER_INDEX_FIELD_COUNT_LIMIT,	"Indexed field count limit reached: %d indexed fields") \
 	/*128 */_(ER_LOCAL_INSTANCE_ID_IS_READ_ONLY, "The local instance id %u is read-only") \
 	/*129 */_(ER_BACKUP_IN_PROGRESS,	"Backup is already in progress") \
+	/*130 */_(ER_READ_VIEW_ABORTED,         "The read view is aborted") \
+	/*131 */_(ER_INVALID_INDEX_FILE,	"Invalid INDEX file %s: %s") \
+	/*132 */_(ER_INVALID_RUN_FILE,		"Invalid RUN file: %s") \
+	/*133 */_(ER_INVALID_VYLOG_FILE,	"Invalid VYLOG file: %s") \
+	/*134 */_(ER_CHECKPOINT_ROLLBACK,	"Can't start a checkpoint while in cascading rollback")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

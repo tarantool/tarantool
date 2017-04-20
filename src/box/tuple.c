@@ -118,11 +118,11 @@ tuple_next(struct tuple_iterator *it)
 }
 
 char *
-tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size)
 {
 	const char *data = tuple_data(tuple);
-	uint32_t part_count = index_def->key_def.part_count;
+	uint32_t part_count = key_def->part_count;
 	uint32_t bsize = mp_sizeof_array(part_count);
 	const struct tuple_format *format = tuple_format(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
@@ -131,7 +131,7 @@ tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
 			tuple_field_raw(format, data, field_map,
-					index_def->key_def.parts[i].fieldno);
+					key_def->parts[i].fieldno);
 		const char *end = field;
 		mp_next(&end);
 		bsize += end - field;
@@ -146,7 +146,7 @@ tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
 			tuple_field_raw(format, data, field_map,
-					index_def->key_def.parts[i].fieldno);
+					key_def->parts[i].fieldno);
 		const char *end = field;
 		mp_next(&end);
 		bsize = end - field;
@@ -160,7 +160,7 @@ tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
 
 char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      const struct index_def *index_def, uint32_t *key_size)
+		      const struct key_def *key_def, uint32_t *key_size)
 {
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -169,7 +169,7 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 			 "tuple_extract_key_raw");
 		return NULL;
 	}
-	char *key_buf = mp_encode_array(key, index_def->key_def.part_count);
+	char *key_buf = mp_encode_array(key, key_def->part_count);
 	const char *field0 = data;
 	mp_decode_array(&field0);
 	const char *field0_end = field0;
@@ -177,8 +177,8 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	const char *field = field0;
 	const char *field_end = field0_end;
 	uint32_t current_fieldno = 0;
-	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
-		uint32_t fieldno = index_def->key_def.parts[i].fieldno;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		uint32_t fieldno = key_def->parts[i].fieldno;
 		if (fieldno < current_fieldno) {
 			/* Rewind. */
 			field = field0;
@@ -367,17 +367,17 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 }
 
 uint32_t
-tuple_hash_slow_path(const struct tuple *tuple, const struct index_def *index_def)
+tuple_hash_slow_path(const struct tuple *tuple, const struct key_def *key_def)
 {
-	assert(index_def->key_def.part_count != 1 ||
-		       index_def->key_def.parts[1].type != FIELD_TYPE_UNSIGNED);
+	assert(key_def->part_count != 1 ||
+	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
 
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 
-	for (const struct key_part *part = index_def->key_def.parts;
-	     part < index_def->key_def.parts + index_def->key_def.part_count; part++) {
+	for (const struct key_part *part = key_def->parts;
+	     part < key_def->parts + key_def->part_count; part++) {
 		const char *field = tuple_field(tuple, part->fieldno);
 		total_size += tuple_hash_field(&h, &carry, &field, part->type);
 	}
@@ -386,17 +386,17 @@ tuple_hash_slow_path(const struct tuple *tuple, const struct index_def *index_de
 }
 
 uint32_t
-key_hash_slow_path(const char *key, const struct index_def *index_def)
+key_hash_slow_path(const char *key, const struct key_def *key_def)
 {
-	assert(index_def->key_def.part_count != 1 ||
-	       index_def->key_def.parts[1].type != FIELD_TYPE_UNSIGNED);
+	assert(key_def->part_count != 1 ||
+	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
 
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 
-	for (const struct key_part *part = index_def->key_def.parts;
-	     part < index_def->key_def.parts + index_def->key_def.part_count; part++) {
+	for (const struct key_part *part = key_def->parts;
+	     part < key_def->parts + key_def->part_count; part++) {
 		total_size += tuple_hash_field(&h, &carry, &key, part->type);
 	}
 

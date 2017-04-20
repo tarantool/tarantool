@@ -195,7 +195,7 @@ sc:close()
 sa:close()
 s:close()
 
-os.remove('/tmp/tarantool-test-socket')
+_ = os.remove('/tmp/tarantool-test-socket')
 
 test_run:cmd("setopt delimiter ';'")
 function aexitst(ai, hostnames, port)
@@ -297,6 +297,7 @@ socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 
 -- AF_UNIX
 path = '/tmp/tarantool-test-socket'
+_ = os.remove(path)
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 s:bind('unix/', path)
 socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
@@ -307,7 +308,7 @@ e
 sc:close()
 s:close()
 socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
-os.remove(path)
+_ = os.remove(path)
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 
 -- invalid fd / tampering
@@ -421,7 +422,7 @@ c:close()
 
 s:close()
 
-os.remove(path)
+_ = os.remove(path)
 
 server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 type(addr)
@@ -432,8 +433,7 @@ client ~= nil
 client:read(123)
 server:close()
 -- unix socket automatically removed
-collectgarbage('collect')
-fio.stat(path) == nil
+while fio.stat(path) ~= nil do fiber.sleep(0.001) end
 
 test_run:cmd("setopt delimiter ';'")
 server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
@@ -503,16 +503,15 @@ buf = client:read({ size = remaining, delimiter = "\n"})
 buf == ""
 client:close()
 server:close()
+_ = os.remove(path)
 
 -- Test that socket is closed on GC
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 s:bind('unix/', path)
 s:listen()
 s = nil
-collectgarbage('collect')
-collectgarbage('collect')
-socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
-os.remove(path)
+while socket.tcp_connect('unix/', path) do collectgarbage('collect') end
+_ = os.remove(path)
 
 -- Test serializers with sockets
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)

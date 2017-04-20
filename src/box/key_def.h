@@ -192,7 +192,6 @@ struct index_opts {
 	/**
 	 * Vinyl index options.
 	 */
-	char path[PATH_MAX];
 	int64_t range_size;
 	int64_t page_size;
 	/**
@@ -420,6 +419,12 @@ typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
 
 static inline size_t
+key_def_sizeof(uint32_t part_count)
+{
+	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+}
+
+static inline size_t
 index_def_sizeof(uint32_t part_count)
 {
 	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
@@ -457,8 +462,50 @@ index_def_copy(struct index_def *to, const struct index_def *from)
  * @pre part_no < part_count
  */
 void
-index_def_set_part(struct index_def *def, uint32_t part_no,
-		   uint32_t fieldno, enum field_type type);
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type);
+
+/**
+ * An snprint-style function to print a key definition.
+ */
+int
+key_def_snprint(char *buf, int size, const struct key_def *key_def);
+
+/**
+ * Return size of key parts array when encoded in MsgPack.
+ * See also key_def_encode_parts().
+ */
+size_t
+key_def_sizeof_parts(const struct key_def *key_def);
+
+/**
+ * Encode key parts array in MsgPack and return a pointer following
+ * the end of encoded data.
+ */
+char *
+key_def_encode_parts(char *data, const struct key_def *key_def);
+
+/**
+ * 1.6.6+
+ * Decode parts array from tuple field and write'em to index_def structure.
+ * Throws a nice error about invalid types, but does not check ranges of
+ *  resulting values field_no and field_type
+ * Parts expected to be a sequence of <part_count> arrays like this:
+ *  [NUM, STR, ..][NUM, STR, ..]..,
+ */
+int
+key_def_decode_parts(struct key_def *key_def, const char **data);
+
+/**
+ * 1.6.5-
+ * TODO: Remove it in newer version, find all 1.6.5-
+ * Decode parts array from tuple fieldw and write'em to index_def structure.
+ * Does not check anything since tuple must be validated before
+ * Parts expected to be a sequence of <part_count> 2 * arrays values this:
+ *  NUM, STR, NUM, STR, ..,
+ */
+int
+key_def_decode_parts_165(struct key_def *key_def, const char **data);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.

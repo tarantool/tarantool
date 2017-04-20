@@ -34,7 +34,7 @@ index = space:create_index('primary')
 ...
 index:alter({parts={1,'unsigned'}})
 ---
-- error: alter is not supported for a Vinyl index
+- error: Vinyl index does not support alter
 ...
 space:drop()
 ---
@@ -113,7 +113,7 @@ box.snapshot()
 ---
 - ok
 ...
-while box.info.vinyl().db[space.id..'/0'].count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
@@ -161,7 +161,7 @@ box.snapshot()
 ---
 - ok
 ...
-while box.info.vinyl().db[space.id..'/0'].run_count ~= 2 do fiber.sleep(0.01) end
+while space.index.primary:info().run_count ~= 2 do fiber.sleep(0.01) end
 ---
 ...
 -- must fail because vy_runs have data
@@ -174,12 +174,20 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space:delete({1})
 ---
 ...
+-- Make sure the run is big enough to trigger compaction.
+space:insert({2, 3})
+---
+- [2, 3]
+...
+space:delete({2})
+---
+...
 box.snapshot()
 ---
 - ok
 ...
 -- Wait until the dump is finished.
-while box.info.vinyl().db[space.id..'/0'].count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
@@ -208,7 +216,7 @@ box.snapshot()
 ---
 - ok
 ...
-while box.info.vinyl().db[space.id..'/0'].run_count ~= 1 do fiber.sleep(0.01) end
+while space.index.primary:info().run_count ~= 1 do fiber.sleep(0.01) end
 ---
 ...
 box.space.test.index.primary:bsize() == 0

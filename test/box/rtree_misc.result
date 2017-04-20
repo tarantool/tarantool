@@ -592,12 +592,13 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'time'}}}
 ---
-- error: 'Can''t create or modify index ''s'' in space ''s'': unknown field type'
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}}
 ---
-- error: 'Wrong index parts (field 5): field id must be an integer; expected field1
-    id (number), field1 type (string), ...'
+- error: 'Wrong index parts: field id must be an integer; expected field1 id (number),
+    field1 type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 ---
@@ -609,12 +610,13 @@ box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 ---
-- error: 'Wrong index parts (field 5): expected a non-empty array; expected field1
-    id (number), field1 type (string), ...'
+- error: 'Wrong index parts: expected a non-empty array; expected field1 id (number),
+    field1 type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
 ---
-- error: 'Can''t create or modify index ''s'' in space ''s'': unknown field type'
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
 ---

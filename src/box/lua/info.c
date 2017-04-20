@@ -41,8 +41,10 @@
 #include <lualib.h>
 
 #include "box/applier.h"
+#include "box/relay.h"
 #include "box/wal.h"
 #include "box/replication.h"
+#include "box/info.h"
 #include "main.h"
 #include "box/box.h"
 #include "lua/utils.h"
@@ -51,7 +53,7 @@
 #include "box/vinyl.h"
 
 static void
-lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
+lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
 {
 	lua_createtable(L, 0, vclock_size(vclock));
 	struct vclock_iterator it;
@@ -65,16 +67,9 @@ lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
 }
 
 static void
-lbox_pushreplica(lua_State *L, struct replica *replica)
+lbox_pushapplier(lua_State *L, struct applier *applier)
 {
-	struct applier *applier = replica->applier;
-
-	lua_createtable(L, 0, 4);
-
-	lua_pushstring(L, "uuid");
-	lua_pushstring(L, tt_uuid_str(&replica->uuid));
-	lua_settable(L, -3);
-
+	lua_newtable(L);
 	/* Get applier state in lower case */
 	static char status[16];
 	char *d = status;
@@ -104,6 +99,49 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	}
 }
 
+static void
+lbox_pushrelay(lua_State *L, struct relay *relay)
+{
+	lua_newtable(L);
+	lua_pushstring(L, "vclock");
+	lbox_pushvclock(L, relay_vclock(relay));
+	lua_settable(L, -3);
+}
+
+static void
+lbox_pushreplica(lua_State *L, struct replica *replica)
+{
+	struct applier *applier = replica->applier;
+	struct relay *relay = replica->relay;
+
+	/* 16 is used to get the best visual experience in YAML output */
+	lua_createtable(L, 0, 16);
+
+	lua_pushstring(L, "id");
+	lua_pushinteger(L, replica->id);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "uuid");
+	lua_pushstring(L, tt_uuid_str(&replica->uuid));
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "lsn");
+	luaL_pushuint64(L, vclock_get(&replicaset_vclock, replica->id));
+	lua_settable(L, -3);
+
+	if (applier != NULL && applier->state != APPLIER_OFF) {
+		lua_pushstring(L, "upstream");
+		lbox_pushapplier(L, applier);
+		lua_settable(L, -3);
+	}
+
+	if (relay != NULL) {
+		lua_pushstring(L, "downstream");
+		lbox_pushrelay(L, relay);
+		lua_settable(L, -3);
+	}
+}
+
 static int
 lbox_info_replication(struct lua_State *L)
 {
@@ -117,7 +155,7 @@ lbox_info_replication(struct lua_State *L)
 
 	replicaset_foreach(replica) {
 		/* Applier hasn't received replica id yet */
-		if (replica->id == REPLICA_ID_NIL || replica->applier == NULL)
+		if (replica->id == REPLICA_ID_NIL)
 			continue;
 
 		lbox_pushreplica(L, replica);
@@ -202,34 +240,77 @@ lbox_info_cluster(struct lua_State *L)
 }
 
 static void
-lbox_vinyl_info_handler(struct vy_info_node *node, void *ctx)
+luaT_info_begin(struct info_handler *info)
 {
-	struct lua_State *L = ctx;
+	lua_State *L = (lua_State *) info->ctx;
+	lua_newtable(L);
+}
 
-	if (node->type != VY_INFO_TABLE_END)
-		lua_pushstring(L, node->key);
+static void
+luaT_info_end(struct info_handler *info)
+{
+	(void) info;
+}
 
-	switch (node->type) {
-	case VY_INFO_TABLE_BEGIN:
-		lua_newtable(L);
-		break;
-	case VY_INFO_TABLE_END:
-		break;
-	case VY_INFO_U32:
-		lua_pushnumber(L, node->value.u32);
-		break;
-	case VY_INFO_U64:
-		luaL_pushuint64(L, node->value.u64);
-		break;
-	case VY_INFO_STRING:
-		lua_pushstring(L, node->value.str);
-		break;
-	default:
-		unreachable();
-	}
+static void
+luaT_info_begin_table(struct info_handler *info, const char *key)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_newtable(L);
+}
 
-	if (node->type != VY_INFO_TABLE_BEGIN)
-		lua_settable(L, -3);
+static void
+luaT_info_end_table(struct info_handler *info)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_u32(struct info_handler *info, const char *key,
+		     uint32_t value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_pushnumber(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_u64(struct info_handler *info, const char *key,
+		     uint64_t value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	luaL_pushuint64(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_append_str(struct info_handler *info, const char *key,
+		     const char *value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_pushstring(L, value);
+	lua_settable(L, -3);
+}
+
+void
+luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
+{
+	static struct info_handler_vtab lua_vtab = {
+		.begin = luaT_info_begin,
+		.end = luaT_info_end,
+		.begin_table = luaT_info_begin_table,
+		.end_table = luaT_info_end_table,
+		.append_u32 = luaT_info_append_u32,
+		.append_u64 = luaT_info_append_u64,
+		.append_str = luaT_info_append_str,
+	};
+	h->vtab = &lua_vtab;
+	h->ctx = L;
 }
 
 /* Declared in vinyl_engine.cc */
@@ -239,11 +320,9 @@ vinyl_engine_get_env();
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
-	struct vy_info_handler h = {
-		.fn = lbox_vinyl_info_handler,
-		.ctx = L,
-	};
-	vy_info_gather(vinyl_engine_get_env(), &h);
+	struct info_handler h;
+	luaT_info_handler_create(&h, L);
+	vy_info(vinyl_engine_get_env(), &h);
 	return 1;
 }
 

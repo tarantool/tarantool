@@ -93,31 +93,25 @@ vy_end_checkpoint(struct vy_env *env);
  * Introspection
  */
 
-enum vy_info_type {
-	VY_INFO_TABLE_BEGIN,
-	VY_INFO_TABLE_END,
-	VY_INFO_STRING,
-	VY_INFO_U32,
-	VY_INFO_U64,
-};
+struct info_handler;
 
-struct vy_info_node {
-	enum vy_info_type type;
-	const char *key;
-	union {
-		const char *str;
-		uint32_t u32;
-		uint64_t u64;
-	} value;
-};
-
-struct vy_info_handler {
-	void (*fn)(struct vy_info_node *node, void *ctx);
-	void *ctx;
-};
-
+/*
+ * Engine introspection (box.info.vinyl())
+ *
+ * @param env environment
+ * @param handler info handler
+ */
 void
-vy_info_gather(struct vy_env *env, struct vy_info_handler *h);
+vy_info(struct vy_env *env, struct info_handler *handler);
+
+/**
+ * Index introspection (index:info())
+ *
+ * @param index index
+ * @param handler info handler
+ */
+void
+vy_index_info(struct vy_index *index, struct info_handler *handler);
 
 /*
  * Transaction

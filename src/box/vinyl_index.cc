@@ -131,14 +131,17 @@ VinylIndex::count(enum iterator_type type, const char *key,
 	return count;
 }
 
+static struct tuple *
+vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr)
+{
+	return NULL;
+}
+
 static inline struct tuple *
 iterator_next(struct iterator *base_it)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *) base_it;
 	struct tuple *tuple;
-	uint32_t it_sc_version = ::sc_version;
-	if (it_sc_version != ::sc_version)
-		goto close;
 
 	/* found */
 	if (vy_cursor_next(it->cursor, &tuple) != 0)
@@ -148,15 +151,15 @@ iterator_next(struct iterator *base_it)
 		tuple_unref(tuple);
 		return tuple;
 	}
-close:
+
 	/* immediately close the cursor */
 	vy_cursor_delete(it->cursor);
 	it->cursor = NULL;
-	it->base.next = NULL;
+	it->base.next = vinyl_iterator_last;
 	return NULL;
 }
 
-void
+static void
 vinyl_iterator_free(struct iterator *ptr)
 {
 	assert(ptr->free == vinyl_iterator_free);
@@ -166,12 +169,6 @@ vinyl_iterator_free(struct iterator *ptr)
 		it->cursor = NULL;
 	}
 	free(ptr);
-}
-
-struct tuple *
-vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr)
-{
-	return NULL;
 }
 
 struct iterator*
@@ -206,4 +203,10 @@ VinylIndex::initIterator(struct iterator *ptr,
 	it->cursor = vy_cursor_new(tx, db, key, part_count, type);
 	if (it->cursor == NULL)
 		diag_raise();
+}
+
+void
+VinylIndex::info(struct info_handler *handler) const
+{
+	vy_index_info(db, handler);
 }

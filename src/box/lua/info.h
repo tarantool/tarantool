@@ -37,8 +37,13 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
+struct info_handler;
+
 void
 box_lua_info_init(struct lua_State *L);
+
+void
+luaT_info_handler_create(struct info_handler *h, struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */

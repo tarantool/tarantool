@@ -137,11 +137,14 @@ request_create(struct request *request, uint32_t code);
  * @param request request to fill up
  * @param data a buffer
  * @param len a buffer size
+ * @param key_map a bit map of keys that are required by the caller,
+ *        @sa request_key_map().
  * @retval 0 on success
  * @retval -1 on error, see diag
  */
 int
-request_decode(struct request *request, const char *data, uint32_t len);
+request_decode(struct request *request, const char *data, uint32_t len,
+	       uint64_t key_map);
 
 /**
  * Encode the request fields to iovec using region_alloc().
@@ -246,9 +249,10 @@ xrow_header_encode_xc(const struct xrow_header *header,
 }
 
 static inline void
-request_decode_xc(struct request *request, const char *data, uint32_t len)
+request_decode_xc(struct request *request, const char *data, uint32_t len,
+		  uint64_t key_map)
 {
-	if (request_decode(request, data, len) < 0)
+	if (request_decode(request, data, len, key_map) < 0)
 		diag_raise();
 }
 

@@ -351,85 +351,6 @@ index_opts_create(struct index_opts *opts, const char *map)
 }
 
 /**
- * Support function for index_def_new_from_tuple(..)
- * 1.6.6+
- * Decode parts array from tuple field and write'em to index_def structure.
- * Throws a nice error about invalid types, but does not check ranges of
- *  resulting values field_no and field_type
- * Parts expected to be a sequence of <part_count> arrays like this:
- *  [NUM, STR, ..][NUM, STR, ..]..,
- */
-static void
-index_def_fill_parts(struct index_def *index_def, const char *parts,
-		     uint32_t part_count)
-{
-	char buf[BOX_NAME_MAX];
-	for (uint32_t i = 0; i < part_count; i++) {
-		if (mp_typeof(*parts) != MP_ARRAY)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
-				  INDEX_PARTS, "expected an array");
-		uint32_t item_count = mp_decode_array(&parts);
-		if (item_count < 1)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
-				  INDEX_PARTS, "expected a non-empty array");
-		if (item_count < 2)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
-				  INDEX_PARTS, "a field type is missing");
-		if (mp_typeof(*parts) != MP_UINT)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
-				  INDEX_PARTS, "field id must be an integer");
-		uint32_t field_no = (uint32_t) mp_decode_uint(&parts);
-		if (mp_typeof(*parts) != MP_STR)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
-				  INDEX_PARTS, "field type must be a string");
-		uint32_t len;
-		const char *str = mp_decode_str(&parts, &len);
-		for (uint32_t j = 2; j < item_count; j++)
-			mp_next(&parts);
-		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = field_type_by_name(buf);
-		if (field_type == field_type_MAX) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name_by_id(index_def->space_id),
-				  "unknown field type");
-		}
-		index_def_set_part(index_def, i, field_no, field_type);
-	}
-}
-
-/**
- * Support function for index_def_new_from_tuple(..)
- * 1.6.5-
- * TODO: Remove it in newer version, find all 1.6.5-
- * Decode parts array from tuple fieldw and write'em to index_def structure.
- * Does not check anything since tuple must be validated before
- * Parts expected to be a sequence of <part_count> 2 * arrays values this:
- *  NUM, STR, NUM, STR, ..,
- */
-static void
-index_def_fill_parts_165(struct index_def *index_def, const char *parts,
-			 uint32_t part_count)
-{
-	char buf[BOX_NAME_MAX];
-	for (uint32_t i = 0; i < part_count; i++) {
-		uint32_t field_no = (uint32_t) mp_decode_uint(&parts);
-		uint32_t len;
-		const char *str = mp_decode_str(&parts, &len);
-		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = field_type_by_name(buf);
-		if (field_type == field_type_MAX) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name_by_id(index_def->space_id),
-				  "unknown field type");
-		}
-		index_def_set_part(index_def, i, field_no, field_type);
-	}
-}
-
-
-/**
  * Create a index_def object from a record in _index
  * system space.
  *
@@ -478,10 +399,12 @@ index_def_new_from_tuple(struct tuple *tuple)
 
 	if (is_166plus) {
 		/* 1.6.6+ */
-		index_def_fill_parts(index_def, parts, part_count);
+		if (key_def_decode_parts(&index_def->key_def, &parts) != 0)
+			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		index_def_fill_parts_165(index_def, parts, part_count);
+		if (key_def_decode_parts_165(&index_def->key_def, &parts) != 0)
+			diag_raise();
 	}
 	index_def_check(index_def);
 	scoped_guard.is_active = false;

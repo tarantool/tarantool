@@ -633,9 +633,8 @@ s:close()
 ---
 - true
 ...
-os.remove('/tmp/tarantool-test-socket')
+_ = os.remove('/tmp/tarantool-test-socket')
 ---
-- true
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -927,6 +926,9 @@ socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 path = '/tmp/tarantool-test-socket'
 ---
 ...
+_ = os.remove(path)
+---
+...
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
@@ -967,9 +969,8 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 - null
 - true
 ...
-os.remove(path)
+_ = os.remove(path)
 ---
-- true
 ...
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 ---
@@ -1278,9 +1279,8 @@ s:close()
 ---
 - true
 ...
-os.remove(path)
+_ = os.remove(path)
 ---
-- true
 ...
 server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 ---
@@ -1312,13 +1312,8 @@ server:close()
 - true
 ...
 -- unix socket automatically removed
-collectgarbage('collect')
+while fio.stat(path) ~= nil do fiber.sleep(0.001) end
 ---
-- 0
-...
-fio.stat(path) == nil
----
-- true
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -1523,6 +1518,9 @@ server:close()
 ---
 - true
 ...
+_ = os.remove(path)
+---
+...
 -- Test that socket is closed on GC
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 ---
@@ -1538,22 +1536,11 @@ s:listen()
 s = nil
 ---
 ...
-collectgarbage('collect')
+while socket.tcp_connect('unix/', path) do collectgarbage('collect') end
 ---
-- 0
 ...
-collectgarbage('collect')
+_ = os.remove(path)
 ---
-- 0
-...
-socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
----
-- null
-- true
-...
-os.remove(path)
----
-- true
 ...
 -- Test serializers with sockets
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)

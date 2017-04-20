@@ -1,6 +1,6 @@
 TAP version 13
 # module_api
-1..17
+1..18
 ok - module is loaded
 ok - test_touint64 is ok
 ok - test_checkint64 is ok
@@ -17,6 +17,7 @@ ok - test_clock is ok
 ok - test_pushtuple is ok
 ok - test_toint64 is ok
 ok - test_pushcheck_cdata is ok
+ok - luaT_error
     # pushcdata
     1..6
     ok - pushcdata typeof

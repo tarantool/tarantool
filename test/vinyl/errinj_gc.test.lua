@@ -8,14 +8,13 @@ errinj = box.error.injection
 temp = box.schema.space.create('temp')
 _ = temp:create_index('pk')
 
-path = test_run:get_cfg('index_options').path
 s = box.schema.space.create('test', {engine='vinyl'})
-_ = s:create_index('pk', {path=path, run_count_per_level=1})
-if not path then path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id)) end
+_ = s:create_index('pk', {run_count_per_level=1})
+path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
-function run_count() return box.info.vinyl().db[s.id..'/'..s.index.pk.id].run_count end
+function run_count() return s.index.pk:info().run_count end
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 
 --
 -- Check that gc retries to delete files left
@@ -50,10 +49,9 @@ file_count()
 -- upon recovery completion.
 --
 
-path = test_run:get_cfg('index_options').path
 s = box.schema.space.create('test', {engine='vinyl'})
-_ = s:create_index('pk', {path=path, run_count_per_level=1})
-if not path then path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id)) end
+_ = s:create_index('pk', {run_count_per_level=1})
+path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 s:insert{100, '12345'} snapshot() -- dump
 file_count()
@@ -70,11 +68,10 @@ fio = require('fio')
 s = box.space.test
 temp = box.space.temp
 
-path = test_run:get_cfg('index_options').path
-if not path then path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id)) end
+path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc(box.info.cluster.signature) end
+function snapshot() box.snapshot() box.internal.gc.run(box.info.cluster.signature) end
 
 file_count()
 

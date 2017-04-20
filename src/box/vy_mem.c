@@ -62,7 +62,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 
 struct vy_mem *
 vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
-	   struct index_def *index_def, struct tuple_format *format,
+	   const struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version)
 {
@@ -73,8 +73,9 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 		return NULL;
 	}
 	index->min_lsn = INT64_MAX;
+	index->max_lsn = -1;
 	index->used = 0;
-	index->index_def = index_def;
+	index->key_def = key_def;
 	index->version = 0;
 	index->sc_version = schema_version;
 	index->snapshot_version = snapshot_version;
@@ -86,11 +87,11 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	tuple_format_ref(format_with_colmask, 1);
 	index->upsert_format = upsert_format;
 	tuple_format_ref(upsert_format, 1);
-	vy_mem_tree_create(&index->tree, &index_def->key_def,
+	vy_mem_tree_create(&index->tree, key_def,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
-	rlist_create(&index->in_frozen);
-	rlist_create(&index->in_dirty);
+	rlist_create(&index->in_sealed);
+	rlist_create(&index->in_dump_fifo);
 	index->pin_count = 0;
 	ipc_cond_create(&index->pin_cond);
 	return index;
@@ -139,7 +140,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 
 	const struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_stmt_compare(result, stmt, &mem->index_def->key_def) != 0)
+	if (vy_stmt_compare(result, stmt, mem->key_def) != 0)
 		return NULL;
 	return result;
 }
@@ -159,9 +160,13 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	if (rc != 0)
 		return -1;
 
+	int64_t lsn = vy_stmt_lsn(stmt);
 	if (mem->used == 0)
-		mem->min_lsn = vy_stmt_lsn(stmt);
-	assert(mem->min_lsn <= vy_stmt_lsn(stmt));
+		mem->min_lsn = lsn;
+	assert(mem->min_lsn <= lsn);
+
+	assert(lsn >= mem->max_lsn);
+	mem->max_lsn = lsn;
 
 	mem->used += size;
 	mem->version++;
@@ -232,12 +237,11 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 {
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	struct index_def *index_def = itr->mem->index_def;
-	while (vy_stmt_lsn(itr->curr_stmt) > *itr->vlsn) {
+	const struct key_def *key_def = itr->mem->key_def;
+	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->iterator_type == ITER_EQ &&
-		     vy_stmt_compare(itr->key, itr->curr_stmt,
-				     &index_def->key_def))) {
+		     vy_stmt_compare(itr->key, itr->curr_stmt, key_def))) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
@@ -250,9 +254,9 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 			const struct tuple *prev_stmt =
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
-			if (vy_stmt_lsn(prev_stmt) > *itr->vlsn ||
+			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
 			    vy_stmt_compare(itr->curr_stmt, prev_stmt,
-					    &index_def->key_def) != 0)
+					    key_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
 			itr->curr_stmt = prev_stmt;
@@ -349,7 +353,7 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const int64_t *vlsn)
+		     const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
@@ -359,7 +363,7 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	itr->vlsn = vlsn;
+	itr->read_view = rv;
 	if (tuple_field_count(key) == 0) {
 		/* NULL key. change itr->iterator_type for simplification */
 		itr->iterator_type = iterator_type == ITER_LT ||
@@ -389,7 +393,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	struct index_def *index_def = itr->mem->index_def;
+	const struct key_def *key_def = itr->mem->key_def;
 
 	const struct tuple *prev_stmt = itr->curr_stmt;
 	do {
@@ -397,11 +401,10 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 			itr->curr_stmt = NULL;
 			return 1;
 		}
-	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt,
-				 &index_def->key_def) == 0);
+	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, key_def) == 0);
 
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_stmt, &index_def->key_def) != 0) {
+	    vy_stmt_compare(itr->key, itr->curr_stmt, key_def) != 0) {
 		itr->curr_stmt = NULL;
 		return 1;
 	}
@@ -441,7 +444,7 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	struct index_def *index_def = itr->mem->index_def;
+	const struct key_def *key_def = itr->mem->key_def;
 
 	struct vy_mem_tree_iterator next_pos = itr->curr_pos;
 	vy_mem_tree_iterator_next(&itr->mem->tree, &next_pos);
@@ -450,7 +453,7 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 
 	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_stmt_compare(itr->curr_stmt, next_stmt, &index_def->key_def) == 0) {
+	if (vy_stmt_compare(itr->curr_stmt, next_stmt, key_def) == 0) {
 		itr->curr_pos = next_pos;
 		itr->curr_stmt = next_stmt;
 		return 0;
@@ -489,7 +492,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 {
 	(void)stop;
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-	struct key_def *def = &itr->mem->index_def->key_def;
+	const struct key_def *def = itr->mem->key_def;
 	int rc;
 	*ret = NULL;
 
@@ -584,7 +587,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			if (cmp < 0 || (cmp == 0 &&
 			    vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt)))
 				break;
-			if (vy_stmt_lsn(t) <= *itr->vlsn) {
+			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
 				itr->curr_pos = pos;
 				itr->curr_stmt = t;
 				rc = 1;
@@ -597,7 +600,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
 	int cmp;
 	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, def);
-	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) : *itr->vlsn + 1;
+	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) :
+		(**itr->read_view).vlsn + 1;
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 		if (vy_mem_tree_iterator_is_invalid(&pos))

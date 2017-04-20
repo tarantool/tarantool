@@ -33,7 +33,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 /*
  * Data stored in vinyl is organized in ranges and runs.
@@ -54,6 +53,7 @@ extern "C" {
 
 struct xlog;
 struct vclock;
+struct key_def;
 
 struct vy_recovery;
 
@@ -62,7 +62,7 @@ enum vy_log_record_type {
 	/**
 	 * Create a new vinyl index.
 	 * Requires vy_log_record::index_lsn, index_id, space_id,
-	 * path, path_len.
+	 * key_def.
 	 */
 	VY_LOG_CREATE_INDEX		= 0,
 	/**
@@ -97,7 +97,7 @@ enum vy_log_record_type {
 	VY_LOG_INSERT_RUN		= 5,
 	/**
 	 * Delete a vinyl run.
-	 * Requires vy_log_record::run_id.
+	 * Requires vy_log_record::run_id, min_lsn, max_lsn, is_empty.
 	 *
 	 * A record of this type indicates that the run is not in use
 	 * any more and its files can be safely removed. When the log
@@ -152,19 +152,21 @@ struct vy_log_record {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
-	/**
-	 * Path to the index. Empty string if default path is used.
-	 * Note, the string is not necessarily nul-termintaed, its
-	 * length is stored in path_len.
-	 */
-	const char *path;
-	/** Length of the path string. */
-	uint32_t path_len;
+	/** Index key definition. */
+	const struct key_def *key_def;
 	/**
 	 * True if the range is on the zero level of the index
 	 * ranges tree.
 	 */
 	bool is_level_zero;
+	/** Min and max LSN spanned by the run. */
+	int64_t min_lsn;
+	int64_t max_lsn;
+	/**
+	 * True if the run is empty and has no data file.
+	 * (Empty runs are kept for the sake of min/max LSN).
+	 */
+	bool is_empty;
 };
 
 /**
@@ -356,8 +358,8 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 
 /** Helper to log a vinyl index creation. */
 static inline void
-vy_log_create_index(int64_t index_lsn, uint32_t index_id,
-		    uint32_t space_id, const char *path)
+vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
+		    const struct key_def *key_def)
 {
 	struct vy_log_record record;
 	record.type = VY_LOG_CREATE_INDEX;
@@ -365,8 +367,7 @@ vy_log_create_index(int64_t index_lsn, uint32_t index_id,
 	record.index_lsn = index_lsn;
 	record.index_id = index_id;
 	record.space_id = space_id;
-	record.path = path;
-	record.path_len = strlen(path);
+	record.key_def = key_def;
 	vy_log_write(&record);
 }
 
@@ -423,13 +424,18 @@ vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 
 /** Helper to log a vinyl run insertion. */
 static inline void
-vy_log_insert_run(int64_t range_id, int64_t run_id)
+vy_log_insert_run(int64_t range_id, int64_t run_id,
+		  int64_t min_lsn, int64_t max_lsn,
+		  bool is_empty)
 {
 	struct vy_log_record record;
 	record.type = VY_LOG_INSERT_RUN;
 	record.signature = -1;
 	record.range_id = range_id;
 	record.run_id = run_id;
+	record.min_lsn = min_lsn;
+	record.max_lsn = max_lsn;
+	record.is_empty = is_empty;
 	vy_log_write(&record);
 }
 

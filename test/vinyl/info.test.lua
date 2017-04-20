@@ -28,16 +28,19 @@ test_run:cmd("clear filter")
 
 space:drop()
 
+info = {}
 test_run:cmd("setopt delimiter ';'")
 for i = 1, 16 do
-	c = box.schema.space.create('i'..i, { engine='vinyl' })
-	c:create_index('pk')
+    local space = box.schema.space.create('i'..i, { engine='vinyl' })
+    local pk = space:create_index('pk')
+    info[i] = box_info_sort(pk:info())
 end;
-box_info_sort(box.info.vinyl().db);
+info;
 for i = 1, 16 do
 	box.space['i'..i]:drop()
 end;
 test_run:cmd("setopt delimiter ''");
+info = nil;
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')

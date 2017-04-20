@@ -434,8 +434,8 @@ index = s:create_index('test', { type = 'hash', parts = { 1 }})
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
 ---
-- error: 'Can''t create or modify index ''test'' in space ''test'': unknown field
-    type'
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
 ...
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})

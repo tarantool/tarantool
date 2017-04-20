@@ -4274,11 +4274,11 @@ bps_tree_debug_check_block(const struct bps_tree *tree, struct bps_block *block,
 					     inner->elems[i], tree->arg) >= 0)
 				result |= 0x2000;
 		for (bps_tree_pos_t i = 0; i < block->size - 1; i++) {
-			struct bps_block *block =
+			struct bps_block *tmp_block =
 				bps_tree_restore_block(tree,
 						       inner->child_ids[i]);
 			bps_tree_elem_t calc_max_elem =
-				bps_tree_debug_find_max_elem(tree, block);
+				bps_tree_debug_find_max_elem(tree, tmp_block);
 			if (inner->elems[i] != calc_max_elem)
 				result |= 0x4000;
 		}

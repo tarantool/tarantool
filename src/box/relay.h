@@ -30,28 +30,29 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "evio.h"
-#include "fiber.h"
-#include "vclock.h"
-#include "xstream.h"
 
+#include <stdint.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct relay;
 struct replica;
 struct tt_uuid;
+struct vclock;
 
-/** State of a replication relay. */
-struct relay {
-	/** The thread in which we relay data to the replica. */
-	struct cord cord;
-	/** Replica connection */
-	struct ev_io io;
-	/* Request sync */
-	uint64_t sync;
-	struct recovery *r;
-	struct xstream stream;
-	struct vclock stop_vclock;
-	ev_tstamp wal_dir_rescan_delay;
-	uint32_t replica_id;
-};
+/**
+ * Returns relay's vclock
+ * @param relay relay
+ * @returns relay's vclock
+ */
+const struct vclock *
+relay_vclock(const struct relay *relay);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 /**
  * Send initial JOIN rows to the replica

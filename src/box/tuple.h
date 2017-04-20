@@ -320,14 +320,14 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.
  * @param tuple - tuple from which need to extract key
- * @param index_def - definition of key that need to extract
+ * @param key_def - definition of key that need to extract
  * @param key_size - here will be size of extracted key
  *
  * @retval not NULL Success
  * @retval NULL     Memory allocation error
  */
 char *
-tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 		  uint32_t *key_size);
 
 /**
@@ -336,7 +336,7 @@ tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
  * This function has O(n^2) complexity, where n is the number of key parts.
  * @param data - msgpuck data from which need to extract key
  * @param data_end - pointer at the end of data
- * @param index_def - definition of key that need to extract
+ * @param key_def - definition of key that need to extract
  * @param key_size - here will be size of extracted key
  *
  * @retval not NULL Success
@@ -344,7 +344,7 @@ tuple_extract_key(const struct tuple *tuple, const struct index_def *index_def,
  */
 char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      const struct index_def *index_def, uint32_t *key_size);
+		      const struct key_def *key_def, uint32_t *key_size);
 
 /**
  * Get the format of the tuple.
@@ -606,30 +606,30 @@ tuple_bless(struct tuple *tuple)
  * @sa tuple_hash
  */
 uint32_t
-tuple_hash_slow_path(const struct tuple *tuple, const struct index_def *index_def);
+tuple_hash_slow_path(const struct tuple *tuple, const struct key_def *key_def);
 
 /**
  * Calculate a common hash value for a tuple
  * @param tuple - a tuple
- * @param index_def - index_def for field description
+ * @param key_def - key_def for field description
  * @return - hash value
  */
 static inline uint32_t
-tuple_hash(const struct tuple *tuple, const struct index_def *index_def)
+tuple_hash(const struct tuple *tuple, const struct key_def *key_def)
 {
-	const struct key_part *part = index_def->key_def.parts;
+	const struct key_part *part = key_def->parts;
 	/*
 	 * Speed up the simplest case when we have a
 	 * single-part hash_table over an integer field.
 	 */
-	if (index_def->key_def.part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
+	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
 		const char *field = tuple_field(tuple, part->fieldno);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
 		return ((uint32_t)((val)>>33^(val)^(val)<<11));
 	}
-	return tuple_hash_slow_path(tuple, index_def);
+	return tuple_hash_slow_path(tuple, key_def);
 }
 
 /**
@@ -638,27 +638,27 @@ tuple_hash(const struct tuple *tuple, const struct index_def *index_def)
  * @sa key_hash
  */
 uint32_t
-key_hash_slow_path(const char *key, const struct index_def *index_def);
+key_hash_slow_path(const char *key, const struct key_def *key_def);
 
 /**
  * Calculate a common hash value for a full key
  * @param key - full key (msgpack fields w/o array marker)
- * @param index_def - index_def for field description
+ * @param key_def - key_def for field description
  * @return - hash value
  */
 static inline uint32_t
-key_hash(const char *key, const struct index_def *index_def)
+key_hash(const char *key, const struct key_def *key_def)
 {
-	const struct key_part *part = index_def->key_def.parts;
+	const struct key_part *part = key_def->parts;
 
 	/* see tuple_hash */
-	if (index_def->key_def.part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
+	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
 		uint64_t val = mp_decode_uint(&key);
 		if (likely(val <= UINT32_MAX))
 			return val;
 		return ((uint32_t)((val)>>33^(val)^(val)<<11));
 	}
-	return key_hash_slow_path(key, index_def);
+	return key_hash_slow_path(key, key_def);
 }
 
 /** These functions are implemented in tuple_convert.cc. */

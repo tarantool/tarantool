@@ -65,8 +65,10 @@
 #include "iproto_port.h"
 #include "xrow.h"
 #include "xrow_io.h"
+#include "xstream.h"
 #include "authentication.h"
 #include "path_lock.h"
+#include "gc.h"
 
 static char status[64] = "unknown";
 
@@ -79,6 +81,12 @@ static void title(const char *new_status)
 
 bool box_snapshot_is_in_progress = false;
 bool box_backup_is_in_progress = false;
+
+/*
+ * vclock of the checkpoint that is currently being backed up.
+ */
+static struct vclock box_backup_vclock;
+
 /**
  * The instance is in read-write mode: the local checkpoint
  * and all write ahead logs are processed. For a replica,
@@ -145,7 +153,8 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 {
 	Index *primary = index_find_xc(space, 0);
 	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple, primary->index_def, &key_len);
+	char *key = tuple_extract_key(found_tuple,
+			&primary->index_def->key_def, &key_len);
 	if (key == NULL)
 		diag_raise();
 	request->key = key;
@@ -314,13 +323,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, row->type);
-	assert(row->bodycnt == 1); /* always 1 for read */
-	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len);
-	request->header = row;
+	struct request *request = xrow_decode_request(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -1197,7 +1200,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * as a replica. Our best effort is to not crash in such
 	 * case: raise ER_MISSING_SNAPSHOT.
 	 */
-	if (recovery_last_checkpoint(&start_vclock) < 0)
+	if (gc_last_checkpoint(&start_vclock) < 0)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 
 	/* Respond to JOIN request with start_vclock. */
@@ -1355,6 +1358,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
 	}
@@ -1537,6 +1541,9 @@ box_cfg_xc(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
+	if (gc_init(cfg_gets("memtx_dir")) < 0)
+		diag_raise();
+
 	engine_init();
 
 	schema_init();
@@ -1554,7 +1561,7 @@ box_cfg_xc(void)
 
 	struct vclock checkpoint_vclock;
 	vclock_create(&checkpoint_vclock);
-	int64_t lsn = recovery_last_checkpoint(&checkpoint_vclock);
+	int64_t lsn = gc_last_checkpoint(&checkpoint_vclock);
 	/*
 	 * Lock the write ahead log directory to avoid multiple
 	 * instances running in the same dir.
@@ -1590,7 +1597,7 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx->recoverSnapshot();
+		memtx->recoverSnapshot(&checkpoint_vclock);
 
 		struct recovery *recovery;
 		recovery = recovery_new(cfg_gets("wal_dir"),
@@ -1719,7 +1726,7 @@ box_snapshot()
 		return 0;
 	int rc = 0;
 	if (box_snapshot_is_in_progress) {
-		diag_set(ClientError, ER_SNAPSHOT_IN_PROGRESS);
+		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
 		return -1;
 	}
 	box_snapshot_is_in_progress = true;
@@ -1729,7 +1736,10 @@ box_snapshot()
 		goto end;
 
 	struct vclock vclock;
-	wal_checkpoint(&vclock, true);
+	if ((rc = wal_checkpoint(&vclock, true))) {
+		tnt_error(ClientError, ER_CHECKPOINT_ROLLBACK);
+		goto end;
+	}
 	rc = engine_commit_checkpoint(&vclock);
 end:
 	if (rc)
@@ -1739,13 +1749,6 @@ end:
 	return rc;
 }
 
-void
-box_gc(int64_t lsn)
-{
-	wal_collect_garbage(lsn);
-	engine_collect_garbage(lsn);
-}
-
 int
 box_backup_start(box_backup_cb cb, void *cb_arg)
 {
@@ -1753,21 +1756,26 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	struct vclock vclock;
-	if (recovery_last_checkpoint(&vclock) < 0) {
+	if (gc_ref_last_checkpoint(&box_backup_vclock) < 0) {
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	int rc = engine_backup(&vclock, cb, cb_arg);
-	if (rc == 0)
-		box_backup_is_in_progress = true;
+	box_backup_is_in_progress = true;
+	int rc = engine_backup(&box_backup_vclock, cb, cb_arg);
+	if (rc != 0) {
+		gc_unref_checkpoint(&box_backup_vclock);
+		box_backup_is_in_progress = false;
+	}
 	return rc;
 }
 
 void
 box_backup_stop(void)
 {
-	box_backup_is_in_progress = false;
+	if (box_backup_is_in_progress) {
+		gc_unref_checkpoint(&box_backup_vclock);
+		box_backup_is_in_progress = false;
+	}
 }
 
 const char *

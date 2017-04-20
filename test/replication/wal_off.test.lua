@@ -16,9 +16,11 @@ wal_off_id = test_run:eval('wal_off', 'return box.info.server.id')[1]
 
 box.cfg { replication = wal_off_uri }
 check = "Replication does not support wal_mode = 'none'"
-while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
-box.info.replication[wal_off_id].status
-box.info.replication[wal_off_id].message
+while box.info.replication[wal_off_id].upstream.message ~= check do fiber.sleep(0) end
+box.info.replication[wal_off_id].upstream ~= nil
+box.info.replication[wal_off_id].downstream ~= nil
+box.info.replication[wal_off_id].upstream.status
+box.info.replication[wal_off_id].upstream.message
 box.cfg { replication = "" }
 
 test_run:cmd('switch wal_off')
@@ -27,7 +29,7 @@ test_run:cmd('switch default')
 
 box.cfg { replication = wal_off_uri }
 check = "Read access on universe is denied for user 'guest'"
-while box.info.replication[wal_off_id].message ~= check do fiber.sleep(0) end
+while box.info.replication[wal_off_id].upstream.message ~= check do fiber.sleep(0) end
 box.cfg { replication = "" }
 
 test_run:cmd("stop server wal_off")

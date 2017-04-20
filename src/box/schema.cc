@@ -83,13 +83,6 @@ space_by_id(uint32_t id)
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;
 }
 
-extern "C" const char *
-space_name_by_id(uint32_t id)
-{
-	struct space *space = space_by_id(id);
-	return space ? space_name(space) : "";
-}
-
 /**
  * Visit all spaces and apply 'func'.
  */
@@ -262,14 +255,15 @@ schema_init()
 						   1); /* part count */
 	if (index_def == NULL)
 		diag_raise();
-	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
+	struct key_def *key_def = &index_def->key_def;
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
 	(void) sc_space_new(&def, index_def, &on_replace_schema);
 
 	/* _space - home for all spaces. */
 	index_def->space_id = def.id = BOX_SPACE_ID;
 	snprintf(def.name, sizeof(def.name), "_space");
-	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 
 	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space);
@@ -310,11 +304,12 @@ schema_init()
 			      2); /* part count */
 	if (index_def == NULL)
 		diag_raise();
+	key_def = &index_def->key_def;
 	/* space no */
-	index_def_set_part(index_def, 0 /* part no */, 0 /* field no */,
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 	/* index no */
-	index_def_set_part(index_def, 1 /* part no */, 1 /* field no */,
+	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 	(void) sc_space_new(&def, index_def, &alter_space_on_replace_index);
 	index_def_delete(index_def);

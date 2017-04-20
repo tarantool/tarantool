@@ -207,14 +207,11 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 	rlist_del(&endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
 
-	while (endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) {
-		/*
-		 * Endpoint has connected pipes or qeued messages
-		 */
+	do {
 		if (process_cb)
 			process_cb(endpoint);
-		ipc_cond_wait(&endpoint->cond);
-	}
+	} while ((endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) &&
+		 ipc_cond_wait(&endpoint->cond));
 
 	tt_pthread_mutex_destroy(&endpoint->mutex);
 	ev_async_stop(endpoint->consumer, &endpoint->async);

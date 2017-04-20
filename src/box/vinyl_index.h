@@ -67,6 +67,9 @@ public:
 	count(enum iterator_type type, const char *key, uint32_t part_count)
 		const override;
 
+	virtual void
+	info(struct info_handler *handler) const override;
+
 public:
 	struct vy_env *env;
 	struct vy_index *db;

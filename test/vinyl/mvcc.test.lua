@@ -1522,6 +1522,7 @@ c2:commit()
 c1("t.index.pk:max()") -- {2}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
+c1:commit()
 --
 -- Convert the reader to a read view: in this test we have
 -- an explicit conflict between c1 and c2, so c1 begins
@@ -1538,6 +1539,7 @@ c2:commit()
 c1("t.index.pk:max()") -- {2}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
+c1:commit()
 t:truncate()
 
 -- *************************************************************************
@@ -1552,3 +1554,62 @@ c4 = nil
 c5 = nil
 c6 = nil
 c7 = nil
+collectgarbage()
+
+-- check of read views proper allocation/deallocation
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = box.space.test:create_index('pk')
+s:replace{1, 2, 3}
+s:replace{4, 5, 6}
+s:replace{7, 8, 9}
+
+box.info.vinyl().performance.read_view -- 0 (no read views needed)
+box.info.vinyl().performance.tx_allocated -- 0
+
+c1 = txn_proxy.new()
+c2 = txn_proxy.new()
+c3 = txn_proxy.new()
+c4 = txn_proxy.new()
+
+c1:begin()
+c2:begin()
+c3:begin()
+c4:begin()
+
+box.info.vinyl().performance.read_view -- 0 (no read views needed)
+box.info.vinyl().performance.tx_allocated -- 0
+
+c1("s:select{1}")
+c2("s:select{1}")
+c3("s:select{1}")
+c4("s:select{1}")
+
+box.info.vinyl().performance.read_view -- 0 (no read views needed)
+box.info.vinyl().performance.tx_allocated -- 4
+
+c4("s:replace{1, 0, 0}")
+
+box.info.vinyl().performance.read_view -- 0 (no read views needed)
+box.info.vinyl().performance.tx_allocated -- 4
+
+c4:commit()
+
+box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
+box.info.vinyl().performance.tx_allocated -- 3
+
+c1:commit()
+
+box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
+box.info.vinyl().performance.tx_allocated-- 2
+
+c2:rollback()
+
+box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
+box.info.vinyl().performance.tx_allocated -- 1
+
+c3:commit()
+
+box.info.vinyl().performance.read_view -- 0 (no read views needed)
+box.info.vinyl().performance.tx_allocated -- 0 (all done)
+
+s:drop()

@@ -174,9 +174,19 @@ extern const char *iproto_type_strs[];
 static inline const char *
 iproto_type_name(uint32_t type)
 {
-	if (type >= IPROTO_TYPE_STAT_MAX)
+	if (type < IPROTO_TYPE_STAT_MAX)
+		return iproto_type_strs[type];
+
+	switch (type) {
+	case VY_INDEX_RUN_INFO:
+		return "RUNINFO";
+	case VY_INDEX_PAGE_INFO:
+		return "PAGEINFO";
+	case VY_RUN_PAGE_INDEX:
+		return "PAGEINDEX";
+	default:
 		return NULL;
-	return iproto_type_strs[type];
+	}
 }
 
 /**
@@ -263,10 +273,10 @@ struct PACKED request_replace_body {
  * @sa struct vy_run_info.
  */
 enum vy_run_info_key {
-	/** Minimal LSN over all statements in a run. */
-	VY_RUN_INFO_MIN_LSN = 1,
-	/** Maximal LSN over all statements in a run. */
-	VY_RUN_INFO_MAX_LSN = 2,
+	/** Min key in the run. */
+	VY_RUN_INFO_MIN_KEY = 1,
+	/** Max key in the run. */
+	VY_RUN_INFO_MAX_KEY = 2,
 	/** Number of pages in a run. */
 	VY_RUN_INFO_PAGE_COUNT = 3,
 	/** Bloom filter for keys. */
@@ -282,7 +292,7 @@ enum vy_run_info_key {
 static inline const char *
 vy_run_info_key_name(enum vy_run_info_key key)
 {
-	if (key < VY_RUN_INFO_MIN_LSN || key >= VY_RUN_INFO_KEY_MAX)
+	if (key < VY_RUN_INFO_MIN_KEY || key >= VY_RUN_INFO_KEY_MAX)
 		return NULL;
 	extern const char *vy_run_info_key_strs[];
 	return vy_run_info_key_strs[key];
