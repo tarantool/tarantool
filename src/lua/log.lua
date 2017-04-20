@@ -1,6 +1,8 @@
 -- log.lua
 --
 local ffi = require('ffi')
+local errno = require('errno')
+
 ffi.cdef[[
     typedef void (*sayfunc_t)(int level, const char *filename, int line,
                const char *error, const char *format, ...);
@@ -24,18 +26,20 @@ ffi.cdef[[
     extern int log_level;
 ]]
 
-local S_WARN  = ffi.C.S_WARN
-local S_INFO  = ffi.C.S_INFO
-local S_DEBUG = ffi.C.S_DEBUG
-local S_ERROR = ffi.C.S_ERROR
+local S_WARN     = ffi.C.S_WARN
+local S_INFO     = ffi.C.S_INFO
+local S_DEBUG    = ffi.C.S_DEBUG
+local S_ERROR    = ffi.C.S_ERROR
+local S_SYSERROR = ffi.C.S_SYSERROR
 
-local function say(level, fmt, ...)
+local function say(level, syserror, fmt, ...)
     if ffi.C.log_level < level then
         -- don't waste cycles on debug.getinfo()
         return
     end
     local debug = require('debug')
     if select('#', ...) ~= 0 then
+        -- don't waste time on string.format if we weren't passing any args
         local stat
         stat, fmt = pcall(string.format, fmt, ...)
         if not stat then
@@ -48,12 +52,17 @@ local function say(level, fmt, ...)
         line = frame.currentline or 0
         file = frame.short_src or frame.src or 'eval'
     end
-    ffi.C._say(level, file, line, nil, "%s", fmt)
+    ffi.C._say(level, file, line, syserror, "%s", fmt)
 end
 
-local function say_closure(lvl)
+local function say_closure(lvl, is_syserror)
+    if is_syserror then
+        return function (fmt, ...)
+            say(lvl, errno.strerror(), fmt, ...)
+        end
+    end
     return function (fmt, ...)
-        say(lvl, fmt, ...)
+        say(lvl, nil, fmt, ...)
     end
 end
 
@@ -81,13 +90,17 @@ local compat_v16 = {
 }
 
 return setmetatable({
-    warn = say_closure(S_WARN);
-    info = say_closure(S_INFO);
-    debug = say_closure(S_DEBUG);
-    error = say_closure(S_ERROR);
-    rotate = log_rotate;
-    pid = log_pid;
-    level = log_level;
+    -- say for level functions
+    warn     = say_closure(S_WARN),
+    info     = say_closure(S_INFO),
+    debug    = say_closure(S_DEBUG),
+    error    = say_closure(S_ERROR),
+    syserror = say_closure(S_SYSERROR, true),
+    -- routines
+    pid = log_pid,
+    rotate = log_rotate,
+    -- level configuration
+    level = log_level,
 }, {
-    __index = compat_v16;
+    __index = compat_v16,
 })
