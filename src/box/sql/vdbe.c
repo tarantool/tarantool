@@ -19,6 +19,7 @@
 ** commenting and indentation practices when changing or adding code.
 */
 #include "sqliteInt.h"
+#include "btreeInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 
@@ -2493,7 +2494,8 @@ case OP_Column: {
       assert( sqlite3BtreeCursorIsValid(pCrsr) );
       pC->payloadSize = sqlite3BtreePayloadSize(pCrsr);
       pC->aRow = sqlite3BtreePayloadFetch(pCrsr, &avail);
-      assert( avail<=65536 );  /* Maximum page size is 64KiB */
+      /* Maximum page size is 64KiB if backend is not Tarantool*/
+      assert( avail<=65536 || (pCrsr->curFlags & BTCF_TaCursor) );
       if( pC->payloadSize <= (u32)avail ){
         pC->szRow = pC->payloadSize;
       }else if( pC->payloadSize > (u32)db->aLimit[SQLITE_LIMIT_LENGTH] ){
