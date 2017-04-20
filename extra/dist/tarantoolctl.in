@@ -908,7 +908,7 @@ end
 local commands = setmetatable({
     start = {
         func = start, process = process_local, help = {
-            header = "%s start NAME",
+            header = "%s start INSTANCE",
             linkmode = "%s start",
             description =
 [=[
@@ -919,7 +919,7 @@ local commands = setmetatable({
         }
     }, stop = {
         func = exit_wrapper(stop), process = process_local, help = {
-            header = "%s stop NAME",
+            header = "%s stop INSTANCE",
             linkmode = "%s stop",
             description =
 [=[
@@ -930,7 +930,7 @@ local commands = setmetatable({
         }
     }, logrotate = {
         func = exit_wrapper(logrotate), process = process_local, help = {
-            header = "%s logrotate NAME",
+            header = "%s logrotate INSTANCE",
             linkmode = "%s logrotate",
             description =
 [=[
@@ -943,7 +943,7 @@ local commands = setmetatable({
         }
     }, status = {
         func = exit_wrapper(status), process = process_local, help = {
-            header = "%s status NAME",
+            header = "%s status INSTANCE",
             linkmode = "%s status",
             description =
 [=[
@@ -959,7 +959,7 @@ local commands = setmetatable({
         }
     }, enter = {
         func = exit_wrapper(enter), process = process_local, help = {
-            header = "%s enter NAME",
+            header = "%s enter INSTANCE",
             linkmode = "%s enter",
             description =
 [=[
@@ -970,7 +970,7 @@ local commands = setmetatable({
         }
     }, restart = {
         func = restart, process = process_local, help = {
-            header = "%s restart NAME",
+            header = "%s restart INSTANCE",
             linkmode = "%s restart",
             description =
 [=[
@@ -982,7 +982,7 @@ local commands = setmetatable({
         }
     }, reload = {
         func = exit_wrapper(eval), process = process_local, help = {
-            header = "%s reload NAME FILE",
+            header = "%s reload INSTANCE FILE",
             linkmode = "%s reload FILE",
             description =
 [=[
@@ -994,8 +994,8 @@ local commands = setmetatable({
     }, eval = {
         func = exit_wrapper(eval), process = process_local, help = {
             header = {
-                "%s eval NAME FILE",
-                "COMMAND | %s eval NAME"
+                "%s eval INSTANCE FILE",
+                "COMMAND | %s eval INSTANCE"
             },
             linkmode = {
                 "%s eval FILE",
@@ -1011,7 +1011,7 @@ local commands = setmetatable({
         }
     }, check = {
         func = exit_wrapper(check), process = process_local, help = {
-            header = "%s check NAME",
+            header = "%s check INSTANCE",
             linkmode = "%s check",
             description =
 [=[
