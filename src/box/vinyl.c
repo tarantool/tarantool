@@ -1870,6 +1870,10 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 {
 	assert(curr_stmt != NULL);
 	assert(*curr_stmt != NULL);
+	struct vy_page_info *page = NULL;
+	const char *region_key;
+	bool end_of_run = false;
+	struct tuple *stmt = NULL;
 
 	/* row offsets accumulator */
 	struct ibuf page_index_buf;
@@ -1890,7 +1894,6 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 	}
 	assert(*page_info_capacity >= run_info->count);
 
-	const char *region_key;
 	if (run_info->count == 0) {
 		/* See comment to run_info->max_key allocation below. */
 		region_key = tuple_extract_key(*curr_stmt, key_def, NULL);
@@ -1902,11 +1905,9 @@ vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
 			goto error_page_index;
 	}
 
-	struct vy_page_info *page = run_info->page_infos + run_info->count;
+	page = run_info->page_infos + run_info->count;
 	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
-	bool end_of_run = false;
 	xlog_tx_begin(data_xlog);
-	struct tuple *stmt = NULL;
 
 	do {
 		uint32_t *offset = (uint32_t *) ibuf_alloc(&page_index_buf,
