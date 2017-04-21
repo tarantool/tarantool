@@ -1353,9 +1353,6 @@ vy_index_acct_range(struct vy_index *index, struct vy_range *range)
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_index_acct_mem(index, mem);
-	struct vy_slice *slice;
-	rlist_foreach_entry(slice, &range->slices, in_range)
-		vy_index_acct_run(index, slice->run);
 	histogram_collect(index->run_hist, range->slice_count);
 }
 
@@ -1367,9 +1364,6 @@ vy_index_unacct_range(struct vy_index *index, struct vy_range *range)
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_index_unacct_mem(index, mem);
-	struct vy_slice *slice;
-	rlist_foreach_entry(slice, &range->slices, in_range)
-		vy_index_unacct_run(index, slice->run);
 	histogram_discard(index->run_hist, range->slice_count);
 }
 
@@ -3089,6 +3083,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (slice == NULL)
 			return -1;
 		vy_range_add_slice(range, slice);
+		vy_index_acct_run(index, run);
 		break;
 	default:
 		unreachable();
@@ -3686,6 +3681,7 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_range_gc_mem(range, scheduler, task->dump_lsn);
 	vy_range_add_slice(range, new_slice);
 	vy_range_update_compact_priority(range);
+	vy_index_acct_run(index, range->new_run);
 	vy_run_unref(range->new_run);
 	range->new_run = NULL;
 	range->version++;
@@ -3844,6 +3840,7 @@ vy_task_split_complete(struct vy_task *task)
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_range *r, *tmp;
 	struct vy_mem *mem;
+	struct vy_slice *slice;
 	const int n_parts = 2;
 	struct vy_slice *new_slice[n_parts];
 	int i;
@@ -3891,6 +3888,7 @@ vy_task_split_complete(struct vy_task *task)
 	i = 0;
 	rlist_foreach_entry_safe(r, &range->split_list, split_list, tmp) {
 		vy_range_add_slice(r, new_slice[i++]);
+		vy_index_acct_run(index, r->new_run);
 		vy_run_unref(r->new_run);
 		r->new_run = NULL;
 
@@ -3907,6 +3905,10 @@ vy_task_split_complete(struct vy_task *task)
 	assert(range->mem == NULL); /* active mem was sealed */
 	rlist_foreach_entry(mem, &range->sealed, in_sealed)
 		vy_scheduler_mem_dumped(scheduler, mem);
+
+	/* Unaccount compacted runs. */
+	rlist_foreach_entry(slice, &range->slices, in_range)
+		vy_index_unacct_run(index, slice->run);
 
 	vy_range_delete(range);
 	return 0;
@@ -4165,6 +4167,7 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_range_gc_mem(range, scheduler, task->dump_lsn);
 	n = range->compact_priority;
 	rlist_foreach_entry_safe(slice, &range->slices, in_range, tmp) {
+		vy_index_unacct_run(index, slice->run);
 		vy_range_remove_slice(range, slice);
 		vy_slice_unref(slice);
 		if (--n == 0)
@@ -4172,6 +4175,7 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 	assert(n == 0);
 	vy_range_add_slice(range, new_slice);
+	vy_index_acct_run(index, range->new_run);
 	vy_run_unref(range->new_run);
 	range->new_run = NULL;
 	range->compact_priority = 0;
