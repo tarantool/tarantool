@@ -130,14 +130,36 @@ struct vy_run {
 	 * (worse, reopened) file descriptor.
 	 */
 	int refs;
-	union {
-		/** Link in range->runs list. */
-		struct rlist in_range;
-		/** Link in vy_join_ctx->runs list. */
-		struct rlist in_join;
-	};
 	/** Unique ID of this run. */
 	int64_t id;
+};
+
+/**
+ * Slice of a run, used to organize runs in ranges.
+ */
+struct vy_slice {
+	/** Run this slice is for (increments vy_run::refs). */
+	struct vy_run *run;
+	/**
+	 * Slice begin and end (increments tuple::refs).
+	 * If @begin is NULL, the slice starts from the beginning
+	 * of the run. If @end is NULL, the slice ends at the end
+	 * of the run.
+	 */
+	struct tuple *begin;
+	struct tuple *end;
+	/**
+	 * Reference counter. Once it hits 0, the slice is freed.
+	 * Used by the iterator to prevent use-after-free after
+	 * waiting for IO. See also vy_run::refs.
+	 */
+	int refs;
+	union {
+		/** Link in range->slices list. */
+		struct rlist in_range;
+		/** Link in vy_join_ctx->slices list. */
+		struct rlist in_join;
+	};
 };
 
 /** Position of a particular stmt in vy_run. */
@@ -181,8 +203,8 @@ struct vy_run_iterator {
 	struct tuple_format *upsert_format;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
-	/* run */
-	struct vy_run *run;
+	/** The run slice to iterate. */
+	struct vy_slice *slice;
 
 	/* Search options */
 	/**
@@ -287,7 +309,7 @@ int
 vy_run_recover(struct vy_run *run, const char *index_path,
 	       const char *run_path);
 
-/** Increment a run's reference counter. */
+/** Increment a slice's reference counter. */
 static inline void
 vy_run_ref(struct vy_run *run)
 {
@@ -297,14 +319,42 @@ vy_run_ref(struct vy_run *run)
 
 /*
  * Decrement a run's reference counter.
- * Return true if the run was deleted.
+ * Delete the run if it reached 0.
  */
-static inline bool
+static inline void
 vy_run_unref(struct vy_run *run)
 {
 	assert(run->refs > 0);
-	if (--run->refs == 0) {
+	if (--run->refs == 0)
 		vy_run_delete(run);
+}
+
+/** Allocate a new run slice. */
+struct vy_slice *
+vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end);
+
+/** Free a run slice. */
+void
+vy_slice_delete(struct vy_slice *slice);
+
+/** Increment a slice's reference counter. */
+static inline void
+vy_slice_ref(struct vy_slice *slice)
+{
+	assert(slice->refs > 0);
+	slice->refs++;
+}
+
+/*
+ * Decrement a slice's reference counter.
+ * Return true if the slice was deleted.
+ */
+static inline bool
+vy_slice_unref(struct vy_slice *slice)
+{
+	assert(slice->refs > 0);
+	if (--slice->refs == 0) {
+		vy_slice_delete(slice);
 		return true;
 	}
 	return false;
@@ -339,9 +389,8 @@ vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
 void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
-		     struct vy_run *run, enum iterator_type iterator_type,
-		     const struct tuple *key,
-		     const struct vy_read_view **read_view,
+		     struct vy_slice *slice, enum iterator_type iterator_type,
+		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
 		     struct tuple_format *format,
