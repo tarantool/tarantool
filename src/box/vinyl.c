@@ -475,7 +475,7 @@ struct txv {
 	struct vy_mem *mem;
 	struct tuple *stmt;
 	/** A tuple in mem's region; is set in vy_prepare */
-	const struct tuple *mem_stmt;
+	const struct tuple *region_stmt;
 	struct vy_tx *tx;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
@@ -3112,7 +3112,6 @@ vy_range_set(struct vy_range *range, struct vy_mem *mem,
 	struct lsregion *allocator = &index->env->allocator;
 	int64_t lsn = vy_stmt_lsn(stmt);
 
-	bool was_empty = (mem->used == 0);
 	/* Allocate region_stmt on demand. */
 	if (*region_stmt == NULL) {
 		*region_stmt = vy_stmt_dup_lsregion(stmt, allocator, lsn);
@@ -3123,13 +3122,11 @@ vy_range_set(struct vy_range *range, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	range->mem_used += tuple_size(stmt);
 	index->mem_used += tuple_size(stmt);
-	index->stmt_count++;
 
 	if (vy_mem_insert(mem, *region_stmt))
 		return -1;
 
-	if (was_empty)
-		vy_scheduler_add_mem(scheduler, mem);
+	vy_scheduler_add_mem(scheduler, mem);
 	return 0;
 }
 
@@ -3138,17 +3135,17 @@ vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt);
 
 /*
  * Confirm that the statement have to stay in the range's in-memory index.
- * One of the vy_range_confirm and vy_range_erase methods must be called
+ * One of the vy_range_commit_stmt and vy_range_rollback_stmt methods must be called
  * after a successful call of vy_range_set method
  * @param range Range to which the statement insert to.
  * @param stmt the Statement.
  * @param mem the mem where the stmt was saved.
  */
 static void
-vy_range_confirm(const struct tuple *stmt, struct vy_index *index,
+vy_range_commit_stmt(const struct tuple *stmt, struct vy_index *index,
 		     struct vy_mem *mem)
 {
-	vy_mem_confirm(mem, stmt);
+	vy_mem_commit_stmt(mem, stmt);
 
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	int64_t lsn = vy_stmt_lsn(stmt);
@@ -3176,8 +3173,9 @@ vy_range_confirm(const struct tuple *stmt, struct vy_index *index,
 	};
 	if (vy_stmt_type(stmt) == IPROTO_UPSERT &&
 	    vy_stmt_n_upserts(stmt) == VY_UPSERT_THRESHOLD) {
-		vy_index_squash_upserts(index, vy_stmt_dup(stmt,
-							   index->upsert_format));
+		vy_index_squash_upserts(index,
+					vy_stmt_dup(stmt,
+						    index->upsert_format));
 	}
 
 	assert(mem->min_lsn <= lsn);
@@ -3188,9 +3186,9 @@ vy_range_confirm(const struct tuple *stmt, struct vy_index *index,
  * Erase a statement from the range's in-memory index.
  */
 static void
-vy_range_erase(struct vy_mem *mem, const struct tuple *stmt)
+vy_range_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
 {
-	vy_mem_erase(mem, stmt);
+	vy_mem_rollback_stmt(mem, stmt);
 }
 
 static int
@@ -3272,6 +3270,10 @@ vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
 			 * workers while this one is in progress.
 			 */
 			vy_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
+			/*
+			 * Avoid squashing upserts here: we may
+			 * still roll back this statement.
+			 */
 		}
 	}
 	return vy_range_set(range, mem, stmt, region_stmt);
@@ -3411,10 +3413,11 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
  * @param index Meme that the statement was written to.
  */
 static void
-vy_tx_confirm(struct vy_index *index, const struct tuple *stmt,
+vy_index_commit_stmt(struct vy_index *index, const struct tuple *stmt,
 	      struct vy_mem *mem)
 {
-	vy_range_confirm(stmt, index, mem);
+	index->stmt_count++;
+	vy_range_commit_stmt(stmt, index, mem);
 	/*
 	 * Invalidate cache element.
 	 */
@@ -3428,10 +3431,10 @@ vy_tx_confirm(struct vy_index *index, const struct tuple *stmt,
  * @param stmt Statement allocated from lsregion.
  */
 static void
-vy_tx_discard(struct vy_index *index, const struct tuple *stmt,
+vy_index_rollback_stmt(struct vy_index *index, const struct tuple *stmt,
 	       struct vy_mem *mem)
 {
-	vy_range_erase(mem, stmt);
+	vy_range_rollback_stmt(mem, stmt);
 
 	/*
 	 * Invalidate cache element.
@@ -4978,6 +4981,9 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_add_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 {
+	/* Don not insert twice. */
+	if (! rlist_empty(&mem->in_dump_fifo))
+		return;
 	if (rlist_empty(&scheduler->dump_fifo))
 		scheduler->min_lsregion_id = mem->lsregion_id;
 	assert(scheduler->min_lsregion_id <= mem->lsregion_id);
@@ -5682,7 +5688,7 @@ txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 	v->mem = NULL;
 	v->stmt = stmt;
 	tuple_ref(stmt);
-	v->mem_stmt = NULL;
+	v->region_stmt = NULL;
 	v->tx = tx;
 	return v;
 }
@@ -7122,7 +7128,12 @@ vy_tx_prepare(struct vy_tx *tx)
 
 	assert(tx->state == VINYL_TX_READY);
 
-	/* wait for quota to be not overused */
+	/*
+	 * Wait for quota to be not overused. We can't
+	 * invoke vy_quota_use() at the end of prepare,
+	 * since we have pinned mems, and a wait for quota
+	 * may lead to a deadlock.
+	 */
 	vy_quota_use(&env->quota, 0);
 
 	tx->state = VINYL_TX_COMMIT;
@@ -7176,7 +7187,7 @@ vy_tx_prepare(struct vy_tx *tx)
 			(type == IPROTO_DELETE) ? &delete : &replace;
 		if (vy_tx_write(index, v->mem, v->stmt, region_stmt, status) != 0)
 			return -1;
-		v->mem_stmt = *region_stmt;
+		v->region_stmt = *region_stmt;
 		write_count++;
 	}
 	size_t mem_used_after = lsregion_used(&env->allocator);
@@ -7208,23 +7219,23 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	/* Fix LSNs of the records and commit changes */
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		if (v->mem_stmt != 0) {
-			vy_stmt_set_lsn((struct tuple *)v->mem_stmt, lsn);
-			vy_tx_confirm(v->index, v->mem_stmt,
+		if (v->region_stmt != 0) {
+			vy_stmt_set_lsn((struct tuple *)v->region_stmt, lsn);
+			vy_index_commit_stmt(v->index, v->region_stmt,
 					       v->mem);
 		}
 		if (v->mem != 0)
 			vy_mem_unpin(v->mem);
 	}
 
-	/* Fix read views of depened TXs */
+	/* Update read views of dependant transactions. */
 	if (tx->read_view != &xm->global_read_view)
 		tx->read_view->vlsn = lsn;
 	vy_tx_destroy(tx);
 }
 
 static void
-vy_tx_rollback_prepared(struct vy_tx *tx)
+vy_tx_rollback_after_prepare(struct vy_tx *tx)
 {
 	assert(tx->state == VINYL_TX_COMMIT);
 
@@ -7236,8 +7247,8 @@ vy_tx_rollback_prepared(struct vy_tx *tx)
 
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		if (v->mem_stmt != NULL)
-			vy_tx_discard(v->index, v->mem_stmt, v->mem);
+		if (v->region_stmt != NULL)
+			vy_index_rollback_stmt(v->index, v->region_stmt, v->mem);
 		if (v->mem != 0)
 			vy_mem_unpin(v->mem);
 	}
@@ -7258,7 +7269,7 @@ vy_tx_rollback(struct vy_tx *tx)
 	tx->xm->env->stat->tx_rlb++;
 
 	if (tx->state == VINYL_TX_COMMIT)
-		vy_tx_rollback_prepared(tx);
+		vy_tx_rollback_after_prepare(tx);
 
 	vy_tx_destroy(tx);
 }
@@ -9467,6 +9478,10 @@ vy_squash_process(struct vy_squash *squash)
 	assert(index_def->iid == 0);
 
 	struct vy_read_iterator itr;
+	/*
+	 * Use the global read view to avoid squashing
+	 * prepared, but not committed statements.
+	 */
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
 			      squash->stmt, &env->xm->p_global_read_view, false);
 	struct tuple *result;
@@ -9539,7 +9554,7 @@ vy_squash_process(struct vy_squash *squash)
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
 	if (rc == 0) {
-		vy_range_confirm(region_stmt, index, mem);
+		vy_range_commit_stmt(region_stmt, index, mem);
 		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
 	}
@@ -9682,7 +9697,8 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		unreachable();
 	}
 	vy_read_iterator_open(&c->iterator, index, tx, iterator_type, c->key,
-			      (const struct vy_read_view **) &tx->read_view, false);
+			      (const struct vy_read_view **) &tx->read_view,
+			      false);
 	c->iterator_type = iterator_type;
 	return c;
 }

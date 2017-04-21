@@ -275,7 +275,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt);
  * @param stmt       Vinyl statement.
  */
 void
-vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt);
 
 /**
  * Remove a statement from the in-memory level.
@@ -283,7 +283,7 @@ vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt);
  * @param stmt       Vinyl statement.
  */
 void
-vy_mem_erase(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt);
 
 /**
  * Iterator for in-memory level.

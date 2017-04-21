@@ -180,7 +180,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 void
-vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 {
 	/* The statement must be from a lsregion. */
 	assert(vy_stmt_is_region_allocated(stmt));
@@ -193,7 +193,7 @@ vy_mem_confirm(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 void
-vy_mem_erase(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
 {
 	/* This is the statement we've inserted before. */
 	assert(vy_stmt_is_region_allocated(stmt));
