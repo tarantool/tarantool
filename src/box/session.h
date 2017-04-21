@@ -59,7 +59,7 @@ enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
  */
 struct session {
 	/** Session id. */
-	uint32_t id;
+	uint64_t id;
 	/** File descriptor - socket of the connected peer.
 	 * Only if the session has a peer.
 	 */
@@ -85,7 +85,7 @@ struct session {
  * Find a session by id.
  */
 struct session *
-session_find(uint32_t sid);
+session_find(uint64_t sid);
 
 /** Global on-connect triggers. */
 extern struct rlist session_on_connect;

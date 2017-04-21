@@ -38,7 +38,7 @@
 #include "random.h"
 #include "user.h"
 
-static struct mh_i32ptr_t *session_registry;
+static struct mh_i64ptr_t *session_registry;
 
 struct mempool session_pool;
 
@@ -46,10 +46,10 @@ RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
 RLIST_HEAD(session_on_auth);
 
-static inline  uint32_t
+static inline uint64_t
 sid_max()
 {
-	static uint32_t sid_max = 0;
+	static uint64_t sid_max = 0;
 	/* Return the next sid rolling over the reserved value of 0. */
 	while (++sid_max == 0)
 		;
@@ -89,11 +89,11 @@ session_create(int fd)
 			 guest_user->def.uid);
 	if (fd >= 0)
 		random_bytes(session->salt, SESSION_SEED_SIZE);
-	struct mh_i32ptr_node_t node;
+	struct mh_i64ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
 
-	mh_int_t k = mh_i32ptr_put(session_registry, &node, NULL, NULL);
+	mh_int_t k = mh_i64ptr_put(session_registry, &node, NULL, NULL);
 
 	if (k == mh_end(session_registry)) {
 		mempool_free(&session_pool, session);
@@ -182,25 +182,25 @@ session_run_on_auth_triggers(const char *user_name)
 void
 session_destroy(struct session *session)
 {
-	struct mh_i32ptr_node_t node = { session->id, NULL };
-	mh_i32ptr_remove(session_registry, &node, NULL);
+	struct mh_i64ptr_node_t node = { session->id, NULL };
+	mh_i64ptr_remove(session_registry, &node, NULL);
 	mempool_free(&session_pool, session);
 }
 
 struct session *
-session_find(uint32_t sid)
+session_find(uint64_t sid)
 {
-	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
+	mh_int_t k = mh_i64ptr_find(session_registry, sid, NULL);
 	if (k == mh_end(session_registry))
 		return NULL;
 	return (struct session *)
-		mh_i32ptr_node(session_registry, k)->val;
+		mh_i64ptr_node(session_registry, k)->val;
 }
 
 void
 session_init()
 {
-	session_registry = mh_i32ptr_new();
+	session_registry = mh_i64ptr_new();
 	if (session_registry == NULL)
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
@@ -216,5 +216,5 @@ void
 session_free()
 {
 	if (session_registry)
-		mh_i32ptr_delete(session_registry);
+		mh_i64ptr_delete(session_registry);
 }
