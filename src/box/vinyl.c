@@ -3615,8 +3615,6 @@ struct vy_task {
 	size_t max_output_count;
 	/** For run-writing tasks: bloom filter false-positive-rate setting */
 	double bloom_fpr;
-	/** Count of ranges to compact. */
-	int run_count;
 };
 
 /**
@@ -4120,7 +4118,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	n = task->run_count;
+	n = range->compact_priority;
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		vy_log_delete_run(run->id);
 		if (--n == 0)
@@ -4145,7 +4143,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	vy_index_unacct_range(index, range);
 	vy_range_gc_mem(range, scheduler, task->dump_lsn);
-	n = task->run_count;
+	n = range->compact_priority;
 	rlist_foreach_entry_safe(run, &range->runs, in_range, tmp) {
 		vy_range_remove_run(range, run);
 		vy_run_unref(run);
@@ -4155,6 +4153,7 @@ vy_task_compact_complete(struct vy_task *task)
 	assert(n == 0);
 	vy_range_add_run(range, range->new_run);
 	range->new_run = NULL;
+	range->compact_priority = 0;
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
@@ -4170,8 +4169,6 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
-	/* Restore compact priority. */
-	vy_range_update_compact_priority(range);
 
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
@@ -4247,8 +4244,6 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	task->wi = wi;
 	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
-	task->run_count = range->compact_priority;
-	range->compact_priority = 0;
 
 	vy_scheduler_remove_range(scheduler, range);
 
