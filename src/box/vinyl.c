@@ -385,7 +385,10 @@ struct vy_range {
 	/** Range upper bound. NULL if range is rightmost. */
 	struct tuple *end;
 	struct vy_index *index;
-	/* Size of data stored on disk (sum of run->info.size). */
+	/*
+	 * An estimate of the size of data stored on disk for this range
+	 * (sum of slice->size).
+	 */
 	uint64_t size;
 	/** Total amount of memory used by this range (sum of mem->used). */
 	size_t mem_used;
@@ -1406,7 +1409,7 @@ vy_range_add_slice(struct vy_range *range, struct vy_slice *slice)
 {
 	rlist_add_entry(&range->slices, slice, in_range);
 	range->slice_count++;
-	range->size += vy_run_size(slice->run);
+	range->size += slice->size;
 }
 
 /** Remove a run slice from a range's list. */
@@ -1414,11 +1417,11 @@ static void
 vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 {
 	assert(range->slice_count > 0);
-	assert(range->size >= vy_run_size(slice->run));
+	assert(range->size >= slice->size);
 	assert(!rlist_empty(&range->slices));
 	rlist_del_entry(slice, in_range);
 	range->slice_count--;
-	range->size -= vy_run_size(slice->run);
+	range->size -= slice->size;
 }
 
 /**
@@ -2513,7 +2516,6 @@ vy_range_get_write_iterator(struct vy_range *range, int slice_count,
 	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
 	struct vy_slice *slice;
-	struct vy_run *run;
 	struct vy_mem *mem;
 	*p_max_output_count = 0;
 
@@ -2548,10 +2550,9 @@ vy_range_get_write_iterator(struct vy_range *range, int slice_count,
 			break;
 		if (vy_write_iterator_add_slice(wi, slice) != 0)
 			goto err_wi_sub;
-		run = slice->run;
-		*p_max_output_count += run->info.keys;
-		*p_min_lsn = MIN(*p_min_lsn, run->info.min_lsn);
-		*p_max_lsn = MAX(*p_max_lsn, run->info.max_lsn);
+		*p_max_output_count += slice->keys;
+		*p_min_lsn = MIN(*p_min_lsn, slice->run->info.min_lsn);
+		*p_max_lsn = MAX(*p_max_lsn, slice->run->info.max_lsn);
 	}
 	return wi;
 err_wi_sub:
@@ -2629,7 +2630,6 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	struct vy_index *index = range->index;
 	struct index_def *index_def = index->index_def;
 	struct vy_slice *slice;
-	struct vy_run *run;
 
 	/* The range hasn't been merged yet - too early to split it. */
 	if (range->n_compactions < 1)
@@ -2638,17 +2638,19 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	/* Find the oldest run. */
 	assert(!rlist_empty(&range->slices));
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
-	run = slice->run;
 
 	/* The range is too small to be split. */
-	if (vy_run_size(run) < (uint64_t)index_def->opts.range_size * 4 / 3)
+	if (slice->size < (uint64_t)index_def->opts.range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
 	struct vy_page_info *mid_page;
-	mid_page = vy_run_page_info(run, run->info.count / 2);
+	mid_page = vy_run_page_info(slice->run, slice->first_page_no +
+				    (slice->last_page_no -
+				     slice->first_page_no) / 2);
 
-	struct vy_page_info *first_page = vy_run_page_info(run, 0);
+	struct vy_page_info *first_page = vy_run_page_info(slice->run,
+						slice->first_page_no);
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (key_compare(first_page->min_key, mid_page->min_key,
@@ -2709,18 +2711,16 @@ vy_range_update_compact_priority(struct vy_range *range)
 
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		struct vy_run *run = slice->run;
-		uint64_t run_size = vy_run_size(run);
 		/*
 		 * The size of the first level is defined by
 		 * the size of the most recent run.
 		 */
 		if (target_run_size == 0)
-			target_run_size = run_size;
-		total_size += run_size;
+			target_run_size = slice->size;
+		total_size += slice->size;
 		level_run_count++;
 		total_run_count++;
-		while (run_size > target_run_size) {
+		while (slice->size > target_run_size) {
 			/*
 			 * The run size exceeds the threshold
 			 * set for the current level. Move this
@@ -3078,7 +3078,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			vy_run_unref(run);
 			return -1;
 		}
-		slice = vy_slice_new(run, NULL, NULL);
+		slice = vy_slice_new(run, NULL, NULL, &index_def->key_def);
 		vy_run_unref(run);
 		if (slice == NULL)
 			return -1;
@@ -3654,7 +3654,8 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_slice *new_slice;
 
-	new_slice = vy_slice_new(range->new_run, NULL, NULL);
+	new_slice = vy_slice_new(range->new_run, NULL, NULL,
+				 &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
 
@@ -3849,7 +3850,8 @@ vy_task_split_complete(struct vy_task *task)
 	memset(new_slice, 0, sizeof(*new_slice) * n_parts);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(i < n_parts);
-		new_slice[i] = vy_slice_new(r->new_run, NULL, NULL);
+		new_slice[i] = vy_slice_new(r->new_run, NULL, NULL,
+					    &index->index_def->key_def);
 		if (new_slice[i] == NULL)
 			goto fail;
 		i++;
@@ -4130,7 +4132,8 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_slice *slice, *tmp, *new_slice;
 	int n;
 
-	new_slice = vy_slice_new(range->new_run, NULL, NULL);
+	new_slice = vy_slice_new(range->new_run, NULL, NULL,
+				 &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
 
@@ -9160,7 +9163,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 			vy_run_unref(run);
 			return -1;
 		}
-		struct vy_slice *slice = vy_slice_new(run, NULL, NULL);
+		struct vy_slice *slice = vy_slice_new(run, NULL, NULL,
+						      ctx->key_def);
 		vy_run_unref(run);
 		if (slice == NULL)
 			return -1;

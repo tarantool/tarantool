@@ -160,6 +160,16 @@ struct vy_slice {
 		/** Link in vy_join_ctx->slices list. */
 		struct rlist in_join;
 	};
+	/**
+	 * Indexes of the first and the last page in the run
+	 * that belong to this slice.
+	 */
+	uint32_t first_page_no;
+	uint32_t last_page_no;
+	/** An estimate of the number of keys in this slice. */
+	uint32_t keys;
+	/** An estimate of the size of this slice on disk. */
+	uint64_t size;
 };
 
 /** Position of a particular stmt in vy_run. */
@@ -331,7 +341,8 @@ vy_run_unref(struct vy_run *run)
 
 /** Allocate a new run slice. */
 struct vy_slice *
-vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end);
+vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end,
+	     const struct key_def *key_def);
 
 /** Free a run slice. */
 void

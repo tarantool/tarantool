@@ -157,8 +157,40 @@ vy_run_delete(struct vy_run *run)
 	free(run);
 }
 
+/**
+ * Search a page in a run that may contain a given key.
+ * Return the index of the found page or -1 if the key is
+ * less than the min key stored in the run. Additionally,
+ * @equal is set if the min key of the found page is equal
+ * to the given key and cleared otherwise.
+ */
+static int
+vy_run_search_page(struct vy_run *run, const struct tuple *key,
+		   const struct key_def *key_def, bool *equal)
+{
+	int beg = 0;
+	int end = run->info.count;
+	while (beg != end) {
+		int mid = beg + (end - beg) / 2;
+		struct vy_page_info *page_info = vy_run_page_info(run, mid);
+		int cmp = key_compare(page_info->min_key,
+				tuple_data(key), key_def);
+		if (cmp == 0) {
+			*equal = true;
+			return mid;
+		}
+		if (cmp < 0)
+			beg = mid + 1;
+		else
+			end = mid;
+	}
+	*equal = false;
+	return end - 1;
+}
+
 struct vy_slice *
-vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end)
+vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end,
+	     const struct key_def *key_def)
 {
 	struct vy_slice *slice = malloc(sizeof(*slice));
 	if (slice == NULL) {
@@ -166,6 +198,7 @@ vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end)
 			 "malloc", "struct vy_slice");
 		return NULL;
 	}
+	memset(slice, 0, sizeof(*slice));
 	vy_run_ref(run);
 	slice->run = run;
 	if (begin != NULL)
@@ -176,6 +209,30 @@ vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end)
 	slice->end = end;
 	slice->refs = 1;
 	rlist_create(&slice->in_range);
+	/*
+	 * Lookup the first and the last page of this slice
+	 * in the run and estimate the slice size.
+	 */
+	bool equal;
+	int page_no = -1;
+	if (end != NULL) {
+		page_no = vy_run_search_page(run, end, key_def, &equal);
+		/* End key doesn't belong to slice. */
+		if (equal)
+			page_no--;
+	} else if (run->info.count > 0)
+		page_no = run->info.count - 1;
+	if (page_no >= 0) {
+		slice->last_page_no = page_no;
+		page_no = (begin == NULL ? 0 :
+			   vy_run_search_page(run, begin, key_def, &equal));
+		slice->first_page_no = page_no > 0 ? page_no : 0;
+		uint64_t count = slice->last_page_no - slice->first_page_no + 1;
+		slice->keys = DIV_ROUND_UP(run->info.keys * count,
+					   run->info.count);
+		slice->size = DIV_ROUND_UP(run->info.size * count,
+					   run->info.count);
+	} /* else the slice is empty */
 	return slice;
 }
 
