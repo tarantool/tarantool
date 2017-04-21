@@ -818,19 +818,19 @@ Index *sqlite3PrimaryKeyIndex(Table *pTab){
 ** column iCol.  Return -1 if not found.
 */
 i16 sqlite3ColumnOfIndex(Index *pIdx, i16 iCol){
-#if 0
-  int i;
-  for(i=0; i<pIdx->nColumn; i++){
-    if( iCol==pIdx->aiColumn[i] ) return i;
+  /* TODO: gh-2376. We need to improve discrimination of the table
+     by introducing spacial flag for Table which will signal if table
+     originated form  Tarantool or not.  */
+  if ( HasRowid(pIdx->pTable) ){
+    int i;
+    for(i=0; i<pIdx->nColumn; i++){
+      if( iCol==pIdx->aiColumn[i] ) return i;
+    }
+    return -1;
+  } else {
+    /* TARANTOOL: Data layout is the same in every index.  */
+    return iCol;
   }
-  return -1;
-#else
-  /*
-  ** TARANTOOL: Data layout is the same in every index. 
-  */
-  (void)pIdx;
-  return iCol;
-#endif
 }
 
 /*
