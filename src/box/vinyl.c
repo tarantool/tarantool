@@ -2502,7 +2502,7 @@ vy_range_delete(struct vy_range *range)
 }
 
 /**
- * Create a write iterator to dump in-memory indexes.
+ * Create a write iterator for a range.
  *
  * We only dump sealed in-memory indexes and skip the active
  * one in order not to conflict with concurrent insertions.
@@ -2512,62 +2512,20 @@ vy_range_delete(struct vy_range *range)
  * @dump_lsn is the maximal LSN to dump. Only in-memory trees
  * with @min_lsn <= @dump_lsn are addded to the write iterator.
  *
- * The maximum possible number of output tuples of the
- * iterator is returned in @p_max_output_count.
- */
-static struct vy_write_iterator *
-vy_range_get_dump_iterator(struct vy_range *range, int64_t vlsn,
-			   int64_t dump_lsn, size_t *p_max_output_count,
-			   int64_t *p_min_lsn, int64_t *p_max_lsn)
-{
-	struct vy_index *index = range->index;
-	struct vy_write_iterator *wi;
-	struct vy_mem *mem;
-	*p_max_output_count = 0;
-
-	*p_min_lsn = INT64_MAX;
-	*p_max_lsn = -1;
-
-	wi = vy_write_iterator_new(index->env, &index->index_def->key_def,
-				   &index->user_index_def->key_def,
-				   index->surrogate_format,
-				   index->upsert_format,
-				   index->index_def->iid == 0,
-				   index->column_mask,
-				   range->run_count == 0, vlsn);
-	if (wi == NULL)
-		goto err_wi;
-	rlist_foreach_entry(mem, &range->sealed, in_sealed) {
-		if (mem->min_lsn > dump_lsn)
-			continue;
-		if (vy_write_iterator_add_mem(wi, mem) != 0)
-			goto err_wi_sub;
-		*p_max_output_count += mem->tree.size;
-		*p_min_lsn = MIN(*p_min_lsn, mem->min_lsn);
-		*p_max_lsn = MAX(*p_max_lsn, mem->max_lsn);
-	}
-	return wi;
-err_wi_sub:
-	vy_write_iterator_cleanup(wi);
-	vy_write_iterator_delete(wi);
-err_wi:
-	return NULL;
-}
-
-/**
- * Create a write iterator to compact a range.
- * For @dump_lsn, @vlsn and @p_max_output_count @sa vy_range_get_dump_iterator.
- *
  * @run_count determines how many runs are added to the write
  * iterator. Set to @range->run_count for major compaction,
  * 0 < .. < @range->run_count for minor compaction, or 0 for
  * dump.
+ *
+ * The maximum possible number of output tuples of the
+ * iterator is returned in @p_max_output_count
+ *
  */
 static struct vy_write_iterator *
-vy_range_get_compact_iterator(struct vy_range *range, int run_count,
-			      int64_t vlsn, int64_t dump_lsn,
-			      bool is_last_level, size_t *p_max_output_count,
-			      int64_t *p_min_lsn, int64_t *p_max_lsn)
+vy_range_get_write_iterator(struct vy_range *range, int run_count,
+			    int64_t vlsn, int64_t dump_lsn,
+			    size_t *p_max_output_count,
+			    int64_t *p_min_lsn, int64_t *p_max_lsn)
 {
 	struct vy_index *index = range->index;
 	struct vy_write_iterator *wi;
@@ -2584,7 +2542,7 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 				   index->upsert_format,
 				   index->index_def->iid == 0,
 				   index->column_mask,
-				   is_last_level, vlsn);
+				   run_count == range->run_count, vlsn);
 	if (wi == NULL)
 		goto err_wi;
 	/*
@@ -3599,11 +3557,11 @@ struct vy_task {
 	 *
 	 * When we dump or compact a range, we write all its sealed
 	 * in-memory trees that existed when the task was scheduled
-	 * (@sa vy_range_get_dump/compact_iterator()). During task
-	 * execution, new trees can be added due to DDL
-	 * (@sa vy_tx_write()), hence we need to remember which
-	 * trees we are going to write so as to only delete dumped
-	 * trees upon task completion.
+	 * (see vy_range_get_write_iterator()). During task execution,
+	 * new trees can be added due to DDL (see vy_tx_write()),
+	 * hence we need to remember which trees we are going
+	 * to write so as to only delete dumped trees upon task
+	 * completion.
 	 */
 	int64_t dump_lsn;
 	/**
@@ -3787,10 +3745,10 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 	dump_lsn = MIN(xm->lsn, dump_lsn);
 
 	struct vy_write_iterator *wi;
-	wi = vy_range_get_dump_iterator(range, tx_manager_vlsn(xm), dump_lsn,
-					&task->max_output_count,
-					&range->new_run->info.min_lsn,
-					&range->new_run->info.max_lsn);
+	wi = vy_range_get_write_iterator(range, 0, tx_manager_vlsn(xm),
+					 dump_lsn, &task->max_output_count,
+					 &range->new_run->info.min_lsn,
+					 &range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -4013,10 +3971,10 @@ vy_task_split_new(struct mempool *pool, struct vy_range *range,
 
 	int64_t min_lsn, max_lsn;
 	struct vy_write_iterator *wi;
-	wi = vy_range_get_compact_iterator(range, range->run_count,
-					   tx_manager_vlsn(xm), dump_lsn, true,
-					   &task->max_output_count,
-					   &min_lsn, &max_lsn);
+	wi = vy_range_get_write_iterator(range, range->run_count,
+					 tx_manager_vlsn(xm), dump_lsn,
+					 &task->max_output_count,
+					 &min_lsn, &max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -4228,13 +4186,11 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	int64_t dump_lsn = xm->lsn;
 
 	struct vy_write_iterator *wi;
-	bool is_last_level = range->compact_priority == range->run_count;
-	wi = vy_range_get_compact_iterator(range, range->compact_priority,
-					   tx_manager_vlsn(xm), dump_lsn,
-					   is_last_level,
-					   &task->max_output_count,
-					   &range->new_run->info.min_lsn,
-					   &range->new_run->info.max_lsn);
+	wi = vy_range_get_write_iterator(range, range->compact_priority,
+					 tx_manager_vlsn(xm), dump_lsn,
+					 &task->max_output_count,
+					 &range->new_run->info.min_lsn,
+					 &range->new_run->info.max_lsn);
 	if (wi == NULL)
 		goto err_wi;
 
