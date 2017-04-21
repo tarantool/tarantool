@@ -1,5 +1,5 @@
 TAP version 13
-1..8
+1..11
 ok - message
 ok - formatting
 ok - formatting without arguments
@@ -8,3 +8,6 @@ ok - found error place
 ok - good syserror message on errno(0)
 ok - good syserror message on errno(22)
 ok - pid()
+ok - first line is OK
+ok - second line is OK
+ok - right count of lines in backtrace

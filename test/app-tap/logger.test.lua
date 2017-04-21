@@ -3,9 +3,10 @@
 local io = require('io')
 local log = require('log')
 local errno = require('errno')
+local fiber = require('fiber')
 
 local test = require('tap').test('log')
-test:plan(8)
+test:plan(11)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
@@ -32,11 +33,11 @@ test:is(file:read():match('I>%s+(.*)'), "gh-700: %%s %%f %%d", "formatting")
 log.info("gh-2340: %s %D")
 test:is(file:read():match('I>%s+(.*)'), "gh-2340: %s %D", "formatting without arguments")
 
-function help() log.info("gh-2340: %s %s", 'help') end
+local function help() log.info("gh-2340: %s %s", 'help') end
 
 xpcall(help, function(err)
     test:ok(err:match("bad argument #3"), "found error string")
-    test:ok(err:match("logger.test.lua:35:"), "found error place")
+    test:ok(err:match("logger.test.lua:36:"), "found error place")
 end)
 
 errno(0)
@@ -59,5 +60,28 @@ debug = nil
 log.info("debug is nil")
 debug = require('debug')
 
-test:check()
-os.exit()
+local file = io.open(filename)
+while file:read() do
+    fiber.yield()
+end
+
+local function another_helper() log.trace() end
+
+another_helper()
+
+local cnt = 0
+repeat
+    cnt = cnt + 1
+    s = file:read()
+    if cnt == 1 then
+        test:ok(s:find("function 'another_helper'"), "first line is OK")
+    elseif cnt == 2 then
+        test:ok(s:find("logger.test.lua"), "second line is OK")
+    elseif s ~= nil then
+        test:fail()
+    end
+until s == nil
+
+test:is(cnt - 1, 2, "right count of lines in backtrace")
+
+os.exit(test:check() and 0 or 1)
