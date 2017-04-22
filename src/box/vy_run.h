@@ -167,6 +167,8 @@ struct vy_run {
  * Slice of a run, used to organize runs in ranges.
  */
 struct vy_slice {
+	/** Unique ID of this slice. */
+	int64_t id;
 	/** Run this slice is for (increments vy_run::refs). */
 	struct vy_run *run;
 	/**
@@ -370,7 +372,8 @@ vy_run_unref(struct vy_run *run)
 
 /** Allocate a new run slice. */
 struct vy_slice *
-vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end,
+vy_slice_new(int64_t id, struct vy_run *run,
+	     struct tuple *begin, struct tuple *end,
 	     const struct key_def *key_def);
 
 /** Free a run slice. */
@@ -405,10 +408,11 @@ vy_slice_unref(struct vy_slice *slice)
  * This function increments vy_run::slice_count.
  */
 static inline struct vy_slice *
-vy_run_make_slice(struct vy_run *run, struct tuple *begin, struct tuple *end,
+vy_run_make_slice(int64_t id, struct vy_run *run,
+		  struct tuple *begin, struct tuple *end,
 		  const struct key_def *key_def)
 {
-	struct vy_slice *slice = vy_slice_new(run, begin, end, key_def);
+	struct vy_slice *slice = vy_slice_new(id, run, begin, end, key_def);
 	if (slice != NULL)
 		run->slice_count++;
 	assert(run->refs >= run->slice_count);

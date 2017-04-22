@@ -1259,8 +1259,8 @@ vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
 			   enum vy_file_type type)
 {
 	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_INSERT_RUN ||
-	       record->type == VY_LOG_DELETE_RUN);
+	       record->type == VY_LOG_CREATE_RUN ||
+	       record->type == VY_LOG_DROP_RUN);
 
 	int total = 0;
 	SNPRINT(total, vy_index_snprint_path, buf, size, vinyl_dir,
@@ -1280,7 +1280,7 @@ static void
 vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 {
 	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_DELETE_RUN);
+	       record->type == VY_LOG_DROP_RUN);
 
 	ERROR_INJECT(ERRINJ_VY_GC,
 		     {say_error("error injection: vinyl run %lld not deleted",
@@ -1465,7 +1465,7 @@ vy_range_discard_new_run(struct vy_range *range)
 				(long long)run_id); return;});
 
 	vy_log_tx_begin();
-	vy_log_delete_run(run_id);
+	vy_log_drop_run(run_id);
 	if (vy_log_tx_commit() < 0) {
 		/*
 		 * Failure to log deletion of an incomplete
@@ -2876,13 +2876,12 @@ vy_range_maybe_coalesce(struct vy_range **p_range)
 			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_slice *slice;
-		rlist_foreach_entry(slice, &it->slices, in_range) {
-			struct vy_run *run = slice->run;
-			vy_log_insert_run(result->id, run->id,
-					  run->info.min_lsn, run->info.max_lsn,
-					  vy_run_is_empty(run));
-		}
 		vy_log_delete_range(it->id);
+		rlist_foreach_entry(slice, &it->slices, in_range) {
+			vy_log_insert_slice(result->id, slice->run->id, slice->id,
+					    tuple_data_or_null(slice->begin),
+					    tuple_data_or_null(slice->end));
+		}
 	}
 	if (vy_log_tx_commit() < 0)
 		goto fail_commit;
@@ -3043,8 +3042,24 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_range *range = arg->range;
 	struct index_def *index_def = index->index_def;
 	struct tuple_format *key_format = index->env->key_format;
+	struct tuple *begin = NULL, *end = NULL;
+	struct vy_run *run = NULL;
 	struct vy_slice *slice;
-	struct vy_run *run;
+	bool success = false;
+
+	if (record->type == VY_LOG_INSERT_RANGE ||
+	    record->type == VY_LOG_INSERT_SLICE) {
+		if (record->begin != NULL) {
+			begin = vy_key_from_msgpack(key_format, record->begin);
+			if (begin == NULL)
+				goto out;
+		}
+		if (record->end != NULL) {
+			end = vy_key_from_msgpack(key_format, record->end);
+			if (end == NULL)
+				goto out;
+		}
+	}
 
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
@@ -3053,26 +3068,12 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	case VY_LOG_DROP_INDEX:
 		index->is_dropped = true;
 		break;
+	case VY_LOG_CREATE_RUN:
+		break;
 	case VY_LOG_INSERT_RANGE:
-		range = vy_range_new(index, record->range_id, NULL, NULL);
+		range = vy_range_new(index, record->range_id, begin, end);
 		if (range == NULL)
-			return -1;
-		if (record->begin != NULL) {
-			range->begin = vy_key_from_msgpack(key_format,
-							   record->begin);
-			if (range->begin == NULL) {
-				vy_range_delete(range);
-				return -1;
-			}
-		}
-		if (record->end != NULL) {
-			range->end = vy_key_from_msgpack(key_format,
-							 record->end);
-			if (range->end == NULL) {
-				vy_range_delete(range);
-				return -1;
-			}
-		}
+			goto out;
 		if (range->begin != NULL && range->end != NULL &&
 		    vy_key_compare(range->begin, range->end,
 				   &index_def->key_def) >= 0) {
@@ -3080,17 +3081,17 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 				 tt_sprintf("begin >= end for range id %lld",
 					    (long long)range->id));
 			vy_range_delete(range);
-			return -1;
+			goto out;
 		}
 		vy_index_add_range(index, range);
 		arg->range = range;
 		break;
-	case VY_LOG_INSERT_RUN:
+	case VY_LOG_INSERT_SLICE:
 		assert(range != NULL);
 		assert(range->id == record->range_id);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
-			return -1;
+			goto out;
 		run->info.min_lsn = record->min_lsn;
 		run->info.max_lsn = record->max_lsn;
 		char index_path[PATH_MAX];
@@ -3100,22 +3101,27 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		vy_run_snprint_path(run_path, sizeof(run_path),
 				    index->path, run->id, VY_FILE_RUN);
 		if (!record->is_empty &&
-		    vy_run_recover(run, index_path, run_path) != 0) {
-			vy_run_unref(run);
-			return -1;
-		}
-		slice = vy_run_make_slice(run, NULL, NULL,
-					  &index_def->key_def);
-		vy_run_unref(run);
+		    vy_run_recover(run, index_path, run_path) != 0)
+			goto out;
+		slice = vy_run_make_slice(record->slice_id, run,
+					  begin, end, &index_def->key_def);
 		if (slice == NULL)
-			return -1;
+			goto out;
 		vy_range_add_slice(range, slice);
 		vy_index_acct_run(index, run);
 		break;
 	default:
 		unreachable();
 	}
-	return 0;
+	success = true;
+out:
+	if (run != NULL)
+		vy_run_unref(run);
+	if (begin != NULL)
+		tuple_unref(begin);
+	if (end != NULL)
+		tuple_unref(end);
+	return success ? 0 : -1;
 }
 
 static int
@@ -3681,7 +3687,8 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_slice *new_slice;
 
-	new_slice = vy_run_make_slice(range->new_run, NULL, NULL,
+	new_slice = vy_run_make_slice(vy_log_next_slice_id(),
+				      range->new_run, NULL, NULL,
 				      &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
@@ -3690,10 +3697,13 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_insert_run(range->id, range->new_run->id,
+	vy_log_create_run(index->index_def->opts.lsn, range->new_run->id,
 			  range->new_run->info.min_lsn,
 			  range->new_run->info.max_lsn,
 			  vy_run_is_empty(range->new_run));
+	vy_log_insert_slice(range->id, range->new_run->id, new_slice->id,
+			    tuple_data_or_null(new_slice->begin),
+			    tuple_data_or_null(new_slice->end));
 	if (vy_log_tx_commit() < 0) {
 		vy_run_destroy_slice(new_slice);
 		return -1;
@@ -3877,7 +3887,8 @@ vy_task_split_complete(struct vy_task *task)
 	memset(new_slice, 0, sizeof(*new_slice) * n_parts);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(i < n_parts);
-		new_slice[i] = vy_run_make_slice(r->new_run, NULL, NULL,
+		new_slice[i] = vy_run_make_slice(vy_log_next_run_id(),
+						 r->new_run, NULL, NULL,
 						 &index->index_def->key_def);
 		if (new_slice[i] == NULL)
 			goto fail;
@@ -3889,14 +3900,23 @@ vy_task_split_complete(struct vy_task *task)
 	 */
 	vy_log_tx_begin();
 	vy_log_delete_range(range->id);
+	rlist_foreach_entry(slice, &range->slices, in_range) {
+		if (slice->run->slice_count == 1)
+			vy_log_drop_run(slice->run->id);
+	}
+	i = 0;
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		vy_log_insert_range(index->index_def->opts.lsn, r->id,
 				    tuple_data_or_null(r->begin),
 				    tuple_data_or_null(r->end));
-		vy_log_insert_run(r->id, r->new_run->id,
+		vy_log_create_run(index->index_def->opts.lsn, r->new_run->id,
 				  r->new_run->info.min_lsn,
 				  r->new_run->info.max_lsn,
 				  vy_run_is_empty(r->new_run));
+		slice = new_slice[i++];
+		vy_log_insert_slice(r->id, r->new_run->id, slice->id,
+				    tuple_data_or_null(slice->begin),
+				    tuple_data_or_null(slice->end));
 	}
 	if (vy_log_tx_commit() < 0)
 		goto fail;
@@ -4161,7 +4181,8 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_slice *slice, *tmp, *new_slice;
 	int n;
 
-	new_slice = vy_run_make_slice(range->new_run, NULL, NULL,
+	new_slice = vy_run_make_slice(vy_log_next_run_id(),
+				      range->new_run, NULL, NULL,
 				      &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
@@ -4172,15 +4193,20 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	n = range->compact_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		vy_log_delete_run(slice->run->id);
+		vy_log_delete_slice(slice->id);
+		if (slice->run->slice_count == 1)
+			vy_log_drop_run(slice->run->id);
 		if (--n == 0)
 			break;
 	}
 	assert(n == 0);
-	vy_log_insert_run(range->id, range->new_run->id,
+	vy_log_create_run(index->index_def->opts.lsn, range->new_run->id,
 			  range->new_run->info.min_lsn,
 			  range->new_run->info.max_lsn,
 			  vy_run_is_empty(range->new_run));
+	vy_log_insert_slice(range->id, range->new_run->id, new_slice->id,
+			    tuple_data_or_null(new_slice->begin),
+			    tuple_data_or_null(new_slice->end));
 	if (vy_log_tx_commit() < 0) {
 		vy_run_destroy_slice(new_slice);
 		return -1;
@@ -9179,26 +9205,50 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		tuple_format_ref(ctx->upsert_format, 1);
 	}
 
-	if (record->type == VY_LOG_INSERT_RUN) {
+	if (record->type == VY_LOG_INSERT_SLICE) {
+		struct tuple_format *key_format = ctx->env->key_format;
+		struct tuple *begin = NULL, *end = NULL;
+		bool success = false;
+
 		struct vy_run *run = vy_run_new(record->run_id);
 		if (run == NULL)
-			return -1;
+			goto done_slice;
 		char index_path[PATH_MAX];
 		vy_run_snprint_path(index_path, sizeof(index_path),
 				    ctx->index_path, run->id, VY_FILE_INDEX);
 		char run_path[PATH_MAX];
 		vy_run_snprint_path(run_path, sizeof(run_path),
 				    ctx->index_path, run->id, VY_FILE_RUN);
-		if (vy_run_recover(run, index_path, run_path) != 0) {
-			vy_run_unref(run);
-			return -1;
+		if (vy_run_recover(run, index_path, run_path) != 0)
+			goto done_slice;
+
+		if (record->begin != NULL) {
+			begin = vy_key_from_msgpack(key_format, record->begin);
+			if (begin == NULL)
+				goto done_slice;
 		}
-		struct vy_slice *slice = vy_run_make_slice(run, NULL, NULL,
-							   ctx->key_def);
-		vy_run_unref(run);
+		if (record->end != NULL) {
+			end = vy_key_from_msgpack(key_format, record->end);
+			if (end == NULL)
+				goto done_slice;
+		}
+
+		struct vy_slice *slice = vy_run_make_slice(record->slice_id,
+						run, begin, end, ctx->key_def);
 		if (slice == NULL)
-			return -1;
+			goto done_slice;
+
 		rlist_add_entry(&ctx->slices, slice, in_join);
+		success = true;
+done_slice:
+		if (run != NULL)
+			vy_run_unref(run);
+		if (begin != NULL)
+			tuple_unref(begin);
+		if (end != NULL)
+			tuple_unref(end);
+		if (!success)
+			return -1;
 	}
 	return 0;
 }
@@ -9291,7 +9341,7 @@ vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_env *env = cb_arg;
 
-	if (record->type == VY_LOG_DELETE_RUN)
+	if (record->type == VY_LOG_DROP_RUN)
 		vy_run_record_gc(env->conf->path, record);
 
 	fiber_reschedule();
@@ -9335,7 +9385,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_backup_arg *arg = cb_arg;
 
-	if (record->type != VY_LOG_INSERT_RUN || record->is_empty)
+	if (record->type != VY_LOG_CREATE_RUN || record->is_empty)
 		goto out;
 
 	char path[PATH_MAX];

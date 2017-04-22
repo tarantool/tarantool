@@ -74,6 +74,7 @@ enum vy_log_key {
 	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_DEF			= 7,
+	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_MIN_LSN		= 9,
 	VY_LOG_KEY_MAX_LSN		= 10,
 	VY_LOG_KEY_IS_EMPTY		= 11,
@@ -96,13 +97,19 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
 	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
-	[VY_LOG_INSERT_RUN]		= (1 << VY_LOG_KEY_RANGE_ID) |
+	[VY_LOG_CREATE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID) |
 					  (1 << VY_LOG_KEY_MIN_LSN) |
 					  (1 << VY_LOG_KEY_MAX_LSN) |
 					  (1 << VY_LOG_KEY_IS_EMPTY),
-	[VY_LOG_DELETE_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
+	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
+	[VY_LOG_INSERT_SLICE]		= (1 << VY_LOG_KEY_RANGE_ID) |
+					  (1 << VY_LOG_KEY_RUN_ID) |
+					  (1 << VY_LOG_KEY_SLICE_ID) |
+					  (1 << VY_LOG_KEY_BEGIN) |
+					  (1 << VY_LOG_KEY_END),
+	[VY_LOG_DELETE_SLICE]		= (1 << VY_LOG_KEY_SLICE_ID),
 };
 
 /** vy_log_key -> human readable name. */
@@ -115,6 +122,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_DEF]		= "key_def",
+	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
 	[VY_LOG_KEY_MIN_LSN]		= "min_lsn",
 	[VY_LOG_KEY_MAX_LSN]		= "max_lsn",
 	[VY_LOG_KEY_IS_EMPTY]		= "is_empty",
@@ -127,9 +135,11 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_INSERT_RANGE]		= "insert_range",
 	[VY_LOG_DELETE_RANGE]		= "delete_range",
 	[VY_LOG_PREPARE_RUN]		= "prepare_run",
-	[VY_LOG_INSERT_RUN]		= "insert_run",
-	[VY_LOG_DELETE_RUN]		= "delete_run",
+	[VY_LOG_CREATE_RUN]		= "create_run",
+	[VY_LOG_DROP_RUN]		= "drop_run",
 	[VY_LOG_FORGET_RUN]		= "forget_run",
+	[VY_LOG_INSERT_SLICE]		= "insert_slice",
+	[VY_LOG_DELETE_SLICE]		= "delete_slice",
 };
 
 struct vy_recovery;
@@ -165,6 +175,11 @@ struct vy_log {
 	 */
 	int64_t next_run_id;
 	/**
+	 * Next ID to use for a vinyl run slice.
+	 * Used by vy_log_next_slice_id().
+	 */
+	int64_t next_slice_id;
+	/**
 	 * Index of the first record of the current
 	 * transaction in tx_buf.
 	 */
@@ -187,6 +202,8 @@ struct vy_recovery {
 	struct mh_i64ptr_t *range_hash;
 	/** ID -> vy_run_recovery_info. */
 	struct mh_i64ptr_t *run_hash;
+	/** ID -> vy_slice_recovery_info. */
+	struct mh_i64ptr_t *slice_hash;
 	/**
 	 * Maximal vinyl range ID, according to the metadata log,
 	 * or -1 in case no ranges were recovered.
@@ -197,6 +214,11 @@ struct vy_recovery {
 	 * or -1 in case no runs were recovered.
 	 */
 	int64_t run_id_max;
+	/**
+	 * Maximal vinyl run slice ID, according to the metadata log,
+	 * or -1 in case no slices were recovered.
+	 */
+	int64_t slice_id_max;
 };
 
 /** Vinyl index info stored in a recovery context. */
@@ -222,11 +244,11 @@ struct vy_index_recovery_info {
 	 */
 	struct rlist ranges;
 	/**
-	 * List of runs that were prepared, but never
-	 * inserted into a range or deleted, linked by
-	 * vy_run_recovery_info::in_incomplete.
+	 * List of all runs created for the index
+	 * (both committed and not), linked by
+	 * vy_run_recovery_info::in_index.
 	 */
-	struct rlist incomplete_runs;
+	struct rlist runs;
 };
 
 /** Vinyl range info stored in a recovery context. */
@@ -239,28 +261,21 @@ struct vy_range_recovery_info {
 	char *begin;
 	/** End of the range, stored in MsgPack array. */
 	char *end;
-	/** True if the range was deleted. */
-	bool is_deleted;
-	/**
-	 * Log signature from the time when the range was created
-	 * or deleted.
-	 */
+	/** Log signature from the time when the range was created. */
 	int64_t signature;
 	/**
-	 * List of all runs in the range, linked by
-	 * vy_run_recovery_info::in_range.
+	 * List of all slices in the range, linked by
+	 * vy_slice_recovery_info::in_range.
 	 *
-	 * Newer runs are closer to the head.
+	 * Newer slices are closer to the head.
 	 */
-	struct rlist runs;
+	struct rlist slices;
 };
 
 /** Run info stored in a recovery context. */
 struct vy_run_recovery_info {
-	/** Link in vy_range_recovery_info::runs. */
-	struct rlist in_range;
-	/** Link in vy_index_recovery_info::incomplete_runs. */
-	struct rlist in_incomplete;
+	/** Link in vy_index_recovery_info::runs. */
+	struct rlist in_index;
 	/** ID of the run. */
 	int64_t id;
 	/** Min and max LSN spanned by the run. */
@@ -268,12 +283,33 @@ struct vy_run_recovery_info {
 	int64_t max_lsn;
 	/** True if the run is empty and thus has no data file. */
 	bool is_empty;
-	/** True if the run was deleted. */
-	bool is_deleted;
+	/**
+	 * True if the run was not committed (there's
+	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
+	 */
+	bool is_incomplete;
+	/** True if the run was dropped (VY_LOG_DROP_RUN). */
+	bool is_dropped;
 	/**
 	 * Log signature from the time when the run was last modified
-	 * (created, inserted into a range, or deleted).
+	 * (prepared, created, or dropped).
 	 */
+	int64_t signature;
+};
+
+/** Slice info stored in a recovery context. */
+struct vy_slice_recovery_info {
+	/** Link in vy_range_recovery_info::slices. */
+	struct rlist in_range;
+	/** ID of the slice. */
+	int64_t id;
+	/** ID of the run this slice is for. */
+	int64_t run_id;
+	/** Start of the slice, stored in MsgPack array. */
+	char *begin;
+	/** End of the slice, stored in MsgPack array. */
+	char *end;
+	/** Log signature from the time when the slice was created. */
 	int64_t signature;
 };
 
@@ -353,6 +389,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, key_def_snprint, buf, size, record->key_def);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
+	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID))
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_SLICE_ID],
+			record->slice_id);
 	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_MIN_LSN], record->min_lsn);
@@ -465,6 +505,12 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += key_def_sizeof_parts(key_def);
 		n_keys++;
 	}
+	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
+		assert(record->slice_id >= 0);
+		size += mp_sizeof_uint(VY_LOG_KEY_SLICE_ID);
+		size += mp_sizeof_uint(record->slice_id);
+		n_keys++;
+	}
 	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
 		size += mp_sizeof_uint(VY_LOG_KEY_MIN_LSN);
 		size += mp_sizeof_uint(record->min_lsn);
@@ -539,6 +585,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
 		pos = mp_encode_array(pos, key_def->part_count);
 		pos = key_def_encode_parts(pos, key_def);
+	}
+	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
+		pos = mp_encode_uint(pos, record->slice_id);
 	}
 	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_MIN_LSN);
@@ -661,6 +711,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->key_def = key_def;
 			break;
 		}
+		case VY_LOG_KEY_SLICE_ID:
+			record->slice_id = mp_decode_uint(&pos);
+			break;
 		case VY_LOG_KEY_MIN_LSN:
 			record->min_lsn = mp_decode_uint(&pos);
 			break;
@@ -786,6 +839,12 @@ vy_log_next_range_id(void)
 	return vy_log.next_range_id++;
 }
 
+int64_t
+vy_log_next_slice_id(void)
+{
+	return vy_log.next_slice_id++;
+}
+
 int
 vy_log_bootstrap(void)
 {
@@ -829,6 +888,7 @@ vy_log_begin_recovery(const struct vclock *vclock)
 
 	vy_log.next_range_id = recovery->range_id_max + 1;
 	vy_log.next_run_id = recovery->run_id_max + 1;
+	vy_log.next_slice_id = recovery->slice_id_max + 1;
 
 	vy_log.recovery = recovery;
 	vclock_copy(&vy_log.last_checkpoint, vclock);
@@ -1132,47 +1192,13 @@ vy_log_write(const struct vy_log_record *record)
 		tx_record->signature = vclock_sum(&vy_log.last_checkpoint);
 }
 
-/** Mark a vinyl run as deleted. */
-static void
-vy_run_mark_deleted(struct vy_run_recovery_info *run, int64_t signature)
-{
-	assert(!run->is_deleted);
-	run->is_deleted = true;
-	run->signature = signature;
-}
-
-/** Mark a vinyl range and all its runs as deleted. */
-static void
-vy_range_mark_deleted(struct vy_range_recovery_info *range, int64_t signature)
-{
-	assert(!range->is_deleted);
-	range->is_deleted = true;
-	range->signature = signature;
-	struct vy_run_recovery_info *run;
-	rlist_foreach_entry(run, &range->runs, in_range) {
-		if (!run->is_deleted)
-			vy_run_mark_deleted(run, signature);
-	}
-}
-
-/** Mark a vinyl index, all its ranges, and all its runs as deleted. */
-static void
-vy_index_mark_deleted(struct vy_index_recovery_info *index, int64_t signature)
-{
-	assert(!index->is_dropped);
-	index->is_dropped = true;
-	index->signature = signature;
-	struct vy_range_recovery_info *range;
-	rlist_foreach_entry(range, &index->ranges, in_index) {
-		if (!range->is_deleted)
-			vy_range_mark_deleted(range, signature);
-	}
-	struct vy_run_recovery_info *run;
-	rlist_foreach_entry(run, &index->incomplete_runs, in_incomplete) {
-		if (!run->is_deleted)
-			vy_run_mark_deleted(run, signature);
-	}
-}
+static int
+vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id);
+static int
+vy_recovery_delete_slice(struct vy_recovery *recovery, int64_t slice_id);
+static int
+vy_recovery_drop_run(struct vy_recovery *recovery,
+		     int64_t signature, int64_t run_id);
 
 /** Lookup a vinyl index in vy_recovery::index_hash map. */
 static struct vy_index_recovery_info *
@@ -1202,6 +1228,17 @@ vy_recovery_lookup_run(struct vy_recovery *recovery, int64_t run_id)
 {
 	struct mh_i64ptr_t *h = recovery->run_hash;
 	mh_int_t k = mh_i64ptr_find(h, run_id, NULL);
+	if (k == mh_end(h))
+		return NULL;
+	return mh_i64ptr_node(h, k)->val;
+}
+
+/** Lookup a vinyl slice in vy_recovery::slice_hash map. */
+static struct vy_slice_recovery_info *
+vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
+{
+	struct mh_i64ptr_t *h = recovery->slice_hash;
+	mh_int_t k = mh_i64ptr_find(h, slice_id, NULL);
 	if (k == mh_end(h))
 		return NULL;
 	return mh_i64ptr_node(h, k)->val;
@@ -1247,14 +1284,15 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 	index->is_dropped = false;
 	index->signature = signature;
 	rlist_create(&index->ranges);
-	rlist_create(&index->incomplete_runs);
+	rlist_create(&index->runs);
 	return 0;
 }
 
 /**
  * Handle a VY_LOG_DROP_INDEX log record.
- * This function marks the vinyl index with ID @index_lsn as dropped.
- * If the index has no ranges and runs, it is freed.
+ * This function marks the vinyl index with ID @index_lsn as dropped,
+ * deletes all its ranges and slices, and drops all its runs.
+ * If the index has no ranges, slices, and runs, it is freed.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
@@ -1276,9 +1314,24 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 				    (long long)index_lsn));
 		return -1;
 	}
-	vy_index_mark_deleted(index, signature);
-	if (rlist_empty(&index->ranges) &&
-	    rlist_empty(&index->incomplete_runs)) {
+	bool need_free = (rlist_empty(&index->runs) &&
+			  rlist_empty(&index->ranges));
+	index->is_dropped = true;
+	index->signature = signature;
+	struct vy_range_recovery_info *range, *tmp;
+	rlist_foreach_entry_safe(range, &index->ranges, in_index, tmp) {
+		if (vy_recovery_delete_range(recovery, range->id) < 0)
+			unreachable();
+	}
+	rlist_create(&index->ranges);
+	struct vy_run_recovery_info *run;
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		if (!run->is_dropped) {
+			run->is_dropped = true;
+			run->signature = signature;
+		}
+	}
+	if (need_free) {
 		mh_i64ptr_del(h, k, NULL);
 		free(index);
 	}
@@ -1290,7 +1343,7 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
  * Return the new run on success, NULL on OOM.
  */
 static struct vy_run_recovery_info *
-vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
+vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 {
 	struct vy_run_recovery_info *run = malloc(sizeof(*run));
 	if (run == NULL) {
@@ -1310,10 +1363,10 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 	run->id = run_id;
 	run->min_lsn = run->max_lsn = -1;
 	run->is_empty = false;
-	run->is_deleted = false;
+	run->is_incomplete = false;
+	run->is_dropped = false;
 	run->signature = -1;
-	rlist_create(&run->in_range);
-	rlist_create(&run->in_incomplete);
+	rlist_create(&run->in_index);
 	if (recovery->run_id_max < run_id)
 		recovery->run_id_max = run_id;
 	return run;
@@ -1321,8 +1374,8 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t run_id)
 
 /**
  * Handle a VY_LOG_PREPARE_RUN log record.
- * This function creates a new vinyl run with ID @run_id and adds it
- * to the list of incomplete runs of the index with ID @index_lsn.
+ * This function creates a new incomplete vinyl run with ID @run_id
+ * and adds it to the list of runs of the index with ID @index_lsn.
  * Return 0 on success, -1 if run already exists, index not found,
  * or OOM.
  */
@@ -1346,75 +1399,76 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
 		return -1;
 	}
 	struct vy_run_recovery_info *run;
-	run = vy_recovery_create_run(recovery, run_id);
+	run = vy_recovery_do_create_run(recovery, run_id);
 	if (run == NULL)
 		return -1;
+	run->is_incomplete = true;
 	run->signature = signature;
-	rlist_add_entry(&index->incomplete_runs, run, in_incomplete);
+	rlist_add_entry(&index->runs, run, in_index);
 	return 0;
 }
 
 /**
- * Handle a VY_LOG_INSERT_RUN log record.
- * This function inserts the vinyl run with ID @run_id to the range
- * with ID @range_id. If the run does not exist, it will be created.
- * Return 0 on success, -1 if range not found, run or range is
- * deleted, or OOM.
+ * Handle a VY_LOG_CREATE_RUN log record.
+ * This function adds the vinyl run with ID @run_id to the list
+ * of runs of the index with ID @index_lsn and marks it committed.
+ * If the run does not exist, it will be created.
+ * Return 0 on success, -1 if index not found, run or index
+ * is dropped, or OOM.
  */
 static int
-vy_recovery_insert_run(struct vy_recovery *recovery, int64_t signature,
-		       int64_t range_id, int64_t run_id,
+vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
+		       int64_t index_lsn, int64_t run_id,
 		       int64_t min_lsn, int64_t max_lsn, bool is_empty)
 {
-	struct vy_range_recovery_info *range;
-	range = vy_recovery_lookup_range(recovery, range_id);
-	if (range == NULL) {
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_lsn);
+	if (index == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Run %lld inserted into unregistered "
-				    "range %lld", (long long)run_id,
-				    (long long)range_id));
+			 tt_sprintf("Run %lld created for unregistered "
+				    "index %lld", (long long)run_id,
+				    (long long)index_lsn));
 		return -1;
 	}
-	if (range->is_deleted) {
+	if (index->is_dropped) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Run %lld inserted into deleted "
-				    "range %lld", (long long)run_id,
-				    (long long)range_id));
+			 tt_sprintf("Run %lld created for deleted "
+				    "index %lld", (long long)run_id,
+				    (long long)index_lsn));
 		return -1;
 	}
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
-	if (run != NULL && run->is_deleted) {
+	if (run != NULL && run->is_dropped) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Deleted run %lld inserted into "
-				    "range %lld", (long long)run_id,
-				    (long long)range_id));
+			 tt_sprintf("Run %lld committed after deletion",
+				    (long long)run_id));
 		return -1;
 	}
 	if (run == NULL) {
-		run = vy_recovery_create_run(recovery, run_id);
+		run = vy_recovery_do_create_run(recovery, run_id);
 		if (run == NULL)
 			return -1;
 	}
+	run->is_incomplete = false;
 	run->signature = signature;
 	run->min_lsn = min_lsn;
 	run->max_lsn = max_lsn;
 	run->is_empty = is_empty;
-	rlist_del_entry(run, in_incomplete);
-	rlist_move_entry(&range->runs, run, in_range);
+	rlist_move_entry(&index->runs, run, in_index);
 	return 0;
 }
 
 /**
- * Handle a VY_LOG_DELETE_RUN log record.
+ * Handle a VY_LOG_DROP_RUN log record.
  * This function marks the vinyl run with ID @run_id as deleted.
  * Note, the run is not removed from the recovery context until it is
  * "forgotten", because it is still needed for garbage collection.
  * Return 0 on success, -1 if run not found or already deleted.
  */
 static int
-vy_recovery_delete_run(struct vy_recovery *recovery, int64_t signature,
-		       int64_t run_id)
+vy_recovery_drop_run(struct vy_recovery *recovery,
+		     int64_t signature, int64_t run_id)
 {
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
@@ -1424,13 +1478,14 @@ vy_recovery_delete_run(struct vy_recovery *recovery, int64_t signature,
 				    (long long)run_id));
 		return -1;
 	}
-	if (run->is_deleted) {
+	if (run->is_dropped) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Run %lld deleted twice",
 				    (long long)run_id));
 		return -1;
 	}
-	vy_run_mark_deleted(run, signature);
+	run->is_dropped = true;
+	run->signature = signature;
 	return 0;
 }
 
@@ -1452,8 +1507,7 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
 	}
 	struct vy_run_recovery_info *run = mh_i64ptr_node(h, k)->val;
 	mh_i64ptr_del(h, k, NULL);
-	rlist_del_entry(run, in_range);
-	rlist_del_entry(run, in_incomplete);
+	rlist_del_entry(run, in_index);
 	free(run);
 	return 0;
 }
@@ -1515,9 +1569,8 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 	memcpy(range->begin, begin, begin_size);
 	range->end = (void *)range + sizeof(*range) + begin_size;
 	memcpy(range->end, end, end_size);
-	range->is_deleted = false;
 	range->signature = signature;
-	rlist_create(&range->runs);
+	rlist_create(&range->slices);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->range_id_max < range_id)
 		recovery->range_id_max = range_id;
@@ -1526,13 +1579,12 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 
 /**
  * Handle a VY_LOG_DELETE_RANGE log record.
- * This function marks the range with ID @range_id as deleted.
- * If the range has no runs, it is freed.
- * Return 0 on success, -1 if range not found or already deleted.
+ * This function frees the vinyl range with ID @range_id
+ * and all its slices.
+ * Return 0 on success, -1 if range not found.
  */
 static int
-vy_recovery_delete_range(struct vy_recovery *recovery, int64_t signature,
-			 int64_t range_id)
+vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
 {
 	struct mh_i64ptr_t *h = recovery->range_hash;
 	mh_int_t k = mh_i64ptr_find(h, range_id, NULL);
@@ -1543,18 +1595,102 @@ vy_recovery_delete_range(struct vy_recovery *recovery, int64_t signature,
 		return -1;
 	}
 	struct vy_range_recovery_info *range = mh_i64ptr_node(h, k)->val;
-	if (range->is_deleted) {
+	struct vy_slice_recovery_info *slice, *tmp;
+	rlist_foreach_entry_safe(slice, &range->slices, in_range, tmp) {
+		if (vy_recovery_delete_slice(recovery, slice->id) < 0)
+			unreachable();
+	}
+	mh_i64ptr_del(h, k, NULL);
+	rlist_del_entry(range, in_index);
+	free(range);
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_INSERT_SLICE log record.
+ * This function allocates a new slice with ID @slice_id for
+ * the run with ID @run_id, inserts it into the hash, and adds
+ * it to the list of slices of the range with ID @range_id.
+ * Return 0 on success, -1 on failure (ID collision or OOM).
+ */
+static int
+vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
+			 int64_t range_id, int64_t run_id, int64_t slice_id,
+			 const char *begin, const char *end)
+{
+	if (vy_recovery_lookup_slice(recovery, slice_id) != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Range %lld deleted twice",
+			 tt_sprintf("Duplicate slice id %lld",
+				    (long long)slice_id));
+		return -1;
+	}
+	struct vy_range_recovery_info *range;
+	range = vy_recovery_lookup_range(recovery, range_id);
+	if (range == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Slice %lld created for unregistered "
+				    "range %lld", (long long)slice_id,
 				    (long long)range_id));
 		return -1;
 	}
-	vy_range_mark_deleted(range, signature);
-	if (rlist_empty(&range->runs)) {
-		mh_i64ptr_del(h, k, NULL);
-		rlist_del_entry(range, in_index);
-		free(range);
+
+	size_t size = sizeof(struct vy_slice_recovery_info);
+	const char *data;
+	data = begin;
+	mp_next(&data);
+	size_t begin_size = data - begin;
+	size += begin_size;
+	data = end;
+	mp_next(&data);
+	size_t end_size = data - end;
+	size += end_size;
+
+	struct vy_slice_recovery_info *slice = malloc(size);
+	if (slice == NULL) {
+		diag_set(OutOfMemory, size,
+			 "malloc", "struct vy_slice_recovery_info");
+		return -1;
 	}
+	struct mh_i64ptr_t *h = recovery->slice_hash;
+	struct mh_i64ptr_node_t node = { slice_id, slice };
+	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
+		free(slice);
+		return -1;
+	}
+	slice->id = slice_id;
+	slice->run_id = run_id;
+	slice->begin = (void *)slice + sizeof(*slice);
+	memcpy(slice->begin, begin, begin_size);
+	slice->end = (void *)slice + sizeof(*slice) + begin_size;
+	memcpy(slice->end, end, end_size);
+	slice->signature = signature;
+	rlist_add_entry(&range->slices, slice, in_range);
+	if (recovery->slice_id_max < slice_id)
+		recovery->slice_id_max = slice_id;
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_DELETE_SLICE log record.
+ * This function frees the vinyl slice with ID @slice_id.
+ * Return 0 on success, -1 if slice not found.
+ */
+static int
+vy_recovery_delete_slice(struct vy_recovery *recovery, int64_t slice_id)
+{
+	struct mh_i64ptr_t *h = recovery->slice_hash;
+	mh_int_t k = mh_i64ptr_find(h, slice_id, NULL);
+	if (k == mh_end(h)) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Slice %lld deleted but not registered",
+				    (long long)slice_id));
+		return -1;
+	}
+	struct vy_slice_recovery_info *slice = mh_i64ptr_node(h, k)->val;
+	mh_i64ptr_del(h, k, NULL);
+	rlist_del_entry(slice, in_range);
+	free(slice);
 	return 0;
 }
 
@@ -1589,25 +1725,32 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 				record->begin, record->end);
 		break;
 	case VY_LOG_DELETE_RANGE:
-		rc = vy_recovery_delete_range(recovery, record->signature,
-					      record->range_id);
+		rc = vy_recovery_delete_range(recovery, record->range_id);
 		break;
 	case VY_LOG_PREPARE_RUN:
 		rc = vy_recovery_prepare_run(recovery, record->signature,
 				record->index_lsn, record->run_id);
 		break;
-	case VY_LOG_INSERT_RUN:
-		rc = vy_recovery_insert_run(recovery, record->signature,
-				record->range_id, record->run_id,
+	case VY_LOG_CREATE_RUN:
+		rc = vy_recovery_create_run(recovery, record->signature,
+				record->index_lsn, record->run_id,
 				record->min_lsn, record->max_lsn,
 				record->is_empty);
 		break;
-	case VY_LOG_DELETE_RUN:
-		rc = vy_recovery_delete_run(recovery, record->signature,
-					    record->run_id);
+	case VY_LOG_DROP_RUN:
+		rc = vy_recovery_drop_run(recovery, record->signature,
+					  record->run_id);
 		break;
 	case VY_LOG_FORGET_RUN:
 		rc = vy_recovery_forget_run(recovery, record->run_id);
+		break;
+	case VY_LOG_INSERT_SLICE:
+		rc = vy_recovery_insert_slice(recovery, record->signature,
+				record->range_id, record->run_id,
+				record->slice_id, record->begin, record->end);
+		break;
+	case VY_LOG_DELETE_SLICE:
+		rc = vy_recovery_delete_slice(recovery, record->slice_id);
 		break;
 	default:
 		unreachable();
@@ -1631,15 +1774,19 @@ vy_recovery_new_f(va_list ap)
 	recovery->index_hash = NULL;
 	recovery->range_hash = NULL;
 	recovery->run_hash = NULL;
+	recovery->slice_hash = NULL;
 	recovery->range_id_max = -1;
 	recovery->run_id_max = -1;
+	recovery->slice_id_max = -1;
 
 	recovery->index_hash = mh_i64ptr_new();
 	recovery->range_hash = mh_i64ptr_new();
 	recovery->run_hash = mh_i64ptr_new();
+	recovery->slice_hash = mh_i64ptr_new();
 	if (recovery->index_hash == NULL ||
 	    recovery->range_hash == NULL ||
-	    recovery->run_hash == NULL) {
+	    recovery->run_hash == NULL ||
+	    recovery->slice_hash == NULL) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
 		goto fail_free;
 	}
@@ -1737,6 +1884,8 @@ vy_recovery_delete(struct vy_recovery *recovery)
 		vy_recovery_delete_hash(recovery->range_hash);
 	if (recovery->run_hash != NULL)
 		vy_recovery_delete_hash(recovery->run_hash);
+	if (recovery->slice_hash != NULL)
+		vy_recovery_delete_hash(recovery->slice_hash);
 	TRASH(recovery);
 	free(recovery);
 }
@@ -1755,6 +1904,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_range_recovery_info *range;
+	struct vy_slice_recovery_info *slice;
 	struct vy_run_recovery_info *run;
 	struct vy_log_record record;
 	const char *tmp;
@@ -1786,9 +1936,27 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		return 0;
 	}
 
-	rlist_foreach_entry(range, &index->ranges, in_index) {
-		if (!include_deleted && range->is_deleted)
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		if (!include_deleted &&
+		    (run->is_dropped || run->is_incomplete))
 			continue;
+		record.type = (run->is_incomplete ?
+			       VY_LOG_PREPARE_RUN : VY_LOG_CREATE_RUN);
+		record.signature = run->signature;
+		record.run_id = run->id;
+		record.min_lsn = run->min_lsn;
+		record.max_lsn = run->max_lsn;
+		record.is_empty = run->is_empty;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
+		if (!run->is_dropped)
+			continue;
+		record.type = VY_LOG_DROP_RUN;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
+	}
+
+	rlist_foreach_entry(range, &index->ranges, in_index) {
 		record.type = VY_LOG_INSERT_RANGE;
 		record.signature = range->signature;
 		record.range_id = range->id;
@@ -1801,51 +1969,23 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		/*
-		 * Newer runs are stored closer to the head of the list,
-		 * while we are supposed to return runs in chronological
+		 * Newer slices are stored closer to the head of the list,
+		 * while we are supposed to return slices in chronological
 		 * order, so use reverse iterator.
 		 */
-		rlist_foreach_entry_reverse(run, &range->runs, in_range) {
-			if (!include_deleted && run->is_deleted)
-				continue;
-			record.type = VY_LOG_INSERT_RUN;
-			record.signature = run->signature;
-			record.range_id = range->id;
-			record.run_id = run->id;
-			record.min_lsn = run->min_lsn;
-			record.max_lsn = run->max_lsn;
-			record.is_empty = run->is_empty;
+		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
+			record.type = VY_LOG_INSERT_SLICE;
+			record.signature = slice->signature;
+			record.slice_id = slice->id;
+			record.run_id = slice->run_id;
+			record.begin = tmp = slice->begin;
+			if (mp_decode_array(&tmp) == 0)
+				record.begin = NULL;
+			record.end = tmp = slice->end;
+			if (mp_decode_array(&tmp) == 0)
+				record.end = NULL;
 			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
-			if (run->is_deleted) {
-				record.type = VY_LOG_DELETE_RUN;
-				if (vy_recovery_cb_call(cb, cb_arg,
-							  &record) != 0)
-					return -1;
-			}
-		}
-		if (range->is_deleted) {
-			record.type = VY_LOG_DELETE_RANGE;
-			record.signature = range->signature;
-			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
-				return -1;
-		}
-	}
-
-	if (include_deleted) {
-		rlist_foreach_entry(run, &index->incomplete_runs,
-				    in_incomplete) {
-			record.type = VY_LOG_PREPARE_RUN;
-			record.signature = run->signature;
-			record.run_id = run->id;
-			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
-				return -1;
-			if (index->is_dropped || run->is_deleted) {
-				record.type = VY_LOG_DELETE_RUN;
-				if (vy_recovery_cb_call(cb, cb_arg,
-							  &record) != 0)
-					return -1;
-			}
 		}
 	}
 

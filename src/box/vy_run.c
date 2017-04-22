@@ -191,7 +191,8 @@ vy_run_search_page(struct vy_run *run, const struct tuple *key,
 }
 
 struct vy_slice *
-vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end,
+vy_slice_new(int64_t id, struct vy_run *run,
+	     struct tuple *begin, struct tuple *end,
 	     const struct key_def *key_def)
 {
 	struct vy_slice *slice = malloc(sizeof(*slice));
@@ -201,6 +202,7 @@ vy_slice_new(struct vy_run *run, struct tuple *begin, struct tuple *end,
 		return NULL;
 	}
 	memset(slice, 0, sizeof(*slice));
+	slice->id = id;
 	vy_run_ref(run);
 	slice->run = run;
 	if (begin != NULL)
