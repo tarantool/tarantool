@@ -73,8 +73,7 @@ enum vy_log_record_type {
 	VY_LOG_DROP_INDEX		= 1,
 	/**
 	 * Insert a new range into a vinyl index.
-	 * Requires vy_log_record::index_lsn, range_id,
-	 * range_begin, range_end.
+	 * Requires vy_log_record::index_lsn, range_id, begin, end.
 	 */
 	VY_LOG_INSERT_RANGE		= 2,
 	/**
@@ -146,9 +145,9 @@ struct vy_log_record {
 	/** Unique ID of the vinyl run. */
 	int64_t run_id;
 	/** Msgpack key for start of the vinyl range. */
-	const char *range_begin;
+	const char *begin;
 	/** Msgpack key for end of the vinyl range. */
-	const char *range_end;
+	const char *end;
 	/** Ordinal index number in the space. */
 	uint32_t index_id;
 	/** Space ID. */
@@ -383,7 +382,7 @@ vy_log_drop_index(int64_t index_lsn)
 /** Helper to log a vinyl range insertion. */
 static inline void
 vy_log_insert_range(int64_t index_lsn, int64_t range_id,
-		    const char *range_begin, const char *range_end)
+		    const char *begin, const char *end)
 {
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
@@ -391,8 +390,8 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.range_id = range_id;
-	record.range_begin = range_begin;
-	record.range_end = range_end;
+	record.begin = begin;
+	record.end = end;
 	vy_log_write(&record);
 }
 

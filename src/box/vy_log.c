@@ -69,8 +69,8 @@ enum vy_log_key {
 	VY_LOG_KEY_INDEX_LSN		= 0,
 	VY_LOG_KEY_RANGE_ID		= 1,
 	VY_LOG_KEY_RUN_ID		= 2,
-	VY_LOG_KEY_RANGE_BEGIN		= 3,
-	VY_LOG_KEY_RANGE_END		= 4,
+	VY_LOG_KEY_BEGIN		= 3,
+	VY_LOG_KEY_END			= 4,
 	VY_LOG_KEY_INDEX_ID		= 5,
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_DEF			= 7,
@@ -91,8 +91,8 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
 	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RANGE_ID) |
-					  (1 << VY_LOG_KEY_RANGE_BEGIN) |
-					  (1 << VY_LOG_KEY_RANGE_END),
+					  (1 << VY_LOG_KEY_BEGIN) |
+					  (1 << VY_LOG_KEY_END),
 	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
 	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
@@ -110,8 +110,8 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_INDEX_LSN]		= "index_lsn",
 	[VY_LOG_KEY_RANGE_ID]		= "range_id",
 	[VY_LOG_KEY_RUN_ID]		= "run_id",
-	[VY_LOG_KEY_RANGE_BEGIN]	= "range_begin",
-	[VY_LOG_KEY_RANGE_END]		= "range_end",
+	[VY_LOG_KEY_BEGIN]		= "begin",
+	[VY_LOG_KEY_END]		= "end",
 	[VY_LOG_KEY_INDEX_ID]		= "index_id",
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_DEF]		= "key_def",
@@ -319,22 +319,22 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_RUN_ID],
 			record->run_id);
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_BEGIN)) {
+	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
-			vy_log_key_name[VY_LOG_KEY_RANGE_BEGIN]);
-		if (record->range_begin != NULL)
+			vy_log_key_name[VY_LOG_KEY_BEGIN]);
+		if (record->begin != NULL)
 			SNPRINT(total, mp_snprint, buf, size,
-				record->range_begin);
+				record->begin);
 		else
 			SNPRINT(total, snprintf, buf, size, "[]");
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_END)) {
+	if (key_mask & (1 << VY_LOG_KEY_END)) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
-			vy_log_key_name[VY_LOG_KEY_RANGE_END]);
-		if (record->range_end != NULL)
+			vy_log_key_name[VY_LOG_KEY_END]);
+		if (record->end != NULL)
 			SNPRINT(total, mp_snprint, buf, size,
-				record->range_end);
+				record->end);
 		else
 			SNPRINT(total, snprintf, buf, size, "[]");
 		SNPRINT(total, snprintf, buf, size, ", ");
@@ -425,24 +425,24 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->run_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_BEGIN)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_RANGE_BEGIN);
-		if (record->range_begin != NULL) {
-			const char *p = record->range_begin;
+	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
+		size += mp_sizeof_uint(VY_LOG_KEY_BEGIN);
+		if (record->begin != NULL) {
+			const char *p = record->begin;
 			assert(mp_typeof(*p) == MP_ARRAY);
 			mp_next(&p);
-			size += p - record->range_begin;
+			size += p - record->begin;
 		} else
 			size += mp_sizeof_array(0);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_END)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_RANGE_END);
-		if (record->range_end != NULL) {
-			const char *p = record->range_end;
+	if (key_mask & (1 << VY_LOG_KEY_END)) {
+		size += mp_sizeof_uint(VY_LOG_KEY_END);
+		if (record->end != NULL) {
+			const char *p = record->end;
 			assert(mp_typeof(*p) == MP_ARRAY);
 			mp_next(&p);
-			size += p - record->range_end;
+			size += p - record->end;
 		} else
 			size += mp_sizeof_array(0);
 		n_keys++;
@@ -506,25 +506,23 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_RUN_ID);
 		pos = mp_encode_uint(pos, record->run_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_BEGIN)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_RANGE_BEGIN);
-		if (record->range_begin != NULL) {
-			const char *p = record->range_begin;
+	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_BEGIN);
+		if (record->begin != NULL) {
+			const char *p = record->begin;
 			mp_next(&p);
-			memcpy(pos, record->range_begin,
-			       p - record->range_begin);
-			pos += p - record->range_begin;
+			memcpy(pos, record->begin, p - record->begin);
+			pos += p - record->begin;
 		} else
 			pos = mp_encode_array(pos, 0);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_END)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_RANGE_END);
-		if (record->range_end != NULL) {
-			const char *p = record->range_end;
+	if (key_mask & (1 << VY_LOG_KEY_END)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_END);
+		if (record->end != NULL) {
+			const char *p = record->end;
 			mp_next(&p);
-			memcpy(pos, record->range_end,
-			       p - record->range_end);
-			pos += p - record->range_end;
+			memcpy(pos, record->end, p - record->end);
+			pos += p - record->end;
 		} else
 			pos = mp_encode_array(pos, 0);
 	}
@@ -627,12 +625,12 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_RUN_ID:
 			record->run_id = mp_decode_uint(&pos);
 			break;
-		case VY_LOG_KEY_RANGE_BEGIN:
-			record->range_begin = pos;
+		case VY_LOG_KEY_BEGIN:
+			record->begin = pos;
 			mp_next(&pos);
 			break;
-		case VY_LOG_KEY_RANGE_END:
-			record->range_end = pos;
+		case VY_LOG_KEY_END:
+			record->end = pos;
 			mp_next(&pos);
 			break;
 		case VY_LOG_KEY_INDEX_ID:
@@ -1588,7 +1586,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_insert_range(recovery, record->signature,
 				record->index_lsn, record->range_id,
-				record->range_begin, record->range_end);
+				record->begin, record->end);
 		break;
 	case VY_LOG_DELETE_RANGE:
 		rc = vy_recovery_delete_range(recovery, record->signature,
@@ -1779,7 +1777,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		 */
 		record.type = VY_LOG_INSERT_RANGE;
 		record.range_id = INT64_MAX; /* fake id */
-		record.range_begin = record.range_end = NULL;
+		record.begin = record.end = NULL;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		record.type = VY_LOG_DROP_INDEX;
@@ -1794,12 +1792,12 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		record.type = VY_LOG_INSERT_RANGE;
 		record.signature = range->signature;
 		record.range_id = range->id;
-		record.range_begin = tmp = range->begin;
+		record.begin = tmp = range->begin;
 		if (mp_decode_array(&tmp) == 0)
-			record.range_begin = NULL;
-		record.range_end = tmp = range->end;
+			record.begin = NULL;
+		record.end = tmp = range->end;
 		if (mp_decode_array(&tmp) == 0)
-			record.range_end = NULL;
+			record.end = NULL;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		/*

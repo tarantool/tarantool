@@ -3057,17 +3057,17 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		range = vy_range_new(index, record->range_id, NULL, NULL);
 		if (range == NULL)
 			return -1;
-		if (record->range_begin != NULL) {
+		if (record->begin != NULL) {
 			range->begin = vy_key_from_msgpack(key_format,
-							   record->range_begin);
+							   record->begin);
 			if (range->begin == NULL) {
 				vy_range_delete(range);
 				return -1;
 			}
 		}
-		if (record->range_end != NULL) {
+		if (record->end != NULL) {
 			range->end = vy_key_from_msgpack(key_format,
-							 record->range_end);
+							 record->end);
 			if (range->end == NULL) {
 				vy_range_delete(range);
 				return -1;
