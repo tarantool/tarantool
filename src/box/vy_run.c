@@ -132,6 +132,7 @@ vy_run_new(int64_t id)
 	run->id = id;
 	run->fd = -1;
 	run->refs = 1;
+	run->slice_count = 0;
 	TRASH(&run->info.bloom);
 	run->info.has_bloom = false;
 	return run;
@@ -141,6 +142,7 @@ void
 vy_run_delete(struct vy_run *run)
 {
 	assert(run->refs == 0);
+	assert(run->slice_count == 0);
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
 	if (run->info.page_infos != NULL) {

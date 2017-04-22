@@ -2471,7 +2471,7 @@ vy_range_delete(struct vy_range *range)
 	while (!rlist_empty(&range->slices)) {
 		struct vy_slice *slice = rlist_shift_entry(&range->slices,
 						struct vy_slice, in_range);
-		vy_slice_unref(slice);
+		vy_run_destroy_slice(slice);
 	}
 	/* Delete all mems. */
 	if (range->mem != NULL)
@@ -3104,7 +3104,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			vy_run_unref(run);
 			return -1;
 		}
-		slice = vy_slice_new(run, NULL, NULL, &index_def->key_def);
+		slice = vy_run_make_slice(run, NULL, NULL,
+					  &index_def->key_def);
 		vy_run_unref(run);
 		if (slice == NULL)
 			return -1;
@@ -3680,8 +3681,8 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_slice *new_slice;
 
-	new_slice = vy_slice_new(range->new_run, NULL, NULL,
-				 &index->index_def->key_def);
+	new_slice = vy_run_make_slice(range->new_run, NULL, NULL,
+				      &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
 
@@ -3694,7 +3695,7 @@ vy_task_dump_complete(struct vy_task *task)
 			  range->new_run->info.max_lsn,
 			  vy_run_is_empty(range->new_run));
 	if (vy_log_tx_commit() < 0) {
-		vy_slice_unref(new_slice);
+		vy_run_destroy_slice(new_slice);
 		return -1;
 	}
 
@@ -3876,8 +3877,8 @@ vy_task_split_complete(struct vy_task *task)
 	memset(new_slice, 0, sizeof(*new_slice) * n_parts);
 	rlist_foreach_entry(r, &range->split_list, split_list) {
 		assert(i < n_parts);
-		new_slice[i] = vy_slice_new(r->new_run, NULL, NULL,
-					    &index->index_def->key_def);
+		new_slice[i] = vy_run_make_slice(r->new_run, NULL, NULL,
+						 &index->index_def->key_def);
 		if (new_slice[i] == NULL)
 			goto fail;
 		i++;
@@ -3935,8 +3936,10 @@ vy_task_split_complete(struct vy_task *task)
 		vy_scheduler_mem_dumped(scheduler, mem);
 
 	/* Unaccount compacted runs. */
-	rlist_foreach_entry(slice, &range->slices, in_range)
-		vy_index_unacct_run(index, slice->run);
+	rlist_foreach_entry(slice, &range->slices, in_range) {
+		if (slice->run->slice_count == 1)
+			vy_index_unacct_run(index, slice->run);
+	}
 
 	vy_range_delete(range);
 	return 0;
@@ -4158,8 +4161,8 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_slice *slice, *tmp, *new_slice;
 	int n;
 
-	new_slice = vy_slice_new(range->new_run, NULL, NULL,
-				 &index->index_def->key_def);
+	new_slice = vy_run_make_slice(range->new_run, NULL, NULL,
+				      &index->index_def->key_def);
 	if (new_slice == NULL)
 		return -1;
 
@@ -4179,7 +4182,7 @@ vy_task_compact_complete(struct vy_task *task)
 			  range->new_run->info.max_lsn,
 			  vy_run_is_empty(range->new_run));
 	if (vy_log_tx_commit() < 0) {
-		vy_slice_unref(new_slice);
+		vy_run_destroy_slice(new_slice);
 		return -1;
 	}
 
@@ -4196,9 +4199,10 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_range_gc_mem(range, scheduler, task->dump_lsn);
 	n = range->compact_priority;
 	rlist_foreach_entry_safe(slice, &range->slices, in_range, tmp) {
-		vy_index_unacct_run(index, slice->run);
+		if (slice->run->slice_count == 1)
+			vy_index_unacct_run(index, slice->run);
 		vy_range_remove_slice(range, slice);
-		vy_slice_unref(slice);
+		vy_run_destroy_slice(slice);
 		if (--n == 0)
 			break;
 	}
@@ -9120,7 +9124,7 @@ vy_send_range(struct vy_join_ctx *ctx)
 
 	struct vy_slice *tmp;
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
-		vy_slice_unref(slice);
+		vy_run_destroy_slice(slice);
 	rlist_create(&ctx->slices);
 
 out_delete_wi:
@@ -9189,8 +9193,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 			vy_run_unref(run);
 			return -1;
 		}
-		struct vy_slice *slice = vy_slice_new(run, NULL, NULL,
-						      ctx->key_def);
+		struct vy_slice *slice = vy_run_make_slice(run, NULL, NULL,
+							   ctx->key_def);
 		vy_run_unref(run);
 		if (slice == NULL)
 			return -1;
@@ -9265,7 +9269,7 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 		tuple_format_ref(ctx->upsert_format, -1);
 	struct vy_slice *slice, *tmp;
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
-		vy_slice_unref(slice);
+		vy_run_destroy_slice(slice);
 out_join_cord:
 	cbus_stop_loop(&ctx->relay_pipe);
 	cpipe_destroy(&ctx->relay_pipe);

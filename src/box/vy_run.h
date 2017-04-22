@@ -128,8 +128,37 @@ struct vy_run {
 	 * in-memory structure is freed only when it reaches 0.
 	 * Needed to prevent coeio thread from using a closed
 	 * (worse, reopened) file descriptor.
+	 *
+	 * Each run is created with the reference counter equal to 1.
+	 * The counter is incremented on slice allocation (vy_slice_new)
+	 * and decremented on slice deallocation (vy_slice_delete).
 	 */
 	int refs;
+	/**
+	 * The number of active slices created for this run.
+	 * Incremented by vy_run_make_slice(), decremented by
+	 * vy_run_destroy_slice().
+	 *
+	 * It is needed to understand when a run is not used by any
+	 * slice and hence should be unaccounted and wiped from the
+	 * metadata log. Note, although ->refs is only incremented by
+	 * slices, it can't be used for the purpose, because it is
+	 * incremented by each allocated slice, which includes slices
+	 * that are pinned by open iterators.
+	 *
+	 * To sum it up,
+	 * - vy_slice::refs is incremented by the range that hosts
+	 *   the slice and by iterators that read from the slice.
+	 * - vy_run::refs is incremented by each allocated slice
+	 *   (including those that are not used by ranges and stay
+	 *   only because of being pinned by an iterator).
+	 * - vy_run::slice_count counts the number of slices that are
+	 *   are used in ranges, slice_count <= vy_run::refs.
+	 *
+	 * XXX: This looks convoluted. We need to come up with
+	 * something better than this reference counting madness.
+	 */
+	int slice_count;
 	/** Unique ID of this run. */
 	int64_t id;
 };
@@ -369,6 +398,35 @@ vy_slice_unref(struct vy_slice *slice)
 		return true;
 	}
 	return false;
+}
+
+/**
+ * Make a new slice for a run.
+ * This function increments vy_run::slice_count.
+ */
+static inline struct vy_slice *
+vy_run_make_slice(struct vy_run *run, struct tuple *begin, struct tuple *end,
+		  const struct key_def *key_def)
+{
+	struct vy_slice *slice = vy_slice_new(run, begin, end, key_def);
+	if (slice != NULL)
+		run->slice_count++;
+	assert(run->refs >= run->slice_count);
+	return slice;
+}
+
+/**
+ * Destroy a run slice created with vy_run_make_slice().
+ * This function decrements vy_run::slice_count.
+ */
+static inline void
+vy_run_destroy_slice(struct vy_slice *slice)
+{
+	struct vy_run *run = slice->run;
+	assert(run->refs >= run->slice_count);
+	assert(run->slice_count > 0);
+	run->slice_count--;
+	vy_slice_unref(slice);
 }
 
 /**
