@@ -50,6 +50,7 @@
 #include <coeio_file.h>
 
 #include "trivia/util.h"
+#include "assoc.h"
 #include "crc32.h"
 #include "clock.h"
 #include "trivia/config.h"
@@ -3031,6 +3032,12 @@ struct vy_index_recovery_cb_arg {
 	struct vy_index *index;
 	/** Last recovered range. */
 	struct vy_range *range;
+	/**
+	 * All recovered runs hashed by ID.
+	 * It is needed in order not to load the same
+	 * run each time a slice is created for it.
+	 */
+	struct mh_i64ptr_t *run_hash;
 };
 
 /** Index recovery callback, passed to vy_recovery_iterate_index(). */
@@ -3040,10 +3047,11 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index_recovery_cb_arg *arg = cb_arg;
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
+	struct mh_i64ptr_t *run_hash = arg->run_hash;
 	struct index_def *index_def = index->index_def;
 	struct tuple_format *key_format = index->env->key_format;
 	struct tuple *begin = NULL, *end = NULL;
-	struct vy_run *run = NULL;
+	struct vy_run *run;
 	struct vy_slice *slice;
 	bool success = false;
 
@@ -3069,6 +3077,30 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		index->is_dropped = true;
 		break;
 	case VY_LOG_CREATE_RUN:
+		run = vy_run_new(record->run_id);
+		if (run == NULL)
+			goto out;
+		run->info.min_lsn = record->min_lsn;
+		run->info.max_lsn = record->max_lsn;
+		char index_path[PATH_MAX];
+		vy_run_snprint_path(index_path, sizeof(index_path),
+				    index->path, run->id, VY_FILE_INDEX);
+		char run_path[PATH_MAX];
+		vy_run_snprint_path(run_path, sizeof(run_path),
+				    index->path, run->id, VY_FILE_RUN);
+		if (!record->is_empty &&
+		    vy_run_recover(run, index_path, run_path) != 0) {
+			vy_run_unref(run);
+			goto out;
+		}
+		struct mh_i64ptr_node_t node = { run->id, run };
+		if (mh_i64ptr_put(run_hash, &node,
+				  NULL, NULL) == mh_end(run_hash)) {
+			diag_set(OutOfMemory, 0,
+				 "mh_i64ptr_put", "mh_i64ptr_node_t");
+			vy_run_unref(run);
+			goto out;
+		}
 		break;
 	case VY_LOG_INSERT_RANGE:
 		range = vy_range_new(index, record->range_id, begin, end);
@@ -3089,34 +3121,27 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	case VY_LOG_INSERT_SLICE:
 		assert(range != NULL);
 		assert(range->id == record->range_id);
-		run = vy_run_new(record->run_id);
-		if (run == NULL)
+		mh_int_t k = mh_i64ptr_find(run_hash, record->run_id, NULL);
+		if (k == mh_end(run_hash)) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Slice %lld created for"
+					    "unregistered run %lld",
+					    (long long)record->slice_id,
+					    (long long)record->run_id));
 			goto out;
-		run->info.min_lsn = record->min_lsn;
-		run->info.max_lsn = record->max_lsn;
-		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path),
-				    index->path, run->id, VY_FILE_INDEX);
-		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path),
-				    index->path, run->id, VY_FILE_RUN);
-		if (!record->is_empty &&
-		    vy_run_recover(run, index_path, run_path) != 0)
-			goto out;
+		}
+		run = mh_i64ptr_node(run_hash, k)->val;
 		slice = vy_run_make_slice(record->slice_id, run,
 					  begin, end, &index_def->key_def);
 		if (slice == NULL)
 			goto out;
 		vy_range_add_slice(range, slice);
-		vy_index_acct_run(index, run);
 		break;
 	default:
 		unreachable();
 	}
 	success = true;
 out:
-	if (run != NULL)
-		vy_run_unref(run);
 	if (begin != NULL)
 		tuple_unref(begin);
 	if (end != NULL)
@@ -3131,8 +3156,32 @@ vy_index_open_ex(struct vy_index *index)
 	assert(env->recovery != NULL);
 
 	struct vy_index_recovery_cb_arg arg = { .index = index };
-	if (vy_recovery_iterate_index(env->recovery, index->index_def->opts.lsn,
-				      false, vy_index_recovery_cb, &arg) != 0)
+	arg.run_hash = mh_i64ptr_new();
+	if (arg.run_hash == NULL) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
+		return -1;
+	}
+
+	struct index_def *index_def = index->index_def;
+	int rc = vy_recovery_iterate_index(env->recovery, index_def->opts.lsn,
+					   false, vy_index_recovery_cb, &arg);
+
+	mh_int_t k;
+	mh_foreach(arg.run_hash, k) {
+		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
+		if (run->slice_count == 0) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Unused run %lld in index %lld",
+					    (long long)run->id,
+					    (long long)index_def->opts.lsn));
+			rc = -1;
+		} else
+			vy_index_acct_run(index, run);
+		vy_run_unref(run);
+	}
+	mh_i64ptr_delete(arg.run_hash);
+
+	if (rc != 0)
 		return -1;
 
 	/*
@@ -3141,7 +3190,7 @@ vy_index_open_ex(struct vy_index *index)
 	 * all data were recovered.
 	 */
 	struct vy_range *range, *prev = NULL;
-	const struct key_def *key_def = &index->index_def->key_def;
+	const struct key_def *key_def = &index_def->key_def;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
 	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
 		if (prev == NULL && range->begin != NULL) {
@@ -3171,7 +3220,7 @@ vy_index_open_ex(struct vy_index *index)
 	if (prev == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Index %lld has empty range tree",
-				    (long long)index->index_def->opts.lsn));
+				    (long long)index_def->opts.lsn));
 		return -1;
 	}
 	if (prev->end != NULL) {
