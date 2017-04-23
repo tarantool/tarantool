@@ -98,7 +98,7 @@ box.snapshot();
 ---
 - ok
 ...
-errinj.set("ERRINJ_VY_RANGE_DUMP", true);
+errinj.set("ERRINJ_VY_RUN_WRITE", true);
 ---
 - ok
 ...
@@ -108,16 +108,16 @@ num_rows = num_rows + range();
 -- fails due to error injection
 box.snapshot();
 ---
-- error: Error injection 'vinyl range dump'
+- error: Error injection 'vinyl dump'
 ...
-errinj.set("ERRINJ_VY_RANGE_DUMP", false);
+errinj.set("ERRINJ_VY_RUN_WRITE", false);
 ---
 - ok
 ...
 -- fails due to scheduler timeout
 box.snapshot();
 ---
-- error: Error injection 'vinyl range dump'
+- error: Error injection 'vinyl dump'
 ...
 fiber.sleep(0.06);
 ---

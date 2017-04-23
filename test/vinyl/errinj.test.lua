@@ -45,11 +45,11 @@ end;
 num_rows = 0;
 num_rows = num_rows + range();
 box.snapshot();
-errinj.set("ERRINJ_VY_RANGE_DUMP", true);
+errinj.set("ERRINJ_VY_RUN_WRITE", true);
 num_rows = num_rows + range();
 -- fails due to error injection
 box.snapshot();
-errinj.set("ERRINJ_VY_RANGE_DUMP", false);
+errinj.set("ERRINJ_VY_RUN_WRITE", false);
 -- fails due to scheduler timeout
 box.snapshot();
 fiber.sleep(0.06);

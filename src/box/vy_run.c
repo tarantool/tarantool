@@ -253,6 +253,39 @@ vy_slice_delete(struct vy_slice *slice)
 	free(slice);
 }
 
+int
+vy_slice_cut(struct vy_slice *slice, int64_t id,
+	     struct tuple *begin, struct tuple *end,
+	     const struct key_def *key_def,
+	     struct vy_slice **result)
+{
+	*result = NULL;
+
+	if (begin != NULL && slice->end != NULL &&
+	    vy_key_compare(begin, slice->end, key_def) >= 0)
+		return 0; /* no intersection: begin >= slice->end */
+
+	if (end != NULL && slice->begin != NULL &&
+	    vy_key_compare(end, slice->begin, key_def) <= 0)
+		return 0; /* no intersection: end <= slice->end */
+
+	/* begin = MAX(begin, slice->begin) */
+	if (slice->begin != NULL &&
+	    (begin == NULL || vy_key_compare(begin, slice->begin, key_def) < 0))
+		begin = slice->begin;
+
+	/* end = MIN(end, slice->end) */
+	if (slice->end != NULL &&
+	    (end == NULL || vy_key_compare(end, slice->end, key_def) > 0))
+		end = slice->end;
+
+	*result = vy_run_make_slice(id, slice->run, begin, end, key_def);
+	if (*result == NULL)
+		return -1; /* OOM */
+
+	return 0;
+}
+
 /**
  * Decode page information from xrow.
  *

@@ -7,7 +7,6 @@ stat = {
     run_step_count = 0,
     run_lookup_count = 0,
     mem_step_count = 0,
-    mem_lookup_count = 0,
 }
 function stat_changed()
     local old_stat = stat
@@ -16,7 +15,6 @@ function stat_changed()
         run_step_count=new_stat.run.step_count,
         run_lookup_count=new_stat.run.lookup_count,
         mem_step_count=new_stat.mem.step_count,
-        mem_lookup_count=new_stat.mem.lookup_count,
     }
     for k,v in pairs(stat) do
         if old_stat[k] ~= v then

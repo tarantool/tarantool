@@ -420,6 +420,19 @@ vy_run_make_slice(int64_t id, struct vy_run *run,
 }
 
 /**
+ * Cut a sub-slice of @slice starting at @begin and ending at @end.
+ * Return 0 on success, -1 on OOM.
+ *
+ * The new slice is returned in @result. If @slice does not intersect
+ * with [@begin, @end), @result is set to NULL.
+ */
+int
+vy_slice_cut(struct vy_slice *slice, int64_t id,
+	     struct tuple *begin, struct tuple *end,
+	     const struct key_def *key_def,
+	     struct vy_slice **result);
+
+/**
  * Destroy a run slice created with vy_run_make_slice().
  * This function decrements vy_run::slice_count.
  */
