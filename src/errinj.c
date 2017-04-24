@@ -40,15 +40,14 @@
 
 #define ERRINJ_MEMBER(n, t, s) { /* .name = */ #n, /* .type = */ t, /* .state = */ s },
 
-struct errinj errinjs[errinj_enum_MAX] = {
+struct errinj errinjs[errinj_id_MAX] = {
 	ERRINJ_LIST(ERRINJ_MEMBER)
 };
 
 struct errinj *
-errinj_lookup(char *name)
+errinj_by_name(char *name)
 {
-	int i;
-	for (i = 0 ; i < errinj_enum_MAX ; i++) {
+	for (enum errinj_id i = 0 ; i < errinj_id_MAX ; i++) {
 		if (strcmp(errinjs[i].name, name) == 0)
 			return &errinjs[i];
 	}
@@ -56,76 +55,11 @@ errinj_lookup(char *name)
 }
 
 /**
- * Get state of the error injection handle by id.
- *
- * @param id error injection id.
- *
- * @return error injection handle state.
- */
-bool
-errinj_getb(int id)
-{
-	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_BOOL);
-	return errinjs[id].state.bparam;
-}
-
-uint64_t
-errinj_getu64(int id)
-{
-	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_U64);
-	return errinjs[id].state.u64param;
-}
-
-/**
- * Set state of the error injection handle by id.
- *
- * @param id error injection id.
- * @param state error injection handle state.
- *
- */
-void
-errinj_setb(int id, bool state)
-{
-	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_BOOL);
-	errinjs[id].state.bparam = state;
-}
-
-void
-errinj_setu64(int id, uint64_t state)
-{
-	assert(id >= 0 && id < errinj_enum_MAX);
-	assert(errinjs[id].type == ERRINJ_U64);
-	errinjs[id].state.u64param = state;
-}
-
-/**
- * Set state of the error injection handle by name.
- *
- * @param name error injection name.
- * @param state error injection handle state.
- *
- * @return 0 on success, -1 if injection was not found.
- */
-int
-errinj_setb_byname(char *name, bool state)
-{
-	struct errinj *ei = errinj_lookup(name);
-	if (ei == NULL)
-		return -1;
-	assert(ei->type == ERRINJ_BOOL);
-	ei->state.bparam = state;
-	return 0;
-}
-
-/**
  * Dump error injection states to the callback function.
  */
 int errinj_foreach(errinj_cb cb, void *cb_ctx) {
 	int i;
-	for (i = 0 ; i < errinj_enum_MAX ; i++) {
+	for (i = 0 ; i < errinj_id_MAX ; i++) {
 		int res = cb(&errinjs[i], cb_ctx);
 		if (res != 0)
 			return res;

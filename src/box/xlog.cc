@@ -1150,11 +1150,14 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	int iovcnt = xrow_header_encode(packet, iov, 0);
 	struct obuf_svp svp = obuf_create_svp(&log->obuf);
 	for (int i = 0; i < iovcnt; ++i) {
-		ERROR_INJECT_U64(ERRINJ_WAL_WRITE_PARTIAL,
-			obuf_size(&log->obuf) > errinj_getu64(ERRINJ_WAL_WRITE_PARTIAL),
-			{	tnt_error(ClientError, ER_INJECTION, "xlog write injection");
-				obuf_rollback_to_svp(&log->obuf, &svp);
-				return -1;});
+		struct errinj *inj = errinj(ERRINJ_WAL_WRITE_PARTIAL,
+					    ERRINJ_U64);
+		if (inj != NULL && obuf_size(&log->obuf) > inj->u64param) {
+			diag_set(ClientError, ER_INJECTION,
+				 "xlog write injection");
+			obuf_rollback_to_svp(&log->obuf, &svp);
+			return -1;
+		};
 		if (obuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len) <
 		    iov[i].iov_len) {
 			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,

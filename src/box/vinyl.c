@@ -4863,9 +4863,10 @@ error:
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MIN;
 		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
-		ERROR_INJECT_U64(ERRINJ_VINYL_SCHED_TIMEOUT,
-				 errinj_getu64(ERRINJ_VINYL_SCHED_TIMEOUT) != 0,
-				 {scheduler->timeout = 0.001 * errinj_getu64(ERRINJ_VINYL_SCHED_TIMEOUT);});
+		struct errinj *inj;
+		inj = errinj(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64);
+		if (inj != NULL && inj->u64param != 0)
+			scheduler->timeout = 0.001 * inj->u64param;
 		say_warn("throttling scheduler for %.0f second(s)",
 			 scheduler->timeout);
 		scheduler->is_throttled = true;
@@ -9465,9 +9466,9 @@ vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 static int
 vy_squash_process(struct vy_squash *squash)
 {
-	ERROR_INJECT_U64(ERRINJ_VY_SQUASH_TIMEOUT,
-		errinj_getu64(ERRINJ_VY_SQUASH_TIMEOUT) > 0,
-		fiber_sleep(errinj_getu64(ERRINJ_VY_SQUASH_TIMEOUT) * 0.001));
+	struct errinj *inj = errinj(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_U64);
+	if (inj != NULL && inj->u64param > 0)
+		fiber_sleep(inj->u64param * 0.001);
 
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;

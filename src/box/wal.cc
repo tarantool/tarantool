@@ -590,7 +590,11 @@ wal_write_to_disk(struct cmsg *msg)
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
 
-	ERROR_INJECT_ONCE(ERRINJ_WAL_DELAY, sleep(5));
+	struct errinj *inj = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
+	if (inj != NULL && inj->bparam) {
+		sleep(5);
+		inj->bparam = false;
+	}
 
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
