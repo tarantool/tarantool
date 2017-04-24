@@ -346,9 +346,10 @@ typedef int
  * files. If the callback returns a non-zero value, the function stops
  * iteration over ranges and runs and returns error.
  * To ease the work done by the callback, records corresponding to
- * slices of a range always go right after the range, in the
- * chronological order, while an index's runs go after the index
- * and before its ranges.
+ * slices of a range always go right after the range, while an index's
+ * runs go after the index and before its ranges. However, the order
+ * of ranges or runs within an index or slices within a range is
+ * arbitrary.
  *
  * If @include_deleted is set, this function will also iterate over
  * deleted objects, issuing the corresponding "delete" record for each

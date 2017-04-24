@@ -266,8 +266,6 @@ struct vy_range_recovery_info {
 	/**
 	 * List of all slices in the range, linked by
 	 * vy_slice_recovery_info::in_range.
-	 *
-	 * Newer slices are closer to the head.
 	 */
 	struct rlist slices;
 };
@@ -1968,12 +1966,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 			record.end = NULL;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
-		/*
-		 * Newer slices are stored closer to the head of the list,
-		 * while we are supposed to return slices in chronological
-		 * order, so use reverse iterator.
-		 */
-		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
+		rlist_foreach_entry(slice, &range->slices, in_range) {
 			record.type = VY_LOG_INSERT_SLICE;
 			record.signature = slice->signature;
 			record.slice_id = slice->id;

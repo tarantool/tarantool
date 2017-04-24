@@ -3149,6 +3149,59 @@ out:
 	return success ? 0 : -1;
 }
 
+/**
+ * Callback passed to qsort() to sort slices by
+ * run's max_lsn descending.
+ */
+static int
+vy_slice_cmp(const void *p1, const void *p2)
+{
+	int64_t lsn1 = (*(const struct vy_slice **)p1)->run->info.max_lsn;
+	int64_t lsn2 = (*(const struct vy_slice **)p2)->run->info.max_lsn;
+	if (lsn1 > lsn2)
+		return -1;
+	if (lsn1 < lsn2)
+		return 1;
+	return 0;
+}
+
+/**
+ * Sort a list of slices by run's max_lsn descending.
+ * Return 0 on success, -1 on OOM.
+ */
+static int
+vy_slice_sort(struct rlist *slice_list)
+{
+	struct vy_slice *slice, **slice_array;
+	int i, n_slices = 0;
+
+	if (rlist_empty(slice_list))
+		return 0; /* nothing to do */
+
+	rlist_foreach_entry(slice, slice_list, in_range)
+		n_slices++;
+
+	slice_array = calloc(n_slices, sizeof(*slice_array));
+	if (slice_array == NULL) {
+		diag_set(OutOfMemory, n_slices * sizeof(*slice_array),
+			 "malloc", "struct vy_slice *");
+		return -1;
+	}
+
+	i = 0;
+	rlist_foreach_entry(slice, slice_list, in_range)
+		slice_array[i++] = slice;
+
+	qsort(slice_array, n_slices, sizeof(*slice_array), vy_slice_cmp);
+
+	rlist_create(slice_list);
+	for (i = 0; i < n_slices; i++)
+		rlist_add_tail_entry(slice_list, slice_array[i], in_range);
+
+	free(slice_array);
+	return 0;
+}
+
 static int
 vy_index_open_ex(struct vy_index *index)
 {
@@ -3193,6 +3246,8 @@ vy_index_open_ex(struct vy_index *index)
 	const struct key_def *key_def = &index_def->key_def;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
 	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
+		if (vy_slice_sort(&range->slices) != 0)
+			return -1;
 		if (prev == NULL && range->begin != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
@@ -9179,6 +9234,9 @@ vy_send_range(struct vy_join_ctx *ctx)
 		return 0; /* nothing to do */
 
 	int rc = -1;
+	if (vy_slice_sort(&ctx->slices) != 0)
+		goto out;
+
 	ctx->wi = vy_write_iterator_new(ctx->env, ctx->key_def, ctx->key_def,
 					ctx->format, ctx->upsert_format,
 					true, 0, true, INT64_MAX);
