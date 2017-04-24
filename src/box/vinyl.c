@@ -2656,6 +2656,32 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	if (key_compare(first_page->min_key, mid_page->min_key,
 			&index_def->key_def) == 0)
 		return false;
+	/*
+	 * In extreme cases the median key can be < the beginning
+	 * of the slice, e.g.
+	 *
+	 * RUN:
+	 * ... |---- page N ----|-- page N + 1 --|-- page N + 2 --
+	 *     | min_key = [10] | min_key = [50] | min_key = [100]
+	 *
+	 * SLICE:
+	 * begin = [30], end = [70]
+	 * first_page_no = N, last_page_no = N + 1
+	 *
+	 * which makes mid_page_no = N and mid_page->min_key = [10].
+	 *
+	 * In such cases there's no point in splitting the range.
+	 */
+	if (slice->begin != NULL && key_compare(mid_page->min_key,
+			tuple_data(slice->begin), &index_def->key_def) <= 0)
+		return false;
+	/*
+	 * The median key can't be >= the end of the slice as we
+	 * take the min key of a page for the median key.
+	 */
+	assert(slice->end == NULL || key_compare(mid_page->min_key,
+			tuple_data(slice->end), &index_def->key_def) < 0);
+
 	*p_split_key = mid_page->min_key;
 	return true;
 }
