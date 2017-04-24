@@ -1046,7 +1046,29 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	tuple_unref(stmt);
 	if (!rc) /* If next_pos() found something then get it. */
 		rc = vy_run_iterator_get(itr, ret);
-	return rc;
+	if (rc != 0 || *ret == NULL)
+		return rc;
+	/* Check if the result is within the slice boundaries. */
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
+		if (slice->begin != NULL &&
+		    vy_stmt_compare_with_key(*ret, slice->begin, key_def) < 0) {
+			vy_run_iterator_cache_clean(itr);
+			itr->search_ended = true;
+			*ret = NULL;
+			return 0;
+		}
+	} else {
+		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
+		       iterator_type == ITER_EQ);
+		if (slice->end != NULL &&
+		    vy_stmt_compare_with_key(*ret, slice->end, key_def) >= 0) {
+			vy_run_iterator_cache_clean(itr);
+			itr->search_ended = true;
+			*ret = NULL;
+			return 0;
+		}
+	}
+	return 0;
 }
 
 /*
@@ -1057,16 +1079,14 @@ static NODISCARD int
 vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 			 bool *stop);
 /**
- * Find next (lower, older) record with the same key as current
- * Return true if the record was found
- * Return false if no value was found (or EOF) or there is a read error
+ * Start iteration in a run w/o checking slice boundaries.
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read or memory error
  * @retval -2 invalid iterator
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
-vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
+vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	struct vy_run *run = itr->slice->run;
 
@@ -1161,6 +1181,75 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 		 */
 		return vy_run_iterator_find_lsn(itr, ret);
 	}
+}
+
+/**
+ * Start iteration in a run taking into account slice boundaries.
+ * This function is a wrapper around vy_run_iterator_do_start()
+ * which temporarily substitutes the search key and the iterator
+ * direction to make sure the result falls in the given slice.
+ */
+static NODISCARD int
+vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
+{
+	enum iterator_type type = itr->iterator_type;
+	const struct tuple *key = itr->key;
+	const struct key_def *key_def = itr->key_def;
+	struct vy_slice *slice = itr->slice;
+	int cmp;
+
+	if (slice->begin != NULL &&
+	    (type == ITER_GT || type == ITER_GE || type == ITER_EQ)) {
+		/*
+		 *    original   |     start
+		 * --------------+-------+-----+
+		 *   KEY   | DIR |  KEY  | DIR |
+		 * --------+-----+-------+-----+
+		 * > begin | *   | key   | *   |
+		 * = begin | gt  | key   | gt  |
+		 *         | ge  | begin | ge  |
+		 *         | eq  | begin | ge  |
+		 * < begin | gt  | begin | ge  |
+		 *         | ge  | begin | ge  |
+		 *         | eq  |    stop     |
+		 */
+		cmp = vy_stmt_compare_with_key(key, slice->begin, key_def);
+		if (cmp < 0 && type == ITER_EQ) {
+			vy_run_iterator_cache_clean(itr);
+			itr->search_ended = true;
+			return 0;
+		}
+		if (cmp < 0 || (cmp == 0 && type != ITER_GT)) {
+			itr->iterator_type = ITER_GE;
+			itr->key = slice->begin;
+		}
+	}
+
+	if (slice->end != NULL &&
+	    (type == ITER_LT || type == ITER_LE)) {
+		/*
+		 *    original   |     start
+		 * --------------+-------+-----+
+		 *   KEY   | DIR |  KEY  | DIR |
+		 * --------+-----+-------+-----+
+		 * < end   | *   | key   | *   |
+		 * = end   | lt  | key   | lt  |
+		 *         | le  | end   | lt  |
+		 * > end   | lt  | end   | lt  |
+		 *         | le  | end   | lt  |
+		 */
+		cmp = vy_stmt_compare_with_key(key, slice->end, key_def);
+		if (cmp > 0 || (cmp == 0 && type != ITER_LT)) {
+			itr->iterator_type = ITER_LT;
+			itr->key = slice->end;
+		}
+	}
+
+	int rc = vy_run_iterator_do_start(itr, ret);
+
+	itr->iterator_type = type;
+	itr->key = key;
+	return rc;
 }
 
 /* }}} vy_run_iterator vy_run_iterator support functions */
