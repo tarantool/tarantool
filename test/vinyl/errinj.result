@@ -396,10 +396,6 @@ s:replace{0, 0}
 ---
 - [0, 0]
 ...
-errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 2)
----
-- ok
-...
 s:replace{1, 0}
 ---
 - [1, 0]
@@ -407,6 +403,10 @@ s:replace{1, 0}
 s:replace{2, 0}
 ---
 - [2, 0]
+...
+errinj.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
 ...
 s:replace{3, 0}
 ---
@@ -424,7 +424,7 @@ s:replace{6, 0}
 ---
 - error: Failed to write to disk
 ...
-errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+errinj.set("ERRINJ_WAL_WRITE", false)
 ---
 - ok
 ...
@@ -522,7 +522,7 @@ test_run:cmd("setopt delimiter ';'");
 ...
 faced_trash = false
 for i = 1,100 do
-    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0)
+    errinj.set("ERRINJ_WAL_WRITE", true)
     local f = fiber.create(fiber_func)
     local itr = create_iterator(s, {0}, {iterator='GE'})
     local first = iterator_next(itr)
@@ -532,7 +532,7 @@ for i = 1,100 do
     local _,next = pcall(iterator_next, itr)
     _,next = pcall(iterator_next, itr)
     _,next = pcall(iterator_next, itr)
-    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+    errinj.set("ERRINJ_WAL_WRITE", false)
     s:delete{5}
 end;
 ---

@@ -137,14 +137,14 @@ s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 s:replace{0, 0}
 
-errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 2)
 s:replace{1, 0}
 s:replace{2, 0}
+errinj.set("ERRINJ_WAL_WRITE", true)
 s:replace{3, 0}
 s:replace{4, 0}
 s:replace{5, 0}
 s:replace{6, 0}
-errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+errinj.set("ERRINJ_WAL_WRITE", false)
 s:replace{7, 0}
 s:replace{8, 0}
 s:select{}
@@ -206,7 +206,7 @@ test_run:cmd("setopt delimiter ';'");
 
 faced_trash = false
 for i = 1,100 do
-    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0)
+    errinj.set("ERRINJ_WAL_WRITE", true)
     local f = fiber.create(fiber_func)
     local itr = create_iterator(s, {0}, {iterator='GE'})
     local first = iterator_next(itr)
@@ -216,7 +216,7 @@ for i = 1,100 do
     local _,next = pcall(iterator_next, itr)
     _,next = pcall(iterator_next, itr)
     _,next = pcall(iterator_next, itr)
-    errinj.set("ERRINJ_WAL_WRITE_COUNTDOWN", 0xFFFFFFFFFFFFFFFF)
+    errinj.set("ERRINJ_WAL_WRITE", false)
     s:delete{5}
 end;
 
