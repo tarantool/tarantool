@@ -2012,12 +2012,16 @@ static Select *isCandidateForInOpt(Expr *pX){
 ** it contains any NULL entries.  Cause the register at regHasNull to be set
 ** to a non-NULL value if iCur contains no NULLs.  Cause register regHasNull
 ** to be set to NULL if iCur contains one or more NULL values.
+**
+** TARANTOOL: Key field of index is not first column, it is column number
+** in the original table instead. So, to do proper check add argumment
+** to the function containing column number to check.
 */
-static void sqlite3SetHasNullFlag(Vdbe *v, int iCur, int regHasNull){
+static void sqlite3SetHasNullFlag(Vdbe *v, int iCur, int iCol, int regHasNull){
   int addr1;
   sqlite3VdbeAddOp2(v, OP_Integer, 0, regHasNull);
   addr1 = sqlite3VdbeAddOp1(v, OP_Rewind, iCur); VdbeCoverage(v);
-  sqlite3VdbeAddOp3(v, OP_Column, iCur, 0, regHasNull);
+  sqlite3VdbeAddOp3(v, OP_Column, iCur, iCol, regHasNull);
   sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
   VdbeComment((v, "first_entry_in(%d)", iCur));
   sqlite3VdbeJumpHere(v, addr1);
@@ -2291,7 +2295,8 @@ int sqlite3FindInIndex(
 #endif
               *prRhsHasNull = ++pParse->nMem;
               if( nExpr==1 ){
-                sqlite3SetHasNullFlag(v, iTab, *prRhsHasNull);
+		/* Tarantool: Check for null is performed on first key of the index.  */
+                sqlite3SetHasNullFlag(v, iTab, pIdx->aiColumn[0], *prRhsHasNull);
               }
             }
             sqlite3VdbeJumpHere(v, iAddr);
@@ -2670,7 +2675,7 @@ int sqlite3CodeSubselect(
   }
 
   if( rHasNullFlag ){
-    sqlite3SetHasNullFlag(v, pExpr->iTable, rHasNullFlag);
+    sqlite3SetHasNullFlag(v, pExpr->iTable, 0, rHasNullFlag);
   }
 
   if( jmpIfDynamic>=0 ){
@@ -2779,11 +2784,13 @@ static void sqlite3ExprCodeIN(
 #ifdef SQLITE_DEBUG
   /* Confirm that aiMap[] contains nVector integer values between 0 and
   ** nVector-1. */
+  /*
   for(i=0; i<nVector; i++){
     int j, cnt;
     for(cnt=j=0; j<nVector; j++) if( aiMap[j]==i ) cnt++;
     assert( cnt==1 );
   }
+  */
 #endif
 
   /* Code the LHS, the <expr> from "<expr> IN (...)". If the LHS is a 
@@ -2797,17 +2804,19 @@ static void sqlite3ExprCodeIN(
   */
   sqlite3ExprCachePush(pParse);
   rLhsOrig = exprCodeVector(pParse, pLeft, &iDummy);
-  for(i=0; i<nVector && aiMap[i]==i; i++){} /* Are LHS fields reordered? */
-  if( i==nVector ){
-    /* LHS fields are not reordered */
-    rLhs = rLhsOrig;
-  }else{
-    /* Need to reorder the LHS fields according to aiMap */
-    rLhs = sqlite3GetTempRange(pParse, nVector);
-    for(i=0; i<nVector; i++){
-      sqlite3VdbeAddOp3(v, OP_Copy, rLhsOrig+i, rLhs+aiMap[i], 0);
-    }
-  }
+  /* Tarantoool: Order is always preserved.  */
+  rLhs = rLhsOrig;
+  /* for(i=0; i<nVector && aiMap[i]==i; i++){} /\* Are LHS fields reordered? *\/ */
+  /* if( i==nVector ){ */
+  /*   /\* LHS fields are not reordered *\/ */
+  /*   rLhs = rLhsOrig; */
+  /* }else{ */
+  /*   /\* Need to reorder the LHS fields according to aiMap *\/ */
+  /*   rLhs = sqlite3GetTempRange(pParse, nVector); */
+  /*   for(i=0; i<nVector; i++){ */
+  /*     sqlite3VdbeAddOp3(v, OP_Copy, rLhsOrig+i, rLhs+aiMap[i], 0); */
+  /*   } */
+  /* } */
 
   /* If sqlite3FindInIndex() did not find or create an index that is
   ** suitable for evaluating the IN operator, then evaluate using a
@@ -2932,7 +2941,9 @@ static void sqlite3ExprCodeIN(
     int r3 = sqlite3GetTempReg(pParse);
     p = sqlite3VectorFieldSubexpr(pLeft, i);
     pColl = sqlite3ExprCollSeq(pParse, p);
-    sqlite3VdbeAddOp3(v, OP_Column, pExpr->iTable, i, r3);
+    /* Tarantool: Replace i -> aiMap [i], since original order of columns
+     * is preserved.  */
+    sqlite3VdbeAddOp3(v, OP_Column, pExpr->iTable, aiMap[i], r3);
     sqlite3VdbeAddOp4(v, OP_Ne, rLhs+i, destNotNull, r3,
                       (void*)pColl, P4_COLLSEQ);
     VdbeCoverage(v);
