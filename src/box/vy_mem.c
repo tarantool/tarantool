@@ -554,6 +554,13 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	const struct key_def *def = itr->mem->key_def;
 	int rc;
 	*ret = NULL;
+	assert(last_stmt == NULL ||
+	       vy_stmt_lsn(last_stmt) <= (**itr->read_view).vlsn);
+	assert(last_stmt == NULL || itr->curr_stmt == NULL ||
+	       iterator_direction(itr->iterator_type) *
+	       vy_tuple_compare(itr->curr_stmt, last_stmt, def) > 0 ||
+	       (vy_tuple_compare(itr->curr_stmt, last_stmt, def) == 0 &&
+		vy_stmt_lsn(itr->curr_stmt) >= vy_stmt_lsn(last_stmt)));
 
 	if (!itr->search_started) {
 		if (last_stmt == NULL) {
@@ -598,11 +605,18 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		} else if (itr->iterator_type == ITER_EQ &&
 			   vy_stmt_compare(itr->key, itr->curr_stmt,
 					   def) != 0) {
-			return true;
+			return 1;
 		}
 		if (itr->curr_stmt != NULL &&
 		    vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
+		/* remove this */
+		assert(last_stmt != NULL);
+		if (itr->curr_stmt) {
+			int dir = iterator_direction(itr->iterator_type);
+			assert(dir * vy_tuple_compare(*ret, last_stmt, def) >= 0);
+			(void)dir;
+		}
 		return position_changed;
 	}
 
@@ -625,52 +639,140 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 
 	vy_mem_iterator_check_version(itr);
-	struct vy_mem_tree_iterator pos = itr->curr_pos;
-	rc = 0;
 	if (itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT ||
 	    itr->iterator_type == ITER_EQ) {
+		/* we need to find min(key) and (if there're several) max(lsn)
+		 * with the following requirements:
+		 * 1) <= curr_stmt
+		 * 2) >= last_stmt
+		 * 3) <= vlsn
+		 * 4) < last_stmt.lsn (only if it is == last_stmt) */
+		/* Search to the left from itr->curr_stmt up to last_stmt
+		 * for something that fits lsn requirements.
+		 * The last found is the result */
+		rc = 0;
+		struct vy_mem_tree_iterator pos = itr->curr_pos; /* (1) */
 		while (true) {
 			vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 			if (vy_mem_tree_iterator_is_invalid(&pos))
 				break;
-			const struct tuple *t;
-			t = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
-							   &pos);
-			int cmp;
-			cmp = vy_stmt_compare(t, last_stmt, def);
+			const struct tuple *t =
+				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+							       &pos);
+			int cmp = vy_stmt_compare(t, last_stmt, def);
 			if (cmp < 0 || (cmp == 0 &&
 			    vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt)))
-				break;
-			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
+				break; /* (2) and (4) */
+			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) { /*(3)*/
+				/* saving the last that fits the requirements */
 				itr->curr_pos = pos;
 				itr->curr_stmt = t;
 				rc = 1;
 			}
 		}
+		/* Check some requirements */
+		assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
+		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) >= 0);
+		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
+		       vy_stmt_lsn(itr->curr_stmt) < vy_stmt_lsn(last_stmt));
 		if (vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
 		return rc;
 	}
 	assert(itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT);
-	int cmp;
-	cmp = vy_stmt_compare(itr->curr_stmt, last_stmt, def);
-	int64_t break_lsn = cmp == 0 ? vy_stmt_lsn(last_stmt) :
-		(**itr->read_view).vlsn + 1;
+	/* we need to find max(key) and (if there're several) max(lsn)
+	 * with the following requirements:
+	 * 1) >= curr_stmt
+	 * 2) <= last_stmt
+	 * 3) <= vlsn
+	 * 4) < last_stmt.lsn (only if it is == last_stmt) */
+	/* A) there might be some tuples == curr_stmt with lsn > curr_lsn,
+	 * we have to try to find that one (with max(lsn))
+	 * B) for every key > curr_stmt (but <= last_stmt) we must look for
+	 * tuple that fits requirements (and with max(lsn) for that key)
+	 * After A and B the last tuple we met is the result */
+	rc = 0;
+	/* A */
+	bool curr_last = vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0;
+	struct vy_mem_tree_iterator pos = itr->curr_pos; /* (1) */
 	while (true) {
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &pos);
 		if (vy_mem_tree_iterator_is_invalid(&pos))
 			break;
-		const struct tuple *t;
-		t = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
-		int cmp;
-		cmp = vy_stmt_compare(t, itr->curr_stmt, def);
-		assert(cmp <= 0);
-		if (cmp < 0 || vy_stmt_lsn(t) >= break_lsn)
-			break;
+		const struct tuple *t =
+			*vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
+		int cmp = vy_stmt_compare(t, itr->curr_stmt, def);
+		assert(cmp <= 0); /* (2) is automatic */
+		if (cmp < 0 || vy_stmt_lsn(t) > (**itr->read_view).vlsn)
+			break; /* (1) and (3) */
+		if (curr_last && vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt))
+			break; /* 4 */
+		/* saving max(lsn) tuple within this key */
 		itr->curr_pos = pos;
 		itr->curr_stmt = t;
 		rc = 1;
 	}
+	if (curr_last) {
+		/* Don't need (B) part */
+		goto done;
+	}
+	/* B */
+	/* forward to the next key */
+	pos = itr->curr_pos; /* (1) */
+	const struct tuple *this_key = NULL;
+	while (true) {
+		vy_mem_tree_iterator_next(&itr->mem->tree, &pos);
+		if (vy_mem_tree_iterator_is_invalid(&pos)) {
+			/* nothing there */
+			goto done;
+		}
+		this_key = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &pos);
+		int cmp = vy_stmt_compare(this_key, itr->curr_stmt, def);
+		assert(cmp >= 0);
+		if (cmp > 0)
+			break;
+	}
+	/* scan key by key */
+	assert(!curr_last);
+	bool is_last  = false;
+	bool found = false; /* found within this key */
+	while (true) {
+		if (!found &&
+		    vy_stmt_lsn(this_key) <= (**itr->read_view).vlsn && /*(3)*/
+		    (!is_last ||
+		     vy_stmt_lsn(this_key) < vy_stmt_lsn(last_stmt))) /* 4*/ {
+			/* saving max(lsn) tuple within this key */
+			found = true;
+			itr->curr_pos = pos;
+			itr->curr_stmt = this_key;
+			rc = 1;
+		}
+		vy_mem_tree_iterator_next(&itr->mem->tree, &pos);
+		if (vy_mem_tree_iterator_is_invalid(&pos))
+			goto done;
+		const struct tuple *t =
+			*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+						       &pos);
+		int cmp = vy_stmt_compare(t, this_key, def);
+		assert(cmp >= 0);
+		if (cmp > 0) {
+			if (is_last)
+				goto done; /* (2) */
+			cmp = vy_stmt_compare(t, last_stmt, def);
+			if (cmp > 0)
+				goto done; /* (2) */
+			if (cmp == 0)
+				is_last = true;
+			found = false;
+		}
+		this_key = t;
+	}
+done:
+	/* Check some requirements */
+	assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
+	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) <= 0);
+	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
+	       vy_stmt_lsn(itr->curr_stmt) < vy_stmt_lsn(last_stmt));
 	if (vy_mem_iterator_copy_to(itr, ret) < 0)
 		return -1;
 	return rc;

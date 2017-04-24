@@ -8030,7 +8030,12 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			assert(i < itr->skipped_start);
 			rc = src->iterator.iface->next_key(&src->iterator,
 							   &src->stmt, &stop);
-		} else  {
+		} else if (i < itr->skipped_start || src->stmt == NULL) {
+			/*
+			 * Do not restore skipped unless it's the first round.
+			 * Generally skipped srcs are handled below, but some
+			 * iterators need to be restored before next_key call.
+			 */
 			rc = src->iterator.iface->restore(&src->iterator,
 							  itr->curr_stmt,
 							  &src->stmt, &stop);
@@ -8093,6 +8098,9 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 	if (itr->skipped_start < itr->src_count)
 		itr->range_ended = false;
 
+	if (itr->curr_stmt != NULL && min_stmt != NULL)
+		assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
+
 	for (int i = MIN(itr->skipped_start, itr->mutable_end) - 1;
 	     was_yield_possible && i >= (int) itr->mutable_start; i--) {
 		struct vy_merge_src *src = &itr->src[i];
@@ -8121,6 +8129,8 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			itr->curr_src = MIN(itr->curr_src, (uint32_t)i);
 			src->front_id = itr->front_id;
 		}
+		if (itr->curr_stmt != NULL && min_stmt != NULL)
+			assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
 	}
 
 	if (itr->skipped_start < itr->src_count)
@@ -8644,11 +8654,17 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 	vy_cache_iterator_open(&sub_src->cache_iterator, stat,
 			       itr->index->cache, itr->iterator_type,
 			       itr->key, itr->read_view);
-	bool stop = false;
-	int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
-						  itr->curr_stmt,
-						  &sub_src->stmt, &stop);
-	(void)rc;
+	if (itr->curr_stmt != NULL) {
+		/*
+		 * In order not to loose stop flag, do not restore cache
+		 * iterator in general case (itr->curr_stmt)
+		 */
+		bool stop = false;
+		int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
+							  itr->curr_stmt,
+							  &sub_src->stmt, &stop);
+		(void)rc;
+	}
 }
 
 static void
