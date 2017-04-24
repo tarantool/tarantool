@@ -777,6 +777,8 @@ static int btreeMoveto(
   }else{
     pIdxKey = 0;
   }
+  /* Pass non-existing OP code to signal Tarantool to re-seek cursor.  */
+  pIdxKey->opcode = 255;
   rc = sqlite3BtreeMovetoUnpacked(pCur, pIdxKey, nKey, bias, pRes);
 moveto_done:
   if( pIdxKey ){
@@ -5446,6 +5448,12 @@ int sqlite3BtreeNext(BtCursor *pCur, int *pRes){
   pCur->curFlags &= ~(BTCF_ValidNKey|BTCF_ValidOvfl);
   *pRes = 0;
   if( pCur->curFlags & BTCF_TaCursor ){
+    if( pCur->eState!=CURSOR_VALID ){
+      int rc = restoreCursorPosition(pCur);
+      if( rc!=SQLITE_OK ){
+	return rc;
+      }
+    }
     return tarantoolSqlite3Next(pCur, pRes);
   }
   if( pCur->eState!=CURSOR_VALID ) return btreeNext(pCur, pRes);

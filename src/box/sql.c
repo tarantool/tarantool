@@ -243,6 +243,12 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 	default:
 	  /*  "Unexpected opcode" */
 		assert(0);
+	case 255:
+	/* Restore saved state. Just re-seek cursor.
+	   TODO: replace w/ named constant.  */
+		iter_type = ((struct ta_cursor *)pCur->pTaCursor)->type;
+		res_success = 0;
+		break;
 	case OP_SeekLT:
 		iter_type = ITER_LT;
 		res_success = -1; /* item<key */
