@@ -260,6 +260,12 @@ typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 const char *data_end,
 					 const struct key_def *key_def,
 					 uint32_t *key_size);
+/** @copydoc tuple_hash() */
+typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
+				 const struct key_def *key_def);
+/** @copydoc key_hash() */
+typedef uint32_t (*key_hash_t)(const char *key,
+				const struct key_def *key_def);
 
 /* Definition of a multipart key. */
 struct key_def {
@@ -271,6 +277,10 @@ struct key_def {
 	tuple_extract_key_t tuple_extract_key;
 	/** @see tuple_extract_key_raw() */
 	tuple_extract_key_raw_t tuple_extract_key_raw;
+	/** @see tuple_hash() */
+	tuple_hash_t tuple_hash;
+	/** @see key_hash() */
+	key_hash_t key_hash;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
