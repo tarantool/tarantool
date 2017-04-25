@@ -872,7 +872,6 @@ struct vy_read_iterator {
 	struct vy_index *index;
 	/* transaction to iterate over */
 	struct vy_tx *tx;
-	bool only_disk;
 
 	/* search options */
 	enum iterator_type iterator_type;
@@ -900,14 +899,12 @@ struct vy_read_iterator {
  *                      of the iteration.
  * @param key           Key for the iteration.
  * @param vlsn          Maximal visible LSN of transactions.
- * @param only_disk     True, if no need to open vy_mems and tx.
  */
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum iterator_type iterator_type,
-		      const struct tuple *key, const struct vy_read_view **rv,
-		      bool only_disk);
+		      const struct tuple *key, const struct vy_read_view **rv);
 
 /**
  * Get the next statement with another key, or start the iterator,
@@ -6176,7 +6173,7 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, ITER_EQ, vykey, p_read_view, false);
+	vy_read_iterator_open(&itr, index, tx, ITER_EQ, vykey, p_read_view);
 	if (vy_read_iterator_next(&itr, result) != 0)
 		goto error;
 	if (tx != NULL && vy_tx_track(tx, index, vykey, *result == NULL) != 0) {
@@ -8869,18 +8866,15 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
-	if (!itr->only_disk && itr->tx != NULL)
+	if (itr->tx != NULL)
 		vy_read_iterator_add_tx(itr);
 
-	if (!itr->only_disk)
-		vy_read_iterator_add_cache(itr);
+	vy_read_iterator_add_cache(itr);
 
 	if (itr->curr_range == NULL)
 		return;
 
-	if (!itr->only_disk)
-		vy_read_iterator_add_mem(itr);
-
+	vy_read_iterator_add_mem(itr);
 	vy_read_iterator_add_disk(itr);
 
 	/* Enable range and range index version checks */
@@ -8895,15 +8889,13 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
-		      const struct tuple *key, const struct vy_read_view **rv,
-		      bool only_disk)
+		      const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->index = index;
 	itr->tx = tx;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	itr->only_disk = only_disk;
 	itr->search_started = false;
 	itr->curr_stmt = NULL;
 	itr->curr_range = NULL;
@@ -9603,7 +9595,7 @@ vy_squash_process(struct vy_squash *squash)
 	 * prepared, but not committed statements.
 	 */
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
-			      &env->xm->p_committed_read_view, false);
+			      &env->xm->p_committed_read_view);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc == 0 && result != NULL)
@@ -9834,8 +9826,7 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		unreachable();
 	}
 	vy_read_iterator_open(&c->iterator, index, tx, iterator_type, c->key,
-			      (const struct vy_read_view **) &tx->read_view,
-			      false);
+			      (const struct vy_read_view **)&tx->read_view);
 	c->iterator_type = iterator_type;
 	return c;
 }
