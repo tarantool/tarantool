@@ -154,7 +154,7 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
-          offset: 68
+          offset: 98
           size: 65
           unpacked_size: 46
           count: 3
@@ -191,7 +191,7 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
-          offset: 68
+          offset: 98
           size: 65
           unpacked_size: 46
           count: 3

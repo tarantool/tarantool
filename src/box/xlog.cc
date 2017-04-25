@@ -276,6 +276,8 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 					  "offset %zd", off);
 				return -1;
 			}
+		} else if (memcmp(key, VERSION_KEY, key_end - key) == 0) {
+			/* Ignore Version: for now */
 		} else {
 			/*
 			 * Unknown key
