@@ -292,6 +292,9 @@ struct key_def {
 	
 	tuple_extract_key_raw_t tuple_extract_key_raw;
 
+	tuple_hash_t tuple_hash;
+
+	key_hash_t key_hash;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */

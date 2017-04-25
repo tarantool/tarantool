@@ -316,7 +316,7 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 }
 
 /**
- * Sets a key extraction functions for the key_def
+ * Sets a key extraction function for the key_def
  *
  * @param key_def key_definition
  *
@@ -605,67 +605,6 @@ tuple_bless(struct tuple *tuple)
 	/* Remember current tuple */
 	box_tuple_last = tuple;
 	return tuple;
-}
-
-/**
- * Non-inline part of tuple_hash.
- * Support function of tuple_hash, only for internal use.
- * @sa tuple_hash
- */
-uint32_t
-tuple_hash_slow_path(const struct tuple *tuple, const struct key_def *key_def);
-
-/**
- * Calculate a common hash value for a tuple
- * @param tuple - a tuple
- * @param key_def - key_def for field description
- * @return - hash value
- */
-static inline uint32_t
-tuple_hash(const struct tuple *tuple, const struct key_def *key_def)
-{
-	const struct key_part *part = key_def->parts;
-	/*
-	 * Speed up the simplest case when we have a
-	 * single-part hash_table over an integer field.
-	 */
-	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
-		const char *field = tuple_field(tuple, part->fieldno);
-		uint64_t val = mp_decode_uint(&field);
-		if (likely(val <= UINT32_MAX))
-			return val;
-		return ((uint32_t)((val)>>33^(val)^(val)<<11));
-	}
-	return tuple_hash_slow_path(tuple, key_def);
-}
-
-/**
- * Non-inline part of key_hash.
- * Support function of key_hash, only for internal use.
- * @sa key_hash
- */
-uint32_t
-key_hash_slow_path(const char *key, const struct key_def *key_def);
-
-/**
- * Calculate a common hash value for a full key
- * @param key - full key (msgpack fields w/o array marker)
- * @param key_def - key_def for field description
- * @return - hash value
- */
-static inline uint32_t
-key_hash(const char *key, const struct key_def *key_def)
-{
-	const struct key_part *part = key_def->parts;
-
-	/* see tuple_hash */
-	if (key_def->part_count == 1 && part->type == FIELD_TYPE_UNSIGNED) {
-		uint64_t val = mp_decode_uint(&key);
-		if (likely(val <= UINT32_MAX))
-			return val;
-		return ((uint32_t)((val)>>33^(val)^(val)<<11));
-	}
-	return key_hash_slow_path(key, key_def);
 }
 
 /** These functions are implemented in tuple_convert.cc. */

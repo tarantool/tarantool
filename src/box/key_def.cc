@@ -41,6 +41,7 @@
 #include "space.h"
 #include "schema.h"
 #include "tuple_compare.h"
+#include "tuple_hash.h"
 
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
@@ -162,6 +163,7 @@ key_def_set_cmp(struct key_def *def)
 {
 	def->tuple_compare = tuple_compare_create(def);
 	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
+	tuple_hash_func_set(def);
 	tuple_extract_key_set(def);
 }
 

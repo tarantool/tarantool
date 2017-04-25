@@ -35,6 +35,7 @@
 #include "xlog.h"
 #include "fio.h"
 #include "memory.h"
+#include "tuple_hash.h"
 
 /**
  * coio task for vinyl page read

@@ -33,11 +33,6 @@
 #include "trivia/util.h"
 #include "fiber.h"
 #include "tt_uuid.h"
-#include "third_party/PMurHash.h"
-
-enum {
-	HASH_SEED = 13U
-};
 
 static struct mempool tuple_iterator_pool;
 
@@ -423,76 +418,4 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
-}
-
-static uint32_t
-tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-	      enum field_type type)
-{
-	const char *f = *field;
-	uint32_t size;
-
-	switch (type) {
-	case FIELD_TYPE_STRING:
-		/*
-		 * (!) MP_STR fields hashed **excluding** MsgPack format
-		 * indentifier. We have to do that to keep compatibility
-		 * with old third-party MsgPack (spec-old.md) implementations.
-		 * \sa https://github.com/tarantool/tarantool/issues/522
-		 */
-		f = mp_decode_str(field, &size);
-		break;
-	default:
-		mp_next(field);
-		size = *field - f;  /* calculate the size of field */
-		/*
-		 * (!) All other fields hashed **including** MsgPack format
-		 * identifier (e.g. 0xcc). This was done **intentionally**
-		 * for performance reasons. Please follow MsgPack specification
-		 * and pack all your numbers to the most compact representation.
-		 * If you still want to add support for broken MsgPack,
-		 * please don't forget to patch tuple_compare_field().
-		 */
-		break;
-	}
-	assert(size < INT32_MAX);
-	PMurHash32_Process(ph1, pcarry, f, size);
-	return size;
-}
-
-uint32_t
-tuple_hash_slow_path(const struct tuple *tuple, const struct key_def *key_def)
-{
-	assert(key_def->part_count != 1 ||
-	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	for (const struct key_part *part = key_def->parts;
-	     part < key_def->parts + key_def->part_count; part++) {
-		const char *field = tuple_field(tuple, part->fieldno);
-		total_size += tuple_hash_field(&h, &carry, &field, part->type);
-	}
-
-	return PMurHash32_Result(h, carry, total_size);
-}
-
-uint32_t
-key_hash_slow_path(const char *key, const struct key_def *key_def)
-{
-	assert(key_def->part_count != 1 ||
-	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	for (const struct key_part *part = key_def->parts;
-	     part < key_def->parts + key_def->part_count; part++) {
-		total_size += tuple_hash_field(&h, &carry, &key, part->type);
-	}
-
-	return PMurHash32_Result(h, carry, total_size);
 }

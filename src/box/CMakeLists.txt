@@ -31,6 +31,7 @@ add_library(box STATIC
     tuple_format.c
     tuple.c
     tuple_convert.c
+    tuple_hash.cc
     tuple_update.c
     tuple_compare.cc
     key_def.cc
