@@ -111,6 +111,10 @@ test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
 ---
 - true
 ...
+test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
+---
+- true
+...
 result
 ---
 - - - 00000000000000000008.vylog
@@ -154,12 +158,12 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
-          offset: 98
+          offset: <offset>
           size: 65
           unpacked_size: 46
           count: 3
           min: [1]
-          page_index_offset: 27
+          page_index_offset: <offset>
   - - 00000000000000000001.run
     - - HEADER:
           lsn: 6
@@ -191,12 +195,12 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
-          offset: 98
+          offset: <offset>
           size: 65
           unpacked_size: 46
           count: 3
           min: [4]
-          page_index_offset: 27
+          page_index_offset: <offset>
   - - 00000000000000000002.run
     - - HEADER:
           lsn: 9

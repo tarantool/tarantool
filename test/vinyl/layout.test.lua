@@ -53,5 +53,6 @@ test_run:cmd("setopt delimiter ''");
 box.backup.stop() -- resume the garbage collection process
 
 test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
+test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
 result
 test_run:cmd("clear filter")
