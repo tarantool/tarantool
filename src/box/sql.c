@@ -53,7 +53,7 @@
 #include "fiber.h"
 #include "small/region.h"
 
-static sqlite3 *db = NULL;
+static sqlite3 *db;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
@@ -61,6 +61,7 @@ void
 sql_init()
 {
 	int rc;
+
 	rc = sqlite3_open("", &db);
 	if (rc == SQLITE_OK) {
 		assert(db);
@@ -132,8 +133,7 @@ sql_get()
  * Tarantool iterator API was apparently designed by space aliens.
  * This wrapper is necessary for interfacing with the SQLite btree code.
  */
-struct ta_cursor
-{
+struct ta_cursor {
 	size_t             size;
 	box_iterator_t    *iter;
 	struct tuple      *tuple_last;
@@ -161,11 +161,12 @@ int tarantoolSqlite3CloseCursor(BtCursor *pCur)
 	assert(pCur->curFlags & BTCF_TaCursor);
 
 	struct ta_cursor *c = pCur->pTaCursor;
+
 	pCur->pTaCursor = NULL;
 
 	if (c) {
-	    if (c->iter) box_iterator_free(c->iter);
-	    if (c->tuple_last) box_tuple_unref(c->tuple_last);
+	if (c->iter) box_iterator_free(c->iter);
+	if (c->tuple_last) box_tuple_unref(c->tuple_last);
 	    free(c);
 	}
 	return SQLITE_OK;
@@ -199,9 +200,9 @@ int tarantoolSqlite3Last(BtCursor *pCur, int *pRes)
 int tarantoolSqlite3Next(BtCursor *pCur, int *pRes)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
-	if( pCur->eState==CURSOR_INVALID ){
+	if (pCur->eState == CURSOR_INVALID) {
 	  *pRes = 1;
-	  return SQLITE_OK;
+	return SQLITE_OK;
 	}
 	assert(pCur->pTaCursor);
 	assert(iterator_direction(
@@ -213,9 +214,9 @@ int tarantoolSqlite3Next(BtCursor *pCur, int *pRes)
 int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
-	if( pCur->eState==CURSOR_INVALID ){
+	if (pCur->eState == CURSOR_INVALID) {
 	  *pRes = 1;
-	  return SQLITE_OK;
+	return SQLITE_OK;
 	}
 	assert(pCur->pTaCursor);
 	assert(iterator_direction(
@@ -363,7 +364,7 @@ int tarantoolSqlite3ClearTable(int iTable)
  * only faster.
  */
 int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
-			          int *res)
+				  int *res)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
@@ -395,7 +396,7 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	field_map = tuple_field_map(tuple);
 	field_count = format->field_count;
 	field0 = base; mp_decode_array(&field0); p = field0;
-	for (i=0; i<n; i++) {
+	for (i = 0; i < n; i++) {
 		/*
 		 * Tuple contains offset map to make it possible to
 		 * extract indexed fields without decoding all prior
@@ -409,19 +410,21 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 		 *      tuple with an incomplete offset map.
 		 */
 		uint32_t fieldno = key_def->parts[i].fieldno;
+
 		if (fieldno != next_fieldno) {
 			if (fieldno >= field_count ||
 			    format->fields[fieldno].offset_slot ==
 			    TUPLE_OFFSET_SLOT_NIL) {
 				/* Outdated field_map. */
 				uint32_t j = 0;
+
 				p = field0;
 				while (j++ != fieldno)
 					mp_next(&p);
 			} else {
 				p = base + field_map[
 					format->fields[fieldno].offset_slot
-				];
+];
 			}
 		}
 		next_fieldno = fieldno + 1;
@@ -576,7 +579,7 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	if (c->iter == NULL) {
 		pCur->eState = CURSOR_INVALID;
 		return SQLITE_TARANTOOL_ERROR;
-        }
+	}
 	c->type = type;
 	pCur->eState = CURSOR_VALID;
 	pCur->curIntKey = 0;
@@ -663,27 +666,22 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	sql_schema_put(
 		init, TARANTOOL_SYS_SCHEMA_NAME,
 		BOX_SCHEMA_ID, 0,
-		"CREATE TABLE "TARANTOOL_SYS_SCHEMA_NAME" ("
-			"key TEXT PRIMARY KEY, value"
-	        ")"
+		"CREATE TABLE "TARANTOOL_SYS_SCHEMA_NAME" (key TEXT PRIMARY KEY, value"
+		")"
 	);
 
 	sql_schema_put(
 		init, TARANTOOL_SYS_SPACE_NAME,
 		BOX_SPACE_ID, 0,
-		"CREATE TABLE "TARANTOOL_SYS_SPACE_NAME" ("
-			"id INT PRIMARY KEY, owner INT, name TEXT, "
-			"engine TEXT, field_count INT, opts, format"
-		")"
+		"CREATE TABLE "TARANTOOL_SYS_SPACE_NAME" (id INT PRIMARY KEY, owner INT, name TEXT, "
+			"engine TEXT, field_count INT, opts, format)"
 	);
 
 	sql_schema_put(
 		init, TARANTOOL_SYS_INDEX_NAME,
 		BOX_INDEX_ID, 0,
-		"CREATE TABLE "TARANTOOL_SYS_INDEX_NAME" ("
-			"id INT, iid INT, "
-			"name TEXT, type TEXT, opts, parts, "
-			"PRIMARY KEY (id, iid)"
+		"CREATE TABLE "TARANTOOL_SYS_INDEX_NAME" (id INT, iid INT, "
+			"name TEXT, type TEXT, opts, parts, PRIMARY KEY (id, iid)"
 		")"
 	);
 
@@ -698,6 +696,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		struct space_def def;
+
 		space_def_create_from_tuple(&def, tuple, 0);
 		if (def.opts.sql != NULL) {
 			sql_schema_put(
@@ -721,6 +720,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		struct index_def *def;
+
 		def = index_def_new_from_tuple(tuple);
 		if (def->opts.sql != NULL) {
 			sql_schema_put(
@@ -754,13 +754,12 @@ void tarantoolSqlite3LoadSchema(InitData *init)
  * Enc is either configured to perform size estimation
  * or to render the result.
  */
-struct Enc
-{
-	char *(*encode_uint)  (char *data, uint64_t num);
-	char *(*encode_str)   (char *data, const char *str, uint32_t len);
-	char *(*encode_bool)  (char *data, bool v);
-	char *(*encode_array) (char *data, uint32_t len);
-	char *(*encode_map)   (char *data, uint32_t len);
+struct Enc {
+	char *(*encode_uint)(char *data, uint64_t num);
+	char *(*encode_str)(char *data, const char *str, uint32_t len);
+	char *(*encode_bool)(char *data, bool v);
+	char *(*encode_array)(char *data, uint32_t len);
+	char *(*encode_map)(char *data, uint32_t len);
 };
 
 /* no_encode_XXX functions estimate result size */
@@ -848,9 +847,11 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
 	int i, n = pTable->nCol;
+
 	p = enc->encode_array(base, n);
-	for (i=0; i<n; i++) {
+	for (i = 0; i < n; i++) {
 		const char *t;
+
 		p = enc->encode_map(p, 2);
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
@@ -874,6 +875,7 @@ int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
 	(void)pTable;
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
+
 	p = enc->encode_map(base, 1);
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, strlen(zSql));
@@ -899,10 +901,12 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	 * data layout.
 	 */
 	int i, n = pIndex->nColumn;
+
 	p = enc->encode_array(base, n);
-	for (i=0; i<n; i++) {
+	for (i = 0; i < n; i++) {
 		int col = pIndex->aiColumn[i];
 		const char *t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
+
 		p = enc->encode_array(p, 2),
 		p = enc->encode_uint(p, col);
 		p = enc->encode_str(p, t, strlen(t));
