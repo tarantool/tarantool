@@ -39,6 +39,7 @@ lua_source(lua_sources lua/clock.lua)
 lua_source(lua_sources lua/title.lua)
 lua_source(lua_sources lua/argparse.lua)
 lua_source(lua_sources lua/env.lua)
+lua_source(lua_sources lua/pwd.lua)
 lua_source(lua_sources lua/trigger.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
