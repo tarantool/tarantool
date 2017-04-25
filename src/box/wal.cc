@@ -592,7 +592,7 @@ wal_write_to_disk(struct cmsg *msg)
 
 	struct errinj *inj = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
 	while (inj != NULL && inj->bparam)
-		sleep(0.01);
+		usleep(10);
 
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
