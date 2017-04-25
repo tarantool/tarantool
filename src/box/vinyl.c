@@ -1091,13 +1091,6 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 	/* Order by index first, by key in the index second. */
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0) {
-		if (a->stmt == NULL) {
-			/*
-			 * A special key to position search at the
-			 * beginning of the index.
-			 */
-			return -1;
-		}
 		struct index_def *index_def = a->index->index_def;
 		return vy_stmt_compare(a->stmt, b->stmt, &index_def->key_def);
 	}
@@ -7676,10 +7669,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
 	itr->curr_txv = NULL;
+	struct write_set_key key = { itr->index, itr->key };
 	struct txv *txv;
 	struct index_def *index_def = itr->index->index_def;
 	if (tuple_field_count(itr->key) > 0) {
-		struct write_set_key key = { itr->index, itr->key };
 		if (itr->iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &key);
 		else if (itr->iterator_type == ITER_GE ||
@@ -7710,10 +7703,10 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
 	} else if (itr->iterator_type == ITER_LE) {
-		txv = write_set_last(&itr->tx->write_set);
+		txv = write_set_nsearch(&itr->tx->write_set, &key);
 	} else {
 		assert(itr->iterator_type == ITER_GE);
-		txv = write_set_first(&itr->tx->write_set);
+		txv = write_set_psearch(&itr->tx->write_set, &key);
 	}
 	if (txv == NULL || txv->index != itr->index)
 		return;
