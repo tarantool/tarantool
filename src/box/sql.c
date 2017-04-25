@@ -63,11 +63,13 @@ sql_init()
 	int rc;
 
 	rc = sqlite3_open("", &db);
-	if (rc == SQLITE_OK) {
-		assert(db);
+	if (rc != SQLITE_OK) {
+		panic("failed to initialize SQL subsystem");
 	} else {
 		/* XXX */
 	}
+
+	assert(db != NULL);
 }
 
 void
