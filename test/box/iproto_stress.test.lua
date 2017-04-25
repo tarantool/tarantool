@@ -26,9 +26,12 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 for i = 1,5000 do fiber.create(worker, i) end
+fiber.sleep(0.1)
 
 -- check that iproto doesn't deplete tx fiber pool on wal stall (see gh-1892)
 box.error.injection.set("ERRINJ_WAL_DELAY", true)
+fiber.sleep(1.0)
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
 
 repeat fiber.sleep(1) until n_workers == 0
 

@@ -16,8 +16,6 @@ errinj.info()
     state: false
   ERRINJ_WAL_WRITE:
     state: false
-  ERRINJ_WAL_SHORT_DELAY:
-    state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: false
   ERRINJ_WAL_WRITE_DISK:

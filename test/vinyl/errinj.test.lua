@@ -245,28 +245,41 @@ c2:begin()
 c3 = txn_proxy.new()
 c3:begin()
 
-errinj.set("ERRINJ_WAL_SHORT_DELAY", true)
+--
+-- Prepared transactions
+--
 
+-- Pause WAL writer to cause all further calls to box.commit() to move
+-- transactions into prepared, but not committed yet state.
+errinj.set("ERRINJ_WAL_DELAY", true)
+lsn = box.info.vinyl().metric.lsn
 c0('s:replace{1, "c0"}')
 c0('s:replace{2, "c0"}')
 c0('s:replace{3, "c0"}')
 _ = fiber.create(c0.commit, c0)
+box.info.vinyl().metric.lsn == lsn
 c1('s:replace{1, "c1"}')
 c1('s:replace{2, "c1"}')
 _ = fiber.create(c1.commit, c1)
+box.info.vinyl().metric.lsn == lsn
 c3('s:select{1}') -- c1 is visible
 c2('s:replace{1, "c2"}')
 c2('s:replace{3, "c2"}')
 _ = fiber.create(c2.commit, c2)
+box.info.vinyl().metric.lsn == lsn
 c3('s:select{1}') -- c1 is visible, c2 is not
 c3('s:select{2}') -- c1 is visible
 c3('s:select{3}') -- c2 is not visible
-fiber.sleep(0.1)
+
+-- Resume WAL writer and wait until all transactions will been committed
+errinj.set("ERRINJ_WAL_DELAY", false)
+REQ_COUNT = 7
+while box.info.vinyl().metric.lsn - lsn < REQ_COUNT do fiber.sleep(0.01) end
+box.info.vinyl().metric.lsn == lsn + REQ_COUNT
+
 c3('s:select{1}') -- c1 is visible, c2 is not
 c3('s:select{2}') -- c1 is visible
 c3('s:select{3}') -- c2 is not visible
 c3:commit()
-
-errinj.set("ERRINJ_WAL_SHORT_DELAY", false)
 
 s:drop()
