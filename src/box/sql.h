@@ -35,10 +35,6 @@
 extern "C" {
 #endif
 
-struct lua_State;
-
-void box_lua_sqlite_init(struct lua_State *L);
-
 void
 sql_init();
 
