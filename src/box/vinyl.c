@@ -2823,15 +2823,10 @@ vy_range_update_compact_priority(struct vy_range *range)
  *
  * We coalesce ranges together when they become too small, less than
  * half the target range size to avoid split-coalesce oscillations.
- *
- * @param range The range from which try to start the coalesce
- *        task.
- * @param[out] p_first The range to coalesce from.
- * @param[out] p_last The range to coalesce until.
  */
 static bool
-vy_range_needs_coalesce(struct vy_range *range, struct vy_range **p_first,
-			struct vy_range **p_last)
+vy_range_needs_coalesce(struct vy_range *range,
+			struct vy_range **p_first, struct vy_range **p_last)
 {
 	struct vy_index *index = range->index;
 	struct vy_range *it;
@@ -2868,6 +2863,99 @@ vy_range_needs_coalesce(struct vy_range *range, struct vy_range **p_first,
 		*p_first = it;
 	}
 	return *p_first != *p_last;
+}
+
+/**
+ * Coalesce a range with one or more its neighbors if it is too small.
+ * In order to coalesce ranges, we splice their lists of in-memory
+ * indexes and on-disk runs, and reflect the change in the metadata
+ * log. No long-term operation involving a worker thread, like writing
+ * a new run file, is necessary, because the merge iterator can deal
+ * with runs that intersect by LSN coexisting in the same range as long
+ * as they do not intersect for each particular key, which is true in
+ * case of merging key ranges.
+ */
+static void
+vy_range_maybe_coalesce(struct vy_range **p_range)
+{
+	struct vy_range *range = *p_range;
+	struct vy_index *index = range->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
+	struct error *e;
+
+	struct vy_range *first, *last;
+	if (!vy_range_needs_coalesce(range, &first, &last))
+		return;
+
+	struct vy_range *result = vy_range_new(index, -1,
+					       first->begin, last->end);
+	if (result == NULL)
+		goto fail_range;
+
+	struct vy_range *it;
+	struct vy_range *end = vy_range_tree_next(&index->tree, last);
+
+	/*
+	 * Log change in metadata.
+	 */
+	vy_log_tx_begin();
+	vy_log_insert_range(index->index_def->opts.lsn, result->id,
+			    result->begin, result->end, result->is_level_zero);
+	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
+		struct vy_run *run;
+		rlist_foreach_entry(run, &it->runs, in_range)
+			vy_log_insert_run(result->id, run->id,
+					  run->info.min_lsn, run->info.max_lsn,
+					  vy_run_is_empty(run));
+		vy_log_delete_range(it->id);
+	}
+	if (vy_log_tx_commit() < 0)
+		goto fail_commit;
+
+	/*
+	 * Move runs and mems of the coalesced ranges to the
+	 * resulting range and delete the former.
+	 */
+	it = first;
+	while (it != end) {
+		struct vy_range *next = vy_range_tree_next(&index->tree, it);
+		vy_scheduler_remove_range(scheduler, it);
+		vy_index_unacct_range(index, it);
+		vy_index_remove_range(index, it);
+		vy_range_seal_mem(it);
+		rlist_splice(&result->runs, &it->runs);
+		rlist_splice(&result->sealed, &it->sealed);
+		result->run_count += it->run_count;
+		result->size += it->size;
+		result->mem_used += it->mem_used;
+		if (result->mem_min_lsn > it->mem_min_lsn)
+			result->mem_min_lsn = it->mem_min_lsn;
+		vy_range_delete(it);
+		it = next;
+	}
+	/*
+	 * Coalescing increases read amplification and breaks the log
+	 * structured layout of the run list, so, although we could
+	 * leave the resulting range as it is, we'd better compact it
+	 * as soon as we can.
+	 */
+	result->compact_priority = result->run_count;
+	vy_index_acct_range(index, result);
+	vy_index_add_range(index, result);
+	index->version++;
+	vy_scheduler_add_range(scheduler, result);
+
+	say_info("%s: coalesced ranges %s", index->name, vy_range_str(result));
+	*p_range = result;
+	return;
+
+fail_commit:
+	vy_range_delete(result);
+fail_range:
+	assert(!diag_is_empty(diag_get()));
+	e = diag_last_error(diag_get());
+	say_error("%s: failed to coalesce range %s: %s",
+		  index->name, vy_range_str(range), e->errmsg);
 }
 
 /**
@@ -3529,9 +3617,6 @@ struct vy_task {
 	double bloom_fpr;
 	/** Count of ranges to compact. */
 	int run_count;
-	/** Range of ranges to coalesce: [begin, end). */
-	struct vy_range *coalesce_begin;
-	struct vy_range *coalesce_end;
 };
 
 /**
@@ -3681,6 +3766,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_range *range,
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
+
+	vy_range_maybe_coalesce(&range);
 
 	if (vy_range_prepare_new_run(range) != 0)
 		goto err_run;
@@ -4021,181 +4108,6 @@ vy_task_compact_execute(struct vy_task *task)
 }
 
 static int
-vy_task_coalesce_complete(struct vy_task *task)
-{
-	struct vy_index *index = task->index;
-	struct vy_range *result = task->range;
-	struct vy_range *it = task->coalesce_begin;
-	struct vy_scheduler *scheduler = index->env->scheduler;
-	vy_log_tx_begin();
-	vy_log_insert_range(index->index_def->opts.lsn, result->id,
-			    result->begin, result->end, result->is_level_zero);
-	vy_log_insert_run(result->id, result->new_run->id,
-			  result->new_run->info.min_lsn,
-			  result->new_run->info.max_lsn,
-			  vy_run_is_empty(result->new_run));
-	/* Delete the old ranges from the log. */
-	while(it != task->coalesce_end) {
-		vy_log_delete_range(it->id);
-		it = vy_range_tree_next(&index->tree, it);
-	}
-	if (vy_log_tx_commit() < 0)
-		/* Schedule old ranges in abort() function. */
-		return -1;
-	vy_range_add_run(result, result->new_run);
-	/* Remove old ranges from the index. */
-	it = task->coalesce_begin;
-	while(it != task->coalesce_end) {
-		vy_index_unacct_range(index, it);
-		vy_range_gc_mem(it, scheduler, task->dump_lsn);
-		vy_range_seal_mem(it);
-		rlist_splice(&result->sealed, &it->sealed);
-		result->mem_min_lsn = MIN(result->mem_min_lsn, it->mem_min_lsn);
-		result->mem_used += it->mem_used;
-		struct vy_range *next = vy_range_tree_next(&index->tree, it);
-		vy_index_remove_range(index, it);
-		vy_range_delete(it);
-		it = next;
-	}
-	result->new_run = NULL;
-	result->compact_priority = 0;
-	vy_index_acct_range(index, result);
-	vy_index_add_range(index, result);
-	index->version++;
-	vy_scheduler_add_range(scheduler, result);
-	say_info("%s: completed coalescing ranges %s", index->name,
-		 vy_range_str(result));
-	return 0;
-}
-
-static void
-vy_task_coalesce_abort(struct vy_task *task, bool in_shutdown)
-{
-	struct vy_index *index = task->index;
-	struct vy_range *result = task->range;
-	struct vy_range *it = task->coalesce_begin;
-	struct vy_scheduler *scheduler = index->env->scheduler;
-	if (!in_shutdown && !index->is_dropped) {
-		say_error("%s: failed to coalesce range %s: %s",
-			  index->name, vy_range_str(result),
-			  diag_last_error(&task->diag)->errmsg);
-		vy_range_discard_new_run(result);
-		while(it != task->coalesce_end) {
-			vy_scheduler_add_range(scheduler, it);
-			it = vy_range_tree_next(&index->tree, it);
-		}
-	}
-	vy_range_delete(result);
-}
-
-/**
- * Coalesce a range with one or more its neighbors if it is too
- * small. In order to coalesce ranges, we merge their in-memory
- * indexes and on-disk runs, and reflect the change in the
- * metadata log.
- */
-static int
-vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
-		     struct vy_range *last, struct vy_task **p_task)
-{
-	static struct vy_task_ops coalesce_ops = {
-		/* Yes, execute() is the same as compact. */
-		.execute = vy_task_compact_execute,
-		.complete = vy_task_coalesce_complete,
-		.abort = vy_task_coalesce_abort,
-	};
-
-	struct vy_index *index = first->index;
-	struct tx_manager *xm = index->env->xm;
-	struct vy_scheduler *scheduler = index->env->scheduler;
-	struct vy_range *result = vy_range_new(index, -1, first->begin,
-					       last->end);
-	if (result == NULL)
-		return -1;
-	struct vy_range *it, *end = vy_range_tree_next(&index->tree, last);
-	if (vy_range_prepare_new_run(result) != 0)
-		goto err_new_run;
-	struct vy_write_iterator *wi =
-		vy_write_iterator_new(index->env, &index->index_def->key_def,
-				      &index->user_index_def->key_def,
-				      index->surrogate_format,
-				      index->upsert_format,
-				      index->index_def->iid == 0,
-				      index->column_mask,
-				      true, tx_manager_vlsn(xm));
-	if (wi == NULL)
-		goto err_wi;
-	struct vy_task *task = vy_task_new(pool, index, &coalesce_ops);
-	if (task == NULL)
-		goto err_task;
-	task->coalesce_begin = first;
-	task->coalesce_end = end;
-
-	/*
-	 * See comment in vy_task_dump_new().
-	 */
-	int64_t dump_lsn = xm->lsn;
-
-	/* Add sealed mems and runs. */
-	it = first;
-	while (it != end) {
-		struct vy_run_info *info = &result->new_run->info;
-		info->min_lsn = INT64_MAX;
-		info->max_lsn = -1;
-		if (vy_range_rotate_mem(it) != 0)
-			goto err_wi_sub;
-		struct vy_mem *mem;
-		rlist_foreach_entry(mem, &it->sealed, in_sealed) {
-			if (mem->min_lsn > dump_lsn)
-				continue;
-			if (vy_write_iterator_add_mem(wi, mem) != 0)
-				goto err_wi_sub;
-			task->max_output_count += mem->tree.size;
-			info->min_lsn = MIN(info->min_lsn, mem->min_lsn);
-			info->max_lsn = MAX(info->max_lsn, mem->max_lsn);
-		}
-		struct vy_run *run;
-		rlist_foreach_entry(run, &it->runs, in_range) {
-			if (vy_write_iterator_add_run(wi, run) != 0)
-				goto err_wi_sub;
-			task->max_output_count += run->info.keys;
-			info->min_lsn = MIN(info->min_lsn, run->info.min_lsn);
-			info->max_lsn = MAX(info->max_lsn, run->info.max_lsn);
-		}
-		vy_range_wait_pinned(it);
-		vy_scheduler_remove_range(scheduler, it);
-		it = vy_range_tree_next(&index->tree, it);
-	}
-	task->wi = wi;
-	task->range = result;
-	task->bloom_fpr = index->env->conf->bloom_fpr;
-	task->dump_lsn = xm->lsn;
-	*p_task = task;
-	say_info("%s: started coalescing range %s", index->name,
-		 vy_range_str(result));
-	return 0;
-err_wi_sub:
-	vy_write_iterator_cleanup(wi);
-	vy_write_iterator_delete(wi);
-	/* Schedule all removed ranges back. */
-	end = it;
-	it = first;
-	while (it != end) {
-		vy_scheduler_add_range(scheduler, it);
-		it = vy_range_tree_next(&index->tree, it);
-	}
-err_task:
-	vy_task_delete(pool, task);
-err_wi:
-	vy_range_discard_new_run(result);
-err_new_run:
-	vy_range_delete(result);
-	say_error("%s: can't start coalescing range %s: %s", index->name,
-		  vy_range_str(result), diag_last_error(diag_get())->errmsg);
-	return -1;
-}
-
-static int
 vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
@@ -4301,13 +4213,11 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	if (vy_range_needs_split(range, &split_key))
 		return vy_task_split_new(pool, range, split_key, p_task);
 
-	struct vy_range *first, *last;
-	if (vy_range_needs_coalesce(range, &first, &last))
-		return vy_task_coalesce_new(pool, first, last, p_task);
-
 	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
 	if (task == NULL)
 		goto err_task;
+
+	vy_range_maybe_coalesce(&range);
 
 	if (vy_range_prepare_new_run(range) != 0)
 		goto err_run;
