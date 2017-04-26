@@ -373,10 +373,6 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		struct tuple_format *upsert_format, bool is_primary,
 		bool suppress_error, struct vy_stat *stat);
 
-/**
- * The interval of statements with keys in
- * [ begin, end ) - including 'begin', but not including 'end'.
- */
 struct vy_range {
 	/** Unique ID of this range. */
 	int64_t   id;
@@ -1846,8 +1842,7 @@ vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
 		      bool is_primary, uint64_t column_mask,
 		      bool is_last_level, int64_t oldest_vlsn);
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
-			  const char *end);
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run);
 static NODISCARD int
 vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem);
 static NODISCARD int
@@ -2609,7 +2604,7 @@ vy_range_get_compact_iterator(struct vy_range *range, int run_count,
 	rlist_foreach_entry(run, &range->runs, in_range) {
 		if (run_count-- == 0)
 			break;
-		if (vy_write_iterator_add_run(wi, run, NULL) != 0)
+		if (vy_write_iterator_add_run(wi, run) != 0)
 			goto err_wi_sub;
 		*p_max_output_count += run->info.keys;
 		*p_min_lsn = MIN(*p_min_lsn, run->info.min_lsn);
@@ -4161,7 +4156,7 @@ vy_task_coalesce_new(struct mempool *pool, struct vy_range *first,
 		}
 		struct vy_run *run;
 		rlist_foreach_entry(run, &it->runs, in_range) {
-			if (vy_write_iterator_add_run(wi, run, NULL) != 0)
+			if (vy_write_iterator_add_run(wi, run) != 0)
 				goto err_wi_sub;
 			task->max_output_count += run->info.keys;
 			info->min_lsn = MIN(info->min_lsn, run->info.min_lsn);
@@ -8525,18 +8520,18 @@ vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
 }
 
 static NODISCARD int
-vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run,
-			  const char *end)
+vy_write_iterator_add_run(struct vy_write_iterator *wi, struct vy_run *run)
 {
 	struct vy_merge_src *src;
 	src = vy_merge_iterator_add(&wi->mi, false, false);
 	if (src == NULL)
 		return -1;
 	vy_run_iterator_open(&src->run_iterator, false, &wi->run_iterator_stat,
-			     &wi->env->run_env, run, ITER_GE, wi->key, end,
-			     &wi->env->xm->p_global_read_view, wi->key_def,
-			     wi->user_key_def, wi->surrogate_format,
-			     wi->upsert_format, wi->is_primary);
+			     &wi->env->run_env, run, ITER_GE, wi->key,
+			     &wi->env->xm->p_global_read_view,
+			     wi->key_def, wi->user_key_def,
+			     wi->surrogate_format, wi->upsert_format,
+			     wi->is_primary);
 	return 0;
 }
 
@@ -8767,9 +8762,9 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, coio_read, stat,
-				     &itr->index->env->run_env, run,
-				     itr->iterator_type, itr->key, NULL,
-				     itr->read_view,
+				     &itr->index->env->run_env,
+				     run, itr->iterator_type,
+				     itr->key, itr->read_view,
 				     &itr->index->index_def->key_def,
 				     &itr->index->user_index_def->key_def,
 				     format, itr->index->upsert_format,
@@ -9155,7 +9150,7 @@ vy_send_range(struct vy_join_ctx *ctx)
 
 	struct vy_run *run;
 	rlist_foreach_entry(run, &ctx->runs, in_join) {
-		if (vy_write_iterator_add_run(ctx->wi, run, NULL) != 0)
+		if (vy_write_iterator_add_run(ctx->wi, run) != 0)
 			goto out_delete_wi;
 	}
 
