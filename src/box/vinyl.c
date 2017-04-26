@@ -8734,9 +8734,6 @@ vy_write_iterator_cleanup(struct vy_write_iterator *wi)
 	if (wi->tmp_stmt != NULL)
 		tuple_unref(wi->tmp_stmt);
 	wi->tmp_stmt = NULL;
-	if (wi->key != NULL)
-		tuple_unref(wi->key);
-	wi->key = NULL;
 	vy_merge_iterator_cleanup(&wi->mi);
 }
 
@@ -8744,9 +8741,9 @@ static void
 vy_write_iterator_delete(struct vy_write_iterator *wi)
 {
 	assert(cord_is_main());
-
 	assert(wi->tmp_stmt == NULL);
-	assert(wi->key == NULL);
+
+	tuple_unref(wi->key);
 	tuple_format_ref(wi->surrogate_format, -1);
 	tuple_format_ref(wi->upsert_format, -1);
 	vy_merge_iterator_close(&wi->mi);
