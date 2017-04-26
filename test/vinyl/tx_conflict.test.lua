@@ -27,6 +27,9 @@ order_of_commit = {}
 num_committed = 0
 stmts = {}
 errors = {}
+initial_data = {}
+initial_repro = ""
+repro = ""
 ops = {'begin', 'commit', 'select', 'replace', 'upsert', 'delete'}
 
 -- ignore case of unnecessary conflict:
@@ -109,6 +112,14 @@ function prepare()
             s2:delete{i}
         end
     end
+    initial_data = s1:select{}
+    initial_repro = ""
+    initial_repro = initial_repro .. "s = box.schema.space.create('test', {engine = 'vinyl', if_not_exists = true})\n"
+    initial_repro = initial_repro .. "i1 = s:create_index('test', {parts = {1, 'uint'}, if_not_exists = true})\n"
+    initial_repro = initial_repro .. "txn_proxy = require('txn_proxy')\n"
+    for _,tuple in pairs(initial_data) do
+        initial_repro = initial_repro .. "s:replace{" .. tuple[1] .. ", " .. tuple[2] .. "} "
+    end
 end;
 
 function apply(t, k, op)
@@ -116,6 +127,7 @@ function apply(t, k, op)
     local v = nil
     local q = nil
     local k = k
+    local repro = nil
     if op == 'begin' then
         if tx.started then
             table.insert(errors, "assert #1")
@@ -123,6 +135,8 @@ function apply(t, k, op)
         tx.started = true
         tx.con:begin()
         k = nil
+        repro = "c" .. t .. " = txn_proxy.new() c" .. t .. ":begin()"
+        repro = "p(\"c" .. t .. ":begin()\") " .. repro
     elseif op == 'commit' then
         if tx.ended or not tx.started then
             table.insert(errors, "assert #2")
@@ -140,11 +154,15 @@ function apply(t, k, op)
             end
         end
         k = nil
+        repro = "c" .. t .. ":commit()"
+        repro = "p(\"" .. repro .. "\", " .. repro .. ", s:select{})"
     elseif op == 'select' then
         v = tx.con('s1:select{'..k..'}')
         if ignore_unnecessary_conflict1 then
             q = tx.con('q1:select{'..k..'}')
         end
+        repro = "c" .. t .. "('s:select{" .. k .. "}')"
+        repro = "p(\"" .. repro .. "\", " .. repro .. ")"
     elseif op == 'replace' then
         v = get_unique_value()
         tx.con('s1:replace{'..k..','..v..'}')
@@ -152,6 +170,8 @@ function apply(t, k, op)
             tx.con('q1:replace{'..k..','..v..'}')
         end
         tx.num_writes = tx.num_writes + 1
+        repro = "c" .. t .. "('s:replace{" .. k .. ", " .. v .. "}')"
+        repro = "p(\"" .. repro .. "\", " .. repro .. ")"
     elseif op == 'upsert' then
         v = math.random(100)
         tx.con('s1:upsert({'..k..','..v..'}, {{"+", 2,'..v..'}})')
@@ -159,11 +179,15 @@ function apply(t, k, op)
             tx.con('q1:upsert({'..k..','..v..'}, {{"+", 2,'..v..'}})')
         end
         tx.num_writes = tx.num_writes + 1
+        repro = "c" .. t .. "('s:upsert({" .. k .. ", " .. v .. "}, {{\\'+\\', 2, " .. v .. "}})')"
+        repro = "p(\"" .. repro .. "\", " .. repro .. ")"
     elseif op == 'delete' then
         tx.con('s1:delete{'..k..'}')
         tx.num_writes = tx.num_writes + 1
+        repro = "c" .. t .. "('s:delete{" .. k .. "}')"
+        repro = "p(\"" .. repro .. "\", " .. repro .. ")"
     end
-    table.insert(stmts, {t=t, k=k, op=op, v=v, q=q})
+    table.insert(stmts, {t=t, k=k, op=op, v=v, q=q, repro=repro})
 end;
 
 function act()
@@ -258,6 +282,7 @@ function check_rdonly_possibility()
 end;
 
 function check()
+    local had_errors = (errors[1] ~= nil)
     for i=1,num_tx do
         if txs[i].read_only then
             if txs[i].conflicted then
@@ -291,6 +316,15 @@ function check()
             table.insert(errors, "not valid read view " .. i)
         end
     end
+    if errors[1] and not had_errors then
+        repro = "p(\"" .. errors[1] .. "\")"
+        repro = repro .. "\n" .. initial_repro
+        repro = repro .. "\n" .. "p(\"" .. initial_repro .. "\")"
+        repro = repro .. "\n" .. '----------------------'
+        for _,stmt in ipairs(stmts) do
+            repro = repro .. "\n" .. stmt.repro
+        end
+    end
 end;
 
 for i = 1, num_tests do
@@ -304,6 +338,7 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 errors
+if repro ~= "" then print(repro) io.flush() end
 
 s1:drop()
 s2:drop()
