@@ -341,8 +341,6 @@ struct vy_mem_iterator {
 
 	/* Is false until first .._next_.. method is called */
 	bool search_started;
-	/** Tuple for deferred restore. */
-	struct tuple *start_from;
 };
 
 /**
@@ -351,8 +349,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
-		     struct tuple *start_from);
+		     const struct tuple *key, const struct vy_read_view **rv);
 
 #if defined(__cplusplus)
 } /* extern "C" */
