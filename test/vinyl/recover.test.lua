@@ -1,92 +1,91 @@
---
--- Check that ranges left from old dumps and incomplete splits
--- are ignored during initial recovery
--- The idea behind the test is simple - create several invalid range files,
--- i.e. those left from previous dumps and incomplete splits, then restart
--- the server and check that the content of the space was not corrupted.
---
--- To make it possible, we need to (1) prevent the garbage collector from
--- removing unused range files and (2) make the split procedure fail after
--- successfully writing the first range. We use error injection to achieve
--- that.
---
--- The test runs as follows:
---
---  1. Disable garbage collection with the aid of error injection.
---
---  2. Add a number of tuples to the test space that would make it split.
---     Rewrite them several times with different values so that different
---     generations of ranges on disk would have different contents.
---
---  3. Inject error to the split procedure.
---
---  4. Rewrite the tuples another couple of rounds. This should trigger
---     split which is going to fail leaving invalid range files with newer
---     ids on the disk.
---
---  5. Restart the server and check that the test space content was not
---     corrupted.
---
---
 test_run = require('test_run').new()
-errinj = box.error.injection
+fiber = require('fiber')
 
+-- Temporary table to restore variables after restart.
+tmp = box.schema.space.create('tmp')
+_ = tmp:create_index('primary', {parts = {1, 'string'}})
+
+--
+-- Check that range splits, compactions, and dumps don't break recovery.
+--
 s = box.schema.space.create('test', {engine='vinyl'})
-_ = s:create_index('primary')
+_ = s:create_index('primary', {page_size=256, range_size=2048, run_count_per_level=1, run_size_ratio=10})
 
+function vyinfo() return box.space.test.index.primary:info() end
+
+range_count = 4
+tuple_size = math.ceil(vyinfo().page_size / 4)
+pad_size = tuple_size - 30
+assert(pad_size >= 16)
+keys_per_range = math.floor(vyinfo().range_size / tuple_size)
+key_count = range_count * keys_per_range
+
+-- Add a number of tuples to the test space to trigger range splitting.
+-- Rewrite them several times with different values so that different
+-- generations of ranges on disk have different contents.
 test_run:cmd("setopt delimiter ';'")
-function gen(i)
-    local pad_size = 256
-    local range_count = 5
-    local pad = string.rep('x', pad_size + i)
-    local n = (range_count + i) * math.floor(box.cfg.vinyl_range_size / pad_size)
-    for k = 1,n do
-        s:replace{k, i + k, pad}
+iter = 0
+function gen_tuple(k)
+    local pad = {}
+    for i = 1,pad_size do
+        pad[i] = string.char(math.random(65, 90))
     end
-    pcall(box.snapshot)
+    return {k, k + iter, table.concat(pad)}
+end
+while vyinfo().range_count < range_count do
+    iter = iter + 1
+    for k = key_count,1,-1 do s:replace(gen_tuple(k)) end
+    box.snapshot()
+    fiber.sleep(0.01)
 end;
 test_run:cmd("setopt delimiter ''");
 
-errinj.set("ERRINJ_VY_GC", true)
-for i=1,4 do gen(i) end
-errinj.set("ERRINJ_VY_RANGE_SPLIT", true)
-for i=5,6 do gen(i) end
-
--- Check that the total size of data stored on disk, the number of pages,
--- and the number of runs are the same before and after recovery.
-tmp = box.schema.space.create('tmp')
-_ = tmp:create_index('primary')
-_ = tmp:insert{0, s.index.primary:info()}
+-- Remember the number of iterations and the number of keys
+-- so that we can check data validity after restart.
+_ = tmp:insert{'iter', iter}
+_ = tmp:insert{'key_count', key_count}
 
 test_run:cmd('restart server default')
 
 s = box.space.test
 tmp = box.space.tmp
 
-vyinfo1 = tmp:select(0)[1][2]
-vyinfo2 = s.index.primary:info()
-vyinfo1.size == vyinfo2.size or {vyinfo1.size, vyinfo2.size}
-vyinfo1.page_count == vyinfo2.page_count or {vyinfo1.page_count, vyinfo2.page_count}
-vyinfo1.run_count == vyinfo2.run_count or {vyinfo1.run_count, vyinfo2.run_count}
-
-tmp:drop()
-
-test_run:cmd("setopt delimiter ';'")
-function check(i)
-    local pad_size = 256
-    local range_count = 5
-    local n = (range_count + i) * math.floor(box.cfg.vinyl_range_size / pad_size)
-    local n_corrupted = 0
-    for k=1,n do
-        local v = s:get(k)
-        if not v or v[2] ~= i + k then
-			n_corrupted = n_corrupted + 1
-		end
-    end
-    return n - s:count(), n_corrupted
-end;
-test_run:cmd("setopt delimiter ''");
-
-check(6)
+-- Check that the test space content was not corrupted.
+iter = tmp:get('iter')[2]
+key_count = tmp:get('key_count')[2]
+for k = 1,key_count do v = s:get(k) assert(v == nil or v[2] == k + iter) end
 
 s:drop()
+
+--
+-- Check that vinyl stats are restored correctly.
+--
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('primary', {run_count_per_level=10})
+
+-- Generate data.
+for i=1,2 do for j=1,10 do s:insert{i*100+j, 'test' .. j} end box.snapshot() end
+
+-- Remember stats before restarting the server.
+_ = tmp:insert{'vyinfo', s.index.primary:info()}
+
+test_run:cmd('restart server default')
+
+s = box.space.test
+tmp = box.space.tmp
+
+-- Check that stats didn't change after recovery.
+vyinfo1 = tmp:get('vyinfo')[2]
+vyinfo2 = s.index.primary:info()
+
+-- Clear metatable for the sake of output format.
+_ = setmetatable(vyinfo1, nil)
+
+success = true
+for k, v in pairs(vyinfo1) do if v ~= vyinfo2[k] then success = false end end
+
+success or {vyinfo1, vyinfo2}
+
+s:drop()
+
+tmp:drop()
