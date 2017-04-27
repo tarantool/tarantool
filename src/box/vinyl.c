@@ -694,11 +694,11 @@ struct read_set_key {
 typedef rb_tree(struct txv) write_set_t;
 
 /**
- * Initialize an instance of the global read view.
+ * Initialize an instance of a global read view.
  * To be used exclusively by the transaction manager.
  */
 static void
-vy_global_read_view_create(struct vy_read_view *rv)
+vy_global_read_view_create(struct vy_read_view *rv, int64_t lsn)
 {
 	rlist_create(&rv->in_read_views);
 	/*
@@ -707,24 +707,7 @@ vy_global_read_view_create(struct vy_read_view *rv)
 	 * prepared transactions. This makes it possible to
 	 * use the tuple cache in it.
 	 */
-	rv->vlsn = INT64_MAX;
-	rv->refs = 0;
-	rv->is_aborted = false;
-}
-
-/**
- * Initialize an instance of the committed read view.
- * To be used exclusively by the transaction manager.
- */
-static void
-vy_committed_read_view_create(struct vy_read_view *rv)
-{
-	rlist_create(&rv->in_read_views);
-	/*
-	 * Prepared lsn range starts with MAX_LSN, so set MAX_LSN - 1
-	 * to make all prepared TXs invisible for this read view.
-	 */
-	rv->vlsn = MAX_LSN - 1;
+	rv->vlsn = lsn;
 	rv->refs = 0;
 	rv->is_aborted = false;
 }
@@ -1147,9 +1130,11 @@ tx_manager_new(struct vy_env *env)
 	m->psn = 0;
 	m->env = env;
 	rlist_create(&m->read_views);
-	vy_global_read_view_create((struct vy_read_view *) &m->global_read_view);
+	vy_global_read_view_create((struct vy_read_view *) &m->global_read_view,
+				   INT64_MAX);
 	m->p_global_read_view = &m->global_read_view;
-	vy_committed_read_view_create((struct vy_read_view *) &m->committed_read_view);
+	vy_global_read_view_create((struct vy_read_view *) &m->committed_read_view,
+				   MAX_LSN - 1);
 	m->p_committed_read_view = &m->committed_read_view;
 	mempool_create(&m->tx_mempool, cord_slab_cache(), sizeof(struct vy_tx));
 	mempool_create(&m->txv_mempool, cord_slab_cache(), sizeof(struct txv));
