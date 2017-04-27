@@ -9506,17 +9506,18 @@ vy_squash_process(struct vy_squash *squash)
 			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
 		if (vy_tuple_compare(result, mem_stmt, &index_def->key_def) != 0)
 			break;
-		struct tuple *applied;
-		if (vy_stmt_type(mem_stmt) == IPROTO_UPSERT) {
-			applied = vy_apply_upsert(mem_stmt, result,
-						  &index_def->key_def,
-						  mem->format,
-						  mem->upsert_format,
-						  index_def->iid == 0,
-						  true, stat);
-		} else {
-			applied = vy_stmt_dup(mem_stmt, mem->format);
+		if (vy_stmt_type(mem_stmt) != IPROTO_UPSERT) {
+			/**
+			 * Somebody inserted non-upsert statement,
+			 * squashing is useless.
+			 */
+			tuple_unref(result);
+			return 0;
 		}
+		struct tuple *applied =
+			vy_apply_upsert(mem_stmt, result, &index_def->key_def,
+					mem->format, mem->upsert_format,
+					index_def->iid == 0, true, stat);
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
