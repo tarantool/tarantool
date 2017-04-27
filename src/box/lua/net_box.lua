@@ -643,7 +643,7 @@ local function connect(...)
     return remote
 end
 
-local function remote_check(remote, method)
+local function check_remote_arg(remote, method)
     if type(remote) ~= 'table' then
         local fmt = 'Use remote:%s(...) instead of remote.%s(...):'
         box.error(E_PROC_LUA, string.format(fmt, method, method))
@@ -665,22 +665,22 @@ local function check_eval_args(args)
 end
 
 function remote_methods:close()
-    remote_check(self, 'close')
+    check_remote_arg(self, 'close')
     self._transport.close()
 end
 
 function remote_methods:on_schema_reload(...)
-    remote_check(self, 'on_schema_reload')
+    check_remote_arg(self, 'on_schema_reload')
     return self._on_schema_reload(...)
 end
 
 function remote_methods:is_connected()
-    remote_check(self, 'is_connected')
+    check_remote_arg(self, 'is_connected')
     return self.state == 'active'
 end
 
 function remote_methods:wait_connected(timeout)
-    remote_check(self, 'wait_connected')
+    check_remote_arg(self, 'wait_connected')
     return self._transport.wait_state('active', timeout)
 end
 
@@ -728,7 +728,7 @@ function remote_methods:_request(method, opts, ...)
 end
 
 function remote_methods:ping(opts)
-    remote_check(self, 'ping')
+    check_remote_arg(self, 'ping')
     local timeout = opts and opts.timeout
     if timeout == nil then
         -- conn:timeout(timeout):ping()
@@ -743,19 +743,19 @@ function remote_methods:ping(opts)
 end
 
 function remote_methods:reload_schema()
-    remote_check(self, 'reload_schema')
+    check_remote_arg(self, 'reload_schema')
     self:_request('select', nil, VSPACE_ID, 0, box.index.GE, 0, 0xFFFFFFFF,
                   nil)
 end
 
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
-    remote_check(self, 'call')
+    check_remote_arg(self, 'call')
     return self:_request('call_16', nil, tostring(func_name), {...})
 end
 
 function remote_methods:call(func_name, args, opts)
-    remote_check(self, 'call')
+    check_remote_arg(self, 'call')
     check_call_args(args)
     args = args or {}
     local res = self:_request('call_17', opts, tostring(func_name), args)
@@ -767,12 +767,12 @@ end
 
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
-    remote_check(self, 'eval')
+    check_remote_arg(self, 'eval')
     return unpack(self:_request('eval', nil, code, {...}))
 end
 
 function remote_methods:eval(code, args, opts)
-    remote_check(self, 'eval')
+    check_remote_arg(self, 'eval')
     check_eval_args(args)
     args = args or {}
     local res = self:_request('eval', opts, code, args)
@@ -783,7 +783,7 @@ function remote_methods:eval(code, args, opts)
 end
 
 function remote_methods:wait_state(state, timeout)
-    remote_check(self, 'wait_state')
+    check_remote_arg(self, 'wait_state')
     if timeout == nil then
         local deadline = self._deadlines[fiber_self()]
         timeout = deadline and max(0, deadline-fiber_time())
@@ -795,7 +795,7 @@ local compat_warning_said = false
 
 -- @deprecated since 1.7.4
 function remote_methods:timeout(timeout)
-    remote_check(self, 'timeout')
+    check_remote_arg(self, 'timeout')
     if not compat_warning_said then
         compat_warning_said = true
         log.warn("netbox:timeout(timeout) is deprecated since 1.7.4, "..
@@ -899,7 +899,7 @@ console_methods.on_schema_reload = remote_methods.on_schema_reload
 console_methods.is_connected = remote_methods.is_connected
 console_methods.wait_state = remote_methods.wait_state
 function console_methods:eval(line, timeout)
-    remote_check(self, 'eval')
+    check_remote_arg(self, 'eval')
     local err, res
     local transport = self._transport
     local pr = transport.perform_request
@@ -1093,7 +1093,7 @@ this_module.self = {
     wait_connected = function(self) return true end,
     is_connected = function(self) return true end,
     call = function(_box, proc_name, args, opts)
-        remote_check(_box, 'call')
+        check_remote_arg(_box, 'call')
         check_call_args(args)
         args = args or {}
         proc_name = tostring(proc_name)
@@ -1111,7 +1111,7 @@ this_module.self = {
         end
     end,
     eval = function(_box, expr, args, opts)
-        remote_check(_box, 'eval')
+        check_remote_arg(_box, 'eval')
         check_eval_args(args)
         args = args or {}
         local proc, errmsg = loadstring(expr)
