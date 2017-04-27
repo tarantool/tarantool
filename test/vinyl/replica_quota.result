@@ -35,7 +35,7 @@ _ = test_run:cmd("create server replica with rpl_master=default, script='vinyl/j
 _ = test_run:cmd("start server replica")
 ---
 ...
-_ = test_run:cmd('wait_lsn replica default')
+_ = test_run:wait_lsn('replica', 'default')
 ---
 ...
 _ = test_run:cmd("stop server replica")

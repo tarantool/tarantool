@@ -16,7 +16,7 @@ for i = 1001,2000 do s:insert{i, pad} end
 -- if the scheduler didn't work on the destination.
 _ = test_run:cmd("create server replica with rpl_master=default, script='vinyl/join_quota.lua'")
 _ = test_run:cmd("start server replica")
-_ = test_run:cmd('wait_lsn replica default')
+_ = test_run:wait_lsn('replica', 'default')
 _ = test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 

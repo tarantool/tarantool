@@ -44,9 +44,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('switch replica')
 ---
@@ -99,9 +98,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('switch replica')
 ---
@@ -176,9 +174,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('switch replica')
 ---
@@ -268,9 +265,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('switch replica')
 ---
@@ -336,9 +332,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('switch replica')
 ---
@@ -395,9 +390,8 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd('wait_lsn replica default')
+test_run:wait_lsn('replica', 'default')
 ---
-- true
 ...
 test_run:cmd('restart server replica')
 ---
