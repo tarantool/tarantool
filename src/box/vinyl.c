@@ -9522,6 +9522,16 @@ vy_squash_process(struct vy_squash *squash)
 		if (applied == NULL)
 			return -1;
 		result = applied;
+		/**
+		 * In normal cases we get a result with the same lsn as
+		 * in mem_stmt.
+		 * But if there are buggy upserts that do wrong things,
+		 * they are ignored and the result has lower lsn.
+		 * We should fix the lsn in any case to replace
+		 * exactly mem_stmt in general and the buggy upsert
+		 * in particular.
+		 */
+		vy_stmt_set_lsn(result, vy_stmt_lsn(mem_stmt));
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	}
 
