@@ -697,8 +697,8 @@ typedef rb_tree(struct txv) write_set_t;
  * Initialize an instance of the global read view.
  * To be used exclusively by the transaction manager.
  */
-void
-vy_read_view_create(struct vy_read_view *rv)
+static void
+vy_global_read_view_create(struct vy_read_view *rv)
 {
 	rlist_create(&rv->in_read_views);
 	/*
@@ -708,6 +708,23 @@ vy_read_view_create(struct vy_read_view *rv)
 	 * use the tuple cache in it.
 	 */
 	rv->vlsn = INT64_MAX;
+	rv->refs = 0;
+	rv->is_aborted = false;
+}
+
+/**
+ * Initialize an instance of the committed read view.
+ * To be used exclusively by the transaction manager.
+ */
+static void
+vy_committed_read_view_create(struct vy_read_view *rv)
+{
+	rlist_create(&rv->in_read_views);
+	/*
+	 * Prepared lsn range starts with MAX_LSN, so set MAX_LSN - 1
+	 * to make all prepared TXs invisible for this read view.
+	 */
+	rv->vlsn = MAX_LSN - 1;
 	rv->refs = 0;
 	rv->is_aborted = false;
 }
@@ -1044,11 +1061,24 @@ struct tx_manager {
 	const struct vy_read_view global_read_view;
 	/**
 	 * It is possible to create a cursor without an active
-	 * transaction, e.g. when squashing upserts or in
-	 * a write iterator, this pointer represents a skeleton
+	 * transaction, e.g. a write iterator;
+	 * this pointer represents a skeleton
 	 * transaction to use in such places.
 	 */
 	const struct vy_read_view *p_global_read_view;
+	/**
+	 * Committed read view - all committed transactions are
+	 * visible in this view. The global read view
+	 * LSN is always (MAX_LSN - 1)  and it never changes.
+	 */
+	const struct vy_read_view committed_read_view;
+	/**
+	 * It is possible to create a cursor without an active
+	 * transaction, e.g. when squashing upserts;
+	 * this pointer represents a skeleton
+	 * transaction to use in such places.
+	 */
+	const struct vy_read_view *p_committed_read_view;
 	struct vy_env *env;
 	struct mempool tx_mempool;
 	struct mempool txv_mempool;
@@ -1117,8 +1147,10 @@ tx_manager_new(struct vy_env *env)
 	m->psn = 0;
 	m->env = env;
 	rlist_create(&m->read_views);
-	vy_read_view_create((struct vy_read_view *) &m->global_read_view);
+	vy_global_read_view_create((struct vy_read_view *) &m->global_read_view);
 	m->p_global_read_view = &m->global_read_view;
+	vy_committed_read_view_create((struct vy_read_view *) &m->committed_read_view);
+	m->p_committed_read_view = &m->committed_read_view;
 	mempool_create(&m->tx_mempool, cord_slab_cache(), sizeof(struct vy_tx));
 	mempool_create(&m->txv_mempool, cord_slab_cache(), sizeof(struct txv));
 	mempool_create(&m->read_view_mempool, cord_slab_cache(),
@@ -3133,6 +3165,10 @@ vy_range_set(struct vy_range *range, struct vy_mem *mem,
 static void
 vy_index_squash_upserts(struct vy_index *index, struct tuple *stmt);
 
+static void
+vy_range_commit_upsert(const struct tuple *stmt, struct vy_index *index,
+		       struct vy_range *range, struct vy_mem *mem);
+
 /*
  * Confirm that the statement have to stay in the range's in-memory index.
  * One of the vy_range_commit_stmt and vy_range_rollback_stmt methods must be called
@@ -3161,22 +3197,8 @@ vy_range_commit_stmt(const struct tuple *stmt, struct vy_index *index,
 		vy_scheduler_update_range(scheduler, range);
 	}
 
-	/*
-	 * If there are a lot of successive upserts for the same key,
-	 * select might take too long to squash them all. So once the
-	 * number of upserts exceeds a certain threshold, we schedule
-	 * a fiber to merge them and insert the resulting statement
-	 * after the latest upsert.
-	 */
-	enum {
-		VY_UPSERT_THRESHOLD = 128,
-	};
-	if (vy_stmt_type(stmt) == IPROTO_UPSERT &&
-	    vy_stmt_n_upserts(stmt) == VY_UPSERT_THRESHOLD) {
-		vy_index_squash_upserts(index,
-					vy_stmt_dup(stmt,
-						    index->upsert_format));
-	}
+	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
+		vy_range_commit_upsert(stmt, index, range, mem);
 
 	assert(mem->min_lsn <= lsn);
 	assert(range->mem_min_lsn <= lsn);
@@ -3191,19 +3213,53 @@ vy_range_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	vy_mem_rollback_stmt(mem, stmt);
 }
 
-static int
-vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
-		    struct tuple *stmt, const struct tuple **region_stmt)
+/**
+ * Calculate and record the number of seqential upserts, squash
+ * immediatelly or schedule upsert process if needed.
+ * Additional handler used in vy_range_commit_stmt for UPSERT statements.
+ *
+ * @param stmt - mem UPSERT statement.
+ * @param index - index that the statement was committed to.
+ * @param range - range that the statement was committed to.
+ * @param mem - mem that the statement was committed to.
+ */
+static void
+vy_range_commit_upsert(const struct tuple *stmt, struct vy_index *index,
+		       struct vy_range *range, struct vy_mem *mem)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
+	assert(vy_stmt_lsn(stmt) < MAX_LSN);
 
-	struct vy_index *index = range->index;
 	struct vy_stat *stat = index->env->stat;
 	struct index_def *index_def = index->index_def;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	older = vy_mem_older_lsn(mem, stmt);
-	*region_stmt = NULL;
+
+	/*
+	 * If there are a lot of successive upserts for the same key,
+	 * select might take too long to squash them all. So once the
+	 * number of upserts exceeds a certain threshold, we schedule
+	 * a fiber to merge them and insert the resulting statement
+	 * after the latest upsert.
+	 */
+	enum {
+		VY_UPSERT_THRESHOLD = 128,
+		VY_UPSERT_INF = 128,
+	};
+	if (older != NULL && vy_stmt_type(older) == IPROTO_UPSERT) {
+		uint8_t n_upserts = vy_stmt_n_upserts(older);
+		if (n_upserts != VY_UPSERT_INF) {
+			n_upserts++;
+			if (n_upserts == VY_UPSERT_THRESHOLD) {
+				struct tuple *dup =
+					vy_stmt_dup(stmt, index->upsert_format);
+				vy_index_squash_upserts(index, dup);
+			}
+		}
+		vy_stmt_set_n_upserts((struct tuple *)stmt, n_upserts);
+	}
+
 	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
 	    (older == NULL && range->shadow == NULL &&
 	     rlist_empty(&range->sealed) && range->run_count == 0)) {
@@ -3224,8 +3280,11 @@ vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
 					index->space_format,
 					index->upsert_format,
 					index_def->iid == 0, false, stat);
-		if (upserted == NULL)
-			return -1; /* OOM */
+		if (upserted == NULL) {
+			/* OOM */
+			diag_clear(diag_get());
+			return;
+		}
 		int64_t upserted_lsn = vy_stmt_lsn(upserted);
 		if (upserted_lsn != lsn) {
 			/**
@@ -3237,46 +3296,40 @@ vy_range_set_upsert(struct vy_range *range, struct vy_mem *mem,
 			assert(older == NULL ||
 			       upserted_lsn == vy_stmt_lsn(older));
 			tuple_unref(upserted);
-			return 0;
+			return;
 		}
 		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
-		int rc = vy_range_set(range, mem, upserted, region_stmt);
-		tuple_unref(upserted);
-		if (rc < 0)
-			return -1;
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
-		return 0;
-	}
+		assert(mem->lsregion_id != INT64_MAX);
+		struct lsregion *allocator = &index->env->allocator;
 
-	/*
-	 * If there are a lot of successive upserts for the same key,
-	 * select might take too long to squash them all. So once the
-	 * number of upserts exceeds a certain threshold, we schedule
-	 * a fiber to merge them and insert the resulting statement
-	 * after the latest upsert.
-	 */
-	enum {
-		VY_UPSERT_THRESHOLD = 128,
-		VY_UPSERT_INF = 255,
-	};
-	if (older != NULL)
-		vy_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(older));
-	if (vy_stmt_n_upserts(stmt) != VY_UPSERT_INF) {
-		vy_stmt_set_n_upserts(stmt, vy_stmt_n_upserts(stmt) + 1);
-		if (vy_stmt_n_upserts(stmt) > VY_UPSERT_THRESHOLD) {
-			/*
-			 * Prevent further upserts from starting new
-			 * workers while this one is in progress.
-			 */
-			vy_stmt_set_n_upserts(stmt, VY_UPSERT_INF);
-			/*
-			 * Avoid squashing upserts here: we may
-			 * still roll back this statement.
-			 */
+		size_t mem_used_before = lsregion_used(allocator);
+
+		const struct tuple *region_stmt =
+			vy_stmt_dup_lsregion(upserted, allocator, mem->lsregion_id);
+		if (region_stmt == NULL) {
+			/* OOM */
+			tuple_unref(upserted);
+			diag_clear(diag_get());
+			return;
 		}
+
+		size_t mem_used_after = lsregion_used(allocator);
+		assert(mem_used_after >= mem_used_before);
+		size_t mem_increment = mem_used_after - mem_used_before;
+		vy_quota_force_use(&index->env->quota, mem_increment);
+
+		int rc = vy_range_set(range, mem, upserted, &region_stmt);
+		/**
+		 * Since we have already allocated mem statement and
+		 * now we replacing one statement with another, the
+		 * vy_range_set cannot fail.
+		 */
+		assert(rc == 0); (void)rc;
+		tuple_unref(upserted);
+		vy_range_commit_stmt(region_stmt, index, mem);
+		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 	}
-	return vy_range_set(range, mem, stmt, region_stmt);
 }
 
 /*
@@ -3388,15 +3441,8 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, stmt,
 					  &index->index_def->key_def);
 
-	int rc;
-	switch (vy_stmt_type(stmt)) {
-	case IPROTO_UPSERT:
-		rc = vy_range_set_upsert(range, mem, stmt, region_stmt);
-		break;
-	default:
-		rc = vy_range_set(range, mem, stmt, region_stmt);
-		break;
-	}
+	int rc = vy_range_set(range, mem, stmt, region_stmt);
+
 	/*
 	 * Invalidate cache element.
 	 */
@@ -9462,11 +9508,11 @@ vy_squash_process(struct vy_squash *squash)
 
 	struct vy_read_iterator itr;
 	/*
-	 * Use the global read view to avoid squashing
+	 * Use the committed read view to avoid squashing
 	 * prepared, but not committed statements.
 	 */
-	vy_read_iterator_open(&itr, index, NULL, ITER_EQ,
-			      squash->stmt, &env->xm->p_global_read_view, false);
+	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
+			      &env->xm->p_committed_read_view, false);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc == 0 && result != NULL)
@@ -9505,6 +9551,12 @@ vy_squash_process(struct vy_squash *squash)
 		const struct tuple *mem_stmt =
 			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
 		if (vy_tuple_compare(result, mem_stmt, &index_def->key_def) != 0)
+			break;
+		/**
+		 * Leave alone prepared statements; they will be handled
+		 * in vy_range_commit_stmt.
+		 */
+		if (vy_stmt_lsn(mem_stmt) >= MAX_LSN)
 			break;
 		if (vy_stmt_type(mem_stmt) != IPROTO_UPSERT) {
 			/**
