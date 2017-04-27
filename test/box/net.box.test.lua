@@ -35,7 +35,7 @@ cn:ping()
 -- check permissions
 cn:call('unexists_procedure')
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 cn:eval('return 2+2')
 
 box.schema.user.grant('guest','execute','universe')
@@ -43,11 +43,11 @@ cn:close()
 cn = remote.connect(box.cfg.listen)
 
 cn:call('unexists_procedure')
-cn:call('test_foo', 'a', 'b', 'c')
-cn:call(nil, 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
+cn:call(nil, {'a', 'b', 'c'})
 cn:eval('return 2+2')
 cn:eval('return 1, 2, 3')
-cn:eval('return ...', 1, 2, 3)
+cn:eval('return ...', {1, 2, 3})
 cn:eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
 cn:eval('return nil')
 cn:eval('return')
@@ -213,12 +213,12 @@ type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
 function pause() fiber.sleep(10) return true end
 
 cn:call('pause')
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 
 
 -- call
-remote.self:call('test_foo', 'a', 'b', 'c')
-cn:call('test_foo', 'a', 'b', 'c')
+remote.self:call('test_foo', {'a', 'b', 'c'})
+cn:call('test_foo', {'a', 'b', 'c'})
 
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
@@ -236,9 +236,9 @@ u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'
 X = {}
 X.X = X
 function X.fn(x,y) return y or x end
-cn:call('X.fn', u)
-cn:call('X.X.X.X.X.X.X.fn', u)
-cn:call('X.X.X.X:fn', u)
+cn:call('X.fn', {u})
+cn:call('X.X.X.X.X.X.X.fn', {u})
+cn:call('X.X.X.X:fn', {u})
 
 -- auth
 
@@ -351,10 +351,21 @@ remote_space:get(2)
 
 remote_space = nil
 
+cn:call('ret_after', {0.01}, { timeout = 1.00 })
+cn:call('ret_after', {1.00}, { timeout = 1e-9 })
+
+cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
+cn:eval('return ret_after(...)', {1.00}, { timeout = 1e-9 })
+
+--
+-- :timeout()
+-- @deprecated since 1.7.4
+--
+
 cn:timeout(1).space.net_box_test_space.index.primary:select{234}
-cn:call('ret_after', .01)
-cn:timeout(1):call('ret_after', .01)
-cn:timeout(.01):call('ret_after', 1)
+cn:call('ret_after', {.01})
+cn:timeout(1):call('ret_after', {.01})
+cn:timeout(.01):call('ret_after', {1})
 
 cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 cn:close()
@@ -365,7 +376,6 @@ remote.self.space.net_box_test_space:select{234}
 remote.self:timeout(123).space.net_box_test_space:select{234}
 remote.self:is_connected()
 remote.self:wait_connected()
-
 
 cn:close()
 -- cleanup database after tests
@@ -418,7 +428,7 @@ test_run:cmd("setopt delimiter ';'")
 function gh594()
     local cn = remote.connect(box.cfg.listen)
     local ping = fiber.create(function() cn:ping() end)
-    cn:call('dostring', 'return 2 + 2')
+    cn:call('dostring', {'return 2 + 2'})
     cn:close()
 end;
 test_run:cmd("setopt delimiter ''");
@@ -499,12 +509,17 @@ c.space.test.index.covering.parts
 box.space.test:drop()
 
 -- CALL vs CALL_16 in connect options
-function scalar42() return 42 end
+function echo(...) return ... end
 c = net.connect(box.cfg.listen)
-c:call('scalar42')
+c:call('echo', {42})
+c:eval('return echo(...)', {42})
+-- invalid arguments
+c:call('echo', 42)
+c:eval('return echo(...)', 42)
 c:close()
 c = net.connect(box.cfg.listen, {call_16 = true})
-c:call('scalar42')
+c:call('echo', 42)
+c:eval('return echo(...)', 42)
 c:close()
 
 --
@@ -560,6 +575,28 @@ ibuf.rpos + len == ibuf.wpos
 ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
 ibuf.rpos == ibuf.wpos
 len
+result
+
+-- call
+c:call("echo", {1, 2, 3}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c:call("echo", {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c:call("echo", nil, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- eval
+c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c:eval("echo(...)", {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c:eval("echo(...)", nil, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
 result
 
 -- unsupported methods

@@ -77,7 +77,7 @@ cn:call('unexists_procedure')
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 ---
 ...
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 ---
 - error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
@@ -98,11 +98,11 @@ cn:call('unexists_procedure')
 ---
 - error: Execute access is denied for user 'guest' to function 'unexists_procedure'
 ...
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 ---
 - error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
-cn:call(nil, 'a', 'b', 'c')
+cn:call(nil, {'a', 'b', 'c'})
 ---
 - error: Execute access is denied for user 'guest' to function 'nil'
 ...
@@ -116,7 +116,7 @@ cn:eval('return 1, 2, 3')
 - 2
 - 3
 ...
-cn:eval('return ...', 1, 2, 3)
+cn:eval('return ...', {1, 2, 3})
 ---
 - 1
 - 2
@@ -562,18 +562,18 @@ cn:call('pause')
 ---
 - error: Peer closed
 ...
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 ---
 - [[{'a': 1}], [{'b': 2}], 'c']
 ...
 -- call
-remote.self:call('test_foo', 'a', 'b', 'c')
+remote.self:call('test_foo', {'a', 'b', 'c'})
 ---
 - - - a: 1
   - - b: 2
   - c
 ...
-cn:call('test_foo', 'a', 'b', 'c')
+cn:call('test_foo', {'a', 'b', 'c'})
 ---
 - [[{'a': 1}], [{'b': 2}], 'c']
 ...
@@ -619,15 +619,15 @@ X.X = X
 function X.fn(x,y) return y or x end
 ---
 ...
-cn:call('X.fn', u)
+cn:call('X.fn', {u})
 ---
 - 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
-cn:call('X.X.X.X.X.X.X.fn', u)
+cn:call('X.X.X.X.X.X.X.fn', {u})
 ---
 - 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
-cn:call('X.X.X.X:fn', u)
+cn:call('X.X.X.X:fn', {u})
 ---
 - 84F7BCFA-079C-46CC-98B4-F0C821BE833E
 ...
@@ -956,19 +956,39 @@ remote_space:get(2)
 remote_space = nil
 ---
 ...
+cn:call('ret_after', {0.01}, { timeout = 1.00 })
+---
+- [[0.01]]
+...
+cn:call('ret_after', {1.00}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
+---
+- [[0.01]]
+...
+cn:eval('return ret_after(...)', {1.00}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+--
+-- :timeout()
+-- @deprecated since 1.7.4
+--
 cn:timeout(1).space.net_box_test_space.index.primary:select{234}
 ---
 - - [234, 1, 2, 3]
 ...
-cn:call('ret_after', .01)
+cn:call('ret_after', {.01})
 ---
 - [[0.01]]
 ...
-cn:timeout(1):call('ret_after', .01)
+cn:timeout(1):call('ret_after', {.01})
 ---
 - [[0.01]]
 ...
-cn:timeout(.01):call('ret_after', 1)
+cn:timeout(.01):call('ret_after', {1})
 ---
 - error: Timeout exceeded
 ...
@@ -1055,7 +1075,7 @@ remote.self:eval('return true')
 ...
 remote.self.eval('return true')
 ---
-- error: 'usage: remote:eval(expr, ...)'
+- error: 'Use remote:eval(...) instead of remote.eval(...):'
 ...
 -- uri as the first argument
 uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
@@ -1115,7 +1135,7 @@ test_run:cmd("setopt delimiter ';'")
 function gh594()
     local cn = remote.connect(box.cfg.listen)
     local ping = fiber.create(function() cn:ping() end)
-    cn:call('dostring', 'return 2 + 2')
+    cn:call('dostring', {'return 2 + 2'})
     cn:close()
 end;
 ---
@@ -1303,15 +1323,30 @@ box.space.test:drop()
 ---
 ...
 -- CALL vs CALL_16 in connect options
-function scalar42() return 42 end
+function echo(...) return ... end
 ---
 ...
 c = net.connect(box.cfg.listen)
 ---
 ...
-c:call('scalar42')
+c:call('echo', {42})
 ---
 - 42
+...
+c:eval('return echo(...)', {42})
+---
+- 42
+...
+-- invalid arguments
+c:call('echo', 42)
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:call(func_name, {arg1, arg2, ...},
+    opts) instead of remote:call(func_name, arg1, arg2, ...)'
+...
+c:eval('return echo(...)', 42)
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:eval(expression, {arg1, arg2, ...},
+    opts) instead of remote:eval(expression, arg1, arg2, ...)'
 ...
 c:close()
 ---
@@ -1319,9 +1354,13 @@ c:close()
 c = net.connect(box.cfg.listen, {call_16 = true})
 ---
 ...
-c:call('scalar42')
+c:call('echo', 42)
 ---
 - - [42]
+...
+c:eval('return echo(...)', 42)
+---
+- 42
 ...
 c:close()
 ---
@@ -1456,6 +1495,74 @@ len
 result
 ---
 - {48: [[1, 'hello'], [2], [3], [4]]}
+...
+-- call
+c:call("echo", {1, 2, 3}, {buffer = ibuf})
+---
+- 10
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: [1, 2, 3]}
+...
+c:call("echo", {}, {buffer = ibuf})
+---
+- 7
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:call("echo", nil, {buffer = ibuf})
+---
+- 7
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- eval
+c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
+---
+- 7
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:eval("echo(...)", {}, {buffer = ibuf})
+---
+- 7
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:eval("echo(...)", nil, {buffer = ibuf})
+---
+- 7
+...
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
 ...
 -- unsupported methods
 c.space.test:get({1}, { buffer = ibuf})

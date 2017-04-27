@@ -8,8 +8,8 @@ box.schema.user.grant('guest','read,write,execute','universe')
 session = box.session
 remote = require('net.box')
 c = remote.connect(box.cfg.listen)
-c:call("dostring", "session.su('admin')")
-c:call("dostring", "return session.user()")
+c:eval("session.su('admin')")
+c:eval("return session.user()")
 c:close()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
@@ -77,7 +77,7 @@ u = box.space._user:get{1}
 box.session.su('admin')
 box.schema.user.passwd('Gx5!')
 c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
-c:call('dostring', 'return 2 + 2')
+c:call('dostring', { 'return 2 + 2' })
 c:close()
 box.space._user:replace(u)
 --

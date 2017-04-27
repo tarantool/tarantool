@@ -20,10 +20,10 @@ remote = require('net.box')
 c = remote.connect(box.cfg.listen)
 ---
 ...
-c:call("dostring", "session.su('admin')")
+c:eval("session.su('admin')")
 ---
 ...
-c:call("dostring", "return session.user()")
+c:eval("return session.user()")
 ---
 - admin
 ...
@@ -201,7 +201,7 @@ box.schema.user.passwd('Gx5!')
 c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
 ---
 ...
-c:call('dostring', 'return 2 + 2')
+c:call('dostring', { 'return 2 + 2' })
 ---
 - 4
 ...

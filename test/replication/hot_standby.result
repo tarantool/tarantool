@@ -145,7 +145,7 @@ REPLICA ~= nil
 a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
 ---
 ...
-a:call('_set_pri_lsn', box.info.id, box.info.lsn)
+a:call('_set_pri_lsn', {box.info.id, box.info.lsn})
 ---
 ...
 a:close()
@@ -228,7 +228,7 @@ HOT_STANDBY ~= nil
 a = (require 'net.box').connect(HOT_STANDBY.host, HOT_STANDBY.service)
 ---
 ...
-a:call('_set_pri_lsn', box.info.id, box.info.lsn)
+a:call('_set_pri_lsn', {box.info.id, box.info.lsn})
 ---
 ...
 a:close()

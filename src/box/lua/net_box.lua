@@ -629,7 +629,10 @@ local function connect(...)
 
         remote._space_mt = space_metatable(remote)
         remote._index_mt = index_metatable(remote)
-        if opts.call_16 then remote.call = remote.call_16 end
+        if opts.call_16 then
+            remote.call = remote.call_16
+            remote.eval = remote.eval_16
+        end
     end
     remote._on_schema_reload = trigger.new("on_schema_reload")
     remote._transport = create_transport(host, port, user, password, callback)
@@ -644,6 +647,20 @@ local function remote_check(remote, method)
     if type(remote) ~= 'table' then
         local fmt = 'Use remote:%s(...) instead of remote.%s(...):'
         box.error(E_PROC_LUA, string.format(fmt, method, method))
+    end
+end
+
+local function check_call_args(args)
+    if args ~= nil and type(args) ~= 'table' then
+        error("Use remote:call(func_name, {arg1, arg2, ...}, opts) "..
+              "instead of remote:call(func_name, arg1, arg2, ...)")
+    end
+end
+
+local function check_eval_args(args)
+    if args ~= nil and type(args) ~= 'table' then
+        error("Use remote:eval(expression, {arg1, arg2, ...}, opts) "..
+              "instead of remote:eval(expression, arg1, arg2, ...)")
     end
 end
 
@@ -731,19 +748,38 @@ function remote_methods:reload_schema()
                   nil)
 end
 
+-- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     remote_check(self, 'call')
     return self:_request('call_16', nil, tostring(func_name), {...})
 end
 
-function remote_methods:call(func_name, ...)
+function remote_methods:call(func_name, args, opts)
     remote_check(self, 'call')
-    return unpack(self:_request('call_17', nil, tostring(func_name), {...}))
+    check_call_args(args)
+    args = args or {}
+    local res = self:_request('call_17', opts, tostring(func_name), args)
+    if type(res) ~= 'table' then
+        return res
+    end
+    return unpack(res)
 end
 
-function remote_methods:eval(code, ...)
+-- @deprecated since 1.7.4
+function remote_methods:eval_16(code, ...)
     remote_check(self, 'eval')
     return unpack(self:_request('eval', nil, code, {...}))
+end
+
+function remote_methods:eval(code, args, opts)
+    remote_check(self, 'eval')
+    check_eval_args(args)
+    args = args or {}
+    local res = self:_request('eval', opts, code, args)
+    if type(res) ~= 'table' then
+        return res
+    end
+    return unpack(res)
 end
 
 function remote_methods:wait_state(state, timeout)
@@ -1056,10 +1092,10 @@ this_module.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     is_connected = function(self) return true end,
-    call = function(_box, proc_name, ...)
-        if type(_box) ~= 'table' then
-            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
-        end
+    call = function(_box, proc_name, args, opts)
+        remote_check(_box, 'call')
+        check_call_args(args)
+        args = args or {}
         proc_name = tostring(proc_name)
         local status, proc, obj = pcall(package.loaded['box.internal'].
             call_loadproc, proc_name)
@@ -1069,15 +1105,15 @@ this_module.self = {
         end
         local result
         if obj ~= nil then
-            return handle_eval_result(pcall(proc, obj, ...))
+            return handle_eval_result(pcall(proc, obj, unpack(args)))
         else
-            return handle_eval_result(pcall(proc, ...))
+            return handle_eval_result(pcall(proc, unpack(args)))
         end
     end,
-    eval = function(_box, expr, ...)
-        if type(_box) ~= 'table' then
-            box.error(box.error.PROC_LUA, "usage: remote:eval(expr, ...)")
-        end
+    eval = function(_box, expr, args, opts)
+        remote_check(_box, 'eval')
+        check_eval_args(args)
+        args = args or {}
         local proc, errmsg = loadstring(expr)
         if not proc then
             proc, errmsg = loadstring("return "..expr)
@@ -1086,7 +1122,7 @@ this_module.self = {
             rollback()
             return box.error(box.error.PROC_LUA, errmsg)
         end
-        return handle_eval_result(pcall(proc, ...))
+        return handle_eval_result(pcall(proc, unpack(args)))
     end
 }
 

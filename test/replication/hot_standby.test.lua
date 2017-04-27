@@ -77,7 +77,7 @@ test_run:cmd("set variable replica_port to 'replica.listen'")
 REPLICA = require('uri').parse(tostring(replica_port))
 REPLICA ~= nil
 a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
-a:call('_set_pri_lsn', box.info.id, box.info.lsn)
+a:call('_set_pri_lsn', {box.info.id, box.info.lsn})
 a:close()
 
 _insert(1, 10)
@@ -98,7 +98,7 @@ test_run:cmd("set variable hot_standby_port to 'hot_standby.master'")
 HOT_STANDBY = require('uri').parse(tostring(hot_standby_port))
 HOT_STANDBY ~= nil
 a = (require 'net.box').connect(HOT_STANDBY.host, HOT_STANDBY.service)
-a:call('_set_pri_lsn', box.info.id, box.info.lsn)
+a:call('_set_pri_lsn', {box.info.id, box.info.lsn})
 a:close()
 
 test_run:cmd("switch hot_standby")
