@@ -610,7 +610,7 @@ errinj.set("ERRINJ_WAL_DELAY", true)
 ---
 - ok
 ...
-lsn = box.info.vinyl().metric.lsn
+lsn = box.info.vinyl().lsn
 ---
 ...
 c0('s:replace{1, "c0"}')
@@ -628,7 +628,7 @@ c0('s:replace{3, "c0"}')
 _ = fiber.create(c0.commit, c0)
 ---
 ...
-box.info.vinyl().metric.lsn == lsn
+box.info.vinyl().lsn == lsn
 ---
 - true
 ...
@@ -643,7 +643,7 @@ c1('s:replace{2, "c1"}')
 _ = fiber.create(c1.commit, c1)
 ---
 ...
-box.info.vinyl().metric.lsn == lsn
+box.info.vinyl().lsn == lsn
 ---
 - true
 ...
@@ -662,7 +662,7 @@ c2('s:replace{3, "c2"}')
 _ = fiber.create(c2.commit, c2)
 ---
 ...
-box.info.vinyl().metric.lsn == lsn
+box.info.vinyl().lsn == lsn
 ---
 - true
 ...
@@ -686,10 +686,10 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 REQ_COUNT = 7
 ---
 ...
-while box.info.vinyl().metric.lsn - lsn < REQ_COUNT do fiber.sleep(0.01) end
+while box.info.vinyl().lsn - lsn < REQ_COUNT do fiber.sleep(0.01) end
 ---
 ...
-box.info.vinyl().metric.lsn == lsn + REQ_COUNT
+box.info.vinyl().lsn == lsn + REQ_COUNT
 ---
 - true
 ...

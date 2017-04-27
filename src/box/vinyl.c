@@ -5174,15 +5174,6 @@ static void vy_conf_delete(struct vy_conf *c)
 /** {{{ Introspection */
 
 static void
-vy_info_append_global(struct vy_env *env, struct info_handler *h)
-{
-	info_table_begin(h, "vinyl");
-	info_append_str(h, "path", env->conf->path);
-	info_append_str(h, "build", PACKAGE_VERSION);
-	info_table_end(h);
-}
-
-static void
 vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 {
 	char buf[16];
@@ -5277,22 +5268,13 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_table_end(h);
 }
 
-static void
-vy_info_append_metric(struct vy_env *env, struct info_handler *h)
-{
-	info_table_begin(h, "metric");
-	info_append_u64(h, "lsn", env->xm->lsn);
-	info_table_end(h);
-}
-
 void
 vy_info(struct vy_env *env, struct info_handler *h)
 {
 	info_begin(h);
-	vy_info_append_global(env, h);
 	vy_info_append_memory(env, h);
-	vy_info_append_metric(env, h);
 	vy_info_append_performance(env, h);
+	info_append_u64(h, "lsn", env->xm->lsn);
 	info_end(h);
 }
 
