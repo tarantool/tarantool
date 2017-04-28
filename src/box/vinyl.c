@@ -2979,8 +2979,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		char run_path[PATH_MAX];
 		vy_run_snprint_path(run_path, sizeof(run_path),
 				    index->path, run->id, VY_FILE_RUN);
-		if (!record->is_empty &&
-		    vy_run_recover(run, index_path, run_path) != 0) {
+		if (vy_run_recover(run, index_path, run_path) != 0) {
 			vy_run_unref(run);
 			goto out;
 		}
@@ -3650,6 +3649,16 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_range *range;
 	int i;
 
+	if (vy_run_is_empty(run)) {
+		/*
+		 * In case the run is empty, we can discard the run
+		 * and delete dumped in-memory trees right away w/o
+		 * inserting slices into ranges.
+		 */
+		vy_run_discard(run);
+		goto delete_mems;
+	}
+
 	/*
 	 * For each range allocate a slice of the new run.
 	 */
@@ -3683,8 +3692,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 */
 	vy_log_tx_begin();
 	vy_log_create_run(index->index_def->opts.lsn, run->id,
-			  run->info.min_lsn, run->info.max_lsn,
-			  vy_run_is_empty(run));
+			  run->info.min_lsn, run->info.max_lsn);
 	for (range = vy_range_tree_first(&index->tree), i = 0;
 	     range != NULL;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
@@ -3731,6 +3739,7 @@ vy_task_dump_complete(struct vy_task *task)
 	assert(i == index->range_count);
 	free(slices);
 
+delete_mems:
 	/*
 	 * Delete dumped in-memory trees.
 	 */
@@ -3914,15 +3923,22 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_slice *first_slice = task->first_slice;
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_scheduler *scheduler = index->env->scheduler;
-	struct vy_slice *slice, *next_slice, *new_slice;
+	struct vy_slice *slice, *next_slice, *new_slice = NULL;
 
 	/*
 	 * Allocate a slice of the new run.
+	 *
+	 * If the run is empty, we don't need to allocate a new slice
+	 * and insert it into the range, but we still need to delete
+	 * compacted runs.
 	 */
-	new_slice = vy_run_make_slice(vy_log_next_slice_id(), run, NULL, NULL,
-				      &index->index_def->key_def);
-	if (new_slice == NULL)
-		return -1;
+	if (!vy_run_is_empty(run)) {
+		new_slice = vy_run_make_slice(vy_log_next_slice_id(),
+					      run, NULL, NULL,
+					      &index->index_def->key_def);
+		if (new_slice == NULL)
+			return -1;
+	}
 
 	/*
 	 * Log change in metadata.
@@ -3935,22 +3951,28 @@ vy_task_compact_complete(struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
-	vy_log_create_run(index->index_def->opts.lsn, run->id,
-			  run->info.min_lsn, run->info.max_lsn,
-			  vy_run_is_empty(run));
-	vy_log_insert_slice(range->id, run->id, new_slice->id,
-			    tuple_data_or_null(new_slice->begin),
-			    tuple_data_or_null(new_slice->end));
+	if (new_slice != NULL) {
+		vy_log_create_run(index->index_def->opts.lsn, run->id,
+				  run->info.min_lsn, run->info.max_lsn);
+		vy_log_insert_slice(range->id, run->id, new_slice->id,
+				    tuple_data_or_null(new_slice->begin),
+				    tuple_data_or_null(new_slice->end));
+	}
 	if (vy_log_tx_commit() < 0) {
-		vy_run_destroy_slice(new_slice);
+		if (new_slice != NULL)
+			vy_run_destroy_slice(new_slice);
 		return -1;
 	}
 
 	/*
-	 * Account the new run.
+	 * Account the new run if it is not empty,
+	 * otherwise discard it.
 	 */
-	vy_index_acct_run(index, run);
-	vy_run_unref(run);
+	if (new_slice != NULL) {
+		vy_index_acct_run(index, run);
+		vy_run_unref(run);
+	} else
+		vy_run_discard(run);
 
 	/*
 	 * Replace compacted slices with the resulting slice.
@@ -3961,7 +3983,8 @@ vy_task_compact_complete(struct vy_task *task)
 	 * the compacted slices were.
 	 */
 	vy_index_unacct_range(index, range);
-	vy_range_add_slice_before(range, new_slice, first_slice);
+	if (new_slice != NULL)
+		vy_range_add_slice_before(range, new_slice, first_slice);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
 		if (slice->run->slice_count == 1)
@@ -9162,7 +9185,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_backup_arg *arg = cb_arg;
 
-	if (record->type != VY_LOG_CREATE_RUN || record->is_empty)
+	if (record->type != VY_LOG_CREATE_RUN)
 		goto out;
 
 	char path[PATH_MAX];

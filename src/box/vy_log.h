@@ -95,7 +95,7 @@ enum vy_log_record_type {
 	/**
 	 * Commit a vinyl run file creation.
 	 * Requires vy_log_record::index_lsn, run_id,
-	 * min_lsn, max_lsn, is_empty.
+	 * min_lsn, max_lsn.
 	 *
 	 * Written after a run file was successfully created.
 	 */
@@ -174,11 +174,6 @@ struct vy_log_record {
 	/** Min and max LSN spanned by the run. */
 	int64_t min_lsn;
 	int64_t max_lsn;
-	/**
-	 * True if the run is empty and has no data file.
-	 * (Empty runs are kept for the sake of min/max LSN).
-	 */
-	bool is_empty;
 	/** Link in vy_log::tx. */
 	struct rlist in_tx;
 };
@@ -448,7 +443,7 @@ vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 /** Helper to log a vinyl run creation. */
 static inline void
 vy_log_create_run(int64_t index_lsn, int64_t run_id,
-		  int64_t min_lsn, int64_t max_lsn, bool is_empty)
+		  int64_t min_lsn, int64_t max_lsn)
 {
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
@@ -458,7 +453,6 @@ vy_log_create_run(int64_t index_lsn, int64_t run_id,
 	record.run_id = run_id;
 	record.min_lsn = min_lsn;
 	record.max_lsn = max_lsn;
-	record.is_empty = is_empty;
 	vy_log_write(&record);
 }
 
