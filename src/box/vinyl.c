@@ -8631,7 +8631,8 @@ vy_write_iterator_add_mem(struct vy_write_iterator *wi, struct vy_mem *mem)
 	if (src == NULL)
 		return -1;
 	vy_mem_iterator_open(&src->mem_iterator, &wi->mem_iterator_stat,
-			     mem, ITER_GE, wi->key, &wi->env->xm->p_global_read_view);
+			     mem, ITER_GE, wi->key,
+			     &wi->env->xm->p_global_read_view, NULL);
 	return 0;
 }
 
@@ -8796,7 +8797,8 @@ vy_read_iterator_add_mem_range(struct vy_read_iterator *itr,
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						true, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , range->mem,
-				     itr->iterator_type, itr->key, itr->read_view);
+				     itr->iterator_type, itr->key,
+				     itr->read_view, NULL);
 	}
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
@@ -8804,7 +8806,8 @@ vy_read_iterator_add_mem_range(struct vy_read_iterator *itr,
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, true);
 		vy_mem_iterator_open(&sub_src->mem_iterator, stat , mem,
-				     itr->iterator_type, itr->key, itr->read_view);
+				     itr->iterator_type, itr->key,
+				     itr->read_view, NULL);
 	}
 }
 

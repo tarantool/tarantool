@@ -298,17 +298,16 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 }
 
 /**
- * Find next (lower, older) record with the same key as current
+ * Position the iterator to the first entry in the memory tree
+ * satisfying the search criteria (iterator type and search key).
  *
  * @retval 0 Found
  * @retval 1 Not found
  */
 static int
-vy_mem_iterator_start(struct vy_mem_iterator *itr)
+vy_mem_iterator_do_start(struct vy_mem_iterator *itr)
 {
-	assert(!itr->search_started);
 	itr->stat->lookup_count++;
-	itr->search_started = true;
 	itr->version = itr->mem->version;
 
 	struct tree_mem_key tree_key;
@@ -351,6 +350,42 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 }
 
 /**
+ * Start iteration from the key following @before_first.
+ *
+ * @retval 0 Found
+ * @retval 1 Not found
+ */
+static int
+vy_mem_iterator_start(struct vy_mem_iterator *itr)
+{
+	assert(!itr->search_started);
+	itr->search_started = true;
+
+	if (itr->before_first == NULL)
+		return vy_mem_iterator_do_start(itr);
+
+	enum iterator_type save_type = itr->iterator_type;
+	const struct tuple *save_key = itr->key;
+	if (itr->iterator_type == ITER_GE ||
+	    itr->iterator_type == ITER_EQ)
+		itr->iterator_type = ITER_GT;
+	else if (itr->iterator_type == ITER_LE)
+		itr->iterator_type = ITER_LT;
+	itr->key = itr->before_first;
+	int rc = vy_mem_iterator_do_start(itr);
+	itr->iterator_type = save_type;
+	itr->key = save_key;
+
+	if (rc == 0 && itr->iterator_type == ITER_EQ &&
+	    vy_stmt_compare(itr->key, itr->curr_stmt,
+			    itr->mem->key_def) != 0) {
+		itr->curr_stmt = NULL;
+		rc = 1;
+	}
+	return rc;
+}
+
+/**
  * Restores iterator if the mem have been changed
  */
 static void
@@ -383,7 +418,8 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv)
+		     const struct tuple *key, const struct vy_read_view **rv,
+		     struct tuple *before_first)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
@@ -400,6 +436,9 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
 				     iterator_type == ITER_LE ?
 				     ITER_LE : ITER_GE;
 	}
+	itr->before_first = before_first;
+	if (before_first != NULL)
+		tuple_ref(before_first);
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
 	itr->curr_stmt = NULL;
@@ -675,6 +714,8 @@ vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 	assert(vitr->iface->close == vy_mem_iterator_close);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	assert(itr->last_stmt == NULL);
+	if (itr->before_first != NULL)
+		tuple_unref(itr->before_first);
 	TRASH(itr);
 	(void) itr;
 }
