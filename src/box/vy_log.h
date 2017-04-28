@@ -35,6 +35,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <small/rlist.h>
+
 /*
  * Data stored in vinyl is organized in ranges and runs.
  * Runs correspond to data files written to disk, while
@@ -177,6 +179,8 @@ struct vy_log_record {
 	 * (Empty runs are kept for the sake of min/max LSN).
 	 */
 	bool is_empty;
+	/** Link in vy_log::tx. */
+	struct rlist in_tx;
 };
 
 /**

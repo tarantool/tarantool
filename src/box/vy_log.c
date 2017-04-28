@@ -42,6 +42,7 @@
 
 #include <bit/bit.h>
 #include <msgpuck/msgpuck.h>
+#include <small/mempool.h>
 #include <small/region.h>
 #include <small/rlist.h>
 
@@ -144,12 +145,6 @@ static const char *vy_log_type_name[] = {
 
 struct vy_recovery;
 
-/**
- * Max number of records in the log buffer.
- * This limits the size of a transaction.
- */
-enum { VY_LOG_TX_BUF_SIZE = 64 };
-
 /** Metadata log object. */
 struct vy_log {
 	/**
@@ -179,18 +174,32 @@ struct vy_log {
 	 * Used by vy_log_next_slice_id().
 	 */
 	int64_t next_slice_id;
+	/** Mempool for struct vy_log_record. */
+	struct mempool record_pool;
 	/**
-	 * Index of the first record of the current
-	 * transaction in tx_buf.
+	 * Records awaiting to be written to disk.
+	 * Linked by vy_log_record::in_tx;
 	 */
-	int tx_begin;
+	struct rlist tx;
+	/** Number of entries in the @tx list. */
+	int tx_size;
+	/** First record of the current transaction. */
+	struct vy_log_record *tx_begin;
 	/**
-	 * Index of the record following the last one
-	 * of the current transaction in tx_buf.
+	 * Flag set if vy_log_write() failed.
+	 *
+	 * It indicates that that the current transaction must be
+	 * aborted on vy_log_commit(). Thanks to this flag, we don't
+	 * need to add error handling code after each invocation of
+	 * vy_log_write(), instead we only check vy_log_commit()
+	 * return code.
 	 */
-	int tx_end;
-	/** Records awaiting to be written to disk. */
-	struct vy_log_record tx_buf[VY_LOG_TX_BUF_SIZE];
+	bool tx_failed;
+	/**
+	 * Diagnostic area where vy_log_write() error is stored,
+	 * only relevant if @tx_failed is set.
+	 */
+	struct diag tx_diag;
 };
 static struct vy_log vy_log;
 
@@ -749,6 +758,10 @@ vy_log_init(const char *dir)
 {
 	xdir_create(&vy_log.dir, dir, VYLOG, &INSTANCE_UUID);
 	latch_create(&vy_log.latch);
+	mempool_create(&vy_log.record_pool, cord_slab_cache(),
+		       sizeof(struct vy_log_record));
+	rlist_create(&vy_log.tx);
+	diag_create(&vy_log.tx_diag);
 	wal_init_vy_log();
 }
 
@@ -762,16 +775,16 @@ vy_log_init(const char *dir)
 static int
 vy_log_flush(void)
 {
-	if (vy_log.tx_end == 0)
+	if (vy_log.tx_size == 0)
 		return 0; /* nothing to do */
 
-	struct journal_entry *entry = journal_entry_new(vy_log.tx_end);
+	struct journal_entry *entry = journal_entry_new(vy_log.tx_size);
 	if (entry == NULL)
 		return -1;
 
 	struct xrow_header *rows;
 	rows = region_aligned_alloc(&fiber()->gc,
-				    vy_log.tx_end * sizeof(struct xrow_header),
+				    vy_log.tx_size * sizeof(struct xrow_header),
 				    alignof(struct xrow_header));
 	if (rows == NULL)
 		return -1;
@@ -779,12 +792,18 @@ vy_log_flush(void)
 	/*
 	 * Encode buffered records.
 	 */
-	for (int i = 0; i < vy_log.tx_end; i++) {
+	int i = 0;
+	struct vy_log_record *record;
+	rlist_foreach_entry(record, &vy_log.tx, in_tx) {
+		assert(i < vy_log.tx_size);
 		struct xrow_header *row = &rows[i];
-		if (vy_log_record_encode(&vy_log.tx_buf[i], row) < 0)
+		if (vy_log_record_encode(record, row) < 0)
 			return -1;
 		entry->rows[i] = row;
+		i++;
 	}
+	assert(i == vy_log.tx_size);
+
 	/*
 	 * Do actual disk writes on behalf of the WAL
 	 * so as not to block the tx thread.
@@ -792,8 +811,12 @@ vy_log_flush(void)
 	if (wal_write_vy_log(entry) != 0)
 		return -1;
 
-	/* Success. Reset the buffer. */
-	vy_log.tx_end = 0;
+	/* Success. Free flushed records. */
+	struct vy_log_record *next;
+	rlist_foreach_entry_safe(record, &vy_log.tx, in_tx, next)
+		mempool_free(&vy_log.record_pool, record);
+	rlist_create(&vy_log.tx);
+	vy_log.tx_size = 0;
 	return 0;
 }
 
@@ -802,6 +825,8 @@ vy_log_free(void)
 {
 	xdir_destroy(&vy_log.dir);
 	latch_destroy(&vy_log.latch);
+	mempool_destroy(&vy_log.record_pool);
+	diag_destroy(&vy_log.tx_diag);
 }
 
 int
@@ -1121,7 +1146,8 @@ void
 vy_log_tx_begin(void)
 {
 	latch_lock(&vy_log.latch);
-	vy_log.tx_begin = vy_log.tx_end;
+	vy_log.tx_begin = NULL;
+	vy_log.tx_failed = false;
 	say_debug("%s", __func__);
 }
 
@@ -1135,9 +1161,25 @@ vy_log_tx_begin(void)
 static int
 vy_log_tx_do_commit(bool no_discard)
 {
+	struct vy_log_record *record, *next;
 	int rc = 0;
 
 	assert(latch_owner(&vy_log.latch) == fiber());
+
+	if (vy_log.tx_failed) {
+		/*
+		 * vy_log_write() failed to append a record to tx.
+		 * @no_discard transactions can't handle this.
+		 */
+		if (no_discard) {
+			error_log(diag_last_error(&vy_log.tx_diag));
+			panic("vinyl log write failed");
+		}
+		diag_move(&vy_log.tx_diag, diag_get());
+		rc = -1;
+		goto rollback;
+	}
+
 	/*
 	 * During recovery, we may replay records we failed to commit
 	 * before restart (e.g. drop index). Since the log isn't open
@@ -1148,17 +1190,32 @@ vy_log_tx_do_commit(bool no_discard)
 		goto out;
 
 	rc = vy_log_flush();
+
 	/*
 	 * Rollback the transaction on failure unless
 	 * we were explicitly told not to.
 	 */
 	if (rc != 0 && !no_discard)
-		vy_log.tx_end = vy_log.tx_begin;
+		goto rollback;
+
 out:
 	say_debug("%s(no_discard=%d): %s", __func__, no_discard,
 		  rc == 0 ? "success" : "fail");
 	latch_unlock(&vy_log.latch);
 	return rc;
+
+rollback:
+	record = vy_log.tx_begin;
+	while (record != NULL) {
+		assert(vy_log.tx_size > 0);
+		vy_log.tx_size--;
+		next = (&record->in_tx != rlist_last(&vy_log.tx) ?
+			rlist_next_entry(record, in_tx) : NULL);
+		rlist_del_entry(record, in_tx);
+		mempool_free(&vy_log.record_pool, record);
+		record = next;
+	}
+	goto out;
 }
 
 int
@@ -1179,15 +1236,24 @@ vy_log_write(const struct vy_log_record *record)
 	assert(latch_owner(&vy_log.latch) == fiber());
 
 	say_debug("%s: %s", __func__, vy_log_record_str(record));
-	if (vy_log.tx_end >= VY_LOG_TX_BUF_SIZE) {
-		latch_unlock(&vy_log.latch);
-		panic("metadata log buffer overflow");
+
+	struct vy_log_record *tx_record = mempool_alloc(&vy_log.record_pool);
+	if (tx_record == NULL) {
+		diag_set(OutOfMemory, sizeof(*tx_record),
+			 "malloc", "struct vy_log_record");
+		diag_move(diag_get(), &vy_log.tx_diag);
+		vy_log.tx_failed = true;
+		return;
 	}
 
-	struct vy_log_record *tx_record = &vy_log.tx_buf[vy_log.tx_end++];
 	*tx_record = *record;
 	if (tx_record->signature < 0)
 		tx_record->signature = vclock_sum(&vy_log.last_checkpoint);
+
+	rlist_add_tail_entry(&vy_log.tx, tx_record, in_tx);
+	vy_log.tx_size++;
+	if (vy_log.tx_begin == NULL)
+		vy_log.tx_begin = tx_record;
 }
 
 static int
