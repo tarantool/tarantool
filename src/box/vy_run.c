@@ -442,6 +442,12 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			if (run_info->max_key == NULL)
 				return -1;
 			break;
+		case VY_RUN_INFO_MIN_LSN:
+			run_info->min_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_RUN_INFO_MAX_LSN:
+			run_info->max_lsn = mp_decode_uint(&pos);
+			break;
 		case VY_RUN_INFO_PAGE_COUNT:
 			run_info->count = mp_decode_uint(&pos);
 			break;

@@ -77,9 +77,7 @@ enum vy_log_key {
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_DEF			= 7,
 	VY_LOG_KEY_SLICE_ID		= 8,
-	VY_LOG_KEY_MIN_LSN		= 9,
-	VY_LOG_KEY_MAX_LSN		= 10,
-	VY_LOG_KEY_DUMP_LSN		= 11,
+	VY_LOG_KEY_DUMP_LSN		= 9,
 };
 
 /**
@@ -100,9 +98,7 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_CREATE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_RUN_ID) |
-					  (1 << VY_LOG_KEY_MIN_LSN) |
-					  (1 << VY_LOG_KEY_MAX_LSN),
+					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_INSERT_SLICE]		= (1 << VY_LOG_KEY_RANGE_ID) |
@@ -126,8 +122,6 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_DEF]		= "key_def",
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
-	[VY_LOG_KEY_MIN_LSN]		= "min_lsn",
-	[VY_LOG_KEY_MAX_LSN]		= "max_lsn",
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
 };
 
@@ -289,9 +283,6 @@ struct vy_run_recovery_info {
 	struct rlist in_index;
 	/** ID of the run. */
 	int64_t id;
-	/** Min and max LSN spanned by the run. */
-	int64_t min_lsn;
-	int64_t max_lsn;
 	/**
 	 * True if the run was not committed (there's
 	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
@@ -402,12 +393,6 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_SLICE_ID],
 			record->slice_id);
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN))
-		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_MIN_LSN], record->min_lsn);
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN))
-		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_MAX_LSN], record->max_lsn);
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
@@ -520,16 +505,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->slice_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_MIN_LSN);
-		size += mp_sizeof_uint(record->min_lsn);
-		n_keys++;
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_MAX_LSN);
-		size += mp_sizeof_uint(record->max_lsn);
-		n_keys++;
-	}
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
 		assert(record->dump_lsn >= 0);
 		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
@@ -599,14 +574,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
 		pos = mp_encode_uint(pos, record->slice_id);
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_MIN_LSN);
-		pos = mp_encode_uint(pos, record->min_lsn);
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_MAX_LSN);
-		pos = mp_encode_uint(pos, record->max_lsn);
 	}
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
@@ -723,12 +690,6 @@ vy_log_record_decode(struct vy_log_record *record,
 		}
 		case VY_LOG_KEY_SLICE_ID:
 			record->slice_id = mp_decode_uint(&pos);
-			break;
-		case VY_LOG_KEY_MIN_LSN:
-			record->min_lsn = mp_decode_uint(&pos);
-			break;
-		case VY_LOG_KEY_MAX_LSN:
-			record->max_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
@@ -1455,7 +1416,6 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 	}
 	assert(old_node == NULL);
 	run->id = run_id;
-	run->min_lsn = run->max_lsn = -1;
 	run->is_incomplete = false;
 	run->is_dropped = false;
 	run->signature = -1;
@@ -1511,8 +1471,7 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
  */
 static int
 vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
-		       int64_t index_lsn, int64_t run_id,
-		       int64_t min_lsn, int64_t max_lsn)
+		       int64_t index_lsn, int64_t run_id)
 {
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
@@ -1545,8 +1504,6 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
 	}
 	run->is_incomplete = false;
 	run->signature = signature;
-	run->min_lsn = min_lsn;
-	run->max_lsn = max_lsn;
 	rlist_move_entry(&index->runs, run, in_index);
 	return 0;
 }
@@ -1825,8 +1782,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		break;
 	case VY_LOG_CREATE_RUN:
 		rc = vy_recovery_create_run(recovery, record->signature,
-				record->index_lsn, record->run_id,
-				record->min_lsn, record->max_lsn);
+				record->index_lsn, record->run_id);
 		break;
 	case VY_LOG_DROP_RUN:
 		rc = vy_recovery_drop_run(recovery, record->signature,
@@ -2046,8 +2002,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 			       VY_LOG_PREPARE_RUN : VY_LOG_CREATE_RUN);
 		record.signature = run->signature;
 		record.run_id = run->id;
-		record.min_lsn = run->min_lsn;
-		record.max_lsn = run->max_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		if (!run->is_dropped)

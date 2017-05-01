@@ -56,6 +56,8 @@ static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
 
 static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
 					    (1 << VY_RUN_INFO_MAX_KEY) |
+					    (1 << VY_RUN_INFO_MIN_LSN) |
+					    (1 << VY_RUN_INFO_MAX_LSN) |
 					    (1 << VY_RUN_INFO_PAGE_COUNT);
 
 enum { VY_BLOOM_VERSION = 0 };
