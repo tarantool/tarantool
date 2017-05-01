@@ -134,6 +134,11 @@ enum vy_log_record_type {
 	 * Requires vy_log_record::slice_id.
 	 */
 	VY_LOG_DELETE_SLICE		= 9,
+	/**
+	 * Update LSN of the last index dump.
+	 * Requires vy_log_record::index_lsn, dump_lsn.
+	 */
+	VY_LOG_DUMP_INDEX		= 10,
 
 	vy_log_record_type_MAX
 };
@@ -174,6 +179,8 @@ struct vy_log_record {
 	/** Min and max LSN spanned by the run. */
 	int64_t min_lsn;
 	int64_t max_lsn;
+	/** LSN of the last index dump. */
+	int64_t dump_lsn;
 	/** Link in vy_log::tx. */
 	struct rlist in_tx;
 };
@@ -494,6 +501,18 @@ vy_log_delete_slice(int64_t slice_id)
 	record.type = VY_LOG_DELETE_SLICE;
 	record.signature = -1;
 	record.slice_id = slice_id;
+	vy_log_write(&record);
+}
+
+static inline void
+vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
+{
+	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
+	record.type = VY_LOG_DUMP_INDEX;
+	record.signature = -1;
+	record.index_lsn = index_lsn;
+	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
 }
 

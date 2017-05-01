@@ -530,6 +530,11 @@ struct vy_index {
 	/** Minimal in-memory lsn (min over mem->min_lsn). */
 	int64_t mem_min_lsn;
 	/**
+	 * LSN of the last dump or -1 if the index has not
+	 * been dumped yet.
+	 */
+	int64_t dump_lsn;
+	/**
 	 * Tree of all ranges of this index, linked by
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
@@ -2964,6 +2969,9 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	case VY_LOG_CREATE_INDEX:
 		assert(record->index_lsn == index_def->opts.lsn);
 		break;
+	case VY_LOG_DUMP_INDEX:
+		index->dump_lsn = record->dump_lsn;
+		break;
 	case VY_LOG_DROP_INDEX:
 		index->is_dropped = true;
 		break;
@@ -3399,39 +3407,6 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	}
 }
 
-/*
- * Check if a statement was dumped to disk before the last shutdown and
- * therefore can be skipped on WAL replay.
- *
- * Since the minimal unit that can be dumped to disk is a range, a
- * statement is on disk iff its LSN is less than or equal to the max LSN
- * over all statements written to disk in the same range.
- */
-static bool
-vy_stmt_is_committed(struct vy_index *index, const struct tuple *stmt)
-{
-	/*
-	 * If the index is going to be dropped on WAL recovery,
-	 * there's no point in inserting statements into it.
-	 */
-	if (index->is_dropped)
-		return true;
-
-	struct vy_range *range;
-	range = vy_range_tree_find_by_key(&index->tree, ITER_EQ, stmt,
-					  &index->index_def->key_def);
-	if (rlist_empty(&range->slices))
-		return false;
-
-	/*
-	 * The newest run, i.e. the run containing a statement with max
-	 * LSN, is at the head of the list.
-	 */
-	struct vy_slice *slice = rlist_first_entry(&range->slices,
-						   struct vy_slice, in_range);
-	return vy_stmt_lsn(stmt) <= slice->run->info.max_lsn;
-}
-
 /**
  * Rotate the active in-memory tree if necessary and pin it to make
  * sure it is not dumped until the transaction is complete.
@@ -3491,10 +3466,14 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 	 * particular run was dumped after the checkpoint, and we're
 	 * replaying records already present in the database. In this
 	 * case avoid overwriting a newer version with an older one.
+	 *
+	 * If the index is going to be dropped on WAL recovery,
+	 * there's no point in replaying statements for it either.
 	 */
-	if (status == VINYL_FINAL_RECOVERY_LOCAL ||
-	    status == VINYL_FINAL_RECOVERY_REMOTE) {
-		if (vy_stmt_is_committed(index, stmt))
+	if (status == VINYL_FINAL_RECOVERY_LOCAL) {
+		if (index->is_dropped)
+			return 0;
+		if (vy_stmt_lsn(stmt) <= index->dump_lsn)
 			return 0;
 	}
 
@@ -3653,8 +3632,13 @@ vy_task_dump_complete(struct vy_task *task)
 		/*
 		 * In case the run is empty, we can discard the run
 		 * and delete dumped in-memory trees right away w/o
-		 * inserting slices into ranges.
+		 * inserting slices into ranges. However, we need
+		 * to log index dump anyway.
 		 */
+		vy_log_tx_begin();
+		vy_log_dump_index(index->index_def->opts.lsn, task->dump_lsn);
+		if (vy_log_tx_commit() < 0)
+			goto fail;
 		vy_run_discard(run);
 		goto delete_mems;
 	}
@@ -3705,6 +3689,7 @@ vy_task_dump_complete(struct vy_task *task)
 		fiber_reschedule(); /* see comment above */
 	}
 	assert(i == index->range_count);
+	vy_log_dump_index(index->index_def->opts.lsn, task->dump_lsn);
 	if (vy_log_tx_commit() < 0)
 		goto fail_free_slices;
 
@@ -3747,6 +3732,7 @@ delete_mems:
 	index->mem_min_lsn = index->mem->min_lsn;
 	rlist_foreach_entry_safe(mem, &index->sealed, in_sealed, next_mem) {
 		if (mem->min_lsn <= task->dump_lsn) {
+			assert(mem->max_lsn <= task->dump_lsn);
 			rlist_del_entry(mem, in_sealed);
 			index->stmt_count -= mem->tree.size;
 			vy_scheduler_mem_dumped(scheduler, mem);
@@ -3758,6 +3744,7 @@ delete_mems:
 		}
 	}
 	index->version++;
+	index->dump_lsn = task->dump_lsn;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
@@ -3869,12 +3856,14 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 		run->info.min_lsn = MIN(run->info.min_lsn, mem->min_lsn);
 		run->info.max_lsn = MAX(run->info.max_lsn, mem->max_lsn);
+		task->dump_lsn = MAX(task->dump_lsn, mem->max_lsn);
 		task->max_output_count += mem->tree.size;
 	}
 
+	assert(task->dump_lsn > index->dump_lsn);
+
 	task->run = run;
 	task->wi = wi;
-	task->dump_lsn = dump_lsn;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_index(scheduler, index);
@@ -5378,6 +5367,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 		goto fail_mem;
 
 	index->mem_min_lsn = INT64_MAX;
+	index->dump_lsn = -1;
 	rlist_create(&index->sealed);
 	vy_range_tree_new(&index->tree);
 	rlist_create(&index->link);

@@ -78,6 +78,7 @@ enum vy_log_key {
 	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_MIN_LSN		= 9,
 	VY_LOG_KEY_MAX_LSN		= 10,
+	VY_LOG_KEY_DUMP_LSN		= 11,
 };
 
 /**
@@ -109,6 +110,8 @@ static const unsigned long vy_log_key_mask[] = {
 					  (1 << VY_LOG_KEY_BEGIN) |
 					  (1 << VY_LOG_KEY_END),
 	[VY_LOG_DELETE_SLICE]		= (1 << VY_LOG_KEY_SLICE_ID),
+	[VY_LOG_DUMP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
+					  (1 << VY_LOG_KEY_DUMP_LSN),
 };
 
 /** vy_log_key -> human readable name. */
@@ -124,6 +127,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
 	[VY_LOG_KEY_MIN_LSN]		= "min_lsn",
 	[VY_LOG_KEY_MAX_LSN]		= "max_lsn",
+	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
 };
 
 /** vy_log_type -> human readable name. */
@@ -239,6 +243,8 @@ struct vy_index_recovery_info {
 	struct key_def *key_def;
 	/** True if the index was dropped. */
 	bool is_dropped;
+	/** LSN of the last index dump. */
+	int64_t dump_lsn;
 	/**
 	 * Log signature from the time when the index was created
 	 * or dropped.
@@ -401,6 +407,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_MAX_LSN], record->max_lsn);
+	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN))
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
+			record->dump_lsn);
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -519,6 +529,12 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->max_lsn);
 		n_keys++;
 	}
+	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
+		assert(record->dump_lsn >= 0);
+		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
+		size += mp_sizeof_uint(record->dump_lsn);
+		n_keys++;
+	}
 	size += mp_sizeof_map(n_keys);
 
 	/*
@@ -590,6 +606,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_MAX_LSN);
 		pos = mp_encode_uint(pos, record->max_lsn);
+	}
+	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
+		pos = mp_encode_uint(pos, record->dump_lsn);
 	}
 	assert(pos == tuple + size);
 
@@ -708,6 +728,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_MAX_LSN:
 			record->max_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_LOG_KEY_DUMP_LSN:
+			record->dump_lsn = mp_decode_uint(&pos);
 			break;
 		default:
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
@@ -1325,6 +1348,7 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 	index->key_def = (void *)index + sizeof(*index);
 	memcpy(index->key_def, key_def, key_def_sizeof(key_def->part_count));
 	index->is_dropped = false;
+	index->dump_lsn = -1;
 	index->signature = signature;
 	rlist_create(&index->ranges);
 	rlist_create(&index->runs);
@@ -1378,6 +1402,34 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 		mh_i64ptr_del(h, k, NULL);
 		free(index);
 	}
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_DUMP_INDEX log record.
+ * This function updates LSN of the last dump of the vinyl index
+ * with ID @index_lsn.
+ * Returns 0 on success, -1 if ID not found or index is dropped.
+ */
+static int
+vy_recovery_dump_index(struct vy_recovery *recovery,
+		       int64_t index_lsn, int64_t dump_lsn)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_lsn);
+	if (index == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Dump of unregistered index %lld",
+				    (long long)index_lsn));
+		return -1;
+	}
+	if (index->is_dropped) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Dump of deleted index %lld",
+				    (long long)index_lsn));
+		return -1;
+	}
+	index->dump_lsn = dump_lsn;
 	return 0;
 }
 
@@ -1792,6 +1844,10 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_DELETE_SLICE:
 		rc = vy_recovery_delete_slice(recovery, record->slice_id);
 		break;
+	case VY_LOG_DUMP_INDEX:
+		rc = vy_recovery_dump_index(recovery, record->index_lsn,
+					    record->dump_lsn);
+		break;
 	default:
 		unreachable();
 	}
@@ -1974,6 +2030,13 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		return 0;
+	}
+
+	if (index->dump_lsn >= 0) {
+		record.type = VY_LOG_DUMP_INDEX;
+		record.dump_lsn = index->dump_lsn;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
 	}
 
 	rlist_foreach_entry(run, &index->runs, in_index) {

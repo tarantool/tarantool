@@ -123,6 +123,10 @@ result
         BODY:
           tuple: [0, {0: 2, 5: 0, 6: 512, 7: [[0, 'unsigned']]}]
       - HEADER:
+          type: INSERT
+        BODY:
+          tuple: [10, {0: 2, 11: 8}]
+      - HEADER:
           lsn: 5
           type: INSERT
         BODY:
@@ -162,6 +166,12 @@ result
           timestamp: <timestamp>
         BODY:
           tuple: [8, {1: 0, 2: 2, 3: [], 4: [], 8: 1}]
+      - HEADER:
+          lsn: 8
+          type: INSERT
+          timestamp: <timestamp>
+        BODY:
+          tuple: [10, {0: 2, 11: 11}]
   - - 00000000000000000001.index
     - - HEADER:
           type: RUNINFO
