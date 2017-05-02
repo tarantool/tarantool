@@ -28,7 +28,6 @@ stmts = {}
 errors = {}
 initial_data = {}
 initial_repro = ""
-repro = ""
 ops = {'begin', 'commit', 'select', 'replace', 'upsert', 'delete'}
 
 test_run:cmd("setopt delimiter ';'")
@@ -257,13 +256,14 @@ function check()
         end
     end
     if errors[1] and not had_errors then
-        repro = "p(\"" .. errors[1] .. "\")"
-        repro = repro .. "\n" .. initial_repro
-        repro = repro .. "\n" .. "p(\"" .. initial_repro .. "\")"
-        repro = repro .. "\n" .. '----------------------'
+        print("p(\"" .. errors[1] .. "\")")
+        print(initial_repro)
+        print("p(\"" .. initial_repro .. "\")")
+        print('----------------------')
         for _,stmt in ipairs(stmts) do
-            repro = repro .. "\n" .. stmt.repro
+            print(stmt.repro)
         end
+        io.flush()
     end
 end;
 
@@ -278,7 +278,6 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 errors
-if repro ~= "" then print(repro) io.flush() end
 
 s1:drop()
 s2:drop()
