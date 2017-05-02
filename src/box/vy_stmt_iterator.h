@@ -124,6 +124,41 @@ struct vy_iterator_stat {
 	size_t bloom_reflections;
 };
 
+
+/**
+ * The stream is a very simple iterator (generally over a mem or a run)
+ * that output all the tuples on increasing order.
+ */
+struct vy_stmt_stream;
+
+/**
+ * Get next tuple from a stream.
+ */
+typedef NODISCARD int
+(*vy_stream_next_f)(struct vy_stmt_stream *virt_stream, struct tuple **ret);
+
+/**
+ * Close the stream.
+ */
+typedef void
+(*vy_stream_close_f)(struct vy_stmt_stream *virt_stream);
+
+/**
+ * The interface description for streams over run and mem.
+ */
+struct vy_stmt_stream_iface {
+	vy_stream_next_f next;
+	vy_stream_close_f close;
+};
+
+/**
+ * Common interface for streams over run and mem.
+ */
+struct vy_stmt_stream {
+	const struct vy_stmt_stream_iface *iface;
+};
+
+
 /** The state of the database the cursor should be looking at. */
 struct vy_read_view {
 	/**

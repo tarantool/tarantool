@@ -285,7 +285,7 @@ vy_slice_new(int64_t id, struct vy_run *run,
 						ITER_LT, &unused);
 		if (slice->last_page_no == run->info.count) {
 			/* It's an empty slice */
-			slice->last_page_no = run->info.count - 1;
+			slice->last_page_no = 0;
 		}
 	}
 	assert(slice->last_page_no >= slice->first_page_no);
@@ -1844,3 +1844,196 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	return -1;
 }
 
+/**
+ * Read a page with stream->page_no from the run and save it in stream->page.
+ * Support function of slice stream.
+ * @param stream - the stream.
+ * @return 0 on success, -1 of memory or read error (diag is set).
+ */
+static NODISCARD int
+vy_slice_stream_read_page(struct vy_slice_stream *stream)
+{
+	assert(stream->page == NULL);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(stream->run_env);
+	if (zdctx == NULL)
+		return -1;
+
+	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
+							  stream->page_no);
+	stream->page = vy_page_new(page_info);
+	if (stream->page == NULL)
+		return -1;
+
+	if (vy_page_read(stream->page, page_info,
+			 stream->slice->run->fd, zdctx) != 0) {
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Binary search in a run for the given key. Find the first position with
+ * a tuple greater or equal to slice
+ * @retval 0 success
+ * @retval -1 read or memory error
+ */
+static NODISCARD int
+vy_slice_stream_search(struct vy_slice_stream *stream)
+{
+	assert(stream->page == NULL);
+	if (stream->slice->begin == NULL) {
+		/* Already at the beginning */
+		assert(stream->page_no == 0);
+		assert(stream->pos_in_page == 0);
+		return 0;
+	}
+
+	if (vy_slice_stream_read_page(stream) != 0)
+		return -1;
+
+	/**
+	 * Binary search in page. Find the first position in page with
+	 * tuple >= stream->slice->begin.
+	 */
+	uint32_t beg = 0;
+	uint32_t end = stream->page->count;
+	while (beg != end) {
+		uint32_t mid = beg + (end - beg) / 2;
+		struct tuple *fnd_key =
+			vy_page_stmt(stream->page, mid, stream->key_def,
+				     stream->format, stream->upsert_format,
+				     stream->is_primary);
+		if (fnd_key == NULL)
+			return -1;
+		int cmp = vy_stmt_compare(fnd_key, stream->slice->begin,
+					  stream->key_def);
+		if (cmp < 0)
+			beg = mid + 1;
+		else
+			end = mid;
+		tuple_unref(fnd_key);
+	}
+	stream->pos_in_page = end;
+
+	if (stream->pos_in_page == stream->page->count) {
+		/* The first tuple is in the beginning of the next page */
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		stream->page_no++;
+		stream->pos_in_page = 0;
+	}
+	return 0;
+}
+
+/**
+ * Get the value from the stream and move to the next position.
+ * Set *ret to the value or NULL if EOF.
+ * @param virt_stream - virtual stream.
+ * @param ret - pointer to pointer to the result.
+ * @return 0 on success, -1 on memory or read error.
+ */
+static NODISCARD int
+vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
+{
+	assert(virt_stream->iface->next == vy_slice_stream_next);
+	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
+	*ret = NULL;
+
+	/* If it's the first call, run binary search on slice->begin */
+	if (stream->tuple == NULL && vy_slice_stream_search(stream) != 0)
+		return -1;
+
+	/* If the slice is ended, return EOF */
+	if (stream->page_no > stream->slice->last_page_no)
+		return 0;
+
+	/* If current page is not already read, read it */
+	if (stream->page == NULL && vy_slice_stream_read_page(stream) != 0)
+		return -1;
+
+	/* Read current tuple from the page */
+	struct tuple *tuple =
+		vy_page_stmt(stream->page, stream->pos_in_page,
+			     stream->key_def, stream->format,
+			     stream->upsert_format, stream->is_primary);
+	if (tuple == NULL) /* Read or memory error */
+		return -1;
+
+	/* Check that the tuple is not out of slice bounds = */
+	if (stream->slice->end != NULL &&
+	    stream->page_no >= stream->slice->last_page_no &&
+	    vy_stmt_compare_with_key(tuple, stream->slice->end,
+				     stream->key_def) >= 0)
+		return 0;
+
+	/* We definitely has the next non-null tuple. Save it in stream */
+	if (stream->tuple != NULL)
+		tuple_unref(stream->tuple);
+	stream->tuple = tuple;
+	*ret = tuple;
+
+	/* Increment position */
+	stream->pos_in_page++;
+
+	/* Check whether the position is out of page */
+	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
+							  stream->page_no);
+	if (stream->pos_in_page >= page_info->count) {
+		/**
+		 * Out of page. Free page, move the position to the next page
+		 * and * nullify page pointer to read it on the next iteration.
+		 */
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		stream->page_no++;
+		stream->pos_in_page = 0;
+	}
+
+	return 0;
+}
+
+/**
+ * Free resources.
+ */
+static void
+vy_slice_stream_close(struct vy_stmt_stream *virt_stream)
+{
+	assert(virt_stream->iface->close == vy_slice_stream_close);
+	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
+	if (stream->page != NULL) {
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+	}
+	if (stream->tuple != NULL) {
+		tuple_unref(stream->tuple);
+		stream->tuple = NULL;
+	}
+}
+
+static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
+	.next = vy_slice_stream_next,
+	.close = vy_slice_stream_close
+};
+
+void
+vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
+		   const struct key_def *key_def, struct tuple_format *format,
+		   struct tuple_format *upsert_format,
+		   struct vy_run_env *run_env, bool is_primary)
+{
+	stream->base.iface = &vy_slice_stream_iface;
+
+	stream->page_no = slice->first_page_no;
+	stream->pos_in_page = 0; /* We'll find it later */
+	stream->page = NULL;
+	stream->tuple = NULL;
+
+	stream->slice = slice;
+	stream->key_def = key_def;
+	stream->format = format;
+	stream->upsert_format = upsert_format;
+	stream->run_env = run_env;
+	stream->is_primary = is_primary;
+}

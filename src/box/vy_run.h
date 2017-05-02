@@ -484,6 +484,45 @@ int
 vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	     ZSTD_DStream *zdctx);
 
+/**
+ * Simple stream over a slice. @see vy_stmt_stream.
+ */
+struct vy_slice_stream {
+	/** Parent class, must be the first member */
+	struct vy_stmt_stream base;
+
+	/** Current position */
+	uint32_t page_no;
+	uint32_t pos_in_page;
+	/** Last page read */
+	struct vy_page *page;
+	/** The last tuple returned to user */
+	struct tuple *tuple;
+
+	/** Members needed for memory allocation and disk access */
+	/** Slice to stream */
+	struct vy_slice *slice;
+	/** Key def for comparing with slice boundaries */
+	const struct key_def *key_def;
+	/** Format for allocating REPLACE and DELETE tuples read from pages. */
+	struct tuple_format *format;
+	/** Same as format, but for UPSERT tuples. */
+	struct tuple_format *upsert_format;
+	/** Vinyl run environment. */
+	struct vy_run_env *run_env;
+	/** Set if this iterator is for a primary index. */
+	bool is_primary;
+};
+
+/**
+ * Open a run stream. Use vy_stmt_stream api for further work.
+ */
+void
+vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
+		     const struct key_def *key_def, struct tuple_format *format,
+		     struct tuple_format *upsert_format,
+		     struct vy_run_env *run_env, bool is_primary);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
