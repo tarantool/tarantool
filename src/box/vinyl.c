@@ -3623,9 +3623,11 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_index *index = task->index;
 	struct vy_run *run = task->run;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+	struct tuple_format *key_format = index->env->key_format;
 	struct vy_mem *mem, *next_mem;
 	struct vy_slice **slices, *slice;
-	struct vy_range *range;
+	struct vy_range *range, *begin_range, *end_range;
+	struct tuple *min_key, *max_key;
 	int i;
 
 	if (vy_run_is_empty(run)) {
@@ -3644,7 +3646,27 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 
 	/*
-	 * For each range allocate a slice of the new run.
+	 * Figure out which ranges intersect the new run.
+	 * @begin_range is the first range intersecting the run.
+	 * @end_range is the range following the last range
+	 * intersecting the run or NULL if the run itersects all
+	 * ranges.
+	 */
+	min_key = vy_key_from_msgpack(key_format, run->info.min_key);
+	if (min_key == NULL)
+		goto fail;
+	max_key = vy_key_from_msgpack(key_format, run->info.max_key);
+	if (max_key == NULL) {
+		tuple_unref(min_key);
+		goto fail;
+	}
+	begin_range = vy_range_tree_psearch(&index->tree, min_key);
+	end_range = vy_range_tree_nsearch(&index->tree, max_key);
+	tuple_unref(min_key);
+	tuple_unref(max_key);
+
+	/*
+	 * For each intersected range allocate a slice of the new run.
 	 */
 	slices = calloc(index->range_count, sizeof(*slices));
 	if (slices == NULL) {
@@ -3652,8 +3674,7 @@ vy_task_dump_complete(struct vy_task *task)
 			 "malloc", "struct vy_slice *");
 		goto fail;
 	}
-	for (range = vy_range_tree_first(&index->tree), i = 0;
-	     range != NULL;
+	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		slice = vy_run_make_slice(vy_log_next_slice_id(),
 					  run, range->begin, range->end,
@@ -3669,7 +3690,6 @@ vy_task_dump_complete(struct vy_task *task)
 		 */
 		fiber_reschedule();
 	}
-	assert(i == index->range_count);
 
 	/*
 	 * Log change in metadata.
@@ -3677,8 +3697,7 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	vy_log_create_run(index->index_def->opts.lsn, run->id,
 			  run->info.min_lsn, run->info.max_lsn);
-	for (range = vy_range_tree_first(&index->tree), i = 0;
-	     range != NULL;
+	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = slices[i];
@@ -3688,7 +3707,6 @@ vy_task_dump_complete(struct vy_task *task)
 
 		fiber_reschedule(); /* see comment above */
 	}
-	assert(i == index->range_count);
 	vy_log_dump_index(index->index_def->opts.lsn, task->dump_lsn);
 	if (vy_log_tx_commit() < 0)
 		goto fail_free_slices;
@@ -3702,8 +3720,7 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * Add new slices to ranges.
 	 */
-	for (range = vy_range_tree_first(&index->tree), i = 0;
-	     range != NULL;
+	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = slices[i];
@@ -3721,7 +3738,6 @@ vy_task_dump_complete(struct vy_task *task)
 		 * skip runs whose statements are still in memory.
 		 */
 	}
-	assert(i == index->range_count);
 	free(slices);
 
 delete_mems:

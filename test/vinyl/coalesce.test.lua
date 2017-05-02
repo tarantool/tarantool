@@ -34,19 +34,20 @@ test_run:cmd("setopt delimiter ''");
 
 vyinfo().range_count
 
--- Delete 90% of keys. Do it in two iterations, calling snapshot after
--- each of them in order to trigger compaction and actual cleanup.
-test_run:cmd("setopt delimiter ';'")
-for i = 1,2 do
-    for k = i,key_count,2 do
-        if k % 10 ~= 0 then s:delete(k) end
-    end
-    box.snapshot()
-end;
-test_run:cmd("setopt delimiter ''");
+-- Delete 90% of keys.
+for k = 1,key_count do if k % 10 ~= 0 then s:delete(k) end end
+box.snapshot()
 
 -- Trigger compaction until ranges are coalesced.
-while vyinfo().range_count > 1 do s:delete{1} box.snapshot() fiber.sleep(0.01) end
+test_run:cmd("setopt delimiter ';'")
+while vyinfo().range_count > 1 do
+    for i = 1,key_count,keys_per_range do
+        s:delete{i}
+    end
+    box.snapshot()
+    fiber.sleep(0.01)
+end
+test_run:cmd("setopt delimiter ''");
 
 vyinfo().range_count
 
