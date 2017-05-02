@@ -3645,6 +3645,9 @@ vy_task_dump_complete(struct vy_task *task)
 		goto delete_mems;
 	}
 
+	assert(run->info.min_lsn > index->dump_lsn);
+	assert(run->info.max_lsn <= task->dump_lsn);
+
 	/*
 	 * Figure out which ranges intersect the new run.
 	 * @begin_range is the first range intersecting the run.
@@ -3731,12 +3734,15 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_scheduler_update_range(scheduler, range);
 		range->version++;
 		/*
-		 * XXX: If we yield here, a concurrent fiber can add
-		 * both the dumped mem and the new run to a read
-		 * iterator, which isn't permitted. To be able to
-		 * yield here, we need to teach the read iterator to
-		 * skip runs whose statements are still in memory.
+		 * If we yield here, a concurrent fiber will see
+		 * a range with a run slice containing statements
+		 * present in the in-memory trees of the index.
+		 * This is OK, because read iterator won't use the
+		 * new run slice until index->dump_lsn is bumped,
+		 * which is only done after in-memory trees are
+		 * removed (see vy_read_iterator_add_disk()).
 		 */
+		fiber_reschedule();
 	}
 	free(slices);
 
@@ -8543,28 +8549,42 @@ static void
 vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->run_stat;
+	struct vy_index *index = itr->index;
+	struct vy_iterator_stat *stat = &index->env->stat->run_stat;
+	struct tuple_format *format;
 	struct vy_slice *slice;
-	struct tuple_format *format = itr->index->surrogate_format;
 	/*
 	 * The format of the statement must be exactly the space
 	 * format with the same identifier to fully match the
 	 * format in vy_mem.
 	 */
-	if (itr->index->space_index_count == 1)
-		format = itr->index->space_format;
-	bool coio_read = cord_is_main() && itr->index->env->status == VINYL_ONLINE;
+	format = (index->space_index_count == 1 ?
+		  index->space_format : index->surrogate_format);
+	bool coio_read = cord_is_main() && index->env->status == VINYL_ONLINE;
 	rlist_foreach_entry(slice, &itr->curr_range->slices, in_range) {
+		/*
+		 * vy_task_dump_complete() may yield after adding
+		 * a new run slice to a range and before removing
+		 * dumped in-memory trees. We must not add both
+		 * the slice and the trees in this case, because
+		 * merge iterator can't deal with duplicates.
+		 * Since index->dump_lsn is bumped after deletion
+		 * of dumped in-memory trees, we can filter out
+		 * the run slice containing duplicates by LSN.
+		 */
+		if (slice->run->info.min_lsn > index->dump_lsn)
+			continue;
+		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
 		vy_run_iterator_open(&sub_src->run_iterator, coio_read, stat,
-				     &itr->index->env->run_env, slice,
+				     &index->env->run_env, slice,
 				     itr->iterator_type, itr->key,
 				     itr->read_view,
-				     &itr->index->index_def->key_def,
-				     &itr->index->user_index_def->key_def,
-				     format, itr->index->upsert_format,
-				     itr->index->index_def->iid == 0);
+				     &index->index_def->key_def,
+				     &index->user_index_def->key_def,
+				     format, index->upsert_format,
+				     index->index_def->iid == 0);
 	}
 }
 
