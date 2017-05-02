@@ -680,3 +680,29 @@ iterator_next(itr)
 s:select{1}
 
 s:drop()
+
+-- gh-2394
+--
+-- Check GE/LE iterators in a transaction involving several spaces.
+--
+test_run:cmd("setopt delimiter ';'")
+s = {}
+for i=1,3 do
+    s[i] = box.schema.space.create('test'..i, { engine = 'vinyl' })
+    _ = s[i]:create_index('primary')
+    s[i]:insert{20, 'B'..i}
+    s[i]:insert{40, 'D'..i}
+end
+test_run:cmd("setopt delimiter ''");
+
+box.begin()
+for i=1,3 do s[i]:insert{10, 'A'..i} s[i]:insert{30, 'C'..i} s[i]:insert{50, 'E'..i} end
+s[1]:select({}, {iterator = 'GE'})
+s[1]:select({}, {iterator = 'LE'})
+s[2]:select({}, {iterator = 'GE'})
+s[2]:select({}, {iterator = 'LE'})
+s[3]:select({}, {iterator = 'GE'})
+s[3]:select({}, {iterator = 'LE'})
+box.rollback()
+
+for i=1,3 do s[i]:drop() end
