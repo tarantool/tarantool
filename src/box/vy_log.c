@@ -55,6 +55,7 @@
 #include "key_def.h"
 #include "latch.h"
 #include "replication.h" /* INSTANCE_UUID */
+#include "salad/stailq.h"
 #include "say.h"
 #include "trivia/util.h"
 #include "wal.h"
@@ -181,11 +182,11 @@ struct vy_log {
 	 * Records awaiting to be written to disk.
 	 * Linked by vy_log_record::in_tx;
 	 */
-	struct rlist tx;
+	struct stailq tx;
 	/** Number of entries in the @tx list. */
 	int tx_size;
 	/** First record of the current transaction. */
-	struct vy_log_record *tx_begin;
+	struct stailq_entry *tx_begin;
 	/**
 	 * Flag set if vy_log_write() failed.
 	 *
@@ -762,7 +763,7 @@ vy_log_init(const char *dir)
 	latch_create(&vy_log.latch);
 	mempool_create(&vy_log.record_pool, cord_slab_cache(),
 		       sizeof(struct vy_log_record));
-	rlist_create(&vy_log.tx);
+	stailq_create(&vy_log.tx);
 	diag_create(&vy_log.tx_diag);
 	wal_init_vy_log();
 }
@@ -796,7 +797,7 @@ vy_log_flush(void)
 	 */
 	int i = 0;
 	struct vy_log_record *record;
-	rlist_foreach_entry(record, &vy_log.tx, in_tx) {
+	stailq_foreach_entry(record, &vy_log.tx, in_tx) {
 		assert(i < vy_log.tx_size);
 		struct xrow_header *row = &rows[i];
 		if (vy_log_record_encode(record, row) < 0)
@@ -815,9 +816,9 @@ vy_log_flush(void)
 
 	/* Success. Free flushed records. */
 	struct vy_log_record *next;
-	rlist_foreach_entry_safe(record, &vy_log.tx, in_tx, next)
+	stailq_foreach_entry_safe(record, next, &vy_log.tx, in_tx)
 		mempool_free(&vy_log.record_pool, record);
-	rlist_create(&vy_log.tx);
+	stailq_create(&vy_log.tx);
 	vy_log.tx_size = 0;
 	return 0;
 }
@@ -1164,6 +1165,7 @@ static int
 vy_log_tx_do_commit(bool no_discard)
 {
 	struct vy_log_record *record, *next;
+	struct stailq rollback;
 	int rc = 0;
 
 	assert(latch_owner(&vy_log.latch) == fiber());
@@ -1207,15 +1209,12 @@ out:
 	return rc;
 
 rollback:
-	record = vy_log.tx_begin;
-	while (record != NULL) {
+	stailq_create(&rollback);
+	stailq_splice(&vy_log.tx, vy_log.tx_begin, &rollback);
+	stailq_foreach_entry_safe(record, next, &rollback, in_tx) {
 		assert(vy_log.tx_size > 0);
 		vy_log.tx_size--;
-		next = (&record->in_tx != rlist_last(&vy_log.tx) ?
-			rlist_next_entry(record, in_tx) : NULL);
-		rlist_del_entry(record, in_tx);
 		mempool_free(&vy_log.record_pool, record);
-		record = next;
 	}
 	goto out;
 }
@@ -1252,10 +1251,10 @@ vy_log_write(const struct vy_log_record *record)
 	if (tx_record->signature < 0)
 		tx_record->signature = vclock_sum(&vy_log.last_checkpoint);
 
-	rlist_add_tail_entry(&vy_log.tx, tx_record, in_tx);
+	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
 	if (vy_log.tx_begin == NULL)
-		vy_log.tx_begin = tx_record;
+		vy_log.tx_begin = &tx_record->in_tx;
 }
 
 static int

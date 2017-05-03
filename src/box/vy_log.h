@@ -35,7 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <small/rlist.h>
+#include "salad/stailq.h"
 
 /*
  * Data stored in vinyl is organized in ranges and runs.
@@ -182,7 +182,7 @@ struct vy_log_record {
 	/** LSN of the last index dump. */
 	int64_t dump_lsn;
 	/** Link in vy_log::tx. */
-	struct rlist in_tx;
+	struct stailq_entry in_tx;
 };
 
 /**
