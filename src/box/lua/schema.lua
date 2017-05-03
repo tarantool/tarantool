@@ -292,10 +292,11 @@ end
 function box.schema.space.format(id, format)
     local _space = box.space._space
     check_param(id, 'id', 'number')
-    check_param(format, 'format', 'table')
+
     if format == nil then
         return _space:get(id)[7]
     else
+        check_param(format, 'format', 'table')
         _space:update(id, {{'=', 7, format}})
     end
 end
