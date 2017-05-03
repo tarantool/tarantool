@@ -297,6 +297,29 @@ space:drop()
 space = nil
 
 -------------------------------------------------------------------------------
+-- space:format()
+-------------------------------------------------------------------------------
+
+space = box.schema.space.create('tweedledum')
+pk = space:create_index('primary')
+
+space:format()
+box.schema.space.format(space.id)
+box.space._space:get(space.id)[7]
+
+space:format({{name = 'id', type = 'unsigned'}})
+space:format()
+box.schema.space.format(space.id)
+box.space._space:get(space.id)[7]
+
+space:format({})
+space:format()
+box.schema.space.format(space.id)
+box.space._space:get(space.id)[7]
+
+space:drop()
+
+-------------------------------------------------------------------------------
 -- Invalid arguments
 -------------------------------------------------------------------------------
 
