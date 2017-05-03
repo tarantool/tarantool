@@ -225,6 +225,17 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->dimension < o2->dimension ? -1 : 1;
 	if (o1->distance != o2->distance)
 		return o1->distance < o2->distance ? -1 : 1;
+	if (o1->range_size != o2->range_size)
+		return o1->range_size < o2->range_size ? -1 : 1;
+	if (o1->page_size != o2->page_size)
+		return o1->page_size < o2->page_size ? -1 : 1;
+	if (o1->run_count_per_level != o2->run_count_per_level)
+		return o1->run_count_per_level < o2->run_count_per_level ?
+		       -1 : 1;
+	if (o1->run_size_ratio != o2->run_size_ratio)
+		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
+	if (o1->bloom_fpr != o2->bloom_fpr)
+		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
 	return 0;
 }
 
@@ -299,6 +310,14 @@ index_def_dup(const struct index_def *def);
 /* Destroy and free an index_def. */
 void
 index_def_delete(struct index_def *def);
+
+/**
+ * True, if the index is so strong changed that it must be
+ * rebuilt.
+ */
+bool
+index_def_change_require_index_rebuild(struct index_def *old_index_def,
+				       struct index_def *new_index_def);
 
 /**
  * Encapsulates privileges of a user on an object.

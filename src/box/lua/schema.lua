@@ -380,11 +380,7 @@ local function update_index_parts(parts)
     return new_parts
 end
 
---
--- Template for entire index object, including
--- index opts.
---
-local alter_index_template = {
+local index_opts_template = {
     unique = 'boolean',
     dimension = 'number',
     distance = 'string',
@@ -393,11 +389,21 @@ local alter_index_template = {
     range_size = 'number',
     page_size = 'number',
     bloom_fpr = 'number',
+}
+
+--
+-- Template for entire index object, including
+-- index opts.
+--
+local alter_index_template = {
     id = 'number',
     name = 'string',
     type = 'string',
     parts = 'table',
 }
+for k, v in pairs(index_opts_template) do
+    alter_index_template[k] = v
+end
 
 local create_index_template = table.deepcopy(alter_index_template)
 create_index_template.if_not_exists = "boolean"
@@ -475,6 +481,7 @@ box.schema.index.create = function(space_id, name, options)
             run_size_ratio = options.run_size_ratio,
             bloom_fpr = options.bloom_fpr,
             lsn = box.info.signature,
+            bloom_fpr = options.bloom_fpr
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
@@ -514,9 +521,6 @@ end
 box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
-    end
-    if box.space[space_id].engine == 'vinyl' then
-        box.error(box.error.UNSUPPORTED, 'Vinyl index', 'alter')
     end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
@@ -584,14 +588,10 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.type == nil then
         options.type = tuple[4]
     end
-    if options.unique ~= nil then
-        index_opts.unique = options.unique and true or false
-    end
-    if options.dimension ~= nil then
-        index_opts.dimension = options.dimension
-    end
-    if options.distance ~= nil then
-        index_opts.distance = options.distance
+    for k, t in pairs(index_opts_template) do
+        if options[k] ~= nil then
+            index_opts[k] = options[k]
+        end
     end
     if options.parts ~= nil then
         check_index_parts(options.parts)

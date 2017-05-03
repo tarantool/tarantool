@@ -138,13 +138,13 @@ s = box.schema.space.create('M', {engine='vinyl'})
 i = s:create_index('primary',{})
 ---
 ...
-s:insert{5}
+s:insert{5, 5}
 ---
-- [5]
+- [5, 5]
 ...
-s.index.primary:alter({parts={1,'unsigned'}})
+s.index.primary:alter({parts={2,'unsigned'}})
 ---
-- error: Vinyl index does not support alter
+- error: Vinyl does not support altering definition of not empty indexes
 ...
 s:drop()
 ---

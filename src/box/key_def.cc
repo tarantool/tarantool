@@ -255,6 +255,27 @@ index_def_delete(struct index_def *index_def)
 	free(index_def);
 }
 
+bool
+index_def_change_require_index_rebuild(struct index_def *old_index_def,
+				       struct index_def *new_index_def)
+{
+	if (old_index_def->iid != new_index_def->iid ||
+	    old_index_def->type != new_index_def->type ||
+	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
+	    key_part_cmp(old_index_def->key_def.parts,
+			 old_index_def->key_def.part_count,
+			 new_index_def->key_def.parts,
+			 new_index_def->key_def.part_count) != 0) {
+		return true;
+	}
+	if (old_index_def->type == RTREE) {
+		if (old_index_def->opts.dimension != new_index_def->opts.dimension
+		    || old_index_def->opts.distance != new_index_def->opts.distance)
+			return true;
+	}
+	return false;
+}
+
 int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2)
@@ -275,6 +296,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 int
 index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 {
+	assert(key1->space_id == key2->space_id);
 	if (key1->iid != key2->iid)
 		return key1->iid < key2->iid ? -1 : 1;
 	if (strcmp(key1->name, key2->name))

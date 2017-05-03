@@ -1071,29 +1071,6 @@ public:
 };
 
 /**
- * Support function for AddIndex::prepare
- */
-static bool
-index_def_change_require_index_rebuid(struct index_def *old_index_def,
-				    struct index_def *new_index_def)
-{
-	if (old_index_def->type != new_index_def->type ||
-	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
-	    key_part_cmp(old_index_def->key_def.parts,
-			 old_index_def->key_def.part_count,
-			 new_index_def->key_def.parts,
-			 new_index_def->key_def.part_count) != 0) {
-		return true;
-	}
-	if (old_index_def->type == RTREE) {
-		if (old_index_def->opts.dimension != new_index_def->opts.dimension
-		    || old_index_def->opts.distance != new_index_def->opts.distance)
-			return true;
-	}
-	return false;
-}
-
-/**
  * Optimize addition of a new index: try to either completely
  * remove it or at least avoid building from scratch.
  */
@@ -1105,8 +1082,8 @@ AddIndex::prepare(struct alter_space *alter)
 	DropIndex *drop = dynamic_cast<DropIndex *>(prev_op);
 
 	if (drop == NULL ||
-	    index_def_change_require_index_rebuid(drop->old_index_def,
-						  new_index_def)) {
+	    index_def_change_require_index_rebuild(drop->old_index_def,
+						   new_index_def)) {
 		/*
 		 * The new index is too distinct from the old one,
 		 * have to rebuild.

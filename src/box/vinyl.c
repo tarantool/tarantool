@@ -3557,8 +3557,13 @@ struct vy_task {
 	struct stailq_entry link;
 	/** For run-writing tasks: maximum possible number of tuple to write */
 	size_t max_output_count;
-	/** For run-writing tasks: bloom filter false-positive-rate setting */
+	/**
+	 * Save the snapshot of some index_opts attributes since
+	 * they can be modified in the index->index_def->opts by
+	 * an index:alter() call.
+	 */
 	double bloom_fpr;
+	int64_t page_size;
 };
 
 /**
@@ -3607,7 +3612,7 @@ vy_task_dump_execute(struct vy_task *task)
 
 	return vy_run_write(task->new_run, index->env->conf->path,
 			    index_def->space_id, index_def->iid,
-			    task->wi, index_def->opts.page_size,
+			    task->wi, task->page_size,
 			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
@@ -3919,6 +3924,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	task->generation = generation;
 	task->max_output_count = max_output_count;
 	task->bloom_fpr = index->index_def->opts.bloom_fpr;
+	task->page_size = index->index_def->opts.page_size;
 
 	vy_scheduler_remove_index(scheduler, index);
 	if (index->index_def->iid != 0) {
@@ -3962,7 +3968,7 @@ vy_task_compact_execute(struct vy_task *task)
 
 	return vy_run_write(task->new_run, index->env->conf->path,
 			    index_def->space_id, index_def->iid,
-			    task->wi, index_def->opts.page_size,
+			    task->wi, task->page_size,
 			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
@@ -4187,6 +4193,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 	task->new_run = new_run;
 	task->wi = wi;
 	task->bloom_fpr = index->index_def->opts.bloom_fpr;
+	task->page_size = index->index_def->opts.page_size;
 
 	vy_scheduler_remove_range(scheduler, range);
 
@@ -5385,15 +5392,42 @@ fail_user_index_def:
 int
 vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 {
-	if (old_space->index_count &&
-	    old_space->index_count <= new_space->index_count) {
-		struct vy_index *pk = vy_index(old_space->index[0]);
-		if (pk->env->status == VINYL_ONLINE && pk->stmt_count != 0) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-				 "altering not empty space");
-			return -1;
+	/*
+	 * The space with no indexes can contain no rows.
+	 * Allow alter.
+	 */
+	if (old_space->index_count == 0)
+		return 0;
+	struct vy_index *pk = vy_index(old_space->index[0]);
+	/*
+	 * During WAL recovery, the space may be not empty. But we
+	 * open existing indexes, not creating new ones. Allow
+	 * alter.
+	 */
+	if (pk->env->status != VINYL_ONLINE)
+		return 0;
+	/* The space is empty. Allow alter. */
+	if (pk->stmt_count == 0)
+		return 0;
+	if (old_space->index_count < new_space->index_count) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "adding an index to a non-empty space");
+		return -1;
+	} else if (old_space->index_count == new_space->index_count) {
+		/* Check index_defs to be unchanged. */
+		for (uint32_t i = 0; i < old_space->index_count; ++i) {
+			struct index_def *old_def, *new_def;
+			old_def = space_index_def(old_space, i);
+			new_def = space_index_def(new_space, i);
+			if (index_def_change_require_index_rebuild(old_def,
+								   new_def)) {
+				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+					 "altering definition of not empty "\
+					 "indexes");
+				return -1;
+			}
 		}
-	}
+	} /* else drop index. */
 	return 0;
 }
 
@@ -5402,6 +5436,8 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 {
 	(void) old_space;
 	struct vy_index *pk = vy_index(new_space->index[0]);
+	struct index_def *new_user_def = space_index_def(new_space, 0);
+
 	pk->space = new_space;
 
 	/* Update the format with column mask. */
@@ -5420,6 +5456,10 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 	}
 	tuple_format_ref(upsert_format, 1);
 
+	/* Set possibly changed opts. */
+	pk->user_index_def->opts = new_user_def->opts;
+	pk->index_def->opts = new_user_def->opts;
+
 	/* Set new formats. */
 	tuple_format_ref(pk->space_format, -1);
 	tuple_format_ref(pk->upsert_format, -1);
@@ -5432,6 +5472,9 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
+		new_user_def = space_index_def(new_space, i);
+		index->user_index_def->opts = new_user_def->opts;
+		index->index_def->opts = new_user_def->opts;
 		index->space = new_space;
 		tuple_format_ref(index->space_format_with_colmask, -1);
 		tuple_format_ref(index->space_format, -1);
