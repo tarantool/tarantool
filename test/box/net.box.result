@@ -1201,7 +1201,7 @@ _ = fiber.create(
    function()
          local conn = require('net.box').new(box.cfg.listen)
          conn:call('no_such_function', {})
-	 conn:close()
+         conn:close()
    end
 );
 ---
@@ -1644,4 +1644,56 @@ srv:close()
 test_run:cmd("clear filter")
 ---
 - true
+...
+--
+-- gh-2402 net.box doesn't support space:format()
+--
+space = box.schema.space.create('test', {format={[1] = {"id", "number"}}})
+---
+...
+space ~= nil
+---
+- true
+...
+_ = box.space.test:create_index('primary')
+---
+...
+box.schema.user.grant('guest','read,write,execute','space', 'test')
+---
+...
+c = net.connect(box.cfg.listen)
+---
+...
+c:ping()
+---
+- true
+...
+c.space.test ~= nil
+---
+- true
+...
+format = c.space.test:format()
+---
+...
+format[1] ~= nil
+---
+- true
+...
+format[1][1] == "id"
+---
+- true
+...
+format[1][2] == "number"
+---
+- true
+...
+c.space.test:format({})
+---
+- error: net.box does not support setting space format
+...
+c:close()
+---
+...
+space:drop()
+---
 ...

@@ -456,7 +456,7 @@ _ = fiber.create(
    function()
          local conn = require('net.box').new(box.cfg.listen)
          conn:call('no_such_function', {})
-	 conn:close()
+         conn:close()
    end
 );
 test_run:cmd("setopt delimiter ''");
@@ -665,3 +665,28 @@ test_run:cmd("setopt delimiter ''");
 srv:close()
 
 test_run:cmd("clear filter")
+
+--
+-- gh-2402 net.box doesn't support space:format()
+--
+
+space = box.schema.space.create('test', {format={[1] = {"id", "number"}}})
+space ~= nil
+_ = box.space.test:create_index('primary')
+box.schema.user.grant('guest','read,write,execute','space', 'test')
+
+c = net.connect(box.cfg.listen)
+
+c:ping()
+c.space.test ~= nil
+
+format = c.space.test:format()
+
+format[1] ~= nil
+format[1][1] == "id"
+format[1][2] == "number"
+
+c.space.test:format({})
+
+c:close()
+space:drop()

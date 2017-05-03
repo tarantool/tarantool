@@ -777,6 +777,7 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
         local id = space[1]
         local engine = space[4]
         local field_count = space[5]
+        local format = space[7] or {}
 
         local s = {
             id              = id,
@@ -785,7 +786,8 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
             field_count     = field_count,
             enabled         = true,
             index           = {},
-            temporary       = false
+            temporary       = false,
+            _format         = format
         }
         if #space > 5 then
             local opts = space[6]
@@ -928,6 +930,14 @@ space_metatable = function(remote)
     function methods:get(key, opts)
         check_space_arg(self, 'get')
         return check_primary_index(self):get(key, opts)
+    end
+
+    function methods:format(format)
+        if format == nil then
+            return self._format
+        else
+            box.error(box.error.UNSUPPORTED, "net.box", "setting space format")
+        end
     end
 
     return { __index = methods, __metatable = false }
