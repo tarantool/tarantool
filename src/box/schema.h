@@ -96,6 +96,9 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 extern "C" struct space *
 space_by_id(uint32_t id);
 
+extern "C" uint32_t
+box_schema_version();
+
 static inline struct space *
 space_cache_find(uint32_t id)
 {

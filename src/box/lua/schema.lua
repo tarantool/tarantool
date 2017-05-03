@@ -18,6 +18,7 @@ assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
 
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
+    extern uint32_t box_schema_version();
     void space_run_triggers(struct space *space, bool yesno);
     size_t space_bsize(struct space *space);
 
@@ -704,6 +705,8 @@ local function check_primary_index(space)
     return pk
 end
 box.internal.check_primary_index = check_primary_index -- for net.box
+
+box.internal.schema_version = builtin.box_schema_version
 
 local function check_iterator_type(opts, key_is_nil)
     local itype

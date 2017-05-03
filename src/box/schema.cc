@@ -83,6 +83,13 @@ space_by_id(uint32_t id)
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;
 }
 
+/** Return current schema version */
+extern "C" uint32_t
+box_schema_version()
+{
+	return sc_version;
+}
+
 /**
  * Visit all spaces and apply 'func'.
  */
