@@ -34,6 +34,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "ipc.h"
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
@@ -124,39 +125,11 @@ struct vy_run {
 	/** Run data file. */
 	int fd;
 	/**
-	 * Reference counter. The run file is closed and the run
-	 * in-memory structure is freed only when it reaches 0.
-	 * Needed to prevent coeio thread from using a closed
-	 * (worse, reopened) file descriptor.
-	 *
-	 * Each run is created with the reference counter equal to 1.
-	 * The counter is incremented on slice allocation (vy_slice_new)
-	 * and decremented on slice deallocation (vy_slice_delete).
-	 */
-	int refs;
-	/**
-	 * The number of active slices created for this run.
-	 * Incremented by vy_run_make_slice(), decremented by
-	 * vy_run_destroy_slice().
-	 *
-	 * It is needed to understand when a run is not used by any
-	 * slice and hence should be unaccounted and wiped from the
-	 * metadata log. Note, although ->refs is only incremented by
-	 * slices, it can't be used for the purpose, because it is
-	 * incremented by each allocated slice, which includes slices
-	 * that are pinned by open iterators.
-	 *
-	 * To sum it up,
-	 * - vy_slice::refs is incremented by the range that hosts
-	 *   the slice and by iterators that read from the slice.
-	 * - vy_run::refs is incremented by each allocated slice
-	 *   (including those that are not used by ranges and stay
-	 *   only because of being pinned by an iterator).
-	 * - vy_run::slice_count counts the number of slices that are
-	 *   are used in ranges, slice_count <= vy_run::refs.
-	 *
-	 * XXX: This looks convoluted. We need to come up with
-	 * something better than this reference counting madness.
+	 * The number of slices created for this run.
+	 * Incremented by vy_slice_new(), decremented by
+	 * vy_slice_delete(). Note, the run isn't deleted
+	 * automatically when it hits 0. To delete a run,
+	 * call vy_run_delete().
 	 */
 	int slice_count;
 	/** Unique ID of this run. */
@@ -169,7 +142,7 @@ struct vy_run {
 struct vy_slice {
 	/** Unique ID of this slice. */
 	int64_t id;
-	/** Run this slice is for (increments vy_run::refs). */
+	/** Run this slice is for (increments vy_run::slice_count). */
 	struct vy_run *run;
 	/**
 	 * Slice begin and end (increments tuple::refs).
@@ -180,11 +153,17 @@ struct vy_slice {
 	struct tuple *begin;
 	struct tuple *end;
 	/**
-	 * Reference counter. Once it hits 0, the slice is freed.
-	 * Used by the iterator to prevent use-after-free after
-	 * waiting for IO. See also vy_run::refs.
+	 * Number of async users of this slice. Slice must not
+	 * be removed until it hits 0. Used by the iterator to
+	 * prevent use-after-free after waiting for IO.
+	 * See also vy_run_wait_pinned().
 	 */
-	int refs;
+	int pin_count;
+	/**
+	 * Condition variable signaled by vy_slice_unpin()
+	 * if pin_count reaches 0.
+	 */
+	struct ipc_cond pin_cond;
 	union {
 		/** Link in range->slices list. */
 		struct rlist in_range;
@@ -350,73 +329,52 @@ int
 vy_run_recover(struct vy_run *run, const char *index_path,
 	       const char *run_path);
 
-/** Increment a slice's reference counter. */
-static inline void
-vy_run_ref(struct vy_run *run)
-{
-	assert(run->refs > 0);
-	run->refs++;
-}
-
-/*
- * Decrement a run's reference counter.
- * Delete the run if it reached 0.
+/**
+ * Allocate a new run slice.
+ * This function increments vy_run::slice_count.
  */
-static inline void
-vy_run_unref(struct vy_run *run)
-{
-	assert(run->refs > 0);
-	if (--run->refs == 0)
-		vy_run_delete(run);
-}
-
-/** Allocate a new run slice. */
 struct vy_slice *
 vy_slice_new(int64_t id, struct vy_run *run,
 	     struct tuple *begin, struct tuple *end,
 	     const struct key_def *key_def);
 
-/** Free a run slice. */
+/**
+ * Free a run slice.
+ * This function decrements vy_run::slice_count.
+ */
 void
 vy_slice_delete(struct vy_slice *slice);
 
-/** Increment a slice's reference counter. */
+/**
+ * Pin a run slice.
+ * A pinned slice can't be deleted until it's unpinned.
+ */
 static inline void
-vy_slice_ref(struct vy_slice *slice)
+vy_slice_pin(struct vy_slice *slice)
 {
-	assert(slice->refs > 0);
-	slice->refs++;
+	slice->pin_count++;
 }
 
 /*
- * Decrement a slice's reference counter.
- * Return true if the slice was deleted.
+ * Unpin a run slice.
+ * This function reverts the effect of vy_slice_pin().
  */
-static inline bool
-vy_slice_unref(struct vy_slice *slice)
+static inline void
+vy_slice_unpin(struct vy_slice *slice)
 {
-	assert(slice->refs > 0);
-	if (--slice->refs == 0) {
-		vy_slice_delete(slice);
-		return true;
-	}
-	return false;
+	assert(slice->pin_count > 0);
+	if (--slice->pin_count == 0)
+		ipc_cond_broadcast(&slice->pin_cond);
 }
 
 /**
- * Make a new slice for a run.
- * This function increments vy_run::slice_count.
+ * Wait until a run slice is unpinned.
  */
-static inline struct vy_slice *
-vy_run_make_slice(int64_t id, struct vy_run *run,
-		  struct tuple *begin, struct tuple *end,
-		  const struct key_def *key_def)
+static inline void
+vy_slice_wait_pinned(struct vy_slice *slice)
 {
-	struct vy_slice *slice = vy_slice_new(id, run, begin, end, key_def);
-	if (slice != NULL)
-		run->slice_count++;
-	assert(run->refs >= run->slice_count);
-	return slice;
+	while (slice->pin_count > 0)
+		ipc_cond_wait(&slice->pin_cond);
 }
 
 /**
@@ -431,20 +389,6 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	     struct tuple *begin, struct tuple *end,
 	     const struct key_def *key_def,
 	     struct vy_slice **result);
-
-/**
- * Destroy a run slice created with vy_run_make_slice().
- * This function decrements vy_run::slice_count.
- */
-static inline void
-vy_run_destroy_slice(struct vy_slice *slice)
-{
-	struct vy_run *run = slice->run;
-	assert(run->refs >= run->slice_count);
-	assert(run->slice_count > 0);
-	run->slice_count--;
-	vy_slice_unref(slice);
-}
 
 /**
  * Decode page information from xrow.

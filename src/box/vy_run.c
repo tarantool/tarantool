@@ -30,6 +30,7 @@
  */
 #include "vy_run.h"
 #include "fiber.h"
+#include "ipc.h"
 #include "coeio.h"
 #include "xrow.h"
 #include "xlog.h"
@@ -131,7 +132,6 @@ vy_run_new(int64_t id)
 	memset(&run->info, 0, sizeof(run->info));
 	run->id = id;
 	run->fd = -1;
-	run->refs = 1;
 	run->slice_count = 0;
 	TRASH(&run->info.bloom);
 	run->info.has_bloom = false;
@@ -141,7 +141,6 @@ vy_run_new(int64_t id)
 void
 vy_run_delete(struct vy_run *run)
 {
-	assert(run->refs == 0);
 	assert(run->slice_count == 0);
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
@@ -203,16 +202,16 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	}
 	memset(slice, 0, sizeof(*slice));
 	slice->id = id;
-	vy_run_ref(run);
 	slice->run = run;
+	run->slice_count++;
 	if (begin != NULL)
 		tuple_ref(begin);
 	slice->begin = begin;
 	if (end != NULL)
 		tuple_ref(end);
 	slice->end = end;
-	slice->refs = 1;
 	rlist_create(&slice->in_range);
+	ipc_cond_create(&slice->pin_cond);
 	/*
 	 * Lookup the first and the last page of this slice
 	 * in the run and estimate the slice size.
@@ -243,12 +242,14 @@ vy_slice_new(int64_t id, struct vy_run *run,
 void
 vy_slice_delete(struct vy_slice *slice)
 {
-	assert(slice->refs == 0);
-	vy_run_unref(slice->run);
+	assert(slice->pin_count == 0);
+	assert(slice->run->slice_count > 0);
+	slice->run->slice_count--;
 	if (slice->begin != NULL)
 		tuple_unref(slice->begin);
 	if (slice->end != NULL)
 		tuple_unref(slice->end);
+	ipc_cond_destroy(&slice->pin_cond);
 	TRASH(slice);
 	free(slice);
 }
@@ -279,7 +280,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	    (end == NULL || vy_key_compare(end, slice->end, key_def) > 0))
 		end = slice->end;
 
-	*result = vy_run_make_slice(id, slice->run, begin, end, key_def);
+	*result = vy_slice_new(id, slice->run, begin, end, key_def);
 	if (*result == NULL)
 		return -1; /* OOM */
 
@@ -761,7 +762,7 @@ vy_page_read_cb_free(struct coio_task *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	vy_page_delete(task->page);
-	vy_slice_unref(task->slice);
+	vy_slice_unpin(task->slice);
 	coio_task_destroy(&task->base);
 	mempool_free(&task->run_env->read_task_pool, task);
 	return 0;
@@ -772,7 +773,6 @@ vy_page_read_cb_free(struct coio_task *base)
  *
  * @retval 0 success
  * @retval -1 critical error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
@@ -796,9 +796,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	if (itr->coio_read) {
 		/*
 		 * Use coeio for TX thread **after recovery**.
-		 * Please note that vy_run can go away after yield.
-		 * In this case vy_run_iterator is no more valid and
-		 * rc = -2 is returned to the caller.
 		 */
 
 		/* Allocate a coio task */
@@ -818,8 +815,9 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		 * (even worse, reopened) while a coeio thread is
 		 * reading it.
 		 */
+		vy_slice_pin(slice);
+
 		task->slice = slice;
-		vy_slice_ref(slice);
 		task->page_info = *page_info;
 		task->run_env = itr->run_env;
 		task->page = page;
@@ -839,15 +837,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		coio_task_destroy(&task->base);
 		mempool_free(&task->run_env->read_task_pool, task);
 
-		if (vy_slice_unref(slice)) {
-			/*
-			 * The run's gone so the iterator isn't
-			 * valid anymore.
-			 */
-			itr->slice = NULL;
-			vy_page_delete(page);
-			return -2;
-		}
+		vy_slice_unpin(slice);
 	} else {
 		/*
 		 * Optimization: use blocked I/O for non-TX threads or
@@ -881,7 +871,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
  *
  * @retval 0 success
  * @retval -1 read error or out of memory.
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_read(struct vy_run_iterator *itr,
@@ -978,7 +967,6 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
  *
  * @retval 0 success
  * @retval -1 read or memory error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_search(struct vy_run_iterator *itr, const struct tuple *key,
@@ -1061,7 +1049,6 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result);
  * (i.e. left for GE, right for LE).
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read or memory error
- * @retval -2 invalid iterator
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
@@ -1176,7 +1163,6 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
  * Start iteration in a run w/o checking slice boundaries.
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read or memory error
- * @retval -2 invalid iterator
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
@@ -1404,7 +1390,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
  *
  * @retval 0 success or EOF (*result == NULL)
  * @retval -1 memory or read error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
@@ -1438,7 +1423,6 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
  *
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 memory or read error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
@@ -1540,7 +1524,6 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
  * Find next (lower, older) record with the same key as current
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 memory or read error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
