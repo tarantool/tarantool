@@ -236,15 +236,16 @@ vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 }
 
 /**
- * Make a step in directions defined by itr->iterator_type
+ * Make a step in directions defined by @iterator_type.
  * @retval 0 success
  * @retval 1 EOF
  */
 static int
-vy_mem_iterator_step(struct vy_mem_iterator *itr)
+vy_mem_iterator_step(struct vy_mem_iterator *itr,
+		     enum iterator_type iterator_type)
 {
 	itr->stat->step_count++;
-	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
@@ -263,20 +264,22 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
  * @retval 1 Not found
  */
 static int
-vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
+vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
+			 enum iterator_type iterator_type,
+			 const struct tuple *key)
 {
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	const struct key_def *key_def = itr->mem->key_def;
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
-		if (vy_mem_iterator_step(itr) != 0 ||
-		    (itr->iterator_type == ITER_EQ &&
-		     vy_stmt_compare(itr->key, itr->curr_stmt, key_def))) {
+		if (vy_mem_iterator_step(itr, iterator_type) != 0 ||
+		    (iterator_type == ITER_EQ &&
+		     vy_stmt_compare(key, itr->curr_stmt, key_def))) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
 	}
-	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
+	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
 
@@ -299,54 +302,56 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 
 /**
  * Position the iterator to the first entry in the memory tree
- * satisfying the search criteria (iterator type and search key).
+ * satisfying the search criteria for a given key and direction.
  *
  * @retval 0 Found
  * @retval 1 Not found
  */
 static int
-vy_mem_iterator_do_start(struct vy_mem_iterator *itr)
+vy_mem_iterator_start_from(struct vy_mem_iterator *itr,
+			   enum iterator_type iterator_type,
+			   const struct tuple *key)
 {
 	itr->stat->lookup_count++;
 	itr->version = itr->mem->version;
 
 	struct tree_mem_key tree_key;
-	tree_key.stmt = itr->key;
+	tree_key.stmt = key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (tuple_field_count(itr->key) > 0) {
-		if (itr->iterator_type == ITER_EQ) {
+	if (tuple_field_count(key) > 0) {
+		if (iterator_type == ITER_EQ) {
 			bool exact;
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, &exact);
 			if (!exact)
 				return 1;
-		} else if (itr->iterator_type == ITER_LE ||
-			   itr->iterator_type == ITER_GT) {
+		} else if (iterator_type == ITER_LE ||
+			   iterator_type == ITER_GT) {
 			itr->curr_pos =
 				vy_mem_tree_upper_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		} else {
-			assert(itr->iterator_type == ITER_GE ||
-			       itr->iterator_type == ITER_LT);
+			assert(iterator_type == ITER_GE ||
+			       iterator_type == ITER_LT);
 			itr->curr_pos =
 				vy_mem_tree_lower_bound(&itr->mem->tree,
 							&tree_key, NULL);
 		}
-	} else if (itr->iterator_type == ITER_LE) {
+	} else if (iterator_type == ITER_LE) {
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
-		assert(itr->iterator_type == ITER_GE);
+		assert(iterator_type == ITER_GE);
 		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
 	}
 
-	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE)
+	if (iterator_type == ITER_LT || iterator_type == ITER_LE)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
 	itr->curr_stmt = vy_mem_iterator_curr_stmt(itr);
-	return vy_mem_iterator_find_lsn(itr);
+	return vy_mem_iterator_find_lsn(itr, iterator_type, key);
 }
 
 /**
@@ -362,20 +367,16 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	itr->search_started = true;
 
 	if (itr->before_first == NULL)
-		return vy_mem_iterator_do_start(itr);
+		return vy_mem_iterator_start_from(itr, itr->iterator_type,
+						  itr->key);
 
-	enum iterator_type save_type = itr->iterator_type;
-	const struct tuple *save_key = itr->key;
-	if (itr->iterator_type == ITER_GE ||
-	    itr->iterator_type == ITER_EQ)
-		itr->iterator_type = ITER_GT;
-	else if (itr->iterator_type == ITER_LE)
-		itr->iterator_type = ITER_LT;
-	itr->key = itr->before_first;
-	int rc = vy_mem_iterator_do_start(itr);
-	itr->iterator_type = save_type;
-	itr->key = save_key;
-
+	enum iterator_type iterator_type = itr->iterator_type;
+	if (iterator_type == ITER_GE || iterator_type == ITER_EQ)
+		iterator_type = ITER_GT;
+	else if (iterator_type == ITER_LE)
+		iterator_type = ITER_LT;
+	int rc = vy_mem_iterator_start_from(itr, iterator_type,
+					    itr->before_first);
 	if (rc == 0 && itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt,
 			    itr->mem->key_def) != 0) {
@@ -466,7 +467,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 
 	const struct tuple *prev_stmt = itr->curr_stmt;
 	do {
-		if (vy_mem_iterator_step(itr) != 0) {
+		if (vy_mem_iterator_step(itr, itr->iterator_type) != 0) {
 			itr->curr_stmt = NULL;
 			return 1;
 		}
@@ -477,7 +478,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 		itr->curr_stmt = NULL;
 		return 1;
 	}
-	return vy_mem_iterator_find_lsn(itr);
+	return vy_mem_iterator_find_lsn(itr, itr->iterator_type, itr->key);
 }
 
 /**
@@ -576,17 +577,12 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		 * Restoration is very similar to first search so we'll use
 		 * that.
 		 */
-		enum iterator_type save_type = itr->iterator_type;
-		const struct tuple *save_key = itr->key;
-		if (itr->iterator_type == ITER_GT ||
-		    itr->iterator_type == ITER_EQ)
-			itr->iterator_type = ITER_GE;
-		else if (itr->iterator_type == ITER_LT)
-			itr->iterator_type = ITER_LE;
-		itr->key = last_stmt;
-		rc = vy_mem_iterator_start(itr);
-		itr->iterator_type = save_type;
-		itr->key = save_key;
+		enum iterator_type iterator_type = itr->iterator_type;
+		if (iterator_type == ITER_GT || iterator_type == ITER_EQ)
+			iterator_type = ITER_GE;
+		else if (iterator_type == ITER_LT)
+			iterator_type = ITER_LE;
+		rc = vy_mem_iterator_start_from(itr, iterator_type, last_stmt);
 		if (rc > 0) /* Search ended. */
 			return 0;
 		bool position_changed = true;

@@ -897,14 +897,15 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
  */
 static uint32_t
 vy_run_iterator_search_page(struct vy_run_iterator *itr,
+			    enum iterator_type iterator_type,
 			    const struct tuple *key, bool *equal_key)
 {
 	struct vy_run *run = itr->slice->run;
 	uint32_t beg = 0;
 	uint32_t end = run->info.count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->iterator_type == ITER_GT ||
-		       itr->iterator_type == ITER_LE ? -1 : 0;
+	int zero_cmp = (iterator_type == ITER_GT ||
+			iterator_type == ITER_LE ? -1 : 0);
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
 		struct vy_page_info *page_info;
@@ -931,14 +932,15 @@ vy_run_iterator_search_page(struct vy_run_iterator *itr,
  */
 static uint32_t
 vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
-			       const struct tuple *key, struct vy_page *page,
-			       bool *equal_key)
+			       enum iterator_type iterator_type,
+			       const struct tuple *key,
+			       struct vy_page *page, bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->count;
 	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = itr->iterator_type == ITER_GT ||
-		       itr->iterator_type == ITER_LE ? -1 : 0;
+	int zero_cmp = (iterator_type == ITER_GT ||
+			iterator_type == ITER_LE ? -1 : 0);
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
 		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->key_def,
@@ -969,10 +971,13 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
  * @retval -1 read or memory error
  */
 static NODISCARD int
-vy_run_iterator_search(struct vy_run_iterator *itr, const struct tuple *key,
+vy_run_iterator_search(struct vy_run_iterator *itr,
+		       enum iterator_type iterator_type,
+		       const struct tuple *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
-	pos->page_no = vy_run_iterator_search_page(itr, key, equal_key);
+	pos->page_no = vy_run_iterator_search_page(itr, iterator_type, key,
+						   equal_key);
 	if (pos->page_no == 0) {
 		pos->pos_in_page = 0;
 		return 0;
@@ -983,7 +988,8 @@ vy_run_iterator_search(struct vy_run_iterator *itr, const struct tuple *key,
 	if (rc != 0)
 		return rc;
 	bool equal_in_page = false;
-	pos->pos_in_page = vy_run_iterator_search_in_page(itr, key, page,
+	pos->pos_in_page = vy_run_iterator_search_in_page(itr, iterator_type,
+							  key, page,
 							  &equal_in_page);
 	if (pos->pos_in_page == page->count) {
 		pos->page_no++;
@@ -1052,14 +1058,14 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result);
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
-vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
+vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
+			 enum iterator_type iterator_type,
+			 const struct tuple *key, struct tuple **ret)
 {
 	struct vy_slice *slice = itr->slice;
 	assert(itr->curr_pos.page_no < slice->run->info.count);
 	struct tuple *stmt;
 	const struct key_def *key_def = itr->key_def;
-	const struct tuple *key = itr->key;
-	enum iterator_type iterator_type = itr->iterator_type;
 	*ret = NULL;
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, &stmt);
 	if (rc != 0)
@@ -1160,13 +1166,16 @@ static NODISCARD int
 vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 			 bool *stop);
 /**
- * Start iteration in a run w/o checking slice boundaries.
+ * Start iteration for a given key and direction.
+ * Note, this function doesn't check slice boundaries.
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read or memory error
  * Affects: curr_loaded_page, curr_pos, search_ended
  */
 static NODISCARD int
-vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
+vy_run_iterator_start_from(struct vy_run_iterator *itr,
+			   enum iterator_type iterator_type,
+			   const struct tuple *key, struct tuple **ret)
 {
 	struct vy_run *run = itr->slice->run;
 
@@ -1175,15 +1184,15 @@ vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
 	*ret = NULL;
 
 	const struct key_def *user_key_def = itr->user_key_def;
-	if (run->info.has_bloom && itr->iterator_type == ITER_EQ &&
-	    tuple_field_count(itr->key) >= user_key_def->part_count) {
+	if (run->info.has_bloom && iterator_type == ITER_EQ &&
+	    tuple_field_count(key) >= user_key_def->part_count) {
 		uint32_t hash;
-		if (vy_stmt_type(itr->key) == IPROTO_SELECT) {
-			const char *data = tuple_data(itr->key);
+		if (vy_stmt_type(key) == IPROTO_SELECT) {
+			const char *data = tuple_data(key);
 			mp_decode_array(&data);
 			hash = key_hash(data, user_key_def);
 		} else {
-			hash = tuple_hash(itr->key, user_key_def);
+			hash = tuple_hash(key, user_key_def);
 		}
 		if (!bloom_possible_has(&run->info.bloom, hash)) {
 			itr->search_ended = true;
@@ -1216,30 +1225,30 @@ vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
 	struct vy_run_iterator_pos end_pos = {run->info.count, 0};
 	bool equal_found = false;
 	int rc;
-	if (tuple_field_count(itr->key) > 0) {
-		rc = vy_run_iterator_search(itr, itr->key, &itr->curr_pos,
-					    &equal_found);
+	if (tuple_field_count(key) > 0) {
+		rc = vy_run_iterator_search(itr, iterator_type, key,
+					    &itr->curr_pos, &equal_found);
 		if (rc != 0)
 			return rc;
-	} else if (itr->iterator_type == ITER_LE) {
+	} else if (iterator_type == ITER_LE) {
 		itr->curr_pos = end_pos;
 	} else {
-		assert(itr->iterator_type == ITER_GE);
+		assert(iterator_type == ITER_GE);
 		itr->curr_pos.page_no = 0;
 		itr->curr_pos.pos_in_page = 0;
 	}
-	if (itr->iterator_type == ITER_EQ && !equal_found) {
+	if (iterator_type == ITER_EQ && !equal_found) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if ((itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT) &&
+	if ((iterator_type == ITER_GE || iterator_type == ITER_GT) &&
 	    itr->curr_pos.page_no == end_pos.page_no) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
 		return 0;
 	}
-	if (itr->iterator_type == ITER_LT || itr->iterator_type == ITER_LE) {
+	if (iterator_type == ITER_LT || iterator_type == ITER_LE) {
 		/**
 		 * 1) in case of ITER_LT we now positioned on the value >= than
 		 * given, so we need to make a step on previous key
@@ -1249,9 +1258,8 @@ vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
 		 */
 		return vy_run_iterator_next_key(&itr->base, ret, NULL);
 	} else {
-		assert(itr->iterator_type == ITER_GE ||
-		       itr->iterator_type == ITER_GT ||
-		       itr->iterator_type == ITER_EQ);
+		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
+		       iterator_type == ITER_EQ);
 		/**
 		 * 1) in case of ITER_GT we now positioned on the value > than
 		 * given (special branch of code in vy_run_iterator_search),
@@ -1259,27 +1267,28 @@ vy_run_iterator_do_start(struct vy_run_iterator *itr, struct tuple **ret)
 		 * 2) in case if ITER_GE or ITER_EQ we now positioned on the
 		 * value >= given, so we need just to find proper lsn
 		 */
-		return vy_run_iterator_find_lsn(itr, ret);
+		return vy_run_iterator_find_lsn(itr, iterator_type, key, ret);
 	}
 }
 
 /**
  * Start iteration in a run taking into account slice boundaries.
- * This function is a wrapper around vy_run_iterator_do_start()
- * which temporarily substitutes the search key and the iterator
+ * This function is a wrapper around vy_run_iterator_start_from()
+ * which passes a contrived search key and the iterator
  * direction to make sure the result falls in the given slice.
  */
 static NODISCARD int
 vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 {
-	enum iterator_type type = itr->iterator_type;
+	enum iterator_type iterator_type = itr->iterator_type;
 	const struct tuple *key = itr->key;
 	const struct key_def *key_def = itr->key_def;
 	struct vy_slice *slice = itr->slice;
 	int cmp;
 
 	if (slice->begin != NULL &&
-	    (type == ITER_GT || type == ITER_GE || type == ITER_EQ)) {
+	    (iterator_type == ITER_GT || iterator_type == ITER_GE ||
+	     iterator_type == ITER_EQ)) {
 		/*
 		 *    original   |     start
 		 * --------------+-------+-----+
@@ -1294,19 +1303,19 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 		 *         | eq  |    stop     |
 		 */
 		cmp = vy_stmt_compare_with_key(key, slice->begin, key_def);
-		if (cmp < 0 && type == ITER_EQ) {
+		if (cmp < 0 && iterator_type == ITER_EQ) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			return 0;
 		}
-		if (cmp < 0 || (cmp == 0 && type != ITER_GT)) {
-			itr->iterator_type = ITER_GE;
-			itr->key = slice->begin;
+		if (cmp < 0 || (cmp == 0 && iterator_type != ITER_GT)) {
+			iterator_type = ITER_GE;
+			key = slice->begin;
 		}
 	}
 
 	if (slice->end != NULL &&
-	    (type == ITER_LT || type == ITER_LE)) {
+	    (iterator_type == ITER_LT || iterator_type == ITER_LE)) {
 		/*
 		 *    original   |     start
 		 * --------------+-------+-----+
@@ -1319,17 +1328,13 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 		 *         | le  | end   | lt  |
 		 */
 		cmp = vy_stmt_compare_with_key(key, slice->end, key_def);
-		if (cmp > 0 || (cmp == 0 && type != ITER_LT)) {
-			itr->iterator_type = ITER_LT;
-			itr->key = slice->end;
+		if (cmp > 0 || (cmp == 0 && iterator_type != ITER_LT)) {
+			iterator_type = ITER_LT;
+			key = slice->end;
 		}
 	}
 
-	int rc = vy_run_iterator_do_start(itr, ret);
-
-	itr->iterator_type = type;
-	itr->key = key;
-	return rc;
+	return vy_run_iterator_start_from(itr, iterator_type, key, ret);
 }
 
 /* }}} vy_run_iterator vy_run_iterator support functions */
@@ -1462,7 +1467,8 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 			}
 			itr->curr_pos.page_no = page_no;
 			itr->curr_pos.pos_in_page = page->count - 1;
-			return vy_run_iterator_find_lsn(itr, ret);
+			return vy_run_iterator_find_lsn(itr, itr->iterator_type,
+							itr->key, ret);
 		}
 	}
 	assert(itr->curr_pos.page_no < end_page);
@@ -1517,7 +1523,7 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	}
 	tuple_unref(next_key);
 	next_key = NULL;
-	return vy_run_iterator_find_lsn(itr, ret);
+	return vy_run_iterator_find_lsn(itr, itr->iterator_type, itr->key, ret);
 }
 
 /**
@@ -1616,17 +1622,13 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 		return 0;
 	}
 	/* Restoration is very similar to first search so we'll use that */
-	enum iterator_type save_type = itr->iterator_type;
-	const struct tuple *save_key = itr->key;
-	if (itr->iterator_type == ITER_GT || itr->iterator_type == ITER_EQ)
-		itr->iterator_type = ITER_GE;
-	else if (itr->iterator_type == ITER_LT)
-		itr->iterator_type = ITER_LE;
-	itr->key = last_stmt;
+	enum iterator_type iterator_type = itr->iterator_type;
+	if (iterator_type == ITER_GT || iterator_type == ITER_EQ)
+		iterator_type = ITER_GE;
+	else if (iterator_type == ITER_LT)
+		iterator_type = ITER_LE;
 	struct tuple *next;
-	rc = vy_run_iterator_start(itr, &next);
-	itr->iterator_type = save_type;
-	itr->key = save_key;
+	rc = vy_run_iterator_start_from(itr, iterator_type, last_stmt, &next);
 	if (rc != 0)
 		return rc;
 	else if (next == NULL)
