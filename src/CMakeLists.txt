@@ -125,6 +125,7 @@ set (server_sources
      proc_title.c
      coeio_file.c
      clock.c
+     systemd.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
