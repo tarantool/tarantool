@@ -33,12 +33,15 @@ local function test_pushcdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(18)
+    test:plan(19)
     local status, module = pcall(require, 'module_api')
     test:ok(status, "module is loaded")
     if not status then
         return
     end
+
+    local space  = box.schema.space.create("test")
+    space:create_index('primary')
 
     for name, fun in pairs(module) do
         if string.sub(name,1, 5) == 'test_' then
@@ -50,5 +53,7 @@ local test = require('tap').test("module_api", function(test)
     test:like(msg, 'luaT_error', 'luaT_error')
 
     test:test("pushcdata", test_pushcdata, module)
+
+    space:drop()
 end)
 os.exit(0)
