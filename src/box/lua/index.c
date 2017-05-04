@@ -326,7 +326,7 @@ box_lua_index_init(struct lua_State *L)
 	CTID_STRUCT_ITERATOR_REF = luaL_ctypeid(L, "struct iterator&");
 	assert(CTID_STRUCT_ITERATOR_REF != 0);
 
-	static const struct luaL_reg indexlib [] = {
+	static const struct luaL_Reg indexlib [] = {
 		{NULL, NULL}
 	};
 
@@ -335,7 +335,7 @@ box_lua_index_init(struct lua_State *L)
 	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
 
-	static const struct luaL_reg boxlib_internal[] = {
+	static const struct luaL_Reg boxlib_internal[] = {
 		{"insert", lbox_insert},
 		{"replace",  lbox_replace},
 		{"update", lbox_index_update},

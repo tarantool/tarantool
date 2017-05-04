@@ -557,7 +557,7 @@ handle_error:
 int
 luaopen_net_box(struct lua_State *L)
 {
-	const luaL_reg net_box_lib[] = {
+	static const luaL_Reg net_box_lib[] = {
 		{ "encode_ping",    netbox_encode_ping },
 		{ "encode_call_16", netbox_encode_call_16 },
 		{ "encode_call",    netbox_encode_call },

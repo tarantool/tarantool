@@ -398,7 +398,7 @@ LUA_API int
 luaopen_module_api(lua_State *L)
 {
 	(void) consts;
-	static const struct luaL_reg lib[] = {
+	static const struct luaL_Reg lib[] = {
 		{"test_say", test_say },
 		{"test_coio_call", test_coio_call },
 		{"test_coio_getaddrinfo", test_coio_getaddrinfo },

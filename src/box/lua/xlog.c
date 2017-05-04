@@ -293,7 +293,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	return 3;
 }
 
-static const struct luaL_reg lbox_xlog_parser_lib [] = {
+static const struct luaL_Reg lbox_xlog_parser_lib [] = {
 	{ "pairs",	lbox_xlog_parser_open_pairs },
 	{ NULL,		NULL                        }
 };

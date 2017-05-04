@@ -326,7 +326,7 @@ lbox_console_add_history(struct lua_State *L)
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
-	static const struct luaL_reg consolelib[] = {
+	static const struct luaL_Reg consolelib[] = {
 		{"load_history",       lbox_console_load_history},
 		{"save_history",       lbox_console_save_history},
 		{"add_history",        lbox_console_add_history},

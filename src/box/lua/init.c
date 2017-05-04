@@ -184,20 +184,20 @@ lbox_backup_stop(struct lua_State *L)
 	return 0;
 }
 
-static const struct luaL_reg boxlib[] = {
+static const struct luaL_Reg boxlib[] = {
 	{"commit", lbox_commit},
 	{"rollback", lbox_rollback},
 	{"snapshot", lbox_snapshot},
 	{NULL, NULL}
 };
 
-static const struct luaL_reg boxlib_gc[] = {
+static const struct luaL_Reg boxlib_gc[] = {
 	{"run", lbox_gc_run},
 	{"info", lbox_gc_info},
 	{NULL, NULL}
 };
 
-static const struct luaL_reg boxlib_backup[] = {
+static const struct luaL_Reg boxlib_backup[] = {
 	{"start", lbox_backup_start},
 	{"stop", lbox_backup_stop},
 	{NULL, NULL}

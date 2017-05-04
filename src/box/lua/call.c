@@ -411,7 +411,7 @@ box_lua_eval(struct request *request, struct obuf *out)
 	return box_process_lua(request, out, execute_lua_eval);
 }
 
-static const struct luaL_reg boxlib_internal[] = {
+static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{NULL, NULL}
 };

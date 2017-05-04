@@ -967,7 +967,7 @@ luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
-	static const struct luaL_reg serializermeta[] = {
+	static const struct luaL_Reg serializermeta[] = {
 		{NULL, NULL},
 	};
 

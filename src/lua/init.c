@@ -306,7 +306,7 @@ luaopen_tarantool(lua_State *L)
 	lua_pushstring(L, tarantool_version());
 	lua_setfield(L, LUA_GLOBALSINDEX, "_TARANTOOL");
 
-	static const struct luaL_reg initlib[] = {
+	static const struct luaL_Reg initlib[] = {
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "tarantool", initlib);

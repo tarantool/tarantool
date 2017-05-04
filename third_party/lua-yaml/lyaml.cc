@@ -727,7 +727,7 @@ static int l_dump(lua_State *L) {
 static int
 l_new(lua_State *L);
 
-const luaL_reg yamllib[] = {
+static const luaL_Reg yamllib[] = {
    { "encode", l_dump },
    { "decode", l_load },
    { "new",    l_new },

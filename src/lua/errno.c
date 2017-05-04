@@ -284,7 +284,7 @@ tarantool_lua_errno_init(struct lua_State *L)
 		{ "",			0		}
 	};
 
-	const luaL_reg errnolib[] = {
+	static const luaL_Reg errnolib[] = {
 		{ NULL, NULL}
 	};
 	luaL_register_module(L, "errno", errnolib);

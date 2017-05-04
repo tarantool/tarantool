@@ -320,7 +320,7 @@ exit:
 void
 box_lua_session_init(struct lua_State *L)
 {
-	static const struct luaL_reg session_internal_lib[] = {
+	static const struct luaL_Reg session_internal_lib[] = {
 		{"create", lbox_session_create},
 		{"run_on_connect",    lbox_session_run_on_connect},
 		{"run_on_disconnect", lbox_session_run_on_disconnect},
@@ -330,7 +330,7 @@ box_lua_session_init(struct lua_State *L)
 	luaL_register(L, "box.internal.session", session_internal_lib);
 	lua_pop(L, 1);
 
-	static const struct luaL_reg sessionlib[] = {
+	static const struct luaL_Reg sessionlib[] = {
 		{"id", lbox_session_id},
 		{"sync", lbox_session_sync},
 		{"uid", lbox_session_uid},

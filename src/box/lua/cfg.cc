@@ -156,7 +156,7 @@ lbox_cfg_set_read_only(struct lua_State *L)
 void
 box_lua_cfg_init(struct lua_State *L)
 {
-	static const struct luaL_reg cfglib_internal[] = {
+	static const struct luaL_Reg cfglib_internal[] = {
 		{"cfg_check", lbox_cfg_check},
 		{"cfg_load", lbox_cfg_load},
 		{"cfg_set_listen", lbox_cfg_set_listen},

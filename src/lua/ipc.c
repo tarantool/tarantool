@@ -345,7 +345,7 @@ lbox_ipc_cond_to_string(struct lua_State *L)
 void
 tarantool_lua_ipc_init(struct lua_State *L)
 {
-	static const struct luaL_reg channel_meta[] = {
+	static const struct luaL_Reg channel_meta[] = {
 		{"__gc",	lbox_ipc_channel_gc},
 		{"__tostring",	lbox_ipc_channel_to_string},
 		{"is_full",	lbox_ipc_channel_is_full},
@@ -362,7 +362,7 @@ tarantool_lua_ipc_init(struct lua_State *L)
 	};
 	luaL_register_type(L, channel_typename, channel_meta);
 
-	static const struct luaL_reg cond_meta[] = {
+	static const struct luaL_Reg cond_meta[] = {
 		{"__gc",	lbox_ipc_cond_gc},
 		{"__tostring",	lbox_ipc_cond_to_string},
 		{"signal",	lbox_ipc_cond_signal},
@@ -372,7 +372,7 @@ tarantool_lua_ipc_init(struct lua_State *L)
 	};
 	luaL_register_type(L, cond_typename, cond_meta);
 
-	static const struct luaL_reg ipc_lib[] = {
+	static const struct luaL_Reg ipc_lib[] = {
 		{"channel",	lbox_ipc_channel},
 		{"cond",	lbox_ipc_cond},
 		{NULL, NULL}

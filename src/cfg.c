@@ -112,7 +112,7 @@ cfg_getarr_size(const char *name)
 		return 1;
 	}
 
-	int result = luaL_getn(tarantool_L, -1);
+	int result = lua_objlen(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
 	return result;
 }

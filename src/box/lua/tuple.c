@@ -374,19 +374,19 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 	luaL_setcdatagc(L, -2);
 }
 
-static const struct luaL_reg lbox_tuple_meta[] = {
+static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{NULL, NULL}
 };
 
-static const struct luaL_reg lbox_tuplelib[] = {
+static const struct luaL_Reg lbox_tuplelib[] = {
 	{"new", lbox_tuple_new},
 	{NULL, NULL}
 };
 
-static const struct luaL_reg lbox_tuple_iterator_meta[] = {
+static const struct luaL_Reg lbox_tuple_iterator_meta[] = {
 	{NULL, NULL}
 };
 

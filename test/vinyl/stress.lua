@@ -39,7 +39,7 @@ local function t1(ch, time_limit)
         local t = math.random(80)
         local data = string.char(math.random(string.byte('Z') - string.byte('A')) + string.byte('A') - 1)
         data = data:rep(math.random(max_data_size))
-        local space = spaces[math.mod(t, #spaces) + 1]
+        local space = spaces[math.fmod(t, #spaces) + 1]
         if t < 32 then
             space:replace({k, data})
         elseif t < 40 then
@@ -60,7 +60,7 @@ local function t2(ch, time_limit)
     while fiber.time() - t1 < time_limit do
         local k = math.random(10000)
         local t = math.random(16)
-        local space = spaces[math.mod(t, #spaces) + 1]
+        local space = spaces[math.fmod(t, #spaces) + 1]
         if t < 12 then
             local l = space:get({k})
         else
@@ -78,7 +78,7 @@ local function t3(ch, time_limit)
         local k = math.random(10000)
         local t = math.random(20)
         local l = math.random(2048)
-        local space = spaces[math.mod(t, #spaces) + 1]
+        local space = spaces[math.fmod(t, #spaces) + 1]
         if t <= 6 then
             space:select(k, { iterator = 'GE', limit = l })
         elseif t <= 12 then

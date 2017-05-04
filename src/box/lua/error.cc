@@ -199,7 +199,7 @@ lbox_errinj_info(struct lua_State *L)
 
 void
 box_lua_error_init(struct lua_State *L) {
-	static const struct luaL_reg errorlib[] = {
+	static const struct luaL_Reg errorlib[] = {
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "box.error", errorlib);
@@ -236,7 +236,7 @@ box_lua_error_init(struct lua_State *L) {
 
 	lua_pop(L, 1);
 
-	static const struct luaL_reg errinjlib[] = {
+	static const struct luaL_Reg errinjlib[] = {
 		{"info", lbox_errinj_info},
 		{"set", lbox_errinj_set},
 		{NULL, NULL}

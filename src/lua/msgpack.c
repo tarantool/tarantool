@@ -491,11 +491,11 @@ lua_ibuf_msgpack_decode(lua_State *L)
 static int
 lua_msgpack_new(lua_State *L);
 
-const luaL_reg msgpacklib[] = {
+static const luaL_Reg msgpacklib[] = {
 	{ "encode", lua_msgpack_encode },
 	{ "decode", lua_msgpack_decode },
 	{ "ibuf_decode", lua_ibuf_msgpack_decode },
-	{ "new",	lua_msgpack_new },
+	{ "new", lua_msgpack_new },
 	{ NULL, NULL}
 };
 

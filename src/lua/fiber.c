@@ -270,8 +270,8 @@ lua_fiber_run_f(va_list ap)
 	int storage_ref = (int)(intptr_t)
 		fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
 	if (storage_ref > 0)
-		lua_unref(L, storage_ref);
-	lua_unref(L, coro_ref);
+		luaL_unref(L, LUA_REGISTRYINDEX, storage_ref);
+	luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
 	return result;
 }
 
@@ -511,7 +511,7 @@ lbox_fiber_wakeup(struct lua_State *L)
 	return 0;
 }
 
-static const struct luaL_reg lbox_fiber_meta [] = {
+static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
 	{"cancel", lbox_fiber_cancel},
@@ -524,7 +524,7 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{NULL, NULL}
 };
 
-static const struct luaL_reg fiberlib[] = {
+static const struct luaL_Reg fiberlib[] = {
 	{"info", lbox_fiber_info},
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},

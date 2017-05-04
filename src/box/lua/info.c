@@ -359,9 +359,7 @@ lbox_info_vinyl(struct lua_State *L)
 	return 1;
 }
 
-static const struct luaL_reg
-lbox_info_dynamic_meta [] =
-{
+static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
 	{"lsn", lbox_info_lsn},
@@ -425,7 +423,7 @@ lbox_info_call(struct lua_State *L)
 void
 box_lua_info_init(struct lua_State *L)
 {
-	static const struct luaL_reg infolib [] = {
+	static const struct luaL_Reg infolib [] = {
 		{NULL, NULL}
 	};
 

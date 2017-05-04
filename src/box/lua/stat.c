@@ -124,13 +124,13 @@ lbox_stat_net_call(struct lua_State *L)
 	return 1;
 }
 
-static const struct luaL_reg lbox_stat_meta [] = {
+static const struct luaL_Reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
 	{"__call",  lbox_stat_call},
 	{NULL, NULL}
 };
 
-static const struct luaL_reg lbox_stat_net_meta [] = {
+static const struct luaL_Reg lbox_stat_net_meta [] = {
 	{"__index", lbox_stat_net_index},
 	{"__call",  lbox_stat_net_call},
 	{NULL, NULL}
@@ -140,7 +140,7 @@ static const struct luaL_reg lbox_stat_net_meta [] = {
 void
 box_lua_stat_init(struct lua_State *L)
 {
-	static const struct luaL_reg statlib [] = {
+	static const struct luaL_Reg statlib [] = {
 		{NULL, NULL}
 	};
 

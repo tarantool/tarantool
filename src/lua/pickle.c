@@ -270,7 +270,7 @@ lbox_unpack(struct lua_State *L)
 void
 tarantool_lua_pickle_init(struct lua_State *L)
 {
-	const luaL_reg picklelib[] = {
+	static const luaL_Reg picklelib[] = {
 		{"pack", lbox_pack},
 		{"unpack", lbox_unpack},
 		{ NULL, NULL}

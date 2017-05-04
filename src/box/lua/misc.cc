@@ -116,7 +116,7 @@ lbox_select(lua_State *L)
 void
 box_lua_misc_init(struct lua_State *L)
 {
-	static const struct luaL_reg boxlib_internal[] = {
+	static const struct luaL_Reg boxlib_internal[] = {
 		{"select", lbox_select},
 		{NULL, NULL}
 	};

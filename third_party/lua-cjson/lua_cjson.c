@@ -1014,7 +1014,7 @@ static int json_decode(lua_State *l)
 static int
 json_new(lua_State *L);
 
-const luaL_reg jsonlib[] = {
+static const luaL_Reg jsonlib[] = {
     { "encode", json_encode },
     { "decode", json_decode },
     { "new",    json_new },
