@@ -239,6 +239,21 @@ somefunc = nil
 cn:close()
 ---
 ...
+-- box.internal.schema_version()
+schema_version = box.internal.schema_version()
+---
+...
+schema_version > 0
+---
+- true
+...
+bump_schema_version()
+---
+...
+box.internal.schema_version() == schema_version + 1
+---
+- true
+...
 if box.space.bump_schema_version ~= nil then box.space.bump_schema_version:drop() end
 ---
 ...
