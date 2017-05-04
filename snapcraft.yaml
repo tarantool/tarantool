@@ -32,6 +32,7 @@ parts:
           - make
           - g++
           - git
+          - tcl # For SQLite
           - libreadline-dev
           - libncurses5-dev
           - libyaml-dev
