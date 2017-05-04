@@ -2,8 +2,8 @@ TAP version 13
 1..3
     # split
     1..10
-    ok - empty split
-    ok - empty split
+    ok - empty separator
+    ok - empty separator
     ok - empty split
     ok - split self
     ok - complex split on empty separator

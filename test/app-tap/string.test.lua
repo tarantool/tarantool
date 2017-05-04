@@ -9,9 +9,9 @@ test:test("split", function(test)
     test:plan(10)
 
     -- testing basic split (works over gsplit)
-    test:is_deeply((""):split(""), {""},   "empty split")
+    test:ok(not pcall(string.split, "", ""), "empty separator")
+    test:ok(not pcall(string.split, "a", ""), "empty separator")
     test:is_deeply((""):split("z"), {""},  "empty split")
-    test:is_deeply(("a"):split(""), {"a"}, "empty split")
     test:is_deeply(("a"):split("a"), {"", ""}, "split self")
     test:is_deeply(
         (" 1 2  3  "):split(),

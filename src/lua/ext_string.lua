@@ -16,66 +16,58 @@ local isspace = ffi.C.isspace
 
 local err_string_arg = "bad argument #%d to '%s' (%s expected, got %s)"
 
-local function next_nonws(inp_p, inp_len)
-    local cur = 0
-    while isspace(inp_p[cur]) ~= 0 and cur < inp_len do
-        cur = cur + 1
-    end
-    return cur
-end
-
-local function next_ws(inp_p, inp_len)
-    local cur = 0
-    while isspace(inp_p[cur]) == 0 and cur < inp_len do
-        cur = cur + 1
-    end
-    return cur
-end
-
-local function string_split_empty(inp, max)
-    local inp_p, inp_len = c_char_ptr(inp), #inp
+local function string_split_empty(inp, maxsplit)
+    local p = c_char_ptr(inp)
+    local p_end = p + #inp
     local rv = {}
-    local pos = 0
-    local inp_p_last = nil
     while true do
-        if inp_p_last ~= nil and inp_p + pos ~= inp_p_last then
-            local chunk_size = (inp_p + pos) - inp_p_last
-            table.insert(rv, ffi.string(inp_p_last, chunk_size))
-            if max then max = max - 1 end
+        -- skip the leading whitespaces
+        while p < p_end and isspace(p[0]) ~= 0 do
+            p = p + 1
         end
-        inp_p_last = inp_p + pos
-        if max == 0 and pos ~= inp_len then
-            -- skip all whitespaces before last part
-            inp_p_last = inp_p_last + next_nonws(inp_p + pos, inp_len - pos)
-            local chunk_size = (inp_p + inp_len) - inp_p_last
-            table.insert(rv, ffi.string(inp_p_last, chunk_size))
-            break
-        elseif pos == inp_len then
+        if p == p_end then
             break
         end
-        -- skip all whitespaces
-        pos = pos + next_nonws(inp_p + pos, inp_len - pos)
-        inp_p_last = inp_p + pos
-        -- find last non-whitespace charachter
-        pos = pos + next_ws(inp_p + pos, inp_len - pos)
+        if maxsplit <= 0 then
+            table.insert(rv, ffi.string(p, p_end - p))
+            break
+        end
+        local chunk = p
+        -- skip all non-whitespace characters
+        while p < p_end and isspace(p[0]) == 0 do
+            p = p + 1
+        end
+        assert((p - chunk) > 0)
+        table.insert(rv, ffi.string(chunk, p - chunk))
+        maxsplit = maxsplit - 1
     end
     return rv
 end
 
-local function string_split_internal(inp, sep, max)
+local function string_split_internal(inp, sep, maxsplit)
+    local p = c_char_ptr(inp)
+    local p_end = p + #inp
     local sep_len = #sep
-    local inp_p, inp_len = c_char_ptr(inp), #inp
+    if sep_len == 0 then
+        error(err_string_arg:format(2, 'string.split', 'non-empty string',
+              "empty string"), 3)
+    end
     local rv = {}
     while true do
-        local sep_start = memmem(inp_p, inp_len, sep, sep_len)
-        if sep_start == nil or max == 0 then
-            local chunk_size = (c_char_ptr(inp) - inp_p) + inp_len
-            table.insert(rv, ffi.string(inp_p, chunk_size))
+        assert(p <= p_end)
+        if maxsplit <= 0 or p == p_end then
+            table.insert(rv, ffi.string(p, p_end - p))
             break
         end
-        table.insert(rv, ffi.string(inp_p, sep_start - inp_p))
-        if max then max = max - 1 end
-        inp_p = sep_start + sep_len
+        local chunk = p
+        p = memmem(p, p_end - p, sep, sep_len)
+        if p == nil then
+            table.insert(rv, ffi.string(chunk, p_end - chunk))
+            break
+        end
+        table.insert(rv, ffi.string(chunk, p - chunk))
+        p = p + sep_len
+        maxsplit = maxsplit - 1
     end
     return rv
 end
@@ -91,6 +83,7 @@ local function string_split(inp, sep, max)
         error(err_string_arg:format(3, 'string.split', 'positive integer',
                                     type(max)), 2)
     end
+    max = max or 0xffffffff
     if not sep then
         return string_split_empty(inp, max)
     end
