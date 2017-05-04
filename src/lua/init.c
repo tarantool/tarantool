@@ -55,6 +55,7 @@
 #include "lua/fio.h"
 #include <small/ibuf.h>
 
+#include <ctype.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
