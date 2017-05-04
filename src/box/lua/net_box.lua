@@ -35,7 +35,7 @@ local VINDEX_ID        = 289
 local IPROTO_STATUS_KEY    = 0x00
 local IPROTO_ERRNO_MASK    = 0x7FFF
 local IPROTO_SYNC_KEY      = 0x01
-local IPROTO_SCHEMA_ID_KEY = 0x05
+local IPROTO_SCHEMA_VERSION_KEY = 0x05
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
 local IPROTO_GREETING_SIZE = 128
@@ -61,7 +61,7 @@ local method_codec           = {
     upsert  = internal.encode_upsert,
     select  = internal.encode_select,
     -- inject raw data into connection, used by console and tests
-    inject = function(buf, id, schema_id, bytes)
+    inject = function(buf, id, schema_version, bytes)
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
@@ -114,7 +114,7 @@ local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
 --  'state_changed', state, errno, error
 --  'handshake', greeting           -> nil (accept) / errno, error (reject)
 --  'will_fetch_schema'             -> true (approve) / false (skip fetch)
---  'did_fetch_schema', schema_id, spaces, indices
+--  'did_fetch_schema', schema_version, spaces, indices
 --  'will_reconnect', errno, error  -> true (approve) / false (reject)
 --
 -- Suggestion for callback writers: sleep a few secs before approving
@@ -149,7 +149,7 @@ local function create_transport(host, port, user, password, callback)
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
 
     -- STATE SWITCHING --
-    local function set_state(new_state, new_errno, new_error, schema_id)
+    local function set_state(new_state, new_errno, new_error, schema_version)
         state = new_state
         last_errno = new_errno
         last_error = new_error
@@ -159,14 +159,14 @@ local function create_transport(host, port, user, password, callback)
             -- cancel all requests but the ones bearing the particular
             -- schema id; if schema id was omitted or we aren't fetching
             -- schema, cancel everything
-            if not schema_id or state ~= 'fetch_schema' then
-                schema_id = -1
+            if not schema_version or state ~= 'fetch_schema' then
+                schema_version = -1
             end
             local next_id, next_request = next(requests)
             while next_id do
                 local id, request = next_id, next_request
                 next_id, next_request = next(requests, id)
-                if request.schema_id ~= schema_id then
+                if request.schema_version ~= schema_version then
                     requests[id] = nil -- this marks the request as completed
                     request.errno  = new_errno
                     request.response = new_error
@@ -219,7 +219,7 @@ local function create_transport(host, port, user, password, callback)
     end
 
     -- REQUEST/RESPONSE --
-    local function perform_request(timeout, buffer, method, schema_id, ...)
+    local function perform_request(timeout, buffer, method, schema_version, ...)
         if state ~= 'active' then
             return last_errno or E_NO_CONNECTION, last_error
         end
@@ -230,12 +230,12 @@ local function create_transport(host, port, user, password, callback)
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_codec[method](send_buf, id, schema_id, ...)
+        method_codec[method](send_buf, id, schema_version, ...)
         next_request_id = next_id(id)
         local request = table_new(0, 6) -- reserve space for 6 keys
         request.client = fiber_self()
         request.method = method
-        request.schema_id = schema_id
+        request.schema_version = schema_version
         request.buffer = buffer
         requests[id] = request
         repeat
@@ -422,23 +422,25 @@ local function create_transport(host, port, user, password, callback)
             return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
         end
         set_state('fetch_schema')
-        return iproto_schema_sm(hdr[IPROTO_SCHEMA_ID_KEY])
+        return iproto_schema_sm(hdr[IPROTO_SCHEMA_VERSION_KEY])
     end
 
-    iproto_schema_sm = function(schema_id)
+    iproto_schema_sm = function(schema_version)
         if not callback('will_fetch_schema') then
             set_state('active')
-            return iproto_sm(schema_id)
+            return iproto_sm(schema_version)
         end
         local select1_id = new_request_id()
         local select2_id = new_request_id()
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0,
+                      0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
-        schema_id = nil -- any schema_id will do provided that
-                        -- it is consistent across responses
+        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0,
+                      0xFFFFFFFF, nil)
+        schema_version = nil -- any schema_version will do provided that
+                             -- it is consistent across responses
         repeat
             local err, hdr, body_rpos, body_end = send_and_recv_iproto()
             if err then return error_sm(err, hdr) end
@@ -447,13 +449,13 @@ local function create_transport(host, port, user, password, callback)
             if id == select1_id or id == select2_id then
                 -- response to a schema query we've submitted
                 local status = hdr[IPROTO_STATUS_KEY]
-                local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
+                local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
                 if status ~= 0 then
                     return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
                 end
-                if schema_id == nil then
-                    schema_id = response_schema_id
-                elseif schema_id ~= response_schema_id then
+                if schema_version == nil then
+                    schema_version = response_schema_version
+                elseif schema_version ~= response_schema_version then
                     -- schema changed while fetching schema; restart loader
                     return iproto_schema_sm()
                 end
@@ -462,29 +464,30 @@ local function create_transport(host, port, user, password, callback)
                 response[id] = body[IPROTO_DATA_KEY]
             end
         until response[select1_id] and response[select2_id]
-        callback('did_fetch_schema', schema_id,
+        callback('did_fetch_schema', schema_version,
                  response[select1_id], response[select2_id])
         set_state('active')
-        return iproto_sm(schema_id)
+        return iproto_sm(schema_version)
     end
 
-    iproto_sm = function(schema_id)
+    iproto_sm = function(schema_version)
         local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then return error_sm(err, hdr) end
         dispatch_response_iproto(hdr, body_rpos, body_end)
         local status = hdr[IPROTO_STATUS_KEY]
-        local response_schema_id = hdr[IPROTO_SCHEMA_ID_KEY]
-        if response_schema_id > 0 and response_schema_id ~= schema_id then
-            -- schema_id has been changed - start to load a new version.
-            -- Sic: self._schema_id will be updated only after reload.
+        local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
+        if response_schema_version > 0 and
+           response_schema_version ~= schema_version then
+            -- schema_version has been changed - start to load a new version.
+            -- Sic: self._schema_version will be updated only after reload.
             local body
             body_end, body = ibuf_decode(body_rpos)
             set_state('fetch_schema',
                       E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
-                      response_schema_id)
-            return iproto_schema_sm(schema_id)
+                      response_schema_version)
+            return iproto_schema_sm(schema_version)
         end
-        return iproto_sm(schema_id)
+        return iproto_sm(schema_version)
     end
 
     error_sm = function(err, msg)
@@ -707,7 +710,7 @@ function remote_methods:_request(method, opts, ...)
             timeout = deadline and max(0, deadline - fiber_time())
         end
         err, res = perform_request(timeout, buffer, method,
-                                   self._schema_id, ...)
+                                   self._schema_version, ...)
         if not err and buffer ~= nil then
             return res -- the length of xrow.body
         elseif not err then
@@ -738,7 +741,7 @@ function remote_methods:ping(opts)
                             or (opts and opts.timeout)
     end
     local err = self._transport.perform_request(timeout, nil, 'ping',
-                                                self._schema_id)
+                                                self._schema_version)
     return not err or err == E_WRONG_SCHEMA_VERSION
 end
 
@@ -806,7 +809,7 @@ function remote_methods:timeout(timeout)
     return self
 end
 
-function remote_methods:_install_schema(schema_id, spaces, indices)
+function remote_methods:_install_schema(schema_version, spaces, indices)
     local sl, space_mt, index_mt = {}, self._space_mt, self._index_mt
     for _, space in pairs(spaces) do
         local name = space[3]
@@ -888,7 +891,7 @@ function remote_methods:_install_schema(schema_id, spaces, indices)
         end
     end
 
-    self._schema_id = schema_id
+    self._schema_version = schema_version
     self.space = sl
     self._on_schema_reload:run(self)
 end

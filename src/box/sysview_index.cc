@@ -62,7 +62,7 @@ sysview_iterator_next(struct iterator *iterator)
 {
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
-	if (it->source->sc_version != sc_version)
+	if (it->source->schema_version != schema_version)
 		return NULL; /* invalidate iterator */
 	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
 	struct tuple *tuple;
@@ -114,13 +114,13 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	if (key_validate(pk->index_def, type, key, part_count))
 		diag_raise();
 	/* Re-allocate iterator if schema was changed */
-	if (it->source != NULL && it->source->sc_version != ::sc_version) {
+	if (it->source != NULL && it->source->schema_version != ::schema_version) {
 		it->source->free(it->source);
 		it->source = NULL;
 	}
 	if (it->source == NULL) {
 		it->source = pk->allocIterator();
-		it->source->sc_version = ::sc_version;
+		it->source->schema_version = ::schema_version;
 	}
 	pk->initIterator(it->source, type, key, part_count);
 	iterator->index = (Index *) this;

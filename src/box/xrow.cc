@@ -87,8 +87,8 @@ error:
 		case IPROTO_TIMESTAMP:
 			header->tm = mp_decode_double(pos);
 			break;
-		case IPROTO_SCHEMA_ID:
-			header->schema_id = mp_decode_uint(pos);
+		case IPROTO_SCHEMA_VERSION:
+			header->schema_version = mp_decode_uint(pos);
 			break;
 		default:
 			/* unknown header */

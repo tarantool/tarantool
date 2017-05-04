@@ -67,7 +67,7 @@ enum {
 
 #include <stdint.h>
 
-extern uint32_t sc_version;
+extern uint32_t schema_version;
 
 #if defined(__cplusplus)
 
@@ -102,14 +102,14 @@ box_schema_version();
 static inline struct space *
 space_cache_find(uint32_t id)
 {
-	static uint32_t scv = 0;
+	static uint32_t prev_schema_version = 0;
 	static struct space *space = NULL;
-	if (scv != sc_version)
+	if (prev_schema_version != schema_version)
 		space = NULL;
 	if (space && space->def.id == id)
 		return space;
 	if ((space = space_by_id(id))) {
-		scv = sc_version;
+		prev_schema_version = schema_version;
 		return space;
 	}
 	tnt_raise(ClientError, ER_NO_SUCH_SPACE, int2str(id));

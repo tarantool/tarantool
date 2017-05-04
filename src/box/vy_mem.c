@@ -78,7 +78,7 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
-	index->sc_version = schema_version;
+	index->schema_version = schema_version;
 	index->snapshot_version = snapshot_version;
 	index->allocator = allocator;
 	index->allocator_lsn = allocator_lsn;

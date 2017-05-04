@@ -2334,7 +2334,7 @@ vy_index_rotate_mem(struct vy_index *index)
 			 &index->index_def->key_def,
 			 index->space_format,
 			 index->space_format_with_colmask,
-			 index->upsert_format, sc_version);
+			 index->upsert_format, schema_version);
 	if (mem == NULL)
 		return -1;
 	if (index->mem->used > 0 || index->mem->pin_count > 0)
@@ -3434,7 +3434,7 @@ vy_tx_write_prepare(struct txv *v)
 	 *   We have to seal the tree, because we don't support mixing
 	 *   statements of different formats in the same tree.
 	 */
-	if (unlikely(index->mem->sc_version != sc_version ||
+	if (unlikely(index->mem->schema_version != schema_version ||
 		     index->mem->snapshot_version != snapshot_version)) {
 		if (vy_index_rotate_mem(index) != 0)
 			return -1;
@@ -5398,7 +5398,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->mem = vy_mem_new(allocator, allocator_lsn,
 				&index->index_def->key_def, space->format,
 				index->space_format_with_colmask,
-				index->upsert_format, sc_version);
+				index->upsert_format, schema_version);
 	if (index->mem == NULL)
 		goto fail_mem;
 

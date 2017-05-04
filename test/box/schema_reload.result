@@ -25,7 +25,7 @@ cn.space.test ~= nil
 ---
 - true
 ...
-old_schema_id = cn._schema_id
+old_schema_version = cn._schema_version
 ---
 ...
 -- create one more space
@@ -43,7 +43,7 @@ cn.space.test2 == nil
 ---
 - true
 ...
-cn._schema_id == old_schema_id
+cn._schema_version == old_schema_version
 ---
 - true
 ...
@@ -52,7 +52,7 @@ cn.space.test:select{}
 ---
 - []
 ...
-cn._schema_id > old_schema_id
+cn._schema_version > old_schema_version
 ---
 - true
 ...
@@ -124,17 +124,17 @@ s2:drop()
 ---
 ...
 --------------------------------------------------------------------------------
--- gh-1808: support schema_id in CALL, EVAL and PING
+-- gh-1808: support schema_version in CALL, EVAL and PING
 --------------------------------------------------------------------------------
 test_run:cmd('setopt delimiter ";"')
 ---
 - true
 ...
-function bump_schema_id()
-    if box.space.bump_schema_id == nil then
-        box.schema.create_space('bump_schema_id')
+function bump_schema_version()
+    if box.space.bump_schema_version == nil then
+        box.schema.create_space('bump_schema_version')
     else
-        box.space.bump_schema_id:drop()
+        box.space.bump_schema_version:drop()
     end
 end;
 ---
@@ -147,10 +147,10 @@ cn = net_box.connect(box.cfg.listen)
 ---
 ...
 -- ping
-schema_id = cn._schema_id
+schema_version = cn._schema_version
 ---
 ...
-bump_schema_id()
+bump_schema_version()
 ---
 ...
 cn:ping()
@@ -158,18 +158,18 @@ cn:ping()
 - true
 ...
 -- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
-while cn._schema_id == schema_id do fiber.sleep(0.0001) end
+while cn._schema_version == schema_version do fiber.sleep(0.0001) end
 ---
 ...
-cn._schema_id == schema_id + 1
+cn._schema_version == schema_version + 1
 ---
 - true
 ...
 -- call
-schema_id = cn._schema_id
+schema_version = cn._schema_version
 ---
 ...
-bump_schema_id()
+bump_schema_version()
 ---
 ...
 function somefunc() return true end
@@ -179,7 +179,7 @@ cn:call('somefunc')
 ---
 - true
 ...
-cn._schema_id == schema_id + 1
+cn._schema_version == schema_version + 1
 ---
 - true
 ...
@@ -187,31 +187,31 @@ somefunc = nil
 ---
 ...
 -- failed call
-schema_id = cn._schema_id
+schema_version = cn._schema_version
 ---
 ...
-bump_schema_id()
+bump_schema_version()
 ---
 ...
 cn:call('somefunc')
 ---
 - error: Procedure 'somefunc' is not defined
 ...
-cn._schema_id == schema_id + 1
+cn._schema_version == schema_version + 1
 ---
 - true
 ...
 -- eval
-schema_id = cn._schema_id
+schema_version = cn._schema_version
 ---
 ...
-bump_schema_id()
+bump_schema_version()
 ---
 ...
 cn:eval('return')
 ---
 ...
-cn._schema_id == schema_id + 1
+cn._schema_version == schema_version + 1
 ---
 - true
 ...
@@ -219,17 +219,17 @@ somefunc = nil
 ---
 ...
 -- failed eval
-schema_id = cn._schema_id
+schema_version = cn._schema_version
 ---
 ...
-bump_schema_id()
+bump_schema_version()
 ---
 ...
 cn:eval('error("xx")')
 ---
 - error: 'eval:1: xx'
 ...
-cn._schema_id == schema_id + 1
+cn._schema_version == schema_version + 1
 ---
 - true
 ...
@@ -239,7 +239,7 @@ somefunc = nil
 cn:close()
 ---
 ...
-if box.space.bump_schema_id ~= nil then box.space.bump_schema_id:drop() end
+if box.space.bump_schema_version ~= nil then box.space.bump_schema_version:drop() end
 ---
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

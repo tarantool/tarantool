@@ -31,7 +31,7 @@
 #include "trivia/config.h"
 #include "iproto_port.h"
 #include "iproto_constants.h"
-#include "schema.h" /* sc_version */
+#include "schema.h" /* schema_version */
 #include "small/obuf.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -47,16 +47,16 @@ struct PACKED iproto_header_bin {
 	uint8_t k_sync;                         /* IPROTO_SYNC */
 	uint8_t m_sync;                         /* MP_UINT64 */
 	uint64_t v_sync;                        /* sync */
-	uint8_t k_schema_id;                    /* IPROTO_SCHEMA_ID */
-	uint8_t m_schema_id;                    /* MP_UINT32 */
-	uint32_t v_schema_id;                   /* schema_id */
+	uint8_t k_schema_version;               /* IPROTO_SCHEMA_VERSION */
+	uint8_t m_schema_version;               /* MP_UINT32 */
+	uint32_t v_schema_version;              /* schema_version */
 };
 
 static const struct iproto_header_bin iproto_header_bin = {
 	0xce, 0, 0x83,
 	IPROTO_REQUEST_TYPE, 0xce, 0,
 	IPROTO_SYNC, 0xcf, 0,
-	IPROTO_SCHEMA_ID, 0xce, 0
+	IPROTO_SCHEMA_VERSION, 0xce, 0
 };
 
 struct PACKED iproto_body_bin {
@@ -87,7 +87,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	struct iproto_header_bin reply = iproto_header_bin;
 	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5 + 1);
 	reply.v_sync = mp_bswap_u64(sync);
-	reply.v_schema_id = mp_bswap_u32(sc_version);
+	reply.v_schema_version = mp_bswap_u32(schema_version);
 	uint8_t empty_map[1] = { 0x80 };
 	obuf_dup_xc(out, &reply, sizeof(reply));
 	obuf_dup_xc(out, &empty_map, sizeof(empty_map));
@@ -106,7 +106,7 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 	header.v_len = mp_bswap_u32(len);
 	header.v_code = mp_bswap_u32(iproto_encode_error(errcode));
 	header.v_sync = mp_bswap_u64(sync);
-	header.v_schema_id = mp_bswap_u32(sc_version);
+	header.v_schema_version = mp_bswap_u32(schema_version);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 	/* Malformed packet appears to be a lesser evil than abort. */
@@ -176,7 +176,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);
 	header.v_sync = mp_bswap_u64(sync);
-	header.v_schema_id = mp_bswap_u32(sc_version);
+	header.v_schema_version = mp_bswap_u32(schema_version);
 
 	struct iproto_body_bin body = iproto_body_bin;
 	body.v_data_len = mp_bswap_u32(count);

@@ -177,7 +177,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /* {{{ Index -- base class for all indexes. ********************/
 
 Index::Index(struct index_def *index_def_arg)
-	:index_def(NULL), sc_version(::sc_version)
+	:index_def(NULL), schema_version(::schema_version)
 {
 	index_def = index_def_dup(index_def_arg);
 	if (index_def == NULL)
@@ -494,7 +494,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 			diag_raise();
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
-		it->sc_version = sc_version;
+		it->schema_version = schema_version;
 		it->space_id = space_id;
 		it->index_id = index_id;
 		it->index = index;
@@ -514,7 +514,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	assert(result != NULL);
 	assert(itr->next != NULL);
 	try {
-		if (itr->sc_version != sc_version) {
+		if (itr->schema_version != schema_version) {
 			struct space *space;
 			/* no tx management */
 			Index *index = check_index(itr->space_id, itr->index_id,
@@ -523,11 +523,11 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 				*result = NULL;
 				return 0;
 			}
-			if (index->sc_version > itr->sc_version) {
+			if (index->schema_version > itr->schema_version) {
 				*result = NULL; /* invalidate iterator */
 				return 0;
 			}
-			itr->sc_version = sc_version;
+			itr->schema_version = schema_version;
 		}
 	} catch (Exception *) {
 		*result = NULL;

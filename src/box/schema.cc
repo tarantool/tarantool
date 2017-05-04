@@ -60,7 +60,7 @@
 static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
-uint32_t sc_version = 0;
+uint32_t schema_version = 0;
 /**
  * Lock of scheme modification
  */
@@ -87,7 +87,7 @@ space_by_id(uint32_t id)
 extern "C" uint32_t
 box_schema_version()
 {
-	return sc_version;
+	return schema_version;
 }
 
 /**
@@ -144,7 +144,7 @@ space_cache_delete(uint32_t id)
 	assert(k != mh_end(spaces));
 	struct space *space = (struct space *)mh_i32ptr_node(spaces, k)->val;
 	mh_i32ptr_del(spaces, k, NULL);
-	sc_version++;
+	schema_version++;
 	return space;
 }
 
@@ -162,7 +162,7 @@ space_cache_replace(struct space *space)
 		panic_syserror("Out of memory for the data "
 			       "dictionary cache.");
 	}
-	sc_version++;
+	schema_version++;
 	/*
 	 * Must be after the space is put into the hash, since
 	 * box.schema.space.bless() uses hash look up to find the

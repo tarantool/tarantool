@@ -161,7 +161,7 @@ struct vy_mem {
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Schema version at the time of creation. */
-	uint32_t sc_version;
+	uint32_t schema_version;
 	/** Snapshot version at the time of creation. */
 	uint32_t snapshot_version;
 	/** Allocator for extents */
