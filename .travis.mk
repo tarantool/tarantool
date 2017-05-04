@@ -56,5 +56,5 @@ coverage: deps_linux
 		echo "Exporting code coverage information to coveralls.io"; \
 		gem install coveralls-lcov; \
 		echo coveralls-lcov --repo-token [FILTERED] coverage.info; \
-		coveralls-lcov -v --repo-token $(COVERALLS_TOKEN) coverage.info; \
+		coveralls-lcov --repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
