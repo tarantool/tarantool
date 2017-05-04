@@ -20,7 +20,7 @@ git:
 
 env:
     global:
-      - PACKAGECLOUD_REPO=1_7
+      - PACKAGECLOUD_REPO=1_8
     matrix:
       - TARGET=source
       - TARGET=test
@@ -123,14 +123,14 @@ deploy:
     package_glob: build/*.{rpm,deb,dsc}
     skip_cleanup: true
     on:
-      branch: "1.7"
+      branch: "1.8"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy sources to SFTP
   - provider: script
     script: ./packpack/tools/sftp ${TRAVIS_BRANCH}/src build/*.tar.gz
     skip_cleanup: true
     on:
-      branch: "1.7"
+      branch: "1.8"
       condition: "x${TARGET} = xsource"
 
 notifications:
