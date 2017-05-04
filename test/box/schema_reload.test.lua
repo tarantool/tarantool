@@ -10,7 +10,7 @@ cn = net_box.connect(LISTEN.host, LISTEN.service)
 
 -- check that schema is correct
 cn.space.test ~= nil
-old_schema_version = cn._schema_version
+old_schema_version = cn.schema_version
 
 -- create one more space
 s2 = box.schema.create_space('test2')
@@ -21,11 +21,11 @@ i2 = s2:create_index('primary')
 ----------------------------------
 -- check that schema is not fresh
 cn.space.test2 == nil
-cn._schema_version == old_schema_version
+cn.schema_version == old_schema_version
 
 -- exec request with reload
 cn.space.test:select{}
-cn._schema_version > old_schema_version
+cn.schema_version > old_schema_version
 
 ----------------------------------
 -- TEST #2 parallel select/reload
@@ -84,39 +84,39 @@ test_run:cmd('setopt delimiter ""');
 cn = net_box.connect(box.cfg.listen)
 
 -- ping
-schema_version = cn._schema_version
+schema_version = cn.schema_version
 bump_schema_version()
 cn:ping()
 -- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
-while cn._schema_version == schema_version do fiber.sleep(0.0001) end
-cn._schema_version == schema_version + 1
+while cn.schema_version == schema_version do fiber.sleep(0.0001) end
+cn.schema_version == schema_version + 1
 
 -- call
-schema_version = cn._schema_version
+schema_version = cn.schema_version
 bump_schema_version()
 function somefunc() return true end
 cn:call('somefunc')
-cn._schema_version == schema_version + 1
+cn.schema_version == schema_version + 1
 somefunc = nil
 
 -- failed call
-schema_version = cn._schema_version
+schema_version = cn.schema_version
 bump_schema_version()
 cn:call('somefunc')
-cn._schema_version == schema_version + 1
+cn.schema_version == schema_version + 1
 
 -- eval
-schema_version = cn._schema_version
+schema_version = cn.schema_version
 bump_schema_version()
 cn:eval('return')
-cn._schema_version == schema_version + 1
+cn.schema_version == schema_version + 1
 somefunc = nil
 
 -- failed eval
-schema_version = cn._schema_version
+schema_version = cn.schema_version
 bump_schema_version()
 cn:eval('error("xx")')
-cn._schema_version == schema_version + 1
+cn.schema_version == schema_version + 1
 somefunc = nil
 
 cn:close()

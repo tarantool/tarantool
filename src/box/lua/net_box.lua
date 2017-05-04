@@ -479,7 +479,7 @@ local function create_transport(host, port, user, password, callback)
         if response_schema_version > 0 and
            response_schema_version ~= schema_version then
             -- schema_version has been changed - start to load a new version.
-            -- Sic: self._schema_version will be updated only after reload.
+            -- Sic: self.schema_version will be updated only after reload.
             local body
             body_end, body = ibuf_decode(body_rpos)
             set_state('fetch_schema',
@@ -572,6 +572,7 @@ local function remote_serialize(self)
         state = self.state,
         error = self.error,
         protocol = self.protocol,
+        schema_version = self.schema_version,
         peer_uuid = self.peer_uuid,
         peer_version_id = self.peer_version_id
     }
@@ -710,7 +711,7 @@ function remote_methods:_request(method, opts, ...)
             timeout = deadline and max(0, deadline - fiber_time())
         end
         err, res = perform_request(timeout, buffer, method,
-                                   self._schema_version, ...)
+                                   self.schema_version, ...)
         if not err and buffer ~= nil then
             return res -- the length of xrow.body
         elseif not err then
@@ -741,7 +742,7 @@ function remote_methods:ping(opts)
                             or (opts and opts.timeout)
     end
     local err = self._transport.perform_request(timeout, nil, 'ping',
-                                                self._schema_version)
+                                                self.schema_version)
     return not err or err == E_WRONG_SCHEMA_VERSION
 end
 
@@ -891,7 +892,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
         end
     end
 
-    self._schema_version = schema_version
+    self.schema_version = schema_version
     self.space = sl
     self._on_schema_reload:run(self)
 end
