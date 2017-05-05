@@ -102,20 +102,23 @@ extern char strict_lua[],
 	clock_lua[],
 	title_lua[],
 	env_lua[],
+	pwd_lua[],
 	trigger_lua[],
+	string_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
+	"fun", fun_lua,
 	"tarantool", init_lua,
 	"errno", errno_lua,
 	"fiber", fiber_lua,
 	"env", env_lua,
+	"string", string_lua,
 	"buffer", buffer_lua,
 	"msgpackffi", msgpackffi_lua,
-	"fun", fun_lua,
 	"crypto", crypto_lua,
 	"digest", digest_lua,
 	"uuid", uuid_lua,
@@ -131,6 +134,7 @@ static const char *lua_modules[] = {
 	"help", help_lua,
 	"internal.argparse", argparse_lua,
 	"internal.trigger", trigger_lua,
+	"pwd", pwd_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,

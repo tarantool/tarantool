@@ -18,26 +18,7 @@ local console = require('console')
 local argparse = require('internal.argparse').parse
 
 ffi.cdef[[
-struct passwd {
-  char *pw_name;   /* username */
-  char *pw_passwd; /* user password */
-  int   pw_uid;    /* user ID */
-  int   pw_gid;    /* group ID */
-  char *pw_gecos;  /* user information */
-  char *pw_dir;    /* home directory */
-  char *pw_shell;  /* shell program */
-};
-
-struct group{
-  char *gr_name;
-  char *gr_passwd;
-  int   gr_gid;
-  char **gr_mem;
-};
-
 int kill(int pid, int sig);
-struct passwd *getpwnam(const char *name);
-struct group *getgrgid(int gid);
 int isatty(int fd);
 int getppid(void);
 ]]

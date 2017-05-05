@@ -1,0 +1,9 @@
+TAP version 13
+1..7
+ok - checking base group equal to base user
+ok - checking user by id
+ok - checking user by name
+ok - checking group by id
+ok - checking group by name
+ok - check output of getpwall
+ok - check output of getgrall

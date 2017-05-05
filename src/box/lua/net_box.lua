@@ -827,7 +827,8 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
             enabled         = true,
             index           = {},
             temporary       = false,
-            _format         = format
+            _format         = format,
+            connection      = self
         }
         if #space > 5 then
             local opts = space[6]

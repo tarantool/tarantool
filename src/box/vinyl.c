@@ -8154,6 +8154,8 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 						 &itr->src[i].stmt, &stop);
 		if (rc < 0)
 			return rc;
+		if (vy_merge_iterator_check_version(itr) != 0)
+			return -2;
 		result = result || rc;
 	}
 	itr->skipped_start = itr->src_count;
