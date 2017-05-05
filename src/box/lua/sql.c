@@ -267,8 +267,8 @@ lua_sql_execute(struct lua_State *L)
 	prep_stmt_list_free(l);
 	return lua_gettop(L) - 1;
 sqlerror:
-	prep_stmt_list_free(l);
 	lua_pushstring(L, sqlite3_errmsg(db));
+	prep_stmt_list_free(l);	
 	return lua_error(L);
 outofmem:
 	prep_stmt_list_free(l);
