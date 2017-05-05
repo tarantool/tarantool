@@ -49,27 +49,44 @@ local function format(status, ...)
     return formatter.encode({{error = err }})
 end
 
-local function set_delimiter(self, value)
-    if self.delimiter == '$EOF$\n' then
-        return error('Can not install delimiter for net box sessions')
+--
+-- Set delimiter
+--
+local function delimiter(delim)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.delimiter(): need existing console")
     end
-    self.delimiter = value or ''
-    return true
+    if delim == nil then
+        return self.delimiter
+    elseif type(delim) == 'string' then
+        self.delimiter = delim
+    else
+        error('invalid delimiter')
+    end
 end
 
-local function set_language(self, value)
+local function set_delimiter(storage, value)
+    local console = fiber.self().storage.console
+    if console ~= nil and console.delimiter == '$EOF$' then
+        return error('Can not install delimiter for net box sessions')
+    end
+    return delimiter(value)
+end
+
+local function set_language(storage, value)
     if value == nil then
-        return { language = self.language or 'lua' }
+        return { language = storage.language or 'lua' }
     end
     if value ~= 'lua' and value ~= 'sql' then
         local msg = 'Invalid language "%s", supported languages: lua and sql.'
         return error(msg:format(value))
     end
-    self.language = value
+    storage.language = value
     return true
 end
 
-local function set_param(self, func, param, value)
+local function set_param(storage, func, param, value)
     local params = {
         language = set_language,
         lang = set_language,
@@ -84,15 +101,18 @@ local function set_param(self, func, param, value)
     if params[param] == nil then
         return format(false, 'Unknown parameter: ' .. tostring(param))
     end
-    return format(pcall(params[param], self, value))
+    return format(pcall(params[param], storage, value))
 end
 
-local function help_wrapper(self)
+local function help_wrapper(storage)
     return format(true, help()) -- defined in help.lua
 end
 
-local function quit(self)
-    self.running = false
+local function quit(storage)
+    local console = fiber.self().storage.console
+    if console ~= nil then
+        console.running = false
+    end
 end
 
 local operators = {
@@ -104,7 +124,7 @@ local operators = {
     q = quit
 }
 
-local function preprocess(self, line)
+local function preprocess(storage, line)
     local items = {}
     for item in string.gmatch(line, '([^%s]+)') do
         items[#items + 1] = item
@@ -116,20 +136,20 @@ local function preprocess(self, line)
         local msg = "Invalid command \\%s. Type \\help for help."
         return format(false, msg:format(items[1]))
     end
-    return operators[items[1]](self, unpack(items))
+    return operators[items[1]](storage, unpack(items))
 end
 
 --
 -- Evaluate command on local instance
 --
-local function local_eval(self, line)
+local function local_eval(storage, line)
     if not line then
         return nil
     end
     if line:sub(1, 1) == '\\' then
-        return preprocess(self, line:sub(2))
+        return preprocess(storage, line:sub(2))
     end
-    if self ~= nil and self.language == 'sql' then
+    if storage ~= nil and storage.language == 'sql' then
         return format(pcall(box.sql.execute, line))
     end
     --
@@ -149,7 +169,7 @@ local function local_eval(self, line)
 end
 
 local function eval(line)
-    return local_eval(fiber.self().storage.console, line)
+    return local_eval(box.session, line)
 end
 
 --
@@ -209,7 +229,7 @@ local function local_read(self)
             break
         end
         if delim == "" then
-            if self.language == 'lua' then
+            if (box.session.language or 'lua') == 'lua' then
                 -- stop once a complete Lua statement is entered
                 if local_check_lua(buf) then
                     break
@@ -282,7 +302,6 @@ local repl_mt = {
     __index = {
         running = false;
         delimiter = "";
-        language = "lua";
         prompt = "tarantool";
         read = local_read;
         eval = local_eval;
@@ -323,23 +342,6 @@ local function on_client_disconnect(foo)
         return
     end
     error('Wrong type of on_client_disconnect hook: ' .. type(foo))
-end
-
---
--- Set delimiter
---
-local function delimiter(delim)
-    local self = fiber.self().storage.console
-    if self == nil then
-        error("console.delimiter(): need existing console")
-    end
-    if delim == nil then
-        return self.delimiter
-    elseif type(delim) == 'string' then
-        self.delimiter = delim
-    else
-        error('invalid delimiter')
-    end
 end
 
 --
