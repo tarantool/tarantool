@@ -394,6 +394,38 @@ check_error(lua_State *L)
 	return 1;
 }
 
+static int
+test_call(lua_State *L)
+{
+	assert(luaL_loadbuffer(L, "", 0, "=eval") == 0);
+	assert(luaT_call(L, 0, LUA_MULTRET) == 0);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int
+cpcall_handler(lua_State *L)
+{
+	return 0;
+}
+
+static int
+test_cpcall(lua_State *L)
+{
+	assert(luaT_cpcall(L, cpcall_handler, 0) == 0);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int
+test_state(lua_State *L)
+{
+	lua_State *tarantool_L = luaT_state();
+	assert(lua_newthread(tarantool_L) != 0);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -418,6 +450,9 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_api", test_key_def_api},
 		{"test_key_def_api2", test_key_def_api2},
 		{"check_error", check_error},
+		{"test_call", test_call},
+		{"test_cpcall", test_cpcall},
+		{"test_state", test_state},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

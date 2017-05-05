@@ -964,6 +964,12 @@ luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 	return 0;
 }
 
+lua_State *
+luaT_state(void)
+{
+	return tarantool_L;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
