@@ -33,10 +33,13 @@
 
 #include <stdarg.h>
 
+#include "trivia/config.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#if defined(WITH_SYSTEMD)
 /**
  * Open connection with systemd daemon (using unix socket located in
  * "NOTIFY_SOCKET" environmnent variable)
@@ -91,6 +94,14 @@ systemd_vsnotify(const char *format, va_list ap);
  */
 int
 systemd_snotify(const char *format, ...);
+
+#else /* !defined(WITH_SYSTEMD) */
+#  define systemd_init()
+#  define systemd_free()
+#  define systemd_notify(...)
+#  define systemd_vsnotify(...)
+#  define systemd_snotify(...)
+#endif /* WITH_SYSTEMD */
 
 #if defined(__cplusplus)
 } /* extern "C" */

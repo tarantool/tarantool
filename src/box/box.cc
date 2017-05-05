@@ -69,9 +69,7 @@
 #include "authentication.h"
 #include "path_lock.h"
 #include "gc.h"
-#if defined(WITH_SYSTEMD)
 #include "systemd.h"
-#endif /* defined(WITH_SYSTEMD) */
 
 static char status[64] = "unknown";
 
@@ -80,9 +78,7 @@ static void title(const char *new_status)
 	snprintf(status, sizeof(status), "%s", new_status);
 	title_set_status(new_status);
 	title_update();
-#if defined(WITH_SYSTEMD)
 	systemd_snotify("STATUS=%s", status);
-#endif /* defined(WITH_SYSTEMD) */
 }
 
 bool box_snapshot_is_in_progress = false;

@@ -30,6 +30,7 @@
  */
 #include "systemd.h"
 
+#if defined(WITH_SYSTEMD)
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -150,3 +151,4 @@ systemd_snotify(const char *format, ...)
 	va_end(args);
 	return res;
 }
+#endif /* defined(WITH_SYSTEMD) */

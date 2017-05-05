@@ -125,6 +125,7 @@ set (server_sources
      proc_title.c
      coeio_file.c
      clock.c
+     systemd.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
@@ -143,10 +144,6 @@ set (server_sources
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/strbuf.c
 )
-
-if (WITH_SYSTEMD)
-    set(server_sources ${server_sources} systemd.c)
-endif (WITH_SYSTEMD)
 
 set(api_headers
     ${CMAKE_BINARY_DIR}/src/trivia/config.h
