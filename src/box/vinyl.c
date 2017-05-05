@@ -627,6 +627,11 @@ struct vy_index {
 	uint64_t column_mask;
 	/** Link in vy_scheduler->dump_heap. */
 	struct heap_node in_dump;
+	/**
+	 * If pin_count > 0 the index can't be scheduled for dump.
+	 * Used to make sure that the primary index is dumped last.
+	 */
+	int pin_count;
 };
 
 /** @sa implementation for details. */
@@ -1482,6 +1487,10 @@ static void
 vy_scheduler_update_index(struct vy_scheduler *, struct vy_index *);
 static void
 vy_scheduler_remove_index(struct vy_scheduler *, struct vy_index *);
+static void
+vy_scheduler_pin_index(struct vy_scheduler *, struct vy_index *);
+static void
+vy_scheduler_unpin_index(struct vy_scheduler *, struct vy_index *);
 static void
 vy_scheduler_add_range(struct vy_scheduler *, struct vy_range *);
 static void
@@ -3755,6 +3764,10 @@ delete_mems:
 	vy_write_iterator_delete(task->wi);
 
 	vy_scheduler_add_index(scheduler, index);
+	if (index->index_def->iid != 0) {
+		struct vy_index *pk = vy_index_find(index->space, 0);
+		vy_scheduler_unpin_index(scheduler, pk);
+	}
 
 	say_info("%s: dump completed", index->name);
 	return 0;
@@ -3773,6 +3786,7 @@ static void
 vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 {
 	struct vy_index *index = task->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	vy_write_iterator_delete(task->wi);
@@ -3781,9 +3795,14 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 		say_error("%s: dump failed: %s", index->name,
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->run);
-		vy_scheduler_add_index(index->env->scheduler, index);
 	} else
 		vy_run_delete(task->run);
+
+	vy_scheduler_add_index(scheduler, index);
+	if (index->index_def->iid != 0) {
+		struct vy_index *pk = vy_index_find(index->space, 0);
+		vy_scheduler_unpin_index(scheduler, pk);
+	}
 }
 
 /**
@@ -3805,6 +3824,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 	struct tx_manager *xm = index->env->xm;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
+	assert(index->pin_count == 0);
 	assert(index->generation < generation);
 
 	if (index->is_dropped) {
@@ -3891,6 +3911,18 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
 	vy_scheduler_remove_index(scheduler, index);
+	if (index->index_def->iid != 0) {
+		/*
+		 * The primary index must be dumped after all
+		 * secondary indexes of the same space - see
+		 * vy_dump_heap_less(). To make sure it isn't
+		 * picked by the scheduler while all secondary
+		 * indexes are being dumped, temporarily remove
+		 * it from the dump heap.
+		 */
+		struct vy_index *pk = vy_index_find(index->space, 0);
+		vy_scheduler_pin_index(scheduler, pk);
+	}
 
 	say_info("%s: dump started", index->name);
 	*p_task = task;
@@ -4036,6 +4068,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/* The iterator has been cleaned up in worker. */
 	vy_write_iterator_delete(task->wi);
@@ -4045,9 +4078,10 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 			  index->name, vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->run);
-		vy_scheduler_add_range(index->env->scheduler, range);
 	} else
 		vy_run_delete(task->run);
+
+	vy_scheduler_add_range(scheduler, range);
 }
 
 static int
@@ -4154,16 +4188,26 @@ err_task:
 #define HEAP_NAME vy_dump_heap
 
 static bool
-heap_dump_less(struct heap_node *a, struct heap_node *b)
+vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
 {
 	struct vy_index *left = container_of(a, struct vy_index, in_dump);
 	struct vy_index *right = container_of(b, struct vy_index, in_dump);
 
 	/* Older indexes are dumped first. */
-	return left->generation < right->generation;
+	if (left->generation != right->generation)
+		return left->generation < right->generation;
+	/*
+	 * If a space has more than one index, appending a statement
+	 * to it requires reading the primary index to get the old
+	 * tuple and delete it from secondary indexes. This means that
+	 * on local recovery from WAL, the primary index must not be
+	 * ahead of secondary indexes of the same space, i.e. it must
+	 * be dumped last.
+	 */
+	return left->index_def->iid > right->index_def->iid;
 }
 
-#define HEAP_LESS(h, l, r) heap_dump_less(l, r)
+#define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
 
 #include "salad/heap.h"
 
@@ -4173,7 +4217,7 @@ heap_dump_less(struct heap_node *a, struct heap_node *b)
 #define HEAP_NAME vy_compact_heap
 
 static bool
-heap_compact_less(struct heap_node *a, struct heap_node *b)
+vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
 {
 	struct vy_range *left = container_of(a, struct vy_range, in_compact);
 	struct vy_range *right = container_of(b, struct vy_range, in_compact);
@@ -4184,7 +4228,7 @@ heap_compact_less(struct heap_node *a, struct heap_node *b)
 	return left->compact_priority > right->compact_priority;
 }
 
-#define HEAP_LESS(h, l, r) heap_compact_less(l, r)
+#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
 
 #include "salad/heap.h"
 
@@ -4383,6 +4427,23 @@ vy_scheduler_remove_index(struct vy_scheduler *scheduler,
 {
 	vy_dump_heap_delete(&scheduler->dump_heap, &index->in_dump);
 	index->in_dump.pos = UINT32_MAX;
+}
+
+static void
+vy_scheduler_pin_index(struct vy_scheduler *scheduler, struct vy_index *index)
+{
+	if (index->pin_count == 0)
+		vy_scheduler_remove_index(scheduler, index);
+	index->pin_count++;
+}
+
+static void
+vy_scheduler_unpin_index(struct vy_scheduler *scheduler, struct vy_index *index)
+{
+	assert(index->pin_count > 0);
+	index->pin_count--;
+	if (index->pin_count == 0)
+		vy_scheduler_add_index(scheduler, index);
 }
 
 static void
