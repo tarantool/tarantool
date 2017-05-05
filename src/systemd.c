@@ -53,7 +53,6 @@ int systemd_init() {
 		say_info("systemd: NOTIFY_SOCKET variable is empty, skipping");
 		return -1;
 	}
-	say_info("systemd: path to socket is '%s'", sd_unix_path);
 	if ((sd_unix_path[0] != '@' && sd_unix_path[0] != '/') ||
 	    (sd_unix_path[1] == '\0')) {
 		say_error("systemd: NOTIFY_SOCKET contains bad value");

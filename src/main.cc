@@ -303,8 +303,6 @@ daemonize()
 	default:                                    /* parent */
 		/* Tell systemd about new main program using */
 		errno = 0;
-		systemd_snotify("MAINPID=%lu", (unsigned long) pid);
-
 		master_pid = pid;
 		exit(EXIT_SUCCESS);
 	}
@@ -655,9 +653,8 @@ main(int argc, char **argv)
 		start_loop = start_loop && ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
-			systemd_snotify("READY=1\n"
-					"STATUS=entering the event loop");
 			say_crit("entering the event loop");
+			systemd_snotify("READY=1");
 			ev_now_update(loop());
 			ev_run(loop(), 0);
 		}
