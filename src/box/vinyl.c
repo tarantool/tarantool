@@ -153,6 +153,8 @@ struct vy_env {
 	struct vy_run_env run_env;
 	/** Local recovery context. */
 	struct vy_recovery *recovery;
+	/** Local recovery vclock. */
+	const struct vclock *recovery_vclock;
 };
 
 #define vy_crcs(p, size, crc) \
@@ -3445,7 +3447,6 @@ vy_tx_write_prepare(struct txv *v, int64_t generation)
  * @param index Index to write to.
  * @param mem In-memory tree to write to.
  * @param stmt Statement allocated from malloc().
- * @param status Vinyl engine status.
  * @param region_stmt NULL or the same statement as stmt,
  *                    but allocated on lsregion.
  * @param status Vinyl engine status.
@@ -3455,28 +3456,11 @@ vy_tx_write_prepare(struct txv *v, int64_t generation)
  */
 static int
 vy_tx_write(struct vy_index *index, struct vy_mem *mem,
-	    struct tuple *stmt, const struct tuple **region_stmt,
-	    enum vy_status status)
+	    struct tuple *stmt, const struct tuple **region_stmt)
 {
 	assert(!vy_stmt_is_region_allocated(stmt));
 	assert(*region_stmt == NULL ||
 	       vy_stmt_is_region_allocated(*region_stmt));
-
-	/*
-	 * If we're recovering the WAL, it may happen so that this
-	 * particular run was dumped after the checkpoint, and we're
-	 * replaying records already present in the database. In this
-	 * case avoid overwriting a newer version with an older one.
-	 *
-	 * If the index is going to be dropped on WAL recovery,
-	 * there's no point in replaying statements for it either.
-	 */
-	if (status == VINYL_FINAL_RECOVERY_LOCAL) {
-		if (index->is_dropped)
-			return 0;
-		if (vy_stmt_lsn(stmt) <= index->dump_lsn)
-			return 0;
-	}
 
 	int rc = vy_index_set(index, mem, stmt, region_stmt);
 
@@ -5917,6 +5901,48 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
  */
 
 /**
+ * Check if a request has already been committed to an index.
+ *
+ * If we're recovering the WAL, it may happen so that this
+ * particular run was dumped after the checkpoint, and we're
+ * replaying records already present in the database. In this
+ * case avoid overwriting a newer version with an older one.
+ *
+ * If the index is going to be dropped on WAL recovery,
+ * there's no point in replaying statements for it either.
+ */
+static inline bool
+vy_is_committed_one(struct vy_tx *tx, struct vy_index *index)
+{
+	struct vy_env *env = tx->xm->env;
+	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
+		return false;
+	if (index->is_dropped)
+		return true;
+	if (vclock_sum(env->recovery_vclock) <= index->dump_lsn)
+		return true;
+	return false;
+}
+
+/**
+ * Check if a request has already been committed to a space.
+ * See also vy_is_committed_one().
+ */
+static inline bool
+vy_is_committed(struct vy_tx *tx, struct space *space)
+{
+	struct vy_env *env = tx->xm->env;
+	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
+		return false;
+	for (uint32_t iid = 0; iid < space->index_count; iid++) {
+		struct vy_index *index = vy_index(space->index[iid]);
+		if (!vy_is_committed_one(tx, index))
+			return false;
+	}
+	return true;
+}
+
+/**
  * Get a vinyl tuple from the index by the key.
  * @param tx          Current transaction.
  * @param index       Index in which search.
@@ -6046,7 +6072,7 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
  * @retval  0 Success.
  * @retval -1 Memory error or duplicate key error.
  */
-int
+static int
 vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		    struct tuple *stmt)
 {
@@ -6155,6 +6181,8 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL) /* space has no primary key */
 		return -1;
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(tx, pk));
 	struct index_def *def = pk->index_def;
 	assert(def->iid == 0);
 	new_stmt = vy_stmt_new_replace(space->format, request->tuple,
@@ -6187,6 +6215,8 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index;
 		index = vy_index(space->index[iid]);
+		if (vy_is_committed_one(tx, index))
+			continue;
 		/*
 		 * Delete goes first, so if old and new keys
 		 * fully match, there is no look up beyond the
@@ -6334,11 +6364,14 @@ vy_index_full_by_key(struct vy_tx *tx, struct vy_index *index, const char *key,
  * @retval -1 Memory error or the index is not found.
  */
 static inline int
-vy_delete_impl(struct vy_tx *tx, struct space *space, const struct tuple *tuple)
+vy_delete_impl(struct vy_tx *tx, struct space *space,
+	       const struct tuple *tuple)
 {
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(tx, pk));
 	struct tuple *delete =
 		vy_stmt_new_surrogate_delete(space->format, tuple);
 	if (delete == NULL)
@@ -6350,6 +6383,8 @@ vy_delete_impl(struct vy_tx *tx, struct space *space, const struct tuple *tuple)
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
+		if (vy_is_committed_one(tx, index))
+			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
 	}
@@ -6364,6 +6399,8 @@ int
 vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)
 {
+	if (vy_is_committed(tx, space))
+		return 0;
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
@@ -6481,6 +6518,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	if (vy_is_committed(tx, space))
+		return 0;
 	struct vy_index *index = vy_index_find_unique(space, request->index_id);
 	if (index == NULL)
 		return -1;
@@ -6499,6 +6538,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk != NULL);
 	assert(pk->index_def->iid == 0);
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(tx, pk));
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
@@ -6561,6 +6602,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(delete != NULL);
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
+		if (vy_is_committed_one(tx, index))
+			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
 		if (vy_insert_secondary(tx, index, stmt->new_tuple))
@@ -6615,7 +6658,7 @@ vy_insert_first_upsert(struct vy_tx *tx, struct space *space,
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
-int
+static int
 vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 	  const char *tuple, const char *tuple_end,
 	  const char *expr, const char *expr_end)
@@ -6640,6 +6683,8 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	  struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	if (vy_is_committed(tx, space))
+		return 0;
 	/* Check update operations. */
 	if (tuple_update_check_ops(region_aligned_alloc_cb, &fiber()->gc,
 				   request->ops, request->ops_end,
@@ -6658,6 +6703,8 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	struct vy_index *pk = vy_index_find(space, 0);
 	if (pk == NULL)
 		return -1;
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(tx, pk));
 	if (tuple_validate_raw(space->format, tuple))
 		return -1;
 
@@ -6762,6 +6809,8 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(delete != NULL);
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
+		if (vy_is_committed_one(tx, index))
+			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
 		if (vy_insert_secondary(tx, index, stmt->new_tuple) != 0)
@@ -6819,6 +6868,8 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	   struct request *request)
 {
 	struct vy_env *env = tx->xm->env;
+	if (vy_is_committed(tx, space))
+		return 0;
 	/* Check the tuple fields. */
 	if (tuple_validate_raw(space->format, request->tuple))
 		return -1;
@@ -7029,7 +7080,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	int count = 0, write_count = 0;
 	const struct tuple *delete = NULL, *replace = NULL;
-	enum vy_status status = env->status;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
@@ -7055,7 +7105,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &replace;
-		if (vy_tx_write(index, v->mem, v->stmt, region_stmt, status) != 0)
+		if (vy_tx_write(index, v->mem, v->stmt, region_stmt) != 0)
 			return -1;
 		v->region_stmt = *region_stmt;
 		write_count++;
@@ -7362,17 +7412,18 @@ vy_bootstrap(struct vy_env *e)
 }
 
 int
-vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock)
+vy_begin_initial_recovery(struct vy_env *e,
+			  const struct vclock *recovery_vclock)
 {
 	assert(e->status == VINYL_OFFLINE);
-	if (vclock != NULL) {
-		e->xm->lsn = vclock_sum(vclock);
+	if (recovery_vclock != NULL) {
+		e->xm->lsn = vclock_sum(recovery_vclock);
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
-		e->recovery = vy_log_begin_recovery(vclock);
+		e->recovery_vclock = recovery_vclock;
+		e->recovery = vy_log_begin_recovery(recovery_vclock);
 		if (e->recovery == NULL)
 			return -1;
 	} else {
-		e->xm->lsn = 0;
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_bootstrap() != 0)
@@ -7430,6 +7481,7 @@ vy_end_recovery(struct vy_env *e)
 				    vy_end_recovery_cb, e);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
+		e->recovery_vclock = NULL;
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;

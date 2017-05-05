@@ -78,9 +78,8 @@ void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
 void Engine::bootstrap()
 {}
 
-void Engine::beginInitialRecovery(struct vclock *vclock)
+void Engine::beginInitialRecovery(const struct vclock *)
 {
-	(void) vclock;
 }
 
 void Engine::beginFinalRecovery()
@@ -287,12 +286,12 @@ engine_bootstrap()
 }
 
 void
-engine_begin_initial_recovery(struct vclock *vclock)
+engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginInitialRecovery(vclock);
+		engine->beginInitialRecovery(recovery_vclock);
 	}
 }
 

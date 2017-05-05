@@ -90,9 +90,9 @@ VinylEngine::bootstrap()
 }
 
 void
-VinylEngine::beginInitialRecovery(struct vclock *vclock)
+VinylEngine::beginInitialRecovery(const struct vclock *recovery_vclock)
 {
-	if (vy_begin_initial_recovery(env, vclock) != 0)
+	if (vy_begin_initial_recovery(env, recovery_vclock) != 0)
 		diag_raise();
 }
 
