@@ -103,7 +103,7 @@ extern char strict_lua[],
 	title_lua[],
 	env_lua[],
 	trigger_lua[],
-	ext_string_lua[],
+	string_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -115,7 +115,7 @@ static const char *lua_modules[] = {
 	"errno", errno_lua,
 	"fiber", fiber_lua,
 	"env", env_lua,
-	"ext_string", ext_string_lua,
+	"string", string_lua,
 	"buffer", buffer_lua,
 	"msgpackffi", msgpackffi_lua,
 	"crypto", crypto_lua,
@@ -131,7 +131,6 @@ static const char *lua_modules[] = {
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
-	"ext_string", ext_string_lua,
 	"internal.argparse", argparse_lua,
 	"internal.trigger", trigger_lua,
 	/* jit.* library */
