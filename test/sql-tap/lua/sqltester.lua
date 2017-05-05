@@ -1,4 +1,5 @@
 local tap = require('tap')
+local yaml = require('yaml')
 
 local test = tap.test("errno")
 
@@ -6,13 +7,13 @@ local function flatten(arr)
     local result = { }
 
     local function flatten(arr)
-	for _, v in ipairs(arr) do
-	    if type(v) == "table" then
-		flatten(v)
-	    else
-		table.insert(result, v)
-	    end
-	end
+        for _, v in ipairs(arr) do
+            if type(v) == "table" then
+                flatten(v)
+            else
+                table.insert(result, v)
+            end
+        end
     end
     flatten(arr)
     return result
@@ -24,17 +25,17 @@ end
 -- Input must be a table.
 local function fix_result(arr)
     for i, v in ipairs(arr) do
-	if type(v) == 'table' then
-	    fix_expect(v)
-	else
-	    if type(v) == 'boolean' then
-		if v then
-		    arr[i] = 1
-		else
-		    arr[i] = 0
-		end
-	    end
-	end
+        if type(v) == 'table' then
+            fix_expect(v)
+        else
+            if type(v) == 'boolean' then
+                if v then
+                    arr[i] = 1
+                else
+                    arr[i] = 0
+                end
+            end
+        end
     end
 end
 
@@ -47,27 +48,40 @@ test.finish_test = finish_test
 local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
     if ok then
-	if result == nil then result = { } end
-	-- Convert all trues and falses to 1s and 0s
-	fix_result(result)
-	-- If expected result is single line of a form '/ ... /' - then
-	-- search for string in the result
-	if table.getn(expect) == 1
-	    and string.sub(expect[1], 1, 1) == '/'
-	    and string.sub(expect[1], -1) == '/' then
-	    local exp = expect[1]
-	    local exp_trimmed = string.sub(exp, 2, string.len(exp) - 2)
-	    for _, v in ipairs(result) do
-		if string.find(v, exp_trimmed) then
-		    return test:ok(self, label)
-		end
-	    end
-	    return test:fail(self, label)
-	else
-	    self:is_deeply(result, expect, label)
-	end
+        if result == nil then result = { } end
+        -- Convert all trues and falses to 1s and 0s
+        fix_result(result)
+        -- If expected result is single line of a form '/ ... /' - then
+        -- search for string in the result
+        if type(expect) == 'table' and table.getn(expect) == 1
+            and string.sub(expect[1], 1, 1) == '/'
+            and string.sub(expect[1], -1) == '/' then
+            local exp = expect[1]
+            local exp_trimmed = string.sub(exp, 2, string.len(exp) - 2)
+            for _, v in ipairs(result) do
+                if string.find(v, exp_trimmed) then
+                    return test:ok(self, label)
+                end
+            end
+            return test:fail(self, label)
+        else
+            -- If nothing is expected: just make sure there were no error.
+            if expect == nil then
+                if table.getn(result) ~= 0 and result[1] ~= 0 then
+                    test:fail(self, label)
+                else
+                    test:ok(self, label)
+                end
+            else
+                if not self:is_deeply(result, expect, label) then
+                    io.write(string.format('%s: Miscompare\n', label))
+                    io.write("Expected: ", yaml.encode(expect))
+                    io.write("Got: ", yaml.encode(result))
+                end
+            end
+        end
     else
-	self:fail(label)
+        self:fail(label)
        --io.stderr:write(string.format('%s: ERROR\n', label))
     end
 end
@@ -79,9 +93,9 @@ local function execsql(self, sql)
 
     result = flatten(result)
     for i, c in ipairs(result) do
-	if c == nil then
-	    result[i] = ""
-	end
+        if c == nil then
+            result[i] = ""
+        end
     end
     return result
 end
@@ -90,19 +104,16 @@ test.execsql = execsql
 local function catchsql(self, sql)
     r = {pcall(execsql, self, sql)}
     if r[1] == true then
-	r[1] = 0
-	r[2] = table.concat(r[2], " ") -- flatten result
+        r[1] = 0
+        r[2] = table.concat(r[2], " ") -- flatten result
     else
-	r[1] = 1
+        r[1] = 1
     end
     return r
 end
 test.catchsql = catchsql
 
 local function do_catchsql_test(self, label, sql, expect)
-    if expect[1] == 1 then
-	-- expect[2] = table.concat(expect[2], " ")
-    end
     return do_test(self, label, function() return catchsql(self, sql) end, expect)
 end
 test.do_catchsql_test = do_catchsql_test
@@ -161,15 +172,15 @@ local function lsearch(self, input, seed)
     local result = 0
 
     local function search(arr)
-	if type(arr) == 'table' then
-	    for _, v in ipairs(arr) do
-		search(v)
-	    end
-	else
-	    if type(arr) == 'string' and arr:find(seed) ~= nil then
-		result = result + 1
-	    end
-	end
+        if type(arr) == 'table' then
+            for _, v in ipairs(arr) do
+                search(v)
+            end
+        else
+            if type(arr) == 'string' and arr:find(seed) ~= nil then
+                result = result + 1
+            end
+        end
     end
 
     search(input)
