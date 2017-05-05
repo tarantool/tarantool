@@ -34,6 +34,7 @@
 
 #include <say.h>
 #include <scoped_guard.h>
+#include "systemd.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -77,6 +78,7 @@ static void title(const char *new_status)
 	snprintf(status, sizeof(status), "%s", new_status);
 	title_set_status(new_status);
 	title_update();
+	systemd_snotify("STATUS=%s", status);
 }
 
 bool box_snapshot_is_in_progress = false;
