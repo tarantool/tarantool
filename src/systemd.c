@@ -47,6 +47,7 @@
 static int systemd_fd = -1;
 static const char *sd_unix_path = NULL;
 
+#ifdef WITH_SYSTEMD
 int systemd_init() {
 	sd_unix_path = getenv("NOTIFY_SOCKET");
 	if (sd_unix_path == NULL) {
@@ -59,7 +60,10 @@ int systemd_init() {
 		goto error;
 	}
 	/* To be sure, that path to unix socket is OK */
-	struct sockaddr_un sa = { 0 };
+	struct sockaddr_un sa = {
+		.sun_family = AF_UNIX,
+		.sun_path = { '\0' }
+	};
 	if (strlen(sd_unix_path) >= sizeof(sa.sun_path)) {
 		say_error("systemd: NOTIFY_SOCKET is longer that MAX_UNIX_PATH");
 		goto error;
@@ -147,3 +151,10 @@ systemd_snotify(const char *format, ...)
 	va_end(args);
 	return res;
 }
+#else /* TARGET_OS_LINUX */
+#  define systemd_init()
+#  define systemd_free()
+#  define systemd_notify(...)
+#  define systemd_vsnotify(...)
+#  define systemd_snotify(...)
+#endif /* TARGET_OS_LINUX */
