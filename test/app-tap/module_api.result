@@ -1,6 +1,6 @@
 TAP version 13
 # module_api
-1..19
+1..21
 ok - module is loaded
 ok - test_touint64 is ok
 ok - test_checkint64 is ok
@@ -11,7 +11,9 @@ ok - test_cord is ok
 ok - test_key_def_api2 is ok
 ok - test_coio_getaddrinfo is ok
 ok - test_pushint64 is ok
+ok - test_cpcall is ok
 ok - test_coio_call is ok
+ok - test_call is ok
 ok - test_checkuint64 is ok
 ok - test_key_def_api is ok
 ok - test_clock is ok
