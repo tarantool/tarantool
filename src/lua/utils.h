@@ -451,6 +451,12 @@ luaT_call(lua_State *L, int nargs, int nreturns);
 LUA_API int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
 
+/*
+ * Get lua global state (tarantool_L)
+ */
+LUA_API lua_State *
+luaT_state(void);
+
 /** \endcond public */
 
 void
