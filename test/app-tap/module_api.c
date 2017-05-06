@@ -417,6 +417,15 @@ test_cpcall(lua_State *L)
   return 1;
 }
 
+static int
+test_state(lua_State *L)
+{
+  lua_State *tarantool_L = luaT_state();
+  assert(lua_newthread(tarantool_L) != 0);
+  lua_pushboolean(L, true);
+  return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -443,6 +452,7 @@ luaopen_module_api(lua_State *L)
 		{"check_error", check_error},
 		{"test_call", test_call},
 		{"test_cpcall", test_cpcall},
+		{"test_state", test_state},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

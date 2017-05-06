@@ -114,7 +114,7 @@ luaT_istuple
 luaT_error
 luaT_call
 luaT_cpcall
-tarantool_L
+luaT_state
 box_txn
 box_txn_begin
 box_txn_commit
