@@ -2985,8 +2985,6 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto out;
-		run->info.min_lsn = record->min_lsn;
-		run->info.max_lsn = record->max_lsn;
 		char index_path[PATH_MAX];
 		vy_run_snprint_path(index_path, sizeof(index_path),
 				    index->path, run->id, VY_FILE_INDEX);
@@ -3005,6 +3003,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			vy_run_delete(run);
 			goto out;
 		}
+		run->info.min_lsn = record->min_lsn;
+		run->info.max_lsn = record->max_lsn;
 		break;
 	case VY_LOG_INSERT_RANGE:
 		range = vy_range_new(index, record->range_id, begin, end);
