@@ -249,9 +249,9 @@ VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 
 
 int
-VinylEngine::prepareWaitCheckpoint(struct vclock *vclock)
+VinylEngine::beginCheckpoint()
 {
-	return vy_checkpoint(env, vclock);
+	return vy_begin_checkpoint(env);
 }
 
 int

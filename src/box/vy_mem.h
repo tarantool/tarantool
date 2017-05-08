@@ -137,12 +137,6 @@ struct vy_mem {
 	 * allocated in it.
 	 */
 	struct rlist in_dump_fifo;
-	/**
-	 * Link in scheduler->checkpoint_fifo list. The mem
-	 * is added to the list when it receives the first
-	 * committed change.
-	 */
-	struct rlist in_checkpoint_fifo;
 	/** BPS tree */
 	struct vy_mem_tree tree;
 	/** The total size of all tuples in this tree in bytes */
@@ -150,24 +144,19 @@ struct vy_mem {
 	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
 	int64_t max_lsn;
-	/**
-	 * The minimum lsregion ID that was allocated for this mem.
-	 * When a mem is dumped, memory can be reclaimed by
-	 * lsregion  up to this id.
-	 */
-	int64_t lsregion_id;
 	/* A key definition for this index. */
 	const struct key_def *key_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Schema version at the time of creation. */
 	uint32_t schema_version;
-	/** Snapshot version at the time of creation. */
-	uint32_t snapshot_version;
+	/**
+	 * Generation of statements stored in the tree.
+	 * Used as lsregion allocator identifier.
+	 */
+	int64_t generation;
 	/** Allocator for extents */
 	struct lsregion *allocator;
-	/** The last LSN for lsregion allocator */
-	const int64_t *allocator_lsn;
 	/**
 	 * Format of vy_mem REPLACE and DELETE tuples without
 	 * column mask.
@@ -231,17 +220,18 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  * Instantiate a new in-memory level.
  *
  * @param allocator lsregion allocator to use for BPS tree extents
- * @param allocator_lsn a pointer to the latest LSN for lsregion.
+ * @param generation Generation of statements stored in the tree.
  * @param key_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
  * @param upsert_format Format for UPSERT tuples.
+ * @param schema_version Schema version.
  * @retval new vy_mem instance on success.
  * @retval NULL on error, check diag.
  */
 struct vy_mem *
-vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
+vy_mem_new(struct lsregion *allocator, int64_t generation,
 	   const struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version);

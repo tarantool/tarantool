@@ -35,7 +35,6 @@
 #include <trivia/util.h>
 #include <small/lsregion.h>
 #include "diag.h"
-#include "box.h"
 
 /** {{{ vy_mem */
 
@@ -43,9 +42,8 @@ static void *
 vy_mem_tree_extent_alloc(void *ctx)
 {
 	struct vy_mem *mem = (struct vy_mem *) ctx;
-	assert(mem->allocator != NULL && mem->allocator_lsn != NULL);
 	void *ret = lsregion_alloc(mem->allocator, VY_MEM_TREE_EXTENT_SIZE,
-				   *mem->allocator_lsn);
+				   mem->generation);
 	if (ret == NULL)
 		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
 			 "ret");
@@ -61,7 +59,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 struct vy_mem *
-vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
+vy_mem_new(struct lsregion *allocator, int64_t generation,
 	   const struct key_def *key_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version)
@@ -74,14 +72,12 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 	}
 	index->min_lsn = INT64_MAX;
 	index->max_lsn = -1;
-	index->lsregion_id = INT64_MAX;
 	index->used = 0;
 	index->key_def = key_def;
 	index->version = 0;
+	index->generation = generation;
 	index->schema_version = schema_version;
-	index->snapshot_version = snapshot_version;
 	index->allocator = allocator;
-	index->allocator_lsn = allocator_lsn;
 	index->format = format;
 	tuple_format_ref(format, 1);
 	index->format_with_colmask = format_with_colmask;
@@ -93,7 +89,6 @@ vy_mem_new(struct lsregion *allocator, const int64_t *allocator_lsn,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_sealed);
 	rlist_create(&index->in_dump_fifo);
-	rlist_create(&index->in_checkpoint_fifo);
 	index->pin_count = 0;
 	ipc_cond_create(&index->pin_cond);
 	return index;
@@ -160,12 +155,6 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	const struct tuple *replaced_stmt = NULL;
 	if (vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt))
 		return -1;
-	/*
-	 * Statement LSN is a commit sequence number here, not
-	 * transaction sequence number.
-	 */
-	if (mem->lsregion_id == INT64_MAX)
-		mem->lsregion_id = vy_stmt_lsn(stmt);
 	/*
 	 * All iterators begin to see the new statement, and
 	 * will be aborted in case of rollback.

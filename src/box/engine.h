@@ -153,12 +153,6 @@ public:
 	 */
 	virtual int beginCheckpoint();
 	/**
-	 * Prepare to wait for a checkpoint.
-	 * Called right after WAL checkpoint.
-	 * Must not yield.
-	 */
-	virtual int prepareWaitCheckpoint(struct vclock *vclock);
-	/**
 	 * Wait for a checkpoint to complete.
 	 */
 	virtual int waitCheckpoint(struct vclock *vclock);

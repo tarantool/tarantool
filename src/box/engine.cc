@@ -117,13 +117,6 @@ Engine::beginCheckpoint()
 }
 
 int
-Engine::prepareWaitCheckpoint(struct vclock *vclock)
-{
-	(void) vclock;
-	return 0;
-}
-
-int
 Engine::waitCheckpoint(struct vclock *vclock)
 {
 	(void) vclock;
@@ -339,11 +332,6 @@ int
 engine_commit_checkpoint(struct vclock *vclock)
 {
 	Engine *engine;
-	/* prepare to wait */
-	engine_foreach(engine) {
-		if (engine->prepareWaitCheckpoint(vclock) < 0)
-			return -1;
-	}
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
 		if (engine->waitCheckpoint(vclock) < 0)
