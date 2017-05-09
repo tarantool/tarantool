@@ -3944,6 +3944,8 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	if (new_slice != NULL)
 		vy_index_acct_run(index, run);
+	else
+		vy_run_discard(run);
 
 	/*
 	 * Replace compacted slices with the resulting slice.
