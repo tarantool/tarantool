@@ -94,7 +94,7 @@ enum vy_log_record_type {
 	VY_LOG_PREPARE_RUN		= 4,
 	/**
 	 * Commit a vinyl run file creation.
-	 * Requires vy_log_record::index_lsn, run_id.
+	 * Requires vy_log_record::index_lsn, run_id, dump_lsn.
 	 *
 	 * Written after a run file was successfully created.
 	 */
@@ -175,7 +175,7 @@ struct vy_log_record {
 	uint32_t space_id;
 	/** Index key definition. */
 	const struct key_def *key_def;
-	/** LSN of the last index dump. */
+	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
@@ -348,10 +348,9 @@ typedef int
  * files. If the callback returns a non-zero value, the function stops
  * iteration over ranges and runs and returns error.
  * To ease the work done by the callback, records corresponding to
- * slices of a range always go right after the range, while an index's
- * runs go after the index and before its ranges. However, the order
- * of ranges or runs within an index or slices within a range is
- * arbitrary.
+ * slices of a range always go right after the range, in the
+ * chronological order, while an index's runs go after the index
+ * and before its ranges.
  *
  * If @include_deleted is set, this function will also iterate over
  * deleted objects, issuing the corresponding "delete" record for each
@@ -445,7 +444,7 @@ vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 
 /** Helper to log a vinyl run creation. */
 static inline void
-vy_log_create_run(int64_t index_lsn, int64_t run_id)
+vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
@@ -453,6 +452,7 @@ vy_log_create_run(int64_t index_lsn, int64_t run_id)
 	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.run_id = run_id;
+	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
 }
 

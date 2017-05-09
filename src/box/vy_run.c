@@ -131,6 +131,7 @@ vy_run_new(int64_t id)
 	}
 	memset(&run->info, 0, sizeof(run->info));
 	run->id = id;
+	run->dump_lsn = -1;
 	run->fd = -1;
 	run->slice_count = 0;
 	TRASH(&run->info.bloom);

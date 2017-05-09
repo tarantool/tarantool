@@ -3013,6 +3013,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto out;
+		run->dump_lsn = record->dump_lsn;
 		char index_path[PATH_MAX];
 		vy_run_snprint_path(index_path, sizeof(index_path),
 				    index->path, run->id, VY_FILE_INDEX);
@@ -3052,14 +3053,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(range != NULL);
 		assert(range->id == record->range_id);
 		mh_int_t k = mh_i64ptr_find(run_hash, record->run_id, NULL);
-		if (k == mh_end(run_hash)) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Slice %lld created for"
-					    "unregistered run %lld",
-					    (long long)record->slice_id,
-					    (long long)record->run_id));
-			goto out;
-		}
+		assert(k != mh_end(run_hash));
 		run = mh_i64ptr_node(run_hash, k)->val;
 		slice = vy_slice_new(record->slice_id, run,
 				     begin, end, &index_def->key_def);
@@ -3077,59 +3071,6 @@ out:
 	if (end != NULL)
 		tuple_unref(end);
 	return success ? 0 : -1;
-}
-
-/**
- * Callback passed to qsort() to sort slices by
- * run's max_lsn descending.
- */
-static int
-vy_slice_cmp(const void *p1, const void *p2)
-{
-	int64_t lsn1 = (*(const struct vy_slice **)p1)->run->info.max_lsn;
-	int64_t lsn2 = (*(const struct vy_slice **)p2)->run->info.max_lsn;
-	if (lsn1 > lsn2)
-		return -1;
-	if (lsn1 < lsn2)
-		return 1;
-	return 0;
-}
-
-/**
- * Sort a list of slices by run's max_lsn descending.
- * Return 0 on success, -1 on OOM.
- */
-static int
-vy_slice_sort(struct rlist *slice_list)
-{
-	struct vy_slice *slice, **slice_array;
-	int i, n_slices = 0;
-
-	if (rlist_empty(slice_list))
-		return 0; /* nothing to do */
-
-	rlist_foreach_entry(slice, slice_list, in_range)
-		n_slices++;
-
-	slice_array = calloc(n_slices, sizeof(*slice_array));
-	if (slice_array == NULL) {
-		diag_set(OutOfMemory, n_slices * sizeof(*slice_array),
-			 "malloc", "struct vy_slice *");
-		return -1;
-	}
-
-	i = 0;
-	rlist_foreach_entry(slice, slice_list, in_range)
-		slice_array[i++] = slice;
-
-	qsort(slice_array, n_slices, sizeof(*slice_array), vy_slice_cmp);
-
-	rlist_create(slice_list);
-	for (i = 0; i < n_slices; i++)
-		rlist_add_tail_entry(slice_list, slice_array[i], in_range);
-
-	free(slice_array);
-	return 0;
 }
 
 static int
@@ -3176,8 +3117,6 @@ vy_index_open_ex(struct vy_index *index)
 	const struct key_def *key_def = &index_def->key_def;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
 	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
-		if (vy_slice_sort(&range->slices) != 0)
-			return -1;
 		if (prev == NULL && range->begin != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
@@ -3534,8 +3473,6 @@ struct vy_task {
 	struct vy_run *run;
 	/** Write iterator producing statements for the new run. */
 	struct vy_write_iterator *wi;
-	/** Max LSN dumped by this task. */
-	int64_t dump_lsn;
 	/**
 	 * The current generation at the time of task start.
 	 * On success a dump task dumps all in-memory trees
@@ -3617,6 +3554,7 @@ vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_run *run = task->run;
+	int64_t dump_lsn = run->dump_lsn;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct tuple_format *key_format = index->env->key_format;
 	struct vy_mem *mem, *next_mem;
@@ -3633,7 +3571,7 @@ vy_task_dump_complete(struct vy_task *task)
 		 * to log index dump anyway.
 		 */
 		vy_log_tx_begin();
-		vy_log_dump_index(index->index_def->opts.lsn, task->dump_lsn);
+		vy_log_dump_index(index->index_def->opts.lsn, dump_lsn);
 		if (vy_log_tx_commit() < 0)
 			goto fail;
 		vy_run_discard(run);
@@ -3641,7 +3579,7 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 
 	assert(run->info.min_lsn > index->dump_lsn);
-	assert(run->info.max_lsn <= task->dump_lsn);
+	assert(run->info.max_lsn <= dump_lsn);
 
 	/*
 	 * Figure out which ranges intersect the new run.
@@ -3693,7 +3631,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_run(index->index_def->opts.lsn, run->id);
+	vy_log_create_run(index->index_def->opts.lsn, run->id, dump_lsn);
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		assert(i < index->range_count);
@@ -3704,7 +3642,7 @@ vy_task_dump_complete(struct vy_task *task)
 
 		fiber_reschedule(); /* see comment above */
 	}
-	vy_log_dump_index(index->index_def->opts.lsn, task->dump_lsn);
+	vy_log_dump_index(index->index_def->opts.lsn, dump_lsn);
 	if (vy_log_tx_commit() < 0)
 		goto fail_free_slices;
 
@@ -3754,7 +3692,7 @@ delete_mems:
 		vy_mem_delete(mem);
 	}
 	index->version++;
-	index->dump_lsn = task->dump_lsn;
+	index->dump_lsn = dump_lsn;
 	index->generation = task->generation;
 
 	/* The iterator has been cleaned up in a worker thread. */
@@ -3867,8 +3805,6 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 		return 0;
 	}
 
-	assert(dump_lsn >= 0);
-
 	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
@@ -3876,6 +3812,9 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 	struct vy_run *run = vy_run_prepare(index);
 	if (run == NULL)
 		goto err_run;
+
+	assert(dump_lsn >= 0);
+	run->dump_lsn = dump_lsn;
 
 	struct vy_write_iterator *wi;
 	bool is_last_level = (index->run_count == 0);
@@ -3897,7 +3836,6 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 	task->run = run;
 	task->wi = wi;
-	task->dump_lsn = dump_lsn;
 	task->generation = generation;
 	task->max_output_count = max_output_count;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
@@ -3988,7 +3926,8 @@ vy_task_compact_complete(struct vy_task *task)
 			break;
 	}
 	if (new_slice != NULL) {
-		vy_log_create_run(index->index_def->opts.lsn, run->id);
+		vy_log_create_run(index->index_def->opts.lsn,
+				  run->id, run->dump_lsn);
 		vy_log_insert_slice(range->id, run->id, new_slice->id,
 				    tuple_data_or_null(new_slice->begin),
 				    tuple_data_or_null(new_slice->end));
@@ -4129,6 +4068,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 			goto err_wi_sub;
 
 		task->max_output_count += slice->keys;
+		run->dump_lsn = MAX(run->dump_lsn, slice->run->dump_lsn);
 
 		/* Remember the slices we are compacting. */
 		if (task->first_slice == NULL)
@@ -4139,6 +4079,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 			break;
 	}
 	assert(n == 0);
+	assert(run->dump_lsn >= 0);
 
 	task->range = range;
 	task->run = run;
@@ -9051,9 +8992,6 @@ vy_send_range(struct vy_join_ctx *ctx)
 		return 0; /* nothing to do */
 
 	int rc = -1;
-	if (vy_slice_sort(&ctx->slices) != 0)
-		goto out;
-
 	ctx->wi = vy_write_iterator_new(ctx->env, ctx->key_def, ctx->key_def,
 					ctx->format, ctx->upsert_format,
 					true, 0, true, INT64_MAX);

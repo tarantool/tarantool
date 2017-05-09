@@ -126,6 +126,8 @@ struct vy_run {
 	struct vy_run_info info;
 	/** Run data file. */
 	int fd;
+	/** Max LSN stored on disk. */
+	int64_t dump_lsn;
 	/**
 	 * The number of slices created for this run.
 	 * Incremented by vy_slice_new(), decremented by

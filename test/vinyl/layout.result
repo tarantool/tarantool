@@ -130,7 +130,7 @@ result
           lsn: 5
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 1}]
+          tuple: [5, {0: 2, 2: 1, 9: 8}]
       - HEADER:
           type: INSERT
         BODY:
@@ -159,7 +159,7 @@ result
           type: INSERT
           timestamp: <timestamp>
         BODY:
-          tuple: [5, {0: 2, 2: 2}]
+          tuple: [5, {0: 2, 2: 2, 9: 11}]
       - HEADER:
           lsn: 8
           type: INSERT
