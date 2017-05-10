@@ -59,7 +59,10 @@ int systemd_init() {
 		goto error;
 	}
 	/* To be sure, that path to unix socket is OK */
-	struct sockaddr_un sa = { 0 };
+	struct sockaddr_un sa = {
+		.sun_family = AF_UNIX,
+		.sun_path = { '\0' }
+	};
 	if (strlen(sd_unix_path) >= sizeof(sa.sun_path)) {
 		say_error("systemd: NOTIFY_SOCKET is longer that MAX_UNIX_PATH");
 		goto error;

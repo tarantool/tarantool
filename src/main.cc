@@ -440,8 +440,9 @@ load_cfg()
 			cfg_geti("log_level"),
 			cfg_geti("log_nonblock"),
 			background);
+#if defined(WITH_SYSTEMD)
 	systemd_init();
-
+#endif /* defined(WITH_SYSTEMD) */
 	if (background)
 		daemonize();
 
@@ -517,7 +518,9 @@ tarantool_free(void)
 	memory_free();
 	random_free();
 #endif
+#if defined(WITH_SYSTEMD)
 	systemd_free();
+#endif /* defined(WITH_SYSTEMD) */
 }
 
 int
@@ -654,14 +657,18 @@ main(int argc, char **argv)
 		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_crit("entering the event loop");
+#if defined(WITH_SYSTEMD)
 			systemd_snotify("READY=1");
+#endif /* defined(WITH_SYSTEMD) */
 			ev_now_update(loop());
 			ev_run(loop(), 0);
 		}
 	} catch (struct error *e) {
 		error_log(e);
+#if defined(WITH_SYSTEMD)
 		systemd_snotify("STATUS=Failed to startup: %s",
 				box_error_message(e));
+#endif /* defined(WITH_SYSTEMD) */
 		panic("%s", "fatal error, exiting the event loop");
 	} catch (...) {
 		/* This can only happen in case of a server bug. */
