@@ -1289,30 +1289,26 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
  * Handle a VY_LOG_DROP_INDEX log record.
  * This function marks the vinyl index with ID @index_lsn as dropped,
  * deletes all its ranges and slices, and drops all its runs.
- * If the index has no ranges, slices, and runs, it is freed.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
 vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 		       int64_t index_lsn)
 {
-	struct mh_i64ptr_t *h = recovery->index_hash;
-	mh_int_t k = mh_i64ptr_find(h, index_lsn, NULL);
-	if (k == mh_end(h)) {
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_lsn);
+	if (index == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Index %lld deleted but not registered",
 				    (long long)index_lsn));
 		return -1;
 	}
-	struct vy_index_recovery_info *index = mh_i64ptr_node(h, k)->val;
 	if (index->is_dropped) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Index %lld deleted twice",
 				    (long long)index_lsn));
 		return -1;
 	}
-	bool need_free = (rlist_empty(&index->runs) &&
-			  rlist_empty(&index->ranges));
 	index->is_dropped = true;
 	index->signature = signature;
 	struct vy_range_recovery_info *range, *tmp;
@@ -1327,10 +1323,6 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 			run->is_dropped = true;
 			run->signature = signature;
 		}
-	}
-	if (need_free) {
-		mh_i64ptr_del(h, k, NULL);
-		free(index);
 	}
 	return 0;
 }
@@ -2069,6 +2061,13 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 	mh_foreach(recovery->index_hash, i) {
 		struct vy_index_recovery_info *index;
 		index = mh_i64ptr_node(recovery->index_hash, i)->val;
+		/*
+		 * Purge dropped indexes that are not referenced by runs
+		 * (and thus not needed for garbage collection) from the
+		 * log on rotation.
+		 */
+		if (index->is_dropped && rlist_empty(&index->runs))
+			continue;
 		if (vy_recovery_do_iterate_index(index, include_deleted,
 						 cb, cb_arg) < 0)
 			return -1;
