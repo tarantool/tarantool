@@ -8835,35 +8835,20 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 				struct tuple **ret)
 {
 	int rc;
-	*ret = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
-	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2) {
+retry:
+	*ret = NULL;
+	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2)
 		if (vy_read_iterator_restore(itr) < 0)
 			return -1;
-		/* Check if the iterator is restored not on the same key. */
-		if (itr->curr_stmt) {
-			rc = vy_merge_iterator_next_key(mi, ret);
-			if (rc == -1)
-				return -1;
-			if (rc == -2) {
-				if (vy_read_iterator_restore(itr) < 0)
-					return -1;
-				continue;
-			}
-			/* If the iterator is empty then return. */
-			if (*ret == NULL)
-				return 0;
-			/*
-			 * If the iterator after restoration is on the same key
-			 * then go to the next.
-			 */
-			if (vy_tuple_compare(itr->curr_stmt, *ret,
-					     &itr->index->index_def->key_def) == 0)
-				continue;
-			/* Else return the new key. */
-			break;
-		}
-	}
+	/*
+	 * If the iterator after next_key is on the same key then
+	 * go to the next.
+	 */
+	if (*ret != NULL && itr->curr_stmt != NULL &&
+	    vy_tuple_compare(itr->curr_stmt, *ret,
+			     &itr->index->index_def->key_def) == 0)
+		goto retry;
 	return rc;
 }
 
@@ -8983,8 +8968,19 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			     itr->key, itr->iterator_type);
 
 clear:
-	if (prev_key != NULL)
+	if (prev_key != NULL) {
+		if (itr->curr_stmt != NULL)
+			/*
+			 * It is impossible to return fully equal
+			 * statements in sequence. At least they
+			 * must have different primary keys.
+			 * (index_def->key_def includes primary
+			 * parts).
+			 */
+			assert(vy_tuple_compare(prev_key, itr->curr_stmt,
+						&def->key_def) != 0);
 		tuple_unref(prev_key);
+	}
 
 	return rc;
 }
