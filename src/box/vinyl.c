@@ -1432,7 +1432,7 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 static struct vy_run *
 vy_run_prepare(struct vy_index *index)
 {
-	struct vy_run *run = vy_run_new(vy_log_next_run_id());
+	struct vy_run *run = vy_run_new(vy_log_next_id());
 	if (run == NULL)
 		return NULL;
 	vy_log_tx_begin();
@@ -2329,7 +2329,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 		return NULL;
 	}
 	/* Allocate a new id unless specified. */
-	range->id = (id >= 0 ? id : vy_log_next_range_id());
+	range->id = (id >= 0 ? id : vy_log_next_id());
 	if (begin != NULL) {
 		tuple_ref(begin);
 		range->begin = begin;
@@ -2555,7 +2555,7 @@ vy_range_maybe_split(struct vy_range *range)
 		 * to iterate backward.
 		 */
 		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
-			if (vy_slice_cut(slice, vy_log_next_slice_id(),
+			if (vy_slice_cut(slice, vy_log_next_id(),
 					 part->begin, part->end,
 					 &index_def->key_def, &new_slice) != 0)
 				goto fail;
@@ -3610,7 +3610,7 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
-		slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+		slice = vy_slice_new(vy_log_next_id(), new_run,
 				     range->begin, range->end,
 				     &index->index_def->key_def);
 		if (slice == NULL)
@@ -3911,7 +3911,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * compacted runs.
 	 */
 	if (!vy_run_is_empty(new_run)) {
-		new_slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+		new_slice = vy_slice_new(vy_log_next_id(), new_run,
 				NULL, NULL, &index->index_def->key_def);
 		if (new_slice == NULL)
 			return -1;

@@ -227,17 +227,9 @@ vy_log_collect_garbage(int64_t signature);
 const char *
 vy_log_backup_path(struct vclock *vclock);
 
-/** Allocate a unique ID for a vinyl run. */
+/** Allocate a unique ID for a vinyl object. */
 int64_t
-vy_log_next_run_id(void);
-
-/** Allocate a unique ID for a vinyl range. */
-int64_t
-vy_log_next_range_id(void);
-
-/** Allocate a unique ID for a vinyl run slice. */
-int64_t
-vy_log_next_slice_id(void);
+vy_log_next_id(void);
 
 /**
  * Begin a transaction in the metadata log.

@@ -157,20 +157,10 @@ struct vy_log {
 	/** Latch protecting the log buffer. */
 	struct latch latch;
 	/**
-	 * Next ID to use for a vinyl range.
-	 * Used by vy_log_next_range_id().
+	 * Next ID to use for a vinyl object.
+	 * Used by vy_log_next_id().
 	 */
-	int64_t next_range_id;
-	/**
-	 * Next ID to use for a vinyl run.
-	 * Used by vy_log_next_run_id().
-	 */
-	int64_t next_run_id;
-	/**
-	 * Next ID to use for a vinyl run slice.
-	 * Used by vy_log_next_slice_id().
-	 */
-	int64_t next_slice_id;
+	int64_t next_id;
 	/** Mempool for struct vy_log_record. */
 	struct mempool record_pool;
 	/**
@@ -211,20 +201,10 @@ struct vy_recovery {
 	/** ID -> vy_slice_recovery_info. */
 	struct mh_i64ptr_t *slice_hash;
 	/**
-	 * Maximal vinyl range ID, according to the metadata log,
-	 * or -1 in case no ranges were recovered.
+	 * Maximal vinyl object ID, according to the metadata log,
+	 * or -1 in case no vinyl objects were recovered.
 	 */
-	int64_t range_id_max;
-	/**
-	 * Maximal vinyl run ID, according to the metadata log,
-	 * or -1 in case no runs were recovered.
-	 */
-	int64_t run_id_max;
-	/**
-	 * Maximal vinyl run slice ID, according to the metadata log,
-	 * or -1 in case no slices were recovered.
-	 */
-	int64_t slice_id_max;
+	int64_t max_id;
 };
 
 /** Vinyl index info stored in a recovery context. */
@@ -820,21 +800,9 @@ vy_log_open(struct xlog *xlog)
 }
 
 int64_t
-vy_log_next_run_id(void)
+vy_log_next_id(void)
 {
-	return vy_log.next_run_id++;
-}
-
-int64_t
-vy_log_next_range_id(void)
-{
-	return vy_log.next_range_id++;
-}
-
-int64_t
-vy_log_next_slice_id(void)
-{
-	return vy_log.next_slice_id++;
+	return vy_log.next_id++;
 }
 
 int
@@ -878,10 +846,7 @@ vy_log_begin_recovery(const struct vclock *vclock)
 	if (recovery == NULL)
 		return NULL;
 
-	vy_log.next_range_id = recovery->range_id_max + 1;
-	vy_log.next_run_id = recovery->run_id_max + 1;
-	vy_log.next_slice_id = recovery->slice_id_max + 1;
-
+	vy_log.next_id = recovery->max_id + 1;
 	vy_log.recovery = recovery;
 	vclock_copy(&vy_log.last_checkpoint, vclock);
 	return recovery;
@@ -1426,8 +1391,8 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 	run->is_dropped = false;
 	run->signature = -1;
 	rlist_create(&run->in_index);
-	if (recovery->run_id_max < run_id)
-		recovery->run_id_max = run_id;
+	if (recovery->max_id < run_id)
+		recovery->max_id = run_id;
 	return run;
 }
 
@@ -1628,8 +1593,8 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 	range->signature = signature;
 	rlist_create(&range->slices);
 	rlist_add_entry(&index->ranges, range, in_index);
-	if (recovery->range_id_max < range_id)
-		recovery->range_id_max = range_id;
+	if (recovery->max_id < range_id)
+		recovery->max_id = range_id;
 	return 0;
 }
 
@@ -1742,8 +1707,8 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
 			break;
 	}
 	rlist_add_tail(&next_slice->in_range, &slice->in_range);
-	if (recovery->slice_id_max < slice_id)
-		recovery->slice_id_max = slice_id;
+	if (recovery->max_id < slice_id)
+		recovery->max_id = slice_id;
 	return 0;
 }
 
@@ -1854,9 +1819,7 @@ vy_recovery_new_f(va_list ap)
 	recovery->range_hash = NULL;
 	recovery->run_hash = NULL;
 	recovery->slice_hash = NULL;
-	recovery->range_id_max = -1;
-	recovery->run_id_max = -1;
-	recovery->slice_id_max = -1;
+	recovery->max_id = -1;
 
 	recovery->index_hash = mh_i64ptr_new();
 	recovery->range_hash = mh_i64ptr_new();
