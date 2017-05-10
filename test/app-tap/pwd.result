@@ -1,6 +1,5 @@
 TAP version 13
-1..7
-ok - checking base group equal to base user
+1..6
 ok - checking user by id
 ok - checking user by name
 ok - checking group by id

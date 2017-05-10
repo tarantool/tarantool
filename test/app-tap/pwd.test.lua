@@ -3,12 +3,10 @@
 local pwd = require("pwd")
 
 local test = require("tap").test("pwd")
-test:plan(7)
+test:plan(6)
 
 local base_group = pwd.getgr()
 local base_user  = pwd.getpw()
-test:is_deeply(base_group, base_user['group'], "checking base group equal " ..
-                                               "to base user")
 
 test:is_deeply(pwd.getpw(base_user.id),   base_user, "checking user by id")
 test:is_deeply(pwd.getpw(base_user.name), base_user, "checking user by name")
