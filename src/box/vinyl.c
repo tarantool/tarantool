@@ -544,6 +544,11 @@ struct vy_index {
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
 	vy_range_tree_t tree;
+	/**
+	 * List of all runs created for this index,
+	 * linked by vy_run->in_index.
+	 */
+	struct rlist runs;
 	/** Number of ranges in this index. */
 	int range_count;
 	/** Number of runs in all ranges. */
@@ -1330,8 +1335,10 @@ vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 }
 
 static void
-vy_index_acct_run(struct vy_index *index, struct vy_run *run)
+vy_index_add_run(struct vy_index *index, struct vy_run *run)
 {
+	assert(rlist_empty(&run->in_index));
+	rlist_add_entry(&index->runs, run, in_index);
 	index->run_count++;
 	index->page_count += run->info.count;
 	index->stmt_count += run->info.keys;
@@ -1339,8 +1346,11 @@ vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 }
 
 static void
-vy_index_unacct_run(struct vy_index *index, struct vy_run *run)
+vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 {
+	assert(index->run_count > 0);
+	assert(!rlist_empty(&run->in_index));
+	rlist_del_entry(run, in_index);
 	index->run_count--;
 	index->page_count -= run->info.count;
 	index->stmt_count -= run->info.keys;
@@ -2571,6 +2581,8 @@ vy_range_maybe_split(struct vy_range *range)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
+	rlist_foreach_entry(slice, &range->slices, in_range)
+		vy_log_delete_slice(slice->id);
 	vy_log_delete_range(range->id);
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
@@ -2808,6 +2820,8 @@ vy_range_maybe_coalesce(struct vy_range *range)
 			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_slice *slice;
+		rlist_foreach_entry(slice, &it->slices, in_range)
+			vy_log_delete_slice(slice->id);
 		vy_log_delete_range(it->id);
 		rlist_foreach_entry(slice, &it->slices, in_range) {
 			vy_log_insert_slice(result->id, slice->run->id, slice->id,
@@ -3097,7 +3111,7 @@ vy_index_open_ex(struct vy_index *index)
 					    (long long)index_def->opts.lsn));
 			rc = -1;
 		} else
-			vy_index_acct_run(index, run);
+			vy_index_add_run(index, run);
 		/* Drop the reference held by the hash. */
 		vy_run_unref(run);
 	}
@@ -3647,7 +3661,7 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * Account the new run.
 	 */
-	vy_index_acct_run(index, new_run);
+	vy_index_add_run(index, new_run);
 
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
@@ -3965,7 +3979,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * otherwise discard it.
 	 */
 	if (new_slice != NULL) {
-		vy_index_acct_run(index, new_run);
+		vy_index_add_run(index, new_run);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
 	} else
@@ -3999,7 +4013,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * Unaccount unused runs and delete compacted slices.
 	 */
 	rlist_foreach_entry(run, &unused_runs, in_unused)
-		vy_index_unacct_run(index, run);
+		vy_index_remove_run(index, run);
 	rlist_foreach_entry_safe(slice, &compacted_slices,
 				 in_range, next_slice) {
 		vy_slice_wait_pinned(slice);
@@ -5211,7 +5225,6 @@ vy_index_drop(struct vy_index *index)
 	index->is_dropped = true;
 	rlist_del(&index->link);
 	index->space = NULL;
-	vy_index_unref(index);
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -5222,13 +5235,28 @@ vy_index_drop(struct vy_index *index)
 	 * on local recovery from WAL.
 	 */
 	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && was_dropped)
-		return;
+		goto free_index;
 
 	vy_log_tx_begin();
+	for (struct vy_range *range = vy_range_tree_first(&index->tree);
+	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
+		struct vy_slice *slice;
+		rlist_foreach_entry(slice, &range->slices, in_range)
+			vy_log_delete_slice(slice->id);
+		vy_log_delete_range(range->id);
+		fiber_reschedule();
+	}
+	struct vy_run *run;
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		vy_log_drop_run(run->id);
+		fiber_reschedule();
+	}
 	vy_log_drop_index(index_id);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
 			 diag_last_error(diag_get())->errmsg);
+free_index:
+	vy_index_unref(index);
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
@@ -5380,6 +5408,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->dump_lsn = -1;
 	rlist_create(&index->sealed);
 	vy_range_tree_new(&index->tree);
+	rlist_create(&index->runs);
 	rlist_create(&index->link);
 	read_set_new(&index->read_set);
 	index->space = space;

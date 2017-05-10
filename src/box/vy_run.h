@@ -147,6 +147,8 @@ struct vy_run {
 	 * after compaction.
 	 */
 	struct rlist in_unused;
+	/** Link in vy_index::runs list. */
+	struct rlist in_index;
 };
 
 /**

@@ -1188,14 +1188,6 @@ vy_log_write(const struct vy_log_record *record)
 		vy_log.tx_begin = &tx_record->in_tx;
 }
 
-static int
-vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id);
-static int
-vy_recovery_delete_slice(struct vy_recovery *recovery, int64_t slice_id);
-static int
-vy_recovery_drop_run(struct vy_recovery *recovery,
-		     int64_t signature, int64_t run_id);
-
 /** Lookup a vinyl index in vy_recovery::index_hash map. */
 static struct vy_index_recovery_info *
 vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn)
@@ -1287,8 +1279,8 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 
 /**
  * Handle a VY_LOG_DROP_INDEX log record.
- * This function marks the vinyl index with ID @index_lsn as dropped,
- * deletes all its ranges and slices, and drops all its runs.
+ * This function marks the vinyl index with ID @index_lsn as dropped.
+ * All ranges and runs of the index must have been deleted by now.
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
@@ -1309,21 +1301,23 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 				    (long long)index_lsn));
 		return -1;
 	}
-	index->is_dropped = true;
-	index->signature = signature;
-	struct vy_range_recovery_info *range, *tmp;
-	rlist_foreach_entry_safe(range, &index->ranges, in_index, tmp) {
-		if (vy_recovery_delete_range(recovery, range->id) < 0)
-			unreachable();
+	if (!rlist_empty(&index->ranges)) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Dropped index %lld has ranges",
+				    (long long)index_lsn));
+		return -1;
 	}
-	rlist_create(&index->ranges);
 	struct vy_run_recovery_info *run;
 	rlist_foreach_entry(run, &index->runs, in_index) {
-		if (!run->is_dropped) {
-			run->is_dropped = true;
-			run->signature = signature;
+		if (!run->is_dropped && !run->is_incomplete) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Dropped index %lld has active "
+					    "runs", (long long)index_lsn));
+			return -1;
 		}
 	}
+	index->is_dropped = true;
+	index->signature = signature;
 	return 0;
 }
 
@@ -1592,8 +1586,8 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 
 /**
  * Handle a VY_LOG_DELETE_RANGE log record.
- * This function frees the vinyl range with ID @range_id
- * and all its slices.
+ * This function frees the vinyl range with ID @range_id.
+ * All slices of the range must have been deleted by now.
  * Return 0 on success, -1 if range not found.
  */
 static int
@@ -1608,10 +1602,11 @@ vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
 		return -1;
 	}
 	struct vy_range_recovery_info *range = mh_i64ptr_node(h, k)->val;
-	struct vy_slice_recovery_info *slice, *tmp;
-	rlist_foreach_entry_safe(slice, &range->slices, in_range, tmp) {
-		if (vy_recovery_delete_slice(recovery, slice->id) < 0)
-			unreachable();
+	if (!rlist_empty(&range->slices)) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Deleted range %lld has run slices",
+				    (long long)range_id));
+		return -1;
 	}
 	mh_i64ptr_del(h, k, NULL);
 	rlist_del_entry(range, in_index);
