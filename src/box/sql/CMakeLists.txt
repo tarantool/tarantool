@@ -9,7 +9,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
 set(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_command(OUTPUT keywordhash.h
-    COMMAND ${CMAKE_BINARY_DIR}/extra/mkkeywordhash > keywordhash.h)
+    COMMAND ${CMAKE_BINARY_DIR}/extra/mkkeywordhash > keywordhash.h
+    DEPENDS mkkeywordhash)
 
 add_custom_command(OUTPUT parse.h parse.c
     COMMAND ${CMAKE_BINARY_DIR}/extra/lemon -DSQLITE_OMIT_VACUUM -T${CMAKE_SOURCE_DIR}/extra/lempar.c ${SRCDIR}/parse.y
