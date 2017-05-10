@@ -301,8 +301,10 @@ vy_mem_iterator_start_from(struct vy_mem_iterator *itr,
 			   enum iterator_type iterator_type,
 			   const struct tuple *key)
 {
+	assert(! itr->search_started);
 	itr->stat->lookup_count++;
 	itr->version = itr->mem->version;
+	itr->search_started = true;
 
 	struct tree_mem_key tree_key;
 	tree_key.stmt = key;
@@ -353,7 +355,6 @@ static int
 vy_mem_iterator_start(struct vy_mem_iterator *itr)
 {
 	assert(!itr->search_started);
-	itr->search_started = true;
 
 	if (itr->before_first == NULL)
 		return vy_mem_iterator_start_from(itr, itr->iterator_type,
