@@ -151,7 +151,8 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
         file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
 
         message(STATUS "Updating submodules")
-        execute_process(COMMAND ${GIT} submodule update --init --recursive)
+        execute_process(COMMAND ${GIT} submodule update --init --recursive
+                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     endif()
 endif()
 
