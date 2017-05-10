@@ -631,7 +631,18 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		const struct tuple *was_stmt = itr->curr_stmt;
 		itr->search_started = false;
 		itr->curr_stmt = NULL;
-		vy_mem_iterator_start(itr);
+		if (last_stmt == NULL) {
+			vy_mem_iterator_start(itr);
+		} else {
+			enum iterator_type iterator_type = itr->iterator_type;
+			if (iterator_type == ITER_GT ||
+			    iterator_type == ITER_EQ)
+				iterator_type = ITER_GE;
+			else if (iterator_type == ITER_LT)
+				iterator_type = ITER_LE;
+			vy_mem_iterator_start_from(itr, iterator_type,
+						   last_stmt);
+		}
 		if (itr->curr_stmt != NULL &&
 		    vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
