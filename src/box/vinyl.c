@@ -1493,6 +1493,131 @@ vy_range_is_scheduled(struct vy_range *range)
 	return range->in_compact.pos == UINT32_MAX;
 }
 
+#define HEAP_NAME vy_dump_heap
+
+static bool
+vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
+{
+	struct vy_index *left = container_of(a, struct vy_index, in_dump);
+	struct vy_index *right = container_of(b, struct vy_index, in_dump);
+
+	/* Older indexes are dumped first. */
+	if (left->generation != right->generation)
+		return left->generation < right->generation;
+	/*
+	 * If a space has more than one index, appending a statement
+	 * to it requires reading the primary index to get the old
+	 * tuple and delete it from secondary indexes. This means that
+	 * on local recovery from WAL, the primary index must not be
+	 * ahead of secondary indexes of the same space, i.e. it must
+	 * be dumped last.
+	 */
+	return left->index_def->iid > right->index_def->iid;
+}
+
+#define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
+
+#include "salad/heap.h"
+
+#undef HEAP_LESS
+#undef HEAP_NAME
+
+#define HEAP_NAME vy_compact_heap
+
+static bool
+vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
+{
+	struct vy_range *left = container_of(a, struct vy_range, in_compact);
+	struct vy_range *right = container_of(b, struct vy_range, in_compact);
+	/*
+	 * Prefer ranges whose read amplification will be reduced
+	 * most as a result of compaction.
+	 */
+	return left->compact_priority > right->compact_priority;
+}
+
+#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
+
+#include "salad/heap.h"
+
+struct vy_scheduler {
+	pthread_mutex_t        mutex;
+	struct vy_env    *env;
+	heap_t dump_heap;
+	heap_t compact_heap;
+
+	struct cord *worker_pool;
+	struct fiber *scheduler;
+	struct ev_loop *loop;
+	/** Total number of worker threads. */
+	int worker_pool_size;
+	/** Number worker threads that are currently idle. */
+	int workers_available;
+	bool is_worker_pool_running;
+
+	/**
+	 * There is a pending task for workers in the pool,
+	 * or we want to shutdown workers.
+	 */
+	pthread_cond_t worker_cond;
+	/**
+	 * There is no pending tasks for workers, so scheduler
+	 * needs to create one, or we want to shutdown the
+	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
+	 * are used here instead of pthread_cond_t.
+	 */
+	struct ev_async scheduler_async;
+	struct ipc_cond scheduler_cond;
+	/** Used for throttling tx when quota is full. */
+	struct ipc_cond quota_cond;
+	/**
+	 * A queue with all vy_task objects created by the
+	 * scheduler and not yet taken by a worker.
+	 */
+	struct stailq input_queue;
+	/**
+	 * A queue of processed vy_tasks objects.
+	 */
+	struct stailq output_queue;
+	/**
+	 * A memory pool for vy_tasks.
+	 */
+	struct mempool task_pool;
+
+	/** Last error seen by the scheduler. */
+	struct diag diag;
+	/**
+	 * Schedule timeout. Grows exponentially with each successive
+	 * failure. Reset on successful task completion.
+	 */
+	ev_tstamp timeout;
+	/** Set if the scheduler is throttled due to errors. */
+	bool is_throttled;
+	/** Set if checkpoint is in progress. */
+	bool checkpoint_in_progress;
+	/**
+	 * Current generation of in-memory data.
+	 *
+	 * New in-memory trees inherit the current generation, while
+	 * the scheduler dumps all in-memory trees whose generation
+	 * is less. The generation is increased either on checkpoint
+	 * or on exceeding the memory quota to force dumping all old
+	 * in-memory trees.
+	 */
+	int64_t generation;
+	/**
+	 * List of all in-memory trees, scheduled for dump.
+	 * Older trees are closer to the tail of the list.
+	 */
+	struct rlist dump_fifo;
+	/**
+	 * Signaled on dump completion, i.e. as soon as all in-memory
+	 * trees whose generation is less than the current generation
+	 * have been dumped. Also signaled on any scheduler failure.
+	 */
+	struct ipc_cond dump_cond;
+};
+
 static void
 vy_scheduler_add_index(struct vy_scheduler *, struct vy_index *);
 static void
@@ -2361,14 +2486,14 @@ vy_range_new(struct vy_index *index, int64_t id,
  * while an index is being dumped.
  */
 static int
-vy_index_rotate_mem(struct vy_index *index, int64_t generation)
+vy_index_rotate_mem(struct vy_index *index)
 {
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_mem *mem;
 
 	assert(index->mem != NULL);
-	mem = vy_mem_new(allocator, generation,
+	mem = vy_mem_new(allocator, scheduler->generation,
 			 &index->index_def->key_def,
 			 index->space_format,
 			 index->space_format_with_colmask,
@@ -3380,9 +3505,10 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
  * sure it is not dumped until the transaction is complete.
  */
 static int
-vy_tx_write_prepare(struct txv *v, int64_t generation)
+vy_tx_write_prepare(struct txv *v)
 {
 	struct vy_index *index = v->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/*
 	 * Allocate a new in-memory tree if either of the following
@@ -3397,8 +3523,8 @@ vy_tx_write_prepare(struct txv *v, int64_t generation)
 	 *   statements of different formats in the same tree.
 	 */
 	if (unlikely(index->mem->schema_version != schema_version ||
-		     index->mem->generation != generation)) {
-		if (vy_index_rotate_mem(index, generation) != 0)
+		     index->mem->generation != scheduler->generation)) {
+		if (vy_index_rotate_mem(index) != 0)
 			return -1;
 	}
 	vy_mem_pin(index->mem);
@@ -3760,11 +3886,10 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
  * Create a task to dump an index.
  *
  * On success the task is supposed to dump all in-memory
- * trees older than @generation.
+ * trees older than @scheduler->generation.
  */
 static int
-vy_task_dump_new(struct mempool *pool, struct vy_index *index,
-		 int64_t generation, struct vy_task **p_task)
+vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
@@ -3774,6 +3899,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 	struct tx_manager *xm = index->env->xm;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+	int64_t generation = scheduler->generation;
 
 	assert(index->pin_count == 0);
 	assert(index->generation < generation);
@@ -3785,7 +3911,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 	/* Rotate the active tree if it needs to be dumped. */
 	if (index->mem->generation < generation &&
-	    vy_index_rotate_mem(index, generation) != 0)
+	    vy_index_rotate_mem(index) != 0)
 		goto err_mem;
 
 	/*
@@ -3821,7 +3947,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 		return 0;
 	}
 
-	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
+	struct vy_task *task = vy_task_new(&scheduler->task_pool,
+					   index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -3879,7 +4006,7 @@ err_wi_sub:
 err_wi:
 	vy_run_discard(new_run);
 err_run:
-	vy_task_delete(pool, task);
+	vy_task_delete(&scheduler->task_pool, task);
 err_task:
 	/* Leave the new mem on the list in case of failure. */
 err_mem:
@@ -4052,8 +4179,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 }
 
 static int
-vy_task_compact_new(struct mempool *pool, struct vy_range *range,
-		    struct vy_task **p_task)
+vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 {
 	assert(range->compact_priority > 1);
 
@@ -4078,7 +4204,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	if (vy_range_maybe_coalesce(range))
 		return 0;
 
-	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
+	struct vy_task *task = vy_task_new(&scheduler->task_pool,
+					   index, &compact_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -4137,7 +4264,7 @@ err_wi_sub:
 err_wi:
 	vy_run_discard(new_run);
 err_run:
-	vy_task_delete(pool, task);
+	vy_task_delete(&scheduler->task_pool, task);
 err_task:
 	say_error("%s: could not start compacting range %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
@@ -4147,131 +4274,6 @@ err_task:
 /* Scheduler Task }}} */
 
 /* {{{ Scheduler */
-
-#define HEAP_NAME vy_dump_heap
-
-static bool
-vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
-{
-	struct vy_index *left = container_of(a, struct vy_index, in_dump);
-	struct vy_index *right = container_of(b, struct vy_index, in_dump);
-
-	/* Older indexes are dumped first. */
-	if (left->generation != right->generation)
-		return left->generation < right->generation;
-	/*
-	 * If a space has more than one index, appending a statement
-	 * to it requires reading the primary index to get the old
-	 * tuple and delete it from secondary indexes. This means that
-	 * on local recovery from WAL, the primary index must not be
-	 * ahead of secondary indexes of the same space, i.e. it must
-	 * be dumped last.
-	 */
-	return left->index_def->iid > right->index_def->iid;
-}
-
-#define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
-
-#include "salad/heap.h"
-
-#undef HEAP_LESS
-#undef HEAP_NAME
-
-#define HEAP_NAME vy_compact_heap
-
-static bool
-vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
-{
-	struct vy_range *left = container_of(a, struct vy_range, in_compact);
-	struct vy_range *right = container_of(b, struct vy_range, in_compact);
-	/*
-	 * Prefer ranges whose read amplification will be reduced
-	 * most as a result of compaction.
-	 */
-	return left->compact_priority > right->compact_priority;
-}
-
-#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
-
-#include "salad/heap.h"
-
-struct vy_scheduler {
-	pthread_mutex_t        mutex;
-	struct vy_env    *env;
-	heap_t dump_heap;
-	heap_t compact_heap;
-
-	struct cord *worker_pool;
-	struct fiber *scheduler;
-	struct ev_loop *loop;
-	/** Total number of worker threads. */
-	int worker_pool_size;
-	/** Number worker threads that are currently idle. */
-	int workers_available;
-	bool is_worker_pool_running;
-
-	/**
-	 * There is a pending task for workers in the pool,
-	 * or we want to shutdown workers.
-	 */
-	pthread_cond_t worker_cond;
-	/**
-	 * There is no pending tasks for workers, so scheduler
-	 * needs to create one, or we want to shutdown the
-	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
-	 * are used here instead of pthread_cond_t.
-	 */
-	struct ev_async scheduler_async;
-	struct ipc_cond scheduler_cond;
-	/** Used for throttling tx when quota is full. */
-	struct ipc_cond quota_cond;
-	/**
-	 * A queue with all vy_task objects created by the
-	 * scheduler and not yet taken by a worker.
-	 */
-	struct stailq input_queue;
-	/**
-	 * A queue of processed vy_tasks objects.
-	 */
-	struct stailq output_queue;
-	/**
-	 * A memory pool for vy_tasks.
-	 */
-	struct mempool task_pool;
-
-	/** Last error seen by the scheduler. */
-	struct diag diag;
-	/**
-	 * Schedule timeout. Grows exponentially with each successive
-	 * failure. Reset on successful task completion.
-	 */
-	ev_tstamp timeout;
-	/** Set if the scheduler is throttled due to errors. */
-	bool is_throttled;
-	/** Set if checkpoint is in progress. */
-	bool checkpoint_in_progress;
-	/**
-	 * Current generation of in-memory data.
-	 *
-	 * New in-memory trees inherit the current generation, while
-	 * the scheduler dumps all in-memory trees whose generation
-	 * is less. The generation is increased either on checkpoint
-	 * or on exceeding the memory quota to force dumping all old
-	 * in-memory trees.
-	 */
-	int64_t generation;
-	/**
-	 * List of all in-memory trees, scheduled for dump.
-	 * Older trees are closer to the tail of the list.
-	 */
-	struct rlist dump_fifo;
-	/**
-	 * Signaled on dump completion, i.e. as soon as all in-memory
-	 * trees whose generation is less than the current generation
-	 * have been dumped. Also signaled on any scheduler failure.
-	 */
-	struct ipc_cond dump_cond;
-};
 
 /* Min and max values for vy_scheduler->timeout. */
 #define VY_SCHEDULER_TIMEOUT_MIN		1
@@ -4474,8 +4476,7 @@ retry:
 	struct vy_index *index = container_of(pn, struct vy_index, in_dump);
 	if (index->generation == scheduler->generation)
 		return 0; /* nothing to do */
-	if (vy_task_dump_new(&scheduler->task_pool, index,
-			     scheduler->generation, ptask) != 0)
+	if (vy_task_dump_new(index, ptask) != 0)
 		return -1;
 	if (*ptask == NULL)
 		goto retry; /* index dropped or all mems empty */
@@ -4506,7 +4507,7 @@ retry:
 	struct vy_range *range = container_of(pn, struct vy_range, in_compact);
 	if (range->compact_priority <= 1)
 		return 0; /* nothing to do */
-	if (vy_task_compact_new(&scheduler->task_pool, range, ptask) != 0)
+	if (vy_task_compact_new(range, ptask) != 0)
 		return -1;
 	if (*ptask == NULL)
 		goto retry; /* index dropped or range split/coalesced */
@@ -7070,7 +7071,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * Flush transactional changes to the index.
 	 * Sic: the loop below must not yield after recovery.
 	 */
-	int64_t generation = env->scheduler->generation;
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	int count = 0, write_count = 0;
 	const struct tuple *delete = NULL, *replace = NULL;
@@ -7081,7 +7081,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (v->is_read)
 			continue;
 
-		if (vy_tx_write_prepare(v, generation) != 0)
+		if (vy_tx_write_prepare(v) != 0)
 			return -1;
 		assert(v->mem != NULL);
 
