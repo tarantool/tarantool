@@ -3910,10 +3910,16 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 		return 0;
 	}
 
+	struct errinj *inj = errinj(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT);
+	if (inj != NULL && inj->iparam == (int)index->index_def->iid) {
+		diag_set(ClientError, ER_INJECTION, "vinyl index dump");
+		goto err;
+	}
+
 	/* Rotate the active tree if it needs to be dumped. */
 	if (index->mem->generation < generation &&
 	    vy_index_rotate_mem(index) != 0)
-		goto err_mem;
+		goto err;
 
 	/*
 	 * Wait until all active writes to in-memory trees
@@ -3951,7 +3957,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	struct vy_task *task = vy_task_new(&scheduler->task_pool,
 					   index, &dump_ops);
 	if (task == NULL)
-		goto err_task;
+		goto err;
 
 	struct vy_run *new_run = vy_run_prepare(index);
 	if (new_run == NULL)
@@ -4008,9 +4014,7 @@ err_wi:
 	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
-err_task:
-	/* Leave the new mem on the list in case of failure. */
-err_mem:
+err:
 	say_error("%s: could not start dump: %s", index->name,
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
