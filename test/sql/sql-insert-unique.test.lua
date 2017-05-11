@@ -20,7 +20,7 @@ box.sql.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 
 -- Cleanup
 box.sql.execute("DROP INDEX zoobar2")
-box.space.zoobar:drop()
+box.sql.execute("DROP TABLE zoobar")
 
 -- Debug
 -- require("console").start()
