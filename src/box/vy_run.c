@@ -134,6 +134,8 @@ vy_run_new(int64_t id)
 	run->dump_lsn = -1;
 	run->fd = -1;
 	run->refs = 1;
+	run->compacted_slice_count = 0;
+	rlist_create(&run->in_unused);
 	TRASH(&run->info.bloom);
 	run->info.has_bloom = false;
 	return run;

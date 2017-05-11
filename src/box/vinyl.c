@@ -3901,6 +3901,7 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_slice *slice, *next_slice, *new_slice = NULL;
+	struct vy_run *run;
 
 	/*
 	 * Allocate a slice of the new run.
@@ -3917,16 +3918,35 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 
 	/*
+	 * Build the list of runs that became unused
+	 * as a result of compaction.
+	 */
+	RLIST_HEAD(unused_runs);
+	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
+		slice->run->compacted_slice_count++;
+		if (slice == last_slice)
+			break;
+	}
+	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
+		run = slice->run;
+		if (run->compacted_slice_count == run->refs)
+			rlist_add_entry(&unused_runs, run, in_unused);
+		slice->run->compacted_slice_count = 0;
+		if (slice == last_slice)
+			break;
+	}
+
+	/*
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
 	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
 		vy_log_delete_slice(slice->id);
-		if (slice->run->refs == 1)
-			vy_log_drop_run(slice->run->id);
 		if (slice == last_slice)
 			break;
 	}
+	rlist_foreach_entry(run, &unused_runs, in_unused)
+		vy_log_drop_run(run->id);
 	if (new_slice != NULL) {
 		vy_log_create_run(index->index_def->opts.lsn,
 				  new_run->id, new_run->dump_lsn);
@@ -3965,8 +3985,6 @@ vy_task_compact_complete(struct vy_task *task)
 		vy_range_add_slice_before(range, new_slice, first_slice);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
-		if (slice->run->refs == 1)
-			vy_index_unacct_run(index, slice->run);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
 		if (slice == last_slice)
@@ -3978,8 +3996,10 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_range_update_compact_priority(range);
 
 	/*
-	 * Delete compacted slices.
+	 * Unaccount unused runs and delete compacted slices.
 	 */
+	rlist_foreach_entry(run, &unused_runs, in_unused)
+		vy_index_unacct_run(index, run);
 	rlist_foreach_entry_safe(slice, &compacted_slices,
 				 in_range, next_slice) {
 		vy_slice_wait_pinned(slice);

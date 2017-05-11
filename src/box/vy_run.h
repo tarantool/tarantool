@@ -126,6 +126,8 @@ struct vy_run {
 	struct vy_run_info info;
 	/** Run data file. */
 	int fd;
+	/** Unique ID of this run. */
+	int64_t id;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -134,8 +136,17 @@ struct vy_run {
 	 * A run is referenced by each slice created for it.
 	 */
 	int refs;
-	/** Unique ID of this run. */
-	int64_t id;
+	/**
+	 * Counter used on completion of a compaction task to check if
+	 * all slices of the run have been compacted and so the run is
+	 * not used any more and should be deleted.
+	 */
+	int64_t compacted_slice_count;
+	/**
+	 * Link in the list of runs that became unused
+	 * after compaction.
+	 */
+	struct rlist in_unused;
 };
 
 /**
