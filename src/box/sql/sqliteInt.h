@@ -157,14 +157,6 @@
 */
 #include "sqlite3.h"
 
-/*
-** Include the configuration header output by 'configure' if we're using the
-** autoconf-based build
-*/
-#ifdef _HAVE_SQLITE_CONFIG_H
-#include "sqliteConfig.h"
-#endif
-
 #include "sqliteLimit.h"
 
 /* Disable nuisance warnings on Borland compilers */

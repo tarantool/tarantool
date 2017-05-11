@@ -23,7 +23,6 @@ find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
 find_program(CTAGS ctags)
-find_program(TCLSH tclsh)
 
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
@@ -460,10 +459,6 @@ set(TARANTOOL_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 configure_file(
     "${PROJECT_SOURCE_DIR}/src/trivia/config.h.cmake"
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
-    )
-configure_file(
-    "${PROJECT_SOURCE_DIR}/src/trivia/config.h.cmake"
-    "${PROJECT_BINARY_DIR}/src/box/sql/sqliteConfig.h"
     )
 message (STATUS "")
 
