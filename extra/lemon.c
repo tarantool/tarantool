@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <libgen.h>
 
 #define ISSPACE(X) isspace((unsigned char)(X))
 #define ISDIGIT(X) isdigit((unsigned char)(X))
@@ -2972,18 +2973,30 @@ void Plink_delete(struct plink *plp)
 PRIVATE char *file_makename(struct lemon *lemp, const char *suffix)
 {
   char *name;
+  char *name_stripped;
+  char *o_dup = 0;
   char *cp;
   char *o = (user_outputname == 0 ? lemp->filename : user_outputname);
 
-  name = (char*)malloc( lemonStrlen(o) + lemonStrlen(suffix) + 5 );
+  if( user_outputname == 0 ){
+    o_dup = strdup(o);
+    name_stripped = basename(o_dup);
+    assert(name_stripped);
+  }
+  else
+    name_stripped = o;
+
+  name = (char*)malloc( lemonStrlen(name_stripped) + lemonStrlen(suffix) + 5 );
   if( name==0 ){
     fprintf(stderr,"Can't allocate space for a filename.\n");
     exit(1);
   }
-  lemon_strcpy(name,o);
+  lemon_strcpy(name,name_stripped);
   cp = strrchr(name,'.');
   if( cp ) *cp = 0;
   lemon_strcat(name,suffix);
+  if( o_dup )
+    free(o_dup);
   return name;
 }
 
