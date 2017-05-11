@@ -1438,7 +1438,7 @@ vy_run_prepare(struct vy_index *index)
 	vy_log_tx_begin();
 	vy_log_prepare_run(index->index_def->opts.lsn, run->id);
 	if (vy_log_tx_commit() < 0) {
-		vy_run_delete(run);
+		vy_run_unref(run);
 		return NULL;
 	}
 	return run;
@@ -1454,7 +1454,7 @@ vy_run_discard(struct vy_run *run)
 {
 	int64_t run_id = run->id;
 
-	vy_run_delete(run);
+	vy_run_unref(run);
 
 	ERROR_INJECT(ERRINJ_VY_RUN_DISCARD,
 		     {say_error("error injection: run %lld not discarded",
@@ -2389,10 +2389,7 @@ vy_range_delete(struct vy_range *range)
 	while (!rlist_empty(&range->slices)) {
 		struct vy_slice *slice = rlist_shift_entry(&range->slices,
 						struct vy_slice, in_range);
-		struct vy_run *run = slice->run;
 		vy_slice_delete(slice);
-		if (run->slice_count == 0)
-			vy_run_delete(run);
 	}
 
 	TRASH(range);
@@ -3021,7 +3018,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		vy_run_snprint_path(run_path, sizeof(run_path),
 				    index->path, run->id, VY_FILE_RUN);
 		if (vy_run_recover(run, index_path, run_path) != 0) {
-			vy_run_delete(run);
+			vy_run_unref(run);
 			goto out;
 		}
 		struct mh_i64ptr_node_t node = { run->id, run };
@@ -3029,7 +3026,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 				  NULL, NULL) == mh_end(run_hash)) {
 			diag_set(OutOfMemory, 0,
 				 "mh_i64ptr_put", "mh_i64ptr_node_t");
-			vy_run_delete(run);
+			vy_run_unref(run);
 			goto out;
 		}
 		break;
@@ -3093,15 +3090,16 @@ vy_index_open_ex(struct vy_index *index)
 	mh_int_t k;
 	mh_foreach(arg.run_hash, k) {
 		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
-		if (run->slice_count == 0) {
+		if (run->refs == 1) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Unused run %lld in index %lld",
 					    (long long)run->id,
 					    (long long)index_def->opts.lsn));
-			vy_run_delete(run);
 			rc = -1;
 		} else
 			vy_index_acct_run(index, run);
+		/* Drop the reference held by the hash. */
+		vy_run_unref(run);
 	}
 	mh_i64ptr_delete(arg.run_hash);
 
@@ -3651,6 +3649,9 @@ vy_task_dump_complete(struct vy_task *task)
 	 */
 	vy_index_acct_run(index, new_run);
 
+	/* Drop the reference held by the task. */
+	vy_run_unref(new_run);
+
 	/*
 	 * Add new slices to ranges.
 	 */
@@ -3732,7 +3733,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
-		vy_run_delete(task->new_run);
+		vy_run_unref(task->new_run);
 
 	vy_scheduler_add_index(scheduler, index);
 	if (index->index_def->iid != 0) {
@@ -3921,7 +3922,7 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
 		vy_log_delete_slice(slice->id);
-		if (slice->run->slice_count == 1)
+		if (slice->run->refs == 1)
 			vy_log_drop_run(slice->run->id);
 		if (slice == last_slice)
 			break;
@@ -3943,9 +3944,11 @@ vy_task_compact_complete(struct vy_task *task)
 	 * Account the new run if it is not empty,
 	 * otherwise discard it.
 	 */
-	if (new_slice != NULL)
+	if (new_slice != NULL) {
 		vy_index_acct_run(index, new_run);
-	else
+		/* Drop the reference held by the task. */
+		vy_run_unref(new_run);
+	} else
 		vy_run_discard(new_run);
 
 	/*
@@ -3962,7 +3965,7 @@ vy_task_compact_complete(struct vy_task *task)
 		vy_range_add_slice_before(range, new_slice, first_slice);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
-		if (slice->run->slice_count == 1)
+		if (slice->run->refs == 1)
 			vy_index_unacct_run(index, slice->run);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
@@ -3979,11 +3982,8 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	rlist_foreach_entry_safe(slice, &compacted_slices,
 				 in_range, next_slice) {
-		struct vy_run *run = slice->run;
 		vy_slice_wait_pinned(slice);
 		vy_slice_delete(slice);
-		if (run->slice_count == 0)
-			vy_run_delete(run);
 	}
 
 	/* The iterator has been cleaned up in worker. */
@@ -4012,7 +4012,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
-		vy_run_delete(task->new_run);
+		vy_run_unref(task->new_run);
 
 	vy_scheduler_add_range(scheduler, range);
 }
@@ -9015,11 +9015,8 @@ vy_send_range(struct vy_join_ctx *ctx)
 	fiber_set_cancellable(cancellable);
 
 	struct vy_slice *tmp;
-	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp) {
-		struct vy_run *run = slice->run;
+	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);
-		vy_run_delete(run);
-	}
 	rlist_create(&ctx->slices);
 
 out_delete_wi:
@@ -9110,8 +9107,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		rlist_add_entry(&ctx->slices, slice, in_join);
 		success = true;
 done_slice:
-		if (!success && run != NULL)
-			vy_run_delete(run);
+		if (run != NULL)
+			vy_run_unref(run);
 		if (begin != NULL)
 			tuple_unref(begin);
 		if (end != NULL)
@@ -9187,11 +9184,8 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	if (ctx->upsert_format != NULL)
 		tuple_format_ref(ctx->upsert_format, -1);
 	struct vy_slice *slice, *tmp;
-	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp) {
-		struct vy_run *run = slice->run;
+	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);
-		vy_run_delete(run);
-	}
 out_join_cord:
 	cbus_stop_loop(&ctx->relay_pipe);
 	cpipe_destroy(&ctx->relay_pipe);
