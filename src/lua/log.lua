@@ -26,17 +26,23 @@ ffi.cdef[[
     extern int log_level;
 ]]
 
+local S_FATAL    = ffi.C.S_FATAL
 local S_SYSERROR = ffi.C.S_SYSERROR
 local S_ERROR    = ffi.C.S_ERROR
+local S_CRIT     = ffi.C.S_CRIT
 local S_WARN     = ffi.C.S_WARN
 local S_INFO     = ffi.C.S_INFO
 local S_DEBUG    = ffi.C.S_DEBUG
 
+local debug_getinfo = debug.getinfo
+
 local log_level_name = setmetatable({
-    warn     = S_WARN,
+    crit     = S_CRIT,
     info     = S_INFO,
+    warn     = S_WARN,
     debug    = S_DEBUG,
     error    = S_ERROR,
+    fatal    = S_FATAL,
     syserror = S_SYSERROR,
 }, {
     __index = function(self, name)
@@ -54,7 +60,7 @@ local function get_traceback_iter(depth)
     depth = depth or 1
 
     return function()
-        local info = debug.getinfo(depth)
+        local info = debug_getinfo(depth)
         assert(type(info) == 'nil' or type(info) == 'table')
         if info == nil then
             return nil
@@ -90,7 +96,7 @@ local logger_object_methods = {
                 error(fmt, 4 + depth)
             end
         end
-        local frame = debug.getinfo(4 + depth, "Sl")
+        local frame = debug_getinfo(4 + depth, "Sl")
         local line, file = 0, 'eval'
         if type(frame) == 'table' then
             line = frame.currentline or 0
@@ -181,7 +187,7 @@ local function logger_object_new(options)
     -- prepare logger name
     local name = options.name
     if name == nil then
-        name = debug.getinfo(2).source
+        name = debug_getinfo(2).source
         if name == nil then
             name = 'internal'
         else
@@ -237,18 +243,20 @@ return setmetatable({
     info     = function(...) logger_default:info(...)     end,
     debug    = function(...) logger_default:debug(...)    end,
     trace    = function(...) logger_default:trace(...)    end,
+    -- routines
+    pid    = logger_default_pid,
+    rotate = function() ffi.C.say_logrotate(0)          end,
+    -- proxy objects configuration
+    new    = logger_object_new,
     -- level configuration
-    level    = function(lvl)
+    level_names = log_level_name
+    level       = function(lvl)
         if lvl == nil then
             return logger_default:_get_level()
         end
         return logger_default:cfg({ level = lvl })
     end,
-    -- routines
-    pid      = logger_default_pid,
-    rotate   = function() ffi.C.say_logrotate(0)          end,
-    -- proxy objects configuration
-    new      = logger_object_new,
+    _log        = function(...) logger_default:_log(...)     end,
 }, {
     __index = compat_v16,
 })
