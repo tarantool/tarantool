@@ -3470,7 +3470,7 @@ struct vy_task {
 	/** Range to compact. */
 	struct vy_range *range;
 	/** Run written by this task. */
-	struct vy_run *run;
+	struct vy_run *new_run;
 	/** Write iterator producing statements for the new run. */
 	struct vy_write_iterator *wi;
 	/**
@@ -3540,7 +3540,7 @@ vy_task_dump_execute(struct vy_task *task)
 	/* The index has been deleted from the scheduler queues. */
 	assert(index->in_dump.pos == UINT32_MAX);
 
-	return vy_run_write(task->run, index->path, task->wi,
+	return vy_run_write(task->new_run, index->path, task->wi,
 			    index->index_def->opts.page_size,
 			    &index->index_def->key_def,
 			    &index->user_index_def->key_def,
@@ -3553,17 +3553,17 @@ static int
 vy_task_dump_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
-	struct vy_run *run = task->run;
-	int64_t dump_lsn = run->dump_lsn;
+	struct vy_run *new_run = task->new_run;
+	int64_t dump_lsn = new_run->dump_lsn;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct tuple_format *key_format = index->env->key_format;
 	struct vy_mem *mem, *next_mem;
-	struct vy_slice **slices, *slice;
+	struct vy_slice **new_slices, *slice;
 	struct vy_range *range, *begin_range, *end_range;
 	struct tuple *min_key, *max_key;
 	int i;
 
-	if (vy_run_is_empty(run)) {
+	if (vy_run_is_empty(new_run)) {
 		/*
 		 * In case the run is empty, we can discard the run
 		 * and delete dumped in-memory trees right away w/o
@@ -3574,12 +3574,12 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_log_dump_index(index->index_def->opts.lsn, dump_lsn);
 		if (vy_log_tx_commit() < 0)
 			goto fail;
-		vy_run_discard(run);
+		vy_run_discard(new_run);
 		goto delete_mems;
 	}
 
-	assert(run->info.min_lsn > index->dump_lsn);
-	assert(run->info.max_lsn <= dump_lsn);
+	assert(new_run->info.min_lsn > index->dump_lsn);
+	assert(new_run->info.max_lsn <= dump_lsn);
 
 	/*
 	 * Figure out which ranges intersect the new run.
@@ -3588,10 +3588,10 @@ vy_task_dump_complete(struct vy_task *task)
 	 * intersecting the run or NULL if the run itersects all
 	 * ranges.
 	 */
-	min_key = vy_key_from_msgpack(key_format, run->info.min_key);
+	min_key = vy_key_from_msgpack(key_format, new_run->info.min_key);
 	if (min_key == NULL)
 		goto fail;
-	max_key = vy_key_from_msgpack(key_format, run->info.max_key);
+	max_key = vy_key_from_msgpack(key_format, new_run->info.max_key);
 	if (max_key == NULL) {
 		tuple_unref(min_key);
 		goto fail;
@@ -3604,22 +3604,22 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * For each intersected range allocate a slice of the new run.
 	 */
-	slices = calloc(index->range_count, sizeof(*slices));
-	if (slices == NULL) {
-		diag_set(OutOfMemory, index->range_count * sizeof(*slices),
+	new_slices = calloc(index->range_count, sizeof(*new_slices));
+	if (new_slices == NULL) {
+		diag_set(OutOfMemory, index->range_count * sizeof(*new_slices),
 			 "malloc", "struct vy_slice *");
 		goto fail;
 	}
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
-		slice = vy_slice_new(vy_log_next_slice_id(),
-				     run, range->begin, range->end,
+		slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+				     range->begin, range->end,
 				     &index->index_def->key_def);
 		if (slice == NULL)
 			goto fail_free_slices;
 
 		assert(i < index->range_count);
-		slices[i] = slice;
+		new_slices[i] = slice;
 		/*
 		 * It's OK to yield here for the range tree can only
 		 * be changed from the scheduler fiber.
@@ -3631,12 +3631,12 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_run(index->index_def->opts.lsn, run->id, dump_lsn);
+	vy_log_create_run(index->index_def->opts.lsn, new_run->id, dump_lsn);
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		assert(i < index->range_count);
-		slice = slices[i];
-		vy_log_insert_slice(range->id, run->id, slice->id,
+		slice = new_slices[i];
+		vy_log_insert_slice(range->id, new_run->id, slice->id,
 				    tuple_data_or_null(slice->begin),
 				    tuple_data_or_null(slice->end));
 
@@ -3649,7 +3649,7 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * Account the new run.
 	 */
-	vy_index_acct_run(index, run);
+	vy_index_acct_run(index, new_run);
 
 	/*
 	 * Add new slices to ranges.
@@ -3657,7 +3657,7 @@ vy_task_dump_complete(struct vy_task *task)
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
 		assert(i < index->range_count);
-		slice = slices[i];
+		slice = new_slices[i];
 		vy_index_unacct_range(index, range);
 		vy_range_add_slice(range, slice);
 		vy_index_acct_range(index, range);
@@ -3676,7 +3676,7 @@ vy_task_dump_complete(struct vy_task *task)
 		 */
 		fiber_reschedule();
 	}
-	free(slices);
+	free(new_slices);
 
 delete_mems:
 	/*
@@ -3709,10 +3709,11 @@ delete_mems:
 
 fail_free_slices:
 	for (i = 0; i < index->range_count; i++) {
-		if (slices[i] != NULL)
-			vy_slice_delete(slices[i]);
+		slice = new_slices[i];
+		if (slice != NULL)
+			vy_slice_delete(slice);
 	}
-	free(slices);
+	free(new_slices);
 fail:
 	return -1;
 }
@@ -3729,9 +3730,9 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: dump failed: %s", index->name,
 			  diag_last_error(&task->diag)->errmsg);
-		vy_run_discard(task->run);
+		vy_run_discard(task->new_run);
 	} else
-		vy_run_delete(task->run);
+		vy_run_delete(task->new_run);
 
 	vy_scheduler_add_index(scheduler, index);
 	if (index->index_def->iid != 0) {
@@ -3809,12 +3810,12 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 	if (task == NULL)
 		goto err_task;
 
-	struct vy_run *run = vy_run_prepare(index);
-	if (run == NULL)
+	struct vy_run *new_run = vy_run_prepare(index);
+	if (new_run == NULL)
 		goto err_run;
 
 	assert(dump_lsn >= 0);
-	run->dump_lsn = dump_lsn;
+	new_run->dump_lsn = dump_lsn;
 
 	struct vy_write_iterator *wi;
 	bool is_last_level = (index->run_count == 0);
@@ -3834,7 +3835,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 			goto err_wi_sub;
 	}
 
-	task->run = run;
+	task->new_run = new_run;
 	task->wi = wi;
 	task->generation = generation;
 	task->max_output_count = max_output_count;
@@ -3861,7 +3862,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
-	vy_run_discard(run);
+	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(pool, task);
 err_task:
@@ -3880,7 +3881,7 @@ vy_task_compact_execute(struct vy_task *task)
 	/* The range has been deleted from the scheduler queues. */
 	assert(task->range->in_compact.pos == UINT32_MAX);
 
-	return vy_run_write(task->run, index->path, task->wi,
+	return vy_run_write(task->new_run, index->path, task->wi,
 			    index->index_def->opts.page_size,
 			    &index->index_def->key_def,
 			    &index->user_index_def->key_def,
@@ -3894,7 +3895,7 @@ vy_task_compact_complete(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_range *range = task->range;
-	struct vy_run *run = task->run;
+	struct vy_run *new_run = task->new_run;
 	struct vy_slice *first_slice = task->first_slice;
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -3907,9 +3908,9 @@ vy_task_compact_complete(struct vy_task *task)
 	 * and insert it into the range, but we still need to delete
 	 * compacted runs.
 	 */
-	if (!vy_run_is_empty(run)) {
-		new_slice = vy_slice_new(vy_log_next_slice_id(), run, NULL,
-					 NULL, &index->index_def->key_def);
+	if (!vy_run_is_empty(new_run)) {
+		new_slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+				NULL, NULL, &index->index_def->key_def);
 		if (new_slice == NULL)
 			return -1;
 	}
@@ -3927,8 +3928,8 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 	if (new_slice != NULL) {
 		vy_log_create_run(index->index_def->opts.lsn,
-				  run->id, run->dump_lsn);
-		vy_log_insert_slice(range->id, run->id, new_slice->id,
+				  new_run->id, new_run->dump_lsn);
+		vy_log_insert_slice(range->id, new_run->id, new_slice->id,
 				    tuple_data_or_null(new_slice->begin),
 				    tuple_data_or_null(new_slice->end));
 	}
@@ -3943,9 +3944,9 @@ vy_task_compact_complete(struct vy_task *task)
 	 * otherwise discard it.
 	 */
 	if (new_slice != NULL)
-		vy_index_acct_run(index, run);
+		vy_index_acct_run(index, new_run);
 	else
-		vy_run_discard(run);
+		vy_run_discard(new_run);
 
 	/*
 	 * Replace compacted slices with the resulting slice.
@@ -4009,9 +4010,9 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 		say_error("%s: failed to compact range %s: %s",
 			  index->name, vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
-		vy_run_discard(task->run);
+		vy_run_discard(task->new_run);
 	} else
-		vy_run_delete(task->run);
+		vy_run_delete(task->new_run);
 
 	vy_scheduler_add_range(scheduler, range);
 }
@@ -4047,8 +4048,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	if (task == NULL)
 		goto err_task;
 
-	struct vy_run *run = vy_run_prepare(index);
-	if (run == NULL)
+	struct vy_run *new_run = vy_run_prepare(index);
+	if (new_run == NULL)
 		goto err_run;
 
 	struct vy_write_iterator *wi;
@@ -4070,7 +4071,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 			goto err_wi_sub;
 
 		task->max_output_count += slice->keys;
-		run->dump_lsn = MAX(run->dump_lsn, slice->run->dump_lsn);
+		new_run->dump_lsn = MAX(new_run->dump_lsn,
+					slice->run->dump_lsn);
 
 		/* Remember the slices we are compacting. */
 		if (task->first_slice == NULL)
@@ -4081,10 +4083,10 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 			break;
 	}
 	assert(n == 0);
-	assert(run->dump_lsn >= 0);
+	assert(new_run->dump_lsn >= 0);
 
 	task->range = range;
-	task->run = run;
+	task->new_run = new_run;
 	task->wi = wi;
 	task->bloom_fpr = index->env->conf->bloom_fpr;
 
@@ -4099,7 +4101,7 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 err_wi_sub:
 	vy_write_iterator_delete(wi);
 err_wi:
-	vy_run_discard(run);
+	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(pool, task);
 err_task:
