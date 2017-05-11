@@ -39,7 +39,7 @@ Documentation=man:tarantool(1)
 ConditionPathExists=@TARANTOOL_INSTANCEDIR@/%I.lua
 
 [Service]
-Type=forking
+Type=notify
 User=@TARANTOOL_USER@
 Group=@TARANTOOL_USER@
 # Disable OOM killer
@@ -50,8 +50,14 @@ ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
 ## NYI: https://github.com/tarantool/tarantool/issues/1229
 #ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %I
 
+# Needed for Type=notify
+PIDFile=@TARANTOOL_RUNDIR@/%I.pid
+
+# Systemd waits until all xlogs are recovered
+TimeoutStartSec=infinity
 # Give a reasonable amount of time to close xlogs
 TimeoutStopSec=10s
+
 Restart=on-failure
 RestartSec=100ms
 

@@ -53,12 +53,5 @@ space:insert({4, 4})
 box.info.vinyl().performance.write_count - old_count == 8
 space:drop()
 
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary')
-space:replace({1})
-box.info.vinyl().memory.min_lsn == box.info.vclock[1]
-space:drop()
-box.info.vinyl().memory.min_lsn
-
 test_run:cmd('switch default')
 test_run:cmd("stop server vinyl_info")

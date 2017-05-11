@@ -82,7 +82,7 @@ ffi.cdef[[
 
 local function _getpw(uid)
     local pw = nil
-    errno(0);
+    errno(0)
     if type(uid) == 'number' then
         pw = ffi.C.getpwuid(uid)
     elseif type(uid) == 'string' then
@@ -95,7 +95,7 @@ end
 
 local function _getgr(gid)
     local gr = nil
-    errno(0);
+    errno(0)
     if type(gid) == 'number' then
         gr = ffi.C.getgrgid(gid)
     elseif type(gid) == 'string' then
@@ -159,7 +159,11 @@ local function getpw(uid)
 end
 
 local function getpwall()
-    errno(0);
+    errno(0)
+    ffi.C.setpwent()
+    if errno() ~= 0 then
+        return nil
+    end
     local pws = {}
     while true do
         local pw = ffi.C.getpwent()
@@ -168,7 +172,7 @@ local function getpwall()
         end
         table.insert(pws, getpw(pw.pw_uid))
     end
-    ffi.C.endpwent();
+    ffi.C.endpwent()
     if errno() ~= 0 then
         return nil
     end
@@ -176,7 +180,11 @@ local function getpwall()
 end
 
 local function getgrall()
-    errno(0);
+    errno(0)
+    ffi.C.setgrent()
+    if errno() ~= 0 then
+        return nil
+    end
     local grs = {}
     while true do
         local gr = ffi.C.getgrent()
@@ -185,7 +193,7 @@ local function getgrall()
         end
         table.insert(grs, getpw(gr.gr_gid))
     end
-    ffi.C.endgrent();
+    ffi.C.endgrent()
     if errno() ~= 0 then
         return nil
     end

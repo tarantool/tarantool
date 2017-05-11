@@ -214,9 +214,8 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::beginInitialRecovery(struct vclock *vclock)
+MemtxEngine::beginInitialRecovery(const struct vclock *)
 {
-	(void) vclock;
 	assert(m_state == MEMTX_INITIALIZED);
 	/*
 	 * By default, enable fast start: bulk read of tuples

@@ -200,14 +200,14 @@ struct lsregion;
  * Duplicate the statement, using the lsregion as allocator.
  * @param stmt      Statement to duplicate.
  * @param lsregion  Allocator.
- * @param alloc_lsn Allocation identifier for the lsregion.
+ * @param alloc_id  Allocation identifier for the lsregion.
  *
  * @retval not NULL The new statement with the same data.
  * @retval     NULL Memory error.
  */
 struct tuple *
 vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
-		     int64_t alloc_lsn);
+		     int64_t alloc_id);
 
 /**
  * Return true if @a stmt was allocated on lsregion.

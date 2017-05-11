@@ -277,10 +277,14 @@ enum vy_run_info_key {
 	VY_RUN_INFO_MIN_KEY = 1,
 	/** Max key in the run. */
 	VY_RUN_INFO_MAX_KEY = 2,
+	/** Minimal LSN over all statements in a run. */
+	VY_RUN_INFO_MIN_LSN = 3,
+	/** Maximal LSN over all statements in a run. */
+	VY_RUN_INFO_MAX_LSN = 4,
 	/** Number of pages in a run. */
-	VY_RUN_INFO_PAGE_COUNT = 3,
+	VY_RUN_INFO_PAGE_COUNT = 5,
 	/** Bloom filter for keys. */
-	VY_RUN_INFO_BLOOM = 4,
+	VY_RUN_INFO_BLOOM = 6,
 	/** The last key in this enum + 1 */
 	VY_RUN_INFO_KEY_MAX = VY_RUN_INFO_BLOOM + 1
 };

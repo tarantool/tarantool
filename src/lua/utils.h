@@ -445,11 +445,18 @@ luaT_error(lua_State *L);
 LUA_API int
 luaT_call(lua_State *L, int nargs, int nreturns);
 
-/*
+/**
  * Like lua_cpcall(), but with the proper support of Tarantool errors.
+ * \sa lua_cpcall()
  */
 LUA_API int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
+/**
+ * Get global Lua state used by Tarantool
+ */
+LUA_API lua_State *
+luaT_state(void);
 
 /** \endcond public */
 

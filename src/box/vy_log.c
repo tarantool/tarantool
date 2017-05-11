@@ -77,9 +77,7 @@ enum vy_log_key {
 	VY_LOG_KEY_SPACE_ID		= 6,
 	VY_LOG_KEY_DEF			= 7,
 	VY_LOG_KEY_SLICE_ID		= 8,
-	VY_LOG_KEY_MIN_LSN		= 9,
-	VY_LOG_KEY_MAX_LSN		= 10,
-	VY_LOG_KEY_DUMP_LSN		= 11,
+	VY_LOG_KEY_DUMP_LSN		= 9,
 };
 
 /**
@@ -101,8 +99,7 @@ static const unsigned long vy_log_key_mask[] = {
 					  (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_CREATE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID) |
-					  (1 << VY_LOG_KEY_MIN_LSN) |
-					  (1 << VY_LOG_KEY_MAX_LSN),
+					  (1 << VY_LOG_KEY_DUMP_LSN),
 	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_INSERT_SLICE]		= (1 << VY_LOG_KEY_RANGE_ID) |
@@ -126,8 +123,6 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_SPACE_ID]		= "space_id",
 	[VY_LOG_KEY_DEF]		= "key_def",
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
-	[VY_LOG_KEY_MIN_LSN]		= "min_lsn",
-	[VY_LOG_KEY_MAX_LSN]		= "max_lsn",
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
 };
 
@@ -279,6 +274,8 @@ struct vy_range_recovery_info {
 	/**
 	 * List of all slices in the range, linked by
 	 * vy_slice_recovery_info::in_range.
+	 *
+	 * Newer slices are closer to the head.
 	 */
 	struct rlist slices;
 };
@@ -289,9 +286,8 @@ struct vy_run_recovery_info {
 	struct rlist in_index;
 	/** ID of the run. */
 	int64_t id;
-	/** Min and max LSN spanned by the run. */
-	int64_t min_lsn;
-	int64_t max_lsn;
+	/** Max LSN stored on disk. */
+	int64_t dump_lsn;
 	/**
 	 * True if the run was not committed (there's
 	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
@@ -312,8 +308,8 @@ struct vy_slice_recovery_info {
 	struct rlist in_range;
 	/** ID of the slice. */
 	int64_t id;
-	/** ID of the run this slice is for. */
-	int64_t run_id;
+	/** Run this slice was created for. */
+	struct vy_run_recovery_info *run;
 	/** Start of the slice, stored in MsgPack array. */
 	char *begin;
 	/** End of the slice, stored in MsgPack array. */
@@ -402,12 +398,6 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_SLICE_ID],
 			record->slice_id);
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN))
-		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_MIN_LSN], record->min_lsn);
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN))
-		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_MAX_LSN], record->max_lsn);
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
@@ -520,16 +510,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->slice_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_MIN_LSN);
-		size += mp_sizeof_uint(record->min_lsn);
-		n_keys++;
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN)) {
-		size += mp_sizeof_uint(VY_LOG_KEY_MAX_LSN);
-		size += mp_sizeof_uint(record->max_lsn);
-		n_keys++;
-	}
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
 		assert(record->dump_lsn >= 0);
 		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
@@ -599,14 +579,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
 		pos = mp_encode_uint(pos, record->slice_id);
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MIN_LSN)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_MIN_LSN);
-		pos = mp_encode_uint(pos, record->min_lsn);
-	}
-	if (key_mask & (1 << VY_LOG_KEY_MAX_LSN)) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_MAX_LSN);
-		pos = mp_encode_uint(pos, record->max_lsn);
 	}
 	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
@@ -723,12 +695,6 @@ vy_log_record_decode(struct vy_log_record *record,
 		}
 		case VY_LOG_KEY_SLICE_ID:
 			record->slice_id = mp_decode_uint(&pos);
-			break;
-		case VY_LOG_KEY_MIN_LSN:
-			record->min_lsn = mp_decode_uint(&pos);
-			break;
-		case VY_LOG_KEY_MAX_LSN:
-			record->max_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
@@ -1455,7 +1421,7 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 	}
 	assert(old_node == NULL);
 	run->id = run_id;
-	run->min_lsn = run->max_lsn = -1;
+	run->dump_lsn = -1;
 	run->is_incomplete = false;
 	run->is_dropped = false;
 	run->signature = -1;
@@ -1511,8 +1477,7 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
  */
 static int
 vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
-		       int64_t index_lsn, int64_t run_id,
-		       int64_t min_lsn, int64_t max_lsn)
+		       int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
@@ -1543,10 +1508,9 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
 		if (run == NULL)
 			return -1;
 	}
+	run->dump_lsn = dump_lsn;
 	run->is_incomplete = false;
 	run->signature = signature;
-	run->min_lsn = min_lsn;
-	run->max_lsn = max_lsn;
 	rlist_move_entry(&index->runs, run, in_index);
 	return 0;
 }
@@ -1725,6 +1689,15 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
 				    (long long)range_id));
 		return -1;
 	}
+	struct vy_run_recovery_info *run;
+	run = vy_recovery_lookup_run(recovery, run_id);
+	if (run == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Slice %lld created for unregistered "
+				    "run %lld", (long long)slice_id,
+				    (long long)run_id));
+		return -1;
+	}
 
 	size_t size = sizeof(struct vy_slice_recovery_info);
 	const char *data;
@@ -1751,13 +1724,24 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
 		return -1;
 	}
 	slice->id = slice_id;
-	slice->run_id = run_id;
+	slice->run = run;
 	slice->begin = (void *)slice + sizeof(*slice);
 	memcpy(slice->begin, begin, begin_size);
 	slice->end = (void *)slice + sizeof(*slice) + begin_size;
 	memcpy(slice->end, end, end_size);
 	slice->signature = signature;
-	rlist_add_entry(&range->slices, slice, in_range);
+	/*
+	 * If dump races with compaction, an older slice created by
+	 * compaction may be added after a newer slice created by
+	 * dump. Make sure that the list stays sorted by LSN in any
+	 * case.
+	 */
+	struct vy_slice_recovery_info *next_slice;
+	rlist_foreach_entry(next_slice, &range->slices, in_range) {
+		if (next_slice->run->dump_lsn < slice->run->dump_lsn)
+			break;
+	}
+	rlist_add_tail(&next_slice->in_range, &slice->in_range);
 	if (recovery->slice_id_max < slice_id)
 		recovery->slice_id_max = slice_id;
 	return 0;
@@ -1826,7 +1810,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_CREATE_RUN:
 		rc = vy_recovery_create_run(recovery, record->signature,
 				record->index_lsn, record->run_id,
-				record->min_lsn, record->max_lsn);
+				record->dump_lsn);
 		break;
 	case VY_LOG_DROP_RUN:
 		rc = vy_recovery_drop_run(recovery, record->signature,
@@ -2046,8 +2030,7 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 			       VY_LOG_PREPARE_RUN : VY_LOG_CREATE_RUN);
 		record.signature = run->signature;
 		record.run_id = run->id;
-		record.min_lsn = run->min_lsn;
-		record.max_lsn = run->max_lsn;
+		record.dump_lsn = run->dump_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		if (!run->is_dropped)
@@ -2069,11 +2052,16 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 			record.end = NULL;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
-		rlist_foreach_entry(slice, &range->slices, in_range) {
+		/*
+		 * Newer slices are stored closer to the head of the list,
+		 * while we are supposed to return slices in chronological
+		 * order, so use reverse iterator.
+		 */
+		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
 			record.type = VY_LOG_INSERT_SLICE;
 			record.signature = slice->signature;
 			record.slice_id = slice->id;
-			record.run_id = slice->run_id;
+			record.run_id = slice->run->id;
 			record.begin = tmp = slice->begin;
 			if (mp_decode_array(&tmp) == 0)
 				record.begin = NULL;

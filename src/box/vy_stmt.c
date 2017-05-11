@@ -120,11 +120,11 @@ vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format)
 
 struct tuple *
 vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
-		     int64_t alloc_lsn)
+		     int64_t alloc_id)
 {
 	size_t size = tuple_size(stmt);
 	struct tuple *mem_stmt;
-	mem_stmt = lsregion_alloc(lsregion, size, alloc_lsn);
+	mem_stmt = lsregion_alloc(lsregion, size, alloc_id);
 	if (mem_stmt == NULL) {
 		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
 		return NULL;

@@ -30,8 +30,8 @@
  */
 #include "box/box.h"
 
+#include "trivia/config.h"
 #include "fiber_pool.h"
-
 #include <say.h>
 #include <scoped_guard.h>
 #include "iproto.h"
@@ -70,6 +70,7 @@
 #include "path_lock.h"
 #include "gc.h"
 #include "sql.h"
+#include "systemd.h"
 
 static char status[64] = "unknown";
 
@@ -78,6 +79,7 @@ static void title(const char *new_status)
 	snprintf(status, sizeof(status), "%s", new_status);
 	title_set_status(new_status);
 	title_update();
+	systemd_snotify("STATUS=%s", status);
 }
 
 bool box_snapshot_is_in_progress = false;
@@ -1591,7 +1593,22 @@ box_cfg_xc(void)
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
-		engine_begin_initial_recovery(&checkpoint_vclock);
+		struct recovery *recovery;
+		recovery = recovery_new(cfg_gets("wal_dir"),
+					cfg_geti("force_recovery"),
+					&checkpoint_vclock);
+		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
+
+		/*
+		 * recovery->vclock is needed by Vinyl to filter
+		 * WAL rows that were dumped before restart.
+		 *
+		 * XXX: Passing an internal member of the recovery
+		 * object to an engine is an ugly hack. Instead we
+		 * should introduce Engine::applyWALRow method and
+		 * explicitly pass the statement LSN to it.
+		 */
+		engine_begin_initial_recovery(&recovery->vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
 		/**
 		 * We explicitly request memtx to recover its
@@ -1601,12 +1618,6 @@ box_cfg_xc(void)
 		 * other engines.
 		 */
 		memtx->recoverSnapshot(&checkpoint_vclock);
-
-		struct recovery *recovery;
-		recovery = recovery_new(cfg_gets("wal_dir"),
-					cfg_geti("force_recovery"),
-					&checkpoint_vclock);
-		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);

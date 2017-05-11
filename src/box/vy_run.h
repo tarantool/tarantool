@@ -56,6 +56,8 @@ static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
 
 static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
 					    (1 << VY_RUN_INFO_MAX_KEY) |
+					    (1 << VY_RUN_INFO_MIN_LSN) |
+					    (1 << VY_RUN_INFO_MAX_LSN) |
 					    (1 << VY_RUN_INFO_PAGE_COUNT);
 
 enum { VY_BLOOM_VERSION = 0 };
@@ -124,6 +126,8 @@ struct vy_run {
 	struct vy_run_info info;
 	/** Run data file. */
 	int fd;
+	/** Max LSN stored on disk. */
+	int64_t dump_lsn;
 	/**
 	 * The number of slices created for this run.
 	 * Incremented by vy_slice_new(), decremented by

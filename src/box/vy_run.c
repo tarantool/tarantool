@@ -131,6 +131,7 @@ vy_run_new(int64_t id)
 	}
 	memset(&run->info, 0, sizeof(run->info));
 	run->id = id;
+	run->dump_lsn = -1;
 	run->fd = -1;
 	run->slice_count = 0;
 	TRASH(&run->info.bloom);
@@ -441,6 +442,12 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			run_info->max_key = vy_key_dup(tmp);
 			if (run_info->max_key == NULL)
 				return -1;
+			break;
+		case VY_RUN_INFO_MIN_LSN:
+			run_info->min_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_RUN_INFO_MAX_LSN:
+			run_info->max_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_RUN_INFO_PAGE_COUNT:
 			run_info->count = mp_decode_uint(&pos);

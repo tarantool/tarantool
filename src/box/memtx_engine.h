@@ -90,7 +90,7 @@ struct MemtxEngine: public Engine {
 	virtual void prepare(struct txn *txn) override;
 	virtual void commit(struct txn *txn, int64_t signature) override;
 	virtual void bootstrap() override;
-	virtual void beginInitialRecovery(struct vclock *vclock) override;
+	virtual void beginInitialRecovery(const struct vclock *) override;
 	virtual void beginFinalRecovery() override;
 	virtual void endRecovery() override;
 	virtual void join(struct vclock *vclock,

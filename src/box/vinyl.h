@@ -72,7 +72,8 @@ int
 vy_bootstrap(struct vy_env *e);
 
 int
-vy_begin_initial_recovery(struct vy_env *e, struct vclock *vclock);
+vy_begin_initial_recovery(struct vy_env *e,
+			  const struct vclock *recovery_vclock);
 
 int
 vy_begin_final_recovery(struct vy_env *e);
@@ -81,7 +82,7 @@ int
 vy_end_recovery(struct vy_env *e);
 
 int
-vy_checkpoint(struct vy_env *env, struct vclock *vclock);
+vy_begin_checkpoint(struct vy_env *env);
 
 int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock);

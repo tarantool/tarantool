@@ -188,6 +188,11 @@
 #cmakedefine HAVE_SETPROGNAME 1
 #cmakedefine HAVE_GETPROGNAME 1
 
+/*
+* Defined if systemd is enabled
+ */
+#cmakedefine WITH_SYSTEMD 1
+
 /** \cond public */
 
 /** System configuration dir (e.g /etc) */

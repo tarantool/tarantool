@@ -133,8 +133,11 @@ public:
 	virtual void bootstrap();
 	/**
 	 * Begin initial recovery from snapshot or dirty disk data.
+	 * On local recovery @recovery_vclock points to the vclock
+	 * used for assigning LSNs to statements replayed from WAL.
+	 * On remote recovery, it is set to NULL.
 	 */
-	virtual void beginInitialRecovery(struct vclock *vclock);
+	virtual void beginInitialRecovery(const struct vclock *recovery_vclock);
 	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
@@ -152,12 +155,6 @@ public:
 	 * Must not yield.
 	 */
 	virtual int beginCheckpoint();
-	/**
-	 * Prepare to wait for a checkpoint.
-	 * Called right after WAL checkpoint.
-	 * Must not yield.
-	 */
-	virtual int prepareWaitCheckpoint(struct vclock *vclock);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
@@ -288,7 +285,7 @@ engine_bootstrap();
  * Called at the start of recovery.
  */
 void
-engine_begin_initial_recovery(struct vclock *vclock);
+engine_begin_initial_recovery(const struct vclock *recovery_vclock);
 
 /**
  * Called in the middle of JOIN stage,
