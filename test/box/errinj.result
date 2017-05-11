@@ -36,12 +36,12 @@ errinj.info()
     state: false
   ERRINJ_VY_TASK_COMPLETE:
     state: false
-  ERRINJ_VINYL_SCHED_TIMEOUT:
-    state: 0
-  ERRINJ_WAL_IO:
-    state: false
   ERRINJ_RELAY:
     state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_VY_SCHED_TIMEOUT:
+    state: 0
   ERRINJ_TESTING:
     state: false
   ERRINJ_WAL_WRITE_PARTIAL:

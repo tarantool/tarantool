@@ -4,7 +4,7 @@
 test_run = require('test_run').new()
 fiber = require('fiber')
 errinj = box.error.injection
-errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 40)
+errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.040)
 s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 function f() box.begin() s:insert{1, 'hi'} s:insert{2, 'bye'} box.commit() end
@@ -109,13 +109,13 @@ box.snapshot();
 #s:select({1})
 s:drop()
 
-errinj.set("ERRINJ_VINYL_SCHED_TIMEOUT", 0)
+errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0)
 
 --
 -- Check that upsert squash fiber does not crash if index or
 -- in-memory tree is gone.
 --
-errinj.set("ERRINJ_VY_SQUASH_TIMEOUT", 50)
+errinj.set("ERRINJ_VY_SQUASH_TIMEOUT", 0.050)
 s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 s:insert{0, 0}
