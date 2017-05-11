@@ -78,6 +78,7 @@ enum vy_log_key {
 	VY_LOG_KEY_DEF			= 7,
 	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_DUMP_LSN		= 9,
+	VY_LOG_KEY_GC_LSN		= 10,
 };
 
 /**
@@ -100,7 +101,8 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_CREATE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_RUN_ID) |
 					  (1 << VY_LOG_KEY_DUMP_LSN),
-	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
+	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID) |
+					  (1 << VY_LOG_KEY_GC_LSN),
 	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
 	[VY_LOG_INSERT_SLICE]		= (1 << VY_LOG_KEY_RANGE_ID) |
 					  (1 << VY_LOG_KEY_RUN_ID) |
@@ -110,6 +112,7 @@ static const unsigned long vy_log_key_mask[] = {
 	[VY_LOG_DELETE_SLICE]		= (1 << VY_LOG_KEY_SLICE_ID),
 	[VY_LOG_DUMP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
 					  (1 << VY_LOG_KEY_DUMP_LSN),
+	[VY_LOG_SNAPSHOT]		= 0,
 };
 
 /** vy_log_key -> human readable name. */
@@ -124,6 +127,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_DEF]		= "key_def",
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
+	[VY_LOG_KEY_GC_LSN]		= "gc_lsn",
 };
 
 /** vy_log_type -> human readable name. */
@@ -138,6 +142,8 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_FORGET_RUN]		= "forget_run",
 	[VY_LOG_INSERT_SLICE]		= "insert_slice",
 	[VY_LOG_DELETE_SLICE]		= "delete_slice",
+	[VY_LOG_DUMP_INDEX]		= "dump_index",
+	[VY_LOG_SNAPSHOT]		= "snapshot",
 };
 
 struct vy_recovery;
@@ -222,11 +228,6 @@ struct vy_index_recovery_info {
 	/** LSN of the last index dump. */
 	int64_t dump_lsn;
 	/**
-	 * Log signature from the time when the index was created
-	 * or dropped.
-	 */
-	int64_t signature;
-	/**
 	 * List of all ranges in the index, linked by
 	 * vy_range_recovery_info::in_index.
 	 */
@@ -249,8 +250,6 @@ struct vy_range_recovery_info {
 	char *begin;
 	/** End of the range, stored in MsgPack array. */
 	char *end;
-	/** Log signature from the time when the range was created. */
-	int64_t signature;
 	/**
 	 * List of all slices in the range, linked by
 	 * vy_slice_recovery_info::in_range.
@@ -269,17 +268,17 @@ struct vy_run_recovery_info {
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
+	 * For deleted runs: LSN of the last checkpoint
+	 * that uses this run.
+	 */
+	int64_t gc_lsn;
+	/**
 	 * True if the run was not committed (there's
 	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
 	 */
 	bool is_incomplete;
 	/** True if the run was dropped (VY_LOG_DROP_RUN). */
 	bool is_dropped;
-	/**
-	 * Log signature from the time when the run was last modified
-	 * (prepared, created, or dropped).
-	 */
-	int64_t signature;
 };
 
 /** Slice info stored in a recovery context. */
@@ -294,8 +293,6 @@ struct vy_slice_recovery_info {
 	char *begin;
 	/** End of the slice, stored in MsgPack array. */
 	char *end;
-	/** Log signature from the time when the slice was created. */
-	int64_t signature;
 };
 
 /**
@@ -326,8 +323,6 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 	unsigned long key_mask = vy_log_key_mask[record->type];
 	SNPRINT(total, snprintf, buf, size, "%s{",
 		vy_log_type_name[record->type]);
-	SNPRINT(total, snprintf, buf, size,
-		"signature=%"PRIi64", ", record->signature);
 	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN))
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_INDEX_LSN],
@@ -382,6 +377,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
 			record->dump_lsn);
+	if (key_mask & (1 << VY_LOG_KEY_GC_LSN))
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_GC_LSN],
+			record->gc_lsn);
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -496,6 +495,12 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->dump_lsn);
 		n_keys++;
 	}
+	if (key_mask & (1 << VY_LOG_KEY_GC_LSN)) {
+		assert(record->gc_lsn >= 0);
+		size += mp_sizeof_uint(VY_LOG_KEY_GC_LSN);
+		size += mp_sizeof_uint(record->gc_lsn);
+		n_keys++;
+	}
 	size += mp_sizeof_map(n_keys);
 
 	/*
@@ -564,6 +569,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
 		pos = mp_encode_uint(pos, record->dump_lsn);
 	}
+	if (key_mask & (1 << VY_LOG_KEY_GC_LSN)) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_GC_LSN);
+		pos = mp_encode_uint(pos, record->gc_lsn);
+	}
 	assert(pos == tuple + size);
 
 	/*
@@ -575,7 +584,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 	req.tuple_end = pos;
 	memset(row, 0, sizeof(*row));
 	row->type = req.type;
-	row->lsn = record->signature;
 	row->bodycnt = request_encode(&req, row->body);
 	return 0;
 }
@@ -591,7 +599,6 @@ vy_log_record_decode(struct vy_log_record *record,
 	char *buf;
 
 	memset(record, 0, sizeof(*record));
-	record->signature = row->lsn;
 
 	struct request req;
 	request_create(&req, row->type);
@@ -678,6 +685,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_LOG_KEY_GC_LSN:
+			record->gc_lsn = mp_decode_uint(&pos);
 			break;
 		default:
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
@@ -787,16 +797,35 @@ vy_log_open(struct xlog *xlog)
 	 */
 	char *path = xdir_format_filename(&vy_log.dir,
 			vclock_sum(&vy_log.last_checkpoint), NONE);
-	if (access(path, F_OK) < 0 && errno == ENOENT) {
-		if (xdir_create_xlog(&vy_log.dir, xlog,
-				     &vy_log.last_checkpoint) < 0 ||
-		    xlog_rename(xlog) < 0)
-			return -1;
-	} else {
-		if (xlog_open(xlog, path) < 0)
-			return -1;
+	if (access(path, F_OK) == 0)
+		return xlog_open(xlog, path);
+
+	if (errno != ENOENT) {
+		diag_set(SystemError, "failed to access file '%s'", path);
+		goto fail;
 	}
+
+	if (xdir_create_xlog(&vy_log.dir, xlog,
+			     &vy_log.last_checkpoint) < 0)
+		goto fail;
+
+	struct xrow_header row;
+	struct vy_log_record record = { .type = VY_LOG_SNAPSHOT };
+	if (vy_log_record_encode(&record, &row) < 0 ||
+	    xlog_write_row(xlog, &row) < 0)
+		goto fail_close_xlog;
+
+	if (xlog_rename(xlog) < 0)
+		goto fail_close_xlog;
+
 	return 0;
+
+fail_close_xlog:
+	if (unlink(xlog->filename) < 0)
+		say_syserror("failed to delete file '%s'", xlog->filename);
+	xlog_close(xlog, false);
+fail:
+	return -1;
 }
 
 int64_t
@@ -842,7 +871,7 @@ vy_log_begin_recovery(const struct vclock *vclock)
 	}
 
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(INT64_MAX);
+	recovery = vy_recovery_new(vclock_sum(&vy_log_vclock), false);
 	if (recovery == NULL)
 		return NULL;
 
@@ -944,6 +973,13 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	if (!xlog_is_open(&xlog))
 		return 0; /* nothing written */
 
+	/* Mark the end of the snapshot. */
+	struct xrow_header row;
+	struct vy_log_record record = { .type = VY_LOG_SNAPSHOT };
+	if (vy_log_record_encode(&record, &row) < 0 ||
+	    xlog_write_row(&xlog, &row) < 0)
+		goto err_write_xlog;
+
 	/* Finalize the new xlog. */
 	if (xlog_flush(&xlog) < 0 ||
 	    xlog_sync(&xlog) < 0 ||
@@ -997,7 +1033,8 @@ vy_log_rotate(const struct vclock *vclock)
 	say_debug("%s: signature %lld", __func__,
 		  (long long)vclock_sum(vclock));
 
-	struct vy_recovery *recovery = vy_recovery_new(INT64_MAX);
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint), false);
 	if (recovery == NULL)
 		goto fail;
 
@@ -1179,9 +1216,6 @@ vy_log_write(const struct vy_log_record *record)
 	}
 
 	*tx_record = *record;
-	if (tx_record->signature < 0)
-		tx_record->signature = vclock_sum(&vy_log.last_checkpoint);
-
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
 	if (vy_log.tx_begin == NULL)
@@ -1239,9 +1273,9 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
-			 int64_t index_lsn, uint32_t index_id,
-			 uint32_t space_id, const struct key_def *key_def)
+vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
+			 uint32_t index_id, uint32_t space_id,
+			 const struct key_def *key_def)
 {
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
@@ -1271,7 +1305,6 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
 	memcpy(index->key_def, key_def, key_def_sizeof(key_def->part_count));
 	index->is_dropped = false;
 	index->dump_lsn = -1;
-	index->signature = signature;
 	rlist_create(&index->ranges);
 	rlist_create(&index->runs);
 	return 0;
@@ -1284,8 +1317,7 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t signature,
  * Returns 0 on success, -1 if ID not found or index is already marked.
  */
 static int
-vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
-		       int64_t index_lsn)
+vy_recovery_drop_index(struct vy_recovery *recovery, int64_t index_lsn)
 {
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
@@ -1317,7 +1349,6 @@ vy_recovery_drop_index(struct vy_recovery *recovery, int64_t signature,
 		}
 	}
 	index->is_dropped = true;
-	index->signature = signature;
 	return 0;
 }
 
@@ -1373,9 +1404,9 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 	assert(old_node == NULL);
 	run->id = run_id;
 	run->dump_lsn = -1;
+	run->gc_lsn = -1;
 	run->is_incomplete = false;
 	run->is_dropped = false;
-	run->signature = -1;
 	rlist_create(&run->in_index);
 	if (recovery->max_id < run_id)
 		recovery->max_id = run_id;
@@ -1390,8 +1421,8 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
  * or OOM.
  */
 static int
-vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
-			int64_t index_lsn, int64_t run_id)
+vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t index_lsn,
+			int64_t run_id)
 {
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
@@ -1413,7 +1444,6 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
 	if (run == NULL)
 		return -1;
 	run->is_incomplete = true;
-	run->signature = signature;
 	rlist_add_entry(&index->runs, run, in_index);
 	return 0;
 }
@@ -1427,8 +1457,8 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t signature,
  * is dropped, or OOM.
  */
 static int
-vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
-		       int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
+vy_recovery_create_run(struct vy_recovery *recovery, int64_t index_lsn,
+		       int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_index_recovery_info *index;
 	index = vy_recovery_lookup_index(recovery, index_lsn);
@@ -1461,7 +1491,6 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
 	}
 	run->dump_lsn = dump_lsn;
 	run->is_incomplete = false;
-	run->signature = signature;
 	rlist_move_entry(&index->runs, run, in_index);
 	return 0;
 }
@@ -1474,8 +1503,8 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t signature,
  * Return 0 on success, -1 if run not found or already deleted.
  */
 static int
-vy_recovery_drop_run(struct vy_recovery *recovery,
-		     int64_t signature, int64_t run_id)
+vy_recovery_drop_run(struct vy_recovery *recovery, int64_t run_id,
+		     int64_t gc_lsn)
 {
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_lookup_run(recovery, run_id);
@@ -1492,7 +1521,7 @@ vy_recovery_drop_run(struct vy_recovery *recovery,
 		return -1;
 	}
 	run->is_dropped = true;
-	run->signature = signature;
+	run->gc_lsn = gc_lsn;
 	return 0;
 }
 
@@ -1527,9 +1556,8 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
-			 int64_t index_lsn, int64_t range_id,
-			 const char *begin, const char *end)
+vy_recovery_insert_range(struct vy_recovery *recovery, int64_t index_lsn,
+			 int64_t range_id, const char *begin, const char *end)
 {
 	if (vy_recovery_lookup_range(recovery, range_id) != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
@@ -1576,7 +1604,6 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t signature,
 	memcpy(range->begin, begin, begin_size);
 	range->end = (void *)range + sizeof(*range) + begin_size;
 	memcpy(range->end, end, end_size);
-	range->signature = signature;
 	rlist_create(&range->slices);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->max_id < range_id)
@@ -1622,8 +1649,8 @@ vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
  * Return 0 on success, -1 on failure (ID collision or OOM).
  */
 static int
-vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
-			 int64_t range_id, int64_t run_id, int64_t slice_id,
+vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
+			 int64_t run_id, int64_t slice_id,
 			 const char *begin, const char *end)
 {
 	if (vy_recovery_lookup_slice(recovery, slice_id) != NULL) {
@@ -1681,7 +1708,6 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t signature,
 	memcpy(slice->begin, begin, begin_size);
 	slice->end = (void *)slice + sizeof(*slice) + begin_size;
 	memcpy(slice->end, end, end_size);
-	slice->signature = signature;
 	/*
 	 * If dump races with compaction, an older slice created by
 	 * compaction may be added after a newer slice created by
@@ -1738,43 +1764,39 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	int rc;
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
-		rc = vy_recovery_create_index(recovery,
-				record->signature, record->index_lsn,
+		rc = vy_recovery_create_index(recovery, record->index_lsn,
 				record->index_id, record->space_id,
 				record->key_def);
 		break;
 	case VY_LOG_DROP_INDEX:
-		rc = vy_recovery_drop_index(recovery, record->signature,
-					    record->index_lsn);
+		rc = vy_recovery_drop_index(recovery, record->index_lsn);
 		break;
 	case VY_LOG_INSERT_RANGE:
-		rc = vy_recovery_insert_range(recovery, record->signature,
-				record->index_lsn, record->range_id,
-				record->begin, record->end);
+		rc = vy_recovery_insert_range(recovery, record->index_lsn,
+				record->range_id, record->begin, record->end);
 		break;
 	case VY_LOG_DELETE_RANGE:
 		rc = vy_recovery_delete_range(recovery, record->range_id);
 		break;
 	case VY_LOG_PREPARE_RUN:
-		rc = vy_recovery_prepare_run(recovery, record->signature,
-				record->index_lsn, record->run_id);
+		rc = vy_recovery_prepare_run(recovery, record->index_lsn,
+					     record->run_id);
 		break;
 	case VY_LOG_CREATE_RUN:
-		rc = vy_recovery_create_run(recovery, record->signature,
-				record->index_lsn, record->run_id,
-				record->dump_lsn);
+		rc = vy_recovery_create_run(recovery, record->index_lsn,
+					    record->run_id, record->dump_lsn);
 		break;
 	case VY_LOG_DROP_RUN:
-		rc = vy_recovery_drop_run(recovery, record->signature,
-					  record->run_id);
+		rc = vy_recovery_drop_run(recovery, record->run_id,
+					  record->gc_lsn);
 		break;
 	case VY_LOG_FORGET_RUN:
 		rc = vy_recovery_forget_run(recovery, record->run_id);
 		break;
 	case VY_LOG_INSERT_SLICE:
-		rc = vy_recovery_insert_slice(recovery, record->signature,
-				record->range_id, record->run_id,
-				record->slice_id, record->begin, record->end);
+		rc = vy_recovery_insert_slice(recovery, record->range_id,
+					      record->run_id, record->slice_id,
+					      record->begin, record->end);
 		break;
 	case VY_LOG_DELETE_SLICE:
 		rc = vy_recovery_delete_slice(recovery, record->slice_id);
@@ -1792,7 +1814,8 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 static ssize_t
 vy_recovery_new_f(va_list ap)
 {
-	int64_t recovery_signature = va_arg(ap, int64_t);
+	int64_t signature = va_arg(ap, int64_t);
+	bool only_snapshot = va_arg(ap, int);
 	struct vy_recovery **p_recovery = va_arg(ap, struct vy_recovery **);
 
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
@@ -1820,24 +1843,18 @@ vy_recovery_new_f(va_list ap)
 		goto fail_free;
 	}
 
-	struct vclock vclock;
-	if (xdir_last_vclock(&vy_log.dir, &vclock) < 0) {
-		/* No log file, nothing to do. */
-		goto out;
-	}
-
 	/*
 	 * We don't create a log file if there are no objects to
 	 * be stored in it, so if the log doesn't exist, assume
 	 * the recovery context is empty.
 	 */
 	const char *path = xdir_format_filename(&vy_log.dir,
-						vclock_sum(&vclock), NONE);
+						signature, NONE);
 	if (access(path, F_OK) < 0 && errno == ENOENT)
 		goto out;
 
 	struct xlog_cursor cursor;
-	if (xdir_open_cursor(&vy_log.dir, vclock_sum(&vclock), &cursor) < 0)
+	if (xdir_open_cursor(&vy_log.dir, signature, &cursor) < 0)
 		goto fail_free;
 
 	int rc;
@@ -1847,8 +1864,11 @@ vy_recovery_new_f(va_list ap)
 		rc = vy_log_record_decode(&record, &row);
 		if (rc < 0)
 			break;
-		if (record.signature >= recovery_signature)
+		if (record.type == VY_LOG_SNAPSHOT) {
+			if (only_snapshot)
+				break;
 			continue;
+		}
 		rc = vy_recovery_process_record(recovery, &record);
 		if (rc < 0)
 			break;
@@ -1872,7 +1892,7 @@ fail:
 }
 
 struct vy_recovery *
-vy_recovery_new(int64_t recovery_signature)
+vy_recovery_new(int64_t signature, bool only_snapshot)
 {
 	int rc;
 	struct vy_recovery *recovery;
@@ -1888,7 +1908,8 @@ vy_recovery_new(int64_t recovery_signature)
 		goto out;
 
 	/* Load the log from coeio so as not to stall tx thread. */
-	rc = coio_call(vy_recovery_new_f, recovery_signature, &recovery);
+	rc = coio_call(vy_recovery_new_f, signature,
+		       (int)only_snapshot, &recovery);
 out:
 	latch_unlock(&vy_log.latch);
 	return rc == 0 ? recovery : NULL;
@@ -1939,7 +1960,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 	const char *tmp;
 
 	record.type = VY_LOG_CREATE_INDEX;
-	record.signature = index->signature;
 	record.index_lsn = index->index_lsn;
 	record.index_id = index->index_id;
 	record.space_id = index->space_id;
@@ -1978,7 +1998,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 			continue;
 		record.type = (run->is_incomplete ?
 			       VY_LOG_PREPARE_RUN : VY_LOG_CREATE_RUN);
-		record.signature = run->signature;
 		record.run_id = run->id;
 		record.dump_lsn = run->dump_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
@@ -1986,13 +2005,13 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		if (!run->is_dropped)
 			continue;
 		record.type = VY_LOG_DROP_RUN;
+		record.gc_lsn = run->gc_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
 		record.type = VY_LOG_INSERT_RANGE;
-		record.signature = range->signature;
 		record.range_id = range->id;
 		record.begin = tmp = range->begin;
 		if (mp_decode_array(&tmp) == 0)
@@ -2009,7 +2028,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		 */
 		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
 			record.type = VY_LOG_INSERT_SLICE;
-			record.signature = slice->signature;
 			record.slice_id = slice->id;
 			record.run_id = slice->run->id;
 			record.begin = tmp = slice->begin;
@@ -2025,7 +2043,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 
 	if (index->is_dropped) {
 		record.type = VY_LOG_DROP_INDEX;
-		record.signature = index->signature;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}

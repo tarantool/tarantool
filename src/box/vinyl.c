@@ -1320,13 +1320,8 @@ vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 		return;
 
 	/* Forget the run on success. */
-	struct vy_log_record gc_record = {
-		.type = VY_LOG_FORGET_RUN,
-		.signature = record->signature,
-		.run_id = record->run_id,
-	};
 	vy_log_tx_begin();
-	vy_log_write(&gc_record);
+	vy_log_forget_run(record->run_id);
 	if (vy_log_tx_commit() < 0) {
 		say_warn("failed to log vinyl run %lld cleanup: %s",
 			 (long long)record->run_id,
@@ -1471,7 +1466,11 @@ vy_run_discard(struct vy_run *run)
 				(long long)run_id); return;});
 
 	vy_log_tx_begin();
-	vy_log_drop_run(run_id);
+	/*
+	 * The run hasn't been used and can be deleted right away
+	 * so set gc_lsn to minimal possible (0).
+	 */
+	vy_log_drop_run(run_id, 0);
 	if (vy_log_tx_commit() < 0) {
 		/*
 		 * Failure to log deletion of an incomplete
@@ -1595,6 +1594,8 @@ struct vy_scheduler {
 	bool is_throttled;
 	/** Set if checkpoint is in progress. */
 	bool checkpoint_in_progress;
+	/** Last checkpoint vclock. */
+	struct vclock last_checkpoint;
 	/**
 	 * Current generation of in-memory data.
 	 *
@@ -4086,8 +4087,9 @@ vy_task_compact_complete(struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
+	int64_t gc_lsn = vclock_sum(&scheduler->last_checkpoint);
 	rlist_foreach_entry(run, &unused_runs, in_unused)
-		vy_log_drop_run(run->id);
+		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
 		vy_log_create_run(index->index_def->opts.lsn,
 				  new_run->id, new_run->dump_lsn);
@@ -4329,6 +4331,7 @@ vy_scheduler_new(struct vy_env *env)
 	diag_create(&scheduler->diag);
 	rlist_create(&scheduler->dump_fifo);
 	ipc_cond_create(&scheduler->dump_cond);
+	vclock_create(&scheduler->last_checkpoint);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
@@ -4927,6 +4930,8 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	if (vy_log_rotate(vclock) != 0)
 		goto error;
 
+	vclock_copy(&scheduler->last_checkpoint, vclock);
+
 	say_info("vinyl checkpoint done");
 	return 0;
 error:
@@ -5248,8 +5253,9 @@ vy_index_drop(struct vy_index *index)
 		fiber_reschedule();
 	}
 	struct vy_run *run;
+	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
 	rlist_foreach_entry(run, &index->runs, in_index) {
-		vy_log_drop_run(run->id);
+		vy_log_drop_run(run->id, gc_lsn);
 		fiber_reschedule();
 	}
 	vy_log_drop_index(index_id);
@@ -9218,7 +9224,8 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	 * Load the recovery context from the given point in time.
 	 * Send all runs stored in it to the replica.
 	 */
-	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		goto out_join_cord;
 	rc = vy_recovery_iterate(recovery, false, vy_join_cb, ctx);
@@ -9250,14 +9257,23 @@ out:
 
 /* {{{ Garbage collection */
 
+/** Argument passed to vy_collect_garbage_cb(). */
+struct vy_gc_arg {
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** LSN of the oldest checkpoint to save. */
+	int64_t gc_lsn;
+};
+
 /** Garbage collection callback, passed to vy_recovery_iterate(). */
 static int
 vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
 {
-	struct vy_env *env = cb_arg;
+	struct vy_gc_arg *arg = cb_arg;
 
-	if (record->type == VY_LOG_DROP_RUN)
-		vy_run_record_gc(env->conf->path, record);
+	if (record->type == VY_LOG_DROP_RUN &&
+	    record->gc_lsn < arg->gc_lsn)
+		vy_run_record_gc(arg->env->conf->path, record);
 
 	fiber_reschedule();
 	return 0;
@@ -9270,13 +9286,18 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	struct vy_recovery *recovery = vy_recovery_new(lsn);
+	int64_t signature = vclock_sum(&env->scheduler->last_checkpoint);
+	struct vy_recovery *recovery = vy_recovery_new(signature, false);
 	if (recovery == NULL) {
 		say_warn("vinyl garbage collection failed: %s",
 			 diag_last_error(diag_get())->errmsg);
 		return;
 	}
-	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, env);
+	struct vy_gc_arg arg = {
+		.env = env,
+		.gc_lsn = lsn,
+	};
+	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, &arg);
 	vy_recovery_delete(recovery);
 }
 
@@ -9327,7 +9348,8 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 		return -1;
 
 	/* Backup run files. */
-	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		return -1;
 	struct vy_backup_arg arg = {

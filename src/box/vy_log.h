@@ -101,7 +101,7 @@ enum vy_log_record_type {
 	VY_LOG_CREATE_RUN		= 5,
 	/**
 	 * Drop a vinyl run.
-	 * Requires vy_log_record::run_id.
+	 * Requires vy_log_record::run_id, gc_lsn.
 	 *
 	 * A record of this type indicates that the run is not in use
 	 * any more and its files can be safely removed. When the log
@@ -138,6 +138,17 @@ enum vy_log_record_type {
 	 * Requires vy_log_record::index_lsn, dump_lsn.
 	 */
 	VY_LOG_DUMP_INDEX		= 10,
+	/**
+	 * We don't split vylog into snapshot and log - all records
+	 * are written to the same file. Since we need to load a
+	 * consistent view from a given checkpoint (for replication
+	 * and backup), we write a marker after the last record
+	 * corresponding to the snapshot. The following record
+	 * represents the marker.
+	 *
+	 * See also: @only_snapshot argument of vy_recovery_new().
+	 */
+	VY_LOG_SNAPSHOT			= 11,
 
 	vy_log_record_type_MAX
 };
@@ -146,11 +157,6 @@ enum vy_log_record_type {
 struct vy_log_record {
 	/** Type of the record. */
 	enum vy_log_record_type type;
-	/**
-	 * The log signature from the time when the record was
-	 * written. Set by vy_log_write().
-	 */
-	int64_t signature;
 	/**
 	 * Unique ID of the vinyl index.
 	 *
@@ -177,6 +183,11 @@ struct vy_log_record {
 	const struct key_def *key_def;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
+	/**
+	 * For deleted runs: LSN of the last checkpoint
+	 * that uses this run.
+	 */
+	int64_t gc_lsn;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
 };
@@ -311,13 +322,17 @@ int
 vy_log_end_recovery(void);
 
 /**
- * Load records having signatures < @recovery_signature from
- * the metadata log and return the recovery context.
+ * Create a recovery context from the metadata log created
+ * by checkpoint with the given signature.
+ *
+ * If @only_snapshot is set, do not load records appended to
+ * the log after checkpoint (i.e. get a consistent view of
+ * Vinyl at the time of the checkpoint).
  *
  * Returns NULL on failure.
  */
 struct vy_recovery *
-vy_recovery_new(int64_t recovery_signature);
+vy_recovery_new(int64_t signature, bool only_snapshot);
 
 /**
  * Free a recovery context created by vy_recovery_new().
@@ -373,7 +388,6 @@ vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_CREATE_INDEX;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.index_id = index_id;
 	record.space_id = space_id;
@@ -388,7 +402,6 @@ vy_log_drop_index(int64_t index_lsn)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DROP_INDEX;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	vy_log_write(&record);
 }
@@ -401,7 +414,6 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_INSERT_RANGE;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.range_id = range_id;
 	record.begin = begin;
@@ -416,7 +428,6 @@ vy_log_delete_range(int64_t range_id)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DELETE_RANGE;
-	record.signature = -1;
 	record.range_id = range_id;
 	vy_log_write(&record);
 }
@@ -428,7 +439,6 @@ vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_PREPARE_RUN;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.run_id = run_id;
 	vy_log_write(&record);
@@ -441,7 +451,6 @@ vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_CREATE_RUN;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.run_id = run_id;
 	record.dump_lsn = dump_lsn;
@@ -450,12 +459,23 @@ vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
 
 /** Helper to log a run deletion. */
 static inline void
-vy_log_drop_run(int64_t run_id)
+vy_log_drop_run(int64_t run_id, int64_t gc_lsn)
 {
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DROP_RUN;
-	record.signature = -1;
+	record.run_id = run_id;
+	record.gc_lsn = gc_lsn;
+	vy_log_write(&record);
+}
+
+/** Helper to log a run cleanup. */
+static inline void
+vy_log_forget_run(int64_t run_id)
+{
+	struct vy_log_record record;
+	memset(&record, 0, sizeof(record));
+	record.type = VY_LOG_FORGET_RUN;
 	record.run_id = run_id;
 	vy_log_write(&record);
 }
@@ -468,7 +488,6 @@ vy_log_insert_slice(int64_t range_id, int64_t run_id, int64_t slice_id,
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_INSERT_SLICE;
-	record.signature = -1;
 	record.range_id = range_id;
 	record.run_id = run_id;
 	record.slice_id = slice_id;
@@ -484,7 +503,6 @@ vy_log_delete_slice(int64_t slice_id)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DELETE_SLICE;
-	record.signature = -1;
 	record.slice_id = slice_id;
 	vy_log_write(&record);
 }
@@ -495,7 +513,6 @@ vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
 	struct vy_log_record record;
 	memset(&record, 0, sizeof(record));
 	record.type = VY_LOG_DUMP_INDEX;
-	record.signature = -1;
 	record.index_lsn = index_lsn;
 	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
