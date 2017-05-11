@@ -44,7 +44,7 @@ enum errinj_type {
 	/** boolean */
 	ERRINJ_BOOL	= 0,
 	/** uint64_t */
-	ERRINJ_U64	= 1,
+	ERRINJ_INT	= 1,
 	/** double */
 	ERRINJ_DOUBLE   = 2
 };
@@ -60,8 +60,8 @@ struct errinj {
 	union {
 		/** bool parameter */
 		bool bparam;
-		/** uint64_t parameter */
-		uint64_t u64param;
+		/** integer parameter */
+		int64_t iparam;
 		/** double parameter */
 		double dparam;
 	};
@@ -75,7 +75,7 @@ struct errinj {
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_U64, {.u64param = UINT64_MAX}) \
+	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \

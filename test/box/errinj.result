@@ -45,7 +45,7 @@ errinj.info()
   ERRINJ_TESTING:
     state: false
   ERRINJ_WAL_WRITE_PARTIAL:
-    state: 18446744073709551615
+    state: -1
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
   ERRINJ_TUPLE_ALLOC:
