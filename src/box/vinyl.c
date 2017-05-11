@@ -5343,7 +5343,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 		}
 	}
 
-	index->cache = vy_cache_new(&e->cache_env, index->index_def);
+	index->cache = vy_cache_new(&e->cache_env, &index->index_def->key_def);
 	if (index->cache == NULL)
 		goto fail_cache_init;
 
