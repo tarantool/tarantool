@@ -554,14 +554,22 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	const struct key_def *def = itr->mem->key_def;
 	int rc;
+	int64_t last_stmt_lsn = 0;
+	if (last_stmt != NULL)
+		last_stmt_lsn = vy_stmt_lsn(last_stmt);
 	*ret = NULL;
-	assert(last_stmt == NULL ||
-	       vy_stmt_lsn(last_stmt) <= (**itr->read_view).vlsn);
+	/*
+	 * Skip the key with lsn bigger than vlsn. It is possible,
+	 * when we restore on prepared, but not commited statement
+	 * from transaction placed in read view.
+	 */
+	bool skip_last_stmt_key = last_stmt != NULL &&
+				  last_stmt_lsn > (**itr->read_view).vlsn;
 	assert(last_stmt == NULL || itr->curr_stmt == NULL ||
 	       iterator_direction(itr->iterator_type) *
 	       vy_tuple_compare(itr->curr_stmt, last_stmt, def) > 0 ||
 	       (vy_tuple_compare(itr->curr_stmt, last_stmt, def) == 0 &&
-		vy_stmt_lsn(itr->curr_stmt) >= vy_stmt_lsn(last_stmt)));
+		vy_stmt_lsn(itr->curr_stmt) >= last_stmt_lsn));
 
 	if (!itr->search_started) {
 		if (last_stmt == NULL) {
@@ -584,8 +592,12 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return 0;
 		bool position_changed = true;
 		if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0) {
-			position_changed = false;
-			if (vy_stmt_lsn(itr->curr_stmt) >= vy_stmt_lsn(last_stmt)) {
+			if (skip_last_stmt_key) {
+				rc = vy_mem_iterator_next_key_impl(itr);
+				assert(rc >= 0);
+			} else if (vy_stmt_lsn(itr->curr_stmt) >=
+				   last_stmt_lsn) {
+				position_changed = false;
 				/*
 				 * Skip the same stmt to next stmt or older
 				 * version.
@@ -599,7 +611,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 					assert(rc >= 0);
 					break;
 				} while (vy_stmt_lsn(itr->curr_stmt) >=
-					 vy_stmt_lsn(last_stmt));
+					 last_stmt_lsn);
 				if (itr->curr_stmt != NULL)
 					position_changed = true;
 			}
@@ -649,6 +661,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return -1;
 		return was_stmt != itr->curr_stmt;
 	}
+	assert(! skip_last_stmt_key);
 
 	vy_mem_iterator_check_version(itr);
 	if (itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT ||
@@ -673,7 +686,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 							       &pos);
 			int cmp = vy_stmt_compare(t, last_stmt, def);
 			if (cmp < 0 || (cmp == 0 &&
-			    vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt)))
+			    vy_stmt_lsn(t) >= last_stmt_lsn))
 				break; /* (2) and (4) */
 			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) { /*(3)*/
 				/* saving the last that fits the requirements */
@@ -686,7 +699,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
 		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) >= 0);
 		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
-		       vy_stmt_lsn(itr->curr_stmt) < vy_stmt_lsn(last_stmt));
+		       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn);
 		if (vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
 		return rc;
@@ -717,7 +730,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		assert(cmp <= 0); /* (2) is automatic */
 		if (cmp < 0 || vy_stmt_lsn(t) > (**itr->read_view).vlsn)
 			break; /* (1) and (3) */
-		if (curr_last && vy_stmt_lsn(t) >= vy_stmt_lsn(last_stmt))
+		if (curr_last && vy_stmt_lsn(t) >= last_stmt_lsn)
 			break; /* 4 */
 		/* saving max(lsn) tuple within this key */
 		itr->curr_pos = pos;
@@ -752,7 +765,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		if (!found &&
 		    vy_stmt_lsn(this_key) <= (**itr->read_view).vlsn && /*(3)*/
 		    (!is_last ||
-		     vy_stmt_lsn(this_key) < vy_stmt_lsn(last_stmt))) /* 4*/ {
+		     vy_stmt_lsn(this_key) < last_stmt_lsn)) /* 4*/ {
 			/* saving max(lsn) tuple within this key */
 			found = true;
 			itr->curr_pos = pos;
@@ -784,7 +797,7 @@ done:
 	assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
 	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) <= 0);
 	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
-	       vy_stmt_lsn(itr->curr_stmt) < vy_stmt_lsn(last_stmt));
+	       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn);
 	if (vy_mem_iterator_copy_to(itr, ret) < 0)
 		return -1;
 	return rc;
