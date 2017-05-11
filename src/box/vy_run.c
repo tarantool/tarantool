@@ -133,7 +133,9 @@ vy_run_new(int64_t id)
 	run->id = id;
 	run->dump_lsn = -1;
 	run->fd = -1;
-	run->slice_count = 0;
+	run->refs = 1;
+	run->compacted_slice_count = 0;
+	rlist_create(&run->in_unused);
 	TRASH(&run->info.bloom);
 	run->info.has_bloom = false;
 	return run;
@@ -142,7 +144,7 @@ vy_run_new(int64_t id)
 void
 vy_run_delete(struct vy_run *run)
 {
-	assert(run->slice_count == 0);
+	assert(run->refs == 0);
 	if (run->fd >= 0 && close(run->fd) < 0)
 		say_syserror("close failed");
 	if (run->info.page_infos != NULL) {
@@ -204,7 +206,7 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	memset(slice, 0, sizeof(*slice));
 	slice->id = id;
 	slice->run = run;
-	run->slice_count++;
+	vy_run_ref(run);
 	if (begin != NULL)
 		tuple_ref(begin);
 	slice->begin = begin;
@@ -244,8 +246,7 @@ void
 vy_slice_delete(struct vy_slice *slice)
 {
 	assert(slice->pin_count == 0);
-	assert(slice->run->slice_count > 0);
-	slice->run->slice_count--;
+	vy_run_unref(slice->run);
 	if (slice->begin != NULL)
 		tuple_unref(slice->begin);
 	if (slice->end != NULL)

@@ -126,18 +126,27 @@ struct vy_run {
 	struct vy_run_info info;
 	/** Run data file. */
 	int fd;
+	/** Unique ID of this run. */
+	int64_t id;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
-	 * The number of slices created for this run.
-	 * Incremented by vy_slice_new(), decremented by
-	 * vy_slice_delete(). Note, the run isn't deleted
-	 * automatically when it hits 0. To delete a run,
-	 * call vy_run_delete().
+	 * Run reference counter, the run is deleted once it hits 0.
+	 * A new run is created with the reference counter set to 1.
+	 * A run is referenced by each slice created for it.
 	 */
-	int slice_count;
-	/** Unique ID of this run. */
-	int64_t id;
+	int refs;
+	/**
+	 * Counter used on completion of a compaction task to check if
+	 * all slices of the run have been compacted and so the run is
+	 * not used any more and should be deleted.
+	 */
+	int64_t compacted_slice_count;
+	/**
+	 * Link in the list of runs that became unused
+	 * after compaction.
+	 */
+	struct rlist in_unused;
 };
 
 /**
@@ -146,7 +155,7 @@ struct vy_run {
 struct vy_slice {
 	/** Unique ID of this slice. */
 	int64_t id;
-	/** Run this slice is for (increments vy_run::slice_count). */
+	/** Run this slice is for (increments vy_run::refs). */
 	struct vy_run *run;
 	/**
 	 * Slice begin and end (increments tuple::refs).
@@ -322,6 +331,21 @@ vy_run_new(int64_t id);
 void
 vy_run_delete(struct vy_run *run);
 
+static inline void
+vy_run_ref(struct vy_run *run)
+{
+	assert(run->refs > 0);
+	run->refs++;
+}
+
+static inline void
+vy_run_unref(struct vy_run *run)
+{
+	assert(run->refs > 0);
+	if (--run->refs == 0)
+		vy_run_delete(run);
+}
+
 /**
  * Load run from disk
  * @param run - run to laod
@@ -335,7 +359,7 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 
 /**
  * Allocate a new run slice.
- * This function increments vy_run::slice_count.
+ * This function increments @run->refs.
  */
 struct vy_slice *
 vy_slice_new(int64_t id, struct vy_run *run,
@@ -344,7 +368,8 @@ vy_slice_new(int64_t id, struct vy_run *run,
 
 /**
  * Free a run slice.
- * This function decrements vy_run::slice_count.
+ * This function decrements @run->refs and
+ * deletes the run if the counter hits 0.
  */
 void
 vy_slice_delete(struct vy_slice *slice);
