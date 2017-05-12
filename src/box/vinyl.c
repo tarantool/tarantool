@@ -7065,6 +7065,18 @@ vy_tx_prepare(struct vy_tx *tx)
 {
 	struct tx_manager *xm = tx->xm;
 	struct vy_env *env = xm->env;
+	/*
+	 * Wait for quota to be not overused. We can't
+	 * invoke vy_quota_use() at the end of prepare,
+	 * since we have pinned mems, and a wait for quota
+	 * may lead to a deadlock.
+	 * And we must use quota before checking the transaction
+	 * read view because the quota use may yield. During the
+	 * yield the prepared transaction may be sent to read
+	 * view.
+	 */
+	vy_quota_use(&env->quota, 0);
+
 	/* proceed non-aborted read-only transactions */
 	if ((!vy_tx_is_ro(tx) && vy_tx_is_in_read_view(tx)) ||
 	    tx->state == VINYL_TX_ABORT) {
@@ -7074,14 +7086,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	}
 
 	assert(tx->state == VINYL_TX_READY);
-
-	/*
-	 * Wait for quota to be not overused. We can't
-	 * invoke vy_quota_use() at the end of prepare,
-	 * since we have pinned mems, and a wait for quota
-	 * may lead to a deadlock.
-	 */
-	vy_quota_use(&env->quota, 0);
 
 	tx->state = VINYL_TX_COMMIT;
 
