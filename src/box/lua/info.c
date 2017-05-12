@@ -218,6 +218,28 @@ lbox_info_ro(struct lua_State *L)
 	return 1;
 }
 
+/*
+ * Tarantool 1.6.x compat
+ */
+static int
+lbox_info_server(struct lua_State *L)
+{
+	lua_createtable(L, 0, 2);
+	lua_pushliteral(L, "id");
+	lbox_info_id(L);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "uuid");
+	lbox_info_uuid(L);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "lsn");
+	lbox_info_lsn(L);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "ro");
+	lbox_info_ro(L);
+	lua_settable(L, -3);
+	return 1;
+}
+
 static int
 lbox_info_vclock(struct lua_State *L)
 {
@@ -375,6 +397,11 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{NULL, NULL}
 };
 
+static const struct luaL_Reg lbox_info_dynamic_meta_v16[] = {
+	{"server", lbox_info_server},
+	{NULL, NULL}
+};
+
 /** Evaluate box.info.* function value and push it on the stack. */
 static int
 lbox_info_index(struct lua_State *L)
@@ -416,6 +443,18 @@ lbox_info_call(struct lua_State *L)
 		lbox_info_dynamic_meta[i].func(L);
 		lua_settable(L, -3);
 	}
+
+	/* Tarantool 1.6.x compat */
+	lua_newtable(L);
+	lua_newtable(L);
+	for (int i = 0; lbox_info_dynamic_meta_v16[i].name; i++) {
+		lua_pushstring(L, lbox_info_dynamic_meta_v16[i].name);
+		lbox_info_dynamic_meta_v16[i].func(L);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, -2, "__index");
+	lua_setmetatable(L, -2);
+
 	return 1;
 }
 
@@ -433,8 +472,9 @@ box_lua_info_init(struct lua_State *L)
 
 	lua_pushstring(L, "__index");
 
-	lua_newtable(L);
-	luaL_register(L, NULL, lbox_info_dynamic_meta); /* table for __index */
+	lua_newtable(L); /* table for __index */
+	luaL_register(L, NULL, lbox_info_dynamic_meta);
+	luaL_register(L, NULL, lbox_info_dynamic_meta_v16);
 	lua_pushcclosure(L, lbox_info_index, 1);
 	lua_settable(L, -3);
 

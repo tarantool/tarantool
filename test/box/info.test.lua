@@ -19,3 +19,13 @@ t = {}
 for k, _ in pairs(box.info()) do table.insert(t, k) end
 table.sort(t)
 t
+
+-- Tarantool 1.6.x compat
+box.info.server.id == box.info.id
+box.info.server.uuid == box.info.uuid
+box.info.server.lsn == box.info.lsn
+box.info.ro == box.info.server.ro
+box.info().server.id == box.info.id
+box.info().server.uuid == box.info.uuid
+box.info().server.lsn == box.info.lsn
+box.info().ro == box.info.server.ro
