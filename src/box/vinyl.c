@@ -544,6 +544,11 @@ struct vy_index {
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
 	vy_range_tree_t tree;
+	/**
+	 * List of all runs created for this index,
+	 * linked by vy_run->in_index.
+	 */
+	struct rlist runs;
 	/** Number of ranges in this index. */
 	int range_count;
 	/** Number of runs in all ranges. */
@@ -1315,13 +1320,8 @@ vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 		return;
 
 	/* Forget the run on success. */
-	struct vy_log_record gc_record = {
-		.type = VY_LOG_FORGET_RUN,
-		.signature = record->signature,
-		.run_id = record->run_id,
-	};
 	vy_log_tx_begin();
-	vy_log_write(&gc_record);
+	vy_log_forget_run(record->run_id);
 	if (vy_log_tx_commit() < 0) {
 		say_warn("failed to log vinyl run %lld cleanup: %s",
 			 (long long)record->run_id,
@@ -1330,8 +1330,10 @@ vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 }
 
 static void
-vy_index_acct_run(struct vy_index *index, struct vy_run *run)
+vy_index_add_run(struct vy_index *index, struct vy_run *run)
 {
+	assert(rlist_empty(&run->in_index));
+	rlist_add_entry(&index->runs, run, in_index);
 	index->run_count++;
 	index->page_count += run->info.count;
 	index->stmt_count += run->info.keys;
@@ -1339,8 +1341,11 @@ vy_index_acct_run(struct vy_index *index, struct vy_run *run)
 }
 
 static void
-vy_index_unacct_run(struct vy_index *index, struct vy_run *run)
+vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 {
+	assert(index->run_count > 0);
+	assert(!rlist_empty(&run->in_index));
+	rlist_del_entry(run, in_index);
 	index->run_count--;
 	index->page_count -= run->info.count;
 	index->stmt_count -= run->info.keys;
@@ -1432,7 +1437,7 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 static struct vy_run *
 vy_run_prepare(struct vy_index *index)
 {
-	struct vy_run *run = vy_run_new(vy_log_next_run_id());
+	struct vy_run *run = vy_run_new(vy_log_next_id());
 	if (run == NULL)
 		return NULL;
 	vy_log_tx_begin();
@@ -1461,7 +1466,11 @@ vy_run_discard(struct vy_run *run)
 				(long long)run_id); return;});
 
 	vy_log_tx_begin();
-	vy_log_drop_run(run_id);
+	/*
+	 * The run hasn't been used and can be deleted right away
+	 * so set gc_lsn to minimal possible (0).
+	 */
+	vy_log_drop_run(run_id, 0);
 	if (vy_log_tx_commit() < 0) {
 		/*
 		 * Failure to log deletion of an incomplete
@@ -1482,6 +1491,133 @@ vy_range_is_scheduled(struct vy_range *range)
 {
 	return range->in_compact.pos == UINT32_MAX;
 }
+
+#define HEAP_NAME vy_dump_heap
+
+static bool
+vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
+{
+	struct vy_index *left = container_of(a, struct vy_index, in_dump);
+	struct vy_index *right = container_of(b, struct vy_index, in_dump);
+
+	/* Older indexes are dumped first. */
+	if (left->generation != right->generation)
+		return left->generation < right->generation;
+	/*
+	 * If a space has more than one index, appending a statement
+	 * to it requires reading the primary index to get the old
+	 * tuple and delete it from secondary indexes. This means that
+	 * on local recovery from WAL, the primary index must not be
+	 * ahead of secondary indexes of the same space, i.e. it must
+	 * be dumped last.
+	 */
+	return left->index_def->iid > right->index_def->iid;
+}
+
+#define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
+
+#include "salad/heap.h"
+
+#undef HEAP_LESS
+#undef HEAP_NAME
+
+#define HEAP_NAME vy_compact_heap
+
+static bool
+vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
+{
+	struct vy_range *left = container_of(a, struct vy_range, in_compact);
+	struct vy_range *right = container_of(b, struct vy_range, in_compact);
+	/*
+	 * Prefer ranges whose read amplification will be reduced
+	 * most as a result of compaction.
+	 */
+	return left->compact_priority > right->compact_priority;
+}
+
+#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
+
+#include "salad/heap.h"
+
+struct vy_scheduler {
+	pthread_mutex_t        mutex;
+	struct vy_env    *env;
+	heap_t dump_heap;
+	heap_t compact_heap;
+
+	struct cord *worker_pool;
+	struct fiber *scheduler;
+	struct ev_loop *loop;
+	/** Total number of worker threads. */
+	int worker_pool_size;
+	/** Number worker threads that are currently idle. */
+	int workers_available;
+	bool is_worker_pool_running;
+
+	/**
+	 * There is a pending task for workers in the pool,
+	 * or we want to shutdown workers.
+	 */
+	pthread_cond_t worker_cond;
+	/**
+	 * There is no pending tasks for workers, so scheduler
+	 * needs to create one, or we want to shutdown the
+	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
+	 * are used here instead of pthread_cond_t.
+	 */
+	struct ev_async scheduler_async;
+	struct ipc_cond scheduler_cond;
+	/** Used for throttling tx when quota is full. */
+	struct ipc_cond quota_cond;
+	/**
+	 * A queue with all vy_task objects created by the
+	 * scheduler and not yet taken by a worker.
+	 */
+	struct stailq input_queue;
+	/**
+	 * A queue of processed vy_tasks objects.
+	 */
+	struct stailq output_queue;
+	/**
+	 * A memory pool for vy_tasks.
+	 */
+	struct mempool task_pool;
+
+	/** Last error seen by the scheduler. */
+	struct diag diag;
+	/**
+	 * Schedule timeout. Grows exponentially with each successive
+	 * failure. Reset on successful task completion.
+	 */
+	ev_tstamp timeout;
+	/** Set if the scheduler is throttled due to errors. */
+	bool is_throttled;
+	/** Set if checkpoint is in progress. */
+	bool checkpoint_in_progress;
+	/** Last checkpoint vclock. */
+	struct vclock last_checkpoint;
+	/**
+	 * Current generation of in-memory data.
+	 *
+	 * New in-memory trees inherit the current generation, while
+	 * the scheduler dumps all in-memory trees whose generation
+	 * is less. The generation is increased either on checkpoint
+	 * or on exceeding the memory quota to force dumping all old
+	 * in-memory trees.
+	 */
+	int64_t generation;
+	/**
+	 * List of all in-memory trees, scheduled for dump.
+	 * Older trees are closer to the tail of the list.
+	 */
+	struct rlist dump_fifo;
+	/**
+	 * Signaled on dump completion, i.e. as soon as all in-memory
+	 * trees whose generation is less than the current generation
+	 * have been dumped. Also signaled on any scheduler failure.
+	 */
+	struct ipc_cond dump_cond;
+};
 
 static void
 vy_scheduler_add_index(struct vy_scheduler *, struct vy_index *);
@@ -2329,7 +2465,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 		return NULL;
 	}
 	/* Allocate a new id unless specified. */
-	range->id = (id >= 0 ? id : vy_log_next_range_id());
+	range->id = (id >= 0 ? id : vy_log_next_id());
 	if (begin != NULL) {
 		tuple_ref(begin);
 		range->begin = begin;
@@ -2351,14 +2487,14 @@ vy_range_new(struct vy_index *index, int64_t id,
  * while an index is being dumped.
  */
 static int
-vy_index_rotate_mem(struct vy_index *index, int64_t generation)
+vy_index_rotate_mem(struct vy_index *index)
 {
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct vy_mem *mem;
 
 	assert(index->mem != NULL);
-	mem = vy_mem_new(allocator, generation,
+	mem = vy_mem_new(allocator, scheduler->generation,
 			 &index->index_def->key_def,
 			 index->space_format,
 			 index->space_format_with_colmask,
@@ -2555,7 +2691,7 @@ vy_range_maybe_split(struct vy_range *range)
 		 * to iterate backward.
 		 */
 		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
-			if (vy_slice_cut(slice, vy_log_next_slice_id(),
+			if (vy_slice_cut(slice, vy_log_next_id(),
 					 part->begin, part->end,
 					 &index_def->key_def, &new_slice) != 0)
 				goto fail;
@@ -2571,6 +2707,8 @@ vy_range_maybe_split(struct vy_range *range)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
+	rlist_foreach_entry(slice, &range->slices, in_range)
+		vy_log_delete_slice(slice->id);
 	vy_log_delete_range(range->id);
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
@@ -2808,6 +2946,8 @@ vy_range_maybe_coalesce(struct vy_range *range)
 			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
 		struct vy_slice *slice;
+		rlist_foreach_entry(slice, &it->slices, in_range)
+			vy_log_delete_slice(slice->id);
 		vy_log_delete_range(it->id);
 		rlist_foreach_entry(slice, &it->slices, in_range) {
 			vy_log_insert_slice(result->id, slice->run->id, slice->id,
@@ -3097,7 +3237,7 @@ vy_index_open_ex(struct vy_index *index)
 					    (long long)index_def->opts.lsn));
 			rc = -1;
 		} else
-			vy_index_acct_run(index, run);
+			vy_index_add_run(index, run);
 		/* Drop the reference held by the hash. */
 		vy_run_unref(run);
 	}
@@ -3366,9 +3506,10 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
  * sure it is not dumped until the transaction is complete.
  */
 static int
-vy_tx_write_prepare(struct txv *v, int64_t generation)
+vy_tx_write_prepare(struct txv *v)
 {
 	struct vy_index *index = v->index;
+	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	/*
 	 * Allocate a new in-memory tree if either of the following
@@ -3383,8 +3524,8 @@ vy_tx_write_prepare(struct txv *v, int64_t generation)
 	 *   statements of different formats in the same tree.
 	 */
 	if (unlikely(index->mem->schema_version != schema_version ||
-		     index->mem->generation != generation)) {
-		if (vy_index_rotate_mem(index, generation) != 0)
+		     index->mem->generation != scheduler->generation)) {
+		if (vy_index_rotate_mem(index) != 0)
 			return -1;
 	}
 	vy_mem_pin(index->mem);
@@ -3610,7 +3751,7 @@ vy_task_dump_complete(struct vy_task *task)
 	}
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(&index->tree, range), i++) {
-		slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+		slice = vy_slice_new(vy_log_next_id(), new_run,
 				     range->begin, range->end,
 				     &index->index_def->key_def);
 		if (slice == NULL)
@@ -3647,7 +3788,7 @@ vy_task_dump_complete(struct vy_task *task)
 	/*
 	 * Account the new run.
 	 */
-	vy_index_acct_run(index, new_run);
+	vy_index_add_run(index, new_run);
 
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
@@ -3746,11 +3887,10 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
  * Create a task to dump an index.
  *
  * On success the task is supposed to dump all in-memory
- * trees older than @generation.
+ * trees older than @scheduler->generation.
  */
 static int
-vy_task_dump_new(struct mempool *pool, struct vy_index *index,
-		 int64_t generation, struct vy_task **p_task)
+vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
@@ -3760,6 +3900,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 	struct tx_manager *xm = index->env->xm;
 	struct vy_scheduler *scheduler = index->env->scheduler;
+	int64_t generation = scheduler->generation;
 
 	assert(index->pin_count == 0);
 	assert(index->generation < generation);
@@ -3771,7 +3912,7 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 
 	/* Rotate the active tree if it needs to be dumped. */
 	if (index->mem->generation < generation &&
-	    vy_index_rotate_mem(index, generation) != 0)
+	    vy_index_rotate_mem(index) != 0)
 		goto err_mem;
 
 	/*
@@ -3807,7 +3948,8 @@ vy_task_dump_new(struct mempool *pool, struct vy_index *index,
 		return 0;
 	}
 
-	struct vy_task *task = vy_task_new(pool, index, &dump_ops);
+	struct vy_task *task = vy_task_new(&scheduler->task_pool,
+					   index, &dump_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -3865,7 +4007,7 @@ err_wi_sub:
 err_wi:
 	vy_run_discard(new_run);
 err_run:
-	vy_task_delete(pool, task);
+	vy_task_delete(&scheduler->task_pool, task);
 err_task:
 	/* Leave the new mem on the list in case of failure. */
 err_mem:
@@ -3911,7 +4053,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * compacted runs.
 	 */
 	if (!vy_run_is_empty(new_run)) {
-		new_slice = vy_slice_new(vy_log_next_slice_id(), new_run,
+		new_slice = vy_slice_new(vy_log_next_id(), new_run,
 				NULL, NULL, &index->index_def->key_def);
 		if (new_slice == NULL)
 			return -1;
@@ -3945,8 +4087,9 @@ vy_task_compact_complete(struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
+	int64_t gc_lsn = vclock_sum(&scheduler->last_checkpoint);
 	rlist_foreach_entry(run, &unused_runs, in_unused)
-		vy_log_drop_run(run->id);
+		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
 		vy_log_create_run(index->index_def->opts.lsn,
 				  new_run->id, new_run->dump_lsn);
@@ -3965,7 +4108,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * otherwise discard it.
 	 */
 	if (new_slice != NULL) {
-		vy_index_acct_run(index, new_run);
+		vy_index_add_run(index, new_run);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
 	} else
@@ -3999,7 +4142,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 * Unaccount unused runs and delete compacted slices.
 	 */
 	rlist_foreach_entry(run, &unused_runs, in_unused)
-		vy_index_unacct_run(index, run);
+		vy_index_remove_run(index, run);
 	rlist_foreach_entry_safe(slice, &compacted_slices,
 				 in_range, next_slice) {
 		vy_slice_wait_pinned(slice);
@@ -4038,8 +4181,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 }
 
 static int
-vy_task_compact_new(struct mempool *pool, struct vy_range *range,
-		    struct vy_task **p_task)
+vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 {
 	assert(range->compact_priority > 1);
 
@@ -4064,7 +4206,8 @@ vy_task_compact_new(struct mempool *pool, struct vy_range *range,
 	if (vy_range_maybe_coalesce(range))
 		return 0;
 
-	struct vy_task *task = vy_task_new(pool, index, &compact_ops);
+	struct vy_task *task = vy_task_new(&scheduler->task_pool,
+					   index, &compact_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -4123,7 +4266,7 @@ err_wi_sub:
 err_wi:
 	vy_run_discard(new_run);
 err_run:
-	vy_task_delete(pool, task);
+	vy_task_delete(&scheduler->task_pool, task);
 err_task:
 	say_error("%s: could not start compacting range %s: %s", index->name,
 		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
@@ -4133,131 +4276,6 @@ err_task:
 /* Scheduler Task }}} */
 
 /* {{{ Scheduler */
-
-#define HEAP_NAME vy_dump_heap
-
-static bool
-vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
-{
-	struct vy_index *left = container_of(a, struct vy_index, in_dump);
-	struct vy_index *right = container_of(b, struct vy_index, in_dump);
-
-	/* Older indexes are dumped first. */
-	if (left->generation != right->generation)
-		return left->generation < right->generation;
-	/*
-	 * If a space has more than one index, appending a statement
-	 * to it requires reading the primary index to get the old
-	 * tuple and delete it from secondary indexes. This means that
-	 * on local recovery from WAL, the primary index must not be
-	 * ahead of secondary indexes of the same space, i.e. it must
-	 * be dumped last.
-	 */
-	return left->index_def->iid > right->index_def->iid;
-}
-
-#define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
-
-#include "salad/heap.h"
-
-#undef HEAP_LESS
-#undef HEAP_NAME
-
-#define HEAP_NAME vy_compact_heap
-
-static bool
-vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
-{
-	struct vy_range *left = container_of(a, struct vy_range, in_compact);
-	struct vy_range *right = container_of(b, struct vy_range, in_compact);
-	/*
-	 * Prefer ranges whose read amplification will be reduced
-	 * most as a result of compaction.
-	 */
-	return left->compact_priority > right->compact_priority;
-}
-
-#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
-
-#include "salad/heap.h"
-
-struct vy_scheduler {
-	pthread_mutex_t        mutex;
-	struct vy_env    *env;
-	heap_t dump_heap;
-	heap_t compact_heap;
-
-	struct cord *worker_pool;
-	struct fiber *scheduler;
-	struct ev_loop *loop;
-	/** Total number of worker threads. */
-	int worker_pool_size;
-	/** Number worker threads that are currently idle. */
-	int workers_available;
-	bool is_worker_pool_running;
-
-	/**
-	 * There is a pending task for workers in the pool,
-	 * or we want to shutdown workers.
-	 */
-	pthread_cond_t worker_cond;
-	/**
-	 * There is no pending tasks for workers, so scheduler
-	 * needs to create one, or we want to shutdown the
-	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
-	 * are used here instead of pthread_cond_t.
-	 */
-	struct ev_async scheduler_async;
-	struct ipc_cond scheduler_cond;
-	/** Used for throttling tx when quota is full. */
-	struct ipc_cond quota_cond;
-	/**
-	 * A queue with all vy_task objects created by the
-	 * scheduler and not yet taken by a worker.
-	 */
-	struct stailq input_queue;
-	/**
-	 * A queue of processed vy_tasks objects.
-	 */
-	struct stailq output_queue;
-	/**
-	 * A memory pool for vy_tasks.
-	 */
-	struct mempool task_pool;
-
-	/** Last error seen by the scheduler. */
-	struct diag diag;
-	/**
-	 * Schedule timeout. Grows exponentially with each successive
-	 * failure. Reset on successful task completion.
-	 */
-	ev_tstamp timeout;
-	/** Set if the scheduler is throttled due to errors. */
-	bool is_throttled;
-	/** Set if checkpoint is in progress. */
-	bool checkpoint_in_progress;
-	/**
-	 * Current generation of in-memory data.
-	 *
-	 * New in-memory trees inherit the current generation, while
-	 * the scheduler dumps all in-memory trees whose generation
-	 * is less. The generation is increased either on checkpoint
-	 * or on exceeding the memory quota to force dumping all old
-	 * in-memory trees.
-	 */
-	int64_t generation;
-	/**
-	 * List of all in-memory trees, scheduled for dump.
-	 * Older trees are closer to the tail of the list.
-	 */
-	struct rlist dump_fifo;
-	/**
-	 * Signaled on dump completion, i.e. as soon as all in-memory
-	 * trees whose generation is less than the current generation
-	 * have been dumped. Also signaled on any scheduler failure.
-	 */
-	struct ipc_cond dump_cond;
-};
 
 /* Min and max values for vy_scheduler->timeout. */
 #define VY_SCHEDULER_TIMEOUT_MIN		1
@@ -4313,6 +4331,7 @@ vy_scheduler_new(struct vy_env *env)
 	diag_create(&scheduler->diag);
 	rlist_create(&scheduler->dump_fifo);
 	ipc_cond_create(&scheduler->dump_cond);
+	vclock_create(&scheduler->last_checkpoint);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
@@ -4460,8 +4479,7 @@ retry:
 	struct vy_index *index = container_of(pn, struct vy_index, in_dump);
 	if (index->generation == scheduler->generation)
 		return 0; /* nothing to do */
-	if (vy_task_dump_new(&scheduler->task_pool, index,
-			     scheduler->generation, ptask) != 0)
+	if (vy_task_dump_new(index, ptask) != 0)
 		return -1;
 	if (*ptask == NULL)
 		goto retry; /* index dropped or all mems empty */
@@ -4492,7 +4510,7 @@ retry:
 	struct vy_range *range = container_of(pn, struct vy_range, in_compact);
 	if (range->compact_priority <= 1)
 		return 0; /* nothing to do */
-	if (vy_task_compact_new(&scheduler->task_pool, range, ptask) != 0)
+	if (vy_task_compact_new(range, ptask) != 0)
 		return -1;
 	if (*ptask == NULL)
 		goto retry; /* index dropped or range split/coalesced */
@@ -4912,6 +4930,8 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	if (vy_log_rotate(vclock) != 0)
 		goto error;
 
+	vclock_copy(&scheduler->last_checkpoint, vclock);
+
 	say_info("vinyl checkpoint done");
 	return 0;
 error:
@@ -5211,7 +5231,6 @@ vy_index_drop(struct vy_index *index)
 	index->is_dropped = true;
 	rlist_del(&index->link);
 	index->space = NULL;
-	vy_index_unref(index);
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -5222,13 +5241,29 @@ vy_index_drop(struct vy_index *index)
 	 * on local recovery from WAL.
 	 */
 	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && was_dropped)
-		return;
+		goto free_index;
 
 	vy_log_tx_begin();
+	for (struct vy_range *range = vy_range_tree_first(&index->tree);
+	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
+		struct vy_slice *slice;
+		rlist_foreach_entry(slice, &range->slices, in_range)
+			vy_log_delete_slice(slice->id);
+		vy_log_delete_range(range->id);
+		fiber_reschedule();
+	}
+	struct vy_run *run;
+	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		vy_log_drop_run(run->id, gc_lsn);
+		fiber_reschedule();
+	}
 	vy_log_drop_index(index_id);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
 			 diag_last_error(diag_get())->errmsg);
+free_index:
+	vy_index_unref(index);
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
@@ -5380,6 +5415,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->dump_lsn = -1;
 	rlist_create(&index->sealed);
 	vy_range_tree_new(&index->tree);
+	rlist_create(&index->runs);
 	rlist_create(&index->link);
 	read_set_new(&index->read_set);
 	index->space = space;
@@ -7041,7 +7077,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * Flush transactional changes to the index.
 	 * Sic: the loop below must not yield after recovery.
 	 */
-	int64_t generation = env->scheduler->generation;
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	int count = 0, write_count = 0;
 	const struct tuple *delete = NULL, *replace = NULL;
@@ -7052,7 +7087,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (v->is_read)
 			continue;
 
-		if (vy_tx_write_prepare(v, generation) != 0)
+		if (vy_tx_write_prepare(v) != 0)
 			return -1;
 		assert(v->mem != NULL);
 
@@ -9189,7 +9224,8 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	 * Load the recovery context from the given point in time.
 	 * Send all runs stored in it to the replica.
 	 */
-	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		goto out_join_cord;
 	rc = vy_recovery_iterate(recovery, false, vy_join_cb, ctx);
@@ -9221,14 +9257,23 @@ out:
 
 /* {{{ Garbage collection */
 
+/** Argument passed to vy_collect_garbage_cb(). */
+struct vy_gc_arg {
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** LSN of the oldest checkpoint to save. */
+	int64_t gc_lsn;
+};
+
 /** Garbage collection callback, passed to vy_recovery_iterate(). */
 static int
 vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
 {
-	struct vy_env *env = cb_arg;
+	struct vy_gc_arg *arg = cb_arg;
 
-	if (record->type == VY_LOG_DROP_RUN)
-		vy_run_record_gc(env->conf->path, record);
+	if (record->type == VY_LOG_DROP_RUN &&
+	    record->gc_lsn < arg->gc_lsn)
+		vy_run_record_gc(arg->env->conf->path, record);
 
 	fiber_reschedule();
 	return 0;
@@ -9241,13 +9286,18 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	struct vy_recovery *recovery = vy_recovery_new(lsn);
+	int64_t signature = vclock_sum(&env->scheduler->last_checkpoint);
+	struct vy_recovery *recovery = vy_recovery_new(signature, false);
 	if (recovery == NULL) {
 		say_warn("vinyl garbage collection failed: %s",
 			 diag_last_error(diag_get())->errmsg);
 		return;
 	}
-	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, env);
+	struct vy_gc_arg arg = {
+		.env = env,
+		.gc_lsn = lsn,
+	};
+	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, &arg);
 	vy_recovery_delete(recovery);
 }
 
@@ -9298,7 +9348,8 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 		return -1;
 
 	/* Backup run files. */
-	struct vy_recovery *recovery = vy_recovery_new(vclock_sum(vclock));
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		return -1;
 	struct vy_backup_arg arg = {

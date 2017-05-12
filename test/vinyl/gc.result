@@ -73,17 +73,6 @@ vylog_count()
 ---
 - 2
 ...
--- Although all run files have been deleted and forgotten by now,
--- the snapshot following the last gc still results in creation of
--- a vylog file, because index and range records are only purged
--- from the log on the next rotation.
-_ = temp:auto_increment{} snapshot()
----
-...
-vylog_count()
----
-- 2
-...
 -- All records should have been purged from the log by now
 -- so we should only keep the previous log file.
 _ = temp:auto_increment{} snapshot()
