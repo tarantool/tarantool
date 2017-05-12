@@ -413,6 +413,7 @@ static int
 test_cpcall(lua_State *L)
 {
 	assert(luaT_cpcall(L, cpcall_handler, 0) == 0);
+	(void)cpcall_handler;
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -422,6 +423,7 @@ test_state(lua_State *L)
 {
 	lua_State *tarantool_L = luaT_state();
 	assert(lua_newthread(tarantool_L) != 0);
+	(void)tarantool_L;
 	lua_pushboolean(L, true);
 	return 1;
 }
