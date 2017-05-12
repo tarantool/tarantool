@@ -4400,8 +4400,10 @@ vy_scheduler_remove_index(struct vy_scheduler *scheduler,
 static void
 vy_scheduler_pin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	if (index->pin_count == 0)
+	if (index->pin_count == 0) {
+		vy_index_ref(index);
 		vy_scheduler_remove_index(scheduler, index);
+	}
 	index->pin_count++;
 }
 
@@ -4410,8 +4412,10 @@ vy_scheduler_unpin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
 	assert(index->pin_count > 0);
 	index->pin_count--;
-	if (index->pin_count == 0)
+	if (index->pin_count == 0) {
 		vy_scheduler_add_index(scheduler, index);
+		vy_index_unref(index);
+	}
 }
 
 static void
