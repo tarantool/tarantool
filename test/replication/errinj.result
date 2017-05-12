@@ -99,7 +99,7 @@ test_f(11, true)
 ---
 - error: Failed to write to disk
 ...
-errinj.set("ERRINJ_WAL_WRITE_PARTIAL", 0x8ffffffff)
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", -1)
 ---
 - ok
 ...

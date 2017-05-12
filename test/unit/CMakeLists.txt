@@ -70,6 +70,9 @@ target_link_libraries(xrow.test server misc ${MSGPUCK_LIBRARIES})
 add_executable(fiber.test fiber.cc unit.c)
 target_link_libraries(fiber.test core)
 
+add_executable(guard.test guard.cc unit.c)
+target_link_libraries(guard.test core)
+
 add_executable(fiber_stress.test fiber_stress.cc)
 target_link_libraries(fiber_stress.test core)
 

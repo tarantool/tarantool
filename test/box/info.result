@@ -85,3 +85,36 @@ t
   - version
   - vinyl
 ...
+-- Tarantool 1.6.x compat
+box.info.server.id == box.info.id
+---
+- true
+...
+box.info.server.uuid == box.info.uuid
+---
+- true
+...
+box.info.server.lsn == box.info.lsn
+---
+- true
+...
+box.info.ro == box.info.server.ro
+---
+- true
+...
+box.info().server.id == box.info.id
+---
+- true
+...
+box.info().server.uuid == box.info.uuid
+---
+- true
+...
+box.info().server.lsn == box.info.lsn
+---
+- true
+...
+box.info().ro == box.info.server.ro
+---
+- true
+...

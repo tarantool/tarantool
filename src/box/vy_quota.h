@@ -105,27 +105,15 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 }
 
 /**
- * Given the rate of memory consumption vs release and
- * the size of memory chunk that will be reclaimed next,
- * compute the optimal watermark.
+ * Set memory watermark. If current memory usage exceeds
+ * the new watermark, invoke the callback.
  */
 static inline void
-vy_quota_update_watermark(struct vy_quota *q, size_t chunk_size,
-			  size_t use_rate, size_t release_rate)
+vy_quota_set_watermark(struct vy_quota *q, size_t watermark)
 {
-	if (q->limit == SIZE_MAX)
-		return;
-	/*
-	 * The gap between the watermark and the hard limit
-	 * is set to such a value that should allow us to dumpe
-	 * the next range before the hard limit is hit, basing
-	 * on average tx rate and disk bandwidth.
-	 */
-	size_t gap = (double)chunk_size * use_rate / release_rate;
-	if (gap < q->limit)
-		q->watermark = q->limit - gap;
-	else
-		q->watermark = 0;
+	q->watermark = watermark;
+	if (q->used >= watermark)
+		q->cb(VY_QUOTA_EXCEEDED, q->cb_arg);
 }
 
 /**

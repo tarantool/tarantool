@@ -149,8 +149,8 @@ lbox_errinj_set(struct lua_State *L)
 	case ERRINJ_BOOL:
 		errinj->bparam = lua_toboolean(L, 2);
 		break;
-	case ERRINJ_U64:
-		errinj->u64param = luaL_checkuint64(L, 2);
+	case ERRINJ_INT:
+		errinj->iparam = luaL_checkint64(L, 2);
 		break;
 	case ERRINJ_DOUBLE:
 		errinj->dparam = lua_tonumber(L, 2);
@@ -175,8 +175,8 @@ lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 	case ERRINJ_BOOL:
 		lua_pushboolean(L, e->bparam);
 		break;
-	case ERRINJ_U64:
-		luaL_pushuint64(L, e->u64param);
+	case ERRINJ_INT:
+		luaL_pushint64(L, e->iparam);
 		break;
 	case ERRINJ_DOUBLE:
 		lua_pushnumber(L, e->dparam);

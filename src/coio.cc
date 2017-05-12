@@ -64,9 +64,7 @@ coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
 {
 	coio->data = fiber();
 	bool is_timedout = fiber_yield_timeout(delay);
-#ifdef DEBUG
 	coio->data = NULL;
-#endif
 	return is_timedout;
 }
 

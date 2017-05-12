@@ -1173,8 +1173,9 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	struct obuf_svp svp = obuf_create_svp(&log->obuf);
 	for (int i = 0; i < iovcnt; ++i) {
 		struct errinj *inj = errinj(ERRINJ_WAL_WRITE_PARTIAL,
-					    ERRINJ_U64);
-		if (inj != NULL && obuf_size(&log->obuf) > inj->u64param) {
+					    ERRINJ_INT);
+		if (inj != NULL && inj->iparam >= 0 &&
+		    obuf_size(&log->obuf) > (size_t)inj->iparam) {
 			diag_set(ClientError, ER_INJECTION,
 				 "xlog write injection");
 			obuf_rollback_to_svp(&log->obuf, &svp);

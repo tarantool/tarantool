@@ -51,7 +51,7 @@ test_f(1)
 errinj.set("ERRINJ_WAL_WRITE_PARTIAL", 16384)
 test_f(11, true)
 
-errinj.set("ERRINJ_WAL_WRITE_PARTIAL", 0x8ffffffff)
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", -1)
 
 test_f(11, true)
 test_f(21, true)

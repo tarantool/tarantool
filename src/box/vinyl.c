@@ -88,6 +88,16 @@
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 
+/**
+ * Yield after iterating over this many objects (e.g. ranges).
+ * Yield more often in debug mode.
+ */
+#if defined(NDEBUG)
+enum { VY_YIELD_LOOPS = 128 };
+#else
+enum { VY_YIELD_LOOPS = 2 };
+#endif
+
 #define vy_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
@@ -3700,7 +3710,7 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_slice **new_slices, *slice;
 	struct vy_range *range, *begin_range, *end_range;
 	struct tuple *min_key, *max_key;
-	int i;
+	int i, loops = 0;
 
 	if (vy_run_is_empty(new_run)) {
 		/*
@@ -3763,7 +3773,8 @@ vy_task_dump_complete(struct vy_task *task)
 		 * It's OK to yield here for the range tree can only
 		 * be changed from the scheduler fiber.
 		 */
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 
 	/*
@@ -3779,7 +3790,8 @@ vy_task_dump_complete(struct vy_task *task)
 				    tuple_data_or_null(slice->begin),
 				    tuple_data_or_null(slice->end));
 
-		fiber_reschedule(); /* see comment above */
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0); /* see comment above */
 	}
 	vy_log_dump_index(index->index_def->opts.lsn, dump_lsn);
 	if (vy_log_tx_commit() < 0)
@@ -3816,7 +3828,8 @@ vy_task_dump_complete(struct vy_task *task)
 		 * which is only done after in-memory trees are
 		 * removed (see vy_read_iterator_add_disk()).
 		 */
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	free(new_slices);
 
@@ -3854,6 +3867,8 @@ fail_free_slices:
 		slice = new_slices[i];
 		if (slice != NULL)
 			vy_slice_delete(slice);
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	free(new_slices);
 fail:
@@ -3910,10 +3925,16 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 		return 0;
 	}
 
+	struct errinj *inj = errinj(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT);
+	if (inj != NULL && inj->iparam == (int)index->index_def->iid) {
+		diag_set(ClientError, ER_INJECTION, "vinyl index dump");
+		goto err;
+	}
+
 	/* Rotate the active tree if it needs to be dumped. */
 	if (index->mem->generation < generation &&
 	    vy_index_rotate_mem(index) != 0)
-		goto err_mem;
+		goto err;
 
 	/*
 	 * Wait until all active writes to in-memory trees
@@ -3951,7 +3972,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	struct vy_task *task = vy_task_new(&scheduler->task_pool,
 					   index, &dump_ops);
 	if (task == NULL)
-		goto err_task;
+		goto err;
 
 	struct vy_run *new_run = vy_run_prepare(index);
 	if (new_run == NULL)
@@ -4008,9 +4029,7 @@ err_wi:
 	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
-err_task:
-	/* Leave the new mem on the list in case of failure. */
-err_mem:
+err:
 	say_error("%s: could not start dump: %s", index->name,
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
@@ -4400,8 +4419,10 @@ vy_scheduler_remove_index(struct vy_scheduler *scheduler,
 static void
 vy_scheduler_pin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	if (index->pin_count == 0)
+	if (index->pin_count == 0) {
+		vy_index_ref(index);
 		vy_scheduler_remove_index(scheduler, index);
+	}
 	index->pin_count++;
 }
 
@@ -4410,8 +4431,10 @@ vy_scheduler_unpin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
 	assert(index->pin_count > 0);
 	index->pin_count--;
-	if (index->pin_count == 0)
+	if (index->pin_count == 0) {
 		vy_scheduler_add_index(scheduler, index);
+		vy_index_unref(index);
+	}
 }
 
 static void
@@ -4707,9 +4730,9 @@ error:
 		if (scheduler->timeout > VY_SCHEDULER_TIMEOUT_MAX)
 			scheduler->timeout = VY_SCHEDULER_TIMEOUT_MAX;
 		struct errinj *inj;
-		inj = errinj(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64);
-		if (inj != NULL && inj->u64param != 0)
-			scheduler->timeout = 0.001 * inj->u64param;
+		inj = errinj(ERRINJ_VY_SCHED_TIMEOUT, ERRINJ_DOUBLE);
+		if (inj != NULL && inj->dparam != 0)
+			scheduler->timeout = inj->dparam;
 		say_warn("throttling scheduler for %.0f second(s)",
 			 scheduler->timeout);
 		scheduler->is_throttled = true;
@@ -5244,19 +5267,22 @@ vy_index_drop(struct vy_index *index)
 		goto free_index;
 
 	vy_log_tx_begin();
+	int loops = 0;
 	for (struct vy_range *range = vy_range_tree_first(&index->tree);
 	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &range->slices, in_range)
 			vy_log_delete_slice(slice->id);
 		vy_log_delete_range(range->id);
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	struct vy_run *run;
 	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
 	rlist_foreach_entry(run, &index->runs, in_index) {
 		vy_log_drop_run(run->id, gc_lsn);
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	vy_log_drop_index(index_id);
 	if (vy_log_tx_try_commit() < 0)
@@ -7289,21 +7315,27 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 {
 	(void)loop;
 	(void)events;
+
 	struct vy_env *e = timer->data;
 
 	int64_t tx_write_rate = vy_stat_tx_write_rate(e->stat);
 	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
 
-	size_t max_index_size = 0;
-	struct heap_node *pn = vy_dump_heap_top(&e->scheduler->dump_heap);
-	if (pn != NULL) {
-		struct vy_index *index = container_of(pn, struct vy_index,
-						      in_dump);
-		max_index_size = index->mem_used;
-	}
+	/*
+	 * Due to log structured nature of the lsregion allocator,
+	 * which is used for allocating statements, we cannot free
+	 * memory in chunks, only all at once. Therefore we should
+	 * configure the watermark so that by the time we hit the
+	 * limit, all memory have been dumped, i.e.
+	 *
+	 *   limit - watermark      watermark
+	 *   ----------------- = --------------
+	 *     tx_write_rate     dump_bandwidth
+	 */
+	size_t watermark = ((double)e->quota.limit * dump_bandwidth /
+			    (dump_bandwidth + tx_write_rate + 1));
 
-	vy_quota_update_watermark(&e->quota, max_index_size,
-				  tx_write_rate, dump_bandwidth);
+	vy_quota_set_watermark(&e->quota, watermark);
 }
 
 static struct vy_squash_queue *
@@ -9263,6 +9295,8 @@ struct vy_gc_arg {
 	struct vy_env *env;
 	/** LSN of the oldest checkpoint to save. */
 	int64_t gc_lsn;
+	/** Number of times the callback has been called. */
+	int loops;
 };
 
 /** Garbage collection callback, passed to vy_recovery_iterate(). */
@@ -9275,7 +9309,8 @@ vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
 	    record->gc_lsn < arg->gc_lsn)
 		vy_run_record_gc(arg->env->conf->path, record);
 
-	fiber_reschedule();
+	if (++arg->loops % VY_YIELD_LOOPS == 0)
+		fiber_sleep(0);
 	return 0;
 }
 
@@ -9313,6 +9348,8 @@ struct vy_backup_arg {
 	int (*cb)(const char *, void *);
 	/** Argument passed to @cb. */
 	void *cb_arg;
+	/** Number of times the callback has been called. */
+	int loops;
 };
 
 /** Backup callback, passed to vy_recovery_iterate(). */
@@ -9332,7 +9369,8 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 			return -1;
 	}
 out:
-	fiber_reschedule();
+	if (++arg->loops % VY_YIELD_LOOPS == 0)
+		fiber_sleep(0);
 	return 0;
 }
 
@@ -9415,9 +9453,9 @@ vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 static int
 vy_squash_process(struct vy_squash *squash)
 {
-	struct errinj *inj = errinj(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_U64);
-	if (inj != NULL && inj->u64param > 0)
-		fiber_sleep(inj->u64param * 0.001);
+	struct errinj *inj = errinj(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
 
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
