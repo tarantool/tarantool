@@ -88,6 +88,16 @@
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 
+/**
+ * Yield after iterating over this many objects (e.g. ranges).
+ * Yield more often in debug mode.
+ */
+#if defined(NDEBUG)
+enum { VY_YIELD_LOOPS = 128 };
+#else
+enum { VY_YIELD_LOOPS = 2 };
+#endif
+
 #define vy_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
@@ -3700,7 +3710,7 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_slice **new_slices, *slice;
 	struct vy_range *range, *begin_range, *end_range;
 	struct tuple *min_key, *max_key;
-	int i;
+	int i, loops = 0;
 
 	if (vy_run_is_empty(new_run)) {
 		/*
@@ -3763,7 +3773,8 @@ vy_task_dump_complete(struct vy_task *task)
 		 * It's OK to yield here for the range tree can only
 		 * be changed from the scheduler fiber.
 		 */
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 
 	/*
@@ -3779,7 +3790,8 @@ vy_task_dump_complete(struct vy_task *task)
 				    tuple_data_or_null(slice->begin),
 				    tuple_data_or_null(slice->end));
 
-		fiber_reschedule(); /* see comment above */
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0); /* see comment above */
 	}
 	vy_log_dump_index(index->index_def->opts.lsn, dump_lsn);
 	if (vy_log_tx_commit() < 0)
@@ -3816,7 +3828,8 @@ vy_task_dump_complete(struct vy_task *task)
 		 * which is only done after in-memory trees are
 		 * removed (see vy_read_iterator_add_disk()).
 		 */
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	free(new_slices);
 
@@ -3854,6 +3867,8 @@ fail_free_slices:
 		slice = new_slices[i];
 		if (slice != NULL)
 			vy_slice_delete(slice);
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	free(new_slices);
 fail:
@@ -5252,19 +5267,22 @@ vy_index_drop(struct vy_index *index)
 		goto free_index;
 
 	vy_log_tx_begin();
+	int loops = 0;
 	for (struct vy_range *range = vy_range_tree_first(&index->tree);
 	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &range->slices, in_range)
 			vy_log_delete_slice(slice->id);
 		vy_log_delete_range(range->id);
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	struct vy_run *run;
 	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
 	rlist_foreach_entry(run, &index->runs, in_index) {
 		vy_log_drop_run(run->id, gc_lsn);
-		fiber_reschedule();
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
 	vy_log_drop_index(index_id);
 	if (vy_log_tx_try_commit() < 0)
@@ -9271,6 +9289,8 @@ struct vy_gc_arg {
 	struct vy_env *env;
 	/** LSN of the oldest checkpoint to save. */
 	int64_t gc_lsn;
+	/** Number of times the callback has been called. */
+	int loops;
 };
 
 /** Garbage collection callback, passed to vy_recovery_iterate(). */
@@ -9283,7 +9303,8 @@ vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
 	    record->gc_lsn < arg->gc_lsn)
 		vy_run_record_gc(arg->env->conf->path, record);
 
-	fiber_reschedule();
+	if (++arg->loops % VY_YIELD_LOOPS == 0)
+		fiber_sleep(0);
 	return 0;
 }
 
@@ -9321,6 +9342,8 @@ struct vy_backup_arg {
 	int (*cb)(const char *, void *);
 	/** Argument passed to @cb. */
 	void *cb_arg;
+	/** Number of times the callback has been called. */
+	int loops;
 };
 
 /** Backup callback, passed to vy_recovery_iterate(). */
@@ -9340,7 +9363,8 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 			return -1;
 	}
 out:
-	fiber_reschedule();
+	if (++arg->loops % VY_YIELD_LOOPS == 0)
+		fiber_sleep(0);
 	return 0;
 }
 
