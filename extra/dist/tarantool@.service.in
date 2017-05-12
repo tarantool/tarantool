@@ -54,7 +54,7 @@ ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
 PIDFile=@TARANTOOL_RUNDIR@/%I.pid
 
 # Systemd waits until all xlogs are recovered
-TimeoutStartSec=86400
+TimeoutStartSec=86400s
 # Give a reasonable amount of time to close xlogs
 TimeoutStopSec=10s
 
