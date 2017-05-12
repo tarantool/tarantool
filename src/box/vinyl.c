@@ -7315,21 +7315,27 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 {
 	(void)loop;
 	(void)events;
+
 	struct vy_env *e = timer->data;
 
 	int64_t tx_write_rate = vy_stat_tx_write_rate(e->stat);
 	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
 
-	size_t max_index_size = 0;
-	struct heap_node *pn = vy_dump_heap_top(&e->scheduler->dump_heap);
-	if (pn != NULL) {
-		struct vy_index *index = container_of(pn, struct vy_index,
-						      in_dump);
-		max_index_size = index->mem_used;
-	}
+	/*
+	 * Due to log structured nature of the lsregion allocator,
+	 * which is used for allocating statements, we cannot free
+	 * memory in chunks, only all at once. Therefore we should
+	 * configure the watermark so that by the time we hit the
+	 * limit, all memory have been dumped, i.e.
+	 *
+	 *   limit - watermark      watermark
+	 *   ----------------- = --------------
+	 *     tx_write_rate     dump_bandwidth
+	 */
+	size_t watermark = ((double)e->quota.limit * dump_bandwidth /
+			    (dump_bandwidth + tx_write_rate + 1));
 
-	vy_quota_update_watermark(&e->quota, max_index_size,
-				  tx_write_rate, dump_bandwidth);
+	vy_quota_set_watermark(&e->quota, watermark);
 }
 
 static struct vy_squash_queue *
