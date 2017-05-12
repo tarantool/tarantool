@@ -303,6 +303,31 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	if (entry->flags & flag)
 		return;
 
+	/* Find inserted stmt in the tree */
+	bool exact = true;
+	struct vy_cache_tree_iterator itr;
+	itr = vy_cache_tree_lower_bound(&cache->cache_tree, stmt,
+					&exact);
+	assert(!vy_cache_tree_iterator_is_invalid(&itr));
+	assert(exact);
+	if (direction > 0) {
+		vy_cache_tree_iterator_prev(&cache->cache_tree, &itr);
+	} else {
+		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
+	}
+	/* Check that there are not statements between prev_stmt and stmt */
+	if (!vy_cache_tree_iterator_is_invalid(&itr)) {
+		struct vy_cache_entry **prev_check_entry =
+			vy_cache_tree_iterator_get_elem(&cache->cache_tree, &itr);
+		assert(*prev_check_entry != NULL);
+		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
+		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
+		    cache->key_def) != 0) {
+			/* Failed to build chain */
+			return;
+		}
+	}
+
 	/* Insert/replace entry with previous statement */
 	struct vy_cache_entry *prev_entry =
 		vy_cache_entry_new(cache->env, cache, prev_stmt);
