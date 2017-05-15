@@ -150,7 +150,7 @@ local function local_eval(storage, line)
         return preprocess(storage, line:sub(2))
     end
     if storage ~= nil and storage.language == 'sql' then
-        return format(pcall(box.sql.execute, line))
+        return format(pcall(function(...) box.sql.execute(...) end, line))
     end
     --
     -- Attempt to append 'return ' before the chunk: if the chunk is
