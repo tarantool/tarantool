@@ -4278,23 +4278,24 @@ static int
 vy_scheduler_f(va_list va);
 
 static void
-vy_scheduler_quota_cb(enum vy_quota_event event, void *arg)
+vy_scheduler_quota_exceeded_cb(struct vy_quota *quota)
 {
-	struct vy_scheduler *scheduler = arg;
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ipc_cond_signal(&env->scheduler->scheduler_cond);
+}
 
-	switch (event) {
-	case VY_QUOTA_EXCEEDED:
-		ipc_cond_signal(&scheduler->scheduler_cond);
-		break;
-	case VY_QUOTA_THROTTLED:
-		ipc_cond_wait(&scheduler->quota_cond);
-		break;
-	case VY_QUOTA_RELEASED:
-		ipc_cond_broadcast(&scheduler->quota_cond);
-		break;
-	default:
-		unreachable();
-	}
+static void
+vy_scheduler_quota_throttled_cb(struct vy_quota *quota)
+{
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ipc_cond_wait(&env->scheduler->quota_cond);
+}
+
+static void
+vy_scheduler_quota_released_cb(struct vy_quota *quota)
+{
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ipc_cond_broadcast(&env->scheduler->quota_cond);
 }
 
 static void
@@ -7376,7 +7377,9 @@ vy_env_new(void)
 	               sizeof(struct vy_cursor));
 	lsregion_create(&e->allocator, slab_cache->arena);
 
-	vy_quota_init(&e->quota, vy_scheduler_quota_cb, e->scheduler);
+	vy_quota_init(&e->quota, vy_scheduler_quota_exceeded_cb,
+		                 vy_scheduler_quota_throttled_cb,
+				 vy_scheduler_quota_released_cb);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);

@@ -37,17 +37,29 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum vy_quota_event {
-	/** Quota is consumed and used >= watermark. */
-	VY_QUOTA_EXCEEDED,
-	/** Quota is consumed and used >= limit. */
-	VY_QUOTA_THROTTLED,
-	/** Quota is released and used < limit. */
-	VY_QUOTA_RELEASED,
-};
+struct vy_quota;
 
+/**
+ * Called when quota is consumed if used >= watermark.
+ * It is supposed to instigate memory reclaim.
+ */
 typedef void
-(*vy_quota_cb)(enum vy_quota_event event, void *arg);
+(*vy_quota_exceeded_f)(struct vy_quota *quota);
+
+/**
+ * Called when quota is consumed if used >= limit.
+ * It is supposed to put the current fiber to sleep
+ * until enough memory is freed.
+ */
+typedef void
+(*vy_quota_throttled_f)(struct vy_quota *quota);
+
+/**
+ * Called when quota is released if used < limit.
+ * It is supposed to wake up all throttled fibers.
+ */
+typedef void
+(*vy_quota_released_f)(struct vy_quota *quota);
 
 /**
  * Quota used for accounting and limiting memory consumption
@@ -67,20 +79,24 @@ struct vy_quota {
 	size_t watermark;
 	/** Current memory consumption. */
 	size_t used;
-	/** Quota callback. */
-	vy_quota_cb cb;
-	/** Argument passed to cb. */
-	void *cb_arg;
+	/** Used-defined callbacks. */
+	vy_quota_exceeded_f quota_exceeded_cb;
+	vy_quota_throttled_f quota_throttled_cb;
+	vy_quota_released_f quota_released_cb;
 };
 
 static inline void
-vy_quota_init(struct vy_quota *q, vy_quota_cb cb, void *cb_arg)
+vy_quota_init(struct vy_quota *q,
+	      vy_quota_exceeded_f quota_exceeded_cb,
+	      vy_quota_throttled_f quota_throttled_cb,
+	      vy_quota_released_f quota_released_cb)
 {
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
 	q->used = 0;
-	q->cb = cb;
-	q->cb_arg = cb_arg;
+	q->quota_exceeded_cb = quota_exceeded_cb;
+	q->quota_throttled_cb = quota_throttled_cb;
+	q->quota_released_cb = quota_released_cb;
 }
 
 /**
@@ -100,8 +116,8 @@ static inline void
 vy_quota_set_limit(struct vy_quota *q, size_t limit)
 {
 	q->limit = q->watermark = limit;
-	if (q->used >= limit)
-		q->cb(VY_QUOTA_EXCEEDED, q->cb_arg);
+	if (q->quota_exceeded_cb != NULL && q->used >= limit)
+		q->quota_exceeded_cb(q);
 }
 
 /**
@@ -112,8 +128,8 @@ static inline void
 vy_quota_set_watermark(struct vy_quota *q, size_t watermark)
 {
 	q->watermark = watermark;
-	if (q->used >= watermark)
-		q->cb(VY_QUOTA_EXCEEDED, q->cb_arg);
+	if (q->quota_exceeded_cb != NULL && q->used >= watermark)
+		q->quota_exceeded_cb(q);
 }
 
 /**
@@ -124,10 +140,10 @@ static inline void
 vy_quota_use(struct vy_quota *q, size_t size)
 {
 	q->used += size;
-	if (q->cb != NULL && q->used >= q->watermark)
-		q->cb(VY_QUOTA_EXCEEDED, q->cb_arg);
-	while (q->cb != NULL && q->used >= q->limit)
-		q->cb(VY_QUOTA_THROTTLED, q->cb_arg);
+	if (q->quota_exceeded_cb != NULL && q->used >= q->watermark)
+		q->quota_exceeded_cb(q);
+	while (q->quota_throttled_cb != NULL && q->used >= q->limit)
+		q->quota_throttled_cb(q);
 }
 
 /**
@@ -148,8 +164,8 @@ vy_quota_release(struct vy_quota *q, size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	if (q->cb != NULL && q->used < q->limit)
-		q->cb(VY_QUOTA_RELEASED, q->cb_arg);
+	if (q->quota_released_cb != NULL && q->used < q->limit)
+		q->quota_released_cb(q);
 }
 
 #if defined(__cplusplus)
