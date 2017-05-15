@@ -718,6 +718,11 @@ struct vy_tx {
 	 * the version increments.
 	 */
 	uint32_t write_set_version;
+	/**
+	 * Total size of memory occupied by statements of
+	 * the write set.
+	 */
+	size_t write_size;
 	/** Transaction start time saved in vy_begin() */
 	ev_tstamp start;
 	/** Current state of the transaction.*/
@@ -5873,6 +5878,9 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			assert(vy_stmt_type(stmt) != 0);
 			rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 		}
+		assert(tx->write_size >= tuple_size(old->stmt));
+		tx->write_size -= tuple_size(old->stmt);
+		tx->write_size += tuple_size(stmt);
 		tuple_unref(old->stmt);
 		tuple_ref(stmt);
 		old->stmt = stmt;
@@ -5883,6 +5891,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		v->is_gap = false;
 		write_set_insert(&tx->write_set, v);
 		tx->write_set_version++;
+		tx->write_size += tuple_size(stmt);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
 	return 0;
@@ -6883,6 +6892,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
+	tx->write_size = 0;
 	tx->start = ev_now(loop());
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
@@ -7030,32 +7040,30 @@ vy_tx_prepare(struct vy_tx *tx)
 {
 	struct tx_manager *xm = tx->xm;
 	struct vy_env *env = xm->env;
-	/*
-	 * Wait for quota to be not overused. We can't
-	 * invoke vy_quota_use() at the end of prepare,
-	 * since we have pinned mems, and a wait for quota
-	 * may lead to a deadlock.
-	 * And we must use quota before checking the transaction
-	 * read view because the quota use may yield. During the
-	 * yield the prepared transaction may be sent to read
-	 * view.
-	 */
-	vy_quota_use(&env->quota, 0);
 
-	/* proceed non-aborted read-only transactions */
-	if ((!vy_tx_is_ro(tx) && vy_tx_is_in_read_view(tx)) ||
-	    tx->state == VINYL_TX_ABORT) {
+	if (vy_tx_is_ro(tx)) {
+		assert(tx->state == VINYL_TX_READY);
+		tx->state = VINYL_TX_COMMIT;
+		return 0;
+	}
+
+	/*
+	 * Reserve quota needed by the transaction before allocating
+	 * memory. Since this may yield, which opens a time window for
+	 * the transaction to be sent to read view or aborted, we call
+	 * it before checking for conflicts.
+	 */
+	vy_quota_use(&env->quota, tx->write_size);
+
+	if (vy_tx_is_in_read_view(tx) || tx->state == VINYL_TX_ABORT) {
+		vy_quota_release(&env->quota, tx->write_size);
 		env->stat->tx_conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
 
 	assert(tx->state == VINYL_TX_READY);
-
 	tx->state = VINYL_TX_COMMIT;
-
-	if (vy_tx_is_ro(tx))
-		return 0;
 
 	assert(tx->read_view == &xm->global_read_view);
 	tx->psn = ++xm->psn;
@@ -7063,9 +7071,10 @@ vy_tx_prepare(struct vy_tx *tx)
 	/** Send to read view read/write intersection */
 	for (struct txv *v = write_set_first(&tx->write_set);
 	     v != NULL; v = write_set_next(&tx->write_set, v)) {
-
-		if (vy_tx_send_to_read_view(tx, v))
+		if (vy_tx_send_to_read_view(tx, v)) {
+			vy_quota_release(&env->quota, tx->write_size);
 			return -1;
+		}
 	}
 
 	/*
@@ -7077,13 +7086,15 @@ vy_tx_prepare(struct vy_tx *tx)
 	const struct tuple *delete = NULL, *replace = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	struct txv *v;
+	int rc = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/* Save only writes. */
 		if (v->is_read)
 			continue;
 
-		if (vy_tx_write_prepare(v) != 0)
-			return -1;
+		rc = vy_tx_write_prepare(v);
+		if (rc != 0)
+			break;
 		assert(v->mem != NULL);
 
 		struct vy_index *index = v->index;
@@ -7100,16 +7111,33 @@ vy_tx_prepare(struct vy_tx *tx)
 		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &replace;
-		if (vy_tx_write(index, v->mem, v->stmt, region_stmt) != 0)
-			return -1;
+		rc = vy_tx_write(index, v->mem, v->stmt, region_stmt);
+		if (rc != 0)
+			break;
 		v->region_stmt = *region_stmt;
 		write_count++;
 	}
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t write_size = mem_used_after - mem_used_before;
+	/*
+	 * Insertion of a statement into an in-memory tree can trigger
+	 * an allocation of a new tree block. This should not normally
+	 * result in a noticeable excess of the memory limit, because
+	 * most memory is occupied by statements anyway, but we need to
+	 * adjust the quota accordingly in this case.
+	 *
+	 * The actual allocation size can also be less than reservation
+	 * if a statement is allocated from an lsregion slab allocated
+	 * by a previous transaction. Take this into account, too.
+	 */
+	if (write_size >= tx->write_size)
+		vy_quota_force_use(&env->quota, write_size - tx->write_size);
+	else
+		vy_quota_release(&env->quota, tx->write_size - write_size);
+	if (rc != 0)
+		return -1;
 	vy_stat_tx(env->stat, tx->start, count, write_count, write_size);
-	vy_quota_force_use(&env->quota, write_size);
 	xm->last_prepared_tx = tx;
 	return 0;
 }
