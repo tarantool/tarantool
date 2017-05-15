@@ -3359,11 +3359,10 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
  * @param index Index the statement is for.
  * @param mem In-memory tree where the statement was saved.
  * @param stmt Statement allocated from lsregion.
- * @param invalidate_cache Remove statement from the cache if set.
  */
 static void
 vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
-		     const struct tuple *stmt, bool invalidate_cache)
+		     const struct tuple *stmt)
 {
 	vy_mem_commit_stmt(mem, stmt);
 
@@ -3373,8 +3372,7 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 		vy_index_commit_upsert(index, mem, stmt);
 
 	/* Invalidate cache element. */
-	if (invalidate_cache)
-		vy_cache_on_write(index->cache, stmt);
+	vy_cache_on_write(index->cache, stmt);
 }
 
 /*
@@ -3506,7 +3504,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		 */
 		assert(rc == 0); (void)rc;
 		tuple_unref(upserted);
-		vy_index_commit_stmt(index, mem, region_stmt, false);
+		vy_mem_commit_stmt(mem, region_stmt);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 	}
 }
@@ -7171,8 +7169,7 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v->region_stmt != 0) {
 			vy_stmt_set_lsn((struct tuple *)v->region_stmt, lsn);
-			vy_index_commit_stmt(v->index, v->mem,
-					     v->region_stmt, true);
+			vy_index_commit_stmt(v->index, v->mem, v->region_stmt);
 		}
 		if (v->mem != 0)
 			vy_mem_unpin(v->mem);
@@ -9576,7 +9573,7 @@ vy_squash_process(struct vy_squash *squash)
 		 * We don't modify the resulting statement,
 		 * so there's no need in invalidating the cache.
 		 */
-		vy_index_commit_stmt(index, mem, region_stmt, false);
+		vy_mem_commit_stmt(mem, region_stmt);
 		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
 	}
