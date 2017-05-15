@@ -70,8 +70,11 @@ target_link_libraries(xrow.test server misc ${MSGPUCK_LIBRARIES})
 add_executable(fiber.test fiber.cc unit.c)
 target_link_libraries(fiber.test core)
 
-add_executable(guard.test guard.cc unit.c)
-target_link_libraries(guard.test core)
+if (NOT ENABLE_GCOV)
+    # This test is known to be broken with GCOV
+    add_executable(guard.test guard.cc unit.c)
+    target_link_libraries(guard.test core)
+endif ()
 
 add_executable(fiber_stress.test fiber_stress.cc)
 target_link_libraries(fiber_stress.test core)
