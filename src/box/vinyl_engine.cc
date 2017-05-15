@@ -284,3 +284,10 @@ VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 {
 	return vy_backup(env, vclock, cb, arg);
 }
+
+void
+VinylEngine::updateOptions()
+{
+	if (vy_update_options(env) != 0)
+		diag_raise();
+}

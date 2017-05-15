@@ -155,6 +155,7 @@ void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
 void box_set_force_recovery(void);
+void box_update_vinyl_options(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

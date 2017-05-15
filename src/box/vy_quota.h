@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+#include <tarantool_ev.h> /* ev_tstamp */
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -49,10 +51,12 @@ typedef void
 /**
  * Called when quota is consumed if used >= limit.
  * It is supposed to put the current fiber to sleep
- * until enough memory is freed.
+ * until enough memory is freed. @timeout sepcifies
+ * the maximal time to wait. The function should
+ * return the time left or 0 on timeout.
  */
-typedef void
-(*vy_quota_throttled_f)(struct vy_quota *quota);
+typedef ev_tstamp
+(*vy_quota_throttled_f)(struct vy_quota *quota, ev_tstamp timeout);
 
 /**
  * Called when quota is released if used < limit.
@@ -133,20 +137,6 @@ vy_quota_set_watermark(struct vy_quota *q, size_t watermark)
 }
 
 /**
- * Consume @size bytes of memory. Throttle the caller if
- * the limit is exceeded.
- */
-static inline void
-vy_quota_use(struct vy_quota *q, size_t size)
-{
-	q->used += size;
-	if (q->quota_exceeded_cb != NULL && q->used >= q->watermark)
-		q->quota_exceeded_cb(q);
-	while (q->quota_throttled_cb != NULL && q->used >= q->limit)
-		q->quota_throttled_cb(q);
-}
-
-/**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
  * this function does not throttle the caller.
  */
@@ -154,6 +144,8 @@ static inline void
 vy_quota_force_use(struct vy_quota *q, size_t size)
 {
 	q->used += size;
+	if (q->quota_exceeded_cb != NULL && q->used >= q->watermark)
+		q->quota_exceeded_cb(q);
 }
 
 /**
@@ -166,6 +158,25 @@ vy_quota_release(struct vy_quota *q, size_t size)
 	q->used -= size;
 	if (q->quota_released_cb != NULL && q->used < q->limit)
 		q->quota_released_cb(q);
+}
+
+/**
+ * Try to consume @size bytes of memory, throttle the caller
+ * if the limit is exceeded. @timeout specifies the maximal
+ * time to wait. Return 0 on success, -1 on timeout.
+ */
+static inline int
+vy_quota_use(struct vy_quota *q, size_t size, ev_tstamp timeout)
+{
+	vy_quota_force_use(q, size);
+	while (q->quota_throttled_cb != NULL &&
+	       q->used >= q->limit && timeout > 0)
+		timeout = q->quota_throttled_cb(q, timeout);
+	if (q->used > q->limit) {
+		vy_quota_release(q, size);
+		return -1;
+	}
+	return 0;
 }
 
 #if defined(__cplusplus)

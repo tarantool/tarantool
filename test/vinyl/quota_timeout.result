@@ -1,0 +1,60 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+---
+- true
+...
+test_run:cmd("start server test")
+---
+- true
+...
+test_run:cmd('switch test')
+---
+- true
+...
+box.cfg{vinyl_timeout=0.01}
+---
+...
+box.error.injection.set('ERRINJ_VY_RUN_WRITE', true)
+---
+- ok
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
+---
+...
+_ = s:auto_increment{pad}
+---
+...
+box.info.vinyl().memory.used
+---
+- 748241
+...
+-- Since the following operation requires more memory than configured
+-- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
+_ = s:auto_increment{pad}
+---
+- error: Timed out waiting for Vinyl memory quota
+...
+box.info.vinyl().memory.used
+---
+- 748241
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
+...

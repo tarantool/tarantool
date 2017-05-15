@@ -100,6 +100,8 @@ struct vy_conf {
 	uint64_t cache;
 	/* bloom filter false positive rate */
 	double bloom_fpr;
+	/* quota timeout */
+	double timeout;
 };
 
 struct vy_env {
@@ -4284,11 +4286,15 @@ vy_scheduler_quota_exceeded_cb(struct vy_quota *quota)
 	ipc_cond_signal(&env->scheduler->scheduler_cond);
 }
 
-static void
-vy_scheduler_quota_throttled_cb(struct vy_quota *quota)
+static ev_tstamp
+vy_scheduler_quota_throttled_cb(struct vy_quota *quota, ev_tstamp timeout)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	ipc_cond_wait(&env->scheduler->quota_cond);
+	ev_tstamp wait_start = ev_now(loop());
+	if (ipc_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
+		return 0; /* timed out */
+	ev_tstamp wait_end = ev_now(loop());
+	return timeout - (wait_end - wait_start);
 }
 
 static void
@@ -4953,6 +4959,8 @@ vy_end_checkpoint(struct vy_env *env)
 
 /* Scheduler }}} */
 
+/* {{{ Configuration */
+
 static struct vy_conf *
 vy_conf_new()
 {
@@ -4961,9 +4969,10 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
-	conf->memory_limit = cfg_getd("vinyl_memory");
-	conf->cache = cfg_getd("vinyl_cache");
+	conf->memory_limit = cfg_geti64("vinyl_memory");
+	conf->cache = cfg_geti64("vinyl_cache");
 	conf->bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+	conf->timeout = cfg_getd("vinyl_timeout");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
@@ -4990,6 +4999,16 @@ static void vy_conf_delete(struct vy_conf *c)
 	free(c->path);
 	free(c);
 }
+
+int
+vy_update_options(struct vy_env *env)
+{
+	struct vy_conf *conf = env->conf;
+	conf->timeout = cfg_getd("vinyl_timeout");
+	return 0;
+}
+
+/* Configuration }}} */
 
 /** {{{ Introspection */
 
@@ -7054,7 +7073,11 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * the transaction to be sent to read view or aborted, we call
 	 * it before checking for conflicts.
 	 */
-	vy_quota_use(&env->quota, tx->write_size);
+	if (vy_quota_use(&env->quota, tx->write_size,
+			 env->conf->timeout) != 0) {
+		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
+		return -1;
+	}
 
 	if (vy_tx_is_in_read_view(tx) || tx->state == VINYL_TX_ABORT) {
 		vy_quota_release(&env->quota, tx->write_size);

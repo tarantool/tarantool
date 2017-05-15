@@ -311,6 +311,13 @@ int
 vy_backup(struct vy_env *env, struct vclock *vclock,
 	  int (*cb)(const char *, void *), void *cb_arg);
 
+/*
+ * Configuration
+ */
+
+int
+vy_update_options(struct vy_env *env);
+
 #ifdef __cplusplus
 }
 #endif

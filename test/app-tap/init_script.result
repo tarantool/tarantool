@@ -32,10 +32,11 @@ box.cfg
 27	vinyl_run_count_per_level:2
 28	vinyl_run_size_ratio:3.5
 29	vinyl_threads:2
-30	wal_dir:.
-31	wal_dir_rescan_delay:2
-32	wal_max_size:274877906944
-33	wal_mode:write
+30	vinyl_timeout:60
+31	wal_dir:.
+32	wal_dir_rescan_delay:2
+33	wal_max_size:274877906944
+34	wal_mode:write
 --
 -- Test insert from detached fiber
 --

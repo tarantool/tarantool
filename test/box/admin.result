@@ -76,6 +76,8 @@ cfg_filter(box.cfg)
     - 3.5
   - - vinyl_threads
     - 2
+  - - vinyl_timeout
+    - 60
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
