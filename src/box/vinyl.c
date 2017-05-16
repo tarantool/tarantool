@@ -68,6 +68,7 @@
 #include "errcode.h"
 #include "key_def.h"
 #include "tuple.h"
+#include "tuple_hash.h"
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
 #include "iproto_constants.h"

@@ -230,12 +230,56 @@ struct key_def;
 struct tuple;
 
 typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
-			      const char *key,
-			      uint32_t part_count,
-			      const struct key_def *key_def);
+			      		const char *key,
+			      		uint32_t part_count,
+			      		const struct key_def *key_def);
 typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
-			   const struct tuple *tuple_b,
-			   const struct key_def *key_def);
+			       const struct tuple *tuple_b,
+			       const struct key_def *key_def);
+/* Function extracts key from tuple by given key definition and return
+ * buffer allocated on box_txn_alloc with this key. This function
+ * has O(n) complexity, where n is the number of key parts.
+ * @param tuple - tuple from which need to extract key
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+typedef char *(*tuple_extract_key_t)(const struct tuple *tuple,
+				     const struct key_def *key_def,
+				     uint32_t *key_size);
+/**
+ * Function extracts key from raw msgpuck by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * This function has O(n) complexity, where n is the number of key parts.
+ * @param data - msgpuck data from which need to extract key
+ * @param data_end - pointer at the end of data
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+typedef char *(*tuple_extract_key_raw_t)(const char *data,
+					 const char *data_end,
+					 const struct key_def *key_def,
+					 uint32_t *key_size);
+/* Function calculates a common hash value for a tuple
+* @param tuple - a tuple
+* @param key_def - key_def for field description
+* @return - hash value
+*/
+typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
+				 const struct key_def *key_def);
+
+/* Function calculates a common hash value for a key
+ * @param key - full key (msgpack fields w/o array marker)
+ * @param key_def - key_def for field description
+ * @return - hash value
+ */
+typedef uint32_t (*key_hash_t)(const char *key,
+				const struct key_def *key_def);
 
 /* Definition of a multipart key. */
 struct key_def {
@@ -243,6 +287,14 @@ struct key_def {
 	tuple_compare_t tuple_compare;
 	/** tuple <-> key comparison function */
 	tuple_compare_with_key_t tuple_compare_with_key;
+
+	tuple_extract_key_t tuple_extract_key;
+	
+	tuple_extract_key_raw_t tuple_extract_key_raw;
+
+	tuple_hash_t tuple_hash;
+
+	key_hash_t key_hash;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
