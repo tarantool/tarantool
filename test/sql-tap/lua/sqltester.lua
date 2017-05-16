@@ -45,21 +45,32 @@ local function finish_test()
 end
 test.finish_test = finish_test
 
+local function string_regex_p(str)
+    if type(str) == 'string'
+        and string.sub(str, 1, 1) == '/'
+        and string.sub(str, -1) == '/' then
+        return true;
+    else
+        return false;
+    end
+end
+
 local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
     if ok then
         if result == nil then result = { } end
+
         -- Convert all trues and falses to 1s and 0s
         fix_result(result)
+
         -- If expected result is single line of a form '/ ... /' - then
         -- search for string in the result
         if type(expect) == 'table' and table.getn(expect) == 1
-            and string.sub(expect[1], 1, 1) == '/'
-            and string.sub(expect[1], -1) == '/' then
+            and string_regex_p(expect[1]) then
             local exp = expect[1]
             local exp_trimmed = string.sub(exp, 2, string.len(exp) - 2)
             for _, v in ipairs(result) do
-                if string.find(v, exp_trimmed) then
+                if string.gmatch(v, exp_trimmed) then
                     return test:ok(self, label)
                 end
             end
@@ -81,8 +92,7 @@ local function do_test(self, label, func, expect)
             end
         end
     else
-        self:fail(label)
-       --io.stderr:write(string.format('%s: ERROR\n', label))
+        self:fail(string.format('%s: Execution failed: %s\n', label, result))
     end
 end
 test.do_test = do_test
