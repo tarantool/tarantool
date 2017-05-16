@@ -1,6 +1,5 @@
 # Symbols exported by the main Tarantool executable
 
-sql_schema_put
 # FFI
 
 password_prepare
