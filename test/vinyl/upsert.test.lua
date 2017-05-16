@@ -214,6 +214,8 @@ stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
+space.index.primary:info().count
+
 -- in-tx upserts
 box.begin()
 space:upsert({2, 1, 1}, {{'+', 2, 10}})
@@ -225,7 +227,11 @@ stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
+space.index.primary:info().count
+
 box.snapshot()
+
+space.index.primary:info().count
 
 -- upsert with on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
@@ -234,6 +240,8 @@ space:upsert({1, 1, 1}, {{'-', 2, 20}})
 stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
+
+space.index.primary:info().count
 
 -- count of applied apserts
 space:get({1})
@@ -256,6 +264,8 @@ for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
 stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
+
+space.index.primary:info().count
 
 space:drop()
 

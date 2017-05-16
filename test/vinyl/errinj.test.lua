@@ -283,3 +283,55 @@ c3('s:select{3}') -- c2 is not visible
 c3:commit()
 
 s:drop()
+
+--
+-- Test mem restoration on a prepared and not commited statement
+-- after moving iterator into read view.
+--
+space = box.schema.space.create('test', {engine = 'vinyl'})
+pk = space:create_index('pk')
+space:replace{1}
+space:replace{2}
+space:replace{3}
+
+last_read = nil
+
+errinj.set("ERRINJ_WAL_DELAY", true)
+
+test_run:cmd("setopt delimiter ';'")
+
+function fill_space()
+    box.begin()
+    space:replace{1}
+    space:replace{2}
+    space:replace{3}
+-- block until wal_delay = false
+    box.commit()
+-- send iterator to read view
+    space:replace{1, 1}
+-- flush mem and update index version to trigger iterator restore
+    box.snapshot()
+end;
+
+function iterate_in_read_view()
+    local i = create_iterator(space)
+    last_read = iterator_next(i)
+    fiber.sleep(100000)
+    last_read = iterator_next(i)
+end;
+
+test_run:cmd("setopt delimiter ''");
+
+f1 = fiber.create(fill_space)
+-- Prepared transaction is blocked due to wal_delay.
+-- Start iterator with vlsn = INT64_MAX
+f2 = fiber.create(iterate_in_read_view)
+last_read
+-- Finish prepared transaction and send to read view the iterator.
+errinj.set("ERRINJ_WAL_DELAY", false)
+while f1:status() ~= 'dead' do fiber.sleep(0.01) end
+f2:wakeup()
+while f2:status() ~= 'dead' do fiber.sleep(0.01) end
+last_read
+
+space:drop()

@@ -858,6 +858,7 @@ vy_log_begin_recovery(const struct vclock *vclock)
 		return NULL;
 
 	struct vclock vy_log_vclock;
+	vclock_create(&vy_log_vclock);
 	if (xdir_last_vclock(&vy_log.dir, &vy_log_vclock) >= 0 &&
 	    vclock_compare(&vy_log_vclock, vclock) > 0) {
 		/*

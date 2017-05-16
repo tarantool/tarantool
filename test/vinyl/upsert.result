@@ -531,6 +531,10 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
+space.index.primary:info().count
+---
+- 3
+...
 -- in-tx upserts
 box.begin()
 ---
@@ -558,9 +562,17 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
+space.index.primary:info().count
+---
+- 4
+...
 box.snapshot()
 ---
 - ok
+...
+space.index.primary:info().count
+---
+- 2
 ...
 -- upsert with on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
@@ -579,6 +591,10 @@ upsert_stat_diff(stat2, stat1)
 ...
 stat1 = stat2
 ---
+...
+space.index.primary:info().count
+---
+- 4
 ...
 -- count of applied apserts
 space:get({1})
@@ -641,6 +657,10 @@ upsert_stat_diff(stat2, stat1)
 ...
 stat1 = stat2
 ---
+...
+space.index.primary:info().count
+---
+- 1004
 ...
 space:drop()
 ---

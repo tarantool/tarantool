@@ -3359,11 +3359,10 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
  * @param index Index the statement is for.
  * @param mem In-memory tree where the statement was saved.
  * @param stmt Statement allocated from lsregion.
- * @param invalidate_cache Remove statement from the cache if set.
  */
 static void
 vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
-		     const struct tuple *stmt, bool invalidate_cache)
+		     const struct tuple *stmt)
 {
 	vy_mem_commit_stmt(mem, stmt);
 
@@ -3373,8 +3372,7 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 		vy_index_commit_upsert(index, mem, stmt);
 
 	/* Invalidate cache element. */
-	if (invalidate_cache)
-		vy_cache_on_write(index->cache, stmt);
+	vy_cache_on_write(index->cache, stmt);
 }
 
 /*
@@ -3506,7 +3504,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		 */
 		assert(rc == 0); (void)rc;
 		tuple_unref(upserted);
-		vy_index_commit_stmt(index, mem, region_stmt, false);
+		vy_mem_commit_stmt(mem, region_stmt);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 	}
 }
@@ -7065,6 +7063,18 @@ vy_tx_prepare(struct vy_tx *tx)
 {
 	struct tx_manager *xm = tx->xm;
 	struct vy_env *env = xm->env;
+	/*
+	 * Wait for quota to be not overused. We can't
+	 * invoke vy_quota_use() at the end of prepare,
+	 * since we have pinned mems, and a wait for quota
+	 * may lead to a deadlock.
+	 * And we must use quota before checking the transaction
+	 * read view because the quota use may yield. During the
+	 * yield the prepared transaction may be sent to read
+	 * view.
+	 */
+	vy_quota_use(&env->quota, 0);
+
 	/* proceed non-aborted read-only transactions */
 	if ((!vy_tx_is_ro(tx) && vy_tx_is_in_read_view(tx)) ||
 	    tx->state == VINYL_TX_ABORT) {
@@ -7074,14 +7084,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	}
 
 	assert(tx->state == VINYL_TX_READY);
-
-	/*
-	 * Wait for quota to be not overused. We can't
-	 * invoke vy_quota_use() at the end of prepare,
-	 * since we have pinned mems, and a wait for quota
-	 * may lead to a deadlock.
-	 */
-	vy_quota_use(&env->quota, 0);
 
 	tx->state = VINYL_TX_COMMIT;
 
@@ -7167,8 +7169,7 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v->region_stmt != 0) {
 			vy_stmt_set_lsn((struct tuple *)v->region_stmt, lsn);
-			vy_index_commit_stmt(v->index, v->mem,
-					     v->region_stmt, true);
+			vy_index_commit_stmt(v->index, v->mem, v->region_stmt);
 		}
 		if (v->mem != 0)
 			vy_mem_unpin(v->mem);
@@ -8030,7 +8031,12 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			assert(i < itr->skipped_start);
 			rc = src->iterator.iface->next_key(&src->iterator,
 							   &src->stmt, &stop);
-		} else  {
+		} else if (i < itr->skipped_start || src->stmt == NULL) {
+			/*
+			 * Do not restore skipped unless it's the first round.
+			 * Generally skipped srcs are handled below, but some
+			 * iterators need to be restored before next_key call.
+			 */
 			rc = src->iterator.iface->restore(&src->iterator,
 							  itr->curr_stmt,
 							  &src->stmt, &stop);
@@ -8093,6 +8099,9 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 	if (itr->skipped_start < itr->src_count)
 		itr->range_ended = false;
 
+	if (itr->curr_stmt != NULL && min_stmt != NULL)
+		assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
+
 	for (int i = MIN(itr->skipped_start, itr->mutable_end) - 1;
 	     was_yield_possible && i >= (int) itr->mutable_start; i--) {
 		struct vy_merge_src *src = &itr->src[i];
@@ -8121,6 +8130,8 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			itr->curr_src = MIN(itr->curr_src, (uint32_t)i);
 			src->front_id = itr->front_id;
 		}
+		if (itr->curr_stmt != NULL && min_stmt != NULL)
+			assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
 	}
 
 	if (itr->skipped_start < itr->src_count)
@@ -8644,11 +8655,17 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 	vy_cache_iterator_open(&sub_src->cache_iterator, stat,
 			       itr->index->cache, itr->iterator_type,
 			       itr->key, itr->read_view);
-	bool stop = false;
-	int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
-						  itr->curr_stmt,
-						  &sub_src->stmt, &stop);
-	(void)rc;
+	if (itr->curr_stmt != NULL) {
+		/*
+		 * In order not to loose stop flag, do not restore cache
+		 * iterator in general case (itr->curr_stmt)
+		 */
+		bool stop = false;
+		int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
+							  itr->curr_stmt,
+							  &sub_src->stmt, &stop);
+		(void)rc;
+	}
 }
 
 static void
@@ -8819,35 +8836,20 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 				struct tuple **ret)
 {
 	int rc;
-	*ret = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
-	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2) {
+retry:
+	*ret = NULL;
+	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2)
 		if (vy_read_iterator_restore(itr) < 0)
 			return -1;
-		/* Check if the iterator is restored not on the same key. */
-		if (itr->curr_stmt) {
-			rc = vy_merge_iterator_next_key(mi, ret);
-			if (rc == -1)
-				return -1;
-			if (rc == -2) {
-				if (vy_read_iterator_restore(itr) < 0)
-					return -1;
-				continue;
-			}
-			/* If the iterator is empty then return. */
-			if (*ret == NULL)
-				return 0;
-			/*
-			 * If the iterator after restoration is on the same key
-			 * then go to the next.
-			 */
-			if (vy_tuple_compare(itr->curr_stmt, *ret,
-					     &itr->index->index_def->key_def) == 0)
-				continue;
-			/* Else return the new key. */
-			break;
-		}
-	}
+	/*
+	 * If the iterator after next_key is on the same key then
+	 * go to the next.
+	 */
+	if (*ret != NULL && itr->curr_stmt != NULL &&
+	    vy_tuple_compare(itr->curr_stmt, *ret,
+			     &itr->index->index_def->key_def) == 0)
+		goto retry;
 	return rc;
 }
 
@@ -8967,8 +8969,19 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			     itr->key, itr->iterator_type);
 
 clear:
-	if (prev_key != NULL)
+	if (prev_key != NULL) {
+		if (itr->curr_stmt != NULL)
+			/*
+			 * It is impossible to return fully equal
+			 * statements in sequence. At least they
+			 * must have different primary keys.
+			 * (index_def->key_def includes primary
+			 * parts).
+			 */
+			assert(vy_tuple_compare(prev_key, itr->curr_stmt,
+						&def->key_def) != 0);
 		tuple_unref(prev_key);
+	}
 
 	return rc;
 }
@@ -9560,7 +9573,7 @@ vy_squash_process(struct vy_squash *squash)
 		 * We don't modify the resulting statement,
 		 * so there's no need in invalidating the cache.
 		 */
-		vy_index_commit_stmt(index, mem, region_stmt, false);
+		vy_mem_commit_stmt(mem, region_stmt);
 		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
 	}
