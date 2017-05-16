@@ -171,9 +171,15 @@ struct vy_log_record {
 	int64_t run_id;
 	/** Unique ID of the run slice. */
 	int64_t slice_id;
-	/** Msgpack key for start of the range/slice. */
+	/**
+	 * Msgpack key for start of the range/slice.
+	 * NULL if the range/slice starts from -inf.
+	 */
 	const char *begin;
-	/** Msgpack key for end of the range/slice. */
+	/**
+	 * Msgpack key for end of the range/slice.
+	 * NULL if the range/slice ends with +inf.
+	 */
 	const char *end;
 	/** Ordinal index number in the space. */
 	uint32_t index_id;
@@ -380,13 +386,24 @@ int
 vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 		    vy_recovery_cb cb, void *cb_arg);
 
+/**
+ * Initialize a log record with default values.
+ * Note, a key is only written to the log file
+ * if its value is different from default.
+ */
+static inline void
+vy_log_record_init(struct vy_log_record *record)
+{
+	memset(record, 0, sizeof(*record));
+}
+
 /** Helper to log a vinyl index creation. */
 static inline void
 vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
 		    const struct key_def *key_def)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_INDEX;
 	record.index_lsn = index_lsn;
 	record.index_id = index_id;
@@ -400,7 +417,7 @@ static inline void
 vy_log_drop_index(int64_t index_lsn)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_DROP_INDEX;
 	record.index_lsn = index_lsn;
 	vy_log_write(&record);
@@ -412,7 +429,7 @@ vy_log_insert_range(int64_t index_lsn, int64_t range_id,
 		    const char *begin, const char *end)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_INSERT_RANGE;
 	record.index_lsn = index_lsn;
 	record.range_id = range_id;
@@ -426,7 +443,7 @@ static inline void
 vy_log_delete_range(int64_t range_id)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_DELETE_RANGE;
 	record.range_id = range_id;
 	vy_log_write(&record);
@@ -437,7 +454,7 @@ static inline void
 vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_PREPARE_RUN;
 	record.index_lsn = index_lsn;
 	record.run_id = run_id;
@@ -449,7 +466,7 @@ static inline void
 vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_RUN;
 	record.index_lsn = index_lsn;
 	record.run_id = run_id;
@@ -462,7 +479,7 @@ static inline void
 vy_log_drop_run(int64_t run_id, int64_t gc_lsn)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_DROP_RUN;
 	record.run_id = run_id;
 	record.gc_lsn = gc_lsn;
@@ -474,7 +491,7 @@ static inline void
 vy_log_forget_run(int64_t run_id)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_FORGET_RUN;
 	record.run_id = run_id;
 	vy_log_write(&record);
@@ -486,7 +503,7 @@ vy_log_insert_slice(int64_t range_id, int64_t run_id, int64_t slice_id,
 		    const char *begin, const char *end)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_INSERT_SLICE;
 	record.range_id = range_id;
 	record.run_id = run_id;
@@ -501,7 +518,7 @@ static inline void
 vy_log_delete_slice(int64_t slice_id)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_DELETE_SLICE;
 	record.slice_id = slice_id;
 	vy_log_write(&record);
@@ -511,7 +528,7 @@ static inline void
 vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
 {
 	struct vy_log_record record;
-	memset(&record, 0, sizeof(record));
+	vy_log_record_init(&record);
 	record.type = VY_LOG_DUMP_INDEX;
 	record.index_lsn = index_lsn;
 	record.dump_lsn = dump_lsn;

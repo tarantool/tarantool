@@ -40,7 +40,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <bit/bit.h>
 #include <msgpuck/msgpuck.h>
 #include <small/mempool.h>
 #include <small/region.h>
@@ -79,40 +78,6 @@ enum vy_log_key {
 	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_DUMP_LSN		= 9,
 	VY_LOG_KEY_GC_LSN		= 10,
-};
-
-/**
- * Bit mask of keys that must be present in a record
- * of a particular type.
- */
-static const unsigned long vy_log_key_mask[] = {
-	[VY_LOG_CREATE_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_INDEX_ID) |
-					  (1 << VY_LOG_KEY_SPACE_ID) |
-					  (1 << VY_LOG_KEY_DEF),
-	[VY_LOG_DROP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN),
-	[VY_LOG_INSERT_RANGE]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_RANGE_ID) |
-					  (1 << VY_LOG_KEY_BEGIN) |
-					  (1 << VY_LOG_KEY_END),
-	[VY_LOG_DELETE_RANGE]		= (1 << VY_LOG_KEY_RANGE_ID),
-	[VY_LOG_PREPARE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_RUN_ID),
-	[VY_LOG_CREATE_RUN]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_RUN_ID) |
-					  (1 << VY_LOG_KEY_DUMP_LSN),
-	[VY_LOG_DROP_RUN]		= (1 << VY_LOG_KEY_RUN_ID) |
-					  (1 << VY_LOG_KEY_GC_LSN),
-	[VY_LOG_FORGET_RUN]		= (1 << VY_LOG_KEY_RUN_ID),
-	[VY_LOG_INSERT_SLICE]		= (1 << VY_LOG_KEY_RANGE_ID) |
-					  (1 << VY_LOG_KEY_RUN_ID) |
-					  (1 << VY_LOG_KEY_SLICE_ID) |
-					  (1 << VY_LOG_KEY_BEGIN) |
-					  (1 << VY_LOG_KEY_END),
-	[VY_LOG_DELETE_SLICE]		= (1 << VY_LOG_KEY_SLICE_ID),
-	[VY_LOG_DUMP_INDEX]		= (1 << VY_LOG_KEY_INDEX_LSN) |
-					  (1 << VY_LOG_KEY_DUMP_LSN),
-	[VY_LOG_SNAPSHOT]		= 0,
 };
 
 /** vy_log_key -> human readable name. */
@@ -320,64 +285,54 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 {
 	int total = 0;
 	assert(record->type < vy_log_record_type_MAX);
-	unsigned long key_mask = vy_log_key_mask[record->type];
 	SNPRINT(total, snprintf, buf, size, "%s{",
 		vy_log_type_name[record->type]);
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN))
+	if (record->index_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_INDEX_LSN],
 			record->index_lsn);
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID))
+	if (record->range_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_RANGE_ID],
 			record->range_id);
-	if (key_mask & (1 << VY_LOG_KEY_RUN_ID))
+	if (record->run_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_RUN_ID],
 			record->run_id);
-	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
+	if (record->begin != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_BEGIN]);
-		if (record->begin != NULL)
-			SNPRINT(total, mp_snprint, buf, size,
-				record->begin);
-		else
-			SNPRINT(total, snprintf, buf, size, "[]");
+		SNPRINT(total, mp_snprint, buf, size, record->begin);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (key_mask & (1 << VY_LOG_KEY_END)) {
+	if (record->end != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_END]);
-		if (record->end != NULL)
-			SNPRINT(total, mp_snprint, buf, size,
-				record->end);
-		else
-			SNPRINT(total, snprintf, buf, size, "[]");
+		SNPRINT(total, mp_snprint, buf, size, record->end);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID))
+	if (record->index_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_INDEX_ID], record->index_id);
-	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
+	if (record->space_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_SPACE_ID],
 			record->space_id);
-	}
-	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
+	if (record->key_def != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_DEF]);
 		SNPRINT(total, key_def_snprint, buf, size, record->key_def);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID))
+	if (record->slice_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_SLICE_ID],
 			record->slice_id);
-	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN))
+	if (record->dump_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
 			record->dump_lsn);
-	if (key_mask & (1 << VY_LOG_KEY_GC_LSN))
+	if (record->gc_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_GC_LSN],
 			record->gc_lsn);
@@ -416,7 +371,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 		     struct xrow_header *row)
 {
 	assert(record->type < vy_log_record_type_MAX);
-	unsigned long key_mask = vy_log_key_mask[record->type];
 
 	/*
 	 * Calculate record size.
@@ -425,78 +379,64 @@ vy_log_record_encode(const struct vy_log_record *record,
 	size += mp_sizeof_array(2);
 	size += mp_sizeof_uint(record->type);
 	size_t n_keys = 0;
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN)) {
-		assert(record->index_lsn >= 0);
+	if (record->index_lsn > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_LSN);
 		size += mp_sizeof_uint(record->index_lsn);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID)) {
-		assert(record->range_id >= 0);
+	if (record->range_id > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_RANGE_ID);
 		size += mp_sizeof_uint(record->range_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RUN_ID)) {
-		assert(record->run_id >= 0);
+	if (record->run_id > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_RUN_ID);
 		size += mp_sizeof_uint(record->run_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
+	if (record->begin != NULL) {
 		size += mp_sizeof_uint(VY_LOG_KEY_BEGIN);
-		if (record->begin != NULL) {
-			const char *p = record->begin;
-			assert(mp_typeof(*p) == MP_ARRAY);
-			mp_next(&p);
-			size += p - record->begin;
-		} else
-			size += mp_sizeof_array(0);
+		const char *p = record->begin;
+		assert(mp_typeof(*p) == MP_ARRAY);
+		mp_next(&p);
+		size += p - record->begin;
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_END)) {
+	if (record->end != NULL) {
 		size += mp_sizeof_uint(VY_LOG_KEY_END);
-		if (record->end != NULL) {
-			const char *p = record->end;
-			assert(mp_typeof(*p) == MP_ARRAY);
-			mp_next(&p);
-			size += p - record->end;
-		} else
-			size += mp_sizeof_array(0);
+		const char *p = record->end;
+		assert(mp_typeof(*p) == MP_ARRAY);
+		mp_next(&p);
+		size += p - record->end;
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
+	if (record->index_id > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_ID);
 		size += mp_sizeof_uint(record->index_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
+	if (record->space_id > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_SPACE_ID);
 		size += mp_sizeof_uint(record->space_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
-		const struct key_def *key_def = record->key_def;
-		assert(key_def != NULL);
+	if (record->key_def != NULL) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DEF);
-		size += mp_sizeof_array(key_def->part_count);
-		size += key_def_sizeof_parts(key_def);
+		size += mp_sizeof_array(record->key_def->part_count);
+		size += key_def_sizeof_parts(record->key_def);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
-		assert(record->slice_id >= 0);
+	if (record->slice_id > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_SLICE_ID);
 		size += mp_sizeof_uint(record->slice_id);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
-		assert(record->dump_lsn >= 0);
+	if (record->dump_lsn > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
 		size += mp_sizeof_uint(record->dump_lsn);
 		n_keys++;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_GC_LSN)) {
-		assert(record->gc_lsn >= 0);
+	if (record->gc_lsn > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_GC_LSN);
 		size += mp_sizeof_uint(record->gc_lsn);
 		n_keys++;
@@ -515,61 +455,54 @@ vy_log_record_encode(const struct vy_log_record *record,
 	pos = mp_encode_array(pos, 2);
 	pos = mp_encode_uint(pos, record->type);
 	pos = mp_encode_map(pos, n_keys);
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_LSN)) {
+	if (record->index_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_LSN);
 		pos = mp_encode_uint(pos, record->index_lsn);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RANGE_ID)) {
+	if (record->range_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_RANGE_ID);
 		pos = mp_encode_uint(pos, record->range_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_RUN_ID)) {
+	if (record->run_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_RUN_ID);
 		pos = mp_encode_uint(pos, record->run_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_BEGIN)) {
+	if (record->begin != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_BEGIN);
-		if (record->begin != NULL) {
-			const char *p = record->begin;
-			mp_next(&p);
-			memcpy(pos, record->begin, p - record->begin);
-			pos += p - record->begin;
-		} else
-			pos = mp_encode_array(pos, 0);
+		const char *p = record->begin;
+		mp_next(&p);
+		memcpy(pos, record->begin, p - record->begin);
+		pos += p - record->begin;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_END)) {
+	if (record->end != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_END);
-		if (record->end != NULL) {
-			const char *p = record->end;
-			mp_next(&p);
-			memcpy(pos, record->end, p - record->end);
-			pos += p - record->end;
-		} else
-			pos = mp_encode_array(pos, 0);
+		const char *p = record->end;
+		mp_next(&p);
+		memcpy(pos, record->end, p - record->end);
+		pos += p - record->end;
 	}
-	if (key_mask & (1 << VY_LOG_KEY_INDEX_ID)) {
+	if (record->index_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_ID);
 		pos = mp_encode_uint(pos, record->index_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_SPACE_ID)) {
+	if (record->space_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
 		pos = mp_encode_uint(pos, record->space_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_DEF)) {
-		const struct key_def *key_def = record->key_def;
+	if (record->key_def != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
-		pos = mp_encode_array(pos, key_def->part_count);
-		pos = key_def_encode_parts(pos, key_def);
+		pos = mp_encode_array(pos, record->key_def->part_count);
+		pos = key_def_encode_parts(pos, record->key_def);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_SLICE_ID)) {
+	if (record->slice_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
 		pos = mp_encode_uint(pos, record->slice_id);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_DUMP_LSN)) {
+	if (record->dump_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
 		pos = mp_encode_uint(pos, record->dump_lsn);
 	}
-	if (key_mask & (1 << VY_LOG_KEY_GC_LSN)) {
+	if (record->gc_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_GC_LSN);
 		pos = mp_encode_uint(pos, record->gc_lsn);
 	}
@@ -602,16 +535,15 @@ vy_log_record_decode(struct vy_log_record *record,
 
 	struct request req;
 	request_create(&req, row->type);
-	uint64_t key_map = 1ULL<<IPROTO_TUPLE;
 	if (request_decode(&req, row->body->iov_base, row->body->iov_len,
-			   key_map) < 0) {
+			   1ULL << IPROTO_TUPLE) < 0) {
 		error_log(diag_last_error(diag_get()));
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 "Bad record: failed to decode request");
 		return -1;
 	}
 
-	const char *pos = req.tuple;
+	const char *tmp, *pos = req.tuple;
 
 	uint32_t array_size = mp_decode_array(&pos);
 	if (array_size != 2) {
@@ -630,7 +562,6 @@ vy_log_record_decode(struct vy_log_record *record,
 		goto fail;
 	}
 
-	uint64_t key_mask = vy_log_key_mask[record->type];
 	uint32_t n_keys = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < n_keys; i++) {
 		uint32_t key = mp_decode_uint(&pos);
@@ -645,11 +576,13 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->run_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_BEGIN:
-			record->begin = pos;
+			tmp = pos;
+			record->begin = mp_decode_array(&tmp) > 0 ? pos : NULL;
 			mp_next(&pos);
 			break;
 		case VY_LOG_KEY_END:
-			record->end = pos;
+			tmp = pos;
+			record->end = mp_decode_array(&tmp) > 0 ? pos : NULL;
 			mp_next(&pos);
 			break;
 		case VY_LOG_KEY_INDEX_ID:
@@ -695,14 +628,6 @@ vy_log_record_decode(struct vy_log_record *record,
 					    (unsigned)key));
 			goto fail;
 		}
-		key_mask &= ~(1UL << key);
-	}
-	if (key_mask != 0) {
-		enum vy_log_key key = bit_ctz_u64(key_mask);
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Bad record: missing mandatory key %s",
-				    vy_log_key_name[key]));
-		goto fail;
 	}
 	return 0;
 fail:
@@ -810,7 +735,9 @@ vy_log_open(struct xlog *xlog)
 		goto fail;
 
 	struct xrow_header row;
-	struct vy_log_record record = { .type = VY_LOG_SNAPSHOT };
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_SNAPSHOT;
 	if (vy_log_record_encode(&record, &row) < 0 ||
 	    xlog_write_row(xlog, &row) < 0)
 		goto fail_close_xlog;
@@ -976,7 +903,9 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 
 	/* Mark the end of the snapshot. */
 	struct xrow_header row;
-	struct vy_log_record record = { .type = VY_LOG_SNAPSHOT };
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_SNAPSHOT;
 	if (vy_log_record_encode(&record, &row) < 0 ||
 	    xlog_write_row(&xlog, &row) < 0)
 		goto err_write_xlog;
@@ -1278,6 +1207,12 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 			 uint32_t index_id, uint32_t space_id,
 			 const struct key_def *key_def)
 {
+	if (key_def == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Missing key definition for index %lld",
+				    (long long)index_lsn));
+		return -1;
+	}
 	if (vy_recovery_lookup_index(recovery, index_lsn) != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Duplicate index id %lld",
@@ -1579,11 +1514,13 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t index_lsn,
 	size_t size = sizeof(struct vy_range_recovery_info);
 	const char *data;
 	data = begin;
-	mp_next(&data);
+	if (data != NULL)
+		mp_next(&data);
 	size_t begin_size = data - begin;
 	size += begin_size;
 	data = end;
-	mp_next(&data);
+	if (data != NULL)
+		mp_next(&data);
 	size_t end_size = data - end;
 	size += end_size;
 
@@ -1601,10 +1538,16 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t index_lsn,
 		return -1;
 	}
 	range->id = range_id;
-	range->begin = (void *)range + sizeof(*range);
-	memcpy(range->begin, begin, begin_size);
-	range->end = (void *)range + sizeof(*range) + begin_size;
-	memcpy(range->end, end, end_size);
+	if (begin != NULL) {
+		range->begin = (void *)range + sizeof(*range);
+		memcpy(range->begin, begin, begin_size);
+	} else
+		range->begin = NULL;
+	if (end != NULL) {
+		range->end = (void *)range + sizeof(*range) + begin_size;
+		memcpy(range->end, end, end_size);
+	} else
+		range->end = NULL;
 	rlist_create(&range->slices);
 	rlist_add_entry(&index->ranges, range, in_index);
 	if (recovery->max_id < range_id)
@@ -1682,11 +1625,13 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
 	size_t size = sizeof(struct vy_slice_recovery_info);
 	const char *data;
 	data = begin;
-	mp_next(&data);
+	if (data != NULL)
+		mp_next(&data);
 	size_t begin_size = data - begin;
 	size += begin_size;
 	data = end;
-	mp_next(&data);
+	if (data != NULL)
+		mp_next(&data);
 	size_t end_size = data - end;
 	size += end_size;
 
@@ -1705,10 +1650,16 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
 	}
 	slice->id = slice_id;
 	slice->run = run;
-	slice->begin = (void *)slice + sizeof(*slice);
-	memcpy(slice->begin, begin, begin_size);
-	slice->end = (void *)slice + sizeof(*slice) + begin_size;
-	memcpy(slice->end, end, end_size);
+	if (begin != NULL) {
+		slice->begin = (void *)slice + sizeof(*slice);
+		memcpy(slice->begin, begin, begin_size);
+	} else
+		slice->begin = NULL;
+	if (end != NULL) {
+		slice->end = (void *)slice + sizeof(*slice) + begin_size;
+		memcpy(slice->end, end, end_size);
+	} else
+		slice->end = NULL;
 	/*
 	 * If dump races with compaction, an older slice created by
 	 * compaction may be added after a newer slice created by
@@ -1958,14 +1909,13 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 	struct vy_slice_recovery_info *slice;
 	struct vy_run_recovery_info *run;
 	struct vy_log_record record;
-	const char *tmp;
 
+	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_INDEX;
 	record.index_lsn = index->index_lsn;
 	record.index_id = index->index_id;
 	record.space_id = index->space_id;
 	record.key_def = index->key_def;
-
 	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;
 
@@ -1975,19 +1925,27 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		 * dropped on WAL recovery anyway. Just create
 		 * an initial range to make vy_get() happy.
 		 */
+		vy_log_record_init(&record);
 		record.type = VY_LOG_INSERT_RANGE;
+		record.index_lsn = index->index_lsn;
 		record.range_id = INT64_MAX; /* fake id */
 		record.begin = record.end = NULL;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
+
+		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_INDEX;
+		record.index_lsn = index->index_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
+
 		return 0;
 	}
 
 	if (index->dump_lsn >= 0) {
+		vy_log_record_init(&record);
 		record.type = VY_LOG_DUMP_INDEX;
+		record.index_lsn = index->index_lsn;
 		record.dump_lsn = index->dump_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
@@ -1997,29 +1955,37 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		if (!include_deleted &&
 		    (run->is_dropped || run->is_incomplete))
 			continue;
-		record.type = (run->is_incomplete ?
-			       VY_LOG_PREPARE_RUN : VY_LOG_CREATE_RUN);
+
+		vy_log_record_init(&record);
+		if (run->is_incomplete) {
+			record.type = VY_LOG_PREPARE_RUN;
+		} else {
+			record.type = VY_LOG_CREATE_RUN;
+			record.dump_lsn = run->dump_lsn;
+		}
+		record.index_lsn = index->index_lsn;
 		record.run_id = run->id;
-		record.dump_lsn = run->dump_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
+
 		if (!run->is_dropped)
 			continue;
+
+		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_RUN;
+		record.run_id = run->id;
 		record.gc_lsn = run->gc_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}
 
 	rlist_foreach_entry(range, &index->ranges, in_index) {
+		vy_log_record_init(&record);
 		record.type = VY_LOG_INSERT_RANGE;
+		record.index_lsn = index->index_lsn;
 		record.range_id = range->id;
-		record.begin = tmp = range->begin;
-		if (mp_decode_array(&tmp) == 0)
-			record.begin = NULL;
-		record.end = tmp = range->end;
-		if (mp_decode_array(&tmp) == 0)
-			record.end = NULL;
+		record.begin = range->begin;
+		record.end = range->end;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		/*
@@ -2028,22 +1994,22 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 		 * order, so use reverse iterator.
 		 */
 		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
+			vy_log_record_init(&record);
 			record.type = VY_LOG_INSERT_SLICE;
+			record.range_id = range->id;
 			record.slice_id = slice->id;
 			record.run_id = slice->run->id;
-			record.begin = tmp = slice->begin;
-			if (mp_decode_array(&tmp) == 0)
-				record.begin = NULL;
-			record.end = tmp = slice->end;
-			if (mp_decode_array(&tmp) == 0)
-				record.end = NULL;
+			record.begin = slice->begin;
+			record.end = slice->end;
 			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 				return -1;
 		}
 	}
 
 	if (index->is_dropped) {
+		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_INDEX;
+		record.index_lsn = index->index_lsn;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 	}
