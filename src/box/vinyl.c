@@ -30,57 +30,30 @@
  */
 #include "vinyl.h"
 
-#include "vy_stmt.h"
-#include "vy_quota.h"
-#include "vy_stmt_iterator.h"
 #include "vy_mem.h"
 #include "vy_run.h"
 #include "vy_cache.h"
+#include "vy_log.h"
 
-#include <dirent.h>
-
-#include <bit/bit.h>
-#include <small/rlist.h>
 #define RB_COMPACT 1
 #include <small/rb.h>
-#include <small/mempool.h>
-#include <small/region.h>
+
 #include <small/lsregion.h>
-#include <msgpuck/msgpuck.h>
 #include <coeio_file.h>
 
-#include "trivia/util.h"
 #include "assoc.h"
-#include "crc32.h"
-#include "clock.h"
-#include "trivia/config.h"
-#include "tt_pthread.h"
 #include "cfg.h"
-#include "diag.h"
-#include "fiber.h" /* cord_slab_cache() */
-#include "ipc.h"
 #include "coeio.h"
 #include "cbus.h"
 #include "histogram.h"
-#include "rmean.h"
-#include "errinj.h"
 
-#include "errcode.h"
-#include "key_def.h"
-#include "tuple.h"
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
-#include "iproto_constants.h"
 #include "replication.h" /* INSTANCE_UUID */
-#include "vclock.h"
-#include "box.h"
 #include "schema.h"
 #include "xrow.h"
 #include "xlog.h"
-#include "fio.h"
 #include "space.h"
-#include "index.h"
-#include "vy_log.h"
 #include "xstream.h"
 #include "info.h"
 #include "request.h"
@@ -97,9 +70,6 @@ enum { VY_YIELD_LOOPS = 128 };
 #else
 enum { VY_YIELD_LOOPS = 2 };
 #endif
-
-#define vy_cmp(a, b) \
-	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
 struct tx_manager;
 struct vy_scheduler;
@@ -166,9 +136,6 @@ struct vy_env {
 	/** Local recovery vclock. */
 	const struct vclock *recovery_vclock;
 };
-
-#define vy_crcs(p, size, crc) \
-	crc32_calc(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
 
 struct vy_latency {
 	uint64_t count;
