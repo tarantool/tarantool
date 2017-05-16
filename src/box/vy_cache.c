@@ -315,6 +315,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	} else {
 		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
 	}
+#ifndef NDEBUG
 	/* Check that there are not statements between prev_stmt and stmt */
 	if (!vy_cache_tree_iterator_is_invalid(&itr)) {
 		struct vy_cache_entry **prev_check_entry =
@@ -322,11 +323,11 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
 		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
-		    cache->key_def) != 0) {
-			/* Failed to build chain */
-			return;
-		}
+		    cache->key_def) != 0)
+			/* Failed to build chain. */
+			unreachable();
 	}
+#endif
 
 	/* Insert/replace entry with previous statement */
 	struct vy_cache_entry *prev_entry =
@@ -734,8 +735,10 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			*ret = itr->curr_stmt;
 			return 0;
 		}
-		if (itr->version == itr->cache->version)
+		if (itr->version == itr->cache->version) {
+			*ret = itr->curr_stmt;
 			return 0;
+		}
 		while (true) {
 			if (dir > 0)
 				vy_cache_tree_iterator_prev(tree, &pos);
