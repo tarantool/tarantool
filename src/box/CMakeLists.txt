@@ -55,6 +55,7 @@ add_library(box STATIC
     vy_run.c
     vy_cache.c
     vy_log.c
+    vy_upsert.c
     space.cc
     func.cc
     alter.cc

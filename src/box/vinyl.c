@@ -34,6 +34,7 @@
 #include "vy_run.h"
 #include "vy_cache.h"
 #include "vy_log.h"
+#include "vy_upsert.h"
 
 #define RB_COMPACT 1
 #include <small/rb.h>
@@ -335,35 +336,6 @@ vy_stat_tx_write_rate(struct vy_stat *s)
 {
 	return rmean_mean(s->rmean, VY_STAT_TX_WRITE);
 }
-
-/**
- * Apply the UPSERT statement to the REPLACE, UPSERT or DELETE statement.
- * If the second statement is
- * - REPLACE then update operations of the first one will be applied to the
- *   second and a REPLACE statement will be returned;
- *
- * - UPSERT then the new UPSERT will be created with combined operations of both
- *   arguments;
- *
- * - DELETE or NULL then the first one will be turned into REPLACE and returned
- *   as the result;
- *
- * @param upsert         An UPSERT statement.
- * @param object         An REPLACE/DELETE/UPSERT statement or NULL.
- * @param key_def        Key definition of an index.
- * @param format         Format for REPLACE/DELETE tuples.
- * @param upsert_format  Format for UPSERT tuples.
- * @param is_primary     True if the index is primary.
- * @param suppress_error True if ClientErrors must not be written to log.
- *
- * @retval NULL     Memory allocation error.
- * @retval not NULL Success.
- */
-static struct tuple *
-vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		const struct key_def *key_def, struct tuple_format *format,
-		struct tuple_format *upsert_format, bool is_primary,
-		bool suppress_error, struct vy_stat *stat);
 
 struct vy_range {
 	/** Unique ID of this range. */
@@ -3399,7 +3371,9 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 			vy_apply_upsert(stmt, older, &index_def->key_def,
 					index->space_format,
 					index->upsert_format,
-					index_def->iid == 0, false, stat);
+					index_def->iid == 0, false);
+		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+
 		if (upserted == NULL) {
 			/* OOM */
 			diag_clear(diag_get());
@@ -5572,224 +5546,6 @@ vy_index_bsize(struct vy_index *index)
 	return index->mem_used;
 }
 
-/** {{{ Upsert */
-
-static void *
-vy_update_alloc(void *arg, size_t size)
-{
-	/* TODO: rewrite tuple_upsert_execute() without exceptions */
-	struct region *region = (struct region *) arg;
-	void *data = region_aligned_alloc(region, size, sizeof(uint64_t));
-	if (data == NULL)
-		diag_set(OutOfMemory, size, "region", "upsert");
-	return data;
-}
-
-/**
- * vinyl wrapper of tuple_upsert_execute.
- * vibyl upsert opts are slightly different from tarantool ops,
- *  so they need some preparation before tuple_upsert_execute call.
- *  The function does this preparation.
- * On successfull upsert the result is placed into stmt and stmt_end args.
- * On fail the stmt and stmt_end args are not changed.
- * Possibly allocates new stmt via fiber region alloc,
- * so call fiber_gc() after usage
- */
-static void
-vy_apply_upsert_ops(struct region *region, const char **stmt,
-		    const char **stmt_end, const char *ops,
-		    const char *ops_end, bool suppress_error)
-{
-	if (ops == ops_end)
-		return;
-
-#ifndef NDEBUG
-			const char *serie_end_must_be = ops;
-			mp_next(&serie_end_must_be);
-			assert(ops_end == serie_end_must_be);
-#endif
-		const char *result;
-		uint32_t size;
-		result = tuple_upsert_execute(vy_update_alloc, region,
-					      ops, ops_end,
-					      *stmt, *stmt_end,
-					      &size, 0, suppress_error, NULL);
-		if (result != NULL) {
-			/* if failed, just skip it and leave stmt the same */
-			*stmt = result;
-			*stmt_end = result + size;
-		}
-}
-
-/**
- * Try to squash two upsert series (msgspacked index_base + ops)
- * Try to create a tuple with squahed operations
- *
- * @retval 0 && *result_stmt != NULL : successful squash
- * @retval 0 && *result_stmt == NULL : unsquashable sources
- * @retval -1 - memory error
- */
-static int
-vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
-			const char *key_mp, const char *key_mp_end,
-			const char *old_serie, const char *old_serie_end,
-			const char *new_serie, const char *new_serie_end,
-			struct tuple **result_stmt)
-{
-	*result_stmt = NULL;
-
-	size_t squashed_size;
-	const char *squashed =
-		tuple_upsert_squash(vy_update_alloc, region,
-				    old_serie, old_serie_end,
-				    new_serie, new_serie_end,
-				    &squashed_size, 0);
-	if (squashed == NULL)
-		return 0;
-	/* Successful squash! */
-	struct iovec operations[1];
-	operations[0].iov_base = (void *)squashed;
-	operations[0].iov_len = squashed_size;
-
-	*result_stmt = vy_stmt_new_upsert(format, key_mp, key_mp_end,
-					  operations, 1);
-	if (*result_stmt == NULL)
-		return -1;
-	return 0;
-}
-
-static struct tuple *
-vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		const struct key_def *key_def, struct tuple_format *format,
-		struct tuple_format *upsert_format, bool is_primary,
-		bool suppress_error, struct vy_stat *stat)
-{
-	/*
-	 * old_stmt - previous (old) version of stmt
-	 * new_stmt - next (new) version of stmt
-	 * result_stmt - the result of merging new and old
-	 */
-	assert(new_stmt != NULL);
-	assert(new_stmt != old_stmt);
-	assert(vy_stmt_type(new_stmt) == IPROTO_UPSERT);
-
-	if (stat != NULL)
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
-
-	if (old_stmt == NULL || vy_stmt_type(old_stmt) == IPROTO_DELETE) {
-		/*
-		 * INSERT case: return new stmt.
-		 */
-		return vy_stmt_replace_from_upsert(format, new_stmt);
-	}
-
-	/*
-	 * Unpack UPSERT operation from the new stmt
-	 */
-	uint32_t mp_size;
-	const char *new_ops;
-	new_ops = vy_stmt_upsert_ops(new_stmt, &mp_size);
-	const char *new_ops_end = new_ops + mp_size;
-
-	/*
-	 * Apply new operations to the old stmt
-	 */
-	const char *result_mp;
-	if (vy_stmt_type(old_stmt) == IPROTO_REPLACE)
-		result_mp = tuple_data_range(old_stmt, &mp_size);
-	else
-		result_mp = vy_upsert_data_range(old_stmt, &mp_size);
-	const char *result_mp_end = result_mp + mp_size;
-	struct tuple *result_stmt = NULL;
-	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
-	uint8_t old_type = vy_stmt_type(old_stmt);
-	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
-			    new_ops_end, suppress_error);
-	if (old_type != IPROTO_UPSERT) {
-		assert(old_type == IPROTO_DELETE || old_type == IPROTO_REPLACE);
-		/*
-		 * UPDATE case: return the updated old stmt.
-		 */
-		result_stmt = vy_stmt_new_replace(format, result_mp,
-						  result_mp_end);
-		region_truncate(region, region_svp);
-		if (result_stmt == NULL)
-			return NULL; /* OOM */
-		vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
-		goto check_key;
-	}
-
-	/*
-	 * Unpack UPSERT operation from the old stmt
-	 */
-	assert(old_stmt != NULL);
-	const char *old_ops;
-	old_ops = vy_stmt_upsert_ops(old_stmt, &mp_size);
-	const char *old_ops_end = old_ops + mp_size;
-	assert(old_ops_end > old_ops);
-
-	/*
-	 * UPSERT + UPSERT case: combine operations
-	 */
-	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(upsert_format, region,
-				    result_mp, result_mp_end,
-				    old_ops, old_ops_end,
-				    new_ops, new_ops_end,
-				    &result_stmt) != 0) {
-		region_truncate(region, region_svp);
-		return NULL;
-	}
-	if (result_stmt != NULL) {
-		region_truncate(region, region_svp);
-		vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
-		goto check_key;
-	}
-
-	/* Failed to squash, simply add one upsert to another */
-	int old_ops_cnt, new_ops_cnt;
-	struct iovec operations[3];
-
-	old_ops_cnt = mp_decode_array(&old_ops);
-	operations[1].iov_base = (void *)old_ops;
-	operations[1].iov_len = old_ops_end - old_ops;
-
-	new_ops_cnt = mp_decode_array(&new_ops);
-	operations[2].iov_base = (void *)new_ops;
-	operations[2].iov_len = new_ops_end - new_ops;
-
-	char ops_buf[16];
-	char *header = mp_encode_array(ops_buf, old_ops_cnt + new_ops_cnt);
-	operations[0].iov_base = (void *)ops_buf;
-	operations[0].iov_len = header - ops_buf;
-
-	result_stmt = vy_stmt_new_upsert(upsert_format, result_mp,
-					 result_mp_end, operations, 3);
-	region_truncate(region, region_svp);
-	if (result_stmt == NULL)
-		return NULL;
-	vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
-
-check_key:
-	/*
-	 * Check that key hasn't been changed after applying operations.
-	 */
-	if (is_primary &&
-	    vy_tuple_compare(old_stmt, result_stmt, key_def) != 0) {
-		/*
-		 * Key has been changed: ignore this UPSERT and
-		 * @retval the old stmt.
-		 */
-		tuple_unref(result_stmt);
-		result_stmt = vy_stmt_dup(old_stmt, old_type == IPROTO_UPSERT ?
-						    upsert_format : format);
-	}
-	return result_stmt;
-}
-
-/* }}} Upsert */
-
 /** True if the transaction is in a read view. */
 bool
 vy_tx_is_in_read_view(struct vy_tx *tx)
@@ -5830,8 +5586,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 					       &index_def->key_def,
 					       index->space_format,
 					       index->upsert_format,
-					       index_def->iid == 0,
-					       true, stat);
+					       index_def->iid == 0, true);
+			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 			if (stmt == NULL)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
@@ -8195,7 +7951,9 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 		struct tuple *applied;
 		applied = vy_apply_upsert(t, next, itr->key_def, itr->format,
 					  itr->upsert_format, itr->is_primary,
-					  suppress_error, stat);
+					  suppress_error);
+		if (stat != NULL)
+			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
@@ -8538,7 +8296,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 			applied = vy_apply_upsert(stmt, NULL, wi->key_def,
 						  wi->surrogate_format,
 						  wi->upsert_format,
-						  wi->is_primary, false, NULL);
+						  wi->is_primary, false);
 			tuple_unref(stmt);
 			if (applied == NULL)
 				return -1;
@@ -8889,8 +8647,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 							  &def->key_def,
 							  mi->format,
 							  mi->upsert_format,
-							  def->iid == 0,
-							  true, stat);
+							  def->iid == 0, true);
+				rmean_collect(stat->rmean,
+					      VY_STAT_UPSERT_APPLIED, 1);
 				tuple_unref(t);
 				t = applied;
 				assert(vy_stmt_type(t) == IPROTO_REPLACE);
@@ -9561,7 +9320,8 @@ vy_squash_process(struct vy_squash *squash)
 		struct tuple *applied =
 			vy_apply_upsert(mem_stmt, result, &index_def->key_def,
 					mem->format, mem->upsert_format,
-					index_def->iid == 0, true, stat);
+					index_def->iid == 0, true);
+		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
