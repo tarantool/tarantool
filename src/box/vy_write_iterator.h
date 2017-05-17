@@ -154,7 +154,6 @@ struct vy_run_env;
  * @param format - dormat to allocate new REPLACE and DELETE tuples from vy_run.
  * @param upsert_format - same as format, but for UPSERT tuples.
  * @param is_primary - set if this iterator is for a primary index.
- * @param column_mask - index column mask.
  * @param is_last_level - there is no older level than the one we're writing to.
  * @param oldest_vlsn - the minimal VLSN among all active transactions.
  * @return the iterator or NULL on error (diag is set).
@@ -162,8 +161,7 @@ struct vy_run_env;
 struct vy_write_iterator *
 vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
-		      uint64_t column_mask, bool is_last_level,
-		      int64_t oldest_vlsn);
+		      bool is_last_level, int64_t oldest_vlsn);
 
 /**
  * Add a mem as a source of iterator.

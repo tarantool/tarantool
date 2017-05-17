@@ -98,8 +98,6 @@ struct vy_write_iterator {
 	struct tuple_format *format;
 	/** Same as format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
-	/** Index column mask. */
-	uint64_t column_mask;
 	/* The minimal VLSN among all active transactions */
 	int64_t oldest_vlsn;
 	/* There are is no level older than the one we're writing to. */
@@ -220,11 +218,9 @@ vy_write_iterator_remove_src(struct vy_write_iterator *stream,
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_write_iterator *
-vy_write_iterator_new(const struct key_def *key_def,
-		      struct tuple_format *format,
+vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
-		      uint64_t column_mask, bool is_last_level,
-		      int64_t oldest_vlsn)
+		      bool is_last_level, int64_t oldest_vlsn)
 {
 	struct vy_write_iterator *stream =
 		(struct vy_write_iterator *) malloc(sizeof(*stream));
@@ -240,7 +236,6 @@ vy_write_iterator_new(const struct key_def *key_def,
 	stream->upsert_format = upsert_format;
 	tuple_format_ref(stream->upsert_format, 1);
 	stream->is_primary = is_primary;
-	stream->column_mask = column_mask;
 	stream->oldest_vlsn = oldest_vlsn;
 	stream->is_last_level = is_last_level;
 	stream->tuple = NULL;
@@ -495,7 +490,7 @@ vy_write_iterator_next(struct vy_write_iterator *stream,
 			 * @sa vy_can_skip_update().
 			 */
 			if (!stream->is_primary &&
-			    vy_can_skip_update(stream->column_mask,
+			    vy_can_skip_update(stream->key_def->column_mask,
 					       vy_stmt_column_mask(stream->tuple)))
 				continue;
 		}
