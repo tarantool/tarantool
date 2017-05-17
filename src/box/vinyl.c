@@ -139,6 +139,18 @@ struct vy_env {
 	const struct vclock *recovery_vclock;
 };
 
+/** Mask passed to vy_gc(). */
+enum {
+	/** Delete incomplete runs. */
+	VY_GC_INCOMPLETE	= 1 << 0,
+	/** Delete dropped runs. */
+	VY_GC_DROPPED		= 1 << 1,
+};
+
+static void
+vy_gc(struct vy_env *env, struct vy_recovery *recovery,
+      unsigned int gc_mask, int64_t gc_lsn);
+
 struct vy_latency {
 	uint64_t count;
 	double total;
@@ -1255,48 +1267,6 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
 		(long long)run_id, vy_file_suffix[type]);
 	return total;
-}
-
-/**
- * Given a record encoding information about a vinyl run, try to
- * delete the corresponding files. On success, write a "forget" record
- * to the log so that all information about the run is deleted on the
- * next log rotation.
- */
-static void
-vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
-{
-	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_DROP_RUN);
-
-	ERROR_INJECT(ERRINJ_VY_GC,
-		     {say_error("error injection: vinyl run %lld not deleted",
-				(long long)record->run_id); return;});
-
-	/* Try to delete files. */
-	bool forget = true;
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), vinyl_dir,
-				    record->space_id, record->index_id,
-				    record->run_id, type);
-		if (coeio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("failed to delete file '%s'", path);
-			forget = false;
-		}
-	}
-
-	if (!forget)
-		return;
-
-	/* Forget the run on success. */
-	vy_log_tx_begin();
-	vy_log_forget_run(record->run_id);
-	if (vy_log_tx_commit() < 0) {
-		say_warn("failed to log vinyl run %lld cleanup: %s",
-			 (long long)record->run_id,
-			 diag_last_error(diag_get())->errmsg);
-	}
 }
 
 static void
@@ -3118,12 +3088,15 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(record->index_lsn == index_def->opts.lsn);
 		break;
 	case VY_LOG_DUMP_INDEX:
+		assert(record->index_lsn == index_def->opts.lsn);
 		index->dump_lsn = record->dump_lsn;
 		break;
 	case VY_LOG_DROP_INDEX:
+		assert(record->index_lsn == index_def->opts.lsn);
 		index->is_dropped = true;
 		break;
 	case VY_LOG_CREATE_RUN:
+		assert(record->index_lsn == index_def->opts.lsn);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto out;
@@ -3151,6 +3124,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		}
 		break;
 	case VY_LOG_INSERT_RANGE:
+		assert(record->index_lsn == index_def->opts.lsn);
 		range = vy_range_new(index, record->range_id, begin, end);
 		if (range == NULL)
 			goto out;
@@ -7469,26 +7443,6 @@ vy_begin_final_recovery(struct vy_env *e)
 	return 0;
 }
 
-/**
- * Callback passed to vy_recovery_iterate() to delete files
- * left from incomplete runs.
- *
- * If the instance is shut down while a dump/compaction task
- * is in progress, we'll get an unfinished run file on disk,
- * i.e. a run file which was either not written to the end
- * or not inserted into a range. We need to delete such runs
- * on recovery.
- */
-static int
-vy_end_recovery_cb(const struct vy_log_record *record, void *cb_arg)
-{
-	struct vy_env *env = cb_arg;
-
-	if (record->type == VY_LOG_PREPARE_RUN)
-		vy_run_record_gc(env->conf->path, record);
-	return 0;
-}
-
 int
 vy_end_recovery(struct vy_env *e)
 {
@@ -7497,9 +7451,15 @@ vy_end_recovery(struct vy_env *e)
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_end_recovery() != 0)
 			return -1;
-
-		vy_recovery_iterate(e->recovery, true,
-				    vy_end_recovery_cb, e);
+		/*
+		 * If the instance is shut down while a dump or
+		 * compaction task is in progress, we'll get an
+		 * unfinished run file on disk, i.e. a run file
+		 * which was either not written to the end or not
+		 * inserted into a range. We need to delete such
+		 * runs on recovery.
+		 */
+		vy_gc(e, e->recovery, VY_GC_INCOMPLETE, INT64_MAX);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
@@ -9126,13 +9086,6 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 			return -1;
 	}
 
-	/*
-	 * We are only interested in the primary index.
-	 * Secondary keys will be rebuilt on the destination.
-	 */
-	if (record->index_id != 0)
-		return 0;
-
 	if (record->type == VY_LOG_CREATE_INDEX) {
 		ctx->space_id = record->space_id;
 		ctx->index_id = record->index_id;
@@ -9151,6 +9104,13 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 			return -1;
 		tuple_format_ref(ctx->upsert_format, 1);
 	}
+
+	/*
+	 * We are only interested in the primary index.
+	 * Secondary keys will be rebuilt on the destination.
+	 */
+	if (ctx->index_id != 0)
+		return 0;
 
 	if (record->type == VY_LOG_INSERT_SLICE) {
 		struct tuple_format *key_format = ctx->env->key_format;
@@ -9285,29 +9245,103 @@ out:
 
 /* {{{ Garbage collection */
 
-/** Argument passed to vy_collect_garbage_cb(). */
+/** Argument passed to vy_gc_cb(). */
 struct vy_gc_arg {
 	/** Vinyl environment. */
 	struct vy_env *env;
+	/**
+	 * Specifies what kinds of runs to delete.
+	 * See VY_GC_*.
+	 */
+	unsigned int gc_mask;
 	/** LSN of the oldest checkpoint to save. */
 	int64_t gc_lsn;
+	/**
+	 * ID of the current space and index.
+	 * Needed for file name formatting.
+	 */
+	uint32_t space_id;
+	uint32_t index_id;
 	/** Number of times the callback has been called. */
 	int loops;
 };
 
-/** Garbage collection callback, passed to vy_recovery_iterate(). */
+/**
+ * Garbage collection callback, passed to vy_recovery_iterate().
+ *
+ * Given a record encoding information about a vinyl run, try to
+ * delete the corresponding files. On success, write a "forget" record
+ * to the log so that all information about the run is deleted on the
+ * next log rotation.
+ */
 static int
-vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
+vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_gc_arg *arg = cb_arg;
 
-	if (record->type == VY_LOG_DROP_RUN &&
-	    record->gc_lsn < arg->gc_lsn)
-		vy_run_record_gc(arg->env->conf->path, record);
+	switch (record->type) {
+	case VY_LOG_CREATE_INDEX:
+		arg->space_id = record->space_id;
+		arg->index_id = record->index_id;
+		goto out;
+	case VY_LOG_PREPARE_RUN:
+		if ((arg->gc_mask & VY_GC_INCOMPLETE) == 0)
+			goto out;
+		break;
+	case VY_LOG_DROP_RUN:
+		if ((arg->gc_mask & VY_GC_DROPPED) == 0 ||
+		    record->gc_lsn >= arg->gc_lsn)
+			goto out;
+		break;
+	default:
+		goto out;
+	}
 
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: vinyl run %lld not deleted",
+				(long long)record->run_id); goto out;});
+
+	/* Try to delete files. */
+	bool forget = true;
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+				    arg->space_id, arg->index_id,
+				    record->run_id, type);
+		if (coeio_unlink(path) < 0 && errno != ENOENT) {
+			say_syserror("failed to delete file '%s'", path);
+			forget = false;
+		}
+	}
+
+	if (!forget)
+		goto out;
+
+	/* Forget the run on success. */
+	vy_log_tx_begin();
+	vy_log_forget_run(record->run_id);
+	if (vy_log_tx_commit() < 0) {
+		say_warn("failed to log vinyl run %lld cleanup: %s",
+			 (long long)record->run_id,
+			 diag_last_error(diag_get())->errmsg);
+	}
+out:
 	if (++arg->loops % VY_YIELD_LOOPS == 0)
 		fiber_sleep(0);
 	return 0;
+}
+
+/** Delete unused run files, see vy_gc_arg for more details. */
+static void
+vy_gc(struct vy_env *env, struct vy_recovery *recovery,
+      unsigned int gc_mask, int64_t gc_lsn)
+{
+	struct vy_gc_arg arg = {
+		.env = env,
+		.gc_mask = gc_mask,
+		.gc_lsn = gc_lsn,
+	};
+	vy_recovery_iterate(recovery, true, vy_gc_cb, &arg);
 }
 
 void
@@ -9324,11 +9358,7 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 			 diag_last_error(diag_get())->errmsg);
 		return;
 	}
-	struct vy_gc_arg arg = {
-		.env = env,
-		.gc_lsn = lsn,
-	};
-	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, &arg);
+	vy_gc(env, recovery, VY_GC_DROPPED, lsn);
 	vy_recovery_delete(recovery);
 }
 
@@ -9344,6 +9374,12 @@ struct vy_backup_arg {
 	int (*cb)(const char *, void *);
 	/** Argument passed to @cb. */
 	void *cb_arg;
+	/**
+	 * ID of the current space and index.
+	 * Needed for file name formatting.
+	 */
+	uint32_t space_id;
+	uint32_t index_id;
 	/** Number of times the callback has been called. */
 	int loops;
 };
@@ -9354,13 +9390,18 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_backup_arg *arg = cb_arg;
 
+	if (record->type == VY_LOG_CREATE_INDEX) {
+		arg->space_id = record->space_id;
+		arg->index_id = record->index_id;
+	}
+
 	if (record->type != VY_LOG_CREATE_RUN)
 		goto out;
 
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
-				    record->space_id, record->index_id,
+				    arg->space_id, arg->index_id,
 				    record->run_id, type);
 		if (arg->cb(path, arg->cb_arg) != 0)
 			return -1;
