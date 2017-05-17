@@ -260,3 +260,31 @@ space:select{}
 space:drop()
 ---
 ...
+-- Allow to specify various bloom fprs per index.
+space = box.schema.space.create('test', {engine='vinyl'})
+---
+...
+pk = space:create_index('pk', {bloom_fpr = 0.1})
+---
+...
+sec = space:create_index('sec', {bloom_fpr = 0.2})
+---
+...
+third = space:create_index('third', {bloom_fpr = 0.3})
+---
+...
+pk:info().bloom_fpr
+---
+- 0.1
+...
+sec:info().bloom_fpr
+---
+- 0.2
+...
+third:info().bloom_fpr
+---
+- 0.3
+...
+space:drop()
+---
+...

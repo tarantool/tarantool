@@ -380,23 +380,43 @@ local function update_index_parts(parts)
     return new_parts
 end
 
+--
+-- Template for index opts. Not for entire
+-- index object.
+--
+local index_opts_template = {
+    unique = 'boolean',
+    dimension = 'number',
+    distance = 'string',
+    run_count_per_level = 'number',
+    run_size_ratio = 'number',
+    range_size = 'number',
+    page_size = 'number',
+    bloom_fpr = 'number'
+}
+--
+-- Template for entire index object, including
+-- index opts.
+--
+local index_object_template = {
+    id = 'number',
+    name = 'string',
+    type = 'string',
+    parts = 'table'
+}
+for k, v in pairs(index_opts_template) do
+    index_object_template[k] = v
+end
+
 box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
-    local options_template = {
-        type = 'string',
-        parts = 'table',
-        unique = 'boolean',
-        id = 'number',
-        if_not_exists = 'boolean',
-        dimension = 'number',
-        distance = 'string',
-        page_size = 'number',
-        range_size = 'number',
-        run_count_per_level = 'number',
-        run_size_ratio = 'number',
-    }
-    check_param_table(options, options_template)
+    -- Create deep copy of index_object_template with one
+    -- new attribute.
+    local new_index_template = table.deepcopy(index_object_template)
+    new_index_template.if_not_exists = 'boolean'
+    check_param_table(options, new_index_template)
+
     local options_defaults = {
         type = 'tree',
     }
@@ -416,6 +436,7 @@ box.schema.index.create = function(space_id, name, options)
             range_size = box.cfg.vinyl_range_size,
             run_count_per_level = box.cfg.vinyl_run_count_per_level,
             run_size_ratio = box.cfg.vinyl_run_size_ratio,
+            bloom_fpr = box.cfg.vinyl_bloom_fpr
         }
     else
         options_defaults = {}
@@ -462,6 +483,7 @@ box.schema.index.create = function(space_id, name, options)
             range_size = options.range_size,
             run_count_per_level = options.run_count_per_level,
             run_size_ratio = options.run_size_ratio,
+            bloom_fpr = options.bloom_fpr,
             lsn = box.info.signature,
     }
     local field_type_aliases = {
@@ -513,16 +535,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         return
     end
 
-    local options_template = {
-        id = 'number',
-        name = 'string',
-        type = 'string',
-        parts = 'table',
-        unique = 'boolean',
-        dimension = 'number',
-        distance = 'string',
-    }
-    check_param_table(options, options_template)
+    check_param_table(options, index_object_template)
 
     if type(space_id) ~= "number" then
         space_id = box.space[space_id].id

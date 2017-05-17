@@ -205,6 +205,8 @@ struct index_opts {
 	 * previous one.
 	 */
 	double run_size_ratio;
+	/* Bloom filter false positive rate. */
+	double bloom_fpr;
 	/**
 	 * LSN from the time of index creation.
 	 */

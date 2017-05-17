@@ -98,8 +98,6 @@ struct vy_conf {
 	uint64_t memory_limit;
 	/* read cache quota */
 	uint64_t cache;
-	/* bloom filter false positive rate */
-	double bloom_fpr;
 	/* quota timeout */
 	double timeout;
 };
@@ -3946,7 +3944,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	task->wi = wi;
 	task->generation = generation;
 	task->max_output_count = max_output_count;
-	task->bloom_fpr = index->env->conf->bloom_fpr;
+	task->bloom_fpr = index->index_def->opts.bloom_fpr;
 
 	vy_scheduler_remove_index(scheduler, index);
 	if (index->index_def->iid != 0) {
@@ -4214,7 +4212,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 	task->range = range;
 	task->new_run = new_run;
 	task->wi = wi;
-	task->bloom_fpr = index->env->conf->bloom_fpr;
+	task->bloom_fpr = index->index_def->opts.bloom_fpr;
 
 	vy_scheduler_remove_range(scheduler, range);
 
@@ -4942,9 +4940,8 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
-	conf->memory_limit = cfg_geti64("vinyl_memory");
-	conf->cache = cfg_geti64("vinyl_cache");
-	conf->bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+	conf->memory_limit = cfg_getd("vinyl_memory");
+	conf->cache = cfg_getd("vinyl_cache");
 	conf->timeout = cfg_getd("vinyl_timeout");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
@@ -5105,6 +5102,7 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	info_append_u32(h, "run_avg", index->run_count / index->range_count);
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
+	info_append_double(h, "bloom_fpr", index->index_def->opts.bloom_fpr);
 	info_end(h);
 }
 

@@ -103,3 +103,13 @@ space:auto_increment{3}
 box.space._index:replace{space.id, 0, 'pk', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 space:select{}
 space:drop()
+
+-- Allow to specify various bloom fprs per index.
+space = box.schema.space.create('test', {engine='vinyl'})
+pk = space:create_index('pk', {bloom_fpr = 0.1})
+sec = space:create_index('sec', {bloom_fpr = 0.2})
+third = space:create_index('third', {bloom_fpr = 0.3})
+pk:info().bloom_fpr
+sec:info().bloom_fpr
+third:info().bloom_fpr
+space:drop()
