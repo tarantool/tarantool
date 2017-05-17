@@ -548,8 +548,6 @@ struct vy_index {
 	 * until all pending operations have completed.
 	 */
 	uint32_t refs;
-	/** A schematic name for profiler output. */
-	char *name;
 	/** The path with index files. */
 	char *path;
 	/**
@@ -619,6 +617,17 @@ struct vy_index {
 	 */
 	int pin_count;
 };
+
+/** Return index name. Used for logging. */
+static const char *
+vy_index_name(struct vy_index *index)
+{
+	char *buf = tt_static_buf();
+	snprintf(buf, TT_STATIC_BUF_LEN, "%u/%u",
+		 (unsigned)index->index_def->space_id,
+		 (unsigned)index->index_def->iid);
+	return buf;
+}
 
 /** @sa implementation for details. */
 extern struct vy_index *
@@ -2722,7 +2731,7 @@ vy_range_maybe_split(struct vy_range *range)
 	}
 	index->version++;
 
-	say_info("%s: split range %s by key %s", index->name,
+	say_info("%s: split range %s by key %s", vy_index_name(index),
 		 vy_range_str(range), vy_key_str(split_key_raw));
 
 	rlist_foreach_entry(slice, &range->slices, in_range)
@@ -2738,7 +2747,7 @@ fail:
 		tuple_unref(split_key);
 	assert(!diag_is_empty(diag_get()));
 	say_error("%s: failed to split range %s: %s",
-		  index->name, vy_range_str(range),
+		  vy_index_name(index), vy_range_str(range),
 		  diag_last_error(diag_get())->errmsg);
 	return false;
 }
@@ -2970,7 +2979,8 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	index->version++;
 	vy_scheduler_add_range(scheduler, result);
 
-	say_info("%s: coalesced ranges %s", index->name, vy_range_str(result));
+	say_info("%s: coalesced ranges %s",
+		 vy_index_name(index), vy_range_str(result));
 	return true;
 
 fail_commit:
@@ -2979,7 +2989,7 @@ fail_range:
 	assert(!diag_is_empty(diag_get()));
 	e = diag_last_error(diag_get());
 	say_error("%s: failed to coalesce range %s: %s",
-		  index->name, vy_range_str(range), e->errmsg);
+		  vy_index_name(index), vy_range_str(range), e->errmsg);
 	return false;
 }
 
@@ -3831,7 +3841,7 @@ delete_mems:
 		vy_scheduler_unpin_index(scheduler, pk);
 	}
 
-	say_info("%s: dump completed", index->name);
+	say_info("%s: dump completed", vy_index_name(index));
 	return 0;
 
 fail_free_slices:
@@ -3857,7 +3867,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	vy_write_iterator_delete(task->wi);
 
 	if (!in_shutdown && !index->is_dropped) {
-		say_error("%s: dump failed: %s", index->name,
+		say_error("%s: dump failed: %s", vy_index_name(index),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
@@ -3991,7 +4001,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 		vy_scheduler_pin_index(scheduler, pk);
 	}
 
-	say_info("%s: dump started", index->name);
+	say_info("%s: dump started", vy_index_name(index));
 	*p_task = task;
 	return 0;
 
@@ -4002,7 +4012,7 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err:
-	say_error("%s: could not start dump: %s", index->name,
+	say_error("%s: could not start dump: %s", vy_index_name(index),
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
 }
@@ -4146,7 +4156,7 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_scheduler_add_range(scheduler, range);
 
 	say_info("%s: completed compacting range %s",
-		 index->name, vy_range_str(range));
+		 vy_index_name(index), vy_range_str(range));
 	return 0;
 }
 
@@ -4162,7 +4172,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
-			  index->name, vy_range_str(range),
+			  vy_index_name(index), vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
@@ -4247,7 +4257,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started compacting range %s, runs %d/%d",
-		 index->name, vy_range_str(range),
+		 vy_index_name(index), vy_range_str(range),
                  range->compact_priority, range->slice_count);
 	*p_task = task;
 	return 0;
@@ -4259,8 +4269,9 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err_task:
-	say_error("%s: could not start compacting range %s: %s", index->name,
-		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
+	say_error("%s: could not start compacting range %s: %s",
+		  vy_index_name(index), vy_range_str(range),
+		  diag_last_error(diag_get())->errmsg);
 	return -1;
 }
 
@@ -5140,20 +5151,13 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 static int
 vy_index_conf_create(struct vy_index *conf, struct index_def *index_def)
 {
-	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
-	         index_def->space_id, index_def->iid);
-	conf->name = strdup(name);
 	char path[PATH_MAX];
 	vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
 			      index_def->space_id, index_def->iid);
 	conf->path = strdup(path);
-	if (conf->name == NULL || conf->path == NULL) {
-		if (conf->name)
-			free(conf->name);
+	if (conf->path == NULL) {
 		if (conf->path)
 			free(conf->path);
-		conf->name = NULL;
 		conf->path = NULL;
 		diag_set(OutOfMemory, strlen(path) + 1, "strdup", "path");
 		return -1;
@@ -5449,7 +5453,6 @@ fail_mem:
 fail_cache_init:
 	histogram_delete(index->run_hist);
 fail_run_hist:
-	free(index->name);
 	free(index->path);
 fail_conf:
 	tuple_format_ref(index->space_format_with_colmask, -1);
@@ -5612,7 +5615,6 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL,
 			   vy_range_tree_free_cb, scheduler);
-	free(index->name);
 	free(index->path);
 	tuple_format_ref(index->surrogate_format, -1);
 	tuple_format_ref(index->space_format_with_colmask, -1);
