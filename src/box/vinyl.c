@@ -548,8 +548,6 @@ struct vy_index {
 	 * until all pending operations have completed.
 	 */
 	uint32_t refs;
-	/** The path with index files. */
-	char *path;
 	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
@@ -1247,37 +1245,15 @@ vy_index_snprint_path(char *buf, int size, const char *dir,
 }
 
 static int
-vy_run_snprint_name(char *buf, int size, int64_t run_id, enum vy_file_type type)
-{
-	return snprintf(buf, size, "%020lld.%s",
-			(long long)run_id, vy_file_suffix[type]);
-}
-
-static int
 vy_run_snprint_path(char *buf, int size, const char *dir,
+		    uint32_t space_id, uint32_t iid,
 		    int64_t run_id, enum vy_file_type type)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buf, size, "%s/", dir);
-	SNPRINT(total, vy_run_snprint_name, buf, size, run_id, type);
-	return total;
-}
-
-/** Return the path to the run encoded by a metadata log record. */
-static int
-vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
-			   const struct vy_log_record *record,
-			   enum vy_file_type type)
-{
-	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_CREATE_RUN ||
-	       record->type == VY_LOG_DROP_RUN);
-
-	int total = 0;
-	SNPRINT(total, vy_index_snprint_path, buf, size, vinyl_dir,
-		record->space_id, record->index_id);
-	SNPRINT(total, snprintf, buf, size, "/");
-	SNPRINT(total, vy_run_snprint_name, buf, size, record->run_id, type);
+	SNPRINT(total, vy_index_snprint_path, buf, size,
+		dir, (unsigned)space_id, (unsigned)iid);
+	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
+		(long long)run_id, vy_file_suffix[type]);
 	return total;
 }
 
@@ -1301,8 +1277,9 @@ vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
 	bool forget = true;
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_record_snprint_path(path, sizeof(path),
-					   vinyl_dir, record, type);
+		vy_run_snprint_path(path, sizeof(path), vinyl_dir,
+				    record->space_id, record->index_id,
+				    record->run_id, type);
 		if (coeio_unlink(path) < 0 && errno != ENOENT) {
 			say_syserror("failed to delete file '%s'", path);
 			forget = false;
@@ -2136,9 +2113,10 @@ error_page_index:
  */
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
+		  uint32_t space_id, uint32_t iid,
 		  struct vy_write_iterator *wi, uint64_t page_size,
 		  const struct key_def *key_def,
-		  const struct key_def *user_key_def, bool is_primary,
+		  const struct key_def *user_key_def,
 		  size_t max_output_count, double bloom_fpr)
 {
 	struct tuple *stmt;
@@ -2163,7 +2141,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    run->id, VY_FILE_RUN);
+			    space_id, iid, run->id, VY_FILE_RUN);
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_RUN,
@@ -2181,7 +2159,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi, &stmt,
 				       page_size, &bs, key_def, user_key_def,
-				       is_primary, &page_infos_capacity);
+				       iid == 0, &page_infos_capacity);
 		if (rc < 0)
 			goto err_close_xlog;
 		fiber_gc();
@@ -2395,11 +2373,12 @@ vy_run_info_encode(const struct vy_run_info *run_info,
  * Write run index to file.
  */
 static int
-vy_run_write_index(struct vy_run *run, const char *dirpath)
+vy_run_write_index(struct vy_run *run, const char *dirpath,
+		   uint32_t space_id, uint32_t iid)
 {
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    run->id, VY_FILE_INDEX);
+			    space_id, iid, run->id, VY_FILE_INDEX);
 
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
@@ -2531,9 +2510,10 @@ vy_range_delete(struct vy_range *range)
  */
 static int
 vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
 	     struct vy_write_iterator *wi, uint64_t page_size,
 	     const struct key_def *key_def,
-	     const struct key_def *user_key_def, bool is_primary,
+	     const struct key_def *user_key_def,
 	     size_t max_output_count, double bloom_fpr,
 	     size_t *written, uint64_t *dumped_statements)
 {
@@ -2541,15 +2521,15 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});
 
-	if (vy_run_write_data(run, dirpath, wi, page_size,
-			      key_def, user_key_def, is_primary,
+	if (vy_run_write_data(run, dirpath, space_id, iid,
+			      wi, page_size, key_def, user_key_def,
 			      max_output_count, bloom_fpr) != 0)
 		return -1;
 
 	if (vy_run_is_empty(run))
 		return 0;
 
-	if (vy_run_write_index(run, dirpath) != 0)
+	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
 		return -1;
 
 	*written += vy_run_size(run);
@@ -3006,7 +2986,10 @@ vy_index_create(struct vy_index *index)
 
 	/* create directory */
 	int rc;
-	char *path_sep = index->path;
+	char path[PATH_MAX];
+	vy_index_snprint_path(path, sizeof(path), index->env->conf->path,
+			      index_def->space_id, index_def->iid);
+	char *path_sep = path;
 	while (*path_sep == '/') {
 		/* Don't create root */
 		++path_sep;
@@ -3014,20 +2997,20 @@ vy_index_create(struct vy_index *index)
 	while ((path_sep = strchr(path_sep, '/'))) {
 		/* Recursively create path hierarchy */
 		*path_sep = '\0';
-		rc = mkdir(index->path, 0777);
+		rc = mkdir(path, 0777);
 		if (rc == -1 && errno != EEXIST) {
 			diag_set(SystemError, "failed to create directory '%s'",
-		                 index->path);
+		                 path);
 			*path_sep = '/';
 			return -1;
 		}
 		*path_sep = '/';
 		++path_sep;
 	}
-	rc = mkdir(index->path, 0777);
+	rc = mkdir(path, 0777);
 	if (rc == -1 && errno != EEXIST) {
 		diag_set(SystemError, "failed to create directory '%s'",
-			 index->path);
+			 path);
 		return -1;
 	}
 
@@ -3145,12 +3128,15 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (run == NULL)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
+		char *dir = index->env->conf->path;
 		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path),
-				    index->path, run->id, VY_FILE_INDEX);
+		vy_run_snprint_path(index_path, sizeof(index_path), dir,
+				    index_def->space_id, index_def->iid,
+				    run->id, VY_FILE_INDEX);
 		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path),
-				    index->path, run->id, VY_FILE_RUN);
+		vy_run_snprint_path(run_path, sizeof(run_path), dir,
+				    index_def->space_id, index_def->iid,
+				    run->id, VY_FILE_RUN);
 		if (vy_run_recover(run, index_path, run_path) != 0) {
 			vy_run_unref(run);
 			goto out;
@@ -3667,15 +3653,16 @@ static int
 vy_task_dump_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct index_def *index_def = index->index_def;
+	struct index_def *user_index_def = index->user_index_def;
 
 	/* The index has been deleted from the scheduler queues. */
 	assert(index->in_dump.pos == UINT32_MAX);
 
-	return vy_run_write(task->new_run, index->path, task->wi,
-			    index->index_def->opts.page_size,
-			    &index->index_def->key_def,
-			    &index->user_index_def->key_def,
-			    index->index_def->iid == 0,
+	return vy_run_write(task->new_run, index->env->conf->path,
+			    index_def->space_id, index_def->iid,
+			    task->wi, index_def->opts.page_size,
+			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
 }
@@ -4021,15 +4008,16 @@ static int
 vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct index_def *index_def = index->index_def;
+	struct index_def *user_index_def = index->user_index_def;
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(task->range->in_compact.pos == UINT32_MAX);
 
-	return vy_run_write(task->new_run, index->path, task->wi,
-			    index->index_def->opts.page_size,
-			    &index->index_def->key_def,
-			    &index->user_index_def->key_def,
-			    index->index_def->iid == 0,
+	return vy_run_write(task->new_run, index->env->conf->path,
+			    index_def->space_id, index_def->iid,
+			    task->wi, index_def->opts.page_size,
+			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
 }
@@ -5148,23 +5136,6 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 
 /** }}} Introspection */
 
-static int
-vy_index_conf_create(struct vy_index *conf, struct index_def *index_def)
-{
-	char path[PATH_MAX];
-	vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
-			      index_def->space_id, index_def->iid);
-	conf->path = strdup(path);
-	if (conf->path == NULL) {
-		if (conf->path)
-			free(conf->path);
-		conf->path = NULL;
-		diag_set(OutOfMemory, strlen(path) + 1, "strdup", "path");
-		return -1;
-	}
-	return 0;
-}
-
 /**
  * Detect whether we already have non-garbage index files,
  * and open an existing index if that's the case. Otherwise,
@@ -5396,9 +5367,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	tuple_format_ref(index->space_format_with_colmask, 1);
 	tuple_format_ref(index->upsert_format, 1);
 
-	if (vy_index_conf_create(index, index->index_def))
-		goto fail_conf;
-
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
@@ -5453,8 +5421,6 @@ fail_mem:
 fail_cache_init:
 	histogram_delete(index->run_hist);
 fail_run_hist:
-	free(index->path);
-fail_conf:
 	tuple_format_ref(index->space_format_with_colmask, -1);
 fail_space_format_with_colmask:
 	tuple_format_ref(index->upsert_format, -1);
@@ -5615,7 +5581,6 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL,
 			   vy_range_tree_free_cb, scheduler);
-	free(index->path);
 	tuple_format_ref(index->surrogate_format, -1);
 	tuple_format_ref(index->space_format_with_colmask, -1);
 	tuple_format_ref(index->upsert_format, -1);
@@ -9034,8 +8999,6 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 struct vy_join_ctx {
 	/** Environment. */
 	struct vy_env *env;
-	/* path to vinyl_dir */
-	char *path;
 	/** Stream to relay statements to. */
 	struct xstream *stream;
 	/** Pipe to the relay thread. */
@@ -9051,8 +9014,6 @@ struct vy_join_ctx {
 	uint32_t space_id;
 	/** Ordinal number of the index. */
 	uint32_t index_id;
-	/** Path to the index directory. */
-	char index_path[PATH_MAX];
 	/** Index key definition. */
 	const struct key_def *key_def;
 	/** Index format used for REPLACE and DELETE statements. */
@@ -9173,9 +9134,6 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		return 0;
 
 	if (record->type == VY_LOG_CREATE_INDEX) {
-		vy_index_snprint_path(ctx->index_path, sizeof(ctx->index_path),
-				      ctx->path,
-				      record->space_id, record->index_id);
 		ctx->space_id = record->space_id;
 		ctx->index_id = record->index_id;
 		ctx->key_def = record->key_def;
@@ -9202,12 +9160,15 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		struct vy_run *run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto done_slice;
+		char *dir = ctx->env->conf->path;
 		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path),
-				    ctx->index_path, run->id, VY_FILE_INDEX);
+		vy_run_snprint_path(index_path, sizeof(index_path), dir,
+				    ctx->space_id, ctx->index_id, run->id,
+				    VY_FILE_INDEX);
 		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path),
-				    ctx->index_path, run->id, VY_FILE_RUN);
+		vy_run_snprint_path(run_path, sizeof(run_path), dir,
+				    ctx->space_id, ctx->index_id, run->id,
+				    VY_FILE_RUN);
 		if (vy_run_recover(run, index_path, run_path) != 0)
 			goto done_slice;
 
@@ -9276,7 +9237,6 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	}
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->env = env;
-	ctx->path = env->conf->path;
 	ctx->stream = stream;
 	rlist_create(&ctx->slices);
 
@@ -9399,8 +9359,9 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_record_snprint_path(path, sizeof(path),
-					   arg->env->conf->path, record, type);
+		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+				    record->space_id, record->index_id,
+				    record->run_id, type);
 		if (arg->cb(path, arg->cb_arg) != 0)
 			return -1;
 	}
