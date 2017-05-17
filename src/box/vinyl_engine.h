@@ -64,6 +64,7 @@ struct VinylEngine: public Engine {
 	virtual void collectGarbage(int64_t lsn) override;
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
+	void updateOptions();
 public:
 	struct vy_env *env;
 };

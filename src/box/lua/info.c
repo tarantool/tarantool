@@ -307,6 +307,16 @@ luaT_info_end_table(struct info_handler *info)
 }
 
 static void
+luaT_info_append_double(struct info_handler *info,
+			const char *key, double value)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	lua_pushstring(L, key);
+	lua_pushnumber(L, value);
+	lua_settable(L, -3);
+}
+
+static void
 luaT_info_append_u32(struct info_handler *info, const char *key,
 		     uint32_t value)
 {
@@ -347,6 +357,7 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 		.append_u32 = luaT_info_append_u32,
 		.append_u64 = luaT_info_append_u64,
 		.append_str = luaT_info_append_str,
+		.append_double = luaT_info_append_double
 	};
 	h->vtab = &lua_vtab;
 	h->ctx = L;

@@ -30,57 +30,30 @@
  */
 #include "vinyl.h"
 
-#include "vy_stmt.h"
-#include "vy_quota.h"
-#include "vy_stmt_iterator.h"
 #include "vy_mem.h"
 #include "vy_run.h"
 #include "vy_cache.h"
+#include "vy_log.h"
 
-#include <dirent.h>
-
-#include <bit/bit.h>
-#include <small/rlist.h>
 #define RB_COMPACT 1
 #include <small/rb.h>
-#include <small/mempool.h>
-#include <small/region.h>
+
 #include <small/lsregion.h>
-#include <msgpuck/msgpuck.h>
 #include <coeio_file.h>
 
-#include "trivia/util.h"
 #include "assoc.h"
-#include "crc32.h"
-#include "clock.h"
-#include "trivia/config.h"
-#include "tt_pthread.h"
 #include "cfg.h"
-#include "diag.h"
-#include "fiber.h" /* cord_slab_cache() */
-#include "ipc.h"
 #include "coeio.h"
 #include "cbus.h"
 #include "histogram.h"
-#include "rmean.h"
-#include "errinj.h"
 
-#include "errcode.h"
-#include "key_def.h"
-#include "tuple.h"
 #include "tuple_update.h"
 #include "txn.h" /* box_txn_alloc() */
-#include "iproto_constants.h"
 #include "replication.h" /* INSTANCE_UUID */
-#include "vclock.h"
-#include "box.h"
 #include "schema.h"
 #include "xrow.h"
 #include "xlog.h"
-#include "fio.h"
 #include "space.h"
-#include "index.h"
-#include "vy_log.h"
 #include "xstream.h"
 #include "info.h"
 #include "request.h"
@@ -97,9 +70,6 @@ enum { VY_YIELD_LOOPS = 128 };
 #else
 enum { VY_YIELD_LOOPS = 2 };
 #endif
-
-#define vy_cmp(a, b) \
-	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 
 struct tx_manager;
 struct vy_scheduler;
@@ -130,6 +100,8 @@ struct vy_conf {
 	uint64_t cache;
 	/* bloom filter false positive rate */
 	double bloom_fpr;
+	/* quota timeout */
+	double timeout;
 };
 
 struct vy_env {
@@ -167,8 +139,17 @@ struct vy_env {
 	const struct vclock *recovery_vclock;
 };
 
-#define vy_crcs(p, size, crc) \
-	crc32_calc(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
+/** Mask passed to vy_gc(). */
+enum {
+	/** Delete incomplete runs. */
+	VY_GC_INCOMPLETE	= 1 << 0,
+	/** Delete dropped runs. */
+	VY_GC_DROPPED		= 1 << 1,
+};
+
+static void
+vy_gc(struct vy_env *env, struct vy_recovery *recovery,
+      unsigned int gc_mask, int64_t gc_lsn);
 
 struct vy_latency {
 	uint64_t count;
@@ -579,10 +560,6 @@ struct vy_index {
 	 * until all pending operations have completed.
 	 */
 	uint32_t refs;
-	/** A schematic name for profiler output. */
-	char *name;
-	/** The path with index files. */
-	char *path;
 	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
@@ -650,6 +627,17 @@ struct vy_index {
 	 */
 	int pin_count;
 };
+
+/** Return index name. Used for logging. */
+static const char *
+vy_index_name(struct vy_index *index)
+{
+	char *buf = tt_static_buf();
+	snprintf(buf, TT_STATIC_BUF_LEN, "%u/%u",
+		 (unsigned)index->index_def->space_id,
+		 (unsigned)index->index_def->iid);
+	return buf;
+}
 
 /** @sa implementation for details. */
 extern struct vy_index *
@@ -751,6 +739,11 @@ struct vy_tx {
 	 * the version increments.
 	 */
 	uint32_t write_set_version;
+	/**
+	 * Total size of memory occupied by statements of
+	 * the write set.
+	 */
+	size_t write_size;
 	/** Transaction start time saved in vy_begin() */
 	ev_tstamp start;
 	/** Current state of the transaction.*/
@@ -1264,79 +1257,16 @@ vy_index_snprint_path(char *buf, int size, const char *dir,
 }
 
 static int
-vy_run_snprint_name(char *buf, int size, int64_t run_id, enum vy_file_type type)
-{
-	return snprintf(buf, size, "%020lld.%s",
-			(long long)run_id, vy_file_suffix[type]);
-}
-
-static int
 vy_run_snprint_path(char *buf, int size, const char *dir,
+		    uint32_t space_id, uint32_t iid,
 		    int64_t run_id, enum vy_file_type type)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buf, size, "%s/", dir);
-	SNPRINT(total, vy_run_snprint_name, buf, size, run_id, type);
+	SNPRINT(total, vy_index_snprint_path, buf, size,
+		dir, (unsigned)space_id, (unsigned)iid);
+	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
+		(long long)run_id, vy_file_suffix[type]);
 	return total;
-}
-
-/** Return the path to the run encoded by a metadata log record. */
-static int
-vy_run_record_snprint_path(char *buf, int size, const char *vinyl_dir,
-			   const struct vy_log_record *record,
-			   enum vy_file_type type)
-{
-	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_CREATE_RUN ||
-	       record->type == VY_LOG_DROP_RUN);
-
-	int total = 0;
-	SNPRINT(total, vy_index_snprint_path, buf, size, vinyl_dir,
-		record->space_id, record->index_id);
-	SNPRINT(total, snprintf, buf, size, "/");
-	SNPRINT(total, vy_run_snprint_name, buf, size, record->run_id, type);
-	return total;
-}
-
-/**
- * Given a record encoding information about a vinyl run, try to
- * delete the corresponding files. On success, write a "forget" record
- * to the log so that all information about the run is deleted on the
- * next log rotation.
- */
-static void
-vy_run_record_gc(const char *vinyl_dir, const struct vy_log_record *record)
-{
-	assert(record->type == VY_LOG_PREPARE_RUN ||
-	       record->type == VY_LOG_DROP_RUN);
-
-	ERROR_INJECT(ERRINJ_VY_GC,
-		     {say_error("error injection: vinyl run %lld not deleted",
-				(long long)record->run_id); return;});
-
-	/* Try to delete files. */
-	bool forget = true;
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_record_snprint_path(path, sizeof(path),
-					   vinyl_dir, record, type);
-		if (coeio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("failed to delete file '%s'", path);
-			forget = false;
-		}
-	}
-
-	if (!forget)
-		return;
-
-	/* Forget the run on success. */
-	vy_log_tx_begin();
-	vy_log_forget_run(record->run_id);
-	if (vy_log_tx_commit() < 0) {
-		say_warn("failed to log vinyl run %lld cleanup: %s",
-			 (long long)record->run_id,
-			 diag_last_error(diag_get())->errmsg);
-	}
 }
 
 static void
@@ -2153,9 +2083,10 @@ error_page_index:
  */
 static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
+		  uint32_t space_id, uint32_t iid,
 		  struct vy_write_iterator *wi, uint64_t page_size,
 		  const struct key_def *key_def,
-		  const struct key_def *user_key_def, bool is_primary,
+		  const struct key_def *user_key_def,
 		  size_t max_output_count, double bloom_fpr)
 {
 	struct tuple *stmt;
@@ -2180,7 +2111,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    run->id, VY_FILE_RUN);
+			    space_id, iid, run->id, VY_FILE_RUN);
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_RUN,
@@ -2198,7 +2129,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	do {
 		rc = vy_run_write_page(run_info, &data_xlog, wi, &stmt,
 				       page_size, &bs, key_def, user_key_def,
-				       is_primary, &page_infos_capacity);
+				       iid == 0, &page_infos_capacity);
 		if (rc < 0)
 			goto err_close_xlog;
 		fiber_gc();
@@ -2412,11 +2343,12 @@ vy_run_info_encode(const struct vy_run_info *run_info,
  * Write run index to file.
  */
 static int
-vy_run_write_index(struct vy_run *run, const char *dirpath)
+vy_run_write_index(struct vy_run *run, const char *dirpath,
+		   uint32_t space_id, uint32_t iid)
 {
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
-			    run->id, VY_FILE_INDEX);
+			    space_id, iid, run->id, VY_FILE_INDEX);
 
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
@@ -2548,9 +2480,10 @@ vy_range_delete(struct vy_range *range)
  */
 static int
 vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
 	     struct vy_write_iterator *wi, uint64_t page_size,
 	     const struct key_def *key_def,
-	     const struct key_def *user_key_def, bool is_primary,
+	     const struct key_def *user_key_def,
 	     size_t max_output_count, double bloom_fpr,
 	     size_t *written, uint64_t *dumped_statements)
 {
@@ -2558,15 +2491,15 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});
 
-	if (vy_run_write_data(run, dirpath, wi, page_size,
-			      key_def, user_key_def, is_primary,
+	if (vy_run_write_data(run, dirpath, space_id, iid,
+			      wi, page_size, key_def, user_key_def,
 			      max_output_count, bloom_fpr) != 0)
 		return -1;
 
 	if (vy_run_is_empty(run))
 		return 0;
 
-	if (vy_run_write_index(run, dirpath) != 0)
+	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
 		return -1;
 
 	*written += vy_run_size(run);
@@ -2748,7 +2681,7 @@ vy_range_maybe_split(struct vy_range *range)
 	}
 	index->version++;
 
-	say_info("%s: split range %s by key %s", index->name,
+	say_info("%s: split range %s by key %s", vy_index_name(index),
 		 vy_range_str(range), vy_key_str(split_key_raw));
 
 	rlist_foreach_entry(slice, &range->slices, in_range)
@@ -2764,7 +2697,7 @@ fail:
 		tuple_unref(split_key);
 	assert(!diag_is_empty(diag_get()));
 	say_error("%s: failed to split range %s: %s",
-		  index->name, vy_range_str(range),
+		  vy_index_name(index), vy_range_str(range),
 		  diag_last_error(diag_get())->errmsg);
 	return false;
 }
@@ -2996,7 +2929,8 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	index->version++;
 	vy_scheduler_add_range(scheduler, result);
 
-	say_info("%s: coalesced ranges %s", index->name, vy_range_str(result));
+	say_info("%s: coalesced ranges %s",
+		 vy_index_name(index), vy_range_str(result));
 	return true;
 
 fail_commit:
@@ -3005,7 +2939,7 @@ fail_range:
 	assert(!diag_is_empty(diag_get()));
 	e = diag_last_error(diag_get());
 	say_error("%s: failed to coalesce range %s: %s",
-		  index->name, vy_range_str(range), e->errmsg);
+		  vy_index_name(index), vy_range_str(range), e->errmsg);
 	return false;
 }
 
@@ -3022,7 +2956,10 @@ vy_index_create(struct vy_index *index)
 
 	/* create directory */
 	int rc;
-	char *path_sep = index->path;
+	char path[PATH_MAX];
+	vy_index_snprint_path(path, sizeof(path), index->env->conf->path,
+			      index_def->space_id, index_def->iid);
+	char *path_sep = path;
 	while (*path_sep == '/') {
 		/* Don't create root */
 		++path_sep;
@@ -3030,20 +2967,20 @@ vy_index_create(struct vy_index *index)
 	while ((path_sep = strchr(path_sep, '/'))) {
 		/* Recursively create path hierarchy */
 		*path_sep = '\0';
-		rc = mkdir(index->path, 0777);
+		rc = mkdir(path, 0777);
 		if (rc == -1 && errno != EEXIST) {
 			diag_set(SystemError, "failed to create directory '%s'",
-		                 index->path);
+		                 path);
 			*path_sep = '/';
 			return -1;
 		}
 		*path_sep = '/';
 		++path_sep;
 	}
-	rc = mkdir(index->path, 0777);
+	rc = mkdir(path, 0777);
 	if (rc == -1 && errno != EEXIST) {
 		diag_set(SystemError, "failed to create directory '%s'",
-			 index->path);
+			 path);
 		return -1;
 	}
 
@@ -3151,22 +3088,28 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(record->index_lsn == index_def->opts.lsn);
 		break;
 	case VY_LOG_DUMP_INDEX:
+		assert(record->index_lsn == index_def->opts.lsn);
 		index->dump_lsn = record->dump_lsn;
 		break;
 	case VY_LOG_DROP_INDEX:
+		assert(record->index_lsn == index_def->opts.lsn);
 		index->is_dropped = true;
 		break;
 	case VY_LOG_CREATE_RUN:
+		assert(record->index_lsn == index_def->opts.lsn);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
+		char *dir = index->env->conf->path;
 		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path),
-				    index->path, run->id, VY_FILE_INDEX);
+		vy_run_snprint_path(index_path, sizeof(index_path), dir,
+				    index_def->space_id, index_def->iid,
+				    run->id, VY_FILE_INDEX);
 		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path),
-				    index->path, run->id, VY_FILE_RUN);
+		vy_run_snprint_path(run_path, sizeof(run_path), dir,
+				    index_def->space_id, index_def->iid,
+				    run->id, VY_FILE_RUN);
 		if (vy_run_recover(run, index_path, run_path) != 0) {
 			vy_run_unref(run);
 			goto out;
@@ -3181,6 +3124,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		}
 		break;
 	case VY_LOG_INSERT_RANGE:
+		assert(record->index_lsn == index_def->opts.lsn);
 		range = vy_range_new(index, record->range_id, begin, end);
 		if (range == NULL)
 			goto out;
@@ -3683,15 +3627,16 @@ static int
 vy_task_dump_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct index_def *index_def = index->index_def;
+	struct index_def *user_index_def = index->user_index_def;
 
 	/* The index has been deleted from the scheduler queues. */
 	assert(index->in_dump.pos == UINT32_MAX);
 
-	return vy_run_write(task->new_run, index->path, task->wi,
-			    index->index_def->opts.page_size,
-			    &index->index_def->key_def,
-			    &index->user_index_def->key_def,
-			    index->index_def->iid == 0,
+	return vy_run_write(task->new_run, index->env->conf->path,
+			    index_def->space_id, index_def->iid,
+			    task->wi, index_def->opts.page_size,
+			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
 }
@@ -3857,7 +3802,7 @@ delete_mems:
 		vy_scheduler_unpin_index(scheduler, pk);
 	}
 
-	say_info("%s: dump completed", index->name);
+	say_info("%s: dump completed", vy_index_name(index));
 	return 0;
 
 fail_free_slices:
@@ -3883,7 +3828,7 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 	vy_write_iterator_delete(task->wi);
 
 	if (!in_shutdown && !index->is_dropped) {
-		say_error("%s: dump failed: %s", index->name,
+		say_error("%s: dump failed: %s", vy_index_name(index),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
@@ -4017,7 +3962,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 		vy_scheduler_pin_index(scheduler, pk);
 	}
 
-	say_info("%s: dump started", index->name);
+	say_info("%s: dump started", vy_index_name(index));
 	*p_task = task;
 	return 0;
 
@@ -4028,7 +3973,7 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err:
-	say_error("%s: could not start dump: %s", index->name,
+	say_error("%s: could not start dump: %s", vy_index_name(index),
 		  diag_last_error(diag_get())->errmsg);
 	return -1;
 }
@@ -4037,15 +3982,16 @@ static int
 vy_task_compact_execute(struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct index_def *index_def = index->index_def;
+	struct index_def *user_index_def = index->user_index_def;
 
 	/* The range has been deleted from the scheduler queues. */
 	assert(task->range->in_compact.pos == UINT32_MAX);
 
-	return vy_run_write(task->new_run, index->path, task->wi,
-			    index->index_def->opts.page_size,
-			    &index->index_def->key_def,
-			    &index->user_index_def->key_def,
-			    index->index_def->iid == 0,
+	return vy_run_write(task->new_run, index->env->conf->path,
+			    index_def->space_id, index_def->iid,
+			    task->wi, index_def->opts.page_size,
+			    &index_def->key_def, &user_index_def->key_def,
 			    task->max_output_count, task->bloom_fpr,
 			    &task->dump_size, &task->dumped_statements);
 }
@@ -4172,7 +4118,7 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_scheduler_add_range(scheduler, range);
 
 	say_info("%s: completed compacting range %s",
-		 index->name, vy_range_str(range));
+		 vy_index_name(index), vy_range_str(range));
 	return 0;
 }
 
@@ -4188,7 +4134,7 @@ vy_task_compact_abort(struct vy_task *task, bool in_shutdown)
 
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
-			  index->name, vy_range_str(range),
+			  vy_index_name(index), vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
 		vy_run_discard(task->new_run);
 	} else
@@ -4273,7 +4219,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 	vy_scheduler_remove_range(scheduler, range);
 
 	say_info("%s: started compacting range %s, runs %d/%d",
-		 index->name, vy_range_str(range),
+		 vy_index_name(index), vy_range_str(range),
                  range->compact_priority, range->slice_count);
 	*p_task = task;
 	return 0;
@@ -4285,8 +4231,9 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err_task:
-	say_error("%s: could not start compacting range %s: %s", index->name,
-		  vy_range_str(range), diag_last_error(diag_get())->errmsg);
+	say_error("%s: could not start compacting range %s: %s",
+		  vy_index_name(index), vy_range_str(range),
+		  diag_last_error(diag_get())->errmsg);
 	return -1;
 }
 
@@ -4306,23 +4253,28 @@ static int
 vy_scheduler_f(va_list va);
 
 static void
-vy_scheduler_quota_cb(enum vy_quota_event event, void *arg)
+vy_scheduler_quota_exceeded_cb(struct vy_quota *quota)
 {
-	struct vy_scheduler *scheduler = arg;
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ipc_cond_signal(&env->scheduler->scheduler_cond);
+}
 
-	switch (event) {
-	case VY_QUOTA_EXCEEDED:
-		ipc_cond_signal(&scheduler->scheduler_cond);
-		break;
-	case VY_QUOTA_THROTTLED:
-		ipc_cond_wait(&scheduler->quota_cond);
-		break;
-	case VY_QUOTA_RELEASED:
-		ipc_cond_broadcast(&scheduler->quota_cond);
-		break;
-	default:
-		unreachable();
-	}
+static ev_tstamp
+vy_scheduler_quota_throttled_cb(struct vy_quota *quota, ev_tstamp timeout)
+{
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ev_tstamp wait_start = ev_now(loop());
+	if (ipc_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
+		return 0; /* timed out */
+	ev_tstamp wait_end = ev_now(loop());
+	return timeout - (wait_end - wait_start);
+}
+
+static void
+vy_scheduler_quota_released_cb(struct vy_quota *quota)
+{
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	ipc_cond_broadcast(&env->scheduler->quota_cond);
 }
 
 static void
@@ -4980,6 +4932,8 @@ vy_end_checkpoint(struct vy_env *env)
 
 /* Scheduler }}} */
 
+/* {{{ Configuration */
+
 static struct vy_conf *
 vy_conf_new()
 {
@@ -4988,9 +4942,10 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
-	conf->memory_limit = cfg_getd("vinyl_memory");
-	conf->cache = cfg_getd("vinyl_cache");
+	conf->memory_limit = cfg_geti64("vinyl_memory");
+	conf->cache = cfg_geti64("vinyl_cache");
 	conf->bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+	conf->timeout = cfg_getd("vinyl_timeout");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
@@ -5017,6 +4972,16 @@ static void vy_conf_delete(struct vy_conf *c)
 	free(c->path);
 	free(c);
 }
+
+int
+vy_update_options(struct vy_env *env)
+{
+	struct vy_conf *conf = env->conf;
+	conf->timeout = cfg_getd("vinyl_timeout");
+	return 0;
+}
+
+/* Configuration }}} */
 
 /** {{{ Introspection */
 
@@ -5144,30 +5109,6 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 }
 
 /** }}} Introspection */
-
-static int
-vy_index_conf_create(struct vy_index *conf, struct index_def *index_def)
-{
-	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32 "/%" PRIu32,
-	         index_def->space_id, index_def->iid);
-	conf->name = strdup(name);
-	char path[PATH_MAX];
-	vy_index_snprint_path(path, sizeof(path), conf->env->conf->path,
-			      index_def->space_id, index_def->iid);
-	conf->path = strdup(path);
-	if (conf->name == NULL || conf->path == NULL) {
-		if (conf->name)
-			free(conf->name);
-		if (conf->path)
-			free(conf->path);
-		conf->name = NULL;
-		conf->path = NULL;
-		diag_set(OutOfMemory, strlen(path) + 1, "strdup", "path");
-		return -1;
-	}
-	return 0;
-}
 
 /**
  * Detect whether we already have non-garbage index files,
@@ -5400,9 +5341,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	tuple_format_ref(index->space_format_with_colmask, 1);
 	tuple_format_ref(index->upsert_format, 1);
 
-	if (vy_index_conf_create(index, index->index_def))
-		goto fail_conf;
-
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
@@ -5457,9 +5395,6 @@ fail_mem:
 fail_cache_init:
 	histogram_delete(index->run_hist);
 fail_run_hist:
-	free(index->name);
-	free(index->path);
-fail_conf:
 	tuple_format_ref(index->space_format_with_colmask, -1);
 fail_space_format_with_colmask:
 	tuple_format_ref(index->upsert_format, -1);
@@ -5620,8 +5555,6 @@ vy_index_delete(struct vy_index *index)
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(&index->tree, NULL,
 			   vy_range_tree_free_cb, scheduler);
-	free(index->name);
-	free(index->path);
 	tuple_format_ref(index->surrogate_format, -1);
 	tuple_format_ref(index->space_format_with_colmask, -1);
 	tuple_format_ref(index->upsert_format, -1);
@@ -5906,6 +5839,9 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			assert(vy_stmt_type(stmt) != 0);
 			rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
 		}
+		assert(tx->write_size >= tuple_size(old->stmt));
+		tx->write_size -= tuple_size(old->stmt);
+		tx->write_size += tuple_size(stmt);
 		tuple_unref(old->stmt);
 		tuple_ref(stmt);
 		old->stmt = stmt;
@@ -5916,6 +5852,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		v->is_gap = false;
 		write_set_insert(&tx->write_set, v);
 		tx->write_set_version++;
+		tx->write_size += tuple_size(stmt);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
 	return 0;
@@ -6916,6 +6853,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
+	tx->write_size = 0;
 	tx->start = ev_now(loop());
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
@@ -7063,32 +7001,34 @@ vy_tx_prepare(struct vy_tx *tx)
 {
 	struct tx_manager *xm = tx->xm;
 	struct vy_env *env = xm->env;
-	/*
-	 * Wait for quota to be not overused. We can't
-	 * invoke vy_quota_use() at the end of prepare,
-	 * since we have pinned mems, and a wait for quota
-	 * may lead to a deadlock.
-	 * And we must use quota before checking the transaction
-	 * read view because the quota use may yield. During the
-	 * yield the prepared transaction may be sent to read
-	 * view.
-	 */
-	vy_quota_use(&env->quota, 0);
 
-	/* proceed non-aborted read-only transactions */
-	if ((!vy_tx_is_ro(tx) && vy_tx_is_in_read_view(tx)) ||
-	    tx->state == VINYL_TX_ABORT) {
+	if (vy_tx_is_ro(tx)) {
+		assert(tx->state == VINYL_TX_READY);
+		tx->state = VINYL_TX_COMMIT;
+		return 0;
+	}
+
+	/*
+	 * Reserve quota needed by the transaction before allocating
+	 * memory. Since this may yield, which opens a time window for
+	 * the transaction to be sent to read view or aborted, we call
+	 * it before checking for conflicts.
+	 */
+	if (vy_quota_use(&env->quota, tx->write_size,
+			 env->conf->timeout) != 0) {
+		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
+		return -1;
+	}
+
+	if (vy_tx_is_in_read_view(tx) || tx->state == VINYL_TX_ABORT) {
+		vy_quota_release(&env->quota, tx->write_size);
 		env->stat->tx_conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
 
 	assert(tx->state == VINYL_TX_READY);
-
 	tx->state = VINYL_TX_COMMIT;
-
-	if (vy_tx_is_ro(tx))
-		return 0;
 
 	assert(tx->read_view == &xm->global_read_view);
 	tx->psn = ++xm->psn;
@@ -7096,9 +7036,10 @@ vy_tx_prepare(struct vy_tx *tx)
 	/** Send to read view read/write intersection */
 	for (struct txv *v = write_set_first(&tx->write_set);
 	     v != NULL; v = write_set_next(&tx->write_set, v)) {
-
-		if (vy_tx_send_to_read_view(tx, v))
+		if (vy_tx_send_to_read_view(tx, v)) {
+			vy_quota_release(&env->quota, tx->write_size);
 			return -1;
+		}
 	}
 
 	/*
@@ -7110,13 +7051,15 @@ vy_tx_prepare(struct vy_tx *tx)
 	const struct tuple *delete = NULL, *replace = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	struct txv *v;
+	int rc = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/* Save only writes. */
 		if (v->is_read)
 			continue;
 
-		if (vy_tx_write_prepare(v) != 0)
-			return -1;
+		rc = vy_tx_write_prepare(v);
+		if (rc != 0)
+			break;
 		assert(v->mem != NULL);
 
 		struct vy_index *index = v->index;
@@ -7133,16 +7076,33 @@ vy_tx_prepare(struct vy_tx *tx)
 		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &replace;
-		if (vy_tx_write(index, v->mem, v->stmt, region_stmt) != 0)
-			return -1;
+		rc = vy_tx_write(index, v->mem, v->stmt, region_stmt);
+		if (rc != 0)
+			break;
 		v->region_stmt = *region_stmt;
 		write_count++;
 	}
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t write_size = mem_used_after - mem_used_before;
+	/*
+	 * Insertion of a statement into an in-memory tree can trigger
+	 * an allocation of a new tree block. This should not normally
+	 * result in a noticeable excess of the memory limit, because
+	 * most memory is occupied by statements anyway, but we need to
+	 * adjust the quota accordingly in this case.
+	 *
+	 * The actual allocation size can also be less than reservation
+	 * if a statement is allocated from an lsregion slab allocated
+	 * by a previous transaction. Take this into account, too.
+	 */
+	if (write_size >= tx->write_size)
+		vy_quota_force_use(&env->quota, write_size - tx->write_size);
+	else
+		vy_quota_release(&env->quota, tx->write_size - write_size);
+	if (rc != 0)
+		return -1;
 	vy_stat_tx(env->stat, tx->start, count, write_count, write_size);
-	vy_quota_force_use(&env->quota, write_size);
 	xm->last_prepared_tx = tx;
 	return 0;
 }
@@ -7381,7 +7341,9 @@ vy_env_new(void)
 	               sizeof(struct vy_cursor));
 	lsregion_create(&e->allocator, slab_cache->arena);
 
-	vy_quota_init(&e->quota, vy_scheduler_quota_cb, e->scheduler);
+	vy_quota_init(&e->quota, vy_scheduler_quota_exceeded_cb,
+		                 vy_scheduler_quota_throttled_cb,
+				 vy_scheduler_quota_released_cb);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
@@ -7481,26 +7443,6 @@ vy_begin_final_recovery(struct vy_env *e)
 	return 0;
 }
 
-/**
- * Callback passed to vy_recovery_iterate() to delete files
- * left from incomplete runs.
- *
- * If the instance is shut down while a dump/compaction task
- * is in progress, we'll get an unfinished run file on disk,
- * i.e. a run file which was either not written to the end
- * or not inserted into a range. We need to delete such runs
- * on recovery.
- */
-static int
-vy_end_recovery_cb(const struct vy_log_record *record, void *cb_arg)
-{
-	struct vy_env *env = cb_arg;
-
-	if (record->type == VY_LOG_PREPARE_RUN)
-		vy_run_record_gc(env->conf->path, record);
-	return 0;
-}
-
 int
 vy_end_recovery(struct vy_env *e)
 {
@@ -7509,9 +7451,15 @@ vy_end_recovery(struct vy_env *e)
 		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_end_recovery() != 0)
 			return -1;
-
-		vy_recovery_iterate(e->recovery, true,
-				    vy_end_recovery_cb, e);
+		/*
+		 * If the instance is shut down while a dump or
+		 * compaction task is in progress, we'll get an
+		 * unfinished run file on disk, i.e. a run file
+		 * which was either not written to the end or not
+		 * inserted into a range. We need to delete such
+		 * runs on recovery.
+		 */
+		vy_gc(e, e->recovery, VY_GC_INCOMPLETE, INT64_MAX);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
@@ -9011,8 +8959,6 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 struct vy_join_ctx {
 	/** Environment. */
 	struct vy_env *env;
-	/* path to vinyl_dir */
-	char *path;
 	/** Stream to relay statements to. */
 	struct xstream *stream;
 	/** Pipe to the relay thread. */
@@ -9028,8 +8974,6 @@ struct vy_join_ctx {
 	uint32_t space_id;
 	/** Ordinal number of the index. */
 	uint32_t index_id;
-	/** Path to the index directory. */
-	char index_path[PATH_MAX];
 	/** Index key definition. */
 	const struct key_def *key_def;
 	/** Index format used for REPLACE and DELETE statements. */
@@ -9142,17 +9086,7 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 			return -1;
 	}
 
-	/*
-	 * We are only interested in the primary index.
-	 * Secondary keys will be rebuilt on the destination.
-	 */
-	if (record->index_id != 0)
-		return 0;
-
 	if (record->type == VY_LOG_CREATE_INDEX) {
-		vy_index_snprint_path(ctx->index_path, sizeof(ctx->index_path),
-				      ctx->path,
-				      record->space_id, record->index_id);
 		ctx->space_id = record->space_id;
 		ctx->index_id = record->index_id;
 		ctx->key_def = record->key_def;
@@ -9171,6 +9105,13 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		tuple_format_ref(ctx->upsert_format, 1);
 	}
 
+	/*
+	 * We are only interested in the primary index.
+	 * Secondary keys will be rebuilt on the destination.
+	 */
+	if (ctx->index_id != 0)
+		return 0;
+
 	if (record->type == VY_LOG_INSERT_SLICE) {
 		struct tuple_format *key_format = ctx->env->key_format;
 		struct tuple *begin = NULL, *end = NULL;
@@ -9179,12 +9120,15 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		struct vy_run *run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto done_slice;
+		char *dir = ctx->env->conf->path;
 		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path),
-				    ctx->index_path, run->id, VY_FILE_INDEX);
+		vy_run_snprint_path(index_path, sizeof(index_path), dir,
+				    ctx->space_id, ctx->index_id, run->id,
+				    VY_FILE_INDEX);
 		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path),
-				    ctx->index_path, run->id, VY_FILE_RUN);
+		vy_run_snprint_path(run_path, sizeof(run_path), dir,
+				    ctx->space_id, ctx->index_id, run->id,
+				    VY_FILE_RUN);
 		if (vy_run_recover(run, index_path, run_path) != 0)
 			goto done_slice;
 
@@ -9253,7 +9197,6 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	}
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->env = env;
-	ctx->path = env->conf->path;
 	ctx->stream = stream;
 	rlist_create(&ctx->slices);
 
@@ -9302,29 +9245,103 @@ out:
 
 /* {{{ Garbage collection */
 
-/** Argument passed to vy_collect_garbage_cb(). */
+/** Argument passed to vy_gc_cb(). */
 struct vy_gc_arg {
 	/** Vinyl environment. */
 	struct vy_env *env;
+	/**
+	 * Specifies what kinds of runs to delete.
+	 * See VY_GC_*.
+	 */
+	unsigned int gc_mask;
 	/** LSN of the oldest checkpoint to save. */
 	int64_t gc_lsn;
+	/**
+	 * ID of the current space and index.
+	 * Needed for file name formatting.
+	 */
+	uint32_t space_id;
+	uint32_t index_id;
 	/** Number of times the callback has been called. */
 	int loops;
 };
 
-/** Garbage collection callback, passed to vy_recovery_iterate(). */
+/**
+ * Garbage collection callback, passed to vy_recovery_iterate().
+ *
+ * Given a record encoding information about a vinyl run, try to
+ * delete the corresponding files. On success, write a "forget" record
+ * to the log so that all information about the run is deleted on the
+ * next log rotation.
+ */
 static int
-vy_collect_garbage_cb(const struct vy_log_record *record, void *cb_arg)
+vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_gc_arg *arg = cb_arg;
 
-	if (record->type == VY_LOG_DROP_RUN &&
-	    record->gc_lsn < arg->gc_lsn)
-		vy_run_record_gc(arg->env->conf->path, record);
+	switch (record->type) {
+	case VY_LOG_CREATE_INDEX:
+		arg->space_id = record->space_id;
+		arg->index_id = record->index_id;
+		goto out;
+	case VY_LOG_PREPARE_RUN:
+		if ((arg->gc_mask & VY_GC_INCOMPLETE) == 0)
+			goto out;
+		break;
+	case VY_LOG_DROP_RUN:
+		if ((arg->gc_mask & VY_GC_DROPPED) == 0 ||
+		    record->gc_lsn >= arg->gc_lsn)
+			goto out;
+		break;
+	default:
+		goto out;
+	}
 
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: vinyl run %lld not deleted",
+				(long long)record->run_id); goto out;});
+
+	/* Try to delete files. */
+	bool forget = true;
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+				    arg->space_id, arg->index_id,
+				    record->run_id, type);
+		if (coeio_unlink(path) < 0 && errno != ENOENT) {
+			say_syserror("failed to delete file '%s'", path);
+			forget = false;
+		}
+	}
+
+	if (!forget)
+		goto out;
+
+	/* Forget the run on success. */
+	vy_log_tx_begin();
+	vy_log_forget_run(record->run_id);
+	if (vy_log_tx_commit() < 0) {
+		say_warn("failed to log vinyl run %lld cleanup: %s",
+			 (long long)record->run_id,
+			 diag_last_error(diag_get())->errmsg);
+	}
+out:
 	if (++arg->loops % VY_YIELD_LOOPS == 0)
 		fiber_sleep(0);
 	return 0;
+}
+
+/** Delete unused run files, see vy_gc_arg for more details. */
+static void
+vy_gc(struct vy_env *env, struct vy_recovery *recovery,
+      unsigned int gc_mask, int64_t gc_lsn)
+{
+	struct vy_gc_arg arg = {
+		.env = env,
+		.gc_mask = gc_mask,
+		.gc_lsn = gc_lsn,
+	};
+	vy_recovery_iterate(recovery, true, vy_gc_cb, &arg);
 }
 
 void
@@ -9341,11 +9358,7 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 			 diag_last_error(diag_get())->errmsg);
 		return;
 	}
-	struct vy_gc_arg arg = {
-		.env = env,
-		.gc_lsn = lsn,
-	};
-	vy_recovery_iterate(recovery, true, vy_collect_garbage_cb, &arg);
+	vy_gc(env, recovery, VY_GC_DROPPED, lsn);
 	vy_recovery_delete(recovery);
 }
 
@@ -9361,6 +9374,12 @@ struct vy_backup_arg {
 	int (*cb)(const char *, void *);
 	/** Argument passed to @cb. */
 	void *cb_arg;
+	/**
+	 * ID of the current space and index.
+	 * Needed for file name formatting.
+	 */
+	uint32_t space_id;
+	uint32_t index_id;
 	/** Number of times the callback has been called. */
 	int loops;
 };
@@ -9371,13 +9390,19 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 {
 	struct vy_backup_arg *arg = cb_arg;
 
+	if (record->type == VY_LOG_CREATE_INDEX) {
+		arg->space_id = record->space_id;
+		arg->index_id = record->index_id;
+	}
+
 	if (record->type != VY_LOG_CREATE_RUN)
 		goto out;
 
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_record_snprint_path(path, sizeof(path),
-					   arg->env->conf->path, record, type);
+		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+				    arg->space_id, arg->index_id,
+				    record->run_id, type);
 		if (arg->cb(path, arg->cb_arg) != 0)
 			return -1;
 	}

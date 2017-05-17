@@ -558,6 +558,13 @@ box_set_readahead(void)
 	iobuf_set_readahead(readahead);
 }
 
+void
+box_update_vinyl_options(void)
+{
+	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
+	vinyl->updateOptions();
+}
+
 /* }}} configuration bindings */
 
 /**

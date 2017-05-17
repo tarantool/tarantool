@@ -89,6 +89,9 @@ struct info_handler_vtab {
 	/** Set uint64_t value. */
 	void (*append_u64)(struct info_handler *, const char *key,
 			   uint64_t value);
+	/** Set double value. */
+	void (*append_double)(struct info_handler *,
+			      const char *key, double value);
 };
 
 /**
@@ -165,6 +168,21 @@ info_append_str(struct info_handler *info, const char *key,
 		   const char *value)
 {
 	return info->vtab->append_str(info, key, value);
+}
+
+/**
+ * Associates double value with @a key in the current associative
+ * array.
+ * @param info box.info() adapter.
+ * @param key key.
+ * @param value value.
+ * @throws C++ exception on OOM, see info.h comments.
+ */
+static inline void
+info_append_double(struct info_handler *info, const char *key,
+		   double value)
+{
+	return info->vtab->append_double(info, key, value);
 }
 
 /*
