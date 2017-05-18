@@ -312,12 +312,20 @@ void
 index_def_delete(struct index_def *def);
 
 /**
- * True, if the index is so strong changed that it must be
- * rebuilt.
+ * True, if the index change by alter requires an index rebuild.
+ *
+ * Some changes, such as a new page size or bloom_fpr do not
+ * take effect immediately, so do not require a rebuild.
+ *
+ * Others, such as index name change, do not change the data, only
+ * metadata, so do not require a rebuild either.
+ *
+ * Finally, changing index type or number of parts always requires
+ * a rebuild.
  */
 bool
-index_def_change_require_index_rebuild(struct index_def *old_index_def,
-				       struct index_def *new_index_def);
+index_def_change_requires_rebuild(struct index_def *old_index_def,
+				  struct index_def *new_index_def);
 
 /**
  * Encapsulates privileges of a user on an object.

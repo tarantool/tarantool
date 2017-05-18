@@ -235,7 +235,7 @@ space:auto_increment{3}
 ...
 box.space._index:replace{space.id, 0, 'pk', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
-- error: Vinyl does not support altering definition of not empty indexes
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 space:select{}
 ---

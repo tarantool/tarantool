@@ -1073,7 +1073,7 @@ AddIndex::prepare(struct alter_space *alter)
 	DropIndex *drop = dynamic_cast<DropIndex *>(prev_op);
 
 	if (drop == NULL ||
-	    index_def_change_require_index_rebuild(drop->old_index_def,
+	    index_def_change_requires_rebuild(drop->old_index_def,
 						   new_index_def)) {
 		/*
 		 * The new index is too distinct from the old one,

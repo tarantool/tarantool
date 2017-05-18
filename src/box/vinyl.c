@@ -5413,21 +5413,28 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "adding an index to a non-empty space");
 		return -1;
-	} else if (old_space->index_count == new_space->index_count) {
+	}
+
+	if (old_space->index_count == new_space->index_count) {
 		/* Check index_defs to be unchanged. */
 		for (uint32_t i = 0; i < old_space->index_count; ++i) {
 			struct index_def *old_def, *new_def;
 			old_def = space_index_def(old_space, i);
 			new_def = space_index_def(new_space, i);
-			if (index_def_change_require_index_rebuild(old_def,
-								   new_def)) {
+			/*
+			 * We do not support a full rebuild in
+			 * vinyl yet.
+			 */
+			if (index_def_change_requires_rebuild(old_def,
+							      new_def)) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "altering definition of not empty "\
-					 "indexes");
+					 "changing the definition of a non-empty "\
+					 "index");
 				return -1;
 			}
 		}
-	} /* else drop index. */
+	}
+	/* Drop index or a change in index options. */
 	return 0;
 }
 

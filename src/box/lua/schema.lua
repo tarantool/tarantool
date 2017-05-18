@@ -380,7 +380,11 @@ local function update_index_parts(parts)
     return new_parts
 end
 
-local index_opts_template = {
+-- Historically, some properties of an index
+-- are stored as tuple fields, others in a
+-- single field containing msgpack map.
+-- This is the map.
+local index_options = {
     unique = 'boolean',
     dimension = 'number',
     distance = 'string',
@@ -392,8 +396,8 @@ local index_opts_template = {
 }
 
 --
--- Template for entire index object, including
--- index opts.
+-- check_param_table() template for alter index,
+-- includes all index options.
 --
 local alter_index_template = {
     id = 'number',
@@ -401,10 +405,14 @@ local alter_index_template = {
     type = 'string',
     parts = 'table',
 }
-for k, v in pairs(index_opts_template) do
+for k, v in pairs(index_options) do
     alter_index_template[k] = v
 end
 
+--
+-- check_param_table() template for create_index(), includes
+-- all index options and if_not_exists specifier
+--
 local create_index_template = table.deepcopy(alter_index_template)
 create_index_template.if_not_exists = "boolean"
 
@@ -588,7 +596,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.type == nil then
         options.type = tuple[4]
     end
-    for k, t in pairs(index_opts_template) do
+    for k, t in pairs(index_options) do
         if options[k] ~= nil then
             index_opts[k] = options[k]
         end

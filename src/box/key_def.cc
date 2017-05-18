@@ -256,8 +256,8 @@ index_def_delete(struct index_def *index_def)
 }
 
 bool
-index_def_change_require_index_rebuild(struct index_def *old_index_def,
-				       struct index_def *new_index_def)
+index_def_change_requires_rebuild(struct index_def *old_index_def,
+				  struct index_def *new_index_def)
 {
 	if (old_index_def->iid != new_index_def->iid ||
 	    old_index_def->type != new_index_def->type ||
