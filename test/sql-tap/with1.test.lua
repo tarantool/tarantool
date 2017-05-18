@@ -236,7 +236,7 @@ test:do_catchsql_test(5.2, [[
   SELECT x FROM i LIMIT 10;
 ]], {
   -- <5.2>
-  0, "1 2 3 4 5 6 7 8 9 10"
+  0, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
   -- </5.2>
 })
 
@@ -307,7 +307,7 @@ test:do_catchsql_test(5.3, [[
   SELECT x FROM i;
 ]], {
   -- <5.3>
-  0, "1 2 3 4 5"
+  0, {1, 2, 3, 4, 5}
   -- </5.3>
 })
 
@@ -402,19 +402,19 @@ test:do_execsql_test(6.1, [[
 
   INSERT INTO f VALUES(0, NULL, '');
   INSERT INTO f VALUES(1, 0, 'bin');
-    INSERT INTO f VALUES(2, 1, 'true');
-    INSERT INTO f VALUES(3, 1, 'false');
-    INSERT INTO f VALUES(4, 1, 'ls');
-    INSERT INTO f VALUES(5, 1, 'grep');
+  INSERT INTO f VALUES(2, 1, 'true');
+  INSERT INTO f VALUES(3, 1, 'false');
+  INSERT INTO f VALUES(4, 1, 'ls');
+  INSERT INTO f VALUES(5, 1, 'grep');
   INSERT INTO f VALUES(6, 0, 'etc');
-    INSERT INTO f VALUES(7, 6, 'rc.d');
-      INSERT INTO f VALUES(8, 7, 'rc.apache');
-      INSERT INTO f VALUES(9, 7, 'rc.samba');
+  INSERT INTO f VALUES(7, 6, 'rc.d');
+  INSERT INTO f VALUES(8, 7, 'rc.apache');
+  INSERT INTO f VALUES(9, 7, 'rc.samba');
   INSERT INTO f VALUES(10, 0, 'home');
-    INSERT INTO f VALUES(11, 10, 'dan');
-      INSERT INTO f VALUES(12, 11, 'public_html');
-        INSERT INTO f VALUES(13, 12, 'index.html');
-          INSERT INTO f VALUES(14, 13, 'logo.gif');
+  INSERT INTO f VALUES(11, 10, 'dan');
+  INSERT INTO f VALUES(12, 11, 'public_html');
+  INSERT INTO f VALUES(13, 12, 'index.html');
+  INSERT INTO f VALUES(14, 13, 'logo.gif');
 ]])
 
 test:do_execsql_test(6.2, [[

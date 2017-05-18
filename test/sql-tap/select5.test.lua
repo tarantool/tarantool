@@ -118,7 +118,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<3 ORDER BY y
     ]], {
         -- <select5-2.3>
-        0, "8 2 9 1 10 1"
+        0, {8, 2, 9, 1, 10, 1}
         -- </select5-2.3>
     })
 

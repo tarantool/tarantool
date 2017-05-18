@@ -24,18 +24,20 @@ end
 -- Right now it converts logical values to numbers.
 -- Input must be a table.
 local function fix_result(arr)
+    if type(arr) ~= 'table' then return arr end
     for i, v in ipairs(arr) do
-        if type(v) == 'table' then
-            fix_expect(v)
-        else
-            if type(v) == 'boolean' then
-                if v then
-                    arr[i] = 1
-                else
-                    arr[i] = 0
-                end
-            end
-        end
+	if type(v) == 'table' then
+            -- it is ok to pass array
+	    --fix_expect(v)
+	else
+	    if type(v) == 'boolean' then
+		if v then
+		    arr[i] = 1
+		else
+		    arr[i] = 0
+		end
+	    end
+	end
     end
 end
 
@@ -48,7 +50,7 @@ test.finish_test = finish_test
 local function string_regex_p(str)
     if type(str) == 'string'
         and string.sub(str, 1, 1) == '/'
-        and string.sub(str, -1) == '/' then
+    and string.sub(str, -1) == '/' then
         return true;
     else
         return false;
@@ -58,15 +60,14 @@ end
 local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
     if ok then
-        if result == nil then result = { } end
+	if result == nil then result = { } end
+	-- Convert all trues and falses to 1s and 0s
+	fix_result(result)
 
-        -- Convert all trues and falses to 1s and 0s
-        fix_result(result)
-
-        -- If expected result is single line of a form '/ ... /' - then
-        -- search for string in the result
+	-- If expected result is single line of a form '/ ... /' - then
+	-- search for string in the result
         if type(expect) == 'table' and table.getn(expect) == 1
-            and string_regex_p(expect[1]) then
+           and string_regex_p(expect[1]) then
             local exp = expect[1]
             local exp_trimmed = string.sub(exp, 2, string.len(exp) - 2)
             for _, v in ipairs(result) do
@@ -75,7 +76,7 @@ local function do_test(self, label, func, expect)
                 end
             end
             return test:fail(self, label)
-        else
+	else
             -- If nothing is expected: just make sure there were no error.
             if expect == nil then
                 if table.getn(result) ~= 0 and result[1] ~= 0 then
@@ -111,11 +112,10 @@ local function execsql(self, sql)
 end
 test.execsql = execsql
 
-local function catchsql(self, sql)
-    r = {pcall(execsql, self, sql)}
+local function catchsql(self, sql, expect)
+    r = {pcall(execsql, self, sql) }
     if r[1] == true then
         r[1] = 0
-        r[2] = table.concat(r[2], " ") -- flatten result
     else
         r[1] = 1
     end
@@ -128,33 +128,38 @@ local function do_catchsql_test(self, label, sql, expect)
 end
 test.do_catchsql_test = do_catchsql_test
 
-local function do_catchsql2_test(self, label, sql)
-    return do_test(self, label, function() return catchsql2(self, sql) end)
+local function do_catchsql2_test(self, label, sql, expect)
+    return do_test(self, label, function() return test.catchsql2(self, sql) end, expect)
 end
 test.do_catchsql2_test = do_catchsql2_test
 
 local function do_execsql_test(self, label, sql, expect)
-    return do_test(self, label, function() return execsql(self, sql) end, expect)
+    return do_test(self, label, function() return test.execsql(self, sql) end, expect)
 end
 test.do_execsql_test = do_execsql_test
 
-local function do_execsql2_test(self, label, sql)
-    return do_test(self, label, function() return execsql2(self, sql) end)
+local function do_execsql2_test(self, label, sql, expect)
+    return do_test(self, label, function() return test.execsql2(self, sql) end, expect)
 end
 test.do_execsql2_test = do_execsql2_test
 
+local function flattern_with_column_names(result)
+    local ret = {}
+    local columns = result[0]
+    for i = 1, #result, 1 do
+        for j = 1, #columns, 1 do
+            table.insert(ret, columns[j])
+            table.insert(ret, result[i][j])
+        end
+    end
+    return ret
+end
+
 local function execsql2(self, sql)
-    local result = execsql(self, sql)
+    local result = box.sql.execute(sql)
     if type(result) ~= 'table' then return end
     -- shift rows down, revealing column names
-    for i = #result,0,-1 do
-        result[i+1] = result[i]
-    end
-    local colnames = result[1]
-    for i,colname in ipairs(colnames) do
-        colnames[i] = colname:gsub('^sqlite_sq_[0-9a-fA-F]+','sqlite_subquery')
-    end
-    result[0] = nil
+    result = flattern_with_column_names(result)
     return result
 end
 test.execsql2 = execsql2
@@ -167,7 +172,11 @@ end
 test.sortsql = sortsql
 
 local function catchsql2(self, sql)
-    return {pcall(execsql2, self, sql)}
+    r = {pcall(execsql2, self, sql) }
+    -- 0 means ok
+    -- 1 means not ok
+    r[1] = r[1] == true and 0 or 1
+    return r
 end
 test.catchsql2 = catchsql2
 

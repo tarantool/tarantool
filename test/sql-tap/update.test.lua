@@ -908,7 +908,7 @@ test:do_catchsql_test("update-10.2", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.2>
-  0, "1 2 3 4 9 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 9, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.2>
 })
 
@@ -925,7 +925,7 @@ test:do_catchsql_test("update-10.4", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.4>
-  0, "1 2 3 4 9 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 9, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.4>
 })
 
@@ -934,7 +934,7 @@ test:do_catchsql_test("update-10.5", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.5>
-  0, "1 2 3 4 11 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 11, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.5>
 })
 
@@ -951,7 +951,7 @@ test:do_catchsql_test("update-10.7", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.7>
-  0, "1 2 3 4 11 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 11, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.7>
 })
 
@@ -960,7 +960,7 @@ test:do_catchsql_test("update-10.8", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.8>
-  0, "1 2 3 4 13 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 13, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.8>
 })
 
@@ -977,7 +977,7 @@ test:do_catchsql_test("update-10.10", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.10>
-  0, "1 2 3 4 13 6 2 3 4 4 6 7"
+  0, {1, 2, 3, 4, 13, 6, 2, 3, 4, 4, 6, 7}
   -- </update-10.10>
 })
 

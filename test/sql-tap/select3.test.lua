@@ -173,7 +173,7 @@ test:do_catchsql_test("select3-2.12", [[
   SELECT log, count(*) FROM t1 GROUP BY 1 ORDER BY log;
 ]], {
   -- <select3-2.12>
-  0, "0 1 1 1 2 2 3 4 4 8 5 15"
+  0, {0, 1, 1, 1, 2, 2, 3, 4, 4, 8, 5, 15}
   -- </select3-2.12>
 })
 
