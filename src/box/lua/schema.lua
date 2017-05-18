@@ -381,10 +381,10 @@ local function update_index_parts(parts)
 end
 
 --
--- Template for index opts. Not for entire
--- index object.
+-- Template for entire index object, including
+-- index opts.
 --
-local index_opts_template = {
+local alter_index_template = {
     unique = 'boolean',
     dimension = 'number',
     distance = 'string',
@@ -392,30 +392,20 @@ local index_opts_template = {
     run_size_ratio = 'number',
     range_size = 'number',
     page_size = 'number',
-    bloom_fpr = 'number'
-}
---
--- Template for entire index object, including
--- index opts.
---
-local index_object_template = {
+    bloom_fpr = 'number',
     id = 'number',
     name = 'string',
     type = 'string',
-    parts = 'table'
+    parts = 'table',
 }
-for k, v in pairs(index_opts_template) do
-    index_object_template[k] = v
-end
+
+local create_index_template = table.deepcopy(alter_index_template)
+create_index_template.if_not_exists = "boolean"
 
 box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
-    -- Create deep copy of index_object_template with one
-    -- new attribute.
-    local new_index_template = table.deepcopy(index_object_template)
-    new_index_template.if_not_exists = 'boolean'
-    check_param_table(options, new_index_template)
+    check_param_table(options, create_index_template)
 
     local options_defaults = {
         type = 'tree',
@@ -535,7 +525,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         return
     end
 
-    check_param_table(options, index_object_template)
+    check_param_table(options, alter_index_template)
 
     if type(space_id) ~= "number" then
         space_id = box.space[space_id].id
