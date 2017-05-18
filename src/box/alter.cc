@@ -598,7 +598,6 @@ public:
 	virtual void alter_def(struct alter_space * /* alter */) {}
 	virtual void alter(struct alter_space * /* alter */) {}
 	virtual void commit(struct alter_space * /* alter */) {}
-	virtual void rollback(struct alter_space * /* alter */) {}
 	virtual ~AlterSpaceOp() {}
 	template <typename T> static T *create();
 	static void destroy(AlterSpaceOp *op);
@@ -759,14 +758,6 @@ static void
 alter_space_rollback(struct trigger *trigger, void * /* event */)
 {
 	struct alter_space *alter = (struct alter_space *) trigger->data;
-#if 0
-	/* Clear the lock, first thing. */
-		op->rollback(alter);
-	space_remove_trigger(alter);
-#endif
-	class AlterSpaceOp *op;
-	rlist_foreach_entry(op, &alter->ops, link)
-		op->rollback(alter);
 	alter_space_delete(alter);
 }
 
