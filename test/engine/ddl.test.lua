@@ -91,3 +91,14 @@ idx2:drop()
 space:replace({4, 5, 6})
 space:select{}
 space:drop()
+
+-- Change index name
+space = box.schema.space.create('test', {engine = engine})
+pk = space:create_index('pk')
+space:replace{1}
+space:replace{2}
+space:replace{3}
+box.space._index:select{space.id}[1][3]
+pk:alter({name = 'altered_pk'})
+box.space._index:select{space.id}[1][3]
+space:drop()

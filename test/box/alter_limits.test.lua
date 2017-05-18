@@ -305,6 +305,8 @@ s:insert{2, 1}
 s:insert{2, 2}
 s.index.secondary:alter{ unique = false}
 s:insert{3, 2}
+-- changing index id is not allowed
+s.index.secondary:alter{ id = 10}
 s:drop()
 -- ----------------------------------------------------------------
 -- SPACE CACHE: what happens to a space cache when an object is gone

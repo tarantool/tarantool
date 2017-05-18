@@ -146,6 +146,10 @@ index_find(struct space *space, uint32_t index_id)
 size_t
 space_bsize(struct space *space);
 
+/** Get definition of the n-th index of the space. */
+struct index_def *
+space_index_def(struct space *space, int n);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

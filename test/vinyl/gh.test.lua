@@ -56,8 +56,8 @@ s:drop()
 -- gh-681: support or produce error on space::alter
 s = box.schema.space.create('M', {engine='vinyl'})
 i = s:create_index('primary',{})
-s:insert{5}
-s.index.primary:alter({parts={1,'unsigned'}})
+s:insert{5, 5}
+s.index.primary:alter({parts={2,'unsigned'}})
 s:drop()
 
 

@@ -120,6 +120,7 @@ const struct index_opts index_opts_default = {
 	/* .page_size           = */ 0,
 	/* .run_count_per_level = */ 2,
 	/* .run_size_ratio      = */ 3.5,
+	/* .bloom_fpr           = */ 0.05,
 	/* .lsn                 = */ 0,
 	/* .sql                 = */ NULL,
 };
@@ -132,6 +133,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
+	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
 	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
 	OPT_DEF("sql", OPT_STRPTR, struct index_opts, sql),
 	{ NULL, opt_type_MAX, 0, 0 },
@@ -281,6 +283,27 @@ index_def_delete(struct index_def *index_def)
 	free(index_def);
 }
 
+bool
+index_def_change_requires_rebuild(struct index_def *old_index_def,
+				  struct index_def *new_index_def)
+{
+	if (old_index_def->iid != new_index_def->iid ||
+	    old_index_def->type != new_index_def->type ||
+	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
+	    key_part_cmp(old_index_def->key_def.parts,
+			 old_index_def->key_def.part_count,
+			 new_index_def->key_def.parts,
+			 new_index_def->key_def.part_count) != 0) {
+		return true;
+	}
+	if (old_index_def->type == RTREE) {
+		if (old_index_def->opts.dimension != new_index_def->opts.dimension
+		    || old_index_def->opts.distance != new_index_def->opts.distance)
+			return true;
+	}
+	return false;
+}
+
 int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2)
@@ -301,6 +324,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 int
 index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 {
+	assert(key1->space_id == key2->space_id);
 	if (key1->iid != key2->iid)
 		return key1->iid < key2->iid ? -1 : 1;
 	if (strcmp(key1->name, key2->name))

@@ -244,4 +244,10 @@ space_bsize(struct space *space)
 	return space->bsize;
 }
 
+struct index_def *
+space_index_def(struct space *space, int n)
+{
+	return space->index[n]->index_def;
+}
+
 /* vim: set fm=marker */
