@@ -783,6 +783,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
+	rlist_del(&f->link);
 	region_destroy(&f->gc);
 	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
@@ -791,11 +792,12 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 void
 fiber_destroy_all(struct cord *cord)
 {
-	struct fiber *f;
-	rlist_foreach_entry(f, &cord->alive, link)
-		fiber_destroy(cord, f);
-	rlist_foreach_entry(f, &cord->dead, link)
-		fiber_destroy(cord, f);
+	while (!rlist_empty(&cord->alive))
+		fiber_destroy(cord, rlist_first_entry(&cord->alive,
+						      struct fiber, link));
+	while (!rlist_empty(&cord->dead))
+		fiber_destroy(cord, rlist_first_entry(&cord->dead,
+						      struct fiber, link));
 }
 
 void
