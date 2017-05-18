@@ -6,7 +6,7 @@ local errno = require('errno')
 ffi.cdef[[
     typedef int uid_t;
     typedef int gid_t;
-    typedef int time_t;
+    typedef long time_t;
 ]]
 
 -- POSIX demands to have three fields in struct group:
