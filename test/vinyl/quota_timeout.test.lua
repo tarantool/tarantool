@@ -13,11 +13,13 @@ _ = s:create_index('pk')
 
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
+s:count()
 box.info.vinyl().memory.used
 
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
 _ = s:auto_increment{pad}
+s:count()
 box.info.vinyl().memory.used
 
 test_run:cmd('switch default')
