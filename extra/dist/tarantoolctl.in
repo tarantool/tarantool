@@ -682,6 +682,13 @@ local function connect()
 end
 
 local function status()
+    if forward_to_systemd() then
+        local cmd = "systemctl status tarantool@" .. instance_name
+        log.info("Forwarding to '" .. cmd .. "'")
+        os.execute(cmd)
+        return
+    end
+
     local pid_file = default_cfg.pid_file
     local console_sock = uri.parse(console_sock).service
 
