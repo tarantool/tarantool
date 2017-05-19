@@ -292,15 +292,19 @@ local function mk_default_dirs(cfg)
 end
 
 -- systemd detection based on http://unix.stackexchange.com/a/164092
-local function forward_to_systemd()
+local function under_systemd()
     if not usermode then
         local rv = os.execute("systemctl 2>/dev/null | grep '\\-\\.mount' " ..
                               "1>/dev/null 2>/dev/null")
-        if rv == 0 and ffi.C.getppid() >= 2 then
+        if rv == 0 then
             return true
         end
     end
     return false
+end
+
+local function forward_to_systemd()
+    return under_systemd() and ffi.C.getppid() >= 2
 end
 
 -- -------------------------------------------------------------------------- --
@@ -420,7 +424,9 @@ local function wrapper_cfg(cfg)
     else
         cfg.username = nil
     end
-    if cfg.background == nil then
+    if under_systemd() then
+        cfg.background = false
+    elseif cfg.background == nil then
         cfg.background = true
     end
 

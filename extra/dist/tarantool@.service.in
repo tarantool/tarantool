@@ -50,9 +50,6 @@ ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
 ## NYI: https://github.com/tarantool/tarantool/issues/1229
 #ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %I
 
-# Needed for Type=notify
-PIDFile=@TARANTOOL_RUNDIR@/%I.pid
-
 # Systemd waits until all xlogs are recovered
 TimeoutStartSec=86400s
 # Give a reasonable amount of time to close xlogs
