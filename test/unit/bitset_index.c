@@ -15,7 +15,7 @@ void test_resize(void)
 	header();
 
 	struct bitset_index index;
-	fail_unless(bitset_index_create(&index, realloc) == 0);
+	bitset_index_create(&index, realloc);
 	struct bitset_iterator it;
 	bitset_iterator_create(&it, realloc);
 	struct bitset_expr expr;
@@ -45,7 +45,7 @@ void test_size_and_count(void)
 	header();
 
 	struct bitset_index index;
-	fail_unless(bitset_index_create(&index, realloc) == 0);
+	bitset_index_create(&index, realloc);
 
 	enum { P = 10, SIZE = (1 << P) + 1 };
 	for(size_t i = 0; i < SIZE; i++) {
@@ -109,7 +109,7 @@ void test_insert_remove(void)
 	header();
 
 	struct bitset_index index;
-	fail_unless(bitset_index_create(&index, realloc) == 0);
+	bitset_index_create(&index, realloc);
 
 	size_t NUMS_SIZE = 1 << 11;
 	size_t *keys = malloc(NUMS_SIZE * sizeof(size_t));
@@ -165,7 +165,7 @@ void test_simple(int mode, size_t search_mask)
 	fail_unless(mode >= 0 && mode < 3);
 
 	struct bitset_index index;
-	fail_unless(bitset_index_create(&index, realloc) == 0);
+	bitset_index_create(&index, realloc);
 	struct bitset_iterator it;
 	bitset_iterator_create(&it, realloc);
 	struct bitset_expr expr;
@@ -254,7 +254,7 @@ void test_equals_simple(void)
 	header();
 
 	struct bitset_index index;
-	fail_unless(bitset_index_create(&index, realloc) == 0);
+	bitset_index_create(&index, realloc);
 	struct bitset_iterator it;
 	bitset_iterator_create(&it, realloc);
 	struct bitset_expr expr;
