@@ -1086,7 +1086,10 @@ xlog_tx_write(struct xlog *log)
 	} else {
 		written = xlog_tx_write_plain(log);
 	}
-	ERROR_INJECT(ERRINJ_WAL_WRITE, written = -1;);
+	ERROR_INJECT(ERRINJ_WAL_WRITE, {
+		diag_set(ClientError, ER_INJECTION, "xlog write injection");
+		written = -1;
+	});
 
 	obuf_reset(&log->obuf);
 	/*
