@@ -71,7 +71,6 @@ set (core_sources
      cbus.c
      fiber_pool.c
      exception.cc
-     coro.c
      reflection.c
      assoc.c
      rmean.c

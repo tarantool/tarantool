@@ -340,8 +340,8 @@ print_backtrace()
 		stack_top = frame; /* we don't know where the system stack top is */
 		stack_size = (const char *) __libc_stack_end - (const char *) frame;
 	} else {
-		stack_top = fiber()->coro.stack;
-		stack_size = fiber()->coro.stack_size;
+		stack_top = fiber()->stack;
+		stack_size = fiber()->stack_size;
 	}
 
 	fdprintf(STDERR_FILENO, "%s", backtrace(frame, stack_top, stack_size));
