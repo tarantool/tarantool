@@ -33,6 +33,7 @@ add_library(box STATIC
     tuple_convert.c
     tuple_update.c
     tuple_compare.cc
+    tuple_hash.cc
     key_def.cc
     index.cc
     memtx_index.cc

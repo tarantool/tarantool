@@ -32,6 +32,7 @@
 #include "say.h"
 #include "tuple.h"
 #include "tuple_compare.h"
+#include "tuple_hash.h"
 #include "memtx_engine.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */

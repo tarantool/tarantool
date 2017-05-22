@@ -58,6 +58,7 @@
 #include "xstream.h"
 #include "info.h"
 #include "request.h"
+#include "tuple_hash.h" /* for bloom filter */
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
