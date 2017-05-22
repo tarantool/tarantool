@@ -202,8 +202,50 @@ s5:drop()
 
 -- gh-1897 Crash on index field type 'any'
 
-space = box.schema.space.create('test')
+space = box.schema.space.create('test', {engine = engine})
 pk = space:create_index('primary', { parts = {1, 'any'} }) --
 space:insert({1})                                          -- must fail
 space:insert({2})                                          --
+space:drop()
+
+-- gh-1701 allow NaN
+
+ffi = require('ffi')
+ffi.cdef[[ union nan_ultra_hack { double d; uint64_t i; } ]]
+nan_ffi = ffi.new('union nan_ultra_hack')
+nan_ffi.i = 0x7ff4000000000000
+sNaN = nan_ffi.d
+nan_ffi.i = 0x7ff8000000000000
+qNaN = nan_ffi.d
+
+-- basic test
+space = box.schema.space.create('test', { engine = engine })
+pk = space:create_index('primary', {parts = {1, 'number'}})
+space:replace({sNaN, 'signaling NaN'})
+space:replace({qNaN, 'quiet NaN'})
+space:get{sNaN}
+space:get{qNaN}
+space:get{1/0}
+space:get{1/0 - 1/0}
+space:get{0/0}
+space:select{}
+space:truncate()
+
+-- test ordering of special values
+space:replace({1/0, '+inf'})
+space:replace({sNaN, 'snan'})
+space:replace({100})
+space:replace({-1/0, '-inf'})
+space:replace({50})
+space:replace({qNaN, 'qnan'})
+
+pk:get{100/0}
+pk:get{sNaN}
+pk:get{100}
+pk:get{-100/0}
+pk:get{50}
+pk:get{qNaN}
+pk:select({sNaN}, {iterator = 'GE'})
+pk:select({1/0}, {iterator = 'LT'})
+
 space:drop()

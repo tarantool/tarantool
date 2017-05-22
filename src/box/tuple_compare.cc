@@ -31,6 +31,7 @@
 #include "tuple_compare.h"
 #include "tuple.h"
 #include "trivia/util.h" /* NOINLINE */
+#include <math.h>
 
 /* {{{ tuple_compare */
 
@@ -152,16 +153,39 @@ mp_compare_double_uint64(double lhs, uint64_t rhs, int k)
 		return k*COMPARE_RESULT((uint64_t)lhs, rhs);
 	}
 	/*
-	 * If RHS < 2^53, uint64_t->double is lossless.
-	 * Otherwize the value may get rounded.	 It's unspecified
-	 * whether it gets rounded up or down, i.e. the conversion may
-	 * yield 2^53 for a RHS > 2^53.
-	 * Since we've aready ensured that LHS < 2^53, the result is
-	 * still correct even if rounding happens.
+	 * According to the IEEE 754 the double format is the
+	 * following:
+	 * +------+----------+----------+
+	 * | sign | exponent | fraction |
+	 * +------+----------+----------+
+	 *  1 bit    11 bits    52 bits
+	 * If the exponent is 0x7FF, the value is a special one.
+	 * Special value can be NaN, +inf and -inf.
+	 * If the fraction == 0, the value is inf. Sign depends on
+	 * the sign bit.
+	 * If the first bit of the fraction is 1, the value is the
+	 * quiet NaN, else the signaling NaN.
 	 */
-	assert(lhs < EXP2_53);
-	assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
-	return k*COMPARE_RESULT(lhs, (double)rhs);
+	if (!isnan(lhs)) {
+		/*
+		 * lhs is a number or inf.
+		 * If RHS < 2^53, uint64_t->double is lossless.
+		 * Otherwize the value may get rounded.	 It's
+		 * unspecified whether it gets rounded up or down,
+		 * i.e. the conversion may yield 2^53 for a
+		 * RHS > 2^53. Since we've aready ensured that
+		 * LHS < 2^53, the result is still correct even if
+		 * rounding happens.
+		 */
+		assert(lhs < EXP2_53);
+		assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
+		return k*COMPARE_RESULT(lhs, (double)rhs);
+	}
+	/*
+	 * Lhs is NaN. We assume all NaNs to be less than any
+	 * number.
+	 */
+	return -k;
 }
 
 static int
@@ -191,7 +215,33 @@ mp_compare_double_any_number(double lhs, const char *rhs,
 		v = mp_decode_double(&rhs);
 	else
 		return mp_compare_double_any_int(lhs, rhs, rhs_type, k);
-	return k*COMPARE_RESULT(lhs, v);
+	int lhs_is_nan = isnan(lhs);
+	int rhs_is_nan = isnan(v);
+	assert(lhs_is_nan == 1 || lhs_is_nan == 0);
+	assert(rhs_is_nan == 1 || rhs_is_nan == 0);
+	if (lhs_is_nan == 0 && rhs_is_nan == 0) {
+		return k * COMPARE_RESULT(lhs, v);
+	} else if (lhs_is_nan != rhs_is_nan) {
+		/*
+		 *   lhs  | lhs_isNaN |  rhs   | rhs_isNaN | ret
+		 * -------+-----------+--------+-----------+-----
+		 *   NaN  |     1     | number |     0     |  -1
+		 * number |     0     |  NaN   |     1     |   1
+		 */
+		return k * (rhs_is_nan - lhs_is_nan);
+	}
+	/*
+	 * Both NaNs. Compare signaling and quiet NaNs by
+	 * 'quiet bit'.
+	 */
+	uint64_t lqbit = *((uint64_t *)&lhs) & (uint64_t)0x8000000000000;
+	uint64_t rqbit = *((uint64_t *)&v) & (uint64_t)0x8000000000000;
+	/*
+	 * Lets consider the quiet NaN (fraction first bit == 1)
+	 * to be bigger than signaling NaN (fraction first
+	 * bit == 0).
+	 */
+	return k * COMPARE_RESULT(lqbit, rqbit);
 }
 
 static int
