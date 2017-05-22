@@ -525,7 +525,7 @@ test:do_catchsql_test(6.6, [[
     WITH x AS (SELECT * FROM t1) DELETE FROM t2 WHERE
 ]], {
     -- <6.6>
-    "/1 {near .* syntax error}/"
+    1, '/near .* syntax error/'
     -- </6.6>
 })
 
@@ -533,7 +533,7 @@ test:do_catchsql_test(6.7, [[
     WITH x AS (SELECT * FROM t1) DELETE FROM t2 WHRE 1;
 ]], {
     -- <6.7>
-    "/1 {near .* syntax error}/"
+    1, '/near .* syntax error/'
     -- </6.7>
 })
 
@@ -541,7 +541,7 @@ test:do_catchsql_test(6.8, [[
     WITH x AS (SELECT * FROM t1) UPDATE t2 SET a = 10, b = ;
 ]], {
     -- <6.8>
-    "/1 {near .* syntax error}/"
+    1, '/near .* syntax error/'
     -- </6.8>
 })
 
@@ -549,7 +549,7 @@ test:do_catchsql_test(6.9, [[
     WITH x AS (SELECT * FROM t1) UPDATE t2 SET a = 10, b = 1 WHERE a===b;
 ]], {
     -- <6.9>
-    "/1 {near .* syntax error}/"
+    1, '/near .* syntax error/'
     -- </6.9>
 })
 

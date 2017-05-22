@@ -47,14 +47,77 @@ local function finish_test()
 end
 test.finish_test = finish_test
 
+-- Check if string is regex pattern.
+-- Condition: /.../ or ~/.../
 local function string_regex_p(str)
     if type(str) == 'string'
-        and string.sub(str, 1, 1) == '/'
-    and string.sub(str, -1) == '/' then
+       and (string.sub(str, 1, 1) == '/'
+            or string.sub(str, 1, 2) == '~/')
+       and string.sub(str, -1) == '/' then
         return true;
     else
         return false;
     end
+end
+
+local function table_check_regex_p(t, regex)
+    -- regex is definetely regex here, no additional checks
+    local nmatch = string.sub(regex, 1, 1) == '~' and 1 or 0
+    local regex_tr = string.sub(regex, 2 + nmatch, string.len(regex) - 2)
+    for _, v in pairs(t) do
+        if nmatch == 1 then
+            if type(v) == 'table' and not table_check_regex_p(v, regex) then
+                return 0
+            end
+            if type(v) == 'string' and string.find(v, regex_tr) then
+                return 0
+            end
+        else
+            if type(v) == 'table' and table_check_regex_p(v, regex) then
+                return 1
+            end
+            if type(v) == 'string' and string.find(v, regex_tr) then
+                return 1
+            end
+        end
+    end
+
+    return nmatch
+end
+
+local function is_deeply_regex(got, expected)
+    if type(expected) == "number" or type(got) == "number" then
+        if got ~= got and expected ~= expected then
+            return true -- nan
+        end
+        return got == expected
+    end
+
+    if string_regex_p(expected) then
+        return table_match_regex_p(got, expected)
+    end
+
+    if got == nil and expected == nil then return true end
+
+    if type(got) ~= type(expected) then
+        return false
+    end
+
+    if type(got) ~= 'table' then
+        return got == expected
+    end
+
+    for i, v in pairs(expected) do
+        if string_regex_p(v) then
+            return table_check_regex_p(got, v) == 1
+        else
+            if not is_deeply_regex(got[i], v) then
+                return false
+            end
+        end
+    end
+
+    return true
 end
 
 local function do_test(self, label, func, expect)
@@ -64,32 +127,21 @@ local function do_test(self, label, func, expect)
 	-- Convert all trues and falses to 1s and 0s
 	fix_result(result)
 
-	-- If expected result is single line of a form '/ ... /' - then
-	-- search for string in the result
-        if type(expect) == 'table' and table.getn(expect) == 1
-           and string_regex_p(expect[1]) then
-            local exp = expect[1]
-            local exp_trimmed = string.sub(exp, 2, string.len(exp) - 2)
-            for _, v in ipairs(result) do
-                if string.gmatch(v, exp_trimmed) then
-                    return test:ok(self, label)
-                end
-            end
-            return test:fail(self, label)
-	else
-            -- If nothing is expected: just make sure there were no error.
-            if expect == nil then
-                if table.getn(result) ~= 0 and result[1] ~= 0 then
-                    test:fail(self, label)
-                else
-                    test:ok(self, label)
-                end
+        -- If nothing is expected: just make sure there were no error.
+        if expect == nil then
+            if table.getn(result) ~= 0 and result[1] ~= 0 then
+                test:fail(self, label)
             else
-                if not self:is_deeply(result, expect, label) then
-                    io.write(string.format('%s: Miscompare\n', label))
-                    io.write("Expected: ", yaml.encode(expect))
-                    io.write("Got: ", yaml.encode(result))
-                end
+                test:ok(self, label)
+            end
+        else
+            if is_deeply_regex(result, expect) then
+                test:ok(self, label)
+            else
+                io.write(string.format('%s: Miscompare\n', label))
+                io.write("Expected: ", yaml.encode(expect))
+                io.write("Got: ", yaml.encode(result))
+                test:fail(self, label)
             end
         end
     else
