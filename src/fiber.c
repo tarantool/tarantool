@@ -86,11 +86,6 @@ pthread_t main_thread_id;
 static size_t page_size;
 static int stack_direction;
 
-enum {
-	/** The number of pages to use for fiber stack */
-	FIBER_STACK_PAGES = 16,
-};
-
 static void
 update_last_stack_frame(struct fiber *fiber)
 {
@@ -102,8 +97,73 @@ update_last_stack_frame(struct fiber *fiber)
 
 }
 
+enum {
+	/* The minimum allowable fiber stack size in bytes */
+	FIBER_STACK_SIZE_MINIMAL = 16384,
+	/* Default fiber stack size in bytes */
+	FIBER_STACK_SIZE_DEFAULT = 65536
+};
+
+/** Default fiber attributes */
+static const struct fiber_attr fiber_attr_default = {
+       .stack_size = FIBER_STACK_SIZE_DEFAULT,
+       .flags = FIBER_DEFAULT_FLAGS
+};
+
+void
+fiber_attr_create(struct fiber_attr *fiber_attr)
+{
+       *fiber_attr = fiber_attr_default;
+}
+
+struct fiber_attr *
+fiber_attr_new()
+{
+	struct fiber_attr *fiber_attr = malloc(sizeof(*fiber_attr));
+	if (fiber_attr == NULL)  {
+		diag_set(OutOfMemory, sizeof(*fiber_attr),
+			 "runtime", "fiber attr");
+		return NULL;
+	}
+	fiber_attr_create(fiber_attr);
+	return fiber_attr;
+}
+
+void
+fiber_attr_delete(struct fiber_attr *fiber_attr)
+{
+	free(fiber_attr);
+}
+
+int
+fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size)
+{
+	if (stack_size < FIBER_STACK_SIZE_MINIMAL) {
+		errno = EINVAL;
+		diag_set(SystemError, "stack size is too small");
+		return -1;
+	}
+	fiber_attr->stack_size = stack_size;
+	if (stack_size != FIBER_STACK_SIZE_DEFAULT) {
+		fiber_attr->flags |= FIBER_CUSTOM_STACK;
+	} else {
+		fiber_attr->flags &= ~FIBER_CUSTOM_STACK;
+	}
+	return 0;
+}
+
+size_t
+fiber_attr_getstacksize(struct fiber_attr *fiber_attr)
+{
+	return fiber_attr != NULL ? fiber_attr->stack_size :
+				    fiber_attr_default.stack_size;
+}
+
 static void
 fiber_recycle(struct fiber *fiber);
+
+static void
+fiber_destroy(struct cord *cord, struct fiber *f);
 
 /**
  * Transfer control to callee fiber.
@@ -521,6 +581,12 @@ unregister_fid(struct fiber *fiber)
 	mh_i32ptr_remove(cord()->fiber_registry, &node, NULL);
 }
 
+struct fiber *
+fiber_self()
+{
+	return fiber();
+}
+
 void
 fiber_gc(void)
 {
@@ -549,6 +615,7 @@ fiber_recycle(struct fiber *fiber)
 	assert(diag_is_empty(&fiber->diag));
 	/* no pending wakeup */
 	assert(rlist_empty(&fiber->state));
+	bool has_custom_stack = fiber->flags & FIBER_CUSTOM_STACK;
 	fiber_reset(fiber);
 	fiber->gc.name[0] = '\0';
 	fiber->f = NULL;
@@ -556,7 +623,11 @@ fiber_recycle(struct fiber *fiber)
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	region_free(&fiber->gc);
-	rlist_move_entry(&cord()->dead, fiber, link);
+	if (!has_custom_stack) {
+		rlist_move_entry(&cord()->dead, fiber, link);
+	} else {
+		fiber_destroy(cord(), fiber);
+	}
 }
 
 static void
@@ -704,6 +775,62 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 	}
 }
 
+struct fiber *
+fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
+	     fiber_func f)
+{
+	struct cord *cord = cord();
+	struct fiber *fiber = NULL;
+	if (fiber_attr == NULL)
+		fiber_attr = &fiber_attr_default;
+
+	/* Now we can not reuse fiber if custom attribute was set */
+	if (!(fiber_attr->flags & FIBER_CUSTOM_STACK) &&
+	    !rlist_empty(&cord->dead)) {
+		fiber = rlist_first_entry(&cord->dead,
+					  struct fiber, link);
+		rlist_move_entry(&cord->alive, fiber, link);
+	} else {
+		fiber = (struct fiber *)
+			mempool_alloc(&cord->fiber_mempool);
+		if (fiber == NULL) {
+			diag_set(OutOfMemory, sizeof(struct fiber),
+				 "fiber pool", "fiber");
+			return NULL;
+		}
+		memset(fiber, 0, sizeof(struct fiber));
+
+		if (fiber_stack_create(fiber, fiber_attr->stack_size)) {
+			mempool_free(&cord->fiber_mempool, fiber);
+			return NULL;
+		}
+		memset(&fiber->ctx, 0, sizeof(fiber->ctx));
+		coro_create(&fiber->ctx, fiber_loop, NULL,
+			    fiber->stack, fiber->stack_size);
+
+		region_create(&fiber->gc, &cord->slabc);
+
+		rlist_create(&fiber->state);
+		rlist_create(&fiber->wake);
+		diag_create(&fiber->diag);
+		fiber_reset(fiber);
+		fiber->flags = fiber_attr->flags;
+
+		rlist_add_entry(&cord->alive, fiber, link);
+	}
+
+	fiber->f = f;
+	/* fids from 0 to 100 are reserved */
+	if (++cord->max_fid < 100)
+		cord->max_fid = 101;
+	fiber->fid = cord->max_fid;
+	fiber_set_name(fiber, name);
+	register_fid(fiber);
+
+	return fiber;
+
+}
+
 /**
  * Create a new fiber.
  *
@@ -718,50 +845,7 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 struct fiber *
 fiber_new(const char *name, fiber_func f)
 {
-	struct cord *cord = cord();
-	struct fiber *fiber = NULL;
-
-	if (! rlist_empty(&cord->dead)) {
-		fiber = rlist_first_entry(&cord->dead,
-					  struct fiber, link);
-		rlist_move_entry(&cord->alive, fiber, link);
-	} else {
-		fiber = (struct fiber *)
-			mempool_alloc(&cord->fiber_mempool);
-		if (fiber == NULL) {
-			diag_set(OutOfMemory, sizeof(struct fiber),
-				 "fiber pool", "fiber");
-			return NULL;
-		}
-		memset(fiber, 0, sizeof(struct fiber));
-
-		if (fiber_stack_create(fiber, FIBER_STACK_PAGES * page_size)) {
-			mempool_free(&cord->fiber_mempool, fiber);
-			return NULL;
-		}
-		memset(&fiber->ctx, 0, sizeof(fiber->ctx));
-		coro_create(&fiber->ctx, fiber_loop, NULL,
-			    fiber->stack, fiber->stack_size);
-
-		region_create(&fiber->gc, &cord->slabc);
-
-		rlist_create(&fiber->state);
-		rlist_create(&fiber->wake);
-		diag_create(&fiber->diag);
-		fiber_reset(fiber);
-
-		rlist_add_entry(&cord->alive, fiber, link);
-	}
-
-	fiber->f = f;
-	/* fids from 0 to 100 are reserved */
-	if (++cord->max_fid < 100)
-		cord->max_fid = 101;
-	fiber->fid = cord->max_fid;
-	fiber_set_name(fiber, name);
-	register_fid(fiber);
-
-	return fiber;
+	return fiber_new_ex(name, NULL, f);
 }
 
 /**
@@ -770,7 +854,7 @@ fiber_new(const char *name, fiber_func f)
  * Sic: cord()->sched needs manual destruction in
  * cord_destroy().
  */
-void
+static void
 fiber_destroy(struct cord *cord, struct fiber *f)
 {
 	if (f == fiber()) {

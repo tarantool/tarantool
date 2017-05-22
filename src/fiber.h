@@ -85,6 +85,10 @@ enum {
 	 * the fiber is recycled.
 	 */
 	FIBER_IS_DEAD		= 1 << 4,
+	/**
+	 * This flag is set when fiber uses custom stack size.
+	 */
+	FIBER_CUSTOM_STACK	= 1 << 5,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -105,12 +109,59 @@ enum fiber_key {
 
 /** \cond public */
 
+/**
+ * Fiber attributes container
+ */
+struct fiber_attr;
+
+/**
+ * Create a new fiber attribute container and initialize it
+ * with default parameters.
+ * Can be used for many fibers creation, corresponding fibers
+ * will not take ownership.
+ */
+API_EXPORT struct fiber_attr *
+fiber_attr_new();
+
+/**
+ * Delete the fiber_attr and free all allocated resources.
+ * This is safe when fibers created with this attribute still exist.
+ *
+ *\param fiber_attr fiber attribute
+ */
+API_EXPORT void
+fiber_attr_delete(struct fiber_attr *fiber_attr);
+
+/**
+ * Set stack size for the fiber attribute.
+ *
+ * \param fiber_attribute fiber attribute container
+ * \param stacksize stack size for new fibers
+ */
+API_EXPORT int
+fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size);
+
+/**
+ * Get stack size from the fiber attribute.
+ *
+ * \param fiber_attribute fiber attribute container or NULL for default
+ * \retval stack size
+ */
+API_EXPORT size_t
+fiber_attr_getstacksize(struct fiber_attr *fiber_attr);
+
 struct fiber;
 /**
  * Fiber - contains information about fiber
  */
 
 typedef int (*fiber_func)(va_list);
+
+/**
+ * Return the current fiber
+ */
+API_EXPORT struct fiber *
+fiber_self();
 
 /**
  * Create a new fiber.
@@ -130,6 +181,25 @@ typedef int (*fiber_func)(va_list);
  */
 API_EXPORT struct fiber *
 fiber_new(const char *name, fiber_func f);
+
+/**
+ * Create a new fiber with defined attributes.
+ *
+ * Can fail only if there is not enough memory for
+ * the fiber structure or fiber stack.
+ *
+ * The created fiber automatically returns itself
+ * to the fiber cache if has default stack size
+ * when its "main" function completes.
+ *
+ * \param name       string with fiber name
+ * \param fiber_attr fiber attributes
+ * \param fiber_func func for run inside fiber
+ *
+ * \sa fiber_start
+ */
+API_EXPORT struct fiber *
+fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr, fiber_func f);
 
 /**
  * Return control to another fiber and wait until it'll be woken.
@@ -243,6 +313,22 @@ API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
 /** \endcond public */
+
+/**
+ * Fiber attribute container
+ */
+struct fiber_attr {
+	/** Fiber stack size. */
+	size_t stack_size;
+	/** Fiber flags. */
+	uint32_t flags;
+};
+
+/**
+ * Init fiber attr with default values
+ */
+void
+fiber_attr_create(struct fiber_attr *fiber_attr);
 
 struct fiber {
 	coro_context ctx;
