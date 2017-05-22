@@ -581,7 +581,7 @@ index_def_merge(const struct index_def *first, const struct index_def *second);
 
 /*
  * Check that parts of the key match with the key definition.
- * @param index_def Key definition.
+ * @param key_def Key definition.
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
  *
@@ -589,7 +589,7 @@ index_def_merge(const struct index_def *first, const struct index_def *second);
  * @retval -1 The key is invalid.
  */
 int
-key_validate_parts(struct index_def *index_def, const char *key,
+key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
 
 /**

@@ -559,14 +559,14 @@ index_def_merge(const struct index_def *first, const struct index_def *second)
 }
 
 int
-key_validate_parts(struct index_def *index_def, const char *key,
+key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count)
 {
 	for (uint32_t part = 0; part < part_count; part++) {
 		enum mp_type mp_type = mp_typeof(*key);
 		mp_next(&key);
 
-		if (key_mp_type_validate(index_def->key_def.parts[part].type, mp_type,
+		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
 					 ER_KEY_PART_TYPE, part))
 			return -1;
 	}

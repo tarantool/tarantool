@@ -320,7 +320,7 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
  * @retval -1 The key is invalid.
  */
 int
-primary_key_validate(struct index_def *index_def, const char *key,
+primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count);
 
 /**
