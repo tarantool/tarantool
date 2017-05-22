@@ -966,33 +966,20 @@ template <int TYPE, int ...MORE_TYPES> struct TupleFieldHash { };
 
 template <int TYPE, int TYPE2, int ...MORE_TYPES>
 struct TupleFieldHash<TYPE, TYPE2, MORE_TYPES...> {
-	static void hash(const char **pfield, const struct key_def *key_def,
-			 uint32_t parts_i, uint32_t *ph,
-			 uint32_t *pcarry, uint32_t *ptotal_size)
+	static void hash(const char **pfield, uint32_t *ph, uint32_t *pcarry,
+			 uint32_t *ptotal_size)
 	{
-		assert(parts_i + 1 < key_def->part_count);
 		*ptotal_size += field_hash<TYPE>(ph, pcarry, pfield);
-		/* on this position in tuple stands pfield,
-		 * after calculating hash for field */
-		uint32_t fieldno = key_def->parts[parts_i].fieldno + 1;
-		/* we  iterate over fields until we find next key field */
-		while (fieldno < key_def->parts[parts_i + 1].fieldno) {
-			mp_next(pfield);
-			fieldno++;
-		}
 		TupleFieldHash<TYPE2, MORE_TYPES...>::
-			hash(pfield, key_def, parts_i + 1, ph,
-			     pcarry, ptotal_size);
+			hash(pfield, ph, pcarry, ptotal_size);
 	}
 };
 
 template <int TYPE>
 struct TupleFieldHash<TYPE> {
-	static void hash(const char **pfield, const struct key_def *key_def,
-			 uint32_t parts_i, uint32_t *ph, uint32_t *pcarry,
+	static void hash(const char **pfield, uint32_t *ph, uint32_t *pcarry,
 			 uint32_t *ptotal_size)
 	{
-		assert(parts_i + 1 == key_def->part_count);
 		*ptotal_size += field_hash<TYPE>(ph, pcarry, pfield);
 	}
 };
@@ -1008,7 +995,7 @@ struct TupleHash
 		uint32_t total_size = 0;
 		const char *field = tuple_field(tuple, key_def->parts->fieldno);
 		TupleFieldHash<TYPE, MORE_TYPES...>::
-			hash(&field, key_def, 0, &h, &carry, &total_size);
+			hash(&field, &h, &carry, &total_size);
 		return PMurHash32_Result(h, carry, total_size);
 	}
 };
@@ -1016,7 +1003,7 @@ struct TupleHash
 template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	static uint32_t	hash(const struct tuple *tuple,
-						const struct key_def *key_def)
+			     const struct key_def *key_def)
 	{
 		const char *field = tuple_field(tuple, key_def->parts->fieldno);
 		uint64_t val = mp_decode_uint(&field);
@@ -1068,6 +1055,19 @@ key_hash_slowpath(const char *key, const struct key_def *key_def);
 
 void
 tuple_hash_func_set(struct key_def *key_def) {
+	/*
+	 * Check that key_def defines sequential a key without holes
+	 * starting from **arbitrary** field.
+	 */
+	for (uint32_t i = 1; i < key_def->part_count; i++) {
+		if (key_def->parts[i - 1].fieldno + 1 !=
+		    key_def->parts[i].fieldno)
+			goto slowpath;
+	}
+	/*
+	 * Try to find pre-generated tuple_hash() and key_hash()
+	 * implementations
+	 */
 	for (uint32_t k = 0; k < sizeof(hash_arr) / sizeof(hash_arr[0]); k++) {
 		uint32_t i = 0;
 		for (; i < key_def->part_count; i++) {
@@ -1082,6 +1082,7 @@ tuple_hash_func_set(struct key_def *key_def) {
 		}
 	}
 
+slowpath:
 	key_def->tuple_hash = tuple_hash_slowpath;
 	key_def->key_hash = key_hash_slowpath;
 }
