@@ -5312,18 +5312,20 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 			vy_tuple_format_new_upsert(space->format);
 		if (index->upsert_format == NULL)
 			goto fail_upsert_format;
+		tuple_format_ref(index->upsert_format, 1);
 
 		index->space_format_with_colmask =
 			vy_tuple_format_new_with_colmask(space->format);
 		if (index->space_format_with_colmask == NULL)
 			goto fail_space_format_with_colmask;
+		tuple_format_ref(index->space_format_with_colmask, 1);
 	} else {
 		index->space_format_with_colmask =
 			pk->space_format_with_colmask;
 		index->upsert_format = pk->upsert_format;
+		tuple_format_ref(index->space_format_with_colmask, 1);
+		tuple_format_ref(index->upsert_format, 1);
 	}
-	tuple_format_ref(index->space_format_with_colmask, 1);
-	tuple_format_ref(index->upsert_format, 1);
 
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
