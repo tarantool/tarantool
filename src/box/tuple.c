@@ -33,11 +33,6 @@
 #include "trivia/util.h"
 #include "fiber.h"
 #include "tt_uuid.h"
-#include "third_party/PMurHash.h"
-
-enum {
-	HASH_SEED = 13U
-};
 
 static struct mempool tuple_iterator_pool;
 
@@ -117,9 +112,64 @@ tuple_next(struct tuple_iterator *it)
 	return NULL;
 }
 
-char *
-tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
-		  uint32_t *key_size)
+/**
+ * Optimized version of tuple_extract_key_raw() for sequential key defs
+ * @copydoc tuple_extract_key_raw()
+ */
+static char *
+tuple_extract_key_sequential_raw(const char *data, const char *data_end,
+				 const struct key_def *key_def,
+				 uint32_t *key_size)
+{
+	assert(key_def_is_sequential(key_def));
+	const char *field_start = data;
+	uint32_t bsize = mp_sizeof_array(key_def->part_count);
+
+	mp_decode_array(&field_start);
+	const char *field_end = field_start;
+
+	for (uint32_t i = 0; i < key_def->part_count; i++)
+		mp_next(&field_end);
+	bsize += field_end - field_start;
+
+	assert(!data_end || (field_end - field_start <= data_end - data));
+	(void) data_end;
+
+	char *key = (char *) region_alloc(&fiber()->gc, bsize);
+	if (key == NULL) {
+		diag_set(OutOfMemory, bsize, "region",
+			"tuple_extract_key_raw_sequential");
+		return NULL;
+	}
+	char *key_buf = mp_encode_array(key, key_def->part_count);
+	memcpy(key_buf, field_start, field_end - field_start);
+
+	if (key_size != NULL)
+		*key_size = bsize;
+	return key;
+}
+
+/**
+ * Optimized version of tuple_extract_key() for sequential key defs
+ * @copydoc tuple_extract_key()
+ */
+static inline char *
+tuple_extract_key_sequential(const struct tuple *tuple,
+			     const struct key_def *key_def,
+			     uint32_t *key_size)
+{
+	assert(key_def_is_sequential(key_def));
+	const char *data = tuple_data(tuple);
+	return tuple_extract_key_sequential_raw(data, NULL, key_def, key_size);
+}
+
+/**
+ * General-purpose implementation of tuple_extract_key()
+ * @copydoc tuple_extract_key()
+ */
+static char *
+tuple_extract_key_slowpath(const struct tuple *tuple,
+			   const struct key_def *key_def, uint32_t *key_size)
 {
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
@@ -127,12 +177,24 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 	const struct tuple_format *format = tuple_format(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 
-	/* Calculate key size. */
+	/* Calculate the key size. */
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
+		/*
+		 * Skip sequential part in order to minimize
+		 * tuple_field_raw() calls.
+		 */
+		for (; i < key_def->part_count - 1; i++) {
+			if (key_def->parts[i].fieldno + 1 !=
+				key_def->parts[i + 1].fieldno) {
+				/* End of sequential part */
+				break;
+			}
+			mp_next(&end);
+		}
 		mp_next(&end);
 		bsize += end - field;
 	}
@@ -148,6 +210,18 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
+		/*
+		 * Skip sequential part in order to minimize
+		 * tuple_field_raw() calls
+		 */
+		for (; i < key_def->part_count - 1; i++) {
+			if (key_def->parts[i].fieldno + 1 !=
+				key_def->parts[i + 1].fieldno) {
+				/* End of sequential part */
+				break;
+			}
+			mp_next(&end);
+		}
 		mp_next(&end);
 		bsize = end - field;
 		memcpy(key_buf, field, bsize);
@@ -158,9 +232,14 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
 	return key;
 }
 
-char *
-tuple_extract_key_raw(const char *data, const char *data_end,
-		      const struct key_def *key_def, uint32_t *key_size)
+/**
+ * General-purpose version of tuple_extract_key_raw()
+ * @copydoc tuple_extract_key_raw()
+ */
+static char *
+tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
+			       const struct key_def *key_def,
+			       uint32_t *key_size)
 {
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -179,14 +258,27 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	uint32_t current_fieldno = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		uint32_t fieldno = key_def->parts[i].fieldno;
+		for (; i < key_def->part_count - 1; i++) {
+			if (key_def->parts[i].fieldno + 1 !=
+			    key_def->parts[i + 1].fieldno)
+				break;
+		}
 		if (fieldno < current_fieldno) {
 			/* Rewind. */
 			field = field0;
 			field_end = field0_end;
 			current_fieldno = 0;
 		}
+
 		while (current_fieldno < fieldno) {
+			/* search first field of key in tuple raw data */
 			field = field_end;
+			mp_next(&field_end);
+			current_fieldno++;
+		}
+
+		while (current_fieldno < key_def->parts[i].fieldno) {
+			/* search the last field in subsequence */
 			mp_next(&field_end);
 			current_fieldno++;
 		}
@@ -197,6 +289,21 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 	if (key_size != NULL)
 		*key_size = (uint32_t)(key_buf - key);
 	return key;
+}
+
+/**
+ * Initialize tuple_extract_key() and tuple_extract_key_raw()
+ */
+void
+tuple_extract_key_set(struct key_def *key_def)
+{
+	if (key_def_is_sequential(key_def)) {
+		key_def->tuple_extract_key = tuple_extract_key_sequential;
+		key_def->tuple_extract_key_raw = tuple_extract_key_sequential_raw;
+	} else {
+		key_def->tuple_extract_key = tuple_extract_key_slowpath;
+		key_def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw;
+	}
 }
 
 void
@@ -329,76 +436,4 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
-}
-
-static uint32_t
-tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-	      enum field_type type)
-{
-	const char *f = *field;
-	uint32_t size;
-
-	switch (type) {
-	case FIELD_TYPE_STRING:
-		/*
-		 * (!) MP_STR fields hashed **excluding** MsgPack format
-		 * indentifier. We have to do that to keep compatibility
-		 * with old third-party MsgPack (spec-old.md) implementations.
-		 * \sa https://github.com/tarantool/tarantool/issues/522
-		 */
-		f = mp_decode_str(field, &size);
-		break;
-	default:
-		mp_next(field);
-		size = *field - f;  /* calculate the size of field */
-		/*
-		 * (!) All other fields hashed **including** MsgPack format
-		 * identifier (e.g. 0xcc). This was done **intentionally**
-		 * for performance reasons. Please follow MsgPack specification
-		 * and pack all your numbers to the most compact representation.
-		 * If you still want to add support for broken MsgPack,
-		 * please don't forget to patch tuple_compare_field().
-		 */
-		break;
-	}
-	assert(size < INT32_MAX);
-	PMurHash32_Process(ph1, pcarry, f, size);
-	return size;
-}
-
-uint32_t
-tuple_hash_slow_path(const struct tuple *tuple, const struct key_def *key_def)
-{
-	assert(key_def->part_count != 1 ||
-	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	for (const struct key_part *part = key_def->parts;
-	     part < key_def->parts + key_def->part_count; part++) {
-		const char *field = tuple_field(tuple, part->fieldno);
-		total_size += tuple_hash_field(&h, &carry, &field, part->type);
-	}
-
-	return PMurHash32_Result(h, carry, total_size);
-}
-
-uint32_t
-key_hash_slow_path(const char *key, const struct key_def *key_def)
-{
-	assert(key_def->part_count != 1 ||
-	       key_def->parts[1].type != FIELD_TYPE_UNSIGNED);
-
-	uint32_t h = HASH_SEED;
-	uint32_t carry = 0;
-	uint32_t total_size = 0;
-
-	for (const struct key_part *part = key_def->parts;
-	     part < key_def->parts + key_def->part_count; part++) {
-		total_size += tuple_hash_field(&h, &carry, &key, part->type);
-	}
-
-	return PMurHash32_Result(h, carry, total_size);
 }

@@ -23,7 +23,7 @@ deps_linux:
 test_linux: deps_linux
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j8
-	cd test && /usr/bin/python test-run.py
+	cd test && /usr/bin/python test-run.py -j -1
 
 deps_osx:
 	brew install openssl readline --force
@@ -40,14 +40,14 @@ test_osx: deps_osx
 	ulimit -S -n 20480 || :
 	ulimit -n
 	make -j8
-	cd test && python test-run.py unit/ app/ app-tap/ box/ box-tap/
+	cd test && python test-run.py -j -1 unit/ app/ app-tap/ box/ box-tap/
 
 coverage: deps_linux
 	sudo apt-get -q -y install lcov
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
 	make -j8
 	# Enable --long tests for coverage
-	cd test && /usr/bin/python test-run.py --long
+	cd test && /usr/bin/python test-run.py -j -1 --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--output-file coverage.info

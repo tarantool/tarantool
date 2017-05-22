@@ -32,6 +32,10 @@ pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 ---
 ...
+s:count()
+---
+- 1
+...
 box.info.vinyl().memory.used
 ---
 - 748241
@@ -41,6 +45,10 @@ box.info.vinyl().memory.used
 _ = s:auto_increment{pad}
 ---
 - error: Timed out waiting for Vinyl memory quota
+...
+s:count()
+---
+- 1
 ...
 box.info.vinyl().memory.used
 ---

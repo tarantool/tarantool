@@ -37,6 +37,8 @@
 #include "fio.h"
 #include "memory.h"
 
+#include "tuple_hash.h" /* for bloom filter */
+
 /**
  * coio task for vinyl page read
  */

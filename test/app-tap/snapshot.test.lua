@@ -144,5 +144,7 @@ fio.unlink(files[#files])
 box.snapshot()
 test:ok(fio.stat(files[#files]) ~= nil, "Snapshot was recreated")
 
+box.space.test:drop()
+
 test:check()
 os.exit(0)

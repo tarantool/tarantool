@@ -247,20 +247,45 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 struct key_def;
 struct tuple;
 
+/** @copydoc tuple_compare_with_key() */
 typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
-			      const char *key,
-			      uint32_t part_count,
-			      const struct key_def *key_def);
+					const char *key,
+					uint32_t part_count,
+					const struct key_def *key_def);
+/** @copydoc tuple_compare() */
 typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
-			   const struct tuple *tuple_b,
-			   const struct key_def *key_def);
+			       const struct tuple *tuple_b,
+			       const struct key_def *key_def);
+/** @copydoc tuple_extract_key() */
+typedef char *(*tuple_extract_key_t)(const struct tuple *tuple,
+				     const struct key_def *key_def,
+				     uint32_t *key_size);
+/** @copydoc tuple_extract_key_raw() */
+typedef char *(*tuple_extract_key_raw_t)(const char *data,
+					 const char *data_end,
+					 const struct key_def *key_def,
+					 uint32_t *key_size);
+/** @copydoc tuple_hash() */
+typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
+				 const struct key_def *key_def);
+/** @copydoc key_hash() */
+typedef uint32_t (*key_hash_t)(const char *key,
+				const struct key_def *key_def);
 
 /* Definition of a multipart key. */
 struct key_def {
-	/** tuple <-> tuple comparison function */
+	/** @see tuple_compare() */
 	tuple_compare_t tuple_compare;
-	/** tuple <-> key comparison function */
+	/** @see tuple_compare_with_key() */
 	tuple_compare_with_key_t tuple_compare_with_key;
+	/** @see tuple_extract_key() */
+	tuple_extract_key_t tuple_extract_key;
+	/** @see tuple_extract_key_raw() */
+	tuple_extract_key_raw_t tuple_extract_key_raw;
+	/** @see tuple_hash() */
+	tuple_hash_t tuple_hash;
+	/** @see key_hash() */
+	key_hash_t key_hash;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
