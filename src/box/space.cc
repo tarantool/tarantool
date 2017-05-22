@@ -70,11 +70,13 @@ access_check_space(struct space *space, uint8_t access)
 void
 space_fill_index_map(struct space *space)
 {
-	space->index_count = 0;
+	uint32_t index_count = 0;
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		Index *index = space->index_map[j];
-		if (index)
-			space->index[space->index_count++] = index;
+		if (index) {
+			assert(index_count < space->index_count);
+			space->index[index_count++] = index;
+		}
 	}
 }
 
@@ -107,13 +109,10 @@ space_new(struct space_def *def, struct rlist *key_list)
 	if (space == NULL)
 		tnt_raise(OutOfMemory, sz, "malloc", "struct space");
 
+	space->index_count = index_count;
+	space->index_id_max = index_id_max;
 	rlist_create(&space->on_replace);
-	auto scoped_guard = make_scoped_guard([=]
-	{
-		/** Ensure space_delete deletes all indexes. */
-		space_fill_index_map(space);
-		space_delete(space);
-	});
+	auto scoped_guard = make_scoped_guard([=] { space_delete(space); });
 
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
@@ -132,7 +131,6 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
 	space->format->exact_field_count = def->exact_field_count;
-	space->index_id_max = index_id_max;
 	/* init space engine instance */
 	space->handler = engine->open();
 	/* Fill the space indexes. */
@@ -149,8 +147,11 @@ space_new(struct space_def *def, struct rlist *key_list)
 void
 space_delete(struct space *space)
 {
-	for (uint32_t j = 0; j < space->index_count; j++)
-		delete space->index[j];
+	for (uint32_t j = 0; j <= space->index_id_max; j++) {
+		Index *index = space->index_map[j];
+		if (index)
+			delete index;
+	}
 	if (space->format)
 		tuple_format_ref(space->format, -1);
 	if (space->handler)
