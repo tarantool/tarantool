@@ -150,6 +150,18 @@ space_bsize(struct space *space);
 struct index_def *
 space_index_def(struct space *space, int n);
 
+/**
+ * Get name of the index by its identifier and parent space.
+ *
+ * @param space Parent space.
+ * @param id    Index identifier.
+ *
+ * @retval not NULL Index name.
+ * @retval     NULL No index with the specified identifier.
+ */
+const char *
+index_name_by_id(struct space *space, uint32_t id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

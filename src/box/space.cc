@@ -251,4 +251,13 @@ space_index_def(struct space *space, int n)
 	return space->index[n]->index_def;
 }
 
+const char *
+index_name_by_id(struct space *space, uint32_t id)
+{
+	struct Index *index = space_index(space, id);
+	if (index != NULL)
+		return index->index_def->name;
+	return NULL;
+}
+
 /* vim: set fm=marker */
