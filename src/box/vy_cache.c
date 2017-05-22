@@ -117,28 +117,20 @@ vy_cache_tree_page_free(void *ctx, void *p)
 	free(p);
 }
 
-struct vy_cache *
-vy_cache_new(struct vy_cache_env *env, struct key_def *key_def)
+void
+vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
+		struct key_def *key_def)
 {
-	struct vy_cache *cache = (struct vy_cache *)
-		malloc(sizeof(struct vy_cache));
-	if (cache == NULL) {
-		diag_set(OutOfMemory, sizeof(*cache),
-			 "malloc", "struct vy_cache");
-		return NULL;
-	}
-
 	cache->env = env;
 	cache->key_def = key_def;
 	cache->version = 1;
 	vy_cache_tree_create(&cache->cache_tree, key_def,
 			     vy_cache_tree_page_alloc,
 			     vy_cache_tree_page_free, env);
-	return cache;
 }
 
 void
-vy_cache_delete(struct vy_cache *cache)
+vy_cache_destroy(struct vy_cache *cache)
 {
 	struct vy_cache_tree_iterator itr =
 		vy_cache_tree_iterator_first(&cache->cache_tree);
@@ -151,7 +143,6 @@ vy_cache_delete(struct vy_cache *cache)
 		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
 	}
 	vy_cache_tree_destroy(&cache->cache_tree);
-	free(cache);
 }
 
 static void

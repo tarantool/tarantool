@@ -470,7 +470,7 @@ struct vy_index {
 	/* An merge cache for current index. Contains the hotest tuples
 	 * with continuation markers.
 	 */
-	struct vy_cache *cache;
+	struct vy_cache cache;
 	/**
 	 * Conflict manager index. Contains all changes
 	 * made by transaction before they commit. Is used
@@ -3284,7 +3284,7 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 		vy_index_commit_upsert(index, mem, stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt);
 }
 
 /*
@@ -3300,7 +3300,7 @@ vy_index_rollback_stmt(struct vy_index *index, struct vy_mem *mem,
 	vy_mem_rollback_stmt(mem, stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt);
 }
 
 /**
@@ -3480,9 +3480,7 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 	/*
 	 * Invalidate cache element.
 	 */
-	struct vy_cache *cache = index->cache;
-	vy_cache_on_write(cache, stmt);
-
+	vy_cache_on_write(&index->cache, stmt);
 	return rc;
 }
 
@@ -5319,10 +5317,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 		}
 	}
 
-	index->cache = vy_cache_new(&e->cache_env, key_def);
-	if (index->cache == NULL)
-		goto fail_cache_init;
-
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	index->mem = vy_mem_new(allocator, scheduler->generation, key_def,
@@ -5333,6 +5327,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 
 	index->generation = scheduler->generation;
 	index->dump_lsn = -1;
+	vy_cache_create(&index->cache, &e->cache_env, key_def);
 	rlist_create(&index->sealed);
 	vy_range_tree_new(&index->tree);
 	rlist_create(&index->runs);
@@ -5353,8 +5348,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	return index;
 
 fail_mem:
-	vy_cache_delete(index->cache);
-fail_cache_init:
 	histogram_delete(index->run_hist);
 fail_run_hist:
 	tuple_format_ref(index->space_format_with_colmask, -1);
@@ -5570,7 +5563,7 @@ vy_index_delete(struct vy_index *index)
 		free(index->key_def);
 	free(index->user_key_def);
 	histogram_delete(index->run_hist);
-	vy_cache_delete(index->cache);
+	vy_cache_destroy(&index->cache);
 	tuple_format_ref(index->space_format, -1);
 	TRASH(index);
 	free(index);
@@ -8388,7 +8381,7 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	struct vy_iterator_stat *stat = &itr->index->env->stat->cache_stat;
 	vy_cache_iterator_open(&sub_src->cache_iterator, stat,
-			       itr->index->cache, itr->iterator_type,
+			       &itr->index->cache, itr->iterator_type,
 			       itr->key, itr->read_view);
 	if (itr->curr_stmt != NULL) {
 		/*
@@ -8692,7 +8685,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	 * Add a statement to the cache
 	 */
 	if ((**itr->read_view).vlsn == INT64_MAX) /* Do not store non-latest data */
-		vy_cache_add(itr->index->cache, *result, prev_key,
+		vy_cache_add(&itr->index->cache, *result, prev_key,
 			     itr->key, itr->iterator_type);
 
 clear:
