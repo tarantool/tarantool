@@ -222,7 +222,7 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 	lua_pushnumber(L, region_used(&f->gc));
 	lua_settable(L, -3);
 	lua_pushstring(L, "total");
-	lua_pushnumber(L, region_total(&f->gc) + f->coro.stack_size +
+	lua_pushnumber(L, region_total(&f->gc) + f->stack_size +
 		       sizeof(struct fiber));
 	lua_settable(L, -3);
 	lua_settable(L, -3);
@@ -233,7 +233,7 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 	if (f != fiber()) {
 		backtrace_foreach(fiber_backtrace_cb,
 				  f->last_stack_frame,
-				  f->coro.stack, f->coro.stack_size, L);
+				  f->stack, f->stack_size, L);
 	}
 	lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */

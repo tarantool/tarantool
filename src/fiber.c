@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
+
+#include <trivia/config.h>
+#include <trivia/util.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +41,8 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
+
+#include "third_party/valgrind/memcheck.h"
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
 
@@ -77,6 +82,14 @@ static const struct cord_on_exit cord_on_exit_sentinel = { NULL, NULL };
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
 pthread_t main_thread_id;
+
+static size_t page_size;
+static int stack_direction;
+
+enum {
+	/** The number of pages to use for fiber stack */
+	FIBER_STACK_PAGES = 16,
+};
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -121,9 +134,9 @@ fiber_call_impl(struct fiber *callee)
 	callee->flags &= ~FIBER_IS_READY;
 	callee->csw++;
 	ASAN_START_SWITCH_FIBER(asan_state, 1,
-				callee->coro.stack,
-				callee->coro.stack_size);
-	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+				callee->stack,
+				callee->stack_size);
+	coro_transfer(&caller->ctx, &callee->ctx);
 	ASAN_FINISH_SWITCH_FIBER(asan_state);
 }
 
@@ -358,9 +371,9 @@ fiber_yield(void)
 	callee->flags &= ~FIBER_IS_READY;
 	ASAN_START_SWITCH_FIBER(asan_state,
 				(caller->flags & FIBER_IS_DEAD) == 0,
-				callee->coro.stack,
-				callee->coro.stack_size);
-	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+				callee->stack,
+				callee->stack_size);
+	coro_transfer(&caller->ctx, &callee->ctx);
 	ASAN_FINISH_SWITCH_FIBER(asan_state);
 }
 
@@ -617,6 +630,80 @@ fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value);
 extern inline void *
 fiber_get_key(struct fiber *fiber, enum fiber_key key);
 
+static inline void *
+page_align_down(void *ptr)
+{
+	return (void *)((intptr_t)ptr & ~(page_size - 1));
+}
+
+static inline void *
+page_align_up(void *ptr)
+{
+	return page_align_down(ptr + page_size - 1);
+}
+
+static int
+fiber_stack_create(struct fiber *fiber, size_t stack_size)
+{
+	stack_size -= slab_sizeof();
+	fiber->stack_slab = slab_get(&cord()->slabc, stack_size);
+
+	if (fiber->stack_slab == NULL) {
+		diag_set(OutOfMemory, stack_size,
+			 "runtime arena", "fiber stack");
+		return -1;
+	}
+	void *guard;
+	/* Adjust begin and size for stack memory chunk. */
+	if (stack_direction < 0) {
+		/*
+		 * A stack grows down. First page after begin of a
+		 * stack memory chunk should be protected and memory
+		 * after protected page until end of memory chunk can be
+		 * used for coro stack usage.
+		 */
+		guard = page_align_up(slab_data(fiber->stack_slab));
+		fiber->stack = guard + page_size;
+		fiber->stack_size = slab_data(fiber->stack_slab) + stack_size -
+				    fiber->stack;
+	} else {
+		/*
+		 * A stack grows up. Last page should be protected and
+		 * memory from begin of chunk until protected page can
+		 * be used for coro stack usage
+		 */
+		guard = page_align_down(fiber->stack_slab + stack_size) -
+			page_size;
+		fiber->stack = fiber->stack_slab + slab_sizeof();
+		fiber->stack_size = guard - fiber->stack;
+	}
+
+	fiber->stack_id = VALGRIND_STACK_REGISTER(fiber->stack,
+						  (char *)fiber->stack +
+						  fiber->stack_size);
+
+	mprotect(guard, page_size, PROT_NONE);
+	return 0;
+}
+
+static void
+fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
+{
+	if (fiber->stack != NULL) {
+		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
+#if ENABLE_ASAN
+		ASAN_UNPOISON_MEMORY_REGION(fiber->stack, fiber->stack_size);
+#endif
+		void *guard;
+		if (stack_direction < 0)
+			guard = page_align_down(fiber->stack - page_size);
+		else
+			guard = page_align_up(fiber->stack + fiber->stack_size);
+		mprotect(guard, page_size, PROT_READ | PROT_WRITE);
+		slab_put(slabc, fiber->stack_slab);
+	}
+}
+
 /**
  * Create a new fiber.
  *
@@ -648,11 +735,13 @@ fiber_new(const char *name, fiber_func f)
 		}
 		memset(fiber, 0, sizeof(struct fiber));
 
-		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
-					  fiber_loop, NULL)) {
+		if (fiber_stack_create(fiber, FIBER_STACK_PAGES * page_size)) {
 			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}
+		memset(&fiber->ctx, 0, sizeof(fiber->ctx));
+		coro_create(&fiber->ctx, fiber_loop, NULL,
+			    fiber->stack, fiber->stack_size);
 
 		region_create(&fiber->gc, &cord->slabc);
 
@@ -694,19 +783,21 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
+	rlist_del(&f->link);
 	region_destroy(&f->gc);
-	tarantool_coro_destroy(&f->coro, &cord->slabc);
+	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
 }
 
 void
 fiber_destroy_all(struct cord *cord)
 {
-	struct fiber *f;
-	rlist_foreach_entry(f, &cord->alive, link)
-		fiber_destroy(cord, f);
-	rlist_foreach_entry(f, &cord->dead, link)
-		fiber_destroy(cord, f);
+	while (!rlist_empty(&cord->alive))
+		fiber_destroy(cord, rlist_first_entry(&cord->alive,
+						      struct fiber, link));
+	while (!rlist_empty(&cord->dead))
+		fiber_destroy(cord, rlist_first_entry(&cord->dead,
+						      struct fiber, link));
 }
 
 void
@@ -746,11 +837,11 @@ cord_create(struct cord *cord, const char *name)
 
 #if ENABLE_ASAN
 	/* Record stack extents */
-	tt_pthread_attr_getstack(cord->id, &cord->sched.coro.stack,
-				 &cord->sched.coro.stack_size);
+	tt_pthread_attr_getstack(cord->id, &cord->sched.stack,
+				 &cord->sched.stack_size);
 #else
-	cord->sched.coro.stack = NULL;
-	cord->sched.coro.stack_size = 0;
+	cord->sched.stack = NULL;
+	cord->sched.stack_size = 0;
 #endif
 }
 
@@ -1049,10 +1140,17 @@ cord_slab_cache(void)
 	return &cord()->slabc;
 }
 
+static NOINLINE int
+check_stack_direction(void *prev_stack_frame)
+{
+	return __builtin_frame_address(0) < prev_stack_frame ? -1: 1;
+}
+
 void
 fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
-	tarantool_coro_init();
+	page_size = sysconf(_SC_PAGESIZE);
+	stack_direction = check_stack_direction(__builtin_frame_address(0));
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
 	main_cord.loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);

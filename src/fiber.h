@@ -38,12 +38,13 @@
 #include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
 #include "diag.h"
-#include "coro.h"
 #include "trivia/util.h"
 #include "small/mempool.h"
 #include "small/region.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
+
+#include <third_party/coro/coro.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -244,7 +245,15 @@ cord_slab_cache(void);
 /** \endcond public */
 
 struct fiber {
-	struct tarantool_coro coro;
+	coro_context ctx;
+	/** Coro stack slab. */
+	struct slab *stack_slab;
+	/** Coro stack addr. */
+	void *stack;
+	/** Coro stack size. */
+	size_t stack_size;
+	/** Valgrind stack id. */
+	unsigned int stack_id;
 	/* A garbage-collected memory pool. */
 	struct region gc;
 #ifdef ENABLE_BACKTRACE

@@ -9,34 +9,40 @@ sigsegf_handler(int signo)
 	exit(0);
 }
 
-static void
-stack_break_f(void *ptr)
+static int __attribute__((noinline))
+stack_break_f(char *ptr)
 {
 	char block[2048];
-	memset(block, 0, 2048);
-	if (abs((char *)ptr - block) < 65536)
-		stack_break_f(ptr);
+	char sum = 0;
+	memset(block, 0xff, 2048);
+	sum += block[block[4]];
+	ptrdiff_t stack_diff = ptr > block ? ptr - block : block - ptr;
+	if (stack_diff < 65536)
+		sum += stack_break_f(ptr);
+	return sum;
 }
+
+static char stack_buf[SIGSTKSZ];
 
 static int
 main_f(va_list ap)
 {
-	char stack_buf[SIGSTKSZ];
 	stack_t stack;
 	stack.ss_sp = stack_buf;
 	stack.ss_size = SIGSTKSZ;
-	stack.ss_flags = SS_ONSTACK;
+	stack.ss_flags = 0;
 	sigaltstack(&stack, NULL);
 	struct sigaction sa;
 	sa.sa_handler = sigsegf_handler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_ONSTACK;
 	sigaction(SIGSEGV, &sa, NULL);
+	sigaction(SIGBUS, &sa, NULL);
 
-	stack_break_f(&stack);
+	int res = stack_break_f((char *)&stack);
 
 	ev_break(loop(), EVBREAK_ALL);
-	return 0;
+	return res;
 }
 
 int main()
