@@ -819,7 +819,7 @@ xlog_open(struct xlog *xlog, const char *name)
 	 * If the file has eof marker, reposition the file pointer so
 	 * that the next write will overwrite it.
 	 */
-	xlog->offset = fio_lseek(xlog->fd, -sizeof(magic), SEEK_END);
+	xlog->offset = fio_lseek(xlog->fd, -(off_t)sizeof(magic), SEEK_END);
 	if (xlog->offset < 0)
 		goto no_eof;
 	/* Use pread() so as not to change file pointer. */
