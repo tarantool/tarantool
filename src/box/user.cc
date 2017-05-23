@@ -234,8 +234,7 @@ access_find(struct priv_def *priv)
 static void
 user_set_effective_access(struct user *user)
 {
-	struct session *session = current_session();
-	struct credentials *cr = &session->credentials;
+	struct credentials *cr = current_user();
 	struct priv_def *priv;
 	for (priv = privset_first(&user->privs);
 	     priv;

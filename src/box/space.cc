@@ -43,8 +43,7 @@
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct session *session = current_session();
-	struct credentials *cr = &session->credentials;
+	struct credentials *cr = current_user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required

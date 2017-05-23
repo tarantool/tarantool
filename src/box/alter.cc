@@ -91,8 +91,7 @@
 void
 access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
-	struct session *session = current_session();
-	struct credentials *cr = &session->credentials;
+	struct credentials *cr = current_user();
 	/*
 	 * Only the owner of the object can be the grantor
 	 * of the privilege on the object. This means that

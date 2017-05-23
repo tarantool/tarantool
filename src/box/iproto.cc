@@ -312,6 +312,7 @@ tx_fiber_init(struct session *session, uint64_t sync)
 {
 	session->sync = sync;
 	fiber_set_session(fiber(), session);
+	fiber_set_user(fiber(), &session->credentials);
 }
 
 /**

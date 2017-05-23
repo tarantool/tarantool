@@ -473,6 +473,7 @@ recovery_follow_f(va_list ap)
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct xstream *stream = va_arg(ap, struct xstream *);
 	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
+	fiber_set_user(fiber(), &admin_credentials);
 
 	WalSubscription subscription(r->wal_dir.dirname);
 
