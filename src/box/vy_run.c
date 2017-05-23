@@ -165,34 +165,84 @@ vy_run_delete(struct vy_run *run)
 }
 
 /**
- * Search a page in a run that may contain a given key.
- * Return the index of the found page or -1 if the key is
- * less than the min key stored in the run. Additionally,
- * @equal is set if the min key of the found page is equal
- * to the given key and cleared otherwise.
+ * Find a page from which the iteration of a given key must be started.
+ * LE and LT: the found page definitely contains the position
+ *  for iteration start.
+ * GE, GT, EQ: Since page search uses only min_key of pages,
+ *  it may happen that the found page doesn't contain the position
+ *  for iteration start. In this case it is certain that the iteration
+ *  must be started from the beginning of the next page.
+ *
+ * @param run - run
+ * @param key - key to find
+ * @param key_def - key_def for comparison
+ * @param itype - iterator type (see above)
+ * @param equal_key: *equal_key is set to true if there is a page
+ *  with min_key equal to the given key.
+ * @return offset of the page in page index OR run->info.count if
+ *  there no pages fulfilling the conditions.
  */
-static int
-vy_run_search_page(struct vy_run *run, const struct tuple *key,
-		   const struct key_def *key_def, bool *equal)
+static uint32_t
+vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
+			const struct key_def *key_def,
+			enum iterator_type itype, bool *equal_key)
 {
-	int beg = 0;
-	int end = run->info.count;
-	while (beg != end) {
-		int mid = beg + (end - beg) / 2;
-		struct vy_page_info *page_info = vy_run_page_info(run, mid);
-		int cmp = key_compare(page_info->min_key,
-				tuple_data(key), key_def);
-		if (cmp == 0) {
-			*equal = true;
-			return mid;
-		}
-		if (cmp < 0)
-			beg = mid + 1;
+	if (itype == ITER_EQ)
+		itype = ITER_GE; /* One day it'll become obsolete */
+	assert(itype == ITER_GE || itype == ITER_GT ||
+	       itype == ITER_LE || itype == ITER_LT);
+	*equal_key = false;
+
+	/**
+	 * Binary search in page index. Depends on given iterator_type:
+	 *  ITER_GE: lowest page with min_key >= given key.
+	 *  ITER_GT: lowest page with min_key > given key.
+	 *  ITER_LE: highest page with min_key <= given key.
+	 *  ITER_LT: highest page with min_key < given key.
+	 *
+	 * Example: we are searching for a value 2 in the run of 10 pages:
+	 * min_key:         [1   1   2   2   2   2   2   3   3   3]
+	 * we want to find: [    LT  GE              LE  GT       ]
+	 * For LT and GE it's a classical lower_bound search.
+	 * Let's set up a range with left page's min_key < key and
+	 *  right page's min >= key; binary cut the range until it
+	 *  becomes of length 1 and then LT pos = left bound of the range
+	 *  and GE pos = right bound of the range.
+	 * For LE and GT it's a classical upper_bound search.
+	 * Let's set up a range with left page's min_key <= key and
+	 *  right page's min > key; binary cut the range until it
+	 *  becomes of length 1 and then LE pos = left bound of the range
+	 *  and GT pos = right bound of the range.
+	 */
+	bool is_lower_bound = itype == ITER_LT || itype == ITER_GE;
+
+	assert(run->info.count > 0);
+	/* Initially the range is set with virtual positions */
+	int32_t range[2] = { -1, run->info.count };
+	assert(run->info.count > 0);
+	do {
+		int32_t mid = range[0] + (range[1] - range[0]) / 2;
+		struct vy_page_info *info = vy_run_page_info(run, mid);
+		int cmp = vy_stmt_compare_with_raw_key(key, info->min_key,
+						       key_def);
+		if (is_lower_bound)
+			range[cmp <= 0] = mid;
 		else
-			end = mid;
-	}
-	*equal = false;
-	return end - 1;
+			range[cmp < 0] = mid;
+		*equal_key = *equal_key || cmp == 0;
+	} while (range[1] - range[0] > 1);
+	if (range[0] < 0)
+		range[0] = run->info.count;
+	uint32_t page = range[iterator_direction(itype) > 0];
+
+	/**
+	 * Since page search uses only min_key of pages,
+	 *  for GE, GT and EQ the previous page can contain
+	 *  the point where iteration must be started.
+	 */
+	if (page > 0 && iterator_direction(itype) > 0)
+		return page - 1;
+	return page;
 }
 
 struct vy_slice *
@@ -218,30 +268,32 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	slice->end = end;
 	rlist_create(&slice->in_range);
 	ipc_cond_create(&slice->pin_cond);
-	/*
-	 * Lookup the first and the last page of this slice
-	 * in the run and estimate the slice size.
-	 */
-	bool equal;
-	int page_no = -1;
-	if (end != NULL) {
-		page_no = vy_run_search_page(run, end, key_def, &equal);
-		/* End key doesn't belong to slice. */
-		if (equal)
-			page_no--;
-	} else if (run->info.count > 0)
-		page_no = run->info.count - 1;
-	if (page_no >= 0) {
-		slice->last_page_no = page_no;
-		page_no = (begin == NULL ? 0 :
-			   vy_run_search_page(run, begin, key_def, &equal));
-		slice->first_page_no = page_no > 0 ? page_no : 0;
-		uint64_t count = slice->last_page_no - slice->first_page_no + 1;
-		slice->keys = DIV_ROUND_UP(run->info.keys * count,
-					   run->info.count);
-		slice->size = DIV_ROUND_UP(run->info.size * count,
-					   run->info.count);
-	} /* else the slice is empty */
+	bool unused;
+	if (slice->begin == NULL) {
+		slice->first_page_no = 0;
+	} else {
+		slice->first_page_no =
+			vy_page_index_find_page(run, slice->begin, key_def,
+						ITER_GE, &unused);
+		assert(slice->last_page_no < run->info.count);
+	}
+	if (slice->end == NULL) {
+		slice->last_page_no = run->info.count ? run->info.count - 1 : 0;
+	} else {
+		slice->last_page_no =
+			vy_page_index_find_page(run, slice->end, key_def,
+						ITER_LT, &unused);
+		if (slice->last_page_no == run->info.count) {
+			/* It's an empty slice */
+			slice->last_page_no = run->info.count - 1;
+		}
+	}
+	assert(slice->last_page_no >= slice->first_page_no);
+	uint64_t count = slice->last_page_no - slice->first_page_no + 1;
+	slice->keys = DIV_ROUND_UP(run->info.keys * count,
+				   run->info.count);
+	slice->size = DIV_ROUND_UP(run->info.size * count,
+				   run->info.count);
 	return slice;
 }
 
@@ -900,41 +952,6 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 }
 
 /**
- * Binary search in page index
- * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
- * Additionally *equal_key argument is set to true if the found value is
- * equal to given key (untouched otherwise)
- * @retval page number
- */
-static uint32_t
-vy_run_iterator_search_page(struct vy_run_iterator *itr,
-			    enum iterator_type iterator_type,
-			    const struct tuple *key, bool *equal_key)
-{
-	struct vy_run *run = itr->slice->run;
-	uint32_t beg = 0;
-	uint32_t end = run->info.count;
-	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = (iterator_type == ITER_GT ||
-			iterator_type == ITER_LE ? -1 : 0);
-	while (beg != end) {
-		uint32_t mid = beg + (end - beg) / 2;
-		struct vy_page_info *page_info;
-		page_info = vy_run_page_info(run, mid);
-		int cmp;
-		cmp = -vy_stmt_compare_with_raw_key(key, page_info->min_key,
-						    itr->key_def);
-		cmp = cmp ? cmp : zero_cmp;
-		*equal_key = *equal_key || cmp == 0;
-		if (cmp < 0)
-			beg = mid + 1;
-		else
-			end = mid;
-	}
-	return end;
-}
-
-/**
  * Binary search in page
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
@@ -987,13 +1004,11 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 		       const struct tuple *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
-	pos->page_no = vy_run_iterator_search_page(itr, iterator_type, key,
-						   equal_key);
-	if (pos->page_no == 0) {
-		pos->pos_in_page = 0;
+	pos->page_no = vy_page_index_find_page(itr->slice->run, key,
+					       itr->key_def, iterator_type,
+					       equal_key);
+	if (pos->page_no == itr->slice->run->info.count)
 		return 0;
-	}
-	pos->page_no--;
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 	if (rc != 0)
