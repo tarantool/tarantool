@@ -1,8 +1,33 @@
 TAP version 13
-1..6
+1..31
 ok - message
 ok - formatting
 ok - formatting without arguments
 ok - found error string
 ok - found error place
+ok - good syserror message on errno(0)
+ok - good syserror message on errno(22)
 ok - pid()
+ok - first line is OK
+ok - second line is OK
+ok - right count of lines in backtrace
+ok - default loglevel
+ok - warn loglevel is set
+ok - warning is printed
+ok - info isn't printed
+ok - error loglevel is set
+ok - warning isn't printed
+ok - error is printed
+ok - info isn't printed
+ok - error is printed
+ok - info isn't printed
+ok - warning is here
+ok - no stacktrace for warn
+ok - error is here
+ok - first line is OK
+ok - second line is OK
+ok - right count of lines in backtrace
+ok - good syserror message on errno(22)
+ok - first line is OK
+ok - second line is OK
+ok - right count of lines in backtrace
