@@ -450,3 +450,32 @@ s:drop()
 s = box.schema.space.create('test', {engine = engine})
 s:upsert({1}, {})
 s:drop()
+
+--
+-- gh-2461 - segfault on sparse or unordered keys.
+--
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk', {parts = {1, 'unsigned', 3, 'unsigned'}})
+s:upsert({100, 100, 100}, {{'+', 2, 200}})
+s:upsert({200, 100, 200}, {{'+', 2, 300}})
+s:upsert({300, 100, 300}, {{'+', 2, 400}})
+pk:select{}
+s:drop()
+
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk', {parts = {1, 'unsigned'}})
+sec = s:create_index('sec', {parts = {4, 'unsigned', 2, 'unsigned', 3, 'unsigned'}})
+s:replace{1, 301, 300, 300}
+sec:select{}
+s:upsert({1, 301, 300, 300}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
+sec:select{}
+s:upsert({1, 302, 301, 301}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
+sec:select{}
+s:upsert({2, 203, 200, 200}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
+sec:select{}
+s:replace{3, 302, 50, 100}
+sec:select{}
+sec:get{100, 302, 50}
+sec:get{200, 203, 200}
+sec:get{302, 303, 302}
+s:drop()
