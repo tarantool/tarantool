@@ -51,5 +51,6 @@ trun:cmd("setopt delimiter ''");
 check_error("version.bad.xlog", "file format version")
 check_error("format.bad.xlog", "not support 'SNOP' file type")
 collect_results(fio.pathjoin(pattern_prefix, "crc.bad.xlog"))
+collect_results(fio.pathjoin(pattern_prefix, "eof.bad.xlog"))
 
 trun:cmd('clear filter')

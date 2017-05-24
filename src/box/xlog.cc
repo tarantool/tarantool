@@ -1686,8 +1686,7 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		return 1;
 	if (load_u32(i->rbuf.rpos) == eof_marker) {
 		/* eof marker found */
-		i->state = XLOG_CURSOR_EOF;
-		goto eof;
+		goto eof_found;
 	}
 
 	ssize_t to_load;
@@ -1699,30 +1698,29 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		if (rc < 0)
 			return -1;
 		if (rc > 0)
-			goto eof;
+			return 1;
 	}
 	if (to_load < 0)
 		return -1;
 
 	i->state = XLOG_CURSOR_TX;
 	return 0;
-eof:
-	if (i->state == XLOG_CURSOR_EOF) {
-		/*
-		 * A eof marker is read, check that there is no
-		 * more data in the file.
-		 */
-		rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
+eof_found:
+	/*
+	 * A eof marker is read, check that there is no
+	 * more data in the file.
+	 */
+	rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
 
-		if (rc < 0)
-			return -1;
-		if (rc == 0) {
-			tnt_error(XlogError, "%s: has some data after "
-				  "eof marker at %lld", i->name,
-				  xlog_cursor_pos(i));
-			return -1;
-		}
+	if (rc < 0)
+		return -1;
+	if (rc == 0) {
+		tnt_error(XlogError, "%s: has some data after "
+			  "eof marker at %lld", i->name,
+			  xlog_cursor_pos(i));
+		return -1;
 	}
+	i->state = XLOG_CURSOR_EOF;
 	return 1;
 }
 

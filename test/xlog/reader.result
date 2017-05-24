@@ -454,6 +454,24 @@ collect_results(fio.pathjoin(pattern_prefix, "crc.bad.xlog"))
     'BODY': {'space_id': 512, 'operations': [['=', 3, 4]], 'index_base': 1, 'tuple': [
         3, 4, 5, 6]}}
 ...
+collect_results(fio.pathjoin(pattern_prefix, "eof.bad.xlog"))
+---
+- - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [0, {0: 8, 7: [[0, 'unsigned']],
+          6: 513}]}}
+  - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [10, {0: 8, 9: 12}]}}
+  - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [5, {0: 8, 2: 1, 9: 12}]}}
+  - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [2, {0: 8}]}}
+  - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [8, {2: 1, 8: 2}]}}
+  - {'HEADER': {'type': 'INSERT'}, 'BODY': {'tuple': [11, {}]}}
+  - {'HEADER': {'timestamp': 1495526288.1972, 'type': 'INSERT'}, 'BODY': {'tuple': [
+        4, {0: 8, 2: 3}]}}
+  - {'HEADER': {'timestamp': 1495526288.2103, 'type': 'INSERT'}, 'BODY': {'tuple': [
+        5, {0: 8, 2: 3, 9: 24}]}}
+  - {'HEADER': {'timestamp': 1495526288.2103, 'type': 'INSERT'}, 'BODY': {'tuple': [
+        8, {2: 3, 8: 4}]}}
+  - {'HEADER': {'timestamp': 1495526288.2103, 'type': 'INSERT'}, 'BODY': {'tuple': [
+        10, {0: 8, 9: 24}]}}
+...
 trun:cmd('clear filter')
 ---
 - true
