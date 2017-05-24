@@ -4422,6 +4422,13 @@ retry:
 			return 0;
 		if (!vy_quota_is_exceeded(&scheduler->env->quota))
 			return 0;
+		if (lsregion_used(&scheduler->env->allocator) == 0) {
+			/*
+			 * Nothing to dump, quota is exceeded by
+			 * a pending transaction.
+			 */
+			return 0;
+		}
 		scheduler->generation++;
 	}
 	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
