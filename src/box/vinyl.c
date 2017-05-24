@@ -581,8 +581,11 @@ struct vy_index {
 	 * to invalidate iterators.
 	 */
 	uint32_t version;
-	/** Space to which the index belongs. */
-	struct space *space;
+	/**
+	 * Primary index of the same space or NULL if this index
+	 * is primary. Referenced by each secondary index.
+	 */
+	struct vy_index *pk;
 	/**
 	 * column_mask is the bitmask in that bit 'n' is set if
 	 * user_index_def parts contains a part with fieldno equal
@@ -2462,6 +2465,10 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});
 
+	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		usleep(inj->dparam * 1000000);
+
 	if (vy_run_write_data(run, dirpath, space_id, iid,
 			      wi, page_size, key_def, user_key_def,
 			      max_output_count, bloom_fpr) != 0)
@@ -3775,10 +3782,8 @@ delete_mems:
 	vy_write_iterator_delete(task->wi);
 
 	vy_scheduler_add_index(scheduler, index);
-	if (index->index_def->iid != 0) {
-		struct vy_index *pk = vy_index_find(index->space, 0);
-		vy_scheduler_unpin_index(scheduler, pk);
-	}
+	if (index->index_def->iid != 0)
+		vy_scheduler_unpin_index(scheduler, index->pk);
 
 	say_info("%s: dump completed", vy_index_name(index));
 	return 0;
@@ -3813,10 +3818,8 @@ vy_task_dump_abort(struct vy_task *task, bool in_shutdown)
 		vy_run_unref(task->new_run);
 
 	vy_scheduler_add_index(scheduler, index);
-	if (index->index_def->iid != 0) {
-		struct vy_index *pk = vy_index_find(index->space, 0);
-		vy_scheduler_unpin_index(scheduler, pk);
-	}
+	if (index->index_def->iid != 0)
+		vy_scheduler_unpin_index(scheduler, index->pk);
 }
 
 /**
@@ -3937,8 +3940,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 		 * indexes are being dumped, temporarily remove
 		 * it from the dump heap.
 		 */
-		struct vy_index *pk = vy_index_find(index->space, 0);
-		vy_scheduler_pin_index(scheduler, pk);
+		vy_scheduler_pin_index(scheduler, index->pk);
 	}
 
 	say_info("%s: dump started", vy_index_name(index));
@@ -4349,10 +4351,8 @@ vy_scheduler_remove_index(struct vy_scheduler *scheduler,
 static void
 vy_scheduler_pin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
-	if (index->pin_count == 0) {
-		vy_index_ref(index);
+	if (index->pin_count == 0)
 		vy_scheduler_remove_index(scheduler, index);
-	}
 	index->pin_count++;
 }
 
@@ -4361,10 +4361,8 @@ vy_scheduler_unpin_index(struct vy_scheduler *scheduler, struct vy_index *index)
 {
 	assert(index->pin_count > 0);
 	index->pin_count--;
-	if (index->pin_count == 0) {
+	if (index->pin_count == 0)
 		vy_scheduler_add_index(scheduler, index);
-		vy_index_unref(index);
-	}
 }
 
 static void
@@ -5172,7 +5170,6 @@ vy_index_drop(struct vy_index *index)
 	 */
 	index->is_dropped = true;
 	rlist_del(&index->link);
-	index->space = NULL;
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -5360,7 +5357,9 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	rlist_create(&index->runs);
 	rlist_create(&index->link);
 	read_set_new(&index->read_set);
-	index->space = space;
+	index->pk = pk;
+	if (pk != NULL)
+		vy_index_ref(pk);
 	index->user_index_def = user_index_def;
 	index->space_format = space->format;
 	tuple_format_ref(index->space_format, 1);
@@ -5446,7 +5445,7 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 	struct vy_index *pk = vy_index(new_space->index[0]);
 	struct index_def *new_user_def = space_index_def(new_space, 0);
 
-	pk->space = new_space;
+	assert(pk->pk == NULL);
 
 	/* Update the format with column mask. */
 	struct tuple_format *format =
@@ -5480,10 +5479,12 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space)
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
+		vy_index_unref(index->pk);
+		vy_index_ref(pk);
+		index->pk = pk;
 		new_user_def = space_index_def(new_space, i);
 		index->user_index_def->opts = new_user_def->opts;
 		index->index_def->opts = new_user_def->opts;
-		index->space = new_space;
 		tuple_format_ref(index->space_format_with_colmask, -1);
 		tuple_format_ref(index->space_format, -1);
 		index->space_format_with_colmask =
@@ -5555,6 +5556,9 @@ static void
 vy_index_delete(struct vy_index *index)
 {
 	struct vy_scheduler *scheduler = index->env->scheduler;
+
+	if (index->pk != NULL)
+		vy_index_unref(index->pk);
 
 	if (index->in_dump.pos != UINT32_MAX) {
 		/*
@@ -5768,6 +5772,7 @@ error:
  * Check if the index contains the key. If true, then set
  * a duplicate key error in the diagnostics area.
  * @param tx         Current transaction.
+ * @param space      Target space.
  * @param index      Index in which to search.
  * @param key        MessagePack'ed data, the array without a
  *                   header.
@@ -5777,8 +5782,8 @@ error:
  * @retval -1 Memory error or the key is found.
  */
 static inline int
-vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
-		 uint32_t part_count)
+vy_check_dup_key(struct vy_tx *tx, struct space *space,
+		 struct vy_index *idx, const char *key, uint32_t part_count)
 {
 	struct tuple *found;
 	(void) part_count;
@@ -5794,7 +5799,7 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 	if (found) {
 		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND, idx->user_index_def->name,
-			 space_name(idx->space));
+			 space_name(space));
 		return -1;
 	}
 	return 0;
@@ -5802,15 +5807,17 @@ vy_check_dup_key(struct vy_tx *tx, struct vy_index *idx, const char *key,
 
 /**
  * Insert a tuple in a primary index.
- * @param tx   Current transaction.
- * @param pk   Primary vinyl index.
- * @param stmt Tuple to insert.
+ * @param tx    Current transaction.
+ * @param space Target space.
+ * @param pk    Primary vinyl index.
+ * @param stmt  Tuple to insert.
  *
  * @retval  0 Success.
  * @retval -1 Memory error or duplicate key error.
  */
 static inline int
-vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
+vy_insert_primary(struct vy_tx *tx, struct space *space,
+		  struct vy_index *pk, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
@@ -5825,7 +5832,7 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
 	 * conflict with existing tuples.
 	 */
 	uint32_t part_count = mp_decode_array(&key);
-	if (vy_check_dup_key(tx, pk, key, part_count))
+	if (vy_check_dup_key(tx, space, pk, key, part_count))
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -5833,6 +5840,7 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
 /**
  * Insert a tuple in a secondary index.
  * @param tx        Current transaction.
+ * @param space     Target space.
  * @param index     Secondary index.
  * @param stmt      Tuple to replace.
  *
@@ -5840,8 +5848,8 @@ vy_insert_primary(struct vy_tx *tx, struct vy_index *pk, struct tuple *stmt)
  * @retval -1 Memory error or duplicate key error.
  */
 static int
-vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
-		    struct tuple *stmt)
+vy_insert_secondary(struct vy_tx *tx, struct space *space,
+		    struct vy_index *index, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
@@ -5859,7 +5867,7 @@ vy_insert_secondary(struct vy_tx *tx, struct vy_index *index,
 		if (key == NULL)
 			return -1;
 		uint32_t part_count = mp_decode_array(&key);
-		if (vy_check_dup_key(tx, index, key, part_count))
+		if (vy_check_dup_key(tx, space, index, key, part_count))
 			return -1;
 	}
 	return vy_tx_set(tx, index, stmt);
@@ -5993,7 +6001,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 			if (vy_tx_set(tx, index, delete) != 0)
 				goto error;
 		}
-		if (vy_insert_secondary(tx, index, new_stmt) != 0)
+		if (vy_insert_secondary(tx, space, index, new_stmt) != 0)
 			goto error;
 	}
 	if (delete != NULL)
@@ -6073,7 +6081,7 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	/*
 	 * Fetch the primary key from the secondary index tuple.
 	 */
-	struct index_def *to_pk = vy_index(index->space->index[0])->index_def;
+	struct index_def *to_pk = index->pk->index_def;
 	uint32_t size;
 	const char *tuple = tuple_data_range(partial, &size);
 	const char *tuple_end = tuple + size;
@@ -6084,10 +6092,7 @@ vy_index_full_by_stmt(struct vy_tx *tx, struct vy_index *index,
 	/* Fetch the tuple from the primary index. */
 	uint32_t part_count = mp_decode_array(&pkey);
 	assert(part_count == to_pk->key_def.part_count);
-	struct space *space = index->space;
-	struct vy_index *pk = vy_index_find(space, 0);
-	assert(pk != NULL);
-	return vy_index_get(tx, pk, pkey, part_count, full);
+	return vy_index_get(tx, index->pk, pkey, part_count, full);
 }
 
 /**
@@ -6373,7 +6378,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
-		if (vy_insert_secondary(tx, index, stmt->new_tuple))
+		if (vy_insert_secondary(tx, space, index, stmt->new_tuple))
 			goto error;
 	}
 	tuple_unref(delete);
@@ -6407,7 +6412,7 @@ vy_insert_first_upsert(struct vy_tx *tx, struct space *space,
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_insert_secondary(tx, index, stmt) != 0)
+		if (vy_insert_secondary(tx, space, index, stmt) != 0)
 			return -1;
 	}
 	return 0;
@@ -6580,7 +6585,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
-		if (vy_insert_secondary(tx, index, stmt->new_tuple) != 0)
+		if (vy_insert_secondary(tx, space, index, stmt->new_tuple) != 0)
 			goto error;
 	}
 	tuple_unref(delete);
@@ -6619,12 +6624,12 @@ vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 				    request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
-	if (vy_insert_primary(tx, pk, stmt->new_tuple) != 0)
+	if (vy_insert_primary(tx, space, pk, stmt->new_tuple) != 0)
 		return -1;
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index = vy_index(space->index[iid]);
-		if (vy_insert_secondary(tx, index, stmt->new_tuple) != 0)
+		if (vy_insert_secondary(tx, space, index, stmt->new_tuple) != 0)
 			return -1;
 	}
 	return 0;
@@ -6870,11 +6875,11 @@ vy_tx_prepare(struct vy_tx *tx)
 		struct vy_index *index = v->index;
 		if (index->index_def->iid == 0) {
 			/* The beginning of the new txn_stmt is met. */
-			current_space_id = index->space->def.id;
+			current_space_id = index->index_def->space_id;
 			replace = NULL;
 			delete = NULL;
 		}
-		assert(index->space->def.id == current_space_id);
+		assert(index->index_def->space_id == current_space_id);
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
