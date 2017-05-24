@@ -80,6 +80,8 @@ level_to_char(int level)
 		return 'W';
 	case S_INFO:
 		return 'I';
+	case S_VERBOSE:
+		return 'V';
 	case S_DEBUG:
 		return 'D';
 	default:
@@ -102,6 +104,8 @@ level_to_syslog_priority(int level)
 	case S_WARN:
 		return LOG_WARNING;
 	case S_INFO:
+		return LOG_INFO;
+	case S_VERBOSE:
 		return LOG_INFO;
 	case S_DEBUG:
 		return LOG_DEBUG;

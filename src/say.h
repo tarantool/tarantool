@@ -47,12 +47,13 @@ extern pid_t log_pid;
 
 /** Log levels */
 enum say_level {
-	S_FATAL,		/* do not this value use directly */
+	S_FATAL,		/* do not use this value directly */
 	S_SYSERROR,
 	S_ERROR,
 	S_CRIT,
 	S_WARN,
 	S_INFO,
+	S_VERBOSE,
 	S_DEBUG
 };
 
@@ -119,6 +120,8 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 #define say_warn(format, ...) say(S_WARN, NULL, format, ##__VA_ARGS__)
 /** \copydoc say_error() */
 #define say_info(format, ...) say(S_INFO, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error() */
+#define say_verbose(format, ...) say(S_VERBOSE, NULL, format, ##__VA_ARGS__)
 /** \copydoc say_error() */
 #define say_debug(format, ...) say(S_DEBUG, NULL, format, ##__VA_ARGS__)
 /** \copydoc say_error(). */

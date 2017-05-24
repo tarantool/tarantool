@@ -33,6 +33,7 @@ test_say(lua_State *L)
 {
 	say_debug("test debug");
 	say_info("test info");
+	say_verbose("test verbose");
 	say_warn("test warn");
 	say_crit("test crit");
 	say_error("test error");
