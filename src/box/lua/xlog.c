@@ -177,8 +177,10 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 			struct error *e = diag_last_error(diag_get());
 			if (e->type != &type_XlogError)
 				luaT_error(L);
-			if ((rc = xlog_cursor_find_tx_magic(cur)) < 1)
+			if ((rc = xlog_cursor_find_tx_magic(cur)) < 0)
 				luaT_error(L);
+			if (rc == 1)
+				break;
 		}
 		if (rc == 1)
 			break;
