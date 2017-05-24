@@ -62,7 +62,7 @@ end
 local function table_check_regex_p(t, regex)
     -- regex is definetely regex here, no additional checks
     local nmatch = string.sub(regex, 1, 1) == '~' and 1 or 0
-    local regex_tr = string.sub(regex, 2 + nmatch, string.len(regex) - 2)
+    local regex_tr = string.sub(regex, 2 + nmatch, string.len(regex) - 1)
     for _, v in pairs(t) do
         if nmatch == 1 then
             if type(v) == 'table' and not table_check_regex_p(v, regex) then
@@ -89,7 +89,10 @@ local function is_deeply_regex(got, expected)
         if got ~= got and expected ~= expected then
             return true -- nan
         end
-        return got == expected
+    end
+    if type(expected) == "number" and type(got) == "number" then
+        local min_delta = 0.0000001
+        return (got - expected < min_delta) and (expected - got < min_delta)
     end
 
     if string_regex_p(expected) then
@@ -122,6 +125,7 @@ local function is_deeply_regex(got, expected)
 
     return true
 end
+test.is_deeply_regex = is_deeply_regex
 
 local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
@@ -256,6 +260,27 @@ test.do_eqp_test = function (self, label, sql, result)
         end,
         result
     )
+end
+
+function test.drop_all_tables(self)
+    local tables = test:execsql("SELECT name FROM _space WHERE name NOT LIKE '\\_%' ESCAPE '\\';")
+    for _, table in ipairs(tables) do
+        test:execsql("DROP TABLE "..table..";")
+    end
+end
+
+function test.do_select_tests(self, label, tests)
+    for _, test_case in ipairs(tests) do
+        local tn = test_case[1]
+        local sql = test_case[2]
+        local result = test_case[3]
+        test:do_test(
+            label..'.'..tn,
+            function()
+                return test:execsql(sql)
+            end,
+            result)
+    end
 end
 
 local function db(self, cmd, ...)
