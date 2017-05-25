@@ -1,7 +1,0 @@
-TAP version 13
-1..5
-ok - gh-695: avoid overwriting tuple data necessary for smfree()
-ok - gh-1185: no crash in matras_touch
-ok - gh-1094: box.snapshot() doesn't abort if out of file descriptors
-ok - No crash for second snapshot w/o any changes
-ok - Snapshot was recreated

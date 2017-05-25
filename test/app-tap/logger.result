@@ -1,8 +1,0 @@
-TAP version 13
-1..6
-ok - message
-ok - formatting
-ok - formatting without arguments
-ok - found error string
-ok - found error place
-ok - pid()
