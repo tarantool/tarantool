@@ -68,6 +68,7 @@ add_executable(xrow.test xrow.cc unit.c
 target_link_libraries(xrow.test server misc ${MSGPUCK_LIBRARIES})
 
 add_executable(fiber.test fiber.cc unit.c)
+set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber.test core)
 
 if (NOT ENABLE_GCOV)
