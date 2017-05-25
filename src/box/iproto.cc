@@ -37,7 +37,7 @@
 #include <msgpuck.h>
 #include "third_party/base64.h"
 
-#include "main.h"
+#include "version.h"
 #include "fiber.h"
 #include "cbus.h"
 #include "say.h"

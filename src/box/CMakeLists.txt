@@ -96,5 +96,5 @@ add_library(box STATIC
     lua/xlog.c
     ${bin_sources})
 
-target_link_libraries(box ${ZSTD_LIBRARIES})
+target_link_libraries(box ${ZSTD_LIBRARIES} ${common_libraries})
 add_dependencies(box build_bundled_libs)

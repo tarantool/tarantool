@@ -30,6 +30,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -62,6 +65,20 @@ version_id_patch(uint32_t version_id)
 {
 	return version_id & 0xff;
 }
+
+/**
+ * Return Tarantool version as string
+ */
+const char *
+tarantool_version(void);
+
+/**
+ * Get version (defined in PACKAGE_VERSION), packed into uint32_t
+ * The highest byte or result means major version, next - minor,
+ * middle - patch, last - revision.
+ */
+uint32_t
+tarantool_version_id(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

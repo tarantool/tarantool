@@ -89,19 +89,6 @@ static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 extern const void *opt_def;
 
-const char *
-tarantool_version(void)
-{
-	return PACKAGE_VERSION;
-}
-
-uint32_t
-tarantool_version_id()
-{
-	return version_id(PACKAGE_VERSION_MAJOR, PACKAGE_VERSION_MINOR,
-			  PACKAGE_VERSION_PATCH);
-}
-
 static double start_time;
 
 double
