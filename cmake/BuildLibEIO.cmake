@@ -17,6 +17,7 @@ macro(libeio_build)
     )
 
     add_library(eio STATIC ${eio_src})
+    target_link_libraries(eio pthread)
 
     set_target_properties(eio PROPERTIES COMPILE_FLAGS "${eio_compile_flags}")
 

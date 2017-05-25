@@ -16,9 +16,12 @@ static struct tuple_format_vtab vy_tuple_format_vtab = {
 static struct tuple *
 vy_mem_insert_helper(struct vy_mem *mem, int key, int64_t lsn)
 {
-	const char data[9];
-	const char *data_end = mp_encode_uint(data, key);
-	struct tuple *stmt = vy_stmt_new_replace(mem->format, data, data_end);
+	char data[16];
+	char *end = data;
+	end = mp_encode_array(end, 1);
+	end = mp_encode_uint(end, key);
+	assert(end <= data + sizeof(data));
+	struct tuple *stmt = vy_stmt_new_replace(mem->format, data, end);
 	assert(stmt != NULL);
 	vy_stmt_set_lsn(stmt, lsn);
 	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
