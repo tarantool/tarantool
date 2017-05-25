@@ -5,7 +5,7 @@
 # place a drop-in file name.conf there that only changes the specific
 # settings one is interested in.
 #
-# For example, if you want to increase the maximum number of open files
+# For example, if you want to change the maximum number of open files
 # for example.lua instance, you need to perform the following steps:
 #
 # 1. Create directory /etc/systemd/system/tarantool@example.service.d/ with
@@ -44,6 +44,8 @@ User=@TARANTOOL_USER@
 Group=@TARANTOOL_USER@
 # Disable OOM killer
 OOMScoreAdjust=-1000
+# Increase fd limit for Vinyl
+LimitNOFILE=65535
 
 ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %I
 ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
