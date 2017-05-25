@@ -1,8 +1,11 @@
 option(SQL_MAINTAINER_MODE "Regenerate parser and opcodes for SQL compiler" OFF)
 
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    set(SQLITE_DEBUG 1)
-endif()  
+# SQLITE_DEBUG == 1 is needed by all tracing capabilities
+# which are heavily used in tests. To be un-commented
+# after #2455 is implemented
+# if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+# set(SQLITE_DEBUG 1)
+# endif()
 
 add_definitions(-Wno-pointer-sign -Wno-error)
 
@@ -16,6 +19,7 @@ add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
 add_definitions(-DSQLITE_OMIT_VACUUM=1)
 
 set(TEST_DEFINITIONS
+    SQLITE_DEBUG=1
     SQLITE_NO_SYNC=1
     TCLSH=1
     SQLITE_TEST=1

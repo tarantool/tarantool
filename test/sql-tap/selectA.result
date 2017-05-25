@@ -1,5 +1,5 @@
 TAP version 13
-1..197
+1..194
 ok - selectA-1.0
 ok - selectA-1.1
 ok - selectA-1.2
@@ -151,10 +151,7 @@ ok - selectA-3.57
 ok - selectA-3.58
 ok - selectA-3.60
 ok - selectA-3.61
-ok - selectA-3.62
 ok - selectA-3.63
-ok - selectA-3.67
-ok - selectA-3.68
 ok - selectA-3.69
 ok - selectA-3.72
 ok - selectA-3.73

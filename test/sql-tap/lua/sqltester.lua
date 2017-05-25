@@ -107,11 +107,21 @@ local function is_deeply_regex(got, expected)
         return got == expected
     end
 
+    local regex_seen = false
     for i, v in pairs(expected) do
         if string_regex_p(v) then
+            regex_seen = true
             return table_check_regex_p(got, v) == 1
         else
             if not is_deeply_regex(got[i], v) then
+                return false
+            end
+        end
+    end
+
+    if not regex_seen then
+        for i, v in pairs(got) do
+            if not is_deeply_regex(v, expected[i]) then
                 return false
             end
         end
@@ -141,7 +151,7 @@ local function do_test(self, label, func, expect)
                 io.write(string.format('%s: Miscompare\n', label))
                 io.write("Expected: ", yaml.encode(expect))
                 io.write("Got: ", yaml.encode(result))
-                test:fail(self, label)
+                test:fail(label)
             end
         end
     else
@@ -231,6 +241,18 @@ local function catchsql2(self, sql)
     return r
 end
 test.catchsql2 = catchsql2
+
+-- Show the VDBE program for an SQL statement but omit the Trace
+-- opcode at the beginning.  This procedure can be used to prove
+-- that different SQL statements generate exactly the same VDBE code.
+local function explain_no_trace(self, sql)
+    tr = execsql(self, "EXPLAIN "..sql)
+    for i=1,8 do
+        table.remove(tr,1)
+    end
+    return tr
+end
+test.explain_no_trace = explain_no_trace
 
 local function db(self, cmd, ...)
     if cmd == 'eval' then
