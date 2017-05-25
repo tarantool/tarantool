@@ -781,8 +781,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 {
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
-	if (fiber_attr == NULL)
-		fiber_attr = &fiber_attr_default;
+	assert(fiber_attr != NULL);
 
 	/* Now we can not reuse fiber if custom attribute was set */
 	if (!(fiber_attr->flags & FIBER_CUSTOM_STACK) &&
@@ -845,7 +844,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 struct fiber *
 fiber_new(const char *name, fiber_func f)
 {
-	return fiber_new_ex(name, NULL, f);
+	return fiber_new_ex(name, &fiber_attr_default, f);
 }
 
 /**
