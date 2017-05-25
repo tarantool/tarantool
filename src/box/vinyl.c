@@ -8521,23 +8521,41 @@ retry:
 static NODISCARD int
 vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 {
-	*ret = NULL;
 	assert(itr->curr_range != NULL);
+	*ret = NULL;
+	struct tuple *stmt = NULL;
+	int rc = 0;
+	struct vy_index *index = itr->index;
+restart:
 	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
-			       itr->key, itr->index->key_def,
-			       itr->index->space_format,
-			       itr->index->upsert_format, itr->index->id == 0);
+			       itr->key, index->key_def, index->space_format,
+			       index->upsert_format, index->id == 0);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
-	struct tuple *stmt = NULL;
-	int rc = vy_read_iterator_merge_next_key(itr, &stmt);
+	rc = vy_read_iterator_merge_next_key(itr, &stmt);
 	if (rc < 0)
 		return -1;
 	assert(rc >= 0);
 	if (!stmt && itr->merge_iterator.range_ended && itr->curr_range != NULL)
-		return vy_read_iterator_next_range(itr, ret);
+		goto restart;
+
+	if (stmt != NULL && itr->curr_range != NULL) {
+		/** Check if the statement is out of the range. */
+		int dir = iterator_direction(itr->iterator_type);
+		if (dir >= 0 && itr->curr_range->end != NULL &&
+		    vy_tuple_compare_with_key(stmt, itr->curr_range->end,
+					      index->key_def) >= 0) {
+			goto restart;
+		}
+		if (dir < 0 && itr->curr_range->begin != NULL &&
+		    vy_tuple_compare_with_key(stmt, itr->curr_range->begin,
+					      index->key_def) < 0) {
+			goto restart;
+		}
+	}
+
 	*ret = stmt;
 	return rc;
 }
