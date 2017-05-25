@@ -559,12 +559,12 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		last_stmt_lsn = vy_stmt_lsn(last_stmt);
 	*ret = NULL;
 	/*
-	 * Skip the key with lsn bigger than vlsn. It is possible,
-	 * when we restore on prepared, but not commited statement
-	 * from transaction placed in read view.
+	 * Last_stmt has lsn > iterator vlsn. It is
+	 * possible, when we restore on prepared, but not commited
+	 * statement from transaction placed in read view.
 	 */
-	bool skip_last_stmt_key = last_stmt != NULL &&
-				  last_stmt_lsn > (**itr->read_view).vlsn;
+	bool last_stmt_is_prepared = last_stmt != NULL &&
+				     last_stmt_lsn > (**itr->read_view).vlsn;
 	assert(last_stmt == NULL || itr->curr_stmt == NULL ||
 	       iterator_direction(itr->iterator_type) *
 	       vy_tuple_compare(itr->curr_stmt, last_stmt, def) > 0 ||
@@ -592,7 +592,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return 0;
 		bool position_changed = true;
 		if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0) {
-			if (skip_last_stmt_key) {
+			if (last_stmt_is_prepared) {
 				rc = vy_mem_iterator_next_key_impl(itr);
 				assert(rc >= 0);
 			} else if (vy_stmt_lsn(itr->curr_stmt) >=
@@ -661,7 +661,6 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			return -1;
 		return was_stmt != itr->curr_stmt;
 	}
-	assert(! skip_last_stmt_key);
 
 	vy_mem_iterator_check_version(itr);
 	if (itr->iterator_type == ITER_GE || itr->iterator_type == ITER_GT ||
@@ -699,7 +698,8 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
 		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) >= 0);
 		assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
-		       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn);
+		       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn ||
+		       last_stmt_is_prepared);
 		if (vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
 		return rc;
@@ -797,7 +797,8 @@ done:
 	assert(vy_stmt_lsn(itr->curr_stmt) <= (**itr->read_view).vlsn);
 	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) <= 0);
 	assert(vy_stmt_compare(itr->curr_stmt, last_stmt, def) != 0 ||
-	       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn);
+	       vy_stmt_lsn(itr->curr_stmt) < last_stmt_lsn ||
+	       last_stmt_is_prepared);
 	if (vy_mem_iterator_copy_to(itr, ret) < 0)
 		return -1;
 	return rc;

@@ -34,10 +34,12 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_VY_TASK_COMPLETE:
-    state: false
   ERRINJ_RELAY:
     state: false
+  ERRINJ_VY_TASK_COMPLETE:
+    state: false
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+    state: 0
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
   ERRINJ_WAL_IO:

@@ -158,17 +158,17 @@ struct vy_cache {
  * Allocate and initialize tuple cache.
  * @param env - pointer to common cache environment.
  * @param key_def - key definition for tuple comparison.
- * @retval - new tuple cache.
  */
-struct vy_cache *
-vy_cache_new(struct vy_cache_env *env, struct key_def *key_def);
+void
+vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
+		struct key_def *key_def);
 
 /**
  * Destroy and deallocate tuple cache.
  * @param cache - pointer to tuple cache to destroy.
  */
 void
-vy_cache_delete(struct vy_cache *cache);
+vy_cache_destroy(struct vy_cache *cache);
 
 /**
  * Add a value to the cache. Can be used only if the reader read the latest

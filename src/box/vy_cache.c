@@ -117,28 +117,20 @@ vy_cache_tree_page_free(void *ctx, void *p)
 	free(p);
 }
 
-struct vy_cache *
-vy_cache_new(struct vy_cache_env *env, struct key_def *key_def)
+void
+vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
+		struct key_def *key_def)
 {
-	struct vy_cache *cache = (struct vy_cache *)
-		malloc(sizeof(struct vy_cache));
-	if (cache == NULL) {
-		diag_set(OutOfMemory, sizeof(*cache),
-			 "malloc", "struct vy_cache");
-		return NULL;
-	}
-
 	cache->env = env;
 	cache->key_def = key_def;
 	cache->version = 1;
 	vy_cache_tree_create(&cache->cache_tree, key_def,
 			     vy_cache_tree_page_alloc,
 			     vy_cache_tree_page_free, env);
-	return cache;
 }
 
 void
-vy_cache_delete(struct vy_cache *cache)
+vy_cache_destroy(struct vy_cache *cache)
 {
 	struct vy_cache_tree_iterator itr =
 		vy_cache_tree_iterator_first(&cache->cache_tree);
@@ -151,7 +143,6 @@ vy_cache_delete(struct vy_cache *cache)
 		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
 	}
 	vy_cache_tree_destroy(&cache->cache_tree);
-	free(cache);
 }
 
 static void
@@ -315,6 +306,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	} else {
 		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
 	}
+#ifndef NDEBUG
 	/* Check that there are not statements between prev_stmt and stmt */
 	if (!vy_cache_tree_iterator_is_invalid(&itr)) {
 		struct vy_cache_entry **prev_check_entry =
@@ -322,11 +314,11 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
 		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
-		    cache->key_def) != 0) {
-			/* Failed to build chain */
-			return;
-		}
+		    cache->key_def) != 0)
+			/* Failed to build chain. */
+			unreachable();
 	}
+#endif
 
 	/* Insert/replace entry with previous statement */
 	struct vy_cache_entry *prev_entry =
@@ -734,8 +726,10 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			*ret = itr->curr_stmt;
 			return 0;
 		}
-		if (itr->version == itr->cache->version)
+		if (itr->version == itr->cache->version) {
+			*ret = itr->curr_stmt;
 			return 0;
+		}
 		while (true) {
 			if (dir > 0)
 				vy_cache_tree_iterator_prev(tree, &pos);

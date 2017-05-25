@@ -285,7 +285,7 @@ MemtxSpace::prepareDelete(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->index_def, key, part_count))
+	if (primary_key_validate(&pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 }
@@ -298,7 +298,7 @@ MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->index_def, key, part_count))
+	if (primary_key_validate(&pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 

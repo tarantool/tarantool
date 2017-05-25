@@ -226,6 +226,7 @@ tuple_format_dup(const struct tuple_format *src)
 	}
 	memcpy(format, src, total);
 	format->id = FORMAT_ID_NIL;
+	format->refs = 0;
 	if (tuple_format_register(format) != 0) {
 		free(format);
 		return NULL;

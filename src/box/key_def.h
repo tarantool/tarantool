@@ -292,6 +292,16 @@ struct key_def {
 	struct key_part parts[];
 };
 
+/**
+ * Duplicate key_def.
+ * @param src Original key_def.
+ *
+ * @retval not NULL Duplicate of src.
+ * @retval     NULL Memory error.
+ */
+struct key_def *
+key_def_dup(struct key_def *src);
+
 /** \cond public */
 
 typedef struct key_def box_key_def_t;
@@ -578,19 +588,19 @@ const struct key_part *
 key_def_find(const struct key_def *key_def, uint32_t fieldno);
 
 /**
- * Allocate a new index_def with a set union of key parts from
- * first and second key defs. Parts of the new index_def consist
- * of the first index_def's parts and those parts of the second
- * index_def that were not among the first parts.
+ * Allocate a new key_def with a set union of key parts from
+ * first and second key defs. Parts of the new key_def consist
+ * of the first key_def's parts and those parts of the second
+ * key_def that were not among the first parts.
  * @retval not NULL Ok.
  * @retval NULL     Memory error.
  */
-struct index_def *
-index_def_merge(const struct index_def *first, const struct index_def *second);
+struct key_def *
+key_def_merge(const struct key_def *first, const struct key_def *second);
 
 /*
  * Check that parts of the key match with the key definition.
- * @param index_def Key definition.
+ * @param key_def Key definition.
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
  *
@@ -598,7 +608,7 @@ index_def_merge(const struct index_def *first, const struct index_def *second);
  * @retval -1 The key is invalid.
  */
 int
-key_validate_parts(struct index_def *index_def, const char *key,
+key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
 
 /**

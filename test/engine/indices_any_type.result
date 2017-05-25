@@ -859,7 +859,7 @@ s5:drop()
 ---
 ...
 -- gh-1897 Crash on index field type 'any'
-space = box.schema.space.create('test')
+space = box.schema.space.create('test', {engine = engine})
 ---
 ...
 pk = space:create_index('primary', { parts = {1, 'any'} }) --
@@ -874,6 +874,142 @@ space:insert({1})                                          -- must fail
 space:insert({2})                                          --
 ---
 - error: 'No index #0 is defined in space ''test'''
+...
+space:drop()
+---
+...
+-- gh-1701 allow NaN
+rnd = math.random(2147483648)
+---
+...
+ffi = require('ffi')
+---
+...
+ffi.cdef(string.format("union nan_%s { double d; uint64_t i; }", rnd))
+---
+...
+nan_ffi = ffi.new(string.format('union nan_%s', rnd))
+---
+...
+nan_ffi.i = 0x7ff4000000000000
+---
+...
+sNaN = nan_ffi.d
+---
+...
+nan_ffi.i = 0x7ff8000000000000
+---
+...
+qNaN = nan_ffi.d
+---
+...
+-- basic test
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+pk = space:create_index('primary', {parts = {1, 'number'}})
+---
+...
+space:replace({sNaN, 'signaling NaN'})
+---
+- [nan, 'signaling NaN']
+...
+space:replace({qNaN, 'quiet NaN'})
+---
+- [nan, 'quiet NaN']
+...
+space:get{sNaN}
+---
+- [nan, 'signaling NaN']
+...
+space:get{qNaN}
+---
+- [nan, 'quiet NaN']
+...
+space:get{1/0}
+---
+...
+space:get{1/0 - 1/0}
+---
+- [nan, 'quiet NaN']
+...
+space:get{0/0}
+---
+- [nan, 'quiet NaN']
+...
+space:select{}
+---
+- - [nan, 'signaling NaN']
+  - [nan, 'quiet NaN']
+...
+space:truncate()
+---
+...
+-- test ordering of special values
+space:replace({1/0, '+inf'})
+---
+- [inf, '+inf']
+...
+space:replace({sNaN, 'snan'})
+---
+- [nan, 'snan']
+...
+space:replace({100})
+---
+- [100]
+...
+space:replace({-1/0, '-inf'})
+---
+- [-inf, '-inf']
+...
+space:replace({50})
+---
+- [50]
+...
+space:replace({qNaN, 'qnan'})
+---
+- [nan, 'qnan']
+...
+pk:get{100/0}
+---
+- [inf, '+inf']
+...
+pk:get{sNaN}
+---
+- [nan, 'snan']
+...
+pk:get{100}
+---
+- [100]
+...
+pk:get{-100/0}
+---
+- [-inf, '-inf']
+...
+pk:get{50}
+---
+- [50]
+...
+pk:get{qNaN}
+---
+- [nan, 'qnan']
+...
+pk:select({sNaN}, {iterator = 'GE'})
+---
+- - [nan, 'snan']
+  - [nan, 'qnan']
+  - [-inf, '-inf']
+  - [50]
+  - [100]
+  - [inf, '+inf']
+...
+pk:select({1/0}, {iterator = 'LT'})
+---
+- - [100]
+  - [50]
+  - [-inf, '-inf']
+  - [nan, 'qnan']
+  - [nan, 'snan']
 ...
 space:drop()
 ---

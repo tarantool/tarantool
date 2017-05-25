@@ -38,27 +38,19 @@
 
 const size_t INDEX_DEFAULT_CAPACITY = 32;
 
-static int
-bitset_index_reserve(struct bitset_index *index, size_t size);
-
-int
+void
 bitset_index_create(struct bitset_index *index,
 		    void *(*realloc)(void *ptr, size_t size))
 {
 	assert(index != NULL);
 	memset(index, 0, sizeof(*index));
 	index->realloc = realloc;
-	if (bitset_index_reserve(index, 1) != 0)
-		return -1;
-
-	return 0;
 }
 
 void
 bitset_index_destroy(struct bitset_index *index)
 {
 	assert(index != NULL);
-	assert(index->capacity > 0);
 
 	for (size_t b = 0; b < index->capacity; b++) {
 		if (index->bitsets[b] == NULL)
@@ -142,7 +134,6 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 {
 	assert(index != NULL);
 	assert(key != NULL);
-	assert(index->capacity > 0);
 
 	/*
 	 * Step 0: allocate enough number of bitsets

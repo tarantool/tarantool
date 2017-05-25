@@ -34,8 +34,16 @@ test_run:cmd("setopt delimiter ''");
 
 vyinfo().range_count
 
--- Delete 90% of keys.
-for k = 1,key_count do if k % 10 ~= 0 then s:delete(k) end end
+-- Delete 90% keys, remove padding for the rest.
+test_run:cmd("setopt delimiter ';'")
+for k = 1,key_count do
+    if k % 10 ~= 0 then
+        s:delete(k)
+    else
+        s:update(k, {{'#', 3, 1}})
+    end
+end
+test_run:cmd("setopt delimiter ''");
 box.snapshot()
 
 -- Trigger compaction until ranges are coalesced.

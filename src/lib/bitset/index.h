@@ -140,10 +140,8 @@ struct bitset_index {
  * @brief Construct \a index
  * @param index bitset index
  * @param realloc memory allocator to use
- * @retval 0 on success
- * @retval -1 on memory error
  */
-int
+void
 bitset_index_create(struct bitset_index *index,
 		    void *(*realloc)(void *ptr, size_t size));
 

@@ -194,16 +194,15 @@ MemtxBitset::MemtxBitset(struct index_def *index_def_arg)
 	m_spare_id = SPARE_ID_END;
 	m_id_to_tuple = (struct matras *)malloc(sizeof(*m_id_to_tuple));
 	if (!m_id_to_tuple)
-		panic_syserror("bitset_index_create");
+		panic("failed to allocate memtx bitset index");
 	matras_create(m_id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
 		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
 
 	m_tuple_to_id = mh_bitset_index_new();
 	if (!m_tuple_to_id)
-		panic_syserror("bitset_index_create");
+		panic("failed to allocate memtx bitset index");
 #endif /* #ifndef OLD_GOOD_BITSET */
-	if (bitset_index_create(&m_index, realloc) != 0)
-		panic_syserror("bitset_index_create");
+	bitset_index_create(&m_index, realloc);
 
 }
 

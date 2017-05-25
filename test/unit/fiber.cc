@@ -46,6 +46,26 @@ cancel_dead_f(va_list ap)
 	return 0;
 }
 
+static size_t fiber_stack_size_default;
+
+static void
+stack_expand(void *ptr)
+{
+	char buf[2048];
+	memset(buf, 0, 2048);
+	long int stack_diff = (long int)(buf - (char *)ptr);
+	if (abs(stack_diff) < (long int)fiber_stack_size_default)
+		stack_expand(ptr);
+}
+
+static int
+test_stack_f(va_list ap)
+{
+	char s;
+	stack_expand(&s);
+	return 0;
+}
+
 static void
 fiber_join_test()
 {
@@ -98,6 +118,22 @@ fiber_join_test()
 	fiber_yield();
 	note("by this time the fiber should be dead already");
 	fiber_cancel(fiber);
+	fiber_join(fiber);
+
+	struct fiber_attr *fiber_attr;
+	fiber_attr = fiber_attr_new();
+	fiber_stack_size_default = fiber_attr_getstacksize(fiber_attr);
+	fiber_attr_setstacksize(fiber_attr, fiber_stack_size_default * 2);
+	fiber = fiber_new_ex("test_stack", fiber_attr, test_stack_f);
+	fiber_attr_delete(fiber_attr);
+	if (fiber == NULL)
+		diag_raise();
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	/** Let the fiber schedule */
+	fiber_wakeup(fiber());
+	fiber_yield();
+	note("big-stack fiber not crashed");
 	fiber_join(fiber);
 
 	footer();

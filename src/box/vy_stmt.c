@@ -281,7 +281,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 			    const struct tuple *upsert)
 {
 	/* REPLACE mustn't have n_upserts field. */
-	assert(replace_format->extra_size != sizeof(uint8_t));
+	assert(replace_format->extra_size == 0);
 	assert(vy_stmt_type(upsert) == IPROTO_UPSERT);
 	/* Get statement size without UPSERT operations */
 	uint32_t bsize;
@@ -307,8 +307,11 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 	struct tuple *replace = vy_stmt_alloc(replace_format, bsize);
 	if (replace == NULL)
 		return NULL;
-	memcpy((char *) tuple_data(replace),
-	       (char *) tuple_data(upsert), bsize);
+	/* Copy both data and field_map. */
+	char *dst = (char *)replace + sizeof(struct vy_stmt);
+	char *src = (char *)upsert + sizeof(struct vy_stmt) +
+		    format->extra_size;
+	memcpy(dst, src, format->field_map_size + bsize);
 	vy_stmt_set_type(replace, IPROTO_REPLACE);
 	vy_stmt_set_lsn(replace, vy_stmt_lsn(upsert));
 	return replace;

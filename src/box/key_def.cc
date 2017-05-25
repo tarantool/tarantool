@@ -175,6 +175,19 @@ schema_object_name(enum schema_object_type type)
 	return object_type_strs[type];
 }
 
+struct key_def *
+key_def_dup(struct key_def *src)
+{
+	size_t sz = key_def_sizeof(src->part_count);
+	struct key_def *res = (struct key_def *)malloc(sz);
+	if (res == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "res");
+		return NULL;
+	}
+	memcpy(res, src, sz);
+	return res;
+}
+
 static void
 key_def_set_cmp(struct key_def *def)
 {
@@ -545,56 +558,57 @@ key_def_find(const struct key_def *key_def, uint32_t fieldno)
 	return NULL;
 }
 
-struct index_def *
-index_def_merge(const struct index_def *first, const struct index_def *second)
+struct key_def *
+key_def_merge(const struct key_def *first, const struct key_def *second)
 {
-	uint32_t new_part_count = first->key_def.part_count + second->key_def.part_count;
+	uint32_t new_part_count = first->part_count + second->part_count;
 	/*
 	 * Find and remove part duplicates, i.e. parts counted
 	 * twice since they are present in both key defs.
 	 */
-	const struct key_part *part = second->key_def.parts;
-	const struct key_part *end = part + second->key_def.part_count;
+	const struct key_part *part = second->parts;
+	const struct key_part *end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(&first->key_def, part->fieldno))
+		if (key_def_find(first, part->fieldno))
 			--new_part_count;
 	}
 
-	struct index_def *new_def;
-	new_def =  index_def_new(first->space_id, first->iid, first->name,
-			       first->type, &first->opts, new_part_count);
-	if (new_def == NULL)
+	struct key_def *new_def;
+	new_def =  (struct key_def *)calloc(1, key_def_sizeof(new_part_count));
+	if (new_def == NULL) {
+		diag_set(OutOfMemory, key_def_sizeof(new_part_count), "malloc",
+			 "new_def");
 		return NULL;
+	}
+	new_def->part_count = new_part_count;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
 	/* Append first key def's parts to the new index_def. */
-	part = first->key_def.parts;
-	end = part + first->key_def.part_count;
+	part = first->parts;
+	end = part + first->part_count;
 	for (; part != end; part++)
-	     key_def_set_part(&new_def->key_def, pos++,
-			      part->fieldno, part->type);
+	     key_def_set_part(new_def, pos++, part->fieldno, part->type);
 
 	/* Set-append second key def's part to the new key def. */
-	part = second->key_def.parts;
-	end = part + second->key_def.part_count;
+	part = second->parts;
+	end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(&first->key_def, part->fieldno))
+		if (key_def_find(first, part->fieldno))
 			continue;
-		key_def_set_part(&new_def->key_def, pos++,
-				 part->fieldno, part->type);
+		key_def_set_part(new_def, pos++, part->fieldno, part->type);
 	}
 	return new_def;
 }
 
 int
-key_validate_parts(struct index_def *index_def, const char *key,
+key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count)
 {
 	for (uint32_t part = 0; part < part_count; part++) {
 		enum mp_type mp_type = mp_typeof(*key);
 		mp_next(&key);
 
-		if (key_mp_type_validate(index_def->key_def.parts[part].type, mp_type,
+		if (key_mp_type_validate(key_def->parts[part].type, mp_type,
 					 ER_KEY_PART_TYPE, part))
 			return -1;
 	}

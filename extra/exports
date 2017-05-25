@@ -80,7 +80,13 @@ tnt_HMAC_CTX_free
 # Module API
 
 _say
+fiber_attr_new
+fiber_attr_delete
+fiber_attr_setstacksize
+fiber_attr_getstacksize
+fiber_self
 fiber_new
+fiber_new_ex
 fiber_yield
 fiber_start
 fiber_wakeup

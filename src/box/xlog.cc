@@ -819,7 +819,7 @@ xlog_open(struct xlog *xlog, const char *name)
 	 * If the file has eof marker, reposition the file pointer so
 	 * that the next write will overwrite it.
 	 */
-	xlog->offset = fio_lseek(xlog->fd, -sizeof(magic), SEEK_END);
+	xlog->offset = fio_lseek(xlog->fd, -(off_t)sizeof(magic), SEEK_END);
 	if (xlog->offset < 0)
 		goto no_eof;
 	/* Use pread() so as not to change file pointer. */
@@ -1086,7 +1086,10 @@ xlog_tx_write(struct xlog *log)
 	} else {
 		written = xlog_tx_write_plain(log);
 	}
-	ERROR_INJECT(ERRINJ_WAL_WRITE, written = -1;);
+	ERROR_INJECT(ERRINJ_WAL_WRITE, {
+		diag_set(ClientError, ER_INJECTION, "xlog write injection");
+		written = -1;
+	});
 
 	obuf_reset(&log->obuf);
 	/*
@@ -1686,8 +1689,7 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		return 1;
 	if (load_u32(i->rbuf.rpos) == eof_marker) {
 		/* eof marker found */
-		i->state = XLOG_CURSOR_EOF;
-		goto eof;
+		goto eof_found;
 	}
 
 	ssize_t to_load;
@@ -1699,30 +1701,29 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		if (rc < 0)
 			return -1;
 		if (rc > 0)
-			goto eof;
+			return 1;
 	}
 	if (to_load < 0)
 		return -1;
 
 	i->state = XLOG_CURSOR_TX;
 	return 0;
-eof:
-	if (i->state == XLOG_CURSOR_EOF) {
-		/*
-		 * A eof marker is read, check that there is no
-		 * more data in the file.
-		 */
-		rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
+eof_found:
+	/*
+	 * A eof marker is read, check that there is no
+	 * more data in the file.
+	 */
+	rc = xlog_cursor_ensure(i, sizeof(log_magic_t) + sizeof(char));
 
-		if (rc < 0)
-			return -1;
-		if (rc == 0) {
-			tnt_error(XlogError, "%s: has some data after "
-				  "eof marker at %lld", i->name,
-				  xlog_cursor_pos(i));
-			return -1;
-		}
+	if (rc < 0)
+		return -1;
+	if (rc == 0) {
+		tnt_error(XlogError, "%s: has some data after "
+			  "eof marker at %lld", i->name,
+			  xlog_cursor_pos(i));
+		return -1;
 	}
+	i->state = XLOG_CURSOR_EOF;
 	return 1;
 }
 

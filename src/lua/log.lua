@@ -17,6 +17,7 @@ ffi.cdef[[
         S_CRIT,
         S_WARN,
         S_INFO,
+        S_VERBOSE,
         S_DEBUG
     };
 
@@ -24,8 +25,9 @@ ffi.cdef[[
     extern int log_level;
 ]]
 
-local S_WARN  = ffi.C.S_WARN
-local S_INFO  = ffi.C.S_INFO
+local S_WARN = ffi.C.S_WARN
+local S_INFO = ffi.C.S_INFO
+local S_VERBOSE = ffi.C.S_VERBOSE
 local S_DEBUG = ffi.C.S_DEBUG
 local S_ERROR = ffi.C.S_ERROR
 
@@ -83,6 +85,7 @@ local compat_v16 = {
 return setmetatable({
     warn = say_closure(S_WARN);
     info = say_closure(S_INFO);
+    verbose = say_closure(S_VERBOSE);
     debug = say_closure(S_DEBUG);
     error = say_closure(S_ERROR);
     rotate = log_rotate;
