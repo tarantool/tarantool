@@ -5187,47 +5187,6 @@ free_index:
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 
-/**
- * Create a tuple format with column mask of an update operation.
- * @sa key_def.column_mask, vy_can_skip_update().
- * @param space_format A base tuple format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format register error.
- */
-static inline struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
-{
-	struct tuple_format *format = tuple_format_dup(space_format);
-	if (format == NULL)
-		return NULL;
-	/* + size of column mask. */
-	assert(format->extra_size == 0);
-	format->extra_size = sizeof(uint64_t);
-	return format;
-}
-
-/**
- * Create a tuple format for UPSERT tuples. UPSERTs has an additional
- * extra byte before an offsets table, that stores the count
- * of squashed upserts @sa vy_squash.
- * @param space_format A base tuple format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format register error.
- */
-static inline struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *space_format)
-{
-	struct tuple_format *format = tuple_format_dup(space_format);
-	if (format == NULL)
-		return NULL;
-	/* + size of n_upserts. */
-	assert(format->extra_size == 0);
-	format->extra_size = sizeof(uint8_t);
-	return format;
-}
-
 struct vy_index *
 vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	     struct space *space)
