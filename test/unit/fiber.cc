@@ -1,6 +1,7 @@
 #include "memory.h"
 #include "fiber.h"
 #include "unit.h"
+#include "trivia/util.h"
 
 static int
 noop_f(va_list ap)
@@ -48,13 +49,14 @@ cancel_dead_f(va_list ap)
 
 static size_t fiber_stack_size_default;
 
-static void
+static void NOINLINE
 stack_expand(void *ptr)
 {
 	char buf[2048];
-	memset(buf, 0, 2048);
-	long int stack_diff = (long int)(buf - (char *)ptr);
-	if (abs(stack_diff) < (long int)fiber_stack_size_default)
+	memset(buf, 0x45, 2048);
+	ptrdiff_t stack_diff = (buf - (char *)ptr);
+	stack_diff = stack_diff >= 0 ? stack_diff : -stack_diff;
+	if (stack_diff < (ptrdiff_t)fiber_stack_size_default)
 		stack_expand(ptr);
 }
 
