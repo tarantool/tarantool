@@ -210,9 +210,10 @@ space:drop()
 
 -- gh-1701 allow NaN
 
+rnd = math.random(2147483648)
 ffi = require('ffi')
-ffi.cdef[[ union nan_ultra_hack { double d; uint64_t i; } ]]
-nan_ffi = ffi.new('union nan_ultra_hack')
+ffi.cdef(string.format("union nan_%s { double d; uint64_t i; }", rnd))
+nan_ffi = ffi.new(string.format('union nan_%s', rnd))
 nan_ffi.i = 0x7ff4000000000000
 sNaN = nan_ffi.d
 nan_ffi.i = 0x7ff8000000000000
