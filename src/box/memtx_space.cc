@@ -386,12 +386,14 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		 * tuple ops, but ignores ops that not suitable
 		 * for the tuple.
 		 */
+		uint64_t column_mask = UINT64_MAX;
 		const char *new_data =
 			tuple_upsert_execute(region_aligned_alloc_cb,
 					     &fiber()->gc, request->ops,
 					     request->ops_end, old_data,
 					     old_data + bsize, &new_size,
-					     request->index_base, false, NULL);
+					     request->index_base, false,
+					     &column_mask);
 		if (new_data == NULL)
 			diag_raise();
 
@@ -400,8 +402,9 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		tuple_ref(stmt->new_tuple);
 
 		Index *pk = space->index[0];
-		if (tuple_compare(stmt->old_tuple, stmt->new_tuple,
-				  &pk->index_def->key_def)) {
+		if ((column_mask & pk->index_def->key_def.column_mask) != 0 &&
+		    tuple_compare(stmt->old_tuple, stmt->new_tuple,
+				  &pk->index_def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 pk->index_def->name, space_name(space));
