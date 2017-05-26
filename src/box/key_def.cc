@@ -38,8 +38,6 @@
 #include "trivia/util.h"
 #include "scoped_guard.h"
 
-#include "space.h"
-#include "schema.h"
 #include "tuple_compare.h"
 #include "tuple_hash.h"
 
@@ -214,7 +212,8 @@ box_key_def_delete(box_key_def_t *key_def)
 }
 
 struct index_def *
-index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+index_def_new(uint32_t space_id, const char *space_name,
+	      uint32_t iid, const char *name,
 	      enum index_type type, const struct index_opts *opts,
 	      uint32_t part_count)
 {
@@ -231,8 +230,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
-		struct space *space = space_cache_find(space_id);
-		diag_set(ClientError, ER_MODIFY_INDEX, name, space_name(space),
+		diag_set(ClientError, ER_MODIFY_INDEX, name, space_name,
 			 "index name is too long");
 		error_log(diag_last_error(diag_get()));
 		return NULL;
@@ -327,32 +325,30 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 }
 
 void
-index_def_check(struct index_def *index_def)
-{
-	struct space *space = space_cache_find(index_def->space_id);
+index_def_check(struct index_def *index_def, const char *space_name)
 
+{
 	if (index_def->iid >= BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  index_def->name,
-			  space_name(space),
+			  index_def->name, space_name,
 			  "index id too big");
 	}
 	if (index_def->iid == 0 && index_def->opts.is_unique == false) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  index_def->name,
-			  space_name(space),
+			  space_name,
 			  "primary key must be unique");
 	}
 	if (index_def->key_def.part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  index_def->name,
-			  space_name(space),
+			  space_name,
 			  "part count must be positive");
 	}
 	if (index_def->key_def.part_count > BOX_INDEX_PART_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  index_def->name,
-			  space_name(space),
+			  space_name,
 			  "too many key parts");
 	}
 	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
@@ -361,7 +357,7 @@ index_def_check(struct index_def *index_def)
 		if (index_def->key_def.parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
-				  space_name(space),
+				  space_name,
 				  "field no is too big");
 		}
 		for (uint32_t j = 0; j < i; j++) {
@@ -373,14 +369,11 @@ index_def_check(struct index_def *index_def)
 			    index_def->key_def.parts[j].fieldno) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  index_def->name,
-					  space_name(space),
+					  space_name,
 					  "same key part is indexed twice");
 			}
 		}
 	}
-
-	/* validate index_def->type */
-	space->handler->checkIndexDef(space, index_def);
 }
 
 void
@@ -617,14 +610,6 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 			  "space engine name is too long");
 	}
 	identifier_check(def->engine_name);
-
-	if (def->opts.temporary) {
-		Engine *engine = engine_find(def->engine_name);
-		if (! engine_can_be_temporary(engine->flags))
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  def->name,
-			         "space does not support temporary flag");
-	}
 }
 
 bool

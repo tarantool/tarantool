@@ -64,7 +64,6 @@ vinyl_engine_get_env()
 VinylEngine::VinylEngine()
 	:Engine("vinyl", &vy_tuple_format_vtab)
 {
-	flags = 0;
 	env = NULL;
 }
 
@@ -242,4 +241,13 @@ VinylEngine::updateOptions()
 {
 	if (vy_update_options(env) != 0)
 		diag_raise();
+}
+
+void
+VinylEngine::checkSpaceDef(struct space_def *def)
+{
+	if (def->opts.temporary) {
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  def->name, "engine does not support temporary flag");
+	}
 }

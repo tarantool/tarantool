@@ -131,7 +131,6 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
 			 alloc_factor);
 
-	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 }
 

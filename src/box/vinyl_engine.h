@@ -60,6 +60,7 @@ struct VinylEngine: public Engine {
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
 	void updateOptions();
+	virtual void checkSpaceDef(struct space_def *def) override;
 public:
 	struct vy_env *env;
 };

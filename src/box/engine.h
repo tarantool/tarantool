@@ -38,10 +38,6 @@ struct tuple;
 struct tuple_format_vtab;
 struct relay;
 
-enum engine_flags {
-	ENGINE_CAN_BE_TEMPORARY = 1,
-};
-
 extern struct rlist engines;
 
 typedef int
@@ -153,13 +149,18 @@ public:
 	 */
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *cb_arg);
+
+	/**
+	 * Check definition of a new space for engine-specific
+	 * limitations. E.g. not all engines support temporary
+	 * tables.
+	 */
+	virtual void checkSpaceDef(struct space_def *def);
 public:
 	/** Name of the engine. */
 	const char *name;
 	/** Engine id. */
 	uint32_t id;
-	/** Engine flags */
-	uint32_t flags;
 	/** Used for search for engine by name. */
 	struct rlist link;
 	struct tuple_format_vtab *format;
@@ -202,29 +203,30 @@ public:
 	 * Check an index definition for violation of
 	 * various limits.
 	 */
-	virtual void checkIndexDef(struct space *space, struct index_def*);
+	virtual void checkIndexDef(struct space *new_space, struct index_def *);
 	/**
 	 * Create an instance of space index. Used in alter
-	 * space.
+	 * space before commit to WAL. The created index
+	 * is deleted with delete operator.
 	 */
-	virtual Index *createIndex(struct space *space, struct index_def*) = 0;
+	virtual Index *createIndex(struct space *new_space, struct index_def *) = 0;
 	/**
-	 * Delete all tuples in the index on drop.
+	 * Delete all tuples in the index on drop index objects on
+	 * disk, if any. Invoked by alter, after writing to WAL.
 	 */
 	virtual void dropIndex(Index *) = 0;
 	/**
 	 * Called by alter when a primary key added,
 	 * after createIndex is invoked for the new
-	 * key.
+	 * key and before the write to WAL.
 	 */
-	virtual void addPrimaryKey(struct space *space);
+	virtual void addPrimaryKey(struct space *new_space);
 	/**
 	 * Called by alter when the primary key is dropped.
 	 * Do whatever is necessary with space/handler object,
-	 * e.g. disable handler replace function, if
-	 * necessary.
+	 * to not crash in DML.
 	 */
-	virtual void dropPrimaryKey(struct space *space);
+	virtual void dropPrimaryKey(struct space *new_space);
 	/**
 	 * Called with the new empty secondary index. Fill the new index
 	 * with data from the primary key of the space.
@@ -262,12 +264,6 @@ Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
-
-static inline bool
-engine_can_be_temporary(uint32_t flags)
-{
-	return flags & ENGINE_CAN_BE_TEMPORARY;
-}
 
 static inline uint32_t
 engine_id(Handler *space)

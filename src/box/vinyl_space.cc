@@ -156,7 +156,7 @@ VinylSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 	if (index_def->type != TREE) {
 		tnt_raise(ClientError, ER_INDEX_TYPE,
 		          index_def->name,
-		          space_name(space));
+			  space_name(space));
 	}
 }
 

@@ -500,9 +500,9 @@ index_def_sizeof(uint32_t part_count)
  * @retval NULL     Memory error.
  */
 struct index_def *
-index_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, const struct index_opts *opts,
-	    uint32_t part_count);
+index_def_new(uint32_t space_id, const char *space_name,
+	      uint32_t iid, const char *name, enum index_type type,
+	      const struct index_opts *opts, uint32_t part_count);
 
 /**
  * Copy one key def into another, preserving the membership
@@ -680,10 +680,11 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2);
 /**
  * Check a key definition for violation of various limits.
  *
- * @param index_def   index_def
+ * @param index_def   index definition
+ * @param old_space   space definition
  */
 void
-index_def_check(struct index_def *index_def);
+index_def_check(struct index_def *index_def, const char *space_name);
 
 /** Check space definition structure for errors. */
 void

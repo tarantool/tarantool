@@ -49,7 +49,6 @@ RLIST_HEAD(engines);
 Engine::Engine(const char *engine_name, struct tuple_format_vtab *format_arg)
 	:name(engine_name),
 	 id(-1),
-	 flags(0),
 	 link(RLIST_HEAD_INITIALIZER(link)),
 	 format(format_arg)
 {}
@@ -134,12 +133,17 @@ Engine::join(struct vclock *vclock, struct xstream *stream)
 	(void) stream;
 }
 
-Handler::Handler(Engine *f)
-	:engine(f)
+void
+Engine::checkSpaceDef(struct space_def * /* def */)
 {
 }
 
 /** {{{ DML */
+
+Handler::Handler(Engine *f)
+	:engine(f)
+{
+}
 
 void
 Handler::applyInitialJoinRow(struct space *, struct request *)
