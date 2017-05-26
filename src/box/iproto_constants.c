@@ -163,6 +163,12 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
 	NULL,               /* 0x29 */
+	NULL,               /* 0x2a */
+	NULL,               /* 0x2b */
+	NULL,               /* 0x2c */
+	NULL,               /* 0x2d */
+	NULL,               /* 0x2e */
+	NULL,               /* 0x2f */
 	"data",             /* 0x30 */
 	"error"             /* 0x31 */
 };
