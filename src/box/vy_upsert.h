@@ -59,7 +59,6 @@ struct tuple_format;
  * @param key_def        Key definition of an index.
  * @param format         Format for REPLACE/DELETE tuples.
  * @param upsert_format  Format for UPSERT tuples.
- * @param is_primary     True if the index is primary.
  * @param suppress_error True if ClientErrors must not be written to log.
  *
  * @retval NULL     Memory allocation error.
@@ -68,8 +67,7 @@ struct tuple_format;
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		const struct key_def *key_def, struct tuple_format *format,
-		struct tuple_format *upsert_format, bool is_primary,
-		bool suppress_error);
+		struct tuple_format *upsert_format, bool suppress_error);
 
 #if defined(__cplusplus)
 } /* extern "C" */

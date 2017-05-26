@@ -3319,6 +3319,11 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	assert(vy_stmt_lsn(stmt) < MAX_LSN);
+	/*
+	 * UPSERT is enabled only for the spaces with the single
+	 * index.
+	 */
+	assert(index->id == 0);
 
 	struct vy_stat *stat = index->env->stat;
 	const struct tuple *older;
@@ -3367,8 +3372,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, index->key_def,
 					index->space_format,
-					index->upsert_format, index->id == 0,
-					false);
+					index->upsert_format, false);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 
 		if (upserted == NULL) {
@@ -5604,6 +5608,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL) {
 		if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
+			assert(index->id == 0);
 			uint8_t old_type = vy_stmt_type(old->stmt);
 			assert(old_type == IPROTO_UPSERT ||
 			       old_type == IPROTO_REPLACE ||
@@ -5612,8 +5617,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 
 			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
 					       index->space_format,
-					       index->upsert_format,
-					       index->id == 0, true);
+					       index->upsert_format, true);
 			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 			if (stmt == NULL)
 				return -1;
@@ -7973,9 +7977,9 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 		if (next == NULL)
 			break;
 		struct tuple *applied;
+		assert(itr->is_primary);
 		applied = vy_apply_upsert(t, next, itr->key_def, itr->format,
-					  itr->upsert_format, itr->is_primary,
-					  suppress_error);
+					  itr->upsert_format, suppress_error);
 		if (stat != NULL)
 			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(t);
@@ -8317,10 +8321,10 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 		if (vy_stmt_type(stmt) == IPROTO_UPSERT && wi->is_last_level) {
 			/* Turn UPSERT to REPLACE. */
 			struct tuple *applied;
+			assert(wi->is_primary);
 			applied = vy_apply_upsert(stmt, NULL, wi->key_def,
 						  wi->surrogate_format,
-						  wi->upsert_format,
-						  wi->is_primary, false);
+						  wi->upsert_format, false);
 			tuple_unref(stmt);
 			if (applied == NULL)
 				return -1;
@@ -8658,11 +8662,12 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		if (vy_stmt_type(t) != IPROTO_DELETE) {
 			if (vy_stmt_type(t) == IPROTO_UPSERT) {
 				struct tuple *applied;
+				assert(index->id == 0);
 				applied = vy_apply_upsert(t, NULL,
 							  index->key_def,
 							  mi->format,
 							  mi->upsert_format,
-							  index->id == 0, true);
+							  true);
 				rmean_collect(stat->rmean,
 					      VY_STAT_UPSERT_APPLIED, 1);
 				tuple_unref(t);
@@ -9331,10 +9336,10 @@ vy_squash_process(struct vy_squash *squash)
 			tuple_unref(result);
 			return 0;
 		}
+		assert(index->id == 0);
 		struct tuple *applied =
 			vy_apply_upsert(mem_stmt, result, index->key_def,
-					mem->format, mem->upsert_format,
-					index->id == 0, true);
+					mem->format, mem->upsert_format, true);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(result);
 		if (applied == NULL)
