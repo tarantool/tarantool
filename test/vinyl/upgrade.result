@@ -1,0 +1,79 @@
+test_run = require('test_run').new()
+---
+...
+version = test_run:get_cfg('version')
+---
+...
+work_dir = 'vinyl/upgrade/' .. version
+---
+...
+test_run:cmd('create server upgrade with script="vinyl/upgrade.lua", workdir="' .. work_dir .. '"')
+---
+- true
+...
+test_run:cmd('start server upgrade')
+---
+- true
+...
+test_run:switch('upgrade')
+---
+- true
+...
+box.space.test.index.i1:select()
+---
+- - [1, 'a']
+  - [2, 'b']
+  - [3, 'c']
+...
+box.space.test.index.i2:select()
+---
+- - [1, 'a']
+  - [2, 'b']
+  - [3, 'c']
+...
+box.space.test_truncate.index.i1:select()
+---
+- - [123, 'abc']
+...
+box.space.test_truncate.index.i2:select()
+---
+- - [123, 'abc']
+...
+box.space.test_split:select()
+---
+- - [1, 5]
+  - [2, 6]
+  - [3, 7]
+  - [4, 8]
+  - [5, 9]
+  - [6, 10]
+  - [7, 11]
+  - [8, 12]
+...
+box.space.test_split:select()
+---
+- - [1, 5]
+  - [2, 6]
+  - [3, 7]
+  - [4, 8]
+  - [5, 9]
+  - [6, 10]
+  - [7, 11]
+  - [8, 12]
+...
+box.space.test_drop == nil
+---
+- true
+...
+test_run:switch('default')
+---
+- true
+...
+test_run:cmd('stop server upgrade')
+---
+- true
+...
+test_run:cmd('cleanup server upgrade')
+---
+- true
+...
