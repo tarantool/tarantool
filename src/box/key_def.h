@@ -281,6 +281,12 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
+	/**
+	 * Bitmask in that bit 'n' is set if parts contains a
+	 * part with fieldno equal to 'n'. This mask is used for
+	 * update and upsert optimizations.
+	 */
+	uint64_t column_mask;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
