@@ -4200,7 +4200,6 @@ static int do_meta_command(char *zLine, ShellState *p){
       { "function_arg",          SQLITE_LIMIT_FUNCTION_ARG              },
       { "attached",              SQLITE_LIMIT_ATTACHED                  },
       { "like_pattern_length",   SQLITE_LIMIT_LIKE_PATTERN_LENGTH       },
-      { "variable_number",       SQLITE_LIMIT_VARIABLE_NUMBER           },
       { "trigger_depth",         SQLITE_LIMIT_TRIGGER_DEPTH             },
       { "worker_threads",        SQLITE_LIMIT_WORKER_THREADS            },
     };

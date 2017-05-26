@@ -3413,10 +3413,6 @@ SQLITE_API int sqlite3_limit(sqlite3*, int id, int newVal);
 ** <dd>The maximum length of the pattern argument to the [LIKE] or
 ** [GLOB] operators.</dd>)^
 **
-** [[SQLITE_LIMIT_VARIABLE_NUMBER]]
-** ^(<dt>SQLITE_LIMIT_VARIABLE_NUMBER</dt>
-** <dd>The maximum index number of any [parameter] in an SQL statement.)^
-**
 ** [[SQLITE_LIMIT_TRIGGER_DEPTH]] ^(<dt>SQLITE_LIMIT_TRIGGER_DEPTH</dt>
 ** <dd>The maximum depth of recursion for triggers.</dd>)^
 **
@@ -3434,9 +3430,8 @@ SQLITE_API int sqlite3_limit(sqlite3*, int id, int newVal);
 #define SQLITE_LIMIT_FUNCTION_ARG              6
 #define SQLITE_LIMIT_ATTACHED                  7
 #define SQLITE_LIMIT_LIKE_PATTERN_LENGTH       8
-#define SQLITE_LIMIT_VARIABLE_NUMBER           9
-#define SQLITE_LIMIT_TRIGGER_DEPTH            10
-#define SQLITE_LIMIT_WORKER_THREADS           11
+#define SQLITE_LIMIT_TRIGGER_DEPTH             9
+#define SQLITE_LIMIT_WORKER_THREADS           10
 
 /*
 ** CAPI3REF: Compiling An SQL Statement
@@ -3728,8 +3723,8 @@ typedef struct sqlite3_context sqlite3_context;
 ** ^The index for named parameters can be looked up using the
 ** [sqlite3_bind_parameter_index()] API if desired.  ^The index
 ** for "?NNN" parameters is the value of NNN.
-** ^The NNN value must be between 1 and the [sqlite3_limit()]
-** parameter [SQLITE_LIMIT_VARIABLE_NUMBER] (default value: 999).
+** ^The NNN value must be between 1 and the
+** SQL_VARIABLE_NUMBER_MAX.
 **
 ** ^The third argument is the value to bind to the parameter.
 ** ^If the third parameter to sqlite3_bind_text() or sqlite3_bind_text16()
@@ -3881,6 +3876,20 @@ SQLITE_API const char *sqlite3_bind_parameter_name(sqlite3_stmt*, int);
 ** [sqlite3_bind_parameter_name()].
 */
 SQLITE_API int sqlite3_bind_parameter_index(sqlite3_stmt*, const char *zName);
+
+/**
+ * Get number of the named parameter in the prepared sql
+ * statement.
+ * @param pStmt Prepared statement.
+ * @param zName Parameter name.
+ * @param nName Parameter name length.
+ *
+ * @retval > 0 Number of the parameter.
+ * @retval   0 Parameter is not found.
+ */
+int
+sqlite3_bind_parameter_lindex(sqlite3_stmt *pStmt, const char *zName,
+			      int nName);
 
 /*
 ** CAPI3REF: Reset All Bindings On A Prepared Statement
@@ -4147,16 +4156,15 @@ SQLITE_API int sqlite3_data_count(sqlite3_stmt *pStmt);
 ** SQLite version 2 and SQLite version 3 should use SQLITE3_TEXT, not
 ** SQLITE_TEXT.
 */
-#define SQLITE_INTEGER  1
-#define SQLITE_FLOAT    2
-#define SQLITE_BLOB     4
-#define SQLITE_NULL     5
-#ifdef SQLITE_TEXT
-# undef SQLITE_TEXT
-#else
-# define SQLITE_TEXT     3
-#endif
-#define SQLITE3_TEXT     3
+enum sql_type {
+	SQLITE_INTEGER = 1,
+	SQLITE_FLOAT = 2,
+	SQLITE_TEXT = 3,
+	SQLITE_BLOB = 4,
+	SQLITE_NULL = 5,
+};
+/** SQLite type name by code. */
+extern const char *sql_type_strs[];
 
 /*
 ** CAPI3REF: Result Values From A Query

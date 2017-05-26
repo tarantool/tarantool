@@ -554,6 +554,33 @@ handle_error:
 	return 2;
 }
 
+static int
+netbox_encode_execute(lua_State *L)
+{
+	if (lua_gettop(L) < 6)
+		return luaL_error(L, "Usage: netbox.encode_execute(ibuf, "\
+				  "sync, schema_version, query, parameters, "\
+				  "options)");
+	struct mpstream stream;
+	size_t svp = netbox_prepare_request(L, &stream, IPROTO_EXECUTE);
+
+	luamp_encode_map(cfg, &stream, 3);
+
+	size_t len;
+	const char *query = lua_tolstring(L, 4, &len);
+	luamp_encode_uint(cfg, &stream, IPROTO_SQL_TEXT);
+	luamp_encode_str(cfg, &stream, query, len);
+
+	luamp_encode_uint(cfg, &stream, IPROTO_SQL_BIND);
+	luamp_encode_tuple(L, cfg, &stream, 5);
+
+	luamp_encode_uint(cfg, &stream, IPROTO_SQL_OPTIONS);
+	luamp_encode_tuple(L, cfg, &stream, 6);
+
+	netbox_encode_request(&stream, svp);
+	return 0;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -568,6 +595,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_delete",  netbox_encode_delete },
 		{ "encode_update",  netbox_encode_update },
 		{ "encode_upsert",  netbox_encode_upsert },
+		{ "encode_execute", netbox_encode_execute},
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },

@@ -30,7 +30,6 @@
  */
 #include "iproto.h"
 #include <string.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -57,6 +56,7 @@
 #include "replication.h" /* instance_uuid */
 #include "iproto_constants.h"
 #include "rmean.h"
+#include "execute.h"
 
 /* The number of iproto messages in flight */
 enum { IPROTO_MSG_MAX = 768 };
@@ -75,8 +75,12 @@ struct iproto_msg: public cmsg
 	/* --- Box msgs - actual requests for the transaction processor --- */
 	/* Request message code and sync. */
 	struct xrow_header header;
-	/* Box request, if this is a DML */
-	struct request request;
+	union {
+		/* Box request, if this is a DML */
+		struct request request;
+		/* SQL request, if this is the EXECUTE request. */
+		struct sql_request sql_request;
+	};
 	/*
 	 * Remember the active iobuf of the connection,
 	 * in which the request is stored. The response
@@ -299,6 +303,8 @@ tx_process1(struct cmsg *msg);
 static void
 tx_process_select(struct cmsg *msg);
 static void
+tx_process_sql(struct cmsg *m);
+static void
 net_send_msg(struct cmsg *msg);
 
 static void
@@ -382,6 +388,11 @@ static const struct cmsg_hop process1_route[] = {
 	{ net_send_msg, NULL },
 };
 
+static const struct cmsg_hop sql_route[] = {
+	{ tx_process_sql, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
 static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	NULL,                                   /* IPROTO_OK */
 	select_route,                           /* IPROTO_SELECT */
@@ -393,7 +404,8 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	misc_route,                             /* IPROTO_AUTH */
 	misc_route,                             /* IPROTO_EVAL */
 	process1_route,                         /* IPROTO_UPSERT */
-	misc_route                              /* IPROTO_CALL */
+	misc_route,                             /* IPROTO_CALL */
+	sql_route,                              /* IPROTO_EXECUTE */
 };
 
 static const struct cmsg_hop sync_route[] = {
@@ -567,8 +579,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
-	request_create(&msg->request, msg->header.type);
-	msg->request.header = &msg->header;
+	const char *body;
 
 	switch (msg->header.type) {
 	case IPROTO_SELECT:
@@ -581,6 +592,8 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_AUTH:
 	case IPROTO_EVAL:
 	case IPROTO_UPSERT:
+		request_create(&msg->request, msg->header.type);
+		msg->request.header = &msg->header;
 		/*
 		 * This is a common request which can be parsed with
 		 * request_decode(). Parse it before putting it into
@@ -592,8 +605,8 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "missing request body");
 		}
-		request_decode_xc(&msg->request,
-				 (const char *) msg->header.body[0].iov_base,
+		body = (const char *) msg->header.body[0].iov_base;
+		request_decode_xc(&msg->request, body,
 				 msg->header.body[0].iov_len,
 				 request_key_map(msg->header.type));
 		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
@@ -606,6 +619,17 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_SUBSCRIBE:
 		cmsg_init(msg, sync_route);
 		*stop_input = true;
+		break;
+	case IPROTO_EXECUTE:
+		if (msg->header.bodycnt == 0)
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "missing request body");
+		body = (const char *) msg->header.body[0].iov_base;
+		if (sql_request_decode(&msg->sql_request, body,
+				       msg->header.body[0].iov_len,
+				       &fiber()->gc, msg->header.sync) != 0)
+			diag_raise();
+		cmsg_init(msg, sql_route);
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -991,6 +1015,28 @@ tx_process_misc(struct cmsg *m)
 error:
 	iproto_reply_error(out, diag_last_error(&fiber()->diag),
 			   msg->header.sync, ::schema_version);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_sql(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct obuf *out = &msg->iobuf->out;
+	uint64_t sync = msg->header.sync;
+
+	tx_fiber_init(msg->connection->session, sync);
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+	assert(msg->header.type == IPROTO_EXECUTE);
+	if (sql_prepare_and_execute(&msg->sql_request, out) == 0) {
+		msg->write_end = obuf_create_svp(out);
+		return;
+	}
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag), sync,
+			   ::schema_version);
 	msg->write_end = obuf_create_svp(out);
 }
 

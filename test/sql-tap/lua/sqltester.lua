@@ -1,7 +1,7 @@
 local tap = require('tap')
 local json = require('json')
-local sql_tokenizer = require('sql_tokenizer')
 local test = tap.test("errno")
+local sql_tokenizer = require('sql_tokenizer')
 
 local function flatten(arr)
     local result = { }
@@ -341,6 +341,7 @@ os.execute("rm -f *.snap *.xlog*")
 
 -- start the database
 box.cfg{
-    memtx_max_tuple_size=4996109,
+    memtx_max_tuple_size=4996109;
+    log="tarantool.log";
 }
 return test

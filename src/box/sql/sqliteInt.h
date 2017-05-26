@@ -2181,21 +2181,7 @@ struct AggInfo {
   int nFunc;              /* Number of entries in aFunc[] */
 };
 
-/*
-** The datatype ynVar is a signed integer, either 16-bit or 32-bit.
-** Usually it is 16-bits.  But if SQLITE_MAX_VARIABLE_NUMBER is greater
-** than 32767 we have to make it 32-bit.  16-bit is preferred because
-** it uses less memory in the Expr object, which is a big memory user
-** in systems with lots of prepared statements.  And few applications
-** need more than about 10 or 20 variables.  But some extreme users want
-** to have prepared statements with over 32767 variables, and for them
-** the option is available (at compile-time).
-*/
-#if SQLITE_MAX_VARIABLE_NUMBER<=32767
-typedef i16 ynVar;
-#else
 typedef int ynVar;
-#endif
 
 /*
 ** Each node of an expression in the parse tree is an instance

@@ -971,11 +971,11 @@ void sqlite3ExprAssignVarNumber(Parse *pParse, Expr *pExpr, u32 n){
       x = (ynVar)i;
       testcase( i==0 );
       testcase( i==1 );
-      testcase( i==db->aLimit[SQLITE_LIMIT_VARIABLE_NUMBER]-1 );
-      testcase( i==db->aLimit[SQLITE_LIMIT_VARIABLE_NUMBER] );
-      if( bOk==0 || i<1 || i>db->aLimit[SQLITE_LIMIT_VARIABLE_NUMBER] ){
+      testcase( i==SQL_VARIABLE_NUMBER_MAX-1 );
+      testcase( i==SQL_VARIABLE_NUMBER_MAX );
+      if( bOk==0 || i<1 || i>SQL_VARIABLE_NUMBER_MAX ){
         sqlite3ErrorMsg(pParse, "variable number must be between ?1 and ?%d",
-            db->aLimit[SQLITE_LIMIT_VARIABLE_NUMBER]);
+            SQL_VARIABLE_NUMBER_MAX);
         return;
       }
       if( x>pParse->nVar ){
@@ -1000,7 +1000,7 @@ void sqlite3ExprAssignVarNumber(Parse *pParse, Expr *pExpr, u32 n){
     }
   }
   pExpr->iColumn = x;
-  if( x>db->aLimit[SQLITE_LIMIT_VARIABLE_NUMBER] ){
+  if( x>SQL_VARIABLE_NUMBER_MAX ){
     sqlite3ErrorMsg(pParse, "too many SQL variables");
   }
 }

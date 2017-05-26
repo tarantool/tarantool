@@ -36,6 +36,8 @@ local IPROTO_STATUS_KEY    = 0x00
 local IPROTO_ERRNO_MASK    = 0x7FFF
 local IPROTO_SYNC_KEY      = 0x01
 local IPROTO_SCHEMA_VERSION_KEY = 0x05
+local IPROTO_DESCRIPTION_KEY = 0x32
+local IPROTO_FIELD_NAME_KEY = 0x29
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
 local IPROTO_GREETING_SIZE = 128
@@ -60,6 +62,7 @@ local method_codec           = {
     update  = internal.encode_update,
     upsert  = internal.encode_upsert,
     select  = internal.encode_select,
+    execute = internal.encode_execute,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, schema_version, bytes)
         local ptr = buf:reserve(#bytes)
@@ -232,7 +235,9 @@ local function create_transport(host, port, user, password, callback)
         local id = next_request_id
         method_codec[method](send_buf, id, schema_version, ...)
         next_request_id = next_id(id)
-        local request = table_new(0, 6) -- reserve space for 6 keys
+        -- reserve space for 7 keys: client, method,
+        -- schema_version, buffer, errno, response, description.
+        local request = table_new(0, 7)
         request.client = fiber_self()
         request.method = method
         request.schema_version = schema_version
@@ -245,7 +250,7 @@ local function create_transport(host, port, user, password, callback)
                 return E_TIMEOUT, 'Timeout exceeded'
             end
         until requests[id] == nil -- i.e. completed (beware spurious wakeups)
-        return request.errno, request.response
+        return request.errno, request.response, request.description
     end
 
     local function wakeup_client(client)
@@ -289,6 +294,7 @@ local function create_transport(host, port, user, password, callback)
         body_end_check, body = ibuf_decode(body_rpos)
         assert(body_end == body_end_check, "invalid xrow length")
         request.response = body[IPROTO_DATA_KEY]
+        request.description = body[IPROTO_DESCRIPTION_KEY]
         wakeup_client(request.client)
     end
 
@@ -688,6 +694,18 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
+function remote_methods:request_timeout(request_opts)
+    local timeout = request_opts and request_opts.timeout
+    if timeout == nil then
+        -- conn:timeout(timeout):ping()
+        -- @deprecated since 1.7.4
+        local deadline = self._deadlines[fiber_self()]
+        timeout = deadline and max(0, deadline - fiber_time())
+                            or (request_opts and request_opts.timeout)
+    end
+    return timeout
+end
+
 function remote_methods:_request(method, opts, ...)
     local this_fiber = fiber_self()
     local transport = self._transport
@@ -703,15 +721,15 @@ function remote_methods:_request(method, opts, ...)
         deadline = self._deadlines[this_fiber]
     end
     local buffer = opts and opts.buffer
-    local err, res
+    local err, res, description
     repeat
         local timeout = deadline and max(0, deadline - fiber_time())
         if self.state ~= 'active' then
             wait_state('active', timeout)
             timeout = deadline and max(0, deadline - fiber_time())
         end
-        err, res = perform_request(timeout, buffer, method,
-                                   self.schema_version, ...)
+        err, res, description = perform_request(timeout, buffer, method,
+                                                self.schema_version, ...)
         if not err and buffer ~= nil then
             return res -- the length of xrow.body
         elseif not err then
@@ -723,7 +741,11 @@ function remote_methods:_request(method, opts, ...)
                     res[i] = tnew(v)
                 end
             end
-            return res -- decoded xrow.body[DATA]
+            if method ~= 'execute' then
+                return res
+            else
+                return res, description
+            end
         elseif err == E_WRONG_SCHEMA_VERSION then
             err = nil
         end
@@ -733,14 +755,7 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    local timeout = opts and opts.timeout
-    if timeout == nil then
-        -- conn:timeout(timeout):ping()
-        -- @deprecated since 1.7.4
-        local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_time())
-                            or (opts and opts.timeout)
-    end
+    local timeout = self:request_timeout(opts)
     local err = self._transport.perform_request(timeout, nil, 'ping',
                                                 self.schema_version)
     return not err or err == E_WRONG_SCHEMA_VERSION
@@ -784,6 +799,37 @@ function remote_methods:eval(code, args, opts)
         return res
     end
     return unpack(res)
+end
+
+function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
+    check_remote_arg(self, "execute")
+    if sql_opts ~= nil then
+        box.error(box.error.UNSUPPORTED, "execute", "options")
+    end
+    local timeout = self:request_timeout(netbox_opts)
+    local buffer = netbox_opts and netbox_opts.buffer
+    parameters = parameters or {}
+    sql_opts = sql_opts or {}
+    local err, res, description = self._transport.perform_request(timeout,
+                                    buffer, 'execute', self.schema_version,
+                                    query, parameters, sql_opts)
+    if err then
+        box.error({code = err, reason = res})
+    end
+    if buffer ~= nil then
+        return res -- body length. Body is written to the buffer.
+    end
+    assert(description == nil or type(description) == 'table')
+    if description == nil or #description == 0 then
+        return true -- Query with boolean result, no rows.
+    end
+    -- Set readable names for the description fields.
+    for i, field_meta in pairs(description) do
+        field_meta["name"] = field_meta[IPROTO_FIELD_NAME_KEY]
+        field_meta[IPROTO_FIELD_NAME_KEY] = nil
+    end
+    setmetatable(res, sequence_mt)
+    return description, res
 end
 
 function remote_methods:wait_state(state, timeout)

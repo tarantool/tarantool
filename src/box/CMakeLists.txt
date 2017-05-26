@@ -84,6 +84,7 @@ add_library(box STATIC
     journal.c
     wal.cc
     sql.c
+    execute.c
     ${lua_sources}
     lua/init.c
     lua/call.c

@@ -44,6 +44,9 @@
 #include "scramble.h"
 #include "iproto_constants.h"
 
+static_assert(IPROTO_DATA < 0x7f && IPROTO_DESCRIPTION < 0x7f,
+	      "encoded IPROTO_BODY keys must fit into one byte");
+
 /**
  * Globally unique identifier of this instance.
  */
@@ -238,6 +241,9 @@ struct PACKED iproto_body_bin {
 	uint32_t v_data_len;               /* string length of array size */
 };
 
+static_assert(sizeof(struct iproto_body_bin) + IPROTO_HEADER_LEN ==
+	      PREPARE_SELECT_SIZE, "size of the prepared select");
+
 static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0
 };
@@ -317,25 +323,41 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
 	(void) fcntl(fd, F_SETFL, flags);
 }
 
-enum { SVP_SIZE = IPROTO_HEADER_LEN  + sizeof(iproto_body_bin) };
-
 int
-iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
+iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 {
 	/**
 	 * Reserve memory before taking a savepoint.
 	 * This ensures that we get a contiguous chunk of memory
 	 * and the savepoint is pointing at the beginning of it.
 	 */
-	void *ptr = obuf_reserve(buf, SVP_SIZE);
+	void *ptr = obuf_reserve(buf, size);
 	if (ptr == NULL) {
-		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
+		diag_set(OutOfMemory, size, "obuf_reserve", "ptr");
 		return -1;
 	}
 	*svp = obuf_create_svp(buf);
-	ptr = obuf_alloc(buf, SVP_SIZE);
+	ptr = obuf_alloc(buf, size);
 	assert(ptr !=  NULL);
 	return 0;
+}
+
+struct PACKED iproto_body_key_bin {
+	uint8_t key;       /* IPROTO_DATA/DESCRIPTION */
+	uint8_t value_len;
+	uint32_t value;
+};
+
+void
+iproto_reply_body_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
+		      uint8_t key)
+{
+	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
+	struct iproto_body_key_bin bin;
+	bin.key = key;
+	bin.value_len = 0xdd;
+	bin.value = mp_bswap_u32(size);
+	memcpy(pos, &bin, sizeof(bin));
 }
 
 void
@@ -351,6 +373,17 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	body.v_data_len = mp_bswap_u32(count);
 
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
+}
+
+void
+iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		 uint32_t schema_version)
+{
+	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
+	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
+			     obuf_size(buf) - svp->used - IPROTO_HEADER_LEN);
+	/* mp_encode_map(2). */
+	*(pos + IPROTO_HEADER_LEN) = 0x82;
 }
 
 void

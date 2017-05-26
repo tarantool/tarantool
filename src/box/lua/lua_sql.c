@@ -66,7 +66,7 @@ static void lua_sql_call(sqlite3_context *pCtx,
 			lua_pushnumber(L, sqlite3_value_double(param));
 			break;
 		}
-		case SQLITE3_TEXT: {
+		case SQLITE_TEXT: {
 			lua_pushstring(L,
 			               (const char *) sqlite3_value_text(param));
 			break;

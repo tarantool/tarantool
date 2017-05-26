@@ -13,6 +13,13 @@
 ** This file defines various limits of what SQLite can process.
 */
 
+enum {
+	/*
+	** The maximum value of a ?nnn wildcard that the parser will accept.
+	*/
+	SQL_VARIABLE_NUMBER_MAX = 65000,
+};
+
 /*
 ** The maximum length of a TEXT or BLOB in bytes.   This also
 ** limits the size of a row in a table or index.
@@ -130,14 +137,6 @@
 */
 #ifndef SQLITE_MAX_ATTACHED
 # define SQLITE_MAX_ATTACHED 10
-#endif
-
-
-/*
-** The maximum value of a ?nnn wildcard that the parser will accept.
-*/
-#ifndef SQLITE_MAX_VARIABLE_NUMBER
-# define SQLITE_MAX_VARIABLE_NUMBER 999
 #endif
 
 /* Maximum page size.  The upper bound on this value is 65536.  This a limit

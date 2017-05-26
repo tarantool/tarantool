@@ -1471,6 +1471,11 @@ int sqlite3VdbeParameterIndex(Vdbe *p, const char *zName, int nName){
 int sqlite3_bind_parameter_index(sqlite3_stmt *pStmt, const char *zName){
   return sqlite3VdbeParameterIndex((Vdbe*)pStmt, zName, sqlite3Strlen30(zName));
 }
+int
+sqlite3_bind_parameter_lindex(sqlite3_stmt *pStmt, const char *zName, int nName)
+{
+  return sqlite3VdbeParameterIndex((Vdbe *) pStmt, zName, nName);
+}
 
 /*
 ** Transfer all bindings from the first statement over to the second.
