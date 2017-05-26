@@ -582,12 +582,12 @@ int
 MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
-	struct vclock last_vclock;
 	/*
 	 * If a snapshot already exists, do not create a new one.
 	 */
-	m_checkpoint->touch = (gc_last_checkpoint(&last_vclock) >= 0) &&
-			      (vclock_compare(&last_vclock, vclock) == 0);
+	struct checkpoint_info *checkpoint = gc_last_checkpoint();
+	m_checkpoint->touch = checkpoint != NULL &&
+		vclock_compare(&checkpoint->vclock, vclock) == 0;
 	vclock_copy(&m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",

@@ -66,6 +66,23 @@ checkpoint_iterator_next(struct checkpoint_iterator *it)
 		container_of(it->curr, struct checkpoint_info, vclock));
 }
 
+void
+checkpoint_ref(struct checkpoint_info *cpt)
+{
+	assert(cpt->refs >= 0);
+	cpt->refs++;
+}
+
+void
+checkpoint_unref(struct checkpoint_info *cpt)
+{
+	assert(cpt->refs > 0);
+	cpt->refs--;
+	/* Retry gc when a checkpoint is unpinned. */
+	if (cpt->refs == 0)
+		gc_run(gc.signature);
+}
+
 int
 gc_init(const char *snap_dirname)
 {
@@ -106,8 +123,8 @@ gc_free(void)
 int
 gc_add_checkpoint(const struct vclock *vclock)
 {
-	struct vclock *prev = vclockset_last(&gc.checkpoints);
-	if (prev != NULL && vclock_compare(vclock, prev) == 0)
+	struct checkpoint_info *last = gc_last_checkpoint();
+	if (last != NULL && vclock_compare(vclock, &last->vclock) == 0)
 		return 0;
 
 	struct checkpoint_info *cpt;
@@ -126,51 +143,27 @@ gc_add_checkpoint(const struct vclock *vclock)
 	vclock_copy(&cpt->vclock, vclock);
 	vclockset_insert(&gc.checkpoints, &cpt->vclock);
 
-	if (prev != NULL) {
-		assert(vclock_compare(vclock, prev) > 0);
-		gc_unref_checkpoint(prev);
+	if (last != NULL) {
+		assert(vclock_compare(vclock, &last->vclock) > 0);
+		checkpoint_unref(last);
 	}
 	return 0;
 }
 
-int64_t
-gc_last_checkpoint(struct vclock *vclock)
+struct checkpoint_info *
+gc_last_checkpoint(void)
 {
 	struct vclock *last = vclockset_last(&gc.checkpoints);
-	if (last == NULL)
-		return -1;
-	vclock_copy(vclock, last);
-	return vclock_sum(last);
+	return (last == NULL ? NULL :
+		container_of(last, struct checkpoint_info, vclock));
 }
 
-int64_t
-gc_ref_last_checkpoint(struct vclock *vclock)
+struct checkpoint_info *
+gc_lookup_checkpoint(struct vclock *vclock)
 {
-	struct vclock *last = vclockset_last(&gc.checkpoints);
-	if (last == NULL)
-		return -1;
-	struct checkpoint_info *cpt = container_of(last,
-			struct checkpoint_info, vclock);
-	/* The last checkpoint is always pinned. */
-	assert(cpt->refs > 0);
-	cpt->refs++;
-	vclock_copy(vclock, last);
-	return vclock_sum(last);
-}
-
-void
-gc_unref_checkpoint(struct vclock *vclock)
-{
-	struct vclock *cpt_vclock = vclockset_search(&gc.checkpoints, vclock);
-	assert(cpt_vclock != NULL);
-	struct checkpoint_info *cpt = container_of(cpt_vclock,
-			struct checkpoint_info, vclock);
-	assert(cpt->refs > 0);
-	cpt->refs--;
-	/* Retry gc when a checkpoint is unpinned. */
-	if (cpt->refs == 0)
-		gc_run(gc.signature);
-
+	struct vclock *found = vclockset_psearch(&gc.checkpoints, vclock);
+	return (found == NULL ? NULL :
+		container_of(found, struct checkpoint_info, vclock));
 }
 
 void
