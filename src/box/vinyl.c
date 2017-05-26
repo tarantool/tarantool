@@ -6177,6 +6177,7 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *                   be not the primary index.
  * @param old_tuple  The tuple before update.
  * @param new_tuple  The tuple after update.
+ * @param column_mask Bitmask of the update operation.
  *
  * @retval  0 Success, the primary key is not modified in the new
  *            tuple.
@@ -6184,9 +6185,11 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  */
 static inline int
 vy_check_update(struct space *space, const struct vy_index *pk,
-		const struct tuple *old_tuple, const struct tuple *new_tuple)
+		const struct tuple *old_tuple, const struct tuple *new_tuple,
+		uint64_t column_mask)
 {
-	if (vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
+	if ((pk->key_def->column_mask & column_mask) != 0 &&
+	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->id), space_name(space));
 		return -1;
@@ -6294,7 +6297,8 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
 	}
-	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple))
+	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
+			    column_mask) != 0)
 		return -1;
 
 	/*
@@ -6497,7 +6501,8 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
 	}
-	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple)) {
+	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
+			    column_mask) != 0) {
 		error_log(diag_last_error(diag_get()));
 		/*
 		 * Upsert is skipped, to match the semantics of
