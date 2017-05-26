@@ -52,11 +52,13 @@ enum {
 enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
+
 	/* Replication keys (header) */
 	IPROTO_REPLICA_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	IPROTO_SCHEMA_VERSION = 0x05,
+
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
@@ -64,20 +66,45 @@ enum iproto_key {
 	IPROTO_OFFSET = 0x13,
 	IPROTO_ITERATOR = 0x14,
 	IPROTO_INDEX_BASE = 0x15,
+
 	/* Leave a gap between integer values and other keys */
 	IPROTO_KEY = 0x20,
 	IPROTO_TUPLE = 0x21,
 	IPROTO_FUNCTION_NAME = 0x22,
 	IPROTO_USER_NAME = 0x23,
-	/* Replication keys (body) */
+
+	/*
+	 * Replication keys (body).
+	 * Unfortunately, there is no gap between request and
+	 * replication keys (between USER_NAME and INSTANCE_UUID).
+	 * So imagine, that OPS, EXPR and FIELD_NAME keys follows
+	 * the USER_NAME key.
+	 */
 	IPROTO_INSTANCE_UUID = 0x24,
 	IPROTO_CLUSTER_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
+
+	/* Also request keys. See the comment above. */
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
+	IPROTO_FIELD_NAME = 0x29,
+
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
+	/**
+	 * IPROTO_DESCRIPTION: [
+	 *      { IPROTO_FIELD_NAME: name },
+	 *      { ... },
+	 *      ...
+	 * ]
+	 */
+	IPROTO_DESCRIPTION = 0x32,
+
+	/* Leave a gap between response keys and SQL keys. */
+	IPROTO_SQL_TEXT = 0x40,
+	IPROTO_SQL_BIND = 0x41,
+	IPROTO_SQL_OPTIONS = 0x42,
 	IPROTO_KEY_MAX
 };
 
@@ -141,6 +168,8 @@ enum iproto_type {
 	IPROTO_UPSERT = 9,
 	/** CALL request - returns arbitrary MessagePack */
 	IPROTO_CALL = 10,
+	/** Execute an SQL statement. */
+	IPROTO_EXECUTE = 11,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 

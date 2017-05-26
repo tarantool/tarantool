@@ -86,6 +86,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
 	/* 0x28 */	MP_ARRAY, /* IPROTO_OPS */
+	/* 0x29 */	MP_STR, /* IPROTO_FIELD_NAME */
 	/* }}} */
 };
 
@@ -101,7 +102,8 @@ const char *iproto_type_strs[] =
 	"AUTH",
 	"EVAL",
 	"UPSERT",
-	"CALL"
+	"CALL",
+	"EXECUTE",
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
@@ -162,7 +164,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
-	NULL,               /* 0x29 */
+	"field name",       /* 0x29 */
 	NULL,               /* 0x2a */
 	NULL,               /* 0x2b */
 	NULL,               /* 0x2c */
@@ -171,6 +173,24 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	NULL,               /* 0x2f */
 	"data",             /* 0x30 */
 	"error"             /* 0x31 */
+	"description",      /* 0x32 */
+	NULL,               /* 0x33 */
+	NULL,               /* 0x34 */
+	NULL,               /* 0x35 */
+	NULL,               /* 0x36 */
+	NULL,               /* 0x37 */
+	NULL,               /* 0x38 */
+	NULL,               /* 0x39 */
+	NULL,               /* 0x3a */
+	NULL,               /* 0x3b */
+	NULL,               /* 0x3c */
+	NULL,               /* 0x3d */
+	NULL,               /* 0x3e */
+	NULL,               /* 0x3f */
+	"sql text",         /* 0x40 */
+	"sql bind",         /* 0x41 */
+	"sql options",      /* 0x42 */
+	NULL,               /* MAX  */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
