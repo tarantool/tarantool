@@ -593,13 +593,6 @@ struct vy_index {
 	 * is primary. Referenced by each secondary index.
 	 */
 	struct vy_index *pk;
-	/**
-	 * column_mask is the bitmask in that bit 'n' is set if
-	 * user_key_def parts contains a part with fieldno equal
-	 * to 'n'. This mask is used for update optimization
-	 * (@sa vy_update).
-	 */
-	uint64_t column_mask;
 	/** Link in vy_scheduler->dump_heap. */
 	struct heap_node in_dump;
 	/**
@@ -1836,8 +1829,7 @@ vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
 		      const struct key_def *user_key_def,
 		      struct tuple_format *surrogate_format,
 		      struct tuple_format *upsert_format,
-		      bool is_primary, uint64_t column_mask,
-		      bool is_last_level, int64_t oldest_vlsn);
+		      bool is_primary, bool is_last_level, int64_t oldest_vlsn);
 static NODISCARD int
 vy_write_iterator_add_slice(struct vy_write_iterator *wi,
 			    struct vy_slice *slice);
@@ -3897,8 +3889,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	wi = vy_write_iterator_new(index->env, index->key_def,
 				   index->user_key_def, index->surrogate_format,
 				   index->upsert_format, index->id == 0,
-				   index->column_mask, is_last_level,
-				   tx_manager_vlsn(xm));
+				   is_last_level, tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
@@ -4146,8 +4137,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 	wi = vy_write_iterator_new(index->env, index->key_def,
 				   index->user_key_def, index->surrogate_format,
 				   index->upsert_format, index->id == 0,
-				   index->column_mask, is_last_level,
-				   tx_manager_vlsn(xm));
+				   is_last_level, tx_manager_vlsn(xm));
 	if (wi == NULL)
 		goto err_wi;
 
@@ -5199,7 +5189,7 @@ extern struct tuple_format_vtab vy_tuple_format_vtab;
 
 /**
  * Create a tuple format with column mask of an update operation.
- * @sa vy_index.column_mask, vy_can_skip_update().
+ * @sa key_def.column_mask, vy_can_skip_update().
  * @param space_format A base tuple format.
  *
  * @retval not NULL Success.
@@ -5305,21 +5295,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
-
-	if (user_index_def->iid > 0) {
-		/**
-		 * Calculate the bitmask of columns used in this
-		 * index.
-		 */
-		for (uint32_t i = 0; i < user_key_def->part_count; ++i) {
-			uint32_t fieldno = user_key_def->parts[i].fieldno;
-			if (fieldno >= 64) {
-				index->column_mask = UINT64_MAX;
-				break;
-			}
-			index->column_mask |= ((uint64_t)1) << (63 - fieldno);
-		}
-	}
 
 	struct lsregion *allocator = &index->env->allocator;
 	struct vy_scheduler *scheduler = index->env->scheduler;
@@ -6252,7 +6227,7 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 {
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_index *index = vy_index(space->index[i]);
-		if (vy_can_skip_update(index->column_mask, column_mask))
+		if (vy_can_skip_update(index->key_def->column_mask, column_mask))
 			return false;
 	}
 	return true;
@@ -8142,8 +8117,6 @@ struct vy_write_iterator {
 	struct tuple_format *upsert_format;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
-	/** Index column mask. */
-	uint64_t column_mask;
 	/* The minimal VLSN among all active transactions */
 	int64_t oldest_vlsn;
 	/* There are is no level older than the one we're writing to. */
@@ -8168,8 +8141,7 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_env *env,
 		       const struct key_def *key_def,
 		       const struct key_def *user_key_def,
 		       struct tuple_format *surrogate_format,
-		       struct tuple_format *upsert_format,
-		       bool is_primary, uint64_t column_mask,
+		       struct tuple_format *upsert_format, bool is_primary,
 		       bool is_last_level, uint64_t oldest_vlsn)
 {
 	wi->env = env;
@@ -8187,7 +8159,6 @@ vy_write_iterator_open(struct vy_write_iterator *wi, struct vy_env *env,
 	tuple_format_ref(surrogate_format, 1);
 	tuple_format_ref(upsert_format, 1);
 	wi->is_primary = is_primary;
-	wi->column_mask = column_mask;
 	vy_merge_iterator_open(&wi->mi, ITER_GE, wi->key, key_def,
 			       surrogate_format, upsert_format, is_primary);
 	return 0;
@@ -8197,8 +8168,7 @@ static struct vy_write_iterator *
 vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
 		      const struct key_def *user_key_def,
 		      struct tuple_format *surrogate_format,
-		      struct tuple_format *upsert_format,
-		      bool is_primary, uint64_t column_mask,
+		      struct tuple_format *upsert_format, bool is_primary,
 		      bool is_last_level, int64_t oldest_vlsn)
 {
 	struct vy_write_iterator *wi = calloc(1, sizeof(*wi));
@@ -8208,8 +8178,8 @@ vy_write_iterator_new(struct vy_env *env, const struct key_def *key_def,
 	}
 	if (vy_write_iterator_open(wi, env, key_def, user_key_def,
 				   surrogate_format, upsert_format,
-				   is_primary, column_mask,
-				   is_last_level, oldest_vlsn) != 0) {
+				   is_primary, is_last_level,
+				   oldest_vlsn) != 0) {
 		free(wi);
 		return NULL;
 	}
@@ -8306,7 +8276,7 @@ vy_write_iterator_next(struct vy_write_iterator *wi, struct tuple **ret)
 			 * @sa vy_can_skip_update().
 			 */
 			if (!wi->is_primary &&
-			    vy_can_skip_update(wi->column_mask,
+			    vy_can_skip_update(wi->key_def->column_mask,
 					       vy_stmt_column_mask(stmt)))
 				continue;
 			break; /* It's the resulting statement */
@@ -8819,7 +8789,7 @@ vy_send_range(struct vy_join_ctx *ctx)
 	int rc = -1;
 	ctx->wi = vy_write_iterator_new(ctx->env, ctx->key_def, ctx->key_def,
 					ctx->format, ctx->upsert_format,
-					true, 0, true, INT64_MAX);
+					true, true, INT64_MAX);
 	if (ctx->wi == NULL)
 		goto out;
 
