@@ -142,7 +142,7 @@ enum iproto_type {
 	/** CALL request - returns arbitrary MessagePack */
 	IPROTO_CALL = 10,
 	/** The maximum typecode used for box.stat() */
-	IPROTO_TYPE_STAT_MAX = IPROTO_CALL + 1,
+	IPROTO_TYPE_STAT_MAX,
 
 	/** PING request */
 	IPROTO_PING = 64,
@@ -210,7 +210,7 @@ static inline uint64_t
 request_key_map(uint32_t type)
 {
 	/** Advanced requests don't have a defined key map. */
-	assert(type <= IPROTO_CALL);
+	assert(type <= IPROTO_TYPE_STAT_MAX);
 	extern const uint64_t iproto_body_key_map[];
 	return iproto_body_key_map[type];
 }
@@ -286,7 +286,7 @@ enum vy_run_info_key {
 	/** Bloom filter for keys. */
 	VY_RUN_INFO_BLOOM = 6,
 	/** The last key in this enum + 1 */
-	VY_RUN_INFO_KEY_MAX = VY_RUN_INFO_BLOOM + 1
+	VY_RUN_INFO_KEY_MAX
 };
 
 /**
@@ -319,7 +319,7 @@ enum vy_page_info_key {
 	/* Page index offset in a page */
 	VY_PAGE_INFO_PAGE_INDEX_OFFSET = 6,
 	/** The last key in this enum + 1 */
-	VY_PAGE_INFO_KEY_MAX = VY_PAGE_INFO_PAGE_INDEX_OFFSET + 1
+	VY_PAGE_INFO_KEY_MAX
 };
 
 /**
