@@ -1200,6 +1200,9 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	if (checkpoint == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 
+	checkpoint_ref(checkpoint);
+	auto guard = make_scoped_guard([=]{ checkpoint_unref(checkpoint); });
+
 	/* Remember start vclock. */
 	struct vclock start_vclock;
 	vclock_copy(&start_vclock, &checkpoint->vclock);
@@ -1223,6 +1226,10 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * client.
 	 */
 	box_on_join(&instance_uuid);
+
+	struct replica *replica = replica_by_uuid(&instance_uuid);
+	assert(replica != NULL);
+	replica_set_checkpoint(replica, checkpoint);
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;

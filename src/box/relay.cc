@@ -42,6 +42,7 @@
 #include "coeio.h"
 #include "coio.h"
 #include "engine.h"
+#include "gc.h"
 #include "iproto_constants.h"
 #include "recovery.h"
 #include "replication.h"
@@ -92,8 +93,8 @@ struct relay {
 	struct vclock stop_vclock;
 	/** Directory rescan delay for recovery */
 	ev_tstamp wal_dir_rescan_delay;
-	/** Remote replica id */
-	uint32_t replica_id;
+	/** Remote replica */
+	struct replica *replica;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -238,6 +239,10 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
+	struct checkpoint_info *checkpoint;
+	checkpoint = gc_lookup_checkpoint(&status->vclock);
+	assert(checkpoint != NULL);
+	replica_set_checkpoint(status->relay->replica, checkpoint);
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
 	};
@@ -293,11 +298,7 @@ relay_subscribe_f(va_list ap)
 	ipc_cond_create(&relay->status_cond);
 	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
 			     fiber_schedule_cb, fiber());
-	/*
-	 * Use tx_prio router because our handler never yields and
-	 * just updates struct relay members.
-	 */
-	cpipe_create(&relay->tx_pipe, "tx_prio");
+	cpipe_create(&relay->tx_pipe, "tx");
 
 	/* Create a guard to detach the relay from cbus on exit */
 	auto cbus_guard = make_scoped_guard([&]{
@@ -392,15 +393,21 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 			  "duplicate connection with the same replica UUID");
 	}
 
+	struct checkpoint_info *checkpoint;
+	checkpoint = gc_lookup_checkpoint(replica_clock);
+	if (checkpoint == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+
 	struct relay relay;
 	relay_create(&relay, fd, sync, relay_send_row);
 	relay.r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       replica_clock);
 	vclock_copy(&relay.tx.vclock, replica_clock);
-	relay.replica_id = replica->id;
+	relay.replica = replica;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
+	replica_set_checkpoint(replica, checkpoint);
 
 	auto scope_guard = make_scoped_guard([&]{
 		replica_clear_relay(replica);
@@ -460,7 +467,8 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	 * In that case, only send a row if it is not from the same replica
 	 * (i.e. don't send replica's own rows back).
 	 */
-	if (packet->replica_id != relay->replica_id) {
+	if (relay->replica == NULL ||
+	    packet->replica_id != relay->replica->id) {
 		relay_send(relay, packet);
 		ERROR_INJECT(ERRINJ_RELAY,
 		{
