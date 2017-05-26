@@ -462,6 +462,23 @@ s:upsert({300, 100, 300}, {{'+', 2, 400}})
 pk:select{}
 s:drop()
 
+-- test for non-spased and non-sequential index
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk', {parts = {2, 'unsigned', 3, 'unsigned'}})
+s:upsert({100, 100, 100}, {{'+', 1, 200}})
+s:upsert({200, 100, 200}, {{'+', 1, 300}})
+s:upsert({300, 100, 300}, {{'+', 1, 400}})
+pk:select{}
+s:drop()
+
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk', {parts = {3, 'unsigned', 2, 'unsigned'}})
+s:upsert({100, 100, 100}, {{'+', 1, 200}})
+s:upsert({200, 100, 200}, {{'+', 1, 300}})
+s:upsert({300, 100, 300}, {{'+', 1, 400}})
+pk:select{}
+s:drop()
+
 s = box.schema.space.create('test', {engine = engine})
 pk = s:create_index('pk', {parts = {1, 'unsigned'}})
 sec = s:create_index('sec', {parts = {4, 'unsigned', 2, 'unsigned', 3, 'unsigned'}})
