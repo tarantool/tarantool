@@ -1,0 +1,99 @@
+#!/usr/bin/env tarantool
+test = require("sqltester")
+test:plan(5)
+
+--!./tcltestrunner.lua
+-- 2008 October 20
+--
+-- The author disclaims copyright to this source code.  In place of
+-- a legal notice, here is a blessing:
+--
+--    May you do good and not evil.
+--    May you find forgiveness for yourself and forgive others.
+--    May you share freely, never taking more than you give.
+--
+-------------------------------------------------------------------------
+-- This file implements regression tests for SQLite library.
+--
+-- This file implements tests to verify that ticket #3442 has been
+-- fixed.  
+--
+--
+-- $Id: tkt3442.test,v 1.2 2009/06/05 17:09:12 drh Exp $
+-- ["set","testdir",[["file","dirname",["argv0"]]]]
+-- ["source",[["testdir"],"\/tester.tcl"]]
+-- Create a schema with some indexes.
+--
+test:do_execsql_test(
+    "tkt3442-1.1",
+    [[
+        CREATE TABLE listhash(
+          key INTEGER PRIMARY KEY,
+          id TEXT,
+          node INTEGER
+        );
+        CREATE UNIQUE INDEX ididx ON listhash(id);
+    ]], {
+        -- <tkt3442-1.1>
+        
+        -- </tkt3442-1.1>
+    })
+
+-- Explain Query Plan
+--
+local function EQP(sql)
+    return test:execsql("EXPLAIN QUERY PLAN "..sql)
+end
+
+-- These tests perform an EXPLAIN QUERY PLAN on both versions of the 
+-- SELECT referenced in ticket #3442 (both '5000' and "5000") 
+-- and verify that the query plan is the same.
+--
+test:do_test(
+    "tkt3442-1.2",
+    function()
+        return EQP(" SELECT node FROM listhash WHERE id='5000' LIMIT 1; ")
+    end, {
+        -- <tkt3442-1.2>
+        0, 0, 0, "SEARCH TABLE listhash USING INDEX ididx (id=?)"
+        -- </tkt3442-1.2>
+    })
+
+test:do_test(
+    "tkt3442-1.3",
+    function()
+        return EQP([[ SELECT node FROM listhash WHERE id="5000" LIMIT 1; ]])
+    end, {
+        -- <tkt3442-1.3>
+        0, 0, 0, "SEARCH TABLE listhash USING INDEX ididx (id=?)"
+        -- </tkt3442-1.3>
+    })
+
+
+
+-- Some extra tests testing other permutations of 5000.
+--
+test:do_test(
+    "tkt3442-1.4",
+    function()
+        return EQP(" SELECT node FROM listhash WHERE id=5000 LIMIT 1; ")
+    end, {
+        -- <tkt3442-1.4>
+        0, 0, 0, "SEARCH TABLE listhash USING INDEX ididx (id=?)"
+        -- </tkt3442-1.4>
+    })
+
+
+
+test:do_catchsql_test(
+    "tkt3442-1.5",
+    [=[
+        SELECT node FROM listhash WHERE id=[5000] LIMIT 1;
+    ]=], {
+        -- <tkt3442-1.5>
+        1, "no such column: 5000"
+        -- </tkt3442-1.5>
+    })
+
+test:finish_test()
+
