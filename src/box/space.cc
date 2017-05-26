@@ -184,29 +184,6 @@ space_run_triggers(struct space *space, bool yesno)
 	space->run_triggers = yesno;
 }
 
-/**
- * We do not allow changes of the primary key during
- * update.
- * The syntax of update operation allows the user to primary
- * key of a tuple, which is prohibited, to avoid funny
- * effects during replication. Some engines can
- * track down this situation and abort the operation;
- * such engines (memtx) don't use this function.
- * Other engines can't do it, so they ask the box to
- * verify that the primary key of the tuple has not changed.
- */
-void
-space_check_update(struct space *space,
-		   struct tuple *old_tuple,
-		   struct tuple *new_tuple)
-{
-	assert(space->index_count > 0);
-	Index *index = space->index[0];
-	if (tuple_compare(old_tuple, new_tuple, &index->index_def->key_def))
-		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			  index_name(index), space_name(space));
-}
-
 ptrdiff_t
 space_bsize_update(struct space *space,
 		   const struct tuple *old_tuple,

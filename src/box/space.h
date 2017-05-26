@@ -251,17 +251,6 @@ index_find_system(struct space *space, uint32_t index_id)
 }
 
 /**
- * Checks that primary key of a tuple did not change during update,
- * otherwise throws ClientError.
- * You should not call this method, if an engine can control it by
- * itself.
- */
-void
-space_check_update(struct space *space,
-		   struct tuple *old_tuple,
-		   struct tuple *new_tuple);
-
-/**
  * Updates space bsize field: decrease it by old tuple's bsize and
  * increase it by new one's.
  * Return an increment in space.bsize
