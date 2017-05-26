@@ -85,21 +85,9 @@ space_new(struct space_def *def, struct rlist *key_list)
 {
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
-	/**
-	 * UPSERT can't run in presence of unique
-	 * secondary keys, since they would be impossible
-	 * to check at recovery. MemTX recovers from
-	 * the binary log with no secondary keys, and does
-	 * not validate them, it assumes that the binary
-	 * log has no records which validate secondary
-	 * unique index constraint.
-	 */
-	bool has_unique_secondary_key = false;
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		if (index_def->iid > 0 && index_def->opts.is_unique == true)
-			has_unique_secondary_key = true;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	size_t sz = sizeof(struct space) +
@@ -128,7 +116,6 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->format = tuple_format_new(engine->format, keys, index_count, 0);
 	if (space->format == NULL)
 		diag_raise();
-	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
 	space->format->exact_field_count = def->exact_field_count;
 	/* init space engine instance */
