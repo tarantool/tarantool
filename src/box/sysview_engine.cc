@@ -51,6 +51,9 @@ struct SysviewSpace: public Handler {
 	virtual Index *createIndex(struct space *space,
 				   struct index_def *index_def) override;
 	virtual void dropIndex(Index *index) override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
 };
 
 struct tuple *
@@ -109,6 +112,10 @@ SysviewSpace::dropIndex(Index *index)
 	(void) index;
 }
 
+void
+SysviewSpace::buildSecondaryKey(struct space *, struct space *, Index *)
+{}
+
 SysviewEngine::SysviewEngine()
 	:Engine("sysview", &memtx_tuple_format_vtab)
 {
@@ -119,6 +126,3 @@ Handler *SysviewEngine::open()
 	return new SysviewSpace(this);
 }
 
-void
-SysviewEngine::buildSecondaryKey(struct space *, struct space *, Index *)
-{}

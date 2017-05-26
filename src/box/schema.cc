@@ -195,7 +195,7 @@ sc_space_new(struct space_def *space_def,
 	 *   ensures validation of tuples when starting from
 	 *   a snapshot of older version.
 	 */
-	space->handler->engine->initSystemSpace(space);
+	space->handler->initSystemSpace(space);
 	return space;
 }
 

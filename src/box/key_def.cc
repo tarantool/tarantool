@@ -380,7 +380,7 @@ index_def_check(struct index_def *index_def)
 	}
 
 	/* validate index_def->type */
-	space->handler->engine->checkIndexDef(space, index_def);
+	space->handler->checkIndexDef(space, index_def);
 }
 
 void

@@ -987,7 +987,7 @@ DropIndex::alter(struct alter_space *alter)
 	 * - when a new primary key is finally added, the space
 	 *   can be put back online properly.
 	 */
-	alter->new_space->handler->engine->dropPrimaryKey(alter->new_space);
+	alter->new_space->handler->dropPrimaryKey(alter->new_space);
 }
 
 void
@@ -1163,7 +1163,7 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
 void
 AddIndex::alter(struct alter_space *alter)
 {
-	Engine *engine = alter->new_space->handler->engine;
+	Handler *handler = alter->new_space->handler;
 
 	if (space_index(alter->old_space, 0) == NULL) {
 		if (new_index_def->iid == 0) {
@@ -1177,7 +1177,7 @@ AddIndex::alter(struct alter_space *alter)
 			 * key. After recovery, it means building
 			 * all keys.
 			 */
-			engine->addPrimaryKey(alter->new_space);
+			handler->addPrimaryKey(alter->new_space);
 		} else {
 			/*
 			 * Adding a secondary key.
@@ -1192,7 +1192,7 @@ AddIndex::alter(struct alter_space *alter)
 	 * Get the new index and build it.
 	 */
 	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
-	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
+	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
 	trigger_add(&alter->old_space->on_replace, on_replace);

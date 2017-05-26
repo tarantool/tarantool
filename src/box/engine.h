@@ -63,33 +63,6 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *open() = 0;
-	virtual void initSystemSpace(struct space *space);
-	/**
-	 * Check an index definition for violation of
-	 * various limits.
-	 */
-	virtual void checkIndexDef(struct space *space, struct index_def*);
-	/**
-	 * Called by alter when a primary key added,
-	 * after createIndex is invoked for the new
-	 * key.
-	 */
-	virtual void addPrimaryKey(struct space *space);
-	/**
-	 * Called by alter when the primary key is dropped.
-	 * Do whatever is necessary with space/handler object,
-	 * e.g. disable handler replace function, if
-	 * necessary.
-	 */
-	virtual void dropPrimaryKey(struct space *space);
-
-	/**
-	 * Called with the new empty secondary index. Fill the new index
-	 * with data from the primary key of the space.
-	 */
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index);
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
@@ -223,6 +196,13 @@ public:
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char *key_end,
 		      struct port *);
+
+	virtual void initSystemSpace(struct space *space);
+	/**
+	 * Check an index definition for violation of
+	 * various limits.
+	 */
+	virtual void checkIndexDef(struct space *space, struct index_def*);
 	/**
 	 * Create an instance of space index. Used in alter
 	 * space.
@@ -232,6 +212,26 @@ public:
 	 * Delete all tuples in the index on drop.
 	 */
 	virtual void dropIndex(Index *) = 0;
+	/**
+	 * Called by alter when a primary key added,
+	 * after createIndex is invoked for the new
+	 * key.
+	 */
+	virtual void addPrimaryKey(struct space *space);
+	/**
+	 * Called by alter when the primary key is dropped.
+	 * Do whatever is necessary with space/handler object,
+	 * e.g. disable handler replace function, if
+	 * necessary.
+	 */
+	virtual void dropPrimaryKey(struct space *space);
+	/**
+	 * Called with the new empty secondary index. Fill the new index
+	 * with data from the primary key of the space.
+	 */
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index);
 	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space'
@@ -243,7 +243,7 @@ public:
 	/**
 	 * Notify the engine engine after altering a space and
 	 * replacing old_space with new_space in the space cache,
-	 * to, e.g., update all referenced to struct space
+	 * to, e.g., update all references to struct space
 	 * and replace old_space with new_space.
 	 */
 	virtual void commitAlterSpace(struct space *old_space,

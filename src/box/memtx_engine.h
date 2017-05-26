@@ -77,12 +77,6 @@ struct MemtxEngine: public Engine {
 		    float alloc_factor);
 	~MemtxEngine();
 	virtual Handler *open() override;
-	virtual void addPrimaryKey(struct space *space) override;
-	virtual void dropPrimaryKey(struct space *space) override;
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index) override;
-	virtual void checkIndexDef(struct space *space, struct index_def *index_def) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *,
 				       struct txn_stmt *stmt) override;
@@ -101,19 +95,20 @@ struct MemtxEngine: public Engine {
 	virtual void abortCheckpoint() override;
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
-	virtual void initSystemSpace(struct space *space) override;
 	/* Update snap_io_rate_limit. */
 	void setSnapIoRateLimit(double new_limit)
 	{
 		m_snap_io_rate_limit = new_limit * 1024 * 1024;
 	}
 	void recoverSnapshot(const struct vclock *vclock);
+public:
+	/** Engine recovery state */
+	enum memtx_recovery_state m_state;
 private:
 	void
 	recoverSnapshotRow(struct xrow_header *row);
 	/** Non-zero if there is a checkpoint (snapshot) in progress. */
 	struct checkpoint *m_checkpoint;
-	enum memtx_recovery_state m_state;
 	/** The directory where to store snapshots. */
 	struct xdir m_snap_dir;
 	/** Limit disk usage of checkpointing (bytes per second). */
