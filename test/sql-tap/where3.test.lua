@@ -96,11 +96,11 @@ test:do_execsql_test(
 test:do_test(
     "where3-1.2.1",
     function()
-        return test:explain_no_trace([[SELECT test1.parent1key, child1.value, child2.value\
+        return test:explain_no_trace([[SELECT test1.parent1key, child1.value, child2.value
                                        FROM test1
                                        LEFT OUTER JOIN child1 ON child1.child1key = test1.child1key
-                                       INNER JOIN child2 ON child2.child2key = test1.child2key;"]])
-    end, {
+                                       INNER JOIN child2 ON child2.child2key = test1.child2key;]])
+     end,
         -- <where3-1.2.1>
         test:explain_no_trace([[
             SELECT test1.parent1key, child1.value, child2.value
@@ -109,7 +109,7 @@ test:do_test(
             INNER JOIN child2 ON child2.child2key = test1.child2key;
         ]])
         -- </where3-1.2.1>
-    })
+    )
 
 
 
@@ -122,7 +122,6 @@ local function queryplan(sql)
     eqp = test:execsql("EXPLAIN QUERY PLAN "..sql)
     for i,v in ipairs(eqp) do
         if i % 4 == 0 then
-            print(v)
             local as, tab, idx = string.match(v, "TABLE (%w+AS )(%w+) USING.*INDEX (%w+)")
             if as == nil then
                 tab, idx = string.match(v, "TABLE (%w+) USING.*INDEX (%w+)")

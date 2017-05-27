@@ -3,85 +3,18 @@ TAP version 13
 ok - where3-1.1
 ok - where3-1.1.1
 ok - where3-1.2
-not ok - where3-1.2.1: Execution failed: unrecognized token: "\"
-
-  ---
-  filename: /export/kyukhin/tarantool/src/test/sql-tap/where3.test.lua
-  line: 0
-  trace:
-  - line: 133
-    source: '@./sqltester.lua'
-    filename: ./sqltester.lua
-    what: Lua
-    namewhat: method
-    name: do_test
-    src: ./sqltester.lua
-  - line: 0
-    source: '@/export/kyukhin/tarantool/src/test/sql-tap/where3.test.lua'
-    filename: /export/kyukhin/tarantool/src/test/sql-tap/where3.test.lua
-    what: main
-    namewhat: 
-    src: /export/kyukhin/tarantool/src/test/sql-tap/where3.test.lua
-  ...
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
+ok - where3-1.2.1
 ok - where3-2.1
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.1.1
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.1.2
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.1.3
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.1.4
-SCAN TABLE tA
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.1.5
-SCAN TABLE tB
-SEARCH TABLE tA USING PRIMARY KEY (apk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.2
-SCAN TABLE tB
-SEARCH TABLE tA USING PRIMARY KEY (apk=?)
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.3
-SCAN TABLE tC
-SEARCH TABLE tA USING PRIMARY KEY (apk=?)
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.4
-SCAN TABLE tA
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.5
-SCAN TABLE tC
-SEARCH TABLE tB USING PRIMARY KEY (bpk=?)
-SEARCH TABLE tA USING PRIMARY KEY (apk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.6
-SCAN TABLE tB
-SEARCH TABLE tC USING PRIMARY KEY (cpk=?)
-SEARCH TABLE tA USING PRIMARY KEY (apk=?)
-SEARCH TABLE tD USING PRIMARY KEY (dpk=?)
 ok - where3-2.7
 ok - where3-3.0
 ok - where3-3.1
@@ -150,4 +83,3 @@ ok - where3-7.none.6
 ok - where3-7.none.7
 ok - where3-7.none.8
 ok - where3-7.none.9
-# failed subtest: 1

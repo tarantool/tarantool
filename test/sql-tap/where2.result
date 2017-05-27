@@ -4,27 +4,6 @@ ok - where2-1.0
 ok - where2-1.1
 ok - where2-2.1
 ok - where2-2.2
-not ok - where2-2.3: Execution failed: no such column: rowid
-
-table
-  ---
-  filename: /export/kyukhin/tarantool/src/test/sql-tap/where2.test.lua
-  line: 0
-  trace:
-  - line: 133
-    source: '@./sqltester.lua'
-    filename: ./sqltester.lua
-    what: Lua
-    namewhat: method
-    name: do_test
-    src: ./sqltester.lua
-  - line: 0
-    source: '@/export/kyukhin/tarantool/src/test/sql-tap/where2.test.lua'
-    filename: /export/kyukhin/tarantool/src/test/sql-tap/where2.test.lua
-    what: main
-    namewhat: 
-    src: /export/kyukhin/tarantool/src/test/sql-tap/where2.test.lua
-  ...
 ok - where2-2.4
 ok - where2-2.5
 ok - where2-2.5b
@@ -95,4 +74,3 @@ ok - where2-8.20
 ok - where2-9.1
 ok - where2-12.1
 ok - where2-13.1
-# bad plan: planned 74 run 75
