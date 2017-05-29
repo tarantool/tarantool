@@ -65,7 +65,7 @@ for i=1,100 do s:insert{i, 'this is test message12345'} end
 ---
 ...
 -- sleep after every tuple
-errinj.set("ERRINJ_RELAY", true)
+errinj.set("ERRINJ_RELAY_TIMEOUT", 1000.0)
 ---
 - ok
 ...
@@ -121,7 +121,7 @@ c.space.test:get(1) == nil
 - true
 ...
 -- check sync
-errinj.set("ERRINJ_RELAY", false)
+errinj.set("ERRINJ_RELAY_TIMEOUT", 0)
 ---
 - ok
 ...

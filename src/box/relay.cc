@@ -335,8 +335,14 @@ relay_subscribe_f(va_list ap)
 	};
 	trigger_add(&r->watcher->on_stop, &on_follow_error);
 	while (! fiber_is_dead(r->watcher)) {
+		double timeout = RELAY_REPORT_INTERVAL;
+		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
+					    ERRINJ_DOUBLE);
+		if (inj != NULL && inj->dparam != 0)
+			timeout = inj->dparam;
+
 		ev_io_start(loop(), &read_ev);
-		fiber_yield_timeout(RELAY_REPORT_INTERVAL);
+		fiber_yield_timeout(timeout);
 		ev_io_stop(loop(), &read_ev);
 		/*
 		 * The fiber can be woken by IO read event, by the timeout of
@@ -443,6 +449,10 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	packet->sync = relay->sync;
 	coio_write_xrow(&relay->io, packet);
 	fiber_gc();
+
+	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
 }
 
 static void
@@ -450,10 +460,6 @@ relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
 	relay_send(relay, row);
-	ERROR_INJECT(ERRINJ_RELAY,
-	{
-		fiber_sleep(1000.0);
-	});
 }
 
 /** Send a single row to the client. */
@@ -470,9 +476,5 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	if (relay->replica == NULL ||
 	    packet->replica_id != relay->replica->id) {
 		relay_send(relay, packet);
-		ERROR_INJECT(ERRINJ_RELAY,
-		{
-			fiber_sleep(1000.0);
-		});
 	}
 }

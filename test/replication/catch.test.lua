@@ -27,7 +27,7 @@ test_run:cmd("stop server replica")
 for i=1,100 do s:insert{i, 'this is test message12345'} end
 
 -- sleep after every tuple
-errinj.set("ERRINJ_RELAY", true)
+errinj.set("ERRINJ_RELAY_TIMEOUT", 1000.0)
 
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
@@ -56,7 +56,7 @@ c = net_box.connect(r_uri)
 c.space.test:get(1) == nil
 
 -- check sync
-errinj.set("ERRINJ_RELAY", false)
+errinj.set("ERRINJ_RELAY_TIMEOUT", 0)
 
 -- cleanup
 test_run:cmd("stop server replica")
