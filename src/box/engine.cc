@@ -208,7 +208,7 @@ Handler::executeSelect(struct txn *, struct space *space,
 		}
 		if (limit == found++)
 			break;
-		port_add_tuple(port, tuple);
+		port_add_tuple_xc(port, tuple);
 	}
 }
 

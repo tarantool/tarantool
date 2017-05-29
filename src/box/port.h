@@ -81,7 +81,7 @@ port_destroy(struct port *port);
 void
 port_dump(struct port *port, struct obuf *out);
 
-void
+int
 port_add_tuple(struct port *port, struct tuple *tuple);
 
 void
@@ -93,5 +93,8 @@ port_free(void);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
+
+void
+port_add_tuple_xc(struct port *port, struct tuple *tuple);
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */
