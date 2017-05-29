@@ -8,6 +8,8 @@ engine = test_run:get_cfg('engine')
 replica_set = require('fast_replica')
 fiber = require('fiber')
 
+test_run:cleanup_cluster()
+
 box.space._cluster:len() == 1
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')

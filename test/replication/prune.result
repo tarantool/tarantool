@@ -22,6 +22,9 @@ replica_set = require('fast_replica')
 fiber = require('fiber')
 ---
 ...
+test_run:cleanup_cluster()
+---
+...
 box.space._cluster:len() == 1
 ---
 - true

@@ -1,5 +1,8 @@
+test_run = require('test_run').new()
 fiber = require('fiber')
 fio = require('fio')
+
+test_run:cleanup_cluster()
 
 -- Temporary space for bumping lsn.
 temp = box.schema.space.create('temp')

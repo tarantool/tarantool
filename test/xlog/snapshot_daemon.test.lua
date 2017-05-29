@@ -4,6 +4,8 @@ fiber = require 'fiber'
 env = require('test_run')
 test_run = env.new()
 
+test_run:cleanup_cluster()
+
 
 PERIOD = 0.03
 if jit.os ~= 'Linux' then PERIOD = 1.5 end

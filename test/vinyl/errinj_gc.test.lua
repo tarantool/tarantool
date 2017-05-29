@@ -4,6 +4,8 @@ fio = require('fio')
 
 errinj = box.error.injection
 
+test_run:cleanup_cluster()
+
 -- Temporary space for bumping lsn.
 temp = box.schema.space.create('temp')
 _ = temp:create_index('pk')
