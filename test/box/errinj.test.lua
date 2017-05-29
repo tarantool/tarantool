@@ -241,6 +241,20 @@ end ;
 
 test_run:cmd('setopt delimiter ""');
 
+-- Port_dump can fail.
+
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+
+cn = net_box.connect(box.cfg.listen)
+cn:ping()
+errinj.set('ERRINJ_PORT_DUMP', true)
+ok, ret = pcall(cn.space._space.select, cn.space._space)
+assert(not ok)
+assert(string.match(tostring(ret), 'Failed to allocate'))
+errinj.set('ERRINJ_PORT_DUMP', false)
+cn:close()
+box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+
 run()
 ch:get()
 
