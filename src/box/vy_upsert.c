@@ -36,6 +36,7 @@
 #include "vy_stmt.h"
 #include "tuple_update.h"
 #include "fiber.h"
+#include "column_mask.h"
 
 static void *
 vy_update_alloc(void *arg, size_t size)
@@ -163,7 +164,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	uint8_t old_type = vy_stmt_type(old_stmt);
-	uint64_t column_mask = UINT64_MAX;
+	uint64_t column_mask = COLUMN_MASK_FULL;
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
 			    new_ops_end, suppress_error, &column_mask);
 	if (old_type != IPROTO_UPSERT) {
@@ -235,7 +236,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	/*
 	 * Check that key hasn't been changed after applying operations.
 	 */
-	if ((key_def->column_mask & column_mask) != 0 &&
+	if (!key_update_can_be_skipped(key_def->column_mask, column_mask) &&
 	    vy_tuple_compare(old_stmt, result_stmt, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and

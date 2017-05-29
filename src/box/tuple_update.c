@@ -42,6 +42,7 @@
 #include <msgpuck/msgpuck.h>
 #include <bit/int96.h>
 #include <salad/rope.h>
+#include "column_mask.h"
 
 
 /** UPDATE request implementation.
@@ -809,13 +810,18 @@ region_alloc_free_stub(void *ctx, void *mem)
 /**
  * We found a tuple to do the update on. Prepare a rope
  * to perform operations on.
+ * @param update Update meta.
+ * @param tuple_data MessagePack array without the array header.
+ * @param tuple_data_end End of the @tuple_data.
+ * @param field_count Field count in @tuple_data.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
  */
 int
-update_create_rope(struct tuple_update *update,
-		   const char *tuple_data, const char *tuple_data_end)
+update_create_rope(struct tuple_update *update, const char *tuple_data,
+		   const char *tuple_data_end, uint32_t field_count)
 {
-	uint32_t field_count = mp_decode_array(&tuple_data);
-
 	update->rope = rope_new(update_field_split, update, update->alloc,
 				region_alloc_free_stub, update->alloc_ctx);
 	if (update->rope == NULL)
@@ -924,9 +930,25 @@ update_op_by(char opcode)
 	}
 }
 
+/**
+ * Read and check update operations and fill column mask.
+ *
+ * @param[out] update Update meta.
+ * @param expr MessagePack array of operations.
+ * @param expr_end End of the @expr.
+ * @param field_count_hint Field count in the updating tuple. If
+ *        there is no a concrete tuple (for example, when we are
+ *        reading UPSERT operations), then you can pass any value.
+ *        The field_count_hint is only a hint and is not
+ *        necessary. But correctly specified field_count_hint can
+ *        make column mask calculation more precise.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
 static int
 update_read_ops(struct tuple_update *update, const char *expr,
-		const char *expr_end)
+		const char *expr_end, int32_t field_count_hint)
 {
 	if (mp_typeof(*expr) != MP_ARRAY) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
@@ -997,48 +1019,77 @@ update_read_ops(struct tuple_update *update, const char *expr,
 			diag_set(ClientError, ER_NO_SUCH_FIELD, field_no);
 			return -1;
 		}
+		if (op->meta->read_arg(update->index_base, op, &expr))
+			return -1;
+
 		/*
 		 * Continue collecting the changed columns
 		 * only if there are unset bits in the mask.
 		 */
-		if (column_mask != UINT64_MAX) {
-			if (op->field_no < 0 || op->field_no > 63) {
+		if (column_mask != COLUMN_MASK_FULL) {
+			if (op->field_no >= 0)
+				field_no = op->field_no;
+			else if (op->opcode != '!')
+				field_no = field_count_hint + op->field_no;
+			else
 				/*
-				 * The optimization is only used if update
-				 * doesn't touch outside range [0..63]
+				 * '!' with a negative number
+				 * inserts a new value after the
+				 * position, specified in the
+				 * field_no. Example:
+				 * tuple: [1, 2, 3]
+				 *
+				 * update1: {'#', -1, 1}
+				 * update2: {'!', -1, 4}
+				 *
+				 * result1: [1, 2, * ]
+				 * result2: [1, 2, 3, *4]
+				 * As you can see, both operations
+				 * has fielno -1, but '!' updates
+				 * actually the next field. So
+				 * make field_no to be + 1.
 				 */
-				column_mask = UINT64_MAX;
-			} else if (op->opcode == '!' || op->opcode == '#') {
+				field_no = field_count_hint + op->field_no + 1;
+			/*
+			 * Now it can be < 0 only if the update
+			 * operation is met with negative field
+			 * number N and abs(N) > field_count_hint.
+			 * For example, the tuple is: {1, 2, 3},
+			 * and the update operation is
+			 * {'#', -4, 1}.
+			 */
+			if (field_no < 0) {
 				/*
-				 * If the operation is insertion or deletion
-				 * then it potentially changes a range of
-				 * columns by moving them, so need to set a
+				 * Turn off column mask for this
+				 * incorrect UPDATE.
+				 */
+				column_mask_set_range(&column_mask, 0);
+				continue;
+			}
+
+			/*
+			 * Update result statement's field count
+			 * hint. It is used to translate negative
+			 * field numbers into positive ones.
+			 */
+			if (op->opcode == '!')
+				++field_count_hint;
+			else if (op->opcode == '#')
+				field_count_hint -= (int32_t) op->arg.del.count;
+
+			if (op->opcode == '!' || op->opcode == '#')
+				/*
+				 * If the operation is insertion
+				 * or deletion then it potentially
+				 * changes a range of columns by
+				 * moving them, so need to set a
 				 * range of bits.
 				 */
-
-				/* Set all bits. */
-				uint64_t range = UINT64_MAX;
-				/*
-				 * Unset bits that are placed before
-				 * the operation field number. Fields
-				 * corresponding to this bits
-				 * definitely will not be changed.
-				 */
-				range = range >> op->field_no;
-				column_mask |= range;
-			} else {
-				/*
-				 * If the operation changes only one
-				 * column, then set the
-				 * corresponding bit.
-				 */
-				uint64_t one_col = 1;
-				one_col = one_col << (63 - op->field_no);
-				column_mask |= one_col;
-			}
+				column_mask_set_range(&column_mask, field_no);
+			else
+				column_mask_set_fieldno(&column_mask,
+							field_no);
 		}
-		if (op->meta->read_arg(update->index_base, op, &expr))
-			return -1;
 	}
 
 	/* Check the remainder length, the request must be fully read. */
@@ -1051,11 +1102,23 @@ update_read_ops(struct tuple_update *update, const char *expr,
 	return 0;
 }
 
+/**
+ * Apply update operations to the concrete tuple.
+ *
+ * @param update Update meta.
+ * @param old_data MessagePack array of tuple fields without the
+ *        array header.
+ * @param old_data_end End of the @old_data.
+ * @param part_count Field count in the @old_data.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
 static int
 update_do_ops(struct tuple_update *update, const char *old_data,
-	      const char *old_data_end)
+	      const char *old_data_end, uint32_t part_count)
 {
-	if (update_create_rope(update, old_data, old_data_end))
+	if (update_create_rope(update, old_data, old_data_end, part_count) != 0)
 		return -1;
 	struct update_op *op = update->ops;
 	struct update_op *ops_end = op + update->op_count;
@@ -1066,11 +1129,17 @@ update_do_ops(struct tuple_update *update, const char *old_data,
 	return 0;
 }
 
+/*
+ * Same as update_do_ops but for upsert.
+ * @param suppress_error True, if an upsert error is not critical
+ *        and it is enough to simply write the error to the log.
+ */
 static int
 upsert_do_ops(struct tuple_update *update, const char *old_data,
-	      const char *old_data_end, bool suppress_error)
+	      const char *old_data_end, uint32_t part_count,
+	      bool suppress_error)
 {
-	if (update_create_rope(update, old_data, old_data_end))
+	if (update_create_rope(update, old_data, old_data_end, part_count) != 0)
 		return -1;
 	struct update_op *op = update->ops;
 	struct update_op *ops_end = op + update->op_count;
@@ -1120,7 +1189,7 @@ tuple_update_check_ops(tuple_update_alloc_func alloc, void *alloc_ctx,
 {
 	struct tuple_update update;
 	update_init(&update, alloc, alloc_ctx, index_base);
-	return update_read_ops(&update, expr, expr_end);
+	return update_read_ops(&update, expr, expr_end, 0);
 }
 
 const char *
@@ -1132,10 +1201,11 @@ tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 {
 	struct tuple_update update;
 	update_init(&update, alloc, alloc_ctx, index_base);
+	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end))
+	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
 		return NULL;
-	if (update_do_ops(&update, old_data, old_data_end))
+	if (update_do_ops(&update, old_data, old_data_end, field_count))
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;
@@ -1152,10 +1222,12 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 {
 	struct tuple_update update;
 	update_init(&update, alloc, alloc_ctx, index_base);
+	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end))
+	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
 		return NULL;
-	if (upsert_do_ops(&update, old_data, old_data_end, suppress_error))
+	if (upsert_do_ops(&update, old_data, old_data_end, field_count,
+			  suppress_error))
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;
@@ -1174,7 +1246,7 @@ tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
 	struct tuple_update update[2];
 	for (int j = 0; j < 2; j++) {
 		update_init(&update[j], alloc, alloc_ctx, index_base);
-		if (update_read_ops(&update[j], expr[j], expr_end[j]))
+		if (update_read_ops(&update[j], expr[j], expr_end[j], 0))
 			return NULL;
 		mp_decode_array(&expr[j]);
 		int32_t prev_field_no = index_base - 1;

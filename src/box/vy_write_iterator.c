@@ -32,6 +32,7 @@
 #include "vy_mem.h"
 #include "vy_run.h"
 #include "vy_upsert.h"
+#include "column_mask.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -362,27 +363,6 @@ vy_write_iterator_add_slice(struct vy_stmt_stream *vstream,
 }
 
 /**
- * Don't modify indexes whose fields were not changed by update.
- * If there is at least one bit in the column mask
- * (@sa update_read_ops in tuple_update.cc) set that corresponds
- * to one of the columns from index_def->parts, then the update
- * operation changes at least one indexed field and the
- * optimization is inapplicable. Otherwise, we can skip the
- * update.
- * @param index_column_mask Mask of index we try to update.
- * @param stmt_column_mask  Maks of the update operations.
- */
-static bool
-vy_can_skip_update(uint64_t index_column_mask, uint64_t stmt_column_mask)
-{
-	/*
-	 * Update of the primary index can't be skipped, since it
-	 * stores not indexes tuple fields besides indexed.
-	 */
-	return (index_column_mask & stmt_column_mask) == 0;
-}
-
-/**
  * Go to next tuple in terms of sorted (merged) input steams.
  * @return 0 on success or not 0 on error (diag is set).
  */
@@ -514,7 +494,7 @@ vy_write_iterator_next(struct vy_stmt_stream *vstream,
 			 * @sa vy_can_skip_update().
 			 */
 			if (!stream->is_primary &&
-			    vy_can_skip_update(stream->key_def->column_mask,
+			    key_update_can_be_skipped(stream->key_def->column_mask,
 					       vy_stmt_column_mask(stream->tuple)))
 				continue;
 		}

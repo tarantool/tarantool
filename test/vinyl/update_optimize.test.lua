@@ -132,4 +132,67 @@ space:select{}
 index2:select{}
 index3:select{}
 
+--
+-- gh-1716: optimize UPDATE with fieldno > 64.
+--
+-- Create a big tuple.
+long_tuple = {}
+for i = 1, 70 do long_tuple[i] = i end
+_ = space:replace(long_tuple)
+box.snapshot()
+
+-- Make update of not indexed field with pos > 64.
+index_run_count = wait_for_dump(index, index_run_count)
+old_stmt_count = box.info.vinyl().performance.dumped_statements
+_ = index:update({2}, {{'=', 65, 1000}})
+box.snapshot()
+
+-- Check the only primary index to be changed.
+index_run_count = wait_for_dump(index, index_run_count)
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count - old_stmt_count == 1
+old_stmt_count = new_stmt_count
+space:get{2}[65]
+
+--
+-- Try to optimize update with negative field numbers.
+--
+index:update({2}, {{'#', -65, 65}})
+box.snapshot()
+index_run_count = wait_for_dump(index, index_run_count)
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count - old_stmt_count == 1
+old_stmt_count = new_stmt_count
+index:select{}
+index2:select{}
+index3:select{}
+
+-- Optimize index2 with negative update op.
+space:replace{10, 20, 30, 40, 50}
+box.snapshot()
+index_run_count = wait_for_dump(index, index_run_count)
+old_stmt_count = box.info.vinyl().performance.dumped_statements
+
+index:update({20}, {{'=', -1, 500}})
+box.snapshot()
+index_run_count = wait_for_dump(index, index_run_count)
+new_stmt_count = box.info.vinyl().performance.dumped_statements
+-- 3 = REPLACE in index1 and DELETE + REPLACE in index3.
+new_stmt_count - old_stmt_count == 3
+old_stmt_count = new_stmt_count
+index:select{}
+index2:select{}
+index3:select{}
+
+-- Check if optimizes update do not skip the entire key during
+-- dump.
+space:replace{10, 100, 1000, 10000, 100000, 1000000}
+index:update({100}, {{'=', 6, 1}})
+box.snapshot()
+index_run_count = wait_for_dump(index, index_run_count)
+old_stmt_count = box.info.vinyl().performance.dumped_statements
+index:select{}
+index2:select{}
+index3:select{}
+
 space:drop()

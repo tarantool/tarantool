@@ -60,6 +60,7 @@
 #include "info.h"
 #include "request.h"
 #include "tuple_hash.h" /* for bloom filter */
+#include "column_mask.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -5530,34 +5531,13 @@ vy_check_update(struct space *space, const struct vy_index *pk,
 		const struct tuple *old_tuple, const struct tuple *new_tuple,
 		uint64_t column_mask)
 {
-	if ((pk->key_def->column_mask & column_mask) != 0 &&
+	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
 	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->id), space_name(space));
 		return -1;
 	}
 	return 0;
-}
-
-/**
- * Don't modify indexes whose fields were not changed by update.
- * If there is at least one bit in the column mask
- * (@sa update_read_ops in tuple_update.cc) set that corresponds
- * to one of the columns from key_def->parts, then the update
- * operation changes at least one indexed field and the
- * optimization is inapplicable. Otherwise, we can skip the
- * update.
- * @param index_column_mask Mask of index we try to update.
- * @param stmt_column_mask  Maks of the update operations.
- */
-static bool
-vy_can_skip_update(uint64_t index_column_mask, uint64_t stmt_column_mask)
-{
-	/*
-	 * Update of the primary index can't be skipped, since it
-	 * stores not indexes tuple fields besides indexed.
-	 */
-	return (index_column_mask & stmt_column_mask) == 0;
 }
 
 /**
@@ -5572,7 +5552,8 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 {
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_index *index = vy_index(space->index[i]);
-		if (vy_can_skip_update(index->key_def->column_mask, column_mask))
+		if (key_update_can_be_skipped(index->key_def->column_mask,
+					      column_mask))
 			return false;
 	}
 	return true;

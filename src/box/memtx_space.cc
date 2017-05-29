@@ -40,6 +40,7 @@
 #include "memtx_bitset.h"
 #include "port.h"
 #include "memtx_tuple.h"
+#include "column_mask.h"
 
 /* {{{ DML */
 
@@ -386,7 +387,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		 * tuple ops, but ignores ops that not suitable
 		 * for the tuple.
 		 */
-		uint64_t column_mask = UINT64_MAX;
+		uint64_t column_mask = COLUMN_MASK_FULL;
 		const char *new_data =
 			tuple_upsert_execute(region_aligned_alloc_cb,
 					     &fiber()->gc, request->ops,
@@ -402,7 +403,8 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		tuple_ref(stmt->new_tuple);
 
 		Index *pk = space->index[0];
-		if ((column_mask & pk->index_def->key_def.column_mask) != 0 &&
+		if (!key_update_can_be_skipped(pk->index_def->key_def.column_mask,
+					       column_mask) &&
 		    tuple_compare(stmt->old_tuple, stmt->new_tuple,
 				  &pk->index_def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
