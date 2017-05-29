@@ -28,7 +28,6 @@ space:insert({4, 5, 6, 7, 8})
 box.snapshot()
 -- Wait for dump both indexes.
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 8
 old_stmt_count = new_stmt_count
@@ -40,15 +39,12 @@ space:update({1}, {{'=', 5, 10}}) -- change secondary index field
 
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
 space:update({1}, {{'!', 4, 20}}) -- move range containing index field
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
 space:update({1}, {{'#', 3, 1}}) -- same
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 9
 old_stmt_count = new_stmt_count
@@ -90,8 +86,6 @@ space:insert({3, 4, 5, 6, 7})
 space:insert({4, 5, 6, 7, 8})
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
-index3_run_count = wait_for_dump(index3, index3_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 12
 old_stmt_count = new_stmt_count
@@ -100,18 +94,12 @@ old_stmt_count = new_stmt_count
 index:update({2}, {{'+', 1, 10}, {'+', 3, 10}, {'+', 4, 10}, {'+', 5, 10}}) -- change all fields
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
-index3_run_count = wait_for_dump(index3, index3_run_count)
 index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
-index3_run_count = wait_for_dump(index3, index3_run_count)
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index2, index2_run_count)
-index3_run_count = wait_for_dump(index3, index3_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 15
 old_stmt_count = new_stmt_count
@@ -123,7 +111,6 @@ index3:select{}
 index:update({3}, {{'+', 1, 10}, {'-', 5, 2}, {'!', 6, 100}}) -- change only index 'third'
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index3_run_count = wait_for_dump(index3, index3_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
@@ -131,7 +118,6 @@ old_stmt_count = new_stmt_count
 index:update({3}, {{'=', 1, 20}, {'+', 3, 5}, {'=', 4, 30}, {'!', 6, 110}}) -- change only index 'secondary'
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-index2_run_count = wait_for_dump(index3, index2_run_count)
 new_stmt_count = box.info.vinyl().performance.dumped_statements
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
