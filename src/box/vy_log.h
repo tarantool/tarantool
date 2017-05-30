@@ -59,6 +59,7 @@ struct vclock;
 struct key_def;
 
 struct vy_recovery;
+struct vy_index_recovery_info;
 
 /** Type of a metadata log record. */
 enum vy_log_record_type {
@@ -346,11 +347,21 @@ vy_recovery_new(int64_t signature, bool only_snapshot);
 void
 vy_recovery_delete(struct vy_recovery *recovery);
 
+/**
+ * Lookup a vinyl index in a recovery context.
+ *
+ * Returns the index handle that can be used for recovering the
+ * index structure with the aid of vy_recovery_iterate_index()
+ * or NULL if the index is not found.
+ */
+struct vy_index_recovery_info *
+vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn);
+
 typedef int
 (*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
 
 /**
- * Recover the vinyl index with ID @index_lsn from a recovery context.
+ * Recover a vinyl index from a recovery context.
  *
  * For each range and run of the index, this function calls @cb passing
  * a log record and an optional @cb_arg to it. A log record type is
@@ -372,9 +383,8 @@ typedef int
  * Returns 0 on success, -1 on failure.
  */
 int
-vy_recovery_iterate_index(struct vy_recovery *recovery,
-			  int64_t index_lsn, bool include_deleted,
-			  vy_recovery_cb cb, void *cb_arg);
+vy_recovery_iterate_index(struct vy_index_recovery_info *index,
+		bool include_deleted, vy_recovery_cb cb, void *cb_arg);
 
 /**
  * Given a recovery context, iterate over all indexes stored in it.

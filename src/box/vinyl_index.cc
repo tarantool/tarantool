@@ -75,6 +75,12 @@ VinylIndex::open()
 }
 
 void
+VinylIndex::commitCreate()
+{
+	vy_index_commit_create(db);
+}
+
+void
 VinylIndex::commitDrop()
 {
 	vy_index_commit_drop(db);

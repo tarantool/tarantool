@@ -2893,14 +2893,10 @@ fail_range:
 
 /**
  * Create an index directory for a new index.
- * TODO: create index files only after the WAL
- * record is committed.
  */
 static int
 vy_index_create(struct vy_index *index)
 {
-	struct vy_scheduler *scheduler = index->env->scheduler;
-
 	/* create directory */
 	int rc;
 	char path[PATH_MAX];
@@ -2935,21 +2931,10 @@ vy_index_create(struct vy_index *index)
 	struct vy_range *range = vy_range_new(index, -1, NULL, NULL);
 	if (unlikely(range == NULL))
 		return -1;
+
+	assert(index->range_count == 0);
 	vy_index_add_range(index, range);
 	vy_index_acct_range(index, range);
-	vy_scheduler_add_range(scheduler, range);
-	vy_scheduler_add_index(scheduler, index);
-
-	/*
-	 * Log change in metadata.
-	 */
-	vy_log_tx_begin();
-	vy_log_create_index(index->opts.lsn, index->id, index->space_id,
-			    index->user_key_def);
-	vy_log_insert_range(index->opts.lsn, range->id, NULL, NULL);
-	if (vy_log_tx_commit() < 0)
-		return -1;
-
 	return 0;
 }
 
@@ -3120,7 +3105,29 @@ static int
 vy_index_recover(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
+
 	assert(env->recovery != NULL);
+	assert(index->range_count == 0);
+
+	struct vy_index_recovery_info *ri;
+	ri = vy_recovery_lookup_index(env->recovery, index->opts.lsn);
+	if (ri == NULL) {
+		if (env->status == VINYL_INITIAL_RECOVERY_LOCAL) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Index %lld not found",
+					    (long long)index->opts.lsn));
+			return -1;
+		}
+		/*
+		 * If we failed to log index creation before restart,
+		 * we won't find it in the log on recovery. This is
+		 * OK as the index doesn't have any runs in this case.
+		 * We will retry to log index in vy_index_commit_create().
+		 * For now, just create the initial range.
+		 */
+		assert(env->status == VINYL_FINAL_RECOVERY_LOCAL);
+		return vy_index_create(index);
+	}
 
 	struct vy_index_recovery_cb_arg arg = { .index = index };
 	arg.run_hash = mh_i64ptr_new();
@@ -3129,8 +3136,8 @@ vy_index_recover(struct vy_index *index)
 		return -1;
 	}
 
-	int rc = vy_recovery_iterate_index(env->recovery, index->opts.lsn,
-					   false, vy_index_recovery_cb, &arg);
+	int rc = vy_recovery_iterate_index(ri, false,
+			vy_index_recovery_cb, &arg);
 
 	mh_int_t k;
 	mh_foreach(arg.run_hash, k) {
@@ -3152,9 +3159,8 @@ vy_index_recover(struct vy_index *index)
 		return -1;
 
 	/*
-	 * Update index size and make ranges visible to the scheduler.
-	 * Also, make sure that the index does not have holes, i.e.
-	 * all data were recovered.
+	 * Account ranges to the index and check that the range tree
+	 * does not have holes or overlaps.
 	 */
 	struct vy_range *range, *prev = NULL;
 	for (range = vy_range_tree_first(&index->tree); range != NULL;
@@ -5105,6 +5111,53 @@ vy_index_unref(struct vy_index *index)
 	assert(index->refs > 0);
 	if (--index->refs == 0)
 		vy_index_delete(index);
+}
+
+void
+vy_index_commit_create(struct vy_index *index)
+{
+	struct vy_env *env = index->env;
+
+	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
+		/*
+		 * Normally, if this is local recovery, the index
+		 * should have been logged before restart and added
+		 * to the scheduler by vy_index_recover(). There's
+		 * one exception though - we could've failed to log
+		 * index due to a vylog write error, in which case
+		 * the index isn't in the recovery context and we
+		 * need to retry to log it now.
+		 */
+		if (vy_recovery_lookup_index(env->recovery,
+					     index->opts.lsn) != NULL)
+			return;
+	}
+
+	assert(index->range_count == 1);
+	struct vy_range *range = vy_range_tree_first(&index->tree);
+
+	/*
+	 * Since it's too late to fail now, in case of vylog write
+	 * failure we leave the records we attempted to write in
+	 * the log buffer so that they are flushed along with the
+	 * next write request. If they don't get flushed before
+	 * the instance is shut down, we will replay them on local
+	 * recovery.
+	 */
+	vy_log_tx_begin();
+	vy_log_create_index(index->opts.lsn, index->id,
+			    index->space_id, index->user_key_def);
+	vy_log_insert_range(index->opts.lsn, range->id, NULL, NULL);
+	if (vy_log_tx_try_commit() != 0)
+		say_warn("failed to log index creation: %s",
+			 diag_last_error(diag_get())->errmsg);
+	/*
+	 * After we committed the index in the log, we can schedule
+	 * a task for it.
+	 */
+	vy_scheduler_add_range(env->scheduler, range);
+	vy_scheduler_add_index(env->scheduler, index);
 }
 
 void

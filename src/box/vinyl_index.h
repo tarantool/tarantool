@@ -47,6 +47,7 @@ public:
 	 */
 	void open();
 
+	virtual void commitCreate() override;
 	virtual void commitDrop() override;
 
 	virtual struct tuple*

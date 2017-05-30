@@ -368,6 +368,11 @@ public:
 	Index& operator=(const Index&) = delete;
 
 	/**
+	 * Called after WAL write to commit index creation.
+	 * Must not fail.
+	 */
+	virtual void commitCreate();
+	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.
 	 */

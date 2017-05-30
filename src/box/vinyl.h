@@ -291,6 +291,12 @@ int
 vy_index_open(struct vy_index *index);
 
 /**
+ * Commit index creation in the metadata log.
+ */
+void
+vy_index_commit_create(struct vy_index *index);
+
+/**
  * Commit index drop in the metadata log.
  */
 void

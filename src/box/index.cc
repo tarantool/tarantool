@@ -191,6 +191,11 @@ Index::~Index()
 }
 
 void
+Index::commitCreate()
+{
+}
+
+void
 Index::commitDrop()
 {
 }
