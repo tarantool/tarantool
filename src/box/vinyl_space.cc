@@ -173,16 +173,6 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 }
 
 void
-VinylSpace::dropIndex(Index *index)
-{
-	VinylIndex *i = (VinylIndex *)index;
-	/* schedule asynchronous drop */
-	vy_index_drop(i->db);
-	i->db  = NULL;
-	i->env = NULL;
-}
-
-void
 VinylSpace::addPrimaryKey(struct space *space)
 {
 	VinylIndex *pk = (VinylIndex *) index_find_xc(space, 0);

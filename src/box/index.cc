@@ -190,6 +190,11 @@ Index::~Index()
 	index_def_delete(index_def);
 }
 
+void
+Index::commitDrop()
+{
+}
+
 size_t
 Index::size() const
 {

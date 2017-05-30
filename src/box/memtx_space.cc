@@ -601,22 +601,6 @@ MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
 	}
 }
 
-void
-MemtxSpace::dropIndex(Index *index)
-{
-	if (index->index_def->iid != 0)
-		return; /* nothing to do for secondary keys */
-	/*
-	 * Delete all tuples in the old space if dropping the
-	 * primary key.
-	 */
-	struct iterator *it = ((MemtxIndex*) index)->position();
-	index->initIterator(it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = it->next(it)))
-		tuple_unref(tuple);
-}
-
 /**
  * Replicate engine state in a newly created space.
  * This function is invoked when executing a replace into _index

@@ -50,7 +50,6 @@ struct SysviewSpace: public Handler {
 
 	virtual Index *createIndex(struct space *space,
 				   struct index_def *index_def) override;
-	virtual void dropIndex(Index *index) override;
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index) override;
@@ -104,12 +103,6 @@ SysviewSpace::createIndex(struct space *space, struct index_def *index_def)
 			  space_name(space), "unknown space for system view");
 		return NULL;
 	}
-}
-
-void
-SysviewSpace::dropIndex(Index *index)
-{
-	(void) index;
 }
 
 void

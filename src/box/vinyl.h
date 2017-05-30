@@ -262,10 +262,10 @@ int
 vy_index_open(struct vy_index *index);
 
 /**
- * Close index and drop all data
+ * Commit index drop in the metadata log.
  */
 void
-vy_index_drop(struct vy_index *index);
+vy_index_commit_drop(struct vy_index *index);
 
 size_t
 vy_index_bsize(struct vy_index *db);

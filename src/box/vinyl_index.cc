@@ -72,6 +72,11 @@ VinylIndex::open()
 		diag_raise();
 }
 
+void
+VinylIndex::commitDrop()
+{
+	vy_index_commit_drop(db);
+}
 
 struct tuple*
 VinylIndex::findByKey(const char *key, uint32_t part_count) const

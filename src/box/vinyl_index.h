@@ -43,6 +43,8 @@ public:
 	virtual void
 	open();
 
+	virtual void commitDrop() override;
+
 	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
 

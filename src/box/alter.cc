@@ -993,7 +993,7 @@ DropIndex::commit(struct alter_space *alter)
 	if (space_index(alter->new_space, old_index_def->iid) != NULL)
 		return;
 	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
-	alter->old_space->handler->dropIndex(index);
+	index->commitDrop();
 }
 
 /** Change non-essential (no data change) properties of an index. */

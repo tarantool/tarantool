@@ -211,11 +211,6 @@ public:
 	 */
 	virtual Index *createIndex(struct space *new_space, struct index_def *) = 0;
 	/**
-	 * Delete all tuples in the index on drop index objects on
-	 * disk, if any. Invoked by alter, after writing to WAL.
-	 */
-	virtual void dropIndex(Index *) = 0;
-	/**
 	 * Called by alter when a primary key added,
 	 * after createIndex is invoked for the new
 	 * key and before the write to WAL.

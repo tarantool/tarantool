@@ -53,7 +53,6 @@ struct VinylSpace: public Handler {
 	virtual void checkIndexDef(struct space *new_space,
 				   struct index_def *def) override;
 	virtual Index *createIndex(struct space *, struct index_def *) override;
-	virtual void dropIndex(Index*) override;
 	virtual void addPrimaryKey(struct space *space) override;
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,

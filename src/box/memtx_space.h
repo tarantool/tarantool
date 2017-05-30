@@ -81,7 +81,6 @@ struct MemtxSpace: public Handler {
 				   struct index_def *index_def) override;
 	virtual Index *createIndex(struct space *space,
 				   struct index_def *index_def) override;
-	virtual void dropIndex(Index *index) override;
 	virtual void addPrimaryKey(struct space *space) override;
 	virtual void dropPrimaryKey(struct space *space) override;
 	virtual void buildSecondaryKey(struct space *old_space,

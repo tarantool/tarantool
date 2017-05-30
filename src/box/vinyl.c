@@ -5135,7 +5135,7 @@ vy_index_unref(struct vy_index *index)
 }
 
 void
-vy_index_drop(struct vy_index *index)
+vy_index_commit_drop(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
 	int64_t index_id = index->opts.lsn;

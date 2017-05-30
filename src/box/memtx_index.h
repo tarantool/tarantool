@@ -41,6 +41,9 @@ public:
 		if (m_position != NULL)
 			m_position->free(m_position);
 	}
+
+	virtual void commitDrop() override;
+
 	virtual struct tuple *min(const char *key,
 				  uint32_t part_count) const override;
 	virtual struct tuple *max(const char *key,
