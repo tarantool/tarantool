@@ -535,8 +535,6 @@ static int codeEqualityTerm(
             pIn->addrInTop = sqlite3VdbeAddOp2(v, OP_Rowid, iTab, iOut);
           }else{
             int iCol = aiMap ? aiMap[iMap++] : iSingleIdxCol;
-	    if( pX->x.pSelect->pEList->nExpr==1 ){
-	    }
             pIn->addrInTop = sqlite3VdbeAddOp3(v,OP_Column,iTab, iCol, iOut);
           }
           sqlite3VdbeAddOp1(v, OP_IsNull, iOut); VdbeCoverage(v);
