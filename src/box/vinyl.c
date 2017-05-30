@@ -107,8 +107,6 @@ struct vy_conf {
 struct vy_env {
 	/** Recovery status */
 	enum vy_status status;
-	/** The list of indexes for vinyl_info(). */
-	struct rlist indexes;
 	/** Configuration */
 	struct vy_conf      *conf;
 	/** TX manager */
@@ -580,9 +578,6 @@ struct vy_index {
 	 * appear only in spaces with a single primary index.
 	 */
 	struct tuple_format *upsert_format;
-
-	/** Member of env->indexes. */
-	struct rlist link;
 	/**
 	 * Incremented for each change of the range list,
 	 * to invalidate iterators.
@@ -4449,8 +4444,6 @@ static int
 vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 	*ptask = NULL;
-	if (rlist_empty(&scheduler->env->indexes))
-		return 0;
 
 	if (vy_scheduler_peek_dump(scheduler, ptask) != 0)
 		goto fail;
@@ -5110,13 +5103,10 @@ vy_index_open_or_create(struct vy_index *index)
 int
 vy_index_open(struct vy_index *index)
 {
-	struct vy_env *env = index->env;
-
 	if (vy_index_open_or_create(index) != 0)
 		return -1;
 
 	vy_index_ref(index);
-	rlist_add(&env->indexes, &index->link);
 	return 0;
 }
 
@@ -5146,7 +5136,6 @@ vy_index_commit_drop(struct vy_index *index)
 	 * operations are already done.
 	 */
 	index->is_dropped = true;
-	rlist_del(&index->link);
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -5269,7 +5258,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	rlist_create(&index->sealed);
 	vy_range_tree_new(&index->tree);
 	rlist_create(&index->runs);
-	rlist_create(&index->link);
 	read_set_new(&index->read_set);
 	index->pk = pk;
 	if (pk != NULL)
@@ -7034,7 +7022,6 @@ vy_env_new(void)
 		return NULL;
 	}
 	memset(e, 0, sizeof(*e));
-	rlist_create(&e->indexes);
 	e->status = VINYL_OFFLINE;
 	e->conf = vy_conf_new();
 	if (e->conf == NULL)
@@ -7091,9 +7078,6 @@ error_conf:
 void
 vy_env_delete(struct vy_env *e)
 {
-	struct vy_index *index, *tmp;
-	rlist_foreach_entry_safe(index, &e->indexes, link, tmp)
-		vy_index_unref(index);
 	ev_timer_stop(loop(), &e->quota_timer);
 	vy_squash_queue_delete(e->squash_queue);
 	vy_scheduler_delete(e->scheduler);
