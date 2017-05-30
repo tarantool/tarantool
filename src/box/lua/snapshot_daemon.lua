@@ -45,7 +45,7 @@ local function make_snapshot()
 
     local checkpoints = box.internal.gc.info().checkpoints
     local last_checkpoint = checkpoints[#checkpoints]
-    if last_checkpoint.signature == box.info.cluster.signature then
+    if last_checkpoint.signature == box.info.signature then
         log.debug('snapshot %d already exists', last_checkpoint.signature)
         return false
     end
