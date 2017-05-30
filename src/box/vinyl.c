@@ -529,7 +529,7 @@ struct vy_index {
 	 * Reference counter. Used to postpone index drop
 	 * until all pending operations have completed.
 	 */
-	uint32_t refs;
+	int refs;
 	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
@@ -1556,15 +1556,6 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 	       struct vy_range, tree_node, vy_range_tree_cmp,
 	       const struct tuple *, vy_range_tree_key_cmp);
 
-static void
-vy_range_delete(struct vy_range *);
-
-static void
-vy_index_ref(struct vy_index *index);
-
-static void
-vy_index_unref(struct vy_index *index);
-
 static int
 vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 {
@@ -1591,9 +1582,6 @@ vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 	return vy_stmt_compare_with_key(stmt, range->begin,
 					range->index->key_def);
 }
-
-static void
-vy_index_delete(struct vy_index *index);
 
 static void
 vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
@@ -3121,8 +3109,15 @@ out:
 	return success ? 0 : -1;
 }
 
+/**
+ * Load a vinyl index from disk. Called on local recovery.
+ *
+ * This function retrieves the index structure from the
+ * metadata log, rebuilds the range tree, and opens run
+ * files.
+ */
 static int
-vy_index_open_ex(struct vy_index *index)
+vy_index_recover(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
 	assert(env->recovery != NULL);
@@ -5064,13 +5059,9 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
  * create a new index. Take the current recovery status into
  * account.
  */
-static int
-vy_index_open_or_create(struct vy_index *index)
+int
+vy_index_open(struct vy_index *index)
 {
-	/*
-	 * TODO: don't drop/recreate index in local wal
-	 * recovery mode if all operations already done.
-	 */
 	switch (index->env->status) {
 	case VINYL_ONLINE:
 		/*
@@ -5094,29 +5085,21 @@ vy_index_open_or_create(struct vy_index *index)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		return vy_index_open_ex(index);
+		return vy_index_recover(index);
 	default:
 		unreachable();
+		return -1;
 	}
 }
 
-int
-vy_index_open(struct vy_index *index)
-{
-	if (vy_index_open_or_create(index) != 0)
-		return -1;
-
-	vy_index_ref(index);
-	return 0;
-}
-
-static void
+void
 vy_index_ref(struct vy_index *index)
 {
+	assert(index->refs >= 0);
 	index->refs++;
 }
 
-static void
+void
 vy_index_unref(struct vy_index *index)
 {
 	assert(index->refs > 0);
@@ -5128,14 +5111,6 @@ void
 vy_index_commit_drop(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
-	int64_t index_id = index->opts.lsn;
-	bool was_dropped = index->is_dropped;
-
-	/* TODO:
-	 * don't drop/recreate index in local wal recovery mode if all
-	 * operations are already done.
-	 */
-	index->is_dropped = true;
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -5145,8 +5120,10 @@ vy_index_commit_drop(struct vy_index *index)
 	 * not flushed before the instance is shut down, we replay it
 	 * on local recovery from WAL.
 	 */
-	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && was_dropped)
-		goto free_index;
+	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && index->is_dropped)
+		return;
+
+	index->is_dropped = true;
 
 	vy_log_tx_begin();
 	int loops = 0;
@@ -5166,12 +5143,10 @@ vy_index_commit_drop(struct vy_index *index)
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0);
 	}
-	vy_log_drop_index(index_id);
+	vy_log_drop_index(index->opts.lsn);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
 			 diag_last_error(diag_get())->errmsg);
-free_index:
-	vy_index_unref(index);
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
@@ -5452,10 +5427,12 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	return NULL;
 }
 
-static void
+void
 vy_index_delete(struct vy_index *index)
 {
 	struct vy_scheduler *scheduler = index->env->scheduler;
+
+	assert(index->refs == 0);
 
 	if (index->pk != NULL)
 		vy_index_unref(index->pk);

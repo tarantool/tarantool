@@ -56,19 +56,21 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct vy_env *env_arg, struct index_def *index_def_arg)
-	:Index(index_def_arg)
-	 ,env(env_arg)
-	 ,db(NULL)
-{}
+VinylIndex::VinylIndex(struct index_def *index_def, struct vy_index *db)
+	: Index(index_def), db(db)
+{
+	vy_index_ref(db);
+}
+
+VinylIndex::~VinylIndex()
+{
+	vy_index_unref(db);
+}
 
 void
 VinylIndex::open()
 {
-	assert(db == NULL);
-	/* Create vinyl database. */
-	db = vy_index_new(env, index_def, space_by_id(index_def->space_id));
-	if (db == NULL || vy_index_open(db))
+	if (vy_index_open(db) != 0)
 		diag_raise();
 }
 

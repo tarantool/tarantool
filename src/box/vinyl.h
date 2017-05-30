@@ -235,6 +235,28 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	     struct space *space);
 
 /**
+ * Delete a vinyl index object.
+ */
+void
+vy_index_delete(struct vy_index *index);
+
+/**
+ * Increment the reference counter of a vinyl index.
+ * An index cannot be deleted if its reference counter
+ * is elevated.
+ */
+void
+vy_index_ref(struct vy_index *index);
+
+/**
+ * Decrement the reference counter of a vinyl index.
+ * If the reference counter reaches 0, the index is
+ * deleted with vy_index_delete().
+ */
+void
+vy_index_unref(struct vy_index *index);
+
+/**
  * Hook on an preparation of space alter event.
  * @param old_space Old space.
  * @param new_space New space.
@@ -258,6 +280,13 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space);
 int
 vy_commit_alter_space(struct space *old_space, struct space *new_space);
 
+/**
+ * Open a vinyl index.
+ *
+ * During recovery, this function loads run files from
+ * the index directory. After recovery is complete, it
+ * creates the index directory.
+ */
 int
 vy_index_open(struct vy_index *index);
 
