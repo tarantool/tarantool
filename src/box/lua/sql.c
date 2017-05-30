@@ -238,9 +238,12 @@ lua_sql_execute(struct lua_State *L)
 			l->last_select_stmt_index = l->stmt_count - 1;
 
 			assert(l->pool_size == 0);
+			/* This might possibly call realloc() and ruin *ps.  */
 			typestr = prep_stmt_list_palloc(&l, column_count, 1);
 			if (typestr == NULL)
 				goto outofmem;
+			/* Refill *ps.  */
+			ps = l->stmt + l->stmt_count - 1;
 
 			lua_settop(L, 1); /* discard any results */
 
