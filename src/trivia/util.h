@@ -442,14 +442,22 @@ tt_cstr(const char *str, uint32_t len)
  * the static buffer returned by tt_static_buf().
  */
 static inline const char *
+tt_vsprintf(const char *format, va_list ap)
+{
+	char *buf = tt_static_buf();
+	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
+	return buf;
+}
+
+/** @copydoc tt_vsprintf() */
+static inline const char *
 tt_sprintf(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	char *buf = tt_static_buf();
-	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
+	const char *result = tt_vsprintf(format, ap);
 	va_end(ap);
-	return buf;
+	return result;
 }
 
 /**
