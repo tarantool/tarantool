@@ -359,6 +359,47 @@ int
 vy_run_recover(struct vy_run *run, const char *index_path,
 	       const char *run_path);
 
+enum vy_file_type {
+	VY_FILE_INDEX,
+	VY_FILE_RUN,
+	vy_file_MAX,
+};
+
+static const char *vy_file_suffix[] = {
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
+};
+
+static int
+vy_index_snprint_path(char *buf, int size, const char *dir,
+		      uint32_t space_id, uint32_t iid)
+{
+	return snprintf(buf, size, "%s/%u/%u",
+			dir, (unsigned)space_id, (unsigned)iid);
+}
+
+static inline int
+vy_run_snprint_path(char *buf, int size, const char *dir,
+		    uint32_t space_id, uint32_t iid,
+		    int64_t run_id, enum vy_file_type type)
+{
+	int total = 0;
+	SNPRINT(total, vy_index_snprint_path, buf, size,
+		dir, (unsigned)space_id, (unsigned)iid);
+	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
+		(long long)run_id, vy_file_suffix[type]);
+	return total;
+}
+
+int
+vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
+	     struct vy_stmt_stream *wi, uint64_t page_size,
+	     const struct key_def *key_def,
+	     const struct key_def *user_key_def,
+	     size_t max_output_count, double bloom_fpr,
+	     size_t *written, uint64_t *dumped_statements);
+
 /**
  * Allocate a new run slice.
  * This function increments @run->refs.

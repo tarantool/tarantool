@@ -34,6 +34,7 @@
 #include "coeio.h"
 #include "xrow.h"
 #include "xlog.h"
+#include "replication.h"
 #include "fio.h"
 #include "memory.h"
 
@@ -1842,6 +1843,569 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	xlog_cursor_close(&cursor, false);
 	fail:
 	return -1;
+}
+
+/* dump statement to the run page buffers (stmt header and data) */
+static int
+vy_run_dump_stmt(const struct tuple *value, struct xlog *data_xlog,
+		 struct vy_page_info *info, const struct key_def *key_def,
+		 bool is_primary)
+{
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+
+	struct xrow_header xrow;
+	int rc = (is_primary ?
+		  vy_stmt_encode_primary(value, key_def, 0, &xrow) :
+		  vy_stmt_encode_secondary(value, key_def, &xrow));
+	if (rc != 0)
+		return -1;
+
+	ssize_t row_size;
+	if ((row_size = xlog_write_row(data_xlog, &xrow)) < 0)
+		return -1;
+
+	region_truncate(region, used);
+
+	info->unpacked_size += row_size;
+	++info->count;
+	return 0;
+}
+
+/**
+ * Encode uint32_t array of row offsets (a page index) as xrow
+ *
+ * @param page_index row index
+ * @param count size of row index
+ * @param[out] xrow xrow to fill.
+ * @retval 0 for success
+ * @retval -1 for error
+ */
+static int
+vy_page_index_encode(const uint32_t *page_index, uint32_t count,
+		     struct xrow_header *xrow)
+{
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->type = VY_RUN_PAGE_INDEX;
+
+	size_t size = mp_sizeof_map(1) +
+		      mp_sizeof_uint(VY_PAGE_INDEX_INDEX) +
+		      mp_sizeof_bin(sizeof(uint32_t) * count);
+	char *pos = region_alloc(&fiber()->gc, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "row index");
+		return -1;
+	}
+	xrow->body->iov_base = pos;
+	pos = mp_encode_map(pos, 1);
+	pos = mp_encode_uint(pos, VY_PAGE_INDEX_INDEX);
+	pos = mp_encode_binl(pos, sizeof(uint32_t) * count);
+	for (uint32_t i = 0; i < count; ++i)
+		pos = mp_store_u32(pos, page_index[i]);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	assert(xrow->body->iov_len == size);
+	xrow->bodycnt = 1;
+	return 0;
+}
+
+/**
+ * Write statements from the iterator to a new page in the run,
+ * update page and run statistics.
+ *
+ *  @retval  1 all is ok, the iterator is finished
+ *  @retval  0 all is ok, the iterator isn't finished
+ *  @retval -1 error occurred
+ */
+static int
+vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
+		  struct vy_stmt_stream *wi, struct tuple **curr_stmt,
+		  uint64_t page_size, struct bloom_spectrum *bs,
+		  const struct key_def *key_def,
+		  const struct key_def *user_key_def, bool is_primary,
+		  uint32_t *page_info_capacity)
+{
+	assert(curr_stmt != NULL);
+	assert(*curr_stmt != NULL);
+	struct vy_page_info *page = NULL;
+	const char *region_key;
+	bool end_of_run = false;
+
+	/* row offsets accumulator */
+	struct ibuf page_index_buf;
+	ibuf_create(&page_index_buf, &cord()->slabc, sizeof(uint32_t) * 4096);
+
+	if (run_info->count >= *page_info_capacity) {
+		uint32_t cap = *page_info_capacity > 0 ?
+			       *page_info_capacity * 2 : 16;
+		struct vy_page_info *new_infos =
+			realloc(run_info->page_infos, cap * sizeof(*new_infos));
+		if (new_infos == NULL) {
+			diag_set(OutOfMemory, cap, "realloc",
+				 "struct vy_page_info");
+			goto error_page_index;
+		}
+		run_info->page_infos = new_infos;
+		*page_info_capacity = cap;
+	}
+	assert(*page_info_capacity >= run_info->count);
+
+	if (run_info->count == 0) {
+		/* See comment to run_info->max_key allocation below. */
+		region_key = tuple_extract_key(*curr_stmt, key_def, NULL);
+		if (region_key == NULL)
+			goto error_page_index;
+		assert(run_info->min_key == NULL);
+		run_info->min_key = vy_key_dup(region_key);
+		if (run_info->min_key == NULL)
+			goto error_page_index;
+	}
+
+	page = run_info->page_infos + run_info->count;
+	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
+	xlog_tx_begin(data_xlog);
+
+	/* Last written statement */
+	struct tuple *last_stmt = *curr_stmt;
+	do {
+		uint32_t *offset = (uint32_t *) ibuf_alloc(&page_index_buf,
+							   sizeof(uint32_t));
+		if (offset == NULL) {
+			diag_set(OutOfMemory, sizeof(uint32_t),
+				 "ibuf", "row index");
+			goto error_rollback;
+		}
+		*offset = page->unpacked_size;
+
+		if (vy_run_dump_stmt(*curr_stmt, data_xlog, page,
+				     key_def, is_primary) != 0)
+			goto error_rollback;
+
+		bloom_spectrum_add(bs, tuple_hash(*curr_stmt, user_key_def));
+
+		int64_t lsn = vy_stmt_lsn(*curr_stmt);
+		run_info->min_lsn = MIN(run_info->min_lsn, lsn);
+		run_info->max_lsn = MAX(run_info->max_lsn, lsn);
+
+		if (wi->iface->next(wi, curr_stmt))
+			goto error_rollback;
+
+		if (*curr_stmt == NULL)
+			end_of_run = true;
+		else
+			last_stmt = *curr_stmt;
+	} while (end_of_run == false &&
+		 obuf_size(&data_xlog->obuf) < page_size);
+
+	/* We don't write empty pages. */
+	assert(last_stmt != NULL);
+
+	if (end_of_run) {
+		/*
+		 * Tuple_extract_key allocates the key on a
+		 * region, but the max_key must be allocated on
+		 * the heap, because the max_key can live longer
+		 * than a fiber. To reach this, we must copy the
+		 * key into malloced memory.
+		 */
+		region_key = tuple_extract_key(last_stmt, key_def, NULL);
+		if (region_key == NULL)
+			goto error_rollback;
+		assert(run_info->max_key == NULL);
+		run_info->max_key = vy_key_dup(region_key);
+		if (run_info->max_key == NULL)
+			goto error_rollback;
+	}
+
+	/* Save offset to row index  */
+	page->page_index_offset = page->unpacked_size;
+
+	/* Write row index */
+	struct xrow_header xrow;
+	const uint32_t *page_index = (const uint32_t *) page_index_buf.rpos;
+	assert(ibuf_used(&page_index_buf) == sizeof(uint32_t) * page->count);
+	if (vy_page_index_encode(page_index, page->count, &xrow) < 0)
+		goto error_rollback;
+
+	ssize_t written = xlog_write_row(data_xlog, &xrow);
+	if (written < 0)
+		goto error_rollback;
+
+	page->unpacked_size += written;
+
+	written = xlog_tx_commit(data_xlog);
+	if (written == 0)
+		written = xlog_flush(data_xlog);
+	if (written < 0)
+		goto error_page_index;
+
+	page->size = written;
+
+	assert(page->count > 0);
+
+	++run_info->count;
+	run_info->size += page->size;
+	run_info->keys += page->count;
+
+	ibuf_destroy(&page_index_buf);
+	return !end_of_run ? 0: 1;
+
+	error_rollback:
+	xlog_tx_rollback(data_xlog);
+	error_page_index:
+	ibuf_destroy(&page_index_buf);
+	return -1;
+}
+
+/**
+ * Write statements from the iterator to a new run file.
+ *
+ *  @retval 0 success
+ *  @retval -1 error occurred
+ */
+static int
+vy_run_write_data(struct vy_run *run, const char *dirpath,
+		  uint32_t space_id, uint32_t iid,
+		  struct vy_stmt_stream *wi, uint64_t page_size,
+		  const struct key_def *key_def,
+		  const struct key_def *user_key_def,
+		  size_t max_output_count, double bloom_fpr)
+{
+	struct tuple *stmt;
+
+	/* Start iteration. */
+	if (wi->iface->start(wi) != 0)
+		goto err;
+	if (wi->iface->next(wi, &stmt) != 0)
+		goto err;
+
+	/* Do not create empty run files. */
+	if (stmt == NULL)
+		goto done;
+
+	struct bloom_spectrum bs;
+	if (bloom_spectrum_create(&bs, max_output_count,
+				  bloom_fpr, runtime.quota) != 0) {
+		diag_set(OutOfMemory, 0,
+			 "bloom_spectrum_create", "bloom_spectrum");
+		goto err;
+	}
+
+	struct vy_run_info *run_info = &run->info;
+
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dirpath,
+			    space_id, iid, run->id, VY_FILE_RUN);
+	struct xlog data_xlog;
+	struct xlog_meta meta = {
+		.filetype = XLOG_META_TYPE_RUN,
+		.instance_uuid = INSTANCE_UUID,
+	};
+	if (xlog_create(&data_xlog, path, &meta) < 0)
+		goto err_free_bloom;
+
+	run_info->min_lsn = INT64_MAX;
+	run_info->max_lsn = -1;
+
+	assert(run_info->page_infos == NULL);
+	uint32_t page_infos_capacity = 0;
+	int rc;
+	do {
+		rc = vy_run_write_page(run_info, &data_xlog, wi, &stmt,
+				       page_size, &bs, key_def, user_key_def,
+				       iid == 0, &page_infos_capacity);
+		if (rc < 0)
+			goto err_close_xlog;
+		fiber_gc();
+	} while (rc == 0);
+
+	/* Sync data and link the file to the final name. */
+	if (xlog_sync(&data_xlog) < 0 ||
+	    xlog_rename(&data_xlog) < 0)
+		goto err_close_xlog;
+
+	run->fd = data_xlog.fd;
+	xlog_close(&data_xlog, true);
+	fiber_gc();
+
+	bloom_spectrum_choose(&bs, &run->info.bloom);
+	run->info.has_bloom = true;
+	bloom_spectrum_destroy(&bs, runtime.quota);
+	done:
+	wi->iface->stop(wi);
+	return 0;
+
+	err_close_xlog:
+	xlog_close(&data_xlog, false);
+	fiber_gc();
+	err_free_bloom:
+	bloom_spectrum_destroy(&bs, runtime.quota);
+	err:
+	wi->iface->stop(wi);
+	return -1;
+}
+
+/** {{{ vy_page_info */
+
+/**
+ * Encode vy_page_info as xrow.
+ * Allocates using region_alloc.
+ *
+ * @param page_info page information to encode
+ * @param[out] xrow xrow to fill
+ *
+ * @retval  0 success
+ * @retval -1 error, check diag
+ */
+static int
+vy_page_info_encode(const struct vy_page_info *page_info,
+		    struct xrow_header *xrow)
+{
+	struct region *region = &fiber()->gc;
+
+	uint32_t min_key_size;
+	const char *tmp = page_info->min_key;
+	assert(mp_typeof(*tmp) == MP_ARRAY);
+	mp_next(&tmp);
+	min_key_size = tmp - page_info->min_key;
+
+	/* calc tuple size */
+	uint32_t size;
+	/* 3 items: page offset, size, and map */
+	size = mp_sizeof_map(6) +
+	       mp_sizeof_uint(VY_PAGE_INFO_OFFSET) +
+	       mp_sizeof_uint(page_info->offset) +
+	       mp_sizeof_uint(VY_PAGE_INFO_SIZE) +
+	       mp_sizeof_uint(page_info->size) +
+	       mp_sizeof_uint(VY_PAGE_INFO_ROW_COUNT) +
+	       mp_sizeof_uint(page_info->count) +
+	       mp_sizeof_uint(VY_PAGE_INFO_MIN_KEY) +
+	       min_key_size +
+	       mp_sizeof_uint(VY_PAGE_INFO_UNPACKED_SIZE) +
+	       mp_sizeof_uint(page_info->unpacked_size) +
+	       mp_sizeof_uint(VY_PAGE_INFO_PAGE_INDEX_OFFSET) +
+	       mp_sizeof_uint(page_info->page_index_offset);
+
+	char *pos = region_alloc(region, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "page encode");
+		return -1;
+	}
+
+	memset(xrow, 0, sizeof(*xrow));
+	/* encode page */
+	xrow->body->iov_base = pos;
+	pos = mp_encode_map(pos, 6);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_OFFSET);
+	pos = mp_encode_uint(pos, page_info->offset);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_SIZE);
+	pos = mp_encode_uint(pos, page_info->size);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_ROW_COUNT);
+	pos = mp_encode_uint(pos, page_info->count);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_MIN_KEY);
+	memcpy(pos, page_info->min_key, min_key_size);
+	pos += min_key_size;
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_UNPACKED_SIZE);
+	pos = mp_encode_uint(pos, page_info->unpacked_size);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_PAGE_INDEX_OFFSET);
+	pos = mp_encode_uint(pos, page_info->page_index_offset);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	xrow->bodycnt = 1;
+
+	xrow->type = VY_INDEX_PAGE_INFO;
+	return 0;
+}
+
+/** vy_page_info }}} */
+
+/** {{{ vy_run_info */
+
+/**
+ * Calculate the size on disk that is needed to store give bloom filter.
+ * @param bloom - storing bloom filter.
+ * @return - calculated size.
+ */
+static size_t
+vy_run_bloom_encode_size(const struct bloom *bloom)
+{
+	size_t size = mp_sizeof_array(4);
+	size += mp_sizeof_uint(VY_BLOOM_VERSION); /* version */
+	size += mp_sizeof_uint(bloom->table_size);
+	size += mp_sizeof_uint(bloom->hash_count);
+	size += mp_sizeof_bin(bloom_store_size(bloom));
+	return size;
+}
+
+/**
+ * Write bloom filter to given buffer.
+ * The buffer must have at least vy_run_bloom_encode_size()
+ * @param bloom - a bloom filter to write.
+ * @param buffer - a buffer to write to.
+ * @return - buffer + number of bytes written.
+ */
+char *
+vy_run_bloom_encode(const struct bloom *bloom, char *buffer)
+{
+	char *pos = buffer;
+	pos = mp_encode_array(pos, 4);
+	pos = mp_encode_uint(pos, VY_BLOOM_VERSION);
+	pos = mp_encode_uint(pos, bloom->table_size);
+	pos = mp_encode_uint(pos, bloom->hash_count);
+	pos = mp_encode_binl(pos, bloom_store_size(bloom));
+	pos = bloom_store(bloom, pos);
+	return pos;
+}
+
+/**
+ * Encode vy_run_info as xrow
+ * Allocates using region alloc
+ *
+ * @param run_info the run information
+ * @param xrow xrow to fill.
+ *
+ * @retval  0 success
+ * @retval -1 on error, check diag
+ */
+static int
+vy_run_info_encode(const struct vy_run_info *run_info,
+		   struct xrow_header *xrow)
+{
+	const char *tmp;
+	tmp = run_info->min_key;
+	mp_next(&tmp);
+	size_t min_key_size = tmp - run_info->min_key;
+	tmp = run_info->max_key;
+	mp_next(&tmp);
+	size_t max_key_size = tmp - run_info->max_key;
+
+	assert(run_info->has_bloom);
+	size_t size = mp_sizeof_map(6);
+	size += mp_sizeof_uint(VY_RUN_INFO_MIN_KEY) + min_key_size;
+	size += mp_sizeof_uint(VY_RUN_INFO_MAX_KEY) + max_key_size;
+	size += mp_sizeof_uint(VY_RUN_INFO_MIN_LSN) +
+		mp_sizeof_uint(run_info->min_lsn);
+	size += mp_sizeof_uint(VY_RUN_INFO_MAX_LSN) +
+		mp_sizeof_uint(run_info->max_lsn);
+	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
+		mp_sizeof_uint(run_info->count);
+	size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
+		vy_run_bloom_encode_size(&run_info->bloom);
+
+	char *pos = region_alloc(&fiber()->gc, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "run encode");
+		return -1;
+	}
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->body->iov_base = pos;
+	/* encode values */
+	pos = mp_encode_map(pos, 6);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_KEY);
+	memcpy(pos, run_info->min_key, min_key_size);
+	pos += min_key_size;
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MAX_KEY);
+	memcpy(pos, run_info->max_key, max_key_size);
+	pos += max_key_size;
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_LSN);
+	pos = mp_encode_uint(pos, run_info->min_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MAX_LSN);
+	pos = mp_encode_uint(pos, run_info->max_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
+	pos = mp_encode_uint(pos, run_info->count);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
+	pos = vy_run_bloom_encode(&run_info->bloom, pos);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	xrow->bodycnt = 1;
+	xrow->type = VY_INDEX_RUN_INFO;
+	return 0;
+}
+
+/* vy_run_info }}} */
+
+/**
+ * Write run index to file.
+ */
+static int
+vy_run_write_index(struct vy_run *run, const char *dirpath,
+		   uint32_t space_id, uint32_t iid)
+{
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dirpath,
+			    space_id, iid, run->id, VY_FILE_INDEX);
+
+	struct xlog index_xlog;
+	struct xlog_meta meta = {
+		.filetype = XLOG_META_TYPE_INDEX,
+		.instance_uuid = INSTANCE_UUID,
+	};
+	if (xlog_create(&index_xlog, path, &meta) < 0)
+		return -1;
+
+	xlog_tx_begin(&index_xlog);
+
+	struct xrow_header xrow;
+	if (vy_run_info_encode(&run->info, &xrow) != 0 ||
+	    xlog_write_row(&index_xlog, &xrow) < 0)
+		goto fail;
+
+	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
+		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
+		if (vy_page_info_encode(page_info, &xrow) < 0) {
+			goto fail;
+		}
+		if (xlog_write_row(&index_xlog, &xrow) < 0)
+			goto fail;
+	}
+
+	if (xlog_tx_commit(&index_xlog) < 0 ||
+	    xlog_flush(&index_xlog) < 0 ||
+	    xlog_rename(&index_xlog) < 0)
+		goto fail;
+	xlog_close(&index_xlog, false);
+	fiber_gc();
+	return 0;
+	fail:
+	fiber_gc();
+	xlog_tx_rollback(&index_xlog);
+	xlog_close(&index_xlog, false);
+	unlink(path);
+	return -1;
+}
+
+/*
+ * Create a run file, write statements returned by a write
+ * iterator to it, and create an index file.
+ */
+int
+vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
+	     struct vy_stmt_stream *wi, uint64_t page_size,
+	     const struct key_def *key_def,
+	     const struct key_def *user_key_def,
+	     size_t max_output_count, double bloom_fpr,
+	     size_t *written, uint64_t *dumped_statements)
+{
+	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
+		     {diag_set(ClientError, ER_INJECTION,
+			       "vinyl dump"); return -1;});
+
+	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		usleep(inj->dparam * 1000000);
+
+	if (vy_run_write_data(run, dirpath, space_id, iid,
+			      wi, page_size, key_def, user_key_def,
+			      max_output_count, bloom_fpr) != 0)
+		return -1;
+
+	if (vy_run_is_empty(run))
+		return 0;
+
+	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
+		return -1;
+
+	*written += vy_run_size(run);
+	*dumped_statements += run->info.keys;
+	return 0;
 }
 
 /**
