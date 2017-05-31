@@ -141,16 +141,21 @@ lbox_session_su(struct lua_State *L)
 	}
 	if (user == NULL)
 		luaT_error(L);
-	struct credentials orig_cr;
-	credentials_copy(&orig_cr, &session->credentials);
-	credentials_init(&session->credentials, user->auth_token, user->def.uid);
-	if (top == 1)
+	if (top == 1) {
+		credentials_init(&session->credentials, user->auth_token,
+				 user->def.uid);
 		return 0; /* su */
+	}
+
+	struct credentials su_credentials;
+	credentials_init(&su_credentials, user->auth_token, user->def.uid);
+	fiber_set_user(fiber(), &su_credentials);
 
 	/* sudo */
 	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
-	credentials_copy(&session->credentials, &orig_cr);
+	fiber_set_user(fiber(), &session->credentials);
+
 	if (error)
 		luaT_error(L);
 	return lua_gettop(L) - 1;

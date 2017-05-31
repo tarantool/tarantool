@@ -129,12 +129,6 @@ credentials_init(struct credentials *cr, uint8_t auth_token, uint32_t uid)
 	cr->uid = uid;
 }
 
-static inline void
-credentials_copy(struct credentials *dst, struct credentials *src)
-{
-	*dst = *src;
-}
-
 /*
  * For use in local hot standby, which runs directly
  * from ev watchers (without current fiber), but needs

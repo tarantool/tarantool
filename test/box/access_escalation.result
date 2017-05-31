@@ -53,7 +53,7 @@ background = fiber.create(function() connection:call("setuid") end)
 ...
 connection:call("escalation")
 ---
-- true
+- error: Read access is denied for user 'guest' to space '_space'
 ...
 fiber.cancel(background)
 ---
@@ -107,7 +107,7 @@ background = fiber.create(function() connection:call("setuid") end)
 ...
 connection:call("escalation")
 ---
-- error: Execute access is denied for user 'underprivileged' to function 'escalation'
+- true
 ...
 fiber.cancel(background)
 ---

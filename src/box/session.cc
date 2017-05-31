@@ -136,14 +136,8 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 	struct fiber *fiber = fiber();
 	assert(session == current_session());
 
-	/* Save original credentials */
-	struct credentials orig_credentials;
-	credentials_copy(&orig_credentials, &session->credentials);
-
-	/* Run triggers with admin credentals */
-	credentials_copy(&session->credentials, &admin_credentials);
-	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &session->credentials);
+	/* Run triggers with admin credentials */
+	fiber_set_user(fiber, &admin_credentials);
 
 	int rc = 0;
 	try {
@@ -153,7 +147,6 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 	}
 
 	/* Restore original credentials */
-	credentials_copy(&session->credentials, &orig_credentials);
 	fiber_set_user(fiber, &session->credentials);
 
 	return rc;
