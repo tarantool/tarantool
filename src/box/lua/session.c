@@ -111,7 +111,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_by_id(current_session()->credentials.uid);
+	struct user *user = user_by_id(current_user()->uid);
 	if (user)
 		lua_pushstring(L, user->def.name);
 	else
@@ -144,6 +144,7 @@ lbox_session_su(struct lua_State *L)
 	if (top == 1) {
 		credentials_init(&session->credentials, user->auth_token,
 				 user->def.uid);
+		fiber_set_user(fiber(), &session->credentials);
 		return 0; /* su */
 	}
 

@@ -165,6 +165,26 @@ current_session()
 	return session;
 }
 
+/*
+ * Return the current user. Create it if it doesn't
+ * exist yet.
+ * The same rationale for initializing the current
+ * user on demand as in current_session() applies.
+ */
+static inline struct credentials *
+current_user()
+{
+	struct credentials *u =
+		(struct credentials *) fiber_get_key(fiber(),
+						     FIBER_KEY_USER);
+	if (u == NULL) {
+		session_create_on_demand(-1);
+		u = (struct credentials *) fiber_get_key(fiber(),
+							 FIBER_KEY_USER);
+	}
+	return u;
+}
+
 /** Global on-disconnect triggers. */
 extern struct rlist session_on_disconnect;
 
@@ -211,26 +231,6 @@ session_run_on_auth_triggers(const char *user_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-/*
- * Return the current user. Create it if it doesn't
- * exist yet.
- * The same rationale for initializing the current
- * user on demand as in current_session() applies.
- */
-static inline struct credentials *
-current_user()
-{
-	struct credentials *u =
-		(struct credentials *) fiber_get_key(fiber(),
-						     FIBER_KEY_USER);
-	if (u == NULL) {
-		session_create_on_demand(-1);
-		u = (struct credentials *) fiber_get_key(fiber(),
-							 FIBER_KEY_USER);
-	}
-	return u;
-}
 
 static inline void
 access_check_universe(uint8_t access)
