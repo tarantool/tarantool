@@ -1,6 +1,5 @@
 local tap = require('tap')
-local yaml = require('yaml')
-
+local json = require('json')
 local test = tap.test("errno")
 
 local function flatten(arr)
@@ -26,18 +25,18 @@ end
 local function fix_result(arr)
     if type(arr) ~= 'table' then return arr end
     for i, v in ipairs(arr) do
-	if type(v) == 'table' then
+        if type(v) == 'table' then
             -- it is ok to pass array
-	    --fix_expect(v)
-	else
-	    if type(v) == 'boolean' then
-		if v then
-		    arr[i] = 1
-		else
-		    arr[i] = 0
-		end
-	    end
-	end
+            --fix_expect(v)
+        else
+            if type(v) == 'boolean' then
+                if v then
+                    arr[i] = 1
+                else
+                    arr[i] = 0
+                end
+            end
+        end
     end
 end
 
@@ -51,9 +50,9 @@ test.finish_test = finish_test
 -- Condition: /.../ or ~/.../
 local function string_regex_p(str)
     if type(str) == 'string'
-       and (string.sub(str, 1, 1) == '/'
+            and (string.sub(str, 1, 1) == '/'
             or string.sub(str, 1, 2) == '~/')
-       and string.sub(str, -1) == '/' then
+            and string.sub(str, -1) == '/' then
         return true;
     else
         return false;
@@ -107,10 +106,8 @@ local function is_deeply_regex(got, expected)
         return got == expected
     end
 
-    local regex_seen = false
     for i, v in pairs(expected) do
         if string_regex_p(v) then
-            regex_seen = true
             return table_check_regex_p(got, v) == 1
         else
             if not is_deeply_regex(got[i], v) then
@@ -119,12 +116,8 @@ local function is_deeply_regex(got, expected)
         end
     end
 
-    if not regex_seen then
-        for i, v in pairs(got) do
-            if not is_deeply_regex(v, expected[i]) then
-                return false
-            end
-        end
+    if #got ~= #expected then
+        return false
     end
 
     return true
@@ -133,9 +126,9 @@ end
 local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
     if ok then
-	if result == nil then result = { } end
-	-- Convert all trues and falses to 1s and 0s
-	fix_result(result)
+        if result == nil then result = { } end
+        -- Convert all trues and falses to 1s and 0s
+        fix_result(result)
 
         -- If nothing is expected: just make sure there were no error.
         if expect == nil then
@@ -149,8 +142,8 @@ local function do_test(self, label, func, expect)
                 test:ok(self, label)
             else
                 io.write(string.format('%s: Miscompare\n', label))
-                io.write("Expected: ", yaml.encode(expect))
-                io.write("Got: ", yaml.encode(result))
+                io.write("Expected: ", json.encode(expect).."\n")
+                io.write("Got     : ", json.encode(result).."\n")
                 test:fail(label)
             end
         end
@@ -254,6 +247,17 @@ local function explain_no_trace(self, sql)
 end
 test.explain_no_trace = explain_no_trace
 
+test.do_eqp_test = function (self, label, sql, result)
+
+    test:do_test(
+        label,
+        function()
+            return box.sql.execute("EXPLAIN QUERY PLAN "..sql)
+        end,
+        result
+    )
+end
+
 local function db(self, cmd, ...)
     if cmd == 'eval' then
         return execsql(self, ...)
@@ -281,6 +285,10 @@ local function lsearch(self, input, seed)
 end
 test.lsearch = lsearch
 
+function test.lindex(arr, pos)
+    return arr[pos+1]
+end
+
 --function capable()
 --    return true
 --end
@@ -289,6 +297,7 @@ setmetatable(_G, nil)
 os.execute("rm -f *.snap *.xlog*")
 
 -- start the database
-box.cfg()
-
+box.cfg{
+    memtx_max_tuple_size=4996109,
+}
 return test

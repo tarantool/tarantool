@@ -1,5 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
+NULL = require('msgpack').NULL
 test:plan(92)
 
 --!./tcltestrunner.lua
@@ -439,7 +440,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 NATURAL LEFT JOIN t2;
     ]], {
         -- <join-2.1.1>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5, "a", 3, "b", 4, "c", 5, "d", nil
+        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5, "a", 3, "b", 4, "c", 5, "d", NULL,
         -- </join-2.1.1>
     })
 
@@ -459,7 +460,7 @@ test:do_execsql2_test(
         SELECT t2.* FROM t1 NATURAL LEFT JOIN t2;
     ]], {
         -- <join-2.1.3>
-        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5, "b", nil, "c", nil, "d", nil
+        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5, "b", NULL, "c", NULL, "d", NULL,
         -- </join-2.1.3>
     })
 
