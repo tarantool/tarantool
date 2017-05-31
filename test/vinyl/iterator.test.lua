@@ -6,36 +6,9 @@
 env = require('test_run')
 test_run = env.new()
 
-test_run:cmd("setopt delimiter ';'")
-
-function create_iterator(obj, key, opts)
-	local iter, key, state = obj:pairs(key, opts)
-	local res = {}
-	res['iter'] = iter
-	res['key'] = key
-	res['state'] = state
-	return res
-end;
-
-function iterator_next(iter_obj)
-	local st, tp = iter_obj.iter.gen(iter_obj.key, iter_obj.state)
-	return tp
-end;
-
-function iterate_over(iter_obj)
-	local tp = nil
-	local ret = {}
-	local i = 0
-	tp = iterator_next(iter_obj)
-	while tp do
-		ret[i] = tp
-		i = i + 1
-		tp = iterator_next(iter_obj)
-	end
-	return ret
-end;
-
-test_run:cmd("setopt delimiter ''");
+create_iterator = require('utils').create_iterator
+iterator_next = function(iter) return iter.next() end
+iterate_over = function(iter) return iter.iterate_over() end
 
 --
 -- Following tests verify that combinations
