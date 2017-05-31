@@ -861,7 +861,9 @@ vy_mem_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 }
 
 static const struct vy_stmt_stream_iface vy_mem_stream_iface = {
+	.start = NULL,
 	.next = vy_mem_stream_next,
+	.stop = NULL,
 	.close = NULL
 };
 

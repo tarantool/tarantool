@@ -78,6 +78,8 @@ struct vy_write_src {
  * Write iterator itself.
  */
 struct vy_write_iterator {
+	/** Parent class, must be the first member */
+	struct vy_stmt_stream base;
 	/* List of all sources of the iterator */
 	struct rlist src_list;
 	/* Heap with sources with the lowest source in head */
@@ -172,6 +174,8 @@ vy_write_iterator_delete_src(struct vy_write_iterator *stream,
 {
 	(void)stream;
 	assert(!src->is_end_of_key);
+	if (src->stream.iface->stop != NULL)
+		src->stream.iface->stop(&src->stream);
 	if (src->stream.iface->close != NULL)
 		src->stream.iface->close(&src->stream);
 	rlist_del(&src->in_src_list);
@@ -186,6 +190,13 @@ static NODISCARD int
 vy_write_iterator_add_src(struct vy_write_iterator *stream,
 			  struct vy_write_src *src)
 {
+	if (src->stream.iface->start != NULL) {
+		int rc = src->stream.iface->start(&src->stream);
+		if (rc != 0) {
+			vy_write_iterator_delete_src(stream, src);
+			return rc;
+		}
+	}
 	int rc = src->stream.iface->next(&src->stream, &src->tuple);
 	if (rc != 0 || src->tuple == NULL) {
 		vy_write_iterator_delete_src(stream, src);
@@ -212,12 +223,14 @@ vy_write_iterator_remove_src(struct vy_write_iterator *stream,
 	vy_write_iterator_delete_src(stream, src);
 }
 
+static const struct vy_stmt_stream_iface vy_slice_stream_iface;
+
 /**
  * Open an empty write iterator. To add sources to the iterator
  * use vy_write_iterator_add_* functions.
  * @return the iterator or NULL on error (diag is set).
  */
-struct vy_write_iterator *
+struct vy_stmt_stream *
 vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
 		      bool is_last_level, int64_t oldest_vlsn)
@@ -228,6 +241,7 @@ vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format
 		diag_set(OutOfMemory, sizeof(*stream), "malloc", "write stream");
 		return NULL;
 	}
+	stream->base.iface = &vy_slice_stream_iface;
 	src_heap_create(&stream->src_heap);
 	rlist_create(&stream->src_list);
 	stream->key_def = key_def;
@@ -240,7 +254,7 @@ vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format
 	stream->is_last_level = is_last_level;
 	stream->tuple = NULL;
 	stream->is_tuple_refable = false;
-	return stream;
+	return &stream->base;
 }
 
 /**
@@ -273,9 +287,11 @@ vy_write_iterator_set_tuple(struct vy_write_iterator *stream,
  * before *next* method.
  * @return 0 on success or not 0 on error (diag is set).
  */
-int
-vy_write_iterator_start(struct vy_write_iterator *stream)
+static int
+vy_write_iterator_start(struct vy_stmt_stream *vstream)
 {
+	assert(vstream->iface->start == vy_write_iterator_start);
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src, *tmp;
 	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp) {
 		if (vy_write_iterator_add_src(stream, src) != 0)
@@ -287,9 +303,11 @@ vy_write_iterator_start(struct vy_write_iterator *stream)
 /**
  * Free all resources.
  */
-void
-vy_write_iterator_cleanup(struct vy_write_iterator *stream)
+static void
+vy_write_iterator_stop(struct vy_stmt_stream *vstream)
 {
+	assert(vstream->iface->stop == vy_write_iterator_stop);
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	vy_write_iterator_set_tuple(stream, NULL, false);
 	struct vy_write_src *src, *tmp;
 	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp)
@@ -299,10 +317,12 @@ vy_write_iterator_cleanup(struct vy_write_iterator *stream)
 /**
  * Delete the iterator.
  */
-void
-vy_write_iterator_delete(struct vy_write_iterator *stream)
+static void
+vy_write_iterator_close(struct vy_stmt_stream *vstream)
 {
-	vy_write_iterator_cleanup(stream);
+	assert(vstream->iface->close == vy_write_iterator_close);
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
+	vy_write_iterator_stop(vstream);
 	tuple_format_ref(stream->format, -1);
 	tuple_format_ref(stream->upsert_format, -1);
 	free(stream);
@@ -313,8 +333,9 @@ vy_write_iterator_delete(struct vy_write_iterator *stream)
  * @return 0 on success or not 0 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_mem(struct vy_write_iterator *stream, struct vy_mem *mem)
+vy_write_iterator_add_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem)
 {
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream, false);
 	if (src == NULL)
 		return -1;
@@ -327,9 +348,10 @@ vy_write_iterator_add_mem(struct vy_write_iterator *stream, struct vy_mem *mem)
  * @return 0 on success or not 0 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_slice(struct vy_write_iterator *stream,
+vy_write_iterator_add_slice(struct vy_stmt_stream *vstream,
 			    struct vy_slice *slice, struct vy_run_env *run_env)
 {
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream, true);
 	if (src == NULL)
 		return -1;
@@ -447,15 +469,17 @@ vy_write_iterator_next_key(struct vy_write_iterator *stream)
  * Get the next statement to write.
  * The user of the write iterator simply expects a stream
  * of statements to write to the output.
- * The tuple *ret is guaranteed to be valid until the next
- *  vy_write_iterator_next call.
+ * The tuple *ret is guaranteed to be valid until next tuple is
+ *  returned (thus last non-null tuple is valid after EOF).
  *
  * @return 0 on success or not 0 on error (diag is set).
  */
-NODISCARD int
-vy_write_iterator_next(struct vy_write_iterator *stream,
-		       const struct tuple **ret)
+static NODISCARD int
+vy_write_iterator_next(struct vy_stmt_stream *vstream,
+		       struct tuple **ret)
 {
+	assert(vstream->iface->next == vy_write_iterator_next);
+	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	/*
 	 * Nullify the result stmt. If the next stmt is not
 	 * found, this would be a marker of the end of the stream.
@@ -509,17 +533,10 @@ vy_write_iterator_next(struct vy_write_iterator *stream,
 	return 0;
 }
 
-/**
- * Get the last not-NULL statement that was returned in
- * the last vy_write_iterator_next call.
- * The tuple *ret is guaranteed to be valid until the next
- *  vy_write_iterator_next call.
- *
- * @param stream - the write iterator.
- * @return the tuple or NULL if the valid tuple has been never returned.
- */
-const struct tuple *
-vy_write_iterator_get_last(struct vy_write_iterator *stream)
-{
-	return stream->tuple;
-}
+static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
+	.start = vy_write_iterator_start,
+	.next = vy_write_iterator_next,
+	.stop = vy_write_iterator_stop,
+	.close = vy_write_iterator_close
+};
+

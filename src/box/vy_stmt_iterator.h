@@ -32,6 +32,8 @@
  */
 
 #include <trivia/util.h>
+#include <stdbool.h>
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -132,6 +134,12 @@ struct vy_iterator_stat {
 struct vy_stmt_stream;
 
 /**
+ * Start streaming
+ */
+typedef NODISCARD int
+(*vy_stream_start_f)(struct vy_stmt_stream *virt_stream);
+
+/**
  * Get next tuple from a stream.
  */
 typedef NODISCARD int
@@ -147,7 +155,9 @@ typedef void
  * The interface description for streams over run and mem.
  */
 struct vy_stmt_stream_iface {
+	vy_stream_start_f start;
 	vy_stream_next_f next;
+	vy_stream_close_f stop;
 	vy_stream_close_f close;
 };
 

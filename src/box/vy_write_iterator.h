@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "vy_stmt_iterator.h"
 #include <stdbool.h>
 #include <pthread.h>
 
@@ -158,7 +159,7 @@ struct vy_run_env;
  * @param oldest_vlsn - the minimal VLSN among all active transactions.
  * @return the iterator or NULL on error (diag is set).
  */
-struct vy_write_iterator *
+struct vy_stmt_stream *
 vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
 		      bool is_last_level, int64_t oldest_vlsn);
@@ -168,61 +169,15 @@ vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format
  * @return 0 on success or not 0 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_mem(struct vy_write_iterator *stream, struct vy_mem *mem);
+vy_write_iterator_add_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
 
 /**
  * Add a run slice as a source of iterator.
  * @return 0 on success or not 0 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_slice(struct vy_write_iterator *stream,
+vy_write_iterator_add_slice(struct vy_stmt_stream *stream,
 			    struct vy_slice *slice, struct vy_run_env *run_env);
-/**
- * Start the search. Must be called after *add* methods and
- * before *next* method.
- * @return 0 on success or not 0 on error (diag is set).
- */
-int
-vy_write_iterator_start(struct vy_write_iterator *stream);
-
-/**
- * Free all resources.
- */
-void
-vy_write_iterator_cleanup(struct vy_write_iterator *stream);
-
-/**
- * Delete the iterator.
- */
-void
-vy_write_iterator_delete(struct vy_write_iterator *stream);
-
-/**
- * Get the next statement to write.
- * The user of the write iterator simply expects a stream
- * of statements to write to the output.
- * The tuple *ret is guaranteed to be valid until the next
- *  vy_write_iterator_next call.
- *
- * @param stream - the write iterator.
- * @param ret - a pointer to a pointer where the result will be saved to.
- * @return 0 on success or not 0 on error (diag is set).
- */
-NODISCARD int
-vy_write_iterator_next(struct vy_write_iterator *stream,
-		       const struct tuple **ret);
-
-/**
- * Get the last not-NULL statement that was returned in
- * the last vy_write_iterator_next call.
- * The tuple *ret is guaranteed to be valid until the next
- *  vy_write_iterator_next call.
- *
- * @param stream - the write iterator.
- * @return the tuple or NULL if the valid tuple has been never returned.
- */
-const struct tuple *
-vy_write_iterator_get_last(struct vy_write_iterator *stream);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */
 
