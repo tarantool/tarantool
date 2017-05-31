@@ -159,7 +159,7 @@ schema_object_name(enum schema_object_type type)
 }
 
 struct key_def *
-key_def_dup(struct key_def *src)
+key_def_dup(const struct key_def *src)
 {
 	size_t sz = key_def_sizeof(src->part_count);
 	struct key_def *res = (struct key_def *)malloc(sz);

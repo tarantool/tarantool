@@ -8686,7 +8686,7 @@ struct vy_join_ctx {
 	/** Ordinal number of the index. */
 	uint32_t index_id;
 	/** Index key definition. */
-	const struct key_def *key_def;
+	struct key_def *key_def;
 	/** Index format used for REPLACE and DELETE statements. */
 	struct tuple_format *format;
 	/** Index format used for UPSERT statements. */
@@ -8800,7 +8800,11 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 	if (record->type == VY_LOG_CREATE_INDEX) {
 		ctx->space_id = record->space_id;
 		ctx->index_id = record->index_id;
-		ctx->key_def = record->key_def;
+		if (ctx->key_def != NULL)
+			free(ctx->key_def);
+		ctx->key_def = key_def_dup(record->key_def);
+		if (ctx->key_def == NULL)
+			return -1;
 		if (ctx->format != NULL)
 			tuple_format_ref(ctx->format, -1);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
@@ -8934,6 +8938,8 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 		rc = vy_send_range(ctx);
 
 	/* Cleanup. */
+	if (ctx->key_def != NULL)
+		free(ctx->key_def);
 	if (ctx->format != NULL)
 		tuple_format_ref(ctx->format, -1);
 	if (ctx->upsert_format != NULL)

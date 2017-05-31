@@ -301,7 +301,7 @@ struct key_def {
  * @retval     NULL Memory error.
  */
 struct key_def *
-key_def_dup(struct key_def *src);
+key_def_dup(const struct key_def *src);
 
 /** \cond public */
 
