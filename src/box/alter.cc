@@ -1103,18 +1103,34 @@ AddIndex::~AddIndex()
 
 /* }}} */
 
+static void
+on_drop_space_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct space *space = (struct space *)trigger->data;
+	space_delete(space);
+}
+
+static void
+on_drop_space_rollback(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct space *space = (struct space *)trigger->data;
+	space_cache_replace(space);
+}
+
 /**
  * A trigger invoked on commit/rollback of DROP/ADD space.
  * The trigger removed the space from the space cache.
  */
 static void
-on_drop_space(struct trigger * /* trigger */, void *event)
+on_create_space_rollback(struct trigger *trigger, void *event)
 {
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	uint32_t id = tuple_field_u32_xc(stmt->old_tuple ?
-				      stmt->old_tuple : stmt->new_tuple,
-				      ID);
-	struct space *space = space_cache_delete(id);
+	(void) event;
+	struct space *space = (struct space *)trigger->data;
+	struct space *cached = space_cache_delete(space_id(space));
+	(void) cached;
+	assert(cached == space);
 	space_delete(space);
 }
 
@@ -1212,7 +1228,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * rollback.
 		 */
 		struct trigger *on_rollback =
-				txn_alter_trigger_new(on_drop_space, NULL);
+			txn_alter_trigger_new(on_create_space_rollback, space);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_space->def.uid, SC_SPACE);
@@ -1227,14 +1243,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "the space has grants");
 		}
-		/* @todo lock space metadata until commit. */
-		/*
-		 * dd_space_delete() can't fail, any such
-		 * failure would have to abort the program.
-		 */
+		struct space *space = space_cache_delete(space_id(old_space));
 		struct trigger *on_commit =
-				txn_alter_trigger_new(on_drop_space, NULL);
+			txn_alter_trigger_new(on_drop_space_commit, space);
 		txn_on_commit(txn, on_commit);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_drop_space_rollback, space);
+		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
 		/*
