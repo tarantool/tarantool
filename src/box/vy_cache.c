@@ -268,7 +268,9 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		return;
 	}
 	struct vy_cache_entry *replaced = NULL;
-	if (vy_cache_tree_insert(&cache->cache_tree, entry, &replaced)) {
+	struct vy_cache_tree_iterator inserted;
+	if (vy_cache_tree_insert_get_iterator(&cache->cache_tree, entry,
+					      &replaced, &inserted) != 0) {
 		/* memory error, let's live without a cache */
 		vy_cache_entry_delete(cache->env, entry);
 		return;
@@ -294,23 +296,18 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	if (entry->flags & flag)
 		return;
 
-	/* Find inserted stmt in the tree */
-	bool exact = true;
-	struct vy_cache_tree_iterator itr;
-	itr = vy_cache_tree_lower_bound(&cache->cache_tree, stmt,
-					&exact);
-	assert(!vy_cache_tree_iterator_is_invalid(&itr));
-	assert(exact);
-	if (direction > 0) {
-		vy_cache_tree_iterator_prev(&cache->cache_tree, &itr);
-	} else {
-		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
-	}
 #ifndef NDEBUG
+	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
+	if (direction > 0) {
+		vy_cache_tree_iterator_prev(&cache->cache_tree, &inserted);
+	} else {
+		vy_cache_tree_iterator_next(&cache->cache_tree, &inserted);
+	}
 	/* Check that there are not statements between prev_stmt and stmt */
-	if (!vy_cache_tree_iterator_is_invalid(&itr)) {
+	if (!vy_cache_tree_iterator_is_invalid(&inserted)) {
 		struct vy_cache_entry **prev_check_entry =
-			vy_cache_tree_iterator_get_elem(&cache->cache_tree, &itr);
+			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
+							&inserted);
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
 		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
