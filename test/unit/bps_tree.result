@@ -278,3 +278,5 @@ Count: 10575
 Error count: 0
 Count: 10575
 	*** approximate_count: done ***
+	*** insert_get_iterator ***
+	*** insert_get_iterator: done ***
