@@ -423,7 +423,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 
 	struct cord cord;
 	char name[FIBER_NAME_MAX];
-	snprintf(name, sizeof(name), "relay: %u", replica->id);
+	snprintf(name, sizeof(name), "relay_%p", &relay);
 	ipc_cond_create(&relay.tx.exit_cond);
 	cord_costart(&cord, name, relay_subscribe_f, &relay);
 	cpipe_create(&relay.relay_pipe, name);
