@@ -9,8 +9,8 @@ test:plan(3)
 local filename = "1.log"
 local message = "Hello, World!"
 box.cfg{
-    logger=filename,
-    slab_alloc_arena=0.1,
+    log=filename,
+    memtx_memory=107374182,
 }
 local log = require('log')
 local io = require('io')
@@ -30,7 +30,7 @@ test:is(file:read():match('I>%s+(.*)'), "gh-700: %s %f %d", "formatting")
 file:close()
 log.rotate()
 
-test:ok(log.logger_pid() >= 0, "logger_pid()")
+test:ok(log.pid() >= 0, "pid()")
 
 -- logger uses 'debug', try to set it to nil
 debug = nil

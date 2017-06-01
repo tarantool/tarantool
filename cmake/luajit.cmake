@@ -127,6 +127,7 @@ unset (LUAJIT_RUNS)
 
 macro(luajit_build)
     set (luajit_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
+    set (luajit_hostcc ${CMAKE_HOST_C_COMPILER})
     # Cmake rules concerning strings and lists of strings are weird.
     #   set (foo "1 2 3") defines a string, while
     #   set (foo 1 2 3) defines a list.
@@ -151,6 +152,13 @@ macro(luajit_build)
     if(CC_HAS_WNO_MISLEADING_INDENTATION)
         set(luajit_cflags ${luajit_cflags} -Wno-misleading-indentation)
     endif()
+    if(CC_HAS_WNO_VARARGS)
+        set(luajit_cflags ${luajit_cflags} -Wno-varargs)
+    endif()
+    if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
+        set(luajit_cflags ${luajit_cflags} -Wno-implicit-fallthrough)
+    endif()
+
     # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)
@@ -165,20 +173,47 @@ macro(luajit_build)
         set (luajit_ccopt -O2)
         set (luajit_ccdbebug "")
     endif()
-    # Pass sysroot settings on OSX
-    if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
-        set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
-        set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+    if (${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
+        # Pass sysroot - prepended in front of system header/lib dirs,
+        # i.e. <sysroot>/usr/include, <sysroot>/usr/lib.
+        # Needed for XCode users without command line tools installed,
+        # they have headers/libs deep inside /Applications/Xcode.app/...
+        if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
+            set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+            set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+            set (luajit_hostcc ${luajit_hostcc} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+        endif()
+        # Pass deployment target
+        if ("${CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
+            # Default to 10.6 since @rpath support is NOT available in
+            # earlier versions, needed by AddressSanitizer.
+            set (luajit_osx_deployment_target 10.6)
+        else()
+            set (luajit_osx_deployment_target ${CMAKE_OSX_DEPLOYMENT_TARGET})
+        endif()
+        set(luajit_ldflags
+            ${luajit_ldflags} -Wl,-macosx_version_min,${luajit_osx_deployment_target})
+    endif ()
+    if (ENABLE_GCOV)
+        set (luajit_ccdebug ${luajit_ccdebug} -fprofile-arcs -ftest-coverage)
     endif()
     if (ENABLE_VALGRIND)
         set (luajit_xcflags ${luajit_xcflags}
-            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
+            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC
+            -I${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
+    endif()
+    # AddressSanitizer - CFLAGS were set globaly
+    if (ENABLE_ASAN)
+        set (luajit_xcflags ${luajit_xcflags} -DLUAJIT_USE_ASAN)
+        set (luajit_ldflags ${luajit_ldflags} -fsanitize=address)
     endif()
     set (luajit_buildoptions
         BUILDMODE=static
-        CC="${luajit_cc}"
-        CFLAGS="${luajit_cflags}"
-        LDFLAGS="${luajit_ldflags}"
+        HOST_CC="${luajit_hostcc}"
+        TARGET_CC="${luajit_cc}"
+        TARGET_CFLAGS="${luajit_cflags}"
+        TARGET_LDFLAGS="${luajit_ldflags}"
+        TARGET_SYS="${CMAKE_SYSTEM_NAME}"
         CCOPT="${luajit_ccopt}"
         CCDEBUG="${luajit_ccdebug}"
         XCFLAGS="${luajit_xcflags}"
@@ -187,7 +222,7 @@ macro(luajit_build)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) ${luajit_buildoptions} clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} jit/vmdef.lua libluajit.a
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
     else()
@@ -198,7 +233,7 @@ macro(luajit_build)
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/third_party/luajit ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) ${luajit_buildoptions} clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} jit/vmdef.lua libluajit.a
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
     endif()

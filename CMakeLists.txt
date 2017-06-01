@@ -19,10 +19,6 @@ include(FindOptionalPackage)
 include(FindPackageMessage)
 
 find_program(ECHO echo)
-find_program(XSLTPROC xsltproc)
-find_program(XMLLINT xmllint)
-find_program(JING jing)
-find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
@@ -53,11 +49,8 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
-include(cmake/FindSphinx.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
-
-option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
@@ -70,7 +63,10 @@ check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
 check_symbol_exists(pthread_yield pthread.h HAVE_PTHREAD_YIELD)
 check_symbol_exists(sched_yield sched.h HAVE_SCHED_YIELD)
+check_symbol_exists(posix_fadvise fcntl.h HAVE_POSIX_FADVISE)
+check_symbol_exists(mremap sys/mman.h HAVE_MREMAP)
 
+check_function_exists(sync_file_range HAVE_SYNC_FILE_RANGE)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)
@@ -81,10 +77,6 @@ if (HAVE_SENDFILE)
         set(HAVE_SENDFILE_BSD 1)
     endif()
 endif()
-check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
-check_function_exists(fmemopen HAVE_FMEMOPEN)
-check_function_exists(funopen HAVE_FUNOPEN)
-check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
 set(CMAKE_REQUIRED_LIBRARIES "")
 if (TARGET_OS_LINUX)
@@ -101,6 +93,7 @@ else ()
     set(HAVE_CLOCK_GETTIME ${HAVE_CLOCK_GETTIME_DECL})
 endif ()
 set(CMAKE_REQUIRED_LIBRARIES "")
+check_symbol_exists(__get_cpuid cpuid.h HAVE_CPUID)
 
 # Checks for libev
 include(CheckStructHasMember)
@@ -192,6 +185,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib/small)
+include_directories(${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
 include_directories(${PROJECT_SOURCE_DIR})
 
 #
@@ -261,13 +255,6 @@ find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
     "${MODULE_LUAPATH}")
 find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
     "${MODULE_LIBPATH}")
-
-#
-# Now handle all configuration options.
-#
-if (IS_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx)
-    option(ENABLE_DOC "Enable building of documentation" OFF)
-endif ()
 
 
 ##
@@ -379,6 +366,20 @@ else()
     find_package(LibYAML)
 endif()
 
+#
+# zstd
+#
+
+# Debian: missing zstd_static.h in libzstd-dev
+# Fedora: not found
+# => always use bundled version
+include(BuildZSTD)
+zstd_build()
+
+#
+# OpenSSL
+#
+
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
     message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
@@ -451,7 +452,7 @@ message (STATUS "")
 set(PREFIX ${CMAKE_INSTALL_PREFIX})
 set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
     ENABLE_SSE2 ENABLE_AVX
-    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND
+    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN
     ENABLE_BACKTRACE
     HAVE_BFD
     ENABLE_DOC

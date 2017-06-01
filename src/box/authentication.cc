@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -83,9 +83,10 @@ authenticate(const char *user_name, uint32_t len,
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def.name);
 
 	/* check and run auth triggers on success */
-	if (! rlist_empty(&session_on_auth))
-		session_run_on_auth_triggers(user->def.name);
+	if (! rlist_empty(&session_on_auth) &&
+	    session_run_on_auth_triggers(user->def.name) != 0)
+		diag_raise();
 ok:
-	credentials_init(&session->credentials, user);
+	credentials_init(&session->credentials, user->auth_token,
+			 user->def.uid);
 }
-

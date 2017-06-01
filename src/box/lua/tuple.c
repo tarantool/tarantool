@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -37,6 +37,7 @@
 
 #include "box/tuple.h"
 #include "box/errcode.h"
+#include "box/memtx_tuple.h"
 
 /** {{{ box.tuple Lua library
  *
@@ -117,7 +118,7 @@ lbox_tuple_new(lua_State *L)
 	struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 					   buf->buf + ibuf_used(buf));
 	if (tuple == NULL)
-		luaT_error(L);
+		return luaT_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	luaT_pushtuple(L, tuple);
 	ibuf_reinit(tarantool_lua_ibuf);
@@ -395,10 +396,11 @@ void
 box_lua_tuple_init(struct lua_State *L)
 {
 	/* export C functions to Lua */
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 1);
 	luaL_newmetatable(L, tuplelib_name);
 	luaL_register(L, NULL, lbox_tuple_meta);
-	/* save Lua/C functions to the global variable (cleaned by tuple.lua) */
-	lua_setglobal(L, "cfuncs");
+	lua_setfield(L, -2, "tuple");
+	lua_pop(L, 1); /* box.internal */
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
 	luaL_register_module(L, tuplelib_name, lbox_tuplelib);

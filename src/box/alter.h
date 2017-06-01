@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
 #define INCLUDES_TARANTOOL_BOX_ALTER_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "trigger.h"
-#include "latch.h"
 
 extern struct trigger alter_space_on_replace_space;
 extern struct trigger alter_space_on_replace_index;
@@ -40,10 +39,5 @@ extern struct trigger on_replace_user;
 extern struct trigger on_replace_func;
 extern struct trigger on_replace_priv;
 extern struct trigger on_replace_cluster;
-
-/**
- * Lock of schema modification
- */
-extern struct latch schema_lock;
 
 #endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */

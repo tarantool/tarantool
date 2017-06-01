@@ -11,6 +11,7 @@ ffi = require('ffi')
 type(socket)
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
@@ -67,7 +68,7 @@ handshake = ffi.new('char[128]')
 s:sysread(handshake, 128)
 ffi.string(handshake, 9)
 
-ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+ping = msgpack.encode({ [0] = 64, [1] = 0 })
 ping = msgpack.encode(string.len(ping)) .. ping
 
 -- test syswrite with char *
@@ -309,14 +310,13 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 
--- invalid fd
+-- invalid fd / tampering
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 s:read(9)
 s:close()
-s.socket.fd = 512
+s._gc_socket.fd = 512
+s._gc_socket = nil
 tostring(s)
-s:readable(0)
-s:writable(0)
 s = nil
 
 -- close
@@ -426,7 +426,7 @@ os.remove(path)
 server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 type(addr)
 server ~= nil
-fiber.sleep(.5)
+fiber.sleep(.1)
 client = socket.tcp_connect('unix/', path)
 client ~= nil
 client:read(123)
@@ -446,7 +446,7 @@ server ~= nil
 addr2 = server:name()
 addr.host == addr2.host
 addr.family == addr2.family
-fiber.sleep(.5)
+fiber.sleep(.1)
 client = socket.tcp_connect(addr2.host, addr2.port)
 client ~= nil
 -- Check that listen and client fibers have appropriate names

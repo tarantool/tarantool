@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_INDEX_H_INCLUDED
 #define TARANTOOL_BOX_INDEX_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -77,9 +77,21 @@ enum iterator_type {
 	ITER_BITS_ANY_SET     =  8, /* at least one x's bit is set         */
 	ITER_BITS_ALL_NOT_SET =  9, /* all bits are not set                */
 	ITER_OVERLAPS         = 10, /* key overlaps x                      */
-	ITER_NEIGHBOR         = 11, /* typles in distance ascending order from specified point */
+	ITER_NEIGHBOR         = 11, /* tuples in distance ascending order from specified point */
 	iterator_type_MAX     = ITER_NEIGHBOR + 1
 };
+
+/**
+ * Determine a direction of the given iterator type.
+ * That is -1 for REQ, LT and LE and +1 for all others.
+ */
+static inline int
+iterator_direction(enum iterator_type type)
+{
+	const uint32_t reverse =
+		(1u << ITER_REQ) | (1u << ITER_LT) | (1u << ITER_LE);
+	return (reverse & (1u << type)) ? -1 : 1;
+}
 
 /**
  * Allocate and initialize iterator for space_id, index_id.
@@ -186,9 +198,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \param[out] result a tuple or NULL if index is empty
  * \retval -1 on error (check box_error_last())
  * \retval 0 on success
@@ -204,9 +214,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \param[out] result a tuple or NULL if index is empty
  * \retval -1 on error (check box_error_last())
  * \retval 0 on success
@@ -223,9 +231,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
  * \param index_id index identifier
  * \param type iterator type - enum \link iterator_type \endlink
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * If NULL then equvivalent to an empty array.
  * \param key_end the end of encoded \a key.
- * Must be NULL if \a key is NULL.
  * \retval -1 on error (check box_error_last())
  * \retval >=0 on success
  * \sa \code box.space[space_id].index[index_id]:count(key,
@@ -250,7 +256,7 @@ struct iterator {
 	uint32_t sc_version;
 	uint32_t space_id;
 	uint32_t index_id;
-	class Index *index;
+	struct Index *index;
 };
 
 static inline bool
@@ -263,21 +269,26 @@ iterator_type_is_reverse(enum iterator_type type)
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
  *
- * @param key_def key definition
+ * @param index_def key definition
  * @param type iterator type (see enum iterator_type)
  * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
+ *
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
  */
-void
-key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+int
+key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
 	     uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for a search in a unique
  * index (i.e. the key must be fully specified).
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
  */
-void
-primary_key_validate(struct key_def *key_def, const char *key,
+int
+primary_key_validate(struct index_def *index_def, const char *key,
 		     uint32_t part_count);
 
 /**
@@ -303,10 +314,10 @@ enum dup_replace_mode {
 	DUP_REPLACE
 };
 
-class Index {
+struct Index {
 public:
 	/* Description of a possibly multipart key. */
-	struct key_def *key_def;
+	struct index_def *index_def;
 	/* Schema version on index construction moment */
 	uint32_t sc_version;
 
@@ -314,9 +325,9 @@ protected:
 	/**
 	 * Initialize index instance.
 	 *
-	 * @param key_def  key part description
+	 * @param index_def  key part description
 	 */
-	Index(struct key_def *key_def);
+	Index(struct index_def *index_def);
 
 public:
 	virtual ~Index();
@@ -411,13 +422,13 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 static inline uint32_t
 index_id(const Index *index)
 {
-	return index->key_def->iid;
+	return index->index_def->iid;
 }
 
 static inline const char *
 index_name(const Index *index)
 {
-	return index->key_def->name;
+	return index->index_def->name;
 }
 
 /** True if this index is a primary key. */

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_WAL_WRITER_H_INCLUDED
 #define TARANTOOL_WAL_WRITER_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,39 +31,36 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
-#include "cbus.h"
+#include <sys/types.h>
 #include "small/rlist.h"
+#include "journal.h"
 
 struct fiber;
-struct recovery;
+struct vclock;
+struct wal_writer;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
+extern int wal_dir_lock;
+
 #if defined(__cplusplus)
 
-struct wal_request: public cmsg {
-	/* Auxiliary. */
-	int64_t res;
-	struct fiber *fiber;
-	/* Relative position of the start of request (used for rollback) */
-	off_t start_offset;
-	/* Relative position of the end of request (used for rollback) */
-	off_t end_offset;
-	int n_rows;
-	struct xrow_header *rows[];
-};
-
-int64_t
-wal_write(struct recovery *r, struct wal_request *req);
-
-int
-wal_writer_start(struct recovery *state, int64_t rows_per_wal);
+void
+wal_thread_start();
 
 void
-wal_writer_stop(struct recovery *r);
+wal_init(enum wal_mode wal_mode, const char *wal_dirname,
+	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
+	 int64_t wal_max_rows, int64_t wal_max_size);
+
+enum wal_mode
+wal_mode();
+
+void
+wal_thread_stop();
 
 struct wal_watcher
 {
@@ -78,13 +75,51 @@ struct wal_watcher
  * Fails (-1) if recovery is NULL or lacking a WAL writer.
  */
 int
-wal_register_watcher(
-	struct recovery *, struct wal_watcher *, struct ev_async *);
+wal_set_watcher(struct wal_watcher *, struct ev_async *);
 
 void
-wal_unregister_watcher(
-	struct recovery *, struct wal_watcher *);
+wal_clear_watcher(struct wal_watcher *);
 
+void
+wal_atfork();
+
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+ * Wait till all pending changes to the WAL are flushed.
+ * Rotates the WAL.
+ *
+ * @param[out] vclock WAL vclock
+ *
+ */
+void
+wal_checkpoint(struct vclock *vclock, bool rotate);
+
+/**
+ * Remove WAL files that are not needed to recover
+ * from snapshot with @lsn or newer.
+ */
+void
+wal_collect_garbage(int64_t lsn);
+
+void
+wal_init_vy_log();
+
+/**
+ * Write xrows to the vinyl metadata log.
+ */
+int
+wal_write_vy_log(struct journal_entry *req);
+
+/**
+ * Rotate the vinyl metadata log.
+ */
+void
+wal_rotate_vy_log();
+
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */

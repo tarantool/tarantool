@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -40,7 +40,7 @@ crc32_func crc32_calc = NULL;
 void
 crc32_init()
 {
-#if defined (__x86_64__) || defined (__i386__)
+#if defined(HAVE_CPUID) && (defined (__x86_64__) || defined (__i386__))
 	crc32_calc = sse42_enabled_cpu() ? &crc32c_hw : &crc32c;
 #else
 	crc32_calc = &crc32c;

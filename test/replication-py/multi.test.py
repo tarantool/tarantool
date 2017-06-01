@@ -20,7 +20,6 @@ print '----------------------------------------------------------------------'
 
 # Start replicas
 master.id = master.get_param('server')['id']
-master_lsn = master.get_lsn(master.id)
 cluster = [ master ]
 for i in range(REPLICA_N - 1):
     server = TarantoolServer(server.ini)
@@ -30,7 +29,6 @@ for i in range(REPLICA_N - 1):
     server.deploy()
     # Wait replica to fully bootstrap.
     # Otherwise can get ACCESS_DENIED error.
-    server.wait_lsn(master.id, master_lsn)
     cluster.append(server)
 
 # Make a list of servers
@@ -47,7 +45,7 @@ print '----------------------------------------------------------------------'
 
 # Connect each server to each other to make full mesh
 for server in cluster:
-    server.iproto.py_con.eval("box.cfg { replication_source = ... }", [sources])
+    server.iproto.py_con.eval("box.cfg { replication = ... }", [sources])
 
 # Wait connections to establish
 for server in cluster:

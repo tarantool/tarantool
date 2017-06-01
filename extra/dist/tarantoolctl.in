@@ -10,7 +10,7 @@ tarantoolctl - an utility to control tarantool instances
 
     vim /etc/tarantool/instances.enabled/my_instance.lua
     tarantoolctl start my_instance
-    tarantoolctl stop  my_instance
+    tarantoolctl stop my_instance
     tarantoolctl logrotate my_instance
 
 =head1 DESCRIPTION
@@ -20,21 +20,18 @@ The file contains common default instances options:
 
     $ cat /etc/default/tarantool
 
-
     -- Options for Tarantool
     default_cfg = {
         -- will become pid_file .. instance .. '.pid'
         pid_file    =   "/var/run/tarantool",
-
         -- will become wal_dir/instance/
         wal_dir     =   "/var/lib/tarantool",
-
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
-
-        -- logger/instance .. '.log'
-        logger      =   "/var/log/tarantool",
-
+        -- vinyl_dir/instance/
+        vinyl_dir  =   "/var/lib/tarantool/vinyl",
+        -- log/instance .. '.log'
+        log      =   "/var/log/tarantool",
         username    =   "tarantool",
     }
 
@@ -91,19 +88,23 @@ please see AUTHORS file.
 
 ]]
 
-local os = require 'os'
-local ffi = require 'ffi'
-local fio = require 'fio'
-local fun = require 'fun'
-local log = require 'log'
-local uri = require 'uri'
-local yaml = require 'yaml'
-local errno = require 'errno'
-local fiber = require 'fiber'
-local digest = require 'digest'
-local netbox = require 'net.box'
-local socket = require 'socket'
-local console = require 'console'
+
+local io = require('io')
+local os = require('os')
+local ffi = require('ffi')
+local fio = require('fio')
+local fun = require('fun')
+local log = require('log')
+local uri = require('uri')
+local json = require('json')
+local xlog = require('xlog')
+local yaml  = require('yaml')
+local errno = require('errno')
+local fiber = require('fiber')
+local netbox = require('net.box')
+local socket = require('socket')
+local console = require('console')
+local argparse = require('internal.argparse').parse
 
 ffi.cdef[[
 struct passwd {
@@ -126,51 +127,35 @@ struct group{
 int kill(int pid, int sig);
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
+int isatty(int fd);
+int getppid(void);
 ]]
---
--- tables with all available commands
---
-local local_commands
-local remote_commands
---
--- true if we're running in HOME directory of a user
---
+
+local TIMEOUT_INFINITY = 100 * 365 * 86400
+
+-- command that we're executing
+local command_name = arg[1]
+-- true if we're running in user's HOME directory
 local usermode = false
---
+-- true if tarantoolctl is a symlink and name != tarantoolctl
+local linkmode = false
 -- a file with system-wide settings
---
 local default_file
+-- current instance settings
 local instance_name
 local instance_path
 local console_sock
 local group_name
---
 -- overrides for defaults files
---
 local instance_dir
 local default_cfg
+local positional_arguments
+local keyword_arguments
 
---
--- print usage and exit
---
-local function usage()
-    local local_tbl = fun.map(function(name, cmd) return name end,
-                                 local_commands):totable()
-    local remote_tbl = fun.map(function(name, cmd) return name end,
-                               remote_commands):totable()
-    table.sort(local_tbl)
-    table.sort(remote_tbl)
+-- function for printing usage reference
+local usage
 
-    log.error("Usage: %s {%s} instance_name", arg[0], table.concat(local_tbl, '|'))
-    log.error("       %s {%s} URI", arg[0], table.concat(remote_tbl, '|'))
-
-    log.error("Config file: %s", default_file)
-    os.exit(1)
-end
-
---
 -- shift argv to remove 'tarantoolctl' from arg[0]
---
 local function shift_argv(arg, argno, argcount)
     for i = argno, 128 do
         arg[i] = arg[i + argcount]
@@ -204,7 +189,7 @@ local function check_user_level()
 end
 
 --
--- Find if we're running under a user, and this user has a default file in his
+-- Find if we're running under a user, and this user has a default file in their
 -- home directory. If present, use it. Otherwise assume a system-wide default.
 -- If it's missing, it's OK as well.
 --
@@ -215,36 +200,38 @@ local function find_default_file()
         return user_level
     end
 
-    -- no user-level defaults, use a system-wide one
+    -- no user-level defaults, use system-wide ones
     local cfg = '@CMAKE_INSTALL_FULL_SYSCONFDIR@/@SYSCONFIG_DEFAULT@/tarantool'
     if fio.stat(cfg) then
         return cfg
     end
-    -- It's OK if there is no default file - load_default_file() will assume
-    -- some defaults
+    -- It's OK if there is no default file.
+    -- load_default_file() will assume some defaults
     return nil
 end
 
 local function check_file(path)
     local rv, err = loadfile(path)
     if rv == nil then
-        log.error("Failed to check %s", err)
+        log.error("%s", debug.traceback())
+        log.error("Failed to check instance file '%s'", err)
         return err
     end
     return nil
 end
 
 --
--- System-wide default file may be missing, this is OK, we'll assume built-in
--- defaults
--- It uses sandboxing for isolation. It's not completely safe, but it won't
--- allow a pollution of global variables
+-- System-wide default file may be missing, this is OK,
+-- we'll assume built-in defaults.
+-- It uses sandboxing for isolation.
+-- It's not completely safe, but it won't
+-- allow pollution of global variables.
 --
 local function load_default_file(default_file)
     if default_file then
         local env = setmetatable({}, { __index = _G })
         local ufunc, msg = loadfile(default_file)
-        -- if load fails - show last 10 lines of the log file
+        -- if load fails - show the last 10 lines of the log file
         if not ufunc then
             log.error("Failed to load defaults file: %s", msg)
         end
@@ -258,15 +245,19 @@ local function load_default_file(default_file)
     end
     local d = default_cfg or {}
 
-    d.pid_file   = d.pid_file    or "/var/run/tarantool"
-    d.wal_dir    = d.wal_dir     or "/var/lib/tarantool"
-    d.snap_dir   = d.snap_dir    or "/var/lib/tarantool"
-    d.logger     = d.logger      or "/var/log/tarantool"
+    d.pid_file  = d.pid_file  or "/var/run/tarantool"
+    d.wal_dir   = d.wal_dir   or "/var/lib/tarantool"
+    d.memtx_dir = d.memtx_dir or d.snap_dir or "/var/lib/tarantool"
+    d.snap_dir  = nil
+    d.log       = d.log       or d.logger or "/var/log/tarantool"
+    d.logger    = nil
+    d.vinyl_dir = d.vinyl_dir or "/var/lib/tarantool"
 
-    d.pid_file   = fio.pathjoin(d.pid_file,   instance_name .. '.pid')
-    d.wal_dir    = fio.pathjoin(d.wal_dir,    instance_name)
-    d.snap_dir   = fio.pathjoin(d.snap_dir,   instance_name)
-    d.logger     = fio.pathjoin(d.logger,     instance_name .. '.log')
+    d.pid_file  = fio.pathjoin(d.pid_file,  instance_name .. '.pid')
+    d.wal_dir   = fio.pathjoin(d.wal_dir,   instance_name)
+    d.memtx_dir = fio.pathjoin(d.memtx_dir, instance_name)
+    d.vinyl_dir = fio.pathjoin(d.vinyl_dir, instance_name)
+    d.log       = fio.pathjoin(d.log,       instance_name .. '.log')
 
     default_cfg = d
 
@@ -281,26 +272,26 @@ local function load_default_file(default_file)
         local user_data = ffi.C.getpwnam(ffi.cast('const char*', d.username))
         if user_data == nil then
             log.error('Unknown user: %s', d.username)
-            os.exit(-1)
+            os.exit(1)
         end
 
         -- get group data
         local group = ffi.C.getgrgid(user_data.pw_gid)
         if group == nil then
             log.error('Group lookup by gid failed: %d', user_data.pw_gid)
-            os.exit(-1)
+            os.exit(1)
         end
         group_name = ffi.string(group.gr_name)
     end
 
     if instance_dir == nil then
         log.error('Instance directory (instance_dir) is not set in %s', default_file)
-        os.exit(-1)
+        os.exit(1)
     end
 
     if not fio.stat(instance_dir) then
         log.error('Instance directory %s does not exist', instance_dir)
-        os.exit(-1)
+        os.exit(1)
     end
 end
 
@@ -317,9 +308,9 @@ local function find_instance_name(arg0, arg2)
         log.error("Can't stat %s: %s", arg0, errno.strerror())
         os.exit(1)
     end
-    if not istat:is_link() then
-        usage()
-    end
+    if not istat:is_link() then usage(command_name) end
+    arg[2] = arg0
+    linkmode = true
     return fio.basename(arg0, '.lua')
 end
 
@@ -327,7 +318,7 @@ local function mkdir(dirname)
     log.info("mkdir %s", dirname)
     if not fio.mkdir(dirname, tonumber('0750', 8)) then
         log.error("Can't mkdir %s: %s", dirname, errno.strerror())
-        os.exit(-1)
+        os.exit(1)
     end
 
     if not usermode and
@@ -339,12 +330,17 @@ end
 
 local function read_file(filename)
     local file = fio.open(filename, {'O_RDONLY'})
+    if file == nil then
+        return nil, errno.strerror()
+    end
+
     local buf = {}
     local i = 1
-
     while true do
         buf[i] = file:read(1024)
-        if buf[i] == '' then
+        if buf[i] == nil then
+            return nil, errno.strerror()
+        elseif buf[i] == '' then
             break
         end
         i = i + 1
@@ -352,15 +348,49 @@ local function read_file(filename)
     return table.concat(buf)
 end
 
+-- Removes leading and trailing whitespaces
+local function string_trim(str)
+    return str:gsub("^%s*(.-)%s*$", "%1")
+end
+
+local function logger_parse(logger)
+    -- syslog
+    if logger:find("syslog:") then
+        logger = string_trim(logger:sub(8))
+        local args = {}
+        logger:gsub("([^,]+)", function(keyval)
+            keyval:gsub("([^=]+)=([^=]+)", function(key, val)
+                args[key] = val
+            end)
+        end)
+        return 'syslog', args
+    -- pipes
+    elseif logger:find("pipe:")   then
+        logger = string_trim(logger:sub(6))
+        return 'pipe', logger
+    elseif logger:find("|")       then
+        logger = string_trim(logger:sub(2))
+        return 'pipe', logger
+    -- files
+    elseif logger:find("file:")   then
+        logger = string_trim(logger:sub(6))
+        return 'file', logger
+    else
+        logger = string_trim(logger)
+        return 'file', logger
+    end
+end
+
 local function mk_default_dirs(cfg)
     local init_dirs = {
         fio.dirname(cfg.pid_file),
         cfg.wal_dir,
         cfg.snap_dir,
+        cfg.vinyl_dir,
     }
-    local log_dir = fio.dirname(cfg.logger)
-    if log_dir:find('|') == nil then
-        table.insert(init_dirs, log_dir)
+    local log_type, log_args = logger_parse(cfg.log)
+    if log_type == 'file' then
+        table.insert(init_dirs, fio.dirname(log_args))
     end
     for _, dir in ipairs(init_dirs) do
         if fio.stat(dir) == nil then
@@ -369,6 +399,120 @@ local function mk_default_dirs(cfg)
     end
 end
 
+-- systemd detection based on http://unix.stackexchange.com/a/164092
+local function forward_to_systemd()
+    if not usermode then
+        local rv = os.execute("systemctl 2>/dev/null | grep '\\-\\.mount' " ..
+                              "1>/dev/null 2>/dev/null")
+        if rv == 0 and ffi.C.getppid() >= 2 then
+            return true
+        end
+    end
+    return false
+end
+
+-- -------------------------------------------------------------------------- --
+--                            CAT command helpers                             --
+-- -------------------------------------------------------------------------- --
+
+local function find_in_list(id, list)
+    if type(list) == 'number' then
+        return id == list
+    end
+    for _, v in ipairs(list) do
+        if v == id then
+            return true
+        end
+    end
+    return false
+end
+
+local write_lua_table = nil
+
+-- escaped string will be written
+local function write_lua_string(string)
+    io.stdout:write("'")
+    local pos, byte = 1, string:byte(1)
+    while byte ~= nil do
+        io.stdout:write(("\\x%02x"):format(byte))
+        pos = pos + 1
+        byte = string:byte(pos)
+    end
+    io.stdout:write("'")
+end
+
+local function write_lua_value(value)
+    if type(value) == 'string' then
+        write_lua_string(value)
+    elseif type(value) == 'table' then
+        write_lua_table(value)
+    else
+        io.stdout:write(tostring(value))
+    end
+end
+
+local function write_lua_fieldpair(key, val)
+    io.stdout:write("[")
+    write_lua_value(key)
+    io.stdout:write("] = ")
+    write_lua_value(val)
+end
+
+write_lua_table = function(tuple)
+    io.stdout:write('{')
+    local is_begin = true
+    for key, val in pairs(tuple) do
+        if is_begin == false then
+            io.stdout:write(', ')
+        else
+            is_begin = false
+        end
+        write_lua_fieldpair(key, val)
+    end
+    io.stdout:write('}')
+end
+
+local function cat_lua_cb(record)
+    io.stdout:write(('box.space[%d]'):format(record.BODY.space_id))
+    local op = record.HEADER.type:lower()
+    io.stdout:write((':%s('):format(op))
+    if op == 'insert' or op == 'replace' then
+        write_lua_table(record.BODY.tuple)
+    elseif op == 'delete' then
+        write_lua_table(record.BODY.key)
+    elseif op == 'update' then
+        write_lua_table(record.BODY.key)
+        io.stdout:write(', ')
+        write_lua_table(record.BODY.tuple)
+    elseif op == 'upsert' then
+        write_lua_table(record.BODY.tuple)
+        io.stdout:write(', ')
+        write_lua_table(record.BODY.operations)
+    end
+    io.stdout:write(')\n')
+end
+
+local function cat_yaml_cb(record)
+    print(yaml.encode(record):sub(1, -6))
+end
+
+local function cat_json_cb(record)
+    print(json.encode(record))
+end
+
+local cat_formats = setmetatable({
+    yaml = cat_yaml_cb,
+    json = cat_json_cb,
+    lua  = cat_lua_cb,
+}, {
+    __index = function(self, cmd)
+        error(("Unknown formatter '%s'"):format(cmd))
+    end
+})
+
+-- -------------------------------------------------------------------------- --
+--                               Commands                                     --
+-- -------------------------------------------------------------------------- --
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
@@ -392,8 +536,11 @@ local function wrapper_cfg(cfg)
     local success, data = pcall(orig_cfg, cfg)
     if not success then
         log.error("Configuration failed: %s", data)
-        if fio.stat(default_cfg.logger) then
-            os.execute('tail -n 10 ' .. default_cfg.logger)
+        if type(cfg) ~= 'function' then
+            local log_type, log_args = logger_parse(cfg.log)
+            if log_type == 'file' and fio.stat(log_args) then
+                os.execute('tail -n 10 ' .. log_args)
+            end
         end
         os.exit(1)
     end
@@ -412,69 +559,109 @@ local function wrapper_cfg(cfg)
     return data
 end
 
+-- It's not 100% result guaranteed function, but it's ok for most cases
+-- Won't help in multiple race-conditions
+-- Returns nil if Tarantool already started, PID otherwise
+local function start_check()
+    local pid_file = default_cfg.pid_file
+
+    local fh = fio.open(pid_file, 'O_RDONLY')
+    if fh == nil then
+        return nil
+    end
+
+    local pid = tonumber(fh:read(64))
+    fh:close()
+
+    if pid == nil or (ffi.C.kill(pid, 0) < 0 and errno() == errno.ESRCH) then
+        return nil
+    end
+    return pid
+end
+
 local function start()
     log.info("Starting instance...")
+    if forward_to_systemd() then
+        local cmd = "systemctl start tarantool@" .. instance_name
+        log.info("Forwarding to '" .. cmd .. "'")
+        os.execute(cmd)
+        return
+    end
     local stat = check_file(instance_path)
     if stat ~= nil then
-        log.error("Error, while checking syntax: halting")
-        return 1
+        log.error("Error while checking syntax: halting")
+        os.exit(1)
+    end
+    local pid = start_check()
+    if pid then
+        log.error("The daemon is already running: PID %s", pid)
+        os.exit(1)
     end
     box.cfg = wrapper_cfg
     require('title').update{
         script_name = instance_path,
         __defer_update = true
     }
+    shift_argv(arg, 0, 2)
     local success, data = pcall(dofile, instance_path)
-    -- if load fails - show last 10 lines of the log file
+    -- if load fails - show last 10 lines of the log file and exit
     if not success then
         log.error("Start failed: %s", data)
-        if fio.stat(default_cfg.logger) then
-            os.execute('tail -n 10 ' .. default_cfg.logger)
+        if type(box.cfg) ~= 'function' then
+            local log_type, log_args = logger_parse(box.cfg.log)
+            if log_type == 'file' and fio.stat(log_args) then
+                os.execute('tail -n 10 ' .. log_args)
+            end
         end
+        os.exit(1)
     end
     return 0
 end
 
 local function stop()
-    local pid_file = default_cfg.pid_file
-
-    local function base_stop()
-        log.info("Stopping instance...")
-        if fio.stat(pid_file) == nil then
-            log.error("Process is not running (pid: %s)", pid_file)
-            return 0
-        end
-
-        local f = fio.open(pid_file, 'O_RDONLY')
-        if f == nil then
-            log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
-            return -1
-        end
-
-        local pid = tonumber(f:read(64))
-        f:close()
-
-        if pid == nil or pid <= 0 then
-            log.error("Broken pid file %s", pid_file)
-            return -1
-        end
-
-        if ffi.C.kill(pid, 15) < 0 then
-            log.error("Can't kill process %d: %s", pid, errno.strerror())
-            return -1
-        end
-        return 0
+    log.info("Stopping instance...")
+    if forward_to_systemd() then
+        local cmd = "systemctl stop tarantool@" .. instance_name
+        log.info("Forwarding to '" .. cmd .. "'")
+        os.execute(cmd)
+        return
     end
 
-    local rv = base_stop()
-    if fio.stat(pid_file) then
-        fio.unlink(pid_file)
-    end
+    -- remove console socket
     local console_sock = uri.parse(console_sock).service
     if fio.stat(console_sock) then
         fio.unlink(console_sock)
     end
-    return rv
+
+    -- kill process and remove pid file
+    local pid_file = default_cfg.pid_file
+    if fio.stat(pid_file) == nil then
+        log.error("Process is not running (pid: %s)", pid_file)
+        return 0
+    end
+
+    local f = fio.open(pid_file, 'O_RDONLY')
+    if f == nil then
+        log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
+        return 1
+    end
+
+    local pid = tonumber(f:read(64))
+    f:close()
+
+    if pid == nil or pid <= 0 then
+        log.error("Broken pid file %s", pid_file)
+        fio.unlink(pid_file)
+        return 1
+    end
+
+    if ffi.C.kill(pid, 15) < 0 then
+        log.error("Can't kill process %d: %s", pid, errno.strerror())
+        fio.unlink(pid_file)
+        return 1
+    end
+
+    return 0
 end
 
 local function check()
@@ -489,7 +676,7 @@ end
 local function restart()
     local stat = check_file(instance_path)
     if stat ~= nil then
-        log.error("Error, while checking syntax: halting")
+        log.error("Error while checking syntax: halting")
         return 1
     end
     stop()
@@ -529,10 +716,13 @@ local function enter()
             log.error("Please add $USER to group '%s': usermod -a -G %s $USER",
                       group_name, group_name)
         end
-        return -1
+        return 1
     end
 
-    local cmd = string.format("require('console').connect('%s')", console_sock)
+    local cmd = string.format(
+        "require('console').connect('%s', { connect_timeout = %s })",
+        console_sock, TIMEOUT_INFINITY
+    )
 
     console.on_start(function(self) self:eval(cmd) end)
     console.on_client_disconnect(function(self) self.running = false end)
@@ -540,10 +730,49 @@ local function enter()
     return 0
 end
 
+local function stdin_isatty()
+    return ffi.C.isatty(0) == 1
+end
+
+local function execute_remote(uri, code)
+    local remote = netbox.connect(uri, {
+        console = true, connect_timeout = TIMEOUT_INFINITY
+    })
+    if remote == nil then
+        return nil
+    end
+    return true, remote:eval(code)
+end
+
 local function connect()
+    if not stdin_isatty() then
+        local code = io.stdin:read("*a")
+        if code == nil then
+            usage(command_name)
+            return 1
+        end
+        local status, full_response = execute_remote(arg[2], code)
+        if not status then
+            log.error("Failed to connect to Tarantool")
+            return 2
+        end
+        local error_response = yaml.decode(full_response)[1]
+        if type(error_response) == 'table' and error_response.error then
+            log.error("Error while executing remote command:")
+            log.error(error_response.error)
+            return 3
+        end
+        print(full_response)
+        return 0
+    end
+    -- Otherwise we're starting console
     console.on_start(function(self)
         local status, reason
-        status, reason = pcall(function() require('console').connect(arg[0]) end)
+        status, reason = pcall(function()
+            require('console').connect(arg[2], {
+                connect_timeout = TIMEOUT_INFINITY
+            })
+        end)
         if not status then
             self:print(reason)
             self.running = false
@@ -589,40 +818,42 @@ end
 
 local function eval()
     local console_sock_path = uri.parse(console_sock).service
-    local filename = arg[1]
+    local filename = arg[3]
+    local code = nil
     if filename == nil then
-        log.error("Usage: tarantoolctl eval instance_name file.lua")
-        return 1
+        if stdin_isatty() then
+            log.error("Usage:")
+            log.error(" - tarantoolctl eval instance_name file.lua")
+            log.error(" - <command> | tarantoolctl eval instance_name")
+            return 1
+        end
+        code = io.stdin:read("*a")
+    else
+        local err
+        code, err = read_file(filename)
+        if code == nil then
+            log.error("%s: %s", filename, err)
+            return 2
+        end
     end
-    if fio.stat(filename) == nil and errno() == errno.ENOENT then
-        log.error("%s: file not found", filename)
-        return 1
-    end
-    if check_file(filename) ~= nil then
-        log.error("Error, while checking syntax: halting")
-        return 1
-    end
-    local content = digest.base64_encode(read_file(filename))
+
+    assert(code ~= nil, "Check that we've successfully loaded file")
 
     if fio.stat(console_sock_path) == nil then
-        log.warn("pid file exists, but the control socket (%s) doesn't",
+        log.warn("Pid file exists, but the control socket (%s) doesn't",
                  console_sock_path)
         return 2
     end
 
-    local u = uri.parse(console_sock)
-    local remote = require('net.box'):new(u.host, u.service,
-        { user = u.login, password = u.password })
-    local code = string.format(
-        'loadstring(require("digest").base64_decode([[%s]]))()',
-        content
-    )
-
-    local full_response = remote:console(code)
+    local status, full_response = execute_remote(console_sock, code)
+    if status == false then
+        log.error("Control socket exists, but Tarantool doesn't listen on it")
+        return 2
+    end
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
-        log.error("Error, while reloading config:")
-        log.info(error_response.error)
+        log.error("Error while reloading config:")
+        log.error(error_response.error)
         return 3
     end
 
@@ -630,48 +861,131 @@ local function eval()
     return 0
 end
 
+local function cat()
+    local options = keyword_arguments
+    local from, to, spaces = options.from, options.to, options.space
+    local show_system, cat_format = options['show-system'], options.format
+    local replicas = options.replica
+
+    local format_cb   = cat_formats[cat_format]
+    local is_printed  = false
+    for id, file in ipairs(positional_arguments) do
+        log.error("Processing file '%s'", file)
+        for lsn, record in xlog.pairs(file) do
+            local sid = record.BODY.space_id
+            local rid = record.HEADER.replica_id
+            -- space filter rules
+            local is_space_filtered    = spaces ~= nil
+            local is_space_system      = sid < 512 and show_system == false
+            local isnt_space_specified = not (is_space_filtered and
+                                              find_in_list(sid, spaces))
+            -- replica id filter rules
+            local is_replica_id_filtered    = replicas ~= nil
+            local isnt_replica_id_specified = not (is_replica_id_filtered and
+                                                   find_in_list(rid, replicas))
+
+            if (lsn < from) or
+               (is_space_filtered and is_space_system and
+                isnt_space_specified) or
+               (is_space_system and isnt_space_specified) or
+               (is_replica_id_filtered and isnt_replica_id_specified) then
+                -- pass this tuple
+            elseif lsn >= to then
+                -- stop, as we've finished reading tuple with lsn == to
+                -- and the next lsn's will be bigger
+                break
+            else
+                is_printed = true
+                format_cb(record)
+                io.stdout:flush()
+            end
+        end
+        if options.format == 'yaml' and is_printed then
+            is_printed = false
+            print('...\n')
+        end
+    end
+end
+
+local function play()
+    local options = keyword_arguments
+    local from, to, spaces = options.from, options.to, options.space
+    local show_system = options['show-system']
+    local uri = table.remove(positional_arguments, 1)
+    local replicas = options.replica
+
+    if uri == nil then
+        error("Empty URI is provided")
+    end
+    local remote = netbox.new(uri)
+    if not remote:wait_connected() then
+        error(("Error while connecting to host '%s'"):format(uri))
+    end
+    for id, file in ipairs(positional_arguments) do
+        log.info(("Processing file '%s'"):format(file))
+        for lsn, record in xlog.pairs(file) do
+            local sid = record.BODY.space_id
+            local rid = record.HEADER.replica_id
+            -- space filter rules
+            local is_space_filtered    = spaces ~= nil
+            local is_space_system      = sid < 512 and show_system == false
+            local isnt_space_specified = not (is_space_filtered and
+                                              find_in_list(sid, spaces))
+            -- replica id filter rules
+            local is_replica_id_filtered    = replicas ~= nil
+            local isnt_replica_id_specified = not (is_replica_id_filtered and
+                                                   find_in_list(rid, replicas))
+
+            if (lsn < from) or
+               (is_space_filtered and is_space_system and
+                isnt_space_specified) or
+               (is_space_system and isnt_space_specified) or
+               (is_replica_id_filtered and isnt_replica_id_specified) then
+                -- pass this tuple
+            elseif lsn >= to then
+                -- stop, as we've finished reading tuple with lsn == to
+                -- and the next lsn's will be bigger
+                break
+            else
+                local args, so = {}, remote.space[sid]
+                if so == nil then
+                    error(("No space #%s, stopping"):format(sid))
+                end
+                table.insert(args, so)
+                table.insert(args, record.BODY.key)
+                table.insert(args, record.BODY.tuple)
+                table.insert(args, record.BODY.operations)
+                so[record.HEADER.type:lower()](unpack(args))
+            end
+        end
+    end
+    remote:close()
+end
+
 local function exit_wrapper(func)
     return function() os.exit(func()) end
 end
 
-local_commands = {
-    start     = start,
-    stop      = exit_wrapper(stop),
-    logrotate = exit_wrapper(logrotate),
-    status    = exit_wrapper(status),
-    enter     = exit_wrapper(enter),
-    restart   = restart,
-    reload    = exit_wrapper(eval),
-    eval      = exit_wrapper(eval),
-    check     = exit_wrapper(check)
-}
-
-remote_commands = {
-    connect   = exit_wrapper(connect)
-}
-
-if #arg <2 then
-    usage()
+local function process_remote(cmd_function)
+    cmd_function()
 end
 
-default_file = find_default_file()
-
-if local_commands[arg[1]] ~= nil then
-    -- Check if the requested action is among supported ones, and return it in this
-    -- case. Otherwise print help and exit.
-    local cmd_function = local_commands[arg[1]]
-
+local function process_local(cmd_function)
     instance_name = find_instance_name(arg[0], arg[2])
+
+    default_file = find_default_file()
     load_default_file(default_file)
 
-    -- Pass the rest of command line arguments to the instance
-    shift_argv(arg, 0, 2)
+    if #arg < 2 then
+        log.error("Not enough arguments for '%s' command", command_name)
+        usage(command_name)
+    end
 
     instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
 
     if not fio.stat(instance_path) then
         log.error('Instance %s is not found in %s', instance_name, instance_dir)
-        os.exit(-1)
+        os.exit(1)
     end
 
     -- create a path to the control socket (admin console)
@@ -680,16 +994,287 @@ if local_commands[arg[1]] ~= nil then
     console_sock = 'unix/:' .. console_sock
 
     cmd_function()
-elseif remote_commands[arg[1]] ~= nil then
-    local cmd_function = remote_commands[arg[1]]
-
-    -- Pass the rest of command line arguments to the instance
-    shift_argv(arg, 0, 2)
-
-    cmd_function()
-else
-    log.error("Unknown command '%s'", arg[1])
-    usage()
 end
+
+local commands = setmetatable({
+    start = {
+        func = start, process = process_local, help = {
+            header = "%s start <instance_name>",
+            linkmode = "%s start",
+            description =
+[=[
+        Start a Tarantool instance (if not started; fail otherwise).
+]=],
+            weight = 10,
+            deprecated = false,
+        }
+    }, stop = {
+        func = exit_wrapper(stop), process = process_local, help = {
+            header = "%s stop <instance_name>",
+            linkmode = "%s stop",
+            description =
+[=[
+        Stop a Tarantool instance (if not stopped; fail otherwise).
+]=],
+            weight = 20,
+            deprecated = false,
+        }
+    }, logrotate = {
+        func = exit_wrapper(logrotate), process = process_local, help = {
+            header = "%s logrotate <instance_name>",
+            linkmode = "%s logrotate",
+            description =
+[=[
+        Rotate logs of a started Tarantool instance.
+        Works only if logging-into-file is enabled in the instance file.
+        Pipe/syslog make no effect.
+]=],
+            weight = 50,
+            deprecated = false,
+        }
+    }, status = {
+        func = exit_wrapper(status), process = process_local, help = {
+            header = "%s status <instance_name>",
+            linkmode = "%s status",
+            description =
+[=[
+        Show an instance's status (started/stopped).
+        If pid file exists and an alive control socket exists, the return code
+        is C<0>. Otherwise, the return code is not C<0>.
+
+        Reports typical problems to stderr (e.g. pid file exists and control
+        socket doesn't).
+
+]=],
+            weight = 30,
+            deprecated = false,
+        }
+    }, enter = {
+        func = exit_wrapper(enter), process = process_local, help = {
+            header = "%s enter <instance_name>",
+            linkmode = "%s enter",
+            description =
+[=[
+        Enter an instance's interactive Lua console.
+]=],
+            weight = 65,
+            deprecated = false,
+        }
+    }, restart = {
+        func = restart, process = process_local, help = {
+            header = "%s restart <instance_name>",
+            linkmode = "%s restart",
+            description =
+[=[
+        Stop and start a Tarantool instance (if started;
+        fail otherwise).
+]=],
+            weight = 40,
+            deprecated = false,
+        }
+    }, reload = {
+        func = exit_wrapper(eval), process = process_local, help = {
+            header = "%s reload <instance_name> <lua_file>",
+            linkmode = "%s reload <lua_file>",
+            description =
+[=[
+        DEPRECATED in favor of "eval"
+]=],
+            weight = 0,
+            deprecated = true,
+        }
+    }, eval = {
+        func = exit_wrapper(eval), process = process_local, help = {
+            header = {
+                "%s eval <instance_name> <lua_file>",
+                "<command> | %s eval <instance_name>"
+            },
+            linkmode = {
+                "%s eval <lua_file>",
+                "<command> | %s eval"
+            },
+            description =
+[=[
+        Evaluate a local file on a Tarantool instance (if started;
+        fail otherwise).
+]=],
+            weight = 70,
+            deprecated = false,
+        }
+    }, check = {
+        func = exit_wrapper(check), process = process_local, help = {
+            header = "%s check <instance_name>",
+            linkmode = "%s check",
+            description =
+[=[
+        Check an instance's script for syntax errors.
+]=],
+            weight = 60,
+            deprecated = false,
+        }
+    }, connect = {
+        func = exit_wrapper(connect), process = process_remote, help = {
+            header = {
+                "%s connect <instance_uri>",
+                "<command> | %s connect <instance_uri>"
+            },
+            description =
+[=[
+        Connect to a Tarantool instance on an admin-console port.
+        Supports both TCP/Unix sockets.
+]=],
+            weight = 80,
+            deprecated = false,
+        }
+    }, cat = {
+        func = exit_wrapper(cat), process = process_remote, help = {
+            header =
+                "%s cat <filename>.. [--space=space_no ..] [--show-system]" ..
+                " [--from=from_lsn] [--to=to_lsn] [--replica=replica_id ..]",
+            description =
+[=[
+        Print into stdout the contents of .snap/.xlog files.
+
+        Supported options:
+        * --space=space_no to filter the output by space number.
+          May be passed more than once.
+        * --show-system to show the contents of system spaces.
+        * --from=from_lsn to show operations starting from the given lsn.
+        * --to=to_lsn to show operations ending with the given lsn.
+        * --replica=replica_id to filter the output by replica id.
+          May be passed more than once.
+]=],
+            weight = 90,
+            deprecated = false,
+        }
+    }, play = {
+        func = exit_wrapper(play), process = process_remote, help = {
+            header =
+                "%s play <instance_uri> <filename>.. [--space=space_no ..]" ..
+                " [--show-system] [--from=from_lsn] [--to=to_lsn]",
+            description =
+[=[
+        Play the contents of .snap/.xlog files to another Tarantool instance.
+
+        Supported options:
+        * --space=space_no to filter the output by space number.
+          May be passed more than once.
+        * --show-system to show the contents of system spaces.
+        * --from=from_lsn to show operations starting from the given lsn.
+        * --to=to_lsn to show operations ending with the given lsn.
+        * --replica=replica_id to filter the output by replica id.
+          May be passed more than once.
+]=],
+            weight = 100,
+            deprecated = false,
+        }
+    }
+}, {
+    __index = function()
+        log.error("Unknown command '%s'", command_name)
+        usage()
+    end
+})
+
+local function usage_command(name, cmd)
+    local header = cmd.help.header
+    if linkmode then
+        header = cmd.help.linkmode
+    end
+    if type(header) == 'string' then
+        header = { header }
+    end
+    for no, line in ipairs(header) do
+        log.error("    " .. line, name)
+    end
+end
+
+local function usage_header()
+    log.error("Tarantool client utility (%s)", _TARANTOOL)
+end
+
+usage = function(command, verbose)
+    local name = fio.basename(arg[0])
+    do -- in case a command is passed and is a valid command
+        local command_struct = rawget(commands, command)
+        if command ~= nil and command_struct then
+            log.error("Usage:\n")
+            usage_command(name, command_struct, true)
+            log.error("")
+            log.error(command_struct.help.description)
+            os.exit(1)
+        end
+    end -- do this otherwise
+    usage_header()
+    if default_file ~= nil then
+        log.error("Config file: %s", default_file)
+    end
+    log.error("")
+    log.error("Usage:")
+    local names = fun.iter(commands):map(
+        function(name, cmd) return {name, cmd.help.weight or 0} end
+    ):totable()
+    table.sort(names, function(left, right) return left[2] < right[2] end)
+    for _, cmd_name in ipairs(names) do
+        local cmd = commands[cmd_name[1]]
+        if cmd.help.deprecated ~= true then
+            usage_command(name, cmd, false)
+            if verbose then
+                log.error("")
+                log.error(cmd.help.description)
+            end
+        end
+    end
+    os.exit(1)
+end
+-- parse parameters and put the result into positional/keyword_arguments
+do
+    local function keyword_arguments_populate(ka)
+        ka                = ka                or {}
+        ka.from           = ka.from           or 0
+        ka.to             = ka.to             or -1ULL
+        ka['show-system'] = ka['show-system'] or false
+        ka.format         = ka.format         or 'yaml'
+        return ka
+    end
+
+    -- returns the command name, file list and named parameters
+    local function parameters_parse(parameters)
+        local command_name = table.remove(parameters, 1)
+        local positional_arguments, keyword_arguments = {}, {}
+        for k, v in pairs(parameters) do
+            if type(k) == 'number' then
+                positional_arguments[k] = v
+            else
+                keyword_arguments[k] = v
+            end
+        end
+        return command_name, positional_arguments, keyword_arguments
+    end
+
+    local parameters = argparse(arg, {
+        { 'space',       'number+' },
+        { 'show-system', 'boolean' },
+        { 'from',        'number'  },
+        { 'to',          'number'  },
+        { 'help',        'boolean' },
+        { 'format',      'string'  },
+        { 'replica',     'number+' },
+    })
+
+    local cmd_name
+    cmd_name, positional_arguments, keyword_arguments = parameters_parse(parameters)
+    if cmd_name == 'help' or parameters.help == true or #arg < 1 then
+        usage(cmd_name, true)
+    end
+    keyword_arguments = keyword_arguments_populate(parameters)
+end
+
+local cmd_pair = commands[command_name]
+if #arg < 2 then
+    log.error("Not enough arguments for '%s' command\n", command_name)
+    usage(command_name)
+end
+cmd_pair.process(cmd_pair.func)
 
 -- vim: syntax=lua

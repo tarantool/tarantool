@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -36,8 +36,8 @@
 #include "lua/msgpack.h"
 
 #include "box/txn.h"
-#include "box/request.h"
 #include "box/xrow.h"
+#include "box/iproto_constants.h"
 #include "box/iproto_port.h"
 #include "box/lua/tuple.h"
 #include "small/obuf.h"
@@ -309,7 +309,17 @@ execute_lua_call(lua_State *L)
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
 
-	uint32_t count = luamp_encode_call(L, cfg, &stream);
+	int count;
+	if (request->type == IPROTO_CALL_16) {
+		/* Tarantool < 1.7.1 compatibility */
+		count = luamp_encode_call(L, cfg, &stream);
+	} else {
+		assert(request->type == IPROTO_CALL);
+		count = lua_gettop(L);
+		for (int k = 1; k <= count; ++k) {
+			luamp_encode(L, cfg, &stream, k);
+		}
+	}
 
 	mpstream_flush(&stream);
 	iproto_reply_select(out, svp, request->header->sync, count);

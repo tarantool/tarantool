@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_FIO_H_INCLUDED
 #define TARANTOOL_FIO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -49,14 +49,15 @@ const char *
 fio_filename(int fd);
 
 struct iovec;
+
 /**
  * Read up to N bytes from file into the buffer,
  * re-trying for interrupted reads. In case of a non-transient
  * error, writes a message to the error log.
  *
- * @param fd		file descriptor.
- * @param buf		pointer to the buffer.
- * @param count		how many bytes to read.
+ * @param fd file descriptor.
+ * @param buf pointer to the buffer.
+ * @param count how many bytes to read.
  *
  * @return When count is 0, returns 0. When count > SSIZE_MAX,
  *         the result is unspecified. Otherwise, returns the total
@@ -64,21 +65,31 @@ struct iovec;
  *         reached and less than count bytes are read, the actual
  *         number of bytes read is returned (can be 0 or more).
  *
- *         Blocking I/O:
- *         -------------
  *         If an error occurs after a few bytes were read, -1 is
  *         returned and current read offset is unspecified.
- *
- *         Non-blocking I/O
- *         ----------------
- *         Same as with blocking I/O but:
- *         If EAGAIN/EWOULDBLOCK occurs right away, returns -1,
- *         like read().
- *         If EAGAIN/EWOULDBLOCK occurs after a few bytes were
- *        read, the actual number of bytes read is returned.
  */
 ssize_t
 fio_read(int fd, void *buf, size_t count);
+
+/**
+ * Read up to N bytes from file into the buffer,
+ * re-trying for interrupted reads. In case of a non-transient
+ * error, writes a message to the error log.
+ *
+ *
+ * @param fd file descriptor.
+ * @param buf pointer to the buffer.
+ * @param count how many bytes to read.
+ * @param offset file offset
+ *
+ * @return When count is 0, returns 0. When count > SSIZE_MAX,
+ *         the result is unspecified. Otherwise, returns the total
+ *         number of bytes read, or -1 if error.  In case EOF is
+ *         reached and less than count bytes are read, the actual
+ *         number of bytes read is returned (can be 0 or more).
+ */
+ssize_t
+fio_pread(int fd, void *buf, size_t count, off_t offset);
 
 /**
  * Write the given buffer, re-trying for partial writes
@@ -90,26 +101,12 @@ fio_read(int fd, void *buf, size_t count);
  * @param buf		pointer to a buffer.
  * @param count		buffer size.
  *
- * @return When count is 0, returns 0. When count is positive,
- *         returns the total number of bytes written, or -1 if error.
- *
- *         Blocking I/O:
- *         -------------
- *         If an error occurs after a few bytes were written, -1 is
- *         returned and current write offset is unspecified.
- *         In other words, with blocking I/O this function
- *         returns either -1 or count.
- *
- *         Non-blocking I/O
- *         ----------------
- *         If EAGAIN/EWOULDBLOCK occurs and no data's been written
- *         yet, sets errno to EAGAIN and returns -1 (like read()).
- *         If EAGAIN/EWOULDBLOCK happens after a few bytes were
- *         written, the actual number of bytes written is
- *         returned.
+ * @retval  0 on success
+ * @retval -1 on error. If an error occurs after a few bytes were written
+ *            then current write offset of \a fd is unspecified.
  */
-ssize_t
-fio_write(int fd, const void *buf, size_t count);
+int
+fio_writen(int fd, const void *buf, size_t count);
 
 /**
  * A simple wrapper around writev().
@@ -137,6 +134,21 @@ fio_write(int fd, const void *buf, size_t count);
  */
 ssize_t
 fio_writev(int fd, struct iovec *iov, int iovcnt);
+
+/**
+ * A wrapper around writev, but retries for partial writes
+ *
+ * @param fd		file descriptor.
+ * @param iov           a vector of buffer descriptors (@sa man
+ *                      writev).
+ * @param count		vector size
+ *
+ * @return When count is 0, returns 0. When count is positive,
+ *         returns the total number of bytes written, or -1 if error.
+ */
+
+ssize_t
+fio_writevn(int fd, struct iovec *iov, int iovcnt);
 
 /**
  * An error-reporting aware wrapper around lseek().

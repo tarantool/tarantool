@@ -1,6 +1,11 @@
-# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=1.6)](https://travis-ci.org/tarantool/tarantool)
+# Tarantool
 
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status][travis-badge]][travis-url]
+[![Code Coverage][coverage-badge]][coverage-url]
+[![Telegram][telegram-badge]][telegram-url]
+[![Slack][slack-badge]][slack-url]
+[![Gitter][gitter-badge]][gitter-url]
+[![Google Groups][groups-badge]][groups-url]
 
 http://tarantool.org
 
@@ -8,7 +13,7 @@ Tarantool is an in-memory database and application server.
 
 Key features of the application server:
  * 100% compatible drop-in replacement for Lua 5.1,
-   based on LuaJIT 2.0.
+   based on LuaJIT 2.1.
    Simply use #!/usr/bin/tarantool instead of
    #!/usr/bin/lua in your script.
  * full support for Lua modules and a rich set of
@@ -21,7 +26,7 @@ Key features of the database:
  * two data engines: 100% in-memory with
    optional persistence and a 2-level disk-based
    B-tree, to use with large data sets
- * multiple index types: HASH, TREE, BITSET
+ * multiple index types: HASH, TREE, RTREE, BITSET
  * asynchronous master-master replication
  * authentication and access control
  * the database is just a C extension to the
@@ -33,68 +38,27 @@ Tarantool is ideal for data-enriched components of
 scalable Web architecture: queue servers, caches,
 stateful Web applications.
 
-## Compilation and install
+To download and install Tarantool as a binary package for your OS, please visit
+https://tarantool.org/download.html.
 
-Tarantool is written in C and C++.
-To build, you will need GCC or Apple CLang compiler.
-
-CMake is used for configuration management.
-3 standard CMake build types are supported:
- * Debug -- used by project maintainers
- * RelWithDebInfo -- the most common release configuration,
- also provides debugging capabilities
- * Release -- use only if the highest performance is required
-
-The build depends on the following external libraries:
-
-- Readline development files (libreadline-dev/readline-devel package).
-- OpenSSL development files (libssl-dev/openssl-devel package).
-- GNU bfd which is the part of GNU binutils (binutils-dev/binutils-devel package).
-
-Please follow these steps to compile Tarantool:
-
-    # If compiling from git
-    tarantool $ git submodule update --init --recursive
-
-    tarantool $ cmake .
-    tarantool $ make
-
-To use a different release type, say, RelWithDebInfo, use:
-
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
-
-Additional build options can be set similarly:
-
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_DOC=true # builds the docs
-
-'make' creates 'tarantool' executable in directory src/.
-
-There is 'make install' goal. One can also run Tarantool executable without
-installation.
-
-To start the server, try:
-
-    tarantool $ ./src/tarantool
-
-This will start Tarantool in interactive mode.
-
-To run Tarantool regression tests (test/test-run.py),
-a few additional Python modules are necessary:
- * PyYAML==3.10
- * argparse==1.1
- * msgpack-python==0.4.6
- * gevent==1.1b5
- * six>=1.8.0
-
-Or run:
-```
-pip install -r test-run/requirements.txt
-```
-
-Simply type 'make test' to fire off the test coverage.
+To build Tarantool from source, see detailed instructions in the Tarantool
+documentation at https://tarantool.org/doc/dev_guide/building_from_source.html.
 
 Please report bugs at http://github.com/tarantool/tarantool/issues
 We also warmly welcome your feedback in the discussion mailing
 list, tarantool@googlegroups.com.
 
 Thank you for your interest in Tarantool!
+
+[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=1.7
+[travis-url]: https://travis-ci.org/tarantool/tarantool
+[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.7
+[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=1.7
+[groups-badge]: https://img.shields.io/badge/Google-Groups-orange.svg
+[groups-url]: https://groups.google.com/forum/#!forum/tarantool
+[telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
+[telegram-url]: http://telegram.me/tarantool
+[slack-badge]: https://img.shields.io/badge/Slack-join%20chat-lightgrey.svg
+[slack-url]: http://slack.tarantool.org/
+[gitter-badge]: https://badges.gitter.im/Join%20Chat.svg
+[gitter-url]: https://gitter.im/tarantool/tarantool

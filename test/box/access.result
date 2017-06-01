@@ -226,7 +226,7 @@ LISTEN ~= nil
 ---
 - true
 ...
-c = (require 'net.box'):new(LISTEN.host, LISTEN.service)
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 ---
 ...
 c:call('nosuchfunction')
@@ -258,7 +258,7 @@ box.schema.user.create('testus')
 s = box.schema.space.create('admin_space')
 ---
 ...
-index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+index = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
 ---
 ...
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
@@ -586,7 +586,7 @@ box.schema.user.exists('nosuchuser')
 ...
 box.schema.user.exists{}
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 -- gh-671: box.schema.func.exists()
 box.schema.func.exists('nosuchfunc')
@@ -719,4 +719,28 @@ box.space._user.index.name:delete{'public'}
 #box.schema.role.info('public') > 0
 ---
 - true
+...
+-- A test case for: http://bugs.launchpad.net/bugs/712456
+-- Verify that when trying to access a non-existing or
+-- very large space id, no crash occurs.
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
+---
+...
+c:_request("select", nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+---
+- error: Space '1' does not exist
+...
+c:_request("select", nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+---
+- error: Space '65537' does not exist
+...
+c:_request("select", nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+---
+- error: Space '4294967295' does not exist
+...
+c:close()
+---
 ...

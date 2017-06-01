@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+---
+...
 box.cfg.wal_mode
 ---
 - none
@@ -39,17 +42,34 @@ box.snapshot()
 ---
 - ok
 ...
-box.snapshot()
----
-- error: can't save snapshot, errno 17 (File exists)
-...
-space:truncate()
+_, e = pcall(box.snapshot)
 ---
 ...
-box.snapshot()
+e.type, e.errno
 ---
-- ok
+- SystemError
+- 17
+...
+e.errno
+---
+- 17
+...
+_, e = pcall(box.snapshot)
+---
+...
+e.type, e.errno
+---
+- SystemError
+- 17
+...
+e.errno
+---
+- 17
 ...
 space:drop()
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

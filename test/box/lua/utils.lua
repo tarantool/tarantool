@@ -16,7 +16,7 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 	local types = space_field_types(space_no);
 	local function get_field(tuple, field_no)
 		local f = tuple[field_no]
-		if (types[field_no] == 'NUM') then
+		if (types[field_no] == 'unsigned') then
 			return string.format('%8d', f);
 		else
 			return f
@@ -61,7 +61,7 @@ function arithmetic(d, count)
 	end
 end
 
-function table.shuffle(t)
+function table_shuffle(t)
 	local n = #t
 	while n >= 2 do
 		local k = math.random(n)
@@ -70,7 +70,7 @@ function table.shuffle(t)
 	end
 end
 
-function table.generate(iter)
+function table_generate(iter)
 	local t = {};
 	for k in iter do
 		table.insert(t, k);
@@ -80,7 +80,7 @@ function table.generate(iter)
 end
 
 -- sort all rows as strings(not for tables);
-function box.sort(tuples)
+function sort(tuples)
     local function compare_tables(t1, t2)
         return (tostring(t1) < tostring(t2))
     end
@@ -89,7 +89,7 @@ function box.sort(tuples)
 end;
 
 -- return string tuple
-function box.tuple.to_string(tuple, yaml)
+function tuple_to_string(tuple, yaml)
     ans = '['
     for i = 0, #tuple - 1 do
         if #i == 4 then
@@ -110,3 +110,108 @@ function box.tuple.to_string(tuple, yaml)
     return ans
 end;
 
+function check_space(space, N)
+    local errors = {}
+
+    --
+    -- Insert
+    --
+    local keys = {}
+    math.randomseed(0)
+    for i=1,N do
+        local key = math.random(2147483647)
+        keys[i] = key
+        space:insert({key, 0})
+    end
+
+    --
+    -- Select
+    --
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        local tuple = space:get({key})
+        if tuple == nil or tuple[1] ~= key then
+            table.insert(errors, {'missing key after insert', key})
+        end
+    end
+
+    --
+    -- Delete some keys
+    --
+    table_shuffle(keys)
+    for i=1,N,3 do
+        local key = keys[i]
+        space:delete({key})
+    end
+
+    --
+    -- Upsert
+    --
+    for k=1,2 do
+        -- Insert/update valuaes
+        table_shuffle(keys)
+        for i=1,N do
+            local key = keys[i]
+            space:upsert({key, 1}, {{'+', 2, 1}})
+        end
+        -- Check values
+        table_shuffle(keys)
+        for i=1,N do
+            local key = keys[i]
+            local tuple = space:get({key})
+            if tuple == nil or tuple[1] ~= key then
+                table.insert(errors, {'missing key after upsert', key})
+            end
+            if tuple[2] ~= k then
+                table.insert(errors, {'invalid value after upsert', key,
+                             'found', tuple[2], 'expected', k})
+            end
+        end
+    end
+
+    --
+    -- Delete
+    --
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        space:delete({key})
+    end
+
+    for i=1,N do
+        local key = keys[i]
+        if space:get({key}) ~= nil then
+            table.insert(errors, {'found deleted key', key})
+        end
+    end
+
+    local count = #space:select()
+    -- :len() doesn't work on vinyl
+    if count ~= 0 then
+        table.insert(errors, {'invalid count after delete', count})
+    end
+
+    return errors
+end
+
+function space_bsize(s)
+    local bsize = 0
+    for _, t in s:pairs() do
+        bsize = bsize + t:bsize()
+    end
+
+    return bsize
+end
+
+return {
+    space_field_types = space_field_types;
+    iterate = iterate;
+    arithmetic = arithmetic;
+    table_generate = table_generate;
+    table_shuffle = table_shuffle;
+    sort = sort;
+    tuple_to_string = tuple_to_string;
+    check_space = check_space;
+    space_bsize = space_bsize;
+};

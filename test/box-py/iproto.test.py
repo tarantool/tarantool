@@ -5,7 +5,7 @@ import socket
 import msgpack
 from tarantool.const import *
 from tarantool import Connection
-from tarantool.request import Request, RequestInsert, RequestSelect
+from tarantool.request import Request, RequestInsert, RequestSelect, RequestUpdate, RequestUpsert
 from tarantool.response import Response
 from lib.tarantool_connection import TarantoolConnection
 
@@ -154,7 +154,7 @@ admin("space:drop()")
 # gh-522: Broken compatibility with msgpack-python for strings of size 33..255
 #
 admin("space = box.schema.space.create('test')")
-admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'str'}})")
+admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'string'}})")
 
 class RawInsert(Request):
     request_type = REQUEST_TYPE_INSERT
@@ -282,4 +282,89 @@ c.close()
 admin("space:drop()")
 admin("space2:drop()")
 
+#
+# gh-1280 Segmentation fault on space.select(tuple()) or space.select([2])
+#
+admin("space = box.schema.create_space('gh1280', { engine = 'vinyl' })")
+admin("index = space:create_index('primary')")
+admin("space:insert({1})")
+admin("space:insert({2, 'Music'})")
+admin("space:insert({3, 'Length', 93})")
+
+iproto.py_con.space('gh1280').select([])
+iproto.py_con.space('gh1280').select(list())
+
+
+admin("space:drop()")
+
 admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
+
+#
+# gh-272 if the packet was incorrect, respond with an error code
+# gh-1654 do not close connnection on invalid request
+#
+print """
+# Test bugs gh-272, gh-1654 if the packet was incorrect, respond with
+# an error code and do not close connection
+"""
+
+c = Connection('localhost', server.iproto.port)
+c.connect()
+s = c._socket
+header = { "hello": "world"}
+body = { "bug": 272 }
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT }
+header[IPROTO_SYNC] = 1234
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+header[IPROTO_SYNC] = 5678
+body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
+resp = test_request(header, body)
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+c.close()
+
+
+admin("space = box.schema.space.create('test_index_base', { id = 568 })")
+admin("index = space:create_index('primary', { type = 'hash' })")
+admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')")
+
+c = Connection('localhost', server.iproto.port)
+c.connect()
+s = c._socket
+
+request = RequestInsert(c, 568, [1, 0, 0, 0])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+request = RequestUpdate(c, 568, 0, [1], [['+', 2, 1], ['-', 3, 1]])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+request = RequestUpsert(c, 568, 0, [1, 0, 0, 0], [['+', 2, 1], ['-', 3, 1]])
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+
+request = RequestSelect(c, 568, 0, [1], 0, 1, 0)
+try:
+    s.send(bytes(request))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response = Response(c, c._read_response())
+print response.__str__()
+
+c.close()
+admin("space:drop()")
+

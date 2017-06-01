@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -51,7 +51,8 @@
 #include "box/lua/session.h"
 #include "box/lua/net_box.h"
 #include "box/lua/cfg.h"
-
+#include "box/lua/xlog.h"
+#include "box/lua/console.h"
 
 extern char session_lua[],
 	tuple_lua[],
@@ -59,7 +60,8 @@ extern char session_lua[],
 	load_cfg_lua[],
 	snapshot_daemon_lua[],
 	net_box_lua[],
-	upgrade_lua[];
+	upgrade_lua[],
+	console_lua[];
 
 static const char *lua_sources[] = {
 	"box/session", session_lua,
@@ -68,6 +70,7 @@ static const char *lua_sources[] = {
 	"box/snapshot_daemon", snapshot_daemon_lua,
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
+	"box/console", console_lua,
 	"box/load_cfg", load_cfg_lua,
 	NULL
 };
@@ -84,7 +87,8 @@ static int
 lbox_rollback(lua_State *L)
 {
 	(void)L;
-	box_txn_rollback();
+	if (box_txn_rollback() != 0)
+		return luaT_error(L);
 	return 0;
 }
 
@@ -96,15 +100,70 @@ lbox_snapshot(struct lua_State *L)
 		lua_pushstring(L, "ok");
 		return 1;
 	}
-	luaL_error(L, "can't save snapshot, errno %d (%s)",
-		   ret, strerror(ret));
+	return luaT_error(L);
+}
+
+static int
+lbox_gc(struct lua_State *L)
+{
+	int64_t lsn = luaL_checkint64(L, 1);
+	box_gc(lsn);
+	return 0;
+}
+
+/** Argument passed to lbox_backup_fn(). */
+struct lbox_backup_arg {
+	/** Lua state. */
+	struct lua_State *L;
+	/** Number of files in the resulting table. */
+	int file_count;
+};
+
+static int
+lbox_backup_cb(const char *path, void *cb_arg)
+{
+	struct lbox_backup_arg *arg = cb_arg;
+	lua_pushinteger(arg->L, ++arg->file_count);
+	lua_pushstring(arg->L, path);
+	lua_settable(arg->L, -3);
+	return 0;
+}
+
+static int
+lbox_backup_start(struct lua_State *L)
+{
+	lua_newtable(L);
+	struct lbox_backup_arg arg = {
+		.L = L,
+	};
+	if (box_backup_start(lbox_backup_cb, &arg) != 0)
+		return luaT_error(L);
 	return 1;
+}
+
+static int
+lbox_backup_stop(struct lua_State *L)
+{
+	(void)L;
+	box_backup_stop();
+	return 0;
 }
 
 static const struct luaL_reg boxlib[] = {
 	{"commit", lbox_commit},
 	{"rollback", lbox_rollback},
 	{"snapshot", lbox_snapshot},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg boxlib_internal[] = {
+	{"gc", lbox_gc},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg boxlib_backup[] = {
+	{"start", lbox_backup_start},
+	{"stop", lbox_backup_stop},
 	{NULL, NULL}
 };
 
@@ -115,6 +174,12 @@ box_lua_init(struct lua_State *L)
 {
 	/* Use luaL_register() to set _G.box */
 	luaL_register(L, "box", boxlib);
+	lua_pop(L, 1);
+
+	luaL_register(L, "box.internal", boxlib_internal);
+	lua_pop(L, 1);
+
+	luaL_register(L, "box.backup", boxlib_backup);
 	lua_pop(L, 1);
 
 	box_lua_error_init(L);
@@ -128,7 +193,10 @@ box_lua_init(struct lua_State *L)
 	box_lua_info_init(L);
 	box_lua_stat_init(L);
 	box_lua_session_init(L);
+	box_lua_xlog_init(L);
 	luaopen_net_box(L);
+	lua_pop(L, 1);
+	tarantool_lua_console_init(L);
 	lua_pop(L, 1);
 
 	/* Load Lua extension */

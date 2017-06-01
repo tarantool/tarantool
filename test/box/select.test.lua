@@ -4,7 +4,7 @@ test_run = env.new()
 
 s = box.schema.space.create('select', { temporary = true })
 index1 = s:create_index('primary', { type = 'tree' })
-index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
+index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'unsigned', 1, 'unsigned'}})
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 
 test_run:cmd("setopt delimiter ';'")

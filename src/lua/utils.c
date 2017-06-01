@@ -32,6 +32,8 @@
 
 #include <assert.h>
 #include <errno.h>
+
+#include <trivia/util.h>
 #include <diag.h>
 #include <fiber.h>
 
@@ -56,10 +58,6 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 	CTSize size;
 	CTState *cts = ctype_cts(L);
 	CTInfo info = lj_ctype_info(cts, ctypeid, &size);
-
-	/* Only numbers and pointers are implemented */
-	assert(ctype_isnum(info) || ctype_isptr(info));
-	(void) info;
 	assert(size != CTSIZE_INVALID);
 
 	/* Allocate a new cdata */
@@ -71,15 +69,27 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 	incr_top(L);
 
 	/*
-	 * lj_cconv_ct_init is omitted because it actually does memset()
+	 * lj_cconv_ct_init is omitted for non-structs because it actually
+	 * does memset()
 	 * Caveats: cdata memory is returned uninitialized
 	 */
-
-	/*
-	 * __gc is omitted because it is only needed for structs.
-	 * Caveats: struct are not supported by this function.
-	 * Please set finalizer using luaL_setcdatagc() if you need.
-	 */
+	if (ctype_isstruct(info)) {
+		/* Initialize cdata. */
+		CType *ct = ctype_raw(cts, ctypeid);
+		lj_cconv_ct_init(cts, ct, size, cdataptr(cd), o,
+				 (MSize)(L->top - o));
+		/* Handle ctype __gc metamethod. Use the fast lookup here. */
+		cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)ctypeid);
+		if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
+			GCtab *t = cts->finalizer;
+			if (gcref(t->metatable)) {
+				/* Add to finalizer table, if still enabled. */
+				copyTV(L, lj_tab_set(L, t, o), tv);
+				lj_gc_anybarriert(L, t);
+				cd->marked |= LJ_GC_CDATA_FIN;
+			}
+		}
+	}
 
 	lj_gc_check(L);
 	return cdataptr(cd);
@@ -243,7 +253,7 @@ luaL_serializer_cfg(lua_State *L)
 			lua_pushinteger(L, *pval);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 		/* Save normalized value to serializer.cfg table */
 		lua_setfield(L, 1, OPTIONS[i].name);
@@ -300,7 +310,7 @@ luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg
 			lua_pushinteger(L, *pval);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 		lua_setfield(L, -2, OPTIONS[i].name);
 	}
@@ -892,8 +902,8 @@ luaL_error_gc(struct lua_State *L)
 	return 0;
 }
 
-static void
-luaL_pusherror(struct lua_State *L, struct error *e)
+void
+luaT_pusherror(struct lua_State *L, struct error *e)
 {
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
 	struct error **ptr = (struct error **) luaL_pushcdata(L,
@@ -911,16 +921,16 @@ luaT_error(lua_State *L)
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
 	/*
-	 * gh-1955 luaL_pusherror allocates Lua objects, thus it may trigger
+	 * gh-1955 luaT_pusherror allocates Lua objects, thus it may trigger
 	 * GC. GC may invoke finalizers which are arbitrary Lua code,
 	 * potentially invalidating last error object, hence error_ref
 	 * below.
 	 */
 	error_ref(e);
-	luaL_pusherror(L, e);
+	luaT_pusherror(L, e);
 	error_unref(e);
 	lua_error(L);
-	assert(0); /* unreachable */
+	unreachable();
 	return 0;
 }
 

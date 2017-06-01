@@ -1,8 +1,8 @@
 env = require('test_run')
 test_run = env.new()
 space = box.schema.space.create('tweedledum')
-index1 = space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
-index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
+index1 = space:create_index('primary', { type ='hash', parts = {1, 'string'}, unique = true })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
 -- A test case for Bug#1042738
 -- https://bugs.launchpad.net/tarantool/+bug/1042738
 -- Iteration over a non-unique TREE index
@@ -60,7 +60,7 @@ space:drop()
 -- index:count() works too long
 fiber = require('fiber')
 s = box.schema.create_space('test')
-i1 = s:create_index('test', {parts = {1, 'num'}})
+i1 = s:create_index('test', {parts = {1, 'unsigned'}})
 for i = 1,10000 do s:insert{i} end
 count = 0
 done = false

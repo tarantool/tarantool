@@ -1,7 +1,7 @@
-dofile('utils.lua')
+utils = dofile('utils.lua')
 
 s0 = box.schema.space.create('tweedledum')
-i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 
 bsize = i0:bsize()
 
@@ -30,10 +30,10 @@ s0:insert{''}
 s0:insert{'12'}
 
 s1 = box.schema.space.create('tweedledee')
-i1 = s1:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
+i1 = s1:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
 
 s2 = box.schema.space.create('alice')
-i2 = s2:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
+i2 = s2:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
 
 -- string keys
 s1:insert{'identifier', 'tuple'}
@@ -92,17 +92,6 @@ s0.index['primary']:get{200}
 s0.index['primary']:get{199}
 s0.index['primary']:get{201}
 
--- Test partially specified keys in TREE indexes
-s1:insert{'abcd'}
-s1:insert{'abcda'}
-s1:insert{'abcda_'}
-s1:insert{'abcdb'}
-s1:insert{'abcdb_'}
-s1:insert{'abcdb__'}
-s1:insert{'abcdb___'}
-s1:insert{'abcdc'}
-s1:insert{'abcdc_'}
-box.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
 s1:drop()
 s1 = nil
 s2:drop()
@@ -113,9 +102,9 @@ s2 = nil
 --
 s0:truncate()
 
-i1 = s0:create_index('i1', { type = 'tree', parts = {2, 'num'}, unique = true })
-i2 = s0:create_index('i2', { type = 'tree', parts = {3, 'num'}, unique = false })
-i3 = s0:create_index('i3', { type = 'tree', parts = {4, 'num'}, unique = true })
+i1 = s0:create_index('i1', { type = 'tree', parts = {2, 'unsigned'}, unique = true })
+i2 = s0:create_index('i2', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+i3 = s0:create_index('i3', { type = 'tree', parts = {4, 'unsigned'}, unique = true })
 
 s0:insert{0, 0, 0, 0}
 s0:insert{1, 1, 1, 1}
@@ -195,9 +184,9 @@ s0:insert{4, 4, 0, 4}
 s0:insert{5, 5, 0, 5}
 s0:insert{6, 6, 0, 6}
 s0:replace{5, 5, 0, 5}
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 s0:delete{5}
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 
 s0:drop()
 s0 = nil

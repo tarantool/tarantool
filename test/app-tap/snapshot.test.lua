@@ -6,7 +6,7 @@ local tap = require('tap')
 local ffi = require('ffi')
 local fio = require('fio')
 
-box.cfg{ logger="tarantool.log", slab_alloc_arena=0.1, rows_per_wal=5000}
+box.cfg{ log="tarantool.log", memtx_memory=107374182, rows_per_wal=5000}
 
 local test = tap.test("snapshot")
 test:plan(3)
@@ -79,10 +79,10 @@ test:ok(true, 'gh-695: avoid overwriting tuple data necessary for smfree()')
 -------------------------------------------------------------------------------
 
 local s1 = box.schema.create_space('test1', { engine = 'memtx'})
-local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'num'} })
+local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 local s2 = box.schema.create_space('test2', { engine = 'memtx'})
-local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'num'} })
+local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 for i = 1,1000 do s1:insert{i, i, i} end
 

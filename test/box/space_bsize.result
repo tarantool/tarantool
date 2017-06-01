@@ -1,0 +1,103 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+utils = dofile('utils.lua')
+---
+...
+s = box.schema.space.create('space_bsize')
+---
+...
+idx = s:create_index('primary')
+---
+...
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+---
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
+for i = 1, 13, 2 do s:delete{ i } end
+---
+...
+s:bsize()
+---
+- 60
+...
+utils.space_bsize(s)
+---
+- 60
+...
+for i = 2, 13, 2 do s:update( { i }, {{ ":", 2, i, 0, string.rep('y', i) }} ) end
+---
+...
+s:bsize()
+---
+- 102
+...
+utils.space_bsize(s)
+---
+- 102
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("restart server default")
+utils = dofile('utils.lua')
+---
+...
+s = box.space['space_bsize']
+---
+...
+s:bsize()
+---
+- 102
+...
+utils.space_bsize(s)
+---
+- 102
+...
+for i = 1, 13, 2 do s:insert{ i, string.rep('y', i) } end
+---
+...
+s:bsize()
+---
+- 172
+...
+utils.space_bsize(s)
+---
+- 172
+...
+s:truncate()
+---
+...
+s:bsize()
+---
+- 0
+...
+utils.space_bsize(s)
+---
+- 0
+...
+for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
+---
+...
+s:bsize()
+---
+- 130
+...
+utils.space_bsize(s)
+---
+- 130
+...
+s:drop()
+---
+...

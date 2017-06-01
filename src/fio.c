@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -48,15 +48,15 @@ fio_filename(int fd)
 {
 #ifdef TARGET_OS_LINUX
 	int save_errno = errno;
-	char proc_path[32];
-	static __thread char filename_path[PATH_MAX];
 
-	sprintf(proc_path, "/proc/self/fd/%d", fd);
+	char *proc_path = tt_static_buf();
+	snprintf(proc_path, TT_STATIC_BUF_LEN, "/proc/self/fd/%d", fd);
+	char *filename_path = tt_static_buf();
 
-	ssize_t sz = readlink(proc_path, filename_path,
-			      sizeof(filename_path));
+	ssize_t sz = readlink(proc_path, filename_path, TT_STATIC_BUF_LEN);
 	errno = save_errno;
 	if (sz >= 0) {
+		sz = MIN(sz, TT_STATIC_BUF_LEN - 1);
 		filename_path[sz] = '\0';
 		return filename_path;
 	}
@@ -69,30 +69,51 @@ fio_filename(int fd)
 ssize_t
 fio_read(int fd, void *buf, size_t count)
 {
-	ssize_t to_read = (size_t) count;
-	while (to_read > 0) {
-		ssize_t nrd = read(fd, buf, to_read);
+	size_t n = 0;
+	do {
+		ssize_t nrd = read(fd, buf + n, count - n);
 		if (nrd < 0) {
 			if (errno == EINTR) {
 				errno = 0;
 				continue;
 			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return (ssize_t)count != to_read ? (ssize_t)count - to_read : -1;
 			say_syserror("read, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
+		} else if (nrd == 0) {
+			break; /* EOF */
 		}
-		if (nrd == 0)
-			break;
+		n += nrd;
+	} while (n < count);
 
-		buf += nrd;
-		to_read -= nrd;
-	}
-	return count - to_read;
+	assert(n <= count);
+	return n;
 }
 
 ssize_t
-fio_write(int fd, const void *buf, size_t count)
+fio_pread(int fd, void *buf, size_t count, off_t offset)
+{
+	size_t n = 0;
+	do {
+		ssize_t nrd = pread(fd, buf + n, count - n, offset + n);
+		if (nrd < 0) {
+			if (errno == EINTR) {
+				errno = 0;
+				continue;
+			}
+			say_syserror("pread, [%s]", fio_filename(fd));
+			return -1;
+		} else if (nrd == 0) {
+			break; /* EOF */
+		}
+		n += nrd;
+	} while (n < count);
+
+	assert(n <= count);
+	return n;
+}
+
+int
+fio_writen(int fd, const void *buf, size_t count)
 {
 	ssize_t to_write = (ssize_t) count;
 	while (to_write > 0) {
@@ -102,20 +123,16 @@ fio_write(int fd, const void *buf, size_t count)
 				errno = 0;
 				continue;
 			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return (ssize_t)count != to_write ? (ssize_t)count - to_write : -1;
 			say_syserror("write, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}
-		if (nwr == 0)
-			break;
-
 		buf += nwr;
 		to_write -= nwr;
 	}
-	return count - to_write;
-}
+	assert(to_write == 0);
 
+	return 0;
+}
 
 ssize_t
 fio_writev(int fd, struct iovec *iov, int iovcnt)
@@ -132,6 +149,32 @@ restart:
 		if (errno != EAGAIN && errno != EWOULDBLOCK)
 			say_syserror("writev, [%s]", fio_filename(fd));
 	}
+	return nwr;
+}
+
+ssize_t
+fio_writevn(int fd, struct iovec *iov, int iovcnt)
+{
+	assert(iov && iovcnt >= 0);
+	ssize_t nwr = 0;
+	int iov_pos = 0;
+	struct fio_batch *batch = fio_batch_new();
+	while (iov_pos < iovcnt) {
+		int iov_to_batch = MIN(batch->max_iov, iovcnt - iov_pos);
+		memmove(batch->iov + batch->iovcnt, iov + iov_pos,
+			sizeof(struct iovec) * iov_to_batch);
+		fio_batch_add(batch, iov_to_batch);
+		iov_pos += iov_to_batch;
+		while (batch->iovcnt) {
+			ssize_t written = fio_batch_write(batch, fd);
+			if (written < 0) {
+				fio_batch_delete(batch);
+				return -1;
+			}
+			nwr += written;
+		}
+	}
+	fio_batch_delete(batch);
 	return nwr;
 }
 

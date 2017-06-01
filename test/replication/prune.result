@@ -13,6 +13,9 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+engine = test_run:get_cfg('engine')
+---
+...
 replica_set = require('fast_replica')
 ---
 ...
@@ -23,15 +26,11 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
-#box.info.vclock == 1
----
-- true
-...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
 -- Create space and fill it
-space = box.schema.create_space('test')
+space = box.schema.create_space('test', {engine = engine})
 ---
 ...
 index = box.space.test:create_index('primary')
@@ -51,10 +50,6 @@ box.space._cluster:len() == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
----
-- true
-...
 -- try to add one more replica
 uuid = require('uuid')
 ---
@@ -68,10 +63,6 @@ replica_set.drop_all(test_run)
 ---
 ...
 box.space._cluster:len() == 1
----
-- true
-...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
@@ -104,10 +95,6 @@ box.space._cluster:len() == 2
 ---
 - true
 ...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
----
-- true
-...
 -- Cleanup
 replica_set.drop_all(test_run)
 ---
@@ -116,9 +103,55 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
+-- delete replica from master
+replica_set.join(test_run, 1)
+---
+...
+while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
+---
+...
+-- Check server ids
+test_run:cmd('eval replica1 "return box.info.server.id"')
+---
+- [2]
+...
+box.space._cluster:len() == 2
 ---
 - true
+...
+replica_set.unregister(test_run, 2)
+---
+...
+while test_run:cmd('eval replica1 "box.info.replication[1].status"')[1] ~= 'stopped' do fiber.sleep(0.001) end
+---
+...
+test_run:cmd('eval replica1 "box.info.replication[1].message"')
+---
+- ['The local instance id 2 is read-only']
+...
+-- restart replica and check that replica isn't able to join to cluster
+test_run:cmd('restart server replica1')
+---
+- true
+...
+test_run:cmd('switch default')
+---
+- true
+...
+box.space._cluster:len() == 1
+---
+- true
+...
+test_run:cmd('eval replica1 "box.info.replication[1].status"')
+---
+- ['stopped']
+...
+test_run:cmd('eval replica1 "box.info.replication[1].message"')[1]:match("is not registered with replica set") ~= nil
+---
+- true
+...
+replica_set.delete(test_run, 2)
+---
 ...
 box.space.test:drop()
 ---

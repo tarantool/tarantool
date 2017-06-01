@@ -20,7 +20,7 @@ LISTEN ~= nil
 ---
 - true
 ...
-conn = (require 'net.box'):new(LISTEN.host, LISTEN.service)
+conn = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 ---
 ...
 conn.space[space.id]:select(3, { iterator = 'GE' })

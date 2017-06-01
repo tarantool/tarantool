@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,14 +33,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pmatomic.h>
 
-#include "say.h"
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
-#include "small/pmatomic.h"
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
+
+#if ENABLE_ASAN
+#include <sanitizer/asan_interface.h>
+
+#define ASAN_START_SWITCH_FIBER(var_name, will_switch_back, bottom, size) \
+	void *var_name = NULL; \
+	__sanitizer_start_switch_fiber((will_switch_back) ? &var_name : NULL, \
+                                       (bottom), (size))
+#define ASAN_FINISH_SWITCH_FIBER(var_name) \
+	__sanitizer_finish_switch_fiber(var_name);
+
+#else
+#define ASAN_START_SWITCH_FIBER(var_name, will_switch_back, bottom, size)
+#define ASAN_FINISH_SWITCH_FIBER(var_name)
+#endif
 
 /*
  * Defines a handler to be executed on exit from cord's thread func,
@@ -78,37 +92,51 @@ update_last_stack_frame(struct fiber *fiber)
 static void
 fiber_recycle(struct fiber *fiber);
 
-void
-fiber_call(struct fiber *callee)
+/**
+ * Transfer control to callee fiber.
+ */
+static void
+fiber_call_impl(struct fiber *callee)
 {
 	struct fiber *caller = fiber();
 	struct cord *cord = cord();
 
 	/* Ensure we aren't switching to a fiber parked in fiber_loop */
-	assert(callee->f != NULL);
-
-	/* Ensure the callee was removed from cord->ready list.
+	assert(callee->f != NULL && callee->fid != 0);
+	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
+	assert(! (callee->flags & FIBER_IS_DEAD));
+	/*
+	 * Ensure the callee was removed from cord->ready list.
 	 * If it wasn't, the callee will observe a 'spurious' wakeup
 	 * later, due to a fiber_wakeup() performed in the past.
-	 *
-	 * To put it another way, fiber_wakeup() is a 'request' to
-	 * schedule the fiber for execution, and once it is executing
-	 * a wakeup request is considered complete and it must be
-	 * removed. */
+	 */
 	assert(rlist_empty(&callee->state));
-
-	assert(cord->call_stack_depth < FIBER_CALL_STACK);
 	assert(caller);
 	assert(caller != callee);
 
-	cord->call_stack_depth++;
 	cord->fiber = callee;
-	callee->caller = caller;
 
 	update_last_stack_frame(caller);
 
+	callee->flags &= ~FIBER_IS_READY;
 	callee->csw++;
+	ASAN_START_SWITCH_FIBER(asan_state, 1,
+				callee->coro.stack,
+				callee->coro.stack_size);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+	ASAN_FINISH_SWITCH_FIBER(asan_state);
+}
+
+void
+fiber_call(struct fiber *callee)
+{
+	callee->caller = fiber();
+	assert(! (callee->caller->flags & FIBER_IS_READY));
+	assert(rlist_empty(&callee->state));
+	assert(! (callee->flags & FIBER_IS_READY));
+	callee->flags |= FIBER_IS_READY;
+	callee->caller->flags |= FIBER_IS_READY;
+	fiber_call_impl(callee);
 }
 
 void
@@ -122,47 +150,78 @@ fiber_start(struct fiber *callee, ...)
 bool
 fiber_checkstack()
 {
-	if (cord()->call_stack_depth + 1 >= FIBER_CALL_STACK)
-		return true;
 	return false;
 }
 
-/** Interrupt a synchronous wait of a fiber inside the event loop.
+/**
+ * Interrupt a synchronous wait of a fiber inside the event loop.
  * We do so by keeping an "async" event in every fiber, solely
  * for this purpose, and raising this event here.
+ *
+ * @note: if this is sent to self, followed by a fiber_yield()
+ * call, it simply reschedules the fiber after other ready
+ * fibers in the same event loop iteration.
  */
-
 void
 fiber_wakeup(struct fiber *f)
 {
-	/** Remove the fiber from whatever wait list it is on. */
-	rlist_del(&f->state);
+	assert(! (f->flags & FIBER_IS_DEAD));
+	/**
+	 * Do nothing if the fiber is already in cord->ready
+	 * list *or* is in the call chain created by
+	 * fiber_schedule_list(). While it's harmless to re-add
+	 * a fiber to cord->ready, even if it's already there,
+	 * but the same game is deadly when the fiber is in
+	 * the callee list created by fiber_schedule_list().
+	 *
+	 * To put it another way, fiber_wakeup() is a 'request' to
+	 * schedule the fiber for execution, and once it is executing
+	 * a wakeup request is considered complete and it must be
+	 * removed.
+	 *
+	 * A dead fiber can be lingering in the cord fiber list
+	 * if it is joinable. This makes it technically possible
+	 * to schedule it. We would never make such a mistake
+	 * in our own code, hence the assert above. But as long
+	 * as fiber.wakeup() is a part of public Lua API, an
+	 * external rock can mess things up. Ignore such attempts
+	 * as well.
+	 */
+	if (f->flags & (FIBER_IS_READY | FIBER_IS_DEAD))
+		return;
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
 		/*
-		 * ev_feed_event() is possibly faster,
-		 * but EV_CUSTOM event gets scheduled in the
-		 * same event loop iteration, which can
-		 * produce unfair scheduling, (see the case of
-		 * fiber_sleep(0))
+		 * ev_feed_event(EV_CUSTOM) gets scheduled in the
+		 * same event loop iteration, and we rely on this
+		 * for quick scheduling. For a wakeup which
+		 * actually can invoke a poll() in libev,
+		 * use fiber_sleep(0)
 		 */
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
 	}
+	/**
+	 * Removes the fiber from whatever wait list it is on.
+	 *
+	 * It's critical that the newly scheduled fiber is
+	 * added to the tail of the list, to preserve correct
+	 * transaction commit order after a successful WAL write.
+	 * (see tx_schedule_commit()/tx_schedule_rollback() in
+	 * box/wal.cc)
+	 */
 	rlist_move_tail_entry(&cord->ready, f, state);
+	f->flags |= FIBER_IS_READY;
 }
 
 /** Cancel the subject fiber.
 *
- * Note: this is not guaranteed to return immediately, since
- * requires a level of cooperation on behalf of the fiber. A fiber
- * may opt to set FIBER_IS_CANCELLABLE to false, and never test that
- * it was cancelled. Such fiber can not ever be cancelled, and
- * for such fiber this call will lead to an infinite wait.
- * However, as long as most of the cooperative code calls fiber_testcancel(),
- * most of the fibers are cancellable.
+ * Note: cancelation is asynchronous. Use fiber_join() to wait for the
+ * cancelation to complete.
  *
- * Currently cancellation can only be synchronous: this call
- * returns only when the subject fiber has terminated.
+ * A fiber may opt to set FIBER_IS_CANCELLABLE to false, and never test
+ * that it was cancelled.  Such fiber can not ever be cancelled.
+ * However, as long as most of the cooperative code calls
+ * fiber_testcancel(), most of the fibers are cancellable.
  *
  * The fiber which is cancelled, has FiberIsCancelled raised
  * in it. For cancellation to work, this exception type should be
@@ -173,18 +232,22 @@ fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
 	struct fiber *self = fiber();
+	/**
+	 * Do nothing if the fiber is dead, since cancelling
+	 * the fiber would clear the diagnostics area and
+	 * the cause of death would be lost.
+	 */
+	if (fiber_is_dead(f))
+		return;
 
 	f->flags |= FIBER_IS_CANCELLED;
 
 	/**
-	 * Don't wait for self and for fibers which are already
-	 * dead.
+	 * Don't wake self and zombies.
 	 */
-	if (f != self && !fiber_is_dead(f)) {
-		rlist_add_tail_entry(&f->wake, self, state);
+	if (f != self) {
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
-		fiber_yield();
 	}
 }
 
@@ -241,7 +304,7 @@ fiber_reschedule(void)
 	fiber_yield();
 }
 
-void
+int
 fiber_join(struct fiber *fiber)
 {
 	assert(fiber->flags & FIBER_IS_JOINABLE);
@@ -253,13 +316,20 @@ fiber_join(struct fiber *fiber)
 	assert(fiber_is_dead(fiber));
 	bool fiber_was_cancelled = fiber->flags & FIBER_IS_CANCELLED;
 	/* Move exception to the caller */
-	diag_move(&fiber->diag, &fiber()->diag);
+	int ret = fiber->f_ret;
+	if (ret != 0) {
+		assert(!diag_is_empty(&fiber->diag));
+		diag_move(&fiber->diag, &fiber()->diag);
+	}
 	/** Don't bother with propagation of FiberIsCancelled */
-	if (fiber_was_cancelled)
+	if (fiber_was_cancelled) {
 		diag_clear(&fiber()->diag);
+		ret = 0;
+	}
 
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
+	return ret;
 }
 
 /**
@@ -273,18 +343,25 @@ fiber_yield(void)
 	struct cord *cord = cord();
 	struct fiber *caller = cord->fiber;
 	struct fiber *callee = caller->caller;
-	cord->call_stack_depth--;
 	caller->caller = &cord->sched;
 
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
 
+	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
+	assert(! (callee->flags & FIBER_IS_DEAD));
 	cord->fiber = callee;
 	update_last_stack_frame(caller);
 
 	callee->csw++;
+	callee->flags &= ~FIBER_IS_READY;
+	ASAN_START_SWITCH_FIBER(asan_state,
+				(caller->flags & FIBER_IS_DEAD) == 0,
+				callee->coro.stack,
+				callee->coro.stack_size);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+	ASAN_FINISH_SWITCH_FIBER(asan_state);
 }
 
 struct fiber_watcher_data {
@@ -324,7 +401,7 @@ fiber_yield_timeout(ev_tstamp delay)
 }
 
 /**
- * @note: this is a cancellation point (@sa fiber_testcancel())
+ * Yield the current fiber to events in the event loop.
  */
 void
 fiber_sleep(double delay)
@@ -332,9 +409,9 @@ fiber_sleep(double delay)
 	/*
 	 * libev sleeps at least backend_mintime, which is 1 ms in
 	 * case of poll()/Linux, unless there are idle watchers.
-	 * This is a special hack to speed up fiber_sleep(0),
-	 * i.e. a sleep with a zero timeout, to ensure that there
-	 * is no 1 ms delay in case of zero sleep timeout.
+	 * So, to properly implement fiber_sleep(0), i.e. a sleep
+	 * with a zero timeout, we set up an idle watcher, and
+	 * it triggers libev to poll() with zero timeout.
 	 */
 	if (delay == 0) {
 		ev_idle_start(loop(), &cord()->idle_event);
@@ -357,26 +434,33 @@ fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 	(void) revents;
 	struct fiber *fiber = watcher->data;
 	assert(fiber() == &cord()->sched);
-	/*
-	 * Assert the fiber will not be scheduled twice because
-	 * it's also on the 'ready' list.
-	 */
-	assert(rlist_empty(&fiber->state));
-	fiber_call(fiber);
+	fiber_wakeup(fiber);
 }
 
 static inline void
 fiber_schedule_list(struct rlist *list)
 {
-	/** Don't schedule both lists at the same time. */
-	struct rlist copy;
-	rlist_create(&copy);
-	rlist_swap(list, &copy);
-	while (! rlist_empty(&copy)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&copy, struct fiber, state);
-		fiber_call(f);
+	struct fiber *first;
+	struct fiber *last;
+
+	/*
+	 * Happens when a fiber exits and is removed from cord->ready
+	 * resulting in the empty list.
+	 */
+	if (rlist_empty(list))
+		return;
+
+	first = last = rlist_shift_entry(list, struct fiber, state);
+	assert(last->flags & FIBER_IS_READY);
+
+	while (! rlist_empty(list)) {
+		last->caller = rlist_shift_entry(list, struct fiber, state);
+		last = last->caller;
+		assert(last->flags & FIBER_IS_READY);
 	}
+	last->caller = fiber();
+	assert(fiber() == &cord()->sched);
+	fiber_call_impl(first);
 }
 
 static void
@@ -463,13 +547,15 @@ fiber_recycle(struct fiber *fiber)
 }
 
 static void
-fiber_loop(void *data __attribute__((unused)))
+fiber_loop(MAYBE_UNUSED void *data)
 {
+	ASAN_FINISH_SWITCH_FIBER(NULL);
 	for (;;) {
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		if (fiber_invoke(fiber->f, fiber->f_data) != 0) {
+		fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		if (fiber->f_ret != 0) {
 			struct error *e = diag_last_error(&fiber->diag);
 			/* diag must not be empty on error */
 			assert(e != NULL || fiber->flags & FIBER_IS_CANCELLED);
@@ -494,6 +580,7 @@ fiber_loop(void *data __attribute__((unused)))
 		       struct fiber *f;
 		       f = rlist_shift_entry(&fiber->wake, struct fiber,
 					     state);
+		       assert(f != fiber);
 		       fiber_wakeup(f);
 	        }
 		if (! rlist_empty(&fiber->on_stop))
@@ -553,7 +640,7 @@ fiber_new(const char *name, fiber_func f)
 		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
 		fiber = (struct fiber *)
-			mempool_alloc(&cord->fiber_pool);
+			mempool_alloc(&cord->fiber_mempool);
 		if (fiber == NULL) {
 			diag_set(OutOfMemory, sizeof(struct fiber),
 				 "fiber pool", "fiber");
@@ -563,7 +650,7 @@ fiber_new(const char *name, fiber_func f)
 
 		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
 					  fiber_loop, NULL)) {
-			mempool_free(&cord->fiber_pool, fiber);
+			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}
 
@@ -622,15 +709,16 @@ fiber_destroy_all(struct cord *cord)
 		fiber_destroy(cord, f);
 }
 
-static void
-cord_init(const char *name)
+void
+cord_create(struct cord *cord, const char *name)
 {
-	struct cord *cord = cord();
+	cord() = cord;
+	slab_cache_set_thread(&cord()->slabc);
 
 	cord->id = pthread_self();
 	cord->on_exit = NULL;
 	slab_cache_create(&cord->slabc, &runtime);
-	mempool_create(&cord->fiber_pool, &cord->slabc,
+	mempool_create(&cord->fiber_mempool, &cord->slabc,
 		       sizeof(struct fiber));
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
@@ -638,7 +726,6 @@ cord_init(const char *name)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
-	cord->call_stack_depth = 0;
 	cord->sched.fid = 1;
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);
@@ -656,9 +743,18 @@ cord_init(const char *name)
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 	cord_set_name(name);
+
+#if ENABLE_ASAN
+	/* Record stack extents */
+	tt_pthread_attr_getstack(cord->id, &cord->sched.coro.stack,
+				 &cord->sched.coro.stack_size);
+#else
+	cord->sched.coro.stack = NULL;
+	cord->sched.coro.stack_size = 0;
+#endif
 }
 
-static void
+void
 cord_destroy(struct cord *cord)
 {
 	slab_cache_set_thread(&cord->slabc);
@@ -692,9 +788,7 @@ struct cord_thread_arg
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
-	cord() = ct_arg->cord;
-	slab_cache_set_thread(&cord()->slabc);
-	cord_init(ct_arg->name);
+	cord_create(ct_arg->cord, (ct_arg->name));
 	/** Can't possibly be the main thread */
 	assert(cord()->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
@@ -731,10 +825,16 @@ cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 	tt_pthread_mutex_lock(&ct_arg.start_mutex);
-	if (!(cord->loop = ev_loop_new(EVFLAG_AUTO | EVFLAG_ALLOCFD)))
+	cord->loop = ev_loop_new(EVFLAG_AUTO | EVFLAG_ALLOCFD);
+	if (cord->loop == NULL) {
+		diag_set(OutOfMemory, 0, "ev_loop_new", "ev_loop");
 		goto end;
-	if (tt_pthread_create(&cord->id, NULL, cord_thread_func, &ct_arg))
+	}
+	if (tt_pthread_create(&cord->id, NULL,
+			      cord_thread_func, &ct_arg) != 0) {
+		diag_set(SystemError, "failed to create thread");
 		goto end;
+	}
 	res = 0;
 	while (! ct_arg.is_started)
 		tt_pthread_cond_wait(&ct_arg.start_cond, &ct_arg.start_mutex);
@@ -758,15 +858,14 @@ cord_join(struct cord *cord)
 	void *retval = NULL;
 	int res = tt_pthread_join(cord->id, &retval);
 	if (res == 0) {
-		/*
-		 * cord_thread_func guarantees that
-		 * cord->exception is only set if the subject cord
-		 * has terminated with an uncaught exception,
-		 * transfer it to the caller. If there is
-		 * no exception, this clears the caller's
-		 * diagnostics area.
-		 */
-		diag_move(&cord->fiber->diag, &fiber()->diag);
+		struct fiber *f = cord->fiber;
+		if (f->f_ret != 0) {
+			assert(!diag_is_empty(&f->diag));
+			diag_move(&f->diag, diag_get());
+			res = -1;
+		}
+	} else {
+		diag_set(SystemError, "failed to join with thread");
 	}
 	cord_destroy(cord);
 	return res;
@@ -904,7 +1003,7 @@ cord_costart_thread_func(void *arg)
 	 * terminated, if any.
 	 */
 	assert(fiber_is_dead(f));
-	fiber_join(f);
+	fiber()->f_ret = fiber_join(f);
 
 	return NULL;
 }
@@ -914,8 +1013,11 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg)
 {
 	/** Must be allocated to avoid races. */
 	struct costart_ctx *ctx = (struct costart_ctx *) malloc(sizeof(*ctx));
-	if (ctx == NULL)
+	if (ctx == NULL) {
+		diag_set(OutOfMemory, sizeof(struct costart_ctx),
+			 "malloc", "costart_ctx");
 		return -1;
+	}
 	ctx->run = f;
 	ctx->arg = arg;
 	if (cord_start(cord, name, cord_costart_thread_func, ctx) == -1) {
@@ -952,9 +1054,8 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
-	cord() = &main_cord;
-	cord()->loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
-	cord_init("main");
+	main_cord.loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
+	cord_create(&main_cord, "main");
 }
 
 void

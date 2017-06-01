@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -46,11 +46,11 @@ rmean_roll(int64_t *value, double dt)
 }
 
 int64_t
-rmean_mean(int64_t *value)
+rmean_mean(struct rmean *rmean, size_t name)
 {
 	int64_t mean = 0;
 	for (size_t j = 1; j <= RMEAN_WINDOW; j++)
-		mean += value[j];
+		mean += rmean->stats[name].value[j];
 	/* value[0] not adds because second isn't over */
 
 	return mean / RMEAN_WINDOW;
@@ -72,8 +72,8 @@ rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 		if (rmean->stats[i].name == NULL)
 			continue;
 		int res = cb(rmean->stats[i].name,
-			     rmean_mean(rmean->stats[i].value),
-			     rmean->stats[i].total,
+			     rmean_mean(rmean, i),
+			     rmean_total(rmean, i),
 			     cb_ctx);
 		if (res != 0)
 			return res;

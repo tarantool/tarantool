@@ -1,0 +1,102 @@
+test_run = require('test_run').new()
+---
+...
+fiber = require('fiber')
+---
+...
+space = box.schema.space.create("vinyl", { engine = 'vinyl' })
+---
+...
+_= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 2 })
+---
+...
+function vyinfo() return box.info.vinyl().db[box.space.vinyl.id..'/0'] end
+---
+...
+vyinfo().run_count == 0
+---
+- true
+...
+-- create the frist run
+space:insert({1})
+---
+- [1]
+...
+space:replace({1, 2})
+---
+- [1, 2]
+...
+space:upsert({1},{{'=', 4, 5}}) -- bad upsert
+---
+...
+require('log').info(string.rep(" ", 1024))
+---
+...
+space:select()
+---
+- - [1, 2]
+...
+space:select()
+---
+- - [1, 2]
+...
+-- gh-1571: bad upsert should not log on reads
+test_run:grep_log('default', 'UPSERT operation failed', 400) == nil
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
+vyinfo().run_count == 1
+---
+- true
+...
+-- create the second run
+space:replace({2,2})
+---
+- [2, 2]
+...
+space:upsert({2},{{'=',4,5}}) -- bad upsert
+---
+...
+box.snapshot() -- create the second run
+---
+- ok
+...
+vyinfo().run_count == 2
+---
+- true
+...
+-- create a few more runs to trigger compaction
+space:insert({3, 3})
+---
+- [3, 3]
+...
+box.snapshot()
+---
+- ok
+...
+-- wait for compaction
+while vyinfo().run_count >= 2 do fiber.sleep(0.1) end
+---
+...
+vyinfo().run_count == 1
+---
+- true
+...
+-- gh-1571: bad upsert should log on compaction
+test_run:grep_log('default', 'UPSERT operation failed') ~= nil
+---
+- true
+...
+space:drop()
+---
+...
+fiber = nil
+---
+...
+test_run = nil
+---
+...

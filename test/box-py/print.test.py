@@ -15,7 +15,7 @@ admin("""local f = require('fiber').create(
         io.flush()
     end
 )""")
-admin("require('fiber').sleep(0.1)")
+admin("require('fiber').sleep(0.01)")
 
 print("Check log line (Hello):")
 print('---')

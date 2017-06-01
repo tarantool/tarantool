@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_BOX_H
 #define INCLUDES_TARANTOOL_BOX_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -48,16 +48,38 @@ struct port;
 struct request;
 struct xrow_header;
 struct obuf;
+struct ev_io;
 
-/** To be called at program start. */
-void box_load_cfg();
-/** To be called at program end. */
-void box_free(void);
+/*
+ * Initialize box library
+ */
+int
+box_init(void);
 
-/** A pthread_atfork() callback for box */
+/**
+ * Cleanup box library
+ */
 void
-box_atfork();
+box_free(void);
 
+/**
+ * Load configuration for box library.
+ * Panics on error.
+ */
+void
+box_cfg(void);
+
+/**
+ * Return true if box has been configured, i.e. box_cfg() was called.
+ */
+bool
+box_is_configured(void);
+
+/**
+ * A pthread_atfork() callback for box
+ */
+void
+box_atfork(void);
 
 void
 box_set_ro(bool ro);
@@ -66,7 +88,7 @@ bool
 box_is_ro(void);
 
 /** True if snapshot is in progress. */
-extern bool snapshot_in_progress;
+extern bool box_snapshot_is_in_progress;
 /** Incremented with each next snapshot. */
 extern uint32_t snapshot_version;
 
@@ -77,6 +99,29 @@ extern uint32_t snapshot_version;
 int box_snapshot(void);
 
 /**
+ * Remove files that are not needed to recover
+ * from snapshot with @lsn or newer.
+ */
+void box_gc(int64_t lsn);
+
+typedef int (*box_backup_cb)(const char *path, void *arg);
+
+/**
+ * Start a backup. This function calls @cb for each file that
+ * needs to be backed up to recover from the last checkpoint.
+ * The caller is supposed to call box_backup_stop() after he's
+ * done copying the files.
+ */
+int
+box_backup_start(box_backup_cb cb, void *cb_arg);
+
+/**
+ * Finish backup started with box_backup_start().
+ */
+void
+box_backup_stop(void);
+
+/**
  * Spit out some basic module status (master/slave, etc.
  */
 const char *box_status(void);
@@ -85,7 +130,7 @@ const char *box_status(void);
 } /* extern "C" */
 
 void
-box_process_auth(struct request *request);
+box_process_auth(struct request *request, struct obuf *out);
 
 void
 box_process_call(struct request *request, struct obuf *out);
@@ -94,10 +139,10 @@ void
 box_process_eval(struct request *request, struct obuf *out);
 
 void
-box_process_join(int fd, struct xrow_header *header);
+box_process_join(struct ev_io *io, struct xrow_header *header);
 
 void
-box_process_subscribe(int fd, struct xrow_header *header);
+box_process_subscribe(struct ev_io *io, struct xrow_header *header);
 
 /**
  * Check Lua configuration before initialization or
@@ -108,14 +153,13 @@ box_check_config();
 
 void box_bind(void);
 void box_listen(void);
-void box_set_replication_source(void);
-void box_set_wal_mode(void);
+void box_set_replication(void);
 void box_set_log_level(void);
 void box_set_io_collect_interval(void);
 void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
-void box_set_panic_on_wal_error(void);
+void box_set_force_recovery(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -235,9 +279,9 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
  * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
  * \param key_end the end of encoded \a key.
  * \param ops encoded operations in MsgPack Arrat format, e.g.
- * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * [ [ '=', fieldno,  value ],  ['!', 2, 'xxx'] ]
  * \param ops_end the end of encoded \a ops
- * \param index_base 0 if field_ids in update operations are zero-based
+ * \param index_base 0 if fieldnos in update operations are zero-based
  * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
  * \param[out] result a new tuple. Can be set to NULL to discard result.
  * \retval -1 on error (check box_error_last())
@@ -256,11 +300,11 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
  * \param space_id space identifier
  * \param index_id index identifier
  * \param ops encoded operations in MsgPack Arrat format, e.g.
- * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * [ [ '=', fieldno,  value ],  ['!', 2, 'xxx'] ]
  * \param ops_end the end of encoded \a ops
  * \param tuple encoded tuple in MsgPack Array format ([ field1, field2, ...])
  * \param tuple_end end of @a tuple
- * \param index_base 0 if field_ids in update operations are zero-based
+ * \param index_base 0 if fieldnos in update operations are zero-based
  * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
  * \param[out] result a new tuple. Can be set to NULL to discard result.
  * \retval -1 on error (check box_error_last())
@@ -273,6 +317,14 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	   const char *tuple_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result);
 
+/**
+ * Truncate space.
+ *
+ * \param space_id space identifier
+ */
+API_EXPORT int
+box_truncate(uint32_t space_id);
+
 /** \endcond public */
 
 /**
@@ -284,6 +336,9 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
  */
 int
 box_process1(struct request *request, box_tuple_t **result);
+
+int
+boxk(int type, uint32_t space_id, const char *format, ...);
 
 #if defined(__cplusplus)
 } /* extern "C" */

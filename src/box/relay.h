@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_REPLICATION_RELAY_H_INCLUDED
 #define TARANTOOL_REPLICATION_RELAY_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,8 +32,11 @@
  */
 #include "evio.h"
 #include "fiber.h"
+#include "vclock.h"
+#include "xstream.h"
 
-struct xrow_header;
+struct replica;
+struct tt_uuid;
 
 /** State of a replication relay. */
 struct relay {
@@ -44,29 +47,31 @@ struct relay {
 	/* Request sync */
 	uint64_t sync;
 	struct recovery *r;
+	struct xstream stream;
+	struct vclock stop_vclock;
 	ev_tstamp wal_dir_rescan_delay;
+	uint32_t replica_id;
 };
 
 /**
- * Send an initial snapshot to the replica,
- * register the replica UUID in _cluster
- * space, end the row with OK packet.
+ * Send initial JOIN rows to the replica
  *
  * @param fd        client connection
- * @param packet    incoming JOIN request
- *                  packet
- * @param server_id server_id of this server
- *                  to send to the replica
- * @param on_join   the hook to invoke when
- *                  the snapshot is sent
- *                  to the replica - it
- *                  registers the replica with
- *                  the cluster.
+ * @param sync      sync from incoming JOIN request
+ * @param vclock    vclock of the last checkpoint
  */
 void
-relay_join(int fd, struct xrow_header *packet,
-	   uint32_t master_server_id,
-	   void (*on_join)(const struct tt_uuid *));
+relay_initial_join(int fd, uint64_t sync, struct vclock *vclock);
+
+/**
+ * Send final JOIN rows to the replica.
+ *
+ * @param fd        client connection
+ * @param sync      sync from incoming JOIN request
+ */
+void
+relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
+	         struct vclock *stop_vclock);
 
 /**
  * Subscribe a replica to updates.
@@ -74,12 +79,7 @@ relay_join(int fd, struct xrow_header *packet,
  * @return none.
  */
 void
-relay_subscribe(int fd, struct xrow_header *packet,
-		uint32_t master_server_id,
-		struct vclock *master_vclock);
-
-void
-relay_send(struct relay *relay, struct xrow_header *packet);
+relay_subscribe(int fd, uint64_t sync, struct replica *replica,
+		struct vclock *replica_vclock);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */
-

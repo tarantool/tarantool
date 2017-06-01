@@ -56,7 +56,16 @@ local function test_parse(test)
     test:isnil(u, "invalid uri", u)
 end
 
+local function test_format(test)
+    test:plan(3)
+    local u = uri.parse("user:password@localhost")
+    test:is(uri.format(u), "user@localhost", "password removed")
+    test:is(uri.format(u, false), "user@localhost", "password removed")
+    test:is(uri.format(u, true), "user:password@localhost", "password kept")
+end
+
 tap.test("uri", function(test)
-    test:plan(1)
+    test:plan(2)
     test:test("parse", test_parse)
+    test:test("format", test_format)
 end)

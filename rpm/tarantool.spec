@@ -63,7 +63,7 @@ BuildRequires: python-yaml >= 3.0.9
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
-Version: 1.6.9.0
+Version: 1.7.2.385
 Release: 1%{?dist}
 Group: Applications/Databases
 Summary: In-memory database and Lua application server
@@ -77,7 +77,7 @@ Obsoletes: tarantool-common < 1.6.8.434-1
 Requires: /etc/protocols
 Requires: /etc/services
 URL: http://tarantool.org
-Source0: http://download.tarantool.org/tarantool/1.6/src/tarantool-%{version}.tar.gz
+Source0: http://download.tarantool.org/tarantool/1.7/src/tarantool-%{version}.tar.gz
 %description
 Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
@@ -131,7 +131,7 @@ echo "self.skip = True" > ./test/app/socket.skipcond
 # https://github.com/tarantool/tarantool/issues/1322
 echo "self.skip = True" > ./test/app/digest.skipcond
 # run a safe subset of the test suite
-cd test && ./test-run.py unit/ app/ app-tap/ box/ box-tap/ engine/
+cd test && ./test-run.py unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
 %endif
 
 %pre
@@ -208,16 +208,52 @@ fi
 %{_includedir}/tarantool/module.h
 
 %changelog
+
+* Fri Dec 16 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.385-1
+- Add `tarantoolctl cat/play` commands and `xlog` Lua module.
+- Add Lua library to manipulate environment variables.
+- Allow DML requests from on_replace triggers.
+- Allow UPSERT without operations.
+- Improve support for the large number of active network clients.
+- Fix race conditions during automatic cluster bootstrap.
+- Fix calculation of periods in snapshot daemon.
+- Fix handling of iterator type in space:pairs() and space:select().
+- Fix CVE-2016-9036 and CVE-2016-9037.
+- Dozens of bug fixes to Vinyl storage engine.
+- Remove broken coredump() Lua function.
+
+* Thu Sep 29 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.1-1
+- Vinyl - a new write-optimized storage engine, allowing the amount of
+  data stored to exceed the amount of available RAM 10-100x times.
+- A new binary protocol command for CALL, which no more restricts a function
+  to returning an array of tuples and allows returning an arbitrary
+  MsgPack/JSON result, including scalars, nil and void (nothing).
+- Automatic replication cluster bootstrap; it's now much easier to configure
+  a new replication cluster.
+- New indexable data types: unsigned, integer, number and scalar.
+- memtx snapshots and xlog files are now compressed on the fly using the
+  fast ZStandard compression algorithm. Compression options are configured
+  automatically to get an optimal trade-off between CPU utilization and disk
+  throughput.
+- fiber.cond() - a new synchronization mechanism for fibers.
+- Tab-based autocompletion in the interactive console.
+- A new implementation of net.box improving performance and solving
+  problems with the garbage collection of dead connections.
+- Native systemd integration alongside sysvinit.
+- A ready-to-use 'example.lua' instance enable by default.
+- Dozens of bugfixes:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
+
 * Wed Sep 28 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.6-1
- - Add dependency on network configuration files used by `socket` module
+- Add dependency on network configuration files used by `socket` module
 
 * Mon Sep 26 2016 Roman Tsisyk <roman@tarantool.org> 1.6.9.1-1
- - Tab-based autocompletion in the interactive console
- - LUA_PATH and LUA_CPATH environment variables taken into account
- - A new box.cfg { read_only = true } option
- - Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
- - Bugs fixed:
-   https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
+- Tab-based autocompletion in the interactive console
+- LUA_PATH and LUA_CPATH environment variables taken into account
+- A new box.cfg { read_only = true } option
+- Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
+- Bugs fixed:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
 
 * Thu Sep 01 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.762-1
 - Add support for OpenSSL 1.1

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_CORO_H_INCLUDED
 #define TARANTOOL_CORO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -42,6 +42,8 @@ struct tarantool_coro {
 	coro_context ctx;
 	void *stack;
 	size_t stack_size;
+	/** Valgrind stack id. */
+	unsigned int stack_id;
 };
 
 struct slab_cache;

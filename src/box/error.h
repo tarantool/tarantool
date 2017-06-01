@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_ERROR_H_INCLUDED
 #define TARANTOOL_BOX_ERROR_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -120,6 +120,8 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 
 /** \endcond public */
 
+extern const struct type type_ClientError;
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #include "exception.h"
@@ -133,7 +135,6 @@ enum rmean_error_name {
 };
 extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
 
-extern const struct type type_ClientError;
 class ClientError: public Exception {
 public:
 	virtual void raise()

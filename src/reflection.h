@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_REFLECTION_H_INCLUDED
 #define TARANTOOL_REFLECTION_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -224,6 +224,7 @@ make_method(const struct type *owner, const char *name,
 	m.thiscall = (method_thiscall_f) method_arg;
 	m.isconst = false;
 	m.rtype = ctypeof<R>();
+	memset(m.atype, 0, sizeof(m.atype));
 	method_helper<0, Args...>::init(&m);
 	return m;
 }

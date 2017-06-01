@@ -43,7 +43,12 @@
 #ifdef __cplusplus
 # define EV_CPP(x) x
 # if __cplusplus >= 201103L
-#  define EV_THROW noexcept
+/*
+ * Avoid noisy "mangled name of 'ev_set_syserr_cb' will change in C++17
+ * due to non-throwing" warnings.
+ * #  define EV_THROW noexcept
+ */
+#  define EV_THROW
 # else
 #  define EV_THROW throw ()
 # endif
@@ -757,6 +762,14 @@ EV_API_DECL int  ev_clear_pending  (EV_P_ void *w) EV_THROW;
 
 EV_API_DECL void ev_io_start       (EV_P_ ev_io *w) EV_THROW;
 EV_API_DECL void ev_io_stop        (EV_P_ ev_io *w) EV_THROW;
+
+/*
+ * Fd is about to close. Make sure that libev won't do anything funny
+ * with now invalid fd. Needed if some ev_io watchers weren't stopped
+ * prior to close().
+ * Note: if fd was reused and added again it just works.
+ */
+EV_API_DECL void ev_io_closing     (EV_P_ int fd, int revents) EV_THROW;
 
 EV_API_DECL void ev_timer_start    (EV_P_ ev_timer *w) EV_THROW;
 EV_API_DECL void ev_timer_stop     (EV_P_ ev_timer *w) EV_THROW;

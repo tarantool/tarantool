@@ -6,7 +6,7 @@ LISTEN = require('uri').parse(box.cfg.listen)
 -- create first space
 s = box.schema.create_space('test')
 i = s:create_index('primary')
-cn = net_box:new(LISTEN.host, LISTEN.service)
+cn = net_box.connect(LISTEN.host, LISTEN.service)
 
 -- check that schema is correct
 cn.space.test ~= nil
@@ -66,4 +66,61 @@ request_fiber:cancel()
 reload_fiber:cancel()
 s:drop()
 s2:drop()
+
+--------------------------------------------------------------------------------
+-- gh-1808: support schema_id in CALL, EVAL and PING
+--------------------------------------------------------------------------------
+
+test_run:cmd('setopt delimiter ";"')
+function bump_schema_id()
+    if box.space.bump_schema_id == nil then
+        box.schema.create_space('bump_schema_id')
+    else
+        box.space.bump_schema_id:drop()
+    end
+end;
+test_run:cmd('setopt delimiter ""');
+
+cn = net_box.connect(box.cfg.listen)
+
+-- ping
+schema_id = cn._schema_id
+bump_schema_id()
+cn:ping()
+-- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
+while cn._schema_id == schema_id do fiber.sleep(0.0001) end
+cn._schema_id == schema_id + 1
+
+-- call
+schema_id = cn._schema_id
+bump_schema_id()
+function somefunc() return true end
+cn:call('somefunc')
+cn._schema_id == schema_id + 1
+somefunc = nil
+
+-- failed call
+schema_id = cn._schema_id
+bump_schema_id()
+cn:call('somefunc')
+cn._schema_id == schema_id + 1
+
+-- eval
+schema_id = cn._schema_id
+bump_schema_id()
+cn:eval('return')
+cn._schema_id == schema_id + 1
+somefunc = nil
+
+-- failed eval
+schema_id = cn._schema_id
+bump_schema_id()
+cn:eval('error("xx")')
+cn._schema_id == schema_id + 1
+somefunc = nil
+
+cn:close()
+
+if box.space.bump_schema_id ~= nil then box.space.bump_schema_id:drop() end
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

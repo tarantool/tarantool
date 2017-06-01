@@ -4,6 +4,7 @@ index = s:create_index('pk')
 -- test delete field
 s:insert{1000001, 1000002, 1000003, 1000004, 1000005}
 s:update({1000001}, {{'#', 1, 1}})
+s:update({1000001}, {{'#', 1, "only one record please"}})
 s:truncate()
 
 -- test arithmetic
@@ -236,7 +237,6 @@ s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 
 -- some wrong updates --
 s:update({0}, 0)
-s:update({0}, {})
 s:update({0}, {'+', 2, 2})
 s:update({0}, {{}})
 s:update({0}, {{'+'}})
@@ -249,8 +249,23 @@ s:update({0}, {{0, 0, 0}})
 ops = {}
 for i = 1,10 do table.insert(ops, {'=', 2, '1234567890'}) end
 s:upsert({0}, ops)
+
+-- https://github.com/tarantool/tarantool/issues/1854
+s:get{0}
+s:update({0}, {})
+
 --#stop server default
 --#start server default
 s = box.space.tweedledum
+
+--
+-- gh-2036: msgpackffi doesn't support __serialize hint
+--
+map = setmetatable({}, { __serialize = 'map' })
+t = box.tuple.new({1, 2, 3})
+s:replace({1, 2, 3})
+
+t:update({{'=', 3, map}})
+s:update(1, {{'=', 3, map}})
 
 s:drop()

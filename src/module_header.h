@@ -2,7 +2,7 @@
 #define TARANTOOL_MODULE_H_INCLUDED
 
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -44,13 +44,6 @@
 #include <stdbool.h>
 #include <stdio.h> /* ssize_t for Apple */
 #include <sys/types.h> /* ssize_t */
-
-/** Extern modifier for all public functions */
-#if defined(__cplusplus)
-#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
-#else
-#define API_EXPORT extern __attribute__ ((visibility ("default")))
-#endif
 
 #if defined(__cplusplus)
 extern "C" {

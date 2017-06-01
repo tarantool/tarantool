@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,6 +32,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tuple.h"
+#include "tuple_format.h"
+#include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
 #include "user_def.h"
@@ -41,7 +43,8 @@
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct credentials *cr = current_user();
+	struct session *session = current_session();
+	struct credentials *cr = &session->credentials;
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
@@ -63,7 +66,6 @@ access_check_space(struct space *space, uint8_t access)
 			  priv_name(access), user->def.name, space->def.name);
 	}
 }
-
 
 void
 space_fill_index_map(struct space *space)
@@ -91,12 +93,12 @@ space_new(struct space_def *def, struct rlist *key_list)
 	 * unique index constraint.
 	 */
 	bool has_unique_secondary_key = false;
-	struct key_def *key_def;
-	rlist_foreach_entry(key_def, key_list, link) {
+	struct index_def *index_def;
+	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		if (key_def->iid > 0 && key_def->opts.is_unique == true)
+		if (index_def->iid > 0 && index_def->opts.is_unique == true)
 			has_unique_secondary_key = true;
-		index_id_max = MAX(index_id_max, key_def->iid);
+		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
@@ -116,17 +118,27 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	space->def = *def;
-	space->format = tuple_format_new(key_list);
+	Engine *engine = engine_find(def->engine_name);
+	struct key_def **keys;
+	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
+						  sizeof(*keys) * index_count);
+	uint32_t key_no = 0;
+	rlist_foreach_entry(index_def, key_list, link) {
+		keys[key_no++] = &index_def->key_def;
+	}
+	space->format = tuple_format_new(engine->format, keys, index_count, 0);
+	if (space->format == NULL)
+		diag_raise();
 	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
+	space->format->exact_field_count = def->exact_field_count;
 	space->index_id_max = index_id_max;
 	/* init space engine instance */
-	Engine *engine = engine_find(def->engine_name);
 	space->handler = engine->open();
-	/* fill space indexes */
-	rlist_foreach_entry(key_def, key_list, link) {
-		space->index_map[key_def->iid] =
-			space->handler->engine->createIndex(key_def);
+	/* Fill the space indexes. */
+	rlist_foreach_entry(index_def, key_list, link) {
+		space->index_map[index_def->iid] =
+			space->handler->createIndex(space, index_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;
@@ -159,38 +171,13 @@ space_size(struct space *space)
 	return space_index(space, 0)->size();
 }
 
-static inline void
-space_validate_field_count(struct space *sp, uint32_t field_count)
-{
-	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
-		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
-		          field_count, space_name(sp), sp->def.field_count);
-	if (field_count < sp->format->field_count)
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  field_count, sp->format->field_count);
-}
-
-void
-space_validate_tuple_raw(struct space *sp, const char *data)
-{
-	uint32_t field_count = mp_decode_array(&data);
-	space_validate_field_count(sp, field_count);
-}
-
-void
-space_validate_tuple(struct space *sp, struct tuple *new_tuple)
-{
-	uint32_t field_count = tuple_field_count(new_tuple);
-	space_validate_field_count(sp, field_count);
-}
-
 void
 space_dump_def(const struct space *space, struct rlist *key_list)
 {
 	rlist_create(key_list);
 
 	for (unsigned j = 0; j < space->index_count; j++)
-		rlist_add_tail_entry(key_list, space->index[j]->key_def,
+		rlist_add_tail_entry(key_list, space->index[j]->index_def,
 				     link);
 }
 
@@ -217,7 +204,7 @@ space_run_triggers(struct space *space, bool yesno)
  * effects during replication. Some engines can
  * track down this situation and abort the operation;
  * such engines (memtx) don't use this function.
- * Other engines can't do it, so they ask the server to
+ * Other engines can't do it, so they ask the box to
  * verify that the primary key of the tuple has not changed.
  */
 void
@@ -227,9 +214,34 @@ space_check_update(struct space *space,
 {
 	assert(space->index_count > 0);
 	Index *index = space->index[0];
-	if (tuple_compare(old_tuple, new_tuple, index->key_def))
+	if (tuple_compare(old_tuple, new_tuple, &index->index_def->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			  index_name(index), space_name(space));
+}
+
+ptrdiff_t
+space_bsize_update(struct space *space,
+		   const struct tuple *old_tuple,
+		   const struct tuple *new_tuple)
+{
+	ptrdiff_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0,
+	          new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
+	assert((ptrdiff_t)space->bsize >= old_bsize);
+	space->bsize += new_bsize - old_bsize;
+	return new_bsize - old_bsize;
+}
+
+void
+space_bsize_rollback(struct space *space, ptrdiff_t bsize_change)
+{
+	assert(bsize_change < 0 || (ptrdiff_t)space->bsize >= bsize_change);
+	space->bsize -= bsize_change;
+}
+
+size_t
+space_bsize(struct space *space)
+{
+	return space->bsize;
 }
 
 /* vim: set fm=marker */

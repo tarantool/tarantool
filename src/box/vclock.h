@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_VCLOCK_H
 #define INCLUDES_TARANTOOL_VCLOCK_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -38,7 +38,7 @@
 #include <assert.h>
 
 #define RB_COMPACT 1
-#include <third_party/rb.h>
+#include <small/rb.h>
 
 #include "bit/bit.h"
 
@@ -46,7 +46,25 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { VCLOCK_MAX = 32 };
+enum {
+	/**
+	 * The maximum number of components in vclock
+	 */
+	VCLOCK_MAX = 32,
+
+	/**
+	 * The maximum length of string representation of vclock.
+	 *
+	 * vclock formatted as {<pair>, ..., <pair>} where
+	 *    <pair> is <replica_id>: <lsn>,
+	 *    <replica_id> is 0..VCLOCK_MAX (2 chars),
+	 *    <lsn> is int64_t (20 chars).
+	 *
+	 * @sa vclock_from_string()
+	 * @sa vclock_to_string()
+	 */
+	VCLOCK_STR_LEN_MAX = 1 + VCLOCK_MAX * (2 + 2 + 20 + 2) + 1
+};
 
 /** Cluster vector clock */
 struct vclock {
@@ -59,7 +77,7 @@ struct vclock {
 	rb_node(struct vclock) link;
 };
 
-/* Server id, coordinate */
+/* Replica id, coordinate */
 struct vclock_c {
 	uint32_t id;
 	int64_t lsn;
@@ -81,7 +99,7 @@ vclock_iterator_init(struct vclock_iterator *it, const struct vclock *vclock)
 static inline struct vclock_c
 vclock_iterator_next(struct vclock_iterator *it)
 {
-	struct vclock_c c;
+	struct vclock_c c = { 0, 0 };
 	size_t id = bit_iterator_next(&it->it);
 	c.id = id == SIZE_MAX ? (int) VCLOCK_MAX : id;
 	if (c.id < VCLOCK_MAX)
@@ -100,24 +118,21 @@ vclock_create(struct vclock *vclock)
 	memset(vclock, 0, sizeof(*vclock));
 }
 
-static inline bool
-vclock_has(const struct vclock *vclock, uint32_t server_id)
+static inline int64_t
+vclock_get(const struct vclock *vclock, uint32_t replica_id)
 {
-	return server_id < VCLOCK_MAX && (vclock->map & (1 << server_id));
+	if (replica_id >= VCLOCK_MAX)
+		return 0;
+	return vclock->lsn[replica_id];
 }
 
 static inline int64_t
-vclock_get(const struct vclock *vclock, uint32_t server_id)
+vclock_inc(struct vclock *vclock, uint32_t replica_id)
 {
-	return vclock_has(vclock, server_id) ? vclock->lsn[server_id] : -1;
-}
-
-static inline int64_t
-vclock_inc(struct vclock *vclock, uint32_t server_id)
-{
-	assert(vclock_has(vclock, server_id));
+	/* Easier add each time than check. */
+	vclock->map |= 1 << replica_id;
 	vclock->signature++;
-	return ++vclock->lsn[server_id];
+	return ++vclock->lsn[replica_id];
 }
 
 static inline void
@@ -138,8 +153,8 @@ vclock_calc_sum(const struct vclock *vclock)
 	int64_t sum = 0;
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, server)
-		sum += server.lsn;
+	vclock_foreach(&it, replica)
+		sum += replica.lsn;
 	return sum;
 }
 
@@ -149,26 +164,12 @@ vclock_sum(const struct vclock *vclock)
 	return vclock->signature;
 }
 
-/**
- * Add a new server to vclock.
- *
- * Please never, ever, ever remove servers with LSN > 0 from vclock!
- * The vclock_sum() must always grow, it is a core invariant of the recovery
- * subsystem!
- */
-static inline void
-vclock_add_server_nothrow(struct vclock *vclock, uint32_t server_id)
-{
-	assert(server_id < VCLOCK_MAX);
-	vclock->map |= 1 << server_id;
-}
-
 int64_t
-vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
+vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn);
 
 /**
  * \brief Format vclock to YAML-compatible string representation:
- * { server_id: lsn, server_id:lsn })
+ * { replica_id: lsn, replica_id:lsn })
  * \param vclock vclock
  * \return fomatted string. This pointer should be passed to free(3) to
  * release the allocated storage when it is no longer needed.
@@ -206,11 +207,11 @@ vclock_compare(const struct vclock *a, const struct vclock *b)
 	struct bit_iterator it;
 	bit_iterator_init(&it, &map, sizeof(map), true);
 
-	for (size_t server_id = bit_iterator_next(&it); server_id < VCLOCK_MAX;
-	     server_id = bit_iterator_next(&it)) {
+	for (size_t replica_id = bit_iterator_next(&it); replica_id < VCLOCK_MAX;
+	     replica_id = bit_iterator_next(&it)) {
 
-		int64_t lsn_a = a->lsn[server_id];
-		int64_t lsn_b = b->lsn[server_id];
+		int64_t lsn_a = a->lsn[replica_id];
+		int64_t lsn_b = b->lsn[replica_id];
 		le = le && lsn_a <= lsn_b;
 		ge = ge && lsn_a >= lsn_b;
 		if (!ge && !le)
@@ -266,18 +267,6 @@ vclockset_match(vclockset_t *set, struct vclock *key)
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "error.h"
-
-static inline void
-vclock_add_server(struct vclock *vclock, uint32_t server_id)
-{
-	if (server_id >= VCLOCK_MAX)
-		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-	assert(! vclock_has(vclock, server_id));
-	vclock_add_server_nothrow(vclock, server_id);
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_VCLOCK_H */

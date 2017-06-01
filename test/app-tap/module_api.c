@@ -205,9 +205,9 @@ test_fiber(lua_State *L)
 	fiber_set_joinable(fiber, true);
 	fiber_start(fiber);
 	fiber_cancel(fiber);
-	fiber_join(fiber);
+	int ret = fiber_join(fiber);
 	box_error_t *err = box_error_last();
-	lua_pushboolean(L, (int )(err == NULL || box_error_code(err) != 10));
+	lua_pushboolean(L, (int)(ret == 0 || box_error_code(err) != 10));
 	return 1;
 }
 
@@ -222,6 +222,29 @@ test_cord(lua_State *L)
 
 	lua_pushboolean(L, 1);
 	return 1;
+}
+
+static int
+test_pushcdata(lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "invalid arguments");
+	uint32_t ctypeid = lua_tointeger(L, 1);
+	void *data = luaL_pushcdata(L, ctypeid);
+	lua_pushlightuserdata(L, data);
+	return 2;
+}
+
+static int
+test_checkcdata(lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "invalid arguments");
+	uint32_t ctypeid = 0;
+	void *data = luaL_checkcdata(L, 1, &ctypeid);
+	lua_pushinteger(L, ctypeid);
+	lua_pushlightuserdata(L, data);
+	return 2;
 }
 
 static int
@@ -278,6 +301,52 @@ error:
 	return 1;
 }
 
+static int
+test_key_def_api(lua_State *L)
+{
+	uint32_t fieldno1[] = {3, 0};
+	uint32_t type1[] = {FIELD_TYPE_UNSIGNED, FIELD_TYPE_STRING};
+	uint32_t fieldno2[] = {1};
+	uint32_t type2[] = {FIELD_TYPE_UNSIGNED};
+	box_key_def_t *key_defs[] = {
+		box_key_def_new(fieldno1, type1, 2),
+		box_key_def_new(fieldno2, type2, 1)};
+	box_tuple_format_t *format = box_tuple_format_new(key_defs, 2);
+	char buf[64], *buf_end;
+	buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 4);
+	buf_end = mp_encode_str(buf_end, "bb", 2);
+	buf_end = mp_encode_uint(buf_end, 1);
+	buf_end = mp_encode_str(buf_end, "abcd", 4);
+	buf_end = mp_encode_uint(buf_end, 6);
+	box_tuple_t *tuple1 = box_tuple_new(format, buf, buf_end);
+	box_tuple_ref(tuple1);
+	buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 4);
+	buf_end = mp_encode_str(buf_end, "aa", 2);
+	buf_end = mp_encode_uint(buf_end, 8);
+	buf_end = mp_encode_nil(buf_end);
+	buf_end = mp_encode_uint(buf_end, 6);
+	box_tuple_t *tuple2 = box_tuple_new(format, buf, buf_end);
+
+	/* Enocode key */
+	buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 2);
+	buf_end = mp_encode_uint(buf_end, 6);
+	buf_end = mp_encode_str(buf_end, "aa", 2);
+
+	bool cmp1 = box_tuple_compare(tuple1, tuple2, key_defs[0]) > 0;
+	bool cmp2 = box_tuple_compare(tuple1, tuple2, key_defs[1]) < 0;
+	bool cmp3 = box_tuple_compare_with_key(tuple1, buf, key_defs[0]) > 0;
+	bool cmp4 = box_tuple_compare_with_key(tuple2, buf, key_defs[0]) == 0;
+	box_tuple_unref(tuple1);
+	lua_pushboolean(L, cmp1 && cmp2 && cmp3 && cmp4);
+	box_tuple_format_unref(format);
+	box_key_def_delete(key_defs[0]);
+	box_key_def_delete(key_defs[1]);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -295,8 +364,11 @@ luaopen_module_api(lua_State *L)
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
 		{"test_cord", test_cord },
+		{"pushcdata", test_pushcdata },
+		{"checkcdata", test_checkcdata },
 		{"test_clock", test_clock },
 		{"test_pushtuple", test_pushtuple},
+		{"test_key_def_api", test_key_def_api},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

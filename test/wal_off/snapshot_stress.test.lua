@@ -43,7 +43,7 @@ res = os.execute(cmd)
 str_res = 'precheck ' .. (res == 0 and ' ok(2)' or 'failed(2)')
 str_res
 
-snap_search_wildcard = fio.pathjoin(box.cfg.snap_dir, '*.snap');
+snap_search_wildcard = fio.pathjoin(box.cfg.memtx_dir, '*.snap');
 snaps = fio.glob(snap_search_wildcard);
 initial_snap_count = #snaps
 
@@ -52,11 +52,11 @@ if box.space.operations then box.space.operations:drop() end
 if box.space.deleting then box.space.deleting:drop() end
 
 s1 = box.schema.create_space("accounts")
-i1 = s1:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
+i1 = s1:create_index('primary', { type = 'HASH', parts = {1, 'unsigned'} })
 s2 = box.schema.create_space("operations")
-i2 = s2:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
+i2 = s2:create_index('primary', { type = 'HASH', parts = {1, 'unsigned'} })
 s3 = box.schema.create_space("deleting")
-i3 = s3:create_index('primary', { type = 'TREE', parts = {1, 'num'} })
+i3 = s3:create_index('primary', { type = 'TREE', parts = {1, 'unsigned'} })
 
 n_accs = 0
 n_ops = 0
@@ -170,7 +170,7 @@ end;
 
 function wait()
     while (not snaps_done) do
-        fiber.sleep(0.1)
+        fiber.sleep(0.01)
     end
 end;
 
@@ -195,7 +195,13 @@ for k,v in pairs(additional_spaces) do v:drop() end;
 s1 = nil s2 = nil additional_spaces = nil;
 
 script_code = [[
-box.cfg{ slab_alloc_arena = 0.5, snap_dir = "]] .. box.cfg.snap_dir .. [[", wal_mode = "none" }
+fio = require'fio'
+new_snap_dir = "]] .. fio.pathjoin(box.cfg.memtx_dir, "snap_test") .. [["
+os.execute("mkdir " .. new_snap_dir)
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.xlog") .. [[ " .. new_snap_dir .. "/")
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.vylog") .. [[ " .. new_snap_dir .. "/")
+os.execute("cp ]] .. fio.pathjoin(box.cfg.memtx_dir, "*.snap") .. [[ " .. new_snap_dir .. "/")
+box.cfg{ memtx_memory = 536870912, memtx_dir = new_snap_dir, wal_dir = new_snap_dir, vinyl_dir = new_snap_dir, wal_mode = "none" }
 
 log = require('log')
 
@@ -205,7 +211,7 @@ s2 = box.space.operations
 total_sum = 0
 t1 = {}
 for k,v in s1:pairs() do t1[ v[1] ] = v[2] total_sum = total_sum + v[2] end
-if total_sum ~= 0 then log.info('error: total sum mismatch') os.exit(-1) end
+if total_sum ~= 0 then log.info('error: total sum mismatch') os.execute("rm -r " .. new_snap_dir) os.exit(-1) end
 
 t2 = {}
 function acc_inc(n1, v) t2[n1] = (t2[n1] and t2[n1] or 0) + v end
@@ -214,9 +220,10 @@ for k,v in s2:pairs() do acc_inc(v[2], v[4]) acc_inc(v[3], -v[4]) end
 bad = false
 for k,v in pairs(t1) do if (t2[k] and t2[k] or 0) ~= v then bad = true end end
 for k,v in pairs(t2) do if (t1[k] and t1[k] or 0) ~= v then bad = true end end
-if bad then log.info('error: operation apply mismatch') os.exit(-1) end
+if bad then log.info('error: operation apply mismatch') os.execute("rm -r " .. new_snap_dir) os.exit(-1) end
 
 log.info('success: snapshot is ok')
+os.execute("rm -r " .. new_snap_dir)
 os.exit(0)
 ]];
 script = fio.open(script_path, open_flags, tonumber('0777', 8))
@@ -228,11 +235,10 @@ log.info('Part II: checking snapshot start');
 snaps = fio.glob(snap_search_wildcard);
 snaps_find_status = #snaps <= initial_snap_count and 'where are my snapshots?' or 'snaps found';
 snaps_find_status;
-snapshot_check_status = "snap check ok";
+snapshot_check_failed = false
 while #snaps > initial_snap_count do
-    if os.execute(cmd) ~= 0 then
-        snapshot_check_status = "snap check failed!"
-        break
+    if not snapshot_check_failed and os.execute(cmd) ~= 0 then
+        snapshot_check_failed = true
     end
     max_snap = nil
     for k,v in pairs(snaps) do
@@ -242,26 +248,15 @@ while #snaps > initial_snap_count do
         end
     end
     if max_snap:sub(1, 1) ~= "/" then
-        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
+        max_snap = fio.pathjoin(box.cfg.memtx_dir, max_snap)
     end
     fio.unlink(max_snap)
+    max_vylog = fio.basename(max_snap, '.snap') .. '.vylog'
+    max_vylog = fio.pathjoin(box.cfg.vinyl_dir, max_vylog)
+    fio.unlink(max_vylog)
     snaps[max_snap_k] = nil
 end;
-while #snaps > initial_snap_count do
-    max_snap = nil
-    for k,v in pairs(snaps) do
-        if max_snap == nil or v > max_snap then
-            max_snap = v
-            max_snap_k = k
-        end
-    end
-    if max_snap:sub(1, 1) ~= "/" then
-        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
-    end
-    fio.unlink(max_snap)
-    snaps[max_snap_k] = nil
-end;
-snapshot_check_status;
+snapshot_check_failed;
 
 log.info('Part II: checking snapshot done');
 

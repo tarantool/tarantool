@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -65,17 +65,6 @@ lbox_cfg_load(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_wal_mode(struct lua_State *L)
-{
-	try {
-		box_set_wal_mode();
-	} catch (Exception *) {
-		luaT_error(L);
-	}
-	return 0;
-}
-
-static int
 lbox_cfg_set_listen(struct lua_State *L)
 {
 	try {
@@ -88,10 +77,10 @@ lbox_cfg_set_listen(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_replication_source(struct lua_State *L)
+lbox_cfg_set_replication(struct lua_State *L)
 {
 	try {
-		box_set_replication_source();
+		box_set_replication();
 	} catch (Exception *) {
 		luaT_error(L);
 	}
@@ -154,17 +143,6 @@ lbox_cfg_set_snap_io_rate_limit(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_panic_on_wal_error(struct lua_State *L)
-{
-	try {
-		box_set_panic_on_wal_error();
-	} catch (Exception *) {
-		luaT_error(L);
-	}
-	return 0;
-}
-
-static int
 lbox_cfg_set_read_only(struct lua_State *L)
 {
 	try {
@@ -181,15 +159,15 @@ box_lua_cfg_init(struct lua_State *L)
 	static const struct luaL_reg cfglib_internal[] = {
 		{"cfg_check", lbox_cfg_check},
 		{"cfg_load", lbox_cfg_load},
-		{"cfg_set_wal_mode", lbox_cfg_set_wal_mode},
 		{"cfg_set_listen", lbox_cfg_set_listen},
-		{"cfg_set_replication_source", lbox_cfg_set_replication_source},
+		{"cfg_set_replication", lbox_cfg_set_replication},
+		/* Backward compatibility */
+		{"cfg_set_replication", lbox_cfg_set_replication},
 		{"cfg_set_log_level", lbox_cfg_set_log_level},
 		{"cfg_set_readahead", lbox_cfg_set_readahead},
 		{"cfg_set_io_collect_interval", lbox_cfg_set_io_collect_interval},
 		{"cfg_set_too_long_threshold", lbox_cfg_set_too_long_threshold},
 		{"cfg_set_snap_io_rate_limit", lbox_cfg_set_snap_io_rate_limit},
-		{"cfg_set_panic_on_wal_error", lbox_cfg_set_panic_on_wal_error},
 		{"cfg_set_read_only", lbox_cfg_set_read_only},
 		{NULL, NULL}
 	};

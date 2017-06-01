@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -349,7 +349,7 @@ print_backtrace()
 #endif /* ENABLE_BACKTRACE */
 
 
-void __attribute__ ((noreturn))
+NORETURN void
 assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);

@@ -26,11 +26,6 @@ macro(libmisc_build)
         )
     endif()
 
-    if (NOT HAVE_OPEN_MEMSTREAM)
-        list(APPEND misc_src
-            ${PROJECT_SOURCE_DIR}/third_party/open_memstream.c
-        )
-    endif()
     if (NOT HAVE_CLOCK_GETTIME)
         list(APPEND misc_src
             ${PROJECT_SOURCE_DIR}/third_party/clock_gettime.c

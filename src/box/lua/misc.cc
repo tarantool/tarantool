@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -57,14 +57,14 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 
 /* }}} */
 
-/** {{{ Lua/C implementation of index:select(): used only by Sophia **/
+/** {{{ Lua/C implementation of index:select(): used only by Vinyl **/
 
 static inline void
-lbox_port_buf_to_table(lua_State *L, struct port_buf *port_buf)
+lbox_port_to_table(lua_State *L, struct port *port)
 {
-	lua_createtable(L, port_buf->size, 0);
-	struct port_buf_entry *entry = port_buf->first;
-	for (size_t i = 0 ; i < port_buf->size; i++) {
+	lua_createtable(L, port->size, 0);
+	struct port_entry *entry = port->first;
+	for (size_t i = 0 ; i < port->size; i++) {
 		luaT_pushtuple(L, entry->tuple);
 		lua_rawseti(L, -2, i + 1);
 		entry = entry->next;
@@ -89,25 +89,25 @@ lbox_select(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
 
-	struct port_buf port;
-	port_buf_create(&port);
+	struct port port;
+	port_create(&port);
 	if (box_select((struct port *) &port, space_id, index_id, iterator,
 			offset, limit, key, key + key_len) != 0) {
-		port_buf_destroy(&port);
+		port_destroy(&port);
 		return luaT_error(L);
 	}
 
 	/*
 	 * Lua may raise an exception during allocating table or pushing
 	 * tuples. In this case `port' definitely will leak. It is possible to
-	 * wrap lbox_port_buf_to_table() to pcall(), but it was too expensive
+	 * wrap lbox_port_to_table() to pcall(), but it was too expensive
 	 * for this binding according to our benchmarks (~5% decrease).
 	 * However, we tried to simulate this situation and LuaJIT finalizers
 	 * table always crashed the first (can't be fixed with pcall).
 	 * https://github.com/tarantool/tarantool/issues/1182
 	 */
-	lbox_port_buf_to_table(L, &port);
-	port_buf_destroy(&port);
+	lbox_port_to_table(L, &port);
+	port_destroy(&port);
 	return 1; /* lua table with tuples */
 }
 

@@ -827,7 +827,7 @@ t:update(10)
 ...
 t:update({})
 ---
-- error: Illegal parameters, no operations for update
+- ['a', 'b', 'c', 'd', 'e']
 ...
 t:update({{ '!', -1, 'f'}})
 ---
@@ -956,8 +956,8 @@ ffi.typeof('struct tuple')
 -- try to allocate 100Mb tuple and checked that server won't crash
 box.tuple.new(string.rep('x', 100 * 1024 * 1024)) == nil
 ---
-- error: 'Failed to allocate 104857618 bytes for tuple in the slab allocator: tuple
-    is too large. Check ''slab_alloc_maximal'' configuration option.'
+- error: 'Failed to allocate 104857622 bytes for tuple in the slab allocator: tuple
+    is too large. Check ''memtx_max_tuple_size'' configuration option.'
 ...
 collectgarbage('collect') -- collect huge string
 ---

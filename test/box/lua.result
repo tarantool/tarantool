@@ -11,10 +11,10 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
+tmp = space:create_index('primary', { type = 'hash', parts = {1, 'string'}, unique = true })
 ---
 ...
-tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
+tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'string', 3, 'string'}, unique = true })
 ---
 ...
 space:insert{'brave', 'new', 'world'}
@@ -127,10 +127,10 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = false })
+tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'string', 3, 'string'}, unique = false })
 ---
 ...
 space:insert{1234567, 'new', 'world'}
@@ -178,7 +178,7 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type  = 'tree', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type  = 'tree', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 space:insert{tonumber64('18446744073709551615'), 'magic'}
@@ -274,230 +274,49 @@ space:auto_increment{'c'}
 ---
 - [7, 'c']
 ...
-space:drop()
+-- gh-2258: Incomprehensive failure of auto_increment in absence of indices
+space.index.primary:drop()
 ---
 ...
---
--- Lua select_reverse_range
---
--- lua select_reverse_range() testing
--- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
-space = box.schema.space.create('tweedledum')
+space:auto_increment{'a'}
 ---
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+space:get({1})
 ---
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-tmp = space:create_index('range', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
+space:select()
 ---
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-space:insert{0, 0}
+space:update({1}, {})
 ---
-- [0, 0]
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-space:insert{1, 0}
+space:upsert({1}, {})
 ---
-- [1, 0]
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-space:insert{2, 0}
+space:delete({1})
 ---
-- [2, 0]
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
-space:insert{3, 0}
+space:bsize()
 ---
-- [3, 0]
+- 0
 ...
-space:insert{4, 0}
+space:count()
 ---
-- [4, 0]
+- 0
 ...
-space:insert{5, 0}
+space:len()
 ---
-- [5, 0]
+- 0
 ...
-space:insert{6, 0}
+space:pairs():totable()
 ---
-- [6, 0]
-...
-space:insert{7, 0}
----
-- [7, 0]
-...
-space:insert{8, 0}
----
-- [8, 0]
-...
-space:insert{9, 0}
----
-- [9, 0]
-...
-space.index['range']:select({}, { limit = 10, iterator = 'GE' })
----
-- - [0, 0]
-  - [1, 0]
-  - [2, 0]
-  - [3, 0]
-  - [4, 0]
-  - [5, 0]
-  - [6, 0]
-  - [7, 0]
-  - [8, 0]
-  - [9, 0]
-...
-space.index['range']:select({}, { limit = 10, iterator = 'LE' })
----
-- - [9, 0]
-  - [8, 0]
-  - [7, 0]
-  - [6, 0]
-  - [5, 0]
-  - [4, 0]
-  - [3, 0]
-  - [2, 0]
-  - [1, 0]
-  - [0, 0]
-...
-space.index['range']:select({}, { limit = 4, iterator = 'LE' })
----
-- - [9, 0]
-  - [8, 0]
-  - [7, 0]
-  - [6, 0]
-...
-space:drop()
----
-...
---
--- Tests for box.index iterators
---
-space = box.schema.space.create('tweedledum')
----
-...
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
----
-...
-tmp = space:create_index('i1', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
----
-...
-pid = 1
----
-...
-tid = 999
----
-...
-env = require('test_run')
----
-...
-test_run = env.new()
----
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-for sid = 1, 2 do
-    for i = 1, 3 do
-        space:insert{'pid_'..pid, 'sid_'..sid, 'tid_'..tid}
-        pid = pid + 1
-        tid = tid - 1
-    end
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
-...
-index = space.index['i1']
----
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_3', 'sid_1', 'tid_997']
-  - ['pid_2', 'sid_1', 'tid_998']
-  - ['pid_1', 'sid_1', 'tid_999']
-  - ['pid_6', 'sid_2', 'tid_994']
-  - ['pid_5', 'sid_2', 'tid_995']
-  - ['pid_4', 'sid_2', 'tid_996']
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_4', 'sid_2', 'tid_996']
-  - ['pid_5', 'sid_2', 'tid_995']
-  - ['pid_6', 'sid_2', 'tid_994']
-  - ['pid_1', 'sid_1', 'tid_999']
-  - ['pid_2', 'sid_1', 'tid_998']
-  - ['pid_3', 'sid_1', 'tid_997']
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_3', 'sid_1', 'tid_997']
-  - ['pid_2', 'sid_1', 'tid_998']
-  - ['pid_1', 'sid_1', 'tid_999']
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_1', 'sid_1', 'tid_999']
-  - ['pid_2', 'sid_1', 'tid_998']
-  - ['pid_3', 'sid_1', 'tid_997']
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_6', 'sid_2', 'tid_994']
-  - ['pid_5', 'sid_2', 'tid_995']
-  - ['pid_4', 'sid_2', 'tid_996']
-...
-t = {}
----
-...
-for state, v in index:pairs('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
----
-...
-t
----
-- - ['pid_4', 'sid_2', 'tid_996']
-  - ['pid_5', 'sid_2', 'tid_995']
-  - ['pid_6', 'sid_2', 'tid_994']
-...
-t = {}
----
-...
-index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
----
-- error: Unknown iterator type 'wrong_iterator_type'
-...
-index = nil
----
+- []
 ...
 space:drop()
 ---
@@ -509,10 +328,10 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-tmp = space:create_index('i1', { type = 'tree', parts = {2, 'num', 3, 'num'}, unique = false })
+tmp = space:create_index('i1', { type = 'tree', parts = {2, 'unsigned', 3, 'unsigned'}, unique = false })
 ---
 ...
 space:insert{1, 1, 1}
@@ -620,7 +439,7 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
+tmp = space:create_index('primary', { type = 'hash', parts = {1, 'string'}, unique = true })
 ---
 ...
 t = space:insert{'1', '2', '3', '4', '5', '6', '7'}
@@ -803,7 +622,7 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 dofile('push.lua')
@@ -887,15 +706,15 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'tree', parts = {3, 'num', 2, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'tree', parts = {3, 'unsigned', 2, 'unsigned'}, unique = true })
 ---
 ...
 -- Print key fields in pk
 space.index['primary'].parts
 ---
-- - type: NUM
+- - type: unsigned
     fieldno: 3
-  - type: NUM
+  - type: unsigned
     fieldno: 2
 ...
 space:insert{1, 2, 3, 4}
@@ -937,10 +756,10 @@ dofile('index_random_test.lua')
 space = box.schema.space.create('tweedledum')
 ---
 ...
-tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-tmp = space:create_index('secondary', { type = 'hash', parts = {1, 'num'}, unique = true })
+tmp = space:create_index('secondary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 -------------------------------------------------------------------------------
@@ -958,6 +777,164 @@ index_random_test(space, 'secondary')
 - true
 ...
 space:drop()
+---
+...
+space = nil
+---
+...
+-------------------------------------------------------------------------------
+-- Invalid arguments
+-------------------------------------------------------------------------------
+space = box.schema.space.create('tweedledum')
+---
+...
+pk = space:create_index('primary')
+---
+...
+space.len()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:len(...) instead of space.len(...)'
+...
+space.count({}, {iterator = 'EQ'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:count(...) instead of space.count(...)'
+...
+space.bsize()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:bsize(...) instead of space.bsize(...)'
+...
+space.get({1})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:get(...) instead of space.get(...)'
+...
+space.select({}, {iterator = 'GE'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:select(...) instead of space.select(...)'
+...
+space.insert({1, 2, 3})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:insert(...) instead of space.insert(...)'
+...
+space.replace({1, 2, 3})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:replace(...) instead of space.replace(...)'
+...
+space.put({1, 2, 3})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:replace(...) instead of space.replace(...)'
+...
+space.update({1}, {})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:update(...) instead of space.update(...)'
+...
+space.upsert({1, 2, 3}, {})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:upsert(...) instead of space.upsert(...)'
+...
+space.delete({1})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:delete(...) instead of space.delete(...)'
+...
+space.auto_increment({'hello'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:auto_increment(...) instead of space.auto_increment(...)'
+...
+space.pairs({}, {iterator = 'EQ'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:pairs(...) instead of space.pairs(...)'
+...
+space.truncate()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:truncate(...) instead of space.truncate(...)'
+...
+space.format({})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:format(...) instead of space.format(...)'
+...
+space.drop()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:drop(...) instead of space.drop(...)'
+...
+space.rename()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:rename(...) instead of space.rename(...)'
+...
+space.create_index('secondary')
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:create_index(...) instead of space.create_index(...)'
+...
+space.run_triggers(false)
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use space:run_triggers(...) instead of space.run_triggers(...)'
+...
+pk.len()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:len(...) instead of index.len(...)'
+...
+pk.bsize()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:bsize(...) instead of index.bsize(...)'
+...
+pk.min()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:min(...) instead of index.min(...)'
+...
+pk.min({})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:min(...) instead of index.min(...)'
+...
+pk.max()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:max(...) instead of index.max(...)'
+...
+pk.max({})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:max(...) instead of index.max(...)'
+...
+pk.random(42)
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:random(...) instead of index.random(...)'
+...
+pk.pairs({}, {iterator = 'EQ'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:pairs(...) instead of index.pairs(...)'
+...
+pk.count({}, {iterator = 'EQ'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:count(...) instead of index.count(...)'
+...
+pk.get({1})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:get(...) instead of index.get(...)'
+...
+pk.select({}, {iterator = 'GE'})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:select(...) instead of index.select(...)'
+...
+pk.update({1}, {})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:update(...) instead of index.update(...)'
+...
+pk.delete({1})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:delete(...) instead of index.delete(...)'
+...
+pk.drop()
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:drop(...) instead of index.drop(...)'
+...
+pk.rename("newname")
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:rename(...) instead of index.rename(...)'
+...
+pk.alter({})
+---
+- error: 'builtin/box/schema.lua..."]:<line>: Use index:alter(...) instead of index.alter(...)'
+...
+space:drop()
+---
+...
+pk = nil
 ---
 ...
 space = nil

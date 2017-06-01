@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_APPLIER_H_INCLUDED
 #define TARANTOOL_APPLIER_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -36,24 +36,28 @@
 
 #include "trivia/util.h"
 #include "uri.h"
+#include "tt_uuid.h"
+#include "trigger.h"
 #include "third_party/tarantool_ev.h"
-#define RB_COMPACT 1
-#include <third_party/rb.h>
 #include "vclock.h"
+#include "ipc.h"
 
-struct recovery;
+struct xstream;
 
 enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
 #define applier_STATE(_)                                             \
 	_(APPLIER_OFF, 0)                                            \
 	_(APPLIER_CONNECT, 1)                                        \
-	_(APPLIER_AUTH, 2)                                           \
-	_(APPLIER_CONNECTED, 3)                                      \
-	_(APPLIER_BOOTSTRAP, 4)                                      \
-	_(APPLIER_FOLLOW, 5)                                         \
-	_(APPLIER_STOPPED, 6)                                        \
-	_(APPLIER_DISCONNECTED, 7)                                   \
+	_(APPLIER_CONNECTED, 2)                                      \
+	_(APPLIER_AUTH, 3)                                           \
+	_(APPLIER_READY, 4)                                          \
+	_(APPLIER_INITIAL_JOIN, 5)                                   \
+	_(APPLIER_FINAL_JOIN, 6)                                     \
+	_(APPLIER_JOINED, 7)                                         \
+	_(APPLIER_FOLLOW, 8)                                         \
+	_(APPLIER_STOPPED, 9)                                        \
+	_(APPLIER_DISCONNECTED, 10)                                  \
 
 /** States for the applier */
 ENUM(applier_state, applier_STATE);
@@ -63,61 +67,65 @@ extern const char *applier_state_strs[];
  * State of a replication connection to the master
  */
 struct applier {
+	/** Background fiber */
 	struct fiber *reader;
+	/** Finite-state machine */
 	enum applier_state state;
-	ev_tstamp lag, last_row_time;
-	bool warning_said;
-	bool cfg_merge_flag; /* used by box_set_replication_source */
-	uint32_t id;
+	/** Local time of this replica when the last row has been received */
+	ev_tstamp last_row_time;
+	/** Number of seconds this replica is behind the remote master */
+	ev_tstamp lag;
+	/** The last box_error_code() logged to avoid log flooding */
+	uint32_t last_logged_errcode;
+	/** Remote UUID */
+	struct tt_uuid uuid;
+	/** Remote URI (string) */
 	char source[APPLIER_SOURCE_MAXLEN];
-	rb_node(struct applier) link; /* a set by source in cluster.cc */
+	/** Remote URI (parsed) */
 	struct uri uri;
-	uint32_t version_id; /* remote version */
-	struct vclock vclock;
+	/** Remote version encoded as a number, see version_id() macro */
+	uint32_t version_id;
+	/** Remote address */
 	union {
 		struct sockaddr addr;
 		struct sockaddr_storage addrstorage;
 	};
+	/** Length of addr */
 	socklen_t addr_len;
-	/** Save master fd to re-use a connection between JOIN and SUBSCRIBE */
+	/** EV watcher for I/O */
 	struct ev_io io;
 	/** Input/output buffer for buffered IO */
 	struct iobuf *iobuf;
+	/** Triggers invoked on state change */
+	struct rlist on_state;
+	/** Channel used by applier_connect_all() and applier_resume() */
+	struct ipc_channel pause;
+	/** xstream to process rows during initial JOIN */
+	struct xstream *join_stream;
+	/** xstream to process rows during final JOIN and SUBSCRIBE */
+	struct xstream *subscribe_stream;
 };
 
 /**
- * Start a client to a remote server using a background fiber.
+ * Start a client to a remote master using a background fiber.
  *
  * If recovery is finalized (i.e. r->writer != NULL) then the client
  * connect to a master and follow remote updates using SUBSCRIBE command.
  *
  * If recovery is not finalized (i.e. r->writer == NULL) then the client
  * connect to a master, download and process snapshot using JOIN command
- * and then exits. The background fiber can be joined to get exit status
- * using applier_wait().
+ * and then switch to follow mode.
  *
- * \pre A connection from io->fd is re-used.
  * \sa fiber_start()
  */
 void
-applier_start(struct applier *applier, struct recovery *r);
+applier_start(struct applier *applier);
 
 /**
  * Stop a client.
  */
 void
 applier_stop(struct applier *applier);
-
-/**
- * Wait replication client to finish and rethrow exception (if any).
- * Use this function to wait until bootstrap.
- *
- * \post This function keeps a open connection in io->fd.
- * \sa applier_start()
- * \sa fiber_join()
- */
-void
-applier_wait(struct applier *applier);
 
 /**
  * Allocate an instance of applier object, create applier and initialize
@@ -127,12 +135,40 @@ applier_wait(struct applier *applier);
  * @error   throws OutOfMemory exception if out of memory.
  */
 struct applier *
-applier_new(const char *uri);
+applier_new(const char *uri, struct xstream *join_stream,
+	    struct xstream *subscribe_stream);
 
 /**
  * Destroy and delete a applier.
  */
 void
 applier_delete(struct applier *applier);
+
+/*
+ * Connect all appliers to remote peer and receive UUID
+ * \post appliers are connected to remote hosts and paused.
+ * Use applier_resume(applier) to resume applier.
+ *
+ * \param appliers the array of appliers
+ * \param count size of appliers array
+ * \param timeout connection timeout
+ *
+ */
+void
+applier_connect_all(struct applier **appliers, int count,
+		    double timeout);
+
+/*
+ * Resume execution of applier until \a state.
+ */
+void
+applier_resume_to_state(struct applier *applier, enum applier_state state,
+			double timeout);
+
+/*
+ * Resume execution of applier.
+ */
+void
+applier_resume(struct applier *applier);
 
 #endif /* TARANTOOL_APPLIER_H_INCLUDED */

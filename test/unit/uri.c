@@ -7,7 +7,7 @@ test(const char *s, const char *scheme, const char *login, const char *password,
      const char *host, const char *service, const char *path,
      const char *query, const char *fragment, int host_hint)
 {
-	plan(10);
+	plan(19);
 
 	struct uri uri;
 	is(uri_parse(&uri, s), 0, "%s: parse", s);
@@ -29,7 +29,20 @@ test(const char *s, const char *scheme, const char *login, const char *password,
 	chk(fragment);
 	is(uri.host_hint, host_hint, "%s: host_hint", s);
 
+	char str1[1024];
+	uri_format(str1, sizeof(str1), &uri, true);
+	is(uri_parse(&uri, s), 0, "%s: parse", s);
+	chk(scheme);
+	chk(login);
+	chk(password);
+	chk(host);
+	chk(service);
+	chk(path);
+	chk(query);
+	chk(fragment);
+
 #undef chk
+
 	return check_plan();
 }
 

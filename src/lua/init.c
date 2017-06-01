@@ -31,8 +31,8 @@
 #include "lua/init.h"
 #include "lua/utils.h"
 #include "main.h"
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#include "libgen.h"
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
+#include <libgen.h>
 #endif
 
 #include <lua.h>
@@ -43,7 +43,6 @@
 
 #include <fiber.h>
 #include "coio.h"
-#include "lua/console.h"
 #include "lua/fiber.h"
 #include "lua/ipc.h"
 #include "lua/errno.h"
@@ -85,11 +84,11 @@ extern char strict_lua[],
 	log_lua[],
 	uri_lua[],
 	socket_lua[],
-	console_lua[],
 	help_lua[],
 	help_en_US_lua[],
 	tap_lua[],
 	fio_lua[],
+	argparse_lua[],
 	/* jit.* library */
 	vmdef_lua[],
 	bc_lua[],
@@ -101,6 +100,8 @@ extern char strict_lua[],
 	v_lua[],
 	clock_lua[],
 	title_lua[],
+	env_lua[],
+	trigger_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -110,6 +111,7 @@ static const char *lua_modules[] = {
 	"tarantool", init_lua,
 	"errno", errno_lua,
 	"fiber", fiber_lua,
+	"env", env_lua,
 	"buffer", buffer_lua,
 	"msgpackffi", msgpackffi_lua,
 	"fun", fun_lua,
@@ -122,11 +124,12 @@ static const char *lua_modules[] = {
 	"csv", csv_lua,
 	"clock", clock_lua,
 	"socket", socket_lua,
-	"console", console_lua,
 	"title", title_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
+	"internal.argparse", argparse_lua,
+	"internal.trigger", trigger_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,
@@ -151,26 +154,71 @@ static const char *lua_modules[] = {
 static int
 lbox_tonumber64(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "tonumber64: wrong number of arguments");
-
+	luaL_checkany(L, 1);
+	int base = luaL_optint(L, 2, -1);
+	luaL_argcheck(L, (2 <= base && base <= 36) || base == -1, 2,
+		      "base out of range");
 	switch (lua_type(L, 1)) {
 	case LUA_TNUMBER:
+		base = (base == -1 ? 10 : base);
+		if (base != 10)
+			return luaL_argerror(L, 1, "string expected");
+		lua_settop(L, 1); /* return original value as is */
 		return 1;
 	case LUA_TSTRING:
 	{
-		const char *arg = luaL_checkstring(L, 1);
-		char *arge;
+		size_t argl = 0;
+		const char *arg = luaL_checklstring(L, 1, &argl);
+		/* Trim whitespaces at begin/end */
+		while (argl > 0 && isspace(arg[argl - 1])) {
+			argl--;
+		}
+		while (isspace(*arg)) {
+			arg++; argl--;
+		}
+
+		/*
+		 * Check if we're parsing custom format:
+		 * 1) '0x' or '0X' trim in case of base == 16 or base == -1
+		 * 2) '0b' or '0B' trim in case of base == 2  or base == -1
+		 * 3) '-' for negative numbers
+		 */
+		char negative = 0;
+		if (arg[0] == '-') {
+			arg++; argl--;
+			negative = 1;
+		}
+		if (argl > 2 && arg[0] == '0') {
+			if ((arg[1] == 'x' || arg[1] == 'X') &&
+			    (base == 16 || base == -1)) {
+				base = 16; arg += 2; argl -= 2;
+			} else if ((arg[1] == 'b' || arg[1] == 'B') &&
+			           (base == 2 || base == -1)) {
+				base = 2;  arg += 2; argl -= 2;
+			}
+		} else if (base == -1) {
+			base = 10;
+		}
 		errno = 0;
-		unsigned long long result = strtoull(arg, &arge, 10);
-		if (errno == 0 && arge != arg) {
-			luaL_pushuint64(L, result);
+		char *arge;
+		unsigned long long result = strtoull(arg, &arge, base);
+		if (errno == 0 && arge == arg + argl) {
+			if (argl == 0) {
+				lua_pushnil(L);
+			} else if (negative) {
+				luaL_pushint64(L, -1 * (long long )result);
+			} else {
+				luaL_pushuint64(L, result);
+			}
 			return 1;
 		}
 		break;
-	}
+	} /* LUA_TSTRING */
 	case LUA_TCDATA:
 	{
+		base = (base == -1 ? 10 : base);
+		if (base != 10)
+			return luaL_argerror(L, 1, "string expected");
 		uint32_t ctypeid = 0;
 		luaL_checkcdata(L, 1, &ctypeid);
 		if (ctypeid >= CTID_INT8 && ctypeid <= CTID_DOUBLE) {
@@ -178,17 +226,9 @@ lbox_tonumber64(struct lua_State *L)
 			return 1;
 		}
 		break;
-	}
+	} /* LUA_TCDATA */
 	}
 	lua_pushnil(L);
-	return 1;
-}
-
-static int
-lbox_coredump(struct lua_State *L __attribute__((unused)))
-{
-	coredump(60);
-	lua_pushstring(L, "ok");
 	return 1;
 }
 
@@ -325,7 +365,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_call(L, 0, 0);
 
 	lua_register(L, "tonumber64", lbox_tonumber64);
-	lua_register(L, "coredump", lbox_coredump);
 
 	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);
@@ -340,8 +379,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
-	luaopen_msgpack(L);
-	lua_pop(L, 1);
 
 #if defined(HAVE_GNU_READLINE)
 	/*
@@ -351,8 +388,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
-	tarantool_lua_console_init(L);
-	lua_pop(L, 1);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
@@ -425,7 +460,7 @@ run_script_f(va_list ap)
 	 */
 	fiber_sleep(0.0);
 
-	if (access(path, F_OK) == 0) {
+	if (path && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			panic("%s", lua_tostring(L, -1));

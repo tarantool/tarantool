@@ -5,7 +5,9 @@ test_run = env.new()
 fio = require('fio')
 glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
-glob = fio.pathjoin(box.cfg.snap_dir, '*.snap')
+glob = fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')
+for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
+glob = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
 test_run:cmd("restart server default")
 box.schema.user.grant('guest', 'replication')
@@ -56,8 +58,8 @@ box.space.test:auto_increment{'after snapshot and restart - one more row'}
 --  
 --  check that panic is true
 --
-box.cfg{panic_on_wal_error=true}
-box.cfg.panic_on_wal_error
+box.cfg{force_recovery=false}
+box.cfg.force_recovery
 -- 
 -- try to start the replica, ha-ha
 -- (replication should fail, some rows are missing)
@@ -65,9 +67,9 @@ box.cfg.panic_on_wal_error
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 fiber = require('fiber')
-while box.info.replication.status ~= "stopped" do fiber.sleep(0.001) end
-box.info.replication.status
-box.info.replication.message
+while box.info.replication[1].status ~= "stopped" do fiber.sleep(0.001) end
+box.info.replication[1].status
+box.info.replication[1].message
 box.space.test:select{}
 --
 --

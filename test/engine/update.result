@@ -11,7 +11,7 @@ engine = inspector:get_cfg('engine')
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 ---
 ...
 for key = 1, 100 do space:replace({tostring(key)}) end
@@ -129,7 +129,7 @@ t
   - ['99', 99]
   - ['100', 100]
 ...
-_ = space:update({tostring(101)}, {{'=', 2, 101}})
+space:update({tostring(101)}, {{'=', 2, 101}})
 ---
 ...
 space:get({tostring(101)})
@@ -142,7 +142,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:replace({key}) end
@@ -260,7 +260,7 @@ t
   - [99, 99]
   - [100, 100]
 ...
-_ = space:update({101}, {{'=', 2, 101}})
+space:update({101}, {{'=', 2, 101}})
 ---
 ...
 space:get({101})
@@ -273,7 +273,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:replace({key, key}) end
@@ -391,7 +391,7 @@ t
   - [99, 99, 99]
   - [100, 100, 100]
 ...
-_ = space:update({101, 101}, {{'=', 3, 101}})
+space:update({101, 101}, {{'=', 3, 101}})
 ---
 ...
 space:get({101, 101})
@@ -404,7 +404,7 @@ space:drop()
 space = box.schema.space.create('test', { engine = engine })
 ---
 ...
-index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
 ---
 ...
 for key = 1, 100 do space:replace({key, key}) end
@@ -522,11 +522,163 @@ t
   - [99, 99, 99]
   - [100, 100, 100]
 ...
-_ = space:update({101, 101}, {{'=', 3, 101}})
+space:update({101, 101}, {{'=', 3, 101}})
 ---
 ...
 space:get({101, 101})
 ---
+...
+space:drop()
+---
+...
+-- update multiple indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'string'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'string'}, unique = false })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'scalar', 2, 'string', 1, 'unsigned'}, unique = false })
+---
+...
+space:insert({1, 'fwoen', 324})
+---
+- [1, 'fwoen', 324]
+...
+space:insert({2, 'fwoen', 123})
+---
+- [2, 'fwoen', 123]
+...
+space:insert({3, 'fwoen', 324})
+---
+- [3, 'fwoen', 324]
+...
+space:insert({4, '21qn2', 213})
+---
+- [4, '21qn2', 213]
+...
+space:insert({5, 'fgb', '231293'})
+---
+- [5, 'fgb', '231293']
+...
+space:insert({6, 'nrhjrt', -1231.234})
+---
+- [6, 'nrhjrt', -1231.234]
+...
+index1:update({1}, {{'+', 3, 10}})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+index1:update({1, 'fwoen'}, {{'+', 3, 10}})
+---
+- [1, 'fwoen', 334]
+...
+index1:update({0, 'fwoen'}, {{'=', 3, 5}})
+---
+...
+index2:update({'fwoen'}, {'=', 3, 1000})
+---
+- error: Get() doesn't support partial keys and non-unique indexes
+...
+index3:update({324, 'fwoen', 3}, {{'-', 3, 100}})
+---
+- error: Get() doesn't support partial keys and non-unique indexes
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'} })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:update({1}, {{'=', 2, 2}, {'=', 3, 3}})
+---
+- error: Duplicate key exists in unique index 'secondary' in space 'test'
+...
+index1:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index2:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index3:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:drop()
+---
+...
+-- https://github.com/tarantool/tarantool/issues/1854
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:update({2}, {})
+---
+- [2, 2, 2]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
 ...
 space:drop()
 ---

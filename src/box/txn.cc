@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,12 +30,18 @@
  */
 #include "txn.h"
 #include "engine.h"
-#include "box.h" /* global recovery */
 #include "tuple.h"
-#include "recovery.h"
+#include "journal.h"
 #include <fiber.h>
-#include "request.h" /* for request_name */
 #include "xrow.h"
+
+enum {
+	/**
+	 * Maximum recursion depth for on_replace triggers.
+	 * Large numbers may corrupt C stack.
+	 */
+	TXN_SUB_STMT_MAX = 3
+};
 
 double too_long_threshold;
 
@@ -53,15 +59,15 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 		return;
 
 	/* Create a redo log row for Lua requests */
-	struct xrow_header *row =
-		region_alloc_object_xc(&fiber()->gc, struct xrow_header);
+	struct xrow_header *row;
+	row = region_alloc_object_xc(&fiber()->gc, struct xrow_header);
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
-	row->server_id = 0;
+	row->replica_id = 0;
 	row->lsn = 0;
 	row->sync = 0;
 	row->tm = 0;
-	row->bodycnt = request_encode(request, row->body);
+	row->bodycnt = request_encode_xc(request, row->body);
 	stmt->row = row;
 }
 
@@ -69,20 +75,19 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
-	assert(txn->in_stmt == false);
-	assert(stailq_empty(&txn->stmts) || !txn->is_autocommit);
-	struct txn_stmt *stmt =
-		region_alloc_object_xc(&fiber()->gc, struct txn_stmt);
+	struct txn_stmt *stmt;
+	stmt = region_alloc_object_xc(&fiber()->gc, struct txn_stmt);
 
 	/* Initialize members explicitly to save time on memset() */
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->bsize_change = 0;
+	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 
 	stailq_add_tail_entry(&txn->stmts, stmt, next);
-
-	txn->in_stmt = true;
+	++txn->in_sub_stmt;
 	return stmt;
 }
 
@@ -90,14 +95,13 @@ struct txn *
 txn_begin(bool is_autocommit)
 {
 	assert(! in_txn());
-	struct txn *txn = (struct txn *)
-		region_alloc_object_xc(&fiber()->gc, struct txn);
+	struct txn *txn = region_alloc_object_xc(&fiber()->gc, struct txn);
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
 	txn->n_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
-	txn->in_stmt = false;
+	txn->in_sub_stmt = 0;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
@@ -106,9 +110,8 @@ txn_begin(bool is_autocommit)
 }
 
 void
-txn_begin_in_engine(struct txn *txn, struct space *space)
+txn_begin_in_engine(Engine *engine, struct txn *txn)
 {
-	Engine *engine = space->handler->engine;
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
@@ -128,11 +131,15 @@ txn_begin_stmt(struct space *space)
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
+	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
+		tnt_raise(ClientError, ER_SUB_STMT_MAX);
 
-	txn_begin_in_engine(txn, space);
-
+	Engine *engine = space->handler->engine;
+	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;
+
+	engine->beginStatement(txn);
 	return txn;
 }
 
@@ -143,7 +150,7 @@ txn_begin_stmt(struct space *space)
 void
 txn_commit_stmt(struct txn *txn, struct request *request)
 {
-	assert(txn->in_stmt);
+	assert(txn->in_sub_stmt > 0);
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -160,18 +167,17 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * If there are triggers, and they are not disabled, and
 	 * the statement found any rows, run triggers.
 	 * XXX:
-	 * - sophia doesn't set old/new tuple, so triggers don't
+	 * - vinyl doesn't set old/new tuple, so triggers don't
 	 *   work for it
 	 * - perhaps we should run triggers even for deletes which
 	 *   doesn't find any rows
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-
 		trigger_run(&stmt->space->on_replace, txn);
 	}
-	txn->in_stmt = false;
-	if (txn->is_autocommit)
+	--txn->in_sub_stmt;
+	if (txn->is_autocommit && txn->in_sub_stmt == 0)
 		txn_commit(txn);
 }
 
@@ -181,39 +187,36 @@ txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_rows > 0);
 
-	struct wal_request *req;
-	req = (struct wal_request *)region_aligned_alloc_xc(
-		&fiber()->gc,
-		sizeof(struct wal_request) +
-		         sizeof(req->rows[0]) * txn->n_rows,
-		alignof(struct wal_request));
-	/*
-	 * Note: offsetof(struct wal_request, rows) is more appropriate,
-	 * but compiler warns.
-	 */
-	req->n_rows = 0;
+	struct journal_entry *req = journal_entry_new(txn->n_rows);
+	if (req == NULL)
+		diag_raise();
 
 	struct txn_stmt *stmt;
+	struct xrow_header **row = req->rows;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
-		/*
-		 * Bump current LSN even if wal_mode = NONE, so that
-		 * snapshots still works with WAL turned off.
-		 */
-		recovery_fill_lsn(recovery, stmt->row);
-		stmt->row->tm = ev_now(loop());
-		req->rows[req->n_rows++] = stmt->row;
+		*row++ = stmt->row;
 	}
-	assert(req->n_rows == txn->n_rows);
+	assert(row == req->rows + req->n_rows);
 
 	ev_tstamp start = ev_now(loop()), stop;
-	int64_t res = wal_write(recovery, req);
+	int64_t res = journal_write(req);
+
 	stop = ev_now(loop());
 	if (stop - start > too_long_threshold)
 		say_warn("too long WAL write: %.3f sec", stop - start);
-	if (res < 0)
+	if (res < 0) {
+		/* Cascading rollback. */
+		txn_rollback(); /* Perform our part of cascading rollback. */
+		/*
+		 * Move fiber to end of event loop to avoid
+		 * execution of any new requests before all
+		 * pending rollbacks are processed.
+		 */
+		fiber_reschedule();
 		tnt_raise(LoggedError, ER_WAL_IO);
+	}
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.
 	 */
@@ -264,17 +267,17 @@ txn_rollback_stmt()
 		return;
 	if (txn->is_autocommit)
 		return txn_rollback();
-	if (txn->in_stmt == false)
+	if (txn->in_sub_stmt == 0)
 		return;
 	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
 						  next);
-	txn->engine->rollbackStatement(stmt);
+	txn->engine->rollbackStatement(txn, stmt);
 	if (stmt->row != NULL) {
 		stmt->row = NULL;
 		--txn->n_rows;
 		assert(txn->n_rows >= 0);
 	}
-	txn->in_stmt = false;
+	--txn->in_sub_stmt;
 }
 
 void
@@ -291,11 +294,6 @@ txn_rollback()
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
-	/*
-	 * Move fiber to end of event loop to avoid execution of
-	 * any new requests before all pending rollbacks will processed
-	 */
-	fiber_reschedule();
 }
 
 void
@@ -340,6 +338,10 @@ box_txn_commit()
 	*/
 	if (! txn)
 		return 0;
+	if (txn->in_sub_stmt) {
+		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
+		return -1;
+	}
 	try {
 		txn_commit(txn);
 	} catch (Exception *e) {
@@ -349,10 +351,16 @@ box_txn_commit()
 	return 0;
 }
 
-void
+int
 box_txn_rollback()
 {
+	struct txn *txn = in_txn();
+	if (txn && txn->in_sub_stmt) {
+		diag_set(ClientError, ER_ROLLBACK_IN_SUB_STMT);
+		return -1;
+	}
 	txn_rollback(); /* doesn't throw */
+	return 0;
 }
 
 void *

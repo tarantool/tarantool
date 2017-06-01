@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_RMEAN_H_INCLUDED
 #define TARANTOOL_RMEAN_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -59,11 +59,17 @@ struct rmean {
 	struct stats stats[0];
 };
 
+static inline int64_t
+rmean_total(struct rmean *rmean, size_t name)
+{
+	return rmean->stats[name].total;
+}
+
 void
 rmean_roll(int64_t *value, double dt);
 
 int64_t
-rmean_mean(int64_t *value);
+rmean_mean(struct rmean *rmean, size_t name);
 
 struct rmean *
 rmean_new(const char **name, size_t n);

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_SAY_H_INCLUDED
 #define TARANTOOL_SAY_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -39,6 +40,8 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+extern pid_t log_pid;
 
 /** \cond public */
 
@@ -53,33 +56,36 @@ enum say_level {
 	S_DEBUG
 };
 
+extern int log_level;
+
+static inline bool
+say_log_level_is_enabled(int level)
+{
+       return level <= log_level;
+}
+
 /** \endcond public */
-
-extern pid_t logger_pid;
-
-void
-say_logrotate(int /* signo */);
 
 void
 say_set_log_level(int new_level);
 
-/** Basic init. */
-void say_init(const char *argv0);
+void
+say_logrotate(int /* signo */);
 
 /* Init logger. */
 void say_logger_init(const char *init_str,
                      int log_level, int nonblock, int background);
 
-void vsay(int level, const char *filename, int line, const char *error,
-          const char *format, va_list ap)
-          __attribute__ ((format(printf, 5, 0)));
+CFORMAT(printf, 5, 0) void
+vsay(int level, const char *filename, int line, const char *error,
+     const char *format, va_list ap);
 
 /** \cond public */
 typedef void (*sayfunc_t)(int, const char *, int, const char *,
 		    const char *, ...);
 
 /** Internal function used to implement say() macros */
-extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
+CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 
 /**
  * Format and print a message to Tarantool log file.
@@ -90,8 +96,9 @@ extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
  * \sa printf()
  * \sa enum say_level
  */
-#define say(level, format, ...) ({ _say(level, __FILE__, __LINE__, format, \
-	##__VA_ARGS__); })
+#define say(level, format, ...) ({ \
+	if (say_log_level_is_enabled(level)) \
+		_say(level, __FILE__, __LINE__, format, ##__VA_ARGS__); })
 
 /**
  * Format and print a message to Tarantool log file.

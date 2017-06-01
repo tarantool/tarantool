@@ -72,6 +72,33 @@ s.temporary
 ---
 - true
 ...
+-- check that temporary space can be modified in read-only mode (gh-1378)
+box.cfg{read_only=true}
+---
+...
+box.cfg.read_only
+---
+- true
+...
+s:insert{2, 3, 4}
+---
+- [2, 3, 4]
+...
+s:get{2}
+---
+- [2, 3, 4]
+...
+s:len()
+---
+- 2
+...
+box.cfg{read_only=false}
+---
+...
+box.cfg.read_only
+---
+- false
+...
 env = require('test_run')
 ---
 ...

@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_COEIO_FILE_H
 #define INCLUDES_TARANTOOL_COEIO_FILE_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -52,6 +52,7 @@ int     coeio_close(int fd);
 
 ssize_t coeio_pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t coeio_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t coeio_preadn(int fd, void *buf, size_t count, off_t offset);
 ssize_t coeio_read(int fd, void *buf, size_t count);
 ssize_t coeio_write(int fd, const void *buf, size_t count);
 off_t   coeio_lseek(int fd, off_t offset, int whence);

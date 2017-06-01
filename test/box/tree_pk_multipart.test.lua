@@ -5,7 +5,7 @@ env = require('test_run')
 test_run = env.new()
 space = box.schema.space.create('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str', 2, 'str', 3, 'num'}, unique = true })
+i1 = space:create_index('primary', { type = 'tree', parts = {1, 'string', 2, 'string', 3, 'unsigned'}, unique = true })
 
 space:insert{'Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
 space:insert{'Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
@@ -119,8 +119,8 @@ space:len()
 --if an index is modified between calls
 --
 space.index['primary']:drop()
-i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
-i2 = space:create_index('second', { type  = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
+i1 = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
+i2 = space:create_index('second', { type  = 'tree', parts = {2, 'string', 3, 'string'}, unique = true })
 
 space:insert{'a', 'a', 'a'}
 space:insert{'d', 'd', 'd'}
@@ -163,7 +163,7 @@ space = nil
 
 space = box.schema.space.create('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-i1 = space:create_index('primary', { type = 'tree', parts = {1, 'num', 3, 'num'}, unique = true })
+i1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 3, 'unsigned'}, unique = true })
 
 space:insert{1, 1}
 space:replace{1, 1}
@@ -172,8 +172,8 @@ space:drop()
 
 -- test deletion of data one by one
 space = box.schema.space.create('test')
-i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
-i2 = space:create_index('second', { type  = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
+i1 = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
+i2 = space:create_index('second', { type  = 'tree', parts = {2, 'string', 3, 'string'}, unique = true })
 test_run:cmd("setopt delimiter ';'")
 for i = 1, 100 do
     v = tostring(i)

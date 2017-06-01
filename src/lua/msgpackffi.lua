@@ -205,6 +205,7 @@ local function encode_nil(buf)
 end
 
 local function encode_r(buf, obj, level)
+::restart::
     if type(obj) == "number" then
         -- Lua-way to check that number is an integer
         if obj % 1 == 0 and obj > -1e63 and obj < 1e64 then
@@ -219,27 +220,40 @@ local function encode_r(buf, obj, level)
             encode_nil(buf)
             return
         end
-        if #obj > 0 then
-            encode_array(buf, #obj)
-            local i
-            for i=1,#obj,1 do
+        local serialize = nil
+        local mt = getmetatable(obj)
+        if mt ~= nil then
+            serialize = mt.__serialize
+        end
+        -- calculate the number of array and map elements in the table
+        -- TODO: pairs() aborts JIT
+        local array_count, map_count = 0, 0
+        for key in pairs(obj) do
+            if type(key) == 'number' and key >= 1 and
+               key == math.floor(key) then
+                array_count = math.max(key, array_count)
+            else
+                map_count = map_count + 1
+            end
+        end
+        if (serialize == nil and map_count == 0) or serialize == 'array' or
+            serialize == 'seq' or serialize == 'sequence' then
+            encode_array(buf, array_count)
+            for i=1,array_count,1 do
                 encode_r(buf, obj[i], level + 1)
             end
-        else
-            local size = 0
-            local key, val
-            for key, val in pairs(obj) do -- goodbye, JIT
-                size = size + 1
-            end
-            if size == 0 then
-                encode_array(buf, 0) -- encode empty table as an array
-                return
-            end
-            encode_map(buf, size)
+        elseif (serialize == nil and map_count > 0) or
+            serialize == 'map' or serialize == 'mapping' then
+            encode_map(buf, array_count + map_count)
             for key, val in pairs(obj) do
                 encode_r(buf, key, level + 1)
                 encode_r(buf, val, level + 1)
             end
+        elseif type(serialize) == 'function' then
+            obj = serialize(obj)
+            goto restart
+        else
+            error("Invalid __serialize value")
         end
     elseif obj == nil then
         encode_nil(buf)

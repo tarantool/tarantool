@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,6 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include "box/lua/info.h"
 
@@ -38,25 +41,39 @@
 #include <lualib.h>
 
 #include "box/applier.h"
-#include "box/recovery.h"
-#include "box/cluster.h"
+#include "box/wal.h"
+#include "box/replication.h"
 #include "main.h"
 #include "box/box.h"
 #include "lua/utils.h"
 #include "fiber.h"
 
-static int
-lbox_info_replication(struct lua_State *L)
-{
-	lua_newtable(L);
+#include "box/vinyl.h"
 
-	struct applier *applier = cluster_applier_first();
-	if (applier == NULL) {
-		lua_pushstring(L, "status");
-		lua_pushstring(L, "off");
+static void
+lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
+{
+	lua_createtable(L, 0, vclock_size(vclock));
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, replica) {
+		lua_pushinteger(L, replica.id);
+		luaL_pushuint64(L, replica.lsn);
 		lua_settable(L, -3);
-		return 1;
 	}
+	luaL_setmaphint(L, -1); /* compact flow */
+}
+
+static void
+lbox_pushreplica(lua_State *L, struct replica *replica)
+{
+	struct applier *applier = replica->applier;
+
+	lua_createtable(L, 0, 4);
+
+	lua_pushstring(L, "uuid");
+	lua_pushstring(L, tt_uuid_str(&replica->uuid));
+	lua_settable(L, -3);
 
 	/* Get applier state in lower case */
 	static char status[16];
@@ -85,6 +102,28 @@ lbox_info_replication(struct lua_State *L)
 			lua_settable(L, -3);
 		}
 	}
+}
+
+static int
+lbox_info_replication(struct lua_State *L)
+{
+	lua_newtable(L); /* box.info.replication */
+
+	/* Nice formatting */
+	lua_newtable(L); /* metatable */
+	lua_pushliteral(L, "mapping");
+	lua_setfield(L, -2, "__serialize");
+	lua_setmetatable(L, -2);
+
+	replicaset_foreach(replica) {
+		/* Applier hasn't received replica id yet */
+		if (replica->id == REPLICA_ID_NIL || replica->applier == NULL)
+			continue;
+
+		lbox_pushreplica(L, replica);
+
+		lua_rawseti(L, -2, replica->id);
+	}
 
 	return 1;
 }
@@ -92,15 +131,26 @@ lbox_info_replication(struct lua_State *L)
 static int
 lbox_info_server(struct lua_State *L)
 {
+	/*
+	 * Self can be NULL during bootstrap: entire box.info
+	 * bundle becomes available soon after entering box.cfg{}
+	 * and replication bootstrap relies on this as it looks
+	 * at box.info.status.
+	 */
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, recovery->server_id);
+	lua_pushinteger(L, self ? self->id : REPLICA_ID_NIL);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&recovery->server_uuid), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&INSTANCE_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	luaL_pushint64(L, vclock_get(&recovery->vclock, recovery->server_id));
+	if (self != NULL) {
+		luaL_pushint64(L, vclock_get(&replicaset_vclock, self->id));
+	} else {
+		luaL_pushint64(L, -1);
+	}
 	lua_settable(L, -3);
 	lua_pushliteral(L, "ro");
 	lua_pushboolean(L, box_is_ro());
@@ -112,17 +162,7 @@ lbox_info_server(struct lua_State *L)
 static int
 lbox_info_vclock(struct lua_State *L)
 {
-	lua_createtable(L, 0, vclock_size(&recovery->vclock));
-	/* Request compact output flow */
-	luaL_setmaphint(L, -1);
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, &recovery->vclock);
-	vclock_foreach(&it, server) {
-		lua_pushinteger(L, server.id);
-		luaL_pushuint64(L, server.lsn);
-		lua_settable(L, -3);
-	}
-
+	lbox_pushvclock(L, &replicaset_vclock);
 	return 1;
 }
 
@@ -152,8 +192,73 @@ lbox_info_cluster(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&cluster_id), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&REPLICASET_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
+	lua_pushliteral(L, "signature");
+	luaL_pushint64(L, vclock_sum(&replicaset_vclock));
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static void
+lbox_vinyl_info_handler(struct vy_info_node *node, void *ctx)
+{
+	struct lua_State *L = ctx;
+
+	if (node->type != VY_INFO_TABLE_END)
+		lua_pushstring(L, node->key);
+
+	switch (node->type) {
+	case VY_INFO_TABLE_BEGIN:
+		lua_newtable(L);
+		break;
+	case VY_INFO_TABLE_END:
+		break;
+	case VY_INFO_U32:
+		lua_pushnumber(L, node->value.u32);
+		break;
+	case VY_INFO_U64:
+		luaL_pushuint64(L, node->value.u64);
+		break;
+	case VY_INFO_STRING:
+		lua_pushstring(L, node->value.str);
+		break;
+	default:
+		unreachable();
+	}
+
+	if (node->type != VY_INFO_TABLE_BEGIN)
+		lua_settable(L, -3);
+}
+
+/* Declared in vinyl_engine.cc */
+extern struct vy_env *
+vinyl_engine_get_env();
+
+static int
+lbox_info_vinyl_call(struct lua_State *L)
+{
+	struct vy_info_handler h = {
+		.fn = lbox_vinyl_info_handler,
+		.ctx = L,
+	};
+	vy_info_gather(vinyl_engine_get_env(), &h);
+	return 1;
+}
+
+static int
+lbox_info_vinyl(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_newtable(L); /* metatable */
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_info_vinyl_call);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
 
 	return 1;
 }
@@ -168,6 +273,7 @@ lbox_info_dynamic_meta [] =
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},
 	{"cluster", lbox_info_cluster},
+	{"vinyl", lbox_info_vinyl},
 	{NULL, NULL}
 };
 

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_KEY_DEF_H_INCLUDED
 #define TARANTOOL_BOX_KEY_DEF_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,13 +33,13 @@
 #include "trivia/util.h"
 #include "small/rlist.h"
 #include "error.h"
+#include "diag.h"
 #include <msgpuck.h>
 #define RB_COMPACT 1
-#include "third_party/rb.h"
+#include "small/rb.h"
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>
-#include "tuple_compare.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -50,7 +50,7 @@ enum {
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 128,
-	BOX_NAME_MAX = 32,
+	BOX_NAME_MAX = 64,
 	BOX_FIELD_MAX = INT32_MAX,
 	BOX_USER_MAX = 32,
 	/**
@@ -82,12 +82,26 @@ schema_object_type(const char *name);
 const char *
 schema_object_name(enum schema_object_type type);
 
+/** \cond public */
+
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_type { UNKNOWN = 0, NUM, STRING, ARRAY, NUMBER, field_type_MAX };
+enum field_type {
+	FIELD_TYPE_ANY = 0,
+	FIELD_TYPE_UNSIGNED,
+	FIELD_TYPE_STRING,
+	FIELD_TYPE_ARRAY,
+	FIELD_TYPE_NUMBER,
+	FIELD_TYPE_INTEGER,
+	FIELD_TYPE_SCALAR,
+	field_type_MAX
+};
+
+/** \endcond public */
+
 extern const char *field_type_strs[];
 
 /* MsgPack type names */
@@ -111,6 +125,9 @@ field_type_maxlen(enum field_type type)
 	return maxlen[type];
 }
 
+enum field_type
+field_type_by_name(const char *name);
+
 enum index_type {
 	HASH = 0, /* HASH Index */
 	TREE,     /* TREE Index */
@@ -121,9 +138,19 @@ enum index_type {
 
 extern const char *index_type_strs[];
 
+enum opt_type {
+	OPT_BOOL,	/* bool */
+	OPT_INT,	/* int64_t */
+	OPT_FLOAT,	/* double */
+	OPT_STR,	/* char[] */
+	opt_type_MAX,
+};
+
+extern const char *opt_type_strs[];
+
 struct opt_def {
 	const char *name;
-	enum mp_type type;
+	enum opt_type type;
 	ptrdiff_t offset;
 	uint32_t len;
 };
@@ -147,7 +174,7 @@ struct key_part {
 };
 
 /** Index options */
-struct key_opts {
+struct index_opts {
 	/**
 	 * Is this index unique or not - relevant to HASH/TREE
 	 * index
@@ -156,19 +183,40 @@ struct key_opts {
 	/**
 	 * RTREE index dimension.
 	 */
-	uint32_t dimension;
+	int64_t dimension;
 	/**
 	 * RTREE distance type.
 	 */
 	char distancebuf[16];
 	enum rtree_index_distance_type distance;
+	/**
+	 * Vinyl index options.
+	 */
+	char path[PATH_MAX];
+	int64_t range_size;
+	int64_t page_size;
+	/**
+	 * Maximal number of runs that can be created in a level
+	 * of the LSM tree before triggering compaction.
+	 */
+	int64_t run_count_per_level;
+	/**
+	 * The LSM tree multiplier. Each subsequent level of
+	 * the LSM tree is run_size_ratio times larger than
+	 * previous one.
+	 */
+	double run_size_ratio;
+	/**
+	 * LSN from the time of index creation.
+	 */
+	int64_t lsn;
 };
 
-extern const struct key_opts key_opts_default;
-extern const struct opt_def key_opts_reg[];
+extern const struct index_opts index_opts_default;
+extern const struct opt_def index_opts_reg[];
 
 static inline int
-key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
+index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 {
 	if (o1->is_unique != o2->is_unique)
 		return o1->is_unique < o2->is_unique ? -1 : 1;
@@ -179,8 +227,57 @@ key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
 	return 0;
 }
 
-/* Descriptor of a multipart key. */
+struct key_def;
+struct tuple;
+
+typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
+			      const char *key,
+			      uint32_t part_count,
+			      const struct key_def *key_def);
+typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
+			   const struct tuple *tuple_b,
+			   const struct key_def *key_def);
+
+/* Definition of a multipart key. */
 struct key_def {
+	/** tuple <-> tuple comparison function */
+	tuple_compare_t tuple_compare;
+	/** tuple <-> key comparison function */
+	tuple_compare_with_key_t tuple_compare_with_key;
+	/** The size of the 'parts' array. */
+	uint32_t part_count;
+	/** Description of parts of a multipart index. */
+	struct key_part parts[];
+};
+
+/** \cond public */
+
+typedef struct key_def box_key_def_t;
+
+/**
+ * Create key definition with key fields with passed typed on passed positions.
+ * May be used for tuple format creation and/or tuple comparation.
+ *
+ * \param key_def key definition to create
+ * \param fields array with key field identifiers
+ * \param types array with key field types (see enum field_type)
+ * \param part_count the number of key fields
+ */
+box_key_def_t *
+box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
+
+/**
+ * Delete key definition
+ *
+ * \param key_def key definition to delete
+ */
+void
+box_key_def_delete(box_key_def_t *key_def);
+
+/** \endcond public */
+
+/* Definition of an index. */
+struct index_def {
 	/* A link in key list. */
 	struct rlist link;
 	/** Ordinal index number in the index array. */
@@ -191,15 +288,16 @@ struct key_def {
 	char name[BOX_NAME_MAX + 1];
 	/** Index type. */
 	enum index_type type;
-	struct key_opts opts;
-	/** comparators */
-	tuple_compare_t tuple_compare;
-	tuple_compare_with_key_t tuple_compare_with_key;
-	/** The size of the 'parts' array. */
-	uint32_t part_count;
-	/** Description of parts of a multipart index. */
-	struct key_part parts[];
+	struct index_opts opts;
+	struct key_def key_def;
 };
+
+struct index_def *
+index_def_dup(const struct index_def *def);
+
+/* Destroy and free an index_def. */
+void
+index_def_delete(struct index_def *def);
 
 /**
  * Encapsulates privileges of a user on an object.
@@ -308,7 +406,7 @@ struct space_def {
 	 * If set, each tuple
 	 * must have exactly this many fields.
 	 */
-	uint32_t field_count;
+	uint32_t exact_field_count;
 	char name[BOX_NAME_MAX + 1];
 	char engine_name[BOX_NAME_MAX + 1];
 	struct space_opts opts;
@@ -321,23 +419,21 @@ typedef struct box_function_ctx box_function_ctx_t;
 typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 static inline size_t
-key_def_sizeof(uint32_t part_count)
+index_def_sizeof(uint32_t part_count)
 {
-	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
 }
 
-/** Initialize a pre-allocated key_def. */
-struct key_def *
-key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, struct key_opts *opts,
+/**
+ * Allocate a new key definition.
+ * @retval not NULL Success.
+ * @retval NULL     Memory error.
+ */
+struct index_def *
+index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	    enum index_type type, const struct index_opts *opts,
 	    uint32_t part_count);
-
-struct key_def *
-key_def_dup(struct key_def *def);
 
 /**
  * Copy one key def into another, preserving the membership
@@ -345,12 +441,12 @@ key_def_dup(struct key_def *def);
  * parts.
  */
 static inline void
-key_def_copy(struct key_def *to, const struct key_def *from)
+index_def_copy(struct index_def *to, const struct index_def *from)
 {
 	struct rlist save_link = to->link;
-	int part_count = (to->part_count < from->part_count ?
-			  to->part_count : from->part_count);
-	size_t size  = (sizeof(struct key_def) +
+	int part_count = (to->key_def.part_count < from->key_def.part_count ?
+			  to->key_def.part_count : from->key_def.part_count);
+	size_t size  = (sizeof(struct index_def) +
 			sizeof(struct key_part) * part_count);
 	memcpy(to, from, size);
 	to->link = save_link;
@@ -361,8 +457,85 @@ key_def_copy(struct key_def *to, const struct key_def *from)
  * @pre part_no < part_count
  */
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type);
+index_def_set_part(struct index_def *def, uint32_t part_no,
+		   uint32_t fieldno, enum field_type type);
+
+/**
+ * Returns the part in index_def->parts for the specified fieldno.
+ * If fieldno is not in index_def->parts returns NULL.
+ */
+const struct key_part *
+key_def_find(const struct key_def *key_def, uint32_t fieldno);
+
+/**
+ * Allocate a new index_def with a set union of key parts from
+ * first and second key defs. Parts of the new index_def consist
+ * of the first index_def's parts and those parts of the second
+ * index_def that were not among the first parts.
+ * @retval not NULL Ok.
+ * @retval NULL     Memory error.
+ */
+struct index_def *
+index_def_merge(const struct index_def *first, const struct index_def *second);
+
+/*
+ * Check that parts of the key match with the key definition.
+ * @param index_def Key definition.
+ * @param key MessagePack'ed data for matching.
+ * @param part_count Field count in the key.
+ *
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
+ */
+int
+key_validate_parts(struct index_def *index_def, const char *key,
+		   uint32_t part_count);
+
+/**
+ * Return true if @a index_def defines a sequential key without
+ * holes starting from the first field. In other words, for all
+ * key parts index_def->parts[part_id].fieldno == part_id.
+ * @param index_def index_def
+ * @retval true index_def is sequential
+ * @retval false otherwise
+ */
+static inline bool
+key_def_is_sequential(const struct key_def *key_def)
+{
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		if (key_def->parts[part_id].fieldno != part_id)
+			return false;
+	}
+	return true;
+}
+
+/** A helper table for key_mp_type_validate */
+extern const uint32_t key_mp_type[];
+
+/**
+ * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
+ * @param type KeyDef type
+ * @param field_type MsgPack type
+ * @param field_no - a field number (is used to store an error message)
+ *
+ * @retval 0  mp_type is valid.
+ * @retval -1 mp_type is invalid.
+ */
+static inline int
+key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
+	       int err, uint32_t field_no)
+{
+	assert(key_type < field_type_MAX);
+	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
+	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
+		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
+		return -1;
+	}
+	return 0;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /** Compare two key part arrays.
  *
@@ -391,30 +564,15 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  * (HASH < TREE < BITSET) or its key part array is greater.
  */
 int
-key_def_cmp(const struct key_def *key1, const struct key_def *key2);
-
-/* Destroy and free a key_def. */
-void
-key_def_delete(struct key_def *def);
-
-/** Add a key to the list of keys. */
-static inline  void
-key_list_add_key(struct rlist *key_list, struct key_def *key)
-{
-	rlist_add_entry(key_list, key, link);
-}
-
-/** Remove a key from the list of keys. */
-void
-key_list_del_key(struct rlist *key_list, uint32_t id);
+index_def_cmp(const struct index_def *key1, const struct index_def *key2);
 
 /**
  * Check a key definition for violation of various limits.
  *
- * @param key_def   key_def
+ * @param index_def   index_def
  */
 void
-key_def_check(struct key_def *key_def);
+index_def_check(struct index_def *index_def);
 
 /** Check space definition structure for errors. */
 void
@@ -422,25 +580,19 @@ space_def_check(struct space_def *def, uint32_t namelen,
                 uint32_t engine_namelen,
                 int32_t errcode);
 
-/** A helper table for key_mp_type_validate */
-extern const uint32_t key_mp_type[];
-
 /**
- * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
- * @param type KeyDef type
- * @param field_type MsgPack type
- * @param field_no - a field number (is used to show an error message)
+ * Given a tuple with an index definition, update the LSN stored
+ * in the index options.
+ *
+ * @return a tuple with updated lsn in key def. The returned tuple
+ *         is blessed (referenced by box_tuple_bless()).
+ *
+ * Throws an exception if error.
+ *
+ * @note Implemented in alter.cc
  */
-static inline void
-key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
-	       int err, uint32_t field_no)
-{
-	assert(key_type < field_type_MAX);
-	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
-		tnt_raise(ClientError, err, field_no,
-			  field_type_strs[key_type]);
-}
+extern struct tuple *
+index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
 
 /**
  * Check object identifier for invalid symbols.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,7 +35,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
+		/* 0x02 */	MP_UINT,   /* IPROTO_REPLICA_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 		/* 0x05 */	MP_UINT,   /* IPROTO_SCHEMA_ID */
@@ -81,7 +81,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
-	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
+	/* 0x24 */	MP_STR, /* IPROTO_INSTANCE_UUID */
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
@@ -97,68 +97,95 @@ const char *iproto_type_strs[] =
 	"REPLACE",
 	"UPDATE",
 	"DELETE",
-	"CALL",
+	NULL, /* CALL_16 */
 	"AUTH",
 	"EVAL",
 	"UPSERT",
+	"CALL"
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_UPSERT + 1] = {
+const uint64_t iproto_body_key_map[IPROTO_CALL + 1] = {
 	0,                                                     /* unused */
 	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
 	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
 	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
-	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL_16 */
 	bit(USER_NAME)| bit(TUPLE),                            /* AUTH */
 	bit(EXPR)     | bit(TUPLE),                            /* EVAL */
 	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
 };
 #undef bit
 
 const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
-	"server_id",          /* 0x02 */
+	"replica_id",       /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
-	"",                 /* 0x05 */
-	"",                 /* 0x06 */
-	"",                 /* 0x07 */
-	"",                 /* 0x08 */
-	"",                 /* 0x09 */
-	"",                 /* 0x0a */
-	"",                 /* 0x0b */
-	"",                 /* 0x0c */
-	"",                 /* 0x0d */
-	"",                 /* 0x0e */
-	"",                 /* 0x0f */
+	NULL,               /* 0x05 */
+	NULL,               /* 0x06 */
+	NULL,               /* 0x07 */
+	NULL,               /* 0x08 */
+	NULL,               /* 0x09 */
+	NULL,               /* 0x0a */
+	NULL,               /* 0x0b */
+	NULL,               /* 0x0c */
+	NULL,               /* 0x0d */
+	NULL,               /* 0x0e */
+	NULL,               /* 0x0f */
 	"space_id",         /* 0x10 */
 	"index_id",         /* 0x11 */
 	"limit",            /* 0x12 */
 	"offset",           /* 0x13 */
 	"iterator",         /* 0x14 */
 	"index_base",       /* 0x15 */
-	"",                 /* 0x16 */
-	"",                 /* 0x17 */
-	"",                 /* 0x18 */
-	"",                 /* 0x19 */
-	"",                 /* 0x1a */
-	"",                 /* 0x1b */
-	"",                 /* 0x1c */
-	"",                 /* 0x1d */
-	"",                 /* 0x1e */
-	"",                 /* 0x1f */
+	NULL,               /* 0x16 */
+	NULL,               /* 0x17 */
+	NULL,               /* 0x18 */
+	NULL,               /* 0x19 */
+	NULL,               /* 0x1a */
+	NULL,               /* 0x1b */
+	NULL,               /* 0x1c */
+	NULL,               /* 0x1d */
+	NULL,               /* 0x1e */
+	NULL,               /* 0x1f */
 	"key",              /* 0x20 */
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"server UUID",      /* 0x24 */
+	"instance UUID",    /* 0x24 */
 	"cluster UUID",     /* 0x25 */
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
+	NULL,               /* 0x29 */
+	"data"              /* 0x30 */
+	"error"             /* 0x31 */
 };
 
+const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
+	NULL,
+	"offset",
+	"size",
+	"unpacked size",
+	"count",
+	"min",
+	"page index offset"
+};
+
+const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
+	NULL,
+	"min lsn",
+	"max lsn",
+	"page count",
+	"bloom filter"
+};
+
+const char *vy_page_index_key_strs[VY_PAGE_INDEX_KEY_MAX] = {
+	NULL,
+	"page index",
+};

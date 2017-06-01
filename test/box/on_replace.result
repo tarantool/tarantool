@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+---
+...
 -- test c and lua triggers: must return only lua triggers
 #box.space._space:on_replace()
 ---
@@ -138,4 +141,315 @@ type(box.space._space:on_replace(f2))
 #box.space._space:on_replace()
 ---
 - 2
+...
+--
+-- gh-587: crash on attempt to modify space from triggers
+--
+first = box.schema.space.create('first')
+---
+...
+_= first:create_index('primary')
+---
+...
+second = box.schema.space.create('second')
+---
+...
+_ = second:create_index('primary')
+---
+...
+-- one statement
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    second:replace({2, first:get(1)[2] .. " from on_replace trigger"})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({1, "hello"})
+---
+- [1, 'hello']
+...
+first:select()
+---
+- - [1, 'hello']
+...
+second:select()
+---
+- - [2, 'hello from on_replace trigger']
+...
+first:on_replace(nil, trigger_id)
+---
+...
+first:delete(1)
+---
+- [1, 'hello']
+...
+second:delete(1)
+---
+...
+-- multiple statements
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    second:replace({1})
+    second:replace({2, first:get(1)[2] .. " in on_replace trigger"})
+    second:replace({3})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({1, "multistatement tx"})
+---
+- [1, 'multistatement tx']
+...
+first:select()
+---
+- - [1, 'multistatement tx']
+...
+second:select()
+---
+- - [1]
+  - [2, 'multistatement tx in on_replace trigger']
+  - [3]
+...
+first:on_replace(nil, trigger_id)
+---
+...
+first:delete(1)
+---
+- [1, 'multistatement tx']
+...
+second:delete(1)
+---
+- [1]
+...
+second:delete(2)
+---
+- [2, 'multistatement tx in on_replace trigger']
+...
+second:delete(3)
+---
+- [3]
+...
+-- rollback on error
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    second:replace({1, "discarded"})
+    second:insert({1})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({1, "rollback"})
+---
+- error: Duplicate key exists in unique index 'primary' in space 'second'
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+-- max recursion depth
+RECURSION_LIMIT = 0
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    RECURSION_LIMIT = RECURSION_LIMIT + 1
+    first:auto_increment({"recursive"})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({1, "recursive"})
+---
+- error: 'Can not execute a nested statement: nesting limit reached'
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+RECURSION_LIMIT
+---
+- 4
+...
+first:on_replace(nil, trigger_id)
+---
+...
+-- recursion
+level = 0
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    level = level + 1
+    if level >= RECURSION_LIMIT then
+        return
+    end
+    first:auto_increment({"recursive", level})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- [0, 'initial']
+...
+first:select()
+---
+- - [0, 'initial']
+  - [1, 'recursive', 1]
+  - [2, 'recursive', 2]
+  - [3, 'recursive', 3]
+...
+second:select()
+---
+- []
+...
+RECURSION_LIMIT
+---
+- 4
+...
+first:on_replace(nil, trigger_id)
+---
+...
+first:truncate()
+---
+...
+second:truncate()
+---
+...
+-- transaction control
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.commit()
+    first:auto_increment({"recursive", level})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: Can not commit transaction in a nested statement
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.rollback()
+    first:auto_increment({"recursive", level})
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: Rollback called in a nested statement
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+test_run:cmd("setopt delimiter ';'");
+---
+- true
+...
+trigger_id = first:on_replace(function()
+    box.begin()
+    first:auto_increment({"recursive", level})
+    box.commit()
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+first:replace({0, "initial"})
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+first:select()
+---
+- []
+...
+second:select()
+---
+- []
+...
+first:on_replace(nil, trigger_id)
+---
+...
+first:drop()
+---
+...
+second:drop()
+---
 ...

@@ -5,61 +5,25 @@ from lib.tarantool_server import TarantoolServer
 # master server
 master = server
 master_id = master.get_param('server')['id']
-
 master.admin("box.schema.user.grant('guest', 'replication')")
+
+print '-------------------------------------------------------------'
+print 'gh-484: JOIN doesn\'t save data to snapshot with TREE index'
+print '-------------------------------------------------------------'
+
 master.admin("space = box.schema.space.create('test', {id =  42})")
 master.admin("index = space:create_index('primary', { type = 'tree'})")
 
 master.admin('for k = 1, 9 do space:insert{k, k*k} end')
-data_dir = os.path.join(master.vardir, master.name)
-for k in glob.glob(os.path.join(data_dir, '*.xlog')):
-    os.unlink(k)
-
-print '-------------------------------------------------------------'
-print 'replica test 1 (no such space)'
-print '-------------------------------------------------------------'
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
-
-# #1075: Box.once should wait before the server enters RW mode
-#
-# We expect the replica to get blocked in box.cfg{}, hence wait = False.
-# Since xlog files on master were deleted, they aren't delivered,
-# and replica waits indefinitely.
-#
-# Note: replica waits for a log entry indicating that this very replica
-# joined the cluster. Once the entry is fetched we assume that the
-# replica is relatively up to date and enter RW mode. Never happens in
-# this particular test case.
-replica.deploy(wait = False)
-
-replica.admin('box.space.test')
-
-replica.admin('box_cfg_done') # blocked in box.cfg it should be
-
-replica.stop()
-replica.cleanup(True)
-
-print '-------------------------------------------------------------'
-print 'replica JOIN'
-print '-------------------------------------------------------------'
-
-master.admin('box.snapshot()')
-master.restart()
-
 replica.deploy()
-replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.space.test:select()')
 
-#
-# gh-484: JOIN doesn't save data to snapshot with TREE index
-#
-
 replica.restart()
-
 replica.admin('box.space.test:select()')
 replica.stop()
 replica.cleanup(True)

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_DIAG_H_INCLUDED
 #define TARANTOOL_DIAG_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -96,10 +97,11 @@ error_unref(struct error *e)
 		e->destroy(e);
 }
 
-static inline void
+NORETURN static inline void
 error_raise(struct error *e)
 {
 	e->raise(e);
+	unreachable();
 }
 
 static inline void
@@ -226,17 +228,19 @@ struct error_factory {
 				     unsigned line, const char *msg);
 	struct error *(*ClientError)(const char *file, unsigned line,
 				     uint32_t errcode, ...);
+	struct error *(*SystemError)(const char *file, unsigned line,
+				     const char *format, ...);
 };
 
 struct diag *
 diag_get();
 
-static inline void
+NORETURN static inline void
 diag_raise(void)
 {
 	struct error *e = diag_last_error(diag_get());
-	if (e)
-		error_raise(e);
+	assert(e != NULL);
+	error_raise(e);
 }
 
 

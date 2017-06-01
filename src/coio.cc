@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -709,7 +709,7 @@ coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
 	(void) loop;
 	struct coio_wdata *wdata = (struct coio_wdata *) watcher->data;
 	wdata->revents = revents;
-	fiber_call(wdata->fiber);
+	fiber_wakeup(wdata->fiber);
 }
 
 int
@@ -718,7 +718,6 @@ coio_wait(int fd, int events, double timeout)
 	if (fiber_is_cancelled())
 		return 0;
 	struct ev_io io;
-	coio_init(&io, fd);
 	ev_io_init(&io, coio_wait_cb, fd, events);
 	struct coio_wdata wdata = {
 		/* .fiber =   */ fiber(),
@@ -733,5 +732,11 @@ coio_wait(int fd, int events, double timeout)
 	fiber_yield_timeout(timeout);
 
 	ev_io_stop(loop(), &io);
-	return wdata.revents;
+	return wdata.revents & (EV_READ | EV_WRITE);
+}
+
+int coio_close(int fd)
+{
+	ev_io_closing(loop(), fd, EV_CUSTOM);
+	return close(fd);
 }

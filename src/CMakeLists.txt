@@ -25,7 +25,6 @@ lua_source(lua_sources lua/crypto.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
 lua_source(lua_sources lua/uri.lua)
-lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/socket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
@@ -37,6 +36,9 @@ lua_source(lua_sources lua/csv.lua)
 lua_source(lua_sources lua/strict.lua)
 lua_source(lua_sources lua/clock.lua)
 lua_source(lua_sources lua/title.lua)
+lua_source(lua_sources lua/argparse.lua)
+lua_source(lua_sources lua/env.lua)
+lua_source(lua_sources lua/trigger.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
@@ -64,13 +66,23 @@ set (core_sources
      memory.c
      fiber.c
      cbus.c
+     fiber_pool.c
      exception.cc
      coro.c
      reflection.c
      assoc.c
      rmean.c
+     histogram.c
      util.c
+     path_lock.c
  )
+
+if (TARGET_OS_NETBSD)
+    # A workaround for "undefined reference to `__gcc_personality_v0'"
+    # on x86_64-rumprun-netbsd-gcc
+    set_source_files_properties(util.c PROPERTIES COMPILE_FLAGS
+        -fno-exceptions)
+endif ()
 
 add_library(core STATIC ${core_sources})
 target_link_libraries(core
@@ -105,14 +117,12 @@ set (server_sources
      opts.c
      cfg.c
      cpu_feature.c
-     fiob.c
      tt_uuid.c
      uri.c
      backtrace.cc
      proc_title.c
      coeio_file.c
      clock.c
-     lua/console.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
@@ -134,13 +144,18 @@ set (server_sources
 
 set(api_headers
     ${CMAKE_BINARY_DIR}/src/trivia/config.h
+    ${CMAKE_SOURCE_DIR}/src/trivia/util.h
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/fiber.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
     ${CMAKE_SOURCE_DIR}/src/coeio.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
+    ${CMAKE_SOURCE_DIR}/src/box/key_def.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple_compare.h
+    ${CMAKE_SOURCE_DIR}/src/box/memtx_tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/schema.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h
@@ -164,14 +179,18 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 target_link_libraries(server core bit uri)
 
-set (common_libraries server core misc bitset csv ${MSGPUCK_LIBRARIES})
+# Rule of thumb: if exporting a symbol from a static library, list the
+# library here.
+set (reexport_libraries server core misc bitset csv
+     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES})
 
-list(APPEND common_libraries
+set (common_libraries
+    ${reexport_libraries}
     ${LIBEIO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${LUAJIT_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
@@ -201,20 +220,56 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
+# Exports syntax is toolchain-dependent, preprocessing is necessary
+set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
+add_custom_target(preprocess_exports
+                  DEPENDS ${exports_file})
+add_custom_command(
+    OUTPUT  ${exports_file}
+    DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
+    COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
+            ${CMAKE_SOURCE_DIR}/extra/exports
+            ${exports_file} ${CMAKE_SYSTEM_NAME})
+
 add_executable(
-	tarantool main.cc ffisyms.cc title.c
+	tarantool main.cc title.c
 	${LIBUTIL_FREEBSD_SRC}/flopen.c
 	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
-add_dependencies(tarantool build_bundled_libs)
-target_link_libraries(tarantool box ${common_libraries} ${OPENSSL_LIBRARIES})
 
+add_dependencies(tarantool build_bundled_libs preprocess_exports)
+
+# Re-link if exports changed
+set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
+
+# A note about linkers:
+# [GNU linker] When linking an *executable* visibility is ignored, and
+#              either nothing is exported (default), or any non-static
+#              symbol is exported (-rdynamic), or explicitly listed
+#              symbols are exported (--dynamic-list).
+#
+#              However, if a symbol listed lives in a static library it
+#              won't be automatically pulled, hence --whole-archive
+#              option.
+#
+# [Apple linker] One can provide an explicit export list; pulls symbols
+#                from static libraries.
+#
 if (TARGET_OS_DARWIN)
+    target_link_libraries(tarantool box ${common_libraries})
     # Necessary to make LuaJIT work on Darwin, see
     # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
-elseif (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
-    # Helps symbol resolution of plug-ins
-    set_target_properties(tarantool PROPERTIES LINK_FLAGS "-rdynamic")
+        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000 \
+        -Wl,-exported_symbols_list,${exports_file}")
+else ()
+    target_link_libraries(tarantool
+                          -Wl,--whole-archive box ${reexport_libraries}
+                          salad -Wl,--no-whole-archive
+                          ${common_libraries})
+    set_target_properties(tarantool PROPERTIES
+        LINK_FLAGS "-Wl,--dynamic-list,${exports_file}")
+    # get rid of -rdynamic
+    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
+
 install (TARGETS tarantool DESTINATION bin)

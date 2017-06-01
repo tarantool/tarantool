@@ -1,3 +1,5 @@
+#!groovy
+
 stage('Build'){
     packpack = new org.tarantool.packpack()
     node {

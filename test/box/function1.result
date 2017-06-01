@@ -7,7 +7,7 @@ log = require('log')
 net = require('net.box')
 ---
 ...
-c = net:new(os.getenv("LISTEN"))
+c = net.connect(os.getenv("LISTEN"))
 ---
 ...
 box.schema.func.create('function1', {language = "C"})
@@ -48,7 +48,7 @@ c:call('function1.args', "xx")
 ...
 c:call('function1.args', 15)
 ---
-- - [15, 'hello']
+- [[15, 'hello']]
 ...
 box.schema.func.drop("function1.args")
 ---
@@ -174,5 +174,8 @@ box.schema.func.create('f16', {language = 'C'}),    func_lang('f16')
 - C
 ...
 box.space.test:drop()
+---
+...
+c:close()
 ---
 ...

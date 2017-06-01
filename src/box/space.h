@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_SPACE_H_INCLUDED
 #define TARANTOOL_BOX_SPACE_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,10 +30,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
 #include "key_def.h"
-#include "engine.h"
 #include "small/rlist.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct Index;
+struct Handler;
 
 struct space {
 	struct access access[BOX_USER_MAX];
@@ -43,10 +48,12 @@ struct space {
 	 * life cycle, throughout phases of recovery or with
 	 * deletion and addition of indexes.
 	 */
-	Handler *handler;
+	struct Handler *handler;
 
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
+	/* Number of bytes used in memory by tuples in the space. */
+	size_t bsize;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *
@@ -78,21 +85,15 @@ struct space {
 	 * Sparse array of indexes defined on the space, indexed
 	 * by id. Used to quickly find index by id (for SELECTs).
 	 */
-	Index **index_map;
+	struct Index **index_map;
 	/**
 	 * Dense array of indexes defined on the space, in order
 	 * of index id. Initially stores only the primary key at
 	 * position 0, and is fully built by
 	 * space_build_secondary_keys().
 	 */
-	Index *index[];
+	struct Index *index[];
 };
-
-/** Check whether or not the current user can be granted
- * the requested access to the space.
- */
-void
-access_check_space(struct space *space, uint8_t access);
 
 /** Get space ordinal number. */
 static inline uint32_t
@@ -102,32 +103,69 @@ space_id(struct space *space) { return space->def.id; }
 static inline const char *
 space_name(struct space *space) { return space->def.name; }
 
-
 /** Return true if space is temporary. */
 static inline bool
 space_is_temporary(struct space *space) { return space->def.opts.temporary; }
 
+void
+space_run_triggers(struct space *space, bool yesno);
+
+/**
+ * Get index by index id.
+ * @return NULL if the index is not found.
+ */
+static inline struct Index *
+space_index(struct space *space, uint32_t id)
+{
+	if (id <= space->index_id_max)
+		return space->index_map[id];
+	return NULL;
+}
+
+/**
+ * Look up the index by id.
+ */
+static inline struct Index *
+index_find(struct space *space, uint32_t index_id)
+{
+	struct Index *index = space_index(space, index_id);
+	if (index == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
+			 space_name(space));
+		error_log(diag_last_error(diag_get()));
+	}
+	return index;
+}
+
+/**
+ * Returns number of bytes used in memory by tuples in the space.
+ */
+size_t
+space_bsize(struct space *space);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "index.h"
+#include "engine.h"
+
+/** Check whether or not the current user can be granted
+ * the requested access to the space.
+ */
+void
+access_check_space(struct space *space, uint8_t access);
+
 static inline bool
 space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }
 
-/** Return true if space is run under sophia engine. */
+/** Return true if space is run under vinyl engine. */
 static inline bool
-space_is_sophia(struct space *space) { return strcmp(space->handler->engine->name, "sophia") == 0; }
+space_is_vinyl(struct space *space) { return strcmp(space->handler->engine->name, "vinyl") == 0; }
 
 void space_noop(struct space *space);
 
 uint32_t
 space_size(struct space *space);
-
-/**
- * Check that the tuple has correct field count and correct field
- * types (a pre-requisite for an INSERT).
- */
-void
-space_validate_tuple(struct space *sp, struct tuple *new_tuple);
-
-void
-space_validate_tuple_raw(struct space *sp, const char *data);
 
 /**
  * Allocate and initialize a space. The space
@@ -162,36 +200,22 @@ void
 space_fill_index_map(struct space *space);
 
 /**
- * Get index by index id.
- * @return NULL if the index is not found.
+ * Look up the index by id, and throw an exception if not found.
  */
-static inline Index *
-space_index(struct space *space, uint32_t id)
+static inline struct Index *
+index_find_xc(struct space *space, uint32_t index_id)
 {
-	if (id <= space->index_id_max)
-		return space->index_map[id];
-	return NULL;
-}
-
-/**
- * Look up index by id.
- * Raise an error if the index is not found.
- */
-static inline Index *
-index_find(struct space *space, uint32_t index_id)
-{
-	Index *index = space_index(space, index_id);
+	struct Index *index = index_find(space, index_id);
 	if (index == NULL)
-		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_id,
-			  space_name(space));
+		diag_raise();
 	return index;
 }
 
-static inline Index *
+static inline struct Index *
 index_find_unique(struct space *space, uint32_t index_id)
 {
-	Index *index = index_find(space, index_id);
-	if (!index->key_def->opts.is_unique)
+	struct Index *index = index_find_xc(space, index_id);
+	if (! index->index_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	return index;
 }
@@ -210,12 +234,8 @@ index_find_system(struct space *space, uint32_t index_id)
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  space->handler->engine->name, "system data");
 	}
-	return (MemtxIndex *) index_find(space, index_id);
+	return (MemtxIndex *) index_find_xc(space, index_id);
 }
-
-
-extern "C" void
-space_run_triggers(struct space *space, bool yesno);
 
 /**
  * Checks that primary key of a tuple did not change during update,
@@ -227,5 +247,23 @@ void
 space_check_update(struct space *space,
 		   struct tuple *old_tuple,
 		   struct tuple *new_tuple);
+
+/**
+ * Updates space bsize field: decrease it by old tuple's bsize and
+ * increase it by new one's.
+ * Return an increment in space.bsize
+ */
+ptrdiff_t
+space_bsize_update(struct space *space,
+		   const struct tuple *old_tuple,
+		   const struct tuple *new_tuple);
+
+/**
+ * Revert previous change in space_bsize
+ */
+void
+space_bsize_rollback(struct space *space, ptrdiff_t bsize_change);
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

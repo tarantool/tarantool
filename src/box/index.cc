@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,7 +35,6 @@
 #include "user_def.h"
 #include "space.h"
 #include "iproto_constants.h"
-#include "request.h"
 #include "txn.h"
 #include "rmean.h"
 
@@ -63,32 +62,16 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 	unsigned line, const Index *index, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
-	struct key_def *key_def = index->key_def;
-	struct space *space = space_cache_find(key_def->space_id);
+	struct index_def *index_def = index->index_def;
+	struct space *space = space_cache_find(index_def->space_id);
 	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
-	error_format_msg(this, tnt_errcode_desc(m_errcode), key_def->name,
-			 index_type_strs[key_def->type],
+	error_format_msg(this, tnt_errcode_desc(m_errcode), index_def->name,
+			 index_type_strs[index_def->type],
 			 space->def.name, space->def.engine_name, what);
 }
 
-void
-key_validate_parts(struct key_def *key_def, const char *key,
-		   uint32_t part_count)
-{
-	(void) key_def;
-	(void) key;
-
-	for (uint32_t part = 0; part < part_count; part++) {
-		enum mp_type mp_type = mp_typeof(*key);
-		mp_next(&key);
-
-		key_mp_type_validate(key_def->parts[part].type, mp_type,
-				     ER_KEY_PART_TYPE, part);
-	}
-}
-
-void
-key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+int
+key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
 	     uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
@@ -99,74 +82,109 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 * - ITER_ALL iterator type, all index types
 		 * - ITER_GT iterator in HASH index (legacy)
 		 */
-		if (key_def->type == TREE || type == ITER_ALL ||
-		    (key_def->type == HASH && type == ITER_GT))
-			return;
+		if (index_def->type == TREE || type == ITER_ALL ||
+		    (index_def->type == HASH && type == ITER_GT))
+			return 0;
 		/* Fall through. */
 	}
 
-	if (key_def->type == RTREE) {
-		unsigned d = key_def->opts.dimension;
-		if (part_count != 1 && part_count != d && part_count != d * 2)
-			tnt_raise(ClientError, ER_KEY_PART_COUNT,
-				  d  * 2, part_count);
+	if (index_def->type == RTREE) {
+		unsigned d = index_def->opts.dimension;
+		if (part_count != 1 && part_count != d && part_count != d * 2) {
+			diag_set(ClientError, ER_KEY_PART_COUNT, d  * 2,
+				 part_count);
+			return -1;
+		}
 		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
-			key_mp_type_validate(ARRAY, mp_type, ER_KEY_PART_TYPE, 0);
+			if (key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
+						 ER_KEY_PART_TYPE, 0))
+				return -1;
 			uint32_t array_size = mp_decode_array(&key);
-			if (array_size != d && array_size != d * 2)
-				tnt_raise(ClientError, ER_RTREE_RECT,
-					  "Key", d, d * 2);
+			if (array_size != d && array_size != d * 2) {
+				diag_set(ClientError, ER_RTREE_RECT, "Key", d,
+					 d * 2);
+				return -1;
+			}
 			for (uint32_t part = 0; part < array_size; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, 0);
+				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
+							 mp_type,
+							 ER_KEY_PART_TYPE, 0))
+					return -1;
 			}
 		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
-				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, part);
+				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
+							 mp_type,
+							 ER_KEY_PART_TYPE,
+							 part))
+					return -1;
 			}
 		}
 	} else {
-		if (part_count > key_def->part_count)
-			tnt_raise(ClientError, ER_KEY_PART_COUNT,
-				  key_def->part_count, part_count);
+		if (part_count > index_def->key_def.part_count) {
+			diag_set(ClientError, ER_KEY_PART_COUNT,
+				 index_def->key_def.part_count, part_count);
+			return -1;
+		}
 
 		/* Partial keys are allowed only for TREE index type. */
-		if (key_def->type != TREE && part_count < key_def->part_count) {
-			tnt_raise(ClientError, ER_EXACT_MATCH,
-				  key_def->part_count, part_count);
+		if (index_def->type != TREE && part_count < index_def->key_def.part_count) {
+			diag_set(ClientError, ER_EXACT_MATCH,
+				 index_def->key_def.part_count, part_count);
+			return -1;
 		}
-		key_validate_parts(key_def, key, part_count);
+		if (key_validate_parts(index_def, key, part_count))
+			return -1;
 	}
+	return 0;
 }
 
-void
-primary_key_validate(struct key_def *key_def, const char *key,
+int
+primary_key_validate(struct index_def *index_def, const char *key,
 		     uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
-	if (key_def->part_count != part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			  key_def->part_count, part_count);
+	if (index_def->key_def.part_count != part_count) {
+		diag_set(ClientError, ER_EXACT_MATCH, index_def->key_def.part_count,
+			 part_count);
+		return -1;
 	}
-	key_validate_parts(key_def, key, part_count);
+	return key_validate_parts(index_def, key, part_count);
+}
+
+char *
+box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
+	uint32_t index_id, uint32_t *key_size)
+{
+	try {
+		struct space *space = space_by_id(space_id);
+		Index *index = index_find_xc(space, index_id);
+		return tuple_extract_key(tuple, index->index_def, key_size);
+	} catch (ClientError *e) {
+		return NULL;
+	}
 }
 
 /* }}} */
 
 /* {{{ Index -- base class for all indexes. ********************/
 
-Index::Index(struct key_def *key_def_arg)
-	:key_def(key_def_dup(key_def_arg)),
-	sc_version(::sc_version)
-{}
+Index::Index(struct index_def *index_def_arg)
+	:index_def(NULL), sc_version(::sc_version)
+{
+	index_def = index_def_dup(index_def_arg);
+	if (index_def == NULL)
+		diag_raise();
+}
 
 Index::~Index()
 {
-	key_def_delete(key_def);
+	index_def_delete(index_def);
 }
 
 size_t
@@ -278,14 +296,14 @@ check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
 	*space = space_cache_find(space_id);
 	access_check_space(*space, PRIV_R);
-	return index_find(*space, index_id);
+	return index_find_xc(*space, index_id);
 }
 
 static inline box_tuple_t *
-tuple_bless_null(struct tuple *tuple)
+tuple_bless_null_xc(struct tuple *tuple)
 {
 	if (tuple != NULL)
-		return tuple_bless(tuple);
+		return tuple_bless_xc(tuple);
 	return NULL;
 }
 
@@ -294,7 +312,7 @@ box_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {
 		struct space *space;
-		/* no tx management, len is approximate in sophia anyway. */
+		/* no tx management, len is approximate in vinyl anyway. */
 		return check_index(space_id, index_id, &space)->size();
 	} catch (Exception *) {
 		return (size_t) -1; /* handled by box.error() in Lua */
@@ -323,7 +341,7 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		/* no tx management, random() is for approximation anyway */
 		Index *index = check_index(space_id, index_id, &space);
 		struct tuple *tuple = index->random(rnd);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	}  catch (Exception *) {
 		return -1;
@@ -334,22 +352,23 @@ int
 box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
+	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	assert(result != NULL);
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
-		if (!index->key_def->opts.is_unique)
+		if (!index->index_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		primary_key_validate(index->key_def, key, part_count);
+		uint32_t part_count = mp_decode_array(&key);
+		if (primary_key_validate(index->index_def, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine. */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->findByKey(key, part_count);
 		/* Count statistics */
 		rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -362,21 +381,22 @@ int
 box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result)
 {
+	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	assert(result != NULL);
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
-		if (index->key_def->type != TREE) {
+		if (index->index_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "min()");
 		}
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, ITER_GE, key, part_count);
+		uint32_t part_count = mp_decode_array(&key);
+		if (key_validate(index->index_def, ITER_GE, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->min(key, part_count);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -394,16 +414,17 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
-		if (index->key_def->type != TREE) {
+		if (index->index_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "max()");
 		}
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, ITER_LE, key, part_count);
+		uint32_t part_count = mp_decode_array(&key);
+		if (key_validate(index->index_def, ITER_LE, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->max(key, part_count);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
@@ -416,13 +437,15 @@ ssize_t
 box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		const char *key, const char *key_end)
 {
+	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
-		uint32_t part_count = key ? mp_decode_array(&key) : 0;
-		key_validate(index->key_def, itype, key, part_count);
+		uint32_t part_count = mp_decode_array(&key);
+		if (key_validate(index->index_def, itype, key, part_count))
+			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
 		ssize_t count = index->count(itype, key, part_count);
@@ -442,27 +465,25 @@ box_iterator_t *
 box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                    const char *key, const char *key_end)
 {
+	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	struct iterator *it = NULL;
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space;
 		Index *index = check_index(space_id, index_id, &space);
+		struct txn *txn = txn_begin_ro_stmt(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
-		key_validate(index->key_def, itype, key, part_count);
+		if (key_validate(index->index_def, itype, key, part_count))
+			diag_raise();
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
 		it->sc_version = sc_version;
 		it->space_id = space_id;
 		it->index_id = index_id;
 		it->index = index;
-		/*
-		 * No transaction management: iterators are
-		 * "dirty" in tarantool now, they exist in
-		 * their own read view in sophia or access dirty
-		 * data in memtx.
-		 */
+		txn_commit_ro_stmt(txn);
 		return it;
 	} catch (Exception *) {
 		if (it)
@@ -498,7 +519,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	}
 	try {
 		struct tuple *tuple = itr->next(itr);
-		*result = tuple_bless_null(tuple);
+		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	} catch (Exception *) {
 		return -1;

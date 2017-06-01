@@ -1,5 +1,6 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 
 box.schema.user.grant('guest', 'replication')
 box.schema.func.create('_set_pri_lsn')
@@ -68,14 +69,14 @@ test_run:cmd("switch default")
 fiber = require('fiber')
 box.info.status
 
-space = box.schema.space.create('tweedledum')
-index = space:create_index('primary', { type = 'hash' })
+space = box.schema.space.create('tweedledum', {engine = engine})
+index = space:create_index('primary', {type = 'tree'})
 
 -- set begin lsn on master, replica and hot_standby.
 test_run:cmd("set variable replica_port to 'replica.listen'")
 REPLICA = require('uri').parse(tostring(replica_port))
 REPLICA ~= nil
-a = (require 'net.box'):new(REPLICA.host, REPLICA.service)
+a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
@@ -96,7 +97,7 @@ test_run:cmd("switch replica")
 test_run:cmd("set variable hot_standby_port to 'hot_standby.master'")
 HOT_STANDBY = require('uri').parse(tostring(hot_standby_port))
 HOT_STANDBY ~= nil
-a = (require 'net.box'):new(HOT_STANDBY.host, HOT_STANDBY.service)
+a = (require 'net.box').connect(HOT_STANDBY.host, HOT_STANDBY.service)
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 

@@ -20,11 +20,11 @@ git:
 
 env:
     global:
-      - TARBALL_EXTRA_ARGS="--exclude=doc/www --exclude=doc/sphinx"
-      - PACKAGECLOUD_REPO=1_6
+      - PACKAGECLOUD_REPO=1_7
     matrix:
       - TARGET=source
       - TARGET=test
+      - TARGET=coverage
       - OS=el DIST=6
       - OS=el DIST=7
       - OS=fedora DIST=24
@@ -39,6 +39,7 @@ env:
 
 matrix:
     allow_failures:
+      - TARGET=coverage
 #      - env: OS=el DIST=6
 #      - env: OS=el DIST=7
 #      - env: OS=fedora DIST=24
@@ -75,6 +76,8 @@ matrix:
         compiler: clang
       - env: TARGET=source
         compiler: clang
+      - env: TARGET=coverage
+        compiler: clang
       - env: OS=el DIST=6
         os: osx
       - env: OS=el DIST=7
@@ -99,6 +102,8 @@ matrix:
         os: osx
       - env: TARGET=source
         os: osx
+      - env: TARGET=coverage
+        os: osx
       - os: osx
         compiler: gcc
 
@@ -118,14 +123,14 @@ deploy:
     package_glob: build/*.{rpm,deb,dsc}
     skip_cleanup: true
     on:
-      branch: "1.6"
+      branch: "1.7"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy sources to SFTP
   - provider: script
     script: ./packpack/tools/sftp ${TRAVIS_BRANCH}/src build/*.tar.gz
     skip_cleanup: true
     on:
-      branch: "1.6"
+      branch: "1.7"
       condition: "x${TARGET} = xsource"
 
 notifications:

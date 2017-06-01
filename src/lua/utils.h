@@ -51,9 +51,11 @@ extern "C" {
 #include <lj_cconv.h>
 #include <lj_lib.h>
 #include <lj_tab.h>
+#include <lj_meta.h>
 
 struct lua_State;
 struct ibuf;
+struct error;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -450,6 +452,9 @@ LUA_API int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
 
 /** \endcond public */
+
+void
+luaT_pusherror(struct lua_State *L, struct error *e);
 
 struct error *
 luaL_iserror(struct lua_State *L, int narg);

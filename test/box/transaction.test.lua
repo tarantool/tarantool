@@ -84,7 +84,7 @@ s:truncate();
 -- Test admin console
 box.begin();
 -- should be ok - active transaction, and we don't
--- know, maybe it will use sophia engine, which
+-- know, maybe it will use vinyl engine, which
 -- may support yield() in the future, so we don't roll
 -- back a transction with no statements.
 box.commit();
@@ -134,7 +134,7 @@ test:select{1}
 function test() box.begin() end
 box.schema.func.create('test')
 box.schema.user.grant('guest', 'execute', 'function', 'test')
-cn = require('net.box').new(box.cfg.listen)
+cn = require('net.box').connect(box.cfg.listen)
 cn:call('test') -- first CALL starts transaction
 cn:call('test') -- iproto reuses fiber on the second call
 cn = nil

@@ -53,7 +53,9 @@ local PMurHash
 local PMurHash_methods = {
 
     update = function(self, str)
-        str = tostring(str or '')
+        if type(str) ~= 'string' then
+            error("Usage: murhash:update(string)")
+        end
         ffi.C.PMurHash32_Process(self.seed, self.value, str, string.len(str))
         self.total_length = self.total_length + string.len(str)
     end,
@@ -93,7 +95,9 @@ PMurHash = {
 
 setmetatable(PMurHash, {
     __call = function(self, str)
-        str = tostring(str or '')
+        if type(str) ~= 'string' then
+            error("Usage: digest.murhash(string)")
+        end
         return ffi.C.PMurHash32(PMurHash.default_seed, str, string.len(str))
     end
 })
@@ -101,7 +105,9 @@ setmetatable(PMurHash, {
 local CRC32
 local CRC32_methods = {
     update = function(self, str)
-        str = tostring(str or '')
+        if type(str) ~= 'string' then
+            error("Usage crc32:update(string)")
+        end
         self.value = ffi.C.crc32_calc(self.value, str, string.len(str))
     end,
 
@@ -132,7 +138,9 @@ CRC32 = {
 
 setmetatable(CRC32, {
     __call = function(self, str)
-        str = tostring(str or '')
+        if type(str) ~= 'string' then
+            error("Usage digest.crc32(string)")
+        end
         return ffi.C.crc32_calc(CRC32.crc_begin, str, string.len(str))
     end
 })
@@ -163,25 +171,23 @@ local m = {
     crc32 = CRC32,
 
     crc32_update = function(crc, str)
-        str = tostring(str or '')
+        if type(str) ~= 'string' then
+            error("Usage: digest.crc32_update(string)")
+        end
         return ffi.C.crc32_calc(tonumber(crc), str, string.len(str))
     end,
 
     sha1 = function(str)
-        if str == nil then
-            str = ''
-        else
-            str = tostring(str)
+        if type(str) ~= 'string' then
+            error("Usage: digest.sha1(string)")
         end
         local r = ffi.C.SHA1internal(str, #str, nil)
         return ffi.string(r, 20)
     end,
 
     sha1_hex = function(str)
-        if str == nil then
-            str = ''
-        else
-            str = tostring(str)
+        if type(str) ~= 'string' then
+            error("Usage: digest.sha1_hex(string)")
         end
         local r = ffi.C.SHA1internal(str, #str, nil)
         return str_to_hex(ffi.string(r, 20))
@@ -208,6 +214,9 @@ for digest, name in pairs(digest_shortcuts) do
         return crypto.digest[digest](str)
     end
     m[digest .. '_hex'] = function (str)
+        if type(str) ~= 'string' then
+            error('Usage: digest.'..digest..'_hex(string)')
+        end
         return str_to_hex(crypto.digest[digest](str))
     end
 end

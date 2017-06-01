@@ -87,18 +87,12 @@ endif()
 # GCC can also be built on top of llvm runtime (on mac).
 #
 
-check_c_compiler_flag("-Wno-unused-const-variable" CC_HAS_WNO_UNUSED_CONST_VARIABLE)
-check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
-check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
-check_c_compiler_flag("-Wno-unused-function" CC_HAS_WNO_UNUSED_FUNCTION)
-check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
-check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
 check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
 check_c_compiler_flag("-Wno-parentheses-equality" CC_HAS_WNO_PARENTHESES_EQUALITY)
-check_c_compiler_flag("-Wno-undefined-inline" CC_HAS_WNO_UNDEFINED_INLINE)
-check_c_compiler_flag("-Wno-dangling-else" CC_HAS_WNO_DANGLING_ELSE)
 check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
 check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
+check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
+check_c_compiler_flag("-Wno-char-subscripts" CC_HAS_WNO_CHAR_SUBSCRIPTS)
 check_c_compiler_flag("-Wno-format-truncation" CC_HAS_WNO_FORMAT_TRUNCATION)
 check_c_compiler_flag("-Wno-implicit-fallthrough" CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
 
@@ -153,7 +147,8 @@ if (ENABLE_BACKTRACE)
         set (BFD_LIBRARIES ${BFD_LIBRARY} ${IBERTY_LIBRARY} ${ZLIB_LIBRARIES})
         find_package_message(BFD_LIBRARIES "Found libbfd and dependencies"
             ${BFD_LIBRARIES})
-        if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
+        if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD OR
+            TARGET_OS_NETBSD)
             set (BFD_LIBRARIES ${BFD_LIBRARIES} iconv)
         endif()
     endif()
@@ -221,6 +216,7 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX" "-std=c++11")
     else()
         add_compile_flags("CXX" "-std=gnu++0x")
+        add_definitions("-Doverride=")
     endif()
 
     add_compile_flags("C;CXX"
@@ -232,6 +228,10 @@ macro(enable_tnt_compile_flags)
     if (CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_VALUE)
         # False-positive warnings for ({ xx = ...; x; }) macroses
         add_compile_flags("C;CXX" "-Wno-unused-value")
+    endif()
+
+    if (CC_HAS_WNO_CHAR_SUBSCRIPTS)
+        add_compile_flags("C;CXX" "-Wno-char-subscripts")
     endif()
 
     if (CC_HAS_WNO_FORMAT_TRUNCATION)
@@ -302,4 +302,12 @@ if (NOT HAVE_BUILTIN_CTZ OR NOT HAVE_BUILTIN_CTZLL)
         check_c_source_compiles("#include <string.h>\n#include <strings.h>\nint main(void) { return ffsll(0UL); }"
             HAVE_FFSLL)
     endif()
+endif()
+
+if (CMAKE_CROSSCOMPILING)
+    set(CMAKE_HOST_C_COMPILER cc)
+    set(CMAKE_HOST_CXX_COMPILER c++)
+else()
+    set(CMAKE_HOST_C_COMPILER ${CMAKE_C_COMPILER})
+    set(CMAKE_HOST_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 endif()

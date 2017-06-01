@@ -19,7 +19,7 @@ box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -31,7 +31,7 @@ index = box.space.test:create_index('primary', { type = 'hash' })
 _ = box.space.test1:create_index('primary', { type = 'hash' })
 ---
 ...
-_ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'str'}})
+_ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'string'}})
 ---
 ...
 conn:ping()
@@ -41,7 +41,7 @@ conn:ping()
 -- xxx: bug  currently selects no rows
 space:select{}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 space:insert{1, 'I am a tuple'}
 ---
@@ -49,23 +49,23 @@ space:insert{1, 'I am a tuple'}
 ...
 space:select{1}
 ---
-- - [1, 'I am a tuple']
+- error: 'No index #0 is defined in space ''test'''
 ...
 -- currently there is no way to find out how many records
 -- a space contains 
 space:select{0}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 space:select{2}
 ---
-- []
+- error: 'No index #0 is defined in space ''test'''
 ...
 test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -87,7 +87,7 @@ test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.test
@@ -237,16 +237,16 @@ box.schema.user.grant('test', 'execute,read,write', 'universe')
 s = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
-index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
+index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
 ---
 ...
-index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
+index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'string'}})
 ---
 ...
 function compare(a,b) return a[1] < b[1] end
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.tweedledum
@@ -347,7 +347,7 @@ s:truncate()
 ...
 -- Test composite keys with trees
 -- Redefine the second key to be composite
-s.index.secondary:alter{unique = true, parts = { 2, 'str', 3, 'str'}}
+s.index.secondary:alter{unique = true, parts = { 2, 'string', 3, 'string'}}
 ---
 ...
 space:insert{'key1', 'part1', 'part2'}
@@ -440,7 +440,7 @@ s:truncate()
 ---
 ...
 -- check non-unique multipart keys
-s.index.primary:alter{type = 'tree', parts = { 1, 'num'}}
+s.index.primary:alter{type = 'tree', parts = { 1, 'unsigned'}}
 ---
 ...
 s.index.secondary:alter{unique = false}
@@ -553,7 +553,7 @@ s:truncate()
 s.index.primary:alter{type = 'hash'}
 ---
 ...
-s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'str' }}
+s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'string' }}
 ---
 ...
 space:insert{1, 'hello'}
@@ -583,7 +583,7 @@ test_run:cmd('restart server default')
 net_box = require('net.box')
 ---
 ...
-conn = net_box:new('test:test@' .. box.cfg.listen)
+conn = net_box.connect('test:test@' .. box.cfg.listen)
 ---
 ...
 space = conn.space.tweedledum
@@ -615,7 +615,7 @@ s:truncate()
 -- A test case for: http://bugs.launchpad.net/bugs/735140
 -- Partial REPLACE corrupts index.
 -- clean data and restart with appropriate config
-s.index.primary:alter{parts = {1, 'str'}}
+s.index.primary:alter{parts = {1, 'string'}}
 ---
 ...
 s.index.secondary:alter{type = 'tree', unique = false}
@@ -649,7 +649,7 @@ space:delete('Spears')
 - ['Spears', 'Britney']
 ...
 -- Test retrieval of duplicates via a secondary key
-s.index.primary:alter{parts = { 1, 'num'}}
+s.index.primary:alter{parts = { 1, 'unsigned'}}
 ---
 ...
 space:insert{1, 'duplicate one'}

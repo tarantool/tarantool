@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Tarantool AUTHORS: please see AUTHORS file.
+ * Copyright 2010-2016 Tarantool AUTHORS: please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -50,6 +50,24 @@ struct mh_i32ptr_node_t {
 };
 
 #define mh_node_t struct mh_i32ptr_node_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) (a->key)
+#define mh_hash_key(a, arg) (a)
+#define mh_cmp(a, b, arg) ((a->key) != (b->key))
+#define mh_cmp_key(a, b, arg) ((a) != (b->key))
+#include "salad/mhash.h"
+
+/*
+ * Map: (i64) => (void *)
+ */
+#define mh_name _i64ptr
+#define mh_key_t uint64_t
+struct mh_i64ptr_node_t {
+	mh_key_t key;
+	void *val;
+};
+
+#define mh_node_t struct mh_i64ptr_node_t
 #define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
 #define mh_hash_key(a, arg) (a)

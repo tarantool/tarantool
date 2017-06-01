@@ -23,5 +23,16 @@ if (TARGET_OS_DARWIN)
          WORLD_READ WORLD_READ)
 endif()
 
-add_executable(txt2c txt2c.c)
-add_executable(bin2c bin2c.c)
+if (CMAKE_CROSSCOMPILING)
+    add_custom_target(txt2c
+        COMMAND ${CMAKE_HOST_C_COMPILER} txt2c.c
+            -o "${CMAKE_CURRENT_BINARY_DIR}/txt2c"
+        DEPENDS txt2c.c)
+    add_custom_target(bin2c
+        COMMAND ${CMAKE_HOST_C_COMPILER} bin2c.c
+            -o "${CMAKE_CURRENT_BINARY_DIR}/bin2c"
+        DEPENDS bin2c.c)
+else()
+    add_executable(txt2c txt2c.c)
+    add_executable(bin2c bin2c.c)
+endif()

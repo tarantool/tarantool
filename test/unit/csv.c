@@ -317,7 +317,7 @@ void iter_test3() {
 	csv_create(&csv);
 	csv_iterator_create(&it, &csv);
 	int st = 0;
-	const char *ar[] = {"1,2,3\r\n", "4,5,6", ""};
+	const char *ar[] = {"1,2,3\r\n", "4,5,6", "", ""};
 	int i = 0;
 	const char *buf = ar[i++];
 	while((st = csv_next(&it)) != CSV_IT_EOF) {

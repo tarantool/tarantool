@@ -1,6 +1,6 @@
 #include "errcode.h"
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,10 +31,9 @@
  */
 #include "errcode.h"
 
-#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
-	.errstr = #s,				\
-	.errflags = f,				\
-	.errdesc = d				\
+#define ERRCODE_RECORD_MEMBER(s, d) {	\
+	.errstr = #s,			\
+	.errdesc = d			\
 },
 
 struct errcode_record box_error_codes[box_error_code_MAX] = {

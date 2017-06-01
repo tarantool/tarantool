@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,35 +28,38 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "engine.h"
+
 #include "tuple.h"
 #include "txn.h"
 #include "port.h"
-#include "request.h"
-#include "engine.h"
 #include "space.h"
 #include "exception.h"
 #include "schema.h"
 #include "small/rlist.h"
 #include "scoped_guard.h"
+#include "vclock.h"
 #include <stdlib.h>
 #include <string.h>
-#include <latch.h>
 #include <errinj.h>
 
 RLIST_HEAD(engines);
 
-extern bool snapshot_in_progress;
-extern struct latch schema_lock;
-
-Engine::Engine(const char *engine_name)
+Engine::Engine(const char *engine_name, struct tuple_format_vtab *format_arg)
 	:name(engine_name),
-	 link(RLIST_HEAD_INITIALIZER(link))
+	 id(-1),
+	 flags(0),
+	 link(RLIST_HEAD_INITIALIZER(link)),
+	 format(format_arg)
 {}
 
 void Engine::init()
 {}
 
 void Engine::begin(struct txn *)
+{}
+
+void Engine::beginStatement(struct txn *)
 {}
 
 void Engine::prepare(struct txn *)
@@ -68,7 +71,21 @@ void Engine::commit(struct txn *, int64_t)
 void Engine::rollback(struct txn *)
 {}
 
-void Engine::rollbackStatement(struct txn_stmt *)
+void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
+{}
+
+void Engine::bootstrap()
+{}
+
+void Engine::beginInitialRecovery(struct vclock *vclock)
+{
+	(void) vclock;
+}
+
+void Engine::beginFinalRecovery()
+{}
+
+void Engine::endRecovery()
 {}
 
 void Engine::initSystemSpace(struct space * /* space */)
@@ -86,32 +103,36 @@ Engine::dropPrimaryKey(struct space * /* space */)
 {
 }
 
-bool Engine::needToBuildSecondaryKey(struct space * /* space */)
-{
-	return true;
-}
-
 void
-Engine::beginJoin()
+Engine::buildSecondaryKey(struct space *, struct space *, Index *)
 {
+	tnt_raise(ClientError, ER_UNSUPPORTED, this->name, "buildSecondaryKey");
 }
 
 int
-Engine::beginCheckpoint(int64_t lsn)
+Engine::beginCheckpoint()
 {
-	(void) lsn;
 	return 0;
 }
 
 int
-Engine::waitCheckpoint()
+Engine::prepareWaitCheckpoint(struct vclock *vclock)
 {
+	(void) vclock;
+	return 0;
+}
+
+int
+Engine::waitCheckpoint(struct vclock *vclock)
+{
+	(void) vclock;
 	return 0;
 }
 
 void
-Engine::commitCheckpoint()
+Engine::commitCheckpoint(struct vclock *vclock)
 {
+	(void) vclock;
 }
 
 void
@@ -120,34 +141,34 @@ Engine::abortCheckpoint()
 }
 
 void
-Engine::endRecovery()
+Engine::collectGarbage(int64_t lsn)
 {
+	(void) lsn;
+}
+
+int
+Engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
+{
+	(void) vclock;
+	(void) cb;
+	(void) cb_arg;
+	return 0;
 }
 
 void
-Engine::recoverToCheckpoint(int64_t /* lsn */)
+Engine::join(struct vclock *vclock, struct xstream *stream)
 {
+	(void) vclock;
+	(void) stream;
 }
 
 void
-Engine::join(struct relay *relay)
-{
-	(void) relay;
-}
-
-void
-Engine::dropIndex(Index *index)
-{
-	(void) index;
-}
-
-void
-Engine::keydefCheck(struct space *space, struct key_def *key_def)
+Engine::checkIndexDef(struct space *space, struct index_def *index_def)
 {
 	(void) space;
-	(void) key_def;
+	(void) index_def;
 	/*
-	 * Don't bother checking key_def to match the view requirements.
+	 * Don't bother checking index_def to match the view requirements.
 	 * Index::initIterator() must check key on each call.
 	 */
 }
@@ -155,6 +176,13 @@ Engine::keydefCheck(struct space *space, struct key_def *key_def)
 Handler::Handler(Engine *f)
 	:engine(f)
 {
+}
+
+void
+Handler::applyInitialJoinRow(struct space *, struct request *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name,
+		  "applySnapshotRow");
 }
 
 struct tuple *
@@ -183,7 +211,12 @@ Handler::executeUpsert(struct txn *, struct space *, struct request *)
 }
 
 void
-Handler::onAlter(Handler *)
+Handler::prepareAlterSpace(struct space *, struct space *)
+{
+}
+
+void
+Handler::commitAlterSpace(struct space *, struct space *)
 {
 }
 
@@ -194,7 +227,7 @@ Handler::executeSelect(struct txn *, struct space *space,
 		       const char *key, const char * /* key_end */,
 		       struct port *port)
 {
-	Index *index = index_find(space, index_id);
+	Index *index = index_find_xc(space, index_id);
 
 	uint32_t found = 0;
 	if (iterator >= iterator_type_MAX)
@@ -202,7 +235,8 @@ Handler::executeSelect(struct txn *, struct space *space,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	key_validate(index->key_def, type, key, part_count);
+	if (key_validate(index->index_def, type, key, part_count))
+		diag_raise();
 
 	struct iterator *it = index->allocIterator();
 	IteratorGuard guard(it);
@@ -210,12 +244,6 @@ Handler::executeSelect(struct txn *, struct space *space,
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
-		/*
-		 * This is for Sophia, which returns a tuple
-		 * with zero refs from the iterator, expecting
-		 * the caller to GC it after use.
-		 */
-		TupleRef tuple_gc(tuple);
 		if (offset > 0) {
 			offset--;
 			continue;
@@ -256,23 +284,30 @@ void engine_shutdown()
 }
 
 void
-engine_recover_to_checkpoint(int64_t checkpoint_id)
+engine_bootstrap()
 {
-	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->recoverToCheckpoint(checkpoint_id);
+		engine->bootstrap();
 	}
 }
 
 void
-engine_begin_join()
+engine_begin_initial_recovery(struct vclock *vclock)
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginJoin();
+		engine->beginInitialRecovery(vclock);
 	}
+}
+
+void
+engine_begin_final_recovery()
+{
+	Engine *engine;
+	engine_foreach(engine)
+		engine->beginFinalRecovery();
 }
 
 void
@@ -288,49 +323,71 @@ engine_end_recovery()
 }
 
 int
-engine_checkpoint(int64_t checkpoint_id)
+engine_begin_checkpoint()
 {
-	if (snapshot_in_progress)
-		return EINPROGRESS;
-
-	snapshot_in_progress = true;
-	latch_lock(&schema_lock);
-
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->beginCheckpoint(checkpoint_id))
-			goto error;
+		if (engine->beginCheckpoint() < 0)
+			return -1;
 	}
+	return 0;
+}
 
+int
+engine_commit_checkpoint(struct vclock *vclock)
+{
+	Engine *engine;
+	/* prepare to wait */
+	engine_foreach(engine) {
+		if (engine->prepareWaitCheckpoint(vclock) < 0)
+			return -1;
+	}
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
-		if (engine->waitCheckpoint())
-			goto error;
+		if (engine->waitCheckpoint(vclock) < 0)
+			return -1;
 	}
-
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
-		engine->commitCheckpoint();
+		engine->commitCheckpoint(vclock);
 	}
-	latch_unlock(&schema_lock);
-	snapshot_in_progress = false;
 	return 0;
-error:
-	int save_errno = errno;
-	/* rollback snapshot creation */
-	engine_foreach(engine)
-		engine->abortCheckpoint();
-	latch_unlock(&schema_lock);
-	snapshot_in_progress = false;
-	return save_errno;
 }
 
 void
-engine_join(struct relay *relay)
+engine_abort_checkpoint()
+{
+	Engine *engine;
+	/* rollback snapshot creation */
+	engine_foreach(engine)
+		engine->abortCheckpoint();
+}
+
+void
+engine_collect_garbage(int64_t lsn)
+{
+	Engine *engine;
+	engine_foreach(engine)
+		engine->collectGarbage(lsn);
+}
+
+int
+engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(relay);
+		if (engine->backup(vclock, cb, cb_arg) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+void
+engine_join(struct vclock *vclock, struct xstream *stream)
+{
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->join(vclock, stream);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -166,6 +166,24 @@ coeio_pread(int fd, void *buf, size_t count, off_t offset)
 	eio_req *req = eio_read(fd, buf, count,
 				offset, 0, coeio_complete, &eio);
 	return coeio_wait_done(req, &eio);
+}
+
+ssize_t
+coeio_preadn(int fd, void *buf, size_t count, off_t offset)
+{
+	size_t n = 0;
+	do {
+		ssize_t r;
+		do {
+			r = coeio_pread(fd, buf + n, count - n, offset + n);
+		} while (r == -1 && errno == EINTR);
+		if (r <= 0)
+			return -1;
+		n += r;
+	} while (n < count);
+
+	assert(n == count);
+	return n;
 }
 
 static void

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +28,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "trivia/config.h"
 #include "iproto_port.h"
 #include "iproto_constants.h"
 #include "schema.h" /* sc_version */
+#include "small/obuf.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
-struct iproto_header_bin {
+struct PACKED iproto_header_bin {
 	uint8_t m_len;                          /* MP_UINT32 */
 	uint32_t v_len;                         /* length */
 	uint8_t m_header;                       /* MP_MAP */
@@ -46,7 +50,7 @@ struct iproto_header_bin {
 	uint8_t k_schema_id;                    /* IPROTO_SCHEMA_ID */
 	uint8_t m_schema_id;                    /* MP_UINT32 */
 	uint32_t v_schema_id;                   /* schema_id */
-} __attribute__((packed));
+};
 
 static const struct iproto_header_bin iproto_header_bin = {
 	0xce, 0, 0x83,
@@ -55,12 +59,12 @@ static const struct iproto_header_bin iproto_header_bin = {
 	IPROTO_SCHEMA_ID, 0xce, 0
 };
 
-struct iproto_body_bin {
+struct PACKED iproto_body_bin {
 	uint8_t m_body;                    /* MP_MAP */
 	uint8_t k_data;                    /* IPROTO_DATA or IPROTO_ERROR */
 	uint8_t m_data;                    /* MP_STR or MP_ARRAY */
 	uint32_t v_data_len;               /* string length of array size */
-} __attribute__((packed));
+};
 
 static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0
@@ -89,7 +93,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	obuf_dup_xc(out, &empty_map, sizeof(empty_map));
 }
 
-void
+int
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg);
@@ -105,36 +109,50 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 	header.v_schema_id = mp_bswap_u32(sc_version);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
+	/* Malformed packet appears to be a lesser evil than abort. */
+	return obuf_dup(out, &header, sizeof(header)) != sizeof(header) ||
+		obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
+		obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
 
-	obuf_dup_xc(out, &header, sizeof(header));
-	obuf_dup_xc(out, &body, sizeof(body));
-	obuf_dup_xc(out, e->errmsg, msg_len);
 }
 
-static inline struct iproto_port *
-iproto_port(struct port *port)
+void
+iproto_write_error(int fd, const struct error *e)
 {
-	return (struct iproto_port *) port;
+	uint32_t msg_len = strlen(e->errmsg);
+	uint32_t errcode = ClientError::get_errcode(e);
+
+	struct iproto_header_bin header = iproto_header_bin;
+	struct iproto_body_bin body = iproto_error_bin;
+
+	uint32_t len = sizeof(header) - 5 + sizeof(body) + msg_len;
+	header.v_len = mp_bswap_u32(len);
+	header.v_code = mp_bswap_u32(iproto_encode_error(errcode));
+
+	body.v_data_len = mp_bswap_u32(msg_len);
+
+	/* Set to blocking to write the error. */
+	int flags = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+	ssize_t r = write(fd, &header, sizeof(header));
+	r = write(fd, &body, sizeof(body));
+	r = write(fd, e->errmsg, msg_len);
+
+	fcntl(fd, F_SETFL, flags);
+	(void) r;
 }
 
 enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };
 
-extern "C" void
-iproto_port_eof(struct port *ptr)
-{
-	struct iproto_port *port = iproto_port(ptr);
-	/* found == 0 means add_tuple wasn't called at all. */
-	if (port->found == 0) {
-		if (iproto_prepare_select(port->buf, &port->svp) != 0)
-			diag_raise();
-	}
-
-	iproto_reply_select(port->buf, &port->svp, port->sync, port->found);
-}
-
 int
 iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
+	/**
+	 * Reserve memory before taking a savepoint.
+	 * This ensures that we get a contiguous chunk of memory
+	 * and the savepoint is pointing at the beginning of it.
+	 */
 	void *ptr = obuf_reserve(buf, SVP_SIZE);
 	if (ptr == NULL) {
 		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
@@ -148,7 +166,7 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-			uint32_t count)
+		    uint32_t count)
 {
 	uint32_t len = obuf_size(buf) - svp->used - 5;
 
@@ -164,21 +182,3 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos, &header, sizeof(header));
 	memcpy(pos + sizeof(header), &body, sizeof(body));
 }
-
-extern "C" void
-iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
-{
-	struct iproto_port *port = iproto_port(ptr);
-	if (port->found == 0) {
-		/* Found the first tuple, add header. */
-		if (iproto_prepare_select(port->buf, &port->svp) != 0)
-			diag_raise();
-	}
-	port->found++;
-	tuple_to_obuf(tuple, port->buf);
-}
-
-struct port_vtab iproto_port_vtab = {
-	iproto_port_add_tuple,
-	iproto_port_eof,
-};

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED
 #define TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,9 +35,10 @@
 struct SysviewEngine: public Engine {
 public:
 	SysviewEngine();
-	virtual Handler *open();
-	virtual Index *createIndex(struct key_def *key_def);
-	virtual bool needToBuildSecondaryKey(struct space *space);
+	virtual Handler *open() override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

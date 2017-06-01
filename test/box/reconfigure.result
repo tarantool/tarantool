@@ -78,22 +78,22 @@ box.cfg{wal_dir="dynamic"}
 ---
 - error: Can't set option 'wal_dir' dynamically
 ...
-box.cfg{snap_dir="dynamic"}
+box.cfg{memtx_dir="dynamic"}
 ---
-- error: Can't set option 'snap_dir' dynamically
+- error: Can't set option 'memtx_dir' dynamically
 ...
-box.cfg{logger="new logger"}
+box.cfg{log="new logger"}
 ---
-- error: Can't set option 'logger' dynamically
+- error: Can't set option 'log' dynamically
 ...
 -- bad1
-box.cfg{slab_alloc_arena=0.2}
+box.cfg{memtx_memory=53687091}
 ---
-- error: Can't set option 'slab_alloc_arena' dynamically
+- error: Can't set option 'memtx_memory' dynamically
 ...
-box.cfg.slab_alloc_arena
+box.cfg.memtx_memory
 ---
-- 0.1
+- 107374182
 ...
 space:drop()
 ---

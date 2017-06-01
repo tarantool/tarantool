@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_COEIO_H_INCLUDED
 #define TARANTOOL_COEIO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -37,6 +37,7 @@
 #include <stdarg.h>
 
 #include "third_party/tarantool_eio.h"
+#include "diag.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -49,12 +50,13 @@ extern "C" {
  */
 
 void coeio_init(void);
-void coeio_reinit(void);
+void coeio_enable(void);
+void coeio_shutdown(void);
 
 struct coio_task;
 
-typedef ssize_t (*coio_task_cb)(struct coio_task *task); /* like eio_req */
 typedef ssize_t (*coio_call_cb)(va_list ap);
+typedef int (*coio_task_cb)(struct coio_task *task); /* like eio_req */
 
 /**
  * A single task context.
@@ -76,11 +78,43 @@ struct coio_task {
 	};
 	/** Callback results. */
 	int complete;
+	/** Task diag **/
+	struct diag diag;
 };
 
-ssize_t
-coio_task(struct coio_task *task, coio_task_cb func,
-          coio_task_cb on_timeout, double timeout);
+/**
+ * Create coio_task.
+ *
+ * @param task coio task
+ * @param func a callback to execute in EIO thread pool.
+ * @param on_timeout a callback to execute on timeout
+ */
+void
+coio_task_create(struct coio_task *task, coio_task_cb func,
+		 coio_task_cb on_timeout);
+
+/**
+ * Destroy coio task.
+ *
+ * @param task coio task.
+ */
+void
+coio_task_destroy(struct coio_task *task);
+
+/**
+ * Post coio task to EIO thread pool.
+ *
+ * @param task coio task.
+ * @param timeout timeout in seconds.
+ * @retval 0  the task completed successfully. Check the result
+ *            code in task->base.result and free the task.
+ * @retval -1 timeout or the waiting fiber was cancelled (check diag);
+ *            the caller should not free the task, it
+ *            will be freed when it's finished in the timeout
+ *            callback.
+ */
+int
+coio_task_post(struct coio_task *task, double timeout);
 
 /** \cond public */
 
@@ -117,7 +151,17 @@ struct addrinfo;
 
 /**
  * Fiber-friendly version of getaddrinfo(3).
- * \sa getaddrinfo().
+ *
+ * @param host host name, i.e. "tarantool.org"
+ * @param port service name, i.e. "80" or "http"
+ * @param hints hints, see getaddrinfo(3)
+ * @param res[out] result, see getaddrinfo(3)
+ * @param timeout timeout
+ * @retval  0 on success, please free @a res using freeaddrinfo(3).
+ * @retval -1 on error, check diag.
+ *            Please note that the return value is not compatible with
+ *            getaddrinfo(3).
+ * @sa getaddrinfo()
  */
 int
 coio_getaddrinfo(const char *host, const char *port,

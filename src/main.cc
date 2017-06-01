@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -50,6 +50,7 @@
 # include <sys/prctl.h>
 #endif
 #include <fiber.h>
+#include <cbus.h>
 #include <coeio.h>
 #include <crc32.h>
 #include "memory.h"
@@ -70,10 +71,10 @@
 #include "cfg.h"
 #include "version.h"
 #include <readline/readline.h>
-#include <readline/history.h>
 #include "title.h"
 #include <libutil.h>
 #include "box/lua/init.h" /* box_lua_init() */
+#include "box/session.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -115,7 +116,7 @@ static void
 sig_snapshot(ev_loop * /* loop */, struct ev_signal * /* w */,
 	     int /* revents */)
 {
-	if (snapshot_in_progress) {
+	if (box_snapshot_is_in_progress) {
 		say_warn("Snapshot process is already running,"
 			" the signal is ignored");
 		return;
@@ -318,11 +319,10 @@ daemonize()
 	 */
 	signal_init();
 
-	/* reinit coeio after fork (because libeio required it) */
-	coeio_reinit();
-
 	/* redirect stdin; stdout and stderr handled in say_logger_init */
 	fd = open("/dev/null", O_RDONLY);
+	if (fd < 0)
+		goto error;
 	dup2(fd, STDIN_FILENO);
 	close(fd);
 
@@ -384,7 +384,7 @@ load_cfg()
 	}
 
 	int background = cfg_geti("background");
-	const char *logger = cfg_gets("logger");
+	const char *log = cfg_gets("log");
 
 	pid_file = (char *)cfg_gets("pid_file");
 	if (pid_file != NULL) {
@@ -394,10 +394,10 @@ load_cfg()
 	}
 
 	if (background) {
-		if (logger == NULL) {
+		if (log == NULL) {
 			say_crit(
 				"'background' requires "
-				"'logger' configuration option to be set");
+				"'log' configuration option to be set");
 			exit(EXIT_FAILURE);
 		}
 		if (pid_file == NULL) {
@@ -433,9 +433,9 @@ load_cfg()
 	 * logger init must happen before daemonising in order for the error
 	 * to show and for the process to exit with a failure status
 	 */
-	say_logger_init(logger,
+	say_logger_init(log,
 			cfg_geti("log_level"),
-			cfg_geti("logger_nonblock"),
+			cfg_geti("log_nonblock"),
 			background);
 
 	if (background)
@@ -455,7 +455,7 @@ load_cfg()
 
 	title_set_custom(cfg_gets("custom_proc_title"));
 	title_update();
-	box_load_cfg();
+	box_cfg();
 }
 
 void
@@ -470,13 +470,11 @@ tarantool_free(void)
 	if (getpid() != master_pid)
 		return;
 
+	/* Shutdown worker pool. Waits until threads terminate. */
+	coeio_shutdown();
+
 	box_free();
 
-	if (history) {
-		write_history(history);
-		clear_history();
-		free(history);
-	}
 	title_free(main_argc, main_argv);
 
 	/* unlink pidfile. */
@@ -487,13 +485,6 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
-	/* A hack for cc/ld, see ffisyms.c */
-	if (time(NULL) == 0) {
-		/* never executed */
-		extern void *ffi_symbols[];
-		ssize_t res = write(0, ffi_symbols, 0);
-		(void) res;
-	}
 	if (script)
 		free(script);
 	/* tarantool_lua_free() was formerly reponsible for terminal reset,
@@ -509,12 +500,15 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
+	cbus_free();
 #if 0
 	/*
 	 * This doesn't work reliably since things
 	 * are too interconnected.
 	 */
 	tarantool_lua_free();
+	session_free();
+	user_cache_free();
 	fiber_free();
 	memory_free();
 	random_free();
@@ -606,17 +600,9 @@ main(int argc, char **argv)
 		argc--;
 		script = abspath(argv[0]);
 		title_set_script_name(argv[0]);
-	} else if (isatty(STDIN_FILENO)) {
-		/* load history file */
-		char *home = getenv("HOME");
-		history = (char *) malloc(PATH_MAX);
-		snprintf(history, PATH_MAX, "%s/%s", home,
-			 ".tarantool_history");
-		read_history(history);
 	}
 
 	random_init();
-	say_init(argv[0]);
 
 	crc32_init();
 	memory_init();
@@ -631,8 +617,12 @@ main(int argc, char **argv)
 	/* Init iobuf library with default readahead */
 	iobuf_init();
 	coeio_init();
+	coeio_enable();
 	signal_init();
+	cbus_init();
+
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+	box_init();
 	box_lua_init(tarantool_L);
 
 	/* main core cleanup routine */

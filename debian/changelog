@@ -1,3 +1,76 @@
+tarantool (1.7.3.353.g06ee320-1) unstable; urgency=medium
+
+  * Bump the minimum required version of tarantool-common.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 10 Mar 2017 16:17:09 +0300
+
+tarantool (1.7.2.385.g952d79e-1) unstable; urgency=medium
+
+  * Add `tarantoolctl cat/play` commands and `xlog` Lua module.
+  * Add Lua library to manipulate environment variables.
+  * Allow DML requests from on_replace triggers.
+  * Allow UPSERT without operations.
+  * Improve support for the large number of active network clients.
+  * Fix race conditions during automatic cluster bootstrap.
+  * Fix calculation of periods in snapshot daemon.
+  * Fix handling of iterator type in space:pairs() and space:select().
+  * Fix CVE-2016-9036 and CVE-2016-9037.
+  * Dozens of bug fixes to Vinyl storage engine.
+  * Remove broken coredump() Lua function.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 16 Dec 2016 19:03:31 +0300
+
+tarantool (1.7.2.314.gedffdc0-1) unstable; urgency=medium
+
+  * Fix "ld: Nonrepresentable section on output". Closes: #846773.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Sun, 04 Dec 2016 09:38:02 +0300
+
+tarantool (1.7.2.135.gcdf16ed-1) unstable; urgency=medium
+
+  * Fix unowned symlink on example.lua after purge. Closes: #842073.
+  * Add conflict on tarantool-lts-dev. Closes: #842086.
+  * Bump debhelper compact version as suggested by lintian.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Wed, 26 Oct 2016 14:12:52 +0300
+
+tarantool (1.7.2.29.g2ad1af9-1) unstable; urgency=medium
+
+  * Drop conflicts with tarantool-lts and tarantool-common-lts.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 11 Oct 2016 16:14:56 +0300
+
+tarantool (1.7.2.21.g7131b0c-1) unstable; urgency=medium
+
+  * Fix "tarantool.1: No such file or directory" on buildd
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 18:06:35 +0300
+
+tarantool (1.7.2.19.g4c8bf56-1) unstable; urgency=medium
+
+  * Vinyl - a new write-optimized storage engine, allowing the amount of
+    data stored to exceed the amount of available RAM 10-100x times.
+  * A new binary protocol command for CALL, which no more restricts a function
+    to returning an array of tuples and allows returning an arbitrary
+    MsgPack/JSON result, including scalars, nil and void (nothing).
+  * New indexable data types: unsigned, integer, number and scalar.
+  * Automatic replication cluster bootstrap; it's now much easier to configure
+    a new replication cluster.
+  * memtx snapshots and xlog files are now compressed on the fly using the
+    fast ZStandard compression algorithm. Compression options are configured
+    automatically to get an optimal trade-off between CPU utilization and disk
+    throughput.
+  * fiber.cond() - a new synchronization mechanism for fibers.
+  * Tab-based autocompletion in the interactive console.
+  * A new implementation of net.box improving performance and solving
+    problems with the garbage collection of dead connections.
+  * Native systemd support alongside sysvinit.
+  * A ready-to-use 'example.lua' instance enable by default.
+  * Dozens of bugfixes:
+    https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 15:21:41 +0300
+
 tarantool (1.6.9.6.g660e882-1) unstable; urgency=medium
 
   * Add dependency on network configuration files used by `socket` module

@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_TRIGGER_H
 #define INCLUDES_TARANTOOL_TRIGGER_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -58,6 +58,16 @@ struct trigger
 	 */
 	trigger_f0 destroy;
 };
+
+static inline void
+trigger_create(struct trigger *trigger, trigger_f run, void *data,
+	       trigger_f0 destroy)
+{
+	rlist_create(&trigger->link);
+	trigger->run = run;
+	trigger->data = data;
+	trigger->destroy = destroy;
+}
 
 static inline void
 trigger_run(struct rlist *list, void *event)

@@ -6,6 +6,7 @@ local ffi = require('ffi')
 ffi.cdef[[
     int umask(int mask);
     char *dirname(char *path);
+    int chdir(const char *path);
 ]]
 
 local internal = fio.internal
@@ -92,7 +93,9 @@ fio_methods.seek = function(self, offset, whence)
 end
 
 fio_methods.close = function(self)
-    return internal.close(self.fh)
+    local res = internal.close(self.fh)
+    self.fh = -1
+    return res
 end
 
 fio_methods.fsync = function(self)
@@ -235,11 +238,28 @@ fio.abspath = function(path)
         return nil
     end
     path = tostring(path)
+    local joined_path = ''
+    local path_tab = {}
     if string.sub(path, 1, 1) == '/' then
-        return path
+        joined_path = path
     else
-        return fio.pathjoin(fio.cwd(), path)
+        joined_path = fio.pathjoin(fio.cwd(), path)
     end
+    for sp in string.gmatch(joined_path, '[^/]+') do
+        if sp == '..' then
+            table.remove(path_tab)
+        elseif sp ~= '.' then
+            table.insert(path_tab, sp)
+        end
+    end
+    return '/' .. table.concat(path_tab, '/')
+end
+
+fio.chdir = function(path)
+    if path == nil or type(path)~='string' then
+        return false
+    end
+    return ffi.C.chdir(path) == 0
 end
 
 return fio

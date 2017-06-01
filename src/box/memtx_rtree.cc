@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,14 +29,30 @@
  * SUCH DAMAGE.
  */
 #include "memtx_rtree.h"
+
+#include <small/small.h>
+
+#include "errinj.h"
+#include "fiber.h"
+#include "trivia/util.h"
+
 #include "tuple.h"
 #include "space.h"
 #include "memtx_engine.h"
-#include "errinj.h"
-#include "fiber.h"
-#include "small/small.h"
 
 /* {{{ Utilities. *************************************************/
+
+static inline double
+mp_decode_num(const char **data, uint32_t fieldno)
+{
+	double val;
+	if (mp_read_double(data, &val) != 0) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
+			  field_type_strs[FIELD_TYPE_NUMBER]);
+	}
+	return val;
+}
 
 /**
  * Extract coordinates of rectangle from message packed string.
@@ -100,11 +116,11 @@ mp_decode_rect_from_key(struct rtree_rect *rect, unsigned dimension,
 
 inline void
 extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
-		  struct key_def *key_def)
+		  struct index_def *index_def)
 {
-	assert(key_def->part_count == 1);
-	const char *elems = tuple_field(tuple, key_def->parts[0].fieldno);
-	unsigned dimension = key_def->opts.dimension;
+	assert(index_def->key_def.part_count == 1);
+	const char *elems = tuple_field(tuple, index_def->key_def.parts[0].fieldno);
+	unsigned dimension = index_def->opts.dimension;
 	if (mp_decode_rect(rect, dimension, elems)) {
 		tnt_raise(ClientError, ER_RTREE_RECT,
 			  "Field", dimension, dimension * 2);
@@ -122,7 +138,8 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
-	delete itr;
+	TRASH(itr);
+	free(itr);
 }
 
 static struct tuple *
@@ -146,14 +163,14 @@ MemtxRTree::~MemtxRTree()
 	rtree_destroy(&m_tree);
 }
 
-MemtxRTree::MemtxRTree(struct key_def *key_def)
-	: MemtxIndex(key_def)
+MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
+	: MemtxIndex(index_def_arg)
 {
-	assert(key_def->part_count == 1);
-	assert(key_def->parts[0].type = ARRAY);
-	assert(key_def->opts.is_unique == false);
+	assert(index_def->key_def.part_count == 1);
+	assert(index_def->key_def.parts[0].type == FIELD_TYPE_ARRAY);
+	assert(index_def->opts.is_unique == false);
 
-	m_dimension = key_def->opts.dimension;
+	m_dimension = index_def->opts.dimension;
 	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
 		char message[64];
 		snprintf(message, 64, "dimension (%u): must belong to range "
@@ -165,7 +182,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
 	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
 	enum rtree_distance_type distance_type =
-		(enum rtree_distance_type)(int)key_def->opts.distance;
+		(enum rtree_distance_type)(int)index_def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
 		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
 		   distance_type);
@@ -191,7 +208,7 @@ MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 
 	rtree_rect rect;
 	if (mp_decode_rect_from_key(&rect, m_dimension, key, part_count))
-		assert(false);
+		unreachable();
 
 	struct tuple *result = NULL;
 	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &iterator))
@@ -206,11 +223,11 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 {
 	struct rtree_rect rect;
 	if (new_tuple) {
-		extract_rectangle(&rect, new_tuple, key_def);
+		extract_rectangle(&rect, new_tuple, index_def);
 		rtree_insert(&m_tree, &rect, new_tuple);
 	}
 	if (old_tuple) {
-		extract_rectangle(&rect, old_tuple, key_def);
+		extract_rectangle(&rect, old_tuple, index_def);
 		if (!rtree_remove(&m_tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
@@ -220,13 +237,14 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 struct iterator *
 MemtxRTree::allocIterator() const
 {
-	index_rtree_iterator *it = new index_rtree_iterator;
-	memset(it, 0, sizeof(*it));
-	rtree_iterator_init(&it->impl);
+	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
+		malloc(sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(OutOfMemory, sizeof(struct index_rtree_iterator),
 			  "MemtxRTree", "iterator");
 	}
+	memset(it, 0, sizeof(*it));
+	rtree_iterator_init(&it->impl);
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	return &it->base;

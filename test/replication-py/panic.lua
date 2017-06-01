@@ -2,8 +2,8 @@
 os = require('os')
 box.cfg({
     listen              = os.getenv("LISTEN"),
-    slab_alloc_arena    = 0.1,
-    panic_on_wal_error  = false,
+    memtx_memory        = 107374182,
+    force_recovery      = true,
 })
 
 require('console').listen(os.getenv('ADMIN'))

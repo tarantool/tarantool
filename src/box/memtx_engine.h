@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED
 #define TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,11 +31,39 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
+#include "xlog.h"
 
+/**
+ * The state of memtx recovery process.
+ * There is a global state of the entire engine state of each
+ * space. The state of a space is initialized from the engine
+ * state when the space is created. The exception is system
+ * spaces, which are always created in the final (OK) state.
+ *
+ * The states exist to speed up recovery: initial state
+ * assumes write-only flow of sorted rows from a snapshot.
+ * It's followed by a state for read-write recovery
+ * of rows from the write ahead log; these rows are
+ * inserted only into the primary key. The final
+ * state is for a fully functional space.
+ */
 enum memtx_recovery_state {
+	/** The space has no indexes. */
 	MEMTX_INITIALIZED,
-	MEMTX_READING_SNAPSHOT,
-	MEMTX_READING_WAL,
+	/**
+	 * The space has only the primary index, which is in
+	 * write-only bulk insert mode.
+	 */
+	MEMTX_INITIAL_RECOVERY,
+	/**
+	 * The space has the primary index, which can be
+	 * used for reads and writes, but secondary indexes are
+	 * empty. The will be built at the end of recovery.
+	 */
+	MEMTX_FINAL_RECOVERY,
+	/**
+	 * The space and all its indexes are fully built.
+	 */
 	MEMTX_OK,
 };
 
@@ -43,32 +71,60 @@ enum memtx_recovery_state {
 extern struct mempool memtx_index_extent_pool;
 
 struct MemtxEngine: public Engine {
-	MemtxEngine();
-	virtual Handler *open();
-	virtual Index *createIndex(struct key_def *key_def);
-	virtual void addPrimaryKey(struct space *space);
-	virtual void dropIndex(Index *index);
-	virtual void dropPrimaryKey(struct space *space);
-	virtual bool needToBuildSecondaryKey(struct space *space);
-	virtual void keydefCheck(struct space *space, struct key_def *key_def);
-	virtual void begin(struct txn *txn);
-	virtual void rollbackStatement(struct txn_stmt *stmt);
-	virtual void rollback(struct txn *txn);
-	virtual void prepare(struct txn *txn);
-	virtual void commit(struct txn *txn, int64_t signature);
-	virtual void beginJoin();
-	virtual void recoverToCheckpoint(int64_t lsn);
-	virtual void endRecovery();
-	virtual void join(struct relay *relay);
-	virtual int beginCheckpoint(int64_t);
-	virtual int waitCheckpoint();
-	virtual void commitCheckpoint();
-	virtual void abortCheckpoint();
-	virtual void initSystemSpace(struct space *space);
+	MemtxEngine(const char *snap_dirname, bool force_recovery,
+		    uint64_t tuple_arena_max_size,
+		    uint32_t objsize_min, uint32_t objsize_max,
+		    float alloc_factor);
+	~MemtxEngine();
+	virtual Handler *open() override;
+	virtual void addPrimaryKey(struct space *space) override;
+	virtual void dropPrimaryKey(struct space *space) override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
+	virtual void checkIndexDef(struct space *space, struct index_def *index_def) override;
+	virtual void begin(struct txn *txn) override;
+	virtual void rollbackStatement(struct txn *,
+				       struct txn_stmt *stmt) override;
+	virtual void rollback(struct txn *txn) override;
+	virtual void prepare(struct txn *txn) override;
+	virtual void commit(struct txn *txn, int64_t signature) override;
+	virtual void bootstrap() override;
+	virtual void beginInitialRecovery(struct vclock *vclock) override;
+	virtual void beginFinalRecovery() override;
+	virtual void endRecovery() override;
+	virtual void join(struct vclock *vclock,
+			  struct xstream *stream) override;
+	virtual int beginCheckpoint() override;
+	virtual int waitCheckpoint(struct vclock *vclock) override;
+	virtual void commitCheckpoint(struct vclock *vclock) override;
+	virtual void abortCheckpoint() override;
+	virtual void collectGarbage(int64_t lsn) override;
+	virtual int backup(struct vclock *vclock,
+			   engine_backup_cb cb, void *arg) override;
+	virtual void initSystemSpace(struct space *space) override;
+	/* Update snap_io_rate_limit. */
+	void setSnapIoRateLimit(double new_limit)
+	{
+		m_snap_io_rate_limit = new_limit * 1024 * 1024;
+	}
+	/**
+	 * Return LSN of the most recent snapshot or -1 if there is
+	 * no snapshot.
+	 */
+	int64_t lastCheckpoint(struct vclock *vclock);
+	void recoverSnapshot();
 private:
-	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
+	void
+	recoverSnapshotRow(struct xrow_header *row);
+	/** Non-zero if there is a checkpoint (snapshot) in progress. */
 	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
+	/** The directory where to store snapshots. */
+	struct xdir m_snap_dir;
+	/** Limit disk usage of checkpointing (bytes per second). */
+	uint64_t m_snap_io_rate_limit;
+	bool m_force_recovery;
 };
 
 enum {

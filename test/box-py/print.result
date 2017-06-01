@@ -12,7 +12,7 @@ local f = require('fiber').create(
 )
 ---
 ...
-require('fiber').sleep(0.1)
+require('fiber').sleep(0.01)
 ---
 ...
 Check log line (Hello):

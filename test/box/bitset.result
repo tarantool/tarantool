@@ -1,6 +1,3 @@
-dofile('utils.lua')
----
-...
 dofile('bitset.lua')
 ---
 ...
@@ -1845,10 +1842,10 @@ drop_space()
 space = box.schema.space.create('test')
 ---
 ...
-_ = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-_ = space:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+_ = space:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
 ---
 ...
 space.index.bitset:select({1}, { iterator = 'OVERLAPS'})
@@ -1866,13 +1863,13 @@ space = nil
 space = box.schema.space.create('test')
 ---
 ...
-_ = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
 _ = space:create_index('bitset', { type = 'bitset', parts = {2, 'number'}, unique = false })
 ---
-- error: 'Can''t create or modify index ''bitset'' in space ''test'': NUMBER field
-    type is not supported'
+- error: 'Can''t create or modify index ''bitset'' in space ''test'': BITSET index
+    field type must be NUM or STR'
 ...
 space:drop()
 ---
@@ -1884,10 +1881,10 @@ space = nil
 s = box.schema.space.create('test')
 ---
 ...
-_ = s:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = s:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-i = s:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+i = s:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
 ---
 ...
 s:insert{1, 0}
@@ -1944,10 +1941,10 @@ s = nil
 s = box.schema.space.create('test')
 ---
 ...
-_ = s:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = s:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 ---
 ...
-i = s:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+i = s:create_index('bitset', { type = 'bitset', parts = {2, 'unsigned'}, unique = false })
 ---
 ...
 for i=1,10 do s:insert{i, math.random(8)} end

@@ -130,7 +130,7 @@ med3(char *a, char *b, char *c, int (*cmp)(const void *a, const void *b, void *a
 }
 
 static void
-qsort_arg_mt_internal(void *a, size_t n, size_t es,
+qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 	     int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 	char *pa, *pb, *pc, *pd, *pl, *pm, *pn;

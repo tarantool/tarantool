@@ -35,9 +35,12 @@ endif()
 
 option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
 if (ENABLE_VALGRIND)
-    check_include_file(valgrind/valgrind.h HAVE_VALGRIND_VALGRIND_H)
-    if (NOT HAVE_VALGRIND_VALGRIND_H)
-        message (FATAL_ERROR
-             "ENABLE_VALGRIND option is set but valgrind/valgrind.h is not found")
-        endif()
+    add_definitions(-UNVALGRIND)
+else()
+    add_definitions(-DNVALGRIND=1)
+endif()
+
+option(ENABLE_ASAN "Enable AddressSanitizer, a fast memory error detector based on compiler instrumentation" OFF)
+if (ENABLE_ASAN)
+    add_compile_flags("C;CXX" -fsanitize=address)
 endif()

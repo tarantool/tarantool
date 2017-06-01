@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -37,10 +37,28 @@
 #include <lualib.h>
 #include <sio.h>
 
+#include "box/box.h"
 #include "box/session.h"
 #include "box/user.h"
 
 static const char *sessionlib_name = "box.session";
+
+/* Create session and pin it to fiber */
+static int
+lbox_session_create(struct lua_State *L)
+{
+	struct session *session = fiber_get_session(fiber());
+	if (session != NULL)
+		return luaL_error(L, "session already exists");
+
+	int fd = luaL_optinteger(L, 1, -1);
+	session = session_create_on_demand(fd);
+	if (session == NULL)
+		return luaT_error(L);
+
+	lua_pushnumber(L, session->id);
+	return 1;
+}
 
 /**
  * Return a unique monotonic session
@@ -105,6 +123,8 @@ lbox_session_user(struct lua_State *L)
 static int
 lbox_session_su(struct lua_State *L)
 {
+	if (!box_is_configured())
+		luaL_error(L, "Please call box.cfg{} first");
 	int top = lua_gettop(L);
 	if (top < 1)
 		luaL_error(L, "session.su(): bad arguments");
@@ -123,11 +143,12 @@ lbox_session_su(struct lua_State *L)
 		luaT_error(L);
 	struct credentials orig_cr;
 	credentials_copy(&orig_cr, &session->credentials);
-	credentials_init(&session->credentials, user);
+	credentials_init(&session->credentials, user->auth_token, user->def.uid);
 	if (top == 1)
 		return 0; /* su */
 
 	/* sudo */
+	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
 	credentials_copy(&session->credentials, &orig_cr);
 	if (error)
@@ -225,6 +246,15 @@ lbox_session_on_connect(struct lua_State *L)
 }
 
 static int
+lbox_session_run_on_connect(struct lua_State *L)
+{
+	struct session *session = current_session();
+	if (session_run_on_connect_triggers(session) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+static int
 lbox_session_on_disconnect(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &session_on_disconnect,
@@ -232,10 +262,28 @@ lbox_session_on_disconnect(struct lua_State *L)
 }
 
 static int
+lbox_session_run_on_disconnect(struct lua_State *L)
+{
+	struct session *session = current_session();
+	session_run_on_disconnect_triggers(session);
+	(void) L;
+	return 0;
+}
+
+static int
 lbox_session_on_auth(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &session_on_auth,
 				  lbox_push_on_auth_event);
+}
+
+static int
+lbox_session_run_on_auth(struct lua_State *L)
+{
+	const char *username = luaL_optstring(L, 1, "");
+	if (session_run_on_auth_triggers(username) != 0)
+		return luaT_error(L);
+	return 0;
 }
 
 void
@@ -272,6 +320,16 @@ exit:
 void
 box_lua_session_init(struct lua_State *L)
 {
+	static const struct luaL_reg session_internal_lib[] = {
+		{"create", lbox_session_create},
+		{"run_on_connect",    lbox_session_run_on_connect},
+		{"run_on_disconnect", lbox_session_run_on_disconnect},
+		{"run_on_auth", lbox_session_run_on_auth},
+		{NULL, NULL}
+	};
+	luaL_register(L, "box.internal.session", session_internal_lib);
+	lua_pop(L, 1);
+
 	static const struct luaL_reg sessionlib[] = {
 		{"id", lbox_session_id},
 		{"sync", lbox_session_sync},

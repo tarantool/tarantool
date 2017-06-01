@@ -1,15 +1,4 @@
 -- write data recover from logs only
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("rm -f " .. name .."/*.snap")
----
-- 0
-...
-os.execute("rm -f " .. name .."/*.xlog")
----
-- 0
-...
 env = require('test_run')
 ---
 ...
@@ -17,13 +6,6 @@ test_run = env.new()
 ---
 ...
 test_run:cmd('restart server default')
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("touch " .. name .."/lock")
----
-- 0
-...
 engine = test_run:get_cfg('engine')
 ---
 ...
@@ -33,17 +15,11 @@ space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary')
 ---
 ...
-for key = 1, 1000 do space:insert({key}) end
+space:insert({0})
 ---
+- [0]
 ...
 test_run:cmd('restart server default')
-name = string.match(arg[0], "([^,]+)%.lua")
----
-...
-os.execute("rm -f " .. name .."/lock")
----
-- 0
-...
 space = box.space['test']
 ---
 ...
@@ -52,7 +28,22 @@ index = space.index['primary']
 ...
 index:select({}, {iterator = box.index.ALL})
 ---
-- - [1]
+- - [0]
+...
+for key = 1, 1000 do space:insert({key}) end
+---
+...
+test_run:cmd('restart server default')
+space = box.space['test']
+---
+...
+index = space.index['primary']
+---
+...
+index:select({}, {iterator = box.index.ALL})
+---
+- - [0]
+  - [1]
   - [2]
   - [3]
   - [4]

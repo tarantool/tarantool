@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,6 +32,7 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
+#include "tuple_format.h"
 
 struct SysviewSpace: public Handler {
 	SysviewSpace(Engine *e) : Handler(e) {}
@@ -39,13 +40,17 @@ struct SysviewSpace: public Handler {
 	virtual ~SysviewSpace() {}
 
 	virtual struct tuple *
-	executeReplace(struct txn *, struct space *, struct request *);
+	executeReplace(struct txn *, struct space *, struct request *) override;
 	virtual struct tuple *
-	executeDelete(struct txn *, struct space *, struct request *);
+	executeDelete(struct txn *, struct space *, struct request *) override;
 	virtual struct tuple *
-	executeUpdate(struct txn *, struct space *, struct request *);
+	executeUpdate(struct txn *, struct space *, struct request *) override;
 	virtual void
-	executeUpsert(struct txn *, struct space *, struct request *);
+	executeUpsert(struct txn *, struct space *, struct request *) override;
+
+	virtual Index *createIndex(struct space *space,
+				   struct index_def *index_def) override;
+	virtual void dropIndex(Index *index) override;
 };
 
 struct tuple *
@@ -76,8 +81,36 @@ SysviewSpace::executeUpsert(struct txn *, struct space *space, struct request *)
 	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
 }
 
+Index *
+SysviewSpace::createIndex(struct space *space, struct index_def *index_def)
+{
+	assert(index_def->type == TREE);
+	switch (index_def->space_id) {
+	case BOX_VSPACE_ID:
+		return new SysviewVspaceIndex(index_def);
+	case BOX_VINDEX_ID:
+		return new SysviewVindexIndex(index_def);
+	case BOX_VUSER_ID:
+		return new SysviewVuserIndex(index_def);
+	case BOX_VFUNC_ID:
+		return new SysviewVfuncIndex(index_def);
+	case BOX_VPRIV_ID:
+		return new SysviewVprivIndex(index_def);
+	default:
+		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
+			  space_name(space), "unknown space for system view");
+		return NULL;
+	}
+}
+
+void
+SysviewSpace::dropIndex(Index *index)
+{
+	(void) index;
+}
+
 SysviewEngine::SysviewEngine()
-	:Engine("sysview")
+	:Engine("sysview", &memtx_tuple_format_vtab)
 {
 }
 
@@ -86,31 +119,6 @@ Handler *SysviewEngine::open()
 	return new SysviewSpace(this);
 }
 
-Index *
-SysviewEngine::createIndex(struct key_def *key_def)
-{
-	assert(key_def->type == TREE);
-	switch (key_def->space_id) {
-	case BOX_VSPACE_ID:
-		return new SysviewVspaceIndex(key_def);
-	case BOX_VINDEX_ID:
-		return new SysviewVindexIndex(key_def);
-	case BOX_VUSER_ID:
-		return new SysviewVuserIndex(key_def);
-	case BOX_VFUNC_ID:
-		return new SysviewVfuncIndex(key_def);
-	case BOX_VPRIV_ID:
-		return new SysviewVprivIndex(key_def);
-	default:
-		struct space *space = space_cache_find(key_def->space_id);
-		tnt_raise(ClientError, ER_MODIFY_INDEX, key_def->name,
-			  space_name(space), "unknown space for system view");
-		return NULL;
-	}
-}
-
-bool
-SysviewEngine::needToBuildSecondaryKey(struct space * /* space */)
-{
-	return false;
-}
+void
+SysviewEngine::buildSecondaryKey(struct space *, struct space *, Index *)
+{}

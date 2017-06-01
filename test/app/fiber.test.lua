@@ -3,6 +3,7 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 env = require('test_run')
 test_run = env.new()
+
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.
@@ -128,8 +129,16 @@ result
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
-f = function() fiber.create(f) end
-f()
+--
+--  2016-03-25 kostja
+--
+--  fiber call stack depth was removed, we should
+--  use runtime memory limit control instead; the
+--  old limit was easy to circument with only
+--  slightly more complicated fork bomb code
+--
+-- f = function() fiber.create(f) end
+-- f()
 -- 
 -- Test argument passing
 -- 
@@ -148,8 +157,10 @@ result
 -- was created
 f = fiber.create(function () fiber.sleep(1) return true end)
 box.snapshot()
-box.snapshot()
-box.snapshot()
+_, e = pcall(box.snapshot)
+e.message:match('already exists')
+_, e = pcall(box.snapshot)
+e.message:match('already exists')
 f = fiber.create(function () fiber.sleep(1) end)
 -- Test fiber.sleep()
 fiber.sleep(0)
@@ -189,6 +200,7 @@ fiber.status(nil)
 function r() fiber.sleep(1000) end
 f = fiber.create(r)
 fiber.cancel(f)
+while f:status() ~= 'dead' do fiber.sleep(0) end
 f:status()
 --  Test fiber.name()
 old_name = fiber.name()
@@ -212,6 +224,7 @@ f = fiber.create(testfun)
 f:cancel()
 fib_id = fiber.create(testfun):id()
 fiber.find(fib_id):cancel()
+while fiber.find(fib_id) ~= nil do fiber.sleep(0) end
 fiber.find(fib_id)
 
 --
@@ -341,15 +354,40 @@ test_run:grep_log("default", "gh%-1238") ~= nil
 
 -- must NOT show in the log
 _ = fiber.create(function() fiber.self():cancel() end)
+fiber.sleep(0.001)
 test_run:grep_log("default", "FiberIsCancelled") == nil
 
 -- must show in the log
 _ = fiber.create(function() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end)
 test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 
+-- #1734 fiber.name irt dead fibers
+fiber.create(function()end):name()
+
 --
 -- gh-1926
 --
 fiber.create(function() fiber.wakeup(fiber.self()) end)
 
+--
+-- gh-2066 test for fiber wakeup
+--
+
+_ = box.schema.space.create('test2066', {if_not_exists = true})
+_ = box.space.test2066:create_index('pk', {if_not_exists = true})
+
+function fn2() fiber.sleep(60) box.space.test2066:replace({1}) end
+f2 = fiber.create(fn2)
+
+function fn1() fiber.sleep(60) f2:wakeup() end
+f1 = fiber.create(fn1)
+-- push two fibers to ready list
+f1:wakeup() f2:wakeup()
+
+fiber.sleep(0.01)
+
+box.space.test2066:drop()
+
 fiber = nil
+
+test_run:cmd("clear filter")

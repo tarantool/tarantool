@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -39,7 +39,6 @@
 #include <sys/socket.h>
 
 #include "fiber.h"
-#include "diag.h"
 #include "third_party/tarantool_ev.h"
 
 /*
@@ -71,7 +70,9 @@ struct coeio_manager {
 	ev_loop *loop;
 	ev_idle coeio_idle;
 	ev_async coeio_async;
-} coeio_manager;
+};
+
+static __thread struct coeio_manager coeio_manager;
 
 static void
 coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
@@ -84,8 +85,8 @@ coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
 }
 
 static void
-coeio_async_cb(ev_loop *loop, struct ev_async *w __attribute__((unused)),
-	       int events __attribute__((unused)))
+coeio_async_cb(ev_loop *loop, MAYBE_UNUSED struct ev_async *w,
+	       MAYBE_UNUSED int events)
 {
 	if (eio_poll() == -1) {
 		/* not all tasks are complete. */
@@ -94,14 +95,42 @@ coeio_async_cb(ev_loop *loop, struct ev_async *w __attribute__((unused)),
 }
 
 static void
-coeio_want_poll_cb(void)
+coeio_want_poll_cb(void *ptr)
 {
-	ev_async_send(coeio_manager.loop, &coeio_manager.coeio_async);
+	struct coeio_manager *manager = ptr;
+	ev_async_send(manager->loop, &manager->coeio_async);
 }
 
 static void
-coeio_done_poll_cb(void)
+coeio_done_poll_cb(void *ptr)
 {
+	(void)ptr;
+}
+
+static int
+coeio_on_start(void *data)
+{
+	(void) data;
+	struct cord *cord = (struct cord *)calloc(sizeof(struct cord), 1);
+	if (!cord)
+		return -1;
+	cord_create(cord, "coeio");
+	return 0;
+}
+
+static int
+coeio_on_stop(void *data)
+{
+	(void) data;
+	cord_destroy(cord());
+	return 0;
+}
+
+void
+coeio_init(void)
+{
+	eio_set_thread_on_start(coeio_on_start, NULL);
+	eio_set_thread_on_stop(coeio_on_stop, NULL);
 }
 
 /**
@@ -110,9 +139,9 @@ coeio_done_poll_cb(void)
  * Create idle and async watchers, init eio.
  */
 void
-coeio_init(void)
+coeio_enable(void)
 {
-	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
+	eio_init(&coeio_manager, coeio_want_poll_cb, coeio_done_poll_cb);
 	coeio_manager.loop = loop();
 
 	ev_idle_init(&coeio_manager.coeio_idle, coeio_idle_cb);
@@ -121,20 +150,19 @@ coeio_init(void)
 	ev_async_start(loop(), &coeio_manager.coeio_async);
 }
 
-/**
- * ReInit coeio subsystem (for example after 'fork')
- */
 void
-coeio_reinit(void)
+coeio_shutdown(void)
 {
-	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
+	eio_set_max_parallel(0);
 }
 
 static void
-coio_on_exec(eio_req *req)
+coio_on_feed(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->task_cb(task);
+	if (req->result)
+		diag_move(diag_get(), &task->diag);
 }
 
 /**
@@ -172,23 +200,16 @@ coio_on_destroy(eio_req *req)
 		task->timeout_cb(task);
 }
 
-/**
- * @retval -1 timeout or the waiting fiber was cancelled;
- *            the caller should not free the task, it
- *            will be freed when it's finished in the timeout
- *            callback.
- * @retval 0  the task completed successfully. Check the result
- *            code in task->rc and free the task.
- */
-
-ssize_t
-coio_task(struct coio_task *task, coio_task_cb func,
-	  coio_task_cb on_timeout, double timeout)
+void
+coio_task_create(struct coio_task *task,
+		 coio_task_cb func, coio_task_cb on_timeout)
 {
+	assert(func != NULL && on_timeout != NULL);
+
 	/* from eio.c: REQ() definition */
 	memset(&task->base, 0, sizeof(task->base));
 	task->base.type = EIO_CUSTOM;
-	task->base.feed = coio_on_exec;
+	task->base.feed = coio_on_feed;
 	task->base.finish = coio_on_finish;
 	task->base.destroy = coio_on_destroy;
 	/* task->base.pri = 0; */
@@ -197,6 +218,20 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	task->task_cb = func;
 	task->timeout_cb = on_timeout;
 	task->complete = 0;
+	diag_create(&task->diag);
+}
+
+void
+coio_task_destroy(struct coio_task *task)
+{
+	diag_destroy(&task->diag);
+}
+
+int
+coio_task_post(struct coio_task *task, double timeout)
+{
+	assert(task->base.type == EIO_CUSTOM);
+	assert(task->fiber == fiber());
 
 	eio_submit(&task->base);
 	fiber_yield_timeout(timeout);
@@ -209,7 +244,6 @@ coio_task(struct coio_task *task, coio_task_cb func,
 			diag_set(TimedOut);
 		return -1;
 	}
-	diag_clear(&fiber()->diag);
 	return 0;
 }
 
@@ -218,6 +252,8 @@ coio_on_call(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->call_cb(task->ap);
+	if (req->result)
+		diag_move(diag_get(), &task->diag);
 }
 
 ssize_t
@@ -236,6 +272,7 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 	task->fiber = fiber();
 	task->call_cb = func;
 	task->complete = 0;
+	diag_create(&task->diag);
 
 	bool cancellable = fiber_set_cancellable(false);
 
@@ -252,6 +289,8 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 
 	ssize_t result = task->base.result;
 	int save_errno = errno;
+	if (result)
+		diag_move(&task->diag, diag_get());
 	free(task);
 	errno = save_errno;
 	return result;
@@ -274,7 +313,7 @@ struct async_getaddrinfo_task {
  * Resolver function, run in separate thread by
  * coeio (libeio).
 */
-static ssize_t
+static int
 getaddrinfo_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
@@ -298,15 +337,19 @@ getaddrinfo_cb(struct coio_task *ptr)
 	return 0;
 }
 
-static ssize_t
+static int
 getaddrinfo_free_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) ptr;
-	free(task->host);
-	free(task->port);
+	if (task->host != NULL)
+		free(task->host);
+	if (task->port != NULL)
+		free(task->port);
 	if (task->result != NULL)
 		freeaddrinfo(task->result);
+	coio_task_destroy(&task->base);
+	TRASH(task);
 	free(task);
 	return 0;
 }
@@ -316,13 +359,14 @@ coio_getaddrinfo(const char *host, const char *port,
 		 const struct addrinfo *hints, struct addrinfo **res,
 		 double timeout)
 {
-	int rc = EAI_SYSTEM;
-	int save_errno = 0;
-
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) calloc(1, sizeof(*task));
-	if (task == NULL)
-		return rc;
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "malloc", "getaddrinfo");
+		return -1;
+	}
+
+	coio_task_create(&task->base, getaddrinfo_cb, getaddrinfo_free_cb);
 
 	/*
 	 * getaddrinfo() on osx upto osx 10.8 crashes when AI_NUMERICSERV is
@@ -340,32 +384,39 @@ coio_getaddrinfo(const char *host, const char *port,
 	if (host != NULL && *host) {
 		task->host = strdup(host);
 		if (task->host == NULL) {
-			save_errno = errno;
-			goto cleanup_task;
+			diag_set(OutOfMemory, strlen(host), "malloc",
+				 "getaddrinfo");
+			getaddrinfo_free_cb(&task->base);
+			return -1;
 		}
 	}
 	if (port != NULL) {
 		task->port = strdup(port);
 		if (task->port == NULL) {
-			save_errno = errno;
-			goto cleanup_host;
+			diag_set(OutOfMemory, strlen(port), "malloc",
+				 "getaddrinfo");
+			getaddrinfo_free_cb(&task->base);
+			return -1;
 		}
 	}
-	/* do resolving */
-	/* coio_task() don't throw. */
-	if (coio_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
-		       timeout) == -1) {
+
+	/* Post coio task */
+	if (coio_task_post(&task->base, timeout) != 0)
+		return -1; /* timed out or cancelled */
+
+	/* Task finished */
+	if (task->rc < 0) {
+		/* getaddrinfo() failed */
+		errno = EIO;
+		diag_set(SystemError, "getaddrinfo: %s",
+			 gai_strerror(task->rc));
+		getaddrinfo_free_cb(&task->base);
 		return -1;
 	}
 
-	rc = task->rc;
+	/* getaddrinfo() succeed */
 	*res = task->result;
-	free(task->port);
-cleanup_host:
-	free(task->host);
-cleanup_task:
-	free(task);
-	errno = save_errno;
-	return rc;
+	task->result = NULL;
+	getaddrinfo_free_cb(&task->base);
+	return 0;
 }
-

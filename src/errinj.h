@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_ERRINJ_H_INCLUDED
 #define TARANTOOL_ERRINJ_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,46 +30,89 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <limits.h>
 #include "trivia/util.h"
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum errinj_type {
+	ERRINJ_BOOL	= 0,
+	ERRINJ_U64	= 1
+};
+
 struct errinj {
 	const char *name;
-	bool state;
+	enum errinj_type type;
+	union {
+		bool bparam;
+		uint64_t u64param;
+	} state;
 };
 
 /**
  * list of error injection handles.
  */
 #define ERRINJ_LIST(_) \
-	_(ERRINJ_TESTING, false) \
-	_(ERRINJ_WAL_IO, false) \
-	_(ERRINJ_WAL_ROTATE, false) \
-	_(ERRINJ_WAL_WRITE, false) \
-	_(ERRINJ_INDEX_ALLOC, false) \
-	_(ERRINJ_TUPLE_ALLOC, false) \
-	_(ERRINJ_TUPLE_FIELD, false) \
-	_(ERRINJ_RELAY, false)
+	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_U64, {.u64param = UINT64_MAX}) \
+	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RANGE_DUMP, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RANGE_SPLIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RUN_DISCARD, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_TASK_COMPLETE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_U64, {.u64param = 0}) \
+	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VINYL_SCHED_TIMEOUT, ERRINJ_U64, {.u64param = 0}) \
+	_(ERRINJ_RELAY_FINAL_SLEEP, ERRINJ_BOOL, {.bparam = false})
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
 
-bool errinj_get(int id);
+struct errinj *
+errinj_lookup(char *name);
 
-void errinj_set(int id, bool state);
-int errinj_set_byname(char *name, bool state);
+bool errinj_getb(int id);
+uint64_t errinj_getu64(int id);
+
+void errinj_setb(int id, bool state);
+int errinj_setb_byname(char *name, bool state);
+void errinj_setu64(int id, uint64_t state);
+int errinj_setu64_byname(char *name, uint64_t state);
 
 typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
 int errinj_foreach(errinj_cb cb, void *cb_ctx);
 
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
+#  define ERROR_INJECT_ONCE(ID, CODE)
+#  define ERROR_INJECT_U64(ID, EXPR, CODE)
 #else
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
-		if (errinj_get(ID) == true) \
+		if (errinj_getb(ID) == true) \
+			CODE; \
+	} while (0)
+#  define ERROR_INJECT_ONCE(ID, CODE) \
+	do { \
+		if (errinj_getb(ID) == true) { \
+			errinj_setb(ID, false); \
+			CODE; \
+		} \
+	} while (0)
+#  define ERROR_INJECT_U64(ID, EXPR, CODE) \
+	do { \
+		if (EXPR) \
 			CODE; \
 	} while (0)
 #endif

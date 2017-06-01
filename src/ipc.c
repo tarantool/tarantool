@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -70,6 +70,7 @@ ipc_channel_new(uint32_t size)
 	if (res == NULL) {
 		diag_set(OutOfMemory, size,
 			 "malloc", "struct ipc_channel");
+		return NULL;
 	}
 	ipc_channel_create(res, size);
 	return res;
@@ -132,6 +133,12 @@ ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
 	struct ipc_wait_pad *pad = (struct ipc_wait_pad *)
 		fiber_get_key(f, FIBER_KEY_MSG);
 	/*
+	 * Safe to overwrite the status without looking at it:
+	 * whoever is touching the status, removes the fiber
+	 * from the wait list.
+	 */
+	pad->status = status;
+	/*
 	 * ipc_channel allows an asynchronous cancel. If a fiber
 	 * is cancelled while waiting on a timeout, it is done via
 	 * fiber_wakeup(), which modifies fiber->state link.
@@ -147,13 +154,6 @@ ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
 	 * delivered to it. Since 'fiber->state' is used, this
 	 * works correctly with fiber_cancel().
 	 */
-	rlist_del_entry(f, state);
-	/*
-	 * Safe to overwrite the status without looking at it:
-	 * whoever is touching the status, removes the fiber
-	 * from the wait list.
-	 */
-	pad->status = status;
 	fiber_wakeup(f);
 }
 
@@ -483,3 +483,47 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 	}
 }
 
+void
+ipc_cond_create(struct ipc_cond *c)
+{
+	rlist_create(&c->waiters);
+}
+
+void
+ipc_cond_destroy(struct ipc_cond *c)
+{
+	(void)c;
+	assert(rlist_empty(&c->waiters));
+}
+
+void
+ipc_cond_signal(struct ipc_cond *e)
+{
+	if (! rlist_empty(&e->waiters)) {
+		struct fiber *f;
+		f = rlist_shift_entry(&e->waiters, struct fiber, state);
+		fiber_wakeup(f);
+	}
+}
+
+void
+ipc_cond_broadcast(struct ipc_cond *e)
+{
+	while (! rlist_empty(&e->waiters)) {
+		struct fiber *f;
+		f = rlist_shift_entry(&e->waiters, struct fiber, state);
+		fiber_wakeup(f);
+	}
+}
+
+int
+ipc_cond_wait_timeout(struct ipc_cond *c, ev_tstamp timeout)
+{
+	struct fiber *f = fiber();
+	rlist_add_tail_entry(&c->waiters, f, state);
+	if (fiber_yield_timeout(timeout)) {
+		diag_set(TimedOut);
+		return -1;
+	}
+	return 0;
+}

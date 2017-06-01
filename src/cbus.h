@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_CBUS_H_INCLUDED
 #define TARANTOOL_CBUS_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
-#include "salad/stailq.h"
 #include "rmean.h"
+#include "ipc.h"
+#include "small/rlist.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -53,7 +55,7 @@ enum cbus_stat_name {
 extern const char *cbus_stat_strings[CBUS_STAT_LAST];
 
 /**
- * One hop in a message travel route.  A message may need to be
+ * One hop in a message travel route. A message may need to be
  * delivered to many destinations before it can be dispensed with.
  * For example, it may be necessary to return a message to the
  * sender just to destroy it.
@@ -83,14 +85,16 @@ struct cmsg {
 	 */
 	struct stailq_entry fifo;
 	/** The message routing path. */
-	struct cmsg_hop *route;
+	const struct cmsg_hop *route;
 	/** The current hop the message is at. */
-	struct cmsg_hop *hop;
+	const struct cmsg_hop *hop;
 };
+
+static inline struct cmsg *cmsg(void *ptr) { return (struct cmsg *) ptr; }
 
 /** Initialize the message and set its route. */
 static inline void
-cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
+cmsg_init(struct cmsg *msg, const struct cmsg_hop *route)
 {
 	/**
 	 * The first hop can be done explicitly with cbus_push(),
@@ -99,148 +103,55 @@ cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
 	msg->hop = msg->route = route;
 }
 
-#define CACHELINE_SIZE 64
+/**
+ * Deliver the message and dispatch it to the next hop.
+ */
+void
+cmsg_deliver(struct cmsg *msg);
+
 /** A  uni-directional FIFO queue from one cord to another. */
 struct cpipe {
+	/** Staging area for pushed messages */
+	struct stailq input;
+	/** Counters are useful for finer-grained scheduling. */
+	int n_input;
 	/**
-	 * The protected part of the pipe: only accessible
-	 * in a critical section.
-	 * The message flow in the pipe is:
-	 *     input       <-- owned by the consumer thread
-	 *       v
-	 *     pipe        <-- shared, protected by a mutex
-	 *       v
-	 *     output      <-- owned by the producer thread
+	 * When pushing messages, keep the staged input size under
+	 * this limit (speeds up message delivery and reduces
+	 * latency, while still keeping the bus mutex cold enough).
 	 */
-	struct {
-		struct stailq pipe;
-		/** Peer pipe - the other direction of the bus. */
-		struct cpipe *peer;
-		struct cbus *bus;
-	} __attribute__((aligned(CACHELINE_SIZE)));
-	/** Stuff most actively used in the producer thread. */
-	struct {
-		/** Staging area for pushed messages */
-		struct stailq input;
-		/** Counters are useful for finer-grained scheduling. */
-		int n_input;
-		/**
-		 * When pushing messages, keep the staged input size under
-		 * this limit (speeds up message delivery and reduces
-		 * latency, while still keeping the bus mutex cold enough).
-		*/
-		int max_input;
-		/**
-		 * Rather than flushing input into the pipe
-		 * whenever a single message or a batch is
-		 * complete, do it once per event loop iteration.
-		 */
-		struct ev_async flush_input;
-		/** The producer thread. */
-		struct ev_loop *producer;
-		/** The consumer thread. */
-		struct ev_loop *consumer;
-	} __attribute__((aligned(CACHELINE_SIZE)));
-	/** Stuff related to the consumer. */
-	struct {
-		/** Staged messages (for pop) */
-		struct stailq output;
-		/**
-		 * Used to trigger task processing when
-		 * the pipe becomes non-empty.
-		 */
-		struct ev_async fetch_output;
-	} __attribute__((aligned(CACHELINE_SIZE)));
+	int max_input;
+	/**
+	 * Rather than flushing input into the pipe
+	 * whenever a single message or a batch is
+	 * complete, do it once per event loop iteration
+	 * or when max_input is reached.
+	 */
+	struct ev_async flush_input;
+	/** The event loop of the producer cord. */
+	struct ev_loop *producer;
+	/**
+	 * The cbus endpoint at the destination cord to handle
+	 * flushed messages.
+	 */
+	struct cbus_endpoint *endpoint;
 };
 
-#undef CACHELINE_SIZE
-
 /**
- * Initialize a pipe. Must be called by the consumer.
+ * Initialize a pipe and connect it to the consumer.
+ * Must be called by the producer. The call returns
+ * only when the consumer, identified by consumer name,
+ * has joined the bus.
  */
 void
-cpipe_create(struct cpipe *pipe);
+cpipe_create(struct cpipe *pipe, const char *consumer);
 
+/**
+ * Deinitialize a pipe and disconnect it from the consumer.
+ * Must be called by producer. Will flash queued messages.
+ */
 void
 cpipe_destroy(struct cpipe *pipe);
-
-/**
- * Reset the default fetch output callback with a custom one.
- */
-static inline void
-cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
-		   void *data)
-{
-	/** Must be done before starting the bus. */
-	assert(pipe->consumer == NULL);
-	/*
-	 * According to libev documentation, you can set cb at
-	 * virtually any time, modulo threads.
-	 */
-	ev_set_cb(&pipe->fetch_output, fetch_output_cb);
-	pipe->fetch_output.data = data;
-}
-
-/**
- * Reset the default fetch output callback with a custom one.
- */
-static inline void
-cpipe_set_flush_cb(struct cpipe *pipe, ev_async_cb flush_input_cb,
-		   void *data)
-{
-	assert(loop() == pipe->producer);
-	/*
-	 * According to libev documentation, you can set cb at
-	 * virtually any time, modulo threads.
-	 */
-	ev_set_cb(&pipe->flush_input, flush_input_cb);
-	pipe->flush_input.data = data;
-}
-
-/**
- * Pop a single message from the staged output area. If
- * the output is empty, returns NULL. There may be messages
- * in the pipe!
- */
-static inline struct cmsg *
-cpipe_pop_output(struct cpipe *pipe)
-{
-	assert(loop() == pipe->consumer);
-
-	if (stailq_empty(&pipe->output))
-		return NULL;
-	return stailq_shift_entry(&pipe->output, struct cmsg, fifo);
-}
-
-struct cmsg *
-cpipe_peek_impl(struct cpipe *pipe);
-
-/**
- * Check if the pipe has any messages. Triggers a bus
- * exchange in a critical section if the pipe is empty.
- */
-static inline struct cmsg *
-cpipe_peek(struct cpipe *pipe)
-{
-	assert(loop() == pipe->consumer);
-
-	if (stailq_empty(&pipe->output))
-		return cpipe_peek_impl(pipe);
-
-	return stailq_first_entry(&pipe->output, struct cmsg, fifo);
-}
-
-/**
- * Pop a single message. Triggers a bus exchange
- * if the pipe is empty.
- */
-static inline struct cmsg *
-cpipe_pop(struct cpipe *pipe)
-{
-	if (cpipe_peek(pipe) == NULL)
-		return NULL;
-	return cpipe_pop_output(pipe);
-}
 
 /**
  * Set pipe max size of staged push area. The default is infinity.
@@ -257,7 +168,6 @@ cpipe_pop(struct cpipe *pipe)
 static inline void
 cpipe_set_max_input(struct cpipe *pipe, int max_input)
 {
-	assert(loop() == pipe->producer);
 	pipe->max_input = max_input;
 }
 
@@ -322,171 +232,143 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
+void
+cbus_init();
+
 /**
- * Cord interconnect: two pipes one for each message flow
- * direction.
+ * cbus endpoint
  */
-struct cbus {
-	/** Two pipes for two directions between two cords. */
-	struct cpipe *pipe[2];
-	/** cbus statistics */
-	struct rmean *stats;
+struct cbus_endpoint {
 	/**
-	 * A single mutex to protect all exchanges around the
-	 * two pipes involved in the bus.
+	 * Endpoint name, used to identify the endpoint when
+	 * establishing a route.
 	 */
+	char name[FIBER_NAME_MAX];
+	/** Member of cbus->endpoints */
+	struct rlist in_cbus;
+	/** The lock around the pipe. */
 	pthread_mutex_t mutex;
-	/** Condition for synchronized start of the bus. */
-	pthread_cond_t cond;
+	/** A queue with incoming messages. */
+	struct stailq output;
+	/** Consumer cord loop */
+	ev_loop *consumer;
+	/** Async to notify the consumer */
+	ev_async async;
+	/** Count of connected pipes */
+	uint32_t n_pipes;
+	/** Condition for endpoint destroy */
+	struct ipc_cond cond;
 };
 
+/**
+ * Fetch incomming messages to output
+ */
+static inline void
+cbus_endpoint_fetch(struct cbus_endpoint *endpoint, struct stailq *output)
+{
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	stailq_concat(output, &endpoint->output);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
+}
+
+/** Initialize the global singleton bus. */
 void
-cbus_create(struct cbus *bus);
+cbus_init();
 
+/** Destroy the global singleton bus. */
 void
-cbus_destroy(struct cbus *bus);
+cbus_free();
 
 /**
- * Connect the pipes: join cord1 input to the cord2 output,
- * and cord1 output to cord2 input.
- * Each cord must invoke this method in its own scope,
- * and provide its own callback to handle incoming messages
- * (pop_output_cb).
- * This call synchronizes two threads, and after this method
- * returns, cpipe_push/cpipe_pop are safe to use.
- *
- * @param  bus the bus
- * @param  pipe the pipe for which this thread is a consumer
- *
- * @retval the pipe for this this thread is a producer
- *
- * @example:
- *	cpipe_create(&in);
- *	struct cpipe *out = cbus_join(bus, &in);
- *	cpipe_set_max_input(out, 128);
- *	cpipe_push(out, msg);
+ * Connect the cord to cbus as a named reciever.
+ * @param name a destination name
+ * @param fetch_cb callback to fetch new messages
+ * @retval 0 for success
+ * @retval 1 if endpoint with given name already registered
  */
-struct cpipe *
-cbus_join(struct cbus *bus, struct cpipe *pipe);
+int
+cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
+		     void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data);
 
 /**
- * Stop listening for events on the bus.
+ * One round for message fetch and deliver */
+void
+cbus_process(struct cbus_endpoint *endpoint);
+
+/**
+ * Run the message delivery loop until the current fiber is
+ * cancelled.
  */
 void
-cbus_leave(struct cbus *bus);
+cbus_loop(struct cbus_endpoint *endpoint);
 
 /**
- * Lock the bus. Ideally should never be used
- * outside cbus code.
+ * Stop the message delivery loop at the destination the pipe
+ * is pointing at.
  */
-static inline void
-cbus_lock(struct cbus *bus)
-{
-	/* Count statistics */
-	if (bus->stats)
-		rmean_collect(bus->stats, CBUS_STAT_LOCKS, 1);
-
-	tt_pthread_mutex_lock(&bus->mutex);
-}
-
-/** Unlock the bus. */
-static inline void
-cbus_unlock(struct cbus *bus)
-{
-	tt_pthread_mutex_unlock(&bus->mutex);
-}
-
-static inline void
-cbus_signal(struct cbus *bus)
-{
-	tt_pthread_cond_signal(&bus->cond);
-}
-
-static inline void
-cbus_wait_signal(struct cbus *bus)
-{
-	tt_pthread_cond_wait(&bus->cond, &bus->mutex);
-}
+void
+cbus_stop_loop(struct cpipe *pipe);
 
 /**
- * Dispatch the message to the next hop.
+ * Disconnect the cord from cbus.
+ * @retval 0 for success
+ * @retval 1 if there is connected pipe or unhandled message
  */
-static inline void
-cmsg_dispatch(struct cpipe *pipe, struct cmsg *msg)
+int
+cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
+		      void (*process_cb)(struct cbus_endpoint *));
+
+/**
+ * A helper method to invoke a function on the other side of the
+ * bus.
+ *
+ * Creates the relevant messages, pushes them to the callee pipe and
+ * blocks the caller until func is executed in the correspondent
+ * thread.
+ * Detects which cord to invoke a function in based on the current
+ * cord value (i.e. finds the respective pipes automatically).
+ * Parameter 'data' is passed to the invoked function as context.
+ *
+ * @return This function itself never fails. It returns 0 if the call
+ * was * finished, or -1 if there is a timeout or the caller fiber
+ * is canceled.
+ * If called function times out or the caller fiber is canceled,
+ * then free_cb is invoked to free 'data' or other caller state.
+ *
+ * If the argument function sets an error in the called cord, this
+ * error is safely transferred to the caller cord's diagnostics
+ * area.
+*/
+struct cbus_call_msg;
+typedef int (*cbus_call_f)(struct cbus_call_msg *);
+
+struct fiber;
+/**
+ * The state of a synchronous cross-thread call. Only func and free_cb
+ * (if needed) are significant to the caller, other fields are
+ * initialized during the call preparation internally.
+ */
+struct cbus_call_msg
 {
+	struct cmsg msg;
+	struct diag diag;
+	struct fiber *caller;
+	struct cmsg_hop route[2];
+	bool complete;
+	int rc;
+	/** The callback to invoke in the peer thread. */
+	cbus_call_f func;
 	/**
-	 * 'pipe' pointer saved in class constructor works as
-	 * a guard that the message is alive. If a message route
-	 * has the next pipe, then the message mustn't have been
-	 * destroyed on this hop. Otherwise msg->hop->pipe could
-	 * be already pointing to garbage.
+	 * A callback to free affiliated resources if the call
+	 * times out or the caller is canceled.
 	 */
-	if (pipe) {
-		/*
-		 * Once we pushed the message to the bus,
-		 * we relinquished all write access to it,
-		 * so we must increase the current hop *before*
-		 * push.
-		 */
-		msg->hop++;
-		cpipe_push(pipe, msg);
-	}
-}
-
-/**
- * Deliver the message and dispatch it to the next hop.
- */
-static inline void
-cmsg_deliver(struct cmsg *msg)
-{
-	struct cpipe *pipe = msg->hop->pipe;
-	msg->hop->f(msg);
-	cmsg_dispatch(pipe, msg);
-}
-
-/**
- * A helper message to wakeup caller whenever an event
- * occurs.
- */
-struct cmsg_notify
-{
-	struct cmsg base;
-	struct fiber *fiber;
+	cbus_call_f free_cb;
 };
 
-void
-cmsg_notify_init(struct cmsg_notify *msg);
-
-/**
- * A pool of worker fibers to handle messages,
- * so that each message is handled in its own fiber.
- */
-struct cpipe_fiber_pool {
-	const char *name;
-	/** Cache of fibers which work on incoming messages. */
-	struct rlist fiber_cache;
-	/** The number of active fibers working on tasks. */
-	int size;
-	/** The number of sleeping fibers, in the cache */
-	int cache_size;
-	/** The limit on the number of fibers working on tasks. */
-	int max_size;
-	/**
-	 * Fibers in leave the pool if they have nothing to do
-	 * for longer than this.
-	 */
-	float idle_timeout;
-	struct cpipe *pipe;
-};
-
-/**
- * Initialize a fiber pool and connect it to a pipe. Currently
- * must be done before the pipe is actively used by a bus.
- */
-void
-cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
-			const char *name, struct cpipe *pipe,
-			int max_pool_size, float idle_timeout);
+int
+cbus_call(struct cpipe *callee, struct cpipe *caller,
+	  struct cbus_call_msg *msg,
+	  cbus_call_f func, cbus_call_f free_cb, double timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -31,19 +31,15 @@
 #cmakedefine TARGET_OS_LINUX 1
 /*  Defined if building for FreeBSD */
 #cmakedefine TARGET_OS_FREEBSD 1
+/*  Defined if building for NetBSD */
+#cmakedefine TARGET_OS_NETBSD 1
 /*  Defined if building for Darwin */
 #cmakedefine TARGET_OS_DARWIN 1
 
-#ifdef TARGET_OS_LINUX
-#define TARANTOOL_LIBEXT "so"
-#endif
-
-#ifdef TARGET_OS_FREEBSD
-#define TARANTOOL_LIBEXT "so"
-#endif
-
 #ifdef TARGET_OS_DARWIN
 #define TARANTOOL_LIBEXT "dylib"
+#else
+#define TARANTOOL_LIBEXT "so"
 #endif
 
 /*
@@ -84,18 +80,13 @@
 #cmakedefine HAVE_FDATASYNC 1
 
 #ifndef HAVE_FDATASYNC
-	#define fdatasync fsync
+#if defined(__APPLE__)
+#include <fcntl.h>
+#define fdatasync(fd) fcntl(fd, F_FULLFSYNC)
+#else
+#define fdatasync fsync
 #endif
-
-/*
- * Defined if this platform has BSD specific funopen()
- */
-#cmakedefine HAVE_FUNOPEN 1
-
-/*
- * Defined if this platform has GNU specific fopencookie()
- */
-#cmakedefine HAVE_FOPENCOOKIE 1
+#endif
 
 /*
  * Defined if this platform has GNU specific memmem().
@@ -169,11 +160,10 @@
 
 #cmakedefine HAVE_PTHREAD_YIELD 1
 #cmakedefine HAVE_SCHED_YIELD 1
+#cmakedefine HAVE_POSIX_FADVISE 1
+#cmakedefine HAVE_MREMAP 1
 
 #cmakedefine HAVE_PRCTL_H 1
-
-#cmakedefine HAVE_OPEN_MEMSTREAM 1
-#cmakedefine HAVE_FMEMOPEN 1
 
 #cmakedefine HAVE_UUIDGEN 1
 #cmakedefine HAVE_CLOCK_GETTIME 1
@@ -187,6 +177,12 @@
 #cmakedefine HAVE_PTHREAD_SETNAME_NP_1 1
 /** pthread_set_name_np(pthread_self(), "") - *BSD */
 #cmakedefine HAVE_PTHREAD_SET_NAME_NP 1
+
+#cmakedefine HAVE_PTHREAD_GETATTR_NP 1
+#cmakedefine HAVE_PTHREAD_ATTR_GET_NP 1
+
+#cmakedefine HAVE_PTHREAD_GET_STACKSIZE_NP 1
+#cmakedefine HAVE_PTHREAD_GET_STACKADDR_NP 1
 
 #cmakedefine HAVE_SETPROCTITLE 1
 #cmakedefine HAVE_SETPROGNAME 1
@@ -228,6 +224,8 @@
 
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 #define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
+
+#cmakedefine ENABLE_ASAN 1
 
 /*
  * vim: syntax=c

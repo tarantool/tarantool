@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -234,7 +234,8 @@ access_find(struct priv_def *priv)
 static void
 user_set_effective_access(struct user *user)
 {
-	struct credentials *cr = current_user();
+	struct session *session = current_session();
+	struct credentials *cr = &session->credentials;
 	struct priv_def *priv;
 	for (priv = privset_first(&user->privs);
 	     priv;

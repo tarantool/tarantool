@@ -1,7 +1,10 @@
 import os
+import sys
 import yaml
 import time
 from signal import SIGUSR1
+
+sys.stdout.push_filter(server.vardir, "<dir>")
 
 admin("space = box.schema.space.create('tweedledum', { id = 0 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
@@ -21,7 +24,9 @@ admin("box.snapshot()")
 # into the same file, since file name is based
 # on LSN.
 #  Don't allow to overwrite snapshots.
-admin("box.snapshot()")
+admin("_, e = pcall(box.snapshot)")
+admin("e.type")
+admin("e.errno")
 #
 # Increment LSN
 admin("space:insert{2, 'second tuple'}")
@@ -30,7 +35,9 @@ admin("space:insert{2, 'second tuple'}")
 print "# Make 'var' directory read-only."
 data_dir = os.path.join(server.vardir, server.name)
 os.chmod(data_dir, 0555)
-admin("box.snapshot()")
+admin("_, e = pcall(box.snapshot)")
+admin("e.type")
+admin("e.errno")
 
 # cleanup
 os.chmod(data_dir, 0755)
@@ -61,7 +68,7 @@ MAX_ITERATIONS = 100
 while not os.access(snapshot, os.F_OK) and iteration < MAX_ITERATIONS:
   if iteration % 10 == 0:
     os.kill(pid, SIGUSR1)
-  time.sleep(0.1)
+  time.sleep(0.01)
   iteration = iteration + 1
 
 if iteration == 0 or iteration >= MAX_ITERATIONS:
@@ -70,3 +77,5 @@ else:
   print "Snapshot exists."
 
 admin("space:drop()")
+
+sys.stdout.pop_filter()

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED
 #define TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -39,15 +39,17 @@ typedef bool (*sysview_filter_f)(struct space *source, struct tuple *);
 
 class SysviewIndex: public Index {
 public:
-	SysviewIndex(struct key_def *key_def, uint32_t source_space_id,
+	SysviewIndex(struct index_def *index_def, uint32_t source_space_id,
 		     uint32_t source_index_id, sysview_filter_f filter);
-	virtual ~SysviewIndex();
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
+	virtual ~SysviewIndex() override;
+	virtual struct tuple *findByKey(const char *key,
+					uint32_t part_count) const override;
 
-	virtual struct iterator *allocIterator() const;
+	virtual struct iterator *allocIterator() const override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+				  const char *key,
+				  uint32_t part_count) const override;
 
 	uint32_t source_space_id;
 	uint32_t source_index_id;
@@ -56,27 +58,27 @@ public:
 
 class SysviewVspaceIndex: public SysviewIndex {
 public:
-	SysviewVspaceIndex(struct key_def *key_def);
+	SysviewVspaceIndex(struct index_def *index_def);
 };
 
 class SysviewVindexIndex: public SysviewIndex {
 public:
-	SysviewVindexIndex(struct key_def *key_def);
+	SysviewVindexIndex(struct index_def *index_def);
 };
 
 class SysviewVuserIndex: public SysviewIndex {
 public:
-	SysviewVuserIndex(struct key_def *key_def);
+	SysviewVuserIndex(struct index_def *index_def);
 };
 
 class SysviewVprivIndex: public SysviewIndex {
 public:
-	SysviewVprivIndex(struct key_def *key_def);
+	SysviewVprivIndex(struct index_def *index_def);
 };
 
 class SysviewVfuncIndex: public SysviewIndex {
 public:
-	SysviewVfuncIndex(struct key_def *key_def);
+	SysviewVfuncIndex(struct index_def *index_def);
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED */

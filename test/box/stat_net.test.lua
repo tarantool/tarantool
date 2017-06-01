@@ -12,14 +12,14 @@ index = space:create_index('primary', { type = 'hash' })
 remote = require 'net.box'
 
 LISTEN = require('uri').parse(box.cfg.listen)
-cn = remote:new(LISTEN.host, LISTEN.service)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 
 cn.space.tweedledum:select() --small request
 
 box.stat.net.SENT.total > 0
 box.stat.net.RECEIVED.total > 0
-box.stat.net.EVENTS.total > 0
-box.stat.net.LOCKS.total > 0
+-- box.stat.net.EVENTS.total > 0
+-- box.stat.net.LOCKS.total > 0
 
 space:drop()
 cn:close()

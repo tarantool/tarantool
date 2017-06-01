@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,90 +30,124 @@
  */
 #include "cbus.h"
 
+#include <limits.h>
+#include "fiber.h"
+
+/**
+ * Cord interconnect.
+ */
+struct cbus {
+	/** cbus statistics */
+	struct rmean *stats;
+	/** A mutex to protect bus join. */
+	pthread_mutex_t mutex;
+	/** Condition for synchronized start of the bus. */
+	pthread_cond_t cond;
+	/** Connected endpoints */
+	struct rlist endpoints;
+};
+
+/** A singleton for all cords. */
+static struct cbus cbus;
+
 const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
 	"LOCKS",
 };
 
-static void
-cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
-	      int /* events */);
-
-static void
-cpipe_fetch_output_cb(ev_loop *loop, struct ev_async *watcher,
-			int events)
+/**
+ * Find a joined cbus endpoint by name.
+ * This is an internal helper method which should be called
+ * under cbus::mutex.
+ *
+ * @return endpoint or NULL if not found
+ */
+static struct cbus_endpoint *
+cbus_find_endpoint(struct cbus *bus, const char *name)
 {
-	(void) loop;
-	(void) events;
-	struct cpipe *pipe = (struct cpipe *) watcher->data;
-	struct cmsg *msg;
-	/* Force an exchange if there is nothing to do. */
-	while (cpipe_peek(pipe)) {
-		while ((msg = cpipe_pop_output(pipe)))
-			cmsg_deliver(msg);
+	struct cbus_endpoint *endpoint;
+	rlist_foreach_entry(endpoint, &bus->endpoints, in_cbus) {
+		if (strcmp(endpoint->name, name) == 0)
+			return endpoint;
 	}
+	return NULL;
 }
 
+static void
+cpipe_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
+	       int /* events */);
+
 void
-cpipe_create(struct cpipe *pipe)
+cpipe_create(struct cpipe *pipe, const char *consumer)
 {
-	stailq_create(&pipe->pipe);
 	stailq_create(&pipe->input);
-	stailq_create(&pipe->output);
 
 	pipe->n_input = 0;
 	pipe->max_input = INT_MAX;
+	pipe->producer = cord()->loop;
 
-	ev_async_init(&pipe->flush_input, cbus_flush_cb);
+	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
 	pipe->flush_input.data = pipe;
 
-	ev_async_init(&pipe->fetch_output, cpipe_fetch_output_cb);
-	pipe->fetch_output.data = pipe;
-	/* Set in join(), which is always called by the consumer thread. */
-	pipe->consumer = NULL;
-	/* Set in join() under a mutex. */
-	pipe->producer = NULL;
+	tt_pthread_mutex_lock(&cbus.mutex);
+	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, consumer);
+	while (endpoint == NULL) {
+		tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
+		endpoint = cbus_find_endpoint(&cbus, consumer);
+	}
+	pipe->endpoint = endpoint;
+	++pipe->endpoint->n_pipes;
+	tt_pthread_mutex_unlock(&cbus.mutex);
+}
+
+struct cmsg_poison {
+	struct cmsg msg;
+	struct cbus_endpoint *endpoint;
+};
+
+static void
+cbus_endpoint_poison_f(struct cmsg *msg)
+{
+	struct cbus_endpoint *endpoint = ((struct cmsg_poison *)msg)->endpoint;
+	--endpoint->n_pipes;
+	ipc_cond_signal(&endpoint->cond);
+	free(msg);
 }
 
 void
 cpipe_destroy(struct cpipe *pipe)
 {
-	(void) pipe;
+	static const struct cmsg_hop route[1] = {
+		{cbus_endpoint_poison_f, NULL}
+	};
+	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
+	poison->endpoint = pipe->endpoint;
+	cmsg_init(&poison->msg, route);
+	poison->endpoint = pipe->endpoint;
+
+	cpipe_push(pipe, &poison->msg);
+	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+
+	ev_async_stop(pipe->producer, &pipe->flush_input);
+	TRASH(pipe);
 }
 
 static void
-cpipe_join(struct cpipe *pipe, struct cbus *bus, struct cpipe *peer)
-{
-	assert(loop() == pipe->consumer);
-	pipe->bus = bus;
-	pipe->peer = peer;
-	pipe->producer = peer->consumer;
-}
-
-void
 cbus_create(struct cbus *bus)
 {
-	bus->pipe[0] = bus->pipe[1] = NULL;
 	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
 	if (bus->stats == NULL)
 		panic_syserror("cbus_create");
 
-	pthread_mutexattr_t errorcheck;
-
-	(void) tt_pthread_mutexattr_init(&errorcheck);
-
-#ifndef NDEBUG
-	(void) tt_pthread_mutexattr_settype(&errorcheck,
-					    PTHREAD_MUTEX_ERRORCHECK);
-#endif
 	/* Initialize queue lock mutex. */
-	(void) tt_pthread_mutex_init(&bus->mutex, &errorcheck);
-	(void) tt_pthread_mutexattr_destroy(&errorcheck);
+	(void) tt_pthread_mutex_init(&bus->mutex, NULL);
 
 	(void) tt_pthread_cond_init(&bus->cond, NULL);
+
+	rlist_create(&bus->endpoints);
 }
 
-void
+static void
 cbus_destroy(struct cbus *bus)
 {
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
@@ -122,233 +156,271 @@ cbus_destroy(struct cbus *bus)
 }
 
 /**
- * @pre both consumers initialized their pipes
- * @post each consumers gets the input end of the opposite pipe
+ * Join a new endpoint (message consumer) to the bus. The endpoint
+ * must have a unique name. Wakes up all producers (@sa cpipe_create())
+ * who are blocked waiting for this endpoint to become available.
  */
-struct cpipe *
-cbus_join(struct cbus *bus, struct cpipe *pipe)
+int
+cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
+		     void (*fetch_cb)(ev_loop *, struct ev_watcher *, int),
+		     void *fetch_data)
 {
-	pipe->consumer = loop();
-	ev_async_start(pipe->consumer, &pipe->fetch_output);
-	/*
-	 * We can't let one or the other thread go off and
-	 * produce events/send ev_async callback messages
-	 * until the peer thread has initialized the async
-	 * and started it.
-	 * Use a condition variable to make sure that two
-	 * threads operate in sync.
-	 */
-	cbus_lock(bus);
-	int pipe_idx = bus->pipe[0] != NULL;
-	int peer_idx = !pipe_idx;
-	bus->pipe[pipe_idx] = pipe;
-	while (bus->pipe[peer_idx] == NULL)
-		cbus_wait_signal(bus);
-
-	cpipe_join(pipe, bus, bus->pipe[peer_idx]);
-	cbus_signal(bus);
-	/*
-	 * At this point we've have both pipes initialized
-	 * in bus->pipe array, and our pipe joined.
-	 * But the other pipe may have not been joined
-	 * yet, ensure it's fully initialized before return.
-	 */
-	while (bus->pipe[peer_idx]->producer == NULL) {
-		/* Let the other side wakeup and perform the join. */
-		cbus_wait_signal(bus);
+	tt_pthread_mutex_lock(&cbus.mutex);
+	if (cbus_find_endpoint(&cbus, name) != NULL) {
+		tt_pthread_mutex_unlock(&cbus.mutex);
+		return 1;
 	}
-	cbus_unlock(bus);
+
+	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
+	endpoint->consumer = loop();
+	endpoint->n_pipes = 0;
+	ipc_cond_create(&endpoint->cond);
+	tt_pthread_mutex_init(&endpoint->mutex, NULL);
+	stailq_create(&endpoint->output);
+	ev_async_init(&endpoint->async,
+		      (void (*)(ev_loop *, struct ev_async *, int)) fetch_cb);
+	endpoint->async.data = fetch_data;
+	ev_async_start(endpoint->consumer, &endpoint->async);
+
+	rlist_add_tail(&cbus.endpoints, &endpoint->in_cbus);
+	tt_pthread_mutex_unlock(&cbus.mutex);
 	/*
-	 * POSIX: pthread_cond_signal() function shall
+	 * Alert all waiting producers.
+	 *
+	 * POSIX: pthread_cond_broadcast() function shall
 	 * have no effect if there are no threads currently
 	 * blocked on cond.
 	 */
-	cbus_signal(bus);
-	return bus->pipe[peer_idx];
+	tt_pthread_cond_broadcast(&cbus.cond);
+	return 0;
 }
 
-void
-cbus_leave(struct cbus *bus)
+int
+cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
+		      void (*process_cb)(struct cbus_endpoint *endpoint))
 {
-	struct cpipe *pipe = bus->pipe[bus->pipe[0]->consumer != cord()->loop];
+	tt_pthread_mutex_lock(&cbus.mutex);
+	/*
+	 * Remove endpoint from cbus registry, so no new pipe can
+	 * be created for this endpoint
+	 */
+	rlist_del(&endpoint->in_cbus);
+	tt_pthread_mutex_unlock(&cbus.mutex);
 
-	assert(loop() == pipe->consumer);
-	ev_async_stop(pipe->consumer, &pipe->fetch_output);
+	while (endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) {
+		/*
+		 * Endpoint has connected pipes or qeued messages
+		 */
+		if (process_cb)
+			process_cb(endpoint);
+		ipc_cond_wait(&endpoint->cond);
+	}
+
+	tt_pthread_mutex_destroy(&endpoint->mutex);
+	ev_async_stop(endpoint->consumer, &endpoint->async);
+	ipc_cond_destroy(&endpoint->cond);
+	TRASH(endpoint);
+	return 0;
 }
 
 static void
-cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
-	      int events)
+cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 {
 	(void) loop;
 	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
+	struct cbus_endpoint *endpoint = pipe->endpoint;
 	if (pipe->n_input == 0)
 		return;
-	struct cpipe *peer = pipe->peer;
-	assert(pipe->producer == loop());
-	assert(peer->consumer == loop());
 
 	/* Trigger task processing when the queue becomes non-empty. */
-	bool pipe_was_empty;
-	bool peer_output_was_empty = stailq_empty(&peer->output);
+	bool output_was_empty;
 
-	cbus_lock(pipe->bus);
-	pipe_was_empty = !ev_async_pending(&pipe->fetch_output);
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	output_was_empty = stailq_empty(&endpoint->output);
 	/** Flush input */
-	stailq_concat(&pipe->pipe, &pipe->input);
-	/*
-	 * While at it, pop output.
-	 * The consumer of the output of the bound queue is the
-	 * same as the producer of input, so we can safely access it.
-	 * We can safely access queue because it's locked.
-	 */
-	stailq_concat(&peer->output, &peer->pipe);
-	cbus_unlock(pipe->bus);
-
+	stailq_concat(&endpoint->output, &pipe->input);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
 
 	pipe->n_input = 0;
-	if (pipe_was_empty) {
+	if (output_was_empty) {
 		/* Count statistics */
-		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
+		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
 
-		ev_async_send(pipe->consumer, &pipe->fetch_output);
+		ev_async_send(endpoint->consumer, &endpoint->async);
 	}
-	if (peer_output_was_empty && !stailq_empty(&peer->output))
-		ev_feed_event(peer->consumer, &peer->fetch_output, EV_CUSTOM);
-}
-
-struct cmsg *
-cpipe_peek_impl(struct cpipe *pipe)
-{
-	assert(stailq_empty(&pipe->output));
-
-	struct cpipe *peer = pipe->peer;
-	assert(pipe->consumer == loop());
-	assert(peer->producer == loop());
-
-	bool peer_pipe_was_empty = false;
-
-
-	cbus_lock(pipe->bus);
-	stailq_concat(&pipe->output, &pipe->pipe);
-	if (! stailq_empty(&peer->input)) {
-		peer_pipe_was_empty = !ev_async_pending(&peer->fetch_output);
-		stailq_concat(&peer->pipe, &peer->input);
-	}
-	cbus_unlock(pipe->bus);
-	peer->n_input = 0;
-
-	if (peer_pipe_was_empty) {
-		/* Count statistics */
-		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
-
-		ev_async_send(peer->consumer, &peer->fetch_output);
-	}
-	return stailq_first_entry(&pipe->output, struct cmsg, fifo);
-}
-
-
-static void
-cmsg_notify_deliver(struct cmsg *msg)
-{
-	fiber_wakeup(((struct cmsg_notify *) msg)->fiber);
 }
 
 void
-cmsg_notify_init(struct cmsg_notify *msg)
+cbus_init()
 {
-	static struct cmsg_hop route[] = { { cmsg_notify_deliver, NULL }, };
-
-	cmsg_init(&msg->base, route);
-	msg->fiber = fiber();
+	cbus_create(&cbus);
 }
 
-
-/** Return true if there are too many active workers in the pool. */
-static inline bool
-cpipe_fiber_pool_needs_throttling(struct cpipe_fiber_pool *pool)
+void
+cbus_free()
 {
-	return pool->size > pool->max_size;
+	cbus_destroy(&cbus);
+}
+
+/* {{{ cmsg */
+
+/**
+ * Dispatch the message to the next hop.
+ */
+static inline void
+cmsg_dispatch(struct cpipe *pipe, struct cmsg *msg)
+{
+	/**
+	 * 'pipe' pointer saved in class constructor works as
+	 * a guard that the message is alive. If a message route
+	 * has the next pipe, then the message mustn't have been
+	 * destroyed on this hop. Otherwise msg->hop->pipe could
+	 * be already pointing to garbage.
+	 */
+	if (pipe) {
+		/*
+		 * Once we pushed the message to the bus,
+		 * we relinquished all write access to it,
+		 * so we must increase the current hop *before*
+		 * push.
+		 */
+		msg->hop++;
+		cpipe_push(pipe, msg);
+	}
 }
 
 /**
- * Main function of the fiber invoked to handle all outstanding
- * tasks in a queue.
+ * Deliver the message and dispatch it to the next hop.
  */
-static int
-cpipe_fiber_pool_f(va_list ap)
+void
+cmsg_deliver(struct cmsg *msg)
 {
-	struct cpipe_fiber_pool *pool = va_arg(ap, struct cpipe_fiber_pool *);
-	struct cpipe *pipe = pool->pipe;
-	struct cmsg *msg;
-	pool->size++;
-restart:
-	while ((msg = cpipe_pop_output(pipe)))
-		cmsg_deliver(msg);
-
-	if (pool->cache_size < 2 * pool->max_size) {
-		/** Put the current fiber into a fiber cache. */
-		rlist_add_entry(&pool->fiber_cache, fiber(), state);
-		pool->size--;
-		pool->cache_size++;
-		bool timed_out = fiber_yield_timeout(pool->idle_timeout);
-		pool->cache_size--;
-		pool->size++;
-		if (! timed_out)
-			goto restart;
-	}
-	pool->size--;
-	return 0;
+	/*
+	 * Save the pointer to the last pipe,
+	 * the memory where it is stored may be destroyed
+	 * on the last hop.
+	 */
+	struct cpipe *pipe = msg->hop->pipe;
+	msg->hop->f(msg);
+	cmsg_dispatch(pipe, msg);
 }
 
+/* }}} cmsg */
 
-/** Create fibers to handle all outstanding tasks. */
-static void
-cpipe_fiber_pool_cb(ev_loop *loop, struct ev_async *watcher,
-		  int events)
+/**
+ * Call the target function and store the results (diag, rc) in
+ * struct cbus_call_msg.
+ */
+void
+cbus_call_perform(struct cmsg *m)
 {
-	(void) loop;
-	(void) events;
-	struct cpipe_fiber_pool *pool =
-		(struct cpipe_fiber_pool *) watcher->data;
-	struct cpipe *pipe = pool->pipe;
-	(void) cpipe_peek(pipe);
-	while (! stailq_empty(&pipe->output)) {
-		struct fiber *f;
-		if (! rlist_empty(&pool->fiber_cache)) {
-			f = rlist_shift_entry(&pool->fiber_cache,
-					      struct fiber, state);
-			fiber_call(f);
-		} else if (! cpipe_fiber_pool_needs_throttling(pool)) {
-			f = fiber_new(pool->name, cpipe_fiber_pool_f);
-			if (f == NULL) {
-				error_log(diag_last_error(&fiber()->diag));
-				break;
-			}
-			fiber_start(f, pool);
-		} else {
-			/**
-			 * No worries that this watcher may not
-			 * get scheduled again - there are enough
-			 * worker fibers already, so just leave.
-			 */
-			break;
-		}
+	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
+	msg->rc = msg->func(msg);
+	if (msg->rc)
+		diag_move(&fiber()->diag, &msg->diag);
+}
+
+/**
+ * Wake up the caller fiber to reap call results.
+ * If the fiber is gone, e.g. in case of call timeout
+ * or cancellation, invoke free_cb to free message state.
+ */
+void
+cbus_call_done(struct cmsg *m)
+{
+	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
+	if (msg->caller == NULL) {
+		if (msg->free_cb)
+			msg->free_cb(msg);
+		return;
 	}
+	msg->complete = true;
+	fiber_wakeup(msg->caller);
+}
+
+/**
+ * Execute a synchronous call over cbus.
+ */
+int
+cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
+	cbus_call_f func, cbus_call_f free_cb, double timeout)
+{
+	int rc;
+
+	diag_create(&msg->diag);
+	msg->caller = fiber();
+	msg->complete = false;
+	msg->route[0].f = cbus_call_perform;
+	msg->route[0].pipe = caller;
+	msg->route[1].f = cbus_call_done;
+	msg->route[1].pipe = NULL;
+	cmsg_init(cmsg(msg), msg->route);
+
+	msg->func = func;
+	msg->free_cb = free_cb;
+	msg->rc = 0;
+
+	cpipe_push(callee, cmsg(msg));
+
+	fiber_yield_timeout(timeout);
+	if (msg->complete == false) {           /* timed out or cancelled */
+		msg->caller = NULL;
+		if (fiber_is_cancelled())
+			diag_set(FiberIsCancelled);
+		else
+			diag_set(TimedOut);
+		return -1;
+	}
+	if ((rc = msg->rc))
+		diag_move(&msg->diag, &fiber()->diag);
+	return rc;
 }
 
 void
-cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
-			const char *name, struct cpipe *pipe,
-			int max_pool_size, float idle_timeout)
+cbus_process(struct cbus_endpoint *endpoint)
 {
-	rlist_create(&pool->fiber_cache);
-	pool->name = name;
-	pool->pipe = pipe;
-	pool->size = 0;
-	pool->cache_size = 0;
-	pool->max_size = max_pool_size;
-	pool->idle_timeout = idle_timeout;
-	cpipe_set_fetch_cb(pipe, cpipe_fiber_pool_cb, pool);
+	struct stailq output;
+	stailq_create(&output);
+	cbus_endpoint_fetch(endpoint, &output);
+	struct cmsg *msg, *msg_next;
+	stailq_foreach_entry_safe(msg, msg_next, &output, fifo)
+		cmsg_deliver(msg);
 }
+
+void
+cbus_loop(struct cbus_endpoint *endpoint)
+{
+	while (true) {
+		cbus_process(endpoint);
+		if (fiber_is_cancelled())
+			break;
+		fiber_yield();
+	}
+}
+
+static void
+cbus_stop_loop_f(struct cmsg *msg)
+{
+	fiber_cancel(fiber());
+	free(msg);
+}
+
+void
+cbus_stop_loop(struct cpipe *pipe)
+{
+	/*
+	 * Hack: static message only works because cmsg_deliver()
+	 * is a no-op on the second hop.
+	 */
+	static const struct cmsg_hop route[1] = {
+		{cbus_stop_loop_f, NULL}
+	};
+	struct cmsg *cancel = malloc(sizeof(struct cmsg));
+
+	cmsg_init(cancel, route);
+
+	cpipe_push(pipe, cancel);
+	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+}
+

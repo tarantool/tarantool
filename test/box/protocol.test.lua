@@ -10,7 +10,7 @@ for i=1,5 do space:insert{i} end
 
 LISTEN = require('uri').parse(box.cfg.listen)
 LISTEN ~= nil
-conn = (require 'net.box'):new(LISTEN.host, LISTEN.service)
+conn = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 conn.space[space.id]:select(3, { iterator = 'GE' })
 conn.space[space.id]:select(3, { iterator = 'LE' })
 conn.space[space.id]:select(3, { iterator = 'GT' })

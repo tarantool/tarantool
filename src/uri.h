@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_URI_H_INCLUDED
 #define TARANTOOL_URI_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,6 +32,7 @@
  */
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <netdb.h> /* NI_MAXHOST, NI_MAXSERV */
 #include <limits.h> /* _POSIX_PATH_MAX */
 
@@ -66,8 +67,8 @@ struct uri {
 int
 uri_parse(struct uri *uri, const char *str);
 
-char *
-uri_format(const struct uri *uri);
+int
+uri_format(char *str, int len, const struct uri *uri, bool write_password);
 
 #if defined(__cplusplus)
 } /* extern "C" */

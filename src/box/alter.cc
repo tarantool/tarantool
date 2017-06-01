@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -42,14 +42,10 @@
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
-#include "cluster.h" /* for cluster_set_uuid() */
+#include "replication.h" /* for replica_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
-
-/**
- * Lock of scheme modification
- */
-struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
+#include "memtx_tuple.h"
 
 /** _space columns */
 #define ID               0
@@ -84,12 +80,19 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 /** _func columns */
 #define FUNC_LANGUAGE    4
 
+/**
+ * chap-sha1 of empty string, i.e.
+ * base64_encode(sha1(sha1(""))
+ */
+#define CHAP_SHA1_EMPTY_PASSWORD "vhvewKp0tNyweZQ+cFKAlsyphfg="
+
 /* {{{ Auxiliary functions and methods. */
 
 void
 access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
-	struct credentials *cr = current_user();
+	struct session *session = current_session();
+	struct credentials *cr = &session->credentials;
 	/*
 	 * Only the owner of the object can be the grantor
 	 * of the privilege on the object. This means that
@@ -107,7 +110,7 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * Checks tuple (of _index space) and throws a nice error if it is invalid
  * Checks only types of fields and their count!
  * Additionally determines version of tuple structure
@@ -115,11 +118,11 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
  * is_166plus is set as false if tuple structure is 1.6.5-
  */
 static void
-key_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
+index_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
 {
 	*is_166plus = true;
 	const mp_type common_template[] = {MP_UINT, MP_UINT, MP_STR, MP_STR};
-	const char *data = tuple->data;
+	const char *data = tuple_data(tuple);
 	uint32_t field_count = mp_decode_array(&data);
 	const char *field_start = data;
 	if (field_count < 6)
@@ -201,46 +204,58 @@ err:
 	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
 }
 
-static void
+static int
 opt_set(void *opts, const struct opt_def *def, const char **val)
 {
-	uint64_t uval;
+	int64_t ival;
+	double dval;
 	uint32_t str_len;
 	const char *str;
 	char *opt = ((char *) opts) + def->offset;
 	switch (def->type) {
-	case MP_BOOL:
+	case OPT_BOOL:
+		if (mp_typeof(**val) != MP_BOOL)
+			return -1;
 		store_bool(opt, mp_decode_bool(val));
 		break;
-	case MP_UINT:
-		uval = mp_decode_uint(val);
-		if (def->len == sizeof(uint64_t)) {
-			store_u64(opt, uval);
-		} else if (def->len == sizeof(uint32_t)) {
-			store_u32(opt, uval);
-		} else {
-			mp_unreachable();
-		}
+	case OPT_INT:
+		if (mp_read_int64(val, &ival) != 0)
+			return -1;
+		store_u64(opt, ival);
 		break;
-	case MP_STR:
+	case OPT_FLOAT:
+		if (mp_read_double(val, &dval) != 0)
+			return -1;
+		store_double(opt, dval);
+		break;
+	case OPT_STR:
+		if (mp_typeof(**val) != MP_STR)
+			return -1;
 		str = mp_decode_str(val, &str_len);
 		str_len = MIN(str_len, def->len - 1);
 		memcpy(opt, str, str_len);
-		opt[str_len + 1] = '\0';
+		opt[str_len] = '\0';
 		break;
 	default:
-		mp_unreachable();
+		unreachable();
 	}
+	return 0;
 }
 
-static void
+/**
+ * Populate key options from their msgpack-encoded representation
+ * (msgpack map)
+ *
+ * @return   the end of the msgpack map in the stream
+ */
+static const char *
 opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		       uint32_t errcode, uint32_t field_no)
 {
 	char errmsg[DIAG_ERRMSG_MAX];
 
 	if (mp_typeof(*map) == MP_NIL)
-		return;
+		return map;
 	if (mp_typeof(*map) != MP_MAP)
 		tnt_raise(ClientError, errcode, field_no,
 			  "expected a map with options");
@@ -263,15 +278,14 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 			    memcmp(key, def->name, key_len) != 0)
 				continue;
 
-			if (mp_typeof(*map) != def->type) {
+			if (opt_set(opts, def, &map) != 0) {
 				snprintf(errmsg, sizeof(errmsg),
 					"'%.*s' must be %s", key_len, key,
-					mp_type_strs[def->type]);
+					opt_type_strs[def->type]);
 				tnt_raise(ClientError, errcode, field_no,
 					  errmsg);
 			}
 
-			opt_set(opts, def, &map);
 			found = true;
 			break;
 		}
@@ -282,17 +296,18 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 			tnt_raise(ClientError, errcode, field_no, errmsg);
 		}
 	}
+	return map;
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
  * Decode distance type from message pached string to enum
  * Does not check message type, MP_STRING expected
  * Throws an error if the the value does not correspond to any enum value
  */
 static enum rtree_index_distance_type
-key_opts_decode_distance(const char *str)
+index_opts_decode_distance(const char *str)
 {
 	uint32_t len = strlen(str);
 	if (len == strlen("euclid") &&
@@ -311,33 +326,42 @@ key_opts_decode_distance(const char *str)
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
- * Fill key_opts structure from opts field in tuple of space _index
- * Throw an error is smth is wrong
+ * Fill index_opts structure from opts field in tuple of space _index
+ * Throw an error is unrecognized option.
+ *
+ * @return  the end of the map in the msgpack stream
  */
-static void
-key_opts_create_from_field(struct key_opts *opts, const char *map)
+static const char *
+index_opts_create(struct index_opts *opts, const char *map)
 {
-	*opts = key_opts_default;
-	opts_create_from_field(opts, key_opts_reg, map,
-			ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+	*opts = index_opts_default;
+	map = opts_create_from_field(opts, index_opts_reg, map,
+				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
 	if (opts->distancebuf[0] != '\0')
-		opts->distance = key_opts_decode_distance(opts->distancebuf);
+		opts->distance = index_opts_decode_distance(opts->distancebuf);
+	if (opts->run_count_per_level <= 0)
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, INDEX_OPTS,
+			  "run_count_per_level must be > 0");
+	if (opts->run_size_ratio <= 1)
+		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS, INDEX_OPTS,
+			  "run_size_ratio must be > 1");
+	return map;
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.6+
- * Decode parts array from tuple field and write'em to key_def structure.
+ * Decode parts array from tuple field and write'em to index_def structure.
  * Throws a nice error about invalid types, but does not check ranges of
  *  resulting values field_no and field_type
  * Parts expected to be a sequence of <part_count> arrays like this:
  *  [NUM, STR, ..][NUM, STR, ..]..,
  */
 static void
-key_def_fill_parts(struct key_def *key_def, const char *parts,
-		   uint32_t part_count)
+index_def_fill_parts(struct index_def *index_def, const char *parts,
+		     uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -363,23 +387,29 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 		for (uint32_t j = 2; j < item_count; j++)
 			mp_next(&parts);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
-		key_def_set_part(key_def, i, field_no, field_type);
+		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  index_def->name,
+				  space_name_by_id(index_def->space_id),
+				  "unknown field type");
+		}
+		index_def_set_part(index_def, i, field_no, field_type);
 	}
 }
 
 /**
- * Support function for key_def_new_from_tuple(..)
+ * Support function for index_def_new_from_tuple(..)
  * 1.6.5-
  * TODO: Remove it in newer version, find all 1.6.5-
- * Decode parts array from tuple fieldw and write'em to key_def structure.
+ * Decode parts array from tuple fieldw and write'em to index_def structure.
  * Does not check anything since tuple must be validated before
  * Parts expected to be a sequence of <part_count> 2 * arrays values this:
  *  NUM, STR, NUM, STR, ..,
  */
 static void
-key_def_fill_parts_165(struct key_def *key_def, const char *parts,
-		       uint32_t part_count)
+index_def_fill_parts_165(struct index_def *index_def, const char *parts,
+			 uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -387,14 +417,20 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		uint32_t len;
 		const char *str = mp_decode_str(&parts, &len);
 		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = STR2ENUM(field_type, buf);
-		key_def_set_part(key_def, i, field_no, field_type);
+		enum field_type field_type = field_type_by_name(buf);
+		if (field_type == field_type_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  index_def->name,
+				  space_name_by_id(index_def->space_id),
+				  "unknown field type");
+		}
+		index_def_set_part(index_def, i, field_no, field_type);
 	}
 }
 
 
 /**
- * Create a key_def object from a record in _index
+ * Create a index_def object from a record in _index
  * system space.
  *
  * Check that:
@@ -405,56 +441,183 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
  * - types of parts in the parts array are known to the system
  * - fieldno of each part in the parts array is within limits
  */
-static struct key_def *
-key_def_new_from_tuple(struct tuple *tuple)
+static struct index_def *
+index_def_new_from_tuple(struct tuple *tuple)
 {
 	bool is_166plus;
-	key_def_check_tuple(tuple, &is_166plus);
+	index_def_check_tuple(tuple, &is_166plus);
 
-	struct key_def *key_def;
-	struct key_opts opts;
-	uint32_t id = tuple_field_u32(tuple, ID);
-	uint32_t index_id = tuple_field_u32(tuple, INDEX_ID);
+	struct index_def *index_def;
+	struct index_opts opts;
+	uint32_t id = tuple_field_u32_xc(tuple, ID);
+	uint32_t index_id = tuple_field_u32_xc(tuple, INDEX_ID);
 	enum index_type type = STR2ENUM(index_type,
-					tuple_field_cstr(tuple, INDEX_TYPE));
-	const char *name = tuple_field_cstr(tuple, NAME);
+					tuple_field_cstr_xc(tuple, INDEX_TYPE));
+	const char *name = tuple_field_cstr_xc(tuple, NAME);
 	uint32_t part_count;
 	const char *parts;
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
 		const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-		key_opts_create_from_field(&opts, opts_field);
+		index_opts_create(&opts, opts_field);
 		parts = tuple_field(tuple, INDEX_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5- _index space structure */
 		/* TODO: remove it in newer versions, find all 1.6.5- */
-		opts = key_opts_default;
-		opts.is_unique = tuple_field_u32(tuple, INDEX_165_IS_UNIQUE);
-		part_count = tuple_field_u32(tuple, INDEX_165_PART_COUNT);
+		opts = index_opts_default;
+		opts.is_unique = tuple_field_u32_xc(tuple, INDEX_165_IS_UNIQUE);
+		part_count = tuple_field_u32_xc(tuple, INDEX_165_PART_COUNT);
 		parts = tuple_field(tuple, INDEX_165_PARTS);
 	}
 
-	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
-	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
+	index_def = index_def_new(id, index_id, name, type, &opts, part_count);
+	if (index_def == NULL)
+		diag_raise();
+	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 
 	if (is_166plus) {
 		/* 1.6.6+ */
-		key_def_fill_parts(key_def, parts, part_count);
+		index_def_fill_parts(index_def, parts, part_count);
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		key_def_fill_parts_165(key_def, parts, part_count);
+		index_def_fill_parts_165(index_def, parts, part_count);
 	}
-	key_def_check(key_def);
+	index_def_check(index_def);
 	scoped_guard.is_active = false;
-	return key_def;
+	return index_def;
 }
 
+static char *
+opt_encode(char *data, char *data_end, const void *opts,
+	   const void *default_opts, const struct opt_def *def)
+{
+	int64_t ival;
+	double dval;
+	const char *opt = ((const char *) opts) + def->offset;
+	const char *default_opt = ((const char *) default_opts) + def->offset;
+	if (memcmp(opt, default_opt, def->len) == 0)
+		return data;
+	uint32_t optlen = strlen(def->name);
+	if (data + mp_sizeof_str(optlen) > data_end)
+		return data_end;
+	data = mp_encode_str(data, def->name, optlen);
+	switch (def->type) {
+	case OPT_BOOL:
+		if (data + mp_sizeof_bool(true) > data_end)
+			return data_end;
+		data = mp_encode_bool(data, load_bool(opt));
+		break;
+	case OPT_INT:
+		ival = load_u64(opt);
+		if ((ival < 0 && data + mp_sizeof_int(ival) > data_end) ||
+		    (ival >= 0 && data + mp_sizeof_uint(ival) > data_end))
+			return data_end;
+		if (ival < 0)
+			data = mp_encode_int(data, ival);
+		else
+			data = mp_encode_uint(data, ival);
+		break;
+	case OPT_FLOAT:
+		dval = load_double(opt);
+		if (data + mp_sizeof_double(dval) > data_end)
+			return data_end;
+		data = mp_encode_double(data, dval);
+		break;
+	case OPT_STR:
+		optlen = strlen(opt);
+		if (data + mp_sizeof_str(optlen) > data_end)
+			return data_end;
+		data = mp_encode_str(data, opt, optlen);
+		break;
+	default:
+		unreachable();
+	}
+	return data;
+}
+
+static char *
+opts_encode(char *data, char *data_end, const void *opts,
+	    const void *default_opts, const struct opt_def *reg)
+{
+	char *p = data;
+	uint32_t n_opts = 0;
+	for (const struct opt_def *def = reg; def->name != NULL; def++) {
+		char *end = opt_encode(p, data_end, opts, default_opts, def);
+		if (end == data_end)
+			return end;
+		if (p != end) {
+			p = end;
+			n_opts++;
+		}
+	}
+	ptrdiff_t len = p - data;
+	if (data + mp_sizeof_map(n_opts) > data_end)
+		return data_end;
+	memmove(data + mp_sizeof_map(n_opts), data, len);
+	data = mp_encode_map(data, n_opts);
+	data += len;
+	return data;
+}
+
+
+/**
+ * Encode options index_opts into msgpack stream.
+ * @pre output buffer is reserved to contain enough space for the
+ * output.
+ *
+ * @return a pointer to the end of the stream.
+ */
+static char *
+index_opts_encode(char *data, char *data_end, const struct index_opts *opts)
+{
+	return opts_encode(data, data_end, opts, &index_opts_default,
+			   index_opts_reg);
+}
+
+struct tuple *
+index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
+{
+	bool is_166plus;
+	index_def_check_tuple(tuple, &is_166plus);
+	if (!is_166plus)
+		return tuple;
+	struct index_opts opts;
+	const char *opts_field = tuple_field(tuple, INDEX_OPTS);
+	const char *opts_field_end = index_opts_create(&opts, opts_field);
+	opts.lsn = lsn;
+	size_t size = (opts_field_end - opts_field) + 64;
+	char *buf = (char *)malloc(size);
+	if (buf == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "buf");
+	char *buf_end = buf;
+	buf_end = mp_encode_array(buf_end, 2);
+	buf_end = mp_encode_array(buf_end, 3);
+	buf_end = mp_encode_str(buf_end, "#", 1);
+	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
+	buf_end = mp_encode_uint(buf_end, 1);
+	buf_end = mp_encode_array(buf_end, 3);
+	buf_end = mp_encode_str(buf_end, "!", 1);
+	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
+	buf_end = index_opts_encode(buf_end, buf + size, &opts);
+	/* No check of return value: buf is checked by box_tuple_update */
+	assert(buf_end < buf + size);
+	tuple = box_tuple_update(tuple, buf, buf_end);
+	free(buf);
+	if (tuple == NULL)
+		diag_raise();
+	return tuple;
+}
+
+/**
+ * Fill space opts from the msgpack stream (MP_MAP field in the
+ * tuple).
+ */
 static void
-space_def_init_opts(struct space_def *def, struct tuple *tuple)
+space_opts_create(struct space_opts *opts, struct tuple *tuple)
 {
 	/* default values of opts */
-	def->opts = space_opts_default;
+	*opts = space_opts_default;
 
 	/* there is no property in the space */
 	if (tuple_field_count(tuple) <= OPTS)
@@ -464,21 +627,20 @@ space_def_init_opts(struct space_def *def, struct tuple *tuple)
 	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
 	if (!is_170_plus) {
 		/* Tarantool < 1.7.0 compatibility */
-		const char *flags = tuple_field_cstr(tuple, OPTS);
+		const char *flags = tuple_field_cstr_xc(tuple, OPTS);
 		while (flags && *flags) {
 			while (isspace(*flags)) /* skip space */
 				flags++;
 			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-				def->opts.temporary = true;
+				opts->temporary = true;
 			flags = strchr(flags, ',');
 			if (flags)
 				flags++;
 		}
-		return;
+	} else {
+		opts_create_from_field(opts, space_opts_reg, data,
+				       ER_WRONG_SPACE_OPTIONS, OPTS);
 	}
-
-	opts_create_from_field(&def->opts, space_opts_reg, data,
-			ER_WRONG_SPACE_OPTIONS, OPTS);
 }
 
 /**
@@ -488,15 +650,15 @@ void
 space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 			    uint32_t errcode)
 {
-	def->id = tuple_field_u32(tuple, ID);
-	def->uid = tuple_field_u32(tuple, UID);
-	def->field_count = tuple_field_u32(tuple, FIELD_COUNT);
+	def->id = tuple_field_u32_xc(tuple, ID);
+	def->uid = tuple_field_u32_xc(tuple, UID);
+	def->exact_field_count = tuple_field_u32_xc(tuple, FIELD_COUNT);
 	int namelen = snprintf(def->name, sizeof(def->name),
-			 "%s", tuple_field_cstr(tuple, NAME));
+			 "%s", tuple_field_cstr_xc(tuple, NAME));
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
-			 "%s", tuple_field_cstr(tuple, ENGINE));
+			 "%s", tuple_field_cstr_xc(tuple, ENGINE));
 
-	space_def_init_opts(def, tuple);
+	space_opts_create(&def->opts, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
 	access_check_ddl(def->uid, SC_SPACE);
 }
@@ -619,8 +781,8 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 		 * new one.
 		 */
 		if (old_index != NULL &&
-		    key_def_cmp(new_index->key_def,
-				old_index->key_def) == 0) {
+		    index_def_cmp(new_index->index_def,
+				  old_index->index_def) == 0) {
 			space_swap_index(alter->old_space,
 					 alter->new_space,
 					 index_id(old_index),
@@ -644,13 +806,21 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	rlist_swap(&alter->new_space->on_replace,
 		   &alter->old_space->on_replace);
 	/*
+	 * Init space bsize.
+	 */
+	if (alter->new_space->index_count != 0)
+		alter->new_space->bsize = alter->old_space->bsize;
+	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
+	alter->old_space->handler->commitAlterSpace(alter->old_space,
+						    alter->new_space);
+
 	struct space *old_space = space_cache_replace(alter->new_space);
+	alter->new_space = NULL; /* for alter_space_delete(). */
 	assert(old_space == alter->old_space);
 	space_delete(old_space);
-	alter->new_space = NULL; /* for alter_space_delete(). */
 	alter_space_delete(alter);
 }
 
@@ -760,7 +930,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * snapshot/xlog, but needs to continue staying "fully
 	 * built".
 	 */
-	alter->new_space->handler->onAlter(alter->old_space->handler);
+	alter->new_space->handler->prepareAlterSpace(alter->old_space,
+						     alter->new_space);
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
@@ -811,8 +982,8 @@ ModifySpace::prepare(struct alter_space *alter)
 			  space_name(alter->old_space),
 			  "can not change space engine");
 
-	if (def.field_count != 0 &&
-	    def.field_count != alter->old_space->def.field_count &&
+	if (def.exact_field_count != 0 &&
+	    def.exact_field_count != alter->old_space->def.exact_field_count &&
 	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 
@@ -850,7 +1021,7 @@ class AddIndex;
 class DropIndex: public AlterSpaceOp {
 public:
 	/** A reference to Index key def of the dropped index. */
-	struct key_def *old_key_def;
+	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
@@ -863,7 +1034,7 @@ public:
 void
 DropIndex::alter_def(struct alter_space * /* alter */)
 {
-	rlist_del_entry(old_key_def, link);
+	rlist_del_entry(old_index_def, link);
 }
 
 /* Do the drop. */
@@ -898,7 +1069,7 @@ DropIndex::alter(struct alter_space *alter)
 	 * since it may have to reset handler->replace function,
 	 * so that:
 	 * - DML returns proper errors rather than crashes the
-	 *   server
+	 *   program
 	 * - when a new primary key is finally added, the space
 	 *   can be put back online properly.
 	 */
@@ -908,24 +1079,18 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter)
 {
-	/*
-	 * Delete all tuples in the old space if dropping the
-	 * primary key.
-	 */
-	if (space_index(alter->new_space, 0) != NULL)
+	if (space_index(alter->new_space, old_index_def->iid) != NULL)
 		return;
-	Index *pk = index_find(alter->old_space, 0);
-	if (pk == NULL)
-		return;
-	alter->old_space->handler->engine->dropIndex(pk);
+	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
+	alter->old_space->handler->dropIndex(index);
 }
 
 /** Change non-essential (no data change) properties of an index. */
 class ModifyIndex: public AlterSpaceOp
 {
 public:
-	struct key_def *new_key_def;
-	struct key_def *old_key_def;
+	struct index_def *new_index_def;
+	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
 	virtual ~ModifyIndex();
@@ -935,8 +1100,8 @@ public:
 void
 ModifyIndex::alter_def(struct alter_space *alter)
 {
-	rlist_del_entry(old_key_def, link);
-	rlist_add_entry(&alter->key_list, new_key_def, link);
+	rlist_del_entry(old_index_def, link);
+	rlist_add_entry(&alter->key_list, new_index_def, link);
 }
 
 /** Move the index from the old space to the new one. */
@@ -945,15 +1110,15 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space,
-			 old_key_def->iid, new_key_def->iid);
-	key_def_copy(old_key_def, new_key_def);
+			 old_index_def->iid, new_index_def->iid);
+	index_def_copy(old_index_def, new_index_def);
 }
 
 ModifyIndex::~ModifyIndex()
 {
-	/* new_key_def is NULL if exception is raised before it's set. */
-	if (new_key_def)
-		key_def_delete(new_key_def);
+	/* new_index_def is NULL if exception is raised before it's set. */
+	if (new_index_def)
+		index_def_delete(new_index_def);
 }
 
 /**
@@ -973,8 +1138,8 @@ ModifyIndex::~ModifyIndex()
 /** AddIndex - add a new index to the space. */
 class AddIndex: public AlterSpaceOp {
 public:
-	/** New index key_def. */
-	struct key_def *new_key_def;
+	/** New index index_def. */
+	struct index_def *new_index_def;
 	struct trigger *on_replace;
 	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
@@ -986,20 +1151,20 @@ public:
  * Support function for AddIndex::prepare
  */
 static bool
-key_def_change_require_index_rebuid(struct key_def *old_key_def,
-				    struct key_def *new_key_def)
+index_def_change_require_index_rebuid(struct index_def *old_index_def,
+				    struct index_def *new_index_def)
 {
-	if (old_key_def->type != new_key_def->type ||
-	    old_key_def->opts.is_unique != new_key_def->opts.is_unique ||
-	    key_part_cmp(old_key_def->parts,
-			 old_key_def->part_count,
-			 new_key_def->parts,
-			 new_key_def->part_count) != 0) {
+	if (old_index_def->type != new_index_def->type ||
+	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
+	    key_part_cmp(old_index_def->key_def.parts,
+			 old_index_def->key_def.part_count,
+			 new_index_def->key_def.parts,
+			 new_index_def->key_def.part_count) != 0) {
 		return true;
 	}
-	if (old_key_def->type == RTREE) {
-		if (old_key_def->opts.dimension != new_key_def->opts.dimension
-		    || old_key_def->opts.distance != new_key_def->opts.distance)
+	if (old_index_def->type == RTREE) {
+		if (old_index_def->opts.dimension != new_index_def->opts.dimension
+		    || old_index_def->opts.distance != new_index_def->opts.distance)
 			return true;
 	}
 	return false;
@@ -1017,8 +1182,8 @@ AddIndex::prepare(struct alter_space *alter)
 	DropIndex *drop = dynamic_cast<DropIndex *>(prev_op);
 
 	if (drop == NULL ||
-	    key_def_change_require_index_rebuid(drop->old_key_def,
-					       new_key_def)) {
+	    index_def_change_require_index_rebuid(drop->old_index_def,
+						  new_index_def)) {
 		/*
 		 * The new index is too distinct from the old one,
 		 * have to rebuild.
@@ -1029,12 +1194,12 @@ AddIndex::prepare(struct alter_space *alter)
 	rlist_del_entry(drop, link);
 	rlist_del_entry(this, link);
 	/* Add ModifyIndex only if the there is a change. */
-	if (key_def_cmp(drop->old_key_def, new_key_def) != 0) {
+	if (index_def_cmp(drop->old_index_def, new_index_def) != 0) {
 		ModifyIndex *modify = AlterSpaceOp::create<ModifyIndex>();
 		alter_space_add_op(alter, modify);
-		modify->new_key_def = new_key_def;
-		new_key_def = NULL;
-		modify->old_key_def = drop->old_key_def;
+		modify->new_index_def = new_index_def;
+		new_index_def = NULL;
+		modify->old_index_def = drop->old_index_def;
 	}
 	AlterSpaceOp::destroy(drop);
 	AlterSpaceOp::destroy(this);
@@ -1044,7 +1209,7 @@ AddIndex::prepare(struct alter_space *alter)
 void
 AddIndex::alter_def(struct alter_space *alter)
 {
-	rlist_add_tail_entry(&alter->key_list, new_key_def, link);
+	rlist_add_tail_entry(&alter->key_list, new_index_def, link);
 }
 
 /**
@@ -1059,7 +1224,7 @@ on_rollback_in_old_space(struct trigger *trigger, void *event)
 	/* Remove the failed tuple from the new index. */
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space->def.id != new_index->key_def->space_id)
+		if (stmt->space->def.id != new_index->index_def->space_id)
 			continue;
 		new_index->replace(stmt->new_tuple, stmt->old_tuple,
 				   DUP_INSERT);
@@ -1108,8 +1273,9 @@ void
 AddIndex::alter(struct alter_space *alter)
 {
 	Engine *engine = alter->new_space->handler->engine;
+
 	if (space_index(alter->old_space, 0) == NULL) {
-		if (new_key_def->iid == 0) {
+		if (new_index_def->iid == 0) {
 			/*
 			 * Adding a primary key: bring the space
 			 * up to speed with the current recovery
@@ -1132,47 +1298,10 @@ AddIndex::alter(struct alter_space *alter)
 		return;
 	}
 	/**
-	 * If it's a secondary key, and we're not building them
-	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
+	 * Get the new index and build it.
 	 */
-	if (new_key_def->iid != 0 && !engine->needToBuildSecondaryKey(alter->new_space))
-		return;
-
-	Index *pk = index_find(alter->old_space, 0);
-	Index *new_index = index_find(alter->new_space, new_key_def->iid);
-
-	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = pk->allocIterator();
-	IteratorGuard guard(it);
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	/*
-	 * The index has to be built tuple by tuple, since
-	 * there is no guarantee that all tuples satisfy
-	 * new index' constraints. If any tuple can not be
-	 * added to the index (insufficient number of fields,
-	 * etc., the build is aborted.
-	 */
-	/* Build the new index. */
-	struct tuple *tuple;
-	struct tuple_format *format = alter->new_space->format;
-	char *field_map = ((char *) region_alloc_xc(&fiber()->gc,
-						    format->field_map_size) +
-			   format->field_map_size);
-	while ((tuple = it->next(it))) {
-		/*
-		 * Check that the tuple is OK according to the
-		 * new format.
-		 */
-		tuple_init_field_map(format, tuple, (uint32_t *) field_map);
-		/*
-		 * @todo: better message if there is a duplicate.
-		 */
-		struct tuple *old_tuple =
-			new_index->replace(NULL, tuple, DUP_INSERT);
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
-	}
+	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
+	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
 	trigger_add(&alter->old_space->on_replace, on_replace);
@@ -1187,8 +1316,8 @@ AddIndex::~AddIndex()
 	 */
 	if (on_replace)
 		trigger_clear(on_replace);
-	if (new_key_def)
-		key_def_delete(new_key_def);
+	if (new_index_def)
+		index_def_delete(new_index_def);
 }
 
 /* }}} */
@@ -1201,7 +1330,7 @@ static void
 on_drop_space(struct trigger * /* trigger */, void *event)
 {
 	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	uint32_t id = tuple_field_u32(stmt->old_tuple ?
+	uint32_t id = tuple_field_u32_xc(stmt->old_tuple ?
 				      stmt->old_tuple : stmt->new_tuple,
 				      ID);
 	struct space *space = space_cache_delete(id);
@@ -1287,7 +1416,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 * old_tuple ID field, if old_tuple is set, since UPDATE
 	 * may have changed space id.
 	 */
-	uint32_t old_id = tuple_field_u32(old_tuple ?
+	uint32_t old_id = tuple_field_u32_xc(old_tuple ?
 					  old_tuple : new_tuple, ID);
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
@@ -1323,7 +1452,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		/* @todo lock space metadata until commit. */
 		/*
 		 * dd_space_delete() can't fail, any such
-		 * failure would have to abort the server.
+		 * failure would have to abort the program.
 		 */
 		struct trigger *on_commit =
 				txn_alter_trigger_new(on_drop_space, NULL);
@@ -1394,8 +1523,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	uint32_t id = tuple_field_u32(old_tuple ? old_tuple : new_tuple, ID);
-	uint32_t iid = tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+	uint32_t id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple, ID);
+	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
 				       INDEX_ID);
 	struct space *old_space = space_cache_find(id);
 	access_check_ddl(old_space->def.uid, SC_SPACE);
@@ -1411,12 +1540,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (old_index != NULL) {
 		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
 		alter_space_add_op(alter, drop_index);
-		drop_index->old_key_def = old_index->key_def;
+		drop_index->old_index_def = old_index->index_def;
 	}
 	if (new_tuple != NULL) {
 		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
 		alter_space_add_op(alter, add_index);
-		add_index->new_key_def = key_def_new_from_tuple(new_tuple);
+		add_index->new_index_def = index_def_new_from_tuple(new_tuple);
 	}
 	alter_space_do(txn, alter, old_space);
 	scoped_guard.is_active = false;
@@ -1517,6 +1646,12 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 			tnt_raise(ClientError, ER_CREATE_USER,
 				  user->name, "invalid user password");
 		}
+                if (user->uid == GUEST) {
+                    /** Guest user is permitted to have empty password */
+                    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
+                        tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
+                }
+
 		base64_decode(hash2_base64, len, user->hash2,
 			      sizeof(user->hash2));
 		break;
@@ -1528,11 +1663,11 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 {
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
-	user->uid = tuple_field_u32(tuple, ID);
-	user->owner = tuple_field_u32(tuple, UID);
-	const char *user_type = tuple_field_cstr(tuple, USER_TYPE);
+	user->uid = tuple_field_u32_xc(tuple, ID);
+	user->owner = tuple_field_u32_xc(tuple, UID);
+	const char *user_type = tuple_field_cstr_xc(tuple, USER_TYPE);
 	user->type= schema_object_type(user_type);
-	const char *name = tuple_field_cstr(tuple, NAME);
+	const char *name = tuple_field_cstr_xc(tuple, NAME);
 	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
 		tnt_raise(ClientError, ER_CREATE_USER,
@@ -1557,8 +1692,6 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 				tnt_raise(ClientError, ER_CREATE_ROLE,
 					  user->name, "authentication "
 					  "data can not be set for a role");
-			if (user->uid == GUEST)
-				tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
 		}
 		user_def_fill_auth_data(user, auth_data);
 	}
@@ -1569,7 +1702,7 @@ user_cache_remove_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_last_stmt(txn);
-	uint32_t uid = tuple_field_u32(stmt->old_tuple ?
+	uint32_t uid = tuple_field_u32_xc(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
 				       ID);
 	user_cache_delete(uid);
@@ -1597,7 +1730,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	uint32_t uid = tuple_field_u32(old_tuple ?
+	uint32_t uid = tuple_field_u32_xc(old_tuple ?
 				       old_tuple : new_tuple, ID);
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
@@ -1645,9 +1778,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 static void
 func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 {
-	def->fid = tuple_field_u32(tuple, ID);
-	def->uid = tuple_field_u32(tuple, UID);
-	const char *name = tuple_field_cstr(tuple, NAME);
+	def->fid = tuple_field_u32_xc(tuple, ID);
+	def->uid = tuple_field_u32_xc(tuple, UID);
+	const char *name = tuple_field_cstr_xc(tuple, NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(def->name)) {
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
@@ -1655,11 +1788,11 @@ func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 	}
 	snprintf(def->name, sizeof(def->name), "%s", name);
 	if (tuple_field_count(tuple) > FUNC_SETUID)
-		def->setuid = tuple_field_u32(tuple, FUNC_SETUID);
+		def->setuid = tuple_field_u32_xc(tuple, FUNC_SETUID);
 	else
 		def->setuid = false;
 	if (tuple_field_count(tuple) > FUNC_LANGUAGE) {
-		const char *language = tuple_field_cstr(tuple, FUNC_LANGUAGE);
+		const char *language = tuple_field_cstr_xc(tuple, FUNC_LANGUAGE);
 		def->language = STR2ENUM(func_language, language);
 		if (def->language == func_language_MAX) {
 			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
@@ -1676,7 +1809,7 @@ static void
 func_cache_remove_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	uint32_t fid = tuple_field_u32(stmt->old_tuple ?
+	uint32_t fid = tuple_field_u32_xc(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
 				       ID);
 	func_cache_delete(fid);
@@ -1706,7 +1839,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct func_def def;
 
-	uint32_t fid = tuple_field_u32(old_tuple ?
+	uint32_t fid = tuple_field_u32_xc(old_tuple ?
 				       old_tuple : new_tuple, ID);
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
@@ -1746,16 +1879,16 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 void
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 {
-	priv->grantor_id = tuple_field_u32(tuple, ID);
-	priv->grantee_id = tuple_field_u32(tuple, UID);
-	const char *object_type = tuple_field_cstr(tuple, PRIV_OBJECT_TYPE);
-	priv->object_id = tuple_field_u32(tuple, PRIV_OBJECT_ID);
+	priv->grantor_id = tuple_field_u32_xc(tuple, ID);
+	priv->grantee_id = tuple_field_u32_xc(tuple, UID);
+	const char *object_type = tuple_field_cstr_xc(tuple, PRIV_OBJECT_TYPE);
+	priv->object_id = tuple_field_u32_xc(tuple, PRIV_OBJECT_ID);
 	priv->object_type = schema_object_type(object_type);
 	if (priv->object_type == SC_UNKNOWN) {
 		tnt_raise(ClientError, ER_UNKNOWN_SCHEMA_OBJECT,
 			  object_type);
 	}
-	priv->access = tuple_field_u32(tuple, PRIV_ACCESS);
+	priv->access = tuple_field_u32_xc(tuple, PRIV_ACCESS);
 }
 
 /*
@@ -1934,20 +2067,6 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 /* {{{ cluster configuration */
 
 /**
- * Parse a tuple field which is expected to contain a string
- * representation of UUID, and return a 16-byte representation.
- */
-tt_uuid
-tuple_field_uuid(struct tuple *tuple, int fieldno)
-{
-	const char *value = tuple_field_cstr(tuple, fieldno);
-	tt_uuid uuid;
-	if (tt_uuid_from_string(value, &uuid) != 0)
-		tnt_raise(ClientError, ER_INVALID_UUID, value);
-	return uuid;
-}
-
-/**
  * This trigger is invoked only upon initial recovery, when
  * reading contents of the system spaces from the snapshot.
  *
@@ -1964,18 +2083,19 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	const char *key = tuple_field_cstr(new_tuple ?
+	const char *key = tuple_field_cstr_xc(new_tuple ?
 					   new_tuple : old_tuple, 0);
 	if (strcmp(key, "cluster") == 0) {
 		if (new_tuple == NULL)
-			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
-		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
-		cluster_id = uu;
+			tnt_raise(ClientError, ER_REPLICASET_UUID_IS_RO);
+		tt_uuid uu;
+		tuple_field_uuid_xc(new_tuple, 1, &uu);
+		REPLICASET_UUID = uu;
 	}
 }
 
 /**
- * A record with id of the new server has been synced to the
+ * A record with id of the new instance has been synced to the
  * write ahead log. Update the cluster configuration cache
  * with it.
  */
@@ -1985,26 +2105,32 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	(void) trigger;
 	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	struct tuple *new_tuple = stmt->new_tuple;
+	struct tuple *old_tuple = stmt->old_tuple;
 
 	if (new_tuple == NULL) {
-		uint32_t old_id = tuple_field_u32(stmt->old_tuple, 0);
-		cluster_del_server(old_id);
+		struct tt_uuid old_uuid;
+		tuple_field_uuid_xc(stmt->old_tuple, 1, &old_uuid);
+		struct replica *replica = replica_by_uuid(&old_uuid);
+		assert(replica != NULL);
+		replica_clear_id(replica);
 		return;
+	} else if (old_tuple != NULL) {
+		return; /* nothing to change */
 	}
-	uint32_t id = tuple_field_u32(new_tuple, 0);
-	tt_uuid uuid = tuple_field_uuid(new_tuple, 1);
-	struct tuple *old_tuple = stmt->old_tuple;
-	if (old_tuple != NULL) {
-		uint32_t old_id = tuple_field_u32(old_tuple, 0);
-		if (id != old_id) {
-			/* box.space._cluster:update(old, {{'=', 1, new}} */
-			cluster_del_server(old_id);
-			cluster_add_server(id, &uuid);
-		} else {
-			cluster_update_server(id, &uuid);
-		}
+
+	uint32_t id = tuple_field_u32_xc(new_tuple, 0);
+	tt_uuid uuid;
+	tuple_field_uuid_xc(new_tuple, 1, &uuid);
+	struct replica *replica = replica_by_uuid(&uuid);
+	if (replica != NULL) {
+		replica_set_id(replica, id);
 	} else {
-		cluster_add_server(id, &uuid);
+		try {
+			replica = replicaset_add(id, &uuid);
+			/* Can't throw exceptions from on_commit trigger */
+		} catch(Exception *e) {
+			panic("Can't register replica: %s", e->errmsg);
+		}
 	}
 }
 
@@ -2016,15 +2142,15 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
  * protocol.
  *
  * The trigger updates the cluster configuration cache
- * with uuid of the newly joined server.
+ * with uuid of the newly joined instance.
  *
  * During recovery, it acts the same way, loading identifiers
- * of all servers into the cache. Node globally unique
+ * of all instances into the cache. Instance globally unique
  * identifiers are used to keep track of cluster configuration,
- * so that a server that previously joined the cluster can
- * follow updates, and a server that belongs to a different
- * cluster can not by mistake join/follow another cluster
- * without first being reset (emptied).
+ * so that a replica that previously joined a replica set can
+ * follow updates, and a replica that belongs to a different
+ * replica set can not by mistake join/follow another replica
+ * set without first being reset (emptied).
  */
 static void
 on_replace_dd_cluster(struct trigger *trigger, void *event)
@@ -2033,19 +2159,39 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	if (new_tuple != NULL) {
+	if (new_tuple != NULL) { /* Insert or replace */
 		/* Check fields */
-		uint32_t server_id = tuple_field_u32(new_tuple, 0);
-		if (cserver_id_is_reserved(server_id))
-			tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
-				  (unsigned) server_id);
-		if (server_id >= VCLOCK_MAX)
-			tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-		tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
-		if (tt_uuid_is_nil(&server_uuid))
+		uint32_t replica_id = tuple_field_u32_xc(new_tuple, 0);
+		replica_check_id(replica_id);
+		tt_uuid replica_uuid;
+		tuple_field_uuid_xc(new_tuple, 1, &replica_uuid);
+		if (tt_uuid_is_nil(&replica_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
-				  tt_uuid_str(&server_uuid));
+				  tt_uuid_str(&replica_uuid));
+		if (old_tuple != NULL) {
+			/*
+			 * Forbid changes of UUID for a registered instance:
+			 * it requires an extra effort to keep _cluster
+			 * in sync with appliers and relays.
+			 */
+			tt_uuid old_uuid;
+			tuple_field_uuid_xc(old_tuple, 1, &old_uuid);
+			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
+				tnt_raise(ClientError, ER_UNSUPPORTED,
+					  "Space _cluster",
+					  "updates of instance uuid");
+			}
+		}
+	} else {
+		/*
+		 * Don't allow deletion of the record for this instance
+		 * from _cluster.
+		 */
+		assert(old_tuple != NULL);
+		uint32_t replica_id = tuple_field_u32_xc(old_tuple, 0);
+		replica_check_id(replica_id);
 	}
 
 	struct trigger *on_commit =

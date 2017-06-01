@@ -281,7 +281,7 @@ void gopt_help(const void *opt_def){
    */
 
   const int long_opt_width = 27; /* not counting leading "--" */
-  const int help_width = 54;
+  const size_t help_width = 54;
   const char help_padding[] = "                                  ";
 
     while (opt->key) {

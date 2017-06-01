@@ -27,7 +27,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 space:len() > 5000;
 ---
@@ -41,7 +41,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 space:len() > 5000;
 ---
@@ -55,7 +55,7 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
 test_run:cmd("setopt delimiter ''");
 ---
@@ -232,7 +232,7 @@ t = nil
 ...
 -- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
 test_run:cmd('restart server default')
-arena_bytes = box.cfg.slab_alloc_arena * 1024 * 1024 * 1024
+arena_bytes = box.cfg.memtx_memory
 ---
 ...
 str = string.rep('a', 15000) -- about size of index memory block
@@ -250,12 +250,12 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
-definatelly_used = index:count() * 16 * 1024
+definitely_used = index:count() * 16 * 1024
 ---
 ...
-2 * definatelly_used > arena_bytes -- at least half memory used
+2 * definitely_used > arena_bytes -- at least half memory used
 ---
 - true
 ...
@@ -275,12 +275,12 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
-definatelly_used = index:count() * 16 * 1024
+definitely_used = index:count() * 16 * 1024
 ---
 ...
-2 * definatelly_used > arena_bytes -- at least half memory used
+2 * definitely_used > arena_bytes -- at least half memory used
 ---
 - true
 ...

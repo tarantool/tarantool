@@ -1,1 +1,1 @@
-Expected error: <type 'exceptions.OSError'>
+Expected error: <class 'lib.tarantool_server.TarantoolStartError'>

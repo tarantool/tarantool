@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -112,37 +112,14 @@ luaT_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	/* TODO: use struct error here */
-	Exception *e = (Exception *) box_error_last();
-
+	struct error *e = box_error_last();
 	if (e == NULL) {
 		lua_pushnil(L);
-	} else {
-		/*
-		 * TODO: use luaL_pusherror here, move type_foreach_method
-		 * to error_unpack() in Lua.
-		 */
-		lua_newtable(L);
+		return 1;
+	}
 
-		lua_pushstring(L, "type");
-		lua_pushstring(L, e->type->name);
-		lua_settable(L, -3);
-
-		type_foreach_method(e->type, method) {
-			if (method_invokable<const char *>(method, e)) {
-				const char *s = method_invoke<const char *>(method, e);
-				lua_pushstring(L, method->name);
-				lua_pushstring(L, s);
-				lua_settable(L, -3);
-			} else if (method_invokable<int>(method, e)) {
-				int code = method_invoke<int>(method, e);
-				lua_pushstring(L, method->name);
-				lua_pushinteger(L, code);
-				lua_settable(L, -3);
-			}
-		}
-       }
-       return 1;
+	luaT_pusherror(L, e);
+	return 1;
 }
 
 static int
@@ -159,11 +136,25 @@ static int
 lbox_errinj_set(struct lua_State *L)
 {
 	char *name = (char*)luaL_checkstring(L, 1);
-	bool state = lua_toboolean(L, 2);
-	if (errinj_set_byname(name, state)) {
+	struct errinj *errinj;
+	errinj = errinj_lookup(name);
+	if (errinj == NULL) {
+		say_error("%s", name);
 		lua_pushfstring(L, "error: can't find error injection '%s'", name);
 		return 1;
 	}
+	switch (errinj->type) {
+	case ERRINJ_BOOL:
+		errinj->state.bparam = lua_toboolean(L, 2);
+		break;
+	case ERRINJ_U64:
+		errinj->state.u64param = luaL_checkuint64(L, 2);
+		break;
+	default:
+		lua_pushfstring(L, "error: unknow injection type '%s'", name);
+		return 1;
+	}
+
 	lua_pushstring(L, "ok");
 	return 1;
 }
@@ -175,7 +166,16 @@ lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 	lua_pushstring(L, e->name);
 	lua_newtable(L);
 	lua_pushstring(L, "state");
-	lua_pushboolean(L, e->state);
+	switch (e->type) {
+	case ERRINJ_BOOL:
+		lua_pushboolean(L, e->state.bparam);
+		break;
+	case ERRINJ_U64:
+		luaL_pushuint64(L, e->state.u64param);
+		break;
+	default:
+		unreachable();
+	}
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 	return 0;

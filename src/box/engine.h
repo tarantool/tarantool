@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_ENGINE_H_INCLUDED
 #define TARANTOOL_BOX_ENGINE_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,25 +35,24 @@
 struct request;
 struct space;
 struct tuple;
+struct tuple_format_vtab;
 struct relay;
 
 enum engine_flags {
 	ENGINE_CAN_BE_TEMPORARY = 1,
-	ENGINE_AUTO_CHECK_UPDATE = 2,
 };
 
 extern struct rlist engines;
 
-typedef void
-(*engine_replace_f)(struct txn *txn, struct space *,
-		    struct tuple *, struct tuple *, enum dup_replace_mode);
+struct Handler;
 
-class Handler;
+typedef int
+engine_backup_cb(const char *path, void *arg);
 
 /** Engine instance */
 class Engine {
 public:
-	Engine(const char *engine_name);
+	Engine(const char *engine_name, struct tuple_format_vtab *format);
 
 	Engine(const Engine &) = delete;
 	Engine& operator=(const Engine&) = delete;
@@ -62,17 +61,12 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *open() = 0;
-	/**
-	 * Create an instance of space index. Used in alter
-	 * space.
-	 */
-	virtual Index *createIndex(struct key_def*) = 0;
 	virtual void initSystemSpace(struct space *space);
 	/**
-	 * Check a key definition for violation of
+	 * Check an index definition for violation of
 	 * various limits.
 	 */
-	virtual void keydefCheck(struct space *space, struct key_def*);
+	virtual void checkIndexDef(struct space *space, struct index_def*);
 	/**
 	 * Called by alter when a primary key added,
 	 * after createIndex is invoked for the new
@@ -80,24 +74,24 @@ public:
 	 */
 	virtual void addPrimaryKey(struct space *space);
 	/**
-	 * Delete all tuples in the index on drop.
-	 */
-	virtual void dropIndex(Index *);
-	/**
 	 * Called by alter when the primary key is dropped.
 	 * Do whatever is necessary with space/handler object,
 	 * e.g. disable handler replace function, if
 	 * necessary.
 	 */
 	virtual void dropPrimaryKey(struct space *space);
-	/**
-	 * An optimization for MemTX engine, which
-	 * builds all secondary keys after recovery from
-	 * a snapshot.
-	 */
-	virtual bool needToBuildSecondaryKey(struct space *space);
 
-	virtual void join(struct relay *);
+	/**
+	 * Called with the new empty secondary index. Fill the new index
+	 * with data from the primary key of the space.
+	 */
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index);
+	/**
+	 * Write statements stored in checkpoint @vclock to @stream.
+	 */
+	virtual void join(struct vclock *vclock, struct xstream *stream);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -106,6 +100,10 @@ public:
 	 * statement.
 	 */
 	virtual void begin(struct txn *);
+	/**
+	 * Begine one statement in existing transaction.
+	 */
+	virtual void beginStatement(struct txn *);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
@@ -122,46 +120,67 @@ public:
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.
 	 */
-	virtual void rollbackStatement(struct txn_stmt *);
+	virtual void rollbackStatement(struct txn *, struct txn_stmt *);
 	/*
 	 * Roll back and end the transaction in the engine.
 	 */
 	virtual void rollback(struct txn *);
 	/**
-	 * Recover the engine to a checkpoint it has.
-	 * After that the engine will be given rows
-	 * from the binary log to replay.
+	 * Bootstrap an empty data directory
 	 */
-	virtual void recoverToCheckpoint(int64_t checkpoint_id);
+	virtual void bootstrap();
+	/**
+	 * Begin initial recovery from snapshot or dirty disk data.
+	 */
+	virtual void beginInitialRecovery(struct vclock *vclock);
+	/**
+	 * Notify engine about a start of recovering from WALs
+	 * that could be local WALs during local recovery
+	 * of WAL catch up durin join on slave side
+	 */
+	virtual void beginFinalRecovery();
 	/**
 	 * Inform the engine about the end of recovery from the
 	 * binary log.
 	 */
 	virtual void endRecovery();
 	/**
-	 * Notify engine about a JOIN start (slave-side)
-	 */
-	virtual void beginJoin();
-	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
+	 * Must not yield.
 	 */
-	virtual int beginCheckpoint(int64_t);
+	virtual int beginCheckpoint();
 	/**
-	 * Wait for a checkpoint to complete. The LSN
-	 * must match one in begin_checkpoint().
+	 * Prepare to wait for a checkpoint.
+	 * Called right after WAL checkpoint.
+	 * Must not yield.
 	 */
-	virtual int waitCheckpoint();
+	virtual int prepareWaitCheckpoint(struct vclock *vclock);
+	/**
+	 * Wait for a checkpoint to complete.
+	 */
+	virtual int waitCheckpoint(struct vclock *vclock);
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	virtual void commitCheckpoint();
+	virtual void commitCheckpoint(struct vclock *vclock);
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
 	virtual void abortCheckpoint();
-
+	/**
+	 * Remove files that are not needed to recover
+	 * from snapshot with @lsn or newer.
+	 */
+	virtual void collectGarbage(int64_t lsn);
+	/**
+	 * Backup callback. It is supposed to call @cb for each file
+	 * that needs to be backed up in order to restore from the
+	 * checkpoint @vclock.
+	 */
+	virtual int backup(struct vclock *vclock,
+			   engine_backup_cb cb, void *cb_arg);
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -171,16 +190,20 @@ public:
 	uint32_t flags;
 	/** Used for search for engine by name. */
 	struct rlist link;
+	struct tuple_format_vtab *format;
 };
 
 /** Engine handle - an operator of a space */
 
-class Handler {
+struct Handler {
 public:
 	Handler(Engine *f);
 	virtual ~Handler() {}
 	Handler(const Handler &) = delete;
 	Handler& operator=(const Handler&) = delete;
+
+	virtual void
+	applyInitialJoinRow(struct space *space, struct request *);
 
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *,
@@ -201,8 +224,31 @@ public:
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char *key_end,
 		      struct port *);
+	/**
+	 * Create an instance of space index. Used in alter
+	 * space.
+	 */
+	virtual Index *createIndex(struct space *space, struct index_def*) = 0;
+	/**
+	 * Delete all tuples in the index on drop.
+	 */
+	virtual void dropIndex(Index *) = 0;
+	/**
+	 * Notify the engine about the changed space,
+	 * before it's done, to prepare 'new_space'
+	 * object.
+	 */
+	virtual void prepareAlterSpace(struct space *old_space,
+				       struct space *new_space);
 
-	virtual void onAlter(Handler *old);
+	/**
+	 * Notify the engine engine after altering a space and
+	 * replacing old_space with new_space in the space cache,
+	 * to, e.g., update all referenced to struct space
+	 * and replace old_space with new_space.
+	 */
+	virtual void commitAlterSpace(struct space *old_space,
+				      struct space *new_space);
 	Engine *engine;
 };
 
@@ -231,17 +277,23 @@ engine_id(Handler *space)
 }
 
 /**
- * Tell the engine what the last LSN to recover from is
- * (during server start.
+ * Initialize an empty data directory
  */
 void
-engine_recover_to_checkpoint(int64_t checkpoint_id);
+engine_bootstrap();
 
 /**
- * Called at the start of JOIN routine.
+ * Called at the start of recovery.
  */
 void
-engine_begin_join();
+engine_begin_initial_recovery(struct vclock *vclock);
+
+/**
+ * Called in the middle of JOIN stage,
+ * when xlog catch-up process is started
+ */
+void
+engine_begin_final_recovery();
 
 /**
  * Called at the end of recovery.
@@ -250,16 +302,29 @@ engine_begin_join();
 void
 engine_end_recovery();
 
+int
+engine_begin_checkpoint();
+
 /**
  * Save a snapshot.
  */
 int
-engine_checkpoint(int64_t checkpoint_id);
+engine_commit_checkpoint(struct vclock *vclock);
+
+void
+engine_abort_checkpoint();
+
+void
+engine_collect_garbage(int64_t lsn);
+
+int
+engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
 /**
- * Send a snapshot.
+ * Feed snapshot data as join events to the replicas.
+ * (called on the master).
  */
 void
-engine_join(struct relay *);
+engine_join(struct vclock *vclock, struct xstream *stream);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

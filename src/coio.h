@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_COIO_H_INCLUDED
 #define TARANTOOL_COIO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -209,6 +209,13 @@ enum {
  */
 API_EXPORT int
 coio_wait(int fd, int event, double timeout);
+
+/**
+ * Close the fd and wake any fiber blocked in
+ * coio_wait() call on this fd.
+ */
+API_EXPORT int
+coio_close(int fd);
 
 /** \endcond public */
 

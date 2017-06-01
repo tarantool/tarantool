@@ -1,0 +1,9 @@
+/etc/default/tarantool
+/usr/bin/tarantoolctl
+/etc/tarantool/instances.available/example.lua
+/etc/logrotate.d/tarantool
+/lib/systemd/system/tarantool.service
+/lib/systemd/system/tarantool@.service
+/lib/systemd/system-generators/tarantool-generator
+/usr/lib/tmpfiles.d/tarantool.conf
+/usr/share/man/man1/tarantoolctl.1

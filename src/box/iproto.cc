@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -47,17 +47,22 @@
 #include "scoped_guard.h"
 #include "memory.h"
 
+#include "port.h"
 #include "iproto_port.h"
+#include "iobuf.h"
+#include "box.h"
+#include "tuple.h"
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* sc_version */
-#include "recovery.h" /* server_uuid */
+#include "replication.h" /* instance_uuid */
 #include "iproto_constants.h"
-#include "authentication.h"
 #include "rmean.h"
 
-/* {{{ iproto_msg - declaration */
+/* The number of iproto messages in flight */
+enum { IPROTO_MSG_MAX = 768 };
 
+/* {{{ iproto_msg - declaration */
 
 /**
  * A single msg from io thread. All requests
@@ -98,19 +103,26 @@ struct iproto_msg: public cmsg
 static struct mempool iproto_msg_pool;
 
 static struct iproto_msg *
-iproto_msg_new(struct iproto_connection *con, struct cmsg_hop *route)
+iproto_msg_new(struct iproto_connection *con)
 {
 	struct iproto_msg *msg =
 		(struct iproto_msg *) mempool_alloc_xc(&iproto_msg_pool);
-	cmsg_init(msg, route);
 	msg->connection = con;
 	return msg;
 }
+
+/**
+ * Resume stopped connections, if any.
+ */
+static void
+iproto_resume();
+
 
 static inline void
 iproto_msg_delete(struct cmsg *msg)
 {
 	mempool_free(&iproto_msg_pool, msg);
+	iproto_resume();
 }
 
 struct IprotoMsgGuard {
@@ -121,8 +133,6 @@ struct IprotoMsgGuard {
 	struct iproto_msg *release()
 	{ struct iproto_msg *tmp = msg; msg = NULL; return tmp; }
 };
-
-enum { IPROTO_FIBER_POOL_SIZE = 1024, IPROTO_FIBER_POOL_IDLE_TIMEOUT = 3 };
 
 /* }}} */
 
@@ -141,12 +151,10 @@ enum { IPROTO_FIBER_POOL_SIZE = 1024, IPROTO_FIBER_POOL_IDLE_TIMEOUT = 3 };
  */
 static struct cpipe tx_pipe;
 static struct cpipe net_pipe;
-static struct cbus net_tx_bus;
 /* A pointer to the transaction processor cord. */
 struct cord *tx_cord;
 
 struct rmean *rmean_net;
-struct rmean *rmean_net_tx_bus;
 
 enum rmean_net_name {
 	IPROTO_SENT,
@@ -186,9 +194,48 @@ struct iproto_connection
 	ev_loop *loop;
 	/* Pre-allocated disconnect msg. */
 	struct iproto_msg *disconnect;
+	struct rlist in_stop_list;
 };
 
 static struct mempool iproto_connection_pool;
+static RLIST_HEAD(stopped_connections);
+
+/**
+ * Returns true if we have enough spare messages
+ * in the message pool. Disconnect messages are
+ * discounted: they are mostly reserved and idle.
+ */
+static inline bool
+iproto_stop_input()
+{
+	size_t connection_count = mempool_count(&iproto_connection_pool);
+	size_t request_count = mempool_count(&iproto_msg_pool);
+	return request_count > connection_count + IPROTO_MSG_MAX;
+}
+
+/**
+ * Throttle the queue to the tx thread and ensure the fiber pool
+ * in tx thread is not depleted by a flood of incoming requests:
+ * resume a stopped connection only if there is a spare message
+ * object in the message pool.
+ */
+static void
+iproto_resume()
+{
+	/*
+	 * Most of the time we have nothing to do here: throttling
+	 * is not active.
+	 */
+	if (rlist_empty(&stopped_connections))
+		return;
+	if (iproto_stop_input())
+		return;
+
+	struct iproto_connection *con;
+	con = rlist_first_entry(&stopped_connections, struct iproto_connection,
+				in_stop_list);
+	ev_feed_event(con->loop, &con->input, EV_READ);
+}
 
 /**
  * A connection is idle when the client is gone
@@ -210,6 +257,14 @@ iproto_connection_is_idle(struct iproto_connection *con)
 {
 	return ibuf_used(&con->iobuf[0]->in) == 0 &&
 		ibuf_used(&con->iobuf[1]->in) == 0;
+}
+
+static inline void
+iproto_connection_stop(struct iproto_connection *con)
+{
+	assert(rlist_empty(&con->in_stop_list));
+	ev_io_stop(con->loop, &con->input);
+	rlist_add_tail(&stopped_connections, &con->in_stop_list);
 }
 
 static void
@@ -239,10 +294,25 @@ iproto_connection_delete(struct iproto_connection *con)
 }
 
 static void
-tx_process_msg(struct cmsg *msg);
-
+tx_process_misc(struct cmsg *msg);
+static void
+tx_process1(struct cmsg *msg);
+static void
+tx_process_select(struct cmsg *msg);
 static void
 net_send_msg(struct cmsg *msg);
+
+static void
+tx_process_join_subscribe(struct cmsg *msg);
+static void
+net_end_join_subscribe(struct cmsg *msg);
+
+static void
+tx_fiber_init(struct session *session, uint64_t sync)
+{
+	session->sync = sync;
+	fiber_set_session(fiber(), session);
+}
 
 /**
  * Fire on_disconnect triggers in the tx
@@ -254,6 +324,7 @@ tx_process_disconnect(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
+	tx_fiber_init(con->session, 0);
 	if (con->session) {
 		if (! rlist_empty(&session_on_disconnect))
 			session_run_on_disconnect_triggers(con->session);
@@ -281,15 +352,43 @@ net_finish_disconnect(struct cmsg *m)
 	iproto_msg_delete(msg);
 }
 
-static struct cmsg_hop disconnect_route[] = {
+static const struct cmsg_hop disconnect_route[] = {
 	{ tx_process_disconnect, &net_pipe },
 	{ net_finish_disconnect, NULL },
 };
 
-
-static struct cmsg_hop request_route[] = {
-	{ tx_process_msg, &net_pipe },
+static const struct cmsg_hop misc_route[] = {
+	{ tx_process_misc, &net_pipe },
 	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop select_route[] = {
+	{ tx_process_select, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop process1_route[] = {
+	{ tx_process1, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
+	NULL,                                   /* IPROTO_OK */
+	select_route,                           /* IPROTO_SELECT */
+	process1_route,                         /* IPROTO_INSERT */
+	process1_route,                         /* IPROTO_REPLACE */
+	process1_route,                         /* IPROTO_UPDATE */
+	process1_route,                         /* IPROTO_DELETE */
+	misc_route,                             /* IPROTO_CALL_16 */
+	misc_route,                             /* IPROTO_AUTH */
+	misc_route,                             /* IPROTO_EVAL */
+	process1_route,                         /* IPROTO_UPSERT */
+	misc_route                              /* IPROTO_CALL */
+};
+
+static const struct cmsg_hop sync_route[] = {
+	{ tx_process_join_subscribe, &net_pipe },
+	{ net_end_join_subscribe, NULL },
 };
 
 static struct iproto_connection *
@@ -306,8 +405,10 @@ iproto_connection_new(const char *name, int fd)
 	con->iobuf[1] = iobuf_new_mt(&tx_cord->slabc);
 	con->parse_size = 0;
 	con->session = NULL;
+	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
-	con->disconnect = iproto_msg_new(con, disconnect_route);
+	con->disconnect = iproto_msg_new(con);
+	cmsg_init(con->disconnect, disconnect_route);
 	return con;
 }
 
@@ -354,6 +455,7 @@ iproto_connection_close(struct iproto_connection *con)
 		con->disconnect = NULL;
 		cpipe_push(&tx_pipe, msg);
 	}
+	rlist_del(&con->in_stop_list);
 }
 
 /**
@@ -361,7 +463,7 @@ iproto_connection_close(struct iproto_connection *con)
  * following:
  * - try to get a new iobuf, so that it can fit the request.
  *   Always getting a new input buffer when there is no space
- *   makes the server susceptible to input-flood attacks.
+ *   makes the instance susceptible to input-flood attacks.
  *   Therefore, at most 2 iobufs are used in a single connection,
  *   one is "open", receiving input, and the  other is closed,
  *   flushing output.
@@ -449,12 +551,65 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	return newbuf;
 }
 
+static void
+iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
+		  bool *stop_input)
+{
+	xrow_header_decode_xc(&msg->header, pos, reqend);
+	assert(*pos == reqend);
+	request_create(&msg->request, msg->header.type);
+	msg->request.header = &msg->header;
+
+	switch (msg->header.type) {
+	case IPROTO_SELECT:
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPDATE:
+	case IPROTO_DELETE:
+	case IPROTO_CALL_16:
+	case IPROTO_CALL:
+	case IPROTO_AUTH:
+	case IPROTO_EVAL:
+	case IPROTO_UPSERT:
+		/*
+		 * This is a common request which can be parsed with
+		 * request_decode(). Parse it before putting it into
+		 * the queue to save tx some CPU. More complicated
+		 * requests are parsed in tx thread into request type-
+		 * specific objects.
+		 */
+		if (msg->header.bodycnt == 0) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "missing request body");
+		}
+		request_decode_xc(&msg->request,
+				 (const char *) msg->header.body[0].iov_base,
+				 msg->header.body[0].iov_len);
+		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
+		cmsg_init(msg, dml_route[msg->header.type]);
+		break;
+	case IPROTO_PING:
+		cmsg_init(msg, misc_route);
+		break;
+	case IPROTO_JOIN:
+	case IPROTO_SUBSCRIBE:
+		cmsg_init(msg, sync_route);
+		*stop_input = true;
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) msg->header.type);
+		break;
+	}
+}
+
 /** Enqueue all requests which were read up. */
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
+	int n_requests = 0;
 	bool stop_input = false;
-	while (true) {
+	while (con->parse_size && stop_input == false) {
 		const char *reqstart = in->wpos - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
@@ -468,60 +623,73 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *reqend = pos + len;
 		if (reqend > in->wpos)
 			break;
-		struct iproto_msg *msg = iproto_msg_new(con, request_route);
+		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->iobuf = con->iobuf[0];
 		IprotoMsgGuard guard(msg);
 
-		xrow_header_decode(&msg->header, &pos, reqend);
-		assert(pos == reqend);
 		msg->len = reqend - reqstart; /* total request length */
+
+		try {
+			iproto_decode_msg(msg, &pos, reqend, &stop_input);
+			cpipe_push_input(&tx_pipe, guard.release());
+			n_requests++;
+		} catch (Exception *e) {
+			/*
+			 * Do not close connection if we failed to
+			 * decode a request, as we have enough info
+			 * to proceed to the next one.
+			 */
+			struct obuf *out = &msg->iobuf->out;
+			iproto_reply_error(out, e, msg->header.sync);
+			out->wend = obuf_create_svp(out);
+			if (!ev_is_active(&con->output))
+				ev_feed_event(con->loop, &con->output, EV_WRITE);
+			e->log();
+		}
+
+		/* Request is parsed */
+		assert(reqend > reqstart);
+		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		/*
 		 * sic: in case of exception con->parse_size
 		 * must not be advanced to stay in sync with
 		 * in->rpos.
 		 */
-		if (msg->header.type >= IPROTO_SELECT &&
-		    msg->header.type <= IPROTO_UPSERT) {
-			/* Pre-parse request before putting it into the queue */
-			if (msg->header.bodycnt == 0) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "request type");
-			}
-			request_create(&msg->request, msg->header.type);
-			pos = (const char *) msg->header.body[0].iov_base;
-			request_decode(&msg->request, pos,
-				       msg->header.body[0].iov_len);
-		} else if (msg->header.type == IPROTO_SUBSCRIBE ||
-			   msg->header.type == IPROTO_JOIN) {
-			/**
-			 * Don't mess with the file descriptor
-			 * while join is running. ev_io_stop()
-			 * also clears any pending events, which
-			 * is good, since their invocation may
-			 * re-start the watcher, ruining our
-			 * efforts.
-			 */
-			ev_io_stop(con->loop, &con->output);
-			ev_io_stop(con->loop, &con->input);
-			stop_input = true;
-		}
-		msg->request.header = &msg->header;
-		cpipe_push_input(&tx_pipe, guard.release());
-
-		/* Request is parsed */
-		assert(reqend > reqstart);
-		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		con->parse_size -= reqend - reqstart;
-		if (con->parse_size == 0 || stop_input)
-			break;
+	}
+	if (stop_input) {
+		/**
+		 * Don't mess with the file descriptor
+		 * while join is running. ev_io_stop()
+		 * also clears any pending events, which
+		 * is good, since their invocation may
+		 * re-start the watcher, ruining our
+		 * efforts.
+		 */
+		ev_io_stop(con->loop, &con->output);
+		ev_io_stop(con->loop, &con->input);
+	} else if (n_requests != 1 || con->parse_size != 0) {
+		assert(rlist_empty(&con->in_stop_list));
+		/*
+		 * Keep reading input, as long as the socket
+		 * supplies data, but don't waste CPU on an extra
+		 * read() if dealing with a blocking client, it
+		 * has nothing in the socket for us.
+		 *
+		 * We look at the amount of enqueued requests
+		 * and presence of a partial request in the
+		 * input buffer as hints to distinguish
+		 * blocking and non-blocking clients:
+		 *
+		 * For blocking clients, a request typically
+		 * is fully read and enqueued.
+		 * If there is unparsed data, or 0 queued
+		 * requests, keep reading input, if only to avoid
+		 * a deadlock on this connection.
+		 */
+		ev_feed_event(con->loop, &con->input, EV_READ);
 	}
 	cpipe_flush_input(&tx_pipe);
-	/*
-	 * Keep reading input, as long as the socket
-	 * supplies data.
-	 */
-	if (!stop_input && !ev_is_active(&con->input))
-		ev_feed_event(con->loop, &con->input, EV_READ);
 }
 
 static void
@@ -532,6 +700,27 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		(struct iproto_connection *) watcher->data;
 	int fd = con->input.fd;
 	assert(fd >= 0);
+	if (! rlist_empty(&con->in_stop_list)) {
+		/* Resumed stopped connection. */
+		rlist_del(&con->in_stop_list);
+		/*
+		 * This connection may have no input, so
+		 * resume one more connection which might have
+		 * input.
+		 */
+		iproto_resume();
+	}
+	/*
+	 * Throttle if there are too many pending requests,
+	 * otherwise we might deplete the fiber pool and
+	 * deadlock (e.g. WAL writer needs a fiber to wake
+	 * another fiber waiting for write to complete).
+	 * Ignore iproto_connection->disconnect messages.
+	 */
+	if (iproto_stop_input()) {
+		iproto_connection_stop(con);
+		return;
+	}
 
 	try {
 		/* Ensure we have sufficient space for the next round.  */
@@ -561,6 +750,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		/* Enqueue all requests which are fully read up. */
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
+		/* Best effort at sending the error message to the client. */
+		iproto_write_error(fd, e);
 		e->log();
 		iproto_connection_close(con);
 	}
@@ -646,8 +837,10 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 				ev_io_start(loop, &con->output);
 				return;
 			}
-			if (! ev_is_active(&con->input))
+			if (! ev_is_active(&con->input) &&
+			    rlist_empty(&con->in_stop_list)) {
 				ev_feed_event(loop, &con->input, EV_READ);
+			}
 		}
 		if (ev_is_active(&con->output))
 			ev_io_stop(con->loop, &con->output);
@@ -657,100 +850,139 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
+static int
+tx_check_schema(uint32_t schema_id)
+{
+	if (schema_id && schema_id != sc_version) {
+		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
+			 sc_version, schema_id);
+		return -1;
+	}
+	return 0;
+}
+
 static void
-tx_process_msg(struct cmsg *m)
+tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct obuf *out = &msg->iobuf->out;
-	struct iproto_connection *con = msg->connection;
-	struct session *session = msg->connection->session;
-	fiber_set_session(fiber(), session);
-	fiber_set_user(fiber(), &session->credentials);
 
-	session->sync = msg->header.sync;
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
+
+	struct tuple *tuple;
+	struct obuf_svp svp;
+	if (box_process1(&msg->request, &tuple) ||
+	    iproto_prepare_select(out, &svp))
+		goto error;
+	if (tuple && tuple_to_obuf(tuple, out))
+		goto error;
+	iproto_reply_select(out, &svp, msg->header.sync,
+			    tuple != 0);
+	msg->write_end = obuf_create_svp(out);
+	return;
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_select(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct obuf *out = &msg->iobuf->out;
+	struct obuf_svp svp;
+	struct port port;
+	int rc;
+	struct request *req = &msg->request;
+
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
+
+	port_create(&port);
+	rc = box_select((struct port *) &port,
+			req->space_id, req->index_id,
+			req->iterator, req->offset, req->limit,
+			req->key, req->key_end);
+	if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
+		port_destroy(&port);
+		goto error;
+	}
+	port_dump(&port, out);
+	iproto_reply_select(out, &svp, msg->header.sync, port.size);
+	msg->write_end = obuf_create_svp(out);
+	return;
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_misc(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct obuf *out = &msg->iobuf->out;
+
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
+
 	try {
-		if (msg->header.schema_id &&
-		    msg->header.schema_id != sc_version) {
-			tnt_raise(ClientError, ER_WRONG_SCHEMA_VERSION,
-				  sc_version, msg->header.schema_id);
-		}
-
 		switch (msg->header.type) {
-		case IPROTO_SELECT:
-		{
-			struct iproto_port port;
-			iproto_port_init(&port, out, msg->header.sync);
-			struct request *req = &msg->request;
-			int rc = box_select((struct port *) &port,
-					    req->space_id, req->index_id,
-					    req->iterator,
-					    req->offset, req->limit,
-					    req->key, req->key_end);
-			if (rc < 0) {
-				/*
-				 * This only works if there are no
-				 * yields between the moment the
-				 * port is first used for
-				 * output and is flushed/an error
-				 * occurs.
-				 */
-				if (port.found)
-					obuf_rollback_to_svp(out, &port.svp);
-				diag_raise();
-			}
-			break;
-		}
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-		case IPROTO_UPDATE:
-		case IPROTO_DELETE:
-		case IPROTO_UPSERT:
-		{
-			assert(msg->request.type == msg->header.type);
-			struct tuple *tuple;
-			if (box_process1(&msg->request, &tuple) < 0)
-				diag_raise();
-			struct obuf_svp svp;
-			if (iproto_prepare_select(out, &svp) != 0)
-				diag_raise();
-			if (tuple) {
-				if (tuple_to_obuf(tuple, out) != 0)
-					diag_raise();
-			}
-			iproto_reply_select(out, &svp, msg->header.sync,
-					    tuple != 0);
-			break;
-		}
 		case IPROTO_CALL:
+		case IPROTO_CALL_16:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
 			box_process_call(&msg->request, out);
 			break;
 		case IPROTO_EVAL:
 			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
 			box_process_eval(&msg->request, out);
 			break;
 		case IPROTO_AUTH:
-		{
 			assert(msg->request.type == msg->header.type);
-			const char *user = msg->request.key;
-			uint32_t len = mp_decode_strl(&user);
-			authenticate(user, len, msg->request.tuple,
-				     msg->request.tuple_end);
-			iproto_reply_ok(out, msg->header.sync);
+			box_process_auth(&msg->request, out);
 			break;
-		}
 		case IPROTO_PING:
 			iproto_reply_ok(out, msg->header.sync);
 			break;
+		default:
+			unreachable();
+		}
+	} catch (Exception *e) {
+		iproto_reply_error(out, diag_last_error(&fiber()->diag),
+				   msg->header.sync);
+	}
+	msg->write_end = obuf_create_svp(out);
+	return;
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_join_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+
+	tx_fiber_init(con->session, msg->header.sync);
+
+	try {
+		switch (msg->header.type) {
 		case IPROTO_JOIN:
 			/*
-			 * As soon as box_process_subscribe() returns the
-			 * lambda in the beginning of the block
+			 * As soon as box_process_subscribe() returns
+			 * the lambda in the beginning of the block
 			 * will re-activate the watchers for us.
 			 */
-			box_process_join(con->input.fd, &msg->header);
+			box_process_join(&con->input, &msg->header);
 			break;
 		case IPROTO_SUBSCRIBE:
 			/*
@@ -759,18 +991,16 @@ tx_process_msg(struct cmsg *m)
 			 * the write watcher will be re-activated
 			 * the same way as for JOIN.
 			 */
-			box_process_subscribe(con->input.fd, &msg->header);
+			box_process_subscribe(&con->input, &msg->header);
 			break;
 		default:
-			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				   (uint32_t) msg->header.type);
+			unreachable();
 		}
 	} catch (SocketError *e) {
 		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
-		iproto_reply_error(out, e, msg->header.sync);
+		iproto_write_error(con->input.fd, e);
 	}
-	msg->write_end = obuf_create_svp(out);
 }
 
 static void
@@ -782,11 +1012,6 @@ net_send_msg(struct cmsg *m)
 	/* Discard request (see iproto_enqueue_batch()) */
 	iobuf->in.rpos += msg->len;
 	iobuf->out.wend = msg->write_end;
-	if ((msg->header.type == IPROTO_SUBSCRIBE ||
-	    msg->header.type == IPROTO_JOIN)) {
-		assert(! ev_is_active(&con->input));
-		ev_io_start(con->loop, &con->input);
-	}
 
 	if (evio_has_fd(&con->output)) {
 		if (! ev_is_active(&con->output))
@@ -795,6 +1020,24 @@ net_send_msg(struct cmsg *m)
 		iproto_connection_close(con);
 	}
 	iproto_msg_delete(msg);
+}
+
+static void
+net_end_join_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+	struct iobuf *iobuf = msg->iobuf;
+
+	iobuf->in.rpos += msg->len;
+	iproto_msg_delete(msg);
+
+	assert(! ev_is_active(&con->input));
+	/*
+	 * Enqueue any messages if they are in the readahead
+	 * queue. Will simply start input otherwise.
+	 */
+	iproto_enqueue_batch(con, &iobuf->in);
 }
 
 /**
@@ -810,14 +1053,19 @@ tx_process_connect(struct cmsg *m)
 	struct obuf *out = &msg->iobuf->out;
 	try {              /* connect. */
 		con->session = session_create(con->input.fd);
+		if (con->session == NULL)
+			diag_raise();
+		tx_fiber_init(con->session, 0);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
-		struct tt_uuid uuid = ::recovery->server_uuid;
+		struct tt_uuid uuid = INSTANCE_UUID;
 		greeting_encode(greeting, tarantool_version_id(),
 				&uuid, con->session->salt, SESSION_SEED_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
-		if (! rlist_empty(&session_on_connect))
-			session_run_on_connect_triggers(con->session);
+		if (! rlist_empty(&session_on_connect)) {
+			if (session_run_on_connect_triggers(con->session) != 0)
+				diag_raise();
+		}
 		msg->write_end = obuf_create_svp(out);
 	} catch (Exception *e) {
 		iproto_reply_error(out, e, 0 /* zero sync for connect error */);
@@ -862,7 +1110,7 @@ net_send_greeting(struct cmsg *m)
 	iproto_msg_delete(msg);
 }
 
-static struct cmsg_hop connect_route[] = {
+static const struct cmsg_hop connect_route[] = {
 	{ tx_process_connect, &net_pipe },
 	{ net_send_greeting, NULL },
 };
@@ -888,7 +1136,8 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	 * fixed so there is a limited number of msgs in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
-	struct iproto_msg *msg = iproto_msg_new(con, connect_route);
+	struct iproto_msg *msg = iproto_msg_new(con);
+	cmsg_init(msg, connect_route);
 	msg->iobuf = con->iobuf[0];
 	msg->close_connection = false;
 	cpipe_push(&tx_pipe, msg);
@@ -922,20 +1171,25 @@ net_cord_f(va_list /* ap */)
 			  "rmean", "struct rmean");
 	}
 
+	struct cbus_endpoint endpoint;
+	/* Create "net" endpoint. */
+	cbus_endpoint_create(&endpoint, "net", fiber_schedule_cb, fiber());
+	/* Create a pipe to "tx" thread. */
+	cpipe_create(&tx_pipe, "tx");
+	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
+	/* Process incomming messages. */
+	cbus_loop(&endpoint);
 
-	cbus_join(&net_tx_bus, &net_pipe);
-
+	cpipe_destroy(&tx_pipe);
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
-	fiber_yield();
 	if (evio_service_is_active(&binary))
 		evio_service_stop(&binary);
 
 	rmean_delete(rmean_net);
-	cbus_leave(&net_tx_bus);
 	return 0;
 }
 
@@ -945,21 +1199,13 @@ iproto_init()
 {
 	tx_cord = cord();
 
-	cbus_create(&net_tx_bus);
-	rmean_net_tx_bus = net_tx_bus.stats;
-	cpipe_create(&tx_pipe);
-	cpipe_create(&net_pipe);
-	static struct cpipe_fiber_pool fiber_pool;
-
-	cpipe_fiber_pool_create(&fiber_pool, "iproto", &tx_pipe,
-				IPROTO_FIBER_POOL_SIZE,
-				IPROTO_FIBER_POOL_IDLE_TIMEOUT);
-
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
 
-	cbus_join(&net_tx_bus, &tx_pipe);
+	/* Create a pipe to "net" thread. */
+	cpipe_create(&net_pipe, "net");
+	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
 }
 
 /**
@@ -968,156 +1214,57 @@ iproto_init()
  * we need to bounce a couple of messages to and
  * from this thread.
  */
-struct iproto_bind_msg: public cmsg
+struct iproto_bind_msg: public cbus_call_msg
 {
-	/**
-	 * If there was an error setting the listen port,
-	 * this will contain the error when the message
-	 * returns to the caller.
-	 */
-	struct diag diag;
-	/**
-	 * The uri to set.
-	 */
 	const char *uri;
-	/**
-	 * The way to tell the caller about the end of
-	 * bind.
-	 */
-	struct cmsg_notify wakeup;
-	/**
-	 * Return code for bind:
-	 * 0 - Ok,
-	 * 1 - busy,
-	 * -1 - an error
-	 */
-	int rc;
 };
 
-static void
-iproto_do_bind(struct cmsg *m)
+static int
+iproto_do_bind(struct cbus_call_msg *m)
 {
-	struct iproto_bind_msg *msg = (struct iproto_bind_msg *) m;
+	const char *uri  = ((struct iproto_bind_msg *) m)->uri;
 	try {
 		if (evio_service_is_active(&binary))
 			evio_service_stop(&binary);
-		msg->rc = 0;
-		if (msg->uri != NULL) {
-			msg->rc = evio_service_bind(&binary, msg->uri);
-			{
-			}
-			/* The bind has finished, notify the caller. */
-		}
-		cpipe_push(&tx_pipe, &msg->wakeup.base);
+		if (uri != NULL)
+			evio_service_bind(&binary, uri);
 	} catch (Exception *e) {
-		msg->rc = -1;
-		diag_move(&fiber()->diag, &msg->diag);
-		cpipe_push(&tx_pipe, &msg->wakeup.base);
+		return -1;
 	}
+	return 0;
 }
 
-static void
-iproto_bind_msg_init(struct iproto_bind_msg *msg,
-			    const char *uri)
+static int
+iproto_do_listen(struct cbus_call_msg *m)
 {
-	static cmsg_hop route[] = { { iproto_do_bind, NULL }, };
-	cmsg_init(msg, route);
-	msg->uri = uri;
-	diag_create(&msg->diag);
-
-	cmsg_notify_init(&msg->wakeup);
+	(void) m;
+	try {
+		if (evio_service_is_active(&binary))
+			evio_service_listen(&binary);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
 }
 
 void
 iproto_bind(const char *uri)
 {
-	/**
-	 * This is a tricky orchestration for something
-	 * that should be pretty easy at the first glance:
-	 * change the listen uri in the io thread.
-	 *
-	 * To do it, create a message which sets the new
-	 * uri, and another one, which will alert tx
-	 * thread when bind() on the new port is done.
-	 */
-	const double BIND_RETRY_DELAY = 0.1;
-	static struct iproto_bind_msg msg;
-	iproto_bind_msg_init(&msg, uri);
-
-	bool first_bind = true;
-	while (true) {
-		cpipe_push(&net_pipe, &msg);
-		/** Wait for the end of bind. */
-		fiber_yield();
-		if (msg.rc != 1)
-			break;
-		if (first_bind)
-			say_warn("%s: %s is already in use, "
-				 "will retry binding",
-				 "binary", msg.uri);
-//		first_try = false;
-		fiber_sleep(BIND_RETRY_DELAY);
-	}
-	if (msg.rc != 0) {
-		assert(!diag_is_empty(&msg.diag));
-		diag_move(&msg.diag, &fiber()->diag);
+	static struct iproto_bind_msg m;
+	m.uri = uri;
+	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_bind,
+		      NULL, TIMEOUT_INFINITY))
 		diag_raise();
-	}
-}
-
-struct iproto_listen_msg: public cmsg
-{
-	/**
-	 * If there was an error while listen port,
-	 * this will contain the error when the message
-	 * returns to the caller.
-	 */
-	struct diag diag;
-	/**
-	 * The way to tell the caller about the end of
-	 * bind.
-	 */
-	struct cmsg_notify wakeup;
-};
-
-static void
-iproto_do_listen(struct cmsg *m)
-{
-	struct iproto_listen_msg *msg =
-		(struct iproto_listen_msg *) m;
-	try {
-		if (evio_service_is_active(&binary))
-			evio_service_listen(&binary);
-	} catch (Exception *e) {
-		diag_move(&fiber()->diag, &msg->diag);
-	}
-	cpipe_push(&tx_pipe, &msg->wakeup.base);
-}
-
-static void
-iproto_listen_msg_init(struct iproto_listen_msg *msg)
-{
-	static cmsg_hop route[] = { { iproto_do_listen, NULL }, };
-	cmsg_init(msg, route);
-	diag_create(&msg->diag);
-
-	cmsg_notify_init(&msg->wakeup);
 }
 
 void
 iproto_listen()
 {
-	static struct iproto_listen_msg msg;
-	iproto_listen_msg_init(&msg);
-
-	cpipe_push(&net_pipe, &msg);
-	/** Wait for the end of bind. */
-	fiber_yield();
-	if (! diag_is_empty(&msg.diag)) {
-		diag_move(&msg.diag, &fiber()->diag);
+	/* Declare static to avoid stack corruption on fiber cancel. */
+	static struct cbus_call_msg m;
+	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_listen,
+		      NULL, TIMEOUT_INFINITY))
 		diag_raise();
-	}
-
 }
 
 /* vim: set foldmethod=marker */

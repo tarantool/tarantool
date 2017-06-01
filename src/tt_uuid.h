@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_UUID_H_INCLUDED
 #define TARANTOOL_UUID_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -84,6 +84,36 @@ tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 	if ((n & 0x80) != 0x00 && (n & 0xc0) != 0x80 &&	(n & 0xe0) != 0xc0)
 		return 1;
 	return 0;
+}
+
+/**
+ * \brief Compare UUIDs lexicographically.
+ * \param a UUID
+ * \param b UUID
+ * \retval comparison result, as in strcmp()
+ */
+inline int
+tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
+{
+#define cmp_tt_uuid_field(field)                \
+        if (a->field > b->field) return 1;      \
+        if (a->field < b->field) return -1;
+
+        cmp_tt_uuid_field(time_low);
+        cmp_tt_uuid_field(time_mid);
+        cmp_tt_uuid_field(time_hi_and_version);
+        cmp_tt_uuid_field(clock_seq_hi_and_reserved);
+        cmp_tt_uuid_field(clock_seq_low);
+        cmp_tt_uuid_field(node[0]);
+        cmp_tt_uuid_field(node[1]);
+        cmp_tt_uuid_field(node[2]);
+        cmp_tt_uuid_field(node[3]);
+        cmp_tt_uuid_field(node[4]);
+        cmp_tt_uuid_field(node[5]);
+
+#undef cmp_tt_uuid_field
+
+        return 0;
 }
 
 /**

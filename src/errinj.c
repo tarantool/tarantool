@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -38,13 +38,13 @@
 #include "say.h"
 #include "errinj.h"
 
-#define ERRINJ_MEMBER(n, s) { /* .name = */ #n, /* .state = */ s },
+#define ERRINJ_MEMBER(n, t, s) { /* .name = */ #n, /* .type = */ t, /* .state = */ s },
 
 struct errinj errinjs[errinj_enum_MAX] = {
 	ERRINJ_LIST(ERRINJ_MEMBER)
 };
 
-static struct errinj *
+struct errinj *
 errinj_lookup(char *name)
 {
 	int i;
@@ -63,10 +63,19 @@ errinj_lookup(char *name)
  * @return error injection handle state.
  */
 bool
-errinj_get(int id)
+errinj_getb(int id)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
-	return errinjs[id].state;
+	assert(errinjs[id].type == ERRINJ_BOOL);
+	return errinjs[id].state.bparam;
+}
+
+uint64_t
+errinj_getu64(int id)
+{
+	assert(id >= 0 && id < errinj_enum_MAX);
+	assert(errinjs[id].type == ERRINJ_U64);
+	return errinjs[id].state.u64param;
 }
 
 /**
@@ -77,10 +86,19 @@ errinj_get(int id)
  *
  */
 void
-errinj_set(int id, bool state)
+errinj_setb(int id, bool state)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
-	errinjs[id].state = state;
+	assert(errinjs[id].type == ERRINJ_BOOL);
+	errinjs[id].state.bparam = state;
+}
+
+void
+errinj_setu64(int id, uint64_t state)
+{
+	assert(id >= 0 && id < errinj_enum_MAX);
+	assert(errinjs[id].type == ERRINJ_U64);
+	errinjs[id].state.u64param = state;
 }
 
 /**
@@ -92,12 +110,13 @@ errinj_set(int id, bool state)
  * @return 0 on success, -1 if injection was not found.
  */
 int
-errinj_set_byname(char *name, bool state)
+errinj_setb_byname(char *name, bool state)
 {
 	struct errinj *ei = errinj_lookup(name);
 	if (ei == NULL)
 		return -1;
-	ei->state = state;
+	assert(ei->type == ERRINJ_BOOL);
+	ei->state.bparam = state;
 	return 0;
 }
 

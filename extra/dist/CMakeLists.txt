@@ -83,23 +83,34 @@ install (FILES example.lua DESTINATION
 # Sic: chmod and chown are performed by rpm/deb
 install(DIRECTORY DESTINATION ${TARANTOOL_DATADIR})
 install(DIRECTORY DESTINATION ${TARANTOOL_LOGDIR})
-install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
+
+# /var/run/tarantool is only needed with sysvinit
+# systemd creates this directory automatically using systemd-tmpfiles
+if (WITH_SYSVINIT)
+    install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
+endif()
 
 if (NOT TARGET_OS_FREEBSD)
-# logrotate files
-configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool.logrotate
-    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d/
-    RENAME "tarantool"
-    PERMISSIONS
-    OWNER_READ OWNER_WRITE
-    GROUP_READ
-    WORLD_READ)
+    set (WITH_LOGROTATE_DEFAULT ON)
+endif()
+option(WITH_LOGROTATE "Enable logrotate configuration" ${WITH_LOGROTATE_DEFAULT})
+file(APPEND "${_OptionalPackagesFile}" "-- WITH_LOGROTATE=${WITH_LOGROTATE}\n")
+
+if (WITH_LOGROTATE)
+    # logrotate files
+    configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
+    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool.logrotate
+        DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d/
+        RENAME "tarantool"
+        PERMISSIONS
+        OWNER_READ OWNER_WRITE
+        GROUP_READ
+        WORLD_READ)
 endif()
 
 # man page for tarantoolctl
 pod2man (
-    tarantoolctl "tarantoolctl" 1
+    tarantoolctl.pod "tarantoolctl" 1
     "tarantoolctl instances control"
 )
 
@@ -121,6 +132,26 @@ if (WITH_SYSTEMD)
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
+
+    if(WITH_SYSVINIT)
+        # Install generator and tarantool.service file to allow
+        # sysvinit alongside systemd (Debian/Ubuntu)
+        #
+        configure_file("tarantool-generator.in" "tarantool-generator" @ONLY)
+        install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool-generator
+            DESTINATION ${SYSTEMD_GENERATOR_DIR}
+            PERMISSIONS
+            OWNER_READ OWNER_WRITE OWNER_EXECUTE
+            GROUP_READ GROUP_READ GROUP_EXECUTE
+            WORLD_READ WORLD_READ WORLD_EXECUTE)
+        install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/tarantool.service
+            DESTINATION ${SYSTEMD_UNIT_DIR}
+            PERMISSIONS
+            OWNER_READ OWNER_WRITE
+            GROUP_READ GROUP_READ
+            WORLD_READ WORLD_READ)
+    endif()
+
     configure_file(tarantool.tmpfiles.conf.in tarantool.tmpfiles.conf @ONLY)
     install (FILES "${CMAKE_CURRENT_BINARY_DIR}/tarantool.tmpfiles.conf"
         DESTINATION "${SYSTEMD_TMPFILES_DIR}"

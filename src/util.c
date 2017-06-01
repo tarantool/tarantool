@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -91,30 +91,6 @@ close_all_xcpt(int fdc, ...)
 	}
 }
 
-void
-coredump(int dump_interval)
-{
-	static time_t last_coredump = 0;
-	time_t now = time(NULL);
-
-	if (now - last_coredump < dump_interval)
-		return;
-
-	last_coredump = now;
-
-	/* flush buffers to avoid multiple output */
-	/* https://github.com/tarantool/tarantool/issues/366 */
-	fflush(stdout);
-	fflush(stderr);
-	if (fork() == 0) {
-		close_all_xcpt(0);
-#ifdef ENABLE_GCOV
-		__gcov_flush();
-#endif
-		abort();
-	}
-}
-
 static int
 itoa(int val, char *buf)
 {
@@ -197,21 +173,6 @@ out:
 	va_end(args);
 	return total;
 }
-
-#ifndef HAVE_FMEMOPEN
-FILE *
-fmemopen(void *buf, size_t size, const char *mode)
-{
-	(void) mode;
-	assert(strcmp(mode, "r") == 0);
-
-	FILE *ret = tmpfile();
-	fwrite(buf, 1, size, ret);
-	rewind(ret);
-	return ret;
-}
-#endif /* HAVE_FMEMOPEN */
-
 
 /** Allocate and fill an absolute path to a file. */
 char *

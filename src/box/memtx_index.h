@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED
 #define TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -34,17 +34,19 @@
 
 class MemtxIndex: public Index {
 public:
-	MemtxIndex(struct key_def *key_def)
-		:Index(key_def), m_position(NULL)
-	{ }
-	virtual ~MemtxIndex() {
+	MemtxIndex(struct index_def *index_def_arg)
+		:Index(index_def_arg), m_position(NULL)
+	{}
+	virtual ~MemtxIndex() override {
 		if (m_position != NULL)
 			m_position->free(m_position);
 	}
-	virtual struct tuple *min(const char *key, uint32_t part_count) const;
-	virtual struct tuple *max(const char *key, uint32_t part_count) const;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const;
+			     uint32_t part_count) const override;
 
 	inline struct iterator *position() const
 	{

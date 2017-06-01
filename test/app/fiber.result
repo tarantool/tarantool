@@ -336,12 +336,16 @@ result
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
-f = function() fiber.create(f) end
----
-...
-f()
----
-...
+--
+--  2016-03-25 kostja
+--
+--  fiber call stack depth was removed, we should
+--  use runtime memory limit control instead; the
+--  old limit was easy to circument with only
+--  slightly more complicated fork bomb code
+--
+-- f = function() fiber.create(f) end
+-- f()
 -- 
 -- Test argument passing
 -- 
@@ -382,13 +386,19 @@ box.snapshot()
 ---
 - ok
 ...
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: can't save snapshot, errno 17 (File exists)
 ...
-box.snapshot()
+e.message:match('already exists')
 ---
-- error: can't save snapshot, errno 17 (File exists)
+- already exists
+...
+_, e = pcall(box.snapshot)
+---
+...
+e.message:match('already exists')
+---
+- already exists
 ...
 f = fiber.create(function () fiber.sleep(1) end)
 ---
@@ -510,6 +520,9 @@ f = fiber.create(r)
 fiber.cancel(f)
 ---
 ...
+while f:status() ~= 'dead' do fiber.sleep(0) end
+---
+...
 f:status()
 ---
 - dead
@@ -586,6 +599,9 @@ fib_id = fiber.create(testfun):id()
 ---
 ...
 fiber.find(fib_id):cancel()
+---
+...
+while fiber.find(fib_id) ~= nil do fiber.sleep(0) end
 ---
 ...
 fiber.find(fib_id)
@@ -868,6 +884,9 @@ test_run:grep_log("default", "gh%-1238") ~= nil
 _ = fiber.create(function() fiber.self():cancel() end)
 ---
 ...
+fiber.sleep(0.001)
+---
+...
 test_run:grep_log("default", "FiberIsCancelled") == nil
 ---
 - true
@@ -880,6 +899,11 @@ test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
 ---
 - 'ER_ILLEGAL_PARAMS: Illegal parameters, oh my'
 ...
+-- #1734 fiber.name irt dead fibers
+fiber.create(function()end):name()
+---
+- error: the fiber is dead
+...
 --
 -- gh-1926
 --
@@ -887,6 +911,41 @@ fiber.create(function() fiber.wakeup(fiber.self()) end)
 ---
 - the fiber is dead
 ...
+--
+-- gh-2066 test for fiber wakeup
+--
+_ = box.schema.space.create('test2066', {if_not_exists = true})
+---
+...
+_ = box.space.test2066:create_index('pk', {if_not_exists = true})
+---
+...
+function fn2() fiber.sleep(60) box.space.test2066:replace({1}) end
+---
+...
+f2 = fiber.create(fn2)
+---
+...
+function fn1() fiber.sleep(60) f2:wakeup() end
+---
+...
+f1 = fiber.create(fn1)
+---
+...
+-- push two fibers to ready list
+f1:wakeup() f2:wakeup()
+---
+...
+fiber.sleep(0.01)
+---
+...
+box.space.test2066:drop()
+---
+...
 fiber = nil
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

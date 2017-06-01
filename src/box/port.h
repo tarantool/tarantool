@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_BOX_PORT_H
 #define INCLUDES_TARANTOOL_BOX_PORT_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -37,7 +37,6 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tuple;
-struct port;
 
 /**
  * A single port represents a destination of box_process output.
@@ -50,7 +49,6 @@ struct port;
  * struct port_iproto *port = port_iproto_new(...)
  * for (tuple in tuples)
  *	port_add_tuple(tuple);
- * port_eof(port);	// end of request
  *
  * Beginning with Tarantool 1.5, tuple can have different internal
  * structure and port_add_tuple() requires a double
@@ -59,67 +57,32 @@ struct port;
  * format defines the internal structure of the tuple.
  */
 
-struct port_vtab
-{
-	void (*add_tuple)(struct port *port, struct tuple *tuple);
-	/** Must be called in the end of execution of a single request. */
-	void (*eof)(struct port *port);
-};
-
-struct port
-{
-	struct port_vtab *vtab;
-};
-
-static inline void
-port_eof(struct port *port)
-{
-	return (port->vtab->eof)(port);
-}
-
-static inline void
-port_add_tuple(struct port *port, struct tuple *tuple)
-{
-	(port->vtab->add_tuple)(port, tuple);
-}
-
-/**
- * This one does not have state currently, thus a single
- * instance is sufficient.
- */
-extern struct port null_port;
-
-/** Reused in port_lua */
-void
-null_port_eof(struct port *port __attribute__((unused)));
-
-struct port_buf_entry {
-	struct port_buf_entry *next;
+struct port_entry {
+	struct port_entry *next;
 	struct tuple *tuple;
 };
 
-struct port_buf {
-	struct port base;
+struct port {
 	size_t size;
-	struct port_buf_entry *first;
-	struct port_buf_entry *last;
-	struct port_buf_entry first_entry;
+	struct port_entry *first;
+	struct port_entry *last;
+	struct port_entry first_entry;
 };
 
 void
-port_buf_create(struct port_buf *port_buf);
+port_create(struct port *port);
 
 /**
  * Unref all tuples and free allocated memory
  */
 void
-port_buf_destroy(struct port_buf *port_buf);
+port_destroy(struct port *port);
 
-/**
- * Like port_buf_destroy() but doesn't do tuple_unref()
- */
 void
-port_buf_transfer(struct port_buf *port_buf);
+port_dump(struct port *port, struct obuf *out);
+
+void
+port_add_tuple(struct port *port, struct tuple *tuple);
 
 void
 port_init(void);

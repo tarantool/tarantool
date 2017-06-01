@@ -272,3 +272,9 @@ full 10 leafs:
   130
     [(10) 131 132 133 134 135 136 137 138 139 140]
 	*** white_box_test: done ***
+	*** approximate_count ***
+Count: 10575 10575
+Count: 10575
+Error count: 0
+Count: 10575
+	*** approximate_count: done ***

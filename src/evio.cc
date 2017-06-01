@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -227,7 +227,7 @@ err:
  *
  * Throws an exception if error.
  */
-static int
+static void
 evio_service_bind_addr(struct evio_service *service)
 {
 	say_debug("%s: binding to %s...", evio_service_name(service),
@@ -244,7 +244,7 @@ evio_service_bind_addr(struct evio_service *service)
 		assert(errno == EADDRINUSE);
 		if (!evio_service_reuse_addr(service) ||
 			sio_bind(fd, &service->addr, service->addr_len)) {
-			return 1;
+			tnt_raise(SocketError, fd, "bind");
 		}
 	}
 
@@ -255,7 +255,6 @@ evio_service_bind_addr(struct evio_service *service)
 	ev_io_set(&service->ev, fd, EV_READ);
 
 	fd_guard.is_active = false;
-	return 0;
 }
 
 /**
@@ -303,7 +302,7 @@ evio_service_init(ev_loop *loop,
 /**
  * Try to bind.
  */
-int
+void
 evio_service_bind(struct evio_service *service, const char *uri)
 {
 	struct uri u;

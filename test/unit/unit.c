@@ -68,6 +68,7 @@ _ok(int condition, const char *fmt, ...)
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
 	printf("\n");
+	va_end(ap);
 	return condition;
 }
 

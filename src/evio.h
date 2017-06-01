@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_EVIO_H_INCLUDED
 #define TARANTOOL_EVIO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -101,7 +101,7 @@ evio_service_init(ev_loop *loop,
 		  void *on_accept_param);
 
 /** Bind service to specified uri */
-int
+void
 evio_service_bind(struct evio_service *service, const char *uri);
 
 /**

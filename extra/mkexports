@@ -1,0 +1,15 @@
+#! /bin/sh
+# $1 - in  file
+# $2 - out file
+# $3 - os
+if [ "x$3x" = xDarwinx ]; then
+    # _func1
+    # _func2
+    sed -e 's/#.*//; /^[[:space:]]*$/d; s/^/_/;' $1 > $2
+else
+    # {
+    #   func1;
+    #   func2;
+    # };
+    ( echo "{" && sed -e '/^\s*$/d;s/$/;/;' $1 && echo "};" ) > $2
+fi

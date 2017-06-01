@@ -13,7 +13,7 @@ s = box.schema.space.create('select', { temporary = true })
 index1 = s:create_index('primary', { type = 'tree' })
 ---
 ...
-index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
+index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'unsigned', 1, 'unsigned'}})
 ---
 ...
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
@@ -81,11 +81,11 @@ test.get(s.index[0], {0})
 ...
 test.get(s.index[0], "0")
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 test.get(s.index[0], {"0"})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 test.get(s.index[1], 1)
 ---
@@ -374,11 +374,11 @@ test.select(s.index[0], {0})
 ...
 test.select(s.index[0], "0")
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 test.select(s.index[0], {"0"})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 test.select(s.index[1], 1)
 ---

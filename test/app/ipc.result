@@ -58,6 +58,10 @@ ch:get(.1, nil, unpack(ignored_args))
 ---
 - null
 ...
+tostring(ch)
+---
+- 'channel: 0'
+...
 ch:put()
 ---
 - error: 'usage: channel:put(var [, timeout])'
@@ -69,6 +73,10 @@ ch:count()
 ch:put('test')
 ---
 - true
+...
+tostring(ch)
+---
+- 'channel: 1'
 ...
 ch:get()
 ---
@@ -240,7 +248,7 @@ tfbr = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr', v})
+            table.insert(buffer, v)
         end
     end
 );
@@ -250,7 +258,7 @@ tfbr2 = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr2', v})
+            table.insert(buffer, v)
         end
     end
 );
@@ -315,43 +323,27 @@ t
   - true
   - true
 ...
-table.sort(buffer, function(a, b) return a[2] < b[2] end)
+table.sort(buffer)
 ---
 ...
 buffer
 ---
-- - - tfbr
-    - 1
-  - - tfbr2
-    - 2
-  - - tfbr
-    - 3
-  - - tfbr2
-    - 4
-  - - tfbr
-    - 5
-  - - tfbr2
-    - 35
-  - - tfbr
-    - 36
-  - - tfbr2
-    - 37
-  - - tfbr2
-    - 38
-  - - tfbr2
-    - 39
-  - - tfbr
-    - 40
-  - - tfbr2
-    - 41
-  - - tfbr2
-    - 42
-  - - tfbr2
-    - 43
-  - - tfbr
-    - 44
-  - - tfbr2
-    - 45
+- - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 35
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
 ...
 ch = fiber.channel(1)
 ---
@@ -368,6 +360,9 @@ type(fiber.create(function() if ch:get() == nil then passed = true end end))
 - userdata
 ...
 ch:close()
+---
+...
+fiber.yield()
 ---
 ...
 passed
@@ -390,6 +385,10 @@ ch:is_closed()
 ---
 - true
 ...
+tostring(ch)
+---
+- 'channel: closed'
+...
 ch = fiber.channel(1)
 ---
 ...
@@ -409,6 +408,9 @@ type(fiber.create(function() if ch:put(true) == false then passed = true end end
 - userdata
 ...
 ch:close()
+---
+...
+fiber.yield()
 ---
 ...
 passed
@@ -432,7 +434,7 @@ ch:is_closed()
 - true
 ...
 -- race conditions
-chs, res, count = {}, {}, 0
+chs, test_res, count = {}, {}, 0
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -459,14 +461,14 @@ for i = 1, 10 do
         while true do
             local r = chs[no]:get(math.random() * .001)
             if r ~= nil and r[1] == no then
-                res[no] = true
+                test_res[no] = true
             elseif r ~= nil then
                 break
             end
             fiber.sleep(0.001 * math.random())
             count = count + 1
         end
-        res[no] = false
+        test_res[no] = false
     end, i)
 end;
 ---
@@ -474,7 +476,7 @@ end;
 for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
 ---
 ...
-count > 2000, #res, res;
+count > 2000, #test_res, test_res;
 ---
 - true
 - 10
@@ -551,4 +553,70 @@ collectgarbage('collect')
 refs -- must be zero
 ---
 - 0
+...
+-- fiber.cond
+c = fiber.cond()
+---
+...
+tostring(c)
+---
+- cond
+...
+-- args validation
+c.wait()
+---
+- error: 'usage: cond:wait([timeout])'
+...
+c.wait('1')
+---
+- error: 'bad argument #1 to ''?'' (fiber.cond expected, got string)'
+...
+c:wait('1')
+---
+- false
+...
+c:wait(-1)
+---
+- error: 'usage: cond:wait([timeout])'
+...
+-- timeout
+c:wait(0.1)
+---
+- false
+...
+-- wait success
+fiber.create(function() fiber.sleep(.5); c:broadcast() end) and c:wait(.6)
+---
+- true
+...
+-- signal
+t = {}
+---
+...
+for i = 1,4 do fiber.create(function() c:wait(); table.insert(t, '#') end) end
+---
+...
+c:signal()
+---
+...
+fiber.sleep(0.1)
+---
+...
+t
+---
+- - '#'
+...
+-- broadcast
+c:broadcast()
+---
+...
+fiber.sleep(0.1)
+---
+...
+t
+---
+- - '#'
+  - '#'
+  - '#'
+  - '#'
 ...

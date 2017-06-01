@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED
 #define TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -37,21 +37,23 @@
 class MemtxRTree: public MemtxIndex
 {
 public:
-	MemtxRTree(struct key_def *key_def);
+	MemtxRTree(struct index_def *index_def);
 	~MemtxRTree();
 
-	virtual void beginBuild();
-	virtual size_t size() const;
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
+	virtual void beginBuild() override;
+	virtual size_t size() const override;
+	virtual struct tuple *findByKey(const char *key,
+					uint32_t part_count) const override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
                                       struct tuple *new_tuple,
-                                      enum dup_replace_mode mode);
+                                      enum dup_replace_mode mode) override;
 
-	virtual size_t bsize() const;
-	virtual struct iterator *allocIterator() const;
+	virtual size_t bsize() const override;
+	virtual struct iterator *allocIterator() const override;
 	virtual void initIterator(struct iterator *iterator,
                                   enum iterator_type type,
-                                  const char *key, uint32_t part_count) const;
+                                  const char *key,
+				  uint32_t part_count) const override;
 
 protected:
 	unsigned m_dimension;

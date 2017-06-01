@@ -1,5 +1,19 @@
+test_run = require('test_run').new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+
 digest = require('digest')
 type(digest)
+
+--
+-- Invalid arguments
+--
+digest.md4()
+digest.md5()
+digest.sha1()
+digest.sha224()
+digest.sha256()
+digest.sha384()
+digest.sha512()
 
 digest.md4_hex()
 digest.md5_hex()
@@ -9,21 +23,54 @@ digest.sha256_hex()
 digest.sha384_hex()
 digest.sha512_hex()
 
-string.len(digest.md4_hex())
-string.len(digest.md5_hex())
-string.len(digest.sha1_hex())
-string.len(digest.sha224_hex())
-string.len(digest.sha256_hex())
-string.len(digest.sha384_hex())
-string.len(digest.sha512_hex())
+--
+-- gh-1561: Bad checksum on non-string types
+--
+digest.md4(12345LL)
+digest.md5(12345LL)
+digest.sha1(12345LL)
+digest.sha224(12345LL)
+digest.sha256(12345LL)
+digest.sha384(12345LL)
+digest.sha512(12345LL)
 
-string.len(digest.md4())
-string.len(digest.md5())
-string.len(digest.sha1())
-string.len(digest.sha224())
-string.len(digest.sha256())
-string.len(digest.sha384())
-string.len(digest.sha512())
+--
+-- Empty string
+--
+digest.md4('')
+digest.md5('')
+digest.sha1('')
+digest.sha224('')
+digest.sha256('')
+digest.sha384('')
+digest.sha512('')
+
+digest.md4_hex('')
+digest.md5_hex('')
+digest.sha1_hex('')
+digest.sha224_hex('')
+digest.sha256_hex('')
+digest.sha384_hex('')
+digest.sha512_hex('')
+
+--
+-- Non-empty string
+--
+digest.md4('tarantool')
+digest.md5('tarantool')
+digest.sha1('tarantool')
+digest.sha224('tarantool')
+digest.sha256('tarantool')
+digest.sha384('tarantool')
+digest.sha512('tarantool')
+
+digest.md4_hex('tarantool')
+digest.md5_hex('tarantool')
+digest.sha1_hex('tarantool')
+digest.sha224_hex('tarantool')
+digest.sha256_hex('tarantool')
+digest.sha384_hex('tarantool')
+digest.sha512_hex('tarantool')
 
 digest.md5_hex(123)
 digest.md5_hex('123')
@@ -96,3 +143,4 @@ digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspa
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 
 digest = nil
+test_run:cmd("clear filter")

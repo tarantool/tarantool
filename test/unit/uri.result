@@ -1,5 +1,5 @@
 1..61
-    1..10
+    1..19
     ok 1 - host: parse
     ok 2 - host: scheme
     ok 3 - host: login
@@ -10,8 +10,17 @@
     ok 8 - host: query
     ok 9 - host: fragment
     ok 10 - host: host_hint
+    ok 11 - host: parse
+    ok 12 - host: scheme
+    ok 13 - host: login
+    ok 14 - host: password
+    ok 15 - host: host
+    ok 16 - host: service
+    ok 17 - host: path
+    ok 18 - host: query
+    ok 19 - host: fragment
 ok 1 - subtests
-    1..10
+    1..19
     ok 1 - host/: parse
     ok 2 - host/: scheme
     ok 3 - host/: login
@@ -22,8 +31,17 @@ ok 1 - subtests
     ok 8 - host/: query
     ok 9 - host/: fragment
     ok 10 - host/: host_hint
+    ok 11 - host/: parse
+    ok 12 - host/: scheme
+    ok 13 - host/: login
+    ok 14 - host/: password
+    ok 15 - host/: host
+    ok 16 - host/: service
+    ok 17 - host/: path
+    ok 18 - host/: query
+    ok 19 - host/: fragment
 ok 2 - subtests
-    1..10
+    1..19
     ok 1 - host/path1/path2/path3: parse
     ok 2 - host/path1/path2/path3: scheme
     ok 3 - host/path1/path2/path3: login
@@ -34,8 +52,17 @@ ok 2 - subtests
     ok 8 - host/path1/path2/path3: query
     ok 9 - host/path1/path2/path3: fragment
     ok 10 - host/path1/path2/path3: host_hint
+    ok 11 - host/path1/path2/path3: parse
+    ok 12 - host/path1/path2/path3: scheme
+    ok 13 - host/path1/path2/path3: login
+    ok 14 - host/path1/path2/path3: password
+    ok 15 - host/path1/path2/path3: host
+    ok 16 - host/path1/path2/path3: service
+    ok 17 - host/path1/path2/path3: path
+    ok 18 - host/path1/path2/path3: query
+    ok 19 - host/path1/path2/path3: fragment
 ok 3 - subtests
-    1..10
+    1..19
     ok 1 - host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - host/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -46,8 +73,17 @@ ok 3 - subtests
     ok 8 - host/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - host/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - host/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - host/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - host/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - host/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - host/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - host/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 4 - subtests
-    1..10
+    1..19
     ok 1 - host:service: parse
     ok 2 - host:service: scheme
     ok 3 - host:service: login
@@ -58,8 +94,17 @@ ok 4 - subtests
     ok 8 - host:service: query
     ok 9 - host:service: fragment
     ok 10 - host:service: host_hint
+    ok 11 - host:service: parse
+    ok 12 - host:service: scheme
+    ok 13 - host:service: login
+    ok 14 - host:service: password
+    ok 15 - host:service: host
+    ok 16 - host:service: service
+    ok 17 - host:service: path
+    ok 18 - host:service: query
+    ok 19 - host:service: fragment
 ok 5 - subtests
-    1..10
+    1..19
     ok 1 - host:service/: parse
     ok 2 - host:service/: scheme
     ok 3 - host:service/: login
@@ -70,8 +115,17 @@ ok 5 - subtests
     ok 8 - host:service/: query
     ok 9 - host:service/: fragment
     ok 10 - host:service/: host_hint
+    ok 11 - host:service/: parse
+    ok 12 - host:service/: scheme
+    ok 13 - host:service/: login
+    ok 14 - host:service/: password
+    ok 15 - host:service/: host
+    ok 16 - host:service/: service
+    ok 17 - host:service/: path
+    ok 18 - host:service/: query
+    ok 19 - host:service/: fragment
 ok 6 - subtests
-    1..10
+    1..19
     ok 1 - host:service/path1/path2/path3: parse
     ok 2 - host:service/path1/path2/path3: scheme
     ok 3 - host:service/path1/path2/path3: login
@@ -82,8 +136,17 @@ ok 6 - subtests
     ok 8 - host:service/path1/path2/path3: query
     ok 9 - host:service/path1/path2/path3: fragment
     ok 10 - host:service/path1/path2/path3: host_hint
+    ok 11 - host:service/path1/path2/path3: parse
+    ok 12 - host:service/path1/path2/path3: scheme
+    ok 13 - host:service/path1/path2/path3: login
+    ok 14 - host:service/path1/path2/path3: password
+    ok 15 - host:service/path1/path2/path3: host
+    ok 16 - host:service/path1/path2/path3: service
+    ok 17 - host:service/path1/path2/path3: path
+    ok 18 - host:service/path1/path2/path3: query
+    ok 19 - host:service/path1/path2/path3: fragment
 ok 7 - subtests
-    1..10
+    1..19
     ok 1 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -94,8 +157,17 @@ ok 7 - subtests
     ok 8 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 8 - subtests
-    1..10
+    1..19
     ok 1 - login@host: parse
     ok 2 - login@host: scheme
     ok 3 - login@host: login
@@ -106,8 +178,17 @@ ok 8 - subtests
     ok 8 - login@host: query
     ok 9 - login@host: fragment
     ok 10 - login@host: host_hint
+    ok 11 - login@host: parse
+    ok 12 - login@host: scheme
+    ok 13 - login@host: login
+    ok 14 - login@host: password
+    ok 15 - login@host: host
+    ok 16 - login@host: service
+    ok 17 - login@host: path
+    ok 18 - login@host: query
+    ok 19 - login@host: fragment
 ok 9 - subtests
-    1..10
+    1..19
     ok 1 - login@host/: parse
     ok 2 - login@host/: scheme
     ok 3 - login@host/: login
@@ -118,8 +199,17 @@ ok 9 - subtests
     ok 8 - login@host/: query
     ok 9 - login@host/: fragment
     ok 10 - login@host/: host_hint
+    ok 11 - login@host/: parse
+    ok 12 - login@host/: scheme
+    ok 13 - login@host/: login
+    ok 14 - login@host/: password
+    ok 15 - login@host/: host
+    ok 16 - login@host/: service
+    ok 17 - login@host/: path
+    ok 18 - login@host/: query
+    ok 19 - login@host/: fragment
 ok 10 - subtests
-    1..10
+    1..19
     ok 1 - login@host/path1/path2/path3: parse
     ok 2 - login@host/path1/path2/path3: scheme
     ok 3 - login@host/path1/path2/path3: login
@@ -130,8 +220,17 @@ ok 10 - subtests
     ok 8 - login@host/path1/path2/path3: query
     ok 9 - login@host/path1/path2/path3: fragment
     ok 10 - login@host/path1/path2/path3: host_hint
+    ok 11 - login@host/path1/path2/path3: parse
+    ok 12 - login@host/path1/path2/path3: scheme
+    ok 13 - login@host/path1/path2/path3: login
+    ok 14 - login@host/path1/path2/path3: password
+    ok 15 - login@host/path1/path2/path3: host
+    ok 16 - login@host/path1/path2/path3: service
+    ok 17 - login@host/path1/path2/path3: path
+    ok 18 - login@host/path1/path2/path3: query
+    ok 19 - login@host/path1/path2/path3: fragment
 ok 11 - subtests
-    1..10
+    1..19
     ok 1 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -142,8 +241,17 @@ ok 11 - subtests
     ok 8 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - login@host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 12 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host: parse
     ok 2 - login:password@host: scheme
     ok 3 - login:password@host: login
@@ -154,8 +262,17 @@ ok 12 - subtests
     ok 8 - login:password@host: query
     ok 9 - login:password@host: fragment
     ok 10 - login:password@host: host_hint
+    ok 11 - login:password@host: parse
+    ok 12 - login:password@host: scheme
+    ok 13 - login:password@host: login
+    ok 14 - login:password@host: password
+    ok 15 - login:password@host: host
+    ok 16 - login:password@host: service
+    ok 17 - login:password@host: path
+    ok 18 - login:password@host: query
+    ok 19 - login:password@host: fragment
 ok 13 - subtests
-    1..10
+    1..19
     ok 1 - login:@host: parse
     ok 2 - login:@host: scheme
     ok 3 - login:@host: login
@@ -166,8 +283,17 @@ ok 13 - subtests
     ok 8 - login:@host: query
     ok 9 - login:@host: fragment
     ok 10 - login:@host: host_hint
+    ok 11 - login:@host: parse
+    ok 12 - login:@host: scheme
+    ok 13 - login:@host: login
+    ok 14 - login:@host: password
+    ok 15 - login:@host: host
+    ok 16 - login:@host: service
+    ok 17 - login:@host: path
+    ok 18 - login:@host: query
+    ok 19 - login:@host: fragment
 ok 14 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host/: parse
     ok 2 - login:password@host/: scheme
     ok 3 - login:password@host/: login
@@ -178,8 +304,17 @@ ok 14 - subtests
     ok 8 - login:password@host/: query
     ok 9 - login:password@host/: fragment
     ok 10 - login:password@host/: host_hint
+    ok 11 - login:password@host/: parse
+    ok 12 - login:password@host/: scheme
+    ok 13 - login:password@host/: login
+    ok 14 - login:password@host/: password
+    ok 15 - login:password@host/: host
+    ok 16 - login:password@host/: service
+    ok 17 - login:password@host/: path
+    ok 18 - login:password@host/: query
+    ok 19 - login:password@host/: fragment
 ok 15 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host/path1/path2/path3: parse
     ok 2 - login:password@host/path1/path2/path3: scheme
     ok 3 - login:password@host/path1/path2/path3: login
@@ -190,8 +325,17 @@ ok 15 - subtests
     ok 8 - login:password@host/path1/path2/path3: query
     ok 9 - login:password@host/path1/path2/path3: fragment
     ok 10 - login:password@host/path1/path2/path3: host_hint
+    ok 11 - login:password@host/path1/path2/path3: parse
+    ok 12 - login:password@host/path1/path2/path3: scheme
+    ok 13 - login:password@host/path1/path2/path3: login
+    ok 14 - login:password@host/path1/path2/path3: password
+    ok 15 - login:password@host/path1/path2/path3: host
+    ok 16 - login:password@host/path1/path2/path3: service
+    ok 17 - login:password@host/path1/path2/path3: path
+    ok 18 - login:password@host/path1/path2/path3: query
+    ok 19 - login:password@host/path1/path2/path3: fragment
 ok 16 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -202,8 +346,17 @@ ok 16 - subtests
     ok 8 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - login:password@host/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 17 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host:service: parse
     ok 2 - login:password@host:service: scheme
     ok 3 - login:password@host:service: login
@@ -214,8 +367,17 @@ ok 17 - subtests
     ok 8 - login:password@host:service: query
     ok 9 - login:password@host:service: fragment
     ok 10 - login:password@host:service: host_hint
+    ok 11 - login:password@host:service: parse
+    ok 12 - login:password@host:service: scheme
+    ok 13 - login:password@host:service: login
+    ok 14 - login:password@host:service: password
+    ok 15 - login:password@host:service: host
+    ok 16 - login:password@host:service: service
+    ok 17 - login:password@host:service: path
+    ok 18 - login:password@host:service: query
+    ok 19 - login:password@host:service: fragment
 ok 18 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host:service/: parse
     ok 2 - login:password@host:service/: scheme
     ok 3 - login:password@host:service/: login
@@ -226,8 +388,17 @@ ok 18 - subtests
     ok 8 - login:password@host:service/: query
     ok 9 - login:password@host:service/: fragment
     ok 10 - login:password@host:service/: host_hint
+    ok 11 - login:password@host:service/: parse
+    ok 12 - login:password@host:service/: scheme
+    ok 13 - login:password@host:service/: login
+    ok 14 - login:password@host:service/: password
+    ok 15 - login:password@host:service/: host
+    ok 16 - login:password@host:service/: service
+    ok 17 - login:password@host:service/: path
+    ok 18 - login:password@host:service/: query
+    ok 19 - login:password@host:service/: fragment
 ok 19 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host:service/path1/path2/path3: parse
     ok 2 - login:password@host:service/path1/path2/path3: scheme
     ok 3 - login:password@host:service/path1/path2/path3: login
@@ -238,8 +409,17 @@ ok 19 - subtests
     ok 8 - login:password@host:service/path1/path2/path3: query
     ok 9 - login:password@host:service/path1/path2/path3: fragment
     ok 10 - login:password@host:service/path1/path2/path3: host_hint
+    ok 11 - login:password@host:service/path1/path2/path3: parse
+    ok 12 - login:password@host:service/path1/path2/path3: scheme
+    ok 13 - login:password@host:service/path1/path2/path3: login
+    ok 14 - login:password@host:service/path1/path2/path3: password
+    ok 15 - login:password@host:service/path1/path2/path3: host
+    ok 16 - login:password@host:service/path1/path2/path3: service
+    ok 17 - login:password@host:service/path1/path2/path3: path
+    ok 18 - login:password@host:service/path1/path2/path3: query
+    ok 19 - login:password@host:service/path1/path2/path3: fragment
 ok 20 - subtests
-    1..10
+    1..19
     ok 1 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -250,8 +430,17 @@ ok 20 - subtests
     ok 8 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 21 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@host:service: parse
     ok 2 - scheme://login:password@host:service: scheme
     ok 3 - scheme://login:password@host:service: login
@@ -262,8 +451,17 @@ ok 21 - subtests
     ok 8 - scheme://login:password@host:service: query
     ok 9 - scheme://login:password@host:service: fragment
     ok 10 - scheme://login:password@host:service: host_hint
+    ok 11 - scheme://login:password@host:service: parse
+    ok 12 - scheme://login:password@host:service: scheme
+    ok 13 - scheme://login:password@host:service: login
+    ok 14 - scheme://login:password@host:service: password
+    ok 15 - scheme://login:password@host:service: host
+    ok 16 - scheme://login:password@host:service: service
+    ok 17 - scheme://login:password@host:service: path
+    ok 18 - scheme://login:password@host:service: query
+    ok 19 - scheme://login:password@host:service: fragment
 ok 22 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@host:service/: parse
     ok 2 - scheme://login:password@host:service/: scheme
     ok 3 - scheme://login:password@host:service/: login
@@ -274,8 +472,17 @@ ok 22 - subtests
     ok 8 - scheme://login:password@host:service/: query
     ok 9 - scheme://login:password@host:service/: fragment
     ok 10 - scheme://login:password@host:service/: host_hint
+    ok 11 - scheme://login:password@host:service/: parse
+    ok 12 - scheme://login:password@host:service/: scheme
+    ok 13 - scheme://login:password@host:service/: login
+    ok 14 - scheme://login:password@host:service/: password
+    ok 15 - scheme://login:password@host:service/: host
+    ok 16 - scheme://login:password@host:service/: service
+    ok 17 - scheme://login:password@host:service/: path
+    ok 18 - scheme://login:password@host:service/: query
+    ok 19 - scheme://login:password@host:service/: fragment
 ok 23 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@host:service/path1/path2/path3: parse
     ok 2 - scheme://login:password@host:service/path1/path2/path3: scheme
     ok 3 - scheme://login:password@host:service/path1/path2/path3: login
@@ -286,8 +493,17 @@ ok 23 - subtests
     ok 8 - scheme://login:password@host:service/path1/path2/path3: query
     ok 9 - scheme://login:password@host:service/path1/path2/path3: fragment
     ok 10 - scheme://login:password@host:service/path1/path2/path3: host_hint
+    ok 11 - scheme://login:password@host:service/path1/path2/path3: parse
+    ok 12 - scheme://login:password@host:service/path1/path2/path3: scheme
+    ok 13 - scheme://login:password@host:service/path1/path2/path3: login
+    ok 14 - scheme://login:password@host:service/path1/path2/path3: password
+    ok 15 - scheme://login:password@host:service/path1/path2/path3: host
+    ok 16 - scheme://login:password@host:service/path1/path2/path3: service
+    ok 17 - scheme://login:password@host:service/path1/path2/path3: path
+    ok 18 - scheme://login:password@host:service/path1/path2/path3: query
+    ok 19 - scheme://login:password@host:service/path1/path2/path3: fragment
 ok 24 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -298,8 +514,17 @@ ok 24 - subtests
     ok 8 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - scheme://login:password@host:service/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 25 - subtests
-    1..10
+    1..19
     ok 1 - host/path: parse
     ok 2 - host/path: scheme
     ok 3 - host/path: login
@@ -310,8 +535,17 @@ ok 25 - subtests
     ok 8 - host/path: query
     ok 9 - host/path: fragment
     ok 10 - host/path: host_hint
+    ok 11 - host/path: parse
+    ok 12 - host/path: scheme
+    ok 13 - host/path: login
+    ok 14 - host/path: password
+    ok 15 - host/path: host
+    ok 16 - host/path: service
+    ok 17 - host/path: path
+    ok 18 - host/path: query
+    ok 19 - host/path: fragment
 ok 26 - subtests
-    1..10
+    1..19
     ok 1 - host//: parse
     ok 2 - host//: scheme
     ok 3 - host//: login
@@ -322,8 +556,17 @@ ok 26 - subtests
     ok 8 - host//: query
     ok 9 - host//: fragment
     ok 10 - host//: host_hint
+    ok 11 - host//: parse
+    ok 12 - host//: scheme
+    ok 13 - host//: login
+    ok 14 - host//: password
+    ok 15 - host//: host
+    ok 16 - host//: service
+    ok 17 - host//: path
+    ok 18 - host//: query
+    ok 19 - host//: fragment
 ok 27 - subtests
-    1..10
+    1..19
     ok 1 - host//path: parse
     ok 2 - host//path: scheme
     ok 3 - host//path: login
@@ -334,8 +577,17 @@ ok 27 - subtests
     ok 8 - host//path: query
     ok 9 - host//path: fragment
     ok 10 - host//path: host_hint
+    ok 11 - host//path: parse
+    ok 12 - host//path: scheme
+    ok 13 - host//path: login
+    ok 14 - host//path: password
+    ok 15 - host//path: host
+    ok 16 - host//path: service
+    ok 17 - host//path: path
+    ok 18 - host//path: query
+    ok 19 - host//path: fragment
 ok 28 - subtests
-    1..10
+    1..19
     ok 1 - host/;abc?q: parse
     ok 2 - host/;abc?q: scheme
     ok 3 - host/;abc?q: login
@@ -346,8 +598,17 @@ ok 28 - subtests
     ok 8 - host/;abc?q: query
     ok 9 - host/;abc?q: fragment
     ok 10 - host/;abc?q: host_hint
+    ok 11 - host/;abc?q: parse
+    ok 12 - host/;abc?q: scheme
+    ok 13 - host/;abc?q: login
+    ok 14 - host/;abc?q: password
+    ok 15 - host/;abc?q: host
+    ok 16 - host/;abc?q: service
+    ok 17 - host/;abc?q: path
+    ok 18 - host/;abc?q: query
+    ok 19 - host/;abc?q: fragment
 ok 29 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: parse
     ok 2 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: scheme
     ok 3 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: login
@@ -358,8 +619,17 @@ ok 29 - subtests
     ok 8 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: query
     ok 9 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: fragment
     ok 10 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: parse
+    ok 12 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: scheme
+    ok 13 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: login
+    ok 14 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: password
+    ok 15 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: host
+    ok 16 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: service
+    ok 17 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: path
+    ok 18 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: query
+    ok 19 - scheme://login:password@host:service/@path1/:path2?q1=v1&q2=v2#fragment: fragment
 ok 30 - subtests
-    1..10
+    1..19
     ok 1 - host/~user: parse
     ok 2 - host/~user: scheme
     ok 3 - host/~user: login
@@ -370,8 +640,17 @@ ok 30 - subtests
     ok 8 - host/~user: query
     ok 9 - host/~user: fragment
     ok 10 - host/~user: host_hint
+    ok 11 - host/~user: parse
+    ok 12 - host/~user: scheme
+    ok 13 - host/~user: login
+    ok 14 - host/~user: password
+    ok 15 - host/~user: host
+    ok 16 - host/~user: service
+    ok 17 - host/~user: path
+    ok 18 - host/~user: query
+    ok 19 - host/~user: fragment
 ok 31 - subtests
-    1..10
+    1..19
     ok 1 - try.tarantool.org: parse
     ok 2 - try.tarantool.org: scheme
     ok 3 - try.tarantool.org: login
@@ -382,8 +661,17 @@ ok 31 - subtests
     ok 8 - try.tarantool.org: query
     ok 9 - try.tarantool.org: fragment
     ok 10 - try.tarantool.org: host_hint
+    ok 11 - try.tarantool.org: parse
+    ok 12 - try.tarantool.org: scheme
+    ok 13 - try.tarantool.org: login
+    ok 14 - try.tarantool.org: password
+    ok 15 - try.tarantool.org: host
+    ok 16 - try.tarantool.org: service
+    ok 17 - try.tarantool.org: path
+    ok 18 - try.tarantool.org: query
+    ok 19 - try.tarantool.org: fragment
 ok 32 - subtests
-    1..10
+    1..19
     ok 1 - try.tarantool.org: parse
     ok 2 - try.tarantool.org: scheme
     ok 3 - try.tarantool.org: login
@@ -394,8 +682,17 @@ ok 32 - subtests
     ok 8 - try.tarantool.org: query
     ok 9 - try.tarantool.org: fragment
     ok 10 - try.tarantool.org: host_hint
+    ok 11 - try.tarantool.org: parse
+    ok 12 - try.tarantool.org: scheme
+    ok 13 - try.tarantool.org: login
+    ok 14 - try.tarantool.org: password
+    ok 15 - try.tarantool.org: host
+    ok 16 - try.tarantool.org: service
+    ok 17 - try.tarantool.org: path
+    ok 18 - try.tarantool.org: query
+    ok 19 - try.tarantool.org: fragment
 ok 33 - subtests
-    1..10
+    1..19
     ok 1 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: parse
     ok 2 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: scheme
     ok 3 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: login
@@ -406,8 +703,17 @@ ok 33 - subtests
     ok 8 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: query
     ok 9 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: fragment
     ok 10 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: host_hint
+    ok 11 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: parse
+    ok 12 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: scheme
+    ok 13 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: login
+    ok 14 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: password
+    ok 15 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: host
+    ok 16 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: service
+    ok 17 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: path
+    ok 18 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: query
+    ok 19 - www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com: fragment
 ok 34 - subtests
-    1..10
+    1..19
     ok 1 - 0.0.0.0: parse
     ok 2 - 0.0.0.0: scheme
     ok 3 - 0.0.0.0: login
@@ -418,8 +724,17 @@ ok 34 - subtests
     ok 8 - 0.0.0.0: query
     ok 9 - 0.0.0.0: fragment
     ok 10 - 0.0.0.0: host_hint
+    ok 11 - 0.0.0.0: parse
+    ok 12 - 0.0.0.0: scheme
+    ok 13 - 0.0.0.0: login
+    ok 14 - 0.0.0.0: password
+    ok 15 - 0.0.0.0: host
+    ok 16 - 0.0.0.0: service
+    ok 17 - 0.0.0.0: path
+    ok 18 - 0.0.0.0: query
+    ok 19 - 0.0.0.0: fragment
 ok 35 - subtests
-    1..10
+    1..19
     ok 1 - 127.0.0.1: parse
     ok 2 - 127.0.0.1: scheme
     ok 3 - 127.0.0.1: login
@@ -430,8 +745,17 @@ ok 35 - subtests
     ok 8 - 127.0.0.1: query
     ok 9 - 127.0.0.1: fragment
     ok 10 - 127.0.0.1: host_hint
+    ok 11 - 127.0.0.1: parse
+    ok 12 - 127.0.0.1: scheme
+    ok 13 - 127.0.0.1: login
+    ok 14 - 127.0.0.1: password
+    ok 15 - 127.0.0.1: host
+    ok 16 - 127.0.0.1: service
+    ok 17 - 127.0.0.1: path
+    ok 18 - 127.0.0.1: query
+    ok 19 - 127.0.0.1: fragment
 ok 36 - subtests
-    1..10
+    1..19
     ok 1 - 127.0.0.1:3313: parse
     ok 2 - 127.0.0.1:3313: scheme
     ok 3 - 127.0.0.1:3313: login
@@ -442,8 +766,17 @@ ok 36 - subtests
     ok 8 - 127.0.0.1:3313: query
     ok 9 - 127.0.0.1:3313: fragment
     ok 10 - 127.0.0.1:3313: host_hint
+    ok 11 - 127.0.0.1:3313: parse
+    ok 12 - 127.0.0.1:3313: scheme
+    ok 13 - 127.0.0.1:3313: login
+    ok 14 - 127.0.0.1:3313: password
+    ok 15 - 127.0.0.1:3313: host
+    ok 16 - 127.0.0.1:3313: service
+    ok 17 - 127.0.0.1:3313: path
+    ok 18 - 127.0.0.1:3313: query
+    ok 19 - 127.0.0.1:3313: fragment
 ok 37 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@127.0.0.1:3313: parse
     ok 2 - scheme://login:password@127.0.0.1:3313: scheme
     ok 3 - scheme://login:password@127.0.0.1:3313: login
@@ -454,8 +787,17 @@ ok 37 - subtests
     ok 8 - scheme://login:password@127.0.0.1:3313: query
     ok 9 - scheme://login:password@127.0.0.1:3313: fragment
     ok 10 - scheme://login:password@127.0.0.1:3313: host_hint
+    ok 11 - scheme://login:password@127.0.0.1:3313: parse
+    ok 12 - scheme://login:password@127.0.0.1:3313: scheme
+    ok 13 - scheme://login:password@127.0.0.1:3313: login
+    ok 14 - scheme://login:password@127.0.0.1:3313: password
+    ok 15 - scheme://login:password@127.0.0.1:3313: host
+    ok 16 - scheme://login:password@127.0.0.1:3313: service
+    ok 17 - scheme://login:password@127.0.0.1:3313: path
+    ok 18 - scheme://login:password@127.0.0.1:3313: query
+    ok 19 - scheme://login:password@127.0.0.1:3313: fragment
 ok 38 - subtests
-    1..10
+    1..19
     ok 1 - [2001::11a3:09d7::1]: parse
     ok 2 - [2001::11a3:09d7::1]: scheme
     ok 3 - [2001::11a3:09d7::1]: login
@@ -466,8 +808,17 @@ ok 38 - subtests
     ok 8 - [2001::11a3:09d7::1]: query
     ok 9 - [2001::11a3:09d7::1]: fragment
     ok 10 - [2001::11a3:09d7::1]: host_hint
+    ok 11 - [2001::11a3:09d7::1]: parse
+    ok 12 - [2001::11a3:09d7::1]: scheme
+    ok 13 - [2001::11a3:09d7::1]: login
+    ok 14 - [2001::11a3:09d7::1]: password
+    ok 15 - [2001::11a3:09d7::1]: host
+    ok 16 - [2001::11a3:09d7::1]: service
+    ok 17 - [2001::11a3:09d7::1]: path
+    ok 18 - [2001::11a3:09d7::1]: query
+    ok 19 - [2001::11a3:09d7::1]: fragment
 ok 39 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@[2001::11a3:09d7::1]:3313: parse
     ok 2 - scheme://login:password@[2001::11a3:09d7::1]:3313: scheme
     ok 3 - scheme://login:password@[2001::11a3:09d7::1]:3313: login
@@ -478,8 +829,17 @@ ok 39 - subtests
     ok 8 - scheme://login:password@[2001::11a3:09d7::1]:3313: query
     ok 9 - scheme://login:password@[2001::11a3:09d7::1]:3313: fragment
     ok 10 - scheme://login:password@[2001::11a3:09d7::1]:3313: host_hint
+    ok 11 - scheme://login:password@[2001::11a3:09d7::1]:3313: parse
+    ok 12 - scheme://login:password@[2001::11a3:09d7::1]:3313: scheme
+    ok 13 - scheme://login:password@[2001::11a3:09d7::1]:3313: login
+    ok 14 - scheme://login:password@[2001::11a3:09d7::1]:3313: password
+    ok 15 - scheme://login:password@[2001::11a3:09d7::1]:3313: host
+    ok 16 - scheme://login:password@[2001::11a3:09d7::1]:3313: service
+    ok 17 - scheme://login:password@[2001::11a3:09d7::1]:3313: path
+    ok 18 - scheme://login:password@[2001::11a3:09d7::1]:3313: query
+    ok 19 - scheme://login:password@[2001::11a3:09d7::1]:3313: fragment
 ok 40 - subtests
-    1..10
+    1..19
     ok 1 - scheme://[2001:0db8:11a3:09d7::1]: parse
     ok 2 - scheme://[2001:0db8:11a3:09d7::1]: scheme
     ok 3 - scheme://[2001:0db8:11a3:09d7::1]: login
@@ -490,8 +850,17 @@ ok 40 - subtests
     ok 8 - scheme://[2001:0db8:11a3:09d7::1]: query
     ok 9 - scheme://[2001:0db8:11a3:09d7::1]: fragment
     ok 10 - scheme://[2001:0db8:11a3:09d7::1]: host_hint
+    ok 11 - scheme://[2001:0db8:11a3:09d7::1]: parse
+    ok 12 - scheme://[2001:0db8:11a3:09d7::1]: scheme
+    ok 13 - scheme://[2001:0db8:11a3:09d7::1]: login
+    ok 14 - scheme://[2001:0db8:11a3:09d7::1]: password
+    ok 15 - scheme://[2001:0db8:11a3:09d7::1]: host
+    ok 16 - scheme://[2001:0db8:11a3:09d7::1]: service
+    ok 17 - scheme://[2001:0db8:11a3:09d7::1]: path
+    ok 18 - scheme://[2001:0db8:11a3:09d7::1]: query
+    ok 19 - scheme://[2001:0db8:11a3:09d7::1]: fragment
 ok 41 - subtests
-    1..10
+    1..19
     ok 1 - [::ffff:11.2.3.4]: parse
     ok 2 - [::ffff:11.2.3.4]: scheme
     ok 3 - [::ffff:11.2.3.4]: login
@@ -502,8 +871,17 @@ ok 41 - subtests
     ok 8 - [::ffff:11.2.3.4]: query
     ok 9 - [::ffff:11.2.3.4]: fragment
     ok 10 - [::ffff:11.2.3.4]: host_hint
+    ok 11 - [::ffff:11.2.3.4]: parse
+    ok 12 - [::ffff:11.2.3.4]: scheme
+    ok 13 - [::ffff:11.2.3.4]: login
+    ok 14 - [::ffff:11.2.3.4]: password
+    ok 15 - [::ffff:11.2.3.4]: host
+    ok 16 - [::ffff:11.2.3.4]: service
+    ok 17 - [::ffff:11.2.3.4]: path
+    ok 18 - [::ffff:11.2.3.4]: query
+    ok 19 - [::ffff:11.2.3.4]: fragment
 ok 42 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@[::ffff:11.2.3.4]:3313: parse
     ok 2 - scheme://login:password@[::ffff:11.2.3.4]:3313: scheme
     ok 3 - scheme://login:password@[::ffff:11.2.3.4]:3313: login
@@ -514,8 +892,17 @@ ok 42 - subtests
     ok 8 - scheme://login:password@[::ffff:11.2.3.4]:3313: query
     ok 9 - scheme://login:password@[::ffff:11.2.3.4]:3313: fragment
     ok 10 - scheme://login:password@[::ffff:11.2.3.4]:3313: host_hint
+    ok 11 - scheme://login:password@[::ffff:11.2.3.4]:3313: parse
+    ok 12 - scheme://login:password@[::ffff:11.2.3.4]:3313: scheme
+    ok 13 - scheme://login:password@[::ffff:11.2.3.4]:3313: login
+    ok 14 - scheme://login:password@[::ffff:11.2.3.4]:3313: password
+    ok 15 - scheme://login:password@[::ffff:11.2.3.4]:3313: host
+    ok 16 - scheme://login:password@[::ffff:11.2.3.4]:3313: service
+    ok 17 - scheme://login:password@[::ffff:11.2.3.4]:3313: path
+    ok 18 - scheme://login:password@[::ffff:11.2.3.4]:3313: query
+    ok 19 - scheme://login:password@[::ffff:11.2.3.4]:3313: fragment
 ok 43 - subtests
-    1..10
+    1..19
     ok 1 - 1: parse
     ok 2 - 1: scheme
     ok 3 - 1: login
@@ -526,8 +913,17 @@ ok 43 - subtests
     ok 8 - 1: query
     ok 9 - 1: fragment
     ok 10 - 1: host_hint
+    ok 11 - 1: parse
+    ok 12 - 1: scheme
+    ok 13 - 1: login
+    ok 14 - 1: password
+    ok 15 - 1: host
+    ok 16 - 1: service
+    ok 17 - 1: path
+    ok 18 - 1: query
+    ok 19 - 1: fragment
 ok 44 - subtests
-    1..10
+    1..19
     ok 1 - 10: parse
     ok 2 - 10: scheme
     ok 3 - 10: login
@@ -538,8 +934,17 @@ ok 44 - subtests
     ok 8 - 10: query
     ok 9 - 10: fragment
     ok 10 - 10: host_hint
+    ok 11 - 10: parse
+    ok 12 - 10: scheme
+    ok 13 - 10: login
+    ok 14 - 10: password
+    ok 15 - 10: host
+    ok 16 - 10: service
+    ok 17 - 10: path
+    ok 18 - 10: query
+    ok 19 - 10: fragment
 ok 45 - subtests
-    1..10
+    1..19
     ok 1 - 331: parse
     ok 2 - 331: scheme
     ok 3 - 331: login
@@ -550,8 +955,17 @@ ok 45 - subtests
     ok 8 - 331: query
     ok 9 - 331: fragment
     ok 10 - 331: host_hint
+    ok 11 - 331: parse
+    ok 12 - 331: scheme
+    ok 13 - 331: login
+    ok 14 - 331: password
+    ok 15 - 331: host
+    ok 16 - 331: service
+    ok 17 - 331: path
+    ok 18 - 331: query
+    ok 19 - 331: fragment
 ok 46 - subtests
-    1..10
+    1..19
     ok 1 - 3313: parse
     ok 2 - 3313: scheme
     ok 3 - 3313: login
@@ -562,8 +976,17 @@ ok 46 - subtests
     ok 8 - 3313: query
     ok 9 - 3313: fragment
     ok 10 - 3313: host_hint
+    ok 11 - 3313: parse
+    ok 12 - 3313: scheme
+    ok 13 - 3313: login
+    ok 14 - 3313: password
+    ok 15 - 3313: host
+    ok 16 - 3313: service
+    ok 17 - 3313: path
+    ok 18 - 3313: query
+    ok 19 - 3313: fragment
 ok 47 - subtests
-    1..10
+    1..19
     ok 1 - /: parse
     ok 2 - /: scheme
     ok 3 - /: login
@@ -574,8 +997,17 @@ ok 47 - subtests
     ok 8 - /: query
     ok 9 - /: fragment
     ok 10 - /: host_hint
+    ok 11 - /: parse
+    ok 12 - /: scheme
+    ok 13 - /: login
+    ok 14 - /: password
+    ok 15 - /: host
+    ok 16 - /: service
+    ok 17 - /: path
+    ok 18 - /: query
+    ok 19 - /: fragment
 ok 48 - subtests
-    1..10
+    1..19
     ok 1 - /path1/path2/path3: parse
     ok 2 - /path1/path2/path3: scheme
     ok 3 - /path1/path2/path3: login
@@ -586,8 +1018,17 @@ ok 48 - subtests
     ok 8 - /path1/path2/path3: query
     ok 9 - /path1/path2/path3: fragment
     ok 10 - /path1/path2/path3: host_hint
+    ok 11 - /path1/path2/path3: parse
+    ok 12 - /path1/path2/path3: scheme
+    ok 13 - /path1/path2/path3: login
+    ok 14 - /path1/path2/path3: password
+    ok 15 - /path1/path2/path3: host
+    ok 16 - /path1/path2/path3: service
+    ok 17 - /path1/path2/path3: path
+    ok 18 - /path1/path2/path3: query
+    ok 19 - /path1/path2/path3: fragment
 ok 49 - subtests
-    1..10
+    1..19
     ok 1 - login:password@/path1/path2/path3: parse
     ok 2 - login:password@/path1/path2/path3: scheme
     ok 3 - login:password@/path1/path2/path3: login
@@ -598,8 +1039,17 @@ ok 49 - subtests
     ok 8 - login:password@/path1/path2/path3: query
     ok 9 - login:password@/path1/path2/path3: fragment
     ok 10 - login:password@/path1/path2/path3: host_hint
+    ok 11 - login:password@/path1/path2/path3: parse
+    ok 12 - login:password@/path1/path2/path3: scheme
+    ok 13 - login:password@/path1/path2/path3: login
+    ok 14 - login:password@/path1/path2/path3: password
+    ok 15 - login:password@/path1/path2/path3: host
+    ok 16 - login:password@/path1/path2/path3: service
+    ok 17 - login:password@/path1/path2/path3: path
+    ok 18 - login:password@/path1/path2/path3: query
+    ok 19 - login:password@/path1/path2/path3: fragment
 ok 50 - subtests
-    1..10
+    1..19
     ok 1 - unix/:/path1/path2/path3: parse
     ok 2 - unix/:/path1/path2/path3: scheme
     ok 3 - unix/:/path1/path2/path3: login
@@ -610,8 +1060,17 @@ ok 50 - subtests
     ok 8 - unix/:/path1/path2/path3: query
     ok 9 - unix/:/path1/path2/path3: fragment
     ok 10 - unix/:/path1/path2/path3: host_hint
+    ok 11 - unix/:/path1/path2/path3: parse
+    ok 12 - unix/:/path1/path2/path3: scheme
+    ok 13 - unix/:/path1/path2/path3: login
+    ok 14 - unix/:/path1/path2/path3: password
+    ok 15 - unix/:/path1/path2/path3: host
+    ok 16 - unix/:/path1/path2/path3: service
+    ok 17 - unix/:/path1/path2/path3: path
+    ok 18 - unix/:/path1/path2/path3: query
+    ok 19 - unix/:/path1/path2/path3: fragment
 ok 51 - subtests
-    1..10
+    1..19
     ok 1 - unix/:/path1/path2/path3:: parse
     ok 2 - unix/:/path1/path2/path3:: scheme
     ok 3 - unix/:/path1/path2/path3:: login
@@ -622,8 +1081,17 @@ ok 51 - subtests
     ok 8 - unix/:/path1/path2/path3:: query
     ok 9 - unix/:/path1/path2/path3:: fragment
     ok 10 - unix/:/path1/path2/path3:: host_hint
+    ok 11 - unix/:/path1/path2/path3:: parse
+    ok 12 - unix/:/path1/path2/path3:: scheme
+    ok 13 - unix/:/path1/path2/path3:: login
+    ok 14 - unix/:/path1/path2/path3:: password
+    ok 15 - unix/:/path1/path2/path3:: host
+    ok 16 - unix/:/path1/path2/path3:: service
+    ok 17 - unix/:/path1/path2/path3:: path
+    ok 18 - unix/:/path1/path2/path3:: query
+    ok 19 - unix/:/path1/path2/path3:: fragment
 ok 52 - subtests
-    1..10
+    1..19
     ok 1 - unix/:/path1/path2/path3:/: parse
     ok 2 - unix/:/path1/path2/path3:/: scheme
     ok 3 - unix/:/path1/path2/path3:/: login
@@ -634,8 +1102,17 @@ ok 52 - subtests
     ok 8 - unix/:/path1/path2/path3:/: query
     ok 9 - unix/:/path1/path2/path3:/: fragment
     ok 10 - unix/:/path1/path2/path3:/: host_hint
+    ok 11 - unix/:/path1/path2/path3:/: parse
+    ok 12 - unix/:/path1/path2/path3:/: scheme
+    ok 13 - unix/:/path1/path2/path3:/: login
+    ok 14 - unix/:/path1/path2/path3:/: password
+    ok 15 - unix/:/path1/path2/path3:/: host
+    ok 16 - unix/:/path1/path2/path3:/: service
+    ok 17 - unix/:/path1/path2/path3:/: path
+    ok 18 - unix/:/path1/path2/path3:/: query
+    ok 19 - unix/:/path1/path2/path3:/: fragment
 ok 53 - subtests
-    1..10
+    1..19
     ok 1 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: parse
     ok 2 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
     ok 3 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: login
@@ -646,8 +1123,17 @@ ok 53 - subtests
     ok 8 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: query
     ok 9 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
     ok 10 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - unix/:/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
 ok 54 - subtests
-    1..10
+    1..19
     ok 1 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: parse
     ok 2 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: scheme
     ok 3 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: login
@@ -658,8 +1144,17 @@ ok 54 - subtests
     ok 8 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: query
     ok 9 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: fragment
     ok 10 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: parse
+    ok 12 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: scheme
+    ok 13 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: login
+    ok 14 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: password
+    ok 15 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: host
+    ok 16 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: service
+    ok 17 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: path
+    ok 18 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: query
+    ok 19 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: fragment
 ok 55 - subtests
-    1..10
+    1..19
     ok 1 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: parse
     ok 2 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: scheme
     ok 3 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: login
@@ -670,8 +1165,17 @@ ok 55 - subtests
     ok 8 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: query
     ok 9 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: fragment
     ok 10 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: host_hint
+    ok 11 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: parse
+    ok 12 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: scheme
+    ok 13 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: login
+    ok 14 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: password
+    ok 15 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: host
+    ok 16 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: service
+    ok 17 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: path
+    ok 18 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: query
+    ok 19 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: fragment
 ok 56 - subtests
-    1..10
+    1..19
     ok 1 - unix/:./relative/path.sock:/test: parse
     ok 2 - unix/:./relative/path.sock:/test: scheme
     ok 3 - unix/:./relative/path.sock:/test: login
@@ -682,8 +1186,17 @@ ok 56 - subtests
     ok 8 - unix/:./relative/path.sock:/test: query
     ok 9 - unix/:./relative/path.sock:/test: fragment
     ok 10 - unix/:./relative/path.sock:/test: host_hint
+    ok 11 - unix/:./relative/path.sock:/test: parse
+    ok 12 - unix/:./relative/path.sock:/test: scheme
+    ok 13 - unix/:./relative/path.sock:/test: login
+    ok 14 - unix/:./relative/path.sock:/test: password
+    ok 15 - unix/:./relative/path.sock:/test: host
+    ok 16 - unix/:./relative/path.sock:/test: service
+    ok 17 - unix/:./relative/path.sock:/test: path
+    ok 18 - unix/:./relative/path.sock:/test: query
+    ok 19 - unix/:./relative/path.sock:/test: fragment
 ok 57 - subtests
-    1..10
+    1..19
     ok 1 - scheme://unix/:./relative/path.sock:/test: parse
     ok 2 - scheme://unix/:./relative/path.sock:/test: scheme
     ok 3 - scheme://unix/:./relative/path.sock:/test: login
@@ -694,8 +1207,17 @@ ok 57 - subtests
     ok 8 - scheme://unix/:./relative/path.sock:/test: query
     ok 9 - scheme://unix/:./relative/path.sock:/test: fragment
     ok 10 - scheme://unix/:./relative/path.sock:/test: host_hint
+    ok 11 - scheme://unix/:./relative/path.sock:/test: parse
+    ok 12 - scheme://unix/:./relative/path.sock:/test: scheme
+    ok 13 - scheme://unix/:./relative/path.sock:/test: login
+    ok 14 - scheme://unix/:./relative/path.sock:/test: password
+    ok 15 - scheme://unix/:./relative/path.sock:/test: host
+    ok 16 - scheme://unix/:./relative/path.sock:/test: service
+    ok 17 - scheme://unix/:./relative/path.sock:/test: path
+    ok 18 - scheme://unix/:./relative/path.sock:/test: query
+    ok 19 - scheme://unix/:./relative/path.sock:/test: fragment
 ok 58 - subtests
-    1..10
+    1..19
     ok 1 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: parse
     ok 2 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: scheme
     ok 3 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: login
@@ -706,8 +1228,17 @@ ok 58 - subtests
     ok 8 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: query
     ok 9 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: fragment
     ok 10 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: host_hint
+    ok 11 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: parse
+    ok 12 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: scheme
+    ok 13 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: login
+    ok 14 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: password
+    ok 15 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: host
+    ok 16 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: service
+    ok 17 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: path
+    ok 18 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: query
+    ok 19 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: fragment
 ok 59 - subtests
-    1..10
+    1..19
     ok 1 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: parse
     ok 2 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: scheme
     ok 3 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: login
@@ -718,6 +1249,15 @@ ok 59 - subtests
     ok 8 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: query
     ok 9 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: fragment
     ok 10 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: host_hint
+    ok 11 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: parse
+    ok 12 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: scheme
+    ok 13 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: login
+    ok 14 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: password
+    ok 15 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: host
+    ok 16 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: service
+    ok 17 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: path
+    ok 18 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: query
+    ok 19 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: fragment
 ok 60 - subtests
     1..2
     ok 1 - empty is invalid

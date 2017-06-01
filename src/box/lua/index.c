@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/index.h"
-
 #include "lua/utils.h"
 #include "box/box.h"
 #include "box/index.h"
@@ -96,22 +95,21 @@ lbox_index_update(lua_State *L)
 }
 
 static int
-lbox_index_upsert(lua_State *L)
+lbox_upsert(lua_State *L)
 {
-	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL) ||
-	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL))
-		return luaL_error(L, "Usage index:upsert(tuple_key, ops)");
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) ||
+	    (lua_type(L, 2) != LUA_TTABLE && luaT_istuple(L, 2) == NULL) ||
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
+		return luaL_error(L, "Usage space:upsert(tuple_key, ops)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
 	size_t tuple_len;
-	const char *tuple = lbox_encode_tuple_on_gc(L, 3, &tuple_len);
+	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 	size_t ops_len;
-	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
+	const char *ops = lbox_encode_tuple_on_gc(L, 3, &ops_len);
 
 	struct tuple *result;
-	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
+	if (box_upsert(space_id, 0, tuple, tuple + tuple_len,
 		       ops, ops + ops_len, 1, &result) != 0)
 		return luaT_error(L);
 	return luaT_pushtupleornil(L, result);
@@ -284,6 +282,16 @@ lbox_iterator_next(lua_State *L)
 	return luaT_pushtupleornil(L, tuple);
 }
 
+/** Truncate a given space */
+static int
+lbox_truncate(struct lua_State *L)
+{
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	if (box_truncate(space_id) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 /* }}} */
 
 void
@@ -309,7 +317,7 @@ box_lua_index_init(struct lua_State *L)
 		{"insert", lbox_insert},
 		{"replace",  lbox_replace},
 		{"update", lbox_index_update},
-		{"upsert",  lbox_index_upsert},
+		{"upsert",  lbox_upsert},
 		{"delete",  lbox_index_delete},
 		{"random", lbox_index_random},
 		{"get",  lbox_index_get},
@@ -318,6 +326,7 @@ box_lua_index_init(struct lua_State *L)
 		{"count", lbox_index_count},
 		{"iterator", lbox_index_iterator},
 		{"iterator_next", lbox_iterator_next},
+		{"truncate", lbox_truncate},
 		{NULL, NULL}
 	};
 

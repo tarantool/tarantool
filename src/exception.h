@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_EXCEPTION_H_INCLUDED
 #define TARANTOOL_EXCEPTION_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <trivia/util.h>
 #include <stdarg.h>
 #include <assert.h>
 
@@ -48,7 +49,7 @@ public:
 	int get_line() const { return line; }
 	const char *get_errmsg() const { return errmsg; }
 
-	virtual void raise() = 0;
+	NORETURN virtual void raise() = 0;
 	virtual void log() const;
 	virtual ~Exception();
 
@@ -136,5 +137,10 @@ exception_init();
 #define tnt_raise(...) do {						\
 	throw tnt_error(__VA_ARGS__);					\
 } while (0)
+
+extern "C" const char *
+exception_get_string(struct error *e, const struct method *method);
+extern "C" int
+exception_get_int(struct error *e, const struct method *method);
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

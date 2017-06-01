@@ -247,6 +247,7 @@ enum {
 struct eio_req
 {
   eio_req volatile *next; /* private ETP */
+  void *pool_user; /* private ETP */
 
   eio_wd wd;       /* all applicable requests: working directory of pathname, old name; wd_open: return wd */
 
@@ -297,7 +298,7 @@ enum {
  * and eio_poll_cb needs to be invoked (it MUST NOT call eio_poll_cb itself).
  * done_poll is called when the need to poll is gone.
  */
-int eio_init (void (*want_poll)(void), void (*done_poll)(void));
+int eio_init (void *, void (*want_poll)(void *), void (*done_poll)(void *));
 
 /* must be called regularly to handle pending requests */
 /* returns 0 if all requests were handled, -1 if not, or the value of EIO_FINISH if != 0 */
@@ -308,6 +309,12 @@ void eio_set_max_poll_time (eio_tstamp nseconds);
 /* do not handle more then count requests in one call to eio_poll_cb */
 void eio_set_max_poll_reqs (unsigned int nreqs);
 
+/* on start callback for eio worker thread */
+void eio_set_thread_on_start(int (*on_start_cb)(void *), void *data);
+
+/* on stop callback for eio worker thread */
+void eio_set_thread_on_stop(int (*on_stop_cb)(void *), void *data);
+
 /* set minimum required number
  * maximum wanted number
  * or maximum idle number of threads */
@@ -317,7 +324,6 @@ void eio_set_max_idle     (unsigned int nthreads);
 void eio_set_idle_timeout (unsigned int seconds);
 
 unsigned int eio_nreqs    (void); /* number of requests in-flight */
-unsigned int eio_nready   (void); /* number of not-yet handled requests */
 unsigned int eio_npending (void); /* number of finished but unhandled requests */
 unsigned int eio_nthreads (void); /* number of worker threads in use currently */
 

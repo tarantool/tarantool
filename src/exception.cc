@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,6 +35,7 @@
 #include <errno.h>
 
 #include "fiber.h"
+#include "reflection.h"
 
 extern "C" {
 
@@ -58,6 +59,26 @@ exception_log(struct error *error)
 	e->log();
 }
 
+const char *
+exception_get_string(struct error *e, const struct method *method)
+{
+	/* A workaround for for vtable */
+	Exception *ex = (Exception *) e;
+	if (!method_invokable<const char *>(method, ex))
+		return NULL;
+	return method_invoke<const char *>(method, ex);
+}
+
+int
+exception_get_int(struct error *e, const struct method *method)
+{
+	/* A workaround for vtable  */
+	Exception *ex = (Exception *) e;
+	if (!method_invokable<int>(method, ex))
+		return 0;
+	return method_invoke<int>(method, ex);
+}
+
 } /* extern "C" */
 
 /** out_of_memory::size is zero-initialized by the linker. */
@@ -66,8 +87,6 @@ static OutOfMemory out_of_memory(__FILE__, __LINE__,
 
 static const struct method exception_methods[] = {
 	make_method(&type_Exception, "message", &Exception::get_errmsg),
-	make_method(&type_Exception, "file", &Exception::get_file),
-	make_method(&type_Exception, "line", &Exception::get_line),
 	make_method(&type_Exception, "log", &Exception::log),
 	METHODS_SENTINEL
 };
@@ -245,6 +264,18 @@ BuildLuajitError(const char *file, unsigned line, const char *msg)
 	return new (p) LuajitError(file, line, msg);
 }
 
+static struct error *
+BuildSystemError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(SystemError);
+	SystemError *e = new (p) SystemError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
 #undef BuildAlloc
 
 void
@@ -257,6 +288,7 @@ exception_init()
 	exception_error_factory.TimedOut = BuildTimedOut;
 	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
 	exception_error_factory.LuajitError = BuildLuajitError;
+	exception_error_factory.SystemError = BuildSystemError;
 
 	error_factory = &exception_error_factory;
 

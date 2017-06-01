@@ -13,6 +13,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter ', .lsn.: [0-9]+' to ''")
+---
+- true
+...
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
@@ -26,7 +30,7 @@ _space:insert{_space.id, ADMIN, 'test', 5 }
 --
 _space:insert{'hello', 'world', 'test'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
 ...
 --
 -- Can't create a space which has wrong field count - field_count must be NUM
@@ -144,55 +148,57 @@ space:replace{0}
 ---
 - error: Space '321' does not exist
 ...
-_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 ---
 - error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
-_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 ---
-- [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
+- [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
 ...
-_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
+_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
 ---
 - error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
-_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
+_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
 ---
-- [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
+- [288, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned']
 ...
 _index:select{}
 ---
-- - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'str']]]
-  - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
-  - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'num'], [2, 'str']]]
-  - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'num'], [1, 'num']]]
-  - [289, 2, 'name', 'tree', {'unique': true}, [[0, 'num'], [2, 'str']]]
-  - [296, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [296, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [296, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [297, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [297, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [297, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [304, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [304, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [304, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [305, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
-  - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
-  - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'num'], [2, 'str'], [3, 'num']]]
-  - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'num']]]
-  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'str'], [3, 'num']]]
-  - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'num'], [2, 'str'], [3, 'num']]]
-  - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'num']]]
-  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'str'], [3, 'num']]]
-  - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
-  - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'str']]]
+- - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
+  - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [288, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned']
+  - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
+  - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
+  - [289, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
+  - [296, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [296, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [296, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [297, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [297, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [297, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [304, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [304, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [304, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [305, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
+      [3, 'unsigned']]]
+  - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
+  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
+      [3, 'unsigned']]]
+  - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
+  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'string']]]
 ...
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
@@ -203,9 +209,9 @@ _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 ---
 - [1000, 1, 'hello', 'memtx', 0]
 ...
-_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 ---
-- [1000, 0, 'primary', 'tree', 1, 1, 0, 'num']
+- [1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
 ...
 box.space[1000]:insert{0, 'hello, world'}
 ---
@@ -370,7 +376,7 @@ auto:drop()
 s = box.schema.space.create('space')
 ---
 ...
-index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {1, 'unsigned', 2, 'string'}})
 ---
 ...
 s:insert{1, 'a'}
@@ -408,16 +414,16 @@ s = box.schema.space.create("test", "bug")
 ...
 s = box.schema.space.create("test", {unknown = 'param'})
 ---
-- error: 'Wrong space options (field 5): unexpected option ''unknown'''
+- error: Illegal parameters, unexpected option 'unknown'
 ...
 s = box.schema.space.create("test")
 ---
 ...
-index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {0, 'unsigned', 1, 'string'}})
 ---
 - error: 'Illegal parameters, invalid index parts: field_no must be one-based'
 ...
-index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+index = s:create_index('primary', {unique = true, parts = {'unsigned', 1, 'string', 2}})
 ---
 - error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
     pairs'
@@ -426,9 +432,9 @@ index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
 - error: Illegal parameters, options parameter 'parts' should be of type table
 ...
-index = s:create_index('test', {unique = true, parts = {1, 'NUM'}, mmap = true})
+index = s:create_index('test', {unique = true, parts = {1, 'unsigned'}, mmap = true})
 ---
-- error: 'Wrong index options (field 4): unexpected option ''mmap'''
+- error: Illegal parameters, unexpected option 'mmap'
 ...
 s:drop()
 ---
@@ -459,5 +465,129 @@ for i=1,W do
     ch:get()
 end
 test_run:cmd("setopt delimiter ''");
+---
+...
+-- ------------------------------------------------------------------
+-- Lower and upper cases
+-- ------------------------------------------------------------------
+space = box.schema.space.create("test")
+---
+...
+_ = space:create_index('primary', { parts = {1, 'nUmBeR', 2, 'StRinG'}})
+---
+...
+space.index.primary.parts[1].type == 'number'
+---
+- true
+...
+space.index.primary.parts[2].type == 'string'
+---
+- true
+...
+box.space._index:get({space.id, 0})[6]
+---
+- [[0, 'number'], [1, 'string']]
+...
+space:drop()
+---
+...
+-- ------------------------------------------------------------------
+-- Aliases
+-- ------------------------------------------------------------------
+space = box.schema.space.create("test")
+---
+...
+_ = space:create_index('primary', { parts = {1, 'uint', 2, 'int', 3, 'str'}})
+---
+...
+space.index.primary.parts[1].type == 'unsigned'
+---
+- true
+...
+space.index.primary.parts[2].type == 'integer'
+---
+- true
+...
+space.index.primary.parts[3].type == 'string'
+---
+- true
+...
+box.space._index:get({space.id, 0})[6]
+---
+- [[0, 'unsigned'], [1, 'integer'], [2, 'string']]
+...
+space:drop()
+---
+...
+-- ------------------------------------------------------------------
+-- Tarantool 1.6 compatibility
+-- ------------------------------------------------------------------
+-- gh-1534: deprecate 'num' data type for unsigned integers
+space = box.schema.space.create("test")
+---
+...
+_ = space:create_index('primary', { parts = {1, 'num'}})
+---
+...
+space.index.primary.parts[1].type == 'unsigned'
+---
+- true
+...
+box.space._index:get({space.id, 0})[6]
+---
+- [[0, 'unsigned']]
+...
+space:drop()
+---
+...
+-- data dictionary compatibility is checked by upgrade.test.lua
+-- ------------------------------------------------------------------
+-- gh-1966 Index lsn does not get updated on space truncate
+-- ------------------------------------------------------------------
+space = box.schema.space.create('test')
+---
+...
+_ = space:create_index('primary', { parts = {1, 'unsigned'} })
+---
+...
+lsn = box.space._index:select{box.space.test.id, 0}[1][5].lsn
+---
+...
+space:truncate()
+---
+...
+indexes = box.space._index:select{space.id}
+---
+...
+lsn < box.space._index:select{box.space.test.id, 0}[1][5].lsn
+---
+- true
+...
+space:drop()
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- create_index() does not modify index options
+--
+s = box.schema.space.create('test', {engine='vinyl'})
+---
+...
+opts = {parts={1, 'unsigned'}}
+---
+...
+_ = s:create_index('pk', opts)
+---
+...
+opts
+---
+- parts:
+  - 1
+  - unsigned
+...
+s:drop()
 ---
 ...

@@ -17,16 +17,15 @@ session = box.session
 remote = require('net.box')
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("dostring", "session.su('admin')")
 ---
-- []
 ...
 c:call("dostring", "return session.user()")
 ---
-- - ['admin']
+- admin
 ...
 c:close()
 ---
@@ -51,7 +50,7 @@ box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("setuid_func")
@@ -79,7 +78,7 @@ box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ...
 c:call("setuid_func")
 ---
-- - [1]
+- [1]
 ...
 session.su('guest')
 ---
@@ -111,12 +110,12 @@ session = box.session
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
 ---
 ...
-c = remote:new(box.cfg.listen)
+c = remote.connect(box.cfg.listen)
 ---
 ...
 c:call("setuid_func")
 ---
-- - [2]
+- [2]
 ...
 session.su('guest')
 ---
@@ -163,7 +162,7 @@ box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:insert{1}
@@ -204,7 +203,7 @@ c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
 ...
 c:call('dostring', 'return 2 + 2')
 ---
-- - [4]
+- 4
 ...
 c:close()
 ---
@@ -240,7 +239,7 @@ box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:select{}
@@ -257,7 +256,7 @@ c.space.test:select{}
 c:close()
 ---
 ...
-c = net.new('test:test@'..box.cfg.listen)
+c = net.connect('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:select{}
@@ -309,7 +308,7 @@ box.schema.func.create('f1')
 box.schema.func.create('f2',{setuid=true})
 ---
 ...
-c = net.new(box.cfg.listen)
+c = net.connect(box.cfg.listen)
 ---
 ...
 -- should return access denied
@@ -320,7 +319,7 @@ c:call('f1')
 -- should work (used to return access denied, because was not setuid
 c:call('f2')
 ---
-- - [0]
+- 0
 ...
 c:close()
 ---
@@ -333,4 +332,15 @@ box.schema.func.drop('f1')
 ...
 box.schema.func.drop('f2')
 ---
+...
+--
+--gh-2063 - improper params to su function
+--
+box.session.su('admin', box.session.user)
+---
+- admin
+...
+box.session.su('admin', box.session.user())
+---
+- error: 'bad argument #2 to ''?'' (function expected, got string)'
 ...

@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_FIBER_H_INCLUDED
 #define TARANTOOL_FIBER_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -43,6 +43,7 @@
 #include "small/mempool.h"
 #include "small/region.h"
 #include "small/rlist.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -72,6 +73,13 @@ enum {
 	 */
 	FIBER_IS_JOINABLE = 1 << 2,
 	/**
+	 * The fiber is in cord->ready list or in
+	 * a call chain created by fiber_schedule_list().
+	 * The flag is set to help fiber_wakeup() avoid
+	 * double wakeup of an already scheduled fiber.
+	 */
+	FIBER_IS_READY = 1 << 3,
+	/**
 	 * This flag is set when fiber function ends and before
 	 * the fiber is recycled.
 	 */
@@ -90,9 +98,8 @@ enum fiber_key {
 	/** transaction */
 	FIBER_KEY_TXN = 2,
 	/** User global privilege and authentication token */
-	FIBER_KEY_USER = 3,
-	FIBER_KEY_MSG = 4,
-	FIBER_KEY_MAX = 5
+	FIBER_KEY_MSG = 3,
+	FIBER_KEY_MAX = 4
 };
 
 /** \cond public */
@@ -187,8 +194,9 @@ fiber_set_joinable(struct fiber *fiber, bool yesno);
  * @pre FIBER_IS_JOINABLE flag is set.
  *
  * \param f fiber to be woken up
+ * \return fiber function ret code
  */
-API_EXPORT void
+API_EXPORT int
 fiber_join(struct fiber *f);
 
 /**
@@ -275,6 +283,7 @@ struct fiber {
 	 */
 	fiber_func f;
 	va_list f_data;
+	int f_ret;
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
 	/** Exception which caused this fiber's death. */
@@ -294,8 +303,6 @@ struct cord {
 	/** The fiber that is currently being executed. */
 	struct fiber *fiber;
 	struct ev_loop *loop;
-	/** Depth of the fiber call stack. */
-	int call_stack_depth;
 	/**
 	 * Every new fiber gets a new monotonic id. Ids 1-100 are
 	 * reserved.
@@ -327,7 +334,7 @@ struct cord {
 	 */
 	ev_idle idle_event;
 	/** A memory cache for (struct fiber) */
-	struct mempool fiber_pool;
+	struct mempool fiber_mempool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
 	/** The "main" fiber of this cord, the scheduler. */
@@ -340,6 +347,12 @@ extern __thread struct cord *cord_ptr;
 #define cord() cord_ptr
 #define fiber() cord()->fiber
 #define loop() (cord()->loop)
+
+void
+cord_create(struct cord *cord, const char *name);
+
+void
+cord_destroy(struct cord *cord);
 
 /**
  * Start a cord with the given thread function.
@@ -374,7 +387,8 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
  * @param cord cord
  * @sa pthread_join()
  *
- * @return 0 on success, pthread_join return code on error
+ * @return 0 on success, -1 if pthread_join failed or the
+ * thread function terminated with an exception.
  */
 int
 cord_cojoin(struct cord *cord);
@@ -387,17 +401,20 @@ cord_cojoin(struct cord *cord);
  * preserves the exception in the caller's cord.
  *
  * @param cord cord
- * @retval  0  pthread_join succeeded.
- *             If the thread function terminated with an
- *             exception, the exception is raised in the
- *             caller cord.
- * @retval -1   pthread_join failed.
+ * @return 0 on success, -1 if pthread_join failed or the
+ * thread function terminated with an exception.
  */
 int
 cord_join(struct cord *cord);
 
 void
 cord_set_name(const char *name);
+
+static inline const char *
+cord_name(struct cord *cord)
+{
+	return cord->name;
+}
 
 /** True if this cord represents the process main thread. */
 bool
@@ -521,7 +538,7 @@ fiber_new_xc(const char *name, fiber_func func)
 	struct fiber *f = fiber_new(name, func);
 	if (f == NULL) {
 		diag_raise();
-		assert(false);
+		unreachable();
 	}
 	return f;
 }
@@ -537,5 +554,16 @@ fiber_cxx_invoke(fiber_func f, va_list ap)
 }
 
 #endif /* defined(__cplusplus) */
+
+static inline void *
+region_aligned_alloc_cb(void *ctx, size_t size)
+{
+	void *ptr = region_aligned_alloc((struct region *) ctx, size,
+					 alignof(uint64_t));
+	if (ptr == NULL)
+		diag_set(OutOfMemory, size, "region", "new slab");
+	return ptr;
+}
+
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

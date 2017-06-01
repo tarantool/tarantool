@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_LIB_BIT_BIT_H_INCLUDED
 #define TARANTOOL_LIB_BIT_BIT_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,7 +35,7 @@
  * @file
  * @brief Bit manipulation library
  */
-#include "trivia/config.h"
+#include "trivia/util.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -54,7 +54,7 @@ extern "C" {
 #define bit_likely(x)    __builtin_expect((x),1)
 #define bit_unlikely(x)  __builtin_expect((x),0)
 
-struct unaligned_mem
+struct PACKED unaligned_mem
 {
 	union
 	{
@@ -66,7 +66,7 @@ struct unaligned_mem
 		double	 lf;
 		bool     b;
 	};
-} __attribute__((__packed__));
+};
 /** @endcond **/
 
 /**
@@ -177,23 +177,27 @@ store_bool(void *p, bool b)
 
 /**
  * @brief Test bit \a pos in memory chunk \a data
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
-*  @retval true bit \a pos is set in \a data
+ * @retval true bit \a pos is set in \a data
  * @retval false otherwise
  */
 inline bool
 bit_test(const void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	const unsigned char *cdata = (const unsigned char  *) data;
-	return (cdata[chunk] >> offset) & 0x1;
+	const unsigned long *ldata = (const unsigned long  *) data;
+	return (ldata[chunk] >> offset) & 0x1;
 }
 
 /**
  * @brief Set bit \a pos in a memory chunk \a data
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -203,17 +207,19 @@ bit_test(const void *data, size_t pos)
 inline bool
 bit_set(void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	unsigned char *cdata = (unsigned char  *) data;
-	bool prev = (cdata[chunk] >> offset) & 0x1;
-	cdata[chunk] |= (1U << offset);
+	unsigned long *ldata = (unsigned long  *) data;
+	bool prev = (ldata[chunk] >> offset) & 0x1;
+	ldata[chunk] |= (1UL << offset);
 	return prev;
 }
 
 /**
  * @brief Clear bit \a pos in memory chunk \a data
+ * data is considered as a sequence of chars,
+ *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -223,12 +229,12 @@ bit_set(void *data, size_t pos)
 inline bool
 bit_clear(void *data, size_t pos)
 {
-	size_t chunk = pos / CHAR_BIT;
-	size_t offset = pos % CHAR_BIT;
+	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
+	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
 
-	unsigned char *cdata = (unsigned char *) data;
-	bool prev = (cdata[chunk] >> offset) & 0x1;
-	cdata[chunk] &= ~(1U << offset);
+	unsigned long *ldata = (unsigned long *) data;
+	bool prev = (ldata[chunk] >> offset) & 0x1;
+	ldata[chunk] &= ~(1UL << offset);
 	return prev;
 }
 

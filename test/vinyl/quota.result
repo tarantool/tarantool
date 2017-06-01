@@ -1,0 +1,89 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+--
+-- Restart the server because need to reset quota used memory
+-- after previous tests.
+--
+test_run:cmd('restart server default')
+--
+-- gh-1863 add BPS tree extents to memory quota
+--
+box.info.vinyl().memory.used
+---
+- 0
+...
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = space:create_index('pk')
+---
+...
+sec = space:create_index('sec', { parts = {2, 'unsigned'} })
+---
+...
+space:insert({1, 1})
+---
+- [1, 1]
+...
+box.info.vinyl().memory.used
+---
+- 98343
+...
+space:insert({1, 1})
+---
+- error: Duplicate key exists in unique index 'pk' in space 'test'
+...
+box.info.vinyl().memory.used
+---
+- 98343
+...
+space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
+---
+- error: Attempt to modify a tuple field which is part of index 'pk' in space 'test'
+...
+box.info.vinyl().memory.used
+---
+- 98343
+...
+space:insert({2, 2})
+---
+- [2, 2]
+...
+space:insert({3, 3})
+---
+- [3, 3]
+...
+space:insert({4, 4})
+---
+- [4, 4]
+...
+box.info.vinyl().memory.used
+---
+- 98460
+...
+box.snapshot()
+---
+- ok
+...
+box.info.vinyl().memory.used
+---
+- 0
+...
+space:select{}
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+...
+box.info.vinyl().memory.used
+---
+- 0
+...
+space:drop()
+---
+...

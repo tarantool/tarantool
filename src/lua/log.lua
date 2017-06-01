@@ -20,7 +20,7 @@ ffi.cdef[[
         S_DEBUG
     };
 
-    pid_t logger_pid;
+    pid_t log_pid;
     extern int log_level;
 ]]
 
@@ -52,21 +52,37 @@ local function say_closure(lvl)
     end
 end
 
-return {
-    warn = say_closure(S_WARN),
-    info = say_closure(S_INFO),
-    debug = say_closure(S_DEBUG),
-    error = say_closure(S_ERROR),
+local function log_rotate()
+    ffi.C.say_logrotate(0)
+end
 
-    rotate = function()
-        ffi.C.say_logrotate(0)
-    end,
+local function log_level(level)
+    return ffi.C.say_set_log_level(level)
+end
 
+local function log_pid()
+    return tonumber(ffi.C.log_pid)
+end
+
+local compat_warning_said = false
+local compat_v16 = {
     logger_pid = function()
-        return tonumber(ffi.C.logger_pid)
-    end,
-
-    level = function(level)
-        return ffi.C.say_set_log_level(level)
-    end,
+        if not compat_warning_said then
+            compat_warning_said = true
+            say(S_WARN, 'logger_pid() is deprecated, please use pid() instead')
+        end
+        return log_pid()
+    end;
 }
+
+return setmetatable({
+    warn = say_closure(S_WARN);
+    info = say_closure(S_INFO);
+    debug = say_closure(S_DEBUG);
+    error = say_closure(S_ERROR);
+    rotate = log_rotate;
+    pid = log_pid;
+    level = log_level;
+}, {
+    __index = compat_v16;
+})

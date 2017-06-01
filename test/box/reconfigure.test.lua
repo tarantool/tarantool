@@ -31,11 +31,11 @@ box.snapshot()
 box.cfg{log_level=5}
 -- constants
 box.cfg{wal_dir="dynamic"}
-box.cfg{snap_dir="dynamic"}
-box.cfg{logger="new logger"}
+box.cfg{memtx_dir="dynamic"}
+box.cfg{log="new logger"}
 -- bad1
-box.cfg{slab_alloc_arena=0.2}
-box.cfg.slab_alloc_arena
+box.cfg{memtx_memory=53687091}
+box.cfg.memtx_memory
 
 space:drop()
 box.cfg{snap_io_rate_limit=0}

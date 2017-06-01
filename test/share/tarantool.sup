@@ -1,254 +1,252 @@
-
-##
-## obj-c leaks
-##
-
 {
-   <obj-c internals>
+   <some crap from dash>
    Memcheck:Leak
+   match-leak-kinds: reachable
    fun:malloc
-   fun:objc_malloc
+   ...
+   obj:/bin/dash
    ...
 }
-
 {
-   <obj-c internals>
+   <luajit assembly>
+   Memcheck:Cond
+   fun:str_fastcmp
+   fun:lj_str_new
+   ...
+}
+{
+   <OpenSSL one-time allocations>
    Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:ERR_load_crypto_strings
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:OpenSSL_add_all_*
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:EVP_add_digest
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations - Lua FFI bindings>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:OBJ_NAME_add
+   ...
+   fun:main
+}
+{
+   <OpenSSL via FFI>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:lh_insert
+   obj:/lib/x86_64-linux-gnu/libcrypto.so.1.0.0
+   obj:/lib/x86_64-linux-gnu/libcrypto.so.1.0.0
+   ...
+}
+{
+   <fiber hash of the main cord>
+   Memcheck:Leak
+   match-leak-kinds: reachable
    fun:calloc
-   fun:objc_calloc
-   ...
+   fun:mh_i32ptr_new
+   fun:cord_create
+   fun:fiber_init
+   fun:main
 }
-
 {
-   <obj-c internals>
+   <title.c>
    Memcheck:Leak
-   fun:realloc
-   fun:objc_realloc
+   match-leak-kinds: reachable
+   fun:malloc
    ...
+   fun:title_init
+   fun:main
 }
-
 {
-   <obj-c internals>
+   <say.c>
    Memcheck:Leak
-   ...
-   fun:objc_msg_lookup
-   ...
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   ...
-   fun:.objc_load_function
-   ...
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
+   match-leak-kinds: reachable
    fun:malloc
    fun:strdup
-   fun:objc_register_selector_copy
-   ...
+   fun:say_init
+   fun:main
 }
-
-
-##
-## libev internals
-##
-
 {
-   <uninitialized value>
-   Memcheck:Param
-   write(buf)
-   fun:__write_nocancel
-   fun:evpipe_write
-   fun:ev_feed_signal
-   fun:ev_sighandler
-   ...
-}
-
-{
-   <ev loop destroy>
+   <libreadline one-time allocation>
    Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
    ...
-   fun:ev_default_destroy
-   fun:tarantool_free
-   ...
-}
-
-##
-## backtrace
-##
-
-## backtrace implementation is low-level and
-## produces alot of warnings.
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:backtrace
+   fun:rl_initialize
    ...
 }
-
 {
-   <backtrace internals>
-   Memcheck:Value8
-   fun:backtrace
-   ...
-}
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   ...
-}
-
-{
-   <backtrace internals>
-   Memcheck:Value8
-   fun:_itoa_word
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   ...
-}
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:_itoa_word
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   ...
-}
-
-##
-## box allocations
-## 
-
-## we can't directly free tuple allocations.
-
-{
-   <box replace command (insert)>
+   <libreadline I don't know what>
    Memcheck:Leak
-   fun:salloc
-   fun:tuple_alloc
-   fun:_i_Replace__execute__
-   fun:box_process_rw
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:rl_redisplay
    ...
 }
-
-
 {
-   <box update command>
+   <libev global array of all fds>
    Memcheck:Leak
-   fun:salloc
-   fun:tuple_alloc
-   fun:_i_Update__execute__
-   fun:box_process_rw
+   match-leak-kinds: reachable
+   ...
+   fun:*alloc
+   ...
+   fun:array_realloc
+   ...
+   fun:ev_*
    ...
 }
-
-##
-## tarantool/lua suppressions
-##
-
-#----------------------------------------------------------------------------#
-# tarantool_lua function
-#----------------------------------------------------------------------------#
-
-#
-# lua_* function suppressions
-#
-
 {
-   <lua_* from luajit library suppression>
-   Memcheck:Cond
+   <libev default loop>
+   Memcheck:Leak
+   match-leak-kinds: reachable
    ...
-   fun:lua_*
-   fun:tarantool_lua
+   fun:*alloc
+   ...
+   fun:ev_default_loop
    ...
 }
-
 {
-   <lua_* from luajit library suppression>
-   Memcheck:Cond
+   <One-time allocations in box initialization>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
    ...
-   fun:lua_*
-   fun:tarantool_lua_dostring
-   fun:tarantool_lua
+   fun:box_load_cfg
+   fun:load_cfg
    ...
 }
-
 {
-   <lua_* from luajit library suppression in admin console>
-   Memcheck:Cond
-   ...
-   fun:lua_*
-   fun:tarantool_lua_tostring
-   fun:tarantool_lua_printstack_yaml
-   fun:tarantool_lua
-   ...
-}
-
-#
-# luaL_* function suppressions
-#
-
-{
-   <luaL_* from luajit library suppression in tarantool_lua>
-   Memcheck:Cond
-   ...
-   fun:luaL_*
-   fun:tarantool_lua
-   ...
-}
-
-{
-   <luaL_* from luajit library suppression in tarantool_lua>
-   Memcheck:Cond
-   ...
-   fun:luaL_*
-   fun:tarantool_lua_dostring
-   fun:tarantool_lua
-   ...
-}
-
-{
-   <luaL_* from luajit library suppression in tarantool_lua>
-   Memcheck:Cond
-   ...
-   fun:luaL_*
-   fun:tarantool_lua_tostring
-   fun:tarantool_lua_printstack_yaml
-   fun:tarantool_lua
-   ...
-}
-
-# third_party/luajit/src/lj.supp -- add as recommended in
-# http://lua-users.org/lists/lua-l/2011-08/msg00736.html
-
-# Valgrind suppression file for LuaJIT 2.x.
-{
-   Optimized string compare
-   Memcheck:Addr4
-   fun:lj_str_cmp
+   <readline, again>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:xmalloc
+   fun:readline_internal_teardown
+   fun:rl_callback_read_char
+   fun:lbox_console_readline
+   fun:lj_BC_FUNCC
+   fun:lua_pcall
+   fun:lbox_call
+   fun:run_script_f
+   fun:_ZL16fiber_cxx_invokePFiP13__va_list_tagES0_
+   fun:fiber_loop
+   fun:coro_init
 }
 {
-   Optimized string compare
-   Memcheck:Addr4
-   fun:lj_str_new
+   <readline history>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:xrealloc
+   fun:add_history
+   fun:read_history_range
+   fun:main
 }
 {
-   Optimized string compare
-   Memcheck:Cond
-   fun:lj_str_new
+   <Existing threads>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:cord_create
+   fun:cord_thread_func
+   fun:start_thread
+   fun:clone
+}
+{
+   <Existing spaces in the space cache>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_Z9space_newP9space_defP5rlist
+   ...
+   fun:trigger_run
+   ...
+}
+{
+   <System spaces>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_Z12sc_space_newP9space_defP7key_defP7trigger
+   ...
+}
+{
+   <Rolling average>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:rmean_new
+   fun:_ZL10net_cord_fP13__va_list_tag
+   fun:_ZL16fiber_cxx_invokePFiP13__va_list_tagES0_
+   fun:fiber_loop
+   fun:coro_init
+}
+{
+   <lua-json>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strbuf_init
+   fun:json_create_tokens
+   fun:luaopen_json
+   fun:tarantool_lua_init
+   fun:main
+}
+{
+   <fiber hash>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mh_i32ptr_put
+   fun:register_fid
+   ...
+}
+{
+   <dlopen>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlsym
+   fun:clib_getsym
+   fun:lj_clib_index
+   fun:ffi_clib_index
+   fun:lj_cf_ffi_clib___index
+   fun:lj_BC_FUNCC
+   fun:lua_call
+   fun:tarantool_lua_init
+   fun:main
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -146,6 +146,8 @@ ClientError::get_errcode(const struct error *e)
 		return client_error->errcode();
 	if (type_cast(OutOfMemory, e))
 		return ER_MEMORY_ISSUE;
+	if (type_cast(SystemError, e))
+		return ER_SYSTEM;
 	return ER_PROC_LUA;
 }
 

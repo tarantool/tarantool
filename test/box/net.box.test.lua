@@ -6,14 +6,21 @@ env = require('test_run')
 test_run = env.new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
+test_run:cmd("setopt delimiter ';'")
+function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
+    return cn:_request('select', opts, space_id, index_id, iterator,
+                       offset, limit, key)
+end
+function x_fatal(cn) cn._transport.perform_request(nil, nil, 'inject', nil, '\x80') end
+test_run:cmd("setopt delimiter ''");
+
 LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.space.create('net_box_test_space')
 index = space:create_index('primary', { type = 'tree' })
 
 -- low level connection
 log.info("create connection")
-cn = remote:new(LISTEN.host, LISTEN.service)
-cn:_wait_state({active = true, error = true}, 1)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 log.info("state is %s", cn.state)
 
 cn:ping()
@@ -33,7 +40,7 @@ cn:eval('return 2+2')
 
 box.schema.user.grant('guest','execute','universe')
 cn:close()
-cn = remote:new(box.cfg.listen)
+cn = remote.connect(box.cfg.listen)
 
 cn:call('unexists_procedure')
 cn:call('test_foo', 'a', 'b', 'c')
@@ -97,14 +104,13 @@ box.space.gh822:drop()
 box.schema.user.revoke('guest','execute','universe')
 box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()
-cn = remote:new(box.cfg.listen)
+cn = remote.connect(box.cfg.listen)
 
-cn:_select(space.id, space.index.primary.id, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 0xFFFFFFFF, 123)
 space:insert{123, 345}
-cn:_select(space.id, space.index.primary.id, 123)
-cn:_select(space.id, space.index.primary.id, 123, { limit = 0 })
-cn:_select(space.id, space.index.primary.id, 123, { limit = 1 })
-cn:_select(space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 0, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 0, 1, 123)
+x_select(cn, space.id, space.index.primary.id, box.index.EQ, 1, 1, 123)
 
 cn.space[space.id]  ~= nil
 cn.space.net_box_test_space ~= nil
@@ -172,33 +178,27 @@ cn.space.net_box_test_space:get(354)
 -- reconnects after errors
 
 -- -- 1. no reconnect
-cn:_fatal('Test fatal error')
--- We expect the connection to enter 'closed' state due to 'reconnect_after'
--- option missing, however 'error'->'closed' transition happens in some
--- unrelated fiber, scheduling quirks bite (again) (sigh)
-fiber.sleep(0)
+x_fatal(cn)
 cn.state
 cn:ping()
 cn:call('test_foo')
+cn:wait_state('active')
 
 -- -- 2 reconnect
-cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
-cn:_wait_state({active = true}, 1)
+cn = remote.connect(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
 cn.space ~= nil
 
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
-cn:_fatal 'Test error'
-cn:_wait_state({active = true, activew = true}, 2)
+x_fatal(cn)
+cn:wait_connected()
+cn:wait_state('active')
+cn:wait_state({active=true})
 cn:ping()
 cn.state
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 
-cn:_fatal 'Test error'
-cn:_select(space.id, 0, {}, { iterator = 'ALL' })
-
--- send broken packet (remote server will close socket)
-cn.s:syswrite(msgpack.encode(1) .. msgpack.encode('abc'))
-fiber.sleep(.2)
+x_fatal(cn)
+x_select(cn, space.id, 0, box.index.ALL, 0, 0xFFFFFFFF, {})
 
 cn.state
 cn:ping()
@@ -206,10 +206,10 @@ cn:ping()
 -- -- dot-new-method
 
 cn1 = remote.new(LISTEN.host, LISTEN.service)
-cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
-
+x_select(cn1, space.id, 0, box.index.ALL, 0, 0xFFFFFFF, {})
+cn1:close()
 -- -- error while waiting for response
-type(fiber.create(function() fiber.sleep(.5) cn:_fatal('Test error') end))
+type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
 function pause() fiber.sleep(10) return true end
 
 cn:call('pause')
@@ -223,13 +223,13 @@ cn:call('test_foo', 'a', 'b', 'c')
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
 res = cn:call('long_rep')
-res[1][1] == 1
-res[1][2] == string.rep('a', 5000)
+res[1] == 1
+res[2] == string.rep('a', 5000)
 
 function long_rep() return { 1,  string.rep('a', 50000) } end
 res = cn:call('long_rep')
-res[1][1] == 1
-res[1][2] == string.rep('a', 50000)
+res[1] == 1
+res[2] == string.rep('a', 50000)
 
 -- a.b.c.d
 u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'
@@ -242,7 +242,7 @@ cn:call('X.X.X.X:fn', u)
 
 -- auth
 
-cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()
 cn.error
 cn.state
@@ -250,24 +250,115 @@ cn.state
 box.schema.user.create('netbox', { password  = 'test' })
 box.schema.user.grant('netbox', 'read, write, execute', 'universe');
 
-cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
 cn:ping()
 
 function ret_after(to) fiber.sleep(to) return {{to}} end
 
--- timeouts
+cn:ping({timeout = 1.00})
+cn:ping({timeout = 1e-9})
+cn:ping()
+
+remote_space = cn.space.net_box_test_space
+remote_pk = remote_space.index.primary
+
+remote_space:insert({0}, { timeout = 1.00 })
+remote_space:insert({1}, { timeout = 1e-9 })
+remote_space:insert({2})
+
+remote_space:replace({0}, { timeout = 1e-9 })
+remote_space:replace({1})
+remote_space:replace({2}, { timeout = 1.00 })
+
+remote_space:upsert({3}, {}, { timeout = 1e-9 })
+remote_space:upsert({4}, {})
+remote_space:upsert({5}, {}, { timeout = 1.00 })
+remote_space:upsert({3}, {})
+
+remote_space:update({3}, {}, { timeout = 1e-9 })
+remote_space:update({4}, {})
+remote_space:update({5}, {}, { timeout = 1.00 })
+remote_space:update({3}, {})
+
+remote_pk:update({5}, {}, { timeout = 1e-9 })
+remote_pk:update({4}, {})
+remote_pk:update({3}, {}, { timeout = 1.00 })
+remote_pk:update({5}, {})
+
+remote_space:get({0})
+remote_space:get({1}, { timeout = 1.00 })
+remote_space:get({2}, { timeout = 1e-9 })
+
+remote_pk:get({3}, { timeout = 1e-9 })
+remote_pk:get({4})
+remote_pk:get({5}, { timeout = 1.00 })
+
+remote_space:select({2}, { timeout = 1e-9 })
+remote_space:select({2}, { timeout = 1.00 })
+remote_space:select({2})
+
+remote_pk:select({2}, { timeout = 1.00 })
+remote_pk:select({2}, { timeout = 1e-9 })
+remote_pk:select({2})
+
+remote_space:select({5}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+remote_space:select({5}, { iterator = 'LE', limit = 5})
+remote_space:select({5}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+
+remote_pk:select({2}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+remote_pk:select({2}, { iterator = 'LE', limit = 5})
+remote_pk:select({2}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+
+remote_pk:count({2}, { timeout = 1.00})
+remote_pk:count({2}, { timeout = 1e-9})
+remote_pk:count({2})
+
+remote_pk:count({2}, { timeout = 1.00, iterator = 'LE' })
+remote_pk:count({2}, { iterator = 'LE'})
+remote_pk:count({2}, { timeout = 1e-9, iterator = 'LE' })
+
+remote_pk:min(nil, { timeout = 1.00 })
+remote_pk:min(nil, { timeout = 1e-9 })
+remote_pk:min(nil)
+
+remote_pk:min({0}, { timeout = 1e-9 })
+remote_pk:min({1})
+remote_pk:min({2}, { timeout = 1.00 })
+
+remote_pk:max(nil)
+remote_pk:max(nil, { timeout = 1e-9 })
+remote_pk:max(nil, { timeout = 1.00 })
+
+remote_pk:max({0}, { timeout = 1.00 })
+remote_pk:max({1}, { timeout = 1e-9 })
+remote_pk:max({2})
+
+_ = remote_space:delete({0}, { timeout = 1e-9 })
+_ = remote_pk:delete({0}, { timeout = 1.00 })
+_ = remote_space:delete({1}, { timeout = 1.00 })
+_ = remote_pk:delete({1}, { timeout = 1e-9 })
+_ = remote_space:delete({2}, { timeout = 1e-9 })
+_ = remote_pk:delete({2})
+_ = remote_pk:delete({3})
+_ = remote_pk:delete({4})
+_ = remote_pk:delete({5})
+
+remote_space:get(0)
+remote_space:get(1)
+remote_space:get(2)
+
+remote_space = nil
+
 cn:timeout(1).space.net_box_test_space.index.primary:select{234}
 cn:call('ret_after', .01)
 cn:timeout(1):call('ret_after', .01)
 cn:timeout(.01):call('ret_after', 1)
 
-cn = remote:timeout(0.0000000001):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-
-
-
+cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn:close()
+cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 
 remote.self:ping()
 remote.self.space.net_box_test_space:select{234}
@@ -276,23 +367,20 @@ remote.self:is_connected()
 remote.self:wait_connected()
 
 
+cn:close()
 -- cleanup database after tests
 space:drop()
 
-
--- admin console tests
-cnc = remote:new(os.getenv('ADMIN'))
-cnc.console ~= nil
-cnc:console('return 1, 2, 3, "string", nil')
-cnc:console('error("test")')
-cnc:console('a = {1, 2, 3, 4}; return a[3]')
-
--- #545 user or password is not defined
-remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
-remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+-- #1545 empty password
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'test' })
+cn ~= nil
+cn:close()
+cn = remote.connect(LISTEN.host, LISTEN.service, { password = 'test' })
+cn ~= nil
+cn:close()
 
 -- #544 usage for remote[point]method
-cn = remote:new(LISTEN.host, LISTEN.service)
+cn = remote.connect(LISTEN.host, LISTEN.service)
 
 cn:eval('return true')
 cn.eval('return true')
@@ -313,8 +401,12 @@ cn:ping()
 cn:close()
 
 uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
-remote.new(uri)
-cn = remote.new(uri, { password = 'test' })
+cn = remote.new(uri)
+cn ~= nil, cn.state, cn.error
+cn:close()
+-- don't merge creds from uri & opts
+remote.new(uri, { password = 'test' })
+cn = remote.new(uri, { user = 'netbox', password = 'test' })
 cn:ping()
 cn:close()
 
@@ -324,7 +416,7 @@ box.schema.user.drop('netbox')
 -- #594: bad argument #1 to 'setmetatable' (table expected, got number)
 test_run:cmd("setopt delimiter ';'")
 function gh594()
-    local cn = remote:new(box.cfg.listen)
+    local cn = remote.connect(box.cfg.listen)
     local ping = fiber.create(function() cn:ping() end)
     cn:call('dostring', 'return 2 + 2')
     cn:close()
@@ -364,6 +456,7 @@ _ = fiber.create(
    function()
          local conn = require('net.box').new(box.cfg.listen)
          conn:call('no_such_function', {})
+	 conn:close()
    end
 );
 test_run:cmd("setopt delimiter ''");
@@ -374,22 +467,23 @@ test_run:grep_log("default", "ER_NO_SUCH_PROC")
 
 -- gh-983 test case: iproto connection selecting a lot of data
 _ = box.schema.space.create('test', { temporary = true })
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 
 data1k = "aaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhh"
 
 for i = 0,10000 do box.space.test:insert{i, data1k} end
 
 net = require('net.box')
-c = net:new(box.cfg.listen)
+c = net:connect(box.cfg.listen)
 r = c.space.test:select(nil, {limit=5000})
 box.space.test:drop()
 
 -- gh-970 gh-971 UPSERT over network
 _ = box.schema.space.create('test')
-_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
+_ = box.space.test:create_index('covering', {type = 'TREE', parts = {1,'unsigned',3,'string',2,'unsigned'}})
 _ = box.space.test:insert{1, 2, "string"}
-c = net:new(box.cfg.listen)
+c = net:connect(box.cfg.listen)
 c.space.test:select{}
 c.space.test:upsert({1, 2, 'nothing'}, {{'+', 2, 1}}) -- common update
 c.space.test:select{}
@@ -397,15 +491,177 @@ c.space.test:upsert({2, 4, 'something'}, {{'+', 2, 1}}) -- insert
 c.space.test:select{}
 c.space.test:upsert({2, 4, 'nothing'}, {{'+', 3, 100500}}) -- wrong operation
 c.space.test:select{}
+
+-- gh-1729 net.box index metadata incompatible with local metadata
+c.space.test.index.primary.parts
+c.space.test.index.covering.parts
+
 box.space.test:drop()
+
+-- CALL vs CALL_16 in connect options
+function scalar42() return 42 end
+c = net.connect(box.cfg.listen)
+c:call('scalar42')
+c:close()
+c = net.connect(box.cfg.listen, {call_16 = true})
+c:call('scalar42')
+c:close()
+
+--
+-- gh-2195 export pure msgpack from net.box
+--
+
+space = box.schema.space.create('test')
+_ = box.space.test:create_index('primary')
+c = net.connect(box.cfg.listen)
+ibuf = require('buffer').ibuf()
+
+c:ping()
+c.space.test ~= nil
+
+c.space.test:replace({1, 'hello'})
+
+-- replace
+c.space.test:replace({2}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- insert
+c.space.test:insert({3}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- update
+c.space.test:update({3}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- upsert
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- delete
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- select
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result
+
+-- select
+len = c.space.test:select({}, {buffer = ibuf})
+ibuf.rpos + len == ibuf.wpos
+ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+ibuf.rpos == ibuf.wpos
+len
+result
+
+-- unsupported methods
+c.space.test:get({1}, { buffer = ibuf})
+c.space.test.index.primary:min({}, { buffer = ibuf})
+c.space.test.index.primary:max({}, { buffer = ibuf})
+c.space.test.index.primary:count({}, { buffer = ibuf})
+c.space.test.index.primary:get({1}, { buffer = ibuf})
+
+-- error handling
+rpos, wpos = ibuf.rpos, ibuf.wpos
+c.space.test:insert({1}, {buffer = ibuf})
+ibuf.rpos == rpos, ibuf.wpos == wpos
+
+ibuf = nil
+c:close()
+space:drop()
 
 -- gh-1904 net.box hangs in :close() if a fiber was cancelled
 -- while blocked in :_wait_state() in :_request()
 options = {user = 'netbox', password = 'badpass', wait_connected = false, reconnect_after = 0.01}
 c = net:new(box.cfg.listen, options)
 f = fiber.create(function() c:call("") end)
-fiber.sleep(0.1)
+fiber.sleep(0.01)
 f:cancel(); c:close()
 
+-- check for on_schema_reload callback
+test_run:cmd("setopt delimiter ';'")
+do
+    local a = 0
+    function osr_cb()
+        a = a + 1
+    end
+    local con = net.new(box.cfg.listen, {
+        wait_connected = false
+    })
+    con:on_schema_reload(osr_cb)
+    con:wait_connected()
+    con.space._schema:select{}
+    box.schema.space.create('misisipi')
+    box.space.misisipi:drop()
+    con.space._schema:select{}
+    con:close()
+    con = nil
+
+    return a
+end;
+do
+    local a = 0
+    function osr_cb()
+        a = a + 1
+    end
+    local con = net.new(box.cfg.listen, {
+        wait_connected = true
+    })
+    con:on_schema_reload(osr_cb)
+    con.space._schema:select{}
+    box.schema.space.create('misisipi')
+    box.space.misisipi:drop()
+    con.space._schema:select{}
+    con:close()
+    con = nil
+
+    return a
+end;
+test_run:cmd("setopt delimiter ''");
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+-- Tarantool < 1.7.1 compatibility (gh-1533)
+c = net.new(box.cfg.listen)
+c:ping()
+c:close()
+
+-- Test for connect_timeout > 0 in netbox connect
+test_run:cmd("setopt delimiter ';'");
+greeting =
+"Tarantool 1.7.3 (Lua console)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" ..
+"type 'help' for interactive help~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+socket = require('socket');
+srv = socket.tcp_server('localhost', 3392, {
+    handler = function(fd)
+        local fiber = require('fiber')
+        fiber.sleep(0.1)
+        fd:write(greeting)
+    end
+});
+-- we must get timeout
+nb = net.new('localhost:3392', {
+    wait_connected = true, console = true,
+    connect_timeout = 0.01
+});
+nb.error == "Timeout exceeded" or nb.error == "Connection timed out";
+nb:close();
+-- we must get peer closed
+nb = net.new('localhost:3392', {
+    wait_connected = true, console = true,
+    connect_timeout = 0.2
+});
+nb.error ~= "Timeout exceeded";
+nb:close();
+test_run:cmd("setopt delimiter ''");
+srv:close()
+
 test_run:cmd("clear filter")

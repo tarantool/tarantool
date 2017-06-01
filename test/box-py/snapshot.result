@@ -19,18 +19,32 @@ box.snapshot()
 ---
 - ok
 ...
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: can't save snapshot, errno 17 (File exists)
+...
+e.type
+---
+- SystemError
+...
+e.errno
+---
+- 17
 ...
 space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
 # Make 'var' directory read-only.
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: can't save snapshot, errno 13 (Permission denied)
+...
+e.type
+---
+- SystemError
+...
+e.errno
+---
+- 13
 ...
 space:delete{1}
 ---

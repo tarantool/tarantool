@@ -34,11 +34,17 @@ box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
 box.error.raise()
-box.error.last()
+e = box.error.last()
+e
+e:unpack()
+e.type
+e.code
+e.message
+tostring(e)
+e = nil
 box.error.clear()
 box.error.last()
 box.error.raise()
-
 space = box.space.tweedledum
 
 ----------------
@@ -110,6 +116,8 @@ box.space.tweedledum:truncate()
 myinsert = nil
 
 -- A test case for gh-37: print of 64-bit number
+
+ffi = require('ffi')
 1, 1
 tonumber64(1), 1
 
@@ -143,6 +151,91 @@ tostring(tonumber64('12345678901234')) == '12345678901234'
 tostring(tonumber64('123456789012345')) == '123456789012345ULL'
 tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
 
+tonumber64('0x12') == 18
+tonumber64('0x12', 16) == 18
+tonumber64('0x12', 17) == nil
+tonumber64('0b01') == 1
+tonumber64('0b01', 2) == 1
+tonumber64('0b01', 3) == nil
+tonumber64('  0b1  ') == 1
+tonumber64('  0b1  ', 'badbase')
+tonumber64('  0b1  ', 123) -- big base
+tonumber64('12345', 123) -- big base
+tonumber64('0xfffff') == 1048575
+tonumber64('0b111111111111111111') == 262143
+
+tonumber64('20', 36)
+
+tonumber64("", 10)
+tonumber64("", 32)
+
+tonumber64("-1")
+tonumber64("-0x16")
+tonumber64("-0b11")
+tonumber64(" -0x16 ")
+tonumber64(" -0b11 ")
+
+-- numbers/cdata with base = 10 - return as is
+tonumber64(100)
+tonumber64(100, 10)
+tonumber64(100LL)
+tonumber64(100ULL, 10)
+tonumber64(-100LL)
+tonumber64(-100LL, 10)
+tonumber64(ffi.new('char', 10))
+tonumber64(ffi.new('short', 10))
+tonumber64(ffi.new('int', 10))
+tonumber64(ffi.new('long ', 10))
+tonumber64(ffi.new('int8_t', 10))
+tonumber64(ffi.new('int16_t', 10))
+tonumber64(ffi.new('int32_t', 10))
+tonumber64(ffi.new('int64_t', 10))
+tonumber64(ffi.new('unsigned char', 10))
+tonumber64(ffi.new('unsigned short', 10))
+tonumber64(ffi.new('unsigned int', 10))
+tonumber64(ffi.new('unsigned int', 10))
+tonumber64(ffi.new('unsigned long ', 10))
+tonumber64(ffi.new('uint8_t', 10))
+tonumber64(ffi.new('uint16_t', 10))
+tonumber64(ffi.new('uint32_t', 10))
+tonumber64(ffi.new('uint64_t', 10))
+tonumber64(ffi.new('float', 10))
+tonumber64(ffi.new('double', 10))
+
+-- number/cdata with custom `base` - is not supported
+tonumber64(100, 2)
+tonumber64(100LL, 2)
+tonumber64(-100LL, 2)
+tonumber64(100ULL, 2)
+tonumber64(ffi.new('char', 10), 2)
+tonumber64(ffi.new('short', 10), 2)
+tonumber64(ffi.new('int', 10), 2)
+tonumber64(ffi.new('long ', 10), 2)
+tonumber64(ffi.new('int8_t', 10), 2)
+tonumber64(ffi.new('int16_t', 10), 2)
+tonumber64(ffi.new('int32_t', 10), 2)
+tonumber64(ffi.new('int64_t', 10), 2)
+tonumber64(ffi.new('unsigned char', 10), 2)
+tonumber64(ffi.new('unsigned short', 10), 2)
+tonumber64(ffi.new('unsigned int', 10), 2)
+tonumber64(ffi.new('unsigned int', 10), 2)
+tonumber64(ffi.new('unsigned long ', 10), 2)
+tonumber64(ffi.new('uint8_t', 10), 2)
+tonumber64(ffi.new('uint16_t', 10), 2)
+tonumber64(ffi.new('uint32_t', 10), 2)
+tonumber64(ffi.new('uint64_t', 10), 2)
+tonumber64(ffi.new('float', 10), 2)
+tonumber64(ffi.new('double', 10), 2)
+
+-- invalid types - return nil
+ffi.cdef("struct __tonumber64_test {};")
+tonumber64(ffi.new('struct __tonumber64_test'))
+tonumber64(nil)
+tonumber64(function() end)
+tonumber64({})
+
+collectgarbage('collect')
+
 --  dostring()
 dostring('abc')
 dostring('abc=2')
@@ -155,17 +248,6 @@ bit.lshift(1, 32)
 bit.band(1, 3)
 bit.bor(1, 2)
 
--- A test case for space:inc and space:dec
-space = box.space.tweedledum
-space:inc{1}
-space:get{1}
-space:inc{1}
-space:inc{1}
-space:get{1}
-space:dec{1}
-space:dec{1}
-space:dec{1}
-space:get{1}
 space:truncate()
 
 dofile('fifo.lua')
@@ -185,19 +267,6 @@ space:delete{1}
 
 space:drop()
 test_run:cmd("clear filter")
-
--- https://github.com/tarantool/tarantool/issues/1109
--- Update via a secondary key breaks recovery
-s = box.schema.create_space('test')
-i1 = s:create_index('test1', {parts = {1, 'num'}})
-i2 = s:create_index('test2', {parts = {2, 'num'}})
-s:insert{1, 2, 3}
-s:insert{5, 8, 13}
-i2:update({2}, {{'+', 3, 3}})
-i2:delete{8}
-test_run:cmd("restart server default")
-box.space.test:select{}
-box.space.test:drop()
 
 -- test test_run:grep_log()
 require('log').info('Incorrect password supplied')

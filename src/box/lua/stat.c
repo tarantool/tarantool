@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -44,7 +44,7 @@ extern struct rmean *rmean_box;
 extern struct rmean *rmean_error;
 /** network statistics (iproto & cbus) */
 extern struct rmean *rmean_net;
-extern struct rmean *rmean_net_tx_bus;
+extern struct rmean *rmean_tx_wal_bus;
 
 static void
 fill_stat_item(struct lua_State *L, int rps, int64_t total)
@@ -113,10 +113,7 @@ static int
 lbox_stat_net_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
-	int res = rmean_foreach(rmean_net, seek_stat_item, L);
-	if (res)
-		return res;
-	return rmean_foreach(rmean_net_tx_bus, seek_stat_item, L);
+	return rmean_foreach(rmean_net, seek_stat_item, L);
 }
 
 static int
@@ -124,7 +121,6 @@ lbox_stat_net_call(struct lua_State *L)
 {
 	lua_newtable(L);
 	rmean_foreach(rmean_net, set_stat_item, L);
-	rmean_foreach(rmean_net_tx_bus, set_stat_item, L);
 	return 1;
 }
 

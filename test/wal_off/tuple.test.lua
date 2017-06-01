@@ -25,3 +25,7 @@ tuple_max = string.rep('a', 1000000)
 #tuple_max
 t = tester:insert{#tuple_max, tuple_max}
 tester:drop()
+-- need to restart because we need to have a clean server after
+-- related to #2280
+test_run:cmd("restart server default")
+test_run:cmd("restart server default")

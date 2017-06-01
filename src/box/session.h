@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_SESSION_H
 #define INCLUDES_TARANTOOL_SESSION_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -92,12 +92,23 @@ extern struct rlist session_on_connect;
 
 extern struct rlist session_on_auth;
 
-static inline void
-fiber_set_user(struct fiber *fiber, struct credentials *cr)
+/**
+ * Get the current session from @a fiber
+ * @param fiber fiber
+ * @return session if any
+ * @retval NULL if there is no active session
+ */
+static inline struct session *
+fiber_get_session(struct fiber *fiber)
 {
-	fiber_set_key(fiber, FIBER_KEY_USER, cr);
+	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
 }
 
+/**
+ * Set the current session in @a fiber
+ * @param fiber fiber
+ * @param session a value to set
+ */
 static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
@@ -105,11 +116,11 @@ fiber_set_session(struct fiber *fiber, struct session *session)
 }
 
 static inline void
-credentials_init(struct credentials *cr, struct user *user)
+credentials_init(struct credentials *cr, uint8_t auth_token, uint32_t uid)
 {
-	cr->auth_token = user->auth_token;
+	cr->auth_token = auth_token;
 	cr->universal_access = universe.access[cr->auth_token].effective;
-	cr->uid = user->def.uid;
+	cr->uid = uid;
 }
 
 static inline void
@@ -130,7 +141,7 @@ extern struct credentials admin_credentials;
  * trigger to destroy it when this fiber ends.
  */
 struct session *
-session_create_on_demand();
+session_create_on_demand(int fd);
 
 /*
  * When creating a new fiber, the database (box)
@@ -145,9 +156,13 @@ session_create_on_demand();
 static inline struct session *
 current_session()
 {
-	struct session *s = (struct session *)
-		fiber_get_key(fiber(), FIBER_KEY_SESSION);
-	return s ? s : session_create_on_demand();
+	struct session *session = fiber_get_session(fiber());
+	if (session == NULL) {
+		session = session_create_on_demand(-1);
+		if (session == NULL)
+			diag_raise();
+	}
+	return session;
 }
 
 /** Global on-disconnect triggers. */
@@ -155,9 +170,6 @@ extern struct rlist session_on_disconnect;
 
 void
 session_storage_cleanup(int sid);
-
-#if defined(__cplusplus)
-} /* extern "C" */
 
 /**
  * Create a session.
@@ -186,40 +198,25 @@ void
 session_destroy(struct session *);
 
 /** Run on-connect triggers */
-void
+int
 session_run_on_connect_triggers(struct session *session);
 
 /** Run on-disconnect triggers */
 void
 session_run_on_disconnect_triggers(struct session *session);
 
-void
+/** Run auth triggers */
+int
 session_run_on_auth_triggers(const char *user_name);
 
-/*
- * Return the current user. Create it if it doesn't
- * exist yet.
- * The same rationale for initializing the current
- * user on demand as in current_session() applies.
- */
-static inline struct credentials *
-current_user()
-{
-	struct credentials *u =
-		(struct credentials *) fiber_get_key(fiber(),
-						      FIBER_KEY_USER);
-	if (u == NULL) {
-		session_create_on_demand();
-		u = (struct credentials *) fiber_get_key(fiber(),
-							  FIBER_KEY_USER);
-	}
-	return u;
-}
+#if defined(__cplusplus)
+} /* extern "C" */
 
 static inline void
 access_check_universe(uint8_t access)
 {
-	struct credentials *credentials = current_user();
+	struct session *session = current_session();
+	struct credentials *credentials = &session->credentials;
 	if (!(credentials->universal_access & access)) {
 		/*
 		 * Access violation, report error.
