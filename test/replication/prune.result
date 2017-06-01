@@ -56,7 +56,7 @@ uuid = require('uuid')
 ...
 box.space._cluster:insert{box.schema.REPLICA_MAX, uuid.str()}
 ---
-- error: 'Replica count limit reached: 32'
+- error: 'Replica count limit reached: 64'
 ...
 -- Delete all replication nodes
 replica_set.drop_all(test_run)
