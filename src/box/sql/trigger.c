@@ -11,6 +11,8 @@
 ** This file contains the implementation for TRIGGERs
 */
 #include "sqliteInt.h"
+#include "tarantoolInt.h"
+#include "vdbeInt.h"
 
 #ifndef SQLITE_OMIT_TRIGGER
 /*
@@ -272,6 +274,8 @@ void sqlite3FinishTrigger(
 ){
   Trigger *pTrig = pParse->pNewTrigger;   /* Trigger being finished */
   char *zName;                            /* Name of trigger */
+  char *zSql;                             /* SQL text */
+  char *zOpts;                            /* MsgPack containing SQL options */
   sqlite3 *db = pParse->db;               /* The database */
   DbFixer sFix;                           /* Fixer object */
   int iDb;                                /* Database containing the trigger */
@@ -299,21 +303,72 @@ void sqlite3FinishTrigger(
   */
   if( !db->init.busy ){
     Vdbe *v;
-    char *z;
+    char *zSql;
+    int sql_len;
+    int zOptsSz;
+    Table *pSysTrigger;
+    int iFirstCol;
+    int iCursor = pParse->nTab++;
+    int iRecord;
 
     /* Make an entry in the sqlite_master table */
     v = sqlite3GetVdbe(pParse);
     if( v==0 ) goto triggerfinish_cleanup;
+
+    pSysTrigger = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash,
+      TARANTOOL_SYS_TRIGGER_NAME
+    );
+    if( NEVER(!pSysTrigger) )
+	    goto triggerfinish_cleanup;
+
+    zSql = sqlite3MPrintf(db, "CREATE TRIGGER %s", pAll->z);
+    if( db->mallocFailed )
+	    goto triggerfinish_cleanup;
+
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysTrigger, OP_OpenWrite);
+
+    /* makerecord(cursor(iRecord), [reg(iFirstCol), reg(iFirstCol+1)])  */
+    iFirstCol = pParse->nMem + 1;
+    pParse->nMem += 2;
+    iRecord = ++pParse->nMem;
+
+    zOpts = sqlite3DbMallocRaw(pParse->db,
+			       tarantoolSqlite3MakeTableOpts(0, zSql, NULL) + 1);
+    if( db->mallocFailed )
+	    goto triggerfinish_cleanup;
+
+    zOptsSz = tarantoolSqlite3MakeTableOpts(0, zSql, zOpts);
+
+    zName = sqlite3DbStrDup(pParse->db, zName);
+    if( db->mallocFailed )
+	    goto triggerfinish_cleanup;
+
+    sqlite3VdbeAddOp4(v,
+		      OP_String8, 0, iFirstCol, 0,
+		      zName,
+		      P4_DYNAMIC);
+    sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol+1, MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
+    sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 2, iRecord);
+    sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 7);
+    sqlite3VdbeAddOp1(v, OP_Close, iCursor);
+
+    /* parseschema3(reg(iFirstCol), ref(iFirstCol)+1) */
+    iFirstCol = pParse->nMem + 1;
+    pParse->nMem += 2;
+
     sqlite3BeginWriteOperation(pParse, 0, iDb);
-    z = sqlite3DbStrNDup(db, (char*)pAll->z, pAll->n);
-    sqlite3NestedParse(pParse,
-       "INSERT INTO %Q.%s VALUES('trigger',%Q,%Q,0,'CREATE TRIGGER %q')",
-       db->aDb[iDb].zDbSName, MASTER_NAME, zName,
-       pTrig->table, z);
-    sqlite3DbFree(db, z);
+    sqlite3VdbeAddOp4(v,
+		      OP_String8, 0, iFirstCol, 0,
+		      zName,
+		      P4_STATIC);
+    
+    sqlite3VdbeAddOp4(v,
+		      OP_String8, 0, iFirstCol+1, 0,
+		      zSql,
+		      P4_DYNAMIC);
     sqlite3ChangeCookie(pParse, iDb);
-    sqlite3VdbeAddParseSchemaOp(v, iDb,
-        sqlite3MPrintf(db, "type='trigger' AND name='%q'", zName));
+    sqlite3VdbeAddParseSchema3Op(v, iDb, iFirstCol);
   }
 
   if( db->init.busy ){
@@ -333,6 +388,12 @@ void sqlite3FinishTrigger(
   }
 
 triggerfinish_cleanup:
+  if( db->mallocFailed ){
+	  sqlite3DbFree(db, zSql);
+	  sqlite3DbFree(db, zOpts);
+	  /* No need to free zName sinceif we reach this point
+	     alloc for it either wasn't called at all or failed.  */
+  }
   sqlite3DeleteTrigger(db, pTrig);
   assert( !pParse->pNewTrigger );
   sqlite3DeleteTriggerStep(db, pStepList);
@@ -558,8 +619,8 @@ void sqlite3DropTriggerPtr(Parse *pParse, Trigger *pTrigger){
   assert( pTable!=0 );
   if( (v = sqlite3GetVdbe(pParse))!=0 ){
     sqlite3NestedParse(pParse,
-       "DELETE FROM %Q.%s WHERE name=%Q AND type='trigger'",
-       db->aDb[iDb].zDbSName, MASTER_NAME, pTrigger->zName
+       "DELETE FROM %Q.%s WHERE name=%Q",
+       db->aDb[iDb].zDbSName, TARANTOOL_SYS_TRIGGER_NAME, pTrigger->zName
     );
     sqlite3ChangeCookie(pParse, iDb);
     sqlite3VdbeAddOp4(v, OP_DropTrigger, iDb, 0, 0, pTrigger->zName, 0);

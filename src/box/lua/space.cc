@@ -310,6 +310,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "VPRIV_ID");
 	lua_pushnumber(L, BOX_CLUSTER_ID);
 	lua_setfield(L, -2, "CLUSTER_ID");
+	lua_pushnumber(L, BOX_TRIGGER_ID);
+	lua_setfield(L, -2, "TRIGGER_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);

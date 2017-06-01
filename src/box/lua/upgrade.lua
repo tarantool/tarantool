@@ -533,6 +533,25 @@ local function upgrade_to_1_7_2()
     box.space._schema:replace({'version', 1, 7, 2})
 end
 
+local function upgrade_to_1_8_2()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _trigger = box.space[box.schema.TRIGGER_ID]
+    local format = {{name='name', type='str'},
+                    {name='opts', type='map'}}
+
+    log.info("create space _trigger")
+    _space:insert{_trigger.id, ADMIN, '_trigger', 'memtx', 0, setmap({}), {}}
+    log.info("create index primary on _trigger")
+    _index:insert{_trigger.id, 0, 'primary', 'tree', { unique = true }, {{0, 'str'}}}
+
+    log.info("alter space _trigger set format")
+    _trigger:format(format)
+
+    log.info("set schema version to 1.8.2")
+    box.space._schema:replace({'version', 1, 8, 2})
+end
+
 --------------------------------------------------------------------------------
 
 local function upgrade()
@@ -549,6 +568,7 @@ local function upgrade()
     upgrade_to_1_6_8()
     upgrade_to_1_7_1()
     upgrade_to_1_7_2()
+    upgrade_to_1_8_2()
 end
 
 local function bootstrap()

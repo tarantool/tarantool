@@ -269,6 +269,11 @@ schema_init()
 			 FIELD_TYPE_STRING);
 	(void) sc_space_new(&def, index_def, &on_replace_schema);
 
+        /* _trigger - all existing SQL triggers */
+	index_def->space_id = def.id = BOX_TRIGGER_ID;
+	snprintf(def.name, sizeof(def.name), "_trigger");
+	(void) sc_space_new(&def, index_def, NULL);
+
 	/* _space - home for all spaces. */
 	index_def->space_id = def.id = BOX_SPACE_ID;
 	snprintf(def.name, sizeof(def.name), "_space");
@@ -300,6 +305,7 @@ schema_init()
 	index_def->space_id = def.id = BOX_CLUSTER_ID;
 	snprintf(def.name, sizeof(def.name), "_cluster");
 	(void) sc_space_new(&def, index_def, &on_replace_cluster);
+
 	index_def_delete(index_def);
 
 	/* _index - definition of indexes in all spaces */

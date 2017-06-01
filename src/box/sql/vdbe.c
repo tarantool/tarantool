@@ -5457,6 +5457,61 @@ case OP_ParseSchema2: {
   break;
 }
 
+/* Opcode: ParseSchema3 P1 P2 * * *
+** Synopsis: name=r[P1] sql=r[P1+1] iDb=P2
+**
+** Create trigger named r[P1] w/ DDL SQL stored in r[P1+1]
+** in database P2
+*/
+case OP_ParseSchema3: {
+  int iDb;
+  InitData initData;
+  Mem *pRec, *pRecEnd;
+  char zPgnoBuf[16];
+  char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
+
+  /* Any prepared statement that invokes this opcode will hold mutexes
+  ** on every btree.  This is a prerequisite for invoking
+  ** sqlite3InitCallback().
+  */
+#ifdef SQLITE_DEBUG
+  for(iDb=0; iDb<db->nDb; iDb++){
+    assert( iDb==1 || sqlite3BtreeHoldsMutex(db->aDb[iDb].pBt) );
+  }
+#endif
+
+  iDb = pOp->p2;
+  assert( iDb>=0 && iDb<db->nDb );
+  assert( DbHasProperty(db, iDb, DB_SchemaLoaded) );
+
+  initData.db = db;
+  initData.iDb = iDb;
+  initData.pzErrMsg = &p->zErrMsg;
+
+  assert( db->init.busy==0 );
+  db->init.busy = 1;
+  initData.rc = SQLITE_OK;
+  assert( !db->mallocFailed );
+
+  pRec = &aMem[pOp->p1];
+  argv[0] = pRec[0].z;
+  argv[1] = "0";
+  argv[2] = pRec[1].z;
+  sqlite3InitCallback(&initData, 3, argv, NULL);
+
+  rc = initData.rc;
+  db->init.busy = 0;
+
+  if( rc ){
+    sqlite3ResetAllSchemasOfConnection(db);
+    if( rc==SQLITE_NOMEM ){
+      goto no_mem;
+    }
+    goto abort_due_to_error;
+  }
+  break;
+}
+
 #if !defined(SQLITE_OMIT_ANALYZE)
 /* Opcode: LoadAnalysis P1 * * * *
 **

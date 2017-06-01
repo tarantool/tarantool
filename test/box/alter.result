@@ -101,7 +101,7 @@ space = box.space[t[1]]
 ...
 space.id
 ---
-- 321
+- 322
 ...
 space.field_count
 ---
@@ -146,7 +146,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space '321' does not exist
+- error: Space '322' does not exist
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 ---
@@ -199,6 +199,7 @@ _index:select{}
   - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
   - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'string']]]
+  - [321, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
 ...
 -- modify indexes of a system space
 _index:delete{_index.id, 0}

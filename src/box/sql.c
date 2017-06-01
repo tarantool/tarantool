@@ -674,23 +674,31 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	sql_schema_put(
 		init, TARANTOOL_SYS_SCHEMA_NAME,
 		BOX_SCHEMA_ID, 0,
-		"CREATE TABLE "TARANTOOL_SYS_SCHEMA_NAME" (key TEXT PRIMARY KEY, value"
-		")"
+		"CREATE TABLE "TARANTOOL_SYS_SCHEMA_NAME
+		" (key TEXT PRIMARY KEY, value)"
 	);
 
 	sql_schema_put(
 		init, TARANTOOL_SYS_SPACE_NAME,
 		BOX_SPACE_ID, 0,
-		"CREATE TABLE "TARANTOOL_SYS_SPACE_NAME" (id INT PRIMARY KEY, owner INT, name TEXT, "
-			"engine TEXT, field_count INT, opts, format)"
+		"CREATE TABLE "TARANTOOL_SYS_SPACE_NAME
+		" (id INT PRIMARY KEY, owner INT, name TEXT, "
+		"engine TEXT, field_count INT, opts, format)"
 	);
 
 	sql_schema_put(
 		init, TARANTOOL_SYS_INDEX_NAME,
 		BOX_INDEX_ID, 0,
 		"CREATE TABLE "TARANTOOL_SYS_INDEX_NAME" (id INT, iid INT, "
-			"name TEXT, type TEXT, opts, parts, PRIMARY KEY (id, iid)"
-		")"
+		"name TEXT, type TEXT, opts, parts, "
+		"PRIMARY KEY (id, iid))"
+	);
+
+	sql_schema_put(
+		init, TARANTOOL_SYS_TRIGGER_NAME,
+		BOX_TRIGGER_ID, 0,
+		"CREATE TABLE "TARANTOOL_SYS_TRIGGER_NAME" ("
+		"name TEXT, opts, PRIMARY KEY(name))"
 	);
 
 	/* Read _space */
@@ -742,6 +750,43 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		index_def_delete(def);
 	}
 
+
+	box_iterator_free(it);
+
+	/* Read _trigger */
+	it = box_index_iterator(BOX_TRIGGER_ID, 0, ITER_GE,
+				nil_key, nil_key + sizeof(nil_key));
+
+	if (it == NULL) {
+		init->rc = SQLITE_TARANTOOL_ERROR;
+		return;
+	}
+
+	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
+		const char *field, *ptr;
+		char *name, *sql;
+		unsigned len;
+		assert(tuple_field_count(tuple) == 2);
+
+		field = tuple_field(tuple, 0);
+		assert (field != NULL);
+		ptr = mp_decode_str(&field, &len);
+		name = strndup(ptr, len);
+
+		field = tuple_field(tuple, 1);
+		assert (field != NULL);
+		mp_decode_array(&field);
+		ptr = mp_decode_str(&field, &len);
+		assert (strncmp(ptr, "sql", 3) == 0);
+
+		ptr = mp_decode_str(&field, &len);
+		sql = strndup(ptr, len);
+
+		sql_schema_put(init, name, 0, 0, sql);
+
+		free(name);
+		free(sql);
+	}
 	box_iterator_free(it);
 }
 

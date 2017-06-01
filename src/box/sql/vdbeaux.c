@@ -312,6 +312,15 @@ void sqlite3VdbeAddParseSchema2Op(Vdbe *p, int iDb, int iRec, int n){
 }
 
 /*
+** Add an OP_ParseSchema3 opcode which in turn will create a trigger
+*/
+void sqlite3VdbeAddParseSchema3Op(Vdbe *p, int iDb, int iRec){
+  int j;
+  sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, iDb);
+  for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
+}
+
+/*
 ** Add an opcode that includes the p4 value as an integer.
 */
 int sqlite3VdbeAddOp4Int(

@@ -135,7 +135,47 @@ box.sql.execute("INSERT INTO barfoo VALUES ('bar', 2)")
 box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 ---
 ...
+-- create a trigger
+box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
+---
+...
+box.sql.execute("SELECT * FROM _trigger");
+---
+- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+...
 test_run:cmd('restart server default');
+-- prove that trigger survived
+box.sql.execute("SELECT * FROM _trigger");
+---
+- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+...
+-- ... functional
+box.sql.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
+---
+...
+box.sql.execute("SELECT * FROM barfoo WHERE foo = 9999");
+---
+- - ['trigger test', 9999]
+...
+-- and still persistent
+box.sql.execute("SELECT * FROM _trigger")
+---
+- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+...
+-- and can be dropped just once
+box.sql.execute("DROP TRIGGER tfoobar")
+---
+...
+-- Should error
+box.sql.execute("DROP TRIGGER tfoobar")
+---
+- error: 'no such trigger: tfoobar'
+...
+-- Should be empty
+box.sql.execute("SELECT * FROM _trigger")
+---
+- []
+...
 -- prove barfoo2 still exists
 box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
@@ -146,12 +186,14 @@ box.sql.execute("SELECT * FROM barfoo")
 - - ['bar', 2]
   - ['foo', 1]
   - ['foobar', 1000]
+  - ['trigger test', 9999]
 ...
 box.sql.execute("SELECT * FROM foobar");
 ---
 - - [1, 'foo']
   - [2, 'bar']
   - [1000, 'foobar']
+  - ['foobar trigger test', 8888]
 ...
 -- cleanup
 box.sql.execute("DROP TABLE foobar")
