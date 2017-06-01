@@ -123,9 +123,10 @@ test.random(s.index[0], 48)
 
 s:drop()
 
+collectgarbage('collect')
 s = box.schema.space.create('select', { temporary = true })
 index = s:create_index('primary', { type = 'tree' })
-local a s:insert{0}
+a = s:insert{0}
 lots_of_links = {}
 ref_count = 0
 while (true) do table.insert(lots_of_links, s:get{0}) ref_count = ref_count + 1 end
