@@ -94,8 +94,8 @@ box.cfg {
     -- "fsync": fibers wait for their data, fsync follows each write;
     wal_mode = "none";
 
-    -- How many log records to store in a single write-ahead log file
-    rows_per_wal = 5000000;
+    -- The maximal size of a single write-ahead log file
+    wal_max_size = 256 * 1024 * 1024;
 
     -- The interval between actions by the snapshot daemon, in seconds
     checkpoint_interval = 60 * 60; -- one hour
