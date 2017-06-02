@@ -2405,16 +2405,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (run == NULL)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
-		char *dir = index->env->conf->path;
-		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path), dir,
-				    index->space_id, index->id,
-				    run->id, VY_FILE_INDEX);
-		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path), dir,
-				    index->space_id, index->id,
-				    run->id, VY_FILE_RUN);
-		if (vy_run_recover(run, index_path, run_path) != 0) {
+		if (vy_run_recover(run, index->env->conf->path,
+				   index->space_id, index->id) != 0) {
 			vy_run_unref(run);
 			goto out;
 		}
@@ -7904,16 +7896,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		struct vy_run *run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto done_slice;
-		char *dir = ctx->env->conf->path;
-		char index_path[PATH_MAX];
-		vy_run_snprint_path(index_path, sizeof(index_path), dir,
-				    ctx->space_id, ctx->index_id, run->id,
-				    VY_FILE_INDEX);
-		char run_path[PATH_MAX];
-		vy_run_snprint_path(run_path, sizeof(run_path), dir,
-				    ctx->space_id, ctx->index_id, run->id,
-				    VY_FILE_RUN);
-		if (vy_run_recover(run, index_path, run_path) != 0)
+		if (vy_run_recover(run, ctx->env->conf->path,
+				   ctx->space_id, ctx->index_id) != 0)
 			goto done_slice;
 
 		if (record->begin != NULL) {

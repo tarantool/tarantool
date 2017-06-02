@@ -322,13 +322,14 @@ vy_run_unref(struct vy_run *run)
 /**
  * Load run from disk
  * @param run - run to laod
- * @param index_path - path to index part of the run
- * @param run_path - path to run part of the run
+ * @param dir - path to the vinyl directory
+ * @param space_id - space id
+ * @param iid - index id
  * @return - 0 on sucess, -1 on fail
  */
 int
-vy_run_recover(struct vy_run *run, const char *index_path,
-	       const char *run_path);
+vy_run_recover(struct vy_run *run, const char *dir,
+	       uint32_t space_id, uint32_t iid);
 
 enum vy_file_type {
 	VY_FILE_INDEX,

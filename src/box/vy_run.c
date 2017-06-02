@@ -1758,19 +1758,16 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 
 /* }}} vy_run_iterator API implementation */
 
-/**
- * Load run from disk
- * @param run - run to laod
- * @param index_path - path to index part of the run
- * @param run_path - path to run part of the run
- * @return - 0 on sucess, -1 on fail
- */
 int
-vy_run_recover(struct vy_run *run, const char *index_path,
-	       const char *run_path)
+vy_run_recover(struct vy_run *run, const char *dir,
+	       uint32_t space_id, uint32_t iid)
 {
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dir,
+			    space_id, iid, run->id, VY_FILE_INDEX);
+
 	struct xlog_cursor cursor;
-	if (xlog_cursor_open(&cursor, index_path))
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 
 	struct xlog_meta *meta = &cursor.meta;
@@ -1787,24 +1784,24 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	if (rc != 0) {
 		if (rc > 0)
 			diag_set(ClientError, ER_INVALID_INDEX_FILE,
-				 index_path, "Unexpected end of file");
+				 path, "Unexpected end of file");
 		goto fail_close;
 	}
 	rc = xlog_cursor_next_row(&cursor, &xrow);
 	if (rc != 0) {
 		if (rc > 0)
 			diag_set(ClientError, ER_INVALID_INDEX_FILE,
-				 index_path, "Unexpected end of file");
+				 path, "Unexpected end of file");
 		goto fail_close;
 	}
 
 	if (xrow.type != VY_INDEX_RUN_INFO) {
-		diag_set(ClientError, ER_INVALID_INDEX_FILE, index_path,
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, path,
 			 tt_sprintf("Wrong xrow type (expected %d, got %u)",
 				    VY_INDEX_RUN_INFO, (unsigned)xrow.type));
 		return -1;
 	}
-	if (vy_run_info_decode(&run->info, &xrow, index_path) != 0)
+	if (vy_run_info_decode(&run->info, &xrow, path) != 0)
 		goto fail_close;
 
 	/* Allocate buffer for page info. */
@@ -1823,7 +1820,7 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 			if (rc > 0) {
 				/** To few pages in file */
 				diag_set(ClientError, ER_INVALID_INDEX_FILE,
-					 index_path, "Unexpected end of file");
+					 path, "Unexpected end of file");
 			}
 			/*
 			 * Limit the count of pages to
@@ -1841,7 +1838,7 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, &xrow, index_path) < 0) {
+		if (vy_page_info_decode(page, &xrow, path) < 0) {
 			/**
 			 * Limit the count of pages to successfully
 			 * created pages
@@ -1857,7 +1854,9 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	xlog_cursor_close(&cursor, false);
 
 	/* Prepare data file for reading. */
-	if (xlog_cursor_open(&cursor, run_path))
+	vy_run_snprint_path(path, sizeof(path), dir,
+			    space_id, iid, run->id, VY_FILE_RUN);
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 	meta = &cursor.meta;
 	if (strcmp(meta->filetype, XLOG_META_TYPE_RUN) != 0) {
