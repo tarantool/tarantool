@@ -632,23 +632,30 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 	return filename;
 }
 
-void
-xdir_collect_garbage(struct xdir *dir, int64_t signature)
+int
+xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
 {
-	struct vclock *it = vclockset_first(&dir->index);
-	while (it != NULL && vclock_sum(it) < signature) {
-		struct vclock *next = vclockset_next(&dir->index, it);
-		char *filename = xdir_format_filename(dir, vclock_sum(it),
+	struct vclock *vclock;
+	while ((vclock = vclockset_first(&dir->index)) != NULL &&
+	       vclock_sum(vclock) < signature) {
+		char *filename = xdir_format_filename(dir, vclock_sum(vclock),
 						      NONE);
 		say_info("removing %s", filename);
-		if (unlink(filename) < 0 && errno != ENOENT) {
+		int rc;
+		if (use_coio)
+			rc = coeio_unlink(filename);
+		else
+			rc = unlink(filename);
+		if (rc < 0 && errno != ENOENT) {
 			say_syserror("error while removing %s", filename);
-		} else {
-			vclockset_remove(&dir->index, it);
-			free(it);
+			diag_set(SystemError, "failed to unlink file '%s'",
+				 filename);
+			return -1;
 		}
-		it = next;
+		vclockset_remove(&dir->index, vclock);
+		free(vclock);
 	}
+	return 0;
 }
 
 /* }}} */

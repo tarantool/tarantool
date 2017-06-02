@@ -1009,14 +1009,6 @@ fail:
 	return -1;
 }
 
-static ssize_t
-vy_log_collect_garbage_f(va_list ap)
-{
-	int64_t signature = va_arg(ap, int64_t);
-	xdir_collect_garbage(&vy_log.dir, signature);
-	return 0;
-}
-
 void
 vy_log_collect_garbage(int64_t signature)
 {
@@ -1024,7 +1016,8 @@ vy_log_collect_garbage(int64_t signature)
 	 * Always keep the previous file, because
 	 * it is still needed for backups.
 	 */
-	coio_call(vy_log_collect_garbage_f, vy_log_prev_checkpoint(signature));
+	signature = vy_log_prev_checkpoint(signature);
+	xdir_collect_garbage(&vy_log.dir, signature, true);
 }
 
 const char *
