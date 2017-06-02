@@ -118,14 +118,14 @@ if(SQL_MAINTAINER_MODE)
         parse.c
         opcodes.c)
 
-    add_custom_command(OUTPUT keywordhash.h
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/keywordhash.h
         COMMAND ${CMAKE_BINARY_DIR}/extra/mkkeywordhash > keywordhash.h.tmp
         COMMAND ${CMAKE_COMMAND} -E copy_if_different keywordhash.h.tmp keywordhash.h
         COMMAND ${CMAKE_COMMAND} -E remove keywordhash.h.tmp
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS mkkeywordhash)
 
-    add_custom_command(OUTPUT parse.h parse.c
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/parse.h ${CMAKE_CURRENT_SOURCE_DIR}/parse.c
         COMMAND ${CMAKE_BINARY_DIR}/extra/lemon -DSQLITE_OMIT_VACUUM -T${CMAKE_SOURCE_DIR}/extra/lempar.c parse.y
         COMMAND ${CMAKE_COMMAND} -E copy parse.h parse.h.tmp
         COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/addopcodes.tcl parse.h.tmp > parse.h
@@ -133,12 +133,12 @@ if(SQL_MAINTAINER_MODE)
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS lemon)
 
-    add_custom_command(OUTPUT opcodes.h
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/opcodes.h
         COMMAND cat parse.h vdbe.c | ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/mkopcodeh.tcl > opcodes.h
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS vdbe.c ${CMAKE_SOURCE_DIR}/extra/mkopcodeh.tcl parse.h)
 
-    add_custom_command(OUTPUT opcodes.c
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/opcodes.c
         COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/mkopcodec.tcl opcodes.h > opcodes.c
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS vdbe.c ${CMAKE_SOURCE_DIR}/extra/mkopcodec.tcl parse.h opcodes.h)
