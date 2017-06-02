@@ -2051,6 +2051,9 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	struct vy_page_info *page = NULL;
 	const char *region_key;
 	bool end_of_run = false;
+	/* Last written statement */
+	struct tuple *last_stmt = *curr_stmt;
+	vy_stmt_ref_if_possible(last_stmt);
 
 	/* row offsets accumulator */
 	struct ibuf row_index_buf;
@@ -2086,8 +2089,6 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
 	xlog_tx_begin(data_xlog);
 
-	/* Last written statement */
-	struct tuple *last_stmt = NULL;
 	do {
 		uint32_t *offset = (uint32_t *) ibuf_alloc(&row_index_buf,
 							   sizeof(uint32_t));
@@ -2097,13 +2098,6 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 			goto error_rollback;
 		}
 		*offset = page->unpacked_size;
-
-		if (last_stmt != NULL && vy_stmt_is_refable(last_stmt))
-			tuple_unref(last_stmt);
-
-		last_stmt = *curr_stmt;
-		if (vy_stmt_is_refable(last_stmt))
-			tuple_ref(last_stmt);
 
 		if (vy_run_dump_stmt(*curr_stmt, data_xlog, page,
 				     key_def, is_primary) != 0)
@@ -2118,8 +2112,13 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		if (wi->iface->next(wi, curr_stmt))
 			goto error_rollback;
 
-		if (*curr_stmt == NULL)
+		if (*curr_stmt == NULL) {
 			end_of_run = true;
+		} else {
+			vy_stmt_unref_if_possible(last_stmt);
+			last_stmt = *curr_stmt;
+			vy_stmt_ref_if_possible(last_stmt);
+		}
 	} while (end_of_run == false &&
 		 obuf_size(&data_xlog->obuf) < page_size);
 
@@ -2142,9 +2141,8 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		if (run->info.max_key == NULL)
 			goto error_rollback;
 	}
-
-	if (vy_stmt_is_refable(last_stmt))
-		tuple_unref(last_stmt);
+	vy_stmt_unref_if_possible(last_stmt);
+	last_stmt = NULL;
 
 	/* Save offset to row index  */
 	page->row_index_offset = page->unpacked_size;
@@ -2180,10 +2178,9 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 
 error_rollback:
 	xlog_tx_rollback(data_xlog);
-	if (last_stmt != NULL && vy_stmt_is_refable(last_stmt))
-		tuple_unref(last_stmt);
 error_row_index:
 	ibuf_destroy(&row_index_buf);
+	vy_stmt_unref_if_possible(last_stmt);
 	return -1;
 }
 

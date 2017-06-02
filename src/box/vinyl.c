@@ -947,7 +947,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	bool is_last_level = (index->run_count == 0);
 	wi = vy_write_iterator_new(index->key_def, index->surrogate_format,
 				   index->upsert_format, index->id == 0,
-				   is_last_level, tx_manager_vlsn(xm));
+				   is_last_level, &xm->read_views);
 	if (wi == NULL)
 		goto err_wi;
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
@@ -1203,7 +1203,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	bool is_last_level = (range->compact_priority == range->slice_count);
 	wi = vy_write_iterator_new(index->key_def, index->surrogate_format,
 				   index->upsert_format, index->id == 0,
-				   is_last_level, tx_manager_vlsn(xm));
+				   is_last_level, &xm->read_views);
 	if (wi == NULL)
 		goto err_wi;
 
@@ -4057,9 +4057,11 @@ vy_send_range(struct vy_join_ctx *ctx)
 		return 0; /* nothing to do */
 
 	int rc = -1;
+	struct rlist fake_read_views;
+	rlist_create(&fake_read_views);
 	ctx->wi = vy_write_iterator_new(ctx->key_def,
 					ctx->format, ctx->upsert_format,
-					true, true, INT64_MAX);
+					true, true, &fake_read_views);
 	if (ctx->wi == NULL)
 		goto out;
 
