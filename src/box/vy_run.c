@@ -29,16 +29,46 @@
  * SUCH DAMAGE.
  */
 #include "vy_run.h"
-#include "fiber.h"
-#include "ipc.h"
+
+#include <zstd.h>
+
 #include "coeio.h"
-#include "xrow.h"
-#include "xlog.h"
-#include "replication.h"
+
+#include "fiber.h"
 #include "fio.h"
+#include "ipc.h"
 #include "memory.h"
 
+#include "replication.h"
 #include "tuple_hash.h" /* for bloom filter */
+#include "xlog.h"
+#include "xrow.h"
+
+static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
+					     (1 << VY_PAGE_INFO_SIZE) |
+					     (1 << VY_PAGE_INFO_UNPACKED_SIZE) |
+					     (1 << VY_PAGE_INFO_ROW_COUNT) |
+					     (1 << VY_PAGE_INFO_MIN_KEY) |
+					     (1 << VY_PAGE_INFO_PAGE_INDEX_OFFSET);
+
+static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
+					    (1 << VY_RUN_INFO_MAX_KEY) |
+					    (1 << VY_RUN_INFO_MIN_LSN) |
+					    (1 << VY_RUN_INFO_MAX_LSN) |
+					    (1 << VY_RUN_INFO_PAGE_COUNT);
+
+enum { VY_BLOOM_VERSION = 0 };
+
+/** xlog meta type for .run files */
+#define XLOG_META_TYPE_RUN "RUN"
+
+/** xlog meta type for .index files */
+#define XLOG_META_TYPE_INDEX "INDEX"
+
+const char *vy_file_suffix[] = {
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
+};
 
 /**
  * coio task for vinyl page read
@@ -95,7 +125,7 @@ vy_run_env_destroy(struct vy_run_env *env)
  * @retval 0 for Success
  * @retval -1 for error
  */
-int
+static int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 		    const struct tuple *min_key, const struct key_def *key_def)
 {
@@ -116,7 +146,7 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 /**
  * Destroy page info struct
  */
-void
+static void
 vy_page_info_destroy(struct vy_page_info *page_info)
 {
 	if (page_info->min_key != NULL)
@@ -355,7 +385,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
  * @retval  0 Success.
  * @retval -1 Error.
  */
-int
+static int
 vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 		    const char *filename)
 {
@@ -419,7 +449,7 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
  * @param filename Filename for error reporting.
  * @return - 0 on success or -1 on format/memory error
  */
-int
+static int
 vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
 		    const char *filename)
 {
@@ -534,7 +564,7 @@ vy_run_info_decode(struct vy_run_info *run_info,
 	return 0;
 }
 
-struct vy_page *
+static struct vy_page *
 vy_page_new(const struct vy_page_info *page_info)
 {
 	struct vy_page *page = malloc(sizeof(*page));
@@ -564,7 +594,7 @@ vy_page_new(const struct vy_page_info *page_info)
 	return page;
 }
 
-void
+static void
 vy_page_delete(struct vy_page *page)
 {
 	uint32_t *page_index = page->page_index;
@@ -579,7 +609,7 @@ vy_page_delete(struct vy_page *page)
 	free(page);
 }
 
-int
+static int
 vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 	     struct xrow_header *xrow)
 {
@@ -725,7 +755,7 @@ vy_page_index_decode(uint32_t *page_index, uint32_t count,
  * @retval 0 on success
  * @retval -1 on error, check diag
  */
-int
+static int
 vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	     ZSTD_DStream *zdctx)
 {
@@ -787,7 +817,7 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 /**
  * Get thread local zstd decompression context
  */
-ZSTD_DStream *
+static ZSTD_DStream *
 vy_env_get_zdctx(struct vy_run_env *env)
 {
 	ZSTD_DStream *zdctx = tt_pthread_getspecific(env->zdctx_key);
