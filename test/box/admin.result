@@ -70,6 +70,8 @@ cfg_filter(box.cfg)
     - 8192
   - - vinyl_range_size
     - 1073741824
+  - - vinyl_read_threads
+    - 1
   - - vinyl_run_count_per_level
     - 2
   - - vinyl_run_size_ratio

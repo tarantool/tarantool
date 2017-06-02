@@ -437,6 +437,9 @@ box_check_config()
 	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
 		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
 			  "can't be greater than vinyl_range_size");
+	if (cfg_geti("vinyl_read_threads") < 1)
+		tnt_raise(ClientError, ER_CFG,
+			  "vinyl_read_threads", "must be >= 1");
 	if (cfg_geti("vinyl_threads") < 2)
 		tnt_raise(ClientError, ER_CFG, "vinyl_threads", "must be >= 2");
 }

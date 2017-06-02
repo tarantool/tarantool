@@ -29,14 +29,15 @@ box.cfg
 24	vinyl_memory:134217728
 25	vinyl_page_size:8192
 26	vinyl_range_size:1073741824
-27	vinyl_run_count_per_level:2
-28	vinyl_run_size_ratio:3.5
-29	vinyl_threads:2
-30	vinyl_timeout:60
-31	wal_dir:.
-32	wal_dir_rescan_delay:2
-33	wal_max_size:268435456
-34	wal_mode:write
+27	vinyl_read_threads:1
+28	vinyl_run_count_per_level:2
+29	vinyl_run_size_ratio:3.5
+30	vinyl_threads:2
+31	vinyl_timeout:60
+32	wal_dir:.
+33	wal_dir_rescan_delay:2
+34	wal_max_size:268435456
+35	wal_mode:write
 --
 -- Test insert from detached fiber
 --

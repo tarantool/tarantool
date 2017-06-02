@@ -12,6 +12,7 @@ box.cfg{
     memtx_memory        = 107374182,
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50,
+    vinyl_read_threads  = 2,
     vinyl_threads       = 3,
     vinyl_range_size    = 64 * 1024,
     vinyl_page_size     = 1024,

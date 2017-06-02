@@ -46,12 +46,23 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vy_run_reader;
+
 /** Part of vinyl environment for run read/write */
 struct vy_run_env {
 	/** Mempool for struct vy_page_read_task */
 	struct mempool read_task_pool;
 	/** Key for thread-local ZSTD context */
 	pthread_key_t zdctx_key;
+	/** Pool of threads used for reading run files. */
+	struct vy_run_reader *reader_pool;
+	/** Number of threads in the reader pool. */
+	int reader_pool_size;
+	/**
+	 * Index of the reader thread in the pool to be used for
+	 * processing the next read request.
+	 */
+	int next_reader;
 };
 
 /**

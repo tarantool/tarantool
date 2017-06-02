@@ -236,6 +236,21 @@ os.exit(0)
 test:is(run_script(code), 0, "page size equal with range")
 
 --
+-- there is at least one vinyl reader thread.
+--
+code = [[
+box.cfg{vinyl_read_threads = 0}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "vinyl_read_threads = 0")
+
+code = [[
+box.cfg{vinyl_read_threads = 1}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "vinyl_read_threads = 1")
+
+--
 -- gh-2150 one vinyl worker thread is reserved for dumps
 --
 code = [[
