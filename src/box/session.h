@@ -110,6 +110,12 @@ fiber_get_session(struct fiber *fiber)
  * @param session a value to set
  */
 static inline void
+fiber_set_user(struct fiber *fiber, struct credentials *cr)
+{
+	fiber_set_key(fiber, FIBER_KEY_USER, cr);
+}
+
+static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
 	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
@@ -121,12 +127,6 @@ credentials_init(struct credentials *cr, uint8_t auth_token, uint32_t uid)
 	cr->auth_token = auth_token;
 	cr->universal_access = universe.access[cr->auth_token].effective;
 	cr->uid = uid;
-}
-
-static inline void
-credentials_copy(struct credentials *dst, struct credentials *src)
-{
-	*dst = *src;
 }
 
 /*
@@ -163,6 +163,26 @@ current_session()
 			diag_raise();
 	}
 	return session;
+}
+
+/*
+ * Return the current user. Create it if it doesn't
+ * exist yet.
+ * The same rationale for initializing the current
+ * user on demand as in current_session() applies.
+ */
+static inline struct credentials *
+current_user()
+{
+	struct credentials *u =
+		(struct credentials *) fiber_get_key(fiber(),
+						     FIBER_KEY_USER);
+	if (u == NULL) {
+		session_create_on_demand(-1);
+		u = (struct credentials *) fiber_get_key(fiber(),
+							 FIBER_KEY_USER);
+	}
+	return u;
 }
 
 /** Global on-disconnect triggers. */
@@ -215,8 +235,7 @@ session_run_on_auth_triggers(const char *user_name);
 static inline void
 access_check_universe(uint8_t access)
 {
-	struct session *session = current_session();
-	struct credentials *credentials = &session->credentials;
+	struct credentials *credentials = current_user();
 	if (!(credentials->universal_access & access)) {
 		/*
 		 * Access violation, report error.

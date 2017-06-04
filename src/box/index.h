@@ -372,6 +372,17 @@ public:
 	Index(const Index &) = delete;
 	Index& operator=(const Index&) = delete;
 
+	/**
+	 * Called after WAL write to commit index creation.
+	 * Must not fail.
+	 */
+	virtual void commitCreate();
+	/**
+	 * Called after WAL write to commit index drop.
+	 * Must not fail.
+	 */
+	virtual void commitDrop();
+
 	virtual size_t size() const;
 	virtual struct tuple *min(const char *key, uint32_t part_count) const;
 	virtual struct tuple *max(const char *key, uint32_t part_count) const;

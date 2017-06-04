@@ -1153,7 +1153,7 @@ vy_log_write(const struct vy_log_record *record)
 }
 
 /** Lookup a vinyl index in vy_recovery::index_hash map. */
-static struct vy_index_recovery_info *
+struct vy_index_recovery_info *
 vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn)
 {
 	struct mh_i64ptr_t *h = recovery->index_hash;
@@ -1901,8 +1901,8 @@ vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
 	return cb(record, cb_arg);
 }
 
-static int
-vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
+int
+vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_range_recovery_info *range;
@@ -2017,22 +2017,6 @@ vy_recovery_do_iterate_index(struct vy_index_recovery_info *index,
 }
 
 int
-vy_recovery_iterate_index(struct vy_recovery *recovery,
-			  int64_t index_lsn, bool include_deleted,
-			  vy_recovery_cb cb, void *cb_arg)
-{
-	struct vy_index_recovery_info *index;
-	index = vy_recovery_lookup_index(recovery, index_lsn);
-	if (index == NULL) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Index %lld not registered",
-				    (long long)index_lsn));
-		return -1;
-	}
-	return vy_recovery_do_iterate_index(index, include_deleted, cb, cb_arg);
-}
-
-int
 vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 		    vy_recovery_cb cb, void *cb_arg)
 {
@@ -2047,8 +2031,8 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 		 */
 		if (index->is_dropped && rlist_empty(&index->runs))
 			continue;
-		if (vy_recovery_do_iterate_index(index, include_deleted,
-						 cb, cb_arg) < 0)
+		if (vy_recovery_iterate_index(index, include_deleted,
+					      cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;

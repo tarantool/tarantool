@@ -43,8 +43,7 @@
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct session *session = current_session();
-	struct credentials *cr = &session->credentials;
+	struct credentials *cr = current_user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
@@ -85,21 +84,9 @@ space_new(struct space_def *def, struct rlist *key_list)
 {
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
-	/**
-	 * UPSERT can't run in presence of unique
-	 * secondary keys, since they would be impossible
-	 * to check at recovery. MemTX recovers from
-	 * the binary log with no secondary keys, and does
-	 * not validate them, it assumes that the binary
-	 * log has no records which validate secondary
-	 * unique index constraint.
-	 */
-	bool has_unique_secondary_key = false;
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		if (index_def->iid > 0 && index_def->opts.is_unique == true)
-			has_unique_secondary_key = true;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	size_t sz = sizeof(struct space) +
@@ -128,7 +115,6 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->format = tuple_format_new(engine->format, keys, index_count, 0);
 	if (space->format == NULL)
 		diag_raise();
-	space->has_unique_secondary_key = has_unique_secondary_key;
 	tuple_format_ref(space->format, 1);
 	space->format->exact_field_count = def->exact_field_count;
 	/* init space engine instance */
@@ -195,29 +181,6 @@ extern "C" void
 space_run_triggers(struct space *space, bool yesno)
 {
 	space->run_triggers = yesno;
-}
-
-/**
- * We do not allow changes of the primary key during
- * update.
- * The syntax of update operation allows the user to primary
- * key of a tuple, which is prohibited, to avoid funny
- * effects during replication. Some engines can
- * track down this situation and abort the operation;
- * such engines (memtx) don't use this function.
- * Other engines can't do it, so they ask the box to
- * verify that the primary key of the tuple has not changed.
- */
-void
-space_check_update(struct space *space,
-		   struct tuple *old_tuple,
-		   struct tuple *new_tuple)
-{
-	assert(space->index_count > 0);
-	Index *index = space->index[0];
-	if (tuple_compare(old_tuple, new_tuple, &index->index_def->key_def))
-		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			  index_name(index), space_name(space));
 }
 
 ptrdiff_t

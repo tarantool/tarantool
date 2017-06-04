@@ -83,12 +83,9 @@ static void title(const char *new_status)
 }
 
 bool box_snapshot_is_in_progress = false;
-bool box_backup_is_in_progress = false;
 
-/*
- * vclock of the checkpoint that is currently being backed up.
- */
-static struct vclock box_backup_vclock;
+/** The checkpoint that is currently being backed up. */
+static struct checkpoint_info *box_backup_checkpoint;
 
 /**
  * The instance is in read-write mode: the local checkpoint
@@ -934,8 +931,7 @@ static inline struct func *
 access_check_func(const char *name, uint32_t name_len)
 {
 	struct func *func = func_by_name(name, name_len);
-	struct session *session = current_session();
-	struct credentials *credentials = &session->credentials;
+	struct credentials *credentials = current_user();
 	/*
 	 * If the user has universal access, don't bother with checks.
 	 * No special check for ADMIN user is necessary
@@ -1044,13 +1040,10 @@ box_process_call(struct request *request, struct obuf *out)
 	 * a set-definer-uid one. If the function is not
 	 * defined, it's obviously not a setuid one.
 	 */
-
-	struct credentials orig_credentials;
-	struct session *session = NULL;
+	struct credentials *orig_credentials = NULL;
 	if (func && func->def.setuid) {
-		/* Save original credentials */
-		session = current_session();
-		credentials_copy(&orig_credentials, &session->credentials);
+		orig_credentials = current_user();
+		/* Remember and change the current user id. */
 		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
 			/*
 			 * Fill the cache upon first access, since
@@ -1063,9 +1056,7 @@ box_process_call(struct request *request, struct obuf *out)
 					 owner->auth_token,
 					 owner->def.uid);
 		}
-		/* Set credentials to function owner (SUID) */
-		credentials_copy(&session->credentials,
-				 &func->owner_credentials);
+		fiber_set_user(fiber(), &func->owner_credentials);
 	}
 
 	int rc;
@@ -1074,11 +1065,9 @@ box_process_call(struct request *request, struct obuf *out)
 	} else {
 		rc = box_lua_call(request, out);
 	}
-
-	if (func && func->def.setuid) {
-		/* Restore original credentials after SUID */
-		credentials_copy(&session->credentials, &orig_credentials);
-	}
+	/* Restore the original user */
+	if (orig_credentials)
+		fiber_set_user(fiber(), orig_credentials);
 
 	if (rc != 0) {
 		txn_rollback();
@@ -1202,16 +1191,22 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
-	/* Remember start vclock. */
-	struct vclock start_vclock;
 	/*
 	 * The only case when the directory index is empty is
 	 * when someone has deleted a snapshot and tries to join
 	 * as a replica. Our best effort is to not crash in such
 	 * case: raise ER_MISSING_SNAPSHOT.
 	 */
-	if (gc_last_checkpoint(&start_vclock) < 0)
+	struct checkpoint_info *checkpoint = gc_last_checkpoint();
+	if (checkpoint == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+
+	checkpoint_ref(checkpoint);
+	auto guard = make_scoped_guard([=]{ checkpoint_unref(checkpoint); });
+
+	/* Remember start vclock. */
+	struct vclock start_vclock;
+	vclock_copy(&start_vclock, &checkpoint->vclock);
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
@@ -1232,6 +1227,10 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * client.
 	 */
 	box_on_join(&instance_uuid);
+
+	struct replica *replica = replica_by_uuid(&instance_uuid);
+	assert(replica != NULL);
+	replica_set_checkpoint(replica, checkpoint);
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -1571,9 +1570,7 @@ box_cfg_xc(void)
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
-	struct vclock checkpoint_vclock;
-	vclock_create(&checkpoint_vclock);
-	int64_t lsn = gc_last_checkpoint(&checkpoint_vclock);
+	struct checkpoint_info *checkpoint = gc_last_checkpoint();
 	/*
 	 * Lock the write ahead log directory to avoid multiple
 	 * instances running in the same dir.
@@ -1586,7 +1583,7 @@ box_cfg_xc(void)
 		 * refuse to start. In hot standby mode, a busy
 		 * WAL dir must contain at least one xlog.
 		 */
-		if (!cfg_geti("hot_standby") || lsn == -1)
+		if (!cfg_geti("hot_standby") || checkpoint == NULL)
 			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
 	} else {
 		/*
@@ -1596,14 +1593,14 @@ box_cfg_xc(void)
 		 */
 		box_bind();
 	}
-	if (lsn != -1) {
+	if (checkpoint != NULL) {
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
 		struct recovery *recovery;
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("force_recovery"),
-					&checkpoint_vclock);
+					&checkpoint->vclock);
 		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
 
 		/*
@@ -1624,7 +1621,7 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx->recoverSnapshot(&checkpoint_vclock);
+		memtx->recoverSnapshot(&checkpoint->vclock);
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);
@@ -1773,19 +1770,20 @@ end:
 int
 box_backup_start(box_backup_cb cb, void *cb_arg)
 {
-	if (box_backup_is_in_progress) {
+	if (box_backup_checkpoint != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	if (gc_ref_last_checkpoint(&box_backup_vclock) < 0) {
+	box_backup_checkpoint = gc_last_checkpoint();
+	if (box_backup_checkpoint == NULL) {
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	box_backup_is_in_progress = true;
-	int rc = engine_backup(&box_backup_vclock, cb, cb_arg);
+	checkpoint_ref(box_backup_checkpoint);
+	int rc = engine_backup(&box_backup_checkpoint->vclock, cb, cb_arg);
 	if (rc != 0) {
-		gc_unref_checkpoint(&box_backup_vclock);
-		box_backup_is_in_progress = false;
+		checkpoint_unref(box_backup_checkpoint);
+		box_backup_checkpoint = NULL;
 	}
 	return rc;
 }
@@ -1793,9 +1791,9 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 void
 box_backup_stop(void)
 {
-	if (box_backup_is_in_progress) {
-		gc_unref_checkpoint(&box_backup_vclock);
-		box_backup_is_in_progress = false;
+	if (box_backup_checkpoint != NULL) {
+		checkpoint_unref(box_backup_checkpoint);
+		box_backup_checkpoint = NULL;
 	}
 }
 

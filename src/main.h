@@ -37,14 +37,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-const char *tarantool_version(void);
-/**
- * Get version (defined in PACKAGE_VERSION), packed into uint32_t
- * The highest byte or result means major version, next - minor,
- * middle - patch, last - revision.
- */
-uint32_t tarantool_version_id(void);
-
 double tarantool_uptime(void);
 
 void

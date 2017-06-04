@@ -72,12 +72,6 @@ struct space {
 	struct space_def def;
 	/** Enable/disable triggers. */
 	bool run_triggers;
-	/**
-	 * True if the space has a unique secondary key.
-	 * UPSERT can't work in presence of unique
-	 * secondary keys.
-	 */
-	bool has_unique_secondary_key;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
@@ -255,17 +249,6 @@ index_find_system(struct space *space, uint32_t index_id)
 	}
 	return (MemtxIndex *) index_find_xc(space, index_id);
 }
-
-/**
- * Checks that primary key of a tuple did not change during update,
- * otherwise throws ClientError.
- * You should not call this method, if an engine can control it by
- * itself.
- */
-void
-space_check_update(struct space *space,
-		   struct tuple *old_tuple,
-		   struct tuple *new_tuple);
 
 /**
  * Updates space bsize field: decrease it by old tuple's bsize and

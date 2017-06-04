@@ -79,7 +79,7 @@ cfg_filter(box.cfg)
   - - wal_dir_rescan_delay
     - 2
   - - wal_max_size
-    - 274877906944
+    - 268435456
   - - wal_mode
     - write
 ...
@@ -154,7 +154,7 @@ cfg_filter(box.cfg)
   - - wal_dir_rescan_delay
     - 2
   - - wal_max_size
-    - 274877906944
+    - 268435456
   - - wal_mode
     - write
 ...

@@ -42,6 +42,7 @@
 #include <luajit.h>
 
 #include <fiber.h>
+#include "version.h"
 #include "coio.h"
 #include "lua/fiber.h"
 #include "lua/ipc.h"

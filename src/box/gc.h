@@ -74,6 +74,18 @@ checkpoint_iterator_next(struct checkpoint_iterator *it);
 	     cpt = checkpoint_iterator_next(it))
 
 /**
+ * Pin a given checkpoint so that it cannot be removed by
+ * garbage collection.
+ */
+void
+checkpoint_ref(struct checkpoint_info *cpt);
+
+/**
+ */
+void
+checkpoint_unref(struct checkpoint_info *cpt);
+
+/**
  * Initialize the garbage collection state.
  * @snap_dirname is a path to the snapshot directory.
  * Return 0 on success, -1 on failure.
@@ -95,26 +107,24 @@ int
 gc_add_checkpoint(const struct vclock *vclock);
 
 /**
- * Get the last checkpoint vclock and return its signature.
- * Returns -1 if there are no checkpoints.
+ * Return the last registered checkpoint or NULL if there
+ * are no checkpoints.
+ *
+ * Note, the object returned by this function may be freed by
+ * gc_run(). If you need to dereference it in the code that
+ * may yield, pin it with the aid of checkpoint_ref().
  */
-int64_t
-gc_last_checkpoint(struct vclock *vclock);
+struct checkpoint_info *
+gc_last_checkpoint(void);
 
 /**
- * Pin the last checkpoint so that it cannot be removed by garbage
- * collection. The checkpoint vclock is returned in @vclock.
- * Returns the checkpoint signature or -1 if there are no checkpoints.
+ * Lookup the newest checkpoint that is needed to recover to
+ * a given vclock or NULL if there's no such checkpoint.
+ *
+ * See also gc_last_checkpoint().
  */
-int64_t
-gc_ref_last_checkpoint(struct vclock *vclock);
-
-/**
- * Unpin a checkpoint that was pinned with gc_pin_last_checkpoint()
- * and retry garbage collection if necessary.
- */
-void
-gc_unref_checkpoint(struct vclock *vclock);
+struct checkpoint_info *
+gc_lookup_checkpoint(struct vclock *vclock);
 
 /**
  * Invoke garbage collection in order to remove files left from

@@ -1,0 +1,210 @@
+test_run = require('test_run').new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+replica_set = require('fast_replica')
+---
+...
+fiber = require('fiber')
+---
+...
+test_run:cleanup_cluster()
+---
+...
+-- Grant permissions needed for replication.
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+-- By default, relay thread reports status to tx once a second.
+-- To reduce the test execute time, let's set it to 50 ms.
+box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0.05)
+---
+- ok
+...
+-- Create and populate the space we will replicate.
+s = box.schema.space.create('test', {engine = engine});
+---
+...
+_ = s:create_index('pk')
+---
+...
+for i = 1, 100 do s:auto_increment{} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+for i = 1, 100 do s:auto_increment{} end
+---
+...
+-- Make sure replica join will take long enough for us to
+-- invoke garbage collection.
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
+---
+- ok
+...
+-- While the replica is receiving the initial data set,
+-- make a snapshot and invoke garbage collection, then
+-- remove the timeout injection so that we don't have to
+-- wait too long for the replica to start.
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+fiber.create(function()
+    fiber.sleep(0.1)
+    box.snapshot()
+    box.internal.gc.run(box.info.signature)
+    box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
+end)
+test_run:cmd("setopt delimiter ''");
+---
+...
+-- Start the replica.
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+-- Despite the fact that we invoked garbage collection that
+-- would have normally removed the snapshot the replica was
+-- bootstrapped from, the replica should still receive all
+-- data from the master. Check it.
+test_run:cmd("switch replica")
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+while box.space.test:count() < 200 do fiber.sleep(0.01) end
+---
+...
+box.space.test:count()
+---
+- 200
+...
+test_run:cmd("switch default")
+---
+- true
+...
+-- Check that garbage collection removed the snapshot once
+-- the replica released the corresponding checkpoint.
+fiber.sleep(0.1) -- wait for relay to notify tx
+---
+...
+#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+---
+- true
+...
+-- Make sure the replica will receive data it is subscribed
+-- to long enough for us to invoke garbage collection.
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
+---
+- ok
+...
+-- Send more data to the replica.
+for i = 1, 100 do s:auto_increment{} end
+---
+...
+-- Invoke garbage collection. Check that it doesn't remove
+-- xlogs needed by the replica.
+box.snapshot()
+---
+- ok
+...
+box.internal.gc.run(box.info.signature)
+---
+...
+#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+---
+- true
+...
+-- Remove the timeout injection so that the replica catches
+-- up quickly.
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
+---
+- ok
+...
+-- Check that the replica received all data from the master.
+test_run:cmd("switch replica")
+---
+- true
+...
+while box.space.test:count() < 300 do fiber.sleep(0.01) end
+---
+...
+box.space.test:count()
+---
+- 300
+...
+test_run:cmd("switch default")
+---
+- true
+...
+-- Now garbage collection should resume and delete files left
+-- from the old checkpoint.
+fiber.sleep(0.1) -- wait for relay to notify tx
+---
+...
+#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+---
+- true
+...
+-- Stop the replica.
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+-- Invoke garbage collection. Check that it doesn't remove
+-- the checkpoint last used by the replica.
+_ = s:auto_increment{}
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.internal.gc.run(box.info.signature)
+---
+...
+#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+---
+- true
+...
+-- The checkpoint should only be deleted after the replica
+-- is unregistered.
+test_run:cleanup_cluster()
+---
+...
+#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+---
+- true
+...
+-- Cleanup.
+s:drop()
+---
+...
+box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
+---
+- ok
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

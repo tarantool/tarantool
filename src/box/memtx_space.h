@@ -77,11 +77,18 @@ struct MemtxSpace: public Handler {
 		      const char *key, const char * /* key_end */,
 		      struct port *port) override;
 
+	virtual void checkIndexDef(struct space *new_space,
+				   struct index_def *index_def) override;
 	virtual Index *createIndex(struct space *space,
 				   struct index_def *index_def) override;
-	virtual void dropIndex(Index *index) override;
+	virtual void addPrimaryKey(struct space *space) override;
+	virtual void dropPrimaryKey(struct space *space) override;
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
+	virtual void initSystemSpace(struct space *space) override;
 public:
 	/**
 	 * A pointer to replace function, set to different values

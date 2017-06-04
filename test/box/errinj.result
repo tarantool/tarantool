@@ -34,8 +34,10 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_RELAY:
-    state: false
+  ERRINJ_RELAY_REPORT_INTERVAL:
+    state: 0
+  ERRINJ_RELAY_TIMEOUT:
+    state: 0
   ERRINJ_VY_TASK_COMPLETE:
     state: false
   ERRINJ_VY_RUN_WRITE_TIMEOUT:
@@ -377,6 +379,9 @@ box.commit();
 ---
 - error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
+box.rollback();
+---
+...
 s:select{};
 ---
 - []
@@ -392,6 +397,9 @@ s:select{};
 ---
 - []
 ...
+box.rollback();
+---
+...
 box.begin()
     pcall(s.insert, s, {1})
     s:insert{2}
@@ -402,6 +410,9 @@ box.commit();
 s:select{};
 ---
 - []
+...
+box.rollback();
+---
 ...
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
 ---
@@ -418,6 +429,9 @@ box.commit();
 s:select{};
 ---
 - []
+...
+box.rollback();
+---
 ...
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
 ---
@@ -433,6 +447,9 @@ box.commit();
 s:select{};
 ---
 - - [1]
+...
+box.rollback();
+---
 ...
 test_run:cmd("setopt delimiter ''");
 ---

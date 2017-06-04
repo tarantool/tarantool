@@ -204,6 +204,28 @@ function space_bsize(s)
     return bsize
 end
 
+function create_iterator(obj, key, opts)
+    local iter, key, state = obj:pairs(key, opts)
+    local res = {iter = iter, key = key, state = state}
+    res.next = function()
+        local st, tp = iter.gen(key, state)
+        return tp
+    end
+    res.iterate_over = function()
+        local tp = nil
+        local ret = {}
+        local i = 0
+        tp = res.next()
+        while tp do
+            ret[i] = tp
+            i = i + 1
+            tp = res.next()
+        end
+        return ret
+    end
+    return res
+end
+
 return {
     space_field_types = space_field_types;
     iterate = iterate;
@@ -214,4 +236,5 @@ return {
     tuple_to_string = tuple_to_string;
     check_space = check_space;
     space_bsize = space_bsize;
+    create_iterator = create_iterator;
 };

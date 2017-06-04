@@ -1,0 +1,16 @@
+	*** test_basic ***
+1..13
+ok 1 - vy_mem_new
+ok 2 - mem->min_lsn on empty mem
+ok 3 - mem->max_lsn on empty mem
+ok 4 - mem->min_lsn after prepare
+ok 5 - mem->max_lsn after prepare
+ok 6 - mem->min_lsn after commit
+ok 7 - mem->max_lsn after commit
+ok 8 - vy_mem_older_lsn 1
+ok 9 - vy_mem_older_lsn 2
+ok 10 - vy_mem_rollback 1
+ok 11 - vy_mem_rollback 2
+ok 12 - vy_mem->version
+ok 13 - vy_mem->version
+	*** test_basic: done ***

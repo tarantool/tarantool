@@ -123,15 +123,14 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 			 uint32_t objsize_max, float alloc_factor)
 	:Engine("memtx", &memtx_tuple_format_vtab),
-	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
+	m_checkpoint(0),
 	m_snap_io_rate_limit(0),
 	m_force_recovery(force_recovery)
 {
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
 			 alloc_factor);
 
-	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 }
 
@@ -278,185 +277,6 @@ MemtxEngine::endRecovery()
 Handler *MemtxEngine::open()
 {
 	return new MemtxSpace(this);
-}
-
-
-/**
- * Replicate engine state in a newly created space.
- * This function is invoked when executing a replace into _index
- * space originating either from a snapshot or from the binary
- * log. It brings the newly created space up to date with the
- * engine recovery state: if the event comes from the snapshot,
- * then the primary key is not built, otherwise it's created
- * right away.
- */
-static void
-memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
-{
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
-	switch (state) {
-	case MEMTX_INITIALIZED:
-		panic("can't create a new space before snapshot recovery");
-		break;
-	case MEMTX_INITIAL_RECOVERY:
-		((MemtxIndex *) space->index[0])->beginBuild();
-		handler->replace = memtx_replace_build_next;
-		break;
-	case MEMTX_FINAL_RECOVERY:
-		((MemtxIndex *) space->index[0])->beginBuild();
-		((MemtxIndex *) space->index[0])->endBuild();
-		handler->replace = memtx_replace_primary_key;
-		break;
-	case MEMTX_OK:
-		((MemtxIndex *) space->index[0])->beginBuild();
-		((MemtxIndex *) space->index[0])->endBuild();
-		handler->replace = memtx_replace_all_keys;
-		break;
-	}
-}
-
-void
-MemtxEngine::addPrimaryKey(struct space *space)
-{
-	memtx_add_primary_key(space, m_state);
-}
-
-void
-MemtxEngine::dropPrimaryKey(struct space *space)
-{
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
-	handler->replace = memtx_replace_no_keys;
-}
-
-void
-MemtxEngine::initSystemSpace(struct space *space)
-{
-	memtx_add_primary_key(space, MEMTX_OK);
-}
-
-void
-MemtxEngine::buildSecondaryKey(struct space *old_space,
-			       struct space *new_space, Index *new_index)
-{
-	struct index_def *new_index_def = new_index->index_def;
-	/**
-	 * If it's a secondary key, and we're not building them
-	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
-	 */
-	if (new_index_def->iid != 0) {
-		struct MemtxSpace *handler;
-		handler = (struct MemtxSpace *) new_space->handler;
-		if (!(handler->replace == memtx_replace_all_keys))
-			return;
-	}
-	Index *pk = index_find_xc(old_space, 0);
-
-	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = pk->allocIterator();
-	IteratorGuard guard(it);
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	/*
-	 * The index has to be built tuple by tuple, since
-	 * there is no guarantee that all tuples satisfy
-	 * new index' constraints. If any tuple can not be
-	 * added to the index (insufficient number of fields,
-	 * etc., the build is aborted.
-	 */
-	/* Build the new index. */
-	struct tuple *tuple;
-	struct tuple_format *format = new_space->format;
-	while ((tuple = it->next(it))) {
-		/*
-		 * Check that the tuple is OK according to the
-		 * new format.
-		 */
-		if (tuple_validate(format, tuple))
-			diag_raise();
-		/*
-		 * @todo: better message if there is a duplicate.
-		 */
-		struct tuple *old_tuple =
-			new_index->replace(NULL, tuple, DUP_INSERT);
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
-	}
-}
-
-void
-MemtxEngine::checkIndexDef(struct space *space, struct index_def *index_def)
-{
-	switch (index_def->type) {
-	case HASH:
-		if (! index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "HASH index must be unique");
-		}
-		break;
-	case TREE:
-		/* TREE index has no limitations. */
-		break;
-	case RTREE:
-		if (index_def->key_def.part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index key can not be multipart");
-		}
-		if (index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index can not be unique");
-		}
-		if (index_def->key_def.parts[0].type != FIELD_TYPE_ARRAY) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index field type must be ARRAY");
-		}
-		/* no furter checks of parts needed */
-		return;
-	case BITSET:
-		if (index_def->key_def.part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET index key can not be multipart");
-		}
-		if (index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET can not be unique");
-		}
-		if (index_def->key_def.parts[0].type != FIELD_TYPE_UNSIGNED &&
-		    index_def->key_def.parts[0].type != FIELD_TYPE_STRING) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET index field type must be NUM or STR");
-		}
-		/* no furter checks of parts needed */
-		return;
-	default:
-		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  index_def->name,
-			  space_name(space));
-		break;
-	}
-	/* Only HASH and TREE indexes checks parts there */
-	/* Just check that there are no ARRAY parts */
-	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
-		if (index_def->key_def.parts[i].type == FIELD_TYPE_ARRAY) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "ARRAY field type is not supported");
-		}
-	}
 }
 
 void
@@ -762,12 +582,12 @@ int
 MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
-	struct vclock last_vclock;
 	/*
 	 * If a snapshot already exists, do not create a new one.
 	 */
-	m_checkpoint->touch = (gc_last_checkpoint(&last_vclock) >= 0) &&
-			      (vclock_compare(&last_vclock, vclock) == 0);
+	struct checkpoint_info *checkpoint = gc_last_checkpoint();
+	m_checkpoint->touch = checkpoint != NULL &&
+		vclock_compare(&checkpoint->vclock, vclock) == 0;
 	vclock_copy(&m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",

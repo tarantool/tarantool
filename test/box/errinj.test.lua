@@ -102,17 +102,20 @@ test_run:cmd("setopt delimiter ';'")
 box.begin()
     s:insert{1}
 box.commit();
+box.rollback();
 s:select{};
 box.begin()
     s:insert{1}
     s:insert{2}
 box.commit();
 s:select{};
+box.rollback();
 box.begin()
     pcall(s.insert, s, {1})
     s:insert{2}
 box.commit();
 s:select{};
+box.rollback();
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
 box.begin()
     s:insert{1}
@@ -120,6 +123,7 @@ box.begin()
     s:insert{2}
 box.commit();
 s:select{};
+box.rollback();
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
 box.begin()
     s:insert{1}
@@ -127,6 +131,7 @@ box.begin()
     pcall(s.insert, s, {2})
 box.commit();
 s:select{};
+box.rollback();
 
 test_run:cmd("setopt delimiter ''");
 errinj.set("ERRINJ_TUPLE_ALLOC", false)

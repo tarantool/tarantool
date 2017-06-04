@@ -46,6 +46,7 @@
 #include "box/replication.h"
 #include "box/info.h"
 #include "main.h"
+#include "version.h"
 #include "box/box.h"
 #include "lua/utils.h"
 #include "fiber.h"

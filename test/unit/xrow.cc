@@ -39,6 +39,24 @@ extern "C" {
 #include "random.h"
 
 int
+test_iproto_constants()
+{
+	/*
+	 * Check that there are no gaps in the iproto_key_strs
+	 * array. In a case of a gap the iproto_key_strs will be
+	 * accessed by an index out of the range
+	 * [0, IPROTO_KEY_MAX).
+	 */
+	for (int i = 0; i < IPROTO_KEY_MAX; ++i)
+		iproto_key_name((enum iproto_key) i);
+
+	/* Same for iproto_type. */
+	for (uint32_t i = 0; i < IPROTO_TYPE_STAT_MAX; ++i)
+		iproto_type_name(i);
+	return 0;
+}
+
+int
 test_greeting()
 {
 	plan(40);
@@ -187,6 +205,7 @@ main(void)
 
 	random_init();
 
+	test_iproto_constants();
 	test_greeting();
 
 	random_free();

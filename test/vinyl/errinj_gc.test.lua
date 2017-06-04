@@ -4,6 +4,8 @@ fio = require('fio')
 
 errinj = box.error.injection
 
+test_run:cleanup_cluster()
+
 -- Temporary space for bumping lsn.
 temp = box.schema.space.create('temp')
 _ = temp:create_index('pk')
@@ -12,9 +14,8 @@ s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk', {run_count_per_level=1})
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
-function run_count() return s.index.pk:info().run_count end
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc.run(box.info.signature) end
+function gc() temp:auto_increment{} box.snapshot() box.internal.gc.run(box.info.signature) end
 
 --
 -- Check that gc retries to delete files left
@@ -22,14 +23,14 @@ function snapshot() box.snapshot() box.internal.gc.run(box.info.signature) end
 --
 
 errinj.set('ERRINJ_VY_GC', true)
-s:insert{12345, 'abcdef'} snapshot() -- dump
-s:insert{67890, 'ghijkl'} snapshot() -- dump + compaction
-while run_count() > 1 do fiber.sleep(0.01) end -- wait for compaction
+s:insert{12345, 'abcdef'} box.snapshot() -- dump
+s:insert{67890, 'ghijkl'} box.snapshot() -- dump + compaction
+while s.index.pk:info().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
 file_count()
-temp:auto_increment{} snapshot()
+gc()
 file_count()
 errinj.set('ERRINJ_VY_GC', false)
-temp:auto_increment{} snapshot()
+gc()
 file_count()
 
 --
@@ -38,10 +39,11 @@ file_count()
 --
 
 errinj.set('ERRINJ_VY_GC', true)
-s:drop() snapshot()
+s:drop()
+gc()
 file_count()
 errinj.set('ERRINJ_VY_GC', false)
-temp:auto_increment{} snapshot()
+gc()
 file_count()
 
 --
@@ -53,11 +55,11 @@ s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk', {run_count_per_level=1})
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
-s:insert{100, '12345'} snapshot() -- dump
+s:insert{100, '12345'} box.snapshot() -- dump
 file_count()
 errinj.set('ERRINJ_VY_RUN_DISCARD', true)
 errinj.set('ERRINJ_VY_TASK_COMPLETE', true)
-s:insert{200, '67890'} snapshot() -- run file created, but dump fails
+s:insert{200, '67890'} box.snapshot() -- run file created, but dump fails
 file_count()
 
 test_run:cmd('restart server default')
@@ -71,7 +73,7 @@ temp = box.space.temp
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function snapshot() box.snapshot() box.internal.gc.run(box.info.signature) end
+function gc() temp:auto_increment{} box.snapshot() box.internal.gc.run(box.info.signature) end
 
 file_count()
 
@@ -81,7 +83,8 @@ s:select()
 -- Cleanup.
 --
 
-s:drop() snapshot()
+s:drop()
+gc()
 file_count()
 
 temp:drop()

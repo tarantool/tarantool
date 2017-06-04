@@ -91,7 +91,8 @@ struct errinj {
 	_(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_SCHED_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_RELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
+	_(ERRINJ_RELAY_REPORT_INTERVAL, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_RELAY_FINAL_SLEEP, ERRINJ_BOOL, {.bparam = false})
 
 ENUM0(errinj_id, ERRINJ_LIST);

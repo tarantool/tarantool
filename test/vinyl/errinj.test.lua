@@ -151,35 +151,10 @@ s:select{}
 
 s:drop()
 
+create_iterator = require('utils').create_iterator
+
 --iterator test
 test_run:cmd("setopt delimiter ';'")
-
-function create_iterator(obj, key, opts)
-    local iter, key, state = obj:pairs(key, opts)
-    local res = {}
-    res['iter'] = iter
-    res['key'] = key
-    res['state'] = state
-    return res
-end;
-
-function iterator_next(iter_obj)
-    local st, tp = iter_obj.iter.gen(iter_obj.key, iter_obj.state)
-    return tp
-end;
-
-function iterate_over(iter_obj)
-    local tp = nil
-    local ret = {}
-    local i = 0
-    tp = iterator_next(iter_obj)
-    while tp do
-        ret[i] = tp
-        i = i + 1
-        tp = iterator_next(iter_obj)
-    end
-    return ret
-end;
 
 fiber_status = 0
 
@@ -209,13 +184,13 @@ for i = 1,100 do
     errinj.set("ERRINJ_WAL_WRITE", true)
     local f = fiber.create(fiber_func)
     local itr = create_iterator(s, {0}, {iterator='GE'})
-    local first = iterator_next(itr)
-    local second = iterator_next(itr)
+    local first = itr.next()
+    local second = itr.next()
     if (second[1] ~= 5 and second[1] ~= 10) then faced_trash = true end
     while fiber_status <= 1 do fiber.sleep(0.001) end
-    local _,next = pcall(iterator_next, itr)
-    _,next = pcall(iterator_next, itr)
-    _,next = pcall(iterator_next, itr)
+    local _,next = pcall(itr.next)
+    _,next = pcall(itr.next)
+    _,next = pcall(itr.next)
     errinj.set("ERRINJ_WAL_WRITE", false)
     s:delete{5}
 end;
@@ -315,9 +290,9 @@ end;
 
 function iterate_in_read_view()
     local i = create_iterator(space)
-    last_read = iterator_next(i)
+    last_read = i.next()
     fiber.sleep(100000)
-    last_read = iterator_next(i)
+    last_read = i.next()
 end;
 
 test_run:cmd("setopt delimiter ''");
@@ -363,3 +338,18 @@ box.snapshot()
 test_run:cmd('switch default')
 test_run:cmd("stop server test")
 test_run:cmd("cleanup server test")
+
+--
+-- If we logged an index creation in the metadata log before WAL write,
+-- WAL failure would result in leaving the index record in vylog forever.
+-- Since we use LSN to identify indexes in vylog, retrying index creation
+-- would then lead to a duplicate index id in vylog and hence inability
+-- to make a snapshot or recover.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+errinj.set('ERRINJ_WAL_IO', true)
+_ = s:create_index('pk')
+errinj.set('ERRINJ_WAL_IO', false)
+_ = s:create_index('pk')
+box.snapshot()
+s:drop()

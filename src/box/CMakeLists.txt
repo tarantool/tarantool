@@ -56,6 +56,7 @@ add_library(box STATIC
     vy_stmt.c
     vy_mem.c
     vy_run.c
+    vy_write_iterator.c
     vy_cache.c
     vy_log.c
     vy_upsert.c
@@ -100,6 +101,5 @@ add_library(box STATIC
     lua/sql.c
     ${bin_sources})
 
-target_link_libraries(box ${ZSTD_LIBRARIES} sql)
-
+target_link_libraries(box ${ZSTD_LIBRARIES} ${common_libraries} sql)
 add_dependencies(box build_bundled_libs)

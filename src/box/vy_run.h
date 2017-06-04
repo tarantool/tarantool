@@ -359,6 +359,47 @@ int
 vy_run_recover(struct vy_run *run, const char *index_path,
 	       const char *run_path);
 
+enum vy_file_type {
+	VY_FILE_INDEX,
+	VY_FILE_RUN,
+	vy_file_MAX,
+};
+
+static const char *vy_file_suffix[] = {
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
+};
+
+static int
+vy_index_snprint_path(char *buf, int size, const char *dir,
+		      uint32_t space_id, uint32_t iid)
+{
+	return snprintf(buf, size, "%s/%u/%u",
+			dir, (unsigned)space_id, (unsigned)iid);
+}
+
+static inline int
+vy_run_snprint_path(char *buf, int size, const char *dir,
+		    uint32_t space_id, uint32_t iid,
+		    int64_t run_id, enum vy_file_type type)
+{
+	int total = 0;
+	SNPRINT(total, vy_index_snprint_path, buf, size,
+		dir, (unsigned)space_id, (unsigned)iid);
+	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
+		(long long)run_id, vy_file_suffix[type]);
+	return total;
+}
+
+int
+vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
+	     struct vy_stmt_stream *wi, uint64_t page_size,
+	     const struct key_def *key_def,
+	     const struct key_def *user_key_def,
+	     size_t max_output_count, double bloom_fpr,
+	     size_t *written, uint64_t *dumped_statements);
+
 /**
  * Allocate a new run slice.
  * This function increments @run->refs.
@@ -483,6 +524,45 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 int
 vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	     ZSTD_DStream *zdctx);
+
+/**
+ * Simple stream over a slice. @see vy_stmt_stream.
+ */
+struct vy_slice_stream {
+	/** Parent class, must be the first member */
+	struct vy_stmt_stream base;
+
+	/** Current position */
+	uint32_t page_no;
+	uint32_t pos_in_page;
+	/** Last page read */
+	struct vy_page *page;
+	/** The last tuple returned to user */
+	struct tuple *tuple;
+
+	/** Members needed for memory allocation and disk access */
+	/** Slice to stream */
+	struct vy_slice *slice;
+	/** Key def for comparing with slice boundaries */
+	const struct key_def *key_def;
+	/** Format for allocating REPLACE and DELETE tuples read from pages. */
+	struct tuple_format *format;
+	/** Same as format, but for UPSERT tuples. */
+	struct tuple_format *upsert_format;
+	/** Vinyl run environment. */
+	struct vy_run_env *run_env;
+	/** Set if this iterator is for a primary index. */
+	bool is_primary;
+};
+
+/**
+ * Open a run stream. Use vy_stmt_stream api for further work.
+ */
+void
+vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
+		     const struct key_def *key_def, struct tuple_format *format,
+		     struct tuple_format *upsert_format,
+		     struct vy_run_env *run_env, bool is_primary);
 
 #if defined(__cplusplus)
 } /* extern "C" */

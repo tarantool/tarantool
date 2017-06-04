@@ -2,6 +2,8 @@ fio = require 'fio'
 log = require 'log'
 test_run = require('test_run').new()
 
+test_run:cleanup_cluster()
+
 ENGINES = {'memtx', 'vinyl'}
 
 -- Directories where files can be stored,

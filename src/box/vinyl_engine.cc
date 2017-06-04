@@ -64,7 +64,6 @@ vinyl_engine_get_env()
 VinylEngine::VinylEngine()
 	:Engine("vinyl", &vy_tuple_format_vtab)
 {
-	flags = 0;
 	env = NULL;
 }
 
@@ -116,45 +115,6 @@ VinylEngine::open()
 {
 	return new VinylSpace(this);
 }
-
-void
-VinylEngine::addPrimaryKey(struct space *space)
-{
-	VinylIndex *pk = (VinylIndex *) index_find_xc(space, 0);
-	pk->open();
-}
-
-void
-VinylEngine::buildSecondaryKey(struct space *old_space,
-			       struct space *new_space,
-			       Index *new_index_arg)
-{
-	(void)old_space;
-	(void)new_space;
-	VinylIndex *new_index = (VinylIndex *) new_index_arg;
-	new_index->open();
-	/*
-	 * Unlike Memtx, Vinyl does not need building of a secondary index.
-	 * This is true because of two things:
-	 * 1) Vinyl does not support alter of non-empty spaces
-	 * 2) During recovery a Vinyl index already has all needed data on disk.
-	 * And there are 3 cases:
-	 * I. The secondary index is added in snapshot. Then Vinyl was
-	 * snapshotted too and all necessary for that moment data is on disk.
-	 * II. The secondary index is added in WAL. That means that vinyl
-	 * space had no data at that point and had nothing to build. The
-	 * index actually could contain recovered data, but it will handle it
-	 * by itself during WAL recovery.
-	 * III. Vinyl is online. The space is definitely empty and there's
-	 * nothing to build.
-	 *
-	 * When we start to implement alter of non-empty vinyl spaces, it
-	 *  seems that we should call here:
-	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
-	 *  but aware of three cases mentioned above.
-	 */
-}
-
 void
 VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 {
@@ -162,15 +122,6 @@ VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 		diag_raise();
 }
 
-void
-VinylEngine::checkIndexDef(struct space *space, struct index_def *index_def)
-{
-	if (index_def->type != TREE) {
-		tnt_raise(ClientError, ER_INDEX_TYPE,
-		          index_def->name,
-		          space_name(space));
-	}
-}
 
 void
 VinylEngine::begin(struct txn *txn)
@@ -290,4 +241,13 @@ VinylEngine::updateOptions()
 {
 	if (vy_update_options(env) != 0)
 		diag_raise();
+}
+
+void
+VinylEngine::checkSpaceDef(struct space_def *def)
+{
+	if (def->opts.temporary) {
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  def->name, "engine does not support temporary flag");
+	}
 }

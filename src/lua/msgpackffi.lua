@@ -230,8 +230,8 @@ local function encode_r(buf, obj, level)
         local array_count, map_count = 0, 0
         for key in pairs(obj) do
             if type(key) == 'number' and key >= 1 and
-               key == math.floor(key) then
-                array_count = math.max(key, array_count)
+               key == math.floor(key) and key == array_count + 1 then
+                array_count = array_count + 1
             else
                 map_count = map_count + 1
             end

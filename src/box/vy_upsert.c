@@ -60,8 +60,8 @@ vy_update_alloc(void *arg, size_t size)
  */
 static void
 vy_apply_upsert_ops(struct region *region, const char **stmt,
-		    const char **stmt_end, const char *ops,
-		    const char *ops_end, bool suppress_error)
+		    const char **stmt_end, const char *ops, const char *ops_end,
+		    bool suppress_error, uint64_t *column_mask)
 {
 	if (ops == ops_end)
 		return;
@@ -76,7 +76,7 @@ vy_apply_upsert_ops(struct region *region, const char **stmt,
 	result = tuple_upsert_execute(vy_update_alloc, region,
 				      ops, ops_end,
 				      *stmt, *stmt_end,
-				      &size, 0, suppress_error, NULL);
+				      &size, 0, suppress_error, column_mask);
 	if (result != NULL) {
 		/* if failed, just skip it and leave stmt the same */
 		*stmt = result;
@@ -124,8 +124,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		const struct key_def *key_def, struct tuple_format *format,
-		struct tuple_format *upsert_format, bool is_primary,
-		bool suppress_error)
+		struct tuple_format *upsert_format, bool suppress_error)
 {
 	/*
 	 * old_stmt - previous (old) version of stmt
@@ -164,8 +163,9 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	uint8_t old_type = vy_stmt_type(old_stmt);
+	uint64_t column_mask = UINT64_MAX;
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
-			    new_ops_end, suppress_error);
+			    new_ops_end, suppress_error, &column_mask);
 	if (old_type != IPROTO_UPSERT) {
 		assert(old_type == IPROTO_DELETE || old_type == IPROTO_REPLACE);
 		/*
@@ -235,7 +235,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	/*
 	 * Check that key hasn't been changed after applying operations.
 	 */
-	if (is_primary &&
+	if ((key_def->column_mask & column_mask) != 0 &&
 	    vy_tuple_compare(old_stmt, result_stmt, key_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and

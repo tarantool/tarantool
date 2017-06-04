@@ -656,8 +656,14 @@ sql_schema_put(InitData *init,
 void
 space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 			    uint32_t errcode);
+
+struct space;
+
+struct space *
+space_by_id(uint32_t id);
+
 struct index_def *
-index_def_new_from_tuple(struct tuple *tuple);
+index_def_new_from_tuple(struct tuple *tuple, struct space *old_space);
 
 /* Load database schema from Tarantool. */
 void tarantoolSqlite3LoadSchema(InitData *init)
@@ -723,7 +729,9 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		struct index_def *def;
 
-		def = index_def_new_from_tuple(tuple);
+		uint32_t id = box_tuple_field_u32(tuple, 0, 0);
+		struct space *space = space_by_id(id);
+		def = index_def_new_from_tuple(tuple, space);
 		if (def->opts.sql != NULL) {
 			sql_schema_put(
 				init, def->name,

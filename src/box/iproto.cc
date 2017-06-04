@@ -37,7 +37,7 @@
 #include <msgpuck.h>
 #include "third_party/base64.h"
 
-#include "main.h"
+#include "version.h"
 #include "fiber.h"
 #include "cbus.h"
 #include "say.h"
@@ -311,7 +311,18 @@ static void
 tx_fiber_init(struct session *session, uint64_t sync)
 {
 	session->sync = sync;
+	/*
+	 * We do not cleanup fiber keys at the end of each request.
+	 * This does not lead to privilege escalation as long as
+	 * fibers used to serve iproto requests never mingle with
+	 * fibers used to serve background tasks without going
+	 * through the purification of fiber_recycle(), which
+	 * resets the fiber local storage. Fibers, used to run
+	 * background tasks clean up their session in on_stop
+	 * trigger as well.
+	 */
 	fiber_set_session(fiber(), session);
+	fiber_set_user(fiber(), &session->credentials);
 }
 
 /**

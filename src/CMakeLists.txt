@@ -122,10 +122,12 @@ set (server_sources
      tt_uuid.c
      uri.c
      backtrace.cc
+     title.c
      proc_title.c
      coeio_file.c
      clock.c
      systemd.c
+     version.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
@@ -235,7 +237,7 @@ add_custom_command(
             ${exports_file} ${CMAKE_SYSTEM_NAME})
 
 add_executable(
-	tarantool main.cc title.c
+	tarantool main.cc
 	${LIBUTIL_FREEBSD_SRC}/flopen.c
 	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 

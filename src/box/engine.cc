@@ -49,7 +49,6 @@ RLIST_HEAD(engines);
 Engine::Engine(const char *engine_name, struct tuple_format_vtab *format_arg)
 	:name(engine_name),
 	 id(-1),
-	 flags(0),
 	 link(RLIST_HEAD_INITIALIZER(link)),
 	 format(format_arg)
 {}
@@ -87,27 +86,6 @@ void Engine::beginFinalRecovery()
 
 void Engine::endRecovery()
 {}
-
-void Engine::initSystemSpace(struct space * /* space */)
-{
-	panic("not implemented");
-}
-
-void
-Engine::addPrimaryKey(struct space * /* space */)
-{
-}
-
-void
-Engine::dropPrimaryKey(struct space * /* space */)
-{
-}
-
-void
-Engine::buildSecondaryKey(struct space *, struct space *, Index *)
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, this->name, "buildSecondaryKey");
-}
 
 int
 Engine::beginCheckpoint()
@@ -156,15 +134,11 @@ Engine::join(struct vclock *vclock, struct xstream *stream)
 }
 
 void
-Engine::checkIndexDef(struct space *space, struct index_def *index_def)
+Engine::checkSpaceDef(struct space_def * /* def */)
 {
-	(void) space;
-	(void) index_def;
-	/*
-	 * Don't bother checking index_def to match the view requirements.
-	 * Index::initIterator() must check key on each call.
-	 */
 }
+
+/** {{{ DML */
 
 Handler::Handler(Engine *f)
 	:engine(f)
@@ -203,15 +177,6 @@ Handler::executeUpsert(struct txn *, struct space *, struct request *)
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
 }
 
-void
-Handler::prepareAlterSpace(struct space *, struct space *)
-{
-}
-
-void
-Handler::commitAlterSpace(struct space *, struct space *)
-{
-}
 
 void
 Handler::executeSelect(struct txn *, struct space *space,
@@ -246,6 +211,57 @@ Handler::executeSelect(struct txn *, struct space *space,
 		port_add_tuple(port, tuple);
 	}
 }
+
+/** }}} DML */
+
+/* {{{ DDL  */
+
+void
+Handler::checkIndexDef(struct space *space, struct index_def *index_def)
+{
+	(void) space;
+	(void) index_def;
+	/*
+	 * Don't bother checking index_def to match the view requirements.
+	 * Index::initIterator() must check key on each call.
+	 */
+}
+
+void
+Handler::initSystemSpace(struct space * /* space */)
+{
+	panic("not implemented");
+}
+
+void
+Handler::addPrimaryKey(struct space * /* space */)
+{
+}
+
+void
+Handler::dropPrimaryKey(struct space * /* space */)
+{
+}
+
+void
+Handler::buildSecondaryKey(struct space *, struct space *, Index *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "buildSecondaryKey");
+}
+
+void
+Handler::prepareAlterSpace(struct space *, struct space *)
+{
+}
+
+void
+Handler::commitAlterSpace(struct space *, struct space *)
+{
+}
+
+/* }}} DDL */
+
+/* {{{ Engine API */
 
 /** Register engine instance. */
 void engine_register(Engine *engine)
@@ -381,3 +397,5 @@ engine_join(struct vclock *vclock, struct xstream *stream)
 		engine->join(vclock, stream);
 	}
 }
+
+/* }}} Engine API */

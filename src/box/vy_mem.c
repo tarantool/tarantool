@@ -841,4 +841,38 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
 	.close = vy_mem_iterator_close
 };
 
+static NODISCARD int
+vy_mem_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
+{
+	assert(virt_stream->iface->next == vy_mem_stream_next);
+	struct vy_mem_stream *stream = (struct vy_mem_stream *)virt_stream;
+
+	struct tuple **res = (struct tuple **)
+		vy_mem_tree_iterator_get_elem(&stream->mem->tree,
+					      &stream->curr_pos);
+	if (res == NULL) {
+		*ret = NULL;
+	} else {
+		*ret = *res;
+		vy_mem_tree_iterator_next(&stream->mem->tree,
+					  &stream->curr_pos);
+	}
+	return 0;
+}
+
+static const struct vy_stmt_stream_iface vy_mem_stream_iface = {
+	.start = NULL,
+	.next = vy_mem_stream_next,
+	.stop = NULL,
+	.close = NULL
+};
+
+void
+vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem)
+{
+	stream->base.iface = &vy_mem_stream_iface;
+	stream->mem = mem;
+	stream->curr_pos = vy_mem_tree_iterator_first(&mem->tree);
+}
+
 /* }}} vy_mem_iterator API implementation */

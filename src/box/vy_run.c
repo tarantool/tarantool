@@ -34,6 +34,7 @@
 #include "coeio.h"
 #include "xrow.h"
 #include "xlog.h"
+#include "replication.h"
 #include "fio.h"
 #include "memory.h"
 
@@ -165,34 +166,84 @@ vy_run_delete(struct vy_run *run)
 }
 
 /**
- * Search a page in a run that may contain a given key.
- * Return the index of the found page or -1 if the key is
- * less than the min key stored in the run. Additionally,
- * @equal is set if the min key of the found page is equal
- * to the given key and cleared otherwise.
+ * Find a page from which the iteration of a given key must be started.
+ * LE and LT: the found page definitely contains the position
+ *  for iteration start.
+ * GE, GT, EQ: Since page search uses only min_key of pages,
+ *  it may happen that the found page doesn't contain the position
+ *  for iteration start. In this case it is certain that the iteration
+ *  must be started from the beginning of the next page.
+ *
+ * @param run - run
+ * @param key - key to find
+ * @param key_def - key_def for comparison
+ * @param itype - iterator type (see above)
+ * @param equal_key: *equal_key is set to true if there is a page
+ *  with min_key equal to the given key.
+ * @return offset of the page in page index OR run->info.count if
+ *  there no pages fulfilling the conditions.
  */
-static int
-vy_run_search_page(struct vy_run *run, const struct tuple *key,
-		   const struct key_def *key_def, bool *equal)
+static uint32_t
+vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
+			const struct key_def *key_def,
+			enum iterator_type itype, bool *equal_key)
 {
-	int beg = 0;
-	int end = run->info.count;
-	while (beg != end) {
-		int mid = beg + (end - beg) / 2;
-		struct vy_page_info *page_info = vy_run_page_info(run, mid);
-		int cmp = key_compare(page_info->min_key,
-				tuple_data(key), key_def);
-		if (cmp == 0) {
-			*equal = true;
-			return mid;
-		}
-		if (cmp < 0)
-			beg = mid + 1;
+	if (itype == ITER_EQ)
+		itype = ITER_GE; /* One day it'll become obsolete */
+	assert(itype == ITER_GE || itype == ITER_GT ||
+	       itype == ITER_LE || itype == ITER_LT);
+	*equal_key = false;
+
+	/**
+	 * Binary search in page index. Depends on given iterator_type:
+	 *  ITER_GE: lowest page with min_key >= given key.
+	 *  ITER_GT: lowest page with min_key > given key.
+	 *  ITER_LE: highest page with min_key <= given key.
+	 *  ITER_LT: highest page with min_key < given key.
+	 *
+	 * Example: we are searching for a value 2 in the run of 10 pages:
+	 * min_key:         [1   1   2   2   2   2   2   3   3   3]
+	 * we want to find: [    LT  GE              LE  GT       ]
+	 * For LT and GE it's a classical lower_bound search.
+	 * Let's set up a range with left page's min_key < key and
+	 *  right page's min >= key; binary cut the range until it
+	 *  becomes of length 1 and then LT pos = left bound of the range
+	 *  and GE pos = right bound of the range.
+	 * For LE and GT it's a classical upper_bound search.
+	 * Let's set up a range with left page's min_key <= key and
+	 *  right page's min > key; binary cut the range until it
+	 *  becomes of length 1 and then LE pos = left bound of the range
+	 *  and GT pos = right bound of the range.
+	 */
+	bool is_lower_bound = itype == ITER_LT || itype == ITER_GE;
+
+	assert(run->info.count > 0);
+	/* Initially the range is set with virtual positions */
+	int32_t range[2] = { -1, run->info.count };
+	assert(run->info.count > 0);
+	do {
+		int32_t mid = range[0] + (range[1] - range[0]) / 2;
+		struct vy_page_info *info = vy_run_page_info(run, mid);
+		int cmp = vy_stmt_compare_with_raw_key(key, info->min_key,
+						       key_def);
+		if (is_lower_bound)
+			range[cmp <= 0] = mid;
 		else
-			end = mid;
-	}
-	*equal = false;
-	return end - 1;
+			range[cmp < 0] = mid;
+		*equal_key = *equal_key || cmp == 0;
+	} while (range[1] - range[0] > 1);
+	if (range[0] < 0)
+		range[0] = run->info.count;
+	uint32_t page = range[iterator_direction(itype) > 0];
+
+	/**
+	 * Since page search uses only min_key of pages,
+	 *  for GE, GT and EQ the previous page can contain
+	 *  the point where iteration must be started.
+	 */
+	if (page > 0 && iterator_direction(itype) > 0)
+		return page - 1;
+	return page;
 }
 
 struct vy_slice *
@@ -218,30 +269,32 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	slice->end = end;
 	rlist_create(&slice->in_range);
 	ipc_cond_create(&slice->pin_cond);
-	/*
-	 * Lookup the first and the last page of this slice
-	 * in the run and estimate the slice size.
-	 */
-	bool equal;
-	int page_no = -1;
-	if (end != NULL) {
-		page_no = vy_run_search_page(run, end, key_def, &equal);
-		/* End key doesn't belong to slice. */
-		if (equal)
-			page_no--;
-	} else if (run->info.count > 0)
-		page_no = run->info.count - 1;
-	if (page_no >= 0) {
-		slice->last_page_no = page_no;
-		page_no = (begin == NULL ? 0 :
-			   vy_run_search_page(run, begin, key_def, &equal));
-		slice->first_page_no = page_no > 0 ? page_no : 0;
-		uint64_t count = slice->last_page_no - slice->first_page_no + 1;
-		slice->keys = DIV_ROUND_UP(run->info.keys * count,
-					   run->info.count);
-		slice->size = DIV_ROUND_UP(run->info.size * count,
-					   run->info.count);
-	} /* else the slice is empty */
+	bool unused;
+	if (slice->begin == NULL) {
+		slice->first_page_no = 0;
+	} else {
+		slice->first_page_no =
+			vy_page_index_find_page(run, slice->begin, key_def,
+						ITER_GE, &unused);
+		assert(slice->last_page_no < run->info.count);
+	}
+	if (slice->end == NULL) {
+		slice->last_page_no = run->info.count ? run->info.count - 1 : 0;
+	} else {
+		slice->last_page_no =
+			vy_page_index_find_page(run, slice->end, key_def,
+						ITER_LT, &unused);
+		if (slice->last_page_no == run->info.count) {
+			/* It's an empty slice */
+			slice->last_page_no = 0;
+		}
+	}
+	assert(slice->last_page_no >= slice->first_page_no);
+	uint64_t count = slice->last_page_no - slice->first_page_no + 1;
+	slice->keys = DIV_ROUND_UP(run->info.keys * count,
+				   run->info.count);
+	slice->size = DIV_ROUND_UP(run->info.size * count,
+				   run->info.count);
 	return slice;
 }
 
@@ -900,41 +953,6 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 }
 
 /**
- * Binary search in page index
- * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
- * Additionally *equal_key argument is set to true if the found value is
- * equal to given key (untouched otherwise)
- * @retval page number
- */
-static uint32_t
-vy_run_iterator_search_page(struct vy_run_iterator *itr,
-			    enum iterator_type iterator_type,
-			    const struct tuple *key, bool *equal_key)
-{
-	struct vy_run *run = itr->slice->run;
-	uint32_t beg = 0;
-	uint32_t end = run->info.count;
-	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = (iterator_type == ITER_GT ||
-			iterator_type == ITER_LE ? -1 : 0);
-	while (beg != end) {
-		uint32_t mid = beg + (end - beg) / 2;
-		struct vy_page_info *page_info;
-		page_info = vy_run_page_info(run, mid);
-		int cmp;
-		cmp = -vy_stmt_compare_with_raw_key(key, page_info->min_key,
-						    itr->key_def);
-		cmp = cmp ? cmp : zero_cmp;
-		*equal_key = *equal_key || cmp == 0;
-		if (cmp < 0)
-			beg = mid + 1;
-		else
-			end = mid;
-	}
-	return end;
-}
-
-/**
  * Binary search in page
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
@@ -987,13 +1005,11 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 		       const struct tuple *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
-	pos->page_no = vy_run_iterator_search_page(itr, iterator_type, key,
-						   equal_key);
-	if (pos->page_no == 0) {
-		pos->pos_in_page = 0;
+	pos->page_no = vy_page_index_find_page(itr->slice->run, key,
+					       itr->key_def, iterator_type,
+					       equal_key);
+	if (pos->page_no == itr->slice->run->info.count)
 		return 0;
-	}
-	pos->page_no--;
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 	if (rc != 0)
@@ -1829,3 +1845,759 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	return -1;
 }
 
+/* dump statement to the run page buffers (stmt header and data) */
+static int
+vy_run_dump_stmt(const struct tuple *value, struct xlog *data_xlog,
+		 struct vy_page_info *info, const struct key_def *key_def,
+		 bool is_primary)
+{
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+
+	struct xrow_header xrow;
+	int rc = (is_primary ?
+		  vy_stmt_encode_primary(value, key_def, 0, &xrow) :
+		  vy_stmt_encode_secondary(value, key_def, &xrow));
+	if (rc != 0)
+		return -1;
+
+	ssize_t row_size;
+	if ((row_size = xlog_write_row(data_xlog, &xrow)) < 0)
+		return -1;
+
+	region_truncate(region, used);
+
+	info->unpacked_size += row_size;
+	++info->count;
+	return 0;
+}
+
+/**
+ * Encode uint32_t array of row offsets (a page index) as xrow
+ *
+ * @param page_index row index
+ * @param count size of row index
+ * @param[out] xrow xrow to fill.
+ * @retval 0 for success
+ * @retval -1 for error
+ */
+static int
+vy_page_index_encode(const uint32_t *page_index, uint32_t count,
+		     struct xrow_header *xrow)
+{
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->type = VY_RUN_PAGE_INDEX;
+
+	size_t size = mp_sizeof_map(1) +
+		      mp_sizeof_uint(VY_PAGE_INDEX_INDEX) +
+		      mp_sizeof_bin(sizeof(uint32_t) * count);
+	char *pos = region_alloc(&fiber()->gc, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "row index");
+		return -1;
+	}
+	xrow->body->iov_base = pos;
+	pos = mp_encode_map(pos, 1);
+	pos = mp_encode_uint(pos, VY_PAGE_INDEX_INDEX);
+	pos = mp_encode_binl(pos, sizeof(uint32_t) * count);
+	for (uint32_t i = 0; i < count; ++i)
+		pos = mp_store_u32(pos, page_index[i]);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	assert(xrow->body->iov_len == size);
+	xrow->bodycnt = 1;
+	return 0;
+}
+
+/**
+ * Write statements from the iterator to a new page in the run,
+ * update page and run statistics.
+ *
+ *  @retval  1 all is ok, the iterator is finished
+ *  @retval  0 all is ok, the iterator isn't finished
+ *  @retval -1 error occurred
+ */
+static int
+vy_run_write_page(struct vy_run_info *run_info, struct xlog *data_xlog,
+		  struct vy_stmt_stream *wi, struct tuple **curr_stmt,
+		  uint64_t page_size, struct bloom_spectrum *bs,
+		  const struct key_def *key_def,
+		  const struct key_def *user_key_def, bool is_primary,
+		  uint32_t *page_info_capacity)
+{
+	assert(curr_stmt != NULL);
+	assert(*curr_stmt != NULL);
+	struct vy_page_info *page = NULL;
+	const char *region_key;
+	bool end_of_run = false;
+
+	/* row offsets accumulator */
+	struct ibuf page_index_buf;
+	ibuf_create(&page_index_buf, &cord()->slabc, sizeof(uint32_t) * 4096);
+
+	if (run_info->count >= *page_info_capacity) {
+		uint32_t cap = *page_info_capacity > 0 ?
+			       *page_info_capacity * 2 : 16;
+		struct vy_page_info *new_infos =
+			realloc(run_info->page_infos, cap * sizeof(*new_infos));
+		if (new_infos == NULL) {
+			diag_set(OutOfMemory, cap, "realloc",
+				 "struct vy_page_info");
+			goto error_page_index;
+		}
+		run_info->page_infos = new_infos;
+		*page_info_capacity = cap;
+	}
+	assert(*page_info_capacity >= run_info->count);
+
+	if (run_info->count == 0) {
+		/* See comment to run_info->max_key allocation below. */
+		region_key = tuple_extract_key(*curr_stmt, key_def, NULL);
+		if (region_key == NULL)
+			goto error_page_index;
+		assert(run_info->min_key == NULL);
+		run_info->min_key = vy_key_dup(region_key);
+		if (run_info->min_key == NULL)
+			goto error_page_index;
+	}
+
+	page = run_info->page_infos + run_info->count;
+	vy_page_info_create(page, data_xlog->offset, *curr_stmt, key_def);
+	xlog_tx_begin(data_xlog);
+
+	/* Last written statement */
+	struct tuple *last_stmt = *curr_stmt;
+	do {
+		uint32_t *offset = (uint32_t *) ibuf_alloc(&page_index_buf,
+							   sizeof(uint32_t));
+		if (offset == NULL) {
+			diag_set(OutOfMemory, sizeof(uint32_t),
+				 "ibuf", "row index");
+			goto error_rollback;
+		}
+		*offset = page->unpacked_size;
+
+		if (vy_run_dump_stmt(*curr_stmt, data_xlog, page,
+				     key_def, is_primary) != 0)
+			goto error_rollback;
+
+		bloom_spectrum_add(bs, tuple_hash(*curr_stmt, user_key_def));
+
+		int64_t lsn = vy_stmt_lsn(*curr_stmt);
+		run_info->min_lsn = MIN(run_info->min_lsn, lsn);
+		run_info->max_lsn = MAX(run_info->max_lsn, lsn);
+
+		if (wi->iface->next(wi, curr_stmt))
+			goto error_rollback;
+
+		if (*curr_stmt == NULL)
+			end_of_run = true;
+		else
+			last_stmt = *curr_stmt;
+	} while (end_of_run == false &&
+		 obuf_size(&data_xlog->obuf) < page_size);
+
+	/* We don't write empty pages. */
+	assert(last_stmt != NULL);
+
+	if (end_of_run) {
+		/*
+		 * Tuple_extract_key allocates the key on a
+		 * region, but the max_key must be allocated on
+		 * the heap, because the max_key can live longer
+		 * than a fiber. To reach this, we must copy the
+		 * key into malloced memory.
+		 */
+		region_key = tuple_extract_key(last_stmt, key_def, NULL);
+		if (region_key == NULL)
+			goto error_rollback;
+		assert(run_info->max_key == NULL);
+		run_info->max_key = vy_key_dup(region_key);
+		if (run_info->max_key == NULL)
+			goto error_rollback;
+	}
+
+	/* Save offset to row index  */
+	page->page_index_offset = page->unpacked_size;
+
+	/* Write row index */
+	struct xrow_header xrow;
+	const uint32_t *page_index = (const uint32_t *) page_index_buf.rpos;
+	assert(ibuf_used(&page_index_buf) == sizeof(uint32_t) * page->count);
+	if (vy_page_index_encode(page_index, page->count, &xrow) < 0)
+		goto error_rollback;
+
+	ssize_t written = xlog_write_row(data_xlog, &xrow);
+	if (written < 0)
+		goto error_rollback;
+
+	page->unpacked_size += written;
+
+	written = xlog_tx_commit(data_xlog);
+	if (written == 0)
+		written = xlog_flush(data_xlog);
+	if (written < 0)
+		goto error_page_index;
+
+	page->size = written;
+
+	assert(page->count > 0);
+
+	++run_info->count;
+	run_info->size += page->size;
+	run_info->keys += page->count;
+
+	ibuf_destroy(&page_index_buf);
+	return !end_of_run ? 0: 1;
+
+	error_rollback:
+	xlog_tx_rollback(data_xlog);
+	error_page_index:
+	ibuf_destroy(&page_index_buf);
+	return -1;
+}
+
+/**
+ * Write statements from the iterator to a new run file.
+ *
+ *  @retval 0 success
+ *  @retval -1 error occurred
+ */
+static int
+vy_run_write_data(struct vy_run *run, const char *dirpath,
+		  uint32_t space_id, uint32_t iid,
+		  struct vy_stmt_stream *wi, uint64_t page_size,
+		  const struct key_def *key_def,
+		  const struct key_def *user_key_def,
+		  size_t max_output_count, double bloom_fpr)
+{
+	struct tuple *stmt;
+
+	/* Start iteration. */
+	if (wi->iface->start(wi) != 0)
+		goto err;
+	if (wi->iface->next(wi, &stmt) != 0)
+		goto err;
+
+	/* Do not create empty run files. */
+	if (stmt == NULL)
+		goto done;
+
+	struct bloom_spectrum bs;
+	if (bloom_spectrum_create(&bs, max_output_count,
+				  bloom_fpr, runtime.quota) != 0) {
+		diag_set(OutOfMemory, 0,
+			 "bloom_spectrum_create", "bloom_spectrum");
+		goto err;
+	}
+
+	struct vy_run_info *run_info = &run->info;
+
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dirpath,
+			    space_id, iid, run->id, VY_FILE_RUN);
+	struct xlog data_xlog;
+	struct xlog_meta meta = {
+		.filetype = XLOG_META_TYPE_RUN,
+		.instance_uuid = INSTANCE_UUID,
+	};
+	if (xlog_create(&data_xlog, path, &meta) < 0)
+		goto err_free_bloom;
+
+	run_info->min_lsn = INT64_MAX;
+	run_info->max_lsn = -1;
+
+	assert(run_info->page_infos == NULL);
+	uint32_t page_infos_capacity = 0;
+	int rc;
+	do {
+		rc = vy_run_write_page(run_info, &data_xlog, wi, &stmt,
+				       page_size, &bs, key_def, user_key_def,
+				       iid == 0, &page_infos_capacity);
+		if (rc < 0)
+			goto err_close_xlog;
+		fiber_gc();
+	} while (rc == 0);
+
+	/* Sync data and link the file to the final name. */
+	if (xlog_sync(&data_xlog) < 0 ||
+	    xlog_rename(&data_xlog) < 0)
+		goto err_close_xlog;
+
+	run->fd = data_xlog.fd;
+	xlog_close(&data_xlog, true);
+	fiber_gc();
+
+	bloom_spectrum_choose(&bs, &run->info.bloom);
+	run->info.has_bloom = true;
+	bloom_spectrum_destroy(&bs, runtime.quota);
+	done:
+	wi->iface->stop(wi);
+	return 0;
+
+	err_close_xlog:
+	xlog_close(&data_xlog, false);
+	fiber_gc();
+	err_free_bloom:
+	bloom_spectrum_destroy(&bs, runtime.quota);
+	err:
+	wi->iface->stop(wi);
+	return -1;
+}
+
+/** {{{ vy_page_info */
+
+/**
+ * Encode vy_page_info as xrow.
+ * Allocates using region_alloc.
+ *
+ * @param page_info page information to encode
+ * @param[out] xrow xrow to fill
+ *
+ * @retval  0 success
+ * @retval -1 error, check diag
+ */
+static int
+vy_page_info_encode(const struct vy_page_info *page_info,
+		    struct xrow_header *xrow)
+{
+	struct region *region = &fiber()->gc;
+
+	uint32_t min_key_size;
+	const char *tmp = page_info->min_key;
+	assert(mp_typeof(*tmp) == MP_ARRAY);
+	mp_next(&tmp);
+	min_key_size = tmp - page_info->min_key;
+
+	/* calc tuple size */
+	uint32_t size;
+	/* 3 items: page offset, size, and map */
+	size = mp_sizeof_map(6) +
+	       mp_sizeof_uint(VY_PAGE_INFO_OFFSET) +
+	       mp_sizeof_uint(page_info->offset) +
+	       mp_sizeof_uint(VY_PAGE_INFO_SIZE) +
+	       mp_sizeof_uint(page_info->size) +
+	       mp_sizeof_uint(VY_PAGE_INFO_ROW_COUNT) +
+	       mp_sizeof_uint(page_info->count) +
+	       mp_sizeof_uint(VY_PAGE_INFO_MIN_KEY) +
+	       min_key_size +
+	       mp_sizeof_uint(VY_PAGE_INFO_UNPACKED_SIZE) +
+	       mp_sizeof_uint(page_info->unpacked_size) +
+	       mp_sizeof_uint(VY_PAGE_INFO_PAGE_INDEX_OFFSET) +
+	       mp_sizeof_uint(page_info->page_index_offset);
+
+	char *pos = region_alloc(region, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "page encode");
+		return -1;
+	}
+
+	memset(xrow, 0, sizeof(*xrow));
+	/* encode page */
+	xrow->body->iov_base = pos;
+	pos = mp_encode_map(pos, 6);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_OFFSET);
+	pos = mp_encode_uint(pos, page_info->offset);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_SIZE);
+	pos = mp_encode_uint(pos, page_info->size);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_ROW_COUNT);
+	pos = mp_encode_uint(pos, page_info->count);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_MIN_KEY);
+	memcpy(pos, page_info->min_key, min_key_size);
+	pos += min_key_size;
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_UNPACKED_SIZE);
+	pos = mp_encode_uint(pos, page_info->unpacked_size);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_PAGE_INDEX_OFFSET);
+	pos = mp_encode_uint(pos, page_info->page_index_offset);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	xrow->bodycnt = 1;
+
+	xrow->type = VY_INDEX_PAGE_INFO;
+	return 0;
+}
+
+/** vy_page_info }}} */
+
+/** {{{ vy_run_info */
+
+/**
+ * Calculate the size on disk that is needed to store give bloom filter.
+ * @param bloom - storing bloom filter.
+ * @return - calculated size.
+ */
+static size_t
+vy_run_bloom_encode_size(const struct bloom *bloom)
+{
+	size_t size = mp_sizeof_array(4);
+	size += mp_sizeof_uint(VY_BLOOM_VERSION); /* version */
+	size += mp_sizeof_uint(bloom->table_size);
+	size += mp_sizeof_uint(bloom->hash_count);
+	size += mp_sizeof_bin(bloom_store_size(bloom));
+	return size;
+}
+
+/**
+ * Write bloom filter to given buffer.
+ * The buffer must have at least vy_run_bloom_encode_size()
+ * @param bloom - a bloom filter to write.
+ * @param buffer - a buffer to write to.
+ * @return - buffer + number of bytes written.
+ */
+char *
+vy_run_bloom_encode(const struct bloom *bloom, char *buffer)
+{
+	char *pos = buffer;
+	pos = mp_encode_array(pos, 4);
+	pos = mp_encode_uint(pos, VY_BLOOM_VERSION);
+	pos = mp_encode_uint(pos, bloom->table_size);
+	pos = mp_encode_uint(pos, bloom->hash_count);
+	pos = mp_encode_binl(pos, bloom_store_size(bloom));
+	pos = bloom_store(bloom, pos);
+	return pos;
+}
+
+/**
+ * Encode vy_run_info as xrow
+ * Allocates using region alloc
+ *
+ * @param run_info the run information
+ * @param xrow xrow to fill.
+ *
+ * @retval  0 success
+ * @retval -1 on error, check diag
+ */
+static int
+vy_run_info_encode(const struct vy_run_info *run_info,
+		   struct xrow_header *xrow)
+{
+	const char *tmp;
+	tmp = run_info->min_key;
+	mp_next(&tmp);
+	size_t min_key_size = tmp - run_info->min_key;
+	tmp = run_info->max_key;
+	mp_next(&tmp);
+	size_t max_key_size = tmp - run_info->max_key;
+
+	assert(run_info->has_bloom);
+	size_t size = mp_sizeof_map(6);
+	size += mp_sizeof_uint(VY_RUN_INFO_MIN_KEY) + min_key_size;
+	size += mp_sizeof_uint(VY_RUN_INFO_MAX_KEY) + max_key_size;
+	size += mp_sizeof_uint(VY_RUN_INFO_MIN_LSN) +
+		mp_sizeof_uint(run_info->min_lsn);
+	size += mp_sizeof_uint(VY_RUN_INFO_MAX_LSN) +
+		mp_sizeof_uint(run_info->max_lsn);
+	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
+		mp_sizeof_uint(run_info->count);
+	size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
+		vy_run_bloom_encode_size(&run_info->bloom);
+
+	char *pos = region_alloc(&fiber()->gc, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region", "run encode");
+		return -1;
+	}
+	memset(xrow, 0, sizeof(*xrow));
+	xrow->body->iov_base = pos;
+	/* encode values */
+	pos = mp_encode_map(pos, 6);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_KEY);
+	memcpy(pos, run_info->min_key, min_key_size);
+	pos += min_key_size;
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MAX_KEY);
+	memcpy(pos, run_info->max_key, max_key_size);
+	pos += max_key_size;
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_LSN);
+	pos = mp_encode_uint(pos, run_info->min_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_MAX_LSN);
+	pos = mp_encode_uint(pos, run_info->max_lsn);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
+	pos = mp_encode_uint(pos, run_info->count);
+	pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
+	pos = vy_run_bloom_encode(&run_info->bloom, pos);
+	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
+	xrow->bodycnt = 1;
+	xrow->type = VY_INDEX_RUN_INFO;
+	return 0;
+}
+
+/* vy_run_info }}} */
+
+/**
+ * Write run index to file.
+ */
+static int
+vy_run_write_index(struct vy_run *run, const char *dirpath,
+		   uint32_t space_id, uint32_t iid)
+{
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dirpath,
+			    space_id, iid, run->id, VY_FILE_INDEX);
+
+	struct xlog index_xlog;
+	struct xlog_meta meta = {
+		.filetype = XLOG_META_TYPE_INDEX,
+		.instance_uuid = INSTANCE_UUID,
+	};
+	if (xlog_create(&index_xlog, path, &meta) < 0)
+		return -1;
+
+	xlog_tx_begin(&index_xlog);
+
+	struct xrow_header xrow;
+	if (vy_run_info_encode(&run->info, &xrow) != 0 ||
+	    xlog_write_row(&index_xlog, &xrow) < 0)
+		goto fail;
+
+	for (uint32_t page_no = 0; page_no < run->info.count; ++page_no) {
+		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
+		if (vy_page_info_encode(page_info, &xrow) < 0) {
+			goto fail;
+		}
+		if (xlog_write_row(&index_xlog, &xrow) < 0)
+			goto fail;
+	}
+
+	if (xlog_tx_commit(&index_xlog) < 0 ||
+	    xlog_flush(&index_xlog) < 0 ||
+	    xlog_rename(&index_xlog) < 0)
+		goto fail;
+	xlog_close(&index_xlog, false);
+	fiber_gc();
+	return 0;
+	fail:
+	fiber_gc();
+	xlog_tx_rollback(&index_xlog);
+	xlog_close(&index_xlog, false);
+	unlink(path);
+	return -1;
+}
+
+/*
+ * Create a run file, write statements returned by a write
+ * iterator to it, and create an index file.
+ */
+int
+vy_run_write(struct vy_run *run, const char *dirpath,
+	     uint32_t space_id, uint32_t iid,
+	     struct vy_stmt_stream *wi, uint64_t page_size,
+	     const struct key_def *key_def,
+	     const struct key_def *user_key_def,
+	     size_t max_output_count, double bloom_fpr,
+	     size_t *written, uint64_t *dumped_statements)
+{
+	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
+		     {diag_set(ClientError, ER_INJECTION,
+			       "vinyl dump"); return -1;});
+
+	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		usleep(inj->dparam * 1000000);
+
+	if (vy_run_write_data(run, dirpath, space_id, iid,
+			      wi, page_size, key_def, user_key_def,
+			      max_output_count, bloom_fpr) != 0)
+		return -1;
+
+	if (vy_run_is_empty(run))
+		return 0;
+
+	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
+		return -1;
+
+	*written += vy_run_size(run);
+	*dumped_statements += run->info.keys;
+	return 0;
+}
+
+/**
+ * Read a page with stream->page_no from the run and save it in stream->page.
+ * Support function of slice stream.
+ * @param stream - the stream.
+ * @return 0 on success, -1 of memory or read error (diag is set).
+ */
+static NODISCARD int
+vy_slice_stream_read_page(struct vy_slice_stream *stream)
+{
+	assert(stream->page == NULL);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(stream->run_env);
+	if (zdctx == NULL)
+		return -1;
+
+	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
+							  stream->page_no);
+	stream->page = vy_page_new(page_info);
+	if (stream->page == NULL)
+		return -1;
+
+	if (vy_page_read(stream->page, page_info,
+			 stream->slice->run->fd, zdctx) != 0) {
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Binary search in a run for the given key. Find the first position with
+ * a tuple greater or equal to slice
+ * @retval 0 success
+ * @retval -1 read or memory error
+ */
+static NODISCARD int
+vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
+{
+	assert(virt_stream->iface->start == vy_slice_stream_search);
+	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
+	assert(stream->page == NULL);
+	if (stream->slice->begin == NULL) {
+		/* Already at the beginning */
+		assert(stream->page_no == 0);
+		assert(stream->pos_in_page == 0);
+		return 0;
+	}
+
+	if (vy_slice_stream_read_page(stream) != 0)
+		return -1;
+
+	/**
+	 * Binary search in page. Find the first position in page with
+	 * tuple >= stream->slice->begin.
+	 */
+	uint32_t beg = 0;
+	uint32_t end = stream->page->count;
+	while (beg != end) {
+		uint32_t mid = beg + (end - beg) / 2;
+		struct tuple *fnd_key =
+			vy_page_stmt(stream->page, mid, stream->key_def,
+				     stream->format, stream->upsert_format,
+				     stream->is_primary);
+		if (fnd_key == NULL)
+			return -1;
+		int cmp = vy_stmt_compare(fnd_key, stream->slice->begin,
+					  stream->key_def);
+		if (cmp < 0)
+			beg = mid + 1;
+		else
+			end = mid;
+		tuple_unref(fnd_key);
+	}
+	stream->pos_in_page = end;
+
+	if (stream->pos_in_page == stream->page->count) {
+		/* The first tuple is in the beginning of the next page */
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		stream->page_no++;
+		stream->pos_in_page = 0;
+	}
+	return 0;
+}
+
+/**
+ * Get the value from the stream and move to the next position.
+ * Set *ret to the value or NULL if EOF.
+ * @param virt_stream - virtual stream.
+ * @param ret - pointer to pointer to the result.
+ * @return 0 on success, -1 on memory or read error.
+ */
+static NODISCARD int
+vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
+{
+	assert(virt_stream->iface->next == vy_slice_stream_next);
+	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
+	*ret = NULL;
+
+	/* If the slice is ended, return EOF */
+	if (stream->page_no > stream->slice->last_page_no)
+		return 0;
+
+	/* If current page is not already read, read it */
+	if (stream->page == NULL && vy_slice_stream_read_page(stream) != 0)
+		return -1;
+
+	/* Read current tuple from the page */
+	struct tuple *tuple =
+		vy_page_stmt(stream->page, stream->pos_in_page,
+			     stream->key_def, stream->format,
+			     stream->upsert_format, stream->is_primary);
+	if (tuple == NULL) /* Read or memory error */
+		return -1;
+
+	/* Check that the tuple is not out of slice bounds = */
+	if (stream->slice->end != NULL &&
+	    stream->page_no >= stream->slice->last_page_no &&
+	    vy_stmt_compare_with_key(tuple, stream->slice->end,
+				     stream->key_def) >= 0)
+		return 0;
+
+	/* We definitely has the next non-null tuple. Save it in stream */
+	if (stream->tuple != NULL)
+		tuple_unref(stream->tuple);
+	stream->tuple = tuple;
+	*ret = tuple;
+
+	/* Increment position */
+	stream->pos_in_page++;
+
+	/* Check whether the position is out of page */
+	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
+							  stream->page_no);
+	if (stream->pos_in_page >= page_info->count) {
+		/**
+		 * Out of page. Free page, move the position to the next page
+		 * and * nullify page pointer to read it on the next iteration.
+		 */
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+		stream->page_no++;
+		stream->pos_in_page = 0;
+	}
+
+	return 0;
+}
+
+/**
+ * Free resources.
+ */
+static void
+vy_slice_stream_close(struct vy_stmt_stream *virt_stream)
+{
+	assert(virt_stream->iface->close == vy_slice_stream_close);
+	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
+	if (stream->page != NULL) {
+		vy_page_delete(stream->page);
+		stream->page = NULL;
+	}
+	if (stream->tuple != NULL) {
+		tuple_unref(stream->tuple);
+		stream->tuple = NULL;
+	}
+}
+
+static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
+	.start = vy_slice_stream_search,
+	.next = vy_slice_stream_next,
+	.stop = NULL,
+	.close = vy_slice_stream_close
+};
+
+void
+vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
+		   const struct key_def *key_def, struct tuple_format *format,
+		   struct tuple_format *upsert_format,
+		   struct vy_run_env *run_env, bool is_primary)
+{
+	stream->base.iface = &vy_slice_stream_iface;
+
+	stream->page_no = slice->first_page_no;
+	stream->pos_in_page = 0; /* We'll find it later */
+	stream->page = NULL;
+	stream->tuple = NULL;
+
+	stream->slice = slice;
+	stream->key_def = key_def;
+	stream->format = format;
+	stream->upsert_format = upsert_format;
+	stream->run_env = run_env;
+	stream->is_primary = is_primary;
+}

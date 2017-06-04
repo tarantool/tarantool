@@ -91,8 +91,7 @@
 void
 access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
-	struct session *session = current_session();
-	struct credentials *cr = &session->credentials;
+	struct credentials *cr = current_user();
 	/*
 	 * Only the owner of the object can be the grantor
 	 * of the privilege on the object. This means that
@@ -379,9 +378,8 @@ index_opts_create(struct index_opts *opts, const char *map)
  * - types of parts in the parts array are known to the system
  * - fieldno of each part in the parts array is within limits
  */
-extern "C"
-struct index_def *
-index_def_new_from_tuple(struct tuple *tuple)
+extern "C" struct index_def *
+index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 {
 	bool is_166plus;
 	index_def_check_tuple(tuple, &is_166plus);
@@ -410,7 +408,8 @@ index_def_new_from_tuple(struct tuple *tuple)
 		parts = tuple_field(tuple, INDEX_165_PARTS);
 	}
 
-	index_def = index_def_new(id, index_id, name, type, &opts, part_count);
+	index_def = index_def_new(id, space_name(old_space), index_id, name,
+				  type, &opts, part_count);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
@@ -424,7 +423,8 @@ index_def_new_from_tuple(struct tuple *tuple)
 		if (key_def_decode_parts_165(&index_def->key_def, &parts) != 0)
 			diag_raise();
 	}
-	index_def_check(index_def);
+	index_def_check(index_def, space_name(old_space));
+	old_space->handler->checkIndexDef(old_space, index_def);
 	scoped_guard.is_active = false;
 	return index_def;
 }
@@ -603,6 +603,8 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 
 	space_opts_create(&def->opts, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
+	Engine *engine = engine_find(def->engine_name);
+	engine->checkSpaceDef(def);
 	access_check_ddl(def->uid, SC_SPACE);
 }
 
@@ -926,12 +928,6 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "can not change field count on a non-empty space");
 	}
 
-	Engine *engine = alter->old_space->handler->engine;
-	if (def.opts.temporary && !engine_can_be_temporary(engine->flags)) {
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  space_name(alter->old_space),
-			  "space does not support temporary flag");
-	}
 	if (def.opts.temporary != alter->old_space->def.opts.temporary &&
 	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
@@ -1007,7 +1003,7 @@ DropIndex::alter(struct alter_space *alter)
 	 * - when a new primary key is finally added, the space
 	 *   can be put back online properly.
 	 */
-	alter->new_space->handler->engine->dropPrimaryKey(alter->new_space);
+	alter->new_space->handler->dropPrimaryKey(alter->new_space);
 }
 
 void
@@ -1016,7 +1012,7 @@ DropIndex::commit(struct alter_space *alter)
 	if (space_index(alter->new_space, old_index_def->iid) != NULL)
 		return;
 	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
-	alter->old_space->handler->dropIndex(index);
+	index->commitDrop();
 }
 
 /** Change non-essential (no data change) properties of an index. */
@@ -1078,6 +1074,7 @@ public:
 	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter);
 	virtual ~AddIndex();
 };
 
@@ -1183,7 +1180,7 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
 void
 AddIndex::alter(struct alter_space *alter)
 {
-	Engine *engine = alter->new_space->handler->engine;
+	Handler *handler = alter->new_space->handler;
 
 	if (space_index(alter->old_space, 0) == NULL) {
 		if (new_index_def->iid == 0) {
@@ -1197,7 +1194,7 @@ AddIndex::alter(struct alter_space *alter)
 			 * key. After recovery, it means building
 			 * all keys.
 			 */
-			engine->addPrimaryKey(alter->new_space);
+			handler->addPrimaryKey(alter->new_space);
 		} else {
 			/*
 			 * Adding a secondary key.
@@ -1212,10 +1209,17 @@ AddIndex::alter(struct alter_space *alter)
 	 * Get the new index and build it.
 	 */
 	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
-	engine->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
+	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
 	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
 	trigger_add(&alter->old_space->on_replace, on_replace);
+}
+
+void
+AddIndex::commit(struct alter_space *alter)
+{
+	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
+	new_index->commitCreate();
 }
 
 AddIndex::~AddIndex()
@@ -1456,7 +1460,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (new_tuple != NULL) {
 		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
 		alter_space_add_op(alter, add_index);
-		add_index->new_index_def = index_def_new_from_tuple(new_tuple);
+		add_index->new_index_def = index_def_new_from_tuple(new_tuple,
+								    old_space);
 	}
 	alter_space_do(txn, alter, old_space);
 	scoped_guard.is_active = false;

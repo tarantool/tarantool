@@ -195,7 +195,7 @@ sc_space_new(struct space_def *space_def,
 	 *   ensures validation of tuples when starting from
 	 *   a snapshot of older version.
 	 */
-	space->handler->engine->initSystemSpace(space);
+	space->handler->initSystemSpace(space);
 	return space;
 }
 
@@ -256,11 +256,12 @@ schema_init()
 	};
 	struct index_opts opts = index_opts_default;
 	struct index_def *index_def = index_def_new(def.id,
+						    "_schema",
 						    0 /* index id */,
-						   "primary", /* name */
-						   TREE /* index type */,
-						   &opts,
-						   1); /* part count */
+						    "primary", /* name */
+						    TREE /* index type */,
+						    &opts,
+						    1); /* part count */
 	if (index_def == NULL)
 		diag_raise();
 	struct key_def *key_def = &index_def->key_def;
@@ -305,11 +306,12 @@ schema_init()
 	def.id = BOX_INDEX_ID;
 	snprintf(def.name, sizeof(def.name), "_index");
 	index_def = index_def_new(def.id,
-			      0 /* index id */,
-			      "primary",
-			      TREE /* index type */,
-			      &opts,
-			      2); /* part count */
+				  "_index",
+				  0 /* index id */,
+				  "primary",
+				  TREE /* index type */,
+				  &opts,
+				  2); /* part count */
 	if (index_def == NULL)
 		diag_raise();
 	key_def = &index_def->key_def;

@@ -38,10 +38,17 @@
 struct VinylIndex: public Index
 {
 public:
-	VinylIndex(struct vy_env *env, struct index_def *index_def);
+	VinylIndex(struct index_def *index_def, struct vy_index *db);
+	virtual ~VinylIndex() override;
 
-	virtual void
-	open();
+	/**
+	 * Open this vinyl index. Called on index creation
+	 * before WAL write. May throw an exception.
+	 */
+	void open();
+
+	virtual void commitCreate() override;
+	virtual void commitDrop() override;
 
 	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
@@ -70,8 +77,6 @@ public:
 	virtual void
 	info(struct info_handler *handler) const override;
 
-public:
-	struct vy_env *env;
 	struct vy_index *db;
 };
 

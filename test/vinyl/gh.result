@@ -75,7 +75,7 @@ s:drop()
 -- gh-436: No error when creating temporary vinyl space
 s = box.schema.space.create('tester',{engine='vinyl', temporary=true})
 ---
-- error: 'Can''t modify space ''tester'': space does not support temporary flag'
+- error: 'Can''t modify space ''tester'': engine does not support temporary flag'
 ...
 -- gh-432: ignored limit
 s = box.schema.space.create('tester',{engine='vinyl'})

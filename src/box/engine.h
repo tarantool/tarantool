@@ -38,10 +38,6 @@ struct tuple;
 struct tuple_format_vtab;
 struct relay;
 
-enum engine_flags {
-	ENGINE_CAN_BE_TEMPORARY = 1,
-};
-
 extern struct rlist engines;
 
 typedef int
@@ -63,33 +59,6 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *open() = 0;
-	virtual void initSystemSpace(struct space *space);
-	/**
-	 * Check an index definition for violation of
-	 * various limits.
-	 */
-	virtual void checkIndexDef(struct space *space, struct index_def*);
-	/**
-	 * Called by alter when a primary key added,
-	 * after createIndex is invoked for the new
-	 * key.
-	 */
-	virtual void addPrimaryKey(struct space *space);
-	/**
-	 * Called by alter when the primary key is dropped.
-	 * Do whatever is necessary with space/handler object,
-	 * e.g. disable handler replace function, if
-	 * necessary.
-	 */
-	virtual void dropPrimaryKey(struct space *space);
-
-	/**
-	 * Called with the new empty secondary index. Fill the new index
-	 * with data from the primary key of the space.
-	 */
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index);
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
@@ -180,13 +149,18 @@ public:
 	 */
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *cb_arg);
+
+	/**
+	 * Check definition of a new space for engine-specific
+	 * limitations. E.g. not all engines support temporary
+	 * tables.
+	 */
+	virtual void checkSpaceDef(struct space_def *def);
 public:
 	/** Name of the engine. */
 	const char *name;
 	/** Engine id. */
 	uint32_t id;
-	/** Engine flags */
-	uint32_t flags;
 	/** Used for search for engine by name. */
 	struct rlist link;
 	struct tuple_format_vtab *format;
@@ -223,15 +197,38 @@ public:
 		      uint32_t offset, uint32_t limit,
 		      const char *key, const char *key_end,
 		      struct port *);
+
+	virtual void initSystemSpace(struct space *space);
+	/**
+	 * Check an index definition for violation of
+	 * various limits.
+	 */
+	virtual void checkIndexDef(struct space *new_space, struct index_def *);
 	/**
 	 * Create an instance of space index. Used in alter
-	 * space.
+	 * space before commit to WAL. The created index
+	 * is deleted with delete operator.
 	 */
-	virtual Index *createIndex(struct space *space, struct index_def*) = 0;
+	virtual Index *createIndex(struct space *new_space, struct index_def *) = 0;
 	/**
-	 * Delete all tuples in the index on drop.
+	 * Called by alter when a primary key added,
+	 * after createIndex is invoked for the new
+	 * key and before the write to WAL.
 	 */
-	virtual void dropIndex(Index *) = 0;
+	virtual void addPrimaryKey(struct space *new_space);
+	/**
+	 * Called by alter when the primary key is dropped.
+	 * Do whatever is necessary with space/handler object,
+	 * to not crash in DML.
+	 */
+	virtual void dropPrimaryKey(struct space *new_space);
+	/**
+	 * Called with the new empty secondary index. Fill the new index
+	 * with data from the primary key of the space.
+	 */
+	virtual void buildSecondaryKey(struct space *old_space,
+				       struct space *new_space,
+				       Index *new_index);
 	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space'
@@ -243,7 +240,7 @@ public:
 	/**
 	 * Notify the engine engine after altering a space and
 	 * replacing old_space with new_space in the space cache,
-	 * to, e.g., update all referenced to struct space
+	 * to, e.g., update all references to struct space
 	 * and replace old_space with new_space.
 	 */
 	virtual void commitAlterSpace(struct space *old_space,
@@ -262,12 +259,6 @@ Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
-
-static inline bool
-engine_can_be_temporary(uint32_t flags)
-{
-	return flags & ENGINE_CAN_BE_TEMPORARY;
-}
 
 static inline uint32_t
 engine_id(Handler *space)
