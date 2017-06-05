@@ -51,8 +51,9 @@ sid_max()
 {
 	static uint64_t sid_max = 0;
 	/* Return the next sid rolling over the reserved value of 0. */
-	while (++sid_max == 0)
-		;
+	while (++sid_max == 0 ||
+	       mh_i32ptr_find(session_registry, sid_max, NULL) !=
+	       mh_end(session_registry));
 	return sid_max;
 }
 
