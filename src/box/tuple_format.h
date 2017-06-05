@@ -221,9 +221,9 @@ tuple_format_meta_size(const struct tuple_format *format)
 	return format->extra_size + format->field_map_size;
 }
 
-/** \cond public */
-
 typedef struct tuple_format box_tuple_format_t;
+
+/** \cond public */
 
 /**
  * Return new in-memory tuple format based on passed key definitions.
