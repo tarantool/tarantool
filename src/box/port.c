@@ -66,13 +66,6 @@ port_add_tuple(struct port *port, struct tuple *tuple)
 }
 
 void
-port_add_tuple_xc(struct port *port, struct tuple *tuple)
-{
-	if (port_add_tuple(port, tuple) != 0)
-		diag_raise();
-}
-
-void
 port_create(struct port *port)
 {
 	port->size = 0;

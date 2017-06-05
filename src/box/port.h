@@ -37,6 +37,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tuple;
+struct obuf;
 
 /**
  * A single port represents a destination of box_process output.
@@ -92,9 +93,16 @@ port_free(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif /* defined(__cplusplus) */
 
-void
-port_add_tuple_xc(struct port *port, struct tuple *tuple);
+#include "diag.h"
+
+static inline void
+port_add_tuple_xc(struct port *port, struct tuple *tuple)
+{
+	if (port_add_tuple(port, tuple) != 0)
+		diag_raise();
+}
+
+#endif /* defined __cplusplus */
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */
