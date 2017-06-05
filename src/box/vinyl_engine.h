@@ -56,7 +56,7 @@ struct VinylEngine: public Engine {
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 	virtual void commitCheckpoint(struct vclock *vclock) override;
 	virtual void abortCheckpoint() override;
-	virtual void collectGarbage(int64_t lsn) override;
+	virtual int collectGarbage(int64_t lsn) override;
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
 	void updateOptions();

@@ -47,8 +47,6 @@ local default_cfg = {
     coredump            = false,
     read_only           = false,
     hot_standby         = false,
-
-    -- snapshot_daemon
     checkpoint_interval = 0,        -- 0 = disabled
     checkpoint_count    = 6,
 }
@@ -142,9 +140,8 @@ local dynamic_cfg = {
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
     vinyl_timeout           = private.cfg_update_vinyl_options,
-    -- snapshot_daemon
-    checkpoint_interval     = box.internal.snapshot_daemon.set_checkpoint_interval,
-    checkpoint_count        = box.internal.snapshot_daemon.set_checkpoint_count,
+    checkpoint_count        = private.cfg_set_checkpoint_count,
+    checkpoint_interval     = private.snapshot_daemon.set_checkpoint_interval,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()

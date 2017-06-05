@@ -56,8 +56,6 @@ fio.basename(snaps[1], '.snap') >= fio.basename(xlogs[1], '.xlog')
 box.cfg{checkpoint_interval = 3600 * 4, checkpoint_count = 4 }
 space:drop()
 
-box.cfg{ checkpoint_count = .2 }
-
 daemon = box.internal.snapshot_daemon
 -- stop daemon
 box.cfg{ checkpoint_interval = 0 }

@@ -6,6 +6,9 @@ errinj = box.error.injection
 
 test_run:cleanup_cluster()
 
+-- Make each snapshot trigger garbage collection.
+box.cfg{checkpoint_count = 1}
+
 -- Temporary space for bumping lsn.
 temp = box.schema.space.create('temp')
 _ = temp:create_index('pk')
@@ -15,7 +18,7 @@ _ = s:create_index('pk', {run_count_per_level=1})
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function gc() temp:auto_increment{} box.snapshot() box.internal.gc.run(box.info.signature) end
+function gc() temp:auto_increment{} box.snapshot() end
 
 --
 -- Check that gc retries to delete files left
@@ -67,13 +70,16 @@ test_run:cmd('restart server default')
 test_run = require('test_run').new()
 fio = require('fio')
 
+default_checkpoint_count = box.cfg.checkpoint_count
+box.cfg{checkpoint_count = 1}
+
 s = box.space.test
 temp = box.space.temp
 
 path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
-function gc() temp:auto_increment{} box.snapshot() box.internal.gc.run(box.info.signature) end
+function gc() temp:auto_increment{} box.snapshot() end
 
 file_count()
 
@@ -88,3 +94,5 @@ gc()
 file_count()
 
 temp:drop()
+
+box.cfg{checkpoint_count = default_checkpoint_count}

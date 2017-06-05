@@ -67,6 +67,7 @@ add_library(box STATIC
     txn.cc
     box.cc
     gc.c
+    checkpoint.cc
     user_def.c
     user.cc
     authentication.cc

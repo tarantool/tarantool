@@ -132,6 +132,8 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 			 alloc_factor);
 
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
+	m_snap_dir.force_recovery = force_recovery;
+	xdir_scan_xc(&m_snap_dir);
 }
 
 MemtxEngine::~MemtxEngine()
@@ -468,7 +470,7 @@ struct checkpoint {
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
-	struct vclock vclock;
+	struct vclock *vclock;
 	struct xdir dir;
 	/**
 	 * Do nothing, just touch the snapshot file - the
@@ -486,7 +488,11 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
-	vclock_create(&ckpt->vclock);
+	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
+	if (ckpt->vclock == NULL)
+		tnt_raise(OutOfMemory, sizeof(*ckpt->vclock),
+			  "malloc", "vclock");
+	vclock_create(ckpt->vclock);
 	ckpt->touch = false;
 }
 
@@ -501,6 +507,7 @@ checkpoint_destroy(struct checkpoint *ckpt)
 	}
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	xdir_destroy(&ckpt->dir);
+	free(ckpt->vclock);
 }
 
 
@@ -532,7 +539,7 @@ checkpoint_f(va_list ap)
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	if (ckpt->touch) {
-		if (xdir_touch_xlog(&ckpt->dir, &ckpt->vclock) == 0)
+		if (xdir_touch_xlog(&ckpt->dir, ckpt->vclock) == 0)
 			return 0;
 		/*
 		 * Failed to touch an existing snapshot, create
@@ -542,7 +549,7 @@ checkpoint_f(va_list ap)
 	}
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, ckpt->vclock) != 0)
 		diag_raise();
 
 	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
@@ -585,10 +592,10 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 	/*
 	 * If a snapshot already exists, do not create a new one.
 	 */
-	struct checkpoint_info *checkpoint = gc_last_checkpoint();
-	m_checkpoint->touch = checkpoint != NULL &&
-		vclock_compare(&checkpoint->vclock, vclock) == 0;
-	vclock_copy(&m_checkpoint->vclock, vclock);
+	struct vclock last;
+	m_checkpoint->touch = (lastSnapshot(&last) >= 0 &&
+			       vclock_compare(&last, vclock) == 0);
+	vclock_copy(m_checkpoint->vclock, vclock);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",
 			 checkpoint_f, m_checkpoint)) {
@@ -617,7 +624,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 	memtx_tuple_end_snapshot();
 
 	if (!m_checkpoint->touch) {
-		int64_t lsn = vclock_sum(&m_checkpoint->vclock);
+		int64_t lsn = vclock_sum(m_checkpoint->vclock);
 		struct xdir *dir = &m_checkpoint->dir;
 		/* rename snapshot on completion */
 		char to[PATH_MAX];
@@ -627,6 +634,14 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 		int rc = coio_rename(from, to);
 		if (rc != 0)
 			panic("can't rename .snap.inprogress");
+	}
+
+	struct vclock last;
+	if (lastSnapshot(&last) < 0 || vclock_compare(&last, vclock) != 0) {
+		/* Add the new checkpoint to the set. */
+		xdir_add_vclock(&m_snap_dir, m_checkpoint->vclock);
+		/* Prevent checkpoint_destroy() from freeing vclock. */
+		m_checkpoint->vclock = NULL;
 	}
 
 	checkpoint_destroy(m_checkpoint);
@@ -651,12 +666,29 @@ MemtxEngine::abortCheckpoint()
 	/** Remove garbage .inprogress file. */
 	char *filename =
 		xdir_format_filename(&m_checkpoint->dir,
-				     vclock_sum(&m_checkpoint->vclock),
+				     vclock_sum(m_checkpoint->vclock),
 				     INPROGRESS);
 	(void) coio_unlink(filename);
 
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
+}
+
+int
+MemtxEngine::collectGarbage(int64_t lsn)
+{
+	/*
+	 * We recover the checkpoint list by scanning the snapshot
+	 * directory so deletion of an xlog file or a file that
+	 * belongs to another engine without the corresponding snap
+	 * file would result in a corrupted checkpoint on the list.
+	 * That said, we have to abort garbage collection if we
+	 * fail to delete a snap file.
+	 */
+	if (xdir_collect_garbage(&m_snap_dir, lsn, true) != 0)
+		return -1;
+
+	return 0;
 }
 
 int

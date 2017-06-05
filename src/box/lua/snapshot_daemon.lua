@@ -12,7 +12,6 @@ local PREFIX = 'snapshot_daemon'
 
 local daemon = {
     checkpoint_interval = 0;
-    checkpoint_count = 6;
     fiber = nil;
     control = nil;
 }
@@ -32,8 +31,8 @@ local function snapshot()
     return false
 end
 
--- create snapshot
-local function make_snapshot()
+-- check filesystem and current time
+local function process(self)
 
     if daemon.checkpoint_interval == nil then
         return false
@@ -59,30 +58,6 @@ local function make_snapshot()
     end
     if snstat.mtime <= fiber.time() + daemon.checkpoint_interval then
         return snapshot()
-    end
-end
-
--- check filesystem and current time
-local function process(self)
-    if not make_snapshot() then
-        return
-    end
-
-    -- cleanup code
-    if daemon.checkpoint_count == nil then
-        return
-    end
-
-    if not (self.checkpoint_count > 0) then
-        return
-    end
-
-    -- delete all but most recent @checkpoint_count snapshots
-    local checkpoints = box.internal.gc.info().checkpoints
-    local oldest_checkpoint = checkpoints[#checkpoints + 1 -
-                                          self.checkpoint_count]
-    if oldest_checkpoint ~= nil then
-        box.internal.gc.run(oldest_checkpoint.signature)
     end
 end
 
@@ -154,15 +129,6 @@ setmetatable(daemon, {
             reload(daemon)
             return
         end,
-
-        set_checkpoint_count = function()
-            if math.floor(box.cfg.checkpoint_count) ~= box.cfg.checkpoint_count then
-                box.error(box.error.CFG, "checkpoint_count",
-                         "must be an integer")
-            end
-            daemon.checkpoint_count = box.cfg.checkpoint_count
-            reload(daemon)
-        end
     }
 })
 

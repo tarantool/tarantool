@@ -4,6 +4,10 @@ fio = require('fio')
 
 test_run:cleanup_cluster()
 
+-- Make each snapshot trigger garbage collection.
+default_checkpoint_count = box.cfg.checkpoint_count
+box.cfg{checkpoint_count = 1}
+
 -- Temporary space for bumping lsn.
 temp = box.schema.space.create('temp')
 _ = temp:create_index('pk')
@@ -15,13 +19,12 @@ path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function file_count() return #fio.glob(fio.pathjoin(path, '*')) end
 function vylog_count() return #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')) end
-function gc() temp:auto_increment{} box.snapshot() box.internal.gc.run(box.info.signature) end
+function gc() temp:auto_increment{} box.snapshot() end
 
 -- Check that run files are deleted by gc.
 s:insert{1} box.snapshot() -- dump
 s:insert{2} box.snapshot() -- dump + compaction
 while s.index.pk:info().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
-file_count()
 gc()
 file_count()
 
@@ -49,3 +52,5 @@ gc()
 vylog_count()
 
 temp:drop()
+
+box.cfg{checkpoint_count = default_checkpoint_count}

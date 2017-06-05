@@ -39,6 +39,8 @@
 #include "box/box.h"
 #include "box/txn.h"
 #include "box/gc.h"
+#include "box/checkpoint.h"
+#include "box/vclock.h"
 
 #include "box/lua/error.h"
 #include "box/lua/tuple.h"
@@ -105,44 +107,54 @@ lbox_snapshot(struct lua_State *L)
 }
 
 static int
-lbox_gc_run(struct lua_State *L)
-{
-	int64_t signature = luaL_checkint64(L, 1);
-	gc_run(signature);
-	return 0;
-}
-
-static int
 lbox_gc_info(struct lua_State *L)
 {
-	lua_newtable(L);
+	int count;
+	const struct vclock *vclock;
 
-	lua_pushstring(L, "signature");
-	luaL_pushint64(L, gc_signature());
-	lua_settable(L, -3);
+	lua_newtable(L);
 
 	lua_pushstring(L, "checkpoints");
 	lua_newtable(L);
 
-	struct checkpoint_iterator it;
-	checkpoint_iterator_init(&it);
+	struct checkpoint_iterator checkpoints;
+	checkpoint_iterator_init(&checkpoints);
 
-	int checkpoint_count = 0;
-	const struct checkpoint_info *cpt;
-	checkpoint_foreach(&it, cpt) {
-		lua_createtable(L, 0, 2);
+	count = 0;
+	while ((vclock = checkpoint_iterator_next(&checkpoints)) != NULL) {
+		lua_createtable(L, 0, 1);
 
 		lua_pushstring(L, "signature");
-		luaL_pushint64(L, vclock_sum(&cpt->vclock));
+		luaL_pushint64(L, vclock_sum(vclock));
 		lua_settable(L, -3);
 
-		lua_pushstring(L, "refs");
-		lua_pushinteger(L, cpt->refs);
-		lua_settable(L, -3);
-
-		lua_rawseti(L, -2, ++checkpoint_count);
+		lua_rawseti(L, -2, ++count);
 	}
 	lua_settable(L, -3);
+
+	lua_pushstring(L, "consumers");
+	lua_newtable(L);
+
+	struct gc_consumer_iterator consumers;
+	gc_consumer_iterator_init(&consumers);
+
+	count = 0;
+	struct gc_consumer *consumer;
+	while ((consumer = gc_consumer_iterator_next(&consumers)) != NULL) {
+		lua_createtable(L, 0, 2);
+
+		lua_pushstring(L, "name");
+		lua_pushstring(L, gc_consumer_name(consumer));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "signature");
+		luaL_pushint64(L, gc_consumer_signature(consumer));
+		lua_settable(L, -3);
+
+		lua_rawseti(L, -2, ++count);
+	}
+	lua_settable(L, -3);
+
 	return 1;
 }
 
@@ -192,7 +204,6 @@ static const struct luaL_Reg boxlib[] = {
 };
 
 static const struct luaL_Reg boxlib_gc[] = {
-	{"run", lbox_gc_run},
 	{"info", lbox_gc_info},
 	{NULL, NULL}
 };

@@ -119,7 +119,7 @@ replica_new(const struct tt_uuid *uuid)
 	replica->uuid = *uuid;
 	replica->applier = NULL;
 	replica->relay = NULL;
-	replica->checkpoint = NULL;
+	replica->gc = NULL;
 	return replica;
 }
 
@@ -127,8 +127,8 @@ static void
 replica_delete(struct replica *replica)
 {
 	assert(replica_is_orphan(replica));
-	if (replica->checkpoint != NULL)
-		checkpoint_unref(replica->checkpoint);
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
 	mempool_free(&replica_pool, replica);
 }
 
@@ -264,16 +264,6 @@ replica_clear_relay(struct replica *replica)
 		replicaset_remove(&replicaset, replica);
 		replica_delete(replica);
 	}
-}
-
-void
-replica_set_checkpoint(struct replica *replica,
-		       struct checkpoint_info *checkpoint)
-{
-	checkpoint_ref(checkpoint);
-	if (replica->checkpoint != NULL)
-		checkpoint_unref(replica->checkpoint);
-	replica->checkpoint = checkpoint;
 }
 
 struct replica *

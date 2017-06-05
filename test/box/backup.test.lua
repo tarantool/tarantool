@@ -4,6 +4,11 @@ test_run = require('test_run').new()
 
 test_run:cleanup_cluster()
 
+-- Make sure that garbage collection is disabled
+-- while backup is in progress.
+default_checkpoint_count = box.cfg.checkpoint_count
+box.cfg{checkpoint_count = 1}
+
 ENGINES = {'memtx', 'vinyl'}
 
 -- Directories where files can be stored,
@@ -41,12 +46,10 @@ for _, engine in ipairs(ENGINES) do
     s = box.space[engine]
     for i=1,3 do s:insert{i*100} end
 end
+-- Even though checkpoint_count is set to 1, this must not trigger
+-- garbage collection, because the checkpoint is pinned by backup.
 box.snapshot()
 _ = test_run:cmd("setopt delimiter ''");
-
--- Make sure that garbage collection is disabled
--- while backup is in progress.
-box.internal.gc.run(box.info.signature)
 
 -- Prepare backup directory
 backup_dir = fio.pathjoin(fio.cwd(), 'backup')
@@ -91,3 +94,5 @@ box.backup.stop()
 -- Cleanup.
 _ =  os.execute(string.format('rm -rf %s', backup_dir))
 for _, engine in ipairs(ENGINES) do box.space[engine]:drop() end
+
+box.cfg{checkpoint_count = default_checkpoint_count}

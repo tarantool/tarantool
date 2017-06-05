@@ -93,10 +93,6 @@ box.cfg{checkpoint_interval = 3600 * 4, checkpoint_count = 4 }
 space:drop()
 ---
 ...
-box.cfg{ checkpoint_count = .2 }
----
-- error: 'Incorrect value for option ''checkpoint_count'': must be an integer'
-...
 daemon = box.internal.snapshot_daemon
 ---
 ...
