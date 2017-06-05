@@ -132,9 +132,9 @@ box_iterator_free(box_iterator_t *iterator);
 
 /** \endcond public */
 
-/** \cond public */
-
 typedef struct key_def box_key_def_t;
+
+/** \cond public */
 
 /**
  * Return a key definition for the index.

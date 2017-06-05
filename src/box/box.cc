@@ -634,12 +634,7 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
-	try {
-		port_add_tuple(ctx->port, tuple);
-		return 0;
-	} catch (Exception *e) {
-		return -1;
-	}
+	return port_add_tuple(ctx->port, tuple);
 }
 
 /* schema_find_id()-like method using only public API */
