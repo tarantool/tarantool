@@ -87,8 +87,10 @@ vy_new_simple_stmt(struct tuple_format *format,
  *
  * @param vy_mem Mem to insert into.
  * @param templ Statement template to insert.
+ *
+ * @retval Lsregion allocated statement.
  */
-void
+const struct tuple *
 vy_mem_insert_template(struct vy_mem *mem,
 		       const struct vy_stmt_template *templ);
 
