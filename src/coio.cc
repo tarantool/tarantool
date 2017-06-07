@@ -51,7 +51,7 @@ typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
 /** Note: this function does not throw */
 void
-coio_init(struct ev_io *coio, int fd)
+coio_create(struct ev_io *coio, int fd)
 {
 	/* Prepare for ev events. */
 	coio->data = fiber();
@@ -591,7 +591,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 			evio_service->on_accept_param;
 	struct ev_io coio;
 
-	coio_init(&coio, fd);
+	coio_create(&coio, fd);
 
 	/* Set connection name. */
 	char fiber_name[SERVICE_NAME_MAXLEN];

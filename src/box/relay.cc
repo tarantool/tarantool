@@ -136,7 +136,7 @@ relay_create(struct relay *relay, int fd, uint64_t sync,
 {
 	memset(relay, 0, sizeof(*relay));
 	xstream_create(&relay->stream, stream_write);
-	coio_init(&relay->io, fd);
+	coio_create(&relay->io, fd);
 	relay->sync = sync;
 }
 
