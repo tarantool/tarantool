@@ -698,7 +698,7 @@ tuple_field_xc(const struct tuple *tuple, uint32_t fieldno,
  * as uint64_t.
  */
 static inline uint64_t
-tuple_field_u64_xc(struct tuple *tuple, uint32_t fieldno)
+tuple_field_u64_xc(const struct tuple *tuple, uint32_t fieldno)
 {
 	const char *field = tuple_field_xc(tuple, fieldno, MP_UINT);
 	return mp_decode_uint(&field);
@@ -709,7 +709,7 @@ tuple_field_u64_xc(struct tuple *tuple, uint32_t fieldno)
  * as uint32_t.
  */
 static inline uint32_t
-tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
+tuple_field_u32_xc(const struct tuple *tuple, uint32_t fieldno)
 {
 	uint64_t val = tuple_field_u64_xc(tuple, fieldno);
 	if (val > UINT32_MAX) {
@@ -725,7 +725,7 @@ tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
 static inline const char *
-tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
+tuple_field_cstr_xc(const struct tuple *tuple, uint32_t fieldno)
 {
 	const char *field = tuple_field_xc(tuple, fieldno, MP_STR);
 	uint32_t len = 0;
@@ -738,7 +738,7 @@ tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
  * representation of UUID, and return a 16-byte representation.
  */
 static inline void
-tuple_field_uuid_xc(struct tuple *tuple, int fieldno, struct tt_uuid *result)
+tuple_field_uuid_xc(const struct tuple *tuple, int fieldno, struct tt_uuid *result)
 {
 	const char *value = tuple_field_cstr_xc(tuple, fieldno);
 	if (tt_uuid_from_string(value, result) != 0)
