@@ -62,7 +62,6 @@
 #include "replication.h" /* replica */
 #include "title.h"
 #include "lua/call.h" /* box_lua_call */
-#include "iproto_port.h"
 #include "xrow.h"
 #include "xrow_io.h"
 #include "xstream.h"

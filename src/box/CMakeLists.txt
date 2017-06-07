@@ -22,7 +22,6 @@ include_directories(${ZSTD_INCLUDE_DIRS})
 add_library(box STATIC
     iproto.cc
     iproto_constants.c
-    iproto_port.cc
     errcode.c
     error.cc
     xrow.cc

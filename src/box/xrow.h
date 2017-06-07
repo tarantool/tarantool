@@ -118,6 +118,36 @@ void
 iproto_header_encode(char *data, uint32_t type, uint64_t sync,
 		     uint32_t schema_version, uint32_t body_length);
 
+struct obuf;
+struct obuf_svp;
+
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp);
+
+/**
+ * Write select header to a preallocated buffer.
+ * This function doesn't throw (and we rely on this in iproto.cc).
+ */
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		    uint32_t schema_version, uint32_t count);
+
+/** Stack a reply to 'ping' packet. */
+void
+iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
+
+/**
+ * Write an error packet int output buffer. Doesn't throw if out
+ * of memory
+ */
+int
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
+		   uint32_t schema_version);
+
+/** Write error directly to a socket. */
+void
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version);
+
 struct request
 {
 	/*

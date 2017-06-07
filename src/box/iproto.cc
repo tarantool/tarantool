@@ -48,7 +48,6 @@
 #include "memory.h"
 
 #include "port.h"
-#include "iproto_port.h"
 #include "iobuf.h"
 #include "box.h"
 #include "tuple.h"

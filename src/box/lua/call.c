@@ -38,7 +38,6 @@
 #include "box/txn.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
-#include "box/iproto_port.h"
 #include "box/lua/tuple.h"
 #include "box/schema.h"
 #include "small/obuf.h"
