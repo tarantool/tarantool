@@ -41,11 +41,11 @@
 #include <small/rb.h>
 
 #include <small/lsregion.h>
-#include <coeio_file.h>
+#include <coio_file.h>
 
 #include "assoc.h"
 #include "cfg.h"
-#include "coeio.h"
+#include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
 

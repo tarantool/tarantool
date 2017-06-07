@@ -32,7 +32,7 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
-#include "coeio_file.h"
+#include "coio_file.h"
 #include "scoped_guard.h"
 
 #include "tuple.h"

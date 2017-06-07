@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "coeio_file.h"
+#include "coio_file.h"
 #include "diag.h"
 #include "errcode.h"
 #include "say.h"

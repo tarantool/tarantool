@@ -46,7 +46,7 @@
 #include <small/rlist.h>
 
 #include "assoc.h"
-#include "coeio.h"
+#include "coio_task.h"
 #include "diag.h"
 #include "errcode.h"
 #include "fiber.h"
@@ -1852,7 +1852,7 @@ vy_recovery_new(int64_t signature, bool only_snapshot)
 	if (rc != 0)
 		goto out;
 
-	/* Load the log from coeio so as not to stall tx thread. */
+	/* Load the log from coio so as not to stall tx thread. */
 	rc = coio_call(vy_recovery_new_f, signature,
 		       (int)only_snapshot, &recovery);
 out:

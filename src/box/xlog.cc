@@ -40,7 +40,7 @@
 #include <msgpuck.h>
 #include "scoped_guard.h"
 
-#include "coeio_file.h"
+#include "coio_file.h"
 
 #include "error.h"
 #include "xrow.h"

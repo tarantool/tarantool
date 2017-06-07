@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_COEIO_FILE_H
-#define INCLUDES_TARANTOOL_COEIO_FILE_H
+#ifndef INCLUDES_TARANTOOL_COIO_FILE_H
+#define INCLUDES_TARANTOOL_COIO_FILE_H
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -86,4 +86,4 @@ int	coeio_tempdir(char *path, size_t path_len);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_COEIO_FILE_H */
+#endif /* INCLUDES_TARANTOOL_COIO_FILE_H */

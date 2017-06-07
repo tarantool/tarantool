@@ -32,7 +32,7 @@
 
 #include <zstd.h>
 
-#include "coeio.h"
+#include "coio_task.h"
 
 #include "fiber.h"
 #include "fio.h"
@@ -889,7 +889,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	int rc;
 	if (itr->coio_read) {
 		/*
-		 * Use coeio for TX thread **after recovery**.
+		 * Use coio for TX thread **after recovery**.
 		 */
 
 		/* Allocate a coio task */

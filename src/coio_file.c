@@ -28,9 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "coeio_file.h"
-#include "coeio.h"
+#include "coio_file.h"
+#include "coio_task.h"
 #include "fiber.h"
 #include "say.h"
 #include <stdio.h>

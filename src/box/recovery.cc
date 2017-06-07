@@ -38,7 +38,7 @@
 #include "wal.h" /* wal_watcher */
 #include "replication.h"
 #include "session.h"
-#include "coeio_file.h"
+#include "coio_file.h"
 
 /*
  * Recovery subsystem

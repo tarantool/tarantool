@@ -105,7 +105,8 @@ set (server_sources
      sio.cc
      evio.cc
      coio.cc
-     coeio.c
+     coio_task.c
+     coio_file.c
      iobuf.cc
      coio_buf.cc
      pickle.c
@@ -124,7 +125,6 @@ set (server_sources
      backtrace.cc
      title.c
      proc_title.c
-     coeio_file.c
      clock.c
      systemd.c
      version.c
@@ -153,7 +153,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/fiber.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
-    ${CMAKE_SOURCE_DIR}/src/coeio.h
+    ${CMAKE_SOURCE_DIR}/src/coio_task.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
     ${CMAKE_SOURCE_DIR}/src/box/key_def.h

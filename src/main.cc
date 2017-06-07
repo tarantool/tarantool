@@ -49,9 +49,9 @@
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
-#include <fiber.h>
-#include <cbus.h>
-#include <coeio.h>
+#include "fiber.h"
+#include "cbus.h"
+#include "coio_task.h"
 #include <crc32.h>
 #include "memory.h"
 #include <say.h>

@@ -38,14 +38,14 @@
 #include <glob.h>
 #include <time.h>
 #include <errno.h>
-#include "coeio.h"
+#include "coio_task.h"
 
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 
 #include "lua/utils.h"
-#include "coeio_file.h"
+#include "coio_file.h"
 
 static int
 lbox_fio_open(struct lua_State *L)

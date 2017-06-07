@@ -39,8 +39,8 @@
 #include "say.h"
 #include "scoped_guard.h"
 
-#include "coeio.h"
 #include "coio.h"
+#include "coio_task.h"
 #include "engine.h"
 #include "gc.h"
 #include "iproto_constants.h"

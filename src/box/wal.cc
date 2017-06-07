@@ -39,7 +39,7 @@
 #include "xrow.h"
 #include "vy_log.h"
 #include "cbus.h"
-#include "coeio.h"
+#include "coio_task.h"
 #include "replication.h"
 
 

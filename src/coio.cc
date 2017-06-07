@@ -39,7 +39,7 @@
 #include "iobuf.h"
 #include "sio.h"
 #include "scoped_guard.h"
-#include "coeio.h" /* coeio_resolve() */
+#include "coio_task.h" /* coeio_resolve() */
 
 struct CoioGuard {
 	struct ev_io *ev_io;
