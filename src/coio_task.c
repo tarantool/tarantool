@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "coeio.h"
+#include "coio_task.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,18 +47,18 @@
  *
  * libeio request processing is designed in edge-trigger
  * manner, when libeio is ready to process some requests it
- * calls coeio_poller callback.
+ * calls coio_poller callback.
  *
  * Due to libeio design, want_poll callback is called while
  * locks are being held, so it's not possible to call any libeio
- * function inside this callback. Thus coeio_want_poll raises an
+ * function inside this callback. Thus coio_want_poll raises an
  * async event which will be dealt with normally as part of the
  * main Tarantool event loop.
  *
  * The async event handler, in turn, performs eio_poll(), which
  * will run on_complete callback for all ready eio tasks.
  * In case if some of the requests are not complete by the time
- * eio_poll() has been called, coeio_idle watcher is started, which
+ * eio_poll() has been called, coio_idle watcher is started, which
  * would periodically invoke eio_poll() until all requests are
  * complete.
  *
@@ -66,16 +66,16 @@
  * http://pod.tst.eu/http://cvs.schmorp.de/libeio/eio.pod
 */
 
-struct coeio_manager {
+struct coio_manager {
 	ev_loop *loop;
-	ev_idle coeio_idle;
-	ev_async coeio_async;
+	ev_idle coio_idle;
+	ev_async coio_async;
 };
 
-static __thread struct coeio_manager coeio_manager;
+static __thread struct coio_manager coio_manager;
 
 static void
-coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
+coio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
 {
 	(void) events;
 	if (eio_poll() != -1) {
@@ -85,41 +85,41 @@ coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
 }
 
 static void
-coeio_async_cb(ev_loop *loop, MAYBE_UNUSED struct ev_async *w,
+coio_async_cb(ev_loop *loop, MAYBE_UNUSED struct ev_async *w,
 	       MAYBE_UNUSED int events)
 {
 	if (eio_poll() == -1) {
 		/* not all tasks are complete. */
-		ev_idle_start(loop, &coeio_manager.coeio_idle);
+		ev_idle_start(loop, &coio_manager.coio_idle);
 	}
 }
 
 static void
-coeio_want_poll_cb(void *ptr)
+coio_want_poll_cb(void *ptr)
 {
-	struct coeio_manager *manager = ptr;
-	ev_async_send(manager->loop, &manager->coeio_async);
+	struct coio_manager *manager = ptr;
+	ev_async_send(manager->loop, &manager->coio_async);
 }
 
 static void
-coeio_done_poll_cb(void *ptr)
+coio_done_poll_cb(void *ptr)
 {
 	(void)ptr;
 }
 
 static int
-coeio_on_start(void *data)
+coio_on_start(void *data)
 {
 	(void) data;
 	struct cord *cord = (struct cord *)calloc(sizeof(struct cord), 1);
 	if (!cord)
 		return -1;
-	cord_create(cord, "coeio");
+	cord_create(cord, "coio");
 	return 0;
 }
 
 static int
-coeio_on_stop(void *data)
+coio_on_stop(void *data)
 {
 	(void) data;
 	cord_destroy(cord());
@@ -127,31 +127,31 @@ coeio_on_stop(void *data)
 }
 
 void
-coeio_init(void)
+coio_init(void)
 {
-	eio_set_thread_on_start(coeio_on_start, NULL);
-	eio_set_thread_on_stop(coeio_on_stop, NULL);
+	eio_set_thread_on_start(coio_on_start, NULL);
+	eio_set_thread_on_stop(coio_on_stop, NULL);
 }
 
 /**
- * Init coeio subsystem.
+ * Init coio subsystem.
  *
  * Create idle and async watchers, init eio.
  */
 void
-coeio_enable(void)
+coio_enable(void)
 {
-	eio_init(&coeio_manager, coeio_want_poll_cb, coeio_done_poll_cb);
-	coeio_manager.loop = loop();
+	eio_init(&coio_manager, coio_want_poll_cb, coio_done_poll_cb);
+	coio_manager.loop = loop();
 
-	ev_idle_init(&coeio_manager.coeio_idle, coeio_idle_cb);
-	ev_async_init(&coeio_manager.coeio_async, coeio_async_cb);
+	ev_idle_init(&coio_manager.coio_idle, coio_idle_cb);
+	ev_async_init(&coio_manager.coio_async, coio_async_cb);
 
-	ev_async_start(loop(), &coeio_manager.coeio_async);
+	ev_async_start(loop(), &coio_manager.coio_async);
 }
 
 void
-coeio_shutdown(void)
+coio_shutdown(void)
 {
 	eio_set_max_parallel(0);
 }
@@ -311,7 +311,7 @@ struct async_getaddrinfo_task {
 
 /*
  * Resolver function, run in separate thread by
- * coeio (libeio).
+ * coio (libeio).
 */
 static int
 getaddrinfo_cb(struct coio_task *ptr)

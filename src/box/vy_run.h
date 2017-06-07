@@ -41,32 +41,10 @@
 
 #include "small/mempool.h"
 #include "salad/bloom.h"
-#include "zstd.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
-					     (1 << VY_PAGE_INFO_SIZE) |
-					     (1 << VY_PAGE_INFO_UNPACKED_SIZE) |
-					     (1 << VY_PAGE_INFO_ROW_COUNT) |
-					     (1 << VY_PAGE_INFO_MIN_KEY) |
-					     (1 << VY_PAGE_INFO_PAGE_INDEX_OFFSET);
-
-static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
-					    (1 << VY_RUN_INFO_MAX_KEY) |
-					    (1 << VY_RUN_INFO_MIN_LSN) |
-					    (1 << VY_RUN_INFO_MAX_LSN) |
-					    (1 << VY_RUN_INFO_PAGE_COUNT);
-
-enum { VY_BLOOM_VERSION = 0 };
-
-/** xlog meta type for .run files */
-#define XLOG_META_TYPE_RUN "RUN"
-
-/** xlog meta type for .index files */
-#define XLOG_META_TYPE_INDEX "INDEX"
 
 /** Part of vinyl environment for run read/write */
 struct vy_run_env {
@@ -301,13 +279,6 @@ vy_run_env_create(struct vy_run_env *env);
 void
 vy_run_env_destroy(struct vy_run_env *env);
 
-int
-vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
-		    const struct tuple *min_key, const struct key_def *key_def);
-
-void
-vy_page_info_destroy(struct vy_page_info *page_info);
-
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
@@ -351,13 +322,14 @@ vy_run_unref(struct vy_run *run)
 /**
  * Load run from disk
  * @param run - run to laod
- * @param index_path - path to index part of the run
- * @param run_path - path to run part of the run
+ * @param dir - path to the vinyl directory
+ * @param space_id - space id
+ * @param iid - index id
  * @return - 0 on sucess, -1 on fail
  */
 int
-vy_run_recover(struct vy_run *run, const char *index_path,
-	       const char *run_path);
+vy_run_recover(struct vy_run *run, const char *dir,
+	       uint32_t space_id, uint32_t iid);
 
 enum vy_file_type {
 	VY_FILE_INDEX,
@@ -365,10 +337,7 @@ enum vy_file_type {
 	vy_file_MAX,
 };
 
-static const char *vy_file_suffix[] = {
-	"index",	/* VY_FILE_INDEX */
-	"run",		/* VY_FILE_RUN */
-};
+extern const char *vy_file_suffix[];
 
 static int
 vy_index_snprint_path(char *buf, int size, const char *dir,
@@ -462,32 +431,6 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	     const struct key_def *key_def,
 	     struct vy_slice **result);
 
-/**
- * Decode page information from xrow.
- *
- * @param[out] page Page information.
- * @param xrow      Xrow to decode.
- * @param filename  Filename for error reporting.
- *
- * @retval  0 Success.
- * @retval -1 Error.
- */
-int
-vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
-		    const char *filename);
-
-/**
- * Read bloom filter from given buffer.
- * @param bloom - a bloom filter to read.
- * @param buffer[in/out] - a buffer to read from.
- *  The pointer is incremented on the number of bytes read.
- * @param filename Filename for error reporting.
- * @return - 0 on success or -1 on format/memory error
- */
-int
-vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
-		    const char *filename);
-
 void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
@@ -498,32 +441,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 		     struct tuple_format *format,
 		     struct tuple_format *upsert_format,
 		     bool is_primary);
-
-/**
- * Get thread local zstd decompression context
- */
-ZSTD_DStream *
-vy_env_get_zdctx(struct vy_run_env *env);
-
-struct vy_page *
-vy_page_new(const struct vy_page_info *page_info);
-
-void
-vy_page_delete(struct vy_page *page);
-
-int
-vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
-	     struct xrow_header *xrow);
-
-/**
- * Read a page requests from vinyl xlog data file.
- *
- * @retval 0 on success
- * @retval -1 on error, check diag
- */
-int
-vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
-	     ZSTD_DStream *zdctx);
 
 /**
  * Simple stream over a slice. @see vy_stmt_stream.

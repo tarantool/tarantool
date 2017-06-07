@@ -32,7 +32,7 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
-#include "coeio_file.h"
+#include "coio_file.h"
 #include "scoped_guard.h"
 
 #include "tuple.h"
@@ -624,7 +624,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 		snprintf(to, sizeof(to), "%s",
 			 xdir_format_filename(dir, lsn, NONE));
 		char *from = xdir_format_filename(dir, lsn, INPROGRESS);
-		int rc = coeio_rename(from, to);
+		int rc = coio_rename(from, to);
 		if (rc != 0)
 			panic("can't rename .snap.inprogress");
 	}
@@ -653,7 +653,7 @@ MemtxEngine::abortCheckpoint()
 		xdir_format_filename(&m_checkpoint->dir,
 				     vclock_sum(&m_checkpoint->vclock),
 				     INPROGRESS);
-	(void) coeio_unlink(filename);
+	(void) coio_unlink(filename);
 
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;

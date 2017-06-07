@@ -138,6 +138,8 @@
  * int bps_tree_build(tree, sorted_array, array_size);
  * bps_tree_elem_t *bps_tree_find(tree, key);
  * int bps_tree_insert(tree, new_elem, replaced_elem);
+ * int bps_tree_insert_get_iterator(tree, new_elem, replaced_elem,
+ * 				    inserted_iterator)
  * int bps_tree_delete(tree, elem);
  * size_t bps_tree_size(tree);
  * size_t bps_tree_mem_used(tree);
@@ -346,6 +348,7 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_destroy _api_name(destroy)
 #define bps_tree_find _api_name(find)
 #define bps_tree_insert _api_name(insert)
+#define bps_tree_insert_get_iterator _api_name(insert_get_iterator)
 #define bps_tree_delete _api_name(delete)
 #define bps_tree_size _api_name(size)
 #define bps_tree_mem_used _api_name(mem_used)
@@ -606,6 +609,16 @@ bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
 static inline int
 bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 		bps_tree_elem_t *replaced);
+
+/**
+ * @sa bps_tree_insert + new parameter:
+ * @param[out] inserted_iterator Iterator, positioned to the
+ *             new element.
+ */
+static inline int
+bps_tree_insert_get_iterator(struct bps_tree *tree, bps_tree_elem_t new_elem,
+			     bps_tree_elem_t *replaced,
+			     struct bps_tree_iterator *inserted_iterator);
 
 /**
  * @brief Delete an element from a tree.
@@ -2545,7 +2558,7 @@ bps_tree_move_elems_to_left_inner(struct bps_tree *tree,
  *  BUT(!) insertion is allowed into full block, so one can consider
  *  insertion as a virtual insertion into virtual block of greater maximum size
  */
-static inline void
+static inline struct bps_leaf_path_elem *
 bps_tree_insert_and_move_elems_to_right_leaf(struct bps_tree *tree,
 		struct bps_leaf_path_elem *a_leaf_path_elem,
 		struct bps_leaf_path_elem *b_leaf_path_elem,
@@ -2563,6 +2576,7 @@ bps_tree_insert_and_move_elems_to_right_leaf(struct bps_tree *tree,
 	bps_tree_pos_t pos = a_leaf_path_elem->insertion_point;
 	bool move_to_empty = b->header.size == 0;
 	bool move_all = a->header.size == num - 1;
+	struct bps_leaf_path_elem *ret;
 
 	assert(num > 0);
 	assert(a->header.size >= num - 1);
@@ -2580,6 +2594,7 @@ bps_tree_insert_and_move_elems_to_right_leaf(struct bps_tree *tree,
 		BPS_TREE_DATAMOVE(a->elems + pos + 1, a->elems + pos,
 				  mid_part_size - num, a, a);
 		a->elems[pos] = new_elem;
+		ret = a_leaf_path_elem;
 	} else {
 		/* In fact insert to 'b' block */
 		bps_tree_pos_t new_pos = num - mid_part_size - 1;/* Can be 0 */
@@ -2589,6 +2604,8 @@ bps_tree_insert_and_move_elems_to_right_leaf(struct bps_tree *tree,
 		b->elems[new_pos] = new_elem;
 		BPS_TREE_DATAMOVE(b->elems + new_pos + 1, a->elems + pos,
 				  mid_part_size, b, a);
+		ret = b_leaf_path_elem;
+		ret->insertion_point = new_pos;
 	}
 
 	a->header.size -= (num - 1);
@@ -2600,6 +2617,7 @@ bps_tree_insert_and_move_elems_to_right_leaf(struct bps_tree *tree,
 		*b_leaf_path_elem->max_elem_copy =
 			b->elems[b->header.size - 1];
 	tree->size++;
+	return ret;
 }
 
 /**
@@ -2744,7 +2762,7 @@ bps_tree_insert_and_move_elems_to_right_inner(struct bps_tree *tree,
  *  BUT(!) insertion is allowed into full block, so one can consider
  *  insertion as a virtual insertion into virtual block of greater maximum size
  */
-static inline void
+static inline struct bps_leaf_path_elem *
 bps_tree_insert_and_move_elems_to_left_leaf(struct bps_tree *tree,
 		struct bps_leaf_path_elem *a_leaf_path_elem,
 		struct bps_leaf_path_elem *b_leaf_path_elem,
@@ -2761,6 +2779,7 @@ bps_tree_insert_and_move_elems_to_left_leaf(struct bps_tree *tree,
 	struct bps_leaf *b = b_leaf_path_elem->block;
 	bps_tree_pos_t pos = b_leaf_path_elem->insertion_point;
 	bool move_all = b->header.size == num - 1;
+	struct bps_leaf_path_elem *ret;
 
 	assert(num > 0);
 	assert(b->header.size >= num - 1);
@@ -2777,7 +2796,8 @@ bps_tree_insert_and_move_elems_to_left_leaf(struct bps_tree *tree,
 		b->elems[new_pos] = new_elem;
 		BPS_TREE_DATAMOVE(b->elems + new_pos + 1, b->elems + pos,
 				  b->header.size - pos, b, b);
-
+		ret = b_leaf_path_elem;
+		ret->insertion_point = new_pos;
 	} else {
 		/* In fact insert to 'a' block */
 		bps_tree_pos_t new_pos = a->header.size + pos; /* Can be 0 */
@@ -2789,6 +2809,8 @@ bps_tree_insert_and_move_elems_to_left_leaf(struct bps_tree *tree,
 		if (!move_all)
 			BPS_TREE_DATAMOVE(b->elems, b->elems + num - 1,
 					  b->header.size - num + 1, b, b);
+		ret = a_leaf_path_elem;
+		ret->insertion_point = new_pos;
 	}
 
 	a->header.size += num;
@@ -2798,6 +2820,7 @@ bps_tree_insert_and_move_elems_to_left_leaf(struct bps_tree *tree,
 		*b_leaf_path_elem->max_elem_copy =
 			b->elems[b->header.size - 1];
 	tree->size++;
+	return ret;
 }
 
 /**
@@ -3130,11 +3153,15 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 static inline int
 bps_tree_process_insert_leaf(struct bps_tree *tree,
 			     struct bps_leaf_path_elem *leaf_path_elem,
-			     bps_tree_elem_t new_elem)
+			     bps_tree_elem_t new_elem,
+			     bps_tree_block_id_t *inserted_in_block,
+			     bps_tree_pos_t *inserted_in_pos)
 {
 	if (bps_tree_leaf_free_size(leaf_path_elem->block)) {
 		bps_tree_insert_into_leaf(tree, leaf_path_elem, new_elem);
 		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x0);
+		*inserted_in_block = leaf_path_elem->block_id;
+		*inserted_in_pos = leaf_path_elem->insertion_point;
 		return 0;
 	}
 	bps_tree_touch_path(tree, leaf_path_elem);
@@ -3151,33 +3178,43 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 						&right_ext);
 	bool has_left_left_ext = false;
 	bool has_right_right_ext = false;
+	struct bps_leaf_path_elem *inserted_ext;
 	if (has_left_ext && has_right_ext) {
 		if (bps_tree_leaf_free_size(left_ext.block) >
 		    bps_tree_leaf_free_size(right_ext.block)) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(left_ext.block) / 2;
-			bps_tree_insert_and_move_elems_to_left_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x1);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		} else if (bps_tree_leaf_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(right_ext.block) / 2;
-			bps_tree_insert_and_move_elems_to_right_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x2);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		}
 	} else if (has_left_ext) {
 		if (bps_tree_leaf_free_size(left_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(left_ext.block) / 2;
-			bps_tree_insert_and_move_elems_to_left_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x3);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		}
 		has_left_left_ext = bps_tree_collect_left_path_elem_leaf(tree,
@@ -3190,20 +3227,26 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_move_elems_to_left_leaf(tree,
 					&left_left_ext, &left_ext, move_count);
 			move_count = 1 + move_count / 2;
-			bps_tree_insert_and_move_elems_to_left_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x4);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		}
 	} else if (has_right_ext) {
 		if (bps_tree_leaf_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(right_ext.block) / 2;
-			bps_tree_insert_and_move_elems_to_right_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x5);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		}
 		has_right_right_ext = bps_tree_collect_right_ext_leaf(tree,
@@ -3216,10 +3259,13 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_move_elems_to_right_leaf(tree, &right_ext,
 					&right_right_ext, move_count);
 			move_count = 1 + move_count / 2;
-			bps_tree_insert_and_move_elems_to_right_leaf(tree,
+			inserted_ext =
+				bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
 			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x6);
+			*inserted_in_block = inserted_ext->block_id;
+			*inserted_in_pos = inserted_ext->insertion_point;
 			return 0;
 		}
 	}
@@ -3274,10 +3320,31 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		const bps_tree_pos_t mc3 = max - nc4;
 		const bps_tree_pos_t mc1 = nc3 - mc3;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
+		assert(inserted_ext == leaf_path_elem ||
+		       inserted_ext == &new_path_elem);
 		bps_tree_move_elems_to_right_leaf(tree,
 				&left_ext, leaf_path_elem, mc2);
+		/*
+		 * If the inserted_ext == leaf_path_elem, then
+		 * update the insertion_point, because the new
+		 * elements were inserted from the left leaf.
+		 * To avoid using 'if' lets always update the
+		 * insertion_point. It is better than branching.
+		 *
+		 * [e - mc2, ...  e - 1]  ---> [ e1, e2 ... eN   ]
+		 *     new elements                     ^
+		 *                              inserted_position
+		 */
+		leaf_path_elem->insertion_point += mc2;
+		/*
+		 * In a case of insertion into the new_path_elem
+		 * there is no need to update insertion_point,
+		 * because the positions of old elements are not
+		 * changed in the new_path_elem block.
+		 */
 		bps_tree_move_elems_to_left_leaf(tree,
 				&new_path_elem, &right_ext, mc3);
 
@@ -3308,10 +3375,15 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		const bps_tree_pos_t mc3 = max - nc1;
 		const bps_tree_pos_t mc2 = max + mc3 - nc2;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_right_leaf(tree,
 				&left_ext, leaf_path_elem, mc2);
+		/*
+		 * @sa comment for 'has_left_ext && has_right_ext'
+		 */
+		leaf_path_elem->insertion_point += mc2;
 		bps_tree_move_elems_to_right_leaf(tree,
 				&left_left_ext, &left_ext, mc3);
 
@@ -3341,7 +3413,8 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		const bps_tree_pos_t mc3 = max - nc4;
 		const bps_tree_pos_t mc2 = max + mc3 - nc3;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_left_leaf(tree,
 				&new_path_elem, &right_ext, mc2);
@@ -3372,10 +3445,15 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		const bps_tree_pos_t mc1 = nc3;
 		const bps_tree_pos_t mc2 = max - nc1;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_right_leaf(tree,
 				&left_ext, leaf_path_elem, mc2);
+		/*
+		 * @sa comment for 'has_left_ext && has_right_ext'
+		 */
+		leaf_path_elem->insertion_point += mc2;
 
 		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xA);
 	} else if (has_right_ext) {
@@ -3400,7 +3478,8 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		const bps_tree_pos_t mc1 = max + 1 - nc1;
 		const bps_tree_pos_t mc2 = max - nc3;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_left_leaf(tree, &new_path_elem,
 				&right_ext, mc2);
@@ -3427,7 +3506,8 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 
 		const bps_tree_pos_t mc1 = nc2;
 
-		bps_tree_insert_and_move_elems_to_right_leaf(tree,
+		inserted_ext =
+			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 				leaf_path_elem, &new_path_elem, mc1, new_elem);
 
 		bps_tree_block_id_t new_root_id = (bps_tree_block_id_t)(-1);
@@ -3442,8 +3522,12 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		tree->depth++;
 
 		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xC);
+		*inserted_in_block = inserted_ext->block_id;
+		*inserted_in_pos = inserted_ext->insertion_point;
 		return 0;
 	}
+	*inserted_in_block = inserted_ext->block_id;
+	*inserted_in_pos = inserted_ext->insertion_point;
 	assert(leaf_path_elem->parent);
 	BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xD);
 	return bps_tree_process_insert_inner(tree, leaf_path_elem->parent,
@@ -4167,8 +4251,49 @@ bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 					 replaced);
 		return 0;
 	} else {
+		bps_tree_block_id_t unused1;
+		bps_tree_pos_t unused2;
 		return bps_tree_process_insert_leaf(tree, &leaf_path_elem,
-						    new_elem);
+						    new_elem, &unused1,
+						    &unused2);
+	}
+}
+
+/**
+ * @sa bps_tree_insert + new parameter:
+ * @param[out] inserted_iterator Iterator, positioned to the
+ *             new element.
+ */
+static inline int
+bps_tree_insert_get_iterator(struct bps_tree *tree, bps_tree_elem_t new_elem,
+			     bps_tree_elem_t *replaced,
+			     struct bps_tree_iterator *inserted_iterator)
+{
+	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		int rc = bps_tree_insert_first_elem(tree, new_elem);
+		inserted_iterator->block_id = tree->first_id;
+		inserted_iterator->pos = 0;
+		matras_head_read_view(&inserted_iterator->view);
+		return rc;
+	}
+	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
+	struct bps_leaf_path_elem leaf_path_elem;
+	bool exact;
+	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem, &exact);
+	if (exact) {
+		inserted_iterator->block_id = leaf_path_elem.block_id;
+		inserted_iterator->pos = leaf_path_elem.insertion_point;
+		matras_head_read_view(&inserted_iterator->view);
+		bps_tree_process_replace(tree, &leaf_path_elem, new_elem,
+					 replaced);
+		return 0;
+	} else {
+		int rc = bps_tree_process_insert_leaf(tree, &leaf_path_elem,
+						      new_elem,
+						      &inserted_iterator->block_id,
+						      &inserted_iterator->pos);
+		matras_head_read_view(&inserted_iterator->view);
+		return rc;
 	}
 }
 

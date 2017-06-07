@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COEIO_H_INCLUDED
-#define TARANTOOL_COEIO_H_INCLUDED
+#ifndef TARANTOOL_COIO_TASK_H_INCLUDED
+#define TARANTOOL_COIO_TASK_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -49,9 +49,9 @@ extern "C" {
  * Yield the current fiber until a created task is complete.
  */
 
-void coeio_init(void);
-void coeio_enable(void);
-void coeio_shutdown(void);
+void coio_init(void);
+void coio_enable(void);
+void coio_shutdown(void);
 
 struct coio_task;
 
@@ -173,4 +173,4 @@ coio_getaddrinfo(const char *host, const char *port,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_COEIO_H_INCLUDED */
+#endif /* TARANTOOL_COIO_TASK_H_INCLUDED */

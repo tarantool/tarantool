@@ -49,9 +49,9 @@
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
-#include <fiber.h>
-#include <cbus.h>
-#include <coeio.h>
+#include "fiber.h"
+#include "cbus.h"
+#include "coio_task.h"
 #include <crc32.h>
 #include "memory.h"
 #include <say.h>
@@ -462,7 +462,7 @@ tarantool_free(void)
 		return;
 
 	/* Shutdown worker pool. Waits until threads terminate. */
-	coeio_shutdown();
+	coio_shutdown();
 
 	box_free();
 
@@ -608,8 +608,8 @@ main(int argc, char **argv)
 	fiber_init(fiber_cxx_invoke);
 	/* Init iobuf library with default readahead */
 	iobuf_init();
-	coeio_init();
-	coeio_enable();
+	coio_init();
+	coio_enable();
 	signal_init();
 	cbus_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);

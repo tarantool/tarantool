@@ -503,7 +503,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 			 "struct applier");
 		return NULL;
 	}
-	coio_init(&applier->io, -1);
+	coio_create(&applier->io, -1);
 	applier->iobuf = iobuf_new();
 
 	/* uri_parse() sets pointers to applier->source buffer */

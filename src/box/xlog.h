@@ -176,9 +176,10 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 
 /**
  * Remove files whose signature is less than specified.
+ * If @use_coio is set, files are deleted by coio threads.
  */
-void
-xdir_collect_garbage(struct xdir *dir, int64_t signature);
+int
+xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio);
 
 /**
  * Return LSN of the newest file in a directory

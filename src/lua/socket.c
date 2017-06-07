@@ -48,7 +48,7 @@
 #include <lualib.h>
 
 #include <coio.h> /* coio_wait() */
-#include <coeio.h> /* coio_getaddrinfo() */
+#include <coio_task.h> /* coio_getaddrinfo() */
 #include <fiber.h>
 #include "lua/utils.h"
 #include "lua/fiber.h"

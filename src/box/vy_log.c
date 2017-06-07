@@ -46,7 +46,7 @@
 #include <small/rlist.h>
 
 #include "assoc.h"
-#include "coeio.h"
+#include "coio_task.h"
 #include "diag.h"
 #include "errcode.h"
 #include "fiber.h"
@@ -979,7 +979,7 @@ vy_log_rotate(const struct vclock *vclock)
 	 */
 	latch_lock(&vy_log.latch);
 
-	/* Do actual work from coeio so as not to stall tx thread. */
+	/* Do actual work from coio so as not to stall tx thread. */
 	int rc = coio_call(vy_log_rotate_f, recovery, vclock);
 	vy_recovery_delete(recovery);
 	if (rc < 0) {
@@ -1009,14 +1009,6 @@ fail:
 	return -1;
 }
 
-static ssize_t
-vy_log_collect_garbage_f(va_list ap)
-{
-	int64_t signature = va_arg(ap, int64_t);
-	xdir_collect_garbage(&vy_log.dir, signature);
-	return 0;
-}
-
 void
 vy_log_collect_garbage(int64_t signature)
 {
@@ -1024,7 +1016,8 @@ vy_log_collect_garbage(int64_t signature)
 	 * Always keep the previous file, because
 	 * it is still needed for backups.
 	 */
-	coio_call(vy_log_collect_garbage_f, vy_log_prev_checkpoint(signature));
+	signature = vy_log_prev_checkpoint(signature);
+	xdir_collect_garbage(&vy_log.dir, signature, true);
 }
 
 const char *
@@ -1859,7 +1852,7 @@ vy_recovery_new(int64_t signature, bool only_snapshot)
 	if (rc != 0)
 		goto out;
 
-	/* Load the log from coeio so as not to stall tx thread. */
+	/* Load the log from coio so as not to stall tx thread. */
 	rc = coio_call(vy_recovery_new_f, signature,
 		       (int)only_snapshot, &recovery);
 out:

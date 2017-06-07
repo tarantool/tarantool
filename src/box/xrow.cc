@@ -30,7 +30,10 @@
  */
 #include "xrow.h"
 
+#include <fcntl.h>
 #include <msgpuck.h>
+#include <small/region.h>
+#include <small/obuf.h>
 #include "third_party/base64.h"
 
 #include "fiber.h"
@@ -40,8 +43,6 @@
 #include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
-
-enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
 /**
  * Globally unique identifier of this instance.
@@ -130,10 +131,10 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		   size_t fixheader_len)
 {
 	/* allocate memory for sign + header */
-	out->iov_base = region_alloc(&fiber()->gc, HEADER_LEN_MAX +
+	out->iov_base = region_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
 				     fixheader_len);
 	if (out->iov_base == NULL) {
-		diag_set(OutOfMemory, HEADER_LEN_MAX + fixheader_len,
+		diag_set(OutOfMemory, XROW_HEADER_LEN_MAX + fixheader_len,
 			 "gc arena", "xrow header encode");
 		return -1;
 	}
@@ -172,7 +173,7 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		d = mp_encode_double(d, header->tm);
 		map_size++;
 	}
-	assert(d <= data + HEADER_LEN_MAX);
+	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
 	out->iov_len = d - (char *) out->iov_base;
 	out++;
@@ -186,6 +187,162 @@ char *
 xrow_encode_uuid(char *pos, const struct tt_uuid *in)
 {
 	return mp_encode_str(pos, tt_uuid_str(in), UUID_STR_LEN);
+}
+
+/* m_ - msgpack meta, k_ - key, v_ - value */
+struct PACKED iproto_header_bin {
+	uint8_t m_len;                          /* MP_UINT32 */
+	uint32_t v_len;                         /* length */
+	uint8_t m_header;                       /* MP_MAP */
+	uint8_t k_code;                         /* IPROTO_REQUEST_TYPE */
+	uint8_t m_code;                         /* MP_UINT32 */
+	uint32_t v_code;                        /* response status */
+	uint8_t k_sync;                         /* IPROTO_SYNC */
+	uint8_t m_sync;                         /* MP_UINT64 */
+	uint64_t v_sync;                        /* sync */
+	uint8_t k_schema_version;               /* IPROTO_SCHEMA_VERSION */
+	uint8_t m_schema_version;               /* MP_UINT32 */
+	uint32_t v_schema_version;              /* schema_version */
+};
+
+static_assert(sizeof(struct iproto_header_bin) == IPROTO_HEADER_LEN,
+	      "sizeof(iproto_header_bin)");
+
+void
+iproto_header_encode(char *out, uint32_t type, uint64_t sync,
+		     uint32_t schema_version, uint32_t body_length)
+{
+	struct iproto_header_bin header;
+	header.m_len = 0xce;
+	/* 5 - sizeof(m_len and v_len fields). */
+	header.v_len = mp_bswap_u32(sizeof(header) + body_length - 5);
+	header.m_header = 0x83;
+	header.k_code = IPROTO_REQUEST_TYPE;
+	header.m_code = 0xce;
+	header.v_code = mp_bswap_u32(type);
+	header.k_sync = IPROTO_SYNC;
+	header.m_sync = 0xcf;
+	header.v_sync = mp_bswap_u64(sync);
+	header.k_schema_version = IPROTO_SCHEMA_VERSION;
+	header.m_schema_version = 0xce;
+	header.v_schema_version = mp_bswap_u32(schema_version);
+	memcpy(out, &header, sizeof(header));
+}
+
+struct PACKED iproto_body_bin {
+	uint8_t m_body;                    /* MP_MAP */
+	uint8_t k_data;                    /* IPROTO_DATA or IPROTO_ERROR */
+	uint8_t m_data;                    /* MP_STR or MP_ARRAY */
+	uint32_t v_data_len;               /* string length of array size */
+};
+
+static const struct iproto_body_bin iproto_body_bin = {
+	0x81, IPROTO_DATA, 0xdd, 0
+};
+
+static const struct iproto_body_bin iproto_error_bin = {
+	0x81, IPROTO_ERROR, 0xdb, 0
+};
+
+/** Return a 4-byte numeric error code, with status flags. */
+static inline uint32_t
+iproto_encode_error(uint32_t error)
+{
+	return error | IPROTO_TYPE_ERROR;
+}
+
+void
+iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
+{
+	char *buf = (char *)obuf_alloc_xc(out, IPROTO_HEADER_LEN + 1);
+	iproto_header_encode(buf, IPROTO_OK, sync, schema_version, 1);
+	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
+}
+
+int
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
+		   uint32_t schema_version)
+{
+	uint32_t msg_len = strlen(e->errmsg);
+	uint32_t errcode = ClientError::get_errcode(e);
+
+	struct iproto_body_bin body = iproto_error_bin;
+	char *header = (char *)obuf_alloc(out, IPROTO_HEADER_LEN);
+	if (header == NULL)
+		return -1;
+
+	iproto_header_encode(header, iproto_encode_error(errcode), sync,
+			     schema_version, sizeof(body) + msg_len);
+	body.v_data_len = mp_bswap_u32(msg_len);
+	/* Malformed packet appears to be a lesser evil than abort. */
+	return obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
+	       obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
+
+}
+
+void
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
+{
+	uint32_t msg_len = strlen(e->errmsg);
+	uint32_t errcode = ClientError::get_errcode(e);
+
+	char header[IPROTO_HEADER_LEN];
+	struct iproto_body_bin body = iproto_error_bin;
+
+	iproto_header_encode(header, iproto_encode_error(errcode), 0,
+			     schema_version, sizeof(body) + msg_len);
+
+	body.v_data_len = mp_bswap_u32(msg_len);
+
+	/* Set to blocking to write the error. */
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0)
+		return;
+
+	(void) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+	size_t r = write(fd, header, sizeof(header));
+	r = write(fd, &body, sizeof(body));
+	r = write(fd, e->errmsg, msg_len);
+	(void) r;
+
+	(void) fcntl(fd, F_SETFL, flags);
+}
+
+enum { SVP_SIZE = IPROTO_HEADER_LEN  + sizeof(iproto_body_bin) };
+
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
+{
+	/**
+	 * Reserve memory before taking a savepoint.
+	 * This ensures that we get a contiguous chunk of memory
+	 * and the savepoint is pointing at the beginning of it.
+	 */
+	void *ptr = obuf_reserve(buf, SVP_SIZE);
+	if (ptr == NULL) {
+		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
+		return -1;
+	}
+	*svp = obuf_create_svp(buf);
+	ptr = obuf_alloc(buf, SVP_SIZE);
+	assert(ptr !=  NULL);
+	return 0;
+}
+
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		    uint32_t schema_version, uint32_t count)
+{
+	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
+	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
+			        obuf_size(buf) - svp->used -
+				IPROTO_HEADER_LEN);
+
+	struct iproto_body_bin body = iproto_body_bin;
+	body.v_data_len = mp_bswap_u32(count);
+
+	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
 }
 
 void
@@ -366,7 +523,7 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	assert(login != NULL);
 	memset(packet, 0, sizeof(*packet));
 
-	size_t buf_size = BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
+	size_t buf_size = XROW_BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
 	char *buf = (char *) region_alloc_xc(&fiber()->gc, buf_size);
 
 	char *d = buf;
@@ -440,7 +597,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 {
 	memset(row, 0, sizeof(*row));
 	uint32_t replicaset_size = vclock_size(vclock);
-	size_t size = BODY_LEN_MAX + replicaset_size *
+	size_t size = XROW_BODY_LEN_MAX + replicaset_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;

@@ -38,14 +38,14 @@
 #include <glob.h>
 #include <time.h>
 #include <errno.h>
-#include "coeio.h"
+#include "coio_task.h"
 
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 
 #include "lua/utils.h"
-#include "coeio_file.h"
+#include "coio_file.h"
 
 static int
 lbox_fio_open(struct lua_State *L)
@@ -61,7 +61,7 @@ usage:
 	int flags = lua_tointeger(L, 2);
 	int mode = lua_tointeger(L, 3);
 
-	int fh = coeio_open(pathname, flags, mode);
+	int fh = coio_file_open(pathname, flags, mode);
 	lua_pushinteger(L, fh);
 	return 1;
 }
@@ -76,7 +76,7 @@ lbox_fio_pwrite(struct lua_State *L)
 	size_t len = lua_tonumber(L, 3);
 	size_t offset = lua_tonumber(L, 4);
 
-	int res = coeio_pwrite(fh, buf, len, offset);
+	int res = coio_pwrite(fh, buf, len, offset);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -102,7 +102,7 @@ lbox_fio_pread(struct lua_State *L)
 	}
 
 
-	int res = coeio_pread(fh, buf, len, offset);
+	int res = coio_pread(fh, buf, len, offset);
 
 
 	if (res < 0) {
@@ -130,7 +130,7 @@ usage:
 	if (oldpath == NULL || newpath == NULL)
 		goto usage;
 
-	int res = coeio_rename(oldpath, newpath);
+	int res = coio_rename(oldpath, newpath);
 	lua_pushboolean(L, res == 0);
 	return 1;
 }
@@ -146,7 +146,7 @@ usage:
 	pathname = lua_tostring(L, 1);
 	if (pathname == NULL)
 		goto usage;
-	int res = coeio_unlink(pathname);
+	int res = coio_unlink(pathname);
 	lua_pushboolean(L, res == 0);
 	return 1;
 }
@@ -156,7 +156,7 @@ lbox_fio_ftruncate(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	off_t length = lua_tonumber(L, 2);
-	int res = coeio_ftruncate(fd, length);
+	int res = coio_ftruncate(fd, length);
 	lua_pushboolean(L, res == 0);
 	return 1;
 }
@@ -178,7 +178,7 @@ usage:
 		length = lua_tonumber(L, 2);
 	else
 		length = 0;
-	int res = coeio_truncate(pathname, length);
+	int res = coio_truncate(pathname, length);
 
 	lua_pushboolean(L, res == 0);
 	return 1;
@@ -193,7 +193,7 @@ lbox_fio_write(struct lua_State *L)
 		luaL_error(L, "fio.write(): buffer is not a string");
 
 	size_t len = lua_tonumber(L, 3);
-	int res = coeio_write(fh, buf, len);
+	int res = coio_write(fh, buf, len);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -241,7 +241,7 @@ usage:
 		}
 		group = entry->gr_gid;
 	}
-	int res = coeio_chown(pathname, owner, group);
+	int res = coio_chown(pathname, owner, group);
 	lua_pushboolean(L, res == 0);
 	return 1;
 }
@@ -259,7 +259,7 @@ usage:
 		goto usage;
 
 	mode_t mode = lua_tointeger(L, 2);
-	lua_pushboolean(L, coeio_chmod(pathname, mode) == 0);
+	lua_pushboolean(L, coio_chmod(pathname, mode) == 0);
 	return 1;
 }
 
@@ -283,7 +283,7 @@ lbox_fio_read(struct lua_State *L)
 	}
 
 
-	int res = coeio_read(fh, buf, len);
+	int res = coio_read(fh, buf, len);
 
 	if (res < 0) {
 		lua_pop(L, 1);
@@ -301,7 +301,7 @@ lbox_fio_lseek(struct lua_State *L)
 	int fh = lua_tointeger(L, 1);
 	off_t offset = lua_tonumber(L, 2);
 	int whence = lua_tointeger(L, 3);
-	off_t res = coeio_lseek(fh, offset, whence);
+	off_t res = coio_lseek(fh, offset, whence);
 	lua_pushnumber(L, res);
 	return 1;
 }
@@ -424,7 +424,7 @@ usage:
 		goto usage;
 	struct stat stat;
 
-	int res = coeio_lstat(pathname, &stat);
+	int res = coio_lstat(pathname, &stat);
 	if (res < 0) {
 		lua_pushnil(L);
 		return 1;
@@ -445,7 +445,7 @@ usage:
 		goto usage;
 	struct stat stat;
 
-	int res = coeio_stat(pathname, &stat);
+	int res = coio_stat(pathname, &stat);
 	if (res < 0) {
 		lua_pushnil(L);
 		return 1;
@@ -458,7 +458,7 @@ lbox_fio_fstat(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	struct stat stat;
-	int res = coeio_fstat(fd, &stat);
+	int res = coio_fstat(fd, &stat);
 	if (res < 0) {
 		lua_pushnil(L);
 		return 1;
@@ -487,7 +487,7 @@ usage:
 		mode = lua_tointeger(L, 2);
 	else
 		mode = 0777;
-	lua_pushboolean(L, coeio_mkdir(pathname, mode) == 0);
+	lua_pushboolean(L, coio_mkdir(pathname, mode) == 0);
 	return 1;
 }
 
@@ -503,7 +503,7 @@ usage:
 	if (pathname == NULL)
 		goto usage;
 
-	lua_pushboolean(L, coeio_rmdir(pathname) == 0);
+	lua_pushboolean(L, coio_rmdir(pathname) == 0);
 	return 1;
 }
 
@@ -560,7 +560,7 @@ usage:
 	linkpath = lua_tostring(L, 2);
 	if (target == NULL || linkpath == NULL)
 		goto usage;
-	lua_pushboolean(L, coeio_link(target, linkpath) == 0);
+	lua_pushboolean(L, coio_link(target, linkpath) == 0);
 	return 1;
 }
 
@@ -577,7 +577,7 @@ usage:
 	linkpath = lua_tostring(L, 2);
 	if (target == NULL || linkpath == NULL)
 		goto usage;
-	lua_pushboolean(L, coeio_symlink(target, linkpath) == 0);
+	lua_pushboolean(L, coio_symlink(target, linkpath) == 0);
 	return 1;
 }
 
@@ -593,7 +593,7 @@ usage:
 	if (pathname == NULL)
 		goto usage;
 	char *path = (char *)lua_newuserdata(L, PATH_MAX);
-	int res = coeio_readlink(pathname, path, PATH_MAX);
+	int res = coio_readlink(pathname, path, PATH_MAX);
 	if (res < 0) {
 		lua_pushnil(L);
 		return 1;
@@ -614,7 +614,7 @@ lbox_fio_tempdir(struct lua_State *L)
 	}
 
 
-	if (coeio_tempdir(buf, PATH_MAX) == 0) {
+	if (coio_tempdir(buf, PATH_MAX) == 0) {
 		lua_pushstring(L, buf);
 		lua_remove(L, -2);
 	} else {
@@ -647,7 +647,7 @@ static int
 lbox_fio_fsync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coeio_fsync(fd) == 0);
+	lua_pushboolean(L, coio_fsync(fd) == 0);
 	return 1;
 }
 
@@ -655,14 +655,14 @@ static int
 lbox_fio_fdatasync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coeio_fdatasync(fd) == 0);
+	lua_pushboolean(L, coio_fdatasync(fd) == 0);
 	return 1;
 }
 
 static int
 lbox_fio_sync(struct lua_State *L)
 {
-	lua_pushboolean(L, coeio_sync() == 0);
+	lua_pushboolean(L, coio_sync() == 0);
 	return 1;
 }
 
@@ -670,7 +670,7 @@ static int
 lbox_fio_close(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coeio_close(fd) == 0);
+	lua_pushboolean(L, coio_file_close(fd) == 0);
 	return 1;
 }
 

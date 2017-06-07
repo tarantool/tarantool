@@ -68,7 +68,7 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr, socklen_t addrlen,
 	    ev_tstamp timeout);
 
 void
-coio_init(struct ev_io *coio, int fd);
+coio_create(struct ev_io *coio, int fd);
 
 static inline void
 coio_close(ev_loop *loop, struct ev_io *coio)

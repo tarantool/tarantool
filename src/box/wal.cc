@@ -39,7 +39,7 @@
 #include "xrow.h"
 #include "vy_log.h"
 #include "cbus.h"
-#include "coeio.h"
+#include "coio_task.h"
 #include "replication.h"
 
 
@@ -444,7 +444,7 @@ static int
 wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	int64_t lsn = ((struct wal_gc_msg *)data)->lsn;
-	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn);
+	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn, false);
 	return 0;
 }
 
@@ -690,7 +690,7 @@ wal_thread_f(va_list ap)
 	(void) ap;
 
 	/** Initialize eio in this thread */
-	coeio_enable();
+	coio_enable();
 
 	struct cbus_endpoint endpoint;
 	cbus_endpoint_create(&endpoint, "wal", fiber_schedule_cb, fiber());

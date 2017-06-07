@@ -29,16 +29,46 @@
  * SUCH DAMAGE.
  */
 #include "vy_run.h"
+
+#include <zstd.h>
+
+#include "coio_task.h"
+
 #include "fiber.h"
-#include "ipc.h"
-#include "coeio.h"
-#include "xrow.h"
-#include "xlog.h"
-#include "replication.h"
 #include "fio.h"
+#include "ipc.h"
 #include "memory.h"
 
+#include "replication.h"
 #include "tuple_hash.h" /* for bloom filter */
+#include "xlog.h"
+#include "xrow.h"
+
+static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
+					     (1 << VY_PAGE_INFO_SIZE) |
+					     (1 << VY_PAGE_INFO_UNPACKED_SIZE) |
+					     (1 << VY_PAGE_INFO_ROW_COUNT) |
+					     (1 << VY_PAGE_INFO_MIN_KEY) |
+					     (1 << VY_PAGE_INFO_PAGE_INDEX_OFFSET);
+
+static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
+					    (1 << VY_RUN_INFO_MAX_KEY) |
+					    (1 << VY_RUN_INFO_MIN_LSN) |
+					    (1 << VY_RUN_INFO_MAX_LSN) |
+					    (1 << VY_RUN_INFO_PAGE_COUNT);
+
+enum { VY_BLOOM_VERSION = 0 };
+
+/** xlog meta type for .run files */
+#define XLOG_META_TYPE_RUN "RUN"
+
+/** xlog meta type for .index files */
+#define XLOG_META_TYPE_INDEX "INDEX"
+
+const char *vy_file_suffix[] = {
+	"index",	/* VY_FILE_INDEX */
+	"run",		/* VY_FILE_RUN */
+};
 
 /**
  * coio task for vinyl page read
@@ -95,7 +125,7 @@ vy_run_env_destroy(struct vy_run_env *env)
  * @retval 0 for Success
  * @retval -1 for error
  */
-int
+static int
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 		    const struct tuple *min_key, const struct key_def *key_def)
 {
@@ -116,7 +146,7 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 /**
  * Destroy page info struct
  */
-void
+static void
 vy_page_info_destroy(struct vy_page_info *page_info)
 {
 	if (page_info->min_key != NULL)
@@ -355,7 +385,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
  * @retval  0 Success.
  * @retval -1 Error.
  */
-int
+static int
 vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 		    const char *filename)
 {
@@ -419,7 +449,7 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
  * @param filename Filename for error reporting.
  * @return - 0 on success or -1 on format/memory error
  */
-int
+static int
 vy_run_bloom_decode(struct bloom *bloom, const char **buffer,
 		    const char *filename)
 {
@@ -534,7 +564,7 @@ vy_run_info_decode(struct vy_run_info *run_info,
 	return 0;
 }
 
-struct vy_page *
+static struct vy_page *
 vy_page_new(const struct vy_page_info *page_info)
 {
 	struct vy_page *page = malloc(sizeof(*page));
@@ -564,7 +594,7 @@ vy_page_new(const struct vy_page_info *page_info)
 	return page;
 }
 
-void
+static void
 vy_page_delete(struct vy_page *page)
 {
 	uint32_t *page_index = page->page_index;
@@ -579,7 +609,7 @@ vy_page_delete(struct vy_page *page)
 	free(page);
 }
 
-int
+static int
 vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 	     struct xrow_header *xrow)
 {
@@ -725,7 +755,7 @@ vy_page_index_decode(uint32_t *page_index, uint32_t count,
  * @retval 0 on success
  * @retval -1 on error, check diag
  */
-int
+static int
 vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	     ZSTD_DStream *zdctx)
 {
@@ -787,7 +817,7 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 /**
  * Get thread local zstd decompression context
  */
-ZSTD_DStream *
+static ZSTD_DStream *
 vy_env_get_zdctx(struct vy_run_env *env)
 {
 	ZSTD_DStream *zdctx = tt_pthread_getspecific(env->zdctx_key);
@@ -859,7 +889,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	int rc;
 	if (itr->coio_read) {
 		/*
-		 * Use coeio for TX thread **after recovery**.
+		 * Use coio for TX thread **after recovery**.
 		 */
 
 		/* Allocate a coio task */
@@ -876,7 +906,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/*
 		 * Make sure the run file descriptor won't be closed
-		 * (even worse, reopened) while a coeio thread is
+		 * (even worse, reopened) while a coio thread is
 		 * reading it.
 		 */
 		vy_slice_pin(slice);
@@ -886,7 +916,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->run_env = itr->run_env;
 		task->page = page;
 
-		/* Post task to coeio */
+		/* Post task to coio */
 		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
 		if (rc < 0)
 			return -1; /* timed out or cancelled */
@@ -1728,19 +1758,16 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 
 /* }}} vy_run_iterator API implementation */
 
-/**
- * Load run from disk
- * @param run - run to laod
- * @param index_path - path to index part of the run
- * @param run_path - path to run part of the run
- * @return - 0 on sucess, -1 on fail
- */
 int
-vy_run_recover(struct vy_run *run, const char *index_path,
-	       const char *run_path)
+vy_run_recover(struct vy_run *run, const char *dir,
+	       uint32_t space_id, uint32_t iid)
 {
+	char path[PATH_MAX];
+	vy_run_snprint_path(path, sizeof(path), dir,
+			    space_id, iid, run->id, VY_FILE_INDEX);
+
 	struct xlog_cursor cursor;
-	if (xlog_cursor_open(&cursor, index_path))
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 
 	struct xlog_meta *meta = &cursor.meta;
@@ -1757,24 +1784,24 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	if (rc != 0) {
 		if (rc > 0)
 			diag_set(ClientError, ER_INVALID_INDEX_FILE,
-				 index_path, "Unexpected end of file");
+				 path, "Unexpected end of file");
 		goto fail_close;
 	}
 	rc = xlog_cursor_next_row(&cursor, &xrow);
 	if (rc != 0) {
 		if (rc > 0)
 			diag_set(ClientError, ER_INVALID_INDEX_FILE,
-				 index_path, "Unexpected end of file");
+				 path, "Unexpected end of file");
 		goto fail_close;
 	}
 
 	if (xrow.type != VY_INDEX_RUN_INFO) {
-		diag_set(ClientError, ER_INVALID_INDEX_FILE, index_path,
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, path,
 			 tt_sprintf("Wrong xrow type (expected %d, got %u)",
 				    VY_INDEX_RUN_INFO, (unsigned)xrow.type));
 		return -1;
 	}
-	if (vy_run_info_decode(&run->info, &xrow, index_path) != 0)
+	if (vy_run_info_decode(&run->info, &xrow, path) != 0)
 		goto fail_close;
 
 	/* Allocate buffer for page info. */
@@ -1793,7 +1820,7 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 			if (rc > 0) {
 				/** To few pages in file */
 				diag_set(ClientError, ER_INVALID_INDEX_FILE,
-					 index_path, "Unexpected end of file");
+					 path, "Unexpected end of file");
 			}
 			/*
 			 * Limit the count of pages to
@@ -1811,7 +1838,7 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 			goto fail_close;
 		}
 		struct vy_page_info *page = run->info.page_infos + page_no;
-		if (vy_page_info_decode(page, &xrow, index_path) < 0) {
+		if (vy_page_info_decode(page, &xrow, path) < 0) {
 			/**
 			 * Limit the count of pages to successfully
 			 * created pages
@@ -1827,7 +1854,9 @@ vy_run_recover(struct vy_run *run, const char *index_path,
 	xlog_cursor_close(&cursor, false);
 
 	/* Prepare data file for reading. */
-	if (xlog_cursor_open(&cursor, run_path))
+	vy_run_snprint_path(path, sizeof(path), dir,
+			    space_id, iid, run->id, VY_FILE_RUN);
+	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 	meta = &cursor.meta;
 	if (strcmp(meta->filetype, XLOG_META_TYPE_RUN) != 0) {

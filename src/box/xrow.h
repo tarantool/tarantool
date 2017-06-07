@@ -45,6 +45,9 @@ enum {
 	XROW_HEADER_IOVMAX = 1,
 	XROW_BODY_IOVMAX = 2,
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
+	XROW_HEADER_LEN_MAX = 40,
+	XROW_BODY_LEN_MAX = 128,
+	IPROTO_HEADER_LEN = 28,
 };
 
 struct xrow_header {
@@ -59,7 +62,6 @@ struct xrow_header {
 	int bodycnt;
 	uint32_t schema_version;
 	struct iovec body[XROW_BODY_IOVMAX];
-
 };
 
 /**
@@ -93,6 +95,58 @@ xrow_header_encode(const struct xrow_header *header,
 int
 xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
+
+/**
+ * Fast encode xrow header using the specified header fields.
+ * It is faster than the xrow_header_encode, because uses
+ * the predefined values for all fields of the header, defined
+ * in the struct iproto_header_bin in iproto_port.cc. Because of
+ * it, the implementation is placed in the same
+ * file: iproto_port.cc.
+ *
+ * @param out Previously allocated memory of at least
+ *        IPROTO_HEADER_LEN bytes.
+ * @param type IPROTO_OK or iproto error code.
+ * @param sync Sync of the response. Must be the same as the
+ *        request sync.
+ * @param schema_version Schema version.
+ * @param body_length Length of the body of the iproto message.
+ *        Please, pass it without IPROTO_HEADER_LEN.
+ * @see xrow_header_encode()
+ */
+void
+iproto_header_encode(char *data, uint32_t type, uint64_t sync,
+		     uint32_t schema_version, uint32_t body_length);
+
+struct obuf;
+struct obuf_svp;
+
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp);
+
+/**
+ * Write select header to a preallocated buffer.
+ * This function doesn't throw (and we rely on this in iproto.cc).
+ */
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		    uint32_t schema_version, uint32_t count);
+
+/** Stack a reply to 'ping' packet. */
+void
+iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
+
+/**
+ * Write an error packet int output buffer. Doesn't throw if out
+ * of memory
+ */
+int
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
+		   uint32_t schema_version);
+
+/** Write error directly to a socket. */
+void
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version);
 
 struct request
 {

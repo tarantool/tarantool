@@ -28,9 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "coeio_file.h"
-#include "coeio.h"
+#include "coio_file.h"
+#include "coio_task.h"
 #include "fiber.h"
 #include "say.h"
 #include <stdio.h>
@@ -39,9 +38,9 @@
 
 /**
  * A context of libeio request for any
- * coeio task.
+ * coio task.
  */
-struct coeio_file_task {
+struct coio_file_task {
 	ssize_t result;
 	int errorno;
 	struct fiber *fiber;
@@ -96,15 +95,15 @@ struct coeio_file_task {
 };
 
 #define INIT_COEIO_FILE(name)			\
-	struct coeio_file_task name;		\
+	struct coio_file_task name;		\
 	memset(&name, 0, sizeof(name));		\
 	name.fiber = fiber();			\
 
 /** A callback invoked by eio when a task is complete. */
 static int
-coeio_complete(eio_req *req)
+coio_complete(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 
 	eio->errorno = req->errorno;
 	eio->done = true;
@@ -119,7 +118,7 @@ coeio_complete(eio_req *req)
  * wait for task completion.
  */
 static ssize_t
-coeio_wait_done(eio_req *req, struct coeio_file_task *eio)
+coio_wait_done(eio_req *req, struct coio_file_task *eio)
 {
 	if (!req) {
 		errno = ENOMEM;
@@ -134,48 +133,48 @@ coeio_wait_done(eio_req *req, struct coeio_file_task *eio)
 }
 
 int
-coeio_open(const char *path, int flags, mode_t mode)
+coio_file_open(const char *path, int flags, mode_t mode)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_open(path, flags, mode, 0,
-				coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+				coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_close(int fd)
+coio_file_close(int fd)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_close(fd, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_close(fd, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 ssize_t
-coeio_pwrite(int fd, const void *buf, size_t count, off_t offset)
+coio_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_write(fd, (void *) buf, count, offset,
-				 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+				 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 ssize_t
-coeio_pread(int fd, void *buf, size_t count, off_t offset)
+coio_pread(int fd, void *buf, size_t count, off_t offset)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_read(fd, buf, count,
-				offset, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+				offset, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 ssize_t
-coeio_preadn(int fd, void *buf, size_t count, off_t offset)
+coio_preadn(int fd, void *buf, size_t count, off_t offset)
 {
 	size_t n = 0;
 	do {
 		ssize_t r;
 		do {
-			r = coeio_pread(fd, buf + n, count - n, offset + n);
+			r = coio_pread(fd, buf + n, count - n, offset + n);
 		} while (r == -1 && errno == EINTR);
 		if (r <= 0)
 			return -1;
@@ -187,57 +186,57 @@ coeio_preadn(int fd, void *buf, size_t count, off_t offset)
 }
 
 static void
-coeio_do_write(eio_req *req)
+coio_do_write(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = write(eio->write.fd, eio->write.buf, eio->write.count);
 	eio->errorno = errno;
 }
 
 ssize_t
-coeio_write(int fd, const void *buf, size_t count)
+coio_write(int fd, const void *buf, size_t count)
 {
 	INIT_COEIO_FILE(eio);
 	eio.write.buf = buf;
 	eio.write.count = count;
 	eio.write.fd = fd;
-	eio_req *req = eio_custom(coeio_do_write, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_write, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_read(eio_req *req)
+coio_do_read(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = read(eio->read.fd, eio->read.buf, eio->read.count);
 	req->errorno = errno;
 }
 
 ssize_t
-coeio_read(int fd, void *buf, size_t count)
+coio_read(int fd, void *buf, size_t count)
 {
 	INIT_COEIO_FILE(eio);
 	eio.read.buf = buf;
 	eio.read.count = count;
 	eio.read.fd = fd;
-	eio_req *req = eio_custom(coeio_do_read, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_read, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 
 static void
-coeio_do_lseek(eio_req *req)
+coio_do_lseek(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result =
 		lseek(eio->lseek.fd, eio->lseek.offset, eio->lseek.whence);
 	req->errorno = errno;
 }
 
 off_t
-coeio_lseek(int fd, off_t offset, int whence)
+coio_lseek(int fd, off_t offset, int whence)
 {
 	INIT_COEIO_FILE(eio);
 
@@ -245,114 +244,114 @@ coeio_lseek(int fd, off_t offset, int whence)
 	eio.lseek.offset = offset;
 	eio.lseek.fd = fd;
 
-	eio_req *req = eio_custom(coeio_do_lseek, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_lseek, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_lstat(eio_req *req)
+coio_do_lstat(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = lstat(eio->lstat.pathname, eio->lstat.buf);
 	req->errorno = errno;
 }
 
 int
-coeio_lstat(const char *pathname, struct stat *buf)
+coio_lstat(const char *pathname, struct stat *buf)
 {
 	INIT_COEIO_FILE(eio);
 	eio.lstat.pathname = pathname;
 	eio.lstat.buf = buf;
-	eio_req *req = eio_custom(coeio_do_lstat, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_lstat, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_stat(eio_req *req)
+coio_do_stat(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = stat(eio->lstat.pathname, eio->lstat.buf);
 	req->errorno = errno;
 }
 
 int
-coeio_stat(const char *pathname, struct stat *buf)
+coio_stat(const char *pathname, struct stat *buf)
 {
 	INIT_COEIO_FILE(eio);
 	eio.lstat.pathname = pathname;
 	eio.lstat.buf = buf;
-	eio_req *req = eio_custom(coeio_do_stat, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_stat, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_fstat(eio_req *req)
+coio_do_fstat(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = fstat(eio->fstat.fd, eio->fstat.buf);
 	req->errorno = errno;
 }
 
 int
-coeio_fstat(int fd, struct stat *stat)
+coio_fstat(int fd, struct stat *stat)
 {
 	INIT_COEIO_FILE(eio);
 	eio.fstat.fd = fd;
 	eio.fstat.buf = stat;
 
-	eio_req *req = eio_custom(coeio_do_fstat, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_fstat, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_rename(const char *oldpath, const char *newpath)
+coio_rename(const char *oldpath, const char *newpath)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_rename(oldpath, newpath, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 
 }
 
 int
-coeio_unlink(const char *pathname)
+coio_unlink(const char *pathname)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_unlink(pathname, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_unlink(pathname, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_ftruncate(int fd, off_t length)
+coio_ftruncate(int fd, off_t length)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_ftruncate(fd, length, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_ftruncate(fd, length, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_truncate(const char *path, off_t length)
+coio_truncate(const char *path, off_t length)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_truncate(path, length, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_truncate(path, length, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_glob(eio_req *req)
+coio_do_glob(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = glob(eio->glob.pattern,
 			   eio->glob.flags, eio->glob.errfunc, eio->glob.pglob);
 	req->errorno = errno;
 }
 
 int
-coeio_glob(const char *pattern, int flags,
+coio_glob(const char *pattern, int flags,
 		int (*errfunc) (const char *epath, int eerrno),
 		glob_t *pglob)
 {
@@ -362,85 +361,85 @@ coeio_glob(const char *pattern, int flags,
 	eio.glob.errfunc = errfunc;
 	eio.glob.pglob = pglob;
 	eio_req *req =
-		eio_custom(coeio_do_glob, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+		eio_custom(coio_do_glob, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_chown(const char *path, uid_t owner, gid_t group)
+coio_chown(const char *path, uid_t owner, gid_t group)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req =
-		eio_chown(path, owner, group, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+		eio_chown(path, owner, group, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_chmod(const char *path, mode_t mode)
+coio_chmod(const char *path, mode_t mode)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_chmod(path, mode, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_chmod(path, mode, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_mkdir(const char *pathname, mode_t mode)
+coio_mkdir(const char *pathname, mode_t mode)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_mkdir(pathname, mode, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_mkdir(pathname, mode, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_rmdir(const char *pathname)
+coio_rmdir(const char *pathname)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_rmdir(pathname, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_rmdir(pathname, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_link(const char *oldpath, const char *newpath)
+coio_link(const char *oldpath, const char *newpath)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_link(oldpath, newpath, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_link(oldpath, newpath, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_symlink(const char *target, const char *linkpath)
+coio_symlink(const char *target, const char *linkpath)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req =
-		eio_symlink(target, linkpath, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+		eio_symlink(target, linkpath, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_readlink(eio_req *req)
+coio_do_readlink(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	req->result = readlink(eio->readlink.pathname,
 			       eio->readlink.buf, eio->readlink.bufsize);
 	req->errorno = errno;
 }
 
 int
-coeio_readlink(const char *pathname, char *buf, size_t bufsize)
+coio_readlink(const char *pathname, char *buf, size_t bufsize)
 {
 	INIT_COEIO_FILE(eio);
 	eio.readlink.pathname = pathname;
 	eio.readlink.buf = buf;
 	eio.readlink.bufsize = bufsize;
-	eio_req *req = eio_custom(coeio_do_readlink, 0,
-				  coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_custom(coio_do_readlink, 0,
+				  coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 static void
-coeio_do_tempdir(eio_req *req)
+coio_do_tempdir(eio_req *req)
 {
-	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
 	char *res = mkdtemp(eio->tempdir.tpl);
 	req->errorno = errno;
 	if (res == NULL) {
@@ -451,7 +450,7 @@ coeio_do_tempdir(eio_req *req)
 }
 
 int
-coeio_tempdir(char *path, size_t path_len)
+coio_tempdir(char *path, size_t path_len)
 {
 	INIT_COEIO_FILE(eio);
 
@@ -464,30 +463,30 @@ coeio_tempdir(char *path, size_t path_len)
 
 	eio.tempdir.tpl = path;
 	eio_req *req =
-		eio_custom(coeio_do_tempdir, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+		eio_custom(coio_do_tempdir, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_sync()
+coio_sync()
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_sync(0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_sync(0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_fsync(int fd)
+coio_fsync(int fd)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_fsync(fd, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_fsync(fd, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }
 
 int
-coeio_fdatasync(int fd)
+coio_fdatasync(int fd)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_fdatasync(fd, 0, coeio_complete, &eio);
-	return coeio_wait_done(req, &eio);
+	eio_req *req = eio_fdatasync(fd, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
 }

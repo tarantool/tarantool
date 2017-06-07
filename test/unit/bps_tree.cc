@@ -71,6 +71,22 @@ compare(type_t a, type_t b);
 #define bps_tree_arg_t int
 #include "salad/bps_tree.h"
 
+#define bps_insert_and_check(tree_name, tree, elem, replaced) \
+{\
+	tree_name##_iterator iter;\
+	if (tree_name##_insert_get_iterator((tree), (elem), \
+					    (replaced), &iter) == 0) {\
+		type_t check_value =\
+			*tree_name##_iterator_get_elem((tree), &iter);\
+		if (check_value != (type_t)(elem)) {\
+			printf("iterator doesn't point to the inserted "\
+			       "element: %lld != %lld", (long long) (elem),\
+			       (long long) check_value);\
+			fail("elem != check_value", "true");\
+		}\
+	}\
+}
+
 static int
 node_comp(const void *p1, const void *p2, void* unused)
 {
@@ -755,6 +771,27 @@ approximate_count()
 	footer();
 }
 
+static void
+insert_get_iterator()
+{
+	header();
+
+	test tree;
+	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	type_t value = 100000;
+
+	bps_insert_and_check(test, &tree, value, NULL)
+	type_t i = 0;
+	for (; i < 10000; i += 2)
+		bps_insert_and_check(test, &tree, i, NULL);
+	for (i = -2; i > -10000; i -= 2)
+		bps_insert_and_check(test, &tree, i, NULL);
+	for (i = -9999; i < 10000; i += 2)
+		bps_insert_and_check(test, &tree, i, NULL)
+
+	footer();
+}
+
 int
 main(void)
 {
@@ -768,4 +805,5 @@ main(void)
 	approximate_count();
 	if (extents_count != 0)
 		fail("memory leak!", "true");
+	insert_get_iterator();
 }
