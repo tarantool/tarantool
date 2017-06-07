@@ -34,6 +34,7 @@
 #include "say.h"
 #include "diag.h"
 #include "error.h"
+#include "tt_uuid.h" /* tuple_field_uuid */
 #include "tuple_format.h"
 
 #if defined(__cplusplus)
@@ -551,13 +552,85 @@ mp_tuple_assert(const char *tuple, const char *tuple_end)
 	(void) tuple_end;
 }
 
-static inline uint32_t
-box_tuple_field_u32(box_tuple_t *tuple, uint32_t fieldno, uint32_t deflt)
+static inline const char *
+tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
+		      enum mp_type type)
 {
-	const char *field = box_tuple_field(tuple, fieldno);
-	if (field != NULL && mp_typeof(*field) == MP_UINT)
-		return mp_decode_uint(&field);
-	return deflt;
+	const char *field = tuple_field(tuple, fieldno);
+	if (field == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FIELD, fieldno);
+		return NULL;
+	}
+	if (mp_typeof(*field) != type) {
+		diag_set(ClientError, ER_FIELD_TYPE,
+			 fieldno + TUPLE_INDEX_BASE, mp_type_strs[type]);
+		return NULL;
+	}
+	return field;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as uint64_t.
+ */
+static inline int
+tuple_field_u64(const struct tuple *tuple, uint32_t fieldno, uint64_t *out)
+{
+	const char *field = tuple_field_with_type(tuple, fieldno, MP_UINT);
+	if (field == NULL)
+		return -1;
+	*out = mp_decode_uint(&field);
+	return 0;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as uint32_t.
+ */
+static inline int
+tuple_field_u32(const struct tuple *tuple, uint32_t fieldno, uint32_t *out)
+{
+	const char *field = tuple_field_with_type(tuple, fieldno, MP_UINT);
+	if (field == NULL)
+		return -1;
+	*out = mp_decode_uint(&field);
+	if (*out > UINT32_MAX) {
+		diag_set(ClientError, ER_FIELD_TYPE, fieldno + TUPLE_INDEX_BASE,
+			 field_type_strs[FIELD_TYPE_UNSIGNED]);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as a NUL-terminated string - returns a string of up to 256 bytes.
+ */
+static inline const char *
+tuple_field_cstr(const struct tuple *tuple, uint32_t fieldno)
+{
+	const char *field = tuple_field_with_type(tuple, fieldno, MP_STR);
+	if (field == NULL)
+		return NULL;
+	uint32_t len = 0;
+	const char *str = mp_decode_str(&field, &len);
+	return tt_cstr(str, len);
+}
+
+/**
+ * Parse a tuple field which is expected to contain a string
+ * representation of UUID, and return a 16-byte representation.
+ */
+static inline int
+tuple_field_uuid(const struct tuple *tuple, int fieldno,
+		 struct tt_uuid *out)
+{
+	const char *value = tuple_field_cstr(tuple, fieldno);
+	if (tt_uuid_from_string(value, out) != 0) {
+		diag_set(ClientError, ER_INVALID_UUID, value);
+		return -1;
+	}
+	return 0;
 }
 
 enum { TUPLE_REF_MAX = UINT16_MAX };
@@ -642,7 +715,6 @@ tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
 
 #include "tuple_update.h"
 #include "errinj.h"
-#include "tt_uuid.h"
 
 /**
  * \copydoc tuple_ref()
@@ -679,70 +751,43 @@ struct TupleRefNil {
 	void operator=(const TupleRefNil&) = delete;
 };
 
-/** Return a tuple field and check its type. */
-static inline const char *
-tuple_field_xc(const struct tuple *tuple, uint32_t fieldno,
-		  enum mp_type type)
-{
-	const char *field = tuple_field(tuple, fieldno);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, fieldno);
-	if (mp_typeof(*field) != type)
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE, mp_type_strs[type]);
-	return field;
-}
-
-/**
- * A convenience shortcut for data dictionary - get a tuple field
- * as uint64_t.
- */
+/* @copydoc tuple_field_u64() */
 static inline uint64_t
 tuple_field_u64_xc(const struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field_xc(tuple, fieldno, MP_UINT);
-	return mp_decode_uint(&field);
+	uint64_t out;
+	if (tuple_field_u64(tuple, fieldno, &out) != 0)
+		diag_raise();
+	return out;
 }
 
-/**
- * A convenience shortcut for data dictionary - get a tuple field
- * as uint32_t.
- */
+/* @copydoc tuple_field_u32() */
 static inline uint32_t
 tuple_field_u32_xc(const struct tuple *tuple, uint32_t fieldno)
 {
-	uint64_t val = tuple_field_u64_xc(tuple, fieldno);
-	if (val > UINT32_MAX) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_UNSIGNED]);
-	}
-	return (uint32_t) val;
+	uint32_t out;
+	if (tuple_field_u32(tuple, fieldno, &out) != 0)
+		diag_raise();
+	return out;
 }
 
-/**
- * A convenience shortcut for data dictionary - get a tuple field
- * as a NUL-terminated string - returns a string of up to 256 bytes.
- */
+/** @copydoc tuple_field_cstr() */
 static inline const char *
 tuple_field_cstr_xc(const struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field_xc(tuple, fieldno, MP_STR);
-	uint32_t len = 0;
-	const char *str = mp_decode_str(&field, &len);
-	return tt_cstr(str, len);
+	const char *out = tuple_field_cstr(tuple, fieldno);
+	if (out == NULL)
+		diag_raise();
+	return out;
 }
 
-/**
- * Parse a tuple field which is expected to contain a string
- * representation of UUID, and return a 16-byte representation.
- */
+/** @copydoc tuple_field_uuid() */
 static inline void
-tuple_field_uuid_xc(const struct tuple *tuple, int fieldno, struct tt_uuid *result)
+tuple_field_uuid_xc(const struct tuple *tuple, int fieldno,
+		    struct tt_uuid *out)
 {
-	const char *value = tuple_field_cstr_xc(tuple, fieldno);
-	if (tt_uuid_from_string(value, result) != 0)
-		tnt_raise(ClientError, ER_INVALID_UUID, value);
+	if (tuple_field_uuid(tuple, fieldno, out) != 0)
+		diag_raise();
 }
 
 /** Return a tuple field and check its type. */

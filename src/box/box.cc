@@ -681,7 +681,10 @@ box_space_id_by_name(const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, BOX_ID_NIL);
+	uint32_t result;
+	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &result) != 0)
+		return BOX_ID_NIL;
+	return result;
 }
 
 uint32_t
@@ -703,7 +706,10 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, BOX_ID_NIL);
+	uint32_t result;
+	if (tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &result) != 0)
+		return BOX_ID_NIL;
+	return result;
 }
 /** \endcond public */
 
