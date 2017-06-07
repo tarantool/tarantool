@@ -40,6 +40,7 @@
 #include "box/iproto_constants.h"
 #include "box/iproto_port.h"
 #include "box/lua/tuple.h"
+#include "box/schema.h"
 #include "small/obuf.h"
 
 /**
@@ -322,7 +323,8 @@ execute_lua_call(lua_State *L)
 	}
 
 	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->header->sync, count);
+	iproto_reply_select(out, svp, request->header->sync, schema_version,
+			    count);
 	return 0; /* truncate Lua stack */
 }
 
@@ -367,7 +369,8 @@ execute_lua_eval(lua_State *L)
 		luamp_encode(L, luaL_msgpack_default, &stream, k);
 	}
 	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->header->sync, nrets);
+	iproto_reply_select(out, svp, request->header->sync, schema_version,
+			    nrets);
 
 	return 0;
 }

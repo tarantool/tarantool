@@ -31,8 +31,8 @@
 #include "trivia/config.h"
 #include "iproto_port.h"
 #include "iproto_constants.h"
-#include "schema.h" /* schema_version */
 #include "small/obuf.h"
+#include "error.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include "xrow.h"
@@ -61,15 +61,16 @@ iproto_encode_error(uint32_t error)
 }
 
 void
-iproto_reply_ok(struct obuf *out, uint64_t sync)
+iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 {
 	char *buf = (char *)obuf_alloc_xc(out, IPROTO_HEADER_LEN + 1);
-	iproto_header_encode(buf, IPROTO_OK, sync, ::schema_version, 1);
+	iproto_header_encode(buf, IPROTO_OK, sync, schema_version, 1);
 	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
 }
 
 int
-iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
+		   uint32_t schema_version)
 {
 	uint32_t msg_len = strlen(e->errmsg);
 	uint32_t errcode = ClientError::get_errcode(e);
@@ -80,7 +81,7 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 		return -1;
 
 	iproto_header_encode(header, iproto_encode_error(errcode), sync,
-			     ::schema_version, sizeof(body) + msg_len);
+			     schema_version, sizeof(body) + msg_len);
 	body.v_data_len = mp_bswap_u32(msg_len);
 	/* Malformed packet appears to be a lesser evil than abort. */
 	return obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
@@ -89,7 +90,7 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 }
 
 void
-iproto_write_error(int fd, const struct error *e)
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
 {
 	uint32_t msg_len = strlen(e->errmsg);
 	uint32_t errcode = ClientError::get_errcode(e);
@@ -98,7 +99,7 @@ iproto_write_error(int fd, const struct error *e)
 	struct iproto_body_bin body = iproto_error_bin;
 
 	iproto_header_encode(header, iproto_encode_error(errcode), 0,
-				::schema_version, sizeof(body) + msg_len);
+			     schema_version, sizeof(body) + msg_len);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 
@@ -140,10 +141,10 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		    uint32_t count)
+		    uint32_t schema_version, uint32_t count)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
-	iproto_header_encode(pos, IPROTO_OK, sync, ::schema_version,
+	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
 			        obuf_size(buf) - svp->used -
 				IPROTO_HEADER_LEN);
 

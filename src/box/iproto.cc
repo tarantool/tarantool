@@ -652,7 +652,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			 * to proceed to the next one.
 			 */
 			struct obuf *out = &msg->iobuf->out;
-			iproto_reply_error(out, e, msg->header.sync);
+			iproto_reply_error(out, e, msg->header.sync,
+					   ::schema_version);
 			out->wend = obuf_create_svp(out);
 			if (!ev_is_active(&con->output))
 				ev_feed_event(con->loop, &con->output, EV_WRITE);
@@ -763,7 +764,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
 		/* Best effort at sending the error message to the client. */
-		iproto_write_error(fd, e);
+		iproto_write_error(fd, e, ::schema_version);
 		e->log();
 		iproto_connection_close(con);
 	}
@@ -890,13 +891,13 @@ tx_process1(struct cmsg *m)
 		goto error;
 	if (tuple && tuple_to_obuf(tuple, out))
 		goto error;
-	iproto_reply_select(out, &svp, msg->header.sync,
+	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
 			    tuple != 0);
 	msg->write_end = obuf_create_svp(out);
 	return;
 error:
 	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync);
+			   msg->header.sync, ::schema_version);
 	msg->write_end = obuf_create_svp(out);
 }
 
@@ -925,12 +926,13 @@ tx_process_select(struct cmsg *m)
 		goto error;
 	}
 	port_dump(&port, out);
-	iproto_reply_select(out, &svp, msg->header.sync, port.size);
+	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
+			    port.size);
 	msg->write_end = obuf_create_svp(out);
 	return;
 error:
 	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync);
+			   msg->header.sync, ::schema_version);
 	msg->write_end = obuf_create_svp(out);
 }
 
@@ -961,20 +963,21 @@ tx_process_misc(struct cmsg *m)
 			box_process_auth(&msg->request, out);
 			break;
 		case IPROTO_PING:
-			iproto_reply_ok(out, msg->header.sync);
+			iproto_reply_ok(out, msg->header.sync,
+					::schema_version);
 			break;
 		default:
 			unreachable();
 		}
 	} catch (Exception *e) {
 		iproto_reply_error(out, diag_last_error(&fiber()->diag),
-				   msg->header.sync);
+				   msg->header.sync, ::schema_version);
 	}
 	msg->write_end = obuf_create_svp(out);
 	return;
 error:
 	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync);
+			   msg->header.sync, ::schema_version);
 	msg->write_end = obuf_create_svp(out);
 }
 
@@ -1011,7 +1014,7 @@ tx_process_join_subscribe(struct cmsg *m)
 	} catch (SocketError *e) {
 		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
-		iproto_write_error(con->input.fd, e);
+		iproto_write_error(con->input.fd, e, ::schema_version);
 	}
 }
 
@@ -1080,7 +1083,8 @@ tx_process_connect(struct cmsg *m)
 		}
 		msg->write_end = obuf_create_svp(out);
 	} catch (Exception *e) {
-		iproto_reply_error(out, e, 0 /* zero sync for connect error */);
+		/* zero sync for connect errors */
+		iproto_reply_error(out, e, 0, ::schema_version);
 		msg->close_connection = true;
 	}
 }

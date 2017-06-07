@@ -986,7 +986,8 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 				goto error;
 			}
 		}
-		iproto_reply_select(out, &svp, request->header->sync, port.size);
+		iproto_reply_select(out, &svp, request->header->sync,
+				    ::schema_version, port.size);
 	} else {
 		assert(request->type == IPROTO_CALL);
 		char *size_buf = (char *)
@@ -1001,7 +1002,8 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 				goto error;
 			}
 		}
-		iproto_reply_select(out, &svp, request->header->sync, 1);
+		iproto_reply_select(out, &svp, request->header->sync,
+				    ::schema_version, 1);
 	}
 
 	port_destroy(&port);
@@ -1111,7 +1113,7 @@ box_process_auth(struct request *request, struct obuf *out)
 	uint32_t len = mp_decode_strl(&user);
 	authenticate(user, len, request->tuple, request->tuple_end);
 	assert(request->header != NULL);
-	iproto_reply_ok(out, request->header->sync);
+	iproto_reply_ok(out, request->header->sync, ::schema_version);
 }
 
 void

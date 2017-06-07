@@ -49,24 +49,25 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp);
  */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		    uint32_t count);
+		    uint32_t schema_version, uint32_t count);
 #if defined(__cplusplus)
 } /*  extern "C" */
 
 /** Stack a reply to 'ping' packet. */
 void
-iproto_reply_ok(struct obuf *out, uint64_t sync);
+iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
  * Write an error packet int output buffer. Doesn't throw if out
  * of memory
  */
 int
-iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync);
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
+		   uint32_t schema_version);
 
 /** Write error directly to a socket. */
 void
-iproto_write_error(int fd, const struct error *e);
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version);
 
 #endif /* defined(__cplusplus) */
 
