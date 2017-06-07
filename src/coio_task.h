@@ -49,9 +49,9 @@ extern "C" {
  * Yield the current fiber until a created task is complete.
  */
 
-void coeio_init(void);
-void coeio_enable(void);
-void coeio_shutdown(void);
+void coio_init(void);
+void coio_enable(void);
+void coio_shutdown(void);
 
 struct coio_task;
 

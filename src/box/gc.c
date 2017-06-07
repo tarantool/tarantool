@@ -187,7 +187,7 @@ gc_run(int64_t signature)
 		const char *filename = xdir_format_filename(&gc.snap_dir,
 						vclock_sum(vclock), NONE);
 		say_info("removing %s", filename);
-		if (coeio_unlink(filename) < 0 && errno != ENOENT) {
+		if (coio_unlink(filename) < 0 && errno != ENOENT) {
 			say_syserror("error while removing %s", filename);
 			break;
 		}

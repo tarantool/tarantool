@@ -40,47 +40,47 @@ extern "C" {
 
 /**
  * Cooperative file I/O.
- * Unlike the rest of coeio API, this implementation
+ * Unlike the rest of coio API, this implementation
  * doesn't support timeouts or cancellation.
  *
  * It follows the error reporting convention of the respective
  * system calls, i.e. it doesn't throw exceptions either.
  */
 
-int     coeio_open(const char *path, int flags, mode_t mode);
-int     coeio_close(int fd);
+int     coio_file_open(const char *path, int flags, mode_t mode);
+int     coio_file_close(int fd);
 
-ssize_t coeio_pwrite(int fd, const void *buf, size_t count, off_t offset);
-ssize_t coeio_pread(int fd, void *buf, size_t count, off_t offset);
-ssize_t coeio_preadn(int fd, void *buf, size_t count, off_t offset);
-ssize_t coeio_read(int fd, void *buf, size_t count);
-ssize_t coeio_write(int fd, const void *buf, size_t count);
-off_t   coeio_lseek(int fd, off_t offset, int whence);
+ssize_t coio_pwrite(int fd, const void *buf, size_t count, off_t offset);
+ssize_t coio_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t coio_preadn(int fd, void *buf, size_t count, off_t offset);
+ssize_t coio_read(int fd, void *buf, size_t count);
+ssize_t coio_write(int fd, const void *buf, size_t count);
+off_t   coio_lseek(int fd, off_t offset, int whence);
 
-int     coeio_stat(const char *pathname, struct stat *buf);
-int     coeio_lstat(const char *pathname, struct stat *buf);
-int     coeio_fstat(int fd, struct stat *buf);
-int     coeio_rename(const char *oldpath, const char *newpath);
-int     coeio_unlink(const char *pathname);
-int     coeio_mkdir(const char *pathname, mode_t mode);
-int     coeio_rmdir(const char *pathname);
-int     coeio_ftruncate(int fd, off_t length);
-int     coeio_truncate(const char *path, off_t length);
-int     coeio_glob(const char *pattern, int flags,
+int     coio_stat(const char *pathname, struct stat *buf);
+int     coio_lstat(const char *pathname, struct stat *buf);
+int     coio_fstat(int fd, struct stat *buf);
+int     coio_rename(const char *oldpath, const char *newpath);
+int     coio_unlink(const char *pathname);
+int     coio_mkdir(const char *pathname, mode_t mode);
+int     coio_rmdir(const char *pathname);
+int     coio_ftruncate(int fd, off_t length);
+int     coio_truncate(const char *path, off_t length);
+int     coio_glob(const char *pattern, int flags,
 		   int (*errfunc) (const char *epath, int eerrno),
 		   glob_t *pglob);
-int     coeio_chown(const char *path, uid_t owner, gid_t group);
-int     coeio_chmod(const char *path, mode_t mode);
+int     coio_chown(const char *path, uid_t owner, gid_t group);
+int     coio_chmod(const char *path, mode_t mode);
 
-int     coeio_link(const char *oldpath, const char *newpath);
-int     coeio_symlink(const char *target, const char *linkpath);
-int     coeio_readlink(const char *pathname, char *buf, size_t bufsiz);
+int     coio_link(const char *oldpath, const char *newpath);
+int     coio_symlink(const char *target, const char *linkpath);
+int     coio_readlink(const char *pathname, char *buf, size_t bufsiz);
 
-int     coeio_sync();
-int     coeio_fsync(int fd);
-int     coeio_fdatasync(int fd);
+int     coio_sync();
+int     coio_fsync(int fd);
+int     coio_fdatasync(int fd);
 
-int	coeio_tempdir(char *path, size_t path_len);
+int	coio_tempdir(char *path, size_t path_len);
 
 #if defined(__cplusplus)
 } /* extern "C" */

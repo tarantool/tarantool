@@ -690,7 +690,7 @@ wal_thread_f(va_list ap)
 	(void) ap;
 
 	/** Initialize eio in this thread */
-	coeio_enable();
+	coio_enable();
 
 	struct cbus_endpoint endpoint;
 	cbus_endpoint_create(&endpoint, "wal", fiber_schedule_cb, fiber());

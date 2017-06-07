@@ -178,7 +178,7 @@ int
 relay_final_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
-	coeio_enable();
+	coio_enable();
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send all WALs until stop_vclock */
@@ -293,7 +293,7 @@ relay_subscribe_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
 	struct recovery *r = relay->r;
-	coeio_enable();
+	coio_enable();
 	relay->stream.write = relay_send_row;
 	ipc_cond_create(&relay->status_cond);
 	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),

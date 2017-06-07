@@ -979,7 +979,7 @@ vy_log_rotate(const struct vclock *vclock)
 	 */
 	latch_lock(&vy_log.latch);
 
-	/* Do actual work from coeio so as not to stall tx thread. */
+	/* Do actual work from coio so as not to stall tx thread. */
 	int rc = coio_call(vy_log_rotate_f, recovery, vclock);
 	vy_recovery_delete(recovery);
 	if (rc < 0) {

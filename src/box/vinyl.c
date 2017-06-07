@@ -4015,7 +4015,7 @@ static int
 vy_worker_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-	coeio_enable();
+	coio_enable();
 	struct vy_task *task = NULL;
 
 	tt_pthread_mutex_lock(&scheduler->mutex);
@@ -7937,7 +7937,7 @@ vy_join_f(va_list ap)
 {
 	struct vy_join_ctx *ctx = va_arg(ap, struct vy_join_ctx *);
 
-	coeio_enable();
+	coio_enable();
 
 	cpipe_create(&ctx->tx_pipe, "tx");
 
@@ -8078,7 +8078,7 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
 				    arg->space_id, arg->index_id,
 				    record->run_id, type);
-		if (coeio_unlink(path) < 0 && errno != ENOENT) {
+		if (coio_unlink(path) < 0 && errno != ENOENT) {
 			say_syserror("failed to delete file '%s'", path);
 			forget = false;
 		}

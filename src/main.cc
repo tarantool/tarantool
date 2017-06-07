@@ -462,7 +462,7 @@ tarantool_free(void)
 		return;
 
 	/* Shutdown worker pool. Waits until threads terminate. */
-	coeio_shutdown();
+	coio_shutdown();
 
 	box_free();
 
@@ -608,8 +608,8 @@ main(int argc, char **argv)
 	fiber_init(fiber_cxx_invoke);
 	/* Init iobuf library with default readahead */
 	iobuf_init();
-	coeio_init();
-	coeio_enable();
+	coio_init();
+	coio_enable();
 	signal_init();
 	cbus_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);

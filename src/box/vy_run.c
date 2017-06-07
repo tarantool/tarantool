@@ -906,7 +906,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 		/*
 		 * Make sure the run file descriptor won't be closed
-		 * (even worse, reopened) while a coeio thread is
+		 * (even worse, reopened) while a coio thread is
 		 * reading it.
 		 */
 		vy_slice_pin(slice);
@@ -916,7 +916,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->run_env = itr->run_env;
 		task->page = page;
 
-		/* Post task to coeio */
+		/* Post task to coio */
 		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
 		if (rc < 0)
 			return -1; /* timed out or cancelled */

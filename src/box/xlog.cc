@@ -643,7 +643,7 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
 		say_info("removing %s", filename);
 		int rc;
 		if (use_coio)
-			rc = coeio_unlink(filename);
+			rc = coio_unlink(filename);
 		else
 			rc = unlink(filename);
 		if (rc < 0 && errno != ENOENT) {
