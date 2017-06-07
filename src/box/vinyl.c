@@ -8546,8 +8546,10 @@ static struct vy_squash_queue *
 vy_squash_queue_new(void)
 {
 	struct vy_squash_queue *sq = malloc(sizeof(*sq));
-	if (sq == NULL)
+	if (sq == NULL) {
+		diag_set(OutOfMemory, sizeof(*sq), "malloc", "sq");
 		return NULL;
+	}
 	sq->fiber = NULL;
 	ipc_cond_create(&sq->cond);
 	stailq_create(&sq->queue);

@@ -106,7 +106,11 @@ vy_cache_tree_page_alloc(void *ctx)
 {
 	struct vy_env *env = (struct vy_env *)ctx;
 	(void)env;
-	return malloc(VY_CACHE_TREE_EXTENT_SIZE);
+	void *ret = malloc(VY_CACHE_TREE_EXTENT_SIZE);
+	if (ret == NULL)
+		diag_set(OutOfMemory, VY_CACHE_TREE_EXTENT_SIZE, "malloc",
+			 "ret");
+	return ret;
 }
 
 static void
