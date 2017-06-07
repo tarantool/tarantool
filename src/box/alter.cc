@@ -47,43 +47,6 @@
 #include "vclock.h" /* VCLOCK_MAX */
 #include "memtx_tuple.h"
 
-/** _space columns */
-#define ID               0
-#define UID              1
-#define NAME             2
-#define ENGINE           3
-#define FIELD_COUNT      4
-#define OPTS             5
-
-/** _index columns */
-#define INDEX_ID         1
-#define INDEX_TYPE       3
-#define INDEX_OPTS       4
-#define INDEX_PARTS      5
-/** old 1.6.5- _index columns */
-/** TODO: remove in future versions, find all 1.6.5- */
-#define INDEX_165_IS_UNIQUE 4
-#define INDEX_165_PART_COUNT 5
-#define INDEX_165_PARTS 6
-
-/** _truncate columnts */
-#define TRUNCATE_ID      0
-#define TRUNCATE_COUNT   1
-
-/** _user columns */
-#define USER_TYPE        3
-#define AUTH_MECH_LIST   4
-
-/** _priv columns */
-#define PRIV_OBJECT_TYPE 2
-#define PRIV_OBJECT_ID   3
-#define PRIV_ACCESS      4
-
-/** _func columns */
-#define FUNC_SETUID      3
-/** _func columns */
-#define FUNC_LANGUAGE    4
-
 /**
  * chap-sha1 of empty string, i.e.
  * base64_encode(sha1(sha1(""))
@@ -322,7 +285,7 @@ index_opts_decode_distance(const char *str)
 	} else {
 		tnt_raise(ClientError,
 			  ER_WRONG_INDEX_OPTIONS,
-			  INDEX_OPTS,
+			  BOX_INDEX_FIELD_OPTS,
 			  "distance must be either 'euclid' or 'manhattan'");
 	}
 	return RTREE_INDEX_DISTANCE_TYPE_EUCLID; /* unreachabe */
@@ -341,15 +304,17 @@ index_opts_create(struct index_opts *opts, const char *map)
 {
 	*opts = index_opts_default;
 	map = opts_create_from_field(opts, index_opts_reg, map,
-				     ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+				     ER_WRONG_INDEX_OPTIONS,
+				     BOX_INDEX_FIELD_OPTS);
 	if (opts->distancebuf[0] != '\0')
 		opts->distance = index_opts_decode_distance(opts->distancebuf);
 	if (opts->run_count_per_level <= 0)
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, INDEX_OPTS,
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS,
 			  "run_count_per_level must be > 0");
 	if (opts->run_size_ratio <= 1)
-		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS, INDEX_OPTS,
-			  "run_size_ratio must be > 1");
+		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS, "run_size_ratio must be > 1");
 	return map;
 }
 
@@ -373,26 +338,31 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 
 	struct index_def *index_def;
 	struct index_opts opts;
-	uint32_t id = tuple_field_u32_xc(tuple, ID);
-	uint32_t index_id = tuple_field_u32_xc(tuple, INDEX_ID);
-	enum index_type type = STR2ENUM(index_type,
-					tuple_field_cstr_xc(tuple, INDEX_TYPE));
-	const char *name = tuple_field_cstr_xc(tuple, NAME);
+	uint32_t id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_SPACE_ID);
+	uint32_t index_id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_ID);
+	enum index_type type =
+		STR2ENUM(index_type, tuple_field_cstr_xc(tuple,
+							 BOX_INDEX_FIELD_TYPE));
+	const char *name = tuple_field_cstr_xc(tuple, BOX_INDEX_FIELD_NAME);
 	uint32_t part_count;
 	const char *parts;
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
-		const char *opts_field = tuple_field(tuple, INDEX_OPTS);
+		const char *opts_field =
+			tuple_field(tuple, BOX_INDEX_FIELD_OPTS);
 		index_opts_create(&opts, opts_field);
-		parts = tuple_field(tuple, INDEX_PARTS);
+		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5- _index space structure */
 		/* TODO: remove it in newer versions, find all 1.6.5- */
 		opts = index_opts_default;
-		opts.is_unique = tuple_field_u32_xc(tuple, INDEX_165_IS_UNIQUE);
-		part_count = tuple_field_u32_xc(tuple, INDEX_165_PART_COUNT);
-		parts = tuple_field(tuple, INDEX_165_PARTS);
+		opts.is_unique =
+			tuple_field_u32_xc(tuple,
+					   BOX_INDEX_FIELD_IS_UNIQUE_165);
+		part_count = tuple_field_u32_xc(tuple,
+						BOX_INDEX_FIELD_PART_COUNT_165);
+		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS_165);
 	}
 
 	index_def = index_def_new(id, space_name(old_space), index_id, name,
@@ -427,14 +397,15 @@ space_opts_create(struct space_opts *opts, struct tuple *tuple)
 	*opts = space_opts_default;
 
 	/* there is no property in the space */
-	if (tuple_field_count(tuple) <= OPTS)
+	if (tuple_field_count(tuple) <= BOX_SPACE_FIELD_OPTS)
 		return;
 
-	const char *data = tuple_field(tuple, OPTS);
+	const char *data = tuple_field(tuple, BOX_SPACE_FIELD_OPTS);
 	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
 	if (!is_170_plus) {
 		/* Tarantool < 1.7.0 compatibility */
-		const char *flags = tuple_field_cstr_xc(tuple, OPTS);
+		const char *flags =
+			tuple_field_cstr_xc(tuple, BOX_SPACE_FIELD_OPTS);
 		while (flags && *flags) {
 			while (isspace(*flags)) /* skip space */
 				flags++;
@@ -446,7 +417,8 @@ space_opts_create(struct space_opts *opts, struct tuple *tuple)
 		}
 	} else {
 		opts_create_from_field(opts, space_opts_reg, data,
-				       ER_WRONG_SPACE_OPTIONS, OPTS);
+				       ER_WRONG_SPACE_OPTIONS,
+				       BOX_SPACE_FIELD_OPTS);
 	}
 }
 
@@ -457,13 +429,17 @@ void
 space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 			    uint32_t errcode)
 {
-	def->id = tuple_field_u32_xc(tuple, ID);
-	def->uid = tuple_field_u32_xc(tuple, UID);
-	def->exact_field_count = tuple_field_u32_xc(tuple, FIELD_COUNT);
-	int namelen = snprintf(def->name, sizeof(def->name),
-			 "%s", tuple_field_cstr_xc(tuple, NAME));
-	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
-			 "%s", tuple_field_cstr_xc(tuple, ENGINE));
+	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
+	def->uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
+	def->exact_field_count =
+		tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_FIELD_COUNT);
+	int namelen =
+		snprintf(def->name, sizeof(def->name), "%s",
+			 tuple_field_cstr_xc(tuple, BOX_SPACE_FIELD_NAME));
+	int engine_namelen =
+		snprintf(def->engine_name, sizeof(def->engine_name),
+			 "%s", tuple_field_cstr_xc(tuple,
+						   BOX_SPACE_FIELD_ENGINE));
 
 	space_opts_create(&def->opts, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
@@ -1221,8 +1197,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 * old_tuple ID field, if old_tuple is set, since UPDATE
 	 * may have changed space id.
 	 */
-	uint32_t old_id = tuple_field_u32_xc(old_tuple ?
-					  old_tuple : new_tuple, ID);
+	uint32_t old_id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
+					     BOX_SPACE_FIELD_ID);
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		struct space_def def;
@@ -1334,9 +1310,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	uint32_t id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple, ID);
+	uint32_t id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
+					 BOX_INDEX_FIELD_SPACE_ID);
 	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-				       INDEX_ID);
+					  BOX_INDEX_FIELD_ID);
 	struct space *old_space = space_cache_find(id);
 	access_check_ddl(old_space->def.uid, SC_SPACE);
 	Index *old_index = space_index(old_space, iid);
@@ -1431,8 +1408,10 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/*
 	 * Truncate counter is updated - truncate the space.
 	 */
-	uint32_t space_id = tuple_field_u32_xc(new_tuple, TRUNCATE_ID);
-	uint64_t truncate_count = tuple_field_u64_xc(new_tuple, TRUNCATE_COUNT);
+	uint32_t space_id =
+		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
+	uint64_t truncate_count =
+		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
 	struct space *old_space = space_cache_find(space_id);
 
 	struct truncate_space *truncate =
@@ -1589,11 +1568,12 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 {
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
-	user->uid = tuple_field_u32_xc(tuple, ID);
-	user->owner = tuple_field_u32_xc(tuple, UID);
-	const char *user_type = tuple_field_cstr_xc(tuple, USER_TYPE);
+	user->uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
+	user->owner = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
+	const char *user_type =
+		tuple_field_cstr_xc(tuple, BOX_USER_FIELD_TYPE);
 	user->type= schema_object_type(user_type);
-	const char *name = tuple_field_cstr_xc(tuple, NAME);
+	const char *name = tuple_field_cstr_xc(tuple, BOX_USER_FIELD_NAME);
 	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
 		tnt_raise(ClientError, ER_CREATE_USER,
@@ -1611,8 +1591,9 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */
-	if (tuple_field_count(tuple) > AUTH_MECH_LIST) {
-		const char *auth_data = tuple_field(tuple, AUTH_MECH_LIST);
+	if (tuple_field_count(tuple) > BOX_USER_FIELD_AUTH_MECH_LIST) {
+		const char *auth_data =
+			tuple_field(tuple, BOX_USER_FIELD_AUTH_MECH_LIST);
 		if (strlen(auth_data)) {
 			if (user->type == SC_ROLE)
 				tnt_raise(ClientError, ER_CREATE_ROLE,
@@ -1630,7 +1611,7 @@ user_cache_remove_user(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_last_stmt(txn);
 	uint32_t uid = tuple_field_u32_xc(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
-				       ID);
+				       BOX_USER_FIELD_ID);
 	user_cache_delete(uid);
 }
 
@@ -1656,8 +1637,8 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	uint32_t uid = tuple_field_u32_xc(old_tuple ?
-				       old_tuple : new_tuple, ID);
+	uint32_t uid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
+					  BOX_USER_FIELD_ID);
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def user;
@@ -1704,21 +1685,22 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 static void
 func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 {
-	def->fid = tuple_field_u32_xc(tuple, ID);
-	def->uid = tuple_field_u32_xc(tuple, UID);
-	const char *name = tuple_field_cstr_xc(tuple, NAME);
+	def->fid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_ID);
+	def->uid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_UID);
+	const char *name = tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(def->name)) {
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
 			  name, "function name is too long");
 	}
 	snprintf(def->name, sizeof(def->name), "%s", name);
-	if (tuple_field_count(tuple) > FUNC_SETUID)
-		def->setuid = tuple_field_u32_xc(tuple, FUNC_SETUID);
+	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
+		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
 	else
 		def->setuid = false;
-	if (tuple_field_count(tuple) > FUNC_LANGUAGE) {
-		const char *language = tuple_field_cstr_xc(tuple, FUNC_LANGUAGE);
+	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_LANGUAGE) {
+		const char *language =
+			tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_LANGUAGE);
 		def->language = STR2ENUM(func_language, language);
 		if (def->language == func_language_MAX) {
 			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
@@ -1737,7 +1719,7 @@ func_cache_remove_func(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	uint32_t fid = tuple_field_u32_xc(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
-				       ID);
+				       BOX_FUNC_FIELD_ID);
 	func_cache_delete(fid);
 }
 
@@ -1765,8 +1747,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct func_def def;
 
-	uint32_t fid = tuple_field_u32_xc(old_tuple ?
-				       old_tuple : new_tuple, ID);
+	uint32_t fid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
+					  BOX_FUNC_FIELD_ID);
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		func_def_create_from_tuple(&def, new_tuple);
@@ -1805,16 +1787,17 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 void
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 {
-	priv->grantor_id = tuple_field_u32_xc(tuple, ID);
-	priv->grantee_id = tuple_field_u32_xc(tuple, UID);
-	const char *object_type = tuple_field_cstr_xc(tuple, PRIV_OBJECT_TYPE);
-	priv->object_id = tuple_field_u32_xc(tuple, PRIV_OBJECT_ID);
+	priv->grantor_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ID);
+	priv->grantee_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_UID);
+	const char *object_type =
+		tuple_field_cstr_xc(tuple, BOX_PRIV_FIELD_OBJECT_TYPE);
+	priv->object_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_OBJECT_ID);
 	priv->object_type = schema_object_type(object_type);
 	if (priv->object_type == SC_UNKNOWN) {
 		tnt_raise(ClientError, ER_UNKNOWN_SCHEMA_OBJECT,
 			  object_type);
 	}
-	priv->access = tuple_field_u32_xc(tuple, PRIV_ACCESS);
+	priv->access = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ACCESS);
 }
 
 /*
@@ -2009,13 +1992,13 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	const char *key = tuple_field_cstr_xc(new_tuple ?
-					   new_tuple : old_tuple, 0);
+	const char *key = tuple_field_cstr_xc(new_tuple ? new_tuple : old_tuple,
+					      BOX_SCHEMA_FIELD_KEY);
 	if (strcmp(key, "cluster") == 0) {
 		if (new_tuple == NULL)
 			tnt_raise(ClientError, ER_REPLICASET_UUID_IS_RO);
 		tt_uuid uu;
-		tuple_field_uuid_xc(new_tuple, 1, &uu);
+		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu);
 		REPLICASET_UUID = uu;
 	}
 }
@@ -2035,7 +2018,8 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 
 	if (new_tuple == NULL) {
 		struct tt_uuid old_uuid;
-		tuple_field_uuid_xc(stmt->old_tuple, 1, &old_uuid);
+		tuple_field_uuid_xc(stmt->old_tuple, BOX_CLUSTER_FIELD_UUID,
+				    &old_uuid);
 		struct replica *replica = replica_by_uuid(&old_uuid);
 		assert(replica != NULL);
 		replica_clear_id(replica);
@@ -2044,9 +2028,9 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 		return; /* nothing to change */
 	}
 
-	uint32_t id = tuple_field_u32_xc(new_tuple, 0);
+	uint32_t id = tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
 	tt_uuid uuid;
-	tuple_field_uuid_xc(new_tuple, 1, &uuid);
+	tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uuid);
 	struct replica *replica = replica_by_uuid(&uuid);
 	if (replica != NULL) {
 		replica_set_id(replica, id);
@@ -2089,10 +2073,12 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) { /* Insert or replace */
 		/* Check fields */
-		uint32_t replica_id = tuple_field_u32_xc(new_tuple, 0);
+		uint32_t replica_id =
+			tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
 		replica_check_id(replica_id);
 		tt_uuid replica_uuid;
-		tuple_field_uuid_xc(new_tuple, 1, &replica_uuid);
+		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID,
+				    &replica_uuid);
 		if (tt_uuid_is_nil(&replica_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&replica_uuid));
@@ -2103,7 +2089,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			 * in sync with appliers and relays.
 			 */
 			tt_uuid old_uuid;
-			tuple_field_uuid_xc(old_tuple, 1, &old_uuid);
+			tuple_field_uuid_xc(old_tuple, BOX_CLUSTER_FIELD_UUID,
+					    &old_uuid);
 			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
@@ -2116,7 +2103,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		 * from _cluster.
 		 */
 		assert(old_tuple != NULL);
-		uint32_t replica_id = tuple_field_u32_xc(old_tuple, 0);
+		uint32_t replica_id =
+			tuple_field_u32_xc(old_tuple, BOX_CLUSTER_FIELD_ID);
 		replica_check_id(replica_id);
 	}
 

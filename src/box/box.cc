@@ -681,7 +681,7 @@ box_space_id_by_name(const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, 0, BOX_ID_NIL);
+	return box_tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, BOX_ID_NIL);
 }
 
 uint32_t
@@ -703,7 +703,7 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, 1, BOX_ID_NIL);
+	return box_tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, BOX_ID_NIL);
 }
 /** \endcond public */
 
@@ -900,7 +900,8 @@ box_on_join(const tt_uuid *instance_uuid)
 	/** Assign a new replica id. */
 	uint32_t replica_id = 1;
 	while ((tuple = it->next(it))) {
-		if (tuple_field_u32_xc(tuple, 0) != replica_id)
+		if (tuple_field_u32_xc(tuple,
+				       BOX_CLUSTER_FIELD_ID) != replica_id)
 			break;
 		replica_id++;
 	}

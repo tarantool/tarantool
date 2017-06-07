@@ -118,7 +118,8 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			/* Get space id, primary key, field 0. */
-			uint32_t id = tuple_field_u32_xc(tuple, 0);
+			uint32_t id =
+				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
 			space = space_cache_find(id);
 			if (! space_is_system(space))
 				break;
