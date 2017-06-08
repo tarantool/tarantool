@@ -1,6 +1,6 @@
 -- crypto.lua (internal file)
 
-local ffi = require 'ffi'
+local ffi = require('ffi')
 local buffer = require('buffer')
 
 ffi.cdef[[
@@ -354,6 +354,12 @@ for class, digest in pairs(hmacs) do
             return res
         end
     })
+    hmac_api[class .. '_hex'] = function (key, str)
+        if type(str) ~= 'string' then
+            error("Usage: hmac."..class.."_hex(key, string)")
+        end
+        return string.hex(hmac_api[class](key, str))
+    end
 end
 
 hmac_api = setmetatable(hmac_api,

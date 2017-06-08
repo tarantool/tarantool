@@ -1,6 +1,6 @@
 -- digest.lua (internal file)
 
-local ffi = require 'ffi'
+local ffi = require('ffi')
 local crypto = require('crypto')
 
 ffi.cdef[[
@@ -38,16 +38,6 @@ local digest_shortcuts = {
     md5     = 'MD5',
     md4     = 'MD4',
 }
-
-local hexres = ffi.new('char[129]')
-
-local function str_to_hex(r)
-    for i = 0, r:len() - 1 do
-        ffi.C.snprintf(hexres + i * 2, 3, "%02x",
-            ffi.cast('unsigned char', r:byte(i + 1)))
-    end
-    return ffi.string(hexres, r:len() * 2)
-end
 
 local PMurHash
 local PMurHash_methods = {
@@ -190,7 +180,7 @@ local m = {
             error("Usage: digest.sha1_hex(string)")
         end
         local r = ffi.C.SHA1internal(str, #str, nil)
-        return str_to_hex(ffi.string(r, 20))
+        return string.hex(ffi.string(r, 20))
     end,
 
     guava = function(state, buckets)
@@ -217,7 +207,7 @@ for digest, name in pairs(digest_shortcuts) do
         if type(str) ~= 'string' then
             error('Usage: digest.'..digest..'_hex(string)')
         end
-        return str_to_hex(crypto.digest[digest](str))
+        return string.hex(crypto.digest[digest](str))
     end
 end
 

@@ -278,6 +278,20 @@ local function string_endswith(inp, tail, _start, _end)
     return memcmp(c_char_ptr(inp) + _start, c_char_ptr(tail), tail_len) == 0
 end
 
+local function string_hex(inp)
+    if type(inp) ~= 'string' then
+        error(err_string_arg:format(1, 'string.hex', 'string', type(inp)), 2)
+    end
+    local len = inp:len() * 2
+    local res = ffi.new('char[?]', len + 1)
+
+    local uinp = ffi.cast('const unsigned char *', inp)
+    for i = 0, inp:len() - 1 do
+        ffi.C.snprintf(res + i * 2, 3, "%02x", ffi.cast('unsigned', uinp[i]))
+    end
+    return ffi.string(res, len)
+end
+
 -- It'll automatically set string methods, too.
 local string = require('string')
 string.split      = string_split
@@ -286,3 +300,4 @@ string.rjust      = string_rjust
 string.center     = string_center
 string.startswith = string_startswith
 string.endswith   = string_endswith
+string.hex        = string_hex
