@@ -78,6 +78,7 @@ enum vy_log_key {
 	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_DUMP_LSN		= 9,
 	VY_LOG_KEY_GC_LSN		= 10,
+	VY_LOG_KEY_TRUNCATE_COUNT	= 11,
 };
 
 /** vy_log_key -> human readable name. */
@@ -93,6 +94,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
 	[VY_LOG_KEY_GC_LSN]		= "gc_lsn",
+	[VY_LOG_KEY_TRUNCATE_COUNT]	= "truncate_count",
 };
 
 /** vy_log_type -> human readable name. */
@@ -109,6 +111,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DELETE_SLICE]		= "delete_slice",
 	[VY_LOG_DUMP_INDEX]		= "dump_index",
 	[VY_LOG_SNAPSHOT]		= "snapshot",
+	[VY_LOG_TRUNCATE_INDEX]		= "truncate_index",
 };
 
 struct vy_recovery;
@@ -192,6 +195,8 @@ struct vy_index_recovery_info {
 	bool is_dropped;
 	/** LSN of the last index dump. */
 	int64_t dump_lsn;
+	/** Truncate count. */
+	int64_t truncate_count;
 	/**
 	 * List of all ranges in the index, linked by
 	 * vy_range_recovery_info::in_index.
@@ -336,6 +341,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_GC_LSN],
 			record->gc_lsn);
+	if (record->truncate_count > 0)
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_TRUNCATE_COUNT],
+			record->truncate_count);
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -441,6 +450,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->gc_lsn);
 		n_keys++;
 	}
+	if (record->truncate_count > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_TRUNCATE_COUNT);
+		size += mp_sizeof_uint(record->truncate_count);
+		n_keys++;
+	}
 	size += mp_sizeof_map(n_keys);
 
 	/*
@@ -505,6 +519,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (record->gc_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_GC_LSN);
 		pos = mp_encode_uint(pos, record->gc_lsn);
+	}
+	if (record->truncate_count > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_TRUNCATE_COUNT);
+		pos = mp_encode_uint(pos, record->truncate_count);
 	}
 	assert(pos == tuple + size);
 
@@ -621,6 +639,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_GC_LSN:
 			record->gc_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_LOG_KEY_TRUNCATE_COUNT:
+			record->truncate_count = mp_decode_uint(&pos);
 			break;
 		default:
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
@@ -1234,6 +1255,7 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 	memcpy(index->key_def, key_def, key_def_sizeof(key_def->part_count));
 	index->is_dropped = false;
 	index->dump_lsn = -1;
+	index->truncate_count = 0;
 	rlist_create(&index->ranges);
 	rlist_create(&index->runs);
 	return 0;
@@ -1306,6 +1328,33 @@ vy_recovery_dump_index(struct vy_recovery *recovery,
 		return -1;
 	}
 	index->dump_lsn = dump_lsn;
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_TRUNCATE_INDEX log record.
+ * This function updates truncate_count of the index with ID @index_lsn.
+ * Returns 0 on success, -1 if ID not found or index is dropped.
+ */
+static int
+vy_recovery_truncate_index(struct vy_recovery *recovery,
+			   int64_t index_lsn, int64_t truncate_count)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_lsn);
+	if (index == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Truncation of unregistered index %lld",
+				    (long long)index_lsn));
+		return -1;
+	}
+	if (index->is_dropped) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Truncation of deleted index %lld",
+				    (long long)index_lsn));
+		return -1;
+	}
+	index->truncate_count = truncate_count;
 	return 0;
 }
 
@@ -1750,6 +1799,10 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_dump_index(recovery, record->index_lsn,
 					    record->dump_lsn);
 		break;
+	case VY_LOG_TRUNCATE_INDEX:
+		rc = vy_recovery_truncate_index(recovery, record->index_lsn,
+						record->truncate_count);
+		break;
 	default:
 		unreachable();
 	}
@@ -1911,6 +1964,15 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 	record.key_def = index->key_def;
 	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;
+
+	if (index->truncate_count > 0) {
+		vy_log_record_init(&record);
+		record.type = VY_LOG_TRUNCATE_INDEX;
+		record.index_lsn = index->index_lsn;
+		record.truncate_count = index->truncate_count;
+		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			return -1;
+	}
 
 	if (!include_deleted && index->is_dropped) {
 		/*

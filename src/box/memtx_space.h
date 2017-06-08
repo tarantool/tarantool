@@ -86,6 +86,10 @@ struct MemtxSpace: public Handler {
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index) override;
+	virtual void prepareTruncateSpace(struct space *old_space,
+					  struct space *new_space) override;
+	virtual void commitTruncateSpace(struct space *old_space,
+					 struct space *new_space) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
 	virtual void initSystemSpace(struct space *space) override;

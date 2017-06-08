@@ -695,20 +695,6 @@ space_def_check(struct space_def *def, uint32_t namelen,
                 int32_t errcode);
 
 /**
- * Given a tuple with an index definition, update the LSN stored
- * in the index options.
- *
- * @return a tuple with updated lsn in key def. The returned tuple
- *         is blessed (referenced by box_tuple_bless()).
- *
- * Throws an exception if error.
- *
- * @note Implemented in alter.cc
- */
-extern struct tuple *
-index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
-
-/**
  * Check object identifier for invalid symbols.
  * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
  * Result is locale-dependent.

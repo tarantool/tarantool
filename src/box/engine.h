@@ -238,6 +238,23 @@ public:
 				       struct space *new_space,
 				       Index *new_index);
 	/**
+	 * Notify the enigne about upcoming space truncation
+	 * so that it can prepare new_space object.
+	 */
+	virtual void prepareTruncateSpace(struct space *old_space,
+					  struct space *new_space);
+	/**
+	 * Commit space truncation. Called after space truncate
+	 * record was written to WAL hence must not fail.
+	 *
+	 * The old_space is the space that was replaced with the
+	 * new_space as a result of truncation. The callback is
+	 * supposed to release resources associated with the
+	 * old_space and commit the new_space.
+	 */
+	virtual void commitTruncateSpace(struct space *old_space,
+					 struct space *new_space);
+	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space'
 	 * object.

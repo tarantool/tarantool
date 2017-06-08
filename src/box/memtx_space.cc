@@ -706,6 +706,24 @@ MemtxSpace::buildSecondaryKey(struct space *old_space,
 }
 
 void
+MemtxSpace::prepareTruncateSpace(struct space *old_space,
+				 struct space *new_space)
+{
+	(void)new_space;
+	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
+	replace = handler->replace;
+}
+
+void
+MemtxSpace::commitTruncateSpace(struct space *old_space,
+				struct space *new_space)
+{
+	(void)new_space;
+	struct MemtxIndex *index = (MemtxIndex *) space_index(old_space, 0);
+	if (index != NULL)
+		index->truncate();
+}
+void
 MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
 	(void)new_space;

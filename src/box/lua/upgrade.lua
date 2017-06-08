@@ -65,6 +65,7 @@ local function erase()
     truncate(box.space._user)
     truncate(box.space._func)
     truncate(box.space._priv)
+    truncate(box.space._truncate)
     --truncate(box.space._schema)
     box.space._schema:delete('version')
     box.space._schema:delete('max_id')
@@ -534,6 +535,36 @@ local function upgrade_to_1_7_2()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 1.7.4
+--------------------------------------------------------------------------------
+
+local function create_truncate_space()
+    local _truncate = box.space[box.schema.TRUNCATE_ID]
+
+    log.info("create space _truncate")
+    box.space._space:insert{_truncate.id, ADMIN, '_truncate', 'memtx', 0, setmap({}),
+                            {{name = 'id', type = 'num'}, {name = 'count', type = 'num'}}}
+
+    log.info("create index primary on _truncate")
+    box.space._index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+
+    for _, def in box.space._space:pairs() do
+        _truncate:insert{def[1], 0}
+    end
+end
+
+local function upgrade_to_1_7_4()
+    if VERSION_ID >= version_id(1, 7, 4) then
+        return
+    end
+
+    create_truncate_space()
+
+    log.info("set schema version to 1.7.4")
+    box.space._schema:replace({'version', 1, 7, 4})
+end
+
+--------------------------------------------------------------------------------
 
 local function upgrade()
     box.cfg{}
@@ -549,6 +580,7 @@ local function upgrade()
     upgrade_to_1_6_8()
     upgrade_to_1_7_1()
     upgrade_to_1_7_2()
+    upgrade_to_1_7_4()
 end
 
 local function bootstrap()

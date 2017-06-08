@@ -177,7 +177,6 @@ Handler::executeUpsert(struct txn *, struct space *, struct request *)
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
 }
 
-
 void
 Handler::executeSelect(struct txn *, struct space *space,
 		       uint32_t index_id, uint32_t iterator,
@@ -247,6 +246,16 @@ void
 Handler::buildSecondaryKey(struct space *, struct space *, Index *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "buildSecondaryKey");
+}
+
+void
+Handler::prepareTruncateSpace(struct space *, struct space *)
+{
+}
+
+void
+Handler::commitTruncateSpace(struct space *, struct space *)
+{
 }
 
 void

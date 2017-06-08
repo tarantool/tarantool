@@ -824,71 +824,31 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	return box_process1(request, result);
 }
 
+/**
+ * Trigger space truncation by bumping a counter
+ * in _truncate space.
+ */
 static void
 space_truncate(struct space *space)
 {
-	if (!space_index(space, 0)) {
-		/* empty space without indexes, nothing to truncate */
-		return;
-	}
+	char key_buf[16];
+	char *key_buf_end = key_buf;
+	key_buf_end = mp_encode_array(key_buf_end, 1);
+	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+	assert(key_buf_end < key_buf + sizeof(key_buf));
 
-	char key_buf[20];
-	char *key_buf_end;
-	key_buf_end = mp_encode_uint(key_buf, space_id(space));
-	assert(key_buf_end <= key_buf + sizeof(key_buf));
+	char ops_buf[128];
+	char *ops_buf_end = ops_buf;
+	ops_buf_end = mp_encode_array(ops_buf_end, 1);
+	ops_buf_end = mp_encode_array(ops_buf_end, 3);
+	ops_buf_end = mp_encode_str(ops_buf_end, "+", 1);
+	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
+	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
+	assert(ops_buf_end < ops_buf + sizeof(ops_buf));
 
-	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
-	struct space *space_index = space_cache_find(BOX_INDEX_ID);
-	Index *index = index_find_xc(space_index, 0);
-	struct iterator *it = index->allocIterator();
-	auto guard_it_free = make_scoped_guard([=]{
-		it->free(it);
-	});
-	index->initIterator(it, ITER_EQ, key_buf, 1);
-	int index_count = 0;
-	struct tuple *indexes[BOX_INDEX_MAX] = { NULL };
-	struct tuple *tuple;
-
-	/* select all indexes of given space */
-	auto guard_indexes_unref = make_scoped_guard([=]{
-		for (int i = 0; i < index_count; i++)
-			tuple_unref(indexes[i]);
-	});
-	while ((tuple = it->next(it)) != NULL) {
-		tuple_ref_xc(tuple);
-		indexes[index_count++] = tuple;
-	}
-	assert(index_count <= BOX_INDEX_MAX);
-
-	/* box_delete() invalidates space pointer */
-	uint32_t x_space_id = space_id(space);
-	space = NULL;
-
-	/* drop all selected indexes */
-	for (int i = index_count - 1; i >= 0; --i) {
-		uint32_t index_id = tuple_field_u32_xc(indexes[i], 1);
-		key_buf_end = mp_encode_array(key_buf, 2);
-		key_buf_end = mp_encode_uint(key_buf_end, x_space_id);
-		key_buf_end = mp_encode_uint(key_buf_end, index_id);
-		assert(key_buf_end <= key_buf + sizeof(key_buf));
-		if (box_delete(BOX_INDEX_ID, 0, key_buf, key_buf_end, NULL))
-			diag_raise();
-	}
-
-	/* create all indexes again, now they are empty */
-	for (int i = 0; i < index_count; i++) {
-		int64_t lsn = vclock_sum(&replicaset_vclock);
-		/*
-		 * The returned tuple is blessed and will be
-		 * collected automatically.
-		 */
-		tuple = index_def_tuple_update_lsn(indexes[i], lsn);
-		TupleRefNil ref(tuple);
-		uint32_t bsize;
-		const char *data = tuple_data_range(tuple, &bsize);
-		if (box_insert(BOX_INDEX_ID, data, data + bsize, NULL))
-			diag_raise();
-	}
+	if (box_update(BOX_TRUNCATE_ID, 0, key_buf, key_buf_end,
+		       ops_buf, ops_buf_end, 0, NULL) != 0)
+		diag_raise();
 }
 
 int

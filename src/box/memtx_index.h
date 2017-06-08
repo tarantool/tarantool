@@ -42,7 +42,13 @@ public:
 			m_position->free(m_position);
 	}
 
-	virtual void commitDrop() override;
+	/** Delete all tuples in the index. */
+	void truncate();
+
+	virtual void commitDrop() override
+	{
+		truncate();
+	}
 
 	virtual struct tuple *min(const char *key,
 				  uint32_t part_count) const override;

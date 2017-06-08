@@ -286,6 +286,10 @@ box.schema.space.create = function(name, options)
     }, { __serialize = 'map' })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
+
+    local _truncate = box.space[box.schema.TRUNCATE_ID]
+    _truncate:insert{id, 0}
+
     return box.space[id], "created"
 end
 
@@ -311,6 +315,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
+    local _truncate = box.space[box.schema.TRUNCATE_ID]
     local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
@@ -328,6 +333,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
             box.error(box.error.NO_SUCH_SPACE, space_name)
         end
     end
+    _truncate:delete{space_id}
 end
 
 box.schema.space.rename = function(space_id, space_name)

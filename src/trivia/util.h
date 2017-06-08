@@ -56,6 +56,12 @@ extern "C" {
 # define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+#define SWAP(a, b) do {							\
+	typeof(a) tmp = (a);						\
+	(a) = (b);							\
+	(b) = tmp;							\
+} while (0)
+
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
 /* Macros to define enum and corresponding strings. */

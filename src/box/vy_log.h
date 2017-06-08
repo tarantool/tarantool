@@ -150,6 +150,11 @@ enum vy_log_record_type {
 	 * See also: @only_snapshot argument of vy_recovery_new().
 	 */
 	VY_LOG_SNAPSHOT			= 11,
+	/**
+	 * Update truncate count of a vinyl index.
+	 * Requires vy_log_record::index_lsn, truncate_count.
+	 */
+	VY_LOG_TRUNCATE_INDEX		= 12,
 
 	vy_log_record_type_MAX
 };
@@ -195,6 +200,8 @@ struct vy_log_record {
 	 * that uses this run.
 	 */
 	int64_t gc_lsn;
+	/** Index truncate count. */
+	int64_t truncate_count;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
 };
@@ -534,6 +541,7 @@ vy_log_delete_slice(int64_t slice_id)
 	vy_log_write(&record);
 }
 
+/** Helper to log index dump. */
 static inline void
 vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
 {
@@ -542,6 +550,18 @@ vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
 	record.type = VY_LOG_DUMP_INDEX;
 	record.index_lsn = index_lsn;
 	record.dump_lsn = dump_lsn;
+	vy_log_write(&record);
+}
+
+/** Helper to log index truncation. */
+static inline void
+vy_log_truncate_index(int64_t index_lsn, int64_t truncate_count)
+{
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_TRUNCATE_INDEX;
+	record.index_lsn = index_lsn;
+	record.truncate_count = truncate_count;
 	vy_log_write(&record);
 }
 

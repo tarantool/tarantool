@@ -219,18 +219,6 @@ space:drop()
 
 -- data dictionary compatibility is checked by upgrade.test.lua
 
--- ------------------------------------------------------------------
--- gh-1966 Index lsn does not get updated on space truncate
--- ------------------------------------------------------------------
-
-space = box.schema.space.create('test')
-_ = space:create_index('primary', { parts = {1, 'unsigned'} })
-lsn = box.space._index:select{box.space.test.id, 0}[1][5].lsn
-space:truncate()
-indexes = box.space._index:select{space.id}
-lsn < box.space._index:select{box.space.test.id, 0}[1][5].lsn
-space:drop()
-
 test_run:cmd("clear filter")
 --
 -- create_index() does not modify index options

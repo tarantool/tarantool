@@ -57,15 +57,18 @@ struct VinylSpace: public Handler {
 	virtual void buildSecondaryKey(struct space *old_space,
 				       struct space *new_space,
 				       Index *new_index) override;
+	virtual void prepareTruncateSpace(struct space *old_space,
+					  struct space *new_space) override;
+	virtual void commitTruncateSpace(struct space *old_space,
+					 struct space *new_space) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
 	/**
 	 * If space was altered then this method updates
 	 * pointers to the primary index in all secondary ones.
 	 */
-	virtual void
-	commitAlterSpace(struct space *old_space, struct space *new_space)
-		override;
+	virtual void commitAlterSpace(struct space *old_space,
+				      struct space *new_space) override;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_SPACE_H_INCLUDED */

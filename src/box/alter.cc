@@ -66,6 +66,10 @@
 #define INDEX_165_PART_COUNT 5
 #define INDEX_165_PARTS 6
 
+/** _truncate columnts */
+#define TRUNCATE_ID      0
+#define TRUNCATE_COUNT   1
+
 /** _user columns */
 #define USER_TYPE        3
 #define AUTH_MECH_LIST   4
@@ -410,127 +414,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	old_space->handler->checkIndexDef(old_space, index_def);
 	scoped_guard.is_active = false;
 	return index_def;
-}
-
-static char *
-opt_encode(char *data, char *data_end, const void *opts,
-	   const void *default_opts, const struct opt_def *def)
-{
-	int64_t ival;
-	double dval;
-	const char *opt = ((const char *) opts) + def->offset;
-	const char *default_opt = ((const char *) default_opts) + def->offset;
-	if (memcmp(opt, default_opt, def->len) == 0)
-		return data;
-	uint32_t optlen = strlen(def->name);
-	if (data + mp_sizeof_str(optlen) > data_end)
-		return data_end;
-	data = mp_encode_str(data, def->name, optlen);
-	switch (def->type) {
-	case OPT_BOOL:
-		if (data + mp_sizeof_bool(true) > data_end)
-			return data_end;
-		data = mp_encode_bool(data, load_bool(opt));
-		break;
-	case OPT_INT:
-		ival = load_u64(opt);
-		if ((ival < 0 && data + mp_sizeof_int(ival) > data_end) ||
-		    (ival >= 0 && data + mp_sizeof_uint(ival) > data_end))
-			return data_end;
-		if (ival < 0)
-			data = mp_encode_int(data, ival);
-		else
-			data = mp_encode_uint(data, ival);
-		break;
-	case OPT_FLOAT:
-		dval = load_double(opt);
-		if (data + mp_sizeof_double(dval) > data_end)
-			return data_end;
-		data = mp_encode_double(data, dval);
-		break;
-	case OPT_STR:
-		optlen = strlen(opt);
-		if (data + mp_sizeof_str(optlen) > data_end)
-			return data_end;
-		data = mp_encode_str(data, opt, optlen);
-		break;
-	default:
-		unreachable();
-	}
-	return data;
-}
-
-static char *
-opts_encode(char *data, char *data_end, const void *opts,
-	    const void *default_opts, const struct opt_def *reg)
-{
-	char *p = data;
-	uint32_t n_opts = 0;
-	for (const struct opt_def *def = reg; def->name != NULL; def++) {
-		char *end = opt_encode(p, data_end, opts, default_opts, def);
-		if (end == data_end)
-			return end;
-		if (p != end) {
-			p = end;
-			n_opts++;
-		}
-	}
-	ptrdiff_t len = p - data;
-	if (data + mp_sizeof_map(n_opts) > data_end)
-		return data_end;
-	memmove(data + mp_sizeof_map(n_opts), data, len);
-	data = mp_encode_map(data, n_opts);
-	data += len;
-	return data;
-}
-
-
-/**
- * Encode options index_opts into msgpack stream.
- * @pre output buffer is reserved to contain enough space for the
- * output.
- *
- * @return a pointer to the end of the stream.
- */
-static char *
-index_opts_encode(char *data, char *data_end, const struct index_opts *opts)
-{
-	return opts_encode(data, data_end, opts, &index_opts_default,
-			   index_opts_reg);
-}
-
-struct tuple *
-index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn)
-{
-	bool is_166plus;
-	index_def_check_tuple(tuple, &is_166plus);
-	if (!is_166plus)
-		return tuple;
-	struct index_opts opts;
-	const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-	const char *opts_field_end = index_opts_create(&opts, opts_field);
-	opts.lsn = lsn;
-	size_t size = (opts_field_end - opts_field) + 64;
-	char *buf = (char *)malloc(size);
-	if (buf == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "buf");
-	char *buf_end = buf;
-	buf_end = mp_encode_array(buf_end, 2);
-	buf_end = mp_encode_array(buf_end, 3);
-	buf_end = mp_encode_str(buf_end, "#", 1);
-	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
-	buf_end = mp_encode_uint(buf_end, 1);
-	buf_end = mp_encode_array(buf_end, 3);
-	buf_end = mp_encode_str(buf_end, "!", 1);
-	buf_end = mp_encode_uint(buf_end, INDEX_OPTS + 1);
-	buf_end = index_opts_encode(buf_end, buf + size, &opts);
-	/* No check of return value: buf is checked by box_tuple_update */
-	assert(buf_end < buf + size);
-	tuple = box_tuple_update(tuple, buf, buf_end);
-	free(buf);
-	if (tuple == NULL)
-		diag_raise();
-	return tuple;
 }
 
 /**
@@ -1444,6 +1327,120 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	scoped_guard.is_active = false;
 }
 
+/* {{{ space truncate */
+
+struct truncate_space {
+	/** Space being truncated. */
+	struct space *old_space;
+	/** Space created as a result of truncation. */
+	struct space *new_space;
+	/** Trigger executed to commit truncation. */
+	struct trigger on_commit;
+	/** Trigger executed to rollback truncation. */
+	struct trigger on_rollback;
+};
+
+/**
+ * Call the engine specific method to commit truncation
+ * and delete the old space.
+ */
+static void
+truncate_space_commit(struct trigger *trigger, void * /* event */)
+{
+	struct truncate_space *truncate =
+		(struct truncate_space *) trigger->data;
+	truncate->new_space->handler->commitTruncateSpace(truncate->old_space,
+							  truncate->new_space);
+	space_delete(truncate->old_space);
+}
+
+/**
+ * Move the old space back to the cache and delete
+ * the new space.
+ */
+static void
+truncate_space_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct truncate_space *truncate =
+		(struct truncate_space *) trigger->data;
+	if (space_cache_replace(truncate->old_space) != truncate->new_space)
+		unreachable();
+	space_delete(truncate->new_space);
+}
+
+/**
+ * A trigger invoked on replace in space _truncate.
+ *
+ * In a nutshell, we truncate a space by replacing it with
+ * a new empty space with the same definition and indexes.
+ * Note, although we instantiate the new space before WAL
+ * write, we don't propagate changes to the old space in
+ * case a WAL write error happens and we have to rollback.
+ * This is OK, because a WAL write error implies cascading
+ * rollback of all transactions following this one.
+ */
+static void
+on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	if (old_tuple == NULL || new_tuple == NULL) {
+		/* Space create or drop. */
+		return;
+	}
+
+	/*
+	 * Truncate counter is updated - truncate the space.
+	 */
+	uint32_t space_id = tuple_field_u32_xc(new_tuple, TRUNCATE_ID);
+	uint64_t truncate_count = tuple_field_u64_xc(new_tuple, TRUNCATE_COUNT);
+	struct space *old_space = space_cache_find(space_id);
+
+	struct truncate_space *truncate =
+		region_calloc_object_xc(&fiber()->gc, struct truncate_space);
+
+	/* Create an empty copy of the old space. */
+	struct rlist key_list;
+	space_dump_def(old_space, &key_list);
+	struct space *new_space = space_new(&old_space->def, &key_list);
+	new_space->truncate_count = truncate_count;
+	auto guard = make_scoped_guard([=] { space_delete(new_space); });
+
+	/* Notify the engine about upcoming space truncation. */
+	new_space->handler->prepareTruncateSpace(old_space, new_space);
+
+	guard.is_active = false;
+
+	/*
+	 * Replace the old space with the new one in the space
+	 * cache. Requests processed after this point will see
+	 * the space as truncated.
+	 */
+	if (space_cache_replace(new_space) != old_space)
+		unreachable();
+
+	/*
+	 * Register the trigger that will commit or rollback
+	 * truncation depending on whether WAL write succeeds
+	 * or fails.
+	 */
+	truncate->old_space = old_space;
+	truncate->new_space = new_space;
+
+	trigger_create(&truncate->on_commit,
+		       truncate_space_commit, truncate, NULL);
+	txn_on_commit(txn, &truncate->on_commit);
+
+	trigger_create(&truncate->on_rollback,
+		       truncate_space_rollback, truncate, NULL);
+	txn_on_rollback(txn, &truncate->on_rollback);
+}
+
+/* }}} */
+
 /* {{{ access control */
 
 /** True if the space has records identified by key 'uid'
@@ -2124,6 +2121,10 @@ struct trigger alter_space_on_replace_space = {
 
 struct trigger alter_space_on_replace_index = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_index, NULL, NULL
+};
+
+struct trigger on_replace_truncate = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_truncate, NULL, NULL
 };
 
 struct trigger on_replace_schema = {

@@ -72,6 +72,12 @@ struct space {
 	uint32_t index_id_max;
 	/** Space meta. */
 	struct space_def def;
+	/**
+	 * Number of times the space has been truncated.
+	 * Updating this counter via _truncate space triggers
+	 * space truncation.
+	 */
+	uint64_t truncate_count;
 	/** Enable/disable triggers. */
 	bool run_triggers;
 

@@ -254,15 +254,14 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", {false}
+		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", space_opts_default
 	};
-	struct index_opts opts = index_opts_default;
 	struct index_def *index_def = index_def_new(def.id,
 						    "_schema",
 						    0 /* index id */,
 						    "primary", /* name */
 						    TREE /* index type */,
-						    &opts,
+						    &index_opts_default,
 						    1); /* part count */
 	if (index_def == NULL)
 		diag_raise();
@@ -279,6 +278,11 @@ schema_init()
 
 	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space,
 			    &on_stmt_begin_space);
+
+	/* _truncate - auxiliary space for triggering space truncation. */
+	index_def->space_id = def.id = BOX_TRUNCATE_ID;
+	snprintf(def.name, sizeof(def.name), "_truncate");
+	(void) sc_space_new(&def, index_def, &on_replace_truncate);
 
 	/* _user - all existing users */
 	index_def->space_id = def.id = BOX_USER_ID;
@@ -313,7 +317,7 @@ schema_init()
 				  0 /* index id */,
 				  "primary",
 				  TREE /* index type */,
-				  &opts,
+				  &index_opts_default,
 				  2); /* part count */
 	if (index_def == NULL)
 		diag_raise();
