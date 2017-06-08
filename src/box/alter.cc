@@ -1291,9 +1291,6 @@ on_drop_space(struct trigger * /* trigger */, void *event)
 static void
 on_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
-	latch_lock(&schema_lock);
-	auto lock_guard = make_scoped_guard([&]{ latch_unlock(&schema_lock); });
-
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _space");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -1413,9 +1410,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 static void
 on_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
-	latch_lock(&schema_lock);
-	auto lock_guard = make_scoped_guard([&]{ latch_unlock(&schema_lock); });
-
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _index");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -2100,6 +2094,30 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 
 /* }}} cluster configuration */
 
+static void
+unlock_after_dd(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	(void) event;
+	latch_unlock(&schema_lock);
+}
+
+static void
+lock_before_dd(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	if (fiber() == latch_owner(&schema_lock))
+		return;
+	struct txn *txn = (struct txn *)event;
+	latch_lock(&schema_lock);
+	struct trigger *on_commit =
+		txn_alter_trigger_new(unlock_after_dd, NULL);
+	txn_on_commit(txn, on_commit);
+	struct trigger *on_rollback =
+		txn_alter_trigger_new(unlock_after_dd, NULL);
+	txn_on_rollback(txn, on_rollback);
+}
+
 struct trigger alter_space_on_replace_space = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
 };
@@ -2126,6 +2144,14 @@ struct trigger on_replace_priv = {
 
 struct trigger on_replace_cluster = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_cluster, NULL, NULL
+};
+
+struct trigger on_stmt_begin_space = {
+	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
+};
+
+struct trigger on_stmt_begin_index = {
+	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */
