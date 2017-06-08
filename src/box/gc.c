@@ -149,8 +149,7 @@ void
 gc_run(void)
 {
 	int checkpoint_count = gc.checkpoint_count;
-	if (checkpoint_count <= 0)
-		return; /* gc disabled */
+	assert(checkpoint_count > 0);
 
 	/* Look up the consumer that uses the oldest snapshot. */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);

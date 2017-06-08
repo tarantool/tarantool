@@ -70,8 +70,10 @@ box.cfg{ checkpoint_interval = 15, checkpoint_count = 20 }
 daemon.checkpoint_interval == 15
 daemon.checkpoint_count = 20
 
--- stop daemon
+-- Check that checkpoint_count can't be < 1.
+box.cfg{ checkpoint_count = 1 }
 box.cfg{ checkpoint_count = 0 }
+box.cfg.checkpoint_count
 
 -- Start
 PERIOD = 3600

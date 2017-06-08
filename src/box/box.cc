@@ -391,6 +391,15 @@ box_check_readahead(int readahead)
 	}
 }
 
+static void
+box_check_checkpoint_count(int checkpoint_count)
+{
+	if (checkpoint_count < 1) {
+		tnt_raise(ClientError, ER_CFG, "checkpoint_count",
+			  "the value must not be less than one");
+	}
+}
+
 static int64_t
 box_check_wal_max_rows(int64_t wal_max_rows)
 {
@@ -420,6 +429,7 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
 	box_check_readahead(cfg_geti("readahead"));
+	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
@@ -562,6 +572,7 @@ void
 box_set_checkpoint_count(void)
 {
 	int checkpoint_count = cfg_geti("checkpoint_count");
+	box_check_checkpoint_count(checkpoint_count);
 	gc_set_checkpoint_count(checkpoint_count);
 }
 
