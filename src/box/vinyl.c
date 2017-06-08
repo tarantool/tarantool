@@ -506,7 +506,7 @@ struct vy_index {
 	 * Tree of all ranges of this index, linked by
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
-	vy_range_tree_t tree;
+	vy_range_tree_t *tree;
 	/**
 	 * List of all runs created for this index,
 	 * linked by vy_run->in_index.
@@ -1683,9 +1683,9 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	if (curr == NULL) {
 		/* First iteration */
 		if (unlikely(index->range_count == 1))
-			next = vy_range_tree_first(&index->tree);
+			next = vy_range_tree_first(index->tree);
 		else
-			next = vy_range_tree_find_by_key(&index->tree,
+			next = vy_range_tree_find_by_key(index->tree,
 							 itr->iterator_type,
 							 itr->key, key_def);
 		goto out;
@@ -1693,18 +1693,18 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	switch (itr->iterator_type) {
 	case ITER_LT:
 	case ITER_LE:
-		next = vy_range_tree_prev(&index->tree, curr);
+		next = vy_range_tree_prev(index->tree, curr);
 		break;
 	case ITER_GT:
 	case ITER_GE:
-		next = vy_range_tree_next(&index->tree, curr);
+		next = vy_range_tree_next(index->tree, curr);
 		break;
 	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_key(itr->key, curr->end,
 					     key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
-			next = vy_range_tree_next(&index->tree, curr);
+			next = vy_range_tree_next(index->tree, curr);
 		} else {
 			next = NULL;
 		}
@@ -1727,7 +1727,7 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 			  struct vy_range **result)
 {
 	struct vy_index *index = itr->index;
-	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
+	struct vy_range *curr = vy_range_tree_find_by_key(index->tree,
 				itr->iterator_type,
 				last_stmt != NULL ? last_stmt : itr->key,
 				index->key_def);
@@ -1737,14 +1737,14 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	vy_range_tree_insert(&index->tree, range);
+	vy_range_tree_insert(index->tree, range);
 	index->range_count++;
 }
 
 static void
 vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
-	vy_range_tree_remove(&index->tree, range);
+	vy_range_tree_remove(index->tree, range);
 	index->range_count--;
 }
 
@@ -2155,17 +2155,17 @@ vy_range_needs_coalesce(struct vy_range *range,
 	assert(!vy_range_is_scheduled(range));
 
 	*p_first = *p_last = range;
-	for (it = vy_range_tree_next(&index->tree, range);
+	for (it = vy_range_tree_next(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_next(&index->tree, it)) {
+	     it = vy_range_tree_next(index->tree, it)) {
 		if (total_size + it->size > max_size)
 			break;
 		total_size += it->size;
 		*p_last = it;
 	}
-	for (it = vy_range_tree_prev(&index->tree, range);
+	for (it = vy_range_tree_prev(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_prev(&index->tree, it)) {
+	     it = vy_range_tree_prev(index->tree, it)) {
 		if (total_size + it->size > max_size)
 			break;
 		total_size += it->size;
@@ -2201,7 +2201,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 		goto fail_range;
 
 	struct vy_range *it;
-	struct vy_range *end = vy_range_tree_next(&index->tree, last);
+	struct vy_range *end = vy_range_tree_next(index->tree, last);
 
 	/*
 	 * Log change in metadata.
@@ -2210,7 +2210,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	vy_log_insert_range(index->opts.lsn, result->id,
 			    tuple_data_or_null(result->begin),
 			    tuple_data_or_null(result->end));
-	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
+	for (it = first; it != end; it = vy_range_tree_next(index->tree, it)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &it->slices, in_range)
 			vy_log_delete_slice(slice->id);
@@ -2230,7 +2230,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	 */
 	it = first;
 	while (it != end) {
-		struct vy_range *next = vy_range_tree_next(&index->tree, it);
+		struct vy_range *next = vy_range_tree_next(index->tree, it);
 		vy_scheduler_remove_range(scheduler, it);
 		vy_index_unacct_range(index, it);
 		vy_index_remove_range(index, it);
@@ -2530,8 +2530,8 @@ vy_index_recover(struct vy_index *index)
 	 * does not have holes or overlaps.
 	 */
 	struct vy_range *range, *prev = NULL;
-	for (range = vy_range_tree_first(&index->tree); range != NULL;
-	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
+	for (range = vy_range_tree_first(index->tree); range != NULL;
+	     prev = range, range = vy_range_tree_next(index->tree, range)) {
 		if (prev == NULL && range->begin != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
@@ -3016,8 +3016,8 @@ vy_task_dump_complete(struct vy_task *task)
 		tuple_unref(min_key);
 		goto fail;
 	}
-	begin_range = vy_range_tree_psearch(&index->tree, min_key);
-	end_range = vy_range_tree_nsearch(&index->tree, max_key);
+	begin_range = vy_range_tree_psearch(index->tree, min_key);
+	end_range = vy_range_tree_nsearch(index->tree, max_key);
 	tuple_unref(min_key);
 	tuple_unref(max_key);
 
@@ -3031,7 +3031,7 @@ vy_task_dump_complete(struct vy_task *task)
 		goto fail;
 	}
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		slice = vy_slice_new(vy_log_next_id(), new_run,
 				     range->begin, range->end, index->key_def);
 		if (slice == NULL)
@@ -3053,7 +3053,7 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	vy_log_create_run(index->opts.lsn, new_run->id, dump_lsn);
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = new_slices[i];
 		vy_log_insert_slice(range->id, new_run->id, slice->id,
@@ -3079,7 +3079,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Add new slices to ranges.
 	 */
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = new_slices[i];
 		vy_index_unacct_range(index, range);
@@ -4501,7 +4501,7 @@ vy_index_commit_create(struct vy_index *index)
 	}
 
 	assert(index->range_count == 1);
-	struct vy_range *range = vy_range_tree_first(&index->tree);
+	struct vy_range *range = vy_range_tree_first(index->tree);
 
 	/*
 	 * Since it's too late to fail now, in case of vylog write
@@ -4546,8 +4546,8 @@ vy_index_commit_drop(struct vy_index *index)
 
 	vy_log_tx_begin();
 	int loops = 0;
-	for (struct vy_range *range = vy_range_tree_first(&index->tree);
-	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
+	for (struct vy_range *range = vy_range_tree_first(index->tree);
+	     range != NULL; range = vy_range_tree_next(index->tree, range)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &range->slices, in_range)
 			vy_log_delete_slice(slice->id);
@@ -4590,9 +4590,16 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_index),
 			 "calloc", "struct vy_index");
-		return NULL;
+		goto fail;
 	}
 	index->env = e;
+
+	index->tree = malloc(sizeof(*index->tree));
+	if (index->tree == NULL) {
+		diag_set(OutOfMemory, sizeof(*index->tree),
+			 "malloc", "vy_range_tree_t");
+		goto fail_tree;
+	}
 
 	struct key_def *user_key_def = key_def_dup(&user_index_def->key_def);
 	if (user_key_def == NULL)
@@ -4650,7 +4657,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->dump_lsn = -1;
 	vy_cache_create(&index->cache, &e->cache_env, key_def);
 	rlist_create(&index->sealed);
-	vy_range_tree_new(&index->tree);
+	vy_range_tree_new(index->tree);
 	rlist_create(&index->runs);
 	read_set_new(&index->read_set);
 	index->pk = pk;
@@ -4681,7 +4688,10 @@ fail_format:
 fail_key_def:
 	free(user_key_def);
 fail_user_key_def:
+	free(index->tree);
+fail_tree:
 	free(index);
+fail:
 	return NULL;
 }
 
@@ -4876,7 +4886,7 @@ vy_index_delete(struct vy_index *index)
 	}
 
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
-	vy_range_tree_iter(&index->tree, NULL,
+	vy_range_tree_iter(index->tree, NULL,
 			   vy_range_tree_free_cb, scheduler);
 	tuple_format_ref(index->surrogate_format, -1);
 	tuple_format_ref(index->space_format_with_colmask, -1);
@@ -4887,6 +4897,7 @@ vy_index_delete(struct vy_index *index)
 	histogram_delete(index->run_hist);
 	vy_cache_destroy(&index->cache);
 	tuple_format_ref(index->space_format, -1);
+	free(index->tree);
 	TRASH(index);
 	free(index);
 }
