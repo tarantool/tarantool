@@ -646,6 +646,7 @@ MemtxSpace::addPrimaryKey(struct space *space)
 void
 MemtxSpace::dropPrimaryKey(struct space *space)
 {
+	(void )space;
 	assert(this == space->handler);
 	replace = memtx_replace_no_keys;
 }
@@ -719,7 +720,7 @@ MemtxSpace::commitTruncateSpace(struct space *old_space,
 				struct space *new_space)
 {
 	(void)new_space;
-	struct MemtxIndex *index = (MemtxIndex *) space_index(old_space, 0);
+	MemtxIndex *index = (MemtxIndex *) space_index(old_space, 0);
 	if (index != NULL)
 		index->truncate();
 }
