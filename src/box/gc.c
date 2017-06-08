@@ -30,6 +30,8 @@
  */
 #include "gc.h"
 
+#include <trivia/util.h>
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -91,7 +93,7 @@ gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 	return 0;
 }
 
-rb_gen(static inline, gc_tree_, gc_tree_t,
+rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
        struct gc_consumer, node, gc_consumer_cmp);
 
 /** Allocate a consumer object. */
