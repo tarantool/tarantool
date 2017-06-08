@@ -230,8 +230,6 @@ lua_sql_execute(struct lua_State *L)
 		int column_count = sqlite3_column_count(ps->stmt);
 		if (column_count == 0) {
 			while ((rc = sqlite3_step(ps->stmt)) == SQLITE_ROW) { ; }
-			if (rc != SQLITE_OK && rc != SQLITE_DONE)
-				goto sqlerror;
 		} else {
 			char *typestr;
 			l->column_count = column_count;
@@ -255,17 +253,15 @@ lua_sql_execute(struct lua_State *L)
 			lua_rawseti(L, -2, 0);
 
 			int row_count = 0;
-			while ((rc = sqlite3_step(ps->stmt) == SQLITE_ROW)) {
+			while ((rc = sqlite3_step(ps->stmt)) == SQLITE_ROW) {
 				lua_push_row(L, l);
 				row_count++;
 				lua_rawseti(L, -2, row_count);
 			}
-
-			if (rc != SQLITE_OK)
-				goto sqlerror;
-
 			l->pool_size = 0;
 		}
+        if (rc != SQLITE_OK && rc != SQLITE_DONE)
+            goto sqlerror;
 	}
 	prep_stmt_list_free(l);
 	return lua_gettop(L) - 1;
