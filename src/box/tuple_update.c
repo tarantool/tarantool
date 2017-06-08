@@ -936,12 +936,13 @@ update_op_by(char opcode)
  * @param[out] update Update meta.
  * @param expr MessagePack array of operations.
  * @param expr_end End of the @expr.
- * @param field_count_hint Field count in the updating tuple. If
- *        there is no a concrete tuple (for example, when we are
- *        reading UPSERT operations), then you can pass any value.
- *        The field_count_hint is only a hint and is not
- *        necessary. But correctly specified field_count_hint can
- *        make column mask calculation more precise.
+ * @param field_count_hint Field count in the updated tuple. If
+ *        there is no tuple at hand (for example, when we are
+ *        reading UPSERT operations), then 0 for field count will
+ *        do as a hint: the only effect of a wrong hint is
+ *        a possibly incorrect column_mask.
+ *        A correct field count results in an accurate
+ *        column mask calculation.
  *
  * @retval  0 Success.
  * @retval -1 Error.
@@ -1045,14 +1046,14 @@ update_read_ops(struct tuple_update *update, const char *expr,
 				 * result1: [1, 2, * ]
 				 * result2: [1, 2, 3, *4]
 				 * As you can see, both operations
-				 * has fielno -1, but '!' updates
-				 * actually the next field. So
-				 * make field_no to be + 1.
+				 * have field_no -1, but '!' actually
+				 * creates a new field. So
+				 * set field_no to insert position + 1.
 				 */
 				field_no = field_count_hint + op->field_no + 1;
 			/*
-			 * Now it can be < 0 only if the update
-			 * operation is met with negative field
+			 * Here field_no can be < 0 only if update
+			 * operation encounters a negative field
 			 * number N and abs(N) > field_count_hint.
 			 * For example, the tuple is: {1, 2, 3},
 			 * and the update operation is
@@ -1087,8 +1088,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 				 */
 				column_mask_set_range(&column_mask, field_no);
 			else
-				column_mask_set_fieldno(&column_mask,
-							field_no);
+				column_mask_set_fieldno(&column_mask, field_no);
 		}
 	}
 

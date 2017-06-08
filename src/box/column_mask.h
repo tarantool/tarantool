@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_BOX_COLUMN_MASK_H_INCLUDED
 #define TARANTOOL_BOX_COLUMN_MASK_H_INCLUDED
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,26 +35,26 @@
 #include <stdbool.h>
 
 /**
- * Column mask is a bitmask of update operations for a one tuple.
- * In the column mask the bit 'n' is set if in the
- * corresponding tuple the field 'n' could be changed by an update
- * operation.
+ * Column mask is a bitmask of update operations for one tuple.
+ * Column mask bit 'n' is set if in the corresponding tuple
+ * field 'n' could be changed by an update operation.
  * This mask is used for update and upsert optimizations, when,
- * for example, it is need to check update operation to have
- * changed key fields of an index.
+ * for example, it is necessary to check whether the operation
+ * has changed an indexed field.
  *
- * The last bit of the mask means the field numbers: [63, +inf).
- * That is if an update operation updates the field with number 63
- * and bigger, then the only last bit of the mask is set. If an
+ * The last bit of the mask stands for fields in range [63, +inf).
+ * If an update operation updates field #63 and greater, then this
+ * last bit of the mask is set. If an
  * update operations changes many fields ('#' or '!'), then all
  * fields after and including the target field could be changed -
- * in such a case we set not a one bit, but a range of bits.
+ * in such case we set not one bit, but a range of bits.
  */
 
 #define COLUMN_MASK_FULL UINT64_MAX
 
 /**
- * Set bit in the bitmask for the single changed column.
+ * Set a bit in the bitmask corresponding to a
+ * single changed column.
  * @param column_mask Mask to update.
  * @param fieldno     Updated fieldno (index base must be 0).
  */
@@ -72,7 +72,7 @@ column_mask_set_fieldno(uint64_t *column_mask, uint32_t fieldno)
 }
 
 /**
- * Set bits in the bitmask for the range of changed columns.
+ * Set bits in a bitmask for a range of changed columns.
  * @param column_mask Mask to update.
  * @param first_fieldno_in_range First fieldno of the updated
  *        range.
@@ -80,16 +80,18 @@ column_mask_set_fieldno(uint64_t *column_mask, uint32_t fieldno)
 static inline void
 column_mask_set_range(uint64_t *column_mask, uint32_t first_fieldno_in_range)
 {
-	/*
-	 * Set all bits by default via COLUMN_MASK_FULL and then
-	 * unset bits that are placed before the operation field
-	 * number. Fields corresponding to this bits definitely
-	 * will not be changed.
-	 */
-	if (first_fieldno_in_range >= 63)
-		*column_mask |= ((uint64_t) 1) << 63;
-	else
+	if (first_fieldno_in_range < 63) {
+		/*
+		 * Set all bits by default via COLUMN_MASK_FULL
+		 * and then unset bits preceding the operation
+		 * field number. Fields corresponding to these
+		 * bits will definitely not be changed.
+		 */
 		*column_mask |= COLUMN_MASK_FULL << first_fieldno_in_range;
+	} else {
+		/* A range outside "short" range. */
+		*column_mask |= ((uint64_t) 1) << 63;
+	}
 }
 
 /**
