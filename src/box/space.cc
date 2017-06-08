@@ -99,6 +99,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_count = index_count;
 	space->index_id_max = index_id_max;
 	rlist_create(&space->on_replace);
+	rlist_create(&space->on_stmt_begin);
 	auto scoped_guard = make_scoped_guard([=] { space_delete(space); });
 
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
@@ -144,6 +145,7 @@ space_delete(struct space *space)
 		delete space->handler;
 
 	trigger_destroy(&space->on_replace);
+	trigger_destroy(&space->on_stmt_begin);
 	free(space);
 }
 

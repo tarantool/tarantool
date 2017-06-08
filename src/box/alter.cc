@@ -730,6 +730,8 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	 */
 	rlist_swap(&alter->new_space->on_replace,
 		   &alter->old_space->on_replace);
+	rlist_swap(&alter->new_space->on_stmt_begin,
+		   &alter->old_space->on_stmt_begin);
 	/*
 	 * Init space bsize.
 	 */
