@@ -282,7 +282,7 @@ schema_init()
 	/* _truncate - auxiliary space for triggering space truncation. */
 	index_def->space_id = def.id = BOX_TRUNCATE_ID;
 	snprintf(def.name, sizeof(def.name), "_truncate");
-	(void) sc_space_new(&def, index_def, &on_replace_truncate);
+	(void) sc_space_new(&def, index_def, &on_replace_truncate, NULL);
 
 	/* _user - all existing users */
 	index_def->space_id = def.id = BOX_USER_ID;
