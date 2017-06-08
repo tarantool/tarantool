@@ -2621,10 +2621,10 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	index->mem_used += tuple_size(stmt);
 
-	if (vy_mem_insert(mem, *region_stmt))
-		return -1;
-
-	return 0;
+	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
+		return vy_mem_insert(mem, *region_stmt);
+	else
+		return vy_mem_insert_upsert(mem, *region_stmt);
 }
 
 static void
@@ -2696,8 +2696,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	struct vy_stat *stat = index->env->stat;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
-	older = vy_mem_older_lsn(mem, stmt);
-
+	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
 	/*
 	 * If there are a lot of successive upserts for the same key,
 	 * select might take too long to squash them all. So once the
@@ -2705,37 +2704,46 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 * a fiber to merge them and insert the resulting statement
 	 * after the latest upsert.
 	 */
-	enum {
-		VY_UPSERT_THRESHOLD = 128,
-		VY_UPSERT_INF = 128,
-	};
-	if (older != NULL && vy_stmt_type(older) == IPROTO_UPSERT) {
-		uint8_t n_upserts = vy_stmt_n_upserts(older);
-		if (n_upserts != VY_UPSERT_INF) {
-			n_upserts++;
-			if (n_upserts == VY_UPSERT_THRESHOLD) {
-				struct tuple *dup =
-					vy_stmt_dup(stmt, index->upsert_format);
-				vy_index_squash_upserts(index, dup);
-			}
+	if (n_upserts == VY_UPSERT_INF) {
+		/*
+		 * If UPSERT has n_upserts > VY_UPSERT_THRESHOLD,
+		 * it means the mem has older UPSERTs for the same
+		 * key which already are beeing processed in the
+		 * squashing task. At the end, the squashing task
+		 * will merge its result with this UPSERT
+		 * automatically.
+		 */
+		return;
+	}
+	if (n_upserts == VY_UPSERT_THRESHOLD) {
+		/*
+		 * Start single squashing task per one-mem and
+		 * one-key continous UPSERTs sequence.
+		 */
+#ifndef NDEBUG
+		older = vy_mem_older_lsn(mem, stmt);
+		assert(older != NULL && vy_stmt_type(older) == IPROTO_UPSERT &&
+		       vy_stmt_n_upserts(older) == VY_UPSERT_THRESHOLD - 1);
+#endif
+		struct tuple *dup = vy_stmt_dup(stmt, index->upsert_format);
+		if (dup != NULL) {
+			vy_index_squash_upserts(index, dup);
+			tuple_unref(dup);
 		}
-		vy_stmt_set_n_upserts((struct tuple *)stmt, n_upserts);
+		/*
+		 * Ignore dup == NULL, because the optimization is
+		 * good, but is not necessary.
+		 */
+		return;
 	}
 
-	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
-	    (older == NULL &&
-	     index->mem_used == index->mem->used && index->run_count == 0)) {
-		/*
-		 * Optimization:
-		 *
-		 *  1. An older non-UPSERT statement for the key has been
-		 *     found in the active memory index.
-		 *  2. Active memory index doesn't have statements for the
-		 *     key, but there are no more mems and runs.
-		 *
-		 *  => apply UPSERT to the older statement and save
-		 *     resulted REPLACE instead of original UPSERT.
-		 */
+	/*
+	 * If there are no other mems and runs and n_upserts == 0,
+	 * then we can turn the UPSERT into the REPLACE.
+	 */
+	if (n_upserts == 0 && index->mem_used == index->mem->used &&
+	    index->run_count == 0) {
+		older = vy_mem_older_lsn(mem, stmt);
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, index->key_def,
@@ -8436,6 +8444,7 @@ vy_squash_process(struct vy_squash *squash)
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
 	struct vy_stat *stat = env->stat;
+	struct key_def *def = index->key_def;
 
 	/* Upserts enabled only in the primary index. */
 	assert(index->id == 0);
@@ -8477,17 +8486,59 @@ vy_squash_process(struct vy_squash *squash)
 		tuple_unref(result);
 		return 0;
 	}
+	/**
+	 * Algorithm of the squashing.
+	 * Assume, during building the non-UPSERT statement
+	 * 'result' in the mem some new UPSERTs were inserted, and
+	 * some of them were commited, while the other were just
+	 * prepared. And lets UPSERT_THRESHOLD to be equal to 3,
+	 * for example.
+	 *                    Mem
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = 1, n_ups = 0           |
+	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
+	 *    UPSERT, lsn = 3, n_ups = 2           |
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = MAX,     n_ups = 3     |
+	 *    UPSERT, lsn = MAX + 1, n_ups = 4     | Prepared
+	 *    UPSERT, lsn = MAX + 2, n_ups = 5     |
+	 *    -------------------------------------+
+	 * In such a case the UPSERT statements with
+	 * lsns = {1, 2, 3} are squashed. But now the n_upsert
+	 * values in the prepared statements are not correct.
+	 * If we will not update values, then the
+	 * vy_index_commit_upsert will not be able to squash them.
+	 *
+	 * So after squashing it is necessary to update n_upsert
+	 * value in the prepared statements:
+	 *                    Mem
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = 1, n_ups = 0           |
+	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
+	 *    REPLACE, lsn = 3                     |
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = MAX,     n_ups = 0 !!! |
+	 *    UPSERT, lsn = MAX + 1, n_ups = 1 !!! | Prepared
+	 *    UPSERT, lsn = MAX + 2, n_ups = 2 !!! |
+	 *    -------------------------------------+
+	 */
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	const struct tuple *mem_stmt;
+	uint64_t stmt_lsn;
+	/*
+	 * According to the described algorithm, squash the
+	 * commited UPSERTs at first.
+	 */
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		const struct tuple *mem_stmt =
-			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_tuple_compare(result, mem_stmt, index->key_def) != 0)
+		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
+		stmt_lsn = vy_stmt_lsn(mem_stmt);
+		if (vy_tuple_compare(result, mem_stmt, def) != 0)
 			break;
 		/**
 		 * Leave alone prepared statements; they will be handled
 		 * in vy_range_commit_stmt.
 		 */
-		if (vy_stmt_lsn(mem_stmt) >= MAX_LSN)
+		if (stmt_lsn >= MAX_LSN)
 			break;
 		if (vy_stmt_type(mem_stmt) != IPROTO_UPSERT) {
 			/**
@@ -8499,8 +8550,8 @@ vy_squash_process(struct vy_squash *squash)
 		}
 		assert(index->id == 0);
 		struct tuple *applied =
-			vy_apply_upsert(mem_stmt, result, index->key_def,
-					mem->format, mem->upsert_format, true);
+			vy_apply_upsert(mem_stmt, result, def, mem->format,
+					mem->upsert_format, true);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(result);
 		if (applied == NULL)
@@ -8515,8 +8566,28 @@ vy_squash_process(struct vy_squash *squash)
 		 * exactly mem_stmt in general and the buggy upsert
 		 * in particular.
 		 */
-		vy_stmt_set_lsn(result, vy_stmt_lsn(mem_stmt));
+		vy_stmt_set_lsn(result, stmt_lsn);
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	}
+	/*
+	 * The second step of the algorithm above is updating of
+	 * n_upsert values of the prepared UPSERTs.
+	 */
+	if (stmt_lsn >= MAX_LSN) {
+		uint8_t n_upserts = 0;
+		while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
+			mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree,
+								  &mem_itr);
+			if (vy_tuple_compare(result, mem_stmt, def) != 0 ||
+			    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
+				break;
+			assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
+			vy_stmt_set_n_upserts((struct tuple *)mem_stmt,
+					      n_upserts);
+			if (n_upserts <= VY_UPSERT_THRESHOLD)
+				++n_upserts;
+			vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+		}
 	}
 
 	rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);

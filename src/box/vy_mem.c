@@ -143,8 +143,72 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 int
+vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
+{
+	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
+	/* Check if the statement can be inserted in the vy_mem. */
+	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
+	       stmt->format_id == tuple_format_id(mem->format) ||
+	       stmt->format_id == tuple_format_id(mem->upsert_format));
+	/* The statement must be from a lsregion. */
+	assert(vy_stmt_is_region_allocated(stmt));
+	size_t size = tuple_size(stmt);
+	const struct tuple *replaced_stmt = NULL;
+	struct vy_mem_tree_iterator inserted;
+	if (vy_mem_tree_insert_get_iterator(&mem->tree, stmt, &replaced_stmt,
+					    &inserted) != 0)
+		return -1;
+	assert(! vy_mem_tree_iterator_is_invalid(&inserted));
+	assert(*vy_mem_tree_iterator_get_elem(&mem->tree, &inserted) == stmt);
+	/*
+	 * All iterators begin to see the new statement, and
+	 * will be aborted in case of rollback.
+	 */
+	mem->version++;
+	/*
+	 * We will not be able to free memory even in case of
+	 * rollback.
+	 */
+	mem->used += size;
+	/*
+	 * Update n_upserts if needed. Get the previous statement
+	 * from the inserted one and if it has the same key, then
+	 * increment n_upserts of the new statement until the
+	 * predefined limit:
+	 *
+	 * UPSERT, n = 0
+	 * UPSERT, n = 1,
+	 *         ...
+	 * UPSERT, n = threshold,
+	 * UPSERT, n = threshold + 1,
+	 * UPSERT, n = threshold + 1, all following ones have
+	 *         ...                threshold + 1.
+	 * These values are used by vy_index_commit to squash
+	 * UPSERTs subsequence.
+	 */
+	vy_mem_tree_iterator_next(&mem->tree, &inserted);
+	const struct tuple **older = vy_mem_tree_iterator_get_elem(&mem->tree,
+								   &inserted);
+	if (older == NULL || vy_stmt_type(*older) != IPROTO_UPSERT ||
+	    vy_tuple_compare(stmt, *older, mem->key_def) != 0)
+		return 0;
+	uint8_t n_upserts = vy_stmt_n_upserts(*older);
+	/*
+	 * Stop increment if the threshold is reached to avoid
+	 * creation of multiple squashing tasks.
+	 */
+	if (n_upserts <= VY_UPSERT_THRESHOLD)
+		n_upserts++;
+	else
+		assert(n_upserts == VY_UPSERT_INF);
+	vy_stmt_set_n_upserts((struct tuple *)stmt, n_upserts);
+	return 0;
+}
+
+int
 vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 {
+	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
 	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
 	       stmt->format_id == tuple_format_id(mem->format) ||

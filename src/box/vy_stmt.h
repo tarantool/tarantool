@@ -52,6 +52,14 @@ struct region;
 struct tuple_format;
 struct iovec;
 
+enum {
+	VY_UPSERT_THRESHOLD = 128,
+	VY_UPSERT_INF,
+};
+static_assert(VY_UPSERT_THRESHOLD <= UINT8_MAX, "n_upserts max value");
+static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
+	      "inf must be threshold + 1");
+
 /**
  * There are two groups of statements:
  *

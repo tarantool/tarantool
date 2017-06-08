@@ -264,6 +264,7 @@ for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
 stat2 = box.info.vinyl().performance
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
+space:get{3}
 
 space.index.primary:info().count
 
