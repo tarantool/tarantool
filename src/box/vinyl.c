@@ -6319,7 +6319,8 @@ vy_tx_prepare(struct vy_tx *tx)
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	int count = 0, write_count = 0;
-	const struct tuple *delete = NULL, *replace = NULL;
+	/* repsert - REPLACE/UPSERT */
+	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	struct txv *v;
 	int rc = 0;
@@ -6337,7 +6338,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (index->id == 0) {
 			/* The beginning of the new txn_stmt is met. */
 			current_space_id = index->space_id;
-			replace = NULL;
+			repsert = NULL;
 			delete = NULL;
 		}
 		assert(index->space_id == current_space_id);
@@ -6346,7 +6347,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
 		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
-			(type == IPROTO_DELETE) ? &delete : &replace;
+			(type == IPROTO_DELETE) ? &delete : &repsert;
 		rc = vy_tx_write(index, v->mem, v->stmt, region_stmt);
 		if (rc != 0)
 			break;
