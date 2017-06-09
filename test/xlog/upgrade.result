@@ -74,7 +74,7 @@ box.space._space:select()
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
         'type': 'str'}]]
   - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'str'}, {'name': 'opts',
-        'type': 'str'}]]
+        'type': 'map'}]]
   - [512, 1, 'distro', 'memtx', 0, {}, [{'name': 'os', 'type': 'str'}, {'name': 'dist',
         'type': 'str'}, {'name': 'version', 'type': 'num'}, {'name': 'time', 'type': 'num'}]]
   - [513, 1, 'temporary', 'memtx', 0, {'temporary': true}, []]
