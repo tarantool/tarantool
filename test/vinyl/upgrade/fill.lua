@@ -85,7 +85,10 @@ s:drop()
 --
 -- Space truncation.
 --
--- Currently, implemented as index drop/create.
+-- Before 1.7.4-126-g2ba51ab2, implemented as index drop/create.
+-- In newer versions, writes a special record:
+--
+-- VY_LOG_TRUNCATE_INDEX
 --
 s = box.schema.space.create('test_truncate', {engine = 'vinyl'})
 s:create_index('i1', {parts = {1, 'unsigned'}})
