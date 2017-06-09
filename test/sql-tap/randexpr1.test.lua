@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(2594)
+test:plan(2600)
 
 --!./tcltestrunner.lua
 -- 2008 December 16
@@ -8204,18 +8204,15 @@ test:do_test(
         -- </randexpr-2.816>
     })
 
--- MUST_WORK_TEST int 64 #2469
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.817",
-        function()
-            return test:execsql "SELECT e-t1.e+a*f*11*c*case when ~f*t1.d-t1.c*b-13*19+(abs(t1.d)/abs(case when t1.c=13 then 17 else 19 end))*a between b*(select abs(cast(avg(( -13)) AS integer)) from t1)-19+19 and t1.b then t1.d else t1.d end+13 FROM t1 WHERE NOT (t1.b not between a and e)"
-        end, {
-            -- <randexpr-2.817>
-            79200000013
-            -- </randexpr-2.817>
-        })
-end
+test:do_test(
+    "randexpr-2.817",
+    function()
+        return test:execsql "SELECT e-t1.e+a*f*11*c*case when ~f*t1.d-t1.c*b-13*19+(abs(t1.d)/abs(case when t1.c=13 then 17 else 19 end))*a between b*(select abs(cast(avg(( -13)) AS integer)) from t1)-19+19 and t1.b then t1.d else t1.d end+13 FROM t1 WHERE NOT (t1.b not between a and e)"
+    end, {
+        -- <randexpr-2.817>
+        79200000013
+        -- </randexpr-2.817>
+    })
 
 test:do_test(
     "randexpr-2.818",
@@ -10477,18 +10474,15 @@ test:do_test(
         -- </randexpr-2.1043>
     })
 
--- MUST_WORK_TEST int 64
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.1044",
-        function()
-            return test:execsql "SELECT + -(select count(*) from t1)*(t1.b)-a-t1.e+17*coalesce((select max(13) from t1 where not exists(select 1 from t1 where case when t1.f<coalesce((select a from t1 where t1.a not in (t1.b,t1.a,19)),t1.a)*f and not exists(select 1 from t1 where exists(select 1 from t1 where (t1.d)=19)) then +t1.d when c<>t1.d then 17 else  -17 end* -(t1.f)=(t1.a))), -d)*t1.f*t1.a* -e FROM t1 WHERE not exists(select 1 from t1 where ~case when d+ -t1.c+11*t1.e-t1.c*a*(t1.b)<=~~t1.b then f else case b when t1.b*t1.c-t1.d then c-b else  -t1.c end end-13+f>=case when d not between t1.c and (t1.b) then t1.e else t1.c end) or t1.d in (d,t1.c,t1.c)"
-        end, {
-            -- <randexpr-2.1044>
-            -6630000800
-            -- </randexpr-2.1044>
-        })
-end
+test:do_test(
+    "randexpr-2.1044",
+    function()
+        return test:execsql "SELECT + -(select count(*) from t1)*(t1.b)-a-t1.e+17*coalesce((select max(13) from t1 where not exists(select 1 from t1 where case when t1.f<coalesce((select a from t1 where t1.a not in (t1.b,t1.a,19)),t1.a)*f and not exists(select 1 from t1 where exists(select 1 from t1 where (t1.d)=19)) then +t1.d when c<>t1.d then 17 else  -17 end* -(t1.f)=(t1.a))), -d)*t1.f*t1.a* -e FROM t1 WHERE not exists(select 1 from t1 where ~case when d+ -t1.c+11*t1.e-t1.c*a*(t1.b)<=~~t1.b then f else case b when t1.b*t1.c-t1.d then c-b else  -t1.c end end-13+f>=case when d not between t1.c and (t1.b) then t1.e else t1.c end) or t1.d in (d,t1.c,t1.c)"
+    end, {
+        -- <randexpr-2.1044>
+        -6630000800
+        -- </randexpr-2.1044>
+    })
 
 test:do_test(
     "randexpr-2.1045",
@@ -10790,18 +10784,15 @@ test:do_test(
         -- </randexpr-2.1074>
     })
 
--- MUST_WORK_TEST int 64
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.1075",
-        function()
-            return test:execsql "SELECT  -(coalesce((select max(coalesce((select t1.f from t1 where not exists(select 1 from t1 where (abs(+b+19+19)/abs(t1.b))<t1.b) or 19+f>=(select  -max(19) from t1)+t1.f),t1.e+t1.f)* -t1.e+19-f) from t1 where (( -t1.c<19) or d>=c)),t1.c))*c*((t1.b))-17 FROM t1 WHERE t1.e not between t1.f*c and t1.f+ -d"
-        end, {
-            -- <randexpr-2.1075>
-            18034859983
-            -- </randexpr-2.1075>
-        })
-end
+test:do_test(
+    "randexpr-2.1075",
+    function()
+        return test:execsql "SELECT  -(coalesce((select max(coalesce((select t1.f from t1 where not exists(select 1 from t1 where (abs(+b+19+19)/abs(t1.b))<t1.b) or 19+f>=(select  -max(19) from t1)+t1.f),t1.e+t1.f)* -t1.e+19-f) from t1 where (( -t1.c<19) or d>=c)),t1.c))*c*((t1.b))-17 FROM t1 WHERE t1.e not between t1.f*c and t1.f+ -d"
+    end, {
+        -- <randexpr-2.1075>
+        18034859983
+        -- </randexpr-2.1075>
+    })
 
 test:do_test(
     "randexpr-2.1076",
@@ -18183,18 +18174,15 @@ test:do_test(
         -- </randexpr-2.1813>
     })
 
--- MUST_WORK_TEST int 64
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.1814",
-        function()
-            return test:execsql "SELECT f*~13*(abs(13*d- -(abs(case when ~coalesce((select max(c) from t1 where b>case when not exists(select 1 from t1 where f not in ( - -(t1.b),t1.b,t1.f)) then e when t1.c<>f then c else 13 end),17) |  -19 not in (f,b,f) then  -b when not 13 in (select max((19)) from t1 union select count(*) | count(*) from t1) and 11 not between t1.b and e or 13 in (t1.a, -e,(t1.c)) then a else 11 end)/abs(t1.c))*b | t1.b)/abs(f))*f*f FROM t1 WHERE NOT (~case f when coalesce((select max(17) from t1 where b+t1.f*case 11 when coalesce((select max(t1.f) from t1 where 17>t1.f),19)-t1.b-t1.b | d then b else c end+t1.d*11-t1.c<=case when b>=a then 19 else f end | t1.a),13) then f else t1.e end*t1.e*17-d in (select 13 from t1 union select t1.e from t1))"
-        end, {
-            -- <randexpr-2.1814>
-            -24192000000
-            -- </randexpr-2.1814>
-        })
-end
+test:do_test(
+    "randexpr-2.1814",
+    function()
+        return test:execsql "SELECT f*~13*(abs(13*d- -(abs(case when ~coalesce((select max(c) from t1 where b>case when not exists(select 1 from t1 where f not in ( - -(t1.b),t1.b,t1.f)) then e when t1.c<>f then c else 13 end),17) |  -19 not in (f,b,f) then  -b when not 13 in (select max((19)) from t1 union select count(*) | count(*) from t1) and 11 not between t1.b and e or 13 in (t1.a, -e,(t1.c)) then a else 11 end)/abs(t1.c))*b | t1.b)/abs(f))*f*f FROM t1 WHERE NOT (~case f when coalesce((select max(17) from t1 where b+t1.f*case 11 when coalesce((select max(t1.f) from t1 where 17>t1.f),19)-t1.b-t1.b | d then b else c end+t1.d*11-t1.c<=case when b>=a then 19 else f end | t1.a),13) then f else t1.e end*t1.e*17-d in (select 13 from t1 union select t1.e from t1))"
+    end, {
+        -- <randexpr-2.1814>
+        -24192000000
+        -- </randexpr-2.1814>
+    })
 
 test:do_test(
     "randexpr-2.1815",
@@ -18926,18 +18914,15 @@ test:do_test(
         -- </randexpr-2.1887>
     })
 
--- MUST_WORK_TEST int 64
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.1888",
-        function()
-            return test:execsql "SELECT  -19 & t1.c*coalesce((select max(+(select cast(avg(case when  -e+t1.d in (select t1.e*a from t1 union select a from t1) then t1.b when 17 in (select t1.a from t1 union select 11 from t1) then 19 else 11 end-19+a+t1.f) AS integer)+count(distinct t1.a) from t1)+(t1.b)) from t1 where (19) not in (17,d,a)),t1.a)*t1.b*19* -11 FROM t1 WHERE case t1.e when f then (select ~count(distinct a) | abs((count(distinct d*f+d+t1.b+17+~t1.f))) from t1) else coalesce((select e from t1 where t1.f not between 17+t1.f+19 and (abs(f)/abs(t1.f))*~t1.b*(b)),coalesce((select t1.b from t1 where 19 in (select count(distinct (t1.d)) from t1 union select  -count(distinct a) from t1)),19)) | 17 end not between t1.c and t1.c"
-        end, {
-            -- <randexpr-2.1888>
-            -11198220000
-            -- </randexpr-2.1888>
-        })
-end
+test:do_test(
+    "randexpr-2.1888",
+    function()
+        return test:execsql "SELECT  -19 & t1.c*coalesce((select max(+(select cast(avg(case when  -e+t1.d in (select t1.e*a from t1 union select a from t1) then t1.b when 17 in (select t1.a from t1 union select 11 from t1) then 19 else 11 end-19+a+t1.f) AS integer)+count(distinct t1.a) from t1)+(t1.b)) from t1 where (19) not in (17,d,a)),t1.a)*t1.b*19* -11 FROM t1 WHERE case t1.e when f then (select ~count(distinct a) | abs((count(distinct d*f+d+t1.b+17+~t1.f))) from t1) else coalesce((select e from t1 where t1.f not between 17+t1.f+19 and (abs(f)/abs(t1.f))*~t1.b*(b)),coalesce((select t1.b from t1 where 19 in (select count(distinct (t1.d)) from t1 union select  -count(distinct a) from t1)),19)) | 17 end not between t1.c and t1.c"
+    end, {
+        -- <randexpr-2.1888>
+        -11198220000
+        -- </randexpr-2.1888>
+    })
 
 test:do_test(
     "randexpr-2.1889",
@@ -20719,18 +20704,15 @@ test:do_test(
         -- </randexpr-2.2066>
     })
 
--- MUST_WORK_TEST int 64
-if 0 > 0 then
-    test:do_test(
-        "randexpr-2.2067",
-        function()
-            return test:execsql "SELECT e | t1.e*case d when t1.e then a else case when t1.a<= -~+e then b else 17-t1.e end*c*f+case when case when +c in (select +min(11) from t1 union select cast(avg(f) AS integer) from t1) and b between c and t1.f then 11+t1.a when f>=c then d else t1.c end<t1.c and t1.d between t1.a and t1.e then 19 when t1.a<=t1.c then t1.d else f end end FROM t1 WHERE NOT (13 in (select case when ++(select abs(max((select count(*) from t1)+~13)) from t1)*11 not in ((d*~19),(abs(f)/abs(t1.b)),case when not exists(select 1 from t1 where b<=e+t1.d) then b*f when d in (select min(t1.d) from t1 union select min(e) from t1) then 19 else f end*a) then t1.c else  -c end from t1 union select t1.a from t1) or f<c)"
-        end, {
-            -- <randexpr-2.2067>
-            18000200180
-            -- </randexpr-2.2067>
-        })
-end
+test:do_test(
+    "randexpr-2.2067",
+    function()
+        return test:execsql "SELECT e | t1.e*case d when t1.e then a else case when t1.a<= -~+e then b else 17-t1.e end*c*f+case when case when +c in (select +min(11) from t1 union select cast(avg(f) AS integer) from t1) and b between c and t1.f then 11+t1.a when f>=c then d else t1.c end<t1.c and t1.d between t1.a and t1.e then 19 when t1.a<=t1.c then t1.d else f end end FROM t1 WHERE NOT (13 in (select case when ++(select abs(max((select count(*) from t1)+~13)) from t1)*11 not in ((d*~19),(abs(f)/abs(t1.b)),case when not exists(select 1 from t1 where b<=e+t1.d) then b*f when d in (select min(t1.d) from t1 union select min(e) from t1) then 19 else f end*a) then t1.c else  -c end from t1 union select t1.a from t1) or f<c)"
+    end, {
+        -- <randexpr-2.2067>
+        18000200180
+        -- </randexpr-2.2067>
+    })
 
 test:do_test(
     "randexpr-2.2068",

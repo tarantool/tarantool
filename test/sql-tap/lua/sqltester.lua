@@ -92,7 +92,10 @@ local function is_deeply_regex(got, expected)
         end
     end
     if type(expected) == "number" and type(got) == "number" then
-        local min_delta = 0.0000001
+        if got == expected then
+            return true
+        end
+        local min_delta = 0.000000001 * math.abs(got)
         return (got - expected < min_delta) and (expected - got < min_delta)
     end
 
@@ -158,8 +161,17 @@ local function do_test(self, label, func, expect)
 end
 test.do_test = do_test
 
-local function execsql_one(query)
-    local result = box.sql.execute(query)
+local function execsql_one_by_one(sql)
+    local queries = sql_tokenizer.split_sql(sql)
+    local last_res = nil
+    for _, query in pairs(queries) do
+        last_res = box.sql.execute(query) or last_res
+    end
+    return last_res
+end
+
+local function execsql(self, sql)
+    local result = execsql_one_by_one(sql)
     if type(result) ~= 'table' then return end
 
     result = flatten(result)
@@ -169,15 +181,6 @@ local function execsql_one(query)
         end
     end
     return result
-end
-
-local function execsql(self, sql)
-    local queries = sql_tokenizer.split_sql(sql)
-    local last_res = nil
-    for k, query in pairs(queries) do
-        last_res = execsql_one(query) or last_res
-    end
-    return last_res
 end
 test.execsql = execsql
 
@@ -225,7 +228,7 @@ local function flattern_with_column_names(result)
 end
 
 local function execsql2(self, sql)
-    local result = box.sql.execute(sql)
+    local result = execsql_one_by_one(sql)
     if type(result) ~= 'table' then return end
     -- shift rows down, revealing column names
     result = flattern_with_column_names(result)
@@ -300,23 +303,28 @@ local function db(self, cmd, ...)
 end
 test.db = db
 
+-- returns first occurance of seed in input or -1
 local function lsearch(self, input, seed)
-    local result = 0
-
+    local index = 1
+    local success = false
     local function search(arr)
         if type(arr) == 'table' then
             for _, v in ipairs(arr) do
                 search(v)
+                if success == true then
+                    return
+                end
             end
         else
             if type(arr) == 'string' and arr:find(seed) ~= nil then
-                result = result + 1
+                success = true
+            else
+                index = index + 1
             end
         end
     end
-
     search(input)
-    return result
+    return success == true and index or -1
 end
 test.lsearch = lsearch
 

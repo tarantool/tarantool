@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(69)
+test:plan(85)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -672,15 +672,14 @@ test:do_execsql_test(
 -- to numeric.  Do not fallback to real (and the corresponding 48-bit
 -- mantissa) unless absolutely necessary.
 --
--- MUST_WORK_TEST waiting for int64 #2363
-if 0 > 0 then
+
 test:do_execsql_test(
     "cast-3.1",
     [[
         SELECT CAST(9223372036854774800 AS integer)
     ]], {
         -- <cast-3.1>
-        9223372036854774800
+        9223372036854774800LL
         -- </cast-3.1>
     })
 
@@ -690,18 +689,22 @@ test:do_execsql_test(
         SELECT CAST(9223372036854774800 AS numeric)
     ]], {
         -- <cast-3.2>
-        9223372036854774800
+        9223372036854774800LL
         -- </cast-3.2>
     })
 
-X(239, "X!cmd", [=[["do_realnum_test","cast-3.3","\n  execsql {SELECT CAST(9223372036854774800 AS real)}\n","9.22337203685477e+18"]]=])
+test:do_execsql_test(
+    "cast-3.3",
+    "SELECT CAST(9223372036854774800 AS real)",
+    {9.22337203685477e+18})
+
 test:do_execsql_test(
     "cast-3.4",
     [[
         SELECT CAST(CAST(9223372036854774800 AS real) AS integer)
     ]], {
         -- <cast-3.4>
-        9223372036854774784
+        9223372036854774784LL
         -- </cast-3.4>
     })
 
@@ -711,7 +714,7 @@ test:do_execsql_test(
         SELECT CAST(-9223372036854774800 AS integer)
     ]], {
         -- <cast-3.5>
-        -9223372036854774800
+        -9223372036854774800LL
         -- </cast-3.5>
     })
 
@@ -721,18 +724,22 @@ test:do_execsql_test(
         SELECT CAST(-9223372036854774800 AS numeric)
     ]], {
         -- <cast-3.6>
-        -9223372036854774800
+        -9223372036854774800LL
         -- </cast-3.6>
     })
 
-X(251, "X!cmd", [=[["do_realnum_test","cast-3.7","\n  execsql {SELECT CAST(-9223372036854774800 AS real)}\n","-9.22337203685477e+18"]]=])
+test:do_execsql_test(
+    "cast-3.7",
+    "SELECT CAST(-9223372036854774800 AS real)",
+    {-9.22337203685477e+18})
+
 test:do_execsql_test(
     "cast-3.8",
     [[
         SELECT CAST(CAST(-9223372036854774800 AS real) AS integer)
     ]], {
         -- <cast-3.8>
-        -9223372036854774784
+        -9223372036854774784LL
         -- </cast-3.8>
     })
 
@@ -742,7 +749,7 @@ test:do_execsql_test(
         SELECT CAST('9223372036854774800' AS integer)
     ]], {
         -- <cast-3.11>
-        9223372036854774800
+        9223372036854774800LL
         -- </cast-3.11>
     })
 
@@ -752,18 +759,22 @@ test:do_execsql_test(
         SELECT CAST('9223372036854774800' AS numeric)
     ]], {
         -- <cast-3.12>
-        9223372036854774800
+        9223372036854774800LL
         -- </cast-3.12>
     })
 
-X(263, "X!cmd", [=[["do_realnum_test","cast-3.13","\n  execsql {SELECT CAST('9223372036854774800' AS real)}\n","9.22337203685477e+18"]]=])
+test:do_execsql_test(
+    "cast-3.13",
+    "SELECT CAST(9223372036854774800 AS real)",
+    {9.22337203685477e+18})
+
 test:do_execsql_test(
     "cast-3.14",
     [[
         SELECT CAST(CAST('9223372036854774800' AS real) AS integer)
     ]], {
         -- <cast-3.14>
-        9223372036854774784
+        9223372036854774784LL
         -- </cast-3.14>
     })
 
@@ -775,7 +786,7 @@ test:do_execsql_test(
         SELECT CAST('-9223372036854774800' AS integer)
     ]], {
         -- <cast-3.15>
-        -9223372036854774800
+        -9223372036854774800LL
         -- </cast-3.15>
     })
 
@@ -785,32 +796,35 @@ test:do_execsql_test(
         SELECT CAST('-9223372036854774800' AS numeric)
     ]], {
         -- <cast-3.16>
-        -9223372036854774800
+        -9223372036854774800LL
         -- </cast-3.16>
     })
 
-X(277, "X!cmd", [=[["do_realnum_test","cast-3.17","\n  execsql {SELECT CAST('-9223372036854774800' AS real)}\n","-9.22337203685477e+18"]]=])
+test:do_execsql_test(
+    "cast-3.17",
+    "SELECT CAST('-9223372036854774800' AS real)",
+    {-9.22337203685477e+18})
+
 test:do_execsql_test(
     "cast-3.18",
     [[
         SELECT CAST(CAST('-9223372036854774800' AS real) AS integer)
     ]], {
         -- <cast-3.18>
-        -9223372036854774784
+        -9223372036854774784LL
         -- </cast-3.18>
     })
 
 
 
-if X(286, "X!cmd", "[\"expr\",\"[db eval {PRAGMA encoding}]==\\\"UTF-8\\\"\"]")
- then
+if test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
     test:do_execsql_test(
         "cast-3.21",
         [[
             SELECT CAST(x'39323233333732303336383534373734383030' AS integer)
         ]], {
             -- <cast-3.21>
-            9223372036854774800
+            9223372036854774800LL
             -- </cast-3.21>
         })
 
@@ -820,11 +834,14 @@ if X(286, "X!cmd", "[\"expr\",\"[db eval {PRAGMA encoding}]==\\\"UTF-8\\\"\"]")
             SELECT CAST(x'39323233333732303336383534373734383030' AS numeric)
         ]], {
             -- <cast-3.22>
-            9223372036854774800
+            9223372036854774800LL
             -- </cast-3.22>
         })
+    test:do_execsql_test(
+        "cast-3.23",
+        "SELECT CAST(x'39323233333732303336383534373734383030' AS real)",
+        {9.22337203685477e+18})
 
-    X(293, "X!cmd", [=[["do_realnum_test","cast-3.23","\n    execsql {SELECT CAST(x'39323233333732303336383534373734383030' AS real)}\n  ","9.22337203685477e+18"]]=])
     test:do_execsql_test(
         "cast-3.24",
         [[
@@ -832,14 +849,11 @@ if X(286, "X!cmd", "[\"expr\",\"[db eval {PRAGMA encoding}]==\\\"UTF-8\\\"\"]")
                         AS integer)
         ]], {
             -- <cast-3.24>
-            9223372036854774784
+            9223372036854774784LL
             -- </cast-3.24>
         })
-
-
-
 end
-end
+
 test:do_execsql_test(
     "case-3.31",
     [[

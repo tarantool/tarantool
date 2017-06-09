@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(101)
+test:plan(103)
 
 --!./tcltestrunner.lua
 -- 2001 November 6
@@ -94,7 +94,8 @@ test:do_execsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT 2, -5
     ]], {
         -- <limit-1.2.4>
-        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
         -- </limit-1.2.4>
     })
 
@@ -114,7 +115,8 @@ test:do_execsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT -2, -5
     ]], {
         -- <limit-1.2.6>
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
         -- </limit-1.2.6>
     })
 
@@ -188,20 +190,17 @@ test:do_execsql_test(
         -- </limit-1.7>
     })
 
--- MUST_WORK_TEST 
--- if X(0, "X!capable", [["view && subquery"]]) then
-    test:do_execsql_test(
-        "limit-2.1",
-        [[
-            CREATE VIEW v1 AS SELECT x,y FROM t1 LIMIT 2;
-            SELECT count(*) FROM (SELECT * FROM v1);
-        ]], {
-            -- <limit-2.1>
-            2
-            -- </limit-2.1>
-        })
+test:do_execsql_test(
+    "limit-2.1",
+    [[
+        CREATE VIEW v1 AS SELECT x,y FROM t1 LIMIT 2;
+        SELECT count(*) FROM (SELECT * FROM v1);
+    ]], {
+        -- <limit-2.1>
+        2
+        -- </limit-2.1>
+    })
 
--- end
 
 -- ifcapable view
 -- do_test limit-2.2 {
@@ -306,7 +305,6 @@ test:do_execsql_test(
         -- </limit-5.2>
     })
 
--- MUST_WORK_TEST
 test:do_execsql_test(
     "limit-5.3",
     [[
@@ -319,7 +317,6 @@ test:do_execsql_test(
         -- </limit-5.3>
     })
 
--- MUST_WORK_TEST
 test:do_execsql_test(
     "limit-5.4",
     [[
@@ -651,11 +648,9 @@ test:do_test(
 test:do_test(
     "limit-10.2",
     function()
-        limit = 5
-        offset = 5
-        return test:execsql [[
-            SELECT x FROM t1 LIMIT 5 OFFSET 5;
-        ]]
+        local limit = 5
+        local offset = 5
+        return test:execsql("SELECT x FROM t1 LIMIT "..limit.." OFFSET "..offset)
     end, {
         -- <limit-10.2>
         26, 25, 24, 23, 22
@@ -665,45 +660,39 @@ test:do_test(
 test:do_test(
     "limit-10.3",
     function()
-        limit = -1
-        return test:execsql [[
-            SELECT x FROM t1 WHERE x<10 LIMIT -1;
-        ]]
+        local limit = -1
+        return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
         -- <limit-10.3>
         9, 8, 7, 6, 5, 4, 3, 2, 1, 0
         -- </limit-10.3>
     })
 
--- Tarantool: following 2 tests are faling right now. #2515
--- Comment until issue is resolved
--- test:do_catchsql_test(
---     "limit-10.4",
---     [[SELECT x FROM t1 WHERE x<10 LIMIT 1.5]],
---     -- function()
---     --     limit = 1.5
---     --     rc = X(444, "X!cmd", [=[["catch","\n  db eval {\n    SELECT x FROM t1 WHERE x<10 LIMIT :limit;\n  } ","msg"]]=])
---     --     return { rc, msg }        
---     --end,
---     {
---         -- <limit-10.4>
---         1, "datatype mismatch"
---         -- </limit-10.4>
---     })
+test:do_test(
+    "limit-10.4",
+    function()
+        local limit = 1.5
+        return {pcall(function()
+            return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
+        end)}
+    end, {
+        -- <limit-10.4>
+        0, "datatype mismatch"
+        -- </limit-10.4>
+    })
 
--- test:do_catchsql_test(
---     "limit-10.5",
---     [[SELECT x FROM t1 WHERE x<10 LIMIT "hello world";]],
---     -- function()
---     --     limit = "hello world"
---     --     rc = X(452, "X!cmd", [=[["catch","\n  db eval {\n    SELECT x FROM t1 WHERE x<10 LIMIT :limit;\n  } ","msg"]]=])
---     --     return { rc, msg }
---     -- end, {
---     {
---         -- <limit-10.5>
---         1, "datatype mismatch"
---         -- </limit-10.5>
---     })
+test:do_test(
+    "limit-10.5",
+    function()
+        local limit = '"hello world"'
+        return {pcall(function()
+            return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
+        end)}
+    end, {
+        -- <limit-10.5>
+        0, "datatype mismatch"
+        -- </limit-10.5>
+    })
 
 test:do_test(
     "limit-11.1",
@@ -716,7 +705,6 @@ test:do_test(
         
         -- </limit-11.1>
     })
-
 
 
 -- ifcapable subquery
