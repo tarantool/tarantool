@@ -6,7 +6,7 @@ box.cfg {
     memtx_max_tuple_size = 4 * 1024 * 1024,
     rows_per_wal      = 1000000,
     vinyl_read_threads = 2;
-    vinyl_threads = 3;
+    vinyl_write_threads = 3;
     vinyl_memory = 512 * 1024 * 1024;
     vinyl_range_size = 1024 * 64;
     vinyl_page_size = 1024;

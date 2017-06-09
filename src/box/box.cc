@@ -440,8 +440,9 @@ box_check_config()
 	if (cfg_geti("vinyl_read_threads") < 1)
 		tnt_raise(ClientError, ER_CFG,
 			  "vinyl_read_threads", "must be >= 1");
-	if (cfg_geti("vinyl_threads") < 2)
-		tnt_raise(ClientError, ER_CFG, "vinyl_threads", "must be >= 2");
+	if (cfg_geti("vinyl_write_threads") < 2)
+		tnt_raise(ClientError, ER_CFG,
+			  "vinyl_write_threads", "must be >= 2");
 }
 
 /*

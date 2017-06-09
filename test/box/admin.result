@@ -76,10 +76,10 @@ cfg_filter(box.cfg)
     - 2
   - - vinyl_run_size_ratio
     - 3.5
-  - - vinyl_threads
-    - 2
   - - vinyl_timeout
     - 60
+  - - vinyl_write_threads
+    - 2
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay

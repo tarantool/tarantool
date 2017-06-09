@@ -12,7 +12,7 @@ box.cfg {
     rows_per_wal      = 500000,
     vinyl_dir         = "./vinyl_test",
     vinyl_read_threads = 3,
-    vinyl_threads     = 5,
+    vinyl_write_threads = 5,
 }
 
 require('console').listen(os.getenv('ADMIN'))
