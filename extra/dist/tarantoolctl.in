@@ -781,7 +781,8 @@ local function cat()
             local rid = record.HEADER.replica_id
             -- space filter rules
             local is_space_filtered    = spaces ~= nil
-            local is_space_system      = sid < 512 and show_system == false
+            local is_space_system      = (sid ~= nil and sid < 512 and
+                                          show_system == false)
             local isnt_space_specified = not (is_space_filtered and
                                               find_in_list(sid, spaces))
             -- replica id filter rules
