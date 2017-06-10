@@ -1103,6 +1103,9 @@ AddIndex::~AddIndex()
 
 /* }}} */
 
+/**
+ * Delete the space. It is already removed from the space cache.
+ */
 static void
 on_drop_space_commit(struct trigger *trigger, void *event)
 {
@@ -1111,6 +1114,11 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 	space_delete(space);
 }
 
+/**
+ * Return the original space back into the cache. The effect
+ * of all other events happened after the space was removed were
+ * reverted by the cascading rollback.
+ */
 static void
 on_drop_space_rollback(struct trigger *trigger, void *event)
 {
@@ -1121,7 +1129,10 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 
 /**
  * A trigger invoked on commit/rollback of DROP/ADD space.
- * The trigger removed the space from the space cache.
+ * The trigger removes the space from the space cache.
+ *
+ * By the time the space is removed, it should be empty: we
+ * rely on cascading rollback.
  */
 static void
 on_create_space_rollback(struct trigger *trigger, void *event)
@@ -1218,6 +1229,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		space_def_create_from_tuple(&def, new_tuple, ER_CREATE_SPACE);
 		RLIST_HEAD(empty_list);
 		struct space *space = space_new(&def, &empty_list);
+		/**
+		 * The new space must be inserted in the space
+		 * cache right away to achieve linearisable
+		 * execution on a replica.
+		 */
 		(void) space_cache_replace(space);
 		/*
 		 * So may happen that until the DDL change record
@@ -1243,6 +1259,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "the space has grants");
 		}
+		/**
+		 * The space must be deleted from the space
+		 * cache right away to achieve linearisable
+		 * execution on a replica.
+		 */
 		struct space *space = space_cache_delete(space_id(old_space));
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, space);
