@@ -428,6 +428,10 @@ box.commit();
 ---
 - error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+---
+- ok
+...
 s:select{};
 ---
 - []
@@ -435,9 +439,9 @@ s:select{};
 box.rollback();
 ---
 ...
-errinj.set("ERRINJ_TUPLE_ALLOC", false);
+s:select{};
 ---
-- ok
+- []
 ...
 box.begin()
     s:insert{1}

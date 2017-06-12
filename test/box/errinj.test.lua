@@ -122,9 +122,10 @@ box.begin()
     errinj.set("ERRINJ_TUPLE_ALLOC", true)
     s:insert{2}
 box.commit();
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
 s:select{};
 box.rollback();
-errinj.set("ERRINJ_TUPLE_ALLOC", false);
+s:select{};
 box.begin()
     s:insert{1}
     errinj.set("ERRINJ_TUPLE_ALLOC", true)
