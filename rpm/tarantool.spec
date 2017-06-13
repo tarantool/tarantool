@@ -41,9 +41,7 @@ Requires(preun): initscripts
 %bcond_without backtrace # enabled by default
 
 %if %{with backtrace}
-# binutils and zlib are needed for stack traces in fiber.info()
-BuildRequires: binutils-devel
-BuildRequires: zlib-devel
+BuildRequires: libunwind-devel
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
 # in runtime. Tarantool uses the debug symbols to display fiber's stack

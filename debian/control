@@ -9,15 +9,9 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
  libreadline-dev,
  libncurses5-dev,
  libyaml-dev,
-# Dependecies below are needed for fiber stack traces
-# libiberty.so is provided by binutils-dev (<< 2.24) for wheezy and precise
- libiberty-dev | binutils-dev (<< 2.24),
-# libbfd-*.so
- binutils-dev,
-# zlib is implicitly needed by libbfd #808516
- zlib1g-dev,
  libssl-dev,
- libcurl4-gnutls-dev | libcurl4-openssl-dev | libcurl4-nss-dev
+ libcurl4-gnutls-dev | libcurl4-openssl-dev | libcurl4-nss-dev,
+ libunwind-dev | libunwind8-dev | libunwind7-dev,
 Section: database
 Standards-Version: 3.9.8
 Homepage: http://tarantool.org/

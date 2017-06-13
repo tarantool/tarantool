@@ -488,9 +488,6 @@ tarantool_free(void)
 		 */
 		rl_cleanup_after_signal();
 	}
-#ifdef HAVE_BFD
-	symbols_free();
-#endif
 	cbus_free();
 #if 0
 	/*
@@ -510,16 +507,6 @@ tarantool_free(void)
 int
 main(int argc, char **argv)
 {
-#ifndef HAVE_LIBC_STACK_END
-	/*
-	 * GNU libc provides a way to get at the top of the stack. This
-	 * is, of course, not-standard and doesn't work on non-GNU
-	 * systems, such as FreeBSD. But as far as we're concerned, argv
-	 * is at the top of the main thread's stack, so save the address
-	 * of it.
-	 */
-	__libc_stack_end = (void*) &argv;
-#endif
 	start_time = ev_time();
 	/* set locale to make iswXXXX function work */
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL &&
@@ -570,9 +557,6 @@ main(int argc, char **argv)
 		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
 		exit(EX_USAGE);
 	}
-#ifdef HAVE_BFD
-	symbols_load(argv[0]);
-#endif
 	argv = title_init(argc, argv);
 	/*
 	 * Support only #!/usr/bin/tarantol but not

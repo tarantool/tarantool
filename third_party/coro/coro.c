@@ -252,6 +252,7 @@ trampoline (int sig)
        #elif __ARM_ARCH==7
 
          #define NUM_SAVED 25
+	 ".thumb\n"
          "\tvpush {d8-d15}\n"
          "\tpush {r4-r11,lr}\n"
          "\tstr sp, [r0]\n"
@@ -301,7 +302,7 @@ trampoline (int sig)
          "coro_startup:\n"
 
        #if __ARM_ARCH==7
-
+	 ".thumb\n"
          ".fnstart\n"
          ".save {lr}\n"
          ".pad #12\n"

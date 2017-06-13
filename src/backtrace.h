@@ -37,21 +37,17 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern void *__libc_stack_end;
-
 #ifdef ENABLE_BACKTRACE
-void print_backtrace();
+#include <coro.h>
 
-char *
-backtrace(void *frame, void *stack, size_t stack_size);
+void print_backtrace();
 
 typedef int (backtrace_cb)(int frameno, void *frameret,
                            const char *func, size_t offset, void *cb_ctx);
 
 
 void
-backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
-		  size_t stack_size, void *cb_ctx);
+backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx);
 
 #endif /* ENABLE_BACKTRACE */
 
@@ -59,11 +55,4 @@ backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#ifdef HAVE_BFD
-void
-symbols_load(const char *name);
-
-void
-symbols_free();
-#endif /* HAVE_BFD */
 #endif /* TARANTOOL_BACKTRACE_H_INCLUDED */

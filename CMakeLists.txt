@@ -55,7 +55,6 @@ include(cmake/thread.cmake)
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)
-check_include_file(unwind.h HAVE_UNWIND_H)
 check_include_file(cpuid.h HAVE_CPUID_H)
 check_include_file(sys/prctl.h HAVE_PRCTL_H)
 
@@ -461,7 +460,6 @@ set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
     ENABLE_SSE2 ENABLE_AVX
     ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN
     ENABLE_BACKTRACE
-    HAVE_BFD
     ENABLE_DOC
     ENABLE_DIST
     ENABLE_BUNDLED_LIBYAML
