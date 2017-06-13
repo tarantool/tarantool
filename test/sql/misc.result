@@ -1,0 +1,17 @@
+-- Forbid multistatement queries.
+box.sql.execute('select 1;')
+---
+- - [1]
+...
+box.sql.execute('select 1; select 2;')
+---
+- error: 'near "select": syntax error'
+...
+box.sql.execute('create table t1 (id primary key); select 100;')
+---
+- error: 'near "select": syntax error'
+...
+box.space.t1 == nil
+---
+- true
+...

@@ -103,9 +103,7 @@ static void disableLookaside(Parse *pParse){
 } // end %include
 
 // Input is a single SQL command
-input ::= cmdlist.
-cmdlist ::= cmdlist ecmd.
-cmdlist ::= ecmd.
+input ::= ecmd.                   { sqlite3FinishCoding(pParse); }
 ecmd ::= SEMI.
 ecmd ::= explain cmdx SEMI.
 explain ::= .
@@ -113,7 +111,7 @@ explain ::= .
 explain ::= EXPLAIN.              { pParse->explain = 1; }
 explain ::= EXPLAIN QUERY PLAN.   { pParse->explain = 2; }
 %endif  SQLITE_OMIT_EXPLAIN
-cmdx ::= cmd.           { sqlite3FinishCoding(pParse); }
+cmdx ::= cmd.
 
 ///////////////////// Begin and end transactions. ////////////////////////////
 //

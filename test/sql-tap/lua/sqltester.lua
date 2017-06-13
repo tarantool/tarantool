@@ -1,5 +1,6 @@
 local tap = require('tap')
 local json = require('json')
+local sql_tokenizer = require('sql_tokenizer')
 local test = tap.test("errno")
 
 local function flatten(arr)
@@ -157,8 +158,8 @@ local function do_test(self, label, func, expect)
 end
 test.do_test = do_test
 
-local function execsql(self, sql)
-    local result = box.sql.execute(sql)
+local function execsql_one(query)
+    local result = box.sql.execute(query)
     if type(result) ~= 'table' then return end
 
     result = flatten(result)
@@ -168,6 +169,15 @@ local function execsql(self, sql)
         end
     end
     return result
+end
+
+local function execsql(self, sql)
+    local queries = sql_tokenizer.split_sql(sql)
+    local last_res = nil
+    for k, query in pairs(queries) do
+        last_res = execsql_one(query) or last_res
+    end
+    return last_res
 end
 test.execsql = execsql
 
