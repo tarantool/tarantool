@@ -222,15 +222,16 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id);
 
 /**
- * Return true if @a stmt was allocated on lsregion.
+ * Return true if @a stmt can be referenced. Now to be not refable
+ * it must be allocated on lsregion.
  * @param stmt a statement
  * @retval true if @a stmt was allocated on lsregion
  * @retval false otherwise
  */
 static inline bool
-vy_stmt_is_region_allocated(const struct tuple *stmt)
+vy_stmt_is_refable(const struct tuple *stmt)
 {
-	return stmt->refs == 0;
+	return stmt->refs > 0;
 }
 
 /**

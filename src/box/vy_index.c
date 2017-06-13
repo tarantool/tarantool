@@ -665,9 +665,8 @@ int
 vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	     const struct tuple *stmt, const struct tuple **region_stmt)
 {
-	assert(!vy_stmt_is_region_allocated(stmt));
-	assert(*region_stmt == NULL ||
-	       vy_stmt_is_region_allocated(*region_stmt));
+	assert(vy_stmt_is_refable(stmt));
+	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
 	/* Allocate region_stmt on demand. */
 	if (*region_stmt == NULL) {
