@@ -126,6 +126,10 @@ function prepare()
     end
     s1:truncate()
     s2:truncate()
+    if ignore_unnecessary_conflict1 then
+        q1:truncate()
+        q2:truncate()
+    end
     for i=1,num_key do
         local r = math.random(5)
         local v = get_unique_value()
