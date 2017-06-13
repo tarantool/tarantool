@@ -114,7 +114,7 @@ if(SQL_MAINTAINER_MODE)
     add_custom_target(generate_sql_files DEPENDS
         parse.h
         keywordhash.h
-        parse.h
+        parse.y
         parse.c
         opcodes.c)
 
@@ -131,7 +131,7 @@ if(SQL_MAINTAINER_MODE)
         COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/addopcodes.tcl parse.h.tmp > parse.h
         COMMAND ${CMAKE_COMMAND} -E remove parse.h.tmp parse.out
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS lemon)
+        DEPENDS lemon parse.y)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/opcodes.h
         COMMAND cat parse.h vdbe.c | ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/mkopcodeh.tcl > opcodes.h
