@@ -28,11 +28,13 @@ s3:select{}
 ...
 i3_1:select({100.5})
 ---
-- error: Invalid key part count in an exact match (expected 3, got 1)
+- error: HASH index  does not support selects via a partial key (expected 3 parts,
+    got 1). Please Consider changing index type to TREE.
 ...
 i3_1:select({true, -459})
 ---
-- error: Invalid key part count in an exact match (expected 3, got 2)
+- error: HASH index  does not support selects via a partial key (expected 3 parts,
+    got 2). Please Consider changing index type to TREE.
 ...
 i3_1:select({"abc#$23", 1000, -21.542})
 ---
@@ -44,7 +46,8 @@ i3_2:select({"str1", 5})
 ...
 i3_2:select({"str"})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: HASH index  does not support selects via a partial key (expected 2 parts,
+    got 1). Please Consider changing index type to TREE.
 ...
 i3_2:select({"str", 5})
 ---
