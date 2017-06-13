@@ -5,7 +5,7 @@ box.space._schema:select{}
 ---
 - - ['cluster', '<cluster uuid>']
   - ['max_id', 511]
-  - ['version', 1, 7, 4]
+  - ['version', 1, 7, 5]
 ...
 box.space._cluster:select{}
 ---

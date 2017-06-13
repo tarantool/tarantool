@@ -2,8 +2,6 @@ local log = require('log')
 local bit = require('bit')
 local json = require('json')
 
-local VERSION_ID
-
 -- Guest user id - the default user
 local GUEST = 0
 -- Super User ID
@@ -28,8 +26,29 @@ local function ismap(tab)
     return mt and (mt.__serialize == 'map' or mt.__serialize == 'mapping')
 end
 
-local function version_id(major, minor, patch)
-    return bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8), patch)
+local mkversion = {}
+mkversion.__index = mkversion
+setmetatable(mkversion, {__call = function(c, ...) return c.new(...) end})
+
+function mkversion.new(major, minor, patch)
+    local self = setmetatable({}, mkversion)
+    self.major = major
+    self.minor = minor
+    self.patch = patch
+    self.id = bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8), patch)
+    return self
+end
+
+function mkversion.__tostring(self)
+    return string.format('%s.%s.%s', self.major, self.minor, self.patch)
+end
+
+function mkversion.__eq(lhs, rhs)
+    return lhs.id == rhs.id
+end
+
+function mkversion.__lt(lhs, rhs)
+    return lhs.id < rhs.id
 end
 
 -- space:truncate() doesn't work with disabled triggers on __index
@@ -439,10 +458,6 @@ local function upgrade_func_to_1_6_8()
 end
 
 local function upgrade_to_1_6_8()
-    if VERSION_ID >= version_id(1, 6, 8) then
-        return
-    end
-
     upgrade_index_options_to_1_6_8()
     upgrade_space_options_to_1_6_8()
     upgrade_space_format_to_1_6_8()
@@ -465,9 +480,6 @@ local function upgrade_to_1_6_8()
         log.info("set max_id to %d", id)
         box.space._schema:insert{'max_id', id}
     end
-
-    log.info("set schema version to 1.6.8")
-    box.space._schema:replace({'version', 1, 6, 8})
 end
 
 --------------------------------------------------------------------------------
@@ -479,14 +491,7 @@ local function upgrade_users_to_1_7_1()
 end
 
 local function upgrade_to_1_7_1()
-    if VERSION_ID >= version_id(1, 7, 0) then
-        return
-    end
-
     upgrade_users_to_1_7_1()
-
-    log.info("set schema version to 1.7.1")
-    box.space._schema:replace({'version', 1, 7, 1})
 end
 
 --------------------------------------------------------------------------------
@@ -524,18 +529,11 @@ local function upgrade_field_types_to_1_7_2()
 end
 
 local function upgrade_to_1_7_2()
-    if VERSION_ID >= version_id(1, 7, 2) then
-        return
-    end
-
     upgrade_field_types_to_1_7_2()
-
-    log.info("set schema version to 1.7.2")
-    box.space._schema:replace({'version', 1, 7, 2})
 end
 
 --------------------------------------------------------------------------------
--- Tarantool 1.7.4
+-- Tarantool 1.7.5
 --------------------------------------------------------------------------------
 
 local function create_truncate_space()
@@ -553,21 +551,16 @@ local function create_truncate_space()
     end
 end
 
-local function upgrade_to_1_7_4()
-    if VERSION_ID >= version_id(1, 7, 4) then
-        return
-    end
-
+local function upgrade_to_1_7_5()
     create_truncate_space()
-
-    log.info("set schema version to 1.7.4")
-    box.space._schema:replace({'version', 1, 7, 4})
 end
 
 --------------------------------------------------------------------------------
 
-local function upgrade()
-    box.cfg{}
+local function upgrade(options)
+    options = options or {}
+    setmetatable(options, {__index = {auto = false}})
+
     local version = box.space._schema:get{'version'}
     if version == nil then
         error('Missing "version" in box.space._schema')
@@ -575,12 +568,34 @@ local function upgrade()
     local major = version[2]
     local minor = version[3]
     local patch = version[4] or 0
-    VERSION_ID = version_id(major, minor, patch)
 
-    upgrade_to_1_6_8()
-    upgrade_to_1_7_1()
-    upgrade_to_1_7_2()
-    upgrade_to_1_7_4()
+    version = mkversion(major, minor, patch)
+
+    local handlers = {
+        {version = mkversion(1, 6, 8), func = upgrade_to_1_6_8, auto = false},
+        {version = mkversion(1, 7, 1), func = upgrade_to_1_7_1, auto = false},
+        {version = mkversion(1, 7, 2), func = upgrade_to_1_7_2, auto = false},
+        {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = true},
+    }
+
+    for _, handler in ipairs(handlers) do
+        if version >= handler.version then
+            goto continue
+        end
+        if options.auto and not handler.auto then
+            log.warn("cannot auto upgrade schema version to %s, " ..
+                     "please call box.schema.upgrade() manually",
+                     handler.version)
+            return
+        end
+        handler.func()
+        log.info("set schema version to %s", handler.version)
+        box.space._schema:replace({'version',
+                                   handler.version.major,
+                                   handler.version.minor,
+                                   handler.version.patch})
+        ::continue::
+    end
 end
 
 local function bootstrap()

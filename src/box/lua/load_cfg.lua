@@ -359,6 +359,7 @@ local function load_cfg(cfg)
             end
         end
     end
+    box.schema.upgrade{auto = true}
 end
 box.cfg = load_cfg
 
