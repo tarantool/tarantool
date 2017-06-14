@@ -37,7 +37,7 @@ space:delete({1})
 -- must fail because vy_mems have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 box.snapshot()
-while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
 -- can be altered.
@@ -66,7 +66,7 @@ space:insert({2, 3})
 space:delete({2})
 box.snapshot()
 -- Wait until the dump is finished.
-while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 
 space:drop()
@@ -127,7 +127,7 @@ pad = string.rep('I', pad_size)
 for i = 1, 20 do space:replace{i, pad} end
 est_bsize = pad_size * 20
 box.snapshot()
-pk:info().page_count
+pk:info().disk.pages
 pk:info().page_size
 pk:info().run_count
 pk:info().bloom_fpr
@@ -144,11 +144,11 @@ est_bsize = est_bsize + pad_size * 20
 box.snapshot()
 -- Wait for compaction
 while pk:info().run_count ~= 1 do fiber.sleep(0.01) end
-pk:info().page_count
+pk:info().disk.pages
 pk:info().page_size
 pk:info().run_count
 pk:info().bloom_fpr
-est_bsize / page_size == pk:info().page_count
+est_bsize / page_size == pk:info().disk.pages
 space:drop()
 
 --

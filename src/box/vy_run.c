@@ -364,6 +364,7 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	slice->end = end;
 	rlist_create(&slice->in_range);
 	ipc_cond_create(&slice->pin_cond);
+	/** Lookup the first and the last pages spanned by the slice. */
 	bool unused;
 	if (slice->begin == NULL) {
 		slice->first_page_no = 0;
@@ -386,11 +387,16 @@ vy_slice_new(int64_t id, struct vy_run *run,
 		}
 	}
 	assert(slice->last_page_no >= slice->first_page_no);
-	uint64_t count = slice->last_page_no - slice->first_page_no + 1;
-	slice->size = DIV_ROUND_UP(run->size * count,
-				   run->info.page_count);
-	slice->row_count = DIV_ROUND_UP(run->row_count * count,
-					run->info.page_count);
+	/** Estimate the number of statements in the slice. */
+	uint32_t run_pages = run->info.page_count;
+	uint32_t slice_pages = slice->last_page_no - slice->first_page_no + 1;
+	slice->count.pages = slice_pages;
+	slice->count.rows = DIV_ROUND_UP(run->count.rows *
+					 slice_pages, run_pages);
+	slice->count.bytes = DIV_ROUND_UP(run->count.bytes *
+					  slice_pages, run_pages);
+	slice->count.bytes_compressed = DIV_ROUND_UP(
+		run->count.bytes_compressed * slice_pages, run_pages);
 	return slice;
 }
 
@@ -1822,6 +1828,16 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 
 /* }}} vy_run_iterator API implementation */
 
+/** Account a page to run statistics. */
+static void
+vy_run_acct_page(struct vy_run *run, struct vy_page_info *page)
+{
+	run->count.rows += page->row_count;
+	run->count.bytes += page->unpacked_size;
+	run->count.bytes_compressed += page->size;
+	run->count.pages++;
+}
+
 int
 vy_run_recover(struct vy_run *run, const char *dir,
 	       uint32_t space_id, uint32_t iid)
@@ -1910,8 +1926,7 @@ vy_run_recover(struct vy_run *run, const char *dir,
 			run->info.page_count = page_no;
 			goto fail_close;
 		}
-		run->size += page->size;
-		run->row_count += page->row_count;
+		vy_run_acct_page(run, page);
 	}
 
 	/* We don't need to keep metadata file open any longer. */
@@ -2136,8 +2151,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	assert(page->row_count > 0);
 
 	run->info.page_count++;
-	run->size += page->size;
-	run->row_count += page->row_count;
+	vy_run_acct_page(run, page);
 
 	ibuf_destroy(&page_index_buf);
 	return !end_of_run ? 0: 1;
@@ -2494,8 +2508,8 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
 		return -1;
 
-	*written += run->size;
-	*dumped_statements += run->row_count;
+	*written += run->count.bytes_compressed;
+	*dumped_statements += run->count.rows;
 	return 0;
 }
 

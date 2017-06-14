@@ -40,6 +40,7 @@
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stat.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -139,8 +140,8 @@ struct vy_mem {
 	struct rlist in_dump_fifo;
 	/** BPS tree */
 	struct vy_mem_tree tree;
-	/** The total size of all tuples in this tree in bytes */
-	size_t used;
+	/** Number of statements. */
+	struct vy_stmt_counter count;
 	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
 	int64_t max_lsn;

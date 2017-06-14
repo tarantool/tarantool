@@ -38,6 +38,7 @@
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stat.h"
 
 #include "small/mempool.h"
 #include "salad/bloom.h"
@@ -115,10 +116,8 @@ struct vy_run {
 	int fd;
 	/** Unique ID of this run. */
 	int64_t id;
-	/** Size of the run on disk. */
-	uint64_t size;
-	/** Number of statements in the run. */
-	uint64_t row_count;
+	/** Number of statements in this run. */
+	struct vy_disk_stmt_counter count;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -182,10 +181,8 @@ struct vy_slice {
 	 */
 	uint32_t first_page_no;
 	uint32_t last_page_no;
-	/** An estimate of the size of this slice on disk. */
-	uint64_t size;
 	/** An estimate of the number of statements in this slice. */
-	uint32_t row_count;
+	struct vy_disk_stmt_counter count;
 };
 
 /** Position of a particular stmt in vy_run. */

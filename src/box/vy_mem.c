@@ -64,7 +64,7 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version)
 {
-	struct vy_mem *index = malloc(sizeof(*index));
+	struct vy_mem *index = calloc(1, sizeof(*index));
 	if (!index) {
 		diag_set(OutOfMemory, sizeof(*index),
 			 "malloc", "struct vy_mem");
@@ -72,9 +72,7 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 	}
 	index->min_lsn = INT64_MAX;
 	index->max_lsn = -1;
-	index->used = 0;
 	index->key_def = key_def;
-	index->version = 0;
 	index->generation = generation;
 	index->schema_version = schema_version;
 	index->allocator = allocator;
@@ -89,7 +87,6 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_sealed);
 	rlist_create(&index->in_dump_fifo);
-	index->pin_count = 0;
 	ipc_cond_create(&index->pin_cond);
 	return index;
 }
@@ -99,7 +96,7 @@ vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
 		      struct tuple_format *new_format_with_colmask,
 		      struct tuple_format *new_upsert_format)
 {
-	assert(mem->used == 0);
+	assert(mem->count.rows == 0);
 	tuple_format_ref(mem->format, -1);
 	tuple_format_ref(mem->format_with_colmask, -1);
 	tuple_format_ref(mem->upsert_format, -1);
@@ -160,16 +157,14 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 		return -1;
 	assert(! vy_mem_tree_iterator_is_invalid(&inserted));
 	assert(*vy_mem_tree_iterator_get_elem(&mem->tree, &inserted) == stmt);
+	if (replaced_stmt == NULL)
+		mem->count.rows++;
+	mem->count.bytes += size;
 	/*
 	 * All iterators begin to see the new statement, and
 	 * will be aborted in case of rollback.
 	 */
 	mem->version++;
-	/*
-	 * We will not be able to free memory even in case of
-	 * rollback.
-	 */
-	mem->used += size;
 	/*
 	 * Update n_upserts if needed. Get the previous statement
 	 * from the inserted one and if it has the same key, then
@@ -219,16 +214,14 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	const struct tuple *replaced_stmt = NULL;
 	if (vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt))
 		return -1;
+	if (replaced_stmt == NULL)
+		mem->count.rows++;
+	mem->count.bytes += size;
 	/*
 	 * All iterators begin to see the new statement, and
 	 * will be aborted in case of rollback.
 	 */
 	mem->version++;
-	/*
-	 * We will not be able to free memory even in case of
-	 * rollback.
-	 */
-	mem->used += size;
 	return 0;
 }
 
@@ -253,7 +246,8 @@ vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	int rc = vy_mem_tree_delete(&mem->tree, stmt);
 	assert(rc == 0);
 	(void) rc;
-
+	/* We can't free memory in case of rollback. */
+	mem->count.rows--;
 	mem->version++;
 }
 

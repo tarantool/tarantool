@@ -78,13 +78,14 @@ tmp = box.space.tmp
 vyinfo1 = tmp:get('vyinfo')[2]
 vyinfo2 = s.index.primary:info()
 
--- Clear metatable for the sake of output format.
-_ = setmetatable(vyinfo1, nil)
-
-success = true
-for k, v in pairs(vyinfo1) do if v ~= vyinfo2[k] then success = false end end
-
-success or {vyinfo1, vyinfo2}
+vyinfo1.memory.rows == vyinfo2.memory.rows
+vyinfo1.memory.bytes == vyinfo2.memory.bytes
+vyinfo1.disk.rows == vyinfo2.disk.rows
+vyinfo1.disk.bytes == vyinfo2.disk.bytes
+vyinfo1.disk.bytes_compressed == vyinfo2.disk.bytes_compressed
+vyinfo1.disk.pages == vyinfo2.disk.pages
+vyinfo1.run_count == vyinfo2.run_count
+vyinfo1.range_count == vyinfo2.range_count
 
 s:drop()
 

@@ -99,7 +99,7 @@ box.snapshot()
 ---
 - ok
 ...
-while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
@@ -173,7 +173,7 @@ box.snapshot()
 - ok
 ...
 -- Wait until the dump is finished.
-while space.index.primary:info().count ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
@@ -314,7 +314,7 @@ box.snapshot()
 ---
 - ok
 ...
-pk:info().page_count
+pk:info().disk.pages
 ---
 - 4
 ...
@@ -361,7 +361,7 @@ box.snapshot()
 while pk:info().run_count ~= 1 do fiber.sleep(0.01) end
 ---
 ...
-pk:info().page_count
+pk:info().disk.pages
 ---
 - 6
 ...
@@ -377,7 +377,7 @@ pk:info().bloom_fpr
 ---
 - 0.2
 ...
-est_bsize / page_size == pk:info().page_count
+est_bsize / page_size == pk:info().disk.pages
 ---
 - true
 ...
