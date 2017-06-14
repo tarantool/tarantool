@@ -927,7 +927,7 @@ access_check_func(const char *name, uint32_t name_len)
 	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
 		return func;
 	uint8_t access = PRIV_X & ~credentials->universal_access;
-	if (func == NULL || (func->def.uid != credentials->uid &&
+	if (func == NULL || (func->def->uid != credentials->uid &&
 	     access & ~func->access[credentials->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
@@ -943,7 +943,7 @@ access_check_func(const char *name, uint32_t name_len)
 int
 func_call(struct func *func, struct request *request, struct obuf *out)
 {
-	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
 	if (func->func == NULL)
 		func_load(func);
 
@@ -1030,7 +1030,7 @@ box_process_call(struct request *request, struct obuf *out)
 	 * defined, it's obviously not a setuid one.
 	 */
 	struct credentials *orig_credentials = NULL;
-	if (func && func->def.setuid) {
+	if (func && func->def->setuid) {
 		orig_credentials = current_user();
 		/* Remember and change the current user id. */
 		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
@@ -1040,7 +1040,7 @@ box_process_call(struct request *request, struct obuf *out)
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user *owner = user_find_xc(func->def.uid);
+			struct user *owner = user_find_xc(func->def->uid);
 			credentials_init(&func->owner_credentials,
 					 owner->auth_token,
 					 owner->def.uid);
@@ -1049,7 +1049,7 @@ box_process_call(struct request *request, struct obuf *out)
 	}
 
 	int rc;
-	if (func && func->def.language == FUNC_LANGUAGE_C) {
+	if (func && func->def->language == FUNC_LANGUAGE_C) {
 		rc = func_call(func, request, out);
 	} else {
 		rc = box_lua_call(request, out);

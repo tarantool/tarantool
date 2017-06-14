@@ -604,16 +604,28 @@ tuple_field_u32(const struct tuple *tuple, uint32_t fieldno, uint32_t *out)
 
 /**
  * A convenience shortcut for data dictionary - get a tuple field
+ * as a string.
+ */
+static inline const char *
+tuple_field_str(const struct tuple *tuple, uint32_t fieldno, uint32_t *len)
+{
+	const char *field = tuple_field_with_type(tuple, fieldno, MP_STR);
+	if (field == NULL)
+		return NULL;
+	return mp_decode_str(&field, len);
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
 static inline const char *
 tuple_field_cstr(const struct tuple *tuple, uint32_t fieldno)
 {
-	const char *field = tuple_field_with_type(tuple, fieldno, MP_STR);
-	if (field == NULL)
+	uint32_t len;
+	const char *str = tuple_field_str(tuple, fieldno, &len);
+	if (str == NULL)
 		return NULL;
-	uint32_t len = 0;
-	const char *str = mp_decode_str(&field, &len);
 	return tt_cstr(str, len);
 }
 
@@ -769,6 +781,17 @@ tuple_field_u32_xc(const struct tuple *tuple, uint32_t fieldno)
 	if (tuple_field_u32(tuple, fieldno, &out) != 0)
 		diag_raise();
 	return out;
+}
+
+/** @copydoc tuple_field_str() */
+static inline const char *
+tuple_field_str_xc(const struct tuple *tuple, uint32_t fieldno,
+			uint32_t *len)
+{
+	const char *ret = tuple_field_str(tuple, fieldno, len);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
 }
 
 /** @copydoc tuple_field_cstr() */

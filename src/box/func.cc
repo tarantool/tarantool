@@ -43,7 +43,7 @@ func_new(struct func_def *def)
 		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
 		return NULL;
 	}
-	func->def = *def;
+	func->def = def;
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));
 	/*
@@ -95,7 +95,7 @@ func_load(struct func *func)
 	 * E.g. name = foo.bar.baz, function = baz, package = foo.bar
 	 */
 	const char *sym;
-	const char *package = func->def.name;
+	const char *package = func->def->name;
 	const char *package_end = strrchr(package, '.');
 	if (package_end != NULL) {
 		/* module.submodule.function => module.submodule, function */
@@ -112,21 +112,21 @@ func_load(struct func *func)
 	lua_getfield(L, -3, "cpath");
 
 	if (lua_pcall(L, 2, 1, 0)) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def->name,
 			  lua_tostring(L, -1));
 	}
 	if (lua_isnil(L, -1)) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def->name,
 			  "shared library not found in the search path");
 	}
 	func->dlhandle = dlopen(lua_tostring(L, -1), RTLD_NOW | RTLD_LOCAL);
 	if (func->dlhandle == NULL) {
-		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
 			  dlerror());
 	}
 	func->func = (box_function_f) dlsym(func->dlhandle, sym);
 	if (func->func == NULL) {
-		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
 			  dlerror());
 	}
 }
@@ -135,12 +135,14 @@ void
 func_update(struct func *func, struct func_def *def)
 {
 	func_unload(func);
-	func->def = *def;
+	free(func->def);
+	func->def = def;
 }
 
 void
 func_delete(struct func *func)
 {
 	func_unload(func);
+	free(func->def);
 	free(func);
 }

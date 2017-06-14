@@ -221,7 +221,7 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);
 	uint8_t effective = func->access[cr->auth_token].effective;
-	if (func->def.uid == cr->uid || (PRIV_X & effective))
+	if (func->def->uid == cr->uid || (PRIV_X & effective))
 		return true;
 	return false;
 }
