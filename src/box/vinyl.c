@@ -1217,9 +1217,9 @@ vy_index_add_run(struct vy_index *index, struct vy_run *run)
 	assert(rlist_empty(&run->in_index));
 	rlist_add_entry(&index->runs, run, in_index);
 	index->run_count++;
-	index->page_count += run->info.count;
-	index->stmt_count += run->info.keys;
-	index->size += vy_run_size(run);
+	index->page_count += run->info.page_count;
+	index->stmt_count += run->row_count;
+	index->size += run->size;
 }
 
 static void
@@ -1229,9 +1229,9 @@ vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 	assert(!rlist_empty(&run->in_index));
 	rlist_del_entry(run, in_index);
 	index->run_count--;
-	index->page_count -= run->info.count;
-	index->stmt_count -= run->info.keys;
-	index->size -= vy_run_size(run);
+	index->page_count -= run->info.page_count;
+	index->stmt_count -= run->row_count;
+	index->size -= run->size;
 }
 
 static void
@@ -3534,7 +3534,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 						&index->env->run_env) != 0)
 			goto err_wi_sub;
 
-		task->max_output_count += slice->keys;
+		task->max_output_count += slice->row_count;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
 

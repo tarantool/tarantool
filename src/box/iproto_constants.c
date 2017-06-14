@@ -178,8 +178,8 @@ const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
 	"offset",
 	"size",
 	"unpacked size",
-	"count",
-	"min",
+	"row count",
+	"min key",
 	"page index offset"
 };
 

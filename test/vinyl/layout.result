@@ -190,10 +190,10 @@ result
         BODY:
           offset: <offset>
           size: 65
-          unpacked_size: 46
-          count: 3
-          min: [1]
           page_index_offset: <offset>
+          unpacked_size: 46
+          row_count: 3
+          min_key: [1]
   - - 00000000000000000002.run
     - - HEADER:
           lsn: 7
@@ -229,10 +229,10 @@ result
         BODY:
           offset: <offset>
           size: 65
-          unpacked_size: 46
-          count: 3
-          min: [4]
           page_index_offset: <offset>
+          unpacked_size: 46
+          row_count: 3
+          min_key: [4]
   - - 00000000000000000004.run
     - - HEADER:
           lsn: 10

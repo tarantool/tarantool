@@ -69,42 +69,37 @@ struct vy_run_env {
  * Run metadata. Is a written to a file as a single chunk.
  */
 struct vy_run_info {
-	/** Run page count. */
-	uint32_t  count;
-	/** Number of keys. */
-	uint32_t  keys;
-	/** Min and max keys in the run. */
+	/** Min key in the run. */
 	char *min_key;
+	/** Max key in the run. */
 	char *max_key;
-	/* Min and max lsn over all statements in the run. */
-	int64_t  min_lsn;
-	int64_t  max_lsn;
-	/** Size of run on disk. */
-	uint64_t size;
-	/** Bloom filter of all tuples in run */
+	/** Min LSN over all statements in the run. */
+	int64_t min_lsn;
+	/** Max LSN over all statements in the run. */
+	int64_t max_lsn;
+	/** Number of pages in the run. */
+	uint32_t page_count;
+	/** Set iff bloom filter is available. */
 	bool has_bloom;
+	/** Bloom filter of all tuples in run */
 	struct bloom bloom;
-	/** Pages meta. */
-	struct vy_page_info *page_infos;
 };
 
 /**
  * Run page metadata. Is a written to a file as a single chunk.
  */
 struct vy_page_info {
-	/* count of statements in the page */
-	uint32_t count;
-	/* offset of page data in run */
+	/** Offset of page data in the run file. */
 	uint64_t offset;
-	/* size of page data in file */
+	/** Size of page data in the run file. */
 	uint32_t size;
-	/* size of page data in memory, i.e. unpacked */
+	/** Size of page data in memory, i.e. unpacked. */
 	uint32_t unpacked_size;
-	/* Offset of the min key in the parent run->pages_min. */
-	uint32_t min_key_offset;
-	/* minimal key */
+	/** Number of statements in the page. */
+	uint32_t row_count;
+	/** Minimal key stored in the page. */
 	char *min_key;
-	/* row index offset in page */
+	/** Offset of the row index in the page. */
 	uint32_t page_index_offset;
 };
 
@@ -112,11 +107,18 @@ struct vy_page_info {
  * Logical unit of vinyl index - a sorted file with data.
  */
 struct vy_run {
+	/** Info about the run stored in the index file. */
 	struct vy_run_info info;
+	/** Info about the run pages stored in the index file. */
+	struct vy_page_info *page_info;
 	/** Run data file. */
 	int fd;
 	/** Unique ID of this run. */
 	int64_t id;
+	/** Size of the run on disk. */
+	uint64_t size;
+	/** Number of statements in the run. */
+	uint64_t row_count;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -180,10 +182,10 @@ struct vy_slice {
 	 */
 	uint32_t first_page_no;
 	uint32_t last_page_no;
-	/** An estimate of the number of keys in this slice. */
-	uint32_t keys;
 	/** An estimate of the size of this slice on disk. */
 	uint64_t size;
+	/** An estimate of the number of statements in this slice. */
+	uint32_t row_count;
 };
 
 /** Position of a particular stmt in vy_run. */
@@ -263,18 +265,18 @@ struct vy_run_iterator {
 };
 
 /**
- * Page
+ * Vinyl page stored in memory.
  */
 struct vy_page {
-	/** Page position in the run file (used by run_iterator->page_cache */
+	/** Page position in the run file. */
 	uint32_t page_no;
-	/** The number of statements */
-	uint32_t count;
-	/** Page data size */
+	/** Size of page data in memory, i.e. unpacked. */
 	uint32_t unpacked_size;
-	/** Array with row offsets in page data */
+	/** Number of statements in the page. */
+	uint32_t row_count;
+	/** Array of row offsets. */
 	uint32_t *page_index;
-	/** Page data */
+	/** Pointer to the page data. */
 	char *data;
 };
 
@@ -293,20 +295,14 @@ vy_run_env_destroy(struct vy_run_env *env);
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
-	assert(pos < run->info.count);
-	return &run->info.page_infos[pos];
-}
-
-static inline uint64_t
-vy_run_size(struct vy_run *run)
-{
-	return run->info.size;
+	assert(pos < run->info.page_count);
+	return &run->page_info[pos];
 }
 
 static inline bool
 vy_run_is_empty(struct vy_run *run)
 {
-	return run->info.count == 0;
+	return run->info.page_count == 0;
 }
 
 struct vy_run *
