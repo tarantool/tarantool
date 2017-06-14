@@ -1490,6 +1490,11 @@ struct vy_scheduler {
 	 */
 	int64_t generation;
 	/**
+	 * Target generation for checkpoint. The scheduler will force
+	 * dumping of all in-memory trees whose generation is less.
+	 */
+	int64_t checkpoint_generation;
+	/**
 	 * List of all in-memory trees, scheduled for dump.
 	 * Older trees are closer to the tail of the list.
 	 */
@@ -3759,31 +3764,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 retry:
 	*ptask = NULL;
-	if (!vy_scheduler_needs_dump(scheduler)) {
-		/*
-		 * If all old in-memory trees have been dumped
-		 * and the quota is still exceeded, increment
-		 * the current generation to schedule another
-		 * dump.
-		 *
-		 * If checkpoint is in progress, do not touch
-		 * the generation, because in order to make a
-		 * consistent checkpoint we must not dump trees
-		 * created after checkpoint started.
-		 */
-		if (scheduler->checkpoint_in_progress)
-			return 0;
-		if (!vy_quota_is_exceeded(&scheduler->env->quota))
-			return 0;
-		if (lsregion_used(&scheduler->env->allocator) == 0) {
-			/*
-			 * Nothing to dump, quota is exceeded by
-			 * a pending transaction.
-			 */
-			return 0;
-		}
-		scheduler->generation++;
-	}
+	if (!vy_scheduler_needs_dump(scheduler))
+		return 0;
 	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
 	if (pn == NULL)
 		return 0; /* nothing to do */
@@ -4136,7 +4118,7 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
  * be dumped (are older than the current generation).
  */
 static bool
-vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
+vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
 {
 	if (rlist_empty(&scheduler->dump_fifo))
 		return false;
@@ -4149,6 +4131,61 @@ vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
 	assert(mem->generation < scheduler->generation);
 	return true;
 
+}
+
+/** Check if memory dump is required. */
+static bool
+vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
+{
+	if (vy_scheduler_dump_in_progress(scheduler)) {
+		/*
+		 * There are old in-memory trees to be dumped.
+		 * Do not increase the generation until all of
+		 * them are dumped to guarantee dump consistency.
+		 */
+		return true;
+	}
+
+	if (scheduler->checkpoint_in_progress) {
+		/*
+		 * If checkpoint is in progress, force dumping
+		 * all in-memory data that need to be included
+		 * in the snapshot.
+		 */
+		if (scheduler->generation < scheduler->checkpoint_generation)
+			goto trigger_dump;
+		/*
+		 * Do not trigger another dump until checkpoint
+		 * is complete so as to make sure no statements
+		 * inserted after WAL rotation are written to
+		 * the snapshot.
+		 */
+		return false;
+	}
+
+	if (!vy_quota_is_exceeded(&scheduler->env->quota)) {
+		/*
+		 * Memory consumption is below the watermark,
+		 * nothing to do.
+		 */
+		return false;
+	}
+
+	if (lsregion_used(&scheduler->env->allocator) == 0) {
+		/*
+		 * Quota must be exceeded by a pending transaction,
+		 * there's nothing we can do about that.
+		 */
+		return false;
+	}
+
+trigger_dump:
+	/*
+	 * Increment the generation to trigger dump of all
+	 * in-memory trees.
+	 */
+	scheduler->generation++;
+	return true;
 }
 
 static void
@@ -4166,7 +4203,7 @@ vy_scheduler_remove_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	assert(!rlist_empty(&mem->in_dump_fifo));
 	rlist_del_entry(mem, in_dump_fifo);
 
-	if (vy_scheduler_needs_dump(scheduler))
+	if (vy_scheduler_dump_in_progress(scheduler))
 		return;
 
 	/*
@@ -4209,9 +4246,8 @@ vy_begin_checkpoint(struct vy_env *env)
 		return -1;
 	}
 
-	scheduler->generation++;
 	scheduler->checkpoint_in_progress = true;
-
+	scheduler->checkpoint_generation = scheduler->generation + 1;
 	ipc_cond_signal(&scheduler->scheduler_cond);
 	return 0;
 }
@@ -4226,14 +4262,20 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 
 	assert(scheduler->checkpoint_in_progress);
 
-	while (!scheduler->is_throttled &&
-	       vy_scheduler_needs_dump(scheduler))
+	/*
+	 * Wait until all in-memory trees whose generation is
+	 * less than checkpoint_generation have been dumped.
+	 */
+	while (scheduler->generation < scheduler->checkpoint_generation ||
+	       vy_scheduler_dump_in_progress(scheduler)) {
+		if (scheduler->is_throttled) {
+			/* A dump error occurred, abort checkpoint. */
+			assert(!diag_is_empty(&scheduler->diag));
+			diag_add_error(diag_get(),
+				       diag_last_error(&scheduler->diag));
+			goto error;
+		}
 		ipc_cond_wait(&scheduler->dump_cond);
-
-	if (scheduler->is_throttled) {
-		assert(!diag_is_empty(&scheduler->diag));
-		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
-		goto error;
 	}
 
 	if (vy_log_rotate(vclock) != 0)
