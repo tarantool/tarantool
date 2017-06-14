@@ -4390,9 +4390,9 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	char buf[16];
 	struct vy_quota *q = &env->quota;
 	info_table_begin(h, "memory");
-	info_append_u64(h, "used", q->used);
-	info_append_u64(h, "limit", q->limit);
-	info_append_u64(h, "watermark", q->watermark);
+	info_append_int(h, "used", q->used);
+	info_append_int(h, "limit", q->limit);
+	info_append_int(h, "watermark", q->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
 	info_append_str(h, "ratio", buf);
 	info_table_end(h);
@@ -4403,8 +4403,8 @@ vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 {
 	struct info_handler *h = ctx;
 	info_table_begin(h, name);
-	info_append_u32(h, "rps", rps);
-	info_append_u64(h, "total", total);
+	info_append_int(h, "rps", rps);
+	info_append_int(h, "total", total);
 	info_table_end(h);
 	return 0;
 }
@@ -4414,8 +4414,8 @@ vy_info_append_stat_latency(struct info_handler *h,
 			    const char *name, struct vy_latency *lat)
 {
 	info_table_begin(h, name);
-	info_append_u64(h, "max", lat->max * 1000000000);
-	info_append_u64(h, "avg", lat->count == 0 ? 0 :
+	info_append_int(h, "max", lat->max * 1000000000);
+	info_append_int(h, "avg", lat->count == 0 ? 0 :
 			   lat->total / lat->count * 1000000000);
 	info_table_end(h);
 }
@@ -4425,9 +4425,9 @@ vy_info_append_iterator_stat(struct info_handler *h, const char *name,
 			     struct vy_iterator_stat *stat)
 {
 	info_table_begin(h, name);
-	info_append_u64(h, "lookup_count", stat->lookup_count);
-	info_append_u64(h, "step_count", stat->step_count);
-	info_append_u64(h, "bloom_reflect_count", stat->bloom_reflections);
+	info_append_int(h, "lookup_count", stat->lookup_count);
+	info_append_int(h, "step_count", stat->step_count);
+	info_append_int(h, "bloom_reflect_count", stat->bloom_reflections);
 	info_table_end(h);
 }
 
@@ -4440,32 +4440,32 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
 
-	info_append_u64(h, "write_count", stat->write_count);
+	info_append_int(h, "write_count", stat->write_count);
 
 	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
 	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
 	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
-	info_append_u64(h, "tx_rollback", stat->tx_rlb);
-	info_append_u64(h, "tx_conflict", stat->tx_conflict);
-	info_append_u32(h, "tx_active", env->xm->tx_count);
+	info_append_int(h, "tx_rollback", stat->tx_rlb);
+	info_append_int(h, "tx_conflict", stat->tx_conflict);
+	info_append_int(h, "tx_active", env->xm->tx_count);
 
 	struct mempool_stats mstats;
 	mempool_stats(&env->xm->tx_mempool, &mstats);
-	info_append_u32(h, "tx_allocated", mstats.objcount);
+	info_append_int(h, "tx_allocated", mstats.objcount);
 	mempool_stats(&env->xm->txv_mempool, &mstats);
-	info_append_u32(h, "txv_allocated", mstats.objcount);
+	info_append_int(h, "txv_allocated", mstats.objcount);
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
-	info_append_u32(h, "read_view", mstats.objcount);
+	info_append_int(h, "read_view", mstats.objcount);
 
-	info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	info_append_u64(h, "dump_total", stat->dump_total);
-	info_append_u64(h, "dumped_statements", stat->dumped_statements);
+	info_append_int(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	info_append_int(h, "dump_total", stat->dump_total);
+	info_append_int(h, "dumped_statements", stat->dumped_statements);
 
 	struct vy_cache_env *ce = &env->cache_env;
 	info_table_begin(h, "cache");
-	info_append_u64(h, "count", ce->cached_count);
-	info_append_u64(h, "used", ce->quota.used);
+	info_append_int(h, "count", ce->cached_count);
+	info_append_int(h, "used", ce->quota.used);
 	info_table_end(h);
 
 	info_table_begin(h, "iterator");
@@ -4484,7 +4484,7 @@ vy_info(struct vy_env *env, struct info_handler *h)
 	info_begin(h);
 	vy_info_append_memory(env, h);
 	vy_info_append_performance(env, h);
-	info_append_u64(h, "lsn", env->xm->lsn);
+	info_append_int(h, "lsn", env->xm->lsn);
 	info_end(h);
 }
 
@@ -4493,15 +4493,15 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 {
 	char buf[1024];
 	info_begin(h);
-	info_append_u64(h, "range_size", index->opts.range_size);
-	info_append_u64(h, "page_size", index->opts.page_size);
-	info_append_u64(h, "memory_used", index->mem_used);
-	info_append_u64(h, "size", index->size);
-	info_append_u64(h, "count", index->stmt_count);
-	info_append_u32(h, "page_count", index->page_count);
-	info_append_u32(h, "range_count", index->range_count);
-	info_append_u32(h, "run_count", index->run_count);
-	info_append_u32(h, "run_avg", index->run_count / index->range_count);
+	info_append_int(h, "range_size", index->opts.range_size);
+	info_append_int(h, "page_size", index->opts.page_size);
+	info_append_int(h, "memory_used", index->mem_used);
+	info_append_int(h, "size", index->size);
+	info_append_int(h, "count", index->stmt_count);
+	info_append_int(h, "page_count", index->page_count);
+	info_append_int(h, "range_count", index->range_count);
+	info_append_int(h, "run_count", index->run_count);
+	info_append_int(h, "run_avg", index->run_count / index->range_count);
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
 	info_append_double(h, "bloom_fpr", index->opts.bloom_fpr);

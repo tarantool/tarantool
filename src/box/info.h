@@ -43,9 +43,9 @@
  *
  * { -- info_begin
  *    section = { -- info_begin_table
- *        key1 = u32; --  info_append_u32
- *        key2 = u64; -- info_append_u64
- *        key3 = str;  -- info_append_str;
+ *        key1 = int;    -- info_append_int
+ *        key2 = double; -- info_append_double
+ *        key3 = str;    -- info_append_str
  *    };          -- info_end_table
  *
  *    section2 = {
@@ -83,12 +83,9 @@ struct info_handler_vtab {
 	/** Set string value. */
 	void (*append_str)(struct info_handler *, const char *key,
 			   const char *value);
-	/** Set uint32_t value. */
-	void (*append_u32)(struct info_handler *, const char *key,
-			   uint32_t value);
-	/** Set uint64_t value. */
-	void (*append_u64)(struct info_handler *, const char *key,
-			   uint64_t value);
+	/** Set int64_t value. */
+	void (*append_int)(struct info_handler *, const char *key,
+			   int64_t value);
 	/** Set double value. */
 	void (*append_double)(struct info_handler *,
 			      const char *key, double value);
@@ -128,7 +125,7 @@ info_end(struct info_handler *info)
 }
 
 /**
- * Associates uint32_t value with @a key in the current associative array.
+ * Associates int64_t value with @a key in the current associative array.
  * @param info box.info() adapter.
  * @param key key.
  * @param value value.
@@ -136,23 +133,9 @@ info_end(struct info_handler *info)
  * @pre associative array is started.
  */
 static inline void
-info_append_u32(struct info_handler *info, const char *key, uint32_t value)
+info_append_int(struct info_handler *info, const char *key, int64_t value)
 {
-	return info->vtab->append_u32(info, key, value);
-}
-
-/**
- * Associates uint64_t value with @a key in the current associative array.
- * @param info box.info() adapter.
- * @param key key.
- * @param value value.
- * @throws C++ exception on OOM, see info.h comments.
- * @pre associative array is started.
- */
-static inline void
-info_append_u64(struct info_handler *info, const char *key, uint64_t value)
-{
-	return info->vtab->append_u64(info, key, value);
+	return info->vtab->append_int(info, key, value);
 }
 
 /**
