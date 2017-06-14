@@ -143,7 +143,7 @@ check_update_result(const struct tuple_template *original,
 				     old, old_end, &actual_len, 1,
 				     &column_mask);
 	fail_if(actual == NULL);
-	is(actual_len, new_end - new, "check result length");
+	is((int32_t)actual_len, new_end - new, "check result length");
 	is(memcmp(actual, new, actual_len), 0, "tuple update is correct");
 	is(column_mask, expected_mask, "column_mask is correct");
 
