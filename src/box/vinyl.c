@@ -4133,6 +4133,36 @@ vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
 
 }
 
+/** Called to trigger memory dump. */
+static void
+vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
+{
+	/*
+	 * Increment the generation to trigger dump of
+	 * all in-memory trees.
+	 */
+	scheduler->generation++;
+}
+
+/** Called on memory dump completion. */
+static void
+vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
+{
+	/*
+	 * All old in-memory trees have been dumped.
+	 * Free memory, release quota, and signal
+	 * dump completion.
+	 */
+	struct lsregion *allocator = &scheduler->env->allocator;
+	struct vy_quota *quota = &scheduler->env->quota;
+	size_t mem_used_before = lsregion_used(allocator);
+	lsregion_gc(allocator, scheduler->generation - 1);
+	size_t mem_used_after = lsregion_used(allocator);
+	assert(mem_used_after <= mem_used_before);
+	vy_quota_release(quota, mem_used_before - mem_used_after);
+	ipc_cond_signal(&scheduler->dump_cond);
+}
+
 /** Check if memory dump is required. */
 static bool
 vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
@@ -4180,11 +4210,7 @@ vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
 	}
 
 trigger_dump:
-	/*
-	 * Increment the generation to trigger dump of all
-	 * in-memory trees.
-	 */
-	scheduler->generation++;
+	vy_scheduler_trigger_dump(scheduler);
 	return true;
 }
 
@@ -4203,22 +4229,8 @@ vy_scheduler_remove_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	assert(!rlist_empty(&mem->in_dump_fifo));
 	rlist_del_entry(mem, in_dump_fifo);
 
-	if (vy_scheduler_dump_in_progress(scheduler))
-		return;
-
-	/*
-	 * All old in-memory trees have been dumped.
-	 * Free memory, release quota, and signal
-	 * dump completion.
-	 */
-	struct lsregion *allocator = &scheduler->env->allocator;
-	struct vy_quota *quota = &scheduler->env->quota;
-	size_t mem_used_before = lsregion_used(allocator);
-	lsregion_gc(allocator, scheduler->generation - 1);
-	size_t mem_used_after = lsregion_used(allocator);
-	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(quota, mem_used_before - mem_used_after);
-	ipc_cond_signal(&scheduler->dump_cond);
+	if (!vy_scheduler_dump_in_progress(scheduler))
+		vy_scheduler_complete_dump(scheduler);
 }
 
 /*
