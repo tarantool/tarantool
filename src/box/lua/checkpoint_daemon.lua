@@ -1,4 +1,4 @@
--- snapshot_daemon.lua (internal file)
+-- checkpoint_daemon.lua (internal file)
 
 local log = require 'log'
 local fiber = require 'fiber'
@@ -8,7 +8,7 @@ local errno = require 'errno'
 local digest = require 'digest'
 local pickle = require 'pickle'
 
-local PREFIX = 'snapshot_daemon'
+local PREFIX = 'checkpoint_daemon'
 
 local daemon = {
     checkpoint_interval = 0;

@@ -143,7 +143,7 @@ local dynamic_cfg = {
     read_only               = private.cfg_set_read_only,
     vinyl_timeout           = private.cfg_update_vinyl_options,
     checkpoint_count        = private.cfg_set_checkpoint_count,
-    checkpoint_interval     = private.snapshot_daemon.set_checkpoint_interval,
+    checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
