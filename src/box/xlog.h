@@ -49,7 +49,7 @@ struct xrow_header;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern const struct type type_XlogError;
+extern const struct type_info type_XlogError;
 
 /* {{{ log dir */
 
@@ -672,8 +672,8 @@ struct XlogError: public Exception
 		  const char *format, ...);
 	virtual void raise() { throw this; }
 protected:
-	XlogError(const struct type *type, const char *file, unsigned line,
-		  const char *format, ...);
+	XlogError(const struct type_info *type, const char *file,
+		  unsigned line, const char *format, ...);
 };
 
 struct XlogGapError: public XlogError

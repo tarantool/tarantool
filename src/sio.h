@@ -93,7 +93,7 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 #include "exception.h"
 enum { SERVICE_NAME_MAXLEN = 32 };
 
-extern const struct type type_SocketError;
+extern const struct type_info type_SocketError;
 class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, int fd,

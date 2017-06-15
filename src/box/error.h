@@ -120,7 +120,7 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 
 /** \endcond public */
 
-extern const struct type type_ClientError;
+extern const struct type_info type_ClientError;
 
 #if defined(__cplusplus)
 } /* extern "C" */

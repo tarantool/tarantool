@@ -2,8 +2,8 @@
 
 local ffi = require('ffi')
 ffi.cdef[[
-struct type;
-struct method;
+struct type_info;
+struct method_info;
 struct error;
 
 enum ctype {
@@ -12,10 +12,10 @@ enum ctype {
     CTYPE_CONST_CHAR_PTR
 };
 
-struct type {
+struct type_info {
     const char *name;
-    const struct type *parent;
-    const struct method *methods;
+    const struct type_info *parent;
+    const struct method_info *methods;
 };
 
 enum {
@@ -29,7 +29,7 @@ struct error {
     error_f _destroy;
     error_f _raise;
     error_f _log;
-    const struct type *_type;
+    const struct type_info *_type;
     int _refs;
     /** Line number. */
     unsigned _line;
@@ -41,8 +41,8 @@ struct error {
 
 enum { METHOD_ARG_MAX = 8 };
 
-struct method {
-    const struct type *owner;
+struct method_info {
+    const struct type_info *owner;
     const char *name;
     enum ctype rtype;
     enum ctype atype[METHOD_ARG_MAX];
@@ -56,9 +56,9 @@ struct method {
 };
 
 char *
-exception_get_string(struct error *e, const struct method *method);
+exception_get_string(struct error *e, const struct method_info *method);
 int
-exception_get_int(struct error *e, const struct method *method);
+exception_get_int(struct error *e, const struct method_info *method);
 
 double
 tarantool_uptime(void);

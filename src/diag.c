@@ -37,7 +37,7 @@ struct error_factory *error_factory = NULL;
 void
 error_create(struct error *e,
 	     error_f destroy, error_f raise, error_f log,
-	     const struct type *type, const char *file, unsigned line)
+	     const struct type_info *type, const char *file, unsigned line)
 {
 	e->destroy = destroy;
 	e->raise = raise;

@@ -2,17 +2,17 @@
 
 #include "unit.h"
 
-static struct type type_Object = {
+static struct type_info type_Object = {
 	.parent = NULL,
 	.name = "Object",
 	.methods = NULL,
 };
-static struct type type_Database = {
+static struct type_info type_Database = {
 	.parent = &type_Object,
 	.name = "Database",
 	.methods = NULL,
 };
-static struct type type_Tarantool = {
+static struct type_info type_Tarantool = {
 	.parent = &type_Database,
 	.name = "Tarantool",
 	.methods = NULL

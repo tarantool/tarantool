@@ -79,7 +79,7 @@ enum {
 	XLOG_TX_COMPRESS_THRESHOLD = 2 * 1024,
 };
 
-const struct type type_XlogError = make_type("XlogError", &type_Exception);
+const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
 XlogError::XlogError(const char *file, unsigned line,
 		     const char *format, ...)
 	:Exception(&type_XlogError, file, line)
@@ -90,8 +90,8 @@ XlogError::XlogError(const char *file, unsigned line,
 	va_end(ap);
 }
 
-XlogError::XlogError(const struct type *type, const char *file, unsigned line,
-		     const char *format, ...)
+XlogError::XlogError(const struct type_info *type, const char *file,
+		     unsigned line, const char *format, ...)
 	:Exception(type, file, line)
 {
 	va_list ap;
@@ -100,7 +100,7 @@ XlogError::XlogError(const struct type *type, const char *file, unsigned line,
 	va_end(ap);
 }
 
-const struct type type_XlogGapError =
+const struct type_info type_XlogGapError =
 	make_type("XlogGapError", &type_XlogError);
 
 XlogGapError::XlogGapError(const char *file, unsigned line,

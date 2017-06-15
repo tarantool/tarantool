@@ -3,7 +3,7 @@
 #include <string.h>
 #include "reflection.h"
 
-extern const struct type type_Object;
+extern const struct type_info type_Object;
 struct Object {
 	Object()
 		: type(&type_Object)
@@ -12,14 +12,14 @@ struct Object {
 	virtual ~Object()
 	{}
 
-	const struct type *type;
-	Object(const struct type *type_arg)
+	const struct type_info *type;
+	Object(const struct type_info *type_arg)
 		: type(type_arg)
 	{}
 };
-const struct type type_Object = make_type("Object", NULL);
+const struct type_info type_Object = make_type("Object", NULL);
 
-extern const struct type type_Database;
+extern const struct type_info type_Database;
 struct Database: public Object {
 	Database()
 		: Object(&type_Database),
@@ -50,23 +50,23 @@ struct Database: public Object {
 		m_int = val;
 	}
 protected:
-	Database(const struct type *type)
+	Database(const struct type_info *type)
 		: Object(type)
 	{}
 	int m_int;
 	char m_str[128];
 };
-static const struct method database_methods[] = {
+static const struct method_info database_methods[] = {
 	make_method(&type_Database, "getString", &Database::getString),
 	make_method(&type_Database, "getInt", &Database::getInt),
 	make_method(&type_Database, "putString", &Database::putString),
 	make_method(&type_Database, "putInt", &Database::putInt),
 	METHODS_SENTINEL
 };
-const struct type type_Database = make_type("Database", &type_Object,
+const struct type_info type_Database = make_type("Database", &type_Object,
 	database_methods);
 
-extern const struct type type_Tarantool;
+extern const struct type_info type_Tarantool;
 struct Tarantool: public Database {
 	Tarantool()
 		: Database(&type_Tarantool)
@@ -76,11 +76,11 @@ struct Tarantool: public Database {
 		++m_int;
 	}
 };
-static const struct method tarantool_methods[] = {
+static const struct method_info tarantool_methods[] = {
 	make_method(&type_Tarantool, "inc", &Tarantool::inc),
 	METHODS_SENTINEL
 };
-const struct type type_Tarantool = make_type("Tarantool", &type_Database,
+const struct type_info type_Tarantool = make_type("Tarantool", &type_Database,
 	tarantool_methods);
 
 int
@@ -90,18 +90,18 @@ main()
 
 	Object obj;
 	Tarantool tntobj;
-	const struct method *get_string = type_method_by_name(tntobj.type,
+	const struct method_info *get_string = type_method_by_name(tntobj.type,
 		"getString");
-	const struct method *put_string = type_method_by_name(tntobj.type,
+	const struct method_info *put_string = type_method_by_name(tntobj.type,
 		"putString");
-	const struct method *get_int = type_method_by_name(tntobj.type,
+	const struct method_info *get_int = type_method_by_name(tntobj.type,
 		"getInt");
-	const struct method *put_int = type_method_by_name(tntobj.type,
+	const struct method_info *put_int = type_method_by_name(tntobj.type,
 		"putInt");
-	const struct method *inc = type_method_by_name(tntobj.type,
+	const struct method_info *inc = type_method_by_name(tntobj.type,
 		"inc");
 
-	/* struct type members */
+	/* struct type_info members */
 	ok(strcmp(type_Object.name, "Object") == 0, "type.name");
 	is(type_Object.parent, NULL, "type.parent");
 	is(type_Database.parent, &type_Object, "type.parent");
@@ -128,7 +128,7 @@ main()
 
 
 	/*
-	 * struct method members
+	 * struct method_info members
 	 */
 	is(get_string->owner, &type_Database, "method.owner");
 	ok(strcmp(get_string->name, "getString") == 0, "method.name");

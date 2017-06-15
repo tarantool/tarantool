@@ -94,13 +94,13 @@ const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
 	"ERROR"
 };
 
-static struct method clienterror_methods[] = {
+static struct method_info clienterror_methods[] = {
 	make_method(&type_ClientError, "code", &ClientError::errcode),
 	METHODS_SENTINEL
 };
 
-const struct type type_ClientError = make_type("ClientError", &type_Exception,
-	clienterror_methods);
+const struct type_info type_ClientError =
+	make_type("ClientError", &type_Exception, clienterror_methods);
 
 ClientError::ClientError(const char *file, unsigned line,
 			 uint32_t errcode, ...)
