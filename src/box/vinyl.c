@@ -8524,7 +8524,7 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	const struct tuple *mem_stmt;
-	uint64_t stmt_lsn;
+	int64_t stmt_lsn;
 	/*
 	 * According to the described algorithm, squash the
 	 * commited UPSERTs at first.
