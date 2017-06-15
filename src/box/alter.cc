@@ -1400,20 +1400,26 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	if (old_tuple == NULL || new_tuple == NULL) {
-		/* Space create or drop. */
+	if (new_tuple == NULL) {
+		/* Space drop - nothing to do. */
 		return;
 	}
 
-	/*
-	 * Truncate counter is updated - truncate the space.
-	 */
 	uint32_t space_id =
 		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
 	uint64_t truncate_count =
 		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
 	struct space *old_space = space_cache_find(space_id);
 
+	if (old_tuple == NULL) {
+		/* Space create - initialize truncate_count. */
+		old_space->truncate_count = truncate_count;
+		return;
+	}
+
+	/*
+	 * Truncate counter is updated - truncate the space.
+	 */
 	struct truncate_space *truncate =
 		region_calloc_object_xc(&fiber()->gc, struct truncate_space);
 

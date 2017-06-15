@@ -112,6 +112,7 @@ _ = s2:insert{10, 30}
 _ = s2:insert{20, 20}
 _ = s2:insert{30, 10}
 box.snapshot()
+_ = s1:insert{321, 123}
 s2:truncate()
 _ = s2:insert{456, 654}
 s3 = box.schema.create_space('test3', {engine = engine})

@@ -248,6 +248,9 @@ box.snapshot()
 ---
 - ok
 ...
+_ = s1:insert{321, 123}
+---
+...
 s2:truncate()
 ---
 ...
@@ -291,10 +294,12 @@ s3 = box.space.test3
 s1.index.i1:select()
 ---
 - - [123, 321]
+  - [321, 123]
 ...
 s1.index.i2:select()
 ---
-- - [123, 321]
+- - [321, 123]
+  - [123, 321]
 ...
 s2.index.i1:select()
 ---
