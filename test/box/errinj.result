@@ -796,3 +796,55 @@ box.space.test:select()
 box.space.test:drop()
 ---
 ...
+errinj = box.error.injection
+---
+...
+net_box = require('net.box')
+---
+...
+fiber = require'fiber'
+---
+...
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+ch = fiber.channel(2)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function test(tuple)
+   ch:put({pcall(s.replace, s, tuple)})
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+errinj.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
+...
+_ = {fiber.create(test, {1, 2, 3}), fiber.create(test, {3, 4, 5})}
+---
+...
+{ch:get(), ch:get()}
+---
+- - - false
+    - Failed to write to disk
+  - - false
+    - Failed to write to disk
+...
+errinj.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
+s:drop()
+---
+...

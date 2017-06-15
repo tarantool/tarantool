@@ -263,3 +263,25 @@ box.space.test:select()
 test_run:cmd('restart server default')
 box.space.test:select()
 box.space.test:drop()
+
+errinj = box.error.injection
+net_box = require('net.box')
+fiber = require'fiber'
+
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+
+ch = fiber.channel(2)
+
+test_run:cmd("setopt delimiter ';'")
+function test(tuple)
+   ch:put({pcall(s.replace, s, tuple)})
+end;
+test_run:cmd("setopt delimiter ''");
+
+errinj.set("ERRINJ_WAL_WRITE", true)
+_ = {fiber.create(test, {1, 2, 3}), fiber.create(test, {3, 4, 5})}
+
+{ch:get(), ch:get()}
+errinj.set("ERRINJ_WAL_WRITE", false)
+s:drop()
