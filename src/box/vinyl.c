@@ -317,10 +317,9 @@ vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
 }
 
 static void
-vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written,
+vy_stat_dump(struct vy_stat *s, size_t written,
 	     uint64_t dumped_statements)
 {
-	histogram_collect(s->dump_bw, written / time);
 	s->dump_total += written;
 	s->dumped_statements += dumped_statements;
 }
@@ -1494,6 +1493,8 @@ struct vy_scheduler {
 	 * dumping of all in-memory trees whose generation is less.
 	 */
 	int64_t checkpoint_generation;
+	/** Time of dump start. */
+	ev_tstamp dump_start;
 	/**
 	 * List of all in-memory trees, scheduled for dump.
 	 * Older trees are closer to the tail of the list.
@@ -2904,8 +2905,6 @@ struct vy_task {
 	struct diag diag;
 	/** Index this task is for. */
 	struct vy_index *index;
-	/** How long ->execute took, in nanoseconds. */
-	ev_tstamp exec_time;
 	/** Number of bytes written to disk by this task. */
 	size_t dump_size;
 	/** Number of statements dumped to the disk. */
@@ -3934,8 +3933,7 @@ vy_scheduler_f(va_list va)
 			else
 				tasks_done++;
 			if (task->dump_size > 0)
-				vy_stat_dump(env->stat, task->exec_time,
-					     task->dump_size,
+				vy_stat_dump(env->stat, task->dump_size,
 					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
 			scheduler->workers_available++;
@@ -4039,9 +4037,7 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		uint64_t start = ev_now(loop());
 		task->status = task->ops->execute(task);
-		task->exec_time = ev_now(loop()) - start;
 		if (task->status != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
@@ -4142,6 +4138,7 @@ vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 	 * all in-memory trees.
 	 */
 	scheduler->generation++;
+	scheduler->dump_start = ev_now(loop());
 }
 
 /** Called on memory dump completion. */
@@ -4159,8 +4156,15 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	lsregion_gc(allocator, scheduler->generation - 1);
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(quota, mem_used_before - mem_used_after);
+	size_t mem_dumped = mem_used_before - mem_used_after;
+	vy_quota_release(quota, mem_dumped);
 	ipc_cond_signal(&scheduler->dump_cond);
+
+	/* Account dump bandwidth. */
+	struct vy_stat *stat = scheduler->env->stat;
+	ev_tstamp dump_duration = ev_now(loop()) - scheduler->dump_start;
+	if (dump_duration > 0)
+		histogram_collect(stat->dump_bw, mem_dumped / dump_duration);
 }
 
 /** Check if memory dump is required. */
