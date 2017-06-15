@@ -4229,8 +4229,14 @@ vy_scheduler_remove_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	assert(!rlist_empty(&mem->in_dump_fifo));
 	rlist_del_entry(mem, in_dump_fifo);
 
-	if (!vy_scheduler_dump_in_progress(scheduler))
+	if (mem->generation < scheduler->generation &&
+	    !vy_scheduler_dump_in_progress(scheduler)) {
+		/*
+		 * The last in-memory tree left from the previous
+		 * generation has just been deleted, complete dump.
+		 */
 		vy_scheduler_complete_dump(scheduler);
+	}
 }
 
 /*
