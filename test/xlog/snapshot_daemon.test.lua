@@ -6,6 +6,7 @@ test_run = env.new()
 
 test_run:cleanup_cluster()
 
+box.cfg{checkpoint_interval = 0}
 
 PERIOD = 0.03
 if jit.os ~= 'Linux' then PERIOD = 1.5 end

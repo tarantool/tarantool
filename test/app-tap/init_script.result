@@ -4,8 +4,8 @@
 
 box.cfg
 1	background:false
-2	checkpoint_count:6
-3	checkpoint_interval:0
+2	checkpoint_count:2
+3	checkpoint_interval:3600
 4	coredump:false
 5	force_recovery:false
 6	hot_standby:false

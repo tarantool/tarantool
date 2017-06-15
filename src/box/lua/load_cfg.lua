@@ -48,8 +48,8 @@ local default_cfg = {
     coredump            = false,
     read_only           = false,
     hot_standby         = false,
-    checkpoint_interval = 0,        -- 0 = disabled
-    checkpoint_count    = 6,
+    checkpoint_interval = 3600,
+    checkpoint_count    = 2,
 }
 
 -- types of available options

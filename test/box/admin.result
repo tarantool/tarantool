@@ -21,9 +21,9 @@ cfg_filter(box.cfg)
 - - - background
     - false
   - - checkpoint_count
-    - 6
+    - 2
   - - checkpoint_interval
-    - 0
+    - 3600
   - - coredump
     - false
   - - force_recovery

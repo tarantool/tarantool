@@ -154,6 +154,11 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
+          tuple: [7, {2: 1}]
+      - HEADER:
+          timestamp: <timestamp>
+          type: INSERT
+        BODY:
           tuple: [4, {0: 3, 2: 4}]
       - HEADER:
           timestamp: <timestamp>
