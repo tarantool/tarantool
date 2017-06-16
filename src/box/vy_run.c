@@ -1879,7 +1879,7 @@ vy_run_recover(struct vy_run *run, const char *dir,
 		diag_set(ClientError, ER_INVALID_INDEX_FILE, path,
 			 tt_sprintf("Wrong xrow type (expected %d, got %u)",
 				    VY_INDEX_RUN_INFO, (unsigned)xrow.type));
-		return -1;
+		goto fail_close;
 	}
 	if (vy_run_info_decode(&run->info, &xrow, path) != 0)
 		goto fail_close;
