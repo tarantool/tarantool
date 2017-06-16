@@ -55,7 +55,8 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - backup
+- - atomic
+  - backup
   - begin
   - cfg
   - commit

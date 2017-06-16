@@ -228,6 +228,21 @@ box.begin = function()
         box.error()
     end
 end
+
+local function atomic_tail(status, ...)
+    if not status then
+        box.rollback()
+        error((...), 2)
+     end
+     box.commit()
+     return ...
+end
+
+box.atomic = function(fun, ...)
+    box.begin()
+    return atomic_tail(pcall(fun, ...))
+end
+
 -- box.commit yields, so it's defined as Lua/C binding
 -- box.rollback yields as well
 
